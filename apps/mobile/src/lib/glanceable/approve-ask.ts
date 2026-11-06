@@ -398,10 +398,12 @@ export async function refreshGlanceableSnapshot(
   deps?: RefreshGlanceableSnapshotDeps
 ): Promise<void> {
   const fetchRows = deps?.fetchRows ?? defaultFetchTrayRows;
+  const ctx = { userId: input.userId, organizationId: input.organizationId };
   const createPublisher: () => GlanceableSnapshotPublisher =
     deps?.createPublisher ??
     (() =>
       createGlanceablePublisher({
+        context: ctx,
         // The tray's row for the session this refresh just answered can still
         // read permission/question while the control plane's status sync lands,
         // and it is usually the oldest asking row, so an ended ask's selection
@@ -419,7 +421,6 @@ export async function refreshGlanceableSnapshot(
   const pollMs = deps?.pollIntervalMs ?? GLANCEABLE_REFRESH_POLL_MS;
   const deadlineMs = deps?.deadlineMs ?? GLANCEABLE_REFRESH_DEADLINE_MS;
   const publisher = createPublisher();
-  const ctx = { userId: input.userId, organizationId: input.organizationId };
   let elapsedMs = 0;
   for (;;) {
     // eslint-disable-next-line no-await-in-loop -- one fetch per poll tick

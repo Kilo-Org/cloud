@@ -4,7 +4,9 @@ import {
   bottom,
   contains,
   contentBox,
+  insidePresentedSurface,
   intersection,
+  layoutRect,
   right,
   type LayoutNode,
   type LayoutTree,
@@ -42,19 +44,29 @@ export function checkClipped(tree: LayoutTree): Finding[] {
   for (const node of tree.nodes) {
     const { parent } = node;
     if (!parent) continue;
+    // A node's own transform moves its descendants and never its own frame, so
+    // a natively presented formSheet reports its screen at the window origin
+    // and its content translated by the detent. Overflow is only a visual cut
+    // when both boxes are measured in the transform-free space.
+    const box = layoutRect(node);
     let measured = 0;
     let against: LayoutNode | undefined;
     const clipper = ancestors(node).find(ancestor => ancestor.clips);
     if (clipper) {
-      const box = node.absolute ? clipper.rect : contentBox(clipper, tree.env.isRTL);
-      const amount = overflowBeyond(node.rect, box, { x: !clipper.scroll.x, y: !clipper.scroll.y });
+      const clipperBox = node.absolute
+        ? layoutRect(clipper)
+        : contentBox(clipper, tree.env.isRTL, layoutRect(clipper));
+      const amount = overflowBeyond(box, clipperBox, {
+        x: !clipper.scroll.x,
+        y: !clipper.scroll.y,
+      });
       if (amount > measured) {
         measured = amount;
         against = clipper;
       }
     }
     if (!node.absolute && node.paints) {
-      const amount = overflowBeyond(node.rect, contentBox(parent, tree.env.isRTL), {
+      const amount = overflowBeyond(box, contentBox(parent, tree.env.isRTL, layoutRect(parent)), {
         x: !parent.scroll.x,
         y: !parent.scroll.y,
       });
@@ -119,6 +131,9 @@ export function checkTouchOverlap(tree: LayoutTree): Finding[] {
     for (let j = i + 1; j < pressables.length; j++) {
       const a = pressables[i];
       const b = pressables[j];
+      // A sheet the platform presents in its own window takes the tap first, so
+      // a control behind it never competes with one on it.
+      if (a.presented?.space !== b.presented?.space) continue;
       if (nearestScroll(a) !== nearestScroll(b)) continue;
       if (!intersects(a.visibleRect, b.visibleRect)) continue;
       if (contains(a.rect, b.rect, TOLERANCE_DP) || contains(b.rect, a.rect, TOLERANCE_DP))
@@ -297,6 +312,10 @@ export function checkSafeArea(tree: LayoutTree): Finding[] {
   const { safeArea, window } = tree.env;
   for (const node of tree.nodes) {
     if (!node.isText && !node.isTextInput && !node.pressable) continue;
+    // A node inside a native dialog or sheet is measured against that surface's
+    // origin, which the platform placed inside the window: its frame says nothing
+    // about the window's insets, and the surface's presenter owns them.
+    if (insidePresentedSurface(node)) continue;
     if (ancestors(node).some(ancestor => ancestor.scroll.y)) continue;
     const rect = node.visibleRect;
     const top = safeArea.top > 0 ? Math.min(bottom(rect), safeArea.top) - Math.max(rect[1], 0) : 0;

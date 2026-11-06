@@ -45,8 +45,13 @@ export const environmentSnapshotSummarySchema = z
   .object({
     buildId: z.string().uuid(),
     revision: z.number().int().positive(),
-    sourceCommit: z.string(),
-    sourceBranch: z.string(),
+    /** A V2 snapshot leaves the singleton commit and branch null. */
+    sourceCommit: z.string().nullable(),
+    sourceBranch: z.string().nullable(),
+    /** The commit each repository of a V2 snapshot was built at; absent for V1. */
+    repositories: z
+      .array(z.object({ repoFullName: z.string(), commit: z.string() }).strict())
+      .optional(),
     capturedAt: z.number().int(),
     size: z.number().nonnegative().nullable(),
     setupDurationMs: z.number().int().nonnegative(),

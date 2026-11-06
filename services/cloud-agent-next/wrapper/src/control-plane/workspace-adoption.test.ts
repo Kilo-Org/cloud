@@ -4,7 +4,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {
-  emptyWorkspaceDirectory,
+  refreshAdoptedRepository,
   stripGitCredentials,
   truncateWrapperLog,
 } from './workspace-adoption.js';
@@ -69,6 +69,32 @@ async function filesContaining(directory: string, needle: string): Promise<strin
   return found;
 }
 
+describe('refreshAdoptedRepository failures', () => {
+  for (const command of ['remote set-url', 'fetch', 'remote set-head']) {
+    it(`classifies ${command} timeouts as repository preparation failures`, async () => {
+      const failure = await rejection(
+        refreshAdoptedRepository({
+          remoteUrl: 'https://github.com/acme/repo.git',
+          route: 'managed',
+          redact: text => text,
+          git: async args => {
+            const operation = args[0] === 'remote' ? `remote ${args[1]}` : args[0];
+            return operation === command
+              ? { stdout: '', stderr: '', exitCode: 124, terminationReason: 'timeout' }
+              : { stdout: '', stderr: '', exitCode: 0 };
+          },
+        })
+      );
+
+      expect(failure).toMatchObject({
+        subtype: 'git_clone_timeout',
+        message: `Repository clone timed out (git ${command})`,
+        gitFailure: 'matcher=timeout http=none operation=clone route=managed',
+      });
+    });
+  }
+});
+
 describe('stripGitCredentials', () => {
   it('leaves no credential in the remote, the reflogs or FETCH_HEAD', async () => {
     await fs.writeFile(
@@ -117,20 +143,6 @@ describe('stripGitCredentials', () => {
         bareUrl: 'https://github.com/acme/repo.git',
       })
     ).toBe(false);
-  });
-});
-
-describe('emptyWorkspaceDirectory', () => {
-  it('removes a dedicated directory and everything in it', async () => {
-    await emptyWorkspaceDirectory(repo);
-    expect(await rejection(fs.access(repo))).toBeInstanceOf(Error);
-  });
-
-  it('refuses the filesystem root and a top-level directory', async () => {
-    expect((await rejection(emptyWorkspaceDirectory('/')))?.message).toContain('top-level');
-    expect((await rejection(emptyWorkspaceDirectory('/workspace')))?.message).toContain(
-      'top-level'
-    );
   });
 });
 

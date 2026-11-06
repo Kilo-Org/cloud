@@ -18,6 +18,7 @@
     "lint": "pnpm -w exec oxlint --config apps/mobile/.oxlintrc.json apps/mobile/src",
     "format": "oxfmt src",
     "format:check": "oxfmt --list-different src",
+    "reusables": "cli",
     "check:unused": "node --env-file=.env node_modules/knip/bin/knip.js --no-config-hints",
     "check:i18n": "pnpm -w exec oxlint --config apps/mobile/.oxlintrc.i18n.json apps/mobile/src packages/app-shared/src && node ../../tools/i18n/check-catalogs.mjs",
     "check:plurals": "node ../../tools/i18n/check-plurals.mjs --source-only",
@@ -71,7 +72,7 @@
     "expo-application": "~58.1.1",
     "expo-asset": "~58.0.15",
     "expo-audio": "~58.0.9",
-    "expo-background-task": "~58.0.10",
+    "expo-background-task": "~58.0.11",
     "expo-battery": "~58.0.3",
     "expo-blur": "~58.0.3",
     "expo-build-properties": "~58.0.10",
@@ -106,7 +107,7 @@
     "expo-status-bar": "~58.0.3",
     "expo-store-review": "~58.0.2",
     "expo-system-ui": "~58.0.5",
-    "expo-task-manager": "~58.0.11",
+    "expo-task-manager": "~58.0.12",
     "expo-tracking-transparency": "~58.0.2",
     "expo-video": "~58.0.10",
     "expo-web-browser": "~58.0.6",
@@ -145,6 +146,7 @@
   },
   "devDependencies": {
     "@expo/plist": "0.10.1",
+    "@react-native-reusables/cli": "0.7.1",
     "@sentry/cli": "catalog:",
     "@types/react": "~19.3.0",
     "@typescript/native-preview": "catalog:",
@@ -174,7 +176,6 @@
         "buildFromSource": [
           "expo-localization",
           "expo-ui",
-          "expo-background-task",
           "expo-notifications",
           "expo-task-manager",
           "unimodules-app-loader"

@@ -35,6 +35,7 @@ export function toFetchedSessionData(
     gitUrl: session.git_url,
     gitBranch: session.git_branch,
     worktreeId: session.cloud_agent_worktree_id ?? null,
+    environmentId: rs?.environmentId ?? null,
     mode: normalizeAlias(rs?.mode),
     model: rs?.model ?? null,
     variant: rs?.variant ?? null,

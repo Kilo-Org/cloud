@@ -1,4 +1,8 @@
-import { createCallerForUser } from '@/routers/test-utils';
+import {
+  createBearerCallerForUser,
+  createCallerForUser,
+  createSessionCallerForUser,
+} from '@/routers/test-utils';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   agent_configs,
@@ -12,12 +16,14 @@ import {
   organization_memberships,
   organizations,
   passkey_credentials,
+  session_step_up_proofs,
   user_activity_tokens,
   user_notification_preferences,
   user_push_tokens,
 } from '@kilocode/db/schema';
 import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { hashWebSessionId } from '@kilocode/web-shared/lib/admin/step-up-store';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import type { User } from '@kilocode/db/schema';
 import { sendSignInCodeEmail } from '@kilocode/web-shared/lib/email';
@@ -26,6 +32,8 @@ import {
   sendAccountDeletionSupportNotification,
 } from '@kilocode/web-shared/lib/email';
 import { performGdprRemoval } from '@/lib/user/gdpr-removal';
+import { createAccountLinkingSession } from '@/lib/account-linking-session';
+import { AccountLinkingProviders } from '@/lib/auth/provider-metadata';
 import { assertUserCanBeSoftDeleted, SoftDeletePreconditionError } from '@/lib/user';
 import { refreshGlanceableScope } from '@kilocode/web-shared/lib/notifications-worker-client';
 
@@ -41,6 +49,13 @@ jest.mock('@kilocode/web-shared/lib/email', () => {
 
 jest.mock('@/lib/user/gdpr-removal', () => ({
   performGdprRemoval: jest.fn(),
+}));
+
+// Starting a link writes the linking cookie through `next/headers`, which has no
+// request scope here; the offer list is what this suite checks against.
+jest.mock('@/lib/account-linking-session', () => ({
+  ...jest.requireActual('@/lib/account-linking-session'),
+  createAccountLinkingSession: jest.fn(),
 }));
 
 jest.mock('@/lib/user', () => {
@@ -119,6 +134,30 @@ describe('user router - getMe', () => {
       email: user.google_user_email,
       isAdmin: false,
     });
+  });
+});
+
+describe('user router - linkAuthProvider', () => {
+  it('starts a link for every provider the connected-accounts card offers', async () => {
+    const user = await insertTestUser();
+    const caller = await createCallerForUser(user.id);
+    const mockCreateLinkingSession = jest.mocked(createAccountLinkingSession);
+
+    for (const { id } of AccountLinkingProviders) {
+      mockCreateLinkingSession.mockClear();
+      await expect(caller.user.linkAuthProvider({ provider: id })).resolves.toEqual({
+        success: true,
+      });
+      expect(mockCreateLinkingSession).toHaveBeenCalledWith(user.id, id, undefined, undefined);
+    }
+
+    // Apple is a sign-in method the card does not offer, so a link it starts
+    // cannot complete and must not open a linking session.
+    mockCreateLinkingSession.mockClear();
+    await expect(caller.user.linkAuthProvider({ provider: 'apple' })).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+    });
+    expect(mockCreateLinkingSession).not.toHaveBeenCalled();
   });
 });
 
@@ -2706,7 +2745,7 @@ describe('user router - passkeys', () => {
 
   it('lists the caller passkeys without the public key or the credential id', async () => {
     const row = await insertPasskey(owner.id, 'Work laptop');
-    const caller = await createCallerForUser(owner.id);
+    const caller = await createSessionCallerForUser(owner.id);
 
     const result = await caller.user.getPasskeys();
 
@@ -2732,7 +2771,7 @@ describe('user router - passkeys', () => {
   it('lists only the caller passkeys', async () => {
     await insertPasskey(owner.id, 'Owner passkey');
     await insertPasskey(other.id, 'Other passkey');
-    const caller = await createCallerForUser(owner.id);
+    const caller = await createSessionCallerForUser(owner.id);
 
     const result = await caller.user.getPasskeys();
 
@@ -2741,7 +2780,7 @@ describe('user router - passkeys', () => {
 
   it('renames an owned passkey', async () => {
     const row = await insertPasskey(owner.id, 'Work laptop');
-    const caller = await createCallerForUser(owner.id);
+    const caller = await createSessionCallerForUser(owner.id);
 
     const result = await caller.user.renamePasskey({ id: row.id, name: 'Home desktop' });
 
@@ -2755,7 +2794,7 @@ describe('user router - passkeys', () => {
 
   it('refuses to rename another user passkey', async () => {
     const row = await insertPasskey(other.id, 'Other passkey');
-    const caller = await createCallerForUser(owner.id);
+    const caller = await createSessionCallerForUser(owner.id);
 
     await expect(caller.user.renamePasskey({ id: row.id, name: 'Hijacked' })).rejects.toMatchObject(
       { code: 'NOT_FOUND' }
@@ -2770,9 +2809,9 @@ describe('user router - passkeys', () => {
 
   it('deletes an owned passkey', async () => {
     const row = await insertPasskey(owner.id, 'Work laptop');
-    const caller = await createCallerForUser(owner.id);
+    const caller = await createSessionCallerForUser(owner.id);
 
-    const result = await caller.user.deletePasskey({ id: row.id });
+    const result = await caller.user.deletePasskey({ id: row!.id });
 
     expect(result).toEqual({ success: true });
     const stored = await db
@@ -2784,7 +2823,7 @@ describe('user router - passkeys', () => {
 
   it('refuses to delete another user passkey and leaves it in place', async () => {
     const row = await insertPasskey(other.id, 'Other passkey');
-    const caller = await createCallerForUser(owner.id);
+    const caller = await createSessionCallerForUser(owner.id);
 
     await expect(caller.user.deletePasskey({ id: row.id })).rejects.toMatchObject({
       code: 'NOT_FOUND',
@@ -2798,7 +2837,7 @@ describe('user router - passkeys', () => {
   });
 
   it('refuses an unknown passkey id', async () => {
-    const caller = await createCallerForUser(owner.id);
+    const caller = await createSessionCallerForUser(owner.id);
 
     await expect(
       caller.user.deletePasskey({ id: '11111111-1111-4111-8111-111111111111' })
@@ -2807,7 +2846,7 @@ describe('user router - passkeys', () => {
 
   it('refuses an empty passkey name', async () => {
     const row = await insertPasskey(owner.id, 'Work laptop');
-    const caller = await createCallerForUser(owner.id);
+    const caller = await createSessionCallerForUser(owner.id);
 
     await expect(caller.user.renamePasskey({ id: row.id, name: '   ' })).rejects.toThrow();
 
@@ -2816,5 +2855,54 @@ describe('user router - passkeys', () => {
       .from(passkey_credentials)
       .where(eq(passkey_credentials.id, row.id));
     expect(stored?.name).toBe('Work laptop');
+  });
+
+  it.each([
+    [
+      'rename',
+      (caller: Awaited<ReturnType<typeof createSessionCallerForUser>>, id: string) =>
+        caller.user.renamePasskey({ id, name: 'Bearer rename' }),
+    ],
+    [
+      'delete',
+      (caller: Awaited<ReturnType<typeof createSessionCallerForUser>>, id: string) =>
+        caller.user.deletePasskey({ id }),
+    ],
+  ])('refuses %s through a bearer token', async (_label, invoke) => {
+    const row = await insertPasskey(owner.id, 'Work laptop');
+    const bearerCaller = await createBearerCallerForUser(owner.id);
+
+    await expect(invoke(bearerCaller, row.id)).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: 'Browser session required',
+    });
+
+    const stored = await db
+      .select()
+      .from(passkey_credentials)
+      .where(eq(passkey_credentials.id, row.id));
+    expect(stored).toHaveLength(1);
+  });
+
+  it('deleting a passkey removes its step-up proofs', async () => {
+    const row = await insertPasskey(owner.id, 'Work laptop');
+    await db.insert(session_step_up_proofs).values({
+      kilo_user_id: owner.id,
+      session_id_hash: hashWebSessionId('passkey-delete-session'),
+      method: 'webauthn_uv',
+      passkey_credential_id: row!.id,
+      purpose: 'session',
+      verified_at: new Date().toISOString(),
+      expires_at: new Date(Date.now() + 15 * 60_000).toISOString(),
+    });
+    const caller = await createSessionCallerForUser(owner.id);
+
+    await caller.user.deletePasskey({ id: row!.id });
+
+    const proofs = await db
+      .select()
+      .from(session_step_up_proofs)
+      .where(eq(session_step_up_proofs.passkey_credential_id, row!.id));
+    expect(proofs).toHaveLength(0);
   });
 });

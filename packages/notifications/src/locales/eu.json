@@ -9,6 +9,7 @@
       "lowBalance": "Zure saldoak arreta behar du",
       "spendAlert": "Zure gastuak arreta behar du",
       "securityFinding": "Aurkitutako segurtasun-arazo batek arreta behar du",
+      "securityUpdate": "Segurtasun-egiaztapen batek eguneratze bat du",
       "activeAgentsGlanceable": "Agente aktiboek eguneratze bat dute"
     }
   },
@@ -61,7 +62,7 @@
     },
     "securityLifecycle": {
       "title": "Kilo",
-      "body": "Aurkitutako segurtasun-arazo batek arreta behar du"
+      "body": "Segurtasun-egiaztapen batek eguneratze bat du"
     }
   },
   "instanceLifecycle": {

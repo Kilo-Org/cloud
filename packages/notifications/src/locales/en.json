@@ -9,6 +9,7 @@
       "lowBalance": "Your balance needs attention",
       "spendAlert": "Your spend needs attention",
       "securityFinding": "A security finding needs attention",
+      "securityUpdate": "A security check has an update",
       "activeAgentsGlanceable": "Active agents have an update"
     }
   },
@@ -61,7 +62,7 @@
     },
     "securityLifecycle": {
       "title": "Kilo",
-      "body": "A security finding needs attention"
+      "body": "A security check has an update"
     }
   },
   "instanceLifecycle": {

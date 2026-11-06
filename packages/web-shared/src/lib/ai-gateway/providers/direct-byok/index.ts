@@ -19,7 +19,6 @@ import {
   isValidOpenRouterModelId,
   resolveOpenRouterModelAlias,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
-import { isKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { getPreferredModels } from '@kilocode/web-shared/lib/ai-gateway/preferred-models';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
@@ -28,7 +27,18 @@ import { getFallbackReasoningOptions } from '@kilocode/web-shared/lib/ai-gateway
 import { withLegacyVariants } from '@kilocode/web-shared/lib/ai-gateway/providers/legacy-variants';
 import { signBedrockRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/aws-bedrock-signing';
 
-/** Providers for `/api/v1/providers` that the general provider list lacks. */
+/**
+ * The provider slug that organization provider allow-lists use for a direct BYOK provider: its
+ * general provider list counterpart, or its own listing.
+ */
+export function getDirectByokPolicyProviderId(provider: DirectByokProvider): string {
+  return provider.openrouter_inference_provider_id ?? provider.id;
+}
+
+/**
+ * Providers for `/api/v1/providers` and the provider policy screens that the general provider list
+ * lacks.
+ */
 export function getDirectByokProviderListings(): OpenRouterProvider[] {
   const providers: ReadonlyArray<DirectByokProvider> = DIRECT_BYOK_PROVIDERS;
   return providers.flatMap(({ id, provider_listing }) => {
@@ -118,7 +128,7 @@ export function getDirectByokModelChatApis(
   return provider.getModelChatApi ? [provider.getModelChatApi(model)] : provider.supportedChatApis;
 }
 
-function findDirectByokProvider(providerId: string): DirectByokProvider | undefined {
+export function findDirectByokProvider(providerId: string): DirectByokProvider | undefined {
   const providers: ReadonlyArray<DirectByokProvider> = DIRECT_BYOK_PROVIDERS;
   return providers.find(provider => provider.id === providerId);
 }
@@ -156,9 +166,8 @@ function isCatalogModeKey(key: EnabledByokProvider): boolean {
 }
 
 // The catalog can drift between syncs, so a stored mapping only counts while its id is current.
-// Kilo-exclusive models are never served from a user's key.
 async function isLiveCatalogModelId(catalogModelId: string): Promise<boolean> {
-  return !isKiloExclusiveModel(catalogModelId) && (await isValidOpenRouterModelId(catalogModelId));
+  return isValidOpenRouterModelId(catalogModelId);
 }
 
 /** The catalog id that replaces `model`'s bespoke id in catalog mode, or null when unmapped. */
@@ -191,36 +200,69 @@ export async function findDirectByokCatalogModels(
   return found;
 }
 
-async function addLatestAliasModelIds(modelIds: Set<string>): Promise<void> {
-  if (modelIds.size === 0) return;
+/** Serving providers per catalog id; a latest alias is served by the providers of its target. */
+type CatalogModeProviders = Map<string, DirectByokProvider[]>;
+
+async function addLatestAliasModelIds(providersByModelId: CatalogModeProviders): Promise<void> {
+  if (providersByModelId.size === 0) return;
   const storedModels = await getOpenRouterModelsMetadataFromDatabase();
   for (const [modelId, storedModel] of Object.entries(storedModels)) {
     const targetModelId = storedModel.alias_target?.slug;
-    if (
-      modelId.startsWith('~') &&
-      targetModelId &&
-      modelIds.has(targetModelId) &&
-      (await isLiveCatalogModelId(modelId))
-    ) {
-      modelIds.add(modelId);
+    const targetProviders = targetModelId ? providersByModelId.get(targetModelId) : undefined;
+    if (modelId.startsWith('~') && targetProviders && (await isLiveCatalogModelId(modelId))) {
+      providersByModelId.set(modelId, targetProviders);
     }
   }
 }
 
-async function getCatalogModeModelIds(keys: EnabledByokProvider[]): Promise<ReadonlySet<string>> {
-  const modelIds = new Set<string>();
+/**
+ * Whether a catalog-mode key of the provider named by `policyProviderId` (see
+ * `getDirectByokPolicyProviderId`) may serve `catalogModelId`.
+ */
+export type DirectByokCatalogServingCheck = (
+  catalogModelId: string,
+  policyProviderId: string
+) => Promise<boolean>;
+
+const allowEveryCatalogProvider: DirectByokCatalogServingCheck = async () => true;
+
+async function getCatalogModeModelIds(
+  keys: EnabledByokProvider[],
+  isServingAllowed: DirectByokCatalogServingCheck
+): Promise<ReadonlySet<string>> {
+  const providersByModelId: CatalogModeProviders = new Map();
   for (const key of keys.filter(isCatalogModeKey)) {
+    const provider = findDirectByokProvider(key.providerId);
+    if (!provider) continue;
     for (const { catalogModelId } of await listDirectByokCatalogModels(key.providerId)) {
-      modelIds.add(catalogModelId);
+      providersByModelId.set(catalogModelId, [
+        ...(providersByModelId.get(catalogModelId) ?? []),
+        provider,
+      ]);
     }
   }
-  await addLatestAliasModelIds(modelIds);
+  await addLatestAliasModelIds(providersByModelId);
+  const modelIds = new Set<string>();
+  for (const [modelId, providers] of providersByModelId) {
+    for (const provider of providers) {
+      if (await isServingAllowed(modelId, getDirectByokPolicyProviderId(provider))) {
+        modelIds.add(modelId);
+        break;
+      }
+    }
+  }
   return modelIds;
 }
 
-/** Catalog ids the owner's catalog-mode keys serve. */
-export async function getDirectByokCatalogModelIds(owner: ByokOwner): Promise<ReadonlySet<string>> {
-  return getCatalogModeModelIds(await getEnabledByokProviders(readDb, owner));
+/**
+ * Catalog ids the owner's catalog-mode keys serve. With `isServingAllowed`, an id counts only when
+ * one of the keys serving it passes, as routing skips the others.
+ */
+export async function getDirectByokCatalogModelIds(
+  owner: ByokOwner,
+  isServingAllowed: DirectByokCatalogServingCheck = allowEveryCatalogProvider
+): Promise<ReadonlySet<string>> {
+  return getCatalogModeModelIds(await getEnabledByokProviders(readDb, owner), isServingAllowed);
 }
 
 /**

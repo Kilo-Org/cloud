@@ -7,9 +7,12 @@ import { RequestDeadlineError } from '@kilocode/event-service';
 import { type AgentAttachmentSubmissionPayload } from '@/lib/agent-attachments/agent-attachment-types';
 import { SPAWNED_NOT_FOUND_MAX_ATTEMPTS } from '@/lib/spawned-not-found-retry';
 import {
+  type CloudAgentSessionId,
   type KiloSessionId,
+  type SessionInfo,
   type SessionManager,
   type SessionManagerConfig,
+  type SessionSnapshotPageOutcome,
 } from '@kilocode/cloud-agent-sdk';
 
 // Keep this suite on the pure vitest project: mock every RN / Expo / SDK
@@ -27,7 +30,7 @@ const { configHolder, mockCreateSessionManager } = vi.hoisted(() => {
   const holder: { current: SessionManagerConfig | null } = { current: null };
   const createSessionManagerMock = vi.fn((config: SessionManagerConfig): SessionManager => {
     holder.current = config;
-    return { atoms: {} } as unknown as SessionManager;
+    return { atoms: {}, destroy: () => undefined } as unknown as SessionManager;
   });
   return { configHolder: holder, mockCreateSessionManager: createSessionManagerMock };
 });
@@ -45,6 +48,7 @@ vi.mock('@/components/agents/mobile-session-diagnostics', () => ({
 }));
 vi.mock('@/components/agents/mobile-session-page-adapter', () => ({
   fetchMobileSessionSnapshotPage: vi.fn(),
+  readMobileSessionSnapshotPage: vi.fn(),
 }));
 // The resolved-delivery-failure memory owns the encrypted KV (SQLCipher)
 // chain; this suite is pure and only needs the call seam.
@@ -80,6 +84,10 @@ const cancelQueuedMessageMutate = vi.fn();
 const getSessionQuery = vi.fn();
 const getWithRuntimeStateQuery = vi.fn();
 const getSessionMessagesPageQuery = vi.fn();
+const getCloudSessionQuery = vi.fn();
+const getCloudSessionMessagesPageQuery = vi.fn();
+const getOrganizationCloudSessionQuery = vi.fn();
+const getOrganizationCloudSessionMessagesPageQuery = vi.fn();
 vi.mock('@/lib/trpc', () => ({
   trpcClient: {
     cliSessionsV2: {
@@ -88,6 +96,8 @@ vi.mock('@/lib/trpc', () => ({
       getSessionMessagesPage: { query: getSessionMessagesPageQuery },
     },
     cloudAgentNext: {
+      getSession: { query: getCloudSessionQuery },
+      getSessionMessagesPage: { query: getCloudSessionMessagesPageQuery },
       getAttachmentDownloadUrl: { mutate },
       prepareSession: { mutate: prepareSessionMutate },
       sendMessage: { mutate: sendMessageMutate },
@@ -95,6 +105,8 @@ vi.mock('@/lib/trpc', () => ({
     },
     organizations: {
       cloudAgentNext: {
+        getSession: { query: getOrganizationCloudSessionQuery },
+        getSessionMessagesPage: { query: getOrganizationCloudSessionMessagesPageQuery },
         prepareSession: { mutate: prepareSessionMutate },
         sendMessage: { mutate: sendMessageMutate },
         cancelQueuedMessage: { mutate: cancelQueuedMessageMutate },
@@ -109,7 +121,7 @@ const { answerSessionPermission: mockedAnswerSessionPermission } =
   await import('@/lib/glanceable/approve-ask');
 const answerSessionPermissionMock = vi.mocked(mockedAnswerSessionPermission);
 const { toast: sonnerToast } = await import('sonner-native');
-const { fetchMobileSessionSnapshotPage } =
+const { fetchMobileSessionSnapshotPage, readMobileSessionSnapshotPage } =
   await import('@/components/agents/mobile-session-page-adapter');
 const {
   createMobileAgentSessionManager,
@@ -466,6 +478,101 @@ describe('StreamTicketResponseSchema', () => {
       ticket: 'ticket-123',
       expiresAt: 1,
     });
+  });
+});
+
+describe('mobile workspace DO callbacks', () => {
+  const sessionId = 'workspace_12345678-1234-4234-9234-123456789abc' as CloudAgentSessionId;
+
+  beforeEach(() => {
+    configHolder.current = null;
+    vi.clearAllMocks();
+  });
+
+  function setup(organizationId?: string): SessionManagerConfig {
+    const options = { store: {}, userWebConnection: {}, organizationId };
+    createMobileAgentSessionManager(options as never);
+    const config = configHolder.current;
+    if (!config) {
+      throw new Error('Missing session manager config');
+    }
+    return config;
+  }
+
+  it.each([undefined, 'org-1'])(
+    'routes metadata and initial/older pages through DO APIs for scope %s',
+    async organizationId => {
+      const config = setup(organizationId);
+      await config.fetchCloudSession?.(sessionId);
+      await config.fetchCloudSnapshotPage?.(sessionId, {});
+      await config.fetchCloudSnapshotPage?.(sessionId, { cursor: 'older', limit: 20 });
+      const childPageOptions = {
+        kiloSessionId: 'ses_bbbbbbbbbbbbbbbbbbbbbbbbbb',
+        cursor: 'child-older',
+        limit: 10,
+      };
+      await config.fetchCloudSnapshotPage?.(sessionId, childPageOptions);
+
+      if (organizationId) {
+        expect(getOrganizationCloudSessionQuery).toHaveBeenCalledWith({
+          cloudAgentSessionId: sessionId,
+          organizationId,
+        });
+        expect(getOrganizationCloudSessionMessagesPageQuery).toHaveBeenNthCalledWith(1, {
+          sessionId,
+          organizationId,
+        });
+        expect(getOrganizationCloudSessionMessagesPageQuery).toHaveBeenNthCalledWith(2, {
+          sessionId,
+          organizationId,
+          cursor: 'older',
+          limit: 20,
+        });
+        expect(getOrganizationCloudSessionMessagesPageQuery).toHaveBeenNthCalledWith(3, {
+          sessionId,
+          organizationId,
+          ...childPageOptions,
+        });
+        expect(getCloudSessionMessagesPageQuery).not.toHaveBeenCalled();
+      } else {
+        expect(getCloudSessionQuery).toHaveBeenCalledWith({ cloudAgentSessionId: sessionId });
+        expect(getCloudSessionMessagesPageQuery).toHaveBeenNthCalledWith(1, { sessionId });
+        expect(getCloudSessionMessagesPageQuery).toHaveBeenNthCalledWith(2, {
+          sessionId,
+          cursor: 'older',
+          limit: 20,
+        });
+        expect(getCloudSessionMessagesPageQuery).toHaveBeenNthCalledWith(3, {
+          sessionId,
+          ...childPageOptions,
+        });
+        expect(getOrganizationCloudSessionMessagesPageQuery).not.toHaveBeenCalled();
+      }
+      expect(getWithRuntimeStateQuery).not.toHaveBeenCalled();
+      expect(getSessionMessagesPageQuery).not.toHaveBeenCalled();
+    }
+  );
+
+  it('adopts organization scope from catalog discovery before requesting DO metadata', async () => {
+    getSessionQuery.mockResolvedValueOnce({
+      session_id: SESSION_ID,
+      cloud_agent_session_id: sessionId,
+      organization_id: 'discovered-org',
+    });
+    const config = setup();
+    await config.resolveSession(SESSION_ID);
+    await config.fetchCloudSession?.(sessionId);
+    await config.fetchCloudSnapshotPage?.(sessionId, {});
+    expect(getOrganizationCloudSessionQuery).toHaveBeenCalledWith({
+      cloudAgentSessionId: sessionId,
+      organizationId: 'discovered-org',
+    });
+    expect(getOrganizationCloudSessionMessagesPageQuery).toHaveBeenCalledWith({
+      sessionId,
+      organizationId: 'discovered-org',
+    });
+    expect(getWithRuntimeStateQuery).not.toHaveBeenCalled();
+    expect(getSessionMessagesPageQuery).not.toHaveBeenCalled();
   });
 });
 
@@ -903,16 +1010,17 @@ describe('createMobileAgentSessionManager cloned session first page', () => {
     fetchPage.mockReset();
   });
 
-  function setup(
-    clonedSessionId?: KiloSessionId
-  ): NonNullable<SessionManagerConfig['fetchSnapshotPage']> {
+  function setup(clonedSessionId?: KiloSessionId): {
+    reader: NonNullable<SessionManagerConfig['fetchSnapshotPage']>;
+    manager: SessionManager;
+  } {
     const options = { store: {}, userWebConnection: {}, clonedSessionId };
-    createMobileAgentSessionManager(options as never);
+    const manager = createMobileAgentSessionManager(options as never);
     const reader = configHolder.current?.fetchSnapshotPage;
     if (reader === undefined) {
       throw new Error('createSessionManager did not capture a page reader');
     }
-    return reader;
+    return { reader, manager };
   }
 
   it('re-reads an empty first page until the CLI sync of the clone lands', async () => {
@@ -922,7 +1030,7 @@ describe('createMobileAgentSessionManager cloned session first page', () => {
         .mockResolvedValueOnce(emptyPage as never)
         .mockResolvedValueOnce(emptyPage as never)
         .mockResolvedValueOnce(syncedPage as never);
-      const fetchSnapshotPage = setup(SESSION_ID);
+      const { reader: fetchSnapshotPage } = setup(SESSION_ID);
 
       const result = fetchSnapshotPage(SESSION_ID, {});
       await vi.advanceTimersByTimeAsync(2000);
@@ -943,7 +1051,7 @@ describe('createMobileAgentSessionManager cloned session first page', () => {
     vi.useFakeTimers();
     try {
       fetchPage.mockResolvedValue(emptyPage as never);
-      const fetchSnapshotPage = setup(SESSION_ID);
+      const { reader: fetchSnapshotPage } = setup(SESSION_ID);
 
       const result = fetchSnapshotPage(SESSION_ID, {});
       await vi.advanceTimersByTimeAsync(SPAWNED_NOT_FOUND_MAX_ATTEMPTS * 1000);
@@ -955,13 +1063,124 @@ describe('createMobileAgentSessionManager cloned session first page', () => {
     }
   });
 
+  it('stops re-reading an empty first page once the manager is destroyed', async () => {
+    vi.useFakeTimers();
+    try {
+      fetchPage.mockResolvedValue(emptyPage as never);
+      const { reader, manager } = setup(SESSION_ID);
+
+      const result = reader(SESSION_ID, {});
+      // The first delay elapses, so the loop is on its second read.
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(fetchPage).toHaveBeenCalledTimes(2);
+
+      manager.destroy();
+      await vi.advanceTimersByTimeAsync(SPAWNED_NOT_FOUND_MAX_ATTEMPTS * 1000);
+
+      await expect(result).resolves.toBe(emptyPage);
+      expect(fetchPage).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('ends the wait as soon as the manager is destroyed mid-delay', async () => {
+    vi.useFakeTimers();
+    try {
+      fetchPage.mockResolvedValue(emptyPage as never);
+      const { reader, manager } = setup(SESSION_ID);
+
+      const result = reader(SESSION_ID, {});
+      await vi.advanceTimersByTimeAsync(250);
+      manager.destroy();
+
+      // The read settles on the abort instead of at the end of the delay.
+      await expect(result).resolves.toBe(emptyPage);
+      expect(fetchPage).toHaveBeenCalledTimes(1);
+      // No timer from the abandoned budget is left to fire a request.
+      await vi.advanceTimersByTimeAsync(SPAWNED_NOT_FOUND_MAX_ATTEMPTS * 1000);
+      expect(fetchPage).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('reads an ordinary session, a child, and an older page once', async () => {
     fetchPage.mockResolvedValue(emptyPage as never);
-    await setup()(SESSION_ID, {});
-    const cloned = setup(SESSION_ID);
+    await setup().reader(SESSION_ID, {});
+    const cloned = setup(SESSION_ID).reader;
     await cloned('ses_child' as KiloSessionId, {});
     await cloned(SESSION_ID, { cursor: 'older' });
 
     expect(fetchPage).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe('createMobileAgentSessionManager fetchSnapshot', () => {
+  const readPage = vi.mocked(readMobileSessionSnapshotPage);
+
+  function pageWith(info: SessionInfo): Extract<SessionSnapshotPageOutcome, { kind: 'success' }> {
+    return {
+      kind: 'success',
+      info,
+      messages: [],
+      nextCursor: null,
+      omittedItemCount: 0,
+    };
+  }
+
+  beforeEach(() => {
+    configHolder.current = null;
+    mockCreateSessionManager.mockClear();
+    getSessionQuery.mockReset();
+    getWithRuntimeStateQuery.mockReset();
+    readPage.mockReset();
+  });
+
+  function setup(): NonNullable<SessionManagerConfig['fetchSnapshot']> {
+    const options = { store: {}, userWebConnection: {} };
+    createMobileAgentSessionManager(options as never);
+    const reader = configHolder.current?.fetchSnapshot;
+    if (reader === undefined) {
+      throw new Error('createSessionManager did not capture a snapshot reader');
+    }
+    return reader;
+  }
+
+  it('reads one page and takes the parent id from it, without a session query', async () => {
+    readPage.mockResolvedValueOnce({
+      parentSessionId: 'ses_parent_from_page_0000000001',
+      outcome: pageWith({ id: SESSION_ID }),
+    });
+
+    await expect(setup()(SESSION_ID)).resolves.toMatchObject({
+      info: { id: SESSION_ID, parentID: 'ses_parent_from_page_0000000001' },
+    });
+    expect(readPage).toHaveBeenCalledTimes(1);
+    expect(getSessionQuery).not.toHaveBeenCalled();
+  });
+
+  it('keeps a root session root without a session query', async () => {
+    readPage.mockResolvedValueOnce({
+      parentSessionId: null,
+      outcome: pageWith({ id: SESSION_ID }),
+    });
+
+    await expect(setup()(SESSION_ID)).resolves.toMatchObject({ info: { id: SESSION_ID } });
+    expect(getSessionQuery).not.toHaveBeenCalled();
+  });
+
+  it('falls back to the session query when the page payload cannot answer the parent', async () => {
+    readPage.mockResolvedValueOnce({
+      parentSessionId: undefined,
+      outcome: pageWith({ id: SESSION_ID }),
+    });
+    getSessionQuery.mockResolvedValue({ parent_session_id: 'ses_parent_from_query_00000001' });
+
+    await expect(setup()(SESSION_ID)).resolves.toMatchObject({
+      info: { id: SESSION_ID, parentID: 'ses_parent_from_query_00000001' },
+    });
+    expect(readPage).toHaveBeenCalledTimes(1);
+    expect(getSessionQuery).toHaveBeenCalledWith({ session_id: SESSION_ID });
   });
 });

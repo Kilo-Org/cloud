@@ -19,6 +19,7 @@ describe('buildNativeEgressAllowlist', () => {
       'media.githubusercontent.com',
       'objects.githubusercontent.com',
       'raw.githubusercontent.com',
+      'uploads.github.com',
     ]);
     expect(policy).not.toContain('registry.npmjs.org');
     expect(policy).not.toContain('*');
@@ -70,7 +71,7 @@ describe('buildNativeEgressAllowlist', () => {
 
   it('supports the full public list plus mandatory domains', () => {
     const allowlist = Array.from({ length: 100 }, (_, index) => `domain${index}.example.com`);
-    expect(buildNativeEgressAllowlist({ allowlist, env })).toHaveLength(112);
+    expect(buildNativeEgressAllowlist({ allowlist, env })).toHaveLength(113);
   });
 
   it.each([

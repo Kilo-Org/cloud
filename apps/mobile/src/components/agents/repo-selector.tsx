@@ -151,12 +151,19 @@ export function RepoSelector({
     router.push('/(app)/agent-chat/repo-picker' as Href);
   }
 
+  // With nothing chosen the trigger shows its own placeholder, which already names
+  // the field and says the choice is open: prefixing it would announce the field
+  // name twice ("Repository: Select repository"). A loading or chosen trigger keeps
+  // the field prefix, so the value is never mistaken for the field.
+  const accessibilityLabel =
+    displayValue === '' && !isLoading ? label : t('agentChat.repoPicker.accessibility', { label });
+
   return (
     <Pressable
       onPress={handlePress}
       disabled={effectivelyDisabled}
       accessibilityRole="button"
-      accessibilityLabel={t('agentChat.repoPicker.accessibility', { label })}
+      accessibilityLabel={accessibilityLabel}
       accessibilityState={{ disabled: effectivelyDisabled }}
       className={cn(
         'flex-row items-center justify-between rounded-lg border border-border bg-secondary px-3 py-3',

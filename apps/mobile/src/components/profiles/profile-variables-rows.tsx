@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
@@ -17,13 +17,15 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { HIDDEN_LABEL_PROPS } from '@/lib/a11y/hidden-label';
 import { ICON_TARGET_BOX_CLASS, ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
+import { useFormDraftRef, useFormDraftState } from '@/lib/form-draft';
 import { cn } from '@/lib/utils';
 
-/** Content-shaped rows in the same slot and height as a loaded variable row. */
+/** Content-shaped rows in the same slot, height and gap as loaded variable rows. */
 export function VariablesSkeleton() {
   return (
-    <View className="gap-2">
+    <View className="gap-3">
       {[0, 1, 2].map(index => (
         <Skeleton key={index} className="h-14 w-full rounded-lg bg-muted-soft" />
       ))}
@@ -44,6 +46,9 @@ function variableInputErrorMessage(t: (key: string) => string, error: VariableIn
   }
   if (error === 'value-required') {
     return t('profiles.valueRequired');
+  }
+  if (error === 'reserved') {
+    return t('profiles.keyReserved');
   }
   return error === 'duplicate' ? t('profiles.keyDuplicate') : t('profiles.keyTooLong');
 }
@@ -81,8 +86,9 @@ type VariableRowViewProps = Readonly<{
 /**
  * One variable row: the key in mono and the value. A secret never renders its
  * stored value — the server sends `***`, and the row shows the dot run instead.
- * When the caller passes `onToggleReveal`, the row offers a reveal control;
- * otherwise a secret stays masked.
+ * When the caller passes `onToggleReveal`, the row offers a reveal control that
+ * names the action it performs now: it reads "Reveal value" while the value is
+ * masked and "Hide value" while it is shown. Otherwise a secret stays masked.
  */
 export function VariableRowView({
   row,
@@ -94,6 +100,7 @@ export function VariableRowView({
 }: VariableRowViewProps) {
   const { t } = useTranslation();
   const colors = useThemeColors();
+  const revealLabel = revealed ? t('profiles.secrets.hide') : t('profiles.secrets.reveal');
   return (
     <View className="min-h-14 flex-row items-center gap-1 rounded-lg bg-secondary pr-1 pl-3">
       <Pressable
@@ -103,22 +110,39 @@ export function VariableRowView({
         disabled={onEdit === undefined}
         onPress={onEdit}
       >
-        <Text className="flex-1 font-mono text-sm text-foreground" numberOfLines={1}>
+        {/* The key is the row's primary text: it keeps its natural width and
+            only yields to the fixed-width mask beside it, because the value
+            gives up width first. `max-w-full` is the last resort for a key
+            longer than the row itself, which middle-truncates it. Middle rather
+            than tail because keys in one profile share long prefixes, and
+            Android middle-truncates single-line text only. */}
+        <Text
+          className={cn(
+            'min-w-0 grow font-mono text-sm text-foreground',
+            row.isSecret && onToggleReveal === undefined ? 'shrink' : 'shrink-0 max-w-full'
+          )}
+          numberOfLines={1}
+          ellipsizeMode="middle"
+        >
           {row.key}
         </Text>
         {row.isSecret && onToggleReveal === undefined ? (
-          <View className="flex-row items-center gap-1">
+          // The mask is a fixed run of dots, so it never truncates: a clipped
+          // mask reads as a cut-off value instead of a hidden one. It holds its
+          // width and the key yields to it.
+          <View className="shrink-0 flex-row items-center gap-1">
             <Lock size={12} color={colors.mutedForeground} />
             <Text
-              className="max-w-[45%] text-xs text-muted-foreground"
-              numberOfLines={1}
+              className="text-xs text-muted-foreground"
               accessibilityLabel={t('profiles.secrets.masked')}
             >
               {row.maskedValue}
             </Text>
           </View>
         ) : (
-          <Text className="max-w-[45%] text-xs text-muted-foreground" numberOfLines={1}>
+          // The value is secondary: it takes the width the key leaves and cuts
+          // at the end, so it never takes width the key needs.
+          <Text className="min-w-0 shrink text-xs text-muted-foreground" numberOfLines={1}>
             {revealed ? row.value : row.maskedValue}
           </Text>
         )}
@@ -127,8 +151,7 @@ export function VariableRowView({
         <Pressable
           className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
           accessibilityRole="button"
-          accessibilityLabel={t('profiles.secrets.reveal')}
-          accessibilityState={{ selected: revealed }}
+          accessibilityLabel={revealLabel}
           onPress={onToggleReveal}
         >
           {revealed ? (
@@ -147,7 +170,7 @@ export function VariableRowView({
           accessibilityState={{ disabled: isDeleting }}
           onPress={onDelete}
         >
-          <Trash2 size={18} color={colors.destructive} />
+          <Trash2 size={18} color={colors.mutedForeground} />
         </Pressable>
       ) : null}
     </View>
@@ -157,6 +180,13 @@ export function VariableRowView({
 type VariableEditFormProps = Readonly<{
   isNew: boolean;
   initial: VariableEdit;
+  /**
+   * The form draft the fields belong to (see `lib/form-draft`). A screen passes
+   * a scope scoped to its profile so the typed key, value and secret survive a
+   * remount; a caller that owns no draft leaves it out and gets fresh fields
+   * every mount.
+   */
+  draftScope?: string;
   /**
    * The profile's stored keys, so a new key that cleans onto an existing one is
    * refused rather than silently overwriting it (the server upserts on
@@ -193,6 +223,7 @@ type VariableEditFormProps = Readonly<{
 export function VariableEditForm({
   isNew,
   initial,
+  draftScope,
   existingKeys = [],
   isSaving,
   requireValue = false,
@@ -202,19 +233,30 @@ export function VariableEditForm({
 }: VariableEditFormProps) {
   const { t } = useTranslation();
   const colors = useThemeColors();
-  const keyRef = useRef(initial.key);
-  const valueRef = useRef(initial.value);
-  const [isSecret, setIsSecret] = useState(initial.isSecret);
-  const [revealed, setRevealed] = useState(false);
+  // A caller that passes no draft scope gets plain per-mount fields, so a form
+  // that must start empty, such as the new-session config, never inherits the
+  // text of the last time it was opened.
+  const keyRef = useFormDraftRef(draftScope, 'key', initial.key);
+  const valueRef = useFormDraftRef(draftScope, 'value', initial.value);
+  const [isSecret, setIsSecret] = useFormDraftState(draftScope, 'isSecret', initial.isSecret);
+  const [revealed, setRevealed] = useFormDraftState(draftScope, 'revealed', false);
   const [error, setError] = useState<VariableInputError | null>(null);
   // The key a save will store, when it differs from what the field holds. An
   // edit keeps its stored key, so only an add can change it.
-  const [keyPreview, setKeyPreview] = useState<string | null>(null);
+  const [keyPreview, setKeyPreview] = useState<string | null>(() =>
+    isNew ? variableKeyPreview(keyRef.current) : null
+  );
 
   const valuePlaceholder = valueFieldPlaceholder(t, isSecret, isNew);
+  // The reveal control names what pressing it does next: it hides the value it
+  // is showing, and reveals the one it is masking.
+  const revealLabel = revealed ? t('profiles.secrets.hide') : t('profiles.secrets.reveal');
   // An edit's key is stored, so only an add can collide with the profile's keys.
   const validate = (key: string, value: string): VariableInputError | null =>
-    validateVariableInput({ key, value }, isNew ? existingKeys : [], { requireValue });
+    validateVariableInput({ key, value }, isNew ? existingKeys : [], {
+      requireValue,
+      newKey: isNew,
+    });
 
   const submit = async () => {
     const key = keyRef.current;
@@ -236,7 +278,7 @@ export function VariableEditForm({
       <View className="gap-1.5">
         <FormField
           label={t('profiles.keyLabel')}
-          defaultValue={initial.key}
+          defaultValue={keyRef.current}
           disabled={!isNew}
           required
           autoCapitalize="characters"
@@ -265,7 +307,7 @@ export function VariableEditForm({
       <FormField
         label={t('profiles.valueLabel')}
         placeholder={valuePlaceholder}
-        defaultValue={initial.value}
+        defaultValue={valueRef.current}
         maxLength={maxValueLength}
         secureTextEntry={isSecret && !revealed}
         autoCapitalize="none"
@@ -285,8 +327,7 @@ export function VariableEditForm({
             'flex-row items-center gap-2 self-start px-1 active:opacity-70'
           )}
           accessibilityRole="button"
-          accessibilityLabel={t('profiles.secrets.reveal')}
-          accessibilityState={{ selected: revealed }}
+          accessibilityLabel={revealLabel}
           onPress={() => {
             setRevealed(current => !current);
           }}
@@ -296,21 +337,31 @@ export function VariableEditForm({
           ) : (
             <Eye size={18} color={colors.mutedForeground} />
           )}
-          <Text className="text-sm text-muted-foreground">{t('profiles.secrets.reveal')}</Text>
+          <Text className="text-sm text-muted-foreground">{revealLabel}</Text>
         </Pressable>
       ) : null}
       <View
         className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-3 rounded-lg bg-secondary p-3')}
       >
         <Lock size={18} color={colors.secondaryForeground} />
-        <Text className="flex-1 text-sm font-medium text-foreground">
+        <Text {...HIDDEN_LABEL_PROPS} className="flex-1 text-sm font-medium text-foreground">
           {t('profiles.secrets.markSecret')}
         </Text>
-        <Switch
-          value={isSecret}
-          accessibilityLabel={t('profiles.secrets.markSecret')}
-          onValueChange={setIsSecret}
-        />
+        {/* The native switch draws its 32dp track inside a box that reserves the
+            thumb's overhang, so the track ends about 12dp before the box does
+            and the row's 10.5dp padding leaves it 23dp from the row's edge,
+            twice the 13dp the lock glyph keeps from its opposite edge. Pulling
+            the box out by the padding itself lines the track's end up with the
+            glyph on both edges. The pull is on the END edge, so it must stay
+            logical: `marginInlineEnd` follows the writing direction, while a
+            hand-picked `-mr-3` lands on the title's side under RTL. */}
+        <View className="-me-3">
+          <Switch
+            value={isSecret}
+            accessibilityLabel={t('profiles.secrets.markSecret')}
+            onValueChange={setIsSecret}
+          />
+        </View>
       </View>
       <View className="flex-row gap-2">
         <Button variant="outline" className="flex-1" onPress={onCancel}>

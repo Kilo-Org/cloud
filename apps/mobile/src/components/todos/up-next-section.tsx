@@ -44,7 +44,7 @@ export function UpNextSection({
   }
   return (
     <View>
-      <SectionHeader label={t('todos.upNext')} />
+      <SectionHeader label={t('todos.upNext')} reserveLabelAir />
       {items.map(item => {
         const list = lists.data?.find(candidate => candidate.id === item.listId);
         const newestSession = item.sessions[0] ?? null;

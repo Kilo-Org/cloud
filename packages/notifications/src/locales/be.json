@@ -9,6 +9,7 @@
       "lowBalance": "Ваш баланс патрабуе ўвагі",
       "spendAlert": "Вашы выдаткі патрабуюць увагі",
       "securityFinding": "Знаходка ў бяспецы патрабуе ўвагі",
+      "securityUpdate": "Праверка бяспекі мае абнаўленне",
       "activeAgentsGlanceable": "Актыўныя агенты маюць абнаўленне"
     }
   },
@@ -61,7 +62,7 @@
     },
     "securityLifecycle": {
       "title": "Kilo",
-      "body": "Знаходка ў бяспецы патрабуе ўвагі"
+      "body": "Праверка бяспекі мае абнаўленне"
     }
   },
   "instanceLifecycle": {

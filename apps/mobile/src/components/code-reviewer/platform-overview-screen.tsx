@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- One reviewer overview: each read state (loading, connect, error, ready) returns its own surface, and the ready branch's row config is the picker call plus the toggle wiring. */
 import { selectionHaptic } from '@/lib/haptics';
 import { type Href, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -16,9 +17,9 @@ import {
 } from '@/components/code-reviewer/platform-overview-rows';
 import { ProviderConnectCard } from '@/components/code-reviewer/provider-connect-card';
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
-import { PlatformErrorScreen } from '@/components/platform-error-screen';
+import { ReviewerErrorScreen } from '@/components/code-reviewer/reviewer-error-screen';
 import { PlatformOverviewSkeleton } from '@/components/code-reviewer/platform-overview-skeleton';
-import { ScreenHeader } from '@/components/screen-header';
+import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
 import { ToggleRow } from '@/components/security-agent/settings-toggle-row';
 import { Button } from '@/components/ui/button';
 import { ConfigureRow } from '@/components/ui/configure-row';
@@ -70,7 +71,7 @@ export function PlatformOverviewScreen({
 
   if (permission.status === 'error') {
     return (
-      <PlatformErrorScreen
+      <ReviewerErrorScreen
         title={capabilities.label}
         eyebrow={t('common.codeReviewer')}
         onRetry={() => {
@@ -106,7 +107,7 @@ export function PlatformOverviewScreen({
 
   if (providerState.status === 'error') {
     return (
-      <PlatformErrorScreen
+      <ReviewerErrorScreen
         title={capabilities.label}
         eyebrow={t('common.codeReviewer')}
         variant={providerState.variant}
@@ -132,7 +133,7 @@ export function PlatformOverviewScreen({
   // failure, and an unsettled connectivity still waits on the skeleton.
   if (!isLoading && connected && (configBody.body.status === 'error' || configBody.exhausted)) {
     return (
-      <PlatformErrorScreen
+      <ReviewerErrorScreen
         title={capabilities.label}
         eyebrow={t('common.codeReviewer')}
         variant={configBody.body.status === 'error' ? configBody.body.variant : 'server'}
@@ -150,7 +151,7 @@ export function PlatformOverviewScreen({
     const canConnect = canConnectProvider(platform, permission);
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
+        <ReviewerHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
         <CenteredState contentContainerClassName="px-6">
           {canConnect ? (
             <ProviderConnectCard scope={scope} platform={platform} onConnected={handleConnected} />
@@ -186,6 +187,7 @@ export function PlatformOverviewScreen({
       options: models,
       value: data.modelSlug,
       variant: data.thinkingEffort ?? '',
+      acceptsVariant: true,
       onSelect: (modelSlug, variant) => {
         save.mutate({ modelSlug, thinkingEffort: variant || null });
       },
@@ -211,7 +213,7 @@ export function PlatformOverviewScreen({
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
+      <ReviewerHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
       <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 pt-4">
         <Animated.View layout={LinearTransition}>
           {/* Every read state paints something: while connectivity is unsettled a
@@ -226,7 +228,7 @@ export function PlatformOverviewScreen({
             >
               {platform === 'gitlab' && hasWebhookSyncWarning && (
                 <View className="flex-row items-center justify-between rounded-lg bg-warn-tile-bg p-4">
-                  <View className="flex-1 pr-3">
+                  <View className="flex-1 pe-3">
                     <Text className="text-sm font-medium">{t('codeReviewer.webhookSetup')}</Text>
                     <Text variant="muted" className="text-xs">
                       {t('codeReviewer.webhookSetupDescription')}
@@ -261,7 +263,7 @@ export function PlatformOverviewScreen({
 
               <View className="rounded-lg bg-secondary p-4">
                 <View className="flex-row items-center justify-between">
-                  <View className="flex-1 pr-3">
+                  <View className="flex-1 pe-3">
                     <Text className="text-sm font-medium">{t('codeReviewer.autoReviews')}</Text>
                     <Text variant="muted" className="text-xs">
                       {status.data?.integration?.accountLogin ?? ''}

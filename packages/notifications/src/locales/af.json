@@ -9,6 +9,7 @@
       "lowBalance": "Jou saldo benodig aandag",
       "spendAlert": "Jou besteding benodig aandag",
       "securityFinding": "'n Sekuriteitsbevinding benodig aandag",
+      "securityUpdate": "'n Sekuriteitskontrole het 'n opdatering",
       "activeAgentsGlanceable": "Aktiewe agente het 'n opdatering"
     }
   },
@@ -61,7 +62,7 @@
     },
     "securityLifecycle": {
       "title": "Kilo",
-      "body": "'n Sekuriteitsbevinding benodig aandag"
+      "body": "'n Sekuriteitskontrole het 'n opdatering"
     }
   },
   "instanceLifecycle": {

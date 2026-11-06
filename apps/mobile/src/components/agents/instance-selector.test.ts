@@ -23,9 +23,7 @@ vi.mock('react-native', () => ({
 }));
 
 vi.mock('@/components/ui/icons', () => ({ ChevronDown: 'ChevronDown' }));
-vi.mock('@/components/ui/text', () => ({
-  Text: ({ children }: { children?: unknown }) => children,
-}));
+vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ foreground: '#000', mutedForeground: '#666' }),
@@ -44,6 +42,25 @@ function textValues(node: Node): string[] {
   return (Array.isArray(children) ? children : [children]).flatMap(child =>
     textValues(child as Node)
   );
+}
+
+/** The className of the closed selector's value line, the only `flex-1` text. */
+function valueClassName(node: Node): string | undefined {
+  if (node === null || typeof node !== 'object') {
+    return undefined;
+  }
+  const className = node.props?.className;
+  if (typeof className === 'string' && className.includes('flex-1')) {
+    return className;
+  }
+  const children = node.props?.children;
+  for (const child of Array.isArray(children) ? children : [children]) {
+    const found = valueClassName(child as Node);
+    if (found) {
+      return found;
+    }
+  }
+  return undefined;
 }
 
 const INSTANCE = {
@@ -97,5 +114,30 @@ describe('InstanceSelector closed label', () => {
 
     expect(textValues(element)).toContain('laptop · kilo');
     expect(textValues(element)).not.toContain('No CLI instances connected');
+  });
+});
+
+describe('InstanceSelector closed label ink', () => {
+  it('gives the selected Cloud Agent default value ink, not placeholder ink', async () => {
+    const { InstanceSelector } = await import('./instance-selector');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = InstanceSelector(baseProps()) as Node;
+
+    const className = valueClassName(element) ?? '';
+    expect(className).toContain('text-foreground');
+    expect(className).not.toContain('text-muted-foreground');
+  });
+
+  it.each([
+    ['the loading copy', { ...baseProps(), isLoading: true }],
+    ['the unbound computer', { ...baseProps(), pendingComputer: true }],
+  ])('keeps placeholder ink while it shows %s', async (_name, props) => {
+    const { InstanceSelector } = await import('./instance-selector');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = InstanceSelector(props) as Node;
+
+    expect(valueClassName(element) ?? '').toContain('text-muted-foreground');
   });
 });

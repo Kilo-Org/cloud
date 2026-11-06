@@ -105,10 +105,12 @@ function Surface({
   scope,
   value,
   onSelectionChange,
+  variant,
 }: {
   scope?: ContextDisplayScope;
   value?: string | null;
   onSelectionChange?: (organizationId: string | null) => void;
+  variant?: 'inline' | 'field';
 }) {
   const { organizationId: id } = useOrganization();
   const [, setVersion] = useState(0);
@@ -120,7 +122,7 @@ function Surface({
   return createElement(
     'GlobalScope',
     { id },
-    createElement(ContextControl, { scope, value, onSelectionChange })
+    createElement(ContextControl, { scope, value, onSelectionChange, variant })
   );
 }
 
@@ -129,6 +131,7 @@ async function mount(
     scope?: ContextDisplayScope;
     value?: string | null;
     onSelectionChange?: (organizationId: string | null) => void;
+    variant?: 'inline' | 'field';
   } = {}
 ) {
   const result = await renderWithProviders(createElement(Surface, props), {
@@ -290,6 +293,9 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
     expect(texts(ui)).toContain(label);
     expect(picker(ui).props.accessibilityLabel).toBe(label);
     expect(picker(ui).findByType(Text).props.numberOfLines).toBe(1);
+    // Memberships of one workspace share their leading words; the label keeps
+    // its tail, which is the part that names the account.
+    expect(picker(ui).findByType(Text).props.ellipsizeMode).toBe('middle');
     expect(picker(ui).props.accessibilityRole).toBe('button');
     expect(picker(ui).props.accessibilityState).toEqual({ busy: false, disabled: false });
     expect(picker(ui).findAllByType('ActivityIndicator' as ElementType)).toHaveLength(0);
@@ -343,7 +349,9 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
     expect(opened.map(row => row.label)).toEqual(['Personal', name]);
     expect(opened.map(row => row.selected)).toEqual([false, true]);
     expect(opened.map(row => row.role)).toEqual(['button', 'button']);
-    expect(opened.map(row => row.divider)).toEqual([true, true]);
+    // Rows divide themselves only: the full rule that closes the list belongs
+    // to the dismiss row's area, not to the last account.
+    expect(opened.map(row => row.divider)).toEqual([true, false]);
     expect(opened.map(row => row.check)).toEqual([false, true]);
     expect(cancelRow(ui).props.accessibilityState).toBeUndefined();
   });
@@ -604,5 +612,24 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
     expect(texts(ui)).toContain('Personal');
     expect(picker(ui).props.disabled).toBe(true);
     expect(list).not.toHaveBeenCalled();
+  });
+
+  it('renders the field variant as the stacked form triggers do', async () => {
+    storage.read.mockResolvedValue(null);
+    const ui = await mount({ variant: 'field' });
+    await waitFor(() => !picker(ui).props.disabled);
+    const trigger = picker(ui).props.className as string;
+    // The same bordered, full-width box `InstanceSelector` and `RepoSelector`
+    // render, so one label-value row on the form keeps one shape. The inline
+    // default is a bare row with no box.
+    expect(trigger).toContain('border');
+    expect(trigger).toContain('bg-secondary');
+    expect(trigger).toContain('justify-between');
+    const label = picker(ui).findByType(Text);
+    expect(label.props.className).toContain('flex-1');
+    expect(label.props.className).toContain('text-foreground');
+    const inline = await mount();
+    const inlineTrigger = picker(inline).props.className as string;
+    expect(inlineTrigger).not.toContain('bg-secondary');
   });
 });

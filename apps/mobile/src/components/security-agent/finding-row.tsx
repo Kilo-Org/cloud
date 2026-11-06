@@ -34,6 +34,13 @@ import { openFindingLink } from '@/lib/security-agent-link';
 import { type SecurityAnalysisCapacityState } from '@/lib/security-analysis-capacity';
 import { cn } from '@/lib/utils';
 
+/**
+ * A finding card's own frame: the padding and the line rhythm the loading
+ * placeholder in `finding-row-skeleton.tsx` repeats, so the cards replace the
+ * placeholders in place.
+ */
+export const FINDING_ROW_FRAME_CLASS = 'gap-1.5 rounded-lg bg-secondary p-3';
+
 const SEVERITY_KEYS = {
   critical: 'common.critical',
   high: 'securityAgent.sla.high',
@@ -103,6 +110,12 @@ type FindingRowQuickActionProps = {
 // (eligibility) and `capacityState` are separate so the button's presence never
 // depends on capacity still loading — only its state does, avoiding a
 // button/text layout shift once capacity resolves.
+//
+// Both actions are `outline`, not `secondary`: the row they sit on is itself
+// `bg-secondary`, so a secondary action painted the card's own fill and, with
+// the shadow invisible on the dark card, read as plain text instead of a
+// control. `outline` is the app's control-on-a-card surface — a `bg-card` chip
+// in light and the `dark:border-neutral-700` hairline in dark.
 function FindingRowQuickAction({
   finding,
   scope,
@@ -120,7 +133,7 @@ function FindingRowQuickAction({
   if (prUrl) {
     return (
       <Button
-        variant="secondary"
+        variant="outline"
         size="sm"
         className="mt-1 self-start px-3"
         onPress={() => {
@@ -136,7 +149,7 @@ function FindingRowQuickAction({
   if (isAnalyzable) {
     return (
       <Button
-        variant="secondary"
+        variant="outline"
         size="sm"
         className="mt-1 self-start px-3"
         // Loading covers both the in-flight start and the capacity read, so the
@@ -224,7 +237,7 @@ export function FindingRow({
       });
 
   return (
-    <View className="gap-1.5 rounded-lg bg-secondary p-3">
+    <View className={FINDING_ROW_FRAME_CLASS}>
       <Pressable
         className="gap-1.5 active:opacity-70"
         accessibilityRole="button"

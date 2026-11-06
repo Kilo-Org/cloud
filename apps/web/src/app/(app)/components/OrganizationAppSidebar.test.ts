@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 
 const mockUseFeatureFlagEnabled = jest.fn();
 const mockUseOrganizationWithMembers = jest.fn();
+const mockUseRequestLogsAvailable = jest.fn();
 
 (globalThis as typeof globalThis & { React: typeof React }).React = React;
 
@@ -22,6 +23,10 @@ jest.mock('@/contexts/RoleTestingContext', () => ({
 }));
 jest.mock('@/app/api/organizations/hooks', () => ({
   useOrganizationWithMembers: () => mockUseOrganizationWithMembers(),
+}));
+jest.mock('@/hooks/useRequestLogsAvailable', () => ({
+  useRequestLogsAvailable: (organizationId: string, canView: boolean) =>
+    mockUseRequestLogsAvailable(organizationId, canView),
 }));
 jest.mock('@/hooks/useOrgKiloClaw', () => ({
   useOrgKiloClawNavState: () => ({ isSuccess: false }),
@@ -44,9 +49,16 @@ jest.mock('./SidebarMenuList', () => ({
     items.map(item => React.createElement('a', { key: item.url, href: item.url }, item.title)),
 }));
 
+function renderSidebar(OrganizationAppSidebar: React.ComponentType<{ organizationId: string }>) {
+  return renderToStaticMarkup(
+    React.createElement(OrganizationAppSidebar, { organizationId: 'test-org' })
+  );
+}
+
 describe('OrganizationAppSidebar Gas Town access', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockUseRequestLogsAvailable.mockReturnValue(false);
   });
 
   afterEach(() => {
@@ -78,5 +90,37 @@ describe('OrganizationAppSidebar Gas Town access', () => {
     expect(html.includes('/organizations/test-org/gastown')).toBe(visible);
     expect(html).toContain('Cloud Agent');
     expect(mockUseFeatureFlagEnabled).toHaveBeenCalledWith('gastown-access');
+  });
+});
+
+describe('OrganizationAppSidebar Request Logs entry', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUseFeatureFlagEnabled.mockReturnValue(false);
+  });
+
+  it.each([
+    { role: 'owner', canView: true },
+    { role: 'admin', canView: true },
+    { role: 'billing_manager', canView: true },
+    { role: 'member', canView: false },
+  ] as const)('only lets $role check availability when allowed', async ({ role, canView }) => {
+    mockUseOrganizationWithMembers.mockReturnValue({ data: { callerRole: role } });
+    mockUseRequestLogsAvailable.mockReturnValue(false);
+
+    const { default: OrganizationAppSidebar } = await import('./OrganizationAppSidebar');
+    renderSidebar(OrganizationAppSidebar);
+
+    expect(mockUseRequestLogsAvailable).toHaveBeenCalledWith('test-org', canView);
+  });
+
+  it.each([true, false])('shows the entry only when available (%s)', async available => {
+    mockUseOrganizationWithMembers.mockReturnValue({ data: { callerRole: 'owner' } });
+    mockUseRequestLogsAvailable.mockReturnValue(available);
+
+    const { default: OrganizationAppSidebar } = await import('./OrganizationAppSidebar');
+    const html = renderSidebar(OrganizationAppSidebar);
+
+    expect(html.includes('/organizations/test-org/request-logs')).toBe(available);
   });
 });

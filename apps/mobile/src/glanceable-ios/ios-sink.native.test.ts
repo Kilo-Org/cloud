@@ -6,7 +6,7 @@ import {
   GLANCEABLE_TERMINAL_MS,
   type GlanceableAgentsSnapshot,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
-import { type GlanceableLiveActivityContentState } from '@kilocode/notifications';
+import { type GlanceableLiveActivityContentState } from '@kilocode/notifications/schemas';
 
 type NativeRecord = {
   id: string;

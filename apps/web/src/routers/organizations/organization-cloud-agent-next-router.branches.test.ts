@@ -83,7 +83,6 @@ jest.mock('@/lib/cloud-agent/bitbucket-integration-helpers', () => ({
   fetchBitbucketRepositoriesForOrganization: jest.fn(),
 }));
 jest.mock('@/lib/cloud-agent/github-integration-helpers', () => ({
-  fetchGitHubRepositoriesForOrganization: jest.fn(),
   fetchAllGitHubRepositoriesForOrganization: jest.fn(),
 }));
 jest.mock('@/lib/cloud-agent/gitlab-integration-helpers', () => ({

@@ -9,6 +9,7 @@
       "lowBalance": "ቀሪ ሂሳብዎ ትኩረት ይፈልጋል",
       "spendAlert": "ወጪዎ ትኩረት ይፈልጋል",
       "securityFinding": "የደህንነት ግኝት ትኩረት ይፈልጋል",
+      "securityUpdate": "የደህንነት ፍተሻ ማዘመኛ አለው",
       "activeAgentsGlanceable": "ንቁ ወኪሎች ማዘመኛ አላቸው"
     }
   },
@@ -61,7 +62,7 @@
     },
     "securityLifecycle": {
       "title": "Kilo",
-      "body": "የደህንነት ግኝት ትኩረት ይፈልጋል"
+      "body": "የደህንነት ፍተሻ ማዘመኛ አለው"
     }
   },
   "instanceLifecycle": {

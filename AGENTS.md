@@ -80,7 +80,7 @@ suggests:
 | `kilocode-ai-gateway` | Frankfurt and us-west (SFO) |
 | `kilocode-ai-gateway-secure-proxy` | us-west (SFO) only |
 
-Treat this table as the source of truth for compute location, database
+Treat this table as the source of truth for compute location, database and Redis
 round-trip latency, and replica reasoning. If an observed region is not `fra1` or
 `sfo1`, it is a proxy/edge hop, not the function. Confirm against the Vercel
 project's region list rather than inferring from a request or log field.

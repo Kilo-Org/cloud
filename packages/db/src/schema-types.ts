@@ -2,6 +2,37 @@ import { SecureProxyUpstreamUrlSchema } from '@kilocode/ai-gateway-secure-proxy-
 import { GATE_THRESHOLDS, REVIEW_STYLES } from '@kilocode/app-shared/code-review';
 import * as z from 'zod';
 
+export const watchPrPolicySchema = z
+  .object({
+    version: z.literal(1),
+    model: z.string().trim().min(1).max(200),
+    profileId: z.string().uuid().nullable(),
+    categories: z.object({
+      reviews: z.boolean(),
+      failedChecks: z.boolean(),
+      baseUpdates: z.boolean(),
+    }),
+    branchStrategy: z.enum(['merge', 'rebase']),
+    historyRewriteConsent: z.boolean(),
+    maxAttemptsPerProblem: z.number().int().min(1).max(2),
+    maxTotalAttempts: z.number().int().min(1).max(10),
+    observationOnlyConsent: z.literal(true),
+    futureEventsOnlyConsent: z.literal(true),
+    noHardSpendCapConsent: z.literal(true),
+  })
+  .strict()
+  .refine(value => value.branchStrategy !== 'rebase' || value.historyRewriteConsent, {
+    message: 'Rebase requires explicit history-rewrite consent',
+    path: ['historyRewriteConsent'],
+  })
+  .refine(value => value.maxAttemptsPerProblem <= value.maxTotalAttempts, {
+    message: 'Per-problem attempts cannot exceed total attempts',
+    path: ['maxAttemptsPerProblem'],
+  });
+
+export type WatchPrPolicy = z.infer<typeof watchPrPolicySchema>;
+export type WatchPrStatus = 'watching' | 'paused' | 'finished';
+
 // =============================================================================
 // A. Runtime Values (used in enumCheck() or .default())
 // =============================================================================
@@ -886,9 +917,15 @@ export const AdminActionAuditAction = z.enum([
   'email_test.send',
   'admin.platform_access.set',
   'admin.permissions.set',
+  'admin.step_up.verified',
+  'admin.passkey.enrolled',
   'cloud_agent_session.messages.view',
   'cloud_agent_session.api_history.view',
   'webhook_trigger.request_logs.view',
+  'request_logging_opt_in.create',
+  'request_logging_opt_in.delete',
+  'api_request_log.download',
+  'provider_metadata.download',
   'organization.member.invite',
   'organization.member.role.update',
   'organization.member.remove',
@@ -900,6 +937,15 @@ export const AdminActionAuditAction = z.enum([
   'credit_campaign.create',
   'credit_campaign.update',
   'credit_campaign.set_active',
+  'support_access.request',
+  'support_access.approve',
+  'support_access.deny',
+  'support_access.cancel',
+  'support_access.revoke',
+  'support_access.emergency_issue',
+  'support_access.review',
+  'service_fee.rollback_refund',
+  'service_fee.rollback_reconcile',
 ]);
 
 export type AdminActionAuditAction = z.infer<typeof AdminActionAuditAction>;
@@ -1088,8 +1134,9 @@ export const ENKRYPT_RULE_FRAMEWORKS = [
 export const ENKRYPT_POLICY_FORMATS = ['policy_text', 'rules'] as const;
 
 /**
- * What a revise-type detector does when it fires. Enkrypt answers these detectors with rewritten
- * text instead of a block message, so the organization chooses whether a detection blocks.
+ * What a revise-type input detector, or any output detector, does when it fires. Enkrypt answers
+ * revise-type detectors with rewritten text instead of a block message, so the organization chooses
+ * whether a detection blocks.
  */
 export const ENKRYPT_REVISE_DETECTOR_ACTIONS = ['log', 'block'] as const;
 
@@ -1156,6 +1203,128 @@ export const EnkryptPolicyRuleSchema = z.strictObject({
 
 export type EnkryptPolicyRule = z.infer<typeof EnkryptPolicyRuleSchema>;
 
+const enkryptPiiEntitiesSchema = z.array(EnkryptPiiEntitySchema).max(ENKRYPT_PII_ENTITIES.length);
+
+const enkryptBannedKeywordsSchema = z
+  .array(enkryptListItemSchema('keyword', enkryptLimits.keywordLength))
+  .max(enkryptLimits.keywords, `Add up to ${enkryptLimits.keywords} keywords.`);
+
+const enkryptTopicsSchema = z
+  .array(enkryptListItemSchema('topic', enkryptLimits.topicLength))
+  .max(enkryptLimits.topics, `Add up to ${enkryptLimits.topics} topics.`);
+
+const enkryptPolicyFields = {
+  format: z.enum(ENKRYPT_POLICY_FORMATS),
+  policy_text: z
+    .string()
+    .trim()
+    .max(
+      enkryptLimits.policyTextLength,
+      `Policy text can be up to ${enkryptLimits.policyTextLength.toLocaleString('en-US')} characters.`
+    ),
+  rules: z
+    .array(EnkryptPolicyRuleSchema)
+    .max(enkryptLimits.rules, `Add up to ${enkryptLimits.rules} rules.`),
+};
+
+const EnkryptPiiDetectorSchema = z.strictObject({
+  enabled: z.boolean(),
+  action: EnkryptReviseDetectorActionSchema,
+  entities: enkryptPiiEntitiesSchema,
+});
+
+const EnkryptKeywordDetectorSchema = z.strictObject({
+  enabled: z.boolean(),
+  action: EnkryptReviseDetectorActionSchema,
+  banned_keywords: enkryptBannedKeywordsSchema,
+});
+
+const EnkryptActionDetectorSchema = z.strictObject({
+  enabled: z.boolean(),
+  action: EnkryptReviseDetectorActionSchema,
+});
+
+type EnkryptConfigurableDetectors = {
+  pii: { enabled: boolean; entities: EnkryptPiiEntity[] };
+  keyword_detector: { enabled: boolean; banned_keywords: string[] };
+  topic_detector: { enabled: boolean; topic: string[] };
+  policy_violation: {
+    enabled: boolean;
+    format: (typeof ENKRYPT_POLICY_FORMATS)[number];
+    policy_text: string;
+    rules: EnkryptPolicyRule[];
+  };
+};
+
+function refineEnkryptDetectors(
+  detectors: EnkryptConfigurableDetectors,
+  ctx: z.core.$RefinementCtx
+) {
+  const { pii, keyword_detector, topic_detector, policy_violation } = detectors;
+  if (pii.enabled && pii.entities.length === 0) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['pii', 'entities'],
+      message: 'Select at least one type of data to detect.',
+    });
+  }
+  if (new Set(pii.entities).size !== pii.entities.length) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['pii', 'entities'],
+      message: 'Select each type of data once.',
+    });
+  }
+  if (keyword_detector.enabled && keyword_detector.banned_keywords.length === 0) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['keyword_detector', 'banned_keywords'],
+      message: 'Add at least one keyword.',
+    });
+  }
+  if (topic_detector.enabled && topic_detector.topic.length === 0) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['topic_detector', 'topic'],
+      message: 'Add at least one topic.',
+    });
+  }
+  if (policy_violation.enabled) {
+    if (policy_violation.format === 'policy_text' && !policy_violation.policy_text) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['policy_violation', 'policy_text'],
+        message: 'Enter the policy text.',
+      });
+    }
+    if (policy_violation.format === 'rules' && policy_violation.rules.length === 0) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['policy_violation', 'rules'],
+        message: 'Add at least one rule.',
+      });
+    }
+  }
+  const seenRuleIds = new Set<string>();
+  policy_violation.rules.forEach((rule, index) => {
+    if (seenRuleIds.has(rule.id)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['policy_violation', 'rules', index, 'id'],
+        message: 'Rule IDs must be unique.',
+      });
+    }
+    seenRuleIds.add(rule.id);
+  });
+  if (JSON.stringify(detectors).length > enkryptLimits.serializedLength) {
+    ctx.addIssue({
+      code: 'custom',
+      path: [],
+      message: 'This detector configuration is too large. Remove some keywords, topics, or rules.',
+    });
+  }
+}
+
 /**
  * An organization's Enkrypt input detectors, stored in `settings.enkrypt.input_guardrail.detectors`
  * and turned into the `detectors` object of `POST /guardrails/detect` by the gateway. Disabled detectors keep
@@ -1165,109 +1334,16 @@ export type EnkryptPolicyRule = z.infer<typeof EnkryptPolicyRuleSchema>;
 export const EnkryptInputDetectorsSchema = z
   .strictObject({
     injection_attack: EnkryptToggleDetectorSchema,
-    pii: z.strictObject({
-      enabled: z.boolean(),
-      action: EnkryptReviseDetectorActionSchema,
-      entities: z.array(EnkryptPiiEntitySchema).max(ENKRYPT_PII_ENTITIES.length),
-    }),
-    keyword_detector: z.strictObject({
-      enabled: z.boolean(),
-      action: EnkryptReviseDetectorActionSchema,
-      banned_keywords: z
-        .array(enkryptListItemSchema('keyword', enkryptLimits.keywordLength))
-        .max(enkryptLimits.keywords, `Add up to ${enkryptLimits.keywords} keywords.`),
-    }),
-    topic_detector: z.strictObject({
-      enabled: z.boolean(),
-      topic: z
-        .array(enkryptListItemSchema('topic', enkryptLimits.topicLength))
-        .max(enkryptLimits.topics, `Add up to ${enkryptLimits.topics} topics.`),
-    }),
-    policy_violation: z.strictObject({
-      enabled: z.boolean(),
-      format: z.enum(ENKRYPT_POLICY_FORMATS),
-      policy_text: z
-        .string()
-        .trim()
-        .max(
-          enkryptLimits.policyTextLength,
-          `Policy text can be up to ${enkryptLimits.policyTextLength.toLocaleString('en-US')} characters.`
-        ),
-      rules: z
-        .array(EnkryptPolicyRuleSchema)
-        .max(enkryptLimits.rules, `Add up to ${enkryptLimits.rules} rules.`),
-    }),
+    pii: EnkryptPiiDetectorSchema,
+    keyword_detector: EnkryptKeywordDetectorSchema,
+    topic_detector: z.strictObject({ enabled: z.boolean(), topic: enkryptTopicsSchema }),
+    policy_violation: z.strictObject({ enabled: z.boolean(), ...enkryptPolicyFields }),
     toxicity: EnkryptToggleDetectorSchema,
     nsfw: EnkryptToggleDetectorSchema,
-    bias: z.strictObject({ enabled: z.boolean(), action: EnkryptReviseDetectorActionSchema }),
+    bias: EnkryptActionDetectorSchema,
     sponge_attack: EnkryptToggleDetectorSchema,
   })
-  .superRefine((detectors, ctx) => {
-    const { pii, keyword_detector, topic_detector, policy_violation } = detectors;
-    if (pii.enabled && pii.entities.length === 0) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['pii', 'entities'],
-        message: 'Select at least one type of data to detect.',
-      });
-    }
-    if (new Set(pii.entities).size !== pii.entities.length) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['pii', 'entities'],
-        message: 'Select each type of data once.',
-      });
-    }
-    if (keyword_detector.enabled && keyword_detector.banned_keywords.length === 0) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['keyword_detector', 'banned_keywords'],
-        message: 'Add at least one keyword.',
-      });
-    }
-    if (topic_detector.enabled && topic_detector.topic.length === 0) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['topic_detector', 'topic'],
-        message: 'Add at least one topic.',
-      });
-    }
-    if (policy_violation.enabled) {
-      if (policy_violation.format === 'policy_text' && !policy_violation.policy_text) {
-        ctx.addIssue({
-          code: 'custom',
-          path: ['policy_violation', 'policy_text'],
-          message: 'Enter the policy text.',
-        });
-      }
-      if (policy_violation.format === 'rules' && policy_violation.rules.length === 0) {
-        ctx.addIssue({
-          code: 'custom',
-          path: ['policy_violation', 'rules'],
-          message: 'Add at least one rule.',
-        });
-      }
-    }
-    const seenRuleIds = new Set<string>();
-    policy_violation.rules.forEach((rule, index) => {
-      if (seenRuleIds.has(rule.id)) {
-        ctx.addIssue({
-          code: 'custom',
-          path: ['policy_violation', 'rules', index, 'id'],
-          message: 'Rule IDs must be unique.',
-        });
-      }
-      seenRuleIds.add(rule.id);
-    });
-    if (JSON.stringify(detectors).length > enkryptLimits.serializedLength) {
-      ctx.addIssue({
-        code: 'custom',
-        path: [],
-        message:
-          'This detector configuration is too large. Remove some keywords, topics, or rules.',
-      });
-    }
-  });
+  .superRefine(refineEnkryptDetectors);
 
 export type EnkryptInputDetectors = z.infer<typeof EnkryptInputDetectorsSchema>;
 
@@ -1286,8 +1362,49 @@ export const ENKRYPT_DETECTOR_IDS = [
 ] as const satisfies readonly EnkryptDetectorId[];
 
 /**
- * Blocking Enkrypt AI input scan of each gateway chat turn. Flagged turns are always blocked, and
- * so is every turn while Enkrypt is unavailable. Without `detectors` the gateway applies Kilo
+ * An organization's Enkrypt output detectors, stored in `settings.enkrypt.output_guardrail.detectors`.
+ * They are the input detectors that apply to model output: prompt injection and sponge attacks
+ * describe prompts, and a response is scanned as input on the next request anyway. Every output
+ * detector chooses block or log, because a blocking detector makes the gateway hold back the whole
+ * response until it is scanned.
+ */
+export const EnkryptOutputDetectorsSchema = z
+  .strictObject({
+    pii: EnkryptPiiDetectorSchema,
+    keyword_detector: EnkryptKeywordDetectorSchema,
+    topic_detector: z.strictObject({
+      enabled: z.boolean(),
+      action: EnkryptReviseDetectorActionSchema,
+      topic: enkryptTopicsSchema,
+    }),
+    policy_violation: z.strictObject({
+      enabled: z.boolean(),
+      action: EnkryptReviseDetectorActionSchema,
+      ...enkryptPolicyFields,
+    }),
+    toxicity: EnkryptActionDetectorSchema,
+    nsfw: EnkryptActionDetectorSchema,
+    bias: EnkryptActionDetectorSchema,
+  })
+  .superRefine(refineEnkryptDetectors);
+
+export type EnkryptOutputDetectors = z.infer<typeof EnkryptOutputDetectorsSchema>;
+
+export type EnkryptOutputDetectorId = keyof EnkryptOutputDetectors;
+
+export const ENKRYPT_OUTPUT_DETECTOR_IDS = [
+  'pii',
+  'keyword_detector',
+  'topic_detector',
+  'policy_violation',
+  'toxicity',
+  'nsfw',
+  'bias',
+] as const satisfies readonly (EnkryptOutputDetectorId & EnkryptDetectorId)[];
+
+/**
+ * Blocking Enkrypt AI input scan of each gateway chat request. Flagged requests are always
+ * blocked, and so is every request while Enkrypt is unavailable. Without `detectors` the gateway applies Kilo
  * Default. `scan_tool_results` defaults to true so organizations enabled before it existed keep
  * scanning tool results.
  *
@@ -1303,8 +1420,23 @@ export const EnkryptInputGuardrailSettingsSchema = z.object({
 
 export type EnkryptInputGuardrailSettings = z.infer<typeof EnkryptInputGuardrailSettingsSchema>;
 
+/**
+ * Enkrypt AI scan of each gateway chat response, off unless an admin enables it. While a detector
+ * blocks, the gateway holds back the whole upstream response until the scan allows it, so a
+ * streamed response arrives all at once. Log-only detectors scan a copy without delaying it.
+ * Without saved `detectors` no detector applies. `detectors` is validated with
+ * `EnkryptOutputDetectorsSchema` where it is written and read, like the input guardrail's.
+ */
+export const EnkryptOutputGuardrailSettingsSchema = z.object({
+  enabled: z.boolean(),
+  detectors: z.unknown().optional(),
+});
+
+export type EnkryptOutputGuardrailSettings = z.infer<typeof EnkryptOutputGuardrailSettingsSchema>;
+
 export const OrganizationEnkryptSettingsSchema = z.object({
   input_guardrail: EnkryptInputGuardrailSettingsSchema.optional(),
+  output_guardrail: EnkryptOutputGuardrailSettingsSchema.optional(),
 });
 
 export const ORGANIZATION_GUARDRAIL_TYPES = ['mcp'] as const;
@@ -1360,6 +1492,10 @@ export type OrganizationMcpConnectTarget =
   | { kind: 'remote'; url: string }
   | { kind: 'package'; ecosystem: 'npm' | 'pypi'; identifier: string };
 
+// The Vercel AI Gateway inference regions: https://vercel.com/docs/ai-gateway/security-and-compliance/regional-inference
+export const OrganizationDataRegionSchema = z.enum(['us', 'eu', 'au', 'jp']);
+export type OrganizationDataRegion = z.infer<typeof OrganizationDataRegionSchema>;
+
 const OrganizationSettingsSchema = z.object({
   provider_allow_list: z.array(z.string()).optional(),
 
@@ -1404,6 +1540,11 @@ const OrganizationSettingsSchema = z.object({
   kilo_encrypt: z.boolean().optional(),
   enkrypt: OrganizationEnkryptSettingsSchema.optional(),
   guardrails: OrganizationGuardrailsSettingsSchema.optional(),
+  // These apply only while the `gateway_settings` organization feature is enabled in the gateway
+  // configuration. A null or absent data_region routes Vercel AI Gateway requests globally.
+  disable_openrouter: z.boolean().optional(),
+  disable_vercel_ai_gateway: z.boolean().optional(),
+  data_region: OrganizationDataRegionSchema.nullable().optional(),
 });
 
 export type OrganizationSettings = z.infer<typeof OrganizationSettingsSchema>;
@@ -2396,6 +2537,11 @@ export const NormalizedProvider = z.object({
       className: z.string().optional(),
     })
     .optional(),
+  /**
+   * Set on a direct BYOK provider that only serves an organization's own keys in catalog mode.
+   * Provider allow-lists can name it, but Kilo's own routes never use it.
+   */
+  byokOnly: z.literal(true).optional(),
   models: z.array(OpenRouterModel),
 });
 
@@ -2448,6 +2594,9 @@ export type EnkryptVerifications = z.infer<typeof EnkryptVerificationsSchema>;
 export type EnkryptGuardrailApiKind = 'chat_completions' | 'messages' | 'responses';
 
 export type EnkryptGuardrailDecision = 'allowed' | 'blocked' | 'error';
+
+/** Which guardrail made an Enkrypt call: the request scan or the response scan. */
+export type EnkryptGuardrailDirection = 'input' | 'output';
 
 export const ENKRYPT_STALE_AFTER_MS = 26 * 60 * 60 * 1000;
 
@@ -2555,9 +2704,12 @@ export type ReasoningOption = z.infer<typeof ReasoningOptionSchema>;
  * Per-key BYOK settings. Every field is optional so new settings need no backfill.
  * `serve_catalog_models` (catalog mode): a direct BYOK key that serves only Kilo catalog model
  * ids, so organization model policies apply to it.
+ * `priority`: the owner's chosen position of the key, lowest first, among keys that can serve the
+ * same request. Keys without one keep their default order after every prioritized key.
  */
 export const ByokApiKeySettingsSchema = z.object({
   serve_catalog_models: z.boolean().optional(),
+  priority: z.number().int().nonnegative().optional(),
 });
 
 export type ByokApiKeySettings = z.infer<typeof ByokApiKeySettingsSchema>;
@@ -2668,6 +2820,7 @@ export const CustomLlmApiConfigSchema = z.object({
   base_url: z.url(),
   disable_url_suffix: z.boolean().optional(),
   add_cache_breakpoints: z.boolean().optional(),
+  user_hash_as_mt_user_id: z.boolean().optional(),
   sanitize_ref_fields: z.boolean().optional(),
   extra_headers: CustomLlmExtraHeadersSchema.optional(),
   extra_body: CustomLlmExtraBodySchema.optional(),
@@ -2776,9 +2929,9 @@ export const CustomLlmInferenceProviderSlugSchema = z
   .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'must be a lowercase provider slug such as "acme-ai"');
 
 /**
- * Makes a custom LLM available to every user, including anonymous ones. Like
- * every custom LLM it is free; unlike private ones it is subject to
- * organization provider allow lists.
+ * Makes a custom LLM available to every user, including anonymous ones when it
+ * is free. Unlike private ones it is subject to organization provider allow
+ * lists.
  */
 export const CustomLlmPublicSchema = z.object({
   /** Provider slugs the upstream may serve this model from. They are listed in
@@ -2796,6 +2949,43 @@ export const VercelCountryCodeSchema = z
   .string()
   .regex(/^[A-Z]{2}$/, 'must be an uppercase two-letter country code such as "US"');
 
+const PricePerMillionSchema = z.number().finite().nonnegative();
+
+const CustomPricingTierSchema = z.object({
+  start_context_length: z.number().int().nonnegative(),
+  pricing: z.object({
+    prompt_per_million: PricePerMillionSchema,
+    completion_per_million: PricePerMillionSchema,
+    input_cache_read_per_million: PricePerMillionSchema.nullable(),
+    input_cache_write_per_million: PricePerMillionSchema.nullable(),
+  }),
+});
+
+export const CustomPricingTiersSchema = z
+  .tuple([CustomPricingTierSchema], CustomPricingTierSchema)
+  .superRefine((tiers, ctx) => {
+    if (tiers[0].start_context_length !== 0) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'The first pricing tier must start at context length 0',
+        path: [0, 'start_context_length'],
+      });
+    }
+    let previousStart = tiers[0].start_context_length;
+    for (const [index, { start_context_length }] of tiers.entries()) {
+      if (index > 0 && start_context_length <= previousStart) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'Pricing tiers must be ordered by ascending start context length',
+          path: [index, 'start_context_length'],
+        });
+      }
+      previousStart = start_context_length;
+    }
+  });
+
+export type CustomPricingTiers = z.infer<typeof CustomPricingTiersSchema>;
+
 export const CustomLlmDefinitionSchema = z
   .object({
     ...CustomLlmMetadataSchema.shape,
@@ -2808,6 +2998,13 @@ export const CustomLlmDefinitionSchema = z
     /** Hidden from model lists and refused by the gateway for requests from these countries.
      * A request without a known country is not restricted. */
     country_deny_list: z.array(VercelCountryCodeSchema).optional(),
+    /** What Kilo bills users, in the custom pricing tier format. Must be unset when the
+     * public id matches the free model id rules, and should be set otherwise. */
+    pricing: CustomPricingTiersSchema.optional(),
+    /** Whether the upstream may train on prompts. Only allowed with pricing; without it,
+     * or when unset, the model is assumed to train on prompts. Set it to false only for
+     * an upstream with zero data retention. */
+    may_train_on_prompts: z.boolean().optional(),
   })
   .superRefine((definition, ctx) => {
     const clientApiKind = getCustomLlmClientApiKind(definition.opencode_settings?.ai_sdk_provider);
@@ -2816,6 +3013,13 @@ export const CustomLlmDefinitionSchema = z
         code: 'custom',
         path: ['api_kinds'],
         message: `api_kinds must include ${clientApiKind}, the API clients use for this ai_sdk_provider`,
+      });
+    }
+    if (definition.may_train_on_prompts !== undefined && !definition.pricing) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['may_train_on_prompts'],
+        message: 'may_train_on_prompts must not be set without pricing',
       });
     }
     if (!definition.public) return;
@@ -2980,40 +3184,9 @@ export type PreferredProviderOrderConfig = z.infer<typeof PreferredProviderOrder
 
 export const CUSTOM_PRICING_MAX_MODELS = 500;
 
-const PricePerMillionSchema = z.number().finite().nonnegative();
-
-const CustomPricingTierSchema = z.object({
-  start_context_length: z.number().int().nonnegative(),
-  pricing: z.object({
-    prompt_per_million: PricePerMillionSchema,
-    completion_per_million: PricePerMillionSchema,
-    input_cache_read_per_million: PricePerMillionSchema.nullable(),
-    input_cache_write_per_million: PricePerMillionSchema.nullable(),
-  }),
-});
-
 export const CustomPricingSchema = z.object({
   model: GatewayModelIdSchema,
-  pricing: z.tuple([CustomPricingTierSchema], CustomPricingTierSchema).superRefine((tiers, ctx) => {
-    if (tiers[0].start_context_length !== 0) {
-      ctx.addIssue({
-        code: 'custom',
-        message: 'The first pricing tier must start at context length 0',
-        path: [0, 'start_context_length'],
-      });
-    }
-    let previousStart = tiers[0].start_context_length;
-    for (const [index, { start_context_length }] of tiers.entries()) {
-      if (index > 0 && start_context_length <= previousStart) {
-        ctx.addIssue({
-          code: 'custom',
-          message: 'Pricing tiers must be ordered by ascending start context length',
-          path: [index, 'start_context_length'],
-        });
-      }
-      previousStart = start_context_length;
-    }
-  }),
+  pricing: CustomPricingTiersSchema,
   /** Human-readable discount shown in the model name; never used in calculations. */
   discountPercentage: z.number().gt(0).lte(100).optional(),
   /** Only use this pricing when the upstream response does not report a market cost. */
@@ -3154,6 +3327,8 @@ export type StripeSubscriptionStatus =
  */
 export const CODE_REVIEW_TERMINAL_REASONS = [
   'billing',
+  // The billed or acting user is blocked (abuse, ToS, deletion), not short on credit.
+  'account_blocked',
   'model_not_found',
   'github_installation_required',
   'github_ip_allow_list',
@@ -3231,6 +3406,7 @@ export type CodeReviewTerminalReason = (typeof CODE_REVIEW_TERMINAL_REASONS)[num
  */
 export const CODE_REVIEW_BENIGN_TERMINAL_REASONS = [
   'billing',
+  'account_blocked',
   'model_not_found',
   'github_installation_required',
   'github_ip_allow_list',

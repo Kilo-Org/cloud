@@ -17,6 +17,11 @@ import {
 } from '@kilocode/worker-utils/bitbucket-workspace-access-token';
 import { and, eq, exists, isNull, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
+import {
+  claimRefreshLease,
+  newRefreshLeaseAttemptId,
+  releaseRefreshLease,
+} from './lib/oauth-refresh-lease.js';
 
 const BITBUCKET_PLATFORM = 'bitbucket';
 const TOKEN_SCHEME = 'bitbucket-oauth-credential-rsa-aes-256-gcm';
@@ -91,6 +96,29 @@ type ActiveAuthorization = {
   scopes: string[] | null;
   workspace: BitbucketWorkspaceIdentity;
 };
+
+const BITBUCKET_OAUTH_TOKEN_TIMEOUT_MS = 10_000;
+
+type BitbucketRefreshOutcome =
+  | { status: 'available'; authorization: ActiveAuthorization }
+  | Exclude<BitbucketAuthorizationResult, { status: 'available' }>;
+
+type BitbucketRefreshInputs = {
+  clientId: string;
+  clientSecret: string;
+  refreshToken: string;
+};
+
+type BitbucketProviderRefreshResult =
+  | {
+      status: 'available';
+      accessToken: string;
+      refreshToken: string;
+      expiresIn: number;
+      scopes: string[];
+    }
+  | { status: 'invalid_grant' }
+  | { status: 'temporarily_unavailable' };
 
 const BITBUCKET_OAUTH_SCOPE_ALIASES: Record<string, readonly string[]> = {
   'read:account:bitbucket-legacy': ['account'],
@@ -312,44 +340,93 @@ export class BitbucketAuthorizationService {
     db: WorkerDb,
     candidate: ActiveAuthorization,
     minimumValidityMs: number
-  ): Promise<
-    | { status: 'available'; authorization: ActiveAuthorization }
-    | Exclude<BitbucketAuthorizationResult, { status: 'available' }>
-  > {
-    return db.transaction(async tx => {
-      await tx.execute(
-        sql`SELECT pg_advisory_xact_lock(hashtextextended(${`bitbucket-oauth-credential:${candidate.credential.id}`}, 0))`
-      );
-      const current = await this.loadAuthorization(tx, candidate.owner);
-      if (current.status !== 'available') return current;
-      const currentExpiry = current.authorization.credential.access_token_expires_at;
-      if (!currentExpiry) return { status: 'reconnect_required' };
-      if (
-        current.authorization.credential.credential_version !==
-          candidate.credential.credential_version ||
-        new Date(currentExpiry).getTime() - Date.now() >= minimumValidityMs
-      ) {
-        return current;
-      }
-      return this.refreshAuthorization(tx, current.authorization);
-    });
+  ): Promise<BitbucketRefreshOutcome> {
+    const attemptId = newRefreshLeaseAttemptId();
+    const decision = await db.transaction(tx =>
+      this.readRefreshDecision(tx, candidate, attemptId, minimumValidityMs)
+    );
+    if (decision.status !== 'refresh') return decision;
+
+    const refreshed = await this.requestRefreshToken(decision.inputs);
+    return db.transaction(tx =>
+      this.commitRefresh(tx, candidate, decision.inputs, refreshed, attemptId)
+    );
   }
 
-  private async refreshAuthorization(
+  private needsRefresh(
+    authorization: ActiveAuthorization,
+    candidate: ActiveAuthorization,
+    minimumValidityMs: number
+  ): boolean {
+    const expiresAt = authorization.credential.access_token_expires_at;
+    if (!expiresAt) return false;
+    return (
+      authorization.credential.credential_version === candidate.credential.credential_version &&
+      new Date(expiresAt).getTime() - Date.now() < minimumValidityMs
+    );
+  }
+
+  private async readRefreshDecision(
     tx: WorkerTransaction,
-    authorization: ActiveAuthorization
-  ): Promise<
-    | { status: 'available'; authorization: ActiveAuthorization }
-    | Exclude<BitbucketAuthorizationResult, { status: 'available' }>
-  > {
+    candidate: ActiveAuthorization,
+    attemptId: string,
+    minimumValidityMs: number
+  ): Promise<{ status: 'refresh'; inputs: BitbucketRefreshInputs } | BitbucketRefreshOutcome> {
+    const lease = {
+      kind: 'platform-oauth-credential' as const,
+      credentialId: candidate.credential.id,
+    };
+    const loaded = await this.loadAuthorization(tx, candidate.owner);
+    if (loaded.status !== 'available') return loaded;
+    if (!loaded.authorization.credential.access_token_expires_at) {
+      return { status: 'reconnect_required' };
+    }
+    if (!this.needsRefresh(loaded.authorization, candidate, minimumValidityMs)) return loaded;
+
+    // Only the attempt that holds the exchange lease may use the refresh token:
+    // a second concurrent exchange would make one of the two attempts look like
+    // a rejected credential.
+    const claimed = await claimRefreshLease(tx, {
+      ...lease,
+      attemptId,
+      providerRequestBudgetMs: BITBUCKET_OAUTH_TOKEN_TIMEOUT_MS,
+    });
+    if (!claimed) return { status: 'temporarily_unavailable' };
+
+    // The claim can wait for a holder that then commits, so re-read the row this
+    // exchange will use and give the lease back when it is no longer the row to
+    // refresh.
+    const current = await this.loadAuthorization(tx, candidate.owner);
+    if (current.status !== 'available') {
+      await releaseRefreshLease(tx, { ...lease, attemptId });
+      return current;
+    }
+    if (!current.authorization.credential.access_token_expires_at) {
+      await releaseRefreshLease(tx, { ...lease, attemptId });
+      return { status: 'reconnect_required' };
+    }
+    if (!this.needsRefresh(current.authorization, candidate, minimumValidityMs)) {
+      await releaseRefreshLease(tx, { ...lease, attemptId });
+      return current;
+    }
+
     const [clientId, clientSecret, refreshToken] = await Promise.all([
       resolveSecret(this.env.BITBUCKET_CLIENT_ID),
       resolveSecret(this.env.BITBUCKET_CLIENT_SECRET),
-      this.decryptCredential(authorization, 'refresh'),
+      this.decryptCredential(current.authorization, 'refresh'),
     ]);
-    if (!clientId || !clientSecret) return { status: 'temporarily_unavailable' };
-    if (!refreshToken) return { status: 'reconnect_required' };
+    if (!clientId || !clientSecret || !refreshToken) {
+      await releaseRefreshLease(tx, { ...lease, attemptId });
+      return {
+        status: !clientId || !clientSecret ? 'temporarily_unavailable' : 'reconnect_required',
+      };
+    }
+    return { status: 'refresh', inputs: { clientId, clientSecret, refreshToken } };
+  }
 
+  private async requestRefreshToken(
+    inputs: BitbucketRefreshInputs
+  ): Promise<BitbucketProviderRefreshResult> {
     let response: Response;
     try {
       response = await fetch('https://bitbucket.org/site/oauth2/access_token', {
@@ -357,13 +434,15 @@ export class BitbucketAuthorizationService {
         redirect: 'manual',
         headers: {
           Accept: 'application/json',
-          Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`,
+          Authorization: `Basic ${Buffer.from(`${inputs.clientId}:${inputs.clientSecret}`).toString('base64')}`,
           'Content-Type': 'application/x-www-form-urlencoded',
         },
         body: new URLSearchParams({
           grant_type: 'refresh_token',
-          refresh_token: refreshToken,
+          refresh_token: inputs.refreshToken,
         }).toString(),
+        // Bounded deadline for the provider token request.
+        signal: AbortSignal.timeout(BITBUCKET_OAUTH_TOKEN_TIMEOUT_MS),
       });
     } catch {
       return { status: 'temporarily_unavailable' };
@@ -377,35 +456,81 @@ export class BitbucketAuthorizationService {
     }
     if (!response.ok) {
       const error = RefreshErrorSchema.safeParse(responseBody);
-      if (error.success && error.data.error === 'invalid_grant') {
-        await tx
-          .update(platform_oauth_credentials)
-          .set({
-            revoked_at: new Date().toISOString(),
-            revocation_reason: 'refresh_token_rejected',
-          })
-          .where(
-            and(
-              eq(platform_oauth_credentials.id, authorization.credential.id),
-              eq(
-                platform_oauth_credentials.credential_version,
-                authorization.credential.credential_version
-              ),
-              isNull(platform_oauth_credentials.revoked_at)
-            )
-          );
-        return { status: 'reconnect_required' };
-      }
-      return { status: 'temporarily_unavailable' };
+      return error.success && error.data.error === 'invalid_grant'
+        ? { status: 'invalid_grant' }
+        : { status: 'temporarily_unavailable' };
     }
 
     const parsed = RefreshResponseSchema.safeParse(responseBody);
     if (!parsed.success) return { status: 'temporarily_unavailable' };
     const scopes = normalizedScopes(parsed.data.scope);
     if (!scopes) return { status: 'temporarily_unavailable' };
+    return {
+      status: 'available',
+      accessToken: parsed.data.access_token,
+      refreshToken: parsed.data.refresh_token,
+      expiresIn: parsed.data.expires_in,
+      scopes,
+    };
+  }
+
+  private async commitRefresh(
+    tx: WorkerTransaction,
+    candidate: ActiveAuthorization,
+    inputs: BitbucketRefreshInputs,
+    refreshed: BitbucketProviderRefreshResult,
+    attemptId: string
+  ): Promise<BitbucketRefreshOutcome> {
+    await tx.execute(
+      sql`SELECT pg_advisory_xact_lock(hashtextextended(${`bitbucket-oauth-credential:${candidate.credential.id}`}, 0))`
+    );
+    // Losing the lease means it expired mid-exchange and another attempt owns
+    // the provider exchange, so this answer describes a generation that may no
+    // longer be current: neither persist it nor revoke on it.
+    const holdsLease = await releaseRefreshLease(tx, {
+      kind: 'platform-oauth-credential',
+      credentialId: candidate.credential.id,
+      attemptId,
+    });
+    if (!holdsLease) {
+      // The credential row may have been deleted while this exchange ran, which
+      // also removed its lease: report that rather than a retry loop.
+      const reloaded = await this.loadAuthorization(tx, candidate.owner);
+      return reloaded.status === 'available' ? { status: 'temporarily_unavailable' } : reloaded;
+    }
+    const current = await this.loadAuthorization(tx, candidate.owner);
+    if (current.status !== 'available') return current;
+    const authorization = current.authorization;
+    if (authorization.credential.credential_version !== candidate.credential.credential_version) {
+      // A concurrent refresh committed new secrets while this request waited on
+      // the token endpoint. Its credential is current and healthy, so return it.
+      return current;
+    }
+
+    if (refreshed.status === 'invalid_grant') {
+      await tx
+        .update(platform_oauth_credentials)
+        .set({
+          revoked_at: new Date().toISOString(),
+          revocation_reason: 'refresh_token_rejected',
+        })
+        .where(
+          and(
+            eq(platform_oauth_credentials.id, authorization.credential.id),
+            eq(
+              platform_oauth_credentials.credential_version,
+              authorization.credential.credential_version
+            ),
+            isNull(platform_oauth_credentials.revoked_at)
+          )
+        );
+      return { status: 'reconnect_required' };
+    }
+    if (refreshed.status !== 'available') return { status: 'temporarily_unavailable' };
+
     const [accessTokenEncrypted, refreshTokenEncrypted] = await Promise.all([
-      this.encryptCredential(parsed.data.access_token, authorization, 'access'),
-      this.encryptCredential(parsed.data.refresh_token, authorization, 'refresh'),
+      this.encryptCredential(refreshed.accessToken, authorization, 'access'),
+      this.encryptCredential(refreshed.refreshToken, authorization, 'refresh'),
     ]);
     if (!accessTokenEncrypted || !refreshTokenEncrypted) {
       return { status: 'temporarily_unavailable' };
@@ -415,7 +540,7 @@ export class BitbucketAuthorizationService {
       .update(platform_oauth_credentials)
       .set({
         access_token_encrypted: accessTokenEncrypted,
-        access_token_expires_at: new Date(Date.now() + parsed.data.expires_in * 1000).toISOString(),
+        access_token_expires_at: new Date(Date.now() + refreshed.expiresIn * 1000).toISOString(),
         refresh_token_encrypted: refreshTokenEncrypted,
         credential_version: sql`${platform_oauth_credentials.credential_version} + 1`,
         last_used_at: new Date().toISOString(),
@@ -437,11 +562,11 @@ export class BitbucketAuthorizationService {
 
     await tx
       .update(platform_integrations)
-      .set({ scopes, updated_at: new Date().toISOString() })
+      .set({ scopes: refreshed.scopes, updated_at: new Date().toISOString() })
       .where(eq(platform_integrations.id, authorization.integrationId));
     return {
       status: 'available',
-      authorization: { ...authorization, credential: credential.data, scopes },
+      authorization: { ...authorization, credential: credential.data, scopes: refreshed.scopes },
     };
   }
 

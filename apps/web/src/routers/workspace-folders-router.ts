@@ -12,18 +12,31 @@ import { cloudAgentWorktreeIdSchema } from '@kilocode/session-ingest-contracts';
 import { TRPCError } from '@trpc/server';
 import { and, asc, eq, inArray, isNull, max, sql } from 'drizzle-orm';
 import * as z from 'zod';
+import { createControlTokenForRequest } from '@/lib/auth/resource-delegation';
+import {
+  createCloudAgentNextClient,
+  rethrowCloudAgentError,
+} from '@/lib/cloud-agent-next/cloud-agent-client';
 import {
   workspaceFolderColorSchema,
   workspaceFolderNameSchema,
   type WorkspaceFolder,
 } from '@/lib/cloud-agent/workspace-folders';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
-import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import {
+  baseProcedure,
+  createTRPCRouter,
+  type TRPCContext,
+} from '@kilocode/web-shared/lib/trpc/init';
 
 const uuidSchema = z.uuid().transform(id => id.toLowerCase());
 const scopeInputSchema = z.object({ organizationId: uuidSchema.nullable() });
 const folderInputSchema = z.object({ folderId: uuidSchema });
 const workspaceSessionIdSchema = z.templateLiteral(['workspace_', z.uuid()]);
+const SCOPED_FOLDER_PROCEDURES = new Set([
+  'workspaceFolders.list',
+  'workspaceFolders.moveWorktree',
+]);
 const folderOutputSchema = z.object({
   id: z.uuid(),
   name: workspaceFolderNameSchema,
@@ -54,10 +67,77 @@ function ownerScopeCondition(
   );
 }
 
+/**
+ * A Cloud Agent parent may only reach the folder surface through the shared
+ * authority allowlist. Revalidate the live parent on the Worker before the
+ * transaction opens, so a revoked authority or a remote failure cannot write.
+ */
+async function revalidateScopedFolderAccess(
+  ctx: TRPCContext,
+  procedure: string,
+  organizationId: string | null,
+  rawInput: unknown
+): Promise<void> {
+  const authority = ctx.cloudAgentAuthority;
+  if (authority === undefined) return;
+  if (
+    !SCOPED_FOLDER_PROCEDURES.has(procedure) ||
+    authority.ownerId !== ctx.user.id ||
+    authority.organizationId !== organizationId
+  ) {
+    throw new TRPCError({ code: 'FORBIDDEN', message: 'Cloud Agent authority denied' });
+  }
+
+  const { token } = await createControlTokenForRequest(ctx.user, 'cloud-agent-next', {
+    headers: ctx.headersList,
+    ...(authority.organizationId === null ? {} : { organizationId: authority.organizationId }),
+    tokenSource: 'cloud-agent',
+  });
+  const client = createCloudAgentNextClient(token);
+  const signedOrganizationId = authority.organizationId ?? undefined;
+
+  if (procedure === 'workspaceFolders.list') {
+    await client
+      .listChildSessions({
+        limit: 1,
+        ...(signedOrganizationId === undefined ? {} : { organizationId: signedOrganizationId }),
+      })
+      .catch(rethrowCloudAgentError);
+    return;
+  }
+
+  const target = z
+    .object({
+      cloudAgentSessionId: workspaceSessionIdSchema,
+      worktreeId: cloudAgentWorktreeIdSchema,
+    })
+    .safeParse(rawInput);
+  if (!target.success) {
+    throw new TRPCError({ code: 'BAD_REQUEST', message: 'A child workspace is required' });
+  }
+  if (target.data.cloudAgentSessionId === authority.parentSessionId) {
+    throw new TRPCError({ code: 'NOT_FOUND', message: 'Worktree not found' });
+  }
+
+  const session = await client
+    .getSession(target.data.cloudAgentSessionId, signedOrganizationId)
+    .catch(rethrowCloudAgentError);
+  if (
+    session.worktreeId !== target.data.worktreeId ||
+    session.userId !== ctx.user.id ||
+    (signedOrganizationId === undefined
+      ? session.orgId != null
+      : session.orgId !== signedOrganizationId)
+  ) {
+    throw new TRPCError({ code: 'NOT_FOUND', message: 'Worktree not found' });
+  }
+}
+
 const workspaceFolderProcedure = baseProcedure
   .input(scopeInputSchema)
-  .use(async ({ ctx, input, type, next }) =>
-    db.transaction(async tx => {
+  .use(async ({ ctx, input, path, type, getRawInput, next }) => {
+    await revalidateScopedFolderAccess(ctx, path, input.organizationId, await getRawInput());
+    return db.transaction(async tx => {
       const scope: FolderScope = { userId: ctx.user.id, organizationId: input.organizationId };
       const [user] = await tx
         .select({ blockedReason: kilocode_users.blocked_reason })
@@ -90,8 +170,8 @@ const workspaceFolderProcedure = baseProcedure
       const result = await next({ ctx: { folderDb: tx, folderScope: scope } });
       if (!result.ok) throw result.error;
       return result;
-    })
-  );
+    });
+  });
 
 function ownedRootSessions(tx: DrizzleTransaction, scope: FolderScope, worktreeId: string) {
   return tx
@@ -156,10 +236,46 @@ async function lockMovableWorktree(tx: DrizzleTransaction, scope: FolderScope, w
   }
 }
 
+async function lockScopedChildSession(
+  tx: DrizzleTransaction,
+  scope: FolderScope,
+  child: { cloudAgentSessionId: string; worktreeId: string }
+) {
+  const [session] = await tx
+    .select({ worktreeId: cli_sessions_v2.cloud_agent_worktree_id })
+    .from(cli_sessions_v2)
+    .where(
+      and(
+        ownerScopeCondition(cli_sessions_v2, scope),
+        eq(cli_sessions_v2.cloud_agent_session_id, child.cloudAgentSessionId)
+      )
+    )
+    .for('update');
+  if (!session || session.worktreeId !== child.worktreeId) {
+    throw new TRPCError({ code: 'NOT_FOUND', message: 'Worktree not found' });
+  }
+}
+
 export const workspaceFoldersRouter = createTRPCRouter({
   list: workspaceFolderProcedure
     .output(z.object({ folders: z.array(folderOutputSchema) }))
     .query(async ({ ctx }) => {
+      if (ctx.cloudAgentAuthority !== undefined) {
+        // Scoped parents may choose a folder by metadata, but workspace IDs are
+        // ordinary-user listing data and must not cross the authority boundary.
+        const rows = await ctx.folderDb
+          .select(folderFields)
+          .from(cloud_agent_workspace_folders)
+          .where(ownerScopeCondition(cloud_agent_workspace_folders, ctx.folderScope))
+          .orderBy(
+            asc(cloud_agent_workspace_folders.position),
+            asc(cloud_agent_workspace_folders.id)
+          );
+        return {
+          folders: rows.map(folder => ({ ...folder, worktreeIds: [] })),
+        };
+      }
+
       const rows = await ctx.folderDb
         .select({
           ...folderFields,
@@ -282,7 +398,13 @@ export const workspaceFoldersRouter = createTRPCRouter({
   }),
 
   moveWorktree: workspaceFolderProcedure
-    .input(z.object({ worktreeId: cloudAgentWorktreeIdSchema, folderId: uuidSchema.nullable() }))
+    .input(
+      z.object({
+        worktreeId: cloudAgentWorktreeIdSchema,
+        folderId: uuidSchema.nullable(),
+        cloudAgentSessionId: workspaceSessionIdSchema.optional(),
+      })
+    )
     .mutation(async ({ ctx, input }) => {
       if (input.folderId !== null) {
         const [folder] = await ctx.folderDb
@@ -299,6 +421,17 @@ export const workspaceFoldersRouter = createTRPCRouter({
       }
 
       await lockMovableWorktree(ctx.folderDb, ctx.folderScope, input.worktreeId);
+
+      if (ctx.cloudAgentAuthority !== undefined) {
+        if (input.cloudAgentSessionId === undefined) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: 'A child workspace is required' });
+        }
+        await lockScopedChildSession(ctx.folderDb, ctx.folderScope, {
+          cloudAgentSessionId: input.cloudAgentSessionId,
+          worktreeId: input.worktreeId,
+        });
+      }
+
       await ctx.folderDb
         .update(cloud_agent_worktrees)
         .set({ folder_id: input.folderId })

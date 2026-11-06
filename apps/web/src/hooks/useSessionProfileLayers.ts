@@ -2,7 +2,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { resolveProfileLayers } from '@kilocode/cloud-agent-profile';
+import { appliesRepoBindings, resolveProfileLayers } from '@kilocode/cloud-agent-profile';
 import {
   useCombinedProfiles,
   useProfiles,
@@ -15,6 +15,8 @@ type SessionProfileLayersInput = {
   selectedOverrideProfileId: string | null;
   repoFullName?: string;
   platform?: 'github' | 'gitlab';
+  /** The session's environment. A V2 environment skips the repo binding; the effective default still applies. */
+  environment?: { repositories?: unknown } | null;
 };
 
 export function useSessionProfileLayers({
@@ -22,6 +24,7 @@ export function useSessionProfileLayers({
   selectedOverrideProfileId,
   repoFullName,
   platform,
+  environment,
 }: SessionProfileLayersInput) {
   const {
     data: combinedData,
@@ -58,6 +61,7 @@ export function useSessionProfileLayers({
     [organizationId, combinedData, personalProfilesData]
   );
 
+  const binds = appliesRepoBindings(environment);
   const effectiveDefaultProfileId = organizationId
     ? (combinedData?.effectiveDefaultId ?? null)
     : (personalProfilesData?.find(p => p.isDefault)?.id ?? null);
@@ -65,14 +69,14 @@ export function useSessionProfileLayers({
   const { data: repoBindings } = useRepoBindings({ organizationId });
 
   const repoBindingProfileId = useMemo(() => {
-    if (!repoFullName || !repoBindings) return null;
+    if (!binds || !repoFullName || !repoBindings) return null;
     const binding = repoBindings.find(
       b =>
         b.repoFullName.toLowerCase() === repoFullName.toLowerCase() &&
         (!platform || b.platform === platform)
     );
     return binding?.profileId ?? null;
-  }, [repoFullName, repoBindings, platform]);
+  }, [binds, repoFullName, repoBindings, platform]);
 
   // Shared resolution logic — same rules as the server-side merge.
   const layers = useMemo(

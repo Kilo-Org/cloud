@@ -11,6 +11,7 @@ import { and, eq, isNull, ne } from 'drizzle-orm';
 import jwt from 'jsonwebtoken';
 import { TRPCError } from '@trpc/server';
 import { headers as nextHeaders } from 'next/headers';
+import { extractBearerToken } from '@kilocode/worker-utils/extract-bearer-token';
 import {
   AI_ATTRIBUTION_AUDIENCE,
   CLOUD_AGENT_NEXT_AUDIENCE,
@@ -92,7 +93,6 @@ export type CreateControlTokenOptions = {
   extra?: {
     botId?: string;
     createdOnPlatform?: string;
-    isAdmin?: boolean;
     gastownAccess?: boolean;
     orgMemberships?: Array<{
       orgId: string;
@@ -158,10 +158,7 @@ export async function canIssueLegacyOrganizationToken(
 }
 
 function tokenFromHeaders(requestHeaders: Headers): string | null {
-  const value = requestHeaders.get('authorization');
-  if (!value || !value.toLowerCase().startsWith('bearer ')) return null;
-  const token = value.slice(7).trim();
-  return token || null;
+  return extractBearerToken(requestHeaders.get('authorization'));
 }
 
 function hasUnsafeLegacyClaims(claimNames: readonly string[]): boolean {
@@ -390,7 +387,6 @@ async function createModernControlToken(
       deviceSessionId: authority.deviceSessionId,
       botId: options?.extra?.botId,
       createdOnPlatform: options?.extra?.createdOnPlatform,
-      isAdmin: options?.extra?.isAdmin === true && authority.user.is_admin,
       gastownAccess: options?.extra?.gastownAccess,
       orgMemberships: memberships,
       ...(resource === 'wasteland' ? {} : { runtimeAdmission: authority.runtimeAdmission }),
@@ -489,10 +485,7 @@ export async function createControlTokenForRequest(
         tokenSource: options?.tokenSource,
         ...(resource === 'cloud-agent-next'
           ? {}
-          : {
-              isAdmin: options?.extra?.isAdmin === true && authority.user.is_admin,
-              orgMemberships: await membershipsFor(authority.user.id),
-            }),
+          : { orgMemberships: await membershipsFor(authority.user.id) }),
       },
       { expiresIn }
     );

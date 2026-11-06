@@ -9,6 +9,7 @@
       "lowBalance": "Nguzozi gị chọrọ nlebara anya",
       "spendAlert": "Mmefu gị chọrọ nlebara anya",
       "securityFinding": "Nchọpụta nchekwa chọrọ nlebara anya",
+      "securityUpdate": "Nlele nchekwa nwere mmelite",
       "activeAgentsGlanceable": "Ndị ọrụ na-arụ ọrụ nwere mmelite"
     }
   },
@@ -61,7 +62,7 @@
     },
     "securityLifecycle": {
       "title": "Kilo",
-      "body": "Nchọpụta nchekwa chọrọ nlebara anya"
+      "body": "Nlele nchekwa nwere mmelite"
     }
   },
   "instanceLifecycle": {

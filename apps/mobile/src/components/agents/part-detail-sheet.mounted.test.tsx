@@ -60,7 +60,10 @@ vi.mock('react-native-safe-area-context', () => ({
 }));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/centered-state-surface', () => ({ StateSurface: 'StateSurface' }));
-vi.mock('./tool-card-image-cache', () => ({ useToolCardImageUri: () => undefined }));
+vi.mock('./tool-card-image-cache', () => ({
+  isToolCardImagePending: () => false,
+  useToolCardImageUri: () => undefined,
+}));
 vi.mock('@/components/sheet-header', () => ({
   SheetHeader: 'SheetHeader',
 }));

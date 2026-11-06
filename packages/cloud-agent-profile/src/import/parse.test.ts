@@ -3,6 +3,7 @@ import { kiloCommandCreateInputSchema } from '../contracts/kilo-commands';
 import { collectImportItems, parseLocalConfigArchive, type ImportPreview } from './index';
 import { buildRepresentativeImportArchive, buildStoredZip, buildZip } from './test-fixtures';
 import {
+  MAX_IMPORT_CONFIG_NESTING_DEPTH,
   MAX_IMPORT_ENTRY_EXPANDED_BYTES,
   MAX_IMPORT_INSTRUCTION_GLOB_LENGTH,
   MAX_IMPORT_INSTRUCTION_GLOB_WILDCARDS,
@@ -447,6 +448,62 @@ describe('parseLocalConfigArchive', () => {
     expect(issue?.message).toContain('Duplicate property "agent"');
     expect(preview.config.agents).toEqual([]);
     expect(preview.hasErrors).toBe(true);
+  });
+
+  test('reports a config past the nesting limit instead of throwing', () => {
+    // 20000 object levels fit inside the 1 MiB per-entry limit and are deeper
+    // than the JSONC parser's own recursion can take.
+    const deep = `${'{"a":'.repeat(20_000)}1${'}'.repeat(20_000)}`;
+    expect(deep.length).toBeLessThan(MAX_IMPORT_ENTRY_EXPANDED_BYTES);
+
+    const preview = parseFiles({ 'kilo.json': deep, 'agent/reviewer.md': 'Review.' });
+
+    expect(preview.issues).toEqual([
+      expect.objectContaining({
+        code: 'invalid-config-json',
+        category: 'config',
+        path: 'kilo.json',
+      }),
+    ]);
+    expect(preview.issues[0]?.message).toContain(String(MAX_IMPORT_CONFIG_NESTING_DEPTH));
+    expect(preview.hasErrors).toBe(true);
+    expect(preview.config.agents.map(agent => agent.slug)).toEqual(['reviewer']);
+  });
+
+  test('reports deeply nested arrays inside a config past the nesting limit', () => {
+    const deep = `${'['.repeat(20_000)}${']'.repeat(20_000)}`;
+    const preview = parseFiles({ 'kilo.json': deep, 'agent/reviewer.md': 'Review.' });
+
+    expect(preview.issues.map(issue => issue.code)).toEqual(['invalid-config-json']);
+    expect(preview.config.agents.map(agent => agent.slug)).toEqual(['reviewer']);
+  });
+
+  test('accepts a config nested to the import limit and rejects the next level', () => {
+    const nest = (depth: number) => `${'{"a":'.repeat(depth)}1${'}'.repeat(depth)}`;
+    // `{"agent":{` is two levels, so the value nests to `depth - 2`.
+    const atLimit = `{"agent":{"n":${nest(MAX_IMPORT_CONFIG_NESTING_DEPTH - 2)}}}`;
+    expect(parseFiles({ 'kilo.json': atLimit }).issues).toEqual([]);
+
+    const overLimit = `{"agent":{"n":${nest(MAX_IMPORT_CONFIG_NESTING_DEPTH - 1)}}}`;
+    expect(parseFiles({ 'kilo.json': overLimit }).issues.map(issue => issue.code)).toEqual([
+      'invalid-config-json',
+    ]);
+  });
+
+  test('does not count braces inside strings or comments as nesting', () => {
+    const braces = '{\\"a\\":['.repeat(200);
+    const preview = parseFiles({
+      'kilo.json': `{${'// {[{[{\n'.repeat(200)}/* }]}]}]{ */"note":"${braces}"}`,
+    });
+    expect(preview.issues).toEqual([]);
+  });
+
+  test('reports duplicate properties inside array elements with their index path', () => {
+    const preview = parseFiles({
+      'kilo.json': '{"agent":{"list":[{"prompt":"A","prompt":"B"}]}}',
+    });
+    const issue = preview.issues.find(candidate => candidate.code === 'duplicate-definition');
+    expect(issue?.message).toContain('"agent.list.0.prompt"');
   });
 
   test('reports malformed config sections instead of silently skipping them', () => {

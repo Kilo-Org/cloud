@@ -6,7 +6,8 @@ import { BackHandler, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/empty-state';
-import { SheetHeader, type SheetHeaderTopInset } from '@/components/sheet-header';
+import { SheetHeader } from '@/components/sheet-header';
+import { type SheetHeaderTopInset } from '@/lib/form-sheet';
 import { NavigationContext } from '@/lib/navigation/navigation-context';
 import { useRouteFocused } from '@/lib/navigation/route-focus';
 
@@ -155,8 +156,10 @@ export function PickerSheet({
         {headerContent}
       </View>
       {scrollable && !expired ? (
-        // keyboardShouldPersistTaps keeps a first tap on a row working while
-        // a picker's search field holds the keyboard open.
+        // "handled" is the shell's own rule for the sheets that live in it: a
+        // form's tap outside its field dismisses the keyboard. A picker whose
+        // rows answer a search field must not rely on it — it owns its list and
+        // carries the shared contract from `@/lib/picker-list` instead.
         <ScrollView
           nestedScrollEnabled
           keyboardShouldPersistTaps="handled"

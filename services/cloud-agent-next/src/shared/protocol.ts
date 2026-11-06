@@ -92,6 +92,8 @@ export type KilocodeEventData = {
 export type AutocommitStartedData = {
   message: string;
   messageId?: string;
+  /** The repository the event is about, for a multi-repository turn. */
+  repository?: string;
 };
 
 /**
@@ -108,6 +110,8 @@ export type AutocommitCompletedData = {
   committedAt?: string;
   pushStatus?: 'pushed' | 'failed' | 'not_attempted' | 'unknown';
   commitMessageTruncated?: true;
+  /** The repository the event is about, for a multi-repository turn. */
+  repository?: string;
 };
 
 /**
@@ -251,6 +255,7 @@ export type SessionStatus =
 /** Data included in 'connected' events. */
 export type ConnectedEventData = {
   bootstrapPending?: boolean;
+  ancillaryOmittedItemCount?: number;
   sessionStatus?: SessionStatus;
   cloudStatus?: { type: CloudStatusType; step?: string; message?: string };
   activeMessageId?: string | null;

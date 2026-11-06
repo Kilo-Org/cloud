@@ -159,7 +159,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     userId,
     proposalId: openProposal.id,
     organizationId,
-    deepLink: 'kiloapp:///code-reviewer/personal/review-memory',
-    readOnlyDeepLink: `kiloapp:///code-reviewer/${organizationId}/review-memory`,
+    deepLink: 'kiloapp:///(app)/code-reviewer/personal/review-memory',
+    readOnlyDeepLink: `kiloapp:///(app)/code-reviewer/${organizationId}/review-memory`,
   };
 }

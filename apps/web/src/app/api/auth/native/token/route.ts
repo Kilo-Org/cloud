@@ -22,11 +22,12 @@ import { consumeSignInTicket } from '@/lib/auth/passkey';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import {
   createOrUpdateUser,
-  findUserByNormalizedEmail,
+  findUserBySignInCodeEmail,
   findUserIdByAuthProvider,
   type CreateOrUpdateUserArgs,
   type CreateOrUpdateUserResult,
 } from '@/lib/user';
+import { getDeliveredEmailAddress } from '@kilocode/web-shared/lib/email-address';
 import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
 import type { User } from '@kilocode/db/schema';
 import { checkDomainSignInEligibility } from '@/lib/auth/email-signin-eligibility';
@@ -216,8 +217,9 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
 
   // ── Step 0: Client-address rate limit ────────────────────────────────────
   // Counted before the admission gate so one address cannot spend the provider
-  // calls that admission and identity verification make. A firewall rule that
-  // is not configured fails open and is reported; it never refuses a sign-in.
+  // calls that admission and identity verification make. Only a rule that
+  // answered may let the exchange through: a rule that is not configured
+  // refuses here, before any of that work, and is reported.
   if (await isNativeTokenAddressRateLimited(request)) {
     return NextResponse.json({ error: 'RATE_LIMITED' }, { status: 429 });
   }
@@ -398,8 +400,12 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
     autoLinkToExistingUser = true;
   } else {
     // Email sign-in code path: reserve → settle → commit.
-    const existingUser = await findUserByNormalizedEmail(data.email);
-    const email = existingUser?.google_user_email ?? data.email.toLowerCase();
+    // The code is bound to the address it was delivered to, so the account is
+    // resolved for that same address. An alias of another account's address is
+    // a different address: it settles the alias, and the signup rules refuse it
+    // when the normalized address is already taken.
+    const existingUser = await findUserBySignInCodeEmail(data.email);
+    const email = existingUser?.google_user_email ?? getDeliveredEmailAddress(data.email);
 
     const reserveResult = await reserveSignInCode(data.email, data.code, data.challengeId);
     if (reserveResult === 'invalid') {
@@ -478,9 +484,8 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
 
       // ── Step 4.5: Key ownership check BEFORE code commit ─────────────
       // For assertion (existing key) and attestation (keyId already bound to
-      // another user): enforce → refuse without consuming the code so a
-      // legitimate retry remains possible. Report → log, skip persistence,
-      // and issue credentials.
+      // another user): refuse without consuming the code so a legitimate retry
+      // remains possible.
       if (
         admissionVerification.existingKeyUserId &&
         admissionVerification.existingKeyUserId !== result.user.id

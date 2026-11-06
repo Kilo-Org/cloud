@@ -27,10 +27,14 @@ let blacklistedDomains: {
   snapshot: BlacklistDomainsConfigSnapshot;
   domains: string[];
 } | null = null;
+// The last over-cap config this isolate reported, so one log line names each
+// loaded config instead of repeating on every cache refresh.
+let reportedDroppedDomains: string | null = null;
 
 export function clearOrganizationPolicyCache(): void {
   deniedModelsCache.clear();
   blacklistedDomains = null;
+  reportedDroppedDomains = null;
 }
 
 class DeniedModelsResponseError extends Error {
@@ -150,6 +154,18 @@ export async function getBlacklistedDomains(env: BlacklistEnv): Promise<string[]
       blacklistedDomains?.snapshot ?? null,
       now
     );
+    // An over-cap list still enforces its prefix. Name what the prefix leaves
+    // out, once per loaded config, so lost enforcement is visible here too.
+    const droppedKey = `${snapshot.config?.updated_at ?? ''}:${snapshot.droppedDomains}`;
+    if (snapshot.droppedDomains > 0 && droppedKey !== reportedDroppedDomains) {
+      reportedDroppedDomains = droppedKey;
+      console.warn(
+        JSON.stringify({
+          event: 'auto_routing_blacklist_domains_over_cap',
+          droppedDomains: snapshot.droppedDomains,
+        })
+      );
+    }
     const domains = blacklistedDomainsFromConfig(snapshot.config, []);
     blacklistedDomains = { expiresAt: now + POLICY_CACHE_TTL_MS, snapshot, domains };
     return domains;

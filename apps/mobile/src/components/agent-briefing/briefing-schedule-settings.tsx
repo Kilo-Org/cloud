@@ -17,7 +17,7 @@ import {
   briefingScheduleProblems,
 } from '@/lib/agent-briefing-schedule';
 import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
-import { formatDate } from '@/lib/format';
+import { formatClockTime } from '@/lib/format';
 import { dateTimeFormat } from '@/lib/intl-cache';
 import { useTRPC } from '@/lib/trpc';
 
@@ -105,6 +105,7 @@ export function ScheduleSettings({
             setTimezoneInvalid(false);
           }}
         />
+        <Text className="text-xs text-muted-foreground">{t('agentBriefing.timezoneHint')}</Text>
         <Button
           variant="ghost"
           disabled={offline || update.isPending}
@@ -134,9 +135,7 @@ export function ScheduleSettings({
                 setActiveTime(field.key);
               }}
             >
-              <Text>
-                {formatDate(pickerValue, i18n.language, { hour: '2-digit', minute: '2-digit' })}
-              </Text>
+              <Text>{formatClockTime(pickerValue, i18n.language)}</Text>
             </Button>
             {activeTime === field.key ? (
               <>
@@ -179,8 +178,8 @@ export function ScheduleSettings({
         message={timesInvalid ? t('agentBriefing.invalidSchedule') : null}
         className="text-sm"
       />
-      <Text className="text-xs text-muted-foreground">{t('agentBriefing.timezoneHint')}</Text>
       <Text className="text-xs text-muted-foreground">{t('agentBriefing.timeHint')}</Text>
+      <Text className="text-xs text-muted-foreground">{t('agentBriefing.scheduleHint')}</Text>
       <Button disabled={offline} loading={update.isPending} onPress={save}>
         <Text>{t('common.save')}</Text>
       </Button>

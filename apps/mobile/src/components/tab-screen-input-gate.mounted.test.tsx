@@ -15,10 +15,13 @@ type SettleProps = {
 };
 
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
+let focused = true;
 
 function renderSettle(): SettleProps {
   act(() => {
-    const element = createElement(TabSwitchInputSettle);
+    const element = createElement(TabSwitchInputSettle, {
+      navigation: { isFocused: () => focused },
+    });
     if (renderer) {
       renderer.update(element);
     } else {
@@ -33,6 +36,7 @@ function renderSettle(): SettleProps {
 
 beforeEach(() => {
   __resetTabSwitchInputForTests();
+  focused = true;
 });
 
 afterEach(() => {
@@ -42,12 +46,22 @@ afterEach(() => {
 
 describe('TabSwitchInputSettle mounted layout', () => {
   it('lets a touch through when no tab press is settling', () => {
+    focused = false;
     const settle = renderSettle();
 
     expect(settle.onStartShouldSetResponderCapture()).toBe(false);
   });
 
-  it('keeps a touch that starts while the pressed tab is still settling', () => {
+  it('lets the destination scene act while a tab switch is still settling', () => {
+    const settle = renderSettle();
+
+    markTabSwitchPending();
+
+    expect(settle.onStartShouldSetResponderCapture()).toBe(false);
+  });
+
+  it('keeps a touch from the scene being left while a tab switch is settling', () => {
+    focused = false;
     const settle = renderSettle();
 
     markTabSwitchPending();
@@ -55,8 +69,18 @@ describe('TabSwitchInputSettle mounted layout', () => {
     expect(settle.onStartShouldSetResponderCapture()).toBe(true);
   });
 
-  it('does not hand a kept touch to the tab screen', () => {
+  it('keeps a touch on the focused scene for a press on the tab it shows', () => {
     const settle = renderSettle();
+
+    markTabSwitchPending(Date.now(), { sameTab: true });
+
+    expect(settle.onStartShouldSetResponderCapture()).toBe(true);
+  });
+
+  it('does not hand a kept touch to the tab screen', () => {
+    focused = false;
+    const settle = renderSettle();
+    markTabSwitchPending();
 
     expect(settle.onResponderTerminationRequest()).toBe(false);
   });

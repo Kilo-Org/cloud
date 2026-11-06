@@ -9,6 +9,7 @@
       "lowBalance": "Usawa wako unahitaji umakini",
       "spendAlert": "Matumizi yako yanahitaji umakini",
       "securityFinding": "Tokeo la usalama linahitaji umakini",
+      "securityUpdate": "Ukaguzi wa usalama umepokea sasisho",
       "activeAgentsGlanceable": "Mawakala wanaofanya kazi wana sasisho"
     }
   },
@@ -61,7 +62,7 @@
     },
     "securityLifecycle": {
       "title": "Kilo",
-      "body": "Tokeo la usalama linahitaji umakini"
+      "body": "Ukaguzi wa usalama umepokea sasisho"
     }
   },
   "instanceLifecycle": {

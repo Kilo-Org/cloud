@@ -12,7 +12,8 @@ import { RadioGroup } from '@/components/ui/radio-group';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { reviewerSaveFailure, type ReviewerSaveFailure } from '@/lib/code-reviewer-save-error';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { usePopWhenFocused } from '@/lib/navigation/pop-when-focused';
+import { usePopOnce } from '@/lib/navigation/pop-once';
+import { CODE_REVIEWER_HOME_PATH } from '@/lib/profile-agent-navigation';
 import { cn } from '@/lib/utils';
 
 type OptionListProps<T extends string, TSaveResult> = {
@@ -40,7 +41,7 @@ export function OptionList<T extends string, TSaveResult>({
   descriptions,
   disabled,
 }: Readonly<OptionListProps<T, TSaveResult>>) {
-  const popWhenFocused = usePopWhenFocused();
+  const popOnce = usePopOnce();
   const colors = useThemeColors();
   const { t } = useTranslation();
   const [pending, setPending] = useState<T | null>(null);
@@ -56,9 +57,11 @@ export function OptionList<T extends string, TSaveResult>({
     setFailure(current => (current?.option === option ? current : null));
     try {
       await onSelect(option);
-      // A Back pressed while the save was in flight already left this screen;
-      // popping again would remove the screen beneath it.
-      popWhenFocused();
+      // A Back pressed while the save was in flight already left this screen,
+      // and a Back handled while the save's own dismissal runs is this
+      // screen's leave too; either way the completion must not pop the screen
+      // beneath.
+      popOnce();
     } catch (error) {
       // The save hook already surfaced the failure (toast + cache rollback) —
       // keep the screen up, clear the busy state, and hand the row to the
@@ -74,7 +77,7 @@ export function OptionList<T extends string, TSaveResult>({
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={title} />
+      <ScreenHeader title={title} backFallback={CODE_REVIEWER_HOME_PATH} />
       <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 pt-4">
         <RadioGroup label={title}>
           {options.map(option => (

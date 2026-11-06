@@ -8,7 +8,7 @@ import {
   agentNotificationKindForAndroidChannelId,
   agentNotificationKindForGlanceableSnapshot,
   androidChannelIdForAgentKind,
-} from '@kilocode/notifications';
+} from '@kilocode/notifications/schemas';
 import { requestWidgetUpdate } from 'react-native-android-widget';
 
 import { i18n } from '@/i18n';

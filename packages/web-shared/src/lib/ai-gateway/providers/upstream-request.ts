@@ -382,7 +382,7 @@ export async function upstreamRequest({
     const urlRejection = enforceUrlPolicy
       ? await rejectDisallowedUpstreamUrls({
           urls: provider.secureProxy ? [outgoing.url, targetUrl] : [outgoing.url],
-          providerId: provider.id,
+          providerId: provider.type,
           vercelRequestId,
           signal: combinedSignal,
         })
@@ -406,7 +406,7 @@ export async function upstreamRequest({
       ? await rejectUpstreamRedirect({
           response,
           url: outgoing.url,
-          providerId: provider.id,
+          providerId: provider.type,
           vercelRequestId,
         })
       : null;
@@ -434,7 +434,7 @@ export async function upstreamRequest({
       const causeMessage = getCauseMessage(cause);
       failureFamily = classifyUpstreamFetchFailure({ errorName, causeCode, causeName });
       const failureMetadata = {
-        providerId: provider.id,
+        providerId: provider.type,
         targetHost: getProviderTargetHost(apiUrl),
         ...(provider.secureProxy && {
           secureProxyHost: getProviderTargetHost(provider.secureProxy.url),
@@ -455,7 +455,7 @@ export async function upstreamRequest({
           level: 'error',
           tags: {
             source: 'ai-gateway-upstream-fetch',
-            provider: provider.id,
+            provider: provider.type,
             failure_family: failureFamily,
           },
           extra: failureMetadata,
@@ -505,7 +505,7 @@ export async function fetchGeneration(messageId: string, provider: Provider) {
   } catch (error) {
     captureException(error, {
       level: 'info',
-      tags: { source: `${provider.id}_generation_fetch` },
+      tags: { source: `${provider.type}_generation_fetch` },
       extra: { messageId },
     });
     return;
@@ -515,7 +515,7 @@ export async function fetchGeneration(messageId: string, provider: Provider) {
     const responseText = await response.text();
     captureMessage(`Timed out fetching openrouter generation`, {
       level: 'info',
-      tags: { source: `${provider.id}_generation_fetch` },
+      tags: { source: `${provider.type}_generation_fetch` },
       extra: {
         messageId,
         status: response.status,

@@ -68,8 +68,14 @@ export async function verifyUserOwnsSessionV2ByCloudAgentId(
 }
 
 /**
- * Verifies that a user owns a V2 organization session by cloud_agent_session_id
- * and is currently a member of that exact organization.
+ * Verifies that a user can reach a V2 organization session by
+ * cloud_agent_session_id.
+ *
+ * The caller must own the session row, and the row must belong to
+ * `organizationId`. That organization must be live (not soft-deleted), and the
+ * caller must hold a direct membership in it or a permitted
+ * parent-organization role (`ORGANIZATION_PARENT_ACCESS_ROLES`) in a live
+ * parent organization.
  *
  * @returns The kiloSessionId if the user can access the organization session, null otherwise
  */

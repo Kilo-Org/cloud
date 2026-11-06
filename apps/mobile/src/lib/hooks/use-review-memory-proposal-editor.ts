@@ -1,9 +1,11 @@
+import { usePreventRemove } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
 import { type PermissionState } from '@/lib/code-reviewer-status';
 import { useReviewMemoryProposalActions } from '@/lib/hooks/use-review-memory';
+import { isLeaveAction } from '@/lib/navigation/leave-actions';
 import {
   isProposalActionable,
   proposalDraft,
@@ -68,6 +70,49 @@ export function useReviewMemoryProposalEditor({
     isDirty: () => !sameProposalDraft(draft.current, baseline.current),
     onDiscard: onClose,
   });
+
+  // The sheet is a native sheet in its own window, so the route below it is out
+  // of sight but still live: without this, a system Back (the iOS edge swipe has
+  // no handler of its own here, and the sheet's own `interactiveDismissDisabled`
+  // only blocks its drag) removed the review-memory route and left the sheet
+  // presented over whatever screen the app fell back to. Back belongs to the
+  // sheet instead: a mutation in flight keeps the sheet and the outcome it
+  // awaits, and an idle sheet closes through the same keep-editing / discard
+  // path as its Close control, so the user stays on the proposal list.
+  //
+  // Only a leave action is the sheet's to answer. Forward navigation — a
+  // `replace` or `RESET` such as the sign-out, consent-required and
+  // force-update redirects — must still run: the sheet closes with it and the
+  // intercepted action is replayed, so the app goes where it was sent.
+  const [leaveAllowed, setLeaveAllowed] = useState(false);
+  const [leaveCount, setLeaveCount] = useState(0);
+  const replayRef = useRef<(() => void) | null>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  usePreventRemove(!leaveAllowed, ({ data, repeat }) => {
+    if (!isLeaveAction(data.action.type)) {
+      // The replay runs from the effect below, so this sheet is still mounted
+      // when the intercepted action is dispatched; closing it here would drop
+      // the replay with the unmounted guard.
+      replayRef.current = repeat;
+      setLeaveAllowed(true);
+      setLeaveCount(count => count + 1);
+      return;
+    }
+    if (pendingRef.current) {
+      return;
+    }
+    guard.requestClose();
+  });
+  useEffect(() => {
+    const replay = replayRef.current;
+    replayRef.current = null;
+    if (replay === null) {
+      return;
+    }
+    replay();
+    onCloseRef.current();
+  }, [leaveCount]);
 
   const changeField = (field: keyof ProposalDraft, value: string) => {
     draft.current = { ...draft.current, [field]: value };

@@ -480,6 +480,55 @@ describe('mergeProfileConfiguration', () => {
       });
       // The environment owns setup: the bound profile's command does not run.
       expect(result.setupCommands).toEqual(['env-cmd', 'manual-cmd']);
+      expect(result.environmentSetupCommandCount).toBe(1);
+
+      const withoutEnvironment = await mergeProfileConfiguration(db, {
+        owner,
+        repoFullName: 'org/repo',
+        platform: 'github',
+        setupCommands: ['manual-cmd'],
+      });
+      expect(withoutEnvironment.setupCommands).toEqual(['repo-cmd', 'manual-cmd']);
+      expect(withoutEnvironment.environmentSetupCommandCount).toBeUndefined();
+    });
+
+    test('keeps environment start commands apart from setup and from profile layers', async () => {
+      const user = await insertTestUser();
+      const owner: ProfileOwner = { type: 'user', id: user.id };
+      const defaultProfileId = await createProfile(owner, 'default', { isDefault: true });
+      await addCommands(defaultProfileId, ['default-cmd']);
+
+      const result = await mergeProfileConfiguration(db, {
+        owner,
+        repoFullName: 'org/repo',
+        platform: 'github',
+        environment: { setupCommands: ['install'], startCommands: ['serve'] },
+        setupCommands: ['manual-cmd'],
+      });
+
+      expect(result.setupCommands).toEqual(['install', 'manual-cmd']);
+      expect(result.startCommands).toEqual(['serve']);
+
+      const withoutEnvironment = await mergeProfileConfiguration(db, {
+        owner,
+        repoFullName: 'org/repo',
+        platform: 'github',
+      });
+      expect(withoutEnvironment.startCommands).toBeUndefined();
+    });
+
+    test('keeps an explicit zero environment setup boundary for inline commands', async () => {
+      const user = await insertTestUser();
+      const owner: ProfileOwner = { type: 'user', id: user.id };
+
+      const result = await mergeProfileConfiguration(db, {
+        owner,
+        environment: {},
+        setupCommands: ['manual-cmd'],
+      });
+
+      expect(result.setupCommands).toEqual(['manual-cmd']);
+      expect(result.environmentSetupCommandCount).toBe(0);
     });
 
     test('an empty environment still replaces profile setup commands, not profile vars', async () => {
@@ -537,6 +586,123 @@ describe('mergeProfileConfiguration', () => {
 
       expect(result.envVars).toBeUndefined();
       expect(result.encryptedSecrets).toEqual({ API_KEY: fakeEnvelopeObject });
+    });
+
+    describe('a V2 environment', () => {
+      // Any V2 environment skips the repository binding, but the implicit
+      // default profile still applies.
+      const v2Environment = {
+        envVars: { FROM_ENV: 'env' },
+        setupCommands: ['env-cmd'],
+        repositories: [
+          {
+            identity: { platform: 'github' as const, repoFullName: 'org/repo' },
+            repoFullName: 'org/repo',
+            leaf: 'repo',
+          },
+        ],
+      };
+
+      test('keeps the implicit default but ignores the repository binding', async () => {
+        const user = await insertTestUser();
+        const owner: ProfileOwner = { type: 'user', id: user.id };
+        const repoProfileId = await createProfile(owner, 'repo-profile');
+        await addVar(repoProfileId, 'FROM_BINDING', 'bound');
+        await addCommands(repoProfileId, ['binding-cmd']);
+        await bindRepo(owner, 'org/repo', 'github', repoProfileId);
+        const defaultProfileId = await createProfile(owner, 'default', { isDefault: true });
+        await addVar(defaultProfileId, 'FROM_DEFAULT', 'default-val');
+        await addCommands(defaultProfileId, ['default-cmd']);
+
+        const result = await mergeProfileConfiguration(db, {
+          owner,
+          repoFullName: 'org/repo',
+          platform: 'github',
+          environment: v2Environment,
+        });
+
+        expect(result.envVars).toEqual({ FROM_ENV: 'env', FROM_DEFAULT: 'default-val' });
+        expect(result.setupCommands).toEqual(['env-cmd']);
+        expect(result.resolvedProfileId).toBe(defaultProfileId);
+      });
+
+      test('applies the personal default over the org default for an organization owner', async () => {
+        const user = await insertTestUser();
+        const org = await createTestOrganization('v2-org', user.id, 0);
+        const orgOwner: ProfileOwner = { type: 'organization', id: org.id };
+        const userOwner: ProfileOwner = { type: 'user', id: user.id };
+        const orgDefaultId = await createProfile(orgOwner, 'org-default', { isDefault: true });
+        await addVar(orgDefaultId, 'FROM_ORG_DEFAULT', 'org');
+        const personalDefaultId = await createProfile(userOwner, 'personal-default', {
+          isDefault: true,
+        });
+        await addVar(personalDefaultId, 'FROM_PERSONAL_DEFAULT', 'personal');
+        const bindingProfileId = await createProfile(orgOwner, 'org-binding');
+        await addVar(bindingProfileId, 'FROM_BINDING', 'bound');
+        await bindRepo(orgOwner, 'org/repo', 'github', bindingProfileId);
+
+        const result = await mergeProfileConfiguration(db, {
+          owner: orgOwner,
+          userId: user.id,
+          repoFullName: 'org/repo',
+          platform: 'github',
+          environment: v2Environment,
+        });
+
+        expect(result.envVars).toEqual({ FROM_ENV: 'env', FROM_PERSONAL_DEFAULT: 'personal' });
+        expect(result.resolvedProfileId).toBe(personalDefaultId);
+      });
+
+      test('falls back to the org default when the user has no personal default', async () => {
+        const user = await insertTestUser();
+        const org = await createTestOrganization('v2-org', user.id, 0);
+        const orgOwner: ProfileOwner = { type: 'organization', id: org.id };
+        const orgDefaultId = await createProfile(orgOwner, 'org-default', { isDefault: true });
+        await addVar(orgDefaultId, 'FROM_ORG_DEFAULT', 'org');
+
+        const result = await mergeProfileConfiguration(db, {
+          owner: orgOwner,
+          userId: user.id,
+          repoFullName: 'org/repo',
+          platform: 'github',
+          environment: v2Environment,
+        });
+
+        expect(result.envVars).toEqual({ FROM_ENV: 'env', FROM_ORG_DEFAULT: 'org' });
+        expect(result.resolvedProfileId).toBe(orgDefaultId);
+      });
+
+      test('applies an explicitly selected profile over the default and keeps request overrides', async () => {
+        const user = await insertTestUser();
+        const owner: ProfileOwner = { type: 'user', id: user.id };
+        const repoProfileId = await createProfile(owner, 'repo-profile');
+        await addVar(repoProfileId, 'FROM_BINDING', 'bound');
+        await bindRepo(owner, 'org/repo', 'github', repoProfileId);
+        const defaultProfileId = await createProfile(owner, 'default', { isDefault: true });
+        await addVar(defaultProfileId, 'FROM_DEFAULT', 'default-val');
+        const pickedProfileId = await createProfile(owner, 'picked');
+        await addVar(pickedProfileId, 'FROM_PICKED', 'picked-val');
+        await addCommands(pickedProfileId, ['picked-cmd']);
+
+        const result = await mergeProfileConfiguration(db, {
+          owner,
+          profileId: pickedProfileId,
+          repoFullName: 'org/repo',
+          platform: 'github',
+          environment: v2Environment,
+          envVars: { FROM_MANUAL: 'manual-val' },
+          setupCommands: ['manual-cmd'],
+        });
+
+        expect(result.envVars).toEqual({
+          FROM_ENV: 'env',
+          FROM_PICKED: 'picked-val',
+          FROM_MANUAL: 'manual-val',
+        });
+        // The environment owns setup: the picked profile's command does not run.
+        expect(result.setupCommands).toEqual(['env-cmd', 'manual-cmd']);
+        expect(result.resolvedProfileId).toBe(pickedProfileId);
+      });
     });
   });
 

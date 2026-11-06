@@ -50,6 +50,17 @@ describe('planNativeStart', () => {
       CONTROL_PLANE_NATIVE_LOGS: '1',
     });
   });
+
+  it('runs the current runtime installer when restoring a snapshot', () => {
+    const command = { argv: ['/bin/sh', '-c', 'install-current-runtime-and-exec'] };
+    const plan = planNativeStart(
+      { ...REQUEST, command, snapshot: { snapshotId: 'old-runtime', baseImage: REQUEST.image } },
+      true
+    );
+    expect(plan.source).toBe('repository');
+    expect(plan.options.containerSnapshot).toEqual({ id: 'old-runtime' });
+    expect(plan.options.entrypoint).toEqual(command.argv);
+  });
 });
 
 describe('native capture records', () => {

@@ -44,6 +44,13 @@ export type RepositoryGroup = {
   repositories: NewSessionRepository[];
   /** Set when the provider answered with only some of its installations' repositories. */
   notice?: RepositoryGroupNotice;
+  /**
+   * Set when the provider's answer did not list rows that may still exist: the
+   * Bitbucket states that ask for a workspace selection or new credentials
+   * report the same status as "not connected" but keep the repositories behind
+   * that fix. A row missing from such a group is not evidence it is gone.
+   */
+  rowsUnlisted?: boolean;
 };
 
 export type RepositoryGroups = {
@@ -137,7 +144,76 @@ export function resolveBitbucketStatus({
   return 'connect';
 }
 
+/** Bitbucket states that must (re)establish the connection before it lists rows. */
+const BITBUCKET_UNLISTED_STATUSES: ReadonlySet<string> = new Set([
+  'workspace_selection_required',
+  'reconnect_required',
+  'insufficient_permissions',
+]);
+
+/**
+ * Whether a Bitbucket answer left repositories unlisted behind a fixable state.
+ *
+ * `not_connected` is an answer: nothing is connected, so nothing exists to
+ * list. The states above share that status but do have repositories, which
+ * return once the workspace is selected or the credentials are replaced.
+ */
+export function bitbucketRowsUnlisted(status: string | undefined): boolean {
+  return status !== undefined && BITBUCKET_UNLISTED_STATUSES.has(status);
+}
+
 // ── Dedup and grouping ───────────────────────────────────────────────
+
+/**
+ * Whether one provider's group accounts for every repository row it has.
+ *
+ * A provider that is still loading, a read that failed, a provider that
+ * reported only some of its installations (`notice: 'partial'`), and one whose
+ * answer left rows unlisted behind a fixable state (`rowsUnlisted`) each omit
+ * rows without the app knowing which. A provider that is connected but cannot
+ * be read right now (`unavailable`, e.g. a suspended installation) is unknown
+ * for the same reason. `repos`, `connected-empty`, and `connect` are answers
+ * that account for the rows.
+ */
+function isRepositoryGroupComplete(group: RepositoryGroup): boolean {
+  if (group.notice === 'partial' || group.rowsUnlisted === true) {
+    return false;
+  }
+  return (
+    group.status === 'repos' || group.status === 'connected-empty' || group.status === 'connect'
+  );
+}
+
+/**
+ * Whether a stored selection must be dropped because its provider answered with
+ * its complete list and that list does not contain it.
+ *
+ * Only the provider that holds the selection decides: another provider's error
+ * says nothing about this repository, and a list that is missing rows (see
+ * `isRepositoryGroupComplete`) leaves the selection and its stored copy alone.
+ * The comparison is the picker's platform-qualified key, so a row on another
+ * provider with the same `fullName` is not a match. A key that names no
+ * provider group in this scope (Bitbucket outside an organization) is reported
+ * gone: that scope cannot offer the repository at all.
+ */
+export function isStoredRepoSelectionGone(input: {
+  groups: readonly RepositoryGroup[];
+  repositories: readonly NewSessionRepository[];
+  selectedRepo: string;
+}): boolean {
+  const separator = input.selectedRepo.indexOf(':');
+  if (separator === -1) {
+    return false;
+  }
+  const platform = input.selectedRepo.slice(0, separator);
+  const group = input.groups.find(candidate => candidate.key === platform);
+  if (group !== undefined && !isRepositoryGroupComplete(group)) {
+    return false;
+  }
+  return !input.repositories.some(
+    repository => `${repository.platform}:${repository.fullName}` === input.selectedRepo
+  );
+}
 
 const repositoryKey = (repository: NewSessionRepository): string =>
   `${repository.platform}/${repository.fullName}`;
@@ -185,6 +261,7 @@ export function resolveRepositoryGroups(input: {
       status: input.bitbucket.status,
       repositories: input.bitbucket.repositories,
       notice: input.bitbucket.notice,
+      rowsUnlisted: input.bitbucket.rowsUnlisted,
     });
   }
   return { recents: input.recents, groups };

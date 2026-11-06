@@ -3,9 +3,15 @@ import { withTimeout } from '@kilocode/worker-utils';
 import type { EnvironmentBuild } from '../../environment-build/environment-build-do.js';
 import type { SnapshotAdmission, SnapshotResolution } from '../../environment-build/coordinator.js';
 import { SNAPSHOT_LOOKUP_BUDGET_MS } from '../../environment-build/policy.js';
-import type { SessionEnvironmentReference } from '../../environment-build/reference.js';
+import {
+  sameEnvironmentScope,
+  type SessionEnvironmentReference,
+} from '../../environment-build/reference.js';
 import type { ProviderSnapshotStart } from '../../sandbox-control/provider.js';
-import { ISOLATED_CONTAINER_WORKSPACE_PATH } from '../../workspace.js';
+import {
+  environmentWorkspaceDirectory,
+  ISOLATED_CONTAINER_WORKSPACE_PATH,
+} from '../../shared/environment-workspace.js';
 import type { RepositoryLaunchRecord } from './repository-launch.js';
 import type { RouteRecord } from './routes.js';
 
@@ -34,24 +40,35 @@ export type EnvironmentCandidateResult =
         | 'no_actor';
     };
 
+/** Whether a route sits at the cwd an isolated sandbox gives its admitted environment. */
+function routeAtExpectedDirectory(route: RouteRecord): boolean {
+  return (
+    route.spec.directory ===
+    environmentWorkspaceDirectory({
+      sessionDirectory: ISOLATED_CONTAINER_WORKSPACE_PATH,
+      environment: route.environment,
+    })
+  );
+}
+
 export function environmentLaunchCandidate(
   routes: readonly RouteRecord[]
 ): EnvironmentCandidateResult {
   const preparing = routes.filter(route => route.state === 'preparing');
   if (preparing.length === 0) return { reason: 'no_preparing_routes' };
-  if (preparing.some(route => route.spec.directory !== ISOLATED_CONTAINER_WORKSPACE_PATH)) {
+  if (preparing.some(route => !routeAtExpectedDirectory(route))) {
     return { reason: 'not_isolated' };
   }
   const [first] = preparing;
   const reference = first?.environment ?? null;
   if (reference === null) return { reason: 'no_environment' };
+  // One snapshot serves the routes only when they admitted the same environment
+  // at the same revision: a route on another revision may need other setup.
   const same = preparing.every(
     route =>
       route.environment !== null &&
-      route.environment.environmentId === reference.environmentId &&
       route.environment.configurationRevision === reference.configurationRevision &&
-      route.environment.owner.type === reference.owner.type &&
-      route.environment.owner.id === reference.owner.id
+      sameEnvironmentScope(route.environment, reference)
   );
   if (!same) return { reason: 'multiple_environments' };
   const actorUserId = first?.credentialSource?.userId;

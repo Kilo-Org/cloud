@@ -66,6 +66,7 @@ import {
   resolveRuntimeCredentialProxyScopedIngestRoute,
   type RuntimeCredentialProxyRoute,
 } from './kilo/runtime-credential-proxy-routes.js';
+import { readBoundedBody } from './utils/read-bounded-body.js';
 import {
   encodeCloudAgentSessionScopeV2ViewHeaders,
   forwardCloudAgentSessionScopeRequest,
@@ -87,6 +88,7 @@ import { getVercelSnapshotBuildStub } from './byoc/vercel-snapshot-build-stub.js
 import { getVercelRuntimeIdentity } from './byoc/vercel-runtime-identity.js';
 import { z } from 'zod';
 import { isOrgInList } from './sandbox-id.js';
+import { registerVercelScmBrokerRoute } from './scm-broker/vercel-route.js';
 
 const app = new Hono<HonoContext>();
 
@@ -288,6 +290,8 @@ app.use('*', async (c: Context<HonoContext>, next: Next) => {
   if (!route) return c.text('Not found', 404);
   return forwardRuntimeCredentialProxy(c, handle, claims, route, path);
 });
+
+registerVercelScmBrokerRoute(app);
 
 app.get('/health', (c: Context<HonoContext>) => {
   return c.json({
@@ -523,29 +527,6 @@ function sanitizeRuntimeProxyResponse(response: Response): Response {
     statusText: response.statusText,
     headers,
   });
-}
-
-async function readBoundedBody(request: Request, maximumBytes: number): Promise<string | null> {
-  if (!request.body) return null;
-  const reader = request.body.getReader();
-  const decoder = new TextDecoder();
-  let size = 0;
-  let value = '';
-  try {
-    while (true) {
-      const chunk = await reader.read();
-      if (chunk.done) return value + decoder.decode();
-      const bytes = new Uint8Array(chunk.value);
-      size += bytes.byteLength;
-      if (size > maximumBytes) {
-        await reader.cancel();
-        return null;
-      }
-      value += decoder.decode(bytes, { stream: true });
-    }
-  } catch {
-    return null;
-  }
 }
 
 async function routeRuntimeCredentialProxy(c: Context<HonoContext>): Promise<Response> {
@@ -984,5 +965,4 @@ export default {
   },
 };
 
-export { Sandbox } from '@cloudflare/sandbox';
 export { UserKiloFacade } from './kilo-facade/user-kilo-facade.js';

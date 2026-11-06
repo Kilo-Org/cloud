@@ -132,6 +132,7 @@ vi.mock('@/components/ui/text', async () => {
 });
 vi.mock('@/components/ui/icons', () => ({
   AlertCircle: 'AlertCircle',
+  Bot: 'Bot',
   ChevronDown: 'ChevronDown',
   GitMerge: 'GitMerge',
   GitPullRequest: 'GitPullRequest',

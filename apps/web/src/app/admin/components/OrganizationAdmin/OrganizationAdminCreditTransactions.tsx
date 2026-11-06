@@ -1,4 +1,5 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { adminFetch } from '@/lib/admin/admin-fetch';
 import { Badge } from '@/components/ui/badge';
 import { BooleanBadge } from '@/components/ui/boolean-badge';
 import {
@@ -136,7 +137,7 @@ export function OrganizationAdminCreditTransactions({
 
   const consumeCreditsMutation = useMutation({
     mutationFn: async (amount_usd: number) => {
-      const response = await fetch(
+      const response = await adminFetch(
         `/admin/api/organizations/${encodeURIComponent(organizationId)}/consume-credits`,
         {
           method: 'POST',
@@ -160,7 +161,7 @@ export function OrganizationAdminCreditTransactions({
 
   const forceExpirationMutation = useMutation<void, Error>({
     mutationFn: async () => {
-      const response = await fetch(
+      const response = await adminFetch(
         `/admin/api/organizations/${encodeURIComponent(organizationId)}/force-expiration-check`,
         { method: 'POST' }
       );

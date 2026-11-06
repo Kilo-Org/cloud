@@ -1391,6 +1391,59 @@ describe('NotificationChannelDO preview mode and channel', () => {
     // carries mutable-content for the notification service extension.
     expect(messages[0]?.mutableContent).toBe(true);
     expect(messages[0]?.categoryId).toBeUndefined();
+    // The push reaches Expo with the iOS thread the OS stacks it into.
+    expect(messages[0]?.threadId).toMatch(/^[0-9a-f]{32}$/);
+  });
+
+  it('keeps each account session in its own iOS thread and attention out of every thread', async () => {
+    installDbMock({
+      tokens: [{ user_id: 'user-thread', token: 'tok-thread', app_version: '1.0.16' }],
+    });
+
+    async function dispatchThreaded(
+      userId: string,
+      cliSessionId: string,
+      options: { category?: 'status' | 'attention'; attempt?: number } = {}
+    ) {
+      vi.mocked(sendPushNotifications).mockClear();
+      const category = options.category;
+      const label = `${userId}-${cliSessionId}-${category ?? 'default'}-${options.attempt ?? 1}`;
+      const result = await getDO(label).dispatchPush(
+        baseInput({
+          userId,
+          idempotencyKey: `k-thread-${label}`,
+          push: {
+            title: 'T',
+            body: 'B',
+            data: {
+              type: 'cloud_agent_session',
+              cliSessionId,
+              ...(category === undefined ? {} : { category }),
+            },
+            sound: 'default',
+            priority: 'high',
+          },
+        })
+      );
+      expect(result.kind).toBe('delivered');
+      const [[messages]] = vi.mocked(sendPushNotifications).mock.calls;
+      return messages[0];
+    }
+
+    const first = await dispatchThreaded('user-thread', 'ses_thread');
+    const repeated = await dispatchThreaded('user-thread', 'ses_thread', { attempt: 2 });
+    const otherSession = await dispatchThreaded('user-thread', 'ses_thread_2');
+    const otherAccount = await dispatchThreaded('user-thread-2', 'ses_thread');
+    const attention = await dispatchThreaded('user-thread', 'ses_thread', {
+      category: 'attention',
+    });
+
+    expect(repeated?.threadId).toBe(first?.threadId);
+    expect(otherSession?.threadId).not.toBe(first?.threadId);
+    expect(otherAccount?.threadId).not.toBe(first?.threadId);
+    // A raise keeps its actions and never joins a progress group.
+    expect(attention?.threadId).toBeUndefined();
+    expect(attention?.categoryId).toBe('kilo-needs-input:unknown');
   });
 
   it('leaves a non-agent push active while keeping its own channel', async () => {

@@ -32,6 +32,7 @@ import {
   MASKED_SECRET_VALUE,
   type EnvironmentCreateInput,
   type EnvironmentOwner,
+  type EnvironmentForSession,
   type EnvironmentRepositoryIdentity,
   type EnvironmentUpdateInput,
 } from '@kilocode/cloud-agent-profile';
@@ -56,6 +57,16 @@ function recordStatements<T extends object>(tx: T, statements: string[]): T {
       return value;
     },
   });
+}
+
+/** The matched environment of a resolution, or null for none; throws on a conflict. */
+async function loadMatchedEnvironment(
+  database: Parameters<typeof loadEnvironmentForSession>[0],
+  input: Parameters<typeof loadEnvironmentForSession>[1]
+): Promise<EnvironmentForSession | null> {
+  const resolution = await loadEnvironmentForSession(database, input);
+  if (resolution.status === 'conflict') throw new Error('unexpected environment conflict');
+  return resolution.status === 'match' ? resolution.environment : null;
 }
 
 async function createEnv(input: EnvironmentCreateInput): Promise<string> {
@@ -739,6 +750,189 @@ describe('repository environment service', () => {
     });
   });
 
+  describe('network policy', () => {
+    async function storedPolicy(environmentId: string) {
+      const [row] = await db
+        .select({
+          mode: cloud_agent_environments.egress_mode,
+          allowlist: cloud_agent_environments.egress_allowlist,
+        })
+        .from(cloud_agent_environments)
+        .where(eq(cloud_agent_environments.id, environmentId));
+      return row;
+    }
+
+    test('stores None as an empty allowlist and reloads it for the session', async () => {
+      const user = await insertTestUser();
+      const owner = userOwner(user.id);
+      const id = await createEnv({
+        owner,
+        createdByUserId: user.id,
+        name: 'none',
+        platform: 'github',
+        repoFullName: 'acme/widgets',
+        egressMode: 'allowlist',
+      });
+
+      expect(await storedPolicy(id)).toEqual({ mode: 'allowlist', allowlist: [] });
+
+      const environment = await getEnvironment(db, id, owner);
+      expect(environment.egressMode).toBe('allowlist');
+      expect(environment.egressAllowlist).toEqual([]);
+
+      const session = await loadMatchedEnvironment(db, {
+        owner,
+        repository: { platform: 'github', repoFullName: 'acme/widgets' },
+      });
+      expect(session).toMatchObject({ egressMode: 'allowlist', egressAllowlist: [] });
+    });
+
+    test('stores Limited with normalized domains and Full as unrestricted without a list', async () => {
+      const user = await insertTestUser();
+      const owner = userOwner(user.id);
+      const limitedId = await createEnv({
+        owner,
+        createdByUserId: user.id,
+        name: 'limited',
+        platform: 'github',
+        repoFullName: 'acme/limited',
+        egressMode: 'allowlist',
+        egressAllowlist: ['Z.Example.COM.', 'example.com'],
+      });
+      const fullId = await createEnv({
+        owner,
+        createdByUserId: user.id,
+        name: 'full',
+        platform: 'github',
+        repoFullName: 'acme/full',
+        egressMode: 'unrestricted',
+      });
+      const absentId = await createEnv({
+        owner,
+        createdByUserId: user.id,
+        name: 'absent',
+        platform: 'github',
+        repoFullName: 'acme/absent',
+      });
+
+      expect(await storedPolicy(limitedId)).toEqual({
+        mode: 'allowlist',
+        allowlist: ['example.com', 'z.example.com'],
+      });
+      expect(await storedPolicy(fullId)).toEqual({ mode: 'unrestricted', allowlist: null });
+      expect(await storedPolicy(absentId)).toEqual({ mode: null, allowlist: null });
+
+      const limited = await getEnvironment(db, limitedId, owner);
+      expect(limited.egressAllowlist).toEqual(['example.com', 'z.example.com']);
+      expect((await getEnvironment(db, fullId, owner)).egressMode).toBe('unrestricted');
+      const absent = await getEnvironment(db, absentId, owner);
+      expect(absent).toMatchObject({ egressMode: null, egressAllowlist: null });
+    });
+
+    test('rejects an allowlist without a mode and invalid hostnames', async () => {
+      const user = await insertTestUser();
+      const base = {
+        owner: userOwner(user.id),
+        createdByUserId: user.id,
+        platform: 'github' as const,
+      };
+
+      await expect(
+        createEnv({ ...base, name: 'no-mode', repoFullName: 'acme/one', egressAllowlist: [] })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+
+      for (const [name, repoFullName, domain] of [
+        ['wildcard', 'acme/two', '*.example.com'],
+        ['url', 'acme/three', 'https://example.com'],
+        ['ip', 'acme/four', '127.0.0.1'],
+      ] as const) {
+        await expect(
+          createEnv({
+            ...base,
+            name,
+            repoFullName,
+            egressMode: 'allowlist',
+            egressAllowlist: [domain],
+          })
+        ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      }
+
+      await expect(
+        createEnv({
+          ...base,
+          name: 'too-many',
+          repoFullName: 'acme/five',
+          egressMode: 'allowlist',
+          egressAllowlist: Array.from({ length: 101 }, (_, index) => `host${index}.example.com`),
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    });
+
+    test('a policy-only update keeps commands, variables, secrets, and the allocation', async () => {
+      const user = await insertTestUser();
+      const owner = userOwner(user.id);
+      const id = await createEnv({
+        owner,
+        createdByUserId: user.id,
+        name: 'limited',
+        platform: 'github',
+        repoFullName: 'acme/widgets',
+        plainVars: { PLAIN: 'plain-value' },
+        secrets: { API_KEY: SECRET_PLAINTEXT },
+        commands: ['npm ci'],
+        sandboxAllocation: 'cloudflare-single',
+        egressMode: 'allowlist',
+        egressAllowlist: ['api.example.com'],
+      });
+
+      await updateEnv({
+        owner,
+        environmentId: id,
+        egressMode: 'allowlist',
+        egressAllowlist: ['Z.Example.COM.'],
+      });
+      await updateEnv({ owner, environmentId: id, name: 'renamed' });
+
+      const environment = await getEnvironment(db, id, owner);
+      expect(environment).toMatchObject({
+        name: 'renamed',
+        commands: ['npm ci'],
+        sandboxAllocation: 'cloudflare-single',
+        egressMode: 'allowlist',
+        egressAllowlist: ['z.example.com'],
+        secretKeys: ['API_KEY'],
+      });
+      expect(environment.plainVars).toEqual([
+        expect.objectContaining({ key: 'PLAIN', value: 'plain-value' }),
+      ]);
+      expect(await storedSecretValue(id, 'API_KEY')).not.toContain(SECRET_PLAINTEXT);
+
+      await updateEnv({ owner, environmentId: id, egressMode: 'unrestricted' });
+      expect(await storedPolicy(id)).toEqual({ mode: 'unrestricted', allowlist: null });
+
+      await updateEnv({ owner, environmentId: id, egressMode: 'allowlist' });
+      expect(await storedPolicy(id)).toEqual({ mode: 'allowlist', allowlist: [] });
+    });
+
+    test('rejects a policy list on update without a mode', async () => {
+      const user = await insertTestUser();
+      const owner = userOwner(user.id);
+      const id = await createEnv({
+        owner,
+        createdByUserId: user.id,
+        name: 'full',
+        platform: 'github',
+        repoFullName: 'acme/widgets',
+        egressMode: 'unrestricted',
+      });
+
+      await expect(
+        updateEnv({ owner, environmentId: id, egressAllowlist: ['api.example.com'] })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      expect(await storedPolicy(id)).toEqual({ mode: 'unrestricted', allowlist: null });
+    });
+  });
+
   describe('loadEnvironmentForSession', () => {
     test('does not mix variable values with a concurrent configuration revision', async () => {
       const user = await insertTestUser();
@@ -796,14 +990,14 @@ describe('repository environment service', () => {
             return value.bind(target);
           },
         });
-      const loaded = await loadEnvironmentForSession(instrument(db), {
+      const loaded = await loadMatchedEnvironment(instrument(db), {
         owner,
         repository: { platform: 'github', repoFullName: 'acme/consistent' },
       });
       expect(edited).toBe(true);
       expect(loaded?.reference.configurationRevision).toBe(1);
       expect(loaded?.layer.envVars).toEqual({ VALUE: 'before' });
-      const current = await loadEnvironmentForSession(db, {
+      const current = await loadMatchedEnvironment(db, {
         owner,
         repository: { platform: 'github', repoFullName: 'acme/consistent' },
       });
@@ -825,7 +1019,7 @@ describe('repository environment service', () => {
         sandboxAllocation: 'cloudflare-shared',
       });
 
-      const environment = await loadEnvironmentForSession(db, {
+      const environment = await loadMatchedEnvironment(db, {
         owner: userOwner(user.id),
         repository: { platform: 'github', repoFullName: 'ACME/widgets' },
       });
@@ -858,10 +1052,10 @@ describe('repository environment service', () => {
           owner: userOwner(user.id),
           repository: { platform: 'github', repoFullName: 'acme/other' },
         })
-      ).resolves.toBeNull();
+      ).resolves.toEqual({ status: 'none' });
       await expect(
         loadEnvironmentForSession(db, { owner: userOwner(other.id), repository })
-      ).resolves.toBeNull();
+      ).resolves.toEqual({ status: 'none' });
 
       const organization = await createTestOrganization('Loader org', user.id, 0);
       const orgOwner: EnvironmentOwner = { type: 'organization', id: organization.id };
@@ -874,15 +1068,15 @@ describe('repository environment service', () => {
       });
       await expect(
         loadEnvironmentForSession(db, { owner: orgOwner, repository })
-      ).resolves.not.toBeNull();
+      ).resolves.toMatchObject({ status: 'match' });
       await db
         .update(organizations)
         .set({ deleted_at: new Date().toISOString() })
         .where(eq(organizations.id, organization.id));
 
-      await expect(
-        loadEnvironmentForSession(db, { owner: orgOwner, repository })
-      ).resolves.toBeNull();
+      await expect(loadEnvironmentForSession(db, { owner: orgOwner, repository })).resolves.toEqual(
+        { status: 'none' }
+      );
     });
 
     test('matches GitLab by the canonical clone URL and Bitbucket by UUID pair', async () => {
@@ -907,7 +1101,7 @@ describe('repository environment service', () => {
         bitbucketRepositoryUuid: 'BBBBBBBB-BBBB-4BBB-8BBB-BBBBBBBBBBBB',
       });
 
-      const gitlab = await loadEnvironmentForSession(db, {
+      const gitlab = await loadMatchedEnvironment(db, {
         owner,
         repository: { platform: 'gitlab', cloneUrl: 'https://gitlab.com/group/project.git' },
       });
@@ -918,10 +1112,10 @@ describe('repository environment service', () => {
           owner,
           repository: { platform: 'gitlab', cloneUrl: 'https://gitlab.com/group/other.git' },
         })
-      ).resolves.toBeNull();
+      ).resolves.toEqual({ status: 'none' });
 
       // The session path was renamed; the UUID pair still matches.
-      const bitbucket = await loadEnvironmentForSession(db, {
+      const bitbucket = await loadMatchedEnvironment(db, {
         owner,
         repository: {
           platform: 'bitbucket',
@@ -940,7 +1134,7 @@ describe('repository environment service', () => {
             repositoryUuid: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
           },
         })
-      ).resolves.toBeNull();
+      ).resolves.toEqual({ status: 'none' });
     });
   });
 
@@ -980,6 +1174,33 @@ describe('repository environment service', () => {
       expect((await getEnvironment(db, id, owner)).configurationRevision).toBe(1);
     });
 
+    test('saves start commands without advancing the revision and loads them for sessions', async () => {
+      const user = await insertTestUser();
+      const id = await createRevisionEnv(user.id);
+      const owner = userOwner(user.id);
+
+      await expect(
+        updateEnv({ owner, environmentId: id, startCommands: ['docker compose up -d'] })
+      ).resolves.toBe(1);
+      const saved = await getEnvironment(db, id, owner);
+      expect(saved.startCommands).toEqual(['docker compose up -d']);
+      expect(saved.commands).toEqual(['install']);
+
+      const loaded = await loadEnvironmentForSession(db, {
+        owner,
+        repository: { platform: 'github', repoFullName: 'acme/widgets' },
+      });
+      expect(loaded.status).toBe('match');
+      if (loaded.status !== 'match') return;
+      expect(loaded.environment.layer.setupCommands).toEqual(['install']);
+      expect(loaded.environment.layer.startCommands).toEqual(['docker compose up -d']);
+      expect(loaded.environment.reference.configurationRevision).toBe(1);
+
+      await expect(
+        updateEnv({ owner, environmentId: id, startCommands: ['x'.repeat(16_001)] })
+      ).rejects.toThrow('Start commands must be 1-16000 characters');
+    });
+
     test('advances for command, plaintext variable and secret changes', async () => {
       const user = await insertTestUser();
       const id = await createRevisionEnv(user.id);
@@ -1010,7 +1231,7 @@ describe('repository environment service', () => {
       await updateEnv({ owner, environmentId: id, commands: ['install\nbuild'] });
 
       const reference = (
-        await loadEnvironmentForSession(db, {
+        await loadMatchedEnvironment(db, {
           owner,
           repository: { platform: 'github', repoFullName: 'Acme/Widgets' },
         })

@@ -50,6 +50,15 @@ export const SetBYOKKeyCatalogModeInputSchema = OptionalOrganizationIdSchema.ext
   serve_catalog_models: z.boolean(),
 });
 
+/** Every listed key of the scoped owner, highest priority first. */
+export const ReorderBYOKKeysInputSchema = OptionalOrganizationIdSchema.extend({
+  keyIds: z
+    .array(z.string().uuid())
+    .min(1)
+    .max(100)
+    .refine(ids => new Set(ids).size === ids.length, 'Key ids must be unique'),
+});
+
 // List schema with optional organizationId
 export const ListBYOKKeysInputSchema = OptionalOrganizationIdSchema;
 

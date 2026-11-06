@@ -4,8 +4,7 @@ import { knownServerErrorMessage } from '@/lib/server-error-copy';
 import { isTerminalTrpcCode, readTrpcErrorField } from '@/lib/trpc-error';
 
 import { type WatchedStartFailure } from './deadline-watched-start';
-
-type ManualReviewStartPlatform = 'github' | 'gitlab';
+import { type ManualReviewPlatform } from './manual-review-platform';
 
 /**
  * Catalog keys for a manual-review start failure, one per tRPC code the
@@ -74,7 +73,7 @@ function manualReviewStartFailureKey(error: unknown): ManualReviewStartFailureKe
  */
 export function manualReviewStartFailure(
   error: unknown,
-  platform: ManualReviewStartPlatform
+  platform: ManualReviewPlatform
 ): WatchedStartFailure {
   const variables = {
     provider: PLATFORM_CAPABILITIES[platform].label,

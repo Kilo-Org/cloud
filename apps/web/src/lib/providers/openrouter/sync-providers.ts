@@ -18,7 +18,7 @@ import type {
 import { OpenRouterProvidersResponse } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
 import { fetchModelsForProvider } from '@/lib/providers/openrouter/fetch-provider-models';
 import { modelsByProvider, ai_gateway_config } from '@kilocode/db/schema';
-import { db } from '@kilocode/web-shared/lib/drizzle';
+import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import { desc, lt, sql } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
@@ -115,7 +115,7 @@ export const openRouterProvidersSource: MetadataSource<OpenRouterProvider[]> = {
 
 export async function fetchGatewayModels(gateway: Provider, source: MetadataSource<GatewayModels>) {
   const headers = gatewayHeaders(gateway);
-  const models = await getMetadata(source, db);
+  const models = await getMetadata(source, readDb);
 
   const limit = pLimit(8);
   const result: Record<string, StoredModel> = {};
@@ -437,9 +437,9 @@ export async function syncAndStoreProviders() {
   const openrouter_data = await fetchGatewayModels(OPENROUTER, openRouterGatewayModelsSource);
   const vercel_data = await fetchGatewayModels(VERCEL_AI_GATEWAY, vercelGatewayModelsSource);
 
-  const openrouterProviders = await getMetadata(openRouterProvidersSource, db);
+  const openrouterProviders = await getMetadata(openRouterProvidersSource, readDb);
 
-  const openRouterCatalog = await getMetadata(openRouterModelsMetadataSource, db);
+  const openRouterCatalog = await getMetadata(openRouterModelsMetadataSource, readDb);
 
   const generatedVercelModelIdOverrides = await generateVercelModelIdOverrides(
     openrouter_data,

@@ -5,7 +5,7 @@ import type {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
 import DIRECT_BYOK_PROVIDERS from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-definitions';
 import type { DirectUserByokInferenceProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
-import { db } from '@kilocode/web-shared/lib/drizzle';
+import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import { direct_byok_model_lists } from '@kilocode/db/schema';
 import {
   assertMinimumCount,
@@ -88,7 +88,7 @@ function openAICompatibleFetcher(options: {
     providerId: options.providerId,
     metadataSources: [metadataSource],
     async fetch() {
-      return toOpenAICompatibleRawModels(await getMetadata(metadataSource, db));
+      return toOpenAICompatibleRawModels(await getMetadata(metadataSource, readDb));
     },
   };
 }
@@ -223,7 +223,7 @@ function modelsDevFetcher(
       if (!metadataSource) {
         return parseModelsDevProviderModels(entry, providerId);
       }
-      const availableModels = await getMetadata(metadataSource, db);
+      const availableModels = await getMetadata(metadataSource, readDb);
       const availableModelIds = new Set(availableModels.data.map(model => model.id));
       return parseModelsDevProviderModels(entry, providerId, availableModelIds);
     },

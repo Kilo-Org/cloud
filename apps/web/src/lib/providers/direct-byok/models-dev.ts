@@ -11,7 +11,7 @@ import {
   getMetadata,
   type MetadataSource,
 } from '@kilocode/web-shared/lib/ai-gateway/metadata-cache';
-import { db } from '@kilocode/web-shared/lib/drizzle';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
 
 export const ModalitySchema = z
   .enum(['text', 'image', 'video', 'pdf', 'audio', 'unknown'])
@@ -65,7 +65,7 @@ export const modelsDevCatalogSource: MetadataSource<ModelsDevCatalog> = {
 };
 
 export function loadModelsDevCatalog(): Promise<ModelsDevCatalog> {
-  return getMetadata(modelsDevCatalogSource, db);
+  return getMetadata(modelsDevCatalogSource, readDb);
 }
 
 export type RawModel = {

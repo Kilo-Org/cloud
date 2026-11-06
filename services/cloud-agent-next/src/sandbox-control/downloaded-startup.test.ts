@@ -415,7 +415,7 @@ describe('startup selection and preflight', () => {
 });
 
 describe('runtime harness selection', () => {
-  const webRoute = { ...orgRoute, createdOnPlatform: 'cloud-agent-web' };
+  const webRoute = { ...orgRoute, billingOrigin: 'cloud-agent-web' };
   const webCohort = { ...isolatedCohort, preparingRoutes: [webRoute] };
   const kilo2Env = {
     ...scopedEnv,
@@ -486,8 +486,8 @@ describe('runtime harness selection', () => {
   });
   it.each(['code-review', 'desktop', 'agent-manager', 'slack', 'unknown', '', undefined])(
     'keeps v1 for a listed organization when the origin is %s',
-    createdOnPlatform => {
-      const route = { ...webRoute, createdOnPlatform };
+    billingOrigin => {
+      const route = { ...webRoute, billingOrigin, createdOnPlatform: 'cloud-agent-web' };
       for (const provider of ['cloudflare-containers', 'vercel'] as const) {
         for (const preparingRoutes of [[route], [webRoute, route], [route, webRoute]]) {
           expect(newSandboxHarness(kilo2Env, provider, { ...webCohort, preparingRoutes })).toBe(

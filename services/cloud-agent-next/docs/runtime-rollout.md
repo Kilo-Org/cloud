@@ -87,10 +87,13 @@ rejected. A complete rollback must change the downloaded default; see Rollback b
 
 A downloaded target can also name `kilo2: { orgIds }`. Without it, new sandboxes select v1.
 A sandbox's first allocation selects v2 only when every preparing route has the
-`cloud-agent-web` origin and its downloaded start passes the organization rule above for the
-`kilo2.orgIds` list. Code reviews, desktop, Agent Manager and other origins stay on v1, including
+worker-owned `billingOrigin: cloud-agent-web`. Its downloaded start must also pass the organization
+rule above for the `kilo2.orgIds` list. Code reviews, desktop, Agent Manager and other origins stay on v1, including
 routes with a missing origin and sandboxes with mixed origins. This origin restriction applies only
-to v2 selection; downloaded v1 startup keeps its existing organization rule.
+to v2 selection; downloaded v1 startup keeps its existing organization rule. A client-supplied
+`createdOnPlatform` cannot select v2. Existing routes without a stored `billingOrigin` select v1.
+The checked-in catalog enables this rule only for organization
+`9d278969-5453-4ae3-a51f-a8d2274a7b56` after deployment.
 The Sandbox DO stores that harness, and every later allocation of the
 sandbox uses it, because native history does not move between v1 and v2. A sandbox that allocated
 before this record existed stays on v1. The harness is stored after startup preflight and capacity

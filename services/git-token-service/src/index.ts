@@ -648,6 +648,7 @@ function decodePathnameIteratively(pathname: string): string | null {
 }
 
 function validateGitLabCapabilityUpstream(
+  requestMethod: string,
   requestUrl: string,
   session: {
     instanceOrigin: string;
@@ -687,7 +688,7 @@ function validateGitLabCapabilityUpstream(
   ) {
     return { failure: 'upstream_origin_not_allowed', authSurface: 'git' };
   }
-  return validateGitLabSessionCapabilityPath(url.pathname, session, base.basePath);
+  return validateGitLabSessionCapabilityPath(requestMethod, url.pathname, session, base.basePath);
 }
 
 function validateBitbucketCapabilityUpstream(
@@ -1634,7 +1635,7 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
 
     const upstream =
       claims.version === 2
-        ? validateGitLabCapabilityUpstream(params.requestUrl, claims)
+        ? validateGitLabCapabilityUpstream(params.requestMethod, params.requestUrl, claims)
         : validateLegacyGitLabCapabilityUpstream(params.requestMethod, params.requestUrl, claims);
     if (upstream.failure) return { success: false, reason: upstream.failure };
     const context = {

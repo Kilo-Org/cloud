@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Tijaabada xakamaynta fog ee CLI v2",
+    "sessionsEmpty": "Weli ma jiraan kalfadhiyo CLI v2 ah",
+    "hosts": "Martigeliyeyaasha ku xiran",
+    "hostsEmpty": "Ma jiraan martigeliyeyaal ku xiran",
+    "directory": "Galka shaqada",
+    "createSession": "Abuur kalfadhi CLI v2 ah",
+    "queueIfOffline": "Saf geli codsiga haddii martigeliyuhu aanu ku xirnayn",
+    "prompt": "Codsi ama /command",
+    "localClear": "Nadiifi muuqaalka maxalliga ah",
+    "abort": "Jooji wareegga",
+    "failed": "Ficilka xakamaynta fog ee CLI v2 wuu fashilmay",
+    "creationUnknown": "Natiijada abuurista lama yaqaan. Cusboonaysii kalfadhiyada ka hor intaadan mar kale isku dayin.",
+    "commandFailed": "Amarka fuliyaha CLI wuu fashilmay",
+    "invalidReply": "Jawaabta fuliyaha CLI ma ansaxna",
+    "unsafeCommand": "Isticmaal /compact, /new, /skill, /models, /agents ama /clear (maxalli ahaan oo keliya).",
+    "status": "Xiriirka: {{connection}} · Fuliyaha CLI: {{runner}}",
+    "presenceStatus": "Martigeliyeyaasha: {{connection}}",
+    "commandStatus": "Gaarsiinta amarka: {{status}}",
+    "delivered": "La gaarsiiyay",
+    "expired": "Waqtigiisu dhacay"
+  },
   "common": {
     "cancel": "Jooji",
     "done": "Dhammaystiran",
@@ -2552,6 +2574,7 @@
       "assistantStopped": "Jawaabta waa la joojiyay.",
       "assistantContextOverflow": "Wadahadalku aad buu ugu dheer yahay moodeelka.",
       "assistantProviderError": "Bixiyaha ayaa cillad ku soo celiyay.",
+      "assistantProviderRefused": "Bixiyaha ayaa diiday codsigan, dibna looma dayi karo.",
       "assistantOutputLimit": "Jawaabtu waxay gaartay xadka wax-soo-saarka moodeelka.",
       "assistantStructuredOutput": "Jawaabtu ma ahayn qaabka loo baahnaa.",
       "assistantFailed": "Jawaabtu way fashilantay."

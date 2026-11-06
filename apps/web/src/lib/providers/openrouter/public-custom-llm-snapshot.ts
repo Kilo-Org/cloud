@@ -6,6 +6,7 @@ import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { formatPricePerToken } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import type { OpenRouterModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
+import { normalizePublicInferenceProvider } from '@/lib/public-inference-provider';
 
 /** A model added to the snapshot under a provider that may not exist upstream. */
 export type SnapshotExtraModel = {
@@ -53,7 +54,12 @@ export function buildPublicCustomLlmSnapshotModels(
     };
     return [...new Set(definition.public.inference_providers)].map(slug => ({
       model,
-      provider: { slug, name: slug.toUpperCase(), training, retainsPrompts: true },
+      provider: {
+        slug,
+        name: normalizePublicInferenceProvider(slug).name,
+        training,
+        retainsPrompts: true,
+      },
     }));
   });
 }

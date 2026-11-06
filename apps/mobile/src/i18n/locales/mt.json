@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Demo ta' kontroll remot nattiv",
+    "sessionsEmpty": "Għad m'hemmx sessjonijiet nattivi",
+    "hosts": "Hosts online",
+    "hostsEmpty": "M'hemmx hosts online",
+    "directory": "Direttorju tax-xogħol",
+    "createSession": "Oħloq sessjoni nattiva",
+    "queueIfOffline": "Poġġi l-prompt fil-kju jekk il-host ikun offline",
+    "prompt": "Prompt jew /command",
+    "localClear": "Naddaf il-veduta lokali",
+    "abort": "Waqqaf id-dawra",
+    "failed": "L-azzjoni remota nattiva falliet",
+    "creationUnknown": "Ir-riżultat tal-ħolqien mhux magħruf. Aġġorna s-sessjonijiet qabel terġa' tipprova.",
+    "commandFailed": "Il-kmand tal-proċess CLI falla",
+    "invalidReply": "Tweġiba invalida mill-proċess CLI",
+    "unsafeCommand": "Uża /compact, /new, /skill, /models, /agents jew /clear (lokalment biss).",
+    "status": "Konnessjoni: {{connection}} · Proċess CLI: {{runner}}",
+    "presenceStatus": "Hosts: {{connection}}",
+    "commandStatus": "Twassil tal-kmand: {{status}}",
+    "delivered": "Imwassal",
+    "expired": "Skada"
+  },
   "common": {
     "cancel": "Ikkanċella",
     "done": "Lest",
@@ -2690,6 +2712,7 @@
       "assistantStopped": "It-tweġiba twaqqfet.",
       "assistantContextOverflow": "Il-konversazzjoni hija twila wisq għall-mudell.",
       "assistantProviderError": "Il-fornitur rritorna żball.",
+      "assistantProviderRefused": "Il-fornitur ċaħad din it-talba u ma tistax terġa' tiġi pruvata.",
       "assistantOutputLimit": "It-tweġiba laħqet il-limitu ta' output tal-mudell.",
       "assistantStructuredOutput": "It-tweġiba ma kinitx konformi mal-format meħtieġ.",
       "assistantFailed": "It-tweġiba falliet."

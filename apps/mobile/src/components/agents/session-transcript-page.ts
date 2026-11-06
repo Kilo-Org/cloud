@@ -1,9 +1,6 @@
 import { type KiloSessionId, type StoredMessage } from '@kilocode/cloud-agent-sdk';
-import {
-  fetchMobileSessionSnapshotPage,
-  SESSION_HISTORY_FAILURES,
-  SessionHistoryFailureError,
-} from './mobile-session-page-adapter';
+import { fetchMobileSessionSnapshotPage } from './mobile-session-page-adapter';
+import { SESSION_HISTORY_FAILURES, SessionHistoryFailureError } from './session-history-failures';
 
 /** Shared by the overlay read and the gesture-start prefetch, so a reopen paints from cache. */
 const SESSION_TRANSCRIPT_QUERY_KEY = 'session-transcript-page';

@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "ਨੇਟਿਵ ਰਿਮੋਟ ਡੈਮੋ",
+    "sessionsEmpty": "ਹਾਲੇ ਕੋਈ ਨੇਟਿਵ ਸੈਸ਼ਨ ਨਹੀਂ",
+    "hosts": "ਆਨਲਾਈਨ ਹੋਸਟ",
+    "hostsEmpty": "ਕੋਈ ਆਨਲਾਈਨ ਹੋਸਟ ਨਹੀਂ",
+    "directory": "ਵਰਕਿੰਗ ਡਾਇਰੈਕਟਰੀ",
+    "createSession": "ਨੇਟਿਵ ਸੈਸ਼ਨ ਬਣਾਓ",
+    "queueIfOffline": "ਹੋਸਟ ਆਫਲਾਈਨ ਹੋਵੇ ਤਾਂ ਪ੍ਰੌਂਪਟ ਕਤਾਰ ਵਿੱਚ ਪਾਓ",
+    "prompt": "ਪ੍ਰੌਂਪਟ ਜਾਂ /command",
+    "localClear": "ਸਥਾਨਕ ਦ੍ਰਿਸ਼ ਸਾਫ਼ ਕਰੋ",
+    "abort": "ਵਾਰੀ ਰੋਕੋ",
+    "failed": "ਨੇਟਿਵ ਰਿਮੋਟ ਕਾਰਵਾਈ ਅਸਫਲ ਰਹੀ",
+    "creationUnknown": "ਬਣਾਉਣ ਦਾ ਨਤੀਜਾ ਅਣਜਾਣ ਹੈ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰਨ ਤੋਂ ਪਹਿਲਾਂ ਸੈਸ਼ਨ ਰੀਫ੍ਰੈਸ਼ ਕਰੋ।",
+    "commandFailed": "ਰਨਰ ਕਮਾਂਡ ਅਸਫਲ ਰਹੀ",
+    "invalidReply": "ਰਨਰ ਦਾ ਜਵਾਬ ਅਵੈਧ ਹੈ",
+    "unsafeCommand": "/compact, /new, /skill, /models, /agents ਜਾਂ /clear (ਸਿਰਫ਼ ਸਥਾਨਕ) ਵਰਤੋ।",
+    "status": "ਕਨੈਕਸ਼ਨ: {{connection}} · ਰਨਰ: {{runner}}",
+    "presenceStatus": "ਹੋਸਟ: {{connection}}",
+    "commandStatus": "ਕਮਾਂਡ ਦੀ ਡਿਲਿਵਰੀ: {{status}}",
+    "delivered": "ਪਹੁੰਚਾਇਆ ਗਿਆ",
+    "expired": "ਮਿਆਦ ਪੁੱਗ ਗਈ"
+  },
   "common": {
     "cancel": "ਰੱਦ ਕਰੋ",
     "done": "ਹੋ ਗਿਆ",
@@ -2558,6 +2580,7 @@
       "assistantStopped": "ਜਵਾਬ ਰੋਕ ਦਿੱਤਾ ਗਿਆ।",
       "assistantContextOverflow": "ਗੱਲਬਾਤ ਮਾਡਲ ਲਈ ਬਹੁਤ ਲੰਬੀ ਹੈ।",
       "assistantProviderError": "ਪ੍ਰਦਾਤਾ ਨੇ ਗ਼ਲਤੀ ਵਾਪਸ ਕੀਤੀ।",
+      "assistantProviderRefused": "ਪ੍ਰਦਾਤਾ ਨੇ ਇਹ ਬੇਨਤੀ ਰੱਦ ਕਰ ਦਿੱਤੀ ਹੈ ਅਤੇ ਇਸਨੂੰ ਦੁਬਾਰਾ ਨਹੀਂ ਭੇਜਿਆ ਜਾ ਸਕਦਾ।",
       "assistantOutputLimit": "ਜਵਾਬ ਮਾਡਲ ਦੀ ਆਉਟਪੁੱਟ ਸੀਮਾ ਤੱਕ ਪਹੁੰਚ ਗਿਆ।",
       "assistantStructuredOutput": "ਜਵਾਬ ਲੋੜੀਂਦੇ ਫਾਰਮੈਟ ਨਾਲ ਮੇਲ ਨਹੀਂ ਖਾਂਦਾ।",
       "assistantFailed": "ਜਵਾਬ ਤਿਆਰ ਨਹੀਂ ਹੋ ਸਕਿਆ।"

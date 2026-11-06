@@ -2,6 +2,7 @@ import type { OrganizationDataRegion, OrganizationSettings } from '@kilocode/db/
 import type { OrganizationFeatures } from '@kilocode/web-shared/lib/ai-gateway/gateway-config';
 import { isOrganizationFeatureEnabled } from '@kilocode/web-shared/lib/ai-gateway/organization-features';
 import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import { getDomain } from 'tldts';
 
 export type ManagedGatewayId = 'openrouter' | 'vercel';
 
@@ -28,6 +29,19 @@ export function getOrganizationGatewaySettings(
   if (settings.disable_openrouter) disabledGateways.add('openrouter');
   if (settings.disable_vercel_ai_gateway) disabledGateways.add('vercel');
   return { disabledGateways, dataRegion: settings.data_region ?? null };
+}
+
+export function getManagedGatewayFromUrl(url: string): ManagedGatewayId | undefined {
+  const hostname = URL.parse(url)?.hostname;
+  if (!hostname) return undefined;
+  switch (getDomain(hostname, { allowPrivateDomains: false })) {
+    case 'openrouter.ai':
+      return 'openrouter';
+    case 'vercel.sh':
+      return 'vercel';
+    default:
+      return undefined;
+  }
 }
 
 export function isManagedGatewayDisabled(

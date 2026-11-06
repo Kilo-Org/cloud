@@ -1,7 +1,7 @@
 import { desc, eq } from 'drizzle-orm';
 import type { DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 
-import { receipts, session } from '../../db/sqlite-schema';
+import { receipts, session, sessionRoles } from '../../db/sqlite-schema';
 import type { ErrorCode, Principal, Receipt, SessionState, SyncError } from '../../protocol';
 
 export type Db = DrizzleSqliteDODatabase;
@@ -34,33 +34,35 @@ function belongs(meta: Meta, principal: Principal, sessionID: string): boolean {
   );
 }
 
-/** Returns the registered session, including its tombstone. */
+/** Returns an owner-authorized session, including its tombstone. */
 export function visible(db: Db, principal: Principal, sessionID: string): Meta {
   const meta = load(db);
   if (!meta || !belongs(meta, principal, sessionID)) {
     raise('session_not_found', 'The session is not registered');
   }
+  const grant = db
+    .select({ role: sessionRoles.role })
+    .from(sessionRoles)
+    .where(eq(sessionRoles.principal_id, principal.userID))
+    .get();
+  // Until multiplayer is enabled, even an accidentally persisted non-creator
+  // owner grant or a future/invalid role must not widen access.
+  if (grant?.role !== 'owner' || meta.creator_id !== principal.userID) {
+    raise('creator_mismatch', 'Only the session creator can access this session');
+  }
   return meta;
 }
 
-/** Returns a registered session that was not deleted. Any tenant member can read it. */
+/** Returns an owner-authorized session that was not deleted. */
 export function live(db: Db, principal: Principal, sessionID: string): Meta {
   const meta = visible(db, principal, sessionID);
   if (meta.deleted_at !== null) raise('session_deleted', 'The session was deleted from the cloud');
   return meta;
 }
 
-/** Returns a live session that the principal created. Only the creator can change it. */
+/** All currently granted roles are owners, so reads and writes share one ACL. */
 export function writable(db: Db, principal: Principal, sessionID: string): Meta {
-  const meta = live(db, principal, sessionID);
-  requireCreator(meta, principal);
-  return meta;
-}
-
-function requireCreator(meta: Meta, principal: Principal): void {
-  if (meta.creator_id !== principal.userID) {
-    raise('creator_mismatch', 'Only the session creator can change this session');
-  }
+  return live(db, principal, sessionID);
 }
 
 export type ReceiptRow = typeof receipts.$inferSelect;
@@ -133,7 +135,6 @@ export function register(
     if (meta.deleted_at !== null) {
       raise('session_deleted', 'A deleted session cannot be registered again');
     }
-    requireCreator(meta, principal);
     if (meta.source_id !== sourceID) {
       raise('source_conflict', 'The session is bound to another source');
     }
@@ -159,6 +160,7 @@ export function register(
     deleted_at: null,
   };
   db.insert(session).values(row).run();
+  db.insert(sessionRoles).values({ principal_id: principal.userID, role: 'owner' }).run();
   return { created: true, state: toState(db, row) };
 }
 

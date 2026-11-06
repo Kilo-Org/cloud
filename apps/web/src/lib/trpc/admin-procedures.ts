@@ -1,64 +1,42 @@
 import 'server-only';
-import { TRPCError } from '@trpc/server';
-import { kilocode_users } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
-import {
-  canCurrentUserExportApiRequestLogs,
-  canCurrentUserViewSessions,
-  userIsSuperadmin,
-} from '@/lib/admin/admin-permissions';
-import { userCanManageCredits } from '@/lib/admin/credit-management';
-import { db } from '@kilocode/web-shared/lib/drizzle';
 import { adminProcedure } from '@kilocode/web-shared/lib/trpc/init';
+import {
+  actionClassForAdminProcedure,
+  markPrivilegedGuard,
+} from '@kilocode/web-shared/lib/admin/privileged-inventory';
+import { requirePrivilegedActor } from '@/lib/admin/require-privileged-actor';
 
-export const creditManagerProcedure = adminProcedure.use(async ({ ctx, next }) => {
-  const currentUser = await getCurrentUserFromPrimary(ctx.user.id);
-  if (!currentUser || currentUser.blocked_reason !== null || !userCanManageCredits(currentUser)) {
-    throw new TRPCError({
-      code: 'FORBIDDEN',
-      message: 'Credit management access required',
-    });
-  }
+export const creditManagerProcedure = adminProcedure.use(
+  markPrivilegedGuard(async ({ ctx, path, type, next }) => {
+    const { actionClass, inventoryId } = actionClassForAdminProcedure(path, type);
+    await requirePrivilegedActor({ permission: 'credit_manager', actionClass, inventoryId }, ctx);
+    return next();
+  }, 'credit_manager')
+);
 
-  return next();
-});
+export const superadminProcedure = adminProcedure.use(
+  markPrivilegedGuard(async ({ ctx, path, type, next }) => {
+    const { actionClass, inventoryId } = actionClassForAdminProcedure(path, type);
+    await requirePrivilegedActor({ permission: 'superadmin', actionClass, inventoryId }, ctx);
+    return next();
+  }, 'superadmin')
+);
 
-async function getCurrentUserFromPrimary(userId: string) {
-  return db.query.kilocode_users.findFirst({
-    where: eq(kilocode_users.id, userId),
-  });
-}
+export const sessionViewerProcedure = adminProcedure.use(
+  markPrivilegedGuard(async ({ ctx, path, type, next }) => {
+    const { actionClass, inventoryId } = actionClassForAdminProcedure(path, type);
+    await requirePrivilegedActor({ permission: 'session_viewer', actionClass, inventoryId }, ctx);
+    return next();
+  }, 'session_viewer')
+);
 
-export const superadminProcedure = adminProcedure.use(async ({ ctx, next }) => {
-  const currentUser = await getCurrentUserFromPrimary(ctx.user.id);
-  if (!currentUser || currentUser.blocked_reason !== null || !userIsSuperadmin(currentUser)) {
-    throw new TRPCError({
-      code: 'FORBIDDEN',
-      message: 'Superadmin access required',
-    });
-  }
-
-  return next();
-});
-
-export const sessionViewerProcedure = adminProcedure.use(async ({ ctx, next }) => {
-  if (!(await canCurrentUserViewSessions(ctx.user.id))) {
-    throw new TRPCError({
-      code: 'FORBIDDEN',
-      message: 'Session viewing access required',
-    });
-  }
-
-  return next();
-});
-
-export const apiRequestLogExporterProcedure = adminProcedure.use(async ({ ctx, next }) => {
-  if (!(await canCurrentUserExportApiRequestLogs(ctx.user.id))) {
-    throw new TRPCError({
-      code: 'FORBIDDEN',
-      message: 'API request log export access required',
-    });
-  }
-
-  return next();
-});
+export const apiRequestLogExporterProcedure = adminProcedure.use(
+  markPrivilegedGuard(async ({ ctx, path, type, next }) => {
+    const { actionClass, inventoryId } = actionClassForAdminProcedure(path, type);
+    await requirePrivilegedActor(
+      { permission: 'api_request_log_exporter', actionClass, inventoryId },
+      ctx
+    );
+    return next();
+  }, 'api_request_log_exporter')
+);

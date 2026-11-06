@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Demo fanaraha-maso lavitra native",
+    "sessionsEmpty": "Tsy mbola misy fotoam-piasana native",
+    "hosts": "Milina mifandray",
+    "hostsEmpty": "Tsy misy milina mifandray",
+    "directory": "Lahatahiry iasana",
+    "createSession": "Mamorona fotoam-piasana native",
+    "queueIfOffline": "Alaharo ny toromarika raha tsy mifandray ny milina",
+    "prompt": "Toromarika na /command",
+    "localClear": "Diovy ny fijery eo an-toerana",
+    "abort": "Atsaharo ny fihodinana",
+    "failed": "Tsy nahomby ny hetsika lavitra native",
+    "creationUnknown": "Tsy fantatra raha voaforona ilay fotoam-piasana. Havaozy ny fotoam-piasana alohan'ny hanandramana indray.",
+    "commandFailed": "Tsy nahomby ny baikon'ny prosesy CLI",
+    "invalidReply": "Tsy manankery ny valin'ny prosesy CLI",
+    "unsafeCommand": "Ampiasao ny /compact, /new, /skill, /models, /agents na /clear (eo an-toerana ihany).",
+    "status": "Fifandraisana: {{connection}} · Prosesy CLI: {{runner}}",
+    "presenceStatus": "Milina: {{connection}}",
+    "commandStatus": "Fanaterana baiko: {{status}}",
+    "delivered": "Voatolotra",
+    "expired": "Lany fe-potoana"
+  },
   "common": {
     "cancel": "Foano",
     "done": "Vita",
@@ -2558,6 +2580,7 @@
       "assistantStopped": "Najanona ny famaliana.",
       "assistantContextOverflow": "Lava loatra ny resaka ho an'ny modely.",
       "assistantProviderError": "Namaly diso ny mpamatsy.",
+      "assistantProviderRefused": "Nolavin'ny mpamatsy ity fangatahana ity ary tsy azo averina intsony.",
       "assistantOutputLimit": "Tonga tamin'ny fetran'ny valian'ny modely ny famaliana.",
       "assistantStructuredOutput": "Tsy nifanaraka tamin'ny endrika takiana ny famaliana.",
       "assistantFailed": "Tsy nahomby ny famaliana."

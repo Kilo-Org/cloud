@@ -199,7 +199,7 @@ export function SessionRow({
   const row = (
     <View
       className={cn(
-        'relative flex-row items-start gap-3 py-[13px] pl-[18px] pr-3',
+        'relative flex-row items-center gap-3 py-[13px] pl-[18px] pr-3',
         !last && 'border-b-[0.5px] border-hair-soft',
         className
       )}
@@ -245,7 +245,11 @@ export function SessionRow({
           </Text>
         ) : null}
       </View>
-      <DirectionalChevronRight size={14} color={colors.mutedSoft} />
+      {/* The row is top-aligned so a multi-line title keeps its first line in
+          line with the eyebrow; the disclosure mark centers on the row. */}
+      <View className="self-center">
+        <DirectionalChevronRight size={14} color={colors.mutedSoft} />
+      </View>
     </View>
   );
   if (onPress) {

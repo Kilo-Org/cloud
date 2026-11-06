@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Idemo yokulawula i-CLI v2 ukude",
+    "sessionsEmpty": "Awekho amaseshini e-CLI v2 okwamanje",
+    "hosts": "Abasingathi abaxhunyiwe",
+    "hostsEmpty": "Abekho abasingathi abaxhunyiwe",
+    "directory": "Uhla lwemibhalo lokusebenza",
+    "createSession": "Dala iseshini ye-CLI v2",
+    "queueIfOffline": "Faka isicelo emgqeni uma umsingathi engaxhunyiwe",
+    "prompt": "Isicelo noma /command",
+    "localClear": "Sula okubukwayo kule divayisi",
+    "abort": "Misa umzuliswano",
+    "failed": "Isenzo sokulawula i-CLI v2 ukude sehlulekile",
+    "creationUnknown": "Umphumela wokudala awaziwa. Vuselela amaseshini ngaphambi kokuzama futhi.",
+    "commandFailed": "Umyalo wenqubo ye-CLI wehlulekile",
+    "invalidReply": "Impendulo yenqubo ye-CLI ayivumelekile",
+    "unsafeCommand": "Sebenzisa /compact, /new, /skill, /models, /agents noma /clear (kule divayisi kuphela).",
+    "status": "Ukuxhumana: {{connection}} · Inqubo ye-CLI: {{runner}}",
+    "presenceStatus": "Abasingathi: {{connection}}",
+    "commandStatus": "Ukulethwa komyalo: {{status}}",
+    "delivered": "Kulethiwe",
+    "expired": "Kuphelelwe yisikhathi"
+  },
   "common": {
     "cancel": "Khansela",
     "done": "Kwenziwe",
@@ -2558,6 +2580,7 @@
       "assistantStopped": "Impendulo yamiswa.",
       "assistantContextOverflow": "Ingxoxo iyinde kakhulu kumodeli.",
       "assistantProviderError": "Umhlinzeki ubuyise iphutha.",
+      "assistantProviderRefused": "Umhlinzeki wenqabe lesi sicelo futhi asikwazi ukuphinda sizanywe.",
       "assistantOutputLimit": "Impendulo ifinyelele emkhawuleni wokukhipha womodeli.",
       "assistantStructuredOutput": "Impendulo ayihambisani nomumo odingekile.",
       "assistantFailed": "Impendulo yehlulekile."

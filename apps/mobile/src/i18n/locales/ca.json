@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Demo de control remot natiu",
+    "sessionsEmpty": "Encara no hi ha sessions natives",
+    "hosts": "Amfitrions en línia",
+    "hostsEmpty": "No hi ha amfitrions en línia",
+    "directory": "Directori de treball",
+    "createSession": "Crea una sessió nativa",
+    "queueIfOffline": "Posa la instrucció en cua si l'amfitrió està desconnectat",
+    "prompt": "Instrucció o /command",
+    "localClear": "Neteja la vista local",
+    "abort": "Interromp el torn",
+    "failed": "Ha fallat l'acció de control remot natiu",
+    "creationUnknown": "Es desconeix el resultat de la creació. Actualitza les sessions abans de tornar-ho a provar.",
+    "commandFailed": "Ha fallat l'ordre de l'executor",
+    "invalidReply": "Resposta de l'executor no vàlida",
+    "unsafeCommand": "Fes servir /compact, /new, /skill, /models, /agents o /clear (només local).",
+    "status": "Connexió: {{connection}} · Executor: {{runner}}",
+    "presenceStatus": "Amfitrions: {{connection}}",
+    "commandStatus": "Lliurament de l'ordre: {{status}}",
+    "delivered": "Lliurada",
+    "expired": "Caducada"
+  },
   "common": {
     "cancel": "Cancel·la",
     "done": "Fet",
@@ -2598,6 +2620,7 @@
       "assistantStopped": "S'ha aturat la generació de la resposta.",
       "assistantContextOverflow": "La conversa és massa llarga per al model.",
       "assistantProviderError": "El proveïdor ha retornat un error.",
+      "assistantProviderRefused": "El proveïdor ha rebutjat aquesta sol·licitud i no es pot tornar a intentar.",
       "assistantOutputLimit": "La resposta ha arribat al límit de sortida del model.",
       "assistantStructuredOutput": "La resposta no coincideix amb el format requerit.",
       "assistantFailed": "No s'ha pogut generar la resposta."

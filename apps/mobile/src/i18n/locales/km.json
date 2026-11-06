@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "ការសាកល្បងពីចម្ងាយដើម",
+    "sessionsEmpty": "មិនទាន់មានវគ្គដើមនៅឡើយទេ",
+    "hosts": "ម៉ាស៊ីនដែលកំពុងអនឡាញ",
+    "hostsEmpty": "គ្មានម៉ាស៊ីនកំពុងអនឡាញទេ",
+    "directory": "ថតធ្វើការ",
+    "createSession": "បង្កើតវគ្គដើម",
+    "queueIfOffline": "ដាក់សំណើក្នុងជួរ ប្រសិនបើម៉ាស៊ីននៅក្រៅបណ្តាញ",
+    "prompt": "សំណើ ឬ /command",
+    "localClear": "សម្អាតទិដ្ឋភាពមូលដ្ឋាន",
+    "abort": "បោះបង់វេន",
+    "failed": "សកម្មភាពពីចម្ងាយដើមបានបរាជ័យ",
+    "creationUnknown": "មិនដឹងលទ្ធផលនៃការបង្កើតទេ។ សូមផ្ទុកវគ្គឡើងវិញ មុនពេលព្យាយាមម្តងទៀត។",
+    "commandFailed": "ពាក្យបញ្ជារបស់កម្មវិធីដំណើរការបានបរាជ័យ",
+    "invalidReply": "ការឆ្លើយតបពីកម្មវិធីដំណើរការមិនត្រឹមត្រូវ",
+    "unsafeCommand": "សូមប្រើ /compact, /new, /skill, /models, /agents ឬ /clear (តែមូលដ្ឋានប៉ុណ្ណោះ)។",
+    "status": "ការតភ្ជាប់: {{connection}} · កម្មវិធីដំណើរការ: {{runner}}",
+    "presenceStatus": "ម៉ាស៊ីន: {{connection}}",
+    "commandStatus": "ការបញ្ជូនពាក្យបញ្ជា: {{status}}",
+    "delivered": "បានបញ្ជូន",
+    "expired": "បានផុតកំណត់"
+  },
   "common": {
     "cancel": "បោះបង់",
     "done": "រួចរាល់",
@@ -2552,6 +2574,7 @@
       "assistantStopped": "ការបង្កើតចម្លើយត្រូវបានបញ្ឈប់។",
       "assistantContextOverflow": "ការសន្ទនាវែងពេកសម្រាប់ម៉ូដែលនេះ។",
       "assistantProviderError": "អ្នកផ្តល់សេវាបានតបដោយកំហុស។",
+      "assistantProviderRefused": "អ្នកផ្តល់សេវាបានបដិសេធសំណើនេះ ហើយមិនអាចព្យាយាមឡើងវិញបានទេ។",
       "assistantOutputLimit": "ចម្លើយបានឈានដល់កម្រិតអតិបរមានៃទិន្នផលរបស់ម៉ូដែល។",
       "assistantStructuredOutput": "ចម្លើយមិនត្រូវគ្នានឹងទម្រង់ដែលត្រូវការទេ។",
       "assistantFailed": "មិនអាចបង្កើតចម្លើយបានទេ។"

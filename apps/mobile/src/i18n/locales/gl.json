@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Demo remota nativa",
+    "sessionsEmpty": "Aínda non hai sesións nativas",
+    "hosts": "Hosts en liña",
+    "hostsEmpty": "Non hai hosts en liña",
+    "directory": "Directorio de traballo",
+    "createSession": "Crear sesión nativa",
+    "queueIfOffline": "Poñer o prompt en cola se o host está desconectado",
+    "prompt": "Prompt ou /command",
+    "localClear": "Limpar a vista local",
+    "abort": "Abortar a quenda",
+    "failed": "Fallou a acción remota nativa",
+    "creationUnknown": "Descoñécese o resultado da creación. Actualiza as sesións antes de tentalo de novo.",
+    "commandFailed": "Fallou o comando do runner",
+    "invalidReply": "Resposta do runner non válida",
+    "unsafeCommand": "Usa /compact, /new, /skill, /models, /agents ou /clear (só local).",
+    "status": "Conexión: {{connection}} · Runner: {{runner}}",
+    "presenceStatus": "Hosts: {{connection}}",
+    "commandStatus": "Entrega do comando: {{status}}",
+    "delivered": "Entregado",
+    "expired": "Caducado"
+  },
   "common": {
     "cancel": "Cancelar",
     "done": "Feito",
@@ -2552,6 +2574,7 @@
       "assistantStopped": "Detívose a resposta.",
       "assistantContextOverflow": "A conversa é demasiado longa para o modelo.",
       "assistantProviderError": "O provedor devolveu un erro.",
+      "assistantProviderRefused": "O provedor rexeitou esta solicitude e non se pode reintentar.",
       "assistantOutputLimit": "A resposta alcanzou o límite de saída do modelo.",
       "assistantStructuredOutput": "A resposta non coincidía co formato requirido.",
       "assistantFailed": "Non se puido xerar a resposta."

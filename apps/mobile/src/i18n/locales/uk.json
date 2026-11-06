@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Демо нативного віддаленого керування",
+    "sessionsEmpty": "Нативних сеансів поки немає",
+    "hosts": "Хости в мережі",
+    "hostsEmpty": "Немає хостів у мережі",
+    "directory": "Робочий каталог",
+    "createSession": "Створити нативний сеанс",
+    "queueIfOffline": "Додати запит у чергу, якщо хост не в мережі",
+    "prompt": "Запит або /command",
+    "localClear": "Очистити локальний перегляд",
+    "abort": "Перервати хід",
+    "failed": "Не вдалося виконати нативну віддалену дію",
+    "creationUnknown": "Результат створення невідомий. Оновіть сеанси перед повторною спробою.",
+    "commandFailed": "Не вдалося виконати команду процесу CLI",
+    "invalidReply": "Некоректна відповідь процесу CLI",
+    "unsafeCommand": "Використовуйте /compact, /new, /skill, /models, /agents або /clear (лише локально).",
+    "status": "З'єднання: {{connection}} · Процес CLI: {{runner}}",
+    "presenceStatus": "Хости: {{connection}}",
+    "commandStatus": "Доставка команди: {{status}}",
+    "delivered": "Доставлено",
+    "expired": "Термін дії минув"
+  },
   "common": {
     "cancel": "Скасувати",
     "done": "Готово",
@@ -2063,6 +2085,7 @@
       "assistantStopped": "Формування відповіді зупинено.",
       "assistantContextOverflow": "Розмова занадто довга для моделі.",
       "assistantProviderError": "Постачальник повернув помилку.",
+      "assistantProviderRefused": "Постачальник відхилив цей запит, і його не можна повторити.",
       "assistantOutputLimit": "Відповідь досягла ліміту вихідних даних моделі.",
       "assistantStructuredOutput": "Відповідь не відповідає потрібному формату.",
       "assistantFailed": "Не вдалося сформувати відповідь."

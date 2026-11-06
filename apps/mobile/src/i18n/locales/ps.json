@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "د نېټیو لرې کنټرول بېلګه",
+    "sessionsEmpty": "تر اوسه هېڅ نېټیو ناسته نشته",
+    "hosts": "آنلاین کوربه‌ګان",
+    "hostsEmpty": "هېڅ آنلاین کوربه نشته",
+    "directory": "کاري پوښۍ",
+    "createSession": "نېټیو ناسته جوړه کړئ",
+    "queueIfOffline": "که کوربه آفلاین وي، لارښوونه په کتار کې واچوئ",
+    "prompt": "لارښوونه یا /command",
+    "localClear": "ځايي لید پاک کړئ",
+    "abort": "روان وار ودروئ",
+    "failed": "د نېټیو لرې کنټرول کړنه ناکامه شوه",
+    "creationUnknown": "د جوړولو پایله نامعلومه ده. له بیا هڅې مخکې ناستې تازه کړئ.",
+    "commandFailed": "د چلوونکي بهیر قومانده ناکامه شوه",
+    "invalidReply": "د چلوونکي بهیر ناسم ځواب",
+    "unsafeCommand": "/compact، /new، /skill، /models، /agents یا /clear وکاروئ (یوازې ځايي).",
+    "status": "اړیکه: {{connection}} · چلوونکی بهیر: {{runner}}",
+    "presenceStatus": "کوربه‌ګان: {{connection}}",
+    "commandStatus": "د قوماندې رسول: {{status}}",
+    "delivered": "ورسول شو",
+    "expired": "مهلت یې تېر شو"
+  },
   "common": {
     "cancel": "لغوه کړئ",
     "done": "بشپړ شو",
@@ -2552,6 +2574,7 @@
       "assistantStopped": "ځواب ودرول شو.",
       "assistantContextOverflow": "خبرې اترې د ماډل لپاره ډېرې اوږدې دي.",
       "assistantProviderError": "چمتو کوونکي تېروتنه راستونه کړه.",
+      "assistantProviderRefused": "چمتو کوونکي دا غوښتنه رد کړه او بیا هڅه نشي کېدای.",
       "assistantOutputLimit": "ځواب د ماډل د وتلو حد ته ورسېد.",
       "assistantStructuredOutput": "ځواب له اړین فورمټ سره سمون نه درلود.",
       "assistantFailed": "ځواب ناکام شو."

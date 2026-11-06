@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Agarsiisa fagoo Native",
+    "sessionsEmpty": "Ammaaf turtiin Native hin jiru",
+    "hosts": "Hoostota toora irra jiran",
+    "hostsEmpty": "Hoostiin toora irra jiru hin jiru",
+    "directory": "Galmee hojii",
+    "createSession": "Turtii Native uumi",
+    "queueIfOffline": "Hoostiin toora ala yoo ta'e gaaffii dabareetti galchi",
+    "prompt": "Gaaffii ykn /command",
+    "localClear": "Mul'ata naannoo qulqulleessi",
+    "abort": "Marsaa addaan kuti",
+    "failed": "Gochi fagoo Native hin milkoofne",
+    "creationUnknown": "Bu'aan uumamaa hin beekamu. Osoo deebi'ee hin yaalin dura turtiiwwan haaromsi.",
+    "commandFailed": "Ajajni raawwataa hin milkoofne",
+    "invalidReply": "Deebiin raawwataa sirrii miti",
+    "unsafeCommand": "/compact, /new, /skill, /models, /agents ykn /clear (naannoo qofa) fayyadami.",
+    "status": "Walqunnamtii: {{connection}} · Raawwataa: {{runner}}",
+    "presenceStatus": "Hoostota: {{connection}}",
+    "commandStatus": "Ergaa ajajaa: {{status}}",
+    "delivered": "Ga'eera",
+    "expired": "Yeroon isaa darbeera"
+  },
   "common": {
     "cancel": "Dhiisi",
     "done": "Xumurame",
@@ -2552,6 +2574,7 @@
       "assistantStopped": "Deebiin dhaabame.",
       "assistantContextOverflow": "Mariin kun moodelichaaf baay'ee dheeraadha.",
       "assistantProviderError": "Dhiyeessaan dogoggora deebisee.",
+      "assistantProviderRefused": "Dhiyeessaan gaaffii kana dideera, kanaaf irra deebi'uun hin danda'amu.",
       "assistantOutputLimit": "Deebiin daangaa baha moodelichaa ga'e.",
       "assistantStructuredOutput": "Deebiin akkaataa barbaachisu waliin hin wal simane.",
       "assistantFailed": "Deebii kennuun hin milkoofne."

@@ -258,7 +258,10 @@ timing gate, which needs a machine nobody else is using, and it is what the
 
 The job exists for `check:migrations`. The repository's own workspace test job
 runs `pnpm test` and nothing else, so without it the inlined SQL could drift
-from the schema and every check in the repository would still be green.
+from the schema and every check in the repository would still be green. That
+job leaves out this workspace while the `harness_sdk` filter matches, because
+this job already ran the suite; a lockfile change that selects the workspace
+through its dependents still puts the matrix entry back.
 
 The live runs are not in CI and must not be: they cost money and they need a
 kilo token.

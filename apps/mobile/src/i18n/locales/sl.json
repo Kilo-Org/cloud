@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Predstavitev izvornega oddaljenega upravljanja",
+    "sessionsEmpty": "Ni še izvornih sej",
+    "hosts": "Povezani gostitelji",
+    "hostsEmpty": "Ni povezanih gostiteljev",
+    "directory": "Delovni imenik",
+    "createSession": "Ustvari izvorno sejo",
+    "queueIfOffline": "Dodaj poziv v čakalno vrsto, če gostitelj ni povezan",
+    "prompt": "Poziv ali /command",
+    "localClear": "Počisti lokalni prikaz",
+    "abort": "Prekini potezo",
+    "failed": "Izvorno oddaljeno dejanje ni uspelo",
+    "creationUnknown": "Izid ustvarjanja ni znan. Pred ponovnim poskusom osveži seje.",
+    "commandFailed": "Ukaz izvajalnika ni uspel",
+    "invalidReply": "Neveljaven odgovor izvajalnika",
+    "unsafeCommand": "Uporabi /compact, /new, /skill, /models, /agents ali /clear (samo lokalno).",
+    "status": "Povezava: {{connection}} · Izvajalnik: {{runner}}",
+    "presenceStatus": "Gostitelji: {{connection}}",
+    "commandStatus": "Dostava ukaza: {{status}}",
+    "delivered": "Dostavljeno",
+    "expired": "Poteklo"
+  },
   "common": {
     "cancel": "Prekliči",
     "done": "Končano",
@@ -2644,6 +2666,7 @@
       "assistantStopped": "Ustvarjanje odgovora je bilo ustavljeno.",
       "assistantContextOverflow": "Pogovor je predolg za model.",
       "assistantProviderError": "Ponudnik je vrnil napako.",
+      "assistantProviderRefused": "Ponudnik je zavrnil to zahtevo in poskusa ni mogoče ponoviti.",
       "assistantOutputLimit": "Odgovor je dosegel omejitev izhoda modela.",
       "assistantStructuredOutput": "Odgovor ni ustrezal zahtevanemu formatu.",
       "assistantFailed": "Odgovora ni bilo mogoče ustvariti."

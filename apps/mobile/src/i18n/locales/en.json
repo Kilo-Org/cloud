@@ -66,6 +66,28 @@
     "sourceBlocker": "Session needs attention",
     "sourceMetadata": "Captured session metadata"
   },
+  "nativeRemote": {
+    "title": "Native remote demo",
+    "sessionsEmpty": "No native sessions yet",
+    "hosts": "Online hosts",
+    "hostsEmpty": "No online hosts",
+    "directory": "Launch directory",
+    "createSession": "Create native session",
+    "queueIfOffline": "Queue prompt if host is offline",
+    "prompt": "Prompt or /command",
+    "localClear": "Clear local view",
+    "abort": "Abort turn",
+    "failed": "Native remote action failed",
+    "creationUnknown": "Creation outcome unknown. Refresh sessions before retrying.",
+    "commandFailed": "Runner command failed",
+    "invalidReply": "Invalid runner reply",
+    "unsafeCommand": "Use /compact, /new, /skill, /models, /agents or /clear (local only).",
+    "status": "Connection: {{connection}} · Runner: {{runner}}",
+    "presenceStatus": "Hosts: {{connection}}",
+    "commandStatus": "Command delivery: {{status}}",
+    "delivered": "Delivered",
+    "expired": "Expired"
+  },
   "common": {
     "cancel": "Cancel",
     "done": "Done",
@@ -2630,6 +2652,7 @@
       "assistantStopped": "The response was stopped.",
       "assistantContextOverflow": "The conversation is too long for the model.",
       "assistantProviderError": "The provider returned an error.",
+      "assistantProviderRefused": "The provider refused this request and it cannot be retried.",
       "assistantOutputLimit": "The response reached the model's output limit.",
       "assistantStructuredOutput": "The response did not match the required format.",
       "assistantFailed": "The response failed."

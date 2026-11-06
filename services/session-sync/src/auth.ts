@@ -36,6 +36,8 @@ const GRANT_AUDIENCE = 'session-sync';
 const GRANT_TTL_SECONDS = 300;
 const MIN_GRANT_SECRET_BYTES = 32;
 const MAX_EXCHANGE_BODY_BYTES = 1024;
+/** Only issue-time checks tolerate skew; expiration remains a hard deadline. */
+export const AUTH_CLOCK_SKEW_SECONDS = 5;
 
 // A device-bound legacy credential carries the one-hour access lifetime or the
 // fixed five-year lifetime; both require a live device session.
@@ -77,6 +79,7 @@ const grantClaims = z
     iat: numericDate,
     exp: numericDate,
     tenant: z.unknown(),
+    env: z.string().min(1),
   })
   .refine(claims => claims.exp > claims.iat && claims.exp - claims.iat <= GRANT_TTL_SECONDS);
 
@@ -101,6 +104,15 @@ async function resolveSecret(binding: SecretBinding, minBytes: number): Promise<
   }
   if (typeof binding !== 'string') resolvedSecrets.set(binding, value);
   return value;
+}
+
+/** Shared signing key; ticket audiences remain distinct from sync grants. */
+export async function syncSigningKey(
+  env: Pick<AuthEnv, 'SESSION_SYNC_SECRET'>
+): Promise<Uint8Array> {
+  return new TextEncoder().encode(
+    await resolveSecret(env.SESSION_SYNC_SECRET, MIN_GRANT_SECRET_BYTES)
+  );
 }
 
 function failure(status: number, code: string, message: string): Response {
@@ -299,7 +311,7 @@ export async function exchange(request: Request, env: AuthEnv): Promise<Response
     const now = Math.floor(Date.now() / 1000);
     const exp = Math.min(now + GRANT_TTL_SECONDS, credential.expiresAt);
     if (exp <= now) return invalidCredential();
-    const grant = await new SignJWT({ version: 1, tenant: issued.data.tenant })
+    const grant = await new SignJWT({ version: 1, tenant: issued.data.tenant, env: environment })
       .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
       .setIssuer(GRANT_ISSUER)
       .setAudience(GRANT_AUDIENCE)
@@ -323,32 +335,45 @@ export async function exchange(request: Request, env: AuthEnv): Promise<Response
   }
 }
 
-/** Verifies a sync grant. Raw Kilo credentials are never accepted here. */
-export async function authorize(request: Request, env: AuthEnv): Promise<Principal | Response> {
-  const token = extractBearerToken(request.headers.get('Authorization'));
-  if (!token) return failure(401, 'unauthenticated', 'A sync grant is required');
-
-  let secret: string;
-  try {
-    secret = await resolveSecret(env.SESSION_SYNC_SECRET, MIN_GRANT_SECRET_BYTES);
-  } catch (error) {
-    return unavailable('authorize', error);
-  }
-
-  const rejected = failure(401, 'invalid_grant', 'The sync grant is invalid or expired');
+/** Validates a grant and exposes its deadline without accepting raw Kilo credentials. */
+export async function verifyGrant(
+  token: string,
+  env: AuthEnv
+): Promise<{ principal: Principal; expiresAt: number } | undefined> {
+  const key = await syncSigningKey(env);
   let payload: unknown;
   try {
-    ({ payload } = await jwtVerify(token, new TextEncoder().encode(secret), {
+    ({ payload } = await jwtVerify(token, key, {
       algorithms: ['HS256'],
       issuer: GRANT_ISSUER,
       audience: GRANT_AUDIENCE,
       requiredClaims: ['sub', 'iat', 'exp'],
     }));
   } catch {
-    return rejected;
+    return undefined;
   }
   const claims = grantClaims.safeParse(payload);
-  if (!claims.success || claims.data.iat > Math.floor(Date.now() / 1000)) return rejected;
+  if (
+    !claims.success ||
+    claims.data.iat > Math.floor(Date.now() / 1000) + AUTH_CLOCK_SKEW_SECONDS
+  ) {
+    return undefined;
+  }
+  if (claims.data.env !== env.ENVIRONMENT) return undefined;
   const bound = principalSchema.safeParse({ userID: claims.data.sub, tenant: claims.data.tenant });
-  return bound.success ? bound.data : rejected;
+  return bound.success ? { principal: bound.data, expiresAt: claims.data.exp } : undefined;
+}
+
+/** Verifies a sync grant. Raw Kilo credentials are never accepted here. */
+export async function authorize(request: Request, env: AuthEnv): Promise<Principal | Response> {
+  const token = extractBearerToken(request.headers.get('Authorization'));
+  if (!token) return failure(401, 'unauthenticated', 'A sync grant is required');
+  try {
+    const verified = await verifyGrant(token, env);
+    return (
+      verified?.principal ?? failure(401, 'invalid_grant', 'The sync grant is invalid or expired')
+    );
+  } catch (error) {
+    return unavailable('authorize', error);
+  }
 }

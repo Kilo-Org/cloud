@@ -7,7 +7,7 @@ import {
   CONTROL_PLANE_KILO_MESSAGE_LIMIT,
   CONTROL_PLANE_KILO_RESULT_MAX_BYTES,
 } from '../../../src/shared/control-plane-protocol.js';
-import type { WrapperKiloClient } from '../kilo-api.js';
+import type { HarnessReads } from './harness.js';
 import { rootPathPrefix } from '../../../src/shared/environment-workspace.js';
 import {
   type SessionGitSummaryPayload,
@@ -38,7 +38,7 @@ export type ControlPlaneKiloRequestsDeps = {
     sessionId: string
   ) => { runtimeKey: string; directory: string; roots?: readonly RouteRoot[] } | null;
   /** The live native client for one runtime key, or null when it is gone. */
-  clientFor: (runtimeKey: string) => WrapperKiloClient | null;
+  clientFor: (runtimeKey: string) => HarnessReads | null;
   captureSnapshot?: (
     directory: string,
     payload: SessionGitSummaryPayload,
@@ -47,6 +47,9 @@ export type ControlPlaneKiloRequestsDeps = {
   log?: (message: string) => void;
   timeoutMs?: number;
 };
+
+/** The runtime's harness does not serve this native operation. */
+class UnsupportedOperationError extends Error {}
 
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -78,7 +81,7 @@ export function createControlPlaneKiloRequests(deps: ControlPlaneKiloRequestsDep
   }
 
   async function run(
-    client: WrapperKiloClient,
+    client: HarnessReads,
     directory: string,
     kiloSessionId: string,
     operation: ControlPlaneNativeOperation,
@@ -89,6 +92,7 @@ export function createControlPlaneKiloRequests(deps: ControlPlaneKiloRequestsDep
       case 'session.get':
         return client.getSessionDetails(kiloSessionId, directory, signal);
       case 'session.messages':
+        if (!client.getRecentSessionMessages) throw new UnsupportedOperationError();
         return client.getRecentSessionMessages(kiloSessionId, directory, signal);
       case 'session.status': {
         const statuses = await client.getSessionStatuses(directory, signal);
@@ -169,6 +173,17 @@ export function createControlPlaneKiloRequests(deps: ControlPlaneKiloRequestsDep
       ) {
         deps.emit(
           fail(requestId, 'too_large', 'Native response exceeds the public response budget', false)
+        );
+        return;
+      }
+      if (error instanceof UnsupportedOperationError) {
+        deps.emit(
+          fail(
+            requestId,
+            'unsupported',
+            `${operation.name} is not supported by this runtime`,
+            false
+          )
         );
         return;
       }

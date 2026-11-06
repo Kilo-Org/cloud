@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Demo remote native",
+    "sessionsEmpty": "Belum ada sesi native",
+    "hosts": "Host online",
+    "hostsEmpty": "Tidak ada host online",
+    "directory": "Direktori kerja",
+    "createSession": "Buat sesi native",
+    "queueIfOffline": "Antrekan prompt jika host offline",
+    "prompt": "Prompt atau /command",
+    "localClear": "Bersihkan tampilan lokal",
+    "abort": "Batalkan giliran",
+    "failed": "Tindakan remote native gagal",
+    "creationUnknown": "Hasil pembuatan belum diketahui. Muat ulang sesi sebelum mencoba lagi.",
+    "commandFailed": "Perintah runner gagal",
+    "invalidReply": "Balasan runner tidak valid",
+    "unsafeCommand": "Gunakan /compact, /new, /skill, /models, /agents atau /clear (hanya lokal).",
+    "status": "Koneksi: {{connection}} · Runner: {{runner}}",
+    "presenceStatus": "Host: {{connection}}",
+    "commandStatus": "Pengiriman perintah: {{status}}",
+    "delivered": "Terkirim",
+    "expired": "Kedaluwarsa"
+  },
   "common": {
     "cancel": "Batal",
     "done": "Selesai",
@@ -2013,6 +2035,7 @@
       "assistantStopped": "Respons dihentikan.",
       "assistantContextOverflow": "Percakapan ini terlalu panjang untuk diproses oleh model.",
       "assistantProviderError": "Penyedia mengembalikan error.",
+      "assistantProviderRefused": "Penyedia menolak permintaan ini dan permintaan tidak dapat dicoba lagi.",
       "assistantOutputLimit": "Respons mencapai batas output model.",
       "assistantStructuredOutput": "Respons tidak sesuai dengan format yang diminta.",
       "assistantFailed": "Gagal menghasilkan respons."

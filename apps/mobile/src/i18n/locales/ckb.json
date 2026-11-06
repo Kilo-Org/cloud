@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "دیمۆی کۆنترۆڵی دوورەوەی نەیتیڤ",
+    "sessionsEmpty": "هێشتا هیچ دانیشتنێکی نەیتیڤ نییە",
+    "hosts": "هۆستە ئۆنلاینەکان",
+    "hostsEmpty": "هیچ هۆستێکی ئۆنلاین نییە",
+    "directory": "بوخچەی کارکردن",
+    "createSession": "دانیشتنێکی نەیتیڤ دروست بکە",
+    "queueIfOffline": "ئەگەر هۆست ئۆفلاین بوو، پڕۆمپت بخەرە ڕیزەوە",
+    "prompt": "پڕۆمپت یان /command",
+    "localClear": "دیمەنی ناوخۆیی پاک بکەرەوە",
+    "abort": "نۆرەکە بوەستێنە",
+    "failed": "کرداری کۆنترۆڵی دوورەوەی نەیتیڤ سەرکەوتوو نەبوو",
+    "creationUnknown": "ئەنجامی دروستکردن نادیارە. پێش دووبارە هەوڵدان، دانیشتنەکان نوێ بکەرەوە.",
+    "commandFailed": "فەرمانی جێبەجێکەر سەرکەوتوو نەبوو",
+    "invalidReply": "وەڵامی جێبەجێکەر نادروستە",
+    "unsafeCommand": "/compact، /new، /skill، /models، /agents یان /clear بەکاربهێنە (تەنها ناوخۆیی).",
+    "status": "پەیوەندی: {{connection}} · جێبەجێکەر: {{runner}}",
+    "presenceStatus": "هۆستەکان: {{connection}}",
+    "commandStatus": "گەیاندنی فەرمان: {{status}}",
+    "delivered": "گەیەندرا",
+    "expired": "بەسەرچوو"
+  },
   "common": {
     "cancel": "هەڵبوەشێنەوە",
     "done": "تەواو",
@@ -2552,6 +2574,7 @@
       "assistantStopped": "وەڵامەکە وەستێنرا.",
       "assistantContextOverflow": "گفتوگۆکە بۆ ئەم مۆدێلە زۆر درێژە.",
       "assistantProviderError": "دابینکەرەکە هەڵەیەکی گەڕاندەوە.",
+      "assistantProviderRefused": "دابینکەرەکە ئەم داواکارییەی ڕەتکردەوە و ناتوانرێت دووبارە هەوڵی بۆ بدرێتەوە.",
       "assistantOutputLimit": "وەڵامەکە گەیشتووەتە سنووری دەرکردنی مۆدێلەکە.",
       "assistantStructuredOutput": "وەڵامەکە لەگەڵ ئەو فۆرماتەی کە پێویست بوو نەگونجاوە.",
       "assistantFailed": "وەڵامدانەوە سەرکەوتوو نەبوو."

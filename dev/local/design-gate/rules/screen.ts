@@ -4,6 +4,7 @@ import {
   bottom,
   contains,
   contentBox,
+  insidePresentedSurface,
   intersection,
   layoutRect,
   right,
@@ -311,6 +312,10 @@ export function checkSafeArea(tree: LayoutTree): Finding[] {
   const { safeArea, window } = tree.env;
   for (const node of tree.nodes) {
     if (!node.isText && !node.isTextInput && !node.pressable) continue;
+    // A node inside a native dialog or sheet is measured against that surface's
+    // origin, which the platform placed inside the window: its frame says nothing
+    // about the window's insets, and the surface's presenter owns them.
+    if (insidePresentedSurface(node)) continue;
     if (ancestors(node).some(ancestor => ancestor.scroll.y)) continue;
     const rect = node.visibleRect;
     const top = safeArea.top > 0 ? Math.min(bottom(rect), safeArea.top) - Math.max(rect[1], 0) : 0;

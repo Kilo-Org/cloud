@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Native fjerndemo",
+    "sessionsEmpty": "Ingen native økter ennå",
+    "hosts": "Verter på nett",
+    "hostsEmpty": "Ingen verter på nett",
+    "directory": "Arbeidsmappe",
+    "createSession": "Opprett native økt",
+    "queueIfOffline": "Sett prompten i kø hvis verten er frakoblet",
+    "prompt": "Prompt eller /command",
+    "localClear": "Tøm lokal visning",
+    "abort": "Avbryt tur",
+    "failed": "Native fjernhandling mislyktes",
+    "creationUnknown": "Ukjent om opprettelsen lyktes. Oppdater øktene før du prøver på nytt.",
+    "commandFailed": "Runner-kommandoen mislyktes",
+    "invalidReply": "Ugyldig svar fra runner",
+    "unsafeCommand": "Bruk /compact, /new, /skill, /models, /agents eller /clear (kun lokalt).",
+    "status": "Tilkobling: {{connection}} · Runner: {{runner}}",
+    "presenceStatus": "Verter: {{connection}}",
+    "commandStatus": "Kommandolevering: {{status}}",
+    "delivered": "Levert",
+    "expired": "Utløpt"
+  },
   "common": {
     "cancel": "Avbryt",
     "done": "Ferdig",
@@ -2552,6 +2574,7 @@
       "assistantStopped": "Genereringen av svaret ble stoppet.",
       "assistantContextOverflow": "Samtalen er for lang for modellen.",
       "assistantProviderError": "Leverandøren returnerte en feil.",
+      "assistantProviderRefused": "Leverandøren avviste denne forespørselen, og den kan ikke gjentas.",
       "assistantOutputLimit": "Svaret nådde utdatagrensen til modellen.",
       "assistantStructuredOutput": "Svaret samsvarte ikke med det påkrevde formatet.",
       "assistantFailed": "Svaret kunne ikke genereres."

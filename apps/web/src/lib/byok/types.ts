@@ -50,8 +50,8 @@ export const SetBYOKKeyCatalogModeInputSchema = OptionalOrganizationIdSchema.ext
   serve_catalog_models: z.boolean(),
 });
 
-/** Personal keys only: every listed key of the caller, highest priority first. */
-export const ReorderBYOKKeysInputSchema = z.object({
+/** Every listed key of the scoped owner, highest priority first. */
+export const ReorderBYOKKeysInputSchema = OptionalOrganizationIdSchema.extend({
   keyIds: z
     .array(z.string().uuid())
     .min(1)

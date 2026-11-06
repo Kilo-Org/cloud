@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "نیٹو ریموٹ ڈیمو",
+    "sessionsEmpty": "ابھی کوئی نیٹو سیشن نہیں ہے",
+    "hosts": "آن لائن ہوسٹس",
+    "hostsEmpty": "کوئی ہوسٹ آن لائن نہیں ہے",
+    "directory": "ورکنگ ڈائریکٹری",
+    "createSession": "نیٹو سیشن بنائیں",
+    "queueIfOffline": "ہوسٹ آف لائن ہو تو پرامپٹ قطار میں رکھیں",
+    "prompt": "پرامپٹ یا /command",
+    "localClear": "مقامی منظر صاف کریں",
+    "abort": "ٹرن منسوخ کریں",
+    "failed": "نیٹو ریموٹ کارروائی ناکام ہو گئی",
+    "creationUnknown": "سیشن بننے کا نتیجہ نامعلوم ہے۔ دوبارہ کوشش سے پہلے سیشن تازہ کریں۔",
+    "commandFailed": "رنر کی کمانڈ ناکام ہو گئی",
+    "invalidReply": "رنر کا جواب درست نہیں ہے",
+    "unsafeCommand": "/compact، /new، /skill، /models، /agents یا /clear (صرف مقامی طور پر) استعمال کریں۔",
+    "status": "رابطہ: {{connection}} · رنر: {{runner}}",
+    "presenceStatus": "ہوسٹس: {{connection}}",
+    "commandStatus": "کمانڈ کی ترسیل: {{status}}",
+    "delivered": "پہنچا دیا گیا",
+    "expired": "میعاد ختم ہو گئی"
+  },
   "common": {
     "cancel": "منسوخ کریں",
     "done": "ہو گیا",
@@ -2552,6 +2574,7 @@
       "assistantStopped": "جواب روک دیا گیا۔",
       "assistantContextOverflow": "گفتگو ماڈل کے لیے بہت طویل ہے۔",
       "assistantProviderError": "فراہم کنندہ نے ایک خرابی واپس کی۔",
+      "assistantProviderRefused": "فراہم کنندہ نے یہ درخواست مسترد کر دی اور اس پر دوبارہ کوشش نہیں کی جا سکتی۔",
       "assistantOutputLimit": "جواب ماڈل کی آؤٹ پٹ حد تک پہنچ گیا۔",
       "assistantStructuredOutput": "جواب مطلوبہ فارمیٹ سے مطابقت نہیں رکھتا۔",
       "assistantFailed": "جواب تیار نہیں ہو سکا۔"

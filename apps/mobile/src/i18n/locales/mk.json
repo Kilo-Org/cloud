@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Демо за нативен далечински пристап",
+    "sessionsEmpty": "Сè уште нема нативни сесии",
+    "hosts": "Онлајн хостови",
+    "hostsEmpty": "Нема онлајн хостови",
+    "directory": "Работен директориум",
+    "createSession": "Создај нативна сесија",
+    "queueIfOffline": "Стави го барањето во редица ако хостот е офлајн",
+    "prompt": "Барање или /command",
+    "localClear": "Исчисти го локалниот приказ",
+    "abort": "Прекини го потегот",
+    "failed": "Нативното далечинско дејство не успеа",
+    "creationUnknown": "Исходот од создавањето е непознат. Освежи ги сесиите пред повторен обид.",
+    "commandFailed": "Командата за извршувачот не успеа",
+    "invalidReply": "Неважечки одговор од извршувачот",
+    "unsafeCommand": "Користи /compact, /new, /skill, /models, /agents или /clear (само локално).",
+    "status": "Врска: {{connection}} · Извршувач: {{runner}}",
+    "presenceStatus": "Хостови: {{connection}}",
+    "commandStatus": "Испорака на командата: {{status}}",
+    "delivered": "Испорачано",
+    "expired": "Истечено"
+  },
   "common": {
     "cancel": "Откажи",
     "done": "Готово",
@@ -2552,6 +2574,7 @@
       "assistantStopped": "Создавањето на одговорот е запрено.",
       "assistantContextOverflow": "Разговорот е премногу долг за моделот.",
       "assistantProviderError": "Давателот врати грешка.",
+      "assistantProviderRefused": "Давателот го одби барањето и тоа не може да се повтори.",
       "assistantOutputLimit": "Одговорот го достигна ограничувањето за излез на моделот.",
       "assistantStructuredOutput": "Одговорот не се совпаѓаше со бараниот формат.",
       "assistantFailed": "Не успеа создавањето на одговорот."

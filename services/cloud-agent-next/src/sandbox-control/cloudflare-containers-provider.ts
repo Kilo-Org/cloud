@@ -122,7 +122,8 @@ export function createCloudflareContainersProviderAdapter(deps: {
 
   return {
     environmentSnapshots: true,
-    sessionSnapshots: {
+    workspaceSnapshots: {
+      currentImage: image => deps.getContainer(deps.logicalSandboxId).currentImage(image),
       async capture(ref, captureId) {
         if (decodeOwnedProviderRef(ref) === null)
           throw new ProviderCreationError('invalid_configuration');

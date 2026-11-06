@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Gwajin sarrafa CLI native daga nesa",
+    "sessionsEmpty": "Babu zaman CLI native tukuna",
+    "hosts": "Na'urorin masauki masu haɗi",
+    "hostsEmpty": "Babu na'urorin masauki masu haɗi",
+    "directory": "Kundin aiki",
+    "createSession": "Ƙirƙiri zaman CLI native",
+    "queueIfOffline": "Saka buƙata a layin jira idan na'urar masauki ba ta da haɗi",
+    "prompt": "Buƙata ko /command",
+    "localClear": "Share nunin wannan na'urar",
+    "abort": "Dakatar da zagaye",
+    "failed": "Aikin sarrafa CLI native daga nesa ya gaza",
+    "creationUnknown": "Ba a san sakamakon ƙirƙirawa ba. Sabunta jerin zama kafin sake gwadawa.",
+    "commandFailed": "Umarnin mai gudanar da CLI ya gaza",
+    "invalidReply": "Amsar mai gudanar da CLI ba ta inganta ba",
+    "unsafeCommand": "Yi amfani da /compact, /new, /skill, /models, /agents ko /clear (a wannan na'urar kawai).",
+    "status": "Haɗi: {{connection}} · Mai gudanar da CLI: {{runner}}",
+    "presenceStatus": "Na'urorin masauki: {{connection}}",
+    "commandStatus": "Isar da umarni: {{status}}",
+    "delivered": "An isar",
+    "expired": "Lokaci ya ƙare"
+  },
   "common": {
     "cancel": "Soke",
     "done": "An gama",
@@ -2552,6 +2574,7 @@
       "assistantStopped": "An dakatar da amsar.",
       "assistantContextOverflow": "Tattaunawar ta yi tsawo fiye da abin da samfurin zai iya karɓa.",
       "assistantProviderError": "Mai ba da sabis ya mayar da kuskure.",
+      "assistantProviderRefused": "Mai ba da sabis ya ƙi wannan buƙatar, kuma ba za a iya sake gwadawa ba.",
       "assistantOutputLimit": "Amsar ta kai iyakar fitar da samfurin.",
       "assistantStructuredOutput": "Amsar ba ta dace da tsarin da ake buƙata ba.",
       "assistantFailed": "An kasa samar da amsar."

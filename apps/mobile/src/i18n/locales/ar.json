@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "عرض تجريبي للتحكم عن بُعد ببروتوكول CLI الأصلي",
+    "sessionsEmpty": "لا توجد جلسات ببروتوكول CLI الأصلي بعد",
+    "hosts": "المضيفون المتصلون",
+    "hostsEmpty": "لا يوجد مضيفون متصلون",
+    "directory": "دليل العمل",
+    "createSession": "إنشاء جلسة ببروتوكول CLI الأصلي",
+    "queueIfOffline": "إضافة المطالبة إلى قائمة الانتظار إذا كان المضيف غير متصل",
+    "prompt": "مطالبة أو /command",
+    "localClear": "مسح العرض المحلي",
+    "abort": "إيقاف الدور",
+    "failed": "فشل إجراء التحكم عن بُعد ببروتوكول CLI الأصلي",
+    "creationUnknown": "نتيجة الإنشاء غير معروفة. حدّث الجلسات قبل إعادة المحاولة.",
+    "commandFailed": "فشل أمر المشغّل",
+    "invalidReply": "ردّ المشغّل غير صالح",
+    "unsafeCommand": "استخدم /compact أو /new أو /skill أو /models أو /agents أو /clear (محليًا فقط).",
+    "status": "الاتصال: {{connection}} · المشغّل: {{runner}}",
+    "presenceStatus": "المضيفون: {{connection}}",
+    "commandStatus": "تسليم الأمر: {{status}}",
+    "delivered": "تم التسليم",
+    "expired": "انتهت الصلاحية"
+  },
   "common": {
     "cancel": "إلغاء",
     "done": "تم",
@@ -2113,6 +2135,7 @@
       "assistantStopped": "تم إيقاف إنشاء الرد.",
       "assistantContextOverflow": "المحادثة أطول من أن يستوعبها النموذج.",
       "assistantProviderError": "أعاد المزود رسالة خطأ.",
+      "assistantProviderRefused": "رفض المزود هذا الطلب ولا يمكن إعادة المحاولة.",
       "assistantOutputLimit": "وصل الرد إلى حدّ الإخراج الأقصى للنموذج.",
       "assistantStructuredOutput": "لم يتطابق الرد مع التنسيق المطلوب.",
       "assistantFailed": "تعذّر إنشاء الرد."

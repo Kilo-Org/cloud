@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Demo kawalan jauh natif",
+    "sessionsEmpty": "Belum ada sesi natif",
+    "hosts": "Hos dalam talian",
+    "hostsEmpty": "Tiada hos dalam talian",
+    "directory": "Direktori kerja",
+    "createSession": "Cipta sesi natif",
+    "queueIfOffline": "Masukkan gesaan dalam baris gilir jika hos di luar talian",
+    "prompt": "Gesaan atau /command",
+    "localClear": "Kosongkan paparan setempat",
+    "abort": "Hentikan giliran",
+    "failed": "Tindakan kawalan jauh natif gagal",
+    "creationUnknown": "Hasil penciptaan tidak diketahui. Muat semula sesi sebelum mencuba semula.",
+    "commandFailed": "Arahan pelaksana gagal",
+    "invalidReply": "Balasan pelaksana tidak sah",
+    "unsafeCommand": "Gunakan /compact, /new, /skill, /models, /agents atau /clear (setempat sahaja).",
+    "status": "Sambungan: {{connection}} · Pelaksana: {{runner}}",
+    "presenceStatus": "Hos: {{connection}}",
+    "commandStatus": "Penghantaran arahan: {{status}}",
+    "delivered": "Dihantar",
+    "expired": "Tamat tempoh"
+  },
   "common": {
     "cancel": "Batal",
     "done": "Selesai",
@@ -2552,6 +2574,7 @@
       "assistantStopped": "Respons dihentikan.",
       "assistantContextOverflow": "Perbualan terlalu panjang untuk model.",
       "assistantProviderError": "Penyedia mengembalikan ralat.",
+      "assistantProviderRefused": "Penyedia menolak permintaan ini dan ia tidak boleh dicuba semula.",
       "assistantOutputLimit": "Respons mencapai had output model.",
       "assistantStructuredOutput": "Respons tidak sepadan dengan format yang diperlukan.",
       "assistantFailed": "Respons gagal."

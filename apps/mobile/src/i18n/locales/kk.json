@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "CLI v2 қашықтан басқару демосы",
+    "sessionsEmpty": "Әзірге CLI v2 сессиялары жоқ",
+    "hosts": "Желідегі хосттар",
+    "hostsEmpty": "Желіде хосттар жоқ",
+    "directory": "Жұмыс каталогы",
+    "createSession": "CLI v2 сессиясын жасау",
+    "queueIfOffline": "Хост желіде болмаса, сұрауды кезекке қою",
+    "prompt": "Сұрау немесе /command",
+    "localClear": "Жергілікті көріністі тазалау",
+    "abort": "Ағымдағы қадамды тоқтату",
+    "failed": "CLI v2 қашықтан басқару әрекеті орындалмады",
+    "creationUnknown": "Жасау нәтижесі белгісіз. Қайталап көру алдында сессияларды жаңартыңыз.",
+    "commandFailed": "Орындаушы процесс командасы орындалмады",
+    "invalidReply": "Орындаушы процестің жауабы жарамсыз",
+    "unsafeCommand": "/compact, /new, /skill, /models, /agents немесе /clear (тек жергілікті) қолданыңыз.",
+    "status": "Байланыс: {{connection}} · Орындаушы процесс: {{runner}}",
+    "presenceStatus": "Хосттар: {{connection}}",
+    "commandStatus": "Команданың жеткізілуі: {{status}}",
+    "delivered": "Жеткізілді",
+    "expired": "Мерзімі өтті"
+  },
   "common": {
     "cancel": "Болдырмау",
     "done": "Дайын",
@@ -2552,6 +2574,7 @@
       "assistantStopped": "Жауапты жасау тоқтатылды.",
       "assistantContextOverflow": "Сөйлесу көлемі модельдің шегінен асты.",
       "assistantProviderError": "Провайдер қате қайтарды.",
+      "assistantProviderRefused": "Провайдер бұл сұрауды қабылдамады және оны қайталау мүмкін емес.",
       "assistantOutputLimit": "Жауап модельдің шығыс шегіне жетті.",
       "assistantStructuredOutput": "Жауап қажетті форматқа сәйкес келмеді.",
       "assistantFailed": "Жауапты жасау мүмкін болмады."

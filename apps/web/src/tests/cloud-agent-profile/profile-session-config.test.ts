@@ -480,6 +480,55 @@ describe('mergeProfileConfiguration', () => {
       });
       // The environment owns setup: the bound profile's command does not run.
       expect(result.setupCommands).toEqual(['env-cmd', 'manual-cmd']);
+      expect(result.environmentSetupCommandCount).toBe(1);
+
+      const withoutEnvironment = await mergeProfileConfiguration(db, {
+        owner,
+        repoFullName: 'org/repo',
+        platform: 'github',
+        setupCommands: ['manual-cmd'],
+      });
+      expect(withoutEnvironment.setupCommands).toEqual(['repo-cmd', 'manual-cmd']);
+      expect(withoutEnvironment.environmentSetupCommandCount).toBeUndefined();
+    });
+
+    test('keeps environment start commands apart from setup and from profile layers', async () => {
+      const user = await insertTestUser();
+      const owner: ProfileOwner = { type: 'user', id: user.id };
+      const defaultProfileId = await createProfile(owner, 'default', { isDefault: true });
+      await addCommands(defaultProfileId, ['default-cmd']);
+
+      const result = await mergeProfileConfiguration(db, {
+        owner,
+        repoFullName: 'org/repo',
+        platform: 'github',
+        environment: { setupCommands: ['install'], startCommands: ['serve'] },
+        setupCommands: ['manual-cmd'],
+      });
+
+      expect(result.setupCommands).toEqual(['install', 'manual-cmd']);
+      expect(result.startCommands).toEqual(['serve']);
+
+      const withoutEnvironment = await mergeProfileConfiguration(db, {
+        owner,
+        repoFullName: 'org/repo',
+        platform: 'github',
+      });
+      expect(withoutEnvironment.startCommands).toBeUndefined();
+    });
+
+    test('keeps an explicit zero environment setup boundary for inline commands', async () => {
+      const user = await insertTestUser();
+      const owner: ProfileOwner = { type: 'user', id: user.id };
+
+      const result = await mergeProfileConfiguration(db, {
+        owner,
+        environment: {},
+        setupCommands: ['manual-cmd'],
+      });
+
+      expect(result.setupCommands).toEqual(['manual-cmd']);
+      expect(result.environmentSetupCommandCount).toBe(0);
     });
 
     test('an empty environment still replaces profile setup commands, not profile vars', async () => {

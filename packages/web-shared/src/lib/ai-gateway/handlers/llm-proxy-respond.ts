@@ -153,6 +153,17 @@ export async function respondToUpstream(input: RespondInput): Promise<NextRespon
     return errorResponse;
   }
 
+  let outputRequestLogs: RequestLoggingParams['enkrypt'];
+  const logging: RequestLoggingParams = {
+    ...input.logging,
+    enkrypt: async captureResponse => {
+      const [inputLogs, outputLogs] = await Promise.all([
+        input.logging.enkrypt?.(captureResponse),
+        outputRequestLogs?.(captureResponse),
+      ]);
+      return [...(inputLogs ?? []), ...(outputLogs ?? [])];
+    },
+  };
   return await guardEnkryptOutput({
     response,
     scan: input.enkryptOutputScan,
@@ -168,17 +179,20 @@ export async function respondToUpstream(input: RespondInput): Promise<NextRespon
         isFree: usageContext.is_free,
         userByok: usageContext.user_byok,
         customLlmPricing: usageContext.custom_llm_pricing,
-        logging: input.logging,
+        logging,
         responseTransforms: provider.responseTransforms,
       }),
     captureReport: input.captureEnkryptOutputReport,
+    captureRequestLogs: logs => {
+      outputRequestLogs = logs;
+    },
     onReject: async (rejection, verdict) => {
       if (input.signal.aborted) return;
       await logUnrewrittenResponse({
         response: rejection.clone(),
         model,
         providerId: provider.type,
-        logging: input.logging,
+        logging,
         error: { guardrail_rejection: verdict.action, guardrail: 'output' },
       });
     },

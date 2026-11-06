@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Demo ng native remote",
+    "sessionsEmpty": "Wala pang native na sesyon",
+    "hosts": "Mga online na host",
+    "hostsEmpty": "Walang online na host",
+    "directory": "Direktoryo ng trabaho",
+    "createSession": "Gumawa ng native na sesyon",
+    "queueIfOffline": "Ipila ang prompt kung offline ang host",
+    "prompt": "Prompt o /command",
+    "localClear": "Linisin ang lokal na view",
+    "abort": "Ihinto ang turn",
+    "failed": "Nabigo ang aksyon sa native remote",
+    "creationUnknown": "Hindi tiyak kung nalikha ang sesyon. I-refresh ang mga sesyon bago subukang muli.",
+    "commandFailed": "Nabigo ang command sa runner",
+    "invalidReply": "Hindi wastong tugon mula sa runner",
+    "unsafeCommand": "Gamitin ang /compact, /new, /skill, /models, /agents o /clear (lokal lang).",
+    "status": "Koneksyon: {{connection}} · Runner: {{runner}}",
+    "presenceStatus": "Mga host: {{connection}}",
+    "commandStatus": "Paghahatid ng command: {{status}}",
+    "delivered": "Naihatid",
+    "expired": "Nag-expire"
+  },
   "common": {
     "cancel": "Kanselahin",
     "done": "Tapos",
@@ -2558,6 +2580,7 @@
       "assistantStopped": "Inihinto ang tugon.",
       "assistantContextOverflow": "Masyadong mahaba ang pag-uusap para sa modelo.",
       "assistantProviderError": "Nagbalik ang tagapagbigay ng serbisyo ng error.",
+      "assistantProviderRefused": "Tinanggihan ng tagapagbigay ng serbisyo ang kahilingang ito at hindi na ito maaaring muling subukan.",
       "assistantOutputLimit": "Naabot ng tugon ang limitasyon ng output ng modelo.",
       "assistantStructuredOutput": "Hindi tumugma ang tugon sa kinakailangang format.",
       "assistantFailed": "Nabigo ang pagtugon."

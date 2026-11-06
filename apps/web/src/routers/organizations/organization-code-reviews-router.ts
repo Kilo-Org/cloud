@@ -17,7 +17,6 @@ import { recordElevatedOrganizationAdminAction } from '@/lib/admin/admin-action-
 import {
   getGitHubConnectionStatusForOwner,
   getIntegrationForOrganization,
-  updateIntegrationMetadata,
 } from '@/lib/integrations/db/platform-integrations';
 import {
   getAgentConfig,
@@ -47,6 +46,7 @@ import {
   syncWebhooksForRepositories,
   type ConfiguredWebhook,
 } from '@/lib/integrations/platforms/gitlab/webhook-sync';
+import { mutateGitLabMetadata } from '@/lib/integrations/platforms/gitlab/metadata-mutation';
 import {
   getValidGitLabToken,
   isGitLabCredentialConnected,
@@ -797,11 +797,10 @@ export const organizationReviewAgentRouter = createTRPCRouter({
                   instanceUrl
                 );
 
-                // Update integration metadata with new webhook configuration
-                const existingMetadata = (integration.metadata as Record<string, unknown>) || {};
-                await updateIntegrationMetadata(integration.id, {
-                  ...existingMetadata,
-                  configured_webhooks: updatedWebhooks,
+                // Merge the new webhook configuration, so a writer that changed
+                // another metadata key meanwhile keeps its value.
+                await mutateGitLabMetadata(integration.id, {
+                  set: { configured_webhooks: updatedWebhooks },
                 });
 
                 webhookSyncResult = {
@@ -1149,10 +1148,8 @@ export const organizationReviewAgentRouter = createTRPCRouter({
                   instanceUrl
                 );
 
-                const existingMetadata = (integration.metadata as Record<string, unknown>) || {};
-                await updateIntegrationMetadata(integration.id, {
-                  ...existingMetadata,
-                  configured_webhooks: updatedWebhooks,
+                await mutateGitLabMetadata(integration.id, {
+                  set: { configured_webhooks: updatedWebhooks },
                 });
 
                 webhookSyncResult = {
@@ -1405,9 +1402,8 @@ export const organizationReviewAgentRouter = createTRPCRouter({
       // If no Kilo-managed webhooks are configured, skip the network
       // round-trip entirely and just persist + return the new secret.
       if (Object.keys(configuredWebhooks).length === 0) {
-        await updateIntegrationMetadata(integration.id, {
-          ...existingMetadata,
-          webhook_secret: newSecret,
+        await mutateGitLabMetadata(integration.id, {
+          set: { webhook_secret: newSecret },
         });
         await createAuditLog({
           organization_id: organizationId,
@@ -1491,10 +1487,8 @@ export const organizationReviewAgentRouter = createTRPCRouter({
         };
       }
 
-      await updateIntegrationMetadata(integration.id, {
-        ...existingMetadata,
-        webhook_secret: newSecret,
-        configured_webhooks: updatedWebhooks,
+      await mutateGitLabMetadata(integration.id, {
+        set: { webhook_secret: newSecret, configured_webhooks: updatedWebhooks },
       });
 
       await createAuditLog({

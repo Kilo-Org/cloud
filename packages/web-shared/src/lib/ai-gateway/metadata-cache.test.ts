@@ -18,6 +18,17 @@ const source: MetadataSource<z.infer<typeof ModelsSchema>> = {
   parse: raw => ModelsSchema.parse(raw),
 };
 
+const NOT_FOUND_MARKER = { status: 404 };
+
+const sourceWithNotFoundMarker: MetadataSource<z.infer<typeof ModelsSchema>> = {
+  ...source,
+  rawWhenNotFound: NOT_FOUND_MARKER,
+  parse: raw =>
+    z.strictObject({ status: z.literal(404) }).safeParse(raw).success
+      ? { models: [] }
+      : ModelsSchema.parse(raw),
+};
+
 let fetchSpy: jest.SpiedFunction<typeof fetch>;
 
 function storeRow(data: unknown) {
@@ -58,6 +69,13 @@ describe('getMetadata', () => {
     await storeRow({ models: ['stored'] });
 
     await expect(getMetadata(source, db)).resolves.toEqual({ models: ['stored'] });
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('uses a stored not-found marker without fetching', async () => {
+    await storeRow(NOT_FOUND_MARKER);
+
+    await expect(getMetadata(sourceWithNotFoundMarker, db)).resolves.toEqual({ models: [] });
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
@@ -102,6 +120,33 @@ describe('fetchMetadata', () => {
     fetchSpy.mockResolvedValue(Response.json({ models: 'not-a-list' }));
 
     await expect(fetchMetadata(source)).rejects.toThrow();
+  });
+
+  it('rejects a 404 when the source has no stand-in body', async () => {
+    fetchSpy.mockResolvedValue(new Response(null, { status: 404, statusText: 'Not Found' }));
+
+    await expect(fetchMetadata(source)).rejects.toThrow(
+      `Fetching ${source.url} failed: 404 Not Found`
+    );
+  });
+
+  it('returns the stand-in body and its parsed form for a 404', async () => {
+    fetchSpy.mockResolvedValue(new Response(null, { status: 404, statusText: 'Not Found' }));
+
+    await expect(fetchMetadata(sourceWithNotFoundMarker)).resolves.toEqual({
+      raw: NOT_FOUND_MARKER,
+      data: { models: [] },
+    });
+  });
+
+  it('still rejects other error statuses when the source has a stand-in body', async () => {
+    fetchSpy.mockResolvedValue(
+      new Response(null, { status: 500, statusText: 'Internal Server Error' })
+    );
+
+    await expect(fetchMetadata(sourceWithNotFoundMarker)).rejects.toThrow(
+      `Fetching ${source.url} failed: 500 Internal Server Error`
+    );
   });
 });
 

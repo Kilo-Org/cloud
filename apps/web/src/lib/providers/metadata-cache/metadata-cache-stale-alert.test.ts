@@ -31,6 +31,15 @@ const staleAfterRecentAlert = entry(
 );
 const neverStored = entry('https://metadata.test/never', null);
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+const DAYS_AGO_2 = new Date(NOW.getTime() - 2 * DAY_MS);
+const DAYS_AGO_3 = new Date(NOW.getTime() - 3 * DAY_MS);
+const GROUP = 'https://gateway.test/models/{id}/endpoints';
+
+function groupedEntry(modelId: string, updatedAt: Date | null): StaleMetadataEntry {
+  return { url: `https://gateway.test/models/${modelId}/endpoints`, updatedAt, group: GROUP };
+}
+
 function postedNotification() {
   return jest.fn(async (_notification: AdminSlackNotification) => 'posted' as const);
 }
@@ -123,6 +132,66 @@ describe('buildMetadataCacheStaleAlertNotification', () => {
     });
 
     expect(JSON.stringify(notification.blocks)).toContain('never stored');
+  });
+
+  it('lists entries sharing a group as one line with their count and oldest update', () => {
+    const notification = buildMetadataCacheStaleAlertNotification({
+      staleEntries: [
+        groupedEntry('a', DAYS_AGO_2),
+        groupedEntry('b', DAYS_AGO_3),
+        groupedEntry('c', DAYS_AGO_2),
+        entry('https://metadata.test/plain', DAYS_AGO_2),
+        {
+          url: 'https://other.test/models/x/endpoints',
+          updatedAt: DAYS_AGO_3,
+          group: 'https://other.test/models/{id}/endpoints',
+        },
+      ],
+      now: NOW,
+    });
+    const blocks = JSON.stringify(notification.blocks);
+
+    expect(notification.text).toContain('5 upstream metadata sources failed to refresh');
+    expect(blocks).toContain(
+      `• \`${GROUP}\` for 3 sources (oldest last updated: ${DAYS_AGO_3.toISOString()})`
+    );
+    expect(blocks).not.toContain('https://gateway.test/models/a/endpoints');
+    expect(blocks).toContain(
+      `• \`https://metadata.test/plain\` (last updated: ${DAYS_AGO_2.toISOString()})`
+    );
+    expect(blocks).toContain(
+      `• \`https://other.test/models/x/endpoints\` (last updated: ${DAYS_AGO_3.toISOString()})`
+    );
+    expect(blocks).not.toContain('https://other.test/models/{id}/endpoints');
+  });
+
+  it('marks a group as never stored when any of its entries was never stored', () => {
+    const notification = buildMetadataCacheStaleAlertNotification({
+      staleEntries: [groupedEntry('a', DAYS_AGO_3), groupedEntry('b', null)],
+      now: NOW,
+    });
+
+    expect(JSON.stringify(notification.blocks)).toContain(
+      `• \`${GROUP}\` for 2 sources (oldest last updated: never stored)`
+    );
+  });
+
+  it('counts listed lines rather than entries when summarizing the rest', () => {
+    const staleEntries = [
+      ...['a', 'b', 'c', 'd', 'e'].map(id => groupedEntry(id, DAYS_AGO_2)),
+      ...Array.from({ length: 11 }, (_, index) =>
+        entry(`https://metadata.test/source-${index}`, null)
+      ),
+    ];
+
+    const notification = buildMetadataCacheStaleAlertNotification({ staleEntries, now: NOW });
+    const blocks = JSON.stringify(notification.blocks);
+
+    expect(notification.text).toContain('16 upstream metadata sources failed to refresh');
+    expect(blocks).toContain(`\`${GROUP}\` for 5 sources`);
+    expect(blocks).toContain('https://metadata.test/source-8`');
+    expect(blocks).not.toContain('https://metadata.test/source-9`');
+    expect(blocks).toContain('• and 2 more');
   });
 });
 

@@ -12,6 +12,9 @@ concurrency:
 
 jobs:
   verify-main:
+    # Guard: workflow_dispatch is reachable from a fork. Only the canonical repo
+    # may deploy the secure proxy.
+    if: github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 5
 
@@ -25,6 +28,8 @@ jobs:
 
   stage-secure-proxy:
     needs: verify-main
+    # Guard: privileged workflow. Only the canonical repo may run it.
+    if: github.repository == 'Kilo-Org/cloud'
     uses: ./.github/workflows/stage-vercel-deployment.yml
     with:
       target_environment: production
@@ -34,6 +39,8 @@ jobs:
 
   promote-secure-proxy:
     needs: stage-secure-proxy
+    # Guard: privileged workflow. Only the canonical repo may run it.
+    if: github.repository == 'Kilo-Org/cloud'
     uses: ./.github/workflows/promote-vercel-deployment.yml
     with:
       deployment_url: ${{ needs.stage-secure-proxy.outputs.deployment_url }}

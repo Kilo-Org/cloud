@@ -132,17 +132,24 @@ function readMetadata(metadata: unknown): Record<string, unknown> {
 }
 
 /**
- * Waits until a session is queued for an advisory lock. The caller holds the
- * GitLab integration lock, so a queued waiter is the other writer being blocked
+ * Waits until a session is queued for this integration's advisory lock. The
+ * caller holds that lock, so a queued waiter is the other writer being blocked
  * by it. Returns false when no waiter appears.
  */
-async function waitForQueuedAdvisoryLock(): Promise<boolean> {
+async function waitForQueuedAdvisoryLock(targetIntegrationId: string): Promise<boolean> {
+  const lockKey = `gitlab-integration:${targetIntegrationId}`;
   // The waiter stays queued until the caller commits, so a wider budget only
   // costs time when the lock is never taken.
   for (let attempt = 0; attempt < 1_000; attempt += 1) {
-    const result = await db.execute<{ waiters: number }>(
-      sql`select count(*)::int as waiters from pg_locks where locktype = 'advisory' and not granted`
-    );
+    const result = await db.execute<{ waiters: number }>(sql`
+      select count(*)::int as waiters
+      from pg_locks
+      where locktype = 'advisory'
+        and not granted
+        and objsubid = 1
+        and classid::bigint = ((hashtextextended(${lockKey}, 0) >> 32) & 4294967295)
+        and objid::bigint = (hashtextextended(${lockKey}, 0) & 4294967295)
+    `);
     if ((result.rows[0]?.waiters ?? 0) > 0) return true;
     await new Promise<void>(resolve => {
       setImmediate(resolve);
@@ -173,7 +180,7 @@ async function regenerateWhilePatchIsOpen(patch: GitLabMetadataPatch) {
     regenerationFinished = true;
   });
 
-  const queueObserved = await waitForQueuedAdvisoryLock();
+  const queueObserved = await waitForQueuedAdvisoryLock(integrationId);
   const overlapped = !regenerationFinished;
 
   patchMayCommit.resolve();
@@ -205,6 +212,28 @@ describe('GitLab metadata writes during a webhook-secret regeneration', () => {
       .delete(platform_integrations)
       .where(eq(platform_integrations.owned_by_user_id, userId));
     await db.delete(kilocode_users).where(eq(kilocode_users.id, userId));
+  });
+
+  it('observes a queued waiter only for its own integration lock', async () => {
+    const patchApplied = Promise.withResolvers<void>();
+    const patchMayCommit = Promise.withResolvers<void>();
+    const patchTransaction = db.transaction(async tx => {
+      await mutateGitLabMetadataInTransaction(tx, integrationId, RECONNECT_PATCH);
+      patchApplied.resolve();
+      await patchMayCommit.promise;
+    });
+    await patchApplied.promise;
+
+    const regeneration = regenerateWebhookSecret({ type: 'user', id: userId });
+    const otherIntegrationObserved = await waitForQueuedAdvisoryLock('another-integration');
+    const ownIntegrationObserved = await waitForQueuedAdvisoryLock(integrationId);
+
+    patchMayCommit.resolve();
+    await patchTransaction;
+    await regeneration;
+
+    expect(otherIntegrationObserved).toBe(false);
+    expect(ownIntegrationObserved).toBe(true);
   });
 
   it('keeps the reconnect fields when a PAT reconnect commits first', async () => {

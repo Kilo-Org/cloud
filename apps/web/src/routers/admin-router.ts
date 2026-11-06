@@ -41,6 +41,7 @@ import { sortSessionMessagesForDisplay } from '@/lib/cloud-agent-next/message-or
 import { postTestStaleSyncAlert } from '@/lib/providers/openrouter/sync-providers-stale-alert';
 import { syncAndStoreProviders } from '@/lib/providers/openrouter/sync-providers';
 import { syncAndStoreDirectByokProviders } from '@/lib/providers/direct-byok/sync-direct-byok';
+import { refreshMetadataCache } from '@/lib/providers/metadata-cache/refresh-metadata-cache';
 import { adminKiloclawInstancesRouter } from '@/routers/admin-kiloclaw-instances-router';
 import { adminKiloclawVersionsRouter } from '@/routers/admin-kiloclaw-versions-router';
 import { adminKiloclawRegionsRouter } from '@/routers/admin-kiloclaw-regions-router';
@@ -2525,6 +2526,15 @@ export const adminRouter = createTRPCRouter({
         });
       }
       return syncAndStoreDirectByokProviders();
+    }),
+    triggerMetadataCacheRefresh: adminProcedure.mutation(async () => {
+      if (!isManualProviderSyncEnabled()) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Manual provider sync is disabled in production; the cron handles syncing.',
+        });
+      }
+      return refreshMetadataCache();
     }),
     postTestStaleAlert: adminProcedure
       .input(z.object({ job: z.enum(['providers', 'direct_byok']) }))

@@ -68,6 +68,8 @@ import { injectDirectByokProviders } from '@/lib/providers/openrouter/inject-dir
  */
 const SYNC_PROVIDERS_SNAPSHOT_LOCK_KEY = 'sync-providers:snapshot';
 
+const ENDPOINTS_FETCH_TIMEOUT_MS = 30_000;
+
 type GatewayModels = z.infer<typeof ModelsSchema>;
 
 function gatewayHeaders(gateway: Provider) {
@@ -124,6 +126,8 @@ export async function fetchGatewayModels(gateway: Provider, source: MetadataSour
         const endpointsResponse = await fetch(`${gateway.apiUrl}/models/${model.id}/endpoints`, {
           method: 'GET',
           headers,
+          cache: 'no-store',
+          signal: AbortSignal.timeout(ENDPOINTS_FETCH_TIMEOUT_MS),
         });
         // Gateways list some models (e.g. Vercel's `*-batch` variants) that have no endpoints resource.
         if (endpointsResponse.status === 404) {

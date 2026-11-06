@@ -403,6 +403,15 @@ describe('briefing prompt evidence', () => {
     expect(prompt).not.toContain('Stopped at');
   });
 
+  it('sends only screened excerpts to the model', () => {
+    const prompt = briefingPrompt(
+      reportRow('Set MYSQL_' + 'PWD=' + 'hunter' + '2 then ran the migration.'),
+      'English'
+    );
+    expect(prompt).not.toContain('hunter' + '2');
+    expect(prompt).toContain('[redacted credential]');
+  });
+
   it('sends only titles that screening clears', () => {
     const prompt = briefingPrompt(
       reportRow('Nothing to report.', 'Plan for client_' + 'secret: "' + secretKey),

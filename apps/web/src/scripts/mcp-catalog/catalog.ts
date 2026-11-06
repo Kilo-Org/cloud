@@ -73,6 +73,8 @@ const NATIVE_ONLY_PATHS: Record<string, true> = {
   'organizations.settings.updateGatewaySettings': true,
   'activeSessions.widgetCredential': true,
   'agentBriefing.updateContextPreferences': true,
+  // Stores a raw GitHub credential as the user's personal identity.
+  'githubApps.provideUserToken': true,
 };
 
 /**

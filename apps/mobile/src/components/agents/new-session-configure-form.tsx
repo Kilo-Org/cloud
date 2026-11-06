@@ -1,6 +1,12 @@
 /* eslint-disable max-lines -- THE new-session body: one screen for every entry point, with a mutually-exclusive branch per target/state. */
 import { useCallback, useRef, useState } from 'react';
-import { type LayoutChangeEvent, ScrollView, type ScrollViewInstance, View } from 'react-native';
+import {
+  type LayoutChangeEvent,
+  ScrollView,
+  type ScrollViewInstance,
+  View,
+  type ViewInstance,
+} from 'react-native';
 import {
   KeyboardAvoidingView,
   useKeyboardState,
@@ -30,6 +36,7 @@ import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Text } from '@/components/ui/text';
 import { stripInlineCodeMarkers } from '@/i18n/plain-copy';
 import { remoteSpawnInstanceDisconnectedNote } from '@/lib/remote-submit-outcome';
+import { keyboardAvoidingViewProps } from '@/lib/keyboard-avoiding-view-props';
 import { keyboardInsetOffset } from '@/lib/keyboard-inset-offset';
 import { useDetailScreenBottomPadding, useSideInsetStyle } from '@/lib/screen-insets';
 
@@ -177,7 +184,12 @@ export function NewSessionConfigureForm({
   const { height: windowHeight } = useWindowDimensions();
   const { height: keyboardHeight, isVisible: keyboardVisible } = useKeyboardState();
   const [containerFrame, setContainerFrame] = useState({ y: 0, height: 0 });
+  const containerRef = useRef<ViewInstance | null>(null);
   const [footerHeight, setFooterHeight] = useState(0);
+  // `containerY` is the view's top as the window places it, the same space the
+  // library measures its keyboard lift in. A parent-relative top would claim the
+  // view ends at the window's bottom edge while it really ends above it — inside
+  // the Tour modal's sheet — so the fit would read room the lift takes away.
   const frame = {
     containerY: containerFrame.y,
     containerHeight: containerFrame.height,
@@ -219,9 +231,23 @@ export function NewSessionConfigureForm({
 
   function handleContainerLayout(event: LayoutChangeEvent) {
     const layout = event.nativeEvent.layout;
-    setContainerFrame(current =>
-      current.y === layout.y && current.height === layout.height ? current : layout
-    );
+    const container = containerRef.current;
+    // The lift pads against where the window puts this view, so the fit asks the
+    // same question. The view's rect inside its parent answers a different one:
+    // inside the Tour modal's sheet its top is the sheet's, not the window's.
+    if (container === null) {
+      setContainerFrame(current =>
+        current.y === layout.y && current.height === layout.height ? current : layout
+      );
+      return;
+    }
+    container.measureInWindow((_x, windowY) => {
+      setContainerFrame(current =>
+        current.y === windowY && current.height === layout.height
+          ? current
+          : { y: windowY, height: layout.height }
+      );
+    });
   }
 
   // The composer's scroll body, so the advanced configuration can bring its
@@ -441,17 +467,30 @@ export function NewSessionConfigureForm({
   );
 
   // Shrink the scroll viewport with the keyboard; a footer-only lift grows
-  // below its full-height sibling and leaves Start behind the keyboard.
+  // below its full-height sibling and leaves Start behind the keyboard. This
+  // form also renders inside the Tour modal, above the window's own bottom
+  // edge, so the lift is measured where the window places the view; the
+  // Android navigation-bar correction stays the separate vertical offset the
+  // content's own bottom padding needs.
+  //
+  // The frame the prompt fits into is measured on the wrapper, not on the lift:
+  // the library's view keeps its keyboard props, and the wrapper's window
+  // position is where that identical frame sits.
   return (
-    <KeyboardAvoidingView
-      className="flex-1 bg-background"
+    <View
+      ref={containerRef}
+      className="flex-1"
       style={sideInsetStyle}
-      behavior="padding"
-      keyboardVerticalOffset={keyboardInsetOffset(bottom)}
       onLayout={handleContainerLayout}
     >
-      {body}
-      {footer}
-    </KeyboardAvoidingView>
+      <KeyboardAvoidingView
+        className="flex-1 bg-background"
+        {...keyboardAvoidingViewProps()}
+        keyboardVerticalOffset={keyboardInsetOffset(bottom)}
+      >
+        {body}
+        {footer}
+      </KeyboardAvoidingView>
+    </View>
   );
 }

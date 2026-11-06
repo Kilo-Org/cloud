@@ -21,6 +21,7 @@ import { z } from 'zod';
 
 import { getPgDb } from '../../db/pg.js';
 import { getSandboxSessionStub } from '../../sandbox-session/session-stub.js';
+import { logControlDiagnostic } from '../../sandbox-control/diagnostics.js';
 import { requireCurrentSessionAccess } from '../../session-access.js';
 import {
   assertSessionOperationIdentity,
@@ -113,6 +114,7 @@ export const DeleteHostedWorkspaceSessionOutput = z
     success: z.literal(true),
     workspaceId: cloudAgentWorktreeIdSchema,
     sessionId: workspaceSessionIdSchema,
+    cleanup: z.enum(['complete', 'pending']).default('complete'),
   })
   .strict();
 
@@ -284,6 +286,55 @@ function rpcErrorCode(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+const SAFE_ERROR_CLASS = /^[A-Za-z][A-Za-z0-9_.:-]{0,63}$/;
+const KNOWN_HOSTED_DELETION_ERROR_CODES: ReadonlyArray<readonly [string, string]> = [
+  [WORKSPACE_IDENTITY_CONFLICT, WORKSPACE_IDENTITY_CONFLICT],
+  [WORKSPACE_REQUIRES_ROOT_SESSION, WORKSPACE_REQUIRES_ROOT_SESSION],
+  [WORKSPACE_DELETING, WORKSPACE_DELETING],
+  ['worktree_access_denied', 'worktree_access_denied'],
+  ['session_deletion_unavailable', 'session_deletion_unavailable'],
+  ['session_deletion_incomplete', 'session_deletion_incomplete'],
+  ['session_deletion_in_progress', 'session_deletion_in_progress'],
+  ['session_deletion_failed', 'session_deletion_failed'],
+  ['operation_key_reuse_mismatch', 'operation_key_reuse_mismatch'],
+];
+
+/** Bounded, sanitized cause fields. Never forwards a raw error message. */
+function safeHostedDeletionError(error: unknown): { errorClass: string; errorCode?: string } {
+  const errorClass =
+    error instanceof Error && SAFE_ERROR_CLASS.test(error.name) ? error.name : 'UnknownError';
+  const message = rpcErrorCode(error);
+  const errorCode = KNOWN_HOSTED_DELETION_ERROR_CODES.find(([needle]) =>
+    message.includes(needle)
+  )?.[1];
+  return { errorClass, ...(errorCode ? { errorCode } : {}) };
+}
+
+/** Authorization and identity failures must never be downgraded to pending cleanup. */
+function hardTeardownFailure(error: unknown): TRPCError | null {
+  if (error instanceof TRPCError) {
+    if (
+      error.code === 'FORBIDDEN' ||
+      error.code === 'UNAUTHORIZED' ||
+      error.code === 'NOT_FOUND' ||
+      error.code === 'CONFLICT'
+    ) {
+      return error;
+    }
+    return null;
+  }
+  const code = rpcErrorCode(error);
+  if (code.includes(WORKSPACE_IDENTITY_CONFLICT))
+    return deletionConflict(WORKSPACE_IDENTITY_CONFLICT);
+  if (code.includes(WORKSPACE_REQUIRES_ROOT_SESSION))
+    return deletionConflict(WORKSPACE_REQUIRES_ROOT_SESSION);
+  if (code.includes(WORKSPACE_DELETING)) return deletionConflict(WORKSPACE_DELETING);
+  if (/forbidden|access denied|membership|worktree_access_denied/i.test(code)) {
+    return new TRPCError({ code: 'FORBIDDEN', message: 'Session access denied' });
+  }
+  return null;
+}
+
 async function deleteHostedWorkspaceSessionInIngest(input: {
   db: WorkerDb;
   env: Env;
@@ -333,19 +384,28 @@ async function teardownHostedWorkspaceSession(input: {
   rowId: string;
   userId: string;
   sessionId: HostedWorkspaceSessionId;
-}): Promise<void> {
+}): Promise<'complete' | 'pending'> {
   try {
     await withDORetry(
       () => getSandboxSessionStub(input.env, input.userId, input.sessionId),
       stub => stub.deleteSession(),
       'deleteSession'
     );
-  } catch {
+    return 'complete';
+  } catch (error) {
+    const failure = hardTeardownFailure(error);
     await markReconcilePending(input.db, { rowId: input.rowId }).catch(() => undefined);
-    throw new TRPCError({
-      code: 'SERVICE_UNAVAILABLE',
-      message: 'session_deletion_incomplete',
-    });
+    logControlDiagnostic(
+      'hosted_session_deletion',
+      {
+        phase: failure ? 'teardown_failed' : 'teardown_pending',
+        workspaceSessionId: input.sessionId,
+        ...safeHostedDeletionError(error),
+      },
+      failure ? 'error' : 'warn'
+    );
+    if (failure) throw failure;
+    return 'pending';
   }
 }
 
@@ -369,7 +429,12 @@ async function settleHostedWorkspaceDeletion(input: {
   if (!settlement.settled && settlement.row?.status !== 'completed') {
     throw new TRPCError({ code: 'CONFLICT', message: 'session_deletion_in_progress' });
   }
-  return { success: true as const, workspaceId: input.workspaceId, sessionId: input.sessionId };
+  return {
+    success: true as const,
+    workspaceId: input.workspaceId,
+    sessionId: input.sessionId,
+    cleanup: 'complete' as const,
+  };
 }
 
 /**
@@ -416,6 +481,7 @@ async function resumeMissingSessionDeletion(input: {
         success: true as const,
         workspaceId: input.workspaceId,
         sessionId: input.sessionId,
+        cleanup: 'complete' as const,
       };
     }
     throw deletionConflict(admission.row.outcome_code);
@@ -436,13 +502,21 @@ async function resumeMissingSessionDeletion(input: {
     sessionId: input.sessionId,
     kiloSessionId: input.kiloSessionId,
   });
-  await teardownHostedWorkspaceSession({
+  const cleanup = await teardownHostedWorkspaceSession({
     db: input.db,
     env: input.env,
     rowId: admission.row.id,
     userId: input.userId,
     sessionId: input.sessionId,
   });
+  if (cleanup === 'pending') {
+    return {
+      success: true as const,
+      workspaceId: input.workspaceId,
+      sessionId: input.sessionId,
+      cleanup: 'pending' as const,
+    };
+  }
   return settleHostedWorkspaceDeletion({
     db: input.db,
     rowId: admission.row.id,
@@ -508,6 +582,7 @@ const deleteHostedWorkspaceSessionHandler = protectedProcedure
           success: true as const,
           workspaceId: input.workspaceId,
           sessionId: input.sessionId,
+          cleanup: 'complete' as const,
         };
       }
       if (existing.status === 'failed') throw deletionConflict(existing.outcome_code);
@@ -568,6 +643,7 @@ const deleteHostedWorkspaceSessionHandler = protectedProcedure
           success: true as const,
           workspaceId: input.workspaceId,
           sessionId: input.sessionId,
+          cleanup: 'complete' as const,
         };
       }
       throw deletionConflict(admission.row.outcome_code);
@@ -596,13 +672,21 @@ const deleteHostedWorkspaceSessionHandler = protectedProcedure
       sessionId: input.sessionId,
       kiloSessionId,
     });
-    await teardownHostedWorkspaceSession({
+    const cleanup = await teardownHostedWorkspaceSession({
       db,
       env: ctx.env,
       rowId: admission.row.id,
       userId: ctx.userId,
       sessionId: input.sessionId,
     });
+    if (cleanup === 'pending') {
+      return {
+        success: true as const,
+        workspaceId: input.workspaceId,
+        sessionId: input.sessionId,
+        cleanup: 'pending' as const,
+      };
+    }
     return settleHostedWorkspaceDeletion({
       db,
       rowId: admission.row.id,

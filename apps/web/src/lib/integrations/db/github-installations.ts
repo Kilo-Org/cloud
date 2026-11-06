@@ -17,7 +17,11 @@ import {
 } from '@/lib/integrations/github/multiple-installations';
 import { lockProviderOAuthOwnerRow } from '@/lib/integrations/provider-oauth-attempts';
 import { parsePlatformRepositoryCache } from '@/lib/integrations/core/schemas';
-import { effectiveAppTypeCondition, ownerCondition } from '@/lib/integrations/db/predicates';
+import {
+  effectiveAppTypeCondition,
+  occupiesAnotherGitHubInstallationSlot,
+  ownerCondition,
+} from '@/lib/integrations/db/predicates';
 import {
   cancelActiveCodeReviewsForIntegration,
   settleCancelledReviews,
@@ -151,11 +155,11 @@ export async function connectVerifiedGitHubInstallation(
             isNull(platform_integrations.github_disconnected_at)
           )
         );
-      const hasAnotherInstallation = ownerIntegrations.some(
-        integration =>
-          integration.installationId !== null &&
-          (integration.installationId !== data.platformInstallationId ||
-            (integration.appType ?? 'standard') !== data.githubAppType)
+      const hasAnotherInstallation = ownerIntegrations.some(integration =>
+        occupiesAnotherGitHubInstallationSlot(integration, {
+          installationId: data.platformInstallationId,
+          appType: data.githubAppType,
+        })
       );
       if (hasAnotherInstallation) {
         return { ok: false, reason: 'multiple_installations_disabled' };

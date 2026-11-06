@@ -15,6 +15,7 @@ import {
 } from '@kilocode/db/schema';
 import { adminWebhookTriggersRouter } from './admin-webhook-triggers-router';
 import type { CapturedRequest } from '@/lib/webhook-agent/webhook-agent-client';
+import { maskHeaderValue } from '@/lib/webhook-agent/request-projection';
 
 const createCaller = createCallerFactory(adminWebhookTriggersRouter);
 
@@ -22,7 +23,7 @@ describe('admin webhook request policy', () => {
   beforeEach(() => mockListWorkerRequests.mockReset());
 
   test.each(['user', 'organization'] as const)(
-    '%s request access follows session policy',
+    '%s request access and payload projection follow admin policy',
     async scope => {
       const owner = await insertTestUser();
       const admin = await insertTestUser({ is_admin: true });
@@ -54,16 +55,20 @@ describe('admin webhook request policy', () => {
         title: 'Webhook test',
         cloud_agent_session_id: cloudAgentSessionId,
       });
+      const headerSecret = `caller-credential-${crypto.randomUUID()}`;
+      const bodySecret = `payload-content-${crypto.randomUUID()}`;
+      const querySecret = `query-credential-${crypto.randomUUID()}`;
+      const sourceIp = '198.51.100.7';
       const request: CapturedRequest = {
         id: crypto.randomUUID(),
         timestamp: '2026-01-01T00:00:00.000Z',
         method: 'POST',
         path: '/',
-        queryString: null,
-        headers: {},
-        body: '{}',
+        queryString: `signature=${querySecret}`,
+        headers: { authorization: headerSecret, 'x-github-event': 'push' },
+        body: JSON.stringify({ token: bodySecret }),
         contentType: 'application/json',
-        sourceIp: null,
+        sourceIp,
         startedAt: null,
         completedAt: null,
         processStatus: 'captured',
@@ -81,9 +86,35 @@ describe('admin webhook request policy', () => {
         code: 'FORBIDDEN',
       });
       expect(mockListWorkerRequests).not.toHaveBeenCalled();
-      await expect(createCaller({ user: viewer }).listRequests(input)).resolves.toEqual([
-        { ...request, kiloSessionId: sessionId },
+
+      const response = await createCaller({ user: viewer }).listRequests(input);
+
+      expect(response).toEqual([
+        {
+          id: request.id,
+          timestamp: request.timestamp,
+          method: request.method,
+          path: request.path,
+          startedAt: null,
+          completedAt: null,
+          processStatus: 'captured',
+          cloudAgentSessionId,
+          kiloSessionId: sessionId,
+          errorMessage: null,
+          triggerSource: 'webhook',
+          headers: [
+            { name: 'authorization', valueMask: maskHeaderValue(headerSecret) },
+            { name: 'x-github-event', valueMask: maskHeaderValue('push') },
+          ],
+          bodyByteLength: new TextEncoder().encode(request.body).byteLength,
+        },
       ]);
+
+      const serialized = JSON.stringify(response);
+      expect(serialized).not.toContain(headerSecret);
+      expect(serialized).not.toContain(bodySecret);
+      expect(serialized).not.toContain(querySecret);
+      expect(serialized).not.toContain(sourceIp);
     }
   );
 });

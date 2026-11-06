@@ -25,6 +25,7 @@ import {
 } from '@/lib/integrations/oauth/common';
 import { consumeProviderOAuthAttempt } from '@/lib/integrations/provider-oauth-attempts';
 import { withWorkspaceInstallationLock } from '@/lib/integrations/oauth/workspace-installation-lock';
+import { restoreProviderInstallation } from '@/lib/integrations/oauth/provider-installation-restore';
 import { getDefaultAllowedModel } from '@/lib/slack-bot/model-allow-list';
 import { DEFAULT_BOT_MODEL } from '@/lib/bot/constants';
 
@@ -190,12 +191,16 @@ export async function handleSlackOAuthCallback(request: NextRequest) {
           tx
         );
       } catch (error) {
+        // The installation store is not part of the database transaction, so a
+        // rolled-back write must put back what this install replaced.
+        await restoreProviderInstallation({
+          provider: 'slack',
+          previousInstallation,
+          setInstallation: restored => slackAdapter.setInstallation(installationId, restored),
+          deleteInstallation: () => slackAdapter.deleteInstallation(installationId),
+        });
+
         if (error instanceof SlackWorkspaceAlreadyConnectedError) {
-          if (previousInstallation) {
-            await slackAdapter.setInstallation(installationId, previousInstallation);
-          } else {
-            await slackAdapter.deleteInstallation(installationId);
-          }
           return conflictRedirect;
         }
 

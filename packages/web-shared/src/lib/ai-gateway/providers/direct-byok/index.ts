@@ -20,7 +20,6 @@ import {
   resolveOpenRouterModelAlias,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
-import { getPreferredModels } from '@kilocode/web-shared/lib/ai-gateway/preferred-models';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { getAiSdkProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/model-settings';
 import { getFallbackReasoningOptions } from '@kilocode/web-shared/lib/ai-gateway/providers/reasoning-options';
@@ -68,11 +67,7 @@ function getDirectByokAiSdkProvider(
     : getAiSdkProvider(id, provider.id);
 }
 
-function convertModel(
-  provider: DirectByokProvider,
-  model: DirectByokModel,
-  preferredIndex: number
-) {
+function convertModel(provider: DirectByokProvider, model: DirectByokModel) {
   const id = formatDirectByokModelId(provider, model);
   const name = DIRECT_BYOK_PROVIDERS_META[provider.id] + ': ' + model.name;
   return {
@@ -109,7 +104,6 @@ function convertModel(
       model.flags?.includes('reasoning') ? ['reasoning'] : []
     ),
     default_parameters: {},
-    preferredIndex: model.flags?.includes('recommended') ? preferredIndex : undefined,
     hasUserByokAvailable: true,
     opencode: withLegacyVariants({
       ai_sdk_provider: getDirectByokAiSdkProvider(provider, model, id),
@@ -287,7 +281,6 @@ export async function createDirectByokReferenceResolver(
 }
 
 async function getDirectByokModels(keys: EnabledByokProvider[]) {
-  const firstPreferredId = (await getPreferredModels()).length;
   // A catalog-mode key serves only catalog ids, so its bespoke models are not listed.
   const enabledProviders = DIRECT_BYOK_PROVIDERS.filter(provider =>
     keys.some(key => key.providerId === provider.id && !isCatalogModeKey(key))
@@ -295,9 +288,8 @@ async function getDirectByokModels(keys: EnabledByokProvider[]) {
   const modelsByProvider = await Promise.all(
     enabledProviders.map(async provider => ({ provider, models: await provider.models() }))
   );
-  let nextPreferredId = firstPreferredId;
   return modelsByProvider.flatMap(({ provider, models }) =>
-    models.map(model => convertModel(provider, model, nextPreferredId++))
+    models.map(model => convertModel(provider, model))
   );
 }
 

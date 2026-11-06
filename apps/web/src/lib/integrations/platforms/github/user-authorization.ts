@@ -2,14 +2,20 @@ import 'server-only';
 
 import { Octokit } from '@octokit/rest';
 import { captureException } from '@sentry/nextjs';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { user_github_app_tokens } from '@kilocode/db/schema';
+import { kilocode_users, user_github_app_tokens } from '@kilocode/db/schema';
 import { getGitHubAppCredentials, type GitHubAppType } from './app-selector';
 import { disconnectStoredGitHubUserAuthorization } from './user-authorization-client';
 import { evictGitHubUserAccessTokenCache } from './user-token-client';
 import { encryptUserGithubTokenEnvelope } from './user-token-envelope';
+import { storeGitHubIdentity } from './identity-store';
+import {
+  GitHubIdentityConflictError,
+  isExpiredProvidedToken,
+  type GitHubIdentityPrecondition,
+} from '@kilocode/db/github-identity';
 
 const GitHubUserTokenResponseSchema = z.object({
   access_token: z.string().min(1),
@@ -37,24 +43,8 @@ function responseHasProperty(value: unknown, property: string): boolean {
   return typeof value === 'object' && value !== null && property in value;
 }
 
-async function withDevelopmentFailureStage<T>(
-  stage: string,
-  operation: () => Promise<T>
-): Promise<T> {
-  try {
-    return await operation();
-  } catch (error) {
-    logDevelopmentAuthorizationFailure(stage);
-    throw error;
-  }
-}
-
-function authorizationGrantLockKey(githubUserId: string): string {
-  return `github-user-authorization:standard:${githubUserId}`;
-}
-
 async function getAuthenticatedGitHubUser(accessToken: string) {
-  const octokit = new Octokit({ auth: accessToken });
+  const octokit = new Octokit({ auth: accessToken, request: { timeout: 10_000 } });
   let authenticatedUserResponse: unknown;
   try {
     authenticatedUserResponse = (await octokit.rest.users.getAuthenticated()).data;
@@ -84,6 +74,8 @@ async function exchangeGitHubUserAuthorizationCode(code: string, codeVerifier: s
   try {
     response = await fetch('https://github.com/login/oauth/access_token', {
       method: 'POST',
+      signal: AbortSignal.timeout(10_000),
+      redirect: 'error',
       headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
       body: JSON.stringify({
         client_id: credentials.clientId,
@@ -123,193 +115,115 @@ async function exchangeGitHubUserAuthorizationCode(code: string, codeVerifier: s
   return { tokens: parsedTokens.data, user: authenticatedUser };
 }
 
-export type StoreGitHubUserAuthorizationResult =
-  | { status: 'connected'; githubLogin: string }
-  | { status: 'already_connected_to_another_account' }
-  | { status: 'disconnect_existing_identity_first' };
-
 export async function exchangeAndStoreGitHubUserAuthorization(input: {
   kiloUserId: string;
   code: string;
   codeVerifier: string;
-}): Promise<StoreGitHubUserAuthorizationResult> {
+  expected: GitHubIdentityPrecondition;
+}) {
   const { tokens, user } = await exchangeGitHubUserAuthorizationCode(
     input.code,
     input.codeVerifier
   );
   const githubUserId = user.id.toString();
-
-  try {
-    const result: StoreGitHubUserAuthorizationResult = await db.transaction(async tx => {
-      await tx.execute(
-        sql`SELECT pg_advisory_xact_lock(hashtext(${authorizationGrantLockKey(githubUserId)}))`
-      );
-      const [existingOwner] = await withDevelopmentFailureStage(
-        'existing_owner_lookup_failed',
-        () =>
-          tx
-            .select({ kiloUserId: user_github_app_tokens.kilo_user_id })
-            .from(user_github_app_tokens)
-            .where(
-              and(
-                eq(user_github_app_tokens.github_user_id, githubUserId),
-                eq(user_github_app_tokens.github_app_type, 'standard')
-              )
-            )
-            .limit(1)
-      );
-      if (existingOwner && existingOwner.kiloUserId !== input.kiloUserId) {
-        return { status: 'already_connected_to_another_account' };
-      }
-
-      const currentUser = await getAuthenticatedGitHubUser(tokens.access_token);
-      if (currentUser.id.toString() !== githubUserId) {
-        throw new Error('GitHub user authorization identity changed during connection');
-      }
-      const now = Date.now();
-      let values: typeof user_github_app_tokens.$inferInsert;
-      try {
-        values = {
-          kilo_user_id: input.kiloUserId,
-          github_app_type: 'standard',
-          github_user_id: githubUserId,
-          github_login: currentUser.login,
-          access_token_encrypted: encryptUserGithubTokenEnvelope(tokens.access_token, {
-            kiloUserId: input.kiloUserId,
-            githubUserId,
-            tokenType: 'access',
-          }),
-          access_token_expires_at: new Date(now + tokens.expires_in * 1000).toISOString(),
-          refresh_token_encrypted: encryptUserGithubTokenEnvelope(tokens.refresh_token, {
-            kiloUserId: input.kiloUserId,
-            githubUserId,
-            tokenType: 'refresh',
-          }),
-          refresh_token_expires_at: new Date(
-            now + tokens.refresh_token_expires_in * 1000
-          ).toISOString(),
-          revoked_at: null,
-          revocation_reason: null,
-        };
-      } catch (error) {
-        logDevelopmentAuthorizationFailure('credential_encryption_failed');
-        throw error;
-      }
-
-      const [storedAuthorization] = await tx
-        .insert(user_github_app_tokens)
-        .values(values)
-        .onConflictDoUpdate({
-          target: [user_github_app_tokens.kilo_user_id, user_github_app_tokens.github_app_type],
-          set: {
-            github_user_id: values.github_user_id,
-            github_login: values.github_login,
-            access_token_encrypted: values.access_token_encrypted,
-            access_token_expires_at: values.access_token_expires_at,
-            refresh_token_encrypted: values.refresh_token_encrypted,
-            refresh_token_expires_at: values.refresh_token_expires_at,
-            revoked_at: null,
-            revocation_reason: null,
-            credential_version: sql`${user_github_app_tokens.credential_version} + 1`,
-            updated_at: new Date().toISOString(),
+  const now = Date.now();
+  const result = await storeGitHubIdentity(
+    {
+      kilo_user_id: input.kiloUserId,
+      github_app_type: 'standard',
+      credential_source: 'github_app',
+      github_user_id: githubUserId,
+      github_login: user.login,
+      access_token_encrypted: encryptUserGithubTokenEnvelope(tokens.access_token, {
+        kiloUserId: input.kiloUserId,
+        githubUserId,
+        tokenType: 'access',
+      }),
+      access_token_expires_at: new Date(now + tokens.expires_in * 1000).toISOString(),
+      refresh_token_encrypted: encryptUserGithubTokenEnvelope(tokens.refresh_token, {
+        kiloUserId: input.kiloUserId,
+        githubUserId,
+        tokenType: 'refresh',
+      }),
+      refresh_token_expires_at: new Date(
+        now + tokens.refresh_token_expires_in * 1000
+      ).toISOString(),
+    },
+    input.expected,
+    async () => {
+      const current = await getAuthenticatedGitHubUser(tokens.access_token);
+      if (current.id !== user.id) throw new Error('GitHub authorization identity changed');
+    }
+  );
+  if (result.status === 'disconnect_existing_identity_first') {
+    // This rejected App grant belongs to a different GitHub account. Never
+    // revoke a grant already owned by another Kilo user or a provided token.
+    const credentials = getGitHubAppCredentials('standard');
+    if (credentials.clientId && credentials.clientSecret) {
+      const response = await fetch(
+        `https://api.github.com/applications/${credentials.clientId}/grant`,
+        {
+          method: 'DELETE',
+          signal: AbortSignal.timeout(10_000),
+          headers: {
+            Accept: 'application/vnd.github+json',
+            Authorization: `Basic ${Buffer.from(`${credentials.clientId}:${credentials.clientSecret}`).toString('base64')}`,
+            'Content-Type': 'application/json',
           },
-          setWhere: eq(user_github_app_tokens.github_user_id, githubUserId),
-        })
-        .returning({ id: user_github_app_tokens.id });
-      if (!storedAuthorization) {
-        await revokeAuthorizationOnGitHub(tokens.access_token);
-        return { status: 'disconnect_existing_identity_first' };
-      }
-      return { status: 'connected', githubLogin: currentUser.login };
-    });
-    if (result.status === 'connected') {
-      // A stored grant replaces whatever the process had cached for this user.
-      evictGitHubUserAccessTokenCache(input.kiloUserId);
+          body: JSON.stringify({ access_token: tokens.access_token }),
+        }
+      );
+      await response.body?.cancel().catch(() => undefined);
+      if (!response.ok && ![401, 403, 404, 422].includes(response.status))
+        throw new Error('GitHub authorization revocation failed');
     }
-    return result;
-  } catch (error) {
-    const [conflict] = await withDevelopmentFailureStage('credential_conflict_lookup_failed', () =>
-      db
-        .select({ kiloUserId: user_github_app_tokens.kilo_user_id })
-        .from(user_github_app_tokens)
-        .where(
-          and(
-            eq(user_github_app_tokens.github_user_id, githubUserId),
-            eq(user_github_app_tokens.github_app_type, 'standard')
-          )
-        )
-        .limit(1)
-    );
-    if (conflict && conflict.kiloUserId !== input.kiloUserId) {
-      return { status: 'already_connected_to_another_account' };
-    }
-    logDevelopmentAuthorizationFailure('credential_persistence_failed');
-    throw error;
   }
+  return result;
 }
 
-export async function getGitHubUserAuthorizationStatus(kiloUserId: string): Promise<{
-  connected: boolean;
-  githubLogin: string | null;
-  revoked: boolean;
-}> {
-  const [authorization] = await db
+export async function getGitHubUserAuthorizationStatus(kiloUserId: string) {
+  const [row] = await db
     .select({
+      authorizationId: user_github_app_tokens.id,
+      credentialVersion: user_github_app_tokens.credential_version,
       githubLogin: user_github_app_tokens.github_login,
       revokedAt: user_github_app_tokens.revoked_at,
+      credentialSource: user_github_app_tokens.credential_source,
+      expiresAt: user_github_app_tokens.access_token_expires_at,
     })
-    .from(user_github_app_tokens)
-    .where(
+    .from(kilocode_users)
+    .leftJoin(
+      user_github_app_tokens,
       and(
-        eq(user_github_app_tokens.kilo_user_id, kiloUserId),
+        eq(user_github_app_tokens.kilo_user_id, kilocode_users.id),
         eq(user_github_app_tokens.github_app_type, 'standard')
       )
     )
+    .where(eq(kilocode_users.id, kiloUserId))
     .limit(1);
-
-  return authorization
-    ? {
-        connected: authorization.revokedAt === null,
-        githubLogin: authorization.githubLogin,
-        revoked: authorization.revokedAt !== null,
-      }
-    : { connected: false, githubLogin: null, revoked: false };
+  if (!row) throw new Error('github_identity_unavailable');
+  const expired = isExpiredProvidedToken(row.credentialSource, row.expiresAt);
+  return {
+    ...row,
+    expiresAt: row.expiresAt ? new Date(row.expiresAt).toISOString() : null,
+    connected: row.authorizationId !== null && row.revokedAt === null && !expired,
+    revoked: row.revokedAt !== null || expired,
+  };
 }
 
-async function revokeAuthorizationOnGitHub(
-  accessToken: string
-): Promise<'revoked' | 'token_invalid'> {
-  const credentials = getGitHubAppCredentials('standard');
-  if (!credentials.clientId || !credentials.clientSecret) return 'token_invalid';
-  const basicAuth = Buffer.from(`${credentials.clientId}:${credentials.clientSecret}`).toString(
-    'base64'
-  );
-  const response = await fetch(
-    `https://api.github.com/applications/${credentials.clientId}/grant`,
-    {
-      method: 'DELETE',
-      headers: {
-        Accept: 'application/vnd.github+json',
-        Authorization: `Basic ${basicAuth}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ access_token: accessToken }),
-    }
-  );
-  if (response.ok || response.status === 404) return 'revoked';
-  if (response.status === 401 || response.status === 403 || response.status === 422) {
-    return 'token_invalid';
-  }
-  throw new Error(`GitHub authorization revocation failed (${response.status})`);
-}
-
-export async function disconnectGitHubUserAuthorization(kiloUserId: string): Promise<void> {
+export async function disconnectGitHubUserAuthorization(
+  kiloUserId: string,
+  expected: GitHubIdentityPrecondition
+): Promise<void> {
   try {
-    await disconnectStoredGitHubUserAuthorization(kiloUserId);
+    await disconnectStoredGitHubUserAuthorization(kiloUserId, expected);
   } catch (error) {
-    captureException(error, {
-      tags: { source: 'github_user_authorization_disconnect' },
-    });
+    // A stale precondition is an expected outcome. The user reloads and retries.
+    if (!(error instanceof GitHubIdentityConflictError)) {
+      captureException(error, {
+        tags: { source: 'github_user_authorization_disconnect' },
+      });
+    }
     throw error;
   } finally {
     // The authorization may be gone even when the disconnect request failed
@@ -330,7 +244,8 @@ export async function revokeStoredGitHubUserAuthorization(
     .where(
       and(
         eq(user_github_app_tokens.github_user_id, githubUserId),
-        eq(user_github_app_tokens.github_app_type, 'standard')
+        eq(user_github_app_tokens.github_app_type, 'standard'),
+        eq(user_github_app_tokens.credential_source, 'github_app')
       )
     )
     .returning({ kiloUserId: user_github_app_tokens.kilo_user_id });

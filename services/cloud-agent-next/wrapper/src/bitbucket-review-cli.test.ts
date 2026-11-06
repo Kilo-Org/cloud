@@ -173,6 +173,7 @@ function providerFetch(options: {
   comments?: Record<string, unknown>[];
   diff?: string;
   createResponse?: Record<string, unknown>;
+  updateTarget?: Record<string, unknown>;
   updateResponse?: Record<string, unknown>;
 }): (url: string, init: RequestInit) => Promise<Response> {
   let pullRequestIndex = 0;
@@ -192,6 +193,9 @@ function providerFetch(options: {
     }
     if (url === `${commentsUrl}?pagelen=100` && method === 'GET') {
       return Response.json({ values: options.comments ?? [] });
+    }
+    if (url.startsWith(`${commentsUrl}/`) && method === 'GET' && options.updateTarget) {
+      return Response.json(options.updateTarget);
     }
     if (url === commentsUrl && method === 'POST' && options.createResponse) {
       return Response.json(options.createResponse, { status: 201 });
@@ -242,12 +246,14 @@ describe('bb', () => {
         `echo '{"body": "Inline finding", "inline": {"path": "src/widget.ts", "to": 42}}' | bb comments create 1 --input -`
       );
       expect(result.stdout).toContain(
-        `echo '{"body": "Updated summary"}' | bb comments update 1 123 --input -`
+        `echo '{"body": "## Code Review Summary\\n\\nNo open findings."}' | bb comments update 1 123 --input -`
       );
       expect(result.stdout).toContain(
         'Create input must be {"body": "..."} or {"body": "...", "inline": {"path": "...", "to": 123}}.'
       );
-      expect(result.stdout).toContain('Update input must be {"body": "..."} only.');
+      expect(result.stdout).toContain(
+        'Update input must be {"body": "..."} only, and the body must start with the Code Review Summary heading.'
+      );
       expect(result.stdout).toContain('Environment:');
       expect(result.stdout).toContain('BITBUCKET_TOKEN');
       expect(result.stdout).toContain('KILO_BITBUCKET_REPOSITORY_UUID');
@@ -971,20 +977,139 @@ describe('bb', () => {
 
   it('updates an explicit comment after one immediate PR reread', async () => {
     const requests: RecordedRequest[] = [];
+    const existingSummary = commentResponse(30, '## Code Review Summary\n\n- Old finding');
     const providerResponse = commentResponse(30, 'Updated summary');
     const result = await execute(
       ['comments', 'update', '42', '30', '--input', '-'],
-      providerFetch({ requests, updateResponse: providerResponse }),
-      { body: ' Updated summary ' }
+      providerFetch({ requests, updateTarget: existingSummary, updateResponse: providerResponse }),
+      { body: ' ## Code Review Summary\n\n- Current finding ' }
     );
 
     expect(result.exitCode).toBe(0);
     expect(requests.map(request => `${request.init.method} ${request.url}`)).toEqual([
       `GET ${pullRequestUrl}`,
+      `GET ${commentsUrl}/30`,
       `PUT ${commentsUrl}/30`,
     ]);
-    expect(requestBody(requests.at(-1))).toEqual({ content: { raw: 'Updated summary' } });
+    expect(requestBody(requests.at(-1))).toEqual({
+      content: { raw: '## Code Review Summary\n\n- Current finding' },
+    });
     expect(JSON.parse(result.stdout)).toEqual(providerResponse);
+  });
+
+  it('rejects a replacement body that is not a summary body before provider access', async () => {
+    const result = await execute(
+      ['comments', 'update', '42', '30', '--input', '-'],
+      async () => {
+        throw new Error('must not reach the provider');
+      },
+      { body: 'Updated summary' }
+    );
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain('bb: summary_body_required\n');
+    expect(result.stderr).toContain(
+      'the updated body must start with the Code Review Summary heading'
+    );
+  });
+
+  it('rejects a replacement body that carries only the legacy marker', async () => {
+    const requests: RecordedRequest[] = [];
+    const result = await execute(
+      ['comments', 'update', '42', '30', '--input', '-'],
+      providerFetch({ requests }),
+      { body: '<!-- kilo-review:bitbucket:pr:42 -->\n\nEarlier summary' }
+    );
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain('bb: summary_body_required\n');
+    expect(requests).toEqual([]);
+  });
+
+  it('refuses to update a comment that is not the Code Review Summary', async () => {
+    const requests: RecordedRequest[] = [];
+    const foreignComment = {
+      ...commentResponse(30, 'Looks good to me'),
+      user: { uuid: '{ffffffff-ffff-4fff-8fff-ffffffffffff}', display_name: 'Repo Owner' },
+    };
+    const result = await execute(
+      ['comments', 'update', '42', '30', '--input', '-'],
+      providerFetch({ requests, updateTarget: foreignComment }),
+      { body: '## Code Review Summary\n\n- Replacement' }
+    );
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain('bb: comment_not_owned\n');
+    expect(result.stderr).toContain(
+      'only the existing Code Review Summary comment can be updated; create a new comment instead'
+    );
+    expect(requests.map(request => `${request.init.method} ${request.url}`)).toEqual([
+      `GET ${pullRequestUrl}`,
+      `GET ${commentsUrl}/30`,
+    ]);
+  });
+
+  it.each([
+    [
+      'a reply that carries the summary heading',
+      commentResponse(30, '## Code Review Summary', { parentId: 12 }),
+    ],
+    [
+      'a deleted summary candidate',
+      commentResponse(30, '## Code Review Summary', { deleted: true }),
+    ],
+    [
+      'an inline finding',
+      commentResponse(30, '## Code Review Summary', { inline: { path: 'src/widget.ts', to: 4 } }),
+    ],
+  ])('refuses to update %s', async (_label, updateTarget) => {
+    const requests: RecordedRequest[] = [];
+    const result = await execute(
+      ['comments', 'update', '42', '30', '--input', '-'],
+      providerFetch({ requests, updateTarget }),
+      { body: '## Code Review Summary\n\n- Replacement' }
+    );
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain('bb: comment_not_owned\n');
+    expect(requests.some(request => request.init.method === 'PUT')).toBe(false);
+  });
+
+  it('updates a legacy summary candidate that still carries the marker', async () => {
+    const requests: RecordedRequest[] = [];
+    const legacySummary = commentResponse(
+      30,
+      '<!-- kilo-review:bitbucket:pr:42 -->\n\nEarlier summary'
+    );
+    const providerResponse = commentResponse(30, '## Code Review Summary\n\n- Old finding');
+    const result = await execute(
+      ['comments', 'update', '42', '30', '--input', '-'],
+      providerFetch({ requests, updateTarget: legacySummary, updateResponse: providerResponse }),
+      { body: '## Code Review Summary\n\n- Old finding' }
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(requests.map(request => `${request.init.method} ${request.url}`)).toEqual([
+      `GET ${pullRequestUrl}`,
+      `GET ${commentsUrl}/30`,
+      `PUT ${commentsUrl}/30`,
+    ]);
+  });
+
+  it('rejects a comment read that answers for a different id', async () => {
+    const requests: RecordedRequest[] = [];
+    const result = await execute(
+      ['comments', 'update', '42', '30', '--input', '-'],
+      providerFetch({
+        requests,
+        updateTarget: commentResponse(31, '## Code Review Summary\n\n- Old finding'),
+      }),
+      { body: '## Code Review Summary\n\n- Replacement' }
+    );
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain('bb: invalid_provider_response\n');
+    expect(requests.some(request => request.init.method === 'PUT')).toBe(false);
   });
 
   it('rejects invalid input before the immediate write fence', async () => {

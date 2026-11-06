@@ -1,22 +1,29 @@
-import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import { MutationCache, QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
-import { createTRPCClient, httpLink } from '@trpc/client';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, View } from 'react-native';
 import { initialWindowMetrics } from 'react-native-safe-area-context';
-import { z } from 'zod';
 
 import { PrReviewFileList } from '@/components/pr-review/diff/pr-diff-file-list';
 import { PrDiffFileNavigator } from '@/components/pr-review/diff/pr-diff-file-navigator';
 import { PrMergeSheet } from '@/components/pr-review/merge/pr-merge-sheet';
 import { providerPrMergeTitles } from '@/components/pr-review/merge/pr-merge-titles';
 import { PrReviewChecksSection } from '@/components/pr-review/pr-review-checks-section';
+import { PrReviewCommentComposer } from '@/components/pr-review/pr-review-comment-composer';
+import {
+  createFixtureClient,
+  fileCount,
+  headSha,
+  triple,
+} from '@/components/pr-review/pr-review-copy-fixture-client';
+import {
+  isGateSurface,
+  PrReviewGateCopyFixture,
+} from '@/components/pr-review/pr-review-copy-fixture-gates';
 import {
   PrReviewOverviewCopyFixture,
   type PrReviewOverviewFixtureSurface,
-  reviewOverviewFixture,
 } from '@/components/pr-review/pr-review-overview-copy-fixture';
 import { PrReviewReviewSubmitScreen } from '@/components/pr-review/pr-review-review-submit-screen';
 import {
@@ -25,7 +32,6 @@ import {
 } from '@/components/pr-review/pr-review-tab-selector';
 import { ScreenHeader } from '@/components/screen-header';
 import { FeedbackPromptProvider } from '@/components/use-feedback-prompt';
-import { type PrReviewFile } from '@/lib/pr-review/diff/pr-review-file-types';
 import {
   pendingReviewDraftKey,
   PendingReviewProvider,
@@ -38,14 +44,16 @@ import { TRPCProvider } from '@/lib/trpc';
 // through the app's native link scheme; the overview surfaces are
 // dev/pr-review-copy-fixture/{overview,overview-blocked,overview-merged,merge-request,
 // merge-request-missing,merge-request-error}.
+// The checks-not-available surface answers the checks read as not found, the
+// terminal that renders the section's unavailable message; the composer surface
+// mounts the comment composer on a line; the gate surfaces are
+// dev/pr-review-copy-fixture/gate-*.
 // Uses the app's selected language without changing its preference.
 // Real review consumers read owned fake DTOs across an asynchronous tRPC boundary.
 // Reads never invoke global fetch. The mutation cache rejects before any mutation
 // function runs, including production hooks that use the singleton tRPC client.
 // The navigator starts with 100 of 101 files, exercising listed-file progress;
 // searching fetches the final page through the usual pagination hook.
-const triple = { owner: 'sample', repo: 'review-copy', number: 1 };
-const headSha = '0123456789abcdef0123456789abcdef01234567';
 const OVERVIEW_SURFACES = [
   'overview',
   'overview-blocked',
@@ -66,113 +74,6 @@ const scope: ProviderPrScope = {
   ref: { platform: 'gitlab', projectPath: 'sample/review-copy', mrIid: 1 },
   organizationId: null,
 };
-const files = [
-  {
-    path: 'src/greeting.ts',
-    previousPath: null,
-    status: 'modified',
-    additions: 1,
-    deletions: 1,
-    patch: '@@ -1 +1 @@\n-export const greeting = "Hi";\n+export const greeting = "Hello";',
-    patchMissing: false,
-  },
-  {
-    path: 'src/greeting.test.ts',
-    previousPath: null,
-    status: 'added',
-    additions: 1,
-    deletions: 0,
-    patch: '@@ -0,0 +1 @@\n+expect(greeting).toBe("Hello");',
-    patchMissing: false,
-  },
-  ...Array.from({ length: 99 }, (_, index) => ({
-    path: `src/example-${String(index + 1).padStart(3, '0')}.ts`,
-    previousPath: null,
-    status: 'added',
-    additions: 1,
-    deletions: 0,
-    patch: '@@ -0,0 +1 @@\n+export const example = true;',
-    patchMissing: false,
-  })),
-] satisfies PrReviewFile[];
-const checks = {
-  checkRuns: [
-    {
-      name: 'Formatting',
-      status: 'completed',
-      conclusion: 'success',
-      detailsUrl: null,
-      appName: null,
-    },
-    {
-      name: 'Unit tests',
-      status: 'completed',
-      conclusion: 'failure',
-      detailsUrl: null,
-      appName: null,
-    },
-  ],
-  rollup: { total: 2, success: 1, failure: 1, pending: 0, skipped: 0 },
-} satisfies inferRouterOutputs<MobileRouter>['githubPrReview']['listChecks'];
-
-type RouterOutputs = inferRouterOutputs<MobileRouter>;
-type FixtureReadData =
-  | RouterOutputs['githubPrReview']['getPullRequest']
-  | RouterOutputs['githubPrReview']['listChecks']
-  | RouterOutputs['githubPrReview']['listFiles']
-  | RouterOutputs['user']['getMe'];
-
-function fixtureResponse(data: FixtureReadData): Response {
-  // eslint-disable-next-line unicorn/prefer-response-static-json -- React Native's fetch polyfill has no static Response.json.
-  return new Response(JSON.stringify({ result: { data } }), {
-    status: 200,
-    headers: { 'content-type': 'application/json' },
-  });
-}
-
-const FilePageInput = z.object({ cursor: z.literal(100).nullish() });
-
-function createFixtureClient() {
-  return createTRPCClient<MobileRouter>({
-    links: [
-      httpLink({
-        url: 'http://pr-review-fixture.invalid/api/trpc',
-        fetch: async (input, init) => {
-          await Promise.resolve();
-          const url = input instanceof Request ? input.url : input.toString();
-          if (init?.method !== 'GET') {
-            throw new Error('Review copy fixture does not allow writes');
-          }
-          if (url.includes('/githubPrReview.getPullRequest')) {
-            return fixtureResponse(reviewOverviewFixture);
-          }
-          if (url.includes('/githubPrReview.listChecks')) {
-            return fixtureResponse(checks);
-          }
-          if (url.includes('/githubPrReview.listFiles')) {
-            const pageInput = FilePageInput.parse(
-              JSON.parse(new URL(url).searchParams.get('input') ?? '{}')
-            );
-            const offset = pageInput.cursor === 100 ? 100 : 0;
-            return fixtureResponse({
-              files: files.slice(offset, offset + 100),
-              nextCursor: offset === 0 ? 100 : null,
-            } satisfies RouterOutputs['githubPrReview']['listFiles']);
-          }
-          if (url.includes('/user.getMe')) {
-            return fixtureResponse({
-              success: true,
-              id: 'review-copy-fixture',
-              email: 'review-copy@example.com',
-              isAdmin: false,
-            } satisfies RouterOutputs['user']['getMe']);
-          }
-          throw new Error('Read not provided by review copy fixture');
-        },
-      }),
-    ],
-  });
-}
 
 /**
  * The standalone CHECKS surface: the section renders from a read its screen
@@ -207,7 +108,7 @@ export function PrReviewCopyFixture() {
         }),
       })
   );
-  const [client] = useState(createFixtureClient);
+  const [client] = useState(() => createFixtureClient(surface));
   const [tab, setTab] = useState<PrReviewTabId>('files');
   const header = (
     <ScreenHeader title={t('prReview.fileNavigator.title')} eyebrow="sample/review-copy#1" />
@@ -264,12 +165,7 @@ export function PrReviewCopyFixture() {
     );
   } else if (surface === 'navigator') {
     content = (
-      <PrDiffFileNavigator
-        {...triple}
-        headSha={headSha}
-        changedFiles={files.length}
-        header={header}
-      />
+      <PrDiffFileNavigator {...triple} headSha={headSha} changedFiles={fileCount} header={header} />
     );
   } else if (surface === 'files') {
     content = (
@@ -278,7 +174,7 @@ export function PrReviewCopyFixture() {
         draftEntityKey={pendingReviewDraftKey(triple.owner, triple.repo, triple.number)}
       >
         {header}
-        <PrReviewFileList {...triple} headSha={headSha} changedFiles={files.length} />
+        <PrReviewFileList {...triple} headSha={headSha} changedFiles={fileCount} />
       </PendingReviewProvider>
     );
   } else if (isOverviewSurface(surface)) {
@@ -296,6 +192,30 @@ export function PrReviewCopyFixture() {
           <PrReviewReviewSubmitScreen />
         </PendingReviewProvider>
       </FeedbackPromptProvider>
+    );
+  } else if (isGateSurface(surface)) {
+    content = <PrReviewGateCopyFixture surface={surface} />;
+  } else if (surface === 'composer') {
+    content = (
+      <PendingReviewProvider
+        userId="review-copy-fixture"
+        draftEntityKey={pendingReviewDraftKey(triple.owner, triple.repo, triple.number)}
+      >
+        <PrReviewCommentComposer
+          owner={triple.owner}
+          repo={triple.repo}
+          number={triple.number}
+          mode={{ kind: 'create', headSha }}
+          path="src/greeting.ts"
+          side="RIGHT"
+          line={2}
+          title={t('prReview.composer.addTitle')}
+          eyebrow="sample/review-copy#1"
+          onDismiss={() => {
+            router.back();
+          }}
+        />
+      </PendingReviewProvider>
     );
   } else {
     content = <ChecksSectionSurface />;

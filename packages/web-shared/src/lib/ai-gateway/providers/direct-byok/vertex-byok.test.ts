@@ -7,6 +7,7 @@ import vertexByok, {
   getGcpVertexHost,
   parseGcpVertexCredentials,
   resolveGcpVertexUpstream,
+  toMistralChatCompletionsBody,
 } from './vertex-byok';
 
 jest.mock('../../custom-llm/google-service-account', () => ({
@@ -316,5 +317,56 @@ describe('vertexByok definition', () => {
     vertexByok.transformRequest(context);
 
     expect(context.request.body.model).toBe(upstreamModel);
+  });
+});
+
+describe('toMistralChatCompletionsBody', () => {
+  it('renames the OpenAI-style fields and drops every field Mistral rejects', () => {
+    const body = {
+      model: 'mistral-medium-3',
+      messages: [
+        { role: 'user', content: 'hi', name: 'ada', reasoning: 'hidden' },
+        { role: 'tool', content: 'result', tool_call_id: 'call-1', refusal: 'no' },
+      ],
+      max_completion_tokens: 100,
+      seed: 7,
+      stream: true,
+      stream_options: { include_usage: true },
+      tool_choice: 'auto',
+      user: 'user-hash',
+      safety_identifier: 'user-hash',
+      prompt_cache_key: 'session-hash',
+      reasoning_effort: 'high',
+      tools: [
+        {
+          type: 'function',
+          function: { name: 'read', parameters: { type: 'object' }, strict: true },
+        },
+      ],
+    };
+
+    toMistralChatCompletionsBody(body);
+
+    expect(body).toStrictEqual({
+      model: 'mistral-medium-3',
+      messages: [
+        { role: 'user', content: 'hi', name: 'ada' },
+        { role: 'tool', content: 'result', tool_call_id: 'call-1' },
+      ],
+      max_tokens: 100,
+      random_seed: 7,
+      stream: true,
+      stream_options: { include_usage: true },
+      tool_choice: 'auto',
+      tools: [{ type: 'function', function: { name: 'read', parameters: { type: 'object' } } }],
+    });
+  });
+
+  it('keeps an explicit max_tokens and random_seed over the OpenAI names', () => {
+    const body = { max_tokens: 5, max_completion_tokens: 9, random_seed: 1, seed: 2 };
+
+    toMistralChatCompletionsBody(body);
+
+    expect(body).toStrictEqual({ max_tokens: 5, random_seed: 1 });
   });
 });

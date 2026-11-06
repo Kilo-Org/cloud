@@ -294,3 +294,94 @@ it.each([
 ] as const)('classifies a native execution error by its status and type', (error, reason) => {
   expect(classifyAssistantFailure(nativeTurnError(error)).reason).toBe(reason);
 });
+
+it('restricts step starts to their message and emits each pending permission once', async () => {
+  const directory = '/workspace';
+  const sessionID = 'ses_local';
+  const events: KiloFeedEvent[] = [];
+  const activity: HarnessActivityEvent[] = [];
+  let pending = [{ id: 'req_first', sessionID, action: 'shell', resources: ['pwd'] }];
+  let controller: ReadableStreamDefaultController<Uint8Array> | undefined;
+  const frame = (type: string, data: Record<string, unknown>) =>
+    new TextEncoder().encode(
+      `data: ${JSON.stringify({ id: `evt_${type}`, type, data, created: 10, location: { directory } })}\n\n`
+    );
+  const native = Bun.serve({
+    hostname: '127.0.0.1',
+    port: 0,
+    fetch(request) {
+      const pathname = new URL(request.url).pathname;
+      if (pathname === '/api/event')
+        return new Response(
+          new ReadableStream<Uint8Array>({
+            start(stream) {
+              controller = stream;
+              stream.enqueue(frame('server.connected', {}));
+            },
+          }),
+          { headers: { 'content-type': 'text/event-stream' } }
+        );
+      if (pathname === '/api/permission/request') return Response.json({ data: pending });
+      if (pathname.endsWith('/message'))
+        return Response.json({
+          data: ['msg_old', 'msg_current'].map((id, index) => ({
+            id,
+            type: 'assistant',
+            time: { created: index + 1 },
+            content: [{ type: 'text', text: id }],
+          })),
+          cursor: { next: null },
+        });
+      return Response.json({
+        data: { id: sessionID, location: { directory }, time: { created: 0, updated: 20 } },
+      });
+    },
+  });
+  const feed = createKilo2EventFeed({
+    source: { server: { url: native.url.origin }, directory, nativeRuntimeId: 'runtime_local' },
+    signal: AbortSignal.timeout(5000),
+    onEvent: event => events.push(event),
+    onHarnessActivity: event => activity.push(event),
+    onFailure() {},
+  });
+  async function until(predicate: () => boolean) {
+    const deadline = Date.now() + 2000;
+    while (!predicate()) {
+      if (Date.now() > deadline) throw new Error('Native event did not arrive');
+      await Bun.sleep(5);
+    }
+  }
+  const permissions = () =>
+    events.filter(event => event.type === 'permission.asked').map(event => event.properties.id);
+  try {
+    await feed.open();
+    controller?.enqueue(
+      frame('session.step.started', { sessionID, assistantMessageID: 'msg_current' })
+    );
+    controller?.enqueue(frame('session.renamed', { sessionID }));
+    await until(() => events.some(event => event.type === 'session.updated'));
+    expect(
+      events
+        .filter(event => event.type === 'conversation.message.updated')
+        .map(event => event.properties.message)
+    ).toEqual([expect.objectContaining({ id: 'msg_current' })]);
+    expect(activity.map(event => event.activity.type)).toEqual(['message']);
+    controller?.enqueue(frame('session.step.ended', { sessionID }));
+    await until(() => activity.filter(event => event.activity.type === 'part').length === 2);
+    controller?.enqueue(frame('permission.asked', { sessionID, action: 'shell' }));
+    await until(() => permissions().length === 1);
+    pending.push({ id: 'req_second', sessionID, action: 'shell', resources: ['ls'] });
+    controller?.enqueue(frame('permission.asked', { sessionID, action: 'shell' }));
+    controller?.enqueue(frame('session.renamed', { sessionID }));
+    await until(() => events.filter(event => event.type === 'session.updated').length === 2);
+    expect(permissions()).toEqual(['req_first', 'req_second']);
+    pending = [{ id: 'req_other', sessionID: 'ses_other', action: 'shell', resources: ['ls'] }];
+    controller?.enqueue(frame('permission.asked', { sessionID, action: 'shell' }));
+    controller?.enqueue(frame('session.renamed', { sessionID }));
+    await until(() => events.filter(event => event.type === 'session.updated').length === 3);
+    expect(permissions()).toEqual(['req_first', 'req_second']);
+  } finally {
+    feed.close();
+    await native.stop(true);
+  }
+});

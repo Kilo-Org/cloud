@@ -1756,6 +1756,37 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     }
   );
 
+  it('reports versions observed at upgrade for a Vercel allocation with an unknown type', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider, { provider: 'vercel' });
+    await awaitLaunch(provider);
+    await runInDurableObject(stub, (_instance, state) =>
+      state.storage.put('control_plane_owner', 'owner-1')
+    );
+    const { credential, allocationId } = launchIdentity(provider);
+    const wrapper = await FakeWrapper.connect({
+      sandboxId: SANDBOX_ID,
+      credential,
+      kiloCliVersion: '7.4.20',
+      wrapperVersion: '2.4.0',
+    });
+    expect(await wrapper.hello({ wrapperId: 'wr_vercel', allocationId })).toMatchObject({
+      type: 'welcome',
+    });
+
+    expect(await stub.getStatusSnapshot()).toMatchObject({
+      provider: 'Vercel',
+      runtime: {
+        sandboxType: 'unknown',
+        kiloCliVersion: '7.4.20',
+        wrapperVersion: '2.4.0',
+        startedAt: null,
+        stoppedAt: null,
+      },
+    });
+    wrapper.close();
+  });
+
   it.each([
     { provider: 'vercel', resources: { vcpus: 2, memory: 4096 } },
     { provider: 'vercel', resources: { vcpus: 4, memory: 8192 } },
@@ -2068,7 +2099,6 @@ describe('SandboxControlV2 allocation egress policy', () => {
         KILOCODE_BACKEND_BASE_URL: 'https://backend.example.com',
         KILO_OPENROUTER_BASE: 'https://gateway.example.com/api',
         KILO_SESSION_INGEST_URL: 'https://ingest.example.com',
-        CREDENTIAL_CONTAINMENT_ENABLED: 'false',
         ...extraEnv,
       });
       Object.assign(instance, {

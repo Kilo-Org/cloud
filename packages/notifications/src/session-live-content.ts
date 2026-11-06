@@ -19,8 +19,8 @@ import { GLANCEABLE_STATUS_KINDS } from '@kilocode/app-shared/glanceable-agents-
 
 /**
  * The card's status kinds: the shared glanceable vocabulary plus a turn that
- * failed. The parser (`pushDataSchema`) and the builder (`SessionCardStatusKind`)
- * both read this one list, so the accepted and the produced kinds cannot drift.
+ * failed. `pushDataSchema` validates a pushed `statusKind` against this list,
+ * and the type derived from it types the kind the builder produces.
  */
 export const SESSION_CARD_STATUS_KINDS = [...GLANCEABLE_STATUS_KINDS, 'failed'] as const;
 export type SessionCardStatusKind = (typeof SESSION_CARD_STATUS_KINDS)[number];

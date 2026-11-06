@@ -14,6 +14,7 @@ import {
 } from '@kilocode/web-shared/lib/config.server';
 import { getDefaultAllowedModel } from '@/lib/slack-bot/model-allow-list';
 import { DEFAULT_BOT_MODEL } from '@/lib/bot/constants';
+import { resolveOrganizationBotModel } from '@/lib/bot/organization-model';
 import { isOrganizationModelUpdateAllowed } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 import { buildDiscordApiUrl, parseDiscordSnowflake } from '@/lib/discord-bot/discord-id';
 
@@ -431,6 +432,9 @@ export async function testConnection(owner: Owner): Promise<{ success: boolean; 
  * Get the model for a Discord integration.
  * Reads model_slug from the given installation's metadata, falling back to
  * the platform default for installations created before model config existed.
+ * For organization-owned integrations, a stored model is resolved through the
+ * organization's current policy at read time, so a policy change applies to the
+ * next message; a user-owned integration keeps its stored model.
  */
 export async function getModel(owner: Owner): Promise<string | null> {
   const integration = await getInstallation(owner);
@@ -440,7 +444,10 @@ export async function getModel(owner: Owner): Promise<string | null> {
 
   const metadata = integration.metadata as { model_slug?: string } | null;
   if (metadata?.model_slug) {
-    return metadata.model_slug;
+    return resolveOrganizationBotModel({
+      organizationId: owner.type === 'org' ? owner.id : null,
+      storedModelSlug: metadata.model_slug,
+    });
   }
 
   // Pre-existing installation without a stored model — resolve a default

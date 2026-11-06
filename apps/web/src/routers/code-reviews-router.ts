@@ -39,6 +39,7 @@ import {
   type CodeReviewFieldMergePatch,
   type CodeReviewStoredConfig,
 } from '@kilocode/app-shared/code-review';
+import { repositoryModeForPlatform } from '@/lib/code-reviews/core/repository-mode';
 
 const PlatformSchema = z.enum(['github', 'gitlab']).default('github');
 
@@ -265,6 +266,10 @@ export const personalReviewAgentRouter = createTRPCRouter({
       const owner = { type: 'user' as const, id: ctx.user.id, userId: ctx.user.id };
       const platform = input?.platform ?? 'github';
       const config = await getAgentConfigForOwner(owner, 'code_review', platform);
+      // GitLab code review has no 'all' repository mode: the webhook handler
+      // reviews only selected or manually added projects, so the reported mode
+      // must not promise 'all' for a stored row or for the default config.
+      const isGitLab = platform === PLATFORM.GITLAB;
 
       if (!config) {
         // Return default configuration
@@ -276,7 +281,7 @@ export const personalReviewAgentRouter = createTRPCRouter({
           modelSlug: PRIMARY_DEFAULT_MODEL,
           thinkingEffort: null satisfies string | null,
           gateThreshold: 'off' as const,
-          repositorySelectionMode: 'all' as const,
+          repositorySelectionMode: isGitLab ? ('selected' as const) : ('all' as const),
           selectedRepositoryIds: [],
           manuallyAddedRepositories: [],
           repositoryModelOverrides: [],
@@ -298,7 +303,9 @@ export const personalReviewAgentRouter = createTRPCRouter({
         modelSlug: cfg.model_slug || PRIMARY_DEFAULT_MODEL,
         thinkingEffort: cfg.thinking_effort ?? null,
         gateThreshold: cfg.gate_threshold ?? 'off',
-        repositorySelectionMode: cfg.repository_selection_mode || 'all',
+        repositorySelectionMode: isGitLab
+          ? ('selected' as const)
+          : cfg.repository_selection_mode || 'all',
         selectedRepositoryIds: (cfg.selected_repository_ids ?? []).filter(
           (repositoryId): repositoryId is number => typeof repositoryId === 'number'
         ),
@@ -336,6 +343,14 @@ export const personalReviewAgentRouter = createTRPCRouter({
         const owner = { type: 'user' as const, id: ctx.user.id, userId: ctx.user.id };
         const platform = input.platform ?? 'github';
 
+        // GitLab code review has no 'all' repository mode: the webhook handler
+        // reviews only selected or manually added projects. The same rule settles
+        // the stored mode and the GitLab hook-sync decision below.
+        const repositorySelectionMode = repositoryModeForPlatform(
+          platform,
+          input.repositorySelectionMode
+        );
+
         // Get previous config to determine which repos were previously selected
         const previousConfig = await getAgentConfigForOwner(owner, 'code_review', platform);
         const previousRepoIds =
@@ -366,7 +381,7 @@ export const personalReviewAgentRouter = createTRPCRouter({
             model_slug: input.modelSlug,
             thinking_effort: input.thinkingEffort ?? null,
             gate_threshold: input.gateThreshold ?? 'off',
-            repository_selection_mode: input.repositorySelectionMode || 'all',
+            repository_selection_mode: repositorySelectionMode,
             selected_repository_ids: input.selectedRepositoryIds || [],
             manually_added_repositories: input.manuallyAddedRepositories || [],
             repository_model_overrides: repositoryModelOverrides,
@@ -384,7 +399,7 @@ export const personalReviewAgentRouter = createTRPCRouter({
         if (
           platform === PLATFORM.GITLAB &&
           input.autoConfigureWebhooks !== false &&
-          input.repositorySelectionMode === 'selected'
+          repositorySelectionMode === 'selected'
         ) {
           const integration = await getIntegrationForOwner(owner, PLATFORM.GITLAB);
           if (integration) {

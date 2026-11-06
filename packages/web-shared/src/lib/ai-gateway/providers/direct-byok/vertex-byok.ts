@@ -3,7 +3,7 @@ import { DirectByokModelEndpointSchema } from '@kilocode/db/schema-types';
 import { isClaudeModel } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/claude-model';
 import { isGeminiModel } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
 import { dropThinkingBlocksOnPrefixMismatch } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/thinking-block-binding';
-import { cachedEnhancedDirectByokModelList } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/model-list';
+import { cachedDirectByokModelList } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/model-list';
 import { DirectVertexCredentialsSchema } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import type {
   DirectByokModel,
@@ -258,7 +258,7 @@ export default {
       request.body.model = toGcpVertexOpenApiModelId(request.body.model);
     }
   },
-  models: cachedEnhancedDirectByokModelList({ providerId: 'vertex-byok', recommendedModels: [] }),
+  models: cachedDirectByokModelList('vertex-byok'),
   async resolveUpstream({ credential, model, stream }) {
     return resolveGcpVertexUpstream(credential, model, stream);
   },

@@ -12,6 +12,43 @@ export function isOverloaded(error: unknown): boolean {
   );
 }
 
+export type FailureCause =
+  | 'none'
+  | 'application_queue'
+  | 'queued_requests'
+  | 'queued_bytes'
+  | 'queue_timeout'
+  | 'object_rate'
+  | 'account_rate'
+  | 'platform_unknown'
+  | 'watch_budget'
+  | 'typed_result'
+  | 'unknown';
+
+/** Classifies platform text without retaining or emitting the original message. */
+export function failureCause(error: unknown): FailureCause {
+  if (error !== null && typeof error === 'object' && 'message' in error) {
+    const message = error.message;
+    if (message === 'Durable Object is overloaded. Too many requests queued.')
+      return 'queued_requests';
+    if (message === 'Durable Object is overloaded. Too much data queued.') return 'queued_bytes';
+    if (message === 'Durable Object is overloaded. Requests queued for too long.')
+      return 'queue_timeout';
+    if (
+      message ===
+      'Durable Object is overloaded. Too many requests for the same object within a 10 second window.'
+    )
+      return 'object_rate';
+    if (
+      message ===
+      'Your account is generating too much load on Durable Objects. Please back off and try again later.'
+    )
+      return 'account_rate';
+    if (message === 'Presence watch budget exceeded') return 'watch_budget';
+  }
+  return isOverloaded(error) ? 'platform_unknown' : 'unknown';
+}
+
 /** Do not carry a retryable flag into the immediate RPC retry policy. */
 export class ServiceOverloaded extends Error {
   constructor() {

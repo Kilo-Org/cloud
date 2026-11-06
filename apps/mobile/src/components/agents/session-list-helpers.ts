@@ -7,7 +7,7 @@ import {
   formatNumber,
 } from '@/lib/format';
 import { type StoredSession } from '@/lib/hooks/use-agent-sessions';
-import { platformLabel } from '@/lib/platform-label';
+import { platformLabel, remoteAgentState } from '@/lib/platform-label';
 import { parseTimestamp, timeAgo } from '@/lib/utils';
 
 /**
@@ -431,10 +431,16 @@ export function selectRemoteRowSpokenMeta(params: {
  * Pinned-tray label for an active session. Reuses `platformLabel` when the
  * origin is known, otherwise falls back to 'LIVE'. An undefined, empty, or
  * 'unknown' origin is treated as unknown and returns 'LIVE' rather than a
- * definitive (and potentially wrong) label.
+ * definitive (and potentially wrong) label: this row is live, so the word
+ * names its state and the row draws the live glyph beside it. A stored row
+ * never takes this path — `storedSessionEyebrowLabel` shows the neutral origin
+ * label instead.
+ *
+ * The word is catalog copy, so its text changes per locale. A row that renders
+ * it takes its tint from {@link remoteAgentState}, never from the string.
  */
 export function remoteAgentLabel(createdOnPlatform: string | undefined): string {
-  if (!createdOnPlatform || createdOnPlatform === 'unknown') {
+  if (remoteAgentState(createdOnPlatform) === 'live') {
     return i18n.t('agents.sessionList.live');
   }
   return platformLabel(createdOnPlatform);
@@ -486,8 +492,9 @@ export function repoNameFromGitUrl(gitUrl: string | null | undefined): string | 
 
 /**
  * Canonical eyebrow label for a stored session: repo name (uppercased) when
- * a git URL is present, else the platform fallback. Replaces the legacy
- * platform-only label in the Agents list.
+ * a git URL is present, else the origin label from `platformLabel`. A stored
+ * row has no live state, so an unrecorded origin reads the neutral origin
+ * label, never "LIVE".
  */
 export function storedSessionEyebrowLabel(session: {
   git_url: string | null;
@@ -512,37 +519,23 @@ export function remoteSessionEyebrowLabel(session: {
 }
 
 /**
+ * Tint key for a remote row's eyebrow, next to the label it belongs to: a
+ * state word when the eyebrow renders one, `null` when it renders a repo or
+ * platform name (which keeps its deterministic hash).
+ */
+export function remoteSessionEyebrowState(session: {
+  gitUrl?: string | null;
+  createdOnPlatform?: string;
+}): 'live' | null {
+  const repo = repoNameFromGitUrl(session.gitUrl);
+  return repo ? null : remoteAgentState(session.createdOnPlatform);
+}
+
+/**
  * Whether the Active now row's long-press menu may offer Exit session.
  * Cloud-agent rows carry the sentinel `connectionId` and have no CLI
  * connection to receive `exit_cli`; only real CLI rows can be exited.
  */
 export function canExitSessionFromList(session: { connectionId: string }): boolean {
   return session.connectionId !== CLOUD_AGENT_CONNECTION_ID;
-}
-
-/**
- * Compose the provenance subtitle for a session row.
- *
- *   - both branch and PR number → `"branch · #N"`
- *   - branch only → the branch
- *   - PR number only → `"#N"`
- *   - neither → `null`
- */
-export function composeSessionProvenanceSubtitle(params: {
-  branch: string | null | undefined;
-  prNumber: number | null | undefined;
-}): string | null {
-  const { branch, prNumber } = params;
-  const hasBranch = branch != null && branch !== '';
-  const hasPr = prNumber != null;
-  if (hasBranch && hasPr) {
-    return `${branch} · #${prNumber}`;
-  }
-  if (hasBranch) {
-    return branch;
-  }
-  if (hasPr) {
-    return `#${prNumber}`;
-  }
-  return null;
 }

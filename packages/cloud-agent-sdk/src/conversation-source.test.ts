@@ -239,6 +239,59 @@ describe('versioned native conversation sources', () => {
     expect(reader.read(raw)).toEqual([]);
   });
 
+  it.each([false, true])(
+    'preserves reasoning duration after a live start or a projected page (%p)',
+    projected => {
+      const reader = createConversationSourceReader();
+      const reasoning = (type: string, created: number) =>
+        reader.read(
+          wire('conversation.event', {
+            sessionID: session.id,
+            source: { version: 'v2' },
+            event: {
+              id: `evt_${type}`,
+              type,
+              created,
+              data: {
+                sessionID: session.id,
+                assistantMessageID: 'msg_live',
+                ordinal: 0,
+                text: 'thinking',
+              },
+            },
+          })
+        ).events;
+      if (projected)
+        reader.observeProjected([
+          {
+            info: {
+              id: 'msg_live',
+              sessionID: session.id,
+              role: 'assistant',
+              time: { created: 1 },
+            } as MessageInfo,
+            parts: [
+              {
+                id: 'msg_live_000000',
+                sessionID: session.id,
+                messageID: 'msg_live',
+                type: 'reasoning',
+                text: 'thinking',
+                time: { start: 10 },
+              },
+            ],
+          },
+        ]);
+      else reasoning('session.reasoning.started', 10);
+      expect(reasoning('session.reasoning.ended', 30)).toEqual([
+        expect.objectContaining({
+          type: 'message.part.updated',
+          part: expect.objectContaining({ time: { start: 10, end: 30 } }),
+        }),
+      ]);
+    }
+  );
+
   it('orders live text after a tool by native content position', () => {
     const sourceReader = createConversationSourceReader();
     const read = (type: string, properties: object) =>

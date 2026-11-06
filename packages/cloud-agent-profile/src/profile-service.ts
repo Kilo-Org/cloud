@@ -389,6 +389,26 @@ export async function clearDefaultProfile(
 }
 
 /**
+ * Resolve the owner's default profile by identifier only.
+ *
+ * Session preparation orders the profile layers from this id and reads the
+ * applied profile's collections inside its own layer transaction. The id is
+ * the only value it needs here.
+ */
+export async function getDefaultProfileId(
+  db: WorkerDb,
+  owner: ProfileOwner
+): Promise<string | null> {
+  const [profile] = await db
+    .select({ id: agent_environment_profiles.id })
+    .from(agent_environment_profiles)
+    .where(and(buildOwnershipCondition(owner), eq(agent_environment_profiles.is_default, true)))
+    .limit(1);
+
+  return profile?.id ?? null;
+}
+
+/**
  * Get the default profile for an owner.
  * Returns null if no default is set.
  */

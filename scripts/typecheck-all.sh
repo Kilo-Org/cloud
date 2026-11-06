@@ -48,9 +48,13 @@ if [ -n "$group" ]; then
       fi
       ;;
     trpc)
-      # kilo-app typechecks in kilo-app CI, which runs whenever kilo-app is
-      # affected. The extension has no other job that typechecks it outside its
-      # own workflow, which skips unrelated PRs.
+      # The rows run on every full typecheck, which `selectAffected` reports
+      # whenever a change has no base, hits a GLOBAL path or this script,
+      # moves root or unscoped dependencies, or holds a file it cannot
+      # attribute to any workspace. The merge queue is one of those runs and
+      # has no extension trigger, so the rows keep the extension's gate there.
+      # The extension's own workflow typechecks it for the same selection on
+      # every other pull request, and kilo-app typechecks in kilo-app CI.
       # CI restores or builds the declarations first and sets
       # KILO_TYPECHECK_TRPC_BUILT=1.
       if [ "${KILO_TYPECHECK_TRPC_BUILT:-}" != 1 ]; then
@@ -121,7 +125,7 @@ fi
 
 # 1b. Build the harness SDK, which apps/mobile typechecks against (same rule as trpc)
 if $changes_only; then
-  harness_changed=$(git diff --name-only "$base" -- 'packages/harness-sdk/src/**' 'packages/harness-sdk/tsconfig.json' 'packages/harness-sdk/package.json' | head -1 || true)
+  harness_changed=$(git diff --name-only "$base" -- 'packages/harness-sdk/src/**' 'packages/harness-sdk/tsconfig.json' 'packages/harness-sdk/tsconfig.build.json' 'packages/harness-sdk/package.json' | head -1 || true)
   if [ -n "$harness_changed" ]; then
     echo "[typecheck] harness-sdk source changed, rebuilding"
     pnpm --filter @kilocode/harness-sdk run build

@@ -127,7 +127,7 @@ describe('SessionStatusIndicator mounted', () => {
   it('renders the delivery copy for the SDK delivery status', async () => {
     await expect(
       textNodes({ type: 'error', message: 'Message delivery failed', timestamp: 0 })
-    ).resolves.toEqual(['Failed to deliver']);
+    ).resolves.toEqual(['Message not sent']);
   });
 
   it('renders fixed retry copy, never the provider text, while the agent retries', async () => {

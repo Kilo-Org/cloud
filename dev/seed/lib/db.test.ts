@@ -3,8 +3,8 @@ import test from 'node:test';
 
 import { assertLocalSeedDatabase } from './db';
 
-const LOOPBACK_POSTGRES_URL = 'postgresql://postgres:postgres@127.0.0.1:5432/postgres';
-const REMOTE_POSTGRES_URL = 'postgresql://user:secret@db.example.internal:5432/prod';
+const LOOPBACK_POSTGRES_URL = 'postgresql://127.0.0.1:5432/postgres';
+const REMOTE_POSTGRES_URL = 'postgresql://db.example.internal:5432/prod';
 
 /** POSTGRES_URL, POSTGRES_URL_PRODUCTION, USE_PRODUCTION_DB */
 type DatabaseEnv = [string, string | undefined, string | undefined];
@@ -50,8 +50,8 @@ test('accepts the loopback resolved connection', () => {
 
 test('accepts every loopback spelling of the resolved connection', () => {
   const cases: { url: string; hostname: string }[] = [
-    { url: 'postgresql://postgres:postgres@localhost:5432/postgres', hostname: 'localhost' },
-    { url: 'postgresql://postgres:postgres@[::1]:5432/postgres', hostname: '[::1]' },
+    { url: 'postgresql://localhost:5432/postgres', hostname: 'localhost' },
+    { url: 'postgresql://[::1]:5432/postgres', hostname: '[::1]' },
   ];
   for (const { url, hostname } of cases) {
     useDatabaseEnv([url, undefined, undefined]);

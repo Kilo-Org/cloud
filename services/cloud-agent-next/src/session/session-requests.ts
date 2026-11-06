@@ -8,6 +8,7 @@ import type {
 } from '../execution/types.js';
 import type { SessionProfileBundle } from '../session-profile.js';
 import type { EnvironmentScope } from '../environment-build/reference.js';
+import type { EnvironmentSetupBinding } from '../shared/environment-setup.js';
 
 export type ProfileOverrides = {
   envVars?: Record<string, string>;
@@ -91,6 +92,19 @@ export type SessionCreateRequest = {
     id: string;
     repositories?: { repoFullName: string; branch?: string }[];
   };
+  /**
+   * The environment setup run this session prepares, trusted only on a
+   * non-authority internal-key `prepareSession`. Preflight verifies it against
+   * the database and turns it into `environmentSetup`.
+   */
+  environmentSetupRunId?: string;
+  /** The setup run whose verification this session serves, copied raw from the request. */
+  verificationOf?: { runId: string };
+  /**
+   * Set only by preflight. It binds the session to one environment setup run
+   * and role; the client can never set it.
+   */
+  environmentSetup?: EnvironmentSetupBinding;
   /**
    * Set only by a client that can ask its user to choose an environment. When
    * several environments contain the repository and `requestedEnvironment` names

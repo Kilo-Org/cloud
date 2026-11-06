@@ -20,7 +20,7 @@ import {
   organizationMemberMutationProcedure,
 } from '@kilocode/web-shared/routers/organizations/utils';
 import { fetchAllGitHubRepositoriesForOrganization } from '@/lib/cloud-agent/github-integration-helpers';
-import { resolveGitHubIntegrationIdForRepository } from '@/lib/cloud-agent/github-integration-resolution';
+import { resolveGitHubPrepareParams } from '@/lib/cloud-agent-next/github-prepare-params';
 import {
   BitbucketOrganizationRepositoryListResultSchema,
   fetchBitbucketRepositoriesForOrganization,
@@ -418,24 +418,12 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         }
         gitParams = { gitUrl: publicRepoUrl };
       } else {
-        // The runtime's repository preflight runs only when the request names
-        // the integration that owns the repository, so resolve it for the
-        // caller's organization here. An explicitly supplied id wins, and an
-        // unresolvable repository stays unqualified (the previous behaviour)
-        // rather than refusing a request the runtime can still serve.
-        const resolvedIntegrationId =
-          githubIntegrationId ??
-          (githubRepo === undefined
-            ? null
-            : await resolveGitHubIntegrationIdForRepository(
-                { type: 'org', id: organizationId },
-                githubRepo
-              ));
-        gitParams = {
+        gitParams = await resolveGitHubPrepareParams({
+          userId: ctx.user.id,
+          organizationId,
           githubRepo,
-          githubIntegrationId: resolvedIntegrationId ?? undefined,
-          platform: PLATFORM.GITHUB,
-        };
+          ...(githubIntegrationId === undefined ? {} : { githubIntegrationId }),
+        });
       }
 
       let linkedObjectKeys: string[] = [];

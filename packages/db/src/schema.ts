@@ -8577,6 +8577,17 @@ export const cloud_agent_environments = pgTable(
     // where an empty list permits only the server-owned Kilo/Git baseline.
     egress_mode: text({ enum: ['unrestricted', 'allowlist'] }),
     egress_allowlist: text().array(),
+    // Draft rows are written by an environment setup run and are invisible to
+    // session matching, lists and builds until they are published.
+    is_draft: boolean().default(false).notNull(),
+    // The existing environment a draft will replace on publish; null for a new
+    // environment. Only a draft may name one.
+    draft_for_environment_id: uuid().references((): AnyPgColumn => cloud_agent_environments.id, {
+      onDelete: 'cascade',
+    }),
+    // Hosts the setup agent found that sessions need. Always included in the
+    // effective allowlist of restricted policies.
+    egress_required_hosts: text().array(),
 
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
@@ -8612,6 +8623,7 @@ export const cloud_agent_environments = pgTable(
       ),
     index('IDX_cloud_agent_environments_user_id').on(table.owned_by_user_id),
     index('IDX_cloud_agent_environments_org_id').on(table.owned_by_organization_id),
+    index('IDX_cloud_agent_environments_draft_for').on(table.draft_for_environment_id),
     check(
       'cloud_agent_environments_owner_check',
       sql`(
@@ -8674,6 +8686,10 @@ export const cloud_agent_environments = pgTable(
         (${table.egress_mode} IS DISTINCT FROM 'allowlist' OR ${table.egress_allowlist} IS NOT NULL)
       )`
     ),
+    check(
+      'cloud_agent_environments_draft_target_check',
+      sql`${table.draft_for_environment_id} IS NULL OR ${table.is_draft}`
+    ),
   ]
 );
 
@@ -8706,6 +8722,180 @@ export const cloud_agent_environment_vars = pgTable(
 );
 
 export type CloudAgentEnvironmentVar = typeof cloud_agent_environment_vars.$inferSelect;
+
+// ============ CLOUD AGENT ENVIRONMENT SETUP RUNS ============
+// One row per attempt to work out and publish a repository environment. The
+// row owns the draft environment, the requests the agent made to the user, the
+// verification evidence, and the publish/revert state. This package cannot
+// import `@kilocode/cloud-agent-profile`, so the payload types live here and
+// that package re-exports them.
+
+export const ENVIRONMENT_SETUP_RUN_STATUSES = [
+  'starting',
+  'running',
+  'needs_input',
+  'verifying',
+  'publish_conflict',
+  'failed',
+  'published',
+  'reverted',
+  'cancelled',
+] as const;
+
+export type EnvironmentSetupRunStatus = (typeof ENVIRONMENT_SETUP_RUN_STATUSES)[number];
+
+export type EnvironmentSetupSecretRequest = {
+  key: string;
+  reason: string;
+  references: { repoFullName: string; path: string; line: number; verified?: boolean }[];
+  highPrivilege: boolean;
+  state: 'pending' | 'provided' | 'skipped';
+  requestedAt: string;
+};
+
+export type EnvironmentSetupNetworkRequest = {
+  host: string;
+  reason: string;
+  evidence:
+    | { sessionId: string; requestCount: number }
+    | { childSessionId: string; deniedCount: number };
+  state: 'pending' | 'approved' | 'declined';
+  requestedAt: string;
+};
+
+export type EnvironmentSetupCheck = { name: string; command: string; expect: string };
+
+export type EnvironmentSetupPendingVerification = {
+  operationKey: string;
+  childSessionId: string | null;
+  childKiloSessionId: string | null;
+  configurationRevision: number;
+  checks: EnvironmentSetupCheck[];
+  startedAt: string;
+  sandboxAllocation: string | null;
+  egressAllowlist: string[] | null;
+};
+
+export type EnvironmentSetupVerification = {
+  childSessionId: string;
+  childKiloSessionId: string | null;
+  configurationRevision: number | null;
+  preparation: 'completed' | 'failed' | 'running' | 'missing';
+  preparationError: string | null;
+  setupDurationMs: number | null;
+  egressMode: 'unrestricted' | 'allowlist' | null;
+  sandboxAllocation?: string | null;
+  egressAllowlist?: string[] | null;
+  checks: EnvironmentSetupCheck[];
+  results: { name: string; passed: boolean; evidence: string }[];
+  recordedAt: string;
+};
+
+export type EnvironmentSetupPreviousConfiguration = {
+  environmentId: string;
+  revision: number;
+  commands: string[];
+  repositories: unknown;
+  sandboxAllocation: string | null;
+  egressMode: string | null;
+  egressAllowlist: string[] | null;
+  egressRequiredHosts: string[] | null;
+  vars: { key: string; value: string; isSecret: boolean }[];
+};
+
+/**
+ * The target environment's non-script settings at fork time, and the settings a
+ * publish wrote. Scripts and variables are compared through the draft instead.
+ */
+export type EnvironmentSetupTargetSettings = {
+  sandboxAllocation: string | null;
+  egressMode: 'unrestricted' | 'allowlist' | null;
+  egressAllowlist: string[] | null;
+  egressRequiredHosts: string[] | null;
+};
+
+export const cloud_agent_environment_setup_runs = pgTable(
+  'cloud_agent_environment_setup_runs',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    owned_by_organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
+    owned_by_user_id: text().references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    created_by_user_id: text().notNull(),
+    draft_environment_id: uuid().references(() => cloud_agent_environments.id, {
+      onDelete: 'set null',
+    }),
+    target_environment_id: uuid().references(() => cloud_agent_environments.id, {
+      onDelete: 'set null',
+    }),
+    target_revision_at_fork: integer(),
+    target_settings_at_fork: jsonb().$type<EnvironmentSetupTargetSettings>(),
+    requirements: text().notNull(),
+    model: text().notNull(),
+    variant: text(),
+    launch_repo_full_name: text().notNull(),
+    cloud_agent_session_id: text(),
+    kilo_session_id: text(),
+    status: text().$type<EnvironmentSetupRunStatus>().notNull().default('starting'),
+    status_reason: text(),
+    status_detail: text(),
+    summary: text(),
+    secret_requests: jsonb().$type<EnvironmentSetupSecretRequest[]>().notNull().default([]),
+    network_requests: jsonb().$type<EnvironmentSetupNetworkRequest[]>().notNull().default([]),
+    generated_secret_keys: text().array().notNull().default([]),
+    sandbox_options: text().array().notNull().default([]),
+    pending_verification: jsonb().$type<EnvironmentSetupPendingVerification>(),
+    last_verification: jsonb().$type<EnvironmentSetupVerification>(),
+    verification_count: integer().notNull().default(0),
+    verification_limit: integer().notNull().default(6),
+    previous_configuration: jsonb().$type<EnvironmentSetupPreviousConfiguration>(),
+    published_environment_id: uuid(),
+    published_revision: integer(),
+    published_settings: jsonb().$type<EnvironmentSetupTargetSettings>(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+    completed_at: timestamp({ withTimezone: true, mode: 'string' }),
+  },
+  table => [
+    index('IDX_env_setup_runs_user_id').on(table.owned_by_user_id),
+    index('IDX_env_setup_runs_org_id').on(table.owned_by_organization_id),
+    index('IDX_env_setup_runs_target').on(table.target_environment_id),
+    uniqueIndex('UQ_env_setup_runs_session')
+      .on(table.cloud_agent_session_id)
+      .where(sql`${table.cloud_agent_session_id} IS NOT NULL`),
+    uniqueIndex('UQ_env_setup_runs_draft')
+      .on(table.draft_environment_id)
+      .where(sql`${table.draft_environment_id} IS NOT NULL`),
+    // At most one run per target may still change. Published, reverted and
+    // cancelled runs are historical.
+    uniqueIndex('UQ_env_setup_runs_open_target')
+      .on(table.target_environment_id)
+      .where(
+        sql`${table.target_environment_id} IS NOT NULL AND ${table.status} NOT IN ('published', 'reverted', 'cancelled')`
+      ),
+    check(
+      'env_setup_runs_owner_check',
+      sql`(
+        (${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR
+        (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL))`
+    ),
+    check(
+      'env_setup_runs_status_check',
+      sql`${table.status} IN ('starting', 'running', 'needs_input', 'verifying', 'publish_conflict', 'failed', 'published', 'reverted', 'cancelled')`
+    ),
+    check(
+      'env_setup_runs_verification_check',
+      sql`${table.verification_count} >= 0 AND ${table.verification_limit} >= 0`
+    ),
+  ]
+);
+
+export type CloudAgentEnvironmentSetupRun = typeof cloud_agent_environment_setup_runs.$inferSelect;
 
 // ============ AGENT ENVIRONMENT PROFILE REPO BINDINGS ============
 // Bind a single environment profile to a repository so sessions auto-inherit it

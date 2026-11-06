@@ -20,6 +20,8 @@
       "@kilocode/web-shared/*": ["../web-shared/src/*"],
       "@kilocode/db": ["../db/src/index.ts"],
       "@kilocode/db/*": ["../db/src/*"],
+      "@kilocode/cloud-agent-profile": ["../cloud-agent-profile/src/index.ts"],
+      "@kilocode/cloud-agent-profile/*": ["../cloud-agent-profile/src/*"],
       "@kilocode/encryption": ["../encryption/src/index.ts"]
     }
   },

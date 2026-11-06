@@ -74,6 +74,33 @@ function matchesWorkspaceMcpBinding(
   );
 }
 
+/**
+ * The claim a session's metadata earns. Only a `setup` session acts under the
+ * environment setup authority; a verification child is a delegated grant and
+ * never carries it.
+ */
+function environmentSetupClaimFor(
+  metadata: SessionMetadata | null
+): CloudAgentAuthority['environmentSetup'] {
+  const binding = metadata?.environmentSetup;
+  if (binding?.role !== 'setup') return undefined;
+  return { runId: binding.runId, environmentId: binding.environmentId };
+}
+
+/**
+ * A grant's claim must be exactly the one its parent metadata earns: a token
+ * cannot add the claim to a session that has no setup binding, drop it from a
+ * setup session, or point it at another run.
+ */
+function matchesEnvironmentSetupClaim(
+  metadata: SessionMetadata | null,
+  claim: CloudAgentAuthority['environmentSetup']
+): boolean {
+  const derived = environmentSetupClaimFor(metadata);
+  if (derived === undefined || claim === undefined) return derived === claim;
+  return derived.runId === claim.runId && derived.environmentId === claim.environmentId;
+}
+
 export function resolveCloudAgentMcpUrl(override?: string): string {
   if (!override) return CLOUD_AGENT_MCP_URL;
   try {
@@ -131,7 +158,8 @@ export function assertCloudAgentParentAuthority(
     authorization.id !== scope.authorizationId ||
     Date.parse(authorization.delegationExpiresAt) <= now ||
     scope.expiresAt * 1000 <= now ||
-    scope.expiresAt * 1000 > Date.parse(authorization.delegationExpiresAt)
+    scope.expiresAt * 1000 > Date.parse(authorization.delegationExpiresAt) ||
+    !matchesEnvironmentSetupClaim(metadata, scope.environmentSetup)
   ) {
     throw new Error(CLOUD_AGENT_PARENT_AUTHORITY_DENIED);
   }
@@ -145,6 +173,22 @@ type ParentAuthorityContext = {
   mcpUrl?: string;
 };
 
+function parentAuthorityFor(
+  metadata: SessionMetadata,
+  authorization: RuntimeAuthorization
+): CloudAgentAuthority {
+  const environmentSetup = environmentSetupClaimFor(metadata);
+  return {
+    version: 1,
+    ownerId: metadata.identity.userId,
+    parentSessionId: metadata.identity.sessionId,
+    organizationId: metadata.identity.orgId ?? null,
+    authorizationId: authorization.id,
+    expiresAt: Math.floor(Date.parse(authorization.delegationExpiresAt) / 1000),
+    ...(environmentSetup === undefined ? {} : { environmentSetup }),
+  };
+}
+
 export async function issueCloudAgentMcpGrant(
   input: ParentAuthorityContext & { workspace?: WorkspaceMcpBinding }
 ): Promise<{ url: string; token: string; expiresAt: number } | undefined> {
@@ -154,14 +198,7 @@ export async function issueCloudAgentMcpGrant(
   if (!matchesWorkspaceMcpBinding(metadata, input.workspace)) return undefined;
   const authorization = RuntimeAuthorizationSchema.parse(await input.authorization());
   const now = Math.floor(Date.now() / 1000);
-  const scope: CloudAgentAuthority = {
-    version: 1,
-    ownerId: metadata.identity.userId,
-    parentSessionId: metadata.identity.sessionId,
-    organizationId: metadata.identity.orgId ?? null,
-    authorizationId: authorization.id,
-    expiresAt: Math.floor(Date.parse(authorization.delegationExpiresAt) / 1000),
-  };
+  const scope = parentAuthorityFor(metadata, authorization);
   assertCloudAgentParentAuthority(metadata, authorization, scope);
   const renewed = await renewRuntimeAuthorization({
     authorization,
@@ -249,14 +286,7 @@ export async function authorizeCloudAgentWorkspaceSibling(input: {
   }
   const authorization = RuntimeAuthorizationSchema.parse(await input.authorization());
   const now = Math.floor(Date.now() / 1000);
-  const scope: CloudAgentAuthority = {
-    version: 1,
-    ownerId: metadata.identity.userId,
-    parentSessionId: metadata.identity.sessionId,
-    organizationId: metadata.identity.orgId ?? null,
-    authorizationId: authorization.id,
-    expiresAt: Math.floor(Date.parse(authorization.delegationExpiresAt) / 1000),
-  };
+  const scope = parentAuthorityFor(metadata, authorization);
   if (scope.expiresAt <= now) throw new Error(CLOUD_AGENT_PARENT_AUTHORITY_DENIED);
   assertCloudAgentParentAuthority(metadata, authorization, scope);
   const sibling = RuntimeAuthorizationSchema.parse({

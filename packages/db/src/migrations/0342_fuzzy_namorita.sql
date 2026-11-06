@@ -1,0 +1,2 @@
+CREATE INDEX "IDX_env_setup_runs_target" ON "cloud_agent_environment_setup_runs" USING btree ("target_environment_id");--> statement-breakpoint
+CREATE INDEX "IDX_cloud_agent_environments_draft_for" ON "cloud_agent_environments" USING btree ("draft_for_environment_id");

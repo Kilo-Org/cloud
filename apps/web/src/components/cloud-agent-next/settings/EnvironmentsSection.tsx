@@ -24,15 +24,28 @@ import {
   type EnvironmentRepository,
   type EnvironmentSummary,
 } from '@/hooks/useCloudAgentEnvironments';
+import {
+  isOpenEnvironmentSetupRun,
+  useEnvironmentSetupEnabled,
+  useEnvironmentSetupRunsForEnvironment,
+} from '@/hooks/useEnvironmentSetupRuns';
+import { EnvironmentSetupAgentDialog } from '../EnvironmentSetupAgentDialog';
 import { EnvironmentDialog } from '../EnvironmentDialog';
 import { snapshotBadge } from '../environment-build-display';
 
 type EnvironmentsSectionProps = {
   organizationId?: string;
   canManage: boolean;
+  onSetupStarted: () => void;
 };
 
-export function EnvironmentsSection({ organizationId, canManage }: EnvironmentsSectionProps) {
+export function EnvironmentsSection({
+  organizationId,
+  canManage,
+  onSetupStarted,
+}: EnvironmentsSectionProps) {
+  const [setupOpen, setSetupOpen] = useState(false);
+  const setupToggle = useEnvironmentSetupEnabled({ organizationId });
   const query = useCloudAgentEnvironmentsForOwner({ organizationId });
 
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -60,7 +73,7 @@ export function EnvironmentsSection({ organizationId, canManage }: EnvironmentsS
 
   return (
     <section className="space-y-3">
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 className="text-sm font-medium">Environments</h3>
           <p className="text-muted-foreground text-xs">
@@ -70,52 +83,64 @@ export function EnvironmentsSection({ organizationId, canManage }: EnvironmentsS
           </p>
         </div>
         {canManage && (
-          <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className="shrink-0">
-                <Plus className="mr-1.5 h-4 w-4" />
-                Add environment
+          <div className="flex flex-wrap gap-2">
+            {setupToggle.data?.canStart === true && (
+              <Button
+                variant="secondary"
+                size="sm"
+                className="pointer-coarse:min-h-11"
+                onClick={() => setSetupOpen(true)}
+              >
+                Set up with agent
               </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-[320px] p-0" align="end">
-              <Command>
-                <CommandInput placeholder="Search repositories..." />
-                <CommandEmpty>No repositories match your search</CommandEmpty>
-                <CommandList className="max-h-64 overflow-auto">
-                  {(['github', 'gitlab', 'bitbucket'] as const).map(platform => {
-                    const choices = repoChoices.filter(choice => choice.platform === platform);
-                    if (choices.length === 0) return null;
-                    return (
-                      <CommandGroup
-                        key={platform}
-                        heading={
-                          platform === 'github'
-                            ? 'GitHub'
-                            : platform === 'gitlab'
-                              ? 'GitLab'
-                              : 'Bitbucket'
-                        }
-                      >
-                        {choices.map(choice => (
-                          <CommandItem
-                            key={`${platform}:${choice.label}`}
-                            value={`${platform}:${choice.label}`}
-                            onSelect={() => openCreate(choice)}
-                            className="flex items-center gap-2"
-                          >
-                            <GitBranch className="text-muted-foreground size-3.5 shrink-0" />
-                            <span className="flex-1 truncate" title={choice.label}>
-                              {choice.label}
-                            </span>
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    );
-                  })}
-                </CommandList>
-              </Command>
-            </PopoverContent>
-          </Popover>
+            )}
+            <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="shrink-0">
+                  <Plus className="mr-1.5 h-4 w-4" />
+                  Add environment
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[320px] p-0" align="end">
+                <Command>
+                  <CommandInput placeholder="Search repositories..." />
+                  <CommandEmpty>No repositories match your search</CommandEmpty>
+                  <CommandList className="max-h-64 overflow-auto">
+                    {(['github', 'gitlab', 'bitbucket'] as const).map(platform => {
+                      const choices = repoChoices.filter(choice => choice.platform === platform);
+                      if (choices.length === 0) return null;
+                      return (
+                        <CommandGroup
+                          key={platform}
+                          heading={
+                            platform === 'github'
+                              ? 'GitHub'
+                              : platform === 'gitlab'
+                                ? 'GitLab'
+                                : 'Bitbucket'
+                          }
+                        >
+                          {choices.map(choice => (
+                            <CommandItem
+                              key={`${platform}:${choice.label}`}
+                              value={`${platform}:${choice.label}`}
+                              onSelect={() => openCreate(choice)}
+                              className="flex items-center gap-2"
+                            >
+                              <GitBranch className="text-muted-foreground size-3.5 shrink-0" />
+                              <span className="flex-1 truncate" title={choice.label}>
+                                {choice.label}
+                              </span>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      );
+                    })}
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          </div>
         )}
       </div>
 
@@ -152,9 +177,16 @@ export function EnvironmentsSection({ organizationId, canManage }: EnvironmentsS
         </div>
       )}
 
+      <EnvironmentSetupAgentDialog
+        open={setupOpen}
+        onOpenChange={setSetupOpen}
+        onStarted={onSetupStarted}
+        organizationId={organizationId}
+      />
       <EnvironmentDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
+        onSetupStarted={onSetupStarted}
         organizationId={organizationId}
         repository={dialogRepository}
         repositoryLabel={dialogRepository ? repositoryLabel(dialogRepository) : undefined}
@@ -178,6 +210,8 @@ function EnvironmentRow({
   canManage: boolean;
   onEdit: () => void;
 }) {
+  const setupRuns = useEnvironmentSetupRunsForEnvironment(environment.id, { organizationId });
+  const setupInProgress = setupRuns.data?.some(run => isOpenEnvironmentSetupRun(run.status));
   const { data: buildStatus } = useEnvironmentBuildStatus(environment.id, { organizationId });
   const badge = snapshotBadge(buildStatus, Date.now());
   const members = environmentMembers(environment);
@@ -201,6 +235,11 @@ function EnvironmentRow({
           {members.length > 1 && (
             <Badge variant="outline" className="shrink-0 text-[10px]">
               {members.length} repos
+            </Badge>
+          )}
+          {setupInProgress && (
+            <Badge variant="outline" className="shrink-0 text-[10px]">
+              Setup in progress
             </Badge>
           )}
           {badge && (

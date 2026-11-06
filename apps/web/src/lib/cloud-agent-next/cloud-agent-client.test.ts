@@ -359,6 +359,19 @@ describe('CloudAgentNextClient getEgressAudit', () => {
     await expect(new CloudAgentNextClient('token').getEgressAudit(input)).resolves.toEqual(audit);
   });
 
+  it('sends only the session, pagination and organization pin', async () => {
+    query.mockResolvedValue(audit);
+    await new CloudAgentNextClient('token').getEgressAudit({
+      ...input,
+      organizationId: '87654321-4321-4321-8321-cba987654321',
+      unexpected: 'dropped',
+    } as CloudAgentClientModule.GetEgressAuditInput);
+    expect(query).toHaveBeenCalledWith({
+      ...input,
+      organizationId: '87654321-4321-4321-8321-cba987654321',
+    });
+  });
+
   it.each([
     { code: 'UNAUTHORIZED', httpStatus: 401 },
     { code: 'FORBIDDEN', httpStatus: 403 },

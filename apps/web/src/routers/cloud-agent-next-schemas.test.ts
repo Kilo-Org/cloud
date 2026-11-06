@@ -316,6 +316,25 @@ describe('baseGetSessionNextOutputSchema', () => {
       ...metadata,
     });
   });
+
+  it('preserves environment, latest preparation and egress facts', () => {
+    const response = {
+      ...baseSession,
+      environment: {
+        environmentId: '11111111-1111-4111-8111-111111111111',
+        configurationRevision: 3,
+      },
+      latestPreparation: {
+        status: 'completed' as const,
+        startedAt: 2_000,
+        completedAt: 3_000,
+        setupDurationMs: 250,
+      },
+      egress: { mode: 'allowlist' as const, allowlist: ['registry.npmjs.org'], audit: true },
+    };
+
+    expect(baseGetSessionNextOutputSchema.parse(response)).toEqual(response);
+  });
 });
 
 describe('baseWorktreeChangesNextSchema', () => {

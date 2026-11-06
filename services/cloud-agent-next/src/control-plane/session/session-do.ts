@@ -23,6 +23,7 @@ import {
   type CloudAgentAuthority,
 } from '@kilocode/worker-utils/cloud-agent-authority';
 import { sessionCallbackContext } from './callback-context.js';
+import type { EnvironmentSetupBinding } from '../../shared/environment-setup.js';
 import {
   cloudAgentWorktreeIdSchema,
   cloudAgentWorktreeLocationSchema,
@@ -1072,9 +1073,12 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     return (await this.getCloudAgentSpawnContext(authority)).token;
   }
 
-  async getCloudAgentSpawnContext(
-    authority: CloudAgentAuthority
-  ): Promise<{ token: string; createdOnPlatform: string | undefined }> {
+  async getCloudAgentSpawnContext(authority: CloudAgentAuthority): Promise<{
+    token: string;
+    createdOnPlatform: string | undefined;
+    environmentSetup: EnvironmentSetupBinding | undefined;
+    egressAudit: boolean;
+  }> {
     await this.initialized;
     const scope = CloudAgentAuthoritySchema.safeParse(authority);
     const authorization = RuntimeAuthorizationSchema.safeParse(
@@ -1107,6 +1111,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     return {
       token: issued.token,
       createdOnPlatform: this.metadata?.identity.createdOnPlatform,
+      environmentSetup: this.metadata?.environmentSetup,
+      egressAudit: this.metadata?.workspace?.egressAudit === true,
     };
   }
 
@@ -2312,6 +2318,13 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     await this.initialized;
     if (this.registration === null) return [];
     return listPreparationAttempts(this.eventQueries);
+  }
+
+  /** The most recent preparation attempt, for the session's read model. */
+  async getLatestPreparationAttempt(): Promise<PreparationAttempt | null> {
+    await this.initialized;
+    if (this.registration === null) return null;
+    return listPreparationAttempts(this.eventQueries).at(-1) ?? null;
   }
 
   async getMessageResult(messageId: string): Promise<MessageResultRPCResponse> {

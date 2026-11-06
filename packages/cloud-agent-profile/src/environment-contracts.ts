@@ -181,6 +181,8 @@ export type EnvironmentUpdateInput = {
   /** Absent keeps the stored policy; a supplied mode replaces it. */
   egressMode?: EgressMode;
   egressAllowlist?: string[];
+  /** Replaces the hosts the setup agent requires; absent keeps them. */
+  requiredHosts?: string[];
 };
 
 /** The primitives a repository environment contributes to a session. */
@@ -224,6 +226,8 @@ export type EnvironmentForSession = {
   /** Saved policy; both null means the legacy unrestricted default. */
   egressMode: EgressMode | null;
   egressAllowlist: string[] | null;
+  /** Hosts the setup agent found; always part of an allowlist policy. */
+  egressRequiredHosts?: string[];
 };
 
 type EnvironmentBuildInputBase = {
@@ -290,6 +294,9 @@ export type EnvironmentResponse = {
   /** Saved policy; both null means the legacy unrestricted default. */
   egressMode: EgressMode | null;
   egressAllowlist: string[] | null;
+  egressRequiredHosts: string[];
+  /** A draft is invisible to session matching, lists and builds until published. */
+  isDraft: boolean;
   /** Secret key names only. Values and envelopes are never returned. */
   secretKeys: string[];
 } & EnvironmentIdentityResponse;

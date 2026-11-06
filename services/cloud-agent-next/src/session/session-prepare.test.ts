@@ -8466,11 +8466,25 @@ describe('prepareInputToSessionCreateRequest environment selection', () => {
     expect(request.requireEnvironmentChoice).toBe(true);
   });
 
+  it('carries the environment setup run and the verification target', () => {
+    const environmentSetupRunId = '22222222-2222-4222-8222-222222222222';
+    const verificationOf = { runId: '33333333-3333-4333-8333-333333333333' };
+
+    const request = prepareInputToSessionCreateRequest(
+      parse({ environmentSetupRunId, verificationOf })
+    );
+
+    expect(request.environmentSetupRunId).toBe(environmentSetupRunId);
+    expect(request.verificationOf).toEqual(verificationOf);
+  });
+
   it('adds neither field when the client sent neither', () => {
     const request = prepareInputToSessionCreateRequest(parse({}));
 
     expect(request).not.toHaveProperty('requestedEnvironment');
     expect(request).not.toHaveProperty('requireEnvironmentChoice');
+    expect(request).not.toHaveProperty('environmentSetupRunId');
+    expect(request).not.toHaveProperty('verificationOf');
   });
 
   it.each([

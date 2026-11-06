@@ -45,6 +45,7 @@ export function CloudAgentSettingsDialog({
           key={organizationId ?? 'personal'}
           organizationId={organizationId}
           {...profileOptions}
+          onSetupStarted={() => onOpenChange(false)}
           onProfileSelect={
             profileOptions.onProfileSelect
               ? profileId => {
@@ -65,7 +66,10 @@ function CloudAgentSettings({
   onProfileSelect,
   openToNewProfile,
   initialSelectedProfileId,
-}: Omit<CloudAgentSettingsDialogProps, 'open' | 'onOpenChange'>) {
+  onSetupStarted,
+}: Omit<CloudAgentSettingsDialogProps, 'open' | 'onOpenChange'> & {
+  onSetupStarted: () => void;
+}) {
   const [section, setSection] = useState(initialSection);
   const isMobile = useIsMobile();
   const settingsQuery = useCloudAgentSettings({ organizationId });
@@ -182,7 +186,11 @@ function CloudAgentSettings({
           value="environments"
           className="mt-0 min-h-0 min-w-0 flex-1 overflow-y-auto px-6 py-5"
         >
-          <EnvironmentsSection organizationId={organizationId} canManage={canManage} />
+          <EnvironmentsSection
+            organizationId={organizationId}
+            canManage={canManage}
+            onSetupStarted={onSetupStarted}
+          />
         </TabsContent>
         <TabsContent
           value="profiles"

@@ -64,6 +64,26 @@ function publicRepositoryFields(metadata: CloudAgentSessionState): {
   }
 }
 
+/** Projects one preparation attempt onto the `latestPreparation` session field. */
+function latestPreparationFacts(attempt: PreparationAttempt): {
+  status: PreparationAttempt['status'];
+  startedAt: number;
+  completedAt?: number;
+  setupDurationMs?: number;
+  safeError?: string;
+} {
+  const setupStep = attempt.steps.find(step => step.key === 'setup_commands');
+  const setupDurationMs =
+    setupStep?.completedAt === undefined ? undefined : setupStep.completedAt - setupStep.startedAt;
+  return {
+    status: attempt.status,
+    startedAt: attempt.startedAt,
+    ...(attempt.completedAt === undefined ? {} : { completedAt: attempt.completedAt }),
+    ...(setupDurationMs === undefined ? {} : { setupDurationMs }),
+    ...(attempt.safeError === undefined ? {} : { safeError: attempt.safeError }),
+  };
+}
+
 /** Projects the control-plane sandbox lifecycle onto the public health enum. */
 function sandboxStatusFromLifecycle(
   status: SandboxLifecycleStatus
@@ -454,6 +474,15 @@ export function createSessionManagementHandlers() {
           const sessionMetadata = metadata;
           const metadataProfile = readProfileBundle(sessionMetadata);
 
+          // Only environment setup and verification sessions report preparation.
+          const latestPreparation = sessionMetadata.environmentSetup
+            ? await withDORetry(
+                () => getSandboxSessionStub(env, userId, sessionId),
+                stub => stub.getLatestPreparationAttempt(),
+                'getLatestPreparationAttempt'
+              )
+            : null;
+
           const sandboxId =
             sessionMetadata.workspace?.sandboxId ??
             (await generateSandboxId(sessionMetadata.identity.sessionId, {
@@ -553,6 +582,29 @@ export function createSessionManagementHandlers() {
                   health: currentWork.health,
                 }
               : null,
+
+            ...(sessionMetadata.environment
+              ? {
+                  environment: {
+                    environmentId: sessionMetadata.environment.environmentId,
+                    configurationRevision: sessionMetadata.environment.configurationRevision,
+                  },
+                }
+              : {}),
+            ...(latestPreparation
+              ? { latestPreparation: latestPreparationFacts(latestPreparation) }
+              : {}),
+            ...(sessionMetadata.workspace
+              ? {
+                  egress: {
+                    mode: sessionMetadata.workspace.egressMode ?? 'unrestricted',
+                    ...(sessionMetadata.workspace.egressAllowlist === undefined
+                      ? {}
+                      : { allowlist: sessionMetadata.workspace.egressAllowlist }),
+                    audit: sessionMetadata.workspace.egressAudit === true,
+                  },
+                }
+              : {}),
 
             // Lifecycle timestamps (critical for idempotency)
             preparedAt: sessionMetadata.lifecycle.preparedAt,

@@ -587,6 +587,50 @@ snapshot (`src/environment-build/`); see `.specs/cloud-agent-session.md` "Enviro
   command and expires at the startup deadline. A restored session supplies a new command and its
   own credentials. Native snapshot retention of start configuration still needs deployed validation.
 
+### Environment setup sessions
+
+- Grouped metadata MAY carry `environmentSetup: { runId, environmentId, role }`
+  with role `setup` or `verification`. Preflight sets it; clients cannot.
+- `setup`: accepted only from a non-authority internal-key `prepareSession`
+  with `environmentSetupRunId`, verified against
+  `cloud_agent_environment_setup_runs` (owner match, open status, draft equals
+  `requestedEnvironment.id`). The session may resolve its draft environment.
+  It runs with full network access and egress auditing to discover setup hosts,
+  even when the draft is restricted. Only this server-admitted role receives
+  that policy. Setup creation requires a Cloudflare Containers allocation with
+  network auditing. Setup runs on `standard-4`; the draft starts on the default
+  `standard-3` allocation for fresh verification, including refinements. The
+  agent must ask the user before selecting a larger verification allocation.
+- `verification`: accepted only under a Cloud Agent authority whose
+  `environmentSetup` claim matches `verificationOf.runId` and
+  `requestedEnvironment.id`, and whose parent metadata carries the same
+  binding with role `setup`. The child resolves the draft and its network
+  policy instead of inheriting the parent's recorded policy.
+- Users choose Full or Restricted access before setup. Restricted is recommended;
+  new environments default to Full, and refinements keep their current policy
+  unless the user changes it. Restricted drafts retain existing allowed and
+  required hosts. The setup agent runs the candidate script with full access, reads its
+  paginated discovery audit through `get_environment_draft`, and recommends only
+  necessary hosts with reasons. `request_network_hosts` uses the setup session's
+  observed requests by default; it may also cite a bound verification child.
+  The server checks each recommendation against that session's audit. Hosts do
+  not have to be denied to qualify as evidence.
+- Under Restricted access, the user approves or declines recommendations. Only approved hosts are added
+  to the draft's required hosts. Pending host requests block verification. A
+  fresh verification reruns setup under the user's chosen policy. Under Full
+  access, the agent records suggested hosts without requiring approval or a mode
+  change. Discovery alone cannot satisfy the completion gate. A successful publication
+  writes the verified policy; a forced conflict preserves later user policy
+  changes. Legacy denied-request evidence remains readable.
+- The MCP grant of a `setup` session adds `environmentSetup` to the
+  `cloudAgentAuthority` claim. Children never receive it.
+- When an environment applies and the resolved egress mode is `allowlist`,
+  the environment's required hosts are added to the allowlist.
+- `getSession` exposes the admitted environment revision, the latest
+  preparation attempt, and the workspace egress policy. `getEgressAudit` is a
+  management procedure for direct children under an `environmentSetup`
+  authority.
+
 ### Workspace tail snapshots
 
 Workspace snapshots are private full-disk checkpoints for trusted registered `worktree_*`

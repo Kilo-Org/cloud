@@ -235,6 +235,44 @@ repository.
 9. Automatic builds started by sessions MUST back off after repeated failures
    of one revision. A manual build MUST stay available during backoff.
 
+### Environment setup agent
+
+1. Personal owners and organization owners and admins MAY start an
+   environment setup run by choosing repositories, a model, and writing
+   requirements. The first repository MUST be on GitHub. Other members MAY
+   only view runs.
+2. A run MUST work on a draft environment. Drafts MUST NOT be matched to
+   sessions, listed as environments, or built. Only the run's setup session
+   and its verification sessions MAY use the draft.
+3. The setup agent MUST NOT read secret values. It MAY write values it
+   generated. It MUST request user-owned credentials by key, with a reason
+   and repository references. Values MUST be entered in the environment
+   editor, never in chat. The editor MUST show the agent's reason as the
+   agent's, where the secret is stored, and that every session using the
+   environment can read it. Skip MUST always be available.
+4. The setup agent MUST NOT change the network mode or allowlist. Under Full
+   or no policy it MAY record required hosts. Under None or Limited each
+   required host MUST be approved by an owner or admin, and the request MUST
+   cite a verification session whose egress audit denied that host. Setup
+   and verification sessions MUST resolve network like any other session.
+5. When the resolved network mode is allowlist and an environment applies,
+   the effective allowlist MUST include the environment's required hosts.
+6. A run MUST publish only after the completion gate passes: the latest
+   verification ran the draft's current revision, preparation succeeded,
+   every planned check passed, no request is pending, and the verification
+   ran under the network mode sessions will get. Publication MUST be
+   automatic after the gate passes, MUST NOT overwrite a target changed
+   after the draft was forked, and MUST keep the previous configuration so
+   an owner or admin MAY revert it until the environment changes again.
+7. The platform MUST NOT track pull requests for a run. When setup needs a
+   repository change, the agent MAY open a pull request and ask the user in
+   chat to merge it. Verification sessions MUST use the default branch, so
+   the gate passes only after the change is merged.
+8. A run MUST never wait silently. A stopped agent, the verification limit,
+   and publish failures MUST show their reason with a way to continue,
+   publish, or cancel.
+
+### Session disk snapshots
 ### Workspace tail snapshots
 
 1. `WORKSPACE_SNAPSHOT_ORG_IDS` and `WORKSPACE_SNAPSHOT_USER_IDS` MUST use explicit
@@ -728,6 +766,11 @@ The following use SHOULD and are not enforced today:
   environment setup commands take effect after the next build.
 - Start commands also run after a session disk snapshot restore, because no
   process survives a snapshot.
+### 2026-11-04 -- Environment setup agent
+
+- Added environment setup runs: drafts, scoped setup agent, secret and
+  network requests, verification gate, automatic publication, and revert.
+  Repository changes go through pull requests that the user merges from chat.
 
 ### 2026-11-04 -- One sandbox per workspace
 

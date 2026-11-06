@@ -249,6 +249,8 @@ export function prepareInputToSessionCreateRequest(input: PrepareInput): Session
       gateThreshold: input.gateThreshold,
     },
     ...(input.requestedEnvironment ? { requestedEnvironment: input.requestedEnvironment } : {}),
+    ...(input.environmentSetupRunId ? { environmentSetupRunId: input.environmentSetupRunId } : {}),
+    ...(input.verificationOf ? { verificationOf: input.verificationOf } : {}),
     ...(input.requireEnvironmentChoice ? { requireEnvironmentChoice: true as const } : {}),
     options: {
       callbackTarget: input.callbackTarget,

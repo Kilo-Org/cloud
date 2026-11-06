@@ -11,6 +11,10 @@ import type { SessionStatusIndicator as SessionStatusIndicatorType } from '@kilo
 
 Object.assign(globalThis, { React });
 
+jest.mock('@/hooks/useEnvironmentSetupRuns', () => ({
+  useEnvironmentSetupRunBySession: () => ({ data: null }),
+}));
+
 let mockSessionId: string | null = 'ses_b';
 let mockAtParam: string | null = null;
 let mockWorktreeId: string | null = null;

@@ -1,6 +1,13 @@
 import { z } from 'zod';
 import { cloudAgentWorktreeIdSchema } from '@kilocode/session-ingest-contracts';
 import { CLOUD_AGENT_NEXT_AUDIENCE, KILO_API_AUDIENCE } from './internal-service-token-audiences';
+import {
+  ENVIRONMENT_SETUP_PROCEDURE_PREFIX,
+  environmentSetupAgentOperations,
+  environmentSetupChildOperations,
+  environmentSetupClaimSchema,
+  environmentSetupProcedure,
+} from './environment-setup-authority';
 
 export const PARENT_WORKSPACE_CALLBACK_URL = 'workspace:new-chat';
 export const WORKSPACE_SESSION_CALLBACK_PREFIX = 'workspace:';
@@ -52,6 +59,7 @@ export const CloudAgentAuthoritySchema = z
     organizationId: z.string().min(1).nullable(),
     authorizationId: z.uuid(),
     expiresAt: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+    environmentSetup: environmentSetupClaimSchema.optional(),
   })
   .strict();
 
@@ -109,6 +117,24 @@ const scopedPrepareSessionSchema = z
     operationKey: z.uuid().optional(),
     callbackTarget: ParentCallbackTargetSchema.optional(),
     organizationId: z.string().min(1).optional(),
+    requestedEnvironment: z
+      .object({
+        id: z.uuid(),
+        repositories: z
+          .array(
+            z
+              .object({
+                repoFullName: z.string().min(1).max(200),
+                branch: z.string().min(1).max(500).optional(),
+              })
+              .strict()
+          )
+          .max(100)
+          .optional(),
+      })
+      .strict()
+      .optional(),
+    verificationOf: z.object({ runId: z.uuid() }).strict().optional(),
   })
   .strict();
 
@@ -190,10 +216,21 @@ function scopedOperation(procedure: string) {
   }
   const match = /^(?:organizations\.)?cloudAgentNext\.([A-Za-z]+)$/.exec(procedure);
   const name = match?.[1];
-  if (!name || !Object.hasOwn(scopedChildOperations, name)) {
-    throw new Error('Cloud Agent authority does not permit this procedure');
+  if (name && Object.hasOwn(scopedChildOperations, name)) {
+    return scopedChildOperations[name as keyof typeof scopedChildOperations];
   }
-  return scopedChildOperations[name as keyof typeof scopedChildOperations];
+  if (name && Object.hasOwn(environmentSetupChildOperations, name)) {
+    return environmentSetupChildOperations[name as keyof typeof environmentSetupChildOperations];
+  }
+  throw new Error('Cloud Agent authority does not permit this procedure');
+}
+
+function environmentSetupAgentOperation(procedure: string) {
+  if (!procedure.startsWith(ENVIRONMENT_SETUP_PROCEDURE_PREFIX)) return null;
+  const name = procedure.slice(ENVIRONMENT_SETUP_PROCEDURE_PREFIX.length);
+  return Object.hasOwn(environmentSetupAgentOperations, name)
+    ? environmentSetupAgentOperations[name as keyof typeof environmentSetupAgentOperations]
+    : null;
 }
 
 function isModelsListProcedure(procedure: string): boolean {
@@ -207,11 +244,21 @@ export function cloudAgentAuthorityProcedures(authority: CloudAgentAuthority): s
     ...Object.keys(scopedChildOperations).map(name => `${prefix}.${name}`),
     MODELS_LIST_PROCEDURE,
     ...Object.keys(scopedFolderOperations),
+    ...(authority.environmentSetup
+      ? [
+          `${prefix}.getEgressAudit`,
+          ...Object.keys(environmentSetupAgentOperations).map(name =>
+            environmentSetupProcedure(name as keyof typeof environmentSetupAgentOperations)
+          ),
+        ]
+      : []),
   ];
 }
 
 export function cloudAgentAuthorityProcedureKind(procedure: string): 'query' | 'mutation' {
   if (isModelsListProcedure(procedure)) return 'query';
+  const environmentSetupOperation = environmentSetupAgentOperation(procedure);
+  if (environmentSetupOperation) return environmentSetupOperation.kind;
   return scopedOperation(procedure).kind;
 }
 
@@ -225,8 +272,20 @@ export function cloudAgentAuthorityInputSchema(
   if (isModelsListProcedure(procedure)) {
     return z.toJSONSchema(modelsListInputSchema, { io: 'input' });
   }
+  const environmentSetupOperation = environmentSetupAgentOperation(procedure);
+  if (environmentSetupOperation) {
+    const jsonSchema = z.toJSONSchema(environmentSetupOperation.schema, { io: 'input' });
+    const properties = { ...jsonSchema.properties };
+    delete properties['runId'];
+    const required = jsonSchema.required?.filter(key => key !== 'runId');
+    return { ...jsonSchema, properties, required: required ?? [] };
+  }
+  const operationSchema =
+    procedure === cloudAgentAuthorityProcedure(authority)
+      ? scopedPrepareSessionSchema.omit({ requestedEnvironment: true, verificationOf: true })
+      : scopedOperation(procedure).schema;
   return z.toJSONSchema(
-    scopedOperation(procedure).schema.extend({
+    operationSchema.extend({
       organizationId: procedure.startsWith('workspaceFolders.')
         ? z.literal(authority.organizationId)
         : authority.organizationId === null
@@ -243,6 +302,40 @@ export function cloudAgentAuthorityProcedure(authority: CloudAgentAuthority) {
     : 'organizations.cloudAgentNext.prepareSession';
 }
 
+function assertScopedOrganization(
+  scope: CloudAgentAuthority,
+  procedure: string,
+  organizationId: string | null | undefined
+) {
+  const folderProcedure = procedure.startsWith('workspaceFolders.');
+  const organizationProcedure = procedure.startsWith('organizations.');
+  if (
+    (!folderProcedure && organizationProcedure !== (scope.organizationId !== null)) ||
+    (organizationId ?? null) !== scope.organizationId
+  ) {
+    throw new Error('Cloud Agent launch exceeds its authority');
+  }
+}
+
+function validatePrepareSessionRequest(scope: CloudAgentAuthority, input: unknown) {
+  const request = scopedPrepareSessionSchema
+    .extend({ organizationId: z.string().min(1).optional() })
+    .parse(input);
+  assertScopedOrganization(scope, cloudAgentAuthorityProcedure(scope), request.organizationId);
+  const environment = request.requestedEnvironment;
+  const verification = request.verificationOf;
+  if ((environment === undefined) !== (verification === undefined)) {
+    throw new Error('Cloud Agent launch exceeds its authority');
+  }
+  if (environment !== undefined && verification !== undefined) {
+    const claim = scope.environmentSetup;
+    if (!claim || environment.id !== claim.environmentId || verification.runId !== claim.runId) {
+      throw new Error('Cloud Agent launch exceeds its authority');
+    }
+  }
+  return request;
+}
+
 export function validateCloudAgentAuthorityRequest(
   authority: unknown,
   procedure: string,
@@ -256,22 +349,26 @@ export function validateCloudAgentAuthorityRequest(
   if (isModelsListProcedure(procedure)) {
     return modelsListInputSchema.optional().parse(input);
   }
+  if (procedure.startsWith(ENVIRONMENT_SETUP_PROCEDURE_PREFIX)) {
+    const claim = scope.environmentSetup;
+    const environmentSetupOperation = environmentSetupAgentOperation(procedure);
+    if (!claim || !environmentSetupOperation) {
+      throw new Error('Cloud Agent authority does not permit this procedure');
+    }
+    return environmentSetupOperation.schema.extend({ runId: z.literal(claim.runId) }).parse(input);
+  }
+  if (procedure === cloudAgentAuthorityProcedure(scope)) {
+    return validatePrepareSessionRequest(scope, input);
+  }
   const operation = scopedOperation(procedure);
-  const folderProcedure = procedure.startsWith('workspaceFolders.');
   const request = operation.schema
     .extend({
-      organizationId: folderProcedure
+      organizationId: procedure.startsWith('workspaceFolders.')
         ? z.literal(scope.organizationId)
         : z.string().min(1).optional(),
     })
     .parse(input);
-  const organizationProcedure = procedure.startsWith('organizations.');
-  if (
-    (!folderProcedure && organizationProcedure !== (scope.organizationId !== null)) ||
-    (request.organizationId ?? null) !== scope.organizationId
-  ) {
-    throw new Error('Cloud Agent launch exceeds its authority');
-  }
+  assertScopedOrganization(scope, procedure, request.organizationId);
   return request;
 }
 

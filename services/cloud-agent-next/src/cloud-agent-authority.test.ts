@@ -490,6 +490,67 @@ describe('Cloud Agent spawn authority', () => {
     expect(() => assertCloudAgentParentAuthority(metadata, authorization, scope)).not.toThrow();
   });
 
+  it('carries the environment setup claim only for a setup session', async () => {
+    const { context, metadata } = fixture();
+    metadata.environmentSetup = {
+      runId: '32345678-1234-4234-8234-123456789abc',
+      environmentId: '42345678-1234-4234-8234-123456789abc',
+      role: 'setup',
+    };
+    const setupGrant = await issueCloudAgentMcpGrant(context);
+    expect(jwt.decode(setupGrant?.token ?? '')).toMatchObject({
+      cloudAgentAuthority: {
+        environmentSetup: {
+          runId: metadata.environmentSetup.runId,
+          environmentId: metadata.environmentSetup.environmentId,
+        },
+      },
+    });
+
+    metadata.environmentSetup = { ...metadata.environmentSetup, role: 'verification' };
+    const verificationGrant = await issueCloudAgentMcpGrant(context);
+    expect(jwt.decode(verificationGrant?.token ?? '')).toMatchObject({
+      cloudAgentAuthority: scope,
+    });
+    expect(jwt.decode(verificationGrant?.token ?? '')).not.toHaveProperty(
+      'cloudAgentAuthority.environmentSetup'
+    );
+
+    delete metadata.environmentSetup;
+    const unboundGrant = await issueCloudAgentMcpGrant(context);
+    expect(jwt.decode(unboundGrant?.token ?? '')).not.toHaveProperty(
+      'cloudAgentAuthority.environmentSetup'
+    );
+  });
+
+  it('rejects a token claim that differs from the parent metadata binding', async () => {
+    const { metadata, authorization } = fixture();
+    const claim = {
+      runId: '32345678-1234-4234-8234-123456789abc',
+      environmentId: '42345678-1234-4234-8234-123456789abc',
+    };
+    const claimedScope: CloudAgentAuthority = { ...scope, environmentSetup: claim };
+
+    metadata.environmentSetup = { ...claim, role: 'setup' };
+    expect(() =>
+      assertCloudAgentParentAuthority(metadata, authorization, claimedScope)
+    ).not.toThrow();
+
+    expect(() => assertCloudAgentParentAuthority(metadata, authorization, scope)).toThrow();
+    expect(() =>
+      assertCloudAgentParentAuthority(metadata, authorization, {
+        ...claimedScope,
+        environmentSetup: { ...claim, runId: '52345678-1234-4234-8234-123456789abc' },
+      })
+    ).toThrow();
+
+    metadata.environmentSetup = { ...claim, role: 'verification' };
+    expect(() => assertCloudAgentParentAuthority(metadata, authorization, claimedScope)).toThrow();
+
+    delete metadata.environmentSetup;
+    expect(() => assertCloudAgentParentAuthority(metadata, authorization, claimedScope)).toThrow();
+  });
+
   it('validates scoped raw input before unsafe fields can be stripped', () => {
     expect(
       validateScopedWorkerPreparation(scope, {
@@ -507,6 +568,7 @@ describe('Cloud Agent spawn authority', () => {
       'runtimeAgents',
       'profileId',
       'sandboxAllocation',
+      'environmentSetupRunId',
     ]) {
       expect(() =>
         validateScopedWorkerPreparation(scope, { ...launch, [forbidden]: {} })

@@ -265,6 +265,21 @@ describe('session registration environment metadata', () => {
     expect(metadata.workspace).not.toHaveProperty('generatedBranchName');
   });
 
+  it('persists the environment setup binding', async () => {
+    const environmentSetup = {
+      runId: '22222222-2222-4222-8222-222222222222',
+      environmentId: ENVIRONMENT_ID,
+      role: 'setup' as const,
+    };
+
+    const metadata = await build({
+      repository: { type: 'github', repo: 'acme/widgets' },
+      environmentSetup,
+    });
+
+    expect(metadata.environmentSetup).toEqual(environmentSetup);
+  });
+
   it('rejects a V2 environment on a repository that has no environment identity', async () => {
     const result = await buildSessionMetadataFromRegistration({
       identity: { sessionId: 'agent_test', userId: 'user_fixture' },

@@ -121,6 +121,8 @@ export async function POST(request: NextRequest) {
 
   // Record cost asynchronously after sending the response
   const cloned = response.clone();
+  const usageId = crypto.randomUUID();
+  const occurredAt = new Date().toISOString();
   after(async () => {
     if (response.status >= 400) {
       return;
@@ -132,6 +134,8 @@ export async function POST(request: NextRequest) {
       if (costMicrodollars === undefined) return;
 
       await recordExaUsage({
+        id: usageId,
+        occurredAt,
         userId: user.id,
         organizationId,
         path: exaPath,

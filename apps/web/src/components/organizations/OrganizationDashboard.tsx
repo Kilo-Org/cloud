@@ -126,10 +126,7 @@ export function OrganizationDashboard({
   };
 
   return (
-    <OrganizationAdminContextProvider
-      organizationId={organizationId}
-      isAutoTopUpEnabled={isAutoTopUpEnabled}
-    >
+    <OrganizationAdminContextProvider role={role} isAutoTopUpEnabled={isAutoTopUpEnabled}>
       <div className="flex w-full flex-col gap-y-6">
         <OrganizationPageHeader
           organizationId={organizationId}

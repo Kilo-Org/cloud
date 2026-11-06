@@ -6,6 +6,7 @@ import type { TRPCContext } from '../../types.js';
 import {
   CreateHostedWorkspaceInput,
   DeleteHostedWorkspaceSessionInput,
+  DeleteHostedWorkspaceSessionOutput,
   hostedWorkspaceCreateRequest,
 } from './hosted-workspace-mutations.js';
 import { CreateHostedWorkspaceSessionInput } from './session-worktree.js';
@@ -18,6 +19,7 @@ const mocks = vi.hoisted(() => ({
   settleOperation: vi.fn(),
   getPgDb: vi.fn(),
   requireCurrentSessionAccess: vi.fn(),
+  diagnostic: vi.fn(),
 }));
 
 vi.mock('@kilocode/db/operation-ledger', () => ({
@@ -32,6 +34,10 @@ vi.mock('../../db/pg.js', () => ({ getPgDb: mocks.getPgDb }));
 
 vi.mock('../../session-access.js', () => ({
   requireCurrentSessionAccess: mocks.requireCurrentSessionAccess,
+}));
+
+vi.mock('../../sandbox-control/diagnostics.js', () => ({
+  logControlDiagnostic: mocks.diagnostic,
 }));
 
 const workspaceId = 'worktree_11111111-1111-4111-8111-111111111111';
@@ -122,6 +128,21 @@ describe('hosted workspace mutation inputs', () => {
       }).success
     ).toBe(false);
   });
+
+  it('defaults cleanup to complete for deletion responses without the field', () => {
+    expect(
+      DeleteHostedWorkspaceSessionOutput.parse({
+        success: true,
+        workspaceId,
+        sessionId: cloudAgentSessionId,
+      })
+    ).toEqual({
+      success: true,
+      workspaceId,
+      sessionId: cloudAgentSessionId,
+      cleanup: 'complete',
+    });
+  });
 });
 
 const RECONCILE_READY_ROW = {
@@ -187,7 +208,12 @@ describe('deleteHostedWorkspaceSession retry after the ownership row is gone', (
       operationKey: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
     });
 
-    expect(result).toEqual({ success: true, workspaceId, sessionId: cloudAgentSessionId });
+    expect(result).toEqual({
+      success: true,
+      workspaceId,
+      sessionId: cloudAgentSessionId,
+      cleanup: 'complete',
+    });
     expect(mocks.admitOperation).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({ operationKey: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' })
@@ -204,6 +230,37 @@ describe('deleteHostedWorkspaceSession retry after the ownership row is gone', (
       expect.objectContaining({ rowId: 'ledger-row-1', status: 'completed' })
     );
     expect(mocks.markReconcilePending).not.toHaveBeenCalled();
+  });
+
+  it('returns pending and keeps the reconcile ledger claimable when teardown still fails', async () => {
+    mocks.getOperation.mockResolvedValue(RECONCILE_READY_ROW);
+    mocks.admitOperation.mockResolvedValue({
+      admission: 'duplicate_reconcile_pending',
+      row: RECONCILE_READY_ROW,
+    });
+    mocks.markReconcilePending.mockResolvedValue({ settled: false });
+    const deleteHostedWorkspaceSession = vi.fn().mockResolvedValue({ deleted: true });
+    const deleteSession = vi.fn().mockRejectedValue(new Error('session DO unavailable'));
+
+    const caller = appRouter.createCaller(
+      reconcileRetryContext(deleteHostedWorkspaceSession, deleteSession)
+    );
+    await expect(
+      caller.deleteHostedWorkspaceSession({
+        workspaceId: workspaceId as `worktree_${string}`,
+        sessionId: cloudAgentSessionId as `workspace_${string}`,
+        operationKey: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      })
+    ).resolves.toEqual({
+      success: true,
+      workspaceId,
+      sessionId: cloudAgentSessionId,
+      cleanup: 'pending',
+    });
+    expect(mocks.markReconcilePending).toHaveBeenCalledWith(expect.anything(), {
+      rowId: 'ledger-row-1',
+    });
+    expect(mocks.settleOperation).not.toHaveBeenCalled();
   });
 });
 
@@ -305,17 +362,21 @@ describe('deleteHostedWorkspaceSession partial-failure recovery', () => {
     expect(mocks.settleOperation).not.toHaveBeenCalled();
   });
 
-  it('keeps a Session DO teardown failure retryable after the ingest row is gone', async () => {
+  it('reports logical deletion success with pending cleanup after the ingest row is gone', async () => {
     mocks.getPgDb.mockReturnValue(
       sequenceDb([{ organizationId: null, deletionStartedAt: null }], [LIVE_SESSION_ROW])
     );
     const ingest = vi.fn().mockResolvedValue({ deleted: true });
-    const deleteSession = vi.fn().mockRejectedValue(new Error('session DO unavailable'));
+    const deleteSession = vi
+      .fn()
+      .mockRejectedValue(new Error('session DO unavailable token=do-not-log'));
     const caller = appRouter.createCaller(liveDeleteContext(ingest, deleteSession));
 
-    await expect(caller.deleteHostedWorkspaceSession(liveDeleteInput)).rejects.toMatchObject({
-      code: 'SERVICE_UNAVAILABLE',
-      message: 'session_deletion_incomplete',
+    await expect(caller.deleteHostedWorkspaceSession(liveDeleteInput)).resolves.toEqual({
+      success: true,
+      workspaceId,
+      sessionId: cloudAgentSessionId,
+      cleanup: 'pending',
     });
     expect(ingest).toHaveBeenCalledWith({
       kiloUserId: 'usr_test',
@@ -327,6 +388,67 @@ describe('deleteHostedWorkspaceSession partial-failure recovery', () => {
       rowId: 'ledger-live',
     });
     expect(mocks.settleOperation).not.toHaveBeenCalled();
+    const diagnostic = mocks.diagnostic.mock.calls.find(
+      ([event, fields]) =>
+        event === 'hosted_session_deletion' && fields.phase === 'teardown_pending'
+    );
+    expect(diagnostic?.[1]).toMatchObject({ errorClass: 'Error' });
+    expect(JSON.stringify(diagnostic?.[1])).not.toContain('do-not-log');
+  });
+
+  it('settles a fully completed live deletion with complete cleanup', async () => {
+    mocks.getPgDb.mockReturnValue(
+      sequenceDb([{ organizationId: null, deletionStartedAt: null }], [LIVE_SESSION_ROW])
+    );
+    mocks.settleOperation.mockResolvedValue({ settled: true, row: LIVE_LEDGER_ROW });
+    const ingest = vi.fn().mockResolvedValue({ deleted: true });
+    const deleteSession = vi.fn().mockResolvedValue({ success: true });
+    const caller = appRouter.createCaller(liveDeleteContext(ingest, deleteSession));
+
+    await expect(caller.deleteHostedWorkspaceSession(liveDeleteInput)).resolves.toEqual({
+      success: true,
+      workspaceId,
+      sessionId: cloudAgentSessionId,
+      cleanup: 'complete',
+    });
+    expect(mocks.recordOperationProgress).toHaveBeenCalledWith(expect.anything(), 'ledger-live', {
+      cloudAgentSessionId,
+      kiloSessionId,
+    });
+    expect(mocks.markReconcilePending).not.toHaveBeenCalled();
+    expect(mocks.settleOperation).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ rowId: 'ledger-live', status: 'completed' })
+    );
+  });
+
+  it('does not turn a forbidden teardown failure into pending cleanup', async () => {
+    mocks.getPgDb.mockReturnValue(
+      sequenceDb([{ organizationId: null, deletionStartedAt: null }], [LIVE_SESSION_ROW])
+    );
+    const ingest = vi.fn().mockResolvedValue({ deleted: true });
+    const deleteSession = vi
+      .fn()
+      .mockRejectedValue(new Error('worktree_access_denied token=do-not-log'));
+    const caller = appRouter.createCaller(liveDeleteContext(ingest, deleteSession));
+
+    await expect(caller.deleteHostedWorkspaceSession(liveDeleteInput)).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: 'Session access denied',
+    });
+    expect(ingest).toHaveBeenCalledTimes(1);
+    expect(mocks.markReconcilePending).toHaveBeenCalledWith(expect.anything(), {
+      rowId: 'ledger-live',
+    });
+    expect(mocks.settleOperation).not.toHaveBeenCalled();
+    const diagnostic = mocks.diagnostic.mock.calls.find(
+      ([event, fields]) => event === 'hosted_session_deletion' && fields.phase === 'teardown_failed'
+    );
+    expect(diagnostic?.[1]).toMatchObject({
+      errorClass: 'Error',
+      errorCode: 'worktree_access_denied',
+    });
+    expect(JSON.stringify(diagnostic?.[1])).not.toContain('do-not-log');
   });
 
   it('rejects a root delete once the caller left the owning organization', async () => {

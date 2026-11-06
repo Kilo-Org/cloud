@@ -11,7 +11,11 @@ import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { PLATFORM, INTEGRATION_STATUS } from '@/lib/integrations/core/constants';
 import { DEFAULT_BOT_MODEL } from '@/lib/bot/constants';
 import { getDefaultAllowedModel } from '@/lib/slack-bot/model-allow-list';
-import { LinearWorkspaceAlreadyConnectedError, upsertLinearInstallation } from './linear-service';
+import {
+  LinearWorkspaceAlreadyConnectedError,
+  retirePreviousLinearWorkspace,
+  upsertLinearInstallation,
+} from './linear-service';
 
 describe('upsertLinearInstallation', () => {
   let user: User;
@@ -69,13 +73,14 @@ describe('upsertLinearInstallation', () => {
   });
 
   test('inserts a new row when no existing installation', async () => {
-    const result = await upsertLinearInstallation({
+    const { integration: result, previousWorkspace } = await upsertLinearInstallation({
       owner: { type: 'user', id: user.id },
       organizationId: 'workspace-a',
       organizationName: 'Workspace A',
       botUserId: 'bot-1',
     });
 
+    expect(previousWorkspace).toBeNull();
     expect(result.platform_installation_id).toBe('workspace-a');
     expect(result.platform_account_login).toBe('Workspace A');
     expect(result.integration_status).toBe(INTEGRATION_STATUS.ACTIVE);
@@ -87,7 +92,7 @@ describe('upsertLinearInstallation', () => {
   });
 
   test('stores no model when the caller supplies null for the model', async () => {
-    const result = await upsertLinearInstallation(
+    const { integration } = await upsertLinearInstallation(
       {
         owner: { type: 'user', id: user.id },
         organizationId: 'workspace-unsupplied-model',
@@ -97,14 +102,14 @@ describe('upsertLinearInstallation', () => {
       { defaultModel: null }
     );
 
-    expect(result.metadata).not.toHaveProperty('model_slug');
+    expect(integration.metadata).not.toHaveProperty('model_slug');
   });
 
   test('uses the supplied transaction for installation ownership and updates', async () => {
     const rollback = new Error('Rollback test transaction');
     await expect(
       db.transaction(async tx => {
-        const result = await upsertLinearInstallation(
+        const { integration: result } = await upsertLinearInstallation(
           {
             owner: { type: 'user', id: user.id },
             organizationId: 'workspace-transaction',
@@ -114,7 +119,7 @@ describe('upsertLinearInstallation', () => {
           { defaultModel: 'test/default-model' },
           tx
         );
-        const updated = await upsertLinearInstallation(
+        const { integration: updated } = await upsertLinearInstallation(
           {
             owner: { type: 'user', id: user.id },
             organizationId: 'workspace-transaction',
@@ -174,7 +179,7 @@ describe('upsertLinearInstallation', () => {
     ).rejects.toBeInstanceOf(LinearWorkspaceAlreadyConnectedError);
   });
 
-  test('reinstalling onto a different workspace cleans up the previous workspace', async () => {
+  test('reports the replaced workspace for the caller to retire after commit', async () => {
     await upsertLinearInstallation({
       owner: { type: 'user', id: user.id },
       organizationId: 'workspace-a',
@@ -186,7 +191,7 @@ describe('upsertLinearInstallation', () => {
     const deleteInstallationCalls: string[] = [];
     const deleteIdentityCacheCalls: string[] = [];
 
-    await upsertLinearInstallation(
+    const { previousWorkspace } = await upsertLinearInstallation(
       {
         owner: { type: 'user', id: user.id },
         organizationId: 'workspace-b',
@@ -198,16 +203,26 @@ describe('upsertLinearInstallation', () => {
           accessTokenCalls.push(orgId);
           return 'old-token';
         },
-        deleteChatSdkInstallation: async (orgId: string) => {
-          deleteInstallationCalls.push(orgId);
-        },
-        deleteChatSdkIdentityCache: async (orgId: string) => {
-          deleteIdentityCacheCalls.push(orgId);
-        },
       }
     );
 
+    // The write itself performs no retirement: the caller decides when.
     expect(accessTokenCalls).toEqual(['workspace-a']);
+    expect(deleteInstallationCalls).toEqual([]);
+    expect(deleteIdentityCacheCalls).toEqual([]);
+
+    expect(previousWorkspace).toEqual({ organizationId: 'workspace-a', accessToken: 'old-token' });
+    if (!previousWorkspace) throw new Error('expected a replaced workspace');
+
+    await retirePreviousLinearWorkspace(previousWorkspace, {
+      deleteChatSdkInstallation: async (orgId: string) => {
+        deleteInstallationCalls.push(orgId);
+      },
+      deleteChatSdkIdentityCache: async (orgId: string) => {
+        deleteIdentityCacheCalls.push(orgId);
+      },
+    });
+
     expect(deleteInstallationCalls).toEqual(['workspace-a']);
     expect(deleteIdentityCacheCalls).toEqual(['workspace-a']);
 
@@ -224,7 +239,19 @@ describe('upsertLinearInstallation', () => {
     expect(row.platform_account_login).toBe('Workspace B');
   });
 
-  test('reinstalling onto the same workspace skips cleanup callbacks', async () => {
+  test('retiring the replaced workspace survives a failed cleanup callback', async () => {
+    await retirePreviousLinearWorkspace(
+      { organizationId: 'workspace-gone', accessToken: null },
+      {
+        deleteChatSdkInstallation: async () => {
+          throw new Error('store unreachable');
+        },
+        deleteChatSdkIdentityCache: async () => undefined,
+      }
+    );
+  });
+
+  test('reinstalling onto the same workspace reports no replaced workspace', async () => {
     await upsertLinearInstallation({
       owner: { type: 'user', id: user.id },
       organizationId: 'workspace-a',
@@ -234,7 +261,7 @@ describe('upsertLinearInstallation', () => {
 
     const calls: string[] = [];
 
-    await upsertLinearInstallation(
+    const { previousWorkspace } = await upsertLinearInstallation(
       {
         owner: { type: 'user', id: user.id },
         organizationId: 'workspace-a',
@@ -246,12 +273,11 @@ describe('upsertLinearInstallation', () => {
           calls.push(orgId);
           return null;
         },
-        deleteChatSdkInstallation: async () => undefined,
-        deleteChatSdkIdentityCache: async () => undefined,
       }
     );
 
     expect(calls).toEqual([]);
+    expect(previousWorkspace).toBeNull();
   });
   test('clears the lifecycle marker when the owner re-authorizes a workspace', async () => {
     const [suspended] = await db
@@ -270,7 +296,7 @@ describe('upsertLinearInstallation', () => {
       })
       .returning();
 
-    const result = await upsertLinearInstallation({
+    const { integration: result } = await upsertLinearInstallation({
       owner: { type: 'user', id: user.id },
       organizationId: 'workspace-recover',
       organizationName: 'Recovery Workspace',
@@ -295,7 +321,7 @@ describe('upsertLinearInstallation', () => {
 
     jest.mocked(getDefaultAllowedModel).mockResolvedValue(null);
 
-    const result = await upsertLinearInstallation({
+    const { integration: result } = await upsertLinearInstallation({
       owner: { type: 'org', id: organization.id },
       organizationId: `workspace-org-blocked-${crypto.randomUUID()}`,
       organizationName: 'Workspace Org',
@@ -314,7 +340,7 @@ describe('upsertLinearInstallation', () => {
 
     jest.mocked(getDefaultAllowedModel).mockResolvedValue('test/allowed-model');
 
-    const result = await upsertLinearInstallation({
+    const { integration: result } = await upsertLinearInstallation({
       owner: { type: 'org', id: organization.id },
       organizationId: `workspace-org-allowed-${crypto.randomUUID()}`,
       organizationName: 'Workspace Org',

@@ -67,6 +67,7 @@ export const CloudAgentRunContainerSchema = z
     snapshotId: OperationalIdentifierSchema.optional(),
     runtimeBuildId: OperationalIdentifierSchema.optional(),
     startSource: z.enum(['image', 'snapshot']).optional(),
+    runtimeHarness: z.enum(['kilo', 'kilo2']).optional(),
   })
   .strict();
 

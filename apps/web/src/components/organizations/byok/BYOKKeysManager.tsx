@@ -82,10 +82,10 @@ export const VERCEL_BYOK_PROVIDER_NAMES = {
   mistral: 'Mistral AI',
   moonshotai: 'Moonshot AI',
   nebius: 'Nebius Token Factory',
-  novita: 'Novita',
+  novita: 'Novita AI',
   perplexity: 'Perplexity',
   vertex: 'Google Vertex AI',
-  xai: 'SpaceXAI',
+  xai: 'SpaceXSI',
   xiaomi: 'Xiaomi (pay as you go)',
   zai: 'Z.ai (pay as you go)',
 } satisfies Record<VercelUserByokInferenceProviderId, string>;

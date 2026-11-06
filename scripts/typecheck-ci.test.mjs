@@ -806,6 +806,7 @@ const changes = process.env.CHANGES.split(',');
 if (name === 'git') {
   if (args[0] === 'merge-base') console.log('base');
   else if (args.includes('packages/trpc/src/**') && changes.includes('trpc')) console.log('packages/trpc/src/index.ts');
+  else if (args.includes('packages/harness-sdk/tsconfig.build.json') && changes.includes('harness-build')) console.log('packages/harness-sdk/tsconfig.build.json');
   else if (args.includes('pnpm-workspace.yaml') && changes.includes('workspace')) console.log('pnpm-workspace.yaml');
   else if (args.includes('*.ts') && changes.includes('cloud-agent-next')) console.log('services/cloud-agent-next/src/shared/protocol.ts');
   else if (args.includes('*.ts')) console.log('apps/extension/package.json');
@@ -904,6 +905,20 @@ test('a failed root tRPC build stops the typecheck', t => {
   const result = runTypecheck(t, { root: true, buildExit: 7 });
   assert.equal(result.status, 7);
   assert.deepEqual(result.commands, ['pnpm --filter @kilocode/trpc run build']);
+});
+
+// The build the predicate guards is `ttsc -p tsconfig.build.json`, so a change
+// to that file must force the rebuild: the dist of another build configuration
+// does not hold the program the new one describes, and apps/mobile typechecks
+// against it.
+test('a changes-only run rebuilds the harness SDK when its build config changed', t => {
+  const result = runTypecheck(t, { root: true, changes: 'harness-build' });
+  assert.equal(result.status, 0);
+  assert.deepEqual(
+    result.commands.filter(command => command === harnessBuild),
+    [harnessBuild],
+    'a skipped build leaves the dist of the previous build configuration in place'
+  );
 });
 
 // The wrapper compiles the service's own shared sources (its tsconfig includes

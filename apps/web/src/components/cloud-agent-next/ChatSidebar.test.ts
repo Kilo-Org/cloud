@@ -743,7 +743,12 @@ describe('ChatSidebar row rendering', () => {
   });
 
   it('keeps immutable standalone rows flat when live inputs churn with stable callbacks', () => {
-    const sessions = makeSessions(SESSION_COUNT);
+    // Every row carries a cloud id so the drag props are defined; otherwise a
+    // per-row onDragStart identity leak would go unnoticed by this test.
+    const sessions = makeSessions(SESSION_COUNT).map((session, index) => ({
+      ...session,
+      cloudAgentSessionId: `workspace_00000000-0000-4000-8000-${index.toString().padStart(12, '0')}`,
+    }));
     const onOpenSession = jest.fn();
     const onDeleteSession = jest.fn();
     const onRenameSession = jest.fn(async () => undefined);

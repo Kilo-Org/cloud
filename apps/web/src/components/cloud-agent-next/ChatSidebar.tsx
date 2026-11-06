@@ -153,7 +153,7 @@ const SessionRow = memo(function SessionRow({
   onCancelRename: () => void;
   onClick: (sessionId: string) => void;
   draggable?: boolean;
-  onDragStart?: (event: DragEvent<HTMLDivElement>) => void;
+  onDragStart?: (event: DragEvent<HTMLDivElement>, session: StoredSession) => void;
   onDragEnd?: () => void;
   isDragging?: boolean;
 }) {
@@ -194,7 +194,7 @@ const SessionRow = memo(function SessionRow({
     <div
       onClick={isEditing || isDeleting ? undefined : () => onClick(session.sessionId)}
       draggable={draggable}
-      onDragStart={onDragStart}
+      onDragStart={onDragStart ? event => onDragStart(event, session) : undefined}
       onDragEnd={onDragEnd}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
@@ -902,6 +902,14 @@ export function ChatSidebar({
     [canEditFolders]
   );
 
+  const startSessionDrag = useCallback(
+    (event: DragEvent<HTMLDivElement>, session: StoredSession) => {
+      const parsed = controlPlaneSessionIdSchema.safeParse(session.cloudAgentSessionId);
+      if (parsed.success) startDrag(event, { type: 'session', id: parsed.data });
+    },
+    [startDrag]
+  );
+
   const folderTarget = (
     event: DragEvent<HTMLElement>,
     folderId: string
@@ -1067,9 +1075,7 @@ export function ChatSidebar({
             editingSessionId !== session.sessionId &&
             !isDeleting
           }
-          onDragStart={
-            sessionId ? event => startDrag(event, { type: 'session', id: sessionId }) : undefined
-          }
+          onDragStart={sessionId ? startSessionDrag : undefined}
           onDragEnd={sessionId ? clearDrag : undefined}
           isDragging={
             sessionId !== null && dragItem?.type === 'session' && dragItem.id === sessionId
@@ -1093,7 +1099,7 @@ export function ChatSidebar({
       onDeleteSession,
       onRenameSession,
       onStartRenameSession,
-      startDrag,
+      startSessionDrag,
     ]
   );
 

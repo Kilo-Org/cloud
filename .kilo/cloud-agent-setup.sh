@@ -15,6 +15,15 @@ startup_bin="$state_dir/bin"
 env_file="$state_dir/env"
 global_state_dir=/usr/local/lib/kilo-cloud-agent
 pnpm_wrapper_marker='# kilo-cloud-agent-pnpm-wrapper'
+dev_cgroup_helper="$global_state_dir/dev-cgroup"
+memory_file="$state_dir/memory-mb"
+
+resume=0
+case ${1:-} in
+  '') ;;
+  --resume) resume=1 ;;
+  *) printf 'Usage: %s [--resume]\n' "$0" >&2; exit 2 ;;
+esac
 
 clean_path=
 IFS=: read -ra path_entries <<< "$PATH"
@@ -55,12 +64,26 @@ if [[ ${KILO_ENVIRONMENT_BUILD:-} == 1 ]]; then
   # starts the daemons from the captured filesystem.
   build_mode=1
   KILO_STARTUP_CGROUP=
+  if (( resume )); then
+    printf -- '--resume is not supported in environment builds.\n' >&2
+    exit 1
+  fi
 elif [[ ! -f $workload_parent/memory.max ]]; then
   printf 'Memory-safe setup requires the sandbox\x27s delegated cgroup v2 memory controller. No workloads were started.\n' >&2
   exit 1
 fi
+if (( resume )) && { [[ ! -f $env_file || ! -x $dev_cgroup_helper ]] \
+  || ! grep -qF "$pnpm_wrapper_marker" "$(command -v pnpm)" 2>/dev/null || ! command -v dockerd >/dev/null; }; then
+  printf 'This workspace was not fully set up; run bash %q/.kilo/cloud-agent-setup.sh without --resume.\n' "$repo" >&2
+  exit 1
+fi
 export KILO_WORKLOAD_CGROUP_ROOT=$workload_parent KILO_STARTUP_CGROUP KILO_STARTUP_RESERVE_MB
 if (( ! build_mode )); then
+if (( resume )) && [[ -s $memory_file ]]; then
+  # After a resume, memory charged to the vanished dev cgroup sits in the parent,
+  # so the headroom check would count it twice. Reuse the cap setup computed.
+  KILO_STARTUP_MEMORY_MB=$(< "$memory_file")
+else
 KILO_STARTUP_MEMORY_MB=$(node -e '
   const fs = require("node:fs");
   const MiB = 1048576;
@@ -90,18 +113,45 @@ KILO_STARTUP_MEMORY_MB=$(node -e '
   if (additional > meminfoBytes("MemAvailable")) fail("Insufficient host memory: " + Math.ceil(additional / MiB) + " MiB additional capacity required, " + Math.floor(meminfoBytes("MemAvailable") / MiB) + " MiB available.");
   console.log(Math.floor(limit / MiB));
 ')
+fi
 export KILO_STARTUP_MEMORY_MB
-"${root[@]}" mkdir -p "$KILO_STARTUP_CGROUP"
-printf '%s\n' "$(( KILO_STARTUP_MEMORY_MB * 1048576 ))" | "${root[@]}" tee "$KILO_STARTUP_CGROUP/memory.max" >/dev/null
-printf '%s\n' "$(( KILO_STARTUP_MEMORY_MB * 1048576 * 95 / 100 ))" | "${root[@]}" tee "$KILO_STARTUP_CGROUP/memory.high" >/dev/null
-printf '0\n' | "${root[@]}" tee "$KILO_STARTUP_CGROUP/memory.swap.max" >/dev/null
-printf '1\n' | "${root[@]}" tee "$KILO_STARTUP_CGROUP/memory.oom.group" >/dev/null
-printf '+memory +cpu\n' | "${root[@]}" tee "$KILO_STARTUP_CGROUP/cgroup.subtree_control" >/dev/null
-"${root[@]}" mkdir -p "$KILO_STARTUP_CGROUP/processes" "$KILO_STARTUP_CGROUP/containers"
-printf '%s\n' "$$" | "${root[@]}" tee "$KILO_STARTUP_CGROUP/processes/cgroup.procs" >/dev/null
+# One helper creates the dev cgroup for this script and for the pnpm wrapper,
+# which recreates it after a workspace tail snapshot restores the disk but not
+# the cgroup tree. Run it as root.
+"${root[@]}" mkdir -p "$global_state_dir"
+"${root[@]}" tee "$dev_cgroup_helper" >/dev/null <<'SH'
+#!/usr/bin/env bash
+# Usage: dev-cgroup <cgroup dir> <memory MiB> [pid to move into processes/]
+set -Eeuo pipefail
+cgroup=$1 memory_mb=$2 pid=${3:-}
+[[ $memory_mb =~ ^[0-9]+$ ]] || { printf 'dev-cgroup: invalid memory cap %q\n' "$memory_mb" >&2; exit 1; }
+[[ -f ${cgroup%/*}/memory.max ]] || { printf 'dev-cgroup: parent cgroup %q is unavailable\n' "${cgroup%/*}" >&2; exit 1; }
+mkdir -p "$cgroup"
+printf '%s\n' "$(( memory_mb * 1048576 ))" > "$cgroup/memory.max"
+printf '%s\n' "$(( memory_mb * 1048576 * 95 / 100 ))" > "$cgroup/memory.high"
+printf '0\n' > "$cgroup/memory.swap.max"
+printf '1\n' > "$cgroup/memory.oom.group"
+printf '+memory +cpu\n' > "$cgroup/cgroup.subtree_control"
+mkdir -p "$cgroup/processes" "$cgroup/containers"
+# Image build steps run in their own 2 GiB slice of the dev workload budget.
+printf '+memory +cpu\n' > "$cgroup/containers/cgroup.subtree_control"
+mkdir -p "$cgroup/containers/builds"
+printf '%s\n' "$(( 2048 * 1048576 ))" > "$cgroup/containers/builds/memory.max"
+printf '0\n' > "$cgroup/containers/builds/memory.swap.max"
+if [[ -n $pid ]]; then
+  printf '%s\n' "$pid" > "$cgroup/processes/cgroup.procs"
+fi
+SH
+"${root[@]}" chmod 0755 "$dev_cgroup_helper"
+"${root[@]}" "$dev_cgroup_helper" "$KILO_STARTUP_CGROUP" "$KILO_STARTUP_MEMORY_MB" "$$"
+mkdir -p "$state_dir"
+printf '%s\n' "$KILO_STARTUP_MEMORY_MB" > "$memory_file"
 printf 'Dev workload capped at %s MiB, with %s MiB reserved for other sandbox workloads.\n' "$KILO_STARTUP_MEMORY_MB" "$KILO_STARTUP_RESERVE_MB"
 fi
 
+# --resume restarts what a workspace tail snapshot does not restore (cgroup,
+# Docker, dnsmasq) from the installed filesystem, skipping installs and builds.
+if (( ! resume )); then
 "${root[@]}" timeout --foreground 5m apt-get -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 update
 docker_packages=(docker.io)
 for package in docker-cli docker-buildx; do
@@ -284,17 +334,25 @@ fi
 printf '%s\n' "$real_pnpm" | "${root[@]}" tee "$global_state_dir/real-pnpm" >/dev/null
 {
   printf '#!/usr/bin/env bash\n%s\n' "$pnpm_wrapper_marker"
-  printf 'repo=%q\nenv_file=%q\n' "$repo" "$env_file"
+  printf 'repo=%q\nenv_file=%q\nmemory_file=%q\ndev_cgroup_helper=%q\n' "$repo" "$env_file" "$memory_file" "$dev_cgroup_helper"
   printf 'cgroup_writer=(%s)\n' "$(printf '%q ' "${cgroup_writer[@]}")"
+  printf 'root=(%s)\n' "${root[*]+$(printf '%q ' "${root[@]}")}"
   cat <<'SH'
 real_pnpm=$(< /usr/local/lib/kilo-cloud-agent/real-pnpm)
 if [[ ($PWD == "$repo" || $PWD == "$repo"/*) && -f $env_file ]]; then
   source "$env_file"
   cgroup=${KILO_STARTUP_CGROUP#/sys/fs/cgroup}
-  if [[ $(< /proc/self/cgroup) != "0::$cgroup/"* ]]; then
+  if [[ -n $KILO_STARTUP_CGROUP && $(< /proc/self/cgroup) != "0::$cgroup/"* ]]; then
     if [[ ! -d $KILO_STARTUP_CGROUP/processes ]]; then
-      printf 'The sandbox dev memory cgroup is missing. Rerun bash %q/.kilo/cloud-agent-setup.sh.\n' "$repo" >&2
-      exit 1
+      # A workspace tail snapshot restores files but not the cgroup tree.
+      parent=${KILO_WORKLOAD_CGROUP_ROOT:-/sys/fs/cgroup/kilo-workloads}
+      memory_mb=$(cat "$memory_file" 2>/dev/null || true)
+      if [[ ! -f $parent/memory.max || -z $memory_mb || ! -x $dev_cgroup_helper ]] \
+        || ! "${root[@]}" "$dev_cgroup_helper" "$KILO_STARTUP_CGROUP" "$memory_mb" 2>/dev/null; then
+        printf 'Warning: the sandbox dev memory cgroup is unavailable; running pnpm without the memory cap.\n' >&2
+        exec "$real_pnpm" "$@"
+      fi
+      printf 'Recreated the sandbox dev memory cgroup (%s MiB). If Docker is not running, start it with bash %q/.kilo/cloud-agent-setup.sh --resume.\n' "$memory_mb" "$repo" >&2
     fi
     printf '%s\n' "$$" | "${cgroup_writer[@]}" "$KILO_STARTUP_CGROUP/processes/cgroup.procs" >/dev/null
   fi
@@ -304,6 +362,7 @@ SH
 } > "$state_dir/pnpm-wrapper"
 "${root[@]}" install -m 0755 "$state_dir/pnpm-wrapper" "${global_pnpm:-/usr/local/bin/pnpm}"
 hash -r
+fi
 source "$env_file"
 
 started_docker=0
@@ -361,13 +420,12 @@ legacy_builder="kilo-lowmem-$(basename "$repo")"
 if docker buildx inspect "$legacy_builder" >/dev/null 2>&1; then
   docker buildx rm --force "$legacy_builder" >/dev/null
 fi
-# Image build steps run in their own 2 GiB slice of the dev workload budget.
-if (( ! build_mode )); then
-  builds_cgroup="$KILO_STARTUP_CGROUP/containers/builds"
-  printf '+memory +cpu\n' | "${root[@]}" tee "$KILO_STARTUP_CGROUP/containers/cgroup.subtree_control" >/dev/null
-  "${root[@]}" mkdir -p "$builds_cgroup"
-  printf '%s\n' "$(( 2048 * 1048576 ))" | "${root[@]}" tee "$builds_cgroup/memory.max" >/dev/null
-  printf '0\n' | "${root[@]}" tee "$builds_cgroup/memory.swap.max" >/dev/null
+# The dev-cgroup helper already created the 2 GiB containers/builds slice for image builds.
+
+if (( resume )); then
+  printf 'Resumed: dev cgroup capped at %s MiB, Docker and DNS forwarding running.\n' "$KILO_STARTUP_MEMORY_MB"
+  printf 'Start the dev database with pnpm dev:start; usage: .kilo/skills/cloud-agent-sandbox/SKILL.md\n'
+  exit 0
 fi
 
 timeout 15m pnpm install --frozen-lockfile --child-concurrency=1 --network-concurrency=4

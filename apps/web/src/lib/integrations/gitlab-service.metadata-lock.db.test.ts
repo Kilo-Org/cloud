@@ -137,7 +137,9 @@ function readMetadata(metadata: unknown): Record<string, unknown> {
  * by it. Returns false when no waiter appears.
  */
 async function waitForQueuedAdvisoryLock(): Promise<boolean> {
-  for (let attempt = 0; attempt < 200; attempt += 1) {
+  // The waiter stays queued until the caller commits, so a wider budget only
+  // costs time when the lock is never taken.
+  for (let attempt = 0; attempt < 1_000; attempt += 1) {
     const result = await db.execute<{ waiters: number }>(
       sql`select count(*)::int as waiters from pg_locks where locktype = 'advisory' and not granted`
     );

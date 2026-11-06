@@ -295,7 +295,8 @@ source "$env_file"
 
 started_docker=0
 if ! docker info >/dev/null 2>&1; then
-  if [[ -z ${DOCKER_HOST:-} && -f /var/run/docker.pid ]] && ! pgrep -x dockerd >/dev/null; then
+  if [[ -z ${DOCKER_HOST:-} && -f /var/run/docker.pid ]] \
+    && ! pgrep -x dockerd >/dev/null && ! mountpoint -q /var/run/docker.sock; then
     # A restored disk keeps the socket and pid file of a daemon that no longer exists.
     "${root[@]}" rm -f /var/run/docker.sock /var/run/docker.pid
   fi

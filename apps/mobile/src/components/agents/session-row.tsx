@@ -161,7 +161,7 @@ export function StoredSessionRow({
   // and a repository named like the label cannot read as one. Repo and origin
   // names keep their own deterministic hash.
   const agentState =
-    repoNameFromGitUrl(session.git_url) === null && isUnknownOrigin(session.created_on_platform)
+    !repoNameFromGitUrl(session.git_url) && isUnknownOrigin(session.created_on_platform)
       ? ('unknown' as const)
       : null;
   const timestamp = getAgentSessionTimestamp(session, sortBy);

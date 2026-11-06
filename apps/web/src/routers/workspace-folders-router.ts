@@ -4,11 +4,15 @@ import {
   cloud_agent_workspace_folders,
   cloud_agent_worktrees,
   kilocode_users,
+  operation_ledgers,
   organization_memberships,
   organizations,
 } from '@kilocode/db/schema';
 import { isGoneOrDeletingBlockedReason } from '@kilocode/db/user-soft-delete';
-import { cloudAgentWorktreeIdSchema } from '@kilocode/session-ingest-contracts';
+import {
+  cloudAgentWorktreeIdSchema,
+  cloudAgentWorktreeLocationSchema,
+} from '@kilocode/session-ingest-contracts';
 import { TRPCError } from '@trpc/server';
 import { and, asc, eq, inArray, isNull, max, sql } from 'drizzle-orm';
 import * as z from 'zod';
@@ -189,6 +193,58 @@ function ownedRootSessions(tx: DrizzleTransaction, scope: FolderScope, worktreeI
       )
     )
     .orderBy(asc(cli_sessions_v2.created_at), asc(cli_sessions_v2.session_id));
+}
+
+const worktreeRuntimeAllocationSchema = z.object({
+  cloudAgentSessionId: z.string().min(1),
+  sandboxId: cloudAgentWorktreeLocationSchema.shape.sandboxId,
+  sandboxProvider: cloudAgentWorktreeLocationSchema.shape.provider,
+});
+
+/**
+ * Runtime locations for a worktree materialized from a standalone session.
+ *
+ * Worktree rows created when a Cloud Agent session starts record the sandbox
+ * that hosts it. Filing an already-ungrouped session has no create event, so
+ * the row would start with `runtime_locations: []` and worktree deletion
+ * could not locate the sandbox to tear it down. Read the same `create_cloud`
+ * ledger entry that deletion's ownership fallback reads, so the materialized
+ * row carries the location the teardown path needs.
+ */
+async function readWorktreeRuntimeLocations(
+  tx: DrizzleTransaction,
+  scope: FolderScope,
+  cloudAgentSessionId: string
+): Promise<{ sandboxId: string; provider: 'cloudflare' | 'vercel' | 'cloudflare-containers' }[]> {
+  const rows = await tx
+    .select({ canonicalResult: operation_ledgers.canonical_result })
+    .from(operation_ledgers)
+    .where(
+      and(
+        eq(operation_ledgers.kilo_user_id, scope.userId),
+        eq(operation_ledgers.domain, 'session'),
+        eq(operation_ledgers.intent, 'create_cloud'),
+        isNull(operation_ledgers.resource_key),
+        scope.organizationId === null
+          ? isNull(operation_ledgers.organization_id)
+          : eq(operation_ledgers.organization_id, scope.organizationId),
+        sql`${operation_ledgers.canonical_result}->>'cloudAgentSessionId' = ${cloudAgentSessionId}`
+      )
+    );
+
+  const locations = new Map<
+    string,
+    { sandboxId: string; provider: 'cloudflare' | 'vercel' | 'cloudflare-containers' }
+  >();
+  for (const row of rows) {
+    const allocation = worktreeRuntimeAllocationSchema.safeParse(row.canonicalResult);
+    if (!allocation.success || allocation.data.cloudAgentSessionId !== cloudAgentSessionId) {
+      continue;
+    }
+    const { sandboxId, sandboxProvider } = allocation.data;
+    locations.set(`${sandboxProvider}:${sandboxId}`, { sandboxId, provider: sandboxProvider });
+  }
+  return [...locations.values()];
 }
 
 async function lockMovableWorktree(tx: DrizzleTransaction, scope: FolderScope, worktreeId: string) {
@@ -497,6 +553,11 @@ export const workspaceFoldersRouter = createTRPCRouter({
           });
         }
       } else {
+        const runtimeLocations = await readWorktreeRuntimeLocations(
+          ctx.folderDb,
+          ctx.folderScope,
+          input.sessionId
+        );
         await ctx.folderDb
           .insert(cloud_agent_worktrees)
           .values({
@@ -504,6 +565,7 @@ export const workspaceFoldersRouter = createTRPCRouter({
             kilo_user_id: ctx.folderScope.userId,
             organization_id: ctx.folderScope.organizationId,
             created_at: session.createdAt,
+            runtime_locations: runtimeLocations,
           })
           .onConflictDoNothing({ target: cloud_agent_worktrees.worktree_id });
         // The insert may have conflicted with an existing row, so lock it and

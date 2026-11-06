@@ -4,6 +4,7 @@ import {
   cloud_agent_workspace_folders,
   cloud_agent_worktrees,
   kilocode_users,
+  operation_ledgers,
   organization_memberships,
   organizations,
   type NewCliSessionV2,
@@ -142,6 +143,7 @@ beforeEach(async () => {
   await db
     .delete(cloud_agent_worktrees)
     .where(inArray(cloud_agent_worktrees.kilo_user_id, userIds));
+  await db.delete(operation_ledgers).where(inArray(operation_ledgers.kilo_user_id, userIds));
   await db
     .delete(cloud_agent_workspace_folders)
     .where(inArray(cloud_agent_workspace_folders.kilo_user_id, userIds));
@@ -811,6 +813,45 @@ describe('workspaceFolders session moves', () => {
     ).toBe(worktreeId);
   });
 
+  it('seeds runtime locations from the create_cloud ledger when filing a standalone session', async () => {
+    const folder = await createFolder();
+    const workspaceId = newWorkspaceId();
+    const worktreeId = `worktree_${workspaceId.slice('workspace_'.length)}`;
+    const session = await insertSession({
+      cloud_agent_session_id: workspaceId,
+      cloud_agent_worktree_id: null,
+    });
+    const sandboxId = 'ses-standalone-runtime-sandbox';
+    await db.insert(operation_ledgers).values({
+      operation_key: `create_cloud:${workspaceId}`,
+      domain: 'session',
+      intent: 'create_cloud',
+      kilo_user_id: USER_ID,
+      organization_id: null,
+      resource_key: null,
+      taxonomy: 'session.create_cloud',
+      canonical_result: {
+        cloudAgentSessionId: workspaceId,
+        kiloSessionId: session.session_id,
+        sandboxId,
+        sandboxProvider: 'cloudflare',
+      },
+      lease_expires_at: LATER_TIME,
+      expires_at: LATER_TIME,
+    });
+
+    await callerFor().moveSession({
+      organizationId: null,
+      sessionId: workspaceId,
+      folderId: folder.id,
+    });
+
+    expect(await readWorktree(worktreeId)).toMatchObject({
+      folder_id: folder.id,
+      runtime_locations: [{ sandboxId, provider: 'cloudflare' }],
+    });
+  });
+
   it('moves the whole workspace group when filing a grouped session by any root chat', async () => {
     const folder = await createFolder();
     const siblingWorkspaceId = newWorkspaceId();
@@ -854,7 +895,9 @@ describe('workspaceFolders session moves', () => {
       sessionId: siblingWorkspaceId,
       folderId: null,
     });
-    expect((await caller.list({ organizationId: null })).folders).toEqual([folder]);
+    expect((await caller.list({ organizationId: null })).folders).toEqual([
+      { ...folder, worktreeIds: [] },
+    ]);
     expect(await readWorktree()).toMatchObject({ name: 'Workspace name', folder_id: null });
     expect(await readSessions()).toEqual(sessions);
   });
@@ -935,6 +978,9 @@ describe('workspaceFolders session moves', () => {
       })
     ).rejects.toMatchObject({ code: 'NOT_FOUND' });
     expect(await readWorktree()).toBeUndefined();
+    expect(
+      await readWorktree(`worktree_${WORKSPACE_ID.slice('workspace_'.length)}`)
+    ).toBeUndefined();
 
     // A destination owned by another member of the same organization must be
     // rejected for ownership, not because the caller is in the wrong scope.

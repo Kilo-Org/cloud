@@ -180,7 +180,8 @@ function CloudAgentSettings({
         </TabsContent>
         <TabsContent
           value="environments"
-          className="mt-0 min-h-0 min-w-0 flex-1 overflow-y-auto px-6 py-5"
+          forceMount
+          className="mt-0 flex min-h-0 min-w-0 flex-1 flex-col data-[state=inactive]:hidden"
         >
           <EnvironmentsSection organizationId={organizationId} canManage={canManage} />
         </TabsContent>

@@ -283,6 +283,7 @@ function installLinkedomDom(): { cleanup: () => void; container: HTMLElement } {
     navigator: globalThis.navigator,
     requestAnimationFrame: globalThis.requestAnimationFrame,
     cancelAnimationFrame: globalThis.cancelAnimationFrame,
+    getComputedStyle: globalThis.getComputedStyle,
     IS_REACT_ACT_ENVIRONMENT: (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean })
       .IS_REACT_ACT_ENVIRONMENT,
   };
@@ -304,6 +305,7 @@ function installLinkedomDom(): { cleanup: () => void; container: HTMLElement } {
     requestAnimationFrame: (callback: FrameRequestCallback) =>
       setTimeout(() => callback(Date.now()), 0),
     cancelAnimationFrame: (id: number) => clearTimeout(id),
+    getComputedStyle: (() => ({ animationName: 'none' })) as unknown as typeof getComputedStyle,
     IS_REACT_ACT_ENVIRONMENT: true,
   });
 
@@ -453,7 +455,7 @@ describe('environment access for members and managers', () => {
     }
   });
 
-  test('a member opens an environment from the settings list', () => {
+  test('a member views an environment inline from the settings list', () => {
     mockCanManage = false;
     const mounted = mount(React.createElement(EnvironmentsSection, { canManage: false }));
     try {
@@ -462,19 +464,13 @@ describe('environment access for members and managers', () => {
         '[aria-label="View environment Kilo Environment"]'
       );
       expect(nameButton).not.toBeNull();
-      expect(dialogContent(mounted.container)).toBeNull();
-
-      click(nameButton);
-      const content = dialogContent(mounted.container);
-      expect(content).not.toBeNull();
-      expect(content?.textContent).toContain(
+      expect(nameButton?.getAttribute('aria-pressed')).toBe('true');
+      expect(mounted.container.textContent).toContain(
         'View only. Organization owners and admins can edit this environment.'
       );
-      expect(content?.textContent).toContain(environment.repoFullName);
-      expect(content?.querySelector('[data-testid="delete-environment"]')).toBeNull();
-
-      clickButton(content!, 'Close');
-      expect(dialogContent(mounted.container)).toBeNull();
+      expect(mounted.container.textContent).toContain(environment.repoFullName);
+      expect(findButton(mounted.container, 'Save environment')).toBeUndefined();
+      expect(mounted.container.querySelector('[data-testid="delete-environment"]')).toBeNull();
     } finally {
       mounted.cleanup();
     }

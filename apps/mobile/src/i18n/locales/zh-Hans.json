@@ -2744,10 +2744,10 @@
     },
     "connect": {
       "checkFailedTitle": "无法检查 GitHub 连接",
-      "checkFailedMessage": "加载完成前，无法确认登录状态。",
+      "checkFailedMessage": "无法连接 GitHub。请检查网络连接后重试。",
       "checkFailedTitleGitLab": "无法检查 GitLab 连接",
       "checkFailedTitleBitbucket": "无法检查 Bitbucket 连接",
-      "providerCheckFailedMessage": "加载完成前无法获取连接状态。",
+      "providerCheckFailedMessage": "无法连接服务提供商。请检查网络连接后重试。",
       "reconnectTitle": "重新连接 GitHub",
       "reconnectTitleGitLab": "重新连接 GitLab",
       "reconnectTitleBitbucket": "重新连接 Bitbucket",

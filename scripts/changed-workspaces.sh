@@ -11,6 +11,10 @@ set -euo pipefail
 # neutral root locations before any manifest read or file probe. The matrix then
 # keeps, of the selected directories, the ones with a test script and a test file.
 #
+# A caller that already ran the detector for the same base passes its document as
+# AFFECTED (ci.yml's changes job does), and the matrix decides from it instead of
+# selecting the repository a second time in the same run.
+#
 # Usage:
 #   scripts/changed-workspaces.sh                                    # all changed workspaces with tests
 #   scripts/changed-workspaces.sh --exclude services/cloud-agent-next --exclude apps/web  # skip specific dirs
@@ -66,9 +70,26 @@ else
   fi
 fi
 
-# One selection pass. The detector answers with every workspace when no base is
-# available, which is the selection the script used before.
-if selection=$(node scripts/affected-workspaces.mjs "$base"); then
+# Reuse the document the caller computed for this base (AFFECTED). A document is
+# usable only when its directory list is an array and it names the same base: one
+# computed for another revision describes other changes, so it is ignored and the
+# detector runs below. A local run supplies nothing here, and an unreadable
+# document fails the same check.
+selection=""
+if [ -n "${AFFECTED:-}" ] \
+    && [ "$(jq -r --arg base "$base" 'if (.dirs | type) == "array" and ((.base // "") == $base) then 1 else 0 end' <<< "$AFFECTED" 2>/dev/null)" = "1" ]; then
+  selection="$AFFECTED"
+  echo "selection: reusing the affected-workspace document for ${base:-no base revision}" >&2
+fi
+
+# One selection pass unless one was supplied. The detector answers with every
+# workspace when no base is available, which is the selection the script used
+# before.
+if [ -z "$selection" ]; then
+  selection=$(node scripts/affected-workspaces.mjs "$base") || selection=""
+fi
+
+if [ -n "$selection" ]; then
   candidate_dirs=$(jq -r '.dirs[]' <<< "$selection")
 else
   # Standalone path for a local run without detector output, for example when

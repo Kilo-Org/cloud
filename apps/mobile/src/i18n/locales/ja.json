@@ -2744,10 +2744,10 @@
     },
     "connect": {
       "checkFailedTitle": "GitHubとの接続を確認できませんでした。",
-      "checkFailedMessage": "読み込みが完了するまで、サインイン状態を確認できません。",
+      "checkFailedMessage": "GitHubに接続できませんでした。接続を確認して、もう一度お試しください。",
       "checkFailedTitleGitLab": "GitLabとの接続を確認できませんでした。",
       "checkFailedTitleBitbucket": "Bitbucketとの接続を確認できませんでした。",
-      "providerCheckFailedMessage": "読み込みが完了するまで接続状態は利用できません。",
+      "providerCheckFailedMessage": "プロバイダーに接続できませんでした。接続を確認して、もう一度お試しください。",
       "reconnectTitle": "GitHubに再接続",
       "reconnectTitleGitLab": "GitLabに再接続",
       "reconnectTitleBitbucket": "Bitbucketに再接続",

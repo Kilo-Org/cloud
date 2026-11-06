@@ -697,10 +697,10 @@
     },
     "connect": {
       "checkFailedTitle": "GitHub ਕਨੈਕਸ਼ਨ ਦੀ ਜਾਂਚ ਨਹੀਂ ਹੋ ਸਕੀ।",
-      "checkFailedMessage": "ਇਹ ਲੋਡ ਹੋਣ ਤੱਕ ਸਾਈਨ-ਇਨ ਦੀ ਸਥਿਤੀ ਉਪਲਬਧ ਨਹੀਂ ਹੋਵੇਗੀ।",
+      "checkFailedMessage": "GitHub ਨਾਲ ਸੰਪਰਕ ਨਹੀਂ ਹੋ ਸਕਿਆ। ਆਪਣੇ ਕਨੈਕਸ਼ਨ ਦੀ ਜਾਂਚ ਕਰੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
       "checkFailedTitleGitLab": "GitLab ਕਨੈਕਸ਼ਨ ਦੀ ਜਾਂਚ ਨਹੀਂ ਹੋ ਸਕੀ।",
       "checkFailedTitleBitbucket": "Bitbucket ਕਨੈਕਸ਼ਨ ਦੀ ਜਾਂਚ ਨਹੀਂ ਹੋ ਸਕੀ।",
-      "providerCheckFailedMessage": "ਇਸ ਦੇ ਲੋਡ ਹੋਣ ਤੱਕ ਕਨੈਕਸ਼ਨ ਦੀ ਸਥਿਤੀ ਉਪਲਬਧ ਨਹੀਂ ਹੈ।",
+      "providerCheckFailedMessage": "ਪ੍ਰਦਾਤਾ ਨਾਲ ਸੰਪਰਕ ਨਹੀਂ ਹੋ ਸਕਿਆ। ਆਪਣੇ ਕਨੈਕਸ਼ਨ ਦੀ ਜਾਂਚ ਕਰੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
       "reconnectTitle": "GitHub ਨੂੰ ਦੁਬਾਰਾ ਕਨੈਕਟ ਕਰੋ",
       "reconnectTitleGitLab": "GitLab ਨੂੰ ਦੁਬਾਰਾ ਕਨੈਕਟ ਕਰੋ",
       "reconnectTitleBitbucket": "Bitbucket ਨੂੰ ਦੁਬਾਰਾ ਕਨੈਕਟ ਕਰੋ",

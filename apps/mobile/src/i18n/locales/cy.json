@@ -757,10 +757,10 @@
     },
     "connect": {
       "checkFailedTitle": "Ni lwyddwyd i wirio'r cysylltiad GitHub.",
-      "checkFailedMessage": "Ni fydd y statws mewngofnodi ar gael nes bod hyn wedi llwytho.",
+      "checkFailedMessage": "Ni lwyddwyd i gysylltu â GitHub. Gwiriwch eich cysylltiad a rhowch gynnig eto.",
       "checkFailedTitleGitLab": "Ni lwyddwyd i wirio'r cysylltiad GitLab.",
       "checkFailedTitleBitbucket": "Ni lwyddwyd i wirio'r cysylltiad Bitbucket.",
-      "providerCheckFailedMessage": "Nid yw statws y cysylltiad ar gael nes iddo lwytho.",
+      "providerCheckFailedMessage": "Ni lwyddwyd i gysylltu â'r darparwr. Gwiriwch eich cysylltiad a rhowch gynnig eto.",
       "reconnectTitle": "Ailgysylltu â GitHub",
       "reconnectTitleGitLab": "Ailgysylltu â GitLab",
       "reconnectTitleBitbucket": "Ailgysylltu â Bitbucket",

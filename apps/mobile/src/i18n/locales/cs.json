@@ -727,10 +727,10 @@
     },
     "connect": {
       "checkFailedTitle": "Připojení ke GitHubu se nepodařilo ověřit.",
-      "checkFailedMessage": "Stav přihlášení bude dostupný až po načtení údajů o připojení.",
+      "checkFailedMessage": "Nepodařilo se připojit ke GitHubu. Zkontroluj připojení a zkus to znovu.",
       "checkFailedTitleGitLab": "Připojení ke GitLabu se nepodařilo ověřit.",
       "checkFailedTitleBitbucket": "Připojení ke Bitbucketu se nepodařilo ověřit.",
-      "providerCheckFailedMessage": "Stav připojení bude dostupný až po načtení.",
+      "providerCheckFailedMessage": "Nepodařilo se připojit k poskytovateli. Zkontroluj připojení a zkus to znovu.",
       "reconnectTitle": "Znovu připojit GitHub",
       "reconnectTitleGitLab": "Znovu připojit GitLab",
       "reconnectTitleBitbucket": "Znovu připojit Bitbucket",

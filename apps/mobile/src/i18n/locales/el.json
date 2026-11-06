@@ -697,10 +697,10 @@
     },
     "connect": {
       "checkFailedTitle": "Δεν ήταν δυνατός ο έλεγχος της σύνδεσης με το GitHub.",
-      "checkFailedMessage": "Η κατάσταση σύνδεσης δεν είναι διαθέσιμη μέχρι να ολοκληρωθεί η φόρτωση.",
+      "checkFailedMessage": "Δεν ήταν δυνατή η σύνδεση με το GitHub. Έλεγξε τη σύνδεσή σου και δοκίμασε ξανά.",
       "checkFailedTitleGitLab": "Δεν ήταν δυνατός ο έλεγχος της σύνδεσης με το GitLab.",
       "checkFailedTitleBitbucket": "Δεν ήταν δυνατός ο έλεγχος της σύνδεσης με το Bitbucket.",
-      "providerCheckFailedMessage": "Η κατάσταση σύνδεσης δεν είναι διαθέσιμη έως ότου φορτωθεί.",
+      "providerCheckFailedMessage": "Δεν ήταν δυνατή η σύνδεση με τον πάροχο. Έλεγξε τη σύνδεσή σου και δοκίμασε ξανά.",
       "reconnectTitle": "Επανασύνδεση με το GitHub",
       "reconnectTitleGitLab": "Επανασύνδεση με το GitLab",
       "reconnectTitleBitbucket": "Επανασύνδεση με το Bitbucket",

@@ -75,7 +75,6 @@ const scope: ProviderPrScope = {
   organizationId: null,
 };
 
-
 /**
  * The standalone CHECKS surface: the section renders from a read its screen
  * owns, so this surface owns one the way the overview does, and the card paints

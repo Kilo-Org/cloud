@@ -1,19 +1,18 @@
 import { describe, expect, it } from 'vitest';
 
-import { agentColor, stateTint } from '@/lib/agent-color';
+import { agentColor, PLACEHOLDER_TINT, stateTint } from '@/lib/agent-color';
 
 describe('stateTint', () => {
-  it('gives every state a ramp entry', () => {
-    expect(stateTint('unknown').hueTextClass).toMatch(/^text-agent-/);
-    expect(stateTint('idle').hueTextClass).toMatch(/^text-agent-/);
-    expect(stateTint('live').hueTextClass).toMatch(/^text-agent-/);
+  it('renders the unknown origin as a muted placeholder, never an accent', () => {
+    expect(stateTint('unknown')).toBe(PLACEHOLDER_TINT);
+    expect(stateTint('unknown').hueTextClass).toBe('text-muted-foreground');
+    expect(stateTint('unknown').hueTextClass).not.toMatch(/^text-agent-/);
   });
 
-  it('keeps each state at the tint its English word first rendered', () => {
+  it('keeps each live state at the tint its English word first rendered', () => {
     // The continuity contract: the pre-pin row tint was the hash of the
-    // rendered English word, so each pin must equal that hash or an existing
-    // surface changes hue for no reason.
-    expect(stateTint('unknown')).toBe(agentColor('UNKNOWN'));
+    // rendered English word, so each state pin must equal that hash or an
+    // existing live surface changes hue for no reason.
     expect(stateTint('idle')).toBe(agentColor('IDLE'));
     expect(stateTint('live')).toBe(agentColor('LIVE'));
   });

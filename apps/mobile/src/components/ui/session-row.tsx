@@ -18,11 +18,13 @@ type SessionRowProps = {
   /** Uppercase label shown in the eyebrow (and hashed for the row hue). */
   agentLabel: string;
   /**
-   * The row tint to paint when the eyebrow names a state word rather than an
-   * agent or origin name: the word's hue must not drift with its translation,
-   * so the state pins to the ramp entry the English word already hashed to
-   * ('unknown' → amber, 'idle'/'live' → sky blue). Omit it for a real agent,
-   * repo or platform name, which keeps its own deterministic hash.
+   * The row tint to paint when the eyebrow names something other than an
+   * agent or origin name: the word's colour must not drift with its
+   * translation, so the state pins instead of hashing. `unknown` is a
+   * placeholder for a value the row cannot name, so it takes the muted
+   * placeholder ink; `idle`/`live` keep the ramp entry the English word
+   * already hashed to (sky blue). Omit it for a real agent, repo or platform
+   * name, which keeps its own deterministic hash.
    */
   agentState?: 'unknown' | 'idle' | 'live' | null;
   title: string;
@@ -216,6 +218,7 @@ export function SessionRow({
       {stripMode === 'edge' ? (
         <AgentBadge
           agent={agentLabel}
+          tint={color}
           variant="strip"
           className={dimStrip ? 'opacity-30' : undefined}
         />

@@ -322,8 +322,8 @@ function removeUpstreamEnkrypt(response: unknown): unknown {
 
 /**
  * Reads one OpenRouter catalogue: fetch, sanitize, validate and report.
- * Callers own the URL, the headers and the cache policy, because the raw list may be cached
- * while the transcription list must not be.
+ * Callers own the URL, the headers and the cache policy; the metadata cache readers use this
+ * as their live fallback, and the local fake LLM transcription catalogue always fetches live.
  */
 async function fetchOpenRouterModels(
   url: string,
@@ -434,7 +434,8 @@ export function resetOpenRouterModelsCaches() {
 }
 
 /**
- * Fetch raw, unfiltered models from OpenRouter API
+ * Raw, unfiltered OpenRouter models, read from the metadata cache table (live fetch only when
+ * the row is missing or unusable) and kept in memory for 5 minutes.
  * Use this for syncing model stats where you need complete data including :free variants
  */
 export async function getRawOpenRouterModels(): Promise<OpenRouterModelsResponse> {
@@ -464,7 +465,8 @@ export async function getEnhancedOpenRouterModels({
   return { data: publishEnkryptModels(models, snapshot) };
 }
 /**
- * Fetch speech-to-text models from the OpenRouter API.
+ * OpenRouter speech-to-text models, read like `getRawOpenRouterModels`. The local fake LLM
+ * catalogue is always fetched live.
  */
 export async function getOpenRouterTranscriptionModels(): Promise<OpenRouterModelsResponse> {
   const localFakeModelsUrl = getLocalFakeTranscriptionModelsUrl();

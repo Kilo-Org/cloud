@@ -78,10 +78,9 @@ async function fetchServedModelIds(apiKey: string): Promise<Set<string> | null> 
 
   try {
     const response = await fetch(MODELS_URL, {
-      // The module cache below is the only cache for this lookup. Next's data
-      // cache would otherwise keep answering with the body it already stored for
-      // `CACHE_TTL_SECONDS`, so the short failure window could only repeat an
-      // unusable answer instead of asking the project again.
+      // Bypass Next's data cache: it would otherwise keep answering with the body
+      // it already stored for `CACHE_TTL_SECONDS`, so the short failure window
+      // could only repeat an unusable answer instead of asking the project again.
       cache: 'no-store',
       headers: { authorization: `Bearer ${apiKey}` },
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
@@ -101,9 +100,9 @@ async function fetchServedModelIds(apiKey: string): Promise<Set<string> | null> 
  * body returns true: a transient problem must not hide the route, and the
  * upstream then answers exactly as it does today. A failure is remembered for
  * `FAILURE_TTL_MS` so a burst of eligible requests does not each pay the lookup
- * and its timeout. The next lookup after that window asks the project again
- * rather than reusing a stored answer, so a bad answer costs the short window
- * and never the hour a good list is reused for.
+ * and its timeout, so a bad answer costs the short window and never the hour a
+ * good list is reused for. Each lookup reads the list the metadata cache refresh
+ * stored, and asks the project directly only when no usable row exists.
  */
 export async function isOpenAiModelServed(apiKey: string, modelId: string): Promise<boolean> {
   if (apiKey.trim().length === 0) return true;

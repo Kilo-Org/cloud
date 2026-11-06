@@ -172,7 +172,11 @@ import {
 } from '../worktree-changes-ready.js';
 import { createControlPlaneTerminals, type ControlPlaneTerminals } from './terminals.js';
 import { createControlPlanePreview, type ControlPlanePreview } from './preview.js';
-import type { PreviewTargetResult, ResolvedPreviewTarget } from '../sandbox/preview-target.js';
+import type {
+  PreviewSandboxScope,
+  PreviewTargetResult,
+  ResolvedPreviewTarget,
+} from '../sandbox/preview-target.js';
 import { readWorktreeChildSessions } from './worktree-child-sessions.js';
 import {
   buildControlPlaneMessageReport,
@@ -462,7 +466,7 @@ export type ControlPlaneSandboxPeer = SharedWorktreeChangesPeer & {
   /** B10: forwards one allowlisted native read to the live wrapper. */
   kiloRequest(input: ControlPlaneKiloRequestInput): Promise<ControlPlaneControlResult>;
   /** Resolves the preview provider coordinates for this sandbox (off the op queue). */
-  previewTarget(sessionId: string): Promise<PreviewTargetResult>;
+  previewTarget(scope: PreviewSandboxScope): Promise<PreviewTargetResult>;
   /** B10: the wrapper identity bound to the connected allocation. */
   getWrapperId(): Promise<string | null>;
   /** B10: the public sandbox status snapshot projected from the allocation. */
@@ -728,7 +732,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     });
     this.preview = createControlPlanePreview({
       getMetadata: () => this.metadata,
-      resolveTarget: sandboxId => this.previewTargetFor(sandboxId),
+      resolveTarget: (sandboxId, scope) => this.previewTargetFor(sandboxId, scope),
     });
     this.initialized = ctx.blockConcurrencyWhile(() => this.initializeStorage());
   }
@@ -747,14 +751,17 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     return peer.terminal(input);
   }
 
-  private async previewTargetFor(sandboxId: string): Promise<PreviewTargetResult> {
+  private async previewTargetFor(
+    sandboxId: string,
+    scope: PreviewSandboxScope
+  ): Promise<PreviewTargetResult> {
     const peer = this.sandboxPeerFor(sandboxId);
     if (peer === null) {
       return { status: 'not_running' };
     }
     return withDORetry(
       () => this.sandboxPeerFor(sandboxId) ?? peer,
-      stub => stub.previewTarget(this.sessionId),
+      stub => stub.previewTarget(scope),
       'previewTarget'
     );
   }

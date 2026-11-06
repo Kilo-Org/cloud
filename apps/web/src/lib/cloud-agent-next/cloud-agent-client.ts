@@ -51,6 +51,7 @@ import {
   SandboxStatusSnapshotSchema,
   type SandboxStatusSnapshot,
 } from '../../../../../services/cloud-agent-next/src/shared/sandbox-status';
+import type { PreviewTarget } from '../../../../../services/cloud-agent-next/src/shared/preview-target';
 import { fetchWithinBudget } from '@/lib/bounded-service-fetch';
 export type { SendMessagePayload } from './types.js';
 
@@ -359,6 +360,9 @@ export type GetPendingInteractionsOutput = {
 export type GetWorktreeFileInput = GetSessionInput & WorktreeFileQuery;
 
 export type GetEgressAuditInput = GetSessionInput & EgressAuditPagination;
+
+/** The preview target plus the route organization the Worker uses for its UI gate. */
+export type GetPreviewOptionsInput = PreviewTarget & { organizationId?: string };
 
 /** Execution status for getSession response */
 export type ExecutionStatus = {
@@ -676,7 +680,7 @@ type CloudAgentNextTRPCClient = {
     query: (input: GetSandboxSelectionOptionsInput) => Promise<SandboxSelectionCapabilities>;
   };
   getPreviewOptions: {
-    query: (input: { cloudAgentSessionId: string; organizationId?: string }) => Promise<unknown>;
+    query: (input: GetPreviewOptionsInput) => Promise<unknown>;
   };
   prepareSession: {
     mutate: (input: PrepareSessionInput) => Promise<PrepareSessionOutput>;
@@ -1061,10 +1065,9 @@ export class CloudAgentNextClient {
     );
   }
 
-  async getPreviewOptions(input: {
-    cloudAgentSessionId: string;
-    organizationId?: string;
-  }): Promise<z.infer<typeof workerPreviewOptionsSchema>> {
+  async getPreviewOptions(
+    input: GetPreviewOptionsInput
+  ): Promise<z.infer<typeof workerPreviewOptionsSchema>> {
     return workerPreviewOptionsSchema.parse(await this.client.getPreviewOptions.query(input));
   }
 

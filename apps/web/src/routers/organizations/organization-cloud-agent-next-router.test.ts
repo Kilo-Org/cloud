@@ -1365,7 +1365,6 @@ describe('organizationCloudAgentNextRouter attachment forwarding', () => {
   ])(
     'uses the selected command model for eligibility and dispatch: $model',
     async ({ model, isFree }) => {
-      mockGetSession.mockResolvedValueOnce({ model: 'kilo/inherited-model' });
       mockComputeCloudAgentNextBalanceCheckEligibility.mockResolvedValueOnce({
         isFree,
         hasUserByokAvailable: false,

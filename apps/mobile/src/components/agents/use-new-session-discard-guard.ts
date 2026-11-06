@@ -8,6 +8,8 @@ import {
   useRef,
   useState,
 } from 'react';
+import { AppState, type HostInstance, Keyboard, Platform, TextInput } from 'react-native';
+import { useKeyboardState } from 'react-native-keyboard-controller';
 import { toast } from 'sonner-native';
 
 import { DestructiveConfirmDialog } from '@/components/destructive-confirm-dialog';
@@ -21,9 +23,59 @@ type NewSessionDiscardGuard = {
   discardConfirm: ReactNode;
 };
 
+type ConfirmPhase = 'closed' | 'awaiting-keyboard' | 'open';
+
+/**
+ * Focuses an input once the app window holds focus. Android reports the sheet's
+ * dismissal while the sheet's dialog window still holds focus, and it ignores a
+ * keyboard request from an unfocused window, so the refocus waits for the
+ * window's own focus event there.
+ */
+function useFocusInputInFocusedWindow(): (input: HostInstance) => void {
+  const windowFocusedRef = useRef(true);
+  const queuedInputRef = useRef<HostInstance | null>(null);
+
+  useEffect(() => {
+    if (Platform.OS !== 'android') {
+      return undefined;
+    }
+    const subscriptions = [
+      AppState.addEventListener('blur', () => {
+        windowFocusedRef.current = false;
+      }),
+      AppState.addEventListener('focus', () => {
+        windowFocusedRef.current = true;
+        const input = queuedInputRef.current;
+        queuedInputRef.current = null;
+        if (input) {
+          TextInput.State.focusTextInput(input);
+        }
+      }),
+    ];
+    return () => {
+      for (const subscription of subscriptions) {
+        subscription.remove();
+      }
+    };
+  }, []);
+
+  return useCallback((input: HostInstance) => {
+    if (windowFocusedRef.current) {
+      TextInput.State.focusTextInput(input);
+      return;
+    }
+    queuedInputRef.current = input;
+  }, []);
+}
+
 /**
  * Protect drafts and opening pickers only. Cancelling and replaying an ordinary
  * native Back reverses its transition before removing the screen again.
+ *
+ * The confirm waits for the keyboard to finish closing: a sheet presented over
+ * the keyboard takes window focus, which drops the keyboard in one frame and
+ * moves the sheet down after it. Keep editing refocuses the prompt only after
+ * the sheet's own dismissal, so the keyboard never rises behind a leaving sheet.
  */
 export function useNewSessionDiscardGuard({
   dirty,
@@ -46,17 +98,47 @@ export function useNewSessionDiscardGuard({
   const onDiscardRef = useRef(onDiscard);
   onDiscardRef.current = onDiscard;
 
-  const [confirmVisible, setConfirmVisible] = useState(false);
+  const [confirmPhase, setConfirmPhase] = useState<ConfirmPhase>('closed');
   const [leaveAllowed, setLeaveAllowed] = useState(false);
   const pendingLeaveRef = useRef<(() => void) | null>(null);
+  const focusedInputRef = useRef<HostInstance | null | undefined>(null);
   const replayRef = useRef<(() => void) | null>(null);
   const [leaveCount, setLeaveCount] = useState(0);
   const pickerOpen = usePickerRouteOnTop();
+  const keyboardVisible = useKeyboardState(state => state.isVisible);
+  const focusInput = useFocusInputInFocusedWindow();
+
+  if (confirmPhase === 'awaiting-keyboard' && !keyboardVisible) {
+    setConfirmPhase('open');
+  }
+
+  useEffect(() => {
+    if (confirmPhase !== 'awaiting-keyboard') {
+      return undefined;
+    }
+    // An interactive hide can miss its completion event. Never trap the draft
+    // behind that event; a repeated Back also opens the confirm immediately.
+    const timeout = setTimeout(() => {
+      setConfirmPhase('open');
+    }, 1000);
+    return () => {
+      clearTimeout(timeout);
+    };
+  }, [confirmPhase]);
 
   const closeConfirm = useCallback(() => {
     pendingLeaveRef.current = null;
-    setConfirmVisible(false);
+    focusedInputRef.current = null;
+    setConfirmPhase('closed');
   }, []);
+
+  const keepEditing = useCallback(() => {
+    const input = focusedInputRef.current;
+    closeConfirm();
+    if (input) {
+      focusInput(input);
+    }
+  }, [closeConfirm, focusInput]);
 
   const discardAndLeave = useCallback((leave: () => void) => {
     void (async () => {
@@ -114,7 +196,20 @@ export function useNewSessionDiscardGuard({
       return;
     }
     pendingLeaveRef.current = leave;
-    setConfirmVisible(true);
+    if (confirmPhase === 'awaiting-keyboard') {
+      setConfirmPhase('open');
+      return;
+    }
+    if (confirmPhase === 'open') {
+      return;
+    }
+    if (!keyboardVisible) {
+      setConfirmPhase('open');
+      return;
+    }
+    focusedInputRef.current = TextInput.State.currentlyFocusedInput();
+    Keyboard.dismiss();
+    setConfirmPhase('awaiting-keyboard');
   });
 
   useEffect(() => {
@@ -124,22 +219,23 @@ export function useNewSessionDiscardGuard({
   }, [leaveCount]);
 
   return {
-    discardConfirm: confirmVisible
-      ? createElement(DestructiveConfirmDialog, {
-          title: i18n.t('agentChat.newSession.discardDraftTitle'),
-          message: i18n.t(
-            hasUnclaimedAttachments
-              ? 'agentChat.newSession.discardWithUploadsMessage'
-              : 'agentChat.newSession.discardDraftMessage'
-          ),
-          confirmLabel: i18n.t('common.discard'),
-          cancelLabel: i18n.t('common.keepEditing'),
-          extraAction: onSaveAsTodo
-            ? { label: i18n.t('todos.saveAsTodo'), onPress: saveAsTodo }
-            : undefined,
-          onConfirm: confirmDiscard,
-          onCancel: closeConfirm,
-        })
-      : null,
+    discardConfirm:
+      confirmPhase === 'open'
+        ? createElement(DestructiveConfirmDialog, {
+            title: i18n.t('agentChat.newSession.discardDraftTitle'),
+            message: i18n.t(
+              hasUnclaimedAttachments
+                ? 'agentChat.newSession.discardWithUploadsMessage'
+                : 'agentChat.newSession.discardDraftMessage'
+            ),
+            confirmLabel: i18n.t('common.discard'),
+            cancelLabel: i18n.t('common.keepEditing'),
+            extraAction: onSaveAsTodo
+              ? { label: i18n.t('todos.saveAsTodo'), onPress: saveAsTodo }
+              : undefined,
+            onConfirm: confirmDiscard,
+            onCancel: keepEditing,
+          })
+        : null,
   };
 }

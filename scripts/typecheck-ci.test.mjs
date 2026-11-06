@@ -383,6 +383,36 @@ test('every consumer job restores or builds the harness SDK through the action',
   }
 });
 
+// The Release build's pod install refetches every pod archive on each
+// dispatch. The cache restores the download store before prebuild, which runs
+// pod install; Pods/ and DerivedData stay out, because prebuild regenerates the
+// native project each run and a restored module cache could compile stale
+// headers in a Release build.
+test('explorer-ios-release restores the CocoaPods download store before prebuild', () => {
+  const steps = workflows['explorer-ios-release.yml'].jobs.build.steps;
+  const prebuildIndex = steps.findIndex(step => (step.run ?? '').includes('expo prebuild'));
+  const storeIndex = steps.findIndex(
+    step =>
+      String(step.uses).startsWith('actions/cache@') &&
+      step.with?.path === '~/Library/Caches/CocoaPods'
+  );
+  assert.ok(prebuildIndex >= 0, 'the build runs expo prebuild');
+  assert.ok(storeIndex >= 0, 'the build restores the CocoaPods download store');
+  assert.ok(storeIndex < prebuildIndex, 'the store is restored before prebuild installs pods');
+  const cache = steps[storeIndex];
+  assert.equal(
+    cache.with.key,
+    "${{ runner.os }}-${{ runner.arch }}-cocoapods-${{ hashFiles('apps/mobile/package.json', 'pnpm-lock.yaml', '.github/workflows/explorer-ios-release.yml') }}",
+    'the key hashes the mobile dependency inputs'
+  );
+  assert.equal(cache.with['restore-keys'], undefined, 'no cross-key restore');
+  assert.deepEqual(
+    steps.filter(step => String(step.uses).startsWith('actions/cache@')).map(step => step.with.path),
+    ['~/Library/Caches/CocoaPods'],
+    'the build caches no generated Pods or DerivedData tree'
+  );
+});
+
 // The mobile suite needs one harness SDK build, not one per job: the build
 // resolves the SDK's whole program and, on a miss, compiles the typia
 // transform. Eleven jobs did that concurrently, and actions/cache saves at the

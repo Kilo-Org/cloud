@@ -107,6 +107,16 @@ jobs:
       - name: Build harness SDK
         if: hashFiles('.github/actions/harness-sdk-build/action.yml') == ''
         run: pnpm --filter @kilocode/harness-sdk run build
+      # The pod install inside prebuild refetches every pod archive into this
+      # store. The key hashes the inputs that pin the pod set, so one dependency
+      # set is one clean hit and a changed set re-downloads only what is missing;
+      # a miss costs the download this job already pays. Pods/ and DerivedData
+      # stay out: prebuild regenerates the native project in each run.
+      - name: Cache the CocoaPods download store
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: ~/Library/Caches/CocoaPods
+          key: ${{ runner.os }}-${{ runner.arch }}-cocoapods-${{ hashFiles('apps/mobile/package.json', 'pnpm-lock.yaml', '.github/workflows/explorer-ios-release.yml') }}
       - name: Expo prebuild
         run: CI=1 pnpm --filter kilo-app exec expo prebuild --platform ios
       - name: Disable OTA in generated native configuration

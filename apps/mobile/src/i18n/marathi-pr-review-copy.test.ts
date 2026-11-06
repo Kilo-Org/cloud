@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { i18n } from '@/i18n';
+import { buildDiffLineAccessibilityLabel } from '@/lib/pr-review/diff/parse-patch';
 
 /**
  * Marathi marks agreement on the verb, not on the counted noun, so a bucket
@@ -51,7 +52,21 @@ describe('Marathi pull-request review copy', () => {
 
   it('labels a diff line without a number without promising one', () => {
     expect(
-      i18n.t('prReview.diff.lineLabelNoNumber', { status: 'जोडले', text: 'const a = 1;' })
+      buildDiffLineAccessibilityLabel({
+        type: 'add',
+        text: 'const a = 1;',
+        noNewlineAtEndOfFile: false,
+      })
     ).toBe('जोडले: const a = 1;');
+    // The numbered sibling keeps the noun, so one shape did not replace the other.
+    expect(
+      buildDiffLineAccessibilityLabel({
+        type: 'context',
+        oldLine: 3,
+        newLine: 3,
+        text: 'export default greeting;',
+        noNewlineAtEndOfFile: false,
+      })
+    ).toBe('संदर्भ ओळ 3: export default greeting;');
   });
 });

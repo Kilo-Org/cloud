@@ -80,6 +80,9 @@ const CREATE_COMMENT_INPUT_HINT =
 const CREATE_BATCH_COMMENT_INPUT_HINT =
   'expected batch create input JSON: {"comments":[{"body":"...","inline":{"path":"src/widget.ts","to":42}}]}';
 const UPDATE_COMMENT_INPUT_HINT = 'expected update input JSON: {"body":"..."}';
+const UPDATE_COMMENT_TARGET_HINT =
+  'only the existing Code Review Summary comment can be updated; create a new comment instead';
+const UPDATE_COMMENT_BODY_HINT = 'the updated body must start with the Code Review Summary heading';
 const BITBUCKET_ENVIRONMENT_HINT =
   'expected Bitbucket cloud-agent environment: BITBUCKET_TOKEN, KILO_BITBUCKET_WORKSPACE_SLUG, KILO_BITBUCKET_WORKSPACE_UUID, KILO_BITBUCKET_REPOSITORY_SLUG, KILO_BITBUCKET_REPOSITORY_UUID';
 const PR_CURRENT_COMMAND_HINT = 'expected PR current syntax: bb pr current';
@@ -128,12 +131,15 @@ Examples:
   echo '{"body": "This is a test comment added via the bb CLI tool"}' | bb comments create 1 --input -
   echo '{"body": "Inline finding", "inline": {"path": "src/widget.ts", "to": 42}}' | bb comments create 1 --input -
   echo '{"comments": [{"body": "Inline finding", "inline": {"path": "src/widget.ts", "to": 42}}]}' | bb comments create-batch 1 --input -
-  echo '{"body": "Updated summary"}' | bb comments update 1 123 --input -
+  echo '{"body": "## Code Review Summary\\n\\nNo open findings."}' | bb comments update 1 123 --input -
 
 Comment input:
   Create input must be {"body": "..."} or {"body": "...", "inline": {"path": "...", "to": 123}}.
   Batch create input must be {"comments": [{"body": "...", "inline": {"path": "...", "to": 123}}, ...]}.
-  Update input must be {"body": "..."} only.
+  Update input must be {"body": "..."} only, and the body must start with the Code Review Summary heading.
+
+Update target:
+  An update applies only to an existing Code Review Summary comment.
 
 Environment:
   Provider-backed commands require BITBUCKET_TOKEN, KILO_BITBUCKET_WORKSPACE_SLUG,
@@ -1048,8 +1054,20 @@ function isCodeReviewSummaryBody(value: string): boolean {
   );
 }
 
+/**
+ * The durable Code Review Summary is always a top-level, non-inline comment:
+ * findings carry an `inline` anchor, and only summary bodies use the heading.
+ * Both the duplicate-create fence and the update scope rely on this shape.
+ */
 function isExistingCodeReviewSummaryComment(value: unknown): boolean {
-  if (!isRecord(value) || value.deleted === true || !isTopLevelComment(value)) return false;
+  if (
+    !isRecord(value) ||
+    value.deleted === true ||
+    !isTopLevelComment(value) ||
+    (value.inline !== undefined && value.inline !== null)
+  ) {
+    return false;
+  }
   const content = value.content;
   if (!isRecord(content) || typeof content.raw !== 'string') return false;
   return isCodeReviewSummaryBody(content.raw);
@@ -1062,6 +1080,26 @@ async function assertNoExistingSummaryComment(
   const comments = await listComments(fetchFunction, target);
   if (comments.some(isExistingCodeReviewSummaryComment)) {
     throw new CliError('summary_already_exists', undefined, SUMMARY_ALREADY_EXISTS_HINT);
+  }
+}
+
+/**
+ * The write scope of an update is the durable Code Review Summary comment.
+ * A workspace access token cannot resolve the account it acts as, so author
+ * identity is not readable from the credential; the update instead re-reads the
+ * target comment and accepts only the shape this publisher writes: a
+ * non-deleted, non-inline, top-level comment whose body carries the summary
+ * heading or the legacy marker. Any other target fails before the request.
+ */
+async function assertUpdatableSummaryComment(
+  fetchFunction: FetchFunction,
+  target: PullRequestTarget,
+  commentId: number
+): Promise<void> {
+  const value = await requestJson(fetchFunction, target, `${commentsUrl(target)}/${commentId}`);
+  if (!isRecord(value) || value.id !== commentId) throw new CliError('invalid_provider_response');
+  if (!isExistingCodeReviewSummaryComment(value)) {
+    throw new CliError('comment_not_owned', undefined, UPDATE_COMMENT_TARGET_HINT);
   }
 }
 
@@ -1114,8 +1152,12 @@ async function updateComment(
   stdin: ReadableStream<Uint8Array>
 ): Promise<unknown> {
   const inputBody = await readCommentInput(stdin, parseUpdateInput, UPDATE_COMMENT_INPUT_HINT);
+  if (!inputBody.trimStart().startsWith('## Code Review Summary')) {
+    throw new CliError('summary_body_required', undefined, UPDATE_COMMENT_BODY_HINT);
+  }
   const requestBody = serializeRequestBody({ content: { raw: inputBody } });
   await assertWritablePullRequest(fetchFunction, target);
+  await assertUpdatableSummaryComment(fetchFunction, target, commentId);
   return await requestJson(fetchFunction, target, `${commentsUrl(target)}/${commentId}`, {
     method: 'PUT',
     body: requestBody,

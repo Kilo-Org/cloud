@@ -163,6 +163,11 @@ A response must not bypass storage output gates.
 Upload and verify blobs before admitting references to them.
 A batch that requires a missing blob fails without advancing its source position.
 Keep receipt metadata bounded without making an old retry eligible to apply again.
+The exact latest 256 accepted batches retain receipts. The accepted-batch counter
+skips pruning until the tail fills; each later acceptance removes its single
+oldest indexed source position in the same transaction. Source positions may jump.
+Retries and rejected/rolled-back writes do not advance that counter or trim the tail.
+This uses the existing `receipts_through_idx` and requires no schema migration.
 
 Each admitted blob upload has a unique attempt and physical R2 key.
 A second same-hash upload receives retryable `upload_in_progress`, including `retryAt`.
@@ -288,10 +293,20 @@ The creator index adds no global coordinator or new Durable Object class.
 Default personal limits are 10,000 sessions and 100 GiB; organization limits are
 200,000 sessions and 2 TiB. Wrangler vars `USER_TENANT_SESSIONS`, `USER_TENANT_BYTES`,
 `ORGANIZATION_TENANT_SESSIONS`, and `ORGANIZATION_TENANT_BYTES` override these defaults.
-Leases include inline values and all reserved or stored blobs. A session grows its lease in
-32 MiB steps, capped at its combined inline/blob bound, only when its usage needs more space.
-An alarm shrinks a lease when usage drops at least two steps below it. Deletion releases
-the session admission and its whole lease. Tenant calls never run inside SQLite transactions.
+Leases include inline values and all reserved or stored blobs. The first nonempty
+lease rounds to 1 MiB, then doubles through 2/4/8/16/32 MiB as usage requires.
+Above 32 MiB, growth uses the existing 32 MiB quantum, capped at the combined
+inline/blob bound. Existing stored reservations remain valid; registration
+preserves a sufficient lease rather than expanding it to another quantum.
+The existing alarm shrink threshold remains 64 MiB of unused capacity. A shrink
+or uncertain-growth reconciliation rounds committed usage by the same tier rule.
+Deletion durably tombstones the session and releases its admission and whole lease.
+Physical blob cleanup follows the fenced upload deadlines and retries independently.
+Tenant calls never run inside SQLite transactions.
+This trades up to five additional growth reservations through the first 32 MiB
+for smaller tiny-session reservations; quotas and session limits are unchanged.
+The local concentrated-organization fixture holds 24 two-KiB checkpoints in
+24 MiB of leases. That is reservation efficiency, not a throughput measurement.
 Admission mutations are serialized without blocking session reads during tenant RPCs.
 Tenant outages return retryable `tenant_unavailable` (503), `Retry-After: 60`, and
 an epoch-ms `error.retryAt`; alarm-driven releases and shrinks retry without resetting the session.
@@ -395,6 +410,45 @@ delivery, including backpressure. Neither latency field is a DO CPU measurement;
 the boundary profiler above measures the complete page operation for capacity review.
 Metrics do not buffer blobs or page bodies or record user IDs, session IDs, hashes,
 credentials, or content. Tests can omit the Analytics Engine binding.
+
+The same binding also emits `diagnostic_v1` stage points, with that literal index.
+Blobs are `[version, operation, stage, outcome, cause, tenantType]`. Doubles are
+`[durationMs, count, maxQueueDepth, maxRetainedBytes, overloadedFlagCount,
+retryableFlagCount, sampleEvery]`. Successful boundary completions sample 1/128
+(`sampleEvery=128`, `count=1`). These indicate boundary completion, not necessarily
+batch acceptance: a resolved RPC can return a typed rejection recorded separately.
+Failure keys aggregate for one second; their duration and flag counts are sums
+and queue/retained-byte fields are maxima. The first failure emits immediately.
+Each isolate retains at most 128 bounded failure keys, with no timer or pending
+I/O. A final aggregate can be lost on eviction/idle shutdown; these are diagnostic
+observations, not billing or exact error-accounting counters.
+The oldest key is evicted when the map fills, so newly observed causes remain visible;
+eviction can discard that key's pending aggregate. A raw-stage point and a
+typed-result point can describe the same request: never sum them as distinct
+per-request failures.
+
+Operations distinguish state, batch, registration, live authorization, connection,
+tenant admission, watch and Sync/Relay/Presence initialization. Stages cover
+Worker RPC lookup/call, limiter credit, hashing, validation, actual mutation
+transaction attempts, receipt pruning, lease reserve/reapply, mutation/watch queue
+wait, watch storage/RPC/budget and scheduling. `lease_required` is an expected
+transaction rollback to acquire capacity, not a platform overload.
+`queue_admission` reports active/queued batch count; `queue_wait` reports all
+active/queued admission-gate calls, including registration/live authorization.
+Their retained-byte field counts pending UTF-16 batch bodies. `watch_queue`
+reports active/queued watch tasks; it does not measure transport-buffer memory.
+The exact fixed label unions are in `src/metrics.ts` and `src/overload.ts`.
+Cause labels distinguish `application_queue`, documented platform request/data
+queue, queue-timeout, object/account-rate categories, flag-only `platform_unknown`,
+watch budget, typed results and explicit unknowns. Raw exceptions are classified
+before generic error conversion; client error bodies, retry rules and limits
+are unchanged. Phase durations are elapsed work and may overlap; they are not CPU
+or hibernation/residency measurements.
+
+Diagnostics contain no raw exception text, payloads, request/session/user IDs or
+credentials. An isolated load deployment must bind its own Analytics Engine
+dataset as `SESSION_SYNC_METRICS`; omitting it disables both HTTP/stage metrics.
+Never bind a production dataset merely to qualify a test.
 
 Run `node scripts/profile-metrics.mjs` in the Worker pool to compare the same
 synthetic batch/state/error/blob mix with metrics off and each component disabled.
@@ -750,6 +804,28 @@ revision-consistent snapshots, and resumes ordered live events or refetches afte
 relay reset. Presence commands retain unknown outcomes on timeout; delivery status
 is not execution success. Permission, question, and abort commands require a live
 runner and its current incarnation/run identity. `/clear` only clears the local view.
+
+Each socket generation owns its frame queue, snapshot reads, and incomplete-transcript
+recovery. Reconnect and close cancel those reads and release queued/replay payloads;
+late results cannot publish or change the accepted relay cursor. A snapshot has a
+two-minute total deadline and a 15-second deadline for each state, page, or blob request.
+The raw queue and recovery replay share a 1,024-frame / 4 MiB estimated UTF-16 storage
+budget. One active frame is additionally bounded to 512 KiB before JSON parsing.
+These are retained-payload limits, not an exact JavaScript heap limit; the bounded
+public event history and visible transcript also consume memory.
+
+Backlog overflow preserves the last accepted cursor and reconnects for ordered relay
+replay. A successful `subscribed` handshake clears the backlog error when the replay
+restores a complete transcript. A relay reset or discarded incomplete-recovery replay
+keeps an explicit `NativeSessionState.error` visible through subsequent connections
+until the connection is closed. A revision-consistent snapshot alone cannot prove
+that missing volatile live effects reached durable storage. Consumers must render
+that error alongside the transcript, including when `connection` is `connected`;
+the web native-session demo renders it as an alert. Recovery attempts are bounded,
+and exhausted incomplete snapshots report an error rather than claiming completeness.
+Specific authorization, deletion, and command failures appear alongside the integrity
+warning. An individual oversized frame reports its size limit separately from a
+combined backlog overflow.
 
 The intentionally minimal web demo is `/native-remote`, hidden unless the client-only
 PostHog flag `native-remote-web` is enabled. Its same-origin

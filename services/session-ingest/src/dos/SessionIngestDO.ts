@@ -1778,10 +1778,10 @@ export class SessionIngestDO extends DurableObject<Env> {
 
     const computed = computeSessionMetrics(window.rows, closeReason, { bounded: window.bounded });
 
-    // The running total moves with each accepted batch, and the close path applies it when the
-    // window covers only part of the session. A window that covers everything recomputes the
-    // cost from the stored rows: a divergence means some path wrote message rows without
-    // adjusting the total, which the monotonic persist could never correct.
+    // The running total moves with each accepted batch. A read that counted every stored row
+    // recomputes the cost from the rows: a divergence means some path wrote message rows
+    // without adjusting the total, which the monotonic persist could never correct. A partial
+    // read cannot recompute the whole cost, so the stored total is the exact figure there.
     const storedRunningCostUsd = readIngestMetaNumber(this.db, RUNNING_ASSISTANT_COST_META_KEY);
     if (!window.bounded) {
       if (

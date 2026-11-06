@@ -931,10 +931,12 @@ describe('SessionIngestDO live activity + cost persist', () => {
             id: row.id,
             item_id: row.item_id,
             item_type: row.item_type,
-            // The scan projects a body away when it is R2-offloaded or over the per-row ceiling.
+            // The scan projects a body away when it is R2-offloaded, or when its bytes exceed
+            // the per-row ceiling the SQL measures with length(CAST(item_data AS BLOB)).
             item_data:
               row.item_data_r2_key !== null ||
-              row.item_data.length > SESSION_METRICS_WINDOW_MAX_ROW_BYTES
+              new TextEncoder().encode(row.item_data).byteLength >
+                SESSION_METRICS_WINDOW_MAX_ROW_BYTES
                 ? ''
                 : row.item_data,
           });
@@ -2013,29 +2015,43 @@ describe('SessionIngestDO live activity + cost persist', () => {
       }
     });
 
-    it('drops a body above the per-row ceiling from the counted figures but keeps its row', async () => {
-      const harness = makeLiveHarness({
-        seedMeta: {
-          kiloUserId: 'usr_live',
-          sessionId: 'ses_live',
-          metricsAlarmAt: String(Date.now() - 1),
-        },
-        seedMessageRows: [
-          {
-            item_data: JSON.stringify({
-              ...userItem('huge').data,
-              text: 'x'.repeat(SESSION_METRICS_WINDOW_MAX_ROW_BYTES + 1),
-            }),
+    it('treats a body above the per-row ceiling as a partial read', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        const harness = makeLiveHarness({
+          seedMeta: {
+            kiloUserId: 'usr_live',
+            sessionId: 'ses_live',
+            runningAssistantCostUsd: '0.4',
+            metricsAlarmAt: String(Date.now() - 1),
           },
-          { item_data: JSON.stringify(userItem('small').data) },
-        ],
-      });
+          seedMessageRows: [
+            {
+              item_data: JSON.stringify({
+                ...userItem('huge').data,
+                text: 'x'.repeat(SESSION_METRICS_WINDOW_MAX_ROW_BYTES + 1),
+              }),
+            },
+            { item_data: JSON.stringify(userItem('small').data) },
+          ],
+        });
 
-      await harness.durableObject.alarm();
+        await harness.durableObject.alarm();
 
-      expect(harness.ingestSessionMetrics).toHaveBeenCalledWith(
-        expect.objectContaining({ metricsBounded: false, totalTurns: 1 })
-      );
+        expect(harness.ingestSessionMetrics).toHaveBeenCalledWith(
+          expect.objectContaining({
+            metricsBounded: true,
+            timeToFirstResponseMs: undefined,
+            totalTurns: 1,
+            // The stored total covers the rows the read left out.
+            totalCost: 0.4,
+          })
+        );
+        // A partial read has nothing to compare against the stored total.
+        expect(warn).not.toHaveBeenCalled();
+      } finally {
+        warn.mockRestore();
+      }
     });
 
     it('still emits for a session whose scanned bodies were all dropped', async () => {

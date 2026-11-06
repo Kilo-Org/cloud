@@ -4218,6 +4218,83 @@ describe('SessionIngestDO integration', () => {
       await stub.clear();
     });
 
+    it('marks a read of exactly the row ceiling with every message counted as complete', async () => {
+      const sessionId = 'ses_metrics_budget_exact_0001';
+      const stub = getStub(kiloUserId, sessionId);
+
+      await stub.ingest(
+        [
+          { type: 'kilo_meta', data: { platform: 'cli', orgId: 'org_metrics_exact' } },
+          { type: 'session', data: { time: { created: 1000, updated: 61_000 } } },
+        ],
+        kiloUserId,
+        sessionId,
+        1
+      );
+      await runInDurableObject(stub, async (_instance, state) => {
+        state.storage.sql.exec(
+          "INSERT INTO ingest_meta (key, value) VALUES ('metricsAlarmAt', ?) " +
+            'ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+          String(Date.now() - 1)
+        );
+        for (let index = 0; index < SESSION_METRICS_WINDOW_MAX_ROWS; index += 1) {
+          state.storage.sql.exec(
+            'INSERT INTO ingest_items (item_id, item_type, item_data, ingested_at) ' +
+              'VALUES (?, ?, ?, ?)',
+            `message/e${String(index).padStart(5, '0')}`,
+            'message',
+            JSON.stringify(userMessage(`e${String(index).padStart(5, '0')}`, index)),
+            index
+          );
+        }
+      });
+
+      const observed = await runAlarmCountingRows(stub);
+
+      expect(observed.emitted).toHaveLength(1);
+      expect(observed.emitted[0]).toMatchObject({
+        metricsBounded: false,
+        totalTurns: SESSION_METRICS_WINDOW_MAX_ROWS,
+      });
+
+      await stub.clear();
+    });
+
+    it('measures the per-row ceiling in bytes for a multibyte body', async () => {
+      const sessionId = 'ses_metrics_budget_multibyte_0001';
+      const stub = getStub(kiloUserId, sessionId);
+      // 400k three-byte characters: under the ceiling counted in characters, over it in bytes.
+      const multibyteBody = '界'.repeat(400_000);
+      expect(encoder.encode(multibyteBody).byteLength).toBeGreaterThan(
+        SESSION_METRICS_WINDOW_MAX_ROW_BYTES
+      );
+      expect(multibyteBody.length).toBeLessThan(SESSION_METRICS_WINDOW_MAX_ROW_BYTES);
+
+      await stub.ingest(
+        [
+          { type: 'message', data: { ...userMessage('wide', 1000), text: multibyteBody } },
+          { type: 'message', data: userMessage('narrow', 2000) },
+        ],
+        kiloUserId,
+        sessionId,
+        1
+      );
+      await runInDurableObject(stub, async (_instance, state) => {
+        state.storage.sql.exec(
+          "INSERT INTO ingest_meta (key, value) VALUES ('metricsAlarmAt', ?) " +
+            'ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+          String(Date.now() - 1)
+        );
+      });
+
+      const observed = await runAlarmCountingRows(stub);
+
+      expect(observed.emitted).toHaveLength(1);
+      expect(observed.emitted[0]).toMatchObject({ metricsBounded: true, totalTurns: 1 });
+
+      await stub.clear();
+    });
+
     it('keeps a body above the per-row ceiling out of the counted figures', async () => {
       const sessionId = 'ses_metrics_budget_oversized_0001';
       const stub = getStub(kiloUserId, sessionId);
@@ -4247,7 +4324,8 @@ describe('SessionIngestDO integration', () => {
       const observed = await runAlarmCountingRows(stub);
 
       expect(observed.emitted).toHaveLength(1);
-      expect(observed.emitted[0]).toMatchObject({ metricsBounded: false, totalTurns: 1 });
+      // The projected body is a stored row the counted figures leave out.
+      expect(observed.emitted[0]).toMatchObject({ metricsBounded: true, totalTurns: 1 });
 
       await stub.clear();
     });

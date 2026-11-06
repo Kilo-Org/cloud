@@ -1,4 +1,4 @@
-import { and, desc, inArray, lt, ne, sql } from 'drizzle-orm';
+import { and, desc, inArray, lt, ne, notInArray, sql } from 'drizzle-orm';
 import type { DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 
 import { ingestItems } from '../db/sqlite-schema';
@@ -30,13 +30,14 @@ export type SessionMetricsWindowRow = { item_type: string; item_data: string };
 export type SessionMetricsWindow = {
   /** Stored rows the aggregation reads, oldest first. */
   rows: SessionMetricsWindowRow[];
-  /**
-   * True when the read stopped at a ceiling with older rows left behind, so the counted figures
-   * describe the newest part of the session only, and when the read kept no body at all.
-   */
-  bounded: boolean;
   /** Stored rows the scan visited. Zero means the session holds no item row to describe. */
   rowCount: number;
+  /**
+   * True when the read left stored rows out of the counted figures: it stopped at a ceiling,
+   * or it never lifted a body the projection excludes. The counted figures then describe part
+   * of the session only.
+   */
+  bounded: boolean;
 };
 
 type ScannedRow = {
@@ -57,7 +58,7 @@ function windowColumns() {
     item_type: ingestItems.item_type,
     item_data: sql<string>`CASE
       WHEN ${ingestItems.item_data_r2_key} IS NOT NULL
-        OR length(${ingestItems.item_data}) > ${SESSION_METRICS_WINDOW_MAX_ROW_BYTES} THEN ''
+        OR length(CAST(${ingestItems.item_data} AS BLOB)) > ${SESSION_METRICS_WINDOW_MAX_ROW_BYTES} THEN ''
       ELSE ${ingestItems.item_data}
     END`,
   };
@@ -69,6 +70,7 @@ export function readSessionMetricsWindow(db: DrizzleSqliteDODatabase): SessionMe
   const seenItemIds = new Set<string>();
   let consumedBytes = 0;
   let rowsRead = 0;
+  let droppedBody = false;
   let lastRowId: number | null = null;
   let stoppedForBudget = false;
 
@@ -97,9 +99,15 @@ export function readSessionMetricsWindow(db: DrizzleSqliteDODatabase): SessionMe
       seenItemIds.add(row.item_id);
       // A body the projection blanked, or one that needs more bytes than the scan has left,
       // contributes nothing. It still consumed a row of the ceiling.
-      if (row.item_data === '') continue;
+      if (row.item_data === '') {
+        droppedBody = true;
+        continue;
+      }
       const rowBytes = encoder.encode(row.item_data).byteLength;
-      if (rowBytes > SESSION_METRICS_WINDOW_MAX_ROW_BYTES) continue;
+      if (rowBytes > SESSION_METRICS_WINDOW_MAX_ROW_BYTES) {
+        droppedBody = true;
+        continue;
+      }
       if (consumedBytes + rowBytes > SESSION_METRICS_WINDOW_MAX_BYTES) {
         stoppedForBudget = true;
         break;
@@ -111,14 +119,14 @@ export function readSessionMetricsWindow(db: DrizzleSqliteDODatabase): SessionMe
     if (page.length < limit) break;
   }
 
-  // The window is partial when a ceiling stopped it with older rows left behind, or when the
-  // read kept no body: the counted figures then describe the newest part of the session only.
-  const bounded =
-    stoppedForBudget ||
-    (rowsRead >= SESSION_METRICS_WINDOW_MAX_ROWS &&
-      lastRowId !== null &&
-      hasRowOlderThan(db, lastRowId)) ||
-    (rowsRead > 0 && rows.length === 0);
+  // A read leaves stored rows out of the counted figures when a ceiling stopped it with older
+  // rows left behind, or when a body was projected away: the figures then describe part of the
+  // session only, and the caller treats them as partial.
+  const rowsBeyondCeiling =
+    rowsRead >= SESSION_METRICS_WINDOW_MAX_ROWS &&
+    lastRowId !== null &&
+    hasRowOlderThan(db, lastRowId);
+  const bounded = stoppedForBudget || droppedBody || rowsBeyondCeiling;
   if (bounded) {
     for (const row of readAnchorRows(db, seenItemIds)) rows.push(row);
   }
@@ -126,8 +134,8 @@ export function readSessionMetricsWindow(db: DrizzleSqliteDODatabase): SessionMe
   rows.sort((left, right) => left.id - right.id);
   return {
     rows: rows.map(row => ({ item_type: row.item_type, item_data: row.item_data })),
-    bounded,
     rowCount: rowsRead,
+    bounded,
   };
 }
 
@@ -135,7 +143,13 @@ function hasRowOlderThan(db: DrizzleSqliteDODatabase, id: number): boolean {
   const row = db
     .select({ id: ingestItems.id })
     .from(ingestItems)
-    .where(and(ne(ingestItems.item_type, 'session_diff'), lt(ingestItems.id, id)))
+    .where(
+      and(
+        ne(ingestItems.item_type, 'session_diff'),
+        notInArray(ingestItems.item_id, [...ANCHOR_ITEM_IDS]),
+        lt(ingestItems.id, id)
+      )
+    )
     .limit(1)
     .get();
   return row !== undefined;

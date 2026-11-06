@@ -577,3 +577,97 @@ describe('support access lifecycle switch and step-up failures', () => {
     });
   });
 });
+
+describe('admin.supportAccess viewAccess', () => {
+  test('a non-member admin without a grant must request access', async () => {
+    const admin = await insertRequester();
+    const { organization } = await orgWithOwner();
+    const caller = await stepUpCaller(admin.id);
+
+    await expect(
+      caller.admin.supportAccess.viewAccess({ organizationId: organization.id })
+    ).resolves.toEqual({ grantRequired: true, expiresAt: null });
+  });
+
+  test('an active own read grant lets the admin open the organization', async () => {
+    const admin = await insertRequester();
+    const { organization } = await orgWithOwner();
+    const caller = await stepUpCaller(admin.id);
+    const grant = await caller.admin.supportAccess.request({
+      organizationId: organization.id,
+      actionClass: 'support_read',
+      reason: 'investigating a customer report',
+    });
+
+    await expect(
+      caller.admin.supportAccess.viewAccess({ organizationId: organization.id })
+    ).resolves.toEqual({ grantRequired: false, expiresAt: grant.expiresAt });
+  });
+
+  test("another admin's grant does not count", async () => {
+    const holder = await insertRequester();
+    const other = await insertRequester();
+    const { organization } = await orgWithOwner();
+    await (
+      await stepUpCaller(holder.id)
+    ).admin.supportAccess.request({
+      organizationId: organization.id,
+      actionClass: 'support_read',
+      reason: 'investigating a customer report',
+    });
+
+    await expect(
+      (await stepUpCaller(other.id)).admin.supportAccess.viewAccess({
+        organizationId: organization.id,
+      })
+    ).resolves.toEqual({ grantRequired: true, expiresAt: null });
+  });
+
+  test('an admin who is a member needs no grant', async () => {
+    const admin = await insertRequester();
+    const organization = await createTestOrganization(
+      `support-access-${crypto.randomUUID()}`,
+      admin.id,
+      0
+    );
+    const caller = await stepUpCaller(admin.id);
+
+    await expect(
+      caller.admin.supportAccess.viewAccess({ organizationId: organization.id })
+    ).resolves.toEqual({ grantRequired: false, expiresAt: null });
+  });
+
+  test('no grant is required while support access is off', async () => {
+    delete process.env.SUPPORT_ACCESS_ENABLED;
+    const admin = await insertRequester();
+    const { organization } = await orgWithOwner();
+    const caller = await stepUpCaller(admin.id);
+
+    await expect(
+      caller.admin.supportAccess.viewAccess({ organizationId: organization.id })
+    ).resolves.toEqual({ grantRequired: false, expiresAt: null });
+  });
+});
+
+describe('admin.supportAccess list display names', () => {
+  test('active grants include the organization name and holder details', async () => {
+    const admin = await insertRequester();
+    const { organization } = await orgWithOwner();
+    const caller = await stepUpCaller(admin.id);
+    const grant = await caller.admin.supportAccess.request({
+      organizationId: organization.id,
+      actionClass: 'support_read',
+      reason: 'investigating a customer report',
+    });
+
+    const active = await caller.admin.supportAccess.listActive();
+    const listed = active.find(item => item.id === grant.id);
+
+    expect(listed).toMatchObject({
+      organizationId: organization.id,
+      organizationName: organization.name,
+      actor: { id: admin.id, name: admin.google_user_name, email: admin.google_user_email },
+      approvedBy: null,
+    });
+  });
+});

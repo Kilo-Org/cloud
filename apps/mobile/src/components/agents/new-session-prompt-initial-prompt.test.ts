@@ -12,6 +12,10 @@ import '@/i18n';
 import * as ReactI18next from 'react-i18next';
 
 const layoutDirection = vi.hoisted(() => ({ isRTL: false }));
+const keyboardMotion = vi.hoisted(() => ({ value: 0 }));
+vi.mock('@/components/keyboard-motion-provider', () => ({
+  useKeyboardMotionProgress: () => keyboardMotion,
+}));
 const TEXT_DIRECTIONS = [
   { direction: 'LTR', isRTL: false, style: undefined },
   {
@@ -91,6 +95,7 @@ vi.mock('react-native', () => ({
 
 vi.mock('react-native-reanimated', () => ({
   default: { View: 'Animated.View' },
+  createAnimatedComponent: (component: unknown) => component,
   FadeIn: { duration: vi.fn() },
   FadeOut: { duration: vi.fn() },
   // The composer's top fade resizes on the UI thread; there is none here, so
@@ -319,6 +324,7 @@ describe('NewSessionPrompt initialPrompt seed', () => {
     returnSendsMessage.current = false;
     layoutDirection.isRTL = false;
     dimensions.current = { fontScale: 1, height: 800, scale: 1, width: 400 };
+    keyboardMotion.value = 0;
   });
 
   it('shows the prefill failure row with retry and discard only when delivery failed', async () => {
@@ -610,5 +616,39 @@ describe('NewSessionPrompt initialPrompt seed', () => {
     expect(input?.style).toEqual(
       expect.arrayContaining([expect.objectContaining({ height: 160 })])
     );
+  });
+
+  it('interpolates from the compact closed preference to the typing preference', async () => {
+    const { NewSessionPrompt: renderPrompt } = await import('./new-session-prompt');
+    for (const { progress, height } of [
+      { progress: -0.1, height: 40 },
+      { progress: 0, height: 40 },
+      { progress: 0.5, height: 64 },
+      { progress: 1, height: 88 },
+      { progress: 1.1, height: 88 },
+    ]) {
+      keyboardMotion.value = progress;
+      const element = renderPrompt({
+        ...defaultProps(),
+        lineCount: 3,
+        keyboardClosedLineCount: 1,
+      }) as Node;
+      const input = findElementByType(element, 'TextInput');
+
+      expect(input?.style).toEqual(expect.arrayContaining([expect.objectContaining({ height })]));
+    }
+  });
+
+  it('keeps at least one full line when native keyboard progress exceeds its destination', async () => {
+    const { NewSessionPrompt: renderPrompt } = await import('./new-session-prompt');
+    keyboardMotion.value = 1.1;
+    const element = renderPrompt({
+      ...defaultProps(),
+      lineCount: 1,
+      keyboardClosedLineCount: 3,
+    }) as Node;
+    const input = findElementByType(element, 'TextInput');
+
+    expect(input?.style).toEqual(expect.arrayContaining([expect.objectContaining({ height: 40 })]));
   });
 });

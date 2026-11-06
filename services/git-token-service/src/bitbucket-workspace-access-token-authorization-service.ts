@@ -209,7 +209,7 @@ export function buildBitbucketWorkspaceAccessTokenAuthorizationQuery(
           platform_integrations.integration_type,
           BITBUCKET_WORKSPACE_ACCESS_TOKEN_INTEGRATION_TYPE
         ),
-        or(currentOrganizationMembership, eq(kilocode_users.is_admin, true))
+        currentOrganizationMembership
       )
     )
     .limit(1);

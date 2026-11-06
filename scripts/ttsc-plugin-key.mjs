@@ -6,9 +6,9 @@
 // resolved versions of the packages that build that transform - ttsc, typia,
 // @ttsc/unplugin and the TypeScript they run on - can change what it writes, so
 // the key covers their lockfile closure and not the whole lockfile: a
-// dependency change elsewhere in the monorepo keeps the compiled plugin. Any
-// failure exits non-zero: a key that misses an input would restore a plugin
-// built from other versions.
+// dependency change elsewhere in the monorepo keeps the compiled plugin. A
+// closure failure widens the key to the whole lockfile, so a wider key only
+// costs a miss and never restores a plugin built from other versions.
 import { buildKeyInput } from './build-key-inputs.mjs';
 
 const plugins = ['ttsc', 'typia', '@ttsc/unplugin', 'typescript'];

@@ -355,7 +355,6 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
             selection={selection}
             fallbackPath={path}
             fallbackLineLabel={lineRangeLabel}
-            fallbackSide={side}
             preferFallback={isEdit}
           />
           <View className="gap-1">

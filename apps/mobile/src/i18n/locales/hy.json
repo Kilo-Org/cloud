@@ -697,7 +697,7 @@
     },
     "connect": {
       "checkFailedTitle": "Չհաջողվեց ստուգել GitHub-ի հետ կապը",
-      "checkFailedMessage": "Մուտքի կարգավիճակը հասանելի կլինի բեռնումն ավարտվելուց հետո։",
+      "checkFailedMessage": "Չհաջողվեց հասնել GitHub-ին։ Ստուգիր կապդ և կրկին փորձիր։",
       "checkFailedTitleGitLab": "Չհաջողվեց ստուգել GitLab-ի հետ կապը",
       "checkFailedTitleBitbucket": "Չհաջողվեց ստուգել Bitbucket-ի հետ կապը",
       "providerCheckFailedMessage": "Միացման կարգավիճակը հասանելի չէ մինչև բեռնվելը։",

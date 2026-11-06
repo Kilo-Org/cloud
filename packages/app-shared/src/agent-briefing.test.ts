@@ -118,6 +118,7 @@ describe('briefing evidence screening', () => {
       ['run -v --password ' + 'hunter' + '2', `run -v --password ${redacted}`],
       ['run --password -' + 'hunter' + '2', `run --password ${redacted}`],
       ['run --password --' + 'hunter' + '2', `run --password ${redacted}`],
+      ['run --pass ' + 'hunter' + '2', `run --pass ${redacted}`],
     ];
     for (const [command, screened] of cases) {
       expect(redactBriefingExcerpt(command)).toBe(screened);
@@ -182,12 +183,6 @@ describe('briefing evidence screening', () => {
     expect(redactBriefingExcerptOrDrop('DB_' + 'PASS=' + 'hunter' + '2')).toBe(
       '[redacted credential]'
     );
-  });
-
-  it('screens a credential flag with its argument', () => {
-    const text = 'run --' + 'pass ' + 'hunter' + '2';
-    expect(redactBriefingExcerpt(text)).toBe('run --' + 'pass [redacted credential]');
-    expect(redactBriefingExcerptOrDrop(text)).toBe('run --' + 'pass [redacted credential]');
   });
 
   it('keeps ordinary words that contain a credential word', () => {

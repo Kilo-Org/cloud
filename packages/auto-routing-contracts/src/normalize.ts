@@ -85,6 +85,9 @@ const SENSITIVE_KEY_QUALIFIERS = [
 // A qualifier only counts when it ends immediately before a credential word, so
 // the scan before each occurrence never needs more than the longest qualifier.
 const MAX_QUALIFIER_LENGTH = Math.max(...SENSITIVE_KEY_QUALIFIERS.map(q => q.length));
+// These words also begin common English words, so they count only as an exact
+// token or a qualified occurrence, not at any token start.
+const TOKEN_START_EXCLUDED_WORDS: Record<string, true> = { pass: true };
 const REDUNDANT_CONTENT_TYPES = new Set([
   'function_call_output',
   'tool_call_output',
@@ -548,8 +551,9 @@ function isSensitiveToken(token: string) {
   if (SENSITIVE_KEY_WORDS.some(word => word === token || word === singular)) return true;
   for (const word of SENSITIVE_KEY_WORDS) {
     for (let index = token.indexOf(word); index !== -1; index = token.indexOf(word, index + 1)) {
-      // A token that starts with a credential word is a credential key.
-      if (index === 0) return true;
+      // A token that starts with a credential word is a credential key, unless
+      // the word is one that also begins ordinary words.
+      if (index === 0 && !TOKEN_START_EXCLUDED_WORDS[word]) return true;
       // A qualifier counts only when it ends immediately before the occurrence,
       // so the last MAX_QUALIFIER_LENGTH characters are the whole window that
       // can match one.

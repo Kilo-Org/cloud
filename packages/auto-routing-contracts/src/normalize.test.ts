@@ -352,6 +352,8 @@ describe('classifier input normalization', () => {
       monkey: 'banana',
       trespasses: 'none',
       overpass: 'closed',
+      passage: 'open',
+      passthrough: 'none',
     };
 
     expect(redactProviderHints({ provider, providerOptions: undefined })).toEqual({

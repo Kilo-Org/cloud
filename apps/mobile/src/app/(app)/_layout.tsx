@@ -129,12 +129,17 @@ export const unstable_settings = {
 export default function AppLayout() {
   const colors = useThemeColors();
   const sheetOptions = useFormSheetScreenOptions();
-  // Android's half-height search sheets leave their results behind the IME.
-  // Keep searchable sheets at the existing safe-area-capped full detent.
-  const searchSheetOptions =
-    Platform.OS === 'android'
-      ? { ...sheetOptions, sheetAllowedDetents: [sheetOptions.sheetAllowedDetents[1]] }
-      : sheetOptions;
+  // Searchable pickers pin the full detent: the half detent sizes the sheet to
+  // its header, so a short window (and the keyboard taking more of it) leaves
+  // less than one result row under the header. Android needs the full detent
+  // for that reason (measured: the half detent left results behind the IME);
+  // a resized iPad window behaves the same way (the half detent presented a
+  // 213pt sheet in a 501pt window, with the first row clipped at the sheet
+  // edge), so the pin is platform-wide now.
+  const searchSheetOptions = {
+    ...sheetOptions,
+    sheetAllowedDetents: [sheetOptions.sheetAllowedDetents[1]],
+  };
   // Android lays a formSheet route's content out at the sheet's largest
   // detent, not at the detent it presents: the run-target list measured 789dp
   // inside a sheet whose presented body is 384dp, so whatever overflowed the

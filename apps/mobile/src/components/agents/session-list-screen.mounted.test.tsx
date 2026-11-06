@@ -1926,6 +1926,27 @@ describe('AgentSessionListScreen live filtering', () => {
     expect(state.routeParams.status).toBeUndefined();
   });
 
+  it('clears the search too when a status filter and a search leave no rows', async () => {
+    state.live.activeSessions = [{ ...row, id: 'idle-1', status: 'idle' }];
+    state.routeParams = { status: 'idle' };
+    const renderer = await renderScreen();
+    const searchHeader = openSearch();
+    act(() => {
+      (searchHeader.props.onChangeText as (text: string) => void)('nothing matches this');
+    });
+
+    const emptyState = renderer.root.findByType(EmptyState);
+    const clearAction = emptyState.props.action as { props: { onPress: () => void } };
+    act(() => {
+      clearAction.props.onPress();
+    });
+
+    // Clearing only the status would land on the same empty body, so the action
+    // must also clear the search that still excludes every row.
+    expect(state.routeParams.status).toBeUndefined();
+    expect(nodes('FlashList')).toHaveLength(1);
+  });
+
   it('shows a clearable no-match state when every live row is filtered out', async () => {
     state.live.activeSessions = [
       { ...row, id: 'a1', organizationId: null, gitUrl: 'https://github.com/kilo/cloud.git' },

@@ -323,20 +323,22 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<AgentSessionListS
   const keyboardRowsInsets = useSessionListInsets({ bottomBand: rowsFrameBand, left, right });
   const rowsInsets = keyboardUp ? keyboardRowsInsets : listInsets;
 
-  // The no-match body's Clear action retires the filter that emptied the list:
-  // the transient status filter when the Home card set one, else the search,
-  // else the persisted filters. A status filter always reads as a filter, so
-  // the copy and the action agree even when a search is also active.
+  // The no-match body's Clear action retires everything that emptied the list.
+  // A status filter always reads as a filter, so the copy and the action agree
+  // even when a search is also active. With a status filter set, the search and
+  // any persisted filters still narrow the list, so the action drops all three;
+  // clearing only the status would land on the same empty body.
   const emptyCopyIsSearch = isSearching && statusKind === null;
-  // A status filter can empty a list only together with the persisted filters,
-  // so clear both when both are set; otherwise the action leaves the list empty.
+  const { handleClearSearch, handleClearFilters } = query;
   const clearStatusAndFilters = useCallback(() => {
-    query.handleClearFilters();
+    handleClearSearch();
+    handleClearFilters();
     clearStatusFilter();
-  }, [query.handleClearFilters, clearStatusFilter]);
+  }, [handleClearSearch, handleClearFilters, clearStatusFilter]);
   let clearNoMatch = query.handleClearFilters;
   if (statusKind !== null) {
-    clearNoMatch = query.activeFilterCount > 0 ? clearStatusAndFilters : clearStatusFilter;
+    clearNoMatch =
+      isSearching || query.activeFilterCount > 0 ? clearStatusAndFilters : clearStatusFilter;
   } else if (isSearching) {
     clearNoMatch = query.handleClearSearch;
   }

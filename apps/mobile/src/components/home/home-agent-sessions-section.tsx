@@ -6,6 +6,7 @@ import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
 
 import { type GlanceableStatusKind } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
+import { AGENTS_SESSIONS_INDEX_HREF } from '@/lib/agents-sessions-route';
 import { useSessionRowPress } from '@/components/agents/use-session-row-press';
 import { AdaptiveHomeCardFrame } from '@/components/home/adaptive-home-card-frame';
 import {
@@ -53,10 +54,10 @@ export function AgentSessionsSection({
   const openAgentsIndex = useCallback(
     (status?: GlanceableStatusKind) => {
       // An object href replaces the route params. A bare string would keep a
-      // status param a previous tap left behind, so See all must pass {}.
+      // status param a previous tap left behind, so See all clears them.
       const href: Href = status
         ? { pathname: '/(app)/(tabs)/(2_agents)/', params: { status } }
-        : { pathname: '/(app)/(tabs)/(2_agents)/', params: {} };
+        : AGENTS_SESSIONS_INDEX_HREF;
       router.navigate(href);
       router.dismissTo(href);
     },

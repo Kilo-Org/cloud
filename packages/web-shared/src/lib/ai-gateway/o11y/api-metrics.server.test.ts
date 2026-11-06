@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, test } from '@jest/globals';
 import { after } from 'next/server';
 import type {
   GatewayMessagesRequest,
@@ -7,6 +7,9 @@ import type {
   OpenRouterChatCompletionRequest,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import { emitApiMetricsForResponse, getToolsAvailable, getToolsUsed } from './api-metrics.server';
+import { parseMessagesMicrodollarUsageFromStream } from '../processUsage.messages';
+import { parseResponsesMicrodollarUsageFromStream } from '../processUsage.responses';
+import type { ProviderType } from '../providers/types';
 
 jest.mock('next/server', () => ({
   ...(jest.requireActual('next/server') as Record<string, unknown>),
@@ -191,58 +194,156 @@ describe('getToolsUsed', () => {
 
 describe('emitApiMetricsForResponse', () => {
   const originalFetch = globalThis.fetch;
+  const mockedFetch = jest.fn() as jest.MockedFunction<typeof globalThis.fetch>;
+  const params = {
+    kiloUserId: 'user-1',
+    isAnonymous: false,
+    isStreaming: true,
+    userByok: false,
+    provider: 'openrouter',
+    requestedModel: 'test-model',
+    resolvedModel: 'test-model',
+    toolsAvailable: [],
+    toolsUsed: [],
+    ttfbMs: 10,
+    statusCode: 200,
+  };
+
+  beforeEach(() => {
+    mockedFetch.mockReset();
+    mockedFetch.mockResolvedValue(new Response(null, { status: 204 }));
+    globalThis.fetch = mockedFetch;
+  });
 
   afterEach(() => {
-    jest.useRealTimers();
+    jest.restoreAllMocks();
     globalThis.fetch = originalFetch;
     jest.mocked(after).mockReset();
   });
 
-  test('stops draining an open stream at the deadline with a single timer', async () => {
-    jest.useFakeTimers();
-    const mockedFetch = jest.fn() as jest.MockedFunction<typeof globalThis.fetch>;
-    mockedFetch.mockResolvedValue(new Response(null, { status: 204 }));
-    globalThis.fetch = mockedFetch;
-    const encoder = new TextEncoder();
-    const stream = new ReadableStream<Uint8Array>({
-      start(controller) {
-        controller.enqueue(encoder.encode('data: {"provider":"Fireworks"}\n\n'));
-      },
-    });
+  test('registers an eager promise and measures parse completion, not deferred callback execution', async () => {
+    const stats = Promise.withResolvers<{ inference_provider: string }>();
+    const now = jest.spyOn(performance, 'now').mockReturnValue(100);
+    emitApiMetricsForResponse(params, stats.promise, 50);
 
-    emitApiMetricsForResponse(
-      {
-        kiloUserId: 'user-1',
-        isAnonymous: false,
-        isStreaming: true,
-        userByok: false,
-        provider: 'openrouter',
-        requestedModel: 'test-model',
-        resolvedModel: 'test-model',
-        toolsAvailable: [],
-        toolsUsed: [],
-        ttfbMs: 10,
-        statusCode: 200,
-      },
-      new Response(stream, { headers: { 'content-type': 'text/event-stream' } }),
-      performance.now()
-    );
+    const [task] = jest.mocked(after).mock.calls[0] ?? [];
+    expect(task).toBeInstanceOf(Promise);
+    expect(mockedFetch).not.toHaveBeenCalled();
 
-    const [callback] = jest.mocked(after).mock.calls[0] ?? [];
-    if (typeof callback !== 'function') throw new Error('Expected deferred metrics callback');
-    const drained = callback();
-    await jest.advanceTimersByTimeAsync(0);
-    expect(jest.getTimerCount()).toBe(1);
+    now.mockReturnValue(275);
+    stats.resolve({ inference_provider: 'Fireworks' });
+    await task;
 
-    await jest.advanceTimersByTimeAsync(60_000);
-    await drained;
-
-    expect(jest.getTimerCount()).toBe(0);
+    now.mockReturnValue(1000);
     expect(mockedFetch).toHaveBeenCalledTimes(1);
-    const [, init] = mockedFetch.mock.calls[0];
-    expect(JSON.parse(init?.body as string)).toMatchObject({
+    expect(JSON.parse(mockedFetch.mock.calls[0][1]?.body as string)).toMatchObject({
       inferenceProvider: 'Fireworks',
+      completeRequestMs: 225,
       clientSecret: 'test-secret',
     });
+  });
+
+  test.each([
+    { kind: 'messages', provider: 'openrouter', inferenceProvider: 'Anthropic' },
+    { kind: 'messages', provider: 'vercel', inferenceProvider: 'bedrock' },
+    { kind: 'responses', provider: 'vercel', inferenceProvider: 'anthropic' },
+  ] satisfies { kind: string; provider: ProviderType; inferenceProvider: string }[])(
+    'reports $kind stream provider from $provider usage parsing without cloning',
+    async ({ kind, provider, inferenceProvider }) => {
+      const clone = jest.spyOn(Response.prototype, 'clone');
+      const now = jest.spyOn(performance, 'now').mockReturnValue(150);
+      const encoder = new TextEncoder();
+      let controller: ReadableStreamDefaultController<Uint8Array> | undefined;
+      const stream = new ReadableStream<Uint8Array>({
+        start(value) {
+          controller = value;
+        },
+      });
+      const metadata = { gateway: { routing: { finalProvider: inferenceProvider } } };
+      const frames =
+        kind === 'messages'
+          ? [
+              {
+                type: 'message_start',
+                message: {
+                  id: 'msg-1',
+                  model: 'test-model',
+                  ...(provider === 'openrouter'
+                    ? { provider: inferenceProvider }
+                    : { provider_metadata: metadata }),
+                  usage: { input_tokens: 2, output_tokens: 0 },
+                },
+              },
+              {
+                type: 'message_delta',
+                delta: { stop_reason: 'end_turn' },
+                usage: { output_tokens: 1 },
+              },
+              { type: 'message_stop' },
+            ]
+          : [
+              {
+                type: 'response.created',
+                response: { id: 'resp-1', model: 'test-model', provider_metadata: metadata },
+              },
+              {
+                type: 'response.completed',
+                response: {
+                  id: 'resp-1',
+                  model: 'test-model',
+                  status: 'completed',
+                  usage: { input_tokens: 2, output_tokens: 1 },
+                },
+              },
+            ];
+      if (!controller) throw new Error('Expected stream controller');
+      controller.enqueue(
+        encoder.encode(frames.map(frame => `data: ${JSON.stringify(frame)}\n\n`).join(''))
+      );
+      const parse =
+        kind === 'messages'
+          ? parseMessagesMicrodollarUsageFromStream
+          : parseResponsesMicrodollarUsageFromStream;
+      const statsPromise = parse(stream, 'user-1', undefined, provider, 200, false, 100);
+
+      emitApiMetricsForResponse({ ...params, provider }, statsPromise, 100);
+      expect(mockedFetch).not.toHaveBeenCalled();
+      now.mockReturnValue(350);
+      controller.close();
+
+      const [task] = jest.mocked(after).mock.calls[0] ?? [];
+      expect(task).toBeInstanceOf(Promise);
+      await task;
+
+      expect(clone).not.toHaveBeenCalled();
+      expect(mockedFetch).toHaveBeenCalledTimes(1);
+      const [, init] = mockedFetch.mock.calls[0];
+      expect(JSON.parse(init?.body as string)).toMatchObject({
+        inferenceProvider,
+        completeRequestMs: 250,
+        clientSecret: 'test-secret',
+      });
+    }
+  );
+
+  test('emits metrics for a missing body without a provider', async () => {
+    emitApiMetricsForResponse(params, Promise.resolve(null), performance.now());
+    await jest.mocked(after).mock.calls[0]?.[0];
+
+    expect(mockedFetch).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(mockedFetch.mock.calls[0][1]?.body as string)).not.toHaveProperty(
+      'inferenceProvider'
+    );
+  });
+
+  test('propagates usage parse failure without emitting replacement metrics', async () => {
+    const stats = Promise.withResolvers<null>();
+    emitApiMetricsForResponse(params, stats.promise, performance.now());
+    const [task] = jest.mocked(after).mock.calls[0] ?? [];
+    const rejected = expect(task).rejects.toThrow('Usage parse failed');
+
+    stats.reject(new Error('Usage parse failed'));
+    await rejected;
+    expect(mockedFetch).not.toHaveBeenCalled();
   });
 });

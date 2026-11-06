@@ -267,7 +267,7 @@ describe('raw provider metadata archive with usage accounting', () => {
         Response.json({ ...jsonBody(apiKind), provider_metadata: metadata }),
         context,
         undefined
-      );
+      ).usagePromise;
 
       expect(fakeR2.send).not.toHaveBeenCalled();
       expect(fakeR2.objects.size).toBe(0);
@@ -285,7 +285,7 @@ describe('raw provider metadata archive with usage accounting', () => {
         Response.json({ ...jsonBody(apiKind), providerMetadata: metadata }),
         context,
         undefined
-      );
+      ).usagePromise;
 
       await runArchive();
       expectArchive(decision, metadata);
@@ -311,7 +311,7 @@ describe('raw provider metadata archive with usage accounting', () => {
         }),
         context,
         undefined
-      );
+      ).usagePromise;
 
       await runArchive();
       expectArchive(decision, metadata);
@@ -425,7 +425,7 @@ describe('raw provider metadata archive with usage accounting', () => {
         new Response(sse(...initialFrames(apiKind), frame)),
         context,
         undefined
-      );
+      ).usagePromise;
 
       expect(fakeR2.send).not.toHaveBeenCalled();
       await runArchive();
@@ -449,7 +449,7 @@ describe('raw provider metadata archive with usage accounting', () => {
       ),
       context,
       undefined
-    );
+    ).usagePromise;
 
     await runArchive();
     expectArchive(decision, metadata);
@@ -464,7 +464,7 @@ describe('raw provider metadata archive with usage accounting', () => {
       Response.json({ ...body, provider_metadata: metadata }),
       context,
       undefined
-    );
+    ).usagePromise;
 
     await runArchive();
     expectArchive(decision, metadata);
@@ -481,7 +481,7 @@ describe('raw provider metadata archive with usage accounting', () => {
       ),
       context,
       undefined
-    );
+    ).usagePromise;
 
     await runArchive();
     expectArchive(decision, metadata);
@@ -492,7 +492,9 @@ describe('raw provider metadata archive with usage accounting', () => {
 
   test.each(API_KINDS)('%s preserves a route-only archive with an absent body', async apiKind => {
     const { context, decision } = createRequest(apiKind, false);
-    await expect(countAndStoreUsage(new Response(null), context, undefined)).resolves.toBeNull();
+    await expect(
+      countAndStoreUsage(new Response(null), context, undefined).usagePromise
+    ).resolves.toBeNull();
 
     await runArchive();
     expectArchive(decision);
@@ -504,7 +506,7 @@ describe('raw provider metadata archive with usage accounting', () => {
     async apiKind => {
       const { context, decision } = createRequest(apiKind, false);
       await expect(
-        countAndStoreUsage(new Response('{invalid JSON'), context, undefined)
+        countAndStoreUsage(new Response('{invalid JSON'), context, undefined).usagePromise
       ).rejects.toThrow(SyntaxError);
 
       await expect(runArchive()).resolves.toBeUndefined();
@@ -523,7 +525,7 @@ describe('raw provider metadata archive with usage accounting', () => {
       const { context, decision, capture } = createRequest(apiKind, true);
       const captured = jest.spyOn(capture, 'captureVercelMetadata');
       const upstream = controlledResponse();
-      const accounting = countAndStoreUsage(upstream.response, context, undefined);
+      const accounting = countAndStoreUsage(upstream.response, context, undefined).usagePromise;
       const partial = metadataFrame(apiKind, metadata);
       await upstream.write(sse(...initialFrames(apiKind), partial));
       await nextTurn();
@@ -547,7 +549,11 @@ describe('raw provider metadata archive with usage accounting', () => {
   test('client cancellation does not discard late metadata from the accounting response clone', async () => {
     const { context, decision } = createRequest('chat_completions', true);
     const upstream = controlledResponse();
-    const accounting = countAndStoreUsage(upstream.response.clone(), context, undefined);
+    const accounting = countAndStoreUsage(
+      upstream.response.clone(),
+      context,
+      undefined
+    ).usagePromise;
     await upstream.write(sse(...initialFrames('chat_completions')));
     const client = upstream.response.body?.getReader();
     if (!client) throw new Error('Expected client response body');
@@ -573,7 +579,7 @@ describe('raw provider metadata archive with usage accounting', () => {
         ),
         context,
         undefined
-      );
+      ).usagePromise;
 
       await runArchive();
       expectArchive(decision, metadata);
@@ -590,7 +596,7 @@ describe('raw provider metadata archive with usage accounting', () => {
     async ({ apiKind, provider }) => {
       const { context, decision } = createRequest(apiKind, true, provider);
       const upstream = controlledResponse();
-      const accounting = countAndStoreUsage(upstream.response, context, undefined);
+      const accounting = countAndStoreUsage(upstream.response, context, undefined).usagePromise;
       const upload = runArchive();
       await nextTurn();
       if (provider === 'vercel') expect(fakeR2.send).not.toHaveBeenCalled();
@@ -643,7 +649,7 @@ describe('raw provider metadata archive with usage accounting', () => {
         Response.json({ ...jsonBody(apiKind), provider_metadata: metadata }),
         context,
         undefined
-      );
+      ).usagePromise;
 
       await runArchive();
       expectArchive(decision, metadata);
@@ -663,7 +669,7 @@ describe('raw provider metadata archive with usage accounting', () => {
         ),
         context,
         undefined
-      );
+      ).usagePromise;
 
       await runArchive();
       expectArchive(decision, metadata);
@@ -686,7 +692,7 @@ describe('raw provider metadata archive with usage accounting', () => {
         }),
         context,
         undefined
-      );
+      ).usagePromise;
 
       await runArchive();
       expectArchive(decision, metadata);
@@ -701,7 +707,7 @@ describe('raw provider metadata archive with usage accounting', () => {
       Response.json({ ...jsonBody('chat_completions'), provider_metadata: metadata }),
       context,
       undefined
-    );
+    ).usagePromise;
 
     await runArchive();
     expectArchive(decision);
@@ -715,7 +721,7 @@ describe('raw provider metadata archive with usage accounting', () => {
       Response.json({ ...jsonBody('chat_completions'), provider_metadata: metadata }),
       context,
       undefined
-    );
+    ).usagePromise;
     const upload = runArchive();
 
     await expect(accounting).resolves.toEqual(

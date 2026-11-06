@@ -227,6 +227,7 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/upstream-request');
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache');
 jest.mock('@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server', () => ({
   emitApiMetricsForResponse: jest.fn(),
+  emitGatewayApiMetrics: jest.fn(),
   getToolsAvailable: jest.fn(() => false),
   getToolsUsed: jest.fn(() => false),
 }));
@@ -334,6 +335,11 @@ const mockedGetOpenRouterModels = jest.mocked(getOpenRouterModelsFromDatabase);
 const mockedIsValidOpenRouterModelId = jest.mocked(isValidOpenRouterModelId);
 const mockedEmitApiMetricsForResponse = jest.mocked(emitApiMetricsForResponse);
 const mockedAccountForMicrodollarUsage = jest.mocked(accountForMicrodollarUsage);
+function usageAccountingResult(
+  usagePromise: Promise<UsageAccountingResult | null> = Promise.resolve(null)
+) {
+  return { statsPromise: Promise.resolve(null), usagePromise };
+}
 const mockedFetchEfficientAutoDecision = jest.mocked(fetchEfficientAutoDecision);
 const mockedFetchCustomRouterDecision = jest.mocked(fetchCustomRouterDecision);
 const mockedFindCustomRouter = jest.mocked(findCustomRouter);
@@ -508,7 +514,30 @@ describe('POST /api/v1/chat/completions bearer audiences', () => {
       response: upstreamJsonResponse({ id: 'chatcmpl-1', model: 'openai/gpt-4o', choices: [] }),
     });
     mockedEmitApiMetricsForResponse.mockReturnValue(undefined);
-    mockedAccountForMicrodollarUsage.mockResolvedValue(null);
+    mockedAccountForMicrodollarUsage.mockReturnValue(usageAccountingResult());
+  });
+
+  it('clones the upstream response only for usage accounting', async () => {
+    const upstreamResponse = upstreamJsonResponse({
+      id: 'chatcmpl-1',
+      model: 'openai/gpt-4o',
+      choices: [],
+    });
+    const cloneSpy = jest.spyOn(upstreamResponse, 'clone');
+    mockedUpstreamRequest.mockResolvedValue({ type: 'success', response: upstreamResponse });
+    setUserAuth();
+
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+    const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
+
+    expect(response.status).toBe(200);
+    expect(cloneSpy).toHaveBeenCalledTimes(1);
+    expect(mockedAccountForMicrodollarUsage.mock.calls[0]?.[0]).toBe(
+      cloneSpy.mock.results[0]?.value
+    );
+    expect(mockedEmitApiMetricsForResponse.mock.calls[0]?.[1]).toBe(
+      mockedAccountForMicrodollarUsage.mock.results[0]?.value.statsPromise
+    );
   });
 
   it('serves a free model to a client that sends the anonymous sentinel', async () => {
@@ -828,7 +857,7 @@ describe('POST /api/v1/chat/completions request handling', () => {
       response: upstreamJsonResponse({ id: 'chatcmpl-1', model: 'openai/gpt-4o', choices: [] }),
     });
     mockedEmitApiMetricsForResponse.mockReturnValue(undefined);
-    mockedAccountForMicrodollarUsage.mockResolvedValue(null);
+    mockedAccountForMicrodollarUsage.mockReturnValue(usageAccountingResult());
   });
 
   it('rejects providerOptions and directs clients to provider', async () => {
@@ -1011,11 +1040,11 @@ describe('POST /api/v1/chat/completions request handling', () => {
         bypassAccessCheck: false,
       };
     });
-    mockedAccountForMicrodollarUsage.mockImplementation(async (_response, usageContext) => {
+    mockedAccountForMicrodollarUsage.mockImplementation((_response, usageContext) => {
       const capture = usageContext.providerMetadataCapture;
       capture?.captureVercelMetadata(vercelFrame);
       capture?.waitFor(Promise.resolve());
-      return null;
+      return usageAccountingResult();
     });
     const { handleLlmProxyRequest } = await import('./llm-proxy');
 
@@ -2691,7 +2720,7 @@ describe('kilo-auto/efficient classifier billing', () => {
       }),
     });
     mockedEmitApiMetricsForResponse.mockReturnValue(undefined);
-    mockedAccountForMicrodollarUsage.mockResolvedValue(null);
+    mockedAccountForMicrodollarUsage.mockReturnValue(usageAccountingResult());
     mockedLogMicrodollarUsage.mockResolvedValue(null);
     mockedGetEffectiveModelDecision.mockResolvedValue({ allowed: true });
     mockedCollectDeniedAutoRoutingModelIds.mockResolvedValue([]);
@@ -3582,7 +3611,7 @@ describe('auto-routing shadow classifier', () => {
       response: upstreamJsonResponse({ id: 'chatcmpl-1', model: 'openai/gpt-4o', choices: [] }),
     });
     mockedEmitApiMetricsForResponse.mockReturnValue(undefined);
-    mockedAccountForMicrodollarUsage.mockResolvedValue(null);
+    mockedAccountForMicrodollarUsage.mockReturnValue(usageAccountingResult());
     mockedApplyResolvedAutoModel.mockImplementation(async (opts, request) => {
       if (opts.efficientDecision) await opts.efficientDecision();
       request.body.model = 'openai/gpt-4o';
@@ -3668,7 +3697,7 @@ describe('custom routers and signed auto decisions', () => {
       response: upstreamJsonResponse({ id: 'chatcmpl-1', model: haiku, choices: [] }),
     });
     mockedEmitApiMetricsForResponse.mockReturnValue(undefined);
-    mockedAccountForMicrodollarUsage.mockResolvedValue(null);
+    mockedAccountForMicrodollarUsage.mockReturnValue(usageAccountingResult());
     mockedGetEffectiveModelDecision.mockResolvedValue({ allowed: true });
     mockedDeniedAutoRoutingCandidates.mockResolvedValue([]);
     mockedFindCustomRouter.mockResolvedValue(personalRouter);
@@ -4360,7 +4389,7 @@ describe('briefing gateway accounting receipts', () => {
       type: 'success',
       response: upstreamJsonResponse({ id: 'chatcmpl-1', model: 'openai/gpt-4o', choices: [] }),
     });
-    mockedAccountForMicrodollarUsage.mockResolvedValue(null);
+    mockedAccountForMicrodollarUsage.mockReturnValue(usageAccountingResult());
   });
 
   async function prepare() {
@@ -4433,7 +4462,7 @@ describe('briefing gateway accounting receipts', () => {
   it('stores completion after accounting without changing the response', async () => {
     const prepared = await prepare();
     const completion = Promise.withResolvers<UsageAccountingResult | null>();
-    mockedAccountForMicrodollarUsage.mockReturnValueOnce(completion.promise);
+    mockedAccountForMicrodollarUsage.mockReturnValueOnce(usageAccountingResult(completion.promise));
     const response = await handleLlmProxyRequest(makeRequest(makeBody(), prepared.headers));
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({
@@ -4454,7 +4483,7 @@ describe('briefing gateway accounting receipts', () => {
   it('stores accounting completion after response handling fails', async () => {
     const prepared = await prepare();
     const completion = Promise.withResolvers<UsageAccountingResult | null>();
-    mockedAccountForMicrodollarUsage.mockReturnValueOnce(completion.promise);
+    mockedAccountForMicrodollarUsage.mockReturnValueOnce(usageAccountingResult(completion.promise));
     mockedRewriteModelResponse.mockRejectedValueOnce(new Error('Response unavailable'));
     await expect(handleLlmProxyRequest(makeRequest(makeBody(), prepared.headers))).rejects.toThrow(
       'Response unavailable'
@@ -4471,7 +4500,9 @@ describe('briefing gateway accounting receipts', () => {
 
   it('leaves completion pending when accounting is unavailable', async () => {
     const prepared = await prepare();
-    mockedAccountForMicrodollarUsage.mockRejectedValueOnce(new Error('Accounting unavailable'));
+    mockedAccountForMicrodollarUsage.mockReturnValueOnce(
+      usageAccountingResult(Promise.reject(new Error('Accounting unavailable')))
+    );
     const response = await handleLlmProxyRequest(makeRequest(makeBody(), prepared.headers));
     expect(response.status).toBe(200);
     await finishAfterTasks();
@@ -4521,7 +4552,9 @@ describe('briefing gateway accounting receipts', () => {
         return { kind: 'ok', resolved: { model: 'openai/gpt-4o' } };
       });
     }
-    mockedAccountForMicrodollarUsage.mockResolvedValueOnce(prepared.usage);
+    mockedAccountForMicrodollarUsage.mockReturnValueOnce(
+      usageAccountingResult(Promise.resolve(prepared.usage))
+    );
     const request = makeRequest(
       { ...body, stream: variant === 'streaming' },
       Object.fromEntries(headers)
@@ -4741,7 +4774,7 @@ describe('Enkrypt output guardrail', () => {
     mockedIsValidOpenRouterModelId.mockResolvedValue(true);
     respondUpstream('chat_completions', false);
     mockedEmitApiMetricsForResponse.mockReturnValue(undefined);
-    mockedAccountForMicrodollarUsage.mockResolvedValue(null);
+    mockedAccountForMicrodollarUsage.mockReturnValue(usageAccountingResult());
     fetchSpy = jest.spyOn(global, 'fetch');
   });
 
@@ -5060,16 +5093,19 @@ describe('Enkrypt output guardrail', () => {
     respondUpstream('messages', true);
     enkryptAnswers(piiDetected);
     let billedBody: string | undefined;
-    mockedAccountForMicrodollarUsage.mockImplementation(async clone => {
-      billedBody = await clone.text();
-      return null;
+    mockedAccountForMicrodollarUsage.mockImplementation(clone => {
+      const usagePromise = (async () => {
+        billedBody = await clone.text();
+        return null;
+      })();
+      return usageAccountingResult(usagePromise);
     });
 
     const response = await sendRequest('messages', true);
 
     expect(await response.text()).not.toContain(secret);
     expect(mockedAccountForMicrodollarUsage).toHaveBeenCalledTimes(1);
-    await mockedAccountForMicrodollarUsage.mock.results[0]?.value;
+    await mockedAccountForMicrodollarUsage.mock.results[0]?.value.usagePromise;
     expect(billedBody).toBe(upstreamBody('messages', true));
   });
 
@@ -5483,7 +5519,7 @@ describe('Enkrypt input guardrail', () => {
       response: upstreamJsonResponse({ id: 'chatcmpl-1', model: 'openai/gpt-4o', choices: [] }),
     });
     mockedEmitApiMetricsForResponse.mockReturnValue(undefined);
-    mockedAccountForMicrodollarUsage.mockResolvedValue(null);
+    mockedAccountForMicrodollarUsage.mockReturnValue(usageAccountingResult());
     mockRedisValues.clear();
     fetchSpy = jest.spyOn(global, 'fetch');
   });

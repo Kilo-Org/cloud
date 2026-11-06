@@ -151,7 +151,13 @@ export function checkTouchOverlap(tree: LayoutTree): Finding[] {
       }
       if (nearestScroll(a) !== nearestScroll(b)) continue;
       if (!intersects(a.visibleRect, b.visibleRect)) continue;
-      if (contains(a.rect, b.rect, TOLERANCE_DP) || contains(b.rect, a.rect, TOLERANCE_DP))
+      // Containment is judged in the same space as the overlap below: the
+      // visible areas are what a tap reaches, and a node whose visible area sits
+      // inside another's is the one that takes the tap, so the two never compete.
+      if (
+        contains(a.visibleRect, b.visibleRect, TOLERANCE_DP) ||
+        contains(b.visibleRect, a.visibleRect, TOLERANCE_DP)
+      )
         continue;
       const overlap = intersection(a.visibleRect, b.visibleRect);
       findings.push(

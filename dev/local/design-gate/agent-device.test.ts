@@ -125,6 +125,7 @@ test('agent-device snapshot converts app nodes to a ProbeDump in dp', () => {
     parent: 2,
     tag: 'ViewGroup',
     rect: [198.86, 529.9, 13.71, 14.1],
+    style: { overflow: 'hidden' },
     label: 'seed-small-target',
     pressable: true,
   });
@@ -269,17 +270,20 @@ const SCROLLED_TRANSCRIPT = JSON.stringify({
   },
 });
 
-test('agent-device snapshot clips a text run to the row that draws it', () => {
+test('agent-device snapshot marks a scrolled box as one that clips what it draws', () => {
   const dump = agentDeviceToProbeDump(SCROLLED_TRANSCRIPT);
   const byLabel = (query: string): ProbeNode =>
     dump.nodes.find(entry => entry.label === query || entry.text === query) ?? dump.nodes[0];
+  // Every node keeps the frame the platform gave it, so the size and overflow
+  // rules still measure this control instead of the slice of a pane it shows.
   assert.deepEqual(
     byLabel('Padded so fifty messages overflow the chat viewport.').rect,
-    [95.24, 136.76, 289.9, 81.9]
+    [95.24, 74.67, 289.9, 144]
   );
-  assert.deepEqual(byLabel('User message 57 of 60.').rect, [95.24, 136.76, 168.76, 0]);
-  // A child of a scrolling pane keeps the frame the platform gave it.
-  assert.deepEqual(byLabel('Assistant message').rect, [0, 254.86, 411.43, 154.67]);
+  assert.deepEqual(byLabel('Assistant message').style, { overflow: 'hidden' });
+  // A box outside every scrolling pane keeps its frame and carries no marker:
+  // a child that really paints outside it must still reach the overflow rules.
+  assert.equal(dump.nodes.find(entry => entry.tag === 'FrameLayout')?.style, undefined);
 });
 
 test('a clipped text run leaves one tap owner on the message row', () => {

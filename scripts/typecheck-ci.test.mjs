@@ -575,9 +575,14 @@ test('the harness SDK action restores dist and builds only on a miss', () => {
   assert.equal(plugins[0].id, 'plugins');
   // macOS has no ci.yml writer for its platform-scoped key, so this action
   // writes the macOS key itself, after the build that compiled the plugins.
+  // The save requires the build path: a skipped restore leaves its outputs
+  // empty, and a save keyed on them would write nothing.
   const macSave = steps.find(step => step.uses?.startsWith('actions/cache/save@'));
   assert.ok(macSave, 'the build action writes the macOS key');
-  assert.equal(macSave.if, "runner.os == 'macOS' && steps.plugins.outputs.cache-hit != 'true'");
+  assert.equal(
+    macSave.if,
+    "runner.os == 'macOS' && steps.cache.outputs.cache-hit != 'true' && steps.plugins.outputs.cache-hit != 'true'"
+  );
   assert.equal(steps.indexOf(macSave), steps.length - 1);
 });
 

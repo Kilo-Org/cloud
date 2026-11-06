@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect, useId, useRef } from 'react';
+import { useState, useCallback, useId } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAtomValue } from 'jotai';
 import { MessageSquareWarning, Loader2, Check, History } from 'lucide-react';
@@ -43,14 +43,7 @@ export function FeedbackDialog({ organizationId, kiloSessionId }: FeedbackDialog
 
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const historyHeadingId = useId();
-
-  useEffect(() => {
-    return () => {
-      if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
-    };
-  }, []);
 
   // Prior submissions from this account, so the dialog can show that feedback
   // was already sent instead of starting blank every time. Only fetched while
@@ -73,20 +66,14 @@ export function FeedbackDialog({ organizationId, kiloSessionId }: FeedbackDialog
     trpc.cloudAgentNextFeedback.create.mutationOptions({
       onSuccess: () => {
         setShowSuccess(true);
+        setFeedbackText('');
         void queryClient.invalidateQueries(trpc.cloudAgentNextFeedback.list.queryFilter());
-        closeTimerRef.current = setTimeout(() => {
-          setIsOpen(false);
-        }, 1200);
       },
     })
   );
 
   const handleOpenChange = useCallback(
     (open: boolean) => {
-      if (closeTimerRef.current) {
-        clearTimeout(closeTimerRef.current);
-        closeTimerRef.current = null;
-      }
       setIsOpen(open);
       setFeedbackText('');
       setShowSuccess(false);
@@ -97,6 +84,7 @@ export function FeedbackDialog({ organizationId, kiloSessionId }: FeedbackDialog
 
   const handleSubmit = useCallback(() => {
     if (!feedbackText.trim()) return;
+    setShowSuccess(false);
 
     mutate({
       cloud_agent_session_id: currentSessionId ?? undefined,
@@ -145,81 +133,75 @@ export function FeedbackDialog({ organizationId, kiloSessionId }: FeedbackDialog
         </DialogHeader>
 
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto">
-          {showSuccess ? (
-            <div className="flex items-center justify-center py-8" role="status" aria-live="polite">
-              <Check className="h-6 w-6 text-green-500" />
-              <span className="ml-2 text-sm text-green-500">Thank you for your feedback!</span>
+          <Textarea
+            placeholder="What's on your mind?"
+            value={feedbackText}
+            onChange={e => setFeedbackText(e.target.value)}
+            rows={4}
+            disabled={isPending}
+            autoFocus
+          />
+
+          {error && (
+            <div className="rounded-md bg-red-500/10 p-3 text-sm text-red-400" role="alert">
+              {error.data?.code === 'TOO_MANY_REQUESTS'
+                ? error.message
+                : 'Failed to send feedback. Please try again.'}
             </div>
-          ) : (
-            <>
-              <Textarea
-                placeholder="What's on your mind?"
-                value={feedbackText}
-                onChange={e => setFeedbackText(e.target.value)}
-                rows={4}
-                disabled={isPending}
-                autoFocus
-              />
+          )}
 
-              {error && (
-                <div className="rounded-md bg-red-500/10 p-3 text-sm text-red-400" role="alert">
-                  {error.data?.code === 'TOO_MANY_REQUESTS'
-                    ? error.message
-                    : 'Failed to send feedback. Please try again.'}
-                </div>
+          {showSuccess && (
+            <div className="flex items-center gap-2" role="status" aria-live="polite">
+              <Check className="h-4 w-4 text-green-500" />
+              <span className="text-sm text-green-500">Thank you for your feedback!</span>
+            </div>
+          )}
+
+          <div className="flex justify-end">
+            <Button onClick={handleSubmit} disabled={isPending || !feedbackText.trim()} size="sm">
+              {isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Sending...
+                </>
+              ) : (
+                'Send Feedback'
               )}
+            </Button>
+          </div>
 
-              <div className="flex justify-end">
-                <Button
-                  onClick={handleSubmit}
-                  disabled={isPending || !feedbackText.trim()}
-                  size="sm"
-                >
-                  {isPending ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Sending...
-                    </>
-                  ) : (
-                    'Send Feedback'
-                  )}
-                </Button>
+          {showHistorySection && (
+            <div className="border-t pt-4">
+              <div className="text-muted-foreground mb-2 flex items-center gap-1.5">
+                <History className="h-3.5 w-3.5" aria-hidden="true" />
+                <h3 id={historyHeadingId} className="text-xs font-medium">
+                  Your recent feedback
+                </h3>
               </div>
-
-              {showHistorySection && (
-                <div className="border-t pt-4">
-                  <div className="text-muted-foreground mb-2 flex items-center gap-1.5">
-                    <History className="h-3.5 w-3.5" aria-hidden="true" />
-                    <h3 id={historyHeadingId} className="text-xs font-medium">
-                      Your recent feedback
-                    </h3>
-                  </div>
-                  {history.length > 0 ? (
-                    <ul aria-labelledby={historyHeadingId} className="space-y-2 pr-1">
-                      {history.map(item => {
-                        const timestamp = formatFeedbackTimestamp(item.created_at);
-                        return (
-                          <li key={item.id} className="bg-muted/50 rounded-md px-3 py-2">
-                            <p className="text-foreground line-clamp-2 text-sm break-words">
-                              {item.feedback_text}
-                            </p>
-                            {timestamp && (
-                              <p className="text-muted-foreground mt-0.5 text-xs">{timestamp}</p>
-                            )}
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  ) : historyLoading ? (
-                    <p className="text-muted-foreground text-xs">Loading recent feedback...</p>
-                  ) : historyError ? (
-                    <p className="text-muted-foreground text-xs" role="status">
-                      Could not load recent feedback. Close and reopen the dialog to try again.
-                    </p>
-                  ) : null}
-                </div>
-              )}
-            </>
+              {history.length > 0 ? (
+                <ul aria-labelledby={historyHeadingId} className="space-y-2 pr-1">
+                  {history.map(item => {
+                    const timestamp = formatFeedbackTimestamp(item.created_at);
+                    return (
+                      <li key={item.id} className="bg-muted/50 rounded-md px-3 py-2">
+                        <p className="text-foreground line-clamp-2 text-sm break-words">
+                          {item.feedback_text}
+                        </p>
+                        {timestamp && (
+                          <p className="text-muted-foreground mt-0.5 text-xs">{timestamp}</p>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : historyLoading ? (
+                <p className="text-muted-foreground text-xs">Loading recent feedback...</p>
+              ) : historyError ? (
+                <p className="text-muted-foreground text-xs" role="status">
+                  Could not load recent feedback. Close and reopen the dialog to try again.
+                </p>
+              ) : null}
+            </div>
           )}
         </div>
       </DialogContent>

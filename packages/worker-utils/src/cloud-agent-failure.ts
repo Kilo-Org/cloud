@@ -145,6 +145,11 @@ export type SessionFailureStagesCoverDatabase = [
   ? true
   : never;
 
+// Materialise the guard: a bare type alias resolving to never compiles
+// cleanly, so only a value of that type makes a missing stage fail the build.
+const sessionFailureStagesCoverDatabase: SessionFailureStagesCoverDatabase = true;
+void sessionFailureStagesCoverDatabase;
+
 export const CloudAgentSessionFailureStageSchema = z.enum(CLOUD_AGENT_SESSION_FAILURE_STAGES);
 
 export const SESSION_FAILURE_MESSAGES = {

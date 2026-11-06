@@ -1,6 +1,9 @@
 import { type CloudAgentRunStateReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
 
-import type { CloudAgentFailureCode } from '@kilocode/worker-utils/cloud-agent-failure';
+import {
+  userVisibleFailureMessage,
+  type CloudAgentFailureCode,
+} from '@kilocode/worker-utils/cloud-agent-failure';
 
 /**
  * Operator-grade diagnostic copied into cloud_agent_session_runs.error_message_redacted.
@@ -27,8 +30,10 @@ export const FAILED_RUN_DIAGNOSTIC_MESSAGES: Partial<Record<CloudAgentFailureCod
   unclassified: 'Run failed without a classified cause',
 };
 
-export function failedRunDiagnosticMessage(code: CloudAgentFailureCode): string | undefined {
-  return FAILED_RUN_DIAGNOSTIC_MESSAGES[code];
+export function failedRunDiagnosticMessage(code: CloudAgentFailureCode): string {
+  // Codes added after this map was written still get a specific diagnostic
+  // instead of falling through to the unclassified fallback.
+  return FAILED_RUN_DIAGNOSTIC_MESSAGES[code] ?? userVisibleFailureMessage(code);
 }
 
 export type RunReportAnchor = {

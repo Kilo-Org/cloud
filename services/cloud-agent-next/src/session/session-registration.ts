@@ -1140,6 +1140,16 @@ async function allocateNewSession(
       throw creationInProgressError();
     }
     // `ready` continues normally.
+  } else if (ingestResult !== undefined && ingestResult.status === 'rejected') {
+    // The ingest plane declined this create (the destination is not accepting
+    // data, the source is unreadable, or the identity conflicts). Record the
+    // destination IDs as retired so a same-key retry allocates fresh ones
+    // instead of resuming IDs the ingest plane will not admit.
+    if (ledger) {
+      await recordCloneTombstone(ledger, { cloudAgentSessionId, kiloSessionId });
+      await ledger.onFailure('ownership_row', ingestResult.code);
+    }
+    throw new TRPCError({ code: 'BAD_REQUEST', message: ingestResult.code });
   }
 
   return {
@@ -2571,6 +2581,14 @@ async function resumeFirstWorktreeCreate(
     }
 
     if (ingestResult?.status === 'rejected') {
+      // A destination the ingest plane refuses must not be resumed: record
+      // the IDs as retired so a same-key retry allocates fresh ones.
+      if (ingestResult.code === 'session_retired') {
+        await recordCloneTombstone(hooks, {
+          cloudAgentSessionId: allocation.cloudAgentSessionId,
+          kiloSessionId: allocation.kiloSessionId,
+        });
+      }
       await hooks.onFailure('ownership_row', ingestResult.code);
       throw new TRPCError({ code: 'BAD_REQUEST', message: ingestResult.code });
     }

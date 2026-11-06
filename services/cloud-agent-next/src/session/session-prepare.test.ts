@@ -8127,6 +8127,95 @@ describe('createSessionWithLedger clone reconciliation', () => {
   });
 });
 
+describe('createSessionWithLedger non-clone rejection', () => {
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    fetchByocVercelEnrollmentMock.mockReset();
+    const actualPlacement =
+      await vi.importActual<typeof SandboxPlacementModule>('../sandbox-placement.js');
+    selectControlPlaneSandboxMock.mockImplementation(actualPlacement.selectControlPlaneSandbox);
+    generateSessionIdMock.mockReturnValue(SANDBOX_SESSION_ID);
+    generateKiloSessionIdMock.mockReturnValue(KILO_SESSION_ID);
+    settleOperationMock.mockResolvedValue({ settled: true });
+    markReconcilePendingMock.mockResolvedValue({});
+    recordOperationProgressMock.mockResolvedValue(undefined);
+    createCliSessionMock.mockResolvedValue(undefined);
+  });
+
+  it('tombstones a refused non-clone create so the next same-key retry allocates fresh IDs', async () => {
+    const request = makeRequest({ options: { operationKey: OPERATION_KEY } });
+    const doStub = makeDoStub();
+    const ctx = makeContext(doStub);
+
+    // Attempt 1: the ingest plane refuses the destination outright. The
+    // best-effort settle fails, so the row stays non-terminal and the
+    // tombstone is what protects the retry.
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'admitted',
+      row: makeLedgerRow({}),
+    });
+    createCliSessionMock.mockResolvedValueOnce({
+      status: 'rejected',
+      code: 'session_retired',
+    });
+    settleOperationMock.mockRejectedValueOnce(new Error('ledger db unavailable'));
+    getPgDbMock.mockReturnValue(makeDb([[{ email: 'test@example.com' }]]));
+
+    await expect(runCreate(ctx, request)).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: 'session_retired',
+    });
+
+    expect(recordOperationProgressMock).toHaveBeenCalledWith(expect.any(Object), ROW_ID, {
+      [SESSION_CREATE_TOMBSTONED_IDS_KEY]: {
+        cloudAgentSessionId: SANDBOX_SESSION_ID,
+        kiloSessionId: KILO_SESSION_ID,
+      },
+    });
+    expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+    expect(doStub.registerSession).not.toHaveBeenCalled();
+
+    // Attempt 2: the same-key retry sees the tombstone and allocates fresh IDs.
+    const FRESH_CLOUD_ID = 'workspace_fresh_11111111-1111-1111-1111-111111111111';
+    const FRESH_KILO_ID = 'ses_fresh_222222222222222222222222';
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'takeover',
+      row: makeLedgerRow({
+        canonical_result: {
+          cloudAgentSessionId: SANDBOX_SESSION_ID,
+          kiloSessionId: KILO_SESSION_ID,
+          [SESSION_CREATE_INTENT_FINGERPRINT_KEY]: await sessionCreateIntentFingerprint(request),
+          [SESSION_CREATE_TOMBSTONED_IDS_KEY]: {
+            cloudAgentSessionId: SANDBOX_SESSION_ID,
+            kiloSessionId: KILO_SESSION_ID,
+          },
+        },
+      }),
+    });
+    generateSessionIdMock.mockReturnValueOnce(FRESH_CLOUD_ID);
+    generateKiloSessionIdMock.mockReturnValueOnce(FRESH_KILO_ID);
+    createCliSessionMock.mockResolvedValue({
+      status: 'ready',
+      clone: { sessionId: FRESH_KILO_ID, copiedItemCount: 0 },
+    });
+    getPgDbMock.mockReturnValue(makeDb([[], [{ email: 'test@example.com' }]]));
+
+    const result = await runCreate(ctx, request);
+
+    expect(createCliSessionMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        sessionId: FRESH_KILO_ID,
+        cloudAgentSessionId: FRESH_CLOUD_ID,
+        kiloUserId: USER_ID,
+      })
+    );
+    expect(result).toEqual({
+      cloudAgentSessionId: FRESH_CLOUD_ID,
+      kiloSessionId: FRESH_KILO_ID,
+    });
+  });
+});
+
 describe('prepareInputToSessionCreateRequest clone mapping', () => {
   const SOURCE_SESSION_ID = 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa';
 

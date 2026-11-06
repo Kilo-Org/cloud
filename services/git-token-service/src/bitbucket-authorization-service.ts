@@ -15,7 +15,7 @@ import {
   BitbucketOAuthCredentialRowSchema,
   type BitbucketOAuthCredentialRow,
 } from '@kilocode/worker-utils/bitbucket-workspace-access-token';
-import { and, eq, exists, isNull, or, sql } from 'drizzle-orm';
+import { and, eq, exists, isNull, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import {
   claimRefreshLease,
@@ -205,9 +205,6 @@ export function buildBitbucketAuthorizationQuery(
           )
       )
     : undefined;
-  const currentOrganizationAccess = owner.orgId
-    ? or(currentOrganizationMembership, eq(kilocode_users.is_admin, true))
-    : undefined;
 
   return db
     .select({
@@ -233,7 +230,7 @@ export function buildBitbucketAuthorizationQuery(
       and(
         ownerCondition(owner),
         eq(platform_integrations.platform, BITBUCKET_PLATFORM),
-        currentOrganizationAccess
+        currentOrganizationMembership
       )
     )
     .limit(1);

@@ -156,7 +156,7 @@ function service(
 }
 
 describe('BitbucketWorkspaceAccessTokenAuthorizationService', () => {
-  it('queries an exact organization credential for a current member or platform admin', () => {
+  it('queries an exact organization credential for a current member', () => {
     const query = buildBitbucketWorkspaceAccessTokenAuthorizationQuery(
       getWorkerDb('postgres://query-builder'),
       { userId: 'member-1', organizationId }
@@ -171,12 +171,24 @@ describe('BitbucketWorkspaceAccessTokenAuthorizationService', () => {
     expect(query.sql).toContain('exists (select');
     expect(query.sql).toContain('"organization_memberships"');
     expect(query.sql).toContain('"kilocode_users"."blocked_reason" is null');
-    expect(query.sql).toContain('"kilocode_users"."is_admin" =');
+    expect(query.sql).not.toContain('"kilocode_users"."is_admin"');
     expect(query.sql).toContain('"platform_integrations"."owned_by_user_id" is null');
     expect(query.params).toContain('member-1');
     expect(query.params).toContain(organizationId);
     expect(query.params).toContain(BITBUCKET_WORKSPACE_ACCESS_TOKEN_PLATFORM);
     expect(query.params).toContain(BITBUCKET_WORKSPACE_ACCESS_TOKEN_INTEGRATION_TYPE);
+  });
+
+  it('does not admit an administrator without an organization membership', () => {
+    const query = buildBitbucketWorkspaceAccessTokenAuthorizationQuery(
+      getWorkerDb('postgres://query-builder'),
+      { userId: 'administrator-1', organizationId }
+    ).toSQL();
+
+    expect(query.sql.match(/exists \(select/g)).toHaveLength(1);
+    expect(query.sql).not.toContain('"kilocode_users"."is_admin"');
+    expect(query.params).toContain('administrator-1');
+    expect(query.params).toContain(organizationId);
   });
 
   it('uses exact credential generation fences', () => {

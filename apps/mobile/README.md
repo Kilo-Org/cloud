@@ -42,6 +42,24 @@ server save finishes, so reopening the form does not restore an older cached
 choice. Older in-flight preference reads are cancelled before that update.
 The existing server, local, and default-model fallback order is unchanged.
 
+## New-session keyboard and Back
+
+Back keeps a dirty editor mounted while the keyboard closes, then opens the
+discard confirmation. Keep editing restores input focus only after the sheet
+closes. Discard and Save as to-do leave the keyboard closed.
+
+The prompt interpolates whole-line heights from the app-root keyboard motion
+provider. Screens do not register keyboard listeners. Native progress is bounded
+before interpolation because keyboard height changes can exceed its normal range.
+The iOS swipe guard requires a native build with the `react-native-screens` patch.
+
+For local computer, folder, model, and effort picker verification, run
+`pnpm dev:seed app:connected-computer kilo-<name>@example.com`.
+The fixture requires an existing fake account, a localhost database,
+`NEXTAUTH_SECRET`, and a running local `cloudflare-session-ingest` service.
+The optional `sessionIngestPort` argument selects an explicit local port.
+The fixture serves read-only picker commands and rejects execution commands.
+
 ## Organization credit-activity links
 
 Credit activity treats a scalar `org` or the first value of a repeated `org`

@@ -4195,6 +4195,50 @@
     ],
     "searchBlob": "byok.update Replace the API key of an existing BYOK provider credential for the current user or an organization. Use to rotate or change a stored provider key without deleting it. byok update organizationid id api_key organizationId id api_key"
   },
+  "claudeBilling.remove": {
+    "path": "claudeBilling.remove",
+    "kind": "mutation",
+    "summary": "Disconnect Claude billing for a user or organization so it stops charging, keeping the profile for future reconnects; owner or admin only.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      }
+    },
+    "tags": [
+      "claudebilling",
+      "remove",
+      "organizationid"
+    ],
+    "searchBlob": "claudeBilling.remove Disconnect Claude billing for a user or organization so it stops charging, keeping the profile for future reconnects; owner or admin only. claudebilling remove organizationid organizationId"
+  },
+  "claudeBilling.status": {
+    "path": "claudeBilling.status",
+    "kind": "query",
+    "summary": "Check whether Claude billing is connected for a user or organization, including connection state and whether the caller can manage it.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      }
+    },
+    "tags": [
+      "claudebilling",
+      "status",
+      "organizationid"
+    ],
+    "searchBlob": "claudeBilling.status Check whether Claude billing is connected for a user or organization, including connection state and whether the caller can manage it. claudebilling status organizationid organizationId"
+  },
   "cliSessions.create": {
     "path": "cliSessions.create",
     "kind": "mutation",
@@ -6760,6 +6804,31 @@
       "forcerefresh"
     ],
     "searchBlob": "cloudAgentNext.listGitLabRepositories List the user's GitLab repositories available for cloud agent use, with optional refresh. cloudagentnext listgitlabrepositories forcerefresh forceRefresh"
+  },
+  "cloudAgentNext.listPreviewServices": {
+    "path": "cloudAgentNext.listPreviewServices",
+    "kind": "query",
+    "summary": "List the live services currently running in a Cloud Agent session's sandbox so you can discover open, previewable ports and open a web server in a new tab. Returns each service's name, port, and description along with whether the sandbox is running, not ready, or unsupported.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "cloudAgentSessionId": {
+          "type": "string",
+          "pattern": "^workspace_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "cloudAgentSessionId"
+      ],
+      "additionalProperties": false
+    },
+    "tags": [
+      "cloudagentnext",
+      "listpreviewservices",
+      "cloudagentsessionid"
+    ],
+    "searchBlob": "cloudAgentNext.listPreviewServices List the live services currently running in a Cloud Agent session's sandbox so you can discover open, previewable ports and open a web server in a new tab. Returns each service's name, port, and description along with whether the sandbox is running, not ready, or unsupported. cloudagentnext listpreviewservices cloudagentsessionid cloudAgentSessionId"
   },
   "cloudAgentNext.listRepositoryBranches": {
     "path": "cloudAgentNext.listRepositoryBranches",
@@ -18393,6 +18462,56 @@
     ],
     "searchBlob": "organizations.cloudAgentNext.listGitLabRepositories List GitLab repositories available to the organization for Cloud Agent, ordered by recent usage. organizations cloudagentnext listgitlabrepositories organizationid forcerefresh organizationId forceRefresh"
   },
+  "organizations.cloudAgentNext.listPreviewServices": {
+    "path": "organizations.cloudAgentNext.listPreviewServices",
+    "kind": "query",
+    "summary": "List the preview services running for a cloud agent session, such as web servers or apps exposed by the agent's sandbox, so you can find session preview URLs and ports.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "allOf": [
+        {
+          "type": "object",
+          "properties": {
+            "organizationId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          "required": [
+            "organizationId"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "cloudAgentSessionId": {
+              "type": "string",
+              "pattern": "^workspace_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "organizationId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          "required": [
+            "cloudAgentSessionId",
+            "organizationId"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "tags": [
+      "organizations",
+      "cloudagentnext",
+      "listpreviewservices",
+      "organizationid",
+      "cloudagentsessionid"
+    ],
+    "searchBlob": "organizations.cloudAgentNext.listPreviewServices List the preview services running for a cloud agent session, such as web servers or apps exposed by the agent's sandbox, so you can find session preview URLs and ports. organizations cloudagentnext listpreviewservices organizationid cloudagentsessionid organizationId cloudAgentSessionId"
+  },
   "organizations.cloudAgentNext.listRepositoryBranches": {
     "path": "organizations.cloudAgentNext.listRepositoryBranches",
     "kind": "query",
@@ -24860,6 +24979,7 @@
         },
         "email": {
           "type": "string",
+          "maxLength": 254,
           "format": "email",
           "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
         },

@@ -54,16 +54,15 @@ describe('isOpenAiModelServed', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('asks the upstream when the stored list is older than the cache TTL', async () => {
+  it('uses an old stored list without asking the upstream', async () => {
     await db.insert(ai_gateway_metadata_cache).values({
       url: openAiServedModelsMetadataSource.url,
       data: { object: 'list', data: [{ id: 'gpt-5.6-luna' }] },
-      updated_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+      updated_at: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
     });
-    fetchMock.mockResolvedValue(modelsResponse(['gpt-5-nano']));
 
-    await expect(isOpenAiModelServed('partner-key', 'gpt-5.6-luna')).resolves.toBe(false);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await expect(isOpenAiModelServed('partner-key', 'gpt-5.6-luna')).resolves.toBe(true);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('asks the upstream when the stored list is unusable', async () => {

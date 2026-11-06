@@ -270,7 +270,10 @@ describe('LanguagePickerSheet apply', () => {
       description: 'Try a different search term.',
     });
     expect(findByType(renderer.root, 'ChoiceRow')).toHaveLength(0);
-    expect(findByType(renderer.root, 'FlashList')).toHaveLength(0);
+    // The list keeps its identity across the empty state: the search field is
+    // uncontrolled, so re-parenting it would remount the native input and drop
+    // the typed query.
+    expect(findByType(renderer.root, 'FlashList')).toHaveLength(1);
     expect(findByType(renderer.root, 'TextInput')[0]).toBe(input);
     expect(emptyState?.props.placement).toBeUndefined();
 
@@ -325,7 +328,9 @@ describe('LanguagePickerSheet apply', () => {
       (input.props.onChangeText as (value: string) => void)('zzzzzz');
     });
 
-    expect(findByType(renderer.root, 'FlashList')).toHaveLength(0);
+    // Same list, same field: the empty state is the list's own empty
+    // component, so a query that matches nothing keeps the input mounted.
+    expect(findByType(renderer.root, 'FlashList')).toHaveLength(1);
     expect(findByType(renderer.root, 'EmptyState')).toHaveLength(1);
     expect(findByType(renderer.root, 'TextInput')).toHaveLength(1);
 

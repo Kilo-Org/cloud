@@ -340,32 +340,32 @@ export function LanguagePickerSheet({
       headerInBody={searchInList}
       headerContent={searchField}
     >
-      {items.length === 0 ? (
-        // The search field is the list header in a short sheet, so the empty
-        // state has to carry it: a query that matches nothing must leave the
-        // field on screen to edit, not only the "no matches" copy.
-        <View style={listStyle}>
-          {searchInList ? searchField : null}
+      {/*
+        One list for both states. The search field is uncontrolled (see its
+        `ref` above), so a branch that re-parents it between the list header and
+        an empty-state wrapper remounts the native input: a query that matched
+        nothing would close the keyboard and drop the typed text. The empty
+        state is the list's own empty component, which leaves the field in place.
+      */}
+      <FlashList
+        nestedScrollEnabled
+        style={listStyle}
+        contentContainerStyle={listContentContainerStyle}
+        data={items}
+        extraData={rowExtraData}
+        keyExtractor={item => item.key}
+        {...SEARCHABLE_PICKER_LIST_PROPS}
+        ListHeaderComponent={searchInList ? searchField : undefined}
+        ListEmptyComponent={
           <EmptyState
             icon={SearchX}
             title={t('language.noMatches')}
             description={t('agents.sessionList.tryDifferentSearch')}
           />
-        </View>
-      ) : (
-        <FlashList
-          nestedScrollEnabled
-          style={listStyle}
-          contentContainerStyle={listContentContainerStyle}
-          data={items}
-          extraData={rowExtraData}
-          keyExtractor={item => item.key}
-          {...SEARCHABLE_PICKER_LIST_PROPS}
-          ListHeaderComponent={searchInList ? searchField : undefined}
-          ListFooterComponent={<View style={{ height: insets.bottom }} pointerEvents="none" />}
-          renderItem={renderItem}
-        />
-      )}
+        }
+        ListFooterComponent={<View style={{ height: insets.bottom }} pointerEvents="none" />}
+        renderItem={renderItem}
+      />
     </PickerSheet>
   );
 }

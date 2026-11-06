@@ -3044,12 +3044,12 @@
   },
   "queryError": {
     "neutralDescription": "Biko nwaa ọzọ.",
-    "offlineTitle": "Enweghị ike ibudata ya.",
+    "offlineTitle": "Enweghị ike ibudata ya",
     "permissionDescription": "Ị nweghị ikike ile nke a.",
     "notFoundDescription": "O nwere ike ịbụ na ewepụla ihe a ma ọ bụ na ọ dịkwaghị.",
-    "serverTitle": "Enweghị ike ibudata ya.",
+    "serverTitle": "Enweghị ike ibudata ya",
     "serverDescription": "Enwere nsogbu n'akụkụ anyị. Biko nwaa ọzọ.",
-    "timeoutTitle": "Ọ na-ewe oge karịa akarị",
+    "timeoutTitle": "Sava a na-ewe oge karịrị akarị",
     "timeoutDescription": "Arịrịọ ahụ enweghị ike imecha tupu oge ya agwụ. Biko nwaa ọzọ."
   },
   "screenHeader": {
@@ -3819,11 +3819,11 @@
     "openLastSession": "Mepee nnọkọ ikpeazụ"
   },
   "spendAlerts": {
-    "subtitle": "Zipu ọkwa site na ozi-e ma ọ bụ push nye ndị kọntaktị ịgba ụgwọ mgbe mmefu nke mpaghara a gafere oke ma ọ bụ rịgoro karịa ọnụ ọgụgụ awa ya.",
+    "subtitle": "Zipu ọkwa site na ozi-e ma ọ bụ push nye ndị kọntaktị ịgba ụgwọ mgbe mmefu nke mpaghara a gafere oke ma ọ bụ rịgoro karịa ọnụego mmefu kwa awa ọ na-emebu.",
     "thresholdTitle": "Ịgafe oke",
     "thresholdSubtitle": "Mmefu na-aga n'ihu nke mpaghara a n'oge a họọrọ na-agafe oke gị",
     "anomalyTitle": "Mmụba kwa awa",
-    "anomalySubtitle": "Ọnụ ọgụgụ kwa awa nke mpaghara a dị nnọọ elu karịa akara ala p95 nke ya",
+    "anomalySubtitle": "Ọnụego mmefu kwa awa nke mpaghara a dị nnọọ elu karịa akara ntọala p95 nke ya",
     "limitLabel": "Oke (USD)",
     "windowLabel": "Oge",
     "window24h": "Awa 24",

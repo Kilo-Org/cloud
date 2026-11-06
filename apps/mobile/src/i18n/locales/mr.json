@@ -3997,7 +3997,7 @@
       "tools": "साधने",
       "visibility": "दृश्यमानता",
       "visibilityPrimary": "प्राथमिक — पिकरमध्ये दाखवले आहे",
-      "visibilitySubagent": "सबएजंट — फक्त इतरांकडून कॉल करण्यायोग्य",
+      "visibilitySubagent": "उपएजंट — फक्त इतरांकडून कॉल करण्यायोग्य",
       "visibilityAll": "सर्व — दोन्ही",
       "modePrimary": "फक्त प्राथमिक",
       "modeSubagent": "फक्त उपएजंट",

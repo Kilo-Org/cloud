@@ -236,9 +236,8 @@ const ingestVersionSchema = z.coerce.number().int().nonnegative().catch(0);
 api.post('/session', zodJsonValidator(createSessionSchema), async c => {
   const body = c.req.valid('json');
 
-  // Require available ingest storage before admitting the id, so create never
-  // answers with a session the ingest plane will not accept. A probe error
-  // keeps create available; ingest reports its own state.
+  // Reject known retired ids before inserting. If this initial probe fails,
+  // the required post-insert tombstone check must still confirm availability.
   try {
     const retired = await withDORetry(
       () =>

@@ -432,10 +432,10 @@ describe('api routes', () => {
     );
 
     expect(res.status).toBe(200);
-    expect(probeOrder).toEqual(['availability-probe', 'insert-transaction']);
+    expect(probeOrder).toEqual(['availability-probe', 'insert-transaction', 'availability-probe']);
   });
 
-  it('POST /session keeps create available when the ingest probe fails', async () => {
+  it('POST /session recovers when the initial ingest probe fails but the final check succeeds', async () => {
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);
     fns.selectResult.mockResolvedValueOnce([{ blocked_reason: null }]);
@@ -454,7 +454,7 @@ describe('api routes', () => {
         status_updated_at: null,
       },
     ]);
-    vi.mocked(getSessionIngestDO).mockImplementation(() => {
+    vi.mocked(getSessionIngestDO).mockImplementationOnce(() => {
       throw new Error('probe unavailable');
     });
     const warn = vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -580,7 +580,7 @@ describe('api routes', () => {
       },
     ]);
     vi.mocked(getSessionIngestDO).mockReturnValue({
-      isDeleted: vi.fn(async () => true),
+      isDeleted: vi.fn(async () => true).mockResolvedValueOnce(false),
     } as never);
     const sessionCache = { putValidated: vi.fn(async () => undefined) };
     vi.mocked(getSessionAccessCacheDO).mockReturnValue(sessionCache as never);
@@ -610,7 +610,7 @@ describe('api routes', () => {
       throw new Error('parent row is still referenced by descendants');
     });
     vi.mocked(getSessionIngestDO).mockReturnValue({
-      isDeleted: vi.fn(async () => true),
+      isDeleted: vi.fn(async () => true).mockResolvedValueOnce(false),
     } as never);
 
     const res = await makeApiApp().fetch(
@@ -663,7 +663,7 @@ describe('api routes', () => {
     );
 
     expect(res.status).toBe(200);
-    expect(isDeleted).toHaveBeenCalledTimes(1);
+    expect(isDeleted).toHaveBeenCalledTimes(2);
     expect(fns.delete).not.toHaveBeenCalled();
     expect(notifyUserSessionEvent).toHaveBeenCalledWith(
       expect.anything(),

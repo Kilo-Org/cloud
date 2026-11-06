@@ -293,6 +293,12 @@ describe('classifier input normalization', () => {
     'cookievalue',
     'authorizationheader',
     'keyid',
+    'mysql_pwd',
+    'db_pass',
+    'dbpass',
+    'redis_passphrase',
+    'pwd',
+    'passphrase',
   ])('redacts the credential-bearing provider hint key %s', key => {
     const hints = redactProviderHints({
       provider: { order: ['openai'], [key]: 'provider-secret' },
@@ -344,6 +350,8 @@ describe('classifier input normalization', () => {
       allow_fallbacks: false,
       quantizations: ['int8'],
       monkey: 'banana',
+      trespasses: 'none',
+      overpass: 'closed',
     };
 
     expect(redactProviderHints({ provider, providerOptions: undefined })).toEqual({

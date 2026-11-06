@@ -85,7 +85,7 @@ describe('briefing evidence screening', () => {
     expect(redactBriefingExcerpt('Turnkey: 4 files changed.')).toBe('Turnkey: 4 files changed.');
   });
 
-  it('screens each pair of a joined assignment', () => {
+  it('screens every pair of a joined assignment', () => {
     const body = redactBriefingExcerpt('user=' + 'bob&' + 'password=' + 'hunter2');
     expect(body).not.toContain('hunter2');
     expect(body).toContain('[redacted credential]');
@@ -159,6 +159,44 @@ describe('briefing evidence screening', () => {
     for (const key of ['MYSQL' + 'PASSWORD', 'my' + 'token']) {
       const text = redactBriefingExcerpt(`${key}=${'hunter' + '2'}`);
       expect(text).not.toContain('hunter' + '2');
+    }
+  });
+
+  it('screens assigned values under prefixed credential key names', () => {
+    for (const key of [
+      'MYSQL_' + 'PWD',
+      'DB_' + 'PASS',
+      'REDIS_' + 'PASSPHRASE',
+      'PG' + 'PWD',
+      'db' + 'pass',
+      'db' + 'Pass',
+      'mysql' + 'pwd',
+      'redis' + 'passphrase',
+      'passphrase',
+      'pwd',
+    ]) {
+      const text = redactBriefingExcerpt(`${key}=${'hunter' + '2'}`);
+      expect(text).not.toContain('hunter' + '2');
+      expect(text).toContain('[redacted credential]');
+    }
+    expect(redactBriefingExcerptOrDrop('DB_' + 'PASS=' + 'hunter' + '2')).toBe(
+      '[redacted credential]'
+    );
+  });
+
+  it('screens a credential flag with its argument', () => {
+    const text = 'run --' + 'pass ' + 'hunter' + '2';
+    expect(redactBriefingExcerpt(text)).toBe('run --' + 'pass [redacted credential]');
+    expect(redactBriefingExcerptOrDrop(text)).toBe('run --' + 'pass [redacted credential]');
+  });
+
+  it('keeps ordinary words that contain a credential word', () => {
+    for (const evidence of [
+      'Passage: open.',
+      'Overpass: closed.',
+      'Bypassed: the cache layer.',
+    ]) {
+      expect(redactBriefingExcerpt(evidence)).toBe(evidence);
     }
   });
 

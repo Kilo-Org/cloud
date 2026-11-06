@@ -679,9 +679,12 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
     const ui = await mount({ value: 'org-a', onSelectionChange });
     await waitFor(() => !picker(ui).props.disabled);
     await openSheet(ui);
+    // Personal plus the listed membership: the sheet really presented.
+    expect(rows(ui).map(row => row.label)).toEqual(['Personal', name]);
     await act(() => {
       pickerFocus.setFocused(false);
     });
+    expect(rows(ui)).toHaveLength(0);
     expect(onSelectionChange).not.toHaveBeenCalled();
     expect(ui.renderer.root.findByType('GlobalScope' as ElementType).props.id).toBe('org-a');
   });

@@ -1242,3 +1242,118 @@ diff --git a/build/jetpack-compose/ModalBottomSheet/index.js b/build/jetpack-com
          onDismissRequest: ()=>{
              onDismissRequest?.();
          }
+diff --git a/android/src/main/java/expo/modules/ui/ModalBottomSheetView.kt b/android/src/main/java/expo/modules/ui/ModalBottomSheetView.kt
+--- a/android/src/main/java/expo/modules/ui/ModalBottomSheetView.kt
++++ b/android/src/main/java/expo/modules/ui/ModalBottomSheetView.kt
+@@ -9,8 +9,10 @@
+ import android.content.res.Resources
+ import android.graphics.Color
+ import android.view.KeyEvent
++import android.view.View
+ import android.view.inputmethod.InputMethodManager
+ import androidx.activity.compose.BackHandler
++import androidx.core.view.WindowCompat
+ import androidx.compose.foundation.layout.WindowInsetsSides
+ import androidx.compose.foundation.layout.only
+ import androidx.compose.material3.BottomSheetDefaults
+@@ -70,14 +72,13 @@
+    */
+   val locale: String? = null,
+   /**
+-   * Repo-local: when true the sheet's content clears the top system bar itself,
+-   * so Material3 stops reserving that inset for it. A dialog window receives its
+-   * insets after the first composition is measured, so a content-sized sheet
+-   * first measured itself taller by the status bar and then shrank, moving its
+-   * whole content down by that inset after it had appeared. With this prop the
+-   * sheet's box no longer depends on that inset, and the caller reserves the
+-   * clearance from values it knows before the first frame. The bottom inset
+-   * stays with the sheet: nothing reads it late.
++   * Repo-local: when true the caller's content clears the top system bar itself. The surface then
++   * pads that inset inside its own tree, so the dialog window's decoration must not fit the
++   * system bars: without it a content-sized sheet first covered the status bar, and the window
++   * shrank by the status bar once its insets arrived, moving the whole content — a full-window
++   * sheet's header included — after it had appeared. Material3 pads what reads as zero in that
++   * window (its insets were consumed by the decoration), so this pair drops the top reserve; the
++   * bottom inset stays with the sheet, whose insets it measures reliably.
+    */
+   val contentOwnsTopInset: Boolean = false,
+   val properties: ModalBottomSheetPropertiesRecord = ModalBottomSheetPropertiesRecord(),
+@@ -91,6 +92,16 @@
+ private fun Activity.isAcceptingText(): Boolean {
+   val inputMethodManager = getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+   return inputMethodManager?.isAcceptingText == true
++}
++
++/**
++ * Repo-local, for `contentOwnsTopInset` callers: stop the sheet's own dialog window from also
++ * fitting the system bars. See the prop's documentation — the two together keep the sheet's box
++ * at the size its first painted frame already has.
++ */
++private fun stopDecorFittingSystemBars(sheet: View) {
++  val window = (sheet.parent as? DialogWindowProvider)?.window ?: return
++  WindowCompat.setDecorFitsSystemWindows(window, false)
+ }
+ 
+ /**
+@@ -257,6 +268,12 @@
+       ),
+       modifier = ModifierRegistry.applyModifiers(props.modifiers, appContext, composableScope, globalEventDispatcher)
+     ) {
++      // LocalView here is the dialog's own view, so its parent is the DialogWindowProvider that
++      // owns the sheet's window: see `stopDecorFittingSystemBars`.
++      val sheetView = LocalView.current
++      DisposableEffect(props.contentOwnsTopInset, sheetView) {
++        if (props.contentOwnsTopInset) stopDecorFittingSystemBars(sheetView)
++      }
+       // Registered inside the dialog, so it runs before the wrapper's fallback.
+       if (props.properties.shouldDismissOnBackPress) {
+         BackHandler { onDismissRequest() }
+diff --git a/src/community/bottom-sheet/BottomSheet.android.tsx b/src/community/bottom-sheet/BottomSheet.android.tsx
+--- a/src/community/bottom-sheet/BottomSheet.android.tsx
++++ b/src/community/bottom-sheet/BottomSheet.android.tsx
+@@ -70,8 +70,8 @@
+     // strings (scrim label, drag handle, pane title) do not fall back to the
+     // device's language.
+     locale,
+-    // Repo-local: the caller clears the status bar itself, so Material3 does not
+-    // reserve that inset for the sheet — see the Kotlin prop's comment.
++    // Repo-local: the caller clears the status bar itself, so the dialog window
++    // must not also fit it — see the Kotlin prop's comment.
+     contentOwnsTopInset,
+     enableDynamicSizing = true,
+     handleComponent,
+diff --git a/src/community/bottom-sheet/types.ts b/src/community/bottom-sheet/types.ts
+--- a/src/community/bottom-sheet/types.ts
++++ b/src/community/bottom-sheet/types.ts
+@@ -239,10 +239,11 @@
+   locale?: string;
+ 
+   /**
+-   * Repo-local, Android: when true the sheet's content clears the status bar
+-   * itself, so the sheet stops reserving that inset for it. The sheet's first
+-   * measured frame is otherwise taller than its settled one, which moves the
+-   * whole content by the status-bar height as the sheet opens.
++   * Repo-local, Android: when true the caller's content clears the status bar
++   * itself, so the sheet's dialog window stops fitting that inset. The window
++   * applies the inset only once its insets arrive, a frame or two after the
++   * sheet presented, and the sheet then shrank by the status bar's height,
++   * moving its whole content after it had already appeared.
+    */
+   contentOwnsTopInset?: boolean;
+ 
+diff --git a/src/jetpack-compose/ModalBottomSheet/index.tsx b/src/jetpack-compose/ModalBottomSheet/index.tsx
+--- a/src/jetpack-compose/ModalBottomSheet/index.tsx
++++ b/src/jetpack-compose/ModalBottomSheet/index.tsx
+@@ -100,9 +100,9 @@
+    */
+   locale?: string;
+   /**
+-   * Repo-local: when true the sheet's content clears the status bar itself, so
+-   * the sheet stops reserving that inset — its box then never depends on an inset
+-   * the dialog window reports only after the sheet's first measurement.
++   * Repo-local: when true the caller's content clears the status bar itself, so
++   * the dialog window stops fitting it — the window applies that inset only once
++   * its insets arrive, which shrinks a sheet after it had first measured.
+    * @platform android
+    */
+   contentOwnsTopInset?: boolean;

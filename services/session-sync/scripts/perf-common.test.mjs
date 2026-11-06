@@ -1,0 +1,445 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import {
+  event,
+  fixture,
+  Pending,
+  prefix,
+  seedText,
+  session,
+  token,
+  validateTarget,
+  sha256,
+  limiterConfig,
+  validateCloudAdmission,
+  arrivalAllowed,
+  validateReceipt,
+  assertReceiptRetry,
+  histogram,
+  observe,
+  summarize,
+} from './perf-common.mjs';
+import { currentDeployment } from './perf-identity.mjs';
+import { mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { forecast } from './perf-budget.mjs';
+
+const s = session({ runID: 'qualification' }, 99999);
+test('event bodies carry unique source markers in exactly 512 bytes', () => {
+  const first = event(s, 1, 1793961200000, 1793961200001);
+  const last = event(s, 1100, 1793961255000, 1793961255001);
+  assert.equal(Buffer.byteLength(JSON.stringify(first.body)), 512);
+  assert.equal(Buffer.byteLength(JSON.stringify(last.body)), 512);
+  assert.notEqual(first.body.data.id, last.body.data.id);
+  assert.equal(last.body.data.data.delta, token(1100));
+});
+test('durable fixtures contain every committed token and explicit coverage', () => {
+  const value = fixture(s, 1100);
+  assert.equal(value.sourceSequence, 1100);
+  assert.equal(value.message.content[0].text, seedText(s) + prefix(1100));
+  assert(Buffer.byteLength(JSON.stringify(value)) <= 8192);
+  assert.equal(Buffer.byteLength(JSON.stringify(fixture(s, 0))), 2048);
+  assert.match(s.source, /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-8[a-f0-9]{3}-[a-f0-9]{12}$/);
+});
+test('pending observations expire and refuse excess population', () => {
+  const pending = new Pending(2, 100);
+  pending.add('a', 0);
+  pending.add('b', 10);
+  assert.throws(() => pending.add('c', 20), /budget/);
+  pending.expire(105);
+  assert.equal(pending.expired, 1);
+  assert.equal(pending.take('b'), 10);
+  assert.equal(pending.entries.size, 0);
+});
+const empty = {
+  name: 'probe',
+  registrations: 0,
+  seeds: 0,
+  checkpoints: 0,
+  finalCheckpoints: 0,
+  receiptRetries: 0,
+  reconciliationReads: 0,
+  ticketRequests: 0,
+  exchanges: 0,
+  socketUpgrades: 0,
+  incomingWebSocketMessages: 0,
+  workerCPUms: 0,
+  sqlRowsRead: 0,
+  sqlRowsWritten: 0,
+  expectedActiveActorSeconds: 1,
+  pessimisticActiveActorSeconds: 8000000,
+  r2ClassA: 1,
+  r2ClassB: 1,
+  logpushEvents: 0,
+  analyticsPoints: 0,
+};
+const plan = {
+  version: 1,
+  stages: [empty],
+  vmInstances: 4,
+  vmHourlyUSD: 0.776,
+  vmHoursEach: 0.5,
+  qualificationVMUSD: 1,
+  vmDiskAndEgressUSD: 1,
+  r2StorageUSD: 0.1,
+  sqlStorageUSD: 0.5,
+  analyticsUSD: 0.1,
+  downstreamLogsUSD: 0.5,
+  delayedBillingReserveUSD: 10,
+  alreadySpentUSD: 0,
+  hardLimitUSD: 50,
+  workerStoredLogsEnabled: false,
+  absoluteResourceDeadlineSeconds: 300,
+};
+test('gross forecast rounds DO duration and R2 units upward', () => {
+  const result = forecast(plan);
+  assert.equal(result.durationExpectedUSD, 12.5);
+  assert.equal(result.durationPessimisticUSD, 25);
+  assert.equal(result.fixed.r2ClassA + result.fixed.r2ClassB, 4.86);
+  assert.equal(result.invoiceGuarantee, false);
+});
+test('pessimistic ceiling includes VM time and delayed billing reserve', () => {
+  const result = forecast({ ...plan, stages: [{ ...empty, sqlRowsWritten: 15000000 }] });
+  assert.equal(result.passed, false);
+  assert(result.committedCeilingUSD > 50);
+  assert(result.vmUSD > 3);
+});
+
+function targetFixture() {
+  const root = mkdtempSync(join(tmpdir(), 'sync-load-guard-'));
+  const now = Date.now();
+  const runID = 'guard-check';
+  const name = `session-sync-${runID}-loadtest`;
+  const configFile = join(root, 'config.json');
+  const evidenceFile = join(root, 'evidence.json');
+  const preProvisionEvidenceFile = join(root, 'absent.json');
+  const watchdogReadyFile = join(root, 'watchdog.json');
+  const rendered = {
+    name,
+    account_id: 'e115e769bcdd4c3d66af59d3332cb394',
+    workers_dev: true,
+    observability: { enabled: false },
+    logpush: true,
+    vars: {
+      ENVIRONMENT: 'staging',
+      USER_TENANT_SESSIONS: '10000',
+      USER_TENANT_BYTES: '107374182400',
+      ORGANIZATION_TENANT_SESSIONS: '200000',
+      ORGANIZATION_TENANT_BYTES: '2199023255552',
+    },
+    ratelimits: limiterConfig(runID),
+    hyperdrive: [{ binding: 'HYPERDRIVE', id: 'bb58259a7dd9454487b333b6b10dfafe' }],
+    r2_buckets: [{ binding: 'SESSION_SYNC_R2', bucket_name: name }],
+    analytics_engine_datasets: [
+      { binding: 'SESSION_SYNC_METRICS', dataset: 'session_sync_guard_check_loadtest_metrics' },
+    ],
+    durable_objects: {
+      bindings: [
+        { name: 'SESSION_SYNC_DO', class_name: 'SessionSyncDO' },
+        { name: 'SESSION_SYNC_TENANT_DO', class_name: 'SessionSyncTenantDO' },
+        { name: 'SESSION_RELAY_DO', class_name: 'SessionRelayDO' },
+        { name: 'SESSION_PRESENCE_DO', class_name: 'SessionPresenceDO' },
+      ],
+    },
+    secrets_store_secrets: [
+      'NEXTAUTH_SECRET',
+      'SESSION_SYNC_SECRET',
+      'INTERNAL_API_SECRET_PROD',
+    ].map(binding => ({
+      binding,
+      store_id: '342a86d9e3a94da698e82d0c6e2a36f0',
+      secret_name: binding + '_STAGING_LOADTEST',
+    })),
+  };
+  const inventory = {
+    runID,
+    workerName: name,
+    checkedAt: now - 2000,
+    workerAbsent: true,
+    bucketAbsent: true,
+    hyperdriveAbsent: true,
+    secretsAbsent: true,
+    limiterNamespacesUnused: true,
+  };
+  const inspection = {
+    runID,
+    workerName: name,
+    checkedAt: now - 1,
+    deploymentID: 'owned-deployment',
+    versionID: 'owned-version',
+    r2BucketID: 'owned-bucket',
+    r2Private: true,
+    databaseTLS: true,
+  };
+  writeFileSync(preProvisionEvidenceFile, JSON.stringify(inventory));
+  writeFileSync(evidenceFile, JSON.stringify(inspection));
+  const namespaces = rendered.durable_objects.bindings.map((binding, index) => ({
+    binding: binding.name,
+    id: String(index + 1).repeat(32),
+  }));
+  const manifest = {
+    runID,
+    accountID: rendered.account_id,
+    workerName: name,
+    baseURL: `https://${name}.synthetic.workers.dev/`,
+    productionBindings: false,
+    syntheticDatabase: true,
+    independentSigningSecrets: true,
+    hyperdriveCaching: false,
+    r2Bucket: name,
+    routes: [],
+    services: [],
+    secretNames: rendered.secrets_store_secrets.map(row => row.secret_name),
+    hyperdriveID: rendered.hyperdrive[0].id,
+    secretsStoreID: '342a86d9e3a94da698e82d0c6e2a36f0',
+    configFile,
+    evidenceFile,
+    evidenceHash: sha256(JSON.stringify(inspection)),
+    preProvisionEvidenceFile,
+    preProvisionEvidenceHash: sha256(JSON.stringify(inventory)),
+    independentWatchdogID: 'owned-watchdog',
+    watchdogReadyFile,
+    resourceCreatedAt: now - 1000,
+    teardownArmedAt: now - 1,
+    teardownAt: now + 120000,
+    teardownTailSeconds: 150,
+    namespaces,
+    namespaceIDs: namespaces.map(row => row.id),
+    deploymentID: inspection.deploymentID,
+    versionID: inspection.versionID,
+    r2BucketID: inspection.r2BucketID,
+  };
+  const config = {
+    runID,
+    baseURL: manifest.baseURL,
+    stopAt: manifest.teardownAt,
+    budgetStage: 'unit',
+    sessions: 1,
+    watched: 1,
+    sdkViewers: 1,
+    eventHz: 10,
+    warmSeconds: 10,
+    measuredSeconds: 45,
+  };
+  const ready = (value = manifest, at = now) =>
+    writeFileSync(
+      watchdogReadyFile,
+      JSON.stringify({
+        runID,
+        workerName: name,
+        deploymentID: value.deploymentID,
+        versionID: value.versionID,
+        instanceID: value.independentWatchdogID,
+        pid: process.pid,
+        heartbeatAt: at,
+        teardownAt: value.teardownAt,
+      })
+    );
+  ready();
+  const validate = value => {
+    const bytes = JSON.stringify(value);
+    writeFileSync(configFile, bytes);
+    validateTarget(config, { ...manifest, configHash: sha256(bytes) });
+  };
+  validate(rendered);
+  return {
+    root,
+    manifest,
+    config,
+    rendered,
+    validate,
+    ready,
+    dispose: () => rmSync(root, { recursive: true, force: true }),
+  };
+}
+
+test('cloud identity guard rejects aliases and duplicate log storage', () => {
+  const f = targetFixture();
+  try {
+    assert.doesNotThrow(() => f.validate(f.rendered));
+    assert.throws(() =>
+      f.validate({ ...f.rendered, kv_namespaces: [{ binding: 'UNREVIEWED', id: 'remote' }] })
+    );
+    assert.throws(() =>
+      f.validate({
+        ...f.rendered,
+        analytics_engine_datasets: [{ binding: 'SESSION_SYNC_METRICS', dataset: 'unapproved' }],
+      })
+    );
+    assert.throws(() => f.validate({ ...f.rendered, observability: { enabled: true } }));
+  } finally {
+    f.dispose();
+  }
+});
+
+test('limiter admission rejects shared namespaces and changed policy', () => {
+  const f = targetFixture();
+  try {
+    const shared = structuredClone(f.rendered.ratelimits);
+    shared[0].namespace_id = '1020';
+    assert.throws(() => f.validate({ ...f.rendered, ratelimits: shared }), /limiter policies/);
+    const raised = structuredClone(f.rendered.ratelimits);
+    raised[0].simple.limit++;
+    assert.throws(() => f.validate({ ...f.rendered, ratelimits: raised }), /limiter policies/);
+  } finally {
+    f.dispose();
+  }
+});
+
+const allowedBudget = {
+  passed: true,
+  pessimisticCFUSD: 30,
+  vmUSD: 4,
+  reserveUSD: 10,
+  committedCeilingUSD: 44,
+  absoluteResourceDeadlineSeconds: 300,
+  workloadBounds: [
+    {
+      name: 'unit',
+      sessions: 1,
+      checkpoints: 11,
+      finalCheckpoints: 1,
+      incomingWebSocketMessages: 600,
+      ticketRequests: 4,
+    },
+  ],
+};
+test('cloud admission requires a matching live watchdog heartbeat', () => {
+  const f = targetFixture();
+  try {
+    assert.doesNotThrow(() => validateCloudAdmission(f.config, f.manifest, allowedBudget));
+    rmSync(f.manifest.watchdogReadyFile);
+    assert.throws(() => validateCloudAdmission(f.config, f.manifest, allowedBudget), /ENOENT/);
+    f.ready(f.manifest, Date.now() - 11000);
+    assert.throws(
+      () => validateCloudAdmission(f.config, f.manifest, allowedBudget),
+      /heartbeat is stale/
+    );
+    f.ready({ ...f.manifest, independentWatchdogID: 'another-watchdog' });
+    assert.throws(() => validateCloudAdmission(f.config, f.manifest, allowedBudget));
+  } finally {
+    f.dispose();
+  }
+});
+test('resource deadline and teardown tail fit the priced lifetime', () => {
+  const f = targetFixture();
+  try {
+    const extended = { ...f.manifest, teardownAt: Date.now() + 600000 };
+    f.ready(extended);
+    assert.throws(
+      () =>
+        validateCloudAdmission(
+          { ...f.config, stopAt: extended.teardownAt },
+          extended,
+          allowedBudget
+        ),
+      /Resource lifetime/
+    );
+    f.ready();
+    assert.throws(() =>
+      validateCloudAdmission(f.config, f.manifest, { ...allowedBudget, passed: false })
+    );
+  } finally {
+    f.dispose();
+  }
+});
+test('fixed drain excludes wire and projection completion at or after cutoff', () => {
+  const window = { drainAt: 100 };
+  let accepted = 0;
+  for (const at of [99, 100, 101]) if (arrivalAllowed(window, at)) accepted++;
+  assert.equal(accepted, 1);
+  assert.equal(arrivalAllowed(window, 100), false);
+});
+test('exact durable receipt validates request bytes and original retry response', () => {
+  const source = { id: 'ses_receipt', revision: 4 };
+  const batch = {
+    batchID: '2ca8a62b-d277-47c8-b70a-447a20d3b0c0',
+    after: 3,
+    through: 4,
+    changes: [],
+  };
+  const value = {
+    version: 1,
+    sessionID: source.id,
+    batchID: batch.batchID,
+    after: 3,
+    through: 4,
+    revision: 5,
+    changes: 0,
+    digest: sha256(JSON.stringify(batch)),
+    committedAt: 123,
+  };
+  const original = validateReceipt(source, batch, value);
+  assert.doesNotThrow(() => assertReceiptRetry(original, { ...value }));
+  for (const field of ['after', 'revision', 'changes', 'committedAt'])
+    assert.throws(() => assertReceiptRetry(original, { ...value, [field]: value[field] + 1 }));
+  assert.throws(() => validateReceipt(source, batch, { ...value, digest: 'f'.repeat(64) }));
+});
+test('replacement deployment is refused before settings or deletion', async () => {
+  let calls = 0;
+  await assert.rejects(
+    currentDeployment(
+      { accountID: 'test', workerName: 'owned', deploymentID: 'original' },
+      async () => {
+        calls++;
+        return {
+          result: {
+            deployments: [{ id: 'replacement', created_on: '2026-11-06T00:00:00Z', versions: [] }],
+          },
+        };
+      }
+    ),
+    /ownership changed/
+  );
+  assert.equal(calls, 1);
+});
+test('latency summaries retain negative clock and overflow counts', () => {
+  const h = histogram();
+  observe(h, -2);
+  observe(h, 12000);
+  const result = summarize(h);
+  assert.equal(result.negative, 1);
+  assert.equal(result.overflow, 1);
+  assert.equal(result.max, 12000);
+});
+
+test('full cloud plan keeps one SDK viewer per watched session and creates no GO', () => {
+  const f = targetFixture();
+  try {
+    const budgetFile = join(f.root, 'budget.json');
+    writeFileSync(budgetFile, JSON.stringify({ ...allowedBudget, passed: false }));
+    const manifestFile = join(f.root, 'manifest.json');
+    const manifest = {
+      ...f.manifest,
+      configHash: sha256(readFileSync(f.manifest.configFile)),
+      budgetFile,
+      sdkModuleHash: 'a'.repeat(64),
+      clockErrorBoundMs: 5,
+      clockEvidenceFile: join(f.root, 'clock.json'),
+      generators: Array.from({ length: 4 }, (_, index) => ({
+        host: `igor-loadtest-${index}.us-central1-a.kilocode`,
+        repository: '/home/igor/work/load',
+        root: '/home/igor/work/load/run-guard',
+      })),
+    };
+    writeFileSync(manifestFile, JSON.stringify(manifest));
+    const output = join(f.root, 'plan');
+    const child = spawnSync(
+      process.execPath,
+      [fileURLToPath(new URL('./perf-plan.mjs', import.meta.url)), 'full', manifestFile, output],
+      { encoding: 'utf8' }
+    );
+    assert.equal(child.status, 0, child.stderr);
+    const cluster = JSON.parse(readFileSync(join(output, 'cluster.json'), 'utf8'));
+    assert.equal(cluster.viewerConnections, 10000);
+    assert.equal(cluster.nodes.flatMap(node => node.shards).length, 16);
+    const config = JSON.parse(readFileSync(join(output, 'node-0/config-0.json'), 'utf8'));
+    assert.equal(config.sdkViewers, config.watched);
+    assert.equal(existsSync(join(output, 'node-0/go.json')), false);
+  } finally {
+    f.dispose();
+  }
+});

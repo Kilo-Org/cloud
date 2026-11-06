@@ -741,6 +741,137 @@ References:
 [Secrets Store bindings](https://developers.cloudflare.com/secrets-store/integrations/workers/),
 [Wrangler deploy](https://developers.cloudflare.com/workers/wrangler/commands/deploy/).
 
+## Performance qualification
+
+The `scripts/perf-*.mjs` tools separate the native publisher, raw wire reader,
+and actual `NativeSyncClient` into independent processes. They use synthetic
+session identities and single-use output directories. Local qualification
+binds a synthetic relay to `127.0.0.1:18829`; it is generator evidence, not a
+measurement of the Worker, Durable Object storage, authentication, or UI rendering.
+
+From this package on an isolated work VM:
+
+```sh
+node --test scripts/perf-common.test.mjs
+node --import tsx scripts/perf-qualify.mjs smoke /private/native-socket.mjs ../../packages/cloud-agent-sdk/src/native-sync.ts /tmp/sync-smoke
+node --import tsx scripts/perf-qualify.mjs local2x /private/native-socket.mjs ../../packages/cloud-agent-sdk/src/native-sync.ts /tmp/sync-local2x plain
+node --import tsx scripts/perf-qualify.mjs sdk625 /private/native-socket.mjs ../../packages/cloud-agent-sdk/src/native-sync.ts /tmp/sync-sdk625 instrumented
+```
+
+Supply the pinned native `RemoteSocket` module from native revision
+`5b3069885d3223b96fdf1b1db51a7bda54e566e8`; `perf-common.mjs` checks its bundle
+digest. The SDK source path and digest are recorded independently. The optional
+`instrumented` mode adds dequeue and projection timing to an in-memory SDK module
+using checked source anchors. It changes no SDK file or public API. Report it
+separately from the ordinary `plain` run. Its extra parsing/observer work is part
+of its measured overhead.
+
+`local2x` offers 12,500 presence connections, 1,250 watched sessions at 10 Hz,
+1,250 actual SDK viewers, and 2,500 scheduled checkpoints/second. This doubles
+one 6,250-session/625-viewer production-shaped generator shard. `raw2x` is the
+separate raw-reader baseline; `sdk625` exercises 625 actual SDK viewers at 20 Hz.
+The full population shape is 100,000 sessions, 10,000 watched at 10 Hz, and
+exactly one actual SDK viewer per watched session. Raw mirrors are not part of
+that shape.
+
+Each 512-byte event body carries its session/sequence identity, scheduled time,
+and producer-send time. A five-byte unique text token carries transcript
+correctness; independent padding supplies the remaining wire bytes. This is
+not a claim that every byte is user-visible text. Durable message values are
+2–8 KiB and contain the exact committed token prefix plus `sourceSequence`.
+Five-second checkpoints and a final checkpoint return durable receipts.
+The producer retries the exact final batch to reconcile its receipt, then
+checks durable state and entity content. A local socket send is not an ACK.
+
+Per-event listeners inspect sequence metadata without reading growing text.
+Full projected transcript hashes are compared at the fixed drain boundary.
+Wire arrivals, SDK callbacks, listener cost, event-loop delay, request concurrency,
+source scheduling backlog, checkpoint scheduling lag, resets, reconnects,
+duplicates, and live socket counts are retained in bounded counters/samples.
+SDK wire-to-callback timing includes queue and projection in `plain` mode;
+`instrumented` also reports those stages separately. SDK callback timing does
+not measure a browser or native view commit.
+Negative clock/skew samples and latency overflow counts are explicit; the
+overflow percentile bin is not a measured upper latency bound.
+
+All rates use the declared 45-second measured denominator after ten seconds of
+warm-up; arrivals have a fixed additional ten-second drain. Late/missing events
+and source underproduction are explicit failures rather than smaller latency
+denominators. Source catch-up preserves every scheduled slot within a bounded
+five-slot budget. Checkpoint admission retains at most one pending slot per
+session, with a 2,048-slot FIFO queue and one-second scheduling deadline. No skipped
+slot is considered success. The producer and viewers close sockets at the fixed
+drain even when durable HTTP work is outstanding.
+Wire and projection completion at or after the drain are excluded from
+acceptance. Every measured viewer arrival must reconcile inside that boundary.
+Receipts validate the exact request digest and all response fields; an exact
+retry must return the complete original receipt, including its commit timestamp.
+
+The `cold`, `renewal`, `hot100`, `slowreader`, and `organization` profiles prepare
+small diagnostic stages. `renewal` uses short synthetic grant lifetimes;
+`hot100` has one SDK plus 99 raw readers on one session; `slowreader` pauses
+actual raw TCP reads for 20 seconds. These local fixtures do not establish
+cloud renewal enforcement, slow-reader eviction, or concentrated-tenant capacity.
+Exercise real credential exchange separately: scale viewers disclose their
+locally signed synthetic grant path.
+
+### Cloud run gates
+
+Cloud mode requires a reviewed target manifest, exact rendered-config and
+source checksums, and an unexpired parent GO matching every workload-config
+checksum. The manifest permits a unique `session-sync-<runID>-loadtest`
+workers.dev target, identically named R2 bucket, isolated run-specific metrics
+dataset, synthetic uncached Hyperdrive origin, and independent staging secrets.
+Run `perf-inspect.mjs absent <manifest>` before provisioning: it checks complete
+name inventories and verifies the run-derived limiter namespace IDs are unused.
+Keep limiter names, limits, and periods unchanged. After deployment, `verify`
+checks actual deployment/version IDs, the `workers/tag` run marker, deployed
+bindings, namespace ownership/classes, private R2 domains and bucket ID, Hyperdrive
+origin, and explicit synthetic/TLS database evidence. It also checks custom
+domains and zone routes. These are read-only operator commands; their credential
+stays on the operator host. Generator admission requires a fresh hash-bound
+inspection artifact, not a configuration-file hash alone.
+
+Render the run-specific Worker config with `perf-render.mjs <manifest.json>`;
+it selects runtime code/settings and dedicated resources without deployment.
+`perf-plan.mjs <profile> <manifest.json> <output-directory>` generates per-node
+target/config packages, the cluster plan, and an approval-request record. It
+creates neither credentials nor GO files. Supported cloud profiles are `cold`,
+`renewal`, `hot100`, `slowreader`, `organization`, and `full`; the last fixes
+100,000 sessions and 10,000 actual SDK viewers across sixteen shards/four hosts.
+
+
+Run `perf-control.mjs seed <configs...>` before opening presence sockets.
+For one host, `run` creates a fresh live-count barrier. For distributed runs,
+`perf-cluster.mjs <cluster-plan.json>` starts `wait` controllers on the exact
+owned test hosts, combines fresh samples into one simultaneous population,
+and distributes one shared absolute window. It rejects stale/missing samples,
+early generator exits, and population drops. A failed node writes task-local
+stop markers to its peers. Clock-offset evidence and its uncertainty must be
+retained before interpreting cross-host latency.
+
+`perf-budget.mjs <budget-plan.json>` prices gross quantities without allowances:
+registration, seed, checkpoint, retry/reconciliation, ticket/exchange, WebSocket,
+SQL, Worker CPU, rounded DO duration, rounded R2 operations, Logpush, analytics,
+downstream ingestion, VM lifetime, storage/egress, and delayed billing reserve.
+Expected activity and pessimistic activity are distinct inputs. A passing plan
+requires at most $35 Cloudflare, $5 VMs, and at least $10 untouched reserve within
+the combined $50 allocation. Analytics lag is not an invoice guarantee.
+
+Arm `perf-teardown.mjs arm <target-manifest.json>` in an independent operator
+process before opening cloud sockets. Pass its scoped credential through a
+private environment wrapper as `SESSION_SYNC_LOADTEST_CF_TOKEN`; never print
+it or put it in arguments. The watchdog publishes a matching nonce-bound
+heartbeat; cloud admission consumes it, and the operator cluster controller
+checks heartbeat freshness and local process liveness throughout ramp and load.
+Workload admission binds the absolute resource lifetime to the approved forecast,
+including a 90-second teardown tail. Before deletion the watchdog re-reads the
+current deployment/version and bucket ID, refusing a replacement run. The
+controller also invokes verified teardown after completion or failure. Exact
+known synthetic R2 keys must be listed for cleanup; a nonempty bucket is a
+teardown failure. Generator VMs need their own provider-enforced maximum lifetime.
+Meter polling and operator availability never extend the resource deadline.
+
 ## Native client demo
 
 `@kilocode/cloud-agent-sdk` exports `NativeSyncClient`, a platform-neutral native-v2

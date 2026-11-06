@@ -34,6 +34,7 @@ import {
 const SOURCE_CONCURRENCY = 4;
 const PROVIDER_MODELS_CONCURRENCY = 3;
 const REFRESH_BUDGET_MS = 180_000;
+const ESCAPED_NUL_PATTERN = /(?:^|[^\\])(?:\\\\)*\\u0000/;
 
 function catalogSources(): MetadataSource<unknown>[] {
   const sources: MetadataSource<unknown>[] = [
@@ -78,6 +79,10 @@ async function refreshSource(
   let raw: unknown;
   try {
     ({ raw } = await fetchMetadata(source, { signal }));
+    // jsonb rejects NUL characters, so such a payload would fail the write on every run.
+    if (ESCAPED_NUL_PATTERN.test(JSON.stringify(raw))) {
+      throw new Error(`${source.url} returned a NUL character, which jsonb cannot store`);
+    }
   } catch (error) {
     console.error(`[refresh-metadata-cache] refreshing ${source.url} failed`, error);
     return false;
@@ -87,7 +92,12 @@ async function refreshSource(
     .values({ url: source.url, data: raw })
     .onConflictDoUpdate({
       target: ai_gateway_metadata_cache.url,
-      set: { data: raw, updated_at: sql`now()` },
+      // Keeping the stored value when it is unchanged reuses its TOAST data instead of rewriting
+      // the whole catalog, which cuts the write-ahead log of a typical run from ~19 MB to ~50 kB.
+      set: {
+        data: sql`case when ${ai_gateway_metadata_cache.data} = excluded.data then ${ai_gateway_metadata_cache.data} else excluded.data end`,
+        updated_at: sql`now()`,
+      },
     });
   return true;
 }
@@ -98,12 +108,19 @@ async function refreshSources(
   signal: AbortSignal
 ): Promise<string[]> {
   const limit = pLimit(concurrency);
-  const results = await Promise.all(
-    (await orderOldestFirst(sources)).map(source =>
-      limit(async () => ({ url: source.url, ok: await refreshSource(source, signal) }))
-    )
+  const ordered = await orderOldestFirst(sources);
+  // Settle every source before rethrowing a write failure, so no queued write outlives the run.
+  const results = await Promise.allSettled(
+    ordered.map(source => limit(() => refreshSource(source, signal)))
   );
-  return results.filter(result => !result.ok).map(result => result.url);
+  const writeFailure = results.find(result => result.status === 'rejected');
+  if (writeFailure) throw writeFailure.reason;
+  return ordered
+    .filter((_source, index) => {
+      const result = results[index];
+      return result?.status === 'fulfilled' && !result.value;
+    })
+    .map(source => source.url);
 }
 
 async function findStaleEntries(failedUrls: string[], now: Date): Promise<StaleMetadataEntry[]> {

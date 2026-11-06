@@ -1862,7 +1862,7 @@
       "dueThisWeekDetail_one": "{{exploitable}} n'ime ha ka e kwadoro na a pụrụ iji ya wakpo sistemụ",
       "dueThisWeekDetail_other": "{{exploitable}} n'ime ha ka e kwadoro na a pụrụ iji ya wakpo sistemụ",
       "noDeadline": "Enweghị oge njedebe",
-      "reviewSlaAssignment": "Nyochaa oge njedebe SLA",
+      "reviewSlaAssignment": "Nyochaa ekenye oge njedebe SLA",
       "allOpenFindingsTracked": "A na-esochi ihe achọpụtara niile a ka na-arụ na ya"
     },
     "dismiss": {
@@ -2104,10 +2104,10 @@
       "replayFailed": "Omume a emechaghị. Biko nwaa ọzọ.",
       "actionFailed": "Enweghị ike imecha omume a. Biko nwaa ọzọ.",
       "actionBlocked": "Enweghị ike imecha omume a. A ghaghị idozi nsogbu a tupu ị nwee ike ịnwa ọzọ.",
-      "syncNoRepositories": "Ọnweghị ebe nchekwa koodu dị n'ime oke mmekọrịta data. Họrọ ebe nchekwa koodu ndị Onye enyemaka nchebe na-enyocha, wee mmekọrịta data ọzọ.",
-      "syncNoRepositoriesNoManage": "Ọnweghị ebe nchekwa koodu dị n'ime oke mmekọrịta data. Onye nwe nzukọ, onye nchịkwa, ma ọ bụ onye njikwa ịgba ụgwọ aghaghị ijikọ ebe nchekwa koodu tupu ọ nwee ike mmekọrịta data.",
-      "syncIntegrationInactive": "Njikọ GitHub maka Onye enyemaka nchebe adịghị arụ ọrụ. Jikọọ Kilo GitHub App ọzọ, wee mmekọrịta data ọzọ.",
-      "syncMissingPermission": "Kilo GitHub App enweghị ike ịgụ ọkwa ọdọ aka ná ntị. Nye ikike ahụ na GitHub, wee mmekọrịta data ọzọ.",
+      "syncNoRepositories": "Ọnweghị ebe nchekwa koodu dị n'ime oke mmekọrịta data. Họrọ ebe nchekwa koodu ndị Onye enyemaka nchebe na-enyocha, wee ịmekọrịta data ọzọ.",
+      "syncNoRepositoriesNoManage": "Ọnweghị ebe nchekwa koodu dị n'ime oke mmekọrịta data. Onye nwe nzukọ, onye nchịkwa, ma ọ bụ onye njikwa ịgba ụgwọ aghaghị ijikọ ebe nchekwa koodu tupu ọ nwee ike ịmekọrịta data.",
+      "syncIntegrationInactive": "Njikọ GitHub maka Onye enyemaka nchebe adịghị arụ ọrụ. Jikọọ Kilo GitHub App ọzọ, wee ịmekọrịta data ọzọ.",
+      "syncMissingPermission": "Kilo GitHub App enweghị ike ịgụ ọkwa ịdọ aka ná ntị. Nye ikike ahụ na GitHub, wee ịmekọrịta data ọzọ.",
       "configConflict": "Agbanweela ntọala Onye enyemaka nchebe n'ebe ọzọ. Lelee ntọala kachasị ọhụrụ ma chekwaa ọzọ."
     },
     "analysisState": {

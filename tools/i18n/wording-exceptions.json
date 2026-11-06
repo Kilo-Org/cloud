@@ -423,7 +423,8 @@
     "pr opened",
     "remediation blocked",
     "remediation failed",
-    "superseded"
+    "superseded",
+    "tokens"
   ],
   "is": [
     "dismissed",

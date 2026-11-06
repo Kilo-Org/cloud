@@ -2,7 +2,7 @@
   "generic": {
     "title": "Kilo",
     "body": {
-      "cloudAgentSession": "Nnọkọ onye nnọchite gị nwere mmelite",
+      "cloudAgentSession": "Nnọkọ onye nnọchi anya gị nwere mmelite",
       "chatMessage": "Ị nwere ozi ọhụrụ",
       "instanceLifecycle": "Ihe atụ gị nwere mmelite",
       "scheduledAction": "Omume ahaziri nwere mmelite",
@@ -10,7 +10,7 @@
       "spendAlert": "Mmefu gị chọrọ nlebara anya",
       "securityFinding": "Nchọpụta nchekwa chọrọ nlebara anya",
       "securityUpdate": "Nlele nchekwa nwere mmelite",
-      "activeAgentsGlanceable": "Ndị ọrụ na-arụ ọrụ nwere mmelite"
+      "activeAgentsGlanceable": "Ndị nnọchi anya na-arụ ọrụ nwere mmelite"
     }
   },
   "cloudAgentSession": {

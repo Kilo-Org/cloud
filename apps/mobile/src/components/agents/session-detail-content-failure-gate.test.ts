@@ -86,7 +86,7 @@ describe('lastVisibleMessageFailure', () => {
       canceledQueuedMessages: nothingCanceled,
     });
     expect(failure?.kind).toBe('delivery');
-    expect(failure?.title).toBe('Failed to deliver');
+    expect(failure?.title).toBe('Message not sent');
   });
 
   it('ignores a cancelled queued row', () => {

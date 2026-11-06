@@ -980,7 +980,7 @@ describe('bb', () => {
     const result = await execute(
       ['comments', 'update', '42', '30', '--input', '-'],
       providerFetch({ requests, updateTarget: existingSummary, updateResponse: providerResponse }),
-      { body: ' Updated summary ' }
+      { body: ' ## Code Review Summary\n\n- Current finding ' }
     );
 
     expect(result.exitCode).toBe(0);
@@ -989,8 +989,26 @@ describe('bb', () => {
       `GET ${commentsUrl}/30`,
       `PUT ${commentsUrl}/30`,
     ]);
-    expect(requestBody(requests.at(-1))).toEqual({ content: { raw: 'Updated summary' } });
+    expect(requestBody(requests.at(-1))).toEqual({
+      content: { raw: '## Code Review Summary\n\n- Current finding' },
+    });
     expect(JSON.parse(result.stdout)).toEqual(providerResponse);
+  });
+
+  it('rejects a replacement body that is not a summary body before provider access', async () => {
+    const result = await execute(
+      ['comments', 'update', '42', '30', '--input', '-'],
+      async () => {
+        throw new Error('must not reach the provider');
+      },
+      { body: 'Updated summary' }
+    );
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain('bb: summary_body_required\n');
+    expect(result.stderr).toContain(
+      'the updated body must start with the Code Review Summary heading'
+    );
   });
 
   it('refuses to update a comment that is not the Code Review Summary', async () => {

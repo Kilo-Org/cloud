@@ -82,6 +82,7 @@ const CREATE_BATCH_COMMENT_INPUT_HINT =
 const UPDATE_COMMENT_INPUT_HINT = 'expected update input JSON: {"body":"..."}';
 const UPDATE_COMMENT_TARGET_HINT =
   'only the existing Code Review Summary comment can be updated; create a new comment instead';
+const UPDATE_COMMENT_BODY_HINT = 'the updated body must start with the Code Review Summary heading';
 const BITBUCKET_ENVIRONMENT_HINT =
   'expected Bitbucket cloud-agent environment: BITBUCKET_TOKEN, KILO_BITBUCKET_WORKSPACE_SLUG, KILO_BITBUCKET_WORKSPACE_UUID, KILO_BITBUCKET_REPOSITORY_SLUG, KILO_BITBUCKET_REPOSITORY_UUID';
 const PR_CURRENT_COMMAND_HINT = 'expected PR current syntax: bb pr current';
@@ -1151,6 +1152,9 @@ async function updateComment(
   stdin: ReadableStream<Uint8Array>
 ): Promise<unknown> {
   const inputBody = await readCommentInput(stdin, parseUpdateInput, UPDATE_COMMENT_INPUT_HINT);
+  if (!isCodeReviewSummaryBody(inputBody)) {
+    throw new CliError('summary_body_required', undefined, UPDATE_COMMENT_BODY_HINT);
+  }
   const requestBody = serializeRequestBody({ content: { raw: inputBody } });
   await assertWritablePullRequest(fetchFunction, target);
   await assertUpdatableSummaryComment(fetchFunction, target, commentId);

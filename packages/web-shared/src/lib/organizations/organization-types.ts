@@ -1,5 +1,8 @@
 import * as z from 'zod';
-import { ORGANIZATION_ROLES } from '@kilocode/app-shared/organizations';
+import {
+  ORGANIZATION_NAME_MAX_LENGTH,
+  ORGANIZATION_ROLES,
+} from '@kilocode/app-shared/organizations';
 import type { Organization, organization_invitations } from '@kilocode/db/schema';
 import type { Result } from '@kilocode/web-shared/lib/maybe-result';
 import { CompanyDomainSchema, isValidDomain } from './company-domain';
@@ -50,7 +53,10 @@ export const OrganizationNameSchema = z
   .string()
   .trim()
   .min(1, 'Organization name is required')
-  .max(100, 'Organization name must be 100 characters or fewer');
+  .max(
+    ORGANIZATION_NAME_MAX_LENGTH,
+    `Organization name must be ${ORGANIZATION_NAME_MAX_LENGTH} characters or fewer`
+  );
 
 export const OrganizationCreateRequestSchema = z.object({
   name: OrganizationNameSchema,

@@ -1,4 +1,5 @@
 /* eslint-disable max-lines -- The hub composes every organization row (money, members, Kilo Pass, rename) on one screen. */
+import { ORGANIZATION_NAME_MAX_LENGTH } from '@kilocode/app-shared/organizations';
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import * as Haptics from 'expo-haptics';
 import { notificationHaptic } from '@/lib/haptics';
@@ -315,6 +316,12 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
           title={t('organization.hub.renameTitle')}
           placeholder={t('organization.hub.renamePlaceholder')}
           initialValue={org.organizationName}
+          // The server validates a rename with `OrganizationNameSchema`
+          // (packages/web-shared), so the field must accept the name it would
+          // accept. RenameModal's own default is lower than a stored name can
+          // be, and React Native applies `maxLength` to the seeded value: the
+          // dialog would open on a cut name, and saving would store the cut.
+          maxLength={ORGANIZATION_NAME_MAX_LENGTH}
           onSave={async name => {
             await mutations.rename.mutateAsync({ name });
             notificationHaptic(Haptics.NotificationFeedbackType.Success);

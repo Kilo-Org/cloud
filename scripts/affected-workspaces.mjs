@@ -2,10 +2,10 @@
 // Select the workspaces whose typecheck and lint results a change can alter.
 //
 // Usage: node scripts/affected-workspaces.mjs <base-sha>
-//        node scripts/affected-workspaces.mjs --filter-neutral
 // Prints JSON: { full, reasons, full_checks, dirs, packages, test_only_dirs,
-// test_only_packages, test_only_files }. With --filter-neutral it instead prints
-// the standard-input paths that some check reads, one per line.
+// test_only_packages, test_only_files }. `dirs` is also the selection the test
+// matrix consumes (scripts/changed-workspaces.sh), so it already carries the
+// workspace-despite-document rule: paths no check reads select nothing.
 //
 // A workspace is affected when one of its files changed, or when it reads an
 // affected workspace. A workspace reads another through a workspace:* entry in
@@ -316,13 +316,6 @@ export function selectAffected({ items, changedFiles, dependencyDirs, references
   };
 }
 
-// Print the standard-input paths that some check reads, so a selector can skip
-// documents and the neutral root locations.
-function filterNeutral() {
-  const paths = readFileSync(0, 'utf8').split('\n').filter(Boolean);
-  console.log(paths.filter(file => !isNeutral(file)).join('\n'));
-}
-
 function detect(base) {
   const items = workspaces();
   const valid =
@@ -348,6 +341,5 @@ function detect(base) {
 }
 
 if (import.meta.main) {
-  if (process.argv[2] === '--filter-neutral') filterNeutral();
-  else detect(process.argv[2] ?? '');
+  detect(process.argv[2] ?? '');
 }

@@ -1,7 +1,5 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
 import test from 'node:test';
-import { fileURLToPath } from 'node:url';
 
 import { isModuleSpecifier, isNeutral, selectAffected } from './affected-workspaces.mjs';
 
@@ -174,24 +172,19 @@ test('documents and neutral root locations are the shared neutral set', () => {
 });
 
 test('the neutral filter keeps every path a check reads', () => {
-  const script = fileURLToPath(new URL('./affected-workspaces.mjs', import.meta.url));
+  // The paths the test matrix still sees after the detector drops the neutral
+  // ones.
   const input = [
     'README.md',
     'packages/db/README.md',
     'packages/db/src/schema.ts',
     'apps/web/.env.test',
     'services/leaf/src/index.ts',
-    '',
-  ].join('\n');
-  const output = execFileSync(process.execPath, [script, '--filter-neutral'], {
-    input,
-    encoding: 'utf8',
-  });
-  assert.deepEqual(output.split('\n').filter(Boolean), [
-    'packages/db/src/schema.ts',
-    'apps/web/.env.test',
-    'services/leaf/src/index.ts',
-  ]);
+  ];
+  assert.deepEqual(
+    input.filter(file => !isNeutral(file)),
+    ['packages/db/src/schema.ts', 'apps/web/.env.test', 'services/leaf/src/index.ts']
+  );
 });
 
 // leaf-reader depends on leaf, so a full edge into leaf reaches it too.

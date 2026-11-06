@@ -356,6 +356,9 @@ jobs:
       - name: Test affected workspace detection
         run: node --test scripts/affected-workspaces.test.mjs
 
+      - name: Test changed workspace matrix
+        run: node --test scripts/changed-workspaces.test.mjs
+
       - name: Plugin shared-schemas sync check
         run: bash scripts/sync-plugin-shared.sh --check
 

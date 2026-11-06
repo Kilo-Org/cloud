@@ -901,8 +901,12 @@ jobs:
         with:
           node-version-file: '.nvmrc'
 
+      # Only this app's dependency closure and the root project are installed:
+      # every step below runs `--filter ai-gateway`. Widen the filter when a
+      # step here imports a workspace outside the closure, as
+      # build-ai-gateway-secure-proxy does.
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --filter 'ai-gateway...' --filter kilocode-monorepo
 
       - name: Cache Next.js build
         uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4

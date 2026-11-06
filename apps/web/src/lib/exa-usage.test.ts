@@ -19,6 +19,7 @@ import { getExaMonthlyUsage, getExaFreeAllowanceMicrodollars, recordExaUsage } f
 import { EXA_MONTHLY_ALLOWANCE_MICRODOLLARS } from '@kilocode/web-shared/lib/constants';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { activatePaidAgreement, createPendingAgreement } from './kilo-pass-org/service';
+import type { ExaUsageRecord } from '@kilocode/usage-contracts';
 
 function usageIdentity() {
   return { id: crypto.randomUUID(), occurredAt: new Date().toISOString() };
@@ -142,7 +143,7 @@ describe('Exa Usage Tracking', () => {
       await recordExaUsage({
         ...usageIdentity(),
         userId: user.id,
-        organizationId: undefined,
+        organizationId: null,
         path: '/search',
         costMicrodollars: 7000,
         chargedToBalance: false,
@@ -167,7 +168,7 @@ describe('Exa Usage Tracking', () => {
       await recordExaUsage({
         ...usageIdentity(),
         userId: user.id,
-        organizationId: undefined,
+        organizationId: null,
         path: '/search',
         costMicrodollars: 3000,
         chargedToBalance: false,
@@ -177,7 +178,7 @@ describe('Exa Usage Tracking', () => {
       await recordExaUsage({
         ...usageIdentity(),
         userId: user.id,
-        organizationId: undefined,
+        organizationId: null,
         path: '/contents',
         costMicrodollars: 5000,
         chargedToBalance: false,
@@ -201,7 +202,7 @@ describe('Exa Usage Tracking', () => {
       await recordExaUsage({
         ...usageIdentity(),
         userId: user.id,
-        organizationId: undefined,
+        organizationId: null,
         path: '/search',
         costMicrodollars: 1000,
         chargedToBalance: false,
@@ -212,7 +213,7 @@ describe('Exa Usage Tracking', () => {
       await recordExaUsage({
         ...usageIdentity(),
         userId: user.id,
-        organizationId: undefined,
+        organizationId: null,
         path: '/search',
         costMicrodollars: 2000,
         chargedToBalance: false,
@@ -236,7 +237,7 @@ describe('Exa Usage Tracking', () => {
       await recordExaUsage({
         ...usageIdentity(),
         userId: user.id,
-        organizationId: undefined,
+        organizationId: null,
         path: '/search',
         costMicrodollars: 5000,
         chargedToBalance: false,
@@ -246,7 +247,7 @@ describe('Exa Usage Tracking', () => {
       await recordExaUsage({
         ...usageIdentity(),
         userId: user.id,
-        organizationId: undefined,
+        organizationId: null,
         path: '/search',
         costMicrodollars: 3000,
         chargedToBalance: true,
@@ -271,7 +272,7 @@ describe('Exa Usage Tracking', () => {
       await recordExaUsage({
         ...usageIdentity(),
         userId: user.id,
-        organizationId: undefined,
+        organizationId: null,
         path: '/search',
         costMicrodollars: 7000,
         chargedToBalance: true,
@@ -323,7 +324,7 @@ describe('Exa Usage Tracking', () => {
         recordExaUsage({
           ...usageIdentity(),
           userId: missingUserId,
-          organizationId: undefined,
+          organizationId: null,
           path: '/search',
           costMicrodollars: 1000,
           chargedToBalance: true,
@@ -349,7 +350,7 @@ describe('Exa Usage Tracking', () => {
       await recordExaUsage({
         ...usageIdentity(),
         userId: user.id,
-        organizationId: undefined,
+        organizationId: null,
         path: '/search',
         costMicrodollars: 7000,
         chargedToBalance: false,
@@ -372,7 +373,7 @@ describe('Exa Usage Tracking', () => {
       await recordExaUsage({
         ...usageIdentity(),
         userId: user.id,
-        organizationId: undefined,
+        organizationId: null,
         path: '/search',
         costMicrodollars: 3000,
         chargedToBalance: false,
@@ -409,7 +410,7 @@ describe('Exa Usage Tracking', () => {
       await recordExaUsage({
         ...usageIdentity(),
         userId: user.id,
-        organizationId: undefined,
+        organizationId: null,
         path: '/search',
         costMicrodollars: 1000,
         chargedToBalance: false,
@@ -500,10 +501,10 @@ describe('Exa Usage Tracking', () => {
           microdollars_used: 0,
           total_microdollars_acquired: 100_000_000,
         });
-        const input = {
+        const input: ExaUsageRecord = {
           ...usageIdentity(),
           userId: user.id,
-          organizationId: undefined,
+          organizationId: null,
           path: '/search',
           costMicrodollars: 7000,
           chargedToBalance: true,
@@ -544,7 +545,7 @@ describe('Exa Usage Tracking', () => {
           user.id,
           50_000
         );
-        const input = {
+        const input: ExaUsageRecord = {
           ...usageIdentity(),
           userId: user.id,
           organizationId: organization.id,
@@ -593,7 +594,7 @@ describe('Exa Usage Tracking', () => {
       test('records a repeated Kilo Pass organization charge once and reports duplicate', async () => {
         const occurredAt = new Date();
         const { owner, organization } = await activePassFixture(occurredAt);
-        const input = {
+        const input: ExaUsageRecord = {
           id: crypto.randomUUID(),
           occurredAt: occurredAt.toISOString(),
           userId: owner.id,
@@ -658,10 +659,10 @@ describe('Exa Usage Tracking', () => {
           microdollars_used: 0,
           total_microdollars_acquired: 100_000_000,
         });
-        const input = {
+        const input: ExaUsageRecord = {
           ...usageIdentity(),
           userId: user.id,
-          organizationId: undefined,
+          organizationId: null,
           path: '/search',
           costMicrodollars: 7000,
           chargedToBalance: true,
@@ -701,9 +702,9 @@ describe('Exa Usage Tracking', () => {
 
       test('records separate charges for different ids', async () => {
         const user = await insertTestUser();
-        const base = {
+        const base: Omit<ExaUsageRecord, 'id' | 'occurredAt'> = {
           userId: user.id,
-          organizationId: undefined,
+          organizationId: null,
           path: '/search',
           costMicrodollars: 4000,
           chargedToBalance: false,

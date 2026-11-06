@@ -12,6 +12,7 @@ import { EXA_MONTHLY_ALLOWANCE_MICRODOLLARS } from '@kilocode/web-shared/lib/con
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { captureException } from '@sentry/nextjs';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
+import { EXA_USAGE_TYPE_MAX_LENGTH, ExaUsageRecordSchema } from '@kilocode/usage-contracts';
 
 // Capture promises scheduled via next/server `after` so tests can await them.
 let afterCallbacks: (() => Promise<void>)[] = [];
@@ -332,18 +333,20 @@ describe('POST /api/exa/[...path]', () => {
       await POST(makeRequest('/search') as never);
       await flushAfterCallbacks();
 
-      expect(mockedRecordExaUsage).toHaveBeenCalledWith({
-        id: expect.any(String),
-        occurredAt: expect.any(String),
-        userId: 'user-123',
-        organizationId: undefined,
-        path: '/search',
-        costMicrodollars: 7000,
-        chargedToBalance: false,
-        freeAllowanceMicrodollars: EXA_MONTHLY_ALLOWANCE_MICRODOLLARS,
-        featureId: undefined,
-        type: undefined,
-      });
+      expect(mockedRecordExaUsage.mock.calls).toStrictEqual([
+        [
+          {
+            id: expect.any(String),
+            occurredAt: expect.any(String),
+            userId: 'user-123',
+            organizationId: null,
+            path: '/search',
+            costMicrodollars: 7000,
+            chargedToBalance: false,
+            freeAllowanceMicrodollars: EXA_MONTHLY_ALLOWANCE_MICRODOLLARS,
+          },
+        ],
+      ]);
     });
 
     it('passes the same usage id and occurredAt to recordExaUsage', async () => {
@@ -385,18 +388,20 @@ describe('POST /api/exa/[...path]', () => {
       await POST(makeRequest('/search') as never);
       await flushAfterCallbacks();
 
-      expect(mockedRecordExaUsage).toHaveBeenCalledWith({
-        id: expect.any(String),
-        occurredAt: expect.any(String),
-        userId: 'user-123',
-        organizationId: undefined,
-        path: '/search',
-        costMicrodollars: 5000,
-        chargedToBalance: true,
-        freeAllowanceMicrodollars: 10_000_000,
-        featureId: undefined,
-        type: undefined,
-      });
+      expect(mockedRecordExaUsage.mock.calls).toStrictEqual([
+        [
+          {
+            id: expect.any(String),
+            occurredAt: expect.any(String),
+            userId: 'user-123',
+            organizationId: null,
+            path: '/search',
+            costMicrodollars: 5000,
+            chargedToBalance: true,
+            freeAllowanceMicrodollars: 10_000_000,
+          },
+        ],
+      ]);
     });
 
     it('includes organizationId in recorded usage', async () => {
@@ -532,12 +537,30 @@ describe('POST /api/exa/[...path]', () => {
       );
       await flushAfterCallbacks();
 
-      expect(mockedRecordExaUsage).toHaveBeenCalledWith(
-        expect.objectContaining({
-          featureId: undefined,
-          type: 'deep',
-        })
+      expect(mockedRecordExaUsage).toHaveBeenCalledWith(expect.objectContaining({ type: 'deep' }));
+      expect(mockedRecordExaUsage.mock.calls[0][0]).not.toHaveProperty('featureId');
+    });
+
+    it('omits a client type longer than the contract bound and still records the charge', async () => {
+      setUserAuth();
+      mockedFetch.mockResolvedValue(
+        makeUpstreamResponse({ results: [], costDollars: { total: 0.007 } })
       );
+
+      const { POST } = await import('./route');
+      await POST(
+        makeRequest('/search', {
+          query: 'test',
+          type: 't'.repeat(EXA_USAGE_TYPE_MAX_LENGTH + 1),
+        }) as never
+      );
+      await flushAfterCallbacks();
+
+      expect(mockedRecordExaUsage).toHaveBeenCalledTimes(1);
+      const record = mockedRecordExaUsage.mock.calls[0][0];
+      expect(record).not.toHaveProperty('type');
+      expect(record.costMicrodollars).toBe(7000);
+      expect(ExaUsageRecordSchema.safeParse(record).success).toBe(true);
     });
 
     it('handles malformed upstream JSON without throwing or recording usage', async () => {

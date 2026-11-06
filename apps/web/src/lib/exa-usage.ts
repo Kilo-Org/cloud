@@ -5,6 +5,7 @@ import { scheduleOrganizationLowBalanceAlert } from '@kilocode/web-shared/lib/or
 import type { OrganizationUsageMutationResult } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { EXA_MONTHLY_ALLOWANCE_MICRODOLLARS } from '@kilocode/web-shared/lib/constants';
 import { recordOrganizationConsumption } from '@kilocode/web-shared/lib/kilo-pass-org/consumption';
+import type { ExaUsageRecord, ExaUsageWriteResponse } from '@kilocode/usage-contracts';
 
 export type ExaMonthlyUsageResult = {
   /** Total spend in microdollars for the current month. */
@@ -60,30 +61,21 @@ export async function getExaMonthlyUsage(
  * A repeated `id`/`occurredAt` pair is a no-op, so retries cannot double-charge.
  * Low-balance notification scheduling happens only after commit.
  */
-export async function recordExaUsage(params: {
-  id: string;
-  occurredAt: string;
-  userId: string;
-  organizationId: string | undefined;
-  path: string;
-  costMicrodollars: number;
-  chargedToBalance: boolean;
-  freeAllowanceMicrodollars: number;
-  featureId?: string;
-  type?: string;
-}): Promise<'recorded' | 'duplicate'> {
+export async function recordExaUsage(
+  record: ExaUsageRecord
+): Promise<ExaUsageWriteResponse['status']> {
   const {
     id,
     occurredAt,
     userId,
-    organizationId,
     path,
     costMicrodollars,
     chargedToBalance,
     freeAllowanceMicrodollars,
     featureId,
     type,
-  } = params;
+  } = record;
+  const organizationId = record.organizationId ?? undefined;
   const chargedAmount = chargedToBalance ? costMicrodollars : 0;
 
   const outcome = await db.transaction(async tx => {

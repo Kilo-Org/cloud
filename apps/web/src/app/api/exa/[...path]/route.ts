@@ -15,7 +15,12 @@ import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { captureException } from '@sentry/nextjs';
 import { describeDatabaseError } from '@kilocode/web-shared/lib/ai-gateway/usage-record-diagnostics';
 import { validateFeatureHeader, FEATURE_HEADER } from '@kilocode/web-shared/lib/feature-detection';
-import { EXA_ALLOWED_PATHS, isExaAllowedPath } from '@/lib/exa-paths';
+import { buildExaUsageRecord } from '@/lib/exa-usage-record';
+import {
+  EXA_ALLOWED_PATHS,
+  isExaAllowedPath,
+  type ExaAllowedPath,
+} from '@kilocode/usage-contracts';
 import { z } from 'zod';
 
 const EXA_BASE_URL = 'https://api.exa.ai';
@@ -28,7 +33,7 @@ const ExaCostResponseSchema = z.object({
     .optional(),
 });
 
-function extractExaPath(url: URL): string | null {
+function extractExaPath(url: URL): ExaAllowedPath | null {
   const prefix = '/api/exa';
   if (!url.pathname.startsWith(prefix)) return null;
   const path = url.pathname.slice(prefix.length);
@@ -135,18 +140,20 @@ export async function POST(request: NextRequest) {
       costMicrodollars = extractCostMicrodollars(body);
       if (costMicrodollars === undefined) return;
 
-      await recordExaUsage({
-        id: usageId,
-        occurredAt,
-        userId: user.id,
-        organizationId,
-        path: exaPath,
-        costMicrodollars,
-        chargedToBalance: isPaidRequest,
-        freeAllowanceMicrodollars: allowance,
-        featureId,
-        type,
-      });
+      await recordExaUsage(
+        buildExaUsageRecord({
+          id: usageId,
+          occurredAt,
+          userId: user.id,
+          organizationId,
+          path: exaPath,
+          costMicrodollars,
+          chargedToBalance: isPaidRequest,
+          freeAllowanceMicrodollars: allowance,
+          featureId,
+          type,
+        })
+      );
     } catch (error) {
       captureException(error, {
         tags: {

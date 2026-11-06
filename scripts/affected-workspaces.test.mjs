@@ -97,8 +97,10 @@ test('an unattributable or global change selects everything', () => {
     'scripts/affected-workspaces.mjs',
     '.github/actions/trpc-declarations/action.yml',
     '.github/actions/harness-sdk-build/action.yml',
+    '.github/actions/ttsc-plugin-cache/action.yml',
     'scripts/trpc-declaration-key.mjs',
     'scripts/harness-sdk-build-key.mjs',
+    'scripts/ttsc-plugin-key.mjs',
     'scripts/build-key-inputs.mjs',
     'patches/a.patch',
   ]) {

@@ -443,20 +443,17 @@ describe('CenteredState measurement fallback', () => {
       });
       expect(mounted.content().accessibilityElementsHidden).toBe(false);
 
-      for (let round = 0; round < 4; round += 1) {
+      const cycle = () => {
         native.surface.frame = null;
         mounted.rerender();
-        await act(async () => {
-          await Promise.resolve();
-        });
         expect(mounted.content().accessibilityElementsHidden).toBe(false);
         native.surface.frame = { top: 0, bottom: 500 };
         mounted.rerender();
-        await act(async () => {
-          await Promise.resolve();
-        });
         expect(mounted.content().accessibilityElementsHidden).toBe(false);
-      }
+      };
+      cycle();
+      cycle();
+      cycle();
       mounted.unmount();
     } finally {
       vi.useRealTimers();

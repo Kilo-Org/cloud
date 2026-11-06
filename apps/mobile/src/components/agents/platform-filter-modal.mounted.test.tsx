@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Sheet } from '@/components/ui/sheet';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { type AgentSessionFilters } from '@/lib/agent-session-filters';
 import { renderWithProviders } from '@/test/render-with-providers';
 import * as PlatformFilterRows from './platform-filter-rows';
@@ -613,5 +614,21 @@ describe('SessionFilterModal', () => {
     expect(findRow(renderer, secondProject.displayName).props.accessibilityState).toEqual({
       checked: true,
     });
+  });
+
+  // The size audit reads the row node's own rect, so the 48dp selection-row
+  // frame must be that node's class — a hitSlop around a smaller box never
+  // lifts the audited frame (see the tap-target rules in DESIGN.md).
+  it('carries the shared row floor on every option row node itself', async () => {
+    const { renderer } = await renderModal({
+      selectedPlatforms: ['cli'],
+      selectedProjects: [firstProject.gitUrl],
+    });
+    const rows = renderer.root.findAllByProps({ accessibilityRole: rowRole() });
+    expect(rows).toHaveLength(10);
+    for (const row of rows) {
+      expect(String(row.props.className).split(' ')).toContain(ROW_TARGET_CLASS);
+      expect(row.props.hitSlop).toBeUndefined();
+    }
   });
 });

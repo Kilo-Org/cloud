@@ -1146,7 +1146,7 @@ export const ENKRYPT_DETECTOR_LIMITS = {
   keywords: 200,
   keywordLength: 100,
   policyTextLength: 10_000,
-  rules: 50,
+  rules: 5,
   ruleIdLength: 64,
   ruleDisplayTextLength: 120,
   ruleTextLength: 1_000,
@@ -1154,6 +1154,13 @@ export const ENKRYPT_DETECTOR_LIMITS = {
 } as const;
 
 const enkryptLimits = ENKRYPT_DETECTOR_LIMITS;
+
+/**
+ * Policies saved before rules were capped at `ENKRYPT_DETECTOR_LIMITS.rules` can hold up to this
+ * many. Saved detectors accept them so the gateway keeps enforcing those policies instead of
+ * rejecting every request; only a save applies the lower cap.
+ */
+const ENKRYPT_SAVED_RULES_LIMIT = 50;
 
 const EnkryptToggleDetectorSchema = z.strictObject({ enabled: z.boolean() });
 
@@ -1224,7 +1231,7 @@ const enkryptPolicyFields = {
     ),
   rules: z
     .array(EnkryptPolicyRuleSchema)
-    .max(enkryptLimits.rules, `Add up to ${enkryptLimits.rules} rules.`),
+    .max(ENKRYPT_SAVED_RULES_LIMIT, `Add up to ${enkryptLimits.rules} rules.`),
 };
 
 const EnkryptPiiDetectorSchema = z.strictObject({
@@ -1401,6 +1408,27 @@ export const ENKRYPT_OUTPUT_DETECTOR_IDS = [
   'nsfw',
   'bias',
 ] as const satisfies readonly (EnkryptOutputDetectorId & EnkryptDetectorId)[];
+
+function refineEnkryptRuleCount(
+  detectors: { policy_violation: { rules: EnkryptPolicyRule[] } },
+  ctx: z.core.$RefinementCtx
+) {
+  if (detectors.policy_violation.rules.length > enkryptLimits.rules) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['policy_violation', 'rules'],
+      message: `Add up to ${enkryptLimits.rules} rules.`,
+    });
+  }
+}
+
+/** Input detectors as an admin saves them, with policies capped at `ENKRYPT_DETECTOR_LIMITS.rules`. */
+export const EnkryptInputDetectorsUpdateSchema =
+  EnkryptInputDetectorsSchema.superRefine(refineEnkryptRuleCount);
+
+/** Output detectors as an admin saves them, with policies capped at `ENKRYPT_DETECTOR_LIMITS.rules`. */
+export const EnkryptOutputDetectorsUpdateSchema =
+  EnkryptOutputDetectorsSchema.superRefine(refineEnkryptRuleCount);
 
 /**
  * Blocking Enkrypt AI input scan of each gateway chat request. Flagged requests are always

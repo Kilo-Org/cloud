@@ -1,14 +1,16 @@
 import {
-  ENKRYPT_DETECTOR_IDS,
   ENKRYPT_OUTPUT_DETECTOR_IDS,
-  EnkryptInputDetectorsSchema,
-  EnkryptOutputDetectorsSchema,
+  EnkryptInputDetectorsUpdateSchema,
+  EnkryptOutputDetectorsUpdateSchema,
   type EnkryptInputDetectors,
   type EnkryptOutputDetectors,
   type EnkryptPolicyRule,
 } from '@kilocode/db/schema-types';
 import type * as z from 'zod';
-import { createKiloDefaultEnkryptInputDetectors } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detectors';
+import {
+  createKiloDefaultEnkryptInputDetectors,
+  ENKRYPT_CONFIGURABLE_INPUT_DETECTOR_IDS,
+} from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detectors';
 
 export type EnkryptInputDetectorsDraft = Omit<
   EnkryptInputDetectors,
@@ -195,7 +197,7 @@ export function getEnkryptOutputGuardrailIssues(
   }
   addSchemaIssues(
     issues,
-    EnkryptOutputDetectorsSchema.safeParse(fromDraftOutputDetectors(output.detectors))
+    EnkryptOutputDetectorsUpdateSchema.safeParse(fromDraftOutputDetectors(output.detectors))
   );
   return issues;
 }
@@ -207,12 +209,15 @@ export function getEnkryptOutputGuardrailIssues(
  */
 export function getEnkryptGuardrailsIssues(draft: EnkryptGuardrailsDraft): EnkryptGuardrailsIssues {
   const issues = new Map<string, string>();
-  if (draft.enabled && !ENKRYPT_DETECTOR_IDS.some(id => draft.detectors[id].enabled)) {
+  if (
+    draft.enabled &&
+    !ENKRYPT_CONFIGURABLE_INPUT_DETECTOR_IDS.some(id => draft.detectors[id].enabled)
+  ) {
     issues.set('detectors', 'Turn on at least one detector.');
   }
   addSchemaIssues(
     issues,
-    EnkryptInputDetectorsSchema.safeParse(fromDraftDetectors(draft.detectors))
+    EnkryptInputDetectorsUpdateSchema.safeParse(fromDraftDetectors(draft.detectors))
   );
   for (const [path, message] of getEnkryptOutputGuardrailIssues(draft.output)) {
     issues.set(path ? `output.${path}` : 'output', message);

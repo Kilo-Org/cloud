@@ -26,21 +26,6 @@ export const ENKRYPT_DETECTOR_TYPES = {
   bias: 'revise',
 } as const satisfies Record<EnkryptDetectorId, 'block' | 'revise'>;
 
-export const ENKRYPT_BLOCK_DETECTOR_IDS = [
-  'injection_attack',
-  'topic_detector',
-  'policy_violation',
-  'toxicity',
-  'nsfw',
-  'sponge_attack',
-] as const satisfies readonly EnkryptDetectorId[];
-
-export const ENKRYPT_REVISE_DETECTOR_IDS = [
-  'pii',
-  'keyword_detector',
-  'bias',
-] as const satisfies readonly EnkryptDetectorId[];
-
 /** Enkrypt reports two detectors in `summary` under names that differ from their request keys. */
 export const ENKRYPT_SUMMARY_DETECTORS: Record<string, EnkryptDetectorId> = {
   injection_attack: 'injection_attack',
@@ -66,6 +51,30 @@ export function createKiloDefaultEnkryptInputDetectors(): EnkryptInputDetectors 
     nsfw: { enabled: false },
     bias: { enabled: false, action: 'log' },
     sponge_attack: { enabled: false },
+  };
+}
+
+/** The input detectors admins can configure: the ones that matter most for developers. */
+export const ENKRYPT_CONFIGURABLE_INPUT_DETECTOR_IDS = [
+  'injection_attack',
+  'pii',
+  'policy_violation',
+  'nsfw',
+] as const satisfies readonly EnkryptDetectorId[];
+
+/**
+ * The input detectors the gateway enforces: the configurable ones as saved, and every other one
+ * off as in Kilo Default, whatever was saved for it before it stopped being offered.
+ */
+export function enforcedEnkryptInputDetectors(
+  detectors: EnkryptInputDetectors
+): EnkryptInputDetectors {
+  return {
+    ...createKiloDefaultEnkryptInputDetectors(),
+    injection_attack: detectors.injection_attack,
+    pii: detectors.pii,
+    policy_violation: detectors.policy_violation,
+    nsfw: detectors.nsfw,
   };
 }
 

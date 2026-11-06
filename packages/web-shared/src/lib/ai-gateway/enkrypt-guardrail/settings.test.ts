@@ -57,10 +57,14 @@ describe('resolveEnkryptInputGuardrail', () => {
     });
   });
 
-  it('uses the saved detectors and scope', () => {
+  it('uses the saved configurable detectors and scope', () => {
     const detectors = createKiloDefaultEnkryptInputDetectors();
-    detectors.pii.action = 'block';
-    detectors.keyword_detector = { enabled: true, action: 'log', banned_keywords: ['Phoenix'] };
+    detectors.policy_violation = {
+      enabled: true,
+      format: 'policy_text',
+      policy_text: 'Never share customer records.',
+      rules: [],
+    };
 
     expect(
       resolve({
@@ -72,16 +76,37 @@ describe('resolveEnkryptInputGuardrail', () => {
       detectors: {
         injection_attack: { enabled: true, need_explanation: false },
         pii: { enabled: true, entities: ['secrets'] },
-        keyword_detector: { enabled: true, banned_keywords: ['Phoenix'] },
+        policy_violation: {
+          enabled: true,
+          need_explanation: false,
+          policy_text: 'Never share customer records.',
+        },
       },
-      blockingDetectors: ['injection_attack', 'pii'],
+      blockingDetectors: ['injection_attack', 'policy_violation'],
     });
   });
 
-  it('is off when the saved detectors enable none', () => {
+  it('ignores saved detectors that are no longer configurable', () => {
+    const detectors = createKiloDefaultEnkryptInputDetectors();
+    detectors.injection_attack.enabled = false;
+    detectors.pii = { enabled: true, action: 'block', entities: ['url'] };
+    detectors.nsfw.enabled = true;
+    detectors.keyword_detector = { enabled: true, action: 'block', banned_keywords: ['Phoenix'] };
+    detectors.toxicity.enabled = true;
+
+    expect(resolve({ enkrypt: { input_guardrail: { enabled: true, detectors } } })).toEqual({
+      scanToolResults: true,
+      status: 'ready',
+      detectors: { pii: { enabled: true, entities: ['url'] }, nsfw: { enabled: true } },
+      blockingDetectors: ['pii', 'nsfw'],
+    });
+  });
+
+  it('is off when the saved detectors enable no configurable detector', () => {
     const detectors = createKiloDefaultEnkryptInputDetectors();
     detectors.injection_attack.enabled = false;
     detectors.pii.enabled = false;
+    detectors.toxicity.enabled = true;
 
     expect(resolve({ enkrypt: { input_guardrail: { enabled: true, detectors } } })).toBeNull();
   });

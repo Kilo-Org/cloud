@@ -9,6 +9,7 @@ import {
   blockingEnkryptDetectorIds,
   buildEnkryptDetectRequestDetectors,
   enabledEnkryptDetectorIds,
+  enforcedEnkryptInputDetectors,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detectors';
 import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -279,7 +280,8 @@ function GuardrailsForm({
                 <div className="grid gap-1.5">
                   <CardTitle>Input detectors</CardTitle>
                   <CardDescription>
-                    Enkrypt runs the detectors you turn on against each checked input. Kilo Default
+                    Enkrypt runs the detectors you turn on against each checked input. A detection
+                    blocks the request unless PII and secrets is set to Log only. Kilo Default
                     blocks prompt injection and logs secrets.
                   </CardDescription>
                 </div>
@@ -519,7 +521,7 @@ function ResponseGuardrailCard({
 
 function RequestPreviewCard({ draft }: { draft: EnkryptGuardrailsDraft }) {
   const [open, setOpen] = useState(false);
-  const detectors = fromDraftDetectors(draft.detectors);
+  const detectors = enforcedEnkryptInputDetectors(fromDraftDetectors(draft.detectors));
   const requestBody = JSON.stringify(
     {
       text: '<checked input>',

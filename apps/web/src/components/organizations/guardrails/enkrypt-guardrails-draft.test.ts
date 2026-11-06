@@ -21,6 +21,14 @@ function offOutput() {
   return { enabled: false, detectors: createEmptyEnkryptOutputDetectors() };
 }
 
+function policyRules(count: number) {
+  return Array.from({ length: count }, (_, index) => ({
+    ...createPolicyRule([]),
+    id: `rule-${index}`,
+    text: 'Do not share customer records.',
+  }));
+}
+
 function enabledDraft(): EnkryptGuardrailsDraft {
   return toDraft({
     enabled: true,
@@ -143,14 +151,23 @@ describe('getEnkryptGuardrailsIssues', () => {
     expect(getEnkryptGuardrailsIssues({ ...enabledDraft(), enabled: false }).size).toBe(0);
   });
 
-  it('reports when no detector is enabled only while guardrails are on', () => {
+  it('reports when no configurable detector is enabled only while guardrails are on', () => {
     const draft = enabledDraft();
     draft.detectors.injection_attack.enabled = false;
     draft.detectors.pii.enabled = false;
+    draft.detectors.toxicity.enabled = true;
     expect(issueAt(getEnkryptGuardrailsIssues(draft), 'detectors')).toBe(
       'Turn on at least one detector.'
     );
     expect(getEnkryptGuardrailsIssues({ ...draft, enabled: false }).size).toBe(0);
+
+    draft.detectors.policy_violation = {
+      enabled: true,
+      format: 'policy_text',
+      policy_text: 'No customer data.',
+      rules: [],
+    };
+    expect(getEnkryptGuardrailsIssues(draft).size).toBe(0);
   });
 
   it('keeps reporting invalid detector settings while guardrails are off, since they are saved', () => {
@@ -179,6 +196,35 @@ describe('getEnkryptGuardrailsIssues', () => {
     );
     expect(issueAt(issues, 'policy_violation.rules.0.id')).toBeUndefined();
   });
+
+  it('caps structured rules at five and policy text at 10,000 characters', () => {
+    const draft = enabledDraft();
+    draft.detectors.policy_violation = {
+      enabled: true,
+      format: 'rules',
+      policy_text: '',
+      rules: policyRules(5),
+    };
+    expect(getEnkryptGuardrailsIssues(draft).size).toBe(0);
+
+    draft.detectors.policy_violation.rules = policyRules(6);
+    expect(getEnkryptGuardrailsIssues(draft).get('policy_violation.rules')).toBe(
+      'Add up to 5 rules.'
+    );
+
+    draft.detectors.policy_violation = {
+      enabled: true,
+      format: 'policy_text',
+      policy_text: 'x'.repeat(10_000),
+      rules: [],
+    };
+    expect(getEnkryptGuardrailsIssues(draft).size).toBe(0);
+
+    draft.detectors.policy_violation.policy_text = 'x'.repeat(10_001);
+    expect(issueAt(getEnkryptGuardrailsIssues(draft), 'policy_violation.policy_text')).toBe(
+      'Policy text can be up to 10,000 characters.'
+    );
+  });
 });
 
 describe('getEnkryptOutputGuardrailIssues', () => {
@@ -204,5 +250,21 @@ describe('getEnkryptOutputGuardrailIssues', () => {
     const issues = getEnkryptGuardrailsIssues(draft);
     expect(issueAt(issues, 'output.topic_detector.topic')).toBe('Add at least one topic.');
     expect(issueAt(issues, 'topic_detector')).toBeUndefined();
+  });
+
+  it('caps structured rules at five', () => {
+    const { output } = enabledDraft();
+    output.enabled = true;
+    output.detectors.policy_violation = {
+      enabled: true,
+      action: 'block',
+      format: 'rules',
+      policy_text: '',
+      rules: policyRules(6),
+    };
+
+    expect(getEnkryptOutputGuardrailIssues(output).get('policy_violation.rules')).toBe(
+      'Add up to 5 rules.'
+    );
   });
 });

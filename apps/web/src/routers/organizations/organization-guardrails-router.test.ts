@@ -12,6 +12,7 @@ import {
   type Organization,
   type User,
 } from '@kilocode/db/schema';
+import type { EnkryptPolicyRule } from '@kilocode/db/schema-types';
 import {
   createEmptyEnkryptOutputDetectors,
   createKiloDefaultEnkryptInputDetectors,
@@ -42,6 +43,18 @@ function savedConfig() {
     detectors,
     output: { enabled: false, detectors: createEmptyEnkryptOutputDetectors() },
   };
+}
+
+function policyRules(count: number) {
+  return Array.from({ length: count }, (_, index): EnkryptPolicyRule => ({
+    id: `rule-${index}`,
+    display_text: '',
+    text: 'Do not share customer records.',
+    risk_category: 'privacy_data_protection',
+    applicability: 'user',
+    severity: 'high',
+    frameworks: [],
+  }));
 }
 
 function savedOutputConfig() {
@@ -207,24 +220,77 @@ describe('organization guardrails router', () => {
         .limit(1);
       expect(auditLog.action).toBe('organization.settings.change');
       expect(auditLog.message).toBe(
-        `Updated AI guardrails: enabled; checking ${scope}; detectors: injection_attack, pii (log, secrets), keyword_detector (block, 2 keywords), policy_violation (policy text); response checks: disabled; response detectors: none`
+        `Updated AI guardrails: enabled; checking ${scope}; detectors: injection_attack, pii (log, secrets), policy_violation (policy text); response checks: disabled; response detectors: none`
       );
       expect(auditLog.message).not.toContain('Phoenix');
       expect(auditLog.message).not.toContain('customer records');
     }
   );
 
-  it('rejects enabling guardrails with no detector', async () => {
+  it('rejects enabling guardrails with no configurable detector', async () => {
     const caller = await createCallerForUser(owner.id);
     const config = savedConfig();
     config.detectors.injection_attack.enabled = false;
     config.detectors.pii.enabled = false;
-    config.detectors.keyword_detector.enabled = false;
     config.detectors.policy_violation.enabled = false;
+    expect(config.detectors.keyword_detector.enabled).toBe(true);
 
     await expect(
       caller.organizations.guardrails.update({ organizationId: organization.id, ...config })
     ).rejects.toThrow('Turn on at least one detector.');
+  });
+
+  it('rejects saving more than five policy rules', async () => {
+    const caller = await createCallerForUser(owner.id);
+    const config = savedConfig();
+    config.detectors.policy_violation = {
+      enabled: true,
+      format: 'rules',
+      policy_text: '',
+      rules: policyRules(6),
+    };
+
+    await expect(
+      caller.organizations.guardrails.update({ organizationId: organization.id, ...config })
+    ).rejects.toThrow('Add up to 5 rules.');
+
+    const output = savedOutputConfig();
+    output.detectors.policy_violation = {
+      enabled: true,
+      action: 'block',
+      format: 'rules',
+      policy_text: '',
+      rules: policyRules(6),
+    };
+    await expect(
+      caller.organizations.guardrails.update({
+        organizationId: organization.id,
+        ...savedConfig(),
+        output,
+      })
+    ).rejects.toThrow('Add up to 5 rules.');
+  });
+
+  it('still reads a policy saved with more than five rules before the cap', async () => {
+    const detectors = createKiloDefaultEnkryptInputDetectors();
+    detectors.policy_violation = {
+      enabled: true,
+      format: 'rules',
+      policy_text: '',
+      rules: policyRules(8),
+    };
+    const legacyOrganization = await createTestOrganization(
+      'Legacy Rules Guardrails Org',
+      owner.id,
+      0,
+      { kilo_encrypt: true, enkrypt: { input_guardrail: { enabled: true, detectors } } },
+      false
+    );
+    const caller = await createCallerForUser(owner.id);
+
+    await expect(
+      caller.organizations.guardrails.get({ organizationId: legacyOrganization.id })
+    ).resolves.toMatchObject({ detectors, invalid_saved_detectors: false });
   });
 
   it('rejects an invalid detector configuration', async () => {

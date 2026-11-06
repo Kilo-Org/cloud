@@ -18,6 +18,7 @@ import {
   createKiloDefaultEnkryptInputDetectors,
   enabledEnkryptDetectorIds,
   enabledEnkryptOutputDetectorIds,
+  enforcedEnkryptInputDetectors,
   enkryptOutputDetectorsAsInputDetectors,
   type EnkryptDetectRequestDetectors,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detectors';
@@ -82,7 +83,8 @@ export function readStoredEnkryptOutputDetectors(
 /**
  * The organization's input guardrail, or null when Kilo admins have not granted the feature
  * (`kilo_encrypt`), or the guardrail is absent, disabled, invalid in settings, or selects no
- * detector. Organizations that never saved detectors get Kilo Default.
+ * detector. Organizations that never saved detectors get Kilo Default. Only the configurable
+ * detectors follow the saved settings; see `enforcedEnkryptInputDetectors`.
  */
 export function resolveEnkryptInputGuardrail(
   organizationId: string,
@@ -104,8 +106,9 @@ export function resolveEnkryptInputGuardrail(
 
   const stored = readStoredEnkryptDetectors(organizationId, parsed.data.detectors);
   if (stored.status === 'invalid') return { scanToolResults, status: 'invalid' };
-  const detectors =
-    stored.status === 'found' ? stored.detectors : createKiloDefaultEnkryptInputDetectors();
+  const detectors = enforcedEnkryptInputDetectors(
+    stored.status === 'found' ? stored.detectors : createKiloDefaultEnkryptInputDetectors()
+  );
   if (enabledEnkryptDetectorIds(detectors).length === 0) return null;
   return {
     scanToolResults,

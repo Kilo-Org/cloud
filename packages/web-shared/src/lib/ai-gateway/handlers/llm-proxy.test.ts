@@ -6117,7 +6117,37 @@ describe('Enkrypt input guardrail', () => {
     expect(mockedLogUnrewrittenResponse).not.toHaveBeenCalled();
   });
 
-  it('applies the saved detectors, blocking on a keyword the organization set to block', async () => {
+  it('applies the saved detectors, blocking on secrets the organization set to block', async () => {
+    const detectors = createKiloDefaultEnkryptInputDetectors();
+    detectors.pii = { enabled: true, action: 'block', entities: ['secrets'] };
+    setOrganization({
+      enkrypt: { input_guardrail: { enabled: true, scan_tool_results: false, detectors } },
+    });
+    enkryptAnswers({ summary: { pii: 1 }, result_message: 'my key is [SECRET_1]' });
+
+    const response = await handleLlmProxyRequest(
+      makeRequest({
+        model: 'openai/gpt-4o',
+        messages: [{ role: 'user', content: 'my key is sk-test-123' }],
+      })
+    );
+
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(JSON.stringify(body)).not.toContain('[SECRET_1]');
+    expect(body).toMatchObject({ error_type: 'guardrail_blocked' });
+    expect(enkryptRequestBodies()).toEqual([
+      expect.objectContaining({
+        detectors: {
+          injection_attack: expect.anything(),
+          pii: { enabled: true, entities: ['secrets'] },
+        },
+      }),
+    ]);
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
+  it('ignores saved detectors that are no longer configurable', async () => {
     const detectors = createKiloDefaultEnkryptInputDetectors();
     detectors.keyword_detector = {
       enabled: true,
@@ -6127,29 +6157,19 @@ describe('Enkrypt input guardrail', () => {
     setOrganization({
       enkrypt: { input_guardrail: { enabled: true, scan_tool_results: false, detectors } },
     });
-    enkryptAnswers({ summary: { keyword_detected: 1 }, result_message: 'about [KEYWORD_1]' });
+    enkryptAnswers({ summary: {}, result_message: null });
 
-    const response = await handleLlmProxyRequest(
+    await handleLlmProxyRequest(
       makeRequest({
         model: 'openai/gpt-4o',
         messages: [{ role: 'user', content: 'tell me about Project Phoenix' }],
       })
     );
 
-    expect(response.status).toBe(400);
-    const body = await response.json();
-    expect(JSON.stringify(body)).not.toContain('[KEYWORD_1]');
-    expect(body).toMatchObject({ error_type: 'guardrail_blocked' });
     expect(enkryptRequestBodies()).toEqual([
-      expect.objectContaining({
-        detectors: {
-          injection_attack: expect.anything(),
-          keyword_detector: { enabled: true, banned_keywords: ['Project Phoenix'] },
-        },
-      }),
+      expect.objectContaining({ detectors: { injection_attack: expect.anything() } }),
       expect.objectContaining({ detectors: { pii: expect.anything() } }),
     ]);
-    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
   it('rejects the request when the saved detectors are invalid', async () => {

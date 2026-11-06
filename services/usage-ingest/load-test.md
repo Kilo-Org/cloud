@@ -214,7 +214,7 @@ never call the writer directly. Neither `mode: on_stall` nor successful queue
 traffic shows that the direct lane ran. Report three counts per usage ID, not one:
 
 - **Hedge candidates.** `usage_ingest_publish` events with `direct_outcome` or
-  `direct_pending: true`. A hedge became due; this alone proves no writer request.
+  `direct_pending: true`. A hedge became due; this alone does not prove a writer request.
   `direct_pending` can mean the Worker was still waiting on the limiter.
 - **Skips without a writer request.** A `direct_outcome` of `rate_limited`,
   `limiter_unavailable` or `missing_config`. Take each request's outcome from its

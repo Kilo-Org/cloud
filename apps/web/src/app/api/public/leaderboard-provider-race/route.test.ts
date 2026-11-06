@@ -146,6 +146,58 @@ describe('leaderboard Snowflake database and schema', () => {
   });
 });
 
+describe('leaderboard model alias attribution', () => {
+  test.each([
+    {
+      route: 'leaderboard-model-usage',
+      loadRoute: () => import('../leaderboard-model-usage/route'),
+    },
+    {
+      route: 'leaderboard-model-provider-usage',
+      loadRoute: () => import('../leaderboard-model-provider-usage/route'),
+    },
+  ])('$route groups tilde aliases by the model that served each request', async ({ loadRoute }) => {
+    await jest.isolateModulesAsync(async () => {
+      const snowflake = await import('@/lib/snowflake');
+      jest.mocked(snowflake.resolveSnowflakeConfig).mockReturnValue(FAKE_CONFIG);
+      const executeStatement = jest.mocked(snowflake.executeSnowflakeStatement);
+      executeStatement.mockReset().mockResolvedValue([]);
+      const { GET } = await loadRoute();
+
+      expect((await GET()).status).toBe(200);
+      const statement = executeStatement.mock.calls[0][0].statement;
+      const modelExpression = statement.match(
+        /(case[\s\S]*?end|coalesce\(mu\.requested_model, mu\.model\)|mu\.requested_model) as "model"/
+      )?.[1];
+      if (!modelExpression) {
+        throw new Error('Missing leaderboard model projection');
+      }
+
+      const usage = await db.execute<{ model: string; tokens: number }>(sql`
+        select ${sql.raw(modelExpression)} as model, sum(mu.tokens)::integer as tokens
+        from (values
+          ('~deepseek/deepseek-pro-latest', 'deepseek/deepseek-v4-pro-0813', 6000000),
+          ('deepseek/deepseek-v4-pro-0813', 'deepseek/deepseek-v4-pro-0813', 6000000),
+          ('~deepseek/deepseek-pro-latest', 'deepseek/deepseek-v4-pro-1101', 12000000),
+          ('deepseek/deepseek-v4-pro-0813:free', 'deepseek/deepseek-v4-pro-0813', 3000000),
+          ('~deepseek/unresolved-latest', null, 2000000),
+          ('acme/model~latest', 'upstream/model', 1000000)
+        ) as mu(requested_model, model, tokens)
+        group by 1
+        order by 2 desc, 1
+      `);
+
+      expect(usage.rows).toEqual([
+        { model: 'deepseek/deepseek-v4-pro-0813', tokens: 12000000 },
+        { model: 'deepseek/deepseek-v4-pro-1101', tokens: 12000000 },
+        { model: 'deepseek/deepseek-v4-pro-0813:free', tokens: 3000000 },
+        { model: '~deepseek/unresolved-latest', tokens: 2000000 },
+        { model: 'acme/model~latest', tokens: 1000000 },
+      ]);
+    });
+  });
+});
+
 describe('public custom model leaderboard usage', () => {
   test.each([
     {

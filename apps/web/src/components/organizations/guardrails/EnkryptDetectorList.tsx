@@ -12,7 +12,6 @@ import {
 import { ENKRYPT_CONFIGURABLE_INPUT_DETECTOR_IDS } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detectors';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import {
@@ -114,49 +113,64 @@ const POLICY_FORMAT_OPTIONS = [
   },
 ] as const;
 
-type ReviseChoice = 'off' | 'log' | 'block';
+type DetectorChoice = 'off' | 'log' | 'block';
 
-const REVISE_CHOICES: { value: ReviseChoice; label: string }[] = [
+const DETECTOR_CHOICES: { value: DetectorChoice; label: string }[] = [
   { value: 'off', label: 'Off' },
   { value: 'log', label: 'Log only' },
   { value: 'block', label: 'Block' },
 ];
+
+function choicePatch(choice: DetectorChoice) {
+  return choice === 'off' ? { enabled: false } : { enabled: true, action: choice };
+}
+
+/** An input detector turned off is saved without its action, so it resumes at Block. */
+function inputChoicePatch(choice: DetectorChoice) {
+  return choice === 'off' ? { enabled: false, action: 'block' as const } : choicePatch(choice);
+}
 
 /** Only the configurable detectors are shown; the gateway applies Kilo Default to the others. */
 export function EnkryptDetectorList({
   detectors,
   issues,
   onUpdate,
+  action,
 }: {
   detectors: EnkryptInputDetectorsDraft;
   issues: EnkryptGuardrailsIssues;
   onUpdate: UpdateEnkryptDetector;
+  action: ReactNode;
 }) {
   return (
-    <ul className="divide-border divide-y rounded-md border px-4">
+    <DetectorSection
+      title="Detectors"
+      description="Block stops a flagged request. Log only records detections without delaying the request. NSFW content is always blocked and secrets are always logged."
+      action={action}
+    >
       {ENKRYPT_CONFIGURABLE_INPUT_DETECTOR_IDS.map(id => (
         <DetectorRow
           key={id}
           details={DETECTOR_DETAILS[id]}
           enabled={detectors[id].enabled}
           control={(labelId, descriptionId) => (
-            <Switch
-              checked={detectors[id].enabled}
-              aria-labelledby={labelId}
-              aria-describedby={descriptionId}
-              onCheckedChange={enabled => onUpdate(id, { enabled })}
+            <DetectorChoiceControl
+              labelId={labelId}
+              descriptionId={descriptionId}
+              value={detectorChoice(detectors[id])}
+              onChange={choice => onUpdate(id, inputChoicePatch(choice))}
             />
           )}
         >
           <DetectorOptions id={id} detectors={detectors} issues={issues} onUpdate={onUpdate} />
         </DetectorRow>
       ))}
-    </ul>
+    </DetectorSection>
   );
 }
 
 /**
- * Every response detector can block or only log. A blocking one makes the gateway hold back each
+ * Every output detector can block or only log. A blocking one makes the gateway hold back each
  * response until it is checked.
  */
 export function EnkryptOutputDetectorList({
@@ -170,7 +184,7 @@ export function EnkryptOutputDetectorList({
 }) {
   return (
     <DetectorSection
-      title="Block or log"
+      title="Detectors"
       description="Block replaces a flagged response with an error. Log only records detections without delaying the response."
     >
       {ENKRYPT_OUTPUT_DETECTOR_IDS.map(id => (
@@ -179,16 +193,11 @@ export function EnkryptOutputDetectorList({
           details={OUTPUT_DETECTOR_DETAILS[id]}
           enabled={detectors[id].enabled}
           control={(labelId, descriptionId) => (
-            <ReviseChoiceControl
+            <DetectorChoiceControl
               labelId={labelId}
               descriptionId={descriptionId}
               value={detectorChoice(detectors[id])}
-              onChange={choice =>
-                onUpdate(
-                  id,
-                  choice === 'off' ? { enabled: false } : { enabled: true, action: choice }
-                )
-              }
+              onChange={choice => onUpdate(id, choicePatch(choice))}
             />
           )}
         >
@@ -199,27 +208,32 @@ export function EnkryptOutputDetectorList({
   );
 }
 
-function detectorChoice(detector: { enabled: boolean; action: 'log' | 'block' }): ReviseChoice {
+function detectorChoice(detector: { enabled: boolean; action: 'log' | 'block' }): DetectorChoice {
   return detector.enabled ? detector.action : 'off';
 }
 
 function DetectorSection({
   title,
   description,
+  action,
   children,
 }: {
   title: string;
   description: string;
+  action?: ReactNode;
   children: ReactNode;
 }) {
   const titleId = useId();
   return (
     <section aria-labelledby={titleId} className="grid gap-4">
-      <div className="grid gap-1">
-        <h3 id={titleId} className="text-sm font-semibold">
-          {title}
-        </h3>
-        <p className="text-muted-foreground text-sm">{description}</p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="grid min-w-0 flex-1 gap-1">
+          <h4 id={titleId} className="text-sm font-semibold">
+            {title}
+          </h4>
+          <p className="text-muted-foreground text-sm">{description}</p>
+        </div>
+        {action}
       </div>
       <ul className="divide-border divide-y rounded-md border px-4">{children}</ul>
     </section>
@@ -258,7 +272,7 @@ function DetectorRow({
   );
 }
 
-function ReviseChoiceControl({
+function DetectorChoiceControl({
   labelId,
   descriptionId,
   value,
@@ -266,8 +280,8 @@ function ReviseChoiceControl({
 }: {
   labelId: string;
   descriptionId: string;
-  value: ReviseChoice;
-  onChange: (value: ReviseChoice) => void;
+  value: DetectorChoice;
+  onChange: (value: DetectorChoice) => void;
 }) {
   const name = useId();
   return (
@@ -277,7 +291,7 @@ function ReviseChoiceControl({
       aria-describedby={descriptionId}
       className="bg-muted/40 inline-flex shrink-0 rounded-md border p-0.5"
     >
-      {REVISE_CHOICES.map(choice => (
+      {DETECTOR_CHOICES.map(choice => (
         <label
           key={choice.value}
           className={cn(

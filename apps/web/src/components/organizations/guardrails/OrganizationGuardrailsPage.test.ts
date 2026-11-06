@@ -156,13 +156,48 @@ describe('OrganizationGuardrailsPage output availability', () => {
   }
 
   function switchControl(label: string) {
-    const found = Array.from(container.querySelectorAll<HTMLButtonElement>('[role="switch"]')).find(
-      candidate => {
-        const labelId = candidate.getAttribute('aria-labelledby');
-        return labelId && document.getElementById(labelId)?.textContent === label;
-      }
-    );
+    const found = labelledBy<HTMLButtonElement>('[role="switch"]', label);
     if (!found) throw new Error(`Switch missing: ${label}`);
+    return found;
+  }
+
+  function labelledBy<T extends Element>(selector: string, label: string) {
+    return Array.from(container.querySelectorAll<T>(selector)).find(candidate => {
+      const labelId = candidate.getAttribute('aria-labelledby');
+      return labelId && document.getElementById(labelId)?.textContent === label;
+    });
+  }
+
+  function choiceGroup(label: string) {
+    const found = labelledBy('[role="radiogroup"]', label);
+    if (!found) throw new Error(`Choice missing: ${label}`);
+    return found;
+  }
+
+  function choiceInputs(label: string) {
+    return Array.from(choiceGroup(label).querySelectorAll<HTMLInputElement>('input[type="radio"]'));
+  }
+
+  function checkedChoice(label: string) {
+    return choiceInputs(label).find(input => input.checked)?.parentElement?.textContent;
+  }
+
+  function choose(label: string, choice: 'Off' | 'Log only' | 'Block') {
+    const input = choiceInputs(label).find(
+      candidate => candidate.parentElement?.textContent === choice
+    );
+    if (!input) throw new Error(`Choice missing: ${label} ${choice}`);
+    act(() => {
+      input.setAttribute('checked', '');
+      input.dispatchEvent(new Event('click', { bubbles: true }));
+    });
+  }
+
+  function textElement(text: string) {
+    const found = Array.from(container.querySelectorAll('*')).find(
+      candidate => candidate.children.length === 0 && candidate.textContent === text
+    );
+    if (!found) throw new Error(`Text missing: ${text}`);
     return found;
   }
 
@@ -183,27 +218,68 @@ describe('OrganizationGuardrailsPage output availability', () => {
     });
   }
 
-  it('hides response controls but keeps saved-output errors and a recovery path visible', () => {
+  it('hides output controls but keeps saved-output errors and a recovery path visible', () => {
     mockConfig.output.enabled = true;
     mockConfig.invalid_saved_output_detectors = true;
     render();
 
-    expect(container.textContent).not.toContain('Response checks');
-    expect(container.textContent).toContain("Saved response detector settings can't be read");
+    expect(container.textContent).not.toContain('Output guardrails');
+    expect(container.textContent).toContain("Saved output detector settings can't be read");
     expect(container.textContent).toContain('Responses are withheld');
     expect(container.textContent).toContain(
-      'Contact Kilo support to restore access to response detector settings.'
+      'Contact Kilo support to restore access to output detector settings.'
     );
     expect(container.textContent).not.toContain('Save detector settings');
-    expect(container.querySelector('[role="radiogroup"]')).toBeNull();
-    expect(switchControl('Enkrypt AI guardrails').getAttribute('aria-checked')).toBe('true');
-    expect(switchControl('Prompt injection').getAttribute('aria-checked')).toBe('true');
-    expect(container.textContent).toContain('Input detectors');
+    expect(container.querySelectorAll('[role="radiogroup"]')).toHaveLength(2);
+    expect(switchControl('Input guardrails').getAttribute('aria-checked')).toBe('true');
+    expect(checkedChoice('Prompt injection')).toBe('Block');
+    expect(checkedChoice('Policy violation')).toBe('Off');
     expect(container.textContent).toContain('MCP and skill guardrails');
     expect(mockUpdate).not.toHaveBeenCalled();
   });
 
-  it('shows and saves response controls and warnings when available, independently of input checks', async () => {
+  it('shows input and output guardrails as sections of one Enkrypt AI guardrails card', () => {
+    mockConfig.output_available = true;
+    render();
+
+    const card = textElement('Enkrypt AI guardrails').closest('.bg-card');
+    const sections = Array.from(card?.querySelectorAll('section > div > div > h3') ?? []);
+    expect(sections.map(heading => heading.textContent)).toEqual([
+      'Input guardrails',
+      'Output guardrails',
+    ]);
+    expect(container.querySelectorAll('.bg-card')).toHaveLength(1);
+    expect(switchControl('Output guardrails').getAttribute('aria-checked')).toBe('false');
+  });
+
+  it('saves Log only and Off choices for input detectors', async () => {
+    render();
+
+    choose('Prompt injection', 'Log only');
+    expect(checkedChoice('Prompt injection')).toBe('Log only');
+    await advance();
+    expect(mockUpdate).toHaveBeenCalledTimes(1);
+    expect(mockUpdate.mock.calls[0][0].detectors.injection_attack).toEqual({
+      enabled: true,
+      action: 'log',
+    });
+    expect(container.textContent).toContain('All changes saved.');
+
+    choose('Prompt injection', 'Off');
+    await advance();
+    expect(mockUpdate).toHaveBeenCalledTimes(1);
+    expect(container.textContent).toContain('Not saved yet. Turn on at least one input detector.');
+
+    choose('Prompt injection', 'Block');
+    await advance();
+    expect(mockUpdate).toHaveBeenCalledTimes(2);
+    expect(mockUpdate.mock.calls[1][0].detectors.injection_attack).toEqual({
+      enabled: true,
+      action: 'block',
+    });
+  });
+
+  it('shows and saves output controls and warnings when available, independently of input guardrails', async () => {
     mockConfig.enabled = false;
     mockConfig.output_available = true;
     mockConfig.output.enabled = true;
@@ -211,13 +287,12 @@ describe('OrganizationGuardrailsPage output availability', () => {
     mockConfig.invalid_saved_output_detectors = true;
     render();
 
-    expect(container.textContent).toContain('Response checks');
-    expect(container.textContent).toContain("Saved response detector settings can't be read");
-    expect(container.textContent).toContain('Block or log');
-    expect(container.textContent).not.toContain('Input detectors');
-    expect(container.querySelector('[role="radiogroup"]')).not.toBeNull();
+    expect(container.textContent).toContain('Output guardrails');
+    expect(container.textContent).toContain("Saved output detector settings can't be read");
+    expect(labelledBy('[role="radiogroup"]', 'Prompt injection')).toBeUndefined();
+    expect(checkedChoice('Toxicity')).toBe('Block');
 
-    act(() => switchControl('Response checks').click());
+    act(() => switchControl('Output guardrails').click());
     await advance();
     expect(mockUpdate).toHaveBeenCalledTimes(1);
     expect(mockUpdate).toHaveBeenLastCalledWith({
@@ -249,7 +324,7 @@ describe('OrganizationGuardrailsPage output availability', () => {
       const savedOutput = structuredClone(mockConfig.output);
       render();
 
-      act(() => switchControl('Enkrypt AI guardrails').click());
+      act(() => switchControl('Input guardrails').click());
       await advance(799);
       expect(mockUpdate).not.toHaveBeenCalled();
       await advance(1);
@@ -278,8 +353,8 @@ describe('OrganizationGuardrailsPage output availability', () => {
       render();
 
       act(() => {
-        switchControl('Response checks').click();
-        if (editInput) switchControl('Enkrypt AI guardrails').click();
+        switchControl('Output guardrails').click();
+        if (editInput) switchControl('Input guardrails').click();
       });
       await advance(400);
       expect(mockUpdate).not.toHaveBeenCalled();
@@ -289,7 +364,7 @@ describe('OrganizationGuardrailsPage output availability', () => {
         queryClient.setQueryData(queryKey, mockConfig);
       });
       await advance(400);
-      expect(container.textContent).not.toContain('Response checks');
+      expect(container.textContent).not.toContain('Output guardrails');
       expect(mockUpdate).toHaveBeenCalledTimes(editInput ? 1 : 0);
       if (editInput) {
         expect(mockUpdate).toHaveBeenLastCalledWith({
@@ -308,7 +383,7 @@ describe('OrganizationGuardrailsPage output availability', () => {
 
   it('saves dirty input once when hidden output changes remotely', async () => {
     render();
-    act(() => switchControl('Enkrypt AI guardrails').click());
+    act(() => switchControl('Input guardrails').click());
     await advance(400);
 
     const remoteOutput = {
@@ -352,14 +427,14 @@ describe('OrganizationGuardrailsPage output availability', () => {
       enabled: true,
       detectors: mockConfig.detectors,
     });
-    expect(container.textContent).not.toContain("Saved detector settings can't be read");
+    expect(container.textContent).not.toContain("Saved input detector settings can't be read");
   });
 
   it('keeps failed autosaves paused and omits hidden invalid output on manual retry', async () => {
     mockConfig.output.enabled = true;
     mockUpdate.mockRejectedValueOnce(new Error('Save unavailable'));
     render();
-    act(() => switchControl('Enkrypt AI guardrails').click());
+    act(() => switchControl('Input guardrails').click());
     await advance();
 
     expect(mockUpdate).toHaveBeenCalledTimes(1);

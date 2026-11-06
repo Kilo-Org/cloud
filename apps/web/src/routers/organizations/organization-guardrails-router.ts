@@ -15,6 +15,7 @@ import {
   enabledEnkryptOutputDetectorIds,
   ENKRYPT_CONFIGURABLE_INPUT_DETECTOR_IDS,
   enforcedEnkryptInputDetectors,
+  storableEnkryptInputDetectors,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detectors';
 import {
   readStoredEnkryptDetectors,
@@ -50,7 +51,7 @@ const OrganizationGuardrailsConfigSchema = z.object({
 
 /**
  * Saves cap policies at fewer rules than saved settings may hold. Omitting `output` preserves
- * response checks when their configuration UI is unavailable.
+ * output guardrails when their configuration UI is unavailable.
  */
 const OrganizationGuardrailsUpdateSchema = OrganizationGuardrailsConfigSchema.extend({
   detectors: EnkryptInputDetectorsUpdateSchema,
@@ -65,7 +66,7 @@ export type OrganizationGuardrailsConfig = z.infer<typeof OrganizationGuardrails
  * `invalid_saved_detectors`: the saved input detectors no longer validate, so the gateway rejects
  * every scanned request while the guardrail is enabled. `detectors` then holds Kilo Default as a
  * starting point for the admin to review and save. `invalid_saved_output_detectors` is the same for
- * the response guardrail, which then withholds every response and starts from no detector.
+ * the output guardrail, which then withholds every response and starts from no detector.
  */
 const OrganizationGuardrailsResponseSchema = OrganizationGuardrailsConfigSchema.extend({
   output_available: z.boolean(),
@@ -113,8 +114,8 @@ export function describeGuardrailsConfig(config: OrganizationGuardrailsConfig): 
   return [
     `Updated AI guardrails: ${config.enabled ? 'enabled' : 'disabled'}`,
     `detectors: ${describeDetectors(ENKRYPT_DETECTOR_IDS, enforcedEnkryptInputDetectors(config.detectors))}`,
-    `response checks: ${config.output.enabled ? 'enabled' : 'disabled'}`,
-    `response detectors: ${describeDetectors(ENKRYPT_OUTPUT_DETECTOR_IDS, config.output.detectors)}`,
+    `output guardrails: ${config.output.enabled ? 'enabled' : 'disabled'}`,
+    `output detectors: ${describeDetectors(ENKRYPT_OUTPUT_DETECTOR_IDS, config.output.detectors)}`,
   ].join('; ');
 }
 
@@ -195,7 +196,10 @@ export const organizationGuardrailsRouter = createTRPCRouter({
         inputGuardrail.enabled &&
         !ENKRYPT_CONFIGURABLE_INPUT_DETECTOR_IDS.some(id => inputGuardrail.detectors[id].enabled)
       ) {
-        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Turn on at least one detector.' });
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Turn on at least one input detector.',
+        });
       }
       if (
         requestedOutput?.enabled &&
@@ -203,7 +207,7 @@ export const organizationGuardrailsRouter = createTRPCRouter({
       ) {
         throw new TRPCError({
           code: 'BAD_REQUEST',
-          message: 'Turn on at least one response detector.',
+          message: 'Turn on at least one output detector.',
         });
       }
       await db.transaction(async tx => {
@@ -214,7 +218,11 @@ export const organizationGuardrailsRouter = createTRPCRouter({
             enkrypt: {
               ...organization.settings.enkrypt,
               // Still written so a rollback to a version that reads it keeps scanning every input.
-              input_guardrail: { ...inputGuardrail, scan_tool_results: true },
+              input_guardrail: {
+                ...inputGuardrail,
+                detectors: storableEnkryptInputDetectors(inputGuardrail.detectors),
+                scan_tool_results: true,
+              },
               ...(requestedOutput ? { output_guardrail: requestedOutput } : {}),
             },
           }),

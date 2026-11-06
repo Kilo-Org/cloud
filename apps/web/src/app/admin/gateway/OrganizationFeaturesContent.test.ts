@@ -162,7 +162,7 @@ describe('OrganizationFeaturesContent', () => {
 
     expect(container.textContent).toContain('These features are experimental.');
     expect(container.textContent).toContain(
-      'Lets the organization configure Enkrypt output/response checks in AI Guardrails. Existing response checks keep running when this feature is removed.'
+      'Lets the organization configure Enkrypt output guardrails in AI Guardrails. Existing output guardrails keep running when this feature is removed.'
     );
     const sections = Array.from(container.querySelectorAll('section'));
     expect(sections.map(section => section.querySelector('h3')?.textContent)).toEqual([

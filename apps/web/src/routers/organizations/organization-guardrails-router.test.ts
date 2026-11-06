@@ -16,6 +16,7 @@ import type { EnkryptPolicyRule } from '@kilocode/db/schema-types';
 import {
   createEmptyEnkryptOutputDetectors,
   createKiloDefaultEnkryptInputDetectors,
+  storableEnkryptInputDetectors,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detectors';
 import { DEFAULT_ORGANIZATION_FEATURES } from '@kilocode/web-shared/lib/ai-gateway/gateway-config';
 import { readOrganizationFeatures } from '@kilocode/web-shared/lib/ai-gateway/organization-features';
@@ -40,6 +41,7 @@ function savedConfig() {
   };
   detectors.policy_violation = {
     enabled: true,
+    action: 'block',
     format: 'policy_text',
     policy_text: 'Never share customer records.',
     rules: [],
@@ -99,7 +101,7 @@ describe('organization guardrails router', () => {
     });
   });
 
-  it('returns Kilo Default, off, and no response detector for an organization that never saved guardrails', async () => {
+  it('returns Kilo Default, off, and no output detector for an organization that never saved guardrails', async () => {
     const caller = await createCallerForUser(owner.id);
 
     await expect(
@@ -139,14 +141,92 @@ describe('organization guardrails router', () => {
       expect.objectContaining({
         data_collection: 'deny',
         enkrypt: {
-          input_guardrail: { ...inputGuardrail, scan_tool_results: true },
+          input_guardrail: {
+            ...inputGuardrail,
+            detectors: storableEnkryptInputDetectors(inputGuardrail.detectors),
+            scan_tool_results: true,
+          },
           output_guardrail: output,
         },
       })
     );
+    const storedDetectors = updated?.settings.enkrypt?.input_guardrail?.detectors;
+    expect(storedDetectors).toMatchObject({ injection_attack: { enabled: true } });
+    expect(storedDetectors).not.toHaveProperty('injection_attack.action');
+    expect(storedDetectors).not.toHaveProperty('policy_violation.action');
   });
 
-  it('saves the response guardrail separately from the input guardrail', async () => {
+  it('saves and reads log only input detectors and counts them as turned on', async () => {
+    const caller = await createCallerForUser(owner.id);
+    const config = savedConfig();
+    config.detectors.injection_attack.action = 'log';
+    config.detectors.policy_violation.enabled = false;
+
+    const saved = await caller.organizations.guardrails.update({
+      organizationId: organization.id,
+      ...config,
+    });
+
+    expect(saved.detectors.injection_attack).toEqual({ enabled: true, action: 'log' });
+    await expect(
+      caller.organizations.guardrails.get({ organizationId: organization.id })
+    ).resolves.toMatchObject({
+      detectors: { injection_attack: { enabled: true, action: 'log' } },
+      invalid_saved_detectors: false,
+    });
+    const updated = await getOrganizationById(organization.id);
+    expect(updated?.settings.enkrypt?.input_guardrail?.detectors).toMatchObject({
+      injection_attack: { enabled: true, action: 'log' },
+    });
+    const [auditLog] = await db
+      .select()
+      .from(organization_audit_logs)
+      .where(eq(organization_audit_logs.organization_id, organization.id))
+      .orderBy(desc(organization_audit_logs.created_at))
+      .limit(1);
+    expect(auditLog.message).toContain(
+      'detectors: injection_attack (log), pii (log, secrets), nsfw;'
+    );
+  });
+
+  it('reads input detectors saved before they had an action as blocking', async () => {
+    const { injection_attack, policy_violation, ...others } =
+      createKiloDefaultEnkryptInputDetectors();
+    const legacyOrganization = await createTestOrganization(
+      'Legacy Action Guardrails Org',
+      owner.id,
+      0,
+      {
+        kilo_encrypt: true,
+        enkrypt: {
+          input_guardrail: {
+            enabled: true,
+            detectors: {
+              ...others,
+              injection_attack: { enabled: injection_attack.enabled },
+              policy_violation: {
+                enabled: policy_violation.enabled,
+                format: policy_violation.format,
+                policy_text: policy_violation.policy_text,
+                rules: policy_violation.rules,
+              },
+            },
+          },
+        },
+      },
+      false
+    );
+    const caller = await createCallerForUser(owner.id);
+
+    await expect(
+      caller.organizations.guardrails.get({ organizationId: legacyOrganization.id })
+    ).resolves.toMatchObject({
+      detectors: createKiloDefaultEnkryptInputDetectors(),
+      invalid_saved_detectors: false,
+    });
+  });
+
+  it('saves the output guardrail separately from the input guardrail', async () => {
     const caller = await createCallerForUser(owner.id);
     const config = { ...savedConfig(), enabled: false, output: savedOutputConfig() };
 
@@ -168,12 +248,12 @@ describe('organization guardrails router', () => {
       .orderBy(desc(organization_audit_logs.created_at))
       .limit(1);
     expect(auditLog.message).toContain(
-      'response checks: enabled; response detectors: pii (block, secrets), topic_detector (log, 1 topics)'
+      'output guardrails: enabled; output detectors: pii (block, secrets), topic_detector (log, 1 topics)'
     );
     expect(auditLog.message).not.toContain('weapons');
   });
 
-  it('keeps the saved response guardrail when an input-only save follows feature revocation', async () => {
+  it('keeps the saved output guardrail when an input-only save follows feature revocation', async () => {
     const caller = await createCallerForUser(owner.id);
     await caller.organizations.guardrails.update({
       organizationId: organization.id,
@@ -243,11 +323,15 @@ describe('organization guardrails router', () => {
     ).resolves.toMatchObject({ ...inputOnly, output_available: false });
 
     expect((await getOrganizationById(ungranted.id))?.settings.enkrypt).toEqual({
-      input_guardrail: { ...inputOnly, scan_tool_results: true },
+      input_guardrail: {
+        ...inputOnly,
+        detectors: storableEnkryptInputDetectors(inputOnly.detectors),
+        scan_tool_results: true,
+      },
     });
   });
 
-  it('rejects enabling the response guardrail with no detector', async () => {
+  it('rejects enabling the output guardrail with no detector', async () => {
     const caller = await createCallerForUser(owner.id);
     const config = {
       ...savedConfig(),
@@ -256,7 +340,7 @@ describe('organization guardrails router', () => {
 
     await expect(
       caller.organizations.guardrails.update({ organizationId: organization.id, ...config })
-    ).rejects.toThrow('Turn on at least one response detector.');
+    ).rejects.toThrow('Turn on at least one output detector.');
   });
 
   it('returns trimmed policy text so the saved form matches what was stored', async () => {
@@ -288,7 +372,7 @@ describe('organization guardrails router', () => {
       .limit(1);
     expect(auditLog.action).toBe('organization.settings.change');
     expect(auditLog.message).toBe(
-      'Updated AI guardrails: enabled; detectors: injection_attack, pii (log, secrets), policy_violation (policy text), nsfw; response checks: disabled; response detectors: none'
+      'Updated AI guardrails: enabled; detectors: injection_attack (block), pii (log, secrets), policy_violation (block, policy text), nsfw; output guardrails: disabled; output detectors: none'
     );
     expect(auditLog.message).not.toContain('Phoenix');
     expect(auditLog.message).not.toContain('customer records');
@@ -318,7 +402,7 @@ describe('organization guardrails router', () => {
 
     await expect(
       caller.organizations.guardrails.update({ organizationId: organization.id, ...config })
-    ).rejects.toThrow('Turn on at least one detector.');
+    ).rejects.toThrow('Turn on at least one input detector.');
   });
 
   it('rejects saving more than five policy rules', async () => {
@@ -326,6 +410,7 @@ describe('organization guardrails router', () => {
     const config = savedConfig();
     config.detectors.policy_violation = {
       enabled: true,
+      action: 'block',
       format: 'rules',
       policy_text: '',
       rules: policyRules(6),
@@ -356,6 +441,7 @@ describe('organization guardrails router', () => {
     const detectors = createKiloDefaultEnkryptInputDetectors();
     detectors.policy_violation = {
       enabled: true,
+      action: 'block',
       format: 'rules',
       policy_text: '',
       rules: policyRules(8),
@@ -486,7 +572,7 @@ describe('organization guardrails router', () => {
     ).resolves.toMatchObject({ data_collection: 'deny' });
   });
 
-  it('preserves invalid saved response detectors during input-only saves without the feature', async () => {
+  it('preserves invalid saved output detectors during input-only saves without the feature', async () => {
     const invalidOrganization = await createTestOrganization(
       'Invalid Response Guardrails Org',
       owner.id,

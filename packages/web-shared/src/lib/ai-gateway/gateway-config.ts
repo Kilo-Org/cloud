@@ -89,7 +89,7 @@ export const ORGANIZATION_FEATURE_DESCRIPTIONS = {
   enkrypt_output_guardrail: {
     label: 'Enkrypt output guardrails',
     description:
-      'Lets the organization configure Enkrypt output/response checks in AI Guardrails. Existing response checks keep running when this feature is removed.',
+      'Lets the organization configure Enkrypt output guardrails in AI Guardrails. Existing output guardrails keep running when this feature is removed.',
   },
   gateway_settings: {
     label: 'Gateway settings',

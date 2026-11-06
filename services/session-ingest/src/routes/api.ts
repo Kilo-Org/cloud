@@ -290,14 +290,16 @@ api.post('/session', zodJsonValidator(createSessionSchema), async c => {
   }
 
   if (ingestDeleted) {
-    await db
-      .delete(cli_sessions_v2)
-      .where(
-        and(
-          eq(cli_sessions_v2.session_id, body.sessionId),
-          eq(cli_sessions_v2.kilo_user_id, kiloUserId)
-        )
-      );
+    if (createdRow) {
+      await db
+        .delete(cli_sessions_v2)
+        .where(
+          and(
+            eq(cli_sessions_v2.session_id, body.sessionId),
+            eq(cli_sessions_v2.kilo_user_id, kiloUserId)
+          )
+        );
+    }
     return c.json({ success: false, error: 'session_deleted' }, 409);
   }
 

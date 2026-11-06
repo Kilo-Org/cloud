@@ -275,13 +275,32 @@ async function finishDeletion(
   dependencies: SessionDeletionFlowDependencies,
   event: SessionDeletionEvent
 ): Promise<void> {
-  await dependencies.removeDeletedSessions(event.deletedSessionIds);
-  dependencies.notifyDeleted(event);
-  await dependencies.invalidateQueries();
+  for (const sessionId of event.deletedSessionIds) {
+    dependencies.dropOperationKey(sessionId);
+  }
+
+  let pageUpdateFailed = false;
+  for (const update of [
+    () => dependencies.removeDeletedSessions(event.deletedSessionIds),
+    () => dependencies.notifyDeleted(event),
+    () => dependencies.invalidateQueries(),
+  ]) {
+    try {
+      await update();
+    } catch {
+      pageUpdateFailed = true;
+    }
+  }
+
   if (event.cleanup === 'pending') {
     dependencies.notifyWarning(cleanupWarning(event.scope));
-  } else {
+  } else if (!pageUpdateFailed) {
     dependencies.notifySuccess(cleanupSuccess(event.scope));
+  }
+  if (pageUpdateFailed) {
+    dependencies.notifyWarning(
+      'History deleted, but the page could not update completely. Refresh the page.'
+    );
   }
 }
 
@@ -349,7 +368,6 @@ async function performSessionDeletion(
   } catch (error) {
     dependencies.setSessionPending(target.sessionId, false);
     if (isDeletionNotFoundError(error)) {
-      dependencies.dropOperationKey(target.sessionId);
       await finishDeletion(dependencies, {
         scope: 'session',
         deletedSessionIds: [target.sessionId],
@@ -370,7 +388,6 @@ async function performSessionDeletion(
     return false;
   }
 
-  dependencies.dropOperationKey(target.sessionId);
   dependencies.setSessionPending(target.sessionId, false);
   await finishDeletion(dependencies, {
     scope: 'session',

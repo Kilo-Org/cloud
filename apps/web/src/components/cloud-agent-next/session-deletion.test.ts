@@ -556,7 +556,47 @@ describe('session deletion flow', () => {
     ]);
     expect(harness.warningMessages).toEqual(['Workspace removed; runtime cleanup is incomplete.']);
     expect(harness.droppedOperationKeys).toContain(deletionTarget.sessionId);
+    expect(harness.droppedOperationKeys).toContain('ses_descendant');
   });
+
+  it.each(['session', 'workspace'] as const)(
+    'preserves confirmed %s deletion when client reconciliation fails',
+    async scope => {
+      for (const step of ['removeDeletedSessions', 'notifyDeleted', 'invalidateQueries'] as const) {
+        const harness = createDeletionFlowHarness();
+        if (scope === 'workspace') {
+          harness.setDeleteSessionImpl(async () => {
+            throw trpcCodeError('CONFLICT', WORKSPACE_REQUIRES_ROOT_SESSION);
+          });
+          harness.setDeleteWorktreeImpl(async () => ({
+            success: true,
+            deletedSessionIds: [deletionTarget.sessionId, 'ses_descendant'],
+            cleanup: 'pending',
+          }));
+        }
+        harness.deps[step] = () => {
+          throw new Error('Client reconciliation failed');
+        };
+
+        await expect(harness.flow.deleteSession(deletionTarget, harness.deps)).resolves.toBe(true);
+
+        expect(harness.errors).toEqual([]);
+        expect(harness.warningMessages).toContain(
+          'History deleted, but the page could not update completely. Refresh the page.'
+        );
+        if (step !== 'notifyDeleted') expect(harness.deletedEvents).toHaveLength(1);
+        if (step !== 'invalidateQueries') expect(harness.stats.invalidations).toBe(1);
+        if (scope === 'workspace') {
+          expect(harness.droppedOperationKeys).toContain('ses_descendant');
+          expect(harness.warningMessages).toContain(
+            'Workspace removed; runtime cleanup is incomplete.'
+          );
+        }
+        expect(harness.flow.isActive()).toBe(false);
+        expect(harness.sessionPending.at(-1)).toEqual([deletionTarget.sessionId, false]);
+      }
+    }
+  );
 
   it('cancels workspace escalation without deleting anything', async () => {
     const harness = createDeletionFlowHarness();

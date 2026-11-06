@@ -501,6 +501,33 @@ describe('api routes', () => {
     expect(sessionCache.putValidated).not.toHaveBeenCalled();
   });
 
+  it('POST /session rejects an existing tombstoned parent without deleting its row', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValueOnce([{ blocked_reason: null }]);
+    fns.insertResult.mockResolvedValueOnce([]);
+    fns.delete.mockImplementation(() => {
+      throw new Error('parent row is still referenced by descendants');
+    });
+    vi.mocked(getSessionIngestDO).mockReturnValue({
+      isDeleted: vi.fn(async () => true),
+    } as never);
+
+    const res = await makeApiApp().fetch(
+      new Request('http://local/session', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sessionId: 'ses_12345678901234567890123456' }),
+      }),
+      makeTestEnv()
+    );
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ success: false, error: 'session_deleted' });
+    expect(fns.delete).not.toHaveBeenCalled();
+    expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+  });
+
   it('POST /session keeps a newly created row when the ingest tombstone is absent', async () => {
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);

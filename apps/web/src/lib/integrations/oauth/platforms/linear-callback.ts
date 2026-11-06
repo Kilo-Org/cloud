@@ -11,6 +11,8 @@ import {
   getConflictingLinearInstallation,
   LinearWorkspaceAlreadyConnectedError,
   type LinearOAuthIdentity,
+  type PreviousLinearWorkspace,
+  retirePreviousLinearWorkspace,
   revokeLinearToken,
   upsertLinearInstallation,
 } from '@/lib/integrations/linear-service';
@@ -340,62 +342,81 @@ export async function handleLinearOAuthCallback(request: NextRequest) {
       )
     );
 
-    return await withWorkspaceInstallationLock(PLATFORM.LINEAR, owner, organizationId, async tx => {
-      const conflicting = await getConflictingLinearInstallation(owner, organizationId, tx);
-      if (conflicting) {
-        return conflictRedirect;
-      }
+    const install = await withWorkspaceInstallationLock(
+      PLATFORM.LINEAR,
+      owner,
+      organizationId,
+      async tx => {
+        const conflicting = await getConflictingLinearInstallation(owner, organizationId, tx);
+        if (conflicting) {
+          return { response: conflictRedirect, previousWorkspace: null };
+        }
 
-      const previousInstallation = await linearAdapter.getInstallation(organizationId);
+        const previousInstallation = await linearAdapter.getInstallation(organizationId);
 
-      await linearAdapter.setInstallation(organizationId, {
-        accessToken,
-        botUserId: identity.viewerId,
-        expiresAt: expiresIn === null ? null : Date.now() + expiresIn * 1000,
-        organizationId,
-        ...(refreshToken ? { refreshToken } : {}),
-      });
-
-      const workspaceName = identity.organizationName ?? organizationId;
-
-      try {
-        await upsertLinearInstallation(
-          {
-            owner,
-            organizationId,
-            organizationName: workspaceName,
-            botUserId: identity.viewerId,
-          },
-          {
-            getChatSdkAccessToken: getChatSdkLinearAccessToken,
-            deleteChatSdkInstallation: deleteChatSdkLinearInstallation,
-            deleteChatSdkIdentityCache: deleteChatSdkLinearIdentityCache,
-            defaultModel,
-          },
-          tx
-        );
-      } catch (error) {
-        // The installation store is not part of the database transaction, so a
-        // rolled-back write must put back what this install replaced.
-        await restoreProviderInstallation({
-          provider: 'linear',
-          previousInstallation,
-          setInstallation: restored => linearAdapter.setInstallation(organizationId, restored),
-          deleteInstallation: () => linearAdapter.deleteInstallation(organizationId),
+        await linearAdapter.setInstallation(organizationId, {
+          accessToken,
+          botUserId: identity.viewerId,
+          expiresAt: expiresIn === null ? null : Date.now() + expiresIn * 1000,
+          organizationId,
+          ...(refreshToken ? { refreshToken } : {}),
         });
 
-        if (error instanceof LinearWorkspaceAlreadyConnectedError) {
-          return conflictRedirect;
+        const workspaceName = identity.organizationName ?? organizationId;
+
+        let previousWorkspace: PreviousLinearWorkspace | null = null;
+        try {
+          const result = await upsertLinearInstallation(
+            {
+              owner,
+              organizationId,
+              organizationName: workspaceName,
+              botUserId: identity.viewerId,
+            },
+            {
+              getChatSdkAccessToken: getChatSdkLinearAccessToken,
+              defaultModel,
+            },
+            tx
+          );
+          previousWorkspace = result.previousWorkspace;
+        } catch (error) {
+          // The installation store is not part of the database transaction, so a
+          // rolled-back write must put back what this install replaced.
+          await restoreProviderInstallation({
+            provider: 'linear',
+            previousInstallation,
+            setInstallation: restored => linearAdapter.setInstallation(organizationId, restored),
+            deleteInstallation: () => linearAdapter.deleteInstallation(organizationId),
+          });
+
+          if (error instanceof LinearWorkspaceAlreadyConnectedError) {
+            return { response: conflictRedirect, previousWorkspace: null };
+          }
+          throw error;
         }
-        throw error;
+
+        const successPath = verified.returnTo
+          ? appendIntegrationOAuthRedirectQuery(verified.returnTo, 'success=linear_installed')
+          : buildIntegrationOAuthRedirectPath(PLATFORM.LINEAR, owner, 'success=installed');
+
+        return {
+          response: NextResponse.redirect(new URL(successPath, APP_URL)),
+          previousWorkspace,
+        };
       }
+    );
 
-      const successPath = verified.returnTo
-        ? appendIntegrationOAuthRedirectQuery(verified.returnTo, 'success=linear_installed')
-        : buildIntegrationOAuthRedirectPath(PLATFORM.LINEAR, owner, 'success=installed');
+    // The workspace this install replaces is retired only after the connection
+    // write has committed, giving the two writes one outcome.
+    if (install.previousWorkspace) {
+      await retirePreviousLinearWorkspace(install.previousWorkspace, {
+        deleteChatSdkInstallation: deleteChatSdkLinearInstallation,
+        deleteChatSdkIdentityCache: deleteChatSdkLinearIdentityCache,
+      });
+    }
 
-      return NextResponse.redirect(new URL(successPath, APP_URL));
-    });
+    return install.response;
   } catch (error) {
     const searchParams = request.nextUrl.searchParams;
     const state = searchParams.get('state');

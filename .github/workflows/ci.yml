@@ -633,21 +633,13 @@ jobs:
   # required check name. It also runs when a web test reads changed data.
   web-test:
     needs: changes
-    # Temporary: run on this PR whatever the change filter says, and compare
-    # runner size against Jest worker count in one pass.
-    if: needs.changes.outputs.kilocode_backend == 'true' || contains(fromJSON(needs.changes.outputs.affected).test_only_packages, 'web') || github.event_name == 'pull_request'
-    name: web-test (${{ matrix.shard }}/8, ${{ matrix.variant.name }})
+    if: needs.changes.outputs.kilocode_backend == 'true' || contains(fromJSON(needs.changes.outputs.affected).test_only_packages, 'web')
+    name: web-test (${{ matrix.shard }}/8)
     strategy:
       fail-fast: false
       matrix:
         shard: [1, 2, 3, 4, 5, 6, 7, 8]
-        variant:
-          - { name: large-4w, tier: large, workers: 4 }
-          - { name: medium-4w, tier: medium, workers: 4 }
-          - { name: large-6w, tier: large, workers: 6 }
-          - { name: large-8w, tier: large, workers: 8 }
-    runs-on: >-
-      ${{ matrix.variant.tier == 'medium' && (vars.RUNNER_MEDIUM_LABEL || 'blacksmith-4vcpu-ubuntu-2404') || (vars.RUNNER_LARGE_LABEL || 'ubuntu-24.04-8core') }}
+    runs-on: ${{ vars.RUNNER_LARGE_LABEL || 'ubuntu-24.04-8core' }}
     timeout-minutes: 30
 
     services:
@@ -692,7 +684,7 @@ jobs:
       POSTGRES_MAX_QUERY_TIME: 30000
       UPSTASH_REDIS_REST_URL: http://localhost:8079
       UPSTASH_REDIS_REST_TOKEN: example_token
-      JEST_MAX_WORKERS: ${{ matrix.variant.workers }}
+      JEST_MAX_WORKERS: 4
 
     steps:
       - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
@@ -710,11 +702,6 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-
-      - name: Report runner shape
-        run: |
-          nproc
-          free -g
 
       - name: Run web tests
         run: pnpm --filter web test --shard=${{ matrix.shard }}/8

@@ -44,10 +44,10 @@ callback targets remain available to trusted integrations.
 ### Sandbox images
 
 Local and deployed workers use the native DO-managed containers runtime; the
-SDK-backed sandbox classes are retired. Its images are `Dockerfile.containers`
-(all-in-one) and `Dockerfile.containers.runtime-free` (runtime-free base for
-downloaded startup). Both use Debian's current Git packages; no third-party APT
-source is required.
+SDK-backed sandbox classes are retired. `Dockerfile.containers.runtime-free` is
+the only native base image. Each new allocation downloads its verified CLI and
+wrapper release before startup. It uses Debian's current Git packages; no
+third-party APT source is required.
 
 The retired SDK class names remain exported as no-op tombstones so their
 historical migrations and stored instances stay valid. They have no binding or
@@ -697,10 +697,16 @@ pnpm --filter cloud-agent-next dev
 ### Local Development with the native image
 
 The `dev` named environment in [`wrangler.jsonc`](wrangler.jsonc) uses
-`./Dockerfile.containers` for the native sandbox container image and sets
+`./Dockerfile.containers.runtime-free` for the native sandbox container image and sets
 `KILOCODE_BACKEND_BASE_URL=http://localhost:3000`, which you will almost
 certainly want to override. Cloudflare builds the image automatically when you
 run the dev environment.
+
+The development launcher builds and publishes runtime artifacts to local Wrangler R2,
+then injects their descriptor hashes. It needs Bun, Docker and registry access on the
+first start, but no remote runtime bucket credentials. Restart after wrapper changes.
+Local and HTTP E2E workers share the explicit `.wrangler/state` persistence location.
+ARM Docker hosts require linux/amd64 emulation for the pinned CLI distribution.
 
 #### Environment Variables
 
@@ -801,10 +807,14 @@ pnpm --filter cloud-agent-next lint:fix
 
 - **Session**: one Session DO per `workspace_*` session ID. It owns the message queue and states, route view, event log, questions, callbacks and the client stream.
 - **Sandbox**: one Sandbox DO per sandbox ID. It owns the physical allocation, provider lease, wrapper socket, credentials and idle stop.
-  - The default control-plane allocation is an isolated per-session `ses-*` sandbox.
-  - A shared allocation (`org-*`, `usr-*`, `bot-*`, `ubt-*`) hosts multiple worktrees and chats, with one runtime per worktree directory. Sibling chats in one worktree share its runtime and MCP configuration; independent worktrees stay isolated.
+- **Standalone ownership**: a session without a workspace gets its own exclusive sandbox.
+- **Workspace ownership**: a workspace gets its own exclusive sandbox, containing any number of sessions. Only sessions in that workspace share its sandbox, runtime and MCP configuration. Independent workspaces and standalone sessions never share a sandbox.
 - **Worktree**: a shared checkout and chat group. A worktree chat gets a `worktree_*` ID and the path `/workspace/<org>/<user>/worktrees/<worktreeId>`; isolated sessions use `/workspace/app`.
 - **Wrapper**: one control wrapper per sandbox. It connects to the Sandbox DO, prepares routes, supervises Kilo, submits prompts and reports turn outcomes.
+
+All new functionality targets these two ownership forms. Legacy owner-scoped shared sandbox keys
+(`org-*`, `usr-*`, `bot-*`, `ubt-*`) are decode-only. Existing compatibility and cleanup code for
+historical shared sandboxes is not a requirement to support or extend for new features.
 
 ### Session Lifecycle
 
@@ -827,7 +837,7 @@ Cloud-agent sessions are linked to Kilocode CLI sessions:
 - **Session ID**: `workspace_${uuid}`
 - **Worktree ID**: `worktree_${uuid}`
 - **Message ID**: durable `msg_*` identity, also passed to Kilo as the user message ID
-- **Sandbox ID**: isolated `ses-*` or a shared `org-*`, `usr-*`, `bot-*`, `ubt-*` key
+- **Sandbox ID**: neutral `sbx-*` placement key with its kind stored in session metadata; older prefixed keys remain readable for compatibility
 - **Workspace Path**: `/workspace/<org>/<user>/sessions/<sessionId>` for isolated sessions, or `/workspace/<org>/<user>/worktrees/<worktreeId>` for worktree sessions
 - **Branch**: `session/${sessionId}` (default) or the specified upstream branch
 

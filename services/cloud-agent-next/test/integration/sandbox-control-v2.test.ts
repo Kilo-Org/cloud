@@ -1,4 +1,4 @@
-import { preinstalledStartup } from '../../src/sandbox-control/preinstalled-startup.js';
+import { supervisorStartup } from '../fixtures/supervisor-startup.js';
 import {
   env,
   evictAllDurableObjects,
@@ -483,7 +483,7 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     );
   });
   it.each([
-    { provider: 'cloudflare' },
+    { provider: 'vercel' },
     { provider: 'cloudflare-containers' },
     { provider: 'cloudflare-containers', instance: 'standard-3' },
     { provider: 'cloudflare-containers', instance: 'standard-4' },
@@ -2038,7 +2038,7 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     });
     const stub = await startAllocation(provider, {
       preparingRoute: 'workspace_cold_retry',
-      timers: { providerCreateRetryMs: 1 },
+      timers: { providerCreateRetryMs: MINUTE },
     });
     await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
     const firstAttempt = launchIdentity(provider);
@@ -2049,6 +2049,7 @@ describe('SandboxControlV2 allocation lifecycle', () => {
       expect(state.allocationId).not.toBe(firstAttempt.allocationId);
       expect(state.providerRef).toBeNull();
     });
+    await setDeadline(stub, { create_deadline_at: Date.now() - 1 });
     await runAlarm(stub);
     // A transient launch failure must retain the retry: a second attempt starts.
     await waitFor(() => expect(provider.createCalls).toBe(2));
@@ -2221,7 +2222,7 @@ describe('SandboxControlV2 allocation egress policy', () => {
     await configureEgressSandbox(provider);
     const stub = await startAllocation(provider, {
       sandboxId,
-      provider: 'cloudflare',
+      provider: 'vercel',
       egressMode: 'unrestricted',
     });
     await awaitStarting(provider, stub);
@@ -2289,7 +2290,7 @@ describe('SandboxControlV2 allocation egress policy', () => {
           instanceId: 'reconstructed-allocation',
         });
         await reconstructed.provider.launch(ref, {
-          command: preinstalledStartup(),
+          command: supervisorStartup(),
           env: {},
         });
       });

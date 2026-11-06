@@ -45,6 +45,7 @@ assert(
   'This driver requires a local database'
 );
 const vars = loadDevVars(serviceRoot);
+const organizationId = z.uuid().parse(process.env.E2E_ORG_ID);
 const user = await loadExistingUserByEmail(
   database.toString(),
   process.env.E2E_USER_EMAIL ?? 'evgeny@kilocode.ai'
@@ -53,7 +54,8 @@ const config: DriverConfig = {
   ...DEFAULT_CONFIG,
   user,
   nextAuthSecret: vars.NEXTAUTH_SECRET,
-  bearerToken: mintApiToken(user, vars.NEXTAUTH_SECRET, 60 * 60),
+  bearerToken: mintApiToken(user, vars.NEXTAUTH_SECRET, 60 * 60, organizationId),
+  kilocodeOrganizationId: organizationId,
   internalApiSecret: vars.INTERNAL_API_SECRET,
   expectControlPlane: true,
   workerUrl: `http://localhost:${port('cloud-agent-next')}`,
@@ -146,10 +148,21 @@ try {
   const docker = async (...args: string[]) =>
     (await execute('docker', args, { timeout: 30_000, maxBuffer: 4 * 1024 * 1024 })).stdout.trim();
   assert.equal(
-    await docker('exec', native.container.id, 'printenv', 'KILO_RUNTIME_HARNESS'),
+    await docker(
+      'exec',
+      native.container.id,
+      'node',
+      '-e',
+      `const fs = require('node:fs'); const entry = fs.readFileSync('/proc/${native.processId}/environ', 'utf8').split('\\0').find(value => value.startsWith('KILO_RUNTIME_HARNESS=')); process.stdout.write(entry?.slice('KILO_RUNTIME_HARNESS='.length) ?? '');`
+    ),
     'kilo2'
   );
-  const version = await docker('exec', native.container.id, 'kilo2', '--version');
+  const version = await docker(
+    'exec',
+    native.container.id,
+    '/opt/kilo-cloud/active/cli/package/bin/kilo2',
+    '--version'
+  );
   const hash = (
     await docker(
       'exec',

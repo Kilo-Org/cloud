@@ -191,9 +191,8 @@
       "scheduling_policy": "durable_object",
       "observability": { "enabled": true },
       "images": {
-        "app": {
-          "dockerfile": "./Dockerfile.containers",
-          "build_vars": { "KILOCODE_CLI_VERSION": "7.8.17" },
+        "runtime-free": {
+          "dockerfile": "./Dockerfile.containers.runtime-free",
         },
       },
     },
@@ -434,9 +433,8 @@
           "scheduling_policy": "durable_object",
           "observability": { "enabled": true },
           "images": {
-            "app": {
-              "dockerfile": "./Dockerfile.containers",
-              "build_vars": { "KILOCODE_CLI_VERSION": "7.8.17" },
+            "runtime-free": {
+              "dockerfile": "./Dockerfile.containers.runtime-free",
             },
           },
         },

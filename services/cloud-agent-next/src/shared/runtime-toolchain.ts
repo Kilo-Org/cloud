@@ -13,9 +13,8 @@ import { RUNTIME_DISTRIBUTION } from './runtime-distribution.js';
  * installed result again, so the snapshot content is a function of this file
  * rather than of what a distribution host serves at build time.
  *
- * Both snapshot producers use these builders: the operator script
- * (`scripts/vercel-snapshot.ts`) and the Durable Object build
- * (`src/persistence/VercelSnapshotBuild.ts`).
+ * The Durable Object snapshot build (`src/persistence/VercelSnapshotBuild.ts`)
+ * uses these builders.
  *
  * Re-measuring a pin after a deliberate version bump means downloading the pinned
  * URL and running `sha256sum` on the archive and on the extracted `member`; for an

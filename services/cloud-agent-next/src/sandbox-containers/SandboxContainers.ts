@@ -71,7 +71,7 @@ import {
   nativeEgressPolicySchema,
   type NativeEgressPolicy,
 } from './egress-policy.js';
-import type { RuntimeStartupConfig } from '../shared/runtime-startup-config.js';
+import type { NativeRuntimeImage } from '../sandbox-control/startup-selection.js';
 
 export type { ContainerInstanceSize, ContainersStartSource } from './native-start.js';
 export type { NativeCaptureResult } from './native-capture.js';
@@ -89,7 +89,7 @@ export type ContainersLaunchInput = {
   /** Environment snapshot selected for this allocation; absent starts from the image. */
   snapshot?: NativeStartSnapshot;
   deadlineAt?: number;
-  nativeImage?: RuntimeStartupConfig['image'];
+  nativeImage?: NativeRuntimeImage;
 };
 
 /**
@@ -590,7 +590,7 @@ export class SandboxContainers extends DurableObject<Env> {
         MAX_SNAPSHOT_START_FAILURES;
     const plan = planNativeStart(
       {
-        image: this.containerImage(input.nativeImage ?? 'all-in-one'),
+        image: this.containerImage(input.nativeImage ?? 'runtime-free'),
         instance: input.instance,
         mainProcess,
         env: input.env,
@@ -1331,7 +1331,7 @@ export class SandboxContainers extends DurableObject<Env> {
     );
   }
 
-  private containerImage(nativeImage: RuntimeStartupConfig['image']): string {
+  private containerImage(nativeImage: NativeRuntimeImage): string {
     const imageName =
       nativeImage === 'runtime-free' ? RUNTIME_FREE_CONTAINER_IMAGE : CONTAINER_IMAGE;
     const image = this.requiredContainer().images[imageName];
@@ -1412,7 +1412,7 @@ export class SandboxContainers extends DurableObject<Env> {
 
   /** The stored outcome of one capture, or null when this DO never recorded it. */
   /** The image a launch uses now; environment snapshots must match it. */
-  async currentImage(nativeImage: RuntimeStartupConfig['image']): Promise<string> {
+  async currentImage(nativeImage: NativeRuntimeImage): Promise<string> {
     return this.containerImage(nativeImage);
   }
 

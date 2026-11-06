@@ -2,6 +2,7 @@ import { createRequire } from 'node:module';
 import { cloudflareTest } from '@cloudflare/vitest-pool-workers';
 import { defineConfig } from 'vitest/config';
 import { binaryAsArrayBuffer } from './test/plugins/binary-as-arraybuffer.js';
+import { FAKE_DOWNLOADED_RUNTIME_ENV } from './test/integration/helpers/fake-credentials.js';
 
 // Integration tests - run in Cloudflare Workers runtime via Miniflare
 // Use cloudflare:test utilities: env, runInDurableObject, createMessageBatch, etc.
@@ -27,12 +28,10 @@ export default defineConfig({
         configPath: './wrangler.test.jsonc',
       },
       miniflare: {
-        // Lifecycle fixtures own their startup mode. Do not inherit a local
-        // developer's downloaded release or runtime-free image selection.
         bindings: {
-          RUNTIME_STARTUP_MODE: 'preinstalled',
-          RUNTIME_RELEASE_DESCRIPTOR: '',
-          NATIVE_RUNTIME_IMAGE: 'all-in-one',
+          RUNTIME_STARTUP_MODE: 'downloaded',
+          RUNTIME_RELEASE_DESCRIPTOR: FAKE_DOWNLOADED_RUNTIME_ENV.RUNTIME_RELEASE_DESCRIPTOR,
+          NATIVE_RUNTIME_IMAGE: 'runtime-free',
         },
         // Faster queue processing in tests
         queueConsumers: {
@@ -48,6 +47,7 @@ export default defineConfig({
   test: {
     name: 'integration',
     globals: true,
+    setupFiles: ['./test/integration/helpers/setup-runtime.ts'],
     include: ['test/integration/**/*.test.ts'],
     // Each test drives real Durable Objects through workerd, and the suite
     // polls for up to its own 10 s budget (test/integration/wait-for.ts).

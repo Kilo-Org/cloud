@@ -105,7 +105,6 @@ import {
   STARTUP_FAILURES,
   type StartupFailureCode,
 } from '../../sandbox-control/startup-failure.js';
-import { preinstalledStartup } from '../../sandbox-control/preinstalled-startup.js';
 import type { GrantDiagnostic } from '../../sandbox-control/grant-diagnostic.js';
 import {
   hasRuntimeCredentialProxy,
@@ -4451,21 +4450,18 @@ export class SandboxControlV2 extends DurableObject<Env> {
         const selection = selectStartup(this.env, pin.provider, cohort, harness);
         const createDeadline =
           state.createDeadlineAt ?? Date.now() + this.sandboxTimers().providerCreateMs;
-        const startupCommand =
-          selection.mode === 'preinstalled'
-            ? preinstalledStartup()
-            : await withTimeout(
-                downloadedStartup({
-                  env: this.env,
-                  descriptor: selection.descriptor,
-                  harness,
-                  sandboxId: this.sandboxId,
-                  allocationId,
-                  deadlineAt: createDeadline + this.sandboxTimers().wrapperFirstConnectMs,
-                }),
-                remainingMs(createDeadline),
-                'Runtime preflight timed out'
-              );
+        const startupCommand = await withTimeout(
+          downloadedStartup({
+            env: this.env,
+            descriptor: selection.descriptor,
+            harness,
+            sandboxId: this.sandboxId,
+            allocationId,
+            deadlineAt: createDeadline + this.sandboxTimers().wrapperFirstConnectMs,
+          }),
+          remainingMs(createDeadline),
+          'Runtime preflight timed out'
+        );
         const launchEnv = await this.wrapperLaunchEnv(credential, allocationId, pin.provider);
         if (pin.billing) {
           await assertContainerCapacity(this.env, {

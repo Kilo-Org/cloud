@@ -1614,6 +1614,55 @@ describe('CodeReviewOrchestrator recovery', () => {
     expect(fetchCalls(fetchMock, '/trpc/interruptSession')).toHaveLength(1);
   });
 
+  it('does not prepare a session when the review is cancelled during the first status update', async () => {
+    const stub = getReviewStub();
+    const runningUpdateStarted = deferredSignal();
+    const runningUpdateRelease = deferredSignal();
+    const fetchMock = vi.fn(async (request: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(request);
+      if (url.includes('/api/internal/code-review-status/')) {
+        const body = JSON.parse(String(init?.body));
+        if (body.status === 'running') {
+          runningUpdateStarted.resolve();
+          await runningUpdateRelease.promise;
+        }
+        return Response.json({ success: true });
+      }
+      if (url.includes('/trpc/prepareSession')) {
+        return trpcSuccess({
+          cloudAgentSessionId: 'agent-unexpected',
+          kiloSessionId: 'ses_unexpected',
+        });
+      }
+      if (url.includes('/trpc/interruptSession')) {
+        return trpcSuccess({ success: true });
+      }
+      if (url.includes('/trpc/initiateFromKilocodeSessionV2')) {
+        return trpcSuccess({ executionId: 'exec-unexpected', status: 'running' });
+      }
+      return new Response('unexpected fetch', { status: 500 });
+    });
+    globalThis.fetch = fetchMock;
+
+    await runInDurableObject(stub, async (instance: CodeReviewOrchestrator, state) => {
+      await state.storage.put('state', codeReview());
+
+      const runPromise = instance.runReview();
+      await runningUpdateStarted.promise;
+      await expect(instance.cancel('superseded')).resolves.toBe(true);
+      runningUpdateRelease.resolve();
+      await runPromise;
+    });
+
+    expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(0);
+    expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(0);
+    expect(fetchCalls(fetchMock, '/trpc/interruptSession')).toHaveLength(0);
+    await expect(storedReview(stub)).resolves.toMatchObject({
+      status: 'cancelled',
+      errorMessage: 'Review cancelled: superseded',
+    });
+  });
+
   it('does not initiate a prepared session when the review is cancelled in flight', async () => {
     const stub = getReviewStub();
     const prepareStarted = deferredSignal();

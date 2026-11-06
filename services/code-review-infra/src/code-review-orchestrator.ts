@@ -1269,6 +1269,18 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
         timestamp: new Date().toISOString(),
       });
 
+      // A review that was ended while this run was queued must not allocate a session.
+      if (this.cancelled || isTerminalStatus(this.state.status)) {
+        console.log(
+          '[CodeReviewOrchestrator] Skipping session preparation - review no longer live',
+          {
+            reviewId: this.state.reviewId,
+            reviewStatus: this.state.status,
+          }
+        );
+        return;
+      }
+
       // Build common headers for prepareSession (internalApiProtectedProcedure)
       const internalHeaders: Record<string, string> = {
         Authorization: `Bearer ${this.state.authToken}`,

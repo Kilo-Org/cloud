@@ -4,6 +4,7 @@ import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { initTRPC, TRPCError } from '@trpc/server';
 import type { ProcedureType } from '@trpc/server';
 import type { User } from '@kilocode/db/schema';
+import type { OrganizationAccess } from '@kilocode/web-shared/lib/admin/support-access';
 import {
   cloudAgentAuthorityProcedureKind,
   cloudAgentAuthorityProcedures,
@@ -87,6 +88,12 @@ export type TRPCContext = {
   // to the exact procedure. Optional for the same reason as the fields above.
   trpcPath?: string;
   trpcType?: string;
+  /**
+   * Set by the organization procedure middlewares after one mode-aware
+   * resolution, so a resolver can tell `member`, `legacy_admin`, and
+   * `support` apart without re-querying.
+   */
+  organizationAccess?: OrganizationAccess;
   // Populated by `createTRPCContext` and read by the min-version middleware.
   headersList?: Headers;
   // `performance.now()` when the mobile control-plane budget started, set by

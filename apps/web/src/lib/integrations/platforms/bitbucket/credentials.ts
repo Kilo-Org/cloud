@@ -1,5 +1,7 @@
 import 'server-only';
 
+import { isSupportAccessEnabled } from '@kilocode/web-shared/lib/admin/support-access';
+
 import { createPublicKey, randomUUID } from 'node:crypto';
 import {
   BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_KEY_ID,
@@ -170,7 +172,7 @@ export async function storeBitbucketIntegration(input: StoreBitbucketIntegration
         );
       }
 
-      if (!authorizer.isAdmin) {
+      if (!authorizer.isAdmin || isSupportAccessEnabled()) {
         const [membership] = await tx
           .select({ id: organization_memberships.id })
           .from(organization_memberships)

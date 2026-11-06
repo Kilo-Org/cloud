@@ -653,3 +653,286 @@ test('binds the browser default fetch receiver', async () => {
     globalThis.fetch = original;
   }
 });
+
+test('a replacement epoch reads and subscribes while its predecessor is held', async () => {
+  let release: (value: NativeSnapshot) => void = () => {};
+  let oldSignal: AbortSignal | undefined;
+  snapshot.mockImplementationOnce((_request, _session, signal) => {
+    oldSignal = signal;
+    return new Promise(resolve => {
+      release = resolve;
+    });
+  });
+  snapshot.mockResolvedValueOnce(complete(20));
+  const { client } = fixture();
+  const listener = jest.fn();
+  const connection = client.connectSession('ses_a', listener);
+  await flush();
+  connectedSocket().frame('hello', hello(), 10);
+  await flush();
+  connectedSocket().close();
+  await jest.advanceTimersByTimeAsync(2001);
+  const next = connectedSocket(1);
+  next.frame('hello', hello(), 30);
+  await flush();
+  expect(oldSignal?.aborted).toBe(true);
+  expect(next.sent).toContainEqual({ type: 'subscribe', afterSeq: 30 });
+  const before = listener.mock.calls.length;
+  release({ ...complete(99), messages: [{ id: 'old', role: 'user', content: 'old', seq: 1 }] });
+  await flush();
+  expect(listener).toHaveBeenCalledTimes(before);
+  expect(listener.mock.lastCall?.[0].messages).toEqual(complete(20).messages);
+  expect(connectedSocket().sent).toEqual([]);
+  connection.close();
+});
+
+test.each(['initial', 'recovery'])(
+  'close cancels a held %s read and fences late results',
+  async mode => {
+    if (mode === 'recovery') snapshot.mockResolvedValueOnce(incomplete(5));
+    let release: (value: NativeSnapshot) => void = () => {};
+    let signal: AbortSignal | undefined;
+    snapshot.mockImplementationOnce((_request, _session, ownedSignal) => {
+      signal = ownedSignal;
+      return new Promise(resolve => {
+        release = resolve;
+      });
+    });
+    const { client } = fixture();
+    const listener = jest.fn();
+    const connection = client.connectSession('ses_a', listener);
+    await flush();
+    const socket = connectedSocket();
+    socket.frame('hello', hello(), 3);
+    await flush();
+    if (mode === 'recovery') await jest.advanceTimersByTimeAsync(250);
+    if (mode === 'initial') socket.frame('reset_required', { seq: 9 }, 9);
+    expect(signal?.aborted).toBe(false);
+    connection.close();
+    const before = listener.mock.calls.length;
+    const sent = socket.sent.length;
+    release(complete(20));
+    await flush();
+    await jest.advanceTimersByTimeAsync(60_000);
+    expect(signal?.aborted).toBe(true);
+    expect(listener).toHaveBeenCalledTimes(before);
+    expect(socket.sent).toHaveLength(sent);
+    expect(FakeSocket.sockets).toHaveLength(1);
+  }
+);
+
+test.each([
+  ['count', 0],
+  ['bytes', 8000],
+])('bounds held raw frames by %s and retires their read', async (_name, padding) => {
+  let signal: AbortSignal | undefined;
+  snapshot.mockImplementationOnce((_request, _session, ownedSignal) => {
+    signal = ownedSignal;
+    return new Promise(() => {});
+  });
+  const { client } = fixture();
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  await flush();
+  const socket = connectedSocket();
+  socket.frame('hello', hello(), 3);
+  await flush();
+  const offered = padding === 0 ? 12_000 : 300;
+  for (let seq = 4; seq < offered + 4; seq++)
+    socket.frame('session.status', { padding: 'x'.repeat(padding) }, seq, 'events');
+  expect(socket.readyState).toBe(3);
+  expect(signal?.aborted).toBe(true);
+  expect(state?.events).toHaveLength(0);
+  expect(state?.error).toContain('incomplete');
+  connection.close();
+});
+
+test.each(['x'.repeat(262_144), '😀'.repeat(131_072)])(
+  'an oversized inbound frame is rejected before parsing',
+  async padding => {
+    const { client } = fixture();
+    let state: NativeSessionState | undefined;
+    const connection = client.connectSession('ses_a', value => {
+      state = value;
+    });
+    await flush();
+    connectedSocket().frame('hello', hello(), 3);
+    await flush();
+    connectedSocket().frame('session.status', { padding }, 4, 'events');
+    expect(connectedSocket().readyState).toBe(3);
+    expect(state?.events).toHaveLength(0);
+    expect(state?.error).toContain('frame exceeded the size limit');
+    connection.close();
+  }
+);
+
+test.each([
+  ['count', 0],
+  ['bytes', 8000],
+])(
+  'bounds subscribed recovery replay by %s without accepting the overflowing cursor',
+  async (_name, padding) => {
+    snapshot.mockResolvedValueOnce(incomplete(5));
+    let signal: AbortSignal | undefined;
+    snapshot.mockImplementationOnce((_request, _session, ownedSignal) => {
+      signal = ownedSignal;
+      return new Promise(() => {});
+    });
+    const { client } = fixture();
+    let state: NativeSessionState | undefined;
+    const connection = client.connectSession('ses_a', value => {
+      state = value;
+    });
+    await flush();
+    const socket = connectedSocket();
+    socket.frame('hello', hello(), 3);
+    await flush();
+    await jest.advanceTimersByTimeAsync(250);
+    let accepted = 3;
+    const offered = padding === 0 ? 12_000 : 300;
+    for (let seq = 4; seq < offered + 4; seq++) {
+      socket.frame(
+        'session.status',
+        { syncPosition: 5, padding: 'x'.repeat(padding) },
+        seq,
+        'events'
+      );
+      await flush();
+      if (socket.readyState === 1) accepted = seq;
+    }
+    expect(signal?.aborted).toBe(true);
+    expect(accepted).toBeLessThanOrEqual(1027);
+    await jest.advanceTimersByTimeAsync(2001);
+    connectedSocket(1).frame('hello', hello(), 12_004);
+    await flush();
+    expect(connectedSocket(1).sent).toContainEqual({ type: 'subscribe', afterSeq: accepted });
+    connectedSocket(1).frame('subscribed', { seq: 12_004 }, 12_004);
+    await flush();
+    expect(state?.error).toContain('incomplete');
+    connection.close();
+  }
+);
+
+test('available relay replay restores unique ordered deltas from the accepted cursor', async () => {
+  const { client } = fixture();
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  await flush();
+  const first = connectedSocket();
+  first.frame('hello', hello(), 3);
+  await flush();
+  const event = (socket: FakeSocket, seq: number, ordinal: number, delta: string) =>
+    socket.frame(
+      'session.text.delta',
+      { syncPosition: 0, data: { data: { assistantMessageID: 'm', ordinal, delta } } },
+      seq,
+      'events'
+    );
+  first.frame('session.step.started', { data: { data: { assistantMessageID: 'm' } } }, 4, 'events');
+  await flush();
+  event(first, 5, 10, 'ten:5|');
+  await flush();
+  for (let seq = 6; seq <= 2000; seq++) event(first, seq, 2, `${seq}|`);
+  await flush();
+  const accepted = state?.events.at(-1)?.seq ?? 0;
+  expect(accepted).toBe(6);
+  await jest.advanceTimersByTimeAsync(2001);
+  const next = connectedSocket(1);
+  next.frame('hello', hello(), 2000);
+  await flush();
+  expect(next.sent).toContainEqual({ type: 'subscribe', afterSeq: accepted });
+  for (let seq = accepted + 1; seq <= 2000; seq++) {
+    event(next, seq, 2, `${seq}|`);
+    await flush();
+  }
+  next.frame('subscribed', { seq: 2000 }, 2000);
+  await flush();
+  expect(state?.messages[0]?.content).toEqual([
+    { type: 'text', text: Array.from({ length: 1995 }, (_, index) => `${index + 6}|`).join('') },
+    { type: 'text', text: 'ten:5|' },
+  ]);
+  expect(state?.messages[0]?.partOrdinals).toEqual([2, 10]);
+  expect(state?.error).toBeUndefined();
+  connection.close();
+});
+
+test('a reset keeps its integrity error through snapshots, reconnect and subscribed', async () => {
+  snapshot.mockResolvedValue(complete(5));
+  const { client } = fixture();
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  await flush();
+  connectedSocket().frame('hello', hello(), 3);
+  await flush();
+  connectedSocket().frame('reset_required', { seq: 50 }, 50);
+  await flush();
+  connectedSocket().frame('subscribed', { seq: 50 }, 50);
+  await flush();
+  expect(state?.error).toContain('incomplete');
+  connectedSocket().close();
+  await jest.advanceTimersByTimeAsync(2001);
+  connectedSocket(1).frame('hello', hello(), 50);
+  connectedSocket(1).frame('subscribed', { seq: 50 }, 50);
+  await flush();
+  expect(state?.connection).toBe('connected');
+  expect(state?.error).toContain('incomplete');
+  connection.close();
+});
+
+test('projection shares untouched parts and preserves previous tool states', () => {
+  const parts = [
+    { type: 'text', text: 'untouched' },
+    { type: 'tool', id: 'tool', state: { status: 'running', input: 'old' } },
+  ];
+  const messages = [{ id: 'm', role: 'assistant', seq: 1, content: parts, partOrdinals: [2, 10] }];
+  const result = applyNativeEvent(messages, {
+    v: 1,
+    channel: 'events',
+    from: 'runner',
+    at: 0,
+    seq: 2,
+    type: 'session.tool.input.delta',
+    body: { data: { data: { assistantMessageID: 'm', id: 'tool', delta: ' new' } } },
+  });
+  expect(result[0]?.content).toEqual([
+    parts[0],
+    { type: 'tool', id: 'tool', state: { status: 'streaming', input: 'old new' } },
+  ]);
+  expect(Array.isArray(result[0]?.content) && result[0].content[0]).toBe(parts[0]);
+  expect(parts[1]?.state).toEqual({ status: 'running', input: 'old' });
+});
+
+test.each([
+  ['forbidden', () => new NativeSyncError('forbidden', 403)],
+  ['deleted', () => Object.assign(new Error('deleted'), { code: 'session_deleted' })],
+])('keeps a specific %s failure visible alongside an integrity gap', async (cause, failure) => {
+  snapshot.mockResolvedValue(complete(5));
+  const { client } = fixture();
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  await flush();
+  const socket = connectedSocket();
+  socket.frame('hello', hello(), 3);
+  await flush();
+  socket.frame('reset_required', { seq: 50 }, 50);
+  await flush();
+  socket.frame('error', { code: 'specific_command_failure' }, 50);
+  await flush();
+  expect(state?.error).toContain('incomplete');
+  expect(state?.error).toContain('specific_command_failure');
+  snapshot.mockRejectedValueOnce(failure());
+  socket.frame('reset_required', { seq: 60 }, 60);
+  await flush();
+  expect(state?.connection).toBe('disconnected');
+  expect(state?.error).toContain(cause);
+  expect(state?.error).toContain('incomplete');
+  connection.close();
+});

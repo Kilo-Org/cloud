@@ -68,6 +68,7 @@ describe('cloudAgentNextFeedback.list', () => {
     const caller = await createCallerForUser(regularUser.id);
     const result = await caller.cloudAgentNextFeedback.list();
 
+    expect(result).toHaveLength(5);
     expect(result.map(row => row.feedback_text)).toEqual([
       'submission 5',
       'submission 4',

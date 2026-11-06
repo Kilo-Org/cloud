@@ -2443,8 +2443,8 @@
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} फाइल अद्ययावत केली.",
-      "updatedFileCount": "{{displayCount}} फाइली अद्ययावत केल्या.",
-      "updatedFileCount_other": "{{displayCount}} फाइली अद्ययावत केल्या."
+      "updatedFileCount": "{{displayCount}} फाइल्स अद्ययावत केल्या.",
+      "updatedFileCount_other": "{{displayCount}} फाइल्स अद्ययावत केल्या."
     },
     "toolCard": {
       "accessibility": "{{label}} साधन, {{status}}",

@@ -2188,6 +2188,43 @@ describe('User', () => {
       expect(providerRows[0]?.provider).toBe('github');
     });
 
+    it('does not attribute a same-provider refusal to the account sign-in requirement', async () => {
+      const existing = await insertTestUser({
+        google_user_email: 'same-provider-event@example.com',
+        google_user_name: 'Same Provider Event',
+      });
+      await db.insert(user_auth_provider).values({
+        kilo_user_id: existing.id,
+        provider: 'github',
+        provider_account_id: 'github-same-provider-old',
+        email: 'same-provider-event@example.com',
+        avatar_url: '',
+        display_name: null,
+        hosted_domain: hosted_domain_specials.github,
+      });
+      mockCapture.mockClear();
+
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: 'same-provider-event@example.com',
+          google_user_name: 'Same Provider Event',
+          google_user_image_url: 'https://example.com/avatar.png',
+          hosted_domain: hosted_domain_specials.github,
+          provider: 'github',
+          provider_account_id: 'github-same-provider-new',
+        },
+        undefined,
+        true
+      );
+
+      expect(result.success).toBe(false);
+      if (result.success) return;
+      expect(result.error).toBe('DIFFERENT-OAUTH');
+      expect(mockCapture).not.toHaveBeenCalledWith(
+        expect.objectContaining({ event: 'auto_link_skipped_account_sign_in_history' })
+      );
+    });
+
     it('allows auto-link when the existing account has a proven provider', async () => {
       const existing = await insertTestUser({
         google_user_email: 'existing-proven@example.com',

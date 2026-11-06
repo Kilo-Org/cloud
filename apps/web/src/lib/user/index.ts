@@ -698,9 +698,15 @@ export async function createOrUpdateUser(
         },
       });
       // Record the sign-ins the account-sign-in requirement held back, so they
-      // are distinguishable from every other different-account refusal.
+      // are distinguishable from every other different-account refusal. A
+      // refusal from the provider already on the account is not this
+      // requirement's outcome, so it stays out.
       const skippedBySignInHistory =
-        !workosSettles && autoLinkToExistingUser && !onlyHasFakeLogin && !accountHasProvenSignIn;
+        !hasThisProvider &&
+        !workosSettles &&
+        autoLinkToExistingUser &&
+        !onlyHasFakeLogin &&
+        !accountHasProvenSignIn;
       if (skippedBySignInHistory) {
         posthogClient.capture({
           distinctId: userByEmail.google_user_email,

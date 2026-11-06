@@ -9,6 +9,7 @@ import {
   assertManifestIdentity,
   currentDeployment,
   inventory,
+  listWorkerScripts,
   operatorAPI,
   resolveOperatorToken,
   retryTransient,
@@ -217,7 +218,7 @@ export async function cleanupOwned(manifest, api, cli, proof, save) {
     });
   }
   await operation('verify_worker_absent', async () => {
-    const rows = await inventory(api, `${account}/workers/scripts`);
+    const rows = await listWorkerScripts(api);
     proof.remaining.worker = rows
       .filter(item => item.id === manifest.workerName)
       .map(item => item.id);

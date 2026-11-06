@@ -58,7 +58,23 @@ export function assertGenerator(node) {
     );
   }
 }
+export async function listWorkerScripts(api) {
+  const response = await api('GET', `/accounts/${approvedAccountID}/workers/scripts`);
+  assert(!response.absent, 'Inventory unavailable; absence is unproven');
+  assert(Array.isArray(response.result), 'Worker scripts inventory response schema changed');
+  assert(
+    response.result_info == null && response.cursor == null,
+    'Worker scripts inventory pagination schema changed; absence is unproven'
+  );
+  for (const worker of response.result)
+    assert(
+      typeof worker?.id === 'string' && /^[a-z0-9][a-z0-9-]{0,62}$/.test(worker.id),
+      'Inventory Worker ID'
+    );
+  return response.result;
+}
 export async function inventory(api, path, rows = result => result, perPage = 100) {
+  assert(Number.isSafeInteger(perPage) && perPage > 0, 'Inventory page size');
   const found = [];
   const cursors = new Set();
   let cursor;
@@ -71,17 +87,35 @@ export async function inventory(api, path, rows = result => result, perPage = 10
     const values = rows(response.result);
     assert(Array.isArray(values), 'Inventory response schema changed');
     found.push(...values);
-    cursor = response.result?.cursor ?? response.result_info?.cursor;
+    const info = response.result_info;
+    assert(
+      info == null ||
+        (typeof info === 'object' &&
+          !Array.isArray(info) &&
+          Object.keys(info).every(key =>
+            ['page', 'per_page', 'count', 'total_count', 'total_pages', 'cursor'].includes(key)
+          )),
+      'Inventory pagination schema changed; absence is unproven'
+    );
+    for (const key of ['page', 'per_page', 'count', 'total_count', 'total_pages'])
+      if (info?.[key] !== undefined)
+        assert(
+          Number.isSafeInteger(info[key]) &&
+            info[key] >= (key === 'page' || key === 'per_page' ? 1 : 0),
+          'Inventory pagination schema changed; absence is unproven'
+        );
+    cursor = response.result?.cursor ?? info?.cursor;
+    assert(
+      cursor == null || typeof cursor === 'string',
+      'Inventory cursor schema changed; absence is unproven'
+    );
     if (cursor) {
       assert(!cursors.has(cursor), 'Inventory cursor repeated; absence is unproven');
       cursors.add(cursor);
       continue;
     }
-    const info = response.result_info;
     if (info?.total_pages !== undefined) {
       if (page >= info.total_pages) return found;
-    } else if (info?.total_count !== undefined) {
-      if (found.length >= info.total_count) return found;
     } else if (values.length < (info?.per_page ?? perPage)) return found;
   }
   throw Error('Inventory page budget exceeded; absence is unproven');

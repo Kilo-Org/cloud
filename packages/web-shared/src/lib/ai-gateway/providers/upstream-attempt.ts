@@ -37,7 +37,7 @@ type SendUpstreamAttemptInput = {
   organizationId: string | null;
   sessionId: string | null;
   taskId: string | null;
-  isNonTrialEnterprise: boolean;
+  isAnthropicProviderAllowed: boolean;
   search: string;
   method: string;
   signal?: AbortSignal;
@@ -66,7 +66,7 @@ export async function sendUpstreamAttempt({
   organizationId,
   sessionId,
   taskId,
-  isNonTrialEnterprise,
+  isAnthropicProviderAllowed,
   search,
   method,
   signal,
@@ -86,7 +86,7 @@ export async function sendUpstreamAttempt({
     organizationId,
     sessionId,
     taskId,
-    isNonTrialEnterprise,
+    isAnthropicProviderAllowed,
     dataRegion
   );
   if (costLimit) {

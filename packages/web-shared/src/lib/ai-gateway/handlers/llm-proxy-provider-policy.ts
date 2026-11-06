@@ -13,9 +13,13 @@ import {
   type OrganizationGatewaySettings,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/organization-gateway-settings';
 import { getRuntimeOrganizationFeatures } from '@kilocode/web-shared/lib/ai-gateway/organization-features';
-import { paidUsageRejection } from '@kilocode/web-shared/lib/ai-gateway/gateway-admission';
+import {
+  paidUsageRejection,
+  type GatewayCaller,
+} from '@kilocode/web-shared/lib/ai-gateway/gateway-admission';
 import { getIgnoredProviders } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
 import { isNonTrialEnterpriseOrganization } from '@kilocode/web-shared/lib/organizations/non-trial-enterprise';
+import { isClaudeModel } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/claude-model';
 import {
   findDirectByokProvider,
   getDirectByokModel,
@@ -48,7 +52,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import { isAnonymousContext, type AnonymousUserContext } from '@kilocode/web-shared/lib/anonymous';
 import { isUnavailableModel } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
-import { ORG_AUTO_MODEL } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
+import { isKiloAutoModel, ORG_AUTO_MODEL } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import {
   allowsInferenceProviderUserByok,
@@ -77,6 +81,7 @@ type ProviderPolicyInput = {
   providerMetadataCapture: AiProviderMetadataCapture | undefined;
   effectivePrivacy: ReturnType<typeof getEffectiveProviderPrivacy>;
   balanceAndSettingsPromise: Promise<BalanceAndOrgSettings>;
+  anthropicProviderAllowedPromise: Promise<[PromiseSettledResult<boolean>]>;
   organizationGroupPolicyPromise: Promise<EffectiveOrganizationModelPolicy | null>;
 };
 
@@ -84,7 +89,7 @@ type ProviderPolicyResult =
   | {
       ok: true;
       providerResult: GetProviderProviderResult;
-      isNonTrialEnterprise: boolean;
+      isAnthropicProviderAllowed: boolean;
       dataRegion: OrganizationGatewaySettings['dataRegion'];
     }
   | { ok: false; response: NextResponseType<unknown> };
@@ -121,11 +126,15 @@ async function resolveAccessCheck(input: ProviderPolicyInput) {
   };
 }
 
-async function resolveIsNonTrialEnterprise(input: ProviderPolicyInput): Promise<boolean> {
-  if (!input.organizationId) return false;
-  const { plan } = await input.balanceAndSettingsPromise;
-  if (plan !== 'enterprise') return false;
-  return await isNonTrialEnterpriseOrganization(input.organizationId, readDb);
+export async function resolveIsAnthropicProviderAllowed(
+  model: string,
+  callerPromise: Promise<GatewayCaller>,
+  balanceAndSettingsPromise: Promise<BalanceAndOrgSettings>
+): Promise<boolean> {
+  if (isKiloAutoModel(model) || !isClaudeModel(model)) return false;
+  const [caller, { plan }] = await Promise.all([callerPromise, balanceAndSettingsPromise]);
+  if (caller.kind !== 'signed-in' || !caller.organizationId || plan !== 'enterprise') return false;
+  return await isNonTrialEnterpriseOrganization(caller.organizationId, readDb);
 }
 
 /**
@@ -153,7 +162,6 @@ export async function resolveProviderAndPolicy(
     );
   };
 
-  const isNonTrialEnterprise = await resolveIsNonTrialEnterprise(input);
   const organizationGatewaySettings = input.organizationId
     ? getOrganizationGatewaySettings(
         await getRuntimeOrganizationFeatures(),
@@ -161,6 +169,9 @@ export async function resolveProviderAndPolicy(
         (await input.balanceAndSettingsPromise).settings
       )
     : NO_ORGANIZATION_GATEWAY_SETTINGS;
+  const [anthropicProviderAllowed] = await input.anthropicProviderAllowedPromise;
+  if (anthropicProviderAllowed.status === 'rejected') throw anthropicProviderAllowed.reason;
+  const isAnthropicProviderAllowed = anthropicProviderAllowed.value;
   const providerResult = await getProvider({
     requestedModel: model,
     request,
@@ -176,7 +187,7 @@ export async function resolveProviderAndPolicy(
     getAllowedProviders: async () =>
       isAnonymous ? undefined : (await getAccessCheck()).allowedProviders,
     isDirectByokProviderAllowed,
-    kiloIgnoredProviders: getIgnoredProviders(model, isNonTrialEnterprise),
+    kiloIgnoredProviders: getIgnoredProviders(model, isAnthropicProviderAllowed),
     onDecision: decision => input.providerMetadataCapture?.captureRoutingDecision(decision),
   });
   if (providerResult.kind === 'chatgpt-reconnect') {
@@ -334,7 +345,7 @@ export async function resolveProviderAndPolicy(
   return {
     ok: true,
     providerResult,
-    isNonTrialEnterprise,
+    isAnthropicProviderAllowed,
     dataRegion: organizationGatewaySettings.dataRegion,
   };
 }

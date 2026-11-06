@@ -315,7 +315,7 @@ export async function applyProviderSpecificLogic(
   organizationId: string | null,
   sessionId: string | null,
   taskId: string | null,
-  isNonTrialEnterprise: boolean,
+  isAnthropicProviderAllowed: boolean,
   dataRegion: OrganizationDataRegion | null
 ) {
   // A user's own gateway key bills their account, so Kilo's routing preferences
@@ -393,7 +393,7 @@ export async function applyProviderSpecificLogic(
       await getPreferredProviderOrderConfig(),
       requestedModel,
       requestToMutate.body,
-      isNonTrialEnterprise
+      isAnthropicProviderAllowed
     );
   }
 

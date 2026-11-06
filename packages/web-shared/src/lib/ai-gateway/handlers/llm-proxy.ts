@@ -76,7 +76,10 @@ import {
   billLegacyClassifierCost,
   resolveModel,
 } from '@kilocode/web-shared/lib/ai-gateway/handlers/llm-proxy-model-resolution';
-import { resolveProviderAndPolicy } from '@kilocode/web-shared/lib/ai-gateway/handlers/llm-proxy-provider-policy';
+import {
+  resolveIsAnthropicProviderAllowed,
+  resolveProviderAndPolicy,
+} from '@kilocode/web-shared/lib/ai-gateway/handlers/llm-proxy-provider-policy';
 import { respondToUpstream } from '@kilocode/web-shared/lib/ai-gateway/handlers/llm-proxy-respond';
 import { resolveEnkryptOutputScan } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/output-guardrail';
 import {
@@ -204,6 +207,14 @@ export async function handleLlmProxyRequest(
       ? readGatewayBalance(caller.user, caller.organizationId, requestedModelLowerCased)
       : anonymousBalance
   );
+  // Early returns may skip provider policy; retain lookup failures until that policy consumes them.
+  let anthropicProviderAllowedPromise = Promise.allSettled([
+    resolveIsAnthropicProviderAllowed(
+      requestedModelLowerCased,
+      callerPromise,
+      balanceAndSettingsPromise
+    ),
+  ]);
   const organizationGroupPolicyPromise = callerPromise.then(async caller => {
     if (caller.kind !== 'signed-in' || !caller.organizationId) return null;
     const context = await getOrganizationGroupPolicyContext({
@@ -299,6 +310,15 @@ export async function handleLlmProxyRequest(
   }
 
   const effectiveModelIdLowerCased = requestBodyParsed.body.model.toLowerCase();
+  if (effectiveModelIdLowerCased !== requestedModelLowerCased) {
+    anthropicProviderAllowedPromise = Promise.allSettled([
+      resolveIsAnthropicProviderAllowed(
+        effectiveModelIdLowerCased,
+        callerPromise,
+        balanceAndSettingsPromise
+      ),
+    ]);
+  }
   const customLlm = await findCustomLlm(effectiveModelIdLowerCased);
   const isPrivateCustomLlm = customLlm !== null && !isPublicCustomLlm(customLlm.definition);
   // Anonymous callers cannot use private custom LLMs, so those are never publicly free.
@@ -387,10 +407,11 @@ export async function handleLlmProxyRequest(
     providerMetadataCapture,
     effectivePrivacy,
     balanceAndSettingsPromise,
+    anthropicProviderAllowedPromise,
     organizationGroupPolicyPromise,
   });
   if (!providerPolicy.ok) return providerPolicy.response;
-  const { providerResult, isNonTrialEnterprise, dataRegion } = providerPolicy;
+  const { providerResult, isAnthropicProviderAllowed, dataRegion } = providerPolicy;
 
   console.debug(`Routing request to ${providerResult.provider.type}`, {
     byokProviderIds: providerResult.userByok?.map(byok => byok.providerId) ?? null,
@@ -480,7 +501,7 @@ export async function handleLlmProxyRequest(
     organizationId: organizationId ?? null,
     sessionId: headers.sessionId,
     taskId: headers.taskId,
-    isNonTrialEnterprise,
+    isAnthropicProviderAllowed,
     search: url.search,
     method: request.method,
     signal: request.signal,

@@ -554,6 +554,7 @@ function assistantFailure(detail: string | null): MessageFailure {
     detail,
     copyDetail: '',
     canRetry: true,
+    canAddCredits: false,
     canCopy: false,
   };
 }
@@ -569,6 +570,7 @@ describe('statusIndicatorDuplicatesMessageFailure', () => {
     detail: 'We could not deliver this message after several attempts.',
     copyDetail: 'Unauthorized: Unauthorized',
     canRetry: true,
+    canAddCredits: false,
     canCopy: true,
   };
 
@@ -585,8 +587,31 @@ describe('statusIndicatorDuplicatesMessageFailure', () => {
     detail: 'The agent could not run this message.',
     copyDetail: 'Message delivery failed',
     canRetry: true,
+    canAddCredits: false,
     canCopy: true,
   };
+
+  it('suppresses the credits line a credits failure row already carries', () => {
+    const failure: MessageFailure = {
+      kind: 'assistant',
+      side: 'assistant',
+      error: true,
+      titleKey: 'agentChat.messageFailure.assistantTitle',
+      title: 'Response failed',
+      detailKey: 'agentChat.session.notEnoughCredits',
+      detail: i18n.t('agentChat.session.notEnoughCredits'),
+      copyDetail: '',
+      canRetry: false,
+      canAddCredits: true,
+      canCopy: false,
+    };
+    expect(
+      statusIndicatorDuplicatesMessageFailure({
+        indicator: { type: 'error', message: 'Assistant request failed: insufficient credits' },
+        failure,
+      })
+    ).toBe(true);
+  });
 
   it('suppresses an unclassified session error the last row already states', () => {
     expect(

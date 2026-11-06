@@ -1,4 +1,5 @@
 import { type MessageDeliveryState, type MessageInfo } from '@kilocode/cloud-agent-sdk';
+import { z } from 'zod';
 
 import { i18n } from '@/i18n';
 
@@ -83,6 +84,48 @@ function assistantErrorMarkedNonRetryable(
     return false;
   }
   return Object.is(error.data.isRetryable, false);
+}
+
+/**
+ * The HTTP status the Kilo AI gateway answers a paid request with when the
+ * account cannot pay (no balance, no allowance). See
+ * `usageLimitExceededResponse` in packages/web-shared (`llm-proxy-helpers.ts`).
+ */
+const PAYMENT_REQUIRED = 402;
+
+/**
+ * What a gateway credit block names in the refusal body. A 402 alone does not
+ * say whose bill it is: an upstream provider's payment refusal passes through
+ * the gateway with the same status and names no credit type of its own.
+ */
+const gatewayCreditRefusalSchema = z.object({
+  error_type: z.enum(['usage_limit_exceeded', 'insufficient_credits']),
+});
+
+/**
+ * Whether this `APIError` is the gateway's own block on the account's credits,
+ * rather than a provider refusal passed through: the same rule
+ * `paymentRequired` in `lib/chat/backend-target.ts` applies to a model send.
+ * Only this failure resolves without spending — the account's balance is the
+ * recovery, not the request — so it is the one non-retryable refusal that
+ * offers an action that can settle it.
+ */
+function assistantCreditsRefusal(
+  error: Extract<MessageInfo, { role: 'assistant' }>['error']
+): boolean {
+  if (error?.name !== 'APIError' || error.data.statusCode !== PAYMENT_REQUIRED) {
+    return false;
+  }
+  const body = error.data.responseBody;
+  if (body === undefined) {
+    return false;
+  }
+  try {
+    return gatewayCreditRefusalSchema.safeParse(JSON.parse(body)).success;
+  } catch {
+    // A body that is not JSON names no gateway credit block.
+    return false;
+  }
 }
 
 /**
@@ -181,6 +224,13 @@ export type MessageFailure = {
    */
   copyDetail: string;
   canRetry: boolean;
+  /**
+   * The account's own balance caused this failure, so the row offers the action
+   * that settles it: opening the credit purchase screen. Independent of
+   * `canRetry` (which reads the request's retryability) and of the session's
+   * ability to re-send.
+   */
+  canAddCredits: boolean;
   canCopy: boolean;
 };
 
@@ -278,6 +328,7 @@ export function selectMessageFailure(input: {
         detail: i18n.t(copy.detailKey),
         copyDetail: deliveryState.error,
         canRetry: retryAvailable,
+        canAddCredits: false,
         canCopy: true,
       };
     }
@@ -298,6 +349,7 @@ export function selectMessageFailure(input: {
       detail: copy.detailKey === null ? null : i18n.t(copy.detailKey),
       copyDetail: deliveryState.error,
       canRetry: retryAvailable,
+      canAddCredits: false,
       canCopy: true,
     };
   }
@@ -309,7 +361,13 @@ export function selectMessageFailure(input: {
     // the name set still covers the errors whose class is terminal on every
     // transport.
     const retryableByProvider = !assistantErrorMarkedNonRetryable(error);
-    const detailKey = assistantDetailKey(errorName, !retryableByProvider);
+    const creditsRefusal = assistantCreditsRefusal(error);
+    // A credits refusal states the class the session's terminal error already
+    // names for the same gateway block (`messageForClass('credits')` in
+    // session-terminal-error.ts), so the row's line and the footer's agree.
+    const detailKey = creditsRefusal
+      ? 'agentChat.session.notEnoughCredits'
+      : assistantDetailKey(errorName, !retryableByProvider);
     return {
       kind: 'assistant',
       side: 'assistant',
@@ -323,6 +381,10 @@ export function selectMessageFailure(input: {
         retryAvailable &&
         retryableByProvider &&
         !NON_RETRYABLE_ASSISTANT_ERRORS.includes(errorName),
+      // Adding credits does not need the session to accept a re-send, so it is
+      // independent of `retryAvailable`: a stored transcript keeps the action
+      // that settles the failure it states.
+      canAddCredits: creditsRefusal,
       canCopy: false,
     };
   }

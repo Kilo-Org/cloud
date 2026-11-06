@@ -27,6 +27,17 @@ function userInfo(): MessageInfo {
 
 type AssistantError = NonNullable<Extract<MessageInfo, { role: 'assistant' }>['error']>;
 
+/** The Kilo gateway's answer to a paid request from an account with no balance. */
+const GATEWAY_CREDITS_BODY = JSON.stringify({
+  error: {
+    title: 'Paid Model - Credits Required',
+    message: 'Add credits to continue, or switch to a free model',
+    balance: 0,
+    buyCreditsUrl: 'https://app.kilo.ai/profile',
+  },
+  error_type: 'usage_limit_exceeded',
+});
+
 function assistantInfo(errorName: string): MessageInfo {
   return {
     id: 'a1',
@@ -199,6 +210,72 @@ describe('selectMessageFailure', () => {
       expect(result?.detailKey).toBe('agentChat.messageFailure.assistantProviderRefused');
       expect(result?.detail).toBe('The provider refused this request and it cannot be retried.');
       expect(JSON.stringify(result)).not.toContain('RAW_PROVIDER_TEXT');
+    });
+
+    it('states a credits refusal the gateway named, and offers the action that settles it', () => {
+      const info = assistantInfo('APIError') as Extract<MessageInfo, { role: 'assistant' }>;
+      info.error = {
+        name: 'APIError',
+        data: {
+          message: 'RAW_PROVIDER_TEXT',
+          statusCode: 402,
+          isRetryable: false,
+          responseBody: GATEWAY_CREDITS_BODY,
+        },
+      };
+
+      const result = selectMessageFailure({ info });
+
+      expect(result?.detailKey).toBe('agentChat.session.notEnoughCredits');
+      expect(result?.detail).toBe(i18n.t('agentChat.session.notEnoughCredits'));
+      expect(result?.canAddCredits).toBe(true);
+      // The same request meets the same block, so the row keeps no resend.
+      expect(result?.canRetry).toBe(false);
+      expect(JSON.stringify(result)).not.toContain('RAW_PROVIDER_TEXT');
+    });
+
+    it('accepts the gateway name the direct-provider path answers with', () => {
+      const info = assistantInfo('APIError') as Extract<MessageInfo, { role: 'assistant' }>;
+      info.error = {
+        name: 'APIError',
+        data: {
+          message: 'RAW_PROVIDER_TEXT',
+          statusCode: 402,
+          isRetryable: false,
+          responseBody:
+            '{"error":{"message":"Insufficient credits"},"error_type":"insufficient_credits"}',
+        },
+      };
+
+      expect(selectMessageFailure({ info })?.canAddCredits).toBe(true);
+    });
+
+    it('keeps the final-refusal line for a payment status a provider key caused', () => {
+      const info = assistantInfo('APIError') as Extract<MessageInfo, { role: 'assistant' }>;
+      info.error = {
+        name: 'APIError',
+        data: {
+          message: 'RAW_PROVIDER_TEXT',
+          statusCode: 402,
+          isRetryable: false,
+          responseBody: '{"error":{"message":"Upstream request failed"}}',
+        },
+      };
+
+      const result = selectMessageFailure({ info });
+
+      expect(result?.detailKey).toBe('agentChat.messageFailure.assistantProviderRefused');
+      expect(result?.canAddCredits).toBe(false);
+    });
+
+    it('does not read a payment status alone as a credit block', () => {
+      const info = assistantInfo('APIError') as Extract<MessageInfo, { role: 'assistant' }>;
+      info.error = {
+        name: 'APIError',
+        data: { message: 'RAW_PROVIDER_TEXT', statusCode: 402, isRetryable: false },
+      };
+
+      expect(selectMessageFailure({ info })?.canAddCredits).toBe(false);
     });
 
     it('keeps Retry when the gateway marked the failure retryable', () => {

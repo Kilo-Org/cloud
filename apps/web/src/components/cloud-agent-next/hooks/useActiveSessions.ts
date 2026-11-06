@@ -16,10 +16,12 @@ import { useUserWebConnection } from '../CloudAgentProvider';
 /**
  * A live row as the sidebar needs it: the connection wire shape plus the
  * fields `activeSessions.list` enriches from `cli_sessions_v2`. A WebSocket
- * payload carries neither, so the merge below keeps the enriched copy.
+ * payload carries none of them, so the merge below keeps the enriched copy —
+ * the live-row filters read `createdOnPlatform` and `organizationId`.
  */
 export type ActiveSession = ActiveSessionWithConnectionData & {
   createdOnPlatform?: string;
+  organizationId?: string | null;
   createdAt?: string;
   updatedAt?: string;
   lastActivityAt?: string;
@@ -30,6 +32,12 @@ type CliConnectionPayload = {
   connectionId: string;
 };
 
+/**
+ * One connection's `sessions.heartbeat`: the full snapshot of that
+ * connection's root sessions, broadcast on its own. A cached row of this
+ * connection that the snapshot omits has ended on it, so it is dropped; rows
+ * of every other connection are untouched here.
+ */
 type RootHeartbeatPayload = {
   connectionId: string;
   sessions: ActiveSession[];
@@ -80,17 +88,24 @@ const ENRICHED_FIELDS = [
  * `activeSessions.list` enriches a row from `cli_sessions_v2` and the wire row
  * is worse on every field this touches: the title is DB-authoritative (nothing
  * propagates a cloud rename back to the CLI, so the wire title stays stale
- * forever), and the origin and timestamp fields are absent from the wire
- * entirely. Dropping them on each heartbeat would also drop a live row out of
- * a filtered sidebar until the next poll refetch. A brand-new id still shows
- * exactly what the connection reported.
+ * forever), and the origin, owner scope, and timestamp fields are absent from
+ * the wire entirely. Dropping them on each heartbeat would also drop a live row
+ * out of a filtered sidebar until the next poll refetch. A brand-new id still
+ * shows exactly what the connection reported.
  */
 function mergeCachedEnrichment(
   cached: ActiveSession | undefined,
   incoming: ActiveSession
 ): ActiveSession {
   if (!cached) return incoming;
-  const merged: ActiveSession = { ...incoming, title: cached.title };
+  const merged: ActiveSession = {
+    ...incoming,
+    title: cached.title,
+    // `null` is meaningful here: it is the personal scope, which the wire
+    // cannot express, so only an absent value falls back to the incoming row.
+    organizationId:
+      cached.organizationId !== undefined ? cached.organizationId : incoming.organizationId,
+  };
   for (const field of ENRICHED_FIELDS) {
     const value = cached[field] !== undefined ? cached[field] : incoming[field];
     if (value !== undefined) merged[field] = value;
@@ -101,11 +116,9 @@ function mergeCachedEnrichment(
 /**
  * Merge one connection's heartbeat into the cached list.
  *
- * The cached order is preserved: a row keeps the position it already had, and
- * only ids the heartbeat introduces are appended. Prepending the heartbeating
- * connection instead would move its rows ahead of every other connection on
- * every heartbeat, so two or more live connections reshuffle the sidebar every
- * few seconds and a row is never where the user last clicked it.
+ * The heartbeating connection's rows come first, as they always have; the
+ * sidebar decides the rendered order itself (`remotePriority` in
+ * `ChatSidebar.tsx`), so a heartbeat cannot reshuffle what the user sees.
  *
  * A row another connection now owns is replaced in place rather than kept
  * alongside the reported one: the connection list attributes each session to
@@ -115,23 +128,14 @@ export function applyActiveSessionsHeartbeat(
   currentSessions: ActiveSession[],
   payload: RootHeartbeatPayload
 ): ActiveSession[] {
-  const reported = new Map(payload.sessions.map(session => [session.id, session]));
-  const merged: ActiveSession[] = [];
-  for (const session of currentSessions) {
-    const incoming = reported.get(session.id);
-    if (!incoming) {
-      // A row this connection no longer reports has ended on it. A row another
-      // connection owns is untouched here.
-      if (session.connectionId !== payload.connectionId) merged.push(session);
-      continue;
-    }
-    reported.delete(session.id);
-    merged.push(mergeCachedEnrichment(session, incoming));
-  }
-  for (const session of reported.values()) {
-    merged.push(mergeCachedEnrichment(undefined, session));
-  }
-  return merged;
+  const cachedById = new Map(currentSessions.map(session => [session.id, session]));
+  const reported = new Set(payload.sessions.map(session => session.id));
+  return [
+    ...payload.sessions.map(session => mergeCachedEnrichment(cachedById.get(session.id), session)),
+    ...currentSessions.filter(
+      session => session.connectionId !== payload.connectionId && !reported.has(session.id)
+    ),
+  ];
 }
 
 /**

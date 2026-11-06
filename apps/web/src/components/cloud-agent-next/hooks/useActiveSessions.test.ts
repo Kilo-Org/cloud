@@ -47,7 +47,7 @@ describe('useActiveSessions live payload helpers', () => {
     expect(payload).toEqual({ connectionId: 'conn-1', sessions: [] });
   });
 
-  it('drops cached rows the heartbeat no longer reports and appends new ones', () => {
+  it('drops the rows this connection no longer reports', () => {
     const sessions = applyActiveSessionsHeartbeat(
       [
         { id: 'root-1', status: 'idle', title: 'Ended', connectionId: 'conn-1' },
@@ -60,41 +60,31 @@ describe('useActiveSessions live payload helpers', () => {
     );
 
     expect(sessions).toEqual([
-      { id: 'root-2', status: 'busy', title: 'Other CLI', connectionId: 'conn-2' },
       { id: 'root-3', status: 'busy', title: 'New', connectionId: 'conn-1' },
+      { id: 'root-2', status: 'busy', title: 'Other CLI', connectionId: 'conn-2' },
     ]);
   });
 
-  it('keeps every row where it was when connections heartbeat in turn', () => {
-    const connA = [
-      { id: 'a1', status: 'busy', title: 'A1', connectionId: 'conn-a' },
-      { id: 'a2', status: 'busy', title: 'A2', connectionId: 'conn-a' },
-    ];
+  it('leaves rows of every other connection where they were', () => {
     const connB = [
       { id: 'b1', status: 'busy', title: 'B1', connectionId: 'conn-b' },
       { id: 'b2', status: 'busy', title: 'B2', connectionId: 'conn-b' },
     ];
-    const settled = [...connA, ...connB];
+    const sessions = applyActiveSessionsHeartbeat(
+      [{ id: 'a1', status: 'busy', title: 'A1', connectionId: 'conn-a' }, ...connB],
+      {
+        connectionId: 'conn-a',
+        sessions: [{ id: 'a1', status: 'idle', title: 'A1', connectionId: 'conn-a' }],
+      }
+    );
 
-    const afterA = applyActiveSessionsHeartbeat(settled, {
-      connectionId: 'conn-a',
-      sessions: connA.map(session => ({ ...session, status: 'idle' })),
-    });
-    const afterB = applyActiveSessionsHeartbeat(afterA, {
-      connectionId: 'conn-b',
-      sessions: connB,
-    });
-
-    expect(afterA.map(session => session.id)).toEqual(['a1', 'a2', 'b1', 'b2']);
-    expect(afterB.map(session => session.id)).toEqual(['a1', 'a2', 'b1', 'b2']);
-    expect(afterB).toEqual([
+    expect(sessions).toEqual([
       { id: 'a1', status: 'idle', title: 'A1', connectionId: 'conn-a' },
-      { id: 'a2', status: 'idle', title: 'A2', connectionId: 'conn-a' },
       ...connB,
     ]);
   });
 
-  it('keeps the cached title for a known id and takes every other field from the heartbeat', () => {
+  it('keeps the cached enrichment the wire row does not carry', () => {
     const sessions = applyActiveSessionsHeartbeat(
       [
         {
@@ -103,6 +93,7 @@ describe('useActiveSessions live payload helpers', () => {
           title: 'DB title',
           connectionId: 'conn-1',
           createdOnPlatform: 'cli',
+          organizationId: 'org-1',
           lastActivityAt: '2026-09-30 10:00:00+00',
         },
         { id: 'root-2', status: 'busy', title: 'Other CLI', connectionId: 'conn-2' },
@@ -127,13 +118,34 @@ describe('useActiveSessions live payload helpers', () => {
         title: 'DB title',
         connectionId: 'conn-1',
         createdOnPlatform: 'cli',
+        organizationId: 'org-1',
         lastActivityAt: '2026-09-30 10:00:00+00',
       },
       { id: 'root-2', status: 'busy', title: 'Other CLI', connectionId: 'conn-2' },
     ]);
   });
 
-  it('appends a brand-new session id after the rows already on screen', () => {
+  it('keeps a personal organization scope, which is an explicit null', () => {
+    const sessions = applyActiveSessionsHeartbeat(
+      [
+        {
+          id: 'root-1',
+          status: 'idle',
+          title: 'Personal',
+          connectionId: 'conn-1',
+          organizationId: null,
+        },
+      ],
+      {
+        connectionId: 'conn-1',
+        sessions: [{ id: 'root-1', status: 'busy', title: 'Stale', connectionId: 'conn-1' }],
+      }
+    );
+
+    expect(sessions[0]?.organizationId).toBeNull();
+  });
+
+  it('takes a brand-new id from the wire as reported', () => {
     const sessions = applyActiveSessionsHeartbeat(
       [{ id: 'root-2', status: 'busy', title: 'Other CLI', connectionId: 'conn-2' }],
       {
@@ -143,12 +155,12 @@ describe('useActiveSessions live payload helpers', () => {
     );
 
     expect(sessions).toEqual([
-      { id: 'root-2', status: 'busy', title: 'Other CLI', connectionId: 'conn-2' },
       { id: 'root-3', status: 'busy', title: 'CLI title', connectionId: 'conn-1' },
+      { id: 'root-2', status: 'busy', title: 'Other CLI', connectionId: 'conn-2' },
     ]);
   });
 
-  it('keeps a row another connection takes over in place and without a duplicate', () => {
+  it('renders a row another connection takes over once', () => {
     const sessions = applyActiveSessionsHeartbeat(
       [
         { id: 'root-1', status: 'busy', title: 'Untouched', connectionId: 'conn-1' },
@@ -165,9 +177,9 @@ describe('useActiveSessions live payload helpers', () => {
     );
 
     expect(sessions).toEqual([
-      { id: 'root-1', status: 'busy', title: 'Untouched', connectionId: 'conn-1' },
       { id: 'root-2', status: 'busy', title: 'Moved', connectionId: 'conn-2' },
       { id: 'root-3', status: 'busy', title: 'Stayed', connectionId: 'conn-2' },
+      { id: 'root-1', status: 'busy', title: 'Untouched', connectionId: 'conn-1' },
     ]);
   });
 
@@ -180,6 +192,7 @@ describe('useActiveSessions live payload helpers', () => {
           title: 'DB title',
           connectionId: 'conn-1',
           createdOnPlatform: 'cli',
+          organizationId: 'org-1',
         },
         { id: 'root-3', status: 'busy', title: 'Gone', connectionId: 'conn-1' },
       ],
@@ -193,6 +206,7 @@ describe('useActiveSessions live payload helpers', () => {
         title: 'DB title',
         connectionId: 'conn-1',
         createdOnPlatform: 'cli',
+        organizationId: 'org-1',
       },
     ]);
   });

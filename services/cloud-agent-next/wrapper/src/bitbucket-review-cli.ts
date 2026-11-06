@@ -137,6 +137,9 @@ Comment input:
   Batch create input must be {"comments": [{"body": "...", "inline": {"path": "...", "to": 123}}, ...]}.
   Update input must be {"body": "..."} only.
 
+Update target:
+  An update applies only to an existing Code Review Summary comment.
+
 Environment:
   Provider-backed commands require BITBUCKET_TOKEN, KILO_BITBUCKET_WORKSPACE_SLUG,
   KILO_BITBUCKET_WORKSPACE_UUID, KILO_BITBUCKET_REPOSITORY_SLUG, and

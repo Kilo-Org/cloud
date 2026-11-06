@@ -1,12 +1,34 @@
 import { type CloudAgentRunStateReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
 
-import {
-  userVisibleFailureMessage,
-  type CloudAgentFailureCode,
-} from '@kilocode/worker-utils/cloud-agent-failure';
+import type { CloudAgentFailureCode } from '@kilocode/worker-utils/cloud-agent-failure';
 
-export function failedRunDiagnosticMessage(code: CloudAgentFailureCode): string {
-  return userVisibleFailureMessage(code);
+/**
+ * Operator-grade diagnostic copied into cloud_agent_session_runs.error_message_redacted.
+ * Keep separate from USER_FAILURE_MESSAGES: this text is what support reads in a
+ * diagnostics export and must not be softened into user-facing copy.
+ */
+export const FAILED_RUN_DIAGNOSTIC_MESSAGES: Partial<Record<CloudAgentFailureCode, string>> = {
+  sandbox_connect_failed: 'Sandbox connection failed',
+  workspace_setup_failed: 'Workspace setup failed',
+  kilo_server_failed: 'Kilo server failed to start',
+  wrapper_start_failed: 'Wrapper failed to start',
+  invalid_delivery_request: 'Queued message could not be dispatched',
+  session_metadata_missing: 'Session metadata is unavailable',
+  model_missing: 'No model is available for this run',
+  delivery_failure_unknown: 'Message delivery outcome is unknown',
+  wrapper_disconnected: 'Wrapper disconnected before completion',
+  wrapper_no_output: 'Wrapper made no execution progress during the watchdog window',
+  wrapper_ping_timeout: 'Wrapper health check timed out',
+  wrapper_error_before_activity: 'Wrapper failed before agent activity',
+  assistant_error: 'Assistant request failed',
+  wrapper_error_after_activity: 'Wrapper failed after agent activity',
+  missing_assistant_reply: 'No assistant reply was produced',
+  payment_required: 'Model request failed: insufficient credits',
+  unclassified: 'Run failed without a classified cause',
+};
+
+export function failedRunDiagnosticMessage(code: CloudAgentFailureCode): string | undefined {
+  return FAILED_RUN_DIAGNOSTIC_MESSAGES[code];
 }
 
 export type RunReportAnchor = {

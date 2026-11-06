@@ -119,8 +119,8 @@ describe('cloudAgentNextFailuresRouter', () => {
         cloud_agent_session_id: PERSONAL_SESSION_ID,
         message_id: 'msg_failures_history_completed',
         status: 'completed',
-        queued_at: '2035-01-10 00:01:00+00',
-        terminal_at: '2035-01-10 00:02:00+00',
+        queued_at: '2020-01-10 00:01:00+00',
+        terminal_at: '2020-01-10 00:02:00+00',
       },
       {
         cloud_agent_session_id: PERSONAL_SESSION_ID,

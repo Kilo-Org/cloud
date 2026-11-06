@@ -3,7 +3,7 @@ import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/i
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
-import { and, desc, eq, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import {
   cloud_agent_session_runs,
   cloud_agent_sessions,
@@ -250,7 +250,10 @@ async function loadSessionFailureDetail(
         sql`coalesce(${cloud_agent_session_runs.queued_at}, ${cloud_agent_session_runs.terminal_at}) >= now() - make_interval(days => ${RUN_RETENTION_DAYS})`
       )
     )
-    .orderBy(desc(cloud_agent_session_runs.queued_at), desc(cloud_agent_session_runs.terminal_at))
+    .orderBy(
+      sql`${cloud_agent_session_runs.queued_at} desc nulls last`,
+      sql`${cloud_agent_session_runs.terminal_at} desc nulls last`
+    )
     .limit(runLimit);
 
   const failureAt = isoOrNull(sessionRow?.failureAt);

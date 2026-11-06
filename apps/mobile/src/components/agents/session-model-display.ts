@@ -1,5 +1,8 @@
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 
+/** The provider id Kilo's own gateway catalog rows are matched and named by. */
+const KILO_PROVIDER_ID = 'kilo';
+
 /**
  * Resolve a human-friendly model name for a (providerID, modelID) pair using
  * the session's catalog options. Falls back to the raw modelID with trailing
@@ -31,7 +34,31 @@ export function resolveModelProviderName(
   if (match?.provider?.name) {
     return match.provider.name;
   }
-  return providerID === 'kilo' ? 'Kilo' : providerID;
+  return providerID === KILO_PROVIDER_ID ? 'Kilo' : providerID;
+}
+
+/**
+ * Resolve the display name and provider of a model *selection*: the
+ * `SessionModelOption.id` the composer's model chip shows. The context sheet
+ * uses it before the session reports context usage, so it names the same model
+ * the chip already names instead of two placeholders.
+ *
+ * Empty strings when no option carries the selection, so the caller keeps its
+ * placeholder for a model the app cannot name.
+ */
+export function resolveSelectionModelDisplay(selectionId: string, options: SessionModelOption[]) {
+  const option = selectionId ? options.find(candidate => candidate.id === selectionId) : undefined;
+  if (!option) {
+    return { model: '', provider: '' };
+  }
+  // A gateway row carries no `modelRef`: its model is a Kilo catalog id, which
+  // the lookup matches through `showGatewayMetadata` and names 'Kilo'.
+  const providerID = option.modelRef?.providerID ?? KILO_PROVIDER_ID;
+  const modelID = option.modelRef?.modelID ?? option.id;
+  return {
+    model: friendlyModelName(providerID, modelID, options) || option.displayId,
+    provider: resolveModelProviderName(providerID, modelID, options),
+  };
 }
 
 /**
@@ -46,7 +73,7 @@ function findMatchingOption(
   return options.find(
     option =>
       (option.modelRef?.providerID === providerID && option.modelRef.modelID === modelID) ||
-      (providerID === 'kilo' && option.showGatewayMetadata && option.id === modelID)
+      (providerID === KILO_PROVIDER_ID && option.showGatewayMetadata && option.id === modelID)
   );
 }
 

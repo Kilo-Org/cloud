@@ -75,6 +75,7 @@ import {
 } from '@/components/agents/session-goal-collapse';
 import { SessionContextMetrics } from '@/components/agents/session-context-metrics';
 import { SessionContextSheet } from '@/components/agents/session-context-sheet';
+import { resolveSelectionModelDisplay } from '@/components/agents/session-model-display';
 import { SessionFollowButton } from '@/components/agents/session-follow-button';
 import {
   canAutoApprovePermissions,
@@ -624,25 +625,6 @@ export function SessionDetailContent({
     () => resolveSessionContextInfo(contextUsage, sessionModels.options),
     [contextUsage, sessionModels.options]
   );
-  const contextModelAndProvider = useMemo(() => {
-    if (!contextInfo) {
-      return { model: '', provider: '' };
-    }
-    const match = sessionModels.options.find(
-      option =>
-        (option.modelRef?.providerID === contextInfo.providerID &&
-          option.modelRef.modelID === contextInfo.modelID) ||
-        (contextInfo.providerID === 'kilo' &&
-          option.showGatewayMetadata &&
-          option.id === contextInfo.modelID)
-    );
-    return {
-      model: match?.name ?? match?.displayId ?? contextInfo.modelID,
-      provider:
-        match?.provider?.name ??
-        (contextInfo.providerID === 'kilo' ? 'Kilo' : contextInfo.providerID),
-    };
-  }, [contextInfo, sessionModels.options]);
   const sheetMountState = getContextSheetMountState(contextInfo, openContextSheetIdentity, {
     sessionId,
     autoApproveAvailable,
@@ -737,6 +719,28 @@ export function SessionDetailContent({
       ? modelOptions
       : [...modelOptions, lockedModelOption(pinned)];
   }, [modelLocked, pinned, modelOptions]);
+  // What the context sheet names as the session's model. The reported usage
+  // wins; before it arrives the sheet names the model the composer chip shows,
+  // resolved through the same catalog rows.
+  const contextModelAndProvider = useMemo(() => {
+    if (!contextInfo) {
+      return resolveSelectionModelDisplay(displayModel, modelOptionsForToolbar);
+    }
+    const match = modelOptionsForToolbar.find(
+      option =>
+        (option.modelRef?.providerID === contextInfo.providerID &&
+          option.modelRef.modelID === contextInfo.modelID) ||
+        (contextInfo.providerID === 'kilo' &&
+          option.showGatewayMetadata &&
+          option.id === contextInfo.modelID)
+    );
+    return {
+      model: match?.name ?? match?.displayId ?? contextInfo.modelID,
+      provider:
+        match?.provider?.name ??
+        (contextInfo.providerID === 'kilo' ? 'Kilo' : contextInfo.providerID),
+    };
+  }, [contextInfo, displayModel, modelOptionsForToolbar]);
   const setSessionConfig = useSetAtom(manager.atoms.sessionConfig);
 
   // Sync the cloud-agent override to the selected agent's pin (or clear it)

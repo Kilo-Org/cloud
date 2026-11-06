@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { friendlyModelName, resolveModelProviderName } from './session-model-display';
+import {
+  friendlyModelName,
+  resolveModelProviderName,
+  resolveSelectionModelDisplay,
+} from './session-model-display';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 
 /**
@@ -99,5 +103,55 @@ describe('resolveModelProviderName', () => {
 
   it('returns the raw providerID for non-kilo providers on no match', () => {
     expect(resolveModelProviderName('openrouter', 'unmapped', [])).toBe('openrouter');
+  });
+});
+
+describe('resolveSelectionModelDisplay', () => {
+  const cliRow: SessionModelOption = {
+    id: 'remote-model-0',
+    name: 'Claude Sonnet 4',
+    displayId: 'claude-sonnet-4',
+    variants: [],
+    isPreferred: false,
+    showGatewayMetadata: false,
+    provider: { id: 'anthropic', name: 'Anthropic' },
+    modelRef: { providerID: 'anthropic', modelID: 'claude-sonnet-4' },
+  };
+
+  const gatewayRow: SessionModelOption = {
+    id: 'deepseek/deepseek-flash',
+    name: 'DeepSeek Flash',
+    displayId: 'deepseek/deepseek-flash',
+    variants: [],
+    isPreferred: false,
+    showGatewayMetadata: true,
+  };
+
+  it('names a CLI catalogue row by its selection id', () => {
+    expect(resolveSelectionModelDisplay('remote-model-0', [cliRow, gatewayRow])).toEqual({
+      model: 'Claude Sonnet 4',
+      provider: 'Anthropic',
+    });
+  });
+
+  it('names a gateway row and its Kilo provider', () => {
+    expect(resolveSelectionModelDisplay('deepseek/deepseek-flash', [cliRow, gatewayRow])).toEqual({
+      model: 'DeepSeek Flash',
+      provider: 'Kilo',
+    });
+  });
+
+  it('returns empty strings for a selection no row carries', () => {
+    expect(resolveSelectionModelDisplay('remote-model-9', [cliRow, gatewayRow])).toEqual({
+      model: '',
+      provider: '',
+    });
+  });
+
+  it('returns empty strings for an empty selection', () => {
+    expect(resolveSelectionModelDisplay('', [cliRow, gatewayRow])).toEqual({
+      model: '',
+      provider: '',
+    });
   });
 });

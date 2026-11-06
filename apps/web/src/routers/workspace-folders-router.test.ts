@@ -884,6 +884,40 @@ describe('workspaceFolders session moves', () => {
     });
   });
 
+  it('refuses to seed divergent runtime locations for a relocated workspace', async () => {
+    const folder = await createFolder();
+    const workspaceId = newWorkspaceId();
+    const worktreeId = `worktree_${workspaceId.slice('workspace_'.length)}`;
+    const session = await insertSession({
+      cloud_agent_session_id: workspaceId,
+      cloud_agent_worktree_id: null,
+    });
+    for (const [index, sandboxId] of ['ses-standalone-first', 'ses-standalone-second'].entries()) {
+      await db.insert(operation_ledgers).values({
+        operation_key: `create_cloud:${workspaceId}:${index}`,
+        domain: 'session',
+        intent: 'create_cloud',
+        kilo_user_id: USER_ID,
+        organization_id: null,
+        resource_key: null,
+        taxonomy: 'session.create_cloud',
+        canonical_result: {
+          cloudAgentSessionId: workspaceId,
+          kiloSessionId: session.session_id,
+          sandboxId,
+          sandboxProvider: 'cloudflare',
+        },
+        lease_expires_at: LATER_TIME,
+        expires_at: LATER_TIME,
+      });
+    }
+
+    await expect(
+      callerFor().moveSession({ organizationId: null, sessionId: workspaceId, folderId: folder.id })
+    ).rejects.toMatchObject({ code: 'CONFLICT' });
+    expect(await readWorktree(worktreeId)).toBeUndefined();
+  });
+
   it('moves the whole workspace group when filing a grouped session by any root chat', async () => {
     const folder = await createFolder();
     const siblingWorkspaceId = newWorkspaceId();

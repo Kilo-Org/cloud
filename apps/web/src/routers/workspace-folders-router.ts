@@ -40,7 +40,6 @@ const workspaceSessionIdSchema = z.templateLiteral(['workspace_', z.uuid()]);
 const SCOPED_FOLDER_PROCEDURES = new Set([
   'workspaceFolders.list',
   'workspaceFolders.moveWorktree',
-  'workspaceFolders.moveSession',
 ]);
 const folderOutputSchema = z.object({
   id: z.uuid(),
@@ -217,7 +216,10 @@ async function readWorktreeRuntimeLocations(
   cloudAgentSessionId: string
 ): Promise<{ sandboxId: string; provider: 'cloudflare' | 'vercel' | 'cloudflare-containers' }[]> {
   const rows = await tx
-    .select({ canonicalResult: operation_ledgers.canonical_result })
+    .select({
+      organizationId: operation_ledgers.organization_id,
+      canonicalResult: operation_ledgers.canonical_result,
+    })
     .from(operation_ledgers)
     .where(
       and(
@@ -225,9 +227,6 @@ async function readWorktreeRuntimeLocations(
         eq(operation_ledgers.domain, 'session'),
         eq(operation_ledgers.intent, 'create_cloud'),
         isNull(operation_ledgers.resource_key),
-        scope.organizationId === null
-          ? isNull(operation_ledgers.organization_id)
-          : eq(operation_ledgers.organization_id, scope.organizationId),
         sql`${operation_ledgers.canonical_result}->>'cloudAgentSessionId' = ${cloudAgentSessionId}`
       )
     );
@@ -237,12 +236,24 @@ async function readWorktreeRuntimeLocations(
     { sandboxId: string; provider: 'cloudflare' | 'vercel' | 'cloudflare-containers' }
   >();
   for (const row of rows) {
+    // Match the row's scope the way deletion's allocation fallback does
+    // (`allocationLocation`), rather than filtering `organization_id` in SQL:
+    // the column is text and a narrowing predicate would silently drop rows.
+    if (row.organizationId !== scope.organizationId) continue;
     const allocation = worktreeRuntimeAllocationSchema.safeParse(row.canonicalResult);
     if (!allocation.success || allocation.data.cloudAgentSessionId !== cloudAgentSessionId) {
       continue;
     }
     const { sandboxId, sandboxProvider } = allocation.data;
     locations.set(`${sandboxProvider}:${sandboxId}`, { sandboxId, provider: sandboxProvider });
+  }
+  // Two distinct allocations mean the workspace was relocated; seeding either
+  // would advertise a sandbox that no longer hosts it, so refuse to seed.
+  if (locations.size > 1) {
+    throw new TRPCError({
+      code: 'CONFLICT',
+      message: 'Workspace runtime history is unavailable. Refresh and try again.',
+    });
   }
   return [...locations.values()];
 }

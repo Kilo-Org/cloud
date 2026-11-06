@@ -2,7 +2,10 @@ import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import { eq } from 'drizzle-orm';
 import { ai_gateway_metadata_cache } from '@kilocode/db/schema';
 import { db, sql } from '@kilocode/web-shared/lib/drizzle';
-import { openRouterModelsMetadataSource } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
+import {
+  openRouterModelsMetadataSource,
+  openRouterTranscriptionModelsMetadataSource,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
 import { openAiServedModelsMetadataSource } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/served-models';
 import { mockOpenRouterModels } from '@kilocode/web-shared/tests/helpers/openrouter-models.helper';
 import type * as StaleAlert from '@/lib/providers/metadata-cache/metadata-cache-stale-alert';
@@ -97,6 +100,10 @@ beforeEach(async () => {
   responses = new Map([
     [openAiServedModelsMetadataSource.url, () => Response.json({ data: [{ id: 'gpt-test' }] })],
     [openRouterModelsMetadataSource.url, () => Response.json(catalogModels())],
+    [
+      openRouterTranscriptionModelsMetadataSource.url,
+      () => Response.json({ data: mockOpenRouterModels.data.slice(0, 1) }),
+    ],
     [openRouterGatewayModelsSource.url, () => Response.json(gatewayModels())],
     [vercelGatewayModelsSource.url, () => Response.json(gatewayModels())],
     [openRouterProvidersSource.url, () => Response.json({ data: providers(10) })],

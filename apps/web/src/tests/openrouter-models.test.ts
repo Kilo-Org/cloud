@@ -9,7 +9,7 @@ import {
   getEnhancedOpenRouterModels,
   getOpenRouterTranscriptionModels,
   getRawOpenRouterModels,
-  resetRawOpenRouterModelsCache,
+  resetOpenRouterModelsCaches,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
 import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import type * as FreeModel from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
@@ -268,7 +268,7 @@ beforeEach(() => {
   jest.mocked(getAvailableModelsForOrganization).mockReset().mockResolvedValue(null);
   jest.mocked(getCustomLlmsById).mockReset().mockResolvedValue(new Map());
   invalidateModelStatsCache();
-  resetRawOpenRouterModelsCache();
+  resetOpenRouterModelsCaches();
   mockRows.mockReset().mockResolvedValue(new Map());
   jest.spyOn(Date, 'now').mockReturnValue(Date.parse(enkryptBenchmark.ingestedAt));
   jest.spyOn(console, 'error').mockImplementation(() => {});

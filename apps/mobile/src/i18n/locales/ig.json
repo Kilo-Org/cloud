@@ -3758,7 +3758,7 @@
       "loadingModel": "Na-ebunye nkọwa ihe nlereanya",
       "couldNotLoadModel": "Enweghị ike ibunye ihe nlereanya a",
       "noFiles": "Ọ dịghị faịlụ ngwa a nwere ike ịgba",
-      "noFilesDescription": "Ngwa a na-agba ihe nlereanya ndị bụ otu faịlụ GGUF zuru ezu, ma ebe nchekwa ihe nlereanya a enweghị otu.",
+      "noFilesDescription": "Ngwa a na-agba ihe nlereanya ndị bụ otu faịlụ GGUF zuru ezu, ma isi mmalite a enweghị otu.",
       "tooLargeTitle": "Ihe nlereanya a nwere ike ọ gaghị arụ ọrụ",
       "tooLargeMessage": "{{name}} nwere ike ịchọ ncheta karịa nke ngwaọrụ a nwere. Ngwa a nwere ike imechi mgbe ihe nlereanya ahụ na-aza. Ị ka chọrọ ibudata ya?",
       "downloadAnyway": "Budata ya agbanyeghị"

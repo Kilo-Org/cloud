@@ -1854,15 +1854,15 @@
       "breakdownHigh": "{{displayCount}} dị elu",
       "breakdownHigh_one": "{{displayCount}} dị elu",
       "breakdownHigh_other": "{{displayCount}} dị elu",
-      "breakdownMediumLow": "{{displayCount}} dị n'etiti ma ọ bụ ala",
-      "breakdownMediumLow_one": "{{displayCount}} dị n'etiti ma ọ bụ ala",
-      "breakdownMediumLow_other": "{{displayCount}} dị n'etiti ma ọ bụ ala",
+      "breakdownMediumLow": "{{displayCount}} dị n'etiti na ala",
+      "breakdownMediumLow_one": "{{displayCount}} dị n'etiti na ala",
+      "breakdownMediumLow_other": "{{displayCount}} dị n'etiti na ala",
       "dueThisWeek": "Oge ga-eru n'izu a",
       "dueThisWeekDetail": "{{exploitable}} n'ime ha ka e kwadoro na a pụrụ iji ya wakpo sistemụ",
       "dueThisWeekDetail_one": "{{exploitable}} n'ime ha ka e kwadoro na a pụrụ iji ya wakpo sistemụ",
       "dueThisWeekDetail_other": "{{exploitable}} n'ime ha ka e kwadoro na a pụrụ iji ya wakpo sistemụ",
       "noDeadline": "Enweghị oge njedebe",
-      "reviewSlaAssignment": "Nyochaa oge SLA e kenyere",
+      "reviewSlaAssignment": "Nyochaa ekenye oge njedebe SLA",
       "allOpenFindingsTracked": "A na-esochi ihe achọpụtara niile a ka na-arụ na ya"
     },
     "dismiss": {
@@ -2060,7 +2060,7 @@
       "slaPersonalTitle": "Zigara m ozi-e gbasara ịdọ aka ná ntị SLA",
       "slaSection": "Ngosi ọkwa ịdọ aka ná ntị SLA",
       "slaSeverityLabel": "Ogo njọ kacha nta maka ngosi ọkwa SLA",
-      "slaSubtitle": "A na-eziga ya tupu oge njedebe SLA eruo, mgbe ọ na-eru nso na mgbe ọ gafere."
+      "slaSubtitle": "A na-eziga ya mgbe ihe achọpụtara dị nso na oge njedebe SLA ya na mgbe ọ gafere ya."
     },
     "repositories": {
       "couldNotLoad": "Enweghị ike ibudata ntọala ebe nchekwa.",
@@ -2094,7 +2094,7 @@
     },
     "mutations": {
       "serviceNotConfiguredResubmit": "A hazibeghị ọrụ nchebe. Izigara ya ọzọ agaghị aga nke ọma ruo mgbe e doziri nke a.",
-      "serviceUnavailable": "Ọrụ nchekwa adịghị. Biko nwaa ọzọ.",
+      "serviceUnavailable": "Ọrụ nchebe adịghị. Biko nwaa ọzọ.",
       "syncMayNotHaveCompleted": "O nwere ike ịbụ na mmekọrịta data ezubeghị. Nwaa ọzọ ka data kwekọọ, ma ọ bụ tufuo ya.",
       "syncInProgress": "Mmekọrịta data nchebe amalitela. Biko nwaa ọzọ.",
       "dismissalInProgress": "Mwepụ a amalitela. Biko nwaa ọzọ.",
@@ -2104,10 +2104,10 @@
       "replayFailed": "Omume a emechaghị. Biko nwaa ọzọ.",
       "actionFailed": "Enweghị ike imecha omume a. Biko nwaa ọzọ.",
       "actionBlocked": "Enweghị ike imecha omume a. A ghaghị idozi nsogbu a tupu ị nwee ike ịnwa ọzọ.",
-      "syncNoRepositories": "Ọnweghị repository dị n'ime oke sync. Họrọ repositories ndị Onye nnọchi anya nchebe na-enyocha, wee sync ọzọ.",
-      "syncNoRepositoriesNoManage": "Ọnweghị repository dị n'ime oke sync. Onye nwe nzukọ, onye nchịkwa, ma ọ bụ onye njikwa ịgba ụgwọ aghaghị ijikọ repositories tupu ọ nwee ike sync.",
-      "syncIntegrationInactive": "Njikọ GitHub maka Onye nnọchi anya nchebe adịghị arụ ọrụ. Jikọọ Kilo GitHub App ọzọ, wee megharịa ọzọ.",
-      "syncMissingPermission": "Kilo GitHub App enweghị ike ịgụ vulnerability alerts. Nye ikike ahụ na GitHub, wee sync ọzọ.",
+      "syncNoRepositories": "Ọnweghị ebe nchekwa koodu dị n'ime oke mmekọrịta data. Họrọ ebe nchekwa koodu ndị Onye nnọchi anya nchebe na-enyocha, wee mekọrịta data ọzọ.",
+      "syncNoRepositoriesNoManage": "Ọnweghị ebe nchekwa koodu dị n'ime oke mmekọrịta data. Onye nwe nzukọ, onye nchịkwa, ma ọ bụ onye njikwa ịgba ụgwọ aghaghị ijikọ ebe nchekwa koodu tupu ọ nwee ike ịmekọrịta data.",
+      "syncIntegrationInactive": "Njikọ GitHub maka Onye nnọchi anya nchebe adịghị arụ ọrụ. Jikọọ Kilo GitHub App ọzọ, wee mekọrịta data ọzọ.",
+      "syncMissingPermission": "Kilo GitHub App enweghị ike ịgụ ọkwa ịdọ aka ná ntị. Nye ikike ahụ na GitHub, wee mekọrịta data ọzọ.",
       "configConflict": "Agbanweela ntọala Onye nnọchi anya nchebe n'ebe ọzọ. Lelee ntọala kachasị ọhụrụ ma chekwaa ọzọ."
     },
     "analysisState": {
@@ -2146,10 +2146,10 @@
       "overdue_other": "Oge gafere ụbọchị {{count}}",
       "dueToday": "Oge ga-eru taa",
       "dueTomorrow": "Oge ga-eru echi",
-      "dueInDays_other": "A ga-emecha n'ime ụbọchị {{count}}",
+      "dueInDays_other": "Oge ga-eru n'ụbọchị {{count}}",
       "overdue": "Oge gafere ụbọchị {{count}}",
       "overdue_one": "Gafere oge site n'ụbọchị {{count}}",
-      "dueInDays": "A ga-emecha n'ime ụbọchị {{count}}",
+      "dueInDays": "Oge ga-eru n'ụbọchị {{count}}",
       "dueInDays_one": "Oge ga-eru n'ụbọchị {{count}}"
     },
     "remediationStatus": {
@@ -2177,7 +2177,7 @@
       "manualReviewRequired": "Nyocha na-atụ aro ka mmadụ nyochaa ya, ya mere enweghị ike iji otu ọpịpị dozie ya.",
       "monitorRequired": "Nyocha na-atụ aro nlekọta kama imepe PR.",
       "triageOnly": "Naanị nyocha mbụ ka gwụchara. Mee nyocha koodu tupu ịmalite ndozi.",
-      "actionNotConcrete": "Enweghị ndozi a kapịrị ọnụ maka ngwugwu a dabere na ya ma ọ bụ ndozi a tụrụ aro.",
+      "actionNotConcrete": "Enweghị ndozi a kapịrị ọnụ maka ngwugwu ndabere ma ọ bụ ndozi a tụrụ aro.",
       "remediationActive": "Mbọ ndozi na-aga n'ihu ugbu a.",
       "prAlreadyOpened": "E mepeelarị PR ndozi.",
       "duplicateAnalysisResult": "E jirila nsonaazụ nyocha a malite ọrụ ndozi.",

@@ -12,7 +12,6 @@
   "dependencies": {
     "@kilocode/usage-queue": "workspace:*",
     "@kilocode/web-shared": "workspace:*",
-    "@opentelemetry/api": "1.9.1",
     "@sentry/nextjs": "11.7.0",
     "next": "16.4.2",
     "react": "19.2.6",

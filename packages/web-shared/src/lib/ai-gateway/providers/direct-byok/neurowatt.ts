@@ -1,5 +1,5 @@
 import { ReasoningDetailsTransform } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
-import { cachedEnhancedDirectByokModelList } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/model-list';
+import { cachedDirectByokModelList } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/model-list';
 import {
   apiKeyUpstream,
   faviconIcon,
@@ -15,18 +15,7 @@ export default {
     responseTransforms: ReasoningDetailsTransform.ReasoningContent,
   }),
   transformRequest() {},
-  models: cachedEnhancedDirectByokModelList({
-    providerId: 'neuralwatt',
-    recommendedModels: [
-      {
-        id: 'moonshotai/Kimi-K2.6',
-        name: 'Kimi-K2.6',
-        flags: ['reasoning'],
-        context_length: 262144,
-        max_completion_tokens: 32000,
-      },
-    ],
-  }),
+  models: cachedDirectByokModelList('neuralwatt'),
   provider_listing: {
     dataPolicy: {
       training: false,

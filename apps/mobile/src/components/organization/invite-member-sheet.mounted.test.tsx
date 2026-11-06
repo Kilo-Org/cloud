@@ -448,7 +448,11 @@ describe('InviteMemberSheet dismissal', () => {
       headerProps(rendered).onDone();
     });
     invite.isPending = true;
-    // Any render re-reads the pending flag the Back handler consults.
+    // A real render is what re-reads the pending flag the Back handler
+    // consults: clear the field, which changes canSubmit, then retype it.
+    act(() => {
+      fieldProps(rendered).onChangeText('');
+    });
     act(() => {
       fieldProps(rendered).onChangeText('dev@example.com');
     });

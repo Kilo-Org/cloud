@@ -172,6 +172,7 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
       is_free: false,
       user_byok: false,
     });
+    expect(jest.mocked(countAndStoreEmbeddingUsage).mock.calls[0]?.[3]).toBe(OPENROUTER);
   });
 
   it.each([undefined, { only: ['openai'] }])(

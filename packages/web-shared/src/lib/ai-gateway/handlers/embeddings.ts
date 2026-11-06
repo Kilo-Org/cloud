@@ -361,7 +361,12 @@ export async function handleEmbeddingsRequest(
   if (upstreamErrorResponse) return upstreamErrorResponse;
 
   const clonedResponse = response.clone();
-  countAndStoreEmbeddingUsage(clonedResponse, usageContext, embeddingRequestSpan);
+  countAndStoreEmbeddingUsage(
+    clonedResponse,
+    usageContext,
+    embeddingRequestSpan,
+    effectiveProvider
+  );
 
   return wrapInSafeNextResponse(response);
 }

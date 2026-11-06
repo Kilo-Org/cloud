@@ -28,9 +28,7 @@ describe('handleOrganizationInviteMemberFixturePath', () => {
     ).toBe(true);
 
     expect(routing.dismissTo).toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)/organization');
-    expect(routing.push.mock.calls).toEqual([
-      ['/(app)/(tabs)/(3_profile)/organization/members'],
-    ]);
+    expect(routing.push.mock.calls).toEqual([['/(app)/(tabs)/(3_profile)/organization/members']]);
 
     // The sheet is pushed once the members screen has presented.
     vi.advanceTimersByTime(400);

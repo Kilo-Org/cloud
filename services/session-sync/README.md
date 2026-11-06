@@ -1045,6 +1045,9 @@ the web session and issuing a five-minute Kilo credential with credential exchan
 disabled. Session-sync enforces all creator ACLs independently of the preview.
 Set `NEXT_PUBLIC_SESSION_SYNC_URL=http://localhost:8817` to use an isolated local
 Worker. The CLI and SDK production endpoints are unchanged.
+The mobile preview also requires a development bundle (`__DEV__`) and an explicit
+`EXPO_PUBLIC_SESSION_SYNC_URL`. Release bundles expose neither its Profile entry
+nor its route, regardless of remote feature flags.
 Browser HTTP reads/commands allow bearer-authenticated CORS from `https://kilo.ai`
 and `https://app.kilo.ai`, without cookies. `http://localhost:3000` is allowed only
 when the Worker environment is `development`. Browser and React Native WebSockets

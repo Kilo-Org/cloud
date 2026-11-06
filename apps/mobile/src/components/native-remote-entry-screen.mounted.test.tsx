@@ -4,7 +4,6 @@ import { act, type ReactTestRenderer, TestRenderer } from '@/test/renderer';
 import { NativeRemoteEntryScreen } from './native-remote-entry-screen';
 
 const mocks = vi.hoisted(() => ({
-  enabled: false,
   token: 'native-token' as string | undefined,
   authEpoch: 1,
   isSigningOut: false,
@@ -15,17 +14,10 @@ const mocks = vi.hoisted(() => ({
   demo: vi.fn(() => null),
   redirect: vi.fn(() => null),
   credential: vi.fn(),
-  flag: vi.fn(),
 }));
 vi.mock('@kilocode/cloud-agent-sdk', () => ({ NativeSyncClient: mocks.client }));
 vi.mock('expo-router', () => ({ Redirect: mocks.redirect }));
 vi.mock('@/components/native-remote/native-remote-demo', () => ({ NativeRemoteDemo: mocks.demo }));
-vi.mock('@/lib/analytics/posthog', () => ({
-  useFeatureFlag: (key: string, fallback: boolean) => {
-    mocks.flag(key, fallback);
-    return mocks.enabled;
-  },
-}));
 vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => mocks }));
 vi.mock('@/lib/config', () => ({
   get SESSION_SYNC_URL() {
@@ -36,7 +28,7 @@ vi.mock('@/lib/native-remote-credential', () => ({ nativeRemoteCredential: mocks
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.enabled = true;
+  vi.stubGlobal('__DEV__', true);
   mocks.token = 'native-token';
   mocks.authEpoch = 1;
   mocks.isSigningOut = false;
@@ -44,6 +36,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   vi.clearAllMocks();
+  vi.unstubAllGlobals();
 });
 
 function mount(): ReactTestRenderer {
@@ -59,8 +52,8 @@ function mount(): ReactTestRenderer {
 }
 
 const REFUSALS = {
-  flag: () => {
-    mocks.enabled = false;
+  production: () => {
+    vi.stubGlobal('__DEV__', false);
   },
   endpoint: () => {
     mocks.url = undefined;
@@ -80,7 +73,6 @@ describe('native remote entry', () => {
     expect(mocks.client).not.toHaveBeenCalled();
     expect(mocks.demo).not.toHaveBeenCalled();
     expect(mocks.redirect).toHaveBeenCalled();
-    expect(mocks.flag).toHaveBeenCalledWith('native-remote-mobile', false);
     act(() => {
       renderer.unmount();
     });
@@ -99,7 +91,7 @@ describe('native remote entry', () => {
       renderer.update(createElement(NativeRemoteEntryScreen));
     });
     expect(mocks.client).toHaveBeenCalledTimes(2);
-    mocks.enabled = false;
+    vi.stubGlobal('__DEV__', false);
     act(() => {
       renderer.update(createElement(NativeRemoteEntryScreen));
     });

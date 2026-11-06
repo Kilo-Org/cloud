@@ -23,9 +23,7 @@ export type FeatureFlagDefinition = Readonly<{
 }>;
 
 /** Register future mobile flags with their first supported app version. */
-export const FEATURE_FLAG_DEFINITIONS: readonly FeatureFlagDefinition[] = [
-  { key: 'native-remote-mobile', minAppVersion: '1.0.15', defaultValue: false },
-];
+export const FEATURE_FLAG_DEFINITIONS: readonly FeatureFlagDefinition[] = [];
 
 const DEFINITIONS_BY_KEY: ReadonlyMap<string, FeatureFlagDefinition> = new Map(
   FEATURE_FLAG_DEFINITIONS.map(definition => [definition.key, definition])

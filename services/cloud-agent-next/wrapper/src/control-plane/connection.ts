@@ -1,4 +1,6 @@
 import {
+  KILO_CLI_VERSION_HEADER,
+  WRAPPER_VERSION_HEADER,
   RUNTIME_HARNESS_HEADER,
   type RuntimeHarness,
   WORKTREE_RUNTIME_HEADER,
@@ -82,6 +84,7 @@ export type ControlPlaneConnectionOptions = {
   wrapperId?: string;
   /** Sent as an upgrade header so the Worker can attribute runs to Kilo v1 or v2. */
   runtimeHarness?: RuntimeHarness;
+  runtimeVersions?: { kiloCliVersion: string | null; wrapperVersion: string };
   log?: (message: string) => void;
   getHeartbeat?: () => ControlPlaneHeartbeat;
   onFrame?: (frame: ControlPlaneWrapperFrame) => void;
@@ -420,6 +423,12 @@ export function createControlPlaneConnection(
           [WORKTREE_RUNTIME_HEADER]: WORKTREE_RUNTIME_VERSION,
           [WORKSPACE_CONFIGURATION_HEADER]: WORKSPACE_CONFIGURATION_VERSION,
           ...(options.runtimeHarness ? { [RUNTIME_HARNESS_HEADER]: options.runtimeHarness } : {}),
+          ...(options.runtimeVersions?.kiloCliVersion
+            ? { [KILO_CLI_VERSION_HEADER]: options.runtimeVersions.kiloCliVersion }
+            : {}),
+          ...(options.runtimeVersions
+            ? { [WRAPPER_VERSION_HEADER]: options.runtimeVersions.wrapperVersion }
+            : {}),
         },
       });
     } catch (error) {

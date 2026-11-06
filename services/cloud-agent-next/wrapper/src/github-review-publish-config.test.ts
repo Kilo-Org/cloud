@@ -83,6 +83,14 @@ const COMMENT_WRITE_COMMANDS: { label: string; command: string }[] = [
       'gh api repos/acme/widgets/pulls/42/reviews --input - && gh pr comment 42 --body reviewed',
   },
   {
+    label: 'graphql request with a header before the endpoint',
+    command: `gh api -H 'Accept: application/json' graphql -f query='mutation { addComment(input: {}) { comment { id } } }'`,
+  },
+  {
+    label: 'graphql request from stdin after a method flag',
+    command: 'gh api --method POST graphql --input /tmp/q.json',
+  },
+  {
     label: 'comment write before an inline review write',
     command:
       'gh api repos/acme/widgets/issues/42/comments -f body=reviewed && gh api repos/acme/widgets/pulls/42/reviews --input -',
@@ -123,6 +131,11 @@ const ALLOWED_COMMANDS: { label: string; command: string }[] = [
     label: 'inline review write whose payload arrives on stdin',
     command:
       'gh api repos/apollographql/apollo-server/pulls/42/reviews --input - << \'EOF\'\n{"body":"looks good","event":"COMMENT"}\nEOF',
+  },
+  {
+    label: 'inline review write with a body naming the endpoint',
+    command:
+      'gh api repos/apollographql/apollo-server/pulls/42/reviews --input - << \'EOF\'\n{"body":"the graphql schema is fine","event":"COMMENT"}\nEOF',
   },
   {
     label: 'inline review write whose payload arrives from a file',

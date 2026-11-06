@@ -10,8 +10,7 @@ const SUMMARY_WRITE_FLAGS = ['--method', '-X', '--input', '-f', '-F', '--field',
 
 // A graphql request is denied whatever operation it carries, because the
 // operation can arrive from a file or from stdin. Each rule names the endpoint
-// argument of `gh api`, so a repository path or a request body that mentions
-// the phrase keeps its own verdict.
+// argument of `gh api`.
 const GRAPHQL_ENDPOINT_TOKENS = ['graphql', '/graphql'];
 
 const COMMENT_SUBCOMMANDS = ['gh issue comment', 'gh pr comment'];
@@ -51,14 +50,14 @@ export function buildGitHubReviewBashRules(): Record<string, string> {
     denies[`*${subcommand}*`] = 'deny';
   }
   // Every `gh api` call that reaches the graphql endpoint is denied, with the
-  // endpoint written first or after a method flag, and with a wrapper prefix or
-  // a surrounding command. The graphql endpoint is the first argument that is
-  // not a flag, so the wildcard before the token covers flags written first.
+  // endpoint written first or after a flag, and with a wrapper prefix or a
+  // surrounding command. The endpoint is the first argument that is not a
+  // flag, which is the position the rules name.
   for (const token of GRAPHQL_ENDPOINT_TOKENS) {
     denies[`gh api ${token}`] = 'deny';
     denies[`gh api ${token} *`] = 'deny';
     denies[`*gh api ${token}*`] = 'deny';
-    denies[`*gh api * ${token}*`] = 'deny';
+    denies[`*gh api -* ${token}*`] = 'deny';
   }
   return denies;
 }

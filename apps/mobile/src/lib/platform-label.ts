@@ -8,9 +8,15 @@ import { i18n } from '@/i18n';
 // read as the row's own state. A live row names its live state itself
 // (`remoteAgentLabel` in session-list-helpers.ts) before it gets here.
 export function platformLabel(platform: string | null | undefined): string {
-  if (!platform || platform === 'unknown') {
+  if (isUnknownOrigin(platform)) {
     return i18n.t('common.unknown');
   }
+  // Flow-sensitive narrowing skips null through the predicate, but the switch's
+  // `default` still reads `platform`; assert the recorded origin here once.
+  return platformLabelRecorded(platform as string);
+}
+
+function platformLabelRecorded(platform: string): string {
   switch (platform) {
     case 'cloud-agent':
     case 'cloud-agent-web': {
@@ -34,6 +40,16 @@ export function platformLabel(platform: string | null | undefined): string {
 }
 
 /**
+ * Whether a created-on-origin value is unrecorded: no value, the empty string,
+ * or the backend's `'unknown'` sentinel. The one predicate behind the neutral
+ * origin label and its tint, so the code never compares rendered label text
+ * to pick a colour, and a repository named like the label cannot read as one.
+ */
+export function isUnknownOrigin(platform: string | null | undefined): boolean {
+  return !platform || platform === 'unknown';
+}
+
+/**
  * Which state word a live row's eyebrow carries for an origin: 'live' for an
  * unrecorded one, null for a real origin. The one predicate behind the live
  * label and its tint, so a translated word can never drift to another token
@@ -42,5 +58,5 @@ export function platformLabel(platform: string | null | undefined): string {
  * row copy from it.
  */
 export function remoteAgentState(platform: string | null | undefined): 'live' | null {
-  return !platform || platform === 'unknown' ? 'live' : null;
+  return isUnknownOrigin(platform) ? 'live' : null;
 }

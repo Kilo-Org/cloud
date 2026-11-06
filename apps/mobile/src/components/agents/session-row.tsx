@@ -8,6 +8,7 @@ import { glanceableStatusKind } from '@kilocode/app-shared/glanceable-agents-sna
 import { SessionRow } from '@/components/ui/session-row';
 import { prefetchSessionTranscript } from '@/lib/agent-session-cache';
 import { type AgentSessionSortBy, getAgentSessionTimestamp } from '@/lib/agent-session-sort';
+import { isUnknownOrigin } from '@/lib/platform-label';
 import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
@@ -23,6 +24,7 @@ import {
   composeStoredSessionVisibleMeta,
   formatScheduledWake,
   formatSessionTotalCost,
+  repoNameFromGitUrl,
   sectionAwareTimeMeta,
   storedSessionEyebrowLabel,
 } from './session-list-helpers';
@@ -153,11 +155,15 @@ export function StoredSessionRow({
   // Both save paths refuse an unchanged or blank value.
   const renameInitialValue = namedSessionTitle(session.title, session.session_id) ?? '';
   const agentLabel = storedSessionEyebrowLabel(session);
-  // Tint by what the eyebrow names, never by its string: the unknown-origin
-  // word pins to one hue in every script (the hash of a translation would
-  // drift per locale and split identical rows). Repo and origin names keep
-  // their own deterministic hash.
-  const agentState = agentLabel === t('common.unknown') ? ('unknown' as const) : null;
+  // Tint by what the eyebrow names, never by its string: the state predicate
+  // decides, so the unknown-origin word pins to one hue in every script (the
+  // hash of a translation would drift per locale and split identical rows),
+  // and a repository named like the label cannot read as one. Repo and origin
+  // names keep their own deterministic hash.
+  const agentState =
+    repoNameFromGitUrl(session.git_url) === null && isUnknownOrigin(session.created_on_platform)
+      ? ('unknown' as const)
+      : null;
   const timestamp = getAgentSessionTimestamp(session, sortBy);
   const canManage = interactive && Boolean(onDelete) && Boolean(onRename);
   // The scheduled branch keys off the status, not the `live` flag: a stored

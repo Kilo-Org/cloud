@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { i18n } from '@/i18n';
-import { platformLabel } from '@/lib/platform-label';
+import { isUnknownOrigin, platformLabel } from '@/lib/platform-label';
 
 afterEach(async () => {
   await i18n.changeLanguage('en');
@@ -50,5 +50,14 @@ describe('platformLabel', () => {
     await i18n.changeLanguage('de');
     expect(platformLabel(undefined)).toBe(i18n.t('common.unknown'));
     expect(platformLabel('unknown')).toBe(i18n.t('common.unknown'));
+  });
+
+  it('classifies unrecorded origins for the tint without label text', () => {
+    for (const origin of [null, undefined, '', 'unknown']) {
+      expect(isUnknownOrigin(origin)).toBe(true);
+    }
+    for (const origin of ['cli', 'cloud-agent-web', 'some-future-platform']) {
+      expect(isUnknownOrigin(origin)).toBe(false);
+    }
   });
 });

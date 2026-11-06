@@ -13,8 +13,6 @@ import {
 import { isNewAccountEligibleForMagicLink } from '@/lib/auth/email-signin-eligibility';
 import { isEmailSignupDisabled } from '@/lib/auth/email-signup-switch';
 import { ProdNonSSOAuthProviders } from '@/lib/auth/provider-metadata';
-import { withLaunchedClaudeSignIn } from '@/lib/auth/claude/access';
-import { isClaudePlatformOAuthEnabled } from '@kilocode/web-shared/lib/auth/claude/feature-flag.server';
 
 const warnInSentry = sentryLogger('sso-organizations', 'warning');
 
@@ -102,13 +100,9 @@ export async function POST(request: Request): Promise<NextResponse> {
     // No organization or provider found → new user signup flow. Resolve the
     // email option on the server so account-creation rules remain authoritative
     // without spending the magic-link rate-limit allowance during discovery.
-    const offeredProviders = withLaunchedClaudeSignIn(
-      ProdNonSSOAuthProviders,
-      await isClaudePlatformOAuthEnabled()
-    );
     const providers = (await isNewAccountEligibleForMagicLink(email))
-      ? offeredProviders
-      : offeredProviders.filter(provider => provider !== 'email');
+      ? [...ProdNonSSOAuthProviders]
+      : ProdNonSSOAuthProviders.filter(provider => provider !== 'email');
     return discoveryResponse({
       kind: 'new',
       providers,

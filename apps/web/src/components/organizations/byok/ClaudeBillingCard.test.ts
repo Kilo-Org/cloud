@@ -3,10 +3,6 @@ jest.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
 
-jest.mock('posthog-js/react', () => ({
-  useFeatureFlagEnabled: () => false,
-}));
-
 import * as React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterAll, beforeAll, describe, expect, it, jest } from '@jest/globals';
@@ -42,26 +38,13 @@ function render(props: ClaudeBillingCardViewProps): string {
 }
 
 describe('ClaudeBillingCardView', () => {
-  it('offers connect for a new connection when a connect action is given', () => {
+  it('offers connect for a new connection', () => {
     const html = render({ status: status('not_connected'), onConnect: () => undefined });
     expect(html).toContain('Connect your Claude organization');
     expect(html).not.toContain('Remove from Kilo');
   });
 
-  it('offers no connect action for a new connection when none is given', () => {
-    const html = render({ status: status('not_connected') });
-    expect(html).not.toContain('Connect your Claude organization');
-    expect(html).not.toContain('Remove from Kilo');
-  });
-
-  it('keeps status and removal for an existing connection with no reconnect action', () => {
-    const html = render({ status: status('connected'), onRemove: () => undefined });
-    expect(html).toContain('Connected');
-    expect(html).toContain('Remove from Kilo');
-    expect(html).not.toContain('Reconnect your Claude organization');
-  });
-
-  it('offers reconnect beside removal for an existing connection when a connect action is given', () => {
+  it('offers reconnect beside removal for an existing connection', () => {
     const html = render({
       status: status('connected'),
       onConnect: () => undefined,

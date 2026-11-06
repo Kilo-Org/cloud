@@ -13,12 +13,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 
 let mockFlowEmail = '';
 let mockHintEmail = '';
-let mockClaudeEnabled = false;
 let mockReturning = false;
-
-jest.mock('@/lib/auth/claude/use-claude-sign-in-enabled', () => ({
-  useClaudeSignInEnabled: () => mockClaudeEnabled,
-}));
 
 jest.mock('@/components/AnimatedLogoMark', () => ({
   AnimatedLogoMark: () => null,
@@ -97,7 +92,6 @@ const { SignInForm } = require('./SignInForm') as {
 beforeEach(() => {
   mockFlowEmail = '';
   mockHintEmail = '';
-  mockClaudeEnabled = false;
   mockReturning = false;
 });
 
@@ -133,15 +127,11 @@ describe('SignInForm sign-in options', () => {
     expect(html).toContain('Continue with Email');
   });
 
-  it.each([false, true])(
-    'offers a remembered Claude method only when it is available (%s)',
-    enabled => {
-      mockClaudeEnabled = enabled;
-      mockReturning = true;
-      mockHintEmail = 'remembered@example.com';
-      const html = renderToStaticMarkup(createElement(SignInForm, { searchParams: {} }));
-      expect(html.includes('Continue with Claude')).toBe(enabled);
-      expect(html).toContain('or see other sign-in methods');
-    }
-  );
+  it('offers a remembered Claude method', () => {
+    mockReturning = true;
+    mockHintEmail = 'remembered@example.com';
+    const html = renderToStaticMarkup(createElement(SignInForm, { searchParams: {} }));
+    expect(html).toContain('Continue with Claude');
+    expect(html).toContain('or see other sign-in methods');
+  });
 });

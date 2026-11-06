@@ -60,8 +60,7 @@ export const AuthProviderIdSchema = z.enum(AuthProviderIds);
 import type { AuthProviderId } from '@kilocode/db/schema-types';
 
 // Subset offered for OAuth sign-in: every provider except SSO, email, passkeys
-// and the dev-only one. Claude is listed here, and the offering surfaces drop it
-// until it is launched (`withLaunchedClaudeSignIn`).
+// and the dev-only one.
 const isLinkableAuthProvider = (p: ProviderMetadata) =>
   p.id !== 'workos' && p.id !== 'fake-login' && p.id !== 'email' && p.id !== 'passkey';
 

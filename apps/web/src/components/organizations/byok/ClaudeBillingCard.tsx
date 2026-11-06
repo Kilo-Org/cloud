@@ -10,8 +10,6 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { ClaudeLogo } from '@/components/auth/ClaudeLogo';
-import { useFeatureFlagEnabled } from 'posthog-js/react';
-import { CLAUDE_PLATFORM_OAUTH_FLAG } from '@kilocode/web-shared/lib/auth/claude/feature-flag';
 import type { ClaudeBillingStatus } from '@/routers/claude-billing-router';
 
 const CONNECTED_PLATFORMS_URL = 'https://platform.claude.com/connected-platforms';
@@ -25,7 +23,7 @@ function outcomeMessage(outcome: string) {
     case 'already_linked':
       return 'This Claude organization is already connected to another Kilo account or organization. Ask that account’s administrator to disconnect it first.';
     case 'forbidden':
-      return 'Only a Kilo organization owner or admin with access to this feature can connect it.';
+      return 'Only a Kilo organization owner or admin can connect it.';
     default:
       return 'We could not connect your Claude organization. Try again.';
   }
@@ -52,7 +50,7 @@ export type ClaudeBillingCardViewProps = {
   status: ClaudeBillingStatus | undefined;
   organizationId?: string;
   outcome?: string | null;
-  onConnect?: () => void;
+  onConnect: () => void;
   onRemove?: () => void;
   onRetry?: () => void;
   connecting?: boolean;
@@ -139,25 +137,23 @@ export function ClaudeBillingCardView({
             >
               Set a spend limit or disconnect in Claude Console
             </a>
-            {status.canManage && (onConnect || connected) ? (
+            {status.canManage ? (
               <div className="flex flex-wrap items-center gap-2">
-                {onConnect ? (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    disabled={connecting || removing}
-                    onClick={onConnect}
-                    className="h-auto min-h-10 whitespace-normal text-left"
-                  >
-                    <ClaudeLogo />
-                    {connecting
-                      ? 'Redirecting to Claude…'
-                      : connected
-                        ? 'Reconnect your Claude organization'
-                        : 'Connect your Claude organization'}
-                  </Button>
-                ) : null}
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={connecting || removing}
+                  onClick={onConnect}
+                  className="h-auto min-h-10 whitespace-normal text-left"
+                >
+                  <ClaudeLogo />
+                  {connecting
+                    ? 'Redirecting to Claude…'
+                    : connected
+                      ? 'Reconnect your Claude organization'
+                      : 'Connect your Claude organization'}
+                </Button>
                 {connected ? (
                   <Button
                     type="button"
@@ -170,11 +166,11 @@ export function ClaudeBillingCardView({
                   </Button>
                 ) : null}
               </div>
-            ) : !status.canManage && onConnect ? (
+            ) : (
               <p className="text-muted-foreground text-sm">
-                Ask a Kilo organization owner or admin to connect your Claude organization.
+                Ask a Kilo organization owner or admin to manage Claude billing.
               </p>
-            ) : null}
+            )}
             {connected && status.canManage ? (
               <p className="text-muted-foreground text-xs">
                 Removing this connection restores normal BYOK or Kilo-credit routing. It does not
@@ -207,7 +203,6 @@ function ClaudeBillingCardContent({ organizationId }: { organizationId?: string 
   }, [router, searchParams]);
   const [connecting, setConnecting] = useState(false);
   const statusQuery = useQuery(trpc.claudeBilling.status.queryOptions({ organizationId }));
-  const flagEnabled = useFeatureFlagEnabled(CLAUDE_PLATFORM_OAUTH_FLAG);
   const removeMutation = useMutation(
     trpc.claudeBilling.remove.mutationOptions({
       onSuccess: () => {
@@ -221,12 +216,6 @@ function ClaudeBillingCardContent({ organizationId }: { organizationId?: string 
   const failureCode = statusQuery.error?.data?.code ?? removeMutation.error?.data?.code;
   const needsSignIn = failureCode === 'UNAUTHORIZED';
   const needsAdmin = failureCode === 'FORBIDDEN';
-  // Before launch the card appears only for an owner who already has a
-  // connection, so they can still see its state and remove it.
-  const launched = flagEnabled === true;
-  const hasConnection =
-    statusQuery.data !== undefined && statusQuery.data.state !== 'not_connected';
-  if (!launched && !hasConnection) return null;
   return (
     <ClaudeBillingCardView
       status={statusQuery.data}
@@ -254,18 +243,14 @@ function ClaudeBillingCardContent({ organizationId }: { organizationId?: string 
               else void statusQuery.refetch();
             }
       }
-      onConnect={
-        launched
-          ? () => {
-              setConnecting(true);
-              const query = new URLSearchParams({
-                owner: organizationId ?? 'personal',
-                return: window.location.pathname,
-              });
-              window.location.assign(`/claude/billing/connect?${query}`);
-            }
-          : undefined
-      }
+      onConnect={() => {
+        setConnecting(true);
+        const query = new URLSearchParams({
+          owner: organizationId ?? 'personal',
+          return: window.location.pathname,
+        });
+        window.location.assign(`/claude/billing/connect?${query}`);
+      }}
       onRemove={() => removeMutation.mutate({ organizationId })}
     />
   );

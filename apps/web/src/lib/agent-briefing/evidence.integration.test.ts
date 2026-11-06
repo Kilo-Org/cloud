@@ -258,6 +258,26 @@ it('does not repeat a successful answer whose body cannot be read', async () => 
   expect(failed?.summary.error).toBe('generation_failed');
 });
 
+it('does not repeat a decline the gateway answers after an accounted generation', async () => {
+  const { now } = await scheduled();
+  await sweepAgentBriefings(now);
+  const [row] = await db.select().from(agent_briefing_snapshots);
+  if (!row) throw new Error('No captured snapshot');
+  const fetcher = jest.spyOn(globalThis, 'fetch').mockResolvedValue(
+    // The shape the gateway sends when a guardrail replaces an answer: a decline
+    // that asks for a quick repeat and carries no `x-should-retry` verdict of its
+    // own, alongside the marker that the answer was already accounted.
+    new Response('{}', {
+      status: 503,
+      headers: { 'retry-after': '1', 'x-kilo-replaced-answer': 'true' },
+    })
+  );
+  await runBriefingSummary(row.id);
+  expect(fetcher).toHaveBeenCalledTimes(1);
+  const [failed] = await db.select().from(agent_briefing_snapshots);
+  expect(failed?.summary.status).toBe('failed');
+});
+
 it('does not repeat a rate limit the gateway marks final', async () => {
   const { now } = await scheduled();
   await sweepAgentBriefings(now);

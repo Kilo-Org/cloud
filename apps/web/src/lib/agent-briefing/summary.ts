@@ -17,6 +17,7 @@ import {
   getOpenRouterModelsMetadataFromDatabase,
   type StoredModelMap,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import { replacedChargedAnswer } from '@kilocode/web-shared/lib/ai-gateway/replaced-answer-header';
 import {
   getRawOpenRouterModels,
   pickerExtraModel,
@@ -126,11 +127,15 @@ async function attemptBriefingSummary(
   }
   if (!response.ok) {
     // `x-should-retry: false` names a condition the gateway knows a repeat cannot
-    // change: an hour-long free-model limit, or a guardrail verdict. Only a
-    // transient status without that marker is worth another request.
+    // change: an hour-long free-model limit, or a guardrail verdict. A decline that
+    // replaced a model answer is terminal too: `x-should-retry` reports the
+    // replacement's own condition there, and that answer may already be charged, so
+    // a repeat would bill the same generation twice. Only a transient status without
+    // either marker is worth another request.
     const transient =
       (TRANSIENT_GATEWAY_STATUSES.has(response.status) || response.status >= 500) &&
-      response.headers.get('x-should-retry') !== 'false';
+      response.headers.get('x-should-retry') !== 'false' &&
+      !replacedChargedAnswer(response.headers);
     const retryAfterMs = transient ? retryAfterDelayMs(response, Date.now()) : null;
     // Release the unused body so the retry reuses the connection.
     void response.body?.cancel().catch(() => {});

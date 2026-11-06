@@ -11,7 +11,6 @@ import {
   CLAUDE_API_BASE_URL,
   CLAUDE_BILLING_BETA,
 } from '@kilocode/web-shared/lib/auth/claude/config';
-import { isClaudePlatformOAuthEnabled } from '@kilocode/web-shared/lib/auth/claude/feature-flag.server';
 import { ClaudeBillingConnectionStatus } from '@kilocode/db/schema-types';
 import type { ClaudeBillingOwner } from './store';
 import { getAuthoritativeClaudeBillingState, type ClaudeBillingPayerState } from './payer-state';
@@ -140,13 +139,6 @@ export async function checkClaudeBilling(
     return { kind: 'unavailable', message: CLAUDE_BILLING_REQUIRED_MESSAGE };
   }
   if (connection.status !== ClaudeBillingConnectionStatus.Connected) return null;
-  if (!(await isClaudePlatformOAuthEnabled())) {
-    return {
-      kind: 'unavailable',
-      message:
-        'Claude organization billing is not enabled. Remove the connection to use another payment method.',
-    };
-  }
   if (!servesApiKind(input.request.kind)) {
     return {
       kind: 'unavailable',

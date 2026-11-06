@@ -17,7 +17,6 @@ import {
 } from '@/lib/claude-billing/protocol';
 import { CLAUDE_BILLING_CALLBACK_PATH } from '@/lib/claude-billing/constants';
 import { canManageClaudeBillingOrganization } from '@/lib/claude-billing/access';
-import { isClaudePlatformOAuthEnabled } from '@kilocode/web-shared/lib/auth/claude/feature-flag.server';
 
 /**
  * Completes a Claude billing connection. The pending cookie must belong to the
@@ -50,7 +49,6 @@ export async function GET(request: NextRequest) {
 
   // auth.claude.com returns the state with every outcome, including a refusal.
   if (params.get('state') !== pending.state) return outcomeRedirect(returnPath, 'failed');
-  if (!(await isClaudePlatformOAuthEnabled())) return outcomeRedirect(returnPath, 'forbidden');
   // Membership can change while the person is on Claude's approval page.
   if (
     pending.owner !== 'personal' &&

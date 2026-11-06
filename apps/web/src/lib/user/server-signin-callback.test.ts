@@ -35,10 +35,6 @@ jest.mock('@kilocode/web-shared/lib/stripe-client', () => ({
   createStripeCustomer: jest.fn(async () => ({ id: 'cus_test' })),
   deleteStripeCustomer: jest.fn(async () => {}),
 }));
-jest.mock('@kilocode/web-shared/lib/auth/claude/feature-flag.server', () => ({
-  isClaudePlatformOAuthEnabled: jest.fn(async () => true),
-}));
-
 import jwt from 'jsonwebtoken';
 import { encode } from 'next-auth/jwt';
 import { authOptions } from '@/lib/user/next-auth-options';
@@ -50,7 +46,6 @@ import {
   getOrganizationById,
   getUserOrgMemberships,
 } from '@kilocode/web-shared/lib/organizations/organizations';
-import { isClaudePlatformOAuthEnabled } from '@kilocode/web-shared/lib/auth/claude/feature-flag.server';
 import { CLAUDE_OIDC_ISSUER } from '@kilocode/web-shared/lib/auth/claude/config';
 
 const mockCreateOrUpdateUser = jest.mocked(createOrUpdateUser);
@@ -483,16 +478,6 @@ describe('authOptions.callbacks.signIn for Claude', () => {
       status: 'not_required',
       domain: 'example.com',
     });
-  });
-
-  it('refuses a Claude sign-in before settlement while it is not launched', async () => {
-    jest.mocked(isClaudePlatformOAuthEnabled).mockResolvedValueOnce(false);
-    setValidTurnstileCookie();
-
-    const result = await claudeSignIn({ email_verified: true });
-
-    expect(result).toEqual(expect.stringContaining('error=UNKNOWN-ERROR'));
-    expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
   });
 
   it('settles an issuer-qualified Claude account and auto-links only a verified email', async () => {

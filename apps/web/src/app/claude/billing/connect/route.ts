@@ -14,7 +14,6 @@ import { validateReturnPath } from '@/lib/integrations/validate-return-path';
 import { pushClaudeAuthorizationRequest } from '@/lib/claude-billing/protocol';
 import { CLAUDE_BILLING_CALLBACK_PATH } from '@/lib/claude-billing/constants';
 import { canManageClaudeBillingOrganization } from '@/lib/claude-billing/access';
-import { isClaudePlatformOAuthEnabled } from '@kilocode/web-shared/lib/auth/claude/feature-flag.server';
 
 function failureRedirect(returnPath: string, outcome: string) {
   const url = new URL(returnPath, APP_URL);
@@ -32,7 +31,6 @@ export async function GET(request: NextRequest) {
       new URL(`/users/sign_in?callbackPath=${encodeURIComponent(returnPath)}`, APP_URL)
     );
   }
-  if (!(await isClaudePlatformOAuthEnabled())) return failureRedirect(returnPath, 'forbidden');
   let owner: ClaudeBillingOwner;
   if (ownerParam === 'personal') {
     owner = { kind: 'personal', kiloUserId: session.id };

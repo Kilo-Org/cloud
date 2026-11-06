@@ -13,11 +13,11 @@ import { renderToStaticMarkup } from 'react-dom/server';
 
 let mockFlowEmail = '';
 let mockHintEmail = '';
-let mockClaudeEnabled = false;
 let mockReturning = false;
+let mockClaudeConfigured = true;
 
-jest.mock('@/lib/auth/claude/use-claude-sign-in-enabled', () => ({
-  useClaudeSignInEnabled: () => mockClaudeEnabled,
+jest.mock('@/lib/auth/claude/use-claude-sign-in-configured', () => ({
+  useClaudeSignInConfigured: () => mockClaudeConfigured,
 }));
 
 jest.mock('@/components/AnimatedLogoMark', () => ({
@@ -97,8 +97,8 @@ const { SignInForm } = require('./SignInForm') as {
 beforeEach(() => {
   mockFlowEmail = '';
   mockHintEmail = '';
-  mockClaudeEnabled = false;
   mockReturning = false;
+  mockClaudeConfigured = true;
 });
 
 describe('SignInForm sign-in options', () => {
@@ -133,15 +133,23 @@ describe('SignInForm sign-in options', () => {
     expect(html).toContain('Continue with Email');
   });
 
-  it.each([false, true])(
-    'offers a remembered Claude method only when it is available (%s)',
-    enabled => {
-      mockClaudeEnabled = enabled;
-      mockReturning = true;
-      mockHintEmail = 'remembered@example.com';
-      const html = renderToStaticMarkup(createElement(SignInForm, { searchParams: {} }));
-      expect(html.includes('Continue with Claude')).toBe(enabled);
-      expect(html).toContain('or see other sign-in methods');
-    }
-  );
+  it('omits an unconfigured Claude provider on the landing and remembered views', () => {
+    mockClaudeConfigured = false;
+    const landing = renderToStaticMarkup(createElement(SignInForm, { searchParams: {} }));
+    expect(landing).not.toContain('Continue with Claude');
+    expect(landing).toContain('Continue with Google');
+    mockReturning = true;
+    mockHintEmail = 'remembered@example.com';
+    const returning = renderToStaticMarkup(createElement(SignInForm, { searchParams: {} }));
+    expect(returning).not.toContain('Continue with Claude');
+    expect(returning).toContain('or see other sign-in methods');
+  });
+
+  it('offers a remembered Claude method', () => {
+    mockReturning = true;
+    mockHintEmail = 'remembered@example.com';
+    const html = renderToStaticMarkup(createElement(SignInForm, { searchParams: {} }));
+    expect(html).toContain('Continue with Claude');
+    expect(html).toContain('or see other sign-in methods');
+  });
 });

@@ -9,6 +9,10 @@ import { renderToStaticMarkup } from 'react-dom/server';
 // `React.createElement` calls need React on the global.
 Object.assign(globalThis, { React });
 
+jest.mock('@/lib/auth/claude/use-claude-sign-in-configured', () => ({
+  useClaudeSignInConfigured: () => true,
+}));
+
 jest.mock('@/components/auth/sign-in/AuthProviderButtons', () => ({
   AuthProviderButtons: () => null,
 }));

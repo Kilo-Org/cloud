@@ -57,7 +57,6 @@ import { eq, and, isNull, inArray, or, sql, gte, gt, desc, isNotNull, ne } from 
 import crypto from 'crypto';
 import { checkDiscordGuildMembership } from '@/lib/integrations/discord-guild-membership';
 import { AuthProviderIdSchema, isAccountLinkingProvider } from '@/lib/auth/provider-metadata';
-import { isClaudePlatformOAuthEnabled } from '@kilocode/web-shared/lib/auth/claude/feature-flag.server';
 import { AUTOCOMPLETE_MODEL } from '@kilocode/web-shared/lib/constants';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { createAutoTopUpSetupCheckoutSession } from '@/lib/stripe';
@@ -701,12 +700,6 @@ export const userRouter = createTRPCRouter({
       // instead of letting the round trip end in a failure on
       // /connected-accounts.
       if (!isAccountLinkingProvider(input.provider)) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: 'This sign-in method cannot be added to an account.',
-        });
-      }
-      if (input.provider === 'claude' && !(await isClaudePlatformOAuthEnabled())) {
         throw new TRPCError({
           code: 'BAD_REQUEST',
           message: 'This sign-in method cannot be added to an account.',

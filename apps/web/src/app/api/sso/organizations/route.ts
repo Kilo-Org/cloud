@@ -13,8 +13,6 @@ import {
 import { isNewAccountEligibleForMagicLink } from '@/lib/auth/email-signin-eligibility';
 import { isEmailSignupDisabled } from '@/lib/auth/email-signup-switch';
 import { ProdNonSSOAuthProviders } from '@/lib/auth/provider-metadata';
-import { withLaunchedClaudeSignIn } from '@/lib/auth/claude/access';
-import { isClaudePlatformOAuthEnabled } from '@kilocode/web-shared/lib/auth/claude/feature-flag.server';
 
 const warnInSentry = sentryLogger('sso-organizations', 'warning');
 
@@ -86,7 +84,12 @@ export async function POST(request: Request): Promise<NextResponse> {
 
       // Return the matched account even when its methods are unsupported. The
       // client presents a recoverable error rather than broadening to signup.
-      return discoveryResponse({ kind: 'existing', providers: userProviderInfo.providers });
+      return discoveryResponse({
+        kind: 'existing',
+        providers: userProviderInfo.providers.filter(
+          provider => provider !== 'claude' || Boolean(process.env.CLAUDE_SIGN_IN_CLIENT_ID)
+        ),
+      });
     }
 
     // ─── New User Flow ────────────────────────────────────────────────────
@@ -102,16 +105,14 @@ export async function POST(request: Request): Promise<NextResponse> {
     // No organization or provider found → new user signup flow. Resolve the
     // email option on the server so account-creation rules remain authoritative
     // without spending the magic-link rate-limit allowance during discovery.
-    const offeredProviders = withLaunchedClaudeSignIn(
-      ProdNonSSOAuthProviders,
-      await isClaudePlatformOAuthEnabled()
-    );
     const providers = (await isNewAccountEligibleForMagicLink(email))
-      ? offeredProviders
-      : offeredProviders.filter(provider => provider !== 'email');
+      ? [...ProdNonSSOAuthProviders]
+      : ProdNonSSOAuthProviders.filter(provider => provider !== 'email');
     return discoveryResponse({
       kind: 'new',
-      providers,
+      providers: providers.filter(
+        provider => provider !== 'claude' || Boolean(process.env.CLAUDE_SIGN_IN_CLIENT_ID)
+      ),
       ...(isEmailSignupDisabled() ? { emailSignupDisabled: true } : {}),
     });
   } catch (err: unknown) {

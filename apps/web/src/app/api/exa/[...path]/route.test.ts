@@ -85,7 +85,7 @@ describe('POST /api/exa/[...path]', () => {
     // Default: user is within free tier, no existing row
     mockedGetExaMonthlyUsage.mockResolvedValue({ usage: 0, freeAllowance: null });
     mockedGetExaFreeAllowanceMicrodollars.mockReturnValue(EXA_MONTHLY_ALLOWANCE_MICRODOLLARS);
-    mockedRecordExaUsage.mockResolvedValue();
+    mockedRecordExaUsage.mockResolvedValue('recorded');
   });
 
   afterAll(() => {
@@ -333,6 +333,8 @@ describe('POST /api/exa/[...path]', () => {
       await flushAfterCallbacks();
 
       expect(mockedRecordExaUsage).toHaveBeenCalledWith({
+        id: expect.any(String),
+        occurredAt: expect.any(String),
         userId: 'user-123',
         organizationId: undefined,
         path: '/search',
@@ -342,6 +344,33 @@ describe('POST /api/exa/[...path]', () => {
         featureId: undefined,
         type: undefined,
       });
+    });
+
+    it('passes the same usage id and occurredAt to recordExaUsage', async () => {
+      setUserAuth();
+      mockedFetch.mockResolvedValue(
+        makeUpstreamResponse({ results: [], costDollars: { total: 0.007 } })
+      );
+      const usageId = '4f4f4f4f-4f4f-4f4f-4f4f-4f4f4f4f4f4f';
+      const occurredAt = new Date('2026-11-06T12:00:00.000Z');
+      jest.useFakeTimers({ now: occurredAt, doNotFake: ['nextTick'] });
+      const randomUUIDSpy = jest.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue(usageId);
+
+      try {
+        const { POST } = await import('./route');
+        await POST(makeRequest('/search') as never);
+        await flushAfterCallbacks();
+
+        expect(mockedRecordExaUsage).toHaveBeenCalledWith(
+          expect.objectContaining({
+            id: usageId,
+            occurredAt: occurredAt.toISOString(),
+          })
+        );
+      } finally {
+        randomUUIDSpy.mockRestore();
+        jest.useRealTimers();
+      }
     });
 
     it('records cost with chargedToBalance when over free tier', async () => {
@@ -357,6 +386,8 @@ describe('POST /api/exa/[...path]', () => {
       await flushAfterCallbacks();
 
       expect(mockedRecordExaUsage).toHaveBeenCalledWith({
+        id: expect.any(String),
+        occurredAt: expect.any(String),
         userId: 'user-123',
         organizationId: undefined,
         path: '/search',

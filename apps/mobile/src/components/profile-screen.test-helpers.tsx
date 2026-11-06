@@ -19,7 +19,6 @@ const keys = vi.hoisted(() => ({
   organizations: ['organizations', 'list'],
 }));
 const authState = vi.hoisted(() => ({ token: 'token-1' as string | null }));
-const nativeRemoteFlag = vi.hoisted(() => ({ enabled: false }));
 const idleState = vi.hoisted(() => ({
   storedCallback: undefined as (() => void) | undefined,
   cancel: vi.fn(),
@@ -42,7 +41,6 @@ const connectivityState = vi.hoisted(() => ({
 export {
   authState,
   connectivityState,
-  nativeRemoteFlag,
   getProfileAgentScopeMock,
   idleState,
   keys,
@@ -68,7 +66,7 @@ vi.mock('react-native-safe-area-context', () => ({
 }));
 
 beforeEach(() => {
-  nativeRemoteFlag.enabled = false;
+  vi.stubGlobal('__DEV__', false);
   vi.stubGlobal('requestIdleCallback', captureIdle);
   vi.stubGlobal('cancelIdleCallback', idleState.cancel);
 });
@@ -107,10 +105,6 @@ vi.mock('@/lib/trpc', () => ({
 
 vi.mock('@/lib/auth/auth-context', () => ({
   useAuth: () => ({ signOut: signOutFn, token: authState.token }),
-}));
-
-vi.mock('@/lib/analytics/posthog', () => ({
-  useFeatureFlag: () => nativeRemoteFlag.enabled,
 }));
 
 vi.mock('@/lib/config', () => ({ SESSION_SYNC_URL: 'http://localhost:8817' }));

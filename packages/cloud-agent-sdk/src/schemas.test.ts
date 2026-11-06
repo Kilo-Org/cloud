@@ -74,18 +74,20 @@ describe('cloudSessionMetadataSchema', () => {
     }
   );
 
-  it.each([{}, { model: undefined, variant: undefined }, { model: 'kilo/auto', variant: 'high' }])(
-    'accepts optional runtime agent overrides %p',
-    overrides => {
-      const runtimeAgents = [{ slug: 'custom', name: 'Custom', ...overrides }];
-      const metadata = cloudSessionMetadataSchema.parse({
-        sessionId: 'workspace_root',
-        runtimeAgents,
-      });
-      const parsedAgents: FetchedSessionData['runtimeAgents'] = metadata.runtimeAgents;
-      expect(parsedAgents).toEqual(runtimeAgents);
-    }
-  );
+  it.each([
+    {},
+    { model: undefined, variant: undefined },
+    { model: 'kilo/auto', variant: 'high' },
+    { mode: 'subagent', hidden: true, disable: false },
+  ])('accepts optional runtime agent overrides %p', overrides => {
+    const runtimeAgents = [{ slug: 'custom', name: 'Custom', ...overrides }];
+    const metadata = cloudSessionMetadataSchema.parse({
+      sessionId: 'workspace_root',
+      runtimeAgents,
+    });
+    const parsedAgents: FetchedSessionData['runtimeAgents'] = metadata.runtimeAgents;
+    expect(parsedAgents).toEqual(runtimeAgents);
+  });
 });
 
 describe('cloudSessionMessagesPageSchema', () => {

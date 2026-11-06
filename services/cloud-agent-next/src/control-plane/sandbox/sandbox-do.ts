@@ -1,4 +1,6 @@
 import {
+  parseRuntimeHarness,
+  RUNTIME_HARNESS_HEADER,
   RUNTIME_HARNESSES,
   type RuntimeHarness,
   WORKSPACE_CONFIGURATION_HEADER,
@@ -417,11 +419,16 @@ const wrapperSocketAttachmentSchema = z.object({
   startCommands: z.literal(true).optional(),
   workspaceConfiguration: z.literal(true).optional(),
   runtimeCapability: z.literal('worktree').optional(),
+  runtimeHarness: z.enum(RUNTIME_HARNESSES).optional(),
   billingCheckedAt: z.number().finite().nonnegative().optional(),
 });
 type WrapperSocketAttachment = z.infer<typeof wrapperSocketAttachmentSchema>;
 
 const WRAPPER_BILLING_CHECK_MS = 30_000;
+
+function runtimeHarnessField(runtimeHarness: RuntimeHarness | undefined) {
+  return runtimeHarness === undefined ? {} : { runtimeHarness };
+}
 
 /** Separates an old wrapper from a decrypt/parse failure; both fail the attempt. */
 type PrepareFrameMaterializationStage =
@@ -2067,6 +2074,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         ...(request.headers.get(WORKSPACE_CONFIGURATION_HEADER) === WORKSPACE_CONFIGURATION_VERSION
           ? { workspaceConfiguration: true as const }
           : {}),
+        ...runtimeHarnessField(parseRuntimeHarness(request.headers.get(RUNTIME_HARNESS_HEADER))),
         helloDeadlineAt: Date.now() + this.sandboxTimers().wrapperHelloMs,
       } satisfies WrapperSocketAttachment);
       await this.armAlarm(await this.readAllocation());
@@ -2616,6 +2624,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         ...runtime,
         allocationId: state.allocationId,
         ...(startSource === undefined ? {} : { startSource }),
+        ...runtimeHarnessField(await this.allocationRuntimeHarness(state)),
       });
       return container.success ? { ...view, container: container.data } : view;
     } catch {
@@ -4335,6 +4344,28 @@ export class SandboxControlV2 extends DurableObject<Env> {
     return namespace === undefined ? null : namespace.getByName(sessionDoName(ownerId, sessionId));
   }
 
+  /**
+   * The Kilo runtime that runs this allocation. The connected wrapper reports the
+   * runtime it runs. Before it connects, the sandbox's stored harness attributes the
+   * run, so a startup failure is not `unknown`. That fallback is exact in production,
+   * where preinstalled images carry only v1. The local v2 image overrides it, so a
+   * local v2 run is attributed correctly only after its wrapper connects.
+   */
+  private async allocationRuntimeHarness(
+    state: AllocationState
+  ): Promise<RuntimeHarness | undefined> {
+    const socket = this.boundWrapperSocket(state);
+    const reported = socket === null ? undefined : this.readAttachment(socket)?.runtimeHarness;
+    return reported ?? (await this.storedRuntimeHarness());
+  }
+
+  private async storedRuntimeHarness(): Promise<RuntimeHarness | undefined> {
+    return z
+      .enum(RUNTIME_HARNESSES)
+      .optional()
+      .parse(await this.ctx.storage.get(RUNTIME_HARNESS_KEY));
+  }
+
   private boundWrapperSocket(state: AllocationState): WebSocket | null {
     if (state.kind !== 'connected' || state.allocationId === null || state.connectionId === null) {
       return null;
@@ -4686,10 +4717,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     provider: AgentSandboxProvider,
     cohort: StartupCohortContext
   ): Promise<RuntimeHarness> {
-    const stored = z
-      .enum(RUNTIME_HARNESSES)
-      .optional()
-      .parse(await this.ctx.storage.get(RUNTIME_HARNESS_KEY));
+    const stored = await this.storedRuntimeHarness();
     if (stored !== undefined) return stored;
     return (await this.ctx.storage.get(CREDENTIAL_HASH_KEY)) === undefined
       ? newSandboxHarness(this.env, provider, cohort)
@@ -5228,7 +5256,11 @@ export class SandboxControlV2 extends DurableObject<Env> {
     if (frame.type === 'hello') {
       if (attachment?.connectionId !== undefined) return;
       const credential = typeof attachment?.credential === 'string' ? attachment.credential : null;
-      const accepted = await this.validateAllocationCredential(frame.allocationId, credential);
+      const accepted = await this.validateAllocationCredential(
+        frame.allocationId,
+        credential,
+        attachment?.runtimeHarness
+      );
       if (!accepted) {
         this.sendFrame(ws, { type: 'shutdown', reason: 'hello_rejected' });
         ws.close(1008, 'shutdown');
@@ -5281,6 +5313,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         ...(frame.installsSkillsSh ? { installsSkillsSh: true } : {}),
         ...(frame.startCommands ? { startCommands: true } : {}),
         ...(attachment?.workspaceConfiguration ? { workspaceConfiguration: true } : {}),
+        ...runtimeHarnessField(attachment?.runtimeHarness),
       });
       logControlDiagnostic('workspace_snapshot_capability', {
         sandboxId: this.sandboxId,
@@ -5472,15 +5505,17 @@ export class SandboxControlV2 extends DurableObject<Env> {
       case 'history.page':
         // Off the serial queue: a Session DO read must not hold other frames.
         if (current)
-          void serveHistoryPage({
-            frame,
-            readRoute: sessionId => readRoute(this.db, sessionId),
-            session: async sessionId => {
-              const owner = await this.requireOwner();
-              return owner === null ? null : this.sessionPeerFor(owner, sessionId);
-            },
-            send: result => this.trySendFrame(ws, result),
-          });
+          this.ctx.waitUntil(
+            serveHistoryPage({
+              frame,
+              readRoute: sessionId => readRoute(this.db, sessionId),
+              session: async sessionId => {
+                const owner = await this.requireOwner();
+                return owner === null ? null : this.sessionPeerFor(owner, sessionId);
+              },
+              send: result => this.trySendFrame(ws, result),
+            })
+          );
         return;
       default:
         return;
@@ -5511,11 +5546,13 @@ export class SandboxControlV2 extends DurableObject<Env> {
 
   private async validateAllocationCredential(
     allocationId: string,
-    credential: string | null
+    credential: string | null,
+    runtimeHarness?: RuntimeHarness
   ): Promise<boolean> {
     const state = await this.readAllocation();
     const admission = {
       allocationName: this.providerPin?.allocationName ?? this.sandboxId,
+      runtimeHarness,
       allocationKind: state.kind,
       expectedAllocationId: state.allocationId,
       receivedAllocationId: allocationId,

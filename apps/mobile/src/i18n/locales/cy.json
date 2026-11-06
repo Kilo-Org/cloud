@@ -3323,7 +3323,7 @@
     "subscriptionLoading": "Yn llwytho tanysgrifiad Kilo Pass",
     "retryHint": "Mae hwn yn ceisio llwytho statws Kilo Pass eto.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
-    "purchaseUnavailable": "Nid yw'n bosibl prynu Kilo Pass ar hyn o bryd.",
+    "purchaseUnavailable": "Nid yw'r pryniant ar gael ar hyn o bryd.",
     "kiloPassManagement": "Rheoli Kilo Pass",
     "kiloPassSetup": "Sefydlu Kilo Pass",
     "subscriptionHeaderDescription": "Tanysgrifiad misol sy'n ychwanegu credydau at eich balans Kilo ar gyfer rhedeg sesiynau codio AI yn Kilo App.",

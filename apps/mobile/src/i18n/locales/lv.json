@@ -3161,7 +3161,7 @@
     "subscriptionLoading": "Kilo Pass abonements tiek ielādēts",
     "retryHint": "Atkārtoti ielādē Kilo Pass stāvokli.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
-    "purchaseUnavailable": "Kilo Pass pašlaik nevar iegādāties.",
+    "purchaseUnavailable": "Pašlaik iegādāties nevar.",
     "kiloPassManagement": "Kilo Pass pārvaldība",
     "kiloPassSetup": "Kilo Pass iestatīšana",
     "subscriptionHeaderDescription": "Mēneša abonements, kas pievieno kredītus tavam Kilo bilancei AI kodēšanas sesiju vadīšanai Kilo App.",

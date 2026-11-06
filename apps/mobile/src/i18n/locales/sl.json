@@ -3215,7 +3215,7 @@
     "subscriptionLoading": "Nalaganje naročnine Kilo Pass",
     "retryHint": "Znova poskusi naložiti stanje naročnine Kilo Pass.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
-    "purchaseUnavailable": "Nakup naročnine Kilo Pass trenutno ni na voljo.",
+    "purchaseUnavailable": "Nakup trenutno ni na voljo.",
     "kiloPassManagement": "Upravljanje naročnine Kilo Pass",
     "kiloPassSetup": "Nastavitev naročnine Kilo Pass",
     "subscriptionHeaderDescription": "Mesečna naročnina, ki tvojemu Kilo stanju doda kredite za izvajanje sej kodiranja z umetno inteligenco v aplikaciji Kilo.",

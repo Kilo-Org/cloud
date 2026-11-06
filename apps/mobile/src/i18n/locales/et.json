@@ -3107,7 +3107,7 @@
     "subscriptionLoading": "Kilo Passi tellimuse laadimine",
     "retryHint": "Proovib Kilo Passi olekut uuesti laadida.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
-    "purchaseUnavailable": "Kilo Passi ei saa praegu osta.",
+    "purchaseUnavailable": "Ost ei ole praegu saadaval.",
     "kiloPassManagement": "Kilo Passi haldamine",
     "kiloPassSetup": "Kilo Passi seadistamine",
     "subscriptionHeaderDescription": "Kuutellimus, mis lisab krediiti sinu Kilo saldole AI kodeerimisseansside käitamiseks Kilo Appis.",

@@ -3107,7 +3107,7 @@
     "subscriptionLoading": "Sæki Kilo Pass-áskrift",
     "retryHint": "Reynir aftur að sækja stöðu Kilo Pass.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
-    "purchaseUnavailable": "Ekki er hægt að kaupa Kilo Pass núna.",
+    "purchaseUnavailable": "Kaup eru ekki í boði núna.",
     "kiloPassManagement": "Umsjón með Kilo Pass",
     "kiloPassSetup": "Uppsetning Kilo Pass",
     "subscriptionHeaderDescription": "Mánaðarleg áskrift sem bætir kredítum við Kilo-stöðuna þína fyrir að keyra AI-forritunarlotur í Kilo App.",

@@ -2601,7 +2601,7 @@
     "subscriptionLoading": "פרטי המינוי ל-Kilo Pass בטעינה",
     "retryHint": "טעינת המצב של Kilo Pass שוב.",
     "cardAccessibility": "{{title}}. {{description}}. פעולה: {{actionLabel}}",
-    "purchaseUnavailable": "רכישת Kilo Pass אינה זמינה כרגע.",
+    "purchaseUnavailable": "הרכישה אינה זמינה כרגע.",
     "kiloPassManagement": "ניהול Kilo Pass",
     "kiloPassSetup": "הגדרת Kilo Pass",
     "subscriptionHeaderDescription": "מנוי חודשי שמוסיף קרדיטים ליתרת Kilo שלך להרצת מפגשי קידוד בינה מלאכותית ב-Kilo App.",

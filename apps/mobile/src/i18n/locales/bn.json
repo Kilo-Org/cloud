@@ -3113,7 +3113,7 @@
     "subscriptionLoading": "Kilo Pass সাবস্ক্রিপশন লোড হচ্ছে",
     "retryHint": "Kilo Pass-এর অবস্থা আবার লোড করার চেষ্টা করে।",
     "cardAccessibility": "{{title}}। {{description}}। {{actionLabel}}",
-    "purchaseUnavailable": "এখন Kilo Pass কেনা যাচ্ছে না।",
+    "purchaseUnavailable": "কেনাকাটা এখন সম্ভব হচ্ছে না।",
     "kiloPassManagement": "Kilo Pass ব্যবস্থাপনা",
     "kiloPassSetup": "Kilo Pass সেটআপ",
     "subscriptionHeaderDescription": "একটি মাসিক সাবস্ক্রিপশন যা Kilo App-এ AI কোডিং সেশন চালানোর জন্য আপনার Kilo ব্যালেন্সে ক্রেডিট যোগ করে।",

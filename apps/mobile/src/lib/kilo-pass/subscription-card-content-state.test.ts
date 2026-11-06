@@ -50,7 +50,7 @@ describe('getKiloPassSubscriptionCardContentState', () => {
       state: {
         action: 'open-native',
         actionLabel: null,
-        description: 'Kilo Pass purchase is not available right now.',
+        description: 'Purchase is not available right now.',
         title: KILO_PASS_TITLE,
       },
     });

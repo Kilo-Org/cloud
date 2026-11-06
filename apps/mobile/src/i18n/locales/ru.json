@@ -2634,7 +2634,7 @@
     "subscriptionLoading": "Загрузка подписки Kilo Pass",
     "retryHint": "Повторно загружает статус Kilo Pass.",
     "cardAccessibility": "{{title}}. {{description}}. Действие: {{actionLabel}}",
-    "purchaseUnavailable": "Покупка Kilo Pass сейчас недоступна.",
+    "purchaseUnavailable": "Покупка сейчас недоступна.",
     "kiloPassManagement": "Управление Kilo Pass",
     "kiloPassSetup": "Настройка Kilo Pass",
     "subscriptionHeaderDescription": "Ежемесячная подписка, которая добавляет кредиты на ваш баланс Kilo для проведения ИИ-сессий кодинга в Kilo App.",

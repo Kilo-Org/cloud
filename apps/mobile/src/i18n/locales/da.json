@@ -3107,7 +3107,7 @@
     "subscriptionLoading": "Indlæser Kilo Pass-abonnement",
     "retryHint": "Prøver at indlæse status for Kilo Pass igen.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
-    "purchaseUnavailable": "Du kan ikke købe Kilo Pass lige nu.",
+    "purchaseUnavailable": "Købet er ikke tilgængeligt lige nu.",
     "kiloPassManagement": "Kilo Pass-administration",
     "kiloPassSetup": "Kilo Pass-opsætning",
     "subscriptionHeaderDescription": "Et månedligt abonnement, der tilføjer kreditter til din Kilo-saldo til at køre AI-kodningssessioner i Kilo App.",

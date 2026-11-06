@@ -3107,7 +3107,7 @@
     "subscriptionLoading": "Зареждане на абонамента за Kilo Pass",
     "retryHint": "Повтаря зареждането на състоянието на Kilo Pass.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
-    "purchaseUnavailable": "В момента не можеш да закупиш Kilo Pass.",
+    "purchaseUnavailable": "Покупката в момента не е достъпна.",
     "kiloPassManagement": "Управление на Kilo Pass",
     "kiloPassSetup": "Настройка на Kilo Pass",
     "subscriptionHeaderDescription": "Месечен абонамент, който добавя кредити към вашия Kilo баланс за стартиране на AI сесии за кодиране в приложението Kilo.",

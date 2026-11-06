@@ -3187,7 +3187,7 @@
     "subscriptionLoading": "Kilo Pass subscription loading",
     "retryHint": "Retries Kilo Pass state.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
-    "purchaseUnavailable": "Kilo Pass purchase is not available right now.",
+    "purchaseUnavailable": "Purchase is not available right now.",
     "kiloPassManagement": "Kilo Pass management",
     "kiloPassSetup": "Kilo Pass setup",
     "subscriptionHeaderDescription": "A monthly subscription that adds credits to your Kilo balance for running AI coding sessions in Kilo App.",

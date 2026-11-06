@@ -3161,7 +3161,7 @@
     "subscriptionLoading": "Učitavanje pretplate na Kilo Pass",
     "retryHint": "Ponovno učitava stanje Kilo Passa.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
-    "purchaseUnavailable": "Kupnja Kilo Passa trenutačno nije dostupna.",
+    "purchaseUnavailable": "Kupnja trenutačno nije dostupna.",
     "kiloPassManagement": "Upravljanje Kilo Passom",
     "kiloPassSetup": "Postavljanje Kilo Passa",
     "subscriptionHeaderDescription": "Mjesečna pretplata koja dodaje kredite vašem Kilo saldu za pokretanje AI sesija kodiranja u aplikaciji Kilo.",

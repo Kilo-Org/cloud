@@ -2535,7 +2535,7 @@
     "subscriptionLoading": "Chargement de l'abonnement Kilo Pass",
     "retryHint": "Actualise à nouveau l'état de Kilo Pass.",
     "cardAccessibility": "{{title}} : {{description}}. {{actionLabel}}",
-    "purchaseUnavailable": "Il n'est pas possible d'acheter Kilo Pass pour le moment.",
+    "purchaseUnavailable": "L'achat n'est pas disponible pour le moment.",
     "kiloPassManagement": "Gestion de Kilo Pass",
     "kiloPassSetup": "Configuration de Kilo Pass",
     "subscriptionHeaderDescription": "Un abonnement mensuel qui ajoute des crédits à votre solde Kilo pour lancer des sessions de codage IA dans Kilo App.",

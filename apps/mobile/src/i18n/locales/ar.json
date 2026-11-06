@@ -2700,7 +2700,7 @@
     "subscriptionLoading": "جارٍ تحميل اشتراك Kilo Pass",
     "retryHint": "يعيد محاولة التحقق من حالة Kilo Pass.",
     "cardAccessibility": "{{title}}؛ {{description}}؛ {{actionLabel}}",
-    "purchaseUnavailable": "شراء Kilo Pass غير متاح حاليًا.",
+    "purchaseUnavailable": "الشراء غير متاح حاليًا.",
     "kiloPassManagement": "إدارة Kilo Pass",
     "kiloPassSetup": "إعداد Kilo Pass",
     "subscriptionHeaderDescription": "اشتراك شهري يضيف أرصدة إلى رصيدك في Kilo لتشغيل جلسات البرمجة بالذكاء الاصطناعي في تطبيق Kilo.",

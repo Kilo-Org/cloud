@@ -3113,7 +3113,7 @@
     "subscriptionLoading": "Nilo-load ang subscription sa Kilo Pass",
     "retryHint": "Sinusubukang kunin muli ang katayuan ng Kilo Pass.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
-    "purchaseUnavailable": "Hindi makabili ng Kilo Pass sa ngayon.",
+    "purchaseUnavailable": "Hindi magagamit ang pagbili sa ngayon.",
     "kiloPassManagement": "Pamamahala ng Kilo Pass",
     "kiloPassSetup": "Pag-set up ng Kilo Pass",
     "subscriptionHeaderDescription": "Isang buwanang subscription na nagdadagdag ng credits sa iyong Kilo balance para sa pagpapatakbo ng mga AI coding session sa Kilo App.",

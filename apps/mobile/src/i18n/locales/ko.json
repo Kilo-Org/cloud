@@ -2568,7 +2568,7 @@
     "subscriptionLoading": "Kilo Pass 구독 정보 불러오는 중",
     "retryHint": "Kilo Pass 상태를 다시 확인합니다.",
     "cardAccessibility": "{{title}}: {{description}}. {{actionLabel}}",
-    "purchaseUnavailable": "지금은 Kilo Pass를 구매할 수 없습니다.",
+    "purchaseUnavailable": "지금은 구매할 수 없습니다.",
     "kiloPassManagement": "Kilo Pass 관리",
     "kiloPassSetup": "Kilo Pass 설정",
     "subscriptionHeaderDescription": "Kilo 앱에서 AI 코딩 세션을 실행하기 위해 Kilo 잔액에 크레딧을 추가하는 월간 구독.",

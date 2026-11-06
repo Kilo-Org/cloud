@@ -3113,7 +3113,7 @@
     "subscriptionLoading": "در حال بارگذاری اشتراک Kilo Pass",
     "retryHint": "وضعیت Kilo Pass را دوباره بررسی می‌کند.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
-    "purchaseUnavailable": "خرید Kilo Pass در حال حاضر ممکن نیست.",
+    "purchaseUnavailable": "خرید در حال حاضر ممکن نیست.",
     "kiloPassManagement": "مدیریت Kilo Pass",
     "kiloPassSetup": "راه‌اندازی Kilo Pass",
     "subscriptionHeaderDescription": "اشتراک ماهانه‌ای که برای اجرای نشست‌های کدنویسی با هوش مصنوعی در Kilo App به موجودی Kilo شما اعتبار اضافه می‌کند.",

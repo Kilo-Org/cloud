@@ -3107,7 +3107,7 @@
     "subscriptionLoading": "Kilo Pass abunəliyi yüklənir",
     "retryHint": "Kilo Pass-ın vəziyyətini yenidən yoxlayır.",
     "cardAccessibility": "{{title}}: {{description}}. {{actionLabel}}",
-    "purchaseUnavailable": "Hazırda Kilo Pass almaq mümkün deyil.",
+    "purchaseUnavailable": "Hazırda alış mümkün deyil.",
     "kiloPassManagement": "Kilo Pass-ın idarə edilməsi",
     "kiloPassSetup": "Kilo Pass-ın qurulması",
     "subscriptionHeaderDescription": "Kilo App-də AI kodlaşdırma sessiyaları aparmaq üçün Kilo balansınıza kredit əlavə edən aylıq abunəlik.",

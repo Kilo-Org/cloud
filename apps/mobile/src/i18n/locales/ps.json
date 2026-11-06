@@ -3107,7 +3107,7 @@
     "subscriptionLoading": "د Kilo Pass ګډون بارېږي",
     "retryHint": "د Kilo Pass د حالت ترلاسه کولو بیا هڅه کوي.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
-    "purchaseUnavailable": "د Kilo Pass پېرود اوس مهال ممکن نه دی.",
+    "purchaseUnavailable": "پېرود اوس مهال ممکن نه دی.",
     "kiloPassManagement": "د Kilo Pass مدیریت",
     "kiloPassSetup": "د Kilo Pass تنظیم",
     "subscriptionHeaderDescription": "یو میاشتنی ګډون چې ستاسو Kilo توازن ته کریډیټونه اضافه کوي په Kilo App کې د AI کوډ کولو ناستو چلولو لپاره.",

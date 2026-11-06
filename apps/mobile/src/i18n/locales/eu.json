@@ -3107,7 +3107,7 @@
     "subscriptionLoading": "Kilo Pass-en harpidetza kargatzen",
     "retryHint": "Kilo Pass-en egoera berriro kargatzen saiatzen da.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
-    "purchaseUnavailable": "Une honetan ezin da Kilo Pass erosi.",
+    "purchaseUnavailable": "Erosketa ez dago une honetan erabilgarri.",
     "kiloPassManagement": "Kilo Pass-en kudeaketa",
     "kiloPassSetup": "Kilo Pass-en konfigurazioa",
     "subscriptionHeaderDescription": "Hileroko harpidetza bat, zure Kilo saldoari kredituak gehitzen dizkiona Kilo App-en AI kodetze-saioak exekutatzeko.",

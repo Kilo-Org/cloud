@@ -80,6 +80,7 @@ export { default as ImageOff } from 'lucide-react-native/icons/image-off';
 export { default as Inbox } from 'lucide-react-native/icons/inbox';
 export { default as Info } from 'lucide-react-native/icons/info';
 export { default as KeyRound } from 'lucide-react-native/icons/key-round';
+export { default as Layers } from 'lucide-react-native/icons/layers';
 export { default as LifeBuoy } from 'lucide-react-native/icons/life-buoy';
 export { default as LineChart } from 'lucide-react-native/icons/chart-line';
 export { default as Link2 } from 'lucide-react-native/icons/link-2';

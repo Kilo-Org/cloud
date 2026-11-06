@@ -2601,7 +2601,7 @@
     "subscriptionLoading": "Caricamento dell'abbonamento Kilo Pass",
     "retryHint": "Riprova a caricare lo stato di Kilo Pass.",
     "cardAccessibility": "{{title}}: {{description}}. {{actionLabel}}",
-    "purchaseUnavailable": "L'acquisto di Kilo Pass non è disponibile al momento.",
+    "purchaseUnavailable": "L'acquisto non è disponibile al momento.",
     "kiloPassManagement": "Gestione di Kilo Pass",
     "kiloPassSetup": "Configurazione di Kilo Pass",
     "subscriptionHeaderDescription": "Un abbonamento mensile che aggiunge crediti al tuo saldo Kilo per eseguire sessioni di coding AI in Kilo App.",

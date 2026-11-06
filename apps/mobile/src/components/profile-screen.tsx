@@ -10,6 +10,7 @@ import {
   GitMerge,
   GitPullRequest,
   KeyRound,
+  Layers,
   Lock,
   LogOut,
   MessageSquare,
@@ -287,7 +288,7 @@ export function ProfileScreen() {
             }}
           />
           <ConfigureRow
-            icon={SlidersHorizontal}
+            icon={Layers}
             title={t('profiles.title')}
             subtitle={t('profiles.entrySubtitle')}
             // Agents step: the row lists the agent profiles, and its two

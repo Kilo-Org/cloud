@@ -3107,7 +3107,7 @@
     "subscriptionLoading": "Ladataan Kilo Pass -tilausta",
     "retryHint": "Yrittää hakea Kilo Passin tilan uudelleen.",
     "cardAccessibility": "{{title}}: {{description}}. {{actionLabel}}",
-    "purchaseUnavailable": "Kilo Passia ei voi ostaa juuri nyt.",
+    "purchaseUnavailable": "Osto ei ole juuri nyt mahdollista.",
     "kiloPassManagement": "Kilo Passin hallinta",
     "kiloPassSetup": "Kilo Passin käyttöönotto",
     "subscriptionHeaderDescription": "Kuukausitilaus, joka lisää krediittejä Kilo-saldollesi AI-koodausistuntojen ajamista varten Kilo-sovelluksessa.",

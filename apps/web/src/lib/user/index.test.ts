@@ -2237,7 +2237,7 @@ describe('User', () => {
       await db.insert(user_auth_provider).values({
         kilo_user_id: existing.id,
         provider: 'github',
-        provider_account_id: 'github-magic-unproven',
+        provider_account_id: 'github-magic-other-method',
         email: 'magic-other-method@example.com',
         avatar_url: '',
         display_name: null,
@@ -2277,7 +2277,7 @@ describe('User', () => {
       await db.insert(user_auth_provider).values({
         kilo_user_id: existing.id,
         provider: 'github',
-        provider_account_id: 'github-workos-unproven',
+        provider_account_id: 'github-workos-other-method',
         email: 'workos-other-method@example.com',
         avatar_url: '',
         display_name: null,
@@ -2291,7 +2291,7 @@ describe('User', () => {
           google_user_image_url: 'https://example.com/avatar.png',
           hosted_domain: 'example.com',
           provider: 'workos',
-          provider_account_id: 'workos-workos-unproven',
+          provider_account_id: 'workos-other-method',
         },
         undefined,
         true
@@ -2307,9 +2307,8 @@ describe('User', () => {
         .where(eq(user_auth_provider.kilo_user_id, existing.id));
       expect(providerRows).toHaveLength(1);
       expect(providerRows[0]?.provider).toBe('workos');
-      expect(providerRows[0]?.provider_account_id).toBe('workos-workos-unproven');
+      expect(providerRows[0]?.provider_account_id).toBe('workos-other-method');
     });
-
   });
 
   describe('anonymizeCloudUserData', () => {

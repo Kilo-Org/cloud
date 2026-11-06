@@ -3253,7 +3253,7 @@
       "selectDescriptionWithOrganizations": "Ị so n'otu ụlọ ọrụ ma ọ bụ karịa. Họrọ akaụntụ nke ihuenyo a kwesịrị iji.",
       "selectOrganization": "Họrọ ụlọ ọrụ",
       "unavailableDescription": "Ụlọ ọrụ a adịkwaghị. Họrọ otu site na profaịlụ gị ka ị gaa n'ihu.",
-      "unavailableSessionsDescription": "Ụlọ ọrụ a adịkwaghị. Enweghi ike ibu oge ya.",
+      "unavailableSessionsDescription": "Ụlọ ọrụ a adịkwaghị. Enweghị ike ibudata nnọkọ ya.",
       "accessDeniedDescription": "Ị nweghị ikike ịbanye n'ụlọ ọrụ a."
     },
     "creditActivity": {
@@ -3281,8 +3281,8 @@
       "roleMember": "Ọrụ: onye otu",
       "sendInvite": "Ziga òkù",
       "title": "Kpọ onye otu",
-      "alreadyInvited": "Ha etinyela òkụ ma ọ bụ ha abụrụla onye otu.",
-      "sendError": "Enweghị ike iziga òkụ.",
+      "alreadyInvited": "E tinyela ya òkù ma ọ bụ ọ abụrụla onye otu.",
+      "sendError": "Enweghị ike iziga òkù.",
       "pendingInvitation": "Adreesị ozi ịntanetị a enwetala òkù na-echere.",
       "alreadyMember": "Onye a abụrụla onye otu nke òtù a."
     },
@@ -3296,7 +3296,7 @@
       "sharingUnavailable": "Ịkekọrịta adịghị na ngwaọrụ a.",
       "status": {
         "paid": "Akwụgoro ụgwọ",
-        "open": "Meghe",
+        "open": "Akwụghị ụgwọ",
         "void": "Akagbuola",
         "uncollectible": "A pụghị ịnakọta ụgwọ"
       },
@@ -3329,8 +3329,8 @@
     },
     "members": {
       "changeRole": "Gbanwee ọrụ",
-      "emptyDescriptionCanInvite": "Kpọ ndị otu ibe gị òkù ka unu malite ịrụkọ ọrụ n'ụlọ ọrụ a.",
-      "emptyDescriptionCannotInvite": "Rịọ onye nwe nzukọ, onye nchịkwa, ma ọ bụ onye njikwa ịgba ụgwọ ka ọ kpọọ ndị otu ibe gị òkù.",
+      "emptyDescriptionCanInvite": "Kpọ ndị otu ibe gị òkù ka unu malite ịrụkọ ọrụ n'òtù a.",
+      "emptyDescriptionCannotInvite": "Rịọ onye nwe òtù, onye nchịkwa, ma ọ bụ onye njikwa ịgba ụgwọ ka ọ kpọọ ndị otu ibe gị òkù.",
       "emptyTitle": "Ọ dịbeghị onye otu",
       "invitedDate": "Akpọrọ òkù na {{date}}",
       "limitPerDay": "{{amount}}/ụbọchị",
@@ -3354,7 +3354,7 @@
       "pendingInvitations": "Òkù ndị na-echere",
       "resendInvite": "Ziga òkù ọzọ",
       "shareInviteLink": "Kekọrịta njikọ òkù",
-      "resendInviteError": "Enweghị ike iziga òkụ ọzọ.",
+      "resendInviteError": "Enweghị ike iziga òkù ọzọ.",
       "inviteNotResendable": "A pụghịzi iziga òkù a ọzọ.",
       "ownerAuthority": "Naanị onye nwe òtù nwere ike ijikwa ndị nwe.",
       "ownRoleChange": "Ị nweghị ike ịgbanwe ọrụ gị.",
@@ -3368,10 +3368,10 @@
       "requests": "Arịrịọ"
     },
     "hub": {
-      "renameTitle": "Gbanwee aha ụlọ ọrụ",
-      "renamePlaceholder": "Aha ụlọ ọrụ",
+      "renameTitle": "Gbanwee aha òtù",
+      "renamePlaceholder": "Tinye aha òtù",
       "balance": "Ego fọdụrụ",
-      "organizationSeats": "Oghere ndị otu ụlọ ọrụ",
+      "organizationSeats": "Oghere ndị otu òtù",
       "lowBalanceBelow": "N'okpuru {{amount}}"
     },
     "kiloPass": {
@@ -3383,8 +3383,8 @@
       "notSubscribed": "Enweghị ndenye aha",
       "overallocated": "Ọnụ ọgụgụ ndị e kenyere Pass karịrị oghere ndị otu akwụgoro ụgwọ",
       "paidSeat_one": "oghere ndị otu {{displayCount}} akwụgoro ụgwọ",
-      "paidSeat": "oghere ndị ọrụ {{displayCount}} a kwụrụ ụgwọ ha",
-      "paidSeat_other": "oghere ndị ọrụ {{displayCount}} a kwụrụ ụgwọ ha",
+      "paidSeat": "oghere ndị otu {{displayCount}} akwụgoro ụgwọ",
+      "paidSeat_other": "oghere ndị otu {{displayCount}} akwụgoro ụgwọ",
       "paymentNeedsAttention": "Ịkwụ ụgwọ chọrọ nlebara anya",
       "paymentPending": "Ịkwụ ụgwọ na-echere",
       "processingBlocked": "Egbochiri nhazi",

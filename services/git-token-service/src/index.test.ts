@@ -2412,7 +2412,6 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
     ['DELETE', 'https://api.github.com/repos/acme/repo/issues/42/labels/bug'],
     ['GET', 'https://api.github.com/repos/acme/repo/contents/src%2Findex.ts'],
     ['GET', 'https://api.github.com/user'],
-    ['POST', 'https://api.github.com/graphql'],
     ['POST', 'https://uploads.github.com/repos/acme/repo/releases/1/assets?name=asset.zip'],
     ['GET', 'https://npm.pkg.github.com/@acme%2fdesign'],
     ['GET', 'https://npm.pkg.github.com/download/@acme/design/1.0.0/package.tgz'],
@@ -2454,7 +2453,7 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
     }
   );
 
-  it('redeems GraphQL for a selected-user capability with the user token', async () => {
+  it('answers GraphQL for a selected-user capability with the recorded repository credential', async () => {
     const service = createService();
     const issued = await service.issueGitHubSessionCapability({
       githubRepo: 'acme/repo',
@@ -2463,6 +2462,7 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
       allowUserAuthorization: true,
     });
     if (!issued.success) throw new Error('Expected successful issuance');
+    expect(issued.source).toBe('user');
     serviceMocks.selectUserAuthorization.mockClear();
     serviceMocks.getTokenForRepo.mockClear();
 
@@ -2475,13 +2475,19 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
       })
     ).resolves.toEqual({
       success: true,
-      authorization: 'Bearer user-token',
+      authorization: 'Bearer installation-token',
       installationId: '123',
-      source: 'user',
+      source: 'installation',
       appType: 'standard',
     });
+    // The pinned user authorization still has to resolve, and the credential sent is
+    // the installation token minted for the recorded repository alone.
     expect(serviceMocks.selectUserAuthorization).toHaveBeenCalledOnce();
-    expect(serviceMocks.getTokenForRepo).not.toHaveBeenCalled();
+    expect(serviceMocks.getTokenForRepo).toHaveBeenCalledExactlyOnceWith(
+      '123',
+      'repo',
+      'standard'
+    );
   });
 
   it('redeems GraphQL for an installation-source capability with the installation token', async () => {

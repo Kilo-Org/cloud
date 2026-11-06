@@ -338,26 +338,8 @@ jobs:
       - name: Install root dependencies
         run: pnpm --filter kilocode-monorepo install --frozen-lockfile --ignore-scripts
 
-      # The stacked-CI admission wiring is checked on every PR. It runs here,
-      # off the critical path; the required `test` job needs this job, so a
-      # broken admission still blocks the merge.
-      - name: Check stacked CI admission
-        run: node --test scripts/stacked-ci.test.mjs
-
       - name: Check runtime publication workflow admission
         run: pnpm --filter cloud-agent-next test:runtime-ci
-
-      - name: Test dependency change detection
-        run: node --test scripts/changed-dependencies.test.mjs
-
-      - name: Test build cache keys
-        run: node --test scripts/build-key-inputs.test.mjs
-
-      - name: Test affected workspace detection
-        run: node --test scripts/affected-workspaces.test.mjs
-
-      - name: Test changed workspace matrix
-        run: node --test scripts/changed-workspaces.test.mjs
 
       - name: Plugin shared-schemas sync check
         run: bash scripts/sync-plugin-shared.sh --check
@@ -365,34 +347,33 @@ jobs:
       - name: Plugin openclaw peer-dep pin check
         run: bash scripts/check-plugin-openclaw-pin.sh
 
-      - name: Test changes-filter retry wiring
-        run: node --test scripts/changes-filter-retry.test.mjs
-
-      - name: Test typecheck CI wiring
-        run: node --test scripts/typecheck-ci.test.mjs
-
       # The relay regression executes Wrangler's real config parser.
       - name: Install usage-ingest deployment test dependencies
         run: pnpm --filter cloudflare-usage-ingest install --frozen-lockfile --ignore-scripts
 
-      - name: Test scheduled deployment wiring
-        run: node --test scripts/deployment-workflows.test.mjs
-
-      - name: Test main workflow failure notifications
-        run: node --test scripts/main-workflow-failure.test.mjs
-
-      - name: Test scheduled production deployment failure notifications
-        run: node --test scripts/production-deploy-failure.test.mjs
-
-      - name: Test meta-janitor approval gates
-        run: node --test scripts/meta-janitor-approve.test.mjs
-
-      # sbom.yml is only reached by a PR that changes the workflow or its test,
-      # and that path set does not trip the kilocode_backend filter that gates
-      # test-scripts. Run the SBOM wiring checks here so a PR cannot drop the
-      # push filter unnoticed.
-      - name: Test SBOM workflow wiring
-        run: node --test scripts/mobile-sbom-workflow.test.mjs
+      # The stacked-CI admission is checked on every PR. All wiring suites run
+      # in one invocation: the test runner starts the named files concurrently,
+      # so the step pays one start-up and one parse of the YAML they share. The
+      # job is off the critical path, and the required `test` job needs it, so
+      # a broken admission still blocks the merge. sbom.yml is only reached by
+      # a PR that changes the workflow or its test, and that path set does not
+      # trip the kilocode_backend filter that gates test-scripts, so its wiring
+      # check runs here too.
+      - name: Test workflow wiring
+        run: >-
+          node --test
+          scripts/stacked-ci.test.mjs
+          scripts/changed-dependencies.test.mjs
+          scripts/build-key-inputs.test.mjs
+          scripts/affected-workspaces.test.mjs
+          scripts/changed-workspaces.test.mjs
+          scripts/changes-filter-retry.test.mjs
+          scripts/typecheck-ci.test.mjs
+          scripts/deployment-workflows.test.mjs
+          scripts/main-workflow-failure.test.mjs
+          scripts/production-deploy-failure.test.mjs
+          scripts/meta-janitor-approve.test.mjs
+          scripts/mobile-sbom-workflow.test.mjs
 
   # One producer for the tRPC declarations. Both matrices used to run the
   # trpc-declarations action behind `matrix.group == 'trpc'`, so a cache miss

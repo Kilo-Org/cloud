@@ -391,4 +391,41 @@ describe('selectFixReviewCommentsForReview', () => {
     expect(selection.comments).toHaveLength(FIX_REVIEW_TOTAL_BODY_MAX_LENGTH / body.length);
     expect(selection.omittedCount).toBe(2);
   });
+  it.each([401, 403, 404, 500])(
+    'handles provided credential failure %s without exposing the provider request',
+    async status => {
+      const credential = connectedCredential('linked-user');
+      const getUserAccessToken = jest
+        .fn<FixReviewSelectionDeps['getUserAccessToken']>()
+        .mockResolvedValueOnce({
+          ...credential,
+          credential: {
+            ...credential.credential,
+            expiresAtEpochMs: null,
+            credentialSource: 'provided_token',
+            refreshSupported: false,
+          },
+        })
+        .mockResolvedValueOnce({ status: 'disconnected', reason: 'revoked' });
+      const client = clientFixture({
+        listComments: async () => {
+          throw { status, message: 'SENTINELSECRET', request: { authorization: 'SENTINELSECRET' } };
+        },
+      });
+      await expect(
+        selectFixReviewCommentsForReview({
+          ...baseInput,
+          integration: null,
+          deps: depsFixture(client, { getUserAccessToken }),
+        })
+      ).rejects.toThrow('GitHub review comments are unavailable');
+      expect(getUserAccessToken).toHaveBeenCalledTimes(status === 401 ? 2 : 1);
+      if (status === 401)
+        expect(getUserAccessToken).toHaveBeenLastCalledWith(baseInput.initiatorKiloUserId, {
+          op: 'reportRejected',
+          authorizationId: credential.credential.authorizationId,
+          credentialVersion: credential.credential.credentialVersion,
+        });
+    }
+  );
 });

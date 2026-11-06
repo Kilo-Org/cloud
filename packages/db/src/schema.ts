@@ -4775,12 +4775,17 @@ export const user_github_app_tokens = pgTable(
       .notNull()
       .references(() => kilocode_users.id, { onDelete: 'cascade' }),
     github_app_type: text().$type<'standard' | 'lite'>().notNull().default('standard'),
+    // The standard slot owns the personal identity for either credential source.
+    credential_source: text()
+      .$type<'github_app' | 'provided_token'>()
+      .notNull()
+      .default('github_app'),
     github_user_id: text().notNull(),
     github_login: text().notNull(),
     access_token_encrypted: text().notNull(),
-    access_token_expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
-    refresh_token_encrypted: text().notNull(),
-    refresh_token_expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    access_token_expires_at: timestamp({ withTimezone: true, mode: 'string' }),
+    refresh_token_encrypted: text(),
+    refresh_token_expires_at: timestamp({ withTimezone: true, mode: 'string' }),
     credential_version: integer().notNull().default(1),
     revoked_at: timestamp({ withTimezone: true, mode: 'string' }),
     revocation_reason: text(),
@@ -4800,6 +4805,17 @@ export const user_github_app_tokens = pgTable(
     check(
       'user_github_app_tokens_app_type_check',
       sql`${table.github_app_type} IN ('standard', 'lite')`
+    ),
+    check(
+      'user_github_app_tokens_source_check',
+      sql`(${table.credential_source} = 'github_app'
+        AND ${table.access_token_expires_at} IS NOT NULL
+        AND ${table.refresh_token_encrypted} IS NOT NULL
+        AND ${table.refresh_token_expires_at} IS NOT NULL)
+        OR (${table.credential_source} = 'provided_token'
+        AND ${table.github_app_type} = 'standard'
+        AND ${table.refresh_token_encrypted} IS NULL
+        AND ${table.refresh_token_expires_at} IS NULL)`
     ),
   ]
 );

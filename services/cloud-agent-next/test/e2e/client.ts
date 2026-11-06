@@ -586,36 +586,55 @@ export async function createWorktreeChat(
   return created;
 }
 
-export type HostedWorkspaceCreateResult = {
+type HostedWorkspaceCreateResponse = {
   workspaceId: string;
   cloudAgentSessionId: string;
   kiloSessionId: string;
-  messageId: string;
+  messageId?: string;
   replayed?: boolean;
 };
+
+export type HostedWorkspaceCreateResult = HostedWorkspaceCreateResponse & {
+  messageId: string;
+};
+
+export type EmptyHostedWorkspaceCreateResult = HostedWorkspaceCreateResponse;
 
 export type HostedWorkspaceRepository =
   | { type: 'github'; repo: string }
   | { type: 'git'; url: string };
 
+export type HostedWorkspaceCreateInput = {
+  operationKey?: string;
+  profileId: string;
+  prompt?: string;
+  repository?: HostedWorkspaceRepository;
+};
+
 /**
  * Create a hosted workspace and its first root session through the
  * `agent-manager` mutation. Requires an explicit, authorized Cloud profile.
  *
- * `repository` overrides the driver's repository so the proof can create a
- * workspace for a second repository; omitted keeps the driver's repo.
+ * Omitting `prompt` creates an empty workspace whose first turn is the later
+ * IDE prompt. `repository` overrides the driver's repository so the proof can
+ * create a workspace for a second repository; omitted keeps the driver's repo.
  */
+export function createHostedWorkspace(
+  config: DriverConfig,
+  input: HostedWorkspaceCreateInput & { prompt: string },
+  signal?: AbortSignal
+): Promise<HostedWorkspaceCreateResult>;
+export function createHostedWorkspace(
+  config: DriverConfig,
+  input: HostedWorkspaceCreateInput & { prompt?: undefined },
+  signal?: AbortSignal
+): Promise<EmptyHostedWorkspaceCreateResult>;
 export async function createHostedWorkspace(
   config: DriverConfig,
-  input: {
-    operationKey?: string;
-    profileId: string;
-    prompt: string;
-    repository?: HostedWorkspaceRepository;
-  },
+  input: HostedWorkspaceCreateInput,
   signal?: AbortSignal
-): Promise<HostedWorkspaceCreateResult> {
-  const created = await trpcCall<HostedWorkspaceCreateResult>(
+): Promise<EmptyHostedWorkspaceCreateResult> {
+  const created = await trpcCall<EmptyHostedWorkspaceCreateResult>(
     config,
     'createHostedWorkspace',
     {
@@ -627,7 +646,7 @@ export async function createHostedWorkspace(
           ? { type: 'github', repo: config.githubRepo }
           : { type: 'git', url: config.gitUrl }),
       profile: { id: input.profileId },
-      message: { prompt: input.prompt },
+      ...(input.prompt === undefined ? {} : { message: { prompt: input.prompt } }),
       agent: { mode: 'code', model: config.model },
       ...(config.kilocodeOrganizationId
         ? { options: { kilocodeOrganizationId: config.kilocodeOrganizationId } }

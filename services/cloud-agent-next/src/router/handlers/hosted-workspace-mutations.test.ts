@@ -99,6 +99,15 @@ describe('hosted workspace mutation inputs', () => {
     expect(hostedWorkspaceCreateRequest(input).profile).toBeUndefined();
   });
 
+  it('accepts a create without a message and omits the initial turn', () => {
+    const { message, ...withoutMessage } = validCreate;
+    const input = CreateHostedWorkspaceInput.parse(withoutMessage);
+
+    expect(message).toBeDefined();
+    expect(input.message).toBeUndefined();
+    expect(hostedWorkspaceCreateRequest(input).initialTurn).toBeUndefined();
+  });
+
   it('accepts and forwards a valid explicit profile unchanged', () => {
     const input = CreateHostedWorkspaceInput.parse({ ...validCreate, profile: validProfile });
 
@@ -246,11 +255,34 @@ describe('createHostedWorkspace profile preflight', () => {
         }),
       }),
       expect.anything(),
-      expect.anything()
+      expect.objectContaining({ includeInitialMessage: true })
     );
     const request: SessionCreateRequest = mocks.createSessionWithLedger.mock.calls[0][0];
     expect(request.profile?.id).toBeUndefined();
     expect(request.profile?.resolvedProfileId).toBeUndefined();
+  });
+
+  it('creates an empty workspace without requiring a message id', async () => {
+    mocks.createSessionWithLedger.mockResolvedValue({
+      cloudAgentSessionId,
+      kiloSessionId,
+    });
+    const { message, ...withoutMessage } = validCreate;
+    const caller = appRouter.createCaller(context);
+
+    expect(message).toBeDefined();
+    await expect(
+      caller.createHostedWorkspace(CreateHostedWorkspaceInput.parse(withoutMessage))
+    ).resolves.toEqual({
+      workspaceId,
+      cloudAgentSessionId,
+      kiloSessionId,
+    });
+    expect(mocks.createSessionWithLedger).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.objectContaining({ includeInitialMessage: false })
+    );
   });
 
   it('resolves an explicit profile for the caller before registration', async () => {

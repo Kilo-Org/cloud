@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { ai_gateway_metadata_cache } from '@kilocode/db/schema';
-import { db } from '@kilocode/web-shared/lib/drizzle';
+import { db, sql } from '@kilocode/web-shared/lib/drizzle';
 import {
   isOpenAiModelServed,
   openAiServedModelsMetadataSource,
@@ -19,7 +19,7 @@ function modelsResponse(ids: string[]): Response {
 
 describe('isOpenAiModelServed', () => {
   beforeEach(async () => {
-    await db.delete(ai_gateway_metadata_cache);
+    await db.delete(ai_gateway_metadata_cache).where(sql`true`);
     resetServedModelIdsCache();
     fetchMock.mockReset();
     global.fetch = fetchMock as typeof fetch;
@@ -52,6 +52,18 @@ describe('isOpenAiModelServed', () => {
     await expect(isOpenAiModelServed('partner-key', 'gpt-5.6-luna')).resolves.toBe(true);
     await expect(isOpenAiModelServed('partner-key', 'gpt-5.6-luna-pro')).resolves.toBe(false);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('asks the upstream when the stored list is older than the cache TTL', async () => {
+    await db.insert(ai_gateway_metadata_cache).values({
+      url: openAiServedModelsMetadataSource.url,
+      data: { object: 'list', data: [{ id: 'gpt-5.6-luna' }] },
+      updated_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+    });
+    fetchMock.mockResolvedValue(modelsResponse(['gpt-5-nano']));
+
+    await expect(isOpenAiModelServed('partner-key', 'gpt-5.6-luna')).resolves.toBe(false);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it('asks the upstream when the stored list is unusable', async () => {

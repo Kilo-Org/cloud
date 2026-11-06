@@ -53,6 +53,7 @@ import { isCustomLlmDeniedInCountry } from '@kilocode/web-shared/lib/ai-gateway/
 import { addMonths } from 'date-fns';
 import { getModelDisplayPricing } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/display-pricing';
 import {
+  assertMinimumCount,
   createCachedMetadataReader,
   type MetadataSource,
 } from '@kilocode/web-shared/lib/ai-gateway/metadata-cache';
@@ -373,7 +374,11 @@ function openRouterModelsHeaders() {
 export const openRouterModelsMetadataSource: MetadataSource<OpenRouterModelsResponse> = {
   url: `${OPENROUTER.apiUrl}/models`,
   headers: openRouterModelsHeaders,
-  parse: raw => OpenRouterModelsResponseSchema.parse(removeUpstreamEnkrypt(raw)),
+  parse: raw => {
+    const parsed = OpenRouterModelsResponseSchema.parse(removeUpstreamEnkrypt(raw));
+    assertMinimumCount(openRouterModelsMetadataSource.url, parsed.data.length, 100);
+    return parsed;
+  },
 };
 
 const openRouterModelsReader = createCachedMetadataReader(openRouterModelsMetadataSource, {

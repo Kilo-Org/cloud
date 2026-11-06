@@ -7,6 +7,7 @@ import {
 } from '@kilocode/db/schema-types';
 import { toLegacyVariants } from '@kilocode/web-shared/lib/ai-gateway/providers/legacy-variants';
 import {
+  assertMinimumCount,
   getMetadata,
   type MetadataSource,
 } from '@kilocode/web-shared/lib/ai-gateway/metadata-cache';
@@ -56,7 +57,11 @@ export type ModelsDevCatalog = z.infer<typeof ModelsDevCatalogSchema>;
 
 export const modelsDevCatalogSource: MetadataSource<ModelsDevCatalog> = {
   url: 'https://models.dev/api.json',
-  parse: raw => ModelsDevCatalogSchema.parse(raw),
+  parse: raw => {
+    const catalog = ModelsDevCatalogSchema.parse(raw);
+    assertMinimumCount(modelsDevCatalogSource.url, Object.keys(catalog).length, 10);
+    return catalog;
+  },
 };
 
 export function loadModelsDevCatalog(): Promise<ModelsDevCatalog> {

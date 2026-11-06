@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import * as z from 'zod';
 import { ai_gateway_metadata_cache } from '@kilocode/db/schema';
-import { db } from '@kilocode/web-shared/lib/drizzle';
+import { db, sql } from '@kilocode/web-shared/lib/drizzle';
 import {
   createCachedMetadataReader,
   fetchMetadata,
@@ -25,7 +25,7 @@ function storeRow(data: unknown) {
 }
 
 beforeEach(async () => {
-  await db.delete(ai_gateway_metadata_cache);
+  await db.delete(ai_gateway_metadata_cache).where(sql`true`);
   fetchSpy = jest
     .spyOn(globalThis, 'fetch')
     .mockImplementation(async () => Response.json({ models: ['live'] }));

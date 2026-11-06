@@ -3131,7 +3131,7 @@
     "subscriptionLoading": "Kilo Pass захиалгыг ачаалж байна",
     "retryHint": "Kilo Pass-ын төлөвийг дахин ачаална.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
-    "purchaseUnavailable": "Одоогоор худалдан авах боломжгүй байна.",
+    "purchaseUnavailable": "Одоогоор Kilo Pass худалдан авах боломжгүй байна.",
     "kiloPassManagement": "Kilo Pass-ын удирдлага",
     "kiloPassSetup": "Kilo Pass-ын тохиргоо",
     "subscriptionHeaderDescription": "Kilo App-д хиймэл оюун ухаан ашиглан код бичих сесс явуулахад зориулж Kilo үлдэгдэлд сар бүр кредит нэмэх захиалга юм.",

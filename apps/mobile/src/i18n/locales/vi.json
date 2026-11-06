@@ -2592,7 +2592,7 @@
     "subscriptionLoading": "Đang tải gói đăng ký Kilo Pass",
     "retryHint": "Thử tải lại trạng thái Kilo Pass.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
-    "purchaseUnavailable": "Hiện chưa thể mua.",
+    "purchaseUnavailable": "Hiện chưa thể mua Kilo Pass.",
     "kiloPassManagement": "Quản lý Kilo Pass",
     "kiloPassSetup": "Thiết lập Kilo Pass",
     "subscriptionHeaderDescription": "Gói đăng ký hàng tháng giúp thêm tín dụng vào số dư Kilo của bạn để chạy các phiên lập trình AI trong Kilo App.",

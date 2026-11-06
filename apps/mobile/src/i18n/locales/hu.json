@@ -3131,7 +3131,7 @@
     "subscriptionLoading": "Kilo Pass előfizetés betöltése",
     "retryHint": "Újra lekéri a Kilo Pass állapotát.",
     "cardAccessibility": "{{title}}. {{description}}. Művelet: {{actionLabel}}",
-    "purchaseUnavailable": "Jelenleg nem vásárolhatsz előfizetést.",
+    "purchaseUnavailable": "Jelenleg nem vásárolhatsz Kilo Pass előfizetést.",
     "kiloPassManagement": "Kilo Pass kezelése",
     "kiloPassSetup": "Kilo Pass beállítása",
     "subscriptionHeaderDescription": "Havi előfizetés, amely krediteket ad a Kilo egyenlegedhez AI kódolási munkamenetek futtatásához a Kilo alkalmazásban.",

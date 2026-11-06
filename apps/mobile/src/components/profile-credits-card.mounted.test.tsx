@@ -14,7 +14,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
 import { CreditsCard } from './profile-credits-card';
-import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
+import {
+  ICON_TARGET_BOX_CLASS,
+  LINE_ACTION_BOX_CLASS,
+  LINE_ACTION_HIT_SLOP,
+} from '@/lib/a11y/tap-target';
 import { type OrgListEntry } from '@/lib/hooks/use-organization-queries';
 import { OrganizationProvider } from '@/lib/organization-context';
 import { ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
@@ -291,11 +295,19 @@ async function choose(renderer: ReactTestRenderer, label: string) {
   });
 }
 
-/** The header container's classes: the only View the card gives `min-h-11`. */
+/**
+ * The header container's classes: the row that lays out the credits eyebrow
+ * beside the account picker. The card's outer box is the only View whose whole
+ * class list is `gap-3`, so the header is the one that adds to it.
+ */
 function headerClasses(renderer: ReactTestRenderer): string[] {
-  const header = renderer.root.find(
-    node => Object.is(node.type, 'View') && String(node.props.className).includes('min-h-11')
-  );
+  const header = renderer.root.find(node => {
+    if (!Object.is(node.type, 'View')) {
+      return false;
+    }
+    const className = String(node.props.className);
+    return className.includes('gap-3') && className !== 'gap-3';
+  });
   return String(header.props.className).split(' ');
 }
 
@@ -750,20 +762,6 @@ describe('CreditsCard balance state', () => {
     settled.unmount();
   });
 
-  it('holds the balance row height while the balance loads', async () => {
-    // One placeholder carries both reserved lines (the amount's and the
-    // note's) and the control box that sets the row's height, so the row's
-    // arrival cannot move the sections below.
-    const { renderer, texts, unmount } = await mountCard();
-    expect(texts().filter(text => text === 'SKELETON')).toHaveLength(2);
-    const spacer = renderer.root.find(
-      node =>
-        String(node.props.className) === 'h-[48px] w-[48px] items-center justify-center shrink-0'
-    );
-    expect(spacer).toBeTruthy();
-    unmount();
-  });
-
   it('shows a cached balance without reusing it after an account change', async () => {
     const queryClient = createTestQueryClient();
 
@@ -1099,6 +1097,22 @@ describe('CreditsCard credits header', () => {
     expect(texts()).toContain('Credits');
     unmount();
   });
+
+  it('keeps the header on the eyebrow line instead of the picker box height', async () => {
+    const { renderer, unmount } = await mountCard(createTestQueryClient(), headerOrgs);
+
+    // The picker is a line action: its box cancels its own layout height and
+    // overflows the eyebrow's line. A minimum height on the row would centre
+    // the eyebrow in the box's height instead and open the gap to the credits
+    // card to twice the gap the section headers below keep to their rows.
+    expect(headerClasses(renderer)).not.toContain('min-h-11');
+    const picker = renderer.root.find(
+      node => Object.is(node.type, Pressable) && node.props.accessibilityHint === 'Select account'
+    );
+    expect(String(picker.props.className)).toContain(LINE_ACTION_BOX_CLASS);
+    expect(picker.props.hitSlop).toEqual(LINE_ACTION_HIT_SLOP);
+    unmount();
+  });
 });
 
 describe('CreditsCard balance row', () => {
@@ -1126,12 +1140,12 @@ describe('CreditsCard balance row', () => {
     );
   }
 
-  /** The amount row of the stacked layout: the amount, the toggle and the purchase action. */
+  /** The amount row of the stacked layout: the amount and the hide/show toggle. */
   function amountRow(renderer: ReactTestRenderer): ReactTestInstance {
     return renderer.root.find(
       node =>
         Object.is(node.type, 'View') &&
-        String(node.props.className) === 'min-w-0 flex-row flex-wrap items-center gap-1'
+        String(node.props.className) === 'min-w-0 flex-row items-center gap-1'
     );
   }
 
@@ -1181,22 +1195,21 @@ describe('CreditsCard balance row', () => {
     // three lines, so both stack instead.
     ['the compact cell', 332],
     ['a 390 dp screen', 362],
-  ])('keeps the toggle and the purchase action on the amount row on %s', async (_name, width) => {
+  ])('gives the note its own row under the amount on %s', async (_name, width) => {
     const { renderer, unmount } = await mountAtCardWidth(width);
 
     const classes = balanceClasses(renderer);
     expect(classes).toContain('items-stretch');
     expect(classes).not.toContain('flex-row');
-    // Row 1 is the amount, the toggle and the purchase action. Only the note
-    // takes a row of its own, under the balance.
+    // Row 1 is the amount and the toggle; the note follows it at the card's
+    // full width and the purchase action takes the row below the note, so the
+    // amount keeps the tight gap under it that the wide cells show.
     const row = amountRow(renderer);
-    expect(renders(row, '$12.34')).toBe(true);
-    // The toggle is an icon control: its label, not a text child, names it.
-    expect(row.findAll(node => node.props.accessibilityLabel === 'Hide balance')).toHaveLength(1);
-    expect(renders(row, 'ADD_CREDITS_BUTTON')).toBe(true);
     expect(renders(row, 'No expiring credits.')).toBe(false);
+    expect(renders(row, 'ADD_CREDITS_BUTTON')).toBe(false);
     const card = cardBox(renderer);
     expect(renders(card, 'No expiring credits.')).toBe(true);
+    expect(renders(card, 'ADD_CREDITS_BUTTON')).toBe(true);
     unmount();
   });
 });

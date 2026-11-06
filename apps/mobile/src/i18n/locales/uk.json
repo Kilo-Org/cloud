@@ -2658,7 +2658,7 @@
     "subscriptionLoading": "Завантаження даних підписки Kilo Pass",
     "retryHint": "Повторно перевіряє стан Kilo Pass.",
     "cardAccessibility": "{{title}}: {{description}}. {{actionLabel}}",
-    "purchaseUnavailable": "Покупка зараз недоступна.",
+    "purchaseUnavailable": "Купити Kilo Pass зараз неможливо.",
     "kiloPassManagement": "Керування Kilo Pass",
     "kiloPassSetup": "Налаштування Kilo Pass",
     "subscriptionHeaderDescription": "Щомісячна підписка, яка додає кредити на ваш баланс Kilo для запуску AI-сесій кодування в Kilo App.",

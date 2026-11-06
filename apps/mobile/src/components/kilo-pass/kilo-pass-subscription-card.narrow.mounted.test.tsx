@@ -9,7 +9,7 @@ const windowDims = vi.hoisted(() => ({ width: 390, height: 844, fontScale: 1, sc
 
 type CardContent = {
   kind: string;
-  state?: { title: string; description: string; action: string; actionLabel: string | null };
+  state?: { title: string; description: string; action: string; actionLabel: string };
 };
 
 const cardState = vi.hoisted(() => {
@@ -46,14 +46,7 @@ vi.mock('@/lib/trpc', () => ({
 }));
 
 vi.mock('@tanstack/react-query', () => ({
-  // A web-managed pass with its link: the only answer a reader can act on, so
-  // the card's one pressable exists for the layout under test.
-  useQuery: () => ({
-    data: { kind: 'web_management', webUrl: 'https://example.com/subscriptions/kilo-pass' },
-    isError: false,
-    isPending: false,
-    refetch: vi.fn(),
-  }),
+  useQuery: () => ({ data: undefined, isError: false, isPending: true, refetch: vi.fn() }),
 }));
 
 vi.mock('@/lib/kilo-pass/subscription-card-state', () => ({
@@ -153,29 +146,5 @@ describe('KiloPassSubscriptionCard loading layout', () => {
     // The card's rem is 14 pt: p-3 (21) + the h-10 icon row (35) + the two
     // 1 px borders, matching the loaded card the reserve stands in for.
     expect(String(root.findByProps({ className: 'h-[58px]' }).props.className)).toBe('h-[58px]');
-  });
-});
-
-describe('KiloPassSubscriptionCard inert card', () => {
-  it('renders the unavailable surface without a button role and in muted ink', () => {
-    cardState.content = {
-      kind: 'card',
-      state: {
-        title: 'Kilo Pass',
-        description: 'kiloPass.purchaseUnavailable',
-        action: 'open-native',
-        actionLabel: null,
-      },
-    };
-    const root = renderCard(false);
-    expect(root.findAllByProps({ accessibilityRole: 'button' })).toHaveLength(0);
-    const card = root.findByProps({
-      accessibilityLabel: 'Kilo Pass',
-    });
-    expect(String(card.props.className)).toBe('rounded-lg border border-border bg-secondary p-3');
-    const title = card
-      .findAll(node => Object.is(node.type, 'Text'))
-      .find(node => node.props.children === 'Kilo Pass');
-    expect(String(title?.props.className)).toContain('text-muted-foreground');
   });
 });

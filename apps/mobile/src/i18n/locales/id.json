@@ -2592,7 +2592,7 @@
     "subscriptionLoading": "Memuat langganan Kilo Pass",
     "retryHint": "Mencoba memuat ulang status Kilo Pass.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
-    "purchaseUnavailable": "Pembelian tidak tersedia saat ini.",
+    "purchaseUnavailable": "Pembelian Kilo Pass tidak tersedia saat ini.",
     "kiloPassManagement": "Pengelolaan Kilo Pass",
     "kiloPassSetup": "Penyiapan Kilo Pass",
     "subscriptionHeaderDescription": "Langganan bulanan yang menambah kredit ke saldo Kilo Anda untuk menjalankan sesi coding AI di Kilo App.",

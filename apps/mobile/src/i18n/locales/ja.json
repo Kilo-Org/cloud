@@ -2592,7 +2592,7 @@
     "subscriptionLoading": "Kilo Passのサブスクリプションを読み込み中",
     "retryHint": "Kilo Passの状態の取得を再試行します。",
     "cardAccessibility": "{{title}}。{{description}}。{{actionLabel}}",
-    "purchaseUnavailable": "現在購入できません。",
+    "purchaseUnavailable": "現在Kilo Passを購入できません。",
     "kiloPassManagement": "Kilo Passの管理",
     "kiloPassSetup": "Kilo Passのセットアップ",
     "subscriptionHeaderDescription": "毎月のサブスクリプションで、Kilo AppでのAIコーディングセッションの実行に使えるクレジットをKilo残高に追加します。",

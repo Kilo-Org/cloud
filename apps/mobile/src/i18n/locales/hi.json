@@ -2599,7 +2599,7 @@
     "subscriptionLoading": "Kilo Pass की सदस्यता लोड हो रही है",
     "retryHint": "Kilo Pass की स्थिति फिर से लोड करता है।",
     "cardAccessibility": "{{title}}। {{description}}। {{actionLabel}}",
-    "purchaseUnavailable": "अभी खरीदारी उपलब्ध नहीं है।",
+    "purchaseUnavailable": "अभी Kilo Pass की खरीदारी उपलब्ध नहीं है।",
     "kiloPassManagement": "Kilo Pass का प्रबंधन",
     "kiloPassSetup": "Kilo Pass का सेटअप",
     "subscriptionHeaderDescription": "एक मासिक सदस्यता जो Kilo App में AI कोडिंग सत्र चलाने के लिए आपके Kilo बैलेंस में क्रेडिट जोड़ती है।",

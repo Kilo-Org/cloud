@@ -3131,7 +3131,7 @@
     "subscriptionLoading": "Die Kilo Pass-intekening word gelaai",
     "retryHint": "Probeer die Kilo Pass-status weer laai.",
     "cardAccessibility": "{{title}}: {{description}}. {{actionLabel}}",
-    "purchaseUnavailable": "Die aankoop is tans nie beskikbaar nie.",
+    "purchaseUnavailable": "Jy kan nie tans Kilo Pass koop nie.",
     "kiloPassManagement": "Kilo Pass-bestuur",
     "kiloPassSetup": "Kilo Pass-opstelling",
     "subscriptionHeaderDescription": "'n Maandelikse intekening wat krediete by jou Kilo-saldo voeg vir die bestuur van AI-koderingsessies in Kilo App.",

@@ -3239,7 +3239,7 @@
     "subscriptionLoading": "Načítava sa predplatné Kilo Pass",
     "retryHint": "Znova načíta stav Kilo Pass.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
-    "purchaseUnavailable": "Nákup momentálne nie je dostupný.",
+    "purchaseUnavailable": "Kilo Pass si momentálne nemožno kúpiť.",
     "kiloPassManagement": "Správa Kilo Pass",
     "kiloPassSetup": "Nastavenie Kilo Pass",
     "subscriptionHeaderDescription": "Mesačné predplatné, ktoré pridáva kredity do vášho zostatku Kilo na spúšťanie AI programovacích relácií v aplikácii Kilo.",

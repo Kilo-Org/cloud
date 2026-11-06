@@ -55,14 +55,6 @@ export function KiloPassSubscriptionCard({
     presentationIsPending: presentationQuery.isPending,
   });
 
-  // A card that resolves to no target here is information, not a control: the
-  // purchase answer says nothing can be bought in this app and there is no web
-  // pass to manage, so it renders muted and inert instead of as a dead button.
-  const pressable =
-    contentState.kind === 'card' &&
-    contentState.state.action === 'open-web' &&
-    Boolean(presentationQuery.data?.webUrl);
-
   const handlePress = () => {
     if (contentState.kind !== 'card') {
       return;
@@ -85,15 +77,10 @@ export function KiloPassSubscriptionCard({
     void presentationQuery.refetch();
   };
 
-  // The card wears the profile rows' beige surface with the honey row tint on
-  // its tile. On the white `bg-card` surface the one row the reader cannot act
-  // on drew more attention than every actionable row beside it (e2 design
-  // review, 2026-11-05).
-  //
   // The card body's one row: icon tile + text block + an optional trailing
   // label, stacked when a narrow window cannot fit the fixed siblings.
   const iconTile = (
-    <View className="h-10 w-10 shrink-0 items-center justify-center rounded-md border border-row-honey-tile-border bg-row-honey-tile-bg">
+    <View className="h-10 w-10 shrink-0 items-center justify-center rounded-md bg-secondary">
       <KiloPassIcon size={19} color={colors[rowTint('honey').hueThemeKey]} />
     </View>
   );
@@ -116,29 +103,6 @@ export function KiloPassSubscriptionCard({
 
   return (
     <View className="gap-2">
-      {/* The inert card: purchases resolve to `unavailable` or a dead end
-          here, so the card wears the section's muted ink, keeps its surface
-          and tile for scanability, and carries no button state. */}
-      {contentState.kind === 'card' && !pressable ? (
-        <View
-          accessibilityLabel={
-            getKiloPassSubscriptionCardAccessibility(contentState.state).accessibilityLabel
-          }
-          className="rounded-lg border border-border bg-secondary p-3"
-        >
-          {cardBody(
-            <>
-              <Text className="font-semibold text-muted-foreground">
-                {contentState.state.title}
-              </Text>
-              <Text className="text-xs text-muted-foreground">
-                {contentState.state.description}
-              </Text>
-            </>
-          )}
-        </View>
-      ) : null}
-
       {contentState.kind === 'loading' && hideLoadingSkeleton ? (
         // The height the loading card below renders at, so revealing it never
         // moves layout. The card's rem is 14 pt, not 16, so the wide row
@@ -157,22 +121,17 @@ export function KiloPassSubscriptionCard({
         <View
           accessibilityLabel={t('kiloPass.subscriptionLoading')}
           accessibilityState={{ busy: true }}
-          className="rounded-lg border border-border bg-secondary p-3"
+          className="rounded-lg border border-border bg-card p-3"
         >
           {cardBody(
             // Bars the height of the loaded title and description lines, clamped
-            // so a narrow window cannot overflow the card. Their fill is
-            // `bg-muted-soft`: the theme's default skeleton fill equals this
-            // shell's `bg-secondary` in light mode, so a bare bar was invisible
-            // there (the same pairing the balance skeleton fixes in
-            // `profile-credits-card.tsx`). `--muted-soft` keeps a step between
-            // them in both themes.
+            // so a narrow window cannot overflow the card.
             <View className="gap-3">
-              <Skeleton className="h-4 w-28 max-w-full rounded bg-muted-soft" />
-              <Skeleton className="h-3 w-48 max-w-full rounded bg-muted-soft" />
+              <Skeleton className="h-4 w-28 max-w-full rounded" />
+              <Skeleton className="h-3 w-48 max-w-full rounded" />
             </View>,
             undefined,
-            <Skeleton className="h-10 w-10 rounded-md bg-muted-soft" />
+            <Skeleton className="h-10 w-10 rounded-md" />
           )}
         </View>
       ) : null}
@@ -186,7 +145,7 @@ export function KiloPassSubscriptionCard({
             actionLabel: contentState.actionLabel,
           })}
           accessibilityRole="button"
-          className="rounded-lg border border-border bg-secondary p-3 active:opacity-80"
+          className="rounded-lg border border-border bg-card p-3 active:opacity-80"
           onPress={handleRetryPress}
         >
           {cardBody(
@@ -201,7 +160,7 @@ export function KiloPassSubscriptionCard({
         </Pressable>
       ) : null}
 
-      {contentState.kind === 'card' && pressable ? (
+      {contentState.kind === 'card' ? (
         <Pressable
           accessibilityHint={
             getKiloPassSubscriptionCardAccessibility(contentState.state).accessibilityHint
@@ -210,7 +169,7 @@ export function KiloPassSubscriptionCard({
             getKiloPassSubscriptionCardAccessibility(contentState.state).accessibilityLabel
           }
           accessibilityRole="button"
-          className="rounded-lg border border-border bg-secondary p-3 active:opacity-80"
+          className="rounded-lg border border-border bg-card p-3 active:opacity-80"
           onPress={handlePress}
         >
           {cardBody(

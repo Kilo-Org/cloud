@@ -69,7 +69,7 @@ describe('KiloPassSubscriptionScreen', () => {
 
   it.each([
     ['web_management', 'This Kilo Pass is managed on web'],
-    ['unavailable', 'Purchase is not available right now.'],
+    ['unavailable', 'Kilo Pass purchase is not available right now.'],
   ] as const)('centers %s outside the purchase scroller', async (kind, description) => {
     mocks.presentation.data = { kind, webUrl: null };
     const renderer = await renderScreen();
@@ -105,7 +105,7 @@ describe('KiloPassSubscriptionScreen', () => {
   it('non-retryable presentation: unavailable shows the unavailable screen with no purchase CTA', async () => {
     mocks.presentation.data = { kind: 'unavailable', webUrl: null };
     const renderer = await renderScreen();
-    expect(allText(renderer)).toContain('Purchase is not available right now.');
+    expect(allText(renderer)).toContain('Kilo Pass purchase is not available right now.');
     expect(renderer.root.findAll(node => String(node.type) === 'Button')).toHaveLength(0);
     renderer.unmount();
   });

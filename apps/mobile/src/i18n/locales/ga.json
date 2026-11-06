@@ -3293,7 +3293,7 @@
     "subscriptionLoading": "Ag lódáil shíntiús Kilo Pass",
     "retryHint": "Déanann sé iarracht eile stádas Kilo Pass a lódáil.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
-    "purchaseUnavailable": "Níl an ceannach ar fáil faoi láthair.",
+    "purchaseUnavailable": "Ní féidir Kilo Pass a cheannach faoi láthair.",
     "kiloPassManagement": "Bainistiú Kilo Pass",
     "kiloPassSetup": "Socrú Kilo Pass",
     "subscriptionHeaderDescription": "Sintiús míosúil a chuireann creidmheasanna le do chothromas Kilo le haghaidh seisiúin chódaithe AI a rith in Kilo App.",

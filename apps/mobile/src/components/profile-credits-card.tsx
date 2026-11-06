@@ -7,17 +7,22 @@ import { ChevronDown, Eye, EyeOff } from '@/components/ui/icons';
 import { Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
+import Animated, { LinearTransition } from 'react-native-reanimated';
 
 import { AddCreditsButton, AddCreditsRow } from '@/components/add-credits-row';
 import { useContextPicker } from '@/components/context-control';
 import { CreditExpiryNote } from '@/components/credits/credit-expiry-note';
-import { BalanceRow } from '@/components/credits/credits-balance-row';
 import { KiloPassSubscriptionCard } from '@/components/kilo-pass/kilo-pass-subscription-card';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { WEB_BASE_URL } from '@/lib/config';
-import { ICON_TARGET_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import {
+  ICON_TARGET_BOX_CLASS,
+  LINE_ACTION_BOX_CLASS,
+  LINE_ACTION_HIT_SLOP,
+  STATE_ACTION_CLASS,
+} from '@/lib/a11y/tap-target';
 import { formatMoney } from '@/lib/format';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useHideBalancePreference } from '@/lib/hooks/use-hide-balance-preference';
@@ -43,9 +48,13 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   const { width } = useWindowDimensions();
   const fontScale = useLiveFontScale();
   const [availableWidth, setAvailableWidth] = useState<number | null>(null);
-  // Stack the balance below 370 scaled card dp; wide cells keep the note
-  // beside the amount at two lines, stacked cells take it at full width.
-  // Measured on the standard matrix (Android, 2026-11-02).
+  // Stack the balance unless the expiry note keeps its two lines beside the
+  // amount, the visibility toggle and the purchase action. Measured on the
+  // standard matrix (Android, 2026-11-02): the note takes two lines from a
+  // 215 dp column and three lines below that, and the one-row siblings take
+  // 157 dp of the card, so the one-row layout holds from about 372 scaled card
+  // dp. The threshold stacks below 370 of them and uses the card's width rather
+  // than the display's; below it the note takes a row of its own at full width.
   const stackBalance = availableWidth === null || availableWidth / fontScale < 370;
   // Below NARROW_LAYOUT_WIDTH the account picker's 65% share leaves the
   // "CREDITS" eyebrow too little room for one word and Android breaks it
@@ -153,18 +162,15 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   const selectedOrgRole = orgs?.find(o => o.organizationId === selectedOrgId)?.role;
   const canManageOrgBilling = selectedOrgId != null && isMoneyRole(selectedOrgRole);
 
-  // The expiry note's slot, under the amount. Every state reserves the note's
-  // own line box — `text-xs` here is a 14 dp line — so a slot that has not
-  // resolved paints that line as its bar and nothing below moves (Android base
-  // cell, design gate 2026-11-06). No entrance fade: the caption holds a row
-  // of this block, so a fade that paints it late leaves it empty.
+  // The expiry note's slot: under the amount. No entrance fade — the caption
+  // holds a row of this block, so a fade that paints it late leaves it empty.
   const expirySlot = (
     <>
       {creditsFailed && (
         <Text className="text-xs text-muted-foreground">{t('credits.expiryUnavailable')}</Text>
       )}
       {!creditsFailed && creditsPending && (
-        <Skeleton className="h-[14px] w-40 max-w-full rounded bg-muted-soft" />
+        <Skeleton className="h-3 w-40 max-w-full rounded bg-muted-soft" />
       )}
       {!creditsFailed && !creditsPending && (
         <CreditExpiryNote
@@ -232,9 +238,15 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
         setAvailableWidth(event.nativeEvent.layout.width);
       }}
     >
+      {/* The header row lays out on the eyebrow's own line: the account picker
+          is a line action, so its box cancels its layout height and overflows
+          that line (LINE_ACTION_BOX_CLASS) instead of lifting the row to the
+          box's height. A taller row centred the eyebrow in it and left the gap
+          to the credits card twice the gap the section headers below keep to
+          their first rows (design gate, Profile base cell, 2026-11-06). */}
       <View
         className={cn(
-          'min-h-11 gap-3',
+          'gap-3',
           narrow ? 'flex-col items-stretch' : 'flex-row items-center justify-between'
         )}
       >
@@ -244,14 +256,15 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
         {canPickContext && (
           <Pressable
             className={cn(
-              'min-h-11 min-w-0 flex-row items-center gap-1 active:opacity-70',
+              LINE_ACTION_BOX_CLASS,
+              'min-w-0 flex-row items-center gap-1 active:opacity-70',
               narrow ? 'max-w-full justify-start' : 'max-w-[65%] shrink justify-end'
             )}
             onPress={openPicker}
             accessibilityRole="button"
             accessibilityLabel={selectedLabel}
             accessibilityHint={t('profile.selectAccount')}
-            hitSlop={8}
+            hitSlop={LINE_ACTION_HIT_SLOP}
           >
             <Text
               className="min-w-0 shrink text-xs font-medium text-muted-foreground"
@@ -286,28 +299,22 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
       {showBalanceSkeleton && (
         // Content-shaped skeleton (number bar + note bar in the card's own
         // bg-secondary shell): a plain block read as an empty box in the e5
-        // spot check (2026-09-07). It holds the balance row's own height: the
-        // column converges on the row's p-2 column (number line + gap + note
-        // line) and the reserved control box matches the row's 48 dp toggle,
-        // which is what sets that row's height. A shorter placeholder left the
-        // sections below moving by the difference when the row arrived (Android
-        // base cell, design gate 2026-11-06). The bars are bg-muted-soft
-        // because the theme's bg-muted equals bg-secondary — default-tone bars
-        // were invisible in this shell (b911 e2 spot check: "blank beige
-        // block", e2-nav-profile.png).
+        // spot check (2026-09-07). The bars are bg-muted-soft because the
+        // theme's bg-muted equals bg-secondary — default-tone bars were
+        // invisible in this shell (b911 e2 spot check: "blank beige block",
+        // e2-nav-profile.png).
+        //
+        // The inner column keeps the loaded block's 48 dp content height
+        // (amount line 28.19 + gap 3.5 + note line 14.1, on the 48 dp
+        // visibility toggle it shares the row with), so the shell measures the
+        // loaded block's 62.1 dp rather than the 56 dp its own `min-h-16` and
+        // two bars made: the swap to the balance row moved every section below
+        // it by 1.5 dp (design gate, Profile, 2026-11-05).
         <View className="min-h-16 flex-row items-center rounded-lg bg-secondary px-3 py-2">
-          {/* The column and the reserve are exact pixel heights: rem-sized
-              placeholders render at a fraction of their nominal dp on Android,
-              so `min-h-12` settled 6 dp under the row it stood in for and the
-              row's arrival moved every section below (Android base cell,
-              design gate 2026-11-06). The row's height is its control box —
-              the toggle's 48 dp, which `ICON_TARGET_BOX_CLASS` writes
-              exactly — so the placeholder carries the same 48. */}
           <View className="min-h-[48px] flex-1 justify-center gap-1">
-            <Skeleton className="h-[28px] w-28 rounded bg-muted-soft" />
-            <Skeleton className="h-[14px] w-40 rounded bg-muted-soft" />
+            <Skeleton className="h-8 w-28 rounded-md bg-muted-soft" />
+            <Skeleton className="h-3 w-40 rounded bg-muted-soft" />
           </View>
-          <View className={cn(ICON_TARGET_BOX_CLASS, 'shrink-0')} />
         </View>
       )}
       {balanceFailed && (
@@ -329,13 +336,56 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
         />
       )}
       {!showBalanceSkeleton && !balanceFailed && (
-        <BalanceRow
-          stackBalance={stackBalance}
-          amountLine={amountLine}
-          visibilityToggle={visibilityToggle}
-          expirySlot={expirySlot}
-          addCreditsAction={addCreditsAction}
-        />
+        <View
+          className={cn(
+            'min-h-16 gap-2 rounded-lg bg-secondary px-3 py-2',
+            // A stacked card ends on the Add credits button, whose own line
+            // sits inside a 38.5 dp pill. `pb-3` gives that pill more room under
+            // it than the card's 7 dp top padding gives the amount above it, so
+            // the bottom edge does not read as tighter than the top.
+            stackBalance ? 'items-stretch pb-3' : 'flex-row items-center'
+          )}
+        >
+          <Animated.View
+            className={cn('min-w-0', stackBalance ? 'gap-1' : 'flex-1 flex-row items-center gap-1')}
+            layout={LinearTransition.duration(200)}
+          >
+            {/* Row 1 holds the amount, and the toggle on a stacked card. Its
+                48 dp box carries `-my-[10px]`, so it reaches its touch target
+                without adding height: the row ends at the amount's own line and
+                the note below keeps the wide cells' 3.4 dp gap. On a wide card
+                the toggle is the row's sibling and the note stays in the
+                amount's column. */}
+            <View
+              className={cn(
+                'min-w-0',
+                // `flex-1` is the row's width share only while this View is the
+                // column's child on a wide card. On a stacked card this View is
+                // the amount row inside the column, where `flex-1` sets a 0
+                // vertical basis and the row measured 0 dp tall on the first
+                // layout pass (Android compact cell, 2026-11-03); the card's
+                // `items-stretch` already gives it the full width.
+                stackBalance ? 'flex-row items-center gap-1' : 'flex-1 gap-1'
+              )}
+            >
+              <View className={cn('min-w-0', stackBalance && 'flex-1')}>{amountLine}</View>
+              {stackBalance ? (
+                <View className="shrink-0 -my-[10px]">{visibilityToggle}</View>
+              ) : (
+                expirySlot
+              )}
+            </View>
+            {stackBalance ? expirySlot : visibilityToggle}
+          </Animated.View>
+          {/* The purchase action keeps the card's trailing end in both
+              layouts: the trailing column on a wide card, its own row below
+              the note on a stacked one. */}
+          {addCreditsAction !== null && (
+            <View className="max-w-full flex-row flex-wrap items-center justify-end gap-2">
+              {addCreditsAction}
+            </View>
+          )}
+        </View>
       )}
       {selectedOrgId != null &&
         canManageOrgBilling &&

@@ -3131,7 +3131,7 @@
     "subscriptionLoading": "Kilo Pass-ის გამოწერა იტვირთება",
     "retryHint": "ხელახლა ამოწმებს Kilo Pass-ის მდგომარეობას.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
-    "purchaseUnavailable": "შესყიდვა ამჟამად შეუძლებელია.",
+    "purchaseUnavailable": "Kilo Pass-ის შეძენა ამჟამად შეუძლებელია.",
     "kiloPassManagement": "Kilo Pass-ის მართვა",
     "kiloPassSetup": "Kilo Pass-ის გამართვა",
     "subscriptionHeaderDescription": "ყოველთვიური გამოწერა, რომელიც თქვენს Kilo ბალანსს კრედიტებს ამატებს AI კოდირების სესიებისთვის Kilo აპში.",

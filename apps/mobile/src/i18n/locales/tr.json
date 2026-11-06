@@ -2592,7 +2592,7 @@
     "subscriptionLoading": "Kilo Pass aboneliği yükleniyor",
     "retryHint": "Kilo Pass durumunu almayı tekrar dener.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
-    "purchaseUnavailable": "Satın alma şu anda kullanılamıyor.",
+    "purchaseUnavailable": "Şu anda Kilo Pass satın alınamıyor.",
     "kiloPassManagement": "Kilo Pass yönetimi",
     "kiloPassSetup": "Kilo Pass kurulumu",
     "subscriptionHeaderDescription": "Kilo App'te AI kodlama oturumları yürütmek için Kilo bakiyenize kredi ekleyen aylık bir abonelik.",

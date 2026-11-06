@@ -3131,7 +3131,7 @@
     "subscriptionLoading": "Sedang memuatkan langganan Kilo Pass",
     "retryHint": "Mencuba semula untuk mendapatkan status Kilo Pass.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
-    "purchaseUnavailable": "Pembelian tidak tersedia sekarang.",
+    "purchaseUnavailable": "Pembelian Kilo Pass tidak tersedia sekarang.",
     "kiloPassManagement": "Pengurusan Kilo Pass",
     "kiloPassSetup": "Persediaan Kilo Pass",
     "subscriptionHeaderDescription": "Langganan bulanan yang menambah kredit ke baki Kilo anda untuk menjalankan sesi pengekodan AI dalam Apl Kilo.",

@@ -3137,7 +3137,7 @@
     "subscriptionLoading": "የKilo Pass ምዝገባ መረጃ በመጫን ላይ",
     "retryHint": "የKilo Pass ሁኔታን ለማግኘት እንደገና ይሞክራል።",
     "cardAccessibility": "{{title}}። {{description}}። {{actionLabel}}",
-    "purchaseUnavailable": "ግዢው አሁን አይገኝም።",
+    "purchaseUnavailable": "አሁን Kilo Passን መግዛት አይቻልም።",
     "kiloPassManagement": "የKilo Pass አስተዳደር",
     "kiloPassSetup": "የKilo Pass ማዋቀር",
     "subscriptionHeaderDescription": "ወርሃዊ ምዝገባ በKilo App ውስጥ የAI ኮዲንግ ክፍለ-ጊዜዎችን ለማስኬድ ወደ Kilo ቀሪ ሂሳብዎ ክሬዲት የሚያክል።",

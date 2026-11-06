@@ -2592,7 +2592,7 @@
     "subscriptionLoading": "Kilo Pass-abonnement wordt geladen",
     "retryHint": "Haalt de Kilo Pass-status opnieuw op.",
     "cardAccessibility": "{{title}}: {{description}}. {{actionLabel}}",
-    "purchaseUnavailable": "De aankoop is op dit moment niet beschikbaar.",
+    "purchaseUnavailable": "Je kunt op dit moment geen Kilo Pass kopen.",
     "kiloPassManagement": "Kilo Pass-beheer",
     "kiloPassSetup": "Kilo Pass-configuratie",
     "subscriptionHeaderDescription": "Een maandelijks abonnement dat credits toevoegt aan je Kilo-saldo voor AI-coderingssessies in Kilo App.",

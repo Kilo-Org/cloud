@@ -13,25 +13,6 @@ type KiloPassSubscriptionCardContentState =
   | { kind: 'error'; actionLabel: string; description: string; title: string }
   | { kind: 'loading' };
 
-/**
- * The card the reader cannot act on, built at call time: the copy is translated
- * when the card renders, not when the module loads, because the app switches
- * language after startup and a module-load copy would freeze the startup
- * language. Everything else about it is fixed: no purchase target in this app,
- * so it renders inert and muted.
- */
-function unavailablePassCard(): KiloPassSubscriptionCardContentState {
-  return {
-    kind: 'card',
-    state: {
-      action: 'open-native',
-      actionLabel: null,
-      description: i18n.t('kiloPass.purchaseUnavailable'),
-      title: KILO_PASS_TITLE,
-    },
-  };
-}
-
 export function getKiloPassSubscriptionCardAccessibility(cardState: KiloPassSubscriptionCardState) {
   return {
     accessibilityHint:
@@ -62,15 +43,13 @@ export function getKiloPassSubscriptionCardContentState(params: {
   if (!params.presentation) {
     return { kind: 'loading' };
   }
-  if (params.presentation.kind !== 'web_management') {
-    return unavailablePassCard();
-  }
+  const managedOnWeb = params.presentation.kind === 'web_management';
   return {
     kind: 'card',
     state: {
-      action: 'open-web',
-      actionLabel: i18n.t('kiloPass.manage'),
-      description: i18n.t('kiloPass.managedOnWeb'),
+      action: managedOnWeb ? 'open-web' : 'open-native',
+      actionLabel: managedOnWeb ? i18n.t('kiloPass.manage') : null,
+      description: i18n.t(managedOnWeb ? 'kiloPass.managedOnWeb' : 'kiloPass.purchaseUnavailable'),
       title: KILO_PASS_TITLE,
     },
   };

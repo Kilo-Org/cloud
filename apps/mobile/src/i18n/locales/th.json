@@ -3131,7 +3131,7 @@
     "subscriptionLoading": "กำลังโหลดการสมัครสมาชิก Kilo Pass",
     "retryHint": "ลองโหลดสถานะ Kilo Pass อีกครั้ง",
     "cardAccessibility": "{{title}} {{description}} {{actionLabel}}",
-    "purchaseUnavailable": "ขณะนี้ไม่สามารถซื้อได้",
+    "purchaseUnavailable": "ขณะนี้ไม่สามารถซื้อ Kilo Pass ได้",
     "kiloPassManagement": "การจัดการ Kilo Pass",
     "kiloPassSetup": "การตั้งค่า Kilo Pass",
     "subscriptionHeaderDescription": "การสมัครสมาชิกรายเดือนที่เพิ่มเครดิตให้กับยอดคงเหลือ Kilo ของคุณสำหรับการรันเซสชันการเขียนโค้ด AI ใน Kilo App.",

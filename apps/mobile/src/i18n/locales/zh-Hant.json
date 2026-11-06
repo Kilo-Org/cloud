@@ -2592,7 +2592,7 @@
     "subscriptionLoading": "正在載入 Kilo Pass 訂閱",
     "retryHint": "重新取得 Kilo Pass 狀態。",
     "cardAccessibility": "{{title}}。{{description}}。{{actionLabel}}",
-    "purchaseUnavailable": "目前無法購買。",
+    "purchaseUnavailable": "目前無法購買 Kilo Pass。",
     "kiloPassManagement": "Kilo Pass 管理",
     "kiloPassSetup": "Kilo Pass 設定",
     "subscriptionHeaderDescription": "每月訂閱，可將點數加入您的 Kilo 餘額，用於在 Kilo App 中執行 AI 程式設計工作階段。",

@@ -3131,7 +3131,7 @@
     "subscriptionLoading": "Се вчитува претплатата на Kilo Pass",
     "retryHint": "Повторно ја проверува состојбата на Kilo Pass.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
-    "purchaseUnavailable": "Купувањето во моментов не е достапно.",
+    "purchaseUnavailable": "Купувањето на Kilo Pass во моментов не е достапно.",
     "kiloPassManagement": "Управување со Kilo Pass",
     "kiloPassSetup": "Поставување на Kilo Pass",
     "subscriptionHeaderDescription": "Месечна претплата што додава кредити на вашата Kilo состојба за извршување на AI сесии за кодирање во Kilo App.",

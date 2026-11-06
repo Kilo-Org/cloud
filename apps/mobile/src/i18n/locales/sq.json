@@ -3131,7 +3131,7 @@
     "subscriptionLoading": "Po ngarkohet abonimi Kilo Pass",
     "retryHint": "Riprovohet ngarkimi i gjendjes së Kilo Pass.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
-    "purchaseUnavailable": "Blerja nuk është e disponueshme tani.",
+    "purchaseUnavailable": "Blerja e Kilo Pass nuk është e disponueshme tani.",
     "kiloPassManagement": "Menaxhimi i Kilo Pass",
     "kiloPassSetup": "Konfigurimi i Kilo Pass",
     "subscriptionHeaderDescription": "Një abonim mujor që shton kredite në bilancin tuaj Kilo për të drejtuar seanca kodimi me AI në Kilo App.",

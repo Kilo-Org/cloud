@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Sheet } from '@/components/ui/sheet';
 import { Text } from '@/components/ui/text';
 import { selectableRowA11y } from '@/lib/a11y/selectable-row';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { type AgentSessionFilters } from '@/lib/agent-session-filters';
 import { platformLabel } from '@/lib/platform-label';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -93,7 +94,10 @@ function FilterCheckboxRow({ label, isChecked, onPress }: Readonly<FilterCheckbo
 
   return (
     <Pressable
-      className="flex-row items-center gap-3 rounded-lg px-3 py-2.5 active:bg-secondary"
+      className={cn(
+        ROW_TARGET_CLASS,
+        'flex-row items-center gap-3 rounded-lg px-3 py-2.5 active:bg-secondary'
+      )}
       onPress={onPress}
       {...selectableRowA11y({ multi: true, selected: isChecked })}
     >

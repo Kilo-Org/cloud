@@ -8,15 +8,7 @@ import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { direct_byok_model_lists } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 
-type CachedEnhancedModelListOptions = {
-  providerId: DirectUserByokInferenceProviderId;
-  recommendedModels: ReadonlyArray<DirectByokModel>;
-};
-
-export function cachedEnhancedDirectByokModelList({
-  providerId,
-  recommendedModels,
-}: CachedEnhancedModelListOptions) {
+export function cachedDirectByokModelList(providerId: DirectUserByokInferenceProviderId) {
   return createCachedFetch<ReadonlyArray<DirectByokModel>>(
     async () => {
       const [row] = await readDb
@@ -24,40 +16,10 @@ export function cachedEnhancedDirectByokModelList({
         .from(direct_byok_model_lists)
         .where(eq(direct_byok_model_lists.provider_id, providerId))
         .limit(1);
-      return enhanceDirectByokModelList({
-        recommendedModels,
-        remainingModels: DirectByokModelArraySchema.parse(row ? row.models : []),
-      });
+      return DirectByokModelArraySchema.parse(row ? row.models : []);
     },
     600_000,
-    recommendedModels,
+    [],
     { name: `directByokModelList[${providerId}]` }
   );
-}
-
-function enhanceDirectByokModelList({
-  recommendedModels,
-  remainingModels,
-}: {
-  recommendedModels: ReadonlyArray<DirectByokModel>;
-  remainingModels: ReadonlyArray<DirectByokModel>;
-}): ReadonlyArray<DirectByokModel> {
-  const seenIds = new Set<string>();
-  const syncedModels = new Map(remainingModels.map(model => [model.id, model]));
-  return [...recommendedModels, ...remainingModels]
-    .filter(model => {
-      if (seenIds.has(model.id)) return false;
-      seenIds.add(model.id);
-      return true;
-    })
-    .map(model => {
-      const flags = new Set(model.flags);
-      if (recommendedModels.some(m => m.id === model.id)) flags.add('recommended');
-      return {
-        ...model,
-        flags: flags.size > 0 ? [...flags] : undefined,
-        reasoning_options: model.reasoning_options ?? syncedModels.get(model.id)?.reasoning_options,
-        catalog_model_id: model.catalog_model_id ?? syncedModels.get(model.id)?.catalog_model_id,
-      };
-    });
 }

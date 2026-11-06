@@ -349,8 +349,7 @@ export function guardrailBlockMessage(
 }
 
 const REQUEST_BLOCKED = "Your organization's Enkrypt AI guardrail blocked this request";
-const REQUEST_FLAGGED_REASON =
-  'The request was flagged by your organization policy. Review it and retry.';
+const REQUEST_FLAGGED_REASON = 'The request was flagged by your organization policy.';
 const RESPONSE_BLOCKED = "Your organization's Enkrypt AI guardrail blocked the model's response";
 const RESPONSE_FLAGGED_REASON =
   'The response was flagged by your organization policy. Rephrase the request and retry.';

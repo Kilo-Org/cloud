@@ -176,7 +176,10 @@ export function extractUsageContextInfo(usageContext: MicrodollarUsageContext) {
     editor_name: usageContext.editor_name,
     api_kind: usageContext.api_kind,
     machine_id: usageContext.machine_id,
-    is_user_byok: usageContext.user_byok,
+    is_user_byok:
+      usageContext.user_byok ||
+      usageContext.provider === OPENAI_CHATGPT_PROVIDER_ID ||
+      usageContext.provider === CLAUDE_BILLING_PROVIDER_ID,
     has_tools: usageContext.has_tools,
     feature: usageContext.feature,
     session_id: usageContext.session_id,

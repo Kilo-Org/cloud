@@ -840,6 +840,10 @@ Cluster nodes must match those exact reviewed entries.
 
 Render the run-specific Worker config with `perf-render.mjs <manifest.json>`;
 it selects runtime code/settings and dedicated resources without deployment.
+Read the run tag and bindings from the deployed version's `annotations` and
+`resources.bindings` through `/versions/<versionID>`. Read Logpush and
+observability through `/script-settings`.
+
 `perf-plan.mjs <profile> <manifest.json> <output-directory>` generates per-node
 target/config packages, the cluster plan, and an approval-request record. It
 creates neither credentials nor GO files. Supported cloud profiles are `cold`,

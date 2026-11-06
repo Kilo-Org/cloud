@@ -69,6 +69,62 @@ async function stub(handler) {
   };
 }
 
+test('deployed version metadata fences ownership without legacy settings annotations', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'operator-version-contract-'));
+  const manifest = { ...identity(), namespaces: [], configFile: join(root, 'wrangler.json') };
+  writeFileSync(
+    manifest.configFile,
+    JSON.stringify({
+      vars: {},
+      hyperdrive: [],
+      r2_buckets: [],
+      analytics_engine_datasets: [],
+      secrets_store_secrets: [],
+      ratelimits: [],
+    })
+  );
+  const version = {
+    id: manifest.versionID,
+    annotations: { 'workers/tag': manifest.runID },
+    resources: { bindings: [] },
+  };
+  const local = await stub(request => {
+    if (request.url.endsWith('/deployments'))
+      return {
+        body: {
+          result: {
+            deployments: [
+              {
+                id: manifest.deploymentID,
+                created_on: '2026-11-06',
+                versions: [{ percentage: 100, version_id: manifest.versionID }],
+              },
+            ],
+          },
+        },
+      };
+    if (request.url.endsWith(`/versions/${manifest.versionID}`))
+      return { body: { result: version } };
+    if (request.url.endsWith('/settings')) return { body: { result: { bindings: [] } } };
+    return { status: 404 };
+  });
+  try {
+    const api = operatorAPI('synthetic-only', { fetch: local.fetch });
+    assert.equal((await currentDeployment(manifest, api)).versionID, manifest.versionID);
+    version.annotations['workers/tag'] = 'another-run';
+    await assert.rejects(currentDeployment(manifest, api), /run tag/);
+    version.annotations['workers/tag'] = manifest.runID;
+    version.resources.bindings.push({ name: 'UNREVIEWED', type: 'plain_text', text: 'unreviewed' });
+    await assert.rejects(currentDeployment(manifest, api), /deployed bindings/);
+    version.resources.bindings.length = 0;
+    version.id = 'another-version';
+    await assert.rejects(currentDeployment(manifest, api), /version metadata/);
+  } finally {
+    await local.close();
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test('escaped/account-external operator paths never resolve credentials or reach HTTP', async () => {
   const local = await stub(() => ({ body: { success: true, result: [] } }));
   let credentials = 0;
@@ -528,12 +584,13 @@ test('unavailable bucket metadata cannot prevent already-verified owned Worker c
           },
         },
       };
-    if (request.url.endsWith('/settings'))
+    if (request.url.endsWith(`/versions/${manifest.versionID}`))
       return {
         body: {
           result: {
+            id: manifest.versionID,
             annotations: { 'workers/tag': manifest.runID },
-            bindings: [],
+            resources: { bindings: [] },
           },
         },
       };
@@ -685,12 +742,13 @@ if (kind === 'object_get') {
             },
           }
         : { status: 404 };
-    if (path.endsWith('/settings'))
+    if (path.endsWith(`/versions/${manifest.versionID}`))
       return {
         body: {
           result: {
+            id: manifest.versionID,
             annotations: { 'workers/tag': manifest.runID },
-            bindings: [],
+            resources: { bindings: [] },
           },
         },
       };

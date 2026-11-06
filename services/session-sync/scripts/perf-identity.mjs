@@ -153,7 +153,7 @@ export function operatorAPI(credentials, options = {}) {
     const accountPath = pathname.slice(`/accounts/${approvedAccountID}/`.length);
     const accountRead =
       pathname.startsWith(`/accounts/${approvedAccountID}/`) &&
-      /^(?:workers\/(?:scripts(?:\/[a-z0-9][a-z0-9-]{0,62}(?:\/(?:deployments|settings|subdomain))?)?|subdomain|domains|durable_objects\/namespaces)|hyperdrive\/configs(?:\/[a-f0-9]{32})?|r2\/buckets(?:\/[a-z0-9][a-z0-9-]{0,62}(?:\/domains\/(?:managed|custom))?)?|secrets_store\/stores\/[a-f0-9]{32}\/secrets(?:\/[a-f0-9]{32})?)$/.test(
+      /^(?:workers\/(?:scripts(?:\/[a-z0-9][a-z0-9-]{0,62}(?:\/(?:deployments|settings|script-settings|subdomain|versions\/[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}))?)?|subdomain|domains|durable_objects\/namespaces)|hyperdrive\/configs(?:\/[a-f0-9]{32})?|r2\/buckets(?:\/[a-z0-9][a-z0-9-]{0,62}(?:\/domains\/(?:managed|custom))?)?|secrets_store\/stores\/[a-f0-9]{32}\/secrets(?:\/[a-f0-9]{32})?)$/.test(
         accountPath
       );
     const accountDelete =
@@ -267,14 +267,15 @@ export async function currentDeployment(manifest, api) {
     'Worker ownership changed; refuse deletion or load'
   );
   assert.deepEqual(latest.versions, [{ percentage: 100, version_id: manifest.versionID }]);
-  const settings = await api('GET', `${path}/settings`);
+  const version = (await api('GET', `${path}/versions/${manifest.versionID}`)).result;
+  assert.equal(version.id, manifest.versionID, 'Unexpected deployed version metadata');
   assert.equal(
-    settings.result.annotations?.['workers/tag'],
+    version.annotations?.['workers/tag'],
     manifest.runID,
     'Deployment must carry this run tag'
   );
-  const bindingsHash = assertBindings(manifest, settings.result.bindings);
-  return { deploymentID: latest.id, versionID: manifest.versionID, bindingsHash };
+  const bindingsHash = assertBindings(manifest, version.resources.bindings);
+  return { deploymentID: latest.id, versionID: version.id, bindingsHash };
 }
 export async function inspectLive(manifest, api) {
   assertManifestIdentity(manifest, true);
@@ -283,6 +284,15 @@ export async function inspectLive(manifest, api) {
   const account = `/accounts/${manifest.accountID}`;
   const subdomain = (await api('GET', `${account}/workers/subdomain`)).result.subdomain;
   const baseURL = `https://${manifest.workerName}.${subdomain}.workers.dev/`;
+  const scriptSettings = (
+    await api('GET', `${account}/workers/scripts/${manifest.workerName}/script-settings`)
+  ).result;
+  assert.equal(scriptSettings.logpush, true, 'Load request logs must reach Logpush');
+  assert.equal(
+    scriptSettings.observability?.enabled,
+    false,
+    'Duplicate stored Worker logs must remain disabled'
+  );
   assert.equal(manifest.baseURL, baseURL, 'Worker origin must belong to the inspected account');
   const exposure = (await api('GET', `${account}/workers/scripts/${manifest.workerName}/subdomain`))
     .result;

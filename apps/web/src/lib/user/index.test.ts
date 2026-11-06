@@ -200,6 +200,7 @@ import {
 } from '@kilocode/db/schema-types';
 
 import type * as StripeClient from '@kilocode/web-shared/lib/stripe-client';
+import type * as PostHogModule from '@kilocode/web-shared/lib/posthog';
 import type * as BouncerClient from '@kilocode/web-shared/lib/bouncer/client';
 import type { WatchwoodSignupAssessment } from '@/lib/auth/watchwood';
 
@@ -231,6 +232,27 @@ const { createStripeCustomer, deleteStripeCustomer } = jest.requireMock<typeof S
   '@kilocode/web-shared/lib/stripe-client'
 );
 
+jest.mock<typeof PostHogModule>('@kilocode/web-shared/lib/posthog', () => {
+  const mockCapture = jest.fn();
+  return {
+    __esModule: true,
+    default: jest.fn(() => ({
+      capture: mockCapture,
+      alias: jest.fn(),
+      debug: jest.fn(),
+      isFeatureEnabled: jest.fn(),
+      getFeatureFlag: jest.fn(),
+    })),
+    flushPostHog: jest.fn(async () => {}),
+    shutdownPosthog: jest.fn(async () => {}),
+    mockCapture,
+  };
+});
+
+const { mockCapture } = jest.requireMock('@kilocode/web-shared/lib/posthog') as {
+  mockCapture: jest.Mock;
+};
+
 jest.mock('@/lib/impact/affiliate-events', () => ({
   recordAffiliateAttributionAndQueueParentEvent: jest.fn(async () => null),
 }));
@@ -252,6 +274,10 @@ const mockRecordAffiliateAttributionAndQueueParentEvent = jest.mocked(
 
 describe('User', () => {
   // Shared cleanup for all tests in this suite to prevent data pollution
+  beforeEach(() => {
+    mockCapture.mockReset();
+  });
+
   afterEach(async () => {
     await db.delete(cloud_agent_pr_watches);
     await db.delete(cloud_agent_worktrees);
@@ -2108,6 +2134,182 @@ describe('User', () => {
       expect(providerRows).toHaveLength(2);
       expect(providerRows.some(row => row.provider === 'github')).toBe(true);
     });
+
+    it('keeps the different-provider refusal when the existing account has no proven sign-in method', async () => {
+      const existing = await insertTestUser({
+        google_user_email: 'existing-other-method@example.com',
+        google_user_name: 'Existing Other Method',
+      });
+      await db.insert(user_auth_provider).values({
+        kilo_user_id: existing.id,
+        provider: 'github',
+        provider_account_id: 'github-n',
+        email: 'existing-other-method@example.com',
+        avatar_url: '',
+        display_name: null,
+        hosted_domain: hosted_domain_specials.github,
+      });
+
+      mockCapture.mockClear();
+
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: 'existing-other-method@example.com',
+          google_user_name: 'Google Later',
+          google_user_image_url: 'https://example.com/avatar.png',
+          hosted_domain: 'example.com',
+          provider: 'google',
+          provider_account_id: 'google-new',
+        },
+        undefined,
+        true
+      );
+
+      expect(result.success).toBe(false);
+      if (result.success) return;
+      expect(result.error).toBe('DIFFERENT-OAUTH');
+      expect(mockCapture).toHaveBeenCalledWith(
+        expect.objectContaining({
+          distinctId: 'existing-other-method@example.com',
+          event: 'auto_link_skipped_account_sign_in_history',
+          properties: {
+            existing_provider_count: 1,
+            existing_providers: ['github'],
+            new_provider: 'google',
+          },
+        })
+      );
+
+      const providerRows = await db
+        .select()
+        .from(user_auth_provider)
+        .where(eq(user_auth_provider.kilo_user_id, existing.id));
+      expect(providerRows).toHaveLength(1);
+      expect(providerRows[0]?.provider).toBe('github');
+    });
+
+    it('allows auto-link when the existing account has a proven provider', async () => {
+      const existing = await insertTestUser({
+        google_user_email: 'existing-proven@example.com',
+        google_user_name: 'Existing Proven',
+      });
+      await db.insert(user_auth_provider).values({
+        kilo_user_id: existing.id,
+        provider: 'apple',
+        provider_account_id: 'apple-n',
+        email: 'existing-proven@example.com',
+        avatar_url: '',
+        display_name: null,
+        hosted_domain: hosted_domain_specials.apple,
+      });
+
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: 'existing-proven@example.com',
+          google_user_name: 'Google Later Two',
+          google_user_image_url: 'https://example.com/avatar.png',
+          hosted_domain: 'example.com',
+          provider: 'google',
+          provider_account_id: 'google-new',
+        },
+        undefined,
+        true
+      );
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.user.id).toBe(existing.id);
+
+      const providerRows = await db
+        .select()
+        .from(user_auth_provider)
+        .where(eq(user_auth_provider.kilo_user_id, existing.id));
+      expect(providerRows).toHaveLength(2);
+      expect(providerRows.some(row => row.provider === 'apple')).toBe(true);
+      expect(providerRows.some(row => row.provider === 'google')).toBe(true);
+    });
+
+    it('keeps the different-provider refusal for a magic-link sign-in into that account', async () => {
+      const existing = await insertTestUser({
+        google_user_email: 'magic-other-method@example.com',
+        google_user_name: 'Magic Other Method',
+      });
+      await db.insert(user_auth_provider).values({
+        kilo_user_id: existing.id,
+        provider: 'github',
+        provider_account_id: 'github-magic-unproven',
+        email: 'magic-other-method@example.com',
+        avatar_url: '',
+        display_name: null,
+        hosted_domain: hosted_domain_specials.github,
+      });
+
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: 'magic-other-method@example.com',
+          google_user_name: 'Magic Later',
+          google_user_image_url: '',
+          hosted_domain: 'example.com',
+          provider: 'email',
+          provider_account_id: 'magic-other-method@example.com',
+        },
+        undefined,
+        true
+      );
+
+      expect(result.success).toBe(false);
+      if (result.success) return;
+      expect(result.error).toBe('DIFFERENT-OAUTH');
+
+      const providerRows = await db
+        .select()
+        .from(user_auth_provider)
+        .where(eq(user_auth_provider.kilo_user_id, existing.id));
+      expect(providerRows).toHaveLength(1);
+      expect(providerRows[0]?.provider).toBe('github');
+    });
+
+    it('keeps WorkOS SSO settlement unchanged', async () => {
+      const existing = await insertTestUser({
+        google_user_email: 'workos-other-method@example.com',
+        google_user_name: 'WorkOS Other Method',
+      });
+      await db.insert(user_auth_provider).values({
+        kilo_user_id: existing.id,
+        provider: 'github',
+        provider_account_id: 'github-workos-unproven',
+        email: 'workos-other-method@example.com',
+        avatar_url: '',
+        display_name: null,
+        hosted_domain: hosted_domain_specials.github,
+      });
+
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: 'workos-other-method@example.com',
+          google_user_name: 'WorkOS Later',
+          google_user_image_url: 'https://example.com/avatar.png',
+          hosted_domain: 'example.com',
+          provider: 'workos',
+          provider_account_id: 'workos-workos-unproven',
+        },
+        undefined,
+        true
+      );
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.user.id).toBe(existing.id);
+
+      const providerRows = await db
+        .select()
+        .from(user_auth_provider)
+        .where(eq(user_auth_provider.kilo_user_id, existing.id));
+      expect(providerRows).toHaveLength(1);
+      expect(providerRows[0]?.provider).toBe('workos');
+      expect(providerRows[0]?.provider_account_id).toBe('workos-workos-unproven');
+    });
+
   });
 
   describe('anonymizeCloudUserData', () => {

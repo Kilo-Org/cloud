@@ -706,7 +706,10 @@ export const userRouter = createTRPCRouter({
           message: 'This sign-in method cannot be added to an account.',
         });
       }
-      if (input.provider === 'claude' && !(await isClaudePlatformOAuthEnabled())) {
+      if (
+        input.provider === 'claude' &&
+        !(await isClaudePlatformOAuthEnabled(ctx.user.google_user_email))
+      ) {
         throw new TRPCError({
           code: 'BAD_REQUEST',
           message: 'This sign-in method cannot be added to an account.',

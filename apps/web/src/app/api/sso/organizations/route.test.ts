@@ -91,6 +91,27 @@ describe('POST /api/sso/organizations', () => {
     });
   });
 
+  it.each([false, true])(
+    'filters only Claude from existing methods using the submitted discovery email (%s)',
+    async enabled => {
+      mockGetAllUserProviders.mockResolvedValue({
+        kind: 'found',
+        user: {
+          kiloUserId: 'user-1',
+          providers: ['claude', 'google'],
+          primaryEmail: 'different-primary@example.com',
+        },
+      });
+      mockIsClaudePlatformOAuthEnabled.mockResolvedValue(enabled);
+      const body = await (await POST(request({ email: 'employee@kilocode.ai' }))).json();
+      expect(body).toEqual({
+        kind: 'existing',
+        providers: enabled ? ['claude', 'google'] : ['google'],
+      });
+      expect(mockIsClaudePlatformOAuthEnabled).toHaveBeenCalledWith('employee@kilocode.ai');
+    }
+  );
+
   it('keeps Email for a normalized existing Gmail plus alias', async () => {
     mockGetAllUserProviders.mockResolvedValue({
       kind: 'found',
@@ -159,6 +180,7 @@ describe('POST /api/sso/organizations', () => {
       const body = await (await POST(request({ email: 'new@example.com' }))).json();
       expect(body.kind).toBe('new');
       expect(body.providers.includes('claude')).toBe(enabled);
+      expect(mockIsClaudePlatformOAuthEnabled).toHaveBeenCalledWith('new@example.com');
     }
   );
 

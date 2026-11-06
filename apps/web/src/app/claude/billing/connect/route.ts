@@ -4,6 +4,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { getUserFromSession } from '@kilocode/web-shared/lib/user/server';
+import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import {
   getClaudeBillingConnection,
   type ClaudeBillingOwner,
@@ -32,7 +33,10 @@ export async function GET(request: NextRequest) {
       new URL(`/users/sign_in?callbackPath=${encodeURIComponent(returnPath)}`, APP_URL)
     );
   }
-  if (!(await isClaudePlatformOAuthEnabled())) return failureRedirect(returnPath, 'forbidden');
+  const user = await findUserById(session.id);
+  if (!(await isClaudePlatformOAuthEnabled(user?.google_user_email))) {
+    return failureRedirect(returnPath, 'forbidden');
+  }
   let owner: ClaudeBillingOwner;
   if (ownerParam === 'personal') {
     owner = { kind: 'personal', kiloUserId: session.id };

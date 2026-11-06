@@ -92,6 +92,7 @@ describe('Claude billing callback', () => {
       const fixture = await seed(org);
       const response = await callback();
       expect(response.headers.get('location')).toContain('claude_billing=connected');
+      expect(isClaudePlatformOAuthEnabled).toHaveBeenCalledWith(fixture.user.google_user_email);
       expect(await state(fixture.row.id)).toMatchObject({
         status: 'connected',
         connection_id: 'ocon_new',
@@ -137,13 +138,39 @@ describe('Claude billing callback', () => {
   });
 
   it('does not start a connection while the Claude platform OAuth flag is off', async () => {
-    await seed();
+    const { user } = await seed();
     jest.mocked(isClaudePlatformOAuthEnabled).mockResolvedValue(false);
     const response = await connect(
       new NextRequest('http://localhost/claude/billing/connect?return=%2Fbyok')
     );
     expect(response.headers.get('location')).toContain('claude_billing=forbidden');
+    expect(isClaudePlatformOAuthEnabled).toHaveBeenCalledWith(user.google_user_email);
   });
+
+  it.each(['connect', 'callback'])(
+    'refuses %s when the session user has no database email',
+    async flow => {
+      const { row } = await seed();
+      const missingUserId = 'missing-claude-billing-user';
+      jest.mocked(getUserFromSession).mockResolvedValue({ id: missingUserId });
+      const pending = await consumeClaudeBillingPending();
+      if (!pending) throw new Error('Missing pending fixture');
+      jest.mocked(consumeClaudeBillingPending).mockResolvedValue({
+        ...pending,
+        kiloUserId: missingUserId,
+      });
+      jest.mocked(isClaudePlatformOAuthEnabled).mockImplementation(async email => Boolean(email));
+
+      const response =
+        flow === 'connect'
+          ? await connect(new NextRequest('http://localhost/claude/billing/connect'))
+          : await callback();
+      expect(response.headers.get('location')).toContain('claude_billing=forbidden');
+      expect(isClaudePlatformOAuthEnabled).toHaveBeenCalledWith(undefined);
+      expect(exchangeClaudeBillingCode).not.toHaveBeenCalled();
+      expect(await state(row.id)).toMatchObject({ status: 'pending', connection_id: null });
+    }
+  );
 
   it.each(['access_denied', 'user_profile_already_linked'])(
     'does not change a connection for callback error %s',

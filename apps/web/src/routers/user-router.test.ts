@@ -176,6 +176,7 @@ describe('user router - linkAuthProvider', () => {
       code: 'BAD_REQUEST',
     });
     expect(mockCreateLinkingSession).not.toHaveBeenCalled();
+    expect(isClaudePlatformOAuthEnabled).toHaveBeenCalledWith(user.google_user_email);
   });
 });
 

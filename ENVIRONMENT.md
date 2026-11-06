@@ -184,7 +184,7 @@ Usage-accounting transport is selected from deployment labels alone: staging wit
 - `OPENAI_DISCOVERY_URL` - Optional override for the OpenAI OpenID Connect discovery document; defaults to the production issuer's document. [SERVER]
 - `OPENAI_TOKEN_ENDPOINT` - Optional override for the OpenAI token endpoint; defaults to the production issuer's endpoint. [SERVER]
 - `OPENAI_CHATGPT_API_URL` - Optional override for the base URL that token-sharing requests use with a "Sign in with ChatGPT" connection; defaults to `https://api.openai.com/v1`. Set it wherever `OPENAI_DISCOVERY_URL`/`OPENAI_TOKEN_ENDPOINT` are overridden, so delegated inference stays in the same environment as the token issuer. [SERVER]
-- `CLAUDE_SIGN_IN_CLIENT_ID` - Client ID of the "Sign in with Claude" OAuth app in the Claude Console. Register `<APP_URL>/api/auth/callback/claude` as its redirect URI. The Claude provider is registered only when this value is set. The global PostHog release toggle `claude-platform-oauth` controls sign-in, linking, billing connections, and customer-billed inference. [SERVER]
+- `CLAUDE_SIGN_IN_CLIENT_ID` - Client ID of the "Sign in with Claude" OAuth app in the Claude Console. Register `<APP_URL>/api/auth/callback/claude` as its redirect URI. The Claude provider is registered only when this value is set. The person-targeted PostHog release toggle `claude-platform-oauth` controls sign-in, linking, billing connections, and customer-billed inference. [SERVER]
 - `CLAUDE_SIGN_IN_ASSERTION_AUDIENCE` - The audience that the sign-in app's **Client authentication** tab shows; the `aud` of its client assertions. [SERVER]
 - `CLAUDE_FEDERATION_ISSUER` - The issuer URL of Kilo's federation issuer registered with Anthropic (inline JWKS); the `iss` of every Kilo-signed Claude JWT. [SERVER]
 - `CLAUDE_FEDERATION_SUBJECT` - The `sub` of every Kilo-signed Claude JWT; must match the subject pattern of the OAuth apps and the federation rule. [SERVER]
@@ -200,8 +200,14 @@ Usage-accounting transport is selected from deployment labels alone: staging wit
 - `CLAUDE_OPERATOR_TOKEN_AUDIENCE` - The audience the operator federation rule expects on the identity JWT Kilo signs. [SERVER]
 
 The `claude-platform-oauth` release toggle defaults to off and requires the boolean value `true`, including in development.
-Use it as a global on/off switch without person targeting or partial rollouts: sign-in starts before a person is identified.
-Server checks cache the result for up to thirty seconds.
+The employee rollout targets person property `email` ending in `@kilocode.ai`, at 100% of that audience only.
+Every server evaluation supplies `personProperties.email`; results are not globally cached or shared between people.
+Sign-in checks the validated provider email only when `email_verified` is boolean `true`.
+Account linking and billing connect/callback also check the authenticated person's current database email.
+Gateway requests check the authenticated requester's database email, including organization-scoped requests, after the authoritative payer lookup.
+Missing email or failed evaluation denies access; there is no development bypass.
+Anonymous visitors can discover Claude through the existing email-first flow without an identified browser PostHog person.
+The submitted discovery email controls offered methods only; the callback independently authorizes the verified provider email.
 The shared server PostHog client deliberately returns no flags outside production, so enabled local server paths require test fixtures.
 Use the focused Claude tests for enabled server behavior and browser-only SDK overrides for UI checks.
 Browser overrides do not bypass the server gate. Do not enable the live rollout for local testing.

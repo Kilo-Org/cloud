@@ -86,7 +86,14 @@ export async function POST(request: Request): Promise<NextResponse> {
 
       // Return the matched account even when its methods are unsupported. The
       // client presents a recoverable error rather than broadening to signup.
-      return discoveryResponse({ kind: 'existing', providers: userProviderInfo.providers });
+      const providers = userProviderInfo.providers;
+      return discoveryResponse({
+        kind: 'existing',
+        providers: withLaunchedClaudeSignIn(
+          providers,
+          !providers.includes('claude') || (await isClaudePlatformOAuthEnabled(email))
+        ),
+      });
     }
 
     // ─── New User Flow ────────────────────────────────────────────────────
@@ -104,7 +111,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     // without spending the magic-link rate-limit allowance during discovery.
     const offeredProviders = withLaunchedClaudeSignIn(
       ProdNonSSOAuthProviders,
-      await isClaudePlatformOAuthEnabled()
+      await isClaudePlatformOAuthEnabled(email)
     );
     const providers = (await isNewAccountEligibleForMagicLink(email))
       ? offeredProviders

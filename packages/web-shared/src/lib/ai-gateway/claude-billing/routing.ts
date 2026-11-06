@@ -32,6 +32,7 @@ export type ClaudeBillingRoutingInput = {
   request: GatewayRequest;
   requestedModel: string;
   userId: string | null;
+  requesterEmail: string | null;
   organizationId: string | undefined;
 };
 
@@ -140,7 +141,11 @@ export async function checkClaudeBilling(
     return { kind: 'unavailable', message: CLAUDE_BILLING_REQUIRED_MESSAGE };
   }
   if (connection.status !== ClaudeBillingConnectionStatus.Connected) return null;
-  if (!(await isClaudePlatformOAuthEnabled())) {
+  if (
+    !input.userId ||
+    !input.requesterEmail ||
+    !(await isClaudePlatformOAuthEnabled(input.requesterEmail))
+  ) {
     return {
       kind: 'unavailable',
       message:

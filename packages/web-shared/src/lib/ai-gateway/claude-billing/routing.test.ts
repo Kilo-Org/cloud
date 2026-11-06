@@ -57,6 +57,7 @@ function input(kind: 'messages' | 'chat_completions' = 'messages') {
     request: request(kind),
     requestedModel: '~anthropic/latest',
     userId: 'user',
+    requesterEmail: 'requester@kilocode.ai',
     organizationId: undefined,
   };
 }
@@ -100,6 +101,10 @@ describe('Claude customer-billed routing', () => {
         message: expect.stringContaining('not enabled'),
       });
       expect(getClaudeOperatorToken).not.toHaveBeenCalled();
+      expect(isClaudePlatformOAuthEnabled).toHaveBeenCalledWith('requester@kilocode.ai');
+      expect(jest.mocked(getClaudeBillingConnection).mock.invocationCallOrder[0]).toBeLessThan(
+        jest.mocked(isClaudePlatformOAuthEnabled).mock.invocationCallOrder[0] ?? 0
+      );
     }
   );
 
@@ -108,6 +113,7 @@ describe('Claude customer-billed routing', () => {
     jest.mocked(getClaudeBillingConnection).mockResolvedValue(null);
     expect(await checkClaudeBilling(input())).toBeNull();
     expect(getClaudeOperatorToken).not.toHaveBeenCalled();
+    expect(isClaudePlatformOAuthEnabled).not.toHaveBeenCalled();
   });
 
   it('does not serve an organization request from a personal connection', async () => {
@@ -117,6 +123,47 @@ describe('Claude customer-billed routing', () => {
       { kind: 'organization', organizationId: 'organization' },
       expect.anything()
     );
+  });
+
+  it.each([true, false])(
+    'gates the requester of an organization connection (%s)',
+    async enabled => {
+      jest
+        .mocked(isClaudePlatformOAuthEnabled)
+        .mockImplementation(async email => enabled && email === 'requester@kilocode.ai');
+      const result = await checkClaudeBilling({ ...input(), organizationId: 'organization' });
+      expect(result?.kind).toBe(enabled ? 'provider' : 'unavailable');
+      expect(isClaudePlatformOAuthEnabled).toHaveBeenCalledWith('requester@kilocode.ai');
+      expect(getClaudeBillingConnection).toHaveBeenCalledWith(
+        { kind: 'organization', organizationId: 'organization' },
+        expect.anything()
+      );
+      if (!enabled) expect(getClaudeOperatorToken).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([undefined, 'organization'])(
+    'refuses a connected payer when the authenticated requester email is absent (org=%s)',
+    async organizationId => {
+      expect(
+        await checkClaudeBilling({ ...input(), organizationId, requesterEmail: null })
+      ).toMatchObject({ kind: 'unavailable' });
+      expect(getClaudeBillingConnection).toHaveBeenCalled();
+      expect(isClaudePlatformOAuthEnabled).not.toHaveBeenCalled();
+      expect(getClaudeOperatorToken).not.toHaveBeenCalled();
+    }
+  );
+
+  it('does not authorize an organization request without an authenticated requester', async () => {
+    expect(
+      await checkClaudeBilling({
+        ...input(),
+        userId: null,
+        organizationId: 'organization',
+      })
+    ).toMatchObject({ kind: 'unavailable' });
+    expect(isClaudePlatformOAuthEnabled).not.toHaveBeenCalled();
+    expect(getClaudeOperatorToken).not.toHaveBeenCalled();
   });
 
   it.each(['pending', 'removed'] as const)('keeps normal routing for %s owners', async status => {

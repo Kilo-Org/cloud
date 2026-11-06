@@ -7,6 +7,7 @@ import { ClaudeBillingConnectionStatus } from '@kilocode/db/schema-types';
 import { and, eq } from 'drizzle-orm';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { getUserFromSession } from '@kilocode/web-shared/lib/user/server';
+import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import { claude_billing_connections } from '@kilocode/db/schema';
 import type { ClaudeBillingOwner } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
 import { consumeClaudeBillingPending } from '@/lib/claude-billing/pending';
@@ -50,7 +51,10 @@ export async function GET(request: NextRequest) {
 
   // auth.claude.com returns the state with every outcome, including a refusal.
   if (params.get('state') !== pending.state) return outcomeRedirect(returnPath, 'failed');
-  if (!(await isClaudePlatformOAuthEnabled())) return outcomeRedirect(returnPath, 'forbidden');
+  const user = await findUserById(session.id);
+  if (!(await isClaudePlatformOAuthEnabled(user?.google_user_email))) {
+    return outcomeRedirect(returnPath, 'forbidden');
+  }
   // Membership can change while the person is on Claude's approval page.
   if (
     pending.owner !== 'personal' &&

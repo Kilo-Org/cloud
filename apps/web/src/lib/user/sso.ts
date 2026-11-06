@@ -22,7 +22,8 @@ async function processSSOInternal(
   args: CreateOrUpdateUserArgs,
   requestHeaders?: Headers,
   affiliateTrackingId?: string | null,
-  trackingContext?: CreateOrUpdateUserTrackingContext
+  trackingContext?: CreateOrUpdateUserTrackingContext,
+  invitationToken?: string
 ): Promise<string | true> {
   if (args.provider !== 'workos') {
     throw new Error('Only SSO logins supported');
@@ -92,6 +93,7 @@ async function processSSOInternal(
   // add user to organization since its been fully created
   const added = await addSsoUserToOrganization(kiloOrg.id, savedUser.id, {
     isNewUser: res.isNew,
+    ...(invitationToken ? { invitationToken } : {}),
   });
   if (added) {
     // Users who join through SSO should not be asked how they heard about Kilo.
@@ -137,10 +139,17 @@ export async function processSSOUserLogin(
   args: CreateOrUpdateUserArgs,
   requestHeaders?: Headers,
   affiliateTrackingId?: string | null,
-  trackingContext?: CreateOrUpdateUserTrackingContext
+  trackingContext?: CreateOrUpdateUserTrackingContext,
+  invitationToken?: string
 ) {
   try {
-    return await processSSOInternal(args, requestHeaders, affiliateTrackingId, trackingContext);
+    return await processSSOInternal(
+      args,
+      requestHeaders,
+      affiliateTrackingId,
+      trackingContext,
+      invitationToken
+    );
   } catch (error) {
     console.error('Error processing SSO login:', error);
     captureException(error, {

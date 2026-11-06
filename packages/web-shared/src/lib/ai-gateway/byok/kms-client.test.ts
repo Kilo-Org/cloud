@@ -48,6 +48,23 @@ const actorUserId = 'user-1';
 
 type Call = { url: URL; init: RequestInit };
 
+/**
+ * Records the waits the client schedules between attempts, and runs each one at once, so the
+ * retry sequence is visible without spending its delay.
+ */
+function recordRetryWaits() {
+  const waits: number[] = [];
+  const spy = jest.spyOn(global, 'setTimeout').mockImplementation(((
+    callback: () => void,
+    ms?: number
+  ) => {
+    waits.push(ms ?? 0);
+    callback();
+    return 0;
+  }) as unknown as typeof setTimeout);
+  return { waits, restore: () => spy.mockRestore() };
+}
+
 function installFakeKms() {
   const calls: Call[] = [];
   const dataKeys = new Map<string, { dataKey: string; context: ByokKmsContext }>();
@@ -295,11 +312,22 @@ describe('byok kms client', () => {
       });
     });
     global.fetch = fetchMock as unknown as typeof fetch;
+    const { waits, restore } = recordRetryWaits();
 
-    const envelope = await encryptByokForStorage({ apiKey: 'sk-secret', context, actorUserId });
+    try {
+      const envelope = await encryptByokForStorage({ apiKey: 'sk-secret', context, actorUserId });
 
-    expect(envelope?.wrapped_dek).toBe('wrapped-after-retries');
-    expect(fetchMock).toHaveBeenCalledTimes(KMS_MAX_ATTEMPTS);
+      expect(envelope?.wrapped_dek).toBe('wrapped-after-retries');
+      expect(fetchMock).toHaveBeenCalledTimes(KMS_MAX_ATTEMPTS);
+      // The base delay grows with the attempt, plus jitter below one base delay.
+      expect(waits).toHaveLength(KMS_MAX_ATTEMPTS - 1);
+      expect(waits[0]).toBeGreaterThanOrEqual(100);
+      expect(waits[0]).toBeLessThan(200);
+      expect(waits[1]).toBeGreaterThanOrEqual(200);
+      expect(waits[1]).toBeLessThan(300);
+    } finally {
+      restore();
+    }
   });
 
   test('retries the transient 4xx answers 408 and 429', async () => {
@@ -338,13 +366,18 @@ describe('byok kms client', () => {
       });
     });
     global.fetch = fetchMock as unknown as typeof fetch;
+    const { waits, restore } = recordRetryWaits();
 
-    const started = Date.now();
-    const envelope = await encryptByokForStorage({ apiKey: 'sk-secret', context, actorUserId });
+    try {
+      const envelope = await encryptByokForStorage({ apiKey: 'sk-secret', context, actorUserId });
 
-    expect(envelope?.wrapped_dek).toBe('wrapped-after-hint');
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(Date.now() - started).toBeGreaterThanOrEqual(900);
+      expect(envelope?.wrapped_dek).toBe('wrapped-after-hint');
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      // The header asks for one second, which is longer than the base delay for attempt one.
+      expect(waits).toEqual([1_000]);
+    } finally {
+      restore();
+    }
   });
 
   test('fails at once when Retry-After asks for longer than the time budget', async () => {
@@ -352,21 +385,35 @@ describe('byok kms client', () => {
       async () => new Response('{}', { status: 429, headers: { 'retry-after': '30' } })
     );
     global.fetch = fetchMock as unknown as typeof fetch;
+    const { waits, restore } = recordRetryWaits();
 
-    await expect(
-      encryptByokForStorage({ apiKey: 'sk-test', context, actorUserId })
-    ).rejects.toThrow('status 429');
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    try {
+      await expect(
+        encryptByokForStorage({ apiKey: 'sk-test', context, actorUserId })
+      ).rejects.toThrow('status 429');
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      // The hint reaches past the budget, so the call fails without waiting for it.
+      expect(waits).toEqual([]);
+    } finally {
+      restore();
+    }
   });
 
   test('gives up after the last attempt and throws the final status', async () => {
     const fetchMock = jest.fn(async () => new Response('nope', { status: 503 }));
     global.fetch = fetchMock as unknown as typeof fetch;
+    const { waits, restore } = recordRetryWaits();
 
-    await expect(
-      encryptByokForStorage({ apiKey: 'sk-test', context, actorUserId })
-    ).rejects.toThrow('status 503');
-    expect(fetchMock).toHaveBeenCalledTimes(KMS_MAX_ATTEMPTS);
+    try {
+      await expect(
+        encryptByokForStorage({ apiKey: 'sk-test', context, actorUserId })
+      ).rejects.toThrow('status 503');
+      expect(fetchMock).toHaveBeenCalledTimes(KMS_MAX_ATTEMPTS);
+      // Two retries are issued and the third failure ends the sequence without a wait.
+      expect(waits).toHaveLength(KMS_MAX_ATTEMPTS - 1);
+    } finally {
+      restore();
+    }
   });
 
   test('retries a timeout and a network failure before returning a data key', async () => {

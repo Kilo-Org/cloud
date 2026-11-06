@@ -27,12 +27,23 @@ const workflows = Object.fromEntries(
 const harnessBuildAction = load(
   readFileSync(new URL('../.github/actions/harness-sdk-build/action.yml', import.meta.url), 'utf8')
 );
+const pluginCacheActionYaml = load(
+  readFileSync(new URL('../.github/actions/ttsc-plugin-cache/action.yml', import.meta.url), 'utf8')
+);
 const extension = JSON.parse(
   readFileSync(new URL('../apps/extension/package.json', import.meta.url), 'utf8')
 );
-const web = JSON.parse(readFileSync(new URL('../apps/web/package.json', import.meta.url), 'utf8'));
 const rootScript = fileURLToPath(new URL('./typecheck-all.sh', import.meta.url));
 const harnessBuild = 'pnpm --filter @kilocode/harness-sdk run build';
+const pluginCacheAction = './.github/actions/ttsc-plugin-cache';
+const pluginPath = 'node_modules/.cache/ttsc/plugins';
+// The step each plugin saver's save must follow.
+const jobRun = new Map([
+  ['ci.yml:harness-sdk', 'pnpm --filter @kilocode/harness-sdk check:ci'],
+  ['ci.yml:workspace-tests', 'pnpm --filter ${{ matrix.workspace.name }} test'],
+  ['.github/actions/harness-sdk-build', harnessBuild],
+]);
+const ciJobs = workflows['ci.yml'].jobs;
 const pnpmCleanup = fileURLToPath(
   new URL('../.github/actions/pnpm-store/cleanup/cleanup.cjs', import.meta.url)
 );
@@ -254,26 +265,77 @@ for (const [file, name, command, condition] of [
 ]) {
   test(`${file} ${name} restores the compiler plugin cache after install and before use`, () => {
     const steps = workflows[file].jobs[name].steps;
-    const cacheIndex = steps.findIndex(step => step.name === 'Cache compiler plugins');
+    const cacheIndex = steps.findIndex(step => step.uses === pluginCacheAction);
     const installIndex = steps.findIndex(step =>
       /^pnpm install --frozen-lockfile\b/.test(step.run ?? '')
     );
     const buildIndex = steps.findIndex(step => step.run === command);
     assert.ok(installIndex >= 0 && cacheIndex > installIndex && buildIndex > cacheIndex);
     const cache = steps[cacheIndex];
-    assert.equal(cache.uses, 'actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7');
-    assert.equal(cache.with.path, 'node_modules/.cache/ttsc/plugins');
-    assert.equal(
-      cache.with.key,
-      "${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-${{ hashFiles('pnpm-lock.yaml') }}"
-    );
-    assert.equal(
-      cache.with['restore-keys'].trim(),
-      '${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-'
-    );
+    // The harness-sdk row of workspace-tests is the only saver; these jobs
+    // restore through the action and compile on a miss when it was skipped.
+    assert.equal(cache.with, undefined);
     assert.equal(cache.if, condition ?? steps[buildIndex].if);
   });
 }
+
+// The explorer release skips every build step when its probe found the
+// immutable artifact, so its guards carry that condition in front.
+const explorerSkip = "needs.probe.outputs.exists != 'true'";
+
+test('one job saves the compiler plugin cache and every reader restores it', () => {
+  const savers = [];
+  const holders = [
+    ...Object.entries(workflows).flatMap(([file, workflow]) =>
+      Object.entries(workflow.jobs ?? {}).map(([name, job]) => [`${file}:${name}`, job.steps ?? []])
+    ),
+    ['.github/actions/harness-sdk-build', harnessBuildAction.runs.steps],
+  ];
+  for (const [key, steps] of holders) {
+    const saversHere = steps.filter(step => step.uses?.startsWith('actions/cache/save@'));
+    for (const save of saversHere) {
+      assert.equal(save.uses, 'actions/cache/save@668228422ae6a00e4ad889ee87cd7109ec5666a7');
+      assert.ok(
+        (save.if ?? '').includes("steps.plugins.outputs.cache-hit != 'true'"),
+        `${key} saves only what its own restore missed`
+      );
+      assert.equal(save.with.path, pluginPath);
+      assert.equal(
+        save.with.key,
+        '${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-${{ steps.plugins.outputs.key }}',
+        `${key} saves under the key its restore read`
+      );
+      savers.push(key);
+    }
+    const restore = steps.find(step => step.uses === pluginCacheAction);
+    if (restore) {
+      // The save must follow the compilation: an inline save inside a restore
+      // action would fire before ttsc wrote the plugins.
+      if (saversHere.length > 0) {
+        const saveIndex = steps.indexOf(saversHere.at(-1));
+        const runIndex = steps.findIndex(step => step.run === jobRun.get(key));
+        assert.ok(restore.id, `${key} must expose the plugin restore to its save`);
+        assert.ok(saveIndex > runIndex, `${key} saves after its run compiles`);
+      } else {
+        assert.equal(restore.with, undefined, `${key} restores only`);
+      }
+    }
+  }
+  // Each Linux selection path has one saver: the dedicated harness-sdk job
+  // when the packages/harness-sdk filter selected it, and the workspace-tests
+  // row otherwise (whose matrix then carries the harness-sdk work). macOS has
+  // no ci.yml reviewer, so the build action writes the macOS key itself.
+  assert.deepEqual(savers, [
+    'ci.yml:harness-sdk',
+    'ci.yml:workspace-tests',
+    '.github/actions/harness-sdk-build',
+  ]);
+  assert.equal(
+    ciJobs['workspace-tests'].steps.find(step => step.uses?.startsWith('actions/cache/save@')).if,
+    "matrix.workspace.name == '@kilocode/harness-sdk' && steps.plugins.outputs.cache-hit != 'true' && needs.changes.outputs.harness_sdk != 'true'",
+    'the two savers must not both save in one run'
+  );
+});
 
 const harnessBuildGuards = [
   [
@@ -289,7 +351,7 @@ const harnessBuildGuards = [
   [
     'explorer-ios-release.yml',
     'build',
-    "hashFiles('.github/actions/harness-sdk-build/action.yml') != ''",
+    `${explorerSkip} && hashFiles('.github/actions/harness-sdk-build/action.yml') != ''`,
   ],
 ];
 
@@ -319,8 +381,70 @@ test('every consumer job restores or builds the harness SDK through the action',
       );
     } else {
       assert.equal(plain.length, 1);
-      assert.equal(plain[0].if, "hashFiles('.github/actions/harness-sdk-build/action.yml') == ''");
+      assert.equal(
+        plain[0].if,
+        `${explorerSkip} && hashFiles('.github/actions/harness-sdk-build/action.yml') == ''`
+      );
     }
+  }
+});
+
+// The probe decides whether the build is needed, so every step after the input
+// validation carries the skip condition. An ungated toolchain step would fail a
+// skipped dispatch: a setup-node cache save needs the dependency tree that the
+// skipped install never creates.
+test('explorer-ios-release gates every build step except input validation', () => {
+  const steps = workflows['explorer-ios-release.yml'].jobs.build.steps;
+  const ungated = steps
+    .filter(step => !(step.if ?? '').startsWith(explorerSkip))
+    // Action steps carry no `name`, so fall back to `uses`: an ungated action
+    // must be identifiable in the failure message.
+    .map(step => step.name ?? step.uses);
+  assert.deepEqual(ungated, ['Validate inputs']);
+  assert.equal(steps[0].name, 'Validate inputs', 'validation runs before the gate');
+  assert.equal(steps[0].if, undefined, 'validation stays unconditional');
+});
+
+// A probe with no answer must cost the build and nothing else. Without the
+// tolerated auth failure the whole run ends `failure` after a build and upload
+// that succeeded, so a client waiting on the run reads a published artifact as a
+// broken build. A broken identity still reports itself in `upload`, which mints
+// the same identity.
+test('explorer-ios-release records a probe failure as no answer', () => {
+  const probe = workflows['explorer-ios-release.yml'].jobs.probe;
+  const auth = probe.steps.find(step => step.uses?.startsWith('google-github-actions/auth@'));
+  assert.equal(auth['continue-on-error'], true, 'a refused identity must not fail the run');
+  assert.equal(auth.with.create_credentials_file, false, 'the probe needs no credentials file');
+  const metadata = probe.steps.find(step => step.id === 'metadata');
+  assert.match(
+    metadata.run,
+    /-z "\$\{ACCESS_TOKEN:-\}"[\s\S]*echo 'exists=false'/,
+    'a lookup without a token still answers exists=false'
+  );
+  assert.equal(probe.outputs.exists, '${{ steps.metadata.outputs.exists }}');
+});
+
+// A probe on one object and an upload to another would never agree: a probe
+// pointed at a key that still exists would skip a build the upload cannot reuse.
+test('explorer-ios-release names its artifact object once', () => {
+  const workflow = workflows['explorer-ios-release.yml'];
+  assert.match(workflow.env.ARTIFACT_BUCKET, /^[a-z0-9-]+$/);
+  assert.match(
+    workflow.env.ARTIFACT_OBJECT,
+    /^explorers%2Fios%2F\$\{\{ inputs\.fingerprint \}\}\.app\.tar\.gz$/,
+    'the object name stays percent-encoded and keyed by the build key'
+  );
+  const [probe, upload] = ['probe', 'upload'].map(name =>
+    workflow.jobs[name].steps
+      .map(step => step.run ?? '')
+      .filter(script => script.includes('storage.googleapis.com'))
+  );
+  assert.equal(probe.length, 1);
+  assert.equal(upload.length, 1);
+  for (const script of [probe[0], upload[0]]) {
+    assert.match(script, /\/b\/\$\{ARTIFACT_BUCKET\}\//);
+    assert.match(script, /ARTIFACT_OBJECT/);
+    assert.doesNotMatch(script, /kwf-planner|explorers%2F/);
   }
 });
 
@@ -498,7 +622,7 @@ test('the harness SDK action restores dist and builds only on a miss', () => {
   const steps = harnessBuildAction.runs.steps;
   const key = steps.find(step => step.name === 'Hash harness SDK build inputs');
   const cache = steps.find(step => step.name === 'Restore harness SDK build');
-  const plugins = steps.filter(step => step.name === 'Cache compiler plugins');
+  const plugins = steps.filter(step => step.uses === pluginCacheAction);
   const build = steps.find(step => step.name === 'Build harness SDK');
   assert.equal(key.run, 'node scripts/harness-sdk-build-key.mjs >> "$GITHUB_OUTPUT"');
   assert.equal(cache.uses, 'actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7');
@@ -508,15 +632,56 @@ test('the harness SDK action restores dist and builds only on a miss', () => {
   assert.equal(build.run, harnessBuild);
   assert.equal(build.if, "steps.cache.outputs.cache-hit != 'true'");
   // The typia transform takes minutes to compile, so the build's plugin cache
-  // comes from the same action and only when a build will run.
+  // comes from the shared action and only when a build will run.
   assert.equal(plugins.length, 1);
-  assert.equal(plugins[0].uses, 'actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7');
-  assert.equal(plugins[0].with.path, 'node_modules/.cache/ttsc/plugins');
-  assert.equal(
-    plugins[0].with.key,
-    "${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-${{ hashFiles('pnpm-lock.yaml') }}"
-  );
+  assert.equal(plugins[0].uses, pluginCacheAction);
+  assert.equal(plugins[0].with, undefined);
   assert.equal(plugins[0].if, "steps.cache.outputs.cache-hit != 'true'");
+  assert.equal(plugins[0].id, 'plugins');
+  // macOS has no ci.yml writer for its platform-scoped key, so this action
+  // writes the macOS key itself, after the build that compiled the plugins.
+  // The save requires the build path: a skipped restore leaves its outputs
+  // empty, and a save keyed on them would write nothing.
+  const macSave = steps.find(step => step.uses?.startsWith('actions/cache/save@'));
+  assert.ok(macSave, 'the build action writes the macOS key');
+  assert.equal(
+    macSave.if,
+    "runner.os == 'macOS' && steps.cache.outputs.cache-hit != 'true' && steps.plugins.outputs.cache-hit != 'true'"
+  );
+  assert.equal(steps.indexOf(macSave), steps.length - 1);
+});
+
+// The plugin cache action owns the key material and the restore; it cannot
+// save, because ttsc writes the plugins after the action runs.
+test('the compiler plugin cache action restores under one plugin-scoped key', () => {
+  const steps = pluginCacheActionYaml.runs.steps;
+  const hash = steps.find(step => step.name === 'Hash compiler plugin inputs');
+  const restore = steps.find(step => step.name === 'Restore compiler plugins');
+  assert.equal(hash.run, 'node scripts/ttsc-plugin-key.mjs >> "$GITHUB_OUTPUT"');
+  assert.equal(restore.uses, 'actions/cache/restore@668228422ae6a00e4ad889ee87cd7109ec5666a7');
+  assert.equal(restore.with.path, pluginPath);
+  // The whole-lockfile hash and the prefix restore key both crossed versions:
+  // the key covers only the plugin's own closure, and a restore that misses it
+  // compiles again rather than reusing another version's plugin.
+  assert.equal(
+    restore.with.key,
+    '${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-${{ steps.key.outputs.key }}'
+  );
+  assert.equal(
+    restore.with['restore-keys'],
+    undefined,
+    'a partial restore would serve a plugin built from other versions'
+  );
+  assert.equal(
+    steps.find(step => step.uses?.startsWith('actions/cache/save@')),
+    undefined
+  );
+  assert.deepEqual(Object.keys(pluginCacheActionYaml.outputs ?? {}).sort(), ['cache-hit', 'key']);
+  assert.equal(
+    pluginCacheActionYaml.outputs['cache-hit'].value,
+    '${{ steps.restore.outputs.cache-hit }}'
+  );
+  assert.equal(pluginCacheActionYaml.outputs.key.value, '${{ steps.key.outputs.key }}');
 });
 
 // One job compiles the tRPC declarations per commit. The typecheck and lint
@@ -581,8 +746,8 @@ test('one job builds the tRPC declarations and both matrices download them', () 
     assert.ok(downloadIndex > installIndex, `${name} downloads after install`);
   }
 
-  // The trpc typecheck row consumes the declarations, so its group script and
-  // apps/web's typecheck skip their own build there.
+  // The trpc typecheck row consumes the declarations, so its group script
+  // skips its own build there.
   const typecheck = ci.jobs['typecheck-groups'].steps.find(step =>
     (step.run ?? '').startsWith('scripts/typecheck-all.sh')
   );
@@ -597,17 +762,28 @@ test('one job builds the tRPC declarations and both matrices download them', () 
   assert.deepEqual(ci.jobs.lint.needs, ['changes', 'lint-groups']);
 });
 
+// Which rows run is one decision, and the affected detector owns it: it keeps
+// the extension's own workflow as the single typecheck and lint for a change
+// that only affects the extension.
+test('the changes job takes both matrix group lists from the affected detector', () => {
+  const step = ciJobs.changes.steps.find(candidate => candidate.id === 'affected');
+  assert.match(
+    step.run,
+    /groups=\$\(node scripts\/affected-workspaces\.mjs --groups <<< "\$affected"\)/,
+    'the groups come from the detector, not from a workflow-local projection'
+  );
+  assert.match(step.run, /echo "typecheck_groups=\$\(jq -c \.typecheck_groups <<< "\$groups"\)"/);
+  assert.match(step.run, /echo "lint_groups=\$\(jq -c \.lint_groups <<< "\$groups"\)"/);
+  assert.doesNotMatch(
+    step.run,
+    /\.full_checks \| index\("(typecheck|lint)"\) != null\) as \$all/,
+    'the workflow must not compute the group lists itself'
+  );
+});
+
 function runTypecheck(
   t,
-  {
-    root = false,
-    changes = '',
-    buildExit = 0,
-    checkExit = 0,
-    built = '',
-    selected = '',
-    script = extension.scripts.typecheck,
-  } = {}
+  { root = false, changes = '', buildExit = 0, checkExit = 0, built = '', selected = '' } = {}
 ) {
   const dir = mkdtempSync(join(tmpdir(), 'typecheck-ci-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
@@ -654,7 +830,9 @@ if (name === 'git') {
   writeFileSync(log, '');
   const result = spawnSync(
     root ? 'bash' : 'sh',
-    root ? [rootScript, ...(changes ? ['--changes-only'] : [])] : ['-c', script],
+    root
+      ? [rootScript, ...(changes ? ['--changes-only'] : [])]
+      : ['-c', extension.scripts.typecheck],
     {
       cwd: dir,
       encoding: 'utf8',
@@ -694,23 +872,6 @@ test('a failed standalone tRPC build prevents extension compilation', t => {
 
 test('extension compiler errors still fail when tRPC is already built', t => {
   assert.equal(runTypecheck(t, { built: '1', checkExit: 9 }).status, 9);
-});
-
-// apps/web typechecks against the built declarations the same way: CI hands
-// them over as an artifact, so the flag must stop the script rebuilding them.
-test('web checks reuse tRPC built by the producer job', t => {
-  const tsgo = 'tsgo --noEmit --checkers 1 --tsBuildInfoFile .tsbuildinfo/tsgo.tsbuildinfo';
-  const reused = runTypecheck(t, { script: web.scripts.typecheck, built: '1' });
-  assert.equal(reused.status, 0);
-  assert.deepEqual(reused.commands, [tsgo]);
-
-  const standalone = runTypecheck(t, { script: web.scripts.typecheck });
-  assert.equal(standalone.status, 0);
-  assert.deepEqual(standalone.commands, ['pnpm --filter @kilocode/trpc run build', tsgo]);
-
-  const failedBuild = runTypecheck(t, { script: web.scripts.typecheck, buildExit: 7 });
-  assert.equal(failedBuild.status, 7);
-  assert.deepEqual(failedBuild.commands, ['pnpm --filter @kilocode/trpc run build']);
 });
 
 const workspaceFilters = '--filter !kilocode-monorepo --filter !web --filter !@kilocode/trpc';
@@ -804,11 +965,17 @@ const workspaces = (() => {
 })();
 
 const workspaceDirByName = new Map(workspaces.map(({ dir, manifest }) => [manifest.name, dir]));
+const manifestByDir = new Map(workspaces.map(({ dir, manifest }) => [dir, manifest]));
 
-// The workspace members whose `typecheck` one script of `dir` starts.
-function typecheckedWorkspaces(dir, script) {
+// The workspace members one script of `dir` starts with `pnpm ... <verb>`.
+function scriptTargets(dir, script, verb) {
   const targets = new Set();
-  for (const [command] of script.matchAll(/pnpm\s[^&|;\n]*\brun\s+typecheck\b/g)) {
+  for (const [command] of script.matchAll(/pnpm\s[^&|;\n]*/g)) {
+    const verbRan = command
+      .trim()
+      .split(/\s+/)
+      .some(token => token.replace(/[),;]+$/, '') === verb);
+    if (!verbRan) continue;
     for (const [, flag, quoted] of command.matchAll(
       /(-C|--dir|--filter|-F)(?:=|\s+)('[^']*'|"[^"]*"|\S+)/g
     )) {
@@ -823,6 +990,8 @@ function typecheckedWorkspaces(dir, script) {
   return [...targets];
 }
 
+const typecheckedWorkspaces = (dir, script) => scriptTargets(dir, script, 'typecheck');
+
 test('no workspace typecheck starts another workspace typecheck', () => {
   const duplicates = [];
   for (const { dir, manifest } of workspaces) {
@@ -833,6 +1002,29 @@ test('no workspace typecheck starts another workspace typecheck', () => {
     }
   }
   assert.deepEqual(duplicates, [], 'a recursive workspace run already typechecks every member');
+});
+
+// A typecheck that also builds another workspace makes every caller pay for a
+// program the checked sources may never read: apps/web rebuilt the tRPC
+// declarations although it declares no dependency on them.
+test('no workspace typecheck builds a workspace it does not depend on', () => {
+  const undeclared = [];
+  for (const { dir, manifest } of workspaces) {
+    const script = manifest.scripts?.typecheck;
+    if (!script) continue;
+    const declared = new Set(
+      ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies'].flatMap(
+        field => Object.keys(manifest[field] ?? {})
+      )
+    );
+    for (const target of scriptTargets(dir, script, 'build')) {
+      const dependency = manifestByDir.get(target)?.name;
+      if (target !== dir && dependency && !declared.has(dependency)) {
+        undeclared.push(`${manifest.name} builds ${dependency}, which it does not depend on`);
+      }
+    }
+  }
+  assert.deepEqual(undeclared, []);
 });
 
 // Dropping the nested call leaves a standalone `typecheck` covering only this

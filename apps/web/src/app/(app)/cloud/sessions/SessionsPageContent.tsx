@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { Input } from '@/components/ui/input';
@@ -11,7 +11,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Search, Cloud, Terminal, Puzzle, Bot, Monitor, Workflow, Loader2 } from 'lucide-react';
+import {
+  Search,
+  Cloud,
+  Terminal,
+  Puzzle,
+  Bot,
+  Monitor,
+  Workflow,
+  Loader2,
+  Trash2,
+} from 'lucide-react';
 import { SetPageTitle } from '@/components/SetPageTitle';
 import type { SessionsListItem } from '@/components/cloud-agent/SessionsList';
 import { SessionsList } from '@/components/cloud-agent/SessionsList';
@@ -33,6 +43,8 @@ import { toast } from 'sonner';
 import { useConfirm } from '@/components/ui/confirm';
 import { useCloudSessionFork } from '@/components/cloud-agent-next/use-cloud-session-fork';
 import { ShareSessionDialog } from '@/components/cloud-agent-next/ShareSessionDialog';
+import { useSessionDeletion } from '@/components/cloud-agent-next/hooks/useSessionDeletion';
+import type { SessionDeletionEvent } from '@/components/cloud-agent-next/session-deletion';
 
 /** Platform filter options matching the badge logic in SessionsList */
 const PLATFORM_OPTIONS: readonly {
@@ -72,6 +84,7 @@ export function SessionsPageContent() {
   type SessionWithSource = SessionsListItem & {
     source: 'v2';
     cloudAgentSessionId?: string | null;
+    worktreeId: string | null;
   };
   const [selectedSession, setSelectedSession] = useState<SessionWithSource | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -87,6 +100,25 @@ export function SessionsPageContent() {
 
   // Determine if we're in an organization context
   const organizationId = pathname.match(/^\/organizations\/([^/]+)/)?.[1];
+
+  const handleSessionsDeleted = useCallback(
+    (event: SessionDeletionEvent) => {
+      if (!selectedSession || !event.deletedSessionIds.includes(selectedSession.sessionId)) return;
+      setIsDialogOpen(false);
+      setSelectedSession(null);
+      setSharingSessionId(null);
+    },
+    [selectedSession]
+  );
+
+  const {
+    deleteSession,
+    deletingSessionIds,
+    isDeleting: deletionInProgress,
+  } = useSessionDeletion({
+    organizationId,
+    onDeleted: handleSessionsDeleted,
+  });
 
   const { forkSessionToNewCloudSession, forkingSessionId } = useCloudSessionFork(organizationId);
 
@@ -177,6 +209,7 @@ export function SessionsPageContent() {
     updated_at: string;
     created_on_platform: string;
     cloud_agent_session_id: string | null;
+    cloud_agent_worktree_id: string | null;
   }): SessionWithSource => {
     const repository = extractRepoFromGitUrl(session.git_url) ?? null;
     const prompt = session.title || 'Untitled';
@@ -185,6 +218,7 @@ export function SessionsPageContent() {
       createdAt: session.created_at,
       createdOnPlatform: session.created_on_platform,
       cloudAgentSessionId: session.cloud_agent_session_id,
+      worktreeId: session.cloud_agent_worktree_id,
       prompt,
       repository,
       sessionId: session.session_id,
@@ -211,6 +245,14 @@ export function SessionsPageContent() {
     if (forked) {
       setIsDialogOpen(false);
     }
+  };
+
+  const handleDeleteSession = (session: SessionWithSource) => {
+    void deleteSession({
+      sessionId: session.sessionId,
+      title: session.prompt,
+      worktreeId: session.worktreeId,
+    });
   };
 
   const content = (
@@ -284,35 +326,55 @@ export function SessionsPageContent() {
         <SessionsList
           sessions={sessions}
           onSessionClick={handleSessionClick}
-          rowActions={
-            sharedOnly
-              ? session => {
-                  const isPending = pendingSessionIds.has(session.sessionId);
-                  return (
-                    <>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        disabled={isPending}
-                        onClick={() => setSharingSessionId(session.sessionId)}
-                      >
-                        Create new link
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        disabled={isPending}
-                        onClick={() => void handleUnshare(session.sessionId)}
-                      >
-                        Unshare
-                      </Button>
-                    </>
-                  );
-                }
-              : undefined
-          }
+          rowActions={session => {
+            const isUnsharing = pendingSessionIds.has(session.sessionId);
+            const isDeleting = deletingSessionIds.has(session.sessionId);
+            const isPending = isUnsharing || isDeleting;
+            return (
+              <>
+                {sharedOnly && (
+                  <>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={isPending}
+                      onClick={() => setSharingSessionId(session.sessionId)}
+                    >
+                      Create new link
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={isPending}
+                      onClick={() => void handleUnshare(session.sessionId)}
+                    >
+                      Unshare
+                    </Button>
+                  </>
+                )}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={isPending || deletionInProgress}
+                  onClick={event => {
+                    event.stopPropagation();
+                    event.preventDefault();
+                    handleDeleteSession(session);
+                  }}
+                >
+                  {isDeleting ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-4 w-4" />
+                  )}
+                  {isDeleting ? 'Deleting...' : 'Delete'}
+                </Button>
+              </>
+            );
+          }}
         />
       )}
 

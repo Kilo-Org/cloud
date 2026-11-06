@@ -59,6 +59,7 @@ jest.mock('@/lib/integrations/linear-service', () => {
     exchangeLinearOAuthCode: jest.fn(),
     fetchLinearOAuthIdentity: jest.fn(),
     getConflictingLinearInstallation: jest.fn(),
+    retirePreviousLinearWorkspace: jest.fn(async () => undefined),
     revokeLinearToken: jest.fn(async () => true),
     upsertLinearInstallation: jest.fn(),
   };
@@ -156,7 +157,10 @@ beforeEach(async () => {
     organizationName: 'Acme Workspace',
   });
   mockedGetConflictingLinearInstallation.mockResolvedValue(null);
-  mockedUpsertLinearInstallation.mockResolvedValue({} as never);
+  mockedUpsertLinearInstallation.mockResolvedValue({
+    integration: {} as never,
+    previousWorkspace: null,
+  });
   mockedBotGetAdapter.mockReturnValue({
     getInstallation: jest.fn(async () => null),
     setInstallation: jest.fn(async () => undefined),

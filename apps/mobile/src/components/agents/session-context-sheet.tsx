@@ -245,7 +245,7 @@ export function SessionContextSheet({
         <Text className="text-xs uppercase tracking-wide text-muted-foreground">
           {t('agentChat.sessionConnection.label')}
         </Text>
-        <View className="flex-row items-center gap-2">
+        <View className="min-h-[28px] flex-row items-center gap-2">
           <Text className="text-sm font-medium text-foreground">{connectionLabel}</Text>
           {connectionDisplay === 'lost' ? (
             <Pressable
@@ -253,7 +253,7 @@ export function SessionContextSheet({
               hitSlop={8}
               accessibilityRole="button"
               accessibilityLabel={t('agentChat.sessionConnection.retryConnection')}
-              className="active:opacity-70"
+              className="min-h-[28px] min-w-[28px] items-center justify-center active:opacity-70"
               testID="session-context-sheet-connection-retry"
             >
               <Text className="text-sm font-medium text-primary">{t('common.retry')}</Text>

@@ -8,10 +8,20 @@ import { createKiloEventFeed } from './kilo-event-feed.js';
 import type { KiloFeedEvent } from './kilo-event-feed.js';
 import type { KiloHarnessOptions } from './kilo-harness.js';
 import { createKilo2Lifecycle } from './kilo2-lifecycle.js';
+import {
+  RUNTIME_HARNESSES,
+  type RuntimeHarness,
+} from '../../../src/shared/control-plane-runtime-contract.js';
 
 /** Only the trusted wrapper environment selects a backend, never route/profile env. */
+export function runtimeHarnessKind(
+  env: Record<string, string | undefined> = process.env
+): RuntimeHarness {
+  return z.enum(RUNTIME_HARNESSES).parse(env.KILO_RUNTIME_HARNESS ?? 'kilo');
+}
+
 export function runtimeHarness(env: Record<string, string | undefined> = process.env) {
-  const kind = z.enum(['kilo', 'kilo2']).parse(env.KILO_RUNTIME_HARNESS ?? 'kilo');
+  const kind = runtimeHarnessKind(env);
   let lifecycle = createKilo2Lifecycle();
   return kind === 'kilo2'
     ? {

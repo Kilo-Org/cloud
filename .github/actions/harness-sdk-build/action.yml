@@ -24,14 +24,11 @@ runs:
 
     # ttsc compiles the typia transform on its first build, which takes minutes
     # on a cold Go cache. Only a miss builds, so only a miss needs the plugin.
-    - name: Cache compiler plugins
+    # Restores only: the harness-sdk row of ci.yml workspace-tests owns the
+    # save, so this build never fights it for the same key.
+    - name: Restore compiler plugins
       if: steps.cache.outputs.cache-hit != 'true'
-      uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
-      with:
-        path: node_modules/.cache/ttsc/plugins
-        key: ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-${{ hashFiles('pnpm-lock.yaml') }}
-        restore-keys: |
-          ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-
+      uses: ./.github/actions/ttsc-plugin-cache
 
     - name: Build harness SDK
       if: steps.cache.outputs.cache-hit != 'true'

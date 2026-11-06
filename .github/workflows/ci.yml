@@ -468,13 +468,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Cache compiler plugins
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
-        with:
-          path: node_modules/.cache/ttsc/plugins
-          key: ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-
+      # The harness-sdk row of workspace-tests saves the compiled plugin; this
+      # group only reads it, so a skipped saver costs a compile, never a failure.
+      - name: Restore compiler plugins
+        uses: ./.github/actions/ttsc-plugin-cache
 
       - name: Download tRPC declarations
         if: matrix.group == 'trpc'
@@ -1120,13 +1117,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Cache compiler plugins
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
-        with:
-          path: node_modules/.cache/ttsc/plugins
-          key: ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-
+      # Read-only: the harness-sdk row of workspace-tests owns the save, and it
+      # runs whenever the plugin key moves. This job is selected only by
+      # packages/harness-sdk changes, so it cannot be the owner.
+      - name: Restore compiler plugins
+        uses: ./.github/actions/ttsc-plugin-cache
 
       # Everything but the timing gate, which needs a machine nobody else is
       # using. The migration check is why this job exists: the store's SQL is
@@ -1257,19 +1252,26 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       # The harness SDK's own vitest run compiles the typia plugin through
-      # @ttsc/unplugin. kilo-app is not in this matrix: its sharded suite runs
-      # in kilo-app CI.
-      - name: Cache compiler plugins
+      # @ttsc/unplugin, and this row is selected whenever the plugin key moves,
+      # so it is the one job that saves the compiled plugin. kilo-app is not in
+      # this matrix: its sharded suite runs in kilo-app CI.
+      - name: Restore compiler plugins
+        id: plugins
         if: matrix.workspace.name == '@kilocode/harness-sdk'
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
-        with:
-          path: node_modules/.cache/ttsc/plugins
-          key: ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-
+        uses: ./.github/actions/ttsc-plugin-cache
 
       - name: Run tests
         run: pnpm --filter ${{ matrix.workspace.name }} test
+
+      # The vitest run compiled the plugins on a miss, and the save must see
+      # them, so the save follows the run. This is the only save of the key in
+      # the run: the other ttsc readers restore through the action.
+      - name: Save compiler plugins
+        if: matrix.workspace.name == '@kilocode/harness-sdk' && steps.plugins.outputs.cache-hit != 'true'
+        uses: actions/cache/save@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: node_modules/.cache/ttsc/plugins
+          key: ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-${{ steps.plugins.outputs.key }}
 
       - name: Test native heartbeat attachment compatibility
         if: matrix.workspace.name == 'cloudflare-session-ingest'

@@ -809,7 +809,9 @@ export function ChatSidebar({
         platformFilter: platformFilter ?? [],
         projectFilter: projectFilter ?? [],
         searchQuery,
-        organizationId,
+        // The stored list is queried with `organizationId ?? null`, where
+        // `null` means personal. Match it, or the personal view keeps org rows.
+        organizationId: organizationId ?? null,
       }
     ).sort(
       (a, b) => remotePriority(b.status) - remotePriority(a.status) || a.id.localeCompare(b.id)

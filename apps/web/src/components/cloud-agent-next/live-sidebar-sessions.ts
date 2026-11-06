@@ -26,8 +26,11 @@ export type LiveSidebarQuery = {
   platformFilter: readonly string[];
   projectFilter: readonly string[];
   searchQuery: string;
-  /** The sidebar's organization scope. `undefined` = unscoped. */
-  organizationId?: string;
+  /**
+   * The sidebar's organization scope: a uuid for that organization, `null`
+   * for the personal view, `undefined` when the caller wants no scope filter.
+   */
+  organizationId?: string | null;
 };
 
 const KNOWN_PLATFORM_VALUES = new Set<string>(KNOWN_PLATFORMS);
@@ -80,13 +83,14 @@ export function matchesLivePlatformFilter(
  *
  * `undefined` is the unscoped sidebar, which lists every session the user can
  * reach — the same set the stored list's unscoped query returns (see
- * `addOrganizationCondition`). A row whose owner is not known yet matches no
- * scope, so an organization view never shows a session it cannot attribute to
- * that organization.
+ * `addOrganizationCondition`). `null` is the personal view, which the server
+ * maps to `organization_id IS NULL`, exactly as the stored list queries it.
+ * Strict equality against either scope leaves a row the server has not
+ * attributed yet (no `organizationId`) out of both filtered views.
  */
 function matchesOrganizationScope(
   session: LiveSidebarSession,
-  organizationId: string | undefined
+  organizationId: string | null | undefined
 ): boolean {
   if (organizationId === undefined) return true;
   return session.organizationId === organizationId;

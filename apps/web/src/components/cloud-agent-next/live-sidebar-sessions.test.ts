@@ -184,6 +184,26 @@ describe('filterLiveSidebarSessions organization scope', () => {
     expect(filterLiveSidebarSessions(scopedSessions, noQuery)).toEqual(scopedSessions);
   });
 
+  it('keeps only the personal rows in the personal view', () => {
+    const rows = filterLiveSidebarSessions(scopedSessions, {
+      ...noQuery,
+      organizationId: null,
+    });
+
+    expect(rows.map(row => row.id)).toEqual(['ses_personal']);
+  });
+
+  it('drops organization and not-yet-attributed rows from the personal view', () => {
+    const rows = filterLiveSidebarSessions(scopedSessions, {
+      ...noQuery,
+      organizationId: null,
+    });
+
+    expect(rows.map(row => row.id)).not.toContain('ses_org');
+    expect(rows.map(row => row.id)).not.toContain('ses_other_org');
+    expect(rows.map(row => row.id)).not.toContain('ses_new');
+  });
+
   it('keeps only the rows owned by the scoped organization', () => {
     const rows = filterLiveSidebarSessions(scopedSessions, {
       ...noQuery,

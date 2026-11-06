@@ -17,6 +17,7 @@ import { SheetHeader } from '@/components/sheet-header';
 import { SheetScrollView } from '@/components/tab-screen';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { FormField } from '@/components/ui/form-field';
+import { FormFieldLabel } from '@/components/ui/form-field-label';
 import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -205,9 +206,10 @@ export function InviteMemberSheet() {
           <Text variant="muted">{t('organization.inviteMember.roleMember')}</Text>
         ) : (
           <View className="gap-2">
-            <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-              {t('common.role')}
-            </Text>
+            {/* The same label the Email field above draws. The two are labels of
+                one form, so the role group does not wear the list-section
+                eyebrow the rest of the app uses for section headings. */}
+            <FormFieldLabel label={t('common.role')} />
             <RadioGroup
               label={t('common.role')}
               className="overflow-hidden rounded-lg bg-secondary"

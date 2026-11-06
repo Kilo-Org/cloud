@@ -23,6 +23,7 @@ import { buildEnterpriseSsoHref, buildNormalSignInHref } from '@/lib/auth/sign-i
 import { SIGNUP_STEP_UP_METHODS_PARAM } from '@/lib/auth/redirect-urls';
 import type { SsoAccountMismatch } from '@/lib/auth/sso-account-mismatch';
 import getSignInCallbackUrl from '@/lib/getSignInCallbackUrl';
+import { useClaudeSignInConfigured } from '@/lib/auth/claude/use-claude-sign-in-configured';
 
 type SignInFormProps = {
   searchParams: Record<string, string>;
@@ -56,6 +57,8 @@ export function SignInForm({
     isSignUp,
     storybookInitialState,
   });
+  const claudeConfigured = useClaudeSignInConfigured();
+  const oauthProviders = OAuthProviderIds.filter(id => id !== 'claude' || claudeConfigured);
   // An Enterprise SSO request for a different address than the signed-in
   // session cannot proceed; offer the one-tap switch before any normal
   // sign-in UI renders (including the returning-user hint loading state).
@@ -228,7 +231,9 @@ export function SignInForm({
                     {/* The remembered provider is the whole list; "see other
                         sign-in methods" below opens the full group. */}
                     <AuthProviderButtons
-                      providers={[lastAuthMethod]}
+                      providers={
+                        lastAuthMethod === 'claude' && !claudeConfigured ? [] : [lastAuthMethod]
+                      }
                       onProviderClick={flow.handleOAuthClick}
                       customLabels={emailCustomLabel}
                     />
@@ -342,7 +347,7 @@ export function SignInForm({
                       </div>
                       <div className="space-y-2">
                         <AuthProviderButtons
-                          providers={OAuthProviderIds}
+                          providers={oauthProviders}
                           onProviderClick={flow.handleOAuthClick}
                         />
                       </div>
@@ -368,7 +373,7 @@ export function SignInForm({
                     <PasskeySignInButton callbackUrl={passkeyCallbackUrl} />
                     {/* OAuth provider buttons - Google first */}
                     <AuthProviderButtons
-                      providers={OAuthProviderIds}
+                      providers={oauthProviders}
                       onProviderClick={flow.handleOAuthClick}
                     />
                     <SignInButton onClick={flow.handleShowEmailInput}>

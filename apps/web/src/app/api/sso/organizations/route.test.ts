@@ -41,6 +41,20 @@ describe('POST /api/sso/organizations', () => {
     }));
   });
 
+  it('offers Claude only when its sign-in provider is configured', async () => {
+    jest.replaceProperty(process, 'env', { ...process.env, CLAUDE_SIGN_IN_CLIENT_ID: '' });
+    try {
+      const unavailable = await (await POST(request({ email: 'new@example.com' }))).json();
+      expect(unavailable.providers).not.toContain('claude');
+      expect(unavailable.providers).toContain('google');
+      process.env.CLAUDE_SIGN_IN_CLIENT_ID = 'configured-client';
+      const available = await (await POST(request({ email: 'new@example.com' }))).json();
+      expect(available.providers).toContain('claude');
+    } finally {
+      jest.restoreAllMocks();
+    }
+  });
+
   it('requires a valid Turnstile proof before discovery', async () => {
     mockVerifyTurnstileJWT.mockResolvedValue({
       success: false,

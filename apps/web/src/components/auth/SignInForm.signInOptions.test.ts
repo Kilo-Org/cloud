@@ -14,6 +14,11 @@ import { renderToStaticMarkup } from 'react-dom/server';
 let mockFlowEmail = '';
 let mockHintEmail = '';
 let mockReturning = false;
+let mockClaudeConfigured = true;
+
+jest.mock('@/lib/auth/claude/use-claude-sign-in-configured', () => ({
+  useClaudeSignInConfigured: () => mockClaudeConfigured,
+}));
 
 jest.mock('@/components/AnimatedLogoMark', () => ({
   AnimatedLogoMark: () => null,
@@ -93,6 +98,7 @@ beforeEach(() => {
   mockFlowEmail = '';
   mockHintEmail = '';
   mockReturning = false;
+  mockClaudeConfigured = true;
 });
 
 describe('SignInForm sign-in options', () => {
@@ -125,6 +131,18 @@ describe('SignInForm sign-in options', () => {
     expect(html.match(/Continue with ChatGPT/g)).toHaveLength(1);
     expect(html).toContain('Continue with Google');
     expect(html).toContain('Continue with Email');
+  });
+
+  it('omits an unconfigured Claude provider on the landing and remembered views', () => {
+    mockClaudeConfigured = false;
+    const landing = renderToStaticMarkup(createElement(SignInForm, { searchParams: {} }));
+    expect(landing).not.toContain('Continue with Claude');
+    expect(landing).toContain('Continue with Google');
+    mockReturning = true;
+    mockHintEmail = 'remembered@example.com';
+    const returning = renderToStaticMarkup(createElement(SignInForm, { searchParams: {} }));
+    expect(returning).not.toContain('Continue with Claude');
+    expect(returning).toContain('or see other sign-in methods');
   });
 
   it('offers a remembered Claude method', () => {

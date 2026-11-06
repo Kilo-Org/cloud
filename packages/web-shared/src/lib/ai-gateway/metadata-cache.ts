@@ -32,17 +32,36 @@ export async function fetchMetadata<T>(
   return { raw, data: source.parse(raw) };
 }
 
+export function assertMinimumCount(url: string, count: number, minimum: number) {
+  if (count < minimum) {
+    throw new Error(`Suspicious: ${url} returned ${count} entries, fewer than ${minimum}`);
+  }
+}
+
+function isOlderThan(updatedAt: string, maxAgeMs: number) {
+  const ageMs = Date.now() - new Date(updatedAt).getTime();
+  return Number.isNaN(ageMs) || ageMs > maxAgeMs;
+}
+
 export async function readStoredMetadata<T>(
   source: MetadataSource<T>,
-  fromDb: MetadataDb
+  fromDb: MetadataDb,
+  options: { maxAgeMs?: number } = {}
 ): Promise<T | null> {
   try {
     const [row] = await fromDb
-      .select({ data: ai_gateway_metadata_cache.data })
+      .select({
+        data: ai_gateway_metadata_cache.data,
+        updated_at: ai_gateway_metadata_cache.updated_at,
+      })
       .from(ai_gateway_metadata_cache)
       .where(eq(ai_gateway_metadata_cache.url, source.url))
       .limit(1);
-    return row ? source.parse(row.data) : null;
+    if (!row) return null;
+    if (options.maxAgeMs !== undefined && isOlderThan(row.updated_at, options.maxAgeMs)) {
+      return null;
+    }
+    return source.parse(row.data);
   } catch (error) {
     warnExceptInTest(`[metadata-cache] stored ${source.url} is unusable`, error);
     return null;

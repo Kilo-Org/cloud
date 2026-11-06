@@ -5,6 +5,7 @@ import {
   openRouterModelsMetadataSource,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
 import {
+  assertMinimumCount,
   getMetadata,
   type MetadataSource,
 } from '@kilocode/web-shared/lib/ai-gateway/metadata-cache';
@@ -80,10 +81,15 @@ export function gatewayModelsSource(
   gateway: Provider,
   modelsPath: string
 ): MetadataSource<GatewayModels> {
+  const url = `${gateway.apiUrl}${modelsPath}`;
   return {
-    url: `${gateway.apiUrl}${modelsPath}`,
+    url,
     headers: () => gatewayHeaders(gateway),
-    parse: raw => ModelsSchema.parse(raw),
+    parse: raw => {
+      const models = ModelsSchema.parse(raw);
+      assertMinimumCount(url, models.data.length, 100);
+      return models;
+    },
   };
 }
 
@@ -99,7 +105,9 @@ export const openRouterProvidersSource: MetadataSource<OpenRouterProvider[]> = {
   headers: () => ATTRIBUTION_HEADERS,
   parse: raw => {
     const parsed = OpenRouterProvidersResponse.parse(raw);
-    return Array.isArray(parsed) ? parsed : parsed.data;
+    const providers = Array.isArray(parsed) ? parsed : parsed.data;
+    assertMinimumCount(openRouterProvidersSource.url, providers.length, 10);
+    return providers;
   },
 };
 
@@ -426,11 +434,6 @@ export async function syncAndStoreProviders() {
   const vercel_data = await fetchGatewayModels(VERCEL_AI_GATEWAY, vercelGatewayModelsSource);
 
   const openrouterProviders = await getMetadata(openRouterProvidersSource, db);
-  if (openrouterProviders.length < 10) {
-    throw new Error(
-      `Suspicious: total number of OpenRouter API providers is ${openrouterProviders.length} < 10`
-    );
-  }
 
   const openRouterCatalog = await getMetadata(openRouterModelsMetadataSource, db);
 

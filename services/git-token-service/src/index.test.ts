@@ -2483,11 +2483,7 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
     // The pinned user authorization still has to resolve, and the credential sent is
     // the installation token minted for the recorded repository alone.
     expect(serviceMocks.selectUserAuthorization).toHaveBeenCalledOnce();
-    expect(serviceMocks.getTokenForRepo).toHaveBeenCalledExactlyOnceWith(
-      '123',
-      'repo',
-      'standard'
-    );
+    expect(serviceMocks.getTokenForRepo).toHaveBeenCalledExactlyOnceWith('123', 'repo', 'standard');
   });
 
   it('redeems GraphQL for an installation-source capability with the installation token', async () => {

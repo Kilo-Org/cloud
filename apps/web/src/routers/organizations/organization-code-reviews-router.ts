@@ -67,6 +67,7 @@ import { getBitbucketCodeReviewerReadiness } from '@/lib/integrations/platforms/
 import {
   BitbucketCodeReviewWebhookConfigurationError,
   ensureBitbucketCodeReviewWorkspaceWebhook,
+  type BitbucketCodeReviewWebhookWorkspace,
 } from '@/lib/integrations/platforms/bitbucket/code-review-webhooks';
 import { cleanupBitbucketCodeReviewerForIntegration } from '@/lib/integrations/platforms/bitbucket/code-review-cleanup';
 import {
@@ -232,7 +233,9 @@ function requireRepositoryIdsForPlatform(
   return numericRepositoryIds.data;
 }
 
-function requireBitbucketWorkspace(readiness: BitbucketCodeReviewerReadiness) {
+function requireBitbucketWorkspace(
+  readiness: BitbucketCodeReviewerReadiness
+): BitbucketCodeReviewWebhookWorkspace {
   if (!readiness.connected || !readiness.integrationId || !readiness.workspace) {
     throw new TRPCError({
       code: 'PRECONDITION_FAILED',
@@ -346,8 +349,7 @@ function manualBitbucketCodeReviewErrorCode(error: ManualBitbucketCodeReviewTrig
 
 async function ensureBitbucketWorkspaceWebhook(input: {
   organizationId: string;
-  currentManagerId: string;
-  workspace: ReturnType<typeof requireBitbucketWorkspace>;
+  workspace: BitbucketCodeReviewWebhookWorkspace;
 }): Promise<void> {
   let result;
   try {
@@ -688,7 +690,6 @@ export const organizationReviewAgentRouter = createTRPCRouter({
           if (previousConfig?.is_enabled) {
             await ensureBitbucketWorkspaceWebhook({
               organizationId: input.organizationId,
-              currentManagerId: ctx.user.id,
               workspace,
             });
           }
@@ -1265,7 +1266,6 @@ export const organizationReviewAgentRouter = createTRPCRouter({
           }
           await ensureBitbucketWorkspaceWebhook({
             organizationId: input.organizationId,
-            currentManagerId: ctx.user.id,
             workspace,
           });
 
@@ -1309,7 +1309,6 @@ export const organizationReviewAgentRouter = createTRPCRouter({
           if (readiness.integrationId) {
             await cleanupBitbucketCodeReviewerForIntegration({
               organizationId: input.organizationId,
-              currentManagerId: ctx.user.id,
               integrationId: readiness.integrationId,
               workspace: readiness.workspace,
             });

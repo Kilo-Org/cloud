@@ -2624,7 +2624,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         ...runtime,
         allocationId: state.allocationId,
         ...(startSource === undefined ? {} : { startSource }),
-        ...runtimeHarnessField(this.boundRuntimeHarness(state)),
+        ...runtimeHarnessField(await this.allocationRuntimeHarness(state)),
       });
       return container.success ? { ...view, container: container.data } : view;
     } catch {
@@ -4343,10 +4343,26 @@ export class SandboxControlV2 extends DurableObject<Env> {
     return namespace === undefined ? null : namespace.getByName(sessionDoName(ownerId, sessionId));
   }
 
-  /** The Kilo runtime the connected wrapper reported, if it reported one. */
-  private boundRuntimeHarness(state: AllocationState): RuntimeHarness | undefined {
+  /**
+   * The Kilo runtime that runs this allocation. The connected wrapper reports the
+   * runtime it runs. Before it connects, the sandbox's stored harness attributes the
+   * run, so a startup failure is not `unknown`. That fallback is exact in production,
+   * where preinstalled images carry only v1. The local v2 image overrides it, so a
+   * local v2 run is attributed correctly only after its wrapper connects.
+   */
+  private async allocationRuntimeHarness(
+    state: AllocationState
+  ): Promise<RuntimeHarness | undefined> {
     const socket = this.boundWrapperSocket(state);
-    return socket === null ? undefined : this.readAttachment(socket)?.runtimeHarness;
+    const reported = socket === null ? undefined : this.readAttachment(socket)?.runtimeHarness;
+    return reported ?? (await this.storedRuntimeHarness());
+  }
+
+  private async storedRuntimeHarness(): Promise<RuntimeHarness | undefined> {
+    return z
+      .enum(RUNTIME_HARNESSES)
+      .optional()
+      .parse(await this.ctx.storage.get(RUNTIME_HARNESS_KEY));
   }
 
   private boundWrapperSocket(state: AllocationState): WebSocket | null {
@@ -4700,10 +4716,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     provider: AgentSandboxProvider,
     cohort: StartupCohortContext
   ): Promise<RuntimeHarness> {
-    const stored = z
-      .enum(RUNTIME_HARNESSES)
-      .optional()
-      .parse(await this.ctx.storage.get(RUNTIME_HARNESS_KEY));
+    const stored = await this.storedRuntimeHarness();
     if (stored !== undefined) return stored;
     return (await this.ctx.storage.get(CREDENTIAL_HASH_KEY)) === undefined
       ? newSandboxHarness(this.env, provider, cohort)

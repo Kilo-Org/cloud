@@ -352,6 +352,7 @@ describe('SandboxControlV2 routes and forwarding', () => {
         allocationId,
         instanceId: allocationId,
         startSource: startSource === 'repository' ? 'snapshot' : 'image',
+        runtimeHarness: 'kilo',
       };
       await waitFor(() =>
         expect(peer.routeUpdatesFor(SESSION)).toContainEqual(
@@ -375,11 +376,13 @@ describe('SandboxControlV2 routes and forwarding', () => {
     }
   );
 
+  // This preinstalled sandbox stores `kilo`. A local v2 image reports `kilo2` and wins;
+  // without a valid report, the run keeps the stored harness.
   it.each([
     ['kilo2', { runtimeHarness: 'kilo2' }],
     ['kilo', { runtimeHarness: 'kilo' }],
-    ['unknown', {}],
-    [undefined, {}],
+    ['unknown', { runtimeHarness: 'kilo' }],
+    [undefined, { runtimeHarness: 'kilo' }],
   ] as const)(
     'records the wrapper runtime harness header %s in the run container',
     async (header, expected) => {

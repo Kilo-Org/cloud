@@ -2104,10 +2104,10 @@
       "replayFailed": "Omume a emechaghị. Biko nwaa ọzọ.",
       "actionFailed": "Enweghị ike imecha omume a. Biko nwaa ọzọ.",
       "actionBlocked": "Enweghị ike imecha omume a. A ghaghị idozi nsogbu a tupu ị nwee ike ịnwa ọzọ.",
-      "syncNoRepositories": "Ọnweghị ebe nchekwa koodu dị n'ime oke mmekọrịta data. Họrọ ebe nchekwa koodu ndị Onye enyemaka nchebe na-enyocha, wee ịmekọrịta data ọzọ.",
+      "syncNoRepositories": "Ọnweghị ebe nchekwa koodu dị n'ime oke mmekọrịta data. Họrọ ebe nchekwa koodu ndị Onye enyemaka nchebe na-enyocha, wee mekọrịta data ọzọ.",
       "syncNoRepositoriesNoManage": "Ọnweghị ebe nchekwa koodu dị n'ime oke mmekọrịta data. Onye nwe nzukọ, onye nchịkwa, ma ọ bụ onye njikwa ịgba ụgwọ aghaghị ijikọ ebe nchekwa koodu tupu ọ nwee ike ịmekọrịta data.",
-      "syncIntegrationInactive": "Njikọ GitHub maka Onye enyemaka nchebe adịghị arụ ọrụ. Jikọọ Kilo GitHub App ọzọ, wee ịmekọrịta data ọzọ.",
-      "syncMissingPermission": "Kilo GitHub App enweghị ike ịgụ ọkwa ịdọ aka ná ntị. Nye ikike ahụ na GitHub, wee ịmekọrịta data ọzọ.",
+      "syncIntegrationInactive": "Njikọ GitHub maka Onye enyemaka nchebe adịghị arụ ọrụ. Jikọọ Kilo GitHub App ọzọ, wee mekọrịta data ọzọ.",
+      "syncMissingPermission": "Kilo GitHub App enweghị ike ịgụ ọkwa ịdọ aka ná ntị. Nye ikike ahụ na GitHub, wee mekọrịta data ọzọ.",
       "configConflict": "Agbanweela ntọala Onye enyemaka nchebe n'ebe ọzọ. Lelee ntọala kachasị ọhụrụ ma chekwaa ọzọ."
     },
     "analysisState": {
@@ -2177,7 +2177,7 @@
       "manualReviewRequired": "Nyocha na-atụ aro ka mmadụ nyochaa ya, ya mere enweghị ike iji otu ọpịpị dozie ya.",
       "monitorRequired": "Nyocha na-atụ aro nlekọta kama imepe PR.",
       "triageOnly": "Naanị nyocha mbụ ka gwụchara. Mee nyocha koodu tupu ịmalite ndozi.",
-      "actionNotConcrete": "Enweghị ndozi a kapịrị ọnụ maka ngwugwu ndabere ma ọ bụ ndozi nduzi enweghị.",
+      "actionNotConcrete": "Enweghị ndozi a kapịrị ọnụ maka ngwugwu ndabere ma ọ bụ ndozi a tụrụ aro.",
       "remediationActive": "Mbọ ndozi na-aga n'ihu ugbu a.",
       "prAlreadyOpened": "E mepeelarị PR ndozi.",
       "duplicateAnalysisResult": "E jirila nsonaazụ nyocha a malite ọrụ ndozi.",

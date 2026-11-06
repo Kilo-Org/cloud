@@ -7,7 +7,6 @@ import {
   type SessionShareDuration,
   type SessionLiveSummary,
 } from '@kilocode/session-ingest-contracts';
-import { sha256Hex } from '@kilocode/worker-utils/sha256';
 import {
   desc,
   eq,
@@ -32,7 +31,7 @@ import { getWorkerDb } from '@kilocode/db/client';
 import { cli_sessions_v2 } from '@kilocode/db/schema';
 import { ingestItems, ingestMeta, agentNotificationDispatch } from '../db/sqlite-schema';
 import type { Env } from '../env';
-import { MAX_INGEST_ITEM_BYTES } from '../util/ingest-limits';
+import { MAX_INGEST_ITEM_BYTES, CLONE_WINDOW_MAX_BYTES } from '../util/ingest-limits';
 import type { IngestBatch } from '../types/session-sync';
 import type { SessionDataItem } from '../types/session-sync';
 import {
@@ -41,6 +40,7 @@ import {
   streamMessagePartRows,
 } from '../util/compaction';
 import { isItemWithinMessageCut } from '../util/message-cut';
+import { cloneSourceRowBytes } from '../util/clone-window';
 import {
   extractNormalizedGitBranchFromItem,
   extractNormalizedGitUrlFromItem,
@@ -254,7 +254,10 @@ type CloneMetaKey =
   | 'cloneRollingDigest'
   | 'cloneCopiedItemCount'
   | 'cloneCompleteSourceId'
-  | 'cloneUpToMessageId';
+  | 'cloneUpToMessageId'
+  | 'cloneVerifyCursor'
+  | 'cloneVerifyChain'
+  | 'cloneVerifyRows';
 
 function readCloneMeta(db: DrizzleSqliteDODatabase, key: CloneMetaKey): string | null {
   const row = db
@@ -270,6 +273,37 @@ function writeCloneMeta(db: DrizzleSqliteDODatabase, key: CloneMetaKey, value: s
     .values({ key, value })
     .onConflictDoUpdate({ target: ingestMeta.key, set: { value } })
     .run();
+}
+
+/**
+ * Verification progress of a clone stage. It starts empty and advances one
+ * source window at a time, so a source larger than one request budget is
+ * verified over several requests instead of restarting.
+ */
+function readCloneVerification(db: DrizzleSqliteDODatabase): CloneVerificationProgress {
+  const raw = readCloneMeta(db, 'cloneVerifyCursor');
+  let verifyCursor: IngestOrderCursor | null = null;
+  if (raw !== null) {
+    try {
+      verifyCursor = JSON.parse(raw) as IngestOrderCursor;
+    } catch {
+      verifyCursor = null;
+    }
+  }
+  return {
+    verifyCursor,
+    verifyChain: readCloneMeta(db, 'cloneVerifyChain') ?? '',
+    verifyRows: Number(readCloneMeta(db, 'cloneVerifyRows') ?? '0') || 0,
+  };
+}
+
+function writeCloneVerification(
+  db: DrizzleSqliteDODatabase,
+  progress: CloneVerificationProgress
+): void {
+  writeCloneMeta(db, 'cloneVerifyCursor', JSON.stringify(progress.verifyCursor));
+  writeCloneMeta(db, 'cloneVerifyChain', progress.verifyChain);
+  writeCloneMeta(db, 'cloneVerifyRows', String(progress.verifyRows));
 }
 
 /**
@@ -431,7 +465,6 @@ export type ExportCloneBatchResult = {
   rows: CloneBatchRow[];
   nextCursor: IngestOrderCursor | null;
   done: boolean;
-  digest: string;
 };
 
 /**
@@ -469,22 +502,49 @@ export type StageCloneBatchResult =
 
 export type InspectCloneStageParams = CloneStageIdentity;
 
+/** Verification progress a resumed clone request continues from. */
+export type CloneVerificationProgress = {
+  verifyCursor: IngestOrderCursor | null;
+  verifyChain: string;
+  verifyRows: number;
+};
+
 export type InspectCloneStageResult =
   | { status: 'empty' }
-  | { status: 'complete'; sourceSessionId: string; destinationSessionId: string }
   | {
+      /**
+       * A finalized stage is trusted: the item count and digest it recorded are
+       * returned so a repeat clone request never re-reads the source.
+       */
+      status: 'complete';
+      sourceSessionId: string;
+      destinationSessionId: string;
+      rollingDigest: string;
+      copiedItemCount: number;
+    }
+  | ({
       status: 'in_progress';
       sourceSessionId: string;
       destinationSessionId: string;
       nextCursor: IngestOrderCursor | null;
       rollingDigest: string;
       copiedItemCount: number;
-    }
+    } & CloneVerificationProgress)
   | {
       status: 'mismatch';
       storedSourceSessionId: string | null;
       storedDestinationSessionId: string | null;
       storedStage: 'complete' | 'in_progress';
+    };
+
+export type StageCloneVerificationParams = CloneStageIdentity & CloneVerificationProgress;
+
+export type StageCloneVerificationResult =
+  | { status: 'staged' }
+  | {
+      status: 'mismatch';
+      storedSourceSessionId: string | null;
+      storedDestinationSessionId: string | null;
     };
 
 export type FinalizeCloneStageParams = CloneStageIdentity & {
@@ -515,8 +575,10 @@ type CloneStageState =
       sourceSessionId: string;
       destinationSessionId: string;
       upToMessageId: string | null;
+      rollingDigest: string;
+      copiedItemCount: number;
     }
-  | {
+  | ({
       kind: 'in_progress';
       sourceSessionId: string;
       destinationSessionId: string;
@@ -524,7 +586,7 @@ type CloneStageState =
       nextCursor: IngestOrderCursor | null;
       rollingDigest: string;
       copiedItemCount: number;
-    };
+    } & CloneVerificationProgress);
 
 /** A stage built for another source, destination, or cut is a different clone. */
 function isSameCloneStage(
@@ -536,13 +598,6 @@ function isSameCloneStage(
     stage.destinationSessionId === params.destinationSessionId &&
     stage.upToMessageId === (params.upToMessageId ?? null)
   );
-}
-
-async function computeCloneBatchDigest(rows: CloneBatchRow[]): Promise<string> {
-  const joined = rows
-    .map(row => `${row.itemId}:${row.itemType}:${row.itemDataR2Key ?? row.itemData}`)
-    .join('\n');
-  return sha256Hex(joined);
 }
 
 export class SessionIngestDO extends DurableObject<Env> {
@@ -2263,10 +2318,14 @@ export class SessionIngestDO extends DurableObject<Env> {
   }
 
   /**
-   * Read the next bounded batch of clone-eligible ingest rows in (ingested_at, id)
-   * order after `cursor`. Returns the rows, the next cursor (null when done), a
-   * `done` flag, and a stable SHA-256 digest over the returned rows. R2 bodies are
-   * not read here; the digest covers the stored reference (item_data or r2 key).
+   * Read the next bounded clone window of clone-eligible ingest rows in
+   * (ingested_at, id) order after `cursor`. Returns the rows, the next cursor
+   * (null when done), and a `done` flag. R2 bodies are not read here.
+   *
+   * The window holds at most `limit` rows and at most
+   * {@link CLONE_WINDOW_MAX_BYTES} of stored row data, always keeping the first
+   * row so a large row cannot stall the cursor, so the returned payload cannot
+   * grow past one window.
    */
   async exportCloneBatch(
     cursor: IngestOrderCursor | null,
@@ -2292,7 +2351,7 @@ export class SessionIngestDO extends DurableObject<Env> {
       .limit(limit)
       .all();
 
-    const batchRows: CloneBatchRow[] = rows.map(row => ({
+    const fetched: CloneBatchRow[] = rows.map(row => ({
       itemId: row.item_id,
       itemType: row.item_type as CloneItemType,
       itemData: row.item_data,
@@ -2300,11 +2359,23 @@ export class SessionIngestDO extends DurableObject<Env> {
       ingestedAt: row.ingested_at,
     }));
 
-    const digest = await computeCloneBatchDigest(batchRows);
-    const done = rows.length < limit;
-    const nextCursor = done ? null : ingestOrderCursor(rows[rows.length - 1]);
+    const window: CloneBatchRow[] = [];
+    let windowBytes = 0;
+    let lastKept = -1;
+    for (const [index, row] of fetched.entries()) {
+      const rowBytes = cloneSourceRowBytes(row);
+      if (window.length > 0 && windowBytes + rowBytes > CLONE_WINDOW_MAX_BYTES) break;
+      window.push(row);
+      windowBytes += rowBytes;
+      lastKept = index;
+    }
 
-    return { rows: batchRows, nextCursor, done, digest };
+    const truncated = window.length < fetched.length;
+    const done = !truncated && fetched.length < limit;
+    const lastRow = lastKept < 0 ? undefined : rows[lastKept];
+    const nextCursor = done || lastRow === undefined ? null : ingestOrderCursor(lastRow);
+
+    return { rows: window, nextCursor, done };
   }
 
   /** True when this session holds a `message` row with exactly this message ID. */
@@ -2328,6 +2399,8 @@ export class SessionIngestDO extends DurableObject<Env> {
         sourceSessionId: completeSource,
         destinationSessionId: readCloneMeta(this.db, 'cloneDestinationSessionId') ?? '',
         upToMessageId,
+        rollingDigest: readCloneMeta(this.db, 'cloneRollingDigest') ?? '',
+        copiedItemCount: Number(readCloneMeta(this.db, 'cloneCopiedItemCount') ?? '0') || 0,
       };
     }
 
@@ -2351,6 +2424,7 @@ export class SessionIngestDO extends DurableObject<Env> {
         nextCursor,
         rollingDigest: readCloneMeta(this.db, 'cloneRollingDigest') ?? '',
         copiedItemCount: Number(readCloneMeta(this.db, 'cloneCopiedItemCount') ?? '0') || 0,
+        ...readCloneVerification(this.db),
       };
     }
 
@@ -2470,6 +2544,8 @@ export class SessionIngestDO extends DurableObject<Env> {
         status: 'complete',
         sourceSessionId: stage.sourceSessionId,
         destinationSessionId: stage.destinationSessionId,
+        rollingDigest: stage.rollingDigest,
+        copiedItemCount: stage.copiedItemCount,
       };
     }
 
@@ -2480,7 +2556,38 @@ export class SessionIngestDO extends DurableObject<Env> {
       nextCursor: stage.nextCursor,
       rollingDigest: stage.rollingDigest,
       copiedItemCount: stage.copiedItemCount,
+      verifyCursor: stage.verifyCursor,
+      verifyChain: stage.verifyChain,
+      verifyRows: stage.verifyRows,
     };
+  }
+
+  /**
+   * Persist how far the source verification of an in-progress stage has read.
+   * Idempotent for the same stage identity; a stage of another source,
+   * destination, or cut is reported as a mismatch without mutation.
+   */
+  stageCloneVerification(params: StageCloneVerificationParams): StageCloneVerificationResult {
+    const stage = this.readCloneStage();
+
+    if (stage.kind !== 'in_progress' || !isSameCloneStage(stage, params)) {
+      return {
+        status: 'mismatch',
+        storedSourceSessionId: stage.kind === 'empty' ? null : stage.sourceSessionId,
+        storedDestinationSessionId: stage.kind === 'empty' ? null : stage.destinationSessionId,
+      };
+    }
+
+    // One transaction: a cursor, chain, and row count from different write
+    // attempts would make the resumed chain disagree with itself.
+    this.ctx.storage.transactionSync(() => {
+      writeCloneVerification(this.db, {
+        verifyCursor: params.verifyCursor,
+        verifyChain: params.verifyChain,
+        verifyRows: params.verifyRows,
+      });
+    });
+    return { status: 'staged' };
   }
 
   finalizeCloneStage(params: FinalizeCloneStageParams): FinalizeCloneStageResult {

@@ -14,6 +14,8 @@ import {
   MAX_KILO_SDK_HISTORY_MATERIALIZATION_BYTES,
   MAX_KILO_SDK_SESSION_SNAPSHOT_BYTES,
 } from '../../src/dos/kilo-sdk-materialization';
+import { cloneSessionIntoDestination } from '../../src/clone/session-clone';
+import type { Env } from '../../src/env';
 import { BRIEFING_MAX_EXCERPT_SOURCE_ROWS } from '../../src/ingest/briefing-excerpt';
 import { INGEST_CHUNK_MAX_BYTES, MAX_INGEST_ITEM_BYTES } from '../../src/util/ingest-limits';
 
@@ -4125,5 +4127,178 @@ describe('SessionIngestDO integration', () => {
 
       expect(snapshot.info).toEqual({ title: 'New' });
     });
+  });
+});
+
+describe('SessionIngestDO clone stage', () => {
+  const kiloUserId = 'usr_test_clone_stage';
+  const sourceSessionId = 'ses_clone_source_0000000000000';
+  const destinationSessionId = 'ses_clone_dest_000000000000000';
+
+  const cloneEnv = {
+    SESSION_INGEST_DO: env.SESSION_INGEST_DO,
+    SESSION_INGEST_R2: env.SESSION_INGEST_R2,
+  } as unknown as Env;
+
+  function messageRow(index: number, sessionId: string) {
+    const itemId = `msg_clone_${String(index).padStart(4, '0')}`;
+    return {
+      itemId: `message/${itemId}`,
+      body: JSON.stringify({
+        id: itemId,
+        sessionID: sessionId,
+        role: 'user',
+        time: { created: index },
+      }),
+    };
+  }
+
+  async function seedSourceRows(sessionId: string, count: number) {
+    await runInDurableObject(getStub(kiloUserId, sessionId), async (_instance, state) => {
+      const chunkSize = 20;
+      for (let start = 0; start < count; start += chunkSize) {
+        const end = Math.min(start + chunkSize, count);
+        const values: string[] = [];
+        const bindings: Array<string | number> = [];
+        for (let index = start; index < end; index += 1) {
+          const row = messageRow(index, sessionId);
+          values.push('(?, ?, ?, NULL, ?)');
+          bindings.push(row.itemId, 'message', row.body, index);
+        }
+        state.storage.sql.exec(
+          `INSERT INTO ingest_items (item_id, item_type, item_data, item_data_r2_key, ingested_at)
+           VALUES ${values.join(', ')}`,
+          ...bindings
+        );
+      }
+    });
+  }
+
+  async function destinationRowCount(sessionId: string) {
+    return runInDurableObject(getStub(kiloUserId, sessionId), async (_instance, state) => {
+      const [row] = [
+        ...state.storage.sql.exec<{ inserted: number }>(
+          `SELECT COUNT(*) AS inserted FROM ingest_items`
+        ),
+      ];
+      return row?.inserted ?? 0;
+    });
+  }
+
+  it('clones a real 1700-row source across bounded requests and verifies it', async () => {
+    await seedSourceRows(sourceSessionId, 1700);
+
+    const first = await cloneSessionIntoDestination({
+      env: cloneEnv,
+      kiloUserId,
+      sourceSessionId,
+      destinationSessionId,
+      sourceOrganizationId: null,
+      destinationOrganizationId: null,
+    });
+    expect(first).toEqual({ status: 'in_progress' });
+    expect(
+      await getStub(kiloUserId, destinationSessionId).inspectCloneStage({
+        sourceSessionId,
+        destinationSessionId,
+      })
+    ).toMatchObject({ status: 'in_progress', copiedItemCount: 1600 });
+
+    const second = await cloneSessionIntoDestination({
+      env: cloneEnv,
+      kiloUserId,
+      sourceSessionId,
+      destinationSessionId,
+      sourceOrganizationId: null,
+      destinationOrganizationId: null,
+    });
+    expect(second).toEqual({ status: 'in_progress' });
+    expect(
+      await getStub(kiloUserId, destinationSessionId).inspectCloneStage({
+        sourceSessionId,
+        destinationSessionId,
+      })
+    ).toMatchObject({ status: 'in_progress', copiedItemCount: 1700, verifyRows: 1500 });
+
+    const third = await cloneSessionIntoDestination({
+      env: cloneEnv,
+      kiloUserId,
+      sourceSessionId,
+      destinationSessionId,
+      sourceOrganizationId: null,
+      destinationOrganizationId: null,
+    });
+    expect(third).toEqual({ status: 'ready', copiedItemCount: 1700 });
+    expect(await destinationRowCount(destinationSessionId)).toBe(1700);
+
+    // The destination rows carry the destination session id.
+    await runInDurableObject(
+      getStub(kiloUserId, destinationSessionId),
+      async (_instance, state) => {
+        const [row] = [
+          ...state.storage.sql.exec<{ item_data: string }>(
+            `SELECT item_data FROM ingest_items ORDER BY id LIMIT 1`
+          ),
+        ];
+        expect(JSON.parse(row?.item_data ?? '{}')).toMatchObject({
+          sessionID: destinationSessionId,
+        });
+      }
+    );
+  });
+
+  it('confirms a complete stage from its record after the source is gone', async () => {
+    const source = 'ses_clone_source_0000000000001';
+    const destination = 'ses_clone_dest_000000000000001';
+    await seedSourceRows(source, 3);
+
+    const params = {
+      env: cloneEnv,
+      kiloUserId,
+      sourceSessionId: source,
+      destinationSessionId: destination,
+      sourceOrganizationId: null,
+      destinationOrganizationId: null,
+    };
+    expect(await cloneSessionIntoDestination(params)).toEqual({
+      status: 'ready',
+      copiedItemCount: 3,
+    });
+
+    // A repeat request must not read the source: the stage already recorded and
+    // verified its count, so an emptied source changes nothing.
+    await getStub(kiloUserId, source).clear();
+    expect(await cloneSessionIntoDestination(params)).toEqual({
+      status: 'ready',
+      copiedItemCount: 3,
+    });
+    expect(await destinationRowCount(destination)).toBe(3);
+  });
+
+  it('rejects a stored body above the row budget and leaves the destination empty', async () => {
+    const source = 'ses_clone_source_0000000000002';
+    const destination = 'ses_clone_dest_000000000000002';
+    const bodyKey = `clone-source/${source}/message/msg_clone_huge`;
+    await env.SESSION_INGEST_R2.put(bodyKey, 'x'.repeat(5 * 1024 * 1024));
+    await runInDurableObject(getStub(kiloUserId, source), async (_instance, state) => {
+      state.storage.sql.exec(
+        `INSERT INTO ingest_items (item_id, item_type, item_data, item_data_r2_key, ingested_at)
+         VALUES (?, 'message', '{}', ?, 1)`,
+        'message/msg_clone_huge',
+        bodyKey
+      );
+    });
+
+    await expect(
+      cloneSessionIntoDestination({
+        env: cloneEnv,
+        kiloUserId,
+        sourceSessionId: source,
+        destinationSessionId: destination,
+        sourceOrganizationId: null,
+        destinationOrganizationId: null,
+      })
+    ).resolves.toEqual({ status: 'rejected', code: 'clone_setup_failed' });
+    expect(await destinationRowCount(destination)).toBe(0);
   });
 });

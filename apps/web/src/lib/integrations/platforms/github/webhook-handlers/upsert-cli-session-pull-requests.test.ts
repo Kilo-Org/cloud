@@ -8,6 +8,7 @@ import {
   upsertCliSessionPullRequestsFromWebhook,
   type WebhookInstallationOwner,
 } from './upsert-cli-session-pull-requests';
+import { createEmptyPrObservations, getPrObservationSummary } from '../pr-observations';
 
 const REPO = 'acme/widgets';
 // Matches what the webhook handler will store after normalizing clone_url.
@@ -176,6 +177,66 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
       await db.delete(organizations).where(inArray(organizations.id, orgIdsToCleanup));
     }
   });
+  it('updates mergeability from PR webhooks without erasing cached check inventory', async () => {
+    const branch = 'feature/cached-status';
+    const headSha = 'a'.repeat(40);
+    await seedSession({ branch, owner: testOwner, prNumber: 999 });
+    const payload = makePayload({ action: 'opened', prNumber: 999, headRef: branch, headSha });
+    payload.pull_request.base.sha = 'b'.repeat(40);
+    payload.pull_request.mergeable = false;
+    payload.pull_request.mergeable_state = 'dirty';
+    await upsertCliSessionPullRequestsFromWebhook(payload, testOwner);
+
+    const [initial] = await readUserRow({ userId: testUserId, prNumber: 999 });
+    expect(getPrObservationSummary(initial.pr_observations, headSha)?.mergeability).toMatchObject({
+      mergeable: false,
+      state: 'dirty',
+      baseSha: 'b'.repeat(40),
+    });
+
+    await db
+      .update(github_branch_pull_requests)
+      .set({
+        pr_observations: {
+          ...createEmptyPrObservations(),
+          headSha,
+          checks: [
+            {
+              key: 'status:test',
+              id: '123',
+              attempt: 1,
+              at: null,
+              phase: 2,
+              failed: false,
+              outcome: 'passed',
+            },
+          ],
+          checksObserved: true,
+          checksComplete: true,
+        },
+      })
+      .where(
+        and(
+          eq(github_branch_pull_requests.owned_by_user_id, testUserId),
+          eq(github_branch_pull_requests.pr_number, 999)
+        )
+      );
+
+    payload.action = 'edited';
+    payload.pull_request.base.sha = 'c'.repeat(40);
+    payload.pull_request.mergeable = true;
+    payload.pull_request.mergeable_state = 'clean';
+    await upsertCliSessionPullRequestsFromWebhook(payload, testOwner);
+    const [updated] = await readUserRow({ userId: testUserId, prNumber: 999 });
+    const summary = getPrObservationSummary(updated.pr_observations, headSha);
+    expect(summary?.checks).toMatchObject({ total: 1, passed: 1, failed: 0, complete: true });
+    expect(summary?.mergeability).toMatchObject({
+      mergeable: true,
+      state: 'clean',
+      baseSha: 'c'.repeat(40),
+    });
+  });
+
   it('inserts a cache row on opened and marks the linking session verified', async () => {
     const sessionId = await seedSession({
       branch: 'feature/alpha',

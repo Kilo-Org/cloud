@@ -819,8 +819,6 @@ export const baseCreatePreviewNextOutputSchema = z.object({
 
 export const basePreviewOptionsNextSchema = z.object({
   cloudAgentSessionId: previewSessionIdSchema,
-  /** The route's organization; the Worker uses it only to decide whether to show preview. */
-  organizationId: z.uuid().optional(),
 });
 
 /** The Worker's answer: its preview hostname with a `{port}` placeholder. */

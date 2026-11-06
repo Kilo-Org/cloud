@@ -19,6 +19,7 @@ export default async function OrganizationByIdPage({
   return (
     <OrganizationByPageLayout
       params={params}
+      supportRead
       render={({ role, organization }) => (
         <OrganizationDashboard
           organizationId={organization.id}

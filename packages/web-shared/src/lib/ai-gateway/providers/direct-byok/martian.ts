@@ -1,4 +1,4 @@
-import { cachedEnhancedDirectByokModelList } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/model-list';
+import { cachedDirectByokModelList } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/model-list';
 import {
   apiKeyUpstream,
   faviconIcon,
@@ -13,18 +13,7 @@ export default {
     responseTransforms: null,
   }),
   transformRequest() {},
-  models: cachedEnhancedDirectByokModelList({
-    providerId: 'martian',
-    recommendedModels: [
-      {
-        id: 'moonshotai/kimi-k2.6',
-        name: 'kimi-k2.6',
-        flags: ['vision', 'reasoning'],
-        context_length: 262144,
-        max_completion_tokens: 65535,
-      },
-    ],
-  }),
+  models: cachedDirectByokModelList('martian'),
   provider_listing: {
     dataPolicy: {
       training: true,

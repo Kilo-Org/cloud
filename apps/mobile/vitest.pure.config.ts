@@ -57,6 +57,7 @@ export default defineProject({
       'src/lib/hooks/**/*.test.ts',
       'src/lib/iap/**/*.test.ts',
       'src/lib/kilo-pass/**/*.test.ts',
+      'src/lib/native-remote/**/*.test.ts',
       // `!(*.mounted)` keeps `*.mounted.test.tsx` in the mounted project only:
       // this directory holds both kinds, and a file in both projects runs twice.
       'src/lib/kilo-pass/**/!(*.mounted).test.tsx',

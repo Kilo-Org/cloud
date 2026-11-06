@@ -236,6 +236,30 @@ const ingestVersionSchema = z.coerce.number().int().nonnegative().catch(0);
 api.post('/session', zodJsonValidator(createSessionSchema), async c => {
   const body = c.req.valid('json');
 
+  // Require available ingest storage before admitting the id, so create never
+  // answers with a session the ingest plane will not accept. A probe error
+  // keeps create available; ingest reports its own state.
+  try {
+    const retired = await withDORetry(
+      () =>
+        getSessionIngestDO(c.env, {
+          kiloUserId: c.get('user_id'),
+          sessionId: body.sessionId,
+        }),
+      stub => stub.isDeleted(),
+      'SessionIngestDO.isDeleted'
+    );
+    if (retired) {
+      return c.json({ success: false, error: 'session_retired' }, 409);
+    }
+  } catch (error) {
+    console.error('Failed to probe session availability before create', {
+      kiloUserId: c.get('user_id'),
+      sessionId: body.sessionId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+
   // Persist a placeholder session row.
   // This is intentionally minimal; we only need a working Hyperdrive -> Postgres path.
   const db = getWorkerDb(c.env.HYPERDRIVE.connectionString);

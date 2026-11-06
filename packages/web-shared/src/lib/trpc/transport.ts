@@ -103,7 +103,11 @@ export function trpcSuccessResponseJsonSchema(dataSchema: JsonSchema): JsonSchem
   };
 }
 
-export type KiloTrpcErrorData = TRPCDefaultErrorShape['data'] & z.infer<typeof TrpcErrorDataSchema>;
+export type KiloTrpcErrorData = TRPCDefaultErrorShape['data'] &
+  z.infer<typeof TrpcErrorDataSchema> & {
+    /** Client-visible reason for a support access denial. */
+    supportAccessReason?: string;
+  };
 
 export type KiloTrpcErrorShape = Omit<TRPCDefaultErrorShape, 'data'> & {
   data: KiloTrpcErrorData;
@@ -113,6 +117,7 @@ export const trpcErrorFormatter = (({ shape, error }) => {
   // Cloud Agent's worker tRPC error is rethrown with a structured cause. Parse
   // it through the SDK contract before exposing it at the browser boundary.
   const billingFailure = parseCustomerBillingFailure({ data: error.cause });
+  const supportAccessReason = readSupportAccessReason(error.cause);
 
   return {
     ...shape,
@@ -134,6 +139,13 @@ export const trpcErrorFormatter = (({ shape, error }) => {
             }
           : undefined,
       ...(billingFailure ? { billingFailure } : {}),
+      ...(supportAccessReason ? { supportAccessReason } : {}),
     },
   };
 }) satisfies TRPCErrorFormatter<unknown, KiloTrpcErrorShape>;
+
+function readSupportAccessReason(cause: unknown): string | undefined {
+  if (cause === null || typeof cause !== 'object') return undefined;
+  const value = (cause as { supportAccessReason?: unknown }).supportAccessReason;
+  return typeof value === 'string' ? value : undefined;
+}

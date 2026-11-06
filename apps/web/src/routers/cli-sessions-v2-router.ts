@@ -65,6 +65,7 @@ import { projectSessionGoal } from '@kilocode/cloud-agent-sdk';
 import { SESSION_ID_RE } from '../../../../services/cloud-agent-next/src/shared/protocol';
 import { KNOWN_PLATFORMS } from '@kilocode/app-shared/platforms';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import { isSupportAccessEnabled } from '@kilocode/web-shared/lib/admin/support-access';
 import { activeOrganizationAccessSql } from '@kilocode/worker-utils/organization-membership';
 import {
   recordKiloAdminElevation,
@@ -72,8 +73,7 @@ import {
 } from '@kilocode/web-shared/lib/admin/admin-access-log';
 import {
   fetchPullRequestByNumber,
-  fetchPullRequestReviewDecision,
-  GitHubRateLimitError,
+  toGitHubRateLimitError,
 } from '@/lib/integrations/platforms/github/adapter';
 import { getIntegrationForOwner } from '@/lib/integrations/db/platform-integrations';
 import { PLATFORM } from '@/lib/integrations/core/constants';
@@ -90,8 +90,15 @@ import {
 import { triggerBatchReviewDecisionFetchIfNeeded } from '@/lib/integrations/platforms/github/batch-review-decisions';
 import {
   getPrObservationSummary,
+  createEmptyPrObservations,
+  prObservationsSchema,
   prObservationSummarySchema,
 } from '@/lib/integrations/platforms/github/pr-observations';
+import { fetchPullRequestObservations } from '@/lib/integrations/platforms/github/pr-status';
+import {
+  claimPrRefresh,
+  deferPrRefresh,
+} from '@/lib/integrations/platforms/github/pr-refresh-budget';
 import { notifyCliSessionRenamed } from '@/lib/cloud-agent/session-events';
 import { after } from 'next/server';
 import {
@@ -949,7 +956,7 @@ async function addOrganizationCondition(
   organizationId: string | null | undefined
 ): Promise<void> {
   if (organizationId === undefined) {
-    if (ctx.user.is_admin) {
+    if (ctx.user.is_admin && !isSupportAccessEnabled()) {
       // No membership predicate is added at all, so the query spans every
       // organization's sessions. This is the broadest read in the file and it
       // never touches `adminProcedure`, so it must be recorded here.
@@ -2089,6 +2096,7 @@ export const cliSessionsV2Router = createTRPCRouter({
           pr_last_synced_at: github_branch_pull_requests.pr_last_synced_at,
           pr_review_decision: github_branch_pull_requests.pr_review_decision,
           review_decision_pending: github_branch_pull_requests.review_decision_pending,
+          cache_updated_at: github_branch_pull_requests.updated_at,
         })
         .from(cli_sessions_v2)
         .leftJoin(github_branch_pull_requests, sessionPrJoinPredicate)
@@ -2123,7 +2131,7 @@ export const cliSessionsV2Router = createTRPCRouter({
         pr_link_verified_at: session.pr_link_verified_at,
       };
 
-      const cacheRow: AssociatedPrRow = {
+      let cacheRow: AssociatedPrRow = {
         pr_url: row.pr_url,
         pr_number: row.pr_number,
         pr_state: row.pr_state,
@@ -2134,6 +2142,7 @@ export const cliSessionsV2Router = createTRPCRouter({
         pr_review_decision: row.pr_review_decision,
         review_decision_pending: row.review_decision_pending,
       };
+      let cacheUpdatedAt = row.cache_updated_at;
 
       // Non-GitHub sessions never call GitHub. A verified link (if any) comes
       // from the cache; an unverified one shows nothing.
@@ -2168,6 +2177,32 @@ export const cliSessionsV2Router = createTRPCRouter({
             );
         }
         return { associatedPr: null };
+      }
+
+      const cacheIdentity = and(
+        eq(github_branch_pull_requests.git_url, normalizeGitUrl(gitUrl)),
+        eq(github_branch_pull_requests.pr_number, parsed.number),
+        session.organization_id
+          ? and(
+              eq(github_branch_pull_requests.owned_by_organization_id, session.organization_id),
+              isNull(github_branch_pull_requests.owned_by_user_id)
+            )
+          : and(
+              eq(github_branch_pull_requests.owned_by_user_id, ctx.user.id),
+              isNull(github_branch_pull_requests.owned_by_organization_id)
+            )
+      );
+      // An unverified session is excluded from the join even if another session cached this PR.
+      if (cacheUpdatedAt === null) {
+        const [existingCache] = await db
+          .select()
+          .from(github_branch_pull_requests)
+          .where(cacheIdentity)
+          .limit(1);
+        if (existingCache) {
+          cacheRow = existingCache;
+          cacheUpdatedAt = existingCache.updated_at;
+        }
       }
 
       // Throttle: skip the fetch only when the session's link is already
@@ -2213,6 +2248,28 @@ export const cliSessionsV2Router = createTRPCRouter({
         });
       }
       const appType = integration.github_app_type ?? 'standard';
+      const refreshBudget = await claimPrRefresh({
+        appType,
+        installationId: String(installationId),
+        owner: session.organization_id
+          ? { type: 'org', id: session.organization_id }
+          : { type: 'user', id: ctx.user.id },
+        repo: `${parsed.owner}/${parsed.repo}`,
+        number: parsed.number,
+      });
+      if (!refreshBudget.allowed) {
+        throw new TRPCError({
+          code:
+            refreshBudget.reason === 'unavailable' ? 'SERVICE_UNAVAILABLE' : 'TOO_MANY_REQUESTS',
+          message:
+            refreshBudget.reason === 'unavailable'
+              ? 'PR refresh is temporarily unavailable. Cached PR data is unchanged.'
+              : refreshBudget.reason === 'rate_limited'
+                ? `GitHub rate limit reached; try again after ${refreshBudget.retryAt.toISOString()}`
+                : `PR refresh was already attempted; try again after ${refreshBudget.retryAt.toISOString()}`,
+        });
+      }
+      const signal = AbortSignal.timeout(45_000);
 
       // Fetch the PR by number from the stored link. When the session reported
       // a head SHA that may not be the current PR head, also fetch the PR's
@@ -2227,13 +2284,19 @@ export const cliSessionsV2Router = createTRPCRouter({
           appType,
           includeCommits: session.pr_head_sha != null,
           expectedHeadSha: session.pr_head_sha,
+          signal,
         });
       } catch (error) {
-        if (error instanceof GitHubRateLimitError) {
+        const rateLimit = toGitHubRateLimitError(error);
+        if (rateLimit) {
+          await deferPrRefresh({
+            appType,
+            installationId: String(installationId),
+            resetAt: rateLimit.resetAt,
+          });
           throw new TRPCError({
             code: 'TOO_MANY_REQUESTS',
-            message: `GitHub rate limit reached; try again after ${error.resetAt.toISOString()}`,
-            cause: error,
+            message: `GitHub rate limit reached; try again after ${rateLimit.resetAt.toISOString()}`,
           });
         }
         captureException(error, {
@@ -2247,25 +2310,6 @@ export const cliSessionsV2Router = createTRPCRouter({
           code: 'INTERNAL_SERVER_ERROR',
           message: 'Failed to fetch pull request from GitHub',
         });
-      }
-
-      // Fetch the rolled-up review decision when we have a PR.
-      // Failures are swallowed so a GraphQL hiccup doesn't break the refresh.
-      let reviewDecision: string | null = null;
-      let reviewDecisionFetched = false;
-      if (fetched && fetched.number > 0) {
-        try {
-          reviewDecision = await fetchPullRequestReviewDecision({
-            installationId: String(installationId),
-            owner: parsed.owner,
-            repo: parsed.repo,
-            number: fetched.number,
-            appType,
-          });
-          reviewDecisionFetched = true;
-        } catch {
-          // Non-fatal.
-        }
       }
 
       // Hard evidence: the link is accepted only when GitHub agrees it is this
@@ -2304,6 +2348,51 @@ export const cliSessionsV2Router = createTRPCRouter({
             );
         }
         return { associatedPr: null };
+      }
+
+      const previousObservations = prObservationsSchema.safeParse(cacheRow.pr_observations);
+      let observations = previousObservations.success
+        ? previousObservations.data
+        : createEmptyPrObservations();
+      let reviewDecision: 'approved' | 'changes_requested' | 'review_required' | null = null;
+      let reviewDecisionFetched = false;
+      try {
+        ({ observations, reviewDecision, reviewDecisionFetched } =
+          await fetchPullRequestObservations({
+            installationId: String(installationId),
+            integrationId: integration.id,
+            owner: parsed.owner,
+            repo: parsed.repo,
+            number: fetched.number,
+            appType,
+            pullRequest: fetched,
+            existing: cacheRow.pr_observations,
+            signal,
+          }));
+      } catch (error) {
+        const rateLimit = toGitHubRateLimitError(error);
+        if (rateLimit) {
+          await deferPrRefresh({
+            appType,
+            installationId: String(installationId),
+            resetAt: rateLimit.resetAt,
+          });
+          throw new TRPCError({
+            code: 'TOO_MANY_REQUESTS',
+            message: `GitHub rate limit reached; try again after ${rateLimit.resetAt.toISOString()}`,
+          });
+        }
+        observations = {
+          ...observations,
+          checksComplete: false,
+          threadsComplete: false,
+          mergeability: undefined,
+          unavailable: ['checks', 'statuses', 'reviews'],
+        };
+        captureException(error, {
+          tags: { source: 'cli-sessions-v2-router', endpoint: 'refreshPullRequestObservations' },
+          extra: { sessionId },
+        });
       }
 
       // On conflict: only overwrite pr_review_decision when the fetch
@@ -2348,6 +2437,7 @@ export const cliSessionsV2Router = createTRPCRouter({
           pr_state: fetched.state,
           pr_title: fetched.title,
           pr_head_sha: fetched.headSha,
+          pr_observations: observations,
           pr_review_decision: reviewDecision,
           review_decision_pending: !reviewDecisionFetched,
           review_decision_fetching_at: null,
@@ -2356,12 +2446,18 @@ export const cliSessionsV2Router = createTRPCRouter({
         .onConflictDoUpdate({
           target: conflictTarget,
           targetWhere: conflictTargetWhere,
+          // Do not overwrite a webhook or observation accepted during the GitHub reads.
+          setWhere:
+            cacheUpdatedAt === null
+              ? sql`false`
+              : eq(github_branch_pull_requests.updated_at, cacheUpdatedAt),
           set: {
             pr_url: sql`excluded.pr_url`,
             pr_number: sql`excluded.pr_number`,
             pr_state: sql`excluded.pr_state`,
             pr_title: sql`excluded.pr_title`,
             pr_head_sha: sql`excluded.pr_head_sha`,
+            pr_observations: sql`excluded.pr_observations`,
             pr_review_decision: prReviewDecisionConflictSet,
             review_decision_pending: reviewDecisionFetched
               ? false
@@ -2385,13 +2481,6 @@ export const cliSessionsV2Router = createTRPCRouter({
           review_decision_pending: github_branch_pull_requests.review_decision_pending,
         });
 
-      if (!persisted) {
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Upsert did not return a row',
-        });
-      }
-
       // The link passed verification; record it so the read path can show it.
       await db
         .update(cli_sessions_v2)
@@ -2412,7 +2501,10 @@ export const cliSessionsV2Router = createTRPCRouter({
         ...sessionPr,
         pr_link_verified_at: new Date().toISOString(),
       };
-      return { associatedPr: formatAssociatedPr(verifiedSessionPr, persisted) };
+      const winningCache =
+        persisted ??
+        (await db.select().from(github_branch_pull_requests).where(cacheIdentity).limit(1))[0];
+      return { associatedPr: formatAssociatedPr(verifiedSessionPr, winningCache ?? cacheRow) };
     }),
 
   delete: baseProcedure.input(DeleteSessionInputSchema).mutation(async ({ ctx, input }) => {

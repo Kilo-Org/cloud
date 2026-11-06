@@ -208,7 +208,8 @@ export type SessionCloneRejectionCode =
   | 'source_digest_changed'
   | 'destination_conflict'
   | 'clone_setup_failed'
-  | 'clone_cut_not_found';
+  | 'clone_cut_not_found'
+  | 'session_retired';
 
 /**
  * Clone acknowledgement carried by the `ready` result. `sessionId` is the

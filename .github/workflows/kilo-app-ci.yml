@@ -4,7 +4,17 @@ name: kilo-app CI
 # every PR and every main push (no path filters) and the `mobile-changes` job
 # gates the suite work. An unrelated PR or push still reports the suite checks
 # as skipped (a skipped job satisfies a required check) instead of leaving them
-# "Expected". The release workflow re-runs the suite through `workflow_call`.
+# "Expected". A release started by the same main push consumes this run's
+# conclusion for that commit — every release path is inside the detection below,
+# so the run always executes the suite — and calls the suite through
+# `workflow_call` only for the hourly schedule, a manual run, or a reuse it
+# cannot prove: no run for the commit, or a run that ended without a pass,
+# including one the cancel-in-progress group above cancels when a later push
+# lands on main.
+#
+# The app's formatting is gated by the repo-wide `format-check` job in ci.yml:
+# `oxfmt --list-different .` covers apps/mobile on every PR, merge-queue entry
+# and main push, so this workflow needs no formatter job of its own.
 
 on:
   push:
@@ -83,14 +93,21 @@ jobs:
             echo "mobile=false" >> "$GITHUB_OUTPUT"
           fi
 
-  # One harness SDK build per run. The four suites below read
-  # packages/harness-sdk/dist: the shard jobs import it at run time, and the
-  # type-aware checks resolve its declarations. Building it inside each job made
-  # a cache miss pay the typia compile once per job, because the shards start
-  # together and actions/cache saves at the end of a job, so no job can hit
-  # another's save. The action still runs here, so its cache serves a later run
-  # with the same inputs, and the required `test` job needs this one, so a
-  # failed build fails the gate instead of leaving the suites skipped.
+  # One harness SDK build per run, and one tRPC declaration build per run. The
+  # four suites below read packages/harness-sdk/dist: the shard jobs import it
+  # at run time, and the type-aware checks resolve its declarations. Building it
+  # inside each job made a cache miss pay the typia compile once per job,
+  # because the shards start together and actions/cache saves at the end of a
+  # job, so no job can hit another's save. The action still runs here, so its
+  # cache serves a later run with the same inputs, and the required `test` job
+  # needs this one, so a failed build fails the gate instead of leaving the
+  # suites skipped.
+  #
+  # The tRPC declarations move here for the same reason: typecheck and lint both
+  # need packages/trpc/dist, they start together, and both used to run the
+  # action, so on a cache miss they compiled the same declaration program twice
+  # and raced to save the one key (the loser logged "Unable to reserve cache").
+  # Here the build happens once and both checks download the tree.
   prepare:
     needs: mobile-changes
     if: needs.mobile-changes.outputs.mobile == 'true'
@@ -127,6 +144,19 @@ jobs:
           retention-days: 1
           if-no-files-found: error
 
+      - name: Restore or build tRPC declarations
+        uses: ./.github/actions/trpc-declarations
+
+      # Same directory-root rule as the harness SDK artifact above.
+      - name: Upload the tRPC declarations
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: trpc-declarations
+          path: packages/trpc/dist
+          retention-days: 1
+          # A cache hit that restored nothing must fail here, not in a consumer.
+          if-no-files-found: error
+
   typecheck:
     needs: [mobile-changes, prepare]
     if: needs.mobile-changes.outputs.mobile == 'true'
@@ -149,8 +179,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Restore or build tRPC declarations
-        uses: ./.github/actions/trpc-declarations
+      - name: Download the tRPC declarations
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: trpc-declarations
+          path: packages/trpc/dist
 
       - name: Download the harness SDK build
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
@@ -188,8 +221,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Restore or build tRPC declarations
-        uses: ./.github/actions/trpc-declarations
+      - name: Download the tRPC declarations
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: trpc-declarations
+          path: packages/trpc/dist
 
       - name: Download the harness SDK build
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
@@ -234,36 +270,6 @@ jobs:
         run: node --test tools/nativewind/check-classes.test.mjs
       - name: Test the i18n catalog checker
         run: node --test tools/i18n/check-catalogs.test.mjs
-
-  format-check:
-    needs: mobile-changes
-    if: needs.mobile-changes.outputs.mobile == 'true'
-    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
-    timeout-minutes: 15
-    steps:
-      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
-
-      - name: Mount pnpm store
-        uses: ./.github/actions/pnpm-store
-
-      - name: Setup Node
-        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
-        with:
-          node-version-file: '.nvmrc'
-
-      # oxfmt is a root dev dependency; the workspace packages are not needed.
-      - name: Install dependencies
-        run: pnpm --filter kilocode-monorepo install --frozen-lockfile --ignore-scripts
-
-      - name: Format check
-        run: |
-          pnpm --filter kilo-app run format:check || {
-            echo "::error::oxfmt formatting check failed. Run 'cd apps/mobile && pnpm format' locally and commit the changes."
-            exit 1
-          }
 
   check-unused:
     needs: [mobile-changes, prepare]

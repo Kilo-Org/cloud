@@ -3,6 +3,7 @@ import type { BYOKApiKeyEnvelope } from '@kilocode/db/schema-types';
 import type { ByokKmsContext } from '@kilocode/web-shared/lib/ai-gateway/byok/kms-context';
 import { redisClient } from '@kilocode/web-shared/lib/redis';
 import { byokDataKeyRedisKey } from '@kilocode/web-shared/lib/redis-keys';
+import { claimReportWindow } from '@kilocode/web-shared/lib/ai-gateway/report-window';
 
 /**
  * How long a decrypted data key may be served without asking the KMS service again. Revoking
@@ -33,9 +34,14 @@ function cacheKey(envelope: BYOKApiKeyEnvelope, context: ByokKmsContext) {
   return byokDataKeyRedisKey(digest);
 }
 
-// Only the error name is logged: a Redis error message can echo the command arguments.
-function warn(message: string, error: unknown): void {
-  console.warn(`[byok-data-key-cache] ${message}`, error instanceof Error ? error.name : 'unknown');
+// Only the error name is logged: a Redis error message can echo the command arguments. Each
+// operation reports once per window, so an outage cannot add log lines to every inference.
+function warn(operation: 'read' | 'write' | 'evict', error: unknown): void {
+  if (!claimReportWindow(`byok-data-key-cache:${operation}`, Date.now())) return;
+  console.warn(
+    `[byok-data-key-cache] ${operation} failed`,
+    error instanceof Error ? error.name : 'unknown'
+  );
 }
 
 /**
@@ -49,7 +55,7 @@ export async function getCachedByokDataKey(
   try {
     return (await redisClient.get<string>(cacheKey(envelope, context))) || null;
   } catch (error) {
-    warn('read failed', error);
+    warn('read', error);
     return null;
   }
 }
@@ -65,7 +71,7 @@ export async function cacheByokDataKey(
       ex: BYOK_DATA_KEY_CACHE_TTL_SECONDS,
     });
   } catch (error) {
-    warn('write failed', error);
+    warn('write', error);
   }
 }
 
@@ -76,6 +82,6 @@ export async function evictCachedByokDataKey(
   try {
     await redisClient.del(cacheKey(envelope, context));
   } catch (error) {
-    warn('evict failed', error);
+    warn('evict', error);
   }
 }

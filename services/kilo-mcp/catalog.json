@@ -6423,11 +6423,6 @@
         "cloudAgentSessionId": {
           "type": "string",
           "pattern": "^workspace_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
         }
       },
       "required": [
@@ -6437,10 +6432,9 @@
     "tags": [
       "cloudagentnext",
       "getpreviewoptions",
-      "cloudagentsessionid",
-      "organizationid"
+      "cloudagentsessionid"
     ],
-    "searchBlob": "cloudAgentNext.getPreviewOptions Check whether live previews are enabled for a Cloud Agent session and get the preview URL template to use, given the session and organization. cloudagentnext getpreviewoptions cloudagentsessionid organizationid cloudAgentSessionId organizationId"
+    "searchBlob": "cloudAgentNext.getPreviewOptions Check whether live previews are enabled for a Cloud Agent session and get the preview URL template to use, given the session and organization. cloudagentnext getpreviewoptions cloudagentsessionid cloudAgentSessionId"
   },
   "cloudAgentNext.getSandboxSelectionOptions": {
     "path": "cloudAgentNext.getSandboxSelectionOptions",
@@ -11035,12 +11029,48 @@
     "path": "githubApps.disconnectUserAuthorization",
     "kind": "mutation",
     "summary": "Disconnect your personal GitHub account from Kilo. Use to unlink the GitHub identity tied to your user.",
-    "inputSchema": {},
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "authorizationId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "credentialVersion": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "authorizationId",
+        "credentialVersion"
+      ],
+      "additionalProperties": false
+    },
     "tags": [
       "githubapps",
-      "disconnectuserauthorization"
+      "disconnectuserauthorization",
+      "authorizationid",
+      "credentialversion"
     ],
-    "searchBlob": "githubApps.disconnectUserAuthorization Disconnect your personal GitHub account from Kilo. Use to unlink the GitHub identity tied to your user. githubapps disconnectuserauthorization"
+    "searchBlob": "githubApps.disconnectUserAuthorization Disconnect your personal GitHub account from Kilo. Use to unlink the GitHub identity tied to your user. githubapps disconnectuserauthorization authorizationid credentialversion authorizationId credentialVersion"
   },
   "githubApps.getAppType": {
     "path": "githubApps.getAppType",
@@ -21327,7 +21357,7 @@
   "organizations.guardrails.get": {
     "path": "organizations.guardrails.get",
     "kind": "query",
-    "summary": "Get an organization's Enkrypt AI guardrail settings: whether input checks are enabled, whether tool results are scanned, the input detectors, and whether response checks are enabled with their detectors. Owners and admins only.",
+    "summary": "Get an organization's Enkrypt AI guardrail settings: whether input checks are enabled, the input detectors, and whether response checks are enabled with their detectors. Owners and admins only.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
@@ -21348,7 +21378,7 @@
       "get",
       "organizationid"
     ],
-    "searchBlob": "organizations.guardrails.get Get an organization's Enkrypt AI guardrail settings: whether input checks are enabled, whether tool results are scanned, the input detectors, and whether response checks are enabled with their detectors. Owners and admins only. organizations guardrails get organizationid organizationId"
+    "searchBlob": "organizations.guardrails.get Get an organization's Enkrypt AI guardrail settings: whether input checks are enabled, the input detectors, and whether response checks are enabled with their detectors. Owners and admins only. organizations guardrails get organizationid organizationId"
   },
   "organizations.invoices": {
     "path": "organizations.invoices",

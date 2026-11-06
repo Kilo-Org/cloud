@@ -42,22 +42,13 @@ WORKER_URL=http://host.docker.internal:8794
 # Preview subdomain suffix; unset turns preview off (the web app reads it from the Worker).
 # Local dev serves previews from `p<port>-<workspace-uuid-hex>.localhost`.
 PREVIEW_HOST_SUFFIX=localhost
-# Comma-separated user or org IDs shown the preview UI, or `*` for all
-PREVIEW_ENABLED_IDS=*
 
 # Timeout overrides (optional)
 CLI_TIMEOUT_SECONDS=900
 REAPER_INTERVAL_MS=300000
 
-# Code Reviewer sessions use the Cloudflare Containers runtime for these owners.
-# Comma-separated user or org IDs, or `*` for all including personal accounts.
-CODE_REVIEW_CONTAINERS_ORG_IDS=*
 # Comma-separated user or org IDs allowed to pick a sandbox destination, or `*` for all
 SANDBOX_SELECTION_IDS=*
-
-# Non-secret rollout control for per-session Kilo runtime isolation.
-RUNTIME_ISOLATION_ENABLED=true
-
 
 # Vercel BYOC runtime defaults. Customer credentials and snapshots come from Compute settings.
 VERCEL_SANDBOX_RUNTIME=node24
@@ -68,11 +59,6 @@ VERCEL_SANDBOX_EXTEND_DURATION_MS=600000
 # `*` enrolls both personal accounts and organizations. BYOC sessions use isolated sandboxes.
 BYOC_VERCEL_IDS=
 
-# Cloudflare containers enrollment (optional). Comma-separated organization IDs, or `*` for
-# every organization and personal accounts. Empty is off.
-CLOUDFLARE_CONTAINERS_ORG_IDS=*
-# Organization IDs allowed to build and restore snapshots. Empty is off; `*` includes personal.
-ENVIRONMENT_SNAPSHOT_ORG_IDS=*
 # Explicit organization or user IDs allowed to capture and restore registered workspace tail snapshots. No wildcard.
 WORKSPACE_SNAPSHOT_ORG_IDS=
 WORKSPACE_SNAPSHOT_USER_IDS=

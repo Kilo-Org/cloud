@@ -94,7 +94,7 @@ export const claudeBillingRouter = createTRPCRouter({
       if (!canManage) {
         throw new TRPCError({
           code: 'FORBIDDEN',
-          message: 'Only an organization owner or admin can remove the connection.',
+          message: 'Only an organization owner or admin can remove the link.',
         });
       }
       // The profile stays: Anthropic allows one per customer organization, and a

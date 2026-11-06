@@ -17,7 +17,7 @@ import {
 import { fetchClaudeWithRetry } from '@kilocode/web-shared/lib/auth/claude/http';
 
 /**
- * The Claude billing connections OAuth round trip: a pushed authorization
+ * The Linked billing with Claude Platform OAuth round trip: a pushed authorization
  * request, the approval redirect, and the code exchange that returns the
  * customer's connection ID.
  */

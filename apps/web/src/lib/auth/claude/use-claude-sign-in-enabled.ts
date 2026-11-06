@@ -1,10 +1,9 @@
 'use client';
 
 import { useFeatureFlagEnabled } from 'posthog-js/react';
-import { CLAUDE_SIGN_IN_FLAG } from './access';
+import { CLAUDE_PLATFORM_OAUTH_FLAG } from '@kilocode/web-shared/lib/auth/claude/feature-flag';
 
-/** Client mirror of `isClaudeSignInEnabled`: hidden until the flag loads as true. */
 export function useClaudeSignInEnabled(): boolean {
-  const flagEnabled = useFeatureFlagEnabled(CLAUDE_SIGN_IN_FLAG);
-  return process.env.NODE_ENV === 'development' || flagEnabled === true;
+  const flagEnabled = useFeatureFlagEnabled(CLAUDE_PLATFORM_OAUTH_FLAG);
+  return flagEnabled === true;
 }

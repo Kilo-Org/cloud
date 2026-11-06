@@ -11,6 +11,7 @@ import {
   CLAUDE_API_BASE_URL,
   CLAUDE_BILLING_BETA,
 } from '@kilocode/web-shared/lib/auth/claude/config';
+import { isClaudePlatformOAuthEnabled } from '@kilocode/web-shared/lib/auth/claude/feature-flag.server';
 import { ClaudeBillingConnectionStatus } from '@kilocode/db/schema-types';
 import type { ClaudeBillingOwner } from './store';
 import { getAuthoritativeClaudeBillingState, type ClaudeBillingPayerState } from './payer-state';
@@ -20,7 +21,7 @@ import { getClaudeOperatorToken, isClaudeOperatorConfigured } from './operator';
 export { CLAUDE_BILLING_PROVIDER_ID } from './provider-id';
 
 export const CLAUDE_BILLING_REQUIRED_MESSAGE =
-  'Your Claude organization connection cannot bill right now. An owner or admin can reconnect it, or check it at https://platform.claude.com/connected-platforms.';
+  'Your Claude organization link cannot bill right now. An owner or admin can link it again, or check it at https://platform.claude.com/connected-platforms.';
 
 const ANTHROPIC_VERSION = '2023-06-01';
 /** Marks a request as authenticated by an OAuth token rather than an API key. */
@@ -31,6 +32,7 @@ export type ClaudeBillingRoutingInput = {
   request: GatewayRequest;
   requestedModel: string;
   userId: string | null;
+  requesterEmail: string | null;
   organizationId: string | undefined;
 };
 
@@ -130,7 +132,7 @@ export async function checkClaudeBilling(
   } catch {
     return {
       kind: 'unavailable',
-      message: 'We could not check your Claude connection. Try again.',
+      message: 'We could not check your Claude link. Try again.',
       retryable: true,
     };
   }
@@ -139,10 +141,21 @@ export async function checkClaudeBilling(
     return { kind: 'unavailable', message: CLAUDE_BILLING_REQUIRED_MESSAGE };
   }
   if (connection.status !== ClaudeBillingConnectionStatus.Connected) return null;
+  if (
+    !input.userId ||
+    !input.requesterEmail ||
+    !(await isClaudePlatformOAuthEnabled(input.requesterEmail))
+  ) {
+    return {
+      kind: 'unavailable',
+      message:
+        'Linked billing with Claude Platform is not enabled. Remove the link to use another payment method.',
+    };
+  }
   if (!servesApiKind(input.request.kind)) {
     return {
       kind: 'unavailable',
-      message: 'Use the Messages or Chat Completions API with your Claude connection.',
+      message: 'Use the Messages or Chat Completions API with your Claude link.',
     };
   }
   if (!isClaudeOperatorConfigured()) {

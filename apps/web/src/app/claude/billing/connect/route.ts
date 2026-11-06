@@ -4,6 +4,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { getUserFromSession } from '@kilocode/web-shared/lib/user/server';
+import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import {
   getClaudeBillingConnection,
   type ClaudeBillingOwner,
@@ -13,10 +14,8 @@ import { saveClaudeBillingPending } from '@/lib/claude-billing/pending';
 import { validateReturnPath } from '@/lib/integrations/validate-return-path';
 import { pushClaudeAuthorizationRequest } from '@/lib/claude-billing/protocol';
 import { CLAUDE_BILLING_CALLBACK_PATH } from '@/lib/claude-billing/constants';
-import {
-  canManageClaudeBillingOrganization,
-  canUseClaudeBilling,
-} from '@/lib/claude-billing/access';
+import { canManageClaudeBillingOrganization } from '@/lib/claude-billing/access';
+import { isClaudePlatformOAuthEnabled } from '@kilocode/web-shared/lib/auth/claude/feature-flag.server';
 
 function failureRedirect(returnPath: string, outcome: string) {
   const url = new URL(returnPath, APP_URL);
@@ -34,7 +33,10 @@ export async function GET(request: NextRequest) {
       new URL(`/users/sign_in?callbackPath=${encodeURIComponent(returnPath)}`, APP_URL)
     );
   }
-  if (!(await canUseClaudeBilling(session.id))) return failureRedirect(returnPath, 'forbidden');
+  const user = await findUserById(session.id);
+  if (!(await isClaudePlatformOAuthEnabled(user?.google_user_email))) {
+    return failureRedirect(returnPath, 'forbidden');
+  }
   let owner: ClaudeBillingOwner;
   if (ownerParam === 'personal') {
     owner = { kind: 'personal', kiloUserId: session.id };

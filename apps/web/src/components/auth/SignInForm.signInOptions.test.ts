@@ -15,6 +15,7 @@ let mockFlowEmail = '';
 let mockHintEmail = '';
 let mockClaudeEnabled = false;
 let mockReturning = false;
+let mockProviderSelect = false;
 
 jest.mock('@/lib/auth/claude/use-claude-sign-in-enabled', () => ({
   useClaudeSignInEnabled: () => mockClaudeEnabled,
@@ -30,7 +31,7 @@ jest.mock('@/hooks/useSignInFlow', () => ({
     emailValidation: { isValid: true, error: null },
     error: '',
     showTurnstile: false,
-    flowState: 'landing',
+    flowState: mockProviderSelect ? 'provider-select' : 'landing',
     tier: mockReturning ? 'returning' : 'new',
     hint: mockHintEmail
       ? { lastEmail: mockHintEmail, lastAuthMethod: mockReturning ? 'claude' : 'openai' }
@@ -38,7 +39,7 @@ jest.mock('@/hooks/useSignInFlow', () => ({
     showEmailInput: mockReturning ? false : !isSignUp,
     email: mockFlowEmail,
     isVerifying: false,
-    availableProviders: [],
+    availableProviders: mockProviderSelect ? ['google', 'claude'] : [],
     isNewUser: false,
     pendingSignIn: null,
     turnstileError: false,
@@ -86,6 +87,15 @@ jest.mock('@/components/auth/sign-in/EmailInputForm', () => ({
     createElement('button', null, submitLabel ?? 'Continue'),
 }));
 
+jest.mock('@/components/auth/sign-in/ProviderSelectView', () => ({
+  ProviderSelectView: ({ providers }: { providers: string[] }) =>
+    createElement(
+      Fragment,
+      null,
+      ...providers.map(provider => createElement('button', { key: provider }, provider))
+    ),
+}));
+
 const { SignInForm } = require('./SignInForm') as {
   SignInForm: (props: {
     searchParams: Record<string, string>;
@@ -99,6 +109,7 @@ beforeEach(() => {
   mockHintEmail = '';
   mockClaudeEnabled = false;
   mockReturning = false;
+  mockProviderSelect = false;
 });
 
 describe('SignInForm sign-in options', () => {
@@ -131,6 +142,15 @@ describe('SignInForm sign-in options', () => {
     expect(html.match(/Continue with ChatGPT/g)).toHaveLength(1);
     expect(html).toContain('Continue with Google');
     expect(html).toContain('Continue with Email');
+  });
+
+  it('offers server-discovered Claude without an identified browser PostHog person', () => {
+    mockProviderSelect = true;
+    mockFlowEmail = 'employee@kilocode.ai';
+    mockClaudeEnabled = false;
+    const html = renderToStaticMarkup(createElement(SignInForm, { searchParams: {} }));
+    expect(html).toContain('claude');
+    expect(html).toContain('google');
   });
 
   it.each([false, true])(

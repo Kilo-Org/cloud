@@ -39,7 +39,6 @@ function savedConfig() {
   };
   return {
     enabled: true,
-    scan_tool_results: false,
     detectors,
     output: { enabled: false, detectors: createEmptyEnkryptOutputDetectors() },
   };
@@ -93,7 +92,6 @@ describe('organization guardrails router', () => {
       caller.organizations.guardrails.get({ organizationId: organization.id })
     ).resolves.toEqual({
       enabled: false,
-      scan_tool_results: false,
       detectors: createKiloDefaultEnkryptInputDetectors(),
       output: { enabled: false, detectors: createEmptyEnkryptOutputDetectors() },
       invalid_saved_detectors: false,
@@ -124,7 +122,10 @@ describe('organization guardrails router', () => {
     expect(updated?.settings).toEqual(
       expect.objectContaining({
         data_collection: 'deny',
-        enkrypt: { input_guardrail: inputGuardrail, output_guardrail: output },
+        enkrypt: {
+          input_guardrail: { ...inputGuardrail, scan_tool_results: true },
+          output_guardrail: output,
+        },
       })
     );
   });
@@ -200,32 +201,41 @@ describe('organization guardrails router', () => {
     expect(saved.detectors.policy_violation.policy_text).toBe('Never share customer records.');
   });
 
-  it.each([
-    { scanToolResults: true, scope: 'every input' },
-    { scanToolResults: false, scope: 'conversation without tool results' },
-  ])(
-    'writes a content-free audit entry with scan_tool_results=$scanToolResults',
-    async ({ scanToolResults, scope }) => {
-      const caller = await createCallerForUser(owner.id);
-      const config = savedConfig();
-      config.scan_tool_results = scanToolResults;
+  it('writes a content-free audit entry', async () => {
+    const caller = await createCallerForUser(owner.id);
 
-      await caller.organizations.guardrails.update({ organizationId: organization.id, ...config });
+    await caller.organizations.guardrails.update({
+      organizationId: organization.id,
+      ...savedConfig(),
+    });
 
-      const [auditLog] = await db
-        .select()
-        .from(organization_audit_logs)
-        .where(eq(organization_audit_logs.organization_id, organization.id))
-        .orderBy(desc(organization_audit_logs.created_at))
-        .limit(1);
-      expect(auditLog.action).toBe('organization.settings.change');
-      expect(auditLog.message).toBe(
-        `Updated AI guardrails: enabled; checking ${scope}; detectors: injection_attack, pii (log, secrets), policy_violation (policy text); response checks: disabled; response detectors: none`
-      );
-      expect(auditLog.message).not.toContain('Phoenix');
-      expect(auditLog.message).not.toContain('customer records');
-    }
-  );
+    const [auditLog] = await db
+      .select()
+      .from(organization_audit_logs)
+      .where(eq(organization_audit_logs.organization_id, organization.id))
+      .orderBy(desc(organization_audit_logs.created_at))
+      .limit(1);
+    expect(auditLog.action).toBe('organization.settings.change');
+    expect(auditLog.message).toBe(
+      'Updated AI guardrails: enabled; detectors: injection_attack, pii (log, secrets), policy_violation (policy text), nsfw; response checks: disabled; response detectors: none'
+    );
+    expect(auditLog.message).not.toContain('Phoenix');
+    expect(auditLog.message).not.toContain('customer records');
+  });
+
+  it('always saves tool result scanning on, even when an older page sends it off', async () => {
+    const caller = await createCallerForUser(owner.id);
+
+    const saved = await caller.organizations.guardrails.update({
+      organizationId: organization.id,
+      ...savedConfig(),
+      ...{ scan_tool_results: false },
+    });
+
+    expect(saved).not.toHaveProperty('scan_tool_results');
+    const updated = await getOrganizationById(organization.id);
+    expect(updated?.settings.enkrypt?.input_guardrail?.scan_tool_results).toBe(true);
+  });
 
   it('rejects enabling guardrails with no configurable detector', async () => {
     const caller = await createCallerForUser(owner.id);
@@ -391,7 +401,6 @@ describe('organization guardrails router', () => {
       caller.organizations.guardrails.get({ organizationId: invalidOrganization.id })
     ).resolves.toEqual({
       enabled: true,
-      scan_tool_results: true,
       detectors: createKiloDefaultEnkryptInputDetectors(),
       output: { enabled: false, detectors: createEmptyEnkryptOutputDetectors() },
       invalid_saved_detectors: true,

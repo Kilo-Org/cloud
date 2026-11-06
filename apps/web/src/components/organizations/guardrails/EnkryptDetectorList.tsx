@@ -122,10 +122,7 @@ const REVISE_CHOICES: { value: ReviseChoice; label: string }[] = [
   { value: 'block', label: 'Block' },
 ];
 
-/**
- * Only the configurable detectors are shown. PII and secrets is the one revise-type detector among
- * them, so it chooses block or log; the others always block.
- */
+/** Only the configurable detectors are shown; the gateway applies Kilo Default to the others. */
 export function EnkryptDetectorList({
   detectors,
   issues,
@@ -142,28 +139,14 @@ export function EnkryptDetectorList({
           key={id}
           details={DETECTOR_DETAILS[id]}
           enabled={detectors[id].enabled}
-          control={(labelId, descriptionId) =>
-            id === 'pii' ? (
-              <ReviseChoiceControl
-                labelId={labelId}
-                descriptionId={descriptionId}
-                value={detectorChoice(detectors.pii)}
-                onChange={choice =>
-                  onUpdate(
-                    id,
-                    choice === 'off' ? { enabled: false } : { enabled: true, action: choice }
-                  )
-                }
-              />
-            ) : (
-              <Switch
-                checked={detectors[id].enabled}
-                aria-labelledby={labelId}
-                aria-describedby={descriptionId}
-                onCheckedChange={enabled => onUpdate(id, { enabled })}
-              />
-            )
-          }
+          control={(labelId, descriptionId) => (
+            <Switch
+              checked={detectors[id].enabled}
+              aria-labelledby={labelId}
+              aria-describedby={descriptionId}
+              onCheckedChange={enabled => onUpdate(id, { enabled })}
+            />
+          )}
         >
           <DetectorOptions id={id} detectors={detectors} issues={issues} onUpdate={onUpdate} />
         </DetectorRow>

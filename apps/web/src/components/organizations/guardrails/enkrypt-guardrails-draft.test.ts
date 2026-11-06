@@ -32,7 +32,6 @@ function policyRules(count: number) {
 function enabledDraft(): EnkryptGuardrailsDraft {
   return toDraft({
     enabled: true,
-    scan_tool_results: false,
     detectors: createKiloDefaultEnkryptInputDetectors(),
     output: offOutput(),
   });
@@ -68,7 +67,6 @@ describe('draft conversion', () => {
     outputDetectors.topic_detector = { enabled: true, action: 'block', topic: ['weapons'] };
     const config = {
       enabled: true,
-      scan_tool_results: true,
       detectors: createKiloDefaultEnkryptInputDetectors(),
       output: { enabled: true, detectors: outputDetectors },
     };
@@ -87,7 +85,6 @@ describe('draftsEqual', () => {
     const draft = enabledDraft();
     const reordered: EnkryptGuardrailsDraft = {
       output: draft.output,
-      scan_tool_results: draft.scan_tool_results,
       detectors: Object.fromEntries(
         Object.entries(draft.detectors).reverse()
       ) as EnkryptGuardrailsDraft['detectors'],
@@ -154,7 +151,6 @@ describe('getEnkryptGuardrailsIssues', () => {
   it('reports when no configurable detector is enabled only while guardrails are on', () => {
     const draft = enabledDraft();
     draft.detectors.injection_attack.enabled = false;
-    draft.detectors.pii.enabled = false;
     draft.detectors.toxicity.enabled = true;
     expect(issueAt(getEnkryptGuardrailsIssues(draft), 'detectors')).toBe(
       'Turn on at least one detector.'

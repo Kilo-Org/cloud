@@ -43,22 +43,6 @@ import {
   type EnkryptGuardrailsDraft,
   type EnkryptGuardrailsIssues,
 } from './enkrypt-guardrails-draft';
-import { RadioCardGroup } from './RadioCardGroup';
-
-const SCAN_SCOPE_OPTIONS = [
-  {
-    value: 'conversation_without_tool_results',
-    label: 'Conversation without tool results',
-    description:
-      'Checks the full conversation, system instructions, and tool definitions on every request, including earlier user and assistant messages. Excludes tool results.',
-  },
-  {
-    value: 'every_input',
-    label: 'Every input',
-    description:
-      'Also checks all tool results in the conversation, such as file reads and command output, on every request. Strictest, but slower.',
-  },
-] as const;
 
 const AUTOSAVE_DELAY_MS = 800;
 
@@ -280,9 +264,9 @@ function GuardrailsForm({
                 <div className="grid gap-1.5">
                   <CardTitle>Input detectors</CardTitle>
                   <CardDescription>
-                    Enkrypt runs the detectors you turn on against each checked input. A detection
-                    blocks the request unless PII and secrets is set to Log only. Kilo Default
-                    blocks prompt injection and logs secrets.
+                    Enkrypt runs the detectors you turn on against each input, and a detection
+                    blocks the request. NSFW content is always blocked and secrets are always
+                    logged.
                   </CardDescription>
                 </div>
                 <Button
@@ -391,8 +375,9 @@ function GuardrailsSettingsCard({
           <div className="grid gap-1.5">
             <CardTitle id={titleId}>Enkrypt AI guardrails</CardTitle>
             <CardDescription id={descriptionId}>
-              Check your members&apos; inputs with Enkrypt AI before they reach a model. Flagged
-              inputs are blocked, and requests are blocked while Enkrypt is unavailable.
+              Check every input with Enkrypt AI before it reaches a model, including tool results
+              such as file reads and command output. Flagged inputs are blocked, and requests are
+              blocked while Enkrypt is unavailable.
             </CardDescription>
           </div>
           <Switch
@@ -403,31 +388,6 @@ function GuardrailsSettingsCard({
           />
         </div>
       </CardHeader>
-      {draft.enabled && (
-        <CardContent className="grid gap-6">
-          <RadioCardGroup
-            legend="Inputs to check"
-            options={SCAN_SCOPE_OPTIONS}
-            value={draft.scan_tool_results ? 'every_input' : 'conversation_without_tool_results'}
-            onChange={scope =>
-              onChange(current => ({
-                ...current,
-                scan_tool_results: scope === 'every_input',
-              }))
-            }
-          />
-          <ul className="text-muted-foreground grid list-disc gap-1 pl-5 text-sm">
-            <li>
-              Kilo sends the text of each checked input to Enkrypt AI with your organization ID.
-              Member names and email addresses aren&apos;t sent.
-            </li>
-            <li>
-              Detection history isn&apos;t available yet. A per-organization history in Kilo Cloud
-              is planned.
-            </li>
-          </ul>
-        </CardContent>
-      )}
     </Card>
   );
 }

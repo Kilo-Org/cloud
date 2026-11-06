@@ -44,7 +44,6 @@ export type EnkryptOutputGuardrailDraft = {
 
 export type EnkryptGuardrailsConfig = {
   enabled: boolean;
-  scan_tool_results: boolean;
   detectors: EnkryptInputDetectors;
   output: EnkryptOutputGuardrailConfig;
 };
@@ -127,7 +126,6 @@ export function fromDraftOutputDetectors(
 export function toDraft(config: EnkryptGuardrailsConfig): EnkryptGuardrailsDraft {
   return {
     enabled: config.enabled,
-    scan_tool_results: config.scan_tool_results,
     detectors: toDraftDetectors(config.detectors),
     output: {
       enabled: config.output.enabled,
@@ -139,7 +137,6 @@ export function toDraft(config: EnkryptGuardrailsConfig): EnkryptGuardrailsDraft
 export function fromDraft(draft: EnkryptGuardrailsDraft): EnkryptGuardrailsConfig {
   return {
     enabled: draft.enabled,
-    scan_tool_results: draft.scan_tool_results,
     detectors: fromDraftDetectors(draft.detectors),
     output: {
       enabled: draft.output.enabled,

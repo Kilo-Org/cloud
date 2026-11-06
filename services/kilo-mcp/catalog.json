@@ -21316,7 +21316,7 @@
   "organizations.guardrails.get": {
     "path": "organizations.guardrails.get",
     "kind": "query",
-    "summary": "Get an organization's Enkrypt AI guardrail settings: whether input checks are enabled, whether tool results are scanned, the input detectors, and whether response checks are enabled with their detectors. Owners and admins only.",
+    "summary": "Get an organization's Enkrypt AI guardrail settings: whether input checks are enabled, the input detectors, and whether response checks are enabled with their detectors. Owners and admins only.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
@@ -21337,7 +21337,7 @@
       "get",
       "organizationid"
     ],
-    "searchBlob": "organizations.guardrails.get Get an organization's Enkrypt AI guardrail settings: whether input checks are enabled, whether tool results are scanned, the input detectors, and whether response checks are enabled with their detectors. Owners and admins only. organizations guardrails get organizationid organizationId"
+    "searchBlob": "organizations.guardrails.get Get an organization's Enkrypt AI guardrail settings: whether input checks are enabled, the input detectors, and whether response checks are enabled with their detectors. Owners and admins only. organizations guardrails get organizationid organizationId"
   },
   "organizations.invoices": {
     "path": "organizations.invoices",

@@ -2,10 +2,13 @@
 // Select the workspaces whose typecheck and lint results a change can alter.
 //
 // Usage: node scripts/affected-workspaces.mjs <base-sha>
-//        node scripts/affected-workspaces.mjs --filter-neutral
+//        node scripts/affected-workspaces.mjs --groups
 // Prints JSON: { full, reasons, full_checks, dirs, packages, test_only_dirs,
-// test_only_packages, test_only_files }. With --filter-neutral it instead prints
-// the standard-input paths that some check reads, one per line.
+// test_only_packages, test_only_files }. `dirs` is also the selection the test
+// matrix consumes (scripts/changed-workspaces.sh), so it already carries the
+// workspace-despite-document rule: paths no check reads select nothing.
+// With --groups it instead prints the CI matrix groups for the selection JSON on
+// standard input.
 //
 // A workspace is affected when one of its files changed, or when it reads an
 // affected workspace. A workspace reads another through a workspace:* entry in
@@ -316,11 +319,49 @@ export function selectAffected({ items, changedFiles, dependencyDirs, references
   };
 }
 
-// Print the standard-input paths that some check reads, so a selector can skip
-// documents and the neutral root locations.
-function filterNeutral() {
-  const paths = readFileSync(0, 'utf8').split('\n').filter(Boolean);
-  console.log(paths.filter(file => !isNeutral(file)).join('\n'));
+// Workspaces whose typecheck runs beside apps/web (scripts/web-env rides along
+// with it).
+const TYPECHECK_WEB_PACKAGES = ['web', '@kilocode/storybook'];
+
+// Workspaces that another check owns: the web and trpc groups, kilo-app CI and
+// extension CI. The packages group covers everything else.
+const PACKAGES_GROUP_EXCLUDED = [
+  'web',
+  '@kilocode/trpc',
+  '@kilocode/storybook',
+  'kilo-app',
+  'kilo-extension',
+];
+
+// Workspaces the rest lint group leaves out: kilo-app CI lints the app, and the
+// extension belongs to the trpc group.
+const LINT_REST_EXCLUDED_DIRS = ['apps/mobile', 'apps/extension'];
+
+// The CI matrix groups that a selection pays for (the ci.yml `changes` job).
+// The trpc rows repeat the extension's own typecheck and lint against the built
+// tRPC declarations, and extension-ci.yml runs both for the same selection:
+// `scripts/changed-workspaces.sh` reads this detector's `dirs`, so a pull
+// request that selects the extension there also runs its `verify` job. The rows
+// therefore run only when the selection is a full check of that check, they
+// keep the extension's gate on the merge queue, whose workflow has no
+// extension trigger, and a full lint also covers apps/mobile there, because
+// kilo-app CI lints the app only when the app is affected.
+export function selectGroups({ full_checks: fullChecks = [], dirs = [], packages = [] }) {
+  const everyTypecheck = fullChecks.includes('typecheck');
+  const everyLint = fullChecks.includes('lint');
+  const typecheck_groups = [];
+  if (everyTypecheck || TYPECHECK_WEB_PACKAGES.some(name => packages.includes(name))) {
+    typecheck_groups.push('web');
+  }
+  if (everyTypecheck) typecheck_groups.push('trpc');
+  if (everyTypecheck || packages.some(name => !PACKAGES_GROUP_EXCLUDED.includes(name))) {
+    typecheck_groups.push('packages');
+  }
+  const lint_groups = [];
+  if (everyLint) lint_groups.push('trpc');
+  if (everyLint || dirs.some(dir => !LINT_REST_EXCLUDED_DIRS.includes(dir)))
+    lint_groups.push('rest');
+  return { typecheck_groups, lint_groups };
 }
 
 function detect(base) {
@@ -347,7 +388,12 @@ function detect(base) {
   console.log(JSON.stringify(selectAffected({ items, changedFiles, dependencyDirs, references })));
 }
 
+// Print the CI matrix groups for the selection JSON on standard input.
+function printGroups() {
+  console.log(JSON.stringify(selectGroups(JSON.parse(readFileSync(0, 'utf8')))));
+}
+
 if (import.meta.main) {
-  if (process.argv[2] === '--filter-neutral') filterNeutral();
+  if (process.argv[2] === '--groups') printGroups();
   else detect(process.argv[2] ?? '');
 }

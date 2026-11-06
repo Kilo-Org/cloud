@@ -271,22 +271,18 @@ jobs:
         run: |
           affected=$(node scripts/affected-workspaces.mjs "$BASE_SHA")
           jq . <<< "$affected"
-          typecheck_groups=$(jq -c '
-            (.full_checks | index("typecheck") != null) as $all | .packages as $p | [
-              (select($all or ($p | index("web")) or ($p | index("@kilocode/storybook"))) | "web"),
-              (select($all or ($p | index("kilo-extension"))) | "trpc"),
-              (select($all or ($p - ["web", "@kilocode/trpc", "@kilocode/storybook", "kilo-app", "kilo-extension"] | length > 0)) | "packages")
-            ]' <<< "$affected")
-          lint_groups=$(jq -c '
-            (.full_checks | index("lint") != null) as $all | .dirs as $d | [
-              (select($all or ($d | index("apps/extension"))) | "trpc"),
-              (select($all or ($d - ["apps/mobile", "apps/extension"] | length > 0)) | "rest")
-            ]' <<< "$affected")
+          # The matrix groups this selection pays for. scripts/affected-workspaces.mjs
+          # owns the decision, so the trpc rows follow the extension's own
+          # workflow: extension-ci.yml typechecks and lints the extension for
+          # this same selection, so those rows run only on a full check. That
+          # keeps the extension's gate on the merge queue, whose workflow has no
+          # extension trigger.
+          groups=$(node scripts/affected-workspaces.mjs --groups <<< "$affected")
           # Only the trpc rows read the trpc-declarations artifact, so those
           # rows get their own jobs. These lists drive the matrices that must
           # start as soon as `changes` completes.
-          typecheck_groups_non_trpc=$(jq -c 'map(select(. != "trpc"))' <<< "$typecheck_groups")
-          lint_groups_non_trpc=$(jq -c 'map(select(. != "trpc"))' <<< "$lint_groups")
+          typecheck_groups_non_trpc=$(jq -c '[.typecheck_groups[] | select(. != "trpc")]' <<< "$groups")
+          lint_groups_non_trpc=$(jq -c '[.lint_groups[] | select(. != "trpc")]' <<< "$groups")
           # Every part when cloud-agent-next is affected. When only its tests
           # read changed data, the unit part covers a reading test under src/,
           # scripts/ or test/unit/; any other reading test runs every part.
@@ -298,9 +294,9 @@ jobs:
             ] | unique end' <<< "$affected")
           {
             echo "affected=$(jq -c . <<< "$affected")"
-            echo "typecheck_groups=$typecheck_groups"
+            echo "typecheck_groups=$(jq -c .typecheck_groups <<< "$groups")"
             echo "typecheck_groups_non_trpc=$typecheck_groups_non_trpc"
-            echo "lint_groups=$lint_groups"
+            echo "lint_groups=$(jq -c .lint_groups <<< "$groups")"
             echo "lint_groups_non_trpc=$lint_groups_non_trpc"
             echo "cloud_agent_next_parts=$cloud_agent_next_parts"
           } >> "$GITHUB_OUTPUT"
@@ -377,7 +373,9 @@ jobs:
           scripts/stacked-ci.test.mjs
           scripts/changed-dependencies.test.mjs
           scripts/build-key-inputs.test.mjs
+          scripts/ttsc-plugin-key.test.mjs
           scripts/affected-workspaces.test.mjs
+          scripts/changed-workspaces.test.mjs
           scripts/changes-filter-retry.test.mjs
           scripts/typecheck-ci.test.mjs
           scripts/deployment-workflows.test.mjs

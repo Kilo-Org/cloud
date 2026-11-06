@@ -746,6 +746,43 @@ test('one job builds the tRPC declarations and only the trpc rows download them'
   assert.deepEqual(ci.jobs.lint.needs, ['changes', 'lint-groups', 'lint-trpc']);
 });
 
+// Which rows run is one decision, and the affected detector owns it: it keeps
+// the extension's own workflow as the single typecheck and lint for a change
+// that only affects the extension.
+test('the changes job takes both matrix group lists from the affected detector', () => {
+  const step = ciJobs.changes.steps.find(candidate => candidate.id === 'affected');
+  assert.match(
+    step.run,
+    /groups=\$\(node scripts\/affected-workspaces\.mjs --groups <<< "\$affected"\)/,
+    'the groups come from the detector, not from a workflow-local projection'
+  );
+  assert.match(step.run, /echo "typecheck_groups=\$\(jq -c \.typecheck_groups <<< "\$groups"\)"/);
+  assert.match(step.run, /echo "lint_groups=\$\(jq -c \.lint_groups <<< "\$groups"\)"/);
+  // The trpc-only rows need the declarations, so the non-trpc matrices need a
+  // list without them. The producer's `if` only sees its own selection unless
+  // every list the rows read is derived from this one output.
+  for (const list of ['typecheck_groups', 'lint_groups']) {
+    assert.match(
+      step.run,
+      new RegExp(`echo "${list}_non_trpc=\\$\\{?${list}_non_trpc\\}?`),
+      `the non-trpc ${list} matrix comes from this job's outputs`
+    );
+    assert.match(
+      step.run,
+      new RegExp(
+        `${list}_non_trpc=\\$\\(jq -c \\x27\\[\\.` +
+          `${list}\\[\\] \\| select\\(. != \\x22trpc\\x22\\)\\]\\x27`
+      ),
+      `the non-trpc ${list} list is derived from the producer's selection`
+    );
+  }
+  assert.doesNotMatch(
+    step.run,
+    /\.full_checks \| index\("(typecheck|lint)"\) != null\) as \$all/,
+    'the workflow must not compute the group lists itself'
+  );
+});
+
 function runTypecheck(
   t,
   { root = false, changes = '', buildExit = 0, checkExit = 0, built = '', selected = '' } = {}

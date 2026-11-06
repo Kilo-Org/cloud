@@ -32,7 +32,7 @@ out of scope; old session IDs are rejected.
 
 | Component | Owns | Does not own |
 |---|---|---|
-| Worker | Authentication, organization and worktree access, billing eligibility on send, tRPC, `/stream` and terminal WebSocket upgrade, preview on/off (`PREVIEW_HOST_SUFFIX`) and UI gate (`PREVIEW_ENABLED_IDS`), `/preview/open` hop, preview hostname dispatch, entry-ticket validation, session-token cookie, entry 303, per-request access checks, and preview request/response header sanitisation (`src/shared/preview-headers.ts`), runtime artifact downloads by grant, startup-failure report admission | Message, route or sandbox state |
+| Worker | Authentication, organization and worktree access, billing eligibility on send, tRPC, `/stream` and terminal WebSocket upgrade, preview on/off (`PREVIEW_HOST_SUFFIX`), `/preview/open` hop, preview hostname dispatch, entry-ticket validation, session-token cookie, entry 303, per-request access checks, and preview request/response header sanitisation (`src/shared/preview-headers.ts`), runtime artifact downloads by grant, startup-failure report admission | Message, route or sandbox state |
 | Session DO, one per session | Message queue and message states, route view, event log and client stream, question/permission projection, per-message reports and batch callback, current runtime authorization and delegated Kilo token renewal, preview eligibility and sandbox lookup | Sandbox lifecycle, preparation steps, Kilo health, turn outcome |
 | Sandbox DO, one per `sandboxId` | Allocation lifecycle through the provider adapter, startup mode and startup command, wrapper socket, per-session routes, forwarding in both directions, activity, idle stop and provider lease, billing admission and attribution, wrapper and session credentials, preview target coordinates | Message states, Kilo health, turn outcome, workspace steps, physical billing intervals (container lifecycle owns them) |
 | Bootstrap, inside the container, `downloaded` mode only | Verify and install the selected runtime, exec the supervisor, report one startup failure | Allocation decisions, retries |
@@ -505,11 +505,10 @@ Scope: `workspace_*` routes on `cloudflare-containers` whose directory is the is
 publish environment snapshots. One `EnvironmentBuild` Durable Object per environment ID builds, publishes and serves the
 snapshot (`src/environment-build/`); see `.specs/cloud-agent-session.md` "Environment snapshots".
 
-- **Enrollment.** `ENVIRONMENT_SNAPSHOT_ORG_IDS` controls build and restore access independently of
-  startup selection. Production and development set `*` for all organizations and personal accounts;
-  native-container enrollment and repository authorization still apply. Personal GitHub and GitLab
-  environments are supported. Bitbucket builds require an organization-owned environment because
-  managed Bitbucket repository access is organization-scoped.
+- **Availability.** Environment snapshot builds and restores are available to every owner. Repository
+  authorization still applies. Personal GitHub and GitLab environments are supported. Bitbucket
+  builds require an organization-owned environment because managed Bitbucket repository access is
+  organization-scoped.
 - **Reference.** For an origin under the `include-web-defaults` profile policy, session preflight
   looks up the owner's one environment for the repository and stores
   `{ environmentId, owner, repository, configurationRevision }` on the session metadata and on the
@@ -1457,18 +1456,15 @@ per-port hostname. It handles ordinary HTTP and WebSocket upgrades.
   other hostname falls through to the normal routes. The label is `p<port>-<workspace-uuid-hex>`
   (port 1024-65535; at most 63 characters). The Worker derives the session and port from the label
   alone and never selects a session from a path prefix, query or header.
-- **Availability.** `PREVIEW_HOST_SUFFIX` turns preview on. `PREVIEW_ENABLED_IDS` (user or org
-  IDs, `*` for all) limits who sees the preview UI; it is a UI gate only, and entry and proxying do
-  not check it. The web app reads both through the Worker's
-  `getPreviewOptions({ cloudAgentSessionId, organizationId? })` query, which answers the session's
+- **Availability.** `PREVIEW_HOST_SUFFIX` turns preview on. The web app reads availability through
+  the Worker's `getPreviewOptions({ cloudAgentSessionId })` query, which answers the session's
   preview hostname with a `{port}` placeholder (`p{port}-<hex>.<suffix>`) or `enabled: false`. The
-  `organizationId` is the web route's org and is not verified. The web app
-  has no preview configuration and no copy of the label format; it adds the browser-facing Worker
-  scheme and port, as the open hop does. One gate (preview enabled, the viewer can open a terminal,
-  a `workspace_*` session) controls both the preview button and preview links in the chat: an
-  assistant link to a loopback address with a port in range (`localhost`, `127.0.0.1`, `0.0.0.0`,
-  `[::1]`, `[::]`) shows the real preview URL with its path, and a click mints a ticket for that
-  port and path. A copied preview URL opened without the cookie gets the 401 below.
+  web app has no preview configuration and no copy of the label format; it adds the browser-facing
+  Worker scheme and port, as the open hop does. One gate (preview enabled, the viewer can open a
+  terminal, a `workspace_*` session) controls both the preview button and preview links in the
+  chat: an assistant link to a loopback address with a port in range (`localhost`, `127.0.0.1`,
+  `0.0.0.0`, `[::1]`, `[::]`) shows the real preview URL with its path, and a click mints a ticket
+  for that port and path. A copied preview URL opened without the cookie gets the 401 below.
 - **Entry exchange.** The web app mints a 60-second HS256 entry ticket (audience
   `cloud-agent-preview`, purpose `preview`, claims `userId`, `cloudAgentSessionId`, optional
   `organizationId`, `port`) and opens `<worker>/preview/open?ticket=<jwt>[&path=<path>]` on the
@@ -1576,9 +1572,9 @@ Request and response bodies stream; there is no body-size cap.
   paths never call it.
 - **Enablement checklist.** Put the preview zone on a separate registrable site from every trusted
   app origin. Add the zone to the Public Suffix List, and set `PREVIEW_HOST_SUFFIX` in production
-  only after the main browsers ship that entry. `PREVIEW_ENABLED_IDS` does not reduce this exposure:
-  it gates only the UI, so with the suffix set any user can mint a ticket and send the link. A pilot
-  before the entry ships needs a server-side gate on ticket mint and entry, which does not exist.
+  only after the main browsers ship that entry. With the suffix set any user can mint a ticket and
+  send the link. A pilot before the entry ships needs a server-side gate on ticket mint and entry,
+  which does not exist.
   With the entry, each `<label>.<zone>` is its own site: a sibling host cannot set zone-wide
   cookies, and `SameSite` treats it as cross-site. (We did not choose a browser-bound ticket, such
   as a POST open hop with an `Origin` allow-list: the browser sends `Origin: null` after a

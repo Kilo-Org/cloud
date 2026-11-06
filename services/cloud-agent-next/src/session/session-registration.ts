@@ -709,11 +709,6 @@ function worktreeEnabledForCreate(
   return true;
 }
 
-export function assertRuntimeIsolationAdmission(env: Pick<Env, 'RUNTIME_ISOLATION_ENABLED'>): void {
-  if (env.RUNTIME_ISOLATION_ENABLED === 'true') return;
-  throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'runtime_isolation_unavailable' });
-}
-
 function finalizationVersionForCreate(row: OperationLedgerRow): 1 | 2 {
   const recorded = row.canonical_result?.[SESSION_CREATE_FINALIZATION_VERSION_KEY];
   if (recorded !== undefined) {
@@ -800,7 +795,6 @@ async function issueSessionRuntimeAuthorization(
     });
   }
   if (ctx.cloudAgentAuthority) {
-    assertRuntimeIsolationAdmission(ctx.env);
     const authority = ctx.cloudAgentAuthority;
     const runtimeAuthorization = await withDORetry(
       () => getSandboxSessionStub(ctx.env, ctx.userId, authority.parentSessionId),
@@ -824,7 +818,6 @@ async function issueSessionRuntimeAuthorization(
   }
   let runtimeAuthorization: NewSessionAllocation['runtimeAuthorization'];
   if (isPolicyBearingAuthToken(ctx.authToken)) {
-    assertRuntimeIsolationAdmission(ctx.env);
     const secret = ctx.env.NEXTAUTH_SECRET;
     const nextAuthSecret = typeof secret === 'string' ? secret : await secret.get();
     if (!nextAuthSecret)

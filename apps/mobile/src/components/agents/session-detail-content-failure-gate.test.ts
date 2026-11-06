@@ -22,11 +22,14 @@ describe('lastVisibleMessageFailure', () => {
     return message;
   }
 
-  function assistantMessageWithError(id: string, errorName: string): StoredMessage {
+  function assistantMessageWithError(id: string, errorName: 'APIError'): StoredMessage {
     const message = assistantMessageWithText(id);
-    (message.info as { error?: { name: string; data: unknown } }).error = {
+    if (message.info.role !== 'assistant') {
+      throw new Error('the fixture builds an assistant row');
+    }
+    message.info.error = {
       name: errorName,
-      data: { message: 'raw' },
+      data: { message: 'raw', isRetryable: true },
     };
     return message;
   }
@@ -60,6 +63,31 @@ describe('lastVisibleMessageFailure', () => {
     expect(failure?.kind).toBe('assistant');
     expect(failure?.title).toBe('Response failed');
     expect(failure?.detailKey).toBe('agentChat.messageFailure.assistantProviderError');
+  });
+
+  it('returns a credits failure that carries its own action with no preceding user row', () => {
+    const message = assistantMessageWithError('m1', 'APIError');
+    if (message.info.role !== 'assistant') {
+      throw new Error('the fixture builds an assistant row');
+    }
+    message.info.error = {
+      name: 'APIError',
+      data: {
+        message: 'raw',
+        statusCode: 402,
+        isRetryable: false,
+        responseBody: JSON.stringify({ error_type: 'usage_limit_exceeded' }),
+      },
+    };
+    const messages: StoredMessage[] = [message];
+    const failure = lastVisibleMessageFailure({
+      displayedMessages: messages,
+      messages,
+      pendingMessages: noPending,
+      canceledQueuedMessages: nothingCanceled,
+    });
+    expect(failure?.canAddCredits).toBe(true);
+    expect(failure?.detailKey).toBe('agentChat.messageFailure.assistantCreditsRefusal');
   });
 
   it('returns null for an assistant failure with no preceding user row (no Retry)', () => {

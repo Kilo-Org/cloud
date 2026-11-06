@@ -36,7 +36,6 @@ cloud-agent-next refactor.
 ## Credential containment
 
 Containment is mandatory for all sandbox providers, including local development.
-The obsolete `CREDENTIAL_CONTAINMENT_ENABLED` setting has no effect.
 Sandboxes receive scoped aliases and runtime proxy handles, never platform-managed upstream tokens.
 Provider adapters authenticate sandbox requests; shared services authorize and forward them.
 Missing containment support fails preparation instead of selecting direct credentials.

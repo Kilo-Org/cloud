@@ -2575,6 +2575,7 @@
       "assistantContextOverflow": "Vestlus on mudeli jaoks liiga pikk.",
       "assistantProviderError": "Pakkuja tagastas vea.",
       "assistantProviderRefused": "Pakkuja keeldus sellest päringust ja seda ei saa uuesti proovida.",
+      "assistantCreditsRefusal": "Cloud Agenti käivitamiseks ei jätku krediiti.",
       "assistantOutputLimit": "Vastus jõudis mudeli väljundi piirini.",
       "assistantStructuredOutput": "Vastus ei vastanud nõutud vormingule.",
       "assistantFailed": "Vastuse koostamine ebaõnnestus."

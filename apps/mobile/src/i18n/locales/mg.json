@@ -2581,6 +2581,7 @@
       "assistantContextOverflow": "Lava loatra ny resaka ho an'ny modely.",
       "assistantProviderError": "Namaly diso ny mpamatsy.",
       "assistantProviderRefused": "Nolavin'ny mpamatsy ity fangatahana ity ary tsy azo averina intsony.",
+      "assistantCreditsRefusal": "Tsy ampy ny kireditra hampandehanana ny Cloud Agent.",
       "assistantOutputLimit": "Tonga tamin'ny fetran'ny valian'ny modely ny famaliana.",
       "assistantStructuredOutput": "Tsy nifanaraka tamin'ny endrika takiana ny famaliana.",
       "assistantFailed": "Tsy nahomby ny famaliana."

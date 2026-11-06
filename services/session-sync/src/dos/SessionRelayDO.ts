@@ -19,7 +19,7 @@ import {
 import { verifyTicket, type LiveTicket } from '../live/ticket';
 import { isBoundedJson, sessionIDSchema, tenantSchema, type Tenant } from '../protocol';
 import { getPresenceStub } from './SessionPresenceDO';
-import { diagnostic, phase, syncPhase } from '../metrics';
+import { diagnostic, metricsEnabled, phase, syncPhase } from '../metrics';
 
 const commandSchema = z.strictObject({
   channel: z.literal('commands'),
@@ -494,7 +494,7 @@ export class SessionRelayDO extends DurableObject<Env> {
           .run(),
       subject.tenant.type
     );
-    const queuedAt = this.env.SESSION_SYNC_METRICS ? performance.now() : 0;
+    const queuedAt = metricsEnabled(this.env) ? performance.now() : 0;
     this.watchQueueDepth++;
     const task = this.watchSerial
       .then(async () => {

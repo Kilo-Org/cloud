@@ -38,7 +38,7 @@ import * as erase from './session-sync/erase';
 import * as page from './session-sync/page';
 import * as session from './session-sync/session';
 import { leaseBytes } from './session-sync/lease';
-import { diagnostic, phase, syncPhase, type DiagnosticOperation } from '../metrics';
+import { diagnostic, metricsEnabled, phase, syncPhase, type DiagnosticOperation } from '../metrics';
 
 const PURGE_RETRY_MS = 60_000;
 export const RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
@@ -168,7 +168,7 @@ export class SessionSyncDO extends DurableObject<Env> {
     const { promise, resolve } = Promise.withResolvers<void>();
     this.quotaGate = promise;
     this.admissionQueueDepth++;
-    const queuedAt = this.env.SESSION_SYNC_METRICS ? performance.now() : 0;
+    const queuedAt = metricsEnabled(this.env) ? performance.now() : 0;
     await prior;
     diagnostic(this.env, {
       operation: 'tenantAdmission',
@@ -220,7 +220,7 @@ export class SessionSyncDO extends DurableObject<Env> {
     return this.serial(async () => {
       let reapplying = false;
       for (;;) {
-        const started = this.env.SESSION_SYNC_METRICS ? performance.now() : 0;
+        const started = metricsEnabled(this.env) ? performance.now() : 0;
         try {
           const result = this.tx(() => {
             const value = fn();
@@ -484,7 +484,7 @@ export class SessionSyncDO extends DurableObject<Env> {
           validationAttempts: number;
           validationCode?: ErrorCode;
         }
-      | undefined = this.env.SESSION_SYNC_METRICS
+      | undefined = metricsEnabled(this.env)
       ? { pruneMs: 0, pruneAttempts: 0, validationMs: 0, validationAttempts: 0 }
       : undefined;
     try {

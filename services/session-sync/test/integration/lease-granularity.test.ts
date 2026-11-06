@@ -83,7 +83,7 @@ it('grows, restarts and erases a small lease alongside a legacy reservation', as
     expect(db.select().from(leases).all()).toHaveLength(2);
   });
   await (await api.remove(sessionID)).json();
-  // Pending upload deadlines keep their reservation until cleanup is safe.
+  // Pending physical uploads retain their fencing deadline until cleanup is safe.
   await runInDurableObject(stub, (_instance, state) => {
     state.storage.sql.exec('UPDATE blobs SET deadline = 0');
     return state.storage.setAlarm(Date.now() + 1);

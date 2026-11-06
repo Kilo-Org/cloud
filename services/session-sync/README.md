@@ -300,7 +300,8 @@ inline/blob bound. Existing stored reservations remain valid; registration
 preserves a sufficient lease rather than expanding it to another quantum.
 The existing alarm shrink threshold remains 64 MiB of unused capacity. A shrink
 or uncertain-growth reconciliation rounds committed usage by the same tier rule.
-Deletion releases the admission and its whole lease after safe blob cleanup.
+Deletion durably tombstones the session and releases its admission and whole lease.
+Physical blob cleanup follows the fenced upload deadlines and retries independently.
 Tenant calls never run inside SQLite transactions.
 This trades up to five additional growth reservations through the first 32 MiB
 for smaller tiny-session reservations; quotas and session limits are unchanged.

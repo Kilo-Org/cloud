@@ -13,6 +13,14 @@ export type Metrics = {
 };
 const requests = new WeakMap<Request, Metrics>();
 
+export function metricsEnabled(env: Pick<Env, 'SESSION_SYNC_METRICS'>): boolean {
+  try {
+    return Boolean(env.SESSION_SYNC_METRICS);
+  } catch {
+    return false;
+  }
+}
+
 /** Known byte lengths avoid counting streams for in-memory JSON responses. */
 export function jsonResponse(body: unknown, init?: ResponseInit): Response {
   const text = JSON.stringify(body);
@@ -258,9 +266,9 @@ const diagnosticFailures = new WeakMap<AnalyticsEngineDataset, Map<string, Aggre
  * isolate may lose its final aggregate, so these are not accounting counters.
  */
 export function diagnostic(env: Pick<Env, 'SESSION_SYNC_METRICS'>, point: DiagnosticPoint): void {
-  const binding = env.SESSION_SYNC_METRICS;
-  if (!binding) return;
   try {
+    const binding = env.SESSION_SYNC_METRICS;
+    if (!binding) return;
     const outcome = point.outcome ?? (point.error === undefined ? 'ok' : 'error');
     if (outcome === 'ok' && Math.random() >= 1 / 128) return;
     const cause = point.cause ?? (point.error === undefined ? 'none' : failureCause(point.error));
@@ -340,7 +348,7 @@ export async function phase<T>(
   fn: () => Promise<T>,
   tenant?: 'user' | 'organization'
 ): Promise<T> {
-  if (!env.SESSION_SYNC_METRICS) return fn();
+  if (!metricsEnabled(env)) return fn();
   const started = performance.now();
   try {
     const value = await fn();
@@ -360,7 +368,7 @@ export function syncPhase<T>(
   fn: () => T,
   tenant?: 'user' | 'organization'
 ): T {
-  if (!env.SESSION_SYNC_METRICS) return fn();
+  if (!metricsEnabled(env)) return fn();
   const started = performance.now();
   try {
     const value = fn();

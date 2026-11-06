@@ -37,6 +37,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
 });
 
 // vitest.setup.ts stubs '@/lib/config' for every pure suite, so a plain import
@@ -64,5 +65,41 @@ describe('KILO_MCP_URL', () => {
       kiloMcpUrl: 'http://localhost:8815',
     };
     await expect(mcpUrl()).resolves.toBe('http://localhost:8815');
+  });
+});
+
+describe('SESSION_SYNC_URL', () => {
+  async function syncUrl() {
+    const config = await vi.importActual<typeof Config>('@/lib/config');
+    return config.SESSION_SYNC_URL;
+  }
+
+  it('uses the public native relay only in production builds', async () => {
+    state.extra = { ...REQUIRED_EXTRA, isProductionBuild: true };
+    await expect(syncUrl()).resolves.toBe('https://session-sync.kiloapps.io');
+  });
+
+  it('requires an explicit isolated relay outside production', async () => {
+    state.extra = { ...REQUIRED_EXTRA, isProductionBuild: false };
+    await expect(syncUrl()).resolves.toBeUndefined();
+  });
+
+  it('accepts the local relay only in a development bundle', async () => {
+    vi.stubGlobal('__DEV__', true);
+    vi.stubEnv('EXPO_PUBLIC_SESSION_SYNC_URL', 'http://localhost:8817');
+    state.extra = REQUIRED_EXTRA;
+    await expect(syncUrl()).resolves.toBe('http://localhost:8817');
+  });
+
+  it('rejects an insecure relay in a release bundle', async () => {
+    vi.stubEnv('EXPO_PUBLIC_SESSION_SYNC_URL', 'http://localhost:8817');
+    state.extra = { ...REQUIRED_EXTRA, isProductionBuild: true };
+    await expect(syncUrl()).rejects.toThrow('Invalid scheme');
+  });
+
+  it('rejects a production override outside the host allowlist', async () => {
+    vi.stubEnv('EXPO_PUBLIC_SESSION_SYNC_URL', 'https://unowned.example.com');
+    state.extra = { ...REQUIRED_EXTRA, isProductionBuild: true };
+    await expect(syncUrl()).rejects.toThrow('outside the allowlist');
   });
 });

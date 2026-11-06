@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { toast } from 'sonner';
 
 type LogExportFormProps = {
   title: string;
@@ -17,6 +18,8 @@ type LogExportFormProps = {
   idPlaceholder: string;
   idInputMode?: 'numeric';
   showErrorsOnly?: boolean;
+  /** Optional gate that must succeed before the browser navigates. */
+  preflight?: () => Promise<void>;
 };
 
 export function LogExportForm({
@@ -27,6 +30,7 @@ export function LogExportForm({
   idPlaceholder,
   idInputMode,
   showErrorsOnly = false,
+  preflight,
 }: LogExportFormProps) {
   const fieldId = useId();
   const [id, setId] = useState('');
@@ -40,7 +44,7 @@ export function LogExportForm({
   const [sessionId, setSessionId] = useState('');
   const [errorsOnly, setErrorsOnly] = useState(false);
 
-  function handleDownload() {
+  async function handleDownload() {
     const params = new URLSearchParams();
     if (id.trim()) {
       params.set('id', id.trim());
@@ -71,6 +75,15 @@ export function LogExportForm({
     }
     if (showErrorsOnly && errorsOnly) {
       params.set('errorsOnly', 'true');
+    }
+
+    if (preflight) {
+      try {
+        await preflight();
+      } catch {
+        toast.error('Could not verify access before download. Try again.');
+        return;
+      }
     }
 
     // Navigate directly to preserve server-side streaming
@@ -195,7 +208,7 @@ export function LogExportForm({
           </div>
         )}
 
-        <Button onClick={handleDownload} className="w-full">
+        <Button onClick={() => void handleDownload()} className="w-full">
           <Download className="mr-2 h-4 w-4" />
           Download ZIP
         </Button>

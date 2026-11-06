@@ -76,6 +76,33 @@ export function formatDate(
   return dateTimeFormat(locale, options).format(date);
 }
 
+const CLOCK_TIME: Intl.DateTimeFormatOptions = { hour: 'numeric', minute: '2-digit' };
+
+/**
+ * Time of day in `locale` (`"2:40 AM"`), for a clock beside another.
+ *
+ * Asking for a numeric hour is not enough: a locale whose short time pattern
+ * carries a padded hour pads it to two digits even then, so Gujarati reads
+ * `02:40 AM` beside the `11:40 AM` that English and Arabic print. On a
+ * twelve-hour clock the padded hour loses its leading zero; every other
+ * character keeps the locale's own text, order and digits. A twenty-four-hour
+ * clock keeps the padded hour, which is its uniform-width convention.
+ */
+export function formatClockTime(date: Date, locale: string): string {
+  const formatter = dateTimeFormat(locale, CLOCK_TIME);
+  const formatted = formatter.format(date);
+  const parts = formatter.formatToParts(date);
+  if (!parts.some(part => part.type === 'dayPeriod')) {
+    return formatted;
+  }
+  const hour = parts.find(part => part.type === 'hour')?.value;
+  const zero = numberFormat(locale, { useGrouping: false }).format(0);
+  if (hour === undefined || hour.length !== zero.length + 1 || !hour.startsWith(zero)) {
+    return formatted;
+  }
+  return formatted.replace(hour, hour.slice(zero.length));
+}
+
 export function formatCalendarDate(value: string, locale: string): string {
   return dateTimeFormat(locale, { timeZone: 'UTC' }).format(new Date(`${value}T00:00:00Z`));
 }

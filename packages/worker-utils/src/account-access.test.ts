@@ -2,12 +2,15 @@ import { describe, expect, it } from 'vitest';
 import {
   BLACKLISTED_DOMAINS_REDIS_KEY,
   BLACKLISTED_DOMAINS_UPDATED_AT_REDIS_KEY,
+  BlacklistDomainsConfigSchema,
+  MAX_BLACKLIST_DOMAINS,
   blacklistedDomainsFromConfig,
   blockedSignupTldsFromConfig,
   canSpendPaidUsage,
   isApiTokenPepperCurrent,
   isEmailBlacklistedByDomain,
   organizationMemberBalance,
+  parseBlacklistDomainsConfig,
   refreshBlacklistDomainsConfig,
   requestOrganizationId,
   type BlacklistDomainsConfig,
@@ -163,6 +166,7 @@ describe('refreshBlacklistDomainsConfig', () => {
     expect(await refreshBlacklistDomainsConfig(redis.get, null, 0)).toEqual({
       config: null,
       fullReadAt: 0,
+      droppedDomains: 0,
     });
 
     const config = blocklistConfig({ domains: ['spam.com'], updated_at: 't1' });
@@ -170,6 +174,7 @@ describe('refreshBlacklistDomainsConfig', () => {
     expect(await refreshBlacklistDomainsConfig(redis.get, null, 0)).toEqual({
       config,
       fullReadAt: 0,
+      droppedDomains: 0,
     });
   });
 
@@ -199,6 +204,7 @@ describe('refreshBlacklistDomainsConfig', () => {
     expect(await refreshBlacklistDomainsConfig(redis.get, first, 60_000)).toEqual({
       config: changed,
       fullReadAt: 60_000,
+      droppedDomains: 0,
     });
   });
 
@@ -229,5 +235,51 @@ describe('refreshBlacklistDomainsConfig', () => {
     expect(
       (await refreshBlacklistDomainsConfig(redis.get, first, FULL_READ_INTERVAL_MS)).config?.domains
     ).toEqual(['junk.org']);
+  });
+});
+
+describe('BlacklistDomainsConfigSchema domain bound', () => {
+  const domains = (count: number) =>
+    Array.from({ length: count }, (_, index) => `bulk-${index}.example`);
+
+  it('parses a stored list at the cap', () => {
+    const parsed = BlacklistDomainsConfigSchema.safeParse(
+      blocklistConfig({ domains: domains(MAX_BLACKLIST_DOMAINS) })
+    );
+
+    expect(parsed.success).toBe(true);
+  });
+
+  it('rejects a stored list one entry over the cap', () => {
+    const parsed = BlacklistDomainsConfigSchema.safeParse(
+      blocklistConfig({ domains: domains(MAX_BLACKLIST_DOMAINS + 1) })
+    );
+
+    expect(parsed.success).toBe(false);
+  });
+});
+
+describe('parseBlacklistDomainsConfig', () => {
+  const domains = (count: number) =>
+    Array.from({ length: count }, (_, index) => `bulk-${index}.example`);
+
+  it('keeps the first capped entries of a stored list over the cap', () => {
+    const parsed = parseBlacklistDomainsConfig(
+      blocklistConfig({ domains: domains(MAX_BLACKLIST_DOMAINS + 50) })
+    );
+
+    expect(parsed.config.domains).toHaveLength(MAX_BLACKLIST_DOMAINS);
+    expect(parsed.config.domains[0]).toBe('bulk-0.example');
+    expect(parsed.config.domains.at(-1)).toBe(`bulk-${MAX_BLACKLIST_DOMAINS - 1}.example`);
+    expect(parsed.droppedDomains).toBe(50);
+  });
+
+  it('keeps every entry of a stored list within the cap', () => {
+    const stored = blocklistConfig({ domains: ['spam.example', 'junk.example'] });
+
+    expect(parseBlacklistDomainsConfig(stored)).toEqual({
+      config: stored,
+      droppedDomains: 0,
+    });
   });
 });

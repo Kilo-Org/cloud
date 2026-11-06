@@ -1,7 +1,7 @@
 'use client';
 
 import { formatDistanceToNow } from 'date-fns';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { useAdminPermissions } from '@/app/admin/useAdminPermissions';
 import AdminPage from '@/app/admin/components/AdminPage';
@@ -9,17 +9,27 @@ import { LogExportForm } from '@/app/admin/components/LogExportForm';
 import { BreadcrumbItem } from '@/components/ui/breadcrumb';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useStepUpActive } from '@/components/admin/step-up/StepUpProvider';
 
 const BYTES_PER_GIGABYTE = 1024 * 1024 * 1024;
 
 export default function ApiRequestLogPage() {
   const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  const stepUpActive = useStepUpActive();
   const { canExportApiRequestLogs, isPermissionResolved, isError, refetch } = useAdminPermissions();
   const summaryQuery = useQuery(
     trpc.admin.apiRequestLog.getSummary.queryOptions(undefined, {
       enabled: canExportApiRequestLogs,
     })
   );
+
+  async function preflight() {
+    if (!stepUpActive) return;
+    await queryClient.fetchQuery(
+      trpc.admin.apiRequestLog.getSummary.queryOptions(undefined, { staleTime: 0 })
+    );
+  }
 
   const breadcrumbs = <BreadcrumbItem className="hidden md:block">API Request Log</BreadcrumbItem>;
 
@@ -101,6 +111,7 @@ export default function ApiRequestLogPage() {
           idPlaceholder="Enter numeric log ID"
           idInputMode="numeric"
           showErrorsOnly
+          preflight={preflight}
         />
       </div>
     </AdminPage>

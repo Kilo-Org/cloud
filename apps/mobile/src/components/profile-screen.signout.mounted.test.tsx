@@ -54,6 +54,8 @@ vi.mock('expo-application', () => ({
   nativeApplicationVersion: '1.0.0',
   nativeBuildVersion: '1',
 }));
+vi.mock('@/lib/analytics/posthog', () => ({ useFeatureFlag: () => false }));
+vi.mock('@/lib/config', () => ({ SESSION_SYNC_URL: undefined }));
 
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({

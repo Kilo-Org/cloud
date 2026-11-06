@@ -1,3 +1,18 @@
+export { NativeSyncClient, NativeSyncError } from './native-sync';
+export type {
+  NativeSyncOptions,
+  NativeEvent,
+  NativeSessionSummary,
+  NativePresenceState,
+  NativeSessionState,
+  NativePresenceConnection,
+  NativeSessionConnection,
+  NativeInstanceReply,
+  NativeSocket,
+  NativeSocketConstructor,
+} from './native-sync';
+export type { NativeMessage, NativeSnapshot } from './native-sync-snapshot';
+
 export { isStreamError, isValidCloudAgentEvent } from './schemas';
 export type { CloudAgentEvent, StreamError, StreamErrorCode } from './schemas';
 

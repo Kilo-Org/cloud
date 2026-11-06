@@ -9,7 +9,7 @@ const windowDims = vi.hoisted(() => ({ width: 390, height: 844, fontScale: 1, sc
 
 type CardContent = {
   kind: string;
-  state?: { title: string; description: string; action: string; actionLabel: string | null };
+  state?: { title: string; description: string; action: string; actionLabel: string };
 };
 
 const cardState = vi.hoisted(() => {
@@ -46,14 +46,7 @@ vi.mock('@/lib/trpc', () => ({
 }));
 
 vi.mock('@tanstack/react-query', () => ({
-  // A web-managed pass with its link: the only answer a reader can act on, so
-  // the card's one pressable exists for the layout under test.
-  useQuery: () => ({
-    data: { kind: 'web_management', webUrl: 'https://example.com/subscriptions/kilo-pass' },
-    isError: false,
-    isPending: false,
-    refetch: vi.fn(),
-  }),
+  useQuery: () => ({ data: undefined, isError: false, isPending: true, refetch: vi.fn() }),
 }));
 
 vi.mock('@/lib/kilo-pass/subscription-card-state', () => ({
@@ -144,15 +137,15 @@ describe('KiloPassSubscriptionCard loading layout', () => {
     cardState.content = { kind: 'loading' };
     windowDims.width = 160;
     const root = renderCard(true);
-    expect(String(root.findByProps({ className: 'h-[101px]' }).props.className)).toBe('h-[101px]');
+    expect(String(root.findByProps({ className: 'h-[114px]' }).props.className)).toBe('h-[114px]');
   });
 
   it('reserves the single-row card height at phone widths', () => {
     cardState.content = { kind: 'loading' };
     const root = renderCard(true);
-    expect(String(root.findByProps({ className: 'h-[58.5px]' }).props.className)).toBe(
-      'h-[58.5px]'
-    );
+    // The card's rem is 14 pt: p-3 (21) + the h-10 icon row (35) + the two
+    // 1 px borders, matching the loaded card the reserve stands in for.
+    expect(String(root.findByProps({ className: 'h-[58px]' }).props.className)).toBe('h-[58px]');
   });
 });
 

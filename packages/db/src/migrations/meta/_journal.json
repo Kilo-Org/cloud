@@ -2395,6 +2395,13 @@
       "when": 1793981793196,
       "tag": "0341_claude_billing_connections",
       "breakpoints": true
+    },
+    {
+      "idx": 342,
+      "version": "7",
+      "when": 1794216638064,
+      "tag": "0342_ai_gateway_metadata_cache",
+      "breakpoints": true
     }
   ]
 }

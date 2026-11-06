@@ -1,4 +1,10 @@
-import { OPENAI_CHATGPT_API_URL } from './upstream';
+import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
+import {
+  readStoredMetadata,
+  type MetadataSource,
+} from '@kilocode/web-shared/lib/ai-gateway/metadata-cache';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
+import { OPENAI_CHATGPT_API_KEY_ENV, OPENAI_CHATGPT_API_URL } from './upstream';
 
 /**
  * Which models the partner project can actually serve.
@@ -54,7 +60,22 @@ function readServedModelIds(body: unknown): Set<string> | null {
   return ids.length === 0 ? null : new Set(ids);
 }
 
+function parseServedModelIds(body: unknown): Set<string> {
+  const ids = readServedModelIds(body);
+  if (!ids) throw new Error('OpenAI /models response has no usable model list');
+  return ids;
+}
+
+export const openAiServedModelsMetadataSource: MetadataSource<Set<string>> = {
+  url: MODELS_URL,
+  headers: () => ({ authorization: `Bearer ${getEnvVariable(OPENAI_CHATGPT_API_KEY_ENV)}` }),
+  parse: parseServedModelIds,
+};
+
 async function fetchServedModelIds(apiKey: string): Promise<Set<string> | null> {
+  const stored = await readStoredMetadata(openAiServedModelsMetadataSource, readDb);
+  if (stored) return stored;
+
   try {
     const response = await fetch(MODELS_URL, {
       // The module cache below is the only cache for this lookup. Next's data

@@ -15,7 +15,7 @@ export const SYNC_PROVIDERS_STALE_ALERT_TTL_SECONDS = 3 * 24 * 60 * 60;
 const SYNC_PROVIDERS_STALE_ALERT_TTL_MS = SYNC_PROVIDERS_STALE_ALERT_TTL_SECONDS * 1000;
 
 const STALE_WINDOW_LABEL = 'hour';
-const URGENCY_COPY = 'Important, not urgent. Some delay is acceptable.';
+export const URGENCY_COPY = 'Important, not urgent. Some delay is acceptable.';
 const TEST_COPY = 'This verifies alert delivery only; it does not indicate an active issue.';
 
 type SyncStateColumn = keyof Pick<
@@ -24,6 +24,7 @@ type SyncStateColumn = keyof Pick<
   | 'stale_alert_last_posted_at'
   | 'direct_byok_last_completed_at'
   | 'direct_byok_stale_alert_last_posted_at'
+  | 'metadata_cache_stale_alert_last_posted_at'
 >;
 
 type SyncJob = {
@@ -162,7 +163,7 @@ export function buildStaleSyncAlertNotification(input: {
   };
 }
 
-type StaleAlertDelivery = 'posted' | 'simulated';
+export type StaleAlertDelivery = 'posted' | 'simulated';
 type SendStaleAlertNotification = (
   notification: AdminSlackNotification
 ) => Promise<StaleAlertDelivery>;
@@ -210,7 +211,7 @@ type StaleAlertDependencies = {
   sendNotification?: SendStaleAlertNotification;
 };
 
-async function readSyncStateColumn(column: SyncStateColumn): Promise<string | null> {
+export async function readSyncStateColumn(column: SyncStateColumn): Promise<string | null> {
   const [row] = await db
     .select({ value: ai_gateway_sync_providers_state[column] })
     .from(ai_gateway_sync_providers_state)
@@ -223,7 +224,7 @@ export function getSyncLastCompletedAt(jobId: SyncJobId): Promise<string | null>
   return readSyncStateColumn(SYNC_JOBS[jobId].lastCompletedColumn);
 }
 
-async function writeLatestSyncStateTimestamp(column: SyncStateColumn, iso: string) {
+export async function writeLatestSyncStateTimestamp(column: SyncStateColumn, iso: string) {
   return db.transaction(async tx => {
     await tx.insert(ai_gateway_sync_providers_state).values({ id: 1 }).onConflictDoNothing();
     const [row] = await tx

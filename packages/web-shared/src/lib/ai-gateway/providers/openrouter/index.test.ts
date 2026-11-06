@@ -5,6 +5,7 @@ import {
   getEnhancedOpenRouterModels,
   getOpenRouterTranscriptionModels,
   getRawOpenRouterModels,
+  resetRawOpenRouterModelsCache,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
 import type { StoredModel } from '@kilocode/db/schema-types';
 import {
@@ -49,6 +50,10 @@ jest.mock(
 );
 
 const originalFetch = global.fetch;
+
+beforeEach(() => {
+  resetRawOpenRouterModelsCache();
+});
 
 function buildModel(overrides: Partial<OpenRouterModel> = {}): OpenRouterModel {
   return {
@@ -193,13 +198,23 @@ describe('auto models', () => {
     expect(models.data.some(model => model.id === KILO_AUTO_EFFICIENT_MODEL.id)).toBe(true);
   });
 
-  it('explicitly caches authenticated catalog requests', async () => {
+  it('caches authenticated catalog requests in memory instead of the framework data cache', async () => {
+    await getEnhancedOpenRouterModels({ countryCode: null });
     await getEnhancedOpenRouterModels({ countryCode: null });
 
-    expect(global.fetch).toHaveBeenCalledWith(
-      'https://openrouter.ai/api/v1/models',
-      expect.objectContaining({ cache: 'force-cache', next: { revalidate: 60 } })
-    );
+    const catalogCalls = jest
+      .mocked(global.fetch)
+      .mock.calls.filter(([url]) => url === 'https://openrouter.ai/api/v1/models');
+    expect(catalogCalls).toEqual([
+      [
+        'https://openrouter.ai/api/v1/models',
+        expect.objectContaining({
+          method: 'GET',
+          headers: expect.objectContaining({ Authorization: expect.stringMatching(/^Bearer /) }),
+        }),
+      ],
+    ]);
+    expect(catalogCalls[0]?.[1]).not.toHaveProperty('cache');
   });
 
   it.each([undefined, { name: 'Current model', slug: 'vendor/current' }])(

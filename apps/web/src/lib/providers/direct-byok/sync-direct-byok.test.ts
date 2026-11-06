@@ -632,7 +632,7 @@ describe('syncDirectByokModels database snapshots', () => {
     };
 
     await expect(syncDirectByokModels()).rejects.toThrow(
-      'Failed to fetch nvidia-byok available models: 503 Service Unavailable'
+      'Fetching https://integrate.api.nvidia.com/v1/models failed: 503 Service Unavailable'
     );
 
     expect(await readSnapshot()).toStrictEqual(previousSnapshot);
@@ -676,7 +676,7 @@ describe('syncDirectByokModels database snapshots', () => {
         new Response(null, { status: 503, statusText: 'Service Unavailable' });
 
       await expect(syncAndStoreDirectByokProviders()).rejects.toThrow(
-        'Failed to fetch nvidia-byok available models: 503 Service Unavailable'
+        'Fetching https://integrate.api.nvidia.com/v1/models failed: 503 Service Unavailable'
       );
 
       expect((await readSyncState()).direct_byok_last_completed_at).toBeNull();

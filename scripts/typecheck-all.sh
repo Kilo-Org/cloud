@@ -48,10 +48,11 @@ if [ -n "$group" ]; then
       fi
       ;;
     trpc)
-      # The rows run on every full check: a main push or the merge queue, and
-      # the merge queue has no extension trigger, so they keep the extension's
-      # gate there. The extension's own workflow typechecks it for the same
-      # selection on every pull request, and kilo-app typechecks in kilo-app CI.
+      # The rows run on every full typecheck: a change with no base, a GLOBAL
+      # path, this script itself, or the merge queue — which has no extension
+      # trigger, so they keep the extension's gate there. The extension's own
+      # workflow typechecks it for the same selection on every other pull
+      # request, and kilo-app typechecks in kilo-app CI.
       # CI restores or builds the declarations first and sets
       # KILO_TYPECHECK_TRPC_BUILT=1.
       if [ "${KILO_TYPECHECK_TRPC_BUILT:-}" != 1 ]; then

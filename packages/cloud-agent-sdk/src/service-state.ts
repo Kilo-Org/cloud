@@ -513,7 +513,12 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
       config.onPreparationFailed?.(event.message);
     } else {
       cloudStatus = { type: 'preparing', step: event.step, message: event.message };
-      if (event.step === 'setup_commands' && event.message) {
+      if (
+        (event.step === 'setup_commands' ||
+          event.step === 'session_setup_commands' ||
+          event.step === 'start_commands') &&
+        event.message
+      ) {
         setupLog = [...setupLog.slice(-(PREPARATION_MAX_SETUP_LOG_ENTRIES - 1)), event.message];
       }
     }

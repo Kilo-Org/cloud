@@ -43,7 +43,6 @@ const scopedEnv = {
   NATIVE_RUNTIME_IMAGE: 'runtime-free',
 };
 const SCOPED_SANDBOX = `sbx-${'1'.repeat(48)}`;
-const SCOPED_FALLBACK_SANDBOX = `sbx-${'2'.repeat(48)}`;
 const EXCLUDED_SANDBOX = `sbx-${'3'.repeat(48)}`;
 const NON_WEB_SANDBOX = `sbx-${'4'.repeat(48)}`;
 const ABSENT_PLATFORM_SANDBOX = `sbx-${'5'.repeat(48)}`;
@@ -113,9 +112,7 @@ it('loads a hash-selected descriptor through a real R2 binding before rendering 
   }
 });
 
-function fakeProvider(
-  options: { holdFirst?: boolean; holdSecond?: boolean; snapshotFailed?: boolean } = {}
-) {
+function fakeProvider(options: { holdFirst?: boolean; snapshotFailed?: boolean } = {}) {
   const launches: {
     env: Record<string, string>;
     command: ProviderStartupCommand;
@@ -132,7 +129,7 @@ function fakeProvider(
     async launch(_ref, startup, launchOptions) {
       const index = launches.length;
       launches.push({ ...startup, options: launchOptions });
-      if ((index === 0 && options.holdFirst) || (index === 1 && options.holdSecond))
+      if (index === 0 && options.holdFirst)
         await new Promise<void>(resolve => {
           releases[index] = resolve;
         });
@@ -307,26 +304,6 @@ describe('downloaded startup in the allocation owner', () => {
     expect(h.provider.launches.length).toBe(1);
     expect((await record(h))?.startupMode).toBe('downloaded');
   });
-  it('rotates the credential before the one baseline image fallback when provider failure wins', async () => {
-    const h = await setup('sbx__runtime_provider_first', {
-      snapshotFailed: true,
-      holdSecond: true,
-    });
-    await prepare(h);
-    await waitFor(() => expect(h.provider.launches.length).toBe(2));
-    expect(h.provider.launches[1]?.options?.snapshot).toBeUndefined();
-    expect(h.provider.launches[0]?.command === h.provider.launches[1]?.command).toBe(true);
-    expect(await report(h, 0, 'artifact_invalid')).toBe(false);
-    expect(await report(h, 1, 'artifact_invalid')).toBe(true);
-    await release(h, 1);
-    await waitFor(async () => expect((await h.stub.getAllocationState()).kind).toBe('stopped'));
-    expect(h.provider.launches.length).toBe(2);
-    expect(
-      h.peer
-        .routeUpdatesFor(SESSION)
-        .some(x => x.state === 'failed' && x.reason === 'runtime_artifact_invalid')
-    ).toBe(true);
-  });
   it.each([true, false])(
     'keeps base incompatibility retryable when creating=%s',
     async holdFirst => {
@@ -462,21 +439,6 @@ describe('downloaded startup in the allocation owner', () => {
       expect(startup.options?.nativeImage).toBe('runtime-free');
     }
   );
-  it('retains the scoped selection through the snapshot-to-image fallback', async () => {
-    const h = await setup(SCOPED_FALLBACK_SANDBOX, { snapshotFailed: true }, scopedEnv);
-    await prepare(h, {
-      orgId: TARGET_ORG,
-      createdOnPlatform: 'cloud-agent-web',
-      sandboxKind: 'isolated',
-    });
-    await waitFor(() => expect(h.provider.launches.length).toBe(2));
-    const [first, fallback] = h.provider.launches;
-    expect(first?.options?.nativeImage).toBe('runtime-free');
-    expect(fallback?.options?.nativeImage).toBe('runtime-free');
-    expect(fallback?.options?.snapshot).toBeUndefined();
-    expect(fallback?.command).toEqual(first?.command);
-    expect((await record(h))?.startupMode).toBe('downloaded');
-  });
   describe('runtime harness', () => {
     const harnessOf = (h: Harness, index: number) =>
       h.provider.launches[index]?.command.argv[2]

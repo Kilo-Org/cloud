@@ -1,12 +1,9 @@
-import { env, evictAllDurableObjects, reset, runInDurableObject } from 'cloudflare:test';
+import { env, reset, runInDurableObject } from 'cloudflare:test';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { SandboxControlV2 } from '../../src/control-plane/sandbox/sandbox-do.js';
 import type { SandboxSessionV2 } from '../../src/control-plane/session/session-do.js';
 import { sessionDoName } from '../../src/session-identity.js';
-import {
-  allocation as allocationTable,
-  routes as routesTable,
-} from '../../src/control-plane/sandbox/sqlite-schema.js';
+import { allocation as allocationTable } from '../../src/control-plane/sandbox/sqlite-schema.js';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import type { SnapshotResolution } from '../../src/environment-build/coordinator.js';
@@ -20,7 +17,6 @@ import type {
   StopResult,
 } from '../../src/sandbox-control/provider.js';
 import type { ControlPlaneRouteSpec } from '../../src/shared/control-plane-protocol.js';
-import { CONTROL_PLANE_TIMERS } from '../../src/shared/control-plane-timers.js';
 import {
   createFakeCredentialBroker,
   FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN,
@@ -298,54 +294,69 @@ async function prepareFrameOf(wrapper: FakeWrapper) {
 afterEach(async () => {
   await reset();
 });
+/** An environment with one build command: it may only start from its snapshot. */
+const BUILD: RouteOverrides = { setupCommands: ['env-build'], environmentSetupCommandCount: 1 };
+const ENVIRONMENT_REQUIRED = {
+  state: 'failed',
+  attemptId: expect.any(String),
+  reason: 'workspace_setup_failed',
+  subtype: 'environment_snapshot_required',
+} as const;
+
+async function waitForFailed(peer: FakeSessionPeer, sessionId = SESSION) {
+  await waitFor(() => expect(peer.routeUpdatesFor(sessionId)).toContainEqual(ENVIRONMENT_REQUIRED));
+}
+
+function environmentSnapshotDetails(peer: FakeSessionPeer): string[] {
+  return peer
+    .routeUpdatesFor(SESSION)
+    .flatMap(update =>
+      update.state === 'preparing' && update.step === 'environment_snapshot' && update.detail
+        ? [update.detail]
+        : []
+    );
+}
 
 describe('environment snapshot launch', () => {
   it.each([
-    { environment: true, skipped: false, budget: 300_000 },
-    { environment: false, skipped: false, budget: 120_000 },
-    { environment: true, skipped: true, budget: 120_000 },
-  ])(
-    'uses creation budget $budget for environment=$environment skipped=$skipped',
-    async ({ environment, skipped, budget }) => {
-      const sandboxId = `sbx__repo_create_budget_${environment}_${skipped}`;
-      const provider = createFakeProvider({ holdLaunch: true });
-      const { stub } = await setup(sandboxId, provider, {
-        ...WITH_SNAPSHOT,
-        SANDBOX_CONTAINERS: FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
-      });
-      if (skipped) {
-        await putLaunchRecord(stub, {
-          allocationId: 'old-allocation',
-          startSource: 'repository',
-          confirmed: false,
-        });
-      }
-      const before = Date.now();
-      await stub.prepare({
-        ...prepareInput(environment ? {} : { environment: null }),
-        sandboxSelection: { provider: 'cloudflare-containers' },
-      });
-      await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
-      const state = await stub.getAllocationState();
-      expect(state.kind).toBe('creating');
-      expect(state.createDeadlineAt).toBeGreaterThanOrEqual(before + budget);
-      expect(state.createDeadlineAt).toBeLessThanOrEqual(Date.now() + budget);
-      expect(provider.launchDeadlines[0]).toBe(state.createDeadlineAt);
-      await releaseHeld(stub, () => provider.releaseLaunch());
-    }
-  );
-
-  it('cleans up a failed snapshot and launches the image on the same allocation and deadline', async () => {
-    const sandboxId = 'sbx__repo_launch_fallback';
-    const provider = createFakeProvider({
-      launches: [{ startSource: 'repository', snapshotFailed: true }, { startSource: 'image' }],
-    });
+    { name: 'an environment with build commands', input: BUILD, budget: 300_000 },
+    { name: 'no environment', input: { environment: null }, budget: 120_000 },
+    { name: 'an environment without build commands', input: {}, budget: 120_000 },
+  ])('uses creation budget $budget for $name', async ({ name, input, budget }) => {
+    const sandboxId = `sbx__repo_create_budget_${name.replaceAll(' ', '_')}`;
+    const provider = createFakeProvider({ holdLaunch: true, startSource: 'repository' });
     const { stub } = await setup(sandboxId, provider, {
       ...WITH_SNAPSHOT,
       SANDBOX_CONTAINERS: FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
     });
+    const before = Date.now();
     await stub.prepare({
-      ...prepareInput(),
+      ...prepareInput(input),
+      sandboxSelection: { provider: 'cloudflare-containers' },
+    });
+    await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
+    const state = await stub.getAllocationState();
+    expect(state.kind).toBe('creating');
+    expect(state.createDeadlineAt).toBeGreaterThanOrEqual(before + budget);
+    expect(state.createDeadlineAt).toBeLessThanOrEqual(Date.now() + budget);
+    expect(provider.launchDeadlines[0]).toBe(state.createDeadlineAt);
+    await releaseHeld(stub, () => provider.releaseLaunch());
+  });
+
+  it('retries the same snapshot on the same allocation and deadline after a transient start failure', async () => {
+    const sandboxId = 'sbx__repo_launch_retry';
+    const provider = createFakeProvider({
+      launches: [
+        { startSource: 'repository', snapshotFailed: true, snapshotFailureReason: 'transient' },
+        { startSource: 'repository' },
+      ],
+    });
+    const { stub, peer } = await setup(sandboxId, provider, {
+      ...WITH_SNAPSHOT,
+      SANDBOX_CONTAINERS: FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
+    });
+    await stub.prepare({
+      ...prepareInput(BUILD),
       sandboxSelection: { provider: 'cloudflare-containers' },
     });
     await waitFor(() => expect(provider.launchEnvs).toHaveLength(2));
@@ -354,244 +365,92 @@ describe('environment snapshot launch', () => {
 
     expect(provider.launchOptions).toEqual([
       { snapshot: SNAPSHOT, nativeImage: 'all-in-one' },
-      { nativeImage: 'all-in-one' },
+      { snapshot: SNAPSHOT, nativeImage: 'all-in-one' },
     ]);
     expect(provider.launchRefs[1]).toBe(provider.launchRefs[0]);
     expect(provider.stopRefs).toEqual([provider.launchRefs[0]]);
-    // Diagnostic upload identities are per launch when a Worker URL is configured.
-    const withoutDiagnostics = (launchEnv: Record<string, string> | undefined) =>
-      Object.fromEntries(
-        Object.entries(launchEnv ?? {}).filter(
-          ([key]) => !key.startsWith('CONTROL_LOG_UPLOAD_') && key !== 'CONTROL_WRAPPER_INSTANCE_ID'
-        )
-      );
-    expect(withoutDiagnostics(provider.launchEnvs[1])).toEqual({
-      ...withoutDiagnostics(provider.launchEnvs[0]),
-      SANDBOX_CONTROL_CREDENTIAL: expect.any(String),
-    });
-    expect(provider.launchEnvs[1].SANDBOX_CONTROL_CREDENTIAL).not.toBe(
-      provider.launchEnvs[0].SANDBOX_CONTROL_CREDENTIAL
-    );
-    expect(provider.launchDeadlines[0]).toEqual(expect.any(Number));
     expect(provider.launchDeadlines[0]).toBe(launchDeadline);
     expect(provider.launchDeadlines[1]).toBe(launchDeadline);
     await prepareFrameOf(wrapper);
     expect(await readLaunchRecord(stub)).toEqual({
       allocationId,
       startupMode: 'preinstalled',
-      startSource: 'image',
-      confirmed: true,
-    });
-  });
-
-  it('reports a snapshot fallback when a failed snapshot start retries from the image', async () => {
-    const sandboxId = 'sbx__repo_launch_fallback_notice';
-    const provider = createFakeProvider({
-      launches: [{ startSource: 'repository', snapshotFailed: true }, { startSource: 'image' }],
-    });
-    const { stub, peer } = await setup(sandboxId, provider);
-    await stub.prepare(prepareInput());
-    await waitFor(() => expect(provider.launchEnvs).toHaveLength(2));
-
-    await waitFor(() =>
-      expect(peer.routeUpdatesFor(SESSION)).toContainEqual({
-        state: 'preparing',
-        attemptId: expect.any(String),
-        step: 'snapshot_fallback',
-        detail: 'Snapshot startup failed. Retrying without a snapshot.',
-      })
-    );
-    const updates = peer.routeUpdatesFor(SESSION);
-    const fallbackIndex = updates.findIndex(
-      update => update.state === 'preparing' && update.step === 'snapshot_fallback'
-    );
-    expect(updates[fallbackIndex + 1]).toMatchObject({
-      state: 'preparing',
-      attemptId: expect.any(String),
-      step: 'sandbox_start',
-      detail: 'Starting sandbox without a snapshot',
-    });
-  });
-
-  it('reports a snapshot fallback when a previous failed snapshot start is skipped', async () => {
-    const sandboxId = 'sbx__repo_launch_skip_notice';
-    const provider = createFakeProvider();
-    const { stub, peer } = await setup(sandboxId, provider);
-    await putLaunchRecord(stub, {
-      allocationId: 'previous-allocation',
-      startSource: 'repository',
-      confirmed: false,
-    });
-    await stub.prepare(prepareInput());
-    await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
-
-    expect(provider.launchOptions).toEqual([{ nativeImage: 'all-in-one' }]);
-    await waitFor(() =>
-      expect(peer.routeUpdatesFor(SESSION)).toContainEqual({
-        state: 'preparing',
-        attemptId: expect.any(String),
-        step: 'snapshot_fallback',
-        detail: 'Previous snapshot startup failed. Retrying without a snapshot.',
-      })
-    );
-  });
-
-  it('does not report a snapshot fallback when the snapshot starts', async () => {
-    const provider = createFakeProvider({ startSource: 'repository' });
-    const { stub, peer } = await setup('sbx__repo_launch_no_notice', provider);
-    await stub.prepare(prepareInput());
-    const { wrapper } = await connect('sbx__repo_launch_no_notice', provider);
-    await prepareFrameOf(wrapper);
-
-    expect(
-      peer
-        .routeUpdatesFor(SESSION)
-        .some(update => update.state === 'preparing' && update.step === 'snapshot_fallback')
-    ).toBe(false);
-  });
-
-  it('does not stop or fall back when a hello owns a slow failed snapshot launch', async () => {
-    const sandboxId = 'sbx__repo_launch_fallback_hello';
-    const provider = createFakeProvider({
-      holdLaunch: true,
-      launches: [{ startSource: 'repository', snapshotFailed: true }],
-    });
-    const { stub } = await setup(sandboxId, provider);
-    await stub.prepare(prepareInput());
-    const { wrapper, allocationId } = await connect(sandboxId, provider);
-    await prepareFrameOf(wrapper);
-
-    await releaseHeld(stub, () => provider.releaseLaunch());
-    expect((await stub.getAllocationState()).kind).toBe('connected');
-    expect(provider.stopRefs).toEqual([]);
-    expect(provider.launchEnvs).toHaveLength(1);
-    expect(await readLaunchRecord(stub)).toEqual({
-      allocationId,
-      startupMode: 'preinstalled',
       startSource: 'repository',
       confirmed: true,
     });
+    expect(peer.routeUpdatesFor(SESSION).some(update => update.state === 'failed')).toBe(false);
   });
 
-  it('rejects a late snapshot hello during cleanup and accepts the new image wrapper', async () => {
-    const sandboxId = 'sbx__repo_launch_fallback_late_hello';
-    const provider = createFakeProvider({
-      holdLaunch: true,
-      holdStop: true,
-      launches: [{ startSource: 'repository', snapshotFailed: true }, { startSource: 'image' }],
-    });
-    const { stub } = await setup(sandboxId, provider);
-    await stub.prepare(prepareInput());
-    await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
-    const { SANDBOX_CONTROL_CREDENTIAL: credential, CONTROL_PLANE_ALLOCATION_ID: allocationId } =
-      provider.launchEnvs[0];
-    const snapshotWrapper = await FakeWrapper.connect({ sandboxId, credential });
-    await releaseHeld(stub, () => {
-      provider.launchHold = false;
-      provider.releaseLaunch();
-    });
-    await waitFor(() => expect(provider.stopRefs).toHaveLength(1));
-
-    expect(await snapshotWrapper.hello({ wrapperId: 'wr_snapshot', allocationId })).toEqual({
-      type: 'shutdown',
-      reason: 'hello_rejected',
-    });
-    expect(await snapshotWrapper.waitForClose()).toBe(1008);
-    expect((await stub.getAllocationState()).kind).toBe('creating');
-    const rejectedUpgrade = await FakeWrapper.connect({ sandboxId, credential });
-    expect(await rejectedUpgrade.waitForClose()).toBe(1008);
-    expect(provider.launchEnvs).toHaveLength(1);
-
-    await releaseHeld(stub, () => provider.releaseStop());
-    const { wrapper } = await connect(sandboxId, provider, 2);
-    expect((await stub.getAllocationState()).kind).toBe('connected');
-    await prepareFrameOf(wrapper);
-    wrapper.send({ type: 'session.ready', sessionId: SESSION });
-    await waitFor(async () =>
-      expect((await stub.status({ sessionId: SESSION })).view.state).toBe('ready')
-    );
-  });
-
-  it('does not loop when the image fallback launch throws', async () => {
+  it('fails with "Rebuild the environment" after a repeated transient failure, without an image launch', async () => {
     const provider = createFakeProvider({
       launches: [
-        { startSource: 'repository', snapshotFailed: true },
-        new Error('image launch failed'),
+        { startSource: 'repository', snapshotFailed: true, snapshotFailureReason: 'transient' },
+        { startSource: 'repository', snapshotFailed: true, snapshotFailureReason: 'transient' },
       ],
     });
-    const { stub } = await setup('sbx__repo_launch_fallback_error', provider);
-    await stub.prepare(prepareInput());
-    await waitFor(() => expect(provider.launchEnvs).toHaveLength(2));
-    const allocationId = provider.launchEnvs[0].CONTROL_PLANE_ALLOCATION_ID;
-    await waitFor(async () =>
-      expect((await stub.getAllocationState()).allocationId).not.toBe(allocationId)
-    );
-    expect(provider.launchOptions[1]).toEqual({ nativeImage: 'all-in-one' });
+    const { stub, peer } = await setup('sbx__repo_launch_retry_exhausted', provider);
+    await stub.prepare(prepareInput(BUILD));
+    await waitForFailed(peer);
+
     expect(provider.launchEnvs).toHaveLength(2);
+    expect(
+      provider.launchOptions.every(options => options?.snapshot?.snapshotId === 'snap-env')
+    ).toBe(true);
+    expect(environmentSnapshotDetails(peer).at(-1)).toContain('Rebuild the environment');
+    expect((await stub.status({ sessionId: SESSION })).view.state).toBe('failed');
   });
 
-  it('does not launch the image when failed snapshot cleanup is unconfirmed', async () => {
-    const provider = createFakeProvider({
-      launches: [{ startSource: 'repository', snapshotFailed: true }],
-      stopResult: 'retryable',
+  it.each([
+    {
+      name: 'expired artifact',
+      launch: {
+        startSource: 'repository' as const,
+        snapshotFailed: true as const,
+        snapshotFailureReason: 'expired' as const,
+      },
+    },
+    { name: 'provider started the image', launch: { startSource: 'image' as const } },
+  ])('fails a permanent snapshot start ($name) at once', async ({ launch }) => {
+    const provider = createFakeProvider({ launches: [launch] });
+    const { stub, peer } = await setup('sbx__repo_launch_permanent', provider);
+    await stub.prepare(prepareInput(BUILD));
+    await waitForFailed(peer);
+    expect(provider.launchEnvs).toHaveLength(1);
+  });
+
+  it('holds preparation for an early hello until the snapshot launch reports its source', async () => {
+    const sandboxId = 'sbx__repo_launch_early_hello';
+    const provider = createFakeProvider({ startSource: 'repository', holdLaunch: true });
+    const { stub } = await setup(sandboxId, provider);
+    await stub.prepare(prepareInput(BUILD));
+    const { wrapper } = await connect(sandboxId, provider);
+    expect(await wrapper.nextSkipping(['worktree.snapshot', 'worktree.summary'], 50)).toBeNull();
+
+    await releaseHeld(stub, () => provider.releaseLaunch());
+    expect(await wrapper.nextSkipping(['worktree.snapshot', 'worktree.summary'])).toMatchObject({
+      type: 'session.prepare',
     });
-    const { stub } = await setup('sbx__repo_launch_fallback_cleanup', provider);
-    await stub.prepare(prepareInput());
-    await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
-    const allocationId = provider.launchEnvs[0].CONTROL_PLANE_ALLOCATION_ID;
+  });
+
+  it('fails and stops when a hello owns a launch whose snapshot did not start', async () => {
+    const sandboxId = 'sbx__repo_launch_owned_miss';
+    const provider = createFakeProvider({
+      holdLaunch: true,
+      launches: [{ startSource: 'repository', snapshotFailed: true }],
+    });
+    const { stub, peer } = await setup(sandboxId, provider);
+    await stub.prepare(prepareInput(BUILD));
+    const { wrapper } = await connect(sandboxId, provider);
+
+    await releaseHeld(stub, () => provider.releaseLaunch());
+    await waitForFailed(peer);
+    expect(
+      await wrapper.nextSkipping(['worktree.snapshot', 'worktree.summary'], 50)
+    ).not.toMatchObject({ type: 'session.prepare' });
+    expect(provider.launchEnvs).toHaveLength(1);
     await waitFor(async () =>
-      expect((await stub.getAllocationState()).allocationId).not.toBe(allocationId)
+      expect(['stopping', 'stopped']).toContain((await stub.getAllocationState()).kind)
     );
-    expect(provider.stopRefs.length).toBeGreaterThan(0);
-    expect(provider.launchEnvs).toHaveLength(1);
-  });
-
-  it('does not launch the image after allocation ownership changes during cleanup', async () => {
-    const provider = createFakeProvider({
-      launches: [{ startSource: 'repository', snapshotFailed: true }],
-      holdStop: true,
-    });
-    const { stub } = await setup('sbx__repo_launch_fallback_replaced', provider);
-    await stub.prepare(prepareInput());
-    await waitFor(() => expect(provider.stopRefs).toHaveLength(1));
-    const replacement = crypto.randomUUID();
-    await runInDurableObject(stub, async (_instance, state) => {
-      const db = drizzle(state.storage, { logger: false });
-      await db
-        .update(allocationTable)
-        .set({ allocation_id: replacement })
-        .where(
-          eq(allocationTable.allocation_id, provider.launchEnvs[0].CONTROL_PLANE_ALLOCATION_ID)
-        );
-    });
-
-    await releaseHeld(stub, () => provider.releaseStop());
-    expect((await stub.getAllocationState()).allocationId).toBe(replacement);
-    expect(provider.launchEnvs).toHaveLength(1);
-  });
-
-  it('does not launch the image after cleanup consumes the original launch deadline', async () => {
-    const provider = createFakeProvider({
-      launches: [{ startSource: 'repository', snapshotFailed: true }],
-      stopDelayMs: 300,
-    });
-    const { stub } = await setup('sbx__repo_launch_fallback_expired', provider);
-    await runInDurableObject(stub, instance => {
-      Object.assign(instance, {
-        sandboxTimers: () => ({
-          ...CONTROL_PLANE_TIMERS.sandbox,
-          providerCreateMs: 150,
-        }),
-      });
-    });
-    // No environment: a snapshot candidate would extend the create deadline.
-    await stub.prepare(prepareInput({ environment: null }));
-    await waitFor(() => expect(provider.stopRefs.length).toBeGreaterThan(0));
-    const allocationId = provider.launchEnvs[0].CONTROL_PLANE_ALLOCATION_ID;
-    await waitFor(async () =>
-      expect((await stub.getAllocationState()).allocationId).not.toBe(allocationId)
-    );
-    expect(provider.launchEnvs).toHaveLength(1);
   });
 
   it('starts from the selected snapshot and never asks the wrapper to capture', async () => {
@@ -600,7 +459,7 @@ describe('environment snapshot launch', () => {
     const { stub, peer } = await setup('sbx__env_launch_selected', provider, {
       ENVIRONMENT_BUILD: lookups.namespace,
     });
-    await stub.prepare(prepareInput({ setupCommands: ['npm install'] }));
+    await stub.prepare(prepareInput(BUILD));
     const { wrapper } = await connect('sbx__env_launch_selected', provider);
     const frame = await prepareFrameOf(wrapper);
 
@@ -608,75 +467,45 @@ describe('environment snapshot launch', () => {
     expect(lookups.lookups).toEqual([{ reference: REFERENCE, actorUserId: 'user_123' }]);
     expect(frame.spec.capture).toBeUndefined();
     expect(frame.spec).not.toHaveProperty('environment');
-    await waitFor(() =>
-      expect(peer.routeUpdatesFor(SESSION)).toContainEqual({
-        state: 'preparing',
-        attemptId: expect.any(String),
-        step: 'environment_snapshot',
-        detail:
-          'Using snapshot · 01 Jan 1970, 00:00:00 UTC; environment settings have changed; cached files may retain earlier values; a replacement build was started',
-      })
+    expect(environmentSnapshotDetails(peer)).toContain(
+      'Using snapshot · 01 Jan 1970, 00:00:00 UTC; environment settings have changed; cached files may retain earlier values; a replacement build was started'
     );
   });
 
-  it('sends the environment setup command boundary in the snapshot prepare frame', async () => {
-    const provider = createFakeProvider({ startSource: 'repository' });
-    const { stub } = await setup('sbx__env_launch_setup_boundary', provider);
-    await stub.prepare(
-      prepareInput({
+  it.each([true, false])(
+    'sends the build boundary and start commands apart from setup (startCommands capability %s)',
+    async startCommands => {
+      const sandboxId = `sbx__env_launch_start_phases_${startCommands}`;
+      const provider = createFakeProvider({ startSource: 'repository' });
+      const { stub } = await setup(sandboxId, provider);
+      await stub.prepare(
+        prepareInput({
+          setupCommands: ['env-install', 'inline-build'],
+          environmentSetupCommandCount: 1,
+          startCommands: ['serve'],
+        })
+      );
+      const { wrapper } = await connect(sandboxId, provider, 1, { startCommands });
+      const frame = await prepareFrameOf(wrapper);
+
+      expect(frame.spec).toMatchObject({
         setupCommands: ['env-install', 'inline-build'],
         environmentSetupCommandCount: 1,
-      })
-    );
-    const { wrapper } = await connect('sbx__env_launch_setup_boundary', provider, 1, {
-      startCommands: true,
-    });
-    const frame = await prepareFrameOf(wrapper);
-
-    expect(frame.spec).toMatchObject({
-      setupCommands: ['env-install', 'inline-build'],
-      environmentSetupCommandCount: 1,
-    });
-  });
-
-  it('sends start commands apart from setup to a start-command wrapper', async () => {
-    const provider = createFakeProvider({ startSource: 'repository' });
-    const { stub } = await setup('sbx__env_launch_start_phases', provider);
-    await stub.prepare(prepareInput({ setupCommands: ['npm install'], startCommands: ['serve'] }));
-    const { wrapper } = await connect('sbx__env_launch_start_phases', provider, 1, {
-      startCommands: true,
-    });
-    const frame = await prepareFrameOf(wrapper);
-
-    expect(frame.spec).toMatchObject({ setupCommands: ['npm install'], startCommands: ['serve'] });
-  });
-
-  it('appends start commands to setup for a wrapper that predates them', async () => {
-    const provider = createFakeProvider({ startSource: 'repository' });
-    const { stub } = await setup('sbx__env_launch_old_wrapper_phases', provider);
-    await stub.prepare(
-      prepareInput({
-        setupCommands: ['npm install'],
         startCommands: ['serve'],
-        environmentSetupCommandCount: 1,
-      })
-    );
-    const { wrapper } = await connect('sbx__env_launch_old_wrapper_phases', provider);
-    const frame = await prepareFrameOf(wrapper);
+      });
+    }
+  );
 
-    expect(frame.spec.setupCommands).toEqual(['npm install', 'serve']);
-    expect(frame.spec).not.toHaveProperty('startCommands');
-    expect(frame.spec).not.toHaveProperty('environmentSetupCommandCount');
-  });
-
-  it('starts from the image without a lookup when the session has no environment', async () => {
+  it.each([
+    { name: 'no environment', input: { environment: null } },
+    { name: 'an environment without build commands', input: { setupCommands: ['npm install'] } },
+  ])('starts from the image without a lookup for $name', async ({ input }) => {
     const lookups = fakeEnvironmentBuild();
     const provider = createFakeProvider();
-    const { stub } = await setup('sbx__env_launch_none', provider, {
-      ENVIRONMENT_BUILD: lookups.namespace,
-    });
-    await stub.prepare(prepareInput({ environment: null }));
-    const { wrapper } = await connect('sbx__env_launch_none', provider);
+    const sandboxId = `sbx__env_launch_image_${'environment' in input ? 'none' : 'unbuilt'}`;
+    const { stub } = await setup(sandboxId, provider, { ENVIRONMENT_BUILD: lookups.namespace });
+    await stub.prepare(prepareInput(input));
+    const { wrapper } = await connect(sandboxId, provider);
     const frame = await prepareFrameOf(wrapper);
 
     expect(provider.launchOptions).toEqual([{ nativeImage: 'all-in-one' }]);
@@ -684,36 +513,62 @@ describe('environment snapshot launch', () => {
     expect(frame.spec.capture).toBeUndefined();
   });
 
-  it('starts from the image when no snapshot is eligible and reports the real build status', async () => {
+  it('fails a required environment that has no snapshot with the real build status', async () => {
     const provider = createFakeProvider();
     const { stub, peer } = await setup('sbx__env_launch_missing', provider, WITHOUT_SNAPSHOT);
-    await stub.prepare(prepareInput());
-    await connect('sbx__env_launch_missing', provider);
+    await stub.prepare(prepareInput(BUILD));
+    await waitForFailed(peer);
 
-    expect(provider.launchOptions).toEqual([{ nativeImage: 'all-in-one' }]);
-    await waitFor(() =>
-      expect(peer.routeUpdatesFor(SESSION)).toContainEqual({
-        state: 'preparing',
-        attemptId: expect.any(String),
-        step: 'environment_snapshot',
-        detail: 'Starting without an environment snapshot; a replacement build is running',
-      })
+    expect(provider.launchEnvs).toHaveLength(0);
+    expect(environmentSnapshotDetails(peer)).toContain(
+      'The environment is building. Build 77777777-7777-4777-8777-777777777777.'
     );
   });
 
-  it('starts from the image for a shared worktree path and for a provider without snapshots', async () => {
-    const shared = createFakeProvider();
-    const { stub: sharedStub } = await setup('sbx__env_launch_shared', shared);
-    await sharedStub.prepare(prepareInput({ directory: '/workspace/org/user/sessions/s1' }));
-    await waitFor(() => expect(shared.launchEnvs).toHaveLength(1));
-    expect(shared.launchOptions).toEqual([{ nativeImage: 'all-in-one' }]);
-
-    const unsupported = createFakeProvider({ snapshots: false });
-    const { stub } = await setup('sbx__env_launch_unsupported', unsupported);
-    await stub.prepare(prepareInput());
-    await waitFor(() => expect(unsupported.launchEnvs).toHaveLength(1));
-    expect(unsupported.launchOptions).toEqual([{ nativeImage: 'all-in-one' }]);
+  it('fails a required environment without an image start when the lookup is unavailable', async () => {
+    const provider = createFakeProvider();
+    const { stub, peer } = await setup('sbx__env_launch_required_lookup', provider, {
+      ENVIRONMENT_BUILD: undefined,
+    });
+    await stub.prepare(prepareInput(BUILD));
+    await waitForFailed(peer);
+    expect(provider.launchEnvs).toHaveLength(0);
   });
+
+  it.each([
+    {
+      name: 'retired shared sandbox path',
+      directory: '/workspace/org/user/sessions/s1',
+      snapshots: true,
+      detail: 'This session uses a retired sandbox type',
+    },
+    {
+      name: 'provider without snapshots',
+      directory: ISOLATED_DIRECTORY,
+      snapshots: false,
+      detail: 'This sandbox provider does not support environment snapshots yet',
+    },
+  ])(
+    'fails at once without an image start or a build link when no environment snapshot can serve it: $name',
+    async scenario => {
+      const provider = createFakeProvider({ snapshots: scenario.snapshots });
+      const sandboxId = `sbx__env_launch_unusable_${scenario.name.replaceAll(' ', '_')}`;
+      const { stub, peer } = await setup(sandboxId, provider);
+      await stub.prepare(prepareInput({ ...BUILD, directory: scenario.directory }));
+      await waitForFailed(peer);
+
+      expect(provider.launchEnvs).toHaveLength(0);
+      expect(environmentSnapshotDetails(peer)).toEqual([]);
+      const sandboxDetails = peer
+        .routeUpdatesFor(SESSION)
+        .flatMap(update =>
+          update.state === 'preparing' && update.step === 'sandbox_create' && update.detail
+            ? [update.detail]
+            : []
+        );
+      expect(sandboxDetails.some(detail => detail.startsWith(scenario.detail))).toBe(true);
+    }
+  );
 
   it('answers a capture request from a pre-change wrapper at once without the provider', async () => {
     const provider = createFakeProvider();
@@ -731,58 +586,19 @@ describe('environment snapshot launch', () => {
     expect(provider.stopRefs).toEqual([]);
   });
 
-  it('skips a snapshot whose start never connected and starts from the image', async () => {
-    const provider = createFakeProvider();
-    const { stub } = await setup('sbx__repo_launch_discard', provider);
-    await putLaunchRecord(stub, {
-      allocationId: 'previous-allocation',
-      startSource: 'repository',
-      confirmed: false,
-    });
-    await stub.prepare(prepareInput());
-
-    await connect('sbx__repo_launch_discard', provider);
-
-    expect(provider.launchOptions).toEqual([{ nativeImage: 'all-in-one' }]);
-  });
-
   it.each([
+    ['a snapshot start that never connected', { startSource: 'repository', confirmed: false }],
     ['a repository start that connected', { startSource: 'repository', confirmed: true }],
     ['an image start that never connected', { startSource: 'image', confirmed: false }],
-  ])('keeps the snapshot after %s', async (_name, previous) => {
-    const provider = createFakeProvider();
+  ])('still selects the snapshot after %s', async (_name, previous) => {
+    const provider = createFakeProvider({ startSource: 'repository' });
     const { stub } = await setup('sbx__repo_launch_keep', provider);
     await putLaunchRecord(stub, { allocationId: 'previous-allocation', ...previous });
-    await stub.prepare(prepareInput());
+    await stub.prepare(prepareInput(BUILD));
 
     await connect('sbx__repo_launch_keep', provider);
 
     expect(provider.launchOptions).toEqual([{ snapshot: SNAPSHOT, nativeImage: 'all-in-one' }]);
-  });
-
-  it('keeps the failed-snapshot skip when a launch fails before it completes', async () => {
-    const provider = createFakeProvider({
-      startSource: 'repository',
-      launchError: new Error('launch failed'),
-    });
-    const { stub } = await setup('sbx__repo_launch_fail', provider);
-    await putLaunchRecord(stub, {
-      allocationId: 'previous-allocation',
-      startSource: 'repository',
-      confirmed: false,
-    });
-    await stub.prepare(prepareInput());
-    await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
-
-    // The launch never completed, so the placeholder must keep the previous
-    // broken-snapshot signal. Otherwise the next start reads no `startSource`,
-    // skips the fallback, and reuses the snapshot that just failed.
-    await waitFor(async () =>
-      expect(await readLaunchRecord(stub)).toMatchObject({
-        skipRepository: true,
-        confirmed: false,
-      })
-    );
   });
 
   it('does not carry a previous confirmation onto a launch that never connects', async () => {
@@ -793,16 +609,13 @@ describe('environment snapshot launch', () => {
       startSource: 'repository',
       confirmed: true,
     });
-    await stub.prepare(prepareInput());
-    await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
-
-    // The previous start was confirmed, but this launch's wrapper never
-    // connected, so the record must stay unconfirmed. Carrying the previous
-    // confirmation would make the next start reuse a broken snapshot.
-    expect(await readLaunchRecord(stub)).toMatchObject({
-      startSource: 'repository',
-      confirmed: false,
-    });
+    await stub.prepare(prepareInput(BUILD));
+    await waitFor(async () =>
+      expect(await readLaunchRecord(stub)).toMatchObject({
+        startSource: 'repository',
+        confirmed: false,
+      })
+    );
   });
 
   it('keeps a launch confirmed when its slow start stops before it returns', async () => {
@@ -813,7 +626,7 @@ describe('environment snapshot launch', () => {
       holdStop: true,
     });
     const { stub } = await setup(sandboxId, provider);
-    await stub.prepare(prepareInput());
+    await stub.prepare(prepareInput(BUILD));
     const { allocationId } = await connect(sandboxId, provider);
 
     // The launch is still held when the wrapper connects. Stop the allocation
@@ -837,7 +650,8 @@ describe('environment snapshot launch', () => {
       })
     );
 
-    // Completing the stop starts the next allocation, which must keep the snapshot.
+    // Completing the stop starts the next allocation, which keeps the snapshot.
+    provider.launchHold = false;
     await releaseHeld(stub, () => provider.releaseStop());
     await waitFor(() => expect(provider.launchEnvs).toHaveLength(2));
     expect(provider.launchOptions[1]).toEqual({ snapshot: SNAPSHOT, nativeImage: 'all-in-one' });
@@ -846,7 +660,7 @@ describe('environment snapshot launch', () => {
   it('marks the launch confirmed only for the allocation whose wrapper connected', async () => {
     const provider = createFakeProvider({ startSource: 'repository' });
     const { stub } = await setup('sbx__repo_launch_confirm', provider);
-    await stub.prepare(prepareInput());
+    await stub.prepare(prepareInput(BUILD));
     await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
     // The placeholder written before `launch` has no source yet; wait for the
     // completed record so this test owns the value it overwrites.
@@ -854,8 +668,7 @@ describe('environment snapshot launch', () => {
       expect(await readLaunchRecord(stub)).toMatchObject({ startSource: 'repository' })
     );
     const record = (await readLaunchRecord(stub)) as { allocationId: string; confirmed: boolean };
-    const launchEnv = provider.launchEnvs[0];
-    expect(record.allocationId).toBe(launchEnv?.CONTROL_PLANE_ALLOCATION_ID);
+    expect(record.allocationId).toBe(provider.launchEnvs[0]?.CONTROL_PLANE_ALLOCATION_ID);
 
     // A wrapper of another allocation cannot confirm it.
     await runInDurableObject(stub, (_instance, state) =>
@@ -870,12 +683,10 @@ describe('environment snapshot launch', () => {
   });
 });
 
-describe('environment snapshot preparation fallback', () => {
-  it('keeps queued messages through fallback and delivers their original identities once', async () => {
+describe('environment snapshot session preparation', () => {
+  it('delivers queued messages once and attaches the command failure note to the first prompt', async () => {
     const sandboxId = 'sbx__repo_prepare_queued_messages';
-    const provider = createFakeProvider({
-      launches: [{ startSource: 'repository' }, { startSource: 'image' }],
-    });
+    const provider = createFakeProvider({ startSource: 'repository' });
     const { stub } = await setup(sandboxId, provider);
     const sessionNamespace = (
       env as unknown as {
@@ -883,7 +694,10 @@ describe('environment snapshot preparation fallback', () => {
       }
     ).SANDBOX_SESSION;
     const session = sessionNamespace.getByName(sessionDoName('user_123', SESSION));
-    await session.registerSession({ sandboxId, ...prepareInput() });
+    await session.registerSession({
+      sandboxId,
+      ...prepareInput({ ...BUILD, startCommands: ['serve'] }),
+    });
     await runInDurableObject(stub, instance => {
       const namespace = (
         instance.env as unknown as {
@@ -906,376 +720,105 @@ describe('environment snapshot preparation fallback', () => {
         agent: { mode: 'code', model: 'test/model' },
       });
     }
-    const { wrapper } = await connect(sandboxId, provider);
+    const { wrapper } = await connect(sandboxId, provider, 1, { startCommands: true });
     await prepareFrameOf(wrapper);
     wrapper.send({
-      type: 'session.failed',
+      type: 'session.ready',
       sessionId: SESSION,
-      reason: 'workspace_setup_failed',
-      step: 'setup',
-      subtype: 'setup_command_failed',
+      commandFailures: [
+        {
+          kind: 'start',
+          index: 1,
+          commandText: 'serve',
+          exitCode: 1,
+          elapsedMs: 5,
+          outputTail: 'port in use',
+        },
+      ],
     });
-    const fresh = await connect(sandboxId, provider, 2);
-    await prepareFrameOf(fresh.wrapper);
-    for (const messageId of ['m1', 'm2']) {
-      expect(await session.getMessageResult(messageId)).toMatchObject({
-        type: 'found',
-        result: { status: 'queued' },
-      });
-    }
-    fresh.wrapper.send({ type: 'session.ready', sessionId: SESSION });
-    for (const messageId of ['m1', 'm2']) {
-      expect(await fresh.wrapper.nextSkipping(['worktree.snapshot'])).toMatchObject({
-        type: 'session.prompt',
-        sessionId: SESSION,
-        payload: { messageId },
-      });
-    }
-    fresh.wrapper.send({
-      type: 'session.outcome',
-      sessionId: SESSION,
-      status: 'completed',
-      lastMessageId: 'm2',
-    });
-    await waitFor(async () => {
-      for (const messageId of ['m1', 'm2']) {
-        expect(await session.getMessageResult(messageId)).toMatchObject({
-          type: 'found',
-          result: { status: 'completed' },
-        });
-      }
-    });
-    expect(provider.launchEnvs).toHaveLength(2);
-  });
-
-  it.each(['setup_command_failed', 'setup_command_timeout', undefined] as const)(
-    'rebuilds from the image without failing the route for %s',
-    async subtype => {
-      const sandboxId = 'sbx__repo_prepare_fallback';
-      const provider = createFakeProvider({
-        launches: [{ startSource: 'repository' }, { startSource: 'image' }],
-      });
-      const peer = new FakeSessionPeer();
-      const { stub } = await setup(sandboxId, provider, WITH_SNAPSHOT, peer);
-      const input = prepareInput({ setupCommands: ['pnpm install'] });
-      const worktreeRecovery = {
-        files: [{ path: 'changed.ts', status: 'modified' as const, patch: 'saved diff' }],
-      };
-      const view = await stub.prepare({
-        ...input,
-        spec: { ...input.spec, branch: 'feature/resume', worktreeRecovery },
-      });
-      const { wrapper, allocationId } = await connect(sandboxId, provider);
-      const original = await prepareFrameOf(wrapper);
-      const deadline = await runInDurableObject(stub, async (_instance, state) => {
-        const db = drizzle(state.storage, { logger: false });
-        const [row] = await db.select().from(routesTable);
-        return row.attempt_deadline_at;
-      });
-
-      wrapper.send({
-        type: 'session.failed',
-        sessionId: SESSION,
-        reason: 'workspace_setup_failed',
-        step: subtype === undefined ? 'restore' : 'setup',
-        ...(subtype === undefined ? {} : { subtype }),
-      });
-
-      const fresh = await connect(sandboxId, provider, 2);
-      const replacement = await prepareFrameOf(fresh.wrapper);
-      expect(fresh.allocationId).not.toBe(allocationId);
-      expect(provider.stopRefs).toEqual([provider.launchRefs[0]]);
-      expect(provider.launchOptions[1]).toEqual({ nativeImage: 'all-in-one' });
-      expect(provider.launchEnvs[1].SANDBOX_CONTROL_CREDENTIAL).not.toBe(
-        provider.launchEnvs[0].SANDBOX_CONTROL_CREDENTIAL
-      );
-      expect(replacement.spec).toMatchObject({
-        sessionId: SESSION,
-        kiloSessionId: KILO_SESSION,
-        attemptId: original.spec.attemptId,
-        setupCommands: ['pnpm install'],
-        branch: 'feature/resume',
-        worktreeRecovery,
-      });
-      expect((await stub.status({ sessionId: SESSION })).view).toMatchObject({
-        state: 'preparing',
-        attemptId: view.attemptId,
-      });
-      await runInDurableObject(stub, async (_instance, state) => {
-        const db = drizzle(state.storage, { logger: false });
-        const [row] = await db.select().from(routesTable);
-        expect(row.attempt_deadline_at).toBe(deadline);
-      });
-      wrapper.send({ type: 'session.ready', sessionId: SESSION });
-      fresh.wrapper.send({ type: 'session.ready', sessionId: SESSION });
-      await waitFor(async () =>
-        expect((await stub.status({ sessionId: SESSION })).view.state).toBe('ready')
-      );
-      expect(peer.routeUpdatesFor(SESSION).some(update => update.state === 'failed')).toBe(false);
-      expect(provider.launchEnvs).toHaveLength(2);
-    }
-  );
-
-  it.each([false, true])(
-    'surfaces image preparation failure without another retry during held launch %s',
-    async holdLaunch => {
-      const sandboxId = 'sbx__repo_prepare_image_failed';
-      const provider = createFakeProvider({
-        launches: [{ startSource: 'repository' }, { startSource: 'image' }],
-      });
-      const peer = new FakeSessionPeer();
-      const { stub } = await setup(sandboxId, provider, WITH_SNAPSHOT, peer);
-      await stub.prepare(prepareInput());
-      const { wrapper } = await connect(sandboxId, provider);
-      await prepareFrameOf(wrapper);
-      provider.launchHold = holdLaunch;
-      wrapper.send({
-        type: 'session.failed',
-        sessionId: SESSION,
-        reason: 'workspace_setup_failed',
-        step: 'setup',
-        subtype: 'setup_command_failed',
-      });
-      const fresh = await connect(sandboxId, provider, 2);
-      await prepareFrameOf(fresh.wrapper);
-      fresh.wrapper.send({
-        type: 'session.failed',
-        sessionId: SESSION,
-        reason: 'workspace_setup_failed',
-        step: 'setup',
-        subtype: 'setup_command_timeout',
-      });
-      await waitFor(() =>
-        expect(peer.routeUpdatesFor(SESSION)).toContainEqual({
-          state: 'failed',
-          attemptId: expect.any(String),
-          reason: 'workspace_setup_failed',
-          subtype: 'setup_command_timeout',
-        })
-      );
-      expect(provider.launchEnvs).toHaveLength(2);
-      expect(provider.stopRefs).toHaveLength(1);
-      if (holdLaunch) await releaseHeld(stub, () => provider.releaseLaunch());
-    }
-  );
-
-  it.each(['repository', 'image'] as const)(
-    'waits for a slow %s launch to report its actual source before deciding recovery',
-    async startSource => {
-      const sandboxId = `sbx__repo_prepare_slow_${startSource}`;
-      const provider = createFakeProvider({
-        holdLaunch: true,
-        launches: [{ startSource }, { startSource: 'image' }],
-      });
-      const { stub } = await setup(sandboxId, provider);
-      await stub.prepare(prepareInput());
-      const { wrapper } = await connect(sandboxId, provider);
-      await prepareFrameOf(wrapper);
-      wrapper.send({
-        type: 'session.failed',
-        sessionId: SESSION,
-        reason: 'workspace_setup_failed',
-        step: 'setup',
-        subtype: 'setup_command_failed',
-      });
-      await waitFor(async () =>
-        expect(await readLaunchRecord(stub)).toMatchObject({
-          preparationFailures: [
-            { sessionId: SESSION, attemptId: expect.any(String), subtype: 'setup_command_failed' },
-          ],
-        })
-      );
-      expect((await stub.status({ sessionId: SESSION })).view.state).toBe('preparing');
-      expect(provider.stopRefs).toEqual([]);
-
-      await releaseHeld(stub, () => {
-        provider.launchHold = false;
-        provider.releaseLaunch();
-      });
-      if (startSource === 'repository') {
-        const fresh = await connect(sandboxId, provider, 2);
-        await prepareFrameOf(fresh.wrapper);
-        expect(provider.launchOptions[1]).toEqual({ nativeImage: 'all-in-one' });
-      } else {
-        await waitFor(async () =>
-          expect((await stub.status({ sessionId: SESSION })).view.state).toBe('failed')
-        );
-        expect(provider.launchEnvs).toHaveLength(1);
-        expect(provider.stopRefs).toEqual([]);
-      }
-    }
-  );
-
-  it('does not retry preparation on a cold image start', async () => {
-    const sandboxId = 'sbx__repo_prepare_cold_image';
-    const provider = createFakeProvider();
-    const { stub } = await setup(sandboxId, provider);
-    await stub.prepare(prepareInput());
-    const { wrapper } = await connect(sandboxId, provider);
-    await prepareFrameOf(wrapper);
-    wrapper.send({
-      type: 'session.failed',
-      sessionId: SESSION,
-      reason: 'workspace_setup_failed',
-      step: 'setup',
-    });
-    await waitFor(async () =>
-      expect((await stub.status({ sessionId: SESSION })).view.state).toBe('failed')
-    );
+    const first = await wrapper.nextSkipping(['worktree.snapshot', 'worktree.summary']);
+    const second = await wrapper.nextSkipping(['worktree.snapshot', 'worktree.summary']);
+    expect(first).toMatchObject({ type: 'session.prompt', payload: { messageId: 'm1' } });
+    expect(second).toMatchObject({ type: 'session.prompt', payload: { messageId: 'm2' } });
+    const firstContext = first?.type === 'session.prompt' ? first.payload.context : undefined;
+    expect(firstContext).toContain('Start command 1 (`serve`) exited 1. Last output: port in use');
+    expect(second?.type === 'session.prompt' ? second.payload.context : 'missing').toBeUndefined();
     expect(provider.launchEnvs).toHaveLength(1);
     expect(provider.stopRefs).toEqual([]);
-  });
-
-  it('settles every preparation failure reported during a slow image launch', async () => {
-    const sandboxId = 'sbx__repo_prepare_multiple_failures';
-    const provider = createFakeProvider({ holdLaunch: true });
-    const peer = new FakeSessionPeer();
-    const { stub } = await setup(sandboxId, provider, WITH_SNAPSHOT, peer);
-    await stub.prepare(prepareInput());
-    const { wrapper } = await connect(sandboxId, provider);
-    await prepareFrameOf(wrapper);
-    const sibling = 'workspace_22222222-2222-2222-2222-222222222222';
-    const input = prepareInput({
-      sessionId: sibling,
-      kiloSessionId: 'ses_bbbbbbbbbbbbbbbbbbbbbbbbbb',
-    });
-    await stub.prepare({ ...input, credentials: { ...input.credentials, scopeId: SESSION } });
-    expect(await wrapper.nextSkipping(['session.credentials'])).toMatchObject({
-      type: 'session.prepare',
-    });
-    for (const sessionId of [SESSION, sibling]) {
-      wrapper.send({
-        type: 'session.failed',
-        sessionId,
-        reason: 'workspace_setup_failed',
-        step: 'setup',
-      });
-    }
-    await waitFor(async () =>
-      expect(await readLaunchRecord(stub)).toMatchObject({ preparationFailures: expect.any(Array) })
-    );
-    await releaseHeld(stub, () => provider.releaseLaunch());
-    await waitFor(async () => {
-      for (const sessionId of [SESSION, sibling]) {
-        expect((await stub.status({ sessionId })).view.state).toBe('failed');
-      }
-    });
-    expect(provider.stopRefs).toEqual([]);
-    expect(provider.launchEnvs).toHaveLength(1);
-  });
-
-  it('does not retry beyond the original preparation deadline', async () => {
-    const sandboxId = 'sbx__repo_prepare_expired';
-    const provider = createFakeProvider({ startSource: 'repository' });
-    const { stub } = await setup(sandboxId, provider);
-    await stub.prepare(prepareInput());
-    const { wrapper } = await connect(sandboxId, provider);
-    await prepareFrameOf(wrapper);
-    await runInDurableObject(stub, async (_instance, state) => {
-      const db = drizzle(state.storage, { logger: false });
-      await db
-        .update(routesTable)
-        .set({ attempt_deadline_at: Date.now() - 1 })
-        .where(eq(routesTable.session_id, SESSION));
-    });
-    wrapper.send({
-      type: 'session.failed',
-      sessionId: SESSION,
-      reason: 'workspace_setup_failed',
-      step: 'setup',
-    });
-    await waitFor(async () =>
-      expect((await stub.status({ sessionId: SESSION })).view.state).toBe('failed')
-    );
-    expect(provider.stopRefs).toEqual([]);
-    expect(provider.launchEnvs).toHaveLength(1);
   });
 
   it.each([
-    ['repository', { startSource: 'repository' }, true],
-    ['unresolved', {}, true],
-    ['unresolved image fallback', { skipRepository: true }, false],
+    ['setup_command_failed', 'setup'],
+    ['setup_command_timeout', 'setup'],
+    [undefined, 'setup'],
   ] as const)(
-    'settles a persisted preparation failure after reconstruction with %s',
-    async (_name, launch, retry) => {
-      const sandboxId = 'sbx__repo_prepare_reconstructed';
-      const provider = createFakeProvider({
-        launches: [{ startSource: 'repository' }, { startSource: 'image' }],
-      });
-      const { stub } = await setup(sandboxId, provider);
-      const view = await stub.prepare(prepareInput());
-      const { wrapper, allocationId } = await connect(sandboxId, provider);
-      await prepareFrameOf(wrapper);
-      await putLaunchRecord(stub, {
-        allocationId,
-        ...launch,
-        confirmed: true,
-        preparationFailures: [
-          { sessionId: SESSION, attemptId: view.attemptId, subtype: 'setup_command_failed' },
-        ],
-      });
-      await evictAllDurableObjects();
-      const { stub: reconstructed } = await setup(sandboxId, provider);
-      await runInDurableObject(reconstructed, instance => instance.alarm());
-      if (retry) {
-        const fresh = await connect(sandboxId, provider, 2);
-        const frame = await prepareFrameOf(fresh.wrapper);
-        expect(frame.spec.attemptId).toBe(view.attemptId);
-        expect(provider.launchOptions[1]).toEqual({ nativeImage: 'all-in-one' });
-      } else {
-        expect((await reconstructed.status({ sessionId: SESSION })).view.state).toBe('failed');
-        expect(provider.launchEnvs).toHaveLength(1);
-        expect(provider.stopRefs).toEqual([]);
-      }
-    }
-  );
-
-  it.each([false, true])(
-    'does not destroy a sandbox with a ready sibling during held launch %s',
-    async holdLaunch => {
-      const sandboxId = 'sbx__repo_prepare_ready_sibling';
-      const provider = createFakeProvider({ startSource: 'repository', holdLaunch });
-      const { stub } = await setup(sandboxId, provider);
-      await stub.prepare(prepareInput());
+    'fails the route without a relaunch for a %s preparation failure',
+    async (subtype, step) => {
+      const sandboxId = 'sbx__repo_prepare_no_retry';
+      const provider = createFakeProvider({ startSource: 'repository' });
+      const peer = new FakeSessionPeer();
+      const { stub } = await setup(sandboxId, provider, WITH_SNAPSHOT, peer);
+      await stub.prepare(prepareInput(BUILD));
       const { wrapper } = await connect(sandboxId, provider);
       await prepareFrameOf(wrapper);
-      wrapper.send({ type: 'session.ready', sessionId: SESSION });
-      await waitFor(async () =>
-        expect((await stub.status({ sessionId: SESSION })).view.state).toBe('ready')
-      );
-      const sibling = 'workspace_22222222-2222-2222-2222-222222222222';
-      const siblingInput = prepareInput({
-        sessionId: sibling,
-        kiloSessionId: 'ses_bbbbbbbbbbbbbbbbbbbbbbbbbb',
-      });
-      await stub.prepare({
-        ...siblingInput,
-        credentials: { ...siblingInput.credentials, scopeId: SESSION },
-      });
-      expect(await wrapper.nextSkipping(['session.credentials'])).toMatchObject({
-        type: 'session.prepare',
-      });
       wrapper.send({
         type: 'session.failed',
-        sessionId: sibling,
+        sessionId: SESSION,
         reason: 'workspace_setup_failed',
-        step: 'setup',
+        step,
+        ...(subtype === undefined ? {} : { subtype }),
       });
       await waitFor(async () =>
-        expect((await stub.status({ sessionId: sibling })).view.state).toBe('failed')
+        expect((await stub.status({ sessionId: SESSION })).view.state).toBe('failed')
       );
-      expect((await stub.status({ sessionId: SESSION })).view.state).toBe('ready');
-      expect(provider.stopRefs).toEqual([]);
       expect(provider.launchEnvs).toHaveLength(1);
-      if (holdLaunch) await releaseHeld(stub, () => provider.releaseLaunch());
+      expect(provider.stopRefs).toEqual([]);
     }
   );
 
-  it('does not fall back for a failure after the route became ready', async () => {
+  it('does not destroy a sandbox with a ready sibling when the sibling fails preparation', async () => {
+    const sandboxId = 'sbx__repo_prepare_ready_sibling';
+    const provider = createFakeProvider({ startSource: 'repository' });
+    const { stub } = await setup(sandboxId, provider);
+    await stub.prepare(prepareInput(BUILD));
+    const { wrapper } = await connect(sandboxId, provider);
+    await prepareFrameOf(wrapper);
+    wrapper.send({ type: 'session.ready', sessionId: SESSION });
+    await waitFor(async () =>
+      expect((await stub.status({ sessionId: SESSION })).view.state).toBe('ready')
+    );
+    const sibling = 'workspace_22222222-2222-2222-2222-222222222222';
+    const siblingInput = prepareInput({
+      ...BUILD,
+      sessionId: sibling,
+      kiloSessionId: 'ses_bbbbbbbbbbbbbbbbbbbbbbbbbb',
+    });
+    await stub.prepare({
+      ...siblingInput,
+      credentials: { ...siblingInput.credentials, scopeId: SESSION },
+    });
+    expect(await wrapper.nextSkipping(['session.credentials'])).toMatchObject({
+      type: 'session.prepare',
+    });
+    wrapper.send({
+      type: 'session.failed',
+      sessionId: sibling,
+      reason: 'workspace_setup_failed',
+      step: 'setup',
+    });
+    await waitFor(async () =>
+      expect((await stub.status({ sessionId: sibling })).view.state).toBe('failed')
+    );
+    expect((await stub.status({ sessionId: SESSION })).view.state).toBe('ready');
+    expect(provider.stopRefs).toEqual([]);
+    expect(provider.launchEnvs).toHaveLength(1);
+  });
+
+  it('does not relaunch for a failure after the route became ready', async () => {
     const sandboxId = 'sbx__repo_prepare_ready_failure';
     const provider = createFakeProvider({ startSource: 'repository' });
     const { stub } = await setup(sandboxId, provider);
-    await stub.prepare(prepareInput());
+    await stub.prepare(prepareInput(BUILD));
     const { wrapper } = await connect(sandboxId, provider);
     await prepareFrameOf(wrapper);
     wrapper.send({ type: 'session.ready', sessionId: SESSION });
@@ -1294,75 +837,4 @@ describe('environment snapshot preparation fallback', () => {
     expect(provider.stopRefs).toEqual([]);
     expect(provider.launchEnvs).toHaveLength(1);
   });
-
-  it.each(['current', 'superseded', 'stale and current'] as const)(
-    'fails preparation if snapshot cleanup exhausts with %s failure records',
-    async failures => {
-      const sandboxId = 'sbx__repo_prepare_unconfirmed_stop';
-      const provider = createFakeProvider({
-        startSource: 'repository',
-        stopResult: 'retryable',
-        holdStop: true,
-      });
-      const peer = new FakeSessionPeer();
-      const { stub } = await setup(sandboxId, provider, WITH_SNAPSHOT, peer);
-      await runInDurableObject(stub, instance => {
-        Object.assign(instance, {
-          sandboxTimers: () => ({ ...CONTROL_PLANE_TIMERS.sandbox, providerStopLadderMs: [] }),
-        });
-      });
-      let view = await stub.prepare(prepareInput());
-      const { wrapper, allocationId } = await connect(sandboxId, provider);
-      await prepareFrameOf(wrapper);
-      if (failures === 'stale and current') {
-        await putLaunchRecord(stub, {
-          allocationId,
-          startSource: 'repository',
-          confirmed: true,
-          preparationFailures: [
-            {
-              sessionId: SESSION,
-              attemptId: 'superseded-attempt',
-              subtype: 'setup_command_timeout',
-            },
-          ],
-        });
-      }
-      wrapper.send({
-        type: 'session.failed',
-        sessionId: SESSION,
-        reason: 'workspace_setup_failed',
-        step: 'setup',
-        subtype: 'setup_command_failed',
-      });
-      await waitFor(() => expect(provider.stopRefs).toHaveLength(1));
-      if (failures === 'superseded') {
-        await stub.release({ sessionId: SESSION });
-        const previousAttemptId = view.attemptId;
-        view = await stub.prepare(prepareInput());
-        expect(view.attemptId).not.toBe(previousAttemptId);
-      }
-      await releaseHeld(stub, () => provider.releaseStop());
-      await waitFor(() =>
-        expect(
-          peer
-            .routeUpdatesFor(SESSION)
-            .some(update => update.state === 'failed' && update.attemptId === view.attemptId)
-        ).toBe(true)
-      );
-      expect(peer.routeUpdatesFor(SESSION)).toContainEqual({
-        state: 'failed',
-        attemptId: view.attemptId,
-        reason: 'workspace_setup_failed',
-        ...(failures === 'superseded' ? {} : { subtype: 'setup_command_failed' }),
-      });
-      expect((await stub.status({ sessionId: SESSION })).view).toMatchObject({
-        state: 'failed',
-        attemptId: view.attemptId,
-      });
-      expect((await stub.getAllocationState()).unconfirmedProviderRef).toBe(provider.launchRefs[0]);
-      expect(provider.stopRefs).toHaveLength(1);
-      expect(provider.launchEnvs).toHaveLength(1);
-    }
-  );
 });

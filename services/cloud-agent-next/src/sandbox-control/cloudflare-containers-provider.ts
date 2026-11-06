@@ -165,7 +165,7 @@ export function createCloudflareContainersProviderAdapter(deps: {
       // One launch selection (amendment "cold session without a snapshot"): a
       // trusted descriptor installs the verified runtime before the supervisor,
       // also on a snapshot start; no descriptor runs the baked supervisor.
-      const { startSource, snapshotFailed } = await container.launchWrapper({
+      const { startSource, snapshotFailed, snapshotFailureReason } = await container.launchWrapper({
         allocationRef: ref,
         command,
         instance,
@@ -182,7 +182,12 @@ export function createCloudflareContainersProviderAdapter(deps: {
           WRAPPER_LOG_PATH: CONTROL_WRAPPER_LOG_PATH,
         },
       });
-      if (snapshotFailed) return { startSource, snapshotFailed };
+      if (snapshotFailed)
+        return {
+          startSource,
+          snapshotFailed,
+          ...(snapshotFailureReason === undefined ? {} : { snapshotFailureReason }),
+        };
       // Lease renewal only starts once the wrapper reports ready, which the
       // recovery admission gate can delay. Establish the initial lease here so
       // the container is not reaped by its inactivity timeout before then.

@@ -13,6 +13,7 @@ import { useAtomValue, useSetAtom } from 'jotai';
 import { useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRawTRPCClient, useTRPC } from '@/lib/trpc/utils';
+import { toast } from 'sonner';
 import { ArrowDown, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { v4 as uuidv4 } from 'uuid';
@@ -69,6 +70,10 @@ import type { ChildSessionDrawerEntry } from './ChildSessionSection';
 import { SessionStatusIndicator } from './SessionStatusIndicator';
 import { isNoOpCompletedPreparationAttempt } from './preparation-summary';
 import { PreparationDrawer } from './PreparationDrawer';
+import { WorkspaceSnapshotRecovery } from './WorkspaceSnapshotRecovery';
+import { EnvironmentBuildRecovery } from './EnvironmentBuildRecovery';
+import { environmentBuildRecoveryOffered } from './environment-build-recovery';
+import { workspaceSnapshotRecoveryOffered } from './workspace-snapshot-recovery';
 import { QuestionToolCard } from './QuestionToolCard';
 import { QuestionContextProvider } from './QuestionContext';
 import { PermissionCard, PermissionContextProvider } from './PermissionCard';
@@ -416,6 +421,51 @@ export default function CloudChatPage({
     deletingSessionIds,
   });
   const workspaceCloudSessionId = workspaceControlSession?.cloudAgentSessionId ?? sessionId;
+  const workspaceSnapshotRecovery = useQuery({
+    ...(organizationId
+      ? trpc.organizations.cloudAgentNext.getWorkspaceSnapshotRecovery.queryOptions({
+          sessionId: workspaceCloudSessionId ?? '',
+          organizationId,
+        })
+      : trpc.cloudAgentNext.getWorkspaceSnapshotRecovery.queryOptions({
+          sessionId: workspaceCloudSessionId ?? '',
+        })),
+    enabled: Boolean(workspaceCloudSessionId) && cloudStatus?.type === 'error',
+    staleTime: 0,
+    retry: false,
+  });
+  const removeWorkspaceSnapshot = useMutation({
+    mutationFn: async () => {
+      if (!workspaceCloudSessionId) throw new Error('Session is not ready');
+      if (organizationId) {
+        return await trpcClient.organizations.cloudAgentNext.removeWorkspaceSnapshot.mutate({
+          sessionId: workspaceCloudSessionId,
+          organizationId,
+        });
+      }
+      return await trpcClient.cloudAgentNext.removeWorkspaceSnapshot.mutate({
+        sessionId: workspaceCloudSessionId,
+      });
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries(
+        organizationId
+          ? trpc.organizations.cloudAgentNext.getWorkspaceSnapshotRecovery.pathFilter()
+          : trpc.cloudAgentNext.getWorkspaceSnapshotRecovery.pathFilter()
+      );
+    },
+  });
+  const workspaceSnapshotRecoveryState = workspaceSnapshotRecoveryOffered({
+    cloudStatus,
+    recovery: workspaceSnapshotRecovery.data,
+    recoveryIsFresh: workspaceSnapshotRecovery.isSuccess && !workspaceSnapshotRecovery.isFetching,
+    isReadOnly,
+  });
+  const environmentBuildRecoveryId = environmentBuildRecoveryOffered({
+    cloudStatus,
+    attempts: preparationAttempts,
+    environmentId: isCurrentSession ? fetchedSessionData?.environmentId : null,
+  });
   const currentSessionCanOpenChanges =
     sessionIdFromParams !== null &&
     isCurrentSession &&
@@ -1860,6 +1910,24 @@ export default function CloudChatPage({
                                     role="alert"
                                   >
                                     <SessionStatusIndicator indicator={statusIndicator} />
+                                    {environmentBuildRecoveryId !== null && (
+                                      <EnvironmentBuildRecovery
+                                        environmentId={environmentBuildRecoveryId}
+                                        organizationId={organizationId}
+                                      />
+                                    )}
+                                    {workspaceSnapshotRecoveryState !== null && (
+                                      <WorkspaceSnapshotRecovery
+                                        capturedAt={workspaceSnapshotRecoveryState.capturedAt}
+                                        isRemoving={removeWorkspaceSnapshot.isPending}
+                                        onRemove={async () => {
+                                          await removeWorkspaceSnapshot.mutateAsync();
+                                          toast.success(
+                                            'Workspace snapshot removed. Your next start will use the environment snapshot or base image.'
+                                          );
+                                        }}
+                                      />
+                                    )}
                                   </div>
                                 )}
                               <ComposerContextLine

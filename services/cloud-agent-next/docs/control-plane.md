@@ -522,28 +522,47 @@ snapshot (`src/environment-build/`); see `.specs/cloud-agent-session.md` "Enviro
   allocation is dropped. Worktree chats inherit the reference.
 - **Candidate.** At `runCreate` the Sandbox DO uses a snapshot only when every preparing route waits
   at `/workspace/app` with the same environment, revision and owner, and a route carries the
-  credential user (`environmentLaunchCandidate`). Any other allocation starts from the image.
+  credential user (`environmentLaunchCandidate`). The candidate also carries the admitted
+  environment's build command count from the route spec. An environment without build commands
+  starts from the image without a lookup. An environment with build commands starts only from its
+  snapshot; routes on different revisions fail as `environment_snapshot_required`. When no
+  environment snapshot can serve the start at all (a provider without snapshot support, such as
+  Vercel, or a route on a retired shared sandbox that is not at `/workspace/app`), rebuilding would
+  not help: the start fails at once as `environment_snapshot_required` with that reason on the
+  `sandbox_provision` step, not the `environment_snapshot` step, so clients offer no build link.
+  Build commands never run in a session.
 - **Progress.** The decision is its own preparation step, `environment_snapshot`, so its detail
   stays in the completed timeline after `sandbox_start` reports.
 - **Lookup.** The Sandbox DO calls `resolveSnapshot` once, bounded at 15 s and by the launch
-  deadline, outside its serial queue. A timeout, a miss or an unavailable coordinator is an ordinary
-  image start; it never waits for a build. The coordinator answers with the published descriptor
-  when it is eligible (same scope, the current base image and runtime ABI, revision not newer
-  than the session's, under the 29-day lifetime) and with the replacement admission: `admitted`, `active`, `not_needed` or `skipped`
-  (backoff, container limit, another build). An older revision or an age-stale snapshot (4 days)
-  stays usable while its replacement builds. A descriptor for another base image or runtime ABI
-  (after a deploy that changes the image) is not used and admits a replacement; the coordinator
+  deadline, outside its serial queue, and retries one transient failure. It never waits for a build.
+  The coordinator answers with the published descriptor when it is eligible (same scope, current
+  runtime ABI, revision not newer than the session's, under the 29-day lifetime) and with the
+  replacement admission: `admitted`, `active`, `not_needed` or `skipped` (backoff, container limit,
+  another build). An older revision or an age-stale snapshot (4 days) stays usable while its
+  replacement builds.
+- **Required environment.** When the admitted environment has build commands, a timeout, an
+  unavailable coordinator, a missing snapshot, a build in progress, a failed build or backoff
+  blocks the start as `environment_snapshot_required`. The failure detail names the state and the
+  build; `environmentId` and `buildId` are logged with `snapshot_start_blocked`. The web client
+  offers "View environment build", which opens the session environment's build panel, when the
+  latest attempt failed at the `environment_snapshot` step. The start never falls back to the image.
+- **Image rollout.** A published snapshot from the previous base image stays usable for 24 hours
+  after its capture, while compatibility with the current image and an automatic replacement build
+  are still unresolved. The runtime ABI must match. After 24 hours the snapshot is incompatible,
+  so an environment with build commands blocks until its replacement publishes. The coordinator
   reads the current image from the builder's container DO.
-- **Start.** `launch` receives `snapshot: { snapshotId, baseImage }`. `SandboxContainers` refuses a
-  descriptor for another base image (`image_mismatch`) and otherwise restores it. `launch` returns
-  `startSource` (`repository` or `image`). The progress detail names the snapshot capture date and time in UTC, the
-  changed environment settings and the real admission outcome.
-- **Fallback.** A failed snapshot start cleans up that container, rotates the launch credential so a
-  late wrapper cannot connect, and launches the image for the same allocation within the original
-  deadline. When the previous snapshot start never connected or its preparation failed, the next
-  launch uses the image once (`previousSnapshotStartFailed`); a completed image start clears this.
-  A failure never changes the published snapshot. Each native container coordinator retains up to 16 failed snapshot IDs.
-  After three failed restores of one snapshot, it starts from the image until a replacement is offered.
+- **Start.** `launch` receives `snapshot: { snapshotId, baseImage }`. During the rollout window a
+  previous-image snapshot is restored and the provider receives the current image identity, because
+  a container snapshot restore does not use the old image and startup installs the current runtime
+  over the disk. `launch` returns `startSource` (`repository` or `image`). The progress detail names
+  the snapshot capture date and time in UTC, the changed environment settings, the rollout window
+  and the real admission outcome.
+- **No fallback.** A failed snapshot start stops that container and retries the same snapshot once
+  within the original deadline. A permanent reason (expired, missing, image mismatch, provenance, or a
+  provider that started the image instead) fails at once. The route then fails with "Rebuild
+  environment"; the image is never launched. A wrapper that connected during the launch receives no
+  preparation until the launch reports how the container started. A failure never changes the
+  published snapshot.
 - **No legacy capture.** A wrapper that predates this change may still send `workspace.capture`;
   the Sandbox DO answers `workspace.captured` with `ok: false` at once. The `REPO_SNAPSHOTS` index,
   repository keys and route `repo_key` are removed.
@@ -562,17 +581,21 @@ snapshot (`src/environment-build/`); see `.specs/cloud-agent-session.md` "Enviro
   reflogs, and writes the workspace stamp. Start commands never run in a build. The coordinator records the capture as issued before it
   calls the platform, captures, publishes when the build revision is still current, and stops the
   builder. Heartbeats from reports renew the build lease; a builder silent for 90 s is lost.
-- **Setup skip.** A workspace whose every root is `foreign` was restored from the environment
-  snapshot, and the build already ran the environment's setup there. The wrapper skips only the
-  leading `environmentSetupCommandCount` commands, runs any request-supplied setup, then runs
-  `startCommands`. Without the count it conservatively runs all setup. A
-  clone or a mixed workspace runs setup, then `startCommands`. A snapshot of an older revision is
-  not re-set-up: changed setup commands take effect after the next build. Only a wrapper whose
-  hello advertised `startCommands` receives `startCommands`; an older wrapper receives them
-  appended to `setupCommands` (`startCommandsForWrapper`), so admission bounds the combined list
-  by the setup-command limit. An older wrapper restoring a session disk snapshot cannot run
-  these commands; preparation fails immediately with `wrapper_start_commands_unsupported`
-  rather than silently skipping them. The restored disk and snapshot descriptor remain intact.
+- **Command policy.** The leading `environmentSetupCommandCount` setup commands are the
+  environment's build commands. They run only in the environment build, so the wrapper skips them on
+  every session start. The remaining setup commands (request-supplied and profile) run as
+  `session_setup`, then `startCommands` run as `start`, on a fresh start and an environment snapshot
+  start. Every list is non-fatal: each failure (kind, index, redacted command text, exit code or
+  timeout, bounded redacted output tail) is collected, the next command still runs, and
+  `session.ready` reports up to 20 as `commandFailures`. The Sandbox DO logs only kind, index, exit
+  code, termination reason and elapsed time, and stores a note of at most 2000 characters for the
+  route's attempt. The first prompt delivered after that preparation carries the note in its
+  server-owned `context`, ahead of any existing context, which is never cut to make room; the note is consumed only after that prompt is handed to the wrapper.
+  The Session DO records each command step under the `session_setup_commands` or `start_commands`
+  phase, labelled with the kind and redacted command text; clients derive one row
+  per failed step, with a link to its output in the preparation drawer. A workspace tail restore runs no commands.
+  A snapshot of an older revision is not re-set-up: changed setup commands take effect after the
+  next build.
 - **Lifetime.** The platform keeps an unused snapshot for 30 days and has no list or delete API in
   this release, so a superseded snapshot is unreferenced rather than deleted.
 - **Runtime selection.** Environment builders always use the `runtime-free` image and downloaded
@@ -612,21 +635,35 @@ keep environment snapshots and existing history/worktree recovery.
   the existing shutdown deadline stays unchanged. Capture runs outside the serial queue, once per
   idle period. Failed capture is best effort. Publication checks allocation, connection, workspace
   binding, all ready route attempts, activity and the durable mutation generation.
-- **Freshness and deletion.** Delivery, answer, terminal admission, preparation, membership and
-  deletion invalidate older disk state before mutation. Session deletion retains workspace ownership and permits another idle capture.
-  Workspace deletion invalidates the descriptor and pending capture before resource teardown.
-  Current credential grants and native request authorization exclude deleted members after restore.
-- **Cold startup.** Local selection validates ownership, enrollment, provider, startup mode,
-  image class and immutable image compatibility. It prefers the private workspace tail, then the
-  existing environment snapshot, then the image. Compatible downloaded startup installs the
-  selected Kilo and wrapper release over the disk. Only confirmed provider restore adds
-  `spec.workspaceSnapshot: { workspaceId, directory, sourceAllocationId }` to authorized route
-  frames. Every later sibling receives the same provenance. Registration rejects supplied
-  provenance. Explicit `workspaceSnapshots` capability negotiation keeps older peers on ordinary
-  recovery. Failed restore or preparation uses bounded fallback and retains the queued turn.
+- **Freshness and deletion.** Delivery, answer, abort, terminal admission, preparation, active
+  heartbeats and session release fence the capture generation (`workspace_snapshot_fenced`); they
+  never delete the descriptor. Publication rejects a capture whose generation changed while it ran,
+  so a torn disk is never published and the previous consistent snapshot stays. Only a newer
+  successful capture, workspace deletion, or the user's explicit "Start fresh" removes the
+  descriptor (`workspace_snapshot_descriptor_removed`). Session deletion keeps the workspace
+  snapshot. Current credential grants and native request authorization exclude deleted members
+  after restore.
+- **Cold startup.** When a descriptor exists, the workspace tail is the only startup source.
+  Selection validates ownership, enrollment, provider, startup mode, image class, the 30-day
+  lifetime and the exact base image; the current image lookup is retried within the deadline. A
+  descriptor that cannot start (malformed, ownership or runtime mismatch, expired, image mismatch,
+  provider unsupported, a permanent or repeated provider failure, or a wrapper failure in the
+  restore step) fails the route as `workspace_snapshot_start_failed` with a specific detail that
+  names the capture time; a possibly transient failure (image lookup, repeated provider error) also
+  says a new message retries. The subtype is user-actionable and does not page. The descriptor is kept and nothing falls back to the environment snapshot or the image. Only confirmed
+  provider restore adds `spec.workspaceSnapshot: { workspaceId, directory, sourceAllocationId }` to
+  authorized route frames. Every later sibling receives the same provenance. Registration rejects
+  supplied provenance. A wrapper without the `workspaceSnapshots` capability fails the restore.
+- **Start fresh.** `getWorkspaceSnapshotRecovery` returns the descriptor's capture time only when
+  the session's route failed a tail start on the current allocation. `removeWorkspaceSnapshot`
+  deletes the caller's own workspace descriptor, fences pending capture and clears that recovery
+  state; it is idempotent. The next start uses the environment snapshot or the image. Both are
+  authenticated tRPC procedures forwarded through the Session DO.
 - **Preparation.** The wrapper validates workspace ID, directory and source allocation stamp.
   It preserves local refs, commits, index, dirty/untracked/ignored files, HOME and native databases.
-  It skips environment adoption, checkout, setup replay and older file recovery. The snapshot
+  It skips environment adoption, checkout, setup and start commands, and older file recovery.
+  Nothing that start commands launched is running after a resume; the agent starts what it needs.
+  The snapshot
   holds only the disk: like an environment snapshot, restore applies the current credentials,
   env, secrets and MCP configuration from the route before accepting work.
   Existing native sessions are reused; missing native sessions use history-only recovery.

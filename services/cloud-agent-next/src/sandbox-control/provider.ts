@@ -12,6 +12,7 @@ import type { RuntimeStartupConfig } from '../shared/runtime-startup-config.js';
 import type { CredentialContainmentRequirements } from './credential-containment.js';
 import type { BillingContext } from '@kilocode/container-usage';
 import type { NativeCaptureResult } from '../sandbox-containers/native-capture.js';
+import type { SnapshotStartFailureReason } from '../sandbox-containers/snapshot-start-failures.js';
 
 export type ProviderCreationCause =
   | 'insufficient_credits'
@@ -116,6 +117,12 @@ export type ProviderLaunchOptions = {
 export type ProviderLaunchResult = {
   startSource: ProviderStartSource;
   snapshotFailed?: true;
+  /**
+   * Why a provider snapshot start failed. The Sandbox DO retries `transient`
+   * against the same artifact and fails permanent reasons without an image
+   * relaunch.
+   */
+  snapshotFailureReason?: SnapshotStartFailureReason;
 };
 
 /**

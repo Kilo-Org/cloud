@@ -657,6 +657,40 @@ export const cloudAgentNextRouter = createTRPCRouter({
     }),
 
   /**
+   * The capture time of the session's workspace snapshot, or null when the
+   * workspace has none. A non-null value is what makes "Start fresh" available
+   * on the failure state of a workspace snapshot start.
+   */
+  getWorkspaceSnapshotRecovery: baseProcedure
+    .input(z.object({ sessionId: z.string().min(1) }).strict())
+    .output(
+      z.union([z.object({ capturedAt: z.number().int().nonnegative().nullable() }), z.null()])
+    )
+    .query(async ({ ctx, input }) => {
+      await assertUserOwnsSession(ctx.user.id, input.sessionId);
+      const client = createCloudAgentNextClient(
+        await createCloudAgentControlToken(ctx.user, ctx.headersList)
+      );
+      return await client.getWorkspaceSnapshotRecovery(input.sessionId);
+    }),
+
+  /**
+   * Remove the session's workspace snapshot so its next start uses the
+   * environment snapshot or the base image. Only an explicit user action may
+   * discard the workspace changes made since the snapshot was captured.
+   */
+  removeWorkspaceSnapshot: baseProcedure
+    .input(z.object({ sessionId: z.string().min(1) }).strict())
+    .output(z.object({ success: z.literal(true) }))
+    .mutation(async ({ ctx, input }) => {
+      await assertUserOwnsSession(ctx.user.id, input.sessionId);
+      const client = createCloudAgentNextClient(
+        await createCloudAgentControlToken(ctx.user, ctx.headersList)
+      );
+      return await client.removeWorkspaceSnapshot(input.sessionId);
+    }),
+
+  /**
    * Cancel one queued (not yet accepted) message by id. Never interrupts the
    * active run; a missing id or the accepted current message returns
    * `{ dropped: false }`.

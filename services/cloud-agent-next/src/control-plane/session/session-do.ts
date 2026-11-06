@@ -88,6 +88,7 @@ import {
 import type {
   CommandsAvailableData,
   PreparationAttempt,
+  PreparingStep,
   SessionStatus,
 } from '../../shared/protocol.js';
 import {
@@ -118,6 +119,7 @@ import {
   type ControlPlaneRouteUpdate,
   type ControlPlaneRouteView,
   type ControlPlaneSessionRefPayload,
+  type ControlPlaneSetupCommandKind,
   type ControlPlaneSetupEvent,
   type ControlPlaneStatusResult,
   type ControlPlaneTerminalInput,
@@ -274,6 +276,51 @@ const SETUP_EVENT_TYPES: ReadonlySet<string> = new Set([
   CONTROL_PLANE_SETUP_EVENTS.output,
   CONTROL_PLANE_SETUP_EVENTS.finished,
 ]);
+
+/**
+ * The command kind a setup event belongs to. Missing on older wrappers, which
+ * only send these events for the fatal, pre-command-policy setup path.
+ */
+type SetupCommandKind = ControlPlaneSetupCommandKind;
+
+const SETUP_COMMAND_PHASES: Record<SetupCommandKind, string> = {
+  build: 'setup_commands',
+  session_setup: 'session_setup_commands',
+  start: 'start_commands',
+};
+const SETUP_COMMAND_PHASE_TITLES: Record<SetupCommandKind, string> = {
+  build: 'Running build commands',
+  session_setup: 'Running session setup',
+  start: 'Running start commands',
+};
+const SETUP_COMMAND_LABELS: Record<SetupCommandKind, string> = {
+  build: 'Build command',
+  session_setup: 'Session setup command',
+  start: 'Start command',
+};
+
+function nonEmptyString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.length > 0 ? value : undefined;
+}
+
+function setupCommandPhase(kind: SetupCommandKind | undefined): string {
+  return kind === undefined ? 'setup_commands' : SETUP_COMMAND_PHASES[kind];
+}
+
+function setupCommandPhaseTitle(kind: SetupCommandKind | undefined): string {
+  return kind === undefined ? 'Running setup commands' : SETUP_COMMAND_PHASE_TITLES[kind];
+}
+
+function setupCommandLabel(
+  kind: SetupCommandKind | undefined,
+  command: number,
+  commandText: string | undefined
+): string {
+  const name = kind === undefined ? 'Setup command' : SETUP_COMMAND_LABELS[kind];
+  return commandText === undefined
+    ? `${name} ${command}`
+    : `${name} ${command} · \`${commandText}\``;
+}
 
 /** Public `PreparingStep` for a control-plane route preparation step (spec §10). */
 const PREPARING_STEP_PUBLIC: Record<ControlPlanePreparationStep, string> = {
@@ -469,6 +516,20 @@ export type ControlPlaneSandboxPeer = SharedWorktreeChangesPeer & {
   getStatusSnapshot(): Promise<SandboxStatusSnapshot>;
   /** Passive billing projection for the workspace that owns this sandbox. */
   getWorkspaceBillingProjection(): Promise<WorkspaceBillingProjection | null>;
+  /**
+   * Removes the workspace snapshot descriptor for this session's workspace on
+   * explicit user action ("Start fresh"). The Sandbox DO only deletes on this
+   * call, never as a side effect of work; the next start uses the environment
+   * snapshot or the base image.
+   */
+  removeWorkspaceSnapshot(payload: ControlPlaneSessionRefPayload): Promise<{ success: true }>;
+  /**
+   * The capture time of the workspace snapshot descriptor that a "Start fresh"
+   * action would discard, or null when the workspace has none.
+   */
+  getWorkspaceSnapshotRecovery(
+    payload: ControlPlaneSessionRefPayload
+  ): Promise<{ capturedAt: number | null } | null>;
   fetch(request: Request): Promise<Response>;
 };
 
@@ -2307,6 +2368,33 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     return { sandbox, billing };
   }
 
+  /**
+   * Explicit user action ("Start fresh"): remove the workspace snapshot
+   * descriptor so the next start uses the environment snapshot or base image.
+   * The Sandbox DO owns the descriptor and never deletes it on its own.
+   * A session with no registered sandbox has nothing to discard.
+   */
+  async removeWorkspaceSnapshot(): Promise<{ success: true }> {
+    await this.initialized;
+    const sandboxId = this.registration?.sandboxId;
+    const peer = sandboxId === undefined ? null : this.sandboxPeerFor(sandboxId);
+    if (peer === null) return { success: true };
+    return await peer.removeWorkspaceSnapshot({ sessionId: this.sessionId });
+  }
+
+  /**
+   * The capture time a "Start fresh" action would discard, or null when the
+   * workspace has no snapshot descriptor. Mirrors the sandbox's descriptor
+   * read; it never mutates it.
+   */
+  async getWorkspaceSnapshotRecovery(): Promise<{ capturedAt: number | null } | null> {
+    await this.initialized;
+    const sandboxId = this.registration?.sandboxId;
+    const peer = sandboxId === undefined ? null : this.sandboxPeerFor(sandboxId);
+    if (peer === null) return null;
+    return await peer.getWorkspaceSnapshotRecovery({ sessionId: this.sessionId });
+  }
+
   /** The preparation attempts the stream replays, for the first transcript page. */
   async getPreparationAttempts(): Promise<PreparationAttempt[]> {
     await this.initialized;
@@ -3267,17 +3355,21 @@ export class SandboxSessionV2 extends DurableObject<Env> {
 
   /**
    * Render a wrapper setup-command lifecycle event into the active preparation
-   * attempt. Each command is its own `setup_command` step under the
-   * `setup_commands` phase (mirroring the legacy bootstrap), so the preparation
-   * UI shows the numbered command, its output, and its terminal state.
+   * attempt. Each command is its own `setup_command` step under the phase for
+   * its kind (`setup_commands` for builds and legacy events,
+   * `session_setup_commands`, `start_commands`), so the preparation UI shows
+   * the numbered command, its text, its output, and its terminal state. Clients
+   * derive the failed-command rows from these steps.
    */
   private recordSetupEvent(event: ControlPlaneSetupEvent): void {
     if (this.route.state !== 'preparing') return;
     const attemptId = this.route.attemptId;
     const attempt = readPreparationAttempt(this.eventQueries, attemptId);
     if (attempt?.status !== 'running') return;
+    const kind = event.properties.kind;
+    const phaseKey = setupCommandPhase(kind);
     let steps = readPreparationSteps(this.eventQueries, attemptId);
-    let phase = steps.findLast(step => step.kind === 'phase' && step.key === 'setup_commands');
+    let phase = steps.findLast(step => step.kind === 'phase' && (step.key as string) === phaseKey);
     const latestPhase = steps.findLast(step => step.kind === 'phase');
     if (
       phase === undefined ||
@@ -3286,18 +3378,31 @@ export class SandboxSessionV2 extends DurableObject<Env> {
           event.type === CONTROL_PLANE_SETUP_EVENTS.output))
     ) {
       this.preparationRecorder(attemptId, attempt.triggerMessageId).onProgress(
-        'setup_commands',
-        'Running setup commands'
+        phaseKey,
+        setupCommandPhaseTitle(kind)
       );
       steps = readPreparationSteps(this.eventQueries, attemptId);
-      phase = steps.findLast(step => step.kind === 'phase' && step.key === 'setup_commands');
+      phase = steps.findLast(step => step.kind === 'phase' && (step.key as string) === phaseKey);
     }
     if (phase === undefined) return;
     const command = event.properties.command;
     const commandId = `setup_command:${command - 1}`;
-    const stepId = phase.id === 'phase:setup_commands' ? commandId : `${phase.id}:${commandId}`;
+    const stepId =
+      phase.id === `phase:${phaseKey}` && phaseKey === 'setup_commands'
+        ? commandId
+        : `${phase.id}:${commandId}`;
     const existingStep = steps.find(step => step.id === stepId);
     if (existingStep !== undefined && existingStep.status !== 'running') return;
+    const commandText =
+      (event.type === CONTROL_PLANE_SETUP_EVENTS.started
+        ? event.properties.commandText
+        : undefined) ?? nonEmptyString(existingStep?.command);
+    const commandCount =
+      existingStep?.commandCount ??
+      (event.type === CONTROL_PLANE_SETUP_EVENTS.started
+        ? event.properties.commandCount
+        : undefined) ??
+      command;
     const base = {
       version: 2 as const,
       attemptId,
@@ -3305,7 +3410,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       revision:
         (readPreparationAttempt(this.eventQueries, attemptId)?.revision ?? attempt.revision) + 1,
       timestamp: Date.now(),
-      step: 'setup_commands' as const,
+      step: phaseKey as PreparingStep,
     };
     const apply = (data: Record<string, unknown>): boolean =>
       applyControlPlanePreparingEvent({
@@ -3316,7 +3421,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       });
 
     if (existingStep === undefined) {
-      const label = `Setup command ${command}`;
+      const label = setupCommandLabel(kind, command, commandText);
       if (
         !apply({
           ...base,
@@ -3326,10 +3431,9 @@ export class SandboxSessionV2 extends DurableObject<Env> {
           kind: 'setup_command',
           label,
           commandIndex: command - 1,
+          commandCount,
           parentStepId: phase.id,
-          ...(event.type === CONTROL_PLANE_SETUP_EVENTS.started
-            ? { commandCount: event.properties.commandCount }
-            : {}),
+          ...(commandText === undefined ? {} : { command: commandText }),
         })
       )
         return;
@@ -3339,7 +3443,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     if (event.type === CONTROL_PLANE_SETUP_EVENTS.output) {
       apply({
         ...base,
-        message: `Setup command ${command} output`,
+        message: `${setupCommandLabel(kind, command, undefined)} output`,
         action: 'step_output',
         stepId,
         output: event.properties.output,
@@ -3349,10 +3453,10 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     if (event.type === CONTROL_PLANE_SETUP_EVENTS.finished) {
       const { exitCode, safeError } = event.properties;
       const failed = safeError !== undefined || exitCode !== 0;
-      const failedMessage = safeError ?? `Setup command ${command} failed`;
+      const failedMessage = safeError ?? `${setupCommandLabel(kind, command, undefined)} failed`;
       apply({
         ...base,
-        message: failed ? failedMessage : 'Setup command finished',
+        message: failed ? failedMessage : `${setupCommandLabel(kind, command, undefined)} finished`,
         action: failed ? 'step_failed' : 'step_completed',
         stepId,
         ...(failed ? { safeError: failedMessage } : {}),

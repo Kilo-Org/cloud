@@ -292,7 +292,8 @@ export async function failRoute(
   attemptId: string,
   reason: ControlPlaneFailureReason,
   stage = 'route',
-  diagnostic?: GrantDiagnosticSnapshot
+  diagnostic?: GrantDiagnosticSnapshot,
+  subtype?: ControlPlaneWorkspaceFailureSubtype
 ): Promise<RouteRecord> {
   const existing = await readRoute(ctx.db, spec.sessionId);
   const route: RouteRecord = {
@@ -312,9 +313,15 @@ export async function failRoute(
     attemptId,
     reason,
     stage,
+    subtype,
     ...(diagnostic === undefined ? {} : pickGrantDiagnosticFields(diagnostic)),
   });
-  await ctx.notify(spec.sessionId, { state: 'failed', attemptId, reason });
+  await ctx.notify(spec.sessionId, {
+    state: 'failed',
+    attemptId,
+    reason,
+    ...(subtype === undefined ? {} : { subtype }),
+  });
   return route;
 }
 
@@ -339,11 +346,12 @@ export async function failCurrentAttempt(
   sessionId: string,
   attemptId: string,
   reason: ControlPlaneFailureReason,
-  stage = 'attempt'
+  stage = 'attempt',
+  subtype?: ControlPlaneWorkspaceFailureSubtype
 ): Promise<void> {
   const route = await readRoute(ctx.db, sessionId);
   if (!isCurrentPreparingAttempt(route, attemptId)) return;
-  await failRoute(ctx, route.spec, attemptId, reason, stage);
+  await failRoute(ctx, route.spec, attemptId, reason, stage, undefined, subtype);
 }
 
 /**

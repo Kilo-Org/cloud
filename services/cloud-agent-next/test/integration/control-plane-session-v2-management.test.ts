@@ -178,6 +178,34 @@ describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
     expect(procedures.listChildSessions._def.type).toBe('query');
   });
 
+  it('exposes workspace snapshot recovery procedures', () => {
+    const procedures = appRouter._def.procedures;
+    expect(procedures.getWorkspaceSnapshotRecovery._def.type).toBe('query');
+    expect(procedures.removeWorkspaceSnapshot._def.type).toBe('mutation');
+  });
+
+  it('forwards workspace snapshot metadata and removal to the sandbox peer', async () => {
+    const sessionId = newSessionId();
+    const sandboxId = await generateSandboxId(sessionId);
+    const stub = await registerSession({ sessionId, sandboxId, kiloSessionId: kiloSessionId() });
+    const peer = new FakeSandboxPeer();
+    peer.workspaceSnapshotRecovery = { capturedAt: 1_763_000_000_000 };
+    await installPeer(stub, peer);
+
+    await expect(stub.getWorkspaceSnapshotRecovery()).resolves.toEqual({
+      capturedAt: 1_763_000_000_000,
+    });
+    await expect(stub.removeWorkspaceSnapshot()).resolves.toEqual({ success: true });
+    expect(peer.removeWorkspaceSnapshotCalls).toEqual([sessionId]);
+    await expect(stub.getWorkspaceSnapshotRecovery()).resolves.toBeNull();
+  });
+
+  it('reports nothing to discard without a registered sandbox', async () => {
+    const stub = sessions.getByName(newSessionId());
+    await expect(stub.getWorkspaceSnapshotRecovery()).resolves.toBeNull();
+    await expect(stub.removeWorkspaceSnapshot()).resolves.toEqual({ success: true });
+  });
+
   it('interrupts a turn without releasing its route and accepts the next message', async () => {
     const sessionId = newSessionId();
     const nativeSessionId = kiloSessionId();

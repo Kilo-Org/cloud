@@ -78,6 +78,44 @@ function textValues(root: TestRenderer.ReactTestInstance): unknown[] {
     .map(node => node.props.children);
 }
 
+describe('PreparationGroup command failures', () => {
+  it('names a start command by its command text, not the setup-command wording', async () => {
+    const phase = phaseStep({
+      id: 'start',
+      key: 'start_commands',
+      label: 'start commands',
+      status: 'completed',
+    });
+    const command = phaseStep({
+      id: 'start-command',
+      key: 'start_commands',
+      kind: 'setup_command',
+      label: 'Start command 1',
+      command: 'pnpm dev:start',
+      commandIndex: 0,
+      parentStepId: 'start',
+      status: 'failed',
+      exitCode: 1,
+      safeError: 'Start command 1 failed',
+    });
+    const renderer = await mountGroup({
+      ...attemptWithStep(phase),
+      status: 'completed',
+      completedAt: 13_400,
+      steps: [phase, command],
+    });
+
+    const texts = textValues(renderer.root);
+    expect(texts).toContain('pnpm dev:start');
+    expect(texts).not.toContain('Setup command 1');
+    expect(texts).toContain('Exit code: 1');
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+});
+
 describe('PreparationGroup phase label', () => {
   it('renders the catalog name for the phase key, not the server label', async () => {
     const renderer = await mountGroup(attemptWithStep(phaseStep()));

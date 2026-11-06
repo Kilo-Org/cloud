@@ -177,14 +177,15 @@ repository.
 4. Running and failed preparation MUST always be visible. Failed preparation,
    its triggering failed message, and its safe error MUST remain visible, with
    a way to open details.
- 5. Setup commands MUST run on the first prepare and again on every rebuild,
-    except when restoring a private workspace tail snapshot. An environment snapshot
-    skips only the environment's setup; request-supplied commands MUST still run.
-    Start commands MUST run each time a workspace starts:
-    on the first prepare, on every rebuild, after an environment snapshot start
-    and after a private workspace tail snapshot restore. They MUST NOT run when a
-    chat joins a workspace that is already running. A failing or timed-out setup or start command
-    MUST fail preparation and the turn.
+ 5. The environment's build commands MUST run only in an environment build.
+    Session setup commands (request-supplied and profile) and the environment's
+    start commands MUST run on a fresh start and on an environment snapshot start.
+    Neither MUST run when restoring a private workspace tail snapshot or when a
+    chat joins a workspace that is already running. A failing or timed-out
+    session setup or start command MUST NOT fail preparation or the turn: the
+    user MUST see a row naming the command kind, number, command text and exit
+    code or timeout, with a way to open its output, and the agent MUST receive a
+    short note about it with the first message after that preparation.
 6. Follow-up turns MUST NOT show preparation unless the environment was
    rebuilt.
 7. Preparation output MUST NOT reveal tokens or secret values.
@@ -203,27 +204,37 @@ repository.
 1. Only an environment build MAY create a reusable environment snapshot.
    Private workspace tail snapshots MUST follow the separate workspace snapshot
    rules below and MUST NOT be published as environment snapshots.
-2. A session that uses a repository environment MAY start from that
-   environment's published snapshot when the owner, repository, sandbox image
-   and runtime match and the snapshot revision is not newer than the
+2. A session whose repository environment has build commands MUST start from
+   that environment's published snapshot when the owner, repository, sandbox
+   image and runtime match and the snapshot revision is not newer than the
    session's configuration revision. For a multi-repository environment, the
    environment, owner and the same list of repositories MUST match instead of
-   one repository. Otherwise, and when the lookup is unavailable, it MUST start from
-   the base image. The lookup MUST NOT delay the start by more than 15 seconds
-   and MUST NOT wait for a build.
-3. A workspace that starts from an environment snapshot, at any revision, MUST
-   NOT run the environment's setup commands, because the build already ran them.
-   It MUST run any request-supplied setup commands, then the start commands.
-   A workspace that starts from the base image, or that is not
-   entirely restored from the snapshot, MUST run setup with the configuration
-   admitted for that session, then the start commands. Changed setup commands
+   one repository. A snapshot from the previous image MAY remain eligible for
+   at most 24 hours after capture while a replacement build runs; the runtime
+   ABI MUST still match. A missing, building, failed or backed-off environment
+   or an unavailable lookup MUST fail with a specific reason and a way to open
+   the environment build, never start from the base image. When no environment
+   snapshot can serve the start at all -- a sandbox provider that cannot restore
+   one, or a retired sandbox type whose workspace path the snapshot does not
+   cover -- rebuilding cannot help: the start MUST fail at once with that
+   reason, without a way to open the environment build, and MUST NOT start from
+   the base image. An environment without build commands MUST
+   start from the base image. The lookup MUST NOT delay the
+   start by more than 15 seconds and MUST NOT wait for a build.
+3. Build commands are the environment's setup commands and run only in its
+   build. Session setup commands are the request-supplied and profile setup
+   commands. A workspace that starts from an environment snapshot, at any
+   revision, or from the base image MUST run the session setup commands, then
+   the start commands, as Preparation rule 5 describes. Changed build commands
    take effect after the next build. Cached files MAY retain earlier values,
    including secrets.
 4. When a session starts from an older snapshot revision, preparation MUST
    show the snapshot revision, the session's revision, and the actual
    replacement build status, including a skipped build or backoff.
-5. If a snapshot start fails, the session MUST start once from the base image
-   within the same preparation deadline.
+5. If a snapshot start fails transiently, the session MUST retry the same
+   snapshot within the preparation deadline. A permanent failure, or a repeated
+   one, MUST fail with a specific reason that asks to rebuild the environment
+   and MUST NOT start from the base image.
 6. A snapshot MUST NOT contain git or build credentials, reflogs, or a Kilo
    home.
 7. Organization managers and personal owners MAY build, refresh, or cancel a
@@ -251,15 +262,18 @@ repository.
    Preparation, native child executions, terminals and admitted filesystem mutations MUST
    fence capture. Provider capture MUST run outside the Sandbox DO queue and MUST NOT delay Stop.
 6. Publication MUST reject changed allocation, connection, workspace binding, preparation,
-   membership, activity or mutation generation. New admitted work MUST invalidate older disk
-   state before dispatch. A capture failure MUST NOT retry repeatedly within the idle period.
-7. Session deletion MUST invalidate stale disk state and allow another idle capture for survivors.
-   Workspace deletion MUST invalidate selection and pending publication before resource teardown.
-   Restored disks MUST NOT restore deleted-session authorization or recreate a deleted workspace.
-8. Cold startup MUST select a compatible private workspace snapshot before the existing
-   environment snapshot and base image. Selection MUST validate ownership, enrollment,
-   provider, startup mode and image compatibility from durable Sandbox DO metadata.
-   A compatible downloaded runtime release MAY update the restored disk.
+   membership, activity or mutation generation. New admitted work MUST fence pending
+   publication before dispatch and MUST NOT delete the current snapshot. A capture failure
+   MUST NOT retry repeatedly within the idle period.
+7. Session deletion MUST keep the workspace snapshot and allow another idle capture for
+   survivors. Only a newer capture, workspace deletion or the user's explicit "Start fresh"
+   MAY remove it. Workspace deletion MUST invalidate selection and pending publication before
+   resource teardown. Restored disks MUST NOT restore deleted-session authorization or
+   recreate a deleted workspace.
+8. When a private workspace snapshot exists, cold startup MUST use it as the only source.
+   Selection MUST validate ownership, enrollment, provider, startup mode, the exact base
+   image and the 30-day lifetime from durable Sandbox DO metadata. A compatible downloaded
+   runtime release MAY update the restored disk.
 9. Only a confirmed provider restore MAY supply frame-only workspace provenance.
    Every authorized sibling, including later joins, MUST receive it.
    Registration MUST reject supplied restore provenance. Older peers use ordinary recovery.
@@ -272,10 +286,14 @@ repository.
     authorization before exposing native sessions. Existing native sessions are reused.
     Missing sessions use history recovery without replacing workspace files.
     New chats MUST attach without resetting files.
-12. Missing artifacts, incompatible peers and failed restored preparation MUST use bounded
-    startup fallback while preserving queued message identity. Diagnostics MUST identify
-    workspace, requesting session, allocation, capture time, selected source and fallback reason.
-    Logs MUST NOT contain snapshot handles, credentials or file contents.
+12. A transient provider failure MUST retry the same snapshot within the preparation deadline.
+    An expired, missing or incompatible snapshot, an incompatible peer, a permanent or repeated
+    provider failure, or a failed restore step MUST fail with a specific reason, keep the
+    snapshot and queued message identity, and MUST NOT fall back to another source. That
+    failure MUST offer "Start fresh", which names the changes since the capture time that it
+    discards. A failure that may be transient MUST also say that a new message retries. Diagnostics MUST identify workspace, requesting session, allocation, capture
+    time, selected source and failure reason. Logs MUST NOT contain snapshot handles,
+    credentials or file contents.
 13. Superseded descriptors MUST remain unselectable. Provider artifacts expire 30 days after
     creation or their last restore; each restore resets this TTL. Snapshots preserve disk,
     not running processes, terminals or memory.

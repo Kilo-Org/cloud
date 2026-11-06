@@ -42,6 +42,8 @@ const WORKSPACE_SUBTYPE_REASONS = {
   kilo_import_failed: 'session_import_failed',
   setup_command_timeout: 'setup_command_failed',
   setup_command_failed: 'setup_command_failed',
+  workspace_snapshot_start_failed: 'workspace_setup_failed',
+  environment_snapshot_required: 'setup_command_failed',
   workspace_setup_unknown: 'workspace_setup_failed',
 } as const satisfies Record<WorkspaceFailureSubtype, CodeReviewTerminalReason>;
 

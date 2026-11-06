@@ -696,6 +696,25 @@ test('one job builds the tRPC declarations and both matrices download them', () 
   assert.deepEqual(ci.jobs.lint.needs, ['changes', 'lint-groups']);
 });
 
+// Which rows run is one decision, and the affected detector owns it: it keeps
+// the extension's own workflow as the single typecheck and lint for a change
+// that only affects the extension.
+test('the changes job takes both matrix group lists from the affected detector', () => {
+  const step = ciJobs.changes.steps.find(candidate => candidate.id === 'affected');
+  assert.match(
+    step.run,
+    /groups=\$\(node scripts\/affected-workspaces\.mjs --groups <<< "\$affected"\)/,
+    'the groups come from the detector, not from a workflow-local projection'
+  );
+  assert.match(step.run, /echo "typecheck_groups=\$\(jq -c \.typecheck_groups <<< "\$groups"\)"/);
+  assert.match(step.run, /echo "lint_groups=\$\(jq -c \.lint_groups <<< "\$groups"\)"/);
+  assert.doesNotMatch(
+    step.run,
+    /\.full_checks \| index\("(typecheck|lint)"\) != null\) as \$all/,
+    'the workflow must not compute the group lists itself'
+  );
+});
+
 function runTypecheck(
   t,
   { root = false, changes = '', buildExit = 0, checkExit = 0, built = '', selected = '' } = {}

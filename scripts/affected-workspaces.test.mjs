@@ -3,7 +3,12 @@ import { execFileSync } from 'node:child_process';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { isModuleSpecifier, isNeutral, selectAffected } from './affected-workspaces.mjs';
+import {
+  isModuleSpecifier,
+  isNeutral,
+  selectAffected,
+  selectGroups,
+} from './affected-workspaces.mjs';
 
 const workspace = (name, dir, dependencies = {}) => ({ name, dir, manifest: { dependencies } });
 const items = [
@@ -124,6 +129,108 @@ test('a check script change runs only that check everywhere', () => {
   const both = select(['scripts/typecheck-all.sh', 'services/leaf/src/a.ts']);
   assert.deepEqual(both.full_checks, ['typecheck']);
   assert.deepEqual(both.packages, ['leaf']);
+});
+
+const groups = selection => selectGroups({ dirs: [], packages: [], ...selection });
+
+test('a selection that only affects the extension leaves both trpc rows out', () => {
+  // extension CI typechecks and lints the extension when it is the only affected
+  // workspace, so ci.yml must not pay for a second copy.
+  assert.deepEqual(groups({ dirs: ['apps/extension'], packages: ['kilo-extension'] }), {
+    typecheck_groups: [],
+    lint_groups: [],
+  });
+});
+
+test('an extension change beside another workspace keeps both trpc rows', () => {
+  // extension-ci.yml does not select the extension for a change that reaches it
+  // from another workspace, so this run is the only check of its types.
+  const reachedFromMobile = {
+    dirs: ['apps/extension', 'apps/mobile', 'apps/web', 'packages/trpc'],
+    packages: ['@kilocode/trpc', 'kilo-app', 'kilo-extension', 'web'],
+  };
+  assert.deepEqual(groups(reachedFromMobile), {
+    typecheck_groups: ['web', 'trpc'],
+    lint_groups: ['trpc', 'rest'],
+  });
+  // A change to the tRPC package beside the extension keeps the typecheck row
+  // for the extension, and the rest lint row covers the tRPC sources.
+  assert.deepEqual(
+    groups({
+      dirs: ['apps/extension', 'packages/trpc'],
+      packages: ['@kilocode/trpc', 'kilo-extension'],
+    }),
+    { typecheck_groups: ['trpc'], lint_groups: ['trpc', 'rest'] }
+  );
+});
+
+test('a full check keeps every group, including both trpc rows', () => {
+  assert.deepEqual(
+    groups({
+      full_checks: ['lint', 'typecheck'],
+      dirs: ['apps/extension', 'apps/mobile', 'apps/web'],
+      packages: ['kilo-app', 'kilo-extension', 'web'],
+    }),
+    { typecheck_groups: ['web', 'trpc', 'packages'], lint_groups: ['trpc', 'rest'] }
+  );
+});
+
+test('a check-script change keeps that check full and leaves the other quiet', () => {
+  assert.deepEqual(groups({ full_checks: ['typecheck'] }), {
+    typecheck_groups: ['web', 'trpc', 'packages'],
+    lint_groups: [],
+  });
+  assert.deepEqual(groups({ full_checks: ['lint'] }), {
+    typecheck_groups: [],
+    lint_groups: ['trpc', 'rest'],
+  });
+});
+
+test('a partial selection keeps only the groups its workspaces need', () => {
+  assert.deepEqual(groups({ packages: ['web'], dirs: ['apps/web'] }), {
+    typecheck_groups: ['web'],
+    lint_groups: ['rest'],
+  });
+  assert.deepEqual(groups({ packages: ['@kilocode/storybook'], dirs: ['apps/storybook'] }), {
+    typecheck_groups: ['web'],
+    lint_groups: ['rest'],
+  });
+  assert.deepEqual(groups({ packages: ['@kilocode/db'], dirs: ['packages/db'] }), {
+    typecheck_groups: ['packages'],
+    lint_groups: ['rest'],
+  });
+  // @kilocode/trpc is built by the trpc-declarations producer, and kilo-app
+  // typechecks and lints in kilo-app CI: neither selects a typecheck row, and
+  // only the trpc package's own sources reach the rest lint group.
+  assert.deepEqual(groups({ packages: ['@kilocode/trpc'], dirs: ['packages/trpc'] }), {
+    typecheck_groups: [],
+    lint_groups: ['rest'],
+  });
+  assert.deepEqual(groups({ packages: ['kilo-app'], dirs: ['apps/mobile'] }), {
+    typecheck_groups: [],
+    lint_groups: [],
+  });
+});
+
+test('the groups mode prints the groups for a selection on standard input', () => {
+  const script = fileURLToPath(new URL('./affected-workspaces.mjs', import.meta.url));
+  const output = execFileSync(process.execPath, [script, '--groups'], {
+    input: JSON.stringify({ dirs: ['apps/extension'], packages: ['kilo-extension'] }),
+    encoding: 'utf8',
+  });
+  assert.deepEqual(JSON.parse(output), { typecheck_groups: [], lint_groups: [] });
+  const full = execFileSync(process.execPath, [script, '--groups'], {
+    input: JSON.stringify({
+      dirs: ['apps/extension'],
+      packages: ['kilo-extension'],
+      full_checks: ['lint', 'typecheck'],
+    }),
+    encoding: 'utf8',
+  });
+  assert.deepEqual(JSON.parse(full), {
+    typecheck_groups: ['web', 'trpc', 'packages'],
+    lint_groups: ['trpc', 'rest'],
+  });
 });
 
 test('dependency manifest changes select the workspaces whose dependencies changed', () => {

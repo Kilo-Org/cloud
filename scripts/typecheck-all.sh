@@ -48,9 +48,10 @@ if [ -n "$group" ]; then
       fi
       ;;
     trpc)
-      # kilo-app typechecks in kilo-app CI, which runs whenever kilo-app is
-      # affected. The extension has no other job that typechecks it outside its
-      # own workflow, which skips unrelated PRs.
+      # A full check only. The extension's own workflow typechecks it on every
+      # pull request that affects it, so ci.yml selects this group only when it
+      # typechecks every workspace (the merge queue and main pushes), where
+      # extension CI has no job. kilo-app typechecks in kilo-app CI.
       # CI restores or builds the declarations first and sets
       # KILO_TYPECHECK_TRPC_BUILT=1.
       if [ "${KILO_TYPECHECK_TRPC_BUILT:-}" != 1 ]; then

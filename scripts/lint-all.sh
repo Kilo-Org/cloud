@@ -8,7 +8,10 @@ set -euo pipefail
 #   scripts/lint-all.sh                  # every workspace
 #   scripts/lint-all.sh --group <name>   # CI: one group of KILO_AFFECTED
 #
-# Groups split the work across parallel CI jobs:
+# Groups split the work across parallel CI jobs. The trpc group is a full-lint
+# job: the extension's own workflow lints it with a stricter, type-aware config
+# on every pull request that affects it, so ci.yml selects trpc only when it
+# lints every workspace.
 #   trpc  apps/extension, which lints against the built tRPC types, and
 #         apps/mobile when every workspace is linted
 #   rest  every other workspace except apps/mobile

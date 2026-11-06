@@ -3,9 +3,11 @@
 //
 // Usage: node scripts/affected-workspaces.mjs <base-sha>
 //        node scripts/affected-workspaces.mjs --filter-neutral
+//        node scripts/affected-workspaces.mjs --groups
 // Prints JSON: { full, reasons, full_checks, dirs, packages, test_only_dirs,
 // test_only_packages, test_only_files }. With --filter-neutral it instead prints
-// the standard-input paths that some check reads, one per line.
+// the standard-input paths that some check reads, one per line. With --groups it
+// instead prints the CI matrix groups for the selection JSON on standard input.
 //
 // A workspace is affected when one of its files changed, or when it reads an
 // affected workspace. A workspace reads another through a workspace:* entry in
@@ -323,6 +325,59 @@ function filterNeutral() {
   console.log(paths.filter(file => !isNeutral(file)).join('\n'));
 }
 
+// Workspaces whose typecheck runs beside apps/web (scripts/web-env rides along
+// with it).
+const TYPECHECK_WEB_PACKAGES = ['web', '@kilocode/storybook'];
+
+// Workspaces that another check owns: the web and trpc groups, kilo-app CI and
+// extension CI. The packages group covers everything else.
+const PACKAGES_GROUP_EXCLUDED = [
+  'web',
+  '@kilocode/trpc',
+  '@kilocode/storybook',
+  'kilo-app',
+  'kilo-extension',
+];
+
+// Workspaces the rest lint group leaves out: kilo-app CI lints the app, and the
+// extension belongs to the trpc group.
+const LINT_REST_EXCLUDED_DIRS = ['apps/mobile', 'apps/extension'];
+
+// The CI matrix groups that a selection pays for (the ci.yml `changes` job).
+// The trpc rows repeat the extension's own typecheck and lint against the built
+// tRPC declarations. extension-ci.yml runs both whenever the extension is the
+// only affected workspace — the pull request changed the extension's own files,
+// a root path it reads, or only the extension's dependencies — so ci.yml leaves
+// the rows out for exactly that selection. Any other affected workspace makes
+// this run the only one that checks the extension's types: extension-ci.yml does
+// not follow the workspace reads that reach the extension from another
+// workspace, and the extension is reached that way from apps/mobile.
+// A full check keeps both rows: a push to main and the merge queue have no
+// extension job at all, and a full lint also covers apps/mobile there, because
+// kilo-app CI lints the app only when the app is affected.
+export function selectGroups({ full_checks: fullChecks = [], dirs = [], packages = [] }) {
+  const everyTypecheck = fullChecks.includes('typecheck');
+  const everyLint = fullChecks.includes('lint');
+  const extensionAlone = packages.includes('kilo-extension') && packages.length === 1;
+  const extensionDirAlone = dirs.includes('apps/extension') && dirs.length === 1;
+  const typecheck_groups = [];
+  if (everyTypecheck || TYPECHECK_WEB_PACKAGES.some(name => packages.includes(name))) {
+    typecheck_groups.push('web');
+  }
+  if (everyTypecheck || (packages.includes('kilo-extension') && !extensionAlone)) {
+    typecheck_groups.push('trpc');
+  }
+  if (everyTypecheck || packages.some(name => !PACKAGES_GROUP_EXCLUDED.includes(name))) {
+    typecheck_groups.push('packages');
+  }
+  const lint_groups = [];
+  if (everyLint || (dirs.includes('apps/extension') && !extensionDirAlone))
+    lint_groups.push('trpc');
+  if (everyLint || dirs.some(dir => !LINT_REST_EXCLUDED_DIRS.includes(dir)))
+    lint_groups.push('rest');
+  return { typecheck_groups, lint_groups };
+}
+
 function detect(base) {
   const items = workspaces();
   const valid =
@@ -347,7 +402,13 @@ function detect(base) {
   console.log(JSON.stringify(selectAffected({ items, changedFiles, dependencyDirs, references })));
 }
 
+// Print the CI matrix groups for the selection JSON on standard input.
+function printGroups() {
+  console.log(JSON.stringify(selectGroups(JSON.parse(readFileSync(0, 'utf8')))));
+}
+
 if (import.meta.main) {
   if (process.argv[2] === '--filter-neutral') filterNeutral();
+  else if (process.argv[2] === '--groups') printGroups();
   else detect(process.argv[2] ?? '');
 }

@@ -2013,42 +2013,57 @@ export class SessionIngestDO extends DurableObject<Env> {
       .values({ key: pendingKey, value: params.key })
       .onConflictDoUpdate({ target: ingestMeta.key, set: { value: params.key } })
       .run();
-    const operation = (async (): Promise<boolean | 'too_large'> => {
-      const reservation = await this.env.SESSION_INGEST_R2.put(params.key, crypto.randomUUID(), {
-        onlyIf: new Headers({ 'If-None-Match': '*' }),
-      });
-      const etag = reservation?.etag ?? (await this.env.SESSION_INGEST_R2.head(params.key))?.etag;
-      if (this.isDeleted()) {
-        await cancelBody();
+    // Every outcome that does not leave the caller's stored body at params.key
+    // releases both the reservation object and its marker. When the reservation
+    // delete itself fails, the marker row survives so clearFencedSessionData can
+    // still collect the object.
+    const releaseReservation = async (): Promise<void> => {
+      try {
         await this.env.SESSION_INGEST_R2.delete(params.key);
-        this.db.delete(ingestMeta).where(eq(ingestMeta.key, pendingKey)).run();
-        return false;
-      }
-      if (!etag) throw new Error('Session R2 reservation disappeared');
-
-      let written: R2Object | null;
-      if (maxBytes === undefined) {
-        written = await this.env.SESSION_INGEST_R2.put(params.key, body, {
-          onlyIf: { etagMatches: etag },
+      } catch (error) {
+        console.error('Failed to release a session ingest staging reservation', {
+          error: error instanceof Error ? error.message : String(error),
         });
-      } else if (body instanceof Uint8Array) {
-        written = await this.env.SESSION_INGEST_R2.put(params.key, body, {
-          onlyIf: { etagMatches: etag },
-        });
-      } else {
-        const result = await this.writeBoundedMultipart(params.key, body, maxBytes, etag);
-        if (result === 'too_large') {
-          await this.env.SESSION_INGEST_R2.delete(params.key);
-          this.db.delete(ingestMeta).where(eq(ingestMeta.key, pendingKey)).run();
-          return result;
-        }
-        written = result;
+        return;
       }
-      const deleted = this.isDeleted();
-      if (!written && !deleted) throw new Error('Session R2 reservation changed');
-      if (deleted) await this.env.SESSION_INGEST_R2.delete(params.key);
       this.db.delete(ingestMeta).where(eq(ingestMeta.key, pendingKey)).run();
-      return !deleted;
+    };
+    const operation = (async (): Promise<boolean | 'too_large'> => {
+      // True once the object at params.key is the caller's stored body.
+      let published = false;
+      try {
+        const reservation = await this.env.SESSION_INGEST_R2.put(params.key, crypto.randomUUID(), {
+          onlyIf: new Headers({ 'If-None-Match': '*' }),
+        });
+        const etag = reservation?.etag ?? (await this.env.SESSION_INGEST_R2.head(params.key))?.etag;
+        if (this.isDeleted()) {
+          await cancelBody();
+          return false;
+        }
+        if (!etag) throw new Error('Session R2 reservation disappeared');
+
+        let written: R2Object | null;
+        if (maxBytes === undefined) {
+          written = await this.env.SESSION_INGEST_R2.put(params.key, body, {
+            onlyIf: { etagMatches: etag },
+          });
+        } else if (body instanceof Uint8Array) {
+          written = await this.env.SESSION_INGEST_R2.put(params.key, body, {
+            onlyIf: { etagMatches: etag },
+          });
+        } else {
+          const result = await this.writeBoundedMultipart(params.key, body, maxBytes, etag);
+          if (result === 'too_large') return result;
+          written = result;
+        }
+        const deleted = this.isDeleted();
+        if (!written && !deleted) throw new Error('Session R2 reservation changed');
+        published = written !== null && !deleted;
+        return !deleted;
+      } finally {
+        if (published) this.db.delete(ingestMeta).where(eq(ingestMeta.key, pendingKey)).run();
+        else await releaseReservation();
+      }
     })();
     this.activeR2Writes.add(operation);
     return operation.finally(() => this.activeR2Writes.delete(operation));

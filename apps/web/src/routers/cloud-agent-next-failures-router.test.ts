@@ -17,10 +17,16 @@ const OTHER_USER_ID = 'oauth/failures-history-other';
 const PERSONAL_SESSION_ID = 'agent_failures_history_personal';
 const OTHER_SESSION_ID = 'agent_failures_history_other';
 const ORG_SESSION_ID = 'agent_failures_history_org';
+const UNCLASSIFIED_SESSION_ID = 'agent_failures_history_unclassified';
 
 const DIAGNOSTIC_EXPIRES_AT = '2035-02-01T00:00:00.000Z';
 
-const SESSION_IDS = [PERSONAL_SESSION_ID, OTHER_SESSION_ID, ORG_SESSION_ID];
+const SESSION_IDS = [
+  PERSONAL_SESSION_ID,
+  OTHER_SESSION_ID,
+  ORG_SESSION_ID,
+  UNCLASSIFIED_SESSION_ID,
+];
 
 describe('cloudAgentNextFailuresRouter', () => {
   let owner: User;
@@ -68,6 +74,13 @@ describe('cloudAgentNextFailuresRouter', () => {
         kilo_user_id: otherUser.id,
         created_on_platform: 'cloud-agent-web',
       },
+      {
+        session_id: 'ses_failures_history_unclassified',
+        cloud_agent_session_id: UNCLASSIFIED_SESSION_ID,
+        kilo_user_id: owner.id,
+        created_on_platform: 'cloud-agent-web',
+        created_at: '2035-01-09 23:00:00+00',
+      },
     ]);
 
     await db.insert(cloud_agent_sessions).values([
@@ -90,6 +103,14 @@ describe('cloudAgentNextFailuresRouter', () => {
         kilo_session_id: 'ses_failures_history_other',
         initial_message_id: 'msg_failures_history_other',
         created_at: '2035-01-10 00:00:00+00',
+      },
+      {
+        cloud_agent_session_id: UNCLASSIFIED_SESSION_ID,
+        kilo_session_id: 'ses_failures_history_unclassified',
+        initial_message_id: 'msg_failures_history_unclassified',
+        created_at: '2035-01-10 00:00:00+00',
+        error_message_redacted: 'Setup failed before classification',
+        error_expires_at: DIAGNOSTIC_EXPIRES_AT,
       },
     ]);
 
@@ -188,6 +209,7 @@ describe('cloudAgentNextFailuresRouter', () => {
         userVisibleError: 'Environment preparation failed (admission rejected)',
         diagnostic: 'Initial admission failed',
         diagnosticExpiresAt: '2035-02-01T00:00:00.000Z',
+        diagnosticStatus: 'present',
       });
 
       expect(result.runs).toHaveLength(2);
@@ -202,10 +224,12 @@ describe('cloudAgentNextFailuresRouter', () => {
       expect(failed.diagnostic).toBe('Agent wrapper stopped responding after 30s');
       expect(failed.terminalAt).toBe('2035-01-10T00:05:00.000Z');
       expect(failed.wrapperRunId).toBe('wrapper_failures_history');
+      expect(failed.diagnosticStatus).toBe('present');
 
       const expired = result.runs[0];
       expect(expired.diagnostic).toBeNull();
       expect(expired.diagnosticExpiresAt).toBeNull();
+      expect(expired.diagnosticStatus).toBe('expired');
     });
 
     it('omits runs outside the retention window and runs without usable timestamps', async () => {
@@ -231,6 +255,20 @@ describe('cloudAgentNextFailuresRouter', () => {
           cloudAgentSessionId: ORG_SESSION_ID,
         })
       ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    });
+
+    it('shows an unclassified setup failure instead of reporting a clean session', async () => {
+      const result = await caller.cloudAgentNextFailures.getSessionFailureHistory({
+        cloudAgentSessionId: UNCLASSIFIED_SESSION_ID,
+      });
+
+      expect(result.setupFailure).toMatchObject({
+        occurredAt: '2035-01-10T00:00:00.000Z',
+        stage: null,
+        code: null,
+        diagnostic: 'Setup failed before classification',
+        diagnosticStatus: 'present',
+      });
     });
 
     it('rejects unknown sessions', async () => {
@@ -280,9 +318,11 @@ describe('cloudAgentNextFailuresRouter', () => {
 
       const lines = file.content.trimEnd().split('\n');
       expect(lines[0]).toContain('source,occurred_at,status,stage,code');
+      expect(lines[0]).toContain('diagnostic_status');
       expect(lines).toHaveLength(3);
       expect(lines[1]).toContain('setup');
       expect(lines[1]).toContain("'=Failures report");
+      expect(lines[1]).toContain('present');
       expect(lines[2]).toContain('run');
       expect(lines[2]).toContain('wrapper_failures_history');
     });

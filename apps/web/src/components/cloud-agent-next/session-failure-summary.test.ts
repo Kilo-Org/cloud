@@ -37,6 +37,7 @@ function run(
     userVisibleError: null,
     diagnostic: null,
     diagnosticExpiresAt: null,
+    diagnosticStatus: 'missing',
     wrapperRunId: null,
   };
 }
@@ -76,6 +77,7 @@ describe('summarizeSessionFailureHistory', () => {
           userVisibleError: 'Environment preparation failed (admission rejected)',
           diagnostic: null,
           diagnosticExpiresAt: null,
+          diagnosticStatus: 'missing',
         },
       })
     );

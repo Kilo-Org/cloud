@@ -52,6 +52,7 @@ const failureRunSchema = z.object({
   userVisibleError: z.string().nullable(),
   diagnostic: z.string().nullable(),
   diagnosticExpiresAt: nullableIsoTimestampSchema,
+  diagnosticStatus: z.enum(['present', 'expired', 'missing']),
   wrapperRunId: z.string().nullable(),
 });
 
@@ -64,6 +65,7 @@ const setupFailureSchema = z.object({
   userVisibleError: z.string().nullable(),
   diagnostic: z.string().nullable(),
   diagnosticExpiresAt: nullableIsoTimestampSchema,
+  diagnosticStatus: z.enum(['present', 'expired', 'missing']),
 });
 
 const failureSessionSchema = z.object({
@@ -117,14 +119,27 @@ function isExpired(expiresAt: string | null): boolean {
   return !Number.isFinite(time) || time <= Date.now();
 }
 
+type DiagnosticStatus = 'present' | 'expired' | 'missing';
+
 function retainedDiagnostic(
   message: string | null,
   expiresAt: string | null
-): { diagnostic: string | null; diagnosticExpiresAt: string | null } {
-  if (!message || !expiresAt || isExpired(expiresAt)) {
-    return { diagnostic: null, diagnosticExpiresAt: null };
+): {
+  diagnostic: string | null;
+  diagnosticExpiresAt: string | null;
+  diagnosticStatus: DiagnosticStatus;
+} {
+  if (!message) {
+    return { diagnostic: null, diagnosticExpiresAt: null, diagnosticStatus: 'missing' };
   }
-  return { diagnostic: message, diagnosticExpiresAt: isoOrNull(expiresAt) };
+  if (!expiresAt || isExpired(expiresAt)) {
+    return { diagnostic: null, diagnosticExpiresAt: null, diagnosticStatus: 'expired' };
+  }
+  return {
+    diagnostic: message,
+    diagnosticExpiresAt: isoOrNull(expiresAt),
+    diagnosticStatus: 'present',
+  };
 }
 
 function runUserVisibleError(code: string | null): string | null {
@@ -145,7 +160,7 @@ function setupUserVisibleError(code: string | null): string {
 function secondsBetween(start: string | null, end: string | null): number | null {
   if (!start || !end) return null;
   const seconds = (new Date(end).getTime() - new Date(start).getTime()) / 1000;
-  return Number.isFinite(seconds) ? Math.round(seconds * 10) / 10 : null;
+  return Number.isFinite(seconds) && seconds >= 0 ? Math.round(seconds * 10) / 10 : null;
 }
 
 type SessionFailureDetail = {
@@ -239,10 +254,22 @@ async function loadSessionFailureDetail(
     .limit(runLimit);
 
   const failureAt = isoOrNull(sessionRow?.failureAt);
+  const hasSetupFailureEvidence =
+    sessionRow !== undefined &&
+    (sessionRow.failureAt !== null ||
+      sessionRow.failureStage !== null ||
+      sessionRow.failureCode !== null ||
+      sessionRow.failureResponsibility !== null ||
+      sessionRow.failureReason !== null ||
+      sessionRow.errorMessageRedacted !== null);
   const setupFailure: SetupFailure | null =
-    sessionRow && failureAt !== null
+    sessionRow && hasSetupFailureEvidence
       ? {
-          occurredAt: failureAt,
+          occurredAt:
+            failureAt ??
+            isoOrNull(sessionRow.createdAt) ??
+            isoOrNull(cliRow.createdAt) ??
+            new Date(0).toISOString(),
           stage: sessionRow.failureStage ?? null,
           code: sessionRow.failureCode ?? null,
           responsibility: sessionRow.failureResponsibility ?? null,
@@ -291,6 +318,7 @@ const CSV_HEADERS = [
   'reason',
   'user_visible_error',
   'diagnostic',
+  'diagnostic_status',
   'message_id',
   'wrapper_run_id',
   'queued_at',
@@ -307,7 +335,7 @@ const CSV_HEADERS = [
 function csvEscape(value: unknown): string {
   if (value === null || value === undefined) return '';
   const text = String(value);
-  const guarded = /^[=+\-@\t\r]/.test(text) ? `'${text}` : text;
+  const guarded = /^[\uFEFF\s]*[=+\-@\t\r]/.test(text) ? `'${text}` : text;
   if (/[",\n\r]/.test(guarded)) {
     return `"${guarded.replaceAll('"', '""')}"`;
   }
@@ -328,6 +356,7 @@ function buildCsv(detail: SessionFailureDetail): string {
       detail.setupFailure.reason,
       detail.setupFailure.userVisibleError,
       detail.setupFailure.diagnostic,
+      detail.setupFailure.diagnosticStatus,
       '',
       '',
       '',
@@ -352,6 +381,7 @@ function buildCsv(detail: SessionFailureDetail): string {
       run.failureReason,
       run.userVisibleError,
       run.diagnostic,
+      run.diagnosticStatus,
       run.messageId,
       run.wrapperRunId,
       run.queuedAt,

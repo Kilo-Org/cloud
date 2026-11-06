@@ -135,6 +135,16 @@ export const CLOUD_AGENT_SESSION_FAILURE_STAGES = [
   'transport',
 ] as const satisfies readonly CloudAgentSessionFailureStage[];
 
+/**
+ * Compile-time guard: adding a stage to the database type without listing it
+ * above fails the build here instead of silently rejecting a valid value.
+ */
+export type SessionFailureStagesCoverDatabase = [
+  Exclude<CloudAgentSessionFailureStage, (typeof CLOUD_AGENT_SESSION_FAILURE_STAGES)[number]>,
+] extends [never]
+  ? true
+  : never;
+
 export const CloudAgentSessionFailureStageSchema = z.enum(CLOUD_AGENT_SESSION_FAILURE_STAGES);
 
 export const SESSION_FAILURE_MESSAGES = {

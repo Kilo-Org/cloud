@@ -191,11 +191,7 @@ describe('briefing evidence screening', () => {
   });
 
   it('keeps ordinary words that contain a credential word', () => {
-    for (const evidence of [
-      'Passage: open.',
-      'Overpass: closed.',
-      'Bypassed: the cache layer.',
-    ]) {
+    for (const evidence of ['Passage: open.', 'Overpass: closed.', 'Bypassed: the cache layer.']) {
       expect(redactBriefingExcerpt(evidence)).toBe(evidence);
     }
   });

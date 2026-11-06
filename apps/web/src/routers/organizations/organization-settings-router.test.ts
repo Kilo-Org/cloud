@@ -1453,7 +1453,8 @@ describe('organizations settings trpc router', () => {
       const auditLogs = await db
         .select()
         .from(organization_audit_logs)
-        .where(eq(organization_audit_logs.organization_id, testOrganization.id));
+        .where(eq(organization_audit_logs.organization_id, testOrganization.id))
+        .orderBy(organization_audit_logs.id);
       expect(auditLogs.map(log => log.message)).toContain(
         'Updated gateway settings: Vercel AI Gateway disabled; Data region: European Union'
       );

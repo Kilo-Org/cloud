@@ -73,15 +73,8 @@ import {
   type WorkspaceFolderDragItem,
   type WorkspaceFolderDropTarget,
 } from './workspace-folders';
-
-type ActiveSession = {
-  id: string;
-  status: string;
-  title: string;
-  connectionId: string;
-  gitUrl?: string;
-  gitBranch?: string;
-};
+import { filterLiveSidebarSessions } from './live-sidebar-sessions';
+import type { ActiveSession } from './hooks/useActiveSessions';
 
 type ChatSidebarProps = {
   sessions: StoredSession[];
@@ -806,21 +799,32 @@ export function ChatSidebar({
     [activeSessions]
   );
 
-  // Heartbeats reorder activeSessions per connection, so the Remote section
-  // needs its own stable order: attention first, then working, id last.
+  // Live sessions the stored list does not carry. The live rows bypass the
+  // server-side filter the stored list gets, so they have to honor the same
+  // selections here or the sidebar shows rows the filters exclude.
   const liveOnlySessions = useMemo(() => {
+    // The merge order is per-connection and changes on every heartbeat, so the
+    // rendered order is decided here: attention first, then working, id last.
     const remotePriority = (status: string) =>
       status === 'question' || status === 'permission'
         ? 2
         : status === 'busy' || status === 'retry'
           ? 1
           : 0;
-    return activeSessions
-      .filter(activeS => !sessions.some(s => s.sessionId === activeS.id))
-      .sort(
-        (a, b) => remotePriority(b.status) - remotePriority(a.status) || a.id.localeCompare(b.id)
-      );
-  }, [activeSessions, sessions]);
+    return filterLiveSidebarSessions(
+      activeSessions.filter(activeS => !sessions.some(s => s.sessionId === activeS.id)),
+      {
+        platformFilter: platformFilter ?? [],
+        projectFilter: projectFilter ?? [],
+        searchQuery,
+        // The stored list is queried with `organizationId ?? null`, where
+        // `null` means personal. Match it, or the personal view keeps org rows.
+        organizationId: organizationId ?? null,
+      }
+    ).sort(
+      (a, b) => remotePriority(b.status) - remotePriority(a.status) || a.id.localeCompare(b.id)
+    );
+  }, [activeSessions, sessions, platformFilter, projectFilter, searchQuery, organizationId]);
 
   const hasActiveFilter = (platformFilter?.length ?? 0) > 0 || (projectFilter?.length ?? 0) > 0;
 

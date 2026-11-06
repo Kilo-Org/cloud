@@ -11,6 +11,7 @@ import {
   createKiloDefaultEnkryptInputDetectors,
   ENKRYPT_CONFIGURABLE_INPUT_DETECTOR_IDS,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detectors';
+import { KILO_DEFAULT_POLICY_TEXT } from './kilo-default-policy';
 
 export type EnkryptInputDetectorsDraft = Omit<
   EnkryptInputDetectors,
@@ -145,7 +146,10 @@ export function fromDraft(draft: EnkryptGuardrailsDraft): EnkryptGuardrailsConfi
   };
 }
 
-/** Applies Kilo Default's detector selection while keeping keywords, topics, and policies. */
+/**
+ * Applies Kilo Default's detector selection and turns on Policy violation with Kilo's default
+ * policy text, keeping keywords, topics, and structured rules.
+ */
 export function applyKiloDefaultPreset(
   detectors: EnkryptInputDetectorsDraft
 ): EnkryptInputDetectorsDraft {
@@ -154,7 +158,12 @@ export function applyKiloDefaultPreset(
     ...preset,
     keyword_detector: { ...detectors.keyword_detector, enabled: preset.keyword_detector.enabled },
     topic_detector: { ...detectors.topic_detector, enabled: preset.topic_detector.enabled },
-    policy_violation: { ...detectors.policy_violation, enabled: preset.policy_violation.enabled },
+    policy_violation: {
+      ...detectors.policy_violation,
+      enabled: true,
+      format: 'policy_text',
+      policy_text: KILO_DEFAULT_POLICY_TEXT,
+    },
   };
 }
 

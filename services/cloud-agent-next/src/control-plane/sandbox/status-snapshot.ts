@@ -10,9 +10,11 @@ import { CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE } from '@kilocode/worker-utils/s
 import { CODE_REVIEW_CONTAINERS_INSTANCE } from '../../sandbox-containers/instance-size.js';
 import {
   getSandboxProviderLabel,
+  type SandboxRuntimeMetadata,
   type SandboxStatusSnapshot,
 } from '../../shared/sandbox-status.js';
 import type { AllocationView } from './allocation.js';
+import type { RuntimeIdentity } from './runtime-identity.js';
 
 export type AllocationStatusSnapshotInput = {
   /** The V2 allocation view, or null when the sandbox has no owner. */
@@ -24,38 +26,48 @@ export type AllocationStatusSnapshotInput = {
    * allocation recovery and provider lease backstops.
    */
   inactivityTimeoutMs: number;
+  runtimeIdentity?: RuntimeIdentity | null;
 };
+
+function containersSandboxType(instance: string): SandboxRuntimeMetadata['sandboxType'] {
+  if (instance === 'standard-3') return 'containers-standard-3';
+  if (instance === 'standard-4') return 'containers-standard-4';
+  if (instance === CODE_REVIEW_CONTAINERS_INSTANCE) return 'code-review';
+  return null;
+}
+
+function observedRuntime(
+  allocation: AllocationView,
+  runtimeIdentity: RuntimeIdentity | null | undefined
+): SandboxRuntimeMetadata {
+  const matched =
+    runtimeIdentity?.allocationId === allocation.allocationId ? runtimeIdentity : undefined;
+  const configuration = allocation.configuration;
+  const instance =
+    configuration?.provider === 'cloudflare-containers'
+      ? (configuration.instance ?? CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE)
+      : CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE;
+  return {
+    sandboxType:
+      allocation.provider === 'cloudflare-containers' ? containersSandboxType(instance) : 'unknown',
+    kiloCliVersion: matched?.kiloCliVersion ?? null,
+    wrapperVersion: matched?.wrapperVersion ?? null,
+    startedAt: null,
+    stoppedAt: null,
+  };
+}
 
 export function projectAllocationStatusSnapshot(
   input: AllocationStatusSnapshotInput
 ): SandboxStatusSnapshot {
-  const { allocation, observedAt, inactivityTimeoutMs } = input;
-  const containersInstance =
-    allocation?.configuration?.provider === 'cloudflare-containers'
-      ? (allocation.configuration.instance ?? CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE)
-      : CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE;
+  const { allocation, observedAt, inactivityTimeoutMs, runtimeIdentity } = input;
   const base = {
     provider: getSandboxProviderLabel(allocation?.provider),
     observedAt,
     inactivityTimeoutMs,
     estimatedSleepAt: null,
-    ...(allocation?.provider === 'cloudflare-containers'
-      ? {
-          runtime: {
-            sandboxType:
-              containersInstance === 'standard-3'
-                ? ('containers-standard-3' as const)
-                : containersInstance === 'standard-4'
-                  ? ('containers-standard-4' as const)
-                  : containersInstance === CODE_REVIEW_CONTAINERS_INSTANCE
-                    ? ('code-review' as const)
-                    : null,
-            kiloCliVersion: null,
-            wrapperVersion: null,
-            startedAt: null,
-            stoppedAt: null,
-          },
-        }
+    ...(allocation?.provider === 'cloudflare-containers' || allocation?.provider === 'vercel'
+      ? { runtime: observedRuntime(allocation, runtimeIdentity) }
       : {}),
   };
   if (allocation === null) {

@@ -12,6 +12,7 @@ import {
   assertUnusedLimiters,
   currentDeployment,
   inventory,
+  listWorkerScripts,
   observabilityIsDisabled,
   operatorAPI,
   OperatorHTTPError,
@@ -175,7 +176,7 @@ test('escaped/account-external operator paths never resolve credentials or reach
     await assert.rejects(api('DELETE', `${account}/workers/scripts/session-sync-production`));
     assert.equal(credentials, 0);
     assert.equal(local.requests.length, 0);
-    await api('GET', `${account}/workers/scripts?per_page=100&page=1`);
+    await api('GET', `${account}/workers/scripts`);
     assert.equal(credentials, 1);
     assert.equal(local.requests.length, 1);
   } finally {
@@ -234,6 +235,7 @@ test('transient ownership reads and deletes retry finitely then complete full pa
       secretPresent = false;
       return {};
     }
+    if (path === `${account}/workers/scripts`) return { body: { result: [] } };
     if (path === secretPath)
       return {
         body: {
@@ -283,8 +285,9 @@ test('transient ownership reads and deletes retry finitely then complete full pa
   }
 });
 
-test('late-page worker/secret remnants cannot produce clean teardown', async () => {
+test('single-page Worker and late-page secret remnants cannot produce clean teardown', async () => {
   const manifest = identity();
+  const apiWorkerName = 'Mixed_worker_' + 'a'.repeat(242);
   const local = await stub(request => {
     const url = new URL(request.url, 'http://127.0.0.1');
     if (
@@ -293,9 +296,18 @@ test('late-page worker/secret remnants cannot produce clean teardown', async () 
       url.pathname.includes('/hyperdrive/configs/')
     )
       return { status: 404 };
-    const worker = url.pathname.endsWith('/workers/scripts');
-    const secret = url.pathname.endsWith('/secrets');
-    if (worker || secret)
+    if (url.pathname === `${account}/workers/scripts`)
+      return {
+        body: {
+          result: [
+            ...Array.from({ length: 150 }, (_, index) => ({
+              id: index === 0 ? apiWorkerName : `unrelated-${index}`,
+            })),
+            { id: manifest.workerName },
+          ],
+        },
+      };
+    if (url.pathname.endsWith('/secrets'))
       return {
         body: {
           result:
@@ -304,9 +316,7 @@ test('late-page worker/secret remnants cannot produce clean teardown', async () 
                   id: `unrelated-${index}`,
                   name: 'OTHER',
                 }))
-              : worker
-                ? [{ id: manifest.workerName }]
-                : [{ id: 'replacement-id', name: manifest.secretNames[0] }],
+              : [{ id: 'replacement-id', name: manifest.secretNames[0] }],
           result_info: { total_pages: 2 },
         },
       };
@@ -323,6 +333,18 @@ test('late-page worker/secret remnants cannot produce clean teardown', async () 
     );
     assert(proof.errors.some(row => row.name === 'verify_worker_absent'));
     assert(proof.errors.some(row => row.name === 'verify_secrets_absent'));
+    assert.deepEqual(proof.remaining.worker, [manifest.workerName]);
+    assert.deepEqual(proof.remaining.secrets, [
+      { id: 'replacement-id', name: manifest.secretNames[0] },
+    ]);
+    assert.deepEqual(
+      local.requests.filter(row => row.path.startsWith(`${account}/workers/scripts`)),
+      [
+        { method: 'GET', path: `${account}/workers/scripts/${manifest.workerName}/deployments` },
+        { method: 'GET', path: `${account}/workers/scripts` },
+      ]
+    );
+    assert(local.requests.some(row => row.path.endsWith('/secrets?per_page=100&page=2')));
     assert(!local.requests.some(row => row.method === 'DELETE'));
   } finally {
     await local.close();
@@ -401,6 +423,159 @@ test('retry attempts and priced-tail deadline are hard finite limits', async () 
   assert.equal(attempts, 1);
 });
 
+for (const scenario of [
+  {
+    name: 'short first page with a stale high count',
+    counts: [68],
+    perPage: 100,
+    totalCount: 71,
+  },
+  {
+    name: 'empty first page with a stale high count',
+    counts: [0],
+    perPage: 100,
+    totalCount: 71,
+  },
+  {
+    name: 'empty second page with a stale high count',
+    counts: [2, 0],
+    perPage: 2,
+    totalCount: 71,
+  },
+  {
+    name: 'full additional page with a stale low count',
+    counts: [2, 2, 1],
+    perPage: 2,
+    totalCount: 1,
+  },
+]) {
+  test(`numbered inventory follows actual page size: ${scenario.name}`, async () => {
+    const manifest = identity();
+    const path = `${account}/secrets_store/stores/${manifest.secretsStoreID}/secrets`;
+    const pages = scenario.counts.map((count, page) => ({
+      result: {
+        secrets: Array.from({ length: count }, (_, index) =>
+          page === scenario.counts.length - 1 && index === count - 1
+            ? manifest.secrets[0]
+            : { id: `unrelated-${page}-${index}`, name: 'OTHER' }
+        ),
+      },
+      result_info: {
+        page: page + 1,
+        per_page: scenario.perPage,
+        count,
+        total_count: scenario.totalCount,
+      },
+    }));
+    const local = await stub(request => {
+      const page = Number(new URL(request.url, 'http://127.0.0.1').searchParams.get('page'));
+      return pages[page - 1] ? { body: pages[page - 1] } : { status: 503 };
+    });
+    try {
+      const values = await inventory(
+        operatorAPI('synthetic-only', { fetch: local.fetch }),
+        path,
+        result => result.secrets
+      );
+      assert.deepEqual(
+        values,
+        pages.flatMap(page => page.result.secrets)
+      );
+      assert.deepEqual(
+        local.requests,
+        pages.map((_, index) => ({
+          method: 'GET',
+          path: `${path}?per_page=100&page=${index + 1}`,
+        }))
+      );
+      if (scenario.counts.at(-1) > 0) assert(values.some(row => row.id === manifest.secrets[0].id));
+    } finally {
+      await local.close();
+    }
+  });
+}
+
+test('explicit total pages visits short and empty pages before the final owned secret', async () => {
+  const manifest = identity();
+  const path = `${account}/secrets_store/stores/${manifest.secretsStoreID}/secrets`;
+  const pages = [[{ id: 'unrelated', name: 'OTHER' }], [], manifest.secrets];
+  const local = await stub(request => {
+    const page = Number(new URL(request.url, 'http://127.0.0.1').searchParams.get('page'));
+    return pages[page - 1]
+      ? {
+          body: {
+            result: pages[page - 1],
+            result_info: { per_page: 100, total_pages: 3, total_count: 1 },
+          },
+        }
+      : { status: 503 };
+  });
+  try {
+    const values = await inventory(operatorAPI('synthetic-only', { fetch: local.fetch }), path);
+    assert.deepEqual(values, pages.flat());
+    assert.equal(local.requests.length, 3);
+    assert.equal(local.requests.at(-1).path, `${path}?per_page=100&page=3`);
+  } finally {
+    await local.close();
+  }
+});
+
+test('numbered inventory rejects unknown pagination and changed response schemas', async () => {
+  for (const body of [
+    { result: {} },
+    { result: [], result_info: [] },
+    { result: [], result_info: { next_cursor: 'next-page' } },
+    { result: [], result_info: { total_pages: '2' } },
+    { result: [], result_info: { total_pages: -1 } },
+    { result: [], result_info: { total_count: -1 } },
+    { result: [], result_info: { per_page: 0 } },
+    { result: [], result_info: { cursor: 123 } },
+  ]) {
+    const local = await stub(() => ({ body }));
+    try {
+      await assert.rejects(
+        inventory(
+          operatorAPI('synthetic-only', { fetch: local.fetch }),
+          `${account}/secrets_store/stores/${'b'.repeat(32)}/secrets`
+        ),
+        /schema changed/
+      );
+      assert.equal(local.requests.length, 1);
+    } finally {
+      await local.close();
+    }
+  }
+});
+
+test('Worker script listing rejects unavailable, paginated, and changed inventories', async () => {
+  for (const scenario of [
+    { status: 404, error: /Inventory unavailable/ },
+    { status: 503, error: /Cloudflare HTTP 503/ },
+    { body: { result: { scripts: [] } }, error: /response schema changed/ },
+    { body: { result: [{}] }, error: /Inventory Worker ID/ },
+    { body: { result: [], cursor: 'next-page' }, error: /pagination schema changed/ },
+    {
+      body: { result: [], result_info: { total_pages: 2 } },
+      error: /pagination schema changed/,
+    },
+    {
+      body: { result: [], result_info: { next_cursor: 'next-page' } },
+      error: /pagination schema changed/,
+    },
+  ]) {
+    const local = await stub(() => scenario);
+    try {
+      await assert.rejects(
+        listWorkerScripts(operatorAPI('synthetic-only', { fetch: local.fetch })),
+        scenario.error
+      );
+      assert.deepEqual(local.requests, [{ method: 'GET', path: `${account}/workers/scripts` }]);
+    } finally {
+      await local.close();
+    }
+  }
+});
+
 test('cursor pagination visits all pages and rejects repeated cursors', async () => {
   const paths = [];
   const values = await inventory(
@@ -421,7 +596,7 @@ test('cursor pagination visits all pages and rejects repeated cursors', async ()
   await assert.rejects(
     inventory(
       async () => ({ result: [], result_info: { cursor: 'repeat' } }),
-      `${account}/workers/scripts`
+      `${account}/secrets_store/stores/${'a'.repeat(32)}/secrets`
     ),
     /cursor repeated/
   );
@@ -564,7 +739,7 @@ test('deployed limiter collision refuses admission instead of changing limits or
     await assert.rejects(
       assertUnusedLimiters(
         operatorAPI('synthetic-only', { fetch: local.fetch }),
-        [{ id: 'another-worker' }],
+        [{ id: 'Mixed_worker_' + 'a'.repeat(242) }],
         namespaceIDs
       ),
       /already shared/

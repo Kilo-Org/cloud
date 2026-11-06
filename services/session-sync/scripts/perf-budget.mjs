@@ -88,6 +88,8 @@ export function forecast(input) {
   const pessimisticCFUSD = base + durationPessimisticUSD;
   const committedCeilingUSD =
     pessimisticCFUSD + vmUSD + plan.alreadySpentUSD + plan.delayedBillingReserveUSD;
+  const cloudflareTargetUSD =
+    plan.hardLimitUSD - plan.alreadySpentUSD - plan.delayedBillingReserveUSD - 5;
   return {
     version: 1,
     grossNoIncludedAllowances: true,
@@ -107,13 +109,13 @@ export function forecast(input) {
     committedCeilingUSD,
     hardLimitUSD: plan.hardLimitUSD,
     targets: {
-      cloudflareUSD: plan.hardLimitUSD - 15,
+      cloudflareUSD: cloudflareTargetUSD,
       vmUSD: 5,
       delayedReserveUSD: plan.delayedBillingReserveUSD,
     },
     passed:
       committedCeilingUSD <= plan.hardLimitUSD &&
-      pessimisticCFUSD <= plan.hardLimitUSD - 15 &&
+      pessimisticCFUSD <= cloudflareTargetUSD &&
       vmUSD <= 5,
     absoluteResourceDeadlineSeconds: plan.absoluteResourceDeadlineSeconds,
     workloadBounds: plan.stages.map(row => ({

@@ -2914,6 +2914,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
           gitUrl: metadata.gitUrl ?? null,
           gitBranch: metadata.upstreamBranch ?? metadata.branchName ?? null,
           worktreeId: metadata.worktreeId ?? null,
+          environmentId: metadata.environmentId ?? null,
           mode: metadata.mode ?? null,
           model: metadata.model ?? null,
           variant: metadata.variant ?? null,

@@ -125,7 +125,7 @@ fi
 
 # 1b. Build the harness SDK, which apps/mobile typechecks against (same rule as trpc)
 if $changes_only; then
-  harness_changed=$(git diff --name-only "$base" -- 'packages/harness-sdk/src/**' 'packages/harness-sdk/tsconfig.json' 'packages/harness-sdk/package.json' | head -1 || true)
+  harness_changed=$(git diff --name-only "$base" -- 'packages/harness-sdk/src/**' 'packages/harness-sdk/tsconfig.json' 'packages/harness-sdk/tsconfig.build.json' 'packages/harness-sdk/package.json' | head -1 || true)
   if [ -n "$harness_changed" ]; then
     echo "[typecheck] harness-sdk source changed, rebuilding"
     pnpm --filter @kilocode/harness-sdk run build

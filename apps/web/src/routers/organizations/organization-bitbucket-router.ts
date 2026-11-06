@@ -269,7 +269,6 @@ export const organizationBitbucketRouter = createTRPCRouter({
 
         await cleanupBitbucketCodeReviewerForIntegration({
           organizationId: input.organizationId,
-          currentManagerId: ctx.user.id,
           integrationId: input.integrationId,
           workspace: integration.workspace,
         });

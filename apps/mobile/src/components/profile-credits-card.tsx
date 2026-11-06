@@ -165,7 +165,10 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
         <Text className="text-xs text-muted-foreground">{t('credits.expiryUnavailable')}</Text>
       )}
       {!creditsFailed && creditsPending && (
-        <Skeleton className="h-3 w-40 max-w-full rounded bg-muted-soft" />
+        // The bar reserves the note's own line box: `text-xs` here is a 14 dp
+        // line, so a 12 dp bar let the note's arrival push every row below by
+        // the difference (Android base cell, design gate 2026-11-06).
+        <Skeleton className="h-[14px] w-40 max-w-full rounded bg-muted-soft" />
       )}
       {!creditsFailed && !creditsPending && (
         <CreditExpiryNote

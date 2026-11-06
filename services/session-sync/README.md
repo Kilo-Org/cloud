@@ -954,12 +954,12 @@ retained before interpreting cross-host latency.
 registration, seed, checkpoint, retry/reconciliation, ticket/exchange, WebSocket,
 SQL, Worker CPU, rounded DO duration, rounded R2 operations, Logpush, analytics,
 downstream ingestion, VM lifetime, storage/egress, and delayed billing reserve.
-Expected activity and pessimistic activity are distinct inputs. The default/legacy
-`hardLimitUSD: 50` plan allows at most $35 Cloudflare, $5 VMs, and at least $10
-untouched reserve. Only a newly forecast plan with explicit parent approval may
-raise `hardLimitUSD` (maximum $100); a $100 plan allows at most $85 Cloudflare,
-the same $5 VMs and $10 reserve. Both include `alreadySpentUSD` from all prior
-attempts in the cumulative ceiling. Run `node scripts/perf-budget.mjs budget-plan.json`
+Expected activity and pessimistic activity are distinct inputs. Plans reserve
+the VM allowance and the full delayed-billing reserve before allocating the
+remaining Cloudflare ceiling. They also deduct `alreadySpentUSD` from every
+earlier attempt; missing cumulative spend fails admission. The default
+`hardLimitUSD` is $50. Only a fresh forecast with explicit parent approval can
+raise it, up to $100. Run `node scripts/perf-budget.mjs budget-plan.json`
 and save its passing output as the forecast; the planner copies that forecast's
 cap into its approval request. Parent GO must explicitly match that exact hashed
 forecast cap: a $100 GO cannot expand a $50 forecast. Analytics lag is not an

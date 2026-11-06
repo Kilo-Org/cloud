@@ -304,11 +304,12 @@ function socketReason(value) {
   if (typeof value !== 'string') return undefined;
   const bounded = value.length > 2048 ? value.slice(0, 2048).replace(/\S*$/, '[truncated]') : value;
   return bounded
+    .replace(/\bauthorization\b(?:\s*[:=]|\s+)[\s\S]*/gi, '[redacted]')
     .replace(/\b(?:[a-z][a-z\d+.-]*:\/\/|www\.)[^\s"'<>]+/gi, '[redacted]')
     .replace(/\bkilo-session-ticket\.[^\s"',;<>]+/gi, '[redacted]')
     .replace(/\bbearer\s+(?:"[^"]*(?:"|$)|'[^']*(?:'|$)|[^\s"'<>;,]+)/gi, '[redacted]')
     .replace(
-      /\b(?:authorization|[\w-]*ticket|sec-websocket-protocol|protocols?)\b\s*[:=]?\s*(?:\[[^\]]*(?:\]|$)|"[^"]*(?:"|$)|'[^']*(?:'|$)|[^\s,;]+)/gi,
+      /\b(?:[\w-]*ticket|sec-websocket-protocol|protocols?)\b\s*[:=]?\s*(?:\[[^\]]*(?:\]|$)|"[^"]*(?:"|$)|'[^']*(?:'|$)|[^\s,;]+)/gi,
       '[redacted]'
     )
     .replace(/\b[\w-]+\.[\w-]+\.[\w-]+\b/g, '[redacted]')
@@ -356,17 +357,18 @@ function trackSocket(socket, s, presence = false) {
   socket.addEventListener('close', event => {
     const unexpected = !stopping && !!window && Date.now() < window.drainAt;
     // Only the wire event, never RemoteSocket's synthetic internal disconnect(1011).
-    stats.firstSocketClose ??= {
-      ...socketContext(socket, s, presence),
-      event: 'websocket_close',
-      nativeCloseCode:
-        Number.isInteger(event.code) && event.code >= 0 && event.code <= 4999
-          ? event.code
-          : undefined,
-      wasClean: typeof event.wasClean === 'boolean' ? event.wasClean : undefined,
-      reason: socketReason(event.reason),
-      unexpected,
-    };
+    if (unexpected)
+      stats.firstSocketClose ??= {
+        ...socketContext(socket, s, presence),
+        event: 'websocket_close',
+        nativeCloseCode:
+          Number.isInteger(event.code) && event.code >= 0 && event.code <= 4999
+            ? event.code
+            : undefined,
+        wasClean: typeof event.wasClean === 'boolean' ? event.wasClean : undefined,
+        reason: socketReason(event.reason),
+        unexpected,
+      };
     if (!stopping && window && Date.now() < window.drainAt) {
       stats.reconnects++;
       stop('unexpected_socket_close');

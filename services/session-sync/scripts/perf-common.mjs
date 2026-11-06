@@ -508,14 +508,15 @@ export function validateCloudAdmission(
   assert(manifest.teardownAt > now);
   assert.equal(budget.passed, true);
   const hardLimitUSD = budget.hardLimitUSD ?? 50;
-  const alreadySpentUSD = budget.alreadySpentUSD ?? 0;
+  const alreadySpentUSD = budget.alreadySpentUSD;
   assert(Number.isFinite(hardLimitUSD) && hardLimitUSD >= 50 && hardLimitUSD <= 100);
   assert(Number.isFinite(alreadySpentUSD) && alreadySpentUSD >= 0);
   assert(
     budget.pessimisticCFUSD >= 0 &&
-      budget.pessimisticCFUSD <= hardLimitUSD - 15 &&
+      budget.pessimisticCFUSD <= hardLimitUSD - alreadySpentUSD - budget.reserveUSD - 5 &&
       budget.vmUSD >= 0 &&
       budget.vmUSD <= 5 &&
+      Number.isFinite(budget.reserveUSD) &&
       budget.reserveUSD >= 10 &&
       budget.committedCeilingUSD >=
         budget.pessimisticCFUSD + budget.vmUSD + budget.reserveUSD + alreadySpentUSD &&

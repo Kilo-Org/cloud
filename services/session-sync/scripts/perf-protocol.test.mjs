@@ -317,6 +317,11 @@ async function socketFailureResult(scenario) {
       constructor(url) {
         super();
         queueMicrotask(() => { this.readyState = 1; dispatch(this, 'open'); });
+        if (scenario.benignOtherClose &&
+            (new URL(url).pathname === '/v1/presence') !== scenario.presence)
+          setTimeout(() => dispatch(this, 'close', {
+            code: 1000, wasClean: true, reason: 'benign startup close'
+          }), 0);
         if ((new URL(url).pathname === '/v1/presence') === scenario.presence)
           setTimeout(() => {
             for (let index = 0; index < 128; index++)
@@ -394,6 +399,7 @@ test(
       ' diagnostic'.repeat(400);
     const { result, output } = await socketFailureResult({
       presence: true,
+      benignOtherClose: true,
       message: reason,
       errorCode: 'UND_ERR_SOCKET',
       causeCode: 'ECONNRESET',
@@ -412,6 +418,7 @@ test(
     const retained = JSON.stringify([result.firstSocketError, result.firstSocketClose]);
     assert(retained.length < 1024);
     for (const secret of secrets) assert(!JSON.stringify({ result, output }).includes(secret));
+    assert(!retained.includes('benign startup close'));
     assert(!retained.includes('later failure') && !retained.includes('later close'));
   }
 );
@@ -437,5 +444,30 @@ test(
     assert(!JSON.stringify(result).includes('private-cause-code'));
     assert(!JSON.stringify(result).includes('private protocol words'));
     assert(!JSON.stringify(result).includes('private.invalid'));
+  }
+);
+
+test(
+  'authorization diagnostics conceal short and folded credentials',
+  { timeout: 20000 },
+  async () => {
+    const message =
+      'Unexpected server response: 503\nAuthorization: Basic dTpw\n  folded-credential\ntrailing diagnostic';
+    const { result, output } = await socketFailureResult({
+      presence: true,
+      message,
+      errorCode: 'UND_ERR_SOCKET',
+      close: { code: 1006, wasClean: false, reason: message },
+    });
+    assert.equal(result.failure, 'unexpected_socket_close');
+    assert.equal(result.firstSocketError.httpStatus, 503);
+    for (const event of [result.firstSocketError, result.firstSocketClose]) {
+      assert(event.reason.includes('Unexpected server response'));
+      assert(event.reason.length <= 256);
+    }
+    const report = JSON.stringify({ result, output });
+    assert(!report.includes('dTpw'));
+    assert(!report.includes('folded-credential'));
+    assert(!report.includes('trailing diagnostic'));
   }
 );

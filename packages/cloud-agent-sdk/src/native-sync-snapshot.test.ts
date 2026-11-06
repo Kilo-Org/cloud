@@ -495,3 +495,120 @@ describe('fetchNativeSnapshot', () => {
     expect(fetch).toHaveBeenCalledTimes(3);
   });
 });
+
+test('cancels a non-cooperative snapshot request and fences its late continuation', async () => {
+  const controller = new AbortController();
+  let release: (value: unknown) => void = () => {};
+  let signal: AbortSignal | null | undefined;
+  const request = jest.fn(<T>(_path: string, init?: RequestInit) => {
+    signal = init?.signal;
+    return new Promise<T>(resolve => {
+      release = value => resolve(value as T);
+    });
+  });
+  const pending = fetchNativeSnapshot(
+    request as Parameters<typeof fetchNativeSnapshot>[0],
+    sessionID,
+    controller.signal
+  );
+  const rejected = expect(pending).rejects.toThrow('canceled');
+  controller.abort();
+  await rejected;
+  release(state());
+  await Promise.resolve();
+  await Promise.resolve();
+  expect(signal?.aborted).toBe(true);
+  expect(request).toHaveBeenCalledTimes(1);
+});
+
+test('the snapshot deadline covers the entire paginated read', async () => {
+  jest.useFakeTimers();
+  let signal: AbortSignal | null | undefined;
+  let reads = 0;
+  const request = jest.fn(<T>(path: string, init?: RequestInit) => {
+    signal = init?.signal;
+    const body =
+      path === sessionPath
+        ? state()
+        : page([entity('session', `item-${reads}`, null)], String(reads));
+    reads++;
+    return new Promise<T>(resolve => {
+      setTimeout(() => resolve(body as T), 8000);
+    });
+  });
+  try {
+    const pending = fetchNativeSnapshot(
+      request as Parameters<typeof fetchNativeSnapshot>[0],
+      sessionID
+    );
+    const rejected = expect(pending).rejects.toThrow('timed out');
+    await jest.advanceTimersByTimeAsync(120_000);
+    await rejected;
+    expect(request).toHaveBeenCalledTimes(15);
+    expect(signal?.aborted).toBe(true);
+    await jest.advanceTimersByTimeAsync(1000);
+    expect(request).toHaveBeenCalledTimes(15);
+  } finally {
+    jest.useRealTimers();
+  }
+});
+
+test('an already canceled snapshot starts no request', async () => {
+  const controller = new AbortController();
+  controller.abort();
+  const request = jest.fn(<T>() => Promise.resolve(undefined as T));
+  await expect(
+    fetchNativeSnapshot(
+      request as Parameters<typeof fetchNativeSnapshot>[0],
+      sessionID,
+      controller.signal
+    )
+  ).rejects.toThrow('canceled');
+  expect(request).not.toHaveBeenCalled();
+});
+
+test('a stalled request ends at its per-request deadline', async () => {
+  jest.useFakeTimers();
+  const request = jest.fn(<T>() => new Promise<T>(() => {}));
+  try {
+    const pending = fetchNativeSnapshot(
+      request as Parameters<typeof fetchNativeSnapshot>[0],
+      sessionID
+    );
+    const rejected = expect(pending).rejects.toThrow('request timed out');
+    await jest.advanceTimersByTimeAsync(15_000);
+    await rejected;
+    expect(request).toHaveBeenCalledTimes(1);
+  } finally {
+    jest.useRealTimers();
+  }
+});
+
+test('a maximum-size snapshot tolerates 100 milliseconds per serial page', async () => {
+  jest.useFakeTimers();
+  let start = 0;
+  const request = jest.fn(<T>(path: string) => {
+    let body: unknown = state();
+    if (path !== sessionPath) {
+      const entities = Array.from({ length: 100 }, (_, index) =>
+        entity('session', `item-${start + index}`, null)
+      );
+      start += entities.length;
+      body = page(entities, start < 100_000 ? String(start) : null);
+    }
+    return new Promise<T>(resolve => {
+      setTimeout(() => resolve(body as T), 100);
+    });
+  });
+  try {
+    const pending = fetchNativeSnapshot(
+      request as Parameters<typeof fetchNativeSnapshot>[0],
+      sessionID
+    );
+    await jest.advanceTimersByTimeAsync(100_100);
+    expect((await pending).entities).toHaveLength(100_000);
+    expect(request).toHaveBeenCalledTimes(1001);
+  } finally {
+    jest.useRealTimers();
+  }
+});

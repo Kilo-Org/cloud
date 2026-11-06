@@ -25,8 +25,14 @@ function secretsMatch(stored: string, presented: string): boolean {
 
 /**
  * One object per ticket. The Worker addresses it with `newUniqueId()`, so the
- * object id is not a secret: the ticket also carries `secret`, and only a
- * matching secret consumes the ticket.
+ * object id is not a secret on its own: a ticket is the object id joined with
+ * its own `secret`. The mint path in `index.ts` builds both in one place and
+ * returns them in one response to the authenticated caller, so the object id
+ * never travels apart from its secret.
+ *
+ * A ticket is single use: any redemption attempt burns it, whether or not the
+ * presented secret matches, so a wrong secret cannot be retried. Only a
+ * matching, unexpired secret returns the `userId`.
  */
 export class ConnectionTicketDO extends DurableObject<Env> {
   async mint(input: TicketMintRequest): Promise<void> {

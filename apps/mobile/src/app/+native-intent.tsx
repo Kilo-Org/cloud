@@ -95,6 +95,9 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
     if (/(?:^|\/)dev\/transcript-style-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/(auth)/transcript-style-fixture';
     }
+    if (/(?:^|\/)dev\/preparation-copy-fixture\/?(?:[?#].*)?$/.test(path)) {
+      return '/(app)/preparation-copy-fixture';
+    }
     if (/(?:^|\/)dev\/new-session-plan-refusal-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/(app)/new-session-plan-refusal-fixture';
     }
@@ -106,6 +109,12 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
     }
     if (/(?:^|\/)dev\/transcript-readonly-failure-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/(app)/transcript-readonly-failure-fixture';
+    }
+    if (/(?:^|\/)dev\/transcript-execution-failure-fixture\/?(?:[?#].*)?$/.test(path)) {
+      return '/(app)/transcript-execution-failure-fixture';
+    }
+    if (/(?:^|\/)dev\/transcript-undelivered-fixture\/?(?:[?#].*)?$/.test(path)) {
+      return '/(app)/transcript-undelivered-fixture';
     }
     // Dev-only render-recovery faults: `kiloapp:///dev/render-recovery-fixture/<name>`
     // arms one and opens the fixture route, or clears it without navigating.

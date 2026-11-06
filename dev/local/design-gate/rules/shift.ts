@@ -27,7 +27,7 @@ type Shift = {
 
 function largestShift(
   byKey: readonly ReadonlyMap<string, LayoutNode>[],
-  routes: readonly string[],
+  contexts: readonly string[],
   key: string,
   intervalMs: number
 ) {
@@ -37,7 +37,7 @@ function largestShift(
   let worst: Shift | undefined;
   for (let sample = byKey.findIndex(nodes => nodes.has(key)); sample < byKey.length; sample++) {
     const node = byKey[sample].get(key);
-    if (!node || routes[sample] !== routes[sample - 1]) {
+    if (!node || contexts[sample] !== contexts[sample - 1]) {
       rest = undefined;
       previous = undefined;
       run = 0;
@@ -98,13 +98,11 @@ export function checkShift(timeline: readonly LayoutTree[], intervalMs: number):
     });
     return new Map(unique);
   });
+  // A tab switch keeps the route (`/`), so the focused screen is part of the
+  // comparison context: another screen on top is not a move inside one.
+  const contexts = timeline.map(tree => `${tree.env.route}|${tree.env.screen ?? ''}`);
   const shifts = [...new Set(byKey.flatMap(nodes => [...nodes.keys()]))].flatMap(key => {
-    const shift = largestShift(
-      byKey,
-      timeline.map(tree => tree.env.route),
-      key,
-      intervalMs
-    );
+    const shift = largestShift(byKey, contexts, key, intervalMs);
     return shift ? [shift] : [];
   });
   const groups: Shift[][] = [];

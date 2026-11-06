@@ -1,4 +1,4 @@
-import type * as z from 'zod';
+import * as z from 'zod';
 import pLimit from 'p-limit';
 import {
   normalizeModelId,
@@ -25,7 +25,7 @@ import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/defini
 import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
 import { logAutoModelChangesForAllOrgs } from '@/lib/organizations/auto-model-change-log';
 import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
-import type { StoredModel } from '@kilocode/db/schema-types';
+import type { Endpoint, StoredModel } from '@kilocode/db/schema-types';
 import {
   EndpointsSchema,
   ModelsSchema,
@@ -68,9 +68,11 @@ import { injectDirectByokProviders } from '@/lib/providers/openrouter/inject-dir
  */
 const SYNC_PROVIDERS_SNAPSHOT_LOCK_KEY = 'sync-providers:snapshot';
 
-const ENDPOINTS_FETCH_TIMEOUT_MS = 30_000;
+const NO_ENDPOINTS_RESOURCE = 'no-endpoints-resource';
+const NoEndpointsResourceSchema = z.strictObject({ status: z.literal(404) });
 
 type GatewayModels = z.infer<typeof ModelsSchema>;
+type GatewayModelEndpoints = Endpoint[] | typeof NO_ENDPOINTS_RESOURCE;
 
 function gatewayHeaders(gateway: Provider) {
   return {
@@ -102,6 +104,27 @@ export const openRouterGatewayModelsSource = gatewayModelsSource(
 );
 export const vercelGatewayModelsSource = gatewayModelsSource(VERCEL_AI_GATEWAY, '/models');
 
+export function gatewayModelEndpointsUrl(gateway: Provider, modelId: string) {
+  return `${gateway.apiUrl}/models/${modelId}/endpoints`;
+}
+
+export function gatewayModelEndpointsSource(
+  gateway: Provider,
+  modelId: string
+): MetadataSource<GatewayModelEndpoints> {
+  return {
+    url: gatewayModelEndpointsUrl(gateway, modelId),
+    headers: () => gatewayHeaders(gateway),
+    // Gateways list some models (e.g. Vercel's `*-batch` variants) that have no endpoints resource.
+    // Storing the 404 as a row keeps sync-providers from fetching those models live on every run.
+    rawWhenNotFound: { status: 404 } satisfies z.infer<typeof NoEndpointsResourceSchema>,
+    parse: raw =>
+      NoEndpointsResourceSchema.safeParse(raw).success
+        ? NO_ENDPOINTS_RESOURCE
+        : EndpointsSchema.parse(raw).data.endpoints,
+  };
+}
+
 export const openRouterProvidersSource: MetadataSource<OpenRouterProvider[]> = {
   url: 'https://openrouter.ai/api/frontend/v1/all-providers',
   headers: () => ATTRIBUTION_HEADERS,
@@ -114,7 +137,6 @@ export const openRouterProvidersSource: MetadataSource<OpenRouterProvider[]> = {
 };
 
 export async function fetchGatewayModels(gateway: Provider, source: MetadataSource<GatewayModels>) {
-  const headers = gatewayHeaders(gateway);
   const models = await getMetadata(source, readDb);
 
   const limit = pLimit(8);
@@ -123,23 +145,11 @@ export async function fetchGatewayModels(gateway: Provider, source: MetadataSour
   await Promise.all(
     models.data.map(model =>
       limit(async () => {
-        const endpointsResponse = await fetch(`${gateway.apiUrl}/models/${model.id}/endpoints`, {
-          method: 'GET',
-          headers,
-          cache: 'no-store',
-          signal: AbortSignal.timeout(ENDPOINTS_FETCH_TIMEOUT_MS),
-        });
-        // Gateways list some models (e.g. Vercel's `*-batch` variants) that have no endpoints resource.
-        if (endpointsResponse.status === 404) {
+        const endpoints = await getMetadata(gatewayModelEndpointsSource(gateway, model.id), readDb);
+        if (endpoints === NO_ENDPOINTS_RESOURCE) {
           modelsWithoutEndpoints.push(model.id);
           return;
         }
-        if (!endpointsResponse.ok) {
-          throw new Error(
-            `Fetching model endpoints for ${gateway.type}/${model.id} failed: ${endpointsResponse.status}`
-          );
-        }
-        const endpoints = EndpointsSchema.parse(await endpointsResponse.json());
         const { reasoning, ...modelMetadata } = model;
         result[model.id] = {
           ...modelMetadata,
@@ -151,11 +161,14 @@ export async function fetchGatewayModels(gateway: Provider, source: MetadataSour
               }),
             },
           }),
-          endpoints: endpoints.data.endpoints,
+          endpoints,
         };
       })
     )
-  );
+  ).catch((error: unknown) => {
+    limit.clearQueue();
+    throw error;
+  });
 
   if (modelsWithoutEndpoints.length > 0) {
     console.warn(

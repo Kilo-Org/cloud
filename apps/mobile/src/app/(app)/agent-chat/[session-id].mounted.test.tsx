@@ -536,11 +536,13 @@ beforeEach(() => {
     },
     // The POP_TO end state the component relies on: find the destination at or
     // below the current index, truncate everything above it; with no match,
-    // drop the current route and land on the destination.
-    dismissTo: (href: string) => {
-      const index = navigationRoutes.lastIndexOf(href.split('?')[0] ?? href);
+    // drop the current route and land on the destination. An object href lands
+    // on its pathname, as the real router does.
+    dismissTo: (href: string | { pathname: string }) => {
+      const path = typeof href === 'string' ? (href.split('?')[0] ?? href) : href.pathname;
+      const index = navigationRoutes.lastIndexOf(path);
       if (index === -1) {
-        navigationRoutes.splice(0, navigationRoutes.length, href);
+        navigationRoutes.splice(0, navigationRoutes.length, path);
       } else {
         navigationRoutes.splice(index + 1);
       }

@@ -43,10 +43,10 @@ description: Work out, test, and save a Cloud Agent repository environment for t
 - Call get_environment_draft after setup to read network.discoveryAudit. It lists observed hosts and request counts. If nextCursor is present, call again with auditCursor set to that cursor. Continue until nextCursor is null.
 - Read network.mode to respect the user's choice of Full or Restricted access. Recommend Restricted access, but never change the mode yourself.
 - Recommend only hosts setup needs (package registries, container registries, toolchain downloads). Explain each recommendation. Exclude incidental traffic and hosts already listed in the draft or baseline.
-- For Restricted access, call request_network_hosts without childSessionId to use this setup session's audit. For hosts found on later pages, pass the same auditCursor used to read them. End your turn and wait for approval.
+- For Restricted access, run verification first. Call request_network_hosts with childSessionId from a verification whose audit denied the needed hosts. Use auditCursor for later audit pages. End your turn and wait for approval before retrying.
 - For Full access, save the recommended hosts with update_environment_draft requiredHosts. Do not request host approval or block completion on switching to Restricted access. Include the recommendation in your summary.
 - Verification runs setup from scratch under the user's chosen policy. Do not verify while host requests are pending.
-- If verification fails, fix setup here with full access and request any additional observed hosts before verifying again. Do not bypass declined hosts.
+- If verification fails, fix setup here with full access. Under Restricted access, request additional hosts only with denied verification evidence. Do not bypass declined hosts.
 - If setup needs no additional hosts, verify without a host request.
 
 ## Smoke checks

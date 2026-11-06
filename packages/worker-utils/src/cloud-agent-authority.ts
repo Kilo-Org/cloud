@@ -276,7 +276,7 @@ export function cloudAgentAuthorityInputSchema(
   if (environmentSetupOperation) {
     const jsonSchema = z.toJSONSchema(environmentSetupOperation.schema, { io: 'input' });
     const properties = { ...jsonSchema.properties };
-    delete properties.runId;
+    delete properties['runId'];
     const required = jsonSchema.required?.filter(key => key !== 'runId');
     return { ...jsonSchema, properties, required: required ?? [] };
   }

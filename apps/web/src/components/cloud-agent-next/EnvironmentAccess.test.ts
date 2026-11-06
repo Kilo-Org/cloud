@@ -10,6 +10,14 @@ import { afterEach, beforeEach, describe, expect, jest, test } from '@jest/globa
 
 Object.assign(globalThis, { React });
 
+jest.mock('@/hooks/useEnvironmentSetupRuns', () => ({
+  useEnvironmentSetupEnabled: () => ({ data: { enabled: false, canStart: false } }),
+  useEnvironmentSetupRunsForEnvironment: () => ({ data: [] }),
+  useEnvironmentSetupRunMutations: () => ({
+    resolveSecretRequests: { isPending: false, mutateAsync: jest.fn() },
+  }),
+}));
+
 let mockCanManage = false;
 let mockEnvironment: EnvironmentResponse;
 let mockEnvironments: EnvironmentSummary[];

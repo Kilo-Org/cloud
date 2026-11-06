@@ -124,13 +124,18 @@ export function KiloPassSubscriptionCard({
         >
           {cardBody(
             // Bars the height of the loaded title and description lines, clamped
-            // so a narrow window cannot overflow the card.
+            // so a narrow window cannot overflow the card. Their fill is
+            // `bg-muted-soft`: the theme's default skeleton fill equals this
+            // shell's `bg-secondary` in light mode, so a bare bar was invisible
+            // there (the same pairing the balance skeleton fixes in
+            // `profile-credits-card.tsx`). `--muted-soft` keeps a step between
+            // them in both themes.
             <View className="gap-3">
-              <Skeleton className="h-4 w-28 max-w-full rounded" />
-              <Skeleton className="h-3 w-48 max-w-full rounded" />
+              <Skeleton className="h-4 w-28 max-w-full rounded bg-muted-soft" />
+              <Skeleton className="h-3 w-48 max-w-full rounded bg-muted-soft" />
             </View>,
             undefined,
-            <Skeleton className="h-10 w-10 rounded-md" />
+            <Skeleton className="h-10 w-10 rounded-md bg-muted-soft" />
           )}
         </View>
       ) : null}

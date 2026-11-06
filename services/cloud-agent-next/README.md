@@ -44,10 +44,10 @@ callback targets remain available to trusted integrations.
 ### Sandbox images
 
 Local and deployed workers use the native DO-managed containers runtime; the
-SDK-backed sandbox classes are retired. Its images are `Dockerfile.containers`
-(all-in-one) and `Dockerfile.containers.runtime-free` (runtime-free base for
-downloaded startup). Both use Debian's current Git packages; no third-party APT
-source is required.
+SDK-backed sandbox classes are retired. `Dockerfile.containers.runtime-free` is
+the only native base image. Each new allocation downloads its verified CLI and
+wrapper release before startup. It uses Debian's current Git packages; no
+third-party APT source is required.
 
 The retired SDK class names remain exported as no-op tombstones so their
 historical migrations and stored instances stay valid. They have no binding or
@@ -697,10 +697,16 @@ pnpm --filter cloud-agent-next dev
 ### Local Development with the native image
 
 The `dev` named environment in [`wrangler.jsonc`](wrangler.jsonc) uses
-`./Dockerfile.containers` for the native sandbox container image and sets
+`./Dockerfile.containers.runtime-free` for the native sandbox container image and sets
 `KILOCODE_BACKEND_BASE_URL=http://localhost:3000`, which you will almost
 certainly want to override. Cloudflare builds the image automatically when you
 run the dev environment.
+
+The development launcher builds and publishes runtime artifacts to local Wrangler R2,
+then injects their descriptor hashes. It needs Bun, Docker and registry access on the
+first start, but no remote runtime bucket credentials. Restart after wrapper changes.
+Local and HTTP E2E workers share the explicit `.wrangler/state` persistence location.
+ARM Docker hosts require linux/amd64 emulation for the pinned CLI distribution.
 
 #### Environment Variables
 

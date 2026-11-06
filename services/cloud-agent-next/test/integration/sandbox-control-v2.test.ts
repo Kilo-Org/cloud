@@ -1,4 +1,4 @@
-import { preinstalledStartup } from '../../src/sandbox-control/preinstalled-startup.js';
+import { supervisorStartup } from '../fixtures/supervisor-startup.js';
 import {
   env,
   evictAllDurableObjects,
@@ -59,6 +59,7 @@ const SANDBOX_ID = 'sbx__control_v2_smoke';
 const CUTOVER_SANDBOX_ID = 'sbx__control_v2_cutover';
 const CUSTOM_ALLOCATION_NAME = 'usr-shared-allocation-name';
 const LEGACY_ALLOCATION_NAME = 'usr-legacy-shared-allocation';
+const WORKSPACE = 'worktree_11111111-1111-4111-8111-111111111111';
 const MINUTE = 60 * 1000;
 const TIMERS = CONTROL_PLANE_TIMERS.sandbox;
 
@@ -483,7 +484,7 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     );
   });
   it.each([
-    { provider: 'cloudflare' },
+    { provider: 'vercel' },
     { provider: 'cloudflare-containers' },
     { provider: 'cloudflare-containers', instance: 'standard-3' },
     { provider: 'cloudflare-containers', instance: 'standard-4' },
@@ -681,8 +682,18 @@ describe('SandboxControlV2 allocation lifecycle', () => {
         userId: 'owner-1',
         kiloSessionId: `kilo-${sessionId}`,
         kiloToken: RUNTIME_AUTHORIZED_KILO_TOKEN,
+        workspaceId: WORKSPACE,
+        scopeId: WORKSPACE,
       },
     };
+    await runInDurableObject(stub, (_instance, state) =>
+      state.storage.put('sandbox_workspace_owner:v1', {
+        kind: 'workspace',
+        workspaceId: WORKSPACE,
+        directory: directPrepare.spec.directory,
+        userId: 'owner-1',
+      })
+    );
     expect(await stub.prepare(directPrepare)).toMatchObject({ state: 'preparing' });
 
     await waitFor(async () =>
@@ -2007,7 +2018,7 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     });
     const stub = await startAllocation(provider, {
       preparingRoute: 'workspace_cold_retry',
-      timers: { providerCreateRetryMs: 1 },
+      timers: { providerCreateRetryMs: MINUTE },
     });
     await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
     const firstAttempt = launchIdentity(provider);
@@ -2018,6 +2029,7 @@ describe('SandboxControlV2 allocation lifecycle', () => {
       expect(state.allocationId).not.toBe(firstAttempt.allocationId);
       expect(state.providerRef).toBeNull();
     });
+    await setDeadline(stub, { create_deadline_at: Date.now() - 1 });
     await runAlarm(stub);
     // A transient launch failure must retain the retry: a second attempt starts.
     await waitFor(() => expect(provider.createCalls).toBe(2));
@@ -2101,14 +2113,15 @@ describe('SandboxControlV2 allocation egress policy', () => {
       spec: {
         sessionId,
         kiloSessionId,
-        directory: `/workspace/${sessionId}`,
+        directory: '/workspace/widgets',
         attemptId: `${sessionId}-requested`,
       },
       credentials: {
         userId: 'owner-1',
         kiloSessionId,
         kiloToken: RUNTIME_AUTHORIZED_KILO_TOKEN,
-        scopeId: sessionId,
+        scopeId: WORKSPACE,
+        workspaceId: WORKSPACE,
         repository: { type: 'git', url: repositoryUrl },
       },
       sandboxSelection: {
@@ -2190,7 +2203,7 @@ describe('SandboxControlV2 allocation egress policy', () => {
     await configureEgressSandbox(provider);
     const stub = await startAllocation(provider, {
       sandboxId,
-      provider: 'cloudflare',
+      provider: 'vercel',
       egressMode: 'unrestricted',
     });
     await awaitStarting(provider, stub);
@@ -2258,7 +2271,7 @@ describe('SandboxControlV2 allocation egress policy', () => {
           instanceId: 'reconstructed-allocation',
         });
         await reconstructed.provider.launch(ref, {
-          command: preinstalledStartup(),
+          command: supervisorStartup(),
           env: {},
         });
       });
@@ -2617,7 +2630,8 @@ describe('SandboxControlV2 prepare frame secrets', () => {
         kiloToken: RUNTIME_AUTHORIZED_KILO_TOKEN,
         orgId: 'org-1',
         repository: { type: 'github', repo: 'acme/widgets' },
-        scopeId: sessionId,
+        scopeId: WORKSPACE,
+        workspaceId: WORKSPACE,
         encryptedSecrets,
       },
     };

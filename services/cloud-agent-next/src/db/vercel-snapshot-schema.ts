@@ -6,6 +6,7 @@ export const vercelSnapshotBuilds = sqliteTable('vercel_snapshot_builds', {
   credential_id: text('credential_id').notNull(),
   build_generation: text('build_generation').notNull(),
   runtime_build_id: text('runtime_build_id').notNull(),
+  recipe_digest: text('recipe_digest'),
   step: text('step').notNull(),
   retry_count: integer('retry_count').notNull().default(0),
   next_attempt_at: integer('next_attempt_at'),

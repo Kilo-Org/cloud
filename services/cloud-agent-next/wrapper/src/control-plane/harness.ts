@@ -3,7 +3,6 @@ import type {
   ControlPlaneSessionCredentialsPayload,
 } from '../../../src/shared/control-plane-protocol.js';
 import type { BoundedSlashCommandCatalog } from '../../../src/shared/slash-commands.js';
-import type { WorktreeKiloCleanupClient } from '../control/delete-worktree.js';
 import type { CondenseResult } from '../condense-on-complete.js';
 import type { SessionObservation } from './session-supervisor.js';
 import type { RestoreRoots } from '../restore-roots.js';
@@ -117,5 +116,4 @@ export type Harness = {
   isUnavailableError(error: unknown): boolean;
   reads: HarnessReads;
   terminals: HarnessTerminals;
-  worktree: WorktreeKiloCleanupClient;
 };

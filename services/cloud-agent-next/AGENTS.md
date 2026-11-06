@@ -21,7 +21,7 @@ Git tokens (GitHub App installation tokens, managed GitLab tokens) are resolved 
 
 ### Wrapper Build
 
-- `pnpm run build:wrapper` - Build wrapper bundle (uses Bun in `wrapper/`)
+- `pnpm run build:wrapper` - Build wrapper artifacts for publication (uses Bun in `wrapper/`)
 
 ### Testing
 
@@ -87,11 +87,11 @@ Git tokens (GitHub App installation tokens, managed GitLab tokens) are resolved 
 - `src/sandbox-containers/` - `SandboxContainers` provider and container outbound handling
 - `src/legacy-runtime-tombstones.ts` - Export-only no-op tombstones for retired SDK sandbox DO names
 - `src/agent-sandbox/` - Provider protocol and provider REST clients
-- `Dockerfile.containers`, `Dockerfile.containers.runtime-free` - Native sandbox images
+- `Dockerfile.containers.runtime-free` - Native sandbox base image; CLI and wrapper download at startup
 
 ### Wrapper
 
-- `wrapper/` - Wrapper runtime bundled into the sandbox image
+- `wrapper/` - Wrapper runtime published as immutable downloaded artifacts
 - `wrapper/src/control-plane/main.ts` - Wrapper entrypoint
 - `wrapper/control-plane-supervisor.sh` - Container supervisor
 - `wrapper/src/control-plane/session-supervisor.ts` - Per-process Kilo supervision and execution clocks

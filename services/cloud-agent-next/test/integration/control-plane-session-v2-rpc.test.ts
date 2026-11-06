@@ -577,6 +577,7 @@ describe('SandboxSessionV2 worker RPC surface', () => {
     // A deliberately different sandbox id than the DO would derive for this
     // session: proves the DO records the given selection and never re-derives (H2).
     const providedSandboxId = await generateSandboxId('other_session');
+    const worktreeId = `worktree_${crypto.randomUUID()}`;
     const provider = createFakeProvider();
     const sandboxStub = await installSandbox(providedSandboxId, provider.adapter);
 
@@ -587,6 +588,7 @@ describe('SandboxSessionV2 worker RPC surface', () => {
         sessionId,
         kiloSessionId: kiloId,
         sandboxId: providedSandboxId,
+        worktreeId,
         sandboxProvider: 'vercel',
         kiloToken: runtimeAuthorizedKiloToken(),
         // A generic git remote avoids the direct managed-GitHub path, which the
@@ -649,7 +651,7 @@ describe('SandboxSessionV2 worker RPC surface', () => {
     const kilo = row.spec.kilo as { token?: string; scopeId?: string } | undefined;
     expect(typeof kilo?.token).toBe('string');
     expect((kilo?.token ?? '').length).toBeGreaterThan(0);
-    expect(kilo?.scopeId).toBe(sessionId);
+    expect(kilo?.scopeId).toBe(worktreeId);
   });
 
   it('registers a worktree sibling from metadata through the DO', async () => {

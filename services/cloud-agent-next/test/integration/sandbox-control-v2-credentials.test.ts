@@ -5,9 +5,8 @@ import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { generateKeyPairSync } from 'node:crypto';
 import jwt from 'jsonwebtoken';
-import type * as VercelIdentityModule from '../../src/scm-broker/vercel-identity.js';
-import type * as byocCredentials from '../../src/byoc/vercel-credential-resolver.js';
-import type * as VercelJwksModule from '../../src/scm-broker/vercel-jwks.js';
+import { vercelJwksCache } from '../../src/scm-broker/vercel-jwks.js';
+import type { ByocVercelCredential } from '../../src/byoc/vercel-credential-resolver.js';
 import { SandboxControlV2 } from '../../src/control-plane/sandbox/sandbox-do.js';
 import { startAttempt, type RouteContext } from '../../src/control-plane/sandbox/routes.js';
 import * as scopeHandleAdoption from '../../src/control-plane/sandbox/scope-handle-adoption.js';
@@ -63,34 +62,13 @@ import { waitFor } from './wait-for.js';
 const SANDBOX_ID = 'sbx__control_v2_credentials';
 const SESSION = 'workspace_11111111-1111-1111-1111-111111111111';
 const SESSION_NEXT = 'workspace_22222222-2222-2222-2222-222222222222';
+const WORKSPACE_ID = 'worktree_11111111-1111-4111-8111-111111111111';
+const OTHER_WORKSPACE_ID = 'worktree_22222222-2222-4222-8222-222222222222';
 const OUTBOUND_CONTAINER_ID = fakeOutboundContainerId(SANDBOX_ID);
 const NATIVE_KILO_TOKEN = 'native-kilo-token-user';
 const NATIVE_GIT_TOKEN = 'ghp_nativeGittoken0000000000000000000000';
 const VERCEL_TARGET = 'https://worker.example.com';
 const TIMERS = CONTROL_PLANE_TIMERS.sandbox;
-const syntheticIdentity = vi.hoisted(() => ({
-  contract: null as VercelIdentityModule.VercelSandboxIdentityContract | null,
-  key: vi.fn(),
-  credential: null as byocCredentials.ByocVercelCredential | null,
-}));
-vi.mock('../../src/scm-broker/vercel-identity.js', async importOriginal => ({
-  ...(await importOriginal<typeof VercelIdentityModule>()),
-  get verifiedVercelSandboxIdentityContract() {
-    return syntheticIdentity.contract;
-  },
-}));
-vi.mock('../../src/scm-broker/vercel-jwks.js', async importOriginal => ({
-  ...(await importOriginal<typeof VercelJwksModule>()),
-  vercelJwksCache: { key: (...args: unknown[]) => syntheticIdentity.key(...args) },
-}));
-vi.mock('../../src/byoc/vercel-credential-resolver.js', async importOriginal => {
-  const actual = await importOriginal<typeof byocCredentials>();
-  return {
-    ...actual,
-    fetchByocVercelCredential: (...args: Parameters<typeof actual.fetchByocVercelCredential>) =>
-      syntheticIdentity.credential ?? actual.fetchByocVercelCredential(...args),
-  };
-});
 
 type SandboxControlNamespace = DurableObjectNamespace<SandboxControlV2>;
 const sandboxNamespace = (env as unknown as { SANDBOX_CONTROL: SandboxControlNamespace })
@@ -209,7 +187,8 @@ function credentialsSource(
     kiloToken: options.kiloToken ?? runtimeAuthorizedKiloToken(),
     orgId: 'org_123',
     repository: options.repository ?? { type: 'github', repo: 'acme/widgets' },
-    scopeId: sessionId,
+    scopeId: WORKSPACE_ID,
+    workspaceId: WORKSPACE_ID,
   };
 }
 
@@ -219,7 +198,7 @@ function routeSpec(sessionId: string): ControlPlaneRouteSpec {
   return {
     sessionId,
     kiloSessionId: kiloSessionIdFor(sessionId),
-    directory: `/workspace/${sessionId}`,
+    directory: `/workspace/${SESSION}`,
     attemptId: `${sessionId}-requested`,
   };
 }
@@ -270,6 +249,16 @@ function prepareInput(
   spec: ControlPlaneRouteSpec = routeSpec(sessionId)
 ): ControlPlanePrepareInput {
   return { spec, credentials: source };
+}
+
+function expectPrepareRejection(
+  stub: DurableObjectStub<SandboxControlV2>,
+  input: ControlPlanePrepareInput,
+  message = 'Sandbox workspace mismatch'
+) {
+  return runInDurableObject(stub, instance =>
+    expect(instance.prepare(input)).rejects.toThrow(message)
+  );
 }
 
 function promptPayload(messageId: string) {
@@ -500,9 +489,6 @@ async function reconstructPreB(
 }
 
 afterEach(async () => {
-  syntheticIdentity.contract = null;
-  syntheticIdentity.credential = null;
-  syntheticIdentity.key.mockReset();
   vi.restoreAllMocks();
   await reset();
 });
@@ -520,20 +506,43 @@ const SCM_REPOSITORIES = {
 } satisfies Record<string, ControlPlaneCredentialSource['repository']>;
 
 async function setupSyntheticVercel(provider: FakeProvider) {
-  syntheticIdentity.contract = {
-    issuerForTeam: () => 'https://oidc.vercel.com/synthetic',
-    sandboxIdForRef: ref => ref.sessionId,
-  };
   const signing = generateKeyPairSync('rsa', { modulusLength: 2048 });
-  syntheticIdentity.key.mockResolvedValue(signing.publicKey);
-  syntheticIdentity.credential = {
+  vi.spyOn(vercelJwksCache, 'key').mockResolvedValue(signing.publicKey);
+  const credential = {
     userId: 'user_123',
     credentialId: '22222222-2222-4222-8222-222222222222',
+    tokenEncrypted: {
+      scheme: 'byoc-vercel-credential-rsa-aes-256-gcm',
+      version: 1,
+      keyId: 'agent-env-vars-v1',
+      ciphertext: {
+        encryptedData: 'synthetic-data',
+        encryptedDEK: 'synthetic-dek',
+        algorithm: 'rsa-aes-256-gcm',
+        version: 1,
+      },
+    },
+    tokenScope: 'team',
     setupStatus: 'ready',
-    teamId: 'team-synthetic',
+    teamId: 'team_synthetic',
     projectId: 'project-synthetic',
     teamSlug: 'synthetic',
-  } as byocCredentials.ByocVercelCredential;
+    projectSlug: null,
+    setupStep: null,
+    setupError: null,
+    buildGeneration: '33333333-3333-4333-8333-333333333333',
+    runtimeBuildId: 'runtime-synthetic',
+    runtimeSnapshotId: 'snapshot-synthetic',
+    setupStartedAt: null,
+    setupCompletedAt: null,
+  } satisfies ByocVercelCredential;
+  vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+    expect(url).toBe(
+      `${VERCEL_TARGET}/api/internal/byoc/vercel-credentials/${credential.credentialId}?userId=user_123`
+    );
+    return Response.json(credential);
+  });
   provider.adapter.create = async intent => {
     provider.intents.push(intent);
     const providerRef = JSON.stringify({
@@ -578,12 +587,15 @@ async function setupSyntheticVercel(provider: FakeProvider) {
   const stub = await setupVercel(provider, broker, {
     allocationName: 'physical-synthetic',
     locator: {
-      teamId: 'team-synthetic',
+      teamId: credential.teamId,
       projectId: 'project-synthetic',
       snapshotId: 'snapshot-synthetic',
       runtimeBuildId: 'runtime-synthetic',
       runtime: 'node24',
     },
+  });
+  await runInDurableObject(stub, instance => {
+    Object.assign(instance.env, { INTERNAL_API_SECRET_PROD: { get: async () => 'internal-test' } });
   });
   const admission = async (
     url: string,
@@ -596,10 +608,10 @@ async function setupSyntheticVercel(provider: FakeProvider) {
     return receiver.admitScmForward({
       oidcToken: jwt.sign(
         {
-          iss: 'https://oidc.vercel.com/synthetic',
+          iss: `https://oidc.vercel.com/${credential.teamId}`,
           aud: `${VERCEL_TARGET}/scm/vercel/${SANDBOX_ID}`,
           exp: Math.floor(Date.now() / 1000) + 600,
-          team_id: 'team-synthetic',
+          team_id: credential.teamId,
           project_id: 'project-synthetic',
           sandbox_id: ref.sessionId,
           ...claims,
@@ -682,19 +694,26 @@ describe.each(['cloudflare', 'vercel'] as const)(
 
 describe('bound Vercel SCM lifecycle with synthetic provider contracts', () => {
   it.each(['gitlab', 'bitbucket'] as const)(
-    'keeps new %s preparation dormant without verified provider contracts',
+    'keeps new %s preparation dormant without an SCM forwarding target',
     async purpose => {
       const provider = createFakeProvider();
       const { stub } = await setupSyntheticVercel(provider);
-      syntheticIdentity.contract = null;
-      expect(
-        await stub.prepare(
-          prepareInput(
-            SESSION,
-            credentialsSource(SESSION, { repository: SCM_REPOSITORIES[purpose] })
-          )
-        )
-      ).toMatchObject({ state: 'failed', reason: 'provider_identity_mismatch' });
+      await runInDurableObject(stub, instance => {
+        Object.assign(instance.env, { WORKER_URL: '' });
+      });
+      const capture = captureRouteFailed();
+      const view = await stub.prepare(
+        prepareInput(SESSION, credentialsSource(SESSION, { repository: SCM_REPOSITORIES[purpose] }))
+      );
+      capture.restore();
+      expect(view).toMatchObject({ state: 'failed', reason: 'workspace_setup_failed' });
+      expect(capture.forAttempt(failedAttemptId(view))).toEqual([
+        expect.objectContaining({
+          grantPhase: 'configuration',
+          grantFailureReason: 'runtime_proxy_targets_unavailable',
+          stage: 'credential_grant_failed',
+        }),
+      ]);
       expect(provider.policyCalls).toEqual([]);
       expect((await readRouteRow(stub, SESSION))?.grant).toBeNull();
       await runInDurableObject(stub, (_instance, state) =>
@@ -853,54 +872,70 @@ describe('bound Vercel SCM lifecycle with synthetic provider contracts', () => {
   it.each([
     ['capability', 'git'],
     ['git', 'capability'],
-  ] as const)('composes %s and %s scopes and removes only retired forwarding', async (...order) => {
-    const provider = createFakeProvider();
-    const { stub, admission } = await setupSyntheticVercel(provider);
-    const sessions = [SESSION, SESSION_NEXT];
-    const sources = order.map((kind, index) => ({
-      ...credentialsSource(sessions[index]),
-      repository:
-        kind === 'git'
-          ? { type: 'git' as const, url: 'https://github.com/acme/public.git' }
-          : { type: 'github' as const, repo: 'acme/widgets' },
-    }));
-    const first = await prepareWarmRoute(stub, provider, prepareInput(sessions[0], sources[0]));
-    expect((await stub.prepare(prepareInput(sessions[1], sources[1]))).state).toBe('preparing');
-    expect((await first.wrapper.next())?.type).toBe('session.prepare');
-    const grants = await runInDurableObject(stub, (_instance, state) =>
-      listScopeGrants(drizzle(state.storage))
-    );
-    expect(grants).toHaveLength(2);
-    for (const grant of grants)
-      expect(sessionCredentialGrantSchema.safeParse(grant).success).toBe(true);
-    const capability = grants.find(grant => grant.scm?.capability);
-    if (!capability?.scm?.alias) throw new Error('missing managed scope');
-    const installed = provider.policyCalls.at(-1) as ReturnType<typeof buildControlNetworkPolicy>;
-    expect(installed.allow['api.github.com']?.at(-1)).toEqual({
-      forwardURL: `${VERCEL_TARGET}/scm/vercel/${SANDBOX_ID}`,
-    });
-    expect(
-      await admission('https://github.com/acme/widgets.git/info/refs', {
-        authorization: `Bearer ${capability.scm.alias}`,
-      })
-    ).toMatchObject({ ok: true, authority: { type: 'managed' } });
-    await stub.release({ sessionId: capability.members[0].sessionId });
-    expect(JSON.stringify(provider.policyCalls.at(-1))).not.toContain('forwardURL');
-    expect(
-      await admission('https://github.com/acme/widgets.git/info/refs', {
-        authorization: `Bearer ${capability.scm.alias}`,
-      })
-    ).toMatchObject({ ok: false });
-    await runInDurableObject(stub, async (instance, state) => {
-      const reconstructed = new SandboxControlV2(state, instance.env);
-      const retained = listScopeGrants(drizzle(state.storage));
-      expect(retained).toHaveLength(1);
-      for (const grant of retained)
+  ] as const)(
+    'rejects a second workspace with %s then %s credentials without changing forwarding',
+    async (...order) => {
+      const provider = createFakeProvider();
+      const { stub, admission } = await setupSyntheticVercel(provider);
+      const sessions = [SESSION, SESSION_NEXT];
+      const sources = order.map<ControlPlaneCredentialSource>((kind, index) => ({
+        ...credentialsSource(sessions[index]),
+        ...(index === 1 ? { workspaceId: OTHER_WORKSPACE_ID, scopeId: OTHER_WORKSPACE_ID } : {}),
+        repository:
+          kind === 'git'
+            ? { type: 'git' as const, url: 'https://github.com/acme/public.git' }
+            : { type: 'github' as const, repo: 'acme/widgets' },
+      }));
+      const first = await prepareWarmRoute(stub, provider, prepareInput(sessions[0], sources[0]));
+      const before = await readRouteRow(stub, SESSION);
+      const policyCalls = provider.policyCalls.length;
+      await expectPrepareRejection(stub, prepareInput(sessions[1], sources[1]));
+      expect(await readRouteRow(stub, SESSION_NEXT)).toBeNull();
+      expect(await readRouteRow(stub, SESSION)).toEqual(before);
+      expect(provider.policyCalls).toHaveLength(policyCalls);
+      expect(await first.wrapper.next(50)).toBeNull();
+      const grants = await runInDurableObject(stub, (_instance, state) =>
+        listScopeGrants(drizzle(state.storage))
+      );
+      expect(grants).toHaveLength(1);
+      for (const grant of grants)
+        expect(sessionCredentialGrantSchema.safeParse(grant).success).toBe(true);
+      const grant = grants[0];
+      if (order[0] === 'capability') {
+        if (!grant?.scm?.alias) throw new Error('missing managed scope');
+        const installed = provider.policyCalls.at(-1) as ReturnType<
+          typeof buildControlNetworkPolicy
+        >;
+        expect(installed.allow['api.github.com']?.at(-1)).toEqual({
+          forwardURL: `${VERCEL_TARGET}/scm/vercel/${SANDBOX_ID}`,
+        });
         expect(
-          (await reconstructed.status({ sessionId: grant.members[0].sessionId })).view.state
-        ).not.toBe('failed');
-    });
-  });
+          await admission('https://github.com/acme/widgets.git/info/refs', {
+            authorization: `Bearer ${grant.scm.alias}`,
+          })
+        ).toMatchObject({ ok: true, authority: { type: 'managed' } });
+      } else {
+        expect(grant?.scm).toBeUndefined();
+        expect(JSON.stringify(provider.policyCalls.at(-1))).not.toContain('forwardURL');
+      }
+      await stub.release({ sessionId: SESSION });
+      expect(JSON.stringify(provider.policyCalls.at(-1))).not.toContain('forwardURL');
+      expect(
+        await admission('https://github.com/acme/widgets.git/info/refs', {
+          ...(grant?.scm?.alias ? { authorization: `Bearer ${grant.scm.alias}` } : {}),
+        })
+      ).toMatchObject({ ok: false });
+      await runInDurableObject(stub, async (instance, state) => {
+        const reconstructed = new SandboxControlV2(state, instance.env);
+        const retained = listScopeGrants(drizzle(state.storage));
+        expect(retained).toEqual([]);
+        expect((await reconstructed.status({ sessionId: SESSION })).view.state).toBe('unknown');
+        await expect(reconstructed.prepare(prepareInput(SESSION_NEXT, sources[1]))).rejects.toThrow(
+          'Sandbox workspace mismatch'
+        );
+      });
+    }
+  );
 
   it('publishes neither a managed scope nor session.credentials after failed policy installation', async () => {
     const provider = createFakeProvider();
@@ -978,7 +1013,7 @@ describe('SandboxControlV2 credentials (B3)', () => {
     }
   );
 
-  it('fails new managed Vercel preparation specifically when provider contracts are unverified, without injection fallback or grant publication', async () => {
+  it('fails new managed Vercel preparation without an SCM forwarding target, without injection fallback or grant publication', async () => {
     const provider = createFakeProvider();
     const broker = createFakeCredentialBroker();
     const issue = broker.issueGitHubSessionCapability;
@@ -990,17 +1025,29 @@ describe('SandboxControlV2 credentials (B3)', () => {
       }),
     });
     const stub = await setupVercel(provider, broker);
+    await runInDurableObject(stub, instance => {
+      Object.assign(instance.env, { WORKER_URL: '' });
+    });
+    const capture = captureRouteFailed();
     const view = await stub.prepare(
       prepareInput(SESSION, {
         ...credentialsSource(SESSION),
         createdOnPlatform: 'cloud-agent-web',
       })
     );
+    capture.restore();
     expect(view).toEqual({
       state: 'failed',
       attemptId: expect.any(String),
-      reason: 'provider_identity_mismatch',
+      reason: 'workspace_setup_failed',
     });
+    expect(capture.forAttempt(failedAttemptId(view))).toEqual([
+      expect.objectContaining({
+        grantPhase: 'configuration',
+        grantFailureReason: 'runtime_proxy_targets_unavailable',
+        stage: 'credential_grant_failed',
+      }),
+    ]);
     expect(provider.policyCalls).toEqual([]);
     expect((await readRouteRow(stub, SESSION))?.grant).toBeNull();
     await runInDurableObject(stub, (_instance, state) => {
@@ -1073,18 +1120,11 @@ describe('SandboxControlV2 credentials (B3)', () => {
       WORKER_URL: VERCEL_TARGET,
     });
     const input = (sessionId: string) =>
-      prepareInput(
-        sessionId,
-        {
-          ...credentialsSource(sessionId),
-          scopeId: 'upgrade_shared',
-        },
-        {
-          ...routeSpec(sessionId),
-          directory: '/workspace/upgrade_shared',
-          runtimeIsolation: 'per-session' as const,
-        }
-      );
+      prepareInput(sessionId, credentialsSource(sessionId), {
+        ...routeSpec(sessionId),
+        directory: '/workspace/upgrade_shared',
+        runtimeIsolation: 'per-session' as const,
+      });
     const { wrapper, prepareFrame } = await prepareWarmRoute(stub, provider, input(SESSION));
     if (prepareFrame?.type !== 'session.prepare') throw new Error('missing old preparation');
     await stub.prepare(input(SESSION_NEXT));
@@ -1191,7 +1231,7 @@ describe('SandboxControlV2 credentials (B3)', () => {
         url,
         method,
       });
-    expect(first.credentials.proxy?.handle === second.credentials.proxy?.handle).toBe(false);
+    expect(second.credentials.proxy?.handle).toBe(first.credentials.proxy?.handle);
     expect(await resolve('https://api.kilo.ai/api/openrouter/chat/completions')).toBeNull();
     await stub.release({ sessionId: SESSION });
     expect((await stub.getAllocationState()).kind).toBe('connected');
@@ -1307,12 +1347,9 @@ describe('SandboxControlV2 credentials (B3)', () => {
     const input = (sessionId: string) =>
       prepareInput(
         sessionId,
-        {
-          ...credentialsSource(sessionId, {
-            repository: { type: 'git', url: 'https://github.com/acme/widgets.git' },
-          }),
-          scopeId: 'shared_legacy',
-        },
+        credentialsSource(sessionId, {
+          repository: { type: 'git', url: 'https://github.com/acme/widgets.git' },
+        }),
         { ...routeSpec(sessionId), directory: '/workspace/shared_legacy' }
       );
     await prepareWarmRoute(stub, provider, input(SESSION));
@@ -1336,21 +1373,20 @@ describe('SandboxControlV2 credentials (B3)', () => {
     const provider = createFakeProvider();
     const stub = await setup(provider);
     const input = (sessionId: string) =>
-      prepareInput(
-        sessionId,
-        { ...credentialsSource(sessionId), scopeId: 'shared_worktree' },
-        { ...routeSpec(sessionId), directory: '/workspace/shared_worktree' }
-      );
+      prepareInput(sessionId, credentialsSource(sessionId), {
+        ...routeSpec(sessionId),
+        directory: '/workspace/shared_worktree',
+      });
     await prepareWarmRoute(stub, provider, input(SESSION));
     await stub.prepare(input(SESSION_NEXT));
     await runInDurableObject(stub, async (instance, state) => {
       const db = drizzle(state.storage, { logger: false });
       expect(db.select().from(scopeGrants).all()).toHaveLength(1);
       expect(db.select({ grant: routesTable.grant }).from(routesTable).all()).toEqual([
-        { grant: 'shared_worktree:runtime' },
-        { grant: 'shared_worktree:runtime' },
+        { grant: `${WORKSPACE_ID}:runtime` },
+        { grant: `${WORKSPACE_ID}:runtime` },
       ]);
-      const grant = readScopeGrant(db, 'shared_worktree:runtime');
+      const grant = readScopeGrant(db, `${WORKSPACE_ID}:runtime`);
       if (!grant?.scm?.alias) throw new Error('missing canonical grant');
       const reconstructed = new SandboxControlV2(state, instance.env);
       expect((await reconstructed.status({ sessionId: SESSION })).view.state).toBe('ready');
@@ -1366,20 +1402,16 @@ describe('SandboxControlV2 credentials (B3)', () => {
     });
   });
 
-  it('keeps modern scope handles per session and removes only the released member', async () => {
+  it('shares the canonical workspace handle and removes only the released member', async () => {
     const provider = createFakeProvider();
     const broker = createFakeCredentialBroker();
     const stub = await setupVercel(provider, broker);
     const input = (sessionId: string) =>
-      prepareInput(
-        sessionId,
-        { ...vercelSource(sessionId), scopeId: 'shared_modern' },
-        {
-          ...routeSpec(sessionId),
-          directory: '/workspace/shared_modern',
-          runtimeIsolation: 'per-session',
-        }
-      );
+      prepareInput(sessionId, vercelSource(sessionId), {
+        ...routeSpec(sessionId),
+        directory: '/workspace/shared_modern',
+        runtimeIsolation: 'per-session',
+      });
     const { wrapper, prepareFrame } = await prepareWarmRoute(stub, provider, input(SESSION));
     await stub.prepare(input(SESSION_NEXT));
     const second = await wrapper.next();
@@ -1387,7 +1419,7 @@ describe('SandboxControlV2 credentials (B3)', () => {
       throw new Error('missing modern preparation');
     expect(Boolean(prepareFrame.credentials.proxy?.handle)).toBe(true);
     expect(Boolean(second.credentials.proxy?.handle)).toBe(true);
-    expect(prepareFrame.credentials.proxy?.handle === second.credentials.proxy?.handle).toBe(false);
+    expect(second.credentials.proxy?.handle).toBe(prepareFrame.credentials.proxy?.handle);
     const before = JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}');
     expect(before.members).toHaveLength(2);
     expect(before.kilo.runtimeProxy.members).toHaveLength(2);
@@ -1407,15 +1439,14 @@ describe('SandboxControlV2 credentials (B3)', () => {
     ).toEqual([SESSION_NEXT]);
     expect(
       JSON.stringify(provider.policyCalls.at(-1)).includes(
-        prepareFrame.credentials.proxy?.handle ?? 'absent'
-      )
-    ).toBe(false);
-    expect(
-      JSON.stringify(provider.policyCalls.at(-1)).includes(
         second.credentials.proxy?.handle ?? 'absent'
       )
     ).toBe(true);
     expect((await stub.getAllocationState()).kind).toBe('connected');
+    await stub.release({ sessionId: SESSION_NEXT });
+    expect(JSON.stringify(provider.policyCalls.at(-1))).not.toContain(
+      second.credentials.proxy?.handle ?? 'absent'
+    );
   });
 
   it.each(['organization', 'repository', 'legacy backing authorization'])(
@@ -1426,11 +1457,10 @@ describe('SandboxControlV2 credentials (B3)', () => {
         WORKER_URL: VERCEL_TARGET,
       });
       const input = (sessionId: string) =>
-        prepareInput(
-          sessionId,
-          { ...credentialsSource(sessionId), scopeId: 'shared_worktree' },
-          { ...routeSpec(sessionId), directory: '/workspace/shared_worktree' }
-        );
+        prepareInput(sessionId, credentialsSource(sessionId), {
+          ...routeSpec(sessionId),
+          directory: '/workspace/shared_worktree',
+        });
       await prepareWarmRoute(stub, provider, input(SESSION));
       const before = (await readRouteRow(stub, SESSION))?.grant;
       const next = input(SESSION_NEXT);
@@ -1439,7 +1469,12 @@ describe('SandboxControlV2 credentials (B3)', () => {
         next.credentials.repository = { type: 'github', repo: 'acme/private' };
       if (kind === 'legacy backing authorization')
         next.credentials.kiloToken = 'different-user-authority';
-      expect((await stub.prepare(next)).state).toBe('failed');
+      if (kind === 'organization') {
+        await expectPrepareRejection(stub, next);
+        expect(await readRouteRow(stub, SESSION_NEXT)).toBeNull();
+      } else {
+        expect((await stub.prepare(next)).state).toBe('failed');
+      }
       expect((await readRouteRow(stub, SESSION))?.grant === before).toBe(true);
       expect((await stub.status({ sessionId: SESSION })).view.state).toBe('ready');
     }
@@ -1694,11 +1729,11 @@ describe('SandboxControlV2 credentials (B3)', () => {
     await runInDurableObject(stub, (_instance, state) => {
       const db = drizzle(state.storage);
       db.update(scopeGrants)
-        .set({ id: SESSION + ':legacy' })
-        .where(eq(scopeGrants.id, SESSION + ':runtime'))
+        .set({ id: WORKSPACE_ID + ':legacy' })
+        .where(eq(scopeGrants.id, WORKSPACE_ID + ':runtime'))
         .run();
       db.update(routesTable)
-        .set({ grant: SESSION + ':legacy' })
+        .set({ grant: WORKSPACE_ID + ':legacy' })
         .where(eq(routesTable.session_id, SESSION))
         .run();
     });
@@ -1759,23 +1794,20 @@ describe('SandboxControlV2 credentials (B3)', () => {
     const legacy = legacyGrant({
       sessionId: SESSION,
       kiloSessionId: kiloSessionIdFor(SESSION),
-      scopeId: LEGACY_SCOPE,
+      scopeId: WORKSPACE_ID,
       directory: spec.directory,
       targets: LOCAL_KILO_TARGETS,
     });
     await runInDurableObject(stub, (_instance, state) => {
       const db = drizzle(state.storage, { logger: false });
       db.insert(scopeGrants)
-        .values({ id: `${LEGACY_SCOPE}:legacy`, grant: JSON.stringify(legacy) })
+        .values({ id: `${WORKSPACE_ID}:legacy`, grant: JSON.stringify(legacy) })
         .run();
     });
-    const source = {
-      ...credentialsSource(SESSION, {
-        kiloToken: NATIVE_KILO_TOKEN,
-        repository: { type: 'git', url: 'https://github.com/acme/widgets.git' },
-      }),
-      scopeId: LEGACY_SCOPE,
-    };
+    const source = credentialsSource(SESSION, {
+      kiloToken: NATIVE_KILO_TOKEN,
+      repository: { type: 'git', url: 'https://github.com/acme/widgets.git' },
+    });
     const diagnostics: Record<string, unknown>[] = [];
     const spy = vi.spyOn(logger, 'withFields').mockImplementation(fields => {
       const bounded = fields as unknown as Record<string, unknown>;
@@ -2064,7 +2096,7 @@ describe('SandboxControlV2 credentials (B3)', () => {
         expect(fields).toHaveBeenCalledWith({
           sandboxId: SANDBOX_ID,
           sessionId: SESSION,
-          anchorSessionId: SESSION,
+          anchorSessionId: WORKSPACE_ID.replace('worktree_', 'workspace_'),
         });
         expect(warn).toHaveBeenCalledWith(
           'Optional Cloud Agent MCP grant unavailable; continuing without it'
@@ -2197,27 +2229,19 @@ describe('SandboxControlV2 credentials (B3)', () => {
     const provider = createFakeProvider();
     const broker = createFakeCredentialBroker();
     const stub = await setupVercel(provider, broker);
-    const { wrapper } = await prepareWarmRoute(
+    const { wrapper, prepareFrame } = await prepareWarmRoute(
       stub,
       provider,
       prepareInput(SESSION, vercelSource(SESSION), routeSpec(SESSION))
     );
 
+    if (prepareFrame?.type !== 'session.prepare' || !prepareFrame.credentials?.proxy?.handle)
+      throw new Error('missing runtime proxy preparation');
     const member = {
       sessionId: SESSION,
       kiloSessionId: kiloSessionIdFor(SESSION),
-      handle: 'handle_1',
+      handle: prepareFrame.credentials.proxy.handle,
     };
-    await patchGrant(stub, SESSION, grant => ({
-      ...grant,
-      kilo: {
-        ...(grant.kilo as Record<string, unknown>),
-        runtimeProxy: {
-          ...((grant.kilo as Record<string, unknown>).runtimeProxy as Record<string, unknown>),
-          members: [member],
-        },
-      },
-    }));
     const first = JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}') as {
       kilo: { alias: string };
     };
@@ -2251,7 +2275,7 @@ describe('SandboxControlV2 credentials (B3)', () => {
     // The policy was rebuilt from the candidate grant (with the carried
     // runtime-proxy handle) before the `session.credentials` frame.
     expect(provider.policyCalls.length).toBe(1);
-    expect(JSON.stringify(provider.policyCalls[0])).toContain('handle_1');
+    expect(JSON.stringify(provider.policyCalls[0])).toContain(member.handle);
 
     const credentialsFrame = await wrapper.next();
     expect(credentialsFrame?.type).toBe('session.credentials');
@@ -2262,7 +2286,7 @@ describe('SandboxControlV2 credentials (B3)', () => {
     // `session.credentials` payload too, not the route spec.
     expect(credentialsFrame && 'proxy' in credentialsFrame ? credentialsFrame.proxy : null).toEqual(
       {
-        handle: 'handle_1',
+        handle: member.handle,
         targets: expect.objectContaining({ backendBaseUrl: VERCEL_TARGET }),
       }
     );
@@ -2467,37 +2491,63 @@ describe('SandboxControlV2 credentials (B3)', () => {
     expect(provider.launchEnvs).toHaveLength(0);
   });
 
-  it('rejects a different owner and fails a cross-scope directory collision', async () => {
+  it.each(['missing workspace', 'session scope'] as const)(
+    'rejects fresh preparation with %s before issuing credentials',
+    async kind => {
+      const provider = createFakeProvider();
+      const broker = createFakeCredentialBroker();
+      const stub = await setup(provider, broker);
+      const input = prepareInput(SESSION);
+      if (kind === 'missing workspace') delete input.credentials.workspaceId;
+      else input.credentials.scopeId = SESSION;
+      await expectPrepareRejection(stub, input, 'Sandbox workspace identity is required');
+      expect(await readRouteRow(stub, SESSION)).toBeNull();
+      expect(broker.githubIssued()).toBe(0);
+      expect(provider.intents).toEqual([]);
+      await runInDurableObject(stub, (_instance, state) => {
+        expect(listScopeGrants(drizzle(state.storage))).toEqual([]);
+      });
+    }
+  );
+
+  it('rejects a different owner, workspace, or directory before issuing credentials', async () => {
     const provider = createFakeProvider();
     const broker = createFakeCredentialBroker();
     const stub = await setup(provider, broker);
     await prepareWarmRoute(stub, provider);
 
-    const rejected = await runInDurableObject(stub, async instance => {
-      try {
-        await instance.prepare(
-          prepareInput(SESSION_NEXT, credentialsSource(SESSION_NEXT, { userId: 'user_other' }))
-        );
-        return false;
-      } catch {
-        return true;
-      }
-    });
-    expect(rejected).toBe(true);
-    expect(await readRouteRow(stub, SESSION_NEXT)).toBeNull();
-
-    // Same working directory under a different credential scope must fail.
-    const colliding = { ...routeSpec(SESSION_NEXT), directory: `/workspace/${SESSION}` };
-    const view = await stub.prepare(
-      prepareInput(SESSION_NEXT, credentialsSource(SESSION_NEXT), colliding)
+    const before = await readRouteRow(stub, SESSION);
+    const issued = broker.githubIssued();
+    await expectPrepareRejection(
+      stub,
+      prepareInput(SESSION_NEXT, credentialsSource(SESSION_NEXT, { userId: 'user_other' })),
+      'Sandbox owner mismatch'
     );
-    expect(view).toEqual({
-      state: 'failed',
-      attemptId: expect.any(String),
-      reason: 'workspace_setup_failed',
-    });
-    const row = await readRouteRow(stub, SESSION_NEXT);
-    expect(row?.state).toBe('failed');
+    for (const directory of [routeSpec(SESSION).directory, '/workspace/another-workspace']) {
+      await expectPrepareRejection(
+        stub,
+        prepareInput(
+          SESSION_NEXT,
+          {
+            ...credentialsSource(SESSION_NEXT),
+            scopeId: OTHER_WORKSPACE_ID,
+            workspaceId: OTHER_WORKSPACE_ID,
+          },
+          { ...routeSpec(SESSION_NEXT), directory }
+        )
+      );
+    }
+    await expectPrepareRejection(
+      stub,
+      prepareInput(SESSION_NEXT, credentialsSource(SESSION_NEXT), {
+        ...routeSpec(SESSION_NEXT),
+        directory: '/workspace/another-directory',
+      })
+    );
+    expect(await readRouteRow(stub, SESSION_NEXT)).toBeNull();
+    expect(await readRouteRow(stub, SESSION)).toEqual(before);
+    expect(broker.githubIssued()).toBe(issued);
+    expect(provider.launchEnvs).toHaveLength(1);
   });
 
   it('fails only the route whose issuance fails and still prepares a later route', async () => {
@@ -3026,7 +3076,7 @@ describe('SandboxControlV2 cold grant rejection diagnostics', () => {
     expect(JSON.stringify(secondEvents)).not.toContain('https://secret.example');
   });
 
-  it('labels a cross-scope directory collision as compatibility', async () => {
+  it('rejects a cross-workspace directory collision before starting a credential attempt', async () => {
     const provider = createFakeProvider();
     const stub = await setup(provider);
     await prepareWarmRoute(stub, provider);
@@ -3036,18 +3086,24 @@ describe('SandboxControlV2 cold grant rejection diagnostics', () => {
       ...routeSpec(SESSION_NEXT),
       directory: `/workspace/${SESSION}`,
     };
-    const view = await stub.prepare(
-      prepareInput(SESSION_NEXT, credentialsSource(SESSION_NEXT), collidingSpec)
+    const before = await readRouteRow(stub, SESSION);
+    await expectPrepareRejection(
+      stub,
+      prepareInput(
+        SESSION_NEXT,
+        {
+          ...credentialsSource(SESSION_NEXT),
+          scopeId: OTHER_WORKSPACE_ID,
+          workspaceId: OTHER_WORKSPACE_ID,
+        },
+        collidingSpec
+      )
     );
-    const events = capture.forAttempt(failedAttemptId(view));
     capture.restore();
 
-    expect(events).toHaveLength(1);
-    expect(events[0]).toMatchObject({
-      grantPhase: 'compatibility',
-      grantFailureReason: 'scope_mismatch',
-      stage: 'credential_grant_failed',
-    });
+    expect(capture.events).toEqual([]);
+    expect(await readRouteRow(stub, SESSION_NEXT)).toBeNull();
+    expect(await readRouteRow(stub, SESSION)).toEqual(before);
   });
 
   it('seals a timed-out attempt against a late rejection and lets a sibling proceed', async () => {

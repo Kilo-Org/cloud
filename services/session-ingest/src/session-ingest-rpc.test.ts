@@ -4095,48 +4095,53 @@ describe('SessionIngestRPC hosted workspace catalog', () => {
     expect(getWorkerDb).not.toHaveBeenCalled();
   });
 
-  it('returns only an authorized completed tombstone when no active root exists', async () => {
-    const workspaceId = 'worktree_11111111-1111-4111-8111-111111111111';
-    const timestamp = '2026-05-28 09:13:37.651263+00';
-    const { db, whereConditions } = makeWorkspaceDbFakes([
-      [],
-      [
-        {
-          workspaceId,
-          userId: 'usr_owner',
-          organizationId: null,
-          createdAt: timestamp,
-          updatedAt: timestamp,
-        },
-      ],
-    ]);
-    const rpc = makeRpc(db);
+  it.each([false, true])(
+    'returns only an authorized journaled workspace with no roots, completed=%s',
+    async completed => {
+      const workspaceId = 'worktree_11111111-1111-4111-8111-111111111111';
+      const timestamp = '2026-05-28 09:13:37.651263+00';
+      const { db, whereConditions } = makeWorkspaceDbFakes([
+        [],
+        [
+          {
+            workspaceId,
+            userId: 'usr_owner',
+            organizationId: null,
+            deletionCompletedAt: completed ? timestamp : null,
+            createdAt: timestamp,
+            updatedAt: timestamp,
+          },
+        ],
+      ]);
+      const rpc = makeRpc(db);
 
-    await expect(
-      rpc.getCloudAgentWorkspace({ kiloUserId: 'usr_owner', workspaceId })
-    ).resolves.toEqual({
-      workspaceId,
-      userId: 'usr_owner',
-      organizationId: null,
-      name: null,
-      repositoryProvider: null,
-      gitUrl: null,
-      gitBranch: null,
-      profileId: null,
-      deletionState: 'deleted',
-      created: new Date(timestamp).getTime(),
-      updated: new Date(timestamp).getTime(),
-      lastActivity: new Date(timestamp).getTime(),
-      sessions: [],
-      nextSessionCursor: null,
-    });
-    const tombstoneQuery = new PgDialect().sqlToQuery(whereConditions.at(-1)!);
-    expect(tombstoneQuery.sql).toContain('"cloud_agent_worktrees"."worktree_id" = $');
-    expect(tombstoneQuery.sql).toContain('"cloud_agent_worktrees"."kilo_user_id" = $');
-    expect(tombstoneQuery.sql).toContain('"deletion_completed_at" is not null');
-    expect(tombstoneQuery.params).toEqual(expect.arrayContaining([workspaceId, 'usr_owner']));
-    expect(getSessionIngestDO).not.toHaveBeenCalled();
-  });
+      await expect(
+        rpc.getCloudAgentWorkspace({ kiloUserId: 'usr_owner', workspaceId })
+      ).resolves.toEqual({
+        workspaceId,
+        userId: 'usr_owner',
+        organizationId: null,
+        name: null,
+        repositoryProvider: null,
+        gitUrl: null,
+        gitBranch: null,
+        profileId: null,
+        deletionState: completed ? 'deleted' : 'deleting',
+        created: new Date(timestamp).getTime(),
+        updated: new Date(timestamp).getTime(),
+        lastActivity: new Date(timestamp).getTime(),
+        sessions: [],
+        nextSessionCursor: null,
+      });
+      const tombstoneQuery = new PgDialect().sqlToQuery(whereConditions.at(-1)!);
+      expect(tombstoneQuery.sql).toContain('"cloud_agent_worktrees"."worktree_id" = $');
+      expect(tombstoneQuery.sql).toContain('"cloud_agent_worktrees"."kilo_user_id" = $');
+      expect(tombstoneQuery.sql).toContain('"deletion_completed_at" is not null');
+      expect(tombstoneQuery.sql).toContain('"deletion_started_at" is not null');
+      expect(tombstoneQuery.params).toEqual(expect.arrayContaining([workspaceId, 'usr_owner']));
+      expect(getSessionIngestDO).not.toHaveBeenCalled();
+    }
+  );
 
   it('reports stored activity and journal progress for an active workspace', async () => {
     const workspaceId = 'worktree_11111111-1111-4111-8111-111111111111';
@@ -4324,6 +4329,7 @@ describe('SessionIngestRPC hosted workspace catalog', () => {
           workspaceId,
           userId: 'usr_owner',
           organizationId: null,
+          deletionCompletedAt: timestamp,
           createdAt: timestamp,
           updatedAt: timestamp,
         },

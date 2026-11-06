@@ -210,24 +210,22 @@ public stream has no reconnecting status today, so `reconnecting` changes no cli
 ### Startup modes
 
 The Sandbox DO selects the first process of a sandbox. The provider runs it and does not interpret it.
-The mode says where the runtime (Kilo and the supervisor) comes from: the image or a download.
+New allocations download their runtime (Kilo and the supervisor) onto a runtime-free base image.
 
 - **Contract.** `launch(ref, { command, env }, options)` takes the command as an argv; a script is
   `['/bin/sh', '-c', script]`. Native uses it as the start entrypoint, and as the exec on a
-  `sleep infinity` main process. Vercel runs it without a login shell. The Sandbox SDK runs it
-  with `startProcess`. A provider never chooses a Kilo version, reads a release descriptor or owns
+  `sleep infinity` main process. Vercel runs it without a login shell.
+  A provider never chooses a Kilo version, reads a release descriptor or owns
   a deadline other than `deadlineAt`.
-- **`preinstalled`.** `preinstalled-startup.ts` supplies `['/bin/sh', CONTROL_SUPERVISOR_PATH]`.
-  The image holds Kilo and the supervisor. There is no download and no grant.
 - **`downloaded`.** `downloaded-startup.ts` reads the release descriptor, confirms both payload
   objects, mints an artifact grant and renders the bootstrap (`runtime-bootstrap.ts`). The bootstrap
   installs the CLI and control payloads under `/opt/kilo-cloud`, points the stable paths at them,
   removes the grant and execs the same supervisor argv. The native PID 1 check, the `pgrep` probe
-  and the SDK process scan stay unchanged.
+  stay unchanged.
 - **Selection.** `startup-selection.ts` reads the mode and the native image from Worker
-  configuration once per create attempt. Absent configuration means `preinstalled`. Mode and image
-  are independent, but the runtime-free image requires `downloaded`. Native and BYOC Vercel pins
-  support `downloaded`; SDK pins keep `preinstalled`. Vercel executes the trusted installer as root
+  configuration once per create attempt. Only `downloaded` and `runtime-free` are accepted;
+  omitted mode/image values select those defaults, but a release descriptor is required.
+  Retired SDK pins cannot create compute. Vercel executes the trusted installer as root
   against the customer snapshot. Its base digest excludes the downloaded CLI and wrapper release.
   Any invalid pair, a `downloaded` pin without a descriptor, or a missing descriptor or payload object fails
   `invalid_configuration` before provider work. An R2 read error is a transient create error.
@@ -432,6 +430,14 @@ Native supervision does not schedule future wakeups after compute has stopped.
 
 These keep their current owners and evidence; the rewrite ports them, it does not redesign them.
 
+- Each logical sandbox owns exactly one workspace and physical container. Durable ownership binds
+  the workspace ID, directory, user, and organization before route or credential mutation. Sibling
+  chats may join that workspace; a second workspace cannot. Ownership survives route release and
+  container replacement. Pre-upgrade route-less sandboxes recover ownership only from matching
+  canonical placement and authenticated persisted workspace records.
+- Whole-workspace deletion validates that ownership before stopping the container and revoking all
+  sibling routes. Allocation fencing, confirmed-stop retries, and deletion journals remain; there is
+  no in-place deletion path for preserving another workspace in the same container.
 - Compute billing follows the physical container lifecycle (`metered-billing-lifecycle.ts`), not
   the routing state.
 - The Sandbox DO reconciles the current wrapper's stored compute policy on a 30-second cadence.
@@ -446,17 +452,17 @@ These keep their current owners and evidence; the rewrite ports them, it does no
   writable grant copies. Compatibility requires the same user, organization, worktree/directory,
   repository authority, targets, provider/physical binding, containment and backing authorization
   class. A scope cannot replace a legacy backing token with a modern delegated token. A checkout
-  directory in a negotiated shared allocation uses exactly one credential class: if another grant serves the joining
+  directory in a negotiated workspace-shared runtime uses exactly one credential class: if another grant serves the joining
   route's directory with a different runtime-proxy presence (modern vs legacy, either direction), the
   join fails closed before any prepare frame, recorded as the distinct `mixed_credential_class`
   diagnostic stage. Existing allocations retain the repository-only mixed-class allowance for isolated
   runtimes. Other incompatible scope or directory reuse fails without changing the surviving grant. A modern worktree scope
   adopts one canonical runtime-proxy handle shared by its members: the first prepare mints through its
   requesting member and each joiner copies that string. A pre-adoption per-session scope, which has
-  stored member rows but no accepted entry at this fence, cannot enter a shared allocation and fails
+  stored member rows but no accepted entry at this fence, cannot enter a workspace-shared runtime and fails
   with `scope_handle_conflict`. Existing allocations bypass adoption and this guard, so siblings can
-  join and refresh credentials during deployment. Only a new allocation can enable sharing.
-  A shared allocation admits at most 32 member roots per worktree; an extra joiner fails `workspace_setup_failed`
+  join and refresh credentials during deployment. Only a new allocation can enable runtime sharing among sibling chats.
+  A workspace-shared runtime admits at most 32 member roots per worktree; an extra joiner fails `workspace_setup_failed`
   without touching incumbents. It serves contained outbound credential lookups (`resolveCredential`),
   runtime proxy authorization and Vercel network policy as today. Grants last 4 hours. When less than
   1 hour remains, `deliver` re-issues the grant with freshly selected Git and legacy Kilo material and
@@ -578,12 +584,11 @@ snapshot (`src/environment-build/`); see `.specs/cloud-agent-session.md` "Enviro
 - **Runtime selection.** Environment builders always use the `runtime-free` image and downloaded
   startup. Snapshot enrollment controls builder access independently of session startup selection.
   Builds are unsupported without a downloaded runtime-free deployment and a published runtime release.
-  Existing all-in-one snapshots are incompatible and trigger replacement builds. Sessions keep their
-  selected image; an `app` session starts from its image instead of a split-image snapshot.
+  Existing all-in-one snapshots are incompatible and trigger replacement builds. Already-running
+  allocations retain their recorded startup identity until replacement.
   Downloaded startup uses the current runtime installer and its named builder or supervisor target,
-  including on snapshot restore. The installed control bundle includes the builder. A preinstalled
-  launch rejects snapshots captured with downloaded aliases; a downloaded launch can install a
-  newer compatible runtime over a snapshot. The artifact read grant travels in the installer
+  including on snapshot restore. The installed control bundle includes the builder. A downloaded
+  launch can install a newer compatible runtime over a snapshot. The artifact read grant travels in the installer
   command and expires at the startup deadline. A restored session supplies a new command and its
   own credentials. Native snapshot retention of start configuration still needs deployed validation.
 
@@ -975,13 +980,12 @@ alone is non-zero and restarts. If the loop gives up, the Sandbox DO `starting` 
 timer stops the sandbox.
 
 On the native Cloudflare Containers runtime the container main process is the startup command:
-`start()` is issued with it as the entrypoint. In `preinstalled` mode that is
-`['/bin/sh', supervisor-path]`. In `downloaded` mode it is the bootstrap, which execs the same argv
+`start()` is issued with the downloaded bootstrap as the entrypoint, which execs
+`['/bin/sh', supervisor-path]`
 after install. PID 1 identity (`/proc/1/cmdline`) is the issuance confirmation when it is either
 argv, bounded by the wrapper readiness deadline. PID 1 identity is not wrapper readiness: the
 wrapper socket and the Sandbox DO `starting` timer stay the readiness owner, and no provider poll or
-wrapper-child probe is added for that path. Sandbox SDK runs the preinstalled startup command
-against a living PID 1. Vercel runs either startup command against a living PID 1; downloaded startup
+wrapper-child probe is added for that path. Vercel runs the bootstrap against a living PID 1; downloaded startup
 installs verified artifacts before it executes the supervisor.
 
 A native attempt that already issued the main process does not start another supervisor when that
@@ -1119,10 +1123,9 @@ Worker forwards an admitted report to the Sandbox DO as `startup-failed`.
 - CI publishes runtime payloads create-only by content hash, and the descriptor last. The deploy
   reads an immutable handoff for the exact commit, and verifies the base image digest and both
   payloads before it deploys a `downloaded` target.
-- The catalog defaults all targets to `downloaded` runtime-free with no `interactiveOrgIds`
-  restriction, including organization and personal sessions. SDK pins remain preinstalled.
-  Optional cohorts can restrict a future target. Roll back by image or by mode; a full mode rollback
-  changes the default to preinstalled/all-in-one, not merely removes a production override.
+- All targets use `downloaded` runtime-free, including organization and personal sessions.
+  Preinstalled images and startup cohorts are not supported. Rollback selects a previously verified
+  runtime release and compatible base image rather than switching startup modes.
 - The runtime-free image change relies on B1 (#7914), which is already merged: a running container
   captures under the image that it started with, including after DO reconstruction.
 - `runtime-targets.json` owns mode and image. Deployment renders Worker vars and the native image
@@ -1762,8 +1765,8 @@ counts.
     local run does not prove hosted DNS/TLS/providers, the native Containers path, or no-wake.
 24. **Downloaded runtime start and restore.** A fresh `downloaded` start runs the selected CLI and
     wrapper. A snapshot captured with runtime A, restored with runtime B, runs only B: A never
-    reaches `hello`. User files and configuration stay. Absent configuration keeps `preinstalled`
-    unchanged.
+    reaches `hello`. User files and configuration stay. Missing release configuration fails before
+    provider creation rather than falling back to a baked runtime.
 25. **Downloaded runtime startup failure.** An unauthorized download or a failed CLI probe fails
     queued work promptly with `runtime_<code>`, before the first-connect timer. If the bootstrap
     exits before the first PID 1 check of a repository start and the provider failure wins, one

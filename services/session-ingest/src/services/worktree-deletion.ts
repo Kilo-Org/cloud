@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNotNull, isNull, notInArray, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNull, notInArray, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { getWorkerDb, type WorkerDb } from '@kilocode/db/client';
 import {
@@ -12,12 +12,9 @@ import {
   cloudAgentWorktreeDeletionManifestSchema,
   cloudAgentWorktreeLocationSchema,
   cloudAgentWorktreeIdSchema,
-  WORKTREE_RUNTIME_HISTORY_UNAVAILABLE,
   WORKTREE_UNREGISTERED_CHILD_SESSIONS,
   WORKTREE_CHILD_LINEAGE_CONFLICT,
   WORKTREE_MEMBERSHIP_CHANGED,
-  type CanDestroyCloudAgentWorktreeSandboxResult,
-  type UnresolvedCloudAgentSandboxOwner,
   type CloudAgentWorktreeDeletionParams,
   type CloudAgentWorktreeDeletionResult,
   type CloudAgentWorktreeDeletionState,
@@ -26,7 +23,6 @@ import {
   type CloudAgentWorktreeLocation,
   type CreateSessionForCloudAgentParams,
   type RecordCloudAgentWorktreeCleanupParams,
-  type CanDestroyCloudAgentWorktreeSandboxParams,
 } from '@kilocode/session-ingest-contracts';
 import { hasOrganizationAccess, withDORetry } from '@kilocode/worker-utils';
 import type { Env } from '../env';
@@ -34,11 +30,6 @@ import { getSessionIngestDO } from '../dos/SessionIngestDO';
 import { getSessionAccessCacheDO } from '../dos/SessionAccessCacheDO';
 import { getUserConnectionDO } from '../dos/UserConnectionDO';
 import { notifyUserSessionEvent } from '../session-events';
-import {
-  allocationLocation,
-  firstWorktreeSessionId,
-  readSessionAllocations,
-} from './worktree-allocation';
 
 type WorktreeDb = Pick<WorkerDb, 'select' | 'insert' | 'update' | 'delete' | 'execute'>;
 
@@ -629,131 +620,6 @@ export async function recordWorktreeCleanup(
     timing.sessionCount = result.manifest.sessions.length;
     return result;
   });
-}
-
-export async function canDestroyWorktreeSandbox(
-  env: Env,
-  params: CanDestroyCloudAgentWorktreeSandboxParams
-): Promise<CanDestroyCloudAgentWorktreeSandboxResult> {
-  const db = getWorkerDb(env.HYPERDRIVE.connectionString);
-  const [row] = await db
-    .select()
-    .from(cloud_agent_worktrees)
-    .where(eq(cloud_agent_worktrees.worktree_id, params.worktreeId));
-  const worktree = await authorize(db, row, params);
-  if (worktree.deletion_started_at === null) throw new Error('worktree_deletion_not_started');
-  const targetIds = new Set(
-    deletionState(worktree).manifest.sessions.map(session => session.sessionId)
-  );
-  const worktrees = await db
-    .select()
-    .from(cloud_agent_worktrees)
-    .where(
-      and(
-        eq(cloud_agent_worktrees.kilo_user_id, params.kiloUserId),
-        isNull(cloud_agent_worktrees.deletion_completed_at)
-      )
-    );
-  const released = new Set(
-    worktrees
-      .filter(
-        item =>
-          item.deletion_started_at !== null &&
-          params.releasedWorktreeIds?.includes(cloudAgentWorktreeIdSchema.parse(item.worktree_id))
-      )
-      .map(item => item.worktree_id)
-  );
-  const roots = await db
-    .select({
-      sessionId: cli_sessions_v2.session_id,
-      cloudAgentSessionId: cli_sessions_v2.cloud_agent_session_id,
-      worktreeId: cli_sessions_v2.cloud_agent_worktree_id,
-      organizationId: cli_sessions_v2.organization_id,
-    })
-    .from(cli_sessions_v2)
-    .where(
-      and(
-        eq(cli_sessions_v2.kilo_user_id, params.kiloUserId),
-        isNull(cli_sessions_v2.parent_session_id),
-        isNotNull(cli_sessions_v2.cloud_agent_session_id)
-      )
-    );
-  const owners = new Map<
-    string,
-    { owner: UnresolvedCloudAgentSandboxOwner; locations: CloudAgentWorktreeLocation[] }
-  >();
-  for (const item of worktrees) {
-    if (item.worktree_id === params.worktreeId || released.has(item.worktree_id)) continue;
-    owners.set(item.worktree_id, {
-      owner: {
-        worktreeId: cloudAgentWorktreeIdSchema.parse(item.worktree_id),
-        organizationId: item.organization_id,
-        sessions: [],
-      },
-      locations: locations(item),
-    });
-  }
-  for (const root of roots) {
-    if (targetIds.has(root.sessionId) || (root.worktreeId && released.has(root.worktreeId)))
-      continue;
-    if (!root.cloudAgentSessionId) throw new Error(WORKTREE_RUNTIME_HISTORY_UNAVAILABLE);
-    const key = root.worktreeId ?? root.cloudAgentSessionId;
-    const existing = owners.get(key);
-    if (existing && existing.owner.organizationId !== root.organizationId)
-      throw new Error(WORKTREE_RUNTIME_HISTORY_UNAVAILABLE);
-    const candidate = existing ?? {
-      owner: {
-        worktreeId: root.worktreeId ? cloudAgentWorktreeIdSchema.parse(root.worktreeId) : null,
-        organizationId: root.organizationId,
-        sessions: [],
-      } satisfies UnresolvedCloudAgentSandboxOwner,
-      locations: [],
-    };
-    candidate.owner.sessions.push({
-      sessionId: root.sessionId,
-      cloudAgentSessionId: root.cloudAgentSessionId,
-    });
-    owners.set(key, candidate);
-  }
-  const matches = (location: CloudAgentWorktreeLocation) =>
-    location.sandboxId === params.location.sandboxId &&
-    location.provider === params.location.provider;
-  if ([...owners.values()].some(candidate => candidate.locations.some(matches)))
-    return { kind: 'shared' };
-  const unknown = [...owners.values()]
-    .filter(candidate => candidate.locations.length === 0)
-    .map(candidate => candidate.owner);
-  const allocations = await readSessionAllocations(
-    db,
-    params.kiloUserId,
-    unknown.flatMap(owner =>
-      owner.worktreeId
-        ? [firstWorktreeSessionId(owner.worktreeId)]
-        : owner.sessions.map(session => session.cloudAgentSessionId)
-    )
-  );
-  const unresolved: UnresolvedCloudAgentSandboxOwner[] = [];
-  for (const owner of unknown) {
-    const sourceId = owner.worktreeId
-      ? firstWorktreeSessionId(owner.worktreeId)
-      : owner.sessions[0]?.cloudAgentSessionId;
-    if (!sourceId) throw new Error(WORKTREE_RUNTIME_HISTORY_UNAVAILABLE);
-    const source = owner.sessions.find(session => session.cloudAgentSessionId === sourceId);
-    const location = allocationLocation(allocations, {
-      cloudAgentSessionId: sourceId,
-      sessionId: source?.sessionId ?? null,
-      organizationId: owner.organizationId,
-    });
-    if (location && owner.worktreeId !== null) {
-      if (matches(location)) return { kind: 'shared' };
-      continue;
-    }
-    if (location) owner.allocationLocation = location;
-    if (owner.sessions.length === 0)
-      owner.sessions.push({ sessionId: null, cloudAgentSessionId: sourceId });
-    unresolved.push(owner);
-  }
-  return unresolved.length > 0 ? { kind: 'unresolved', owners: unresolved } : { kind: 'exclusive' };
 }
 
 /**

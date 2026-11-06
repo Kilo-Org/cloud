@@ -216,7 +216,8 @@ function prepareInput(overrides: RouteOverrides = {}) {
       kiloToken: FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN,
       orgId: overrides.orgId === null ? undefined : (overrides.orgId ?? 'org_123'),
       repository: { type: 'github' as const, repo: 'acme/widgets' },
-      scopeId: sessionId,
+      scopeId: 'worktree_11111111-1111-4111-8111-111111111111',
+      workspaceId: 'worktree_11111111-1111-4111-8111-111111111111',
     },
   };
 }
@@ -234,10 +235,6 @@ async function setup(
       NEXTAUTH_SECRET: WORKER_SECRET,
       // Credential grants require the runtime proxy facade, independent of local settings.
       WORKER_URL: 'https://worker.example.com',
-      // These tests use fake providers, independently of local runtime deployment settings.
-      RUNTIME_STARTUP_MODE: 'preinstalled',
-      NATIVE_RUNTIME_IMAGE: 'all-in-one',
-      RUNTIME_RELEASE_DESCRIPTOR: undefined,
       ...extraEnv,
     });
     peer.runtimeProxyForSession = createRuntimeProxyMintingPeer(instance.env, sessionId => {
@@ -353,8 +350,8 @@ describe('environment snapshot launch', () => {
     const { wrapper, allocationId } = await connect(sandboxId, provider, 2);
 
     expect(provider.launchOptions).toEqual([
-      { snapshot: SNAPSHOT, nativeImage: 'all-in-one' },
-      { nativeImage: 'all-in-one' },
+      { snapshot: SNAPSHOT, nativeImage: 'runtime-free' },
+      { nativeImage: 'runtime-free' },
     ]);
     expect(provider.launchRefs[1]).toBe(provider.launchRefs[0]);
     expect(provider.stopRefs).toEqual([provider.launchRefs[0]]);
@@ -378,7 +375,7 @@ describe('environment snapshot launch', () => {
     await prepareFrameOf(wrapper);
     expect(await readLaunchRecord(stub)).toEqual({
       allocationId,
-      startupMode: 'preinstalled',
+      startupMode: 'downloaded',
       startSource: 'image',
       confirmed: true,
     });
@@ -425,7 +422,7 @@ describe('environment snapshot launch', () => {
     await stub.prepare(prepareInput());
     await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
 
-    expect(provider.launchOptions).toEqual([{ nativeImage: 'all-in-one' }]);
+    expect(provider.launchOptions).toEqual([{ nativeImage: 'runtime-free' }]);
     await waitFor(() =>
       expect(peer.routeUpdatesFor(SESSION)).toContainEqual({
         state: 'preparing',
@@ -467,7 +464,7 @@ describe('environment snapshot launch', () => {
     expect(provider.launchEnvs).toHaveLength(1);
     expect(await readLaunchRecord(stub)).toEqual({
       allocationId,
-      startupMode: 'preinstalled',
+      startupMode: 'downloaded',
       startSource: 'repository',
       confirmed: true,
     });
@@ -526,7 +523,7 @@ describe('environment snapshot launch', () => {
     await waitFor(async () =>
       expect((await stub.getAllocationState()).allocationId).not.toBe(allocationId)
     );
-    expect(provider.launchOptions[1]).toEqual({ nativeImage: 'all-in-one' });
+    expect(provider.launchOptions[1]).toEqual({ nativeImage: 'runtime-free' });
     expect(provider.launchEnvs).toHaveLength(2);
   });
 
@@ -604,7 +601,7 @@ describe('environment snapshot launch', () => {
     const { wrapper } = await connect('sbx__env_launch_selected', provider);
     const frame = await prepareFrameOf(wrapper);
 
-    expect(provider.launchOptions).toEqual([{ snapshot: SNAPSHOT, nativeImage: 'all-in-one' }]);
+    expect(provider.launchOptions).toEqual([{ snapshot: SNAPSHOT, nativeImage: 'runtime-free' }]);
     expect(lookups.lookups).toEqual([{ reference: REFERENCE, actorUserId: 'user_123' }]);
     expect(frame.spec.capture).toBeUndefined();
     expect(frame.spec).not.toHaveProperty('environment');
@@ -679,7 +676,7 @@ describe('environment snapshot launch', () => {
     const { wrapper } = await connect('sbx__env_launch_none', provider);
     const frame = await prepareFrameOf(wrapper);
 
-    expect(provider.launchOptions).toEqual([{ nativeImage: 'all-in-one' }]);
+    expect(provider.launchOptions).toEqual([{ nativeImage: 'runtime-free' }]);
     expect(lookups.lookups).toEqual([]);
     expect(frame.spec.capture).toBeUndefined();
   });
@@ -690,7 +687,7 @@ describe('environment snapshot launch', () => {
     await stub.prepare(prepareInput());
     await connect('sbx__env_launch_missing', provider);
 
-    expect(provider.launchOptions).toEqual([{ nativeImage: 'all-in-one' }]);
+    expect(provider.launchOptions).toEqual([{ nativeImage: 'runtime-free' }]);
     await waitFor(() =>
       expect(peer.routeUpdatesFor(SESSION)).toContainEqual({
         state: 'preparing',
@@ -706,13 +703,13 @@ describe('environment snapshot launch', () => {
     const { stub: sharedStub } = await setup('sbx__env_launch_shared', shared);
     await sharedStub.prepare(prepareInput({ directory: '/workspace/org/user/sessions/s1' }));
     await waitFor(() => expect(shared.launchEnvs).toHaveLength(1));
-    expect(shared.launchOptions).toEqual([{ nativeImage: 'all-in-one' }]);
+    expect(shared.launchOptions).toEqual([{ nativeImage: 'runtime-free' }]);
 
     const unsupported = createFakeProvider({ snapshots: false });
     const { stub } = await setup('sbx__env_launch_unsupported', unsupported);
     await stub.prepare(prepareInput());
     await waitFor(() => expect(unsupported.launchEnvs).toHaveLength(1));
-    expect(unsupported.launchOptions).toEqual([{ nativeImage: 'all-in-one' }]);
+    expect(unsupported.launchOptions).toEqual([{ nativeImage: 'runtime-free' }]);
   });
 
   it('answers a capture request from a pre-change wrapper at once without the provider', async () => {
@@ -743,7 +740,7 @@ describe('environment snapshot launch', () => {
 
     await connect('sbx__repo_launch_discard', provider);
 
-    expect(provider.launchOptions).toEqual([{ nativeImage: 'all-in-one' }]);
+    expect(provider.launchOptions).toEqual([{ nativeImage: 'runtime-free' }]);
   });
 
   it.each([
@@ -757,7 +754,7 @@ describe('environment snapshot launch', () => {
 
     await connect('sbx__repo_launch_keep', provider);
 
-    expect(provider.launchOptions).toEqual([{ snapshot: SNAPSHOT, nativeImage: 'all-in-one' }]);
+    expect(provider.launchOptions).toEqual([{ snapshot: SNAPSHOT, nativeImage: 'runtime-free' }]);
   });
 
   it('keeps the failed-snapshot skip when a launch fails before it completes', async () => {
@@ -840,7 +837,7 @@ describe('environment snapshot launch', () => {
     // Completing the stop starts the next allocation, which must keep the snapshot.
     await releaseHeld(stub, () => provider.releaseStop());
     await waitFor(() => expect(provider.launchEnvs).toHaveLength(2));
-    expect(provider.launchOptions[1]).toEqual({ snapshot: SNAPSHOT, nativeImage: 'all-in-one' });
+    expect(provider.launchOptions[1]).toEqual({ snapshot: SNAPSHOT, nativeImage: 'runtime-free' });
   });
 
   it('marks the launch confirmed only for the allocation whose wrapper connected', async () => {
@@ -985,7 +982,7 @@ describe('environment snapshot preparation fallback', () => {
       const replacement = await prepareFrameOf(fresh.wrapper);
       expect(fresh.allocationId).not.toBe(allocationId);
       expect(provider.stopRefs).toEqual([provider.launchRefs[0]]);
-      expect(provider.launchOptions[1]).toEqual({ nativeImage: 'all-in-one' });
+      expect(provider.launchOptions[1]).toEqual({ nativeImage: 'runtime-free' });
       expect(provider.launchEnvs[1].SANDBOX_CONTROL_CREDENTIAL).not.toBe(
         provider.launchEnvs[0].SANDBOX_CONTROL_CREDENTIAL
       );
@@ -1095,7 +1092,7 @@ describe('environment snapshot preparation fallback', () => {
       if (startSource === 'repository') {
         const fresh = await connect(sandboxId, provider, 2);
         await prepareFrameOf(fresh.wrapper);
-        expect(provider.launchOptions[1]).toEqual({ nativeImage: 'all-in-one' });
+        expect(provider.launchOptions[1]).toEqual({ nativeImage: 'runtime-free' });
       } else {
         await waitFor(async () =>
           expect((await stub.status({ sessionId: SESSION })).view.state).toBe('failed')
@@ -1139,7 +1136,7 @@ describe('environment snapshot preparation fallback', () => {
       sessionId: sibling,
       kiloSessionId: 'ses_bbbbbbbbbbbbbbbbbbbbbbbbbb',
     });
-    await stub.prepare({ ...input, credentials: { ...input.credentials, scopeId: SESSION } });
+    await stub.prepare(input);
     expect(await wrapper.nextSkipping(['session.credentials'])).toMatchObject({
       type: 'session.prepare',
     });
@@ -1221,7 +1218,7 @@ describe('environment snapshot preparation fallback', () => {
         const fresh = await connect(sandboxId, provider, 2);
         const frame = await prepareFrameOf(fresh.wrapper);
         expect(frame.spec.attemptId).toBe(view.attemptId);
-        expect(provider.launchOptions[1]).toEqual({ nativeImage: 'all-in-one' });
+        expect(provider.launchOptions[1]).toEqual({ nativeImage: 'runtime-free' });
       } else {
         expect((await reconstructed.status({ sessionId: SESSION })).view.state).toBe('failed');
         expect(provider.launchEnvs).toHaveLength(1);
@@ -1248,10 +1245,7 @@ describe('environment snapshot preparation fallback', () => {
         sessionId: sibling,
         kiloSessionId: 'ses_bbbbbbbbbbbbbbbbbbbbbbbbbb',
       });
-      await stub.prepare({
-        ...siblingInput,
-        credentials: { ...siblingInput.credentials, scopeId: SESSION },
-      });
+      await stub.prepare(siblingInput);
       expect(await wrapper.nextSkipping(['session.credentials'])).toMatchObject({
         type: 'session.prepare',
       });

@@ -1,6 +1,5 @@
 import { createKiloClient } from '@kilocode/sdk';
 import { WrapperBootstrapError } from '../bootstrap-error.js';
-import { createWorktreeKiloCleanupClient } from '../control/delete-worktree.js';
 import { summarizeWithTimeout } from '../condense-on-complete.js';
 import {
   createWrapperKiloClient,
@@ -181,7 +180,6 @@ export function createKiloHarness(options: KiloHarnessOptions): Harness {
         return Array.isArray(ptys) && ptys.length === 0;
       },
     },
-    worktree: createWorktreeKiloCleanupClient(options.server),
   };
 }
 

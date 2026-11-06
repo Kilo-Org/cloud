@@ -8,6 +8,7 @@ import type { SandboxSessionV2 } from '../../src/control-plane/session/session-d
 import { events } from '../../src/control-plane/session/sqlite-schema.js';
 import { generateSandboxId } from '../../src/sandbox-id.js';
 import { sessionDoName } from '../../src/session-identity.js';
+import { getWorktreeWorkspacePath } from '../../src/workspace.js';
 import { parseSessionMetadata } from '../../src/persistence/session-metadata.js';
 import {
   CONTROL_PLANE_PROTOCOL_VERSION,
@@ -42,7 +43,7 @@ const sandboxes = (env as unknown as { SANDBOX_CONTROL: SandboxControlNamespace 
 const sessions = (env as unknown as { SANDBOX_SESSION: SessionNamespace }).SANDBOX_SESSION;
 
 const USER_ID = 'user_b10';
-const ORG_ID = 'org_b10';
+const ORG_ID = '11111111-1111-4111-8111-111111111b10';
 
 /** A minimal but schema-valid full snapshot capture (baseRef filled per reply). */
 const SNAPSHOT_SUMMARY = {
@@ -77,6 +78,7 @@ function metadata(input: {
   sandboxId: string;
   worktreeId?: string;
 }) {
+  const worktreeId = input.worktreeId ?? `worktree_${input.sessionId.slice('workspace_'.length)}`;
   return parseSessionMetadata({
     metadataSchemaVersion: 2,
     identity: {
@@ -92,7 +94,8 @@ function metadata(input: {
       branchName: 'kilo/b10',
       sandboxId: input.sandboxId,
       sandboxProvider: 'cloudflare-containers',
-      ...(input.worktreeId ? { worktreeId: input.worktreeId } : {}),
+      worktreeId,
+      workspacePath: getWorktreeWorkspacePath(ORG_ID, USER_ID, worktreeId as `worktree_${string}`),
     },
     lifecycle: { version: 1, timestamp: 1 },
   });
@@ -328,7 +331,13 @@ describe('control-plane worktree changes (B10)', () => {
       const sessionId = newSessionId();
       const worktreeId = `worktree_${crypto.randomUUID()}`;
       const sandboxId = await generateSandboxId(sessionId);
-      const sandbox = await injectProvider(sandboxId, createFakeProvider());
+      await startSessionWithSandbox({
+        sessionId,
+        sandboxId,
+        provider: createFakeProvider(),
+        worktreeId,
+      });
+      const sandbox = sandboxes.getByName(sandboxId);
       const context = worktreeChangesContext(
         metadata({ sessionId, sandboxId, worktreeId, kiloSessionId: kiloSessionId() }),
         '/workspace/shared'
@@ -358,6 +367,7 @@ describe('control-plane worktree changes (B10)', () => {
       await sandbox.deleteWorktreeResources({
         worktreeId,
         kiloUserId: USER_ID,
+        organizationId: ORG_ID,
         location: { sandboxId, provider: 'cloudflare-containers' },
         sessionIds: [context.session.kiloSessionId],
       });
@@ -742,10 +752,11 @@ describe('control-plane worktree changes (B10)', () => {
       provider,
       worktreeId,
     });
+    const otherSessionId = newSessionId();
     const other = await startSessionWithSandbox({
-      sessionId: newSessionId(),
-      sandboxId,
-      provider,
+      sessionId: otherSessionId,
+      sandboxId: await generateSandboxId(otherSessionId),
+      provider: createFakeProvider(),
       worktreeId: `worktree_${crypto.randomUUID()}`,
     });
     const wrapper = await connectAndHello(provider, sandboxId, 'wr_siblings');
@@ -1170,9 +1181,15 @@ describe('control-plane worktree changes (B10)', () => {
 
   it('persists and retrieves the same path in both scopes through the wrapper and Session DO', async () => {
     const sessionId = newSessionId();
+    const worktreeId = `worktree_${crypto.randomUUID()}`;
     const sandboxId = await generateSandboxId(sessionId);
     const provider = createFakeProvider();
-    const sessionStub = await startSessionWithSandbox({ sessionId, sandboxId, provider });
+    const sessionStub = await startSessionWithSandbox({
+      sessionId,
+      sandboxId,
+      provider,
+      worktreeId,
+    });
     const wrapper = await connectAndHello(provider, sandboxId, 'wr_scoped');
     await markRouteReady(sessionStub, wrapper, sessionId);
     await settleCaptures(wrapper);
@@ -1226,15 +1243,17 @@ describe('control-plane worktree changes (B10)', () => {
         expectedRevision: frame.payload.revision,
       })
     ).resolves.toEqual({ status: 'no_longer_listed', currentRevision: frame.payload.revision });
-    const keys = await runInDurableObject(sessionStub, (_instance, state) =>
-      [...state.storage.kv.list({ prefix: WORKTREE_FILE_PREFIX })].map(([key]) => key)
+    const prefix = `worktree_changes/${worktreeId}/`;
+    const sandbox = sandboxes.getByName(sandboxId);
+    const keys = await runInDurableObject(sandbox, (_instance, state) =>
+      [...state.storage.kv.list({ prefix: `${prefix}${WORKTREE_FILE_PREFIX}` })].map(([key]) => key)
     );
     expect(keys).toHaveLength(2);
-    expect(keys).toContain(`${WORKTREE_FILE_PREFIX}uncommitted\0same.txt`);
-    expect(keys).toContain(`${WORKTREE_FILE_PREFIX}against-base-branch\0same.txt`);
+    expect(keys).toContain(`${prefix}${WORKTREE_FILE_PREFIX}uncommitted\0same.txt`);
+    expect(keys).toContain(`${prefix}${WORKTREE_FILE_PREFIX}against-base-branch\0same.txt`);
     expect(
-      await runInDurableObject(sessionStub, (_instance, state) =>
-        state.storage.kv.get(WORKTREE_RECOVERY_KEY)
+      await runInDurableObject(sandbox, (_instance, state) =>
+        state.storage.kv.get(`${prefix}${WORKTREE_RECOVERY_KEY}`)
       )
     ).toEqual({
       revision: frame.payload.revision,

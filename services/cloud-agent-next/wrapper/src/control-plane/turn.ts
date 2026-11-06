@@ -1365,14 +1365,6 @@ export function createTurnManager(deps: TurnManagerDeps) {
   return {
     canRestartRuntime,
 
-    async cancelInterruptedFinalizations(directory: string): Promise<void> {
-      const pending = [...interruptedFinalizations.values()].filter(
-        entry => entry.route.directory === directory
-      );
-      for (const entry of pending) entry.abort.abort(new Error('worktree deleted'));
-      await Promise.all(pending.map(entry => entry.done));
-    },
-
     credentialsInstalled(runtimeKeyValue: string): void {
       maybeApplyPendingCredentials(runtimeKeyValue);
     },

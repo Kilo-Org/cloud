@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { DatabaseSync } from 'node:sqlite';
 
 import { eq } from 'drizzle-orm';
@@ -13,6 +14,12 @@ import {
 } from '../sandbox-control/credential.js';
 import { encodeVercelProviderRef } from '../sandbox-control/vercel-provider.js';
 import { RUNTIME_TOOLCHAIN } from '../shared/runtime-toolchain.js';
+import snapshotMigrations from '../../drizzle/vercel-snapshot/migrations.js';
+import * as runtimeBase from '../byoc/vercel-runtime-base.js';
+import {
+  snapshotValidatorAllocation,
+  type SnapshotValidatorInput,
+} from '../control-plane/sandbox/snapshot-validator.js';
 
 const mocks = vi.hoisted(() => {
   class CredentialMissingError extends Error {}
@@ -54,10 +61,11 @@ const mocks = vi.hoisted(() => {
       confirmSnapshotValidatorStopped: vi.fn(),
       getSnapshotValidatorStatus: vi.fn(),
     },
+    getControl: vi.fn(),
     fetchCredential: vi.fn(),
     resolveAccess: vi.fn(),
     projectStatus: vi.fn(),
-    getArtifacts: vi.fn(),
+    downloadedStartup: vi.fn(),
     getIdentity: vi.fn(),
   };
 });
@@ -89,6 +97,11 @@ vi.mock('../../drizzle/vercel-snapshot/migrations', async () => {
             .pathname,
           'utf8'
         ),
+        m0001: readFileSync(
+          new URL('../../drizzle/vercel-snapshot/0001_runtime_recipe.sql', import.meta.url)
+            .pathname,
+          'utf8'
+        ),
       },
     },
   };
@@ -102,8 +115,8 @@ vi.mock('../byoc/vercel-credential-resolver.js', () => ({
   projectByocVercelStatus: mocks.projectStatus,
 }));
 
-vi.mock('../byoc/vercel-runtime-artifacts.js', () => ({
-  getVercelRuntimeArtifacts: mocks.getArtifacts,
+vi.mock('../sandbox-control/downloaded-startup.js', () => ({
+  downloadedStartup: mocks.downloadedStartup,
 }));
 
 vi.mock('../byoc/vercel-runtime-identity.js', () => ({
@@ -237,7 +250,8 @@ function createStorage(database: DatabaseSync) {
 
 function createBuild(
   storage: StorageFixture,
-  ownerKey = ORGANIZATION_ID
+  ownerKey = ORGANIZATION_ID,
+  runtimeDescriptor = 'a'.repeat(64)
 ): InstanceType<typeof VercelSnapshotBuild> {
   const ctx = {
     id: { name: ownerKey },
@@ -247,7 +261,8 @@ function createBuild(
   const env = {
     WORKER_URL: 'https://worker.invalid',
     NEXTAUTH_SECRET: 'snapshot-test-signing-secret',
-    SANDBOX_CONTROL: { getByName: () => mocks.control },
+    RUNTIME_RELEASE_DESCRIPTOR: runtimeDescriptor,
+    SANDBOX_CONTROL: { getByName: mocks.getControl },
   };
   return new VercelSnapshotBuild(ctx as never, env as never);
 }
@@ -355,6 +370,7 @@ function deferred<T>() {
 
 beforeEach(() => {
   vi.resetAllMocks();
+  mocks.getControl.mockImplementation(() => mocks.control);
   mocks.fetchCredential.mockResolvedValue(makeCredential());
   mocks.resolveAccess.mockResolvedValue({
     accessToken: 'test-vercel-credential',
@@ -391,21 +407,61 @@ beforeEach(() => {
     releasedAt: '2026-09-08',
     digest: 'digest-test',
   });
-  mocks.getArtifacts.mockResolvedValue([
-    {
-      path: 'usr/local/bin/kilocode-control-plane-wrapper.js',
-      bytes: new TextEncoder().encode('control-wrapper'),
-      sha256: 'b'.repeat(64),
-    },
-    {
-      path: 'usr/local/bin/kilocode-control-plane-supervisor.sh',
-      bytes: new TextEncoder().encode('supervisor'),
-      sha256: 'c'.repeat(64),
-    },
-  ]);
+  mocks.downloadedStartup.mockResolvedValue({
+    argv: ['/bin/sh', '-c', 'download-runtime-and-exec-supervisor'],
+    user: 'root',
+  });
 });
 
 describe('VercelSnapshotBuild persistence isolation', () => {
+  it('parses the actual migration module without mocked imports', () => {
+    const result = spawnSync(
+      process.execPath,
+      ['--check', new URL('../../drizzle/vercel-snapshot/migrations.js', import.meta.url).pathname],
+      { encoding: 'utf8' }
+    );
+    expect(result.stderr).toBe('');
+    expect(result.status).toBe(0);
+  });
+  it('migrates legacy build rows without certifying their runtime recipe', async () => {
+    const source = createFixture();
+    await source.build.start(startInput());
+    const state = storedRow(source);
+    const database = new DatabaseSync(':memory:');
+    const storage = createStorage(database);
+    const db = drizzle(storage as never);
+    await migrate(db, {
+      ...snapshotMigrations,
+      journal: {
+        ...snapshotMigrations.journal,
+        entries: snapshotMigrations.journal.entries.slice(0, 1),
+      },
+    });
+    const legacy = Object.entries({
+      ...state,
+      step: 'confirm_terminal',
+      snapshot_id: 'legacy-baked-snapshot',
+    }).filter(([name]) => name !== 'recipe_digest');
+    database
+      .prepare(
+        `INSERT INTO vercel_snapshot_builds (${legacy.map(([name]) => name).join(',')}) VALUES (${legacy.map(() => '?').join(',')})`
+      )
+      .run(...legacy.map(([, value]) => value as never));
+    await migrate(db, snapshotMigrations);
+    expect(db.select().from(vercelSnapshotBuilds).get()).toMatchObject({
+      recipe_digest: null,
+      step: 'confirm_terminal',
+      snapshot_id: 'legacy-baked-snapshot',
+    });
+    const build = createBuild(storage);
+    await build.alarm();
+    expect(db.select().from(vercelSnapshotBuilds).get()).toMatchObject({
+      step: 'validating_access',
+      snapshot_id: null,
+    });
+    expect(mocks.getIdentity).not.toHaveBeenCalled();
+  });
+
   it('applies snapshot-only migrations without adding snapshot tables to session migrations', async () => {
     const snapshot = createFixture();
     const snapshotTables = snapshot.database
@@ -1828,6 +1884,264 @@ describe('VercelSnapshotBuild terminal replay', () => {
 });
 
 describe('VercelSnapshotBuild runtime preparation', () => {
+  it('changes validator control and allocation incarnations when the same generation changes recipe', async () => {
+    const recipe = vi
+      .spyOn(runtimeBase, 'vercelRuntimeBaseDigest')
+      .mockResolvedValue('old-base-recipe');
+    try {
+      const fixture = createFixture();
+      await fixture.build.start(startInput());
+      updateRow(fixture, {
+        step: 'launch_validator_wrapper',
+        snapshot_id: 'old-base-snapshot',
+        validator_session_id: 'old-validator-session',
+      });
+      await fixture.build.alarm();
+      const oldControlId = storedRow(fixture)?.validator_control_id;
+      const oldAllocationId = mocks.downloadedStartup.mock.calls[0]?.[0].allocationId;
+      recipe.mockResolvedValue('new-base-recipe');
+      await runNextAlarm(fixture);
+      expect(storedRow(fixture)?.step).toBe('validating_access');
+      updateRow(fixture, {
+        step: 'launch_validator_wrapper',
+        snapshot_id: 'current-base-snapshot',
+        validator_session_id: 'current-validator-session',
+      });
+      await fixture.build.alarm();
+      expect(storedRow(fixture)?.step).toBe('verify_validator_call_home');
+      expect(storedRow(fixture)?.validator_control_id).not.toBe(oldControlId);
+      expect(mocks.downloadedStartup.mock.calls[1]?.[0].allocationId).not.toBe(oldAllocationId);
+      expect(
+        mocks.control.initializeSnapshotValidator.mock.calls.map(
+          ([input]) => input.build.generation
+        )
+      ).toEqual([FIRST_GENERATION, FIRST_GENERATION]);
+    } finally {
+      recipe.mockRestore();
+    }
+  });
+
+  it.each(['legacy', 'previous-recipe'])(
+    'restarts a %s build without rebinding its preinitialized validator',
+    async kind => {
+      const fixture = createFixture();
+      await fixture.build.start(startInput());
+      const oldAllocationId =
+        kind === 'legacy' ? FIRST_GENERATION : 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+      const oldControlId = `ses-byoc-validator-${oldAllocationId.replaceAll('-', '')}`;
+      const oldProviderRef = encodeVercelProviderRef({
+        sandboxName: 'legacy-validator',
+        sessionId: 'legacy-validator-session',
+      });
+      const registered = new Map([[oldControlId, oldProviderRef]]);
+      mocks.getControl.mockImplementation((sandboxId: string) => ({
+        ...mocks.control,
+        initializeSnapshotValidator: async (input: SnapshotValidatorInput) => {
+          snapshotValidatorAllocation(sandboxId, input, Date.now());
+          const providerRef = registered.get(sandboxId);
+          if (providerRef && providerRef !== input.allocation.providerRef)
+            throw new Error('Snapshot validator allocation changed');
+          registered.set(sandboxId, input.allocation.providerRef);
+          await mocks.control.initializeSnapshotValidator(input);
+        },
+      }));
+      updateRow(fixture, {
+        step: 'verify_validator_call_home',
+        recipe_digest: kind === 'legacy' ? null : 'previous-recipe',
+        validator_control_id: oldControlId,
+        validator_name: 'legacy-validator',
+        validator_session_id: 'legacy-validator-session',
+        snapshot_id: 'legacy-baked-snapshot',
+      });
+      await fixture.build.alarm();
+      expect(mocks.control.confirmSnapshotValidatorStopped).toHaveBeenCalledWith(oldProviderRef);
+      expect(storedRow(fixture)?.step).toBe('validating_access');
+      updateRow(fixture, {
+        step: 'launch_validator_wrapper',
+        snapshot_id: 'current-base-snapshot',
+        validator_session_id: 'current-validator-session',
+      });
+      await fixture.build.alarm();
+      const current = storedRow(fixture);
+      expect(current?.step).toBe('verify_validator_call_home');
+      expect(current?.validator_control_id).not.toBe(oldControlId);
+      expect(registered.get(oldControlId)).toBe(oldProviderRef);
+      const input = mocks.control.initializeSnapshotValidator.mock.calls[0]?.[0];
+      expect(input.build.generation).toBe(FIRST_GENERATION);
+      expect(input.build.incarnation).not.toBe(oldAllocationId);
+      expect(mocks.downloadedStartup).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sandboxId: current?.validator_control_id,
+          allocationId: input.build.incarnation,
+        })
+      );
+      expect(registered.size).toBe(2);
+    }
+  );
+
+  it('keeps the incarnation of a persisted in-progress legacy validator', async () => {
+    const fixture = createFixture();
+    await fixture.build.start(startInput());
+    const sandboxId = `ses-byoc-validator-${FIRST_GENERATION.replaceAll('-', '')}`;
+    updateRow(fixture, {
+      step: 'launch_validator_wrapper',
+      validator_control_id: sandboxId,
+      snapshot_id: 'current-base-snapshot',
+      validator_session_id: 'current-validator-session',
+    });
+    await fixture.build.alarm();
+    expect(storedRow(fixture)?.step).toBe('verify_validator_call_home');
+    expect(mocks.downloadedStartup).toHaveBeenCalledWith(
+      expect.objectContaining({ sandboxId, allocationId: FIRST_GENERATION })
+    );
+    expect(mocks.control.initializeSnapshotValidator).toHaveBeenCalledWith(
+      expect.objectContaining({
+        build: expect.objectContaining({
+          generation: FIRST_GENERATION,
+          incarnation: FIRST_GENERATION,
+        }),
+      })
+    );
+  });
+
+  it('fences an old recipe snapshot response after restarting the same generation', async () => {
+    const recipe = vi.spyOn(runtimeBase, 'vercelRuntimeBaseDigest').mockResolvedValue('old-recipe');
+    try {
+      const fixture = createFixture();
+      await fixture.build.start(startInput());
+      updateRow(fixture, {
+        step: 'snapshot_builder',
+        builder_session_id: 'legacy-builder-session',
+        snapshot_source_session_id: 'legacy-builder-session',
+        snapshot_baseline_json: '[]',
+        snapshot_requested: 1,
+      });
+      const pendingSnapshot = deferred<{ id: string; sourceSessionId: string; status: string }>();
+      mocks.client.createSnapshot.mockImplementationOnce(() => pendingSnapshot.promise);
+      const staleAlarm = fixture.build.alarm();
+      await vi.waitFor(() => expect(mocks.client.createSnapshot).toHaveBeenCalledOnce());
+      recipe.mockResolvedValue('current-recipe');
+      await fixture.build.alarm();
+      expect(storedRow(fixture)).toMatchObject({
+        step: 'validating_access',
+        recipe_digest: 'current-recipe',
+        snapshot_id: null,
+      });
+      pendingSnapshot.resolve({
+        id: 'late-baked-snapshot',
+        sourceSessionId: 'legacy-builder-session',
+        status: 'created',
+      });
+      await staleAlarm;
+      expect(storedRow(fixture)).toMatchObject({
+        step: 'validating_access',
+        recipe_digest: 'current-recipe',
+        snapshot_id: null,
+      });
+      expect(mocks.client.deleteSnapshot).toHaveBeenCalledWith('late-baked-snapshot');
+      expect(mocks.projectStatus).not.toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ setupStatus: 'ready' })
+      );
+    } finally {
+      recipe.mockRestore();
+    }
+  });
+
+  it.each([
+    'snapshot_builder',
+    'create_validator',
+    'launch_validator_wrapper',
+    'verify_validator_call_home',
+    'stop_validator',
+    'confirm_terminal',
+  ])('restarts unproven persisted %s builds without publishing their old snapshots', async step => {
+    const fixture = createFixture();
+    await fixture.build.start(startInput());
+    updateRow(fixture, {
+      step,
+      recipe_digest: null,
+      builder_name: 'legacy-builder',
+      builder_operation_id: 'legacy-builder-operation',
+      builder_session_id: 'legacy-builder-session',
+      validator_name: 'legacy-validator',
+      validator_operation_id: 'legacy-validator-operation',
+      validator_session_id: step === 'snapshot_builder' ? null : 'legacy-validator-session',
+      validator_control_id: step === 'snapshot_builder' ? null : 'legacy-validator-control',
+      snapshot_id: step === 'snapshot_builder' ? null : 'legacy-baked-snapshot',
+      snapshot_candidate_id: step === 'snapshot_builder' ? 'legacy-baked-snapshot' : null,
+    });
+    await fixture.build.alarm();
+    expect(storedRow(fixture)).toMatchObject({
+      step: 'validating_access',
+      recipe_digest: expect.stringMatching(/^downloaded-base-v1:[a-f0-9]{64}$/),
+      builder_session_id: null,
+      validator_session_id: null,
+      snapshot_id: null,
+      snapshot_candidate_id: null,
+    });
+    expect(storedRow(fixture)?.builder_name).not.toBe('legacy-builder');
+    expect(mocks.client.deleteSnapshot).toHaveBeenCalledWith('legacy-baked-snapshot');
+    expect(mocks.client.stopSession).toHaveBeenCalledWith(
+      step === 'snapshot_builder' ? 'legacy-builder-session' : 'legacy-validator-session',
+      step === 'snapshot_builder' ? 'legacy-builder' : 'legacy-validator'
+    );
+    expect(mocks.getIdentity).not.toHaveBeenCalled();
+    expect(mocks.projectStatus).not.toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ setupStatus: 'ready' })
+    );
+    const cleanupCalls = mocks.client.stopSession.mock.calls.length;
+    fixture.build = createBuild(fixture.storage);
+    await runNextAlarm(fixture);
+    expect(storedRow(fixture)?.builder_name).not.toBe('legacy-builder');
+    expect(mocks.client.stopSession).toHaveBeenCalledTimes(cleanupCalls);
+  });
+
+  it('retries fenced cleanup before restarting an incompatible recipe', async () => {
+    const fixture = createFixture();
+    await fixture.build.start(startInput());
+    updateRow(fixture, {
+      step: 'confirm_terminal',
+      recipe_digest: 'old-recipe',
+      snapshot_id: 'legacy-baked-snapshot',
+      validator_session_id: 'legacy-validator-session',
+    });
+    mocks.client.stopSession.mockRejectedValueOnce(
+      new mocks.SandboxRestError('request_failed', 'stop-session', 503)
+    );
+    await fixture.build.alarm();
+    expect(storedRow(fixture)).toMatchObject({
+      step: 'restart_recipe',
+      recipe_digest: 'old-recipe',
+      snapshot_id: 'legacy-baked-snapshot',
+      validator_session_id: 'legacy-validator-session',
+    });
+    expect(mocks.client.deleteSnapshot).not.toHaveBeenCalled();
+    expect(mocks.getIdentity).not.toHaveBeenCalled();
+    await runNextAlarm(fixture);
+    expect(storedRow(fixture)).toMatchObject({
+      step: 'validating_access',
+      snapshot_id: null,
+      validator_session_id: null,
+    });
+    expect(mocks.client.deleteSnapshot).toHaveBeenCalledWith('legacy-baked-snapshot');
+  });
+
+  it('fails a missing runtime release before creating a billable builder', async () => {
+    const database = new DatabaseSync(':memory:');
+    const storage = createStorage(database);
+    const build = createBuild(storage, ORGANIZATION_ID, '');
+    const fixture = { database, storage, build };
+    await build.start(startInput());
+    await build.alarm();
+    expect(storedRow(fixture)).toMatchObject({
+      step: 'project_failure',
+      last_error: 'provider_configuration_failed',
+    });
+    expect(mocks.client.createSandbox).not.toHaveBeenCalled();
+  });
+
   it('registers the fenced validator allocation before launching its matching wrapper identity', async () => {
     const fixture = createFixture();
     await fixture.build.start(startInput());
@@ -1844,7 +2158,7 @@ describe('VercelSnapshotBuild runtime preparation', () => {
     });
     mocks.control.initializeSnapshotValidator.mockImplementationOnce(async () => {
       expect(storedRow(fixture)).toMatchObject({
-        validator_control_id: `ses-byoc-validator-${FIRST_GENERATION.replaceAll('-', '')}`,
+        validator_control_id: expect.stringMatching(/^ses-byoc-validator-[a-f0-9]{32}$/),
         validator_wrapper_requested: 0,
       });
       expect(mocks.client.executeCommand).not.toHaveBeenCalled();
@@ -1857,11 +2171,27 @@ describe('VercelSnapshotBuild runtime preparation', () => {
       sessionId: 'validator-session',
     });
     const launch = mocks.client.executeCommand.mock.calls[0]?.[1];
+    const startup = mocks.downloadedStartup.mock.calls[0]?.[0];
+    expect(mocks.downloadedStartup).toHaveBeenCalledWith(
+      expect.objectContaining({
+        descriptor: 'a'.repeat(64),
+        allocationId: expect.any(String),
+        sandboxId: storedRow(fixture)?.validator_control_id,
+      })
+    );
+    expect(launch.sudo).toBe(true);
+    expect(launch.args).toContain(
+      `download-runtime-and-exec-supervisor\n# byoc-call-home:${startup.allocationId}`
+    );
     const identity = verifySandboxLaunchCredential(
       launch.env.SANDBOX_CONTROL_CREDENTIAL,
       'snapshot-test-signing-secret'
     );
-    expect(identity?.allocationId).toBe(FIRST_GENERATION);
+    expect(identity?.allocationId).toBe(startup.allocationId);
+    expect(identity?.allocationId).not.toBe(FIRST_GENERATION);
+    expect(startup.sandboxId).toBe(
+      `ses-byoc-validator-${startup.allocationId.replaceAll('-', '')}`
+    );
     if (!identity) throw new Error('Expected signed validator identity');
     expect(launch.env.PROVIDER_INSTANCE_ID).toBe(providerRef);
     expect(mocks.control.initializeSnapshotValidator).toHaveBeenCalledWith({
@@ -1869,6 +2199,7 @@ describe('VercelSnapshotBuild runtime preparation', () => {
         organizationId: ORGANIZATION_ID,
         credentialId: CREDENTIAL_ID,
         generation: FIRST_GENERATION,
+        incarnation: startup.allocationId,
       },
       allocation: {
         providerRef,
@@ -1915,6 +2246,7 @@ describe('VercelSnapshotBuild runtime preparation', () => {
           userId: PERSONAL_USER_ID,
           credentialId: CREDENTIAL_ID,
           generation: FIRST_GENERATION,
+          incarnation: expect.any(String),
         },
       })
     );
@@ -1985,7 +2317,10 @@ describe('VercelSnapshotBuild runtime preparation', () => {
     );
     await fixture.build.alarm();
     mocks.client.listCommands.mockResolvedValueOnce([
-      { id: 'recovered-command', args: [`byoc-call-home:${FIRST_GENERATION}`] },
+      {
+        id: 'recovered-command',
+        args: [`byoc-call-home:${mocks.downloadedStartup.mock.calls[0]?.[0].allocationId}`],
+      },
     ]);
 
     await runNextAlarm(fixture);
@@ -2223,10 +2558,10 @@ describe('VercelSnapshotBuild runtime preparation', () => {
     const command = mocks.client.executeCommand.mock.calls[0]?.[1];
     expect(command.args[1]).toContain(RUNTIME_TOOLCHAIN.bun.url);
     expect(command.args[1]).toContain(RUNTIME_TOOLCHAIN.bun.sha256);
-    expect(command.args[1]).toContain(RUNTIME_TOOLCHAIN.kilo.url);
-    expect(command.args[1]).toContain(RUNTIME_TOOLCHAIN.kilo.sha256);
+    expect(command.args[1]).not.toContain(RUNTIME_TOOLCHAIN.kilo.url);
+    expect(command.args[1]).not.toContain(RUNTIME_TOOLCHAIN.kilo.sha256);
     expect(command.args[1]).toContain("check_sha256 '/usr/local/bin/bun'");
-    expect(command.args[1]).toContain('npm install -g --loglevel=error "$work/package.tgz"');
+    expect(command.args[1]).not.toContain('npm install -g');
     expect(command.args[1]).not.toContain('| bash');
   });
 
@@ -2244,13 +2579,12 @@ describe('VercelSnapshotBuild runtime preparation', () => {
     expect(command.args[1]).toContain(
       `check_sha256 '/usr/local/bin/bun' '${RUNTIME_TOOLCHAIN.bun.installedSha256[0]}'`
     );
-    expect(command.args[1]).toContain(
-      `check_sha256 "$npm_root/@kilocode/cli/bin/.kilo" '${RUNTIME_TOOLCHAIN.kilo.installedSha256[0]}'`
-    );
+    expect(command.args[1]).toContain('sudo npm uninstall -g @kilocode/cli');
+    expect(command.args[1]).toContain('test ! -e /usr/local/bin/kilo');
     expect(storedRow(fixture)).toMatchObject({ step: 'snapshot_builder' });
   });
 
-  it('stages runtime artifacts in tmp and installs validated root-owned files with sudo', async () => {
+  it('resumes a persisted upload step without baking runtime artifacts into the base snapshot', async () => {
     const fixture = createFixture();
     await fixture.build.start(startInput());
     updateRow(fixture, {
@@ -2260,27 +2594,13 @@ describe('VercelSnapshotBuild runtime preparation', () => {
 
     await fixture.build.alarm();
 
-    expect(mocks.client.writeFiles).toHaveBeenCalledWith('builder-session', '/tmp', [
-      expect.objectContaining({ path: 'kilocode-control-plane-wrapper.js' }),
-      expect.objectContaining({ path: 'kilocode-control-plane-supervisor.sh' }),
-      expect.objectContaining({ path: 'kilo-runtime-manifest.json' }),
-    ]);
-    const manifest = JSON.parse(
-      mocks.client.writeFiles.mock.calls[0]?.[2]?.find(
-        (file: { path: string }) => file.path === 'kilo-runtime-manifest.json'
-      )?.content
-    );
-    expect(manifest.controlWrapperSha256).toBe('b'.repeat(64));
+    expect(mocks.client.writeFiles).not.toHaveBeenCalled();
+    expect(storedRow(fixture)).toMatchObject({ step: 'verify_runtime_artifacts' });
 
     await fixture.build.alarm();
 
     const command = mocks.client.executeCommand.mock.calls[0]?.[1];
-    expect(command.args[1]).toContain(
-      'sudo install -m 0755 /tmp/kilocode-control-plane-wrapper.js /usr/local/bin/kilocode-control-plane-wrapper.js'
-    );
-    expect(command.args[1]).toContain(
-      'sudo install -m 0644 /tmp/kilo-runtime-manifest.json /usr/local/share/kilo/runtime-manifest.json'
-    );
-    expect(command.args[1]).toContain('sha256sum /usr/local/bin/kilocode-control-plane-wrapper.js');
+    expect(command.args[1]).not.toContain('sudo install');
+    expect(command.args[1]).toContain('test ! -e /usr/local/bin/kilocode-control-plane-wrapper.js');
   });
 });

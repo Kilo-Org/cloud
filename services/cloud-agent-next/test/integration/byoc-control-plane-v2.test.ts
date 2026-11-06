@@ -39,6 +39,89 @@ describe('Vercel requires customer credentials', () => {
 });
 
 describe('BYOC snapshot validator on the current control plane', () => {
+  it('initializes a new recipe incarnation after a generation-only validator has stopped', async () => {
+    const generation = crypto.randomUUID();
+    const oldSandboxId = `ses-byoc-validator-${generation.replaceAll('-', '')}`;
+    const oldStub = sandboxes.getByName(oldSandboxId);
+    const credential = generateSandboxCredential();
+    const oldProviderRef = encodeVercelProviderRef({
+      sandboxName: 'legacy-validator',
+      sessionId: 'legacy-validator-session',
+    });
+    const input = {
+      build: { generation, credentialId: crypto.randomUUID(), organizationId: crypto.randomUUID() },
+      allocation: {
+        providerRef: oldProviderRef,
+        locator: {
+          teamId: 'team_customer',
+          projectId: 'prj_customer',
+          snapshotId: 'legacy-snapshot',
+          runtimeBuildId: 'runtime-build',
+          runtime: 'node24' as const,
+        },
+        createdAt: Date.now(),
+        expiresAt: Date.now() + 600_000,
+      },
+      credentialHash: await hashSandboxCredential(credential),
+    };
+    await oldStub.initializeSnapshotValidator(input);
+    await oldStub.confirmSnapshotValidatorStopped(oldProviderRef);
+    const incarnation = crypto.randomUUID();
+    const sandboxId = `ses-byoc-validator-${incarnation.replaceAll('-', '')}`;
+    const providerRef = encodeVercelProviderRef({
+      sandboxName: 'recipe-validator',
+      sessionId: 'recipe-validator-session',
+    });
+    const replacement = {
+      ...input,
+      build: { ...input.build, incarnation },
+      allocation: { ...input.allocation, providerRef },
+    };
+    const stub = sandboxes.getByName(sandboxId);
+    await stub.initializeSnapshotValidator(replacement);
+    await stub.initializeSnapshotValidator(replacement);
+    expect(await oldStub.getAllocationState()).toMatchObject({
+      kind: 'stopped',
+      allocationId: null,
+    });
+    expect(await stub.getAllocationState()).toMatchObject({
+      kind: 'starting',
+      allocationId: incarnation,
+      providerRef,
+    });
+    const mismatch = await runInDurableObject(oldStub, async instance => {
+      try {
+        await instance.initializeSnapshotValidator({
+          ...input,
+          allocation: { ...input.allocation, providerRef },
+        });
+        return null;
+      } catch (error) {
+        return error instanceof Error ? error.message : 'unknown';
+      }
+    });
+    expect(mismatch).toContain('allocation changed');
+    const secret = await resolveSecret(env.NEXTAUTH_SECRET);
+    if (!secret) throw new Error('Test signing secret is unavailable');
+    const wrapper = await FakeWrapper.connect({
+      sandboxId,
+      credential: mintSandboxLaunchCredential(
+        { sandboxId, allocationId: incarnation, credential },
+        secret
+      ),
+    });
+    wrapper.send({
+      type: 'hello',
+      protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
+      allocationId: incarnation,
+      wrapperId: 'recipe-validator-wrapper',
+    });
+    expect(await wrapper.next()).toMatchObject({ type: 'welcome' });
+    await stub.confirmSnapshotValidatorStopped(providerRef);
+    expect((await stub.getAllocationState()).kind).toBe('stopped');
+    wrapper.close();
+  });
+
   it.each(['organization', 'personal'] as const)(
     'persists the %s customer identity, accepts the signed wrapper, and confirms cleanup',
     async ownerType => {

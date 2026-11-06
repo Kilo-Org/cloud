@@ -40,11 +40,9 @@ import {
   cloudAgentWorktreeDeletionSchema,
   cloudAgentWorktreeLocationSchema,
   recordCloudAgentWorktreeCleanupSchema,
-  canDestroyCloudAgentWorktreeSandboxSchema,
   retireCloudAgentWorktreeIfSoleMemberSchema,
   type CloudAgentWorktreeDeletionParams,
   type RecordCloudAgentWorktreeCleanupParams,
-  type CanDestroyCloudAgentWorktreeSandboxParams,
   type RetireCloudAgentWorktreeIfSoleMemberParams,
   deleteSessionForCloudAgentSchema,
   deleteHostedWorkspaceSessionSchema,
@@ -115,7 +113,6 @@ import {
   recordWorktreeCleanup,
   completeWorktreeDeletion,
   deleteWorktreeContent,
-  canDestroyWorktreeSandbox,
   registerCloudAgentWorktree,
   retireWorktreeIfSoleMember,
   isWorktreeSessionDeleting,
@@ -269,13 +266,6 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
       this.env,
       cloudAgentWorktreeDeletionSchema.parse(params),
       this.ctx
-    );
-  }
-
-  async canDestroyCloudAgentWorktreeSandbox(params: CanDestroyCloudAgentWorktreeSandboxParams) {
-    return canDestroyWorktreeSandbox(
-      this.env,
-      canDestroyCloudAgentWorktreeSandboxSchema.parse(params)
     );
   }
 
@@ -1012,7 +1002,7 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
     });
     const workspace = page.items.find(item => item.workspaceId === parsed.workspaceId);
     if (!workspace)
-      return this.getDeletedCloudAgentWorkspace(parsed.kiloUserId, parsed.workspaceId);
+      return this.getJournaledCloudAgentWorkspace(parsed.kiloUserId, parsed.workspaceId);
     if (!parsed.sessionCursor) return workspace;
 
     const sessions = await this.listCloudAgentRootSessions({
@@ -1118,7 +1108,7 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
     };
   }
 
-  private async getDeletedCloudAgentWorkspace(
+  private async getJournaledCloudAgentWorkspace(
     kiloUserId: string,
     workspaceId: GetCloudAgentWorkspaceParams['workspaceId']
   ): Promise<GetCloudAgentWorkspaceResult> {
@@ -1128,6 +1118,7 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
         workspaceId: cloud_agent_worktrees.worktree_id,
         userId: cloud_agent_worktrees.kilo_user_id,
         organizationId: cloud_agent_worktrees.organization_id,
+        deletionCompletedAt: cloud_agent_worktrees.deletion_completed_at,
         createdAt: cloud_agent_worktrees.created_at,
         updatedAt: cloud_agent_worktrees.updated_at,
       })
@@ -1143,7 +1134,10 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
         and(
           eq(cloud_agent_worktrees.worktree_id, workspaceId),
           eq(cloud_agent_worktrees.kilo_user_id, kiloUserId),
-          isNotNull(cloud_agent_worktrees.deletion_completed_at),
+          or(
+            isNotNull(cloud_agent_worktrees.deletion_started_at),
+            isNotNull(cloud_agent_worktrees.deletion_completed_at)
+          ),
           worktreePersonalOrAccessibleOrganizationCondition()
         )
       )
@@ -1159,7 +1153,7 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
       gitUrl: null,
       gitBranch: null,
       profileId: null,
-      deletionState: 'deleted',
+      deletionState: row.deletionCompletedAt === null ? 'deleting' : 'deleted',
       created: databaseTimestampToMilliseconds(row.createdAt),
       updated: databaseTimestampToMilliseconds(row.updatedAt),
       lastActivity: databaseTimestampToMilliseconds(row.updatedAt),

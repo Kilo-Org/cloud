@@ -3540,7 +3540,7 @@ describe('native session outcome transitions', () => {
     }
   );
 
-  it.each(['stop', 'release', 'shutdown', 'timeout', 'worktree-deletion'] as const)(
+  it.each(['stop', 'release', 'shutdown', 'timeout'] as const)(
     'cancels interruption auto-commit on %s even without a current turn',
     async action => {
       let signal: AbortSignal | undefined;
@@ -3579,7 +3579,6 @@ describe('native session outcome transitions', () => {
           .find(timer => !timer.cancelled && timer.ms === DEFAULT_CONDENSE_TIMEOUT_MS)
           ?.handler();
       }
-      if (action === 'worktree-deletion') await h.manager.cancelInterruptedFinalizations(DIRECTORY);
       await settle();
       expect(signal?.aborted).toBe(true);
       expect(h.manager.hasPendingWork()).toBe(false);

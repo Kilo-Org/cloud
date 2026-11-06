@@ -37,13 +37,15 @@ usage() {
 Usage: deploy-e2e-worker.sh <command>
 
 Commands:
-  render    Render .wrangler/wrangler.e2e-test.jsonc from wrangler.jsonc
-  dry-run   Render, build the wrapper, and run wrangler deploy --dry-run
-  deploy    Render, build the wrapper, ensure the callback queue, deploy, upload the internal
+  render    Render .wrangler/wrangler.e2e-test.jsonc from wrangler.runtime-generated.json
+  dry-run   Render and run wrangler deploy --dry-run
+  deploy    Render, ensure the callback queue, deploy, upload the internal
             secret when supplied, then list deployments
 
 Required environment:
   FAKE_LLM_BASE_URL  https://<fake-host>/api/openrouter
+Required file:
+  wrangler.runtime-generated.json from exact-SHA runtime deployment preparation
 Optional environment:
   E2E_INTERNAL_API_SECRET Value uploaded as the Worker's INTERNAL_API_SECRET when supplied. Needed
                           for the first deploy or a rotation; omit it on a redeploy to keep the
@@ -198,13 +200,11 @@ main() {
       ;;
     dry-run)
       render_config
-      run_service_command pnpm run build:wrapper
       run_service_command pnpm exec wrangler deploy --dry-run --config "$CONFIG_PATH"
       ;;
     deploy)
       prepare_internal_secret
       render_config
-      run_service_command pnpm run build:wrapper
       ensure_callback_queue
       run_service_command pnpm exec wrangler deploy --config "$CONFIG_PATH"
       if [[ -n "$INTERNAL_SECRET" ]]; then

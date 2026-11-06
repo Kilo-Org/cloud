@@ -10,16 +10,7 @@
   "compatibility_date": "2026-06-03",
   "compatibility_flags": ["nodejs_compat"],
   "preview_urls": false,
-  "rules": [
-    { "type": "Text", "globs": ["**/*.sql"], "fallthrough": true },
-    {
-      "type": "Data",
-      "globs": [
-        "**/wrapper/dist/control-plane-wrapper.js?binary",
-        "**/wrapper/control-plane-supervisor.sh?binary",
-      ],
-    },
-  ],
+  "rules": [{ "type": "Text", "globs": ["**/*.sql"], "fallthrough": true }],
   "workers_dev": true,
   "dev": {
     "port": 8794,
@@ -191,9 +182,8 @@
       "scheduling_policy": "durable_object",
       "observability": { "enabled": true },
       "images": {
-        "app": {
-          "dockerfile": "./Dockerfile.containers",
-          "build_vars": { "KILOCODE_CLI_VERSION": "7.8.17" },
+        "runtime-free": {
+          "dockerfile": "./Dockerfile.containers.runtime-free",
         },
       },
     },
@@ -434,9 +424,8 @@
           "scheduling_policy": "durable_object",
           "observability": { "enabled": true },
           "images": {
-            "app": {
-              "dockerfile": "./Dockerfile.containers",
-              "build_vars": { "KILOCODE_CLI_VERSION": "7.8.17" },
+            "runtime-free": {
+              "dockerfile": "./Dockerfile.containers.runtime-free",
             },
           },
         },

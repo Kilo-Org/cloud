@@ -95,8 +95,6 @@ function fakeRuntimes(runtime: KiloRuntime | undefined): KiloRuntimes {
       restartingCount: 0,
       unavailableCount: 0,
     }),
-    runtimesForDirectory: () => (runtime ? [runtime] : []),
-    async retireDirectory() {},
     async shutdown() {},
   };
 }
@@ -183,32 +181,28 @@ describe('control-plane terminal adapter (B10)', () => {
   });
 
   it('detaches without reading the client of a restarting runtime', async () => {
-    for (const detachDirectory of [false, true]) {
-      const runtime = fakeRuntime(fakeClient(serverUrl));
-      const terminals = createControlPlaneTerminals({
-        controlUrl: serverUrl,
-        wrapperId: 'wrapper_test',
-        runtimes: fakeRuntimes(runtime),
-      });
-      terminals.rememberAttachedSession(session, session.sessionId);
-      const created = await terminals.handle({
-        type: 'terminal.create',
-        requestId: 'restart_detach',
-        session,
-        payload: { operationId: crypto.randomUUID() },
-      });
-      expect(created).toMatchObject({ ok: true, result: { pty: { id: ptyId } } });
-      Object.defineProperty(runtime, 'client', {
-        get() {
-          throw new Error('not started');
-        },
-      });
-      if (detachDirectory) await terminals.detachDirectory(session.directory);
-      else await terminals.forgetSession(session.sessionId);
-      if (!detachDirectory) expect(rootForSession(session.kiloSessionId)).toBeUndefined();
-      forgetAttachedRoot(session.kiloSessionId, session.directory);
-      terminals.shutdown();
-    }
+    const runtime = fakeRuntime(fakeClient(serverUrl));
+    const terminals = createControlPlaneTerminals({
+      controlUrl: serverUrl,
+      wrapperId: 'wrapper_test',
+      runtimes: fakeRuntimes(runtime),
+    });
+    terminals.rememberAttachedSession(session, session.sessionId);
+    const created = await terminals.handle({
+      type: 'terminal.create',
+      requestId: 'restart_detach',
+      session,
+      payload: { operationId: crypto.randomUUID() },
+    });
+    expect(created).toMatchObject({ ok: true, result: { pty: { id: ptyId } } });
+    Object.defineProperty(runtime, 'client', {
+      get() {
+        throw new Error('not started');
+      },
+    });
+    await terminals.forgetSession(session.sessionId);
+    expect(rootForSession(session.kiloSessionId)).toBeUndefined();
+    terminals.shutdown();
   });
   it('answers an unattached terminal request with a mapped not_ready result', async () => {
     const terminals = createControlPlaneTerminals({

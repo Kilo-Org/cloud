@@ -430,7 +430,22 @@ if (isMain) {
     }
 
     const kiloOpenRouterBase = `${parsedFakeLlmBaseUrl.origin}${parsedFakeLlmBaseUrl.pathname}`;
-    const sourceConfig = parse(readFileSync(sourceConfigPath, 'utf8'));
+    const runtimeConfigPath = join(packageDir, 'wrangler.runtime-generated.json');
+    if (!existsSync(runtimeConfigPath)) {
+      throw new Error(
+        'Prepare the exact-SHA runtime deployment before rendering deployed E2E configuration (scripts/prepare-runtime-deploy.ts production <source-sha>).'
+      );
+    }
+    const sourceConfig = parse(readFileSync(runtimeConfigPath, 'utf8'));
+    if (
+      sourceConfig.vars?.RUNTIME_STARTUP_MODE !== 'downloaded' ||
+      sourceConfig.vars?.NATIVE_RUNTIME_IMAGE !== 'runtime-free' ||
+      !sourceConfig.vars?.RUNTIME_RELEASE_DESCRIPTOR
+    ) {
+      throw new Error(
+        'Deployed E2E requires a verified downloaded runtime-free deployment configuration.'
+      );
+    }
     let rendered;
     try {
       rendered = buildE2eWorkerConfig(sourceConfig, {

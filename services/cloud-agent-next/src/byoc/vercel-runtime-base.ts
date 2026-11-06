@@ -1,11 +1,25 @@
 import { RUNTIME_BASE_ABI } from '../sandbox-control/runtime-release.js';
 import { RUNTIME_DISTRIBUTION } from '../shared/runtime-distribution.js';
-import { installPinnedArchiveScript } from '../shared/runtime-toolchain.js';
+import {
+  installPinnedArchiveScript,
+  toolchainVerificationScript,
+} from '../shared/runtime-toolchain.js';
 
 export const VERCEL_BASE_SYSTEM_SETUP =
   'set -euo pipefail; sudo dnf install -y git git-lfs jq tar gzip unzip; sudo mkdir -p /workspace /usr/local/share/kilo /opt/git/etc; sudo chown "$(id -u):$(id -g)" /workspace; test -w /workspace; sudo git lfs install --system --skip-repo';
 
 export const VERCEL_BASE_NODE_SETUP = `set -euo pipefail; node_path="$(node -p 'process.execPath')"; sudo ln -sf "$node_path" /usr/local/bin/node; test -x /usr/local/bin/node; ${installPinnedArchiveScript('bun')}`;
+
+export const VERCEL_BASE_VERIFY = [
+  'set -euo pipefail',
+  'sudo npm uninstall -g @kilocode/cli >/dev/null',
+  'sudo rm -f /usr/local/bin/kilo /usr/local/bin/kilocode-control-plane-wrapper.js /usr/local/bin/kilocode-control-plane-supervisor.sh /usr/local/share/kilo/runtime-manifest.json /tmp/kilocode-control-plane-wrapper.js /tmp/kilocode-control-plane-supervisor.sh /tmp/kilo-runtime-manifest.json',
+  toolchainVerificationScript(['bun']),
+  'test -x /usr/local/bin/node',
+  'case "$(/usr/local/bin/node --version)" in v24.*) ;; *) exit 1 ;; esac',
+  'test ! -e /usr/local/bin/kilo',
+  'test ! -e /usr/local/bin/kilocode-control-plane-wrapper.js',
+].join('\n');
 
 /** Downloaded releases replace CLI/control files; only base dependencies require a new snapshot. */
 export async function vercelRuntimeBaseDigest(): Promise<string> {
@@ -15,6 +29,7 @@ export async function vercelRuntimeBaseDigest(): Promise<string> {
     nodeMajor: RUNTIME_DISTRIBUTION.nodeMajor,
     systemSetup: VERCEL_BASE_SYSTEM_SETUP,
     bunSetup: VERCEL_BASE_NODE_SETUP,
+    verify: VERCEL_BASE_VERIFY,
   });
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(input));
   return `downloaded-base-v1:${Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('')}`;

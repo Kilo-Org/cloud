@@ -1,4 +1,4 @@
-import { preinstalledStartup } from '../sandbox-control/preinstalled-startup.js';
+import { supervisorStartup } from '../../test/fixtures/supervisor-startup.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { DurableObjectMock } = vi.hoisted(() => ({
@@ -191,7 +191,9 @@ type StartBehavior = 'ok' | 'reject' | 'effect-then-reject';
 
 class FakeContainer {
   running = false;
-  images: Record<string, string> = { app: 'registry.example/kilo/app:test' };
+  images: Record<string, string> = {
+    'runtime-free': 'registry.example/kilo/runtime-free:test',
+  };
   startCalls: ContainerStartupOptions[] = [];
   destroyCalls = 0;
   destroyBehavior: 'ok' | 'reject' = 'ok';
@@ -332,7 +334,7 @@ async function launch(
   instanceSize: ContainerInstanceSize
 ) {
   return instance.launchWrapper({
-    command: preinstalledStartup(),
+    command: supervisorStartup(),
     allocationRef,
     env: {},
     instance: instanceSize,
@@ -532,7 +534,7 @@ describe('ContainersBilling physical lifecycle', () => {
     const { instance, container, storage, meter, pendingTasks } = setup();
     await admit(instance, 'standard-4');
     await instance.launchWrapper({
-      command: preinstalledStartup(),
+      command: supervisorStartup(),
       allocationRef: REF_A,
       env: {},
       instance: 'standard-4',
@@ -577,7 +579,7 @@ describe('ContainersBilling physical lifecycle', () => {
     const { instance, container, storage, meter, pendingTasks } = setup();
     await admit(instance, 'standard-4');
     await instance.launchWrapper({
-      command: preinstalledStartup(),
+      command: supervisorStartup(),
       allocationRef: REF_A,
       env: {},
       instance: 'standard-4',
@@ -747,7 +749,7 @@ describe('ContainersBilling inert without persisted attribution', () => {
 
       await expect(
         instance.launchWrapper({
-          command: preinstalledStartup(),
+          command: supervisorStartup(),
           allocationRef: REF_A,
           env: {},
           instance: instanceSize,
@@ -761,7 +763,7 @@ describe('ContainersBilling inert without persisted attribution', () => {
 
       await expect(
         instance.launchWrapper({
-          command: preinstalledStartup(),
+          command: supervisorStartup(),
           allocationRef: REF_A,
           env: {},
           instance: instanceSize,
@@ -789,7 +791,7 @@ describe('ContainersBilling inert without persisted attribution', () => {
     const { instance, container, storage, meter, pendingTasks } = setup();
 
     await instance.launchWrapper({
-      command: preinstalledStartup(),
+      command: supervisorStartup(),
       allocationRef: REF_A,
       env: {},
       instance: 'standard-4',
@@ -1068,7 +1070,7 @@ describe('ContainersBilling resumed launch activation', () => {
 
     await expect(
       resumed.instance.launchWrapper({
-        command: preinstalledStartup(),
+        command: supervisorStartup(),
         allocationRef: 'ref-b',
         env: {},
         instance: 'standard-4',

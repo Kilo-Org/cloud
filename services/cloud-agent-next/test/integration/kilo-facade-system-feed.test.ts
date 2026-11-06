@@ -59,6 +59,7 @@ function metadata(sandboxId: string) {
     agent: { mode: 'code', model: 'test/model' },
     repository: { type: 'git', url: 'https://github.com/acme/widgets.git', platform: 'github' },
     workspace: {
+      worktreeId: cloudAgentSessionId.replace('workspace_', 'worktree_'),
       branchName: 'kilo/system-feed',
       sandboxId,
       sandboxProvider: 'cloudflare-containers',

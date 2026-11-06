@@ -115,9 +115,6 @@ async function setup(
     installFakeCredentialEnv(instance['env'], createFakeCredentialBroker(), {
       WORKSPACE_SNAPSHOT_USER_IDS: options.enabled === false ? '' : USER,
       WORKSPACE_SNAPSHOT_ORG_IDS: '',
-      RUNTIME_STARTUP_MODE: 'preinstalled',
-      NATIVE_RUNTIME_IMAGE: 'all-in-one',
-      RUNTIME_RELEASE_DESCRIPTOR: '',
       SANDBOX_CONTAINERS: { idFromName: (name: string) => ({ toString: () => `oc_${name}` }) },
     });
     installFakeRuntimeProxyPeer(instance, async (owner, id) => ({
@@ -150,6 +147,22 @@ async function setup(
     },
   };
   await session.registerSession(registration);
+  if (options.standalone) {
+    await runInDurableObject(sandbox, instance => {
+      writeRoute(instance['db'], {
+        sessionId,
+        spec: registration.spec,
+        credentialSource: registration.credentials,
+        grant: null,
+        environment: null,
+        state: 'failed',
+        reason: 'agent_restarted',
+        attemptId: 'historical',
+        attemptDeadlineAt: 0,
+      });
+      instance['restoreWorkspaceOwner']();
+    });
+  }
   const wrappers: FakeWrapper[] = [];
   async function connect(index = 0) {
     await waitFor(() => expect(launchEnvs.length).toBeGreaterThan(index));

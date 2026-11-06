@@ -162,9 +162,6 @@ export function createCloudflareContainersProviderAdapter(deps: {
       const workloadLimitMb =
         env['CONTROL_WORKLOAD_LIMIT_MB'] ??
         String(containersBillingIdentity(instance).capacity.memoryMiB);
-      // One launch selection (amendment "cold session without a snapshot"): a
-      // trusted descriptor installs the verified runtime before the supervisor,
-      // also on a snapshot start; no descriptor runs the baked supervisor.
       const { startSource, snapshotFailed } = await container.launchWrapper({
         allocationRef: ref,
         command,

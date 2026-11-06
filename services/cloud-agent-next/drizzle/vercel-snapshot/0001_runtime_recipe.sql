@@ -1,0 +1,1 @@
+ALTER TABLE `vercel_snapshot_builds` ADD `recipe_digest` text;

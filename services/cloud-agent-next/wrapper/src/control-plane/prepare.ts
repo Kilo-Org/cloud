@@ -239,6 +239,25 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
   const inheritedEnv = deps.inheritedEnv ?? process.env;
   const profileMaterializer = createRuntimeProfileMaterializer();
   const workspaceConfigurations = new Map<string, WorkspaceConfig>();
+  let workspaceOwner:
+    | { scopeId: string; directory: string; organizationId: string | undefined }
+    | undefined;
+
+  function admitWorkspace(spec: AttachmentSpec): void {
+    const candidate = {
+      scopeId: spec.kilo?.scopeId ?? spec.sessionId,
+      directory: spec.directory,
+      organizationId: spec.kilo?.organizationId,
+    };
+    if (
+      workspaceOwner !== undefined &&
+      (workspaceOwner.scopeId !== candidate.scopeId ||
+        workspaceOwner.directory !== candidate.directory ||
+        workspaceOwner.organizationId !== candidate.organizationId)
+    )
+      throw new Error('Sandbox workspace mismatch');
+    workspaceOwner = candidate;
+  }
   const workspaceMcpGrants = new Map<
     string,
     NonNullable<ControlPlaneSessionCredentialsPayload['cloudAgentMcp']>
@@ -1430,6 +1449,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
 
   return {
     workspaceConfiguration(spec, offered) {
+      admitWorkspace(spec);
       const key = workspaceConfigRuntimeKey(spec);
       const retained =
         callerKeepsRuntime(spec.sessionId, key) || hasRoutesForKey(key, spec.sessionId)
@@ -1440,6 +1460,12 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       return offered;
     },
     prepare: function prepare(spec, credentials) {
+      try {
+        admitWorkspace(spec);
+      } catch (error) {
+        emitFailure(spec.sessionId, 'kilo_runtime', error);
+        return Promise.reject(error);
+      }
       const existing = preparing.get(spec.sessionId);
       if (existing && !existing.released) return existing.promise;
       if (existing) {

@@ -20,6 +20,7 @@ import {
   type RouteContext,
 } from '../../src/control-plane/sandbox/routes.js';
 import { WORKTREE_DELETION_PREFIX } from '../../src/control-plane/sandbox/worktree-deletion.js';
+import { WORKSPACE_OWNER_KEY } from '../../src/control-plane/sandbox/workspace-owner.js';
 import type {
   ProviderAdapter,
   ProviderCreateIntent,
@@ -35,18 +36,23 @@ import { logger } from '../../src/logger.js';
 import { encryptWithPublicKey } from '../../src/utils/encryption.js';
 import {
   createFakeCredentialBroker,
+  FAKE_DOWNLOADED_RUNTIME_ENV,
   installFakeCredentialEnv,
   type FakeCredentialBroker,
 } from './helpers/fake-credentials.js';
 import { createRuntimeProxyMintingPeer, FakeSessionPeer } from './helpers/fake-session-peer.js';
 import { FakeWrapper } from './helpers/fake-wrapper.js';
 import { waitFor } from './wait-for.js';
+import { hashToSandboxId } from '../../src/sandbox-id.js';
+import { ISOLATED_CONTAINER_WORKSPACE_PATH } from '../../src/workspace.js';
 
 const SANDBOX_ID = 'sbx__control_v2_routes';
 const SESSION = 'workspace_11111111-1111-1111-1111-111111111111';
 const SESSION_NEXT = 'workspace_22222222-2222-2222-2222-222222222222';
 const SESSION_THIRD = 'workspace_33333333-3333-3333-3333-333333333333';
 const SHARED_DIRECTORY = '/workspace/shared';
+const WORKSPACE = 'worktree_11111111-1111-4111-8111-111111111111';
+const OTHER_WORKSPACE = 'worktree_22222222-2222-4222-8222-222222222222';
 const NATIVE_KILO_TOKEN =
   'eyJhbGciOiJub25lIn0.eyJydW50aW1lQXV0aG9yaXphdGlvbiI6eyJpZCI6InJhXzEifX0.c2ln';
 const TIMERS = CONTROL_PLANE_TIMERS.sandbox;
@@ -124,7 +130,7 @@ function routeSpec(sessionId: string): ControlPlaneRouteSpec {
   return {
     sessionId,
     kiloSessionId: kiloSessionIdFor(sessionId),
-    directory: `/workspace/${sessionId}`,
+    directory: SHARED_DIRECTORY,
     attemptId: `${sessionId}-requested`,
   };
 }
@@ -137,8 +143,9 @@ function prepareInput(sessionId: string, createdOnPlatform?: string) {
       kiloSessionId: kiloSessionIdFor(sessionId),
       kiloToken: NATIVE_KILO_TOKEN,
       orgId: 'org_123',
-      repository: { type: 'github' as const, repo: 'acme/widgets' },
-      scopeId: sessionId,
+      repository: { type: 'github' as const, repo: 'acme/widgets', allowUserAuthorization: false },
+      scopeId: WORKSPACE,
+      workspaceId: WORKSPACE,
       createdOnPlatform,
     },
   };
@@ -159,8 +166,33 @@ function configuredPrepareInput(
       runtimeAgents: [{ slug: 'helper', name: 'Helper', config: {} }],
       kiloCommands: [{ name: 'review', template: 'Review the change' }],
     },
-    credentials: { ...input.credentials, scopeId: 'shared-worktree' },
+    credentials: input.credentials,
   };
+}
+
+function workspacePrepareInput(sessionId: string, workspaceId = WORKSPACE) {
+  const input = prepareInput(sessionId);
+  return {
+    ...input,
+    spec: { ...input.spec, directory: SHARED_DIRECTORY },
+    credentials: { ...input.credentials, workspaceId, scopeId: workspaceId },
+  };
+}
+
+function standalonePrepareInput(sessionId: string) {
+  const input = prepareInput(sessionId);
+  const { workspaceId: _workspaceId, ...credentials } = input.credentials;
+  return { ...input, credentials: { ...credentials, scopeId: sessionId } };
+}
+
+async function expectPrepareRejected(
+  stub: DurableObjectStub<SandboxControlV2>,
+  input: Parameters<SandboxControlV2['prepare']>[0],
+  message: string
+) {
+  await runInDurableObject(stub, async instance => {
+    await expect(instance.prepare(input)).rejects.toThrow(message);
+  });
 }
 
 async function patchGrant(
@@ -253,7 +285,8 @@ async function releaseGate(
 
 async function setup(
   provider: FakeProvider,
-  broker: FakeCredentialBroker = createFakeCredentialBroker()
+  broker: FakeCredentialBroker = createFakeCredentialBroker(),
+  sandboxId = SANDBOX_ID
 ): Promise<{
   stub: DurableObjectStub<SandboxControlV2>;
   peer: FakeSessionPeer;
@@ -263,10 +296,10 @@ async function setup(
     userId: 'user_123',
     kiloSessionId: kiloSessionIdFor(sessionId),
   }));
-  const stub = sandboxNamespace.getByName(SANDBOX_ID);
+  const stub = sandboxNamespace.getByName(sandboxId);
   await runInDurableObject(stub, async instance => {
     await instance.getAllocationState();
-    installFakeCredentialEnv(instance.env, broker);
+    installFakeCredentialEnv(instance.env, broker, FAKE_DOWNLOADED_RUNTIME_ENV);
     Object.assign(instance, {
       createProviderAdapter: () => provider.adapter,
       provider: provider.adapter,
@@ -298,6 +331,238 @@ afterEach(async () => {
 });
 
 describe('SandboxControlV2 routes and forwarding', () => {
+  it.each(['idle', 'provider'] as const)(
+    'recovers registered historical ownership after normal %s stop removed the ready route',
+    async stoppedBy => {
+      const sessionId = 'workspace_11111111-1111-4111-8111-111111111111';
+      const sandboxId = await hashToSandboxId(`control-isolated-v1:${sessionId}`, 'sbx');
+      const provider = createFakeProvider();
+      const { stub } = await setup(provider, undefined, sandboxId);
+      const input = {
+        ...workspacePrepareInput(sessionId),
+        sandboxSelection: {
+          provider: 'cloudflare-containers' as const,
+          sandboxKind: 'isolated' as const,
+        },
+      };
+      input.spec.directory = ISOLATED_CONTAINER_WORKSPACE_PATH;
+      await stub.prepare(input);
+      await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
+      const launch = provider.launchEnvs[0];
+      const wrapper = await FakeWrapper.connect({
+        sandboxId,
+        credential: launch.SANDBOX_CONTROL_CREDENTIAL,
+      });
+      await wrapper.hello({
+        wrapperId: 'historical',
+        allocationId: launch.CONTROL_PLANE_ALLOCATION_ID,
+      });
+      wrapper.send({ type: 'session.ready', sessionId });
+      await waitFor(async () => expect((await readRouteRow(stub, sessionId))?.state).toBe('ready'));
+      await runInDurableObject(stub, (_instance, state) => {
+        state.storage.kv.delete(WORKSPACE_OWNER_KEY);
+      });
+      if (stoppedBy === 'idle') {
+        const at = Date.now();
+        wrapper.heartbeat(false);
+        await waitFor(async () =>
+          expect((await readState(stub)).lastFrameAt).toBeGreaterThanOrEqual(at)
+        );
+        await setAllocationField(stub, { last_activity_at: Date.now() - TIMERS.idleMs - 1 });
+        await runAlarm(stub);
+      } else {
+        await runInDurableObject(stub, instance =>
+          instance['applyEvent']({ type: 'provider-gone', at: Date.now() })
+        );
+      }
+      await waitFor(async () => expect(await readState(stub)).toMatchObject({ kind: 'stopped' }));
+      expect(await readRouteRow(stub, sessionId)).toBeNull();
+      await evictAllDurableObjects();
+      await setup(provider, undefined, sandboxId);
+      await runInDurableObject(stub, instance => {
+        Object.assign(instance.env, {
+          SESSION_INGEST: {
+            getCloudAgentWorkspace: async () => ({
+              workspaceId: WORKSPACE,
+              userId: 'user_123',
+              organizationId: 'org_123',
+            }),
+          },
+        });
+      });
+      const conflict = { ...input, credentials: { ...input.credentials, orgId: 'other-org' } };
+      await expectPrepareRejected(stub, conflict, 'Sandbox workspace mismatch');
+      await expectPrepareRejected(
+        stub,
+        { ...input, spec: { ...input.spec, directory: '/workspace/wrong' } },
+        'Sandbox workspace mismatch'
+      );
+      expect(
+        await runInDurableObject(stub, (_instance, state) =>
+          state.storage.kv.get(WORKSPACE_OWNER_KEY)
+        )
+      ).toBeUndefined();
+      expect(await stub.prepare(input)).toMatchObject({ state: 'preparing' });
+      await waitFor(() => expect(provider.createCalls).toBe(2));
+      await waitFor(() => expect(provider.launchEnvs).toHaveLength(2));
+      await evictAllDurableObjects();
+      await setup(provider, undefined, sandboxId);
+      await runInDurableObject(stub, instance => {
+        Object.assign(instance.env, {
+          SESSION_INGEST: {
+            getCloudAgentWorkspace: async () => {
+              throw new Error('must not requery');
+            },
+          },
+        });
+      });
+      const sibling = workspacePrepareInput(SESSION_NEXT);
+      sibling.spec.directory = ISOLATED_CONTAINER_WORKSPACE_PATH;
+      expect(await stub.prepare(sibling)).toMatchObject({
+        state: 'preparing',
+      });
+    }
+  );
+
+  it('admits sibling chats in one workspace without starting another sandbox', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    expect(await stub.prepare(workspacePrepareInput(SESSION))).toMatchObject({
+      state: 'preparing',
+    });
+    expect(await stub.prepare(workspacePrepareInput(SESSION_NEXT))).toMatchObject({
+      state: 'preparing',
+    });
+    expect(await readRouteRow(stub, SESSION_NEXT)).not.toBeNull();
+    expect(provider.createCalls).toBe(1);
+  });
+
+  it.each([SHARED_DIRECTORY, '/workspace/independent'])(
+    'rejects a second workspace at %s before changing allocation, credentials or routes',
+    async directory => {
+      const provider = createFakeProvider();
+      const { stub } = await setup(provider);
+      await stub.prepare(workspacePrepareInput(SESSION));
+      await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
+      const before = await runInDurableObject(stub, (_instance, state) => {
+        const db = drizzle(state.storage);
+        return {
+          allocation: db.select().from(allocationTable).all(),
+          routes: db.select().from(routesTable).all(),
+          grants: db.select().from(scopeGrantsTable).all(),
+          binding: state.storage.kv.get(WORKSPACE_OWNER_KEY),
+        };
+      });
+      const conflict = workspacePrepareInput(SESSION_NEXT, OTHER_WORKSPACE);
+      conflict.spec.directory = directory;
+      await expectPrepareRejected(stub, conflict, 'Sandbox workspace mismatch');
+      expect(
+        await runInDurableObject(stub, (_instance, state) => {
+          const db = drizzle(state.storage);
+          return {
+            allocation: db.select().from(allocationTable).all(),
+            routes: db.select().from(routesTable).all(),
+            grants: db.select().from(scopeGrantsTable).all(),
+            binding: state.storage.kv.get(WORKSPACE_OWNER_KEY),
+          };
+        })
+      ).toEqual(before);
+      expect(provider.createCalls).toBe(1);
+    }
+  );
+
+  it('rejects another organization or credential scope even for the same workspace', async () => {
+    const { stub } = await setup(createFakeProvider());
+    await stub.prepare(workspacePrepareInput(SESSION));
+    const conflict = workspacePrepareInput(SESSION_NEXT);
+    conflict.credentials.orgId = 'org_other';
+    await expectPrepareRejected(stub, conflict, 'Sandbox workspace mismatch');
+    conflict.credentials.orgId = 'org_123';
+    conflict.credentials.scopeId = OTHER_WORKSPACE;
+    await expectPrepareRejected(stub, conflict, 'Sandbox workspace identity is required');
+    expect(await readRouteRow(stub, SESSION_NEXT)).toBeNull();
+  });
+
+  it('retains ownership through route release, allocation replacement and DO reconstruction', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    await stub.prepare(workspacePrepareInput(SESSION));
+    await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
+    await stub.release({ sessionId: SESSION });
+    expect(await readRouteRow(stub, SESSION)).toBeNull();
+    await runInDurableObject(stub, instance =>
+      instance['applyEvent']({ type: 'stop-requested', at: Date.now(), reason: 'sandbox_stopped' })
+    );
+    await waitFor(async () => expect(await readState(stub)).toMatchObject({ kind: 'stopped' }));
+    await evictAllDurableObjects();
+    await setup(provider);
+    await expectPrepareRejected(
+      stub,
+      workspacePrepareInput(SESSION_NEXT, OTHER_WORKSPACE),
+      'Sandbox workspace mismatch'
+    );
+    expect(await stub.prepare(workspacePrepareInput(SESSION_NEXT))).toMatchObject({
+      state: 'preparing',
+    });
+    await waitFor(() => expect(provider.createCalls).toBe(2));
+  });
+
+  it('restores historical standalone ownership from persisted records, not new input', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    await expectPrepareRejected(
+      stub,
+      standalonePrepareInput(SESSION),
+      'Sandbox workspace identity is required'
+    );
+    await runInDurableObject(stub, (_instance, state) => {
+      state.storage.kv.put('control_plane_owner', 'user_123');
+      writeRoute(drizzle(state.storage), {
+        sessionId: SESSION,
+        spec: routeSpec(SESSION),
+        credentialSource: standalonePrepareInput(SESSION).credentials,
+        grant: null,
+        environment: null,
+        state: 'failed',
+        reason: 'agent_restarted',
+        attemptId: 'historical',
+        attemptDeadlineAt: 0,
+      });
+    });
+    await evictAllDurableObjects();
+    await setup(provider);
+    expect(await stub.prepare(standalonePrepareInput(SESSION))).toMatchObject({
+      state: 'preparing',
+    });
+    await stub.release({ sessionId: SESSION });
+    await expectPrepareRejected(
+      stub,
+      standalonePrepareInput(SESSION_NEXT),
+      'Sandbox workspace mismatch'
+    );
+    await expectPrepareRejected(
+      stub,
+      workspacePrepareInput(SESSION_NEXT),
+      'Sandbox workspace mismatch'
+    );
+  });
+
+  it('does not claim a route-less historical sandbox without matching placement evidence', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    await runInDurableObject(stub, (_instance, state) => {
+      state.storage.kv.put('control_plane_owner', 'user_123');
+    });
+    await expectPrepareRejected(stub, workspacePrepareInput(SESSION), 'Sandbox workspace mismatch');
+    expect(provider.createCalls).toBe(0);
+    expect(await readRouteRow(stub, SESSION)).toBeNull();
+    expect(
+      await runInDurableObject(stub, (_instance, state) =>
+        state.storage.kv.get(WORKSPACE_OWNER_KEY)
+      )
+    ).toBeUndefined();
+  });
+
   it.each(['throw', 'invalid'] as const)(
     'keeps preparation and delivery healthy when runtime metadata projection is %s',
     async failure => {
@@ -932,10 +1197,17 @@ describe('SandboxControlV2 routes and forwarding', () => {
   it('refuses to prepare a route whose worktree is mid-deletion', async () => {
     const provider = createFakeProvider();
     const { stub } = await setup(provider);
-    const worktree = 'worktree_11111111-1111-1111-1111-111111111111';
+    const worktree = WORKSPACE;
     const sentPrepares: string[] = [];
     await runInDurableObject(stub, async (instance, state) => {
       await instance.getAllocationState();
+      state.storage.kv.put(WORKSPACE_OWNER_KEY, {
+        kind: 'workspace',
+        workspaceId: worktree,
+        directory: SHARED_DIRECTORY,
+        userId: 'user_123',
+        orgId: 'org_123',
+      });
       instance.sendSessionPrepare = (_allocation, route) => {
         sentPrepares.push(route.sessionId);
       };
@@ -962,6 +1234,7 @@ describe('SandboxControlV2 routes and forwarding', () => {
 
     const input = prepareInput(SESSION);
     input.credentials.scopeId = worktree;
+    input.credentials.workspaceId = worktree;
     const view = await stub.prepare(input);
 
     expect(view).toEqual({
@@ -1278,7 +1551,10 @@ describe('SandboxControlV2 routes and forwarding', () => {
     });
     for (const sessionId of [root, SESSION_NEXT]) {
       const input = configuredPrepareInput(sessionId, SHARED_DIRECTORY);
-      await stub.prepare({ ...input, credentials: { ...input.credentials, scopeId } });
+      await stub.prepare({
+        ...input,
+        credentials: { ...input.credentials, scopeId, workspaceId: scopeId },
+      });
     }
     const { wrapper } = await connectAndHello(provider, 'wr_1', { workspaceConfiguration: true });
     const frames = [await wrapper.next(), await wrapper.next()];

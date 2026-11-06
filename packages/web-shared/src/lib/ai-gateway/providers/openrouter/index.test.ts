@@ -198,7 +198,7 @@ describe('auto models', () => {
     expect(models.data.some(model => model.id === KILO_AUTO_EFFICIENT_MODEL.id)).toBe(true);
   });
 
-  it('caches authenticated catalog requests in memory instead of the framework data cache', async () => {
+  it('caches authenticated catalog requests in memory and bypasses the framework data cache', async () => {
     await getEnhancedOpenRouterModels({ countryCode: null });
     await getEnhancedOpenRouterModels({ countryCode: null });
 
@@ -210,11 +210,12 @@ describe('auto models', () => {
         'https://openrouter.ai/api/v1/models',
         expect.objectContaining({
           method: 'GET',
+          cache: 'no-store',
           headers: expect.objectContaining({ Authorization: expect.stringMatching(/^Bearer /) }),
         }),
       ],
     ]);
-    expect(catalogCalls[0]?.[1]).not.toHaveProperty('cache');
+    expect(catalogCalls[0]?.[1]).not.toHaveProperty('next');
   });
 
   it.each([undefined, { name: 'Current model', slug: 'vendor/current' }])(

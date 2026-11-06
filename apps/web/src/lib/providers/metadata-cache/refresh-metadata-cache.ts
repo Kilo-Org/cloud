@@ -55,20 +55,21 @@ async function refreshSource(
   source: MetadataSource<unknown>,
   signal: AbortSignal
 ): Promise<boolean> {
+  let raw: unknown;
   try {
-    const { raw } = await fetchMetadata(source, { signal });
-    await db
-      .insert(ai_gateway_metadata_cache)
-      .values({ url: source.url, data: raw })
-      .onConflictDoUpdate({
-        target: ai_gateway_metadata_cache.url,
-        set: { data: raw, updated_at: sql`now()` },
-      });
-    return true;
+    ({ raw } = await fetchMetadata(source, { signal }));
   } catch (error) {
     console.error(`[refresh-metadata-cache] refreshing ${source.url} failed`, error);
     return false;
   }
+  await db
+    .insert(ai_gateway_metadata_cache)
+    .values({ url: source.url, data: raw })
+    .onConflictDoUpdate({
+      target: ai_gateway_metadata_cache.url,
+      set: { data: raw, updated_at: sql`now()` },
+    });
+  return true;
 }
 
 async function refreshSources(

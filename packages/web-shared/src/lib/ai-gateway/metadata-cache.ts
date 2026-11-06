@@ -4,7 +4,7 @@ import { createCachedFetch } from '@kilocode/web-shared/lib/cached-fetch';
 import type { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
-const DEFAULT_FETCH_TIMEOUT_MS = 60_000;
+const DEFAULT_FETCH_TIMEOUT_MS = 30_000;
 
 export type MetadataSource<T> = {
   url: string;
@@ -22,7 +22,8 @@ export async function fetchMetadata<T>(
   const timeout = AbortSignal.timeout(source.timeoutMs ?? DEFAULT_FETCH_TIMEOUT_MS);
   const response = await fetch(source.url, {
     method: 'GET',
-    headers: source.headers?.(),
+    headers: { accept: 'application/json', ...source.headers?.() },
+    cache: 'no-store',
     signal: options.signal ? AbortSignal.any([timeout, options.signal]) : timeout,
   });
   if (!response.ok) {

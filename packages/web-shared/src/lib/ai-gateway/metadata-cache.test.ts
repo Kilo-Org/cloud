@@ -75,14 +75,15 @@ describe('getMetadata', () => {
 });
 
 describe('fetchMetadata', () => {
-  it('returns the raw body and its parsed form, sending the source headers', async () => {
+  it('returns the raw body and its parsed form, bypassing the framework data cache', async () => {
     await expect(fetchMetadata(source)).resolves.toEqual({
       raw: { models: ['live'] },
       data: { models: ['live'] },
     });
     expect(fetchSpy).toHaveBeenCalledWith(source.url, {
       method: 'GET',
-      headers: { authorization: 'Bearer test-key' },
+      headers: { accept: 'application/json', authorization: 'Bearer test-key' },
+      cache: 'no-store',
       signal: expect.any(AbortSignal),
     });
   });

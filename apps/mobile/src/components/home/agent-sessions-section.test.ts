@@ -231,9 +231,9 @@ afterEach(() => {
 function newestButton() {
   // Count rows are buttons too; the newest block is drawn after them, so the
   // last button is the one that opens the session.
-  const button = nodes('Pressable')
-    .filter(candidate => candidate.props.accessibilityRole === 'button')
-    .at(-1);
+  const button = nodes('Pressable').findLast(
+    candidate => candidate.props.accessibilityRole === 'button'
+  );
   if (!button) {
     throw new Error('Missing newest session button');
   }
@@ -320,7 +320,9 @@ describe('Home live section', () => {
     });
 
     const row = nodes('Pressable').find(candidate => candidate.props.testID === 'home-status-idle');
-    if (!row) throw new Error('Missing idle status row');
+    if (!row) {
+      throw new Error('Missing idle status row');
+    }
     expect(row.props.accessibilityRole).toBe('button');
     (row.props.onPress as () => void)();
 

@@ -51,6 +51,9 @@ export async function prepareRuntimeDeployment(input: {
     startup,
     release: {
       descriptorSha256: handoff.descriptorSha256,
+      ...(handoff.kilo2DescriptorSha256 === undefined
+        ? {}
+        : { kilo2DescriptorSha256: handoff.kilo2DescriptorSha256 }),
       baseImage: handoff.base.image,
       bucket: input.bucket,
     },

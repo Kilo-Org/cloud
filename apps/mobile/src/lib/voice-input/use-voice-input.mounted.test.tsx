@@ -28,14 +28,26 @@ const controllerMock = vi.hoisted(() => {
   };
 });
 
+const routerMock = vi.hoisted(() => ({ push: vi.fn<(href: string) => void>() }));
+
+const actionsMock = vi.hoisted(() => ({
+  /** What the hook handed to `createVoiceInputActions`, for the navigation cases. */
+  config: undefined as { openTranscriptionModelPicker: () => void } | undefined,
+}));
+
+vi.mock('expo-router', () => ({ useRouter: () => routerMock }));
+
 vi.mock('./native-voice-input', () => ({ voiceInputController: controllerMock }));
 
 vi.mock('./use-voice-input-actions', () => ({
-  createVoiceInputActions: () => ({
-    abort: () => Promise.resolve(true),
-    settleBeforeSubmit: () => Promise.resolve(true),
-    toggle: () => Promise.resolve(),
-  }),
+  createVoiceInputActions: (config: { openTranscriptionModelPicker: () => void }) => {
+    actionsMock.config = config;
+    return {
+      abort: () => Promise.resolve(true),
+      settleBeforeSubmit: () => Promise.resolve(true),
+      toggle: () => Promise.resolve(),
+    };
+  },
   publishVoiceInputFeedback: vi.fn(),
   readVoiceInputFeedback: () => null,
   runVoiceInputListeningFeedback: vi.fn(),
@@ -115,5 +127,45 @@ describe('useVoiceInput availability probe', () => {
       listener('active');
     });
     expect(controllerMock.refreshAvailability).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('useVoiceInput model-picker navigation', () => {
+  beforeEach(() => {
+    state.appStateListeners = [];
+    actionsMock.config = undefined;
+  });
+
+  afterEach(() => {
+    act(() => {
+      renderer?.unmount();
+    });
+    renderer = undefined;
+    vi.clearAllMocks();
+  });
+
+  it('opens the picker through the router of the surface that owns the feedback', async () => {
+    await render();
+
+    actionsMock.config?.openTranscriptionModelPicker();
+
+    expect(routerMock.push).toHaveBeenCalledWith('/(app)/transcription-model-picker');
+  });
+
+  it('opens nothing once the owner is gone and its alert is still on screen', async () => {
+    await render();
+    const action = actionsMock.config?.openTranscriptionModelPicker;
+    if (!action) {
+      throw new Error('the hook did not supply a navigation action');
+    }
+
+    act(() => {
+      renderer?.unmount();
+    });
+    renderer = undefined;
+
+    action();
+
+    expect(routerMock.push).not.toHaveBeenCalled();
   });
 });

@@ -1,5 +1,7 @@
 'use client';
 
+import { adminFetch } from '@/lib/admin/admin-fetch';
+
 import { useState, Fragment } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
@@ -20,7 +22,7 @@ export function UserAdminReferrals({ kilo_user_id, className }: Props) {
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['admin-user-referrals', kilo_user_id],
     queryFn: async (): Promise<AdminUserReferralsResponse> => {
-      const response = await fetch(
+      const response = await adminFetch(
         `/admin/api/users/${encodeURIComponent(kilo_user_id)}/referrals`
       );
       if (!response.ok) {

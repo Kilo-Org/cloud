@@ -287,13 +287,19 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
       {showBalanceSkeleton && (
         // Content-shaped skeleton (number bar + note bar in the card's own
         // bg-secondary shell): a plain block read as an empty box in the e5
-        // spot check (2026-09-07). Sized to the card's min-h-16 so the swap
-        // to the balance row does not shift the sections below. The bars are
-        // bg-muted-soft because the theme's bg-muted equals bg-secondary —
-        // default-tone bars were invisible in this shell (b911 e2 spot check:
-        // "blank beige block", e2-nav-profile.png).
+        // spot check (2026-09-07). The bars are bg-muted-soft because the
+        // theme's bg-muted equals bg-secondary — default-tone bars were
+        // invisible in this shell (b911 e2 spot check: "blank beige block",
+        // e2-nav-profile.png).
+        //
+        // The inner column keeps the loaded block's 48 dp content height
+        // (amount line 28.19 + gap 3.5 + note line 14.1, on the 48 dp
+        // visibility toggle it shares the row with), so the shell measures the
+        // loaded block's 62.1 dp rather than the 56 dp its own `min-h-16` and
+        // two bars made: the swap to the balance row moved every section below
+        // it by 1.5 dp (design gate, Profile, 2026-11-05).
         <View className="min-h-16 flex-row items-center rounded-lg bg-secondary px-3 py-2">
-          <View className="flex-1 gap-1">
+          <View className="min-h-[48px] flex-1 justify-center gap-1">
             <Skeleton className="h-8 w-28 rounded-md bg-muted-soft" />
             <Skeleton className="h-3 w-40 rounded bg-muted-soft" />
           </View>

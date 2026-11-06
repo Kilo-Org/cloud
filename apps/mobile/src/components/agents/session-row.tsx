@@ -8,6 +8,7 @@ import { glanceableStatusKind } from '@kilocode/app-shared/glanceable-agents-sna
 import { SessionRow } from '@/components/ui/session-row';
 import { prefetchSessionTranscript } from '@/lib/agent-session-cache';
 import { type AgentSessionSortBy, getAgentSessionTimestamp } from '@/lib/agent-session-sort';
+import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
   isAttentionAcked,
@@ -132,6 +133,13 @@ export function StoredSessionRow({
   const colors = useThemeColors();
   const { t } = useTranslation();
   const queryClient = useQueryClient();
+  // The row's time label is derived from the clock this row reads, not from a
+  // `Date.now()` hidden behind the render: React Compiler memoizes the label
+  // against its traced inputs, so a mounted row kept the instant it first
+  // painted. The shared minute ticker re-derives the relative label as it ages
+  // and the clock time as the device time zone changes, so the list agrees
+  // with the session detail while both stay open.
+  const now = useRelativeTimeNow();
   // The backend names an unnamed session with a raw ISO placeholder
   // ("New session - 2026-09-22T02:05:22.778Z"); it is not a name the user
   // should see. `namedSessionTitle` uses the shared display helper and keeps
@@ -211,12 +219,12 @@ export function StoredSessionRow({
   // A row under the section its relative label would restate (`YESTERDAY` under
   // the Yesterday heading) shows its clock time instead, and speaks the same
   // clock time rather than repeating the heading.
-  const timeMeta = sectionAwareTimeMeta(timestamp, sectionTitle);
+  const timeMeta = sectionAwareTimeMeta(timestamp, sectionTitle, now);
   const visibleMeta = composeStoredSessionVisibleMeta(
     formatSessionTotalCost(session.total_cost_microdollars),
     timeMeta.visible
   );
-  const spokenTime = timeMeta.clock ?? formatSpokenTimeAgo(timestamp);
+  const spokenTime = timeMeta.clock ?? formatSpokenTimeAgo(timestamp, now);
   const storedSpokenMeta = needsInput
     ? null
     : composeStoredSessionSpokenMeta(formatSpokenCost(session.total_cost_microdollars), spokenTime);

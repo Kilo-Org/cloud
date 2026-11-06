@@ -47,9 +47,12 @@ const SESSION_FAMILY_PREFIX = deeplinkPathFromHref(SESSION_HREF_PREFIX);
 /**
  * Whether a universal-link destination opens something the app can show. Every
  * row but the session row names a fixed screen; the session row accepts any
- * capture, so its capture has to be the composer's `new` or an id the route can
- * resolve. `isPlausibleKiloSessionId` is the same shape guard the route uses
- * before it decides an id can never be a session.
+ * capture, so its capture has to be the composer's `new` or an id this app can
+ * prove openable. A link is the one entry point that is not tied to a row the
+ * store issued, so it keeps the canonical `isPlausibleKiloSessionId` rule: an
+ * unrecognized capture opens nothing and never replaces the visible screen.
+ * (The session route itself accepts every id the store can hold, because a
+ * stored row can carry an id minted before the canonical shape.)
  */
 export function opensDestination(href: string): boolean {
   if (!href.startsWith(SESSION_HREF_PREFIX)) {

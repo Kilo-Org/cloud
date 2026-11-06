@@ -501,6 +501,10 @@ export type Env = {
   RUNTIME_INTERACTIVE_ORG_IDS?: string;
   /** SHA-256 of the private R2 descriptor; existing allocations can retain inline JSON. */
   RUNTIME_RELEASE_DESCRIPTOR?: string;
+  /** Comma-separated org UUIDs whose new downloaded sandboxes run the Kilo v2 harness. */
+  RUNTIME_KILO2_ORG_IDS?: string;
+  /** The v2 release for `RUNTIME_KILO2_ORG_IDS`, in the same form as `RUNTIME_RELEASE_DESCRIPTOR`. */
+  RUNTIME_RELEASE_DESCRIPTOR_KILO2?: string;
   /** Queue for callback messages (optional - supports incremental rollout) */
   CALLBACK_QUEUE?: Queue<CallbackJob>;
   /** Dedicated best-effort Cloud Agent reporting queue. */
@@ -576,8 +580,8 @@ export type Env = {
   CLOUDFLARE_CONTAINERS_ORG_IDS?: string;
   /** Organization IDs allowed to build and restore environment snapshots. Empty is off. `*` includes personal. */
   ENVIRONMENT_SNAPSHOT_ORG_IDS?: string;
-  SESSION_SNAPSHOT_ORG_IDS?: string;
-  SESSION_SNAPSHOT_USER_IDS?: string;
+  WORKSPACE_SNAPSHOT_ORG_IDS?: string;
+  WORKSPACE_SNAPSHOT_USER_IDS?: string;
   /** R2 endpoint for S3-compatible API access (presigned URL generation) */
   R2_ENDPOINT?: string;
   /** R2 read-only access key ID for downloading image attachments */

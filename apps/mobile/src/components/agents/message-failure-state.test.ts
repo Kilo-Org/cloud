@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- The failure selector and the every-catalog label check share one subject. */
 import { describe, expect, it } from 'vitest';
 
 import { type MessageInfo } from '@kilocode/cloud-agent-sdk';
@@ -178,6 +179,10 @@ describe('selectMessageFailure', () => {
       const result = selectMessageFailure({ info });
 
       expect(result?.canRetry).toBe(false);
+      // The row has no recovery action left, so the detail line states that the
+      // refusal is final instead of repeating the transient-failure line.
+      expect(result?.detailKey).toBe('agentChat.messageFailure.assistantProviderRefused');
+      expect(result?.detail).toBe('The provider refused this request and it cannot be retried.');
       expect(JSON.stringify(result)).not.toContain('RAW_PROVIDER_TEXT');
     });
 
@@ -188,7 +193,10 @@ describe('selectMessageFailure', () => {
         data: { message: 'RAW_PROVIDER_TEXT', isRetryable: true },
       };
 
-      expect(selectMessageFailure({ info })?.canRetry).toBe(true);
+      const result = selectMessageFailure({ info });
+
+      expect(result?.canRetry).toBe(true);
+      expect(result?.detailKey).toBe('agentChat.messageFailure.assistantProviderError');
     });
 
     it('keeps Retry for a session written before the retryability flag existed', () => {
@@ -198,12 +206,47 @@ describe('selectMessageFailure', () => {
         data: { message: 'RAW_PROVIDER_TEXT' },
       } as unknown as AssistantError;
 
-      expect(selectMessageFailure({ info })?.canRetry).toBe(true);
+      const result = selectMessageFailure({ info });
+
+      expect(result?.canRetry).toBe(true);
+      expect(result?.detailKey).toBe('agentChat.messageFailure.assistantProviderError');
     });
 
     it('never sets canCopy true for an assistant row', () => {
       const result = selectMessageFailure({ info: assistantInfo('APIError') });
       expect(result?.canCopy).toBe(false);
+    });
+  });
+
+  describe('retryAvailable', () => {
+    it('keeps an assistant failure copy but drops Retry for a session that cannot send', () => {
+      const result = selectMessageFailure({
+        info: assistantInfo('APIError'),
+        retryAvailable: false,
+      });
+
+      expect(result?.title).toBe('Response failed');
+      expect(result?.detail).toBe('The provider returned an error.');
+      expect(result?.canRetry).toBe(false);
+    });
+
+    it('drops Retry from a delivery failure and keeps its copy action', () => {
+      const result = selectMessageFailure({
+        info: userInfo(),
+        deliveryState: { status: 'failed', error: 'RAW_TRANSPORT_TEXT', reason: 'exhausted' },
+        retryAvailable: false,
+      });
+
+      expect(result?.detail).toBe('We could not deliver this message after several attempts.');
+      expect(result?.canRetry).toBe(false);
+      expect(result?.canCopy).toBe(true);
+    });
+
+    it('leaves the provider verdict in charge when the caller does not say', () => {
+      expect(selectMessageFailure({ info: assistantInfo('APIError') })?.canRetry).toBe(true);
+      expect(
+        selectMessageFailure({ info: assistantInfo('APIError'), retryAvailable: true })?.canRetry
+      ).toBe(true);
     });
   });
 });

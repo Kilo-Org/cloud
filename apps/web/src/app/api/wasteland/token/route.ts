@@ -7,6 +7,17 @@ import {
   recordKiloAdminElevationForRequest,
   serviceTarget,
 } from '@kilocode/web-shared/lib/admin/admin-access-log';
+import {
+  isWorkerAdminCapabilityIssuanceEnabled,
+  isWorkerAdminLegacyClaimIssuanceEnabled,
+} from '@kilocode/web-shared/lib/config.server';
+import { WASTELAND_ADMIN_AUDIENCE } from '@kilocode/worker-utils/worker-admin-capability';
+import {
+  AdminCapabilityRequestSchema,
+  WorkerAdminCapabilityIssuanceError,
+  issueWorkerAdminCapability,
+} from '@/lib/worker-admin/capability-issuer';
+import { requireWorkerAdminActor, WorkerAdminActorError } from '@/lib/worker-admin/actor-guard';
 
 const ONE_HOUR_SECONDS = 60 * 60;
 
@@ -16,22 +27,28 @@ const ONE_HOUR_SECONDS = 60 * 60;
  * Mints a short-lived (1 hour) Kilo JWT that the browser can use to
  * authenticate directly with the Wasteland Cloudflare Worker.
  *
- * The browser authenticates to this endpoint via the NextAuth session cookie
- * (same-origin). The returned token is sent as `Authorization: Bearer <token>`
- * to the worker's tRPC endpoint (cross-origin).
- *
- * The JWT includes `isAdmin`, `apiTokenPepper`, and `orgMemberships` so the
- * worker can enforce access and check org membership without DB round-trips.
+ * With no body, this is the ordinary identity token. A body of
+ * `{ adminCapability: { target, actions? } }` additionally mints a scoped,
+ * short-lived ES256 capability. See /api/gastown/token for the same contract.
  */
-export async function POST() {
+export async function POST(request: Request) {
   const { user, authFailedResponse, tokenSource } = await getUserFromAuth({ adminOnly: false });
   if (authFailedResponse) return authFailedResponse;
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  if (user.is_admin) {
-    // The minted token carries `isAdmin`, so the elevation is exercised inside
-    // the Wasteland worker where this app emits nothing. Correlate on
-    // `kiloUserId` within the token's lifetime below.
+  const rawBody: unknown = await request.json().catch(() => null);
+  const hasCapabilityRequest =
+    typeof rawBody === 'object' && rawBody !== null && 'adminCapability' in rawBody;
+  const capabilityRequest = hasCapabilityRequest
+    ? AdminCapabilityRequestSchema.safeParse(rawBody)
+    : null;
+  if (capabilityRequest !== null && !capabilityRequest.success) {
+    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+  }
+
+  const legacyIssuance = isWorkerAdminLegacyClaimIssuanceEnabled();
+
+  if (legacyIssuance && user.is_admin) {
     await recordKiloAdminElevationForRequest({
       user,
       tokenSource,
@@ -41,13 +58,66 @@ export async function POST() {
   }
 
   const orgMemberships = await getUserOrgMemberships(user.id);
-
   const token = generateApiToken(
     user,
-    { isAdmin: user.is_admin, orgMemberships },
+    {
+      ...(legacyIssuance && user.is_admin ? { isAdmin: true } : {}),
+      orgMemberships,
+    },
     { expiresIn: ONE_HOUR_SECONDS }
   );
   const expiresAt = new Date(Date.now() + 55 * 60 * 1000).toISOString();
 
-  return NextResponse.json({ token, expiresAt });
+  if (capabilityRequest !== null) {
+    const { target, actions } = capabilityRequest.data.adminCapability;
+    try {
+      const actor = await requireWorkerAdminActor(request, request.headers, {
+        actionClass: 'worker_admin',
+        target: { kind: 'service', id: 'wasteland' },
+        inventoryId: 'rest.wastelandToken',
+      });
+      if (actor.actor.assurance.userId !== user.id) {
+        return NextResponse.json(
+          { error: 'Worker admin capabilities require the same authenticated user' },
+          { status: 403 }
+        );
+      }
+      const issued = await issueWorkerAdminCapability({
+        user: { ...user, api_token_pepper: actor.sessionBinding.apiTokenPepper },
+        audience: WASTELAND_ADMIN_AUDIENCE,
+        target,
+        actions,
+        headersList: request.headers,
+      });
+      return NextResponse.json({
+        token,
+        expiresAt,
+        admin: user.is_admin === true,
+        capabilityIssuance: true,
+        capability: issued.capability,
+        capabilityExpiresAt: issued.capabilityExpiresAt,
+      });
+    } catch (error) {
+      if (error instanceof WorkerAdminActorError) {
+        return NextResponse.json(
+          { error: error.message, code: error.code },
+          { status: error.status }
+        );
+      }
+      if (error instanceof WorkerAdminCapabilityIssuanceError) {
+        return NextResponse.json(
+          { error: error.message, code: error.code },
+          { status: error.status }
+        );
+      }
+      throw error;
+    }
+  }
+
+  return NextResponse.json({
+    token,
+    expiresAt,
+    admin: user.is_admin === true,
+    capabilityIssuance: isWorkerAdminCapabilityIssuanceEnabled(),
+  });
 }

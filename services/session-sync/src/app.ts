@@ -1,6 +1,7 @@
 import { withDORetry } from '@kilocode/worker-utils';
 import { readBoundedStream } from '@kilocode/worker-utils/bounded-stream-reader';
-import { Hono, type Context } from 'hono';
+import { Hono, type Context, type Next } from 'hono';
+import { cors } from 'hono/cors';
 import { z } from 'zod';
 
 import { authorize, exchange, type Principal } from './auth';
@@ -8,6 +9,7 @@ import { uploadBlob } from './blob-upload';
 import { getSessionSyncDOStub, type SessionSyncDO } from './dos/SessionSyncDO';
 import type { Env } from './env';
 import { internal } from './internal';
+import { isOverloaded, overloaded, rpcError, ServiceOverloaded } from './overload';
 import {
   ERROR_STATUS,
   LIMITS,
@@ -23,7 +25,9 @@ import {
   type SyncError,
 } from './protocol';
 import { rateLimit } from './rate-limit';
-import { jsonResponse, requestMetrics, requestRoute, textResponse, timed } from './metrics';
+import { jsonResponse, requestMetrics, requestRoute, timed } from './metrics';
+import { live } from './live/routes';
+import { LiveTicketError } from './live/ticket';
 
 type AppContext = { Bindings: Env; Variables: { principal: Principal } };
 type C = Context<AppContext>;
@@ -36,6 +40,7 @@ function failure(error: SyncError): Response {
   const response = json(errorBody(error), ERROR_STATUS[error.code]);
   if (error.code === 'tenant_unavailable') response.headers.set('Retry-After', '60');
   if (error.code === 'rate_limited') response.headers.set('Retry-After', '60');
+  if (error.code === 'service_overloaded') response.headers.set('Retry-After', '3');
   return response;
 }
 
@@ -51,16 +56,31 @@ function invalid(error: z.ZodError): SyncError {
 async function call<T>(
   c: C,
   sessionID: string,
-  operation: (stub: DurableObjectStub<SessionSyncDO>) => Promise<T>,
+  operation: (stub: DurableObjectStub<SessionSyncDO>) => Promise<Result<T>>,
   name: string
-): Promise<T> {
+): Promise<Result<T>> {
   const tenant = c.get('principal').tenant;
   return timed(c.req.raw, 'doMs', async () => {
     const result = await withDORetry(
-      () => getSessionSyncDOStub(c.env, { tenant, sessionID }),
-      operation,
+      () => {
+        try {
+          return getSessionSyncDOStub(c.env, { tenant, sessionID });
+        } catch (error) {
+          throw rpcError(error);
+        }
+      },
+      async stub => {
+        try {
+          return await operation(stub);
+        } catch (error) {
+          throw rpcError(error);
+        }
+      },
       `SessionSyncDO.${name}`
-    );
+    ).catch((error: unknown) => {
+      if (error instanceof ServiceOverloaded) return overloaded();
+      throw error;
+    });
     const metrics = requestMetrics(c.req.raw);
     if (
       metrics &&
@@ -129,9 +149,25 @@ function sessionParam(c: C): Result<string> {
 
 export const app = new Hono<AppContext>();
 
+const browserCors = cors({
+  origin: (origin, c: C) =>
+    ['https://kilo.ai', 'https://app.kilo.ai'].includes(origin) ||
+    (c.env.ENVIRONMENT === 'development' && origin === 'http://localhost:3000')
+      ? origin
+      : null,
+  allowMethods: ['GET', 'POST', 'OPTIONS'],
+  allowHeaders: ['Content-Type', 'Authorization'],
+  exposeHeaders: ['Retry-After'],
+  maxAge: 86400,
+});
+app.use('/v1/*', (c: C, next: Next) =>
+  c.req.header('Upgrade')?.toLowerCase() === 'websocket' ? next() : browserCors(c, next)
+);
+
 app.route('/internal', internal);
 
 app.post('/v1/auth/exchange', c => exchange(c.req.raw, c.env));
+app.route('/v1', live);
 
 app.use('/v1/sessions/*', async (c, next) => {
   const principal = await authorize(c.req.raw, c.env);
@@ -219,7 +255,7 @@ app.get('/v1/sessions/:id/entities', async c => {
     'readEntities'
   );
   if (!result.ok) return failure(result.error);
-  return textResponse(result.value, {
+  return new Response(result.value, {
     headers: { 'content-type': 'application/json', 'cache-control': 'no-store' },
   });
 });
@@ -310,6 +346,15 @@ app.get('/v1/sessions/:id/blobs/:hash', async c => {
 app.notFound(() => failure({ code: 'not_found', message: 'Route not found' }));
 
 app.onError((error, c) => {
+  if (isOverloaded(error)) {
+    return failure({
+      code: 'service_overloaded',
+      message: 'The service is temporarily overloaded',
+    });
+  }
+  if (error instanceof LiveTicketError) {
+    return json({ error: { code: error.code, message: error.message } }, error.status);
+  }
   console.error('session-sync request failed', {
     path: requestRoute(c.req.raw),
     error: error.name,

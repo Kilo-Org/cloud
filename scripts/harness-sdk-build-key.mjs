@@ -4,14 +4,15 @@
 //
 // The key covers every repository file of the build program (from
 // `tsgo --listFilesOnly`, so tsconfig.build.json's test/fixture exclusions are
-// honoured), the build configuration, pnpm-lock.yaml, and the action that runs
-// the build. Files under node_modules are pinned by the lockfile, so they are
-// left out of the per-file hash. Any failure exits non-zero: a key that misses
-// an input would restore a dist built from other sources.
-import { createHash } from 'node:crypto';
+// honoured), the build configuration, and the lockfile entries of the package's
+// importer closure, which pin every file the build reads under node_modules. A
+// dependency change in another workspace does not move it. Any failure exits
+// non-zero: a key that misses an input would restore a dist built from other
+// sources.
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
 import { isAbsolute, relative, resolve } from 'node:path';
+
+import { buildKeyInput } from './build-key-inputs.mjs';
 
 const root = process.cwd();
 const sdk = resolve(root, 'packages/harness-sdk');
@@ -26,7 +27,6 @@ const listed = execFileSync(
 if (listed.length === 0) throw new Error('tsgo listed no files for packages/harness-sdk');
 
 const files = new Set([
-  'pnpm-lock.yaml',
   'packages/harness-sdk/package.json',
   'packages/harness-sdk/tsconfig.json',
   'packages/harness-sdk/tsconfig.build.json',
@@ -34,23 +34,16 @@ const files = new Set([
   // a change to either must not reuse a dist built the old way.
   '.github/actions/harness-sdk-build/action.yml',
   'scripts/harness-sdk-build-key.mjs',
+  'scripts/build-key-inputs.mjs',
 ]);
 for (const file of listed) {
   const absolute = isAbsolute(file) ? file : resolve(sdk, file);
   const path = relative(root, absolute);
-  // A dependency's .d.ts comes from node_modules, which the lockfile pins. A
+  // A dependency's .d.ts comes from node_modules, which the closure pins. A
   // file outside the checkout has no tracked content to hash.
   if (!path || path.startsWith('..') || isAbsolute(path)) continue;
   if (path.split('/').includes('node_modules')) continue;
   files.add(path);
 }
 
-const hash = createHash('sha256');
-for (const path of [...files].sort()) {
-  hash
-    .update(path)
-    .update('\0')
-    .update(readFileSync(resolve(root, path)))
-    .update('\0');
-}
-console.log(`key=${hash.digest('hex')}`);
+console.log(`key=${buildKeyInput(root, 'packages/harness-sdk', files)}`);

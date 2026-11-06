@@ -68,6 +68,9 @@ export function resolveGatewayCaller(
       botId: auth.botId,
     };
   }
+  if (auth.rejectionReason === 'empty_organization_context') {
+    return { kind: 'rejected', response: auth.authFailedResponse };
+  }
   if (auth.credentialsRejected) return { kind: 'rejected', response: invalidTokenResponse() };
   if (opts.passThroughAuthFailure) return { kind: 'rejected', response: auth.authFailedResponse };
   if (opts.allowAnonymous && opts.ipAddress) {

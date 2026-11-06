@@ -20,7 +20,8 @@ import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { redisClient } from '@kilocode/web-shared/lib/redis';
 import { eq, inArray } from 'drizzle-orm';
 import { createCallerForUser } from '@/routers/test-utils';
-import { computeBlacklistStats, isDomainOnBlacklist } from './blacklist-domains-router';
+import { computeBlacklistStats } from '@/lib/abuse/blacklist-domain-stats';
+import { isDomainOnBlacklist } from './blacklist-domains-router';
 import { backfillBlockBlacklistedDomainsBatch } from '@/lib/abuse/block-blacklisted-domains';
 import type { BlockBlacklistedDomainsBackfillResponse } from '@/lib/abuse/block-blacklisted-domains';
 import {
@@ -28,6 +29,7 @@ import {
   BLACKLIST_DOMAINS_UPDATED_AT_REDIS_KEY,
 } from '@kilocode/web-shared/lib/redis-keys';
 import type { User } from '@kilocode/db/schema';
+import { MAX_BLACKLIST_DOMAINS } from '@kilocode/worker-utils/account-access';
 
 type BackfillBatch = (params: {
   actorId: string;
@@ -87,13 +89,13 @@ describe('isDomainOnBlacklist', () => {
 });
 
 describe('computeBlacklistStats', () => {
-  it('sums per-email_domain counts for each blacklist entry by exact match', () => {
+  it('sums per-host counts for each blacklist entry by exact match', () => {
     const stats = computeBlacklistStats(
       ['mailinator.com', 'spam.org'],
       [
-        { email_domain: 'mailinator.com', count: 12 },
-        { email_domain: 'spam.org', count: 5 },
-        { email_domain: 'legit.com', count: 99 },
+        { email_host: 'mailinator.com', has_local_part: true, count: 12 },
+        { email_host: 'spam.org', has_local_part: true, count: 5 },
+        { email_host: 'legit.com', has_local_part: true, count: 99 },
       ]
     );
 
@@ -109,10 +111,10 @@ describe('computeBlacklistStats', () => {
     const stats = computeBlacklistStats(
       ['mailinator.com'],
       [
-        { email_domain: 'mailinator.com', count: 4 },
-        { email_domain: 'evil.mailinator.com', count: 3 },
-        { email_domain: 'a.b.mailinator.com', count: 2 },
-        { email_domain: 'notmailinator.com', count: 100 },
+        { email_host: 'mailinator.com', has_local_part: true, count: 4 },
+        { email_host: 'evil.mailinator.com', has_local_part: true, count: 3 },
+        { email_host: 'a.b.mailinator.com', has_local_part: true, count: 2 },
+        { email_host: 'notmailinator.com', has_local_part: true, count: 100 },
       ]
     );
 
@@ -124,9 +126,9 @@ describe('computeBlacklistStats', () => {
     const stats = computeBlacklistStats(
       ['first.com', 'second.com', 'third.com'],
       [
-        { email_domain: 'first.com', count: 1 },
-        { email_domain: 'second.com', count: 10 },
-        { email_domain: 'third.com', count: 5 },
+        { email_host: 'first.com', has_local_part: true, count: 1 },
+        { email_host: 'second.com', has_local_part: true, count: 10 },
+        { email_host: 'third.com', has_local_part: true, count: 5 },
       ]
     );
 
@@ -137,9 +139,9 @@ describe('computeBlacklistStats', () => {
     const stats = computeBlacklistStats(
       ['first.com', 'second.com', 'third.com'],
       [
-        { email_domain: 'first.com', count: 1 },
-        { email_domain: 'second.com', count: 10 },
-        { email_domain: 'third.com', count: 5 },
+        { email_host: 'first.com', has_local_part: true, count: 1 },
+        { email_host: 'second.com', has_local_part: true, count: 10 },
+        { email_host: 'third.com', has_local_part: true, count: 5 },
       ],
       2
     );
@@ -152,12 +154,12 @@ describe('computeBlacklistStats', () => {
     expect(stats.totalBlockedUsers).toBe(16);
   });
 
-  it('ignores rows with null email_domain', () => {
+  it('ignores rows with a null host', () => {
     const stats = computeBlacklistStats(
       ['mailinator.com'],
       [
-        { email_domain: null, count: 999 },
-        { email_domain: 'mailinator.com', count: 3 },
+        { email_host: null, has_local_part: true, count: 999 },
+        { email_host: 'mailinator.com', has_local_part: true, count: 3 },
       ]
     );
 
@@ -165,7 +167,10 @@ describe('computeBlacklistStats', () => {
   });
 
   it('returns zero-count entries for blacklist entries with no matching users', () => {
-    const stats = computeBlacklistStats(['unused.com'], [{ email_domain: 'other.com', count: 10 }]);
+    const stats = computeBlacklistStats(
+      ['unused.com'],
+      [{ email_host: 'other.com', has_local_part: true, count: 10 }]
+    );
 
     expect(stats.domains).toEqual([{ domain: 'unused.com', blockedCount: 0 }]);
     expect(stats.totalBlockedUsers).toBe(0);
@@ -174,7 +179,7 @@ describe('computeBlacklistStats', () => {
   it('counts one group once for each matching entry, including nested entries', () => {
     const stats = computeBlacklistStats(
       ['mailinator.com', 'sub.mailinator.com'],
-      [{ email_domain: 'sub.mailinator.com', count: 3 }]
+      [{ email_host: 'sub.mailinator.com', has_local_part: true, count: 3 }]
     );
 
     expect(stats.domains).toEqual([
@@ -184,17 +189,32 @@ describe('computeBlacklistStats', () => {
     expect(stats.totalBlockedUsers).toBe(6);
   });
 
+  it('credits an address without @ only through a dotted entry', () => {
+    const stats = computeBlacklistStats(
+      ['deep.spam.org', 'spam.org'],
+      [{ email_host: 'deep.spam.org', has_local_part: false, count: 2 }]
+    );
+
+    expect(stats.domains).toEqual([
+      { domain: 'spam.org', blockedCount: 2 },
+      { domain: 'deep.spam.org', blockedCount: 0 },
+    ]);
+  });
+
   it('does not match a group whose label boundary differs from the entry', () => {
     const stats = computeBlacklistStats(
       ['mailinator.com'],
-      [{ email_domain: 'notmailinator.com', count: 50 }]
+      [{ email_host: 'notmailinator.com', has_local_part: true, count: 50 }]
     );
 
     expect(stats.domains).toEqual([{ domain: 'mailinator.com', blockedCount: 0 }]);
   });
 
   it('returns empty stats for an empty blacklist', () => {
-    const stats = computeBlacklistStats([], [{ email_domain: 'anything.com', count: 5 }]);
+    const stats = computeBlacklistStats(
+      [],
+      [{ email_host: 'anything.com', has_local_part: true, count: 5 }]
+    );
 
     expect(stats.domains).toEqual([]);
     expect(stats.totalDomains).toBe(0);
@@ -559,5 +579,35 @@ describe('admin.blacklistDomains.get', () => {
     const config = await caller.admin.blacklistDomains.get();
 
     expect(config.blocked_signup_tlds).toEqual(['shop', 'top']);
+  });
+
+  it('reports zero dropped entries for a stored list', async () => {
+    mockedRedisGet.mockResolvedValue(
+      JSON.stringify({
+        domains: ['mailinator.com', 'spam.org'],
+        updated_at: null,
+        updated_by: null,
+        updated_by_email: null,
+      })
+    );
+
+    const caller = await createCallerForUser(admin.id);
+    const config = await caller.admin.blacklistDomains.get();
+
+    expect(config.domains).toEqual(['mailinator.com', 'spam.org']);
+    expect(config.dropped_domains).toBe(0);
+  });
+
+  it('returns the capped prefix and its dropped-entry count', async () => {
+    const domains = Array.from({ length: MAX_BLACKLIST_DOMAINS + 5 }, (_, i) => `bulk${i}.example`);
+    mockedRedisGet.mockResolvedValue(
+      JSON.stringify({ domains, updated_at: null, updated_by: null, updated_by_email: null })
+    );
+
+    const caller = await createCallerForUser(admin.id);
+    const config = await caller.admin.blacklistDomains.get();
+
+    expect(config.domains).toHaveLength(MAX_BLACKLIST_DOMAINS);
+    expect(config.dropped_domains).toBe(5);
   });
 });

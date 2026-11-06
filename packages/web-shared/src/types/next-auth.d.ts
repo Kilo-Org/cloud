@@ -10,6 +10,12 @@ declare module 'next-auth' {
     kiloUserId: string;
     pepper?: string | null;
     webSessionPepper?: string | null;
+    /**
+     * Random per-session identifier minted only when a sign-in JWT is created.
+     * Always server-only: it is read by `getServerSession` and must never be
+     * serialized into the browser `/api/auth/session` response.
+     */
+    webSessionId?: string;
     version: number;
     isNewUser?: boolean;
     isAdmin: boolean;
@@ -20,6 +26,8 @@ declare module 'next-auth' {
   interface Session {
     kiloUserId: string;
     webSessionPepper?: string | null;
+    /** Server-only; stripped from the browser `/api/auth/session` response. */
+    webSessionId?: string;
     isNewUser: boolean;
     isAdmin: boolean; //also probably not a good idea; no reason to trust this over in-db state and we need that anyhow.
     authProvider?: string;

@@ -62,6 +62,11 @@ project path; project credentials also support their recorded numeric project ID
 The configured instance base path and outbound container binding remain part of
 request authorization.
 
+The request method is part of authorization. A listed project resource answers
+the methods its policy allows: credential endpoints answer none, and
+configuration, membership and lifecycle endpoints answer reads only. The
+project root answers reads only.
+
 ## API Documentation
 
 ### Overview
@@ -786,8 +791,8 @@ issuance while retaining real Session DO notifications. A fake wrapper answers
 #### Other Quality Checks
 
 ```bash
-# Type checking
-pnpm --filter cloud-agent-next typecheck
+# Type checking (this service and its nested wrapper workspace)
+pnpm --filter cloud-agent-next typecheck:wrapper
 
 # Linting
 pnpm --filter cloud-agent-next lint

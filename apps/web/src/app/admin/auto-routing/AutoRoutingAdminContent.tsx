@@ -1,5 +1,7 @@
 'use client';
 
+import { adminFetch } from '@/lib/admin/admin-fetch';
+
 import {
   AutoRoutingClassifierAnalyticsResponseSchema,
   AutoRoutingClassifierModelResponseSchema,
@@ -39,7 +41,7 @@ const periods: Array<{ value: AutoRoutingAnalyticsPeriod; label: string }> = [
 ];
 
 async function fetchClassifierModel() {
-  const response = await fetch('/admin/api/auto-routing/classifier-model');
+  const response = await adminFetch('/admin/api/auto-routing/classifier-model');
   return parseAdminResponse<AutoRoutingClassifierModelResponse>(
     response,
     AutoRoutingClassifierModelResponseSchema
@@ -47,7 +49,7 @@ async function fetchClassifierModel() {
 }
 
 async function saveClassifierModel(model: string | null) {
-  const response = await fetch('/admin/api/auto-routing/classifier-model', {
+  const response = await adminFetch('/admin/api/auto-routing/classifier-model', {
     method: 'PUT',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ model }),
@@ -60,7 +62,7 @@ async function saveClassifierModel(model: string | null) {
 
 async function fetchClassifierAnalytics(period: AutoRoutingAnalyticsPeriod) {
   const searchParams = new URLSearchParams({ period });
-  const response = await fetch(`/admin/api/auto-routing/classifier-analytics?${searchParams}`);
+  const response = await adminFetch(`/admin/api/auto-routing/classifier-analytics?${searchParams}`);
   return parseAdminResponse<AutoRoutingClassifierAnalyticsResponse>(
     response,
     AutoRoutingClassifierAnalyticsResponseSchema

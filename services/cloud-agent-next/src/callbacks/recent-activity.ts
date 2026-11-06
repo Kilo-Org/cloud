@@ -1,4 +1,4 @@
-import type { LatestAssistantMessage } from '../session/types.js';
+import type { AssistantAnswer } from './assistant-answer.js';
 
 export const CALLBACK_ACTIVITY_MESSAGE_LIMIT = 5;
 
@@ -13,32 +13,16 @@ function excerpt(text: string, limit: number): string {
   return text.slice(0, last >= 0xd800 && last <= 0xdbff ? end - 1 : end);
 }
 
-export function renderRecentActivity(
-  messages: readonly LatestAssistantMessage[]
-): string | undefined {
+export function renderRecentActivity(messages: readonly AssistantAnswer[]): string | undefined {
   const activity: ActivityMessage[] = [];
   for (const message of messages.slice(-CALLBACK_ACTIVITY_MESSAGE_LIMIT)) {
     const entry: ActivityMessage = { tools: [] };
-    let text = '';
-    for (const part of message.parts) {
-      if (part.type === 'text' && typeof part.text === 'string') {
-        text += excerpt(part.text, Math.max(0, 1_500 - text.length));
-      } else if (part.type === 'tool' && typeof part.tool === 'string') {
-        const state = part.state;
-        if (typeof state !== 'object' || state === null || !('status' in state)) continue;
-        const status = state.status;
-        if (
-          status !== 'pending' &&
-          status !== 'running' &&
-          status !== 'completed' &&
-          status !== 'error'
-        )
-          continue;
-        const name = excerpt(part.tool, 80).trim();
-        if (name) {
-          entry.tools.push({ name, status });
-          if (entry.tools.length > 5) entry.tools.shift();
-        }
+    const text = excerpt(message.text, 1_500);
+    for (const tool of message.tools) {
+      const name = excerpt(tool.name, 80).trim();
+      if (name) {
+        entry.tools.push({ name, status: tool.status });
+        if (entry.tools.length > 5) entry.tools.shift();
       }
     }
     while (JSON.stringify(entry.tools).length > 1_000) entry.tools.shift();

@@ -260,8 +260,15 @@ export function evictGitHubUserAccessTokenCache(kiloUserId: string): void {
  * Test-only helper: reset the in-process cache and per-user queue. NOT exported
  * via the module's public API surface — only consumed by jest tests in the
  * same package.
+ *
+ * Queued work is settled before the reset clears. An operation a test started —
+ * a fetch that writes the cache, or a queued eviction — therefore cannot run
+ * after the reset and reach the next test's state.
  */
-export function __resetGitHubUserAccessTokenClientForTests(): void {
+export async function __resetGitHubUserAccessTokenClientForTests(): Promise<void> {
+  while (queue.size > 0) {
+    await Promise.allSettled([...queue.values()]);
+  }
   cache.clear();
   queue.clear();
 }

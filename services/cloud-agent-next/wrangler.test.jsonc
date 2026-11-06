@@ -37,6 +37,10 @@
         "class_name": "EnvironmentBuild",
         "name": "ENVIRONMENT_BUILD",
       },
+      {
+        "class_name": "SandboxContainers",
+        "name": "SANDBOX_CONTAINERS",
+      },
     ],
   },
   "migrations": [
@@ -64,8 +68,11 @@
       "new_sqlite_classes": ["EnvironmentBuild"],
       "tag": "v12",
     },
+    {
+      "new_sqlite_classes": ["SandboxContainers"],
+      "tag": "v13",
+    },
   ],
-  "kv_namespaces": [{ "binding": "SHARED_SANDBOX_OVERRIDES" }],
   "r2_buckets": [
     { "binding": "RUNTIME_RELEASE_BUCKET", "bucket_name": "cloud-agent-runtime-test" },
   ],

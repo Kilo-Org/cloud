@@ -25,6 +25,13 @@
     },
   ],
   "dev": { "port": 8787 },
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "624ec80650dd414199349f4e217ddb10",
+      "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
+    },
+  ],
   "logpush": true,
   "observability": {
     "enabled": true,
@@ -96,6 +103,13 @@
           },
         ],
       },
+      "hyperdrive": [
+        {
+          "binding": "HYPERDRIVE",
+          "id": "624ec80650dd414199349f4e217ddb10",
+          "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
+        },
+      ],
       "ratelimits": [
         {
           "name": "ATTRIBUTION_TRACK_ORG_RATE_LIMITER",

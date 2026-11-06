@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { getAuthorizedOrgContext } from '@/lib/organizations/organization-auth';
+import { getAuthorizedOrgContextOrSupport } from '@/lib/organizations/organization-auth';
 import {
   getOrganizationGuardrailsPolicy,
   type OrganizationGuardrailsPolicy,
@@ -8,15 +8,21 @@ import {
 
 /**
  * The organization's guardrails for its clients to apply: the MCP allow list and enforcement
- * mode, skill guardrails, and whether input scanning is on. Readable by any member, because
- * every member's client needs it. Organizations without AI Guardrails get everything off.
+ * mode, skill guardrails, and whether input and response scanning are on. Readable by any
+ * member, because every member's client needs it. Organizations without AI Guardrails get
+ * everything off.
  */
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse<OrganizationGuardrailsPolicy | { error: string }>> {
   const organizationId = (await params).id;
-  const { success, data, nextResponse } = await getAuthorizedOrgContext(organizationId);
+  const { success, data, nextResponse } = await getAuthorizedOrgContextOrSupport(
+    organizationId,
+    '/api/organizations/[id]/guardrails',
+    undefined,
+    { requestMethod: request.method }
+  );
   if (!success) {
     return nextResponse;
   }

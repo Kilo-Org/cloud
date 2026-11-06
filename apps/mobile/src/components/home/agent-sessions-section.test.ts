@@ -4,18 +4,16 @@ import * as ReactQuery from '@tanstack/react-query';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { type GlanceableStatusKind } from '@kilocode/app-shared/glanceable-agents-snapshot';
-
 import { i18n } from '@/i18n';
-import { statusRowTestId } from '@/components/home/glanceable-active-card';
 import { AgentSessionsSection } from '@/components/home/home-agent-sessions-section';
+import { LiveSessionFeedback } from '@/components/home/agent-sessions-section';
 import { formatScheduledWake } from '@/components/agents/session-list-helpers';
 import { type ActiveSession } from '@/lib/hooks/use-agent-sessions';
 
 const navigateSpy = vi.hoisted(() => vi.fn());
 const dismissToSpy = vi.hoisted(() => vi.fn());
 const sessionDestination = vi.hoisted(() => ({ id: '' }));
-const connectivity = vi.hoisted(() => ({ offline: false }));
+const connectivity = vi.hoisted(() => ({ offline: false, connected: true, exhausted: false }));
 const queryClient = new ReactQuery.QueryClient();
 vi.mock('expo-router', () => ({
   useRouter: () => ({ navigate: navigateSpy, dismissTo: dismissToSpy }),
@@ -83,6 +81,9 @@ vi.mock('@/lib/a11y/announcing-toast', () => ({
 }));
 vi.mock('@/components/ui/agent-badge', () => ({ AgentBadge: 'AgentBadge' }));
 vi.mock('@/components/ui/session-status-icon', () => ({ SessionStatusIcon: 'SessionStatusIcon' }));
+// The zero state's glyph comes from the icon set, whose native renderer the
+// pure project does not load.
+vi.mock('@/components/ui/icons', () => ({ Bot: 'Bot' }));
 vi.mock('@/components/ui/directional-icons', () => ({ DirectionalChevronRight: 'ChevronRight' }));
 // The briefing card reaches the native SQLCipher dismissal journal; these
 // assertions cover the live card and the section header only.
@@ -99,9 +100,24 @@ vi.mock('@/components/home/section-header', async () => {
   };
 });
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+// The shared empty state is measured on the device; the section only decides
+// which state it draws, so the mock keeps its title and hint readable as Text.
+// The factory is hoisted above the static imports, so it loads React itself.
+vi.mock('@/components/empty-state', async () => {
+  const { createElement: create } = await import('react');
+  return {
+    EmptyState: (props: { icon: unknown; title: string; description?: ReactNode }) =>
+      create(
+        'EmptyState',
+        props,
+        create('Text', {}, props.title),
+        props.description === undefined ? null : create('Text', {}, props.description)
+      ),
+  };
+});
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
-vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: () => null }));
+vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/lib/auth/auth-context', () => ({ useAuth: vi.fn() }));
@@ -114,8 +130,8 @@ vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
 }));
 vi.mock('@/lib/hooks/use-user-web-connection-state', () => ({
   useUserWebConnectionHealth: () => ({
-    isConnected: !connectivity.offline,
-    reconnectExhausted: false,
+    isConnected: connectivity.connected && !connectivity.offline,
+    reconnectExhausted: connectivity.exhausted,
   }),
 }));
 vi.mock('@/components/agents/user-web-connection-provider', () => ({
@@ -182,9 +198,13 @@ function text() {
     .map(textNode => textNode.children.filter(child => typeof child === 'string').join(''))
     .join('\n');
 }
-async function render(sessions = settled, contextOverride = context) {
+async function render(sessions = settled, contextOverride = context, briefing?: Props['briefing']) {
   await act(async () => {
-    const tree = createElement(AgentSessionsSection, { context: contextOverride, sessions });
+    const tree = createElement(AgentSessionsSection, {
+      context: contextOverride,
+      sessions,
+      briefing,
+    });
     if (renderer) {
       renderer.update(tree);
     } else {
@@ -199,6 +219,8 @@ beforeEach(() => {
   dismissToSpy.mockClear();
   sessionDestination.id = '';
   connectivity.offline = false;
+  connectivity.connected = true;
+  connectivity.exhausted = false;
 });
 afterEach(() => {
   act(() => renderer?.unmount());
@@ -207,23 +229,13 @@ afterEach(() => {
 });
 
 function newestButton() {
-  const button = nodes('Pressable').find(
-    candidate => candidate.props.testID === 'live-card-newest'
-  );
+  // Count rows are buttons too; the newest block is drawn after them, so the
+  // last button is the one that opens the session.
+  const button = nodes('Pressable')
+    .filter(candidate => candidate.props.accessibilityRole === 'button')
+    .at(-1);
   if (!button) {
     throw new Error('Missing newest session button');
-  }
-  return button;
-}
-
-const STATUS_KINDS: GlanceableStatusKind[] = ['needsInput', 'running', 'scheduled', 'idle'];
-
-function statusButton(kind: GlanceableStatusKind) {
-  const button = nodes('Pressable').find(
-    candidate => candidate.props.testID === statusRowTestId(kind)
-  );
-  if (!button) {
-    throw new Error(`Missing ${kind} status button`);
   }
   return button;
 }
@@ -287,31 +299,32 @@ describe('Home live section', () => {
     await render({ ...settled, activeSessions: [session('a1')] });
     expect(node('SectionHeader').props.label).toBe(i18n.t('home.agentSessions'));
     (node('SectionHeader').props.onActionPress as () => void)();
-    const href = { pathname: '/(app)/(tabs)/(2_agents)/', params: {} };
-    expect(navigateSpy).toHaveBeenCalledWith(href);
-    expect(dismissToSpy).toHaveBeenCalledWith(href);
+    expect(navigateSpy).toHaveBeenCalledWith('/(app)/(tabs)/(2_agents)/');
+    expect(dismissToSpy).toHaveBeenCalledWith('/(app)/(tabs)/(2_agents)/');
     expect(navigateSpy.mock.invocationCallOrder[0] ?? 0).toBeLessThan(
       dismissToSpy.mock.invocationCallOrder[0] ?? 0
     );
   });
 
-  it('opens the Agents list filtered to the status a count row names', async () => {
+  it('opens the agents index narrowed to the tapped status', async () => {
     await render({
       ...settled,
-      activeSessions: [
-        session('need', 'question'),
-        session('work', 'busy'),
-        session('idle', 'idle'),
-        session('later', 'scheduled'),
-      ],
+      activeSessions: [session('older', 'idle', { statusUpdatedAt: new Date().toISOString() })],
     });
-    for (const kind of STATUS_KINDS) {
-      expect(statusButton(kind).props.accessibilityRole).toBe('button');
-    }
-    (statusButton('idle').props.onPress as () => void)();
-    const expected = { pathname: '/(app)/(tabs)/(2_agents)/', params: { status: 'idle' } };
-    expect(navigateSpy).toHaveBeenCalledWith(expected);
-    expect(dismissToSpy).toHaveBeenCalledWith(expected);
+
+    const row = nodes('Pressable').find(candidate => candidate.props.testID === 'home-status-idle');
+    if (!row) throw new Error('Missing idle status row');
+    expect(row.props.accessibilityRole).toBe('button');
+    (row.props.onPress as () => void)();
+
+    expect(navigateSpy).toHaveBeenCalledWith({
+      pathname: '/(app)/(tabs)/(2_agents)/',
+      params: { status: 'idle' },
+    });
+    expect(dismissToSpy).toHaveBeenCalledWith({
+      pathname: '/(app)/(tabs)/(2_agents)/',
+      params: { status: 'idle' },
+    });
   });
 
   it('shows a skeleton until the live list resolves', async () => {
@@ -324,21 +337,58 @@ describe('Home live section', () => {
     expect(text()).toContain('a1');
   });
 
-  it('draws the zero state in the loaded card frame when the accepted live list is empty', async () => {
+  it('draws the zero state as its one message, without four zero counts', async () => {
     await render();
-    for (const label of ['Needs input', 'Working', 'Scheduled', 'Idle']) {
-      expect(text()).toContain(`0\n${label}`);
-    }
+    // The zero state is the shared empty state: a title and one hint, so the
+    // card does not read as a blank frame with a lone line in it.
     expect(text()).toContain(i18n.t('home.noLiveSessions'));
-    // Nothing to open: the newest block is not a button, but every status row
-    // keeps its control so a zero count still opens the filtered list.
-    expect(newestButton().props.accessibilityRole).toBeUndefined();
-    for (const kind of STATUS_KINDS) {
-      expect(statusButton(kind).props.accessibilityRole).toBe('button');
+    expect(text()).toContain(i18n.t('agents.sessionList.noSessionsYetDescription'));
+    expect(nodes('EmptyState')).toHaveLength(1);
+    // The count rows' labels are the only place the card names the four
+    // states, so their absence proves the card dropped the zero counts.
+    for (const label of ['Needs input', 'Working', 'Scheduled', 'Idle']) {
+      expect(text()).not.toContain(label);
     }
+    // Nothing to open: the newest block is not a button.
+    expect(
+      nodes('Pressable').some(pressable => pressable.props.accessibilityRole === 'button')
+    ).toBe(false);
     // The header keeps See all's box but hides it.
     expect(node('SectionHeader').props.label).toBe(i18n.t('home.agentSessions'));
     expect(node('SectionHeader').props.actionHidden).toBe(true);
+  });
+
+  it('leaves the live card without a single pressable while the briefing holds the frame', async () => {
+    await render({ ...settled, activeSessions: [session('live-1', 'running')] });
+    expect(typeof newestButton().props.onPress).toBe('function');
+
+    // The briefing layer is drawn; the live card stays mounted underneath only
+    // to reserve the frame's height, so it renders no press target at all: a
+    // mounted Pressable is a touch area even without its onPress.
+    await render({ ...settled, activeSessions: [session('live-1', 'running')] }, context, {
+      visible: true,
+      card: createElement('BriefingCard'),
+    });
+    expect(nodes('Pressable')).toHaveLength(0);
+    expect(text()).toContain('live-1');
+  });
+
+  it('leaves no button behind when the card settles into the zero state', async () => {
+    await render({ ...settled, activeSessions: [session('live-1', 'running')] });
+    const live = newestButton();
+    expect(live.props.accessibilityLabel).toContain('live-1');
+
+    await render();
+    // The zero state draws no press target at all, so the Android view that
+    // announced the previous session and its button role has nothing to reuse.
+    expect(nodes('Pressable')).toHaveLength(0);
+    expect(nodes('EmptyState')).toHaveLength(1);
+
+    // Returning to a session mounts a labelled control again.
+    await render({ ...settled, activeSessions: [session('live-2', 'busy')] });
+    const revived = newestButton();
+    expect(revived).not.toBe(live);
+    expect(revived.props.accessibilityLabel).toContain('live-2');
   });
 
   it('moves the offline notice into the header and keeps the card in place', async () => {
@@ -370,5 +420,92 @@ describe('Home live section', () => {
         candidate.children.includes('No internet connection')
       )
     ).not.toHaveLength(0);
+  });
+});
+
+describe('Home live section status box', () => {
+  // Home reports the live facts in the section header, so the feedback column
+  // must add no box of its own: the card column's `gap-2` would then place the
+  // card below an invisible child, twice as far from the section label as the
+  // Explore rows are from theirs (home section-label gap).
+  function mountFeedback(
+    sessions: Props['sessions'] = settled,
+    contextOverride: Props['context'] = context
+  ) {
+    act(() => {
+      renderer = TestRenderer.create(
+        createElement(LiveSessionFeedback, {
+          context: contextOverride,
+          sessions,
+          failureLabel: "Couldn't load active sessions",
+          inlineNotices: false,
+        })
+      );
+    });
+  }
+
+  it.each([
+    ['the accepted list is empty', settled, context],
+    [
+      'the list is still resolving',
+      { ...settled, hasAcceptedSuccess: false },
+      { ...context, isResolving: true },
+    ],
+    [
+      'rows are shown',
+      {
+        ...settled,
+        activeSessions: [session('a1', 'running', { statusUpdatedAt: new Date().toISOString() })],
+      },
+      context,
+    ],
+  ])('draws no box between the label and the card while %s', (_state, sessions, ctx) => {
+    mountFeedback(sessions, ctx);
+    expect(nodes('View')).toHaveLength(0);
+  });
+
+  it('keeps announcing a pending list without drawing a box', () => {
+    mountFeedback({ ...settled, hasAcceptedSuccess: false }, { ...context, isResolving: true });
+    expect(nodes('AccessibleStatus').map(status => status.props.message)).toContain(
+      i18n.t('common.loading')
+    );
+    expect(nodes('View')).toHaveLength(0);
+  });
+
+  it('draws the column when the failure block owns the surface', () => {
+    mountFeedback(settled, { ...context, isError: true });
+    expect(nodes('View').length).toBeGreaterThan(0);
+    expect(nodes('QueryError')).toHaveLength(1);
+  });
+
+  it('keeps the status announcement mounted when the visible column appears', () => {
+    // Home flips this way while the socket still reports the same connection
+    // state: the load fails and the column is drawn. A remounted announcement
+    // starts its dedupe from nothing and speaks the unchanged message again, so
+    // the node has to survive the flip.
+    connectivity.connected = false;
+    mountFeedback();
+    const before = nodes('AccessibleStatus').find(
+      status => status.props.message === i18n.t('agentChat.sessionConnection.connecting')
+    );
+    expect(before).toBeDefined();
+    expect(nodes('QueryError')).toHaveLength(0);
+
+    act(() => {
+      renderer?.update(
+        createElement(LiveSessionFeedback, {
+          context: { ...context, isError: true },
+          sessions: settled,
+          failureLabel: "Couldn't load active sessions",
+          inlineNotices: false,
+        })
+      );
+    });
+    expect(nodes('QueryError')).toHaveLength(1);
+    const after = nodes('AccessibleStatus').filter(
+      status => status.props.message === i18n.t('agentChat.sessionConnection.connecting')
+    );
+    expect(after).toHaveLength(1);
+    expect(after[0]).toBe(before);
   });
 });

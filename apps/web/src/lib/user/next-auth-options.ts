@@ -5,6 +5,7 @@ import { cookies, headers } from 'next/headers';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import type { CreateOrUpdateUserArgs, CreateOrUpdateUserTrackingContext } from '@/lib/user';
 import { createOrUpdateUser, findAndSyncExistingUser } from '@/lib/user';
+import { readWatchwoodSignupAssessment } from '@/lib/auth/watchwood';
 import type { NextAuthOptions, Account, User as NextUser, Profile } from 'next-auth';
 import NextAuth from 'next-auth';
 import type { GoogleProfile } from 'next-auth/providers/google';
@@ -31,6 +32,7 @@ import {
 import { secondsInDay } from 'date-fns/constants';
 import type { AdapterUser } from 'next-auth/adapters';
 import assert from 'node:assert';
+import { randomBytes } from 'node:crypto';
 import type { User } from '@kilocode/db/schema';
 import type { AuthProviderId } from '@kilocode/db/schema-types';
 import PostHogClient from '@kilocode/web-shared/lib/posthog';
@@ -98,6 +100,7 @@ import { processSSOUserLogin } from '@/lib/user/sso';
 import { getLowerDomainFromEmail } from '@kilocode/web-shared/lib/email-address';
 import { z } from 'zod';
 import {
+  getUserFromSession,
   isBlockedTLD,
   isEmailBlacklistedByDomainAsync,
   sessionAuthOptions,
@@ -110,6 +113,7 @@ export type TurnstileJwtPayload = {
    */
   guid: UUID;
   ip: string;
+  watchwoodIp?: string;
   iat: number;
   exp: number;
 };
@@ -778,6 +782,8 @@ const openAiProvider: OAuthConfig<Profile> & { callbackUrl: string } = {
   profile: parseOpenAiProfile,
 };
 
+const serverSessionCallback = sessionAuthOptions.callbacks?.session;
+
 export const authOptions: NextAuthOptions = {
   ...sessionAuthOptions,
   cookies: {
@@ -833,6 +839,7 @@ export const authOptions: NextAuthOptions = {
     DiscordProvider({
       clientId: DISCORD_OAUTH_CLIENT_ID ?? '',
       clientSecret: DISCORD_OAUTH_CLIENT_SECRET ?? '',
+      issuer: 'https://discord.com',
     }),
     LinkedInProvider({
       clientId: LINKEDIN_CLIENT_ID,
@@ -961,6 +968,29 @@ export const authOptions: NextAuthOptions = {
   ],
   callbacks: {
     ...sessionAuthOptions.callbacks,
+    // `webSessionId` and `webSessionPepper` are server-side bindings for MFA
+    // step-up proofs and session revocation. Server reads use
+    // `sessionAuthOptions` and see them; the browser-facing
+    // `/api/auth/session` response must expose neither.
+    async session({ session, token, user, trigger, newSession }) {
+      if (!serverSessionCallback) return session;
+      const result = await serverSessionCallback({
+        session,
+        token,
+        user,
+        trigger,
+        newSession,
+      });
+      if (result) {
+        const browserSession = result as {
+          webSessionId?: string;
+          webSessionPepper?: string | null;
+        };
+        delete browserSession.webSessionId;
+        delete browserSession.webSessionPepper;
+      }
+      return result;
+    },
     // NOTE(bmc): Errors thrown from this function have their messages sent to the client.
     // Realistically the entire thing should be wrapped in a try/catch and handle errors appropriately.
     // any string returned from here is a redirect URL and returning "true" is considered a successful login.
@@ -1006,6 +1036,30 @@ export const authOptions: NextAuthOptions = {
         linkingSession = await getAccountLinkingSession();
 
         isAccountLinking = linkingSession && linkingSession.targetProvider === accountInfo.provider;
+
+        // Account linking requires the person who started it: the pending link
+        // names a user, and the request must carry that user's web session. A
+        // request whose session does not name the same user is refused with the
+        // ordinary linking failure. The read above consumed the cookie, so a
+        // refusal is final.
+        if (isAccountLinking && linkingSession) {
+          const linkingPrincipal = await getUserFromSession();
+          if (linkingPrincipal?.id !== linkingSession.existingUserId) {
+            warnInSentry('SECURITY: Account link refused: the session does not match the link', {
+              extra: { provider: accountInfo.provider },
+            });
+            // An organization-scoped connect starts on the organization's BYOK
+            // card, which reads `openai_error`; return the refusal there the
+            // same way the shared-services re-check below does.
+            if (account.provider === 'openai' && linkingSession.organizationId) {
+              return openAiChatGptConnectFailureUrl(
+                linkingSession.organizationId,
+                'LINKING-FAILED'
+              );
+            }
+            return redirectUrlForCode('LINKING-FAILED');
+          }
+        }
 
         // The linking session is consumed here, so it carries the organization
         // through to the jwt callback on the profile, the same way `isNewUser`
@@ -1094,6 +1148,7 @@ export const authOptions: NextAuthOptions = {
         }
 
         const requestHeaders = await headers();
+        const watchwood = !isAccountLinking ? await readWatchwoodSignupAssessment() : undefined;
 
         if (accountInfo.provider === 'workos') {
           const { affiliateTrackingId, trackingContext } = !isAccountLinking
@@ -1110,12 +1165,10 @@ export const authOptions: NextAuthOptions = {
             }
           );
 
-          return processSSOUserLogin(
-            accountInfo,
-            requestHeaders,
-            affiliateTrackingId,
-            trackingContext
-          );
+          return processSSOUserLogin(accountInfo, requestHeaders, affiliateTrackingId, {
+            ...trackingContext,
+            watchwood,
+          });
         }
 
         // Validate Turnstile JWT for real OAuth logins (not fake logins or email auth)
@@ -1192,7 +1245,7 @@ export const authOptions: NextAuthOptions = {
                 autoLinkToExistingUser,
                 requestHeaders,
                 affiliateTrackingId,
-                trackingContext
+                { ...trackingContext, watchwood }
               );
 
         if (result.success === false) {
@@ -1305,6 +1358,10 @@ export const authOptions: NextAuthOptions = {
         token.iat = Math.floor(Date.now() / 1000);
         token.isNewUser = (profile as ExtendedProfile)?.isNewUser || false;
         token.webSessionPepper = existingUser.web_session_pepper;
+        // Minted only on sign-in. NextAuth re-encodes the JWT on every session
+        // read (`trigger` absent), and that path returns the token unchanged, so
+        // one browser session keeps one id for its whole life.
+        token.webSessionId = randomBytes(32).toString('base64url');
         token.isAdmin = existingUser.is_admin;
         token.authProvider = accountInfo.provider;
         token.authenticatedAt = token.iat;

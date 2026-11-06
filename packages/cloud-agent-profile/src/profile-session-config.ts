@@ -22,7 +22,7 @@ import {
   getInstructionsForSession,
   type InstructionForSession,
 } from './profile-instructions-service';
-import { resolveProfileLayers } from './profile-resolution';
+import { appliesRepoBindings, resolveProfileLayers } from './profile-resolution';
 import { buildOwnershipCondition } from './profile-utils';
 import { encryptedEnvelopeSchema, type EnvironmentSessionLayer } from './environment-contracts';
 import type { ProfileOwner } from './types';
@@ -104,6 +104,13 @@ export type EnvironmentInlineArgs = Pick<
 export type MergeProfileConfigurationResult = {
   envVars?: Record<string, string>;
   setupCommands?: string[];
+  /** The environment's start commands. Only an environment supplies them. */
+  startCommands?: string[];
+  /**
+   * How many leading `setupCommands` are the environment's own. An environment
+   * snapshot already ran them; the rest are the session's.
+   */
+  environmentSetupCommandCount?: number;
   encryptedSecrets?: Record<string, EncryptedEnvelope>;
   mcpServers?: McpServerForSession[];
   skills?: MergedSkillForSession[];
@@ -352,10 +359,15 @@ export async function mergeProfileConfiguration(
   args: MergeProfileConfigurationArgs
 ): Promise<MergeProfileConfigurationResult> {
   const { profileId, owner, userId, repoFullName, platform } = args;
+  // A V2 environment has no single repository, so the repository binding does
+  // not apply. The implicit default still does.
+  const binds = appliesRepoBindings(args.environment);
 
   // Look up the inputs to resolution.
   const repoBindingProfileId =
-    repoFullName && platform ? await getBindingForRepo(db, owner, repoFullName, platform) : null;
+    binds && repoFullName && platform
+      ? await getBindingForRepo(db, owner, repoFullName, platform)
+      : null;
 
   let explicitOverrideProfileId: string | null = null;
   if (profileId) {
@@ -365,6 +377,7 @@ export async function mergeProfileConfiguration(
 
   // Default fills the top slot when no explicit pick is made — even if a
   // repo binding is also present, in which case the default layers on top.
+  // The environment version does not affect the default.
   const effectiveDefaultProfileId = explicitOverrideProfileId
     ? null
     : owner.type === 'organization' && userId
@@ -439,8 +452,13 @@ export async function mergeProfileConfiguration(
   // the (identical) base id as the active profile.
   const resolvedProfileId = top?.profileId ?? base?.profileId ?? null;
 
+  const startCommands = args.environment?.startCommands ?? [];
+  const environmentSetupCommandCount =
+    args.environment === undefined ? undefined : (args.environment.setupCommands?.length ?? 0);
   return {
     ...mergeLayers(layers),
+    ...(startCommands.length > 0 ? { startCommands: [...startCommands] } : {}),
+    ...(environmentSetupCommandCount === undefined ? {} : { environmentSetupCommandCount }),
     ...(resolvedProfileId ? { resolvedProfileId } : {}),
   };
 }

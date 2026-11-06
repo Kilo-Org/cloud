@@ -8,7 +8,7 @@
  * every profile surface shares.
  */
 
-type ProfileSectionKey = 'organization' | 'personal';
+export type ProfileSectionKey = 'organization' | 'personal';
 
 export type ProfileDefaultSource = {
   id: string;

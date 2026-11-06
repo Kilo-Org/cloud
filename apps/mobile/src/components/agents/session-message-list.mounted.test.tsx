@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { SessionMessageList } from './session-message-list';
 import { getSessionTranscriptItemKey, type SessionTranscriptItem } from './session-transcript';
+import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
 import { MAX_RESUME_OLDER_LOADS } from '@/lib/session-resume';
 import { stubTextPart, stubUserMessage } from '@kilocode/cloud-agent-sdk/test-helpers';
 
@@ -51,6 +52,9 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 }));
 vi.mock('@/components/agents/session-pagination-header', () => ({
   SessionPaginationHeader: () => null,
+}));
+vi.mock('@/components/agents/session-detail-skeleton', () => ({
+  SessionSkeletonMessages: 'SessionSkeletonMessages',
 }));
 
 const baseProps = {
@@ -163,6 +167,120 @@ describe('SessionMessageList', () => {
   });
 });
 
+describe('SessionMessageList open settle', () => {
+  function skeletonCount(renderer: TestRenderer.ReactTestRenderer): number {
+    return renderer.root.findAll(node => Object.is(node.type, 'SessionSkeletonMessages')).length;
+  }
+
+  function fireContentSize(height: number): void {
+    const handler = flashListProps.current?.onContentSizeChange as
+      | ((width: number, height: number) => void)
+      | undefined;
+    act(() => {
+      handler?.(400, height);
+    });
+  }
+
+  function fireLayout(height: number): void {
+    const handler = flashListProps.current?.onLayout as
+      | ((event: { nativeEvent: { layout: { height: number } } }) => void)
+      | undefined;
+    act(() => {
+      handler?.({ nativeEvent: { layout: { height } } });
+    });
+  }
+
+  it('keeps the loading skeleton over the rows until they stop measuring', () => {
+    vi.useFakeTimers();
+    const renderer = mountList({ items: ['m1', 'm2', 'm3'] });
+    expect(skeletonCount(renderer)).toBe(1);
+
+    // Content taller than the viewport: the list still has to settle.
+    fireLayout(655);
+    fireContentSize(790);
+    expect(skeletonCount(renderer)).toBe(1);
+
+    act(() => {
+      vi.advanceTimersByTime(150);
+    });
+    expect(skeletonCount(renderer)).toBe(0);
+  });
+
+  it('reveals a short transcript after the quiet window, not on its first height', () => {
+    vi.useFakeTimers();
+    const renderer = mountList();
+    fireLayout(655);
+    fireContentSize(500);
+
+    // A height that fits may still be a measurement in progress.
+    expect(skeletonCount(renderer)).toBe(1);
+    act(() => {
+      vi.advanceTimersByTime(150);
+    });
+    expect(skeletonCount(renderer)).toBe(0);
+  });
+
+  it('does not reveal before the list has measured anything', () => {
+    vi.useFakeTimers();
+    const renderer = mountList({ items: ['m1', 'm2', 'm3'] });
+
+    // A slow first measurement must not let the quiet window run out first.
+    act(() => {
+      vi.advanceTimersByTime(400);
+    });
+    expect(skeletonCount(renderer)).toBe(1);
+
+    fireLayout(655);
+    fireContentSize(790);
+    act(() => {
+      vi.advanceTimersByTime(150);
+    });
+    expect(skeletonCount(renderer)).toBe(0);
+  });
+
+  it('settles again for a session the mounted list switches to', () => {
+    vi.useFakeTimers();
+    const renderer = mountList({ items: ['m1', 'm2', 'm3'] });
+    fireLayout(655);
+    fireContentSize(790);
+    act(() => {
+      vi.advanceTimersByTime(150);
+    });
+    expect(skeletonCount(renderer)).toBe(0);
+
+    // The Chat tab follows a conversation that moved onto a new session: the
+    // same list now paints different rows, without a new layout (the frame did
+    // not change), so only the content size arrives.
+    rerenderList(renderer, { sessionId: 'session-2', items: ['n1', 'n2', 'n3'] });
+    expect(skeletonCount(renderer)).toBe(1);
+
+    fireContentSize(810);
+    act(() => {
+      vi.advanceTimersByTime(150);
+    });
+    expect(skeletonCount(renderer)).toBe(0);
+  });
+
+  it('reveals the rows even if the content never stops measuring', () => {
+    vi.useFakeTimers();
+    const renderer = mountList({ items: ['m1', 'm2', 'm3'] });
+    fireLayout(655);
+
+    for (let elapsed = 0; elapsed < 1400; elapsed += 100) {
+      fireContentSize(800 + elapsed);
+      act(() => {
+        vi.advanceTimersByTime(100);
+      });
+    }
+    expect(skeletonCount(renderer)).toBe(1);
+
+    act(() => {
+      vi.advanceTimersByTime(200);
+    });
+    expect(skeletonCount(renderer)).toBe(0);
+  });
+});
+
 describe('SessionMessageList older-page auto-scroll', () => {
   it('does not yank the viewport when an older page is prepended', () => {
     const renderer = mountList({ items: ['m1', 'm2'], hasOlderMessages: true });
@@ -216,6 +334,27 @@ describe('SessionMessageList pagination header', () => {
   });
 });
 
+describe('SessionMessageList scroll-to-bottom control', () => {
+  it('carries the full touch target on its own pressable node', () => {
+    const renderer = mountList();
+    scrollAwayFromBottom();
+
+    // A control-size audit reads the pressable's own rect, and `hitSlop` does
+    // not move it, so the target has to be the class. The shared 48pt box is
+    // the Android minimum and clears the 44pt design target on iOS.
+    const button = renderer.root.find(node => Object.is(node.type, 'Pressable'));
+    expect(String(button.props.className)).toContain(ICON_TARGET_BOX_CLASS);
+    expect(button.props.hitSlop).toBeUndefined();
+
+    // The visible circle stays compact inside the enlarged target. Its explicit
+    // px keep NativeWind's 14pt rem from shrinking it back below the look it
+    // shipped with (`h-10` renders at 35pt).
+    const circle = button.find(node => Object.is(node.type, 'View'));
+    expect(String(circle.props.className)).toContain('h-[35px] w-[35px]');
+    expect(String(circle.props.className)).toContain('rounded-full');
+  });
+});
+
 describe('SessionMessageList landscape side insets', () => {
   it('keeps the module style reference and a 16pt control offset in portrait', () => {
     const renderer = mountList();
@@ -249,6 +388,9 @@ describe('SessionMessageList landscape side insets', () => {
       paddingRight: 59,
     });
     expect(scrollButton(renderer).props.style).toEqual({ right: 75 });
+    // The control box grows inward from that offset, so only the wrapper's own
+    // style decides its distance from the screen edge: the raised end inset
+    // still clears the 48pt box.
   });
 
   it('carries the side paddings when a content bottom inset is provided', () => {

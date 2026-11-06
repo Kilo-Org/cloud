@@ -7,6 +7,7 @@ import {
 
 export default {
   id: 'alibaba-token-plan',
+  openrouter_inference_provider_id: 'alibaba',
   models_dev_id: 'alibaba-token-plan',
   ...apiKeyUpstream({
     apiUrl: 'https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1',

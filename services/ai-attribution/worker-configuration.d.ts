@@ -13,6 +13,7 @@ declare namespace Cloudflare {
     >;
     NEXTAUTH_SECRET: SecretsStoreSecret;
     ADMIN_SECRET: SecretsStoreSecret;
+    HYPERDRIVE: Hyperdrive;
     ATTRIBUTION_TRACK_ORG_RATE_LIMITER: RateLimit;
     ATTRIBUTION_TRACK_USER_RATE_LIMITER: RateLimit;
   }

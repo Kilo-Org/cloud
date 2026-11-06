@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 
 import {
   countGlanceableSessions,
@@ -9,55 +9,51 @@ import {
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
 import {
-  STATUS_FILTER_ORDER,
-  statusFilterLabelKey,
-} from '@/components/agents/live-session-status-filter';
-import {
   namedSessionTitle,
   useUserSessionTitlesRevision,
 } from '@/components/agents/session-detail-rename-state';
 import { formatScheduledWake } from '@/components/agents/session-list-helpers';
+import { EmptyState } from '@/components/empty-state';
+import { CardControl } from '@/components/home/adaptive-home-card-frame';
+import { Bot } from '@/components/ui/icons';
 import { SessionStatusIcon } from '@/components/ui/session-status-icon';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { COMPACT_H11_HIT_SLOP_DP } from '@/lib/a11y/tap-target';
 import { pickNewestSession } from '@/lib/glanceable/newest-session';
 import { type ActiveSession } from '@/lib/hooks/use-agent-sessions';
 import { useNowTicker } from '@/lib/hooks/use-now-ticker';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
 
-/** Test id for the selectable row of one status kind. */
-export function statusRowTestId(kind: GlanceableStatusKind): string {
-  return `live-card-status-${kind}`;
-}
+/**
+ * The four ranked state counts, in the order every glanceable surface draws
+ * them: what the user must act on, then what is making progress, then what will
+ * wake later, then what is only connected. Zero rows still draw, so every
+ * state remains visible even when no session currently occupies it.
+ */
+const COUNT_LINES: readonly { kind: GlanceableStatusKind; labelKey: string }[] = [
+  { kind: 'needsInput', labelKey: 'glanceable.needsInput' },
+  { kind: 'running', labelKey: 'common.working' },
+  { kind: 'scheduled', labelKey: 'common.scheduled' },
+  { kind: 'idle', labelKey: 'common.idle' },
+];
 
 /** Shared minimum frame; text determines the loaded card's height. */
 const CARD_CLASS = 'overflow-hidden rounded-2xl border border-border bg-card';
 const COUNTS_CLASS = 'gap-2 px-4 py-3';
-// The row is a control, so its own 38.5pt frame clears the control-size audit's
-// floor and the per-side slop carries the touch region to 44pt (see
-// `@/lib/a11y/tap-target`). The counts' `gap-2` is 7pt, more than twice the
-// 3pt slop, so two facing rows' regions never overlap.
-const COUNT_ROW_CLASS = 'min-h-11 flex-row items-center gap-2';
-const COUNT_ROW_HIT_SLOP = {
-  top: COMPACT_H11_HIT_SLOP_DP,
-  bottom: COMPACT_H11_HIT_SLOP_DP,
-  left: 0,
-  right: 0,
-};
+const COUNT_ROW_CLASS = 'min-h-6 flex-row items-center gap-2';
 const DIVIDER_CLASS = 'h-px bg-border';
 const NEWEST_BLOCK_CLASS = 'min-h-[68px] justify-center gap-1 px-4 py-3';
 const NEWEST_ROW_CLASS = 'min-h-5 flex-row items-center gap-2';
 
+function labelKeyFor(kind: GlanceableStatusKind): string {
+  return COUNT_LINES.find(line => line.kind === kind)?.labelKey ?? 'common.working';
+}
+
 type GlanceableActiveCardProps = {
   sessions: readonly ActiveSession[];
   onPressSession: (session: ActiveSession) => void;
-  /**
-   * Open the Agents list filtered to one status kind. Every count row calls
-   * this, including a zero row, so the row is always a control and the user
-   * gets the same empty-list explanation instead of a dead row.
-   */
-  onPressStatus: (kind: GlanceableStatusKind) => void;
+  /** Opens the live index narrowed to one state. Rows stay inert without it. */
+  onPressStatus?: (kind: GlanceableStatusKind) => void;
   embedded?: boolean;
 };
 
@@ -65,10 +61,10 @@ type GlanceableActiveCardProps = {
  * The Home `Live now` card, composed from the native glanceable's vocabulary:
  * the four ranked state counts with the shared state dots, the soonest
  * scheduled wake beside its count, and the newest session with its state and
- * relative age. Tapping a count row opens the Agents list filtered to that
- * status; tapping the newest session opens it; `See all` in the section header
- * opens the live index. With no sessions it is the zero state: every count
- * reads 0 and the newest block centers `Nothing running`.
+ * relative age. Tapping the newest session opens it; `See all` in the section
+ * header opens the live index. With no sessions it is the zero state, and four
+ * zero counts would only restate its one message: the counters are left out and
+ * the empty message takes the card's body.
  */
 export function GlanceableActiveCard({
   sessions,
@@ -84,7 +80,7 @@ export function GlanceableActiveCard({
   // cold start; subscribing re-renders the block once it lands.
   useUserSessionTitlesRevision();
   const counts = countGlanceableSessions(sessions);
-  const primaryKind = STATUS_FILTER_ORDER.find(line => counts[line.kind] > 0)?.kind ?? null;
+  const primaryKind = COUNT_LINES.find(line => counts[line.kind] > 0)?.kind ?? null;
   const scheduledAt = soonestScheduledAt(sessions);
   const scheduledWake = scheduledAt === null ? null : formatScheduledWake(scheduledAt);
   // The widgets name the same session (`pickNewestSession`), and any live
@@ -98,81 +94,111 @@ export function GlanceableActiveCard({
       ? null
       : (namedSessionTitle(newestSession.title, newestSession.id) ??
         t('agents.sessionRow.untitled'));
-  const stateLabel = newestKind === null ? null : t(statusFilterLabelKey(newestKind));
+  const stateLabel = newestKind === null ? null : t(labelKeyFor(newestKind));
   const newestAt = newest?.at ?? null;
   const newestAge = newestAt === null ? null : timeAgo(parseTimestamp(newestAt), undefined, now);
   const newestLabel = [newestTitle, stateLabel, newestAge].filter(Boolean).join(', ');
+  const empty = newestSession === null;
 
   return (
-    <View className={cn(CARD_CLASS, embedded && 'rounded-none border-0 bg-transparent')}>
-      <View className={COUNTS_CLASS}>
-        {STATUS_FILTER_ORDER.map(line => {
-          const isPrimary = line.kind === primaryKind;
-          const label = t(line.labelKey);
-          return (
-            <Pressable
-              key={line.kind}
-              onPress={() => {
-                onPressStatus(line.kind);
-              }}
-              accessibilityRole="button"
-              // The row's own count and status texts are its spoken name, so a
-              // screen reader reads "13 Idle" and no separate label is needed.
-              hitSlop={COUNT_ROW_HIT_SLOP}
-              testID={statusRowTestId(line.kind)}
-              className={cn(COUNT_ROW_CLASS, 'active:opacity-70')}
-            >
-              <SessionStatusIcon kind={line.kind} />
-              <Text className="text-sm font-semibold text-foreground">{counts[line.kind]}</Text>
-              <View className="min-w-0 flex-1 flex-row flex-wrap items-center gap-x-2 gap-y-1">
-                <Text
-                  className={cn(
-                    'shrink text-sm',
-                    isPrimary ? 'text-foreground' : 'text-muted-foreground'
-                  )}
+    <View
+      className={cn(
+        CARD_CLASS,
+        embedded && 'rounded-none border-0 bg-transparent',
+        // The frame reserves the counts card's height, so the zero state fills
+        // that height with its one message instead of leaving a band below it.
+        empty && 'flex-1'
+      )}
+    >
+      {empty ? null : (
+        <>
+          <View className={COUNTS_CLASS}>
+            {COUNT_LINES.map(line => {
+              const isPrimary = line.kind === primaryKind;
+              // The row keeps its drawn height so the frame's sizing probe
+              // still matches; the touch target grows through hitSlop. Rows
+              // render through CardControl so the reserved layer stays inert.
+              return (
+                <CardControl
+                  key={line.kind}
+                  onPress={
+                    onPressStatus === undefined
+                      ? undefined
+                      : () => {
+                          onPressStatus(line.kind);
+                        }
+                  }
+                  accessibilityRole={onPressStatus === undefined ? undefined : 'button'}
+                  accessibilityLabel={`${counts[line.kind]} ${t(line.labelKey)}`}
+                  testID={`home-status-${line.kind}`}
+                  hitSlop={onPressStatus === undefined ? undefined : 8}
+                  className={COUNT_ROW_CLASS}
                 >
-                  {label}
-                </Text>
-                {line.kind === 'scheduled' && scheduledWake !== null ? (
-                  <Text className="max-w-full text-xs text-muted-foreground">{scheduledWake}</Text>
+                  <SessionStatusIcon kind={line.kind} />
+                  <Text className="text-sm font-semibold text-foreground">{counts[line.kind]}</Text>
+                  <View className="min-w-0 flex-1 flex-row flex-wrap items-center gap-x-2 gap-y-1">
+                    <Text
+                      className={cn(
+                        'shrink text-sm',
+                        isPrimary ? 'text-foreground' : 'text-muted-foreground'
+                      )}
+                    >
+                      {t(line.labelKey)}
+                    </Text>
+                    {line.kind === 'scheduled' && scheduledWake !== null ? (
+                      <Text className="max-w-full text-xs text-muted-foreground">
+                        {scheduledWake}
+                      </Text>
+                    ) : null}
+                  </View>
+                </CardControl>
+              );
+            })}
+          </View>
+          <View className={DIVIDER_CLASS} />
+        </>
+      )}
+      {/* Keyed by the newest session: the zero state has to be its own host
+          view. React Native copies the previous props and applies only the keys
+          it receives, so a label this component stops passing keeps its old
+          value on the native view, and Android keeps announcing the previous
+          account's session from the reused node. A new node per session and
+          per zero state is the same remedy the PR-review inbox slot uses. */}
+      {newestSession !== null && newestTitle !== null && newestKind !== null ? (
+        <CardControl
+          key={newestSession.id}
+          onPress={() => {
+            onPressSession(newestSession);
+          }}
+          accessibilityRole="button"
+          accessibilityLabel={newestLabel}
+        >
+          <View className={NEWEST_BLOCK_CLASS}>
+            <Text className="text-sm text-foreground">{newestTitle}</Text>
+            <View className={NEWEST_ROW_CLASS}>
+              <SessionStatusIcon kind={newestKind} />
+              <View className="min-w-0 flex-1 flex-row flex-wrap items-center justify-between gap-x-2 gap-y-1">
+                <Text className="max-w-full text-sm text-muted-foreground">{stateLabel}</Text>
+                {newestAge !== null ? (
+                  <Text className="max-w-full text-xs text-muted-foreground">{newestAge}</Text>
                 ) : null}
               </View>
-            </Pressable>
-          );
-        })}
-      </View>
-      <View className={DIVIDER_CLASS} />
-      <Pressable
-        disabled={newestSession === null}
-        onPress={() => {
-          if (newestSession !== null) {
-            onPressSession(newestSession);
-          }
-        }}
-        accessibilityRole={newestSession === null ? undefined : 'button'}
-        accessibilityLabel={newestSession === null ? undefined : newestLabel}
-        testID="live-card-newest"
-        className="active:opacity-70"
-      >
-        <View className={cn(NEWEST_BLOCK_CLASS, newestSession === null && 'items-center')}>
-          {newestTitle !== null && newestKind !== null ? (
-            <>
-              <Text className="text-sm text-foreground">{newestTitle}</Text>
-              <View className={NEWEST_ROW_CLASS}>
-                <SessionStatusIcon kind={newestKind} />
-                <View className="min-w-0 flex-1 flex-row flex-wrap items-center justify-between gap-x-2 gap-y-1">
-                  <Text className="max-w-full text-sm text-muted-foreground">{stateLabel}</Text>
-                  {newestAge !== null ? (
-                    <Text className="max-w-full text-xs text-muted-foreground">{newestAge}</Text>
-                  ) : null}
-                </View>
-              </View>
-            </>
-          ) : (
-            <Text className="text-sm text-muted-foreground">{t('home.noLiveSessions')}</Text>
-          )}
+            </View>
+          </View>
+        </CardControl>
+      ) : (
+        <View key="no-session" className="flex-1 justify-center">
+          {/* The card keeps its reserved frame with nothing live, so the zero
+              state fills that frame with the shared empty state's icon, title
+              and one-line hint instead of a lone line in a blank card. */}
+          <EmptyState
+            placement="static"
+            icon={Bot}
+            title={t('home.noLiveSessions')}
+            description={t('agents.sessionList.noSessionsYetDescription')}
+          />
         </View>
-      </Pressable>
+      )}
     </View>
   );
 }
@@ -188,7 +214,7 @@ export function GlanceableActiveCardSkeleton({
       importantForAccessibility="no-hide-descendants"
     >
       <View className={COUNTS_CLASS}>
-        {STATUS_FILTER_ORDER.map(line => (
+        {COUNT_LINES.map(line => (
           <View key={line.kind} className={COUNT_ROW_CLASS}>
             <Skeleton className="size-3 rounded-full" />
             <Skeleton className="h-3 w-6 rounded" />

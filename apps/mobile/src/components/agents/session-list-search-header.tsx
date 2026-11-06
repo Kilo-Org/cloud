@@ -64,9 +64,16 @@ export function SessionListSearchHeader({
       <View
         style={inline ? undefined : fieldMargins}
         className={cn(
-          'flex-row items-center gap-2 rounded-[10px] border border-border',
+          // Dark keeps the same two-part definition the light cell gets from its
+          // near-white page: an elevated fill (the compact/inline field carries
+          // none in light) and the input border token every other text field in
+          // the app uses, because `--border` is 7% white and disappears on the
+          // dark page.
+          'flex-row items-center gap-2 rounded-[10px] border border-border dark:border-input',
           !inline && 'my-2',
-          compact ? 'min-h-[44px] px-2' : 'min-h-[51px] bg-card px-4 py-1.5'
+          compact
+            ? 'min-h-[44px] px-2 dark:bg-secondary'
+            : 'min-h-[51px] bg-card px-4 py-1.5 dark:bg-secondary'
         )}
       >
         {/* Fixed-size slot: the spinner swaps in for the icon, so the row never reflows. */}

@@ -31,7 +31,10 @@ vi.mock('react-native-safe-area-context', () => ({
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/centered-state-surface', () => ({ StateSurface: 'StateSurface' }));
 const cachedUri = vi.hoisted(() => ({ value: undefined as string | undefined }));
-vi.mock('./tool-card-image-cache', () => ({ useToolCardImageUri: () => cachedUri.value }));
+vi.mock('./tool-card-image-cache', () => ({
+  isToolCardImagePending: () => false,
+  useToolCardImageUri: () => cachedUri.value,
+}));
 vi.mock('@/components/sheet-header', () => ({
   SheetHeader: 'SheetHeader',
 }));

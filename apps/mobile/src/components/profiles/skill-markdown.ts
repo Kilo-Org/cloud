@@ -12,6 +12,7 @@ import { type SkillInputError } from '@/lib/agent-profile-forms';
 /** The `profiles.*` copy key for each `validateSkillInput` error code. */
 const SKILL_ERROR_KEYS = {
   empty: 'profiles.skillNameRequired',
+  'too-long': 'profiles.skillNameTooLong',
   'bad-name': 'profiles.skillNameInvalid',
   'no-content': 'profiles.skillContentRequired',
 } satisfies Record<SkillInputError, string>;

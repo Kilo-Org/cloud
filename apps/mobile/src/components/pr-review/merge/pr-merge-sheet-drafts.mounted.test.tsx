@@ -106,6 +106,9 @@ describe('PrMergeSheet durable drafts', () => {
     expect(hosts(renderer, 'TextInput')).toHaveLength(0);
     expect(hosts(renderer, 'Button')).toHaveLength(0);
     expect(state.getItem).not.toHaveBeenCalled();
+    // The sheet body is never empty: a placeholder holds the form's rows until
+    // the account's draft is known, so the sheet does not present blank.
+    expect(hosts(renderer, 'Skeleton').length).toBeGreaterThan(0);
 
     const read = deferred<string | null>();
     state.getItem.mockReturnValueOnce(read.promise);
@@ -113,10 +116,12 @@ describe('PrMergeSheet durable drafts', () => {
     await update(renderer);
     expect(hosts(renderer, 'TextInput')).toHaveLength(0);
     expect(hosts(renderer, 'Button')).toHaveLength(0);
+    expect(hosts(renderer, 'Skeleton').length).toBeGreaterThan(0);
     await act(() => {
       read.resolve(JSON.stringify({ title: 'Loaded title', message: 'Loaded message' }));
     });
     expect(input(renderer, 'Commit title').props.defaultValue).toBe('Loaded title');
+    expect(hosts(renderer, 'Skeleton')).toHaveLength(0);
   });
 
   it('ignores an obsolete account load and saves only the current account values', async () => {

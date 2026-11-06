@@ -43,22 +43,19 @@ export const SECURITY_ANALYSIS_OWNER_CAP = 3;
 
 const SecurityAgentConfigPartialSchema = SecurityAgentConfigSchema.partial().passthrough();
 
-/** Parse a raw (possibly partial) config into a full SecurityAgentConfig. */
+/**
+ * Parse a raw (possibly partial) config into a full SecurityAgentConfig.
+ *
+ * Every model role is independent: a stored `remediation_model_slug` wins, and
+ * without one the role keeps `DEFAULT_SECURITY_AGENT_REMEDIATION_MODEL` from
+ * `DEFAULT_SECURITY_AGENT_CONFIG`. It never follows the analysis model.
+ */
 export function parseSecurityAgentConfig(rawConfig: unknown): SecurityAgentConfig {
   const partial = SecurityAgentConfigPartialSchema.parse(rawConfig ?? {});
-  const parsed = SecurityAgentConfigSchema.parse({
+  return SecurityAgentConfigSchema.parse({
     ...DEFAULT_SECURITY_AGENT_CONFIG,
     ...partial,
   });
-  return {
-    ...parsed,
-    remediation_model_slug:
-      partial.remediation_model_slug ??
-      parsed.remediation_model_slug ??
-      parsed.analysis_model_slug ??
-      parsed.model_slug ??
-      DEFAULT_SECURITY_AGENT_REMEDIATION_MODEL,
-  };
 }
 
 export function mergeSecurityAgentConfigPatch(

@@ -6,8 +6,8 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 // Dependency-contract guard for the repository release-age policy in
-// pnpm-workspace.yaml. The global minimumReleaseAge gate must stay intact, the
-// container-runtime exemptions must each name one exact package@version (a
+// pnpm-workspace.yaml. The global minimumReleaseAge gate must stay intact, every
+// exemption added for a pinned version must name one exact package@version (a
 // name-only or wildcard entry would un-gate every future release), and every
 // pre-existing base exclusion must survive unchanged.
 const EXPECTED_MINIMUM_RELEASE_AGE_MINUTES = 6842;
@@ -33,23 +33,6 @@ const BASE_EXCLUDE_ENTRIES = [
   '@anthropic-ai/sdk',
   '@kilocode/sdk',
   'openclaw',
-] as const;
-
-const CLOUDFLARE_SANDBOX_EXACT_EXCLUDE_ENTRIES = ['@cloudflare/sandbox@0.12.12'] as const;
-
-// The DO-managed Cloudflare containers runtime needs wrangler 4.134.0+, and
-// 4.135.0 exact-pins its own workerd/miniflare runtime, so each is exempted by
-// exact version. Approved early-access exception; remove this group when 4.135.0
-// matures.
-const CLOUDFLARE_CONTAINER_RUNTIME_EXACT_EXCLUDE_ENTRIES = [
-  'wrangler@4.135.0',
-  'workerd@1.20260918.1',
-  'miniflare@5.20260918.0-alpha',
-  '@cloudflare/workerd-darwin-64@1.20260918.1',
-  '@cloudflare/workerd-darwin-arm64@1.20260918.1',
-  '@cloudflare/workerd-linux-64@1.20260918.1',
-  '@cloudflare/workerd-linux-arm64@1.20260918.1',
-  '@cloudflare/workerd-windows-64@1.20260918.1',
 ] as const;
 
 // Two mobile pins must move without waiting out the gate: FlashList 2.3.3
@@ -108,12 +91,9 @@ describe('minimum release age policy contract', () => {
     expect(Number(match?.[1])).toBe(EXPECTED_MINIMUM_RELEASE_AGE_MINUTES);
   });
 
-  it('excludes exactly the base list plus the container-runtime, mobile and Bun-types exact versions', () => {
+  it('excludes exactly the base list plus the mobile and Bun-types exact versions', () => {
     const expected = [
-      BASE_EXCLUDE_ENTRIES[0],
-      ...CLOUDFLARE_SANDBOX_EXACT_EXCLUDE_ENTRIES,
-      ...CLOUDFLARE_CONTAINER_RUNTIME_EXACT_EXCLUDE_ENTRIES,
-      ...BASE_EXCLUDE_ENTRIES.slice(1),
+      ...BASE_EXCLUDE_ENTRIES,
       ...MOBILE_EXACT_EXCLUDE_ENTRIES,
       ...BUN_TYPES_EXACT_EXCLUDE_ENTRIES,
     ];
@@ -122,8 +102,6 @@ describe('minimum release age policy contract', () => {
 
   it('scopes every new exclusion to one exact package@version', () => {
     expect(newExclusions).toEqual([
-      ...CLOUDFLARE_SANDBOX_EXACT_EXCLUDE_ENTRIES,
-      ...CLOUDFLARE_CONTAINER_RUNTIME_EXACT_EXCLUDE_ENTRIES,
       ...MOBILE_EXACT_EXCLUDE_ENTRIES,
       ...BUN_TYPES_EXACT_EXCLUDE_ENTRIES,
     ]);

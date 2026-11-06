@@ -16,6 +16,8 @@ export const REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY = {
   // The provider detail stays in the log drain: a forwarded API sentence is not
   // stable enough to match, and it is not the user's to read.
   change_request_failed: 'Kilo could not open the REVIEW.md pull request. Try again in a moment.',
+  // One active proposal per owner and repository; a second one cannot be saved.
+  proposal_conflict: 'Another review memory proposal is already active for this repository.',
   review_memory_disabled: 'Review memory is disabled for this platform.',
 } as const;
 

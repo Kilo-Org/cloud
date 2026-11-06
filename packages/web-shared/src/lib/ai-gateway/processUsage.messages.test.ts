@@ -10,6 +10,7 @@ import { join } from 'node:path';
 import { createReadStream } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { Readable } from 'node:stream';
+import { createVercelProviderMetadataCollector } from '@kilocode/web-shared/lib/r2/vercel-provider-metadata';
 
 jest.mock('@sentry/nextjs', () => ({
   ...jest.requireActual<object>('@sentry/nextjs'),
@@ -309,6 +310,58 @@ describe('parseMessagesMicrodollarUsageFromStream approval tests', () => {
 });
 
 describe('parseMessagesMicrodollarUsageFromStream', () => {
+  test('releases metadata capture on [DONE] without waiting for the connection to close', async () => {
+    const collector = createVercelProviderMetadataCollector();
+    const { readable, writable } = new TransformStream<Uint8Array, Uint8Array>();
+    const writer = writable.getWriter();
+    const metadata = { gateway: { generationId: 'gen_messages', marketCost: '0.12' } };
+    let parsed = false;
+    const parsing = parseMessagesMicrodollarUsageFromStream(
+      readable,
+      'fake-user-id',
+      undefined,
+      'vercel',
+      200,
+      false,
+      undefined,
+      {
+        captureRoutingDecision: jest.fn(),
+        captureVercelMetadata: value => collector.capture(value, 'messages'),
+        captureEnkryptReport: jest.fn(),
+        captureEnkryptOutputReport: jest.fn(),
+        waitFor: jest.fn(),
+      }
+    ).then(result => {
+      parsed = true;
+      return result;
+    });
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await writer.write(
+        new TextEncoder().encode(
+          `data: ${JSON.stringify({ type: 'message_start', message: { id: 'msg_1', model: 'model', usage: { input_tokens: 3, output_tokens: 1 }, provider_metadata: metadata } })}\n\ndata: [DONE]\n\n`
+        )
+      );
+      await Promise.race([
+        collector.completed,
+        new Promise<never>((_resolve, reject) => {
+          timeout = setTimeout(() => reject(new Error('Metadata capture waited for EOF')), 1000);
+        }),
+      ]);
+      expect(collector.snapshot()).toEqual(metadata);
+      expect(parsed).toBe(false);
+    } finally {
+      clearTimeout(timeout);
+      await writer.close();
+    }
+    expect(await parsing).toMatchObject({
+      cost_mUsd: 120_000,
+      inputTokens: 3,
+      outputTokens: 1,
+      hasError: false,
+    });
+  });
+
   test.each([false, true])(
     'retains Vercel start-frame cost and routing metadata with a final delta=%s',
     async hasDelta => {
@@ -392,7 +445,7 @@ describe('parseMessagesMicrodollarUsageFromStream', () => {
       stream,
       'fake-user-id',
       undefined,
-      'martian',
+      'direct-byok',
       200,
       false
     );
@@ -417,7 +470,7 @@ describe('parseMessagesMicrodollarUsageFromStream', () => {
       stream,
       'fake-user-id',
       undefined,
-      'martian',
+      'direct-byok',
       200,
       false
     );
@@ -442,7 +495,7 @@ describe('parseMessagesMicrodollarUsageFromStream', () => {
       stream,
       'fake-user-id',
       undefined,
-      'martian',
+      'direct-byok',
       200,
       false
     );

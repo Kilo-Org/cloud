@@ -82,10 +82,6 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<AgentSessionListS
   // `SessionStatusFilterBar`, which clears it through `clearStatusFilter`.
   const params = useLocalSearchParams<{ status?: string }>();
   const statusKind = parseStatusFilterKind(params.status);
-  const statusSessions = useMemo(
-    () => filterSessionsByStatusKind(activeSessions, statusKind),
-    [activeSessions, statusKind]
-  );
   // A failed foreground refresh keeps the cached rows on screen. That failure
   // must speak through the reserved status line (one inline "Couldn't refresh"
   // with Retry) instead of the load-failure block, which would push the kept
@@ -191,13 +187,10 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<AgentSessionListS
   const listRef = useRef<FlashListRef<ActiveSession>>(null);
   useScrollToTop(listRef);
 
-  // The tabs navigator uses `freezeOnBlur`, so while the session detail screen
-  // is pushed the live Agents list is frozen. On return, each row re-reads the
-  // ack store via its own `useSyncExternalStore` subscription
-  // (`useSessionAttentionRevision`). Snapshot the attention revision when the
-  // tab (re)gains focus via `useFocusEffect` (fires after unfreeze) and pass
-  // it as `extraData` so visible cells re-render without remounting the list —
-  // preserving scroll.
+  // Each row re-reads the ack store through its own `useSyncExternalStore`
+  // subscription (`useSessionAttentionRevision`). The snapshot taken when the
+  // tab regains focus passes back down as `extraData`, so visible cells
+  // re-render on return without remounting the list — preserving scroll.
   const [attentionFocusRevision, setAttentionFocusRevision] = useState(getRevisionSnapshot);
   useFocusEffect(
     useCallback(() => {
@@ -335,9 +328,15 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<AgentSessionListS
   // else the persisted filters. A status filter always reads as a filter, so
   // the copy and the action agree even when a search is also active.
   const emptyCopyIsSearch = isSearching && statusKind === null;
+  // A status filter can empty a list only together with the persisted filters,
+  // so clear both when both are set; otherwise the action leaves the list empty.
+  const clearStatusAndFilters = useCallback(() => {
+    query.handleClearFilters();
+    clearStatusFilter();
+  }, [query.handleClearFilters, clearStatusFilter]);
   let clearNoMatch = query.handleClearFilters;
   if (statusKind !== null) {
-    clearNoMatch = clearStatusFilter;
+    clearNoMatch = query.activeFilterCount > 0 ? clearStatusAndFilters : clearStatusFilter;
   } else if (isSearching) {
     clearNoMatch = query.handleClearSearch;
   }
@@ -494,7 +493,7 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<AgentSessionListS
         {hasLiveRows && statusKind !== null ? (
           <SessionStatusFilterBar
             kind={statusKind}
-            count={statusSessions.length}
+            count={visibleSessions.length}
             onClear={clearStatusFilter}
           />
         ) : null}

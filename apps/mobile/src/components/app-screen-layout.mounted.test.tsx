@@ -6,6 +6,7 @@ import { expect, it, vi } from 'vitest';
 
 import { appScreenLayout } from '@/components/app-screen-layout';
 import { type ScreenLayoutProps } from '@/components/centered-state-surface';
+import { armLeaveSettle, insideLeaveSettle, resetLeaveSettle } from '@/lib/navigation/leave-settle';
 
 // The gate reads nothing else from React Native, and the mounted project cannot
 // parse the library's Flow-typed source: the wrapper is a plain host element.
@@ -22,17 +23,17 @@ vi.mock('@/components/centered-state-surface', () => ({
   NativeStateSurface: ({ children }: { children: unknown }) => children,
 }));
 
-type FocusListener = () => void;
+type SceneListener = (event?: { data?: { closing: boolean } }) => void;
 
 /** The scene's own navigation object, as the native Stack hands it to a layout. */
 function fakeSceneNavigation(initiallyFocused = true) {
-  const listeners = new Map<string, Set<FocusListener>>();
+  const listeners = new Map<string, Set<SceneListener>>();
   let focused = initiallyFocused;
   return {
     navigation: {
       isFocused: () => focused,
-      addListener: (event: string, listener: FocusListener) => {
-        const set = listeners.get(event) ?? new Set<FocusListener>();
+      addListener: (event: string, listener: SceneListener) => {
+        const set = listeners.get(event) ?? new Set<SceneListener>();
         set.add(listener);
         listeners.set(event, set);
         return () => {
@@ -46,6 +47,13 @@ function fakeSceneNavigation(initiallyFocused = true) {
       focused = next;
       for (const listener of listeners.get(next ? 'focus' : 'blur') ?? []) {
         listener();
+      }
+    },
+    // Drives the native transition's end for this scene, `closing` when it is
+    // this scene that left.
+    finishTransition(closing: boolean) {
+      for (const listener of listeners.get('transitionEnd') ?? []) {
+        listener({ data: { closing } });
       }
     },
     listenerCount: () => [...listeners.values()].reduce((total, set) => total + set.size, 0),
@@ -147,4 +155,27 @@ it('follows the scene navigation it is replaced with instead of the old one', as
 
   view.unmount();
   expect(second.listenerCount()).toBe(0);
+});
+
+it('ends a dismissal’s settle window when this scene finishes appearing', async () => {
+  const { scene, view } = await mountScene(true);
+  armLeaveSettle();
+  expect(insideLeaveSettle()).toBe(true);
+
+  // A scene that appears carries the screen that dismissed itself away, so its
+  // own transition's end is the end of that leave.
+  act(() => {
+    scene.finishTransition(false);
+  });
+  expect(insideLeaveSettle()).toBe(false);
+
+  armLeaveSettle();
+  // A scene that leaves is not the one a dismissal revealed.
+  act(() => {
+    scene.finishTransition(true);
+  });
+  expect(insideLeaveSettle()).toBe(true);
+
+  view.unmount();
+  resetLeaveSettle();
 });

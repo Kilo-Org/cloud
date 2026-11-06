@@ -5,6 +5,7 @@ import { View } from 'react-native';
 import { Text } from '@/components/ui/text';
 import { ChoiceRow } from '@/components/ui/choice-row';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { cn } from '@/lib/utils';
 
 /**
  * Repository checkbox row (lock icon for private repos + full name + check)
@@ -56,7 +57,11 @@ export function RepoToggleRow({
             truncate inside the row so it can never run into the trailing
             checkmark, which the private lock icon shifts toward. */}
         <View className="min-w-0 flex-1">
-          <Text className="text-sm" numberOfLines={1} ellipsizeMode="middle">
+          <Text
+            className={cn('text-sm', disabled && 'text-muted-foreground')}
+            numberOfLines={1}
+            ellipsizeMode="middle"
+          >
             {repo.fullName}
           </Text>
         </View>

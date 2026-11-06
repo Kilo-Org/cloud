@@ -3,10 +3,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   buildGlanceableSnapshot,
+  buildOpaqueScopeKey,
   GLANCEABLE_STALE_MS,
   type GlanceableAgentsSnapshot,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
-import { type GlanceableLiveActivityContentState } from '@kilocode/notifications';
+import { type GlanceableLiveActivityContentState } from '@kilocode/notifications/schemas';
 import { EMPTY_HOME_WIDGET_DETAILS } from '@kilocode/app-shared/home-widget';
 import {
   _resetHomeWidgetDataForTests,
@@ -1175,7 +1176,9 @@ describe('iosSink approve-failed notice', () => {
     kiloSessionId: 'session-1',
     status: 'permission',
     isCloudAgent: true,
-    scopeKey: 'scope',
+    // The scope key the record is stored under, as `selectWaitingAsk` derives
+    // it: the notice draws on the stored snapshot for this same scope.
+    scopeKey: buildOpaqueScopeKey(CTX),
     organizationId: null,
     userId: 'u1',
     recordedAt: NOW,

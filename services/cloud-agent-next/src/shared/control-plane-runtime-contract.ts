@@ -5,3 +5,6 @@ export const WORKTREE_RUNTIME_VERSION = '1';
 
 export const WORKSPACE_CONFIGURATION_HEADER = 'x-kilo-workspace-configuration';
 export const WORKSPACE_CONFIGURATION_VERSION = '1';
+
+export const RUNTIME_HARNESSES = ['kilo', 'kilo2'] as const;
+export type RuntimeHarness = (typeof RUNTIME_HARNESSES)[number];

@@ -5,7 +5,7 @@ import {
   type SessionLiveActivityContentState,
   sessionLiveActivityRelevance,
   type SessionLiveActivityRow,
-} from '@kilocode/notifications';
+} from '@kilocode/notifications/schemas';
 
 import type * as AndroidFollow from '@/glanceable-android/session-follow';
 import type * as IosFollow from '@/glanceable-ios/session-follow';

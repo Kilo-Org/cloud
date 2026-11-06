@@ -1,5 +1,7 @@
 'use client';
 
+import { adminFetch } from '@/lib/admin/admin-fetch';
+
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { RevenueStats } from '@/app/admin/components/RevenueStats';
@@ -49,7 +51,7 @@ export default function RevenuePage() {
       url.searchParams.set('startDate', startDate);
       url.searchParams.set('endDate', endDate);
 
-      const response = await fetch(url.toString());
+      const response = await adminFetch(url.toString());
 
       if (!response.ok) {
         throw new Error('Failed to fetch daily revenue statistics');

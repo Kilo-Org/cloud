@@ -9,6 +9,7 @@
       "lowBalance": "Số dư của bạn cần được chú ý",
       "spendAlert": "Chi tiêu của bạn cần được chú ý",
       "securityFinding": "Một phát hiện bảo mật cần được chú ý",
+      "securityUpdate": "Một bài kiểm tra bảo mật có bản cập nhật",
       "activeAgentsGlanceable": "Các tác nhân đang hoạt động có bản cập nhật"
     }
   },
@@ -61,7 +62,7 @@
     },
     "securityLifecycle": {
       "title": "Kilo",
-      "body": "Một phát hiện bảo mật cần được chú ý"
+      "body": "Một bài kiểm tra bảo mật có bản cập nhật"
     }
   },
   "instanceLifecycle": {

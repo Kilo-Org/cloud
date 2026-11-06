@@ -24,6 +24,7 @@ import {
 import { LiveSessionFeedback } from '@/components/home/agent-sessions-section';
 import { SectionHeader } from '@/components/home/section-header';
 import { selectReducedMotionEntrance, useMotionPolicy } from '@/lib/a11y/motion';
+import { AGENTS_SESSIONS_HREF } from '@/lib/agents-sessions-route';
 
 /**
  * The briefing that replaces the live card inside the shared adaptive frame.
@@ -53,8 +54,8 @@ export function AgentSessionsSection({
   const openAgentsIndex = useCallback(
     (status?: GlanceableStatusKind) => {
       const href: Href = status
-        ? { pathname: '/(app)/(tabs)/(2_agents)/', params: { status } }
-        : { pathname: '/(app)/(tabs)/(2_agents)/', params: {} };
+        ? { pathname: AGENTS_SESSIONS_HREF, params: { status } }
+        : AGENTS_SESSIONS_HREF;
       router.navigate(href);
       router.dismissTo(href);
     },
@@ -70,6 +71,7 @@ export function AgentSessionsSection({
         label={showBriefing ? t('agentBriefing.title') : t('home.agentSessions')}
         actionLabel={showBriefing ? t('agentBriefing.history') : t('home.seeAll')}
         actionHidden={!showBriefing && content === 'empty'}
+        reserveLabelAir
         onActionPress={() => {
           if (showBriefing) {
             router.push('/(app)/agent-briefing' as Href);

@@ -36,6 +36,9 @@ export const codingPlanUsageRedisKey = (input: {
     `coding-plan-usage:v1:${input.userId}:${input.subscriptionId}:${input.planId}:${input.providerId}:${input.inventoryId}`
   );
 
+/** `digest` is a hex SHA-256 over the envelope and its KMS context; see `data-key-cache.ts`. */
+export const byokDataKeyRedisKey = (digest: string) => redisKey(`byok-data-key:v1:${digest}`);
+
 export const LEADERBOARD_MODEL_PROVIDER_USAGE_REDIS_KEY = redisKey(
   'public-api:leaderboard-model-provider-usage'
 );
@@ -59,3 +62,9 @@ export const githubUserAuthorizationPkceRedisKey = (verifierRef: string) =>
 
 export const githubConnectionPkceRedisKey = (verifierRef: string) =>
   redisKey(`auth-pkce:github-connection:${verifierRef}`);
+
+export const watchPrCiInboxRedisKey = (input: {
+  installationId: string;
+  appType: 'standard' | 'lite';
+  repositoryId: string;
+}) => redisKey(`watch-pr-ci:v1:${input.installationId}:${input.appType}:${input.repositoryId}`);

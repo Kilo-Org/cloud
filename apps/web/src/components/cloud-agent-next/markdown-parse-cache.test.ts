@@ -4,6 +4,10 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { createRoot, type Root } from 'react-dom/client';
 import { createRequire } from 'node:module';
 
+jest.mock('../../../node_modules/@pierre/diffs/dist/utils/iterateOverDiff.js', () => ({
+  iterateOverDiff: () => [],
+}));
+
 jest.mock('react-markdown', () =>
   process.getBuiltinModule('module').createRequire(__filename)('react-markdown')
 );
@@ -22,7 +26,7 @@ import {
   type MarkdownParseTree,
   type MarkdownRemarkPlugin,
 } from './markdown-parse-cache';
-import { PartRenderer } from './PartRenderer';
+import { PartRenderer } from './assistant-ui/test-renderers';
 import { ToolMarkdown } from './ToolOutput';
 import type { TextPart } from './types';
 

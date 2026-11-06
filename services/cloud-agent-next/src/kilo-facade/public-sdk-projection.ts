@@ -1,4 +1,7 @@
-import { projectPrivateWorktreePaths } from '@kilocode/session-ingest-contracts';
+import {
+  projectKnownCloudAgentPath,
+  projectPrivateWorktreePaths,
+} from '@kilocode/session-ingest-contracts';
 import type {
   CloudAgentRootSessionSummary,
   KiloSdkAssistantMessage,
@@ -36,7 +39,10 @@ function isAbsoluteStructuredPath(value: string): boolean {
 function publicPath(path: string, kiloSessionId: string): string {
   const directory = publicCloudAgentDirectory(kiloSessionId);
   if (path === directory || path.startsWith(`${directory}/`)) return path;
-  return isAbsoluteStructuredPath(path) ? directory : path;
+  return (
+    projectKnownCloudAgentPath(path, directory) ??
+    (isAbsoluteStructuredPath(path) ? directory : path)
+  );
 }
 
 export function projectPublicStructuredPaths<T extends object>(value: T, kiloSessionId: string): T {
@@ -63,6 +69,8 @@ export function projectPublicStructuredPaths<T extends object>(value: T, kiloSes
   const roots = [...privateDirectories].sort((a, b) => b.length - a.length);
   function projectPath(path: string): string {
     if (path === directory || path.startsWith(`${directory}/`)) return path;
+    const knownPath = projectKnownCloudAgentPath(path, directory);
+    if (knownPath !== undefined) return knownPath;
     for (const root of roots) {
       if (path === root || path.startsWith(`${root}/`)) {
         const projected = projectPrivateWorktreePaths({ path }, metadata, directory).path;
@@ -104,11 +112,15 @@ export function projectPublicStructuredPaths<T extends object>(value: T, kiloSes
   const pathKeys = new Set([
     'path',
     'cwd',
+    'workdir',
     'root',
     'directory',
     'worktree',
     'filepath',
+    'file_path',
     'filePath',
+    'absolutePath',
+    'movePath',
     'file',
     'files',
     'visibleFiles',

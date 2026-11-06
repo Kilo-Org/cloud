@@ -4,13 +4,16 @@ import {
   GitMerge,
   GitPullRequest,
   type LucideIcon,
+  UserRound,
 } from '@/components/ui/icons';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
+import { DirectionalArrowLeft } from '@/components/ui/directional-icons';
 import { Image } from '@/components/ui/image';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
+import { isolateLtrBidiText } from '@/lib/bidi';
 import { formatNumber } from '@/lib/format';
 import { type ThemeColors, useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
@@ -102,21 +105,42 @@ export function PrStateChip({ descriptor }: Readonly<{ descriptor: PrStateChipDe
 }
 
 /**
- * A GitHub account's avatar at the size every PR-review row uses. Falls back
- * to the muted circle when GitHub reports no avatar, so the row never jumps.
+ * A GitHub account's avatar at the size every PR-review row uses. Falls back to
+ * the account's initial on a filled disc when GitHub reports no avatar, so a
+ * row without a picture still reads as a person instead of an empty circle.
+ * The fallback is decoration: the login beside it is the text a reader gets, so
+ * the disc stays out of both accessibility trees instead of adding a lone
+ * initial to a row that is announced as one element.
  */
-export function PrAvatar({ avatarUrl }: Readonly<{ avatarUrl: string | null }>) {
-  if (!avatarUrl) {
-    return <View className="size-6 rounded-full bg-muted" />;
+export function PrAvatar({
+  avatarUrl,
+  login,
+}: Readonly<{ avatarUrl: string | null; login: string | null }>) {
+  const colors = useThemeColors();
+  if (avatarUrl) {
+    return (
+      <Image
+        source={{ uri: avatarUrl }}
+        className="size-6 rounded-full"
+        transition={0}
+        cachePolicy="memory"
+        accessibilityIgnoresInvertColors
+      />
+    );
   }
+  const initial = login?.trim().charAt(0).toLocaleUpperCase(i18n.language);
   return (
-    <Image
-      source={{ uri: avatarUrl }}
-      className="size-6 rounded-full"
-      transition={0}
-      cachePolicy="memory"
-      accessibilityIgnoresInvertColors
-    />
+    <View
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      className="size-6 items-center justify-center rounded-full bg-secondary-fill"
+    >
+      {initial ? (
+        <Text className="text-[11px] font-semibold text-secondary-foreground">{initial}</Text>
+      ) : (
+        <UserRound size={12} color={colors.secondaryForeground} />
+      )}
+    </View>
   );
 }
 
@@ -127,7 +151,7 @@ export function PrAuthorRow({
   if (!author) {
     return (
       <View className="flex-row items-center gap-2">
-        <PrAvatar avatarUrl={null} />
+        <PrAvatar avatarUrl={null} login={null} />
         <Text variant="muted" className="text-sm">
           {t('prReview.overview.unknownAuthor')}
         </Text>
@@ -136,7 +160,7 @@ export function PrAuthorRow({
   }
   return (
     <View className="flex-row items-center gap-2">
-      <PrAvatar avatarUrl={author.avatarUrl} />
+      <PrAvatar avatarUrl={author.avatarUrl} login={author.login} />
       <Text className="text-sm font-medium text-foreground" numberOfLines={1}>
         {author.login}
       </Text>
@@ -172,9 +196,10 @@ export function PrRefsRow({
         {headRepoFullName && isCrossRepo ? `${headRepoFullName}:` : ''}
         {headRef}
       </Text>
-      <Text variant="muted" className="shrink-0 text-sm">
-        ←
-      </Text>
+      {/* The flow reads "head ← base": a mirrored arrow icon sized to the
+          13 px ref text, so its ink centers on the row instead of sitting on
+          the baseline of a text glyph. */}
+      <DirectionalArrowLeft size={13} color={colors.mutedForeground} />
       <Text
         variant="mono"
         className="max-w-1/2 shrink-0 text-[13px]"
@@ -223,6 +248,11 @@ function localizeNumber(n: number): string {
   return formatNumber(n, i18n.language);
 }
 
+/**
+ * The added/removed counts as one left-to-right run. Without the isolate, bidi
+ * on a right-to-left screen moves each sign behind its number, so the line
+ * reads "3+ / 1−" and the counts look like they added the sign.
+ */
 export function formatPrCounts(additions: number, deletions: number): string {
-  return `+${localizeNumber(additions)} / −${localizeNumber(deletions)}`;
+  return isolateLtrBidiText(`+${localizeNumber(additions)} / −${localizeNumber(deletions)}`);
 }

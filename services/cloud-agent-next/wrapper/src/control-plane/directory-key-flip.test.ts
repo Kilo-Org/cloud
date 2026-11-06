@@ -25,6 +25,7 @@ import { createPreparationManager, runtimeKey, type PreparationManager } from '.
 import { createTurnManager, type TurnManager } from './turn.js';
 import { createControlPlaneTerminals, type ControlPlaneTerminalRuntime } from './terminals.js';
 import { createControlPlaneFrameDispatcher } from './main.js';
+import type { WorkspaceStamp } from './workspace-stamp.js';
 
 const TEST_TIMERS: ControlPlaneTimers = {
   ...CONTROL_PLANE_TIMERS,
@@ -144,6 +145,7 @@ function createScheduler(): KiloRuntimeScheduler {
 
 function createHarness() {
   const frames: ControlPlaneWrapperFrame[] = [];
+  const stamps = new Map<string, WorkspaceStamp>();
   const send = (frame: ControlPlaneWrapperFrame): void => {
     frames.push(frame);
   };
@@ -190,8 +192,13 @@ function createHarness() {
     timers: TEST_TIMERS,
     emit: send,
     allocationId: 'alloc_directory_key_flip',
+    onPreparedRoute: spec => turns.registerRoute(spec),
     runtimes: {
-      ensure: input => runtimes.ensure(input),
+      ensure: async input => {
+        const harness = await runtimes.ensure(input);
+        harness.open = async () => true;
+        return harness;
+      },
       installCredentials: async (key, nextEnv) => {
         await runtimes.get(key)?.installCredentials(nextEnv);
         turns.credentialsInstalled(key);
@@ -208,8 +215,11 @@ function createHarness() {
     inheritedEnv: {},
     mkdir: async () => undefined,
     hasGit: async () => false,
-    sessionExists: async () => true,
-    seedRegistration: async () => undefined,
+    runGit: async () => ({ stdout: '', stderr: 'not a repository', exitCode: 128 }),
+    readStamp: async directory => stamps.get(directory) ?? null,
+    writeStamp: async (directory, stamp) => {
+      stamps.set(directory, stamp);
+    },
     runSetup: async () => ({ stdout: '', stderr: '', exitCode: 0 }),
     homeRoots: { directory: HOME_ROOT, legacy: HOME_ROOT },
   });
@@ -281,22 +291,12 @@ describe('directory-key flip (production dispatcher)', () => {
       expect(runtime!.env.HOME).toBe(
         path.join(HOME_ROOT, createHash('sha256').update(DIRECTORY).digest('hex'))
       );
-      const client = runtime!.client as unknown as {
-        sendPromptAsync: (opts: { sessionId: string }) => Promise<void>;
-        abortSession: (opts: { sessionId: string }) => Promise<unknown>;
-        answerQuestion: (
-          questionId: string,
-          answers: string[][],
-          directory?: string
-        ) => Promise<unknown>;
-        createPty: (input: { cwd: string }) => Promise<unknown>;
-        deletePty: () => Promise<unknown>;
-      };
+      const client = runtime!.client;
       const prompts: string[] = [];
       const aborts: string[] = [];
       const answers: string[] = [];
       let ptySeq = 0;
-      client.sendPromptAsync = async opts => {
+      client.submit = async opts => {
         prompts.push(opts.sessionId);
         h.turns.observeKiloEvent({
           type: 'session.turn.open',
@@ -304,15 +304,15 @@ describe('directory-key flip (production dispatcher)', () => {
           nativeRuntimeId: 'rt',
         });
       };
-      client.abortSession = async opts => {
+      client.interrupt = async opts => {
         aborts.push(opts.sessionId);
         return true;
       };
-      client.answerQuestion = async (questionId, _answers, directory) => {
-        answers.push(`${questionId}@${directory ?? 'none'}`);
+      client.answer = async ({ reply, directory }) => {
+        if (reply.action === 'answer') answers.push(`${reply.questionId}@${directory}`);
         return true;
       };
-      client.createPty = async input => ({
+      client.terminals.createPty = async input => ({
         id: `pty_${(ptySeq += 1)}`,
         title: 'Terminal',
         command: '/bin/sh',
@@ -321,7 +321,7 @@ describe('directory-key flip (production dispatcher)', () => {
         status: 'running',
         pid: 1,
       });
-      client.deletePty = async () => true;
+      client.terminals.deletePty = async () => true;
 
       h.dispatcher({ type: 'session.prompt', sessionId: 'ses_a', payload: promptPayload('m1') });
       h.dispatcher({ type: 'session.prompt', sessionId: 'ses_b', payload: promptPayload('m2') });
@@ -481,15 +481,8 @@ describe('directory-key flip (production dispatcher)', () => {
       expect(h.spawner.spawnCount()).toBe(1);
 
       const retiredAborts: string[] = [];
-      const retiredClient = h.runtimes.get(DIRECTORY)!.client as unknown as {
-        sendPromptAsync: (opts: { sessionId: string }) => Promise<void>;
-        abortSessionForCleanup: (input: { sessionId: string }) => Promise<void>;
-        stopSessionProcesses: (input: { sessionId: string }) => Promise<void>;
-        children: (input: {
-          sessionId: string;
-        }) => Promise<Array<{ id: string; directory: string }>>;
-      };
-      retiredClient.sendPromptAsync = async opts => {
+      const retiredClient = h.runtimes.get(DIRECTORY)!.client;
+      retiredClient.submit = async opts => {
         h.turns.observeKiloEvent({
           type: 'session.turn.open',
           properties: { sessionID: opts.sessionId },
@@ -497,13 +490,11 @@ describe('directory-key flip (production dispatcher)', () => {
         });
       };
       // If release cleanup used this retired client, these would record it.
-      retiredClient.abortSessionForCleanup = async input => {
+      retiredClient.release = async input => {
         retiredAborts.push(`abort:${input.sessionId}`);
-      };
-      retiredClient.stopSessionProcesses = async input => {
         retiredAborts.push(`stop:${input.sessionId}`);
+        return { ok: true, sessions: 1, failures: 0, elapsedMs: 0 };
       };
-      retiredClient.children = async () => [];
 
       h.dispatcher({ type: 'session.prompt', sessionId: 'ses_a', payload: promptPayload('m1') });
       await Bun.sleep(5);
@@ -534,24 +525,15 @@ describe('directory-key flip (production dispatcher)', () => {
 
       // The restart replaced the process AND its client on a new port. Stub
       // cleanup on the CURRENT client; the retired one must never be used.
-      const currentClient = h.runtimes.get(DIRECTORY)!.client as unknown as {
-        sendPromptAsync: (opts: { sessionId: string }) => Promise<void>;
-        abortSessionForCleanup: (input: { sessionId: string }) => Promise<void>;
-        stopSessionProcesses: (input: { sessionId: string }) => Promise<void>;
-        children: (input: {
-          sessionId: string;
-        }) => Promise<Array<{ id: string; directory: string }>>;
-      };
+      const currentClient = h.runtimes.get(DIRECTORY)!.client;
       expect(currentClient).not.toBe(retiredClient);
       const cleaned: string[] = [];
-      currentClient.sendPromptAsync = async () => undefined;
-      currentClient.abortSessionForCleanup = async input => {
+      currentClient.submit = async () => undefined;
+      currentClient.release = async input => {
         cleaned.push(`abort:${input.sessionId}`);
-      };
-      currentClient.stopSessionProcesses = async input => {
         cleaned.push(`stop:${input.sessionId}`);
+        return { ok: true, sessions: 1, failures: 0, elapsedMs: 0 };
       };
-      currentClient.children = async () => [];
 
       // Releasing one route cleans up only that route's tree, never the sibling's.
       h.dispatcher({ type: 'session.release', sessionId: 'ses_a' });
@@ -591,11 +573,10 @@ describe('directory-key flip (production dispatcher)', () => {
 
       const runtime = h.runtimes.get(DIRECTORY)!;
       const aborts: string[] = [];
-      const client = runtime.client as unknown as {
-        abortSessionForCleanup: (input: { sessionId: string }) => Promise<void>;
-      };
-      client.abortSessionForCleanup = async input => {
+      const client = runtime.client;
+      client.release = async input => {
         aborts.push(input.sessionId);
+        return { ok: true, sessions: 1, failures: 0, elapsedMs: 0 };
       };
       // The shared runtime is mid-restart: liveRuntimeClient reports no client.
       Object.assign(runtime, { isRestarting: () => true });

@@ -8,6 +8,8 @@ import {
   clearFenceWalkCacheForTests,
   CODE_CHUNK_MOUNT_BATCH,
   CODE_FIRST_PAINT_CHUNKS,
+  fenceWalkCacheStatsForTests,
+  releaseFenceChunkWalk,
   tokenizeCodeLines,
 } from './code-block-model';
 
@@ -105,5 +107,55 @@ describe('chunkCodeLines lazy highlighting', () => {
     }
 
     expect(page.chunks).toEqual(expected);
+  });
+});
+
+describe('fence walk cache accounting', () => {
+  it('weighs a walk by the highlighted tokens it retains, not only its source', () => {
+    // The walk holds every token it placed, and those token texts are copies of
+    // the source. Charging only the key made a warm cache hold several times the
+    // budget it claims to keep.
+    const code = Array.from({ length: 400 }, (_, index) => `const value${index} = ${index};`).join(
+      '\n'
+    );
+    let mounted = CODE_FIRST_PAINT_CHUNKS;
+    for (;;) {
+      const page = chunkCodeLines(code, 'typescript', mounted);
+      if (!page.hasMore) {
+        break;
+      }
+      mounted += CODE_CHUNK_MOUNT_BATCH;
+    }
+
+    const { entries, weight } = fenceWalkCacheStatsForTests();
+    expect(entries).toBe(1);
+    expect(weight).toBeGreaterThan(code.length);
+  });
+
+  it('drops one fence walk when its block releases it', async () => {
+    const code = 'const value = 1;';
+    chunkCodeLines(code, 'typescript', CODE_FIRST_PAINT_CHUNKS);
+    expect(fenceWalkCacheStatsForTests().entries).toBe(1);
+
+    releaseFenceChunkWalk(code, 'typescript');
+    // The entry is dropped on the task after the release, so a block mounting
+    // the same fence in that commit keeps it.
+    await Promise.resolve();
+    expect(fenceWalkCacheStatsForTests()).toEqual({ entries: 0, weight: 0 });
+
+    // A released fence highlights its lines again, because nothing is retained.
+    highlightCalls.lines = [];
+    chunkCodeLines(code, 'typescript', CODE_FIRST_PAINT_CHUNKS);
+    expect(highlightCalls.lines).toEqual([code]);
+  });
+
+  it('keeps the walks of other fences when one is released', async () => {
+    chunkCodeLines('const a = 1;', null, CODE_FIRST_PAINT_CHUNKS);
+    chunkCodeLines('const b = 2;', null, CODE_FIRST_PAINT_CHUNKS);
+    expect(fenceWalkCacheStatsForTests().entries).toBe(2);
+
+    releaseFenceChunkWalk('const a = 1;', null);
+    await Promise.resolve();
+    expect(fenceWalkCacheStatsForTests().entries).toBe(1);
   });
 });

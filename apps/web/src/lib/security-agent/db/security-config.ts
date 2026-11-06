@@ -6,17 +6,16 @@ import type { Owner } from '@/lib/code-reviews/core';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { createSecurityAgentCommand, type SecurityAgentCommandOwner } from '@kilocode/db';
 import { agent_configs } from '@kilocode/db/schema';
-import type { SecurityCommandType } from '@kilocode/app-shared/security-agent';
+import {
+  SECURITY_CONFIG_CONFLICT_CODE,
+  type SecurityCommandType,
+} from '@kilocode/app-shared/security-agent';
+import { UpstreamApiError } from '@kilocode/web-shared/lib/trpc/transport';
 import { TRPCError } from '@trpc/server';
 import { assertGitHubAutomationCanBeEnabled } from '@/lib/integrations/github/sharing-compatibility';
 import { and, eq } from 'drizzle-orm';
+import { mergeSecurityAgentConfigPatch, parseSecurityAgentConfig } from '../core/constants';
 import {
-  DEFAULT_SECURITY_AGENT_CONFIG,
-  mergeSecurityAgentConfigPatch,
-  parseSecurityAgentConfig,
-} from '../core/constants';
-import {
-  SecurityAgentConfigSchema,
   type AutoAnalysisMinSeverity,
   type SecurityAgentConfig,
   type SecurityReviewOwner,
@@ -33,17 +32,25 @@ const DEFAULT_PLATFORM = 'github';
 const SECURITY_CONFIG_CONFLICT_MESSAGE =
   'This configuration changed in another tab. Review the latest settings and save again.';
 
+/**
+ * The compare-and-set refusal. The English message stays the web surface's copy;
+ * `upstreamCode` is the stable marker a device maps onto its own catalog copy, so
+ * the client never parses server prose.
+ */
+function securityConfigConflictError(): TRPCError {
+  return new TRPCError({
+    code: 'CONFLICT',
+    message: SECURITY_CONFIG_CONFLICT_MESSAGE,
+    cause: new UpstreamApiError(SECURITY_CONFIG_CONFLICT_CODE),
+  });
+}
+
 export async function getSecurityAgentConfig(
   owner: Owner,
   platform: string = DEFAULT_PLATFORM
 ): Promise<SecurityAgentConfig> {
   const config = await getAgentConfigForOwner(owner, AGENT_TYPE, platform);
-
-  if (!config) {
-    return SecurityAgentConfigSchema.parse(DEFAULT_SECURITY_AGENT_CONFIG);
-  }
-
-  return parseSecurityAgentConfig(config.config);
+  return parseSecurityAgentConfig(config?.config);
 }
 
 export async function getSecurityAgentConfigWithStatus(
@@ -90,10 +97,6 @@ function computeMergedSecurityConfig(
     (!wasAutoRemediationEnabled || !fullConfig.auto_remediation_enabled_at)
   ) {
     fullConfig.auto_remediation_enabled_at = new Date().toISOString();
-  }
-  if (!fullConfig.remediation_model_slug) {
-    fullConfig.remediation_model_slug =
-      fullConfig.analysis_model_slug ?? fullConfig.model_slug ?? fullConfig.triage_model_slug;
   }
 
   return fullConfig;
@@ -160,7 +163,7 @@ async function writeSecurityAgentConfigWithRevision(
       .returning({ id: agent_configs.id });
 
     if (inserted.length === 0) {
-      throw new TRPCError({ code: 'CONFLICT', message: SECURITY_CONFIG_CONFLICT_MESSAGE });
+      throw securityConfigConflictError();
     }
     return 1;
   }
@@ -189,7 +192,7 @@ async function writeSecurityAgentConfigWithRevision(
     .returning({ id: agent_configs.id });
 
   if (updated.length === 0) {
-    throw new TRPCError({ code: 'CONFLICT', message: SECURITY_CONFIG_CONFLICT_MESSAGE });
+    throw securityConfigConflictError();
   }
   return params.expectedRevision + 1;
 }

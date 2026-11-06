@@ -69,6 +69,7 @@ const FAILURE_CODE_REASONS = {
   payment_required: 'billing',
   admission_billing_unavailable: 'sandbox_connection',
   container_limit_reached: 'delivery_failed',
+  account_blocked: 'account_blocked',
   user_interrupt: 'user_cancelled',
   container_shutdown: 'container_shutdown',
   system_interrupt: 'interrupted',

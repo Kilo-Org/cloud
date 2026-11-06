@@ -56,115 +56,232 @@ describe('hasRetentionBudget', () => {
 });
 
 describe('reconcileFirstPage', () => {
-  it('resets a multi-page cached entry to empty pages/pageParams through a prefix key', () => {
-    const queryClient = new QueryClient();
-    const prefix = ['trpc', 'cliSessionsV2', 'list'];
-    const fullKey = [...prefix, { input: { organizationId: 'org-1' } }];
-    queryClient.setQueryData(fullKey, {
-      pages: [
-        page([{ id: 'a', title: 'a' }]),
-        page([{ id: 'b', title: 'b' }]),
-        page([{ id: 'c', title: 'c' }]),
-      ],
-      pageParams: [0, 1, 2],
-    });
+  const prefix = ['trpc', 'cliSessionsV2', 'list'];
+  const fullKey = [...prefix, { input: { organizationId: 'org-1' } }];
 
-    reconcileFirstPage(queryClient, prefix);
-
-    const data = queryClient.getQueryData(fullKey) as { pages: Page[]; pageParams: unknown[] };
-    expect(data.pages).toEqual([]);
-    expect(data.pageParams).toEqual([]);
-  });
-
-  it('resets to empty even when maxPages has trimmed page one from the front', () => {
-    const queryClient = new QueryClient();
-    const prefix = ['trpc', 'cliSessionsV2', 'list'];
-    const fullKey = [...prefix, { input: { organizationId: 'org-1' } }];
-    // After maxPages evicts page 1, `pages[0]` is page 2, not page 1. The
-    // reset must not keep that stale head — it empties the list instead.
-    queryClient.setQueryData(fullKey, {
-      pages: [
-        page([{ id: 'b', title: 'b' }]),
-        page([{ id: 'c', title: 'c' }]),
-        page([{ id: 'd', title: 'd' }]),
-      ],
-      pageParams: [1, 2, 3],
-    });
-
-    reconcileFirstPage(queryClient, prefix);
-
-    const data = queryClient.getQueryData(fullKey) as { pages: Page[]; pageParams: unknown[] };
-    expect(data.pages).toEqual([]);
-    expect(data.pageParams).toEqual([]);
-  });
-
-  it('invalidates the prefix so page one is refetched from initialPageParam', () => {
-    const queryClient = new QueryClient();
-    const prefix = ['trpc', 'cliSessionsV2', 'list'];
-    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
-    queryClient.setQueryData([...prefix, { input: { organizationId: 'org-1' } }], {
-      pages: [page([{ id: 'a', title: 'a' }])],
-      pageParams: [0],
-    });
-
-    reconcileFirstPage(queryClient, prefix);
-
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: prefix });
-  });
-
-  it('leaves a non-infinite entry under the same prefix untouched', () => {
-    const queryClient = new QueryClient();
-    const prefix = ['trpc', 'cliSessionsV2', 'list'];
-    const nonInfiniteKey = [...prefix, { input: { organizationId: 'org-2' } }];
-    const nonInfinite = { repos: [{ name: 'r' }] };
-    queryClient.setQueryData(nonInfiniteKey, nonInfinite);
-
-    reconcileFirstPage(queryClient, prefix);
-
-    expect(queryClient.getQueryData(nonInfiniteKey)).toBe(nonInfinite);
-  });
-
-  it('returns synchronously', () => {
-    const queryClient = new QueryClient();
-
-    // eslint-disable-next-line typescript-eslint/no-confusing-void-expression -- asserting the void return proves the call needs no await.
-    const returned = reconcileFirstPage(queryClient, ['trpc', 'cliSessionsV2', 'list']);
-    expect(returned).toBeUndefined();
-  });
-
-  it('empties pages and flips fetchStatus to fetching in the same flush on an observed idle query', () => {
-    const queryClient = new QueryClient();
-    const prefix = ['trpc', 'cliSessionsV2', 'list'];
-    const fullKey = [...prefix, { input: { organizationId: 'org-1' } }];
-    queryClient.setQueryData(fullKey, {
-      pages: [page([{ id: 'a', title: 'a' }])],
-      pageParams: [0],
-    });
-
+  it('keeps the retained pages while page one refetches, then replaces them with page one', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    // A holder rather than a captured `let`: the recipe assigns `release` from
+    // inside the query function, and only a property read is re-checked there.
+    const gate: { release?: () => void } = {};
+    let hold = false;
+    const calls: number[] = [];
+    // eslint-disable-next-line require-await -- the held fetch is the point: the recipe resolves it from the test.
+    const queryFn = async ({ pageParam }: { pageParam: number }): Promise<Page> => {
+      calls.push(pageParam);
+      if (hold) {
+        await new Promise<void>(resolve => {
+          gate.release = resolve;
+        });
+      }
+      return page([{ id: `p${pageParam}`, title: `p${pageParam}` }]);
+    };
     const observer = new InfiniteQueryObserver(queryClient, {
       queryKey: fullKey,
-      // eslint-disable-next-line require-await -- the recipe pins an async queryFn for the flush contract; the body needs no await.
-      queryFn: async () => page([{ id: 'a', title: 'a' }]),
+      queryFn,
       initialPageParam: 0,
-      getNextPageParam: () => undefined,
-      staleTime: Infinity,
-      retry: false,
+      getNextPageParam: (_lastPage: Page, _pages: Page[], lastPageParam: number) =>
+        lastPageParam + 1,
     });
     // eslint-disable-next-line no-empty-function -- a real listener is required to activate the observer; the body is intentionally empty.
     const unsubscribe = observer.subscribe(() => {});
 
-    // The observer must be settled before the blank, or the fetchStatus flip
-    // below would be vacuous.
-    expect(observer.getCurrentResult().data).toBeDefined();
-    expect(observer.getCurrentResult().fetchStatus).toBe('idle');
+    await observer.refetch();
+    await observer.fetchNextPage();
+    await observer.fetchNextPage();
+    expect(observer.getCurrentResult().data?.pages).toHaveLength(3);
 
-    reconcileFirstPage(queryClient, prefix);
+    calls.length = 0;
+    hold = true;
+    const reconcile = reconcileFirstPage(queryClient, prefix);
+    await vi.waitFor(() => {
+      expect(gate.release).toBeTypeOf('function');
+    });
 
-    const data = queryClient.getQueryData(fullKey) as { pages: Page[] };
-    expect(data.pages).toEqual([]);
+    // The reader's rows are still on screen while page one is in flight.
+    expect(observer.getCurrentResult().data?.pages).toHaveLength(3);
     expect(queryClient.getQueryState(fullKey)?.fetchStatus).toBe('fetching');
 
+    gate.release?.();
+    await reconcile;
+
+    // One request, from page one, replacing the pages only when it arrives.
+    expect(calls).toEqual([0]);
+    expect(observer.getCurrentResult().data).toEqual({
+      pages: [page([{ id: 'p0', title: 'p0' }])],
+      pageParams: [0],
+    });
+
     unsubscribe();
+  });
+
+  it('re-anchors a trimmed start cursor so the refetch is page one, not the oldest retained page', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const calls: number[] = [];
+    // eslint-disable-next-line require-await -- the recipe pins an async queryFn; the body needs no await.
+    const queryFn = async ({ pageParam }: { pageParam: number }): Promise<Page> => {
+      calls.push(pageParam);
+      return page([{ id: `p${pageParam}`, title: `p${pageParam}` }]);
+    };
+    const observer = new InfiniteQueryObserver(queryClient, {
+      queryKey: fullKey,
+      queryFn,
+      initialPageParam: 0,
+      getNextPageParam: (_lastPage: Page, _pages: Page[], lastPageParam: number) =>
+        lastPageParam + 1,
+      maxPages: 2,
+    });
+    // eslint-disable-next-line no-empty-function -- a real listener is required to activate the observer; the body is intentionally empty.
+    const unsubscribe = observer.subscribe(() => {});
+
+    await observer.refetch();
+    await observer.fetchNextPage();
+    // `maxPages: 2` evicts page one, so index 0 is now page two's cursor.
+    await observer.fetchNextPage();
+    expect(observer.getCurrentResult().data?.pageParams).toEqual([1, 2]);
+
+    calls.length = 0;
+    await reconcileFirstPage(queryClient, prefix);
+
+    expect(calls).toEqual([0]);
+    expect(observer.getCurrentResult().data).toEqual({
+      pages: [page([{ id: 'p0', title: 'p0' }])],
+      pageParams: [0],
+    });
+
+    unsubscribe();
+  });
+
+  it('keeps the rows when the page-one refetch fails', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    let fail = false;
+    // eslint-disable-next-line require-await -- the recipe pins an async queryFn that fails on demand.
+    const queryFn = async ({ pageParam }: { pageParam: number }): Promise<Page> => {
+      if (fail) {
+        throw new Error('offline');
+      }
+      return page([{ id: `p${pageParam}`, title: `p${pageParam}` }]);
+    };
+    const observer = new InfiniteQueryObserver(queryClient, {
+      queryKey: fullKey,
+      queryFn,
+      initialPageParam: 0,
+      getNextPageParam: (_lastPage: Page, _pages: Page[], lastPageParam: number) =>
+        lastPageParam + 1,
+    });
+    // eslint-disable-next-line no-empty-function -- a real listener is required to activate the observer; the body is intentionally empty.
+    const unsubscribe = observer.subscribe(() => {});
+
+    await observer.refetch();
+    await observer.fetchNextPage();
+    const before = observer.getCurrentResult().data;
+
+    fail = true;
+    await reconcileFirstPage(queryClient, prefix);
+
+    // A failed refresh is not an empty list: the rows and their cursors stay.
+    expect(observer.getCurrentResult().data).toEqual(before);
+    expect(queryClient.getQueryState(fullKey)?.isInvalidated).toBe(true);
+
+    unsubscribe();
+  });
+
+  it('removes an entry no list is showing so its next mount starts unloaded', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const calls: number[] = [];
+    // eslint-disable-next-line require-await -- the recipe pins an async queryFn; the body needs no await.
+    const queryFn = async ({ pageParam }: { pageParam: number }): Promise<Page> => {
+      calls.push(pageParam);
+      return page([{ id: `p${pageParam}`, title: `p${pageParam}` }]);
+    };
+    const observer = new InfiniteQueryObserver(queryClient, {
+      queryKey: fullKey,
+      queryFn,
+      initialPageParam: 0,
+      getNextPageParam: () => undefined,
+    });
+    queryClient.setQueryData(fullKey, {
+      pages: [page([{ id: 'a', title: 'a' }])],
+      pageParams: [0],
+    });
+
+    await reconcileFirstPage(queryClient, prefix);
+
+    // Nothing renders these rows, so the entry goes: its next mount fetches page
+    // one instead of fanning out over every retained page, and a zero-page
+    // success is never stored (that shape reads as "loaded and empty").
+    expect(calls).toEqual([]);
+    expect(queryClient.getQueryState(fullKey)).toBeUndefined();
+    expect(queryClient.getQueryData(fullKey)).toBeUndefined();
+    observer.destroy();
+  });
+
+  it('does not run a read its observer has not enabled', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const calls: number[] = [];
+    // eslint-disable-next-line require-await -- the recipe pins an async queryFn; the body needs no await.
+    const queryFn = async ({ pageParam }: { pageParam: number }): Promise<Page> => {
+      calls.push(pageParam);
+      return page([{ id: `p${pageParam}`, title: `p${pageParam}` }]);
+    };
+    const observer = new InfiniteQueryObserver(queryClient, {
+      queryKey: fullKey,
+      queryFn,
+      initialPageParam: 0,
+      getNextPageParam: (_lastPage: Page, _pages: Page[], lastPageParam: number) =>
+        lastPageParam + 1,
+      // The screen waits on filters or an organization before it reads.
+      enabled: false,
+    });
+    queryClient.setQueryData(fullKey, {
+      pages: [page([{ id: 'a', title: 'a' }])],
+      pageParams: [0],
+    });
+    // eslint-disable-next-line no-empty-function -- a real listener is required to activate the observer; the body is intentionally empty.
+    const unsubscribe = observer.subscribe(() => {});
+
+    await reconcileFirstPage(queryClient, prefix);
+
+    // `query.fetch` ignores `enabled`, so the reconcile has to respect it: the
+    // app has not loaded what the read depends on yet.
+    expect(calls).toEqual([]);
+    // The rows stay, because the mounted list is only waiting to enable.
+    expect(queryClient.getQueryData(fullKey)).toEqual({
+      pages: [page([{ id: 'a', title: 'a' }])],
+      pageParams: [0],
+    });
+
+    unsubscribe();
+  });
+
+  it('marks the prefix stale without refetching it', async () => {
+    const queryClient = new QueryClient();
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+    queryClient.setQueryData(fullKey, {
+      pages: [page([{ id: 'a', title: 'a' }])],
+      pageParams: [0],
+    });
+
+    await reconcileFirstPage(queryClient, prefix);
+
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: prefix, refetchType: 'none' });
+  });
+
+  it('leaves a non-infinite entry under the same prefix untouched', async () => {
+    const queryClient = new QueryClient();
+    const nonInfiniteKey = [...prefix, { input: { organizationId: 'org-2' } }];
+    const nonInfinite = { repos: [{ name: 'r' }] };
+    queryClient.setQueryData(nonInfiniteKey, nonInfinite);
+
+    await reconcileFirstPage(queryClient, prefix);
+
+    expect(queryClient.getQueryData(nonInfiniteKey)).toBe(nonInfinite);
+  });
+
+  it('resolves when nothing is cached under the prefix', async () => {
+    const queryClient = new QueryClient();
+
+    await expect(reconcileFirstPage(queryClient, prefix)).resolves.toBeUndefined();
   });
 });
 

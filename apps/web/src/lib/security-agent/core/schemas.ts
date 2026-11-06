@@ -47,14 +47,14 @@ export const SaveSecurityConfigInputSchema = z.object({
    * `config_revision` or the save conflicts.
    */
   expectedRevision: z.number().int().positive().nullable(),
-  slaCriticalDays: z.number().min(1).max(365).optional(),
-  slaHighDays: z.number().min(1).max(365).optional(),
-  slaMediumDays: z.number().min(1).max(365).optional(),
-  slaLowDays: z.number().min(1).max(365).optional(),
+  slaCriticalDays: z.number().int().min(1).max(365).optional(),
+  slaHighDays: z.number().int().min(1).max(365).optional(),
+  slaMediumDays: z.number().int().min(1).max(365).optional(),
+  slaLowDays: z.number().int().min(1).max(365).optional(),
   slaEnabled: z.boolean().optional(),
   autoSyncEnabled: z.boolean().optional(),
   repositorySelectionMode: RepositorySelectionModeSchema.optional(),
-  selectedRepositoryIds: z.array(z.number()).optional(),
+  selectedRepositoryIds: z.array(z.number().int()).optional(),
   modelSlug: z.string().optional(),
   triageModelSlug: z.string().optional(),
   analysisModelSlug: z.string().optional(),
@@ -97,8 +97,8 @@ export const ListFindingsInputSchema = z.object({
   outcomeFilter: OutcomeFilterSchema.optional(),
   overdue: z.boolean().optional(),
   sortBy: z.enum(['severity_desc', 'severity_asc', 'sla_due_at_asc']).default('severity_desc'),
-  limit: z.number().min(1).max(100).default(50),
-  offset: z.number().min(0).default(0),
+  limit: z.number().int().min(1).max(100).default(50),
+  offset: z.number().int().min(0).default(0),
 });
 
 export const TriggerSyncInputSchema = z.object({
@@ -125,7 +125,7 @@ export const GetFindingInputSchema = z.object({
 export const SetEnabledInputSchema = z.object({
   isEnabled: z.boolean(),
   repositorySelectionMode: RepositorySelectionModeSchema.optional(),
-  selectedRepositoryIds: z.array(z.number()).optional(),
+  selectedRepositoryIds: z.array(z.number().int()).optional(),
 });
 
 export const AnalysisStatusSchema = z.enum(['pending', 'running', 'completed', 'failed']);

@@ -9,7 +9,10 @@ import { toast } from 'sonner-native';
 import { type KiloSessionId, type RemoteModelOverride } from '@kilocode/cloud-agent-sdk';
 
 import { NewSessionConfigureForm } from '@/components/agents/new-session-configure-form';
-import { resetSelectedBranchOverrides } from '@/components/agents/new-session-repository-state';
+import {
+  isStoredRepoSelectionGone,
+  resetSelectedBranchOverrides,
+} from '@/components/agents/new-session-repository-state';
 import { resolveNewSessionModelView } from '@/components/agents/new-session-model-view';
 import {
   type NewSessionPromptSeed,
@@ -69,6 +72,7 @@ import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useInstanceModelCatalog } from '@/lib/hooks/use-instance-model-catalog';
 import { useLaunchFolder } from '@/lib/hooks/use-launch-folder';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
+import { useOrganizationsList } from '@/lib/hooks/use-organizations-list';
 import { usePersistedAgentModel } from '@/lib/hooks/use-persisted-agent-model';
 import { usePersistedRunOnDestination } from '@/lib/hooks/use-persisted-run-on-destination';
 import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
@@ -89,6 +93,7 @@ import {
   clearDraft,
   flushDraft,
   NEW_SESSION_DRAFT_KEY,
+  newSessionRepositoryDraftKey,
   resolvePrefillOverDraft,
   saveDraft,
 } from '@/lib/persist/drafts';
@@ -96,7 +101,9 @@ import { useDraftFlushOnBackground } from '@/lib/persist/use-draft-flush';
 import { useFencedDraftLoad, useRemoteSpawnDraftCleanup } from '@/lib/persist/use-draft-load';
 import { type InstancePickerInstance, type ModelPickerSelection } from '@/lib/picker-bridge';
 import { profilePickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
+import { startPlanRefusal } from '@/lib/remote-spawn-admission';
 import {
+  followLiveRunOn,
   PRESELECT_CLOUD_RUN_ON,
   PRESELECT_COMPUTER_RUN_ON,
   readPreselectRunOn,
@@ -104,7 +111,7 @@ import {
   shouldRestorePersistedRunOn,
 } from '@/lib/run-on-destination';
 import { shouldShowRunOnSelector } from '@/lib/should-show-run-on-selector';
-import { peekSharePayload } from '@/lib/share-payload';
+import { clearSharePayload, peekSharePayload } from '@/lib/share-payload';
 import { sessionDisplayTitle } from '@/lib/session-display-title';
 import { useNewSessionShareRemote } from '@/lib/use-new-session-share-remote';
 import { useNewSessionRepos } from '@/lib/use-new-session-repos';
@@ -262,23 +269,28 @@ export function NewSessionScreenBody() {
     },
     [stackSafeRouter, searchParams, userId, isCloneEntry]
   );
-  // One line, label left and control right: the organization is a value the
-  // user changes in place, not a section with a control under its title.
-  const organizationSection = (
-    <View className="mt-5 min-h-11 flex-row items-center justify-between gap-3">
-      <Text className="shrink-0 text-sm font-medium text-muted-foreground">
-        {t('common.organization')}
+  // Stacked like the Run on and Repository sections below it: one label above
+  // one full-width picker, so the form's label-value relation keeps one shape.
+  // The label names the account, not the organization: the picker holds either
+  // the personal account or one of the reader's organizations, and its sheet is
+  // titled "Select account" (`profile.selectAccount`).
+  const accountSection = (
+    <View className="mt-5">
+      <Text className="mb-2 text-sm font-medium text-muted-foreground">
+        {t('preferences.account')}
       </Text>
-      <View className="min-w-0 shrink flex-row items-center justify-end">
-        {isCloneEntry ? (
-          <ContextControl scope={{ organizationId: organizationId ?? null, isResolved: true }} />
-        ) : (
-          <ContextControl
-            value={organizationId ?? null}
-            onSelectionChange={handleOrganizationSwitch}
-          />
-        )}
-      </View>
+      {isCloneEntry ? (
+        <ContextControl
+          scope={{ organizationId: organizationId ?? null, isResolved: true }}
+          variant="field"
+        />
+      ) : (
+        <ContextControl
+          value={organizationId ?? null}
+          onSelectionChange={handleOrganizationSwitch}
+          variant="field"
+        />
+      )}
     </View>
   );
 
@@ -437,14 +449,28 @@ export function NewSessionScreenBody() {
     isRetrying,
     reposSettled,
     openIntegration,
+    connectingProvider,
     refreshReposForceFresh,
   } = useNewSessionRepos({ organizationId });
+
+  // The repository the account last chose in this organization, so a form
+  // reopened after a process restart or an Activity recreation shows the same
+  // target the person had, next to the durable prompt. A clone entry keeps the
+  // source session's own repository and never reads or writes this draft,
+  // exactly like the prompt draft.
+  const repositoryDraftKey = newSessionRepositoryDraftKey(organizationId ?? null);
+  const repositoryDraft = useFencedDraftLoad({
+    userId: isCloneEntry ? undefined : userId,
+    isIdentityLoading,
+    entityKey: repositoryDraftKey,
+  });
 
   const { selectedRepo, setSelectedRepo } = useNewSessionPrefillTargets({
     repositories,
     reposSettled,
     models,
     modelsSettled: !isLoadingModels && !isModelsError && models.length > 0,
+    storedRepo: repositoryDraft.settled ? repositoryDraft.value : null,
   });
 
   // The branch pick belongs to THIS screen, not to the repository section: the
@@ -471,6 +497,39 @@ export function NewSessionScreenBody() {
       ) ?? null
     );
   }, [repositories, selectedRepo]);
+
+  // A repository is one discrete choice, not a keystroke burst, so it is
+  // written through the debounce immediately: a restart in the next half second
+  // must still reopen the form on the target the person had just picked.
+  const handleRepoChange = useCallback(
+    (next: string) => {
+      setSelectedRepo(next);
+      if (!userId || isCloneEntry) {
+        return;
+      }
+      saveDraft(userId, repositoryDraftKey, next);
+      void flushDraft(userId, repositoryDraftKey);
+    },
+    [isCloneEntry, repositoryDraftKey, setSelectedRepo, userId]
+  );
+
+  // A selection its provider's complete list does not contain belongs to a
+  // repository that is no longer connected (or to another scope's list): the
+  // row would read as chosen while Start refuses it. Drop it and its stored
+  // copy, so the next visit starts from the picker instead of a dead key. A
+  // provider that is loading, failed, answered partially, or cannot be read
+  // leaves the selection alone (see `isStoredRepoSelectionGone`).
+  const dropUnresolvedRepo =
+    !isCloneEntry && isStoredRepoSelectionGone({ groups, repositories, selectedRepo });
+  useEffect(() => {
+    if (!dropUnresolvedRepo) {
+      return;
+    }
+    setSelectedRepo('');
+    if (userId) {
+      void clearDraft(userId, repositoryDraftKey);
+    }
+  }, [dropUnresolvedRepo, repositoryDraftKey, setSelectedRepo, userId]);
 
   const {
     profile,
@@ -500,7 +559,7 @@ export function NewSessionScreenBody() {
   const handleOpenRepoDefaults = useCallback(() => {
     // The composer's own Stack, so Back returns here with the draft instead of
     // landing on the Profile tab root.
-    router.push(getRepoBindingsPath(organizationId, 'app'));
+    router.push(getRepoBindingsPath({ organizationId, stack: 'app', openedFrom: 'composer' }));
   }, [organizationId, router]);
 
   // Keep the inline selector and picker list in sync.
@@ -573,6 +632,22 @@ export function NewSessionScreenBody() {
     preselectRunOn,
   ]);
 
+  // The chosen target is a snapshot of the row, not a durable identity: a host
+  // that reboots reconnects its CLI with the same name and project under a new
+  // connectionId. Follow the live row so the launch folder, the model catalog
+  // and the CLI agents keep reading a connected instance, and so the picker
+  // marks the row the form actually shows. A target the live list no longer
+  // represents keeps its value here; the spawn path reports that case.
+  useEffect(() => {
+    if (instancesData === undefined || runOnInstance === null) {
+      return;
+    }
+    const live = followLiveRunOn(runOnInstance, instanceList);
+    if (live !== null && live.connectionId !== runOnInstance.connectionId) {
+      setRunOnInstance(live);
+    }
+  }, [instanceList, instancesData, runOnInstance]);
+
   // A successful session creation owns clearing the new-session draft; a
   // failure must preserve it for the retry. The success path navigates via
   // `replace`, so arm the discard-confirm bypass here — `onCreated` runs
@@ -581,9 +656,10 @@ export function NewSessionScreenBody() {
   const handleCreated = useCallback(() => {
     if (userId) {
       void clearDraft(userId, NEW_SESSION_DRAFT_KEY);
+      void clearDraft(userId, repositoryDraftKey);
     }
     skipDiscardGuardRef.current = true;
-  }, [userId]);
+  }, [repositoryDraftKey, userId]);
 
   // The form owns the cloud-create failure feedback (a persistent inline
   // error), so the creator hook does not also toast the same rejection.
@@ -600,6 +676,7 @@ export function NewSessionScreenBody() {
   // the unmount flush preserves the draft.
   const { markRemoteSpawnAttempted, markRemoteSpawnFailed } = useRemoteSpawnDraftCleanup({
     userId: isCloneEntry ? undefined : userId,
+    repositoryDraftKey,
   });
 
   // A committed remote spawn arms the discard-confirm bypass alongside the
@@ -857,17 +934,22 @@ export function NewSessionScreenBody() {
   const handleDiscardDraft = useCallback(async () => {
     if (userId) {
       const cleared = await clearDraft(userId, NEW_SESSION_DRAFT_KEY);
-      if (!cleared) {
+      const clearedRepository = await clearDraft(userId, repositoryDraftKey);
+      if (!cleared || !clearedRepository) {
         // The stored draft could not be removed: stay on the screen so the
         // guard keeps the draft and toasts instead of navigating away.
         throw new Error('Failed to clear the new-session draft');
       }
     }
     promptRef.current = '';
+    // A staged payload a failed delivery put back is abandoned with the draft.
+    if (shareId !== undefined) {
+      clearSharePayload(shareId);
+    }
     // Release only after the discard is committed (clearDraft succeeded): a
     // failed clear keeps the composer mounted, so the uploads stay recoverable.
     attachments.releaseUnclaimedUploads();
-  }, [userId, promptRef, attachments]);
+  }, [attachments, promptRef, repositoryDraftKey, shareId, userId]);
 
   // "Save as to-do" keeps the leave the confirm intercepted until a list is
   // picked; saving then discards the draft and replays that leave.
@@ -949,6 +1031,21 @@ export function NewSessionScreenBody() {
   );
 
   const isRemoteTargetSelected = runOnInstance !== null || computerTargetSelected;
+  // The organization subscription gate's own verdict for a start under the
+  // selected account, whatever the run target. `organizations.list` carries the
+  // predicate the server middleware classifies with, so the form reads the
+  // verdict instead of re-deriving a plan. Read while rendering, before the
+  // press: a lapsed organization never looks startable, its explanation sits
+  // under the composer, and Start keeps the disabled style until the plan (or
+  // the account) changes. The Cloud Agent create is an organization mutation
+  // that the same gate refuses, so the explanation precedes that rejection too;
+  // the footer therefore names no other blocker while it shows. A personal
+  // start, an unsettled list, and a list without the organization stay allowed
+  // — the app never blocks a start on a verdict it does not have.
+  const planRefusal = startPlanRefusal({
+    organizationId,
+    organizations: useOrganizationsList().data,
+  });
   // The composer only takes focus on arrival when the form already has its
   // repository. Focusing raises the keyboard, which shrinks the scroll frame past
   // the repository picker, Changes, Environment and Advanced Configuration while
@@ -1041,7 +1138,10 @@ export function NewSessionScreenBody() {
     });
   }
 
-  const isStartDisabled = resolveStartDisabled();
+  // A lapsed organization plan blocks Start exactly like a missing
+  // precondition does: the explanation is already on screen, so the button
+  // must not keep the primary fill over it.
+  const isStartDisabled = resolveStartDisabled() || planRefusal !== null;
 
   // The repository section's own settle state, separated from the repository
   // count exactly as the extension separates provider connect from repo count.
@@ -1115,6 +1215,10 @@ export function NewSessionScreenBody() {
         onPress: () => {
           openIntegration(connectProviderPlatform);
         },
+        // The flow's first step is a network round trip (GitHub mints an install
+        // state), so the action keeps a spinner and stays disabled until the
+        // flow ends instead of looking inert for the whole mint.
+        isBusy: connectingProvider !== null,
       };
     }
   } else if (startBlockedReasonKey === 'refresh-repositories') {
@@ -1131,6 +1235,12 @@ export function NewSessionScreenBody() {
   } else if (startBlockedReasonKey === 'enter-prompt-or-file') {
     startBlockedReason = t('agentChat.newSession.enterPromptOrFileToStart');
   }
+
+  // The plan explanation already says why Start cannot run, and nothing the
+  // user types or connects would re-enable it, so the footer names no second
+  // blocker while it is shown.
+  const footerStartBlockedReason = planRefusal === null ? startBlockedReason : null;
+  const footerStartBlockedAction = planRefusal === null ? startBlockedAction : null;
 
   const handleStartSession = useCallback(() => {
     if (isCloneEntry) {
@@ -1273,8 +1383,9 @@ export function NewSessionScreenBody() {
         autoFocusPrompt={autoFocusPrompt}
         groups={groups}
         isRetrying={isRetrying}
-        onChangeRepo={setSelectedRepo}
+        onChangeRepo={handleRepoChange}
         onConnectProvider={openIntegration}
+        connectingProvider={connectingProvider}
         onRefreshRepos={() => void refreshReposForceFresh()}
         repositories={repositories}
         recents={recents}
@@ -1293,16 +1404,17 @@ export function NewSessionScreenBody() {
         onManualVarsChange={setManualVars}
         onManualCommandsChange={setManualCommands}
         onOpenRepoDefaults={handleOpenRepoDefaults}
-        organizationSection={organizationSection}
+        accountSection={accountSection}
         autoCommit={autoCommit}
         onAutoCommitChange={setAutoCommit}
         isStartDisabled={isStartDisabled}
         isSpawningRemote={remoteSpawn.isSpawningRemote}
-        startBlockedReason={startBlockedReason}
-        startBlockedAction={startBlockedAction}
+        startBlockedReason={footerStartBlockedReason}
+        startBlockedAction={footerStartBlockedAction}
         onStartSession={handleStartSession}
         cloudCreateError={cloudCreateError}
         onRetryCloudCreate={handleStartSession}
+        planRefusal={planRefusal}
         remoteSpawnFailure={remoteSpawn.remoteSpawnFailure}
         onRetryRemoteSpawn={handleStartSession}
       />

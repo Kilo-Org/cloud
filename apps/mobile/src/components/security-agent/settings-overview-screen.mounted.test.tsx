@@ -43,6 +43,7 @@ vi.mock('react-native-reanimated', () => ({
 }));
 vi.mock('@/components/security-agent/dashboard-screen', () => ({
   DashboardScreen: 'DashboardScreen',
+  DashboardLoadingView: 'DashboardLoadingView',
 }));
 vi.mock('@/components/security-agent/security-agent-setup', () => ({
   SecurityAgentSetup: 'SecurityAgentSetup',
@@ -215,10 +216,14 @@ describe.each([
         const progress = presentation === 'inline' ? 'Skeleton' : 'ActivityIndicator';
         expect(host(root, progress).length).toBeGreaterThan(0);
       } else if (presentation === 'inline') {
-        // The entry screen replaces its failure page with the loading skeleton
-        // while the retry runs, so the attempt is visible without a spinner.
+        // The entry screen replaces its failure page with a pending frame while
+        // the retry runs, so the attempt is visible without a spinner. A retry
+        // of the config read still leaves the destination unknown, so it paints
+        // the dashboard's own frame; retrying a gate read already knows the
+        // destination and keeps the neutral frame.
+        const pending = procedure === 'getConfig' ? 'DashboardLoadingView' : 'Skeleton';
         expect(host(root, 'PlatformErrorScreen')).toHaveLength(0);
-        expect(host(root, 'Skeleton').length).toBeGreaterThan(0);
+        expect(host(root, pending).length).toBeGreaterThan(0);
       } else {
         expect(host(root, 'PlatformErrorScreen')[0]?.props.isRetrying).toBe(true);
       }
@@ -316,7 +321,8 @@ describe.each([
     onlineManager.setOnline(false);
     committedConnectivity.status = 'unknown';
     const root = await mount(scope);
-    expect(host(root, 'Skeleton').length).toBeGreaterThan(0);
+    const pending = presentation === 'inline' ? 'DashboardLoadingView' : 'Skeleton';
+    expect(host(root, pending).length).toBeGreaterThan(0);
     expect(host(root, 'PlatformErrorScreen')).toHaveLength(0);
     expect(host(root, 'SecurityAgentSetup')).toHaveLength(0);
     expect(host(root, 'Switch')).toHaveLength(0);
@@ -343,4 +349,141 @@ describe.each([
       ).toBe(true);
     }
   );
+
+  // A disabled agent whose GitHub App grant holds nothing accessible has no
+  // repository to select, and the enable rule (an effective repository) leaves
+  // the switch disabled. The picker stays the only route to widening the grant,
+  // so the CTA must survive the settled-empty repository list — hiding it there
+  // stranded the page with nothing to press and no way back on.
+  it.each(['all', 'selected'] as const)(
+    'offers the repository picker with an empty grant in %s mode',
+    async mode => {
+      configData.isEnabled = false;
+      configData.repositorySelectionMode = mode;
+      configData.selectedRepositoryIds = [];
+      repositoriesData = [];
+      const root = await mount('personal');
+      expect(host(root, 'Switch')[0]?.props.value).toBe(false);
+      expect(host(root, 'Switch')[0]?.props.disabled).toBe(true);
+      expect(texts(root)).toContain(emptyCopy);
+      const cta = host(root, 'ConfigureRow').find(
+        node => node.props.title === 'Select repositories'
+      );
+      // The empty list makes "choose which repositories to monitor" untrue, so
+      // the row names the step that actually unblocks it.
+      expect(cta?.props.subtitle).toBe('Grant the Kilo GitHub App access to repositories');
+    }
+  );
+
+  // The row only carries a subtitle for the settled empty grant, where it names
+  // the step that unblocks the switch. With a repository accessible the row
+  // stays the action alone: a saved count would always read zero, and the
+  // status line above already states the state.
+  it('keeps the row subtitle off once a repository is accessible', async () => {
+    configData.isEnabled = false;
+    configData.repositorySelectionMode = 'selected';
+    configData.selectedRepositoryIds = [];
+    const root = await mount('personal');
+    const cta = host(root, 'ConfigureRow').find(node => node.props.title === 'Select repositories');
+    expect(cta?.props.subtitle).toBeUndefined();
+  });
+
+  it('hides the picker CTA from a reader who cannot manage the agent', async () => {
+    roles = [{ organizationId: 'org_123', role: 'member' }];
+    configData.isEnabled = false;
+    repositoriesData = [];
+    const root = await mount('org_123');
+    expect(texts(root)).toContain(denialCopy);
+    expect(
+      host(root, 'ConfigureRow').some(node => node.props.title === 'Select repositories')
+    ).toBe(false);
+  });
+
+  it('hides the picker CTA once the agent is enabled', async () => {
+    configData.isEnabled = true;
+    const root = await mount('personal');
+    expect(
+      host(root, 'ConfigureRow').some(node => node.props.title === 'Select repositories')
+    ).toBe(false);
+    if (presentation === 'standalone') {
+      // The enabled settings page lists the repositories row instead; the
+      // inline presentation hands the enabled scope to the dashboard.
+      expect(host(root, 'ConfigureRow').some(node => node.props.title === 'Repositories')).toBe(
+        true
+      );
+    }
+  });
+
+  // The Repositories row's subtitle is a claim about the GitHub App grant, so a
+  // settled empty grant must not make it: the repositories screen one tap away
+  // answers this state with its own no-repositories empty state, and the two
+  // readings must not disagree.
+  it('names an empty repository grant in the Repositories row', async () => {
+    if (presentation !== 'standalone') {
+      return;
+    }
+    configData.isEnabled = true;
+    configData.repositorySelectionMode = 'all';
+    repositoriesData = [];
+    const root = await mount('personal');
+    const row = host(root, 'ConfigureRow').find(node => node.props.title === 'Repositories');
+    expect(row?.props.subtitle).toBe('No repositories');
+  });
+
+  it('keeps the all-repositories subtitle for a grant that holds repositories', async () => {
+    if (presentation !== 'standalone') {
+      return;
+    }
+    configData.isEnabled = true;
+    configData.repositorySelectionMode = 'all';
+    const root = await mount('personal');
+    const row = host(root, 'ConfigureRow').find(node => node.props.title === 'Repositories');
+    expect(row?.props.subtitle).toBe('All repositories');
+  });
+
+  // A read in flight is not a proven empty grant: an empty label there would
+  // replace the truthful one on every first paint.
+  it('keeps the all-repositories subtitle while the list is still loading', async () => {
+    if (presentation !== 'standalone') {
+      return;
+    }
+    configData.isEnabled = true;
+    configData.repositorySelectionMode = 'all';
+    gates.set('getRepositories', Promise.withResolvers<undefined>().promise);
+    const root = await mount('personal');
+    const row = host(root, 'ConfigureRow').find(node => node.props.title === 'Repositories');
+    expect(row?.props.subtitle).toBe('All repositories');
+  });
+
+  // The same holds for a failed read: a stale or absent list proves nothing.
+  it('keeps the all-repositories subtitle after the list read fails', async () => {
+    if (presentation !== 'standalone') {
+      return;
+    }
+    configData.isEnabled = true;
+    configData.repositorySelectionMode = 'all';
+    failures.add('getRepositories');
+    const root = await mount('personal');
+    await advanceBy(60_000);
+    expect(texts(root)).toContain('Could not load repositories');
+    const row = host(root, 'ConfigureRow').find(node => node.props.title === 'Repositories');
+    expect(row?.props.subtitle).toBe('All repositories');
+  });
+
+  // The header is not part of the body's loading state: a ⋯ that appeared only
+  // once the queries answered changed the header between the two states.
+  it('keeps the header action while the settings load', async () => {
+    gates.set('getConfig', Promise.withResolvers<undefined>().promise);
+    const root = await mount('personal');
+    if (presentation !== 'standalone') {
+      return;
+    }
+    expect(host(root, 'Skeleton').length).toBeGreaterThan(0);
+    expect(host(root, 'Switch')).toHaveLength(0);
+    const header = host(root, 'ScreenHeader');
+    expect(header).toHaveLength(1);
+    expect((header[0]?.props.headerRight as { type?: unknown } | undefined)?.type).toBe(
+      'AuditReportButton'
+    );
+  });
 });

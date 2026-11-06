@@ -30,6 +30,7 @@ import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Text } from '@/components/ui/text';
 import { stripInlineCodeMarkers } from '@/i18n/plain-copy';
 import { remoteSpawnInstanceDisconnectedNote } from '@/lib/remote-submit-outcome';
+import { keyboardAvoidingViewProps } from '@/lib/keyboard-avoiding-view-props';
 import { keyboardInsetOffset } from '@/lib/keyboard-inset-offset';
 import { useDetailScreenBottomPadding, useSideInsetStyle } from '@/lib/screen-insets';
 
@@ -185,6 +186,18 @@ export function NewSessionConfigureForm({
     windowHeight,
     keyboardVerticalOffset: keyboardInsetOffset(bottom),
   };
+  // TEMP PROBE: remove before commit.
+  console.log(
+    'PROBE form',
+    JSON.stringify({
+      windowHeight,
+      bottom,
+      containerFrame,
+      footerHeight,
+      keyboardHeight,
+      keyboardVisible,
+    })
+  );
   // Fit against the keyboard's destination, not each intermediate viewport.
   // The prompt interpolates to that whole-line fit on the UI thread.
   const frameHeight = resolveNewSessionFormFrameHeight({ ...frame, keyboardHeight });
@@ -446,8 +459,7 @@ export function NewSessionConfigureForm({
     <KeyboardAvoidingView
       className="flex-1 bg-background"
       style={sideInsetStyle}
-      behavior="padding"
-      keyboardVerticalOffset={keyboardInsetOffset(bottom)}
+      {...keyboardAvoidingViewProps(bottom)}
       onLayout={handleContainerLayout}
     >
       {body}

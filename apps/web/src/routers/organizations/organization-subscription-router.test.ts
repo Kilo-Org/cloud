@@ -461,13 +461,11 @@ describe('checkout session status of an organization', () => {
   });
 
   it('keeps a provider transport failure as an internal error', async () => {
-    jest
-      .mocked(client.checkout.sessions.retrieve)
-      .mockRejectedValue(
-        new Stripe.errors.StripeConnectionError({
-          message: 'An error occurred with our connection',
-        })
-      );
+    jest.mocked(client.checkout.sessions.retrieve).mockRejectedValue(
+      new Stripe.errors.StripeConnectionError({
+        message: 'An error occurred with our connection',
+      })
+    );
 
     await expect(
       getSessionStatus({ organizationId, sessionId: 'cs_transport' })

@@ -2486,6 +2486,31 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
     expect(serviceMocks.getTokenForRepo).toHaveBeenCalledExactlyOnceWith('123', 'repo', 'standard');
   });
 
+  it('refuses GraphQL for a selected-user capability when the recorded repository credential cannot be minted', async () => {
+    const service = createService();
+    const issued = await service.issueGitHubSessionCapability({
+      githubRepo: 'acme/repo',
+      userId: 'user_1',
+      outboundContainerId,
+      allowUserAuthorization: true,
+    });
+    if (!issued.success) throw new Error('Expected successful issuance');
+    serviceMocks.selectUserAuthorization.mockClear();
+    serviceMocks.getTokenForRepo.mockRejectedValueOnce(
+      new Error('provider token detail: raw-detail')
+    );
+
+    const redemption = await service.redeemGitHubSessionCapability({
+      capability: issued.capability,
+      outboundContainerId,
+      requestMethod: 'POST',
+      requestUrl: 'https://api.github.com/graphql',
+    });
+
+    expect(redemption).toEqual({ success: false, reason: 'source_unavailable' });
+    expect(JSON.stringify(redemption)).not.toContain('raw-detail');
+  });
+
   it('redeems GraphQL for an installation-source capability with the installation token', async () => {
     const service = createService();
     const issued = await service.issueGitHubSessionCapability({

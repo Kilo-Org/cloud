@@ -15,7 +15,6 @@ import {
   agent_environment_profile_mcp_servers,
   agent_environment_profile_skills,
   agent_environment_profile_agents,
-  agent_environment_profile_kilo_commands,
   agent_environment_profile_instructions,
   cloud_agent_environments,
 } from '@kilocode/db/schema';

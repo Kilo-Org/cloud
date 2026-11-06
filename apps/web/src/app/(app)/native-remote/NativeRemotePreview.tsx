@@ -43,7 +43,7 @@ export default function NativeRemotePreview() {
   const client = useMemo(
     () =>
       new NativeSyncClient({
-        baseUrl: process.env.NEXT_PUBLIC_SESSION_SYNC_URL || 'https://session-sync.kiloapps.io',
+        baseUrl: process.env.NEXT_PUBLIC_SESSION_SYNC_URL || 'http://localhost:8817',
         getCredential,
       }),
     []

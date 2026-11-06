@@ -1043,8 +1043,10 @@ cannot enable it in a deployed environment. The same-origin
 `POST /api/native-remote/token` also requires development mode before authenticating
 the web session and issuing a five-minute Kilo credential with credential exchange
 disabled. Session-sync enforces all creator ACLs independently of the preview.
-Set `NEXT_PUBLIC_SESSION_SYNC_URL=http://localhost:8817` to use an isolated local
-Worker. The CLI and SDK production endpoints are unchanged.
+The preview defaults to the isolated local Worker at `http://localhost:8817`;
+`NEXT_PUBLIC_SESSION_SYNC_URL` selects another development relay. Its connection
+permissions are included in the web CSP only in development. The CLI and SDK
+production endpoints are unchanged.
 The mobile preview also requires a development bundle (`__DEV__`) and an explicit
 `EXPO_PUBLIC_SESSION_SYNC_URL`. Release bundles expose neither its Profile entry
 nor its route, regardless of remote feature flags.

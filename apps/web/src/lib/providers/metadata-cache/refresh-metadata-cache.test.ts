@@ -116,7 +116,7 @@ beforeEach(async () => {
     if (url.startsWith(PROVIDER_MODELS_URL_PREFIX)) {
       return Response.json({ data: { models: [] } });
     }
-    return Response.json({ data: [] });
+    return Response.json({ data: [{ id: 'vendor/model' }] });
   });
   jest.spyOn(console, 'error').mockImplementation(() => {});
   jest.mocked(alertIfMetadataCacheStale).mockClear();

@@ -8,6 +8,7 @@ import type { DirectUserByokInferenceProviderId } from '@kilocode/web-shared/lib
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { direct_byok_model_lists } from '@kilocode/db/schema';
 import {
+  assertMinimumCount,
   getMetadata,
   type MetadataSource,
 } from '@kilocode/web-shared/lib/ai-gateway/metadata-cache';
@@ -15,6 +16,7 @@ import {
   ModalitySchema,
   ModelsDevProviderSchema,
   loadModelsDevCatalog,
+  modelsDevCatalogSource,
   isUsableModelsDevModel,
   shortenDisplayName,
   toRawModel,
@@ -46,7 +48,14 @@ const OpenAICompatibleModelsResponseSchema = z.object({
 type OpenAICompatibleModelsResponse = z.infer<typeof OpenAICompatibleModelsResponseSchema>;
 
 function openAICompatibleModelsSource(url: string): MetadataSource<OpenAICompatibleModelsResponse> {
-  return { url, parse: raw => OpenAICompatibleModelsResponseSchema.parse(raw) };
+  return {
+    url,
+    parse: raw => {
+      const parsed = OpenAICompatibleModelsResponseSchema.parse(raw);
+      assertMinimumCount(url, parsed.data.length, 1);
+      return parsed;
+    },
+  };
 }
 
 // A models.dev per-model `provider.npm` names the SDK for the model's own endpoint. Several SDK
@@ -66,7 +75,7 @@ type SyncContext = {
 
 type ProviderFetcher = {
   providerId: DirectUserByokInferenceProviderId;
-  metadataSource?: MetadataSource<OpenAICompatibleModelsResponse>;
+  metadataSources: ReadonlyArray<MetadataSource<unknown>>;
   fetch(ctx: SyncContext): Promise<RawModel[]>;
 };
 
@@ -77,7 +86,7 @@ function openAICompatibleFetcher(options: {
   const metadataSource = openAICompatibleModelsSource(options.url);
   return {
     providerId: options.providerId,
-    metadataSource,
+    metadataSources: [metadataSource],
     async fetch() {
       return toOpenAICompatibleRawModels(await getMetadata(metadataSource, db));
     },
@@ -189,6 +198,7 @@ function customModelsDevFetcher(
 ): ProviderFetcher {
   return {
     providerId,
+    metadataSources: [modelsDevCatalogSource],
     async fetch(ctx) {
       const entry = getModelsDevEntry(providerId, await ctx.getModelsDevCatalog());
       return parse(ModelsDevProviderSchema.parse(entry));
@@ -205,7 +215,9 @@ function modelsDevFetcher(
     : undefined;
   return {
     providerId,
-    metadataSource,
+    metadataSources: metadataSource
+      ? [modelsDevCatalogSource, metadataSource]
+      : [modelsDevCatalogSource],
     async fetch(ctx) {
       const entry = getModelsDevEntry(providerId, await ctx.getModelsDevCatalog());
       if (!metadataSource) {
@@ -259,9 +271,11 @@ const FETCHERS: ReadonlyArray<ProviderFetcher> = [
   customModelsDevFetcher('vertex-byok', parseGcpVertexModelsDevModels),
 ];
 
-export const directByokMetadataSources: ReadonlyArray<MetadataSource<unknown>> = FETCHERS.flatMap(
-  fetcher => (fetcher.metadataSource ? [fetcher.metadataSource] : [])
-);
+export const directByokMetadataSources: ReadonlyArray<MetadataSource<unknown>> = [
+  ...new Map(
+    FETCHERS.flatMap(fetcher => fetcher.metadataSources).map(source => [source.url, source])
+  ).values(),
+];
 
 async function syncProvider(fetcher: ProviderFetcher, ctx: SyncContext): Promise<number> {
   const [fetched, catalogModelIds] = await Promise.all([

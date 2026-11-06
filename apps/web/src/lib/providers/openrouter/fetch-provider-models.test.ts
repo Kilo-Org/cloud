@@ -92,7 +92,11 @@ describe('fetchModelsForProvider', () => {
       'https://openrouter.ai/api/frontend/v1/models/find?providers=Amazon+Bedrock&fmt=cards',
       expect.objectContaining({
         method: 'GET',
-        headers: { 'HTTP-Referer': 'https://kilocode.ai', 'X-Title': 'Kilo Code' },
+        headers: {
+          accept: 'application/json',
+          'HTTP-Referer': 'https://kilocode.ai',
+          'X-Title': 'Kilo Code',
+        },
         signal: expect.any(AbortSignal),
       })
     );

@@ -13,10 +13,7 @@ import { refreshMetadataCache } from '@/lib/providers/metadata-cache/refresh-met
 export const maxDuration = 240;
 
 export async function GET(request: NextRequest) {
-  if (
-    !CRON_SECRET ||
-    !isCronAuthorizationValid(request.headers.get('authorization'), CRON_SECRET)
-  ) {
+  if (!isCronAuthorizationValid(request.headers.get('authorization'), CRON_SECRET)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

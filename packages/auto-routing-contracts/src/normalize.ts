@@ -49,11 +49,19 @@ const SENSITIVE_KEY_WORDS = [
   'cookie',
   'credential',
   'key',
+  'pass',
+  'passkey',
+  'passphrase',
   'password',
   'passwd',
+  'pwd',
   'secret',
   'token',
 ];
+// A vendor name joined directly to a short password word (`dbpass`, `pgpass`,
+// `mongopass`) is a credential key only when the vendor is listed here, because a
+// broader rule would also classify ordinary words that end in `pass`, such as
+// `compass`. The list holds the products whose clients ship such a key name.
 const SENSITIVE_KEY_QUALIFIERS = [
   'access',
   'account',
@@ -61,20 +69,33 @@ const SENSITIVE_KEY_QUALIFIERS = [
   'app',
   'auth',
   'client',
+  'db',
   'encryption',
   'master',
+  'mongo',
+  'mssql',
+  'mysql',
+  'oracle',
+  'pg',
+  'postgres',
+  'postgresql',
   'private',
   'public',
+  'redis',
   'root',
   'secret',
   'service',
   'session',
   'signing',
+  'sql',
   'subscription',
 ];
 // A qualifier only counts when it ends immediately before a credential word, so
 // the scan before each occurrence never needs more than the longest qualifier.
 const MAX_QUALIFIER_LENGTH = Math.max(...SENSITIVE_KEY_QUALIFIERS.map(q => q.length));
+// These words also begin common English words, so they count only as an exact
+// token or a qualified occurrence, not at any token start.
+const TOKEN_START_EXCLUDED_WORDS: Record<string, true> = { pass: true };
 const REDUNDANT_CONTENT_TYPES = new Set([
   'function_call_output',
   'tool_call_output',
@@ -538,8 +559,9 @@ function isSensitiveToken(token: string) {
   if (SENSITIVE_KEY_WORDS.some(word => word === token || word === singular)) return true;
   for (const word of SENSITIVE_KEY_WORDS) {
     for (let index = token.indexOf(word); index !== -1; index = token.indexOf(word, index + 1)) {
-      // A token that starts with a credential word is a credential key.
-      if (index === 0) return true;
+      // A token that starts with a credential word is a credential key, unless
+      // the word is one that also begins ordinary words.
+      if (index === 0 && !TOKEN_START_EXCLUDED_WORDS[word]) return true;
       // A qualifier counts only when it ends immediately before the occurrence,
       // so the last MAX_QUALIFIER_LENGTH characters are the whole window that
       // can match one.

@@ -99,3 +99,22 @@ export function useRemoveRepositorySettingsMutation(organizationId?: string) {
     })
   );
 }
+
+/**
+ * Built-in agent overrides are personal (user-scoped) even when the dialog is
+ * showing organization settings, so this mutation records the user's settings
+ * and refreshes both the current context and the personal settings query.
+ */
+export function useSetBuiltinAgentsMutation(organizationId?: string) {
+  const invalidateCurrent = useInvalidateCloudAgentSettings(organizationId);
+  const invalidatePersonal = useInvalidateCloudAgentSettings();
+  const trpc = useTRPC();
+
+  return useMutation(
+    trpc.cloudAgentSettings.setBuiltinAgents.mutationOptions({
+      onSuccess: async () => {
+        await Promise.all([invalidateCurrent(), invalidatePersonal()]);
+      },
+    })
+  );
+}

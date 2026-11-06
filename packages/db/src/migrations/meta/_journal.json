@@ -2381,6 +2381,13 @@
       "when": 1793911550611,
       "tag": "0339_public_roland_deschain",
       "breakpoints": true
+    },
+    {
+      "idx": 340,
+      "version": "7",
+      "when": 1793960900444,
+      "tag": "0340_cloud_agent_builtin_agent_settings",
+      "breakpoints": true
     }
   ]
 }

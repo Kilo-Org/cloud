@@ -8818,6 +8818,41 @@ export type CloudAgentSandboxAllocationSetting =
 export type NewCloudAgentSandboxAllocationSetting =
   typeof cloud_agent_sandbox_allocation_settings.$inferInsert;
 
+// ============ CLOUD AGENT BUILT-IN AGENT SETTINGS ============
+// User-scoped model and visibility overrides for the CLI's built-in agents
+// (for example `explore`, `compaction`, `plan`, and `debug`). These apply to
+// every Cloud Agent session the user starts, independent of a profile.
+
+export const cloud_agent_builtin_agent_settings = pgTable(
+  'cloud_agent_builtin_agent_settings',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    // Map of built-in agent slug → override. Only model, variant, and disable
+    // are meaningful here; see BuiltinAgentSettingsSchema in
+    // `@kilocode/cloud-agent-profile`.
+    agents: jsonb()
+      .$type<Record<string, { model?: string | null; variant?: string; disable?: boolean }>>()
+      .notNull()
+      .default({}),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [uniqueIndex('UQ_cloud_agent_builtin_agent_settings_user').on(table.user_id)]
+);
+
+export type CloudAgentBuiltinAgentSetting = typeof cloud_agent_builtin_agent_settings.$inferSelect;
+export type NewCloudAgentBuiltinAgentSetting =
+  typeof cloud_agent_builtin_agent_settings.$inferInsert;
+
 // ============ AGENT ENVIRONMENT PROFILE MCP SERVERS ============
 // MCP servers configured on an environment profile. Materialized into the
 // CLI-native KILO_CONFIG_CONTENT.mcp block at session preparation time.

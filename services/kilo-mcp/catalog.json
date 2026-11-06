@@ -8676,6 +8676,67 @@
     ],
     "searchBlob": "cloudAgentSettings.removeRepositorySettings Delete the saved Cloud Agent settings for a specific repository. cloudagentsettings removerepositorysettings organizationid repofullname platform organizationId repoFullName platform"
   },
+  "cloudAgentSettings.setBuiltinAgents": {
+    "path": "cloudAgentSettings.setBuiltinAgents",
+    "kind": "mutation",
+    "summary": "Save which built-in agents are enabled or disabled for the current user's Cloud Agent settings, and return the updated configuration. Use to turn built-in agents on or off or update their per-agent settings.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "agents": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "enum": [
+              "code",
+              "plan",
+              "debug",
+              "orchestrator",
+              "ask",
+              "explore",
+              "compaction"
+            ]
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "model": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "variant": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 50
+              },
+              "disable": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "agents"
+      ]
+    },
+    "tags": [
+      "cloudagentsettings",
+      "setbuiltinagents",
+      "agents"
+    ],
+    "searchBlob": "cloudAgentSettings.setBuiltinAgents Save which built-in agents are enabled or disabled for the current user's Cloud Agent settings, and return the updated configuration. Use to turn built-in agents on or off or update their per-agent settings. cloudagentsettings setbuiltinagents agents agents"
+  },
   "cloudAgentSettings.setContextAllocation": {
     "path": "cloudAgentSettings.setContextAllocation",
     "kind": "mutation",

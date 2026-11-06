@@ -131,6 +131,10 @@ import {
 import type { SessionCreateRequest, SessionRepositoryRequest } from './session-requests.js';
 import { isInteractiveSessionOrigin } from '../shared/control-plane-permission.js';
 import { egressAllowlistSchema, egressPolicySchema } from '@kilocode/worker-utils/egress-allowlist';
+import {
+  RUNTIME_BUILTIN_AGENT_SLUGS,
+  type RuntimeBuiltinAgents,
+} from '../shared/runtime-profile.js';
 
 export type SessionRegistrationInput = SessionCreateRequest;
 
@@ -264,6 +268,7 @@ type NewSessionAllocation = SessionRegistrationResult & {
   credentialContainment: CredentialContainment;
   rollbackCliSession: () => Promise<void>;
   runtimeAuthorization?: { token: string; seal: string };
+  builtinAgents?: RuntimeBuiltinAgents;
 };
 
 /**
@@ -849,6 +854,61 @@ async function issueSessionRuntimeAuthorization(
   return runtimeAuthorization;
 }
 
+async function filterUnavailableBuiltinAgentModels(
+  builtinAgents: RuntimeBuiltinAgents | undefined,
+  input: SessionRegistrationInput,
+  ctx: SessionRegistrationContext,
+  runtimeAuthorization: NewSessionAllocation['runtimeAuthorization']
+): Promise<RuntimeBuiltinAgents | undefined> {
+  if (builtinAgents === undefined) return undefined;
+  const organizationId = input.options?.kilocodeOrganizationId;
+  const availability = new Map<string, Promise<boolean>>();
+  const filtered: RuntimeBuiltinAgents = {};
+  await Promise.all(
+    RUNTIME_BUILTIN_AGENT_SLUGS.map(async slug => {
+      const override = builtinAgents[slug];
+      if (override === undefined) return;
+      const model = override.model;
+      if (typeof model !== 'string') {
+        filtered[slug] = override;
+        return;
+      }
+      let validation = availability.get(model);
+      if (!validation) {
+        validation = assertKiloModelAvailable({
+          env: ctx.env,
+          submittedModel: model,
+          originalToken: runtimeAuthorization?.token ?? ctx.authToken,
+          originalOrganizationId: organizationId,
+          createdOnPlatform: input.options?.createdOnPlatform,
+          procedure: 'builtin_agent_model_validation',
+        }).then(
+          () => true,
+          (error: unknown) => {
+            logger
+              .withFields({
+                userId: ctx.userId,
+                orgId: organizationId,
+                slug,
+                errorClass: error instanceof Error ? error.name : typeof error,
+                ...(error instanceof TRPCError ? { errorCode: error.code } : {}),
+              })
+              .warn('Dropping built-in agent model override that failed availability validation');
+            return false;
+          }
+        );
+        availability.set(model, validation);
+      }
+      if (await validation) {
+        filtered[slug] = override;
+      } else if (override.disable !== undefined) {
+        filtered[slug] = { disable: override.disable };
+      }
+    })
+  );
+  return filtered;
+}
+
 async function assertSandboxAllocationMembership(
   input: SessionRegistrationInput,
   ctx: SessionRegistrationContext
@@ -930,6 +990,12 @@ async function allocateNewSession(
     ctx,
     cloudAgentSessionId,
     initialTurn
+  );
+  const builtinAgents = await filterUnavailableBuiltinAgentModels(
+    input.profile?.resolved?.builtinAgents,
+    input,
+    ctx,
+    runtimeAuthorization
   );
 
   try {
@@ -1163,6 +1229,7 @@ async function allocateNewSession(
     sandboxProviderBinding,
     initialTurn,
     credentialContainment,
+    builtinAgents,
     rollbackCliSession: async () => {
       try {
         await ctx.env.SESSION_INGEST.deleteSessionForCloudAgent({
@@ -1380,7 +1447,12 @@ function buildSessionRegistrationCommand(
       appendSystemPrompt: input.profile?.overrides?.appendSystemPrompt,
     },
     repository: input.repository,
-    profile: input.profile?.resolved,
+    profile: input.profile?.resolved
+      ? {
+          ...input.profile.resolved,
+          builtinAgents: allocation.builtinAgents,
+        }
+      : input.profile?.resolved,
     ...(input.environment
       ? {
           environment: input.environment,
@@ -1932,6 +2004,7 @@ function profileCreateIntent(
     ...(mcpServers ? { mcpServers } : {}),
     runtimeSkills: resolved.runtimeSkills,
     runtimeAgents: resolved.runtimeAgents,
+    builtinAgents: resolved.builtinAgents,
     kiloCommands: resolved.kiloCommands,
     runtimeInstructions: resolved.runtimeInstructions,
   };
@@ -2613,6 +2686,12 @@ async function resumeAllocatedSession(
     ctx,
     allocation.cloudAgentSessionId,
     allocation.initialTurn
+  );
+  allocation.builtinAgents = await filterUnavailableBuiltinAgentModels(
+    input.profile?.resolved?.builtinAgents,
+    input,
+    ctx,
+    allocation.runtimeAuthorization
   );
   const billingOrigin = { billingOrigin: options.billingOrigin };
   if (input.initialTurn === undefined) {

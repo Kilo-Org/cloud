@@ -158,6 +158,11 @@ repository.
     picker MUST NOT offer a shared sandbox. A request for the retired shared
     sandbox MUST fail with a specific message, and a saved shared default MUST
     be skipped so that the session starts on another sandbox.
+21. A user's Cloud Agent settings MAY override the model of a built-in agent,
+    including `explore` and `compaction`, and MAY hide a built-in primary agent
+    other than `code`. These preferences MUST belong to the user, MUST apply to
+    every session that user starts including organization sessions, and MUST
+    NOT be settable by a session request.
 
 ### Preparation
 

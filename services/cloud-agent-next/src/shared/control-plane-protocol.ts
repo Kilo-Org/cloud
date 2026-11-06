@@ -2,6 +2,7 @@ import { environmentSetupCommandCountSchema, setupCommandsSchema } from './setup
 import {
   RuntimeSkillsSchema,
   RuntimeAgentsSchema,
+  RuntimeBuiltinAgentsSchema,
   RuntimeKiloCommandsSchema,
 } from './runtime-profile.js';
 import type {
@@ -388,6 +389,7 @@ const routeSpecObjectSchema = z
     environmentSetupCommandCount: environmentSetupCommandCountSchema.optional(),
     runtimeSkills: RuntimeSkillsSchema.optional(),
     runtimeAgents: RuntimeAgentsSchema.optional(),
+    builtinAgents: RuntimeBuiltinAgentsSchema.optional(),
     kiloCommands: RuntimeKiloCommandsSchema.optional(),
     /**
      * Preserves the runtime key and HOME of existing allocations. The Sandbox
@@ -442,6 +444,7 @@ export const workspaceConfigSchema = routeSpecObjectSchema
     environmentSetupCommandCount: true,
     runtimeSkills: true,
     runtimeAgents: true,
+    builtinAgents: true,
     kiloCommands: true,
   })
   .strict();
@@ -457,6 +460,7 @@ export const attachmentSpecSchema = routeSpecObjectSchema
     environmentSetupCommandCount: true,
     runtimeSkills: true,
     runtimeAgents: true,
+    builtinAgents: true,
     kiloCommands: true,
   })
   .strict()

@@ -25,9 +25,7 @@ afterAll(async () => {
 describe('Marathi pull-request review copy', () => {
   it('agrees with a single skipped check and keeps the plural form above one', () => {
     expect(i18n.t('prReview.checks.skipped', { count: 1, displayCount: '1' })).toBe('1 वगळली');
-    expect(i18n.t('prReview.checks.skipped', { count: 3, displayCount: '3' })).toBe(
-      '3 वगळल्या'
-    );
+    expect(i18n.t('prReview.checks.skipped', { count: 3, displayCount: '3' })).toBe('3 वगळल्या');
   });
 
   it('names the organization with one term across the Bitbucket gate', () => {

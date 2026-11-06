@@ -202,6 +202,30 @@ describe('optimizeThresholdPolicy', () => {
 
     expect(optimization).toBeNull();
   });
+  it.each([0, 1])('declines when pair %i lacks a complete route', pairIndex => {
+    const pairs = pairsFor(
+      ['reference', 'alternative'].map(model => ({
+        model,
+        train: { score: 1, costUsd: 0.001 },
+        heldOut: { score: 1, costUsd: 0.001 },
+      }))
+    );
+    const incomplete = pairs[pairIndex];
+    if (!incomplete) throw new Error('Missing pair fixture');
+    incomplete.results = incomplete.results.filter(
+      result => result.routeKey === 'implementation/code_generation'
+    );
+    expect(
+      optimizeThresholdPolicy({
+        router: 'efficient',
+        referencePolicy: { minAccuracy: 0.95, accuracyNoiseBand: 0 },
+        pairs,
+        profile: null,
+        pricing: noPricing,
+      })
+    ).toBeNull();
+  });
+
   it.each(['missing_cost', 'execution_error', 'different_cases', 'duplicate_case'])(
     'keeps the published policy when comparisons contain $0',
     issue => {

@@ -76,6 +76,7 @@ export function optimizeThresholdPolicy(params: {
     ...pair,
     results: pair.results.map(result => ({ ...result, split: caseSplitForId(result.caseId) })),
   }));
+  const expectedRoutes = new Set(splitPairs[0]?.results.map(result => result.routeKey) ?? []);
   const supportByRoute = new Map<string, string>();
   for (const pair of splitPairs) {
     const casesByRoute = new Map<string, string[]>();
@@ -87,6 +88,10 @@ export function optimizeThresholdPolicy(params: {
         casesByRoute.set(result.routeKey, cases);
       }
       cases.push(JSON.stringify([result.split, result.caseId, result.rep]));
+    }
+    if (casesByRoute.size !== expectedRoutes.size) return null;
+    for (const route of expectedRoutes) {
+      if (!casesByRoute.has(route)) return null;
     }
     for (const [route, cases] of casesByRoute) {
       if (new Set(cases).size !== cases.length) return null;

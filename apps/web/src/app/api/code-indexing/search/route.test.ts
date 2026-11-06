@@ -1,14 +1,13 @@
-import { beforeEach, describe, expect, jest, test } from '@jest/globals';
 import { NextRequest } from 'next/server';
 import { handleTRPCRequest } from '@/lib/trpc-route-handler';
 import { POST } from './route';
 
-const availability = { enabled: false };
+const mockAvailability = { enabled: false };
 
 jest.mock('@/lib/trpc-route-handler', () => ({ handleTRPCRequest: jest.fn() }));
 
 jest.mock('@/lib/code-indexing/availability.server', () => ({
-  isCodeIndexingEnabled: () => availability.enabled,
+  isCodeIndexingEnabled: () => mockAvailability.enabled,
   codeIndexingGoneResponse: () =>
     Response.json(
       { error: 'gone', message: 'Managed code indexing is no longer available.' },
@@ -18,18 +17,23 @@ jest.mock('@/lib/code-indexing/availability.server', () => ({
 
 const mockedHandleTRPCRequest = jest.mocked(handleTRPCRequest);
 
+function createRequest(body?: string) {
+  return new NextRequest('http://localhost:3000/api/code-indexing/search', {
+    method: 'POST',
+    body,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
 describe('POST /api/code-indexing/search', () => {
   beforeEach(() => {
     jest.resetAllMocks();
-    availability.enabled = false;
+    mockAvailability.enabled = false;
   });
 
   test('returns 410 without invoking the tRPC router when the feature is off', async () => {
     const response = await POST(
-      new NextRequest('http://localhost:3000/api/code-indexing/search', {
-        method: 'POST',
-        body: JSON.stringify({ query: 'test', projectId: 'project-1' }),
-      })
+      createRequest(JSON.stringify({ query: 'test', projectId: 'project-1' }))
     );
 
     expect(response.status).toBe(410);
@@ -41,14 +45,20 @@ describe('POST /api/code-indexing/search', () => {
   });
 
   test('returns 400 for a malformed JSON body', async () => {
-    availability.enabled = true;
-    const response = await POST(
-      new NextRequest('http://localhost:3000/api/code-indexing/search', {
-        method: 'POST',
-        body: 'not-json{',
-        headers: { 'Content-Type': 'application/json' },
-      })
-    );
+    mockAvailability.enabled = true;
+    const response = await POST(createRequest('not-json{'));
+
+    expect(response.status).toBe(400);
+    expect(mockedHandleTRPCRequest).not.toHaveBeenCalled();
+    await expect(response.json()).resolves.toEqual({
+      error: 'Invalid JSON body',
+      message: 'Invalid JSON body',
+    });
+  });
+
+  test('returns 400 for an absent body', async () => {
+    mockAvailability.enabled = true;
+    const response = await POST(createRequest());
 
     expect(response.status).toBe(400);
     expect(mockedHandleTRPCRequest).not.toHaveBeenCalled();

@@ -1,6 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { handleTRPCRequest } from '@/lib/trpc-route-handler';
+import { INVALID_JSON, readJsonBody } from '@/lib/invalid-json-body';
 import {
   codeIndexingGoneResponse,
   isCodeIndexingEnabled,
@@ -11,8 +12,8 @@ export async function POST(request: NextRequest) {
     return codeIndexingGoneResponse();
   }
 
-  const body: unknown = await request.json().catch(() => undefined);
-  if (body === undefined) {
+  const body = await readJsonBody(request);
+  if (body === INVALID_JSON) {
     return NextResponse.json(
       { error: 'Invalid JSON body', message: 'Invalid JSON body' },
       { status: 400 }

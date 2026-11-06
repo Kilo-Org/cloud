@@ -38,6 +38,9 @@ const nativeSheet = vi.hoisted(() => ({
   // `index === -1` effect; iOS fires them from the native dismiss event later.
   synchronous: false,
   dismiss: (): void => undefined,
+  // The iOS sheet reports a dimmed-area tap through this prop instead of
+  // dismissing on its own.
+  backdropTap: (): void => undefined,
 }));
 
 vi.mock('@expo/ui/community/bottom-sheet', () => {
@@ -45,11 +48,12 @@ vi.mock('@expo/ui/community/bottom-sheet', () => {
     index: number;
     onClose?: () => void;
     onDismiss?: () => void;
+    onBackdropTap?: () => void;
     children?: ReactNode;
   };
 
   function NativeSheetStub(props: NativeSheetProps) {
-    const { index, onClose, onDismiss } = props;
+    const { index, onClose, onDismiss, onBackdropTap } = props;
     const [presented, setPresented] = useState(index >= 0);
     const closedRef = useRef(index < 0);
     const closeRef = useRef(onClose);
@@ -86,6 +90,11 @@ vi.mock('@expo/ui/community/bottom-sheet', () => {
         setPresented(false);
         closeRef.current?.();
         dismissRef.current?.();
+      };
+      // The iOS sheet reports a dimmed-area tap through this prop instead of
+      // dismissing on its own (repo-local `BottomSheet.ios`).
+      nativeSheet.backdropTap = () => {
+        onBackdropTap?.();
       };
     });
 
@@ -137,6 +146,7 @@ beforeEach(() => {
   nativeSheet.mounts = 0;
   nativeSheet.synchronous = false;
   nativeSheet.dismiss = () => undefined;
+  nativeSheet.backdropTap = () => undefined;
   for (const ui of mounted.splice(0)) {
     ui.unmount();
   }
@@ -342,6 +352,39 @@ describe('Sheet', () => {
     await mount({ visible: false });
 
     expect(isSheetTouchHeld()).toBe(false);
+  });
+
+  // iOS only: the native sheet there reports a dimmed-area tap instead of
+  // dismissing (repo-local `BottomSheet.ios`), and the wrapper answers it the
+  // way Android Back is answered.
+  it('closes the sheet when the iOS backdrop tap is reported', async () => {
+    const onClose = vi.fn<() => void>();
+    const onDismiss = vi.fn<() => void>();
+    const { renderer } = await mount({ onClose, onDismiss });
+
+    await act(async () => {
+      nativeSheet.backdropTap();
+      await Promise.resolve();
+    });
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+    // The caller's own `visible` flip is what unmounts; the wrapper only closes.
+    expect(sheet(renderer)).toBeDefined();
+  });
+
+  it('asks the caller before an iOS backdrop tap dismisses and honours a refusal', async () => {
+    const onRequestDismiss = vi.fn(() => false);
+    const onClose = vi.fn<() => void>();
+    const { renderer } = await mount({ onRequestDismiss, onClose });
+
+    await act(async () => {
+      nativeSheet.backdropTap();
+      await Promise.resolve();
+    });
+
+    expect(onRequestDismiss).toHaveBeenCalledTimes(1);
+    expect(onClose).not.toHaveBeenCalled();
+    expect(renderer.root.findAllByProps({ testID: 'sheet-content' })).toHaveLength(1);
   });
 
   it('ends the sheet when the native sheet dismisses on its own (swipe, backdrop or Back)', async () => {

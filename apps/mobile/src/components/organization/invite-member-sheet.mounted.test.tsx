@@ -342,3 +342,135 @@ describe('InviteMemberSheet reopen', () => {
     rendered.unmount();
   });
 });
+
+const ROLE_TEXTS: Record<string, true> = { member: true, billing_manager: true, owner: true };
+
+function isRoleLabel(child: unknown): child is string {
+  return typeof child === 'string' && ROLE_TEXTS[child] === true;
+}
+
+/** The role labels the sheet draws, in screen order. */
+function roleLabels(rendered: RenderWithProvidersResult): string[] {
+  return rendered.renderer.root
+    .findAll(node => String(node.type) === 'Text')
+    .map(node => node.props.children)
+    .filter(child => isRoleLabel(child));
+}
+
+describe('InviteMemberSheet roles', () => {
+  it('offers an owner the owner row', async () => {
+    boundary.role = 'owner';
+    const rendered = await openSheet();
+
+    expect(roleLabels(rendered)).toEqual(['member', 'billing_manager', 'owner']);
+    rendered.unmount();
+  });
+
+  it('does not offer an admin the owner row the server always refuses', async () => {
+    boundary.role = 'admin';
+    const rendered = await openSheet();
+
+    expect(roleLabels(rendered)).toEqual(['member', 'billing_manager']);
+    rendered.unmount();
+  });
+
+  it('submits the plain member role to a billing manager', async () => {
+    boundary.role = 'billing_manager';
+    const rendered = await openSheet();
+
+    act(() => {
+      fieldProps(rendered).onChangeText('dev@example.com');
+    });
+    act(() => {
+      headerProps(rendered).onDone();
+    });
+
+    expect(invite.mutate).toHaveBeenCalledWith(
+      { email: 'dev@example.com', role: 'member' },
+      expect.anything()
+    );
+    rendered.unmount();
+  });
+
+  it('never submits a selection the caller lost the authority for', async () => {
+    boundary.role = 'owner';
+    const rendered = await openSheet();
+    act(() => {
+      roleRowProps(rendered, 2).onPress();
+    });
+    expect(roleLabels(rendered)).toContain('owner');
+
+    // The membership changed underneath the open form: an admin cannot assign
+    // owner, and the row is gone from the list.
+    boundary.role = 'admin';
+    act(() => {
+      fieldProps(rendered).onChangeText('dev@example.com');
+    });
+    expect(roleLabels(rendered)).toEqual(['member', 'billing_manager']);
+
+    act(() => {
+      headerProps(rendered).onDone();
+    });
+
+    expect(invite.mutate).toHaveBeenCalledWith(
+      { email: 'dev@example.com', role: 'member' },
+      expect.anything()
+    );
+    rendered.unmount();
+  });
+});
+
+describe('InviteMemberSheet dismissal', () => {
+  it('dismisses the route once when the invite succeeds', async () => {
+    const rendered = await openSheet();
+    act(() => {
+      fieldProps(rendered).onChangeText('dev@example.com');
+    });
+    act(() => {
+      headerProps(rendered).onDone();
+    });
+
+    const [, options] = invite.mutate.mock.calls[0] as [unknown, { onSuccess: () => void }];
+    act(() => {
+      options.onSuccess();
+    });
+
+    expect(popOnce).toHaveBeenCalledOnce();
+    rendered.unmount();
+  });
+
+  it('keeps the sheet up while the invite is in flight', async () => {
+    const rendered = await openSheet();
+    act(() => {
+      fieldProps(rendered).onChangeText('dev@example.com');
+    });
+    act(() => {
+      headerProps(rendered).onDone();
+    });
+    invite.isPending = true;
+    // Any render re-reads the pending flag the Back handler consults.
+    act(() => {
+      fieldProps(rendered).onChangeText('dev@example.com');
+    });
+
+    let consumed = false;
+    act(() => {
+      consumed = backPress.handler?.() ?? false;
+    });
+
+    expect(consumed).toBe(true);
+    expect(guard.requestClose).not.toHaveBeenCalled();
+    rendered.unmount();
+  });
+
+  it('asks the discard guard on Back when nothing is in flight', async () => {
+    const rendered = await openSheet();
+
+    act(() => {
+      backPress.handler?.();
+    });
+
+    expect(guard.requestClose).toHaveBeenCalledOnce();
+    rendered.unmount();
+  });
+});

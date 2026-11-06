@@ -435,6 +435,11 @@ export function selectRemoteRowSpokenMeta(params: {
  * names its state and the row draws the live glyph beside it. A stored row
  * never takes this path — `storedSessionEyebrowLabel` shows the neutral origin
  * label instead.
+ *
+ * The word stays untranslated, so it hashes to one hue in every language and
+ * the eyebrow tint needs no pin: its hash IS the state's colour. This is the
+ * text-hash rule platform-label.ts documents — the one state word a row can
+ * still print.
  */
 export function remoteAgentLabel(createdOnPlatform: string | undefined): string {
   if (!createdOnPlatform || createdOnPlatform === 'unknown') {

@@ -128,6 +128,28 @@ export const NEUTRAL_TINT = {
   hueThemeKey: 'secondaryForeground',
 } as const satisfies Tint;
 
+/**
+ * Fixed hue for eyebrow labels that name a state or the unknown origin, not an
+ * agent: 'LIVE' / 'IDLE' / 'UNKNOWN' and their translations. A state's colour
+ * must not drift with its translation, so these keys pin to the ramp entry the
+ * live surface already rendered for the English word (`agentColor('UNKNOWN')`
+ * → amber, `agentColor('IDLE')` → slate blue) and stay stable while every
+ * real-agent hash still walks the ramp.
+ */
+
+/** Tint for a row whose eyebrow names a state, not an agent. */
+export function stateTint(state: 'unknown' | 'idle' | 'live'): Tint {
+  // The state-word pins: the entry `agentColor` hashes each English word to
+  // ('UNKNOWN' → agent-kilocode amber, 'IDLE'/'LIVE' → agent-sky), so a live
+  // surface keeps its hue when the word renders in another script. Literal
+  // indices into the `as const` ramp resolve non-null (same rule as
+  // `agentColor` below).
+  if (state === 'unknown') {
+    return AGENT_RAMP[2];
+  }
+  return AGENT_RAMP[4];
+}
+
 /** Deterministic agent hue from the agent name. */
 export function agentColor(name: string): Tint {
   let hash = 0;

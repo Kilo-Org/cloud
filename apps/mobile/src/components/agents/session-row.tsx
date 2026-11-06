@@ -153,6 +153,11 @@ export function StoredSessionRow({
   // Both save paths refuse an unchanged or blank value.
   const renameInitialValue = namedSessionTitle(session.title, session.session_id) ?? '';
   const agentLabel = storedSessionEyebrowLabel(session);
+  // Tint by what the eyebrow names, never by its string: the unknown-origin
+  // word pins to one hue in every script (the hash of a translation would
+  // drift per locale and split identical rows). Repo and origin names keep
+  // their own deterministic hash.
+  const agentState = agentLabel === t('common.unknown') ? ('unknown' as const) : null;
   const timestamp = getAgentSessionTimestamp(session, sortBy);
   const canManage = interactive && Boolean(onDelete) && Boolean(onRename);
   // The scheduled branch keys off the status, not the `live` flag: a stored
@@ -304,6 +309,7 @@ export function StoredSessionRow({
     >
       <SessionRow
         agentLabel={agentLabel}
+        agentState={agentState}
         title={title}
         subtitle={subtitle}
         meta={visibleMeta}

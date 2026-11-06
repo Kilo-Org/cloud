@@ -10,13 +10,21 @@ import { Eyebrow } from '@/components/ui/eyebrow';
 import { selectSessionRowEyebrowRight } from '@/components/ui/session-row-eyebrow-right';
 import { SessionStatusIcon } from '@/components/ui/session-status-icon';
 import { Text } from '@/components/ui/text';
-import { agentColor } from '@/lib/agent-color';
+import { agentColor, stateTint } from '@/lib/agent-color';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
 type SessionRowProps = {
   /** Uppercase label shown in the eyebrow (and hashed for the row hue). */
   agentLabel: string;
+  /**
+   * The row tint to paint when the eyebrow names a state word rather than an
+   * agent or origin name: the word's hue must not drift with its translation,
+   * so the state pins to the ramp entry the English word already hashed to
+   * ('unknown' → amber, 'idle'/'live' → slate blue). Omit it for a real agent,
+   * repo or platform name, which keeps its own deterministic hash.
+   */
+  agentState?: 'unknown' | 'idle' | null;
   title: string;
   /** Small line shown below the title (e.g. git branch, a message preview). */
   subtitle?: string | null;
@@ -86,6 +94,7 @@ type SessionRowProps = {
  */
 export function SessionRow({
   agentLabel,
+  agentState = null,
   title,
   subtitle,
   meta,
@@ -103,7 +112,7 @@ export function SessionRow({
 }: Readonly<SessionRowProps>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
-  const color = agentColor(agentLabel);
+  const color = agentState ? stateTint(agentState) : agentColor(agentLabel);
   const dimStrip = !live && !needsInput;
   const liveKind: GlanceableStatusKind = statusKind === 'idle' ? 'idle' : 'running';
 

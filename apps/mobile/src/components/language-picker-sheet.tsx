@@ -83,6 +83,12 @@ export function LanguagePickerSheet({
   // `value`), so an emptied field is cleared through this ref rather than by
   // remounting the input.
   const searchInputRef = useRef<TextInput>(null);
+  // The typed term, kept out of the controlled path but readable when the field
+  // is mounted again. A window resize that crosses the short-window threshold
+  // moves the field between the pinned header and the list header, which mounts
+  // a new native input: without this the field would come back empty while the
+  // list stayed filtered by the query it no longer shows.
+  const searchTextRef = useRef('');
   const [closing, setClosing] = useState(false);
   const closeRequestedRef = useRef(false);
   const disablePrevention = usePreventRemove(
@@ -112,6 +118,7 @@ export function LanguagePickerSheet({
       // same behaviour — a reopened sheet starts empty — without recreating the
       // view.
       searchInputRef.current?.clear();
+      searchTextRef.current = '';
       setSelected(getLanguagePreference());
       setApplied(getLanguagePreference());
       setAppliedLanguage(getResolvedLanguage());
@@ -327,7 +334,13 @@ export function LanguagePickerSheet({
         // Uncontrolled: iOS drops keystrokes when state drives `value`. The
         // focus effect clears the live field through the ref, so a reopen
         // starts empty.
-        onChangeText={setQuery}
+        onChangeText={text => {
+          searchTextRef.current = text;
+          setQuery(text);
+        }}
+        // A resize that moves this field between the pinned header and the list
+        // header mounts a new input; the draft then comes back with it.
+        defaultValue={searchTextRef.current}
         autoCapitalize="none"
         autoCorrect={false}
         editable={!busy}

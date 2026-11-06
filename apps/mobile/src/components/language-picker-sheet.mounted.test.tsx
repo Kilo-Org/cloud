@@ -320,6 +320,39 @@ describe('LanguagePickerSheet apply', () => {
     windowSize.height = 874;
   });
 
+  it('keeps the typed query in the field when a resize moves it into the list', async () => {
+    // A window that grows or shrinks past the pinned-header threshold moves the
+    // field between the sheet's chrome and the list header. That is a new
+    // native input, so the draft has to reach it: an empty field over a list
+    // still filtered by the old query shows neither what was typed nor why the
+    // rows are few.
+    windowSize.height = 874;
+    const onClose = vi.fn<() => void>();
+    const renderer = await mountSheet(onClose);
+    const pinnedInput = findByType(renderer.root, 'TextInput')[0];
+    if (!pinnedInput) {
+      throw new Error('language search input not found');
+    }
+
+    act(() => {
+      (pinnedInput.props.onChangeText as (value: string) => void)('german');
+    });
+
+    windowSize.height = 500;
+    await act(async () => {
+      renderer.update(createElement(LanguagePickerSheet, { onClose, returnTarget: 'login' }));
+      await Promise.resolve();
+    });
+
+    const listInput = findByType(renderer.root, 'TextInput')[0];
+    expect(findByType(renderer.root, 'PickerSheet')[0]?.props.headerInBody).toBe(true);
+    expect(listInput).not.toBe(pinnedInput);
+    expect(listInput?.props.defaultValue).toBe('german');
+
+    renderer.unmount();
+    windowSize.height = 874;
+  });
+
   it('keeps the search field usable when the compact list has no matches', async () => {
     windowSize.height = 500;
     const renderer = await mountSheet(vi.fn<() => void>());

@@ -8,7 +8,7 @@ import {
   getMetadata,
   type MetadataSource,
 } from '@kilocode/web-shared/lib/ai-gateway/metadata-cache';
-import { db } from '@kilocode/web-shared/lib/drizzle';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
 
 export function openRouterProviderModelsSource(
   providerName: string
@@ -28,5 +28,5 @@ export function openRouterProviderModelsSource(
 }
 
 export function fetchModelsForProvider(provider: OpenRouterProvider): Promise<OpenRouterModel[]> {
-  return getMetadata(openRouterProviderModelsSource(provider.name), db);
+  return getMetadata(openRouterProviderModelsSource(provider.name), readDb);
 }

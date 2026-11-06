@@ -172,7 +172,7 @@ export function ClaudeBillingCardView({
               </div>
             ) : !status.canManage ? (
               <p className="text-muted-foreground text-sm">
-                Ask a Kilo organization owner or admin to manage this connection.
+                Ask a Kilo organization owner or admin to manage Claude billing.
               </p>
             ) : null}
             {connected && status.canManage ? (

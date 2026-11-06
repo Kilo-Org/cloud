@@ -215,7 +215,10 @@ export function lastVisibleMessageFailure({
   if (failure === null || failure.kind === 'delivery') {
     return failure;
   }
-  return resolveRetryPrompt(last, messages) !== null ? failure : null;
+  // An assistant row needs an action wired for its footer to render. A credits
+  // refusal carries its own (Add credits), so it states the failure even where
+  // a re-send has no prompt to retry.
+  return failure.canAddCredits || resolveRetryPrompt(last, messages) !== null ? failure : null;
 }
 
 /**

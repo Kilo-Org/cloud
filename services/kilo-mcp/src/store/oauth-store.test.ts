@@ -463,6 +463,147 @@ describe('KiloMcpOAuthStore (real drizzle durable-sqlite over node:sqlite)', () 
       expect(await store.getPendingAuthorization('pa-2')).not.toBeNull();
     });
 
+    it('reclaims one expired batch per start and keeps live rows', async () => {
+      const insertDb = new DatabaseSync(':memory:');
+      const recorder: FakeDoStateRecorder = { statements: [], alarms: [] };
+      const insertState = createFakeDoState(insertDb, recorder);
+      const insertStore = new KiloMcpOAuthStore(insertState as never, {} as never);
+      await insertState.whenReady();
+      // Seeded rows carry the same timestamp they expired at, so no seed call
+      // reclaims anything: only a later start may.
+      const expiredCount = PENDING_PURGE_BATCH_SIZE * 2 + 5;
+      for (let index = 0; index < expiredCount; index += 1) {
+        await insertStore.createPendingAuthorization(
+          pendingInput({
+            id: `pa-stale-${index}`,
+            deviceAuthCode: `PAIR-STALE-${index}`,
+            createdAt: EXPIRED,
+            expiresAt: EXPIRED,
+          })
+        );
+      }
+      const countErased = () =>
+        Number(
+          insertDb
+            .prepare('SELECT count(*) AS n FROM oauth_pending_authorizations WHERE expires_at < ?')
+            .get(NOW)?.n ?? -1
+        );
+      expect(countErased()).toBe(expiredCount);
+
+      recorder.statements.length = 0;
+      await insertStore.createPendingAuthorization(
+        pendingInput({ id: 'pa-fresh', deviceAuthCode: 'PAIR-FRESH' })
+      );
+
+      expect(countErased()).toBe(expiredCount - PENDING_PURGE_BATCH_SIZE);
+      expect(await insertStore.getPendingAuthorization('pa-fresh')).toMatchObject({
+        status: 'pending',
+        expiresAt: LATER,
+      });
+      for (const statement of recorder.statements) {
+        expect(statement.params.length).toBeLessThanOrEqual(100);
+      }
+    });
+
+    it('reclaims at most one expired batch per create', async () => {
+      const backlogDb = new DatabaseSync(':memory:');
+      const backlogState = createFakeDoState(backlogDb);
+      const backlogStore = new KiloMcpOAuthStore(backlogState as never, {} as never);
+      await backlogState.whenReady();
+      const expiredCount = PENDING_PURGE_BATCH_SIZE * 2 + 5;
+      for (let index = 0; index < expiredCount; index += 1) {
+        await backlogStore.createPendingAuthorization(
+          pendingInput({
+            id: `pa-backlog-${index}`,
+            deviceAuthCode: `PAIR-BACKLOG-${index}`,
+            createdAt: EXPIRED,
+            expiresAt: EXPIRED,
+          })
+        );
+      }
+      const countErased = () =>
+        Number(
+          backlogDb
+            .prepare('SELECT count(*) AS n FROM oauth_pending_authorizations WHERE expires_at < ?')
+            .get(NOW)?.n ?? -1
+        );
+
+      for (const step of [1, 2, 3]) {
+        await backlogStore.createPendingAuthorization(
+          pendingInput({ id: `pa-next-${step}`, deviceAuthCode: `PAIR-NEXT-${step}` })
+        );
+        expect(countErased()).toBe(Math.max(0, expiredCount - PENDING_PURGE_BATCH_SIZE * step));
+      }
+      expect(
+        backlogDb
+          .prepare('SELECT count(*) AS n FROM oauth_pending_authorizations WHERE expires_at >= ?')
+          .get(NOW)?.n
+      ).toBe(3);
+    });
+
+    it('keeps a start whose own timestamp is already past', async () => {
+      // Reclaim runs before the insert, so a caller-supplied timestamp in the
+      // past does not make the call delete the record it is writing.
+      await store.createPendingAuthorization(
+        pendingInput({
+          id: 'pa-stale-start',
+          deviceAuthCode: 'PAIR-STALE-START',
+          createdAt: NOW,
+          expiresAt: EXPIRED,
+        })
+      );
+      expect(await store.getPendingAuthorization('pa-stale-start')).not.toBeNull();
+    });
+
+    it('reclaims expired rows on a later create and keeps live rows', async () => {
+      const orderDb = new DatabaseSync(':memory:');
+      const orderState = createFakeDoState(orderDb);
+      const orderStore = new KiloMcpOAuthStore(orderState as never, {} as never);
+      await orderState.whenReady();
+      const baseMs = Date.parse(NOW);
+      const ttlMs = 10 * 60 * 1000;
+      const minuteIso = (minute: number) => new Date(baseMs + minute * 60 * 1000).toISOString();
+      const createMinute = async (minute: number) => {
+        for (let slot = 0; slot < 40; slot += 1) {
+          await orderStore.createPendingAuthorization(
+            pendingInput({
+              id: `pa-order-${minute}-${slot}`,
+              deviceAuthCode: `PAIR-ORDER-${minute}-${slot}`,
+              createdAt: minuteIso(minute),
+              expiresAt: new Date(baseMs + minute * 60 * 1000 + ttlMs).toISOString(),
+            })
+          );
+        }
+      };
+      const countExpiredAt = (minute: number) =>
+        Number(
+          orderDb
+            .prepare('SELECT count(*) AS n FROM oauth_pending_authorizations WHERE expires_at < ?')
+            .get(minuteIso(minute))?.n ?? -1
+        );
+
+      await createMinute(0);
+      await createMinute(5);
+      expect(countExpiredAt(5)).toBe(0);
+
+      await createMinute(12);
+
+      // The minute-0 records reached their expiry; the minute-5 and minute-12
+      // records are still actionable and untouched.
+      expect(countExpiredAt(12)).toBe(0);
+      const remainingIds = new Set(
+        (
+          orderDb
+            .prepare('SELECT id FROM oauth_pending_authorizations WHERE expires_at >= ?')
+            .all(minuteIso(12)) as Array<{ id: string }>
+        ).map(row => row.id)
+      );
+      expect(remainingIds.size).toBe(80);
+      expect(remainingIds.has('pa-order-0-0')).toBe(false);
+      expect(remainingIds.has('pa-order-5-0')).toBe(true);
+      expect(remainingIds.has('pa-order-12-0')).toBe(true);
+    });
+
     it('deletes a large expired set with an exact count', async () => {
       const bulkDb = new DatabaseSync(':memory:');
       const recorder: FakeDoStateRecorder = { statements: [], alarms: [] };
@@ -470,6 +611,11 @@ describe('KiloMcpOAuthStore (real drizzle durable-sqlite over node:sqlite)', () 
       const bulkStore = new KiloMcpOAuthStore(bulkState as never, {} as never);
       await bulkState.whenReady();
       const expiredCount = PENDING_PURGE_BATCH_SIZE * 3 + 7;
+      // The live row first: a later start reclaims an expired batch in its own
+      // call, which would take rows away from the count under test.
+      await bulkStore.createPendingAuthorization(
+        pendingInput({ id: 'pa-live', deviceAuthCode: 'PAIR-LIVE' })
+      );
       for (let index = 0; index < expiredCount; index += 1) {
         await bulkStore.createPendingAuthorization(
           pendingInput({
@@ -480,9 +626,6 @@ describe('KiloMcpOAuthStore (real drizzle durable-sqlite over node:sqlite)', () 
           })
         );
       }
-      await bulkStore.createPendingAuthorization(
-        pendingInput({ id: 'pa-live', deviceAuthCode: 'PAIR-LIVE' })
-      );
 
       recorder.statements.length = 0;
       expect(await bulkStore.purgeExpired(NOW)).toBe(expiredCount);

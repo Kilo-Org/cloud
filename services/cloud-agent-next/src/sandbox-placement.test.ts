@@ -95,24 +95,21 @@ describe('selectControlPlaneSandbox', () => {
     ).rejects.toThrow('Shared sandboxes are retired');
   });
 
-  it.each([{}, { CLOUDFLARE_CONTAINERS_ORG_IDS: '*' }])(
-    'defaults code review to Cloudflare Containers regardless of enrollment: %j',
-    async env => {
-      const decision = await selectControlPlaneSandbox({
-        env,
-        sessionId: SESSION_ID,
-        userId: 'user-1',
-        orgId: 'org-1',
-        codeReview: true,
-      });
+  it('defaults code review to Cloudflare Containers', async () => {
+    const decision = await selectControlPlaneSandbox({
+      env: {},
+      sessionId: SESSION_ID,
+      userId: 'user-1',
+      orgId: 'org-1',
+      codeReview: true,
+    });
 
-      expect(decision).toEqual({
-        sandboxId: sha256Key(`control-isolated-v1:${SESSION_ID}`),
-        provider: 'cloudflare-containers',
-        sandboxKind: 'code-review',
-      });
-    }
-  );
+    expect(decision).toEqual({
+      sandboxId: sha256Key(`control-isolated-v1:${SESSION_ID}`),
+      provider: 'cloudflare-containers',
+      sandboxKind: 'code-review',
+    });
+  });
 
   it.each([
     ['cloudflare-single', 'cloudflare', 'isolated'],
@@ -133,20 +130,17 @@ describe('selectControlPlaneSandbox', () => {
     expect(decision.sandboxKind).toBe(sandboxKind);
   });
 
-  it.each([{}, { CLOUDFLARE_CONTAINERS_ORG_IDS: '*' }] as const)(
-    'defaults an isolated session to Cloudflare Containers regardless of enrollment: %j',
-    async env => {
-      const decision = await selectControlPlaneSandbox({
-        env,
-        sessionId: SESSION_ID,
-        userId: 'user-1',
-        codeReview: false,
-      });
+  it('defaults an isolated session to Cloudflare Containers', async () => {
+    const decision = await selectControlPlaneSandbox({
+      env: {},
+      sessionId: SESSION_ID,
+      userId: 'user-1',
+      codeReview: false,
+    });
 
-      expect(decision.provider).toBe('cloudflare-containers');
-      expect(decision.sandboxKind).toBe('isolated');
-    }
-  );
+    expect(decision.provider).toBe('cloudflare-containers');
+    expect(decision.sandboxKind).toBe('isolated');
+  });
 
   it('keeps a code-review kind when the resolved default allocation is native', async () => {
     const decision = await selectControlPlaneSandbox({

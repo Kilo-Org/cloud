@@ -56,6 +56,14 @@ describe('localized format helpers', () => {
     expect(firstGrapheme('👨‍👩‍👧‍👦 family', 'en')).toBe('👨‍👩‍👧‍👦');
   });
 
+  it('pluralizes a whole-byte size in the active language', () => {
+    expect(formatFileSize(1, 'en')).toBe('1 byte');
+    expect(formatFileSize(564, 'en')).toBe('564 bytes');
+    expect(formatFileSize(1023, 'en')).toBe('1,023 bytes');
+    // A count that reaches the kilobyte unit keeps the abbreviated form.
+    expect(formatFileSize(1024, 'en')).toBe('1 kB');
+  });
+
   it('parses localized numbers and rejects other input', () => {
     expect(parseLocalizedNumber('1.234,5', 'de-DE')).toBe(1234.5);
     expect(parseLocalizedNumber('1 234,5', 'ru')).toBe(1234.5);

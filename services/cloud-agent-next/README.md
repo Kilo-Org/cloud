@@ -62,6 +62,11 @@ project path; project credentials also support their recorded numeric project ID
 The configured instance base path and outbound container binding remain part of
 request authorization.
 
+The request method is part of authorization. A listed project resource answers
+the methods its policy allows: credential endpoints answer none, and
+configuration, membership and lifecycle endpoints answer reads only. The
+project root answers reads only.
+
 ## API Documentation
 
 ### Overview
@@ -682,10 +687,6 @@ cp .dev.vars.example .dev.vars
 # Edit .dev.vars with your credentials
 # The worker will reuse the Authorization bearer token as the kilo code api token (because thats what it is).
 ```
-
-For existing `.dev.vars` files, set `CREDENTIAL_CONTAINMENT_ENABLED=true`,
-`CLOUDFLARE_CONTAINERS_ORG_IDS=*`, and `CODE_REVIEW_CONTAINERS_ORG_IDS=*`.
-These values select the retained runtimes. Non-contained runtimes have been retired.
 
 3. Run locally:
 

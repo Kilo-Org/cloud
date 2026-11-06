@@ -68,7 +68,7 @@ const partSchema = z.strictObject({
   part: z.record(z.string(), z.json()),
 });
 
-type Request = <T>(path: string) => Promise<T>;
+type Request = <T>(path: string, init?: RequestInit) => Promise<T>;
 type ResolvedEntity = { entity: NativeEntity; value: unknown };
 
 /** Portable wire entities; blob references remain available to callers. */
@@ -244,24 +244,70 @@ async function readSnapshot(request: Request, sessionID: string): Promise<Native
  * Read one revision-consistent native snapshot, pinning even its first entity
  * page to the inspected state. Requests JSON-decode entity blobs and surface
  * service errors with a `code` property. Revision races and reclaimed blobs
- * restart from state, at most three complete attempts; other failures propagate.
+ * restart from state, at most three complete attempts. Reads have a two-minute
+ * total deadline, a 15-second request deadline, and non-cooperative cancellation.
  */
 export async function fetchNativeSnapshot(
   request: Request,
-  sessionID: string
+  sessionID: string,
+  signal?: AbortSignal
 ): Promise<NativeSnapshot> {
   sessionIDSchema.parse(sessionID);
-  for (let attempt = 0; ; attempt++) {
-    try {
-      return await readSnapshot(request, sessionID);
-    } catch (error) {
-      if (
-        attempt >= 2 ||
-        !record(error) ||
-        (error['code'] !== 'revision_changed' && error['code'] !== 'blob_not_found')
-      ) {
-        throw error;
+  const controller = new AbortController();
+  let failure = new Error('Native snapshot read canceled');
+  const cancel = () => controller.abort();
+  const timeout = setTimeout(() => {
+    failure = new Error('Native snapshot read timed out');
+    controller.abort();
+  }, 120_000);
+  signal?.addEventListener('abort', cancel, { once: true });
+  if (signal?.aborted) cancel();
+  const cancellable: Request = <T>(path: string) =>
+    new Promise<T>((resolve, reject) => {
+      if (controller.signal.aborted) {
+        reject(failure);
+        return;
+      }
+      const requestTimeout = setTimeout(() => {
+        failure = new Error('Native snapshot request timed out');
+        controller.abort();
+      }, 15_000);
+      const abort = () => {
+        clearTimeout(requestTimeout);
+        reject(failure);
+      };
+      controller.signal.addEventListener('abort', abort, { once: true });
+      void request<T>(path, { signal: controller.signal }).then(
+        value => {
+          clearTimeout(requestTimeout);
+          controller.signal.removeEventListener('abort', abort);
+          if (controller.signal.aborted) reject(failure);
+          else resolve(value);
+        },
+        error => {
+          clearTimeout(requestTimeout);
+          controller.signal.removeEventListener('abort', abort);
+          reject(error);
+        }
+      );
+    });
+  try {
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await readSnapshot(cancellable, sessionID);
+      } catch (error) {
+        if (
+          controller.signal.aborted ||
+          attempt >= 2 ||
+          !record(error) ||
+          (error['code'] !== 'revision_changed' && error['code'] !== 'blob_not_found')
+        ) {
+          throw error;
+        }
       }
     }
+  } finally {
+    clearTimeout(timeout);
+    signal?.removeEventListener('abort', cancel);
   }
 }

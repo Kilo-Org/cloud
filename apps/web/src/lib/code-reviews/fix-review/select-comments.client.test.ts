@@ -31,6 +31,17 @@ function octokitWithFetch(handler: (call: FetchCall) => unknown) {
 const TARGET = { owner: 'owner', repo: 'repo', pullNumber: 7 };
 
 describe('createFixReviewCommentClient', () => {
+  it('preserves a definitive 401 from permission lookup for generation-safe rejection', async () => {
+    const octokit = new Octokit({
+      auth: 'synthetic-token',
+      request: {
+        fetch: async () => Response.json({ message: 'Bad credentials' }, { status: 401 }),
+      },
+    });
+    await expect(
+      createFixReviewCommentClient(octokit, TARGET).lookupPermission('reviewer')
+    ).rejects.toMatchObject({ status: 401 });
+  });
   it('lists every comment page and maps the author identity', async () => {
     const firstPage = Array.from({ length: 100 }, (_, index) => ({
       id: 500 + index,

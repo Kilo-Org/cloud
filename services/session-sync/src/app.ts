@@ -25,7 +25,15 @@ import {
   type SyncError,
 } from './protocol';
 import { rateLimit } from './rate-limit';
-import { jsonResponse, requestMetrics, requestRoute, timed } from './metrics';
+import {
+  diagnostic,
+  phase,
+  jsonResponse,
+  requestMetrics,
+  requestRoute,
+  timed,
+  type DiagnosticOperation,
+} from './metrics';
 import { live } from './live/routes';
 import { LiveTicketError } from './live/ticket';
 
@@ -57,7 +65,7 @@ async function call<T>(
   c: C,
   sessionID: string,
   operation: (stub: DurableObjectStub<SessionSyncDO>) => Promise<Result<T>>,
-  name: string
+  name: DiagnosticOperation
 ): Promise<Result<T>> {
   const tenant = c.get('principal').tenant;
   return timed(c.req.raw, 'doMs', async () => {
@@ -66,12 +74,13 @@ async function call<T>(
         try {
           return getSessionSyncDOStub(c.env, { tenant, sessionID });
         } catch (error) {
+          diagnostic(c.env, { operation: name, stage: 'rpc_lookup', tenant: tenant.type, error });
           throw rpcError(error);
         }
       },
       async stub => {
         try {
-          return await operation(stub);
+          return await phase(c.env, name, 'rpc', () => operation(stub), tenant.type);
         } catch (error) {
           throw rpcError(error);
         }
@@ -81,6 +90,15 @@ async function call<T>(
       if (error instanceof ServiceOverloaded) return overloaded();
       throw error;
     });
+    if (!result.ok) {
+      diagnostic(c.env, {
+        operation: name,
+        stage: 'rpc',
+        tenant: tenant.type,
+        outcome: result.error.code,
+        cause: 'typed_result',
+      });
+    }
     const metrics = requestMetrics(c.req.raw);
     if (
       metrics &&

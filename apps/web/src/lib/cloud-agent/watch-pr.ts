@@ -16,7 +16,6 @@ import {
 } from '@kilocode/db/schema';
 import { watchPrPolicySchema } from '@kilocode/db/schema-types';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { isReleaseToggleEnabled } from '@kilocode/web-shared/lib/posthog-feature-flags';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { generateGitHubInstallationToken } from '@/lib/integrations/platforms/github/adapter';
 import {
@@ -75,12 +74,6 @@ export function serializeWatchPr(watch: CloudAgentPrWatch) {
     manualRecheckAvailable: watch.status !== 'finished',
     manualRecheckCoverage: 'pr_identity_and_lifecycle_only' as const,
   };
-}
-
-async function requireRelease(ctx: WatchContext) {
-  if (!(await isReleaseToggleEnabled('cloud-agent-watch-pr', ctx.user.id))) {
-    throw new TRPCError({ code: 'FORBIDDEN', message: 'Watch PR enablement is not available' });
-  }
 }
 
 async function ownedSession(ctx: WatchContext, sessionId: string) {
@@ -318,86 +311,83 @@ export async function getPrWatchOptions(
 ) {
   const session = await ownedSession(ctx, input.sessionId);
   assertExpectedPr(session, input);
-  const enabled = await isReleaseToggleEnabled('cloud-agent-watch-pr', ctx.user.id);
   const integrationOptions: {
     integrationId: string;
     appType: 'standard' | 'lite';
     accountLogin: string | null;
   }[] = [];
-  let unavailableReason: string | null = enabled ? null : 'Watch PR enablement is not available';
-  if (enabled) {
-    try {
-      const source = assertWatchPrSource(session);
-      const worktree = await db.query.cloud_agent_worktrees.findFirst({
+  let unavailableReason: string | null = null;
+  try {
+    const source = assertWatchPrSource(session);
+    const worktree = await db.query.cloud_agent_worktrees.findFirst({
+      where: and(
+        eq(cloud_agent_worktrees.worktree_id, source.worktreeId),
+        eq(cloud_agent_worktrees.kilo_user_id, ctx.user.id)
+      ),
+    });
+    if (
+      !worktree ||
+      worktree.organization_id !== session.organization_id ||
+      worktree.deletion_started_at
+    ) {
+      unavailableReason = 'Source worktree is unavailable';
+    } else {
+      const integrations = await db.query.platform_integrations.findMany({
         where: and(
-          eq(cloud_agent_worktrees.worktree_id, source.worktreeId),
-          eq(cloud_agent_worktrees.kilo_user_id, ctx.user.id)
+          eq(platform_integrations.platform, 'github'),
+          session.organization_id
+            ? and(
+                eq(platform_integrations.owned_by_organization_id, session.organization_id),
+                isNull(platform_integrations.owned_by_user_id)
+              )
+            : and(
+                eq(platform_integrations.owned_by_user_id, ctx.user.id),
+                isNull(platform_integrations.owned_by_organization_id)
+              )
         ),
+        orderBy: platform_integrations.id,
       });
-      if (
-        !worktree ||
-        worktree.organization_id !== session.organization_id ||
-        worktree.deletion_started_at
-      ) {
-        unavailableReason = 'Source worktree is unavailable';
-      } else {
-        const integrations = await db.query.platform_integrations.findMany({
-          where: and(
-            eq(platform_integrations.platform, 'github'),
-            session.organization_id
-              ? and(
-                  eq(platform_integrations.owned_by_organization_id, session.organization_id),
-                  isNull(platform_integrations.owned_by_user_id)
-                )
-              : and(
-                  eq(platform_integrations.owned_by_user_id, ctx.user.id),
-                  isNull(platform_integrations.owned_by_organization_id)
-                )
-          ),
-          orderBy: platform_integrations.id,
-        });
-        for (const integration of integrations) {
-          if (
-            !integration.platform_installation_id ||
-            integration.permissions?.contents !== 'write' ||
-            (integration.repository_access !== 'all' &&
-              !(
-                integration.repository_access === 'selected' &&
-                integration.repositories?.some(
-                  repository => repository.full_name.toLowerCase() === source.repo.fullName
-                )
-              ))
-          )
-            continue;
-          const appType = integration.github_app_type ?? 'standard';
-          try {
-            await assertGitHubInstallationRuntimeAuthorized(
-              integration.platform_installation_id,
-              appType,
-              integration.id,
-              'agent'
-            );
-          } catch (error) {
-            if (error instanceof GitHubRuntimeAuthorizationError) continue;
-            throw error;
-          }
-          integrationOptions.push({
-            integrationId: integration.id,
+      for (const integration of integrations) {
+        if (
+          !integration.platform_installation_id ||
+          integration.permissions?.contents !== 'write' ||
+          (integration.repository_access !== 'all' &&
+            !(
+              integration.repository_access === 'selected' &&
+              integration.repositories?.some(
+                repository => repository.full_name.toLowerCase() === source.repo.fullName
+              )
+            ))
+        )
+          continue;
+        const appType = integration.github_app_type ?? 'standard';
+        try {
+          await assertGitHubInstallationRuntimeAuthorized(
+            integration.platform_installation_id,
             appType,
-            accountLogin: integration.platform_account_login,
-          });
+            integration.id,
+            'agent'
+          );
+        } catch (error) {
+          if (error instanceof GitHubRuntimeAuthorizationError) continue;
+          throw error;
         }
-        if (!integrationOptions.length)
-          unavailableReason = 'No eligible GitHub connection is available';
+        integrationOptions.push({
+          integrationId: integration.id,
+          appType,
+          accountLogin: integration.platform_account_login,
+        });
       }
-    } catch (error) {
-      if (!(error instanceof TRPCError) || error.code !== 'BAD_REQUEST') throw error;
-      unavailableReason = error.message;
+      if (!integrationOptions.length)
+        unavailableReason = 'No eligible GitHub connection is available';
     }
+  } catch (error) {
+    if (!(error instanceof TRPCError) || error.code !== 'BAD_REQUEST') throw error;
+    unavailableReason = error.message;
   }
   return {
-    enabled,
-    canEnable: enabled && unavailableReason === null,
+    enabled: true,
+    canEnable: unavailableReason === null,
     unavailableReason,
     integrationOptions,
     defaultIntegrationId:
@@ -423,7 +413,6 @@ export function assertWatchPrExpiry(expiresAt: string, now = Date.now()) {
 }
 
 export async function enableWatchPr(ctx: WatchContext, input: z.infer<typeof watchPrEnableSchema>) {
-  await requireRelease(ctx);
   assertWatchPrExpiry(input.expiresAt);
   const session = await ownedSession(ctx, input.sessionId);
   assertExpectedPr(session, input);
@@ -638,7 +627,6 @@ export async function changeWatchPr(
   input: z.infer<typeof watchPrMutationSchema>,
   action: 'pause' | 'resume' | 'stop'
 ) {
-  if (action === 'resume') await requireRelease(ctx);
   const watch = await settleUnavailableWatch(await ownedWatch(ctx, input.watchId));
   if (watch.generation !== input.generation)
     throw new TRPCError({ code: 'CONFLICT', message: 'Watch changed; reload before retrying' });

@@ -123,7 +123,7 @@ export function createBillingStub(
           profiles.get(par.profileId)?.organization ?? `org-${uri.slice(-12)}`
         ).replace(/[&<>"']/g, character => `&#${character.charCodeAt(0)};`);
         response.end(
-          `<!doctype html><h1>Connect your Claude organization</h1><p>Approve billing Claude requests from Kilo to your API organization.</p><form method="post" action="/oauth/billing/decision"><input name="request_uri" type="hidden" value="${uri}"><label>Claude organization <input name="organization" value="${organization}"></label><button name="decision" value="approve">Approve</button><button name="decision" value="decline">Decline</button></form>`
+          `<!doctype html><h1>Link your Claude organization</h1><p>Approve billing Claude requests from Kilo to your API organization.</p><form method="post" action="/oauth/billing/decision"><input name="request_uri" type="hidden" value="${uri}"><label>Claude organization <input name="organization" value="${organization}"></label><button name="decision" value="approve">Approve</button><button name="decision" value="decline">Decline</button></form>`
         );
       }
       return true;

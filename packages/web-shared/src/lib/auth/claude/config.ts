@@ -3,7 +3,7 @@ import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 
 /**
  * Claude Platform OAuth configuration shared by "Sign in with Claude" and
- * Claude billing connections.
+ * Linked billing with Claude Platform.
  *
  * Every Anthropic URL has an environment override so a local stub can stand in
  * for the whole surface. Production leaves them unset.
@@ -57,7 +57,7 @@ export const CLAUDE_SIGN_IN_ASSERTION_AUDIENCE = getEnvVariable(
 
 export const CLAUDE_SIGN_IN_SCOPE = 'openid email profile';
 
-/** The Claude billing connections OAuth app ("Attribute and bill users"). */
+/** The Linked billing with Claude Platform OAuth app ("Attribute and bill users"). */
 export const CLAUDE_BILLING_CLIENT_ID = getEnvVariable('CLAUDE_BILLING_CLIENT_ID');
 
 /** The `aud` the billing app's client authentication settings expect. */

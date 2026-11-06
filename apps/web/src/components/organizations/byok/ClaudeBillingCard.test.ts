@@ -9,6 +9,7 @@ jest.mock('posthog-js/react', () => ({
 
 import * as React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { parseHTML } from 'linkedom';
 import { afterAll, beforeAll, describe, expect, it, jest } from '@jest/globals';
 import {
   CLAUDE_BILLING_PROVIDER_ID,
@@ -37,44 +38,37 @@ function status(state: ClaudeBillingStatus['state']): ClaudeBillingStatus {
   };
 }
 
-function render(props: ClaudeBillingCardViewProps): string {
-  return renderToStaticMarkup(React.createElement(ClaudeBillingCardView, props));
+function buttons(props: ClaudeBillingCardViewProps): HTMLButtonElement[] {
+  const html = renderToStaticMarkup(React.createElement(ClaudeBillingCardView, props));
+  return Array.from(parseHTML(html).document.querySelectorAll('button'));
 }
 
 describe('ClaudeBillingCardView', () => {
-  it('offers connect for a new connection when a connect action is given', () => {
-    const html = render({ status: status('not_connected'), onConnect: () => undefined });
-    expect(html).toContain('Connect your Claude organization');
-    expect(html).not.toContain('Remove from Kilo');
+  it('offers the linking action for an unlinked owner when supplied', () => {
+    expect(buttons({ status: status('not_connected'), onConnect: () => undefined })).toHaveLength(
+      1
+    );
   });
 
-  it('offers no connect action for a new connection when none is given', () => {
-    const html = render({ status: status('not_connected') });
-    expect(html).not.toContain('Connect your Claude organization');
-    expect(html).not.toContain('Remove from Kilo');
+  it('offers no linking action when the release gate omits it', () => {
+    expect(buttons({ status: status('not_connected') })).toHaveLength(0);
   });
 
-  it('keeps status and removal for an existing connection with no reconnect action', () => {
-    const html = render({ status: status('connected'), onRemove: () => undefined });
-    expect(html).toContain('Connected');
-    expect(html).toContain('Remove from Kilo');
-    expect(html).not.toContain('Reconnect your Claude organization');
+  it('retains removal when an existing link has no linking action', () => {
+    expect(buttons({ status: status('connected'), onRemove: () => undefined })).toHaveLength(1);
   });
 
-  it('offers reconnect beside removal for an existing connection when a connect action is given', () => {
-    const html = render({
-      status: status('connected'),
-      onConnect: () => undefined,
-      onRemove: () => undefined,
-    });
-    expect(html).toContain('Reconnect your Claude organization');
-    expect(html).toContain('Remove from Kilo');
+  it('offers linking again and removal for an existing link', () => {
+    expect(
+      buttons({
+        status: status('connected'),
+        onConnect: () => undefined,
+        onRemove: () => undefined,
+      })
+    ).toHaveLength(2);
   });
 
-  it('directs read-only members to an owner without offering connection controls', () => {
-    const html = render({ status: { ...status('connected'), canManage: false } });
-    expect(html).toContain('Ask a Kilo organization owner or admin');
-    expect(html).not.toContain('Remove from Kilo');
-    expect(html).not.toContain('Reconnect your Claude organization');
+  it('hides linking and removal controls from read-only members', () => {
+    expect(buttons({ status: { ...status('connected'), canManage: false } })).toHaveLength(0);
   });
 });

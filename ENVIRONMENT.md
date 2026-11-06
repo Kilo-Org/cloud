@@ -184,7 +184,7 @@ Usage-accounting transport is selected from deployment labels alone: staging wit
 - `OPENAI_DISCOVERY_URL` - Optional override for the OpenAI OpenID Connect discovery document; defaults to the production issuer's document. [SERVER]
 - `OPENAI_TOKEN_ENDPOINT` - Optional override for the OpenAI token endpoint; defaults to the production issuer's endpoint. [SERVER]
 - `OPENAI_CHATGPT_API_URL` - Optional override for the base URL that token-sharing requests use with a "Sign in with ChatGPT" connection; defaults to `https://api.openai.com/v1`. Set it wherever `OPENAI_DISCOVERY_URL`/`OPENAI_TOKEN_ENDPOINT` are overridden, so delegated inference stays in the same environment as the token issuer. [SERVER]
-- `CLAUDE_SIGN_IN_CLIENT_ID` - Client ID of the "Sign in with Claude" OAuth app in the Claude Console. Register `<APP_URL>/api/auth/callback/claude` as its redirect URI. The Claude provider is registered only when this value is set. The person-targeted PostHog release toggle `claude-platform-oauth` controls sign-in, linking, billing connections, and customer-billed inference. [SERVER]
+- `CLAUDE_SIGN_IN_CLIENT_ID` - Client ID of the "Sign in with Claude" OAuth app in the Claude Console. Register `<APP_URL>/api/auth/callback/claude` as its redirect URI. The Claude provider is registered only when this value is set. The person-targeted PostHog release toggle `claude-platform-oauth` controls sign-in, account linking, Linked billing with Claude Platform, and customer-billed inference. [SERVER]
 - `CLAUDE_SIGN_IN_ASSERTION_AUDIENCE` - The audience that the sign-in app's **Client authentication** tab shows; the `aud` of its client assertions. [SERVER]
 - `CLAUDE_FEDERATION_ISSUER` - The issuer URL of Kilo's federation issuer registered with Anthropic (inline JWKS); the `iss` of every Kilo-signed Claude JWT. [SERVER]
 - `CLAUDE_FEDERATION_SUBJECT` - The `sub` of every Kilo-signed Claude JWT; must match the subject pattern of the OAuth apps and the federation rule. [SERVER]
@@ -193,9 +193,9 @@ Usage-accounting transport is selected from deployment labels alone: staging wit
 - `CLAUDE_OIDC_ISSUER` - Optional override for the Claude ID-token issuer and discovery base; defaults to `https://identity.anthropic.com/users`. Set it only for the local stub (`pnpm dev:mock-anthropic`). [SERVER]
 - `CLAUDE_AUTH_BASE_URL` - Optional override for the Claude authorization server; defaults to `https://auth.claude.com`. Set it only for the local stub. [SERVER]
 - `CLAUDE_API_BASE_URL` - Optional override for the Claude API; defaults to `https://api.anthropic.com`. Set it only for the local stub. [SERVER]
-- `CLAUDE_BILLING_CLIENT_ID` - Client ID of the Claude OAuth app that connects customer organizations. Register `<APP_URL>/claude/billing/callback` as its redirect URI. [SERVER]
+- `CLAUDE_BILLING_CLIENT_ID` - Client ID of the Claude OAuth app for Linked billing with Claude Platform. It links customer organizations. Register `<APP_URL>/claude/billing/callback` as its redirect URI. [SERVER]
 - `CLAUDE_BILLING_ASSERTION_AUDIENCE` - The audience that the billing app's **Client authentication** tab shows. [SERVER]
-- `CLAUDE_OPERATOR_FEDERATION_RULE_ID`, `CLAUDE_OPERATOR_ORGANIZATION_ID`, `CLAUDE_OPERATOR_SERVICE_ACCOUNT_ID` - Identify the Kilo operator service account and the federation rule that maps Kilo-signed JWTs to it. Without them, a connected owner's requests fail with an explicit error instead of falling back to Kilo credits. [SERVER]
+- `CLAUDE_OPERATOR_FEDERATION_RULE_ID`, `CLAUDE_OPERATOR_ORGANIZATION_ID`, `CLAUDE_OPERATOR_SERVICE_ACCOUNT_ID` - Identify the Kilo operator service account and the federation rule that maps Kilo-signed JWTs to it. Without them, a linked owner's requests fail with an explicit error instead of falling back to Kilo credits. [SERVER]
 - `CLAUDE_OPERATOR_WORKSPACE_ID` - Optional; needed only when the operator federation rule covers more than one workspace. [SERVER]
 - `CLAUDE_OPERATOR_TOKEN_AUDIENCE` - The audience the operator federation rule expects on the identity JWT Kilo signs. [SERVER]
 
@@ -203,7 +203,7 @@ The `claude-platform-oauth` release toggle defaults to off and requires the bool
 The employee rollout targets person property `email` ending in `@kilocode.ai`, at 100% of that audience only.
 Every server evaluation supplies `personProperties.email`; results are not globally cached or shared between people.
 Sign-in checks the validated provider email only when `email_verified` is boolean `true`.
-Account linking and billing connect/callback also check the authenticated person's current database email.
+Account linking and billing approval routes also check the authenticated person's current database email.
 Gateway requests check the authenticated requester's database email, including organization-scoped requests, after the authoritative payer lookup.
 Missing email or failed evaluation denies access; there is no development bypass.
 Anonymous visitors can discover Claude through the existing email-first flow without an identified browser PostHog person.
@@ -211,15 +211,15 @@ The submitted discovery email controls offered methods only; the callback indepe
 The shared server PostHog client deliberately returns no flags outside production, so enabled local server paths require test fixtures.
 Use the focused Claude tests for enabled server behavior and browser-only SDK overrides for UI checks.
 Browser overrides do not bypass the server gate. Do not enable the live rollout for local testing.
-When disabled, connected owners cannot use customer-billed inference; requests fail explicitly rather than switch payer.
-Existing connection status and removal stay available, while new connections and reconnections remain hidden and refused.
+When disabled, linked owners cannot use customer-billed inference; requests fail explicitly rather than switch payer.
+Existing link status and removal stay available, while new links and linking again remain hidden and refused.
 
-Customer-billed Claude requests require a current connection check. Frankfurt reads the authoritative connection directly.
+Customer-billed Claude requests require a current link check. Frankfurt reads the authoritative link directly.
 The US gateway delegates this check to the web application with `INTERNAL_API_SECRET`.
 A failed check returns a retryable error; it never selects another payer.
 Keep the internal secret consistent across both applications before enabling customer billing.
 Provider billing failures remain customer failures, including spend-limit refusals.
-A generic permission refusal does not disable the connection. Only explicit profile refusals trigger that transition.
+A generic permission refusal does not disable the link. Only explicit profile refusals trigger that transition.
 Account erasure retries temporary remote cleanup failures before deleting the stored profile identifier.
 
 - `GITHUB_CLIENT_ID` - GitHub OAuth app client ID. `[PUBLIC]`

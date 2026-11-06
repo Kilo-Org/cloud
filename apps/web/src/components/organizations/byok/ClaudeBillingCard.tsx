@@ -19,25 +19,25 @@ const CONNECTED_PLATFORMS_URL = 'https://platform.claude.com/connected-platforms
 function outcomeMessage(outcome: string) {
   switch (outcome) {
     case 'connected':
-      return 'Your Claude organization is connected. Any stored Anthropic API key was removed from Kilo. Revoke that key in Claude Console if nothing else uses it.';
+      return 'Your Claude organization is linked. Any stored Anthropic API key was removed from Kilo. Revoke that key in Claude Console if nothing else uses it.';
     case 'declined':
-      return 'The connection did not complete. An owner, admin, or billing admin of your Claude organization must approve it.';
+      return 'Linking did not complete. An owner, admin, or billing admin of your Claude organization must approve it.';
     case 'already_linked':
-      return 'This Claude organization is already connected to another Kilo account or organization. Ask that account’s administrator to disconnect it first.';
+      return 'This Claude organization is already linked to another Kilo account or organization. Ask that account’s administrator to unlink it first.';
     case 'forbidden':
-      return 'Only a Kilo organization owner or admin with access to this feature can connect it.';
+      return 'Only a Kilo organization owner or admin with access to this feature can link it.';
     default:
-      return 'We could not connect your Claude organization. Try again.';
+      return 'We could not link your Claude organization. Try again.';
   }
 }
 
 function refusalMessage(status: ClaudeBillingStatus) {
   if (status.state === 'billing_unavailable') {
-    return 'Claude billing is unavailable. The connection may have ended, the Claude organization may be ineligible, or Kilo may have an authentication problem. Check Claude Console, reconnect if needed, or contact Kilo support.';
+    return 'Claude billing is unavailable. The link may have ended, the Claude organization may be ineligible, or Kilo may have an authentication problem. Check Claude Console, link it again if needed, or contact Kilo support.';
   }
   switch (status.lastRefusalCode) {
     case 'linked_organization_spend_limit_reached':
-      return 'A Claude spend limit was reached. Check both the Kilo connection cap in Connected platforms and the organization’s monthly spend limit in Claude billing settings.';
+      return 'A Claude spend limit was reached. Check both the Kilo linked billing cap and the organization’s monthly spend limit in Claude Console.';
     case 'linked_organization_billing_unavailable':
     case 'billing_error':
       return 'Anthropic cannot bill your Claude organization. Check its billing status and spend limits in Claude Console.';
@@ -76,14 +76,14 @@ export function ClaudeBillingCardView({
   return (
     <Card>
       <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 space-y-0">
-        <CardTitle className="text-base">Claude organization</CardTitle>
+        <CardTitle className="text-base">Linked billing with Claude Platform</CardTitle>
         {status ? (
           <Badge variant={status.state === 'billing_unavailable' ? 'destructive' : 'outline'}>
             {status.state === 'connected'
-              ? 'Connected'
+              ? 'Linked'
               : status.state === 'billing_unavailable'
                 ? 'Billing unavailable'
-                : 'Not connected'}
+                : 'Not linked'}
           </Badge>
         ) : (
           <Skeleton className="h-5 w-20" />
@@ -121,14 +121,14 @@ export function ClaudeBillingCardView({
               You will go to Claude to approve. An owner, admin, or billing admin of your Claude
               organization must approve.
               {organizationId
-                ? ' Only an owner or admin of this Kilo organization can start the connection.'
+                ? ' Only an owner or admin of this Kilo organization can start linking.'
                 : ''}{' '}
               Claude requests pause if Anthropic refuses billing. Kilo does not fall back to Kilo
               credits.
             </p>
             {status.connectedAt && connected ? (
               <p className="text-muted-foreground text-xs">
-                Connected {new Date(status.connectedAt).toLocaleDateString()}.
+                Linked {new Date(status.connectedAt).toLocaleDateString()}.
               </p>
             ) : null}
             <a
@@ -137,7 +137,7 @@ export function ClaudeBillingCardView({
               target="_blank"
               rel="noreferrer"
             >
-              Set a spend limit or disconnect in Claude Console
+              Set a spend limit or unlink in Claude Console
             </a>
             {status.canManage && (onConnect || connected) ? (
               <div className="flex flex-wrap items-center gap-2">
@@ -154,8 +154,8 @@ export function ClaudeBillingCardView({
                     {connecting
                       ? 'Redirecting to Claude…'
                       : connected
-                        ? 'Reconnect your Claude organization'
-                        : 'Connect your Claude organization'}
+                        ? 'Link your Claude organization again'
+                        : 'Link your Claude organization'}
                   </Button>
                 ) : null}
                 {connected ? (
@@ -177,8 +177,8 @@ export function ClaudeBillingCardView({
             ) : null}
             {connected && status.canManage ? (
               <p className="text-muted-foreground text-xs">
-                Removing this connection restores normal BYOK or Kilo-credit routing. It does not
-                revoke consent in Claude Console.
+                Removing this link restores normal BYOK or Kilo-credit routing. It does not revoke
+                consent in Claude Console.
               </p>
             ) : null}
           </>
@@ -236,13 +236,13 @@ function ClaudeBillingCardContent({ organizationId }: { organizationId?: string 
       removing={removeMutation.isPending}
       error={
         needsSignIn
-          ? 'Sign in again to manage this connection.'
+          ? 'Sign in again to manage this link.'
           : needsAdmin
-            ? 'An organization owner or admin must manage this connection.'
+            ? 'An organization owner or admin must manage this link.'
             : statusQuery.isError
-              ? 'We could not load your Claude connection.'
+              ? 'We could not load your Claude link.'
               : removeMutation.isError
-                ? 'We could not remove your Claude connection. Try again.'
+                ? 'We could not remove your Claude link. Try again.'
                 : null
       }
       onRetry={

@@ -97,7 +97,7 @@ does not require this credential.
 
 ### Analytics & Monitoring
 
-- `NEXT_PUBLIC_POSTHOG_KEY` - PostHog public API key for client-side analytics; used in `apps/web/src/components/PostHogProvider.tsx`. [PUBLIC]
+- `NEXT_PUBLIC_POSTHOG_KEY` - PostHog public project key for client analytics and server feature evaluation. Configure the same project for the web app and AI gateway. The web app has a tracked public default in `apps/web/.env`; verify runtime configuration in both deployments before rollout. [PUBLIC]
 - `NEXT_PUBLIC_POSTHOG_DEBUG` - Enables PostHog debug logging; checked in `apps/web/src/components/PostHogProvider.tsx` and `apps/web/src/lib/stytch.ts`. [PUBLIC]
 - `POSTHOG_PERSONAL_API_KEY` - PostHog personal API key used by user-deletion PostHog cleanup. `[SECRET]`
 - `POSTHOG_ENVIRONMENT_ID` - PostHog project/environment ID used by user-deletion PostHog cleanup. [SERVER]
@@ -202,6 +202,9 @@ Usage-accounting transport is selected from deployment labels alone: staging wit
 The `claude-platform-oauth` release toggle defaults to off and requires the boolean value `true`, including in development.
 Use it as a global on/off switch without person targeting or partial rollouts: sign-in starts before a person is identified.
 Server checks cache the result for up to thirty seconds.
+The shared server PostHog client deliberately returns no flags outside production, so enabled local server paths require test fixtures.
+Use the focused Claude tests for enabled server behavior and browser-only SDK overrides for UI checks.
+Browser overrides do not bypass the server gate. Do not enable the live rollout for local testing.
 When disabled, connected owners cannot use customer-billed inference; requests fail explicitly rather than switch payer.
 Existing connection status and removal stay available, while new connections and reconnections remain hidden and refused.
 

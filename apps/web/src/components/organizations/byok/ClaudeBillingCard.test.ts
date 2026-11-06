@@ -70,4 +70,11 @@ describe('ClaudeBillingCardView', () => {
     expect(html).toContain('Reconnect your Claude organization');
     expect(html).toContain('Remove from Kilo');
   });
+
+  it('directs read-only members to an owner without offering connection controls', () => {
+    const html = render({ status: { ...status('connected'), canManage: false } });
+    expect(html).toContain('Ask a Kilo organization owner or admin');
+    expect(html).not.toContain('Remove from Kilo');
+    expect(html).not.toContain('Reconnect your Claude organization');
+  });
 });

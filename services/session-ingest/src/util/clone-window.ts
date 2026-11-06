@@ -5,8 +5,8 @@ import type { CloneBatchRow } from '../dos/SessionIngestDO';
 /**
  * The one-line identity of a clone source row: item id, item type, and the
  * stored body reference (the R2 key for an offloaded body, the inline body
- * otherwise). Both the source window digest and the clone stage digest are
- * built from these lines, so a body change always changes the digest.
+ * otherwise). The clone stage digest is built from these lines, so a body
+ * change always changes the digest.
  */
 export function cloneSourceDigestLine(row: CloneBatchRow): string {
   return `${row.itemId}:${row.itemType}:${row.itemDataR2Key ?? row.itemData}`;
@@ -23,15 +23,20 @@ export function utf8ByteLength(value: string): number {
 }
 
 /**
- * Chain one clone window digest onto the digest of the windows before it.
- * `previous` is empty for the first window. The chain keeps a fixed amount of
- * memory and a fixed amount of state, so a resumed clone continues from the
- * digest the stage recorded and a verification pass can continue across
- * requests.
+ * Chain one source row onto the digest of the rows before it. `previous` is
+ * empty for the first row.
+ *
+ * Per-row chaining keeps the stage digest independent of how the source is
+ * split into export windows, so a resumed request continues from the digest the
+ * stage recorded and a verification pass can read the source in different
+ * windows and still compare the same value.
  */
-export async function chainCloneWindowDigest(
-  previous: string,
-  windowDigest: string
-): Promise<string> {
-  return previous === '' ? windowDigest : sha256Hex(`${previous}\n${windowDigest}`);
+export async function chainCloneRowDigest(previous: string, line: string): Promise<string> {
+  return previous === '' ? sha256Hex(line) : sha256Hex(`${previous}\n${line}`);
+}
+
+export async function chainCloneRowDigests(lines: Array<string>): Promise<string> {
+  let chain = '';
+  for (const line of lines) chain = await chainCloneRowDigest(chain, line);
+  return chain;
 }

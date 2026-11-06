@@ -7,7 +7,6 @@ import {
   type SessionShareDuration,
   type SessionLiveSummary,
 } from '@kilocode/session-ingest-contracts';
-import { sha256Hex } from '@kilocode/worker-utils/sha256';
 import {
   desc,
   eq,
@@ -41,7 +40,7 @@ import {
   streamMessagePartRows,
 } from '../util/compaction';
 import { isItemWithinMessageCut } from '../util/message-cut';
-import { cloneSourceDigestLine, cloneSourceRowBytes } from '../util/clone-window';
+import { cloneSourceRowBytes } from '../util/clone-window';
 import {
   extractNormalizedGitBranchFromItem,
   extractNormalizedGitUrlFromItem,
@@ -466,7 +465,6 @@ export type ExportCloneBatchResult = {
   rows: CloneBatchRow[];
   nextCursor: IngestOrderCursor | null;
   done: boolean;
-  digest: string;
 };
 
 /**
@@ -600,11 +598,6 @@ function isSameCloneStage(
     stage.destinationSessionId === params.destinationSessionId &&
     stage.upToMessageId === (params.upToMessageId ?? null)
   );
-}
-
-async function computeCloneBatchDigest(rows: CloneBatchRow[]): Promise<string> {
-  const joined = rows.map(cloneSourceDigestLine).join('\n');
-  return sha256Hex(joined);
 }
 
 export class SessionIngestDO extends DurableObject<Env> {
@@ -2298,15 +2291,12 @@ export class SessionIngestDO extends DurableObject<Env> {
   /**
    * Read the next bounded clone window of clone-eligible ingest rows in
    * (ingested_at, id) order after `cursor`. Returns the rows, the next cursor
-   * (null when done), a `done` flag, and a stable SHA-256 digest over the
-   * returned rows. R2 bodies are not read here; the digest covers the stored
-   * reference (item_data or r2 key).
+   * (null when done), and a `done` flag. R2 bodies are not read here.
    *
    * The window holds at most `limit` rows and at most
    * {@link CLONE_WINDOW_MAX_BYTES} of stored row data, always keeping the first
-   * row so a large row cannot stall the cursor. Both bounds apply inside this
-   * object, so neither the returned payload nor the digest input can grow past
-   * one window.
+   * row so a large row cannot stall the cursor, so the returned payload cannot
+   * grow past one window.
    */
   async exportCloneBatch(
     cursor: IngestOrderCursor | null,
@@ -2351,13 +2341,12 @@ export class SessionIngestDO extends DurableObject<Env> {
       lastKept = index;
     }
 
-    const digest = await computeCloneBatchDigest(window);
     const truncated = window.length < fetched.length;
     const done = !truncated && fetched.length < limit;
     const lastRow = lastKept < 0 ? undefined : rows[lastKept];
     const nextCursor = done || lastRow === undefined ? null : ingestOrderCursor(lastRow);
 
-    return { rows: window, nextCursor, done, digest };
+    return { rows: window, nextCursor, done };
   }
 
   /** True when this session holds a `message` row with exactly this message ID. */

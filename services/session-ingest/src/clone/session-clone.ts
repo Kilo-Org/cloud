@@ -21,7 +21,7 @@ import {
   type StageCloneBatchResult,
   type StageCloneVerificationResult,
 } from '../dos/SessionIngestDO';
-import { chainCloneWindowDigest, utf8ByteLength } from '../util/clone-window';
+import { chainCloneRowDigest, cloneSourceDigestLine, utf8ByteLength } from '../util/clone-window';
 import { parsePartItemIdentity } from '../util/compaction';
 import { isItemWithinMessageCut } from '../util/message-cut';
 
@@ -33,6 +33,8 @@ const CLONE_BATCH_MAX_ROWS = 100;
  * the clone ends with a typed rejection before the body is read.
  */
 const CLONE_MAX_ROW_MATERIALIZED_BYTES = 4 * 1024 * 1024;
+/** Largest materialized payload one stage batch carries. */
+const CLONE_MAX_BATCH_MATERIALIZED_BYTES = 4 * 1024 * 1024;
 const CLONE_MAX_BATCHES_PER_REQUEST = 16;
 /**
  * One clone request reads at most this many source rows, counting every row of
@@ -261,34 +263,53 @@ async function materializeAndRewriteRow(
 }
 
 /**
- * Materialize and rewrite every clone-eligible row of one source window, then
- * write the destination R2 bodies it will stage. One window is one stage
- * batch, so the request never holds more than one window of source data.
+ * Materialize, rewrite, and stage the clone-eligible rows of one source window
+ * until the batch reaches the materialized-byte budget, then stop before the
+ * row that would not fit. An R2 destination body is written the moment its row
+ * is accepted, so the request never keeps more than one body in memory. The
+ * caller re-exports the consumed prefix to recover the resume cursor.
  */
-async function materializeSourceWindow(
+async function materializeSourceBatch(
   rows: CloneBatchRow[],
   upToMessageId: string | undefined,
   r2: R2Bucket,
   sourceSessionId: string,
   destinationSessionId: string,
-  writtenR2Keys: string[]
-): Promise<RewrittenCloneRow[]> {
+  writtenR2Keys: string[],
+  chain: string
+): Promise<{ rows: RewrittenCloneRow[]; chain: string; consumedSourceRows: number }> {
   const rewritten: RewrittenCloneRow[] = [];
-  for (const row of rows) {
-    if (!isCloneEligibleRow(row, upToMessageId)) continue;
+  let batchChain = chain;
+  let bytes = 0;
+  let consumed = 0;
+  for (const [index, row] of rows.entries()) {
+    if (!isCloneEligibleRow(row, upToMessageId)) {
+      consumed = index + 1;
+      batchChain = await chainCloneRowDigest(batchChain, cloneSourceDigestLine(row));
+      continue;
+    }
     const materialized = await materializeAndRewriteRow(
       row,
       r2,
       sourceSessionId,
       destinationSessionId
     );
+    if (
+      rewritten.length > 0 &&
+      bytes + materialized.materializedByteLength > CLONE_MAX_BATCH_MATERIALIZED_BYTES
+    ) {
+      break;
+    }
     if (materialized.itemDataR2Key !== null) {
       await r2.put(materialized.itemDataR2Key, materialized.destinationR2Body);
       writtenR2Keys.push(materialized.itemDataR2Key);
     }
+    bytes += materialized.materializedByteLength;
+    consumed = index + 1;
+    batchChain = await chainCloneRowDigest(batchChain, cloneSourceDigestLine(row));
     rewritten.push(materialized);
   }
-  return rewritten;
+  return { rows: rewritten, chain: batchChain, consumedSourceRows: consumed };
 }
 
 async function exportSourceWindow(
@@ -305,11 +326,13 @@ async function exportSourceWindow(
 type VerifyOutcome = 'verified' | 'in_progress' | 'changed' | 'setup_failed';
 
 /**
- * Re-read the source window by window and compare the chain of window digests
- * and the clone-eligible row count against what the stage recorded. The
- * request-wide row budget bounds the rows one request reads; progress is
- * persisted in the stage before signalling `in_progress`, so a source longer
- * than the budget is verified over several requests.
+ * Re-read the source window by window and compare the per-row digest chain and
+ * the clone-eligible row count against what the stage recorded. Row chaining is
+ * independent of the window split, so this pass reads the same rows in
+ * whatever windows the source hands out. The request-wide row budget and the
+ * per-request window cap bound the work one request does; progress is persisted
+ * in the stage before signalling `in_progress`, so a source longer than the
+ * budget is verified over several requests.
  */
 async function verifyCloneSource(params: {
   sourceStub: () => SessionIngestDOStub;
@@ -323,9 +346,13 @@ async function verifyCloneSource(params: {
   let cursor = params.progress.verifyCursor;
   let chain = params.progress.verifyChain;
   let rows = params.progress.verifyRows;
+  let windowsRead = 0;
 
   for (;;) {
-    if (params.budget.rowsRead >= CLONE_REQUEST_MAX_SOURCE_ROWS) {
+    if (
+      params.budget.rowsRead >= CLONE_REQUEST_MAX_SOURCE_ROWS ||
+      windowsRead >= CLONE_MAX_BATCHES_PER_REQUEST
+    ) {
       const persisted = await params.persist({
         verifyCursor: cursor,
         verifyChain: chain,
@@ -336,13 +363,12 @@ async function verifyCloneSource(params: {
 
     const exported = await exportSourceWindow(params.sourceStub, cursor);
     params.budget.rowsRead += exported.rows.length;
-    if (exported.rows.length > 0) {
-      chain = await chainCloneWindowDigest(chain, exported.digest);
-      for (const row of exported.rows) {
-        if (isCloneEligibleRow(row, params.upToMessageId)) rows += 1;
-      }
-      if (rows > params.targetItemCount) return 'changed';
+    windowsRead += 1;
+    for (const row of exported.rows) {
+      chain = await chainCloneRowDigest(chain, cloneSourceDigestLine(row));
+      if (isCloneEligibleRow(row, params.upToMessageId)) rows += 1;
     }
+    if (rows > params.targetItemCount) return 'changed';
     cursor = exported.nextCursor;
     if (exported.done) break;
   }
@@ -490,39 +516,58 @@ export async function cloneSessionIntoDestination(
       const exported = await exportSourceWindow(sourceStub, cursor);
       budget.rowsRead += exported.rows.length;
 
-      let rows: RewrittenCloneRow[];
+      let batch: {
+        rows: RewrittenCloneRow[];
+        chain: string;
+        consumedSourceRows: number;
+      };
       try {
-        rows = await materializeSourceWindow(
+        batch = await materializeSourceBatch(
           exported.rows,
           upToMessageId,
           r2,
           sourceSessionId,
           destinationSessionId,
-          writtenDestinationR2Keys
+          writtenDestinationR2Keys,
+          chain
         );
       } catch (error) {
         if (error instanceof CloneRejectionError) return reject(error.code);
         throw error;
       }
 
-      if (exported.rows.length > 0) {
-        chain = await chainCloneWindowDigest(chain, exported.digest);
+      let nextCursor = exported.nextCursor;
+      let done = exported.done;
+      if (batch.consumedSourceRows < exported.rows.length) {
+        // The batch stopped before the row that exceeded the materialized-byte
+        // budget. The row id is not part of a source row, so re-export the
+        // consumed prefix (bounded by one window) for the resume cursor.
+        budget.rowsRead += batch.consumedSourceRows;
+        const prefix = await withDORetry<SessionIngestDOStub, ExportCloneBatchResult>(
+          sourceStub,
+          stub => stub.exportCloneBatch(cursor, batch.consumedSourceRows),
+          'SessionIngestDO.exportCloneBatch'
+        );
+        nextCursor = prefix.nextCursor;
+        done = false;
       }
-      copiedItemCount += rows.length;
+
+      copiedItemCount += batch.rows.length;
+      chain = batch.chain;
 
       const staged = await withDORetry<SessionIngestDOStub, StageCloneBatchResult>(
         destinationStub,
         stub =>
           stub.stageCloneBatch({
             ...stageIdentity,
-            rows: rows.map(row => ({
+            rows: batch.rows.map(row => ({
               itemId: row.itemId,
               itemType: row.itemType,
               itemData: row.itemData,
               itemDataR2Key: row.itemDataR2Key,
               ingestedAt: row.ingestedAt,
             })),
-            nextCursor: exported.nextCursor,
+            nextCursor,
             rollingDigest: chain,
             copiedItemCount,
           }),
@@ -533,10 +578,10 @@ export async function cloneSessionIntoDestination(
         return reject('clone_setup_failed');
       }
 
-      cursor = exported.nextCursor;
+      cursor = nextCursor;
       batchesProcessed += 1;
 
-      if (exported.done) break;
+      if (done) break;
       if (batchesProcessed >= CLONE_MAX_BATCHES_PER_REQUEST) {
         return { status: 'in_progress' };
       }

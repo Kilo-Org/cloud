@@ -1213,14 +1213,6 @@ describe('createSessionForCloudAgent clone path', () => {
     ingestedAt: 3,
   });
 
-  // The window digest covers the stored row identity, exactly like the Durable
-  // Object's clone window digest, so a body change changes the digest.
-  function cloneWindowDigest(page: CloneItem[]): string {
-    return page
-      .map(row => `${row.itemId}:${row.itemType}:${row.itemDataR2Key ?? row.itemData}`)
-      .join('\n');
-  }
-
   function makePagedSourceStub(items: CloneItem[], pageSize: number) {
     const exportCloneBatch = vi.fn(
       async (cursor: { ingestedAt: number | null; id: number } | null, limit: number) => {
@@ -1231,7 +1223,7 @@ describe('createSessionForCloudAgent clone path', () => {
         const nextCursor = done
           ? null
           : { ingestedAt: items[lastIndex - 1]?.ingestedAt ?? null, id: lastIndex };
-        return { rows: page, nextCursor, done, digest: cloneWindowDigest(page) };
+        return { rows: page, nextCursor, done };
       }
     );
     return { exportCloneBatch };
@@ -1823,6 +1815,14 @@ describe('createSessionForCloudAgent clone path', () => {
     expect(dest.state.kind).toBe('in_progress');
     expect(dest.state.copiedItemCount).toBe(16);
 
+    // The second request finishes the copy and verifies 16 rows; the window cap
+    // ends it before the last 4 rows.
+    await expect(rpc.createSessionForCloudAgent(cloneParams())).resolves.toEqual({
+      status: 'in_progress',
+    });
+    expect(dest.state.copiedItemCount).toBe(20);
+    expect(dest.state.verifyRows).toBe(16);
+
     await expect(rpc.createSessionForCloudAgent(cloneParams())).resolves.toEqual({
       status: 'ready',
       clone: { sessionId: destinationSessionId, copiedItemCount: 20 },
@@ -1872,6 +1872,7 @@ describe('createSessionForCloudAgent clone path', () => {
     expect(dest.state.copiedItemCount).toBe(1700);
     expect(dest.state.verifyRows).toBe(1500);
 
+    // The third request finishes the verification from the recorded progress.
     await expect(rpc.createSessionForCloudAgent(cloneParams())).resolves.toEqual({
       status: 'ready',
       clone: { sessionId: destinationSessionId, copiedItemCount: 1700 },
@@ -1880,11 +1881,51 @@ describe('createSessionForCloudAgent clone path', () => {
 
     expect(dest.state.stagedRows).toHaveLength(1700);
     // Each request reads at most 16 windows of 100 rows: the copy fills the
-    // first, the second finishes the copy and verifies 1500 rows, the third
-    // verifies the remaining 200.
+    // first, the second finishes the copy and verifies 1500 rows, and the third
+    // verifies the remaining 200 from the recorded progress.
     expect(afterFirstRequest).toBe(16);
     expect(afterSecondRequest - afterFirstRequest).toBe(16);
     expect(afterThirdRequest - afterSecondRequest).toBe(2);
+  });
+
+  it('splits a window when one batch would exceed the materialized byte budget', async () => {
+    const largeMessage = (id: string, ingestedAt: number): CloneItem => ({
+      itemId: `message/${id}`,
+      itemType: 'message',
+      itemData: JSON.stringify({
+        id,
+        sessionID: sourceSessionId,
+        role: 'assistant',
+        time: { created: ingestedAt },
+        text: 'x'.repeat(3 * 1024 * 1024),
+      }),
+      itemDataR2Key: null,
+      ingestedAt,
+    });
+    const items = [sourceSessionItem(), largeMessage('msg_a', 2), largeMessage('msg_b', 3)];
+    const sourceStub = makePagedSourceStub(items, 100);
+    const dest = makeDestinationStub();
+    const r2 = { get: vi.fn(async () => null), put: vi.fn(async () => {}) };
+    const { db } = makeCloneDb({
+      sourceRows: [{ sessionId: sourceSessionId, organizationId }],
+      created: createdRow,
+    });
+    const rpc = makeCloneRpc({ db, sourceStub, destStub: dest.stub, r2 });
+
+    await expect(rpc.createSessionForCloudAgent(cloneParams())).resolves.toEqual({
+      status: 'ready',
+      clone: { sessionId: destinationSessionId, copiedItemCount: 3 },
+    });
+
+    // The third row does not fit the batch that holds the session row plus the
+    // first large message, so the batch stops after two rows and the request
+    // re-exports that prefix for the resume cursor.
+    expect(sourceStub.exportCloneBatch).toHaveBeenCalledWith(null, 2);
+    expect(dest.state.stagedRows.map(row => row.itemId)).toEqual([
+      'session',
+      'message/msg_a',
+      'message/msg_b',
+    ]);
   });
 
   it('returns ready for a repeated clone of a complete stage without reading the source', async () => {
@@ -1915,7 +1956,8 @@ describe('createSessionForCloudAgent clone path', () => {
 
   it('rejects a source whose already-copied inline body changed', async () => {
     // One row per window, so the first request stages 16 rows and the second
-    // request resumes and verifies the whole source against the staged digest.
+    // request resumes, copies the last rows, and verifies from row 1 against
+    // the staged digest.
     const items = [sourceSessionItem(), ...bulkItems(17)];
     const sourceStub = makePagedSourceStub(items, 1);
     const dest = makeDestinationStub();
@@ -1932,7 +1974,8 @@ describe('createSessionForCloudAgent clone path', () => {
     const stagedDigest = dest.state.rollingDigest;
     expect(stagedDigest).not.toBe('');
 
-    // Rewrite a body that was already copied, without changing the row count.
+    // Rewrite a body that was already copied, without changing the row count,
+    // before the resumed request verifies it against the staged digest.
     const copiedRow = items[1];
     if (copiedRow === undefined) throw new Error('missing copied row fixture');
     copiedRow.itemData = JSON.stringify({
@@ -1944,6 +1987,14 @@ describe('createSessionForCloudAgent clone path', () => {
       model: { providerID: 'openrouter', modelID: 'anthropic/claude-sonnet-4' },
       text: 'rewritten after the copy',
     });
+
+    // The resumed request finishes the copy and verifies 16 of the 18 rows
+    // before the window cap ends it.
+    await expect(rpc.createSessionForCloudAgent(cloneParams())).resolves.toEqual({
+      status: 'in_progress',
+    });
+    expect(dest.state.copiedItemCount).toBe(18);
+    expect(dest.state.verifyRows).toBe(16);
 
     await expect(rpc.createSessionForCloudAgent(cloneParams())).resolves.toEqual({
       status: 'rejected',
@@ -2454,6 +2505,16 @@ describe('createSessionForCloudAgent clone path', () => {
         status: 'in_progress',
       });
       expect(dest.state.copiedItemCount).toBe(15);
+
+      // The second request finishes the copy and verifies 16 windows before the
+      // window cap ends it.
+      await expect(rpc.createSessionForCloudAgent(params)).resolves.toEqual({
+        status: 'in_progress',
+      });
+      expect(dest.state.copiedItemCount).toBe(15);
+      // The verification counts kept rows only: one row per window ended the
+      // pass at 16 windows with 15 kept rows verified.
+      expect(dest.state.verifyRows).toBe(15);
 
       await expect(rpc.createSessionForCloudAgent(params)).resolves.toEqual({
         status: 'ready',

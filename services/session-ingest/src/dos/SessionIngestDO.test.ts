@@ -2983,25 +2983,6 @@ describe('SessionIngestDO clone primitives', () => {
     expect(third.nextCursor).toBeNull();
   });
 
-  it('produces a deterministic, stable digest over identical rows', async () => {
-    const harness = makeCloneHarness([
-      itemRow(1, 'session/1', 'session', 100),
-      itemRow(2, 'message/2', 'message', 200, 'items/blob-2'),
-    ]);
-
-    const first = await harness.durableObject.exportCloneBatch(null, 10);
-    const second = await harness.durableObject.exportCloneBatch(null, 10);
-
-    expect(first.digest).toBe(second.digest);
-    expect(first.digest).toMatch(/^[0-9a-f]{64}$/);
-
-    // The digest covers the stored reference: an inline row contributes item_data,
-    // so changing inline data changes the digest.
-    harness.items[0].item_data = JSON.stringify({ id: 'session/1', changed: true });
-    const changed = await harness.durableObject.exportCloneBatch(null, 10);
-    expect(changed.digest).not.toBe(first.digest);
-  });
-
   it('bounds one clone window by stored row bytes as well as row count', async () => {
     const largeBody = 'x'.repeat(3 * 1024 * 1024);
     const harness = makeCloneHarness([

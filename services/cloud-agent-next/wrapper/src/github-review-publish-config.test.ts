@@ -6,15 +6,18 @@ import {
   resolveCommandGuardBashPermission,
 } from '../../src/session/command-guard.js';
 import {
-  buildGitHubReviewBashDenies,
+  buildGitHubReviewBashRules,
   buildGitHubReviewPublishConfigContent,
 } from './github-review-publish-config.js';
 
-/** Production order: the worker guard map, then the review denies appended. */
+/** Production order: the worker guard map, then the appended review rules. */
 function reviewBashPermissions(): Record<string, string> {
   const policy = getCommandGuardPolicy('code-review', 'github');
   if (!policy) throw new Error('Missing code-review command guard policy');
-  return { ...buildCommandGuardBashPermissions(policy), ...buildGitHubReviewBashDenies() };
+  const composed = buildCommandGuardBashPermissions(policy);
+  const rules = buildGitHubReviewBashRules();
+  for (const key of Object.keys(rules)) delete composed[key];
+  return Object.assign(composed, rules);
 }
 
 const COMMENT_WRITE_COMMANDS: { label: string; command: string }[] = [
@@ -78,6 +81,14 @@ const COMMENT_WRITE_COMMANDS: { label: string; command: string }[] = [
 
 const ALLOWED_COMMANDS: { label: string; command: string }[] = [
   {
+    label: 'inline review write on a repository whose path contains the graphql phrase',
+    command: 'gh api repos/apollographql/apollo-server/pulls/42/reviews --input -',
+  },
+  {
+    label: 'inline review read on a repository whose path contains the graphql phrase',
+    command: 'gh api repos/apollographql/apollo-server/pulls/42/reviews',
+  },
+  {
     label: 'paginated conversation read',
     command:
       "gh api repos/acme/widgets/issues/42/comments --paginate --jq '.[] | {id,created_at,body}'",
@@ -102,9 +113,9 @@ const ALLOWED_COMMANDS: { label: string; command: string }[] = [
   { label: 'plain command', command: 'echo review-ready' },
 ];
 
-describe('github review bash denies', () => {
+describe('github review bash rules', () => {
   it.each(COMMENT_WRITE_COMMANDS)('denies the comment write form: $label', ({ command }) => {
-    expect(resolveCommandGuardBashPermission(buildGitHubReviewBashDenies(), command)).toBe('deny');
+    expect(resolveCommandGuardBashPermission(buildGitHubReviewBashRules(), command)).toBe('deny');
   });
 
   it.each(COMMENT_WRITE_COMMANDS)(

@@ -12,6 +12,13 @@ const GRAPHQL_ENDPOINT = 'graphql';
 
 const COMMENT_SUBCOMMANDS = ['gh issue comment', 'gh pr comment'];
 
+// The atomic inline review write routes through the review endpoint, never
+// through the conversation-comments endpoints.
+const INLINE_REVIEW_ALLOWS = [
+  'gh api repos/*/pulls/*/reviews',
+  'gh api repos/*/pulls/*/reviews --input*',
+];
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -21,10 +28,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * The map denies every `gh` form that creates or edits a conversation comment,
  * in any flag order and regardless of a command prefix. The CLI matcher
  * anchors whole-command globs and lets the last matching pattern win, so a rule
- * appended here overrides an earlier allow. Paginated reads and inline review
- * writes on pull review endpoints stay allowed.
+ * appended here overrides an earlier allow, and a later rule overrides an
+ * earlier deny. Paginated reads and inline review writes on pull review
+ * endpoints stay allowed.
  */
-export function buildGitHubReviewBashDenies(): Record<string, string> {
+export function buildGitHubReviewBashRules(): Record<string, string> {
   const denies: Record<string, string> = {};
   for (const endpoint of SUMMARY_COMMENT_ENDPOINTS) {
     for (const flag of SUMMARY_WRITE_FLAGS) {
@@ -50,6 +58,12 @@ export function buildGitHubReviewBashDenies(): Record<string, string> {
   denies[`gh api ${GRAPHQL_ENDPOINT}`] = 'deny';
   denies[`gh api ${GRAPHQL_ENDPOINT} *`] = 'deny';
   denies[`*gh api *${GRAPHQL_ENDPOINT}*`] = 'deny';
+  // Appended last: the session matcher resolves whole-command globs in key
+  // order and the last matching rule engages, so the inline review write stays
+  // allowed even when the repository path itself contains the graphql phrase.
+  for (const allow of INLINE_REVIEW_ALLOWS) {
+    denies[allow] = 'allow';
+  }
   return denies;
 }
 
@@ -67,10 +81,15 @@ export function buildGitHubReviewPublishConfigContent(input: {
 
   const permission = isRecord(parsed.permission) ? { ...parsed.permission } : {};
   const existingBash = permission.bash;
-  const bash = isRecord(existingBash)
+  const bash: Record<string, unknown> = isRecord(existingBash)
     ? { ...existingBash }
     : { '*': typeof existingBash === 'string' ? existingBash : 'allow' };
-  Object.assign(bash, buildGitHubReviewBashDenies());
+  // The CLI matcher lets the last matching key engage, and a key repeated by
+  // the rules keeps its first insertion position under a plain merge. Delete
+  // the rule keys first so every appended rule lands after the guard map.
+  const rules = buildGitHubReviewBashRules();
+  for (const key of Object.keys(rules)) delete bash[key];
+  Object.assign(bash, rules);
   permission.bash = bash;
   permission[GITHUB_REVIEW_TOOL_PERMISSION_KEY] = 'allow';
 

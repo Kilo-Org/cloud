@@ -21,6 +21,7 @@ import { LANGUAGE_ENDONYMS, type SupportedLanguage } from '@/i18n/languages';
 import { resolveDeviceLanguage } from '@/i18n/resolve-language';
 import { isRtlLanguage } from '@/i18n/rtl';
 import { type LanguageReturnTarget } from '@/i18n/return-target';
+import { searchPickerHeaderInList } from '@/lib/form-sheet-detents';
 import {
   getLanguagePreference,
   getResolvedLanguage,
@@ -28,6 +29,7 @@ import {
 } from '@/lib/hooks/use-language-preference';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { dismissSearchPickerKeyboard, SEARCHABLE_PICKER_LIST_PROPS } from '@/lib/picker-list';
+import { useWindowDimensions } from 'react-native';
 
 // The picker sheet renders its own scroll container (`scrollable={false}`), so
 // the list fills the sheet's body. The list stays transparent: the route's
@@ -55,6 +57,11 @@ export function LanguagePickerSheet({
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
+  // A sheet shorter than its header plus one row (a short window, and the
+  // keyboard takes more of it) cannot show a pinned search field and a result
+  // row at the same time. The search field then leads the scrolling list
+  // instead of pinning under the title row.
+  const searchInList = searchPickerHeaderInList({ windowHeight: useWindowDimensions().height });
   const [selected, setSelected] = useState<LanguagePreference>('device');
   const [applied, setApplied] = useState<LanguagePreference>('device');
   const [appliedLanguage, setAppliedLanguage] = useState<SupportedLanguage>('en');
@@ -284,6 +291,37 @@ export function LanguagePickerSheet({
       </PickerSheet>
     );
   }
+  // Filled pill with a leading magnifier, the one search-field shape the
+  // repository and share pickers use. Pinned under the title row in a window
+  // tall enough for it plus a result row; the list header otherwise. The
+  // outlined box this replaced made the same control look like two different
+  // controls across pickers. The field itself is the shared single-line
+  // `Input`: it owns the height floor, the one line box for the placeholder
+  // and the value, and the RTL content alignment, so the pill owns only the
+  // chrome and this field keeps only its flex share and text size.
+  const searchField = (
+    <View className="mx-4 mb-3 mt-3 flex-row items-center gap-2 rounded-full bg-secondary px-3 py-2">
+      <Search size={18} color={colors.mutedForeground} />
+      <Input
+        ref={searchInputRef}
+        accessibilityLabel={t('language.search')}
+        // The pill supplies the horizontal inset, so the field zeroes both
+        // physical sides of the shared box.
+        className="flex-1 pl-0 pr-0 text-base text-foreground"
+        placeholder={t('language.search')}
+        placeholderTextColor={colors.mutedForeground}
+        // Uncontrolled: iOS drops keystrokes when state drives `value`. The
+        // focus effect clears the live field through the ref, so a reopen
+        // starts empty.
+        onChangeText={setQuery}
+        autoCapitalize="none"
+        autoCorrect={false}
+        editable={!busy}
+        clearButtonMode="while-editing"
+        returnKeyType="search"
+      />
+    </View>
+  );
   return (
     <PickerSheet
       title={t('common.language')}
@@ -294,43 +332,21 @@ export function LanguagePickerSheet({
       doneLabel={t('common.done')}
       disabled={busy}
       scrollable={false}
-      headerContent={
-        // Filled pill with a leading magnifier, the one search-field shape the
-        // repository and share pickers use. The outlined box this replaced made
-        // the same control look like two different controls across pickers. The
-        // field itself is the shared single-line `Input`: it owns the height
-        // floor, the one line box for the placeholder and the value, and the RTL
-        // content alignment, so the pill owns only the chrome and this field
-        // keeps only its flex share and text size.
-        <View className="mx-4 mb-3 mt-3 flex-row items-center gap-2 rounded-full bg-secondary px-3 py-2">
-          <Search size={18} color={colors.mutedForeground} />
-          <Input
-            ref={searchInputRef}
-            accessibilityLabel={t('language.search')}
-            // The pill supplies the horizontal inset, so the field zeroes both
-            // physical sides of the shared box.
-            className="flex-1 pl-0 pr-0 text-base text-foreground"
-            placeholder={t('language.search')}
-            placeholderTextColor={colors.mutedForeground}
-            // Uncontrolled: iOS drops keystrokes when state drives `value`. The
-            // focus effect clears the live field through the ref, so a reopen
-            // starts empty.
-            onChangeText={setQuery}
-            autoCapitalize="none"
-            autoCorrect={false}
-            editable={!busy}
-            clearButtonMode="while-editing"
-            returnKeyType="search"
-          />
-        </View>
-      }
+      headerInBody={searchInList}
+      headerContent={searchField}
     >
       {items.length === 0 ? (
-        <EmptyState
-          icon={SearchX}
-          title={t('language.noMatches')}
-          description={t('agents.sessionList.tryDifferentSearch')}
-        />
+        // The search field is the list header in a short sheet, so the empty
+        // state has to carry it: a query that matches nothing must leave the
+        // field on screen to edit, not only the "no matches" copy.
+        <View style={listStyle}>
+          {searchInList ? searchField : null}
+          <EmptyState
+            icon={SearchX}
+            title={t('language.noMatches')}
+            description={t('agents.sessionList.tryDifferentSearch')}
+          />
+        </View>
       ) : (
         <FlashList
           nestedScrollEnabled
@@ -340,6 +356,7 @@ export function LanguagePickerSheet({
           extraData={rowExtraData}
           keyExtractor={item => item.key}
           {...SEARCHABLE_PICKER_LIST_PROPS}
+          ListHeaderComponent={searchInList ? searchField : undefined}
           ListFooterComponent={<View style={{ height: insets.bottom }} pointerEvents="none" />}
           renderItem={renderItem}
         />

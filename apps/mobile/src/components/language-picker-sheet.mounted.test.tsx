@@ -18,6 +18,10 @@ const writeDirectionAttemptAsync = vi.hoisted(() => vi.fn(() => Promise.resolve(
 const renameAndroidNotificationChannels = vi.hoisted(() => vi.fn());
 const registerNeedsInputCategories = vi.hoisted(() => vi.fn());
 const insets = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
+// The sheet picks its header shape from the window height, so the harness owns
+// that value: a tall window keeps the pinned search field, a short one hands it
+// to the list.
+const windowSize = vi.hoisted(() => ({ width: 402, height: 874 }));
 const i18nManager = vi.hoisted(() => ({
   allowRTL: vi.fn(),
   isRTL: false,
@@ -71,6 +75,7 @@ vi.mock('react-native', async () => {
     Keyboard: { dismiss: () => undefined },
     TextInput: MockTextInput,
     View: 'View',
+    useWindowDimensions: () => windowSize,
   };
 });
 vi.mock('expo-router', async () => {
@@ -107,8 +112,19 @@ vi.mock('@/i18n/apply-language', async importOriginal => {
 vi.mock('@/i18n/direction-attempt', () => ({ writeDirectionAttemptAsync }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/picker-sheet', () => ({
-  PickerSheet: (props: { headerContent?: ReactNode; children?: ReactNode }) =>
-    createElement('PickerSheet', props, props.headerContent, props.children),
+  // Mirrors the shell: `headerContent` is pinned chrome unless the caller put
+  // it in its own body (`headerInBody`), and the prop is exposed for assertions.
+  PickerSheet: (props: {
+    headerContent?: ReactNode;
+    headerInBody?: boolean;
+    children?: ReactNode;
+  }) =>
+    createElement(
+      'PickerSheet',
+      props,
+      props.headerInBody ? null : props.headerContent,
+      props.children
+    ),
 }));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/ui/choice-row', () => ({ ChoiceRow: 'ChoiceRow' }));
@@ -225,6 +241,7 @@ describe('LanguagePickerSheet apply', () => {
     renameAndroidNotificationChannels.mockReset();
     registerNeedsInputCategories.mockReset();
     insets.bottom = 0;
+    windowSize.height = 874;
     i18nManager.isRTL = false;
     i18nManager.forceRTL.mockReset();
     vi.mocked(applyLanguagePreference).mockClear();
@@ -263,6 +280,57 @@ describe('LanguagePickerSheet apply', () => {
     expect(findByType(renderer.root, 'EmptyState')).toHaveLength(0);
 
     renderer.unmount();
+  });
+
+  it('keeps the search field pinned above the list in a window tall enough for a row', async () => {
+    windowSize.height = 874;
+    const renderer = await mountSheet(vi.fn<() => void>());
+
+    const sheet = findByType(renderer.root, 'PickerSheet')[0];
+    expect(sheet?.props.headerInBody).toBe(false);
+    expect(renderer.root.findByType(flashListMock).props.ListHeaderComponent).toBeUndefined();
+    expect(findByType(renderer.root, 'TextInput')).toHaveLength(1);
+
+    renderer.unmount();
+  });
+
+  it('leads the list with the search field when the window cannot show it with a row', async () => {
+    // A short window (and the keyboard takes more of it) leaves a sheet body
+    // smaller than the pinned header plus one row, which put every filtered
+    // result under the sheet edge.
+    windowSize.height = 500;
+    const renderer = await mountSheet(vi.fn<() => void>());
+
+    const sheet = findByType(renderer.root, 'PickerSheet')[0];
+    expect(sheet?.props.headerInBody).toBe(true);
+    const listHeader = renderer.root.findByType(flashListMock).props
+      .ListHeaderComponent as TestRenderer.ReactTestInstance | null;
+    expect(String(listHeader?.props.className)).toContain('rounded-full');
+    // One field on screen: the list header, not a second copy in the chrome.
+    expect(findByType(renderer.root, 'TextInput')).toHaveLength(1);
+
+    renderer.unmount();
+    windowSize.height = 874;
+  });
+
+  it('keeps the search field usable when the compact list has no matches', async () => {
+    windowSize.height = 500;
+    const renderer = await mountSheet(vi.fn<() => void>());
+    const input = findByType(renderer.root, 'TextInput')[0];
+    if (!input) {
+      throw new Error('language search input not found');
+    }
+
+    act(() => {
+      (input.props.onChangeText as (value: string) => void)('zzzzzz');
+    });
+
+    expect(findByType(renderer.root, 'FlashList')).toHaveLength(0);
+    expect(findByType(renderer.root, 'EmptyState')).toHaveLength(1);
+    expect(findByType(renderer.root, 'TextInput')).toHaveLength(1);
+
+    renderer.unmount();
+    windowSize.height = 874;
   });
 
   it('keeps the same item array identity when the sheet re-renders without a query change', async () => {

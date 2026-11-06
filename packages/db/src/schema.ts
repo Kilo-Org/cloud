@@ -4775,12 +4775,17 @@ export const user_github_app_tokens = pgTable(
       .notNull()
       .references(() => kilocode_users.id, { onDelete: 'cascade' }),
     github_app_type: text().$type<'standard' | 'lite'>().notNull().default('standard'),
+    // The standard slot owns the personal identity for either credential source.
+    credential_source: text()
+      .$type<'github_app' | 'provided_token'>()
+      .notNull()
+      .default('github_app'),
     github_user_id: text().notNull(),
     github_login: text().notNull(),
     access_token_encrypted: text().notNull(),
-    access_token_expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
-    refresh_token_encrypted: text().notNull(),
-    refresh_token_expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    access_token_expires_at: timestamp({ withTimezone: true, mode: 'string' }),
+    refresh_token_encrypted: text(),
+    refresh_token_expires_at: timestamp({ withTimezone: true, mode: 'string' }),
     credential_version: integer().notNull().default(1),
     revoked_at: timestamp({ withTimezone: true, mode: 'string' }),
     revocation_reason: text(),
@@ -4800,6 +4805,17 @@ export const user_github_app_tokens = pgTable(
     check(
       'user_github_app_tokens_app_type_check',
       sql`${table.github_app_type} IN ('standard', 'lite')`
+    ),
+    check(
+      'user_github_app_tokens_source_check',
+      sql`(${table.credential_source} = 'github_app'
+        AND ${table.access_token_expires_at} IS NOT NULL
+        AND ${table.refresh_token_encrypted} IS NOT NULL
+        AND ${table.refresh_token_expires_at} IS NOT NULL)
+        OR (${table.credential_source} = 'provided_token'
+        AND ${table.github_app_type} = 'standard'
+        AND ${table.refresh_token_encrypted} IS NULL
+        AND ${table.refresh_token_expires_at} IS NULL)`
     ),
   ]
 );
@@ -5492,6 +5508,98 @@ export const passkey_sign_in_tickets = pgTable(
 
 export type PasskeySignInTicket = typeof passkey_sign_in_tickets.$inferSelect;
 export type NewPasskeySignInTicket = typeof passkey_sign_in_tickets.$inferInsert;
+
+/**
+ * A one-time WebAuthn challenge for session-bound MFA step-up.
+ *
+ * `session_id_hash` is the SHA-256 of the server-only `webSessionId` claim, so
+ * a challenge minted for one browser session cannot be completed by another.
+ * `purpose:'operation'` additionally binds the challenge to one sensitive
+ * action through `action_binding_hash`; a plain session challenge leaves that
+ * column null.
+ */
+export const session_step_up_challenges = pgTable(
+  'session_step_up_challenges',
+  {
+    id: uuid().primaryKey(),
+    challenge: text().notNull(),
+    kilo_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    session_id_hash: text().notNull(),
+    purpose: text().notNull().$type<'session' | 'operation'>(),
+    action_binding_hash: text(),
+    expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    consumed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    index('idx_session_step_up_challenges_expires_at').on(table.expires_at),
+    index('idx_session_step_up_challenges_kilo_user_id').on(table.kilo_user_id),
+    check(
+      'check_session_step_up_challenges_purpose',
+      sql`${table.purpose} IN ('session', 'operation')`
+    ),
+    check(
+      'check_session_step_up_challenges_action_binding',
+      sql`(${table.purpose} = 'operation') = (${table.action_binding_hash} IS NOT NULL)`
+    ),
+  ]
+);
+
+export type SessionStepUpChallenge = typeof session_step_up_challenges.$inferSelect;
+export type NewSessionStepUpChallenge = typeof session_step_up_challenges.$inferInsert;
+
+/**
+ * A verified, session-bound MFA proof. The row is opaque to clients: only its
+ * state (fresh, expired, revoked, consumed) is ever evaluated. A session proof
+ * authorizes ordinary privileged actions for `STEP_UP_ORDINARY_TTL`; an
+ * operation proof is single-use and bound to one action through
+ * `action_binding_hash`.
+ */
+export const session_step_up_proofs = pgTable(
+  'session_step_up_proofs',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    kilo_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    session_id_hash: text().notNull(),
+    method: text().notNull().$type<'webauthn_uv'>(),
+    passkey_credential_id: uuid()
+      .notNull()
+      .references(() => passkey_credentials.id, { onDelete: 'cascade' }),
+    purpose: text().notNull().$type<'session' | 'operation'>(),
+    action_binding_hash: text(),
+    verified_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    consumed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    revoked_at: timestamp({ withTimezone: true, mode: 'string' }),
+    revoked_reason: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    index('idx_session_step_up_proofs_user_session_expires').on(
+      table.kilo_user_id,
+      table.session_id_hash,
+      table.expires_at
+    ),
+    index('idx_session_step_up_proofs_expires_at').on(table.expires_at),
+    index('idx_session_step_up_proofs_passkey_credential_id').on(table.passkey_credential_id),
+    check('check_session_step_up_proofs_method', sql`${table.method} IN ('webauthn_uv')`),
+    check(
+      'check_session_step_up_proofs_purpose',
+      sql`${table.purpose} IN ('session', 'operation')`
+    ),
+    check(
+      'check_session_step_up_proofs_action_binding',
+      sql`(${table.purpose} = 'operation') = (${table.action_binding_hash} IS NOT NULL)`
+    ),
+  ]
+);
+
+export type SessionStepUpProof = typeof session_step_up_proofs.$inferSelect;
+export type NewSessionStepUpProof = typeof session_step_up_proofs.$inferInsert;
 
 export type WebhookEvent = typeof webhook_events.$inferSelect;
 
@@ -11998,3 +12106,199 @@ export const auto_routing_custom_routers = pgTable(
 
 export type AutoRoutingCustomRouter = typeof auto_routing_custom_routers.$inferSelect;
 export type NewAutoRoutingCustomRouter = typeof auto_routing_custom_routers.$inferInsert;
+
+/**
+ * Explicit support-organization access. A platform admin requests a
+ * time-bounded grant for one organization; reads activate immediately, writes
+ * require a second approver. `support_access_grant_events` is the append-only
+ * evidence trail and is never pruned, unlike `admin_action_audit_logs`.
+ */
+export type SupportAccessActionClass = 'support_read' | 'support_write';
+export type SupportAccessGrantKind = 'standard' | 'emergency';
+export type SupportAccessGrantStatus =
+  | 'pending'
+  | 'active'
+  | 'expired'
+  | 'denied'
+  | 'revoked'
+  | 'cancelled';
+
+export const support_access_grants = pgTable(
+  'support_access_grants',
+  {
+    id: uuid()
+      .default(sql`gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    actor_kilo_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id),
+    organization_id: uuid()
+      .notNull()
+      .references(() => organizations.id),
+    action_class: text().$type<SupportAccessActionClass>().notNull(),
+    grant_kind: text().$type<SupportAccessGrantKind>().default('standard').notNull(),
+    status: text().$type<SupportAccessGrantStatus>().default('pending').notNull(),
+    reason: text().notNull(),
+    ticket_reference: text(),
+    requested_duration_seconds: integer().notNull(),
+    requested_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    request_expires_at: timestamp({ withTimezone: true, mode: 'string' }),
+    approved_by_kilo_user_id: text().references(() => kilocode_users.id),
+    decided_at: timestamp({ withTimezone: true, mode: 'string' }),
+    issued_at: timestamp({ withTimezone: true, mode: 'string' }),
+    expires_at: timestamp({ withTimezone: true, mode: 'string' }),
+    revoked_at: timestamp({ withTimezone: true, mode: 'string' }),
+    revoked_by_kilo_user_id: text().references(() => kilocode_users.id),
+    revoke_reason: text(),
+    review_required: boolean().default(false).notNull(),
+    reviewed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    reviewed_by_kilo_user_id: text().references(() => kilocode_users.id),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    check(
+      'support_access_grants_action_class_check',
+      sql`${table.action_class} IN ('support_read', 'support_write')`
+    ),
+    check(
+      'support_access_grants_grant_kind_check',
+      sql`${table.grant_kind} IN ('standard', 'emergency')`
+    ),
+    check(
+      'support_access_grants_status_check',
+      sql`${table.status} IN ('pending', 'active', 'expired', 'denied', 'revoked', 'cancelled')`
+    ),
+    check(
+      'support_access_grants_reason_length_check',
+      sql`length(${table.reason}) BETWEEN 10 AND 2000`
+    ),
+    check(
+      'support_access_grants_ticket_length_check',
+      sql`${table.ticket_reference} IS NULL OR length(${table.ticket_reference}) <= 200`
+    ),
+    check(
+      'support_access_grants_requested_duration_positive_check',
+      sql`${table.requested_duration_seconds} > 0`
+    ),
+    check(
+      'support_access_grants_approver_not_actor_check',
+      sql`${table.approved_by_kilo_user_id} IS NULL OR ${table.approved_by_kilo_user_id} <> ${table.actor_kilo_user_id}`
+    ),
+    check(
+      'support_access_grants_reviewer_not_actor_check',
+      sql`${table.reviewed_by_kilo_user_id} IS NULL OR ${table.reviewed_by_kilo_user_id} <> ${table.actor_kilo_user_id}`
+    ),
+    check(
+      'support_access_grants_write_requires_approver_check',
+      sql`NOT (
+        ${table.action_class} = 'support_write'
+        AND ${table.grant_kind} = 'standard'
+        AND ${table.issued_at} IS NOT NULL
+        AND ${table.approved_by_kilo_user_id} IS NULL
+      )`
+    ),
+    check(
+      'support_access_grants_emergency_review_required_check',
+      sql`NOT (${table.grant_kind} = 'emergency' AND NOT ${table.review_required})`
+    ),
+    check(
+      'support_access_grants_issued_expires_pair_check',
+      sql`(${table.issued_at} IS NULL) = (${table.expires_at} IS NULL)`
+    ),
+    check(
+      'support_access_grants_expires_after_issued_check',
+      sql`${table.issued_at} IS NULL OR ${table.expires_at} > ${table.issued_at}`
+    ),
+    check(
+      'support_access_grants_duration_cap_check',
+      sql`${table.issued_at} IS NULL OR ${table.expires_at} - ${table.issued_at} <= CASE
+        WHEN ${table.action_class} = 'support_read' AND ${table.grant_kind} = 'standard'
+        THEN interval '60 minutes'
+        ELSE interval '15 minutes'
+      END`
+    ),
+    check(
+      'support_access_grants_active_requires_issue_check',
+      sql`NOT (${table.status} = 'active' AND ${table.issued_at} IS NULL)`
+    ),
+    uniqueIndex('UQ_support_access_grants_open')
+      .on(table.actor_kilo_user_id, table.organization_id, table.action_class)
+      .where(sql`${table.status} IN ('pending', 'active')`),
+    index('IDX_support_access_grants_actor_org_expires')
+      .on(table.actor_kilo_user_id, table.organization_id, table.expires_at)
+      .where(sql`${table.status} = 'active'`),
+    index('IDX_support_access_grants_organization_requested').on(
+      table.organization_id,
+      table.requested_at
+    ),
+    index('IDX_support_access_grants_pending_requested')
+      .on(table.requested_at)
+      .where(sql`${table.status} = 'pending'`),
+    index('IDX_support_access_grants_unreviewed_emergency')
+      .on(table.issued_at)
+      .where(sql`${table.review_required} AND ${table.reviewed_at} IS NULL`),
+  ]
+);
+
+export type SupportAccessGrant = typeof support_access_grants.$inferSelect;
+export type NewSupportAccessGrant = typeof support_access_grants.$inferInsert;
+
+export type SupportAccessGrantEventType =
+  | 'requested'
+  | 'approved'
+  | 'denied'
+  | 'issued'
+  | 'emergency_issued'
+  | 'cancelled'
+  | 'revoked'
+  | 'expired'
+  | 'reviewed'
+  | 'used_write';
+
+export const support_access_grant_events = pgTable(
+  'support_access_grant_events',
+  {
+    id: uuid()
+      .default(sql`gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    grant_id: uuid()
+      .notNull()
+      .references(() => support_access_grants.id, { onDelete: 'restrict' }),
+    event_type: text().$type<SupportAccessGrantEventType>().notNull(),
+    performed_by_kilo_user_id: text().references(() => kilocode_users.id),
+    organization_id: uuid().notNull(),
+    action_class: text().$type<SupportAccessActionClass>().notNull(),
+    metadata: jsonb().$type<Record<string, unknown>>(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    check(
+      'support_access_grant_events_event_type_check',
+      sql`${table.event_type} IN (
+        'requested', 'approved', 'denied', 'issued', 'emergency_issued',
+        'cancelled', 'revoked', 'expired', 'reviewed', 'used_write'
+      )`
+    ),
+    check(
+      'support_access_grant_events_action_class_check',
+      sql`${table.action_class} IN ('support_read', 'support_write')`
+    ),
+    index('IDX_support_access_grant_events_grant_created').on(table.grant_id, table.created_at),
+    index('IDX_support_access_grant_events_organization_created').on(
+      table.organization_id,
+      table.created_at
+    ),
+    index('IDX_support_access_grant_events_actor_created').on(
+      table.performed_by_kilo_user_id,
+      table.created_at
+    ),
+  ]
+);
+
+export type SupportAccessGrantEvent = typeof support_access_grant_events.$inferSelect;
+export type NewSupportAccessGrantEvent = typeof support_access_grant_events.$inferInsert;

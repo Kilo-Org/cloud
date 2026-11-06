@@ -139,6 +139,7 @@ function ingestRequest(body: string, contentLength = new TextEncoder().encode(bo
 
 function r2StagingStub(env: Parameters<typeof getSessionIngestDO>[0]) {
   return {
+    isDeleted: async () => false,
     stageR2Object: async (
       params: { key: string },
       body: ReadableStream<Uint8Array> | Uint8Array
@@ -375,6 +376,106 @@ describe('api routes', () => {
       env
     );
     expect(unshareRes.status).toBe(400);
+  });
+
+  it('POST /session answers a conflict for an id the ingest plane rejects', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    const isDeleted = vi.fn(async () => true);
+    vi.mocked(getSessionIngestDO).mockReturnValue({ isDeleted } as never);
+
+    const app = makeApiApp();
+    const res = await app.fetch(
+      new Request('http://local/session', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sessionId: 'ses_12345678901234567890123456' }),
+      }),
+      makeTestEnv()
+    );
+
+    expect(res.status).toBe(409);
+    await expect(res.json()).resolves.toEqual({ success: false, error: 'session_retired' });
+    expect(isDeleted).toHaveBeenCalledOnce();
+    expect(fns.insert).not.toHaveBeenCalled();
+    expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+  });
+
+  it('POST /session probes ingest availability before the insert transaction', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    const probeOrder: string[] = [];
+    fns.selectResult.mockResolvedValueOnce([{ blocked_reason: null }]);
+    fns.insertResult.mockResolvedValueOnce([]);
+    fns.transaction.mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => {
+      probeOrder.push('insert-transaction');
+      return fn(db);
+    });
+    vi.mocked(getSessionIngestDO).mockImplementation(
+      () =>
+        ({
+          isDeleted: vi.fn(async () => {
+            probeOrder.push('availability-probe');
+            return false;
+          }),
+        }) as never
+    );
+
+    const app = makeApiApp();
+    const res = await app.fetch(
+      new Request('http://local/session', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sessionId: 'ses_12345678901234567890123456' }),
+      }),
+      makeTestEnv()
+    );
+
+    expect(res.status).toBe(200);
+    expect(probeOrder).toEqual(['availability-probe', 'insert-transaction']);
+  });
+
+  it('POST /session keeps create available when the ingest probe fails', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValueOnce([{ blocked_reason: null }]);
+    fns.insertResult.mockResolvedValueOnce([
+      {
+        session_id: 'ses_12345678901234567890123456',
+        created_at: '2026-01-01T00:00:00.000Z',
+        updated_at: '2026-01-01T00:00:00.000Z',
+        title: null,
+        created_on_platform: null,
+        organization_id: null,
+        git_url: null,
+        git_branch: null,
+        parent_session_id: null,
+        status: null,
+        status_updated_at: null,
+      },
+    ]);
+    vi.mocked(getSessionIngestDO).mockImplementation(() => {
+      throw new Error('probe unavailable');
+    });
+    const warn = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const app = makeApiApp();
+    const res = await app.fetch(
+      new Request('http://local/session', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sessionId: 'ses_12345678901234567890123456' }),
+      }),
+      makeTestEnv()
+    );
+
+    warn.mockRestore();
+    expect(res.status).toBe(200);
+    expect(notifyUserSessionEvent).toHaveBeenCalledWith(
+      expect.anything(),
+      'usr_test',
+      expect.objectContaining({ type: 'session.created' })
+    );
   });
 
   it('POST /session emits created only for newly inserted rows', async () => {

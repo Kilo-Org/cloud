@@ -71,9 +71,6 @@ export function installFakeCredentialEnv(
   Object.assign(target as object, {
     GIT_TOKEN_SERVICE: broker,
     SANDBOX_CONTAINERS: FAKE_SANDBOX_CONTAINERS_NAMESPACE,
-    // The fake harness asserts contained grants unless a test opts out; the
-    // local `.dev.vars` value must not decide what a test means.
-    CREDENTIAL_CONTAINMENT_ENABLED: 'true',
     WORKER_URL: 'https://worker.example.com',
     ...extra,
   });

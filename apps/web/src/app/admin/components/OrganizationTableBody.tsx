@@ -8,6 +8,7 @@ import { formatDateOnly, formatMicrodollars, formatRelativeTime } from '@/lib/ad
 import type { AdminOrganizationSchema } from '@/types/admin';
 import type { z } from 'zod';
 import { ExternalLink } from 'lucide-react';
+import { AdminViewOrganizationButton } from '@/app/admin/support-access/AdminViewOrganizationButton';
 import type { TableVariant } from './OrganizationTableHeader';
 import {
   getStripeStatusLabel,
@@ -76,15 +77,13 @@ function LinksCell({ organization }: { organization: AdminOrganization }) {
         Pylon
         <ExternalLink className="h-3 w-3" />
       </a>
-      <a
-        href={`/organizations/${organization.id}`}
-        target="_blank"
+      <AdminViewOrganizationButton
+        organizationId={organization.id}
+        organizationName={organization.name}
         className="inline-flex items-center rounded-md bg-blue-100 px-3 py-1 text-xs font-medium text-blue-800 transition-colors hover:bg-blue-200"
-        title="View Org"
-        onClick={e => e.stopPropagation()}
       >
         View Org
-      </a>
+      </AdminViewOrganizationButton>
     </div>
   );
 }

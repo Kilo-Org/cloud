@@ -93,7 +93,6 @@ export type CreateControlTokenOptions = {
   extra?: {
     botId?: string;
     createdOnPlatform?: string;
-    isAdmin?: boolean;
     gastownAccess?: boolean;
     orgMemberships?: Array<{
       orgId: string;
@@ -388,7 +387,6 @@ async function createModernControlToken(
       deviceSessionId: authority.deviceSessionId,
       botId: options?.extra?.botId,
       createdOnPlatform: options?.extra?.createdOnPlatform,
-      isAdmin: options?.extra?.isAdmin === true && authority.user.is_admin,
       gastownAccess: options?.extra?.gastownAccess,
       orgMemberships: memberships,
       ...(resource === 'wasteland' ? {} : { runtimeAdmission: authority.runtimeAdmission }),
@@ -487,10 +485,7 @@ export async function createControlTokenForRequest(
         tokenSource: options?.tokenSource,
         ...(resource === 'cloud-agent-next'
           ? {}
-          : {
-              isAdmin: options?.extra?.isAdmin === true && authority.user.is_admin,
-              orgMemberships: await membershipsFor(authority.user.id),
-            }),
+          : { orgMemberships: await membershipsFor(authority.user.id) }),
       },
       { expiresIn }
     );

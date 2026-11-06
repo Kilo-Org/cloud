@@ -1,7 +1,7 @@
 import { generateKeyPairSync } from 'node:crypto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { encryptKeyedEnvelope } from '@kilocode/encryption';
-import { oauth_refresh_exchange_leases } from '@kilocode/db/schema';
+import { kilocode_users, oauth_refresh_exchange_leases } from '@kilocode/db/schema';
 
 const database = vi.hoisted(() => ({
   rows: [] as Array<Record<string, unknown>>,
@@ -23,13 +23,21 @@ const database = vi.hoisted(() => ({
 vi.mock('@kilocode/db/client', () => ({
   getWorkerDb: () => {
     const transactionDb = {
-      execute: async () => {
-        database.lockExecutions += 1;
+      // Count GitHub grant locks only. Identity writers also take a per-user lock.
+      execute: async (query: { queryChunks?: unknown[] }) => {
+        if (
+          (query.queryChunks ?? []).some(chunk =>
+            String(chunk).startsWith('github-user-authorization:')
+          )
+        )
+          database.lockExecutions += 1;
       },
       select: () => ({
-        from: () => ({
+        from: (table: unknown) => ({
           where: () => ({
             limit: async () => {
+              if (table === kilocode_users)
+                return [{ blockedReason: null, deletionRequestedAt: null }];
               if (database.selectSequence && database.selectSequence.length > 0) {
                 return [database.selectSequence.shift()].filter(Boolean);
               }
@@ -116,6 +124,7 @@ function makeRow(
     id: 'authorization_1',
     kilo_user_id: 'user_1',
     github_app_type: 'standard',
+    credential_source: 'github_app',
     github_user_id: '42',
     github_login: 'octocat',
     access_token_encrypted: encryptKeyedEnvelope(
@@ -437,7 +446,10 @@ describe('GitHubUserAuthorizationService disconnect', () => {
     database.rows = [];
     vi.stubGlobal('fetch', vi.fn());
 
-    await makeService().disconnectUserAuthorization('user_1');
+    await makeService().disconnectUserAuthorization('user_1', {
+      authorizationId: database.rows[0] ? 'authorization_1' : null,
+      credentialVersion: database.rows[0] ? 1 : null,
+    });
 
     expect(fetch).not.toHaveBeenCalled();
     expect(database.deleted).toBe(false);
@@ -447,7 +459,10 @@ describe('GitHubUserAuthorizationService disconnect', () => {
     database.rows = [{ ...makeRow(), revoked_at: new Date().toISOString() }];
     vi.stubGlobal('fetch', vi.fn());
 
-    await makeService().disconnectUserAuthorization('user_1');
+    await makeService().disconnectUserAuthorization('user_1', {
+      authorizationId: database.rows[0] ? 'authorization_1' : null,
+      credentialVersion: database.rows[0] ? 1 : null,
+    });
 
     expect(fetch).not.toHaveBeenCalled();
     expect(database.deleted).toBe(true);
@@ -456,7 +471,10 @@ describe('GitHubUserAuthorizationService disconnect', () => {
   it('treats remote 404 as revoked and deletes the current credential generation', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 404 })));
 
-    await makeService().disconnectUserAuthorization('user_1');
+    await makeService().disconnectUserAuthorization('user_1', {
+      authorizationId: database.rows[0] ? 'authorization_1' : null,
+      credentialVersion: database.rows[0] ? 1 : null,
+    });
 
     expect(database.lockExecutions).toBe(1);
     expect(database.deleted).toBe(true);
@@ -466,7 +484,10 @@ describe('GitHubUserAuthorizationService disconnect', () => {
     const request = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
     vi.stubGlobal('fetch', request);
 
-    await makeService().disconnectUserAuthorization('user_1');
+    await makeService().disconnectUserAuthorization('user_1', {
+      authorizationId: database.rows[0] ? 'authorization_1' : null,
+      credentialVersion: database.rows[0] ? 1 : null,
+    });
 
     expect(request).toHaveBeenCalledWith(
       'https://api.github.com/applications/client-id/grant',
@@ -480,7 +501,10 @@ describe('GitHubUserAuthorizationService disconnect', () => {
     const request = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
     vi.stubGlobal('fetch', request);
 
-    await makeService().disconnectUserAuthorization('user_1');
+    await makeService().disconnectUserAuthorization('user_1', {
+      authorizationId: database.rows[0] ? 'authorization_1' : null,
+      credentialVersion: database.rows[0] ? 1 : null,
+    });
 
     expect(request).toHaveBeenCalledWith(
       'https://api.github.com/applications/client-id/grant',
@@ -510,7 +534,10 @@ describe('GitHubUserAuthorizationService disconnect', () => {
       { ...makeRow(), access_token_expires_at: new Date(Date.now() - 1000).toISOString() },
     ];
 
-    await makeService().disconnectUserAuthorization('user_1');
+    await makeService().disconnectUserAuthorization('user_1', {
+      authorizationId: database.rows[0] ? 'authorization_1' : null,
+      credentialVersion: database.rows[0] ? 1 : null,
+    });
 
     expect(request).toHaveBeenCalledWith(
       'https://github.com/login/oauth/access_token',
@@ -528,7 +555,10 @@ describe('GitHubUserAuthorizationService disconnect', () => {
     ];
     vi.stubGlobal('fetch', vi.fn());
 
-    await makeService().disconnectUserAuthorization('user_1');
+    await makeService().disconnectUserAuthorization('user_1', {
+      authorizationId: database.rows[0] ? 'authorization_1' : null,
+      credentialVersion: database.rows[0] ? 1 : null,
+    });
 
     expect(fetch).not.toHaveBeenCalled();
     expect(database.deleted).toBe(true);
@@ -543,7 +573,10 @@ describe('GitHubUserAuthorizationService disconnect', () => {
       vi.fn().mockResolvedValue(Response.json({ error: 'bad_refresh_token' }))
     );
 
-    await makeService().disconnectUserAuthorization('user_1');
+    await makeService().disconnectUserAuthorization('user_1', {
+      authorizationId: database.rows[0] ? 'authorization_1' : null,
+      credentialVersion: database.rows[0] ? 1 : null,
+    });
 
     expect(fetch).toHaveBeenCalledTimes(1);
     expect(database.deleted).toBe(true);
@@ -573,7 +606,10 @@ describe('GitHubUserAuthorizationService disconnect', () => {
       .mockResolvedValueOnce(new Response(null, { status: 204 }));
     vi.stubGlobal('fetch', request);
 
-    await makeService().disconnectUserAuthorization('user_1');
+    await makeService().disconnectUserAuthorization('user_1', {
+      authorizationId: database.rows[0] ? 'authorization_1' : null,
+      credentialVersion: database.rows[0] ? 1 : null,
+    });
 
     expect(request).toHaveBeenCalledTimes(2);
     expect(request.mock.calls[1]?.[1]).toEqual(
@@ -617,9 +653,12 @@ describe('GitHubUserAuthorizationService disconnect', () => {
         .mockResolvedValueOnce(new Response(null, { status: 500 }))
     );
 
-    await expect(makeService().disconnectUserAuthorization('user_1')).rejects.toThrow(
-      'GitHub authorization revocation failed'
-    );
+    await expect(
+      makeService().disconnectUserAuthorization('user_1', {
+        authorizationId: database.rows[0] ? 'authorization_1' : null,
+        credentialVersion: database.rows[0] ? 1 : null,
+      })
+    ).rejects.toThrow('GitHub authorization revocation failed');
     expect(database.updates).toHaveLength(1);
     expect(database.rows[0]?.credential_version).toBe(2);
     expect(database.lockExecutions).toBe(2);
@@ -632,9 +671,12 @@ describe('GitHubUserAuthorizationService disconnect', () => {
     ];
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 500 })));
 
-    await expect(makeService().disconnectUserAuthorization('user_1')).rejects.toThrow(
-      'could not be revoked'
-    );
+    await expect(
+      makeService().disconnectUserAuthorization('user_1', {
+        authorizationId: database.rows[0] ? 'authorization_1' : null,
+        credentialVersion: database.rows[0] ? 1 : null,
+      })
+    ).rejects.toThrow('could not be revoked');
     expect(database.deleted).toBe(false);
   });
 
@@ -645,9 +687,12 @@ describe('GitHubUserAuthorizationService disconnect', () => {
     const request = vi.fn().mockResolvedValue(new Response(null, { status: 422 }));
     vi.stubGlobal('fetch', request);
 
-    await expect(makeService().disconnectUserAuthorization('user_1')).rejects.toThrow(
-      'could not be revoked'
-    );
+    await expect(
+      makeService().disconnectUserAuthorization('user_1', {
+        authorizationId: database.rows[0] ? 'authorization_1' : null,
+        credentialVersion: database.rows[0] ? 1 : null,
+      })
+    ).rejects.toThrow('could not be revoked');
     expect(request).toHaveBeenCalledTimes(1);
     expect(database.deleted).toBe(false);
   });
@@ -659,9 +704,12 @@ describe('GitHubUserAuthorizationService disconnect', () => {
       .mockResolvedValueOnce(new Response(null, { status: 500 }));
     vi.stubGlobal('fetch', request);
 
-    await expect(makeService().disconnectUserAuthorization('user_1')).rejects.toThrow(
-      'could not be revoked'
-    );
+    await expect(
+      makeService().disconnectUserAuthorization('user_1', {
+        authorizationId: database.rows[0] ? 'authorization_1' : null,
+        credentialVersion: database.rows[0] ? 1 : null,
+      })
+    ).rejects.toThrow('could not be revoked');
     expect(request).toHaveBeenCalledTimes(2);
     expect(database.deleted).toBe(false);
   });
@@ -680,9 +728,12 @@ describe('GitHubUserAuthorizationService disconnect', () => {
     );
     vi.stubGlobal('fetch', request);
 
-    await expect(makeService().disconnectUserAuthorization('user_1')).rejects.toThrow(
-      'changed during disconnect'
-    );
+    await expect(
+      makeService().disconnectUserAuthorization('user_1', {
+        authorizationId: database.rows[0] ? 'authorization_1' : null,
+        credentialVersion: database.rows[0] ? 1 : null,
+      })
+    ).rejects.toThrow('changed during disconnect');
     expect(request).toHaveBeenCalledTimes(1);
     expect(database.deleted).toBe(false);
   });
@@ -691,7 +742,12 @@ describe('GitHubUserAuthorizationService disconnect', () => {
     database.deleteWinsRace = false;
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 204 })));
 
-    await expect(makeService().disconnectUserAuthorization('user_1')).resolves.toBeUndefined();
+    await expect(
+      makeService().disconnectUserAuthorization('user_1', {
+        authorizationId: database.rows[0] ? 'authorization_1' : null,
+        credentialVersion: database.rows[0] ? 1 : null,
+      })
+    ).resolves.toBeUndefined();
   });
 
   it('retains the row when the conditional delete loses a reconnect race', async () => {
@@ -699,17 +755,23 @@ describe('GitHubUserAuthorizationService disconnect', () => {
     database.rowAfterDelete = { ...makeRow(), credential_version: 2 };
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 204 })));
 
-    await expect(makeService().disconnectUserAuthorization('user_1')).rejects.toThrow(
-      'changed during disconnect'
-    );
+    await expect(
+      makeService().disconnectUserAuthorization('user_1', {
+        authorizationId: database.rows[0] ? 'authorization_1' : null,
+        credentialVersion: database.rows[0] ? 1 : null,
+      })
+    ).rejects.toThrow('changed during disconnect');
   });
 
   it('retains the row when remote revocation fails', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 500 })));
 
-    await expect(makeService().disconnectUserAuthorization('user_1')).rejects.toThrow(
-      'GitHub authorization revocation failed'
-    );
+    await expect(
+      makeService().disconnectUserAuthorization('user_1', {
+        authorizationId: database.rows[0] ? 'authorization_1' : null,
+        credentialVersion: database.rows[0] ? 1 : null,
+      })
+    ).rejects.toThrow('GitHub authorization revocation failed');
     expect(database.deleted).toBe(false);
   });
 });
@@ -1168,5 +1230,146 @@ describe('GitHubUserAuthorizationService.getUserAccessToken', () => {
       'temporarily_unavailable'
     );
     expect(database.updates).toEqual([]);
+  });
+});
+
+describe('provided credential lifecycle', () => {
+  beforeEach(() => {
+    database.rows = [
+      {
+        ...makeRow(),
+        credential_source: 'provided_token',
+        access_token_expires_at: null,
+        refresh_token_encrypted: null,
+        refresh_token_expires_at: null,
+      },
+    ];
+    database.updates = [];
+    database.updatedRow = undefined;
+    database.deleted = false;
+    database.deleteWinsRace = true;
+    database.selectSequence = undefined;
+    vi.restoreAllMocks();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(Response.json({ permissions: { push: true } }))
+    );
+  });
+
+  it('returns unknown expiry and no refresh support without a provider request', async () => {
+    await expect(
+      makeService().getUserAccessToken('user_1', { op: 'fetch' })
+    ).resolves.toMatchObject({
+      connected: true,
+      token: 'access-token',
+      expiresAtEpochMs: null,
+      credentialSource: 'provided_token',
+      refreshSupported: false,
+    });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it.each([null, 60_000])(
+    'uses the common repository decision without App refresh headroom: %s',
+    async expiresIn => {
+      database.rows[0].access_token_expires_at =
+        expiresIn === null ? null : new Date(Date.now() + expiresIn).toISOString();
+      await expect(
+        makeService().selectUserAuthorization({
+          userId: 'user_1',
+          githubRepo: 'acme/repo',
+          strictRepositoryLookup: true,
+        })
+      ).resolves.toMatchObject({ selected: true, token: 'access-token' });
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(fetch).toHaveBeenCalledWith(
+        'https://api.github.com/repos/acme/repo',
+        expect.objectContaining({
+          headers: expect.objectContaining({ Authorization: 'Bearer access-token' }),
+        })
+      );
+    }
+  );
+
+  it('makes a known expired credential unavailable without trying refresh', async () => {
+    database.rows[0].access_token_expires_at = new Date(Date.now() - 1).toISOString();
+    await expect(makeService().getUserAccessToken('user_1', { op: 'fetch' })).resolves.toEqual({
+      connected: false,
+      reason: 'revoked',
+    });
+    await expect(
+      makeService().selectUserAuthorization({ userId: 'user_1', githubRepo: 'acme/repo' })
+    ).resolves.toEqual({ selected: false, reason: 'revoked' });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it.each([403, 404, 429, 500])(
+    'does not reject the identity for repository HTTP %s',
+    async status => {
+      vi.mocked(fetch).mockResolvedValueOnce(new Response(null, { status }));
+      await expect(
+        makeService().selectUserAuthorization({
+          userId: 'user_1',
+          githubRepo: 'acme/repo',
+          strictRepositoryLookup: true,
+        })
+      ).resolves.toEqual({ selected: false, reason: 'insufficient_user_access' });
+      expect(database.updates).toEqual([]);
+    }
+  );
+
+  it('rejects only a matching generation on a definitive 401 without refreshing', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(null, { status: 401 }));
+    await expect(
+      makeService().selectUserAuthorization({ userId: 'user_1', githubRepo: 'acme/repo' })
+    ).resolves.toEqual({ selected: false, reason: 'revoked' });
+    expect(database.updates).toEqual([
+      expect.objectContaining({ revocation_reason: 'github_token_rejected' }),
+    ]);
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects a matching rotate request from an older reader without App refresh', async () => {
+    await expect(
+      makeService().getUserAccessToken('user_1', {
+        op: 'rotate',
+        staleAuthorizationId: 'authorization_1',
+        staleCredentialVersion: 1,
+      })
+    ).resolves.toEqual({ connected: false, reason: 'revoked' });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('does not reject a replacement when an older request reports 401', async () => {
+    database.rows[0].credential_version = 2;
+    await expect(
+      makeService().getUserAccessToken('user_1', {
+        op: 'reportRejected',
+        authorizationId: 'authorization_1',
+        credentialVersion: 1,
+      })
+    ).resolves.toMatchObject({ connected: true, credentialVersion: 2 });
+    expect(database.updates).toEqual([]);
+  });
+
+  it('disconnects a provided credential without any provider grant request', async () => {
+    await makeService().disconnectUserAuthorization('user_1', {
+      authorizationId: 'authorization_1',
+      credentialVersion: 1,
+    });
+    expect(database.deleted).toBe(true);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('rejects a stale disconnect before deletion or provider revocation', async () => {
+    database.rows[0].credential_version = 2;
+    await expect(
+      makeService().disconnectUserAuthorization('user_1', {
+        authorizationId: 'authorization_1',
+        credentialVersion: 1,
+      })
+    ).rejects.toThrow('github_identity_conflict');
+    expect(database.deleted).toBe(false);
+    expect(fetch).not.toHaveBeenCalled();
   });
 });

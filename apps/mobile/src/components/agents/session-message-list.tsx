@@ -89,6 +89,16 @@ type SessionMessageListProps<T> = {
    * history exactly when the user returns to the live tail.
    */
   onReachedBottom?: () => void;
+  /**
+   * Optional callback that publishes the open gate's verdict, keyed by the
+   * session it belongs to: the rows are still measuring and the skeleton is
+   * what the body paints. A host that owns chrome around the transcript — the
+   * composer slot, the read-only footer, the header pill — must hold that
+   * chrome in its loading shape until this reports settled, or the screen
+   * shows finished controls beside a loading body. Absent keeps every other
+   * caller byte-identical.
+   */
+  onOpenSettledChange?: (sessionId: string, settled: boolean) => void;
 };
 
 export function SessionMessageList<T>({
@@ -106,6 +116,7 @@ export function SessionMessageList<T>({
   contentBottomInset,
   onReachedBottom,
   onAnchorChange,
+  onOpenSettledChange,
   resumeAt,
   followTailNonce,
 }: Readonly<SessionMessageListProps<T>>) {
@@ -171,6 +182,12 @@ export function SessionMessageList<T>({
     onContentSizeChange: handleContentSizeChange,
     onLayout: handleListLayout,
   });
+  // The host holds the chrome around this list — the bottom slot and the header
+  // pill — in its loading shape while the gate hides the rows, so it needs the
+  // gate's verdict, keyed by the session it describes.
+  useEffect(() => {
+    onOpenSettledChange?.(sessionId, openSettled);
+  }, [onOpenSettledChange, openSettled, sessionId]);
   const colors = useThemeColors();
   const { t } = useTranslation();
   const { left, right } = useSafeAreaInsets();

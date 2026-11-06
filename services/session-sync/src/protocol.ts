@@ -48,6 +48,7 @@ export const LIMITS = {
   uploadMs: 5 * 60_000,
   /** Grace period for verified blobs without a current entity reference. */
   unreferencedMs: 15 * 60_000,
+  tenantInitialLeaseBytes: 1024 * 1024,
   tenantLeaseBytes: 32 * 1024 * 1024,
   userTenantSessions: 10_000,
   userTenantBytes: 100 * 1024 * 1024 * 1024,

@@ -1,4 +1,5 @@
 import { type MessageDeliveryState, type MessageInfo } from '@kilocode/cloud-agent-sdk';
+import { z } from 'zod';
 
 import { i18n } from '@/i18n';
 
@@ -8,26 +9,55 @@ import { i18n } from '@/i18n';
  */
 type DeliveryReason = Extract<MessageDeliveryState, { status: 'failed' }>['reason'];
 
-const DELIVERY_DETAIL_KEY_BY_REASON = {
-  interrupted: 'agentChat.messageFailure.deliveryInterrupted',
-  exhausted: 'agentChat.messageFailure.deliveryExhausted',
-  // `execution` is the response failure, not a delivery one (the message
-  // reached the agent): the row shows the assistant-failure title instead, so
-  // this line is never rendered. It stays in the record to keep the reason
-  // coverage complete.
-  execution: 'agentChat.messageFailure.deliveryExecution',
-} as const satisfies Record<DeliveryReason, string>;
+/**
+ * The row a delivery failure draws, keyed by its `reason`. A message the person
+ * stopped states that it stopped and nothing more. A message the transport gave
+ * up on says it was not sent, and a second line says how many attempts it took;
+ * that is the only failure drawn on a failed bubble, because the message itself
+ * is what did not arrive.
+ *
+ * `execution` is the response failing, not the message: the message reached the
+ * agent, so the row states the response's failure in the assistant column, and
+ * its second line names the run as the thing that failed.
+ *
+ * `error` marks a row that reports an error, so the row carries the destructive
+ * marker beside its title. A message the person stopped reports a neutral
+ * status rather than an error, so it carries none.
+ */
+const DELIVERY_FAILURE_ROW = {
+  interrupted: {
+    side: 'user',
+    error: false,
+    titleKey: 'agentChat.messageFailure.deliveryInterrupted',
+    detailKey: null,
+  },
+  exhausted: {
+    side: 'user',
+    error: true,
+    titleKey: 'agentChat.messageFailure.deliveryTitle',
+    detailKey: 'agentChat.messageFailure.deliveryExhausted',
+  },
+  execution: {
+    side: 'assistant',
+    error: true,
+    titleKey: 'agentChat.messageFailure.assistantTitle',
+    detailKey: 'agentChat.messageFailure.deliveryExecution',
+  },
+} as const satisfies Record<
+  DeliveryReason,
+  { side: 'user' | 'assistant'; error: boolean; titleKey: string; detailKey: string | null }
+>;
 
 /**
  * The one delivery reason that is an agent run failing, not the transport: the
  * message was delivered and the agent could not run it. The row states it in
- * the assistant-failure copy ("Response failed") with no second line — the
- * session's own status line reports the same failure, so a delivery-flavoured
- * title here plus the footer's line read as the failure stated three times
- * (UX-DEFECT session-detail failed turn). Retry and Copy-to-composer keep
+ * the assistant-failure copy ("Response failed") in the assistant's column,
+ * with one line naming what failed; the session's status indicator for this
+ * reason is the delivery line, which that row already supersedes (see
+ * `statusIndicatorDuplicatesMessageFailure`). Retry and Copy-to-composer keep
  * working: the transport text stays reachable behind the copy action.
  */
-const AGENT_EXECUTION_DELIVERY_REASON: DeliveryReason = 'execution';
+const AGENT_EXECUTION_DELIVERY_REASON = 'execution' satisfies DeliveryReason;
 
 /**
  * Assistant error names that can never be retried. Pinned to the exact names
@@ -54,6 +84,48 @@ function assistantErrorMarkedNonRetryable(
     return false;
   }
   return Object.is(error.data.isRetryable, false);
+}
+
+/**
+ * The HTTP status the Kilo AI gateway answers a paid request with when the
+ * account cannot pay (no balance, no allowance). See
+ * `usageLimitExceededResponse` in packages/web-shared (`llm-proxy-helpers.ts`).
+ */
+const PAYMENT_REQUIRED = 402;
+
+/**
+ * What a gateway credit block names in the refusal body. A 402 alone does not
+ * say whose bill it is: an upstream provider's payment refusal passes through
+ * the gateway with the same status and names no credit type of its own.
+ */
+const gatewayCreditRefusalSchema = z.object({
+  error_type: z.enum(['usage_limit_exceeded', 'insufficient_credits']),
+});
+
+/**
+ * Whether this `APIError` is the gateway's own block on the account's credits,
+ * rather than a provider refusal passed through: the same rule
+ * `paymentRequired` in `lib/chat/backend-target.ts` applies to a model send.
+ * Only this failure resolves without spending — the account's balance is the
+ * recovery, not the request — so it is the one non-retryable refusal that
+ * offers an action that can settle it.
+ */
+function assistantCreditsRefusal(
+  error: Extract<MessageInfo, { role: 'assistant' }>['error']
+): boolean {
+  if (error?.name !== 'APIError' || error.data.statusCode !== PAYMENT_REQUIRED) {
+    return false;
+  }
+  const body = error.data.responseBody;
+  if (body === undefined) {
+    return false;
+  }
+  try {
+    return gatewayCreditRefusalSchema.safeParse(JSON.parse(body)).success;
+  } catch {
+    // A body that is not JSON names no gateway credit block.
+    return false;
+  }
 }
 
 /**
@@ -105,6 +177,25 @@ function assistantDetailKey(errorName: string, nonRetryableByProvider: boolean):
 export type MessageFailure = {
   kind: 'delivery' | 'assistant';
   /**
+   * The column the footer occupies, which is the column of the turn that
+   * failed rather than of the row that carries it. A delivery failure of the
+   * transport is the user's own message not arriving, so its footer sits under
+   * that bubble. Every failure of the response — the assistant's own error, and
+   * an agent-execution failure carried by the question, whose copy already
+   * names the response — takes the assistant's leading column (see
+   * `AGENT_EXECUTION_DELIVERY_REASON`). `kind` cannot carry this: the execution
+   * failure is a delivery record with the assistant's statement.
+   */
+  side: 'user' | 'assistant';
+  /**
+   * Whether the row reports an error, so it carries the destructive marker
+   * beside its title. Every failure does except a message the person stopped:
+   * stopping is a neutral status, not an error. The message bubble itself keeps
+   * the same fill and ink in every state, so the marker does not touch the ink
+   * its 15px copy reads at.
+   */
+  error: boolean;
+  /**
    * The catalog key behind `title`. The duplicate check compares keys, not the
    * resolved copy: `selectMessageFailure` runs inside a memo keyed on the
    * message arrays, so an in-place language switch would otherwise leave a
@@ -115,10 +206,9 @@ export type MessageFailure = {
   title: string;
   /**
    * The catalog key behind `detail`, or `null` when the title alone says it (an
-   * assistant failure with no classified reason, or an agent-execution delivery
-   * failure whose response-failure title is the whole statement). The footer
-   * then shows one statement plus the action rather than the same sentence
-   * twice.
+   * assistant failure with no classified reason, or a message the person
+   * stopped). The footer then shows one statement plus the action rather than
+   * the same sentence twice.
    */
   detailKey: string | null;
   /**
@@ -134,6 +224,13 @@ export type MessageFailure = {
    */
   copyDetail: string;
   canRetry: boolean;
+  /**
+   * The account's own balance caused this failure, so the row offers the action
+   * that settles it: opening the credit purchase screen. Independent of
+   * `canRetry` (which reads the request's retryability) and of the session's
+   * ability to re-send.
+   */
+  canAddCredits: boolean;
   canCopy: boolean;
 };
 
@@ -207,31 +304,52 @@ export function messageFailureLabel(
 export function selectMessageFailure(input: {
   deliveryState?: MessageDeliveryState;
   info: MessageInfo;
+  /**
+   * Whether this row's session can accept a re-send right now. A read-only
+   * stored transcript and a session without a live transport cannot, so the
+   * failure keeps its copy and drops the Retry that could never send.
+   * Defaults to true.
+   */
+  retryAvailable?: boolean;
 }): MessageFailure | null {
   const { deliveryState, info } = input;
+  const retryAvailable = input.retryAvailable ?? true;
 
   if (info.role === 'user' && deliveryState?.status === 'failed') {
     if (deliveryState.reason === AGENT_EXECUTION_DELIVERY_REASON) {
+      const copy = DELIVERY_FAILURE_ROW.execution;
       return {
         kind: 'delivery',
-        titleKey: 'agentChat.messageFailure.assistantTitle',
-        title: i18n.t('agentChat.messageFailure.assistantTitle'),
-        detailKey: null,
-        detail: null,
+        side: copy.side,
+        error: copy.error,
+        titleKey: copy.titleKey,
+        title: i18n.t(copy.titleKey),
+        detailKey: copy.detailKey,
+        detail: i18n.t(copy.detailKey),
         copyDetail: deliveryState.error,
-        canRetry: true,
+        canRetry: retryAvailable,
+        canAddCredits: false,
         canCopy: true,
       };
     }
-    const detailKey = DELIVERY_DETAIL_KEY_BY_REASON[deliveryState.reason];
+    // The SDK maps every transport failure that is not a person stopping the
+    // message onto the give-up copy, so a state that names no known reason
+    // takes the same branch instead of drawing an unlabelled row.
+    const copy =
+      deliveryState.reason === 'interrupted'
+        ? DELIVERY_FAILURE_ROW.interrupted
+        : DELIVERY_FAILURE_ROW.exhausted;
     return {
       kind: 'delivery',
-      titleKey: 'agentChat.messageFailure.deliveryTitle',
-      title: i18n.t('agentChat.messageFailure.deliveryTitle'),
-      detailKey,
-      detail: i18n.t(detailKey),
+      side: copy.side,
+      error: copy.error,
+      titleKey: copy.titleKey,
+      title: i18n.t(copy.titleKey),
+      detailKey: copy.detailKey,
+      detail: copy.detailKey === null ? null : i18n.t(copy.detailKey),
       copyDetail: deliveryState.error,
-      canRetry: true,
+      canRetry: retryAvailable,
+      canAddCredits: false,
       canCopy: true,
     };
   }
@@ -243,15 +361,31 @@ export function selectMessageFailure(input: {
     // the name set still covers the errors whose class is terminal on every
     // transport.
     const retryableByProvider = !assistantErrorMarkedNonRetryable(error);
-    const detailKey = assistantDetailKey(errorName, !retryableByProvider);
+    const creditsRefusal = assistantCreditsRefusal(error);
+    // A credits refusal names its cause, like the session's terminal error does
+    // for the same gateway block (`messageForClass('credits')` in
+    // session-terminal-error.ts). The row says only the cause: the action under
+    // it carries the recovery, so the line does not repeat it.
+    const detailKey = creditsRefusal
+      ? 'agentChat.messageFailure.assistantCreditsRefusal'
+      : assistantDetailKey(errorName, !retryableByProvider);
     return {
       kind: 'assistant',
+      side: 'assistant',
+      error: true,
       titleKey: 'agentChat.messageFailure.assistantTitle',
       title: i18n.t('agentChat.messageFailure.assistantTitle'),
       detailKey,
       detail: detailKey === null ? null : i18n.t(detailKey),
       copyDetail: '',
-      canRetry: retryableByProvider && !NON_RETRYABLE_ASSISTANT_ERRORS.includes(errorName),
+      canRetry:
+        retryAvailable &&
+        retryableByProvider &&
+        !NON_RETRYABLE_ASSISTANT_ERRORS.includes(errorName),
+      // Adding credits does not need the session to accept a re-send, so it is
+      // independent of `retryAvailable`: a stored transcript keeps the action
+      // that settles the failure it states.
+      canAddCredits: creditsRefusal,
       canCopy: false,
     };
   }

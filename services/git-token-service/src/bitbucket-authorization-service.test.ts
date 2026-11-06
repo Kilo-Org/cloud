@@ -197,9 +197,29 @@ describe('BitbucketAuthorizationService', () => {
 
     expect(query.sql).toContain('exists (select');
     expect(query.sql).toContain('"organization_memberships"');
-    expect(query.sql).toContain('"kilocode_users"."is_admin"');
     expect(query.params).toContain('member-1');
     expect(query.params).toContain('123e4567-e89b-12d3-a456-426614174030');
+  });
+
+  it('does not admit an administrator without an organization membership', () => {
+    const db = getWorkerDb('postgres://query-builder');
+    const query = buildBitbucketAuthorizationQuery(db, {
+      userId: 'administrator-1',
+      orgId: '123e4567-e89b-12d3-a456-426614174030',
+    }).toSQL();
+
+    expect(query.sql).not.toContain('"kilocode_users"."is_admin"');
+    expect(query.sql.match(/exists \(select/g)).toHaveLength(1);
+  });
+
+  it('keeps personal credentials free of the organization condition', () => {
+    const db = getWorkerDb('postgres://query-builder');
+    const query = buildBitbucketAuthorizationQuery(db, { userId: 'user-1' }).toSQL();
+
+    expect(query.sql).not.toContain('"organization_memberships"');
+    expect(query.sql).not.toContain('"kilocode_users"."is_admin"');
+    expect(query.sql).toContain('"platform_integrations"."owned_by_user_id" =');
+    expect(query.sql).toContain('"platform_integrations"."owned_by_organization_id" is null');
   });
 
   beforeEach(() => {

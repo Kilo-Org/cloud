@@ -62,8 +62,14 @@ jobs:
           node-version-file: '.nvmrc'
           cache: 'pnpm'
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      # The hash steps run tsx over the local dev/local scripts and let
+      # @expo/fingerprint read the Expo config from apps/mobile, so they need the
+      # root project and the mobile app, not the whole workspace. Both build jobs
+      # wait behind this one, so a filtered install here releases them sooner.
+      # The hash must stay identical to the one a build job recomputes after its
+      # recursive install, or the artifact name matches no build.
+      - name: Install root and mobile dependencies
+        run: pnpm --filter kilocode-monorepo --filter kilo-app install --frozen-lockfile --ignore-scripts
 
       - name: Compute hashes and gate the build
         id: decide
@@ -251,6 +257,25 @@ jobs:
       - name: Expo prebuild
         if: steps.published.outputs.published != 'true'
         run: CI=1 pnpm --filter kilo-app exec expo prebuild --platform android
+
+      # The prebuild rewrites apps/mobile/android inside this run, so the key
+      # hashes the inputs that pin the generated Gradle toolchain — the app
+      # manifest and the lockfile, which also records the patch hashes —
+      # instead of a generated wrapper file that does not exist yet. A warm
+      # user home is reused without a daemon. Any dependency change rotates the
+      # key, so a miss restores the newest earlier user home from the prefix
+      # and Gradle fetches only the modules that changed; the Build step stays
+      # the gate.
+      - name: Cache the Gradle user home
+        if: steps.published.outputs.published != 'true'
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-${{ runner.arch }}-gradle-${{ hashFiles('apps/mobile/package.json', 'pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-gradle-
 
       - name: Build
         if: steps.published.outputs.published != 'true'

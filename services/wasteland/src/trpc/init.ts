@@ -1,7 +1,12 @@
 import * as Sentry from '@sentry/cloudflare';
 import { initTRPC, TRPCError } from '@trpc/server';
+import type {
+  WorkerAdminAuthority,
+  WorkerAdminTarget,
+} from '@kilocode/worker-utils/worker-admin-capability';
 import { z } from 'zod';
 import { writeEvent } from '../util/analytics.util';
+import { emitWorkerAdminDecision } from '../middleware/worker-admin.middleware';
 import { checkRateLimit } from '../util/rate-limit.util';
 
 import type { JwtOrgMembership } from '../middleware/auth.middleware';
@@ -9,8 +14,10 @@ import type { JwtOrgMembership } from '../middleware/auth.middleware';
 export type TRPCContext = {
   env: Env;
   userId: string;
-  isAdmin: boolean;
+  workerAdmin: WorkerAdminAuthority;
+  procedurePath: string;
   apiTokenPepper: string | null;
+  legacyClaimLifetimeSeconds: number | null;
   orgMemberships: JwtOrgMembership[];
 };
 
@@ -63,7 +70,7 @@ const analyticsProcedure = t.procedure.use(async ({ ctx, path, type, getRawInput
 
   let error: string | undefined;
   try {
-    const result = await next({ ctx });
+    const result = await next({ ctx: { ...ctx, procedurePath: path } });
     return result;
   } catch (err) {
     error = err instanceof Error ? err.message : String(err);
@@ -102,9 +109,42 @@ export const procedure = analyticsProcedure.use(async ({ ctx, path, next }) => {
  * Admin-only procedure — requires `isAdmin` on the JWT. Used for admin
  * endpoints that bypass per-user ownership checks.
  */
-export const adminProcedure = procedure.use(async ({ ctx, next }) => {
-  if (!ctx.isAdmin) {
-    throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
+function adminTargetForInput(input: unknown): WorkerAdminTarget {
+  if (typeof input === 'object' && input !== null) {
+    if ('wastelandId' in input && typeof input.wastelandId === 'string') {
+      return { kind: 'wasteland', id: input.wastelandId };
+    }
+  }
+  return { kind: 'service', id: 'wasteland' };
+}
+
+export const adminProcedure = procedure.use(async ({ ctx, path, getRawInput, next }) => {
+  const action = `trpc:${path}`;
+  const target = adminTargetForInput(await getRawInput());
+  const decision = await ctx.workerAdmin.decide(action, target);
+  if (ctx.workerAdmin.takeDecisionReport(action, target)) {
+    emitWorkerAdminDecision(ctx.env, decision, {
+      action,
+      userId: ctx.userId || null,
+      wastelandId: target.kind === 'wasteland' ? target.id : null,
+      jti: decision.allowed ? decision.jti : null,
+      lifetimeSeconds: ctx.legacyClaimLifetimeSeconds,
+      delivery: 'trpc',
+    });
+  }
+  if (!decision.allowed) {
+    throw new TRPCError({
+      code:
+        decision.status === 401
+          ? 'UNAUTHORIZED'
+          : decision.status === 503
+            ? 'SERVICE_UNAVAILABLE'
+            : 'FORBIDDEN',
+      message:
+        decision.status === 503
+          ? 'Admin capability validation unavailable'
+          : 'Admin access required',
+    });
   }
   return next({ ctx });
 });

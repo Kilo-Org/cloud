@@ -1,3 +1,7 @@
+import {
+  GitHubIdentityPreconditionSchema,
+  GitHubIdentityConflictError,
+} from '@kilocode/db/github-identity';
 import { timingSafeEqual } from '@kilocode/encryption';
 import {
   BITBUCKET_REPOSITORY_LIST_AUDIENCE,
@@ -351,6 +355,7 @@ const bitbucketCodeReviewAudiences = new Map([
 
 type ServiceHttpEnv = CloudflareEnv & {
   NEXTAUTH_SECRET: SecretsStoreSecret | string;
+  GITHUB_USER_TOKEN_SOURCE_METADATA_ENABLED?: string;
 };
 
 async function resolveSecret(secret: SecretsStoreSecret | string): Promise<string> {
@@ -648,6 +653,7 @@ function decodePathnameIteratively(pathname: string): string | null {
 }
 
 function validateGitLabCapabilityUpstream(
+  requestMethod: string,
   requestUrl: string,
   session: {
     instanceOrigin: string;
@@ -687,7 +693,7 @@ function validateGitLabCapabilityUpstream(
   ) {
     return { failure: 'upstream_origin_not_allowed', authSurface: 'git' };
   }
-  return validateGitLabSessionCapabilityPath(url.pathname, session, base.basePath);
+  return validateGitLabSessionCapabilityPath(requestMethod, url.pathname, session, base.basePath);
 }
 
 function validateBitbucketCapabilityUpstream(
@@ -1634,7 +1640,7 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
 
     const upstream =
       claims.version === 2
-        ? validateGitLabCapabilityUpstream(params.requestUrl, claims)
+        ? validateGitLabCapabilityUpstream(params.requestMethod, params.requestUrl, claims)
         : validateLegacyGitLabCapabilityUpstream(params.requestMethod, params.requestUrl, claims);
     if (upstream.failure) return { success: false, reason: upstream.failure };
     const context = {
@@ -1980,6 +1986,14 @@ export default {
       try {
         const service = new GitHubUserAuthorizationService(env);
         const result = await service.getUserAccessToken(authorization.kiloUserId, parsed.data);
+        if (
+          result.connected &&
+          result.credentialSource === 'github_app' &&
+          env.GITHUB_USER_TOKEN_SOURCE_METADATA_ENABLED !== 'true'
+        ) {
+          const { credentialSource: _source, refreshSupported: _refresh, ...legacy } = result;
+          return Response.json(legacy, { headers: { 'Cache-Control': 'no-store' } });
+        }
         return Response.json(result, { headers: { 'Cache-Control': 'no-store' } });
       } catch (error) {
         if (error instanceof Error && error.message === 'temporarily_unavailable') {
@@ -1995,11 +2009,21 @@ export default {
       }
     }
 
+    let disconnectBody: unknown;
+    try {
+      disconnectBody = await readBoundedInternalJsonRequest(request);
+    } catch {
+      return Response.json({ error: 'invalid_request' }, { status: 400 });
+    }
+    const expected = GitHubIdentityPreconditionSchema.safeParse(disconnectBody);
+    if (!expected.success) return Response.json({ error: 'invalid_request' }, { status: 400 });
     try {
       const service = new GitHubUserAuthorizationService(env);
-      await service.disconnectUserAuthorization(authorization.kiloUserId);
+      await service.disconnectUserAuthorization(authorization.kiloUserId, expected.data);
       return Response.json({ disconnected: true });
-    } catch {
+    } catch (error) {
+      if (error instanceof GitHubIdentityConflictError)
+        return Response.json({ error: 'connection_conflict' }, { status: 409 });
       return Response.json({ error: 'disconnect_failed' }, { status: 502 });
     }
   },

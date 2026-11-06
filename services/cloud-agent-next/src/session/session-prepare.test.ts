@@ -106,7 +106,6 @@ function modernContext(
   organizationId?: string
 ): SessionRegistrationContext {
   ctx.env.NEXTAUTH_SECRET = 'registration-test-secret';
-  ctx.env.RUNTIME_ISOLATION_ENABLED = 'true';
   ctx.authToken = jwt.sign(
     {
       kiloUserId: ctx.userId,
@@ -333,7 +332,6 @@ function createdMetadata(doStub: ReturnType<typeof makeDoStub>): SessionMetadata
 
 function makeEnv(doStub: ReturnType<typeof makeDoStub>): Env {
   return {
-    CODE_REVIEW_CONTAINERS_ORG_IDS: '*',
     SANDBOX_SESSION: {
       idFromName: vi.fn((name: string) => ({ toString: () => name })),
       get: vi.fn(() => doStub),
@@ -488,8 +486,6 @@ describe('explicit sandbox session creation', () => {
     const ctx = makeContext(doStub);
     Object.assign(ctx.env, vercel, {
       SANDBOX_SELECTION_IDS: orgId,
-      VERCEL_SANDBOX_ORG_IDS: '*',
-      CLOUDFLARE_CONTAINERS_ORG_IDS: '*',
     });
     return ctx;
   }
@@ -587,7 +583,6 @@ describe('explicit sandbox session creation', () => {
   it('resolves an inherited allowlist to the native containers replacement', async () => {
     const doStub = makeDoStub();
     const ctx = selectedContext(doStub);
-    ctx.env.CLOUDFLARE_CONTAINERS_ORG_IDS = '';
     const request = makeRequest({
       repository: { type: 'github', repo: 'acme/repo' },
       options: { kilocodeOrganizationId: orgId, operationKey: OPERATION_KEY },
@@ -1251,9 +1246,6 @@ describe('explicit sandbox session creation', () => {
     async ({ preset, format }) => {
       const doStub = makeDoStub();
       const ctx = selectedContext(doStub);
-      if (preset.startsWith('vercel-')) {
-        Object.assign(ctx.env, { VERCEL_SANDBOX_ORG_IDS: '' });
-      }
       await runCreate(
         ctx,
         format === 'structured' ? requestFromStructuredAllocation(preset) : requestForPreset(preset)
@@ -1449,8 +1441,6 @@ describe('explicit sandbox session creation', () => {
     async sandboxAllocation => {
       const doStub = makeDoStub();
       const ctx = selectedContext(doStub);
-      ctx.env.CREDENTIAL_CONTAINMENT_ENABLED = 'false';
-      ctx.env.CLOUDFLARE_CONTAINERS_ORG_IDS = '*';
       const request = requestForPreset(sandboxAllocation);
       request.options = {
         ...request.options,
@@ -2099,10 +2089,9 @@ describe('explicit sandbox session creation', () => {
       expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
     });
 
-    it('starts a V2 environment when the obsolete containment flag is off', async () => {
+    it('starts a V2 environment', async () => {
       const doStub = makeDoStub();
       const ctx = selectedContext(doStub);
-      ctx.env.CREDENTIAL_CONTAINMENT_ENABLED = 'false';
       getPgDbMock.mockReturnValue(makeDb([[{ id: 'member' }], []]));
 
       await expect(runCreate(ctx, environmentRequest(v2Environment))).resolves.toMatchObject({
@@ -2686,122 +2675,46 @@ describe('createSessionWithLedger admission ladder', () => {
     });
   });
 
-  it('rejects a new modern control-plane session before durable session effects when isolation is disabled', async () => {
-    generateSessionIdMock.mockReturnValue(WORKSPACE_SESSION_ID);
-    const doStub = makeDoStub();
-    const ctx = makeContext(doStub);
-    ctx.env.RUNTIME_ISOLATION_ENABLED = 'false';
-    ctx.authToken = 'eyJhbGciOiJub25lIn0.eyJhdWQiOiJhcGkifQ.';
-
-    await expect(runCreate(ctx)).rejects.toMatchObject({
-      code: 'PRECONDITION_FAILED',
-      message: 'runtime_isolation_unavailable',
-    });
-    expect(recordSandboxIdentityMock).not.toHaveBeenCalled();
-    expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
-  });
-
-  describe.each([undefined, 'true', 'false', '', 'False', '0'] as const)(
-    'workspace containment samples CREDENTIAL_CONTAINMENT_ENABLED=%s',
-    flag => {
-      it.each([
-        {
-          repository: { type: 'github', repo: 'acme/repo' },
-          expected: { github: true, gitlab: false, bitbucket: false, kilocode: true },
+  describe('workspace containment', () => {
+    it.each([
+      {
+        repository: { type: 'github', repo: 'acme/repo' },
+        expected: { github: true, gitlab: false, bitbucket: false, kilocode: true },
+      },
+      {
+        repository: { type: 'gitlab', url: 'https://gitlab.com/acme/repo.git' },
+        expected: { github: false, gitlab: true, bitbucket: false, kilocode: true },
+      },
+      {
+        repository: {
+          type: 'bitbucket',
+          url: 'https://bitbucket.org/acme/repo.git',
+          workspaceUuid: '123e4567-e89b-12d3-a456-426614174000',
+          repositoryUuid: '123e4567-e89b-12d3-a456-426614174001',
         },
-        {
-          repository: { type: 'gitlab', url: 'https://gitlab.com/acme/repo.git' },
-          expected: { github: false, gitlab: true, bitbucket: false, kilocode: true },
-        },
-        {
-          repository: {
-            type: 'bitbucket',
-            url: 'https://bitbucket.org/acme/repo.git',
-            workspaceUuid: '123e4567-e89b-12d3-a456-426614174000',
-            repositoryUuid: '123e4567-e89b-12d3-a456-426614174001',
-          },
-          expected: { github: false, gitlab: false, bitbucket: true, kilocode: true },
-        },
-        {
-          repository: { type: 'git', url: 'https://example.com/acme/repo.git' },
-          expected: { github: false, gitlab: false, bitbucket: false, kilocode: true },
-        },
-      ] as const)(
-        'derives $repository.type containment from the allocated workspace ID',
-        async ({ repository, expected }) => {
-          generateSessionIdMock.mockReturnValue(WORKSPACE_SESSION_ID);
-          const doStub = makeDoStub();
-          const ctx = makeContext(doStub);
-          if (flag !== undefined) ctx.env.CREDENTIAL_CONTAINMENT_ENABLED = flag;
-          if (flag === 'false') ctx.env.CLOUDFLARE_CONTAINERS_ORG_IDS = '*';
+        expected: { github: false, gitlab: false, bitbucket: true, kilocode: true },
+      },
+      {
+        repository: { type: 'git', url: 'https://example.com/acme/repo.git' },
+        expected: { github: false, gitlab: false, bitbucket: false, kilocode: true },
+      },
+    ] as const)(
+      'derives $repository.type containment from the allocated workspace ID',
+      async ({ repository, expected }) => {
+        generateSessionIdMock.mockReturnValue(WORKSPACE_SESSION_ID);
+        const doStub = makeDoStub();
+        const ctx = makeContext(doStub);
+        await runCreate(ctx, makeRequest({ repository }));
 
-          await runCreate(ctx, makeRequest({ repository }));
-
-          expect(createdMetadata(doStub)).toMatchObject(
-            expect.objectContaining({
-              identity: expect.objectContaining({ sessionId: WORKSPACE_SESSION_ID }),
-              workspace: expect.objectContaining({
-                credentialContainment: expected,
-              }),
-            })
-          );
-        }
-      );
-    }
-  );
-
-  it('persists mandatory containment independently of obsolete flag changes', async () => {
-    generateSessionIdMock.mockReturnValue(WORKSPACE_SESSION_ID);
-    const doStub = makeDoStub();
-    const ctx = makeContext(doStub);
-    ctx.env.CREDENTIAL_CONTAINMENT_ENABLED = 'false';
-    ctx.env.CLOUDFLARE_CONTAINERS_ORG_IDS = '*';
-
-    await runCreate(
-      ctx,
-      makeRequest({ repository: { type: 'gitlab', url: 'https://gitlab.com/acme/repo.git' } })
-    );
-
-    ctx.env.CREDENTIAL_CONTAINMENT_ENABLED = 'true';
-
-    expect(createdMetadata(doStub)).toMatchObject(
-      expect.objectContaining({
-        identity: expect.objectContaining({ sessionId: WORKSPACE_SESSION_ID }),
-        workspace: expect.objectContaining({
-          credentialContainment: {
-            github: false,
-            gitlab: true,
-            bitbucket: false,
-            kilocode: true,
-          },
-        }),
-      })
-    );
-  });
-
-  it('ignores the obsolete containment opt-out', async () => {
-    const doStub = makeDoStub();
-    const ctx = makeContext(doStub);
-    ctx.env.CREDENTIAL_CONTAINMENT_ENABLED = 'false';
-    ctx.env.CLOUDFLARE_CONTAINERS_ORG_IDS = '*';
-
-    await runCreate(
-      ctx,
-      makeRequest({ repository: { type: 'gitlab', url: 'https://gitlab.com/acme/repo.git' } })
-    );
-
-    expect(createdMetadata(doStub)).toMatchObject(
-      expect.objectContaining({
-        identity: expect.objectContaining({ sessionId: SANDBOX_SESSION_ID }),
-        workspace: expect.objectContaining({
-          credentialContainment: {
-            github: false,
-            gitlab: true,
-            bitbucket: false,
-            kilocode: true,
-          },
-        }),
-      })
+        expect(createdMetadata(doStub)).toMatchObject(
+          expect.objectContaining({
+            identity: expect.objectContaining({ sessionId: WORKSPACE_SESSION_ID }),
+            workspace: expect.objectContaining({
+              credentialContainment: expected,
+            }),
+          })
+        );
+      }
     );
   });
 
@@ -2811,7 +2724,6 @@ describe('createSessionWithLedger admission ladder', () => {
     const doStub = makeDoStub();
     const ctx = makeContext(doStub);
     ctx.env.SANDBOX_SELECTION_IDS = orgId;
-    ctx.env.CLOUDFLARE_CONTAINERS_ORG_IDS = orgId;
     getPgDbMock.mockReturnValue(
       makeDb([[{ id: 'member' }], [{ id: 'member' }], [{ email: 'test@example.com' }]])
     );
@@ -3411,7 +3323,6 @@ describe('createSessionWithLedger admission ladder', () => {
       Object.assign(ctx.env, {
         BYOC_VERCEL_IDS: organizationId,
         SANDBOX_SELECTION_IDS: organizationId,
-        CLOUDFLARE_CONTAINERS_ORG_IDS: organizationId,
         CONTROL_PLANE_IDS: '',
       });
       getPgDbMock.mockReturnValue(
@@ -5608,7 +5519,7 @@ describe('createSessionWithLedger worktree and ownership reconciliation', () => 
     }
   );
 
-  it.each(['admission', 'isolation', 'model'] as const)(
+  it.each(['admission', 'model'] as const)(
     'fails closed on resumed modern %s rejection',
     async failure => {
       const input = request();
@@ -5624,8 +5535,6 @@ describe('createSessionWithLedger worktree and ownership reconciliation', () => 
         vi.mocked(createRuntimeAuthorization).mockRejectedValueOnce(
           new Error('Invalid runtime admission')
         );
-      } else if (failure === 'isolation') {
-        ctx.env.RUNTIME_ISOLATION_ENABLED = 'false';
       } else {
         vi.mocked(assertKiloModelAvailable).mockRejectedValueOnce(new Error('Model unavailable'));
       }
@@ -6416,7 +6325,6 @@ describe('createSessionWithLedger changed-intent rejection', () => {
     const doStub = makeDoStub();
     const ctx = makeContext(doStub);
     ctx.env.SANDBOX_SELECTION_IDS = ORIGINAL_OPTIONS.kilocodeOrganizationId;
-    ctx.env.CLOUDFLARE_CONTAINERS_ORG_IDS = ORIGINAL_OPTIONS.kilocodeOrganizationId;
     getPgDbMock.mockReturnValue(makeDb([[{ id: 'member' }]]));
 
     await expect(runCreate(ctx, request)).rejects.toMatchObject(
@@ -7080,7 +6988,6 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
       const doStub = makeDoStub();
       const ctx = makeContext(doStub);
       ctx.env.SANDBOX_SELECTION_IDS = orgId;
-      ctx.env.CLOUDFLARE_CONTAINERS_ORG_IDS = orgId;
       getPgDbMock.mockReturnValue(
         makeDb([[{ id: 'member' }], [{ id: 'member' }], [{ email: 'test@example.com' }]])
       );
@@ -7125,7 +7032,6 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
     const doStub = makeDoStub();
     const ctx = makeContext(doStub);
     ctx.env.SANDBOX_SELECTION_IDS = orgId;
-    ctx.env.CLOUDFLARE_CONTAINERS_ORG_IDS = orgId;
     getPgDbMock.mockReturnValue(
       makeDb([[{ id: 'member' }], [{ id: 'member' }], [{ email: 'test@example.com' }]])
     );
@@ -8217,6 +8123,95 @@ describe('createSessionWithLedger clone reconciliation', () => {
       cloudAgentSessionId: SANDBOX_SESSION_ID,
       kiloSessionId: KILO_SESSION_ID,
       replayed: true,
+    });
+  });
+});
+
+describe('createSessionWithLedger non-clone rejection', () => {
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    fetchByocVercelEnrollmentMock.mockReset();
+    const actualPlacement =
+      await vi.importActual<typeof SandboxPlacementModule>('../sandbox-placement.js');
+    selectControlPlaneSandboxMock.mockImplementation(actualPlacement.selectControlPlaneSandbox);
+    generateSessionIdMock.mockReturnValue(SANDBOX_SESSION_ID);
+    generateKiloSessionIdMock.mockReturnValue(KILO_SESSION_ID);
+    settleOperationMock.mockResolvedValue({ settled: true });
+    markReconcilePendingMock.mockResolvedValue({});
+    recordOperationProgressMock.mockResolvedValue(undefined);
+    createCliSessionMock.mockResolvedValue(undefined);
+  });
+
+  it('tombstones a refused non-clone create so the next same-key retry allocates fresh IDs', async () => {
+    const request = makeRequest({ options: { operationKey: OPERATION_KEY } });
+    const doStub = makeDoStub();
+    const ctx = makeContext(doStub);
+
+    // Attempt 1: the ingest plane refuses the destination outright. The
+    // best-effort settle fails, so the row stays non-terminal and the
+    // tombstone is what protects the retry.
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'admitted',
+      row: makeLedgerRow({}),
+    });
+    createCliSessionMock.mockResolvedValueOnce({
+      status: 'rejected',
+      code: 'session_retired',
+    });
+    settleOperationMock.mockRejectedValueOnce(new Error('ledger db unavailable'));
+    getPgDbMock.mockReturnValue(makeDb([[{ email: 'test@example.com' }]]));
+
+    await expect(runCreate(ctx, request)).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: 'session_retired',
+    });
+
+    expect(recordOperationProgressMock).toHaveBeenCalledWith(expect.any(Object), ROW_ID, {
+      [SESSION_CREATE_TOMBSTONED_IDS_KEY]: {
+        cloudAgentSessionId: SANDBOX_SESSION_ID,
+        kiloSessionId: KILO_SESSION_ID,
+      },
+    });
+    expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+    expect(doStub.registerSession).not.toHaveBeenCalled();
+
+    // Attempt 2: the same-key retry sees the tombstone and allocates fresh IDs.
+    const FRESH_CLOUD_ID = 'workspace_fresh_11111111-1111-1111-1111-111111111111';
+    const FRESH_KILO_ID = 'ses_fresh_222222222222222222222222';
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'takeover',
+      row: makeLedgerRow({
+        canonical_result: {
+          cloudAgentSessionId: SANDBOX_SESSION_ID,
+          kiloSessionId: KILO_SESSION_ID,
+          [SESSION_CREATE_INTENT_FINGERPRINT_KEY]: await sessionCreateIntentFingerprint(request),
+          [SESSION_CREATE_TOMBSTONED_IDS_KEY]: {
+            cloudAgentSessionId: SANDBOX_SESSION_ID,
+            kiloSessionId: KILO_SESSION_ID,
+          },
+        },
+      }),
+    });
+    generateSessionIdMock.mockReturnValueOnce(FRESH_CLOUD_ID);
+    generateKiloSessionIdMock.mockReturnValueOnce(FRESH_KILO_ID);
+    createCliSessionMock.mockResolvedValue({
+      status: 'ready',
+      clone: { sessionId: FRESH_KILO_ID, copiedItemCount: 0 },
+    });
+    getPgDbMock.mockReturnValue(makeDb([[], [{ email: 'test@example.com' }]]));
+
+    const result = await runCreate(ctx, request);
+
+    expect(createCliSessionMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        sessionId: FRESH_KILO_ID,
+        cloudAgentSessionId: FRESH_CLOUD_ID,
+        kiloUserId: USER_ID,
+      })
+    );
+    expect(result).toEqual({
+      cloudAgentSessionId: FRESH_CLOUD_ID,
+      kiloSessionId: FRESH_KILO_ID,
     });
   });
 });

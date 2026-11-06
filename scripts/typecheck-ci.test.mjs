@@ -331,6 +331,20 @@ test('every consumer job restores or builds the harness SDK through the action',
   }
 });
 
+// The probe decides whether the build is needed, so every step after the input
+// validation carries the skip condition. An ungated toolchain step would fail a
+// skipped dispatch: a setup-node cache save needs the dependency tree that the
+// skipped install never creates.
+test('explorer-ios-release gates every build step except input validation', () => {
+  const steps = workflows['explorer-ios-release.yml'].jobs.build.steps;
+  const ungated = steps
+    .filter(step => !(step.if ?? '').startsWith(explorerSkip))
+    .map(step => step.name);
+  assert.deepEqual(ungated, ['Validate inputs']);
+  assert.equal(steps[0].name, 'Validate inputs', 'validation runs before the gate');
+  assert.equal(steps[0].if, undefined, 'validation stays unconditional');
+});
+
 // The mobile suite needs one harness SDK build, not one per job: the build
 // resolves the SDK's whole program and, on a miss, compiles the typia
 // transform. Eleven jobs did that concurrently, and actions/cache saves at the

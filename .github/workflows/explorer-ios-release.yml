@@ -120,16 +120,24 @@ jobs:
           }
           NODE
           # The env is data consumed by Expo, never sourced as shell code.
+      # Only `Validate inputs` above stays unconditional. The rest of the job is the build
+      # itself, so a probe that found the object skips it: the toolchain setup steps must be
+      # skipped too, because a setup-node cache save with no installed dependency tree fails
+      # the job and would report the skipped dispatch as a failed build.
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        if: needs.probe.outputs.exists != 'true'
         with:
           ref: ${{ inputs.cloud_ref }}
           lfs: true
           persist-credentials: false
       - name: Prepare explorer env
+        if: needs.probe.outputs.exists != 'true'
         run: cp "$RUNNER_TEMP/explorer.env" apps/mobile/.env.local
       - name: Setup pnpm
+        if: needs.probe.outputs.exists != 'true'
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
       - name: Setup Node
+        if: needs.probe.outputs.exists != 'true'
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
         with:
           node-version-file: .nvmrc

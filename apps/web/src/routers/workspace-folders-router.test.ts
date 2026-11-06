@@ -97,6 +97,14 @@ function readSessions(worktreeId = WORKTREE_ID) {
     .orderBy(asc(cli_sessions_v2.session_id));
 }
 
+async function readSessionWorktreeId(sessionId: string) {
+  const [row] = await db
+    .select({ cloudAgentWorktreeId: cli_sessions_v2.cloud_agent_worktree_id })
+    .from(cli_sessions_v2)
+    .where(eq(cli_sessions_v2.session_id, sessionId));
+  return row?.cloudAgentWorktreeId ?? null;
+}
+
 function readFolders(organizationId: string | null = null, userId = USER_ID) {
   return db
     .select()
@@ -813,6 +821,54 @@ describe('workspaceFolders session moves', () => {
     ).toBe(worktreeId);
   });
 
+  it('links descendants of a standalone root when materializing its worktree', async () => {
+    const folder = await createFolder();
+    const workspaceId = newWorkspaceId();
+    const worktreeId = `worktree_${workspaceId.slice('workspace_'.length)}`;
+    const root = await insertSession({
+      cloud_agent_session_id: workspaceId,
+      cloud_agent_worktree_id: null,
+    });
+    const child = await insertSession({
+      parent_session_id: root.session_id,
+      cloud_agent_session_id: null,
+      cloud_agent_session_scope_id: workspaceId,
+      cloud_agent_worktree_id: null,
+    });
+    const grandchild = await insertSession({
+      parent_session_id: child.session_id,
+      cloud_agent_session_id: null,
+      cloud_agent_session_scope_id: workspaceId,
+      cloud_agent_worktree_id: null,
+    });
+
+    await callerFor().moveSession({
+      organizationId: null,
+      sessionId: workspaceId,
+      folderId: folder.id,
+    });
+
+    expect(await readSessionWorktreeId(root.session_id)).toBe(worktreeId);
+    expect(await readSessionWorktreeId(child.session_id)).toBe(worktreeId);
+    expect(await readSessionWorktreeId(grandchild.session_id)).toBe(worktreeId);
+  });
+
+  it('treats moving an ungrouped session to Ungrouped as a no-op', async () => {
+    const folder = await createFolder();
+    const workspaceId = newWorkspaceId();
+    const worktreeId = `worktree_${workspaceId.slice('workspace_'.length)}`;
+    const session = await insertSession({
+      cloud_agent_session_id: workspaceId,
+      cloud_agent_worktree_id: null,
+    });
+
+    await callerFor().moveSession({ organizationId: null, sessionId: workspaceId, folderId: null });
+
+    expect(await readWorktree(worktreeId)).toBeUndefined();
+    expect(await readSessionWorktreeId(session.session_id)).toBeNull();
+    expect((await callerFor().list({ organizationId: null })).folders).toEqual([folder]);
+  });
+
   it('seeds runtime locations from the create_cloud ledger when filing a standalone session', async () => {
     const folder = await createFolder();
     const workspaceId = newWorkspaceId();
@@ -997,42 +1053,72 @@ describe('workspaceFolders session moves', () => {
     { sourceUserId: USER_ID, sourceOrganizationId: ORGANIZATION_ID, organizationId: null },
     { sourceUserId: USER_ID, sourceOrganizationId: null, organizationId: ORGANIZATION_ID },
   ])(
-    'rejects cross-owner or cross-scope sessions with or without metadata: %p',
+    'rejects cross-owner or cross-scope sessions: %p',
     async ({ sourceUserId, sourceOrganizationId, organizationId }) => {
       const folder = await createFolder(organizationId);
-      for (const hasMetadata of [false, true]) {
-        const workspaceId = newWorkspaceId();
-        const worktreeId = `worktree_${workspaceId.slice('workspace_'.length)}`;
-        await insertSession({
-          kilo_user_id: sourceUserId,
-          organization_id: sourceOrganizationId,
-          cloud_agent_session_id: workspaceId,
-          cloud_agent_worktree_id: null,
-        });
-        if (hasMetadata) {
-          await insertWorktree({
-            worktree_id: worktreeId,
-            kilo_user_id: sourceUserId,
-            organization_id: sourceOrganizationId,
-          });
-        }
-        for (const folderId of [folder.id, null]) {
-          await expect(
-            callerFor().moveSession({ organizationId, sessionId: workspaceId, folderId })
-          ).rejects.toMatchObject({ code: 'NOT_FOUND' });
-        }
-        if (hasMetadata) {
-          expect(await readWorktree(worktreeId)).toMatchObject({
-            kilo_user_id: sourceUserId,
-            organization_id: sourceOrganizationId,
-            folder_id: null,
-          });
-        } else {
-          expect(await readWorktree(worktreeId)).toBeUndefined();
-        }
+      const workspaceId = newWorkspaceId();
+      const worktreeId = `worktree_${workspaceId.slice('workspace_'.length)}`;
+      await insertSession({
+        kilo_user_id: sourceUserId,
+        organization_id: sourceOrganizationId,
+        cloud_agent_session_id: workspaceId,
+        cloud_agent_worktree_id: null,
+      });
+      for (const folderId of [folder.id, null]) {
+        await expect(
+          callerFor().moveSession({ organizationId, sessionId: workspaceId, folderId })
+        ).rejects.toMatchObject({ code: 'NOT_FOUND' });
       }
+      expect(await readWorktree(worktreeId)).toBeUndefined();
     }
   );
+
+  it('rejects a derived worktree owned by another user without linking the session', async () => {
+    const folder = await createFolder();
+    const workspaceId = newWorkspaceId();
+    const worktreeId = `worktree_${workspaceId.slice('workspace_'.length)}`;
+    const session = await insertSession({
+      cloud_agent_session_id: workspaceId,
+      cloud_agent_worktree_id: null,
+    });
+    await insertWorktree({
+      worktree_id: worktreeId,
+      kilo_user_id: OTHER_USER_ID,
+    });
+
+    await expect(
+      callerFor().moveSession({ organizationId: null, sessionId: workspaceId, folderId: folder.id })
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    expect(await readWorktree(worktreeId)).toMatchObject({
+      kilo_user_id: OTHER_USER_ID,
+      folder_id: null,
+    });
+    expect(await readSessionWorktreeId(session.session_id)).toBeNull();
+    expect((await callerFor().list({ organizationId: null })).folders).toEqual([folder]);
+  });
+
+  it('rejects a derived worktree that is being deleted without linking the session', async () => {
+    const folder = await createFolder();
+    const workspaceId = newWorkspaceId();
+    const worktreeId = `worktree_${workspaceId.slice('workspace_'.length)}`;
+    const session = await insertSession({
+      cloud_agent_session_id: workspaceId,
+      cloud_agent_worktree_id: null,
+    });
+    await insertWorktree({
+      worktree_id: worktreeId,
+      deletion_started_at: LATER_TIME,
+    });
+
+    await expect(
+      callerFor().moveSession({ organizationId: null, sessionId: workspaceId, folderId: folder.id })
+    ).rejects.toMatchObject({ code: 'CONFLICT' });
+    const worktree = await readWorktree(worktreeId);
+    expect(worktree?.kilo_user_id).toBe(USER_ID);
+    expect(worktree?.deletion_started_at).not.toBeNull();
+    expect(worktree?.folder_id).toBeNull();
+    expect(await readSessionWorktreeId(session.session_id)).toBeNull();
+  });
 
   it('rejects cross-scope or foreign-member destinations before touching session metadata', async () => {
     const crossScopeDestination = await createFolder(ORGANIZATION_ID);

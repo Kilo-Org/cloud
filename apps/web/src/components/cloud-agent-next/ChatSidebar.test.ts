@@ -707,7 +707,7 @@ describe('ChatSidebar row rendering', () => {
 
   it('drags a standalone ses_ row by its cloud workspace id', () => {
     const { sessions, workspaceFolders, dataTransfer, dragEvent } = folderDragFixture();
-    const workspaceId = `workspace_${workspaceFolders.folders[0].id}`;
+    const workspaceId = 'workspace_99999999-9999-4999-8999-999999999999';
     const standalone = makeSession(3, {
       prompt: 'Standalone cloud chat',
       cloudAgentSessionId: workspaceId,

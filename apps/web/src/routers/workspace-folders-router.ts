@@ -562,6 +562,11 @@ export const workspaceFoldersRouter = createTRPCRouter({
       if (!session) throw new TRPCError({ code: 'NOT_FOUND', message: 'Session not found' });
 
       const groupedWorktreeId = session.cloudAgentWorktreeId;
+      // An ungrouped session dropped on Ungrouped has nothing to move. Skip it
+      // so direct callers cannot materialize a worktree by asking for the state
+      // the session is already in.
+      if (groupedWorktreeId === null && input.folderId === null) return { success: true };
+
       const worktreeId =
         groupedWorktreeId ?? `worktree_${input.sessionId.slice('workspace_'.length)}`;
       if (groupedWorktreeId) {
@@ -630,6 +635,20 @@ export const workspaceFoldersRouter = createTRPCRouter({
             message: 'Session moved. Refresh and try again.',
           });
         }
+        // A standalone root's descendants carry a null worktree id. Link them
+        // in the same transaction so worktree deletion, which discovers
+        // members by worktree id and refuses roots with unregistered children,
+        // can tear the new workspace down.
+        await ctx.folderDb
+          .update(cli_sessions_v2)
+          .set({ cloud_agent_worktree_id: worktreeId })
+          .where(
+            and(
+              ownerScopeCondition(cli_sessions_v2, ctx.folderScope),
+              eq(cli_sessions_v2.cloud_agent_session_scope_id, input.sessionId),
+              isNull(cli_sessions_v2.cloud_agent_worktree_id)
+            )
+          );
       }
 
       await ctx.folderDb

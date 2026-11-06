@@ -978,21 +978,7 @@ export function ChatSidebar({
     if (action.type === 'move-worktree') {
       void moveWorktree(action.worktreeId, action.folderId);
     } else if (action.type === 'move-session') {
-      // Dropping a row that is already ungrouped onto Ungrouped would
-      // materialize a worktree and silently turn the session row into a
-      // workspace group, so treat it as a no-op.
-      const dragged = sessions.find(
-        session =>
-          controlPlaneSessionIdSchema.safeParse(session.cloudAgentSessionId).data ===
-          action.sessionId
-      );
-      const alreadyUngrouped =
-        action.folderId === null &&
-        (!dragged?.worktreeId ||
-          getWorkspaceFolderId(workspaceFolders.folders, dragged.worktreeId) === null);
-      if (!alreadyUngrouped) {
-        void workspaceFolders.moveSession(action.sessionId, action.folderId);
-      }
+      void workspaceFolders.moveSession(action.sessionId, action.folderId);
     } else {
       void workspaceFolders.reorderFolders(action.folderIds);
     }

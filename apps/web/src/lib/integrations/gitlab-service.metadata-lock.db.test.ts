@@ -173,21 +173,31 @@ async function regenerateWhilePatchIsOpen(patch: GitLabMetadataPatch) {
     await patchMayCommit.promise;
   });
 
-  await patchApplied.promise;
+  try {
+    await patchApplied.promise;
 
-  let regenerationFinished = false;
-  const regeneration = regenerateWebhookSecret({ type: 'user', id: userId }).finally(() => {
-    regenerationFinished = true;
-  });
+    let regenerationFinished = false;
+    const regeneration = regenerateWebhookSecret({ type: 'user', id: userId }).finally(() => {
+      regenerationFinished = true;
+    });
+    // Observe the queued write even when the probe below throws before the
+    // await, so a failed probe cannot leave an unobserved rejection behind.
+    void regeneration.catch(() => undefined);
 
-  const queueObserved = await waitForQueuedAdvisoryLock(integrationId);
-  const overlapped = !regenerationFinished;
+    const queueObserved = await waitForQueuedAdvisoryLock(integrationId);
+    const overlapped = !regenerationFinished;
 
-  patchMayCommit.resolve();
-  await patchTransaction;
-  const regenerated = await regeneration;
+    // Release before awaiting the regeneration; it is queued behind the lock.
+    patchMayCommit.resolve();
+    await patchTransaction;
 
-  return { regenerated, overlapped, queueObserved };
+    return { regenerated: await regeneration, overlapped, queueObserved };
+  } finally {
+    // Release on every path, including a throwing probe, so the transaction
+    // never keeps the integration lock and a pool connection open.
+    patchMayCommit.resolve();
+    await patchTransaction;
+  }
 }
 
 describe('GitLab metadata writes during a webhook-secret regeneration', () => {
@@ -222,15 +232,27 @@ describe('GitLab metadata writes during a webhook-secret regeneration', () => {
       patchApplied.resolve();
       await patchMayCommit.promise;
     });
-    await patchApplied.promise;
 
-    const regeneration = regenerateWebhookSecret({ type: 'user', id: userId });
-    const otherIntegrationObserved = await waitForQueuedAdvisoryLock('another-integration');
-    const ownIntegrationObserved = await waitForQueuedAdvisoryLock(integrationId);
+    let otherIntegrationObserved = false;
+    let ownIntegrationObserved = false;
 
-    patchMayCommit.resolve();
-    await patchTransaction;
-    await regeneration;
+    try {
+      await patchApplied.promise;
+
+      const regeneration = regenerateWebhookSecret({ type: 'user', id: userId });
+      void regeneration.catch(() => undefined);
+      otherIntegrationObserved = await waitForQueuedAdvisoryLock('another-integration');
+      ownIntegrationObserved = await waitForQueuedAdvisoryLock(integrationId);
+
+      patchMayCommit.resolve();
+      await patchTransaction;
+      await regeneration;
+    } finally {
+      // Release on every path, including a throwing probe, so the transaction
+      // never keeps the integration lock and a pool connection open.
+      patchMayCommit.resolve();
+      await patchTransaction;
+    }
 
     expect(otherIntegrationObserved).toBe(false);
     expect(ownIntegrationObserved).toBe(true);

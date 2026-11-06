@@ -477,7 +477,10 @@ test('ai-gateway deploys with each scheduled release after migrations', () => {
   // Staging Workers read nothing from the Vercel jobs, so they start with them
   // after the gate; record-deployment below still requires all three.
   assert.deepEqual(staging.jobs['deploy-workers'].needs, ['check-changes', 'db-gate']);
-  assert.doesNotMatch(staging.jobs['deploy-workers'].if, /needs\.deploy-app\.result|needs\.deploy-ai-gateway\.result/);
+  assert.doesNotMatch(
+    staging.jobs['deploy-workers'].if,
+    /needs\.deploy-app\.result|needs\.deploy-ai-gateway\.result/
+  );
 
   for (const [deployment, jobs] of [
     [production, ['stage-ai-gateway', 'promote-ai-gateway']],

@@ -79,6 +79,21 @@ vi.mock('@/lib/hooks/use-organization-mutations', () => ({
   useOrganizationMutations: () => ({ rename: { mutateAsync: vi.fn() } }),
 }));
 
+// The hub obeys the Profile tab's hide-balance preference; this suite pins both
+// renderings from a hoisted state each case sets.
+const hideBalancePref = vi.hoisted(() => ({
+  hideBalance: false,
+  hasLoaded: true,
+}));
+
+vi.mock('@/lib/hooks/use-hide-balance-preference', () => ({
+  useHideBalancePreference: () => ({
+    hideBalance: hideBalancePref.hideBalance,
+    hasLoaded: hideBalancePref.hasLoaded,
+    setHideBalance: vi.fn(),
+  }),
+}));
+
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: 'gray', foreground: 'black' }),
 }));
@@ -242,6 +257,8 @@ beforeEach(() => {
   boundary.parentOrganizationId = null;
   boundary.requireSeats = false;
   boundary.seatCount = { used: 1, total: 1 };
+  hideBalancePref.hideBalance = false;
+  hideBalancePref.hasLoaded = true;
   kiloPassRowState.current = null;
   routerPush.mockClear();
   kiloPassQuery.enabled = [];
@@ -275,6 +292,51 @@ describe('Organization hub card', () => {
     // Left-to-right isolate (U+2066) and pop-directional-isolate (U+2069): the
     // pair reads 1 of 5 in either interface direction.
     expect(seats?.props.value).toBe('\u20661 / 5\u2069');
+    unmount();
+  });
+});
+
+describe('Organization hub balance masking', () => {
+  // The mocked org carries balance 5_000_000 → the mocked formatMoney paints $5.
+  const balanceRow = (renderer: TestRenderer.ReactTestRenderer) =>
+    renderer.root
+      .findAllByType('KvRow')
+      .find(node => node.props.label === i18n.t('organization.hub.balance'));
+
+  it('paints the amount while the hide-balance preference is off', async () => {
+    const { renderer, unmount } = await renderHub();
+
+    const row = balanceRow(renderer);
+    expect(row?.props.value).toBe('$5');
+    // The spoken label stays the amount itself (no overriding label).
+    expect(row?.props.valueAccessibilityLabel).toBeUndefined();
+    unmount();
+  });
+
+  it('masks the amount and speaks the hidden label while the preference is on', async () => {
+    hideBalancePref.hideBalance = true;
+
+    const { renderer, unmount } = await renderHub();
+
+    const row = balanceRow(renderer);
+    expect(row?.props.value).toBe('*****');
+    expect(row?.props.valueAccessibilityLabel).toBe(i18n.t('profile.balanceHidden'));
+    // No painted node may carry the amount while it is hidden.
+    expect(
+      renderer.root.findAll(node => typeof node.props.children === 'string' && node.props.children === '$5')
+    ).toHaveLength(0);
+    unmount();
+  });
+
+  it('keeps the amount masked until the preference read settles', async () => {
+    hideBalancePref.hideBalance = false;
+    hideBalancePref.hasLoaded = false;
+
+    const { renderer, unmount } = await renderHub();
+
+    const row = balanceRow(renderer);
+    expect(row?.props.value).toBe('*****');
+    expect(row?.props.valueAccessibilityLabel).toBe(i18n.t('profile.balanceHidden'));
     unmount();
   });
 });

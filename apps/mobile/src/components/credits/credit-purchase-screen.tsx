@@ -24,8 +24,10 @@ import { getCreditStorefront } from '@/lib/credits/storefront';
 import { useInlinePurchaseErrorOwnership } from '@/lib/credits/use-store-credit-purchase';
 import { openExternalUrl } from '@/lib/external-link';
 import { formatMoney, formatUsd } from '@/lib/format';
+import { useHideBalancePreference } from '@/lib/hooks/use-hide-balance-preference';
 import { getStoreLegalLinks } from '@/lib/iap/legal-links';
 import { useTRPC } from '@/lib/trpc';
+import { HIDDEN_BALANCE } from '@/lib/storage-keys';
 import { cn } from '@/lib/utils';
 import { useCreditNativeIap } from './credit-native-iap-owner';
 import { CreditExpiryNote } from './credit-expiry-note';
@@ -73,6 +75,12 @@ export function CreditPurchaseScreen() {
   });
   const refetchBalance = balanceQuery.refetch;
   const creditBlocksQuery = useQuery(trpc.user.getCreditBlocks.queryOptions({}));
+
+  // The amount here is the same one the Profile credits card masks, so the
+  // same preference rules this screen. Until the disk read settles the choice
+  // is unknown and the amounts stay masked.
+  const { hideBalance, hasLoaded: hideBalanceLoaded } = useHideBalancePreference();
+  const hideBalanceAmount = hideBalance || !hideBalanceLoaded;
 
   const [privacyPolicyLink, termsOfUseLink] = getStoreLegalLinks(WEB_BASE_URL);
 
@@ -126,8 +134,11 @@ export function CreditPurchaseScreen() {
       );
     }
     return (
-      <Text className="text-2xl font-bold tabular-nums">
-        {formatMoney(balanceQuery.data.balance, i18n.language)}
+      <Text
+        className="text-2xl font-bold tabular-nums"
+        accessibilityLabel={hideBalanceAmount ? t('profile.balanceHidden') : undefined}
+      >
+        {hideBalanceAmount ? HIDDEN_BALANCE : formatMoney(balanceQuery.data.balance, i18n.language)}
       </Text>
     );
   };
@@ -147,7 +158,10 @@ export function CreditPurchaseScreen() {
             </Text>
             {renderBalanceValue()}
             {!balancePending && !balanceFailed && (
-              <CreditExpiryNote creditBlocks={creditBlocksQuery.data?.creditBlocks ?? []} />
+              <CreditExpiryNote
+                creditBlocks={creditBlocksQuery.data?.creditBlocks ?? []}
+                hiddenAmount={hideBalanceAmount ? HIDDEN_BALANCE : undefined}
+              />
             )}
           </View>
 

@@ -3,6 +3,7 @@ import {
   getGitHubUserAccessToken,
   evictGitHubUserAccessTokenCache,
   __resetGitHubUserAccessTokenClientForTests,
+  __cachedGitHubUserIdsForTests,
 } from './user-token-client';
 
 describe('provided credential contract', () => {
@@ -598,6 +599,34 @@ describe('getGitHubUserAccessToken', () => {
     if (other.status !== 'connected') throw new Error('expected connected');
     expect(other.credential.token).toBe('ghs_two');
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('drops an expired entry of a user who never returns when another user is cached', async () => {
+    const start = Date.now();
+    const now = jest.spyOn(Date, 'now').mockReturnValue(start);
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          connected: true,
+          token: 'ghp_never_expires',
+          expiresAtEpochMs: null,
+          githubLogin: 'octocat',
+          authorizationId: 'auth-1',
+          credentialVersion: 1,
+          credentialSource: 'provided_token',
+          refreshSupported: false,
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } }
+      )
+    );
+    await getGitHubUserAccessToken('kilo-user-1', { op: 'fetch' });
+    expect(__cachedGitHubUserIdsForTests()).toEqual(['kilo-user-1']);
+
+    now.mockReturnValue(start + 61_000);
+    fetchMock.mockResolvedValueOnce(makeConnectedResponse({ token: 'ghs_two' }));
+    await getGitHubUserAccessToken('kilo-user-2', { op: 'fetch' });
+
+    expect(__cachedGitHubUserIdsForTests()).toEqual(['kilo-user-2']);
   });
 
   it('does not let a fetch that started before the eviction put the credential back', async () => {

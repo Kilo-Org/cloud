@@ -126,11 +126,22 @@ function readCache(userId: string): GitHubUserAccessTokenConnected | undefined {
   return entry.credential;
 }
 
+/**
+ * An expired entry is otherwise removed only when the same user fetches again,
+ * so a user who never returns would keep a live token in memory indefinitely.
+ */
+function sweepExpiredCacheEntries(now: number): void {
+  for (const [userId, entry] of cache) {
+    if (entry.validUntil <= now) cache.delete(userId);
+  }
+}
+
 function cacheForUser(userId: string, credential: GitHubUserAccessTokenConnected | null): void {
   if (credential === null) {
     cache.delete(userId);
     return;
   }
+  sweepExpiredCacheEntries(Date.now());
   const validUntil =
     credential.credentialSource === 'provided_token'
       ? Math.min(Date.now() + 60_000, credential.expiresAtEpochMs ?? Infinity)
@@ -287,4 +298,9 @@ export async function __resetGitHubUserAccessTokenClientForTests(): Promise<void
   }
   cache.clear();
   queue.clear();
+}
+
+/** Test-only helper: the Kilo user ids that currently hold a cache entry. */
+export function __cachedGitHubUserIdsForTests(): string[] {
+  return [...cache.keys()];
 }

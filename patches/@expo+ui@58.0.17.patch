@@ -1089,3 +1089,156 @@ index 2351ee8..e9c590f 100644
  
  export interface TextProps extends CommonViewModifierProps {
    /**
+diff --git a/android/src/main/java/expo/modules/ui/ModalBottomSheetView.kt b/android/src/main/java/expo/modules/ui/ModalBottomSheetView.kt
+--- a/android/src/main/java/expo/modules/ui/ModalBottomSheetView.kt
++++ b/android/src/main/java/expo/modules/ui/ModalBottomSheetView.kt
+@@ -11,6 +11,8 @@
+ import android.view.KeyEvent
+ import android.view.inputmethod.InputMethodManager
+ import androidx.activity.compose.BackHandler
++import androidx.compose.foundation.layout.WindowInsetsSides
++import androidx.compose.foundation.layout.only
+ import androidx.compose.material3.BottomSheetDefaults
+ import androidx.compose.material3.ExperimentalMaterial3Api
+ import androidx.compose.material3.MaterialTheme
+@@ -67,6 +69,17 @@
+    * density, theme) stays the activity's.
+    */
+   val locale: String? = null,
++  /**
++   * Repo-local: when true the sheet's content clears the top system bar itself,
++   * so Material3 stops reserving that inset for it. A dialog window receives its
++   * insets after the first composition is measured, so a content-sized sheet
++   * first measured itself taller by the status bar and then shrank, moving its
++   * whole content down by that inset after it had appeared. With this prop the
++   * sheet's box no longer depends on that inset, and the caller reserves the
++   * clearance from values it knows before the first frame. The bottom inset
++   * stays with the sheet: nothing reads it late.
++   */
++  val contentOwnsTopInset: Boolean = false,
+   val properties: ModalBottomSheetPropertiesRecord = ModalBottomSheetPropertiesRecord(),
+   val modifiers: ModifierList = emptyList()
+ ) : ComposeProps
+@@ -220,6 +233,11 @@
+       contentColor = resolvedContentColor,
+       scrimColor = resolvedScrimColor,
+       sheetGesturesEnabled = props.sheetGesturesEnabled,
++      contentWindowInsets = {
++        val sheetInsets = BottomSheetDefaults.modalWindowInsets
++        // Repo-local: see the `contentOwnsTopInset` field above.
++        if (props.contentOwnsTopInset) sheetInsets.only(WindowInsetsSides.Bottom) else sheetInsets
++      },
+       dragHandle = when {
+         dragHandleSlotView != null -> {
+           { with(UIComposableScope()) { with(dragHandleSlotView) { Content() } } }
+diff --git a/src/community/bottom-sheet/BottomSheet.android.tsx b/src/community/bottom-sheet/BottomSheet.android.tsx
+--- a/src/community/bottom-sheet/BottomSheet.android.tsx
++++ b/src/community/bottom-sheet/BottomSheet.android.tsx
+@@ -70,6 +70,9 @@
+     // strings (scrim label, drag handle, pane title) do not fall back to the
+     // device's language.
+     locale,
++    // Repo-local: the caller clears the status bar itself, so Material3 does not
++    // reserve that inset for the sheet — see the Kotlin prop's comment.
++    contentOwnsTopInset,
+     enableDynamicSizing = true,
+     handleComponent,
+     backgroundStyle,
+@@ -215,6 +218,7 @@
+             showDragHandle={handleComponent !== null}
+             sheetGesturesEnabled={dismissGestures}
+             locale={locale}
++            contentOwnsTopInset={contentOwnsTopInset}
+             containerColor={containerColor}
+             properties={{
+               shouldDismissOnBackPress: enablePanDownToClose,
+diff --git a/build/community/bottom-sheet/BottomSheet.android.js b/build/community/bottom-sheet/BottomSheet.android.js
+--- a/build/community/bottom-sheet/BottomSheet.android.js
++++ b/build/community/bottom-sheet/BottomSheet.android.js
+@@ -37,7 +37,7 @@
+  * @remarks Supports two snap states: partially expanded (~50%) and fully expanded.
+  * `snapToIndex(0)` maps to partial, `snapToIndex(lastIndex)` maps to expanded.
+  */ export function BottomSheet(props) {
+-    const { ref, snapPoints: snapPointsProp, index: indexProp = 0, onChange, onClose, onDismiss, enablePanDownToClose = false, dismissGestures = enablePanDownToClose, onRequestDismiss, locale, enableDynamicSizing = true, handleComponent, backgroundStyle, children } = props;
++    const { ref, snapPoints: snapPointsProp, index: indexProp = 0, onChange, onClose, onDismiss, enablePanDownToClose = false, dismissGestures = enablePanDownToClose, onRequestDismiss, locale, contentOwnsTopInset, enableDynamicSizing = true, handleComponent, backgroundStyle, children } = props;
+     const { width } = useWindowDimensions();
+     const hasMultipleSnapPoints = snapPointsProp != null && snapPointsProp.length > 1;
+     const fitToContents = enableDynamicSizing && (!snapPointsProp || snapPointsProp.length === 0);
+@@ -184,6 +184,7 @@
+                     showDragHandle: handleComponent !== null,
+                     sheetGesturesEnabled: dismissGestures,
+                     locale: locale,
++                    contentOwnsTopInset: contentOwnsTopInset,
+                     containerColor: containerColor,
+                     properties: {
+                         shouldDismissOnBackPress: enablePanDownToClose,
+diff --git a/src/community/bottom-sheet/types.ts b/src/community/bottom-sheet/types.ts
+--- a/src/community/bottom-sheet/types.ts
++++ b/src/community/bottom-sheet/types.ts
+@@ -237,6 +237,14 @@
+    * language. Repo-local; ignored where the platform sheet has no such strings.
+    */
+   locale?: string;
++
++  /**
++   * Repo-local, Android: when true the sheet's content clears the status bar
++   * itself, so the sheet stops reserving that inset for it. The sheet's first
++   * measured frame is otherwise taller than its settled one, which moves the
++   * whole content by the status-bar height as the sheet opens.
++   */
++  contentOwnsTopInset?: boolean;
+ 
+   /**
+    * Whether the sheet should automatically size to fit its content.
+diff --git a/build/community/bottom-sheet/types.d.ts b/build/community/bottom-sheet/types.d.ts
+--- a/build/community/bottom-sheet/types.d.ts
++++ b/build/community/bottom-sheet/types.d.ts
+@@ -201,6 +201,8 @@
+      * language. Repo-local; ignored where the platform sheet has no such strings.
+      */
+     locale?: string;
++
++    contentOwnsTopInset?: boolean;
+     /**
+      * Whether the sheet should automatically size to fit its content.
+      * @default true
+diff --git a/src/jetpack-compose/ModalBottomSheet/index.tsx b/src/jetpack-compose/ModalBottomSheet/index.tsx
+--- a/src/jetpack-compose/ModalBottomSheet/index.tsx
++++ b/src/jetpack-compose/ModalBottomSheet/index.tsx
+@@ -100,6 +100,13 @@
+    */
+   locale?: string;
+   /**
++   * Repo-local: when true the sheet's content clears the status bar itself, so
++   * the sheet stops reserving that inset — its box then never depends on an inset
++   * the dialog window reports only after the sheet's first measurement.
++   * @platform android
++   */
++  contentOwnsTopInset?: boolean;
++  /**
+    * Properties for the modal window behavior.
+    */
+   properties?: ModalBottomSheetProperties;
+diff --git a/build/jetpack-compose/ModalBottomSheet/index.d.ts b/build/jetpack-compose/ModalBottomSheet/index.d.ts
+--- a/build/jetpack-compose/ModalBottomSheet/index.d.ts
++++ b/build/jetpack-compose/ModalBottomSheet/index.d.ts
+@@ -85,6 +85,8 @@
+      * @platform android
+      */
+     locale?: string;
++
++    contentOwnsTopInset?: boolean;
+     /**
+      * Properties for the modal window behavior.
+      */
+diff --git a/build/jetpack-compose/ModalBottomSheet/index.js b/build/jetpack-compose/ModalBottomSheet/index.js
+--- a/build/jetpack-compose/ModalBottomSheet/index.js
++++ b/build/jetpack-compose/ModalBottomSheet/index.js
+@@ -12,6 +12,7 @@
+         ...restProps,
+         skipPartiallyExpanded: props.skipPartiallyExpanded ?? false,
+         initialFullyExpanded: props.initialFullyExpanded ?? false,
++        contentOwnsTopInset: props.contentOwnsTopInset ?? false,
+         onDismissRequest: ()=>{
+             onDismissRequest?.();
+         }

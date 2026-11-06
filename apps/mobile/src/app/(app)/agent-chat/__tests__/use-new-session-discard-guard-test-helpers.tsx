@@ -26,6 +26,21 @@ const toastErrorMock = vi.hoisted(() => vi.fn());
 // implementation: the same in-app dialog opens for both platform values, and
 // the native alert is never reached on either.
 const platform = vi.hoisted(() => ({ os: 'ios' as 'ios' | 'android' }));
+// The provider's keyboard state and the focused prompt, so a suite can hold the
+// keyboard open across a leave and report its close the way the provider does.
+const keyboardState = vi.hoisted(() => ({ visible: false, listeners: new Set<() => void>() }));
+const focusedInput = vi.hoisted(() => ({ current: null as object | null }));
+const keyboardDismissMock = vi.hoisted(() => vi.fn());
+const focusTextInputMock = vi.hoisted(() => vi.fn());
+// Android's window focus events, which move to the sheet's dialog window while
+// the confirm is presented and back to the app window after it closes.
+const windowFocusListeners = vi.hoisted(
+  () =>
+    new Map<'blur' | 'focus', Set<() => void>>([
+      ['blur', new Set()],
+      ['focus', new Set()],
+    ])
+);
 
 /** Both platform values, so every behaviour below is proven for iOS and Android. */
 const PLATFORMS = ['ios', 'android'] as const;
@@ -57,6 +72,16 @@ const usePreventRemoveMock = vi.hoisted(() =>
 // the native confirm again fails here.
 vi.mock('react-native', () => ({
   Alert: { alert: alertMock },
+  AppState: {
+    addEventListener: (event: 'blur' | 'focus', listener: () => void) => {
+      windowFocusListeners.get(event)?.add(listener);
+      return {
+        remove: () => {
+          windowFocusListeners.get(event)?.delete(listener);
+        },
+      };
+    },
+  },
   I18nManager: { isRTL: false },
   Modal: 'Modal',
   Platform: {
@@ -69,7 +94,30 @@ vi.mock('react-native', () => ({
   View: 'View',
   // Sheet registers the app-level Android Back listener while it is visible.
   BackHandler: { addEventListener: vi.fn(() => ({ remove: () => undefined })) },
+  Keyboard: { dismiss: keyboardDismissMock },
+  TextInput: {
+    State: {
+      currentlyFocusedInput: () => focusedInput.current,
+      focusTextInput: focusTextInputMock,
+    },
+  },
 }));
+
+vi.mock('react-native-keyboard-controller', async () => {
+  const { useSyncExternalStore } = await import('react');
+  const subscribe = (listener: () => void) => {
+    keyboardState.listeners.add(listener);
+    return () => {
+      keyboardState.listeners.delete(listener);
+    };
+  };
+  return {
+    useKeyboardState: <T,>(selector: (state: { isVisible: boolean }) => T) =>
+      selector({
+        isVisible: useSyncExternalStore(subscribe, () => keyboardState.visible),
+      }),
+  };
+});
 
 vi.mock('@rn-primitives/slot', () => ({ Text: 'Slot.Text' }));
 
@@ -209,6 +257,25 @@ export function triggerPreventRemoveInAct(): Action {
   return holder.action;
 }
 
+/** Reports the keyboard as shown or hidden, as the provider's events do. */
+export function setKeyboardVisible(visible: boolean): void {
+  act(() => {
+    keyboardState.visible = visible;
+    for (const listener of keyboardState.listeners) {
+      listener();
+    }
+  });
+}
+
+/** Reports the app window losing or regaining focus, as Android does around a sheet. */
+export function setWindowFocused(focused: boolean): void {
+  act(() => {
+    for (const listener of windowFocusListeners.get(focused ? 'focus' : 'blur') ?? []) {
+      listener();
+    }
+  });
+}
+
 export function setPickerTopRoute(topRoute: string): void {
   act(() => {
     navigationState.topRoute = topRoute;
@@ -229,6 +296,14 @@ export function resetGuardHarness(): void {
   usePreventRemoveHolder.callback = undefined;
   navigationState.topRoute = 'agent-chat/new';
   stateListeners.clear();
+  keyboardState.visible = false;
+  keyboardState.listeners.clear();
+  focusedInput.current = null;
+  keyboardDismissMock.mockReset();
+  focusTextInputMock.mockReset();
+  for (const listeners of windowFocusListeners.values()) {
+    listeners.clear();
+  }
 }
 
 export function isType(node: TestRenderer.ReactTestInstance, type: string): boolean {
@@ -298,6 +373,9 @@ export {
   alertMock,
   backMock,
   dispatchMock,
+  focusedInput,
+  focusTextInputMock,
+  keyboardDismissMock,
   platform,
   PLATFORMS,
   toastErrorMock,

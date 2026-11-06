@@ -1,4 +1,5 @@
 import {
+  RUNTIME_HARNESS_HEADER,
   WORKTREE_RUNTIME_HEADER,
   WORKTREE_RUNTIME_VERSION,
   WORKSPACE_CONFIGURATION_HEADER,
@@ -198,6 +199,29 @@ it('advertises worktree support without changing the strict legacy hello', () =>
       installsSkillsSh: true,
       startCommands: true,
     });
+  });
+});
+
+it.each(['kilo', 'kilo2'] as const)(
+  'reports the %s runtime harness as an upgrade header, not a hello field',
+  runtimeHarness => {
+    withControlledConnection(
+      ({ connection }) => {
+        connection.start();
+        const socket = TestSocket.instances[0];
+        expect(socket.options?.headers?.[RUNTIME_HARNESS_HEADER]).toBe(runtimeHarness);
+        socket.onopen?.();
+        expect(socket.frames[0]).not.toHaveProperty('runtimeHarness');
+      },
+      { runtimeHarness }
+    );
+  }
+);
+
+it('omits the runtime harness header when no harness is configured', () => {
+  withControlledConnection(({ connection }) => {
+    connection.start();
+    expect(TestSocket.instances[0].options?.headers).not.toHaveProperty(RUNTIME_HARNESS_HEADER);
   });
 });
 

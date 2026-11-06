@@ -118,6 +118,7 @@ const adminAreaPolicies: Record<string, AdminAreaPolicy> = {
   serviceFeeRollback: { read: 'platform_read', write: 'sensitive_write', target: 'none' },
   securityAdvisorContent: support,
   sessionTraces: { read: 'support_read', write: 'support_write', target: 'user' },
+  supportAccess: support,
   syncProviders: platform,
   userDataExports: { read: 'support_read', write: 'support_write', target: 'user' },
   userDeletionQueue: { read: 'platform_read', write: 'sensitive_write', target: 'user' },
@@ -358,6 +359,11 @@ const trpcEntries: PrivilegedInventoryEntry[] = [
     read: 'support_read',
     write: 'support_write',
     target: 'user',
+  }),
+  adminEntry('trpc.githubApps', 'githubApps.*', {
+    read: 'support_read',
+    write: 'support_write',
+    target: 'organization',
   }),
   {
     id: 'trpc.securityAgent.getAuditReport',
@@ -865,6 +871,13 @@ export const internalElevationSites: readonly InternalElevationSite[] = [
     occurrences: 3,
   },
   {
+    id: 'internal.admin.supportAccessResolver',
+    file: 'packages/web-shared/src/lib/admin/support-access-resolver.ts',
+    actionClass: 'support_read',
+    surface: 'trpc',
+    occurrences: 1,
+  },
+  {
     id: 'internal.admin.creditManagement',
     file: 'apps/web/src/lib/admin/credit-management.ts',
     actionClass: 'platform_read',
@@ -900,18 +913,11 @@ export const internalElevationSites: readonly InternalElevationSite[] = [
     occurrences: 1,
   },
   {
-    id: 'internal.organizations.organizationAuth',
-    file: 'apps/web/src/lib/organizations/organization-auth.ts',
-    actionClass: 'support_write',
-    surface: 'rest',
-    occurrences: 1,
-  },
-  {
     id: 'internal.securityAgent.sharedHandlers',
     file: 'apps/web/src/lib/security-agent/router/shared-handlers.ts',
     actionClass: 'support_read',
     surface: 'trpc',
-    occurrences: 5,
+    occurrences: 3,
   },
   {
     id: 'internal.user.deletionLegacyBackfill',
@@ -1033,11 +1039,25 @@ export const internalElevationSites: readonly InternalElevationSite[] = [
     occurrences: 1,
   },
   {
+    id: 'internal.admin.supportAccessService',
+    file: 'apps/web/src/lib/admin/support-access-service.ts',
+    actionClass: 'support_write',
+    surface: 'trpc',
+    occurrences: 3,
+  },
+  {
+    id: 'internal.organizations.organizationAuth',
+    file: 'apps/web/src/lib/organizations/organization-auth.ts',
+    actionClass: 'support_read',
+    surface: 'rest',
+    occurrences: 2,
+  },
+  {
     id: 'internal.webShared.organizationsUtils',
     file: 'packages/web-shared/src/routers/organizations/utils.ts',
     actionClass: 'support_write',
     surface: 'trpc',
-    occurrences: 3,
+    occurrences: 5,
   },
 ];
 

@@ -16,6 +16,8 @@ jest.mock('@kilocode/web-shared/lib/redis', () => ({
 const mockedRedisGetDel = jest.mocked(redisClient.getdel);
 const mockedRedisSet = jest.mocked(redisClient.set);
 const userId = 'oauth/synthetic-user';
+const expected = { authorizationId: null, credentialVersion: null };
+const verifierAt = (index: number) => mockedRedisSet.mock.calls[index][1];
 
 function stateWithPayload(payload: string): string {
   return createOAuthState(
@@ -49,8 +51,8 @@ describe('GitHub user authorization state', () => {
   });
 
   test('round-trips a single-use PKCE verifier bound to a non-UUID Kilo user', async () => {
-    const created = await createGitHubUserAuthorizationState(userId);
-    const codeVerifier = mockedRedisSet.mock.calls[0][1];
+    const created = await createGitHubUserAuthorizationState(userId, expected);
+    const codeVerifier = verifierAt(0);
     if (typeof codeVerifier !== 'string') throw new Error('Expected a string verifier');
 
     expect(created.codeChallenge).toBe(
@@ -64,6 +66,7 @@ describe('GitHub user authorization state', () => {
     await expect(consumeGitHubUserAuthorizationState(created.state, userId)).resolves.toEqual({
       status: 'consumed',
       codeVerifier,
+      expected,
     });
     expect(mockedRedisGetDel).toHaveBeenCalledWith(mockedRedisSet.mock.calls[0][0]);
     await expect(consumeGitHubUserAuthorizationState(created.state, userId)).resolves.toEqual({
@@ -73,7 +76,7 @@ describe('GitHub user authorization state', () => {
   });
 
   test('does not consume a verifier for a different signed-in user', async () => {
-    const created = await createGitHubUserAuthorizationState(userId);
+    const created = await createGitHubUserAuthorizationState(userId, expected);
     await expect(
       consumeGitHubUserAuthorizationState(created.state, 'oauth/synthetic-other')
     ).resolves.toEqual({
@@ -100,7 +103,7 @@ describe('GitHub user authorization state', () => {
   });
 
   test('rejects a state minted for another provider before touching storage', async () => {
-    const created = await createGitHubUserAuthorizationState(userId);
+    const created = await createGitHubUserAuthorizationState(userId, expected);
     const [payload] = created.state.split('.');
     const forged = createOAuthState(`github-user-authorization:${payload}`, userId, undefined, {
       provider: 'bitbucket',
@@ -139,7 +142,7 @@ describe('GitHub user authorization state', () => {
 
   test('rejects expired state before storage access', async () => {
     jest.useFakeTimers();
-    const created = await createGitHubUserAuthorizationState(userId);
+    const created = await createGitHubUserAuthorizationState(userId, expected);
     jest.advanceTimersByTime(601_000);
     await expect(consumeGitHubUserAuthorizationState(created.state, userId)).resolves.toEqual({
       status: 'invalid',
@@ -149,8 +152,8 @@ describe('GitHub user authorization state', () => {
   });
 
   test('keeps independently started same-account flows independent', async () => {
-    const first = await createGitHubUserAuthorizationState(userId);
-    const second = await createGitHubUserAuthorizationState(userId);
+    const first = await createGitHubUserAuthorizationState(userId, expected);
+    const second = await createGitHubUserAuthorizationState(userId, expected);
     expect(first.state).not.toBe(second.state);
     expect(mockedRedisSet.mock.calls[0][0]).not.toBe(mockedRedisSet.mock.calls[1][0]);
     const results = await Promise.all([
@@ -158,13 +161,13 @@ describe('GitHub user authorization state', () => {
       consumeGitHubUserAuthorizationState(first.state, userId),
     ]);
     expect(results).toEqual([
-      { status: 'consumed', codeVerifier: mockedRedisSet.mock.calls[1][1] },
-      { status: 'consumed', codeVerifier: mockedRedisSet.mock.calls[0][1] },
+      { status: 'consumed', codeVerifier: verifierAt(1), expected },
+      { status: 'consumed', codeVerifier: verifierAt(0), expected },
     ]);
   });
 
   test('consumes one state exactly once under concurrent callbacks', async () => {
-    const created = await createGitHubUserAuthorizationState(userId);
+    const created = await createGitHubUserAuthorizationState(userId, expected);
     const results = await Promise.all([
       consumeGitHubUserAuthorizationState(created.state, userId),
       consumeGitHubUserAuthorizationState(created.state, userId),
@@ -179,7 +182,7 @@ describe('GitHub user authorization state', () => {
     new DOMException('synthetic-sensitive-timeout', 'TimeoutError'),
     new Error('synthetic-sensitive-storage-failure'),
   ])('classifies storage exceptions without exposing or retrying them', async error => {
-    const created = await createGitHubUserAuthorizationState(userId);
+    const created = await createGitHubUserAuthorizationState(userId, expected);
     mockedRedisGetDel.mockRejectedValueOnce(error);
     await expect(consumeGitHubUserAuthorizationState(created.state, userId)).resolves.toEqual({
       status: 'storage_error',
@@ -189,7 +192,7 @@ describe('GitHub user authorization state', () => {
   });
 
   test('classifies an absent verifier without claiming expiration or replay', async () => {
-    const created = await createGitHubUserAuthorizationState(userId);
+    const created = await createGitHubUserAuthorizationState(userId, expected);
     verifiers.clear();
     await expect(consumeGitHubUserAuthorizationState(created.state, userId)).resolves.toEqual({
       status: 'invalid',
@@ -199,14 +202,14 @@ describe('GitHub user authorization state', () => {
 
   test('fails closed if transient PKCE storage is unavailable', async () => {
     mockedRedisSet.mockResolvedValue(null);
-    await expect(createGitHubUserAuthorizationState(userId)).rejects.toThrow(
+    await expect(createGitHubUserAuthorizationState(userId, expected)).rejects.toThrow(
       'configured transient state storage'
     );
   });
 
   test('does not return authorization state after a failed storage write', async () => {
     mockedRedisSet.mockRejectedValueOnce(new Error('synthetic-write-failed'));
-    await expect(createGitHubUserAuthorizationState(userId)).rejects.toThrow(
+    await expect(createGitHubUserAuthorizationState(userId, expected)).rejects.toThrow(
       'synthetic-write-failed'
     );
   });

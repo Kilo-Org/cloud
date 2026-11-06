@@ -126,6 +126,17 @@ describe('parseLinkedInProfileName', () => {
   });
 });
 
+describe('Discord OAuth provider', () => {
+  test('configures the issuer for Discord authorization responses', () => {
+    expect(authOptions.providers.find(provider => provider.id === 'discord')).toMatchObject({
+      authorization: 'https://discord.com/api/oauth2/authorize?scope=identify+email',
+      token: 'https://discord.com/api/oauth2/token',
+      userinfo: 'https://discord.com/api/users/@me',
+      options: { issuer: 'https://discord.com' },
+    });
+  });
+});
+
 describe('Anaconda OAuth provider', () => {
   test('maps a valid profile and uses sub as the stable account id', () => {
     expect(

@@ -163,6 +163,11 @@ A response must not bypass storage output gates.
 Upload and verify blobs before admitting references to them.
 A batch that requires a missing blob fails without advancing its source position.
 Keep receipt metadata bounded without making an old retry eligible to apply again.
+The exact latest 256 accepted batches retain receipts. The accepted-batch counter
+skips pruning until the tail fills; each later acceptance removes its single
+oldest indexed source position in the same transaction. Source positions may jump.
+Retries and rejected/rolled-back writes do not advance that counter or trim the tail.
+This uses the existing `receipts_through_idx` and requires no schema migration.
 
 Each admitted blob upload has a unique attempt and physical R2 key.
 A second same-hash upload receives retryable `upload_in_progress`, including `retryAt`.
@@ -288,10 +293,20 @@ The creator index adds no global coordinator or new Durable Object class.
 Default personal limits are 10,000 sessions and 100 GiB; organization limits are
 200,000 sessions and 2 TiB. Wrangler vars `USER_TENANT_SESSIONS`, `USER_TENANT_BYTES`,
 `ORGANIZATION_TENANT_SESSIONS`, and `ORGANIZATION_TENANT_BYTES` override these defaults.
-Leases include inline values and all reserved or stored blobs. A session grows its lease in
-32 MiB steps, capped at its combined inline/blob bound, only when its usage needs more space.
-An alarm shrinks a lease when usage drops at least two steps below it. Deletion releases
-the session admission and its whole lease. Tenant calls never run inside SQLite transactions.
+Leases include inline values and all reserved or stored blobs. The first nonempty
+lease rounds to 1 MiB, then doubles through 2/4/8/16/32 MiB as usage requires.
+Above 32 MiB, growth uses the existing 32 MiB quantum, capped at the combined
+inline/blob bound. Existing stored reservations remain valid; registration
+preserves a sufficient lease rather than expanding it to another quantum.
+The existing alarm shrink threshold remains 64 MiB of unused capacity. A shrink
+or uncertain-growth reconciliation rounds committed usage by the same tier rule.
+Deletion durably tombstones the session and releases its admission and whole lease.
+Physical blob cleanup follows the fenced upload deadlines and retries independently.
+Tenant calls never run inside SQLite transactions.
+This trades up to five additional growth reservations through the first 32 MiB
+for smaller tiny-session reservations; quotas and session limits are unchanged.
+The local concentrated-organization fixture holds 24 two-KiB checkpoints in
+24 MiB of leases. That is reservation efficiency, not a throughput measurement.
 Admission mutations are serialized without blocking session reads during tenant RPCs.
 Tenant outages return retryable `tenant_unavailable` (503), `Retry-After: 60`, and
 an epoch-ms `error.retryAt`; alarm-driven releases and shrinks retry without resetting the session.
@@ -395,6 +410,45 @@ delivery, including backpressure. Neither latency field is a DO CPU measurement;
 the boundary profiler above measures the complete page operation for capacity review.
 Metrics do not buffer blobs or page bodies or record user IDs, session IDs, hashes,
 credentials, or content. Tests can omit the Analytics Engine binding.
+
+The same binding also emits `diagnostic_v1` stage points, with that literal index.
+Blobs are `[version, operation, stage, outcome, cause, tenantType]`. Doubles are
+`[durationMs, count, maxQueueDepth, maxRetainedBytes, overloadedFlagCount,
+retryableFlagCount, sampleEvery]`. Successful boundary completions sample 1/128
+(`sampleEvery=128`, `count=1`). These indicate boundary completion, not necessarily
+batch acceptance: a resolved RPC can return a typed rejection recorded separately.
+Failure keys aggregate for one second; their duration and flag counts are sums
+and queue/retained-byte fields are maxima. The first failure emits immediately.
+Each isolate retains at most 128 bounded failure keys, with no timer or pending
+I/O. A final aggregate can be lost on eviction/idle shutdown; these are diagnostic
+observations, not billing or exact error-accounting counters.
+The oldest key is evicted when the map fills, so newly observed causes remain visible;
+eviction can discard that key's pending aggregate. A raw-stage point and a
+typed-result point can describe the same request: never sum them as distinct
+per-request failures.
+
+Operations distinguish state, batch, registration, live authorization, connection,
+tenant admission, watch and Sync/Relay/Presence initialization. Stages cover
+Worker RPC lookup/call, limiter credit, hashing, validation, actual mutation
+transaction attempts, receipt pruning, lease reserve/reapply, mutation/watch queue
+wait, watch storage/RPC/budget and scheduling. `lease_required` is an expected
+transaction rollback to acquire capacity, not a platform overload.
+`queue_admission` reports active/queued batch count; `queue_wait` reports all
+active/queued admission-gate calls, including registration/live authorization.
+Their retained-byte field counts pending UTF-16 batch bodies. `watch_queue`
+reports active/queued watch tasks; it does not measure transport-buffer memory.
+The exact fixed label unions are in `src/metrics.ts` and `src/overload.ts`.
+Cause labels distinguish `application_queue`, documented platform request/data
+queue, queue-timeout, object/account-rate categories, flag-only `platform_unknown`,
+watch budget, typed results and explicit unknowns. Raw exceptions are classified
+before generic error conversion; client error bodies, retry rules and limits
+are unchanged. Phase durations are elapsed work and may overlap; they are not CPU
+or hibernation/residency measurements.
+
+Diagnostics contain no raw exception text, payloads, request/session/user IDs or
+credentials. An isolated load deployment must bind its own Analytics Engine
+dataset as `SESSION_SYNC_METRICS`; omitting it disables both HTTP/stage metrics.
+Never bind a production dataset merely to qualify a test.
 
 Run `node scripts/profile-metrics.mjs` in the Worker pool to compare the same
 synthetic batch/state/error/blob mix with metrics off and each component disabled.
@@ -740,6 +794,246 @@ Neither a live deployment nor provisioning is part of these commands.
 References:
 [Secrets Store bindings](https://developers.cloudflare.com/secrets-store/integrations/workers/),
 [Wrangler deploy](https://developers.cloudflare.com/workers/wrangler/commands/deploy/).
+
+## Performance qualification
+
+The `scripts/perf-*.mjs` tools separate the native publisher, raw wire reader,
+and actual `NativeSyncClient` into independent processes. They use synthetic
+session identities and single-use output directories. Local qualification
+binds a synthetic relay to `127.0.0.1:18829`; it validates HS256 grant signatures,
+environment/expiry, scoped one-use expiring renewal tickets, and strict heartbeat
+shape. It remains synthetic generator evidence, not real Worker authentication,
+Durable Object storage, enforcement, or UI-rendering proof. The actual-workerd
+pipeline is separate evidence.
+
+From this package on an isolated work VM:
+
+```sh
+node --test scripts/perf-*.test.mjs
+node --import tsx scripts/perf-qualify.mjs smoke /private/native-socket.mjs ../../packages/cloud-agent-sdk/src/native-sync.ts /tmp/sync-smoke
+node --import tsx scripts/perf-qualify.mjs local2x /private/native-socket.mjs ../../packages/cloud-agent-sdk/src/native-sync.ts /tmp/sync-local2x plain
+node --import tsx scripts/perf-qualify.mjs sdk625 /private/native-socket.mjs ../../packages/cloud-agent-sdk/src/native-sync.ts /tmp/sync-sdk625 instrumented
+```
+
+Supply the pinned native `RemoteSocket` module from native revision
+`5b3069885d3223b96fdf1b1db51a7bda54e566e8`; `perf-common.mjs` checks its bundle
+digest. The SDK source path and digest are recorded independently. The optional
+`instrumented` mode adds dequeue and projection timing to an in-memory SDK module
+using checked source anchors. It changes no SDK file or public API. Report it
+separately from the ordinary `plain` run. Its extra parsing/observer work is part
+of its measured overhead.
+
+`local2x` offers 6,250 presence connections, 626 watched sessions at 10 Hz,
+626 actual SDK viewers, and 1,250 scheduled checkpoints/second. This covers
+twice the largest 3,125-session/313-viewer production generator shard.
+`raw2x` is the separate raw-reader baseline; `sdk625` exercises 625 actual
+SDK viewers at 20 Hz as an additional stress case.
+The full shape remains 100,000 sessions, 10,000 watched at 10 Hz, and one
+actual SDK viewer per watched session. Raw mirrors are not part of that shape.
+
+Each 512-byte event body carries its session/sequence identity, scheduled time,
+and producer-send time. A five-byte unique text token carries transcript
+correctness; independent padding supplies the remaining wire bytes. This is
+not a claim that every byte is user-visible text. Durable message values are
+2–8 KiB and contain the exact committed token prefix plus `sourceSequence`.
+Five-second checkpoints and a final checkpoint return durable receipts.
+The producer retries the exact final batch to reconcile its receipt, then
+checks durable state and entity content. A local socket send is not an ACK.
+
+Per-event listeners inspect sequence metadata without reading growing text.
+Full projected transcript hashes are compared at the fixed drain boundary.
+Wire arrivals, SDK callbacks, listener cost, event-loop delay, request concurrency,
+source scheduling backlog, checkpoint scheduling lag, resets, reconnects,
+duplicates, and live socket counts are retained in bounded counters/samples.
+SDK wire-to-callback timing includes queue and projection in `plain` mode;
+`instrumented` also reports those stages separately. SDK callback timing does
+not measure a browser or native view commit.
+Negative clock/skew samples and latency overflow counts are explicit; the
+overflow percentile bin is not a measured upper latency bound.
+
+All rates use the declared 45-second measured denominator after ten seconds of
+warm-up; arrivals have a fixed additional ten-second drain. Late/missing events
+and source underproduction are explicit failures rather than smaller latency
+denominators. Source catch-up preserves every scheduled slot within a bounded
+five-slot budget. Checkpoint admission retains at most one pending slot per
+session, with a 2,048-slot FIFO queue and one-second scheduling deadline. No skipped
+slot is considered success. The producer and viewers close sockets at the fixed
+drain even when durable HTTP work is outstanding.
+Wire and projection completion at or after the drain are excluded from
+acceptance. Every measured viewer arrival must reconcile inside that boundary.
+Receipts validate the exact request digest and all response fields; an exact
+retry must return the complete original receipt, including its commit timestamp.
+
+The `cold`, `renewal`, `hot100`, `slowreader`, and `organization` profiles prepare
+small diagnostic stages. `renewal` uses short synthetic grant lifetimes;
+`hot100` has one SDK plus 99 raw readers on one session; `slowreader` pauses
+actual raw TCP reads for 20 seconds. These local fixtures do not establish
+cloud renewal enforcement, slow-reader eviction, or concentrated-tenant capacity.
+Exercise real credential exchange separately: scale viewers disclose their
+locally signed synthetic grant path.
+
+### Cloud run gates
+
+Cloud mode requires a reviewed target manifest, exact rendered-config and
+source checksums, and an unexpired parent GO matching every workload-config
+checksum. The manifest permits a unique `session-sync-<runID>-loadtest`
+workers.dev target, identically named R2 bucket, isolated run-specific metrics
+dataset, synthetic uncached Hyperdrive origin, and independent staging secrets.
+Run `perf-inspect.mjs absent <manifest>` before provisioning: it checks complete
+name inventories and verifies the run-derived limiter namespace IDs are unused.
+Keep limiter names, limits, and periods unchanged. After deployment, `verify`
+checks actual deployment/version IDs, the `workers/tag` run marker, deployed
+bindings, namespace ownership/classes, private R2 domains and bucket ID, Hyperdrive
+origin, and explicit synthetic/TLS database evidence. It also checks custom
+domains and zone routes. These are read-only operator commands; their credential
+stays on the owned control VM. Generator admission requires a fresh hash-bound
+inspection artifact, not a configuration-file hash alone. Generator hosts,
+repositories, and absolute normalized output roots are explicitly reviewed in
+`manifest.generators`; no developer-specific home-directory prefix is required.
+Cluster nodes must match those exact reviewed entries.
+
+Render the run-specific Worker config with `perf-render.mjs <manifest.json>`;
+it selects runtime code/settings and dedicated resources without deployment.
+Read the run tag and bindings from the deployed version's `annotations` and
+`resources.bindings` through `/versions/<versionID>`. Read Logpush and
+observability through `/script-settings`.
+Wrangler canonicalizes omitted or null remote observability as disabled.
+Reject explicit logging or tracing enablement, including nested overrides.
+
+`perf-plan.mjs <profile> <manifest.json> <output-directory>` generates per-node
+target/config packages, the cluster plan, and an approval-request record. It
+creates neither credentials nor GO files. Supported cloud profiles are `cold`,
+`renewal`, `hot100`, `slowreader`, `organization`, and `full`; the last fixes
+100,000 sessions and 10,000 actual SDK viewers across 32 shards/four hosts.
+
+Start `perf-teardown.mjs arm <target-manifest.json>` on the owned control VM
+before any refresh or seed command. Require its matching heartbeat and live
+process before approval or admission.
+
+Planning freezes the workload, source hashes, target, and lifetime budget but
+does not freeze live evidence forever. Before **each** seed or launch admission,
+run `perf-plan.mjs refresh <same-manifest.json> <same-output-directory>` from the
+owned control VM. It re-inspects live ownership/bindings and the current local
+watchdog, refuses any frozen config/cluster/manifest/budget change, and writes
+per-node `attestation.json` plus current heartbeat copies and a new
+`approval-request.json`. Transfer those two current artifacts to each reviewed
+root. Parent must explicitly issue renewed `go.json` with `approvedByParent:true`,
+the exact config/target/budget hashes and new `attestationHash`, the unchanged
+forecast hard limit, and expiry covering the unchanged stop time. Refresh never writes
+GO or extends resource lifetime. An old GO cannot authorize refreshed evidence;
+inspection/attestation freshness remains 60 seconds and heartbeat freshness ten
+seconds. After lengthy seeding, repeat refresh and obtain another parent GO
+before launch. Do not overwrite the frozen target/evidence copies or re-plan a
+running resource to work around expiry.
+
+
+Run `perf-control.mjs seed <configs...>` before opening presence sockets.
+For one host, `run` creates a fresh live-count barrier. For distributed runs,
+`perf-cluster.mjs <cluster-plan.json>` starts `wait` controllers on the exact
+owned test hosts, combines fresh samples into one simultaneous population,
+and distributes one shared absolute window. It rejects stale/missing samples,
+early generator exits, and population drops. A failed node writes task-local
+stop markers to its peers. Clock-offset evidence and its uncertainty must be
+retained before interpreting cross-host latency.
+
+`perf-budget.mjs <budget-plan.json>` prices gross quantities without allowances:
+registration, seed, checkpoint, retry/reconciliation, ticket/exchange, WebSocket,
+SQL, Worker CPU, rounded DO duration, rounded R2 operations, Logpush, analytics,
+downstream ingestion, VM lifetime, storage/egress, and delayed billing reserve.
+Expected activity and pessimistic activity are distinct inputs. The default/legacy
+`hardLimitUSD: 50` plan allows at most $35 Cloudflare, $5 VMs, and at least $10
+untouched reserve. Only a newly forecast plan with explicit parent approval may
+raise `hardLimitUSD` (maximum $100); a $100 plan allows at most $85 Cloudflare,
+the same $5 VMs and $10 reserve. Both include `alreadySpentUSD` from all prior
+attempts in the cumulative ceiling. Run `node scripts/perf-budget.mjs budget-plan.json`
+and save its passing output as the forecast; the planner copies that forecast's
+cap into its approval request. Parent GO must explicitly match that exact hashed
+forecast cap: a $100 GO cannot expand a $50 forecast. Analytics lag is not an
+invoice guarantee.
+
+Arm `perf-teardown.mjs arm <target-manifest.json>` as a **finite independent job
+on the owned control VM**, separate from generator VMs, before opening cloud
+sockets. Do not run an operator/watchdog background service on a developer Mac.
+The cluster controller, current inspection, and watchdog PID checks must share
+that explicit control-VM runtime. Only the parent's approved **private wrapper**
+may capture the pinned repository Wrangler credential resolver's JSON token;
+emit status only, never the resolver output/token, and never create credential
+files. Do not run the token resolver standalone in a terminal/logged tool call.
+The private wrapper may provide only the needed operator token in the finite
+control job's `SESSION_SYNC_LOADTEST_OPERATOR_TOKEN` environment (or its private
+stdin-to-environment adapter). Never send operator credentials to generators.
+Without that private environment, helpers privately capture the pinned resolver
+internally; no credential-file parsing is supported.
+
+The watchdog publishes a matching nonce-bound heartbeat; cloud admission consumes
+it, and the cluster controller checks freshness and local PID liveness throughout
+ramp/load. Admission prices absolute resource lifetime including the 150-second
+teardown tail. Transient transport/408/429/5xx REST failures and explicitly
+classified Wrangler transient/timeout failures receive at most four attempts
+with bounded backoff inside the same absolute tail. Wrangler output is captured
+privately within 64 KiB only for safe-category classification: never echo it,
+tokens, or raw subprocess errors. Authorization/permission/syntax/unknown failures
+and output overflow are permanent. Every CLI retry first rechecks resource
+ownership and absence; ambiguous successful Worker/bucket deletion is not repeated,
+and object retry checks the owned bucket and reads the exact known key through
+`r2 object get --remote --file` directed to the operating system's null device.
+Explicit absence counts as already cleaned; object bodies cannot fill the private output buffer.
+Replacement or unverified ownership never permits another destructive attempt.
+Compute cleanup runs first, then each remaining resource is independently
+ownership-checked; unavailable bucket metadata cannot block verified Worker
+deletion. Replacements are refused for that resource without abandoning other
+independently verifiable cleanup. Complete paginated Worker/namespace/secret
+inventories must prove absence. The private proof records exact observed
+leftover IDs/names and `null` for unavailable inventories, never assumed absence.
+Exact known synthetic R2 keys must be listed; nonempty or deletion-failed buckets
+are failures. Cluster artifacts persist `passed:true` only
+after teardown succeeds; workload success with cleanup failure is not PASS.
+Generator VMs need their own provider-enforced maximum lifetime. Meter polling
+and operator availability never extend the resource deadline.
+
+## Native client demo
+
+`@kilocode/cloud-agent-sdk` exports `NativeSyncClient`, a platform-neutral native-v2
+reader/controller with injectable `fetch` and WebSocket implementations. It exchanges
+a Kilo credential, mints controller tickets, renews authorization, reconstructs
+revision-consistent snapshots, and resumes ordered live events or refetches after a
+relay reset. Presence commands retain unknown outcomes on timeout; delivery status
+is not execution success. Permission, question, and abort commands require a live
+runner and its current incarnation/run identity. `/clear` only clears the local view.
+
+Each socket generation owns its frame queue, snapshot reads, and incomplete-transcript
+recovery. Reconnect and close cancel those reads and release queued/replay payloads;
+late results cannot publish or change the accepted relay cursor. A snapshot has a
+two-minute total deadline and a 15-second deadline for each state, page, or blob request.
+The raw queue and recovery replay share a 1,024-frame / 4 MiB estimated UTF-16 storage
+budget. One active frame is additionally bounded to 512 KiB before JSON parsing.
+These are retained-payload limits, not an exact JavaScript heap limit; the bounded
+public event history and visible transcript also consume memory.
+
+Backlog overflow preserves the last accepted cursor and reconnects for ordered relay
+replay. A successful `subscribed` handshake clears the backlog error when the replay
+restores a complete transcript. A relay reset or discarded incomplete-recovery replay
+keeps an explicit `NativeSessionState.error` visible through subsequent connections
+until the connection is closed. A revision-consistent snapshot alone cannot prove
+that missing volatile live effects reached durable storage. Consumers must render
+that error alongside the transcript, including when `connection` is `connected`;
+the web native-session demo renders it as an alert. Recovery attempts are bounded,
+and exhausted incomplete snapshots report an error rather than claiming completeness.
+Specific authorization, deletion, and command failures appear alongside the integrity
+warning. An individual oversized frame reports its size limit separately from a
+combined backlog overflow.
+
+The intentionally minimal web demo is `/native-remote`, hidden unless the client-only
+PostHog flag `native-remote-web` is enabled. Its same-origin
+`POST /api/native-remote/token` authenticates the web session and issues a five-minute
+Kilo credential with credential exchange disabled; session-sync enforces all creator ACLs independently of the
+flag. `NEXT_PUBLIC_SESSION_SYNC_URL` optionally selects an isolated local Worker
+(`http://localhost:8817`); otherwise the production destination is used.
+Browser HTTP reads/commands allow bearer-authenticated CORS from `https://kilo.ai`
+and `https://app.kilo.ai`, without cookies. `http://localhost:3000` is allowed only
+when the Worker environment is `development`. Browser and React Native WebSockets
+authenticate through the ticket subprotocol; CLI sockets use `Authorization: Bearer`.
+URL tickets are rejected.
 
 ## Production prerequisites
 

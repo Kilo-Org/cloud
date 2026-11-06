@@ -1,4 +1,5 @@
 import {
+  RUNTIME_HARNESS_HEADER,
   WORKSPACE_CONFIGURATION_HEADER,
   WORKSPACE_CONFIGURATION_VERSION,
   WORKTREE_RUNTIME_HEADER,
@@ -17,6 +18,8 @@ export type FakeWrapperConnectInput = {
   path?: string;
   runtimeContract?: 'legacy' | 'worktree';
   workspaceConfiguration?: boolean;
+  /** Raw `x-kilo-runtime-harness` value, so a test can also send an unknown one. */
+  runtimeHarness?: string;
 };
 
 export type FakeWrapperHelloInput = {
@@ -90,6 +93,9 @@ export class FakeWrapper {
         ...(input.workspaceConfiguration
           ? { [WORKSPACE_CONFIGURATION_HEADER]: WORKSPACE_CONFIGURATION_VERSION }
           : {}),
+        ...(input.runtimeHarness === undefined
+          ? {}
+          : { [RUNTIME_HARNESS_HEADER]: input.runtimeHarness }),
       },
     });
     if (response.status !== 101 || !response.webSocket) {

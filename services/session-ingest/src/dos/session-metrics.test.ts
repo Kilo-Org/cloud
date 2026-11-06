@@ -214,6 +214,24 @@ describe('computeSessionMetrics', () => {
     ];
     const result = computeSessionMetrics(items, 'completed');
     expect(result.timeToFirstResponseMs).toBe(1500);
+    expect(result.metricsBounded).toBe(false);
+  });
+
+  it('states a partial item set and omits a time to first response it cannot know', () => {
+    const items = [
+      makeItem('message', { role: 'user', time: { created: 6_000_000 } }),
+      makeItem('message', {
+        role: 'assistant',
+        time: { created: 6_000_500 },
+        tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+        cost: 0,
+      }),
+    ];
+    const result = computeSessionMetrics(items, 'completed', { bounded: true });
+    // A partial item set holds no first message, so no response time is reported.
+    expect(result.timeToFirstResponseMs).toBeUndefined();
+    expect(result.metricsBounded).toBe(true);
+    expect(result.totalTurns).toBe(1);
   });
 
   it('extracts platform from kilo_meta', () => {

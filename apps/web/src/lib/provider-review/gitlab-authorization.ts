@@ -19,8 +19,7 @@ import {
   type ProviderReviewErrorKind,
 } from '@kilocode/app-shared/provider-review';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
-import type { Owner, PlatformRepository } from '@/lib/integrations/core/types';
-import { requireNumericPlatformRepositories } from '@/lib/integrations/core/types';
+import type { Owner } from '@/lib/integrations/core/types';
 import { getIntegrationForOwner } from '@/lib/integrations/db/platform-integrations';
 import { getValidGitLabToken } from '@/lib/integrations/gitlab-service';
 import {
@@ -30,6 +29,11 @@ import {
 } from '@/lib/integrations/platforms/gitlab/instance-url';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { providerReviewErrorToTrpcError } from './error-mapping';
+import {
+  GITLAB_PROJECT_NOT_IN_CACHE_MESSAGE,
+  matchCachedGitLabProject,
+  readCachedGitLabRepositories,
+} from '@/lib/integrations/platforms/gitlab/project-scope';
 
 /**
  * The account that owns the GitLab integration. `userId` is the acting user
@@ -308,20 +312,6 @@ async function resolveIntegration(
 }
 
 /**
- * The integration's cached repository set, resolved before a token is
- * released. A catalogue that cannot be read (non-numeric provider ids) yields
- * no repositories: the same fail-closed rule authorizeProject applies when it
- * cannot make its match, so neither read widens past the cache.
- */
-function readCachedRepositories(integration: PlatformIntegration): PlatformRepository[] {
-  try {
-    return requireNumericPlatformRepositories(integration.repositories) ?? [];
-  } catch {
-    return [];
-  }
-}
-
-/**
  * The connection's credentials plus the repository scope they are bounded by:
  * the cached repository full paths, which a workspace-wide read intersects its
  * rows with. A connection with an empty catalogue has no listable project.
@@ -346,7 +336,7 @@ export async function authorizeOwner(
   instanceHint?: string
 ): Promise<GitLabOwnerAccess> {
   const { integration, instanceUrl } = await resolveIntegration(owner, instanceHint);
-  const repositoryFullNames = readCachedRepositories(integration).map(
+  const repositoryFullNames = readCachedGitLabRepositories(integration).map(
     repository => repository.full_name
   );
   try {
@@ -355,10 +345,6 @@ export async function authorizeOwner(
   } catch (error) {
     throw classifyGitLabErrorForOwner(error, owner);
   }
-}
-
-function cleanProjectPath(projectPath: string): string {
-  return projectPath.trim().replace(/^\/+|\/+$/g, '');
 }
 
 /**
@@ -374,19 +360,14 @@ export async function authorizeProject(
   projectPath: string,
   instanceHint?: string
 ): Promise<GitLabProjectAccess> {
-  const requested = cleanProjectPath(projectPath);
   const { integration, instanceUrl } = await resolveIntegration(owner, instanceHint);
 
-  const match = readCachedRepositories(integration).find(
-    repo => repo.full_name.toLowerCase() === requested.toLowerCase()
-  );
+  // The repository list is the project's authorization scope; the shared
+  // match rule and refusal copy live in platforms/gitlab/project-scope.ts so
+  // the integration-service branch listing refuses in the same words.
+  const match = matchCachedGitLabProject(integration, projectPath);
   if (!match) {
-    // The repository list is the project's authorization scope, so this refusal
-    // names the one remedy that restores it.
-    throw new GitLabReviewError(
-      'not_found',
-      'This project is not in your connected GitLab repositories. Refresh the repository list on the GitLab integration and try again.'
-    );
+    throw new GitLabReviewError('not_found', GITLAB_PROJECT_NOT_IN_CACHE_MESSAGE);
   }
 
   try {

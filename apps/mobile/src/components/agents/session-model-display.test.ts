@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { friendlyModelName, resolveModelProviderName } from './session-model-display';
+import {
+  friendlyModelName,
+  resolveModelProviderName,
+  resolveSelectionModelDisplay,
+} from './session-model-display';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 
 /**
@@ -99,5 +103,89 @@ describe('resolveModelProviderName', () => {
 
   it('returns the raw providerID for non-kilo providers on no match', () => {
     expect(resolveModelProviderName('openrouter', 'unmapped', [])).toBe('openrouter');
+  });
+});
+
+describe('resolveSelectionModelDisplay', () => {
+  const cliRow: SessionModelOption = {
+    id: 'remote-model-0',
+    name: 'Claude Sonnet 4',
+    displayId: 'claude-sonnet-4',
+    variants: [],
+    isPreferred: false,
+    showGatewayMetadata: false,
+    provider: { id: 'anthropic', name: 'Anthropic' },
+    modelRef: { providerID: 'anthropic', modelID: 'claude-sonnet-4' },
+  };
+
+  const gatewayRow: SessionModelOption = {
+    id: 'deepseek/deepseek-flash',
+    name: 'DeepSeek Flash',
+    displayId: 'deepseek/deepseek-flash',
+    variants: [],
+    isPreferred: false,
+    showGatewayMetadata: true,
+  };
+
+  it('names a CLI catalogue row by its selection id', () => {
+    expect(resolveSelectionModelDisplay('remote-model-0', [cliRow, gatewayRow])).toEqual({
+      model: 'Claude Sonnet 4',
+      provider: 'Anthropic',
+    });
+  });
+
+  it('names a gateway row and its Kilo provider', () => {
+    expect(resolveSelectionModelDisplay('deepseek/deepseek-flash', [cliRow, gatewayRow])).toEqual({
+      model: 'DeepSeek Flash',
+      provider: 'Kilo',
+    });
+  });
+
+  it('returns empty strings for a selection no row carries', () => {
+    expect(resolveSelectionModelDisplay('remote-model-9', [cliRow, gatewayRow])).toEqual({
+      model: '',
+      provider: '',
+    });
+  });
+
+  it('returns empty strings for an empty selection', () => {
+    expect(resolveSelectionModelDisplay('', [cliRow, gatewayRow])).toEqual({
+      model: '',
+      provider: '',
+    });
+  });
+
+  it('names the unavailable placeholder row and leaves its unknown provider empty', () => {
+    const placeholder: SessionModelOption = {
+      id: 'remote-session-model',
+      name: 'Session model',
+      displayId: '',
+      variants: [],
+      isPreferred: false,
+      showGatewayMetadata: false,
+      unavailable: true,
+    };
+    expect(resolveSelectionModelDisplay('remote-session-model', [placeholder])).toEqual({
+      model: 'Session model',
+      provider: '',
+    });
+  });
+
+  it('names an unavailable row whose catalog lost the model by its reference', () => {
+    const unavailable: SessionModelOption = {
+      id: 'remote-unavailable-model',
+      name: 'deepseek v4.1 flash 1017',
+      displayId: 'deepseek/deepseek-v4.1-flash-1017',
+      variants: [],
+      isPreferred: false,
+      showGatewayMetadata: false,
+      provider: { id: 'kilo', name: 'kilo' },
+      modelRef: { providerID: 'kilo', modelID: 'deepseek/deepseek-v4.1-flash-1017' },
+      unavailable: true,
+    };
+    expect(resolveSelectionModelDisplay('remote-unavailable-model', [unavailable])).toEqual({
+      model: 'deepseek v4.1 flash 1017',
+      provider: 'kilo',
+    });
   });
 });

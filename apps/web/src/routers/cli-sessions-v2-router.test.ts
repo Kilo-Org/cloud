@@ -14,6 +14,11 @@ import type { User, Organization } from '@kilocode/db/schema';
 import type { KiloSdkStoredMessage } from '@kilocode/session-ingest-contracts';
 import { MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH } from '@kilocode/session-ingest-contracts';
 import * as githubAdapter from '@/lib/integrations/platforms/github/adapter';
+import type * as GitHubAdapterModule from '@/lib/integrations/platforms/github/adapter';
+import {
+  createEmptyPrObservations,
+  type PrObservations,
+} from '@/lib/integrations/platforms/github/pr-observations';
 import { TRPCClientError } from '@trpc/client';
 import { TRPCError } from '@trpc/server';
 import {
@@ -28,6 +33,11 @@ import type {
 } from '@/lib/session-ingest-client';
 import { notifyCliSessionRenamed } from '@/lib/cloud-agent/session-events';
 import { captureException } from '@sentry/nextjs';
+
+function enableSupportAccess(enabled: boolean) {
+  if (enabled) process.env.SUPPORT_ACCESS_ENABLED = 'true';
+  else delete process.env.SUPPORT_ACCESS_ENABLED;
+}
 
 // Mock the cloud agent client for watermark and runtime-state tests.
 const mockGetSession = jest.fn().mockRejectedValue(new Error('not mocked'));
@@ -106,15 +116,24 @@ jest.mock('@sentry/nextjs', () => {
 // module members fails. Replace `fetchPullRequestByNumber` on the already-mocked
 // adapter module with a fresh `jest.fn()` so individual tests can drive it.
 jest.mock('@/lib/integrations/platforms/github/adapter', () => {
-  const actual: Record<string, unknown> = jest.requireActual(
+  const actual = jest.requireActual<typeof GitHubAdapterModule>(
     '@/lib/integrations/platforms/github/adapter'
   );
   return {
     ...actual,
     fetchPullRequestByNumber: jest.fn(),
-    fetchPullRequestReviewDecision: jest.fn(),
+    toGitHubRateLimitError: jest.fn(actual.toGitHubRateLimitError),
   };
 });
+
+jest.mock('@/lib/integrations/platforms/github/pr-refresh-budget', () => ({
+  claimPrRefresh: jest.fn(async () => ({ allowed: true })),
+  deferPrRefresh: jest.fn(async () => undefined),
+}));
+
+jest.mock('@/lib/integrations/platforms/github/pr-status', () => ({
+  fetchPullRequestObservations: jest.fn(),
+}));
 
 // Same trick for the paginated session-message client. The web router only
 // calls `fetchSessionMessagesPage`; the rest of the module keeps its real
@@ -142,10 +161,11 @@ const mockedFetchPullRequestByNumber =
   githubAdapter.fetchPullRequestByNumber as jest.MockedFunction<
     typeof githubAdapter.fetchPullRequestByNumber
   >;
-const mockedFetchPullRequestReviewDecision =
-  githubAdapter.fetchPullRequestReviewDecision as jest.MockedFunction<
-    typeof githubAdapter.fetchPullRequestReviewDecision
-  >;
+const mockedFetchPullRequestObservations = (
+  jest.requireMock('@/lib/integrations/platforms/github/pr-status') as {
+    fetchPullRequestObservations: jest.Mock;
+  }
+).fetchPullRequestObservations;
 
 let regularUser: User;
 let otherUser: User;
@@ -1698,22 +1718,26 @@ describe('cli-sessions-v2-router', () => {
         'throws an operational failure',
         () => mockDeleteCloudAgentSession.mockRejectedValueOnce(new Error('Worker unavailable')),
       ],
-    ])('preserves the real ownership row when the Worker %s', async (_, failDeletion) => {
-      failDeletion();
-      const caller = await createCallerForUser(regularUser.id);
+    ])(
+      'continues ingest cleanup with pending cleanup when the Worker %s',
+      async (_, failDeletion) => {
+        failDeletion();
+        const caller = await createCallerForUser(regularUser.id);
 
-      await expect(caller.cliSessionsV2.delete({ session_id: sessionId })).rejects.toMatchObject({
-        code: 'INTERNAL_SERVER_ERROR',
-        message: 'Failed to clean up cloud-agent session',
-      });
+        await expect(caller.cliSessionsV2.delete({ session_id: sessionId })).resolves.toEqual({
+          success: true,
+          session_id: sessionId,
+          cleanup: 'pending',
+        });
 
-      const [persisted] = await db
-        .select({ sessionId: cli_sessions_v2.session_id })
-        .from(cli_sessions_v2)
-        .where(eq(cli_sessions_v2.session_id, sessionId));
-      expect(persisted?.sessionId).toBe(sessionId);
-      expect(fetchSpy).not.toHaveBeenCalled();
-    });
+        expect(mockDeleteCloudAgentSession).toHaveBeenCalledWith(cloudAgentSessionId);
+        expect(fetchSpy).toHaveBeenCalledWith(
+          `https://test-ingest.example.com/api/session/${encodeURIComponent(sessionId)}`,
+          expect.objectContaining({ method: 'DELETE' })
+        );
+        expect(jest.mocked(captureException)).toHaveBeenCalled();
+      }
+    );
 
     it('continues idempotent ownership cleanup after a typed runtime NOT_FOUND', async () => {
       const error = new TRPCClientError('Runtime session not found', {
@@ -1731,6 +1755,7 @@ describe('cli-sessions-v2-router', () => {
       await expect(caller.cliSessionsV2.delete({ session_id: sessionId })).resolves.toEqual({
         success: true,
         session_id: sessionId,
+        cleanup: 'complete',
       });
 
       expect(mockDeleteCloudAgentSession).toHaveBeenCalledWith(cloudAgentSessionId);
@@ -1750,6 +1775,7 @@ describe('cli-sessions-v2-router', () => {
       await expect(caller.cliSessionsV2.delete({ session_id: sessionId })).resolves.toEqual({
         success: true,
         session_id: sessionId,
+        cleanup: 'complete',
       });
 
       expect(mockDeleteCloudAgentSession).not.toHaveBeenCalled();
@@ -1860,6 +1886,26 @@ describe('cli-sessions-v2-router', () => {
 
         expect(result.cliSessions.map(session => session.session_id)).toContain(adminSessionId);
       } finally {
+        await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, adminSessionId));
+      }
+    });
+
+    it('support access removes the platform-admin cross-organization list bypass', async () => {
+      const adminSessionId = 'ses_read_auth_admin_enforce_1234';
+      await db.insert(cli_sessions_v2).values({
+        session_id: adminSessionId,
+        kilo_user_id: adminUser.id,
+        organization_id: testOrganization.id,
+        created_on_platform: 'cloud-agent',
+      });
+
+      enableSupportAccess(true);
+      try {
+        const caller = await createCallerForUser(adminUser.id);
+        const result = await caller.cliSessionsV2.list({});
+        expect(result.cliSessions.map(session => session.session_id)).not.toContain(adminSessionId);
+      } finally {
+        enableSupportAccess(false);
         await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, adminSessionId));
       }
     });
@@ -2401,8 +2447,17 @@ describe('cli-sessions-v2-router', () => {
       const caller = await createCallerForUser(regularUser.id);
       const result = await caller.cliSessionsV2.getWithRuntimeState({ session_id: sessionWithPr });
       expect(result.associatedPr?.observations).toEqual({
-        checks: { total: 1, failed: 1 },
+        checks: {
+          total: 1,
+          failed: 1,
+          passed: 0,
+          pending: 0,
+          skipped: 0,
+          unknown: 0,
+          complete: false,
+        },
         unresolvedThreads: 1,
+        threadsComplete: false,
         truncated: false,
       });
       expect(result).not.toHaveProperty('pr_observations');
@@ -3322,7 +3377,11 @@ describe('cli-sessions-v2-router', () => {
       integrationId = integration.id;
 
       mockedFetchPullRequestByNumber.mockReset();
-      mockedFetchPullRequestReviewDecision.mockReset().mockResolvedValue('approved');
+      mockedFetchPullRequestObservations.mockReset().mockResolvedValue({
+        observations: createEmptyPrObservations(),
+        reviewDecision: 'approved',
+        reviewDecisionFetched: true,
+      });
     });
 
     afterEach(async () => {
@@ -3345,7 +3404,8 @@ describe('cli-sessions-v2-router', () => {
         .update(cli_sessions_v2)
         .set({ pr_head_sha: 'abc123' })
         .where(eq(cli_sessions_v2.session_id, sessionId));
-      mockedFetchPullRequestByNumber.mockResolvedValue(ownPrFacts());
+      const fetched = ownPrFacts();
+      mockedFetchPullRequestByNumber.mockResolvedValue(fetched);
 
       const caller = await createCallerForUser(regularUser.id);
       const result = await caller.cliSessionsV2.refreshAssociatedPullRequest({
@@ -3361,7 +3421,21 @@ describe('cli-sessions-v2-router', () => {
         appType: 'standard',
         includeCommits: true,
         expectedHeadSha: 'abc123',
+        signal: expect.any(AbortSignal),
       });
+      expect(mockedFetchPullRequestObservations).toHaveBeenCalledTimes(1);
+      expect(mockedFetchPullRequestObservations).toHaveBeenCalledWith({
+        installationId: '12345',
+        integrationId,
+        owner: 'kilo',
+        repo: 'repo',
+        number: 7,
+        appType: 'standard',
+        pullRequest: fetched,
+        existing: null,
+        signal: expect.any(AbortSignal),
+      });
+      expect(mockedFetchPullRequestObservations.mock.calls[0][0].pullRequest).toBe(fetched);
       expect(result.associatedPr).toMatchObject({
         url: SESSION_PR_URL,
         number: 7,
@@ -3389,6 +3463,97 @@ describe('cli-sessions-v2-router', () => {
         .from(cli_sessions_v2)
         .where(eq(cli_sessions_v2.session_id, sessionId));
       expect(sessionRow.verifiedAt).not.toBeNull();
+    });
+
+    it('persists fetched observations and returns their derived summary', async () => {
+      const head = 'd'.repeat(40);
+      await db
+        .update(cli_sessions_v2)
+        .set({ pr_head_sha: head })
+        .where(eq(cli_sessions_v2.session_id, sessionId));
+      const observations: PrObservations = {
+        ...createEmptyPrObservations(),
+        headSha: head,
+        checksObserved: true,
+        checksComplete: true,
+        checks: [
+          {
+            key: 'check:1:ci',
+            id: '1',
+            attempt: 1,
+            at: null,
+            phase: 2,
+            failed: false,
+            outcome: 'passed',
+          },
+        ],
+        threadsObserved: true,
+        threadsComplete: true,
+        threads: [{ rootId: '2', threadId: 'thread-1', state: 'unresolved' }],
+      };
+      mockedFetchPullRequestByNumber.mockResolvedValue(ownPrFacts({ headSha: head }));
+      mockedFetchPullRequestObservations.mockResolvedValue({
+        observations,
+        reviewDecision: 'approved',
+        reviewDecisionFetched: true,
+      });
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.refreshAssociatedPullRequest({ sessionId });
+
+      expect(result.associatedPr?.observations).toEqual({
+        checks: {
+          total: 1,
+          failed: 0,
+          passed: 1,
+          pending: 0,
+          skipped: 0,
+          unknown: 0,
+          complete: true,
+        },
+        unresolvedThreads: 1,
+        truncated: false,
+        threadsComplete: true,
+      });
+      const [persisted] = await readCacheRows();
+      expect(persisted.pr_observations).toEqual(observations);
+      expect(persisted.pr_head_sha).toBe(head);
+    });
+
+    it('preserves an existing review decision when the observation helper cannot fetch reviews', async () => {
+      await db
+        .update(cli_sessions_v2)
+        .set({ pr_link_verified_at: new Date().toISOString() })
+        .where(eq(cli_sessions_v2.session_id, sessionId));
+      await db.insert(github_branch_pull_requests).values({
+        git_url: SESSION_GIT_URL,
+        git_branch: SESSION_BRANCH,
+        owned_by_user_id: regularUser.id,
+        pr_url: SESSION_PR_URL,
+        pr_number: SESSION_PR_NUMBER,
+        pr_state: 'open',
+        pr_title: 'Existing cache title',
+        pr_head_sha: 'old-sha',
+        pr_review_decision: 'approved',
+        pr_last_synced_at: new Date(Date.now() - 90_000).toISOString(),
+      });
+      const fetched = ownPrFacts();
+      mockedFetchPullRequestByNumber.mockResolvedValue(fetched);
+      mockedFetchPullRequestObservations.mockResolvedValue({
+        observations: createEmptyPrObservations(),
+        reviewDecision: null,
+        reviewDecisionFetched: false,
+      });
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.refreshAssociatedPullRequest({ sessionId });
+
+      expect(result.associatedPr?.reviewDecision).toBe('approved');
+      const [persisted] = await readCacheRows();
+      expect(persisted).toMatchObject({
+        pr_head_sha: fetched.headSha,
+        pr_review_decision: 'approved',
+      });
     });
 
     it('rejects a PR whose head repository is a fork', async () => {

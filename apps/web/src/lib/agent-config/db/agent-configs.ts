@@ -6,6 +6,7 @@ import { ensureBotUserForOrg } from '@/lib/bot-users/bot-user-service';
 import { logExceptInTest, warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { captureException } from '@sentry/nextjs';
 import { assertGitHubAutomationCanBeEnabled } from '@/lib/integrations/github/sharing-compatibility';
+import { withPlatformRepositoryMode } from '@/lib/code-reviews/core/repository-mode';
 
 type AgentConfigOwner = { type: 'org'; id: string } | { type: 'user'; id: string };
 
@@ -134,8 +135,12 @@ export async function upsertAgentConfigForOwner(
     createdBy: string;
   } & AgentConfigUpsertOptions
 ) {
+  const config =
+    data.agentType === 'code_review'
+      ? withPlatformRepositoryMode(data.platform, data.config)
+      : data.config;
   const updateSet = {
-    config: configForAtomicUpdate(data.config, data),
+    config: configForAtomicUpdate(config, data),
     updated_at: new Date().toISOString(),
     ...(data.isEnabled !== undefined ? { is_enabled: data.isEnabled } : {}),
   };
@@ -147,7 +152,7 @@ export async function upsertAgentConfigForOwner(
           owned_by_user_id: null,
           agent_type: data.agentType,
           platform: data.platform,
-          config: data.config,
+          config,
           is_enabled: data.isEnabled ?? false,
           created_by: data.createdBy,
         }
@@ -156,7 +161,7 @@ export async function upsertAgentConfigForOwner(
           owned_by_user_id: data.owner.id,
           agent_type: data.agentType,
           platform: data.platform,
-          config: data.config,
+          config,
           is_enabled: data.isEnabled ?? false,
           created_by: data.createdBy,
         };
@@ -254,7 +259,9 @@ export async function resetCodeReviewConfigForOwner(
       ...existingConfig,
       selected_repository_ids: [],
       manually_added_repositories: [],
-      repository_selection_mode: 'all',
+      // GitLab code review has no 'all' repository mode, so the reset keeps the
+      // platform's only valid mode rather than writing an unsupported one.
+      repository_selection_mode: platform === 'gitlab' ? 'selected' : 'all',
     },
     isEnabled: false,
     createdBy: 'system',

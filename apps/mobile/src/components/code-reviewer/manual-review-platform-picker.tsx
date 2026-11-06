@@ -4,17 +4,14 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
 import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { PLATFORM_CAPABILITIES } from '@/lib/code-reviewer-config';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
-const MANUAL_REVIEW_PLATFORMS = ['github', 'gitlab'] as const;
-type ManualReviewPlatform = (typeof MANUAL_REVIEW_PLATFORMS)[number];
+import { MANUAL_REVIEW_PLATFORMS, type ManualReviewPlatform } from './manual-review-platform';
 
 type ManualReviewPlatformPickerProps = {
-  isLoading: boolean;
   platform: ManualReviewPlatform;
   isConnected: (option: ManualReviewPlatform) => boolean;
   onSelect: (option: ManualReviewPlatform) => void;
@@ -24,23 +21,18 @@ type ManualReviewPlatformPickerProps = {
  * The manual-review form's platform radio group. Selecting a platform clears
  * the URL field (the placeholder and validation are platform-shaped), so the
  * picker owns the selection haptic and the caller's reset through `onSelect`.
+ *
+ * The screen replaces this group with `ManualReviewSkeleton` while the provider
+ * statuses load, so the group renders the choices only; a second loading shape
+ * here would be a placeholder no caller can reach.
  */
 export function ManualReviewPlatformPicker({
-  isLoading,
   platform,
   isConnected,
   onSelect,
 }: Readonly<ManualReviewPlatformPickerProps>) {
   const { t } = useTranslation();
   const colors = useThemeColors();
-  if (isLoading) {
-    return (
-      <View className="gap-2">
-        <Skeleton className="h-14 w-full rounded-lg" />
-        <Skeleton className="h-14 w-full rounded-lg" />
-      </View>
-    );
-  }
   return (
     <RadioGroup label={t('common.platform')} className="overflow-hidden rounded-lg bg-secondary">
       {MANUAL_REVIEW_PLATFORMS.map((option, index) => {

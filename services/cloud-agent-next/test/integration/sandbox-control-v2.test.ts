@@ -2068,7 +2068,6 @@ describe('SandboxControlV2 allocation egress policy', () => {
         KILOCODE_BACKEND_BASE_URL: 'https://backend.example.com',
         KILO_OPENROUTER_BASE: 'https://gateway.example.com/api',
         KILO_SESSION_INGEST_URL: 'https://ingest.example.com',
-        CREDENTIAL_CONTAINMENT_ENABLED: 'false',
         ...extraEnv,
       });
       Object.assign(instance, {

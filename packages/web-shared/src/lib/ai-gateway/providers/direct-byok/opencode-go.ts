@@ -1,7 +1,7 @@
 import { ReasoningDetailsTransform } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { randomUUID } from 'node:crypto';
 import { generateProviderSpecificSessionHash } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
-import { cachedEnhancedDirectByokModelList } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/model-list';
+import { cachedDirectByokModelList } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/model-list';
 import {
   apiKeyUpstream,
   faviconIcon,
@@ -33,18 +33,7 @@ export default {
       removeChatCompletionsMessageNames(context.request.body);
     }
   },
-  models: cachedEnhancedDirectByokModelList({
-    providerId: 'opencode-go',
-    recommendedModels: [
-      {
-        id: 'qwen3.7-plus',
-        name: 'Qwen3.7 Plus',
-        flags: ['vision', 'reasoning'],
-        context_length: 1_000_000,
-        max_completion_tokens: 65_536,
-      },
-    ],
-  }),
+  models: cachedDirectByokModelList('opencode-go'),
   provider_listing: {
     dataPolicy: {
       training: true,

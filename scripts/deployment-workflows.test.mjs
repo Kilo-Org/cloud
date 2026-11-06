@@ -489,6 +489,15 @@ test('ai-gateway deploys with each scheduled release after migrations', () => {
 });
 
 test('one database gate per deployment checks out, installs and migrates once', () => {
+  const dbGateInstall =
+    "pnpm install --frozen-lockfile --filter '@kilocode/db...' --filter kilocode-monorepo";
+  // The deploy gate narrows its install to the workspace set the CI drizzle
+  // check already proves: the probe and drizzle-kit both resolve there.
+  const ciDrizzleInstall = ci.jobs['drizzle-check'].steps.find(
+    step => step.name === 'Install dependencies'
+  ).run;
+  assert.equal(dbGateInstall, ciDrizzleInstall);
+
   for (const [name, deployment, startupStep, migrateStep, environment] of [
     [
       'production',
@@ -511,7 +520,7 @@ test('one database gate per deployment checks out, installs and migrates once', 
 
     const steps = job.steps;
     assert.equal(steps.filter(step => step.uses?.startsWith('useblacksmith/checkout@')).length, 1);
-    assert.equal(steps.filter(step => step.run === 'pnpm install --frozen-lockfile').length, 1);
+    assert.equal(steps.filter(step => step.run === dbGateInstall).length, 1);
     assert.equal(
       steps.find(step => step.uses?.startsWith('useblacksmith/checkout@')).with.ref,
       '${{ needs.check-changes.outputs.target_sha }}'
@@ -519,7 +528,7 @@ test('one database gate per deployment checks out, installs and migrates once', 
 
     const startupIndex = steps.findIndex(step => step.name === startupStep);
     const migrateIndex = steps.findIndex(step => step.name === migrateStep);
-    const installIndex = steps.findIndex(step => step.run === 'pnpm install --frozen-lockfile');
+    const installIndex = steps.findIndex(step => step.run === dbGateInstall);
     assert.ok(installIndex < startupIndex && startupIndex < migrateIndex);
     assert.match(steps[startupIndex].run, /scripts\/check-production-db-startup\.ts/);
     assert.equal(steps[migrateIndex].run, 'NODE_ENV=production pnpm run drizzle migrate');
@@ -542,6 +551,39 @@ test('one database gate per deployment checks out, installs and migrates once', 
     assert.match(production.jobs[job].if, /needs\.db-gate\.result == 'success'/);
   }
   assert.match(staging.jobs['record-deployment'].if, /needs\.db-gate\.result == 'success'/);
+});
+
+test('every Worker deploy job installs only the Worker closure and the root project', () => {
+  // A recursive workspace install from inside a Worker links every unrelated
+  // project and runs its lifecycle scripts once per deploy job. The closure
+  // install links the Worker, its workspace dependencies, the root project and,
+  // where the Worker builds the nested wrapper package, that package too.
+  for (const [job, workingDirectory] of [
+    ['deploy-manual', '${{ inputs.worker }}'],
+    ['deploy-changed', '${{ matrix.worker }}'],
+    ['deploy-session-ingest', 'services/session-ingest'],
+    ['deploy-cloud-agent-after-session-ingest', 'services/cloud-agent-next'],
+  ]) {
+    const installs = workers.jobs[job].steps.filter(step =>
+      (step.run ?? '').includes('pnpm install')
+    );
+    assert.equal(installs.length, 1, `${job} installs once`);
+    assert.equal(installs[0]['working-directory'], workingDirectory);
+    const run = installs[0].run;
+    assert.ok(run.includes("filters=(--filter '{.}...' --filter kilocode-monorepo)"), job);
+    assert.ok(run.includes('if [ -f wrapper/package.json ]; then'), job);
+    assert.ok(run.includes("filters+=(--filter '@kilocode/cloud-agent-wrapper...')"), job);
+    assert.ok(run.includes('pnpm install --frozen-lockfile "${filters[@]}"'), job);
+    assert.ok(!run.includes('pnpm install --frozen-lockfile\n'), job);
+  }
+
+  // The change-detection job installs the root project alone: it only runs the
+  // lockfile-dependent scripts that the root dependencies provide.
+  assert.equal(
+    workers.jobs['detect-changes'].steps.find(step => step.name === 'Install root dependencies')
+      .run,
+    'pnpm --filter kilocode-monorepo install --frozen-lockfile --ignore-scripts'
+  );
 });
 
 test('staging and production Worker changes use independent deployment baselines', () => {

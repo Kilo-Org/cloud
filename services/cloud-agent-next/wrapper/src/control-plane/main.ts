@@ -38,6 +38,7 @@ import { createControlPlaneWorktreeChanges } from './worktree-changes.js';
 import { createControlPlaneWorktreeDeletion } from './worktree-deletion.js';
 import { createControlPlaneKiloRequests } from './kilo-requests.js';
 import { createHistoryRequests } from './history-requests.js';
+import { runtimeHarnessKind } from './runtime-harness.js';
 import {
   CONTROL_SANDBOX_PROVIDER_ENV,
   parseAgentSandboxProvider,
@@ -426,6 +427,7 @@ export async function runControlPlaneWrapper(
     url,
     credential,
     allocationId,
+    runtimeHarness: runtimeHarnessKind(),
     timers,
     log: logToFile,
     onNativeDiagnostic: projector,

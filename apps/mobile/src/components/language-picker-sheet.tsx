@@ -28,6 +28,7 @@ import { resolveDeviceLanguage } from '@/i18n/resolve-language';
 import { isRtlLanguage } from '@/i18n/rtl';
 import { type LanguageReturnTarget } from '@/i18n/return-target';
 import { searchPickerHeaderInList } from '@/lib/form-sheet-detents';
+import { cn } from '@/lib/utils';
 import {
   getLanguagePreference,
   getResolvedLanguage,
@@ -305,7 +306,15 @@ export function LanguagePickerSheet({
   // and the value, and the RTL content alignment, so the pill owns only the
   // chrome and this field keeps only its flex share and text size.
   const searchField = (
-    <View className="mx-4 mb-3 mt-3 flex-row items-center gap-2 rounded-full bg-secondary px-3 py-2">
+    <View
+      className={cn(
+        'mb-3 mt-3 flex-row items-center gap-2 rounded-full bg-secondary px-3 py-2',
+        // As the list header the list's own content padding stands in for the
+        // pinned side margin, so the field keeps its width and aligns with the
+        // rows.
+        searchInList ? 'mx-0' : 'mx-4'
+      )}
+    >
       <Search size={18} color={colors.mutedForeground} />
       <Input
         ref={searchInputRef}

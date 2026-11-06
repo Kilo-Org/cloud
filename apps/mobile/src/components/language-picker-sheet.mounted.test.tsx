@@ -309,6 +309,10 @@ describe('LanguagePickerSheet apply', () => {
     const listHeader = renderer.root.findByType(flashListMock).props
       .ListHeaderComponent as TestRenderer.ReactTestInstance | null;
     expect(String(listHeader?.props.className)).toContain('rounded-full');
+    // The list's content padding replaces the pinned side margin, so the field
+    // keeps its width and lines up with the rows it now scrolls with.
+    expect(String(listHeader?.props.className)).not.toContain('mx-4');
+    expect(String(listHeader?.props.className)).toContain('mx-0');
     // One field on screen: the list header, not a second copy in the chrome.
     expect(findByType(renderer.root, 'TextInput')).toHaveLength(1);
 
@@ -330,9 +334,16 @@ describe('LanguagePickerSheet apply', () => {
 
     // Same list, same field: the empty state is the list's own empty
     // component, so a query that matches nothing keeps the input mounted.
+    // The mock gives each element one host instance, so a remounted field
+    // would be a different node here.
     expect(findByType(renderer.root, 'FlashList')).toHaveLength(1);
     expect(findByType(renderer.root, 'EmptyState')).toHaveLength(1);
-    expect(findByType(renderer.root, 'TextInput')).toHaveLength(1);
+    expect(findByType(renderer.root, 'TextInput')[0]).toBe(input);
+
+    act(() => {
+      (input.props.onChangeText as (value: string) => void)('');
+    });
+    expect(findByType(renderer.root, 'TextInput')[0]).toBe(input);
 
     renderer.unmount();
     windowSize.height = 874;

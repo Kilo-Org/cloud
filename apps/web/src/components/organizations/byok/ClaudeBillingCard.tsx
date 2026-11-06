@@ -41,6 +41,8 @@ function refusalMessage(status: ClaudeBillingStatus) {
     case 'linked_organization_billing_unavailable':
     case 'billing_error':
       return 'Anthropic cannot bill your Claude organization. Check its billing status and spend limits in Claude Console.';
+    case 'permission_error':
+      return 'Claude refused the request. Check model access and billing in Claude Console, or contact Kilo support.';
     default:
       return null;
   }

@@ -1,21 +1,13 @@
 import * as z from 'zod';
 
-/**
- * Anthropic's refusals on a customer-billed request. `/v1/messages` carries the
- * code in `error.details.error_code`; the OpenAI-compatible
- * `/v1/chat/completions` reports the same HTTP status and message and may carry
- * the Anthropic error type in `error.code`, but no `error_code`. A compatibility
- * refusal without a code therefore falls back to a status-derived one, so the
- * connection still records the refusal.
- */
+// Compatibility responses can omit billing details. Record their status without
+// treating an unrelated permission failure as proof that the connection ended.
 export const CLAUDE_BILLING_REFUSALS = {
   spendingLimit: 'linked_organization_spend_limit_reached',
   billingUnavailable: 'linked_organization_billing_unavailable',
   notBillable: 'user_profile_not_billable',
   profileRequired: 'user_profile_required',
-  /** `403` without a code on the OpenAI-compatible endpoint. */
   forbiddenWithoutCode: 'permission_error',
-  /** `402` without a code on the OpenAI-compatible endpoint. */
   paymentRequiredWithoutCode: 'billing_error',
 } as const;
 
@@ -29,18 +21,13 @@ const refusalBodySchema = z.object({
   }),
 });
 
-/** The refusal code in a response body, or null when the body names none. */
 export function readClaudeBillingRefusalCode(body: unknown): string | null {
   const parsed = refusalBodySchema.safeParse(body);
   if (!parsed.success) return null;
   return parsed.data.error.details?.error_code ?? parsed.data.error.code ?? null;
 }
 
-/**
- * The refusal code to record for a refused response: the body's code, or a
- * status-derived one when the body carries none. A 403 means the profile cannot
- * bill, and a 402 means the organization's billing or spend limit applies.
- */
+// A status-only refusal remains visible without changing the connection state.
 export function claudeBillingRefusalCodeFor(status: number, body: unknown): string | null {
   const code = readClaudeBillingRefusalCode(body);
   if (code) return code;
@@ -49,12 +36,9 @@ export function claudeBillingRefusalCodeFor(status: number, body: unknown): stri
   return null;
 }
 
-/** True for a refusal that means the connection can no longer bill. */
 export function isClaudeBillingConnectionDead(code: string): boolean {
   return (
-    code === CLAUDE_BILLING_REFUSALS.notBillable ||
-    code === CLAUDE_BILLING_REFUSALS.profileRequired ||
-    code === CLAUDE_BILLING_REFUSALS.forbiddenWithoutCode
+    code === CLAUDE_BILLING_REFUSALS.notBillable || code === CLAUDE_BILLING_REFUSALS.profileRequired
   );
 }
 

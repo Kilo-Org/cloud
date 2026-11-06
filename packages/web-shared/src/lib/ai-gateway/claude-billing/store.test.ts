@@ -83,11 +83,17 @@ describe('Claude billing refusal transitions', () => {
   });
 
   it.each([
-    [403, { error: { message: 'cannot bill' } }, 'permission_error', true],
+    [403, { error: { message: 'model access denied' } }, 'permission_error', false],
     [
       403,
       { error: { type: 'invalid_request_error', code: 'permission_error' } },
       'permission_error',
+      false,
+    ],
+    [
+      403,
+      { error: { type: 'permission_error', details: { error_code: 'user_profile_not_billable' } } },
+      'user_profile_not_billable',
       true,
     ],
     [402, { error: { code: 'billing_error' } }, 'billing_error', false],

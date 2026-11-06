@@ -206,6 +206,7 @@ The US gateway delegates this check to the web application with `INTERNAL_API_SE
 A failed check returns a retryable error; it never selects another payer.
 Keep the internal secret consistent across both applications before enabling customer billing.
 Provider billing failures remain customer failures, including spend-limit refusals.
+A generic permission refusal does not disable the connection. Only explicit profile refusals trigger that transition.
 Account erasure retries temporary remote cleanup failures before deleting the stored profile identifier.
 
 - `GITHUB_CLIENT_ID` - GitHub OAuth app client ID. `[PUBLIC]`

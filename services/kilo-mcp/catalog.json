@@ -6986,6 +6986,21 @@
                       "default": "",
                       "type": "string",
                       "maxLength": 100000
+                    },
+                    "mode": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 50,
+                      "pattern": "^[a-z][a-z0-9-]*$"
+                    },
+                    "model": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "variant": {
+                      "type": "string",
+                      "maxLength": 50,
+                      "pattern": "^[a-zA-Z]+$"
                     }
                   },
                   "required": [
@@ -8447,6 +8462,21 @@
                   "default": "",
                   "type": "string",
                   "maxLength": 100000
+                },
+                "mode": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 50,
+                  "pattern": "^[a-z][a-z0-9-]*$"
+                },
+                "model": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "variant": {
+                  "type": "string",
+                  "maxLength": 50,
+                  "pattern": "^[a-zA-Z]+$"
                 }
               },
               "required": [
@@ -18633,6 +18663,21 @@
                           "default": "",
                           "type": "string",
                           "maxLength": 100000
+                        },
+                        "mode": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 50,
+                          "pattern": "^[a-z][a-z0-9-]*$"
+                        },
+                        "model": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "variant": {
+                          "type": "string",
+                          "maxLength": 50,
+                          "pattern": "^[a-zA-Z]+$"
                         }
                       },
                       "required": [
@@ -20167,6 +20212,21 @@
                   "default": "",
                   "type": "string",
                   "maxLength": 100000
+                },
+                "mode": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 50,
+                  "pattern": "^[a-z][a-z0-9-]*$"
+                },
+                "model": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "variant": {
+                  "type": "string",
+                  "maxLength": 50,
+                  "pattern": "^[a-zA-Z]+$"
                 }
               },
               "required": [

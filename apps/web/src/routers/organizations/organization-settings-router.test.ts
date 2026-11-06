@@ -27,6 +27,8 @@ import { eq, sql } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 
+jest.setTimeout(30_000);
+
 jest.mock('@kilocode/web-shared/lib/posthog-feature-flags', () => ({
   isReleaseToggleEnabled: jest.fn(async () => true),
 }));

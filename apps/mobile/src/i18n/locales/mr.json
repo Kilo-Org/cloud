@@ -515,7 +515,7 @@
       }
     },
     "discussion": {
-      "threadAccessibilityLabel": "चर्चा {{anchorLabel}}",
+      "threadAccessibilityLabel": "चर्चा थ्रेड {{anchorLabel}}",
       "collapseThread": "चर्चेतील तपशील लपवा",
       "resolveThread": "चर्चेतील मुद्दा सुटल्याची खूण करा",
       "unresolveThread": "चर्चेतील मुद्दा सुटल्याची खूण काढा",
@@ -574,9 +574,9 @@
         }
       },
       "accessDeniedMessage": "तुम्हाला या PR वरील चर्चा पाहण्याची परवानगी नाही.",
-      "unavailable": "चर्चा उपलब्ध नाही.",
+      "unavailable": "चर्चा उपलब्ध नाही",
       "unavailableMessage": "ही पुल रिक्वेस्ट काढून टाकली असेल.",
-      "couldNotLoad": "चर्चा लोड करता आली नाही.",
+      "couldNotLoad": "चर्चा लोड करता आली नाही",
       "loading": "चर्चा लोड होत आहे",
       "noDiscussion": "अजून चर्चा नाही",
       "noDiscussionDescription": "या पुल रिक्वेस्टवर पुनरावलोकनाच्या चर्चा किंवा इतर टिप्पण्या नाहीत.",
@@ -628,12 +628,12 @@
     "headLine": "{{counts}} · हेड {{sha}}",
     "entry": {
       "noRecentPrs": "अलीकडील पुनरावलोकने नाहीत",
-      "noRecentPrsDescription": "पुनरावलोकन सुरू करण्यासाठी वर एक लिंक पेस्ट करा — पुढच्या वेळी ती येथे दिसेल.",
+      "noRecentPrsDescription": "पुनरावलोकन सुरू करण्यासाठी वर एक लिंक पेस्ट करा — पुढच्या वेळी पुनरावलोकन येथे दिसेल.",
       "removeFromRecentsTitle": "अलीकडील यादीतून काढायचे?",
       "removeFromRecentsMessage": "हे पुनरावलोकन तुमच्या अलीकडील यादीतून काढले जाईल.",
       "removeRecentAccessibility": "{{repo}} अलीकडील यादीतून काढा",
       "urlAccessibility": "पुल रिक्वेस्ट किंवा मर्ज रिक्वेस्टचा URL टाका",
-      "urlPlaceholder": "पुल रिक्वेस्ट किंवा मर्ज रिक्वेस्ट URL",
+      "urlPlaceholder": "पुल रिक्वेस्ट किंवा मर्ज रिक्वेस्टचा URL",
       "openAccessibility": "पुल रिक्वेस्ट किंवा मर्ज रिक्वेस्ट उघडा",
       "clearLink": "लिंक काढा",
       "pasteLink": "पुल रिक्वेस्ट किंवा मर्ज रिक्वेस्टची लिंक पेस्ट करा",
@@ -813,7 +813,7 @@
       "truncationBanner_one": "GitHub API च्या मर्यादेमुळे बदललेल्या {{total}} फाइल्सपैकी पहिल्या {{limit}} फाइल्स दाखवल्या आहेत.",
       "truncationBanner_other": "GitHub API च्या मर्यादेमुळे बदललेल्या {{total}} फाइल्सपैकी पहिल्या {{limit}} फाइल्स दाखवल्या आहेत."
     },
-    "linkPasteClipboardEmpty": "क्लिपबोर्ड रिकामा आहे.",
+    "linkPasteClipboardEmpty": "क्लिपबोर्ड रिकामा आहे",
     "linkPasteDenied": "पेस्ट करण्याची परवानगी नाकारण्यात आली. पेस्ट करण्याची परवानगी द्या आणि पुन्हा प्रयत्न करा.",
     "linkPasteNotAPullRequest": "ही पुल रिक्वेस्ट किंवा मर्ज रिक्वेस्टची लिंक नाही",
     "announce": {

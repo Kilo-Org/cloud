@@ -319,12 +319,14 @@ describe('cloudAgentNextFailuresRouter', () => {
       const lines = file.content.trimEnd().split('\n');
       expect(lines[0]).toContain('source,occurred_at,status,stage,code');
       expect(lines[0]).toContain('diagnostic_status');
-      expect(lines).toHaveLength(3);
+      expect(lines).toHaveLength(4);
       expect(lines[1]).toContain('setup');
       expect(lines[1]).toContain("'=Failures report");
       expect(lines[1]).toContain('present');
       expect(lines[2]).toContain('run');
-      expect(lines[2]).toContain('wrapper_failures_history');
+      expect(lines[2]).toContain('msg_failures_history_expired');
+      expect(lines[3]).toContain('run');
+      expect(lines[3]).toContain('wrapper_failures_history');
     });
   });
 });

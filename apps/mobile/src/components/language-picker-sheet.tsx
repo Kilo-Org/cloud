@@ -3,7 +3,13 @@ import { reloadAppAsync } from 'expo';
 import { useFocusEffect, usePreventRemove } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { I18nManager, type TextInput, View, type ViewStyle } from 'react-native';
+import {
+  I18nManager,
+  type TextInput,
+  useWindowDimensions,
+  View,
+  type ViewStyle,
+} from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
@@ -29,7 +35,6 @@ import {
 } from '@/lib/hooks/use-language-preference';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { dismissSearchPickerKeyboard, SEARCHABLE_PICKER_LIST_PROPS } from '@/lib/picker-list';
-import { useWindowDimensions } from 'react-native';
 
 // The picker sheet renders its own scroll container (`scrollable={false}`), so
 // the list fills the sheet's body. The list stays transparent: the route's

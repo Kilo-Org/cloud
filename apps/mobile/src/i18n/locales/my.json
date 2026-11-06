@@ -2293,6 +2293,7 @@
       "emptyDescription": "စတင်ရန် အောက်တွင် မက်ဆေ့ခ်ျတစ်ခု ပို့ပါ။",
       "scrollToBottom": "အောက်ခြေသို့ ဆွဲချပါ",
       "emptyTitle": "မက်ဆေ့ခ်ျ မရှိသေးပါ",
+      "emptyReadOnlyTitle": "ဤစက်ရှင်တွင် မက်ဆေ့ခ်ျ မရှိပါ",
       "renameAccessibility": "{{title}} စက်ရှင်ကို အမည်ပြောင်းပါ",
       "cloningSession": "စက်ရှင်ကို မိတ္တူပွားနေသည်",
       "couldNotLoadThisSession": "ဤစက်ရှင်ကို ဖွင့်၍မရပါ။",

@@ -2293,6 +2293,7 @@
       "emptyDescription": "सुरुवात करण्यासाठी खाली संदेश पाठवा.",
       "scrollToBottom": "शेवटपर्यंत स्क्रोल करा",
       "emptyTitle": "अजून संदेश नाहीत",
+      "emptyReadOnlyTitle": "या सत्रात संदेश नाहीत",
       "renameAccessibility": "{{title}} या सत्राचे नाव बदला",
       "cloningSession": "सत्राची प्रत तयार होत आहे",
       "couldNotLoadThisSession": "हे सत्र लोड करता आले नाही.",

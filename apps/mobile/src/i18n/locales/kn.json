@@ -2299,6 +2299,7 @@
       "emptyDescription": "ಪ್ರಾರಂಭಿಸಲು ಕೆಳಗೆ ಸಂದೇಶ ಕಳುಹಿಸಿ.",
       "scrollToBottom": "ಕೊನೆಯವರೆಗೆ ಸ್ಕ್ರಾಲ್ ಮಾಡಿ",
       "emptyTitle": "ಇನ್ನೂ ಯಾವುದೇ ಸಂದೇಶಗಳಿಲ್ಲ",
+      "emptyReadOnlyTitle": "ಈ ಸೆಶನ್ನಲ್ಲಿ ಯಾವುದೇ ಸಂದೇಶಗಳಿಲ್ಲ",
       "renameAccessibility": "{{title}} ಸೆಶನ್‌ನ ಹೆಸರು ಬದಲಾಯಿಸಿ",
       "cloningSession": "ಸೆಶನ್‌ನ ಪ್ರತಿ ರಚಿಸಲಾಗುತ್ತಿದೆ",
       "couldNotLoadThisSession": "ಈ ಸೆಶನ್ ಅನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",

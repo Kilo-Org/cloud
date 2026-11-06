@@ -1742,6 +1742,7 @@
       "emptyDescription": "Invia un messaggio qui sotto per iniziare.",
       "scrollToBottom": "Scorri fino in fondo",
       "emptyTitle": "Ancora nessun messaggio",
+      "emptyReadOnlyTitle": "Nessun messaggio in questa sessione",
       "renameAccessibility": "Rinomina la sessione: {{title}}",
       "cloningSession": "Clonazione in corso…",
       "couldNotLoadThisSession": "Impossibile caricare questa sessione.",

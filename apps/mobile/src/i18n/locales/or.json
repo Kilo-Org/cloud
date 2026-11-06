@@ -2293,6 +2293,7 @@
       "emptyDescription": "ଆରମ୍ଭ କରିବାକୁ ନିମ୍ନରେ ଏକ ବାର୍ତ୍ତା ପଠାନ୍ତୁ।",
       "scrollToBottom": "ସବୁଠାରୁ ତଳକୁ ସ୍କ୍ରୋଲ୍ କରନ୍ତୁ",
       "emptyTitle": "ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି ବାର୍ତ୍ତା ନାହିଁ",
+      "emptyReadOnlyTitle": "ଏହି ସେସନରେ କୌଣସି ବାର୍ତ୍ତା ନାହିଁ",
       "renameAccessibility": "{{title}} ସେସନର ନାମ ବଦଳାନ୍ତୁ",
       "cloningSession": "ସେସନର ନକଲ ତିଆରି ହେଉଛି",
       "couldNotLoadThisSession": "ଏହି ସେସନ୍ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",

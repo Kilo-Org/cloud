@@ -2293,6 +2293,7 @@
       "emptyDescription": "Send en melding nedenfor for å komme i gang.",
       "scrollToBottom": "Rull til bunnen",
       "emptyTitle": "Ingen meldinger ennå",
+      "emptyReadOnlyTitle": "Ingen meldinger i denne økten",
       "renameAccessibility": "Gi økten nytt navn: {{title}}",
       "cloningSession": "Kloner økten",
       "couldNotLoadThisSession": "Kunne ikke laste inn denne økten.",

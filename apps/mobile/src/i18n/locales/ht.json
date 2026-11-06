@@ -2293,6 +2293,7 @@
       "emptyDescription": "Voye yon mesaj anba a pou kòmanse.",
       "scrollToBottom": "Desann jis anba",
       "emptyTitle": "Pa gen mesaj ankò",
+      "emptyReadOnlyTitle": "Pa gen mesaj nan sesyon sa a",
       "renameAccessibility": "Chanje non sesyon an: {{title}}",
       "cloningSession": "Ap klone sesyon an",
       "couldNotLoadThisSession": "Nou pa t ka chaje sesyon sa a.",

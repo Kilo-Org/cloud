@@ -2360,6 +2360,7 @@
       "emptyDescription": "Send a message below to get started.",
       "scrollToBottom": "Scroll to bottom",
       "emptyTitle": "No messages yet",
+      "emptyReadOnlyTitle": "No messages in this session",
       "renameAccessibility": "Rename session: {{title}}",
       "cloningSession": "Cloning session",
       "couldNotLoadThisSession": "Couldn't load this session",

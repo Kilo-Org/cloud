@@ -1754,6 +1754,7 @@
       "emptyDescription": "Sende unten eine Nachricht, um zu beginnen.",
       "scrollToBottom": "Nach unten scrollen",
       "emptyTitle": "Noch keine Nachrichten",
+      "emptyReadOnlyTitle": "Keine Nachrichten in dieser Sitzung",
       "renameAccessibility": "Sitzung umbenennen: {{title}}",
       "cloningSession": "Sitzung wird geklont",
       "couldNotLoadThisSession": "Diese Sitzung konnte nicht geladen werden.",

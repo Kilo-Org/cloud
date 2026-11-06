@@ -2293,6 +2293,7 @@
       "emptyDescription": "Изпрати съобщение по-долу, за да започнеш.",
       "scrollToBottom": "Превърти до края",
       "emptyTitle": "Все още няма съобщения",
+      "emptyReadOnlyTitle": "В тази сесия няма съобщения",
       "renameAccessibility": "Преименувай сесията: {{title}}",
       "cloningSession": "Клониране на сесия",
       "couldNotLoadThisSession": "Не успяхме да заредим тази сесия.",

@@ -2293,6 +2293,7 @@
       "emptyDescription": "ప్రారంభించడానికి కింద సందేశం పంపండి.",
       "scrollToBottom": "చివరి వరకు స్క్రోల్ చేయండి",
       "emptyTitle": "ఇంకా సందేశాలు లేవు",
+      "emptyReadOnlyTitle": "ఈ సెషన్‌లో సందేశాలు లేవు",
       "renameAccessibility": "{{title}} సెషన్ పేరు మార్చండి",
       "cloningSession": "సెషన్‌ను క్లోన్ చేస్తోంది",
       "couldNotLoadThisSession": "ఈ సెషన్‌ను లోడ్ చేయలేకపోయాము.",

@@ -2293,6 +2293,7 @@
       "emptyDescription": "Ziga ozi n'okpuru iji bido.",
       "scrollToBottom": "Pịgharịa ruo n'ala",
       "emptyTitle": "Ozi adịbeghị",
+      "emptyReadOnlyTitle": "Enweghị ozi na nnọkọ a",
       "renameAccessibility": "Gbanwee aha nnọkọ: {{title}}",
       "cloningSession": "Na-emepụta oyiri nnọkọ",
       "couldNotLoadThisSession": "Enweghị ike ibudata nnọkọ a.",

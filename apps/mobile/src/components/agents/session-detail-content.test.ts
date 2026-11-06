@@ -2961,8 +2961,10 @@ describe.each([true, false])('session detail return with history=%s', hasHistory
   it.each(['loaded after child dismissal', 'empty'] as const)('leaves %s content', async state => {
     const view = await mountDetails(state === 'empty' ? [] : undefined);
     if (state === 'empty') {
+      // The fixture resolves read-only, so the empty title states a fact rather
+      // than a wait: a stored transcript can never gain a row.
       expect(view.renderer.root.findByType(EmptyState).props).toMatchObject({
-        title: i18n.t('agentChat.session.emptyTitle'),
+        title: i18n.t('agentChat.session.emptyReadOnlyTitle'),
       });
     } else {
       pressCard(view.renderer, SELECTED_ID);
@@ -3339,7 +3341,7 @@ describe('session detail zero-render transcript guard (mobile-app e2-open)', () 
 
     expect(messageLists(view.renderer)).toHaveLength(0);
     expect(view.renderer.root.findByType(EmptyState).props).toMatchObject({
-      title: i18n.t('agentChat.session.emptyTitle'),
+      title: i18n.t('agentChat.session.emptyReadOnlyTitle'),
     });
     expect(view.requestedIds()).toEqual([ROOT_ID]);
   });
@@ -3348,9 +3350,21 @@ describe('session detail zero-render transcript guard (mobile-app e2-open)', () 
     const view = await mountDetails([blankAssistantMessage('msg-blank')]);
     expect(messageLists(view.renderer)).toHaveLength(0);
     expect(view.renderer.root.findByType(EmptyState).props).toMatchObject({
-      title: i18n.t('agentChat.session.emptyTitle'),
+      title: i18n.t('agentChat.session.emptyReadOnlyTitle'),
     });
     expect(view.requestedIds()).toEqual([ROOT_ID]);
+  });
+
+  it('keeps the live empty title, with its prompt, for a writable session', async () => {
+    // A session that can still receive a message reads the wait, not the fact:
+    // the title stays "No messages yet" and the composer's prompt comes with it.
+    goalMountOptions = { resolvedType: 'remote' };
+    const view = await mountDetails([blankAssistantMessage('msg-blank')]);
+    expect(messageLists(view.renderer)).toHaveLength(0);
+    expect(view.renderer.root.findByType(EmptyState).props).toMatchObject({
+      title: i18n.t('agentChat.session.emptyTitle'),
+      description: i18n.t('agentChat.session.emptyDescription'),
+    });
   });
 
   it('pages older messages into the reserved skeleton while a zero-render transcript has a cursor', async () => {
@@ -3367,7 +3381,7 @@ describe('session detail zero-render transcript guard (mobile-app e2-open)', () 
     expect(view.renderer.root.findAllByType(SessionSkeletonMessages)).toHaveLength(0);
     expect(messageLists(view.renderer)).toHaveLength(0);
     expect(view.renderer.root.findByType(EmptyState).props).toMatchObject({
-      title: i18n.t('agentChat.session.emptyTitle'),
+      title: i18n.t('agentChat.session.emptyReadOnlyTitle'),
     });
   });
 
@@ -3404,7 +3418,7 @@ describe('session detail zero-render transcript guard (mobile-app e2-open)', () 
     expect(messageLists(view.renderer)).toHaveLength(0);
     const empty = view.renderer.root.findByType(EmptyState);
     expect(empty.props).toMatchObject({
-      title: i18n.t('agentChat.session.emptyTitle'),
+      title: i18n.t('agentChat.session.emptyReadOnlyTitle'),
     });
     expect(empty.props.action).toBeUndefined();
   });

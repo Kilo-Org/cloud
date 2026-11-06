@@ -2293,6 +2293,7 @@
       "emptyDescription": "Tuma ujumbe hapa chini ili uanze.",
       "scrollToBottom": "Tembeza hadi chini",
       "emptyTitle": "Bado hakuna ujumbe",
+      "emptyReadOnlyTitle": "Hakuna ujumbe katika kikao hiki",
       "renameAccessibility": "Badilisha jina la kikao: {{title}}",
       "cloningSession": "Inanakili kikao",
       "couldNotLoadThisSession": "Imeshindikana kupakia kikao hiki.",

@@ -1754,6 +1754,7 @@
       "emptyDescription": "Kirim pesan di bawah untuk memulai.",
       "scrollToBottom": "Gulir ke bawah",
       "emptyTitle": "Belum ada pesan",
+      "emptyReadOnlyTitle": "Tidak ada pesan dalam sesi ini",
       "renameAccessibility": "Ganti nama sesi: {{title}}",
       "cloningSession": "Menyalin sesi",
       "couldNotLoadThisSession": "Tidak dapat memuat sesi ini.",

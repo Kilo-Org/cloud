@@ -2299,6 +2299,7 @@
       "emptyDescription": "Mandefasa hafatra etsy ambany mba hanombohana.",
       "scrollToBottom": "Mikorisa hatrany ambany",
       "emptyTitle": "Mbola tsy misy hafatra",
+      "emptyReadOnlyTitle": "Tsy misy hafatra ao amin'ity fotoam-piasana ity",
       "renameAccessibility": "Ovao ny anaran'ny fotoam-piasana: {{title}}",
       "cloningSession": "Mamorona dika mitovy amin'ny fotoam-piasana",
       "couldNotLoadThisSession": "Tsy voaray ity fotoam-piasana ity.",

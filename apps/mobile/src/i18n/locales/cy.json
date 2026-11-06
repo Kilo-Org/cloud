@@ -2461,6 +2461,7 @@
       "emptyDescription": "Anfonwch neges isod i ddechrau.",
       "scrollToBottom": "Sgrolio i'r gwaelod",
       "emptyTitle": "Dim negeseuon eto",
+      "emptyReadOnlyTitle": "Dim negeseuon yn y sesiwn hon",
       "renameAccessibility": "Ailenwi sesiwn: {{title}}",
       "cloningSession": "Yn clonio sesiwn",
       "couldNotLoadThisSession": "Methu llwytho'r sesiwn hon.",

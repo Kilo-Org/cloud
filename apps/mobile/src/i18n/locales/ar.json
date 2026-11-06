@@ -1838,6 +1838,7 @@
       "emptyDescription": "أرسل رسالة أدناه للبدء.",
       "scrollToBottom": "التمرير إلى الأسفل",
       "emptyTitle": "لا توجد رسائل بعد",
+      "emptyReadOnlyTitle": "لا توجد رسائل في هذه الجلسة",
       "renameAccessibility": "إعادة تسمية الجلسة: {{title}}",
       "cloningSession": "جارٍ استنساخ الجلسة",
       "couldNotLoadThisSession": "تعذّر تحميل هذه الجلسة.",

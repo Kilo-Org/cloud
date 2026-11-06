@@ -4,7 +4,11 @@ name: kilo-app CI
 # every PR and every main push (no path filters) and the `mobile-changes` job
 # gates the suite work. An unrelated PR or push still reports the suite checks
 # as skipped (a skipped job satisfies a required check) instead of leaving them
-# "Expected". The release workflow re-runs the suite through `workflow_call`.
+# "Expected". A release started by the same main push consumes this run's
+# conclusion for that commit — every release path is inside the detection below,
+# so the run always executes the suite — and calls the suite through
+# `workflow_call` only for the hourly schedule, a manual run, or a reuse the
+# release cannot prove.
 
 on:
   push:

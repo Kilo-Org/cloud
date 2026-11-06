@@ -35,12 +35,15 @@ permissions:
 jobs:
   check-changes:
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
-    timeout-minutes: 5
+    timeout-minutes: 10
     permissions:
       contents: read # read the release tags
+      actions: read # look up the kilo-app CI run this same push started
     outputs:
       should_build: ${{ steps.check.outputs.should_build }}
       allowed: ${{ steps.cap.outputs.allowed }}
+      reuse: ${{ steps.suite.outputs.reuse }}
+      suite_run: ${{ steps.suite.outputs.suite_run }}
       version: ${{ steps.check.outputs.version }}
       notes: ${{ steps.notes.outputs.notes }}
     steps:
@@ -151,9 +154,103 @@ jobs:
             echo "::notice::App Store Connect upload limit reached — no artifact is built; the next push or the hourly run picks this release up."
           fi
 
+      # A push to main starts the kilo-app CI run and this release run from the
+      # same commit, and every path that triggers this workflow is inside that
+      # workflow's change detection, so its run always executes the suite for
+      # this commit. Publishing that run's id lets the `reuse` job wait for its
+      # conclusion instead of the suite running a second time. Every other case
+      # keeps the in-workflow suite: the hourly schedule and a manual dispatch
+      # have no push run for this commit, a lookup that fails proves nothing,
+      # and a run that already concluded unsuccessfully is not a validation for
+      # this commit. The default `reuse=false` is therefore the fail-closed
+      # value, and only a lookup that succeeded can turn it true.
+      - name: Look for the suite run of this commit
+        id: suite
+        if: steps.check.outputs.should_build == 'true' && steps.cap.outputs.allowed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          echo "reuse=false" >> "$GITHUB_OUTPUT"
+
+          if [ "$GITHUB_EVENT_NAME" != "push" ]; then
+            echo "Not a push run — the suite runs in this workflow."
+            exit 0
+          fi
+
+          # Both runs are created by the same push event, but the runs list can
+          # lag behind the run it should describe, and a lookup that matches
+          # nothing still prints an empty row (`[null,null,""] | @tsv`). The id
+          # is therefore the field that proves the run exists: wait for it
+          # briefly, then fall back to the suite. The release never rests on an
+          # unproven lookup.
+          ID=""
+          ROW=""
+          for attempt in $(seq 1 12); do
+            if ROW=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/kilo-app-ci.yml/runs?head_sha=$GITHUB_SHA&event=push&per_page=1" \
+                --jq '.workflow_runs[0] | [.id, .status, .conclusion // ""] | @tsv'); then
+              ID=$(printf '%s' "$ROW" | cut -f1)
+              if [ -n "$ID" ]; then
+                break
+              fi
+            else
+              echo "::warning::could not look up the kilo-app CI run for this commit — the suite runs in this workflow"
+              exit 0
+            fi
+            ID=""
+            sleep 5
+          done
+          if [ -z "$ID" ]; then
+            echo "No kilo-app CI run for this commit — the suite runs in this workflow."
+            exit 0
+          fi
+
+          STATUS=$(printf '%s' "$ROW" | cut -f2)
+          CONCLUSION=$(printf '%s' "$ROW" | cut -f3)
+          echo "kilo-app CI run $ID for $GITHUB_SHA: status=$STATUS conclusion=${CONCLUSION:-none}"
+
+          if [ "$STATUS" = "completed" ] && [ "$CONCLUSION" != "success" ]; then
+            echo "The suite run for this commit concluded $CONCLUSION — the suite runs in this workflow instead."
+            exit 0
+          fi
+
+          echo "reuse=true" >> "$GITHUB_OUTPUT"
+          echo "suite_run=$ID" >> "$GITHUB_OUTPUT"
+
+  # The push-triggered release consumes the kilo-app CI conclusion instead of
+  # running the suite a second time; `validate` below keeps the in-workflow
+  # suite for the schedule and manual paths. This job only runs when
+  # check-changes found a suite run for this exact commit, and it fails unless
+  # that run concluded successfully, so no store submission precedes a passing
+  # suite. A run that another merge cancels fails this job, and a rerun of the
+  # release then re-runs the suite itself through `reuse=false`.
+  reuse:
+    name: Reuse the same-commit suite run
+    needs: [check-changes]
+    if: needs.check-changes.outputs.should_build == 'true' && needs.check-changes.outputs.allowed == 'true' && needs.check-changes.outputs.reuse == 'true'
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      actions: read # read the suite run's status
+    steps:
+      - name: Wait for the suite run of this commit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SUITE_RUN: ${{ needs.check-changes.outputs.suite_run }}
+        run: |
+          set -euo pipefail
+          if [ -z "$SUITE_RUN" ]; then
+            echo "::error::check-changes selected an existing suite run but published no run id"
+            exit 1
+          fi
+          # --exit-status makes a failed or cancelled suite fail this job.
+          # --interval 30 keeps the polling cost down against the 3 s default.
+          gh run watch "$SUITE_RUN" --exit-status --interval 30
+
   validate:
     needs: [check-changes]
-    if: needs.check-changes.outputs.should_build == 'true' && needs.check-changes.outputs.allowed == 'true'
+    if: needs.check-changes.outputs.should_build == 'true' && needs.check-changes.outputs.allowed == 'true' && needs.check-changes.outputs.reuse == 'false'
     uses: ./.github/workflows/kilo-app-ci.yml
 
   preflight:
@@ -222,8 +319,14 @@ jobs:
         run: pnpm exec eas env:exec production --non-interactive 'EAS_BUILD_PROFILE=production SENTRY_AUTH_TOKEN=preflight-placeholder pnpm assert:config'
 
   build-and-submit:
-    needs: [check-changes, validate, preflight]
-    if: needs.check-changes.outputs.should_build == 'true' && github.ref == 'refs/heads/main' && needs.check-changes.outputs.allowed == 'true'
+    needs: [check-changes, validate, reuse, preflight]
+    # Exactly one of the two gates ran: `validate` runs the suite when this
+    # commit's run cannot be reused, `reuse` waits for the run that already
+    # exists. A skipped need would skip this job without a status function, and
+    # the status function alone would ignore a failed gate, so both the status
+    # function and the per-gate results are required. The expression is wrapped
+    # because a bare condition that starts with `!` is a YAML tag.
+    if: ${{ !cancelled() && needs.check-changes.result == 'success' && needs.preflight.result == 'success' && needs.check-changes.outputs.should_build == 'true' && needs.check-changes.outputs.allowed == 'true' && github.ref == 'refs/heads/main' && ((needs.validate.result == 'success' && needs.reuse.result == 'skipped') || (needs.reuse.result == 'success' && needs.validate.result == 'skipped')) }}
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 60
     outputs:

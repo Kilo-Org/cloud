@@ -206,7 +206,7 @@ describe('github-integration-helpers', () => {
     });
   });
 
-  describe('fetchGitHubRepositoriesForOrganization', () => {
+  describe('fetchAllGitHubRepositoriesForOrganization', () => {
     it('returns cached repositories for an active integration', async () => {
       mockGetIntegrationsByOrganization.mockResolvedValue([buildIntegration()]);
 
@@ -556,68 +556,6 @@ describe('github-integration-helpers', () => {
       await expect(fetchAllGitHubRepositoriesForOrganization('org-123')).rejects.toThrow(
         'Failed to fetch GitHub repositories'
       );
-    });
-
-    it('returns integrationInstalled false when no integration exists', async () => {
-      mockGetPrimaryGitHubIntegrationForOrganization.mockResolvedValue(null);
-      mockGetIntegrationForOrganization.mockResolvedValue(null);
-
-      const { fetchGitHubRepositoriesForOrganization } =
-        await import('./github-integration-helpers');
-      const result = await fetchGitHubRepositoriesForOrganization('org-123');
-
-      expect(result.integrationInstalled).toBe(false);
-      expect(result.repositories).toEqual([]);
-    });
-
-    it('returns no repositories when the integration is suspended', async () => {
-      mockGetPrimaryGitHubIntegrationForOrganization.mockResolvedValue(null);
-      mockGetIntegrationForOrganization.mockResolvedValue(
-        buildIntegration({
-          integration_status: 'suspended',
-          suspended_at: '2026-06-25 18:00:00+00',
-          suspended_by: 'someone',
-        })
-      );
-
-      const { fetchGitHubRepositoriesForOrganization } =
-        await import('./github-integration-helpers');
-      const result = await fetchGitHubRepositoriesForOrganization('org-123');
-
-      expect(result.integrationInstalled).toBe(false);
-      expect(result.repositories).toEqual([]);
-      expect(result.errorMessage).toBe('GitHub integration is suspended');
-      expect(mockFetchGitHubRepositories).not.toHaveBeenCalled();
-    });
-
-    it('returns no repositories when the integration requires reauthorization', async () => {
-      mockGetPrimaryGitHubIntegrationForOrganization.mockResolvedValue(null);
-      mockGetIntegrationForOrganization.mockResolvedValue(
-        buildIntegration({ auth_invalid_at: '2026-06-25 18:00:00+00' })
-      );
-
-      const { fetchGitHubRepositoriesForOrganization } =
-        await import('./github-integration-helpers');
-      const result = await fetchGitHubRepositoriesForOrganization('org-123');
-
-      expect(result.integrationInstalled).toBe(false);
-      expect(result.errorMessage).toBe('GitHub integration requires reauthorization');
-      expect(mockFetchGitHubRepositories).not.toHaveBeenCalled();
-    });
-
-    it('does not refresh repositories for a suspended integration even with forceRefresh', async () => {
-      mockGetPrimaryGitHubIntegrationForOrganization.mockResolvedValue(null);
-      mockGetIntegrationForOrganization.mockResolvedValue(
-        buildIntegration({ integration_status: 'suspended' })
-      );
-
-      const { fetchGitHubRepositoriesForOrganization } =
-        await import('./github-integration-helpers');
-      const result = await fetchGitHubRepositoriesForOrganization('org-123', true);
-
-      expect(result.integrationInstalled).toBe(false);
-      expect(mockFetchGitHubRepositories).not.toHaveBeenCalled();
-      expect(mockUpdateRepositoriesForIntegration).not.toHaveBeenCalled();
     });
   });
 });

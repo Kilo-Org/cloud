@@ -15,6 +15,7 @@ import {
   type GatewayChatApiKind,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { getGoogleServiceAccountAccessToken } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/google-service-account';
+import { isRecord } from '@kilocode/web-shared/lib/ai-gateway/providers/json-schema-traversal';
 
 /**
  * Vertex AI serves Gemini and the managed open and partner models through its
@@ -103,10 +104,6 @@ export function getGcpVertexMistralLocation(location: string) {
   return location === 'eu' || location.startsWith('europe-')
     ? MISTRAL_EU_LOCATION
     : MISTRAL_US_LOCATION;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function deleteFieldsExcept(value: object, allowed: ReadonlySet<string>) {
@@ -241,6 +238,7 @@ export async function resolveGcpVertexUpstream(
 
 export default {
   id: 'vertex-byok',
+  openrouter_inference_provider_id: 'google-vertex',
   models_dev_id: 'google-vertex',
   transformRequest(context) {
     const { request } = context;

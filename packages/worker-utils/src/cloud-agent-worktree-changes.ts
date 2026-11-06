@@ -114,6 +114,32 @@ const legacyWorktreeChangesSnapshotSchema = z
     'Saved worktree summary exceeds the size limit'
   );
 
+const MAX_WORKTREE_REPOSITORIES = 100;
+
+/**
+ * One repository of a multi-repository environment's saved snapshot. `path` is
+ * the repository directory below the session directory (the leaf, or `''` when
+ * the repository is the session directory itself), so a file belongs to the
+ * repository with the longest `path` that prefixes it.
+ */
+const savedWorktreeChangesRepositorySchema = z
+  .object({
+    path: z
+      .string()
+      .max(4096)
+      .refine(
+        path =>
+          path === '' ||
+          (!path.includes('\0') &&
+            path.split('/').every(part => part !== '' && part !== '.' && part !== '..')),
+        'Expected a path below the session directory'
+      ),
+    repoFullName: z.string().min(1).max(500),
+    comparison: worktreeChangesComparisonSchema,
+    truncated: z.boolean(),
+  })
+  .strict();
+
 const savedWorktreeChangesSnapshotSchema = z
   .object({
     schemaVersion: z.literal(WORKTREE_CHANGES_SCHEMA_VERSION),
@@ -122,11 +148,29 @@ const savedWorktreeChangesSnapshotSchema = z
     comparison: worktreeChangesComparisonSchema,
     files: z.array(savedWorktreeChangesFileSchema).max(MAX_WORKTREE_CHANGES_FILES),
     truncated: z.boolean(),
+    /**
+     * Only the snapshot of a multi-repository (V2) environment has this; a V1
+     * snapshot is saved without the key. A reader that does not know the key
+     * rejects the snapshot (the schema is strict), so deploy this reader before
+     * any Worker can write multi-repository snapshots.
+     */
+    repositories: z
+      .array(savedWorktreeChangesRepositorySchema)
+      .min(1)
+      .max(MAX_WORKTREE_REPOSITORIES)
+      .optional(),
   })
   .strict()
   .refine(
     snapshot => new Set(snapshot.files.map(worktreeFileIdentity)).size === snapshot.files.length,
     'Saved worktree summary identities must be unique'
+  )
+  .refine(
+    snapshot =>
+      snapshot.repositories === undefined ||
+      new Set(snapshot.repositories.map(repository => repository.path)).size ===
+        snapshot.repositories.length,
+    'Saved worktree repository paths must be unique'
   );
 
 export type WorktreeChangesSnapshot = z.infer<typeof savedWorktreeChangesSnapshotSchema>;

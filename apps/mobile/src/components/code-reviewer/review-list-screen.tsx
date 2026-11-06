@@ -11,13 +11,14 @@ import { type CodeReviewStatus, isCodeReviewStatus } from '@kilocode/app-shared/
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
-import { ScreenHeader } from '@/components/screen-header';
+import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
 import { TabScreenScrollView, useTabBarBottomPadding } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { useReviewerScopeTitle } from '@/lib/hooks/use-reviewer-scope-title';
 import { useGitHubStatus, useGitLabStatus } from '@/lib/hooks/use-code-reviewer';
 import { useReviewList } from '@/lib/hooks/use-code-reviews';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
@@ -98,6 +99,7 @@ function ReviewListFooter({
 export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
   const pushOnce = useSinglePushRoute();
   const { t } = useTranslation();
+  const scopeTitle = useReviewerScopeTitle(scope);
   // The page-one probe refetches unchanged rows while a review is in flight, so
   // the row objects keep their identity and nothing re-renders. A shared minute
   // clock is the row's one changing input: it advances the relative label, and
@@ -257,7 +259,20 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('codeReviewer.reviewList.title')} eyebrow={t('common.codeReviewer')} />
+      <ReviewerHeader
+        title={scopeTitle}
+        // One line on both scopes: the personal and the organization list are
+        // the same header over the same list, so they keep one height, or the
+        // organization one paints its eyebrow lower and leaves a wider gap above
+        // the first review. One line is all the header needs to keep the body
+        // still when the name arrives with the membership read: a longer name
+        // tail-truncates inside the same line instead of wrapping to a second.
+        titleNumberOfLines={1}
+        // The scope now titles the screen, so the eyebrow keeps the screen's own
+        // name where the header's category label goes — the org name is user
+        // prose and must not be uppercased or tail-truncated into it.
+        eyebrow={t('codeReviewer.reviewList.title')}
+      />
       {body}
     </View>
   );

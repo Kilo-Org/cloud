@@ -9,13 +9,34 @@ export function modelPickerFixtureRoute(path: string): string | null {
   }
 
   const routeKey = 'model-picker-fixture';
+  // The Kilo Auto tiers, shaped as `createGatewayOption` shapes them: the
+  // catalog id is the display id and the model ref, so each row renders the
+  // catalog's own tier label instead of the gateway's English name.
+  const autoTiers = [
+    { modelID: 'kilo-auto/frontier', name: 'Auto Frontier' },
+    { modelID: 'kilo-auto/balanced', name: 'Auto Balanced' },
+    { modelID: 'kilo-auto/efficient', name: 'Auto Efficient' },
+    { modelID: 'kilo-auto/small', name: 'Auto Small' },
+    { modelID: 'kilo-auto/free', name: 'Auto Free' },
+  ];
+  const autoOptions: SessionModelOption[] = autoTiers.map(({ modelID, name }) => ({
+    id: modelID,
+    name,
+    displayId: modelID,
+    modelRef: { providerID: 'kilo', modelID },
+    provider: { id: 'kilo', name: 'Kilo' },
+    variants: [],
+    isPreferred: false,
+    showGatewayMetadata: true,
+  }));
   const providers = [
     { id: 'anthropic', name: 'Anthropic' },
     { id: 'openai', name: 'OpenAI' },
     { id: 'google', name: 'Google' },
   ];
-  const options: SessionModelOption[] = providers.flatMap(
-    ({ id: providerID, name: providerName }, providerIndex) =>
+  const options: SessionModelOption[] = [
+    ...autoOptions,
+    ...providers.flatMap(({ id: providerID, name: providerName }, providerIndex) =>
       Array.from({ length: 40 }, (_, index) => {
         const modelID = `${providerID}-model-${String(index).padStart(2, '0')}`;
         return {
@@ -29,7 +50,8 @@ export function modelPickerFixtureRoute(path: string): string | null {
           showGatewayMetadata: false,
         };
       })
-  );
+    ),
+  ];
   const selectionScope: ModelPickerBridge['selectionScope'] = {
     sessionId: routeKey,
     ownerConnectionId: 'fixture-remote-cli',
@@ -40,6 +62,7 @@ export function modelPickerFixtureRoute(path: string): string | null {
     options,
     currentValue: options[0]?.id ?? '',
     currentVariant: '',
+    acceptsVariant: true,
     selectionScope,
     isSelectionCurrent: scope => scope === selectionScope,
     onSelect: selection => {

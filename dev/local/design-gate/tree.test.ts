@@ -143,3 +143,64 @@ test('parseDump accepts tapTarget with or without the dropped icon key', () => {
   const withIcon = { ...valid, env: { ...valid.env, tapTarget: { min: 28, touch: 44, icon: 48 } } };
   assert.deepEqual(parseDump(withIcon).env.tapTarget, { min: 28, touch: 44 });
 });
+
+test('normalize places a presented sheet in window space', () => {
+  // `@expo/ui` presents its Android sheet in a dialog of its own: the RN host
+  // and its children report frames inside that dialog, and the platform anchors
+  // it above the navigation inset.
+  const sheet = (contentHeight: number) =>
+    normalize(
+      dump(
+        [
+          {
+            parent: 0,
+            tag: 'ViewManagerAdapter_ExpoUI_HostView',
+            rect: [0, 0, 400, contentHeight],
+          },
+          {
+            parent: 1,
+            tag: 'ViewManagerAdapter_ExpoUI_RNHostView',
+            rect: [0, 0, 400, contentHeight],
+          },
+          { parent: 2, tag: 'SheetScrollContextReset', rect: [0, 0, 400, contentHeight] },
+          { parent: 3, tag: 'Paragraph', rect: [10, 20, 200, 24], text: 'Discard draft?' },
+        ],
+        { safeArea: { top: 24, right: 0, bottom: 24, left: 0 } }
+      )
+    );
+
+  const short = sheet(200);
+  // The platform anchors the dialog's bottom above the 24dp navigation inset,
+  // so a 200dp sheet starts at 800 - 24 - 200 = 576.
+  assert.deepEqual(
+    short.nodes.map(node => node.rect[1]),
+    [0, 576, 576, 576, 596]
+  );
+  assert.deepEqual(short.nodes[4].presented, { space: 1, dy: 576 });
+  // Its title is below the status bar, not 20dp into it.
+  assert.ok(short.nodes[4].rect[1] > 24);
+
+  // A full detent already spans that area: the sheet is not moved, and its
+  // content still reaches the top edge for the caller to pad.
+  const full = sheet(776);
+  assert.deepEqual(
+    full.nodes.map(node => node.rect[1]),
+    [0, 0, 0, 0, 20]
+  );
+});
+
+test('normalize leaves iOS sheets and non-sheet subtrees where they report', () => {
+  const nodes = [
+    { parent: 0, tag: 'ViewManagerAdapter_ExpoUI_HostView', rect: [0, 0, 400, 200] },
+    { parent: 1, tag: 'ViewManagerAdapter_ExpoUI_RNHostView', rect: [0, 0, 400, 200] },
+    { parent: 2, tag: 'Paragraph', rect: [10, 20, 200, 24], text: 'Title' },
+    { parent: 0, tag: 'View', rect: [0, 300, 400, 100] },
+    { parent: 4, tag: 'Paragraph', rect: [10, 320, 200, 24], text: 'Body' },
+  ] as const;
+  const ios = normalize(dump([...nodes], { platform: 'ios' }));
+  assert.deepEqual(
+    ios.nodes.map(node => node.rect[1]),
+    [0, 0, 0, 20, 300, 320]
+  );
+  assert.ok(ios.nodes.every(node => node.presented === undefined));
+});

@@ -4,7 +4,11 @@ import type { PlatformIntegration } from '@kilocode/db/schema';
 import { platform_integrations } from '@kilocode/db/schema';
 import { eq, and, asc, desc, isNull } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
-import { requireNumericPlatformRepositories, type Owner } from '@/lib/integrations/core/types';
+import {
+  requireNumericPlatformRepositories,
+  shouldSyncProviderRepositories,
+  type Owner,
+} from '@/lib/integrations/core/types';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
 import { platformIntegrationHealthSql } from '@/lib/integrations/core/health';
 import {
@@ -21,7 +25,7 @@ import {
   fetchGitHubBranches,
   fetchGitHubRepositories,
 } from '@/lib/integrations/platforms/github/adapter';
-import { isOrganizationModelUpdateAllowed } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+import { isOrganizationModelUpdateAllowed } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 /**
@@ -149,7 +153,9 @@ export async function uninstallApp(
 
 /**
  * List repositories accessible by an integration
- * Returns cached repositories by default, fetches fresh from GitHub when forceRefresh is true
+ * Returns the cached snapshot by default, including an empty one that has
+ * already synced; reads the provider when the row has no snapshot yet or when
+ * forceRefresh is true
  */
 export async function listRepositories(
   owner: Owner,
@@ -185,7 +191,16 @@ export async function listRepositories(
   }
 
   const cachedRepositories = requireNumericPlatformRepositories(integration.repositories);
-  if (forceRefresh || !cachedRepositories?.length || !integration.repositories_synced_at) {
+  // Answer from the cached snapshot unless the caller forces a sync or the
+  // integration has never synced: a synced empty snapshot is the
+  // connected-empty state, not a reason to re-query GitHub on every read.
+  if (
+    shouldSyncProviderRepositories({
+      forceRefresh,
+      cachedRepositories,
+      repositoriesSyncedAt: integration.repositories_synced_at,
+    })
+  ) {
     const appType = integration.github_app_type || 'standard';
     const repos = await fetchGitHubRepositories(
       integration.platform_installation_id,
@@ -201,7 +216,7 @@ export async function listRepositories(
   }
 
   return {
-    repositories: cachedRepositories,
+    repositories: cachedRepositories ?? [],
     syncedAt: integration.repositories_synced_at,
   };
 }

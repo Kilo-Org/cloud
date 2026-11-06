@@ -14,6 +14,7 @@ import {
   peekSharePayload,
   persistSharePayloadsNow,
   putSharePayload,
+  restoreSharePayload,
   restoreSharePayloads,
   setSharePersistUserId,
   SHARE_PAYLOAD_MAX_ENTRIES,
@@ -232,6 +233,51 @@ describe('share payload store', () => {
     clearSharePayload(a);
     expect(peekSharePayload(a)).toBeNull();
     expect(peekSharePayload(b)?.text).toBe('b');
+  });
+
+  it('restore puts a taken payload back under the same id, and a live id is never replaced', () => {
+    const id = putSharePayload({
+      text: 'restored',
+      files: [{ name: 'photo.jpg', uri: 'file:///cache/photo.jpg' }],
+      failedFiles: [],
+    });
+    const taken = takeSharePayload(id);
+    expect(taken).not.toBeNull();
+    expect(peekSharePayload(id)).toBeNull();
+
+    if (taken !== null) {
+      restoreSharePayload(id, taken);
+    }
+    expect(peekSharePayload(id)?.text).toBe('restored');
+    expect(peekSharePayload(id)?.files).toEqual([
+      { name: 'photo.jpg', uri: 'file:///cache/photo.jpg' },
+    ]);
+    // The retry takes it exactly as staged, and the second take empties it.
+    expect(takeSharePayload(id)?.text).toBe('restored');
+    expect(takeSharePayload(id)).toBeNull();
+
+    const live = putSharePayload({ text: 'live', files: [], failedFiles: [] });
+    restoreSharePayload(live, { text: 'stale', files: [], failedFiles: [] });
+    expect(peekSharePayload(live)?.text).toBe('live');
+  });
+
+  it('a restored payload obeys the entry cap like a fresh put', () => {
+    const id = putSharePayload({ text: 'restored', files: [], failedFiles: [] });
+    const taken = takeSharePayload(id);
+    const others: string[] = [];
+    for (let i = 0; i < SHARE_PAYLOAD_MAX_ENTRIES; i += 1) {
+      others.push(putSharePayload({ text: `t-${i}`, files: [], failedFiles: [] }));
+    }
+    if (taken !== null) {
+      restoreSharePayload(id, taken);
+    }
+    expect(peekSharePayload(id)?.text).toBe('restored');
+    const oldest = others[0];
+    const newest = others.at(-1);
+    expect(oldest).toBeDefined();
+    expect(newest).toBeDefined();
+    expect(peekSharePayload(oldest ?? '')).toBeNull();
+    expect(peekSharePayload(newest ?? '')?.text).toBe(`t-${SHARE_PAYLOAD_MAX_ENTRIES - 1}`);
   });
 
   it('evicts oldest first beyond the cap', () => {

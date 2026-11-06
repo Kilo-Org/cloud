@@ -4,7 +4,10 @@ import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { initTRPC, TRPCError } from '@trpc/server';
 import type { ProcedureType } from '@trpc/server';
 import type { User } from '@kilocode/db/schema';
+import type { OrganizationAccess } from '@kilocode/web-shared/lib/admin/support-access';
 import {
+  cloudAgentAuthorityProcedureKind,
+  cloudAgentAuthorityProcedures,
   validateCloudAgentAuthorityRequest,
   type CloudAgentAuthority,
 } from '@kilocode/worker-utils/cloud-agent-authority';
@@ -12,7 +15,20 @@ import {
   authViaTokenFromHeaders,
   clientIpFromHeaders,
   emitAdminAccessEvent,
+  emitPrivilegedAccessEvent,
+  userAgentProductFromHeaders,
 } from '@kilocode/web-shared/lib/admin/admin-access-log';
+import {
+  deriveCredentialKind,
+  type AdminStepUpState,
+  type PrivilegedCredentialKind,
+} from '@kilocode/web-shared/lib/admin/privileged-access';
+import {
+  actionClassForAdminProcedure,
+  markPrivilegedGuard,
+} from '@kilocode/web-shared/lib/admin/privileged-inventory';
+import { runStepUpGuard } from '@kilocode/web-shared/lib/admin/step-up-guard';
+import { isAdminStepUpEnabled } from '@kilocode/web-shared/lib/config.server';
 import { setTag, trpcMiddleware } from '@sentry/nextjs';
 import { AuthContextError, trpcErrorFormatter } from '@kilocode/web-shared/lib/trpc/transport';
 import {
@@ -45,6 +61,26 @@ export type TRPCContext = {
   // production `createTRPCContext` always populates them.
   authViaToken?: boolean;
   tokenSource?: string | null;
+  /**
+   * Provenance derived once at the request boundary. `adminProcedure` and the
+   * privileged-access telemetry read this instead of re-deriving from
+   * `authViaToken` so a scoped or delegated token cannot be mislabeled as a
+   * human session.
+   */
+  credential?: PrivilegedCredentialKind;
+  internalApiUse?: boolean;
+  /**
+   * Server-only identifiers for the browser session that authenticated this
+   * request. Absent for bearer credentials and for legacy session cookies that
+   * predate the `webSessionId` claim.
+   */
+  webSessionId?: string;
+  webSessionPepper?: string | null;
+  /**
+   * Step-up state measured by `adminProcedure` so a specialized guard chained
+   * on it can reuse the result instead of evaluating twice.
+   */
+  adminStepUpState?: AdminStepUpState;
   ip?: string | null;
   // Procedure path and type, injected into the context by `baseProcedure` so
   // that `is_admin` elevation sites *inside* a resolver (which only receive
@@ -52,6 +88,12 @@ export type TRPCContext = {
   // to the exact procedure. Optional for the same reason as the fields above.
   trpcPath?: string;
   trpcType?: string;
+  /**
+   * Set by the organization procedure middlewares after one mode-aware
+   * resolution, so a resolver can tell `member`, `legacy_admin`, and
+   * `support` apart without re-querying.
+   */
+  organizationAccess?: OrganizationAccess;
   // Populated by `createTRPCContext` and read by the min-version middleware.
   headersList?: Headers;
   // `performance.now()` when the mobile control-plane budget started, set by
@@ -82,7 +124,15 @@ export type CreateTRPCContextOpts = {
 export const createTRPCContext = async (opts?: CreateTRPCContextOpts): Promise<TRPCContext> => {
   const headersList = opts?.req?.headers ?? (await headers());
   const startedAt = performance.now();
-  const { user, deviceSessionId, tokenSource, cloudAgentAuthority } = await withControlPlaneBudget({
+  const {
+    user,
+    deviceSessionId,
+    tokenSource,
+    cloudAgentAuthority,
+    internalApiUse,
+    webSessionId,
+    webSessionPepper,
+  } = await withControlPlaneBudget({
     path: controlPlanePathFromInfo(opts?.info),
     type: controlPlaneTypeFromInfo(opts?.info),
     headersList,
@@ -106,12 +156,22 @@ export const createTRPCContext = async (opts?: CreateTRPCContextOpts): Promise<T
     });
   }
   setTag('userId', user.id);
+  const authViaToken = authViaTokenFromHeaders(headersList);
   return {
     user,
     deviceSessionId,
     cloudAgentAuthority,
-    authViaToken: authViaTokenFromHeaders(headersList),
+    authViaToken,
+    credential: deriveCredentialKind({
+      authViaToken,
+      tokenSource: tokenSource ?? null,
+      internalApiUse,
+      delegatedWorkload: cloudAgentAuthority !== undefined,
+    }),
+    internalApiUse,
     tokenSource: tokenSource ?? null,
+    webSessionId,
+    webSessionPepper: webSessionPepper ?? null,
     ip: clientIpFromHeaders(headersList),
     headersList,
     controlPlaneStartedAt: isMobileClient(headersList) ? startedAt : undefined,
@@ -122,19 +182,6 @@ export const createTRPCContext = async (opts?: CreateTRPCContextOpts): Promise<T
 // since it's not very descriptive.
 // For instance, the use of a t variable
 // is common in i18n libraries.
-/**
- * Marker class used to attach an upstream API error code to a TRPCError so the
- * error-formatter can surface it to the client in `err.data.upstreamCode`.
- *
- * Usage:
- *   throw new TRPCError({
- *     code: 'CONFLICT',
- *     message: 'Config was modified',
- *     cause: new UpstreamApiError('etag_mismatch'),
- *   });
- *
- * The client then sees `err.data.upstreamCode === 'etag_mismatch'`.
- */
 const t = initTRPC.context<TRPCContext>().create({
   errorFormatter: trpcErrorFormatter,
 });
@@ -232,8 +279,14 @@ const cloudAgentAuthorityMiddleware = t.middleware(
   async ({ ctx, path, type, getRawInput, next }) => {
     if (ctx.cloudAgentAuthority === undefined) return next();
     try {
-      if (type !== 'mutation' || ctx.cloudAgentAuthority.ownerId !== ctx.user.id) {
+      if (ctx.cloudAgentAuthority.ownerId !== ctx.user.id) {
         throw new Error('Invalid scoped caller');
+      }
+      if (!cloudAgentAuthorityProcedures(ctx.cloudAgentAuthority).includes(path)) {
+        throw new Error('Cloud Agent authority does not permit this procedure');
+      }
+      if (cloudAgentAuthorityProcedureKind(path) !== type) {
+        throw new Error('Cloud Agent authority procedure kind mismatch');
       }
       validateCloudAgentAuthorityRequest(ctx.cloudAgentAuthority, path, await getRawInput());
     } catch {
@@ -253,24 +306,105 @@ export const baseProcedure = t.procedure
 // Admin-only procedure. The creditManager/superadmin/sessionViewer procedures in
 // lib/trpc/admin-procedures chain on this, so emitting here covers the whole
 // admin.* tRPC surface with a single event.
-export const adminProcedure = baseProcedure.use(async ({ ctx, path, type, next }) => {
+type AdminGuardFn = Parameters<typeof t.middleware>[0];
+const adminGuardFn = markPrivilegedGuard<AdminGuardFn>(async ({ ctx, path, type, next }) => {
+  const credential =
+    ctx.credential ??
+    deriveCredentialKind({
+      authViaToken: ctx.authViaToken ?? false,
+      tokenSource: ctx.tokenSource ?? null,
+      internalApiUse: ctx.internalApiUse,
+    });
+  const isBearer = credential !== 'session';
+  const { actionClass, inventoryId } = actionClassForAdminProcedure(path, type);
+  const emitPrivileged = (outcome: 'succeeded' | 'denied' | 'failed') =>
+    emitPrivilegedAccessEvent({
+      surface: 'trpc',
+      user: ctx.user,
+      credential,
+      outcome,
+      actionClass,
+      actionId: inventoryId,
+      target: null,
+      wouldBlock: true,
+      userAgentProduct: userAgentProductFromHeaders(ctx.headersList ?? new Headers()),
+      tokenSource: ctx.tokenSource ?? null,
+      route: path,
+      method: type,
+      ip: ctx.ip ?? null,
+    });
+
   if (!ctx.user.is_admin) {
+    if (isBearer) emitPrivileged('denied');
     throw new TRPCError({
       code: 'FORBIDDEN',
       message: 'Admin access required',
     });
   }
-  // Emit before next() so the access attempt is recorded even if the handler
-  // (or a chained sub-check) later throws.
   emitAdminAccessEvent({
     surface: 'trpc',
     kind: 'admin_guard',
     user: ctx.user,
     authViaToken: ctx.authViaToken ?? false,
     tokenSource: ctx.tokenSource ?? null,
+    credential,
+    wouldBlock: isBearer,
+    userAgentProduct: userAgentProductFromHeaders(ctx.headersList ?? new Headers()),
     route: path,
     method: type,
     ip: ctx.ip ?? null,
   });
-  return next();
+  try {
+    const result = await next();
+    if (isBearer) {
+      if (result.ok) {
+        emitPrivileged('succeeded');
+      } else if (result.error.code === 'FORBIDDEN' || result.error.code === 'UNAUTHORIZED') {
+        emitPrivileged('denied');
+      } else {
+        emitPrivileged('failed');
+      }
+    }
+    return result;
+  } catch (error) {
+    if (isBearer) emitPrivileged('failed');
+    throw error;
+  }
+}, 'admin');
+
+const adminGuardMiddleware = t.middleware(adminGuardFn);
+
+// Enforcement for every admin procedure when the switch is on. When it is off
+// this performs no reads. `stepUp.*` is exempt so the dialog can read status and
+// the user can lock a session; both still require an admin browser session.
+// Specialized guards chained on adminProcedure reuse `adminStepUpState`.
+const adminStepUpEnforcementMiddleware = t.middleware(async ({ ctx, path, type, next }) => {
+  const enabled = isAdminStepUpEnabled();
+  if (!enabled || path.startsWith('stepUp.')) return next();
+
+  const credential =
+    ctx.credential ??
+    deriveCredentialKind({
+      authViaToken: ctx.authViaToken ?? false,
+      tokenSource: ctx.tokenSource ?? null,
+      internalApiUse: ctx.internalApiUse,
+    });
+  const { actionClass } = actionClassForAdminProcedure(path, type);
+
+  const adminStepUpState = await runStepUpGuard({
+    userId: ctx.user.id,
+    credential,
+    webSessionId: ctx.webSessionId,
+    actionClass,
+    enabled,
+    route: path,
+    method: type,
+    surface: 'trpc',
+  });
+
+  return next({ ctx: { adminStepUpState } });
 });
+
+export const adminProcedure = baseProcedure
+  .use(adminGuardMiddleware)
+  .use(adminStepUpEnforcementMiddleware);

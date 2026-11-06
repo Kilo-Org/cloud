@@ -10,9 +10,11 @@ import { direct_byok_model_lists } from '@kilocode/db/schema';
 import {
   ModalitySchema,
   ModelsDevProviderSchema,
+  fetchModelsDevCatalog,
   isUsableModelsDevModel,
   shortenDisplayName,
   toRawModel,
+  type ModelsDevCatalog,
   type ModelsDevProvider,
   type RawModel,
 } from './models-dev';
@@ -44,10 +46,6 @@ const GEMINI_API_MODELS_DEV_SDKS: ReadonlySet<string> = new Set([
   '@ai-sdk/google',
   '@ai-sdk/google-vertex',
 ]);
-
-const ModelsDevCatalogSchema = z.record(z.string(), z.unknown());
-
-type ModelsDevCatalog = z.infer<typeof ModelsDevCatalogSchema>;
 
 const MODELS_DEV_OPENROUTER_ID = 'openrouter';
 
@@ -214,16 +212,6 @@ function modelsDevFetcher(
       return parseModelsDevProviderModels(entry, providerId, availableModelIds);
     },
   };
-}
-
-async function fetchModelsDevCatalog(): Promise<ModelsDevCatalog> {
-  const response = await fetch('https://models.dev/api.json');
-  if (!response.ok) {
-    throw new Error(
-      `Failed to fetch models.dev catalog: ${response.status} ${response.statusText}`
-    );
-  }
-  return ModelsDevCatalogSchema.parse(await response.json());
 }
 
 const FETCHERS: ReadonlyArray<ProviderFetcher> = [

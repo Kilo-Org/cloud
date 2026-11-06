@@ -69,6 +69,7 @@ function keyFor(sessionId: string, permissionId: string): string {
 
 vi.mock('./persist', () => ({
   getLastGlanceableSnapshot: () => null,
+  getGlanceableSnapshotForSignedInScope: () => null,
 }));
 
 function query<T>(result: T) {

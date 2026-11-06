@@ -10,6 +10,7 @@ import m0007 from './0007_drop_approval_queue.sql';
 import m0008 from './0008_watery_jazinda.sql';
 import m0009 from './0009_pending_flow_token.sql';
 import m0010 from './0010_pairing_user_code.sql';
+import m0011 from './0011_pending_expires_index.sql';
 
 export default {
   journal,
@@ -25,5 +26,6 @@ export default {
     m0008,
     m0009,
     m0010,
+    m0011,
   },
 };

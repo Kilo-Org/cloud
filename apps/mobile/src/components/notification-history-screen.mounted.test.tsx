@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- one mounted harness: the paged list, its states, the chip filter, the row tap and the push banner share one fake tRPC surface */
-import { createElement, type ReactElement } from 'react';
+import { createElement, type ReactElement, useState } from 'react';
 import { onlineManager } from '@tanstack/react-query';
 import { act, type ReactTestInstance } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -27,6 +27,7 @@ type PreferencesFixture = { capabilities: Record<string, { available: boolean }>
 type GateFixture = {
   loading: boolean;
   settled: boolean;
+  answered: boolean;
   permissionGranted: boolean;
   pushEnabled: boolean;
 };
@@ -36,6 +37,7 @@ const state = vi.hoisted(() => {
   const gate: GateFixture = {
     loading: false,
     settled: true,
+    answered: true,
     permissionGranted: true,
     pushEnabled: true,
   };
@@ -250,7 +252,13 @@ beforeEach(() => {
   state.historyError = undefined;
   state.preferencesError = undefined;
   state.preferences = { capabilities: {} };
-  state.gate = { loading: false, settled: true, permissionGranted: true, pushEnabled: true };
+  state.gate = {
+    loading: false,
+    settled: true,
+    answered: true,
+    permissionGranted: true,
+    pushEnabled: true,
+  };
   state.historyInputs = [];
   state.historyOptions = [];
   state.pageSize = undefined;
@@ -337,7 +345,13 @@ describe('NotificationHistoryScreen', () => {
   });
 
   it('shows the settings banner while the push gate is closed and still loads the list', async () => {
-    state.gate = { loading: false, settled: true, permissionGranted: false, pushEnabled: false };
+    state.gate = {
+      loading: false,
+      settled: true,
+      answered: true,
+      permissionGranted: false,
+      pushEnabled: false,
+    };
     state.rows = [row()];
     await mount();
 
@@ -347,6 +361,82 @@ describe('NotificationHistoryScreen', () => {
 
     press(banner);
     expect(mocks.push).toHaveBeenCalledWith('/(app)/notifications');
+  });
+
+  it('mounts the banner, the chips and the rows in one pass instead of pushing them later', async () => {
+    // The push banner sits above the filters and the list. A banner that
+    // mounted after either of them had settled would move them by its height,
+    // so nothing under it renders while its gate is still answering.
+    state.gate = {
+      loading: true,
+      settled: false,
+      answered: false,
+      permissionGranted: false,
+      pushEnabled: false,
+    };
+    state.rows = [row()];
+    let settle: (() => void) | undefined = undefined;
+    function Harness() {
+      const [, rerender] = useState(0);
+      settle = () => {
+        rerender(version => version + 1);
+      };
+      return <NotificationHistoryScreen />;
+    }
+    view = await renderWithProviders(<Harness />);
+    // Both reads under the banner answer first; only the gate is still out.
+    await waitFor(() => {
+      const history = view?.queryClient.getQueryCache().findAll({ queryKey: [HISTORY_PATH] }) ?? [];
+      return (
+        history.length > 0 &&
+        history.every(entry => entry.state.status === 'success') &&
+        view?.queryClient.getQueryState(['user', 'getNotificationPreferences'])?.status ===
+          'success'
+      );
+    });
+    // The cache check above can pass one flush before the observer renders, so
+    // let the resolved reads reach the tree before asserting on it.
+    const settledTick = Promise.withResolvers<undefined>();
+    setTimeout(() => {
+      settledTick.resolve(undefined);
+    }, 0);
+    await act(async () => {
+      await settledTick.promise;
+    });
+    expect(withText(byType('Button'), 'All')).toBeUndefined();
+    expect(byType('Cell')).toHaveLength(0);
+
+    state.gate = {
+      loading: false,
+      settled: true,
+      answered: true,
+      permissionGranted: false,
+      pushEnabled: false,
+    };
+    act(() => {
+      settle?.();
+    });
+    await waitFor(() => byType('Cell').length === 1);
+    expect(withText(byType('Button'), 'Notification settings')).toBeDefined();
+    expect(withText(byType('Button'), 'All')).toBeDefined();
+  });
+
+  it('claims nothing about pushes when the gate could not answer', async () => {
+    // A failed read is not an answer: the banner may not tell the user their
+    // pushes are off, and the rows still render.
+    state.gate = {
+      loading: false,
+      settled: true,
+      answered: false,
+      permissionGranted: true,
+      pushEnabled: false,
+    };
+    state.rows = [row()];
+    await mount();
+
+    const texts = byType('Text').map(node => node.props.children);
+    expect(texts).not.toContain('Notification settings');
+    expect(byType('Cell')).toHaveLength(1);
   });
 
   it('shows no banner while push reaches the device', async () => {

@@ -18,7 +18,7 @@ import {
   dispatchSecurityLifecyclePush,
 } from '@kilocode/web-shared/lib/notifications-worker-client';
 import { securityFindingTemplateVars } from '@/lib/security-notification-email-vars';
-import { securityLifecycleEventSchema } from '@kilocode/notifications';
+import { securityLifecycleEventSchema } from '@kilocode/notifications/schemas';
 import {
   SecurityNotificationPolicySchema,
   getEligibleSlaNotificationKind,

@@ -13,9 +13,12 @@ import {
   INLINE_LINK_BOX_CLASS,
   INLINE_LINK_CONNECTOR_CLASS,
   INLINE_LINK_FACING_HIT_SLOP_DP,
+  INLINE_LINK_LINE_GAP_CLASS,
+  INLINE_LINK_LINE_GAP_DP,
   INLINE_LINK_OUTER_HIT_SLOP_DP,
   INLINE_LINK_ROW_CLASS,
   INLINE_LINK_ROW_MARGIN_DP,
+  INLINE_LINK_SENTENCE_LINE_DP,
   INLINE_LINK_VERTICAL_HIT_SLOP_DP,
   MIN_TAP_TARGET_DP,
   TOUCH_TARGET_DP,
@@ -195,7 +198,7 @@ function findLink(root: I, label: string): I {
 
 /** The sentence end a legal link's accessibility label sits at. */
 function linkEdge(label: string | undefined): 'start' | 'end' {
-  return label === 'Terms' ? 'start' : 'end';
+  return label === 'Terms of Use' ? 'start' : 'end';
 }
 
 /**
@@ -326,6 +329,16 @@ async function compiledNumber(classes: string, property: string): Promise<number
   return undefined;
 }
 
+/** The value of one compiled declaration, through the app's pipeline. */
+async function compiledValue(classes: string, property: string): Promise<unknown> {
+  for (const declaration of await compiledDeclarations(classes)) {
+    if (!Array.isArray(declaration) && property in (declaration as object)) {
+      return (declaration as Record<string, unknown>)[property];
+    }
+  }
+  return undefined;
+}
+
 /** A Button that keeps the default (brand-filled) variant is a primary action. */
 function filledPrimaryLabels(root: I): (string | undefined)[] {
   return root
@@ -393,6 +406,68 @@ describe('IdleAuth provider chrome parity', () => {
     expect(apple.findByType('AppleLogo')).toBeTruthy();
 
     expect(filledPrimaryLabels(renderer.root)).toEqual(['Continue with email']);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('centers every provider label on the button, not beside its mark', async () => {
+    const renderer = await mountIdleAuth(vi.fn<StartFn>());
+
+    for (const button of providerRows(renderer.root)) {
+      // The label owns the whole content width and centers inside it…
+      expect(String(labelText(button).props.className).split(/\s+/)).toContain('flex-1');
+      const rowClasses = String(button.props.className).split(/\s+/);
+      expect(rowClasses).toContain('justify-center');
+      // …and the row adds no gap an in-flow mark could push the label by.
+      expect(rowClasses.filter(name => name.startsWith('gap-'))).toEqual([]);
+      expect(String(glyphSlot(button).props.className)).toBe(PROVIDER_GLYPH_SLOT_CLASS);
+    }
+
+    // Compiled once, because every row shares the slot className asserted above:
+    // the mark sits out of flow at the leading edge, vertically centered, so it
+    // contributes no width to the row the label is centered in.
+    expect(await compiledValue(PROVIDER_GLYPH_SLOT_CLASS, 'position')).toBe('absolute');
+    expect(await compiledValue(PROVIDER_GLYPH_SLOT_CLASS, 'justifyContent')).toBe('center');
+    expect(await compiledValue(PROVIDER_GLYPH_SLOT_CLASS, 'top')).toBe(0);
+    expect(await compiledValue(PROVIDER_GLYPH_SLOT_CLASS, 'bottom')).toBe(0);
+
+    // The mark is inset off the rounded edge, on the leading edge in either
+    // direction, and the row's content box starts where the mark ends: the
+    // centered copy can never run under the mark, and the two insets being equal
+    // is what keeps the label on the button's own axis.
+    const markInset = await compiledNumber(PROVIDER_GLYPH_SLOT_CLASS, 'insetInlineStart');
+    const markWidth = await compiledNumber(PROVIDER_GLYPH_SLOT_CLASS, 'width');
+    expect(markInset).toBe(16);
+    expect(markWidth).toBe(18);
+    const rowPaddings = await Promise.all(
+      providerRows(renderer.root).map(button =>
+        compiledNumber(String(button.props.className), 'paddingInline')
+      )
+    );
+    expect(rowPaddings).toHaveLength(3);
+    expect(rowPaddings.every(padding => padding === (markInset ?? 0) + (markWidth ?? 0))).toBe(
+      true
+    );
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('sizes the primary Continue label like the provider rows', async () => {
+    const renderer = await mountIdleAuth(vi.fn<StartFn>());
+
+    const proceed = findButton(renderer.root, 'Continue with email');
+    const google = findButton(renderer.root, 'Sign in with Google');
+    // The filled primary action reads at the provider label size; at the button
+    // variant's 14pt it read weaker than the two outlined ways in above it.
+    expect(await compiledNumber(String(labelText(proceed).props.className), 'fontSize')).toBe(
+      await compiledNumber(String(labelText(google).props.className), 'fontSize')
+    );
+    // It keeps the brand fill, so it still reads as the primary action.
+    expect(proceed.props.variant).toBeUndefined();
 
     act(() => {
       renderer.unmount();
@@ -855,7 +930,7 @@ describe('IdleAuth email continue copy', () => {
     const start = vi.fn<StartFn>();
     const renderer = await mountIdleAuth(start);
 
-    expect(texts(renderer.root)).toContain('Terms');
+    expect(texts(renderer.root)).toContain('Terms of Use');
     expect(texts(renderer.root)).toContain('Privacy Policy');
   });
 
@@ -864,7 +939,10 @@ describe('IdleAuth email continue copy', () => {
     const renderer = await mountIdleAuth(start);
 
     const links = linkPressables(renderer.root);
-    expect(links.map(link => link.props.accessibilityLabel)).toEqual(['Terms', 'Privacy Policy']);
+    expect(links.map(link => link.props.accessibilityLabel)).toEqual([
+      'Terms of Use',
+      'Privacy Policy',
+    ]);
 
     for (const link of links) {
       const box = boxDp(link.props.className as string);
@@ -885,10 +963,10 @@ describe('IdleAuth email continue copy', () => {
       expect(box.height + slop.top + slop.bottom).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
     }
 
-    // The sentence's copy is unchanged: both labels still render, with the
+    // The sentence's copy is unchanged: both links still render, with the
     // connector and suffix the sentence carried before.
     expect(texts(renderer.root)).toEqual(
-      expect.arrayContaining(['Terms', 'Privacy Policy', ' and ', '.'])
+      expect.arrayContaining(['Terms of Use', 'Privacy Policy', ' and ', '.'])
     );
 
     act(() => {
@@ -925,7 +1003,7 @@ describe('IdleAuth email continue copy', () => {
     const start = vi.fn<StartFn>();
     const renderer = await mountIdleAuth(start);
 
-    const terms = findLink(renderer.root, 'Terms');
+    const terms = findLink(renderer.root, 'Terms of Use');
     act(() => {
       (terms.props.onPress as () => void)();
     });
@@ -955,7 +1033,7 @@ describe('IdleAuth email continue copy', () => {
     );
     expect(wrapper.props.accessibilityRole).toBe('text');
     expect(wrapper.props.accessibilityLabel).toBe(
-      'By continuing you agree to our Terms and Privacy Policy.'
+      'By continuing you agree to our Terms of Use and Privacy Policy.'
     );
     expect(wrapper.props.accessibilityActions).toEqual([
       { name: 'openTerms', label: 'Terms' },
@@ -1155,7 +1233,7 @@ describe('IdleAuth layout repairs', () => {
     // tight against "Privacy Policy". The links' own px-1 padding widened every
     // boundary it touched.
     expect(legalSentence(renderer.root)).toBe(
-      'By continuing you agree to our Terms and Privacy Policy.'
+      'By continuing you agree to our Terms of Use and Privacy Policy.'
     );
     for (const link of linkPressables(renderer.root)) {
       expect(String(link.props.className)).not.toMatch(/(?:^|\s)px-/);
@@ -1217,31 +1295,40 @@ describe('IdleAuth layout repairs', () => {
     }
   );
 
-  it('cancels the inline link box height so the sentence keeps a text-xs line', async () => {
+  it('cancels the inline link box height so the box never lifts the sentence line', async () => {
     // The audit floor stays on the node's own rect...
     expect(await compiledNumber(INLINE_LINK_BOX_CLASS, 'minHeight')).toBe(28);
     expect(await compiledNumber(INLINE_LINK_BOX_CLASS, 'minWidth')).toBe(28);
-    // ...while the vertical cancel keeps (28 - 14) / 2 out of the text-xs row,
-    // so the legal line is no taller than the surrounding prose.
+    // ...while the vertical cancel keeps its outer at 14dp, below the 17.5dp
+    // text-sm line, so the legal row lays out on the sentence's own line and
+    // never on the box's 28dp floor.
     expect(await compiledNumber(INLINE_LINK_BOX_CLASS, 'marginBlock')).toBe(-7);
+    const cancelDp = (await compiledNumber(INLINE_LINK_BOX_CLASS, 'marginBlock')) ?? 0;
+    expect(28 + 2 * cancelDp).toBeLessThan(INLINE_LINK_SENTENCE_LINE_DP);
   });
 
   it('keeps each legal link touch region inside the row gutter, clear of the Continue button', async () => {
     const renderer = await mountIdleAuth(vi.fn<StartFn>());
 
-    // A link's 44pt vertical region reaches (28 - 14) / 2 + 8 = 15dp past the
-    // text-xs line it sits on. The screen's `gap-3` gutter to the Continue
-    // button above the row (and the ghost button below) is 10.5dp — 4.5dp
+    // A link's 44pt vertical region reaches (28 - 17.5) / 2 + 8 = 13.25dp past
+    // the text line it sits on. The screen's `gap-3` gutter to the Continue
+    // button above the row (and the ghost button below) is 10.5dp — 2.75dp
     // short — so the legal row carries its own margin and the free space is
     // 10.5 + 5 = 15.5dp each side. Without that clearance the region started
     // 4.5dp inside the Continue button and a tap on the button's bottom strip
     // opened the link instead of sending the code (the earlier mis-routed-tap
     // finding).
-    expect(INLINE_LINK_ROW_CLASS).toBe(`my-[${INLINE_LINK_ROW_MARGIN_DP}px]`);
-    const overflowDp = (MIN_TAP_TARGET_DP - 14) / 2;
+    expect(INLINE_LINK_ROW_CLASS).toBe(
+      `my-[${INLINE_LINK_ROW_MARGIN_DP}px] ${INLINE_LINK_LINE_GAP_CLASS}`
+    );
+    // A wrapped sentence line gets more than the box's per-side overflow, or
+    // the box on the next line enters the prose above it (a pt-BR gate run
+    // measured 6.9dp of that collision on the old 14dp line).
+    const overflowDp = (MIN_TAP_TARGET_DP - INLINE_LINK_SENTENCE_LINE_DP) / 2;
+    expect(INLINE_LINK_LINE_GAP_DP).toBeGreaterThan(overflowDp);
     const gutterDp = 10.5 + INLINE_LINK_ROW_MARGIN_DP;
     expect(overflowDp + INLINE_LINK_VERTICAL_HIT_SLOP_DP).toBeLessThanOrEqual(gutterDp);
-    expect(overflowDp).toBe(7);
+    expect(overflowDp).toBe(5.25);
 
     const row = renderer.root.find(
       n =>

@@ -16,6 +16,7 @@ type PickerParams = {
   options: { id: string; name: string }[];
   value: string;
   variant: string;
+  acceptsVariant: boolean;
   onSelect: (id: string) => void;
 };
 
@@ -91,16 +92,6 @@ const MODELS: ModelOption[] = [
   },
 ];
 
-/**
- * The picker rows the screen hands the shared model picker: the catalogue's
- * gateway reasoning-effort variants are stripped, because the translation
- * model carries no effort and the shared picker only commits on tap for a
- * single-variant row.
- */
-function withoutVariants(candidate: ModelOption): ModelOption {
-  return { ...candidate, variants: [] };
-}
-
 let view: Awaited<ReturnType<typeof renderWithProviders>> | undefined = undefined;
 async function mountScreen(): Promise<ReactTestRenderer> {
   view = await renderWithProviders(<ToolSummaryTranslationSettingsScreen />);
@@ -143,7 +134,7 @@ describe('ToolSummaryTranslationSettingsScreen', () => {
 
     expect(findPreferenceRow(renderer).props).toMatchObject({
       icon: 'WandSparkles',
-      title: 'Translate tool summaries',
+      title: 'Translate summaries',
       subtitle:
         'Send each tool summary to a model to translate it into your app language. The original is shown if translation fails.',
       value: false,
@@ -277,13 +268,14 @@ describe('ToolSummaryTranslationSettingsScreen', () => {
     expect(openModelPicker).toHaveBeenCalledTimes(1);
     const [calledRouter, params] = lastPickerCall();
     expect(calledRouter).toBe(router);
-    // The translation model has no reasoning effort, so the picker rows drop
-    // the catalogue's gateway variants: that is what makes the shared picker
-    // commit and close on tap instead of demanding a variant then Done.
+    // The translation model carries no reasoning effort: the picker gets the
+    // live catalogue but is told the picked effort has nowhere to be stored, so
+    // its rows leave the effort chips out and a model tap is the whole pick.
     expect(params).toMatchObject({
-      options: MODELS.map(candidate => withoutVariants(candidate)),
+      options: MODELS,
       value: 'kilo-auto/small',
       variant: '',
+      acceptsVariant: false,
     });
 
     act(() => {

@@ -9,6 +9,7 @@
       "lowBalance": "మీ బ్యాలెన్స్కు శ్రద్ధ అవసరం",
       "spendAlert": "మీ ఖర్చుకు శ్రద్ధ అవసరం",
       "securityFinding": "భద్రతా ఫైండింగ్కు శ్రద్ధ అవసరం",
+      "securityUpdate": "భద్రతా తనిఖీకి నవీకరణ ఉంది",
       "activeAgentsGlanceable": "చురుకైన ఏజెంట్లకు నవీకరణ ఉంది"
     }
   },
@@ -61,7 +62,7 @@
     },
     "securityLifecycle": {
       "title": "Kilo",
-      "body": "భద్రతా ఫైండింగ్కు శ్రద్ధ అవసరం"
+      "body": "భద్రతా తనిఖీకి నవీకరణ ఉంది"
     }
   },
   "instanceLifecycle": {

@@ -9,7 +9,7 @@ import {
   type InternalDispatchSecurityFindingRequest,
   type InternalDispatchSecurityLifecycleRequest,
   type InternalDispatchSpendAlertRequest,
-} from '@kilocode/notifications';
+} from '@kilocode/notifications/schemas';
 import {
   INTERNAL_API_SECRET,
   NOTIFICATIONS_WORKER_URL,

@@ -13,13 +13,16 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/usage-record-diagnostics';
 
 /**
- * Frankfurt-local sink for AI-gateway usage writes.
+ * Frankfurt-local sink for usage writes against the PostgreSQL primary.
  *
- * Callers are SFO instances of `kilocode-ai-gateway`, which are a transatlantic
- * round trip away from the PostgreSQL primary. Executing the write here collapses
- * the row-lock hold on `kilocode_users` / `organizations` /
- * `organization_user_usage` from hundreds of milliseconds to single-digit
- * milliseconds. See `usage-record-client.ts` for the calling side.
+ * `writer_caller` comes from `x-usage-write-source`: `queue` (the usage-ingest
+ * consumer), `queue_vercel` (the staging Vercel queue consumer),
+ * `region_handoff` (an SFO `kilocode-ai-gateway` handoff through
+ * `recordUsageInPrimaryRegion`), or `unknown` when that header is missing or
+ * any other value. Executing the write here collapses the row-lock hold on
+ * `kilocode_users` / `organizations` / `organization_user_usage` from hundreds
+ * of milliseconds to single-digit milliseconds. See `usage-record-client.ts`
+ * for the `region_handoff` caller.
  *
  * This route only does the right thing on a deployment whose functions run in
  * Frankfurt. `APP_URL` points at `kilocode-app`, which is Frankfurt-only, and
@@ -30,6 +33,8 @@ import {
 // the database `statement_timeout` ceiling of 120s. Allow more than that so a
 // slow write is reported rather than silently truncated into a lost billing row.
 export const maxDuration = 150;
+
+const POOL_WAITING_SAMPLE_INTERVAL_MS = 100;
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   const unauthorized = authorizeInternalApiRequest(request);
@@ -50,15 +55,24 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const reportTiming = (usageId: string, outcome: UsageRecordResponse['status']) => {
     const totalMs = timer.totalMs();
     if (!shouldEmitUsageRecordTiming(totalMs)) return;
-    emitUsageRecordTiming({
-      usageId,
-      outcome,
-      totalMs,
-      phases: timer.phases(),
-      poolBefore,
-      poolAfter: samplePool(),
-      poolWaitingPeak,
-    });
+    try {
+      emitUsageRecordTiming({
+        usageId,
+        outcome,
+        totalMs,
+        phases: timer.phases(),
+        poolBefore,
+        poolAfter: samplePool(),
+        poolWaitingPeak,
+      });
+    } catch (error) {
+      // Diagnostics must not turn a committed write into a retryable failure.
+      console.warn('usage record timing emission failed', {
+        usageId,
+        outcome,
+        errorName: error instanceof Error ? error.name : typeof error,
+      });
+    }
   };
 
   const rawBody: unknown = await request.json().catch(() => null);
@@ -78,7 +92,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const source = request.headers.get('x-usage-write-source');
   const admission =
     source === 'queue' || source === 'queue_vercel'
-      ? queueWriterAdmission.tryAcquire(source)
+      ? queueWriterAdmission.tryAcquire(source, core.id)
       : null;
   if (admission && !admission.admitted) {
     return NextResponse.json(
@@ -88,6 +102,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   // Redelivery is handled inside the write, not by a lookup here.
+  // Sample on an interval: waiting peaks during the write, not at its endpoints.
+  const poolSampler = setInterval(samplePool, POOL_WAITING_SAMPLE_INTERVAL_MS);
   let result: Awaited<ReturnType<typeof saveUsageRelatedDataLocally>>;
   try {
     result = await saveUsageRelatedDataLocally(
@@ -105,6 +121,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }
     );
   } finally {
+    clearInterval(poolSampler);
     // Keep the slot through actual completion, including awaited post-commit work.
     admission?.release();
   }
@@ -112,15 +129,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   // `saveUsageRelatedDataLocally` swallows database errors and returns null,
   // matching the pre-existing local behaviour. Report it as a successful HTTP
-  // exchange with a negative outcome so the client does not retry a write that
-  // deliberately gave up.
+  // exchange with a negative outcome. `not_recorded` is not a signal to write
+  // locally, and the direct client does not retry it.
   //
-  // Deliberately not an `unavailable` signal that would make the client write
-  // locally instead: `insertUsageRecord` has already exhausted its retries against
-  // this primary, and a cross-region retry from SFO would re-add the transatlantic
-  // lock hold this endpoint exists to remove — at the exact moment the database is
-  // least able to absorb it. The failure is reported from here via
-  // `captureException` in `insertUsageRecord`.
+  // Deliberately not an `unavailable` signal. That is what tells
+  // `recordUsageInPrimaryRegion` to fall back to a local write, and
+  // `insertUsageRecord` has already exhausted its retries against this primary.
+  // The failure is reported from here via `captureException` in
+  // `insertUsageRecord`.
   const response: UsageRecordResponse = result
     ? {
         // A recovered identity means an earlier delivery of this same record

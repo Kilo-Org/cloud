@@ -61,6 +61,14 @@ function buildAppReturnHref(query: string, organizationId?: string): string {
   return `/cloud/sessions?${query}${orgParam}`;
 }
 
+/**
+ * A canonical installation GitHub reports as suspended or deleted refuses the
+ * completion, so the card must name that state instead of the
+ * claimed-by-another-account reason.
+ */
+const INSTALLATION_UNAVAILABLE_MESSAGE =
+  'This GitHub App installation is suspended or no longer available. Restore or reinstall it in GitHub, then start again.';
+
 export type AppReturnOutcomeView = {
   kind: 'installed' | 'pending' | 'blocked' | 'retryable';
   title: string;
@@ -88,6 +96,7 @@ export function buildAppReturnOutcomeView(input: {
     input.error === 'installation_already_claimed' ||
     input.error === 'shared_installation_disabled' ||
     input.error === 'incompatible_workflow' ||
+    input.error === 'installation_unavailable' ||
     input.error === 'multiple_installations_disabled';
   const returnQuery = isSuccess
     ? 'github_install=success'
@@ -115,9 +124,11 @@ export function buildAppReturnOutcomeView(input: {
               ? 'That GitHub installation has an existing workflow that is not yet compatible with shared access.'
               : input.error === 'multiple_installations_disabled'
                 ? 'This Kilo organization can currently connect only one GitHub organization.'
-                : input.error === 'install_state_user_mismatch'
-                  ? 'This connection was started from the Kilo App signed in as a different account. Sign in to the web with that account, or start again from the app.'
-                  : 'The installation did not complete. Try again or return to the Kilo App.';
+                : input.error === 'installation_unavailable'
+                  ? INSTALLATION_UNAVAILABLE_MESSAGE
+                  : input.error === 'install_state_user_mismatch'
+                    ? 'This connection was started from the Kilo App signed in as a different account. Sign in to the web with that account, or start again from the app.'
+                    : 'The installation did not complete. Try again or return to the Kilo App.';
   const cta = isSuccess ? 'Continue' : isPending ? 'Done' : isNonRetryable ? 'Back' : 'Try again';
 
   return {
@@ -200,6 +211,8 @@ function GitHubIntegrationOutcomeToasts({
         'That GitHub installation is already connected to another Kilo account. Disconnect it there first.',
         { duration: 8000 }
       );
+    } else if (error === 'installation_unavailable') {
+      toast.error(INSTALLATION_UNAVAILABLE_MESSAGE, { duration: 8000 });
     } else if (error === 'multiple_installations_disabled') {
       toast.error('This organization can currently connect only one GitHub organization.', {
         duration: 8000,

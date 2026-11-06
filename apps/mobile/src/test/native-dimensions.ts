@@ -1,8 +1,9 @@
 // Compiles a NativeWind `className` to the native style rules Metro emits, so a
 // test can assert the box a Pressable actually lays out. The on-device explorer
 // measures those bounds and `hitSlop` never widens them, so a control's touch
-// contract is only real when its compiled box meets it. Mirrors the compiler
-// wiring in `components/ui/button.mounted.test.tsx`.
+// contract is only real when its compiled box meets it. Every suite that reads
+// compiled styles goes through `compileClassName`, so the compiler wiring and
+// its 14-point inline rem live in one place.
 // eslint-disable-next-line import/no-nodejs-modules -- Use the compiler's compatible CommonJS export.
 import { createRequire } from 'node:module';
 import tailwindcss from '@tailwindcss/postcss';
@@ -13,9 +14,13 @@ const { compile } = createRequire(import.meta.url)(
   'react-native-css/compiler'
 ) as typeof NativeCSSCompiler;
 
-async function compiledDeclarations(classes: string) {
+/**
+ * The declarations `className` compiles to through the app's own Tailwind theme
+ * and the installed react-native-css compiler.
+ */
+export async function compileClassName(className: string) {
   const { css } = await postcss([tailwindcss()]).process(
-    `@reference "../global.css"; .target { @apply ${classes}; }`,
+    `@reference "../global.css"; .target { @apply ${className}; }`,
     { from: import.meta.filename }
   );
   // Match metro.config.js. The compiler keeps its default 14-point inlineRem.
@@ -33,7 +38,7 @@ export async function compiledDimensions(className: string) {
     .split(' ')
     .filter(name => /^(?:min-h|min-w|h|w)-/.test(name))
     .join(' ');
-  const declarations = await compiledDeclarations(dimensions);
+  const declarations = await compileClassName(dimensions);
   return declarations;
 }
 
@@ -45,7 +50,7 @@ export async function compiledDimensions(className: string) {
  * control lays out.
  */
 export async function compiledLengthDp(className: string, property: string): Promise<number> {
-  const declarations = await compiledDeclarations(className);
+  const declarations = await compileClassName(className);
   for (const declaration of declarations) {
     if (Array.isArray(declaration)) {
       const [value, names] = declaration;
@@ -70,6 +75,12 @@ function compiledLength(value: unknown): number {
   }
   if (!Array.isArray(value)) {
     throw new TypeError(`cannot resolve compiled length ${JSON.stringify(value)}`);
+  }
+  // `[guards, '<property>', <term>, ...]` is a whole declaration, not a bare
+  // length: the compiler tags a value it computed (`lineHeight`, for one) with
+  // the property it lands on. Resolve the value it wrapped.
+  if (typeof value[1] === 'string' && value[1] !== 'var' && value[1] !== 'calc') {
+    return compiledLength(value[2]);
   }
   // A descriptor is either one term ([guards, kind, ...]) or a list of terms.
   const term = (value[1] === 'var' || value[1] === 'calc' ? value : value[0]) as unknown[];

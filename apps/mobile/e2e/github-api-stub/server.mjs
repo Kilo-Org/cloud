@@ -25,9 +25,7 @@
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.GITHUB_STUB_PORT || process.argv[2] || 0);
 const LOG_PATH =
   process.env.GITHUB_STUB_LOG || path.join(process.cwd(), 'github-api-stub-requests.log');
@@ -104,28 +102,20 @@ const prFile = (filename, additions, deletions, patch) => ({
   patch,
 });
 
-// Two files per fixture, matching restPull's changed_files: 2 / additions: 10 / deletions: 2.
-const stubFiles = () => [
-  prFile(
-    'src/alpha.ts',
-    6,
-    1,
-    '@@ -8,4 +8,9 @@ export function alpha() {\n-  return 1;\n+  // stub change\n+  return 2;\n+}\n+\n+export function alphaExtra() {\n+  return 3;\n }'
-  ),
-  prFile(
-    'src/beta.ts',
-    4,
-    1,
-    '@@ -18,3 +18,6 @@ export function beta() {\n-  return 1;\n+  return 2;\n+}\n+\n+export function betaExtra() {\n+  return 3;\n }'
-  ),
-];
-
+// Patch text shared by the REST file entry and the inline threads that quote the same
+// file, so the two can never describe different hunks.
 const DIFF_HUNK_ALPHA =
   '@@ -8,4 +8,9 @@ export function alpha() {\n-  return 1;\n+  // stub change\n+  return 2;\n+}\n+\n+export function alphaExtra() {\n+  return 3;\n }';
 const DIFF_HUNK_BETA =
   '@@ -18,3 +18,6 @@ export function beta() {\n-  return 1;\n+  return 2;\n+}\n+\n+export function betaExtra() {\n+  return 3;\n }';
 const DIFF_HUNK_ALPHA_OUTDATED =
   '@@ -7,5 +7,5 @@ export function alpha() {\n   const x = 0;\n-  return 1;\n+  return 1;\n   // end\n }';
+
+// The fixture file list; the PR summary totals are derived from it.
+const stubFiles = () => [
+  prFile('src/alpha.ts', 6, 1, DIFF_HUNK_ALPHA),
+  prFile('src/beta.ts', 4, 1, DIFF_HUNK_BETA),
+];
 
 /**
  * Fresh mixed-discussion fixture per call (D9). idSuffix is the platform key
@@ -385,6 +375,8 @@ function flipReaction(node, content, add) {
 function restPull(owner, repo, number, fx) {
   const full = `${owner}/${repo}`;
   const sha = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+  const additions = fx.files.reduce((total, file) => total + file.additions, 0);
+  const deletions = fx.files.reduce((total, file) => total + file.deletions, 0);
   return {
     id: Number(number) * 1000,
     node_id: `PR_kwstub_${owner}_${repo}_${number}`,
@@ -399,9 +391,9 @@ function restPull(owner, repo, number, fx) {
     mergeable_state: 'clean',
     auto_merge: null,
     commits: 1,
-    changed_files: 2,
-    additions: 10,
-    deletions: 2,
+    changed_files: fx.files.length,
+    additions,
+    deletions,
     user: restUser('alice'),
     head: {
       ref: 'feature/stub',
@@ -461,6 +453,13 @@ function json(res, status, body) {
   });
   res.end(payload);
 }
+
+// reviewDecision + viewer shape, shared by the named decision query and the tolerant
+// overview fallback below.
+const reviewDecisionOverview = {
+  repository: { pullRequest: { reviewDecision: null } },
+  viewer: { login: 'kilo-stub-user' },
+};
 
 function handleGraphql(body, res) {
   let parsed;
@@ -524,30 +523,13 @@ function handleGraphql(body, res) {
   }
 
   if (op === 'PrReviewDecision') {
-    return json(res, 200, {
-      data: {
-        repository: {
-          pullRequest: { reviewDecision: null },
-        },
-        viewer: { login: 'kilo-stub-user' },
-      },
-    });
+    return json(res, 200, { data: reviewDecisionOverview });
   }
 
-  // Overview enrichment query name may differ — serve reviewDecision + viewer for any
-  // query that looks like the overview fragment.
-  if (op && /Decision|Overview|Fragment|PullRequest/i.test(op) && op !== 'PrReviewThreads') {
-    // Prefer matching known names; still return a safe shape.
-    if (op !== 'PrReviewThreadComments') {
-      return json(res, 200, {
-        data: {
-          repository: {
-            pullRequest: { reviewDecision: null },
-          },
-          viewer: { login: 'kilo-stub-user' },
-        },
-      });
-    }
+  // The overview enrichment query name has varied; answer any overview-shaped
+  // operation with the reviewDecision + viewer shape such a query reads.
+  if (op && /Decision|Overview|Fragment|PullRequest/i.test(op)) {
+    return json(res, 200, { data: reviewDecisionOverview });
   }
 
   if (op === 'PrReviewThreads') {

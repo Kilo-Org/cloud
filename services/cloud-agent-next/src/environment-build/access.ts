@@ -7,8 +7,12 @@ import {
   resolveManagedGitLabToken,
 } from '../services/git-token-service-client.js';
 import type { Env } from '../types.js';
-import type { EnvironmentBuildInput } from '../shared/environment-build-protocol.js';
-import type { SessionEnvironmentReference } from './reference.js';
+import type { EnvironmentBuildGit } from '../shared/environment-build-protocol.js';
+import {
+  bitbucketCloneUrl,
+  type EnvironmentReferenceRepository,
+} from '@kilocode/cloud-agent-profile';
+import type { EnvironmentScope } from './reference.js';
 
 /**
  * Who may do what with an environment's builds (plan "Build admission and
@@ -27,7 +31,7 @@ export type EnvironmentActorAccess = 'manage' | 'read' | 'none';
  */
 export async function environmentActorAccess(
   db: WorkerDb,
-  owner: SessionEnvironmentReference['owner'],
+  owner: EnvironmentScope['owner'],
   userId: string
 ): Promise<EnvironmentActorAccess> {
   if (owner.type === 'user') return owner.id === userId ? 'manage' : 'none';
@@ -46,7 +50,7 @@ export async function environmentActorAccess(
 }
 
 export type BuilderGitSource =
-  | { ok: true; git: EnvironmentBuildInput['git'] }
+  | { ok: true; git: EnvironmentBuildGit }
   | { ok: false; reason: 'repository_unauthorized' | 'unavailable' };
 
 const TRANSIENT_REASONS: ReadonlySet<string> = new Set([
@@ -59,6 +63,8 @@ const TRANSIENT_REASONS: ReadonlySet<string> = new Set([
  * A short-lived, repository-scoped Git source for the initiating actor. A
  * resolved token is also the repository authorization check: the integration
  * must still grant the actor's owner access to this repository.
+ *
+ * One call resolves one member. A multi-member build calls this once per member.
  */
 export async function resolveBuilderGitSource(
   env: Pick<
@@ -69,15 +75,20 @@ export async function resolveBuilderGitSource(
     | 'GITHUB_APP_BOT_USER_ID'
     | 'GITHUB_LITE_APP_BOT_USER_ID'
   >,
-  input: { reference: SessionEnvironmentReference; repoFullName: string; actorUserId: string }
+  input: {
+    reference: EnvironmentScope;
+    member: EnvironmentReferenceRepository;
+    actorUserId: string;
+  }
 ): Promise<BuilderGitSource> {
-  const { reference, actorUserId } = input;
+  const { reference, actorUserId, member } = input;
+  const repository = member.identity;
+  const repoFullName = member.repoFullName;
   const orgId = reference.owner.type === 'organization' ? reference.owner.id : undefined;
-  const repository = reference.repository;
   switch (repository.platform) {
     case 'github': {
       const resolved = await resolveCloudAgentGitHubAuthForRepo(env, {
-        githubRepo: input.repoFullName,
+        githubRepo: repoFullName,
         userId: actorUserId,
         ...(orgId ? { orgId } : {}),
         accessPurpose: 'workflow',
@@ -94,7 +105,7 @@ export async function resolveBuilderGitSource(
       return {
         ok: true,
         git: {
-          url: `https://github.com/${input.repoFullName}.git`,
+          url: `https://github.com/${repoFullName}.git`,
           token: resolved.value.githubToken,
           platform: 'github',
         },
@@ -121,7 +132,7 @@ export async function resolveBuilderGitSource(
     }
     case 'bitbucket': {
       if (!orgId) return { ok: false, reason: 'repository_unauthorized' };
-      const url = `https://bitbucket.org/${input.repoFullName}.git`;
+      const url = bitbucketCloneUrl(repoFullName);
       const resolved = await resolveManagedBitbucketToken(env, {
         userId: actorUserId,
         orgId,

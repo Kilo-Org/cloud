@@ -66,21 +66,19 @@ describe('formatSandboxInstance', () => {
 describe('getSandboxSelectionOptions', () => {
   it('places BYOC before Kilo and gathers each provider without reordering instances', () => {
     const options: SandboxSelectionCapabilities['options'] = [
+      { allocation: getSandboxAllocationRequest('cloudflare-containers-standard-3') },
       { allocation: vercelLarge },
-      { allocation: byocLarge },
-      { allocation: getSandboxAllocationRequest('cloudflare-shared') },
       { allocation: { ...byocLarge, instanceType: 'small' } },
+      { allocation: getSandboxAllocationRequest('cloudflare-containers-standard-4') },
       { allocation: getSandboxAllocationRequest('vercel-small') },
-      { allocation: getSandboxAllocationRequest('cloudflare-single') },
     ];
     const originalOrder = [...options];
     expect(getSandboxSelectionOptions({ enabled: true, options })).toEqual([
-      options[0],
       options[1],
-      options[3],
-      options[4],
       options[2],
-      options[5],
+      options[4],
+      options[0],
+      options[3],
     ]);
     expect(options).toEqual(originalOrder);
   });

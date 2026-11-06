@@ -16,7 +16,7 @@ import { consumeSignInTicket } from '@/lib/auth/passkey';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import {
   createOrUpdateUser,
-  findUserByNormalizedEmail,
+  findUserBySignInCodeEmail,
   findUserIdByAuthProvider,
 } from '@/lib/user';
 import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
@@ -105,7 +105,7 @@ const mockConsumeSignInCode = jest.mocked(consumeSignInCode);
 const mockConsumeSignInTicket = jest.mocked(consumeSignInTicket);
 const mockCreateOrUpdateUser = jest.mocked(createOrUpdateUser);
 const mockFindUserById = jest.mocked(findUserById);
-const mockFindUserByNormalizedEmail = jest.mocked(findUserByNormalizedEmail);
+const mockFindUserBySignInCodeEmail = jest.mocked(findUserBySignInCodeEmail);
 const mockFindUserIdByAuthProvider = jest.mocked(findUserIdByAuthProvider);
 const mockGenerateApiToken = jest.mocked(generateApiToken);
 const mockCheckDomainSignInEligibility = jest.mocked(checkDomainSignInEligibility);
@@ -152,7 +152,7 @@ describe('POST /api/auth/native/token', () => {
     mockCreateDeviceSession.mockResolvedValue('session-1');
     mockCheckDomainSignInEligibility.mockResolvedValue({ ok: true, existingUser: false });
     mockFindUserById.mockResolvedValue(undefined);
-    mockFindUserByNormalizedEmail.mockResolvedValue(undefined);
+    mockFindUserBySignInCodeEmail.mockResolvedValue(undefined);
     mockFindUserIdByAuthProvider.mockResolvedValue(null);
     mockRequireAdmissionPayload.mockReturnValue({
       platform: 'ios',
@@ -670,6 +670,33 @@ describe('POST /api/auth/native/token', () => {
           google_user_name: 'emailuser',
           hosted_domain: 'example.com',
           provider_account_id: 'emailuser@example.com',
+        }),
+        undefined,
+        true,
+        expect.any(Headers),
+        undefined,
+        undefined,
+        true,
+        expect.any(Function)
+      );
+    });
+
+    it('resolves the account for the delivered address, not for an alias of another address', async () => {
+      await POST(
+        createRequest({
+          provider: 'email',
+          email: 'victim+tag@example.com',
+          code: '123456',
+        })
+      );
+
+      expect(mockFindUserBySignInCodeEmail).toHaveBeenCalledWith('victim+tag@example.com');
+      expect(mockCreateOrUpdateUser).toHaveBeenCalledWith(
+        expect.objectContaining({
+          google_user_email: 'victim+tag@example.com',
+          google_user_name: 'victim+tag',
+          provider: 'email',
+          provider_account_id: 'victim+tag@example.com',
         }),
         undefined,
         true,

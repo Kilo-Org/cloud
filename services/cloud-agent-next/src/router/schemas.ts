@@ -37,7 +37,10 @@ import { MESSAGE_ID_FORMAT_DESCRIPTION, MESSAGE_ID_PATTERN } from '../session/me
 import { SessionMessageCompletionSourceSchema } from '../session/session-message-state.js';
 import { SafeFailureProjectionSchema } from '../session/safe-failure-projection.js';
 import { SandboxStatusSessionIdSchema } from '../shared/sandbox-status.js';
+import { GetEgressAuditInputSchema } from '../shared/egress-audit.js';
 
+export { GetEgressAuditResponseSchema as GetEgressAuditOutput } from '../shared/egress-audit.js';
+export type { GetEgressAuditResponse } from '../shared/egress-audit.js';
 export { SandboxStatusSnapshotSchema as GetSandboxStatusOutput } from '../shared/sandbox-status.js';
 export type { SandboxStatusSnapshot as GetSandboxStatusResponse } from '../shared/sandbox-status.js';
 
@@ -417,6 +420,31 @@ export const CloseTerminalOutput = z.object({
 });
 
 /**
+ * The environment the client selected: its id, and the branch of each
+ * additional repository of a multi-repository environment. The server checks
+ * both against the owner and the launch repository.
+ */
+const requestedEnvironmentSchema = z
+  .object({
+    id: z.string().uuid(),
+    repositories: z
+      .array(
+        z
+          .object({
+            repoFullName: z.string().min(1).max(500),
+            branch: branchNameSchema.optional(),
+          })
+          .strict()
+      )
+      .max(100)
+      .optional(),
+  })
+  .strict()
+  .describe(
+    'Repository environment the client selected. The server verifies it belongs to the owner and contains the launch repository.'
+  );
+
+/**
  * Input schema for prepareSession endpoint.
  * Creates a session in "prepared" state for later initiation.
  * Used by backend-to-backend flows.
@@ -433,6 +461,13 @@ const PrepareSessionSharedFields = {
     .optional()
     .describe(
       'Allow resolving GitHub credentials with the session user’s own authorization when available'
+    ),
+  requestedEnvironment: requestedEnvironmentSchema.optional(),
+  requireEnvironmentChoice: z
+    .literal(true)
+    .optional()
+    .describe(
+      'Set by a client that can ask its user to choose. Several matching environments then fail the start with a conflict; without it they resolve to no environment.'
     ),
   mode: ModeSlugSchema.describe(
     'Kilo Code execution mode (built-in or custom slug from runtimeAgents)'
@@ -1025,6 +1060,11 @@ export const GetSessionInput = z.object({
   cloudAgentSessionId: sessionIdSchema.describe('Cloud-agent session ID to retrieve'),
 });
 
+export const GetEgressAuditInput = GetEgressAuditInputSchema.extend({
+  cloudAgentSessionId: sessionIdSchema,
+  limit: z.number().int().min(1).max(100).default(50),
+}).strict();
+
 export const GetSandboxStatusInput = z
   .object({
     cloudAgentSessionId: SandboxStatusSessionIdSchema,
@@ -1124,8 +1164,28 @@ export const ExecutionStatusSchema = z
 export const GetSessionOutput = z.object({
   sessionId: z.string().describe('Cloud-agent session ID'),
   kiloSessionId: z.string().optional().describe('Kilo CLI session ID'),
+  title: z.string().nullable().optional(),
+  associatedPr: z
+    .object({
+      url: z.string(),
+      number: z.number(),
+      state: z.string(),
+      title: z.string().nullable(),
+      headSha: z.string().nullable(),
+      lastSyncedAt: z.string().datetime(),
+      platform: z.string().optional(),
+      reviewDecision: z.enum(['approved', 'changes_requested', 'review_required']).nullable(),
+      reviewDecisionPending: z.boolean(),
+    })
+    .nullable()
+    .optional(),
+  totalCostMicrodollars: z.number().finite().nonnegative().nullable().optional(),
+  createdOnPlatform: z.string().nullable().optional(),
+  profileId: z.string().nullable().optional(),
+  updateCursor: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).optional(),
   userId: z.string().describe('Owner user ID'),
   orgId: z.string().optional().describe('Organization ID if applicable'),
+  environmentId: z.string().uuid().optional().describe('Environment used to create the workspace'),
   sandboxId: z
     .string()
     .optional()
@@ -1147,6 +1207,10 @@ export const GetSessionOutput = z.object({
     .nullable()
     .optional()
     .describe('Cloud-agent session scope ID for a grouped worktree session (null when no group)'),
+  parentCloudAgentSessionId: z
+    .string()
+    .optional()
+    .describe('Canonical parent Cloud Agent session ID when this session was spawned by a parent'),
 
   // Repository info (no tokens)
   githubRepo: z.string().optional().describe('GitHub repository in org/repo format'),
@@ -1166,6 +1230,9 @@ export const GetSessionOutput = z.object({
       z.object({
         slug: z.string(),
         name: z.string(),
+        mode: z.enum(['primary', 'subagent', 'all']).optional(),
+        hidden: z.boolean().optional(),
+        disable: z.boolean().optional(),
         /** Optional model override so the chat UI can lock its model picker. */
         model: z.string().optional(),
         /** Optional thinking-effort variant override so the chat UI can lock its variant picker. */
@@ -1174,7 +1241,7 @@ export const GetSessionOutput = z.object({
     )
     .optional()
     .describe(
-      'Custom agents available on this session (slug + name, plus optional model and thinking-effort overrides)'
+      'Custom agents installed on this session, including picker visibility and model overrides'
     ),
 
   execution: ExecutionStatusSchema,
@@ -1223,6 +1290,16 @@ export const GetMessageResultInput = z
   .object({
     cloudAgentSessionId: sessionIdSchema.describe('Cloud-agent session ID to inspect'),
     messageId: MessageIdSchema.describe('Exact submitted message ID to inspect'),
+    expectedWorktreeId: z
+      .string()
+      .min(1)
+      .optional()
+      .describe('Optional expected worktree identity for a scoped Cloud Agent parent'),
+    organizationId: z
+      .string()
+      .min(1)
+      .optional()
+      .describe('Organization pinned by a scoped Cloud Agent parent authority'),
   })
   .strict();
 
@@ -1301,38 +1378,6 @@ export const GetMessageResultOutput = z
   });
 
 export type GetMessageResultResponse = z.infer<typeof GetMessageResultOutput>;
-
-export const GetLatestAssistantMessageInput = z.object({
-  cloudAgentSessionId: sessionIdSchema.describe('Cloud-agent session ID to inspect'),
-});
-
-export const AssistantMessageInfoSchema = z
-  .object({
-    id: z.string().describe('Assistant message ID'),
-    role: z.literal('assistant'),
-  })
-  .passthrough();
-
-export const AssistantMessagePartSchema = z
-  .object({
-    id: z.string().describe('Message part ID'),
-    messageID: z.string().describe('Parent message ID'),
-  })
-  .passthrough();
-
-export const LatestAssistantMessageSchema = z.object({
-  eventId: z.number().describe('Stored event ID for the message.updated event'),
-  timestamp: z.number().describe('Stored event timestamp in milliseconds'),
-  info: AssistantMessageInfoSchema,
-  parts: z.array(AssistantMessagePartSchema),
-});
-
-export const GetLatestAssistantMessageOutput = z.object({
-  cloudAgentSessionId: sessionIdSchema,
-  message: LatestAssistantMessageSchema.nullable(),
-});
-
-export type GetLatestAssistantMessageResponse = z.infer<typeof GetLatestAssistantMessageOutput>;
 
 /**
  * Compatibility response schema for public send/V2 endpoints.

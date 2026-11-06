@@ -38,7 +38,14 @@ import {
 import { ensureRemoteMcp } from './remote-mcp';
 import { type ChatPlace } from './scope';
 import { questionSearches } from './web-search-budget';
-import { askedIn, forgetAsked, migrateAsked, moveAsked, rememberAsked } from './pending';
+import {
+  askedIn,
+  forgetAsked,
+  migrateAsked,
+  moveAsked,
+  recordAskedFailure,
+  rememberAsked,
+} from './pending';
 import { chatToolNames, chatToolNamesStarting } from './tools';
 import {
   moveWebSearchEnabled,
@@ -490,7 +497,7 @@ async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
       askedEffort: asked?.effort ?? null,
       status: 'idle',
       failed: null,
-      failureKey: null,
+      failureKey: asked?.failureKey ?? null,
       record: recordOfChat(database, current),
     });
     return;
@@ -521,6 +528,7 @@ async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
       askedModel: asked?.model ?? null,
       record: recordOfChat(database, sessionId),
       askedEffort: asked?.effort ?? null,
+      failureKey: asked?.failureKey ?? null,
     });
   } catch (error) {
     /* Reading the history or the pending question failed after the session
@@ -602,6 +610,8 @@ export async function say(
        as one whose answer never arrived. */
     /* onto may have installed the new session before its cleanup failed. */
     current = snapshotOf(current).sessionId;
+    const failureKey = backendFailureKey(error, model);
+    await keepAskedFailure(current, failureKey);
     change(current, {
       status: 'idle',
       answering: [],
@@ -610,8 +620,24 @@ export async function say(
       askedModel: model,
       askedEffort: effort,
       failed: reason(error),
-      failureKey: backendFailureKey(error, model),
+      failureKey,
     });
+  }
+}
+
+/**
+ * Keeps why the waiting question failed beside the question, so a chat opened
+ * again says it instead of reading as a message the person stopped.
+ *
+ * Only for the screen's copy: the failure itself is already on screen, so a
+ * store that refuses the write costs the reason after a restart and nothing
+ * that a send reports.
+ */
+async function keepAskedFailure(sessionId: string, failureKey: string): Promise<void> {
+  try {
+    await recordAskedFailure(sessionId, failureKey);
+  } catch {
+    /* Nothing holds it: it stays on screen for as long as this chat is open. */
   }
 }
 
@@ -783,9 +809,9 @@ async function settle(
   const turns = await runtime.runPromise(chat.handle.history);
   await countCall(sessionId, chat, { total: await runtime.runPromise(chat.handle.usageByModel) });
   const failed = failure?.reason ?? null;
-  if (failed === null) {
-    await forgetAsked(sessionId);
-  }
+  /* A question whose answer landed is forgotten; one whose answer failed keeps
+     the reason beside it, so a reopened chat still says why. */
+  await (failure === null ? forgetAsked(sessionId) : keepAskedFailure(sessionId, failure.key));
   chat.answering = undefined;
   change(sessionId, {
     turns,

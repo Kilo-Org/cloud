@@ -12,6 +12,7 @@ import { clearChatBackends } from '@/lib/chat/backend-store';
 import { forgetRemoteMcp } from '@/lib/chat/remote-mcp';
 import { clearRemoteMcpServers } from '@/lib/chat/remote-mcp-store';
 import { clearSettingsToolsEnabled } from '@/lib/chat/settings-tools-switch';
+import { clearFormDrafts } from '@/lib/form-draft';
 import { clearRepoSelectionSenders } from '@/lib/hooks/repo-selection-senders';
 import { clearTrustedImageHosts } from '@/lib/hooks/use-trusted-image-hosts';
 import { clearTrustedHosts } from '@/lib/hooks/use-trusted-hosts';
@@ -86,7 +87,8 @@ function clearRecentPrsBestEffort(): void {
 /**
  * Clear the session-scoped local state that must not leak across an account
  * boundary: trusted hosts, trusted image hosts, confirmed markdown images, media
- * caches, per-session auto-approve and goal-disclosure flags, the remote MCP
+ * caches, typed profile form drafts, per-session auto-approve and goal-disclosure
+ * flags, the remote MCP
  * connection and the stored servers behind it, the app-settings-tools group
  * switch, the debounced repository-selection send state, the browsable
  * artifact mirror, app-owned temp copies, the stored PR recents, the retained
@@ -111,6 +113,11 @@ export function clearSessionScopedState(): void {
   runClear(clearToolCardImageCache);
   runClear(clearFilePartCache);
   runClear(clearClipboardImages);
+  // Profile form drafts hold what someone typed, including a secret value, in
+  // this process's memory, so the account boundary drops them with the other
+  // stores: a form left open under the previous account must not reopen under
+  // the next one.
+  runClear(clearFormDrafts);
   runClear(clearSessionAutoApprove);
   runClear(forgetRemoteMcp);
   runClear(clearRemoteMcpServers);

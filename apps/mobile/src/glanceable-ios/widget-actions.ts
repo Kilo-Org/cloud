@@ -3,7 +3,7 @@ import { Linking } from 'react-native';
 
 import { i18n } from '@/i18n';
 import { getHomeWidgetDataForSnapshot } from '@/lib/glanceable/home-widget-data';
-import { getLastGlanceableSnapshot } from '@/lib/glanceable/persist';
+import { getGlanceableSnapshotForSignedInScope } from '@/lib/glanceable/persist';
 import { getSurfaceExtras, setSurfaceExtras } from '@/lib/glanceable/surface-extras';
 import { runWidgetApprove } from '@/lib/glanceable/widget-actions';
 import { LAUNCHER_NEW_AGENT_URL } from '@/lib/launcher-surfaces';
@@ -148,7 +148,7 @@ export function pendingActionForEvent(
  * does; `null` means a terminal blank, whose single frame stands.
  */
 function republishWidgetProps(): void {
-  const snapshot = getLastGlanceableSnapshot();
+  const snapshot = getGlanceableSnapshotForSignedInScope();
   if (snapshot === null) {
     return;
   }

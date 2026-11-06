@@ -102,6 +102,12 @@ function mockModels(models: StoredModel[]) {
       }),
   });
 }
+const FREE_MODEL_ID = 'test/free-model:free';
+function mockFreeCatalogModel() {
+  jest.mocked(getRawOpenRouterModels).mockResolvedValue({
+    data: [catalogModel(FREE_MODEL_ID, { prompt: '0', completion: '0' })],
+  });
+}
 describe('request cost admission', () => {
   it('fails closed for unknown or incompletely priced routes', async () => {
     await expect(
@@ -177,9 +183,10 @@ describe('request cost admission', () => {
     expect(decision).toEqual({ refusal: null, providerConfig: null });
   });
   it('admits a free model on a managed provider without a route price cap', async () => {
+    mockFreeCatalogModel();
     const decision = await enforceRequestCostLimitDecision(
       '2000000',
-      'google/gemma-4-26b-a4b-it:free',
+      FREE_MODEL_ID,
       body,
       2_000_000,
       { id: 'vercel', userFunded: false }
@@ -188,9 +195,10 @@ describe('request cost admission', () => {
     expect(decision).toEqual({ refusal: null, providerConfig: null });
   });
   it('caps a free OpenRouter-served model at zero route prices', async () => {
+    mockFreeCatalogModel();
     const decision = await enforceRequestCostLimitDecision(
       '2000000',
-      'google/gemma-4-26b-a4b-it:free',
+      FREE_MODEL_ID,
       body,
       2_000_000,
       { id: 'openrouter', userFunded: false }

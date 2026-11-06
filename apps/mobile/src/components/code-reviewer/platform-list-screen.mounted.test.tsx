@@ -70,8 +70,12 @@ vi.mock('@/components/organization/scope-access-denied-screen', () => ({
 }));
 
 vi.mock('@/components/screen-header', () => ({
-  ScreenHeader: (props: { title?: string; eyebrow?: string }) =>
-    createElement('ScreenHeaderMock', { title: props.title, eyebrow: props.eyebrow }),
+  ScreenHeader: (props: { title?: string; eyebrow?: string; backFallback?: string }) =>
+    createElement('ScreenHeaderMock', {
+      title: props.title,
+      eyebrow: props.eyebrow,
+      backFallback: props.backFallback,
+    }),
 }));
 
 vi.mock('@/components/ui/configure-row', () => ({
@@ -176,6 +180,22 @@ describe('PlatformListScreen organization access', () => {
 
     expect(findByType(renderer.root, 'ScopeAccessDeniedScreenMock')).toHaveLength(0);
     expect(findByType(renderer.root, 'ConfigureRowMock').length).toBeGreaterThan(0);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+});
+
+// The header paints Back from its own fallback rather than waiting for the
+// navigation container: a restored screen renders before its stack settles, so
+// a list opened without a settled parent still needs a way out.
+describe('PlatformListScreen back control', () => {
+  it('offers Back from the Home tab when the list has no history behind it', () => {
+    const renderer = mountScreen();
+    const header = findByType(renderer.root, 'ScreenHeaderMock')[0];
+
+    expect(header?.props.backFallback).toBe('/(app)/(tabs)/(0_home)');
 
     act(() => {
       renderer.unmount();

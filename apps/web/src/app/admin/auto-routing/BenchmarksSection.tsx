@@ -1,5 +1,7 @@
 'use client';
 
+import { adminFetch } from '@/lib/admin/admin-fetch';
+
 import {
   BENCHMARK_CONTAINER_BUDGET,
   DEFAULT_AUTO_ROUTER,
@@ -269,12 +271,12 @@ export function effortCoverageForModel(
 }
 
 async function fetchBenchmarkConfig(router: AutoRouter) {
-  const response = await fetch(`/admin/api/auto-routing/benchmark-config?router=${router}`);
+  const response = await adminFetch(`/admin/api/auto-routing/benchmark-config?router=${router}`);
   return parseAdminResponse(response, BenchmarkConfigResponseSchema);
 }
 
 async function saveBenchmarkConfig(config: BenchmarkConfig) {
-  const response = await fetch('/admin/api/auto-routing/benchmark-config', {
+  const response = await adminFetch('/admin/api/auto-routing/benchmark-config', {
     method: 'PUT',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(config),
@@ -308,7 +310,7 @@ export function runTypeLabel(run: Pick<BenchmarkRun, 'kind' | 'purpose'>): strin
 async function fetchBenchmarkRuns(filter: RunFilter, router: AutoRouter) {
   const query = new URLSearchParams(runFilterQuery(filter).replace(/^\?/, ''));
   query.set('router', router);
-  const response = await fetch(`/admin/api/auto-routing/benchmark-runs?${query}`);
+  const response = await adminFetch(`/admin/api/auto-routing/benchmark-runs?${query}`);
   return parseAdminResponse(response, BenchmarkRunsResponseSchema);
 }
 
@@ -323,7 +325,7 @@ async function startBenchmarkRun({
   queue: BenchmarkQueueSelector;
   router: AutoRouter;
 }) {
-  const response = await fetch('/admin/api/auto-routing/benchmark-runs', {
+  const response = await adminFetch('/admin/api/auto-routing/benchmark-runs', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ kind, force, queue, router }),
@@ -332,12 +334,12 @@ async function startBenchmarkRun({
 }
 
 async function fetchBenchmarkRegistry(router: AutoRouter) {
-  const response = await fetch(`/admin/api/auto-routing/benchmark-registry?router=${router}`);
+  const response = await adminFetch(`/admin/api/auto-routing/benchmark-registry?router=${router}`);
   return parseAdminResponse(response, BenchmarkRegistryResponseSchema);
 }
 
 async function requeueBenchmarkRegistry(scope: BenchmarkQueueSelector, router: AutoRouter) {
-  const response = await fetch('/admin/api/auto-routing/benchmark-registry', {
+  const response = await adminFetch('/admin/api/auto-routing/benchmark-registry', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ scope, router }),
@@ -346,7 +348,9 @@ async function requeueBenchmarkRegistry(scope: BenchmarkQueueSelector, router: A
 }
 
 async function fetchBenchmarkRoutingTable(router: AutoRouter) {
-  const response = await fetch(`/admin/api/auto-routing/benchmark-routing-table?router=${router}`);
+  const response = await adminFetch(
+    `/admin/api/auto-routing/benchmark-routing-table?router=${router}`
+  );
   return parseAdminResponse<BenchmarkRoutingTableResponse>(
     response,
     BenchmarkRoutingTableResponseSchema

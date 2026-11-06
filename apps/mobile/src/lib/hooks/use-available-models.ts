@@ -13,6 +13,7 @@ import { i18n } from '@/i18n';
 import { collator } from '@/lib/intl-cache';
 import { formatShortModelDisplayName } from '@/lib/model-display-name';
 import { catalogVariantEfforts } from '@/lib/chat/effort';
+import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 
 const THINKING_EFFORT_KEYS = {
   none: 'models.thinkingEffort.none',
@@ -223,6 +224,8 @@ export function useOrgDefaultModel(organizationId: string | undefined) {
     },
     enabled: Boolean(organizationId),
     staleTime: 60_000,
+    // The model picker's auto-selection waits on this value.
+    ...SETTLE_WHILE_OFFLINE,
   });
   return { defaultModel: data?.defaultModel, isLoading };
 }
@@ -240,6 +243,9 @@ export function useAvailableModels(
     queryKey: ['available-models', organizationId, audience] as const,
     queryFn: fetchModels.bind(null, organizationId, audience),
     staleTime: 60_000,
+    // A paused catalogue read leaves the picker with no model to list, so
+    // auto-selection never resolves.
+    ...SETTLE_WHILE_OFFLINE,
   });
 
   const models = useMemo(() => toModelOptions(data), [data]);

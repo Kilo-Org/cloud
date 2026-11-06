@@ -39,7 +39,8 @@ import {
 import { differenceInCalendarDays, format, isSameDay, startOfDay, subDays } from 'date-fns';
 import { extractRepoFromGitUrl } from '../utils/git-utils';
 import type { StoredSession } from '../types';
-import { getChatDisplayTitle } from '../utils/session-title';
+import type { AssociatedPr } from '../utils/github-pr-link';
+import { getChatDisplayTitle, keepRealSessionTitle } from '../utils/session-title';
 import { getCachedWorktreeDetails, getLoadingWorktreeIds } from './worktree-details-placeholder';
 import {
   sidebarFolderListInput,
@@ -588,9 +589,10 @@ export function sessionCacheKey(s: {
     lastSyncedAt: string;
     reviewDecision: string | null;
     reviewDecisionPending: boolean;
+    observations?: AssociatedPr['observations'];
   } | null;
 }): string {
-  return `${s.session_id}-${s.updated_at}-${s.status ?? ''}-${s.status_updated_at ?? ''}-${s.cloud_agent_worktree_id ?? ''}-${s.latest_run_status ?? ''}-${s.latest_run_failure_kind ?? ''}-${s.latest_run_terminal_at ?? ''}-${s.associatedPr?.state ?? ''}-${s.associatedPr?.lastSyncedAt ?? ''}-${s.associatedPr?.reviewDecision ?? ''}-${s.associatedPr?.reviewDecisionPending ?? false}`;
+  return `${s.session_id}-${s.updated_at}-${s.status ?? ''}-${s.status_updated_at ?? ''}-${s.cloud_agent_worktree_id ?? ''}-${s.latest_run_status ?? ''}-${s.latest_run_failure_kind ?? ''}-${s.latest_run_terminal_at ?? ''}-${s.associatedPr?.state ?? ''}-${s.associatedPr?.lastSyncedAt ?? ''}-${s.associatedPr?.reviewDecision ?? ''}-${s.associatedPr?.reviewDecisionPending ?? false}-${JSON.stringify(s.associatedPr?.observations ?? null)}`;
 }
 
 /**
@@ -698,6 +700,7 @@ function mergeSidebarDbSession(
   );
   const merged = {
     ...next,
+    title: keepRealSessionTitle(existing.title, next.title) ?? null,
     latest_run_status:
       next.latest_run_status === undefined
         ? previousOutcome.latest_run_status
@@ -1016,8 +1019,17 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
 
       if (lastDataKeyRef.current !== dataKey) {
         lastDataKeyRef.current = dataKey;
-        const sessions = listData.cliSessions.map(apiSessionToDbSession);
-        setDbSessions(sessions);
+        setDbSessions(previous => {
+          const previousTitles = new Map(
+            previous.map(session => [session.session_id, session.title] as const)
+          );
+          return listData.cliSessions.map(session => {
+            const mapped = apiSessionToDbSession(session);
+            const previousTitle = previousTitles.get(mapped.session_id);
+            const title = keepRealSessionTitle(previousTitle, mapped.title);
+            return title === mapped.title ? mapped : { ...mapped, title: title ?? null };
+          });
+        });
       }
     }
   }, [listData?.cliSessions, setDbSessions, isSearchActive]);

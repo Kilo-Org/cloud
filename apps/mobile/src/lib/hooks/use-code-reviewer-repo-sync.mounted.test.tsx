@@ -1,6 +1,8 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { bumpAuthEpoch } from '@/lib/auth/auth-epoch';
 import { act, type ReactTestRenderer, TestRenderer } from '@/test/renderer';
 
 import {
@@ -13,12 +15,7 @@ const state = vi.hoisted(() => ({
   queryPersonalGitLab: vi.fn(),
   queryOrgGitHub: vi.fn(),
   queryOrgGitLab: vi.fn(),
-  setQueryData: vi.fn(),
   toastError: vi.fn(),
-}));
-
-vi.mock('@tanstack/react-query', () => ({
-  useQueryClient: () => ({ setQueryData: state.setQueryData }),
 }));
 
 vi.mock('sonner-native', () => ({ toast: { error: state.toastError } }));
@@ -66,6 +63,9 @@ vi.mock('./use-code-reviewer', () => ({
   isPersonal: (scope: string) => scope === 'personal',
 }));
 
+const PERSONAL_GITHUB_KEY = ['personal-github', {}];
+const ORG_GITHUB_KEY = ['org-github', { organizationId: 'org-1' }];
+
 type HarnessProps = {
   scope: string;
   platform: 'github' | 'gitlab';
@@ -81,18 +81,24 @@ function snapshot() {
   return { repositories: [{ id: 1, fullName: 'acme/one' }], syncedAt: '2026-10-23T00:00:00.000Z' };
 }
 
+let queryClient = new QueryClient();
+
 function mount(scope: string, platform: 'github' | 'gitlab') {
   let latest: ReviewerRepositoriesResync | null = null;
   let renderer: ReactTestRenderer | null = null;
   act(() => {
     renderer = TestRenderer.create(
-      createElement(Harness, {
-        scope,
-        platform,
-        publish: value => {
-          latest = value;
-        },
-      })
+      createElement(
+        QueryClientProvider,
+        { client: queryClient },
+        createElement(Harness, {
+          scope,
+          platform,
+          publish: value => {
+            latest = value;
+          },
+        })
+      )
     );
   });
   return {
@@ -111,8 +117,8 @@ beforeEach(() => {
   state.queryPersonalGitLab.mockReset();
   state.queryOrgGitHub.mockReset();
   state.queryOrgGitLab.mockReset();
-  state.setQueryData.mockReset();
   state.toastError.mockReset();
+  queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 });
 
 describe('useReviewerRepositoriesResync', () => {
@@ -126,7 +132,7 @@ describe('useReviewerRepositoriesResync', () => {
     });
 
     expect(state.queryPersonalGitHub).toHaveBeenCalledWith({ forceRefresh: true });
-    expect(state.setQueryData).toHaveBeenCalledWith(['personal-github', {}], data);
+    expect(queryClient.getQueryData(PERSONAL_GITHUB_KEY)).toEqual(data);
     expect(mounted.latest().resyncing).toBe(false);
     mounted.unmount();
   });
@@ -144,10 +150,7 @@ describe('useReviewerRepositoriesResync', () => {
       organizationId: 'org-1',
       forceRefresh: true,
     });
-    expect(state.setQueryData).toHaveBeenCalledWith(
-      ['org-github', { organizationId: 'org-1' }],
-      data
-    );
+    expect(queryClient.getQueryData(ORG_GITHUB_KEY)).toEqual(data);
     mounted.unmount();
   });
 
@@ -169,6 +172,8 @@ describe('useReviewerRepositoriesResync', () => {
   });
 
   it('keeps the rows and reports a failed forced read', async () => {
+    const previous = { repositories: [{ id: 7, fullName: 'acme/seven' }], syncedAt: null };
+    queryClient.setQueryData(ORG_GITHUB_KEY, previous);
     state.queryOrgGitHub.mockRejectedValue(new Error('provider down'));
     const mounted = mount('org-1', 'github');
 
@@ -176,7 +181,7 @@ describe('useReviewerRepositoriesResync', () => {
       await mounted.latest().resync();
     });
 
-    expect(state.setQueryData).not.toHaveBeenCalled();
+    expect(queryClient.getQueryData(ORG_GITHUB_KEY)).toEqual(previous);
     expect(state.toastError).toHaveBeenCalledWith('common.couldNotRefresh');
     expect(mounted.latest().resyncing).toBe(false);
     mounted.unmount();
@@ -201,7 +206,58 @@ describe('useReviewerRepositoriesResync', () => {
       pending.resolve(snapshot());
       await first;
     });
-    expect(state.setQueryData).toHaveBeenCalledTimes(1);
+    expect(queryClient.getQueryData(PERSONAL_GITHUB_KEY)).toEqual(snapshot());
+    expect(mounted.latest().resyncing).toBe(false);
+    mounted.unmount();
+  });
+
+  it('keeps the cached list when the refresh is superseded', async () => {
+    const previous = {
+      repositories: [{ id: 7, fullName: 'previous-account/rows' }],
+      syncedAt: '2026-10-22T00:00:00.000Z',
+    };
+    queryClient.setQueryData(PERSONAL_GITHUB_KEY, previous);
+    const pending = Promise.withResolvers<unknown>();
+    state.queryPersonalGitHub.mockImplementation(() => pending.promise);
+    const mounted = mount('personal', 'github');
+
+    let run: Promise<void> | null = null;
+    act(() => {
+      run = mounted.latest().resync();
+    });
+    // The refresh is superseded before the pending read answers.
+    act(() => {
+      bumpAuthEpoch();
+    });
+    await act(async () => {
+      pending.resolve(snapshot());
+      await run;
+    });
+
+    expect(queryClient.getQueryData(PERSONAL_GITHUB_KEY)).toEqual(previous);
+    expect(state.toastError).not.toHaveBeenCalled();
+    expect(mounted.latest().resyncing).toBe(false);
+    mounted.unmount();
+  });
+
+  it('skips the failure report when the refresh is superseded', async () => {
+    const pending = Promise.withResolvers<unknown>();
+    state.queryOrgGitLab.mockImplementation(() => pending.promise);
+    const mounted = mount('org-1', 'gitlab');
+
+    let run: Promise<void> | null = null;
+    act(() => {
+      run = mounted.latest().resync();
+    });
+    act(() => {
+      bumpAuthEpoch();
+    });
+    await act(async () => {
+      pending.reject(new Error('provider down'));
+      await run;
+    });
+
+    expect(state.toastError).not.toHaveBeenCalled();
     expect(mounted.latest().resyncing).toBe(false);
     mounted.unmount();
   });

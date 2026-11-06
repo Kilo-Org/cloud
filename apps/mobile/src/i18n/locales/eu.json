@@ -3492,9 +3492,9 @@
       "searching": "Web bilaketa",
       "thinking": "Hausnartzen"
     },
-    "planOf": "etik",
+    "planProgress": "{{total}}tik {{done}}",
     "filesChanged": "fitxategiak aldatuta",
-    "finishedIn": "Amaituta",
+    "finishedIn": "{{duration}} barru amaituta",
     "noActivityFor": "Jarduerarik gabe",
     "prOpened": "Pull request irekita",
     "permissionWants": "Exekutatu nahi du",

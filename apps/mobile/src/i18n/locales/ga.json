@@ -3657,9 +3657,9 @@
       "searching": "Cuardach gréasáin",
       "thinking": "Ag smaoineamh"
     },
-    "planOf": "as",
+    "planProgress": "{{done}} as {{total}}",
     "filesChanged": "comhaid athraithe",
-    "finishedIn": "Críochnaithe i",
+    "finishedIn": "Críochnaithe i {{duration}}",
     "noActivityFor": "Níl aon ghníomhaíocht le",
     "prOpened": "Iarratas tarraingthe oscailte",
     "permissionWants": "Teastaíonn uaidh rith",

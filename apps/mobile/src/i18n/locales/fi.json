@@ -3492,9 +3492,9 @@
       "searching": "Verkkohaku",
       "thinking": "Pohdinta"
     },
-    "planOf": "/",
+    "planProgress": "{{done}}/{{total}}",
     "filesChanged": "tiedostoa muutettu",
-    "finishedIn": "Kesti",
+    "finishedIn": "Kesti {{duration}}",
     "noActivityFor": "Ei toimintaa",
     "prOpened": "Pull request avattu",
     "permissionWants": "Haluaa suorittaa",

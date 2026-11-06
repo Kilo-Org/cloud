@@ -3492,9 +3492,9 @@
       "searching": "網頁搜尋",
       "thinking": "正在思考"
     },
-    "planOf": "/",
+    "planProgress": "{{done}}/{{total}}",
     "filesChanged": "個檔案已變更",
-    "finishedIn": "耗時",
+    "finishedIn": "耗時 {{duration}}",
     "noActivityFor": "無活動",
     "prOpened": "拉取請求已開啟",
     "permissionWants": "想要執行",

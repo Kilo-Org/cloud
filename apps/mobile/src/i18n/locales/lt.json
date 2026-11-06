@@ -3602,9 +3602,9 @@
       "searching": "Paieška žiniatinklyje",
       "thinking": "Mąstoma"
     },
-    "planOf": "iš",
+    "planProgress": "{{done}} iš {{total}}",
     "filesChanged": "pakeisti failai",
-    "finishedIn": "Baigta per",
+    "finishedIn": "Baigta per {{duration}}",
     "noActivityFor": "Nėra veiklos",
     "prOpened": "Atidaryta pull užklausa",
     "permissionWants": "Nori vykdyti",

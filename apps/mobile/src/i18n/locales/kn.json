@@ -3498,9 +3498,9 @@
       "searching": "ವೆಬ್ ಹುಡುಕಾಟ",
       "thinking": "ಆಲೋಚಿಸುತ್ತಿದೆ"
     },
-    "planOf": "ರಲ್ಲಿ",
+    "planProgress": "{{total}} ರಲ್ಲಿ {{done}}",
     "filesChanged": "ಫೈಲ್‌ಗಳು ಬದಲಾಗಿವೆ",
-    "finishedIn": "ಮುಗಿಯಿತು",
+    "finishedIn": "{{duration}} ನಲ್ಲಿ ಮುಗಿಯಿತು",
     "noActivityFor": "ಚಟುವಟಿಕೆ ಇಲ್ಲ",
     "prOpened": "ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ತೆರೆಯಲಾಗಿದೆ",
     "permissionWants": "ರನ್ ಮಾಡಲು ಬಯಸುತ್ತದೆ",

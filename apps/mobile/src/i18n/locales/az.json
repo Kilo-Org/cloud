@@ -3492,9 +3492,9 @@
       "searching": "Veb axtarış",
       "thinking": "Dərindən düşünür"
     },
-    "planOf": "dən",
+    "planProgress": "{{total}}-dən {{done}}",
     "filesChanged": "fayl dəyişdi",
-    "finishedIn": "Tamamlandı",
+    "finishedIn": "{{duration}} ərzində tamamlandı",
     "noActivityFor": "Fəaliyyət yoxdur",
     "prOpened": "Çəkmə sorğusu açıldı",
     "permissionWants": "İşlətmək istəyir",

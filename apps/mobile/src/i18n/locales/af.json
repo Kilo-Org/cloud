@@ -3492,9 +3492,9 @@
       "searching": "Websoektog",
       "thinking": "Dink dit deur"
     },
-    "planOf": "van",
+    "planProgress": "{{done}} van {{total}}",
     "filesChanged": "lêers verander",
-    "finishedIn": "Klaar in",
+    "finishedIn": "Klaar in {{duration}}",
     "noActivityFor": "Geen aktiwiteit vir",
     "prOpened": "Trekversoek oopgemaak",
     "permissionWants": "Wil uitvoer",

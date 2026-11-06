@@ -3492,9 +3492,9 @@
       "searching": "Kërkim në web",
       "thinking": "Duke e menduar"
     },
-    "planOf": "nga",
+    "planProgress": "{{done}} nga {{total}}",
     "filesChanged": "skedarë të ndryshuar",
-    "finishedIn": "Përfundoi në",
+    "finishedIn": "Përfundoi në {{duration}}",
     "noActivityFor": "Pa aktivitet për",
     "prOpened": "U hap kërkesa për tërheqje",
     "permissionWants": "Dëshiron të ekzekutojë",

@@ -3492,9 +3492,9 @@
       "searching": "Utafutaji wa wavuti",
       "thinking": "Kufikiri kwa kina"
     },
-    "planOf": "kati ya",
+    "planProgress": "{{done}} kati ya {{total}}",
     "filesChanged": "faili zilizobadilishwa",
-    "finishedIn": "Imekamilika kwa",
+    "finishedIn": "Imekamilika kwa {{duration}}",
     "noActivityFor": "Hakuna shughuli kwa",
     "prOpened": "Ombi la kuvuta limefunguliwa",
     "permissionWants": "Inataka kuendesha",

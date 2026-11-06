@@ -3492,9 +3492,9 @@
       "searching": "Vefleit",
       "thinking": "Ígrundun"
     },
-    "planOf": "af",
+    "planProgress": "{{done}} af {{total}}",
     "filesChanged": "skrár breyttar",
-    "finishedIn": "Lokið á",
+    "finishedIn": "Lokið á {{duration}}",
     "noActivityFor": "Engin virkni í",
     "prOpened": "Pull request opnað",
     "permissionWants": "Vill keyra",

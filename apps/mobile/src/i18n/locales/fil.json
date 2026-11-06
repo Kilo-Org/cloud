@@ -3498,9 +3498,9 @@
       "searching": "Paghahanap sa web",
       "thinking": "Pinag-iisipan"
     },
-    "planOf": "ng",
+    "planProgress": "{{done}} ng {{total}}",
     "filesChanged": "mga file na binago",
-    "finishedIn": "Natapos sa",
+    "finishedIn": "Natapos sa {{duration}}",
     "noActivityFor": "Walang aktibidad sa loob ng",
     "prOpened": "Nabuksan ang pull request",
     "permissionWants": "Gustong patakbuhin",

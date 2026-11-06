@@ -3492,9 +3492,9 @@
       "searching": "Nettsøk",
       "thinking": "Tenker gjennom"
     },
-    "planOf": "av",
+    "planProgress": "{{done}} av {{total}}",
     "filesChanged": "filer endret",
-    "finishedIn": "Fullført på",
+    "finishedIn": "Fullført på {{duration}}",
     "noActivityFor": "Ingen aktivitet i",
     "prOpened": "Pull request åpnet",
     "permissionWants": "Vil kjøre",

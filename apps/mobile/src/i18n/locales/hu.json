@@ -3492,9 +3492,9 @@
       "searching": "Webes keresés",
       "thinking": "Végiggondolás"
     },
-    "planOf": "/",
+    "planProgress": "{{done}}/{{total}}",
     "filesChanged": "módosított fájl",
-    "finishedIn": "Befejezve ennyi idő alatt:",
+    "finishedIn": "Befejezve {{duration}} alatt",
     "noActivityFor": "Nincs aktivitás ennyi ideje:",
     "prOpened": "Pull request megnyitva",
     "permissionWants": "Futtatni szeretne",

@@ -3547,9 +3547,9 @@
       "searching": "Web pretraga",
       "thinking": "Razmišljanje"
     },
-    "planOf": "od",
+    "planProgress": "{{done}} od {{total}}",
     "filesChanged": "datoteke promijenjene",
-    "finishedIn": "Završeno za",
+    "finishedIn": "Završeno za {{duration}}",
     "noActivityFor": "Nema aktivnosti već",
     "prOpened": "Zahtjev za povlačenje otvoren",
     "permissionWants": "Želi pokrenuti",

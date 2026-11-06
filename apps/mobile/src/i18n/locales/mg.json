@@ -3498,9 +3498,9 @@
       "searching": "Fikarohana an-tserasera",
       "thinking": "Misaina"
     },
-    "planOf": "amin'ny",
+    "planProgress": "{{done}} amin'ny {{total}}",
     "filesChanged": "rakipeo niova",
-    "finishedIn": "Vita tao anatin'ny",
+    "finishedIn": "Vita tao anatin'ny {{duration}}",
     "noActivityFor": "Tsy misy hetsika",
     "prOpened": "Nisokatra pull request",
     "permissionWants": "Te hampandeha",

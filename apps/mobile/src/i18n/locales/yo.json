@@ -3492,9 +3492,9 @@
       "searching": "Wíwá lórí wẹ́ẹ̀bù",
       "thinking": "Ń rònú jinlẹ̀"
     },
-    "planOf": "nínú",
+    "planProgress": "{{done}} nínú {{total}}",
     "filesChanged": "àwọn fáìlì tí a yí padà",
-    "finishedIn": "Ó parí ní",
+    "finishedIn": "Ó parí ní {{duration}}",
     "noActivityFor": "Kò sí ìṣe fún",
     "prOpened": "Ìbéèrè ìfà ti ṣí",
     "permissionWants": "Ó fẹ́ ṣiṣẹ́",

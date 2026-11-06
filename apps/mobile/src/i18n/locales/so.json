@@ -3492,9 +3492,9 @@
       "searching": "Raadinta webka",
       "thinking": "Ka fikrid"
     },
-    "planOf": "ka mid ah",
+    "planProgress": "{{done}} ka mid ah {{total}}",
     "filesChanged": "faylal la beddelay",
-    "finishedIn": "Ku dhammaaday",
+    "finishedIn": "Ku dhammaaday {{duration}}",
     "noActivityFor": "Dhaqdhaqaaq ma jiro",
     "prOpened": "Pull request la furay",
     "permissionWants": "Wuxuu rabaa inuu socodsiiyo",

@@ -3492,9 +3492,9 @@
       "searching": "Վեբ որոնում",
       "thinking": "Մտածում"
     },
-    "planOf": "/",
+    "planProgress": "{{total}}-ից {{done}}",
     "filesChanged": "փոփոխված ֆայլեր",
-    "finishedIn": "Ավարտվեց",
+    "finishedIn": "Ավարտվեց {{duration}}",
     "noActivityFor": "Ակտիվություն չկա",
     "prOpened": "Pull request-ը բացվեց",
     "permissionWants": "Ուզում է գործարկել",

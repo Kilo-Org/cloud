@@ -3602,9 +3602,9 @@
       "searching": "Вэб-пошук",
       "thinking": "Абдумванне"
     },
-    "planOf": "з",
+    "planProgress": "{{done}} з {{total}}",
     "filesChanged": "файлаў зменена",
-    "finishedIn": "Завершана за",
+    "finishedIn": "Завершана за {{duration}}",
     "noActivityFor": "Няма актыўнасці за",
     "prOpened": "Запыт на зліццё адкрыты",
     "permissionWants": "Хоча запусціць",

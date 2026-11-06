@@ -3602,9 +3602,9 @@
       "searching": "Веб-поиск",
       "thinking": "Обдумывание"
     },
-    "planOf": "из",
+    "planProgress": "{{done}} из {{total}}",
     "filesChanged": "файлов изменено",
-    "finishedIn": "Завершено за",
+    "finishedIn": "Завершено за {{duration}}",
     "noActivityFor": "Нет активности уже",
     "prOpened": "Pull request открыт",
     "permissionWants": "Хочет запустить",

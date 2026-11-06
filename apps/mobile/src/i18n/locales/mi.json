@@ -3492,9 +3492,9 @@
       "searching": "Rapu ipurangi",
       "thinking": "Whakaaroaro"
     },
-    "planOf": "o",
+    "planProgress": "{{done}} o {{total}}",
     "filesChanged": "kōnae kua huri",
-    "finishedIn": "Kua oti i roto i",
+    "finishedIn": "Kua oti i roto i {{duration}}",
     "noActivityFor": "Kāore he mahi mō",
     "prOpened": "Kua huaki te tono kume",
     "permissionWants": "Kei te hiahia whakahaere",

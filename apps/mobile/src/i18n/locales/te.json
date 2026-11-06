@@ -3492,9 +3492,9 @@
       "searching": "వెబ్ శోధన",
       "thinking": "ఆలోచించడం"
     },
-    "planOf": "లో",
+    "planProgress": "{{total}} లో {{done}}",
     "filesChanged": "ఫైళ్లు మారాయి",
-    "finishedIn": "పూర్తయింది",
+    "finishedIn": "{{duration}} లో పూర్తయింది",
     "noActivityFor": "కార్యాచరణ లేదు",
     "prOpened": "పుల్ రిక్వెస్ట్ తెరవబడింది",
     "permissionWants": "అమలు చేయాలనుకుంటోంది",

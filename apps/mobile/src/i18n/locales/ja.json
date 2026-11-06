@@ -3492,9 +3492,9 @@
       "searching": "ウェブ検索",
       "thinking": "思考中"
     },
-    "planOf": "/",
+    "planProgress": "{{total}}件中{{done}}件完了",
     "filesChanged": "ファイル変更",
-    "finishedIn": "所要時間",
+    "finishedIn": "所要時間 {{duration}}",
     "noActivityFor": "アクティビティなし",
     "prOpened": "プルリクエストを開きました",
     "permissionWants": "実行を希望",

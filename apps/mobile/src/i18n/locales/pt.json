@@ -3553,9 +3553,9 @@
       "searching": "Pesquisa na Web",
       "thinking": "A pensar"
     },
-    "planOf": "de",
+    "planProgress": "{{done}} de {{total}}",
     "filesChanged": "ficheiros alterados",
-    "finishedIn": "Concluído em",
+    "finishedIn": "Concluído em {{duration}}",
     "noActivityFor": "Sem atividade há",
     "prOpened": "Pull request aberto",
     "permissionWants": "Quer executar",

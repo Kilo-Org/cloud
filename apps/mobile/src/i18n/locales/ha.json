@@ -3492,9 +3492,9 @@
       "searching": "Binciken yanar gizo",
       "thinking": "Ana tunani"
     },
-    "planOf": "cikin",
+    "planProgress": "{{done}} cikin {{total}}",
     "filesChanged": "fayiloli sun canza",
-    "finishedIn": "An gama cikin",
+    "finishedIn": "An gama cikin {{duration}}",
     "noActivityFor": "Babu aiki na",
     "prOpened": "An buɗe buƙatar ja",
     "permissionWants": "Yana son gudu",

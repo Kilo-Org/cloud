@@ -3498,9 +3498,9 @@
       "searching": "વેબ શોધ",
       "thinking": "વિચારી રહ્યું છે"
     },
-    "planOf": "/",
+    "planProgress": "{{total}}માંથી {{done}}",
     "filesChanged": "ફાઇલો બદલાઈ",
-    "finishedIn": "માં પૂર્ણ",
+    "finishedIn": "{{duration}} માં પૂર્ણ",
     "noActivityFor": "છેલ્લી પ્રવૃત્તિ પછી",
     "prOpened": "પુલ રિક્વેસ્ટ ખૂલી",
     "permissionWants": "ચલાવવા માંગે છે",

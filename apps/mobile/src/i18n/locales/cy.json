@@ -3712,9 +3712,9 @@
       "searching": "Chwilio'r we",
       "thinking": "Meddwl drwyddo"
     },
-    "planOf": "o",
+    "planProgress": "{{done}} o {{total}}",
     "filesChanged": "ffeiliau wedi newid",
-    "finishedIn": "Gorffen mewn",
+    "finishedIn": "Gorffen mewn {{duration}}",
     "noActivityFor": "Dim gweithgaredd am",
     "prOpened": "Cais tynnu wedi agor",
     "permissionWants": "Eisiau rhedeg",

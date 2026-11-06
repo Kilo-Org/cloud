@@ -3498,9 +3498,9 @@
       "searching": "ওয়েব অনুসন্ধান",
       "thinking": "ভেবে দেখা"
     },
-    "planOf": "এর",
+    "planProgress": "{{total}}টির মধ্যে {{done}}টি",
     "filesChanged": "ফাইল পরিবর্তিত",
-    "finishedIn": "শেষ হয়েছে",
+    "finishedIn": "{{duration}}-এ শেষ হয়েছে",
     "noActivityFor": "কোনও কার্যকলাপ নেই",
     "prOpened": "পুল অনুরোধ খোলা হয়েছে",
     "permissionWants": "চালাতে চায়",

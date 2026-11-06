@@ -3492,9 +3492,9 @@
       "searching": "Busca web",
       "thinking": "Pensando"
     },
-    "planOf": "de",
+    "planProgress": "{{done}} de {{total}}",
     "filesChanged": "ficheiros modificados",
-    "finishedIn": "Rematado en",
+    "finishedIn": "Rematado en {{duration}}",
     "noActivityFor": "Sen actividade durante",
     "prOpened": "Solicitude de extracción aberta",
     "permissionWants": "Quere executar",

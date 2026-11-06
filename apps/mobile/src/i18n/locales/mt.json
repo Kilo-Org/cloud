@@ -3657,9 +3657,9 @@
       "searching": "Fittxija fuq il-web",
       "thinking": "Qed jaħseb"
     },
-    "planOf": "minn",
+    "planProgress": "{{done}} minn {{total}}",
     "filesChanged": "fajls mibdula",
-    "finishedIn": "Lest fi",
+    "finishedIn": "Spiċċa fi {{duration}}",
     "noActivityFor": "L-ebda attività għal",
     "prOpened": "Pull request miftuħa",
     "permissionWants": "Jixtieq iħaddem",

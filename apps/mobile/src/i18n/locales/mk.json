@@ -3492,9 +3492,9 @@
       "searching": "Пребарување на веб",
       "thinking": "Размислување"
     },
-    "planOf": "од",
+    "planProgress": "{{done}} од {{total}}",
     "filesChanged": "променети датотеки",
-    "finishedIn": "Завршено за",
+    "finishedIn": "Завршено за {{duration}}",
     "noActivityFor": "Нема активност за",
     "prOpened": "Отворено барање за повлекување",
     "permissionWants": "Сака да изврши",

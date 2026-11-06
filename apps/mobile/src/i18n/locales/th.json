@@ -3492,9 +3492,9 @@
       "searching": "ค้นหาเว็บ",
       "thinking": "กำลังคิดทบทวน"
     },
-    "planOf": "จาก",
+    "planProgress": "{{done}} จาก {{total}}",
     "filesChanged": "ไฟล์ที่เปลี่ยนแปลง",
-    "finishedIn": "เสร็จใน",
+    "finishedIn": "เสร็จใน {{duration}}",
     "noActivityFor": "ไม่มีกิจกรรมเป็นเวลา",
     "prOpened": "เปิดพูลรีเควสต์แล้ว",
     "permissionWants": "ต้องการรัน",

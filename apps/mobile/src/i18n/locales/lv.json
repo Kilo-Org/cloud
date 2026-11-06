@@ -3547,9 +3547,9 @@
       "searching": "Tīmekļa meklēšana",
       "thinking": "Domāšana"
     },
-    "planOf": "no",
+    "planProgress": "{{done}} no {{total}}",
     "filesChanged": "mainīti faili",
-    "finishedIn": "Pabeigts pēc",
+    "finishedIn": "Pabeigts {{duration}} laikā",
     "noActivityFor": "Nav aktivitātes",
     "prOpened": "Atvērts pull pieprasījums",
     "permissionWants": "Vēlas palaist",

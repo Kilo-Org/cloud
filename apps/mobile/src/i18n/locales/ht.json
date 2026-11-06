@@ -3492,9 +3492,9 @@
       "searching": "Rechèch wèb",
       "thinking": "Ap reflechi"
     },
-    "planOf": "sou",
+    "planProgress": "{{done}} sou {{total}}",
     "filesChanged": "fichye chanje",
-    "finishedIn": "Fini nan",
+    "finishedIn": "Fini nan {{duration}}",
     "noActivityFor": "Pa gen aktivite pou",
     "prOpened": "Demann rale ouvè",
     "permissionWants": "Vle ekzekite",

@@ -239,4 +239,42 @@ describe('GET /api/integrations/slack/callback', () => {
     expect(deleteInstallation).toHaveBeenCalledWith(TEAM_ID);
     expectRedirectLocation(response, '/integrations/slack?error=workspace_already_connected');
   });
+
+  test('puts back the installation it replaced when the integration write fails', async () => {
+    await insertTestUser({ id: USER_ID });
+    try {
+      const previousInstallation = {
+        botToken: 'xoxb-prior-token',
+        botUserId: 'U0PRIOR',
+        teamName: 'Prior Workspace',
+      };
+      const storedInstallations = new Map<string, unknown>().set(TEAM_ID, previousInstallation);
+      getInstallation.mockImplementation(async (teamId: string) => {
+        return storedInstallations.get(teamId) ?? null;
+      });
+      setInstallation.mockImplementation(async (teamId: string, installation: unknown) => {
+        storedInstallations.set(teamId, installation);
+      });
+      deleteInstallation.mockImplementation(async (teamId: string) => {
+        storedInstallations.delete(teamId);
+      });
+      mockedUpsertSlackInstallation.mockRejectedValue(new Error('integration write failed'));
+      const state = createProviderState();
+
+      const response = await callSlackCallback(
+        makeRequest(`/api/integrations/slack/callback?code=abc&state=${state}`)
+      );
+
+      expectRedirectLocation(response, '/integrations/slack?error=installation_failed');
+      expect(storedInstallations.get(TEAM_ID)).toEqual(previousInstallation);
+      expect(storedInstallations.size).toBe(1);
+      const stored = await db
+        .select()
+        .from(platform_integrations)
+        .where(eq(platform_integrations.owned_by_user_id, USER_ID));
+      expect(stored).toHaveLength(0);
+    } finally {
+      await db.delete(kilocode_users).where(eq(kilocode_users.id, USER_ID));
+    }
+  });
 });

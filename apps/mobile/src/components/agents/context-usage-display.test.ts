@@ -1,6 +1,8 @@
 /* eslint-disable max-lines -- Migrated getHeaderSummary cases plus new no-info pill/a11y branches. */
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
+import { i18n } from '@/i18n';
+import { SUPPORTED_LANGUAGES } from '@/i18n/languages';
 import { type SessionContextInfo } from '@/lib/session-context-info';
 
 import {
@@ -430,7 +432,7 @@ describe('getMetricsAccessibilityLabel', () => {
         interactive: false,
         usageUnavailable: false,
       })
-    ).toBe('cost 8 cents');
+    ).toBe('Cost so far 8 cents.');
   });
 
   it('names usage unavailable when there is no info or cost', () => {
@@ -479,6 +481,115 @@ describe('getMetricsAccessibilityLabel', () => {
     });
     expect(label).not.toContain('CLI');
     expect(label.toLowerCase()).toContain('context details');
+  });
+});
+
+describe('getMetricsAccessibilityLabel locale terminators', () => {
+  afterEach(async () => {
+    await i18n.changeLanguage('en');
+  });
+
+  /**
+   * The catalog carries the sentence terminator, so a locale that ends a
+   * sentence with its own mark announces that mark and never a stray ASCII
+   * period. The body may end a sentence and the tap intent may add another;
+   * two terminators in a row is the defect this guards against.
+   */
+  const ADJACENT_TERMINATORS = /[\p{Sentence_Terminal}\u2026]{2}/u;
+
+  /** The finding's Japanese announcement shape, terminator included. */
+  const JA_LABEL =
+    'コンテキストは100トークン使用、ウィンドウのサイズは不明、コスト 40 セント。' +
+    'タップするとコンテキストの詳細を表示します。';
+
+  it('ends each Japanese sentence with the Japanese full stop', async () => {
+    await i18n.changeLanguage('ja');
+    expect(
+      getMetricsAccessibilityLabel({
+        info: info({ contextTokens: 100, contextWindow: undefined, percentage: undefined }),
+        totalCostMicrodollars: 400_000,
+        interactive: true,
+      })
+    ).toBe(JA_LABEL);
+  });
+
+  it('keeps the Japanese terminator when the window is known or usage is unavailable', async () => {
+    await i18n.changeLanguage('ja');
+    expect(
+      getMetricsAccessibilityLabel({
+        info: info({ contextTokens: 64_000, contextWindow: 200_000, percentage: 32 }),
+        totalCostMicrodollars: 0,
+        interactive: false,
+      })
+    ).toBe('コンテキスト 200,000トークン中64,000トークン、32%使用。');
+    expect(
+      getMetricsAccessibilityLabel({
+        info: undefined,
+        totalCostMicrodollars: 80_000,
+        interactive: false,
+        usageUnavailable: true,
+      })
+    ).toBe('コンテキスト使用状況を利用できません、コスト 8 セント。');
+  });
+
+  it('ends the loading cost sentence with the Japanese full stop before the hint', async () => {
+    await i18n.changeLanguage('ja');
+    expect(
+      getMetricsAccessibilityLabel({
+        info: undefined,
+        totalCostMicrodollars: 80_000,
+        interactive: true,
+        usageUnavailable: false,
+      })
+    ).toBe('コスト 8 セント。タップするとコンテキストの詳細を表示します。');
+  });
+
+  it('keeps the tap hint a separate sentence where no body mark closes the sentence', async () => {
+    // "th" ends no sentence with a terminator, so the hint's own leading space
+    // is the only thing that keeps the two sentences apart.
+    await i18n.changeLanguage('th');
+    const args = {
+      info: info({ contextTokens: 100, contextWindow: undefined, percentage: undefined }),
+      totalCostMicrodollars: null,
+    } as const;
+    const body = getMetricsAccessibilityLabel({ ...args, interactive: false });
+    const hint = i18n.t('agentChat.contextUsage.tapToViewDetails');
+    expect(body.at(-1)).not.toMatch(/[\p{Sentence_Terminal}\u2026]/u);
+    expect(hint.startsWith(' ')).toBe(true);
+    expect(getMetricsAccessibilityLabel({ ...args, interactive: true })).toBe(`${body}${hint}`);
+  });
+
+  it('never puts two sentence terminators side by side in any supported locale', async () => {
+    expect(SUPPORTED_LANGUAGES.length).toBeGreaterThan(50);
+    const usages = [
+      {
+        tag: 'full',
+        info: info({ contextTokens: 64_000, contextWindow: 200_000, percentage: 32 }),
+      },
+      {
+        tag: 'unknown-window',
+        info: info({ contextTokens: 100, contextWindow: undefined, percentage: undefined }),
+      },
+      { tag: 'none', info: undefined },
+      { tag: 'loading', info: undefined, usageUnavailable: false },
+    ];
+    for (const language of SUPPORTED_LANGUAGES) {
+      await i18n.changeLanguage(language); // eslint-disable-line no-await-in-loop -- one catalog at a time mirrors the runtime switch
+      for (const interactive of [true, false]) {
+        for (const cost of [80_000, null]) {
+          for (const usage of usages) {
+            const where = `${language} info=${usage.tag} cost=${String(cost)}`;
+            const label = getMetricsAccessibilityLabel({
+              info: usage.info,
+              totalCostMicrodollars: cost,
+              interactive,
+              usageUnavailable: usage.usageUnavailable ?? true,
+            });
+            expect(label, where).not.toMatch(ADJACENT_TERMINATORS);
+          }
+        }
+      }
+    }
   });
 });
 

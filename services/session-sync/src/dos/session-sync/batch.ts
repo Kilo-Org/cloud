@@ -1,8 +1,9 @@
-import { and, desc, eq, lt } from 'drizzle-orm';
+import { asc, and, eq } from 'drizzle-orm';
 
 import { blobs, entities, receipts } from '../../db/sqlite-schema';
 import { LIMITS, utf8Bytes, type BatchRequest, type Principal, type Receipt } from '../../protocol';
 import { raise, toReceipt, update, writable, type Db, type ReceiptRow } from './session';
+type BatchWork = { pruneMs: number; pruneAttempts: number; pruneError?: unknown };
 
 /**
  * Applies one batch, records its receipt, and advances the source position.
@@ -20,7 +21,8 @@ export function apply(
   sessionID: string,
   batch: BatchRequest,
   digest: string,
-  now: number
+  now: number,
+  work?: BatchWork
 ): Receipt {
   const meta = writable(db, principal, sessionID);
   if (meta.source_id !== batch.sourceID) {
@@ -140,18 +142,27 @@ export function apply(
     committed_at: now,
   };
   db.insert(receipts).values(receipt).run();
-  prune(db);
+  prune(db, meta.batches + 1, work);
   return toReceipt(sessionID, receipt);
 }
 
-/** Keeps the newest receipts. Positions increase strictly, so `through` orders them. */
-function prune(db: Db): void {
-  const oldest = db
-    .select({ through: receipts.through })
-    .from(receipts)
-    .orderBy(desc(receipts.through))
-    .limit(1)
-    .offset(LIMITS.receipts - 1)
-    .get();
-  if (oldest) db.delete(receipts).where(lt(receipts.through, oldest.through)).run();
+/** One accepted batch inserts one receipt; positions strictly order that tail. */
+function prune(db: Db, accepted: number, work?: BatchWork): void {
+  if (accepted <= LIMITS.receipts) return;
+  const started = work ? performance.now() : 0;
+  if (work) work.pruneAttempts++;
+  try {
+    const oldest = db
+      .select({ through: receipts.through })
+      .from(receipts)
+      .orderBy(asc(receipts.through))
+      .limit(1)
+      .get();
+    if (oldest) db.delete(receipts).where(eq(receipts.through, oldest.through)).run();
+  } catch (error) {
+    if (work) work.pruneError = error;
+    throw error;
+  } finally {
+    if (work) work.pruneMs += performance.now() - started;
+  }
 }

@@ -85,12 +85,87 @@ describe('hasPaymentMethodInStripe', () => {
     expect(mockCaptureMessage).toHaveBeenCalled();
   });
 
+  it('reports an unknown customer once per cached answer', async () => {
+    mockList.mockRejectedValue(noSuchCustomer('cus_setup_smoke_abc'));
+
+    await client.hasPaymentMethodInStripe({ stripeCustomerId: 'cus_setup_smoke_abc' });
+    await client.hasPaymentMethodInStripe({ stripeCustomerId: 'cus_setup_smoke_abc' });
+
+    expect(mockList).toHaveBeenCalledTimes(1);
+    expect(mockCaptureMessage).toHaveBeenCalledTimes(1);
+  });
+
   it('still surfaces every other Stripe failure', async () => {
     mockList.mockRejectedValue(new Error('Invalid API Key provided'));
 
     await expect(client.hasPaymentMethodInStripe({ stripeCustomerId: 'cus_live' })).rejects.toThrow(
       'Invalid API Key provided'
     );
+  });
+
+  it('answers the second lookup for a customer without a Stripe call', async () => {
+    mockList.mockResolvedValue({ data: [{ id: 'pm_1' }] });
+
+    await expect(client.hasPaymentMethodInStripe({ stripeCustomerId: 'cus_warm' })).resolves.toBe(
+      true
+    );
+    await expect(client.hasPaymentMethodInStripe({ stripeCustomerId: 'cus_warm' })).resolves.toBe(
+      true
+    );
+    expect(mockList).toHaveBeenCalledTimes(1);
+
+    // The cache is per customer: another id still goes to Stripe.
+    mockList.mockResolvedValue({ data: [] });
+    await expect(client.hasPaymentMethodInStripe({ stripeCustomerId: 'cus_other' })).resolves.toBe(
+      false
+    );
+    expect(mockList).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not cache a rejected lookup', async () => {
+    mockList
+      .mockRejectedValueOnce(new Error('Invalid API Key provided'))
+      .mockResolvedValueOnce({ data: [{ id: 'pm_1' }] });
+
+    await expect(
+      client.hasPaymentMethodInStripe({ stripeCustomerId: 'cus_flaky' })
+    ).rejects.toThrow('Invalid API Key provided');
+    await expect(client.hasPaymentMethodInStripe({ stripeCustomerId: 'cus_flaky' })).resolves.toBe(
+      true
+    );
+    expect(mockList).toHaveBeenCalledTimes(2);
+  });
+
+  it('serves a changed answer after the customer is invalidated', async () => {
+    mockList.mockResolvedValue({ data: [{ id: 'pm_1' }] });
+    await client.hasPaymentMethodInStripe({ stripeCustomerId: 'cus_changing' });
+
+    mockList.mockResolvedValue({ data: [] });
+    client.invalidateStripePaymentMethodCache('cus_changing');
+
+    await expect(
+      client.hasPaymentMethodInStripe({ stripeCustomerId: 'cus_changing' })
+    ).resolves.toBe(false);
+    expect(mockList).toHaveBeenCalledTimes(2);
+  });
+
+  it('asks Stripe again once the cached answer expires', async () => {
+    const now = jest.spyOn(Date, 'now');
+    try {
+      now.mockReturnValue(new Date('2026-01-01T00:00:00Z').getTime());
+      mockList.mockResolvedValue({ data: [{ id: 'pm_1' }] });
+      await client.hasPaymentMethodInStripe({ stripeCustomerId: 'cus_expiring' });
+
+      mockList.mockResolvedValue({ data: [] });
+      now.mockReturnValue(new Date('2026-01-01T00:05:00Z').getTime());
+
+      await expect(
+        client.hasPaymentMethodInStripe({ stripeCustomerId: 'cus_expiring' })
+      ).resolves.toBe(false);
+      expect(mockList).toHaveBeenCalledTimes(2);
+    } finally {
+      now.mockRestore();
+    }
   });
 });
 

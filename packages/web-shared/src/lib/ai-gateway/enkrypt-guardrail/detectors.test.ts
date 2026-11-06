@@ -1,8 +1,12 @@
+import type * as z from 'zod';
 import {
   ENKRYPT_DETECTOR_IDS,
   ENKRYPT_DETECTOR_LIMITS,
   EnkryptInputDetectorsSchema,
+  EnkryptInputDetectorsUpdateSchema,
   EnkryptOutputDetectorsSchema,
+  EnkryptOutputDetectorsUpdateSchema,
+  type EnkryptDetectorId,
   type EnkryptInputDetectors,
   type EnkryptOutputDetectors,
   type EnkryptPolicyRule,
@@ -15,10 +19,10 @@ import {
   createKiloDefaultEnkryptInputDetectors,
   enabledEnkryptDetectorIds,
   enabledEnkryptOutputDetectorIds,
-  ENKRYPT_BLOCK_DETECTOR_IDS,
+  ENKRYPT_CONFIGURABLE_INPUT_DETECTOR_IDS,
   ENKRYPT_DETECTOR_TYPES,
-  ENKRYPT_REVISE_DETECTOR_IDS,
   ENKRYPT_SUMMARY_DETECTORS,
+  enforcedEnkryptInputDetectors,
   enkryptOutputDetectorsAsInputDetectors,
 } from './detectors';
 
@@ -46,8 +50,8 @@ function allEnabled(): EnkryptInputDetectors {
   };
 }
 
-function issueMessages(input: unknown) {
-  const result = EnkryptInputDetectorsSchema.safeParse(input);
+function issueMessages(input: unknown, schema: z.ZodType = EnkryptInputDetectorsSchema) {
+  const result = schema.safeParse(input);
   return result.success
     ? []
     : result.error.issues.map(issue => ({ path: issue.path.join('.'), message: issue.message }));
@@ -188,14 +192,75 @@ describe('EnkryptInputDetectorsSchema', () => {
   });
 });
 
+describe('policy rule cap', () => {
+  const rules = (count: number) =>
+    Array.from({ length: count }, (_, index) => ({ ...rule, id: `rule-${index}` }));
+  const ruleIssue = { path: 'policy_violation.rules', message: 'Add up to 5 rules.' };
+
+  it('caps saved input and output policies at five rules', () => {
+    const input = allEnabled();
+    input.policy_violation.rules = rules(5);
+    expect(issueMessages(input, EnkryptInputDetectorsUpdateSchema)).toEqual([]);
+    input.policy_violation.rules = rules(6);
+    expect(issueMessages(input, EnkryptInputDetectorsUpdateSchema)).toEqual([ruleIssue]);
+
+    const output = allOutputEnabled();
+    output.policy_violation.rules = rules(5);
+    expect(issueMessages(output, EnkryptOutputDetectorsUpdateSchema)).toEqual([]);
+    output.policy_violation.rules = rules(6);
+    expect(issueMessages(output, EnkryptOutputDetectorsUpdateSchema)).toEqual([ruleIssue]);
+  });
+
+  it('keeps reading policies saved with more rules before the cap, so they stay enforced', () => {
+    const input = allEnabled();
+    input.policy_violation.rules = rules(50);
+    expect(issueMessages(input)).toEqual([]);
+    input.policy_violation.rules = rules(51);
+    expect(issueMessages(input)).toContainEqual(ruleIssue);
+
+    const output = allOutputEnabled();
+    output.policy_violation.rules = rules(50);
+    expect(issueMessages(output, EnkryptOutputDetectorsSchema)).toEqual([]);
+  });
+});
+
+describe('enforcedEnkryptInputDetectors', () => {
+  it('keeps the configurable detectors and applies Kilo Default to every other one', () => {
+    const detectors = allEnabled();
+    const enforced = enforcedEnkryptInputDetectors(detectors);
+
+    expect(enabledEnkryptDetectorIds(enforced)).toEqual([
+      'injection_attack',
+      'pii',
+      'policy_violation',
+      'nsfw',
+    ]);
+    expect(enforced.policy_violation).toBe(detectors.policy_violation);
+    const configurable: readonly EnkryptDetectorId[] = ENKRYPT_CONFIGURABLE_INPUT_DETECTOR_IDS;
+    for (const id of ENKRYPT_DETECTOR_IDS.filter(id => !configurable.includes(id))) {
+      expect(enforced[id]).toEqual(createKiloDefaultEnkryptInputDetectors()[id]);
+    }
+  });
+
+  it('blocks NSFW content and logs secrets even when the saved detectors turned them off', () => {
+    const detectors = createKiloDefaultEnkryptInputDetectors();
+    detectors.injection_attack.enabled = false;
+    detectors.pii = { enabled: false, action: 'block', entities: ['url'] };
+    detectors.nsfw.enabled = false;
+    const enforced = enforcedEnkryptInputDetectors(detectors);
+
+    expect(buildEnkryptDetectRequestDetectors(enforced)).toEqual({
+      pii: { enabled: true, entities: ['secrets'] },
+      nsfw: { enabled: true },
+    });
+    expect(blockingEnkryptDetectorIds(enforced)).toEqual(['nsfw']);
+  });
+});
+
 describe('detector metadata', () => {
-  it('splits every detector by its Enkrypt type', () => {
-    expect([...ENKRYPT_BLOCK_DETECTOR_IDS, ...ENKRYPT_REVISE_DETECTOR_IDS].sort()).toEqual(
-      [...ENKRYPT_DETECTOR_IDS].sort()
-    );
-    for (const id of ENKRYPT_BLOCK_DETECTOR_IDS) expect(ENKRYPT_DETECTOR_TYPES[id]).toBe('block');
-    for (const id of ENKRYPT_REVISE_DETECTOR_IDS) {
-      expect(ENKRYPT_DETECTOR_TYPES[id]).toBe('revise');
+  it('offers only detectors that always block, so each needs just an on/off switch', () => {
+    for (const id of ENKRYPT_CONFIGURABLE_INPUT_DETECTOR_IDS) {
+      expect(ENKRYPT_DETECTOR_TYPES[id]).toBe('block');
     }
   });
 
@@ -213,6 +278,7 @@ describe('blockingEnkryptDetectorIds', () => {
   it('blocks on enabled block-type detectors and on revise-type detectors set to block', () => {
     expect(blockingEnkryptDetectorIds(createKiloDefaultEnkryptInputDetectors())).toEqual([
       'injection_attack',
+      'nsfw',
     ]);
     expect(blockingEnkryptDetectorIds(allEnabled())).toEqual([
       'injection_attack',
@@ -228,10 +294,11 @@ describe('blockingEnkryptDetectorIds', () => {
 });
 
 describe('buildEnkryptDetectRequestDetectors', () => {
-  it('sends prompt injection and secrets for Kilo Default', () => {
+  it('sends prompt injection, secrets, and NSFW for Kilo Default', () => {
     expect(buildEnkryptDetectRequestDetectors(createKiloDefaultEnkryptInputDetectors())).toEqual({
       injection_attack: { enabled: true, need_explanation: false },
       pii: { enabled: true, entities: ['secrets'] },
+      nsfw: { enabled: true },
     });
   });
 
@@ -290,6 +357,7 @@ describe('buildEnkryptDetectRequestDetectors', () => {
     const detectors = createKiloDefaultEnkryptInputDetectors();
     detectors.injection_attack.enabled = false;
     detectors.pii.enabled = false;
+    detectors.nsfw.enabled = false;
     expect(buildEnkryptDetectRequestDetectors(detectors)).toEqual({});
   });
 });

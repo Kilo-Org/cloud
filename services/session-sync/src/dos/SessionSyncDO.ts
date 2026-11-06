@@ -24,6 +24,7 @@ import {
   sessionIDSchema,
   utf8Bytes,
   type BlobAck,
+  type ErrorCode,
   type Receipt,
   type Result,
   type SessionState,
@@ -36,6 +37,8 @@ import * as blob from './session-sync/blob';
 import * as erase from './session-sync/erase';
 import * as page from './session-sync/page';
 import * as session from './session-sync/session';
+import { leaseBytes } from './session-sync/lease';
+import { diagnostic, metricsEnabled, phase, syncPhase, type DiagnosticOperation } from '../metrics';
 
 const PURGE_RETRY_MS = 60_000;
 export const RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
@@ -118,6 +121,7 @@ function parseBatch(body: string) {
 export class SessionSyncDO extends DurableObject<Env> {
   private db: session.Db;
   private quotaGate: Promise<void> = Promise.resolve();
+  private admissionQueueDepth = 0;
   private pendingBatchBytes = 0;
   private pendingBatches = 0;
   private purgeRetryAt = 0;
@@ -133,17 +137,19 @@ export class SessionSyncDO extends DurableObject<Env> {
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     this.db = drizzle(ctx.storage, { logger: false });
-    void ctx.blockConcurrencyWhile(async () => {
-      await migrate(this.db, migrations);
-      this.purgeRetryAt = (await ctx.storage.get<number>('purgeRetryAt')) ?? 0;
-      this.relayUsed = (await ctx.storage.get<boolean>('relayUsed')) ?? false;
-      this.relayPurged = (await ctx.storage.get<boolean>('relayPurged')) ?? false;
-      this.relayPurgeRetryAt = (await ctx.storage.get<number>('relayPurgeRetryAt')) ?? 0;
-      this.leaseReconcilePending =
-        (await ctx.storage.get<boolean>('leaseReconcilePending')) ?? false;
-      this.pendingRegistration = await ctx.storage.get('pendingRegistration');
-      await this.scheduleSweep();
-    });
+    void ctx.blockConcurrencyWhile(() =>
+      phase(env, 'syncInitialize', 'initialize', async () => {
+        await migrate(this.db, migrations);
+        this.purgeRetryAt = (await ctx.storage.get<number>('purgeRetryAt')) ?? 0;
+        this.relayUsed = (await ctx.storage.get<boolean>('relayUsed')) ?? false;
+        this.relayPurged = (await ctx.storage.get<boolean>('relayPurged')) ?? false;
+        this.relayPurgeRetryAt = (await ctx.storage.get<number>('relayPurgeRetryAt')) ?? 0;
+        this.leaseReconcilePending =
+          (await ctx.storage.get<boolean>('leaseReconcilePending')) ?? false;
+        this.pendingRegistration = await ctx.storage.get('pendingRegistration');
+        await this.scheduleSweep();
+      })
+    );
   }
 
   /** Runs `fn` in one storage transaction; a `SyncFailure` rolls it back. */
@@ -161,17 +167,27 @@ export class SessionSyncDO extends DurableObject<Env> {
     const prior = this.quotaGate;
     const { promise, resolve } = Promise.withResolvers<void>();
     this.quotaGate = promise;
+    this.admissionQueueDepth++;
+    const queuedAt = metricsEnabled(this.env) ? performance.now() : 0;
     await prior;
+    diagnostic(this.env, {
+      operation: 'tenantAdmission',
+      stage: 'queue_wait',
+      durationMs: queuedAt ? performance.now() - queuedAt : 0,
+      queueDepth: this.admissionQueueDepth,
+      retainedBytes: this.pendingBatchBytes,
+    });
     try {
       return await fn();
     } finally {
+      this.admissionQueueDepth--;
       resolve();
     }
   }
 
   private async tenantCall<T>(fn: () => Promise<Result<T>>): Promise<Result<T>> {
     try {
-      return await fn();
+      return await phase(this.env, 'tenantAdmission', 'tenant_rpc', fn);
     } catch (error) {
       if (isOverloaded(error)) return overloaded();
       console.error('session-sync tenant admission failed', {
@@ -198,12 +214,15 @@ export class SessionSyncDO extends DurableObject<Env> {
   private async leased<T>(
     principal: z.infer<typeof principalSchema>,
     sessionID: string,
+    operation: DiagnosticOperation,
     fn: () => T
   ): Promise<Result<T>> {
     return this.serial(async () => {
+      let reapplying = false;
       for (;;) {
+        const started = metricsEnabled(this.env) ? performance.now() : 0;
         try {
-          return this.tx(() => {
+          const result = this.tx(() => {
             const value = fn();
             const meta = session.load(this.db);
             if (meta && meta.blob_bytes + meta.inline_bytes > meta.tenant_lease) {
@@ -211,19 +230,42 @@ export class SessionSyncDO extends DurableObject<Env> {
             }
             return value;
           });
+          diagnostic(this.env, {
+            operation,
+            stage: reapplying ? 'lease_reapply' : 'sql_transaction',
+            tenant: principal.tenant.type,
+            durationMs: started ? performance.now() - started : 0,
+            outcome: result.ok ? 'ok' : result.error.code,
+            cause: result.ok ? 'none' : 'typed_result',
+          });
+          return result;
         } catch (error) {
+          diagnostic(this.env, {
+            operation,
+            stage: 'sql_transaction',
+            tenant: principal.tenant.type,
+            durationMs: started ? performance.now() - started : 0,
+            outcome: error instanceof LeaseRequired ? 'lease_required' : 'error',
+            cause: error instanceof LeaseRequired ? 'none' : undefined,
+            error: error instanceof LeaseRequired ? undefined : error,
+          });
           if (!(error instanceof LeaseRequired)) throw error;
-          const bytes = Math.min(
-            LIMITS.sessionBlobBytes + LIMITS.sessionInlineBytes,
-            Math.ceil(error.bytes / LIMITS.tenantLeaseBytes) * LIMITS.tenantLeaseBytes
-          );
+          reapplying = true;
+          const bytes = leaseBytes(error.bytes);
           await this.markLeaseReconcile();
-          const lease = await this.tenantCall(() =>
-            getTenantStub(this.env, principal.tenant).reserve({
-              tenant: principal.tenant,
-              sessionID,
-              bytes,
-            })
+          const lease = await phase(
+            this.env,
+            operation,
+            'lease_reserve',
+            () =>
+              this.tenantCall(() =>
+                getTenantStub(this.env, principal.tenant).reserve({
+                  tenant: principal.tenant,
+                  sessionID,
+                  bytes,
+                })
+              ),
+            principal.tenant.type
           );
           if (!lease.ok) return lease;
           session.update(this.db, { tenant_lease: lease.value.bytes });
@@ -284,9 +326,7 @@ export class SessionSyncDO extends DurableObject<Env> {
         this.leaseReconcilePending ||
         meta.tenant_lease - meta.blob_bytes - meta.inline_bytes >= 2 * LIMITS.tenantLeaseBytes
       ) {
-        const bytes =
-          Math.ceil((meta.blob_bytes + meta.inline_bytes) / LIMITS.tenantLeaseBytes) *
-          LIMITS.tenantLeaseBytes;
+        const bytes = leaseBytes(meta.blob_bytes + meta.inline_bytes);
         // Fence writes before capacity can be released by a tenant RPC whose
         // successful response may be lost. Persist the intent so an eviction
         // cannot strand the tenant's old, larger reservation either.
@@ -332,8 +372,7 @@ export class SessionSyncDO extends DurableObject<Env> {
         const registered = prior;
         const bytes = Math.max(
           existing.tenant_lease,
-          Math.ceil((existing.blob_bytes + existing.inline_bytes) / LIMITS.tenantLeaseBytes) *
-            LIMITS.tenantLeaseBytes
+          leaseBytes(existing.blob_bytes + existing.inline_bytes)
         );
         await this.markLeaseReconcile();
         const admitted = await this.tenantCall(() =>
@@ -391,12 +430,21 @@ export class SessionSyncDO extends DurableObject<Env> {
     const parsed = parse(stateInput, input);
     if (!parsed.ok) return parsed;
     const { principal, sessionID } = parsed.value;
-    const admitted = await this.dataRateLimit.admit(
-      this.env.USER_DATA_BLOCK_LIMITER,
-      principal.userID
+    const admitted = await phase(
+      this.env,
+      'getState',
+      'rate_credit',
+      () => this.dataRateLimit.admit(this.env.USER_DATA_BLOCK_LIMITER, principal.userID),
+      principal.tenant.type
     );
     if (!admitted.ok) return admitted;
-    return this.tx(() => session.toState(this.db, session.visible(this.db, principal, sessionID)));
+    return syncPhase(
+      this.env,
+      'getState',
+      'sql_transaction',
+      () => this.tx(() => session.toState(this.db, session.visible(this.db, principal, sessionID))),
+      principal.tenant.type
+    );
   }
 
   /** Applies the batch in `body`, the exact UTF-8 request text. */
@@ -414,27 +462,89 @@ export class SessionSyncDO extends DurableObject<Env> {
       this.pendingBatchBytes + retainedBytes > LIMITS.batchQueueBytes ||
       this.pendingBatches >= LIMITS.batchQueueRequests
     ) {
+      diagnostic(this.env, {
+        operation: 'applyBatch',
+        stage: 'queue_admission',
+        tenant: principal.tenant.type,
+        outcome: 'service_overloaded',
+        cause: 'application_queue',
+        queueDepth: this.pendingBatches,
+        retainedBytes: this.pendingBatchBytes,
+      });
       return overloaded();
     }
     this.pendingBatchBytes += retainedBytes;
     this.pendingBatches++;
+    const work:
+      | {
+          pruneMs: number;
+          pruneAttempts: number;
+          pruneError?: unknown;
+          validationMs: number;
+          validationAttempts: number;
+          validationCode?: ErrorCode;
+        }
+      | undefined = metricsEnabled(this.env)
+      ? { pruneMs: 0, pruneAttempts: 0, validationMs: 0, validationAttempts: 0 }
+      : undefined;
     try {
-      const admitted = await this.dataRateLimit.admit(
-        this.env.USER_DATA_BLOCK_LIMITER,
-        principal.userID
+      const admitted = await phase(
+        this.env,
+        'applyBatch',
+        'rate_credit',
+        () => this.dataRateLimit.admit(this.env.USER_DATA_BLOCK_LIMITER, principal.userID),
+        principal.tenant.type
       );
       if (!admitted.ok) return admitted;
       // Hash before the transaction: checks and writes below run synchronously.
-      const digest = await sha256Hex(body);
-      const applied = await this.leased(principal, sessionID, () => {
+      const digest = await phase(
+        this.env,
+        'applyBatch',
+        'hash',
+        () => sha256Hex(body),
+        principal.tenant.type
+      );
+      const applied = await this.leased(principal, sessionID, 'applyBatch', () => {
         // Queued writes never retain parsed trees across tenant RPC I/O.
+        const validationStarted = work ? performance.now() : 0;
         const batch = parseBatch(body);
+        if (work) {
+          work.validationMs += performance.now() - validationStarted;
+          work.validationAttempts++;
+          if (!batch.ok) work.validationCode = batch.error.code;
+        }
         if (!batch.ok) throw new session.SyncFailure(batch.error);
-        return batches.apply(this.db, principal, sessionID, batch.value, digest, Date.now());
+        return batches.apply(this.db, principal, sessionID, batch.value, digest, Date.now(), work);
       });
-      if (applied.ok) await this.scheduleSweep();
+      if (applied.ok)
+        await phase(
+          this.env,
+          'applyBatch',
+          'schedule',
+          () => this.scheduleSweep(),
+          principal.tenant.type
+        );
       return applied;
     } finally {
+      if (work) {
+        if (work.validationAttempts > 0)
+          diagnostic(this.env, {
+            operation: 'applyBatch',
+            stage: 'validate',
+            tenant: principal.tenant.type,
+            durationMs: work.validationMs,
+            outcome: work.validationCode ?? 'ok',
+            cause: work.validationCode ? 'typed_result' : 'none',
+          });
+        if (work.pruneAttempts > 0)
+          diagnostic(this.env, {
+            operation: 'applyBatch',
+            stage: 'receipt_prune',
+            tenant: principal.tenant.type,
+            durationMs: work.pruneMs,
+            error: work.pruneError,
+          });
+      }
       this.pendingBatchBytes -= retainedBytes;
       this.pendingBatches--;
     }
@@ -444,19 +554,28 @@ export class SessionSyncDO extends DurableObject<Env> {
     const parsed = parse(pageInput, input);
     if (!parsed.ok) return parsed;
     const { principal, sessionID, ...query } = parsed.value;
-    const admitted = await this.dataRateLimit.admit(
-      this.env.USER_DATA_BLOCK_LIMITER,
-      principal.userID
+    const admitted = await phase(
+      this.env,
+      'readEntities',
+      'rate_credit',
+      () => this.dataRateLimit.admit(this.env.USER_DATA_BLOCK_LIMITER, principal.userID),
+      principal.tenant.type
     );
     if (!admitted.ok) return admitted;
-    return this.tx(() => page.read(this.db, principal, sessionID, query));
+    return syncPhase(
+      this.env,
+      'readEntities',
+      'sql_transaction',
+      () => this.tx(() => page.read(this.db, principal, sessionID, query)),
+      principal.tenant.type
+    );
   }
 
   async beginBlob(input: unknown): Promise<Result<blob.Begin>> {
     const parsed = parse(blobInput, input);
     if (!parsed.ok) return parsed;
     const { principal, sessionID, blob: ref } = parsed.value;
-    const begun = await this.leased(principal, sessionID, () =>
+    const begun = await this.leased(principal, sessionID, 'beginBlob', () =>
       blob.begin(this.db, principal, sessionID, ref, Date.now())
     );
     if (

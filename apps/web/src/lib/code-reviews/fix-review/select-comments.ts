@@ -10,7 +10,10 @@ import {
   type CollaboratorPermission,
   type GitHubAppType,
 } from '@/lib/integrations/platforms/github/adapter';
-import { getGitHubUserAccessToken } from '@/lib/integrations/platforms/github/user-token-client';
+import {
+  getGitHubUserAccessToken,
+  type GitHubUserAccessTokenConnected,
+} from '@/lib/integrations/platforms/github/user-token-client';
 import { isKiloReviewBotAuthor, normalizeGitHubLogin } from '@/lib/code-reviews/kilo-bot-logins';
 
 /**
@@ -30,6 +33,10 @@ export const FIX_REVIEW_TOTAL_BODY_MAX_LENGTH = 40_000;
 const COMMENTS_PAGE_SIZE = 100;
 const REVIEW_THREADS_MAX_PAGES = 20;
 const THREAD_COMMENTS_MAX_PAGES = 20;
+
+function isGitHubAuthenticationRejection(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && 'status' in error && error.status === 401;
+}
 
 const KNOWN_PERMISSIONS: Record<string, CollaboratorPermission> = {
   admin: 'admin',
@@ -206,7 +213,8 @@ export function createFixReviewCommentClient(
         });
         const permission = data.permission;
         return KNOWN_PERMISSIONS[permission] ?? null;
-      } catch {
+      } catch (error) {
+        if (isGitHubAuthenticationRejection(error)) throw error;
         return null;
       }
     },
@@ -402,7 +410,11 @@ async function resolveCommentClient(input: {
     'id' | 'platform_installation_id' | 'github_app_type'
   > | null;
   deps: FixReviewSelectionDeps;
-}): Promise<{ client: FixReviewCommentClient; initiatorGitHubLogin: string | null }> {
+}): Promise<{
+  client: FixReviewCommentClient;
+  initiatorGitHubLogin: string | null;
+  userCredential?: GitHubUserAccessTokenConnected;
+}> {
   const { owner, repo } = splitRepositoryFullName(input.repositoryFullName);
   const initiatorGitHubLogin = await input.deps.getInitiatorGitHubLogin(input.initiatorKiloUserId);
   const target = { owner, repo, pullNumber: input.pullNumber };
@@ -429,6 +441,7 @@ async function resolveCommentClient(input: {
   }
   return {
     client: input.deps.createCommentClient(credential.credential.token, target),
+    userCredential: credential.credential,
     initiatorGitHubLogin: initiatorGitHubLogin ?? credential.credential.githubLogin,
   };
 }
@@ -458,21 +471,39 @@ export async function selectFixReviewCommentsForReview(input: {
   deps?: Partial<FixReviewSelectionDeps>;
 }): Promise<FixReviewSelection> {
   const deps: FixReviewSelectionDeps = { ...defaultDeps, ...input.deps };
-  const { client, initiatorGitHubLogin } = await resolveCommentClient({ ...input, deps });
-
-  const [comments, settledCommentIds] = await Promise.all([
-    client.listComments(),
-    client.listSettledCommentIds(input.prAuthor),
-  ]);
-
-  const selected = await selectFixReviewComments({
-    comments,
-    trustedLogins: initiatorGitHubLogin ? [initiatorGitHubLogin] : [],
-    settledCommentIds,
-    lookupPermission: login => client.lookupPermission(login),
+  const { client, initiatorGitHubLogin, userCredential } = await resolveCommentClient({
+    ...input,
+    deps,
   });
 
-  return selectWithinPromptBudget(selected);
+  try {
+    const [comments, settledCommentIds] = await Promise.all([
+      client.listComments(),
+      client.listSettledCommentIds(input.prAuthor),
+    ]);
+
+    const selected = await selectFixReviewComments({
+      comments,
+      trustedLogins: initiatorGitHubLogin ? [initiatorGitHubLogin] : [],
+      settledCommentIds,
+      lookupPermission: login => client.lookupPermission(login),
+    });
+
+    return selectWithinPromptBudget(selected);
+  } catch (error) {
+    if (userCredential?.refreshSupported !== false) throw error;
+    if (isGitHubAuthenticationRejection(error)) {
+      await deps.getUserAccessToken(input.initiatorKiloUserId, {
+        op: 'reportRejected',
+        authorizationId: userCredential.authorizationId,
+        credentialVersion: userCredential.credentialVersion,
+      });
+    }
+    // Octokit errors can retain the authenticated request. Never forward them.
+    throw new Error(
+      'GitHub review comments are unavailable. Check your personal connection and try again.'
+    );
+  }
 }
 
 /**

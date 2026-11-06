@@ -240,11 +240,24 @@ export function getContextSheetContent(
  */
 function getUnknownUsageBody(spoken: string | null, usageUnavailable: boolean): string {
   if (!usageUnavailable) {
-    return spoken ? i18n.t('agents.sessionRow.costSpoken', { cost: spoken }) : '';
+    // The loading placeholder speaks only the cost. Its sentence ends the way
+    // the catalog closes one, so the tap hint after it stays a separate
+    // sentence in a locale that writes no space there.
+    return spoken ? i18n.t('agentChat.contextUsage.loadingCostSpoken', { cost: spoken }) : '';
   }
-  const unavailable = i18n.t('agentChat.contextUsage.usageUnavailable');
-  const costPart = spoken ? i18n.t('agentChat.contextUsage.costSuffix', { cost: spoken }) : '';
-  return `${unavailable}${costPart}.`;
+  return i18n.t('agentChat.contextUsage.usageUnavailable', {
+    costClause: spokenCostClause(spoken),
+  });
+}
+
+/**
+ * The spoken cost as a connecting clause for the context pill's sentences.
+ * Interpolated as `{{costClause}}`, so the catalog places it — and the
+ * sentence terminator — where its grammar puts them; the code adds no
+ * punctuation of its own. An absent cost contributes nothing.
+ */
+function spokenCostClause(spoken: string | null): string {
+  return spoken === null ? '' : i18n.t('agentChat.contextUsage.costClause', { cost: spoken });
 }
 
 export function getMetricsAccessibilityLabel({
@@ -259,23 +272,25 @@ export function getMetricsAccessibilityLabel({
   usageUnavailable?: boolean;
 }): string {
   const spoken = formatSpokenCost(totalCostMicrodollars);
-  const tapPart = interactive ? ` ${i18n.t('agentChat.contextUsage.tapToViewDetails')}` : '';
+  const tapPart = interactive ? i18n.t('agentChat.contextUsage.tapToViewDetails') : '';
 
   if (!info) {
     return `${getUnknownUsageBody(spoken, usageUnavailable)}${tapPart}`.trim();
   }
 
-  const costPart = spoken ? i18n.t('agentChat.contextUsage.costSuffix', { cost: spoken }) : '';
+  const costClause = spokenCostClause(spoken);
   const body =
     info.contextWindow === undefined
-      ? `${i18n.t('agentChat.contextUsage.tokensWindowUnavailable', {
+      ? i18n.t('agentChat.contextUsage.tokensWindowUnavailable', {
           used: formatExactTokens(info.contextTokens),
-        })}${costPart}.`
-      : `${i18n.t('agentChat.contextUsage.tokensUsage', {
+          costClause,
+        })
+      : i18n.t('agentChat.contextUsage.tokensUsage', {
           used: formatExactTokens(info.contextTokens),
           window: formatExactTokens(info.contextWindow),
           percentage: formatPercent(info.percentage ?? 0, i18n.language),
-        })}${costPart}.`;
+          costClause,
+        });
   return `${body}${tapPart}`;
 }
 

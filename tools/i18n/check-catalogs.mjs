@@ -456,7 +456,16 @@ function edges(value) {
  * keeps that space in the value, and Chinese abuts the segments. Every other
  * key keeps English's edges exactly.
  */
-const LOCALE_SEPARATED_KEYS = new Set(['login.termsPrefix', 'login.termsConnector']);
+const LOCALE_SEPARATED_KEYS = new Set([
+  'login.termsPrefix',
+  'login.termsConnector',
+  // The context-usage pill appends the tap hint straight to the sentence the
+  // pill's body sentence terminator closed, so the hint's leading separator is
+  // the catalog's own: a space nearly everywhere, none where the sentence mark
+  // alone separates ("ja", "zh-Hans", "zh-Hant"). "th" ends no sentence with a
+  // mark, so it keeps the space the hint needs to stay a separate sentence.
+  'agentChat.contextUsage.tapToViewDetails',
+]);
 
 /**
  * The counted clause the review-submit message renders before its stale

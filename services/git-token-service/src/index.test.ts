@@ -2402,7 +2402,7 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
     }
   );
 
-  it('answers GraphQL for a selected-user capability with the recorded repository credential', async () => {
+  it('redeems GraphQL for a selected-user capability with the user token', async () => {
     const service = createService();
     const issued = await service.issueGitHubSessionCapability({
       githubRepo: 'acme/repo',
@@ -2424,40 +2424,13 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
       })
     ).resolves.toEqual({
       success: true,
-      authorization: 'Bearer installation-token',
+      authorization: 'Bearer user-token',
       installationId: '123',
-      source: 'installation',
+      source: 'user',
       appType: 'standard',
     });
-    // The pinned user authorization still has to resolve, and the credential sent is
-    // the installation token minted for the recorded repository alone.
     expect(serviceMocks.selectUserAuthorization).toHaveBeenCalledOnce();
-    expect(serviceMocks.getTokenForRepo).toHaveBeenCalledExactlyOnceWith('123', 'repo', 'standard');
-  });
-
-  it('refuses GraphQL for a selected-user capability when the recorded repository credential cannot be minted', async () => {
-    const service = createService();
-    const issued = await service.issueGitHubSessionCapability({
-      githubRepo: 'acme/repo',
-      userId: 'user_1',
-      outboundContainerId,
-      allowUserAuthorization: true,
-    });
-    if (!issued.success) throw new Error('Expected successful issuance');
-    serviceMocks.selectUserAuthorization.mockClear();
-    serviceMocks.getTokenForRepo.mockRejectedValueOnce(
-      new Error('provider token detail: raw-detail')
-    );
-
-    const redemption = await service.redeemGitHubSessionCapability({
-      capability: issued.capability,
-      outboundContainerId,
-      requestMethod: 'POST',
-      requestUrl: 'https://api.github.com/graphql',
-    });
-
-    expect(redemption).toEqual({ success: false, reason: 'source_unavailable' });
-    expect(JSON.stringify(redemption)).not.toContain('raw-detail');
+    expect(serviceMocks.getTokenForRepo).not.toHaveBeenCalled();
   });
 
   it('redeems GraphQL for an installation-source capability with the installation token', async () => {

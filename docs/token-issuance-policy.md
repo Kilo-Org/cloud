@@ -249,3 +249,15 @@ user returns to an unfinished request.
 
 Deploy the shared database migration, apps/web, then the MCP worker. The worker's
 SQLite migration runs on first access to its authorization store.
+
+## GitHub GraphQL session identity
+
+GraphQL redemption preserves the credential source selected when the session capability is issued.
+Webhook runs with selected user authorization perform approvals as that user, not the installation bot.
+This is intentional: substituting an installation token changes the reviewer and can prevent approvals of bot-authored pull requests.
+
+GraphQL has no repository URL scope.
+User-source GraphQL requests retain the user's GitHub permissions; they are not restricted to the capability's repository.
+Repository-only and installation-source capabilities continue to use their scoped installation credentials.
+Redemption still checks the container binding, current authorization, integration, and recorded identity.
+If the selected user authorization disappears, redemption fails without falling back to the bot.

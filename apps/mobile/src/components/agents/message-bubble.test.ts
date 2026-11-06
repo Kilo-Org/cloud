@@ -556,8 +556,11 @@ describe('MessageBubble failure footer', () => {
       'Button',
       p => p.accessibilityLabel === 'Add credits'
     );
-    expect(addCredits).not.toBeNull();
-    (addCredits?.props.onPress as () => void)();
+    if (!addCredits) {
+      throw new Error('the footer drew no Add credits button');
+    }
+    const press = addCredits.props.onPress as () => void;
+    press();
     expect(onAddCredits).toHaveBeenCalledTimes(1);
 
     // A retry of the same request meets the same block, so the row offers the

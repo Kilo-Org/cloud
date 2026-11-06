@@ -22,15 +22,15 @@ describe('lastVisibleMessageFailure', () => {
     return message;
   }
 
-  function assistantMessageWithError(id: string, errorName: string): StoredMessage {
+  function assistantMessageWithError(id: string, errorName: 'APIError'): StoredMessage {
     const message = assistantMessageWithText(id);
     if (message.info.role !== 'assistant') {
       throw new Error('the fixture builds an assistant row');
     }
     message.info.error = {
       name: errorName,
-      data: { message: 'raw' },
-    } as NonNullable<typeof message.info.error>;
+      data: { message: 'raw', isRetryable: true },
+    };
     return message;
   }
 

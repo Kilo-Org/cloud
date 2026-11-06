@@ -61,16 +61,24 @@ export type CloneSessionParams = {
   upToMessageId?: string;
 };
 
+/** The row as the stage stores it. An R2-backed row stores `{}` and its key. */
 type RewrittenCloneRow = {
   itemId: string;
   itemType: CloneItemType;
   itemData: string;
+  itemDataR2Key: string | null;
   ingestedAt: number | null;
   materializedByteLength: number;
-} & (
-  | { itemDataR2Key: null; destinationR2Body: null }
-  | { itemDataR2Key: string; destinationR2Body: string }
-);
+};
+
+/**
+ * One materialized row plus the body to write to R2 before staging. The body
+ * stays out of {@link RewrittenCloneRow} so a staged row never retains it.
+ */
+type MaterializedCloneRow = {
+  row: RewrittenCloneRow;
+  destinationR2Body: string | null;
+};
 
 type SessionIngestDOStub = ReturnType<typeof getSessionIngestDO>;
 
@@ -178,7 +186,7 @@ async function materializeAndRewriteRow(
   r2: R2Bucket,
   sourceSessionId: string,
   destinationSessionId: string
-): Promise<RewrittenCloneRow> {
+): Promise<MaterializedCloneRow> {
   let rawText: string;
   if (row.itemDataR2Key !== null) {
     const object = await r2.get(row.itemDataR2Key);
@@ -239,25 +247,28 @@ async function materializeAndRewriteRow(
   }
 
   if (row.itemDataR2Key !== null) {
-    const destinationKey = `clone/${destinationSessionId}/${row.itemId}`;
     return {
-      itemId: row.itemId,
-      itemType: row.itemType,
-      itemData: '{}',
-      itemDataR2Key: destinationKey,
-      ingestedAt: row.ingestedAt,
-      materializedByteLength,
+      row: {
+        itemId: row.itemId,
+        itemType: row.itemType,
+        itemData: '{}',
+        itemDataR2Key: `clone/${destinationSessionId}/${row.itemId}`,
+        ingestedAt: row.ingestedAt,
+        materializedByteLength,
+      },
       destinationR2Body: rewrittenJson,
     };
   }
 
   return {
-    itemId: row.itemId,
-    itemType: row.itemType,
-    itemData: rewrittenJson,
-    itemDataR2Key: null,
-    ingestedAt: row.ingestedAt,
-    materializedByteLength,
+    row: {
+      itemId: row.itemId,
+      itemType: row.itemType,
+      itemData: rewrittenJson,
+      itemDataR2Key: null,
+      ingestedAt: row.ingestedAt,
+      materializedByteLength,
+    },
     destinationR2Body: null,
   };
 }
@@ -288,7 +299,7 @@ async function materializeSourceBatch(
       batchChain = await chainCloneRowDigest(batchChain, cloneSourceDigestLine(row));
       continue;
     }
-    const materialized = await materializeAndRewriteRow(
+    const { row: staged, destinationR2Body } = await materializeAndRewriteRow(
       row,
       r2,
       sourceSessionId,
@@ -296,18 +307,20 @@ async function materializeSourceBatch(
     );
     if (
       rewritten.length > 0 &&
-      bytes + materialized.materializedByteLength > CLONE_MAX_BATCH_MATERIALIZED_BYTES
+      bytes + staged.materializedByteLength > CLONE_MAX_BATCH_MATERIALIZED_BYTES
     ) {
       break;
     }
-    if (materialized.itemDataR2Key !== null) {
-      await r2.put(materialized.itemDataR2Key, materialized.destinationR2Body);
-      writtenR2Keys.push(materialized.itemDataR2Key);
+    if (staged.itemDataR2Key !== null && destinationR2Body !== null) {
+      // Write the body now and keep only the key, so the batch holds one body at
+      // a time.
+      await r2.put(staged.itemDataR2Key, destinationR2Body);
+      writtenR2Keys.push(staged.itemDataR2Key);
     }
-    bytes += materialized.materializedByteLength;
+    bytes += staged.materializedByteLength;
     consumed = index + 1;
     batchChain = await chainCloneRowDigest(batchChain, cloneSourceDigestLine(row));
-    rewritten.push(materialized);
+    rewritten.push(staged);
   }
   return { rows: rewritten, chain: batchChain, consumedSourceRows: consumed };
 }

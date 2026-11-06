@@ -56,3 +56,35 @@ export const CLAUDE_SIGN_IN_ASSERTION_AUDIENCE = getEnvVariable(
 );
 
 export const CLAUDE_SIGN_IN_SCOPE = 'openid email profile';
+
+/** The Claude billing connections OAuth app ("Attribute and bill users"). */
+export const CLAUDE_BILLING_CLIENT_ID = getEnvVariable('CLAUDE_BILLING_CLIENT_ID');
+
+/** The `aud` the billing app's client authentication settings expect. */
+export const CLAUDE_BILLING_ASSERTION_AUDIENCE = getEnvVariable(
+  'CLAUDE_BILLING_ASSERTION_AUDIENCE'
+);
+
+export const CLAUDE_BILLING_SCOPE = 'org:billing_attribution';
+
+/** Requests an organization connection, which only a billing connection uses. */
+export const CLAUDE_BILLING_CONNECTION_TYPE = 'organization_shared';
+
+/** Beta header Anthropic enables for billing connections; required with `billing_policy`. */
+export const CLAUDE_BILLING_BETA = 'user-profiles-billing-2026-10-01';
+
+/**
+ * Kilo's operator service account: the only identity allowed to send requests
+ * that bill a connected customer. Its federation rule maps Kilo-signed JWTs
+ * with `CLAUDE_OPERATOR_TOKEN_AUDIENCE` to the service account.
+ */
+export const CLAUDE_OPERATOR_FEDERATION_RULE_ID = getEnvVariable(
+  'CLAUDE_OPERATOR_FEDERATION_RULE_ID'
+);
+export const CLAUDE_OPERATOR_ORGANIZATION_ID = getEnvVariable('CLAUDE_OPERATOR_ORGANIZATION_ID');
+export const CLAUDE_OPERATOR_SERVICE_ACCOUNT_ID = getEnvVariable(
+  'CLAUDE_OPERATOR_SERVICE_ACCOUNT_ID'
+);
+/** Optional: needed only when the federation rule covers several workspaces. */
+export const CLAUDE_OPERATOR_WORKSPACE_ID = getEnvVariable('CLAUDE_OPERATOR_WORKSPACE_ID');
+export const CLAUDE_OPERATOR_TOKEN_AUDIENCE = getEnvVariable('CLAUDE_OPERATOR_TOKEN_AUDIENCE');

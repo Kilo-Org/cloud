@@ -25,6 +25,7 @@ import { reviewMemoryRouter } from '@/routers/code-reviews/review-memory-router'
 import { personalReviewAgentRouter } from '@/routers/code-reviews-router';
 import { byokRouter } from '@/routers/byok-router';
 import { openAiChatGptRouter } from '@/routers/openai-chatgpt-router';
+import { claudeBillingRouter } from '@/routers/claude-billing-router';
 import { securityAgentRouter } from '@/routers/security-agent-router';
 import { securityAuditLogRouter } from '@/routers/security-audit-log-router';
 import { appReportedMessagesRouter } from '@/routers/app-reported-messages-router';
@@ -79,6 +80,7 @@ export const rootRouter = createTRPCRouter({
   personalReviewAgent: personalReviewAgentRouter,
   byok: byokRouter,
   openAiChatGpt: openAiChatGptRouter,
+  claudeBilling: claudeBillingRouter,
   securityAgent: securityAgentRouter,
   securityAuditLog: securityAuditLogRouter,
   appReportedMessages: appReportedMessagesRouter,

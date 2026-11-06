@@ -5,6 +5,13 @@
  */
 export const CLAUDE_SIGN_IN_FLAG = 'sign-in-with-claude';
 
+/**
+ * PostHog flag gating the Claude billing connection card on the BYOK pages. It
+ * needs a signed-in person, so unlike the sign-in toggle it is evaluated in the
+ * browser where the person is known.
+ */
+export const CLAUDE_BILLING_FLAG = 'claude-platform-oauth';
+
 /** `providers` without Claude unless Sign in with Claude is launched. */
 export function withLaunchedClaudeSignIn<T extends string>(
   providers: readonly T[],

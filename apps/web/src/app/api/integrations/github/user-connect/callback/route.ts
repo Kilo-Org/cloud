@@ -2,6 +2,7 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
+import { GitHubIdentityConflictError } from '@kilocode/db/github-identity';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { consumeGitHubUserAuthorizationState } from '@/lib/integrations/platforms/github/user-authorization-state';
 import { exchangeAndStoreGitHubUserAuthorization } from '@/lib/integrations/platforms/github/user-authorization';
@@ -71,13 +72,18 @@ export async function GET(request: NextRequest) {
       kiloUserId: user.id,
       code,
       codeVerifier: state.codeVerifier,
+      expected: state.expected,
     });
     if (result.status !== 'connected') {
       return redirectWithStatus('error', result.status);
     }
 
     return redirectWithStatus('success', 'user_connected');
-  } catch {
+  } catch (error) {
+    // The identity changed during the round trip. The user starts a new connection.
+    if (error instanceof GitHubIdentityConflictError) {
+      return redirectWithStatus('error', 'connection_conflict');
+    }
     captureException(new Error('GitHub user authorization callback failed'), {
       tags: { endpoint: 'github/user-connect/callback', stage, reason: 'operation_failed' },
       extra: safeCallbackContext(request.nextUrl.searchParams),

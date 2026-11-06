@@ -11,6 +11,7 @@ import { clearOpenAiChatGptConnection } from '@kilocode/web-shared/lib/ai-gatewa
 import { deletePersonalClaudeProfile } from '@/lib/claude-billing/delete';
 import { WorkOS } from '@workos-inc/node';
 import type { User } from '@kilocode/db/schema';
+import { lockGitHubIdentityWrites } from '@kilocode/db/github-identity';
 import {
   createSoftDeletedBlockedReason,
   isSoftDeletedBlockedReason,
@@ -1130,6 +1131,8 @@ export async function anonymizeCloudUserData(
   tx: DrizzleTransaction,
   userId: string
 ): Promise<void> {
+  // GitHub identity writers take this lock before the user row. Keep the same order.
+  await lockGitHubIdentityWrites(tx, userId);
   const [user] = await tx
     .select()
     .from(kilocode_users)

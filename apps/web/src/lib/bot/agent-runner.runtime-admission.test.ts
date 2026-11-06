@@ -63,6 +63,11 @@ jest.mock('@/lib/bot/platforms', () => ({
     }),
   },
 }));
+jest.mock('@/lib/bot/organization-model', () => ({
+  resolveOrganizationBotModel: jest.fn(
+    async ({ storedModelSlug }: { storedModelSlug: string }) => storedModelSlug
+  ),
+}));
 jest.mock('@/lib/bot/request-logging', () => ({
   updateBotRequest: jest.fn(),
   linkBotRequestToSession: jest.fn(),

@@ -3,8 +3,6 @@ import { describe, expect, it, vi } from 'vitest';
 // Static import of the mobile package manifest — no file-system walk.
 import pkg from '../../../package.json';
 
-// ---- shared hoisted mocks ----
-
 const hoisted = vi.hoisted(() => {
   const client = {
     register: vi.fn(),
@@ -54,8 +52,6 @@ const hoisted = vi.hoisted(() => {
 
   return { client, appsFlyer, device, storage, controller };
 });
-
-// ---- vi.mock calls ----
 
 vi.mock('posthog-react-native', () => ({
   default: vi.fn(() => hoisted.client),
@@ -128,8 +124,6 @@ vi.mock('@sentry/react-native', () => ({ captureException: vi.fn() }));
 
 vi.stubGlobal('__DEV__', false);
 
-// ---- loaders ----
-
 // oxlint-disable-next-line require-await -- async required by promise-function-async
 async function loadPostHogModule() {
   vi.resetModules();
@@ -141,8 +135,6 @@ async function loadAppsFlyerModule() {
   vi.resetModules();
   return import('../appsflyer');
 }
-
-// ---- tests ----
 
 describe('no SDK starts before a telemetry decision', () => {
   it('has no expo-insights in the mobile package dependencies', () => {

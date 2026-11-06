@@ -21,7 +21,18 @@ import {
 import { defineTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 describe('clientIpFromHeaders', () => {
-  test('returns the first hop of x-forwarded-for', () => {
+  test('prefers x-vercel-forwarded-for when both headers are present', () => {
+    expect(
+      clientIpFromHeaders(
+        new Headers({
+          'x-forwarded-for': '203.0.113.7, 10.0.0.1',
+          'x-vercel-forwarded-for': '198.51.100.5, 10.0.0.2',
+        })
+      )
+    ).toBe('198.51.100.5');
+  });
+
+  test('returns the first hop of x-forwarded-for when it is the only forwarding header', () => {
     expect(clientIpFromHeaders(new Headers({ 'x-forwarded-for': '203.0.113.7, 10.0.0.1' }))).toBe(
       '203.0.113.7'
     );
@@ -33,7 +44,7 @@ describe('clientIpFromHeaders', () => {
     ).toBe('203.0.113.9');
   });
 
-  test('falls back to x-vercel-forwarded-for when x-forwarded-for is absent', () => {
+  test('returns the first hop of x-vercel-forwarded-for when x-forwarded-for is absent', () => {
     expect(clientIpFromHeaders(new Headers({ 'x-vercel-forwarded-for': '198.51.100.5' }))).toBe(
       '198.51.100.5'
     );
@@ -45,6 +56,14 @@ describe('clientIpFromHeaders', () => {
 
   test('returns null for an empty x-forwarded-for header', () => {
     expect(clientIpFromHeaders(new Headers({ 'x-forwarded-for': '' }))).toBeNull();
+  });
+
+  test('falls back to x-forwarded-for when x-vercel-forwarded-for is empty', () => {
+    expect(
+      clientIpFromHeaders(
+        new Headers({ 'x-vercel-forwarded-for': '   ', 'x-forwarded-for': '203.0.113.7' })
+      )
+    ).toBe('203.0.113.7');
   });
 });
 

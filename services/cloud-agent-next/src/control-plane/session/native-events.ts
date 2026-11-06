@@ -1,6 +1,7 @@
 import { autoCommitRecordSchema } from '@kilocode/worker-utils/cloud-agent-commits';
 import { z } from 'zod';
 import {
+  autocommitEntityId,
   publicEventProperties,
   type SandboxControlSessionEventInput,
 } from '../../sandbox-session/sandbox-control-event.js';
@@ -206,7 +207,7 @@ export function persistSessionEvent(input: {
       timestamp = Date.parse(commit.data.committedAt);
       unique = true;
     } else if (typeof properties.messageId === 'string') {
-      entityId = `autocommit/${properties.messageId}`;
+      entityId = autocommitEntityId(properties.messageId, properties.repository);
     }
   }
 

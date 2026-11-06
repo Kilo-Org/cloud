@@ -12,14 +12,11 @@ type PreviewSessionId = `workspace_${string}`;
  * Worker does not serve preview for it. The answer changes only on a Worker
  * deploy, so it is read once per session; it is null while loading.
  */
-export function usePreviewUrlTemplate(
-  cloudAgentSessionId: PreviewSessionId | null,
-  organizationId: string | undefined
-): string | null {
+export function usePreviewUrlTemplate(cloudAgentSessionId: PreviewSessionId | null): string | null {
   const trpc = useTRPC();
   const query = useQuery({
     ...trpc.cloudAgentNext.getPreviewOptions.queryOptions(
-      cloudAgentSessionId ? { cloudAgentSessionId, organizationId } : skipToken
+      cloudAgentSessionId ? { cloudAgentSessionId } : skipToken
     ),
     staleTime: Infinity,
     retry: false,

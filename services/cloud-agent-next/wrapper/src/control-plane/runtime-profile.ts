@@ -3,13 +3,14 @@ import path from 'node:path';
 import type { ControlPlaneRouteSpec } from '../../../src/shared/control-plane-protocol.js';
 import {
   buildAgentEntryFromRuntimeAgent,
+  buildBuiltinAgentEntries,
   buildKiloCommandsConfiguration,
 } from '../../../src/shared/runtime-profile-config.js';
 import { writeRuntimeSkills, type RuntimeSkillInstallOptions } from '../runtime-skills.js';
 
 type RuntimeProfile = Pick<
   ControlPlaneRouteSpec,
-  'runtimeSkills' | 'runtimeAgents' | 'kiloCommands'
+  'runtimeSkills' | 'runtimeAgents' | 'builtinAgents' | 'kiloCommands'
 >;
 
 export type RuntimeProfileMaterializer = {
@@ -51,7 +52,13 @@ export function withRuntimeProfileEnvironment(
   env: Record<string, string>,
   profile: RuntimeProfile
 ): Record<string, string> {
-  if (!profile.runtimeAgents?.length && !profile.kiloCommands?.length) return env;
+  if (
+    !profile.runtimeAgents?.length &&
+    Object.keys(profile.builtinAgents ?? {}).length === 0 &&
+    !profile.kiloCommands?.length
+  ) {
+    return env;
+  }
   return { ...env, KILO_CONFIG: profileConfigPath(env.HOME) };
 }
 
@@ -72,6 +79,7 @@ export function runtimeProfileConfigKey(profile: RuntimeProfile): string {
     stableValue({
       runtimeSkills: profile.runtimeSkills ?? [],
       runtimeAgents: profile.runtimeAgents ?? [],
+      builtinAgents: profile.builtinAgents ?? {},
       kiloCommands: profile.kiloCommands ?? [],
     })
   );
@@ -252,14 +260,16 @@ async function commitRuntimeProfileConfig(
 }
 
 async function writeRuntimeProfileConfig(home: string, profile: RuntimeProfile): Promise<boolean> {
-  const config = {
+  const agents = {
+    ...buildBuiltinAgentEntries(profile.builtinAgents),
     ...(profile.runtimeAgents?.length
-      ? {
-          agent: Object.fromEntries(
-            profile.runtimeAgents.map(agent => [agent.slug, buildAgentEntryFromRuntimeAgent(agent)])
-          ),
-        }
+      ? Object.fromEntries(
+          profile.runtimeAgents.map(agent => [agent.slug, buildAgentEntryFromRuntimeAgent(agent)])
+        )
       : {}),
+  };
+  const config = {
+    ...(Object.keys(agents).length > 0 ? { agent: agents } : {}),
     ...(profile.kiloCommands?.length
       ? { command: buildKiloCommandsConfiguration(profile.kiloCommands) }
       : {}),

@@ -36,7 +36,7 @@ export default {
       {
         id: 'kimi-for-coding',
         name: 'Kimi for Coding',
-        flags: ['recommended', 'vision', 'reasoning'],
+        flags: ['vision', 'reasoning'],
         context_length: 262144,
         max_completion_tokens: 32768,
         description:

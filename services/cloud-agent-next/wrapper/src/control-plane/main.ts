@@ -38,6 +38,9 @@ import { createControlPlaneWorktreeChanges } from './worktree-changes.js';
 import { createControlPlaneWorktreeDeletion } from './worktree-deletion.js';
 import { createControlPlaneKiloRequests } from './kilo-requests.js';
 import { createHistoryRequests } from './history-requests.js';
+import { runtimeHarness } from './runtime-harness.js';
+import { readKiloCliVersion } from './runtime-versions.js';
+import { WRAPPER_VERSION } from '../../../src/shared/wrapper-version.js';
 import {
   CONTROL_SANDBOX_PROVIDER_ENV,
   parseAgentSandboxProvider,
@@ -422,10 +425,14 @@ export async function runControlPlaneWrapper(
   });
   const { runtimes } = host;
   turnsRef.current = host.turns;
+  const harness = runtimeHarness(env);
+  const kiloCliVersion = await readKiloCliVersion(harness.cli);
   const connection = createControlPlaneConnection({
     url,
     credential,
     allocationId,
+    runtimeHarness: harness.kind,
+    runtimeVersions: { kiloCliVersion, wrapperVersion: WRAPPER_VERSION },
     timers,
     log: logToFile,
     onNativeDiagnostic: projector,

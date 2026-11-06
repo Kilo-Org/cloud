@@ -21,6 +21,7 @@ export type CloudAgentWorktreeLocation = z.infer<typeof cloudAgentWorktreeLocati
 export const WORKTREE_RUNTIME_HISTORY_UNAVAILABLE = 'worktree_runtime_history_unavailable';
 export const WORKTREE_UNREGISTERED_CHILD_SESSIONS = 'worktree_unregistered_child_sessions';
 export const WORKTREE_CHILD_LINEAGE_CONFLICT = 'worktree_child_lineage_conflict';
+export const WORKTREE_MEMBERSHIP_CHANGED = 'worktree_membership_changed';
 
 export const cloudAgentWorktreeDeletionManifestSchema = z
   .object({
@@ -45,6 +46,9 @@ export const cloudAgentWorktreeDeletionSchema = z
     worktreeId: cloudAgentWorktreeIdSchema,
     kiloUserId: z.string().min(1),
     organizationId: z.uuid().optional(),
+    // Begin-only precondition: the worktree must still have exactly one root
+    // session and it must be this session. Descendants are allowed.
+    onlyIfSoleSessionId: sessionIdSchema.optional(),
   })
   .strict();
 export type CloudAgentWorktreeDeletionParams = z.infer<typeof cloudAgentWorktreeDeletionSchema>;
@@ -57,6 +61,11 @@ export const cloudAgentWorktreeDeletionStateSchema = z
   })
   .strict();
 export type CloudAgentWorktreeDeletionState = z.infer<typeof cloudAgentWorktreeDeletionStateSchema>;
+
+export type CloudAgentWorktreeDeletionResult = {
+  success: true;
+  deletedSessionIds: string[];
+};
 
 export const retireCloudAgentWorktreeIfSoleMemberSchema = cloudAgentWorktreeDeletionSchema
   .extend({
@@ -199,7 +208,8 @@ export type SessionCloneRejectionCode =
   | 'source_digest_changed'
   | 'destination_conflict'
   | 'clone_setup_failed'
-  | 'clone_cut_not_found';
+  | 'clone_cut_not_found'
+  | 'session_retired';
 
 /**
  * Clone acknowledgement carried by the `ready` result. `sessionId` is the
@@ -1342,7 +1352,10 @@ export type SessionIngestRpcMethods = {
   ) => Promise<CloudAgentWorktreeDeletionState>;
   completeCloudAgentWorktreeDeletion: (
     params: CloudAgentWorktreeDeletionParams
-  ) => Promise<{ success: true; deletedSessionIds: string[] }>;
+  ) => Promise<CloudAgentWorktreeDeletionResult>;
+  deleteCloudAgentWorktreeContent: (
+    params: CloudAgentWorktreeDeletionParams
+  ) => Promise<CloudAgentWorktreeDeletionResult>;
   canDestroyCloudAgentWorktreeSandbox: (
     params: CanDestroyCloudAgentWorktreeSandboxParams
   ) => Promise<CanDestroyCloudAgentWorktreeSandboxResult>;

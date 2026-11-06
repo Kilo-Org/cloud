@@ -42,6 +42,7 @@ function environmentLoad(
 
 const {
   mergeProfileConfigurationMock,
+  getBuiltinAgentSettingsMock,
   loadEnvironmentForSessionMock,
   assertKiloModelAvailableMock,
   assertBitbucketRepositoryAccessMock,
@@ -55,6 +56,7 @@ const {
   requireCurrentSessionAccessMock,
 } = vi.hoisted(() => ({
   mergeProfileConfigurationMock: vi.fn().mockResolvedValue({}),
+  getBuiltinAgentSettingsMock: vi.fn().mockResolvedValue({}),
   loadEnvironmentForSessionMock: vi.fn().mockResolvedValue({ status: 'none' }),
   parentSpawnContextMock: vi.fn().mockResolvedValue({
     token: 'trusted-parent-model-token',
@@ -112,6 +114,7 @@ vi.mock('@kilocode/cloud-agent-profile', async importActual => {
   return {
     ...actual,
     mergeProfileConfiguration: mergeProfileConfigurationMock,
+    getBuiltinAgentSettings: getBuiltinAgentSettingsMock,
     loadEnvironmentForSession: loadEnvironmentForSessionMock,
   };
 });
@@ -221,6 +224,7 @@ describe('prepareSession operation-ledger admission gate', () => {
       getMetadata: parentMetadataMock,
     }));
     mergeProfileConfigurationMock.mockResolvedValue({});
+    getBuiltinAgentSettingsMock.mockResolvedValue({});
     loadEnvironmentForSessionMock.mockResolvedValue({ status: 'none' });
     assertKiloModelAvailableMock.mockResolvedValue(undefined);
     assertBitbucketRepositoryAccessMock.mockResolvedValue(undefined);
@@ -668,7 +672,6 @@ describe('prepareSession operation-ledger admission gate', () => {
         egressAllowlist: ['changed.example.com'],
       },
     });
-    context.env.CLOUDFLARE_CONTAINERS_ORG_IDS = '*';
     context.authToken = jwt.sign({ aud: 'cloud-agent-next' }, 'fixture');
     context.cloudAgentAuthority = {
       version: 1,

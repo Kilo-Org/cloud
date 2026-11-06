@@ -163,15 +163,32 @@ const CREDENTIAL_KEY_WORDS = [
   'credential',
   'key',
   'keyid',
+  'pass',
+  'passkey',
+  'passphrase',
   'passwd',
   'password',
+  'pwd',
   'secret',
   'token',
 ];
 // A credential word that ends the token still names a credential when a product or
 // vendor prefix precedes it (`mysqlpassword`, `mytoken`); generic words are excluded
 // so `turnkey`, `monkey` and `hockey` stay ordinary.
-const CREDENTIAL_SUFFIX_WORDS = ['apikey', 'credential', 'passwd', 'password', 'secret', 'token'];
+const CREDENTIAL_SUFFIX_WORDS = [
+  'apikey',
+  'credential',
+  'passphrase',
+  'passwd',
+  'password',
+  'pwd',
+  'secret',
+  'token',
+];
+// A vendor name joined directly to a short password word (`dbpass`, `pgpass`,
+// `mongopass`) is a credential key only when the vendor is listed here, because a
+// broader rule would also classify ordinary words that end in `pass`, such as
+// `compass`. The list holds the products whose clients ship such a key name.
 const CREDENTIAL_KEY_QUALIFIERS = [
   'access',
   'account',
@@ -179,15 +196,25 @@ const CREDENTIAL_KEY_QUALIFIERS = [
   'app',
   'auth',
   'client',
+  'db',
   'encryption',
   'master',
+  'mongo',
+  'mssql',
+  'mysql',
+  'oracle',
+  'pg',
+  'postgres',
+  'postgresql',
   'private',
   'public',
+  'redis',
   'root',
   'secret',
   'service',
   'session',
   'signing',
+  'sql',
   'subscription',
 ];
 const CREDENTIAL_QUALIFIER_WINDOW = Math.max(

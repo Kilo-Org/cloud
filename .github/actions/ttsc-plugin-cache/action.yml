@@ -1,0 +1,32 @@
+name: ttsc compiler plugin cache
+description: >-
+  Restore the compiler plugins ttsc builds in node_modules/.cache/ttsc/plugins.
+  The key covers the lockfile closure of ttsc, typia, @ttsc/unplugin and
+  TypeScript, which decide the compiled plugin, so a dependency change anywhere
+  else keeps the cache. There is no partial restore: a plugin built from other
+  versions of those packages is never restored. Saving stays with the job that
+  compiled the plugins (see the outputs); this action restores only. Run it
+  after `pnpm install`.
+
+outputs:
+  cache-hit:
+    description: Whether the restore hit the plugin cache.
+    value: ${{ steps.restore.outputs.cache-hit }}
+  key:
+    description: The plugin cache key the restore used.
+    value: ${{ steps.key.outputs.key }}
+
+runs:
+  using: composite
+  steps:
+    - name: Hash compiler plugin inputs
+      id: key
+      shell: bash
+      run: node scripts/ttsc-plugin-key.mjs >> "$GITHUB_OUTPUT"
+
+    - name: Restore compiler plugins
+      id: restore
+      uses: actions/cache/restore@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+      with:
+        path: node_modules/.cache/ttsc/plugins
+        key: ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-${{ steps.key.outputs.key }}

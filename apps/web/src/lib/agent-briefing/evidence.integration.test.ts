@@ -236,6 +236,28 @@ it('fails a terminal decline without a second request', async () => {
   expect(failed?.summary.error).toBe('gateway_declined');
 });
 
+it('does not repeat a successful answer whose body cannot be read', async () => {
+  const { now } = await scheduled();
+  await sweepAgentBriefings(now);
+  const [row] = await db.select().from(agent_briefing_snapshots);
+  if (!row) throw new Error('No captured snapshot');
+  const fetcher = jest.spyOn(globalThis, 'fetch').mockResolvedValue(
+    new Response(
+      new ReadableStream({
+        start(controller) {
+          controller.error(new TypeError('terminated'));
+        },
+      }),
+      { status: 200 }
+    )
+  );
+  await runBriefingSummary(row.id);
+  expect(fetcher).toHaveBeenCalledTimes(1);
+  const [failed] = await db.select().from(agent_briefing_snapshots);
+  expect(failed?.summary.status).toBe('failed');
+  expect(failed?.summary.error).toBe('generation_failed');
+});
+
 it('does not repeat a rate limit the gateway marks final', async () => {
   const { now } = await scheduled();
   await sweepAgentBriefings(now);

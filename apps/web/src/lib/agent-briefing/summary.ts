@@ -105,34 +105,14 @@ async function attemptBriefingSummary(
   init: RequestInit,
   timeoutMs: number
 ): Promise<BriefingSummaryAttempt> {
+  let response: Response;
   try {
-    const response = await fetch(url, { ...init, signal: AbortSignal.timeout(timeoutMs) });
-    if (!response.ok) {
-      // `x-should-retry: false` names a condition the gateway knows a repeat cannot
-      // change: an hour-long free-model limit, or a guardrail verdict. Only a
-      // transient status without that marker is worth another request.
-      const transient =
-        (TRANSIENT_GATEWAY_STATUSES.has(response.status) || response.status >= 500) &&
-        response.headers.get('x-should-retry') !== 'false';
-      const retryAfterMs = transient ? retryAfterDelayMs(response, Date.now()) : null;
-      // Release the unused body so the retry reuses the connection.
-      void response.body?.cancel().catch(() => {});
-      return {
-        kind: 'failure',
-        error: new Error('gateway_declined'),
-        retryable: transient,
-        retryAfterMs,
-      };
-    }
-    // A successful answer may already have been charged, so a body this code cannot
-    // read is terminal: it is never requested twice.
-    const parsed = responseSchema.parse(await response.json());
-    const text = parsed.choices[0]?.message.content;
-    if (!text?.trim()) throw new Error('invalid_summary');
-    return { kind: 'text', text };
+    response = await fetch(url, { ...init, signal: AbortSignal.timeout(timeoutMs) });
   } catch (error) {
     // `fetch` raises a TypeError for a reset or refused connection and for a DNS or
     // proxy answer; an abort surfaces as a TimeoutError or AbortError DOMException.
+    // Only this phase is repeated: a failure after the gateway answered could
+    // already have been charged.
     const aborted =
       error instanceof Error || error instanceof DOMException
         ? error.name === 'TimeoutError' || error.name === 'AbortError'
@@ -144,6 +124,29 @@ async function attemptBriefingSummary(
       retryAfterMs: null,
     };
   }
+  if (!response.ok) {
+    // `x-should-retry: false` names a condition the gateway knows a repeat cannot
+    // change: an hour-long free-model limit, or a guardrail verdict. Only a
+    // transient status without that marker is worth another request.
+    const transient =
+      (TRANSIENT_GATEWAY_STATUSES.has(response.status) || response.status >= 500) &&
+      response.headers.get('x-should-retry') !== 'false';
+    const retryAfterMs = transient ? retryAfterDelayMs(response, Date.now()) : null;
+    // Release the unused body so the retry reuses the connection.
+    void response.body?.cancel().catch(() => {});
+    return {
+      kind: 'failure',
+      error: new Error('gateway_declined'),
+      retryable: transient,
+      retryAfterMs,
+    };
+  }
+  // A successful answer may already have been charged, so a body this code cannot
+  // read is terminal: it throws past the retry loop instead of being requested twice.
+  const parsed = responseSchema.parse(await response.json());
+  const text = parsed.choices[0]?.message.content;
+  if (!text?.trim()) throw new Error('invalid_summary');
+  return { kind: 'text', text };
 }
 
 /**

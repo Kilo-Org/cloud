@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Demo điều khiển từ xa native",
+    "sessionsEmpty": "Chưa có phiên native nào",
+    "hosts": "Máy chủ trực tuyến",
+    "hostsEmpty": "Không có máy chủ trực tuyến",
+    "directory": "Thư mục làm việc",
+    "createSession": "Tạo phiên native",
+    "queueIfOffline": "Đưa lời nhắc vào hàng đợi nếu máy chủ ngoại tuyến",
+    "prompt": "Lời nhắc hoặc /command",
+    "localClear": "Xóa nội dung hiển thị cục bộ",
+    "abort": "Hủy lượt",
+    "failed": "Thao tác điều khiển từ xa native thất bại",
+    "creationUnknown": "Chưa rõ kết quả tạo phiên. Làm mới danh sách phiên trước khi thử lại.",
+    "commandFailed": "Lệnh gửi đến trình chạy thất bại",
+    "invalidReply": "Phản hồi từ trình chạy không hợp lệ",
+    "unsafeCommand": "Dùng /compact, /new, /skill, /models, /agents hoặc /clear (chỉ cục bộ).",
+    "status": "Kết nối: {{connection}} · Trình chạy: {{runner}}",
+    "presenceStatus": "Máy chủ: {{connection}}",
+    "commandStatus": "Trạng thái gửi lệnh: {{status}}",
+    "delivered": "Đã gửi đến nơi",
+    "expired": "Đã hết hạn"
+  },
   "common": {
     "cancel": "Hủy",
     "done": "Xong",

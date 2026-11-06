@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Àfihàn ìṣàkóso native CLI láti ọ̀nà jíjìn",
+    "sessionsEmpty": "Kò tíì sí ìgbà iṣẹ́ native",
+    "hosts": "Àwọn ẹ̀rọ agbàlejò tó wà lórí ayélujára",
+    "hostsEmpty": "Kò sí ẹ̀rọ agbàlejò lórí ayélujára",
+    "directory": "Àpò iṣẹ́",
+    "createSession": "Ṣẹ̀dá ìgbà iṣẹ́ native",
+    "queueIfOffline": "Fi ìbéèrè sí ìlà ìdúró bí ẹ̀rọ agbàlejò kò bá sí lórí ayélujára",
+    "prompt": "Ìbéèrè tàbí /command",
+    "localClear": "Nu ìwòye lórí ẹ̀rọ yìí",
+    "abort": "Dá ìyípo dúró",
+    "failed": "Ìṣàkóso native láti ọ̀nà jíjìn kùnà",
+    "creationUnknown": "A kò mọ àbájáde ìṣẹ̀dá. Sọ àwọn ìgbà iṣẹ́ di tuntun kí o tó gbìyànjú lẹ́ẹ̀kan sí i.",
+    "commandFailed": "Àṣẹ ètò ìṣiṣẹ́ CLI kùnà",
+    "invalidReply": "Ìdáhùn ètò ìṣiṣẹ́ CLI kò tọ́",
+    "unsafeCommand": "Lo /compact, /new, /skill, /models, /agents tàbí /clear (lórí ẹ̀rọ yìí nìkan).",
+    "status": "Àsopọ̀: {{connection}} · Ètò ìṣiṣẹ́ CLI: {{runner}}",
+    "presenceStatus": "Àwọn ẹ̀rọ agbàlejò: {{connection}}",
+    "commandStatus": "Ìfiránṣẹ́ àṣẹ: {{status}}",
+    "delivered": "Ti dé",
+    "expired": "Àkókò ti kọjá"
+  },
   "common": {
     "cancel": "Fagilé",
     "done": "Ó ti tán",

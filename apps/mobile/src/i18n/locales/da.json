@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Demo af native-fjernstyring",
+    "sessionsEmpty": "Ingen native-sessioner endnu",
+    "hosts": "Værter online",
+    "hostsEmpty": "Ingen værter online",
+    "directory": "Arbejdsmappe",
+    "createSession": "Opret native-session",
+    "queueIfOffline": "Sæt prompt i kø, hvis værten er offline",
+    "prompt": "Prompt eller /command",
+    "localClear": "Ryd lokal visning",
+    "abort": "Afbryd tur",
+    "failed": "Handling via native-fjernstyring mislykkedes",
+    "creationUnknown": "Resultatet af oprettelsen er ukendt. Opdater sessionerne, før du prøver igen.",
+    "commandFailed": "Runner-kommando mislykkedes",
+    "invalidReply": "Ugyldigt svar fra runner",
+    "unsafeCommand": "Brug /compact, /new, /skill, /models, /agents eller /clear (kun lokalt).",
+    "status": "Forbindelse: {{connection}} · Runner: {{runner}}",
+    "presenceStatus": "Værter: {{connection}}",
+    "commandStatus": "Kommandolevering: {{status}}",
+    "delivered": "Leveret",
+    "expired": "Udløbet"
+  },
   "common": {
     "cancel": "Annuller",
     "done": "Færdig",

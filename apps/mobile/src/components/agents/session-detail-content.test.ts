@@ -15,6 +15,7 @@ import { type Pressable } from 'react-native';
 import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import {
   type AssociatedPrData,
+  type CloudAgentSessionId,
   createSessionManager,
   createUserWebConnection,
   type KiloSessionId,
@@ -242,6 +243,7 @@ vi.mock('@/components/agents/mobile-session-manager', () => ({
 vi.mock('@/components/agents/session-follow-button', () => ({ SessionFollowButton: () => null }));
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 vi.mock('@/components/ui/icons', () => ({
+  AlertCircle: 'AlertCircle',
   Bot: 'Bot',
   ChevronDown: 'ChevronDown',
   CircleDot: 'CircleDot',
@@ -639,6 +641,8 @@ let goalMountOptions: {
 } = {};
 /** The PR `fetchSession` reports; `null` keeps the PR row off the screen. */
 let associatedPrMountOption: AssociatedPrData | null = null;
+/** The cloud-agent id `fetchSession` reports; `null` keeps the metadata kindless. */
+let fetchedCloudAgentSessionId: CloudAgentSessionId | null = null;
 const ASSOCIATED_PR: AssociatedPrData = {
   url: 'https://github.com/acme/repo/pull/42',
   number: 42,
@@ -810,6 +814,7 @@ beforeEach(() => {
   hideThinking.loaded = true;
   goalMountOptions = {};
   associatedPrMountOption = null;
+  fetchedCloudAgentSessionId = null;
   globalContext.organizationId = 'global-org';
   globalContext.setOrganizationId.mockClear();
   rootPageNextCursor = null;
@@ -927,7 +932,7 @@ async function mountDetails(
       await metadataReady;
       return {
         kiloSessionId: id,
-        cloudAgentSessionId: null,
+        cloudAgentSessionId: fetchedCloudAgentSessionId,
         title: sessionTitleOverride ?? `Root ${id}`,
         organizationId: options.sessionOrganizationId ?? null,
         profileId: options.sessionProfileId ?? null,
@@ -2151,6 +2156,9 @@ describe('session detail slow load', () => {
   // row. A lost transport now owns the body, so the skeleton is gone and the
   // failure is stated once, with the Retry that resolves it.
   it('replaces the skeleton with one retryable error when the agent transport is lost', async () => {
+    // A writable session: the composer this case inspects is a writable
+    // session's control.
+    goalMountOptions = { resolvedType: 'remote' };
     const view = await mountDetails(null);
     expect(view.renderer.root.findAllByType(SessionSkeletonMessages)).toHaveLength(1);
 
@@ -2189,6 +2197,7 @@ describe('session detail slow load', () => {
   it('resolves a lost transport whose indicator carries no error type', async () => {
     // The SDK's own code names the failure; the indicator's type must not decide
     // whether the skeleton keeps painting beside the connection-lost line.
+    goalMountOptions = { resolvedType: 'remote' };
     const view = await mountDetails(null);
     act(() => {
       view.store.set<SessionStatusIndicator | null, [SessionStatusIndicator | null], unknown>(
@@ -2234,6 +2243,60 @@ describe('session detail slow load', () => {
     expect(renderedText(view.renderer.root)).toContain('read-only row');
     expect(view.renderer.root.findAllByType(SessionReadOnlyFooterPlaceholder)).toHaveLength(0);
     expect(renderedText(view.renderer.root)).toContain(i18n.t('agentChat.session.readOnly'));
+    expect(view.renderer.root.findAll(node => Object.is(node.type, 'ChatComposer'))).toHaveLength(
+      0
+    );
+  });
+
+  it('holds the composer while the metadata names a cloud-agent session', async () => {
+    // The metadata read lands before the transport resolves, and it names the
+    // one kind that is writable by construction. The slot then holds the
+    // composer the screen ends in instead of the read-only footer it would
+    // replace.
+    fetchedCloudAgentSessionId = cloudAgentId('cag-fixture');
+    const view = await mountDetails(null);
+    act(() => {
+      view.store.set<
+        'cloud-agent' | 'read-only' | 'remote' | null,
+        ['cloud-agent' | 'read-only' | 'remote' | null],
+        unknown
+      >(view.manager.atoms.activeSessionType, null);
+      view.store.set(view.manager.atoms.isReadOnly, false);
+    });
+    expect(view.renderer.root.findAllByType(SessionSkeletonMessages)).toHaveLength(1);
+    expect(view.renderer.root.findAllByType(SessionComposerSkeleton)).toHaveLength(1);
+    expect(view.renderer.root.findAllByType(SessionReadOnlyFooterPlaceholder)).toHaveLength(0);
+  });
+
+  it('holds the read-only footer area while the open has not resolved the kind', async () => {
+    const view = await mountDetails(null);
+    // The transport has not answered, so no kind is known and the read-only
+    // fact is not set: the bottom slot must not offer a composer the session
+    // may never get.
+    act(() => {
+      view.store.set<
+        'cloud-agent' | 'read-only' | 'remote' | null,
+        ['cloud-agent' | 'read-only' | 'remote' | null],
+        unknown
+      >(view.manager.atoms.activeSessionType, null);
+      view.store.set(view.manager.atoms.isReadOnly, false);
+    });
+    expect(view.renderer.root.findAllByType(SessionSkeletonMessages)).toHaveLength(1);
+    expect(view.renderer.root.findAllByType(SessionReadOnlyFooterPlaceholder)).toHaveLength(1);
+    expect(view.renderer.root.findAllByType(SessionComposerSkeleton)).toHaveLength(0);
+    expect(view.renderer.root.findAll(node => Object.is(node.type, 'ChatComposer'))).toHaveLength(
+      0
+    );
+
+    // The stored session resolves read-only, so the footer lands on the area
+    // the loading state held instead of replacing a composer.
+    act(() => {
+      view.store.set(view.manager.atoms.activeSessionType, 'read-only');
+      view.store.set(view.manager.atoms.isReadOnly, true);
+    });
+    await view.respond(ROOT_ID, [childMessage(ROOT_ID, 'resolved read-only row')]);
+    expect(renderedText(view.renderer.root)).toContain('resolved read-only row');
+    expect(view.renderer.root.findAllByType(SessionReadOnlyFooterPlaceholder)).toHaveLength(0);
     expect(view.renderer.root.findAll(node => Object.is(node.type, 'ChatComposer'))).toHaveLength(
       0
     );
@@ -2551,6 +2614,8 @@ describe('session detail connection latch', () => {
 
 describe('session detail bottom strip', () => {
   it('keeps the home-indicator strip full-bleed (pure background, no side padding)', async () => {
+    // The strip backs the composer's area, so this is a writable session.
+    goalMountOptions = { resolvedType: 'remote' };
     const { renderer } = await mountDetails([]);
     const strips = renderer.root.findAll(node => Object.is(node.type, 'BlurBar'));
     expect(strips).toHaveLength(1);
@@ -3327,6 +3392,8 @@ describe('session detail exit retry row', () => {
       await Promise.resolve();
     });
 
+    // Exit lives on the composer, so this case needs a writable session.
+    goalMountOptions = { resolvedType: 'remote' };
     const view = await mountDetails([]);
     const composer = view.renderer.root.find(node => Object.is(node.type, 'ChatComposer'));
     const onExitSession = composer.props.onExitSession as (
@@ -3758,6 +3825,7 @@ describe('session detail composer cannot-send reason', () => {
     // The open fails, the transcript is empty and the manager cannot send. The
     // body states the failure once with the Retry that resolves it, so the
     // reason beside send does not name the same failure a second time.
+    goalMountOptions = { resolvedType: 'remote' };
     const view = await mountDetails([]);
     act(() => {
       view.store.set<boolean, [boolean], unknown>(view.manager.atoms.canSend, false);
@@ -3809,6 +3877,7 @@ describe('session detail composer cannot-send reason', () => {
   });
 
   it('passes no reason while the session can send', async () => {
+    goalMountOptions = { resolvedType: 'remote' };
     const view = await mountDetails([]);
     act(() => {
       view.store.set<boolean, [boolean], unknown>(view.manager.atoms.canSend, true);
@@ -4384,6 +4453,7 @@ describe('SessionDetailContent fixed indicator row', () => {
   );
 
   it('renders no footer item while the error card owns the empty transcript', async () => {
+    goalMountOptions = { resolvedType: 'remote' };
     const view = await mountDetails([]);
     act(() => {
       view.store.set<boolean, [boolean], unknown>(view.manager.atoms.canSend, false);
@@ -4412,14 +4482,23 @@ describe('SessionDetailContent fixed indicator row', () => {
   });
 
   it('states the cannot-send reason in the row with the row item typography', async () => {
-    // An empty read-only transcript keeps the composer, so its reason is the
-    // row's item.
+    // A writable session names the phase it is in beside the composer it keeps.
+    // (A read-only session has no composer to carry it: its continue section
+    // states the read-only fact instead.)
+    goalMountOptions = { resolvedType: 'remote' };
     const view = await mountDetails([]);
+    act(() => {
+      view.store.set<boolean, [boolean], unknown>(view.manager.atoms.canSend, false);
+      view.store.set<SessionStatusIndicator | null, [SessionStatusIndicator | null], unknown>(
+        view.manager.atoms.statusIndicator,
+        { type: 'progress', message: 'Committing changes', code: 'committing', timestamp: 0 }
+      );
+    });
     const items = footerRowItems(view);
     expect(items).toHaveLength(1);
     const reason = items[0];
     expect(Object.is(reason?.type, AccessibleStatus)).toBe(true);
-    expect(reason?.props.message).toBe(i18n.t('agentChat.session.readOnly'));
+    expect(reason?.props.message).toBe(i18n.t('agentChat.session.committing'));
     expect(reason?.props.maxFontSizeMultiplier).toBe(SEND_REASON_MAX_FONT_SCALE);
     const className = String(reason?.props.className ?? '');
     // The row's own typography, not the composer's narrower one: a shorter item
@@ -4484,6 +4563,47 @@ describe('session detail read-only composer', () => {
     );
   });
 
+  it('replaces the composer on an empty read-only transcript too', async () => {
+    // A stored session with no rows has nowhere to write either. The read-only
+    // fact is the resolved kind, so the composer must not mount beside it and
+    // the continue affordance must still be offered.
+    const view = await mountDetails([]);
+    await view.respond(ROOT_ID, []);
+    expect(view.renderer.root.findAll(node => Object.is(node.type, 'ChatComposer'))).toHaveLength(
+      0
+    );
+    const readOnlyCopy = renderedTextOutsideSheet(view.renderer.root)
+      .split('\n')
+      .filter(text => text === i18n.t('agentChat.session.readOnly'));
+    expect(readOnlyCopy).toHaveLength(1);
+    const continueControl = view.renderer.root.find(
+      node =>
+        Object.is(node.type, 'Button') &&
+        node.props.accessibilityLabel === i18n.t('agentChat.session.continueInNewSession')
+    );
+    expect(renderedText(continueControl)).toContain(
+      i18n.t('agentChat.session.continueInNewSession')
+    );
+  });
+
+  it('fills the continue control with the muted tone in dark mode', async () => {
+    // The footer's action is the only control on the screen: light fills it
+    // with the palette's olive, and dark must not fill it with the full brand
+    // accent, which glares as a full-width bar under the near-black page. Dark
+    // takes the lifted olive and its own label tone.
+    const view = await mountDetails([childMessage(ROOT_ID, 'shown row')]);
+    const continueControl = view.renderer.root.find(
+      node =>
+        Object.is(node.type, 'Button') &&
+        node.props.accessibilityLabel === i18n.t('agentChat.session.continueInNewSession')
+    );
+    expect(String(continueControl.props.className)).toContain('bg-primary');
+    expect(String(continueControl.props.className)).toContain('dark:bg-selection');
+    const label = continueControl.find(node => Object.is(node.type, 'Text'));
+    expect(String(label.props.className)).toContain('text-primary-foreground');
+    expect(String(label.props.className)).toContain('dark:text-selection-foreground');
+  });
+
   it('opens the new-session composer once on a repeated continue press', async () => {
     const view = await mountDetails([childMessage(ROOT_ID, 'shown row')]);
     const continueControl = view.renderer.root.find(
@@ -4521,6 +4641,7 @@ describe('session detail composer placeholder (explorer session-detail)', () => 
   // can pass is catalog copy, so the proof is that the mounted composer always
   // receives a non-empty catalog string — never 'undefined' and never a raw key.
   it('passes catalog copy to the composer, never the literal undefined', async () => {
+    goalMountOptions = { resolvedType: 'remote' };
     const view = await mountDetails([]);
     const composer = view.renderer.root.find(node => Object.is(node.type, 'ChatComposer'));
     expect(composer.props.placeholder).toBe(i18n.t('common.message'));
@@ -4543,6 +4664,7 @@ describe('session detail composer placeholder (explorer session-detail)', () => 
 
 describe('session detail composer mode chip', () => {
   it('hands the composer a mode control, because a session has modes', async () => {
+    goalMountOptions = { resolvedType: 'remote' };
     const view = await mountDetails([]);
     const composer = view.renderer.root.find(node => Object.is(node.type, 'ChatComposer'));
     expect(composer.props.modeControl).toMatchObject({

@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Urruneko demo natiboa",
+    "sessionsEmpty": "Oraindik ez dago saio natiborik",
+    "hosts": "Linean dauden ostalariak",
+    "hostsEmpty": "Ez dago ostalaririk linean",
+    "directory": "Abiarazte-direktorioa",
+    "createSession": "Sortu saio natiboa",
+    "queueIfOffline": "Jarri gonbita ilaran ostalaria lineaz kanpo badago",
+    "prompt": "Gonbita edo /command",
+    "localClear": "Garbitu ikuspegi lokala",
+    "abort": "Eten txanda",
+    "failed": "Urruneko ekintza natiboak huts egin du",
+    "creationUnknown": "Sorreraren emaitza ezezaguna da. Freskatu saioak berriro saiatu aurretik.",
+    "commandFailed": "Exekutatzailearen komandoak huts egin du",
+    "invalidReply": "Exekutatzailearen erantzun baliogabea",
+    "unsafeCommand": "Erabili /compact, /new, /skill, /models, /agents edo /clear (lokalki soilik).",
+    "status": "Konexioa: {{connection}} · Exekutatzailea: {{runner}}",
+    "presenceStatus": "Ostalariak: {{connection}}",
+    "commandStatus": "Komandoen bidalketa: {{status}}",
+    "delivered": "Entregatuta",
+    "expired": "Iraungita"
+  },
   "common": {
     "cancel": "Utzi",
     "done": "Eginda",

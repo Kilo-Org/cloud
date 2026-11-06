@@ -66,6 +66,28 @@
     "sourceBlocker": "Session needs attention",
     "sourceMetadata": "Captured session metadata"
   },
+  "nativeRemote": {
+    "title": "Native remote demo",
+    "sessionsEmpty": "No native sessions yet",
+    "hosts": "Online hosts",
+    "hostsEmpty": "No online hosts",
+    "directory": "Launch directory",
+    "createSession": "Create native session",
+    "queueIfOffline": "Queue prompt if host is offline",
+    "prompt": "Prompt or /command",
+    "localClear": "Clear local view",
+    "abort": "Abort turn",
+    "failed": "Native remote action failed",
+    "creationUnknown": "Creation outcome unknown. Refresh sessions before retrying.",
+    "commandFailed": "Runner command failed",
+    "invalidReply": "Invalid runner reply",
+    "unsafeCommand": "Use /compact, /new, /skill, /models, /agents or /clear (local only).",
+    "status": "Connection: {{connection}} · Runner: {{runner}}",
+    "presenceStatus": "Hosts: {{connection}}",
+    "commandStatus": "Command delivery: {{status}}",
+    "delivered": "Delivered",
+    "expired": "Expired"
+  },
   "common": {
     "cancel": "Cancel",
     "done": "Done",
@@ -2621,7 +2643,7 @@
       "failedToRender": "Failed to render content"
     },
     "messageFailure": {
-      "deliveryTitle": "Failed to deliver",
+      "deliveryTitle": "Message not sent",
       "deliveryInterrupted": "You stopped this message.",
       "deliveryExhausted": "We could not deliver this message after several attempts.",
       "deliveryExecution": "The agent could not run this message.",

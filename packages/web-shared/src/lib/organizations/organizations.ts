@@ -29,10 +29,14 @@ import {
 } from '@kilocode/db/schema';
 import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { auto_deleted_at, db, sql } from '@kilocode/web-shared/lib/drizzle';
-import { and, asc, desc, eq, isNull, gt, or } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull, gt, or } from 'drizzle-orm';
 import { TRIAL_DURATION_DAYS } from '@kilocode/web-shared/lib/constants';
 import { randomUUID } from 'crypto';
-import { getLowerDomainFromEmail, normalizeEmail } from '@kilocode/web-shared/lib/email-address';
+import {
+  getDeliveredEmailAddress,
+  getLowerDomainFromEmail,
+  normalizeEmail,
+} from '@kilocode/web-shared/lib/email-address';
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { resolveEffectiveOrganizationSsoPolicy } from './organization-sso-policy';
 import { classifyOrganizationEntitlement } from './trial-utils';
@@ -449,11 +453,33 @@ export async function updateUserRoleInOrganization(
 
     // If no membership was updated, check for pending invitations
     const [user] = await tx
-      .select({ email: kilocode_users.google_user_email })
+      .select({
+        email: kilocode_users.google_user_email,
+        normalizedEmail: kilocode_users.normalized_email,
+      })
       .from(kilocode_users)
       .where(eq(kilocode_users.id, userId));
 
     if (!user) {
+      return { success: false, updated: 'none' };
+    }
+
+    const pendingInvitations = await tx
+      .select({ id: organization_invitations.id, email: organization_invitations.email })
+      .from(organization_invitations)
+      .where(
+        and(
+          eq(organization_invitations.organization_id, organizationId),
+          isNull(organization_invitations.accepted_at),
+          gt(organization_invitations.expires_at, sql`NOW()`)
+        )
+      );
+
+    const invitationIds = pendingInvitations
+      .filter(invitation => invitationAddressesAccount(invitation.email, user))
+      .map(invitation => invitation.id);
+
+    if (invitationIds.length === 0) {
       return { success: false, updated: 'none' };
     }
 
@@ -462,8 +488,7 @@ export async function updateUserRoleInOrganization(
       .set({ role })
       .where(
         and(
-          eq(organization_invitations.organization_id, organizationId),
-          eq(organization_invitations.email, user.email),
+          inArray(organization_invitations.id, invitationIds),
           isNull(organization_invitations.accepted_at),
           gt(organization_invitations.expires_at, sql`NOW()`)
         )
@@ -485,29 +510,86 @@ export const CHILD_ORGANIZATION_INVITE_REQUIRES_PARENT_MEMBER =
 export const CHILD_ORGANIZATION_ACCEPT_REQUIRES_PARENT_MEMBER =
   'Only parent organization members can join a child organization.';
 
+/**
+ * The one relation that decides which account an invitation address belongs to:
+ * both addresses must have the same `normalizeEmail` form, so the dedupe,
+ * existing-member check, role change and acceptance treat a `+` alias, Gmail
+ * dots and casing as one person. The stored address itself keeps the spelling
+ * the inviter typed.
+ */
+function isSameInvitationAddress(invitationEmail: string, address: string): boolean {
+  return normalizeEmail(invitationEmail) === normalizeEmail(address);
+}
+
+/**
+ * `isSameInvitationAddress` for a stored account row. A row's stored normalized
+ * form is one more spelling of the same account, so an address change after
+ * signup does not make an invitation unclaimable.
+ */
+function invitationAddressesAccount(
+  invitationEmail: string,
+  account: { email: string; normalizedEmail: string | null }
+): boolean {
+  return (
+    isSameInvitationAddress(invitationEmail, account.email) ||
+    account.normalizedEmail === normalizeEmail(invitationEmail)
+  );
+}
+
+/**
+ * The account-matching relation for member rows. The query returns the rows that
+ * can match: the stored normalized form, a case variant of the address, and the
+ * rows that carry no stored normalized form. The relation itself decides. Rows
+ * without a stored normalized form are the only ones the database cannot narrow,
+ * and they are the legacy ones.
+ */
+async function organizationMembersMatchingEmail(
+  tx: DrizzleTransaction,
+  organizationId: Organization['id'],
+  email: string
+) {
+  const candidates = await tx
+    .select({
+      membershipId: organization_memberships.id,
+      userId: kilocode_users.id,
+      isBot: kilocode_users.is_bot,
+      email: kilocode_users.google_user_email,
+      normalizedEmail: kilocode_users.normalized_email,
+    })
+    .from(organization_memberships)
+    .innerJoin(kilocode_users, eq(kilocode_users.id, organization_memberships.kilo_user_id))
+    .where(
+      and(
+        eq(organization_memberships.organization_id, organizationId),
+        or(
+          eq(kilocode_users.normalized_email, normalizeEmail(email)),
+          isNull(kilocode_users.normalized_email),
+          sql`lower(${kilocode_users.google_user_email}) = ${getDeliveredEmailAddress(email)}`
+        )
+      )
+    );
+
+  return candidates.filter(candidate => invitationAddressesAccount(email, candidate));
+}
+
 async function parentOrganizationMemberIdForEmail(
   tx: DrizzleTransaction,
   parentOrganizationId: Organization['id'],
   email: string
 ): Promise<User['id'] | null> {
-  const [member] = await tx
-    .select({ userId: kilocode_users.id })
+  const members = await organizationMembersMatchingEmail(tx, parentOrganizationId, email);
+  const member = members.find(candidate => !candidate.isBot);
+  if (!member) return null;
+
+  // Re-read the row under a share lock: a membership removed between the read
+  // above and this statement no longer counts as a parent member.
+  const [lockedMembership] = await tx
+    .select({ id: organization_memberships.id })
     .from(organization_memberships)
-    .innerJoin(kilocode_users, eq(kilocode_users.id, organization_memberships.kilo_user_id))
-    .where(
-      and(
-        eq(organization_memberships.organization_id, parentOrganizationId),
-        eq(kilocode_users.is_bot, false),
-        or(
-          sql`lower(${kilocode_users.google_user_email}) = ${email.trim().toLowerCase()}`,
-          eq(kilocode_users.normalized_email, normalizeEmail(email))
-        )
-      )
-    )
-    .limit(1)
+    .where(eq(organization_memberships.id, member.membershipId))
     .for('share');
 
-  return member?.userId ?? null;
+  return lockedMembership ? member.userId : null;
 }
 
 export async function inviteUserToOrganization(
@@ -562,36 +644,24 @@ export async function inviteUserToOrganization(
       ssoSourceOrganizationId = policy.sourceOrganizationId;
     }
 
-    const existingInvitation = await tx
-      .select()
+    const pendingInvitations = await tx
+      .select({ email: organization_invitations.email })
       .from(organization_invitations)
       .where(
         and(
           eq(organization_invitations.organization_id, organizationId),
-          eq(organization_invitations.email, email),
           isNull(organization_invitations.accepted_at),
           gt(organization_invitations.expires_at, sql`NOW()`)
         )
-      )
-      .limit(1);
+      );
 
-    if (existingInvitation.length > 0) {
+    if (pendingInvitations.some(invitation => isSameInvitationAddress(invitation.email, email))) {
       throw new Error('User already has a pending invitation');
     }
 
-    const existingMember = await tx
-      .select()
-      .from(organization_memberships)
-      .innerJoin(kilocode_users, eq(kilocode_users.id, organization_memberships.kilo_user_id))
-      .where(
-        and(
-          eq(organization_memberships.organization_id, organizationId),
-          eq(kilocode_users.google_user_email, email)
-        )
-      )
-      .limit(1);
+    const existingMembers = await organizationMembersMatchingEmail(tx, organizationId, email);
 
-    if (existingMember.length > 0) {
+    if (existingMembers.length > 0) {
       throw new Error('User is already a member of this organization');
     }
 
@@ -762,8 +832,7 @@ export async function acceptOrganizationInvite(
 
       joinedDistinctId = acceptingUser.email;
 
-      const acceptedEmail = acceptingUser.normalizedEmail ?? normalizeEmail(acceptingUser.email);
-      if (acceptedEmail !== normalizeEmail(invitation.email)) {
+      if (!invitationAddressesAccount(invitation.email, acceptingUser)) {
         return failureResult('Invitation is for a different email address');
       }
 

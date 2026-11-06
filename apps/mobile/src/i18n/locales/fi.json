@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Natiivi etädemo",
+    "sessionsEmpty": "Ei vielä natiiveja istuntoja",
+    "hosts": "Verkossa olevat isännät",
+    "hostsEmpty": "Ei verkossa olevia isäntiä",
+    "directory": "Työhakemisto",
+    "createSession": "Luo natiivi istunto",
+    "queueIfOffline": "Lisää kehote jonoon, jos isäntä ei ole verkossa",
+    "prompt": "Kehote tai /command",
+    "localClear": "Tyhjennä paikallinen näkymä",
+    "abort": "Keskeytä vuoro",
+    "failed": "Natiivi etätoiminto epäonnistui",
+    "creationUnknown": "Luonnin lopputulos on tuntematon. Päivitä istunnot ennen kuin yrität uudelleen.",
+    "commandFailed": "Suorittajan komento epäonnistui",
+    "invalidReply": "Virheellinen vastaus suorittajalta",
+    "unsafeCommand": "Käytä komentoa /compact, /new, /skill, /models, /agents tai /clear (vain paikallisesti).",
+    "status": "Yhteys: {{connection}} · Suorittaja: {{runner}}",
+    "presenceStatus": "Isännät: {{connection}}",
+    "commandStatus": "Komennon toimitus: {{status}}",
+    "delivered": "Toimitettu",
+    "expired": "Vanhentunut"
+  },
   "common": {
     "cancel": "Peruuta",
     "done": "Valmis",

@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "دموی دسترسی از راه دور نیتیو",
+    "sessionsEmpty": "هنوز نشست نیتیو وجود ندارد",
+    "hosts": "میزبان‌های آنلاین",
+    "hostsEmpty": "میزبان آنلاینی وجود ندارد",
+    "directory": "پوشهٔ کاری",
+    "createSession": "ایجاد نشست نیتیو",
+    "queueIfOffline": "قرار دادن پرامپت در صف اگر میزبان آفلاین است",
+    "prompt": "پرامپت یا /command",
+    "localClear": "پاک کردن نمای محلی",
+    "abort": "لغو نوبت",
+    "failed": "عملیات دسترسی از راه دور نیتیو ناموفق بود",
+    "creationUnknown": "نتیجهٔ ایجاد نشست نامشخص است. پیش از تلاش دوباره، نشست‌ها را بازخوانی کنید.",
+    "commandFailed": "فرمان اجراگر ناموفق بود",
+    "invalidReply": "پاسخ اجراگر نامعتبر است",
+    "unsafeCommand": "از /compact، /new، /skill، /models، /agents یا /clear (فقط محلی) استفاده کنید.",
+    "status": "اتصال: {{connection}} · اجراگر: {{runner}}",
+    "presenceStatus": "میزبان‌ها: {{connection}}",
+    "commandStatus": "تحویل فرمان: {{status}}",
+    "delivered": "تحویل داده شد",
+    "expired": "منقضی شد"
+  },
   "common": {
     "cancel": "لغو",
     "done": "تمام",

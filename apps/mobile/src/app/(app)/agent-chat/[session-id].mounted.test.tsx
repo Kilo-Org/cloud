@@ -299,6 +299,7 @@ vi.mock('@/components/agents/session-detail-content', async () => {
 vi.mock('@/components/agents/session-detail-skeleton', () => ({
   SessionSkeletonMessages: 'SessionSkeletonMessages',
   SessionComposerSkeleton: 'SessionComposerSkeleton',
+  SessionReadOnlyFooterPlaceholder: 'SessionReadOnlyFooterPlaceholder',
 }));
 
 vi.mock('@/components/agents/session-context-metrics', () => ({
@@ -796,7 +797,11 @@ describe('SessionDetailScreen metadata read that cannot settle', () => {
     queryState.fetchStatus = 'fetching';
     const renderer = await mountRoute();
 
-    expect(findByType(renderer.root, 'SessionComposerSkeleton')).toHaveLength(1);
+    // Nothing has resolved the session's kind, so the bottom slot reserves the
+    // read-only footer's shape instead of offering a composer the session may
+    // not get.
+    expect(findByType(renderer.root, 'SessionReadOnlyFooterPlaceholder')).toHaveLength(1);
+    expect(findByType(renderer.root, 'SessionComposerSkeleton')).toHaveLength(0);
     expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(0);
 
     // The same threshold the session body applies to a stalled transport.
@@ -805,6 +810,7 @@ describe('SessionDetailScreen metadata read that cannot settle', () => {
     });
 
     expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
+    expect(findByType(renderer.root, 'SessionReadOnlyFooterPlaceholder')).toHaveLength(0);
     expect(findByType(renderer.root, 'SessionComposerSkeleton')).toHaveLength(0);
   });
 
@@ -1566,7 +1572,10 @@ describe('SessionDetailScreen identity confirmation feedback', () => {
       expect(propOf(header, 'title')).toBeTruthy();
       expect(propOf(header, 'title')).not.toBe('Account A private title');
       expect(findByType(renderer.root, 'SessionSkeletonMessages')).toHaveLength(1);
-      expect(findByType(renderer.root, 'SessionComposerSkeleton')).toHaveLength(1);
+      // The account is unconfirmed, so no metadata has named the session's
+      // kind: the bottom slot reserves the read-only footer's shape.
+      expect(findByType(renderer.root, 'SessionReadOnlyFooterPlaceholder')).toHaveLength(1);
+      expect(findByType(renderer.root, 'SessionComposerSkeleton')).toHaveLength(0);
       expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(0);
       expect(findByType(renderer.root, 'QueryError')).toHaveLength(0);
       expect(
@@ -1580,6 +1589,23 @@ describe('SessionDetailScreen identity confirmation feedback', () => {
       expect(queryEnabled()).toBe(false);
     }
   );
+
+  it('holds the composer while the remote-spawn open waits for its new session', async () => {
+    // A `kilo remote` spawn has no row to read yet (the ingest one the retry
+    // below waits for), but the spawn itself is the writer: the account window
+    // holds the composer the spawned session ends in.
+    queryState.data = null;
+    useLocalSearchParamsMock.mockReturnValue({
+      'session-id': 'ses_12345678901234567890123456',
+      spawned: '1',
+    });
+    const renderer = await mountRoute(
+      createElement('RouteAndSibling', null, createElement(SessionDetailScreen))
+    );
+
+    expect(findByType(renderer.root, 'SessionComposerSkeleton')).toHaveLength(1);
+    expect(findByType(renderer.root, 'SessionReadOnlyFooterPlaceholder')).toHaveLength(0);
+  });
 
   it('keeps repeated failures recoverable and opens current root and child rows after user Retry', async () => {
     const repeatedFailure = Promise.withResolvers<{ id: string }>();

@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Native demo op afstand",
+    "sessionsEmpty": "Nog geen native sessies",
+    "hosts": "Online hosts",
+    "hostsEmpty": "Geen online hosts",
+    "directory": "Werkmap",
+    "createSession": "Native sessie aanmaken",
+    "queueIfOffline": "Prompt in de wachtrij zetten als host offline is",
+    "prompt": "Prompt of /command",
+    "localClear": "Lokale weergave wissen",
+    "abort": "Beurt afbreken",
+    "failed": "Native actie op afstand mislukt",
+    "creationUnknown": "Resultaat van aanmaken onbekend. Vernieuw de sessies voordat je het opnieuw probeert.",
+    "commandFailed": "Runner-opdracht mislukt",
+    "invalidReply": "Ongeldig antwoord van runner",
+    "unsafeCommand": "Gebruik /compact, /new, /skill, /models, /agents of /clear (alleen lokaal).",
+    "status": "Verbinding: {{connection}} · Runner: {{runner}}",
+    "presenceStatus": "Hosts: {{connection}}",
+    "commandStatus": "Opdrachtbezorging: {{status}}",
+    "delivered": "Bezorgd",
+    "expired": "Verlopen"
+  },
   "common": {
     "cancel": "Annuleren",
     "done": "Klaar",

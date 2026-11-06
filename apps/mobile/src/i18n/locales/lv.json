@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Natīvā attālā demonstrācija",
+    "sessionsEmpty": "Vēl nav natīvo sesiju",
+    "hosts": "Resursdatori tiešsaistē",
+    "hostsEmpty": "Nav resursdatoru tiešsaistē",
+    "directory": "Darba direktorija",
+    "createSession": "Izveidot natīvo sesiju",
+    "queueIfOffline": "Ievietot uzvedni rindā, ja resursdators ir bezsaistē",
+    "prompt": "Uzvedne vai /command",
+    "localClear": "Notīrīt lokālo skatu",
+    "abort": "Pārtraukt gājienu",
+    "failed": "Natīvā attālā darbība neizdevās",
+    "creationUnknown": "Izveides rezultāts nav zināms. Pirms atkārtota mēģinājuma atsvaidzināt sesijas.",
+    "commandFailed": "Izpildītāja komanda neizdevās",
+    "invalidReply": "Nederīga izpildītāja atbilde",
+    "unsafeCommand": "Izmantot /compact, /new, /skill, /models, /agents vai /clear (tikai lokāli).",
+    "status": "Savienojums: {{connection}} · Izpildītājs: {{runner}}",
+    "presenceStatus": "Resursdatori: {{connection}}",
+    "commandStatus": "Komandas piegāde: {{status}}",
+    "delivered": "Piegādāts",
+    "expired": "Termiņš beidzies"
+  },
   "common": {
     "cancel": "Atcelt",
     "done": "Gatavs",

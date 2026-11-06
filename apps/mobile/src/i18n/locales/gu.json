@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "નેટિવ રિમોટ ડેમો",
+    "sessionsEmpty": "હજી સુધી કોઈ નેટિવ સત્ર નથી",
+    "hosts": "ઓનલાઇન હોસ્ટ",
+    "hostsEmpty": "કોઈ ઓનલાઇન હોસ્ટ નથી",
+    "directory": "લોન્ચ ડિરેક્ટરી",
+    "createSession": "નેટિવ સત્ર બનાવો",
+    "queueIfOffline": "હોસ્ટ ઓફલાઇન હોય તો પ્રોમ્પ્ટ કતારમાં મૂકો",
+    "prompt": "પ્રોમ્પ્ટ અથવા /command",
+    "localClear": "સ્થાનિક દૃશ્ય સાફ કરો",
+    "abort": "ટર્ન અટકાવો",
+    "failed": "નેટિવ રિમોટ ક્રિયા નિષ્ફળ ગઈ",
+    "creationUnknown": "સત્ર બન્યું કે નહીં તે જાણી શકાયું નથી. ફરી પ્રયાસ કરતા પહેલાં સત્રો ફરી લોડ કરો.",
+    "commandFailed": "રનર આદેશ નિષ્ફળ ગયો",
+    "invalidReply": "રનરનો અમાન્ય જવાબ",
+    "unsafeCommand": "/compact, /new, /skill, /models, /agents અથવા /clear (ફક્ત સ્થાનિક) નો ઉપયોગ કરો.",
+    "status": "કનેક્શન: {{connection}} · રનર: {{runner}}",
+    "presenceStatus": "હોસ્ટ: {{connection}}",
+    "commandStatus": "આદેશ ડિલિવરી: {{status}}",
+    "delivered": "પહોંચાડાયું",
+    "expired": "સમયસીમા સમાપ્ત"
+  },
   "common": {
     "cancel": "રદ કરો",
     "done": "પૂર્ણ",

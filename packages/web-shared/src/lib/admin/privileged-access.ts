@@ -58,6 +58,7 @@ export type AdminStepUpState =
 export type SupportGrantSlot = {
   grantId: string;
   organizationId: string;
+  actionClass: 'support_read' | 'support_write';
   expiresAt: string;
 };
 

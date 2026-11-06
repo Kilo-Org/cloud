@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Demo vir natiewe afstandbeheer",
+    "sessionsEmpty": "Nog geen natiewe sessies nie",
+    "hosts": "Aanlyn gashere",
+    "hostsEmpty": "Geen aanlyn gashere nie",
+    "directory": "Werkmap",
+    "createSession": "Skep natiewe sessie",
+    "queueIfOffline": "Plaas instruksie in die tou as die gasheer vanlyn is",
+    "prompt": "Instruksie of /command",
+    "localClear": "Maak plaaslike aansig skoon",
+    "abort": "Breek beurt af",
+    "failed": "Natiewe afstandaksie het misluk",
+    "creationUnknown": "Uitkoms van skepping onbekend. Verfris sessies voordat jy weer probeer.",
+    "commandFailed": "Bevel aan uitvoerproses het misluk",
+    "invalidReply": "Ongeldige antwoord van uitvoerproses",
+    "unsafeCommand": "Gebruik /compact, /new, /skill, /models, /agents of /clear (slegs plaaslik).",
+    "status": "Verbinding: {{connection}} · Uitvoerproses: {{runner}}",
+    "presenceStatus": "Gashere: {{connection}}",
+    "commandStatus": "Bevelaflewering: {{status}}",
+    "delivered": "Afgelewer",
+    "expired": "Verval"
+  },
   "common": {
     "cancel": "Kanselleer",
     "done": "Klaar",

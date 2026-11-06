@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Demo remota nativa",
+    "sessionsEmpty": "Ancora nessuna sessione nativa",
+    "hosts": "Host online",
+    "hostsEmpty": "Nessun host online",
+    "directory": "Directory di lavoro",
+    "createSession": "Crea sessione nativa",
+    "queueIfOffline": "Metti in coda il prompt se l'host è offline",
+    "prompt": "Prompt o /command",
+    "localClear": "Svuota vista locale",
+    "abort": "Interrompi turno",
+    "failed": "Azione remota nativa non riuscita",
+    "creationUnknown": "Esito della creazione sconosciuto. Aggiorna le sessioni prima di riprovare.",
+    "commandFailed": "Comando del runner non riuscito",
+    "invalidReply": "Risposta del runner non valida",
+    "unsafeCommand": "Usa /compact, /new, /skill, /models, /agents o /clear (solo locale).",
+    "status": "Connessione: {{connection}} · Runner: {{runner}}",
+    "presenceStatus": "Host: {{connection}}",
+    "commandStatus": "Consegna comando: {{status}}",
+    "delivered": "Consegnato",
+    "expired": "Scaduto"
+  },
   "common": {
     "cancel": "Annulla",
     "done": "Fatto",

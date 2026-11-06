@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Natiivse kaugjuhtimise demo",
+    "sessionsEmpty": "Natiivseid seansse veel pole",
+    "hosts": "Võrgus olevad hostid",
+    "hostsEmpty": "Võrgus olevaid hoste pole",
+    "directory": "Töökataloog",
+    "createSession": "Loo natiivne seanss",
+    "queueIfOffline": "Pane viip järjekorda, kui host pole võrgus",
+    "prompt": "Viip või /command",
+    "localClear": "Tühjenda kohalik vaade",
+    "abort": "Katkesta käik",
+    "failed": "Natiivne kaugtoiming ebaõnnestus",
+    "creationUnknown": "Loomise tulemus on teadmata. Värskenda seansse enne uuesti proovimist.",
+    "commandFailed": "Käivitaja käsk ebaõnnestus",
+    "invalidReply": "Vigane käivitaja vastus",
+    "unsafeCommand": "Kasuta käske /compact, /new, /skill, /models, /agents või /clear (ainult kohalikult).",
+    "status": "Ühendus: {{connection}} · Käivitaja: {{runner}}",
+    "presenceStatus": "Hostid: {{connection}}",
+    "commandStatus": "Käsu edastamine: {{status}}",
+    "delivered": "Edastatud",
+    "expired": "Aegunud"
+  },
   "common": {
     "cancel": "Tühista",
     "done": "Valmis",

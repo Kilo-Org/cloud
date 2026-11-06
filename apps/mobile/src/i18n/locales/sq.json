@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Demo e kontrollit në distancë me protokollin native",
+    "sessionsEmpty": "Ende nuk ka sesione native",
+    "hosts": "Hoste në linjë",
+    "hostsEmpty": "Nuk ka hoste në linjë",
+    "directory": "Dosja e punës",
+    "createSession": "Krijo sesion native",
+    "queueIfOffline": "Vendose udhëzimin në radhë nëse hosti është jashtë linje",
+    "prompt": "Udhëzim ose /command",
+    "localClear": "Pastro pamjen lokale",
+    "abort": "Ndërprit radhën",
+    "failed": "Veprimi në distancë me protokollin native dështoi",
+    "creationUnknown": "Rezultati i krijimit nuk dihet. Rifresko sesionet para se të provosh përsëri.",
+    "commandFailed": "Komanda e ekzekutuesit dështoi",
+    "invalidReply": "Përgjigje e pavlefshme nga ekzekutuesi",
+    "unsafeCommand": "Përdor /compact, /new, /skill, /models, /agents ose /clear (vetëm lokalisht).",
+    "status": "Lidhja: {{connection}} · Ekzekutuesi: {{runner}}",
+    "presenceStatus": "Hostet: {{connection}}",
+    "commandStatus": "Dorëzimi i komandës: {{status}}",
+    "delivered": "Dorëzuar",
+    "expired": "Skaduar"
+  },
   "common": {
     "cancel": "Anulo",
     "done": "U krye",

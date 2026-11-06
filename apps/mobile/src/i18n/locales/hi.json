@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "नेटिव रिमोट डेमो",
+    "sessionsEmpty": "अभी तक कोई नेटिव सत्र नहीं है",
+    "hosts": "ऑनलाइन होस्ट",
+    "hostsEmpty": "कोई ऑनलाइन होस्ट नहीं है",
+    "directory": "कार्यशील डायरेक्टरी",
+    "createSession": "नेटिव सत्र बनाएँ",
+    "queueIfOffline": "होस्ट ऑफ़लाइन होने पर प्रॉम्प्ट कतार में रखें",
+    "prompt": "प्रॉम्प्ट या /command",
+    "localClear": "स्थानीय दृश्य साफ़ करें",
+    "abort": "टर्न रोकें",
+    "failed": "नेटिव रिमोट कार्रवाई विफल रही",
+    "creationUnknown": "सत्र बना या नहीं, यह पता नहीं है। फिर से कोशिश करने से पहले सत्र रीफ़्रेश करें।",
+    "commandFailed": "रनर कमांड विफल रहा",
+    "invalidReply": "रनर का उत्तर अमान्य है",
+    "unsafeCommand": "/compact, /new, /skill, /models, /agents या /clear (केवल स्थानीय) का उपयोग करें।",
+    "status": "कनेक्शन: {{connection}} · रनर: {{runner}}",
+    "presenceStatus": "होस्ट: {{connection}}",
+    "commandStatus": "कमांड डिलीवरी: {{status}}",
+    "delivered": "पहुँचाया गया",
+    "expired": "समय समाप्त"
+  },
   "common": {
     "cancel": "रद्द करें",
     "done": "हो गया",

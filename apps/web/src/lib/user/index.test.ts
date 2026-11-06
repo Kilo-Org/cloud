@@ -47,6 +47,8 @@ import {
   kiloclaw_image_catalog,
   security_findings,
   security_finding_notifications,
+  support_access_grants,
+  support_access_grant_events,
   security_remediation_attempts,
   security_remediations,
   security_analysis_queue,
@@ -351,6 +353,8 @@ describe('User', () => {
     await db.delete(github_app_installations);
     await db.delete(byoc_connections);
     await db.delete(enkrypt_usage);
+    await db.delete(support_access_grant_events);
+    await db.delete(support_access_grants);
     await db.delete(organizations);
     await db.delete(cli_sessions_v2);
     await db.delete(kilocode_users);
@@ -1330,6 +1334,62 @@ describe('User', () => {
       expect(
         await db.query.kilocode_users.findFirst({ where: eq(kilocode_users.id, retry.user.id) })
       ).toBeDefined();
+    });
+
+    it('creates the account without an IP when a trusted path skips admission', async () => {
+      // SCIM directory-sync provisioning has no end user and no forwarded IP.
+      // Without the skip this fails closed with SIGNUP-UNAVAILABLE, which would
+      // block every directory-provisioned account in production.
+      const email = 'skip-admission@example.com';
+      const args = {
+        google_user_email: email,
+        google_user_name: 'Skip Admission',
+        google_user_image_url: '',
+        hosted_domain: null,
+        provider: 'workos' as const,
+        provider_account_id: 'workos-skip-admission',
+      };
+
+      const result = await createOrUpdateUser(
+        args,
+        undefined,
+        true,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        { skipSignupAdmission: true }
+      );
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.isNew).toBe(true);
+      // Admission is the only gate skipped: the account is still fully provisioned.
+      expect(createStripeCustomer).toHaveBeenCalledTimes(1);
+      expect(mockSignupDecide).not.toHaveBeenCalled();
+      expect(
+        await db.query.kilocode_users.findFirst({ where: eq(kilocode_users.id, result.user.id) })
+      ).toBeDefined();
+    });
+
+    it('still rejects a request with no IP when admission is not skipped', async () => {
+      // The guard against the skip becoming the default.
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: 'no-ip-no-skip@example.com',
+          google_user_name: 'No IP No Skip',
+          google_user_image_url: '',
+          hosted_domain: null,
+          provider: 'google' as const,
+          provider_account_id: 'google-no-ip-no-skip',
+        },
+        undefined,
+        false
+      );
+
+      expect(result).toEqual({ success: false, error: 'SIGNUP-UNAVAILABLE' });
+      expect(createStripeCustomer).not.toHaveBeenCalled();
     });
 
     it.each([undefined, '', 'not-a-digest', 'has space', 'a'.repeat(129)])(
@@ -2510,6 +2570,48 @@ describe('User', () => {
   });
 
   describe('softDeleteUser', () => {
+    it('revokes the actor open support access grants and records events', async () => {
+      const admin = await insertTestUser({
+        is_admin: true,
+      });
+      const owner = await insertTestUser({ is_admin: false });
+      const organization = await createTestOrganization(
+        `soft-delete-support-${crypto.randomUUID()}`,
+        owner.id,
+        0
+      );
+      const now = new Date();
+      const [grant] = await db
+        .insert(support_access_grants)
+        .values({
+          actor_kilo_user_id: admin.id,
+          organization_id: organization.id,
+          action_class: 'support_read',
+          status: 'active',
+          reason: 'investigating a customer report',
+          requested_duration_seconds: 1800,
+          issued_at: now.toISOString(),
+          expires_at: new Date(now.getTime() + 30 * 60 * 1000).toISOString(),
+        })
+        .returning();
+
+      await softDeleteUser(admin.id);
+
+      const [revoked] = await db
+        .select()
+        .from(support_access_grants)
+        .where(eq(support_access_grants.id, grant.id));
+      expect(revoked).toMatchObject({
+        status: 'revoked',
+        revoke_reason: 'actor account soft-deleted',
+      });
+      const events = await db
+        .select()
+        .from(support_access_grant_events)
+        .where(eq(support_access_grant_events.grant_id, grant.id));
+      expect(events).toEqual([expect.objectContaining({ event_type: 'revoked' })]);
+    });
+
     it('removes session step-up rows', async () => {
       const user = await insertTestUser();
       const [credential] = await db

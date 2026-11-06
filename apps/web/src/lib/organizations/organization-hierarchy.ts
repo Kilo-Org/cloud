@@ -99,10 +99,25 @@ export async function validateParentOrganizationChange(
   }
 }
 
+/**
+ * Directory-sync bindings, written in the same statement as the row.
+ *
+ * They have to land inside this function's transaction. Stripe provisioning
+ * runs after it commits and can fail, so a binding written afterwards leaves a
+ * live sub-organization carrying none of these columns — invisible to the
+ * lookups keyed on them, and duplicated by every retry.
+ */
+export type DirectoryOrganizationBinding = {
+  directory_id: string;
+  directory_group_id: string;
+  directory_idp_id: string;
+};
+
 export async function createChildOrganization(
   name: string,
   parentOrganizationId: string,
-  userId?: string
+  userId?: string,
+  directoryBinding?: DirectoryOrganizationBinding
 ) {
   const organization = await db.transaction(async tx => {
     await tx.execute(sql`SELECT pg_advisory_xact_lock(20260624, 1)`);
@@ -136,6 +151,7 @@ export async function createChildOrganization(
           code_indexing_enabled: true,
           ...childOrganizationSettings,
         },
+        ...directoryBinding,
       })
       .returning();
 

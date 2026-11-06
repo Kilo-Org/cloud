@@ -8,15 +8,22 @@ const SUMMARY_COMMENT_ENDPOINTS = ['repos/*/issues/*/comments', 'repos/*/issues/
 
 const SUMMARY_WRITE_FLAGS = ['--method', '-X', '--input', '-f', '-F', '--field', '--raw-field'];
 
+/** A graphql request names its operation in the command text or in a provided body. */
+const GRAPHQL_ENDPOINT = 'graphql';
+
+const GRAPHQL_WRITE_MARKERS = ['mutation', '--input', '=@'];
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 /**
- * Denies summary-comment writes through `gh` in any flag order. The CLI matcher
- * anchors whole-command globs and lets the last matching pattern win, so each
- * write flag is denied with the endpoint both before and after it. Paginated
- * reads and inline review writes on pull review endpoints are untouched.
+ * Comment writes on the reviewed pull request belong to the trusted publisher.
+ * The map denies every `gh` form that creates or edits a conversation comment,
+ * in any flag order. The CLI matcher anchors whole-command globs and lets the
+ * last matching pattern win, so a rule appended here overrides an earlier
+ * allow. Paginated reads, inline review writes on pull review endpoints, and
+ * inline read-only graphql queries stay allowed.
  */
 export function buildGitHubReviewBashDenies(): Record<string, string> {
   const denies: Record<string, string> = {};
@@ -27,6 +34,14 @@ export function buildGitHubReviewBashDenies(): Record<string, string> {
       denies[`gh api ${endpoint}* ${flag}*`] = 'deny';
     }
   }
+  for (const marker of GRAPHQL_WRITE_MARKERS) {
+    denies[`gh api *${GRAPHQL_ENDPOINT}*${marker}*`] = 'deny';
+    denies[`gh api *${marker}*${GRAPHQL_ENDPOINT}*`] = 'deny';
+  }
+  // A pull request is an issue, so both comment subcommands reach the same
+  // conversation comment.
+  denies['gh issue comment'] = 'deny';
+  denies['gh issue comment *'] = 'deny';
   denies['gh pr comment'] = 'deny';
   denies['gh pr comment *'] = 'deny';
   return denies;

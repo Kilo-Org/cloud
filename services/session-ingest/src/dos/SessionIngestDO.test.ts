@@ -873,10 +873,13 @@ describe('SessionIngestDO live activity + cost persist', () => {
       }),
       get: vi.fn(() => {
         if (selectKind === 'row_exists') {
-          // The cut test: is there a stored row older than the cursor the scan stopped at?
+          // The cut test: is there a counted row (message or part) older than the cursor the
+          // scan stopped at?
           const cursor = boundNumbers[0];
           return [...itemRows.values()].some(
-            row => row.item_type !== 'session_diff' && (cursor === undefined || row.id < cursor)
+            row =>
+              (row.item_type === 'message' || row.item_type === 'part') &&
+              (cursor === undefined || row.id < cursor)
           )
             ? { id: 1 }
             : undefined;

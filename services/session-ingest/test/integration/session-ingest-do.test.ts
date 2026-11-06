@@ -4252,9 +4252,13 @@ describe('SessionIngestDO integration', () => {
       const observed = await runAlarmCountingRows(stub);
 
       expect(observed.emitted).toHaveLength(1);
+      // The two anchor rows are older than every message row; the read still reports them.
       expect(observed.emitted[0]).toMatchObject({
         metricsBounded: false,
         totalTurns: SESSION_METRICS_WINDOW_MAX_ROWS,
+        platform: 'cli',
+        organizationId: 'org_metrics_exact',
+        sessionDurationMs: 60_000,
       });
 
       await stub.clear();

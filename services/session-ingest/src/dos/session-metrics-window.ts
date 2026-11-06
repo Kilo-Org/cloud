@@ -1,4 +1,4 @@
-import { and, desc, inArray, lt, ne, notInArray, sql } from 'drizzle-orm';
+import { and, desc, inArray, lt, ne, sql } from 'drizzle-orm';
 import type { DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 
 import { ingestItems } from '../db/sqlite-schema';
@@ -24,6 +24,12 @@ const SESSION_METRICS_WINDOW_BATCH_ROWS = 16;
  * only part of a session still reports them.
  */
 const ANCHOR_ITEM_IDS = ['session', 'kilo_meta'] as const;
+
+/**
+ * The item types the aggregation counts: `computeSessionMetrics` derives every figure from
+ * `message` and `part` rows.
+ */
+const COUNTED_ITEM_TYPES = ['message', 'part'] as const;
 
 export type SessionMetricsWindowRow = { item_type: string; item_data: string };
 
@@ -125,11 +131,12 @@ export function readSessionMetricsWindow(db: DrizzleSqliteDODatabase): SessionMe
   const rowsBeyondCeiling =
     rowsRead >= SESSION_METRICS_WINDOW_MAX_ROWS &&
     lastRowId !== null &&
-    hasRowOlderThan(db, lastRowId);
+    hasOlderCountedRow(db, lastRowId);
   const bounded = stoppedForBudget || droppedBody || rowsBeyondCeiling;
-  if (bounded) {
-    for (const row of readAnchorRows(db, seenItemIds)) rows.push(row);
-  }
+  // The anchors sit at their original row ids, so a long session pushes them below the read's
+  // window; reading them by item id keeps the session duration, platform and organization in
+  // the record whatever the read covered. Rows the read counted are deduplicated by item id.
+  for (const row of readAnchorRows(db, seenItemIds)) rows.push(row);
 
   rows.sort((left, right) => left.id - right.id);
   return {
@@ -139,17 +146,17 @@ export function readSessionMetricsWindow(db: DrizzleSqliteDODatabase): SessionMe
   };
 }
 
-function hasRowOlderThan(db: DrizzleSqliteDODatabase, id: number): boolean {
+/**
+ * Whether a stored row the aggregation counts (`message` or `part`) still sits below the read's
+ * cursor. Single-row metadata items (`session`, `kilo_meta`, `model`, lifecycle and status
+ * items) are not counted figures: the scan reads them by their unique item id, so their age
+ * never makes a read partial.
+ */
+function hasOlderCountedRow(db: DrizzleSqliteDODatabase, id: number): boolean {
   const row = db
     .select({ id: ingestItems.id })
     .from(ingestItems)
-    .where(
-      and(
-        ne(ingestItems.item_type, 'session_diff'),
-        notInArray(ingestItems.item_id, [...ANCHOR_ITEM_IDS]),
-        lt(ingestItems.id, id)
-      )
-    )
+    .where(and(inArray(ingestItems.item_type, COUNTED_ITEM_TYPES), lt(ingestItems.id, id)))
     .limit(1)
     .get();
   return row !== undefined;

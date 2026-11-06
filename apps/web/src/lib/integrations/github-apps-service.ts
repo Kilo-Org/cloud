@@ -347,6 +347,13 @@ export async function updateModel(
         ? thinkingEffortInput.trim()
         : null;
 
+  // No server-side variant check: this mutation has no cheap catalog source,
+  // and the write path (the integration UI) already validates the effort
+  // against the selected model's variants. Residual risk: a direct tRPC caller
+  // can still store an unadvertised token, and a catalog that later drops a
+  // stored variant leaves it applied until it is cleared in the UI. The bot
+  // then forwards it to the Cloud Agent; this code does not verify how that
+  // layer handles a variant the model does not advertise.
   await updateIntegrationMetadataForOwner(
     owner,
     PLATFORM.GITHUB,

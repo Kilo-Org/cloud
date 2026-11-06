@@ -1312,6 +1312,76 @@ describe('workspace DO-only session transport', () => {
   beforeEach(() => jest.useFakeTimers());
   afterEach(() => jest.useRealTimers());
 
+  it('retains an orphan environment step snapshot when bootstrap repeats its event id and cursor', async () => {
+    const { manager, store } = workspaceManager();
+    const base = {
+      version: 2,
+      attemptId: 'attempt-1',
+      triggerMessageId: 'msg_002',
+      step: 'environment_snapshot',
+      message: 'Preparation snapshot',
+    };
+    const stepSnapshot = {
+      id: 'phase:environment_snapshot',
+      key: 'environment_snapshot',
+      kind: 'phase',
+      label: 'Environment snapshot',
+      status: 'completed',
+      startedAt: 1_100,
+      completedAt: 1_500,
+      revision: 3,
+      latestDetail: 'Environment restored',
+    };
+    const step = {
+      ...base,
+      action: 'step_snapshot',
+      revision: 3,
+      timestamp: 1_500,
+      stepId: stepSnapshot.id,
+      stepSnapshot,
+    };
+    const send = (eventId: number, cursor: number, data: Record<string, unknown>) => {
+      mockWs.onmessage?.({
+        data: JSON.stringify({
+          eventId,
+          cursor,
+          sessionId: workspaceId,
+          streamEventType: 'preparing',
+          timestamp: '2026-11-06T11:00:00.000Z',
+          data,
+        }),
+      } as MessageEvent);
+    };
+    try {
+      await manager.switchSession(routeId);
+      await jest.advanceTimersByTimeAsync(0);
+      mockWs.onopen?.(new Event('open'));
+      send(21, 13, step);
+      send(20, 14, {
+        ...base,
+        action: 'attempt_snapshot',
+        revision: 4,
+        timestamp: 2_000,
+        attempt: {
+          id: base.attemptId,
+          triggerMessageId: base.triggerMessageId,
+          status: 'completed',
+          startedAt: 1_000,
+          completedAt: 2_000,
+          revision: 4,
+        },
+      });
+      sync(14, 'connected', true);
+      send(21, 13, step);
+      sync(14, 'bootstrap.complete');
+      expect(store.get(manager.atoms.preparationAttempts)).toMatchObject([
+        { id: base.attemptId, status: 'completed', steps: [stepSnapshot] },
+      ]);
+    } finally {
+      manager.destroy();
+    }
+  });
+
   it('paints Cloud Agent cache before deferred resolution and metadata, then reconciles the live DO page', async () => {
     const fixture = workspaceManager();
     const { manager, store } = fixture;

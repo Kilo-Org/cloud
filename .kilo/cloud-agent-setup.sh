@@ -344,7 +344,15 @@ if pgrep -a -x dockerd | grep -qF -- "--bip=$bridge_gateway/16"; then
   # Without IP forwarding, bridge containers reach only the host. Workerd pins sandbox
   # containers to public resolvers, so redirect all their DNS to a forwarder on the gateway.
   if ! pgrep -f "dnsmasq .*--listen-address=$bridge_gateway" >/dev/null; then
-    as_docker_daemon dnsmasq --conf-file=/dev/null --no-hosts --bind-interfaces --listen-address="$bridge_gateway"
+    # dnsmasq reads resolv.conf only once its mtime advances, and the sandbox's file is
+    # dated 1970, so it would answer REFUSED. Pass the upstream servers explicitly.
+    dns_servers=()
+    while read -r key value _; do
+      [[ $key == nameserver && -n $value ]] && dns_servers+=(--server="$value")
+    done < /etc/resolv.conf
+    (( ${#dns_servers[@]} )) || dns_servers=(--server=1.1.1.1 --server=8.8.8.8)
+    as_docker_daemon dnsmasq --conf-file=/dev/null --no-hosts --no-resolv "${dns_servers[@]}" \
+      --bind-interfaces --listen-address="$bridge_gateway"
   fi
   for proto in udp tcp; do
     dns_redirect=(PREROUTING -i docker0 -p "$proto" --dport 53 -j DNAT --to-destination "$bridge_gateway:53")

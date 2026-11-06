@@ -16,6 +16,7 @@ const PROVIDER_ALIASES: Record<string, string> = {
   particleai: 'particle',
   sakanaai: 'sakana',
   seed: 'bytedance',
+  spacexai: 'xai',
   togetherai: 'together',
   unknown: 'other',
   vertex: 'google',
@@ -89,7 +90,7 @@ const PROVIDER_NAMES: Record<string, string> = {
   together: 'Together AI',
   typesafe: 'TypeSafe',
   wandb: 'Weights & Biases',
-  xai: 'xAI',
+  xai: 'SpaceXAI',
   zai: 'Z.ai',
 };
 

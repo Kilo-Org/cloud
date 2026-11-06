@@ -16,6 +16,10 @@ describe('normalizePublicInferenceProvider', () => {
     ['particle', 'particle', 'Particle AI'],
     ['runinfra', 'runinfra', 'RunInfra'],
     ['runware', 'runware', 'Runware'],
+    ['xAI', 'xai', 'SpaceXAI'],
+    ['x-ai', 'xai', 'SpaceXAI'],
+    ['x_ai', 'xai', 'SpaceXAI'],
+    ['X.AI', 'xai', 'SpaceXAI'],
   ])('normalizes %s to its provider key and display name', (provider, key, name) => {
     expect(normalizePublicInferenceProvider(provider)).toEqual({ key, name });
   });
@@ -39,11 +43,13 @@ describe('normalizePublicInferenceProvider', () => {
     ['sakana', 'sakana'],
     ['Sakana AI', 'sakana'],
     ['seed', 'bytedance'],
+    ['SpaceXAI', 'xai'],
     ['togetherai', 'together'],
     ['unknown', 'other'],
     ['vertex', 'google'],
     ['vertexAnthropic', 'google'],
     ['wandb', 'wandb'],
+    ['x-ai', 'xai'],
   ])('deduplicates %s with its canonical display name', (provider, key) => {
     const normalized = normalizePublicInferenceProvider(provider);
 
@@ -111,7 +117,7 @@ describe('normalizePublicInferenceProvider', () => {
     ['together', 'Together AI'],
     ['typesafe', 'TypeSafe'],
     ['wandb', 'Weights & Biases'],
-    ['xai', 'xAI'],
+    ['xai', 'SpaceXAI'],
     ['zai', 'Z.ai'],
   ])('preserves the official capitalization of %s', (key, name) => {
     for (const provider of [key, name, name.toLowerCase(), name.toUpperCase()]) {

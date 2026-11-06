@@ -398,7 +398,9 @@ test('explorer-ios-release gates every build step except input validation', () =
   const steps = workflows['explorer-ios-release.yml'].jobs.build.steps;
   const ungated = steps
     .filter(step => !(step.if ?? '').startsWith(explorerSkip))
-    .map(step => step.name);
+    // Action steps carry no `name`, so fall back to `uses`: an ungated action
+    // must be identifiable in the failure message.
+    .map(step => step.name ?? step.uses);
   assert.deepEqual(ungated, ['Validate inputs']);
   assert.equal(steps[0].name, 'Validate inputs', 'validation runs before the gate');
   assert.equal(steps[0].if, undefined, 'validation stays unconditional');

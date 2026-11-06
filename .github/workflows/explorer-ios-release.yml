@@ -26,7 +26,51 @@ concurrency:
 permissions:
   contents: read
 jobs:
+  # A dispatch whose immutable object already exists has nothing to build: the
+  # upload below already treats that object as success. The probe names the same
+  # object for the same build key and runs with the upload job's identity, so
+  # `build` keeps its steps free of any OIDC credential.
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      exists: ${{ steps.metadata.outputs.exists }}
+    env:
+      FINGERPRINT: ${{ inputs.fingerprint }}
+    steps:
+      - name: Require the build key format
+        run: |
+          set -euo pipefail
+          [[ "$FINGERPRINT" =~ ^explorer-[0-9a-f]{12}-[0-9a-f]{16}$ ]] || { echo '::error::Invalid explorer build key'; exit 1; }
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        id: auth
+        with:
+          workload_identity_provider: ${{ vars.KWF_IOS_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.KWF_IOS_UPLOAD_SERVICE_ACCOUNT }}
+          token_format: access_token
+      - name: Check whether the immutable artifact already exists
+        id: metadata
+        env:
+          ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+        run: |
+          set -euo pipefail
+          url="https://storage.googleapis.com/storage/v1/b/kwf-planner-kilocode-us-central1/o/explorers%2Fios%2F${FINGERPRINT}.app.tar.gz"
+          # Fail open: only a confirmed object skips the build, so a lookup that
+          # cannot answer costs the build that runs today.
+          status=$(curl -sS --retry 3 --retry-connrefused -o "$RUNNER_TEMP/metadata-response" -w '%{http_code}' \
+            -H "Authorization: Bearer $ACCESS_TOKEN" "$url") || status=000
+          case "$status" in
+            200) echo 'exists=true' >> "$GITHUB_OUTPUT"; echo '::notice::Immutable explorer artifact already published' ;;
+            *) echo 'exists=false' >> "$GITHUB_OUTPUT"; echo "::notice::Explorer artifact lookup returned HTTP $status; building" ;;
+          esac
   build:
+    needs: probe
+    # A probe that failed publishes no output, and then the build runs: the
+    # probe can only skip work it has proven is already done.
+    if: ${{ !cancelled() }}
     runs-on: macos-26
     # A cold Release build takes about 56 minutes and one needed 83. The explorer client waits 160 minutes,
     # so this limit reports its own failure first.
@@ -91,25 +135,28 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - name: Install dependencies
+        if: needs.probe.outputs.exists != 'true'
         run: pnpm install --frozen-lockfile
       # The dispatch runs this file from main but checks out `cloud_ref`, which
       # can be any earlier commit: a checkout that predates either action still
       # has to build, so the plain command stays as its fallback.
       - name: Restore or build tRPC declarations
-        if: hashFiles('.github/actions/trpc-declarations/action.yml') != ''
+        if: needs.probe.outputs.exists != 'true' && hashFiles('.github/actions/trpc-declarations/action.yml') != ''
         uses: ./.github/actions/trpc-declarations
       - name: Build trpc types
-        if: hashFiles('.github/actions/trpc-declarations/action.yml') == ''
+        if: needs.probe.outputs.exists != 'true' && hashFiles('.github/actions/trpc-declarations/action.yml') == ''
         run: pnpm --filter @kilocode/trpc run build
       - name: Restore or build the harness SDK
-        if: hashFiles('.github/actions/harness-sdk-build/action.yml') != ''
+        if: needs.probe.outputs.exists != 'true' && hashFiles('.github/actions/harness-sdk-build/action.yml') != ''
         uses: ./.github/actions/harness-sdk-build
       - name: Build harness SDK
-        if: hashFiles('.github/actions/harness-sdk-build/action.yml') == ''
+        if: needs.probe.outputs.exists != 'true' && hashFiles('.github/actions/harness-sdk-build/action.yml') == ''
         run: pnpm --filter @kilocode/harness-sdk run build
       - name: Expo prebuild
+        if: needs.probe.outputs.exists != 'true'
         run: CI=1 pnpm --filter kilo-app exec expo prebuild --platform ios
       - name: Disable OTA in generated native configuration
+        if: needs.probe.outputs.exists != 'true'
         run: |
           set -euo pipefail
           plist=apps/mobile/ios/Kilo/Supporting/Expo.plist
@@ -117,6 +164,7 @@ jobs:
           /usr/libexec/PlistBuddy -c 'Add :EXUpdatesEnabled bool false' "$plist"
           [[ "$(/usr/libexec/PlistBuddy -c 'Print :EXUpdatesEnabled' "$plist")" == false ]]
       - name: Build embedded Release bundle
+        if: needs.probe.outputs.exists != 'true'
         run: |
           set -euo pipefail
           xcodebuild \
@@ -129,6 +177,7 @@ jobs:
             CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- build
           test -s "$RUNNER_TEMP/DerivedData/Build/Products/Release-iphonesimulator/Kilo.app/main.jsbundle"
       - name: Verify linked simulator keychain entitlements
+        if: needs.probe.outputs.exists != 'true'
         run: |
           set -euo pipefail
           python3 <<'PY'
@@ -196,6 +245,7 @@ jobs:
           subprocess.run(['codesign', '--verify', '--deep', '--strict', str(app)], check=True)
           PY
       - name: Package
+        if: needs.probe.outputs.exists != 'true'
         run: |
           set -euo pipefail
           products="$RUNNER_TEMP/DerivedData/Build/Products/Release-iphonesimulator"
@@ -203,6 +253,7 @@ jobs:
           tar -C "$products" -czf "$RUNNER_TEMP/explorer.app.tar.gz" Kilo.app ca.crt
       # Upload runs in a separate trusted job: untrusted pinned app code never receives an OIDC credential.
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: needs.probe.outputs.exists != 'true'
         with:
           name: explorer-ios-release
           path: ${{ runner.temp }}/explorer.app.tar.gz
@@ -210,7 +261,10 @@ jobs:
           retention-days: 1
           if-no-files-found: error
   upload:
-    needs: build
+    needs: [probe, build]
+    # A build that skipped produced no artifact to upload, and the object the
+    # probe found is the one this job would have written.
+    if: needs.probe.outputs.exists != 'true' && needs.build.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:

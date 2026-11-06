@@ -275,6 +275,10 @@ for (const [file, name, command, condition] of [
   });
 }
 
+// The explorer release skips every build step when its probe found the
+// immutable artifact, so its guards carry that condition in front.
+const explorerSkip = "needs.probe.outputs.exists != 'true'";
+
 const harnessBuildGuards = [
   [
     'ci.yml',
@@ -289,7 +293,7 @@ const harnessBuildGuards = [
   [
     'explorer-ios-release.yml',
     'build',
-    "hashFiles('.github/actions/harness-sdk-build/action.yml') != ''",
+    `${explorerSkip} && hashFiles('.github/actions/harness-sdk-build/action.yml') != ''`,
   ],
 ];
 
@@ -319,7 +323,10 @@ test('every consumer job restores or builds the harness SDK through the action',
       );
     } else {
       assert.equal(plain.length, 1);
-      assert.equal(plain[0].if, "hashFiles('.github/actions/harness-sdk-build/action.yml') == ''");
+      assert.equal(
+        plain[0].if,
+        `${explorerSkip} && hashFiles('.github/actions/harness-sdk-build/action.yml') == ''`
+      );
     }
   }
 });

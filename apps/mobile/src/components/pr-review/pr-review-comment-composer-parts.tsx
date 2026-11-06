@@ -205,7 +205,7 @@ export function ContextPreview({
   return (
     <View className="gap-0.5 rounded-lg border border-hair-soft bg-secondary px-4 py-2">
       <Text className="font-mono-medium text-[11px] text-muted-foreground" numberOfLines={1}>
-        {isolateLtrBidiText(`${path} ${side} ${lineLabel}`)}
+        {`${isolateLtrBidiText(path)} ${side} ${lineLabel}`}
       </Text>
       {previewText.length > 0 ? (
         <Text

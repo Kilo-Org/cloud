@@ -12,7 +12,7 @@ import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { dispatchAgentBriefingPush } from '@kilocode/web-shared/lib/notifications-worker-client';
 import { sweepAgentBriefings, generatePendingAgentBriefings } from './sweep';
-import { reconcileBriefingCharge, runBriefingSummary } from './summary';
+import { reconcileBriefingCharge, runBriefingSummary, SUMMARY_MAX_ATTEMPTS } from './summary';
 import { briefingFactsSchema, buildBriefingSnapshot, collectBriefingSnapshot } from './evidence';
 import { agentBriefingRouter } from '@/routers/agent-briefing-router';
 import { emptySummary } from './store';
@@ -188,15 +188,95 @@ it('publishes failure while preserving facts and refuses automatic paid retries'
   await sweepAgentBriefings(now);
   const [row] = await db.select().from(agent_briefing_snapshots);
   if (!row) throw new Error('No captured snapshot');
-  const fetcher = jest.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('gateway_declined'));
+  const fetcher = jest.spyOn(globalThis, 'fetch').mockRejectedValue(new TypeError('fetch failed'));
   await runBriefingSummary(row.id);
   await generatePendingAgentBriefings();
   const [failed] = await db.select().from(agent_briefing_snapshots);
   expect(failed?.summary.status).toBe('failed');
   expect(failed?.published_at).not.toBeNull();
   expect(failed?.facts).toEqual(row.facts);
+  expect(fetcher).toHaveBeenCalledTimes(SUMMARY_MAX_ATTEMPTS);
+}, 20_000);
+
+it('retries a transient gateway decline and publishes the answer it gets', async () => {
+  const { now } = await scheduled();
+  await sweepAgentBriefings(now);
+  const [row] = await db.select().from(agent_briefing_snapshots);
+  if (!row) throw new Error('No captured snapshot');
+  const fetcher = jest
+    .spyOn(globalThis, 'fetch')
+    .mockResolvedValueOnce(new Response('{}', { status: 429 }))
+    .mockResolvedValueOnce(
+      Response.json({ choices: [{ message: { content: 'Retried morning summary.' } }] })
+    );
+  await runBriefingSummary(row.id);
+  expect(fetcher).toHaveBeenCalledTimes(2);
+  const [first] = fetcher.mock.calls;
+  const [second] = fetcher.mock.calls.slice(1);
+  expect(new Headers(second?.[1]?.headers).get('x-kilo-session')).toBe(
+    new Headers(first?.[1]?.headers).get('x-kilo-session')
+  );
+  const [finished] = await db.select().from(agent_briefing_snapshots);
+  expect(finished?.summary.status).toBe('ready');
+  expect(finished?.summary.text).toBe('Retried morning summary.');
+}, 20_000);
+
+it('fails a terminal decline without a second request', async () => {
+  const { now } = await scheduled();
+  await sweepAgentBriefings(now);
+  const [row] = await db.select().from(agent_briefing_snapshots);
+  if (!row) throw new Error('No captured snapshot');
+  const fetcher = jest
+    .spyOn(globalThis, 'fetch')
+    .mockResolvedValue(new Response('{}', { status: 400 }));
+  await runBriefingSummary(row.id);
   expect(fetcher).toHaveBeenCalledTimes(1);
+  const [failed] = await db.select().from(agent_briefing_snapshots);
+  expect(failed?.summary.status).toBe('failed');
+  expect(failed?.summary.error).toBe('gateway_declined');
 });
+
+it('does not repeat a rate limit the gateway marks final', async () => {
+  const { now } = await scheduled();
+  await sweepAgentBriefings(now);
+  const [row] = await db.select().from(agent_briefing_snapshots);
+  if (!row) throw new Error('No captured snapshot');
+  const fetcher = jest
+    .spyOn(globalThis, 'fetch')
+    .mockResolvedValue(new Response('{}', { status: 429, headers: { 'x-should-retry': 'false' } }));
+  await runBriefingSummary(row.id);
+  expect(fetcher).toHaveBeenCalledTimes(1);
+  const [failed] = await db.select().from(agent_briefing_snapshots);
+  expect(failed?.summary.status).toBe('failed');
+});
+
+it('does not wait past the generation deadline for a retry', async () => {
+  const { now } = await scheduled();
+  await sweepAgentBriefings(now);
+  const [row] = await db.select().from(agent_briefing_snapshots);
+  if (!row) throw new Error('No captured snapshot');
+  const fetcher = jest
+    .spyOn(globalThis, 'fetch')
+    .mockResolvedValue(new Response('{}', { status: 503, headers: { 'retry-after': '900' } }));
+  await runBriefingSummary(row.id);
+  expect(fetcher).toHaveBeenCalledTimes(1);
+  const [failed] = await db.select().from(agent_briefing_snapshots);
+  expect(failed?.summary.status).toBe('failed');
+});
+
+it('retries an aborted request and records the failure at the bound', async () => {
+  const { now } = await scheduled();
+  await sweepAgentBriefings(now);
+  const [row] = await db.select().from(agent_briefing_snapshots);
+  if (!row) throw new Error('No captured snapshot');
+  const fetcher = jest
+    .spyOn(globalThis, 'fetch')
+    .mockRejectedValue(new DOMException('The operation was aborted.', 'TimeoutError'));
+  await runBriefingSummary(row.id);
+  expect(fetcher).toHaveBeenCalledTimes(SUMMARY_MAX_ATTEMPTS);
+  const [failed] = await db.select().from(agent_briefing_snapshots);
+  expect(failed?.summary.status).toBe('failed');
+}, 20_000);
 it('settles a delayed usage delivery against its immutable occurrence generation', async () => {
   const { now, user } = await scheduled();
   await sweepAgentBriefings(now);

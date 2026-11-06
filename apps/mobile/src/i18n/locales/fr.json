@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Démo de contrôle à distance du CLI natif",
+    "sessionsEmpty": "Aucune session native pour le moment",
+    "hosts": "Hôtes en ligne",
+    "hostsEmpty": "Aucun hôte en ligne",
+    "directory": "Répertoire de travail",
+    "createSession": "Créer une session native",
+    "queueIfOffline": "Mettre l'instruction en file d'attente si l'hôte est hors ligne",
+    "prompt": "Instruction ou /command",
+    "localClear": "Effacer la vue locale",
+    "abort": "Interrompre le tour",
+    "failed": "Échec de l'action à distance du CLI natif",
+    "creationUnknown": "Résultat de la création inconnu. Actualisez les sessions avant de réessayer.",
+    "commandFailed": "Échec de la commande du processus CLI",
+    "invalidReply": "Réponse du processus CLI non valide",
+    "unsafeCommand": "Utilisez /compact, /new, /skill, /models, /agents ou /clear (en local uniquement).",
+    "status": "Connexion : {{connection}} · Processus CLI : {{runner}}",
+    "presenceStatus": "Hôtes : {{connection}}",
+    "commandStatus": "Transmission de la commande : {{status}}",
+    "delivered": "Transmise",
+    "expired": "Expirée"
+  },
   "common": {
     "cancel": "Annuler",
     "done": "Terminé",

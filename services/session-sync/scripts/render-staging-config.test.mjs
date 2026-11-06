@@ -60,6 +60,14 @@ for (const cachingDisabled of [undefined, false, true]) {
           120
         );
         assert.equal(new Set(config.ratelimits.map(binding => binding.namespace_id)).size, 5);
+        assert.deepEqual(
+          config.durable_objects.bindings.map(binding => binding.class_name),
+          ['SessionSyncDO', 'SessionSyncTenantDO', 'SessionRelayDO', 'SessionPresenceDO']
+        );
+        assert.deepEqual(config.migrations.at(-1), {
+          tag: 'v3',
+          new_sqlite_classes: ['SessionRelayDO', 'SessionPresenceDO'],
+        });
       } else {
         assert.match(result.stderr, /caching disabled/);
       }

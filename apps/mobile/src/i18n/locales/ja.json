@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "ネイティブリモートデモ",
+    "sessionsEmpty": "ネイティブセッションはまだありません",
+    "hosts": "オンラインのホスト",
+    "hostsEmpty": "オンラインのホストはありません",
+    "directory": "作業ディレクトリ",
+    "createSession": "ネイティブセッションを作成",
+    "queueIfOffline": "ホストがオフラインの場合はプロンプトを順番待ちにする",
+    "prompt": "プロンプトまたは/command",
+    "localClear": "ローカル表示をクリア",
+    "abort": "ターンを中止",
+    "failed": "ネイティブリモート操作に失敗しました",
+    "creationUnknown": "作成結果が不明です。再試行する前にセッションを更新してください。",
+    "commandFailed": "ランナーのコマンドに失敗しました",
+    "invalidReply": "ランナーからの応答が無効です",
+    "unsafeCommand": "/compact、/new、/skill、/models、/agents、または/clear（ローカルのみ）を使用してください。",
+    "status": "接続：{{connection}} · ランナー：{{runner}}",
+    "presenceStatus": "ホスト：{{connection}}",
+    "commandStatus": "コマンドの配信：{{status}}",
+    "delivered": "配信済み",
+    "expired": "期限切れ"
+  },
   "common": {
     "cancel": "キャンセル",
     "done": "完了",

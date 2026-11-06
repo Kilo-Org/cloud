@@ -77,7 +77,7 @@ fi
 # document fails the same check.
 selection=""
 if [ -n "${AFFECTED:-}" ] \
-    && [ "$(jq -r --arg base "$base" 'if has("dirs") and ((.base // "") == $base) then 1 else 0 end' <<< "$AFFECTED" 2>/dev/null || true)" = "1" ]; then
+    && [ "$(jq -r --arg base "$base" 'if has("dirs") and ((.base // "") == $base) then 1 else 0 end' <<< "$AFFECTED" 2>/dev/null)" = "1" ]; then
   selection="$AFFECTED"
   echo "selection: reusing the affected-workspace document for ${base:-no base revision}" >&2
 fi

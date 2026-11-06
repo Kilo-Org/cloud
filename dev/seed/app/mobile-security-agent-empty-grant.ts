@@ -20,7 +20,7 @@ import {
 } from '@kilocode/db/schema';
 import { eq, sql } from 'drizzle-orm';
 
-import { getSeedDb } from '../lib/db';
+import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
 import { normalizeSeedEmail } from '../lib/email';
 import type { SeedResult } from '../index';
 
@@ -103,6 +103,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   if (rest.length > 0) {
     throw new Error(`unexpected arguments: ${rest.join(' ')}`);
   }
+  assertLocalSeedDatabase('app:mobile-security-agent-empty-grant');
 
   const ownerUserId = await findUser(ownerEmail);
   const memberUserId = await findUser(memberEmail);

@@ -14,6 +14,11 @@ import {
 } from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
 import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import { countAndStoreEmbeddingUsage } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
+import { getRuntimeOrganizationFeatures } from '@kilocode/web-shared/lib/ai-gateway/organization-features';
+import {
+  DEFAULT_ORGANIZATION_FEATURES,
+  type OrganizationFeatures,
+} from '@kilocode/web-shared/lib/ai-gateway/gateway-config';
 import { decide, type DecideResponse } from '@kilocode/web-shared/lib/bouncer/client';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import { captureException } from '@sentry/nextjs';
@@ -42,6 +47,13 @@ jest.mock(
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/get-provider', () => ({
   getEmbeddingProvider: jest.fn(),
 }));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/organization-features', () => ({
+  ...(jest.requireActual('@kilocode/web-shared/lib/ai-gateway/organization-features') as Record<
+    string,
+    unknown
+  >),
+  getRuntimeOrganizationFeatures: jest.fn(),
+}));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel', () => ({
   mapModelIdToVercel: jest.fn(),
 }));
@@ -54,6 +66,7 @@ const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockedGetBalanceAndOrgSettings = jest.mocked(getBalanceAndOrgSettings);
 const mockedResolveModelDecision = jest.mocked(resolveOrganizationMemberModelDecision);
 const mockedGetEmbeddingProvider = jest.mocked(getEmbeddingProvider);
+const mockedGetRuntimeOrganizationFeatures = jest.mocked(getRuntimeOrganizationFeatures);
 const mockedMapModelIdToVercel = jest.mocked(mapModelIdToVercel);
 const mockedFetch = jest.fn() as jest.MockedFunction<typeof globalThis.fetch>;
 const originalFetch = globalThis.fetch;
@@ -107,6 +120,7 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
     jest.resetAllMocks();
     globalThis.fetch = mockedFetch;
     setUserAuth();
+    mockedGetRuntimeOrganizationFeatures.mockResolvedValue(DEFAULT_ORGANIZATION_FEATURES);
     mockedResolveModelDecision.mockResolvedValue(allowedModelDecision);
     mockedGetEmbeddingProvider.mockResolvedValue({
       provider: OPENROUTER,
@@ -315,6 +329,73 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
     expect(jest.mocked(countAndStoreEmbeddingUsage).mock.calls[0]?.[1]).toMatchObject({
       is_free: false,
       user_byok: true,
+    });
+  });
+
+  describe('organization gateway settings', () => {
+    function setOrganization(
+      settings: OrganizationSettings,
+      features: Partial<OrganizationFeatures>
+    ) {
+      setUserAuth(settings);
+      mockedGetRuntimeOrganizationFeatures.mockResolvedValue({
+        ...DEFAULT_ORGANIZATION_FEATURES,
+        ...features,
+      });
+    }
+
+    it('rejects a request through the OpenRouter gateway the organization disabled', async () => {
+      setOrganization({ disable_openrouter: true }, { gateway_settings: ['org-123'] });
+
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const response = await handleEmbeddingsRequest(makeRequest());
+
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toMatchObject({
+        error:
+          'This request would be routed through OpenRouter, which your organization has disabled.',
+        error_type: ProxyErrorType.provider_not_allowed,
+      });
+      expect(mockedFetch).not.toHaveBeenCalled();
+    });
+
+    it('rejects a BYOK request through the Vercel AI Gateway the organization disabled', async () => {
+      setOrganization({ disable_vercel_ai_gateway: true }, { gateway_settings: ['org-123'] });
+      mockedGetEmbeddingProvider.mockResolvedValue({
+        provider: VERCEL_AI_GATEWAY,
+        userByok: [{ providerId: 'openai', decryptedAPIKey: 'test-byok-key' }],
+        isFree: false,
+      });
+
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const response = await handleEmbeddingsRequest(makeRequest());
+
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toMatchObject({
+        error:
+          'This request would be routed through the Vercel AI Gateway, which your organization has disabled.',
+      });
+      expect(mockedFetch).not.toHaveBeenCalled();
+    });
+
+    it('serves the request while a gateway it does not use is disabled', async () => {
+      setOrganization({ disable_vercel_ai_gateway: true }, { gateway_settings: ['org-123'] });
+
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const response = await handleEmbeddingsRequest(makeRequest());
+
+      expect(response.status).toBe(200);
+      expect(getUpstreamBody()).toMatchObject({ model });
+    });
+
+    it('serves the request while the organization feature is off', async () => {
+      setOrganization({ disable_openrouter: true }, {});
+
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const response = await handleEmbeddingsRequest(makeRequest());
+
+      expect(response.status).toBe(200);
+      expect(getUpstreamBody()).toMatchObject({ model });
     });
   });
 

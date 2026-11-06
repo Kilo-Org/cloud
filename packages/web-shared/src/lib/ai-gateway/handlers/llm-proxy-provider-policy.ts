@@ -6,13 +6,10 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
 import type { AiProviderMetadataCapture } from '@kilocode/web-shared/lib/r2/kilo-routing-decision';
 import {
-  getManagedGatewayFromUrl,
-  getOrganizationGatewaySettings,
-  isManagedGatewayDisabled,
-  NO_ORGANIZATION_GATEWAY_SETTINGS,
+  disabledManagedGateway,
+  resolveOrganizationGatewaySettings,
   type OrganizationGatewaySettings,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/organization-gateway-settings';
-import { getRuntimeOrganizationFeatures } from '@kilocode/web-shared/lib/ai-gateway/organization-features';
 import { paidUsageRejection } from '@kilocode/web-shared/lib/ai-gateway/gateway-admission';
 import { getIgnoredProviders } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
 import { isNonTrialEnterpriseOrganization } from '@kilocode/web-shared/lib/organizations/non-trial-enterprise';
@@ -154,13 +151,10 @@ export async function resolveProviderAndPolicy(
   };
 
   const isNonTrialEnterprise = await resolveIsNonTrialEnterprise(input);
-  const organizationGatewaySettings = input.organizationId
-    ? getOrganizationGatewaySettings(
-        await getRuntimeOrganizationFeatures(),
-        input.organizationId,
-        (await input.balanceAndSettingsPromise).settings
-      )
-    : NO_ORGANIZATION_GATEWAY_SETTINGS;
+  const organizationGatewaySettings = await resolveOrganizationGatewaySettings(
+    input.organizationId,
+    (await input.balanceAndSettingsPromise).settings
+  );
   const providerResult = await getProvider({
     requestedModel: model,
     request,
@@ -204,15 +198,13 @@ export async function resolveProviderAndPolicy(
     );
   }
   // A local, so the type guard narrows it rather than `providerResult.provider.type`.
-  const providerType = providerResult.provider.type;
-  if (isManagedGatewayDisabled(organizationGatewaySettings, providerType)) {
-    return reject(managedGatewayDisabledResponse(providerType));
-  }
-  const providerBaseUrl =
-    providerResult.provider.apiUrlOverrides[request.kind] ?? providerResult.provider.apiUrl;
-  const gatewayByDomain = getManagedGatewayFromUrl(providerBaseUrl);
-  if (gatewayByDomain && isManagedGatewayDisabled(organizationGatewaySettings, gatewayByDomain)) {
-    return reject(managedGatewayDisabledResponse(gatewayByDomain));
+  const disabledGateway = disabledManagedGateway(
+    organizationGatewaySettings,
+    providerResult.provider.type,
+    providerResult.provider.apiUrlOverrides[request.kind] ?? providerResult.provider.apiUrl
+  );
+  if (disabledGateway) {
+    return reject(managedGatewayDisabledResponse(disabledGateway));
   }
   if (orgAutoRouteTarget) {
     try {

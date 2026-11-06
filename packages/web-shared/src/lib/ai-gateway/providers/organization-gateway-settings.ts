@@ -1,6 +1,9 @@
 import type { OrganizationDataRegion, OrganizationSettings } from '@kilocode/db/schema-types';
 import type { OrganizationFeatures } from '@kilocode/web-shared/lib/ai-gateway/gateway-config';
-import { isOrganizationFeatureEnabled } from '@kilocode/web-shared/lib/ai-gateway/organization-features';
+import {
+  getRuntimeOrganizationFeatures,
+  isOrganizationFeatureEnabled,
+} from '@kilocode/web-shared/lib/ai-gateway/organization-features';
 import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { getDomain } from 'tldts';
 
@@ -52,4 +55,38 @@ export function isManagedGatewayDisabled(
     (providerType === 'openrouter' || providerType === 'vercel') &&
     settings.disabledGateways.has(providerType)
   );
+}
+
+/**
+ * The organization's gateway policy for a request that already read the organization's balance and
+ * settings through `readGatewayBalance` or `getBalanceAndOrgSettings`. A caller without an
+ * organization has no policy to apply.
+ */
+export async function resolveOrganizationGatewaySettings(
+  organizationId: string | undefined,
+  settings: OrganizationSettings | undefined
+): Promise<OrganizationGatewaySettings> {
+  if (!organizationId) return NO_ORGANIZATION_GATEWAY_SETTINGS;
+  return getOrganizationGatewaySettings(
+    await getRuntimeOrganizationFeatures(),
+    organizationId,
+    settings
+  );
+}
+
+/**
+ * The managed gateway this request would leave through, when the organization has disabled it.
+ * Checks the provider type and the gateway host of the upstream URL, so a provider with a generic
+ * type that targets a managed gateway is refused as well.
+ */
+export function disabledManagedGateway(
+  settings: OrganizationGatewaySettings,
+  providerType: Provider['type'],
+  upstreamUrl: string
+): ManagedGatewayId | undefined {
+  if (isManagedGatewayDisabled(settings, providerType)) return providerType;
+  const gatewayByDomain = getManagedGatewayFromUrl(upstreamUrl);
+  return gatewayByDomain && isManagedGatewayDisabled(settings, gatewayByDomain)
+    ? gatewayByDomain
+    : undefined;
 }

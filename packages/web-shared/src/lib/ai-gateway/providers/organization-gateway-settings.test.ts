@@ -1,6 +1,8 @@
 import { describe, expect, it } from '@jest/globals';
+import type { OrganizationSettings } from '@kilocode/db/schema-types';
 import { DEFAULT_ORGANIZATION_FEATURES } from '@kilocode/web-shared/lib/ai-gateway/gateway-config';
 import {
+  disabledManagedGateway,
   getManagedGatewayFromUrl,
   getOrganizationGatewaySettings,
   isManagedGatewayDisabled,
@@ -59,5 +61,33 @@ describe('getOrganizationGatewaySettings', () => {
 
     expect(settings.disabledGateways.size).toBe(0);
     expect(settings.dataRegion).toBeNull();
+  });
+});
+
+describe('disabledManagedGateway', () => {
+  function settingsFor(organizationSettings: OrganizationSettings | undefined) {
+    return getOrganizationGatewaySettings(
+      { ...DEFAULT_ORGANIZATION_FEATURES, gateway_settings: [organizationId] },
+      organizationId,
+      organizationSettings
+    );
+  }
+
+  it.each([
+    ['openrouter', 'https://openrouter.ai/api/v1', { disable_openrouter: true }, 'openrouter'],
+    ['vercel', 'https://ai-gateway.vercel.sh/v1', { disable_vercel_ai_gateway: true }, 'vercel'],
+    ['custom', 'https://openrouter.ai/api/v1', { disable_openrouter: true }, 'openrouter'],
+    [
+      'custom-public',
+      'https://ai-gateway.vercel.sh/v1',
+      { disable_vercel_ai_gateway: true },
+      'vercel',
+    ],
+    ['custom', 'https://openrouter.ai/api/v1', { disable_vercel_ai_gateway: true }, undefined],
+    ['custom', 'https://api.example.com/v1', { disable_openrouter: true }, undefined],
+    ['openrouter', 'https://openrouter.ai/api/v1', {}, undefined],
+    ['direct-byok', 'https://example.com/v1', { disable_openrouter: true }, undefined],
+  ] as const)('reports %s at %s with %j as %s', (type, url, organizationSettings, expected) => {
+    expect(disabledManagedGateway(settingsFor(organizationSettings), type, url)).toBe(expected);
   });
 });

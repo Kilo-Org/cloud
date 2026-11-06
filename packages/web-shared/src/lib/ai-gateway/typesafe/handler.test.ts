@@ -4,6 +4,7 @@ import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { TypeSafeClient, choice, noul, score } from '@typesafe-ai/sdk';
 import type { User } from '@kilocode/db/schema';
 import type { StoredModel } from '@kilocode/db';
+import type { OrganizationSettings } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { after, NextRequest, NextResponse } from 'next/server';
 import type * as NextServer from 'next/server';
@@ -40,6 +41,11 @@ import {
 import { fetchGeneration } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
 import type { OpenRouterGeneration } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import { emitGatewayApiMetrics } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
+import { getRuntimeOrganizationFeatures } from '@kilocode/web-shared/lib/ai-gateway/organization-features';
+import {
+  DEFAULT_ORGANIZATION_FEATURES,
+  type OrganizationFeatures,
+} from '@kilocode/web-shared/lib/ai-gateway/gateway-config';
 import {
   systemOneRequestSchema,
   SYSTEM_ONE_MAX_QUESTIONS,
@@ -120,6 +126,13 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/upstream-request', () =
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server', () => ({
   emitGatewayApiMetrics: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/organization-features', () => ({
+  ...(jest.requireActual('@kilocode/web-shared/lib/ai-gateway/organization-features') as Record<
+    string,
+    unknown
+  >),
+  getRuntimeOrganizationFeatures: jest.fn(),
 }));
 
 const routeUrl = 'http://localhost:3000/api/gateway/typesafe/v1/systemone';
@@ -275,6 +288,7 @@ describe('handleSystemOneRequest', () => {
     setAuth();
     mockVerdict(null);
     jest.mocked(getBalanceAndOrgSettings).mockResolvedValue({ balance: 1_000_000 });
+    jest.mocked(getRuntimeOrganizationFeatures).mockResolvedValue(DEFAULT_ORGANIZATION_FEATURES);
     jest.mocked(isGatewayAccountRateLimited).mockResolvedValue(false);
     jest.mocked(gatewayRateLimitKey).mockReturnValue('test-rate-limit-key');
     jest.mocked(resolveOrganizationMemberModelDecision).mockResolvedValue(memberDecision);
@@ -1253,5 +1267,52 @@ describe('handleSystemOneRequest', () => {
     expect(getBalanceAndOrgSettings).not.toHaveBeenCalled();
     expect(mockedFetch).not.toHaveBeenCalled();
     expect(deferredUsageCallbacks()).toHaveLength(0);
+  });
+
+  describe('organization gateway settings', () => {
+    function setOrganization(
+      features: Partial<OrganizationFeatures>,
+      settings: OrganizationSettings = {}
+    ) {
+      setAuth('org-123');
+      jest.mocked(getBalanceAndOrgSettings).mockResolvedValue({ balance: 1_000_000, settings });
+      jest.mocked(getRuntimeOrganizationFeatures).mockResolvedValue({
+        ...DEFAULT_ORGANIZATION_FEATURES,
+        ...features,
+      });
+    }
+
+    it('rejects a request through the OpenRouter gateway the organization disabled', async () => {
+      setOrganization({ gateway_settings: ['org-123'] }, { disable_openrouter: true });
+
+      const response = await handleSystemOneRequest(makeRequest());
+
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toMatchObject({
+        error:
+          'This request would be routed through OpenRouter, which your organization has disabled.',
+        error_type: 'provider_not_allowed',
+      });
+      expect(mockedFetch).not.toHaveBeenCalled();
+      expect(deferredUsageCallbacks()).toHaveLength(0);
+    });
+
+    it('serves the request while a gateway it does not use is disabled', async () => {
+      setOrganization({ gateway_settings: ['org-123'] }, { disable_vercel_ai_gateway: true });
+
+      const response = await handleSystemOneRequest(makeRequest());
+
+      expect(response.status).toBe(200);
+      expect(mockedFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('serves the request while the organization feature is off', async () => {
+      setOrganization({}, { disable_openrouter: true });
+
+      const response = await handleSystemOneRequest(makeRequest());
+
+      expect(response.status).toBe(200);
+      expect(mockedFetch).toHaveBeenCalledTimes(1);
+    });
   });
 });

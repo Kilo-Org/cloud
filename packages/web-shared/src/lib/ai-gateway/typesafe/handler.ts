@@ -17,6 +17,11 @@ import {
   paidUsageRejection,
   resolveGatewayCaller,
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-admission';
+import { managedGatewayDisabledResponse } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
+import {
+  disabledManagedGateway,
+  resolveOrganizationGatewaySettings,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/organization-gateway-settings';
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
 import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
 import { generateProviderSpecificHash } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
@@ -138,6 +143,16 @@ export async function handleSystemOneRequest(request: NextRequest) {
   const { balance, settings, plan, payer } = account;
   const creditsBlocked = paidUsageRejection({ user, organizationId, account, exempt: false });
   if (creditsBlocked) return await creditsBlocked();
+
+  // Same provider policy as the chat path: System One is served only by OpenRouter,
+  // so the organization's effective gateway policy answers every request for it
+  // here, before any upstream request.
+  const disabledGateway = disabledManagedGateway(
+    await resolveOrganizationGatewaySettings(organizationId, settings),
+    OPENROUTER.type,
+    OPENROUTER.apiUrl
+  );
+  if (disabledGateway) return managedGatewayDisabledResponse(disabledGateway);
 
   // Admit the request when the balance covers the cost bound: the schema bounds the bytes it can
   // carry, and the bound prices those bytes plus the answer generation at the model's current

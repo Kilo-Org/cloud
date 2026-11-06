@@ -14,9 +14,14 @@ import { applyUpstreamErrorPolicy } from '@kilocode/web-shared/lib/ai-gateway/up
 import {
   countAndStoreTranscriptionUsage,
   invalidRequestResponse,
+  managedGatewayDisabledResponse,
   modelDoesNotExistResponse,
   wrapInSafeNextResponse,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
+import {
+  disabledManagedGateway,
+  resolveOrganizationGatewaySettings,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/organization-gateway-settings';
 import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import { providerPrivacySchema } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
@@ -256,6 +261,16 @@ export async function handleAudioTranscriptionsRequest(
     exempt: usageContext.is_free || !!userByok,
   });
   if (creditsBlocked) return await creditsBlocked();
+
+  // Same provider policy as the chat path: the organization's effective gateway
+  // policy refuses a request whose selected provider targets a disabled managed
+  // gateway, before any upstream request.
+  const disabledGateway = disabledManagedGateway(
+    await resolveOrganizationGatewaySettings(organizationId, settings),
+    provider.type,
+    provider.apiUrl
+  );
+  if (disabledGateway) return managedGatewayDisabledResponse(disabledGateway);
 
   // OpenRouter's transcription endpoint accepts the same provider preferences
   // as chat, so the organization data-collection policy and provider routes are

@@ -110,6 +110,11 @@ describe('BYOKKeysManager provider names', () => {
     expect(VERCEL_BYOK_PROVIDER_NAMES.cohere).toBe('Cohere');
   });
 
+  it('uses the current Novita AI and SpaceXSI provider names', () => {
+    expect(VERCEL_BYOK_PROVIDER_NAMES.novita).toBe('Novita AI');
+    expect(VERCEL_BYOK_PROVIDER_NAMES.xai).toBe('SpaceXSI');
+  });
+
   it('names the pasted OpenAI entry for the credential it holds', () => {
     expect(VERCEL_BYOK_PROVIDER_NAMES.openai).toBe('OpenAI API key');
   });

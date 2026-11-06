@@ -355,6 +355,24 @@ describe('readSweepCompletion', () => {
       null,
     ],
     [
+      'leaves cost unknown when the final BYOK receipt nulls both charges',
+      [
+        { cost: 0.0004, is_byok: true, cost_details: { upstream_inference_cost: 0.008 } },
+        { cost: null, is_byok: true, cost_details: { upstream_inference_cost: null } },
+      ],
+      null,
+    ],
+    [
+      'leaves cost unknown when the final ordinary receipt nulls the total',
+      [{ cost: 0.012 }, { cost: null, prompt_tokens: 10 }],
+      null,
+    ],
+    [
+      'leaves cost unknown when the final ordinary receipt gives only its upstream breakdown',
+      [{ cost: 0.012 }, { cost_details: { upstream_inference_cost: 0.009 } }],
+      null,
+    ],
+    [
       'leaves cost unknown when a later frame affirms BYOK without the upstream cost',
       [{ cost: 0.012 }, { cost: 0.0004, is_byok: true }],
       null,

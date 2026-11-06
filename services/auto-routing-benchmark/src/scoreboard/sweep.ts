@@ -90,18 +90,22 @@ export async function readSweepCompletion(
     if (chunk.usage) {
       const usage = chunk.usage;
       const upstream = usage.cost_details?.upstream_inference_cost;
+      const billingFrame =
+        Object.hasOwn(usage, 'cost') ||
+        (usage.cost_details != null &&
+          Object.hasOwn(usage.cost_details, 'upstream_inference_cost'));
       // BYOK bills the router fee and provider usage separately. Billing frames
       // are cumulative receipts, so do not sum frames or combine partial receipts.
       const wasByok = byok;
       if (usage.is_byok === true) byok = true;
       if (byok) {
-        if (usage.cost != null || upstream != null) {
+        if (billingFrame) {
           costUsd = usage.cost != null && upstream != null ? usage.cost + upstream : null;
         } else if (!wasByok) {
           costUsd = null;
         }
-      } else if (usage.cost != null) {
-        costUsd = usage.cost;
+      } else if (billingFrame) {
+        costUsd = usage.cost ?? null;
       }
     }
     if (chunk.usage?.prompt_tokens != null || chunk.usage?.completion_tokens != null) {

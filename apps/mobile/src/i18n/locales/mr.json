@@ -354,7 +354,7 @@
       "diffTooLarge": "तुलनेसाठी खूप मोठे बदल",
       "openFile": "{{path}} उघडा",
       "openFileViewed": "{{path}} उघडा (पाहिलेली)",
-      "title": "फाइली"
+      "title": "फाइल्स"
     },
     "fileRows": {
       "markViewed": "{{path}} ही फाइल पाहिल्याची खूण करा",
@@ -397,11 +397,11 @@
       "loadAllFiles": "सर्व फाइल्स लोड करा",
       "loadAll": "सर्व लोड करा",
       "fileLoadedCount_one": "{{displayCount}} फाइल लोड झाली",
-      "fileLoadedCount": "{{displayCount}} फाइली लोड झाल्या",
-      "fileLoadedCount_other": "{{displayCount}} फाइली लोड झाल्या",
+      "fileLoadedCount": "{{displayCount}} फाइल्स लोड झाल्या",
+      "fileLoadedCount_other": "{{displayCount}} फाइल्स लोड झाल्या",
       "fileLoadedOfTotalCount_one": "{{total}} पैकी {{displayCount}} फाइल लोड झाली",
-      "fileLoadedOfTotalCount": "{{total}} पैकी {{displayCount}} फाइली लोड झाल्या",
-      "fileLoadedOfTotalCount_other": "{{total}} पैकी {{displayCount}} फाइली लोड झाल्या",
+      "fileLoadedOfTotalCount": "{{total}} पैकी {{displayCount}} फाइल्स लोड झाल्या",
+      "fileLoadedOfTotalCount_other": "{{total}} पैकी {{displayCount}} फाइल्स लोड झाल्या",
       "filesStillLoading": "फाइल्स अजूनही लोड होत आहेत. रीफ्रेश करण्यासाठी खाली ओढा.",
       "goToOverview": "आढावा पहा",
       "goToOverviewTab": "आढावा टॅबवर जा",
@@ -413,7 +413,7 @@
       "expandLinesOfContext_other": "संदर्भासाठी {{displayCount}} ओळी दाखवा",
       "expandMoreLines_one": "आणखी {{displayCount}} ओळ दाखवा ({{start}}–{{end}})",
       "expandMoreLines_other": "आणखी {{displayCount}} ओळी दाखवा ({{start}}–{{end}})",
-      "loadedOfTotalFiles_one": "{{total}} पैकी {{loaded}} फाइल्स लोड झाल्या",
+      "loadedOfTotalFiles_one": "{{total}} पैकी {{loaded}} फाइल लोड झाली",
       "loadedOfTotalFiles_other": "{{total}} पैकी {{loaded}} फाइल्स लोड झाल्या"
     },
     "sideBySide": {
@@ -762,8 +762,8 @@
       "commit": "कमिट",
       "commit_other": "कमिट",
       "file_one": "फाइल",
-      "file": "फाइली",
-      "file_other": "फाइली",
+      "file": "फाइल्स",
+      "file_other": "फाइल्स",
       "openedAgo": "{{time}} उघडले",
       "updatedAgo": "{{time}} अद्ययावत केले",
       "mergedAgo": "{{time}} मर्ज केले",
@@ -793,7 +793,7 @@
     },
     "tabs": {
       "overview": "आढावा",
-      "files": "फाइली",
+      "files": "फाइल्स",
       "discussion": "चर्चा"
     },
     "fileStatus": {
@@ -810,7 +810,7 @@
       "lineLabel": "{{status}} ओळ {{line}}: {{text}}",
       "lineLabelNoNumber": "{{status}} ओळ: {{text}}",
       "emptyLine": "(रिकामे)",
-      "truncationBanner_one": "GitHub API च्या मर्यादेमुळे बदललेल्या {{total}} फाइल्सपैकी पहिल्या {{limit}} फाइल्स दाखवल्या आहेत.",
+      "truncationBanner_one": "GitHub API च्या मर्यादेमुळे बदललेल्या {{total}} फाइलपैकी पहिल्या {{limit}} फाइल्स दाखवल्या आहेत.",
       "truncationBanner_other": "GitHub API च्या मर्यादेमुळे बदललेल्या {{total}} फाइल्सपैकी पहिल्या {{limit}} फाइल्स दाखवल्या आहेत."
     },
     "linkPasteClipboardEmpty": "क्लिपबोर्ड रिकामा आहे.",
@@ -1054,7 +1054,7 @@
     "attachmentPicker": {
       "takePhoto": "फोटो घ्या",
       "photoLibrary": "फोटो संग्रह",
-      "files": "फाइली",
+      "files": "फाइल्स",
       "cameraAccessMessage": "फोटो काढण्यासाठी सेटिंग्जमध्ये कॅमेरा वापरण्याची परवानगी द्या."
     },
     "typingIndicator": {
@@ -2816,7 +2816,7 @@
     "attachmentPicker": {
       "camera": "कॅमेरा",
       "photoLibrary": "फोटो संग्रह",
-      "files": "फाइली",
+      "files": "फाइल्स",
       "couldNotOpenPhotoPicker": "फोटो निवडण्याची सुविधा उघडता आली नाही. Kilo पुन्हा सुरू करून पुन्हा प्रयत्न करा.",
       "maxFilesAllowed": "जास्तीत जास्त {{displayCount}} फाइल्स जोडता येतात.",
       "onlyAddingFiles": "{{total}} पैकी फक्त {{accepted}} फाइल्स जोडत आहोत (कमाल {{max}})",

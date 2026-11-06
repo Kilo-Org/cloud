@@ -7,6 +7,7 @@ on:
       - Auto-docs intake
       - Chromatic
       - CI
+      - Dependency submission
       - extension CI
       - kilo-app CI
       - kilo-app Release

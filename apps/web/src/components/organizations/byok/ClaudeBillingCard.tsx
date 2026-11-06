@@ -11,7 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { ClaudeLogo } from '@/components/auth/ClaudeLogo';
 import { useFeatureFlagEnabled } from 'posthog-js/react';
-import { CLAUDE_BILLING_FLAG } from '@/lib/auth/claude/access';
+import { CLAUDE_PLATFORM_OAUTH_FLAG } from '@kilocode/web-shared/lib/auth/claude/feature-flag';
 import type { ClaudeBillingStatus } from '@/routers/claude-billing-router';
 
 const CONNECTED_PLATFORMS_URL = 'https://platform.claude.com/connected-platforms';
@@ -139,23 +139,25 @@ export function ClaudeBillingCardView({
             >
               Set a spend limit or disconnect in Claude Console
             </a>
-            {status.canManage ? (
+            {status.canManage && (onConnect || connected) ? (
               <div className="flex flex-wrap items-center gap-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  disabled={connecting || removing}
-                  onClick={onConnect}
-                  className="h-auto min-h-10 whitespace-normal text-left"
-                >
-                  <ClaudeLogo />
-                  {connecting
-                    ? 'Redirecting to Claude…'
-                    : connected
-                      ? 'Reconnect your Claude organization'
-                      : 'Connect your Claude organization'}
-                </Button>
+                {onConnect ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={connecting || removing}
+                    onClick={onConnect}
+                    className="h-auto min-h-10 whitespace-normal text-left"
+                  >
+                    <ClaudeLogo />
+                    {connecting
+                      ? 'Redirecting to Claude…'
+                      : connected
+                        ? 'Reconnect your Claude organization'
+                        : 'Connect your Claude organization'}
+                  </Button>
+                ) : null}
                 {connected ? (
                   <Button
                     type="button"
@@ -168,11 +170,11 @@ export function ClaudeBillingCardView({
                   </Button>
                 ) : null}
               </div>
-            ) : (
+            ) : !status.canManage && onConnect ? (
               <p className="text-muted-foreground text-sm">
                 Ask a Kilo organization owner or admin to connect your Claude organization.
               </p>
-            )}
+            ) : null}
             {connected && status.canManage ? (
               <p className="text-muted-foreground text-xs">
                 Removing this connection restores normal BYOK or Kilo-credit routing. It does not
@@ -205,7 +207,7 @@ function ClaudeBillingCardContent({ organizationId }: { organizationId?: string 
   }, [router, searchParams]);
   const [connecting, setConnecting] = useState(false);
   const statusQuery = useQuery(trpc.claudeBilling.status.queryOptions({ organizationId }));
-  const flagEnabled = useFeatureFlagEnabled(CLAUDE_BILLING_FLAG);
+  const flagEnabled = useFeatureFlagEnabled(CLAUDE_PLATFORM_OAUTH_FLAG);
   const removeMutation = useMutation(
     trpc.claudeBilling.remove.mutationOptions({
       onSuccess: () => {
@@ -221,7 +223,7 @@ function ClaudeBillingCardContent({ organizationId }: { organizationId?: string 
   const needsAdmin = failureCode === 'FORBIDDEN';
   // Before launch the card appears only for an owner who already has a
   // connection, so they can still see its state and remove it.
-  const launched = process.env.NODE_ENV === 'development' || flagEnabled === true;
+  const launched = flagEnabled === true;
   const hasConnection =
     statusQuery.data !== undefined && statusQuery.data.state !== 'not_connected';
   if (!launched && !hasConnection) return null;
@@ -252,14 +254,18 @@ function ClaudeBillingCardContent({ organizationId }: { organizationId?: string 
               else void statusQuery.refetch();
             }
       }
-      onConnect={() => {
-        setConnecting(true);
-        const query = new URLSearchParams({
-          owner: organizationId ?? 'personal',
-          return: window.location.pathname,
-        });
-        window.location.assign(`/claude/billing/connect?${query}`);
-      }}
+      onConnect={
+        launched
+          ? () => {
+              setConnecting(true);
+              const query = new URLSearchParams({
+                owner: organizationId ?? 'personal',
+                return: window.location.pathname,
+              });
+              window.location.assign(`/claude/billing/connect?${query}`);
+            }
+          : undefined
+      }
       onRemove={() => removeMutation.mutate({ organizationId })}
     />
   );

@@ -69,7 +69,7 @@ import {
   OPENAI_CHATGPT_NOT_ELIGIBLE_MESSAGE,
   probeOpenAiChatGptEligibility,
 } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/eligibility';
-import { isClaudeSignInEnabled } from '@/lib/auth/claude/access.server';
+import { isClaudePlatformOAuthEnabled } from '@kilocode/web-shared/lib/auth/claude/feature-flag.server';
 import { claudeSignInProvider } from '@/lib/auth/claude/sign-in-provider';
 import {
   CLAUDE_OIDC_ISSUER,
@@ -1053,7 +1053,7 @@ export const authOptions: NextAuthOptions = {
 
         // Sign in with Claude stays closed until its launch toggle is on, also
         // for a sign-in or link started by URL instead of the button.
-        if (account.provider === 'claude' && !(await isClaudeSignInEnabled())) {
+        if (account.provider === 'claude' && !(await isClaudePlatformOAuthEnabled())) {
           return redirectUrlForCode('UNKNOWN-ERROR');
         }
 

@@ -8,12 +8,16 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', 
     model === '~anthropic/latest' ? 'anthropic/claude-sonnet-4.6' : model
   ),
 }));
+jest.mock('@kilocode/web-shared/lib/auth/claude/feature-flag.server', () => ({
+  isClaudePlatformOAuthEnabled: jest.fn(),
+}));
 import { beforeEach, describe, expect, it } from '@jest/globals';
 import type { ClaudeBillingConnectionRow } from '@kilocode/db/schema';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import { getClaudeBillingConnection } from './store';
 import { getClaudeOperatorToken, isClaudeOperatorConfigured } from './operator';
 import { checkClaudeBilling } from './routing';
+import { isClaudePlatformOAuthEnabled } from '@kilocode/web-shared/lib/auth/claude/feature-flag.server';
 
 const row: ClaudeBillingConnectionRow = {
   id: 'row',
@@ -34,6 +38,7 @@ beforeEach(() => {
   jest.mocked(getClaudeBillingConnection).mockReset().mockResolvedValue(row);
   jest.mocked(getClaudeOperatorToken).mockReset().mockResolvedValue('operator-token');
   jest.mocked(isClaudeOperatorConfigured).mockReset().mockReturnValue(true);
+  jest.mocked(isClaudePlatformOAuthEnabled).mockReset().mockResolvedValue(true);
 });
 
 function request(kind: 'messages' | 'chat_completions'): GatewayRequest {
@@ -85,6 +90,25 @@ describe('Claude customer-billed routing', () => {
       expect(result.skipBalanceCheck).toBe(true);
     }
   );
+
+  it.each(['messages', 'chat_completions'] as const)(
+    'pauses a connected owner without switching payer when the flag is off (%s)',
+    async kind => {
+      jest.mocked(isClaudePlatformOAuthEnabled).mockResolvedValue(false);
+      expect(await checkClaudeBilling(input(kind))).toMatchObject({
+        kind: 'unavailable',
+        message: expect.stringContaining('not enabled'),
+      });
+      expect(getClaudeOperatorToken).not.toHaveBeenCalled();
+    }
+  );
+
+  it('preserves normal routing for an owner without a connection when the flag is off', async () => {
+    jest.mocked(isClaudePlatformOAuthEnabled).mockResolvedValue(false);
+    jest.mocked(getClaudeBillingConnection).mockResolvedValue(null);
+    expect(await checkClaudeBilling(input())).toBeNull();
+    expect(getClaudeOperatorToken).not.toHaveBeenCalled();
+  });
 
   it('does not serve an organization request from a personal connection', async () => {
     jest.mocked(getClaudeBillingConnection).mockResolvedValue(null);

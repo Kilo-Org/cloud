@@ -2731,16 +2731,21 @@ describe('session detail per-session auto-approve', () => {
       showGatewayMetadata: true,
     };
     sessionModelOptions.rows = [modelRow];
-    // A stored session: no live transport reports context usage, and the
-    // session's own settings name the model it ran on.
+    // A writable empty session: no live transport reported context usage yet,
+    // and the sheet lists the model the live session runs on. A stored session
+    // with an empty transcript hides this pill instead (its sheet has no
+    // permission settings to offer); the naming sheet stays for a session that
+    // can still send.
     sessionConfigSync.currentModel = modelRow.id;
     onTestFinished(() => {
       sessionModelOptions.rows = [];
       sessionConfigSync.currentModel = '';
     });
+    goalMountOptions = { resolvedType: 'remote' };
     const view = await mountDetails([]);
     await act(async () => {
-      view.store.set(view.manager.atoms.activeSessionType, 'read-only');
+      view.store.set(view.manager.atoms.activeSessionType, 'remote');
+      view.store.set(view.manager.atoms.isReadOnly, false);
       await Promise.resolve();
     });
 
@@ -3365,6 +3370,85 @@ describe('session detail zero-render transcript guard (mobile-app e2-open)', () 
       title: i18n.t('agentChat.session.emptyTitle'),
       description: i18n.t('agentChat.session.emptyDescription'),
     });
+  });
+
+  it('keeps the header pill live so the stored session still names its model', async () => {
+    // The sheet stays reachable in the pill's other states: its rows name the
+    // model the stored session ran on before any usage arrives.
+    const modelRow: SessionModelOption = {
+      id: 'deepseek/deepseek-v4.1-flash-1017',
+      name: 'DeepSeek V4.1 Flash 1017',
+      displayId: 'deepseek/deepseek-v4.1-flash-1017',
+      variants: [],
+      isPreferred: false,
+      showGatewayMetadata: true,
+    };
+    sessionModelOptions.rows = [modelRow];
+    sessionConfigSync.currentModel = modelRow.id;
+    onTestFinished(() => {
+      sessionModelOptions.rows = [];
+      sessionConfigSync.currentModel = '';
+    });
+    goalMountOptions = { resolvedType: 'remote' };
+    const view = await mountDetails([]);
+    await act(async () => {
+      view.store.set(view.manager.atoms.activeSessionType, 'remote');
+      view.store.set(view.manager.atoms.isReadOnly, false);
+      await Promise.resolve();
+    });
+    const metrics = view.renderer.root.findByProps({ testID: 'session-context-metrics' });
+    const metricsProps = metrics.props as { accessibilityRole: string; onPress: () => void };
+    expect(metricsProps.accessibilityRole).toBe('button');
+    await act(async () => {
+      metricsProps.onPress();
+      await Promise.resolve();
+    });
+    const contextSheet = view.renderer.root.findByType(SessionContextSheet);
+    expect(contextSheet.props.modelDisplay).toBe('DeepSeek V4.1 Flash 1017');
+    expect(contextSheet.props.providerDisplay).toBe('Kilo');
+  });
+
+  it('hides the header pill for a stored session with no transcript and no reported usage', async () => {
+    // A settled empty stored session never reports usage, and a read-only
+    // session has no permission settings to open: the pill keeps its reserved
+    // box instead of painting dash placeholders beside the empty state.
+    const view = await mountDetails([]);
+    await act(async () => {
+      view.store.set(view.manager.atoms.activeSessionType, 'read-only');
+      await Promise.resolve();
+    });
+    const metrics = view.renderer.root.findByProps({ testID: 'session-context-metrics' });
+    const metricsProps = metrics.props as {
+      className?: string;
+      onPress?: () => void;
+      accessibilityElementsHidden?: boolean;
+      importantForAccessibility?: string;
+    };
+    expect(metricsProps.onPress).toBeUndefined();
+    expect(metricsProps.className).toContain('opacity-0');
+    expect(metricsProps.accessibilityElementsHidden).toBe(true);
+    expect(metricsProps.importantForAccessibility).toBe('no');
+    // The box stays reserved so the header does not shift when the pill hides.
+    expect(metricsProps.className).toContain('h-[44px]');
+  });
+
+  it('keeps the header pill after a failed stored open leaves nothing to show', async () => {
+    // The sheet still offers the connection reading and its Retry, so a failed
+    // open keeps the live control instead of hiding the pill.
+    const view = await mountDetails([]);
+    act(() => {
+      view.store.set(view.manager.atoms.activeSessionType, 'read-only');
+      view.store.set(view.manager.atoms.isReadOnly, true);
+      view.store.set(view.manager.atoms.isLoading, false);
+      view.store.set<string | null, [string | null], unknown>(
+        view.manager.atoms.error,
+        'connect ECONNREFUSED 127.0.0.1:12000'
+      );
+    });
+    const metrics = view.renderer.root.findByProps({ testID: 'session-context-metrics' });
+    const metricsProps = metrics.props as { accessibilityRole?: string; onPress?: () => void };
+    expect(metricsProps.accessibilityRole).toBe('button');
+    expect(metricsProps.onPress).toBeTypeOf('function');
   });
 
   it('pages older messages into the reserved skeleton while a zero-render transcript has a cursor', async () => {

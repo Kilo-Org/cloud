@@ -2581,6 +2581,7 @@
       "assistantContextOverflow": "گفت‌وگو برای این مدل بیش از حد طولانی است.",
       "assistantProviderError": "ارائه‌دهنده خطا برگرداند.",
       "assistantProviderRefused": "ارائه‌دهنده این درخواست را رد کرد و تلاش دوباره ممکن نیست.",
+      "assistantCreditsRefusal": "اعتبار کافی برای اجرای Cloud Agent وجود ندارد.",
       "assistantOutputLimit": "پاسخ به محدودیت خروجی مدل رسید.",
       "assistantStructuredOutput": "پاسخ با قالب مورد نیاز مطابقت نداشت.",
       "assistantFailed": "تولید پاسخ ناموفق بود."

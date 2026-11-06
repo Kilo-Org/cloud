@@ -2575,6 +2575,7 @@
       "assistantContextOverflow": "Samtalen er for lang for modellen.",
       "assistantProviderError": "Leverandøren returnerte en feil.",
       "assistantProviderRefused": "Leverandøren avviste denne forespørselen, og den kan ikke gjentas.",
+      "assistantCreditsRefusal": "Du har ikke nok kreditter til å kjøre Cloud Agent.",
       "assistantOutputLimit": "Svaret nådde utdatagrensen til modellen.",
       "assistantStructuredOutput": "Svaret samsvarte ikke med det påkrevde formatet.",
       "assistantFailed": "Svaret kunne ikke genereres."

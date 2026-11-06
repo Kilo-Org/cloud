@@ -20,9 +20,6 @@ const repoUrl = 'https://github.com/kilo/watch-lifecycle';
 jest.mock('@octokit/rest', () => ({
   Octokit: jest.fn(() => ({ pulls: { get: mockPrGet } })),
 }));
-jest.mock('@kilocode/web-shared/lib/posthog-feature-flags', () => ({
-  isReleaseToggleEnabled: jest.fn(async () => true),
-}));
 jest.mock('@/lib/integrations/github/runtime-authorization', () => ({
   assertGitHubInstallationRuntimeAuthorized: jest.fn(async () => undefined),
   GitHubRuntimeAuthorizationError: class extends Error {},

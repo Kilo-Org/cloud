@@ -2575,6 +2575,7 @@
       "assistantContextOverflow": "Харилцан яриа загварын боловсруулах хэмжээнээс хэтэрсэн байна.",
       "assistantProviderError": "Үйлчилгээ үзүүлэгч алдаа буцаалаа.",
       "assistantProviderRefused": "Үйлчилгээ үзүүлэгч энэ хүсэлтийг татгалзсан тул дахин оролдох боломжгүй.",
+      "assistantCreditsRefusal": "Cloud Agent ажиллуулахад кредит хүрэлцэхгүй байна.",
       "assistantOutputLimit": "Хариулт загварын гаргах хэмжээний хязгаарт хүрлээ.",
       "assistantStructuredOutput": "Хариулт шаардлагатай форматад нийцсэнгүй.",
       "assistantFailed": "Хариулт үүсгэж чадсангүй."

@@ -2036,6 +2036,7 @@
       "assistantContextOverflow": "会話が長すぎてモデルで処理できません。",
       "assistantProviderError": "プロバイダーがエラーを返しました。",
       "assistantProviderRefused": "プロバイダーがこのリクエストを拒否したため、再試行できません。",
+      "assistantCreditsRefusal": "Cloud Agentを実行するためのクレジットが不足しています。",
       "assistantOutputLimit": "応答がモデルの出力上限に達しました。",
       "assistantStructuredOutput": "応答が必要な形式に一致しませんでした。",
       "assistantFailed": "応答に失敗しました。"

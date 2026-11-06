@@ -7,6 +7,7 @@ import {
   isValidElement,
   type ReactElement,
   type ReactNode,
+  useEffect,
 } from 'react';
 import { createStore, Provider } from 'jotai';
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -90,6 +91,10 @@ import { recordLastOpenedSession } from '@/lib/last-opened-session';
 import { renderWithProviders, waitFor } from '@/test/render-with-providers';
 
 const managerSlot = vi.hoisted(() => ({ current: null as SessionManager | null }));
+// The open gate's verdict the list mock publishes. `true` is the settled open
+// these cases describe; a test that needs the still-measuring window sets it to
+// `false`, and `null` models a list that never reports.
+const openSettledReport = vi.hoisted(() => ({ value: true as boolean | null }));
 const connectionHealth = vi.hoisted(() => ({
   isConnected: true,
   reconnectExhausted: false,
@@ -359,6 +364,17 @@ vi.mock('@/components/agents/tool-cards', () => ({
 vi.mock('@/components/agents/suggest-tool-card', () => ({ SuggestToolCard: 'SuggestToolCard' }));
 vi.mock('@/components/agents/session-message-list', () => ({
   SessionMessageList: function MessageList<T>(props: ComponentProps<typeof SessionMessageList<T>>) {
+    // The real list publishes its open gate's verdict to the host. These cases
+    // describe an open that has settled, so the mock reports it; a test that
+    // needs the still-measuring window sets `openSettledReport.value = false`.
+    const { onOpenSettledChange, sessionId } = props;
+    useEffect(() => {
+      const report = openSettledReport.value;
+      if (report === null) {
+        return;
+      }
+      onOpenSettledChange?.(sessionId, report);
+    }, [onOpenSettledChange, sessionId]);
     return createElement(
       'MessageList',
       null,
@@ -826,6 +842,7 @@ beforeEach(() => {
   condensePreference.value = false;
   currentUserId.value = 'test-user';
   sessionConfigSync.currentModel = '';
+  openSettledReport.value = true;
   connectionHealth.isConnected = true;
   connectionHealth.reconnectExhausted = false;
   connectionHealth.retryConnection.mockClear();
@@ -2321,6 +2338,32 @@ describe('session detail slow load', () => {
     // The composer takes the held area, so the transcript never moves under it.
     await view.respond(ROOT_ID, [childMessage(ROOT_ID, 'writable row')]);
     expect(renderedText(view.renderer.root)).toContain('writable row');
+    expect(view.renderer.root.findAllByType(SessionComposerSkeleton)).toHaveLength(0);
+    expect(view.renderer.root.findAll(node => Object.is(node.type, 'ChatComposer'))).toHaveLength(
+      1
+    );
+  });
+
+  it('holds a writable session composer back until the mounted rows are painted', async () => {
+    goalMountOptions = { resolvedType: 'remote' };
+    openSettledReport.value = false;
+    const view = await mountDetails([childMessage(ROOT_ID, 'writable row')]);
+    // The rows are mounted but the open gate still hides them behind its
+    // skeleton, so the bottom slot keeps the composer's reserve: an input over a
+    // loading body is the same two states at once the read-only side avoids.
+    expect(view.renderer.root.findAllByType(SessionComposerSkeleton)).toHaveLength(1);
+    expect(view.renderer.root.findAllByType(SessionReadOnlyFooterPlaceholder)).toHaveLength(0);
+    expect(view.renderer.root.findAll(node => Object.is(node.type, 'ChatComposer'))).toHaveLength(
+      0
+    );
+
+    const list = view.renderer.root.findByType(SessionMessageList);
+    act(() => {
+      (list.props as ComponentProps<typeof SessionMessageList>).onOpenSettledChange?.(
+        ROOT_ID,
+        true
+      );
+    });
     expect(view.renderer.root.findAllByType(SessionComposerSkeleton)).toHaveLength(0);
     expect(view.renderer.root.findAll(node => Object.is(node.type, 'ChatComposer'))).toHaveLength(
       1
@@ -4601,6 +4644,54 @@ describe('session detail read-only composer', () => {
     );
   });
 
+  // The transcript paints a skeleton until its rows stop measuring. The chrome
+  // around it reads the same fact: a live continue footer, or a pill settled on
+  // a bare ring, beside a loading body is the screen showing two states at once.
+  it('keeps the footer and the pill in their loading shapes until the rows are painted', async () => {
+    openSettledReport.value = false;
+    const view = await mountDetails([childMessage(ROOT_ID, 'shown row')]);
+
+    expect(view.renderer.root.findAllByType(SessionReadOnlyFooterPlaceholder)).toHaveLength(1);
+    expect(
+      view.renderer.root.findAll(
+        node =>
+          Object.is(node.type, 'Button') &&
+          node.props.accessibilityLabel === i18n.t('agentChat.session.continueInNewSession')
+      )
+    ).toHaveLength(0);
+    // The pill holds the row its values will take, instead of shrinking to a
+    // ring with no slot.
+    const metrics = view.renderer.root.findByProps({ testID: 'session-context-metrics' });
+    expect(metrics.findAll(node => Object.is(node.type, 'Skeleton'))).toHaveLength(1);
+
+    // The list then reports its rows painted, and the footer takes the
+    // placeholder's place in the same slot.
+    const list = view.renderer.root.findByType(SessionMessageList);
+    act(() => {
+      (list.props as ComponentProps<typeof SessionMessageList>).onOpenSettledChange?.(
+        ROOT_ID,
+        true
+      );
+    });
+    expect(view.renderer.root.findAllByType(SessionReadOnlyFooterPlaceholder)).toHaveLength(0);
+    expect(renderedTextOutsideSheet(view.renderer.root)).toContain(
+      i18n.t('agentChat.session.readOnly')
+    );
+    expect(metrics.findAll(node => Object.is(node.type, 'Skeleton'))).toHaveLength(0);
+  });
+
+  it('keeps the footer live when the mounted list never reports its open state', async () => {
+    openSettledReport.value = null;
+    const view = await mountDetails([childMessage(ROOT_ID, 'shown row')]);
+
+    // A list that stays silent must not leave the bottom slot in its reserve:
+    // the session's own footer replaces the placeholder.
+    expect(view.renderer.root.findAllByType(SessionReadOnlyFooterPlaceholder)).toHaveLength(0);
+    expect(renderedTextOutsideSheet(view.renderer.root)).toContain(
+      i18n.t('agentChat.session.readOnly')
+    );
+  });
+
   it('replaces the composer on an empty read-only transcript too', async () => {
     // A stored session with no rows has nowhere to write either. The read-only
     // fact is the resolved kind, so the composer must not mount beside it and
@@ -4641,7 +4732,6 @@ describe('session detail read-only composer', () => {
     expect(String(label.props.className)).toContain('text-primary-foreground');
     expect(String(label.props.className)).toContain('dark:text-selection-foreground');
   });
-
   it('opens the new-session composer once on a repeated continue press', async () => {
     const view = await mountDetails([childMessage(ROOT_ID, 'shown row')]);
     const continueControl = view.renderer.root.find(

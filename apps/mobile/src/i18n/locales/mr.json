@@ -2575,6 +2575,7 @@
       "assistantContextOverflow": "हे संभाषण मॉडेलच्या मर्यादेपेक्षा मोठे आहे.",
       "assistantProviderError": "सेवा पुरवठादाराने त्रुटी दिली.",
       "assistantProviderRefused": "सेवा पुरवठादाराने ही विनंती नाकारली आणि ती पुन्हा प्रयत्न करता येणार नाही.",
+      "assistantCreditsRefusal": "Cloud Agent चालवण्यासाठी पुरेसे क्रेडिट नाहीत.",
       "assistantOutputLimit": "प्रतिसाद मॉडेलची आउटपुट मर्यादा गाठली.",
       "assistantStructuredOutput": "प्रतिसाद आवश्यक स्वरूपाशी जुळला नाही.",
       "assistantFailed": "प्रतिसाद तयार करता आला नाही."

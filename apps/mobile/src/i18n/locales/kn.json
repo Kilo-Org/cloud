@@ -2581,6 +2581,7 @@
       "assistantContextOverflow": "ಸಂಭಾಷಣೆಯ ಉದ್ದವು ಮಾದರಿ ನಿಭಾಯಿಸಬಹುದಾದ ಮಿತಿಯನ್ನು ಮೀರಿದೆ.",
       "assistantProviderError": "ಪೂರೈಕೆದಾರರು ದೋಷವನ್ನು ಹಿಂತಿರುಗಿಸಿದ್ದಾರೆ.",
       "assistantProviderRefused": "ಪೂರೈಕೆದಾರರು ಈ ವಿನಂತಿಯನ್ನು ನಿರಾಕರಿಸಿದ್ದಾರೆ ಮತ್ತು ಇದನ್ನು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಲು ಸಾಧ್ಯವಿಲ್ಲ.",
+      "assistantCreditsRefusal": "Cloud Agent ಅನ್ನು ಚಲಾಯಿಸಲು ಸಾಕಷ್ಟು ಕ್ರೆಡಿಟ್‌ಗಳಿಲ್ಲ.",
       "assistantOutputLimit": "ಪ್ರತಿಕ್ರಿಯೆಯು ಮಾದರಿಯ ಔಟ್‌ಪುಟ್ ಮಿತಿಯನ್ನು ತಲುಪಿದೆ.",
       "assistantStructuredOutput": "ಪ್ರತಿಕ್ರಿಯೆಯು ಅಗತ್ಯ ಸ್ವರೂಪಕ್ಕೆ ಸರಿಹೊಂದಲಿಲ್ಲ.",
       "assistantFailed": "ಪ್ರತಿಕ್ರಿಯೆ ವಿಫಲವಾಗಿದೆ."

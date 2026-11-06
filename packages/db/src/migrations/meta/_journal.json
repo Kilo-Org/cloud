@@ -2374,6 +2374,13 @@
       "when": 1793899074271,
       "tag": "0338_support_access_grants",
       "breakpoints": true
+    },
+    {
+      "idx": 339,
+      "version": "7",
+      "when": 1793911550611,
+      "tag": "0339_public_roland_deschain",
+      "breakpoints": true
     }
   ]
 }

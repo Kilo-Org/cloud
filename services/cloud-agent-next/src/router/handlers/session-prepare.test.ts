@@ -668,7 +668,6 @@ describe('prepareSession operation-ledger admission gate', () => {
         egressAllowlist: ['changed.example.com'],
       },
     });
-    context.env.CLOUDFLARE_CONTAINERS_ORG_IDS = '*';
     context.authToken = jwt.sign({ aud: 'cloud-agent-next' }, 'fixture');
     context.cloudAgentAuthority = {
       version: 1,

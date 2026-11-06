@@ -709,11 +709,6 @@ function worktreeEnabledForCreate(
   return true;
 }
 
-export function assertRuntimeIsolationAdmission(env: Pick<Env, 'RUNTIME_ISOLATION_ENABLED'>): void {
-  if (env.RUNTIME_ISOLATION_ENABLED === 'true') return;
-  throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'runtime_isolation_unavailable' });
-}
-
 function finalizationVersionForCreate(row: OperationLedgerRow): 1 | 2 {
   const recorded = row.canonical_result?.[SESSION_CREATE_FINALIZATION_VERSION_KEY];
   if (recorded !== undefined) {
@@ -800,7 +795,6 @@ async function issueSessionRuntimeAuthorization(
     });
   }
   if (ctx.cloudAgentAuthority) {
-    assertRuntimeIsolationAdmission(ctx.env);
     const authority = ctx.cloudAgentAuthority;
     const runtimeAuthorization = await withDORetry(
       () => getSandboxSessionStub(ctx.env, ctx.userId, authority.parentSessionId),
@@ -824,7 +818,6 @@ async function issueSessionRuntimeAuthorization(
   }
   let runtimeAuthorization: NewSessionAllocation['runtimeAuthorization'];
   if (isPolicyBearingAuthToken(ctx.authToken)) {
-    assertRuntimeIsolationAdmission(ctx.env);
     const secret = ctx.env.NEXTAUTH_SECRET;
     const nextAuthSecret = typeof secret === 'string' ? secret : await secret.get();
     if (!nextAuthSecret)
@@ -1147,6 +1140,16 @@ async function allocateNewSession(
       throw creationInProgressError();
     }
     // `ready` continues normally.
+  } else if (ingestResult !== undefined && ingestResult.status === 'rejected') {
+    // The ingest plane declined this create (the destination is not accepting
+    // data, the source is unreadable, or the identity conflicts). Record the
+    // destination IDs as retired so a same-key retry allocates fresh ones
+    // instead of resuming IDs the ingest plane will not admit.
+    if (ledger) {
+      await recordCloneTombstone(ledger, { cloudAgentSessionId, kiloSessionId });
+      await ledger.onFailure('ownership_row', ingestResult.code);
+    }
+    throw new TRPCError({ code: 'BAD_REQUEST', message: ingestResult.code });
   }
 
   return {
@@ -2578,6 +2581,14 @@ async function resumeFirstWorktreeCreate(
     }
 
     if (ingestResult?.status === 'rejected') {
+      // A destination the ingest plane refuses must not be resumed: record
+      // the IDs as retired so a same-key retry allocates fresh ones.
+      if (ingestResult.code === 'session_retired') {
+        await recordCloneTombstone(hooks, {
+          cloudAgentSessionId: allocation.cloudAgentSessionId,
+          kiloSessionId: allocation.kiloSessionId,
+        });
+      }
       await hooks.onFailure('ownership_row', ingestResult.code);
       throw new TRPCError({ code: 'BAD_REQUEST', message: ingestResult.code });
     }

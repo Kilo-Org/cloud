@@ -14,6 +14,17 @@ function identity() {
   };
 }
 
+type HarnessState = Parameters<Parameters<typeof runInDurableObject>[1]>[1];
+
+function pendingR2Markers(state: HarnessState): string[] {
+  return drizzle(state.storage)
+    .select()
+    .from(ingestMeta)
+    .all()
+    .filter(row => row.key.startsWith('pendingR2/'))
+    .map(row => row.key);
+}
+
 describe('worktree session cleanup in Workers', () => {
   it('reads and deletes a never-run child snapshot without waking its expired runtime', async () => {
     const { kiloUserId, sessionId, stub } = identity();
@@ -278,13 +289,13 @@ describe('worktree session cleanup in Workers', () => {
     await stub.clearForWorktree(kiloUserId, sessionId);
   });
 
-  it('abandons a streamed multipart stage whose reservation etag moved', async () => {
+  it('removes the marker when a multipart stage is superseded', async () => {
     const { kiloUserId, sessionId, stub } = identity();
     const key = `ingest/${kiloUserId}/${sessionId}/raced`;
     const bodySize = 5 * 1024 * 1024 + 17;
     const body = new Uint8Array(bodySize);
 
-    await runInDurableObject(stub, async instance => {
+    await runInDurableObject(stub, async (instance, state) => {
       const original = instance['env'].SESSION_INGEST_R2;
       Object.assign(instance['env'], {
         SESSION_INGEST_R2: new Proxy(original, {
@@ -305,12 +316,67 @@ describe('worktree session cleanup in Workers', () => {
             bodySize
           )
         ).rejects.toThrow(/Session R2 reservation changed/);
+        expect(await original.head(key)).not.toBeNull();
+        expect(pendingR2Markers(state)).toEqual([]);
       } finally {
         Object.assign(instance['env'], { SESSION_INGEST_R2: original });
       }
     });
 
-    expect((await env.SESSION_INGEST_R2.get(key))?.size).not.toBe(bodySize);
+    await stub.clearForWorktree(kiloUserId, sessionId);
+  });
+
+  it('removes the marker when a stage write stops early', async () => {
+    const { kiloUserId, sessionId, stub } = identity();
+
+    await runInDurableObject(stub, async (instance, state) => {
+      const original = instance['env'].SESSION_INGEST_R2;
+      let reservations = 0;
+      const rejectingPut = (
+        name: string,
+        body: unknown,
+        options?: Record<string, unknown> & { onlyIf?: unknown }
+      ): Promise<R2Object | null> => {
+        // Allow the put that carries request headers; abandon the conditional put.
+        if (!options || options.onlyIf instanceof Headers) {
+          reservations++;
+          return original.put(name, body as never);
+        }
+        return Promise.reject(new Error('Staging body write rejected'));
+      };
+
+      Object.assign(instance['env'], {
+        SESSION_INGEST_R2: new Proxy(original, {
+          get(target, property, receiver) {
+            if (property === 'put') return rejectingPut;
+            const value = Reflect.get(target, property, receiver) as unknown;
+            return typeof value === 'function' ? (value as () => unknown).bind(target) : value;
+          },
+        }),
+      });
+      try {
+        const streamedKey = `items/${kiloUserId}/${sessionId}/rejected/1`;
+        await expect(
+          instance.stageR2Object(
+            { kiloUserId, sessionId, key: streamedKey },
+            new Blob(['streamed body']).stream()
+          )
+        ).rejects.toThrow(/Staging body write rejected/);
+        expect(await original.head(streamedKey)).toBeNull();
+        // A by-value body uses the same reservation flow.
+        const byValueKey = `items/${kiloUserId}/${sessionId}/rejected-by-value/1`;
+        const bytes = new TextEncoder().encode('by-value body');
+        await expect(
+          instance.stageR2Object({ kiloUserId, sessionId, key: byValueKey }, bytes)
+        ).rejects.toThrow(/Staging body write rejected/);
+        expect(await original.head(byValueKey)).toBeNull();
+        expect(pendingR2Markers(state)).toEqual([]);
+        expect(reservations).toBeGreaterThan(0);
+      } finally {
+        Object.assign(instance['env'], { SESSION_INGEST_R2: original });
+      }
+    });
+
     await stub.clearForWorktree(kiloUserId, sessionId);
   });
 

@@ -1,14 +1,17 @@
 import {
-  ENKRYPT_DETECTOR_IDS,
   ENKRYPT_OUTPUT_DETECTOR_IDS,
-  EnkryptInputDetectorsSchema,
-  EnkryptOutputDetectorsSchema,
+  EnkryptInputDetectorsUpdateSchema,
+  EnkryptOutputDetectorsUpdateSchema,
   type EnkryptInputDetectors,
   type EnkryptOutputDetectors,
   type EnkryptPolicyRule,
 } from '@kilocode/db/schema-types';
 import type * as z from 'zod';
-import { createKiloDefaultEnkryptInputDetectors } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detectors';
+import {
+  createKiloDefaultEnkryptInputDetectors,
+  ENKRYPT_CONFIGURABLE_INPUT_DETECTOR_IDS,
+} from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detectors';
+import { KILO_DEFAULT_POLICY_TEXT } from './kilo-default-policy';
 
 export type EnkryptInputDetectorsDraft = Omit<
   EnkryptInputDetectors,
@@ -42,7 +45,6 @@ export type EnkryptOutputGuardrailDraft = {
 
 export type EnkryptGuardrailsConfig = {
   enabled: boolean;
-  scan_tool_results: boolean;
   detectors: EnkryptInputDetectors;
   output: EnkryptOutputGuardrailConfig;
 };
@@ -125,7 +127,6 @@ export function fromDraftOutputDetectors(
 export function toDraft(config: EnkryptGuardrailsConfig): EnkryptGuardrailsDraft {
   return {
     enabled: config.enabled,
-    scan_tool_results: config.scan_tool_results,
     detectors: toDraftDetectors(config.detectors),
     output: {
       enabled: config.output.enabled,
@@ -137,7 +138,6 @@ export function toDraft(config: EnkryptGuardrailsConfig): EnkryptGuardrailsDraft
 export function fromDraft(draft: EnkryptGuardrailsDraft): EnkryptGuardrailsConfig {
   return {
     enabled: draft.enabled,
-    scan_tool_results: draft.scan_tool_results,
     detectors: fromDraftDetectors(draft.detectors),
     output: {
       enabled: draft.output.enabled,
@@ -146,7 +146,10 @@ export function fromDraft(draft: EnkryptGuardrailsDraft): EnkryptGuardrailsConfi
   };
 }
 
-/** Applies Kilo Default's detector selection while keeping keywords, topics, and policies. */
+/**
+ * Applies Kilo Default's detector selection and turns on Policy violation with Kilo's default
+ * policy text, keeping keywords, topics, and structured rules.
+ */
 export function applyKiloDefaultPreset(
   detectors: EnkryptInputDetectorsDraft
 ): EnkryptInputDetectorsDraft {
@@ -155,7 +158,12 @@ export function applyKiloDefaultPreset(
     ...preset,
     keyword_detector: { ...detectors.keyword_detector, enabled: preset.keyword_detector.enabled },
     topic_detector: { ...detectors.topic_detector, enabled: preset.topic_detector.enabled },
-    policy_violation: { ...detectors.policy_violation, enabled: preset.policy_violation.enabled },
+    policy_violation: {
+      ...detectors.policy_violation,
+      enabled: true,
+      format: 'policy_text',
+      policy_text: KILO_DEFAULT_POLICY_TEXT,
+    },
   };
 }
 
@@ -195,7 +203,7 @@ export function getEnkryptOutputGuardrailIssues(
   }
   addSchemaIssues(
     issues,
-    EnkryptOutputDetectorsSchema.safeParse(fromDraftOutputDetectors(output.detectors))
+    EnkryptOutputDetectorsUpdateSchema.safeParse(fromDraftOutputDetectors(output.detectors))
   );
   return issues;
 }
@@ -207,12 +215,15 @@ export function getEnkryptOutputGuardrailIssues(
  */
 export function getEnkryptGuardrailsIssues(draft: EnkryptGuardrailsDraft): EnkryptGuardrailsIssues {
   const issues = new Map<string, string>();
-  if (draft.enabled && !ENKRYPT_DETECTOR_IDS.some(id => draft.detectors[id].enabled)) {
+  if (
+    draft.enabled &&
+    !ENKRYPT_CONFIGURABLE_INPUT_DETECTOR_IDS.some(id => draft.detectors[id].enabled)
+  ) {
     issues.set('detectors', 'Turn on at least one detector.');
   }
   addSchemaIssues(
     issues,
-    EnkryptInputDetectorsSchema.safeParse(fromDraftDetectors(draft.detectors))
+    EnkryptInputDetectorsUpdateSchema.safeParse(fromDraftDetectors(draft.detectors))
   );
   for (const [path, message] of getEnkryptOutputGuardrailIssues(draft.output)) {
     issues.set(path ? `output.${path}` : 'output', message);

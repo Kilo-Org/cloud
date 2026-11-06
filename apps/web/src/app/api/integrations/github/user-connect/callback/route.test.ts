@@ -5,6 +5,7 @@ import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { redisClient } from '@kilocode/web-shared/lib/redis';
 import { createGitHubUserAuthorizationState } from '@/lib/integrations/platforms/github/user-authorization-state';
 import { exchangeAndStoreGitHubUserAuthorization } from '@/lib/integrations/platforms/github/user-authorization';
+import { GitHubIdentityConflictError } from '@kilocode/db/github-identity';
 import { GET } from './route';
 
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
@@ -27,6 +28,7 @@ const mockedRedisSet = jest.mocked(redisClient.set);
 const mockedCaptureMessage = jest.mocked(captureMessage);
 const mockedCaptureException = jest.mocked(captureException);
 const userId = 'oauth/synthetic-callback-user';
+const expected = { authorizationId: null, credentialVersion: null };
 const code = 'synthetic-code';
 
 function makeRequest(params: Record<string, string> = {}): NextRequest {
@@ -63,7 +65,14 @@ describe('GET /api/integrations/github/user-connect/callback', () => {
       verifiers.delete(key);
       return verifier;
     });
-    mockedExchange.mockResolvedValue({ status: 'connected', githubLogin: 'synthetic-login' });
+    mockedExchange.mockResolvedValue({
+      status: 'connected',
+      githubLogin: 'synthetic-login',
+      credentialSource: 'github_app',
+      authorizationId: crypto.randomUUID(),
+      credentialVersion: 1,
+      expiresAt: '2030-01-01T00:00:00.000Z',
+    });
   });
 
   afterEach(() => {
@@ -71,7 +80,7 @@ describe('GET /api/integrations/github/user-connect/callback', () => {
   });
 
   test('redirects an unauthenticated callback before state consumption', async () => {
-    const { state } = await createGitHubUserAuthorizationState(userId);
+    const { state } = await createGitHubUserAuthorizationState(userId, expected);
     mockedGetUserFromAuth.mockResolvedValue({
       user: null,
       authFailedResponse: NextResponse.json(
@@ -87,7 +96,7 @@ describe('GET /api/integrations/github/user-connect/callback', () => {
   });
 
   test('handles provider cancellation without consuming or logging provider data', async () => {
-    const { state } = await createGitHubUserAuthorizationState(userId);
+    const { state } = await createGitHubUserAuthorizationState(userId, expected);
     expectRedirect(
       await GET(makeRequest({ code, state, error: 'synthetic-sensitive-provider-error' })),
       'error',
@@ -102,7 +111,7 @@ describe('GET /api/integrations/github/user-connect/callback', () => {
   test.each([undefined, '', 'invalid code', 'x'.repeat(2049)])(
     'leaves the verifier available after a missing or malformed code (case %#)',
     async invalidCode => {
-      const { state } = await createGitHubUserAuthorizationState(userId);
+      const { state } = await createGitHubUserAuthorizationState(userId, expected);
       const params: Record<string, string> = { state };
       if (invalidCode !== undefined) params.code = invalidCode;
       expectRedirect(await GET(makeRequest(params)), 'error', 'missing_code');
@@ -114,6 +123,7 @@ describe('GET /api/integrations/github/user-connect/callback', () => {
         kiloUserId: userId,
         code,
         codeVerifier: mockedRedisSet.mock.calls[0][1],
+        expected,
       });
     }
   );
@@ -137,7 +147,7 @@ describe('GET /api/integrations/github/user-connect/callback', () => {
   });
 
   test('rejects tampered state without consuming or exchanging', async () => {
-    const { state } = await createGitHubUserAuthorizationState(userId);
+    const { state } = await createGitHubUserAuthorizationState(userId, expected);
     expectRedirect(
       await GET(makeRequest({ code, state: `${state}tampered` })),
       'error',
@@ -153,7 +163,7 @@ describe('GET /api/integrations/github/user-connect/callback', () => {
 
   test('rejects expired state before consuming storage', async () => {
     jest.useFakeTimers();
-    const { state } = await createGitHubUserAuthorizationState(userId);
+    const { state } = await createGitHubUserAuthorizationState(userId, expected);
     jest.advanceTimersByTime(601_000);
     expectRedirect(await GET(makeRequest({ code, state })), 'error', 'invalid_state');
     expect(mockedRedisGetDel).not.toHaveBeenCalled();
@@ -165,7 +175,10 @@ describe('GET /api/integrations/github/user-connect/callback', () => {
   });
 
   test('routes a different authenticated account to account-mismatch recovery', async () => {
-    const { state } = await createGitHubUserAuthorizationState('oauth/synthetic-other-account');
+    const { state } = await createGitHubUserAuthorizationState(
+      'oauth/synthetic-other-account',
+      expected
+    );
     expectRedirect(await GET(makeRequest({ code, state })), 'error', 'account_mismatch');
     expect(mockedRedisGetDel).not.toHaveBeenCalled();
     expect(mockedExchange).not.toHaveBeenCalled();
@@ -176,7 +189,7 @@ describe('GET /api/integrations/github/user-connect/callback', () => {
   });
 
   test('classifies missing verifier separately from storage failures', async () => {
-    const { state } = await createGitHubUserAuthorizationState(userId);
+    const { state } = await createGitHubUserAuthorizationState(userId, expected);
     verifiers.clear();
     expectRedirect(await GET(makeRequest({ code, state })), 'error', 'invalid_state');
     expect(mockedExchange).not.toHaveBeenCalled();
@@ -203,7 +216,7 @@ describe('GET /api/integrations/github/user-connect/callback', () => {
     new DOMException('synthetic-sensitive-timeout', 'TimeoutError'),
     new Error('synthetic-sensitive-redis-details'),
   ])('reports a storage failure safely without exchange or GETDEL retry', async error => {
-    const { state } = await createGitHubUserAuthorizationState(userId);
+    const { state } = await createGitHubUserAuthorizationState(userId, expected);
     const verifier = mockedRedisSet.mock.calls[0][1];
     mockedRedisGetDel.mockRejectedValueOnce(error);
     expectRedirect(await GET(makeRequest({ code, state })), 'error', 'connection_failed');
@@ -235,7 +248,7 @@ describe('GET /api/integrations/github/user-connect/callback', () => {
   });
 
   test('exchanges a valid callback exactly once under concurrent requests', async () => {
-    const { state } = await createGitHubUserAuthorizationState(userId);
+    const { state } = await createGitHubUserAuthorizationState(userId, expected);
     const results = await Promise.all([
       GET(makeRequest({ code, state })),
       GET(makeRequest({ code, state })),
@@ -247,6 +260,7 @@ describe('GET /api/integrations/github/user-connect/callback', () => {
       kiloUserId: userId,
       code,
       codeVerifier: mockedRedisSet.mock.calls[0][1],
+      expected,
     });
   });
 
@@ -254,13 +268,20 @@ describe('GET /api/integrations/github/user-connect/callback', () => {
     'already_connected_to_another_account',
     'disconnect_existing_identity_first',
   ] as const)('preserves authorization conflict redirects: %s', async status => {
-    const { state } = await createGitHubUserAuthorizationState(userId);
+    const { state } = await createGitHubUserAuthorizationState(userId, expected);
     mockedExchange.mockResolvedValueOnce({ status });
     expectRedirect(await GET(makeRequest({ code, state })), 'error', status);
   });
 
+  test('routes an identity change during the round trip to conflict recovery without an exception', async () => {
+    const { state } = await createGitHubUserAuthorizationState(userId, expected);
+    mockedExchange.mockRejectedValueOnce(new GitHubIdentityConflictError());
+    expectRedirect(await GET(makeRequest({ code, state })), 'error', 'connection_conflict');
+    expect(mockedCaptureException).not.toHaveBeenCalled();
+  });
+
   test('sanitizes unexpected exchange errors and records the stage', async () => {
-    const { state } = await createGitHubUserAuthorizationState(userId);
+    const { state } = await createGitHubUserAuthorizationState(userId, expected);
     const sensitiveError = `synthetic-exchange-secret ${code} ${state} ${userId}`;
     mockedExchange.mockRejectedValueOnce(new Error(sensitiveError));
     expectRedirect(await GET(makeRequest({ code, state })), 'error', 'connection_failed');

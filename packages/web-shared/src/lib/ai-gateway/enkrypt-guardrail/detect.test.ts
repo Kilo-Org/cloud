@@ -229,7 +229,7 @@ describe('scanRequest', () => {
     expect(result.verdict).toEqual({
       action: 'block',
       message:
-        "Your organization's Enkrypt AI guardrail blocked this request (detected: toxicity). The request was flagged by your organization policy. Review it and retry.",
+        "Your organization's Enkrypt AI guardrail blocked this request (detected: toxicity). The request was flagged by your organization policy.",
     });
   });
 
@@ -247,7 +247,7 @@ describe('scanRequest', () => {
     expect(result.verdict).toEqual({
       action: 'block',
       message:
-        "Your organization's Enkrypt AI guardrail blocked this request (detected: keyword_detector). The request was flagged by your organization policy. Review it and retry.",
+        "Your organization's Enkrypt AI guardrail blocked this request (detected: keyword_detector). The request was flagged by your organization policy.",
     });
     expect(result.usageRecords).toEqual([expect.objectContaining({ decision: 'blocked' })]);
   });

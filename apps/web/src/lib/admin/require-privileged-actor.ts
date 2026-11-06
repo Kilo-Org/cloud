@@ -112,11 +112,9 @@ export async function requirePrivilegedActor(
       internalApiUse: ctx.internalApiUse,
     });
 
-  if (
-    credential === 'session' &&
-    ctx.webSessionPepper !== undefined &&
-    !isWebSessionCurrent(ctx.webSessionPepper, currentUser)
-  ) {
+  // `isWebSessionCurrent` normalizes an absent pepper to null, so a session
+  // credential is always compared against the primary row.
+  if (credential === 'session' && !isWebSessionCurrent(ctx.webSessionPepper, currentUser)) {
     throw new TRPCError({ code: 'FORBIDDEN', message: 'Reauthentication required' });
   }
 

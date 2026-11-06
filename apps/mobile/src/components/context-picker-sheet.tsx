@@ -90,12 +90,17 @@ function ContextPickerSheetBody({
   const { height: windowHeight } = useWindowDimensions();
   const cancelLabel = options[cancelButtonIndex] ?? '';
   const listRef = useRef<ScrollViewInstance>(null);
+  const listViewportHeight = Math.round(windowHeight * LIST_MAX_WINDOW_FRACTION);
   // The list caps at half the window, so a long membership list starts at the
   // top and the checked row can begin below the fold: the sheet would open with
   // no visible mark on the account the user is on, and the first row is the
-  // only one left to read as the selection. Scroll the check into view once,
-  // when its row is laid out; a later layout (resize, rotation) must not yank
-  // a list the user has scrolled.
+  // only one left to read as the selection. Reveal the check once, when its row
+  // is laid out, and only when the row runs past the fold: a row that already
+  // fits needs no scroll, and scrolling it would hide the rows above it — the
+  // first row is the personal account, so the sheet would open showing only
+  // organizations. The reveal stops at the checked row's bottom edge, so the
+  // rows above it keep as much of the list as their own height allows. A later
+  // layout (resize, rotation) must not yank a list the user has scrolled.
   const revealed = useRef(false);
   // Divider between rows only: the rule that closes the list belongs to the
   // action area below, not to the last row.
@@ -122,7 +127,7 @@ function ContextPickerSheetBody({
           <ScrollView
             ref={listRef}
             nestedScrollEnabled
-            style={{ maxHeight: Math.round(windowHeight * LIST_MAX_WINDOW_FRACTION) }}
+            style={{ maxHeight: listViewportHeight }}
             showsVerticalScrollIndicator={false}
           >
             {options.map((label, index) => {
@@ -147,8 +152,12 @@ function ContextPickerSheetBody({
                             return;
                           }
                           revealed.current = true;
+                          const { y, height } = event.nativeEvent.layout;
+                          if (y + height <= listViewportHeight) {
+                            return;
+                          }
                           listRef.current?.scrollTo({
-                            y: event.nativeEvent.layout.y,
+                            y: y + height - listViewportHeight,
                             animated: false,
                           });
                         }

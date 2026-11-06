@@ -1228,7 +1228,7 @@ Build/validate/acceptance arguments:
   --sandbox-name <name>    Stop only: exact sandbox name used to create it
 
 Activation and rollback:
-  1. Deploy code with VERCEL_SANDBOX_ORG_IDS empty.
+  1. Deploy code with BYOC_VERCEL_IDS empty.
   2. Verify no deployed version-1 Vercel tombstones exist.
   3. Build and accept the snapshot.
   4. Configure accepted runtime values and one allowlisted organization.

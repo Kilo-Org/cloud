@@ -198,7 +198,7 @@ export function CenteredState({
     return () => {
       clearTimeout(timer);
     };
-}, []);
+  }, []);
   // The latch is set during render rather than in an effect: a detach clears the
   // measured placement in a layout effect, so an effect-only latch would still
   // paint one hidden frame — the same blank body, on the tab a returning screen

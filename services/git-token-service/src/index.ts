@@ -168,7 +168,7 @@ export type GetCloudAgentAuthForRepoResult =
   | { success: false; reason: 'repository_permissions_unavailable' };
 
 export type IssueGitHubSessionCapabilityParams = GetCloudAgentAuthForRepoParams & {
-  outboundContainerId?: string;
+  outboundContainerId: string;
 };
 export type IssueGitHubSessionCapabilitySuccess = Omit<
   GetCloudAgentAuthForRepoSuccess,
@@ -187,7 +187,7 @@ export type IssueGitHubSessionCapabilityResult =
 
 export type RedeemGitHubSessionCapabilityParams = {
   capability: string;
-  outboundContainerId?: string;
+  outboundContainerId: string;
   requestMethod: string;
   requestUrl: string;
 };
@@ -216,7 +216,7 @@ export type RedeemGitHubSessionCapabilityResult =
 
 export type IssueGitLabSessionCapabilityParams = GetGitLabTokenParams & {
   gitUrl: string;
-  outboundContainerId?: string;
+  outboundContainerId: string;
 };
 export type IssueGitLabSessionCapabilitySuccess = {
   success: true;
@@ -242,7 +242,7 @@ export type IssueGitLabSessionCapabilityResult =
     };
 export type RedeemGitLabSessionCapabilityParams = {
   capability: string;
-  outboundContainerId?: string;
+  outboundContainerId: string;
   requestMethod: string;
   requestUrl: string;
 };
@@ -591,47 +591,6 @@ function validateGitHubCapabilityUpstream(
   return { failure: 'upstream_host_not_allowed' };
 }
 
-function validateLegacyGitHubCapabilityUpstream(
-  requestMethod: string,
-  requestUrl: string,
-  repository: { owner: string; repo: string }
-): RedeemGitHubSessionCapabilityFailureReason | null {
-  if (/%2f|%5c/i.test(requestUrl) || /\/(?:(?:\.|%2e){1,2})(?:\/|$)/i.test(requestUrl)) {
-    return 'invalid_upstream_url';
-  }
-  const parsed = parseGitHubCapabilityRequest(requestMethod, requestUrl);
-  if (parsed.failure) return parsed.failure;
-  const { url, method, path } = parsed.request;
-
-  if (url.hostname === 'api.github.com') {
-    if (!['GET', 'POST', 'PATCH', 'HEAD'].includes(method)) {
-      return 'invalid_upstream_request';
-    }
-    const repositoryApiPrefix = repositoryApiPath(repository);
-    if (!isRepositoryApiPath(path, repository)) {
-      return 'repository_mismatch';
-    }
-    const relativePath = path.slice(repositoryApiPrefix.length);
-    if (
-      ['GET', 'HEAD'].includes(method) &&
-      (/^\/pulls\/[1-9]\d*$/.test(relativePath) ||
-        /^\/issues\/[1-9]\d*\/comments$/.test(relativePath) ||
-        /^\/pulls\/[1-9]\d*\/(?:comments|reviews)$/.test(relativePath))
-    ) {
-      return null;
-    }
-    if (method === 'POST' && /^\/issues\/[1-9]\d*\/comments$/.test(relativePath)) return null;
-    if (method === 'PATCH' && /^\/issues\/comments\/[1-9]\d*$/.test(relativePath)) return null;
-    if (method === 'POST' && /^\/pulls\/[1-9]\d*\/reviews$/.test(relativePath)) return null;
-    return 'invalid_upstream_request';
-  }
-  if (url.hostname !== 'github.com') return 'upstream_host_not_allowed';
-  if (!isRepositoryRootPath(path, repository)) return 'repository_mismatch';
-  return matchesRepositoryGitRequest(method, url, path, repository)
-    ? null
-    : 'invalid_upstream_request';
-}
-
 function decodePathnameIteratively(pathname: string): string | null {
   let decoded = pathname;
   for (let depth = 0; depth < 4; depth++) {
@@ -745,110 +704,6 @@ function validateBitbucketCapabilityUpstream(
     return { failure: 'repository_mismatch', authSurface };
   }
   return { failure: null, authSurface };
-}
-
-function validateLegacyGitLabCapabilityUpstream(
-  requestMethod: string,
-  requestUrl: string,
-  session: {
-    instanceOrigin: string;
-    projectPath: string;
-    source: GitLabCapabilityCredentialSource;
-  }
-): { failure: RedeemGitLabSessionCapabilityFailureReason | null; authSurface: 'git' | 'api' } {
-  if (/%5c/i.test(requestUrl) || /\/(?:(?:\.|%2e){1,2})(?:\/|$)/i.test(requestUrl)) {
-    return { failure: 'invalid_upstream_url', authSurface: 'git' };
-  }
-  const base = parseGitLabBaseUrl(session.instanceOrigin);
-  if (!base) return { failure: 'invalid_upstream_url', authSurface: 'git' };
-  let url: URL;
-  try {
-    url = new URL(requestUrl);
-  } catch {
-    return { failure: 'invalid_upstream_url', authSurface: 'git' };
-  }
-  if (
-    url.protocol !== 'https:' ||
-    url.username ||
-    url.password ||
-    url.hash ||
-    url.origin !== base.origin
-  ) {
-    return {
-      failure: url.origin !== base.origin ? 'upstream_origin_not_allowed' : 'invalid_upstream_url',
-      authSurface: 'git',
-    };
-  }
-  const method = requestMethod.toUpperCase();
-  const apiPrefix = `${base.basePath}/api/v4/`;
-  const projectApiPrefix = `${base.basePath}/api/v4/projects/`;
-  if (url.pathname.startsWith(projectApiPrefix)) {
-    const projectApiPath = url.pathname.slice(projectApiPrefix.length);
-    const [projectSelector, ...remainingSegments] = projectApiPath.split('/');
-    if (!projectSelector || remainingSegments.some(segment => /%2f|%5c/i.test(segment))) {
-      return { failure: 'invalid_upstream_url', authSurface: 'api' };
-    }
-    let decodedProjectSelector: string;
-    try {
-      decodedProjectSelector = decodeURIComponent(projectSelector);
-    } catch {
-      return { failure: 'invalid_upstream_url', authSurface: 'api' };
-    }
-    const selectorMatches =
-      decodedProjectSelector === session.projectPath ||
-      (session.source.type === 'project' &&
-        decodedProjectSelector === String(session.source.projectId));
-    const relativePath = remainingSegments.join('/');
-    const allowed =
-      (['GET', 'HEAD'].includes(method) &&
-        /^merge_requests\/[1-9]\d*(?:\/(?:changes|diffs|notes|discussions))?$/.test(
-          relativePath
-        )) ||
-      (method === 'POST' &&
-        /^merge_requests\/[1-9]\d*\/(?:notes|discussions)$/.test(relativePath)) ||
-      (method === 'PUT' && /^merge_requests\/[1-9]\d*\/notes\/[1-9]\d*$/.test(relativePath));
-    return {
-      failure: selectorMatches
-        ? allowed
-          ? null
-          : 'invalid_upstream_request'
-        : 'repository_mismatch',
-      authSurface: 'api',
-    };
-  }
-  if (url.pathname === `${base.basePath}/api/graphql` || url.pathname.startsWith(apiPrefix)) {
-    return { failure: 'invalid_upstream_request', authSurface: 'api' };
-  }
-  if (/%2f/i.test(requestUrl)) {
-    return { failure: 'invalid_upstream_url', authSurface: 'git' };
-  }
-
-  const repositoryPath = `${base.basePath}/${session.projectPath}.git`;
-  if (method === 'GET' && url.pathname === `${repositoryPath}/info/refs`) {
-    const entries = [...url.searchParams.entries()];
-    const service = url.searchParams.get('service');
-    if (entries.length === 1 && (service === 'git-upload-pack' || service === 'git-receive-pack')) {
-      return { failure: null, authSurface: 'git' };
-    }
-  }
-  if (
-    method === 'POST' &&
-    url.search === '' &&
-    (url.pathname === `${repositoryPath}/git-upload-pack` ||
-      url.pathname === `${repositoryPath}/git-receive-pack` ||
-      url.pathname === `${repositoryPath}/info/lfs/objects/batch` ||
-      url.pathname === `${repositoryPath}/info/lfs/locks/verify`)
-  ) {
-    return { failure: null, authSurface: 'git' };
-  }
-  const repositoryPrefix = `${base.basePath}/${session.projectPath}`;
-  return {
-    failure:
-      url.pathname.startsWith(repositoryPrefix) || !url.pathname.includes('.git/')
-        ? 'invalid_upstream_request'
-        : 'repository_mismatch',
-    authSurface: 'git',
-  };
 }
 
 export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
@@ -1108,8 +963,8 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
     const repository = normalizeGitHubRepository(params.githubRepo);
     if (!repository) return { success: false, reason: 'invalid_repo_format' };
     if (
-      params.permissionScope !== undefined &&
-      (params.permissionScope !== 'repository' || !params.outboundContainerId)
+      !params.outboundContainerId ||
+      (params.permissionScope !== undefined && params.permissionScope !== 'repository')
     )
       return { success: false, reason: 'capability_configuration_error' };
 
@@ -1125,9 +980,7 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
       capability = new GitHubSessionCapabilityCodec(encryptionKey).issue({
         userId: params.userId,
         accessPurpose: params.accessPurpose ?? 'workflow',
-        ...(params.outboundContainerId !== undefined
-          ? { outboundContainerId: params.outboundContainerId }
-          : {}),
+        outboundContainerId: params.outboundContainerId,
         ...(params.orgId !== undefined ? { orgId: params.orgId } : {}),
         ...(params.expectedIntegrationId !== undefined
           ? { integrationId: params.expectedIntegrationId }
@@ -1168,28 +1021,20 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
       return { success: false, reason: 'capability_configuration_error' };
     }
 
-    if (claims.version === 2 && claims.outboundContainerId !== params.outboundContainerId) {
+    if (claims.outboundContainerId !== params.outboundContainerId) {
       return { success: false, reason: 'container_mismatch' };
     }
 
-    let upstream: GitHubCapabilityUpstream;
-    if (claims.version === 2) {
-      upstream = validateGitHubCapabilityUpstream(params.requestMethod, params.requestUrl, claims);
-    } else {
-      const failure = validateLegacyGitHubCapabilityUpstream(
-        params.requestMethod,
-        params.requestUrl,
-        claims
-      );
-      upstream = failure === null ? { failure: null, credential: 'pinned' } : { failure };
-    }
+    const upstream = validateGitHubCapabilityUpstream(
+      params.requestMethod,
+      params.requestUrl,
+      claims
+    );
     if (upstream.failure) return { success: false, reason: upstream.failure };
 
     const authParams = {
       userId: claims.userId,
-      ...(claims.version === 2 && claims.permissionScope
-        ? { permissionScope: claims.permissionScope }
-        : {}),
+      ...(claims.permissionScope ? { permissionScope: claims.permissionScope } : {}),
       accessPurpose: claims.accessPurpose ?? 'workflow',
       ...(claims.orgId !== undefined ? { orgId: claims.orgId } : {}),
       ...(claims.integrationId !== undefined
@@ -1559,6 +1404,9 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
   async issueGitLabSessionCapability(
     params: IssueGitLabSessionCapabilityParams
   ): Promise<IssueGitLabSessionCapabilityResult> {
+    if (!params.outboundContainerId) {
+      return { success: false, reason: 'capability_configuration_error' };
+    }
     const runtimeToken = await resolveGitLabRuntimeToken(
       { ...params, repositoryUrl: params.gitUrl },
       {
@@ -1587,9 +1435,7 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
       const encryptionKey = await resolveSecret(this.env.SCM_SESSION_CAPABILITY_ENCRYPTION_KEY);
       capability = new GitLabSessionCapabilityCodec(encryptionKey).issue({
         userId: params.userId,
-        ...(params.outboundContainerId !== undefined
-          ? { outboundContainerId: params.outboundContainerId }
-          : {}),
+        outboundContainerId: params.outboundContainerId,
         ...(params.orgId !== undefined ? { orgId: params.orgId } : {}),
         integrationId: integration.integrationId,
         instanceOrigin: repository.instanceOrigin,
@@ -1629,14 +1475,15 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
       return { success: false, reason: 'capability_configuration_error' };
     }
 
-    if (claims.version === 2 && claims.outboundContainerId !== params.outboundContainerId) {
+    if (claims.outboundContainerId !== params.outboundContainerId) {
       return { success: false, reason: 'container_mismatch' };
     }
 
-    const upstream =
-      claims.version === 2
-        ? validateGitLabCapabilityUpstream(params.requestMethod, params.requestUrl, claims)
-        : validateLegacyGitLabCapabilityUpstream(params.requestMethod, params.requestUrl, claims);
+    const upstream = validateGitLabCapabilityUpstream(
+      params.requestMethod,
+      params.requestUrl,
+      claims
+    );
     if (upstream.failure) return { success: false, reason: upstream.failure };
     const context = {
       userId: claims.userId,

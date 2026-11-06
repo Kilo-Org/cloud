@@ -2013,8 +2013,8 @@ export class SessionIngestDO extends DurableObject<Env> {
       .values({ key: pendingKey, value: params.key })
       .onConflictDoUpdate({ target: ingestMeta.key, set: { value: params.key } })
       .run();
-    // Every stage outcome ends with the key in its final state and no marker row
-    // left for it.
+    // Every stage outcome ends with the key in its final state, whichever way
+    // the conditional upload resolved.
     const operation = (async (): Promise<boolean | 'too_large'> => {
       // The key holds this attempt's stored body once the conditional upload
       // completes.

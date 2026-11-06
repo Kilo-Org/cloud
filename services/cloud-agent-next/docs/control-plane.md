@@ -1793,3 +1793,16 @@ provider stop reliability, billing or hosted timing; those are checked on a depl
   shared directories.
 - Out of scope: Kilo and model-provider retry policy, full workspace snapshot recovery after sandbox
   loss (saved worktree-change patches are restored), the retired legacy plane.
+
+### Mandatory credential containment
+
+All sandbox providers require credential containment, including local development.
+The former environment opt-out no longer changes execution.
+Sandbox processes receive aliases and scoped proxy handles; upstream tokens stay in trusted services.
+Provider adapters own interception and identity verification. Shared brokers own authorization and forwarding.
+Direct grants remain readable for cleanup but cannot execute or renew.
+On activation, saved non-contained allocations stop and their grants retire before replacement.
+A new preparation after stop creates a contained allocation. Sessions retain their logical identities.
+Earlier branch work recorded live Vercel identity and GitHub checks.
+The shared admission refactor has local tests only; those earlier checks do not verify this change.
+Maximum payload and duration compatibility still require verification before production rollout.

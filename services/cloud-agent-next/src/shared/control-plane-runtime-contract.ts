@@ -6,6 +6,9 @@ export const WORKTREE_RUNTIME_VERSION = '1';
 export const WORKSPACE_CONFIGURATION_HEADER = 'x-kilo-workspace-configuration';
 export const WORKSPACE_CONFIGURATION_VERSION = '1';
 
+export const KILO_CLI_VERSION_HEADER = 'x-kilo-cli-version';
+export const WRAPPER_VERSION_HEADER = 'x-kilo-wrapper-version';
+
 // The Kilo runtime the wrapper actually runs. The Worker records it per run so
 // v1 (`kilo`) and v2 (`kilo2`) outcomes can be compared.
 export const RUNTIME_HARNESS_HEADER = 'x-kilo-runtime-harness';

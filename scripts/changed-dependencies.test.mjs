@@ -340,7 +340,10 @@ test('the ingest workspace runs only the explicit native attachment regression',
   const step = workflow.jobs['workspace-tests'].steps.find(step =>
     step.run?.includes('test:integration')
   );
-  assert.equal(step?.if, "matrix.workspace.name == 'cloudflare-session-ingest'");
+  assert.equal(
+    step?.if,
+    "matrix.workspace.name == 'cloudflare-session-ingest' && needs.changes.outputs.kilocode_backend != 'true'"
+  );
   assert.equal(
     step?.run,
     'pnpm --filter cloudflare-session-ingest run test:integration test/integration/user-connection-attachment.test.ts'

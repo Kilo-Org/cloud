@@ -32,17 +32,11 @@ import { cn } from '@/lib/utils';
 const HIDDEN_BALANCE = '*****';
 
 type CreditsCardProps = {
-  /** The section's reads run: signed in and the identity query resolved. */
   readonly enabled: boolean;
   orgs: OrgListEntry[] | undefined;
-  /**
-   * The server resolved the pass's web management with a link, so the Kilo
-   * Pass card renders pressable; everything else renders inert and muted.
-   */
-  readonly canOpenPass: boolean;
 };
 
-export function CreditsCard({ enabled, orgs, canOpenPass }: Readonly<CreditsCardProps>) {
+export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   const trpc = useTRPC();
   const colors = useThemeColors();
   const router = useRouter();
@@ -360,10 +354,7 @@ export function CreditsCard({ enabled, orgs, canOpenPass }: Readonly<CreditsCard
           stacking a second skeleton card. The card's queries still run from
           mount, so the swap adds no fetch latency. */}
       {enabled && !selectedOrgId ? (
-        <KiloPassSubscriptionCard
-          hideLoadingSkeleton={showBalanceSkeleton}
-          inertMuted={!canOpenPass}
-        />
+        <KiloPassSubscriptionCard hideLoadingSkeleton={showBalanceSkeleton} />
       ) : null}
     </View>
   );

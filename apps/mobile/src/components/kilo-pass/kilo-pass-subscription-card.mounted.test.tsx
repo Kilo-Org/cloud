@@ -176,11 +176,10 @@ describe('KiloPassSubscriptionCard mounted', () => {
     expect(queryState.presentation).toHaveBeenCalledTimes(1);
   });
 
-  it('renders the unavailable card with its title, description, and button role', async () => {
+  it('renders the unavailable card as information, with no button role', async () => {
     queryState.presentationData = { kind: 'unavailable' };
 
     const renderer = await renderCard();
-    const card = renderer.root.findByProps({ accessibilityRole: 'button' });
     const renderedText = renderer.root
       .findAll(node => Object.is(node.type, 'Text'))
       .map(node => node.props.children);
@@ -188,6 +187,13 @@ describe('KiloPassSubscriptionCard mounted', () => {
     // The tests run with i18n mocked to echo keys; the title comes from the
     // shared `KILO_PASS_TITLE` and the description from the unavailable kind.
     expect(renderedText).toEqual(['Kilo Pass', 'kiloPass.purchaseUnavailable']);
-    expect(card.props.accessibilityLabel).toBe('Kilo Pass. kiloPass.purchaseUnavailable');
+    // Nothing in this app can buy or manage the pass, so the card carries no
+    // pressable: a card whose press does nothing must not read as a control.
+    expect(renderer.root.findAllByProps({ accessibilityRole: 'button' })).toHaveLength(0);
+    expect(
+      renderer.root.findByProps({
+        accessibilityLabel: 'Kilo Pass. kiloPass.purchaseUnavailable',
+      })
+    ).toBeTruthy();
   });
 });

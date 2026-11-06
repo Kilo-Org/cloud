@@ -225,16 +225,12 @@ let saveCompletion: Promise<undefined> | undefined = undefined;
 
 async function mountCard(
   queryClient: QueryClient = createTestQueryClient(),
-  orgs?: OrgListEntry[],
-  cardProps?: { canOpenPass?: boolean }
+  orgs?: OrgListEntry[]
 ) {
-  const ui = await renderWithProviders(
-    createElement(CreditsCard, { enabled: true, orgs, canOpenPass: true, ...cardProps }),
-    {
-      queryClient,
-      wrapper: OrganizationProvider,
-    }
-  );
+  const ui = await renderWithProviders(createElement(CreditsCard, { enabled: true, orgs }), {
+    queryClient,
+    wrapper: OrganizationProvider,
+  });
   return {
     ...ui,
     texts: () =>
@@ -751,28 +747,6 @@ describe('CreditsCard balance state', () => {
     const settled = await mountCard(queryClient);
     await waitFor(() => settled.texts().includes('$10.00'));
     expect(lastKiloPassProps()?.hideLoadingSkeleton).toBe(false);
-    settled.unmount();
-  });
-
-  it('renders the pass card inert and muted when the web-managed pass is absent', async () => {
-    kiloPassCardProps.latest = undefined;
-    const queryClient = createTestQueryClient();
-    currentUser.userId = 'user-1';
-    queryClient.setQueryData([...BALANCE_KEY], { balance: 10 });
-    const settled = await mountCard(queryClient, undefined, { canOpenPass: false });
-    await waitFor(() => settled.texts().includes('$10.00'));
-    expect(lastKiloPassProps()).toMatchObject({ hideLoadingSkeleton: false, inertMuted: true });
-    settled.unmount();
-  });
-
-  it('keeps the pass card pressable while the pass is web-managed', async () => {
-    kiloPassCardProps.latest = undefined;
-    const queryClient = createTestQueryClient();
-    currentUser.userId = 'user-1';
-    queryClient.setQueryData([...BALANCE_KEY], { balance: 10 });
-    const settled = await mountCard(queryClient, undefined, { canOpenPass: true });
-    await waitFor(() => settled.texts().includes('$10.00'));
-    expect(lastKiloPassProps()).toMatchObject({ hideLoadingSkeleton: false, inertMuted: false });
     settled.unmount();
   });
 

@@ -19,7 +19,7 @@ import {
   Sparkles,
   Trash2,
 } from '@/components/ui/icons';
-import { type LayoutChangeEvent, type ScrollViewInstance, Platform, View } from 'react-native';
+import { type LayoutChangeEvent, type ScrollViewInstance, View } from 'react-native';
 import Animated, { FadeOut } from 'react-native-reanimated';
 
 import { useConfirmDialog } from '@/components/ui/dialog';
@@ -138,24 +138,6 @@ export function ProfileScreen() {
   // the tile requests it and the screen renders whichever one applies.
   const feedbackPrompt = useFeedbackPrompt();
 
-  // The Kilo Pass card is the credits section's only row this screen cannot
-  // make actionable: the subscription screen owns the pass's web management,
-  // and an answer the offline policy settled while the section slept still
-  // carries the last real kind. Without it the card would load its web-managed
-  // self for a frame before the profile's muted inert state resolves.
-  const platform = Platform.OS === 'ios' ? 'ios' : 'android';
-  const storefront = Platform.OS === 'ios' ? 'app_store' : 'play';
-  const { data: passPresentation } = useQuery({
-    ...trpc.kiloPass.getPurchasePresentation.queryOptions({
-      platform,
-      storefront,
-      product: 'kilo_pass',
-    }),
-    enabled: isAuthenticated,
-  });
-  const canOpenPass =
-    passPresentation?.kind === 'web_management' && passPresentation.webUrl != null;
-
   const { t } = useTranslation();
   // Reactive: a connectivity commit re-renders the error-variant selection, so
   // a read that settled by failing while the device is confirmed offline says
@@ -272,7 +254,7 @@ export function ProfileScreen() {
         onLayout={onDeleteScrollLayout}
       >
         {/* Credits */}
-        <CreditsCard orgs={orgs} enabled={isAuthenticated} canOpenPass={canOpenPass} />
+        <CreditsCard orgs={orgs} enabled={isAuthenticated} />
 
         {/* Code Reviewer */}
         <View className="mt-6 gap-3">

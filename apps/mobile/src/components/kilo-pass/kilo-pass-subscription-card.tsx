@@ -19,8 +19,6 @@ import {
 
 export function KiloPassSubscriptionCard({
   hideLoadingSkeleton = false,
-  inertMuted = false,
-  onPress: onPressOverride,
 }: Readonly<{
   /**
    * Render no loading shimmer while the card's queries are still in flight:
@@ -30,10 +28,6 @@ export function KiloPassSubscriptionCard({
    * this state never moves the sections below.
    */
   hideLoadingSkeleton?: boolean;
-  /** Style the inert card muted and drop its pressable state. */
-  inertMuted?: boolean;
-  /** Replaces the card body's press handler; the muted card cannot need one. */
-  onPress?: () => void;
 }>) {
   const colors = useThemeColors();
   const router = useRouter();
@@ -61,25 +55,31 @@ export function KiloPassSubscriptionCard({
     presentationIsPending: presentationQuery.isPending,
   });
 
-  const handlePress =
-    onPressOverride ??
-    (() => {
-      if (contentState.kind !== 'card') {
-        return;
-      }
+  // A card that resolves to no target here is information, not a control: the
+  // purchase answer says nothing can be bought in this app and there is no web
+  // pass to manage, so it renders muted and inert instead of as a dead button.
+  const pressable =
+    contentState.kind === 'card' &&
+    contentState.state.action === 'open-web' &&
+    Boolean(presentationQuery.data?.webUrl);
 
-      const cardState = contentState.state;
+  const handlePress = () => {
+    if (contentState.kind !== 'card') {
+      return;
+    }
 
-      selectionHaptic();
-      if (cardState.action === 'open-web') {
-        const webUrl = presentationQuery.data?.webUrl;
-        if (webUrl) {
-          void Linking.openURL(webUrl);
-        }
-        return;
+    const cardState = contentState.state;
+
+    selectionHaptic();
+    if (cardState.action === 'open-web') {
+      const webUrl = presentationQuery.data?.webUrl;
+      if (webUrl) {
+        void Linking.openURL(webUrl);
       }
-      router.push('/(app)/kilo-pass' as Href);
-    });
+      return;
+    }
+    router.push('/(app)/kilo-pass' as Href);
+  };
   const handleRetryPress = () => {
     selectionHaptic();
     void presentationQuery.refetch();
@@ -119,7 +119,7 @@ export function KiloPassSubscriptionCard({
       {/* The inert card: purchases resolve to `unavailable` or a dead end
           here, so the card wears the section's muted ink, keeps its surface
           and tile for scanability, and carries no button state. */}
-      {contentState.kind === 'card' && inertMuted ? (
+      {contentState.kind === 'card' && !pressable ? (
         <View
           accessibilityLabel={
             getKiloPassSubscriptionCardAccessibility(contentState.state).accessibilityLabel
@@ -195,7 +195,7 @@ export function KiloPassSubscriptionCard({
         </Pressable>
       ) : null}
 
-      {contentState.kind === 'card' && !inertMuted ? (
+      {contentState.kind === 'card' && pressable ? (
         <Pressable
           accessibilityHint={
             getKiloPassSubscriptionCardAccessibility(contentState.state).accessibilityHint

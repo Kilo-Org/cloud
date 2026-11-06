@@ -46,7 +46,14 @@ vi.mock('@/lib/trpc', () => ({
 }));
 
 vi.mock('@tanstack/react-query', () => ({
-  useQuery: () => ({ data: undefined, isError: false, isPending: true, refetch: vi.fn() }),
+  // A web-managed pass with its link: the only answer a reader can act on, so
+  // the card's one pressable exists for the layout under test.
+  useQuery: () => ({
+    data: { kind: 'web_management', webUrl: 'https://example.com/subscriptions/kilo-pass' },
+    isError: false,
+    isPending: false,
+    refetch: vi.fn(),
+  }),
 }));
 
 vi.mock('@/lib/kilo-pass/subscription-card-state', () => ({
@@ -76,12 +83,9 @@ vi.mock('react-native', () => ({
 
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 
-function renderCard(hideLoadingSkeleton = true, cardProps: { inertMuted?: boolean } = {}) {
+function renderCard(hideLoadingSkeleton = true) {
   act(() => {
-    const element = createElement(KiloPassSubscriptionCard, {
-      hideLoadingSkeleton,
-      ...cardProps,
-    });
+    const element = createElement(KiloPassSubscriptionCard, { hideLoadingSkeleton });
     if (renderer) {
       renderer.update(element);
     } else {
@@ -161,7 +165,7 @@ describe('KiloPassSubscriptionCard inert card', () => {
         actionLabel: null,
       },
     };
-    const root = renderCard(false, { inertMuted: true });
+    const root = renderCard(false);
     expect(root.findAllByProps({ accessibilityRole: 'button' })).toHaveLength(0);
     const card = root.findByProps({
       accessibilityLabel: 'Kilo Pass',

@@ -161,6 +161,37 @@ A mutation promise can settle before React Query publishes its observer state.
 Use `waitFor` from `@/test/render-with-providers` before asserting a rendered mutation result.
 Awaiting `mutateAsync` inside `act` does not replace that wait.
 
+## Design proof comparisons
+
+Prepare exact base and head revisions before comparing a changed screen:
+
+```sh
+pnpm dev:mobile:design-gate prepare --base <base-sha> --head <head-sha> --targets <manifest.json> --out <new-directory>
+```
+
+The manifest names each target's link, route, focused screen, and readiness test ID.
+An optional diagnostic wrapper imports each revision's own component with identical declared props.
+Preparation never copies head product code into the base.
+
+Start an isolated development stack in each prepared worktree.
+Run the tool from that worktree with its preparation receipt:
+
+```sh
+pnpm exec tsx <tool-checkout>/dev/local/design-gate/cli.ts run --preparation <preparation.json> --revision base --targets <manifest.json> --platform android --device <serial> --metro <url> --out <base-run>
+pnpm exec tsx <tool-checkout>/dev/local/design-gate/cli.ts run --preparation <preparation.json> --revision head --targets <manifest.json> --platform android --device <serial> --metro <url> --out <head-run>
+pnpm dev:mobile:design-gate compare --preparation <preparation.json> --base-run <base-run> --head-run <head-run> --out <comparison>
+```
+
+Login, splash, unopened, or mismatched targets make the comparison inconclusive.
+They do not establish an introduced defect.
+The runtime marker binds the loaded source to the preparation receipt.
+
+Captures retain the original screenshot and a `.capture.json` alignment record.
+Matching probe states bracket the screenshot but do not certify native paint.
+Uncertain alignment skips pixel-to-tree rules; unsettled state skips single-frame geometry rules.
+Timeline shifts still use their own resting-state checks.
+Possible blank frames remain visible as observations, not confirmed defects.
+
 ## Getting started
 
 Generally speaking, you only need a new dev build if making dependency/native changes.

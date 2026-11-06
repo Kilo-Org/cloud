@@ -23,7 +23,9 @@ import {
 describe('cursor', () => {
   it('advances once per applied event', async () => {
     const target = stub('advance');
-    harness({ pages: [[directoryEvent('evt_1'), directoryEvent('evt_2'), directoryEvent('evt_3')]] });
+    harness({
+      pages: [[directoryEvent('evt_1'), directoryEvent('evt_2'), directoryEvent('evt_3')]],
+    });
 
     const result = await runInDurableObject(target, instance => instance.poll());
 
@@ -356,10 +358,7 @@ describe('response classes', () => {
     const target = stub('payload-terminal');
     const io = harness({
       pages: [
-        [
-          userEvent('evt_1', 'dsync.user.created', { email: null }),
-          directoryEvent('evt_2', null),
-        ],
+        [userEvent('evt_1', 'dsync.user.created', { email: null }), directoryEvent('evt_2', null)],
       ],
     });
 

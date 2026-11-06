@@ -225,12 +225,16 @@ let saveCompletion: Promise<undefined> | undefined = undefined;
 
 async function mountCard(
   queryClient: QueryClient = createTestQueryClient(),
-  orgs?: OrgListEntry[]
+  orgs?: OrgListEntry[],
+  cardProps?: { canOpenPass?: boolean }
 ) {
-  const ui = await renderWithProviders(createElement(CreditsCard, { enabled: true, orgs }), {
-    queryClient,
-    wrapper: OrganizationProvider,
-  });
+  const ui = await renderWithProviders(
+    createElement(CreditsCard, { enabled: true, orgs, canOpenPass: true, ...cardProps }),
+    {
+      queryClient,
+      wrapper: OrganizationProvider,
+    }
+  );
   return {
     ...ui,
     texts: () =>
@@ -748,6 +752,38 @@ describe('CreditsCard balance state', () => {
     await waitFor(() => settled.texts().includes('$10.00'));
     expect(lastKiloPassProps()?.hideLoadingSkeleton).toBe(false);
     settled.unmount();
+  });
+
+  it('renders the pass card inert and muted when the web-managed pass is absent', async () => {
+    kiloPassCardProps.latest = undefined;
+    const queryClient = createTestQueryClient();
+    currentUser.userId = 'user-1';
+    queryClient.setQueryData([...BALANCE_KEY], { balance: 10 });
+    const settled = await mountCard(queryClient, undefined, { canOpenPass: false });
+    await waitFor(() => settled.texts().includes('$10.00'));
+    expect(lastKiloPassProps()).toMatchObject({ hideLoadingSkeleton: false, inertMuted: true });
+    settled.unmount();
+  });
+
+  it('keeps the pass card pressable while the pass is web-managed', async () => {
+    kiloPassCardProps.latest = undefined;
+    const queryClient = createTestQueryClient();
+    currentUser.userId = 'user-1';
+    queryClient.setQueryData([...BALANCE_KEY], { balance: 10 });
+    const settled = await mountCard(queryClient, undefined, { canOpenPass: true });
+    await waitFor(() => settled.texts().includes('$10.00'));
+    expect(lastKiloPassProps()).toMatchObject({ hideLoadingSkeleton: false, inertMuted: false });
+    settled.unmount();
+  });
+
+  it('keeps the expiry line reserved inside the balance skeleton', async () => {
+    // The slot's line paints while the balance skeleton owns the surface, so
+    // the card holds the balance row's height before the row's own first pass.
+    const { texts, unmount } = await mountCard();
+    // The surface skeleton renders two bars; the pending line renders the
+    // third (the note's reserved box) as a sibling below the surface block.
+    expect(texts().filter(text => text === 'SKELETON')).toHaveLength(3);
+    unmount();
   });
 
   it('shows a cached balance without reusing it after an account change', async () => {

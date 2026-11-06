@@ -31,6 +31,7 @@ export function formatUsd(
   })
     .formatToParts(amount)
     .map(part => (part.type === 'currency' ? '$' : part.value))
+    .filter(part => !/[^\S\r\n]/.test(part))
     .join('');
 }
 

@@ -65,6 +65,16 @@ vi.mock('@/lib/trpc', () => ({
     organizations: {
       list: { queryOptions: () => ({ queryKey: ['organizations', 'list'], queryFn: vi.fn() }) },
     },
+    kiloPass: {
+      // The sign-out dialog tests do not reach the pass card; the screen's
+      // presentability read only needs a stable key here.
+      getPurchasePresentation: {
+        queryOptions: () => ({
+          queryKey: ['kiloPass', 'getPurchasePresentation'],
+          queryFn: vi.fn(),
+        }),
+      },
+    },
   }),
 }));
 

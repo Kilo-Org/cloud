@@ -13,6 +13,22 @@ type KiloPassSubscriptionCardContentState =
   | { kind: 'error'; actionLabel: string; description: string; title: string }
   | { kind: 'loading' };
 
+/**
+ * A card the reader cannot act on: purchase resolution answered but gives this
+ * app nothing to buy or manage in it. `open-web` states keep their web CTA;
+ * everything else renders inert and muted, so the dead end stops reading as a
+ * disabled row. One marker for both platforms and every storefront.
+ */
+export const UNAVAILABLE_PASS_CARD: KiloPassSubscriptionCardContentState = {
+  kind: 'card',
+  state: {
+    action: 'open-native',
+    actionLabel: null,
+    description: i18n.t('kiloPass.purchaseUnavailable'),
+    title: KILO_PASS_TITLE,
+  },
+};
+
 export function getKiloPassSubscriptionCardAccessibility(cardState: KiloPassSubscriptionCardState) {
   return {
     accessibilityHint:
@@ -43,13 +59,15 @@ export function getKiloPassSubscriptionCardContentState(params: {
   if (!params.presentation) {
     return { kind: 'loading' };
   }
-  const managedOnWeb = params.presentation.kind === 'web_management';
+  if (params.presentation.kind !== 'web_management') {
+    return UNAVAILABLE_PASS_CARD;
+  }
   return {
     kind: 'card',
     state: {
-      action: managedOnWeb ? 'open-web' : 'open-native',
-      actionLabel: managedOnWeb ? i18n.t('kiloPass.manage') : null,
-      description: i18n.t(managedOnWeb ? 'kiloPass.managedOnWeb' : 'kiloPass.purchaseUnavailable'),
+      action: 'open-web',
+      actionLabel: i18n.t('kiloPass.manage'),
+      description: i18n.t('kiloPass.managedOnWeb'),
       title: KILO_PASS_TITLE,
     },
   };

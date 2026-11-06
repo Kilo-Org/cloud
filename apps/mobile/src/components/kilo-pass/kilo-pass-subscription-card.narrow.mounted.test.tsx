@@ -76,9 +76,12 @@ vi.mock('react-native', () => ({
 
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 
-function renderCard(hideLoadingSkeleton = true) {
+function renderCard(hideLoadingSkeleton = true, cardProps: { inertMuted?: boolean } = {}) {
   act(() => {
-    const element = createElement(KiloPassSubscriptionCard, { hideLoadingSkeleton });
+    const element = createElement(KiloPassSubscriptionCard, {
+      hideLoadingSkeleton,
+      ...cardProps,
+    });
     if (renderer) {
       renderer.update(element);
     } else {
@@ -144,5 +147,29 @@ describe('KiloPassSubscriptionCard loading layout', () => {
     cardState.content = { kind: 'loading' };
     const root = renderCard(true);
     expect(String(root.findByProps({ className: 'h-[66px]' }).props.className)).toBe('h-[66px]');
+  });
+});
+
+describe('KiloPassSubscriptionCard inert card', () => {
+  it('renders the unavailable surface without a button role and in muted ink', () => {
+    cardState.content = {
+      kind: 'card',
+      state: {
+        title: 'Kilo Pass',
+        description: 'kiloPass.purchaseUnavailable',
+        action: 'open-native',
+        actionLabel: null,
+      },
+    };
+    const root = renderCard(false, { inertMuted: true });
+    expect(root.findAllByProps({ accessibilityRole: 'button' })).toHaveLength(0);
+    const card = root.findByProps({
+      accessibilityLabel: 'Kilo Pass',
+    });
+    expect(String(card.props.className)).toBe('rounded-lg border border-border bg-secondary p-3');
+    const title = card
+      .findAll(node => Object.is(node.type, 'Text'))
+      .find(node => node.props.children === 'Kilo Pass');
+    expect(String(title?.props.className)).toContain('text-muted-foreground');
   });
 });

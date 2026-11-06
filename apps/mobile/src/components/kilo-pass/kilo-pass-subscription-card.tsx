@@ -19,6 +19,8 @@ import {
 
 export function KiloPassSubscriptionCard({
   hideLoadingSkeleton = false,
+  inertMuted = false,
+  onPress: onPressOverride,
 }: Readonly<{
   /**
    * Render no loading shimmer while the card's queries are still in flight:
@@ -28,6 +30,10 @@ export function KiloPassSubscriptionCard({
    * this state never moves the sections below.
    */
   hideLoadingSkeleton?: boolean;
+  /** Style the inert card muted and drop its pressable state. */
+  inertMuted?: boolean;
+  /** Replaces the card body's press handler; the muted card cannot need one. */
+  onPress?: () => void;
 }>) {
   const colors = useThemeColors();
   const router = useRouter();
@@ -55,23 +61,25 @@ export function KiloPassSubscriptionCard({
     presentationIsPending: presentationQuery.isPending,
   });
 
-  const handlePress = () => {
-    if (contentState.kind !== 'card') {
-      return;
-    }
-
-    const cardState = contentState.state;
-
-    selectionHaptic();
-    if (cardState.action === 'open-web') {
-      const webUrl = presentationQuery.data?.webUrl;
-      if (webUrl) {
-        void Linking.openURL(webUrl);
+  const handlePress =
+    onPressOverride ??
+    (() => {
+      if (contentState.kind !== 'card') {
+        return;
       }
-      return;
-    }
-    router.push('/(app)/kilo-pass' as Href);
-  };
+
+      const cardState = contentState.state;
+
+      selectionHaptic();
+      if (cardState.action === 'open-web') {
+        const webUrl = presentationQuery.data?.webUrl;
+        if (webUrl) {
+          void Linking.openURL(webUrl);
+        }
+        return;
+      }
+      router.push('/(app)/kilo-pass' as Href);
+    });
   const handleRetryPress = () => {
     selectionHaptic();
     void presentationQuery.refetch();
@@ -108,6 +116,29 @@ export function KiloPassSubscriptionCard({
 
   return (
     <View className="gap-2">
+      {/* The inert card: purchases resolve to `unavailable` or a dead end
+          here, so the card wears the section's muted ink, keeps its surface
+          and tile for scanability, and carries no button state. */}
+      {contentState.kind === 'card' && inertMuted ? (
+        <View
+          accessibilityLabel={
+            getKiloPassSubscriptionCardAccessibility(contentState.state).accessibilityLabel
+          }
+          className="rounded-lg border border-border bg-secondary p-3"
+        >
+          {cardBody(
+            <>
+              <Text className="font-semibold text-muted-foreground">
+                {contentState.state.title}
+              </Text>
+              <Text className="text-xs text-muted-foreground">
+                {contentState.state.description}
+              </Text>
+            </>
+          )}
+        </View>
+      ) : null}
+
       {contentState.kind === 'loading' && hideLoadingSkeleton ? (
         // The height the loading card below renders at, so revealing it never
         // moves layout: p-3 (24) + the h-10 icon row (40) + the 1px borders
@@ -164,7 +195,7 @@ export function KiloPassSubscriptionCard({
         </Pressable>
       ) : null}
 
-      {contentState.kind === 'card' ? (
+      {contentState.kind === 'card' && !inertMuted ? (
         <Pressable
           accessibilityHint={
             getKiloPassSubscriptionCardAccessibility(contentState.state).accessibilityHint

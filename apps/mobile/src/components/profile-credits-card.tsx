@@ -32,24 +32,26 @@ import { cn } from '@/lib/utils';
 const HIDDEN_BALANCE = '*****';
 
 type CreditsCardProps = {
+  /** The section's reads run: signed in and the identity query resolved. */
   readonly enabled: boolean;
   orgs: OrgListEntry[] | undefined;
+  /**
+   * The server resolved the pass's web management with a link, so the Kilo
+   * Pass card renders pressable; everything else renders inert and muted.
+   */
+  readonly canOpenPass: boolean;
 };
 
-export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
+export function CreditsCard({ enabled, orgs, canOpenPass }: Readonly<CreditsCardProps>) {
   const trpc = useTRPC();
   const colors = useThemeColors();
   const router = useRouter();
   const { width } = useWindowDimensions();
   const fontScale = useLiveFontScale();
   const [availableWidth, setAvailableWidth] = useState<number | null>(null);
-  // Stack the balance unless the expiry note keeps its two lines beside the
-  // amount, the visibility toggle and the purchase action. Measured on the
-  // standard matrix (Android, 2026-11-02): the note takes two lines from a
-  // 215 dp column and three lines below that, and the one-row siblings take
-  // 157 dp of the card, so the one-row layout holds from about 372 scaled card
-  // dp. The threshold stacks below 370 of them and uses the card's width rather
-  // than the display's; below it the note takes a row of its own at full width.
+  // Stack the balance below 370 scaled card dp; wide cells keep the note
+  // beside the amount at two lines, stacked cells take it at full width.
+  // Measured on the standard matrix (Android, 2026-11-02).
   const stackBalance = availableWidth === null || availableWidth / fontScale < 370;
   // Below NARROW_LAYOUT_WIDTH the account picker's 65% share leaves the
   // "CREDITS" eyebrow too little room for one word and Android breaks it
@@ -157,17 +159,17 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   const selectedOrgRole = orgs?.find(o => o.organizationId === selectedOrgId)?.role;
   const canManageOrgBilling = selectedOrgId != null && isMoneyRole(selectedOrgRole);
 
-  // The expiry note's slot: under the amount. No entrance fade — the caption
-  // holds a row of this block, so a fade that paints it late leaves it empty.
+  // The expiry note's slot, under the amount. Every state reserves the note's
+  // own line box — `text-xs` here is a 14 dp line — so a slot that has not
+  // resolved paints that line as its bar and nothing below moves (Android base
+  // cell, design gate 2026-11-06). No entrance fade: the caption holds a row
+  // of this block, so a fade that paints it late leaves it empty.
   const expirySlot = (
     <>
       {creditsFailed && (
         <Text className="text-xs text-muted-foreground">{t('credits.expiryUnavailable')}</Text>
       )}
       {!creditsFailed && creditsPending && (
-        // The bar reserves the note's own line box: `text-xs` here is a 14 dp
-        // line, so a 12 dp bar let the note's arrival push every row below by
-        // the difference (Android base cell, design gate 2026-11-06).
         <Skeleton className="h-[14px] w-40 max-w-full rounded bg-muted-soft" />
       )}
       {!creditsFailed && !creditsPending && (
@@ -178,6 +180,15 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
         />
       )}
     </>
+  );
+
+  // The slot's paint while the balance skeleton owns the surface: the card
+  // keeps its full height from the first cell, not from the row's first pass
+  // (Android base cell, design gate 2026-11-06).
+  const expirySlotPending = creditsFailed ? (
+    <Text className="text-xs text-muted-foreground">{t('credits.expiryUnavailable')}</Text>
+  ) : (
+    <Skeleton className="h-[14px] w-40 max-w-full rounded bg-muted-soft" />
   );
 
   // `shrink-0 grow-0` keeps the amount at its text height: a horizontal
@@ -302,6 +313,10 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
           </View>
         </View>
       )}
+      {/* The pending expiry line paints while the balance skeleton owns the
+          surface, so the reserved line already exists when the balance row
+          renders its own slot beneath the amount. */}
+      {showBalanceSkeleton && expirySlotPending}
       {balanceFailed && (
         <Pressable
           className="min-h-16 justify-center rounded-lg bg-secondary px-3 py-3 active:opacity-70"
@@ -345,7 +360,10 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
           stacking a second skeleton card. The card's queries still run from
           mount, so the swap adds no fetch latency. */}
       {enabled && !selectedOrgId ? (
-        <KiloPassSubscriptionCard hideLoadingSkeleton={showBalanceSkeleton} />
+        <KiloPassSubscriptionCard
+          hideLoadingSkeleton={showBalanceSkeleton}
+          inertMuted={!canOpenPass}
+        />
       ) : null}
     </View>
   );

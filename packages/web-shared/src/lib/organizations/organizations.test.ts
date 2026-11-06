@@ -24,6 +24,7 @@ import {
   CHILD_ORGANIZATION_ACCEPT_REQUIRES_PARENT_MEMBER,
   getOrganizationMembers,
   acceptOrganizationInvite,
+  lockOrganizationMembershipMutation,
   updateOrganizationSettings,
   mutateOrganizationSettings,
   markOrganizationAsDeleted,
@@ -2132,6 +2133,64 @@ describe('Organizations', () => {
         ]);
         expect(settingsResult).toEqual(organization.settings);
         expect(acceptanceResult.success).toBe(true);
+      }, 20000);
+
+      test('waits for a concurrent member removal instead of deadlocking', async () => {
+        const owner = await insertTestUser();
+        const invitee = await insertTestUser();
+        const organization = await createOrganization('Concurrent removal', owner.id);
+        const invitation = await inviteUserToOrganization(
+          organization.id,
+          owner.id,
+          invitee.google_user_email,
+          'member'
+        );
+
+        const { promise: removalLockHeld, resolve: signalRemovalLockHeld } =
+          Promise.withResolvers<number>();
+        const { promise: removalMayProceed, resolve: allowRemoval } = Promise.withResolvers<void>();
+
+        // Member removal holds the membership-mutation lock while it deletes the
+        // member's pending invitations.
+        const removal = db.transaction(async tx => {
+          await lockOrganizationMembershipMutation(tx, organization.id, invitee.id);
+          const backend = await tx.execute<{ pid: number }>(
+            sql`SELECT pg_backend_pid()::int AS pid`
+          );
+          const pid = backend.rows[0]?.pid;
+          if (pid === undefined) throw new Error('PostgreSQL backend pid unavailable');
+          signalRemovalLockHeld(pid);
+          await removalMayProceed;
+          await tx
+            .delete(organization_invitations)
+            .where(eq(organization_invitations.id, invitation.id));
+        });
+
+        const holderPid = await removalLockHeld;
+        const acceptance = acceptOrganizationInvite(invitee.id, invitation.token);
+        let acceptanceBlocked = false;
+        try {
+          for (let attempt = 0; attempt < 2000 && !acceptanceBlocked; attempt += 1) {
+            const waiting = await db.execute(sql`
+              SELECT 1
+              FROM pg_stat_activity
+              WHERE datname = current_database()
+                AND wait_event_type = 'Lock'
+                AND ${holderPid} = ANY(pg_blocking_pids(pid))
+            `);
+            acceptanceBlocked = waiting.rows.length > 0;
+          }
+          expect(acceptanceBlocked).toBe(true);
+        } finally {
+          allowRemoval();
+        }
+
+        await expect(removal).resolves.toBeUndefined();
+        await expect(acceptance).resolves.toEqual({
+          success: false,
+          error: 'Invitation not found',
+        });
+        expect(await isOrganizationMember(db, organization.id, invitee.id)).toBe(false);
       }, 20000);
 
       test('should update invitation timestamps correctly', async () => {

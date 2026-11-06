@@ -726,10 +726,32 @@ export async function acceptOrganizationInvite(
   try {
     let joinedDistinctId: string | null = null;
     const result = await db.transaction(async tx => {
+      const [candidate] = await tx
+        .select({ organizationId: organization_invitations.organization_id })
+        .from(organization_invitations)
+        .where(eq(organization_invitations.token, inviteToken))
+        .limit(1);
+
+      if (!candidate) {
+        return failureResult('Invitation not found');
+      }
+
+      // Take the membership-mutation advisory lock, then the policy lock, before
+      // the invitation and organization row locks. Member removal holds the
+      // membership lock while deleting pending invitations, and SSO joins and
+      // settings writes take the same advisory locks before row locks.
+      await lockOrganizationMembershipMutation(tx, candidate.organizationId, userId);
+      await lockOrganizationGroupPolicy(tx, candidate.organizationId);
+
       const [invitation] = await tx
         .select()
         .from(organization_invitations)
-        .where(eq(organization_invitations.token, inviteToken))
+        .where(
+          and(
+            eq(organization_invitations.token, inviteToken),
+            eq(organization_invitations.organization_id, candidate.organizationId)
+          )
+        )
         .for('update');
 
       if (!invitation) {
@@ -766,11 +788,6 @@ export async function acceptOrganizationInvite(
       if (acceptedEmail !== normalizeEmail(invitation.email)) {
         return failureResult('Invitation is for a different email address');
       }
-
-      // Keep the membership-mutation advisory lock before the policy lock, and
-      // both before the organization row lock, matching SSO joins and settings writes.
-      await lockOrganizationMembershipMutation(tx, invitation.organization_id, userId);
-      await lockOrganizationGroupPolicy(tx, invitation.organization_id);
 
       const [organization] = await tx
         .select()

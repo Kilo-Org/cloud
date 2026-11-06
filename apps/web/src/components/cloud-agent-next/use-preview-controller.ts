@@ -40,7 +40,7 @@ export function usePreviewController({
 }: PreviewControllerInput): PreviewController {
   const actionSessionId = selectPreviewSessionId(sessionInput);
   const sessionId = gatePreviewSessionId(actionSessionId, canOpenTerminal);
-  const urlTemplate = usePreviewUrlTemplate(sessionId, organizationId);
+  const urlTemplate = usePreviewUrlTemplate(sessionId);
   const { openPreview } = useOpenPreview(organizationId);
   const [dialogOpen, setDialogOpen] = useState(false);
 

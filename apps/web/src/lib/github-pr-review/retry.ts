@@ -83,33 +83,43 @@ export async function withGitHubUserTokenRetry<T>(args: {
     // Non-401 raw GitHub errors are classified here (this wrapper is the
     // single raw→tRPC boundary), so procedures let raw errors propagate.
     if (!isHttp401(error)) throwTrpcFromGitHubError(error);
-    // First 401 — rotate and retry once.
-    const rotate = await getGitHubUserAccessToken(args.kiloUserId, {
-      op: 'rotate',
-      staleAuthorizationId: first.credential.authorizationId,
-      staleCredentialVersion: first.credential.credentialVersion,
-    });
-    if (rotate.status === 'temporarily_unavailable') {
+    // Provided credentials cannot refresh. A stale rejection can still return
+    // a newer replacement, which may serve the one bounded retry.
+    const retryCredential = await getGitHubUserAccessToken(
+      args.kiloUserId,
+      first.credential.refreshSupported === false
+        ? {
+            op: 'reportRejected',
+            authorizationId: first.credential.authorizationId,
+            credentialVersion: first.credential.credentialVersion,
+          }
+        : {
+            op: 'rotate',
+            staleAuthorizationId: first.credential.authorizationId,
+            staleCredentialVersion: first.credential.credentialVersion,
+          }
+    );
+    if (retryCredential.status === 'temporarily_unavailable') {
       throwTrpcFromClassification({
         code: 'BAD_GATEWAY',
         message: 'GitHub authorization is temporarily unavailable. Try again.',
       });
     }
-    if (rotate.status !== 'connected') {
+    if (retryCredential.status !== 'connected') {
       throwTrpcFromClassification({
         code: 'PRECONDITION_FAILED',
         message: 'GitHub connection is no longer valid — reconnect',
       });
     }
-    const secondOctokit = createGitHubPrReviewOctokit(rotate.credential.token);
+    const secondOctokit = createGitHubPrReviewOctokit(retryCredential.credential.token);
     try {
       return await args.call(secondOctokit);
     } catch (secondError) {
       if (secondError instanceof TRPCError) throw secondError;
       if (isHttp401(secondError)) {
         await reportAndThrowPrecondition(args.kiloUserId, {
-          authorizationId: rotate.credential.authorizationId,
-          credentialVersion: rotate.credential.credentialVersion,
+          authorizationId: retryCredential.credential.authorizationId,
+          credentialVersion: retryCredential.credential.credentialVersion,
         });
       }
       throwTrpcFromGitHubError(secondError);

@@ -697,10 +697,10 @@
     },
     "connect": {
       "checkFailedTitle": "GitHub ချိတ်ဆက်မှုကို စစ်ဆေး၍မရပါ။",
-      "checkFailedMessage": "အချက်အလက် ရယူပြီးမှသာ အကောင့်ဝင်ထားခြင်း ရှိမရှိ သိနိုင်ပါမည်။",
+      "checkFailedMessage": "GitHub သို့ ချိတ်ဆက်၍မရပါ။ အင်တာနက်ချိတ်ဆက်မှုကို စစ်ဆေးပြီး ထပ်စမ်းကြည့်ပါ။",
       "checkFailedTitleGitLab": "GitLab ချိတ်ဆက်မှုကို စစ်ဆေး၍မရပါ။",
       "checkFailedTitleBitbucket": "Bitbucket ချိတ်ဆက်မှုကို စစ်ဆေး၍မရပါ။",
-      "providerCheckFailedMessage": "၎င်းတိုင် လိုက်ဒ်မဖြစ်မီ ချိတ်ဆက်မှုအခြေအနေ မရရှိနိုင်ပါ။",
+      "providerCheckFailedMessage": "ဝန်ဆောင်မှုပေးသူထံ ချိတ်ဆက်၍မရပါ။ အင်တာနက်ချိတ်ဆက်မှုကို စစ်ဆေးပြီး ထပ်စမ်းကြည့်ပါ။",
       "reconnectTitle": "GitHub ပြန်ချိတ်ဆက်ခြင်း",
       "reconnectTitleGitLab": "GitLab ပြန်ချိတ်ဆက်ခြင်း",
       "reconnectTitleBitbucket": "Bitbucket ပြန်ချိတ်ဆက်ခြင်း",

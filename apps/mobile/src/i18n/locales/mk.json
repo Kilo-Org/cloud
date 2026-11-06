@@ -697,10 +697,10 @@
     },
     "connect": {
       "checkFailedTitle": "Не успеа проверката на врската со GitHub.",
-      "checkFailedMessage": "Статусот на најавата е недостапен додека не заврши вчитувањето.",
+      "checkFailedMessage": "Не можеше да се поврзе со GitHub. Провери ја врската и обиди се повторно.",
       "checkFailedTitleGitLab": "Не можеше да се провери врската со GitLab",
       "checkFailedTitleBitbucket": "Не можеше да се провери врската со Bitbucket",
-      "providerCheckFailedMessage": "Статусот на врската е недостапен додека не се вчита.",
+      "providerCheckFailedMessage": "Не можеше да се поврзе со провајдерот. Провери ја врската и обиди се повторно.",
       "reconnectTitle": "Повторно поврзување со GitHub",
       "reconnectTitleGitLab": "Повторно поврзување со GitLab",
       "reconnectTitleBitbucket": "Повторно поврзување со Bitbucket",

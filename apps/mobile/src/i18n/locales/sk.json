@@ -727,10 +727,10 @@
     },
     "connect": {
       "checkFailedTitle": "Pripojenie k službe GitHub sa nepodarilo skontrolovať.",
-      "checkFailedMessage": "Stav prihlásenia bude dostupný až po načítaní údajov.",
+      "checkFailedMessage": "Nepodarilo sa spojiť s GitHubom. Skontroluj pripojenie a skús to znova.",
       "checkFailedTitleGitLab": "Pripojenie k službe GitLab sa nepodarilo skontrolovať.",
       "checkFailedTitleBitbucket": "Pripojenie k službe Bitbucket sa nepodarilo skontrolovať.",
-      "providerCheckFailedMessage": "Stav pripojenia bude dostupný po načítaní.",
+      "providerCheckFailedMessage": "Nepodarilo sa spojiť s poskytovateľom. Skontroluj pripojenie a skús to znova.",
       "reconnectTitle": "Opätovné pripojenie k službe GitHub",
       "reconnectTitleGitLab": "Opätovné pripojenie k službe GitLab",
       "reconnectTitleBitbucket": "Opätovné pripojenie k službe Bitbucket",

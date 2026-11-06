@@ -697,10 +697,10 @@
     },
     "connect": {
       "checkFailedTitle": "Nuk u kontrollua lidhja me GitHub.",
-      "checkFailedMessage": "Statusi i hyrjes nuk është i disponueshëm derisa të ngarkohet ky informacion.",
+      "checkFailedMessage": "Nuk u arrit të lidhej me GitHub. Kontrollo lidhjen dhe provo përsëri.",
       "checkFailedTitleGitLab": "Nuk u kontrollua lidhja me GitLab.",
       "checkFailedTitleBitbucket": "Nuk u kontrollua lidhja me Bitbucket.",
-      "providerCheckFailedMessage": "Gjendja e lidhjes nuk është e disponueshme derisa të ngarkohet.",
+      "providerCheckFailedMessage": "Nuk u arrit të lidhej me ofruesin. Kontrollo lidhjen dhe provo përsëri.",
       "reconnectTitle": "Rilidhu me GitHub",
       "reconnectTitleGitLab": "Rilidhu me GitLab",
       "reconnectTitleBitbucket": "Rilidhu me Bitbucket",

@@ -642,7 +642,7 @@
     "checks": {
       "title": "Ստուգումներ",
       "openDetails": "Բացել {{name}} ստուգման մանրամասները",
-      "notAvailable": "Ստուգումները դեռ հասանելի չեն։ Հնարավոր է՝ վերջին կոմիտը դեռ չի մշակվել, կամ Kilo GitHub հավելվածը տեղադրված չէ աղբյուրի պահոցում։",
+      "notAvailable": "Ստուգումները դեռ հասանելի չեն։ Հնարավոր է՝ վերջին կոմիտը դեռ չի մշակվել, կամ Kilo GitHub հավելվածը տեղադրված չէ այն պահոցում, որտեղից գալիս է pull request-ը։",
       "noAccess": "Այս պահոցի ստուգումները դիտելու թույլտվություն չունես։",
       "couldNotLoad": "Չհաջողվեց բեռնել ստուգումները։",
       "retryChecks": "Կրկին փորձել բեռնել ստուգումները",
@@ -676,7 +676,7 @@
       "continueInPersonal": "Շարունակել անձնական հաշվով"
     },
     "composer": {
-      "commentBodyPlaceholder": "Մեկնաբանություն",
+      "commentBodyPlaceholder": "Թողիր մեկնաբանություն…",
       "commentBody": "Մեկնաբանության բովանդակություն",
       "commentNow": "Մեկնաբանել հիմա",
       "addToReview": "Ավելացնել վերանայմանը",
@@ -696,11 +696,11 @@
       "tapDiffLineToSuggest": "Հպիր փոփոխությունների որևէ տողի՝ առաջարկներ անելու հնարավորությունը միացնելու համար։"
     },
     "connect": {
-      "checkFailedTitle": "Չհաջողվեց ստուգել GitHub-ի հետ կապը։",
-      "checkFailedMessage": "Մուտքի կարգավիճակը հասանելի կլինի բեռնումն ավարտվելուց հետո։",
-      "checkFailedTitleGitLab": "Չհաջողվեց ստուգել GitLab-ի հետ կապը։",
-      "checkFailedTitleBitbucket": "Չհաջողվեց ստուգել Bitbucket-ի հետ կապը։",
-      "providerCheckFailedMessage": "Միացման կարգավիճակը հասանելի չէ մինչև բեռնվելը։",
+      "checkFailedTitle": "Չհաջողվեց ստուգել GitHub-ի հետ կապը",
+      "checkFailedMessage": "Չհաջողվեց հասնել GitHub-ին։ Ստուգիր կապդ և կրկին փորձիր։",
+      "checkFailedTitleGitLab": "Չհաջողվեց ստուգել GitLab-ի հետ կապը",
+      "checkFailedTitleBitbucket": "Չհաջողվեց ստուգել Bitbucket-ի հետ կապը",
+      "providerCheckFailedMessage": "Չհաջողվեց հասնել մատակարարին։ Ստուգիր կապդ և կրկին փորձիր։",
       "reconnectTitle": "Կրկին միացում GitHub-ին",
       "reconnectTitleGitLab": "Կրկին միացում GitLab-ին",
       "reconnectTitleBitbucket": "Կրկին միացում Bitbucket-ին",
@@ -711,7 +711,7 @@
       "checkActiveConnection": "Միացումն ակտիվ է, բայց այս տարրը դեռ հնարավոր չէ բեռնել։",
       "bitbucketOrgOnlyDescription": "Վերեւի հաշիվը փոխիր կազմակերպության՝ դրա Bitbucket-ի pull request-ները վերանայելու համար։",
       "bitbucketOrgOnlyNoOrganizationDescription": "Այս հաշիվն առայժմ չունի որեւէ կազմակերպություն։ Bitbucket-ի pull request-ները հնարավոր կլինի վերանայել, երբ ստեղծես կամ միանաս կազմակերպության։",
-      "gitlabReconnectAdminOnlyDescription": "Խնդրիր կազմակերպության սեփականատիրոջը, ադմինիստրատորին կամ վճարումների կառավարչին նորից միացնել այն։",
+      "gitlabReconnectAdminOnlyDescription": "Խնդրիր կազմակերպության սեփականատերերին, ադմինիստրատորներին կամ վճարումների կառավարիչներին նորից միացնել այն։",
       "bitbucketNotConnectedTitle": "Bitbucket-ը միացված չէ",
       "bitbucketAdminOnlyDescription": "Միայն կազմակերպության սեփականատերերը, ադմինիստրատորները և վճարումների կառավարիչները կարող են այն միացնել։",
       "contextLine": "{{organization}}-ի համար",

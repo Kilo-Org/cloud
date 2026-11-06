@@ -2744,10 +2744,10 @@
     },
     "connect": {
       "checkFailedTitle": "GitHub 연결을 확인하지 못했습니다.",
-      "checkFailedMessage": "정보를 불러올 때까지 로그인 상태를 확인할 수 없습니다.",
+      "checkFailedMessage": "GitHub에 연결하지 못했습니다. 인터넷 연결을 확인하고 다시 시도하세요.",
       "checkFailedTitleGitLab": "GitLab 연결을 확인하지 못했습니다.",
       "checkFailedTitleBitbucket": "Bitbucket 연결을 확인하지 못했습니다.",
-      "providerCheckFailedMessage": "로드될 때까지 연결 상태를 사용할 수 없습니다.",
+      "providerCheckFailedMessage": "공급자에 연결하지 못했습니다. 인터넷 연결을 확인하고 다시 시도하세요.",
       "reconnectTitle": "GitHub 다시 연결",
       "reconnectTitleGitLab": "GitLab 다시 연결",
       "reconnectTitleBitbucket": "Bitbucket 다시 연결",

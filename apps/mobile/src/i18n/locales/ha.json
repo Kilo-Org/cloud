@@ -697,10 +697,10 @@
     },
     "connect": {
       "checkFailedTitle": "Ba a iya duba haɗin GitHub ba.",
-      "checkFailedMessage": "Ba za a iya sanin matsayin shiga ba har sai an loda wannan.",
+      "checkFailedMessage": "Ba a iya haɗawa da GitHub ba. Duba haɗinka na intanet ka sake gwadawa.",
       "checkFailedTitleGitLab": "Ba a iya duba haɗin GitLab ba.",
       "checkFailedTitleBitbucket": "Ba a iya duba haɗin Bitbucket ba.",
-      "providerCheckFailedMessage": "Ba a samun yanayin haɗi har sai wannan ya lodu.",
+      "providerCheckFailedMessage": "Ba a iya haɗawa da mai ba da sabis ba. Duba haɗinka na intanet ka sake gwadawa.",
       "reconnectTitle": "Sake haɗa GitHub",
       "reconnectTitleGitLab": "Sake haɗa GitLab",
       "reconnectTitleBitbucket": "Sake haɗa Bitbucket",

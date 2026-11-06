@@ -697,10 +697,10 @@
     },
     "connect": {
       "checkFailedTitle": "GitHub കണക്ഷൻ പരിശോധിക്കാനായില്ല.",
-      "checkFailedMessage": "ഇത് ലോഡ് ചെയ്യുന്നത് വരെ സൈൻ-ഇൻ നില ലഭ്യമല്ല.",
+      "checkFailedMessage": "GitHub-ലേക്ക് കണക്റ്റ് ചെയ്യാനായില്ല. ഇന്റർനെറ്റ് കണക്ഷൻ പരിശോധിച്ച് വീണ്ടും ശ്രമിക്കുക.",
       "checkFailedTitleGitLab": "GitLab കണക്ഷൻ പരിശോധിക്കാനായില്ല.",
       "checkFailedTitleBitbucket": "Bitbucket കണക്ഷൻ പരിശോധിക്കാനായില്ല.",
-      "providerCheckFailedMessage": "ഇത് ലോഡ് ആകുന്നതുവരെ കണക്ഷൻ നില ലഭ്യമല്ല.",
+      "providerCheckFailedMessage": "പ്രൊവൈഡറിലേക്ക് കണക്റ്റ് ചെയ്യാനായില്ല. ഇന്റർനെറ്റ് കണക്ഷൻ പരിശോധിച്ച് വീണ്ടും ശ്രമിക്കുക.",
       "reconnectTitle": "GitHub വീണ്ടും കണക്റ്റ് ചെയ്യുക",
       "reconnectTitleGitLab": "GitLab വീണ്ടും കണക്റ്റ് ചെയ്യുക",
       "reconnectTitleBitbucket": "Bitbucket വീണ്ടും കണക്റ്റ് ചെയ്യുക",

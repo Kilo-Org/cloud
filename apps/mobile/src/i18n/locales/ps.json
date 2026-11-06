@@ -697,10 +697,10 @@
     },
     "connect": {
       "checkFailedTitle": "د GitHub اړیکه ونه کتل شوه.",
-      "checkFailedMessage": "تر هغه چې دا بار نه شي، د ننوتلو حالت نه څرګندېږي.",
+      "checkFailedMessage": "د GitHub سره اړیکه ونه نیول شوه. خپله اړیکه وګورئ او بیا هڅه وکړئ.",
       "checkFailedTitleGitLab": "د GitLab اړیکه ونه کتل شوه.",
       "checkFailedTitleBitbucket": "د Bitbucket اړیکه ونه کتل شوه.",
-      "providerCheckFailedMessage": "تر څو چې دا نه وي بار شوی، د اړیکې حالت شتون نلري.",
+      "providerCheckFailedMessage": "د چمتو کوونکي سره اړیکه ونه نیول شوه. خپله اړیکه وګورئ او بیا هڅه وکړئ.",
       "reconnectTitle": "GitHub بیا ونښلئ",
       "reconnectTitleGitLab": "GitLab بیا ونښلئ",
       "reconnectTitleBitbucket": "Bitbucket بیا ونښلئ",

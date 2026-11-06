@@ -697,10 +697,10 @@
     },
     "connect": {
       "checkFailedTitle": "GitHub-თან კავშირის შემოწმება ვერ მოხერხდა.",
-      "checkFailedMessage": "ჩატვირთვის დასრულებამდე შესვლის სტატუსი მიუწვდომელია.",
+      "checkFailedMessage": "GitHub-თან დაკავშირება ვერ მოხერხდა. შეამოწმე კავშირი და ხელახლა სცადე.",
       "checkFailedTitleGitLab": "GitLab-თან კავშირის შემოწმება ვერ მოხერხდა.",
       "checkFailedTitleBitbucket": "Bitbucket-თან კავშირის შემოწმება ვერ მოხერხდა.",
-      "providerCheckFailedMessage": "კავშირის სტატუსი მიუწვდომელია ჩატვირთვამდე.",
+      "providerCheckFailedMessage": "პროვაიდერთან დაკავშირება ვერ მოხერხდა. შეამოწმე კავშირი და ხელახლა სცადე.",
       "reconnectTitle": "GitHub-თან ხელახლა დაკავშირება",
       "reconnectTitleGitLab": "GitLab-თან ხელახლა დაკავშირება",
       "reconnectTitleBitbucket": "Bitbucket-თან ხელახლა დაკავშირება",

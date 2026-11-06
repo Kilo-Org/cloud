@@ -697,10 +697,10 @@
     },
     "connect": {
       "checkFailedTitle": "Walqunnamtii GitHub sakatta'uun hin danda'amne.",
-      "checkFailedMessage": "Hanga kun fe'amutti haala seensaa beekuun hin danda'amu.",
+      "checkFailedMessage": "GitHub waliin walqunnamuun hin danda'amne. Walqunnamtii kee ilaaliitii irra deebi'ii yaali.",
       "checkFailedTitleGitLab": "Walqunnamtii GitLab sakatta'uun hin danda'amne.",
       "checkFailedTitleBitbucket": "Walqunnamtii Bitbucket sakatta'uun hin danda'amne.",
-      "providerCheckFailedMessage": "Kun fe'amuun isaa dura haalli walqunnamtii hin argamu.",
+      "providerCheckFailedMessage": "Dhiyeessaa tajaajilaa waliin walqunnamuun hin danda'amne. Walqunnamtii kee ilaaliitii irra deebi'ii yaali.",
       "reconnectTitle": "GitHub irra deebi'ii walqabsiisi",
       "reconnectTitleGitLab": "GitLab irra deebi'ii walqabsiisi",
       "reconnectTitleBitbucket": "Bitbucket irra deebi'ii walqabsiisi",

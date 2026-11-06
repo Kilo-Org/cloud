@@ -2781,10 +2781,10 @@
     },
     "connect": {
       "checkFailedTitle": "No se pudo comprobar la conexión con GitHub.",
-      "checkFailedMessage": "No se puede consultar el estado de tu sesión hasta que termine la carga.",
+      "checkFailedMessage": "No se pudo conectar con GitHub. Comprueba tu conexión e inténtalo de nuevo.",
       "checkFailedTitleGitLab": "No se pudo comprobar la conexión con GitLab.",
       "checkFailedTitleBitbucket": "No se pudo comprobar la conexión con Bitbucket.",
-      "providerCheckFailedMessage": "No se puede consultar el estado de la conexión hasta que termine la carga.",
+      "providerCheckFailedMessage": "No se pudo conectar con el proveedor. Comprueba tu conexión e inténtalo de nuevo.",
       "reconnectTitle": "Volver a conectar GitHub",
       "reconnectTitleGitLab": "Volver a conectar GitLab",
       "reconnectTitleBitbucket": "Volver a conectar Bitbucket",

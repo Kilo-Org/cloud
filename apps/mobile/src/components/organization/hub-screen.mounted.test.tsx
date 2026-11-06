@@ -9,6 +9,7 @@
 // eslint-disable-next-line import/no-nodejs-modules -- vitest-only theme-token guard, runs in node, never bundled into the app
 import { readFileSync } from 'node:fs';
 
+import { ORGANIZATION_NAME_MAX_LENGTH } from '@kilocode/app-shared/organizations';
 import { createElement } from 'react';
 import { act, type TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -29,6 +30,7 @@ const SPACING_UNIT_DP = 4;
 
 const boundary = vi.hoisted(() => ({
   role: 'owner' as string,
+  name: 'Acme',
   parentOrganizationId: null as string | null | undefined,
   requireSeats: false,
   seatCount: { used: 1, total: 1 },
@@ -60,7 +62,7 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
     role: boundary.role,
     org: {
       organizationId: 'org-1',
-      organizationName: 'Acme',
+      organizationName: boundary.name,
       parentOrganizationId: boundary.parentOrganizationId,
       balance: 5_000_000,
       requireSeats: boundary.requireSeats,
@@ -239,6 +241,7 @@ async function renderHub() {
 
 beforeEach(() => {
   boundary.role = 'owner';
+  boundary.name = 'Acme';
   boundary.parentOrganizationId = null;
   boundary.requireSeats = false;
   boundary.seatCount = { used: 1, total: 1 };
@@ -342,6 +345,31 @@ describe('OrganizationHubScreen rename control', () => {
     });
 
     expect(renderer.root.findAll(node => String(node.type) === 'RenameModal')).toHaveLength(1);
+    unmount();
+  });
+
+  it('opens the rename sheet on the whole stored name, up to the server limit', async () => {
+    // `RenameModal`'s own default is shorter than a stored organization name can
+    // be, and React Native applies `maxLength` to the seeded value: the dialog
+    // then opens on a cut name, and saving keeps only what the field shows.
+    const longName = 'Northwind Logistics — European Operations and Customer Support Berlin';
+    expect(longName.length).toBeGreaterThan(50);
+    boundary.name = longName;
+
+    const { renderer, unmount } = await renderHub();
+    const control = findRenameControl(renderer.root)[0];
+    if (!control) {
+      throw new Error('rename control not found');
+    }
+    act(() => {
+      (control.props.onPress as () => void)();
+    });
+
+    const modal = renderer.root.findAll(node => String(node.type) === 'RenameModal')[0];
+    expect(modal?.props).toMatchObject({
+      initialValue: longName,
+      maxLength: ORGANIZATION_NAME_MAX_LENGTH,
+    });
     unmount();
   });
 

@@ -697,10 +697,10 @@
     },
     "connect": {
       "checkFailedTitle": "GitHub සම්බන්ධතාවය පරීක්ෂා කිරීමට නොහැකි විය.",
-      "checkFailedMessage": "මෙය පූරණය වන තුරු පිවිසුම් තත්ත්වය දැනගත නොහැක.",
+      "checkFailedMessage": "GitHub වෙත සම්බන්ධ වීමට නොහැකි විය. ඔබේ සම්බන්ධතාවය පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
       "checkFailedTitleGitLab": "GitLab සම්බන්ධතාවය පරීක්ෂා කිරීමට නොහැකි විය.",
       "checkFailedTitleBitbucket": "Bitbucket සම්බන්ධතාවය පරීක්ෂා කිරීමට නොහැකි විය.",
-      "providerCheckFailedMessage": "මෙය පූරණය වන තුරු සම්බන්ධතා තත්ත්වය ලබා ගත නොහැක.",
+      "providerCheckFailedMessage": "සේවා සපයන්නා වෙත සම්බන්ධ වීමට නොහැකි විය. ඔබේ සම්බන්ධතාවය පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
       "reconnectTitle": "GitHub නැවත සම්බන්ධ කරන්න",
       "reconnectTitleGitLab": "GitLab නැවත සම්බන්ධ කරන්න",
       "reconnectTitleBitbucket": "Bitbucket නැවත සම්බන්ධ කරන්න",
@@ -2581,6 +2581,7 @@
       "assistantContextOverflow": "මාදිලියට සැකසිය හැකි ප්‍රමාණයට වඩා සංවාදය දිගුයි.",
       "assistantProviderError": "සැපයුම්කරු දෝෂයක් ලබා දුන්නේය.",
       "assistantProviderRefused": "සැපයුම්කරු මෙම ඉල්ලීම ප්‍රතික්ෂේප කළ අතර එය නැවත උත්සාහ කළ නොහැක.",
+      "assistantCreditsRefusal": "Cloud Agent ධාවනය කිරීමට ප්‍රමාණවත් ක්‍රෙඩිට් නොමැත.",
       "assistantOutputLimit": "ප්‍රතිචාරය මාදිලියේ ප්‍රතිදාන සීමාවට ළඟා විය.",
       "assistantStructuredOutput": "ප්‍රතිචාරය අවශ්‍ය ආකෘතියට ගැළපුණේ නැත.",
       "assistantFailed": "ප්‍රතිචාරය අසාර්ථක විය."
@@ -3497,9 +3498,9 @@
       "searching": "වෙබ් සෙවීම",
       "thinking": "සිතා බැලීම"
     },
-    "planOf": "න්",
+    "planProgress": "{{total}} න් {{done}}",
     "filesChanged": "ගොනු වෙනස් විය",
-    "finishedIn": "අවසන් විය",
+    "finishedIn": "{{duration}} කින් අවසන් විය",
     "noActivityFor": "ක්‍රියාකාරකම් නැත",
     "prOpened": "Pull request විවෘත කරන ලදී",
     "permissionWants": "ක්‍රියාත්මක කිරීමට අවශ්‍යයි",

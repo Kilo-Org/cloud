@@ -697,10 +697,10 @@
     },
     "connect": {
       "checkFailedTitle": "GitHub қосылымын тексеру мүмкін болмады.",
-      "checkFailedMessage": "Бұл деректер жүктелмейінше, жүйеге кіру күйін анықтау мүмкін емес.",
+      "checkFailedMessage": "GitHub-қа қосылу мүмкін болмады. Байланысты тексеріп, қайталап көріңіз.",
       "checkFailedTitleGitLab": "GitLab қосылымын тексеру мүмкін болмады.",
       "checkFailedTitleBitbucket": "Bitbucket қосылымын тексеру мүмкін болмады.",
-      "providerCheckFailedMessage": "Жүктелгенше қосылым күйі қолжетімсіз.",
+      "providerCheckFailedMessage": "Провайдерге қосылу мүмкін болмады. Байланысты тексеріп, қайталап көріңіз.",
       "reconnectTitle": "GitHub-қа қайта қосылу",
       "reconnectTitleGitLab": "GitLab-қа қайта қосылу",
       "reconnectTitleBitbucket": "Bitbucket-қа қайта қосылу",
@@ -2575,6 +2575,7 @@
       "assistantContextOverflow": "Сөйлесу көлемі модельдің шегінен асты.",
       "assistantProviderError": "Провайдер қате қайтарды.",
       "assistantProviderRefused": "Провайдер бұл сұрауды қабылдамады және оны қайталау мүмкін емес.",
+      "assistantCreditsRefusal": "Cloud Agent қызметін іске қосуға кредит жеткіліксіз.",
       "assistantOutputLimit": "Жауап модельдің шығыс шегіне жетті.",
       "assistantStructuredOutput": "Жауап қажетті форматқа сәйкес келмеді.",
       "assistantFailed": "Жауапты жасау мүмкін болмады."
@@ -3491,9 +3492,9 @@
       "searching": "Веб іздеу",
       "thinking": "Ойлану"
     },
-    "planOf": "/",
+    "planProgress": "{{done}} / {{total}}",
     "filesChanged": "файл өзгертілді",
-    "finishedIn": "Аяқталды",
+    "finishedIn": "{{duration}} ішінде аяқталды",
     "noActivityFor": "Белсенділік жоқ",
     "prOpened": "Pull request ашылды",
     "permissionWants": "Іске қосуды қалайды",

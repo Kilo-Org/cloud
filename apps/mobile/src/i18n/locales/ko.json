@@ -2036,6 +2036,7 @@
       "assistantContextOverflow": "대화가 너무 길어 모델이 처리할 수 없습니다.",
       "assistantProviderError": "제공업체가 오류를 반환했습니다.",
       "assistantProviderRefused": "제공업체가 이 요청을 거부했으며 다시 시도할 수 없습니다.",
+      "assistantCreditsRefusal": "Cloud Agent를 실행할 크레딧이 부족합니다.",
       "assistantOutputLimit": "응답이 모델의 출력 한도에 도달했습니다.",
       "assistantStructuredOutput": "응답이 필요한 형식과 일치하지 않습니다.",
       "assistantFailed": "응답을 생성하지 못했습니다."
@@ -2743,10 +2744,10 @@
     },
     "connect": {
       "checkFailedTitle": "GitHub 연결을 확인하지 못했습니다.",
-      "checkFailedMessage": "정보를 불러올 때까지 로그인 상태를 확인할 수 없습니다.",
+      "checkFailedMessage": "GitHub에 연결하지 못했습니다. 인터넷 연결을 확인하고 다시 시도하세요.",
       "checkFailedTitleGitLab": "GitLab 연결을 확인하지 못했습니다.",
       "checkFailedTitleBitbucket": "Bitbucket 연결을 확인하지 못했습니다.",
-      "providerCheckFailedMessage": "로드될 때까지 연결 상태를 사용할 수 없습니다.",
+      "providerCheckFailedMessage": "공급자에 연결하지 못했습니다. 인터넷 연결을 확인하고 다시 시도하세요.",
       "reconnectTitle": "GitHub 다시 연결",
       "reconnectTitleGitLab": "GitLab 다시 연결",
       "reconnectTitleBitbucket": "Bitbucket 다시 연결",
@@ -3491,9 +3492,9 @@
       "searching": "웹 검색",
       "thinking": "생각 중"
     },
-    "planOf": "중",
+    "planProgress": "{{total}}개 중 {{done}}개",
     "filesChanged": "파일 변경됨",
-    "finishedIn": "완료 시간",
+    "finishedIn": "{{duration}} 만에 완료",
     "noActivityFor": "활동 없음",
     "prOpened": "풀 리퀘스트 열림",
     "permissionWants": "실행하려 함",

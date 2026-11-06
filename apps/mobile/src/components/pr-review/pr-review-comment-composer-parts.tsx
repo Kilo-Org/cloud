@@ -183,18 +183,15 @@ export function ContextPreview({
   selection,
   fallbackPath,
   fallbackLineLabel,
-  fallbackSide,
   preferFallback,
 }: {
   selection: DiffSelection | null;
   fallbackPath: string;
   fallbackLineLabel: string;
-  fallbackSide: 'LEFT' | 'RIGHT';
   /** When true, never prefer the live bridge over route/item params. */
   preferFallback: boolean;
 }) {
   const path = preferFallback ? fallbackPath : (selection?.path ?? fallbackPath);
-  const side = preferFallback ? fallbackSide : (selection?.side ?? fallbackSide);
   const lineLabel =
     preferFallback || !selection
       ? fallbackLineLabel
@@ -204,7 +201,7 @@ export function ContextPreview({
   return (
     <View className="gap-0.5 rounded-lg border border-hair-soft bg-secondary px-4 py-2">
       <Text className="font-mono-medium text-[11px] text-muted-foreground" numberOfLines={1}>
-        {path} {side} {lineLabel}
+        {path} {lineLabel}
       </Text>
       {previewText.length > 0 ? (
         <Text

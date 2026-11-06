@@ -697,10 +697,10 @@
     },
     "connect": {
       "checkFailedTitle": "Nem sikerült ellenőrizni a GitHub-kapcsolatot",
-      "checkFailedMessage": "A bejelentkezési állapot csak a betöltés után érhető el.",
+      "checkFailedMessage": "Nem sikerült elérni a GitHubot. Ellenőrizd az internetkapcsolatot, és próbáld újra.",
       "checkFailedTitleGitLab": "Nem sikerült ellenőrizni a GitLab-kapcsolatot",
       "checkFailedTitleBitbucket": "Nem sikerült ellenőrizni a Bitbucket-kapcsolatot",
-      "providerCheckFailedMessage": "A kapcsolódási állapot csak a betöltés után érhető el.",
+      "providerCheckFailedMessage": "Nem sikerült elérni a szolgáltatót. Ellenőrizd az internetkapcsolatot, és próbáld újra.",
       "reconnectTitle": "Újracsatlakozás a GitHubhoz",
       "reconnectTitleGitLab": "Újracsatlakozás a GitLabhoz",
       "reconnectTitleBitbucket": "Újracsatlakozás a Bitbuckethoz",
@@ -2575,6 +2575,7 @@
       "assistantContextOverflow": "A beszélgetés túl hosszú a modell számára.",
       "assistantProviderError": "A szolgáltató hibát adott vissza.",
       "assistantProviderRefused": "A szolgáltató elutasította ezt a kérést, ezért nem lehet újrapróbálni.",
+      "assistantCreditsRefusal": "Nincs elég kredit a Cloud Agent futtatásához.",
       "assistantOutputLimit": "A válasz elérte a modell kimeneti korlátját.",
       "assistantStructuredOutput": "A válasz nem felelt meg a szükséges formátumnak.",
       "assistantFailed": "Nem sikerült létrehozni a választ."
@@ -3491,9 +3492,9 @@
       "searching": "Webes keresés",
       "thinking": "Végiggondolás"
     },
-    "planOf": "/",
+    "planProgress": "{{done}}/{{total}}",
     "filesChanged": "módosított fájl",
-    "finishedIn": "Befejezve ennyi idő alatt:",
+    "finishedIn": "Befejezve {{duration}} alatt",
     "noActivityFor": "Nincs aktivitás ennyi ideje:",
     "prOpened": "Pull request megnyitva",
     "permissionWants": "Futtatni szeretne",

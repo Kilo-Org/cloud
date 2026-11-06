@@ -11,7 +11,6 @@ import {
   canExitSessionFromList,
   composeActiveSessionSpokenMeta,
   composeActiveSessionVisibleMeta,
-  composeSessionProvenanceSubtitle,
   expandPlatformFilter,
   formatGitUrlProject,
   formatMeta,
@@ -23,11 +22,13 @@ import {
   remoteAgentLabel,
   remoteMeta,
   remoteSessionEyebrowLabel,
+  remoteSessionEyebrowState,
   repoNameFromGitUrl,
   sectionAwareTimeMeta,
   selectRemoteRowSpokenMeta,
   storedSessionEyebrowLabel,
 } from './session-list-helpers';
+import { composeSessionProvenanceSubtitle } from './session-provenance-subtitle';
 
 afterEach(async () => {
   await i18n.changeLanguage('en');
@@ -497,6 +498,19 @@ describe('storedSessionEyebrowLabel (canonical eyebrow — repo-name-first)', ()
     );
   });
 
+  it('labels a stored session of unknown origin without a live status', () => {
+    const neutral = i18n.t('common.unknown');
+    const live = i18n.t('agents.sessionList.live');
+    // The backend's `'unknown'` sentinel is the reachable unrecorded origin;
+    // the empty string is the same class through a data anomaly. `platformLabel`'s
+    // own tests cover null and undefined with their nullable signature.
+    for (const created_on_platform of ['', 'unknown']) {
+      const label = storedSessionEyebrowLabel({ git_url: null, created_on_platform });
+      expect(label).toBe(neutral);
+      expect(label).not.toBe(live);
+    }
+  });
+
   it('shows the decoded repository name for a percent-encoded git_url', () => {
     expect(
       storedSessionEyebrowLabel({
@@ -570,6 +584,26 @@ describe('remoteSessionEyebrowLabel (canonical eyebrow — repo-name-first)', ()
         createdOnPlatform: 'cli',
       })
     ).toBe('MY-REPO');
+  });
+});
+
+describe('remoteSessionEyebrowState (the tint key beside the label)', () => {
+  it('names the live state for every unrecorded origin the label renders as LIVE', async () => {
+    for (const createdOnPlatform of [undefined, '', 'unknown']) {
+      expect(remoteSessionEyebrowState({ gitUrl: null, createdOnPlatform })).toBe('live');
+    }
+    // The word is catalog copy: the tint keys off the state, not its text.
+    await i18n.changeLanguage('de');
+    expect(remoteSessionEyebrowLabel({ gitUrl: null, createdOnPlatform: undefined })).toBe(
+      i18n.t('agents.sessionList.live')
+    );
+    expect(remoteSessionEyebrowState({ gitUrl: null, createdOnPlatform: undefined })).toBe('live');
+    await i18n.changeLanguage('en');
+  });
+
+  it('returns null for a repo-name or platform-name eyebrow', () => {
+    expect(remoteSessionEyebrowState({ gitUrl: null, createdOnPlatform: 'cli' })).toBeNull();
+    expect(remoteSessionEyebrowState({ gitUrl: 'https://github.com/org/my-repo.git' })).toBeNull();
   });
 });
 

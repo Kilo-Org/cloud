@@ -288,7 +288,6 @@ function fixture(options?: {
   metadata?: SessionMetadata;
   ownershipResults?: unknown[][];
   internalSecret?: string;
-  runtimeIsolationEnabled?: string;
   botId?: string;
   authToken?: string;
 }) {
@@ -333,7 +332,6 @@ function fixture(options?: {
     env: {
       INTERNAL_API_SECRET: INTERNAL_SECRET,
       NEXTAUTH_SECRET: 'runtime-authorization-test-secret',
-      RUNTIME_ISOLATION_ENABLED: options?.runtimeIsolationEnabled ?? 'true',
       HYPERDRIVE: { connectionString: 'postgres://worktree-handler-test' },
       SANDBOX_SESSION: sandboxSessionNamespace,
       CLOUD_AGENT_SESSION: legacySessionNamespace,
@@ -879,10 +877,6 @@ describe('createWorktreeChat sandbox preset inheritance', () => {
         organizationId: ORGANIZATION_ID,
       });
       context.env.SANDBOX_SELECTION_IDS = '';
-      Object.assign(context.env, {
-        VERCEL_SANDBOX_ORG_IDS: sandboxAllocation.startsWith('vercel-') ? '' : '*',
-      });
-      context.env.CREDENTIAL_CONTAINMENT_ENABLED = 'true';
       await caller.createWorktreeChat(input);
       const registration = destinationStub.registerSessionFromMetadata.mock.calls[0]?.[0];
       const registered = parseSessionMetadata({
@@ -1085,13 +1079,13 @@ describe('createWorktreeChat sandbox preset inheritance', () => {
 });
 
 describe('createWorktreeChat ownership, metadata, and control-plane routing', () => {
-  it('rejects a new destination before recording ownership when runtime isolation is disabled', async () => {
-    const { caller, input, destinationStub } = fixture({ runtimeIsolationEnabled: 'false' });
-    verifyKiloTokenForPolicyMock.mockResolvedValue({ claims: { runtimeAdmission: {} } });
+  it('rejects a new destination before recording ownership when runtime admission is missing', async () => {
+    const { caller, input, destinationStub } = fixture();
+    verifyKiloTokenForPolicyMock.mockResolvedValue({ claims: { tokenPurpose: 'control' } });
 
     await expect(caller.createWorktreeChat(input)).rejects.toMatchObject({
-      code: 'PRECONDITION_FAILED',
-      message: 'runtime_isolation_unavailable',
+      code: 'FORBIDDEN',
+      message: 'Runtime authorization denied',
     });
     expect(recordOperationProgressMock).not.toHaveBeenCalled();
     expect(createSessionForCloudAgentMock).not.toHaveBeenCalled();

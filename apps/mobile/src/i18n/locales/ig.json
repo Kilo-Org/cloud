@@ -697,10 +697,10 @@
     },
     "connect": {
       "checkFailedTitle": "Enweghị ike ịlele njikọ GitHub",
-      "checkFailedMessage": "Enweghị ike ịmata ọnọdụ nbanye ruo mgbe ebudatara nke a.",
+      "checkFailedMessage": "Enweghị ike ijikọ na GitHub. Lelee njikọ gị ma nwaa ọzọ.",
       "checkFailedTitleGitLab": "Enweghị ike ịlele njikọ GitLab",
       "checkFailedTitleBitbucket": "Enweghị ike ịlele njikọ Bitbucket",
-      "providerCheckFailedMessage": "Ọnọdụ njikọ agaghị adị ruo mgbe nke a budatara.",
+      "providerCheckFailedMessage": "Enweghị ike ijikọ na onye na-enye ọrụ. Lelee njikọ gị ma nwaa ọzọ.",
       "reconnectTitle": "Jikọtaghachi GitHub",
       "reconnectTitleGitLab": "Jikọtaghachi GitLab",
       "reconnectTitleBitbucket": "Jikọtaghachi Bitbucket",
@@ -2575,6 +2575,7 @@
       "assistantContextOverflow": "Mkparịta ụka ahụ toro ogologo karịa ihe ihe nlereanya ahụ nwere ike ịnabata.",
       "assistantProviderError": "Onye na-enye ọrụ zaghachiri na njehie.",
       "assistantProviderRefused": "Onye na-enye ọrụ jụrụ arịrịọ a ma enweghị ike ịnwale ya ọzọ.",
+      "assistantCreditsRefusal": "Ego ojiji ezughị iji rụọ ọrụ na Cloud Agent.",
       "assistantOutputLimit": "Nzaghachi ahụ ruru oke mmepụta nke ihe nlereanya ahụ.",
       "assistantStructuredOutput": "Nzaghachi ahụ adabaghị n'usoro a chọrọ.",
       "assistantFailed": "Nzaghachi ahụ agaghị nke ọma."
@@ -3491,9 +3492,9 @@
       "searching": "Nchọgharị weebụ",
       "thinking": "Na-eche echiche"
     },
-    "planOf": "nke",
+    "planProgress": "{{done}} nke {{total}}",
     "filesChanged": "faịlụ gbanwere",
-    "finishedIn": "Emechara n'ime",
+    "finishedIn": "Emechara n'ime {{duration}}",
     "noActivityFor": "Enweghị ọrụ ruo",
     "prOpened": "E meghere arịrịọ ijikọ koodu",
     "permissionWants": "Ọ chọrọ ịgba",

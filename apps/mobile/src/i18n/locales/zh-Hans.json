@@ -2036,6 +2036,7 @@
       "assistantContextOverflow": "对话长度已超出模型的处理范围。",
       "assistantProviderError": "提供商返回了错误。",
       "assistantProviderRefused": "提供商拒绝了该请求，且无法重试。",
+      "assistantCreditsRefusal": "额度不足，无法运行 Cloud Agent。",
       "assistantOutputLimit": "回复已达到模型的输出上限。",
       "assistantStructuredOutput": "回复与所需格式不匹配。",
       "assistantFailed": "生成回复失败。"
@@ -2743,10 +2744,10 @@
     },
     "connect": {
       "checkFailedTitle": "无法检查 GitHub 连接",
-      "checkFailedMessage": "加载完成前，无法确认登录状态。",
+      "checkFailedMessage": "无法连接 GitHub。请检查网络连接后重试。",
       "checkFailedTitleGitLab": "无法检查 GitLab 连接",
       "checkFailedTitleBitbucket": "无法检查 Bitbucket 连接",
-      "providerCheckFailedMessage": "加载完成前无法获取连接状态。",
+      "providerCheckFailedMessage": "无法连接服务提供商。请检查网络连接后重试。",
       "reconnectTitle": "重新连接 GitHub",
       "reconnectTitleGitLab": "重新连接 GitLab",
       "reconnectTitleBitbucket": "重新连接 Bitbucket",
@@ -3491,9 +3492,9 @@
       "searching": "网页搜索",
       "thinking": "正在思考"
     },
-    "planOf": "/",
+    "planProgress": "{{done}}/{{total}}",
     "filesChanged": "个文件已更改",
-    "finishedIn": "耗时",
+    "finishedIn": "耗时 {{duration}}",
     "noActivityFor": "无活动已持续",
     "prOpened": "拉取请求已打开",
     "permissionWants": "想要运行",

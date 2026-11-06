@@ -87,7 +87,7 @@ export function glanceableLayoutCopy() {
     stepRunning: i18n.t('glanceable.step.running'),
     searching: i18n.t('glanceable.step.searching'),
     thinking: i18n.t('glanceable.step.thinking'),
-    of: i18n.t('glanceable.planOf'),
+    planProgress: i18n.t('glanceable.planProgress'),
     filesChanged: i18n.t('glanceable.filesChanged'),
     finishedIn: i18n.t('glanceable.finishedIn'),
     minute: i18n.t('common.durationMinuteShort'),

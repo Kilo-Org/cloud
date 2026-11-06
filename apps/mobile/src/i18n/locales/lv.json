@@ -712,10 +712,10 @@
     },
     "connect": {
       "checkFailedTitle": "Neizdevās pārbaudīt GitHub savienojumu.",
-      "checkFailedMessage": "Pierakstīšanās statuss būs pieejams pēc ielādes.",
+      "checkFailedMessage": "Neizdevās sasniegt GitHub. Pārbaudi savienojumu un mēģini vēlreiz.",
       "checkFailedTitleGitLab": "Neizdevās pārbaudīt GitLab savienojumu.",
       "checkFailedTitleBitbucket": "Neizdevās pārbaudīt Bitbucket savienojumu.",
-      "providerCheckFailedMessage": "Savienojuma statuss būs pieejams pēc ielādes.",
+      "providerCheckFailedMessage": "Neizdevās sasniegt pakalpojumu sniedzēju. Pārbaudi savienojumu un mēģini vēlreiz.",
       "reconnectTitle": "Atkārtoti savienot GitHub",
       "reconnectTitleGitLab": "Atkārtoti savienot GitLab",
       "reconnectTitleBitbucket": "Atkārtoti savienot Bitbucket",
@@ -2621,6 +2621,7 @@
       "assistantContextOverflow": "Saruna modelim ir pārāk gara.",
       "assistantProviderError": "Pakalpojumu sniedzējs atgrieza kļūdu.",
       "assistantProviderRefused": "Pakalpojumu sniedzējs noraidīja šo pieprasījumu, un to nevar atkārtot.",
+      "assistantCreditsRefusal": "Nepietiek kredītu, lai palaistu Cloud Agent.",
       "assistantOutputLimit": "Atbilde sasniedza modeļa izvades ierobežojumu.",
       "assistantStructuredOutput": "Atbilde neatbilda pieprasītajam formātam.",
       "assistantFailed": "Neizdevās sagatavot atbildi."
@@ -3546,9 +3547,9 @@
       "searching": "Tīmekļa meklēšana",
       "thinking": "Domāšana"
     },
-    "planOf": "no",
+    "planProgress": "{{done}} no {{total}}",
     "filesChanged": "mainīti faili",
-    "finishedIn": "Pabeigts pēc",
+    "finishedIn": "Pabeigts {{duration}} laikā",
     "noActivityFor": "Nav aktivitātes",
     "prOpened": "Atvērts pull pieprasījums",
     "permissionWants": "Vēlas palaist",

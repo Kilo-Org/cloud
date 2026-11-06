@@ -2086,6 +2086,7 @@
       "assistantContextOverflow": "Rozmowa jest zbyt długa dla modelu.",
       "assistantProviderError": "Dostawca zwrócił błąd.",
       "assistantProviderRefused": "Dostawca odrzucił to żądanie i nie można go ponowić.",
+      "assistantCreditsRefusal": "Brakuje środków na uruchomienie Cloud Agent.",
       "assistantOutputLimit": "Odpowiedź osiągnęła limit wyjścia modelu.",
       "assistantStructuredOutput": "Odpowiedź nie była zgodna z wymaganym formatem.",
       "assistantFailed": "Nie udało się wygenerować odpowiedzi."
@@ -2817,10 +2818,10 @@
     },
     "connect": {
       "checkFailedTitle": "Nie udało się sprawdzić połączenia z kontem GitHub.",
-      "checkFailedMessage": "Status logowania będzie dostępny dopiero po wczytaniu danych.",
+      "checkFailedMessage": "Nie udało się połączyć z GitHubem. Sprawdź połączenie i spróbuj ponownie.",
       "checkFailedTitleGitLab": "Nie udało się sprawdzić połączenia z kontem GitLab.",
       "checkFailedTitleBitbucket": "Nie udało się sprawdzić połączenia z kontem Bitbucket.",
-      "providerCheckFailedMessage": "Status połączenia będzie dostępny po wczytaniu danych.",
+      "providerCheckFailedMessage": "Nie udało się połączyć z dostawcą. Sprawdź połączenie i spróbuj ponownie.",
       "reconnectTitle": "Połącz ponownie konto GitHub",
       "reconnectTitleGitLab": "Połącz ponownie konto GitLab",
       "reconnectTitleBitbucket": "Połącz ponownie konto Bitbucket",
@@ -3601,9 +3602,9 @@
       "searching": "Wyszukiwanie w sieci",
       "thinking": "Przemyśliwanie"
     },
-    "planOf": "z",
+    "planProgress": "{{done}} z {{total}}",
     "filesChanged": "zmienione pliki",
-    "finishedIn": "Zakończono w",
+    "finishedIn": "Zakończono w {{duration}}",
     "noActivityFor": "Brak aktywności przez",
     "prOpened": "Otwarto pull request",
     "permissionWants": "Chce uruchomić",

@@ -697,10 +697,10 @@
     },
     "connect": {
       "checkFailedTitle": "GitHub-თან კავშირის შემოწმება ვერ მოხერხდა.",
-      "checkFailedMessage": "ჩატვირთვის დასრულებამდე შესვლის სტატუსი მიუწვდომელია.",
+      "checkFailedMessage": "GitHub-თან დაკავშირება ვერ მოხერხდა. შეამოწმე კავშირი და ხელახლა სცადე.",
       "checkFailedTitleGitLab": "GitLab-თან კავშირის შემოწმება ვერ მოხერხდა.",
       "checkFailedTitleBitbucket": "Bitbucket-თან კავშირის შემოწმება ვერ მოხერხდა.",
-      "providerCheckFailedMessage": "კავშირის სტატუსი მიუწვდომელია ჩატვირთვამდე.",
+      "providerCheckFailedMessage": "პროვაიდერთან დაკავშირება ვერ მოხერხდა. შეამოწმე კავშირი და ხელახლა სცადე.",
       "reconnectTitle": "GitHub-თან ხელახლა დაკავშირება",
       "reconnectTitleGitLab": "GitLab-თან ხელახლა დაკავშირება",
       "reconnectTitleBitbucket": "Bitbucket-თან ხელახლა დაკავშირება",
@@ -2575,6 +2575,7 @@
       "assistantContextOverflow": "საუბარი ძალიან გრძელია ამ მოდელისთვის.",
       "assistantProviderError": "პროვაიდერმა შეცდომა დააბრუნა.",
       "assistantProviderRefused": "პროვაიდერმა უარყო ეს მოთხოვნა და მისი განმეორებითი ცდა შეუძლებელია.",
+      "assistantCreditsRefusal": "Cloud Agent-ის გასაშვებად კრედიტები საკმარისი არ არის.",
       "assistantOutputLimit": "პასუხმა მოდელის გამოტანის ლიმიტს მიაღწია.",
       "assistantStructuredOutput": "პასუხი არ შეესაბამება საჭირო ფორმატს.",
       "assistantFailed": "პასუხის შექმნა ვერ მოხერხდა."
@@ -3491,9 +3492,9 @@
       "searching": "ვებ ძიება",
       "thinking": "დაფიქრება"
     },
-    "planOf": "/",
+    "planProgress": "{{total}}-დან {{done}}",
     "filesChanged": "შეცვლილი ფაილები",
-    "finishedIn": "დასრულდა",
+    "finishedIn": "დასრულდა {{duration}}-ში",
     "noActivityFor": "აქტივობა არ არის",
     "prOpened": "Pull request გაიხსნა",
     "permissionWants": "სურს გაშვება",

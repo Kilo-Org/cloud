@@ -503,6 +503,26 @@ describe('downloaded startup in the allocation owner', () => {
       await recreate(h, { RUNTIME_KILO2_ORG_IDS: OTHER_ORG });
       expect(harnessOf(h, 1)).toBe('kilo2');
     });
+    it('attributes a v2 run to kilo2 before its wrapper connects', async () => {
+      const h = await setup(KILO2_SANDBOX, {}, kilo2Env);
+      h.provider.adapter.describeRuntime = ref => ({
+        provider: 'cloudflare-containers',
+        sandboxId: KILO2_SANDBOX,
+        instanceId: ref.slice('mem_'.length),
+      });
+      await prepare(h, isolatedTarget);
+      await waitFor(async () => expect((await h.stub.getAllocationState()).kind).toBe('starting'));
+      // A startup failure keeps the container of the last update before the wrapper connects.
+      const container = expect.objectContaining({ runtimeHarness: 'kilo2' });
+      await waitFor(() =>
+        expect(h.peer.routeUpdatesFor(SESSION).at(-1)).toEqual(
+          expect.objectContaining({ state: 'preparing', container })
+        )
+      );
+      expect((await h.stub.status({ sessionId: SESSION })).view).toEqual(
+        expect.objectContaining({ container })
+      );
+    });
     it('keeps an unlisted organization sandbox on v1 after the organization joins the list', async () => {
       const h = await setup(
         UNLISTED_KILO2_SANDBOX,

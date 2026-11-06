@@ -15,7 +15,12 @@ import {
   MAX_KILO_SDK_SESSION_SNAPSHOT_BYTES,
 } from '../../src/dos/kilo-sdk-materialization';
 import { BRIEFING_MAX_EXCERPT_SOURCE_ROWS } from '../../src/ingest/briefing-excerpt';
+import {
+  SESSION_METRICS_WINDOW_MAX_ROW_BYTES,
+  SESSION_METRICS_WINDOW_MAX_ROWS,
+} from '../../src/dos/session-metrics-window';
 import { INGEST_CHUNK_MAX_BYTES, MAX_INGEST_ITEM_BYTES } from '../../src/util/ingest-limits';
+import type { SessionMetricsParamsInput } from '@kilocode/worker-utils';
 
 const encoder = new TextEncoder();
 
@@ -4064,6 +4069,183 @@ describe('SessionIngestDO integration', () => {
         expect(readStoredTotal(state)).toBeCloseTo(0.5, 10);
         expect(readRowCosts(state)).toEqual([{ item_id: 'message/msg_legacy', cost_usd: 0.5 }]);
       });
+
+      await stub.clear();
+    });
+  });
+
+  describe('metrics emission budget', () => {
+    function userMessage(id: string, created: number) {
+      return { id, role: 'user' as const, time: { created } };
+    }
+
+    /**
+     * Runs the close path with an O11Y stub bound in place of the service binding, and returns
+     * the rows every SQLite statement produced while it ran plus the emitted records.
+     */
+    async function runAlarmCountingRows(stub: DurableObjectStub) {
+      return runInDurableObject(stub, async (instance, state) => {
+        const sqlStorage: SqlStorage = Object.getPrototypeOf(state.storage.sql);
+        const exec = sqlStorage.exec;
+        const cursors: Array<{ rowsRead: number }> = [];
+        sqlStorage.exec = function (this: SqlStorage, ...args: Parameters<SqlStorage['exec']>) {
+          const cursor = exec.apply(this, args);
+          cursors.push(cursor);
+          return cursor;
+        };
+        // The test worker has no O11Y service binding; the close path needs one to finish.
+        // The DO keeps its bindings on a plain property, so a test can replace them.
+        const doInstance = instance as unknown as { env: Record<string, unknown> };
+        const emitted: SessionMetricsParamsInput[] = [];
+        Object.defineProperty(doInstance, 'env', {
+          value: {
+            ...doInstance.env,
+            O11Y: {
+              ingestSessionMetrics: async (params: SessionMetricsParamsInput) => {
+                emitted.push(params);
+              },
+            },
+          },
+          configurable: true,
+        });
+        try {
+          await instance.alarm();
+        } finally {
+          sqlStorage.exec = exec;
+        }
+        return {
+          rowsRead: cursors.reduce((sum, cursor) => sum + cursor.rowsRead, 0),
+          emitted,
+          metricsEmitted: [
+            ...state.storage.sql.exec<{ value: string }>(
+              "SELECT value FROM ingest_meta WHERE key = 'metricsEmitted'"
+            ),
+          ].length,
+        };
+      });
+    }
+
+    it('reads a fixed window of a long history and marks the emitted record', async () => {
+      const sessionId = 'ses_metrics_budget_long_0001';
+      const stub = getStub(kiloUserId, sessionId);
+      const storedCostUsd = 1.5;
+      const historyRows = SESSION_METRICS_WINDOW_MAX_ROWS * 2;
+
+      await stub.ingest(
+        [
+          { type: 'kilo_meta', data: { platform: 'cli', orgId: 'org_metrics_budget' } },
+          { type: 'session', data: { time: { created: 1000, updated: 61_000 } } },
+        ],
+        kiloUserId,
+        sessionId,
+        1
+      );
+      await runInDurableObject(stub, async (_instance, state) => {
+        state.storage.sql.exec(
+          "INSERT INTO ingest_meta (key, value) VALUES ('runningAssistantCostUsd', ?) " +
+            'ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+          String(storedCostUsd)
+        );
+        state.storage.sql.exec(
+          "INSERT INTO ingest_meta (key, value) VALUES ('metricsAlarmAt', ?) " +
+            'ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+          String(Date.now() - 1)
+        );
+        for (let index = 0; index < historyRows; index += 1) {
+          state.storage.sql.exec(
+            'INSERT INTO ingest_items (item_id, item_type, item_data, ingested_at) ' +
+              'VALUES (?, ?, ?, ?)',
+            `message/h${String(index).padStart(5, '0')}`,
+            'message',
+            JSON.stringify(userMessage(`h${String(index).padStart(5, '0')}`, index)),
+            index
+          );
+        }
+      });
+
+      const observed = await runAlarmCountingRows(stub);
+
+      // The scan reads at most its row ceiling plus a few single-row lookups.
+      expect(observed.rowsRead).toBeLessThanOrEqual(SESSION_METRICS_WINDOW_MAX_ROWS + 32);
+      expect(observed.emitted).toHaveLength(1);
+      expect(observed.emitted[0]).toMatchObject({
+        metricsBounded: true,
+        totalTurns: SESSION_METRICS_WINDOW_MAX_ROWS,
+        totalCost: storedCostUsd,
+        // The anchors outside the read identify the session.
+        platform: 'cli',
+        organizationId: 'org_metrics_budget',
+        sessionDurationMs: 60_000,
+      });
+      expect(observed.emitted[0].timeToFirstResponseMs).toBeUndefined();
+      expect(observed.metricsEmitted).toBe(1);
+
+      await stub.clear();
+    });
+
+    it('marks a complete read as unbounded', async () => {
+      const sessionId = 'ses_metrics_budget_short_0001';
+      const stub = getStub(kiloUserId, sessionId);
+
+      await stub.ingest(
+        [
+          { type: 'kilo_meta', data: { platform: 'cli', orgId: 'org_metrics_short' } },
+          { type: 'session', data: { time: { created: 1000, updated: 61_000 } } },
+          { type: 'message', data: userMessage('u1', 1000) },
+        ],
+        kiloUserId,
+        sessionId,
+        1
+      );
+      await runInDurableObject(stub, async (_instance, state) => {
+        state.storage.sql.exec(
+          "INSERT INTO ingest_meta (key, value) VALUES ('metricsAlarmAt', ?) " +
+            'ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+          String(Date.now() - 1)
+        );
+      });
+
+      const observed = await runAlarmCountingRows(stub);
+
+      expect(observed.emitted).toHaveLength(1);
+      expect(observed.emitted[0]).toMatchObject({
+        metricsBounded: false,
+        totalTurns: 1,
+        platform: 'cli',
+        sessionDurationMs: 60_000,
+      });
+
+      await stub.clear();
+    });
+
+    it('keeps a body above the per-row ceiling out of the counted figures', async () => {
+      const sessionId = 'ses_metrics_budget_oversized_0001';
+      const stub = getStub(kiloUserId, sessionId);
+      const oversizedBody = 'x'.repeat(SESSION_METRICS_WINDOW_MAX_ROW_BYTES + 1);
+      expect(encoder.encode(JSON.stringify({ ...userMessage('huge', 1000), text: oversizedBody })).byteLength)
+        .toBeGreaterThan(SESSION_METRICS_WINDOW_MAX_ROW_BYTES);
+
+      await stub.ingest(
+        [
+          { type: 'message', data: { ...userMessage('huge', 1000), text: oversizedBody } },
+          { type: 'message', data: userMessage('small', 2000) },
+        ],
+        kiloUserId,
+        sessionId,
+        1
+      );
+      await runInDurableObject(stub, async (_instance, state) => {
+        state.storage.sql.exec(
+          "INSERT INTO ingest_meta (key, value) VALUES ('metricsAlarmAt', ?) " +
+            'ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+          String(Date.now() - 1)
+        );
+      });
+
+      const observed = await runAlarmCountingRows(stub);
+
+      expect(observed.emitted).toHaveLength(1);
+      expect(observed.emitted[0]).toMatchObject({ metricsBounded: false, totalTurns: 1 });
 
       await stub.clear();
     });

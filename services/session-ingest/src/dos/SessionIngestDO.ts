@@ -79,6 +79,7 @@ import {
   storedMessageCostUsd,
   type TerminationReason,
 } from './session-metrics';
+import { readSessionMetricsWindow } from './session-metrics-window';
 import migrations from '../../drizzle/migrations';
 import { refreshGlanceableSessions } from '../remote-session-notifications';
 import {
@@ -1767,42 +1768,39 @@ export class SessionIngestDO extends DurableObject<Env> {
       return false;
     }
 
-    // Note: items that exceeded the DO SQLite row limit (~1.94MB) are stored in R2
-    // with item_data='{}'. Metrics reads only item_data from SQLite, so those items
-    // contribute empty data. This is acceptable — oversized items are rare edge cases
-    // (giant tool results) and metrics only needs small fields (timestamps, types).
-    const rows = this.db
-      .select({
-        item_type: ingestItems.item_type,
-        item_data: ingestItems.item_data,
-      })
-      .from(ingestItems)
-      .where(ne(ingestItems.item_type, 'session_diff'))
-      .orderBy(ingestItems.ingested_at, ingestItems.id)
-      .all();
-
-    if (rows.length === 0) {
+    // The scan reads the newest stored rows that fit in its fixed row and byte ceiling. The
+    // window row does not hand the isolate a whole large body, and the emitted record states
+    // whether the counted figures cover the whole session.
+    const window = readSessionMetricsWindow(this.db);
+    if (window.rowCount === 0) {
       return false;
     }
 
-    const metrics = computeSessionMetrics(rows, closeReason);
+    const computed = computeSessionMetrics(window.rows, closeReason, { bounded: window.bounded });
 
-    // The running total moves with each accepted batch; this close-path recomputation reads
-    // the stored rows themselves. A divergence means some path wrote message rows without
-    // maintaining the total, which the monotonic persist below could never correct.
+    // The running total moves with each accepted batch, and the close path applies it when the
+    // window covers only part of the session. A window that covers everything recomputes the
+    // cost from the stored rows: a divergence means some path wrote message rows without
+    // adjusting the total, which the monotonic persist could never correct.
     const storedRunningCostUsd = readIngestMetaNumber(this.db, RUNNING_ASSISTANT_COST_META_KEY);
-    if (
-      storedRunningCostUsd !== null &&
-      Number.isFinite(metrics.totalCost) &&
-      Math.abs(storedRunningCostUsd - metrics.totalCost) > COST_DIVERGENCE_TOLERANCE_USD
-    ) {
-      console.warn('SessionIngestDO session cost total diverges from its stored rows', {
-        sessionId,
-        kiloUserId,
-        storedUsd: storedRunningCostUsd,
-        recomputedUsd: metrics.totalCost,
-      });
+    if (!window.bounded) {
+      if (
+        storedRunningCostUsd !== null &&
+        Number.isFinite(computed.totalCost) &&
+        Math.abs(storedRunningCostUsd - computed.totalCost) > COST_DIVERGENCE_TOLERANCE_USD
+      ) {
+        console.warn('SessionIngestDO session cost total diverges from its stored rows', {
+          sessionId,
+          kiloUserId,
+          storedUsd: storedRunningCostUsd,
+          recomputedUsd: computed.totalCost,
+        });
+      }
     }
+    const metrics =
+      window.bounded && storedRunningCostUsd !== null
+        ? { ...computed, totalCost: Math.max(0, storedRunningCostUsd) }
+        : computed;
 
     const modelRow = this.db
       .select({ item_data: ingestItems.item_data })

@@ -3493,7 +3493,7 @@
     },
     "inviteMember": {
       "emailError": "أدخل عنوان بريد إلكتروني صالحًا.",
-      "emailPlaceholder": "user@example.com",
+      "emailPlaceholder": "name@company.com",
       "permissionDenied": "ليست لديك صلاحية لدعوة الأعضاء.",
       "roleMember": "الدور هو عضو.",
       "sendInvite": "إرسال الدعوة",

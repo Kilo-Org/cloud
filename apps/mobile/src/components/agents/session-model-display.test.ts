@@ -154,4 +154,38 @@ describe('resolveSelectionModelDisplay', () => {
       provider: '',
     });
   });
+
+  it('names the unavailable placeholder row by its localized name', () => {
+    const placeholder: SessionModelOption = {
+      id: 'remote-session-model',
+      name: 'Session model',
+      displayId: '',
+      variants: [],
+      isPreferred: false,
+      showGatewayMetadata: false,
+      unavailable: true,
+    };
+    expect(resolveSelectionModelDisplay('remote-session-model', [placeholder])).toEqual({
+      model: 'Session model',
+      provider: 'Kilo',
+    });
+  });
+
+  it('names an unavailable row whose catalog lost the model by its reference', () => {
+    const unavailable: SessionModelOption = {
+      id: 'remote-unavailable-model',
+      name: 'deepseek v4.1 flash 1017',
+      displayId: 'deepseek/deepseek-v4.1-flash-1017',
+      variants: [],
+      isPreferred: false,
+      showGatewayMetadata: false,
+      provider: { id: 'kilo', name: 'kilo' },
+      modelRef: { providerID: 'kilo', modelID: 'deepseek/deepseek-v4.1-flash-1017' },
+      unavailable: true,
+    };
+    expect(resolveSelectionModelDisplay('remote-unavailable-model', [unavailable])).toEqual({
+      model: 'deepseek v4.1 flash 1017',
+      provider: 'kilo',
+    });
+  });
 });

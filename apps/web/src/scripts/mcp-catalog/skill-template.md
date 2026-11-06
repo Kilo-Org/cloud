@@ -34,9 +34,8 @@ an admin guard carries `admin: true`; an opted-in admin connection also gets
 and `submit_otp`, which runs it once the user approves with their authenticator
 code. A row whose top segment is `debug` carries `debug: true`.
 
-The catalog is `services/kilo-mcp/catalog.json`. This skill is generated from
-it, and the catalog wins when the two disagree — read the catalog, not this
-file, for current detail.
+The catalog at `services/kilo-mcp/catalog.json` is authoritative.
+Read it for current endpoint details.
 
 ## Parent-scoped child sessions
 

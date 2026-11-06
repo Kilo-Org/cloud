@@ -3623,10 +3623,10 @@
       "authBearer": "Bearer ቶከን",
       "authOAuth": "በOAuth መግባት",
       "fieldToken": "ቶከን",
-      "oauthHint": "ካስቀመጡ በኋላ በአሳሽዎ ለመግባት በሰርቨሩ ላይ $t(modelChat.mcpOAuth.signIn) የሚለውን ይንኩ።",
-      "serverNeedsSignIn": "ይህን ሰርቨር ለመጠቀም ይግቡ",
+      "oauthHint": "ካስቀመጡ በኋላ በአሳሽዎ ለመግባት በአገልጋዩ ላይ $t(modelChat.mcpOAuth.signIn) የሚለውን ይንኩ።",
+      "serverNeedsSignIn": "ይህን አገልጋይ ለመጠቀም ይግቡ",
       "signIn": "ግባ",
-      "signInA11y": "ወደዚህ ሰርቨር ግባ: {{name}}",
+      "signInA11y": "ወደዚህ አገልጋይ ግባ: {{name}}",
       "signInFailed": "ወደ {{name}} መግባት አልተቻለም። እንደገና ይሞክሩ።"
     },
     "backends": {

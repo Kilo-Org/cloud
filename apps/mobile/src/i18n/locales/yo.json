@@ -3556,7 +3556,7 @@
       "costPartialNote": "Àpapọ̀ yìí kò ní àwọn awoṣe tí a kò mọ iye owó wọn nínú.",
       "localNote": "Àwọn awoṣe lórí ẹ̀rọ ń ṣiṣẹ́ lórí ẹ̀rọ yìí. Wọn kò ní iye owó, wọn kò sì ní ìpamọ́ ìgbà díẹ̀ fún ìbéèrè, iye tókẹ̀n wọn sì lè jẹ́ àfojúbù.",
       "countedSinceNote": "Ìjíròrò yìí bẹ̀rẹ̀ kí a tó máa ṣàkọsílẹ̀ ìlò. Àpapọ̀ ń fi àwọn ìdáhùn lẹ́yìn ìgbà náà nìkan hàn.",
-      "remoteServersOn": "Àwọn sáfà MCP jíjìn tí ó wà ní títàn"
+      "remoteServersOn": "Àwọn olupin MCP jíjìn tí ó wà ní títàn"
     },
     "webSearch": {
       "title": "Wá lórí wẹ́ẹ̀bù",
@@ -3617,10 +3617,10 @@
       "authBearer": "Tọ́kẹ̀nì Bearer",
       "authOAuth": "Ìwọlé OAuth",
       "fieldToken": "Tọ́kẹ̀nì",
-      "oauthHint": "Lẹ́yìn tí o bá fipamọ́, tẹ $t(modelChat.mcpOAuth.signIn) lórí sáfà náà láti wọlé pẹ̀lú aṣàwákiri rẹ.",
-      "serverNeedsSignIn": "Wọlé láti lo sáfà yìí",
+      "oauthHint": "Lẹ́yìn tí o bá fipamọ́, tẹ $t(modelChat.mcpOAuth.signIn) lórí olupin náà láti wọlé pẹ̀lú aṣàwákiri rẹ.",
+      "serverNeedsSignIn": "Wọlé láti lo olupin yìí",
       "signIn": "Wọlé",
-      "signInA11y": "Wọlé sí sáfà yìí: {{name}}",
+      "signInA11y": "Wọlé sí olupin yìí: {{name}}",
       "signInFailed": "A kò lè wọlé sí {{name}}. Tún gbìyànjú."
     },
     "backends": {

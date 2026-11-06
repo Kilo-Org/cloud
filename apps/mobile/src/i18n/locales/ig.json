@@ -3556,7 +3556,7 @@
       "costPartialNote": "Ngụkọta a agụnyeghị ụdị nlereanya ndị a na-amaghị ọnụ ahịa ha.",
       "localNote": "Ụdị nlereanya na ngwaọrụ na-arụ ọrụ na ngwaọrụ a. Ha enweghị ọnụ ahịa, ha enweghị nchekwa nwa oge maka ihe ị dere, ọnụ ọgụgụ iberibe ederede ha nwekwara ike ịbụ atụmatụ.",
       "countedSinceNote": "Nkata a malitere tupu e debe ojiji. Ngụkọta na-egosi naanị azịza ndị bịara mgbe nke ahụ gasịrị.",
-      "remoteServersOn": "Sava MCP dị anya gbanyere"
+      "remoteServersOn": "Ihe nkesa MCP dị anya gbanyere"
     },
     "webSearch": {
       "title": "Chọọ na weebụ",
@@ -3617,10 +3617,10 @@
       "authBearer": "Token Bearer",
       "authOAuth": "Ịbanye OAuth",
       "fieldToken": "Token",
-      "oauthHint": "Mgbe ị chekwasịrị, pịa $t(modelChat.mcpOAuth.signIn) na sava ahụ iji banye site na ihe nchọgharị gị.",
-      "serverNeedsSignIn": "Banye iji sava a",
+      "oauthHint": "Mgbe ị chekwasịrị, pịa $t(modelChat.mcpOAuth.signIn) na ihe nkesa ahụ iji banye site na ihe nchọgharị gị.",
+      "serverNeedsSignIn": "Banye iji ihe nkesa a",
       "signIn": "Banye",
-      "signInA11y": "Banye na sava a: {{name}}",
+      "signInA11y": "Banye na ihe nkesa a: {{name}}",
       "signInFailed": "Enweghị ike ịbanye na {{name}}. Nwaa ọzọ."
     },
     "backends": {

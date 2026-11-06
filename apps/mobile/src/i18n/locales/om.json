@@ -3617,10 +3617,10 @@
       "authBearer": "Token Bearer",
       "authOAuth": "OAuth'n seenuu",
       "fieldToken": "Token",
-      "oauthHint": "Erga olkaa'attee booda, brawuzarii keetiin seenuuf seerverii irratti $t(modelChat.mcpOAuth.signIn) tuqi.",
-      "serverNeedsSignIn": "Seerverii kana fayyadamuuf seeni",
+      "oauthHint": "Erga olkaa'attee booda, brawuzarii keetiin seenuuf sarvarii irratti $t(modelChat.mcpOAuth.signIn) tuqi.",
+      "serverNeedsSignIn": "Sarvarii kana fayyadamuuf seeni",
       "signIn": "Seeni",
-      "signInA11y": "Seerverii kanatti seeni: {{name}}",
+      "signInA11y": "Sarvarii kanatti seeni: {{name}}",
       "signInFailed": "{{name}} tti seenuun hin danda'amne. Irra deebi'ii yaali."
     },
     "backends": {

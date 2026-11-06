@@ -3562,7 +3562,7 @@
       "costPartialNote": "Tsy tafiditra amin'ity fitambarany ity ireo modely tsy fantatra vidiny.",
       "localNote": "Ny modely ao amin'ny fitaovana dia mandeha amin'ity fitaovana ity. Tsy misy sarany izy ireo ary tsy misy fitehirizana vonjimaika ho an'ny baiko, ary mety ho tombantombana ny isan'ny sombin-tsoratra.",
       "countedSinceNote": "Nanomboka talohan'ny nandraisana an-tsoratra ny fampiasana ity resaka ity. Ny valiny taorian'izay ihany no hita amin'ny fitambarany.",
-      "remoteServersOn": "Server MCP lavitra mandeha"
+      "remoteServersOn": "Mpizara MCP lavitra mandeha"
     },
     "webSearch": {
       "title": "Mikaroka amin'ny tranonkala",
@@ -3623,10 +3623,10 @@
       "authBearer": "Token Bearer",
       "authOAuth": "Fidirana OAuth",
       "fieldToken": "Token",
-      "oauthHint": "Rehefa voatahiry, tsindrio ny $t(modelChat.mcpOAuth.signIn) eo amin'ny server mba hiditra amin'ny alalan'ny navigateur-nao.",
-      "serverNeedsSignIn": "Midira mba hampiasa ity server ity",
+      "oauthHint": "Rehefa voatahiry, tsindrio ny $t(modelChat.mcpOAuth.signIn) eo amin'ny mpizara mba hiditra amin'ny alalan'ny navigateur-nao.",
+      "serverNeedsSignIn": "Midira mba hampiasa ity mpizara ity",
       "signIn": "Hiditra",
-      "signInA11y": "Hiditra amin'ity server ity: {{name}}",
+      "signInA11y": "Hiditra amin'ity mpizara ity: {{name}}",
       "signInFailed": "Tsy afaka niditra tamin'ny {{name}}. Andramo indray."
     },
     "backends": {

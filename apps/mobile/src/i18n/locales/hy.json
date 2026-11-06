@@ -2575,6 +2575,7 @@
       "assistantContextOverflow": "Զրույցը չափազանց երկար է մոդելի համար։",
       "assistantProviderError": "Մատակարարը սխալ է վերադարձրել։",
       "assistantProviderRefused": "Մատակարարը մերժեց այս հարցումը, և այն հնարավոր չէ կրկին փորձել։",
+      "assistantCreditsRefusal": "Cloud Agent-ը գործարկելու համար կրեդիտները բավարար չեն։",
       "assistantOutputLimit": "Պատասխանը հասել է մոդելի ելքի սահմանին։",
       "assistantStructuredOutput": "Պատասխանը չի համապատասխանում պահանջվող ձևաչափին։",
       "assistantFailed": "Չհաջողվեց ստեղծել պատասխանը։"

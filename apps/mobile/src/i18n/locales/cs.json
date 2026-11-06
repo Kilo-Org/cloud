@@ -2667,6 +2667,7 @@
       "assistantContextOverflow": "Konverzace je pro model příliš dlouhá.",
       "assistantProviderError": "Poskytovatel vrátil chybu.",
       "assistantProviderRefused": "Poskytovatel tento požadavek odmítl a nelze jej znovu odeslat.",
+      "assistantCreditsRefusal": "Nemáte dost kreditů ke spuštění služby Cloud Agent.",
       "assistantOutputLimit": "Odpověď dosáhla limitu výstupu modelu.",
       "assistantStructuredOutput": "Odpověď neodpovídala požadovanému formátu.",
       "assistantFailed": "Odpověď se nepodařilo vytvořit."

@@ -112,9 +112,8 @@ export function UpNextSection({
               accessibilityState={{ disabled: !canPress }}
               className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
             >
-              {/* The visible circle stays compact (explicit px, because
-                  NativeWind's 14pt rem renders `size-10` at 35pt): DESIGN.md
-                  keeps the target, not the visual, at 44pt. */}
+              {/* The visible circle keeps its 35pt size inside the frame:
+                  DESIGN.md keeps the target, not the visual, at 44pt. */}
               <View className="size-10 items-center justify-center rounded-full bg-secondary">
                 {startingTodoId === item.id ? (
                   <ActivityIndicator color={colors.foreground} />

@@ -100,6 +100,7 @@ vi.mock('expo-haptics', () => ({
 }));
 vi.mock('sonner-native', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('@/components/ui/icons', () => ({
+  AlertCircle: () => null,
   Clock: () => null,
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
@@ -298,7 +299,7 @@ describe('MessageBubble failure footer', () => {
       onRetryMessage: vi.fn<(message: StoredMessage) => void>(),
       onCopyToComposer: vi.fn<(text: string) => void>(),
     });
-    expect(findText(tree, t => t === 'Failed to deliver')).toBe(true);
+    expect(findText(tree, t => t === 'Message not sent')).toBe(true);
     expect(
       findText(tree, t => t === 'We could not deliver this message after several attempts.')
     ).toBe(true);
@@ -347,6 +348,14 @@ describe('MessageBubble failure footer', () => {
       assistantMessageWithError('m-align-asst', 'APIError'),
       { onRetryMessage: vi.fn<(message: StoredMessage) => void>() }
     );
+    // A question whose answer failed: the row is the user's, the statement is
+    // the assistant's, so the footer takes the assistant's column — the same
+    // layout an assistant error draws.
+    const executionTree = await renderBubbleWithHandlers(userMessage('m-align-exec'), {
+      deliveryState: { status: 'failed', error: '', reason: 'execution' },
+      onRetryMessage: vi.fn<(message: StoredMessage) => void>(),
+      onCopyToComposer: vi.fn<(text: string) => void>(),
+    });
 
     const userFooter = footerOf(userTree);
     expect(String(userFooter?.props.className)).toBe('gap-2 px-4 pt-1 pb-[24px] items-end');
@@ -379,13 +388,33 @@ describe('MessageBubble failure footer', () => {
       )
     ).toEqual([]);
 
+    const executionFooter = footerOf(executionTree);
+    expect(String(executionFooter?.props.className)).toBe('gap-2 px-4 pt-1 pb-[24px]');
+    expect(
+      classNamesIn(executionFooter?.props.children).filter(name =>
+        name.split(' ').includes('text-right')
+      )
+    ).toEqual([]);
+    // The failed response states its reason under the title, the same way the
+    // provider's own failures do.
+    expect(findText(executionTree, t => t === 'The agent could not run this message.')).toBe(true);
+    // The failed response still offers both recovery actions.
+    expect(
+      findElementByType(executionTree, 'Button', p => p.accessibilityLabel === 'Retry')
+    ).not.toBeNull();
+    expect(
+      findElementByType(executionTree, 'Button', p => p.accessibilityLabel === 'Copy to composer')
+    ).not.toBeNull();
+
     // No start/end text class: NativeWind drops `text-align: end`, and RN
     // already resolves `text-right` against the interface direction.
     const footerClasses = [
       ...classNamesIn(userFooter?.props.children),
       ...classNamesIn(assistantFooter?.props.children),
+      ...classNamesIn(executionFooter?.props.children),
       String(userFooter?.props.className),
       String(assistantFooter?.props.className),
+      String(executionFooter?.props.className),
     ];
     expect(footerClasses.filter(name => /\btext-(start|end)\b/.test(name))).toEqual([]);
   });
@@ -409,7 +438,7 @@ describe('MessageBubble failure footer', () => {
       });
 
       expect(findElementByTypeFn(tree, MockBubble)).toBeNull();
-      expect(findText(tree, text => text === 'Failed to deliver')).toBe(true);
+      expect(findText(tree, text => text === 'Message not sent')).toBe(true);
       expect(
         findElementByType(tree, 'Button', props => props.accessibilityLabel === 'Retry')
       ).not.toBeNull();
@@ -459,7 +488,7 @@ describe('MessageBubble failure footer', () => {
       retryAvailable: false,
     });
 
-    expect(findText(tree, t => t === 'Failed to deliver')).toBe(true);
+    expect(findText(tree, t => t === 'Message not sent')).toBe(true);
     expect(
       findText(tree, t => t === 'We could not deliver this message after several attempts.')
     ).toBe(true);
@@ -514,12 +543,12 @@ describe('MessageBubble failure footer', () => {
     const tree = await renderBubbleWithHandlers(userMessage('m-nohandler'), {
       deliveryState: { status: 'failed', error: 'nope', reason: 'exhausted' },
     });
-    expect(findText(tree, t => t === 'Failed to deliver')).toBe(false);
+    expect(findText(tree, t => t === 'Message not sent')).toBe(false);
   });
 
   it('names the failure row on the title text without grouping the CTA buttons', async () => {
     const tree = await renderBubbleWithHandlers(userMessage('m-a11y'), {
-      deliveryState: { status: 'failed', error: 'nope', reason: 'interrupted' },
+      deliveryState: { status: 'failed', error: 'nope', reason: 'exhausted' },
       onRetryMessage: vi.fn<(message: StoredMessage) => void>(),
       onCopyToComposer: vi.fn<(text: string) => void>(),
     });
@@ -533,16 +562,16 @@ describe('MessageBubble failure footer', () => {
     expect(footer?.props.accessibilityLabel).toBeUndefined();
 
     // The row name lives on the title Text, which still announces the row.
-    const title = findElementByLabel(tree, 'Failed to deliver. Retry available.');
+    const title = findElementByLabel(tree, 'Message not sent. Retry available.');
     expect(title).not.toBeNull();
-    expect(title?.props.children).toBe('Failed to deliver');
+    expect(title?.props.children).toBe('Message not sent');
   });
 
   it('names a German failure row with one full stop, keeping the title line as translated', async () => {
     await i18n.changeLanguage('de');
     try {
       const tree = await renderBubbleWithHandlers(userMessage('m-a11y-de'), {
-        deliveryState: { status: 'failed', error: 'nope', reason: 'interrupted' },
+        deliveryState: { status: 'failed', error: 'nope', reason: 'exhausted' },
         onRetryMessage: vi.fn<(message: StoredMessage) => void>(),
       });
 

@@ -418,9 +418,11 @@ describe('createSessionForCloudAgent', () => {
     vi.mocked(canCreateCliSessionForUser).mockReset().mockResolvedValue(true);
     // The availability probe runs before every create; default it to an
     // available destination so each test opts into the refusal.
-    vi.mocked(getSessionIngestDO).mockReset().mockReturnValue({
-      isDeleted: vi.fn(async () => false),
-    } as never);
+    vi.mocked(getSessionIngestDO)
+      .mockReset()
+      .mockReturnValue({
+        isDeleted: vi.fn(async () => false),
+      } as never);
   });
 
   it('creates a root with both Cloud Agent identity columns', async () => {

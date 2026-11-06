@@ -2392,7 +2392,7 @@
       "selectRepositoryToStart": "Սկսելու համար ընտրեք պահոց։",
       "enterPromptToStart": "Սկսելու համար ավելացրեք հուշում։",
       "enterPromptOrFileToStart": "Սկսելու համար ավելացրեք հուշում կամ ֆայլ։",
-      "connectProviderToStart": "Սկսելու համար միացրեք մատակարար։",
+      "connectProviderToStart": "Պահոցները գալիս են միացված GitHub, GitLab կամ Bitbucket հաշվից։",
       "promptPlaceholder": "Ինչի՞ վրա եք ուզում աշխատել",
       "couldNotLoadModels": "Չհաջողվեց բեռնել մոդելները։",
       "prefillRepoAndModelUnavailable": "Սկզբնական նստաշրջանի պահոցն ու մոդելն այլևս հասանելի չեն։ Ստորև ընտրեք պահոց և մոդել։",

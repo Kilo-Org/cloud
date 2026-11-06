@@ -2392,7 +2392,7 @@
       "selectRepositoryToStart": "Избери хранилище, за да започнеш.",
       "enterPromptToStart": "Добави заявка, за да започнеш.",
       "enterPromptOrFileToStart": "Добави заявка или файл, за да започнеш.",
-      "connectProviderToStart": "Свържи доставчик, за да започнеш.",
+      "connectProviderToStart": "Хранилищата идват от свързан акаунт в GitHub, GitLab или Bitbucket.",
       "promptPlaceholder": "Върху какво искаш да работиш?",
       "couldNotLoadModels": "Не успяхме да заредим моделите.",
       "prefillRepoAndModelUnavailable": "Хранилището и моделът от първоначалната сесия вече не са достъпни. Избери други по-долу.",

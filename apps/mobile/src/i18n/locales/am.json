@@ -2398,7 +2398,7 @@
       "selectRepositoryToStart": "ለመጀመር ማከማቻ ይምረጡ።",
       "enterPromptToStart": "ለመጀመር ትዕዛዝ ያክሉ።",
       "enterPromptOrFileToStart": "ለመጀመር ትዕዛዝ ወይም ፋይል ያክሉ።",
-      "connectProviderToStart": "ለመጀመር አቅራቢ ያገናኙ።",
+      "connectProviderToStart": "ማከማቻዎች ከተገናኘ GitHub፣ GitLab ወይም Bitbucket መለያ ይመጣሉ።",
       "promptPlaceholder": "በምን ላይ መስራት ይፈልጋሉ?",
       "couldNotLoadModels": "ሞዴሎችን መጫን አልተቻለም።",
       "prefillRepoAndModelUnavailable": "የመጀመሪያው ክፍለ ጊዜ ማከማቻና ሞዴል ከእንግዲህ አይገኙም። ከታች ሌሎችን ይምረጡ።",

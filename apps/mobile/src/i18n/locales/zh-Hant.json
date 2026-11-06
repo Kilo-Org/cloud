@@ -1853,7 +1853,7 @@
       "selectRepositoryToStart": "選取儲存庫以開始。",
       "enterPromptToStart": "新增提示詞以開始。",
       "enterPromptOrFileToStart": "新增提示詞或檔案以開始。",
-      "connectProviderToStart": "連結平台以開始。",
+      "connectProviderToStart": "儲存庫來自已連結的 GitHub、GitLab 或 Bitbucket 帳戶。",
       "promptPlaceholder": "你想處理什麼？",
       "couldNotLoadModels": "無法載入模型。",
       "prefillRepoAndModelUnavailable": "原工作階段的儲存庫與模型已無法使用。請在下方重新選取。",

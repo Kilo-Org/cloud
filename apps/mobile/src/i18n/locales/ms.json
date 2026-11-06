@@ -2392,7 +2392,7 @@
       "selectRepositoryToStart": "Pilih repositori untuk bermula.",
       "enterPromptToStart": "Tambahkan prompt untuk bermula.",
       "enterPromptOrFileToStart": "Tambahkan prompt atau fail untuk bermula.",
-      "connectProviderToStart": "Sambungkan penyedia untuk bermula.",
+      "connectProviderToStart": "Repositori datang daripada akaun GitHub, GitLab atau Bitbucket yang disambungkan.",
       "promptPlaceholder": "Apa yang ingin anda usahakan?",
       "couldNotLoadModels": "Tidak dapat memuatkan model.",
       "prefillRepoAndModelUnavailable": "Repositori dan model sesi asal tidak lagi tersedia. Pilih repositori dan model lain di bawah.",

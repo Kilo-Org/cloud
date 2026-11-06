@@ -2392,7 +2392,7 @@
       "selectRepositoryToStart": "Jalqabuuf kuusaa koodii filadhu.",
       "enterPromptToStart": "Jalqabuuf gaaffii dabaladhu.",
       "enterPromptOrFileToStart": "Jalqabuuf gaaffii ykn faayilii dabaladhu.",
-      "connectProviderToStart": "Jalqabuuf waltajjii walqabsiisi.",
+      "connectProviderToStart": "Kuusaawwan koodii herrega GitHub, GitLab yookiin Bitbucket walqabate irraa dhufu.",
       "promptPlaceholder": "Maal irratti hojjechuu barbaadda?",
       "couldNotLoadModels": "Moodeloota fe'uu hin danda'amne.",
       "prefillRepoAndModelUnavailable": "Kuusaan koodii fi moodeli turtii jalqabaa kana booda hin argaman. Gadiitti isaan filadhu.",

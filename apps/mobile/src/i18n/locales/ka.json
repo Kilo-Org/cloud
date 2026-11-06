@@ -2392,7 +2392,7 @@
       "selectRepositoryToStart": "დასაწყებად აირჩიეთ რეპოზიტორია.",
       "enterPromptToStart": "დასაწყებად დაამატეთ პრომპტი.",
       "enterPromptOrFileToStart": "დასაწყებად დაამატეთ პრომპტი ან ფაილი.",
-      "connectProviderToStart": "დასაწყებად დააკავშირეთ პროვაიდერი.",
+      "connectProviderToStart": "რეპოზიტორიები მოდის GitHub-ის, GitLab-ის ან Bitbucket-ის დაკავშირებული ანგარიშიდან.",
       "promptPlaceholder": "რაზე გსურთ მუშაობა?",
       "couldNotLoadModels": "მოდელების ჩატვირთვა ვერ მოხერხდა.",
       "prefillRepoAndModelUnavailable": "საწყისი სესიის რეპოზიტორია და მოდელი აღარ არის ხელმისაწვდომი. ქვემოთ აირჩიეთ სხვა რეპოზიტორია და მოდელი.",

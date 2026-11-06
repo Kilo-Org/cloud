@@ -2392,7 +2392,7 @@
       "selectRepositoryToStart": "Эхлэхийн тулд кодын сангаа сонгоно уу.",
       "enterPromptToStart": "Эхлэхийн тулд заавар нэмнэ үү.",
       "enterPromptOrFileToStart": "Эхлэхийн тулд заавар эсвэл файл нэмнэ үү.",
-      "connectProviderToStart": "Эхлэхийн тулд үйлчилгээ үзүүлэгчийг холбоно уу.",
+      "connectProviderToStart": "Кодын сан нь холбогдсон GitHub, GitLab эсвэл Bitbucket бүртгэлээс ирдэг.",
       "promptPlaceholder": "Юун дээр ажиллах вэ?",
       "couldNotLoadModels": "Загваруудыг ачаалж чадсангүй.",
       "prefillRepoAndModelUnavailable": "Анхны сессийн кодын сан болон загварыг ашиглах боломжгүй болсон. Доороос өөр кодын сан, загвар сонгоно уу.",

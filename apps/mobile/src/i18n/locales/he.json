@@ -1874,7 +1874,7 @@
       "selectRepositoryToStart": "בחר מאגר כדי להתחיל.",
       "enterPromptToStart": "הוסף פרומפט כדי להתחיל.",
       "enterPromptOrFileToStart": "הוסף פרומפט או קובץ כדי להתחיל.",
-      "connectProviderToStart": "חבר ספק כדי להתחיל.",
+      "connectProviderToStart": "מאגרים מגיעים מחשבון מחובר של GitHub, GitLab או Bitbucket.",
       "promptPlaceholder": "על מה תרצה לעבוד?",
       "couldNotLoadModels": "לא ניתן היה לטעון את המודלים.",
       "prefillRepoAndModelUnavailable": "המאגר והמודל מהסשן המקורי כבר אינם זמינים. בחר מאגר ומודל אחרים למטה.",

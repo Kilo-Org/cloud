@@ -2392,7 +2392,7 @@
       "selectRepositoryToStart": "Zgjidh një depo për të filluar.",
       "enterPromptToStart": "Shto një kërkesë për të filluar.",
       "enterPromptOrFileToStart": "Shto një kërkesë ose një skedar për të filluar.",
-      "connectProviderToStart": "Lidh një ofrues për të filluar.",
+      "connectProviderToStart": "Depot vijnë nga një llogari e lidhur e GitHub, GitLab ose Bitbucket.",
       "promptPlaceholder": "Me çfarë do të punosh?",
       "couldNotLoadModels": "Nuk u ngarkuan modelet.",
       "prefillRepoAndModelUnavailable": "Depoja dhe modeli i seancës fillestare nuk janë më të disponueshëm. Zgjidhi më poshtë.",

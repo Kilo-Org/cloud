@@ -2392,7 +2392,7 @@
       "selectRepositoryToStart": "Επίλεξε ένα αποθετήριο για να ξεκινήσεις.",
       "enterPromptToStart": "Πρόσθεσε μια οδηγία για να ξεκινήσεις.",
       "enterPromptOrFileToStart": "Πρόσθεσε μια οδηγία ή ένα αρχείο για να ξεκινήσεις.",
-      "connectProviderToStart": "Σύνδεσε έναν πάροχο για να ξεκινήσεις.",
+      "connectProviderToStart": "Τα αποθετήρια προέρχονται από έναν συνδεδεμένο λογαριασμό GitHub, GitLab ή Bitbucket.",
       "promptPlaceholder": "Με τι θέλεις να ασχοληθείς;",
       "couldNotLoadModels": "Δεν ήταν δυνατή η φόρτωση των μοντέλων.",
       "prefillRepoAndModelUnavailable": "Το αποθετήριο και το μοντέλο της αρχικής συνεδρίας δεν είναι πλέον διαθέσιμα. Επίλεξε άλλα παρακάτω.",

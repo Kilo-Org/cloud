@@ -1853,7 +1853,7 @@
       "selectRepositoryToStart": "Pilih repositori untuk memulai.",
       "enterPromptToStart": "Tambahkan prompt untuk memulai.",
       "enterPromptOrFileToStart": "Tambahkan prompt atau file untuk memulai.",
-      "connectProviderToStart": "Hubungkan penyedia untuk memulai.",
+      "connectProviderToStart": "Repositori berasal dari akun GitHub, GitLab, atau Bitbucket yang terhubung.",
       "promptPlaceholder": "Apa yang ingin kamu kerjakan?",
       "couldNotLoadModels": "Tidak dapat memuat model.",
       "prefillRepoAndModelUnavailable": "Repositori dan model dari sesi asal sudah tidak tersedia. Pilih penggantinya di bawah.",

@@ -1176,9 +1176,11 @@ describe('mergeProfileConfiguration', () => {
       const result = await mergeProfileConfiguration(countingDb, { owner });
 
       expect(result.skills?.map(s => s.name)).toEqual(['reviewer-skill']);
-      expect(result.skills?.[0] && 'rawMarkdown' in result.skills[0] ? result.skills[0].rawMarkdown : null).toBe(
-        'profile skill body'
-      );
+      expect(
+        result.skills?.[0] && 'rawMarkdown' in result.skills[0]
+          ? result.skills[0].rawMarkdown
+          : null
+      ).toBe('profile skill body');
       expect(result.envVars).toEqual({ PROFILE_VAR: 'profile-var-value' });
       expect(result.setupCommands).toEqual(['profile-setup-command']);
       expect(result.agents?.map(a => a.slug)).toEqual(['reviewer']);

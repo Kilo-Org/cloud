@@ -859,13 +859,13 @@ requires at most $35 Cloudflare, $5 VMs, and at least $10 untouched reserve with
 the combined $50 allocation. Analytics lag is not an invoice guarantee.
 
 Arm `perf-teardown.mjs arm <target-manifest.json>` in an independent operator
-process before opening cloud sockets. Pass its scoped credential through a
-private environment wrapper as `SESSION_SYNC_LOADTEST_CF_TOKEN`; never print
-it or put it in arguments. The watchdog publishes a matching nonce-bound
+process before opening cloud sockets. Operator commands resolve credentials
+internally with the pinned repository `wrangler auth token --json`, capturing
+the token without printing it or reading credential files. The watchdog publishes a matching nonce-bound
 heartbeat; cloud admission consumes it, and the operator cluster controller
 checks heartbeat freshness and local process liveness throughout ramp and load.
 Workload admission binds the absolute resource lifetime to the approved forecast,
-including a 90-second teardown tail. Before deletion the watchdog re-reads the
+including a 150-second teardown tail. Before deletion the watchdog re-reads the
 current deployment/version and bucket ID, refusing a replacement run. The
 controller also invokes verified teardown after completion or failure. Exact
 known synthetic R2 keys must be listed for cleanup; a nonempty bucket is a

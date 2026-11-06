@@ -169,7 +169,7 @@ function bearer(s) {
     config.grantTTLseconds
   );
 }
-async function request(s, route, method = 'GET', body) {
+async function request(s, route, method = 'GET', body, caller) {
   assert(!stopping, 'Run stopped');
   if (++stats.requestCount > config.maxRequests || stats.inFlight >= config.requestConcurrency) {
     stop('request_budget');
@@ -185,9 +185,14 @@ async function request(s, route, method = 'GET', body) {
     const response = await fetch(new URL(route, config.baseURL), {
       method,
       redirect: 'error',
-      headers: { authorization: `Bearer ${bearer(s)}`, 'content-type': 'application/json' },
-      body: body === undefined ? undefined : JSON.stringify(body),
-      signal: controller.signal,
+      headers: caller?.headers ?? {
+        authorization: `Bearer ${bearer(s)}`,
+        'content-type': 'application/json',
+      },
+      body: caller?.body ?? (body === undefined ? undefined : JSON.stringify(body)),
+      signal: caller?.signal
+        ? AbortSignal.any([controller.signal, caller.signal])
+        : controller.signal,
     });
     const type = response.headers.get('content-type') ?? '';
     const ray = response.headers.get('cf-ray');
@@ -493,7 +498,8 @@ async function viewer(s) {
             s,
             path,
             init?.method ?? 'GET',
-            init?.body ? JSON.parse(init.body) : undefined
+            init?.body ? JSON.parse(init.body) : undefined,
+            init
           )
         );
       },

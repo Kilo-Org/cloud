@@ -9,6 +9,7 @@
   "workers_dev": true,
   "preview_urls": false,
   "observability": { "enabled": true },
+  "logpush": true,
   // Production merge/deployment prerequisites: eu-queues.md.
   "vars": {
     "USAGE_INGEST_PARALLELISM": "2",
@@ -36,6 +37,7 @@
     "staging": {
       "name": "usage-ingest-staging",
       "workers_dev": true,
+      "logpush": true,
       "vars": {
         "USAGE_INGEST_PARALLELISM": "2",
         "USAGE_WRITER_URL": "https://staging-app.kilo.ai/api/internal/usage/record",

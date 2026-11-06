@@ -266,17 +266,13 @@ jobs:
         run: |
           affected=$(node scripts/affected-workspaces.mjs "$BASE_SHA")
           jq . <<< "$affected"
-          typecheck_groups=$(jq -c '
-            (.full_checks | index("typecheck") != null) as $all | .packages as $p | [
-              (select($all or ($p | index("web")) or ($p | index("@kilocode/storybook"))) | "web"),
-              (select($all or ($p | index("kilo-extension"))) | "trpc"),
-              (select($all or ($p - ["web", "@kilocode/trpc", "@kilocode/storybook", "kilo-app", "kilo-extension"] | length > 0)) | "packages")
-            ]' <<< "$affected")
-          lint_groups=$(jq -c '
-            (.full_checks | index("lint") != null) as $all | .dirs as $d | [
-              (select($all or ($d | index("apps/extension"))) | "trpc"),
-              (select($all or ($d - ["apps/mobile", "apps/extension"] | length > 0)) | "rest")
-            ]' <<< "$affected")
+          # The matrix groups this selection pays for. scripts/affected-workspaces.mjs
+          # owns the decision, so the trpc rows follow the extension's own
+          # workflow: extension-ci.yml typechecks and lints the extension for
+          # this same selection, so those rows run only on a full check. That
+          # keeps the extension's gate on the merge queue, whose workflow has no
+          # extension trigger.
+          groups=$(node scripts/affected-workspaces.mjs --groups <<< "$affected")
           # Every part when cloud-agent-next is affected. When only its tests
           # read changed data, the unit part covers a reading test under src/,
           # scripts/ or test/unit/; any other reading test runs every part.
@@ -288,8 +284,8 @@ jobs:
             ] | unique end' <<< "$affected")
           {
             echo "affected=$(jq -c . <<< "$affected")"
-            echo "typecheck_groups=$typecheck_groups"
-            echo "lint_groups=$lint_groups"
+            echo "typecheck_groups=$(jq -c .typecheck_groups <<< "$groups")"
+            echo "lint_groups=$(jq -c .lint_groups <<< "$groups")"
             echo "cloud_agent_next_parts=$cloud_agent_next_parts"
           } >> "$GITHUB_OUTPUT"
 
@@ -383,10 +379,10 @@ jobs:
   # every consumer downloads the built tree instead of building it again.
   trpc-declarations:
     needs: changes
-    # Only the trpc rows consume the declarations: the typecheck group that
-    # covers the extension, and the lint group that lints it. The web and
-    # packages groups never read packages/trpc/dist, so a run that selects only
-    # them must not wait for this job.
+    # Only the trpc rows consume the declarations, and both run only for a full
+    # check: the typecheck group that typechecks the extension, and the lint
+    # group that lints it. The web and packages groups never read packages/trpc/dist,
+    # so a run that selects only them must not wait for this job.
     if: contains(fromJSON(needs.changes.outputs.typecheck_groups), 'trpc') || contains(fromJSON(needs.changes.outputs.lint_groups), 'trpc')
     runs-on: ${{ vars.RUNNER_MEDIUM_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15

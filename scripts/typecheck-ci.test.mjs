@@ -38,6 +38,12 @@ const rootScript = fileURLToPath(new URL('./typecheck-all.sh', import.meta.url))
 const harnessBuild = 'pnpm --filter @kilocode/harness-sdk run build';
 const pluginCacheAction = './.github/actions/ttsc-plugin-cache';
 const pluginPath = 'node_modules/.cache/ttsc/plugins';
+// The step each plugin saver's save must follow.
+const jobRun = new Map([
+  ['ci.yml:harness-sdk', 'pnpm --filter @kilocode/harness-sdk check:ci'],
+  ['ci.yml:workspace-tests', 'pnpm --filter ${{ matrix.workspace.name }} test'],
+]);
+const ciJobs = workflows['ci.yml'].jobs;
 const pnpmCleanup = fileURLToPath(
   new URL('../.github/actions/pnpm-store/cleanup/cleanup.cjs', import.meta.url)
 );
@@ -278,13 +284,8 @@ test('one job saves the compiler plugin cache and every reader restores it', () 
   for (const [file, workflow] of Object.entries(workflows)) {
     for (const [name, job] of Object.entries(workflow.jobs ?? {})) {
       const steps = job.steps ?? [];
-      for (const step of steps) {
-        // Saving must follow the compilation: an inline save inside a restore
-        // action would fire before ttsc wrote the plugins.
-        if (step.uses === pluginCacheAction) assert.equal(step.with, undefined, `${file}:${name}`);
-      }
-      const save = steps.find(step => step.uses?.startsWith('actions/cache/save@'));
-      if (save) {
+      const saversHere = steps.filter(step => step.uses?.startsWith('actions/cache/save@'));
+      for (const save of saversHere) {
         assert.equal(save.uses, 'actions/cache/save@668228422ae6a00e4ad889ee87cd7109ec5666a7');
         assert.ok(
           (save.if ?? '').includes("steps.plugins.outputs.cache-hit != 'true'"),
@@ -298,9 +299,30 @@ test('one job saves the compiler plugin cache and every reader restores it', () 
         );
         savers.push(`${file}:${name}`);
       }
+      const restore = steps.find(step => step.uses === pluginCacheAction);
+      if (restore) {
+        // The save must follow the compilation: an inline save inside a
+        // restore action would fire before ttsc wrote the plugins.
+        if (saversHere.length > 0) {
+          const saveIndex = steps.indexOf(saversHere.at(-1));
+          const runIndex = steps.findIndex(step => step.run === jobRun.get(`${file}:${name}`));
+          assert.ok(restore.id, `${file}:${name} must expose the plugin restore to its save`);
+          assert.ok(saveIndex > runIndex, `${file}:${name} saves after its run compiles`);
+        } else {
+          assert.equal(restore.with, undefined, `${file}:${name} restores only`);
+        }
+      }
     }
   }
-  assert.deepEqual(savers, ['ci.yml:workspace-tests']);
+  // Each selection path has one saver: the dedicated harness-sdk job when the
+  // packages/harness-sdk filter selected it, and the workspace-tests row
+  // otherwise (whose matrix then carries the harness-sdk work).
+  assert.deepEqual(savers, ['ci.yml:harness-sdk', 'ci.yml:workspace-tests']);
+  assert.equal(
+    ciJobs['workspace-tests'].steps.find(step => step.uses?.startsWith('actions/cache/save@')).if,
+    "matrix.workspace.name == '@kilocode/harness-sdk' && steps.plugins.outputs.cache-hit != 'true' && needs.changes.outputs.harness_sdk != 'true'",
+    'the two savers must not both save in one run'
+  );
 });
 
 const harnessBuildGuards = [

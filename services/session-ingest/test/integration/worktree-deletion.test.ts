@@ -289,7 +289,7 @@ describe('worktree session cleanup in Workers', () => {
     await stub.clearForWorktree(kiloUserId, sessionId);
   });
 
-  it('abandons a streamed multipart stage whose reservation etag moved and leaves no reservation', async () => {
+  it('removes the marker when a multipart stage is superseded', async () => {
     const { kiloUserId, sessionId, stub } = identity();
     const key = `ingest/${kiloUserId}/${sessionId}/raced`;
     const bodySize = 5 * 1024 * 1024 + 17;
@@ -316,7 +316,7 @@ describe('worktree session cleanup in Workers', () => {
             bodySize
           )
         ).rejects.toThrow(/Session R2 reservation changed/);
-        expect(await original.head(key)).toBeNull();
+        expect(await original.head(key)).not.toBeNull();
         expect(pendingR2Markers(state)).toEqual([]);
       } finally {
         Object.assign(instance['env'], { SESSION_INGEST_R2: original });
@@ -326,19 +326,22 @@ describe('worktree session cleanup in Workers', () => {
     await stub.clearForWorktree(kiloUserId, sessionId);
   });
 
-  it('releases the reservation when the staged body upload rejects', async () => {
+  it('removes the marker when a stage write stops early', async () => {
     const { kiloUserId, sessionId, stub } = identity();
 
     await runInDurableObject(stub, async (instance, state) => {
       const original = instance['env'].SESSION_INGEST_R2;
+      let reservations = 0;
       const rejectingPut = (
         name: string,
         body: unknown,
         options?: Record<string, unknown> & { onlyIf?: unknown }
       ): Promise<R2Object | null> => {
-        // The reservation write carries `If-None-Match: *` as Headers. Reject
-        // only the conditional body upload that follows it.
-        if (!(options?.onlyIf instanceof Headers)) return original.put(name, body as never);
+        // Allow the put that carries request headers; abandon the conditional put.
+        if (!options || options.onlyIf instanceof Headers) {
+          reservations++;
+          return original.put(name, body as never);
+        }
         return Promise.reject(new Error('Staging body write rejected'));
       };
 
@@ -368,6 +371,7 @@ describe('worktree session cleanup in Workers', () => {
         ).rejects.toThrow(/Staging body write rejected/);
         expect(await original.head(byValueKey)).toBeNull();
         expect(pendingR2Markers(state)).toEqual([]);
+        expect(reservations).toBeGreaterThan(0);
       } finally {
         Object.assign(instance['env'], { SESSION_INGEST_R2: original });
       }

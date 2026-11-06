@@ -229,6 +229,18 @@ Each selected persistence attempt adds one completion line; IDs remain log
 fields, not metric labels. Logs can be dropped, and are not durable accounting:
 reconcile against persisted usage rows when exact completeness matters.
 
+Both environments also persist [Workers traces](https://developers.cloudflare.com/workers/observability/traces/)
+for a 5% head sample of invocations (`observability.traces`, inherited by
+`env.staging`). Trace sampling is independent of Workers Logs, which keep their unsampled default.
+Sampled traces show the fetch and queue handler spans, `queue_send`, and the
+outbound writer `fetch` with timing and status. In the dashboard, filter by
+`$metadata.service` (`usage-ingest` or `usage-ingest-staging`) rather than
+`service.name`. Trace IDs are not propagated to the Vercel writer, spans do not
+show time a message waits in the queue before the consumer handler starts, and a
+5% sample cannot count rare events; use the logs above for those. No custom spans
+are added. See the [span attributes](https://developers.cloudflare.com/workers/observability/traces/spans-and-attributes/)
+and [known limitations](https://developers.cloudflare.com/workers/observability/traces/known-limitations/).
+
 ## Queue policy
 
 Production uses batch size 6 and staging keeps batch size 2. Both allow at most

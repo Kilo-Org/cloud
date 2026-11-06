@@ -8,7 +8,11 @@
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
   "preview_urls": false,
-  "observability": { "enabled": true },
+  // env.staging inherits this block. Trace sampling is independent of Workers Logs.
+  "observability": {
+    "enabled": true,
+    "traces": { "enabled": true, "head_sampling_rate": 0.05 },
+  },
   // Production merge/deployment prerequisites: eu-queues.md.
   "vars": {
     "USAGE_INGEST_PARALLELISM": "2",

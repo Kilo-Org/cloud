@@ -155,7 +155,7 @@ describe('resolveSelectionModelDisplay', () => {
     });
   });
 
-  it('names the unavailable placeholder row by its localized name', () => {
+  it('names the unavailable placeholder row and leaves its unknown provider empty', () => {
     const placeholder: SessionModelOption = {
       id: 'remote-session-model',
       name: 'Session model',
@@ -167,7 +167,7 @@ describe('resolveSelectionModelDisplay', () => {
     };
     expect(resolveSelectionModelDisplay('remote-session-model', [placeholder])).toEqual({
       model: 'Session model',
-      provider: 'Kilo',
+      provider: '',
     });
   });
 

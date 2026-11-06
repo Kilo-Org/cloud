@@ -53,12 +53,13 @@ export function resolveSelectionModelDisplay(selectionId: string, options: Sessi
   }
   // A row the chip would show by name (`remote-session-model`, a model no
   // catalog carries) must reach the sheet by that name, not re-derived from a
-  // raw id; the chip resolves these through the option row it renders.
+  // raw id; the chip resolves these through the option row it renders. A row
+  // that records no provider leaves the sheet's placeholder in place: the
+  // session's provider is unknown, not Kilo.
   if (option.unavailable) {
-    const fallbackProvider = option.provider?.name ?? option.modelRef?.providerID ?? 'Kilo';
     return {
       model: option.name || option.displayId,
-      provider: fallbackProvider,
+      provider: option.provider?.name ?? option.modelRef?.providerID ?? '',
     };
   }
   // A gateway row carries no `modelRef`: its model is a Kilo catalog id, which

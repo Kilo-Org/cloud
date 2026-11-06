@@ -1,3 +1,4 @@
+import { runInDurableObject } from 'cloudflare:test';
 import { afterEach, expect, it, vi } from 'vitest';
 
 import { diagnostic, phase, syncPhase } from './metrics';
@@ -5,6 +6,7 @@ import { failureCause, rpcError, ServiceOverloaded } from './overload';
 import { app } from './app';
 import type { Env } from './env';
 import { grant, newSessionID, personal, testEnv } from '../test/helpers';
+import { getSessionSyncDOStub } from './dos/SessionSyncDO';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -169,4 +171,40 @@ it('emits a newly observed cause after the bounded failure map fills', () => {
     'object_rate',
     'unknown',
   ]);
+});
+
+it('measures admission queue depth for control calls without batch bodies', async () => {
+  const principal = personal(crypto.randomUUID());
+  const sessionID = newSessionID();
+  const stub = getSessionSyncDOStub(testEnv, { tenant: principal.tenant, sessionID });
+  await runInDurableObject(stub, async instance => {
+    const exposed = instance as unknown as {
+      env: Env;
+      quotaGate: Promise<void>;
+      admissionQueueDepth: number;
+    };
+    const original = exposed.env;
+    const writeDataPoint = vi.fn();
+    exposed.env = { ...original, SESSION_SYNC_METRICS: { writeDataPoint } };
+    const hold = Promise.withResolvers<void>();
+    exposed.quotaGate = hold.promise;
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    try {
+      const first = instance.authorizeLive({ principal, sessionID });
+      const second = instance.authorizeLive({ principal, sessionID });
+      expect(exposed.admissionQueueDepth).toBe(2);
+      hold.resolve();
+      await Promise.all([first, second]);
+      expect(
+        writeDataPoint.mock.calls
+          .filter(([point]) => point.blobs[2] === 'queue_wait')
+          .map(([point]) => point.doubles[2])
+      ).toEqual([2, 1]);
+      expect(exposed.admissionQueueDepth).toBe(0);
+    } finally {
+      hold.resolve();
+      exposed.env = original;
+      vi.restoreAllMocks();
+    }
+  });
 });

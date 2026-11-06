@@ -121,6 +121,7 @@ function parseBatch(body: string) {
 export class SessionSyncDO extends DurableObject<Env> {
   private db: session.Db;
   private quotaGate: Promise<void> = Promise.resolve();
+  private admissionQueueDepth = 0;
   private pendingBatchBytes = 0;
   private pendingBatches = 0;
   private purgeRetryAt = 0;
@@ -166,18 +167,20 @@ export class SessionSyncDO extends DurableObject<Env> {
     const prior = this.quotaGate;
     const { promise, resolve } = Promise.withResolvers<void>();
     this.quotaGate = promise;
+    this.admissionQueueDepth++;
     const queuedAt = this.env.SESSION_SYNC_METRICS ? performance.now() : 0;
     await prior;
     diagnostic(this.env, {
       operation: 'tenantAdmission',
       stage: 'queue_wait',
       durationMs: queuedAt ? performance.now() - queuedAt : 0,
-      queueDepth: this.pendingBatches,
+      queueDepth: this.admissionQueueDepth,
       retainedBytes: this.pendingBatchBytes,
     });
     try {
       return await fn();
     } finally {
+      this.admissionQueueDepth--;
       resolve();
     }
   }

@@ -432,6 +432,10 @@ Worker RPC lookup/call, limiter credit, hashing, validation, actual mutation
 transaction attempts, receipt pruning, lease reserve/reapply, mutation/watch queue
 wait, watch storage/RPC/budget and scheduling. `lease_required` is an expected
 transaction rollback to acquire capacity, not a platform overload.
+`queue_admission` reports active/queued batch count; `queue_wait` reports all
+active/queued admission-gate calls, including registration/live authorization.
+Their retained-byte field counts pending UTF-16 batch bodies. `watch_queue`
+reports active/queued watch tasks; it does not measure transport-buffer memory.
 The exact fixed label unions are in `src/metrics.ts` and `src/overload.ts`.
 Cause labels distinguish `application_queue`, documented platform request/data
 queue, queue-timeout, object/account-rate categories, flag-only `platform_unknown`,

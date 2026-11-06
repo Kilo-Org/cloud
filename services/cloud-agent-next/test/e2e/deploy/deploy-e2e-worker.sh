@@ -38,8 +38,8 @@ Usage: deploy-e2e-worker.sh <command>
 
 Commands:
   render    Render .wrangler/wrangler.e2e-test.jsonc from wrangler.runtime-generated.json
-  dry-run   Render and run wrangler deploy --dry-run
-  deploy    Render, ensure the callback queue, deploy, upload the internal
+  dry-run   Render, build the wrapper, and run wrangler deploy --dry-run
+  deploy    Render, build the wrapper, ensure the callback queue, deploy, upload the internal
             secret when supplied, then list deployments
 
 Required environment:
@@ -200,11 +200,13 @@ main() {
       ;;
     dry-run)
       render_config
+      run_service_command pnpm run build:wrapper
       run_service_command pnpm exec wrangler deploy --dry-run --config "$CONFIG_PATH"
       ;;
     deploy)
       prepare_internal_secret
       render_config
+      run_service_command pnpm run build:wrapper
       ensure_callback_queue
       run_service_command pnpm exec wrangler deploy --config "$CONFIG_PATH"
       if [[ -n "$INTERNAL_SECRET" ]]; then

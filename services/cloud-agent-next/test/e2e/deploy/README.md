@@ -15,7 +15,7 @@ modified, so the production/default deploy is unaffected.
 ## Prerequisites
 
 - `pnpm install` at the repo root.
-- Runtime publication builds the wrapper separately; Worker deployment does not bundle runtime artifacts.
+- Bun 1.4.4. The Cloud Agent deploy script builds the wrapper before bundling, including for `dry-run`.
 - Cloudflare auth for account `e115e769bcdd4c3d66af59d3332cb394`.
 - A verified exact-SHA `wrangler.runtime-generated.json`, prepared with
   `pnpm exec tsx scripts/prepare-runtime-deploy.ts production <source-sha>` and the approved runtime

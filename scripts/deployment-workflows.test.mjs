@@ -554,6 +554,10 @@ test('one database gate per deployment checks out, installs and migrates once', 
 });
 
 test('every Worker deploy job installs only the Worker closure and the root project', () => {
+  // A recursive workspace install from inside a Worker links every unrelated
+  // project and runs its lifecycle scripts once per deploy job. The closure
+  // install links the Worker, its workspace dependencies, the root project and,
+  // where the Worker builds the nested wrapper package, that package too.
   for (const [job, workingDirectory] of [
     ['deploy-manual', '${{ inputs.worker }}'],
     ['deploy-changed', '${{ matrix.worker }}'],
@@ -567,9 +571,8 @@ test('every Worker deploy job installs only the Worker closure and the root proj
     assert.equal(installs[0]['working-directory'], workingDirectory);
     const run = installs[0].run;
     assert.ok(run.includes("filters=(--filter '{.}...' --filter kilocode-monorepo)"), job);
-    if (job !== 'deploy-session-ingest') {
-      assert.doesNotMatch(run, /wrapper|filters\+=/, job);
-    }
+    assert.ok(run.includes('if [ -f wrapper/package.json ]; then'), job);
+    assert.ok(run.includes("filters+=(--filter '@kilocode/cloud-agent-wrapper...')"), job);
     assert.ok(run.includes('pnpm install --frozen-lockfile "${filters[@]}"'), job);
     assert.ok(!run.includes('pnpm install --frozen-lockfile\n'), job);
   }
@@ -581,54 +584,6 @@ test('every Worker deploy job installs only the Worker closure and the root proj
       .run,
     'pnpm --filter kilocode-monorepo install --frozen-lockfile --ignore-scripts'
   );
-});
-
-test('every Cloud Agent deployment prepares the verified downloaded runtime before upload', () => {
-  for (const [job, condition, deployName] of [
-    [
-      'deploy-manual',
-      "inputs.worker == 'services/cloud-agent-next'",
-      'Deploy to Cloudflare Workers',
-    ],
-    [
-      'deploy-changed',
-      "matrix.worker == 'services/cloud-agent-next'",
-      'Deploy to Cloudflare Workers',
-    ],
-    ['deploy-cloud-agent-after-session-ingest', undefined, 'Deploy cloud-agent-next'],
-  ]) {
-    const steps = workers.jobs[job].steps;
-    const install = steps.findIndex(step => (step.run ?? '').includes('pnpm install'));
-    const prepare = steps.findIndex(step => step.id === 'runtime');
-    const deploy = steps.findIndex(step => step.name === deployName);
-    assert.ok(install >= 0 && install < prepare && prepare < deploy, job);
-    assert.equal(steps[prepare].if, condition, job);
-    assert.equal(steps[prepare]['working-directory'], 'services/cloud-agent-next', job);
-    assert.equal(steps[prepare]['continue-on-error'], undefined, job);
-    assert.equal(
-      steps[prepare].run.trim(),
-      'pnpm exec tsx scripts/prepare-runtime-deploy.ts "$TARGET_ENVIRONMENT" "$SOURCE_SHA"',
-      job
-    );
-    assert.deepEqual(steps[prepare].env, {
-      SOURCE_SHA: '${{ inputs.source_sha || github.sha }}',
-      TARGET_ENVIRONMENT: '${{ inputs.target_environment }}',
-      RUNTIME_R2_ACCOUNT_ID: '${{ vars.CLOUD_AGENT_RUNTIME_ACCOUNT_ID }}',
-      RUNTIME_R2_BUCKET: '${{ vars.CLOUD_AGENT_RUNTIME_BUCKET }}',
-      RUNTIME_R2_ACCESS_KEY_ID: '${{ secrets.CLOUD_AGENT_RUNTIME_R2_ACCESS_KEY_ID }}',
-      RUNTIME_R2_SECRET_ACCESS_KEY: '${{ secrets.CLOUD_AGENT_RUNTIME_R2_SECRET_ACCESS_KEY }}',
-      CLOUDFLARE_ACCOUNT_ID: '${{ vars.CLOUD_AGENT_RUNTIME_ACCOUNT_ID }}',
-      CLOUDFLARE_API_TOKEN: '${{ secrets.CLOUDFLARE_API_TOKEN }}',
-      GITHUB_TOKEN: '${{ github.token }}',
-    });
-    for (const upload of [steps[deploy], steps[deploy + 1]]) {
-      assert.ok(upload.with.command.startsWith('${{ steps.runtime.outputs.command || '), job);
-    }
-  }
-  const cloudAgentPackage = JSON.parse(
-    readFileSync(new URL('../services/cloud-agent-next/package.json', import.meta.url), 'utf8')
-  );
-  assert.equal(cloudAgentPackage.scripts.predeploy, undefined);
 });
 
 test('staging and production Worker changes use independent deployment baselines', () => {
@@ -972,8 +927,8 @@ test('production deploys cloud-agent-next after the session-ingest job', () => {
   const deploy = ordered.steps.findIndex(step => step.name === 'Deploy cloud-agent-next');
   assert.ok(prepare >= 0 && prepare < deploy);
 
-  assert.equal(ordered.steps[deploy].with.preCommands, undefined);
-  assert.equal(ordered.steps[deploy + 1].with.preCommands, undefined);
+  assert.equal(ordered.steps[deploy].with.preCommands, 'pnpm run predeploy');
+  assert.equal(ordered.steps[deploy + 1].with.preCommands, 'pnpm run predeploy');
 });
 
 test('the ordered production path takes both workers out of the parallel matrix', () => {

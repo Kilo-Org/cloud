@@ -230,6 +230,7 @@ function createHarness() {
     turns: turnsRef,
     terminals: terminalsRef,
     worktreeChanges: { current: undefined },
+    worktreeDeletion: { current: undefined },
     kiloRequests: { current: undefined },
     send,
     log: () => undefined,
@@ -426,7 +427,6 @@ describe('directory-key flip (production dispatcher)', () => {
 
   it('keys shared HOME by directory', async () => {
     const h = createHarness();
-    const other = createHarness();
     try {
       const first = routeSpec('ses_a', 'ses_kilo_a', {
         directory: `${DIRECTORY}/one`,
@@ -440,26 +440,25 @@ describe('directory-key flip (production dispatcher)', () => {
         spec: first,
         credentials: credentialsFor('ses_a', proxyHandle(EXP_NOW)),
       });
-      other.dispatcher({
+      h.dispatcher({
         type: 'session.prepare',
         spec: second,
         credentials: credentialsFor('ses_b', proxyHandle(EXP_NOW)),
       });
-      await waitFor(
-        () =>
-          h.frames.filter(frame => frame.type === 'session.ready').length === 1 &&
-          other.frames.filter(frame => frame.type === 'session.ready').length === 1
-      );
+      await waitFor(() => h.frames.filter(frame => frame.type === 'session.ready').length === 2);
 
+      // The two routes are distinct runtimes (distinct directories), so read each
+      // HOME from the runtime the preparation built.
       const homeFor = (directory: string): string =>
         path.join(HOME_ROOT, createHash('sha256').update(directory).digest('hex'));
       const firstRuntime = h.runtimes.get(`${DIRECTORY}/one`);
-      const secondRuntime = other.runtimes.get(`${DIRECTORY}/two`);
+      const secondRuntime = h.runtimes.get(`${DIRECTORY}/two`);
       expect(firstRuntime?.env.HOME).toBe(homeFor(`${DIRECTORY}/one`));
       expect(secondRuntime?.env.HOME).toBe(homeFor(`${DIRECTORY}/two`));
+      // Same scope, different directory: HOME differs (directory is hashed in).
       expect(firstRuntime?.env.HOME).not.toBe(secondRuntime?.env.HOME);
     } finally {
-      await Promise.all([h.runtimes.shutdown(), other.runtimes.shutdown()]);
+      await h.runtimes.shutdown();
     }
   });
 

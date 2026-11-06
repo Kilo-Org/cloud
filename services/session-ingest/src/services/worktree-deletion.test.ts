@@ -16,12 +16,14 @@ import {
   cloudAgentWorktreeDeletionSchema,
   WORKTREE_MEMBERSHIP_CHANGED,
   type CloudAgentWorktreeDeletionParams,
+  type CanDestroyCloudAgentWorktreeSandboxParams,
 } from '@kilocode/session-ingest-contracts';
 import {
   beginWorktreeDeletion,
   recordWorktreeCleanup,
   completeWorktreeDeletion,
   deleteWorktreeContent,
+  canDestroyWorktreeSandbox,
   registerCloudAgentWorktree,
   retireWorktreeIfSoleMember,
 } from './worktree-deletion';
@@ -1172,6 +1174,48 @@ describe('durable worktree deletion journal', () => {
     expect(f.cleared.size).toBe(0);
   });
 
+  it.each([null, otherWorktreeId])(
+    'does not count an unrelated %s root allocation as physical sharing',
+    async unrelatedWorktreeId => {
+      const f = database();
+      await beginWorktreeDeletion(env, params);
+      const unrelatedCloudId = unrelatedWorktreeId
+        ? `workspace_${unrelatedWorktreeId.slice('worktree_'.length)}`
+        : 'agent_44444444-4444-4444-8444-444444444444';
+      if (unrelatedWorktreeId)
+        f.worktrees.push(worktree({ worktree_id: unrelatedWorktreeId, runtime_locations: [] }));
+      f.members.push({
+        sessionId: kiloId(1),
+        cloudAgentSessionId: unrelatedCloudId,
+        organizationId: null,
+        worktreeId: unrelatedWorktreeId,
+        userId,
+        parentSessionId: null,
+      });
+      f.allocations.push({
+        kilo_user_id: userId,
+        organization_id: null,
+        intent: 'create_cloud',
+        resource_key: null,
+        canonical_result: {
+          cloudAgentSessionId: unrelatedCloudId,
+          kiloSessionId: kiloId(1),
+          sandboxId: 'ses-unrelated-original',
+          sandboxProvider: 'vercel',
+        },
+      });
+      const result = await canDestroyWorktreeSandbox(env, { ...params, location });
+      if (unrelatedWorktreeId) expect(result).toEqual({ kind: 'exclusive' });
+      else
+        expect(result).toMatchObject({
+          kind: 'unresolved',
+          owners: [
+            { allocationLocation: { sandboxId: 'ses-unrelated-original', provider: 'vercel' } },
+          ],
+        });
+    }
+  );
+
   it('uses the registered location for an unopened root without reading DO or allocation history', async () => {
     const f = database();
     const first = await beginWorktreeDeletion(env, params);
@@ -1206,6 +1250,20 @@ describe('durable worktree deletion journal', () => {
     expect(f.worktrees[0].deletion_started_at).toBe(started);
     expect(f.ledgerReads).toEqual([]);
     expect(f.worktrees[0].runtime_locations).toEqual([]);
+  });
+
+  it('excludes acknowledged scoped cleanup only for worktrees whose admission has been fenced', async () => {
+    const f = database();
+    await beginWorktreeDeletion(env, params);
+    f.worktrees.push(worktree({ worktree_id: otherWorktreeId }));
+    const input = {
+      ...params,
+      location,
+      releasedWorktreeIds: [otherWorktreeId],
+    } satisfies CanDestroyCloudAgentWorktreeSandboxParams;
+    await expect(canDestroyWorktreeSandbox(env, input)).resolves.toEqual({ kind: 'shared' });
+    f.worktrees[1].deletion_started_at = '2026-08-27 01:00:00+00';
+    await expect(canDestroyWorktreeSandbox(env, input)).resolves.toEqual({ kind: 'exclusive' });
   });
 
   it('denies a different owner and personal/org scope confusion before starting deletion', async () => {
@@ -1417,6 +1475,39 @@ describe('durable worktree deletion journal', () => {
       cloudAgentWorktreeDeletionManifestSchema.parse(f.worktrees[0].deletion_manifest)
         .completedRuntimeLocations
     ).toEqual([location]);
+  });
+
+  it('refuses exclusive teardown for another worktree or an unopened root with unknown runtime ownership', async () => {
+    const f = database();
+    await beginWorktreeDeletion(env, params);
+    await expect(canDestroyWorktreeSandbox(env, { ...params, location })).resolves.toEqual({
+      kind: 'exclusive',
+    });
+    f.worktrees.push(worktree({ worktree_id: otherWorktreeId, runtime_locations: [location] }));
+    await expect(canDestroyWorktreeSandbox(env, { ...params, location })).resolves.toEqual({
+      kind: 'shared',
+    });
+    f.worktrees[1].runtime_locations = [{ ...location, sandboxId: 'ses-unrelated' }];
+    f.members.push({
+      sessionId: kiloId(1),
+      cloudAgentSessionId: cloudId(1),
+      organizationId: null,
+      worktreeId: null,
+      userId,
+      parentSessionId: null,
+    });
+    await expect(canDestroyWorktreeSandbox(env, { ...params, location })).resolves.toMatchObject({
+      kind: 'unresolved',
+    });
+    f.members[1].worktreeId = otherWorktreeId;
+    await expect(canDestroyWorktreeSandbox(env, { ...params, location })).resolves.toEqual({
+      kind: 'exclusive',
+    });
+    f.members.pop();
+    f.worktrees[1].runtime_locations = [];
+    await expect(canDestroyWorktreeSandbox(env, { ...params, location })).resolves.toMatchObject({
+      kind: 'unresolved',
+    });
   });
 });
 

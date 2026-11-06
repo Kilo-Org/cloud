@@ -15,6 +15,7 @@ import {
 } from '../../../src/shared/worktree-changes-wire.js';
 import { collectWorktreeSnapshot } from '../control/worktree-changes.js';
 import { WorktreeFileCaptureError } from '../control/worktree-file-capture.js';
+import { runDirectoryOperation } from '../control/worktree-operations.js';
 import { captureRootSnapshots, snapshotFileDiffs } from './root-changes.js';
 import { hasEnvironmentRoots, type RouteRoot } from './workspace-roots.js';
 
@@ -106,21 +107,23 @@ export function createControlPlaneKiloRequests(deps: ControlPlaneKiloRequestsDep
           throw new Error('Native session diff returned an invalid array');
         if (nativeDiff.length > 0) return nativeDiff;
         // Cloud runtimes disable Kilo snapshots; reuse the bounded worktree patches instead.
-        if (roots !== undefined && hasEnvironmentRoots(roots)) {
-          // Each repository compares with its own base, not the launch repository's.
-          const { repositories } = await captureRootSnapshots({
-            roots,
-            revision: 1,
-            capture: (rootDirectory, payload) => captureSnapshot(rootDirectory, payload, signal),
-          });
-          return repositories.flatMap(({ directory: rootDirectory, capture }) =>
-            snapshotFileDiffs(capture, rootPathPrefix(directory, rootDirectory))
+        return runDirectoryOperation(directory, async () => {
+          if (roots !== undefined && hasEnvironmentRoots(roots)) {
+            // A V2 route compares each repository with its own base; the base of the request is the launch repository's.
+            const { repositories } = await captureRootSnapshots({
+              roots,
+              revision: 1,
+              capture: (rootDirectory, payload) => captureSnapshot(rootDirectory, payload, signal),
+            });
+            return repositories.flatMap(({ directory: rootDirectory, capture }) =>
+              snapshotFileDiffs(capture, rootPathPrefix(directory, rootDirectory))
+            );
+          }
+          return snapshotFileDiffs(
+            await captureSnapshot(directory, { revision: 1, baseRef: operation.baseRef }, signal),
+            ''
           );
-        }
-        return snapshotFileDiffs(
-          await captureSnapshot(directory, { revision: 1, baseRef: operation.baseRef }, signal),
-          ''
-        );
+        });
       }
       case 'question.list': {
         const questions = await client.getQuestions(directory, signal);
@@ -182,6 +185,10 @@ export function createControlPlaneKiloRequests(deps: ControlPlaneKiloRequestsDep
             false
           )
         );
+        return;
+      }
+      if (messageOf(error) === 'worktree_deleting') {
+        deps.emit(fail(requestId, 'not_ready', 'Session directory is not attached', false));
         return;
       }
       deps.log?.(`native request ${operation.name} failed: ${messageOf(error)}`);

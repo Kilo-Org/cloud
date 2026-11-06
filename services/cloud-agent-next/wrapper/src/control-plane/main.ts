@@ -35,6 +35,7 @@ import { createTurnManager, type TurnManager, type TurnManagerDeps } from './tur
 import { createControlPlaneTerminals, type ControlPlaneTerminalRuntime } from './terminals.js';
 import { createNativeStatusReporter } from './native-status.js';
 import { createControlPlaneWorktreeChanges } from './worktree-changes.js';
+import { createControlPlaneWorktreeDeletion } from './worktree-deletion.js';
 import { createControlPlaneKiloRequests } from './kilo-requests.js';
 import { createHistoryRequests } from './history-requests.js';
 import { runtimeHarness } from './runtime-harness.js';
@@ -225,6 +226,7 @@ export type ControlPlaneFrameDispatcherDeps = {
   turns: { current?: TurnManager };
   terminals: { current?: ControlPlaneTerminalRuntime };
   worktreeChanges: { current?: ReturnType<typeof createControlPlaneWorktreeChanges> };
+  worktreeDeletion: { current?: ReturnType<typeof createControlPlaneWorktreeDeletion> };
   kiloRequests: { current?: ReturnType<typeof createControlPlaneKiloRequests> };
   historyRequests?: { current?: ReturnType<typeof createHistoryRequests> };
   send: (frame: ControlPlaneWrapperFrame) => void;
@@ -239,22 +241,14 @@ export function createControlPlaneFrameDispatcher(
       case 'session.attach': {
         const preparation = deps.preparation.current;
         if (preparation === undefined) return;
-        try {
-          onFrame({
-            type: 'session.prepare',
-            spec: {
-              ...frame.spec,
-              ...preparation.workspaceConfiguration(frame.spec, frame.workspace),
-            },
-            credentials: frame.credentials,
-          });
-        } catch {
-          deps.send({
-            type: 'session.failed',
-            sessionId: frame.spec.sessionId,
-            reason: 'workspace_setup_failed',
-          });
-        }
+        onFrame({
+          type: 'session.prepare',
+          spec: {
+            ...frame.spec,
+            ...preparation.workspaceConfiguration(frame.spec, frame.workspace),
+          },
+          credentials: frame.credentials,
+        });
         return;
       }
       case 'session.prepare':
@@ -305,6 +299,13 @@ export function createControlPlaneFrameDispatcher(
       case 'worktree.snapshot':
       case 'worktree.summary':
         void deps.worktreeChanges.current?.handle(frame);
+        return;
+      case 'worktree.prepareDeletion':
+      case 'worktree.delete':
+        void (
+          deps.turns.current?.cancelInterruptedFinalizations(frame.payload.directory) ??
+          Promise.resolve()
+        ).then(() => deps.worktreeDeletion.current?.handle(frame));
         return;
       case 'kilo.request':
         void deps.kiloRequests.current?.handle(frame);
@@ -394,6 +395,10 @@ export async function runControlPlaneWrapper(
   // Terminal requests also answer over the same connection, so the adapter
   // reaches it through a holder.
   const terminalsRef: { current?: ReturnType<typeof createControlPlaneTerminals> } = {};
+  // Worktree-deletion requests also answer over the same connection (R2).
+  const worktreeDeletionRef: {
+    current?: ReturnType<typeof createControlPlaneWorktreeDeletion>;
+  } = {};
   // Allowlisted native reads answer over the same connection.
   const kiloRequestsRef: {
     current?: ReturnType<typeof createControlPlaneKiloRequests>;
@@ -437,6 +442,7 @@ export async function runControlPlaneWrapper(
       turns: turnsRef,
       terminals: terminalsRef,
       worktreeChanges: worktreeChangesRef,
+      worktreeDeletion: worktreeDeletionRef,
       kiloRequests: kiloRequestsRef,
       historyRequests: historyRequestsRef,
       send: frame => connection.send(frame),
@@ -486,6 +492,19 @@ export async function runControlPlaneWrapper(
     emit: frame => connection.send(frame),
     isPrepared: sessionId => preparationRef.current?.isPrepared(sessionId) ?? false,
     roots: sessionId => preparationRef.current?.preparedRoute(sessionId)?.roots,
+    log: logToFile,
+  });
+  worktreeDeletionRef.current = createControlPlaneWorktreeDeletion({
+    emit: frame => connection.send(frame),
+    clients: directory =>
+      runtimes.runtimesForDirectory(directory).map(runtime => runtime.client.worktree),
+    retireDirectory: async directory => {
+      await turnsRef.current?.cancelInterruptedFinalizations(directory);
+      await runtimes.retireDirectory(directory);
+    },
+    detachTerminals: directory =>
+      terminalsRef.current?.detachDirectory(directory) ?? Promise.resolve(),
+    onDiagnostic: diagnostics.onDiagnostic,
     log: logToFile,
   });
   kiloRequestsRef.current = createControlPlaneKiloRequests({

@@ -14,6 +14,10 @@ import {
 import type { WrapperKiloClient } from '../kilo-api.js';
 import { createKiloHarness } from './kilo-harness.js';
 import type { WorktreeSnapshotCapture } from '../../../src/shared/worktree-changes-wire.js';
+import {
+  fenceDirectoryOperations,
+  resetDirectoryOperationState,
+} from '../control/worktree-operations.js';
 
 const SESSION_ID = 'workspace_11111111-1111-4111-8111-111111111111';
 const KILO_SESSION_ID = 'ses_12345678901234567890123456';
@@ -68,6 +72,7 @@ describe('control-plane native reads', () => {
   const temporaryDirectories: string[] = [];
 
   afterEach(async () => {
+    resetDirectoryOperationState();
     await Promise.all(
       temporaryDirectories
         .splice(0)
@@ -481,6 +486,15 @@ describe('control-plane native reads', () => {
       await handler.handle(frame({ name: 'session.diff' }));
       expect(emitted[0]).toMatchObject({ ok: false, error: { code: 'not_ready' } });
     }
+    expect(captureSnapshot).not.toHaveBeenCalled();
+  });
+
+  it('fences fallback capture against worktree deletion', async () => {
+    const captureSnapshot = mock(async () => snapshot());
+    await fenceDirectoryOperations(DIRECTORY);
+    const { emitted, handler } = harness(client(), true, DIRECTORY, { captureSnapshot });
+    await handler.handle(frame({ name: 'session.diff' }));
+    expect(emitted[0]).toMatchObject({ ok: false, error: { code: 'not_ready' } });
     expect(captureSnapshot).not.toHaveBeenCalled();
   });
 

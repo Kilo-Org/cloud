@@ -284,18 +284,7 @@ export function workspaceSnapshotOwner(
 ): WorkspaceSnapshotIdentity | null {
   const route = liveWorkspaceRoutes(routes).find(candidate => candidate.credentialSource !== null);
   if (route === undefined || route.credentialSource === null) return null;
-  const owner = workspaceSnapshotIdentity(sandboxId, route.spec.directory, route.credentialSource);
-  return liveWorkspaceRoutes(routes).every(
-    candidate =>
-      candidate.credentialSource !== null &&
-      owner !== null &&
-      sameWorkspaceSnapshotIdentity(
-        owner,
-        workspaceSnapshotIdentity(sandboxId, candidate.spec.directory, candidate.credentialSource)
-      )
-  )
-    ? owner
-    : null;
+  return workspaceSnapshotIdentity(sandboxId, route.spec.directory, route.credentialSource);
 }
 
 /**
@@ -310,8 +299,6 @@ export function workspaceSnapshotRestoreSkip(
 ): string | undefined {
   const live = liveWorkspaceRoutes(routes);
   if (live.length === 0) return 'no_routes';
-  if (!sameWorkspaceSnapshotIdentity(owner, workspaceSnapshotOwner(owner.sandboxId, routes)))
-    return 'ownership_mismatch';
   if (!workspaceSnapshotRoutesEligible(routes, eligible)) return 'route_ineligible';
   if (!live.some(route => route.state === 'preparing')) return 'route_not_preparing';
   if (readWorkspaceSnapshot(db, owner.workspaceId) === null) return 'missing_descriptor';
@@ -373,8 +360,6 @@ export async function captureIdleWorkspaceSnapshot(input: {
     if (Date.now() < workspaceSnapshotIdleAt(state, disk) + input.idleMs) return reject('not_idle');
     if (!capable) return reject('not_capable');
     if (live.length === 0) return reject('no_routes');
-    if (!sameWorkspaceSnapshotIdentity(disk.owner, workspaceSnapshotOwner(input.sandboxId, routes)))
-      return reject('ownership_mismatch');
     if (live.some(route => route.state !== 'ready')) return reject('route_not_ready');
     if (!workspaceSnapshotRoutesEligible(routes, route => input.eligible(route)))
       return reject('route_ineligible');

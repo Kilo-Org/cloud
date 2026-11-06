@@ -9,6 +9,7 @@ import {
 import type { RuntimeHarness } from '../shared/control-plane-runtime-contract.js';
 import type { AgentSandboxProvider, Env } from '../types.js';
 import { ProviderCreationError } from './provider.js';
+import { RetiredSandboxProviderError } from './retired-cloudflare-provider.js';
 
 export type StartupMode = 'preinstalled' | 'downloaded';
 export type NativeRuntimeImage = 'all-in-one' | 'runtime-free';
@@ -84,7 +85,8 @@ function startupTarget(
   env: StartupEnv,
   provider: AgentSandboxProvider
 ): { mode: 'downloaded'; image: 'runtime-free' } {
-  if (provider === 'cloudflare' || env.RUNTIME_INTERACTIVE_ORG_IDS !== undefined)
+  if (provider === 'cloudflare') throw new RetiredSandboxProviderError('create');
+  if (env.RUNTIME_INTERACTIVE_ORG_IDS !== undefined)
     throw new ProviderCreationError('invalid_configuration');
   const selected = runtimeStartupConfigSchema.safeParse({
     mode: env.RUNTIME_STARTUP_MODE ?? 'downloaded',

@@ -1229,6 +1229,34 @@ const controlPlaneWorktreeResultFrameSchema = z.discriminatedUnion('ok', [
 ]);
 
 /**
+ * Worktree-deletion payload (R2, spec §6 "Billing, credentials and deletion").
+ * Both deletion requests answer with the shared `worktree.result` frame.
+ */
+export const controlPlaneWorktreeDeletionPayloadSchema = z
+  .object({
+    worktreeId: cloudAgentWorktreeIdSchema,
+    directory: z.string().min(1).max(1024),
+    sessionIds: z.array(z.string().startsWith('ses_').length(30)),
+  })
+  .strict();
+
+const controlPlaneWorktreePrepareDeletionFrameSchema = z
+  .object({
+    type: z.literal('worktree.prepareDeletion'),
+    requestId: z.string().min(1).max(128),
+    payload: controlPlaneWorktreeDeletionPayloadSchema,
+  })
+  .strict();
+
+const controlPlaneWorktreeDeleteFrameSchema = z
+  .object({
+    type: z.literal('worktree.delete'),
+    requestId: z.string().min(1).max(128),
+    payload: controlPlaneWorktreeDeletionPayloadSchema,
+  })
+  .strict();
+
+/**
  * Session DO -> Sandbox DO terminal request (spec §10). The Sandbox DO forwards
  * exactly one request frame and returns the wrapper's `terminal.result`. The
  * payload/result shapes are the shared terminal data contracts; the wire is the
@@ -1448,6 +1476,8 @@ export const controlPlaneWrapperFrameSchema = z.discriminatedUnion('type', [
   controlPlaneEventsDroppedFrameSchema,
   controlPlaneWorktreeSnapshotFrameSchema,
   controlPlaneWorktreeSummaryFrameSchema,
+  controlPlaneWorktreePrepareDeletionFrameSchema,
+  controlPlaneWorktreeDeleteFrameSchema,
   controlPlaneWorktreeResultFrameSchema,
   controlPlaneTerminalCreateFrameSchema,
   controlPlaneTerminalResizeFrameSchema,
@@ -1520,6 +1550,16 @@ export type ControlPlaneWorktreeSummaryFrame = z.infer<
   typeof controlPlaneWorktreeSummaryFrameSchema
 >;
 export type ControlPlaneWorktreeResultFrame = z.infer<typeof controlPlaneWorktreeResultFrameSchema>;
+export type ControlPlaneWorktreeDeletionPayload = z.infer<
+  typeof controlPlaneWorktreeDeletionPayloadSchema
+>;
+export type ControlPlaneWorktreePrepareDeletionFrame = z.infer<
+  typeof controlPlaneWorktreePrepareDeletionFrameSchema
+>;
+export type ControlPlaneWorktreeDeleteFrame = z.infer<typeof controlPlaneWorktreeDeleteFrameSchema>;
+export type ControlPlaneWorktreeDeletionRequestFrame =
+  | ControlPlaneWorktreePrepareDeletionFrame
+  | ControlPlaneWorktreeDeleteFrame;
 export type ControlPlaneWorktreeRequestFrame =
   | ControlPlaneWorktreeSnapshotFrame
   | ControlPlaneWorktreeSummaryFrame;

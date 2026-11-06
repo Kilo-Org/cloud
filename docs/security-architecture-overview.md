@@ -60,7 +60,7 @@ Kilo Cloud combines a web control plane with Cloudflare-hosted service component
 - A Vercel-hosted Next.js application provides account management, organization authorization, billing, product configuration, and API orchestration.
 - Cloudflare Workers provide feature-specific ingress, authenticated internal service communication, queue-backed workflows, durable coordination, real-time streams, and selected sandbox orchestration.
 - Managed PostgreSQL stores relational control-plane records. Cloudflare Durable Objects, queues, KV, R2 object storage, and optional specialized stores support scoped state, event processing, caching, and feature-specific content storage.
-- Cloud Agent coding sessions execute in dedicated sandbox containers. Each sandbox and container belongs to exactly one workspace. Sibling chats in that workspace share its runtime and MCP configuration; independent workspaces use separate containers, runtimes, and HOME directories.
+- Cloud Agent coding sessions execute in Cloudflare sandbox containers coordinated per session. Sibling chats in one workspace share its runtime and MCP configuration. Independent workspaces have separate runtimes and HOME directories; isolated allocations also use separate containers, while shared allocations can host multiple workspaces.
 - KiloClaw assistant instances run in owner-scoped, provider-backed runtimes with instance-scoped persistent storage and encrypted configuration delivery.
 - External providers may be invoked as platform dependencies, operational services, enabled product capabilities, or customer-selected integrations. Active providers and processing paths must be validated against the live production inventory.
 
@@ -141,7 +141,7 @@ flowchart LR
 | Web control plane | Next.js application hosted on Vercel | Identity, organization authorization, billing, configuration, and API orchestration |
 | Cloud service layer | Cloudflare Workers connected through feature-specific ingress and service bindings | Authenticated APIs, asynchronous workflows, durable coordination, streaming, and integration delivery |
 | Managed persistence | PostgreSQL, Durable Object storage, queues, object storage, caches, and feature-specific analytical stores | Scoped application records, durable state, reliable background processing, and operational telemetry |
-| Cloud Agent execution | One sandbox and container per workspace | Authorized repository and model access; sibling chats within the workspace share runtime and MCP configuration |
+| Cloud Agent execution | Sandbox containers with workspace-scoped runtimes | Authorized repository and model access; sibling chats share runtime and MCP configuration; shared allocations can host multiple workspaces |
 | KiloClaw execution | Owner-scoped provider-backed runtimes with persistent storage | Dedicated assistant runtime with scoped configuration and lifecycle coordination |
 | External providers | Identity, source-control, model, billing, messaging, telemetry, and optional tool providers | Explicit third-party trust boundaries invoked by enabled capabilities |
 

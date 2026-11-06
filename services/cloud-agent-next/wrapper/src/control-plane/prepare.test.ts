@@ -37,81 +37,6 @@ import {
 import type { restoreWorktreeRecovery } from './worktree-recovery.js';
 import { restoreSession } from '../restore-session.js';
 
-describe('sandbox workspace admission', () => {
-  it.each(['scope', 'directory', 'organization'] as const)(
-    'rejects another workspace %s before configuration or credential mutation',
-    async field => {
-      const harness = createHarness();
-      const spec = routeSpec();
-      const config = { env: { WORKSPACE_FLAG: 'retained' } };
-      harness.manager.workspaceConfiguration(spec, config);
-      await harness.manager.prepare({ ...spec, ...config });
-      const conflict = routeSpec({
-        sessionId: 'workspace_other',
-        ...(field === 'directory' ? { directory: '/tmp/independent-workspace' } : {}),
-        kilo: {
-          ...spec.kilo!,
-          ...(field === 'scope' ? { scopeId: 'other-workspace' } : {}),
-          ...(field === 'organization' ? { organizationId: 'org_other' } : {}),
-        },
-      });
-      expect(() =>
-        harness.manager.workspaceConfiguration(conflict, { env: { WORKSPACE_FLAG: 'wrong' } })
-      ).toThrow('Sandbox workspace mismatch');
-      expect(
-        await harness.manager
-          .prepare(conflict, {
-            sessionId: conflict.sessionId,
-            kilo: { token: 'must-not-install' },
-          })
-          .then(
-            () => undefined,
-            (error: Error) => error.message
-          )
-      ).toBe('Sandbox workspace mismatch');
-      expect(harness.ensureInputs).toHaveLength(1);
-      expect(harness.installCalls).toHaveLength(0);
-      expect(harness.manager.workspaceConfiguration(spec, {})).toBe(config);
-      expect(harness.manager.isPrepared(conflict.sessionId)).toBe(false);
-    }
-  );
-
-  it('keeps the workspace binding after its last chat releases', async () => {
-    const harness = createHarness();
-    const spec = routeSpec();
-    await harness.manager.prepare(spec);
-    harness.manager.release(spec.sessionId);
-    const conflict = routeSpec({ directory: '/tmp/independent-workspace' });
-    expect(
-      await harness.manager.prepare(conflict).then(
-        () => undefined,
-        (error: Error) => error.message
-      )
-    ).toBe('Sandbox workspace mismatch');
-    await harness.manager.prepare({ ...spec, sessionId: 'workspace_sibling' });
-    expect(harness.manager.isPrepared('workspace_sibling')).toBe(true);
-  });
-
-  it('validates a repeated chat prepare before refreshing its credentials', async () => {
-    const harness = createHarness();
-    const spec = routeSpec();
-    await harness.manager.prepare(spec);
-    expect(
-      await harness.manager
-        .prepare(
-          { ...spec, kilo: { ...spec.kilo!, scopeId: 'other-workspace' } },
-          { sessionId: spec.sessionId, kilo: { token: 'must-not-install' } }
-        )
-        .then(
-          () => undefined,
-          (error: Error) => error.message
-        )
-    ).toBe('Sandbox workspace mismatch');
-    expect(harness.installCalls).toHaveLength(0);
-    expect(harness.ensureInputs).toHaveLength(1);
-  });
-});
-
 describe('replacement workspace local recovery', () => {
   const recovery = {
     files: [{ path: 'lost.txt', status: 'added' as const, patch: 'saved patch' }],
@@ -2234,7 +2159,7 @@ describe('createPreparationManager', () => {
     ).toBe(true);
   });
 
-  it('keys sibling runtime HOME by directory and preserves historical per-session homes separately', async () => {
+  it('keys a worktree runtime HOME by directory alone and keeps per-session homes', async () => {
     const harness = createHarness();
     const directory = '/tmp/home-scope-one';
     const worktree = routeSpec({
@@ -2242,10 +2167,12 @@ describe('createPreparationManager', () => {
       kiloSessionId: 'kilo_a',
       directory,
     });
+    // A sibling in the same directory with another scope shares the same HOME.
     const sibling = routeSpec({
       sessionId: 'ses_b',
       kiloSessionId: 'kilo_b',
       directory,
+      kilo: { ...routeSpec().kilo!, scopeId: 'ses_b' },
     });
     // An existing allocation keeps its per-session runtime and HOME.
     const perSession = routeSpec({
@@ -2257,13 +2184,12 @@ describe('createPreparationManager', () => {
 
     await harness.manager.prepare(worktree);
     await harness.manager.prepare(sibling);
-    const standalone = createHarness();
-    await standalone.manager.prepare(perSession);
+    await harness.manager.prepare(perSession);
 
     const roots = homeRootsFor('/tmp/prepare-test-homes');
     expect(harness.ensureInputs[0]!.env.HOME).toBe(directoryHome(directory, roots.directory));
     expect(harness.ensureInputs[1]!.env.HOME).toBe(directoryHome(directory, roots.directory));
-    expect(standalone.ensureInputs[0]!.env.HOME).toBe(
+    expect(harness.ensureInputs[2]!.env.HOME).toBe(
       path.join(
         roots.legacy,
         createHash('sha256')
@@ -2447,13 +2373,10 @@ describe('createPreparationManager', () => {
         directory: '/tmp/prepare-child-worktree',
         runtimeIsolation,
       });
-      const childHarness = createHarness();
-      await childHarness.manager.prepare(child);
-      const childConfig = JSON.parse(childHarness.ensureInputs[0]?.env.KILO_CONFIG_CONTENT ?? '{}');
+      await harness.manager.prepare(child);
+      const childConfig = JSON.parse(harness.ensureInputs[1]?.env.KILO_CONFIG_CONTENT ?? '{}');
       expect(childConfig.mcp?.['kilo-cloud-agent']).toBeUndefined();
-      expect(childHarness.ensureInputs[0]?.env.KILO_CONFIG_CONTENT).not.toContain(
-        cloudAgentMcp.token
-      );
+      expect(harness.ensureInputs[1]?.env.KILO_CONFIG_CONTENT).not.toContain(cloudAgentMcp.token);
     }
   );
 
@@ -3710,15 +3633,14 @@ describe('control-plane runtime profiles', () => {
       expect(siblingEnv.HOME).toBe(env.HOME);
       expect(siblingEnv.KILO_CONFIG).toBe(env.KILO_CONFIG);
 
-      const otherHarness = createHarness();
-      await otherHarness.manager.prepare(
+      await harness.manager.prepare(
         routeSpec({
           sessionId: 'ses_33333333333333333333333333',
           kiloSessionId: 'ses_33333333333333333333333333',
           directory: `${spec.directory}/other-worktree`,
         })
       );
-      const otherEnv = otherHarness.ensureInputs[0].env;
+      const otherEnv = harness.ensureInputs[2].env;
       expect(otherEnv.HOME).not.toBe(env.HOME);
       expect(otherEnv.KILO_CONFIG).toBeUndefined();
       expect(existsSync(path.join(otherEnv.HOME, '.kilocode/skills/review/SKILL.md'))).toBe(false);

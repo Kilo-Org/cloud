@@ -147,22 +147,6 @@ async function setup(
     },
   };
   await session.registerSession(registration);
-  if (options.standalone) {
-    await runInDurableObject(sandbox, instance => {
-      writeRoute(instance['db'], {
-        sessionId,
-        spec: registration.spec,
-        credentialSource: registration.credentials,
-        grant: null,
-        environment: null,
-        state: 'failed',
-        reason: 'agent_restarted',
-        attemptId: 'historical',
-        attemptDeadlineAt: 0,
-      });
-      instance['restoreWorkspaceOwner']();
-    });
-  }
   const wrappers: FakeWrapper[] = [];
   async function connect(index = 0) {
     await waitFor(() => expect(launchEnvs.length).toBeGreaterThan(index));

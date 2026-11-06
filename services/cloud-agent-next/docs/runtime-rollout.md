@@ -17,18 +17,11 @@ Persisted allocation readers still recognize historical startup modes and image 
 allocations are not rewritten. Retired SDK provider pins cannot create a new allocation.
 
 BYOC Vercel uses its customer-owned snapshot as the base. The snapshot setup provides the fixed Node
-path and Bun version required by the bootstrap. `src/shared/runtime-toolchain.ts` pins Bun's release
-archive and SHA-256 next to `RUNTIME_DISTRIBUTION`. The Durable Object build verifies the downloaded
-bytes before installation, then verifies the installed tool by exact version and digest. The snapshot
-contains no Kilo CLI, wrapper, supervisor or runtime manifest. Validators install the current runtime
-through the normal download bootstrap. Each build persists its base recipe digest. An in-flight build
-with missing or outdated recipe evidence is fenced from publication at every step, including terminal
-confirmation. Its old resources are cleaned up before restarting the same generation with recipe-specific
-resource identities. Cleanup failures retain old references and retry; stale snapshot responses cannot
-overwrite the restarted build. Active owner snapshots are unchanged until a replacement validates.
-Validator control DOs, allocation IDs and signed launch credentials use the recipe-specific incarnation;
-the credential's authoritative build generation remains unchanged. Persisted validator control IDs are
-retained for in-progress launch recovery and cleanup, including generation-only legacy validators.
+path and Bun version required by the bootstrap. `src/shared/runtime-toolchain.ts` pins every base tool
+(`bun`, `rg`, `gh`, `glab`, `pnpm`, `kilo`) to a release archive or registry tarball whose SHA-256 sits
+next to `RUNTIME_DISTRIBUTION`. The Durable Object build installs `bun` and the Kilo CLI from those pins,
+checks the downloaded bytes before unpacking or installing, and re-checks the tools it installed by exact
+version and digest before the snapshot is created or accepted.
 Downloaded startup installs the selected immutable CLI
 and control release as root. The base digest covers the ABI, Node major, Bun, and base setup commands;
 CLI and wrapper changes do not change that digest or require a new snapshot. Existing allocations keep

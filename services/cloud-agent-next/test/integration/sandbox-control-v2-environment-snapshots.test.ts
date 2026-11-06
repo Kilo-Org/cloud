@@ -216,8 +216,7 @@ function prepareInput(overrides: RouteOverrides = {}) {
       kiloToken: FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN,
       orgId: overrides.orgId === null ? undefined : (overrides.orgId ?? 'org_123'),
       repository: { type: 'github' as const, repo: 'acme/widgets' },
-      scopeId: 'worktree_11111111-1111-4111-8111-111111111111',
-      workspaceId: 'worktree_11111111-1111-4111-8111-111111111111',
+      scopeId: sessionId,
     },
   };
 }
@@ -1136,7 +1135,7 @@ describe('environment snapshot preparation fallback', () => {
       sessionId: sibling,
       kiloSessionId: 'ses_bbbbbbbbbbbbbbbbbbbbbbbbbb',
     });
-    await stub.prepare(input);
+    await stub.prepare({ ...input, credentials: { ...input.credentials, scopeId: SESSION } });
     expect(await wrapper.nextSkipping(['session.credentials'])).toMatchObject({
       type: 'session.prepare',
     });
@@ -1245,7 +1244,10 @@ describe('environment snapshot preparation fallback', () => {
         sessionId: sibling,
         kiloSessionId: 'ses_bbbbbbbbbbbbbbbbbbbbbbbbbb',
       });
-      await stub.prepare(siblingInput);
+      await stub.prepare({
+        ...siblingInput,
+        credentials: { ...siblingInput.credentials, scopeId: SESSION },
+      });
       expect(await wrapper.nextSkipping(['session.credentials'])).toMatchObject({
         type: 'session.prepare',
       });

@@ -10,9 +10,7 @@ import type { StoredProviderPin } from './sandbox-do.js';
 export const SNAPSHOT_VALIDATOR_REF_KEY = 'byoc_snapshot_validator_ref';
 export const snapshotValidatorInputSchema = z
   .object({
-    build: z
-      .object({ credentialId: z.uuid(), generation: z.uuid(), incarnation: z.uuid().optional() })
-      .and(byocVercelOwnerSchema),
+    build: z.object({ credentialId: z.uuid(), generation: z.uuid() }).and(byocVercelOwnerSchema),
     allocation: z
       .object({
         providerRef: z.string().min(1),
@@ -26,16 +24,15 @@ export const snapshotValidatorInputSchema = z
   .strict();
 export type SnapshotValidatorInput = z.infer<typeof snapshotValidatorInputSchema>;
 
-/** Adopt only the external sandbox identified by this validator incarnation. */
+/** Adopt only the external sandbox identified by this build generation. */
 export function snapshotValidatorAllocation(
   sandboxId: string,
   input: SnapshotValidatorInput,
   now: number
 ): { pin: StoredProviderPin; state: AllocationState } {
   const reference = decodeVercelProviderRef(input.allocation.providerRef);
-  const allocationId = input.build.incarnation ?? input.build.generation;
   if (
-    sandboxId !== `ses-byoc-validator-${allocationId.replaceAll('-', '')}` ||
+    sandboxId !== `ses-byoc-validator-${input.build.generation.replaceAll('-', '')}` ||
     !reference ||
     input.allocation.expiresAt <= Math.max(now, input.allocation.createdAt)
   ) {
@@ -54,7 +51,7 @@ export function snapshotValidatorAllocation(
     state: {
       ...initialAllocationState(),
       kind: 'starting',
-      allocationId,
+      allocationId: input.build.generation,
       providerRef: input.allocation.providerRef,
       firstConnectDeadlineAt: input.allocation.expiresAt,
     },

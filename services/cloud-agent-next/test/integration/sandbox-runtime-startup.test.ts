@@ -39,7 +39,6 @@ const namespace = (env as unknown as { SANDBOX_CONTROL: DurableObjectNamespace<S
   .SANDBOX_CONTROL;
 const workerSecret = (env as unknown as { NEXTAUTH_SECRET: string }).NEXTAUTH_SECRET;
 const SESSION = 'workspace_11111111-1111-1111-1111-111111111111';
-const WORKSPACE = 'worktree_11111111-1111-4111-8111-111111111111';
 const TARGET_ORG = '9d278969-5453-4ae3-a51f-a8d2274a7b56';
 const OTHER_ORG = '11111111-1111-4111-8111-111111111111';
 const scopedEnv = {
@@ -230,8 +229,7 @@ async function requestPrepare(h: Harness, options: PrepareOptions = {}) {
         ? {}
         : { createdOnPlatform: options.createdOnPlatform }),
       repository: { type: 'github', repo: 'acme/widgets' },
-      scopeId: WORKSPACE,
-      workspaceId: WORKSPACE,
+      scopeId: SESSION,
     },
     sandboxSelection: {
       provider: 'cloudflare-containers',

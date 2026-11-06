@@ -231,7 +231,6 @@ type SandboxControlNamespace = DurableObjectNamespace<SandboxControlV2>;
 type SessionNamespace = DurableObjectNamespace<SandboxSessionV2>;
 const sandboxes = (env as unknown as { SANDBOX_CONTROL: SandboxControlNamespace }).SANDBOX_CONTROL;
 const sessions = (env as unknown as { SANDBOX_SESSION: SessionNamespace }).SANDBOX_SESSION;
-const WORKSPACE = 'worktree_11111111-1111-4111-8111-111111111111';
 
 let sequence = 0;
 function unique(prefix: string): string {
@@ -256,7 +255,7 @@ function routeSpec(sessionId: string): ControlPlaneRouteSpec {
   return {
     sessionId,
     kiloSessionId: kiloSessionId(),
-    directory: '/workspace/widgets',
+    directory: `/workspace/${sessionId}`,
     attemptId: `${sessionId}-requested`,
   };
 }
@@ -273,8 +272,7 @@ function registration(sandboxId: string, sessionId: string) {
       kiloToken: NATIVE_KILO_TOKEN,
       orgId: 'org_123',
       repository: { type: 'github' as const, repo: 'acme/widgets' },
-      scopeId: WORKSPACE,
-      workspaceId: WORKSPACE,
+      scopeId: sessionId,
     },
   };
 }
@@ -1995,11 +1993,7 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
             auth: { kiloSessionId: kiloSessionId(), kilocodeToken: NATIVE_KILO_TOKEN },
             agent: { mode: 'code', model: 'test/model' },
             repository: { type: 'github', repo: 'acme/widgets', upstreamBranch: 'main' },
-            workspace: {
-              sandboxId,
-              sandboxProvider: 'cloudflare-containers',
-              worktreeId: WORKSPACE,
-            },
+            workspace: { sandboxId, sandboxProvider: 'cloudflare-containers' },
             callback: { target: { url: 'https://callback.test/hook' } },
             lifecycle: { version: 1, timestamp: 1 },
           }),
@@ -2273,7 +2267,7 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
           auth: { kiloSessionId: kiloSessionId(), kilocodeToken: NATIVE_KILO_TOKEN },
           agent: { mode: 'code', model: 'test/model' },
           repository: { type: 'github', repo: 'acme/widgets', upstreamBranch: 'main' },
-          workspace: { sandboxId, sandboxProvider: 'cloudflare-containers', worktreeId: WORKSPACE },
+          workspace: { sandboxId, sandboxProvider: 'cloudflare-containers' },
           callback: { target: { url: 'https://callback.test/hook' } },
           lifecycle: { version: 1, timestamp: 1 },
         }),
@@ -2489,7 +2483,7 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
           auth: { kiloSessionId: kiloSessionId(), kilocodeToken: NATIVE_KILO_TOKEN },
           agent: { mode: 'code', model: 'test/model' },
           repository: { type: 'github', repo: 'acme/widgets', upstreamBranch: 'main' },
-          workspace: { sandboxId, sandboxProvider: 'cloudflare-containers', worktreeId: WORKSPACE },
+          workspace: { sandboxId, sandboxProvider: 'cloudflare-containers' },
           callback: { target: { url: 'https://callback.test/hook' } },
           lifecycle: { version: 1, timestamp: 1 },
         }),
@@ -2770,7 +2764,7 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
           auth: { kiloSessionId: kiloSessionId(), kilocodeToken: NATIVE_KILO_TOKEN },
           agent: { mode: 'code', model: 'test/model' },
           repository: { type: 'github', repo: 'acme/widgets', upstreamBranch: 'main' },
-          workspace: { sandboxId, sandboxProvider: 'cloudflare-containers', worktreeId: WORKSPACE },
+          workspace: { sandboxId, sandboxProvider: 'cloudflare-containers' },
           callback: { target: { url: 'https://callback.test/hook' } },
           lifecycle: { version: 1, timestamp: 1 },
         }),

@@ -85,7 +85,6 @@ function metadata(input: { sessionId: string; kiloSessionId: string; sandboxId: 
     agent: { mode: 'code', model: 'test/model' },
     repository: { type: 'git', url: 'https://github.com/acme/widgets.git', platform: 'github' },
     workspace: {
-      worktreeId: input.sessionId.replace('workspace_', 'worktree_'),
       branchName: 'kilo/cold-runtime',
       sandboxId: input.sandboxId,
       sandboxProvider: 'cloudflare-containers',

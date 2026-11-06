@@ -104,6 +104,55 @@ export type RecordCloudAgentWorktreeCleanupParams = z.infer<
   typeof recordCloudAgentWorktreeCleanupSchema
 >;
 
+export const canDestroyCloudAgentWorktreeSandboxSchema = cloudAgentWorktreeDeletionSchema
+  .extend({
+    location: cloudAgentWorktreeLocationSchema,
+    releasedWorktreeIds: z.array(cloudAgentWorktreeIdSchema).optional(),
+  })
+  .strict();
+export type CanDestroyCloudAgentWorktreeSandboxParams = z.infer<
+  typeof canDestroyCloudAgentWorktreeSandboxSchema
+>;
+
+export const unresolvedCloudAgentSandboxOwnerSchema = z
+  .object({
+    worktreeId: cloudAgentWorktreeIdSchema.nullable(),
+    organizationId: z.uuid().nullable(),
+    allocationLocation: cloudAgentWorktreeLocationSchema.optional(),
+    sessions: z
+      .array(
+        z
+          .object({
+            sessionId: sessionIdSchema.nullable(),
+            // Read straight from the historical `cli_sessions_v2` column, which
+            // still holds owner ids minted before the `workspace_` shape. This
+            // reader reports foreign owners, so it must accept them rather than
+            // fail the whole teardown answer.
+            cloudAgentSessionId: z.string().min(1),
+          })
+          .strict()
+      )
+      .min(1),
+  })
+  .strict();
+export type UnresolvedCloudAgentSandboxOwner = z.infer<
+  typeof unresolvedCloudAgentSandboxOwnerSchema
+>;
+
+export const canDestroyCloudAgentWorktreeSandboxResultSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('exclusive') }).strict(),
+  z.object({ kind: z.literal('shared') }).strict(),
+  z
+    .object({
+      kind: z.literal('unresolved'),
+      owners: z.array(unresolvedCloudAgentSandboxOwnerSchema).min(1),
+    })
+    .strict(),
+]);
+export type CanDestroyCloudAgentWorktreeSandboxResult = z.infer<
+  typeof canDestroyCloudAgentWorktreeSandboxResultSchema
+>;
+
 // Message and part ids become storage and item identities, so both refuse `/`
 // and U+0000.
 function createIdSchema(prefix: string, label: string) {
@@ -1307,6 +1356,9 @@ export type SessionIngestRpcMethods = {
   deleteCloudAgentWorktreeContent: (
     params: CloudAgentWorktreeDeletionParams
   ) => Promise<CloudAgentWorktreeDeletionResult>;
+  canDestroyCloudAgentWorktreeSandbox: (
+    params: CanDestroyCloudAgentWorktreeSandboxParams
+  ) => Promise<CanDestroyCloudAgentWorktreeSandboxResult>;
   createSessionForCloudAgent: (
     params: CreateSessionForCloudAgentParams
   ) => Promise<CreateSessionForCloudAgentResult>;

@@ -172,6 +172,7 @@ describe('workspace session attachment', () => {
       turns: {},
       terminals: {},
       worktreeChanges: {},
+      worktreeDeletion: {},
       kiloRequests: {},
       send: frame => frames.push(frame),
       log: () => undefined,
@@ -182,7 +183,7 @@ describe('workspace session attachment', () => {
       directory: '/workspace/app',
       attemptId: 'attempt_first',
     };
-    return { dispatch, prepared, frames, spec, retained, preparation };
+    return { dispatch, prepared, frames, spec, retained };
   }
 
   it('prepares the route with the configuration the preparation manager selects', () => {
@@ -194,18 +195,6 @@ describe('workspace session attachment', () => {
     });
     expect(h.prepared).toEqual([{ ...h.spec, ...h.retained }]);
     expect(h.frames).toEqual([]);
-  });
-
-  it('reports rejected workspace admission without preparing the route or crashing the wrapper', () => {
-    const h = createDispatcher();
-    h.preparation.workspaceConfiguration = () => {
-      throw new Error('Sandbox workspace mismatch');
-    };
-    expect(() => h.dispatch({ type: 'session.attach', spec: h.spec, workspace: {} })).not.toThrow();
-    expect(h.prepared).toEqual([]);
-    expect(h.frames).toEqual([
-      { type: 'session.failed', sessionId: h.spec.sessionId, reason: 'workspace_setup_failed' },
-    ]);
   });
 });
 

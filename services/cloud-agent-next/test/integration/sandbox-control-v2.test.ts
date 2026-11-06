@@ -59,7 +59,6 @@ const SANDBOX_ID = 'sbx__control_v2_smoke';
 const CUTOVER_SANDBOX_ID = 'sbx__control_v2_cutover';
 const CUSTOM_ALLOCATION_NAME = 'usr-shared-allocation-name';
 const LEGACY_ALLOCATION_NAME = 'usr-legacy-shared-allocation';
-const WORKSPACE = 'worktree_11111111-1111-4111-8111-111111111111';
 const MINUTE = 60 * 1000;
 const TIMERS = CONTROL_PLANE_TIMERS.sandbox;
 
@@ -682,18 +681,8 @@ describe('SandboxControlV2 allocation lifecycle', () => {
         userId: 'owner-1',
         kiloSessionId: `kilo-${sessionId}`,
         kiloToken: RUNTIME_AUTHORIZED_KILO_TOKEN,
-        workspaceId: WORKSPACE,
-        scopeId: WORKSPACE,
       },
     };
-    await runInDurableObject(stub, (_instance, state) =>
-      state.storage.put('sandbox_workspace_owner:v1', {
-        kind: 'workspace',
-        workspaceId: WORKSPACE,
-        directory: directPrepare.spec.directory,
-        userId: 'owner-1',
-      })
-    );
     expect(await stub.prepare(directPrepare)).toMatchObject({ state: 'preparing' });
 
     await waitFor(async () =>
@@ -2144,15 +2133,14 @@ describe('SandboxControlV2 allocation egress policy', () => {
       spec: {
         sessionId,
         kiloSessionId,
-        directory: '/workspace/widgets',
+        directory: `/workspace/${sessionId}`,
         attemptId: `${sessionId}-requested`,
       },
       credentials: {
         userId: 'owner-1',
         kiloSessionId,
         kiloToken: RUNTIME_AUTHORIZED_KILO_TOKEN,
-        scopeId: WORKSPACE,
-        workspaceId: WORKSPACE,
+        scopeId: sessionId,
         repository: { type: 'git', url: repositoryUrl },
       },
       sandboxSelection: {
@@ -2661,8 +2649,7 @@ describe('SandboxControlV2 prepare frame secrets', () => {
         kiloToken: RUNTIME_AUTHORIZED_KILO_TOKEN,
         orgId: 'org-1',
         repository: { type: 'github', repo: 'acme/widgets' },
-        scopeId: WORKSPACE,
-        workspaceId: WORKSPACE,
+        scopeId: sessionId,
         encryptedSecrets,
       },
     };

@@ -1337,6 +1337,10 @@ export type KiloRuntimes = {
     restartingCount: number;
     unavailableCount: number;
   };
+  /** Live runtimes serving one directory; worktree deletion retires them (R2). */
+  runtimesForDirectory(directory: string): KiloRuntime[];
+  /** Stops and removes every runtime serving one directory (worktree deletion). */
+  retireDirectory(directory: string): Promise<void>;
   shutdown(): Promise<void>;
 };
 
@@ -1468,7 +1472,10 @@ export function createKiloRuntimes(options: KiloRuntimesOptions): KiloRuntimes {
         return existing.ensure();
       }
       if (existing) {
-        // A sibling must not see the shutting-down runtime and call `ensure` on it.
+        // Retire the old runtime before awaiting its shutdown: a second session
+        // on the same key must not see the shutting-down runtime (`stopped`
+        // reports not-unavailable) and call `ensure` on it. `remove` and
+        // `retireDirectory` already delete before shutting down.
         runtimes.delete(input.key);
         await existing.shutdown();
       }
@@ -1517,6 +1524,15 @@ export function createKiloRuntimes(options: KiloRuntimesOptions): KiloRuntimes {
         restartingCount,
         unavailableCount,
       };
+    },
+    runtimesForDirectory: directory =>
+      [...runtimes.values()].filter(runtime => runtime.directory === directory),
+    async retireDirectory(directory) {
+      const targets = [...runtimes.entries()].filter(
+        ([, runtime]) => runtime.directory === directory
+      );
+      for (const [key] of targets) runtimes.delete(key);
+      await Promise.all(targets.map(([, runtime]) => runtime.shutdown()));
     },
     async shutdown() {
       const all = [...runtimes.values()];

@@ -23,6 +23,8 @@ export type ControlPlaneTerminalRuntime = {
    */
   rememberAttachedSession(identity: SessionRequestIdentity, runtimeKey: string): void;
   forgetSession(sessionId: string): Promise<void>;
+  /** Detaches every attached session for a directory, for worktree deletion (R2). */
+  detachDirectory(directory: string): Promise<void>;
   /** Attached sessions with input in the last 30 seconds, for diagnostics only. */
   recentInputCount(): number;
   hasActivePty(): boolean;
@@ -127,6 +129,15 @@ export function createControlPlaneTerminals(options: {
     forgetAttachedRoot(attachedSession.identity.kiloSessionId, attachedSession.identity.directory);
   }
 
+  async function detachDirectory(directory: string): Promise<void> {
+    for (const [sessionId, session] of attached) {
+      if (session.identity.directory !== directory) continue;
+      attached.delete(sessionId);
+      inputAt.delete(sessionId);
+    }
+    await runtime.detachDirectory(directory);
+  }
+
   function recentInputCount(): number {
     const now = Date.now();
     let count = 0;
@@ -183,6 +194,7 @@ export function createControlPlaneTerminals(options: {
   return {
     rememberAttachedSession,
     forgetSession,
+    detachDirectory,
     recentInputCount,
     hasActivePty: () =>
       [...attached.values()].some(session => runtime.hasActivePty(session.identity)),

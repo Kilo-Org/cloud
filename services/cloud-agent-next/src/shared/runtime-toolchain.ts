@@ -13,7 +13,8 @@ import { RUNTIME_DISTRIBUTION } from './runtime-distribution.js';
  * installed result again, so the snapshot content is a function of this file
  * rather than of what a distribution host serves at build time.
  *
- * The BYOC base snapshot builder uses the Bun installer and verifier.
+ * The Durable Object snapshot build (`src/persistence/VercelSnapshotBuild.ts`)
+ * uses these builders.
  *
  * Re-measuring a pin after a deliberate version bump means downloading the pinned
  * URL and running `sha256sum` on the archive and on the extracted `member`; for an

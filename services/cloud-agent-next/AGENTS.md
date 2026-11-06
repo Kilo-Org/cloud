@@ -91,7 +91,7 @@ Git tokens (GitHub App installation tokens, managed GitLab tokens) are resolved 
 
 ### Wrapper
 
-- `wrapper/` - Wrapper runtime published as immutable downloaded artifacts
+- `wrapper/` - Wrapper runtime published as immutable downloaded artifacts; BYOC Vercel snapshot builds also bundle it
 - `wrapper/src/control-plane/main.ts` - Wrapper entrypoint
 - `wrapper/control-plane-supervisor.sh` - Container supervisor
 - `wrapper/src/control-plane/session-supervisor.ts` - Per-process Kilo supervision and execution clocks

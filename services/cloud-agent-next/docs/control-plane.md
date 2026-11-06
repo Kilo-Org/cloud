@@ -430,14 +430,6 @@ Native supervision does not schedule future wakeups after compute has stopped.
 
 These keep their current owners and evidence; the rewrite ports them, it does not redesign them.
 
-- Each logical sandbox owns exactly one workspace and physical container. Durable ownership binds
-  the workspace ID, directory, user, and organization before route or credential mutation. Sibling
-  chats may join that workspace; a second workspace cannot. Ownership survives route release and
-  container replacement. Pre-upgrade route-less sandboxes recover ownership only from matching
-  canonical placement and authenticated persisted workspace records.
-- Whole-workspace deletion validates that ownership before stopping the container and revoking all
-  sibling routes. Allocation fencing, confirmed-stop retries, and deletion journals remain; there is
-  no in-place deletion path for preserving another workspace in the same container.
 - Compute billing follows the physical container lifecycle (`metered-billing-lifecycle.ts`), not
   the routing state.
 - The Sandbox DO reconciles the current wrapper's stored compute policy on a 30-second cadence.
@@ -452,17 +444,17 @@ These keep their current owners and evidence; the rewrite ports them, it does no
   writable grant copies. Compatibility requires the same user, organization, worktree/directory,
   repository authority, targets, provider/physical binding, containment and backing authorization
   class. A scope cannot replace a legacy backing token with a modern delegated token. A checkout
-  directory in a negotiated workspace-shared runtime uses exactly one credential class: if another grant serves the joining
+  directory in a negotiated shared allocation uses exactly one credential class: if another grant serves the joining
   route's directory with a different runtime-proxy presence (modern vs legacy, either direction), the
   join fails closed before any prepare frame, recorded as the distinct `mixed_credential_class`
   diagnostic stage. Existing allocations retain the repository-only mixed-class allowance for isolated
   runtimes. Other incompatible scope or directory reuse fails without changing the surviving grant. A modern worktree scope
   adopts one canonical runtime-proxy handle shared by its members: the first prepare mints through its
   requesting member and each joiner copies that string. A pre-adoption per-session scope, which has
-  stored member rows but no accepted entry at this fence, cannot enter a workspace-shared runtime and fails
+  stored member rows but no accepted entry at this fence, cannot enter a shared allocation and fails
   with `scope_handle_conflict`. Existing allocations bypass adoption and this guard, so siblings can
-  join and refresh credentials during deployment. Only a new allocation can enable runtime sharing among sibling chats.
-  A workspace-shared runtime admits at most 32 member roots per worktree; an extra joiner fails `workspace_setup_failed`
+  join and refresh credentials during deployment. Only a new allocation can enable sharing.
+  A shared allocation admits at most 32 member roots per worktree; an extra joiner fails `workspace_setup_failed`
   without touching incumbents. It serves contained outbound credential lookups (`resolveCredential`),
   runtime proxy authorization and Vercel network policy as today. Grants last 4 hours. When less than
   1 hour remains, `deliver` re-issues the grant with freshly selected Git and legacy Kilo material and

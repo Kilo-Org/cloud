@@ -9,19 +9,24 @@ import {
   routes as routesTable,
 } from '../../src/control-plane/sandbox/sqlite-schema.js';
 import type { SandboxSessionV2 } from '../../src/control-plane/session/session-do.js';
-import { readRoute } from '../../src/control-plane/sandbox/routes.js';
 import {
   WORKTREE_DELETION_PREFIX,
   WorktreeDeletionIncompleteError,
-  type ControlPlaneWorktreeDeletionInput,
-  type WorktreeRuntimeDeletionJournal,
 } from '../../src/control-plane/sandbox/worktree-deletion.js';
-import { generateSandboxId } from '../../src/sandbox-id.js';
+import { generateSandboxId, hashToSandboxId } from '../../src/sandbox-id.js';
 import { sessionDoName } from '../../src/session-identity.js';
 import { getWorktreeWorkspacePath } from '../../src/workspace.js';
 import { parseSessionMetadata } from '../../src/persistence/session-metadata.js';
-import type { ProviderAdapter, StopResult } from '../../src/sandbox-control/provider.js';
-import { CONTROL_PLANE_PROTOCOL_VERSION } from '../../src/shared/control-plane-protocol.js';
+import type {
+  ProviderAdapter,
+  ProviderCreateIntent,
+  StopResult,
+} from '../../src/sandbox-control/provider.js';
+import {
+  CONTROL_PLANE_PROTOCOL_VERSION,
+  type ControlPlanePromptPayload,
+  type ControlPlaneWrapperFrame,
+} from '../../src/shared/control-plane-protocol.js';
 import {
   FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN,
   createFakeCredentialBroker,
@@ -30,49 +35,109 @@ import {
 } from './helpers/fake-credentials.js';
 import { FakeWrapper } from './helpers/fake-wrapper.js';
 import { waitFor } from './wait-for.js';
-import { WORKSPACE_OWNER_KEY } from '../../src/control-plane/sandbox/workspace-owner.js';
 
-type SandboxStub = DurableObjectStub<SandboxControlV2>;
-const sandboxes = (env as unknown as { SANDBOX_CONTROL: DurableObjectNamespace<SandboxControlV2> })
-  .SANDBOX_CONTROL;
-const sessions = (env as unknown as { SANDBOX_SESSION: DurableObjectNamespace<SandboxSessionV2> })
-  .SANDBOX_SESSION;
-const USER_ID = 'user_workspace_delete';
-const ORG_ID = '11111111-1111-4111-8111-111111111111';
-const newSessionId = () => `workspace_${crypto.randomUUID()}`;
-const kiloSessionId = () => `ses_${crypto.randomUUID().replaceAll('-', '').slice(0, 26)}`;
-const worktreeId = () => `worktree_${crypto.randomUUID()}`;
+type SandboxControlNamespace = DurableObjectNamespace<SandboxControlV2>;
+type SessionNamespace = DurableObjectNamespace<SandboxSessionV2>;
+const sandboxes = (env as unknown as { SANDBOX_CONTROL: SandboxControlNamespace }).SANDBOX_CONTROL;
+const sessions = (env as unknown as { SANDBOX_SESSION: SessionNamespace }).SANDBOX_SESSION;
+
+const USER_ID = 'user_b10_delete';
+const ORG_ID = 'org_b10_delete';
+const OTHER_USER_ID = 'user_b10_delete_other';
+const WRAPPER_ID = 'wr_delete';
+
+function newSessionId(): string {
+  return `workspace_${crypto.randomUUID()}`;
+}
+
+function kiloSessionId(): string {
+  return `ses_${crypto.randomUUID().replaceAll('-', '').slice(0, 26)}`;
+}
+
+function messageId(): string {
+  const hex = crypto.randomUUID().replaceAll('-', '').slice(0, 12);
+  const suffix = crypto.randomUUID().replaceAll('-', '').slice(0, 14);
+  return `msg_${hex}${suffix}`;
+}
+
+function worktreeId(): string {
+  return `worktree_${crypto.randomUUID()}`;
+}
+
+/** The request-derived checkout directory deletion now uses (Fix 1). */
+function worktreePath(worktree: string): string {
+  return getWorktreeWorkspacePath(null, USER_ID, worktree as `worktree_${string}`);
+}
+
+function metadata(input: {
+  sessionId: string;
+  kiloSessionId: string;
+  sandboxId: string;
+  worktreeId: string;
+  sandboxKind?: 'code-review';
+}) {
+  return parseSessionMetadata({
+    metadataSchemaVersion: 2,
+    identity: {
+      sessionId: input.sessionId,
+      userId: USER_ID,
+      orgId: ORG_ID,
+      createdOnPlatform: 'cloud-agent-web',
+    },
+    auth: { kiloSessionId: input.kiloSessionId, kilocodeToken: FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN },
+    agent: { mode: 'code', model: 'test/model' },
+    repository: { type: 'github', repo: 'acme/widgets', upstreamBranch: 'main' },
+    workspace: {
+      branchName: 'kilo/b10',
+      sandboxId: input.sandboxId,
+      sandboxProvider: 'cloudflare-containers',
+      worktreeId: input.worktreeId,
+      workspacePath: worktreePath(input.worktreeId),
+      ...(input.sandboxKind === undefined ? {} : { sandboxKind: input.sandboxKind }),
+    },
+    lifecycle: { version: 1, timestamp: 1 },
+  });
+}
+
+function promptPayload(id: string): ControlPlanePromptPayload {
+  return {
+    messageId: id,
+    turn: { type: 'prompt', prompt: 'hello' },
+    agent: { mode: 'code', model: 'test/model' },
+  };
+}
 
 type FakeProvider = {
   adapter: ProviderAdapter;
   launchEnvs: Record<string, string>[];
   stopCalls: (string | null)[];
   stopResult: StopResult;
-  stopGate?: Promise<StopResult>;
+  observeStatus: 'active' | 'terminal' | 'unknown';
 };
 
 function createFakeProvider(): FakeProvider {
   const provider: FakeProvider = {
-    adapter: {} as ProviderAdapter,
+    adapter: null as unknown as ProviderAdapter,
     launchEnvs: [],
     stopCalls: [],
     stopResult: 'terminal',
+    observeStatus: 'active',
   };
   provider.adapter = {
     async ensureBillingAdmission() {},
-    async create(intent) {
+    async create(intent: ProviderCreateIntent) {
       return { providerRef: `mem_${intent.intentId}` };
     },
     async launch(_ref, { env: launchEnv }) {
       provider.launchEnvs.push({ ...launchEnv });
       return { startSource: 'image' as const };
     },
-    async observe() {
-      throw new Error('Deletion must not observe topology');
+    async observe(ref) {
+      return { status: provider.observeStatus, ...(ref === null ? {} : { providerRef: ref }) };
     },
     async stop(ref) {
       provider.stopCalls.push(ref);
-      return provider.stopGate ?? provider.stopResult;
+      return provider.stopResult;
     },
     async ensureLeaseAtLeast() {},
     async logs() {
@@ -82,7 +147,10 @@ function createFakeProvider(): FakeProvider {
   return provider;
 }
 
-async function injectProvider(sandboxId: string, provider: FakeProvider): Promise<SandboxStub> {
+async function injectProvider(
+  sandboxId: string,
+  provider: FakeProvider
+): Promise<DurableObjectStub<SandboxControlV2>> {
   const stub = sandboxes.getByName(sandboxId);
   const broker = createFakeCredentialBroker();
   await runInDurableObject(stub, async instance => {
@@ -103,71 +171,82 @@ async function injectProvider(sandboxId: string, provider: FakeProvider): Promis
   return stub;
 }
 
+function launchIdentity(provider: FakeProvider): { credential: string; allocationId: string } {
+  const launchEnv = provider.launchEnvs[0];
+  if (!launchEnv) throw new Error('provider.launch was not called');
+  const credential = launchEnv.SANDBOX_CONTROL_CREDENTIAL;
+  const allocationId = launchEnv.CONTROL_PLANE_ALLOCATION_ID;
+  if (!credential || !allocationId) throw new Error('launch environment is missing identity');
+  return { credential, allocationId };
+}
+
+async function connectAndHello(provider: FakeProvider, sandboxId: string): Promise<FakeWrapper> {
+  const { credential, allocationId } = launchIdentity(provider);
+  const wrapper = await FakeWrapper.connect({ sandboxId, credential });
+  const reply = await wrapper.hello({ wrapperId: WRAPPER_ID, allocationId });
+  expect(reply).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
+  return wrapper;
+}
+
+/** Reads frames until `type` arrives, so interleaved route frames are skipped. */
+async function awaitFrame<T extends ControlPlaneWrapperFrame['type']>(
+  wrapper: FakeWrapper,
+  type: T
+): Promise<Extract<ControlPlaneWrapperFrame, { type: T }>> {
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const frame = await wrapper.next();
+    if (frame === null) throw new Error('wrapper socket closed');
+    if (frame.type === type) return frame as Extract<ControlPlaneWrapperFrame, { type: T }>;
+  }
+  throw new Error(`did not receive a ${type} frame`);
+}
+
 async function createWorktreeSession(input: {
   sessionId: string;
   sandboxId: string;
   worktreeId: string;
   kiloSessionId: string;
-}) {
+  sandboxKind?: 'code-review';
+}): Promise<DurableObjectStub<SandboxSessionV2>> {
   const stub = sessions.getByName(sessionDoName(USER_ID, input.sessionId));
   await stub.createSessionWithInitialAdmission({
-    metadata: parseSessionMetadata({
-      metadataSchemaVersion: 2,
-      identity: {
-        sessionId: input.sessionId,
-        userId: USER_ID,
-        orgId: ORG_ID,
-        createdOnPlatform: 'cloud-agent-web',
-      },
-      auth: {
-        kiloSessionId: input.kiloSessionId,
-        kilocodeToken: FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN,
-      },
-      agent: { mode: 'code', model: 'test/model' },
-      repository: { type: 'github', repo: 'acme/widgets', upstreamBranch: 'main' },
-      workspace: {
-        branchName: 'kilo/delete',
-        sandboxId: input.sandboxId,
-        sandboxProvider: 'cloudflare-containers',
-        worktreeId: input.worktreeId,
-        workspacePath: getWorktreeWorkspacePath(
-          ORG_ID,
-          USER_ID,
-          input.worktreeId as `worktree_${string}`
-        ),
-      },
-      lifecycle: { version: 1, timestamp: 1 },
-    }),
-    message: {
-      messageId: `msg_${crypto.randomUUID().replaceAll('-', '').slice(0, 26)}`,
-      turn: { type: 'prompt', prompt: 'hello' },
-      agent: { mode: 'code', model: 'test/model' },
+    metadata: metadata(input),
+    message: promptPayload(messageId()),
+    sandboxSelection: {
+      provider: 'cloudflare-containers',
+      ...(input.sandboxKind === undefined ? {} : { sandboxKind: input.sandboxKind }),
     },
-    sandboxSelection: { provider: 'cloudflare-containers' },
   });
   return stub;
 }
 
-async function startConnectedSandbox() {
-  const sessionId = newSessionId();
-  const sandboxId = await generateSandboxId(sessionId);
+/**
+ * A multi-worktree sandbox uses the code-review kind: native isolated sandboxes
+ * are single-session and force every route into /workspace/app, which would make
+ * a second worktree's grant collide with the first.
+ */
+function multiWorktreeSandboxId(sessionId: string): Promise<string> {
+  return hashToSandboxId(`control-isolated-v1:${sessionId}`, 'sbx');
+}
+
+async function startConnectedSandbox(): Promise<{
+  sandboxId: string;
+  sandbox: DurableObjectStub<SandboxControlV2>;
+  provider: FakeProvider;
+  wrapper: FakeWrapper;
+  sessionId: string;
+  kiloSessionId: string;
+  worktreeId: string;
+}> {
+  const sandboxId = await generateSandboxId(newSessionId());
   const provider = createFakeProvider();
   const sandbox = await injectProvider(sandboxId, provider);
+  const sessionId = newSessionId();
   const kilo = kiloSessionId();
-  const worktree = `worktree_${sessionId.slice('workspace_'.length)}`;
+  const worktree = worktreeId();
   await createWorktreeSession({ sessionId, sandboxId, worktreeId: worktree, kiloSessionId: kilo });
   await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
-  const launchEnv = provider.launchEnvs[0];
-  const wrapper = await FakeWrapper.connect({
-    sandboxId,
-    credential: launchEnv.SANDBOX_CONTROL_CREDENTIAL,
-  });
-  expect(
-    await wrapper.hello({
-      wrapperId: 'wr_delete',
-      allocationId: launchEnv.CONTROL_PLANE_ALLOCATION_ID,
-    })
-  ).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
+  const wrapper = await connectAndHello(provider, sandboxId);
   wrapper.send({ type: 'session.ready', sessionId });
   await waitFor(async () => {
     const snapshot = await sessions.getByName(sessionDoName(USER_ID, sessionId)).getSession();
@@ -179,24 +258,82 @@ async function startConnectedSandbox() {
     provider,
     wrapper,
     sessionId,
-    worktreeId: worktree,
     kiloSessionId: kilo,
+    worktreeId: worktree,
+  };
+}
+
+/** Two worktrees on one connected native sandbox with a live wrapper. */
+async function startSharedConnectedSandbox(): Promise<{
+  sandboxId: string;
+  sandbox: DurableObjectStub<SandboxControlV2>;
+  provider: FakeProvider;
+  wrapper: FakeWrapper;
+  worktreeA: string;
+  worktreeB: string;
+  sessionA: string;
+  sessionB: string;
+  kiloA: string;
+  kiloB: string;
+}> {
+  const sessionA = newSessionId();
+  const sandboxId = await multiWorktreeSandboxId(sessionA);
+  const provider = createFakeProvider();
+  const sandbox = await injectProvider(sandboxId, provider);
+  const worktreeA = worktreeId();
+  const worktreeB = worktreeId();
+  const sessionB = newSessionId();
+  const kiloA = kiloSessionId();
+  const kiloB = kiloSessionId();
+  await createWorktreeSession({
+    sessionId: sessionA,
+    sandboxId,
+    worktreeId: worktreeA,
+    kiloSessionId: kiloA,
+    sandboxKind: 'code-review',
+  });
+  await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
+  const wrapper = await connectAndHello(provider, sandboxId);
+  await createWorktreeSession({
+    sessionId: sessionB,
+    sandboxId,
+    worktreeId: worktreeB,
+    kiloSessionId: kiloB,
+    sandboxKind: 'code-review',
+  });
+  return {
+    sandboxId,
+    sandbox,
+    provider,
+    wrapper,
+    worktreeA,
+    worktreeB,
+    sessionA,
+    sessionB,
+    kiloA,
+    kiloB,
   };
 }
 
 function deletionInput(input: { sandboxId: string; worktreeId: string; sessionIds: string[] }) {
   return {
     worktreeId: input.worktreeId,
-    sessionIds: input.sessionIds,
     kiloUserId: USER_ID,
-    organizationId: ORG_ID,
     location: { sandboxId: input.sandboxId, provider: 'cloudflare-containers' as const },
+    sessionIds: input.sessionIds,
   };
 }
 
+/** Patches the single allocation row to reach a state the provider path cannot cheaply build. */
 async function patchAllocation(
-  sandbox: SandboxStub,
-  patch: Partial<typeof allocationTable.$inferInsert>
+  sandbox: DurableObjectStub<SandboxControlV2>,
+  patch: Partial<{
+    state: 'stopped' | 'creating' | 'starting' | 'connected' | 'disconnected' | 'stopping';
+    allocation_id: string | null;
+    provider_ref: string | null;
+    unconfirmed_provider_ref: string | null;
+    stop_at: number | null;
+  }>
 ): Promise<void> {
   await runInDurableObject(sandbox, async (_instance, state) => {
     const db = drizzle(state.storage, { logger: false });
@@ -204,328 +341,468 @@ async function patchAllocation(
   });
 }
 
-async function journal(sandbox: SandboxStub, worktree: string) {
-  return runInDurableObject(sandbox, (_instance, state) =>
-    state.storage.get<WorktreeRuntimeDeletionJournal>(`${WORKTREE_DELETION_PREFIX}${worktree}`)
-  );
-}
-
-async function deletionFailure(sandbox: SandboxStub, input: ControlPlaneWorktreeDeletionInput) {
-  return runInDurableObject(sandbox, async instance => {
-    try {
-      await instance.deleteWorktreeResources(input);
-      return null;
-    } catch (error) {
-      return {
-        message: error instanceof Error ? error.message : String(error),
-        retryable: error instanceof WorktreeDeletionIncompleteError && error.retryable,
-      };
-    }
+/** Marks an existing route failed, as a timed-out preparation would. */
+async function failRoute(
+  sandbox: DurableObjectStub<SandboxControlV2>,
+  sessionId: string
+): Promise<void> {
+  await runInDurableObject(sandbox, async (_instance, state) => {
+    const db = drizzle(state.storage, { logger: false });
+    await db
+      .update(routesTable)
+      .set({ state: 'failed', reason: 'preparation_timeout' })
+      .where(eq(routesTable.session_id, sessionId));
   });
 }
 
-afterEach(async () => reset());
+afterEach(async () => {
+  await reset();
+});
 
-describe('whole workspace deletion on the Sandbox DO', () => {
-  it.each(['running', 'stopped', 'confirmed'] as const)(
-    'recovers route-less historical deletion ownership for %s allocation',
-    async mode => {
-      const f = await startConnectedSandbox();
-      const confirmedJournal = mode === 'confirmed';
-      if (mode === 'running') await f.sandbox.release({ sessionId: f.sessionId });
-      await runInDurableObject(f.sandbox, async (instance, state) => {
-        if (mode !== 'running')
-          await instance['applyEvent']({ type: 'provider-gone', at: Date.now() });
-        state.storage.kv.delete(WORKSPACE_OWNER_KEY);
-        if (confirmedJournal)
-          await state.storage.put(`${WORKTREE_DELETION_PREFIX}${f.worktreeId}`, {
-            sessionIds: [f.kiloSessionId],
-            resourcesCleaned: true,
-            destroyed: true,
-            completed: true,
-          });
-      });
-      if (mode !== 'running')
-        await waitFor(async () =>
-          expect(await f.sandbox.getAllocationState()).toMatchObject({ kind: 'stopped' })
-        );
-      expect(
-        await runInDurableObject(f.sandbox, instance => readRoute(instance['db'], f.sessionId))
-      ).toBeNull();
-      await runInDurableObject(f.sandbox, instance => {
-        Object.assign(instance.env, {
-          SESSION_INGEST: {
-            getCloudAgentWorkspace: async () => ({
-              workspaceId: f.worktreeId,
-              userId: USER_ID,
-              organizationId: ORG_ID,
-              deletionState: confirmedJournal ? 'deleted' : 'deleting',
-              sessions: [],
-            }),
-          },
-        });
-      });
-      const input = deletionInput({ ...f, sessionIds: [f.kiloSessionId] });
-      expect(
-        await deletionFailure(f.sandbox, {
-          ...input,
-          organizationId: '22222222-2222-4222-8222-222222222222',
-        })
-      ).toMatchObject({ message: 'Sandbox workspace mismatch' });
-      expect(
-        await runInDurableObject(f.sandbox, (_instance, state) =>
-          state.storage.kv.get(WORKSPACE_OWNER_KEY)
-        )
-      ).toBeUndefined();
-      expect(await f.sandbox.deleteWorktreeResources(input)).toEqual({
-        deleted: true,
-        sessionIds: [f.kiloSessionId],
-      });
-      expect(f.provider.stopCalls).toHaveLength(mode === 'running' ? 1 : 0);
-      expect(await journal(f.sandbox, f.worktreeId)).toMatchObject({
-        resourcesCleaned: true,
-        destroyed: true,
-      });
-      expect(
-        await runInDurableObject(f.sandbox, (_instance, state) =>
-          state.storage.kv.get(WORKSPACE_OWNER_KEY)
-        )
-      ).toMatchObject({ workspaceId: f.worktreeId, userId: USER_ID, orgId: ORG_ID });
-    }
-  );
+describe('worktree deletion on the V2 Sandbox DO (B10)', () => {
+  it('destroys the sandbox and removes the route when the provider confirms the stop', async () => {
+    const {
+      sandboxId,
+      sandbox,
+      provider,
+      worktreeId: worktree,
+      sessionId,
+      kiloSessionId: kilo,
+    } = await startConnectedSandbox();
 
-  it('stops the provider, purges workspace caches, removes routes, and replays the journal', async () => {
-    const f = await startConnectedSandbox();
-    await runInDurableObject(f.sandbox, (_instance, state) => {
-      state.storage.kv.put(`worktree_changes/${f.worktreeId}/worktree_changes`, { sentinel: true });
-      state.storage.kv.put('worktree_changes/another/worktree_changes', { sentinel: true });
-    });
-    const input = deletionInput({ ...f, sessionIds: [f.kiloSessionId] });
-    await expect(f.sandbox.deleteWorktreeResources(input)).resolves.toEqual({
-      deleted: true,
-      sessionIds: [f.kiloSessionId],
-    });
-    expect(f.provider.stopCalls).toHaveLength(1);
-    expect((await f.sandbox.getAllocationState()).kind).toBe('stopped');
-    await expect(f.sandbox.status({ sessionId: f.sessionId })).resolves.toMatchObject({
-      view: { state: 'unknown' },
-    });
-    await runInDurableObject(f.sandbox, (_instance, state) => {
-      expect(
-        Array.from(state.storage.kv.list({ prefix: `worktree_changes/${f.worktreeId}/` }))
-      ).toEqual([]);
-      expect(state.storage.kv.get('worktree_changes/another/worktree_changes')).toEqual({
+    await runInDurableObject(sandbox, (_instance, state) => {
+      state.storage.kv.put(`worktree_changes/${worktree}/worktree_changes`, { sentinel: true });
+      state.storage.kv.put(`worktree_changes/${worktree}/worktree_file:changed.txt`, {
+        sentinel: true,
+      });
+      state.storage.kv.put('worktree_changes/another-worktree/worktree_changes', {
         sentinel: true,
       });
     });
-    await expect(journal(f.sandbox, f.worktreeId)).resolves.toMatchObject({
-      resourcesCleaned: true,
-      destroyed: true,
-      exclusiveTeardown: true,
-      completed: false,
+
+    const result = await sandbox.deleteWorktreeResources(
+      deletionInput({ sandboxId, worktreeId: worktree, sessionIds: [kilo] })
+    );
+
+    expect(result).toEqual({ deleted: true, sessionIds: [kilo] });
+    expect(provider.stopCalls).toHaveLength(1);
+    expect((await sandbox.getAllocationState()).kind).toBe('stopped');
+    await runInDurableObject(sandbox, (_instance, state) => {
+      expect(
+        Array.from(state.storage.kv.list({ prefix: `worktree_changes/${worktree}/` }))
+      ).toEqual([]);
+      expect(state.storage.kv.get('worktree_changes/another-worktree/worktree_changes')).toEqual({
+        sentinel: true,
+      });
     });
-    await f.sandbox.deleteWorktreeResources(input);
-    expect(f.provider.stopCalls).toHaveLength(1);
+    await expect(sandbox.status({ sessionId })).resolves.toMatchObject({
+      view: { state: 'unknown' },
+    });
   });
 
-  it('keeps routes and the manifest retryable until the provider confirms the stop', async () => {
-    const f = await startConnectedSandbox();
-    f.provider.stopResult = 'retryable';
-    const input = deletionInput({ ...f, sessionIds: [f.kiloSessionId] });
-    await expect(deletionFailure(f.sandbox, input)).resolves.toEqual({
-      message: 'Worktree provider stop is unconfirmed',
-      retryable: true,
+  it('reports incomplete and retryable when the provider does not confirm the stop', async () => {
+    const {
+      sandboxId,
+      sandbox,
+      provider,
+      worktreeId: worktree,
+      sessionId,
+      kiloSessionId: kilo,
+    } = await startConnectedSandbox();
+    provider.stopResult = 'retryable';
+
+    const failure = await runInDurableObject(sandbox, async instance => {
+      try {
+        await instance.deleteWorktreeResources(
+          deletionInput({ sandboxId, worktreeId: worktree, sessionIds: [kilo] })
+        );
+        return null;
+      } catch (error) {
+        return error;
+      }
     });
-    expect((await f.sandbox.getAllocationState()).kind).toBe('connected');
-    await expect(f.sandbox.status({ sessionId: f.sessionId })).resolves.toMatchObject({
+
+    expect(failure).toBeInstanceOf(WorktreeDeletionIncompleteError);
+    expect((failure as WorktreeDeletionIncompleteError).retryable).toBe(true);
+    expect(provider.stopCalls).toHaveLength(1);
+    expect((await sandbox.getAllocationState()).kind).toBe('connected');
+    await expect(sandbox.status({ sessionId })).resolves.toMatchObject({
       view: { state: 'ready' },
     });
-    await expect(journal(f.sandbox, f.worktreeId)).resolves.toMatchObject({
-      sessionIds: [f.kiloSessionId],
-      resourcesCleaned: false,
-    });
-    f.provider.stopResult = 'terminal';
-    await f.sandbox.deleteWorktreeResources(input);
-    expect(f.provider.stopCalls).toHaveLength(2);
   });
 
-  it('retries an unconfirmed physical stop even when routing is already stopped', async () => {
-    const f = await startConnectedSandbox();
-    await patchAllocation(f.sandbox, {
+  it('shortcuts only a stopped allocation with no unconfirmed provider ref', async () => {
+    const sandboxId = await generateSandboxId(newSessionId());
+    const provider = createFakeProvider();
+    const sandbox = await injectProvider(sandboxId, provider);
+    const worktree = worktreeId();
+    const kilo = kiloSessionId();
+
+    const result = await sandbox.deleteWorktreeResources(
+      deletionInput({ sandboxId, worktreeId: worktree, sessionIds: [kilo] })
+    );
+
+    expect(result).toEqual({ deleted: true, sessionIds: [kilo] });
+    expect(provider.stopCalls).toHaveLength(0);
+    const state = await sandbox.getAllocationState();
+    expect(state.kind).toBe('stopped');
+    expect(state.unconfirmedProviderRef).toBeNull();
+  });
+
+  it('does not treat an exhausted stop ladder as a confirmed stop, then succeeds on retry', async () => {
+    const {
+      sandboxId,
+      sandbox,
+      provider,
+      worktreeId: worktree,
+      sessionId,
+      kiloSessionId: kilo,
+    } = await startConnectedSandbox();
+    // The reducer leaves a `stopped` state with the ref preserved when the ladder
+    // is exhausted (spec §9): deletion must still confirm the physical stop.
+    await patchAllocation(sandbox, {
       state: 'stopped',
       allocation_id: null,
       provider_ref: null,
       unconfirmed_provider_ref: 'mem_unconfirmed',
     });
-    const input = deletionInput({ ...f, sessionIds: [f.kiloSessionId] });
-    f.provider.stopResult = 'retryable';
-    await expect(deletionFailure(f.sandbox, input)).resolves.toMatchObject({
-      message: 'Worktree provider stop is unconfirmed',
-      retryable: true,
+    provider.stopResult = 'retryable';
+
+    const failure = await runInDurableObject(sandbox, async instance => {
+      try {
+        await instance.deleteWorktreeResources(
+          deletionInput({ sandboxId, worktreeId: worktree, sessionIds: [kilo] })
+        );
+        return null;
+      } catch (error) {
+        return error;
+      }
     });
-    expect((await f.sandbox.getAllocationState()).unconfirmedProviderRef).toBe('mem_unconfirmed');
-    f.provider.stopResult = 'terminal';
-    await f.sandbox.deleteWorktreeResources(input);
-    expect(f.provider.stopCalls).toEqual(['mem_unconfirmed', 'mem_unconfirmed']);
-    expect((await f.sandbox.getAllocationState()).unconfirmedProviderRef).toBeNull();
+
+    expect(failure).toBeInstanceOf(WorktreeDeletionIncompleteError);
+    expect((failure as WorktreeDeletionIncompleteError).message).toContain(
+      'Worktree provider stop is unconfirmed'
+    );
+    expect(provider.stopCalls).toEqual(['mem_unconfirmed']);
+    expect((await sandbox.getAllocationState()).unconfirmedProviderRef).toBe('mem_unconfirmed');
+    await expect(sandbox.status({ sessionId })).resolves.not.toMatchObject({
+      view: { state: 'unknown' },
+    });
+
+    // Retry with a confirmed stop clears the evidence and finishes the deletion.
+    provider.stopResult = 'terminal';
+    const result = await runInDurableObject(sandbox, instance =>
+      instance.deleteWorktreeResources(
+        deletionInput({ sandboxId, worktreeId: worktree, sessionIds: [kilo] })
+      )
+    );
+    expect(result).toEqual({ deleted: true, sessionIds: [kilo] });
+    expect(provider.stopCalls).toEqual(['mem_unconfirmed', 'mem_unconfirmed']);
+    const state = await sandbox.getAllocationState();
+    expect(state.kind).toBe('stopped');
+    expect(state.unconfirmedProviderRef).toBeNull();
+    await expect(sandbox.status({ sessionId })).resolves.toMatchObject({
+      view: { state: 'unknown' },
+    });
   });
 
-  it('cleans failed routes without another provider call after a confirmed stop', async () => {
-    const f = await startConnectedSandbox();
-    await runInDurableObject(f.sandbox, async (_instance, state) => {
-      await drizzle(state.storage)
-        .update(routesTable)
-        .set({ state: 'failed', reason: 'preparation_timeout' })
-        .where(eq(routesTable.session_id, f.sessionId));
-    });
-    await patchAllocation(f.sandbox, {
+  it('removes a stale failed route from a stopped sandbox', async () => {
+    const {
+      sandboxId,
+      sandbox,
+      provider,
+      worktreeId: worktree,
+      sessionId,
+      kiloSessionId: kilo,
+    } = await startConnectedSandbox();
+    await failRoute(sandbox, sessionId);
+    await patchAllocation(sandbox, {
       state: 'stopped',
       allocation_id: null,
       provider_ref: null,
       unconfirmed_provider_ref: null,
     });
-    await f.sandbox.deleteWorktreeResources(deletionInput({ ...f, sessionIds: [f.kiloSessionId] }));
-    expect(f.provider.stopCalls).toHaveLength(0);
-    await expect(f.sandbox.status({ sessionId: f.sessionId })).resolves.toMatchObject({
+
+    const result = await sandbox.deleteWorktreeResources(
+      deletionInput({ sandboxId, worktreeId: worktree, sessionIds: [kilo] })
+    );
+
+    expect(result).toEqual({ deleted: true, sessionIds: [kilo] });
+    expect(provider.stopCalls).toHaveLength(0);
+    await expect(sandbox.status({ sessionId })).resolves.toMatchObject({
       view: { state: 'unknown' },
     });
   });
 
-  it('retains workspace ownership after release so route-less cleanup remains safe', async () => {
-    const f = await startConnectedSandbox();
-    await f.sandbox.release({ sessionId: f.sessionId });
-    await f.sandbox.deleteWorktreeResources(deletionInput({ ...f, sessionIds: [f.kiloSessionId] }));
-    expect(f.provider.stopCalls).toHaveLength(1);
-  });
+  it('stops and removes the route while the sandbox is stopping', async () => {
+    const {
+      sandboxId,
+      sandbox,
+      provider,
+      worktreeId: worktree,
+      sessionId,
+      kiloSessionId: kilo,
+    } = await startConnectedSandbox();
+    await patchAllocation(sandbox, { state: 'stopping', stop_at: Date.now() + 60_000 });
 
-  it('retains the deletion tombstone and rejects subsequent preparation', async () => {
-    const f = await startConnectedSandbox();
-    const route = await runInDurableObject(f.sandbox, (_instance, state) =>
-      readRoute(drizzle(state.storage), f.sessionId)
+    const result = await sandbox.deleteWorktreeResources(
+      deletionInput({ sandboxId, worktreeId: worktree, sessionIds: [kilo] })
     );
-    if (route?.credentialSource == null) throw new Error('Missing owned route');
-    await f.sandbox.deleteWorktreeResources(deletionInput({ ...f, sessionIds: [f.kiloSessionId] }));
-    await expect(
-      f.sandbox.prepare({
-        spec: {
-          ...route.spec,
-          kilo: undefined,
-          git: route.spec.git === undefined ? undefined : { ...route.spec.git, token: undefined },
-        },
-        credentials: route.credentialSource,
-      })
-    ).resolves.toMatchObject({ state: 'failed', reason: 'workspace_setup_failed' });
-    expect(f.provider.launchEnvs).toHaveLength(1);
-    await expect(journal(f.sandbox, f.worktreeId)).resolves.toMatchObject({ completed: false });
-  });
 
-  it('preserves a historical shared-cleanup manifest but still confirms whole-container stop', async () => {
-    const f = await startConnectedSandbox();
-    const historicalChild = kiloSessionId();
-    await runInDurableObject(f.sandbox, (_instance, state) =>
-      state.storage.put(`${WORKTREE_DELETION_PREFIX}${f.worktreeId}`, {
-        sessionIds: [f.kiloSessionId, historicalChild],
-        resourcesCleaned: true,
-        destroyed: false,
-      })
-    );
-    const result = await f.sandbox.deleteWorktreeResources(
-      deletionInput({ ...f, sessionIds: [f.kiloSessionId] })
-    );
-    expect(result.sessionIds).toEqual([f.kiloSessionId, historicalChild]);
-    expect(f.provider.stopCalls).toHaveLength(1);
-    await expect(journal(f.sandbox, f.worktreeId)).resolves.toMatchObject({ destroyed: true });
-  });
-
-  it('deletes sibling chat routes together and journals their session identities', async () => {
-    const f = await startConnectedSandbox();
-    const siblingId = newSessionId();
-    const siblingKiloId = kiloSessionId();
-    await createWorktreeSession({
-      sessionId: siblingId,
-      sandboxId: f.sandboxId,
-      worktreeId: f.worktreeId,
-      kiloSessionId: siblingKiloId,
+    expect(result).toEqual({ deleted: true, sessionIds: [kilo] });
+    expect(provider.stopCalls).toHaveLength(1);
+    expect((await sandbox.getAllocationState()).kind).toBe('stopped');
+    await expect(sandbox.status({ sessionId })).resolves.toMatchObject({
+      view: { state: 'unknown' },
     });
+  });
+
+  it('cleans a shared connected sandbox through the wrapper deletion frames', async () => {
+    const { sandboxId, sandbox, provider, wrapper, worktreeA, sessionA, sessionB, kiloA } =
+      await startSharedConnectedSandbox();
+
+    const pending = sandbox.deleteWorktreeResources(
+      deletionInput({ sandboxId, worktreeId: worktreeA, sessionIds: [kiloA] })
+    );
+
+    const prepare = await awaitFrame(wrapper, 'worktree.prepareDeletion');
+    expect(prepare.payload).toMatchObject({ worktreeId: worktreeA, sessionIds: [kiloA] });
+    expect(prepare.payload.directory).toBe(worktreePath(worktreeA));
+    wrapper.send({
+      type: 'worktree.result',
+      requestId: prepare.requestId,
+      ok: true,
+      result: { prepared: true, sessionIds: [kiloA] },
+    });
+
+    const remove = await awaitFrame(wrapper, 'worktree.delete');
+    expect(remove.payload).toMatchObject({ worktreeId: worktreeA, sessionIds: [kiloA] });
+    wrapper.send({
+      type: 'worktree.result',
+      requestId: remove.requestId,
+      ok: true,
+      result: { deleted: true, sessionIds: [kiloA] },
+    });
+
+    await expect(pending).resolves.toEqual({ deleted: true, sessionIds: [kiloA] });
+    expect(provider.stopCalls).toHaveLength(0);
+    await expect(sandbox.status({ sessionId: sessionA })).resolves.toMatchObject({
+      view: { state: 'unknown' },
+    });
+    // Worktree B really prepared on its own per-session directory: an isolated
+    // sandbox id would place both worktrees at /workspace/app and fail B's grant
+    // with a credential scope mismatch.
     await waitFor(async () => {
-      await expect(f.sandbox.status({ sessionId: siblingId })).resolves.toMatchObject({
+      await expect(sandbox.status({ sessionId: sessionB })).resolves.toMatchObject({
         view: { state: 'preparing' },
       });
     });
-    const result = await f.sandbox.deleteWorktreeResources(
-      deletionInput({ ...f, sessionIds: [f.kiloSessionId] })
-    );
-    expect(result.sessionIds).toEqual(expect.arrayContaining([f.kiloSessionId, siblingKiloId]));
-    expect(f.provider.stopCalls).toHaveLength(1);
-    await expect(f.sandbox.status({ sessionId: siblingId })).resolves.toMatchObject({
-      view: { state: 'unknown' },
-    });
+    wrapper.close();
   });
 
-  it('stops an allocation already in the stopping state', async () => {
-    const f = await startConnectedSandbox();
-    await patchAllocation(f.sandbox, { state: 'stopping', stop_at: Date.now() + 60_000 });
-    await f.sandbox.deleteWorktreeResources(deletionInput({ ...f, sessionIds: [f.kiloSessionId] }));
-    expect(f.provider.stopCalls).toHaveLength(1);
-    expect((await f.sandbox.getAllocationState()).kind).toBe('stopped');
-  });
-
-  it('does not apply an old provider stop to a replacement allocation', async () => {
-    const f = await startConnectedSandbox();
-    const gate = Promise.withResolvers<StopResult>();
-    f.provider.stopGate = gate.promise;
-    const pending = f.sandbox.deleteWorktreeResources(
-      deletionInput({ ...f, sessionIds: [f.kiloSessionId] })
-    );
-    await waitFor(() => expect(f.provider.stopCalls).toHaveLength(1));
-    const replacementId = crypto.randomUUID();
-    await patchAllocation(f.sandbox, {
-      allocation_id: replacementId,
-      provider_ref: 'mem_replacement',
-    });
-    gate.resolve('terminal');
-    await pending;
-    expect(await f.sandbox.getAllocationState()).toMatchObject({
-      kind: 'connected',
-      allocationId: replacementId,
-      providerRef: 'mem_replacement',
-    });
-  });
-
-  it.each(['workspace', 'organization', 'user', 'location', 'provider'] as const)(
-    'rejects a different %s before stopping or journaling',
-    async mismatch => {
-      const f = await startConnectedSandbox();
-      const input = deletionInput({ ...f, sessionIds: [f.kiloSessionId] });
-      if (mismatch === 'workspace') input.worktreeId = worktreeId();
-      if (mismatch === 'organization') input.organizationId = crypto.randomUUID();
-      if (mismatch === 'user') input.kiloUserId = 'another-user';
-      if (mismatch === 'location') input.location.sandboxId = 'foreign-sandbox';
-      const request =
-        mismatch === 'provider'
-          ? { ...input, location: { ...input.location, provider: 'vercel' as const } }
-          : input;
-      await expect(deletionFailure(f.sandbox, request)).resolves.toMatchObject({
-        retryable: false,
-      });
-      expect(f.provider.stopCalls).toHaveLength(0);
-      await expect(journal(f.sandbox, input.worktreeId)).resolves.toBeUndefined();
-      await expect(f.sandbox.status({ sessionId: f.sessionId })).resolves.toMatchObject({
-        view: { state: 'ready' },
-      });
-    }
-  );
-
-  it('fails closed when an allocation has no provable workspace owner', async () => {
+  it('cleans a connected shared sandbox when the deleted worktree has no route', async () => {
     const sandboxId = await generateSandboxId(newSessionId());
     const provider = createFakeProvider();
     const sandbox = await injectProvider(sandboxId, provider);
-    await expect(
-      deletionFailure(
-        sandbox,
-        deletionInput({ sandboxId, worktreeId: worktreeId(), sessionIds: [] })
-      )
-    ).resolves.toEqual({ message: 'Sandbox workspace mismatch', retryable: false });
+    const worktreeA = worktreeId();
+    const worktreeB = worktreeId();
+    const sessionB = newSessionId();
+    const kiloB = kiloSessionId();
+    const kiloA = kiloSessionId();
+    await createWorktreeSession({
+      sessionId: sessionB,
+      sandboxId,
+      worktreeId: worktreeB,
+      kiloSessionId: kiloB,
+    });
+    await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
+    const wrapper = await connectAndHello(provider, sandboxId);
+
+    const pending = sandbox.deleteWorktreeResources(
+      deletionInput({ sandboxId, worktreeId: worktreeA, sessionIds: [kiloA] })
+    );
+
+    const prepare = await awaitFrame(wrapper, 'worktree.prepareDeletion');
+    expect(prepare.payload).toMatchObject({ worktreeId: worktreeA, sessionIds: [kiloA] });
+    expect(prepare.payload.directory).toBe(worktreePath(worktreeA));
+    wrapper.send({
+      type: 'worktree.result',
+      requestId: prepare.requestId,
+      ok: true,
+      result: { prepared: true, sessionIds: [kiloA] },
+    });
+
+    const remove = await awaitFrame(wrapper, 'worktree.delete');
+    wrapper.send({
+      type: 'worktree.result',
+      requestId: remove.requestId,
+      ok: true,
+      result: { deleted: true, sessionIds: [kiloA] },
+    });
+
+    await expect(pending).resolves.toEqual({ deleted: true, sessionIds: [kiloA] });
     expect(provider.stopCalls).toHaveLength(0);
+    // The unrelated worktree's route is untouched.
+    await expect(sandbox.status({ sessionId: sessionB })).resolves.not.toMatchObject({
+      view: { state: 'unknown' },
+    });
+    wrapper.close();
+  });
+
+  it('deletes the session manifest the wrapper discovers during prepare', async () => {
+    const { sandboxId, sandbox, wrapper, worktreeA, kiloA } = await startSharedConnectedSandbox();
+    const discovered = kiloSessionId();
+
+    const pending = sandbox.deleteWorktreeResources(
+      deletionInput({ sandboxId, worktreeId: worktreeA, sessionIds: [kiloA] })
+    );
+
+    const prepare = await awaitFrame(wrapper, 'worktree.prepareDeletion');
+    wrapper.send({
+      type: 'worktree.result',
+      requestId: prepare.requestId,
+      ok: true,
+      result: { prepared: true, sessionIds: [kiloA, discovered] },
+    });
+
+    const remove = await awaitFrame(wrapper, 'worktree.delete');
+    expect(remove.payload.sessionIds).toEqual([kiloA, discovered]);
+    wrapper.send({
+      type: 'worktree.result',
+      requestId: remove.requestId,
+      ok: true,
+      result: { deleted: true, sessionIds: [kiloA, discovered] },
+    });
+
+    await expect(pending).resolves.toEqual({
+      deleted: true,
+      sessionIds: [kiloA, discovered],
+    });
+    wrapper.close();
+  });
+
+  it('reports incomplete and keeps the routes when the wrapper delete is unconfirmed', async () => {
+    const { sandboxId, sandbox, wrapper, worktreeA, sessionA, kiloA } =
+      await startSharedConnectedSandbox();
+    const discovered = kiloSessionId();
+
+    const pending = runInDurableObject(sandbox, async instance => {
+      try {
+        await instance.deleteWorktreeResources(
+          deletionInput({ sandboxId, worktreeId: worktreeA, sessionIds: [kiloA] })
+        );
+        return null;
+      } catch (error) {
+        return error;
+      }
+    });
+
+    const prepare = await awaitFrame(wrapper, 'worktree.prepareDeletion');
+    wrapper.send({
+      type: 'worktree.result',
+      requestId: prepare.requestId,
+      ok: true,
+      result: { prepared: true, sessionIds: [kiloA, discovered] },
+    });
+    const remove = await awaitFrame(wrapper, 'worktree.delete');
+    expect(remove.payload.sessionIds).toEqual([kiloA, discovered]);
+    wrapper.send({
+      type: 'worktree.result',
+      requestId: remove.requestId,
+      ok: false,
+      error: { code: 'not_ready', message: 'Worktree cleanup is incomplete', retryable: true },
+    });
+
+    const failure = await pending;
+    expect(failure).toBeInstanceOf(WorktreeDeletionIncompleteError);
+    expect((failure as WorktreeDeletionIncompleteError).retryable).toBe(true);
+    // The prepare-discovered child survives the failed delete (Fix 3).
+    const journal = await runInDurableObject(sandbox, (_instance, state) =>
+      state.storage.get<{ sessionIds: string[] }>(`${WORKTREE_DELETION_PREFIX}${worktreeA}`)
+    );
+    expect(journal?.sessionIds).toEqual([kiloA, discovered]);
+    await expect(sandbox.status({ sessionId: sessionA })).resolves.not.toMatchObject({
+      view: { state: 'unknown' },
+    });
+    wrapper.close();
+  });
+
+  it('keeps a multi-worktree sandbox alive and removes only the deleted worktree route when the provider is terminal', async () => {
+    const sessionA = newSessionId();
+    const sandboxId = await multiWorktreeSandboxId(sessionA);
+    const provider = createFakeProvider();
+    provider.observeStatus = 'terminal';
+    const sandbox = await injectProvider(sandboxId, provider);
+
+    const worktreeA = worktreeId();
+    const worktreeB = worktreeId();
+    const sessionB = newSessionId();
+    const kiloA = kiloSessionId();
+    const kiloB = kiloSessionId();
+    await createWorktreeSession({
+      sessionId: sessionA,
+      sandboxId,
+      worktreeId: worktreeA,
+      kiloSessionId: kiloA,
+      sandboxKind: 'code-review',
+    });
+    await createWorktreeSession({
+      sessionId: sessionB,
+      sandboxId,
+      worktreeId: worktreeB,
+      kiloSessionId: kiloB,
+      sandboxKind: 'code-review',
+    });
+
+    const result = await sandbox.deleteWorktreeResources(
+      deletionInput({ sandboxId, worktreeId: worktreeA, sessionIds: [kiloA] })
+    );
+
+    expect(result).toEqual({ deleted: true, sessionIds: [kiloA] });
+    expect(provider.stopCalls).toHaveLength(0);
+    await expect(sandbox.status({ sessionId: sessionA })).resolves.toMatchObject({
+      view: { state: 'unknown' },
+    });
+    await expect(sandbox.status({ sessionId: sessionB })).resolves.not.toMatchObject({
+      view: { state: 'unknown' },
+    });
+    expect((await sandbox.getAllocationState()).kind).not.toBe('stopped');
+  });
+
+  it('rejects a foreign sandbox location', async () => {
+    const sandboxId = await generateSandboxId(newSessionId());
+    const provider = createFakeProvider();
+    const sandbox = await injectProvider(sandboxId, provider);
+
+    await expect(
+      runInDurableObject(sandbox, instance =>
+        instance.deleteWorktreeResources({
+          worktreeId: worktreeId(),
+          kiloUserId: USER_ID,
+          location: { sandboxId: 'usr-foreign', provider: 'cloudflare-containers' },
+          sessionIds: [kiloSessionId()],
+        })
+      )
+    ).rejects.toThrow('does not match this sandbox');
+  });
+
+  it('rejects a different owner', async () => {
+    const {
+      sandboxId,
+      sandbox,
+      worktreeId: worktree,
+      kiloSessionId: kilo,
+    } = await startConnectedSandbox();
+
+    await expect(
+      runInDurableObject(sandbox, instance =>
+        instance.deleteWorktreeResources({
+          worktreeId: worktree,
+          kiloUserId: OTHER_USER_ID,
+          location: { sandboxId, provider: 'cloudflare-containers' },
+          sessionIds: [kilo],
+        })
+      )
+    ).rejects.toThrow('Sandbox owner mismatch');
   });
 });

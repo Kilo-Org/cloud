@@ -8,6 +8,7 @@ import { classifyControlPlaneFailure } from '../telemetry/control-plane-failure.
 import { loadRuntimeRelease } from './runtime-release-loader.js';
 import { downloadedStartup } from './downloaded-startup.js';
 import { newSandboxHarness, selectStartup } from './startup-selection.js';
+import { RetiredSandboxProviderError } from './retired-cloudflare-provider.js';
 import {
   mintRuntimeArtifactGrant,
   validateRuntimeArtifactGrant,
@@ -78,7 +79,7 @@ const scopedDownloaded = { mode: 'downloaded', image: 'runtime-free', descriptor
 
 describe('startup selection and preflight', () => {
   it('requires a release descriptor instead of falling back to an image runtime', () => {
-    for (const provider of ['cloudflare', 'cloudflare-containers', 'vercel'] as const)
+    for (const provider of ['cloudflare-containers', 'vercel'] as const)
       expect(() => selectStartup({}, provider)).toThrow('configuration');
   });
   it.each([
@@ -89,13 +90,13 @@ describe('startup selection and preflight', () => {
     expect(() => selectStartup(env, provider)).toThrow('configuration');
   });
   it('rejects the retired SDK provider for a new allocation', () => {
-    for (const provider of ['cloudflare'] as const)
-      expect(() =>
-        selectStartup(
-          { RUNTIME_STARTUP_MODE: 'downloaded', RUNTIME_RELEASE_DESCRIPTOR: text },
-          provider
-        )
-      ).toThrow('configuration');
+    expect(() => selectStartup({}, 'cloudflare')).toThrow(RetiredSandboxProviderError);
+    expect(() =>
+      selectStartup(
+        { RUNTIME_STARTUP_MODE: 'downloaded', RUNTIME_RELEASE_DESCRIPTOR: text },
+        'cloudflare'
+      )
+    ).toThrow(RetiredSandboxProviderError);
   });
   it('selects downloaded startup for Vercel and requires its release descriptor', () => {
     expect(
@@ -250,7 +251,9 @@ describe('startup selection and preflight', () => {
     ).toThrow('configuration');
   });
   it('rejects SDK pins even for a matching cohort', () => {
-    expect(() => selectStartup(scopedEnv, 'cloudflare', isolatedCohort)).toThrow('configuration');
+    expect(() => selectStartup(scopedEnv, 'cloudflare', isolatedCohort)).toThrow(
+      RetiredSandboxProviderError
+    );
   });
   it('downloads on Vercel regardless of organization', () => {
     expect(selectStartup(scopedEnv, 'vercel', { preparingRoutes: [orgRoute] })).toEqual(
@@ -263,7 +266,6 @@ describe('startup selection and preflight', () => {
   });
   it('rejects obsolete interactive startup scope without fallback', () => {
     for (const [env, provider] of [
-      [{ ...scopedEnv, RUNTIME_INTERACTIVE_ORG_IDS: '*' }, 'cloudflare'],
       [
         {
           ...scopedEnv,
@@ -500,7 +502,7 @@ describe('runtime harness selection', () => {
         )
       ).toBe('kilo');
     expect(() => newSandboxHarness(kilo2Env, 'cloudflare', isolatedCohort)).toThrow(
-      'configuration'
+      RetiredSandboxProviderError
     );
     expect(() =>
       newSandboxHarness(

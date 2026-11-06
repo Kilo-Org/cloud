@@ -97,5 +97,6 @@ stay in a temporary Docker configuration, which the command removes on exit.
 
 The Worker deployment matrix does not cancel unrelated jobs when one target fails.
 
-Rollback uses an earlier successful source commit with a verified retained runtime handoff. Runtime
-preparation is required; there is no preinstalled deployment path in the current source.
+The deployment selector can choose an earlier successful CI commit. A checkout that predates both
+runtime preparation and its target catalog keeps the ordinary preinstalled deployment path. A present
+catalog still requires preparation, so a missing current script cannot bypass the deployment checks.

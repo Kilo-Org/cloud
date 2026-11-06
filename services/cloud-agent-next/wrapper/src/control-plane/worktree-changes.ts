@@ -11,9 +11,19 @@ import {
 } from '../../../src/shared/worktree-changes-wire.js';
 import { groupedWorktreeSnapshotSchema } from '../../../src/shared/worktree-groups.js';
 import { collectWorktreeChanges, collectWorktreeSnapshot } from '../control/worktree-changes.js';
+import { runDirectoryOperation } from '../control/worktree-operations.js';
 import { captureRootSnapshots } from './root-changes.js';
 import { hasEnvironmentRoots, type RouteRoot } from './workspace-roots.js';
 
+/**
+ * Handles the Sandbox DO's worktree-change requests inside the control-plane
+ * wrapper (spec §10). The capture itself is the shared, pure
+ * `control/worktree-changes.ts`; this adapter owns the frame in/out plus the
+ * guards the legacy handler had: only an attached route may capture, captures
+ * for one directory are fenced against a concurrent delete (`runDirectoryOperation`
+ * registers pending work and rejects while the directory is deleting; it is not
+ * a serializer), and the result is validated before it is reported.
+ */
 export type ControlPlaneWorktreeChangesDeps = {
   emit: (frame: ControlPlaneWrapperFrame) => void;
   /** The preparation manager's readiness for a session route (spec §7). */
@@ -57,31 +67,37 @@ export function createControlPlaneWorktreeChanges(deps: ControlPlaneWorktreeChan
       return;
     }
     try {
-      const roots = deps.roots?.(session.sessionId);
-      if (roots !== undefined && hasEnvironmentRoots(roots)) {
-        await handleGrouped(frame, roots);
+      await runDirectoryOperation(session.directory, async () => {
+        const roots = deps.roots?.(session.sessionId);
+        if (roots !== undefined && hasEnvironmentRoots(roots)) {
+          await handleGrouped(frame, roots);
+          return;
+        }
+        const captured =
+          frame.type === 'worktree.snapshot'
+            ? await captureSnapshot(session.directory, payload)
+            : await captureChanges(session.directory, payload);
+        if (frame.type === 'worktree.snapshot') {
+          const parsed = worktreeSnapshotCaptureSchema.safeParse(captured);
+          if (!parsed.success || !resultMatches(parsed.data.summary, payload)) {
+            deps.emit(fail(requestId, 'protocol_error', 'Invalid worktree result', false));
+            return;
+          }
+          deps.emit({ type: 'worktree.result', requestId, ok: true, result: parsed.data });
+        } else {
+          const parsed = sessionGitSummaryResultSchema.safeParse(captured);
+          if (!parsed.success || !resultMatches(parsed.data, payload)) {
+            deps.emit(fail(requestId, 'protocol_error', 'Invalid worktree result', false));
+            return;
+          }
+          deps.emit({ type: 'worktree.result', requestId, ok: true, result: parsed.data });
+        }
+      });
+    } catch (error) {
+      if (messageOf(error) === 'worktree_deleting') {
+        deps.emit(fail(requestId, 'not_ready', 'Session directory is not attached', false));
         return;
       }
-      const captured =
-        frame.type === 'worktree.snapshot'
-          ? await captureSnapshot(session.directory, payload)
-          : await captureChanges(session.directory, payload);
-      if (frame.type === 'worktree.snapshot') {
-        const parsed = worktreeSnapshotCaptureSchema.safeParse(captured);
-        if (!parsed.success || !resultMatches(parsed.data.summary, payload)) {
-          deps.emit(fail(requestId, 'protocol_error', 'Invalid worktree result', false));
-          return;
-        }
-        deps.emit({ type: 'worktree.result', requestId, ok: true, result: parsed.data });
-      } else {
-        const parsed = sessionGitSummaryResultSchema.safeParse(captured);
-        if (!parsed.success || !resultMatches(parsed.data, payload)) {
-          deps.emit(fail(requestId, 'protocol_error', 'Invalid worktree result', false));
-          return;
-        }
-        deps.emit({ type: 'worktree.result', requestId, ok: true, result: parsed.data });
-      }
-    } catch (error) {
       deps.log?.(`worktree capture failed: ${messageOf(error)}`);
       deps.emit(fail(requestId, 'capture_failed', messageOf(error).slice(0, 4096), true));
     }

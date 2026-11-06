@@ -223,6 +223,9 @@ export function createTestSessionIngestDouble(storage: StorageLike): SessionInge
     async deleteCloudAgentWorktreeContent(): Promise<never> {
       throw new Error(UNSUPPORTED_METHOD);
     },
+    async canDestroyCloudAgentWorktreeSandbox(): Promise<never> {
+      throw new Error(UNSUPPORTED_METHOD);
+    },
     async createSessionForCloudAgent(): Promise<never> {
       throw new Error(UNSUPPORTED_METHOD);
     },

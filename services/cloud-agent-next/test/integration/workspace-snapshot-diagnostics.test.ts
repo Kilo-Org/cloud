@@ -140,37 +140,6 @@ afterEach(async () => {
 });
 
 describe('workspace snapshot diagnostics with durable SQLite', () => {
-  it.each(['workspace', 'directory', 'user', 'organization', 'scope'] as const)(
-    'rejects mixed %s snapshot owners even when every route is individually eligible',
-    async changed =>
-      withDatabase(async db => {
-        const original = route();
-        const sibling = route();
-        sibling.sessionId = 'workspace-sibling';
-        sibling.spec = { ...sibling.spec, sessionId: sibling.sessionId };
-        expect(workspaceSnapshotOwner(IDENTITY.sandboxId, [original, sibling])).toEqual(IDENTITY);
-        const source = sibling.credentialSource;
-        if (source === null) throw new Error('Missing fixture credentials');
-        if (changed === 'workspace') {
-          source.workspaceId = 'worktree_00000000-0000-4000-8000-000000000002';
-          source.scopeId = source.workspaceId;
-        }
-        if (changed === 'directory') sibling.spec.directory = '/workspace/other';
-        if (changed === 'user') source.userId = 'other-user';
-        if (changed === 'organization') source.orgId = 'other-org';
-        if (changed === 'scope') source.scopeId = 'other-scope';
-        expect(workspaceSnapshotOwner(IDENTITY.sandboxId, [original, sibling])).toBeNull();
-        expect(workspaceSnapshotRestoreSkip(db, IDENTITY, [original, sibling], () => true)).toBe(
-          'ownership_mismatch'
-        );
-        writeWorkspaceSnapshotAllocation(db, disk());
-        const test = captureInput(db);
-        test.setRoutes([original, sibling]);
-        await captureIdleWorkspaceSnapshot(test.input);
-        expect(test.capture).not.toHaveBeenCalled();
-      })
-  );
-
   it.each([
     { change: undefined, reason: 'missing' },
     { change: { sandboxId: IDENTITY.sandboxId }, reason: 'invalid_descriptor' },

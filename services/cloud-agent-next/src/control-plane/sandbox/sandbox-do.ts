@@ -184,7 +184,12 @@ import {
 } from './scope-handle-resolution.js';
 import { buildScopeGrantView, type ScopeGrantView } from './scope-view.js';
 import { readScopeGrantView } from './scope-view-store.js';
-import type { SessionAttachPayload } from '../../shared/sandbox-control-protocol.js';
+import {
+  SANDBOX_CONTROL_ATTACH_TIMEOUT_MS,
+  worktreeDeleteResultSchema,
+  worktreePrepareDeletionResultSchema,
+  type SessionAttachPayload,
+} from '../../shared/sandbox-control-protocol.js';
 import { MCPServerConfigSchema } from '../../persistence/schemas.js';
 import {
   McpAttachValidationError,
@@ -207,12 +212,12 @@ import {
   controlPlaneDeliverPayloadSchema,
   controlPlaneKiloRequestInputSchema,
   controlPlanePrepareInputSchema,
-  controlPlaneCredentialSourceSchema,
   controlPlaneRouteSpecSchema,
   controlPlaneSessionCredentialsPayloadSchema,
   controlPlaneSessionRefPayloadSchema,
   controlPlaneTerminalInputSchema,
   controlPlaneWorktreeCaptureInputSchema,
+  controlPlaneWorktreeDeletionPayloadSchema,
   controlPlaneWrapperFrameSchema,
   type AttachmentSpec,
   type ControlPlaneAnswerPayload,
@@ -322,20 +327,14 @@ import {
   controlPlaneWorktreeDeletionInputSchema,
   finishWorktreeDeletion,
   loadWorktreeDeletionJournal,
+  persistWorktreeDeletionManifest,
   WORKTREE_DELETION_PREFIX,
   WorktreeDeletionIncompleteError,
+  worktreeOwnedRoutes,
   type ControlPlaneWorktreeDeletionInput,
   type WorktreeDeletionPlan,
 } from './worktree-deletion.js';
 import { projectAllocationStatusSnapshot } from './status-snapshot.js';
-import {
-  WORKSPACE_OWNER_KEY,
-  sandboxWorkspaceOwnerSchema,
-  sameSandboxWorkspaceOwner,
-  workspaceOwnerFromRoute,
-  recoverHistoricalWorkspaceOwner,
-  type SandboxWorkspaceOwner,
-} from './workspace-owner.js';
 import {
   readObservedRuntimeVersions,
   readRuntimeIdentity,
@@ -349,6 +348,7 @@ import {
   type SandboxStatusSnapshot,
 } from '../../shared/sandbox-status.js';
 import type { WorkspaceBillingProjection } from '../../shared/workspace-runtime-status.js';
+import { getWorktreeWorkspacePath } from '../../workspace.js';
 import {
   createSharedWorktreeChanges,
   worktreeSubscriberKey,
@@ -1007,15 +1007,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
     };
     if (this.currentProvider() !== 'cloudflare-containers') return result('unsupported_provider');
     if (route.credentialSource === null) return result('missing_credentials');
-    const owner = this.readWorkspaceOwner();
-    if (
-      owner === undefined ||
-      !sameSandboxWorkspaceOwner(
-        owner,
-        workspaceOwnerFromRoute(route.spec, route.credentialSource, true)
-      )
-    )
-      return result('ownership_mismatch');
     if (!workspaceSnapshotsEnabled(this.env, route.credentialSource))
       return result('not_allowlisted');
     if (sandboxIdlePolicyForOrigins([route.credentialSource.createdOnPlatform]) !== 'interactive')
@@ -1161,6 +1152,17 @@ export class SandboxControlV2 extends DurableObject<Env> {
     });
   }
 
+  /**
+   * Worker -> Sandbox DO (spec §6 "Billing, credentials and deletion"). Port of
+   * the legacy DO cleanup: when the provider stop or the shared runtime is
+   * confirmed, the worktree's routes are removed; otherwise it throws
+   * `WorktreeDeletionIncompleteError`, which the Worker reports as an
+   * incomplete, retryable result. Exclusivity is V2-native: the sandbox is
+   * destroyed only when the deleted worktree owns the last route.
+   *
+   * The bounded provider call runs between two serial-queue phases, so a slow
+   * provider cannot stall a sibling's hello/events/status (like worktreeCapture).
+   */
   async deleteWorktreeResources(
     input: ControlPlaneWorktreeDeletionInput
   ): Promise<{ deleted: true; sessionIds: string[] }> {
@@ -1170,35 +1172,32 @@ export class SandboxControlV2 extends DurableObject<Env> {
       throw new Error('Worktree deletion location does not match this sandbox');
     }
 
+    // Phase 1 (serial queue): owner admission, route/state reads, journal
+    // decision. No provider call here.
     const handoff = await this.enqueue(async () => {
       await this.initializeOwner(parsed.kiloUserId);
-      if (parsed.location.provider !== this.currentProvider()) {
-        throw new Error('Worktree deletion provider does not match this sandbox');
-      }
-      await this.recoverWorkspaceOwner({
-        userId: parsed.kiloUserId,
-        orgId: parsed.organizationId ?? undefined,
-        workspaceId: parsed.worktreeId,
-      });
-      this.assertWorkspaceOwner({
-        userId: parsed.kiloUserId,
-        orgId: parsed.organizationId ?? undefined,
-        workspaceId: parsed.worktreeId,
-      });
       const routes = await listRoutes(this.db);
       deleteWorkspaceSnapshot(this.db, parsed.worktreeId, 'workspace_deleted');
       this.invalidateWorkspaceSnapshot('workspace_deleted');
+      const target = worktreeOwnedRoutes(routes, parsed);
       const state = await this.readAllocation();
       return {
+        // The checkout directory comes from the request, not the routes, so a
+        // connected shared sandbox with no route for this worktree still cleans
+        // up (legacy `getWorktreeWorkspacePath` parity).
+        directory: getWorktreeWorkspacePath(
+          parsed.organizationId ?? null,
+          parsed.kiloUserId,
+          parsed.worktreeId
+        ),
         plan: await beginWorktreeDeletion({
-          request: {
-            ...parsed,
-            sessionIds: [...parsed.sessionIds, ...routes.map(route => route.spec.kiloSessionId)],
-          },
+          request: parsed,
+          exclusive: routes.length === target.length,
           storage: this.ctx.storage,
           allocation: state,
+          hasConnection: this.boundWrapperSocket(state) !== null,
         }),
-        targetSessionIds: routes.map(route => route.sessionId),
+        targetSessionIds: target.map(route => route.sessionId),
       };
     });
 
@@ -1206,16 +1205,51 @@ export class SandboxControlV2 extends DurableObject<Env> {
       return { deleted: true, sessionIds: handoff.plan.journal.sessionIds };
     }
 
-    // Provider I/O stays outside the queue; its result is fenced by allocation identity.
+    if (handoff.plan.action === 'shared') {
+      // Phase 2 (off-queue): clean up the shared checkout through the wrapper
+      // (R2). The bounded request awaits run outside the serial queue, exactly
+      // like worktree captures.
+      const cleanup = await this.runSharedWorktreeCleanup(
+        parsed.worktreeId,
+        handoff.directory,
+        handoff.plan
+      );
+      // Phase 3 (serial queue): apply the confirmed result.
+      return this.enqueue(async () => {
+        if (!cleanup.ok) {
+          throw new WorktreeDeletionIncompleteError('Shared worktree cleanup is not confirmed');
+        }
+        await this.revokeWorktreeRoutes(handoff.targetSessionIds);
+        this.worktreeChanges.purge(parsed.worktreeId);
+        const journal = await finishWorktreeDeletion(
+          this.ctx.storage,
+          parsed.worktreeId,
+          handoff.plan,
+          cleanup.sessionIds
+        );
+        return { deleted: true, sessionIds: journal.sessionIds };
+      });
+    }
+
+    // Phase 2 (off-queue): the bounded provider stop or observation.
     const confirmed = await this.confirmWorktreeRemoval(handoff.plan);
 
+    // Phase 3 (serial queue): apply the confirmed result.
     return this.enqueue(async () => {
       if (!confirmed) {
-        throw new WorktreeDeletionIncompleteError('Worktree provider stop is unconfirmed');
+        throw new WorktreeDeletionIncompleteError(
+          handoff.plan.action === 'stop'
+            ? 'Worktree provider stop is unconfirmed'
+            : 'Shared worktree runtime must reconnect before cleanup'
+        );
       }
+      // Revoke the worktree's routes/grants even for a confirmed stop, so a
+      // failed route cannot keep the sandbox looking shared forever.
       await this.revokeWorktreeRoutes(handoff.targetSessionIds);
       this.worktreeChanges.purge(parsed.worktreeId);
       if (handoff.plan.action === 'stop') {
+        // Fence by allocation identity: a sibling prepare may have created a new
+        // allocation while the provider stop ran off-queue.
         const current = await this.readAllocation();
         if (current.allocationId === handoff.plan.allocationId) {
           await this.applyEvent({ type: 'provider-gone', at: Date.now() });
@@ -1230,10 +1264,86 @@ export class SandboxControlV2 extends DurableObject<Env> {
     });
   }
 
-  private async confirmWorktreeRemoval(plan: WorktreeDeletionPlan): Promise<boolean> {
-    return (
-      plan.action !== 'stop' || this.stopProviderConfirmed(plan.providerRef, plan.allocationId)
+  /**
+   * R2 shared checkout cleanup: ask the wrapper to prepare the deletion manifest
+   * and then delete it. Mirrors the legacy `shared_wrapper` path: discovery first
+   * so the wrapper's `deleteWorktree` manifest does not grow, then delete, then
+   * require the wrapper to confirm every discovered session. A failed or
+   * unconfirmed step reports incomplete, so the caller retries.
+   */
+  private async runSharedWorktreeCleanup(
+    worktreeId: string,
+    directory: string,
+    plan: WorktreeDeletionPlan
+  ): Promise<{ ok: true; sessionIds: string[] } | { ok: false }> {
+    try {
+      const discovery = await this.forwardWorktreeDeletion(
+        worktreeId,
+        directory,
+        plan.journal.sessionIds,
+        'prepareDeletion'
+      );
+      if (discovery === null) return { ok: false };
+      const prepared = worktreePrepareDeletionResultSchema.safeParse(discovery);
+      if (!prepared.success) return { ok: false };
+      const manifest = [...new Set([...plan.journal.sessionIds, ...prepared.data.sessionIds])];
+      // Persist the discovered manifest before the delete so a delete that
+      // removes a child and then fails does not lose that child on retry
+      // (legacy `sandbox-control/worktree-deletion.ts` parity).
+      await this.enqueue(() =>
+        persistWorktreeDeletionManifest(this.ctx.storage, worktreeId, plan.journal, manifest)
+      );
+      const deleted = await this.forwardWorktreeDeletion(worktreeId, directory, manifest, 'delete');
+      if (deleted === null) return { ok: false };
+      const confirmed = worktreeDeleteResultSchema.safeParse(deleted);
+      if (!confirmed.success) return { ok: false };
+      if (manifest.some(sessionId => !confirmed.data.sessionIds.includes(sessionId))) {
+        return { ok: false };
+      }
+      return { ok: true, sessionIds: [...new Set([...manifest, ...confirmed.data.sessionIds])] };
+    } catch {
+      // Any unexpected failure is still an unconfirmed cleanup (spec §6).
+      return { ok: false };
+    }
+  }
+
+  /**
+   * One wrapper worktree-deletion request. Returns null on any failure
+   * (`not_ready`, a closed socket, a timeout or a rejected frame) so the caller
+   * reports incomplete instead of trusting an unconfirmed cleanup. Uses the
+   * legacy attach bound: `deleteWorktree` waits on in-flight directory
+   * operations, Kilo calls, retirement and `fs.rm -rf`.
+   */
+  private async forwardWorktreeDeletion(
+    worktreeId: string,
+    directory: string,
+    sessionIds: readonly string[],
+    operation: 'prepareDeletion' | 'delete'
+  ): Promise<unknown> {
+    const payload = controlPlaneWorktreeDeletionPayloadSchema.parse({
+      worktreeId,
+      directory,
+      sessionIds: [...sessionIds],
+    });
+    const requestId = crypto.randomUUID();
+    const frame: ControlPlaneWrapperFrame =
+      operation === 'prepareDeletion'
+        ? { type: 'worktree.prepareDeletion', requestId, payload }
+        : { type: 'worktree.delete', requestId, payload };
+    const handoff = await this.enqueue(() =>
+      this.beginWrapperControlRequest(frame, SANDBOX_CONTROL_ATTACH_TIMEOUT_MS)
     );
+    const result = 'error' in handoff ? handoff.error : await handoff.promise;
+    return result.ok ? result.result : null;
+  }
+
+  /** Deletion phase 2: the bounded provider call, outside the serial queue. */
+  private async confirmWorktreeRemoval(plan: WorktreeDeletionPlan): Promise<boolean> {
+    if (plan.action === 'complete') return true;
+    if (plan.action === 'stop') {
+      return this.stopProviderConfirmed(plan.providerRef, plan.allocationId);
+    }
+    return (await this.observeWorktreeRuntime(plan.providerRef)).status === 'terminal';
   }
 
   private async notifyWorktreeChangesReady(
@@ -2111,7 +2221,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
       return;
     }
     await migrate(this.db, migrations);
-    this.restoreWorkspaceOwner();
     this.ctx.storage.kv.delete('session_disk_snapshot:v1');
     this.ctx.storage.kv.delete('session_disk_allocation:v1');
     const row = await this.readAllocationRow();
@@ -2412,7 +2521,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
     sandboxSelection?: ControlPlaneSandboxSelection,
     environment?: SessionEnvironmentReference
   ): Promise<ControlPlaneRouteView> {
-    await this.admitWorkspace(spec, source);
+    // Sandbox owner admission (B3 review 5): the first prepare names the owner;
+    // a later prepare for a different owner is rejected, not silently accepted.
     await this.initializeOwner(source.userId);
     let state = await this.readAllocation();
     if (state.kind === 'connected' || state.kind === 'disconnected')
@@ -2543,115 +2653,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     }
   }
 
-  private readWorkspaceOwner(): SandboxWorkspaceOwner | undefined {
-    return sandboxWorkspaceOwnerSchema
-      .optional()
-      .parse(this.ctx.storage.kv.get(WORKSPACE_OWNER_KEY));
-  }
-
-  private restoreWorkspaceOwner(): void {
-    if (this.readWorkspaceOwner() !== undefined) return;
-    const routes = this.db.select().from(routesTable).all();
-    let owner: SandboxWorkspaceOwner | undefined;
-    for (const row of routes) {
-      if (row.credential_source === null) return;
-      const source = controlPlaneCredentialSourceSchema.parse(JSON.parse(row.credential_source));
-      const spec = controlPlaneRouteSpecSchema.parse(JSON.parse(row.spec));
-      let candidate: SandboxWorkspaceOwner;
-      try {
-        candidate = workspaceOwnerFromRoute(spec, source, true);
-      } catch {
-        return;
-      }
-      if (owner !== undefined && !sameSandboxWorkspaceOwner(owner, candidate)) return;
-      owner = candidate;
-    }
-    if (owner !== undefined) this.ctx.storage.kv.put(WORKSPACE_OWNER_KEY, owner);
-  }
-
-  private async recoverWorkspaceOwner(input: {
-    userId: string;
-    orgId?: string;
-    workspaceId: string;
-    directory?: string;
-  }): Promise<void> {
-    if (
-      this.readWorkspaceOwner() !== undefined ||
-      this.ctx.storage.kv.get(OWNER_KEY) !== input.userId ||
-      this.db.select().from(routesTable).get() !== undefined
-    )
-      return;
-    const owner = await recoverHistoricalWorkspaceOwner({
-      sandboxId: this.sandboxId,
-      sandboxKind: this.providerPin?.sandboxKind,
-      userId: input.userId,
-      workspaceId: input.workspaceId,
-      readWorkspace: workspaceId =>
-        withTimeout(
-          this.env.SESSION_INGEST.getCloudAgentWorkspace({
-            kiloUserId: input.userId,
-            workspaceId,
-            sessionLimit: 1,
-          }),
-          5_000,
-          'Historical sandbox workspace ownership lookup timed out'
-        ),
-    });
-    if (
-      owner !== undefined &&
-      owner.orgId === input.orgId &&
-      (input.directory === undefined || owner.directory === input.directory)
-    )
-      this.ctx.storage.kv.put(WORKSPACE_OWNER_KEY, owner);
-  }
-
-  private async admitWorkspace(
-    spec: ControlPlaneRouteSpec,
-    source: ControlPlaneCredentialSource
-  ): Promise<void> {
-    const storedUser = this.ctx.storage.kv.get<string>(OWNER_KEY);
-    if (storedUser !== undefined && storedUser !== source.userId)
-      throw new Error('Sandbox owner mismatch');
-    const candidate = workspaceOwnerFromRoute(
-      spec,
-      source,
-      this.readWorkspaceOwner() !== undefined
-    );
-    await this.recoverWorkspaceOwner({
-      userId: source.userId,
-      orgId: source.orgId,
-      workspaceId: source.workspaceId ?? '',
-      directory: spec.directory,
-    });
-    const owner = this.readWorkspaceOwner();
-    if (owner !== undefined) {
-      if (!sameSandboxWorkspaceOwner(owner, candidate))
-        throw new Error('Sandbox workspace mismatch');
-      return;
-    }
-    // Existing rows without one unambiguous identity must not be claimed by a new workspace.
-    if (storedUser !== undefined || this.db.select().from(routesTable).get() !== undefined)
-      throw new Error('Sandbox workspace mismatch');
-    this.ctx.storage.kv.put(WORKSPACE_OWNER_KEY, candidate);
-  }
-
-  private assertWorkspaceOwner(input: {
-    userId: string;
-    orgId?: string;
-    workspaceId: string;
-    directory?: string;
-  }): void {
-    const owner = this.readWorkspaceOwner();
-    if (
-      owner === undefined ||
-      owner.userId !== input.userId ||
-      owner.orgId !== input.orgId ||
-      owner.workspaceId !== input.workspaceId ||
-      (input.directory !== undefined && owner.directory !== input.directory)
-    )
-      throw new Error('Sandbox workspace mismatch');
-  }
-
+  /** Stores the sandbox owner on first use and rejects a different one. */
   private async initializeOwner(userId: string): Promise<void> {
     const normalized = userId.trim();
     if (normalized.length === 0) throw new Error('Sandbox owner is required');
@@ -5129,6 +5131,20 @@ export class SandboxControlV2 extends DurableObject<Env> {
     for (const sessionId of sessionIds) {
       this.notifications.retire(sessionId);
       await deleteRoute(this.db, this.ctx.storage.kv, sessionId);
+    }
+  }
+
+  private async observeWorktreeRuntime(
+    providerRef: string | null
+  ): Promise<{ status: 'active' | 'terminal' | 'unknown' }> {
+    try {
+      return await withTimeout(
+        this.provider.observe(providerRef),
+        this.sandboxTimers().providerStopAttemptMs,
+        'Worktree runtime observation timed out'
+      );
+    } catch {
+      return { status: 'unknown' };
     }
   }
 

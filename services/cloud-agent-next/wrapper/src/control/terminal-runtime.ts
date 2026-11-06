@@ -77,6 +77,7 @@ export class ControlTerminalRuntimeError extends Error {
 export type ControlTerminalRuntime = {
   rememberAttachedSession(identity: SessionRequestIdentity): void;
   detachSession(identity: SessionRequestIdentity): Promise<void>;
+  detachDirectory(directory: string): Promise<void>;
   hasActivePty(identity: SessionRequestIdentity): boolean;
   beginRecoveryRetirement(identity: SessionRequestIdentity): void;
   endRecoveryRetirement(identity: SessionRequestIdentity): void;
@@ -504,6 +505,13 @@ export function createControlTerminalRuntime(options: {
     },
 
     detachSession,
+
+    async detachDirectory(directory) {
+      const sessions = [...attachedSessions.values()].filter(
+        session => session.directory === directory
+      );
+      await Promise.all(sessions.map(detachSession));
+    },
 
     async create(identity, payload) {
       const existing = operations.get(payload.operationId);

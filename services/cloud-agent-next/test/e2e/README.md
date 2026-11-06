@@ -26,8 +26,8 @@ cloud-agent-next refactor.
 3. Start the stack. The `cloud-agent` group already includes `fake-llm`:
 
    ```bash
-    pnpm dev:start cloud-agent
-    ```
+   pnpm dev:start cloud-agent
+   ```
 
    Startup publishes the current wrapper and pinned CLI artifacts to local Wrangler R2 and downloads
    them into each new runtime-free sandbox. The first start needs registry access, Bun and Docker;

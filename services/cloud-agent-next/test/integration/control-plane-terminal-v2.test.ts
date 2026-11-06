@@ -66,7 +66,6 @@ function metadata(input: { sessionId: string; kiloSessionId: string; sandboxId: 
     agent: { mode: 'code', model: 'test/model' },
     repository: { type: 'github', repo: 'acme/widgets', upstreamBranch: 'main' },
     workspace: {
-      worktreeId: input.sessionId.replace('workspace_', 'worktree_'),
       branchName: 'kilo/b10t',
       sandboxId: input.sandboxId,
       sandboxProvider: 'cloudflare-containers',

@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { CONTROL_PLANE_TIMERS } from '../../../src/shared/control-plane-timers.js';
 import type { ControlPlaneWrapperFrame } from '../../../src/shared/control-plane-protocol.js';
-import { createControlPlaneSessionHost } from './main.js';
+import { createControlPlaneFrameDispatcher, createControlPlaneSessionHost } from './main.js';
 import type { KiloFeedCallbacks } from './kilo-runtime.js';
 import type { KiloEventFeedSource } from './kilo-event-feed.js';
 import type { SessionObservation } from './session-supervisor.js';
@@ -637,7 +637,7 @@ describe('production session host composition', () => {
       await f.advance(11 * 60_000);
       expect(f.host.getHeartbeat().active).toBe(true);
       expect(f.aborts).toEqual([]);
-      f.host.runtimes.remove('/different');
+      await f.host.runtimes.retireDirectory('/different');
       f.host.runtimes.remove('/workspace');
       expect(f.host.getHeartbeat().active).toBe(true);
       // A callback retained by the old feed cannot revive its retired process.
@@ -770,6 +770,74 @@ describe('production session host composition', () => {
       await f.dispose();
     }
   });
+
+  it.each(['worktree.prepareDeletion', 'worktree.delete'] as const)(
+    'cancels and awaits interruption auto-commit before handling %s',
+    async type => {
+      const committed = Promise.withResolvers<{ success: boolean }>();
+      let signal: AbortSignal | undefined;
+      let deleted = false;
+      const f = await hostFixture({
+        runAutoCommit: input => {
+          signal = input.signal;
+          return committed.promise;
+        },
+      });
+      try {
+        const feed = await f.runtime('/workspace');
+        f.host.turns.registerRoute({
+          sessionId: 'workspace_chat',
+          kiloSessionId: 'ses_root',
+          directory: '/workspace',
+          attemptId: 'a',
+        });
+        f.host.turns.submit('workspace_chat', {
+          messageId: 'm1',
+          turn: { type: 'prompt', prompt: 'test' },
+          agent: { mode: 'code', model: 'test/model' },
+          finalization: { autoCommit: true },
+        });
+        await settle();
+        f.event(feed, 'session.turn.open', { sessionID: 'ses_root' });
+        await f.advance(CONTROL_PLANE_TIMERS.wrapper.turnHardCapMs);
+        expect(signal).toBeDefined();
+        const dispatch = createControlPlaneFrameDispatcher({
+          preparation: {},
+          turns: { current: f.host.turns },
+          terminals: {},
+          worktreeChanges: {},
+          worktreeDeletion: {
+            current: {
+              handle: async () => {
+                deleted = true;
+              },
+            },
+          },
+          kiloRequests: {},
+          send: () => undefined,
+          log: () => undefined,
+        });
+        dispatch({
+          type,
+          requestId: 'delete-request',
+          payload: {
+            worktreeId: 'worktree_test',
+            directory: '/workspace',
+            sessionIds: ['ses_root'],
+          },
+        });
+        await settle();
+        expect(signal?.aborted).toBe(true);
+        expect(deleted).toBe(false);
+        committed.resolve({ success: false });
+        await settle();
+        expect(deleted).toBe(true);
+      } finally {
+        committed.resolve({ success: false });
+        await f.dispose();
+      }
+    }
+  );
 
   it('settles a deadline once, retains compute through abort, and fences cancellation from a newly accepted prompt', async () => {
     const f = await hostFixture();

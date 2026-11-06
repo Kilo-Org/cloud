@@ -39,6 +39,8 @@ export const SANDBOX_OPERATIONS = [
   'sandbox.event.publish',
   'sandbox.event.publishBatch',
   'sandbox.shutdown',
+  'worktree.prepareDeletion',
+  'worktree.delete',
 ] as const;
 
 export const SESSION_OPERATIONS = [
@@ -98,6 +100,21 @@ export const sessionEventIdentitySchema = z.object({
 export type SessionRequestIdentity = z.infer<typeof sessionRequestIdentitySchema>;
 export type SessionEventIdentity = z.infer<typeof sessionEventIdentitySchema>;
 
+export const worktreeDeletePayloadSchema = z
+  .object({
+    worktreeId: z.templateLiteral(['worktree_', z.uuid()]),
+    directory: z.string().min(1).max(1024),
+    sessionIds: z.array(z.string().startsWith('ses_').length(30)),
+  })
+  .strict();
+
+export const worktreePrepareDeletionResultSchema = z
+  .object({
+    prepared: z.literal(true),
+    sessionIds: z.array(z.string().startsWith('ses_').length(30)),
+  })
+  .strict();
+
 export const worktreeDeleteResultSchema = z
   .object({
     deleted: z.literal(true),
@@ -105,6 +122,7 @@ export const worktreeDeleteResultSchema = z
   })
   .strict();
 
+export type WorktreeDeletePayload = z.infer<typeof worktreeDeletePayloadSchema>;
 export type WorktreeDeleteResult = z.infer<typeof worktreeDeleteResultSchema>;
 
 export const gitAuthorSchema = z

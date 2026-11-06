@@ -380,5 +380,51 @@ export function createKilo2Harness(options: {
     updateCloudAgentMcp,
     reads,
     terminals,
+    worktree: {
+      async listSessionIds(directory) {
+        return (await list(directory)).map(info => info.id);
+      },
+      async getSession(directory, id) {
+        try {
+          const info = await session(id);
+          return info.location.directory === directory ? { id, directory } : null;
+        } catch (error) {
+          if (error instanceof Kilo2HttpError && error.status === 404) return null;
+          throw error;
+        }
+      },
+      async children(directory, id) {
+        return (await list(directory))
+          .filter(info => info.parentID === id)
+          .map(info => ({ id: info.id, directory }));
+      },
+      async abortSession(directory, sessionId) {
+        if (!(await interrupt({ directory, sessionId })))
+          throw new Error('Kilo v2 cancellation was not confirmed');
+      },
+      async stopSessionProcesses(directory, sessionId) {
+        if (!(await interrupt({ directory, sessionId })))
+          throw new Error('Kilo v2 cancellation was not confirmed');
+        await stopSessionProcesses(sessionId);
+      },
+      async deleteSession(_directory, id) {
+        await remove(kilo2SessionPath(id));
+      },
+      async closeTerminals(directory) {
+        const ptys = z
+          .array(ptySchema)
+          .parse(await api.data(`/api/pty?${locationQuery(directory)}`));
+        for (const pty of ptys) await terminals.deletePty(pty.id, directory);
+      },
+      async disposeDirectory(directory) {
+        // V2 locations are process-owned caches. Cloud removes the directory after
+        // session and PTY cleanup; there is no per-location disposal endpoint.
+        if (
+          (await list(directory)).length ||
+          !(await terminals.isIdle(directory, AbortSignal.timeout(20_000)))
+        )
+          throw new Error('Kilo v2 directory still has native resources');
+      },
+    },
   };
 }

@@ -16,6 +16,7 @@ import {
 } from '../../../src/shared/worktree-groups.js';
 import type { WrapperKiloClient } from '../kilo-api.js';
 import { collectWorktreeSnapshot } from '../control/worktree-changes.js';
+import { resetDirectoryOperationState } from '../control/worktree-operations.js';
 import { createControlPlaneKiloRequests } from './kilo-requests.js';
 import { captureRootSnapshots, fitSnapshotBudget, rootBaseRef } from './root-changes.js';
 import { createControlPlaneWorktreeChanges } from './worktree-changes.js';
@@ -79,6 +80,7 @@ describe('the changes of a multi-repository route', () => {
   });
 
   afterEach(async () => {
+    resetDirectoryOperationState();
     await rm(workspace, { recursive: true, force: true });
   });
 

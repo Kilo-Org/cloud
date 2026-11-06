@@ -5,11 +5,6 @@ import {
   sealRuntimeAuthorization,
 } from '@kilocode/worker-utils/runtime-authorization';
 import jwt from 'jsonwebtoken';
-import {
-  cloudAgentSessionScopeHeaders,
-  cloudAgentSessionScopeV2Headers,
-  tryEncodeCloudAgentSessionScopeV2Headers,
-} from '@kilocode/session-ingest-contracts';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type {
   ControlPlaneSessionPeer,
@@ -18,6 +13,8 @@ import type {
 import type { SandboxSessionV2 } from '../../src/control-plane/session/session-do.js';
 import { parseSessionMetadata } from '../../src/persistence/session-metadata.js';
 import {
+  createRuntimeProxyGrant,
+  issueRuntimeCredentialProxyHandle,
   runtimeCredentialProxyFacadeBaseUrl,
   runtimeProxyHandleGrantId,
   RUNTIME_PROXY_GRANT_KEY,
@@ -64,13 +61,6 @@ const FACADE_BASE = runtimeCredentialProxyFacadeBaseUrl(WORKER_URL);
 type FakeProvider = {
   adapter: ProviderAdapter;
   launchEnvs: Record<string, string>[];
-};
-
-type RuntimeMintHarness = {
-  mintRuntimeProxyGrant: (
-    peer: ControlPlaneSessionPeer,
-    fence: Parameters<ControlPlaneSessionPeer['issueRuntimeCredentialProxyGrant']>[0]
-  ) => Promise<string | null>;
 };
 
 let sequence = 0;
@@ -139,10 +129,9 @@ function metadata(input: {
       platform: 'github',
     },
     workspace: {
-      worktreeId: input.worktreeId ?? input.sessionId.replace('workspace_', 'worktree_'),
       ...(input.worktreeId === undefined
         ? {}
-        : { workspacePath: `/workspace/${input.worktreeId}` }),
+        : { worktreeId: input.worktreeId, workspacePath: `/workspace/${input.worktreeId}` }),
       branchName: 'kilo/test-branch',
       sandboxId: input.sandboxId,
       sandboxProvider: input.provider ?? 'vercel',
@@ -570,22 +559,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
       expect(scopedRequest && new URL(scopedRequest.url).pathname).toBe(
         `/internal/cloud-agent/v1/session/${siblingKiloSessionId}/ingest`
       );
-      const encodedScope = tryEncodeCloudAgentSessionScopeV2Headers({
-        worktreeId: `worktree_${sessionId.slice('workspace_'.length)}`,
-        organizationId: ORG_ID,
-        memberRootKiloSessionIds: [kiloId],
-      });
-      expect(encodedScope).not.toBeNull();
-      expect(scopedRequest?.headers.get(cloudAgentSessionScopeHeaders.protocolVersion)).toBe('2');
-      expect(scopedRequest?.headers.get(cloudAgentSessionScopeV2Headers.worktreeId)).toBe(
-        encodedScope?.worktreeId
-      );
-      expect(
-        scopedRequest?.headers.get(cloudAgentSessionScopeV2Headers.memberRootKiloSessionIds)
-      ).toBe(encodedScope?.memberRootKiloSessionIds);
-      expect(scopedRequest?.headers.get(cloudAgentSessionScopeV2Headers.expectedOrganization)).toBe(
-        encodedScope?.expectedOrganization
-      );
+      expect(scopedRequest?.headers.get('X-Kilo-Root-Session')).toBe(kiloId);
       expect(destinations).toHaveLength(6);
       await runInDurableObject(sessionStub, async instance => {
         const authorization = await instance.ctx.storage.get<{ delegationExpiresAt: string }>(
@@ -1025,7 +999,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
     expect(await sessionStub.resolveRuntimeCredentialProxyGrant(firstHandle)).toBeNull();
   });
 
-  it('resends the identical handle on a plain reconnect without minting again', async () => {
+  it('resends the identical handle on a plain reconnect without re-binding', async () => {
     const sessionId = newSessionId();
     const sandboxId = await generateSandboxId(sessionId);
     const provider = createProvider();
@@ -1047,13 +1021,14 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
     if (first?.type !== 'session.prepare') throw new Error('expected session.prepare');
     const firstHandle = first.credentials?.proxy?.handle ?? '';
 
-    let mintCalls = 0;
+    // Count binds from here: a reconnect with the same wrapperId keeps the same
+    // allocation fence, so the handle must be reused without re-binding.
+    let bindCalls = 0;
     await runInDurableObject(sandboxStub, instance => {
-      const harness = instance as unknown as RuntimeMintHarness;
-      const original = harness.mintRuntimeProxyGrant.bind(instance);
-      harness.mintRuntimeProxyGrant = async (...input) => {
-        mintCalls += 1;
-        return original(...input);
+      const original = instance.bindRuntimeCredentialProxyHandle.bind(instance);
+      instance.bindRuntimeCredentialProxyHandle = async input => {
+        bindCalls += 1;
+        return original(input);
       };
     });
 
@@ -1071,10 +1046,10 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
     const secondHandle = second.credentials?.proxy?.handle ?? '';
 
     expect(secondHandle).toBe(firstHandle);
-    expect(mintCalls).toBe(0);
+    expect(bindCalls).toBe(0);
   });
 
-  it('does not adopt or send a stale handle when the fence changes after mint', async () => {
+  it('does not send a stale handle when the fence changes between bind and send', async () => {
     const sessionId = newSessionId();
     const sandboxId = await generateSandboxId(sessionId);
     const provider = createProvider();
@@ -1091,26 +1066,28 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
     await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
     const { credential, allocationId } = launchIdentity(provider);
 
-    let releaseMint!: () => void;
-    const mintGate = new Promise<void>(resolve => {
-      releaseMint = resolve;
+    // Hold both tasks inside `bind` so a wrapper restart can change the fence
+    // after the first task minted and bound for the old fence, before it sends.
+    let releaseBind!: () => void;
+    const bindGate = new Promise<void>(resolve => {
+      releaseBind = resolve;
     });
-    let mintCalls = 0;
+    let bindCalls = 0;
     await runInDurableObject(sandboxStub, instance => {
-      const harness = instance as unknown as RuntimeMintHarness;
-      const original = harness.mintRuntimeProxyGrant.bind(instance);
-      harness.mintRuntimeProxyGrant = async (...input) => {
-        const handle = await original(...input);
-        mintCalls += 1;
-        await mintGate;
-        return handle;
+      const original = instance.bindRuntimeCredentialProxyHandle.bind(instance);
+      instance.bindRuntimeCredentialProxyHandle = async input => {
+        bindCalls += 1;
+        await bindGate;
+        return original(input);
       };
     });
 
     const wrapper = await FakeWrapper.connect({ sandboxId, credential });
     await wrapper.hello({ wrapperId: 'wr_1', allocationId });
-    await waitFor(() => expect(mintCalls).toBe(1));
+    await waitFor(() => expect(bindCalls).toBe(1));
 
+    // The restart changes the fence while the first task is blocked; the
+    // reconnect's own task mints for the new fence.
     wrapper.close();
     await waitFor(async () => {
       expect((await sandboxStub.getAllocationState()).kind).toBe('disconnected');
@@ -1120,9 +1097,9 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
       type: 'welcome',
       protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
     });
-    await waitFor(() => expect(mintCalls).toBe(2));
+    await waitFor(() => expect(bindCalls).toBe(2));
 
-    releaseMint();
+    releaseBind();
 
     const frame = await restarted.next();
     if (frame?.type !== 'session.prepare') throw new Error('expected session.prepare');

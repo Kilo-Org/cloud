@@ -5,7 +5,6 @@ import {
   controlPlaneWorkspaceFailureSubtypeSchema,
 } from './control-plane-protocol.js';
 import { CONTROL_OPERATIONS, controlErrorCodes } from './sandbox-control-protocol.js';
-import { cloudAgentWorktreeIdSchema } from '@kilocode/session-ingest-contracts';
 
 export const OWNED_PROCESS_CLEANUP_UNREAPED = 'Owned process cleanup unreaped';
 export const CONTROL_LOG_MAX_BATCH_BYTES = 256 * 1024;
@@ -284,7 +283,7 @@ export const controlDiagnosticFieldsSchema = z
     retryable: z.boolean().optional(),
     detail: z.string().min(1).max(128).optional(),
     scopeId: identifier.optional(),
-    worktreeId: cloudAgentWorktreeIdSchema.optional(),
+    worktreeId: z.templateLiteral(['worktree_', z.uuid()]).optional(),
     sessionId: identifier.optional(),
     kiloSessionId: identifier.optional(),
     rootKiloSessionId: identifier.optional(),

@@ -264,6 +264,15 @@ async function lockMovableWorktree(tx: DrizzleTransaction, scope: FolderScope, w
     if (!firstRoot) {
       throw new TRPCError({ code: 'NOT_FOUND', message: 'Worktree not found' });
     }
+    // The row may be missing because the worktree predates metadata
+    // registration. Seed the location deletion needs from the same ledger
+    // entry the standalone moveSession path uses, so this path cannot leave
+    // runtime_locations empty either.
+    const runtimeLocations = await readWorktreeRuntimeLocations(
+      tx,
+      scope,
+      workspaceSessionIdSchema.parse(firstRoot.cloudAgentSessionId)
+    );
     await tx
       .insert(cloud_agent_worktrees)
       .values({
@@ -271,6 +280,7 @@ async function lockMovableWorktree(tx: DrizzleTransaction, scope: FolderScope, w
         kilo_user_id: scope.userId,
         organization_id: scope.organizationId,
         created_at: firstRoot.createdAt,
+        runtime_locations: runtimeLocations,
       })
       .onConflictDoNothing({ target: cloud_agent_worktrees.worktree_id });
     [worktree] = await selectWorktree();

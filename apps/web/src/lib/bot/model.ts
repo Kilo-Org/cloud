@@ -23,26 +23,14 @@ export type BotModelSettings = {
 export function resolveBotModelSettings(
   integration: BotModelIntegration | null | undefined
 ): BotModelSettings {
-  const modelParsed = BotModelSlugSchema.safeParse(
-    (integration?.metadata as Record<string, unknown> | null)?.model_slug
-  );
-  const effortParsed = BotThinkingEffortSchema.safeParse(
-    (integration?.metadata as Record<string, unknown> | null)?.thinking_effort
-  );
-  if (!modelParsed.success) return { modelSlug: DEFAULT_BOT_MODEL, thinkingEffort: null };
+  const metadata = integration?.metadata as Record<string, unknown> | null;
+  const modelParsed = BotModelSlugSchema.safeParse(metadata?.model_slug);
+  const effortParsed = BotThinkingEffortSchema.safeParse(metadata?.thinking_effort);
+  const thinkingEffort = effortParsed.success ? effortParsed.data?.trim() || null : null;
 
-  return {
-    modelSlug: modelParsed.data,
-    thinkingEffort: effortParsed.success ? effortParsed.data?.trim() || null : null,
-  };
-}
+  // Keep a stored effort alongside the default model: the read path surfaces
+  // it and the bot applies it to the default model, so both agree.
+  if (!modelParsed.success) return { modelSlug: DEFAULT_BOT_MODEL, thinkingEffort };
 
-export function resolveBotModelSlug(integration: BotModelIntegration | null | undefined): string {
-  return resolveBotModelSettings(integration).modelSlug;
-}
-
-export function resolveBotThinkingEffort(
-  integration: BotModelIntegration | null | undefined
-): string | null {
-  return resolveBotModelSettings(integration).thinkingEffort;
+  return { modelSlug: modelParsed.data, thinkingEffort };
 }

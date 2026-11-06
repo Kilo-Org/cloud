@@ -6,24 +6,41 @@ type BotModelIntegration = {
   metadata: unknown;
 };
 
-const BotModelMetadataSchema = z
-  .object({
-    model_slug: z.string().trim().min(1),
-  })
-  .passthrough();
+const BotModelSlugSchema = z.string().trim().min(1);
 
-export function resolveBotModelSlug(integration: BotModelIntegration | null | undefined): string {
-  const parsed = BotModelMetadataSchema.safeParse(integration?.metadata);
-  if (!parsed.success) return DEFAULT_BOT_MODEL;
+export const BotThinkingEffortSchema = z
+  .string()
+  .trim()
+  .max(50)
+  .regex(/^[a-zA-Z]+$/)
+  .nullable()
+  .optional();
 
-  return parsed.data.model_slug;
+export type BotModelSettings = {
+  modelSlug: string;
+  thinkingEffort: string | null;
+};
+
+export function resolveBotModelSettings(
+  integration: BotModelIntegration | null | undefined
+): BotModelSettings {
+  const metadata = integration?.metadata as Record<string, unknown> | null;
+  const modelParsed = BotModelSlugSchema.safeParse(metadata?.model_slug);
+  const effortParsed = BotThinkingEffortSchema.safeParse(metadata?.thinking_effort);
+  const thinkingEffort = effortParsed.success ? effortParsed.data?.trim() || null : null;
+
+  // Keep a stored effort alongside the default model: the read path surfaces
+  // it and the bot applies it to the default model, so both agree.
+  if (!modelParsed.success) return { modelSlug: DEFAULT_BOT_MODEL, thinkingEffort };
+
+  return { modelSlug: modelParsed.data, thinkingEffort };
 }
 
 /**
  * The model a bot run uses, resolved for the integration's owner. An
  * organization-owned integration gets the stored slug while the organization's
  * current policy allows it, otherwise the organization's allowed default. A
- * user-owned integration keeps `resolveBotModelSlug`'s result.
+ * user-owned integration keeps its stored model.
  */
 export async function resolveBotRunModel(
   integration:
@@ -33,6 +50,6 @@ export async function resolveBotRunModel(
 ): Promise<string> {
   return resolveOrganizationBotModel({
     organizationId: integration?.owned_by_organization_id ?? null,
-    storedModelSlug: resolveBotModelSlug(integration),
+    storedModelSlug: resolveBotModelSettings(integration).modelSlug,
   });
 }

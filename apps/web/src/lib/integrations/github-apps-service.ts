@@ -322,7 +322,8 @@ export async function listBranches(
 export async function updateModel(
   owner: Owner,
   modelSlug: string,
-  integrationId?: string
+  integrationId?: string,
+  thinkingEffortInput?: string | null
 ): Promise<{ success: boolean; error?: string }> {
   const integration = integrationId
     ? await getGitHubIntegrationById(owner, integrationId)
@@ -339,10 +340,27 @@ export async function updateModel(
     }
   }
 
+  const thinkingEffort =
+    thinkingEffortInput === undefined
+      ? undefined
+      : thinkingEffortInput?.trim()
+        ? thinkingEffortInput.trim()
+        : null;
+
+  // No server-side variant check: this mutation has no cheap catalog source,
+  // and the write path (the integration UI) already validates the effort
+  // against the selected model's variants. Residual risk: a direct tRPC caller
+  // can still store an unadvertised token, and a catalog that later drops a
+  // stored variant leaves it applied until it is cleared in the UI. The bot
+  // then forwards it to the Cloud Agent; this code does not verify how that
+  // layer handles a variant the model does not advertise.
   await updateIntegrationMetadataForOwner(
     owner,
     PLATFORM.GITHUB,
-    { model_slug: modelSlug },
+    {
+      model_slug: modelSlug,
+      ...(thinkingEffort === undefined ? {} : { thinking_effort: thinkingEffort }),
+    },
     integration.id
   );
 

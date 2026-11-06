@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { TRPCClientError } from '@trpc/client';
@@ -24,6 +24,16 @@ import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import { useModelSelectorList } from '@/lib/hooks/use-openrouter-models';
 import { GitHubConnectionAttemptState } from './GitHubConnectionAttemptState';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { thinkingEffortLabel } from '@/lib/code-reviews/core/model-variants';
+import { DEFAULT_BOT_MODEL } from '@/lib/bot/constants';
 
 type OrganizationGitHubInstallationsProps = {
   organizationId: string;
@@ -64,6 +74,7 @@ export function OrganizationGitHubInstallations({
         isFree: model.isFree,
         mayTrainOnYourPrompts: model.mayTrainOnYourPrompts,
         hasUserByokAvailable: model.hasUserByokAvailable,
+        variants: model.opencode?.variants ? Object.keys(model.opencode.variants) : [],
       })) ?? [],
     [openRouterModels]
   );
@@ -458,26 +469,23 @@ export function OrganizationGitHubInstallations({
                     </div>
                     {installation.status === 'connected' &&
                       installation.connectionRole === 'workflow' && (
-                        <div className="space-y-3 rounded-lg border p-4">
-                          <ModelCombobox
-                            id={`model-combobox-${installation.id}`}
-                            label="AI Model"
-                            helperText="Select the AI model to use when responding to GitHub bot mentions"
-                            models={modelOptions}
-                            value={installation.modelSlug ?? undefined}
-                            onValueChange={modelSlug =>
-                              updateModel.mutate({
-                                organizationId,
-                                integrationId: installation.id,
-                                modelSlug,
-                              })
-                            }
-                            isLoading={isLoadingModels}
-                            disabled={!installation.canManageModel}
-                            placeholder="Select a model"
-                            triggerAriaLabel={`AI model for ${accountName}`}
-                          />
-                        </div>
+                        <InstallationModelSettings
+                          installationId={installation.id}
+                          accountName={accountName}
+                          modelSlug={installation.modelSlug}
+                          thinkingEffort={installation.thinkingEffort}
+                          canManageModel={installation.canManageModel}
+                          modelOptions={modelOptions}
+                          isLoadingModels={isLoadingModels}
+                          onSave={(modelSlug, thinkingEffort) =>
+                            updateModel.mutate({
+                              organizationId,
+                              integrationId: installation.id,
+                              modelSlug,
+                              thinkingEffort,
+                            })
+                          }
+                        />
                       )}
                     {installation.status === 'connected' &&
                       installation.connectionRole === 'agent_only' && (
@@ -516,5 +524,124 @@ export function OrganizationGitHubInstallations({
         )}
       </Card>
     </section>
+  );
+}
+
+function InstallationModelSettings({
+  installationId,
+  accountName,
+  modelSlug,
+  thinkingEffort,
+  canManageModel,
+  modelOptions,
+  isLoadingModels,
+  onSave,
+}: {
+  installationId: string;
+  accountName: string;
+  modelSlug: string | null;
+  thinkingEffort: string | null;
+  canManageModel: boolean;
+  modelOptions: ModelOption[];
+  isLoadingModels: boolean;
+  onSave: (modelSlug: string, thinkingEffort: string | null) => void;
+}) {
+  // Seed from the effective model the bot uses (the server falls back to the
+  // default model) so an effort-only change is savable and attributable.
+  const effectiveModelSlug = modelSlug ?? DEFAULT_BOT_MODEL;
+  const [selectedModel, setSelectedModel] = useState(effectiveModelSlug);
+  const [selectedEffort, setSelectedEffort] = useState<string | null>(thinkingEffort ?? null);
+  const availableVariants = useMemo(
+    () => modelOptions.find(model => model.id === selectedModel)?.variants ?? [],
+    [modelOptions, selectedModel]
+  );
+  // A stored effort can outlive the selected model's variant list (the model
+  // changed, or the catalog dropped the variant). Keep it selectable so the
+  // setting is visible and can be cleared instead of silently persisting.
+  const effortOptions = useMemo(
+    () =>
+      selectedEffort && !availableVariants.includes(selectedEffort)
+        ? [...availableVariants, selectedEffort]
+        : availableVariants,
+    [availableVariants, selectedEffort]
+  );
+
+  useEffect(() => {
+    setSelectedModel(modelSlug ?? DEFAULT_BOT_MODEL);
+  }, [modelSlug]);
+  useEffect(() => {
+    setSelectedEffort(thinkingEffort ?? null);
+  }, [thinkingEffort]);
+  const handleModelChange = (modelId: string) => {
+    setSelectedModel(modelId);
+    // While the catalog is loading, or when it does not know the slug, the
+    // model's variants are unknown; keep the selected effort instead of
+    // clearing a possibly valid one.
+    if (isLoadingModels || !modelOptions.some(model => model.id === modelId)) return;
+    const variants = modelOptions.find(model => model.id === modelId)?.variants ?? [];
+    if (selectedEffort && !variants.includes(selectedEffort)) {
+      setSelectedEffort(null);
+    }
+  };
+
+  const dirty =
+    selectedModel !== effectiveModelSlug || (selectedEffort ?? null) !== (thinkingEffort ?? null);
+
+  return (
+    <div className="space-y-3 rounded-lg border p-4">
+      <ModelCombobox
+        id={`model-combobox-${installationId}`}
+        label="AI Model"
+        helperText="Select the AI model to use when responding to GitHub bot mentions"
+        models={modelOptions}
+        value={selectedModel || undefined}
+        onValueChange={handleModelChange}
+        isLoading={isLoadingModels}
+        disabled={!canManageModel}
+        placeholder="Select a model"
+        triggerAriaLabel={`AI model for ${accountName}`}
+      />
+      {effortOptions.length > 0 && (
+        <div className="space-y-2">
+          <Label>Thinking Effort</Label>
+          <Select
+            value={selectedEffort ?? '__default__'}
+            onValueChange={value => setSelectedEffort(value === '__default__' ? null : value)}
+            disabled={!canManageModel}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__default__">Default</SelectItem>
+              {effortOptions.map(variant => (
+                <SelectItem key={variant} value={variant}>
+                  {thinkingEffortLabel(variant)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-muted-foreground text-sm">
+            Configure the model&apos;s reasoning intensity
+          </p>
+        </div>
+      )}
+      <div className="flex justify-end">
+        <Button
+          size="sm"
+          onClick={() =>
+            onSave(
+              selectedModel,
+              selectedEffort !== null && availableVariants.includes(selectedEffort)
+                ? selectedEffort
+                : null
+            )
+          }
+          disabled={!canManageModel || !dirty || !selectedModel}
+        >
+          Save
+        </Button>
+      </div>
+    </div>
   );
 }

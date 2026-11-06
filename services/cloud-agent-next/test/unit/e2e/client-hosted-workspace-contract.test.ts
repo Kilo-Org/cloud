@@ -146,6 +146,24 @@ describe('hosted workspace creation repository override', () => {
     return JSON.parse(body) as Record<string, unknown>;
   }
 
+  it('creates an empty workspace without a message when no prompt is given', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      okEnvelope({
+        workspaceId: WORKSPACE_ID,
+        cloudAgentSessionId: 'workspace_11111111-1111-4111-8111-111111111111',
+        kiloSessionId: 'ses_12345678901234567890123456',
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await createHostedWorkspace(baseConfig, {
+      operationKey: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      profileId: PROFILE_ID,
+    });
+
+    expect(sentBody(fetchMock, 0)).not.toHaveProperty('message');
+  });
+
   it('defaults to the driver repository', async () => {
     const fetchMock = vi.fn().mockResolvedValue(okEnvelope(createResult()));
     vi.stubGlobal('fetch', fetchMock);

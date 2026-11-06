@@ -697,10 +697,10 @@
     },
     "connect": {
       "checkFailedTitle": "Tidak dapat menyemak sambungan GitHub.",
-      "checkFailedMessage": "Status log masuk hanya tersedia selepas data ini dimuatkan.",
+      "checkFailedMessage": "Tidak dapat menghubungi GitHub. Semak sambungan anda dan cuba lagi.",
       "checkFailedTitleGitLab": "Tidak dapat menyemak sambungan GitLab.",
       "checkFailedTitleBitbucket": "Tidak dapat menyemak sambungan Bitbucket.",
-      "providerCheckFailedMessage": "Status sambungan tidak tersedia sehingga ia dimuatkan.",
+      "providerCheckFailedMessage": "Tidak dapat menghubungi penyedia. Semak sambungan anda dan cuba lagi.",
       "reconnectTitle": "Sambung semula ke GitHub",
       "reconnectTitleGitLab": "Sambung semula ke GitLab",
       "reconnectTitleBitbucket": "Sambung semula ke Bitbucket",

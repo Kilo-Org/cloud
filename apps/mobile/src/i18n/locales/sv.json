@@ -697,10 +697,10 @@
     },
     "connect": {
       "checkFailedTitle": "Kunde inte kontrollera GitHub-anslutningen.",
-      "checkFailedMessage": "Inloggningsstatusen kan inte visas förrän inläsningen är klar.",
+      "checkFailedMessage": "Det gick inte att nå GitHub. Kontrollera anslutningen och försök igen.",
       "checkFailedTitleGitLab": "Kunde inte kontrollera GitLab-anslutningen.",
       "checkFailedTitleBitbucket": "Kunde inte kontrollera Bitbucket-anslutningen.",
-      "providerCheckFailedMessage": "Anslutningsstatusen kan inte visas förrän inläsningen är klar.",
+      "providerCheckFailedMessage": "Det gick inte att nå leverantören. Kontrollera anslutningen och försök igen.",
       "reconnectTitle": "Anslut GitHub igen",
       "reconnectTitleGitLab": "Anslut GitLab igen",
       "reconnectTitleBitbucket": "Anslut Bitbucket igen",

@@ -712,10 +712,10 @@
     },
     "connect": {
       "checkFailedTitle": "Nije moguće proveriti vezu sa GitHub-om.",
-      "checkFailedMessage": "Status prijave nije dostupan dok se ovo ne učita.",
+      "checkFailedMessage": "Nije moguće povezati se sa GitHub-om. Proveri vezu i pokušaj ponovo.",
       "checkFailedTitleGitLab": "Nije moguće proveriti vezu sa GitLab-om.",
       "checkFailedTitleBitbucket": "Nije moguće proveriti vezu sa Bitbucket-om.",
-      "providerCheckFailedMessage": "Status veze nije dostupan dok se ovo ne učita.",
+      "providerCheckFailedMessage": "Nije moguće povezati se sa provajderom. Proveri vezu i pokušaj ponovo.",
       "reconnectTitle": "Ponovo poveži GitHub",
       "reconnectTitleGitLab": "Ponovo poveži GitLab",
       "reconnectTitleBitbucket": "Ponovo poveži Bitbucket",

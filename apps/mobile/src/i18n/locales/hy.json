@@ -700,7 +700,7 @@
       "checkFailedMessage": "Չհաջողվեց հասնել GitHub-ին։ Ստուգիր կապդ և կրկին փորձիր։",
       "checkFailedTitleGitLab": "Չհաջողվեց ստուգել GitLab-ի հետ կապը",
       "checkFailedTitleBitbucket": "Չհաջողվեց ստուգել Bitbucket-ի հետ կապը",
-      "providerCheckFailedMessage": "Միացման կարգավիճակը հասանելի չէ մինչև բեռնվելը։",
+      "providerCheckFailedMessage": "Չհաջողվեց հասնել մատակարարին։ Ստուգիր կապդ և կրկին փորձիր։",
       "reconnectTitle": "Կրկին միացում GitHub-ին",
       "reconnectTitleGitLab": "Կրկին միացում GitLab-ին",
       "reconnectTitleBitbucket": "Կրկին միացում Bitbucket-ին",

@@ -2815,10 +2815,10 @@
     },
     "connect": {
       "checkFailedTitle": "Nie udało się sprawdzić połączenia z kontem GitHub.",
-      "checkFailedMessage": "Status logowania będzie dostępny dopiero po wczytaniu danych.",
+      "checkFailedMessage": "Nie udało się połączyć z GitHubem. Sprawdź połączenie i spróbuj ponownie.",
       "checkFailedTitleGitLab": "Nie udało się sprawdzić połączenia z kontem GitLab.",
       "checkFailedTitleBitbucket": "Nie udało się sprawdzić połączenia z kontem Bitbucket.",
-      "providerCheckFailedMessage": "Status połączenia będzie dostępny po wczytaniu danych.",
+      "providerCheckFailedMessage": "Nie udało się połączyć z dostawcą. Sprawdź połączenie i spróbuj ponownie.",
       "reconnectTitle": "Połącz ponownie konto GitHub",
       "reconnectTitleGitLab": "Połącz ponownie konto GitLab",
       "reconnectTitleBitbucket": "Połącz ponownie konto Bitbucket",

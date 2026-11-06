@@ -764,10 +764,10 @@
     },
     "connect": {
       "checkFailedTitle": "Could not check GitHub connection",
-      "checkFailedMessage": "Sign-in status is unavailable until this loads.",
+      "checkFailedMessage": "Could not reach GitHub. Check your connection and try again.",
       "checkFailedTitleGitLab": "Could not check GitLab connection",
       "checkFailedTitleBitbucket": "Could not check Bitbucket connection",
-      "providerCheckFailedMessage": "Connection status is unavailable until this loads.",
+      "providerCheckFailedMessage": "Could not reach the provider. Check your connection and try again.",
       "reconnectTitle": "Reconnect GitHub",
       "reconnectTitleGitLab": "Reconnect GitLab",
       "reconnectTitleBitbucket": "Reconnect Bitbucket",

@@ -697,10 +697,10 @@
     },
     "connect": {
       "checkFailedTitle": "GitHub සම්බන්ධතාවය පරීක්ෂා කිරීමට නොහැකි විය.",
-      "checkFailedMessage": "මෙය පූරණය වන තුරු පිවිසුම් තත්ත්වය දැනගත නොහැක.",
+      "checkFailedMessage": "GitHub වෙත සම්බන්ධ වීමට නොහැකි විය. ඔබේ සම්බන්ධතාවය පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
       "checkFailedTitleGitLab": "GitLab සම්බන්ධතාවය පරීක්ෂා කිරීමට නොහැකි විය.",
       "checkFailedTitleBitbucket": "Bitbucket සම්බන්ධතාවය පරීක්ෂා කිරීමට නොහැකි විය.",
-      "providerCheckFailedMessage": "මෙය පූරණය වන තුරු සම්බන්ධතා තත්ත්වය ලබා ගත නොහැක.",
+      "providerCheckFailedMessage": "සේවා සපයන්නා වෙත සම්බන්ධ වීමට නොහැකි විය. ඔබේ සම්බන්ධතාවය පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
       "reconnectTitle": "GitHub නැවත සම්බන්ධ කරන්න",
       "reconnectTitleGitLab": "GitLab නැවත සම්බන්ධ කරන්න",
       "reconnectTitleBitbucket": "Bitbucket නැවත සම්බන්ධ කරන්න",

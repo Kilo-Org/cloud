@@ -697,10 +697,10 @@
     },
     "connect": {
       "checkFailedTitle": "GitHub ulanishini tekshirib bo'lmadi.",
-      "checkFailedMessage": "Bu ma'lumot yuklanmaguncha hisobga kirish holatini aniqlab bo'lmaydi.",
+      "checkFailedMessage": "GitHub bilan bog'lanib bo'lmadi. Ulanishni tekshiring va qayta urinib ko'ring.",
       "checkFailedTitleGitLab": "GitLab ulanishini tekshirib bo'lmadi.",
       "checkFailedTitleBitbucket": "Bitbucket ulanishini tekshirib bo'lmadi.",
-      "providerCheckFailedMessage": "Yuklanmaguncha ulanish holati mavjud emas.",
+      "providerCheckFailedMessage": "Provayder bilan bog'lanib bo'lmadi. Ulanishni tekshiring va qayta urinib ko'ring.",
       "reconnectTitle": "GitHubga qayta ulanish",
       "reconnectTitleGitLab": "GitLabga qayta ulanish",
       "reconnectTitleBitbucket": "Bitbucketga qayta ulanish",

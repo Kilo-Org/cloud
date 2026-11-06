@@ -697,10 +697,10 @@
     },
     "connect": {
       "checkFailedTitle": "GitHub कनेक्शन तपासता आले नाही.",
-      "checkFailedMessage": "हे लोड होईपर्यंत तुम्ही साइन इन केले आहे का ते कळणार नाही.",
+      "checkFailedMessage": "GitHub शी कनेक्ट होऊ शकले नाही. इंटरनेट कनेक्शन तपासा आणि पुन्हा प्रयत्न करा.",
       "checkFailedTitleGitLab": "GitLab कनेक्शन तपासता आले नाही.",
       "checkFailedTitleBitbucket": "Bitbucket कनेक्शन तपासता आले नाही.",
-      "providerCheckFailedMessage": "हे लोड होईपर्यंत कनेक्शनची स्थिती उपलब्ध नाही.",
+      "providerCheckFailedMessage": "प्रदात्याशी कनेक्ट होऊ शकले नाही. इंटरनेट कनेक्शन तपासा आणि पुन्हा प्रयत्न करा.",
       "reconnectTitle": "GitHub पुन्हा कनेक्ट करा",
       "reconnectTitleGitLab": "GitLab पुन्हा कनेक्ट करा",
       "reconnectTitleBitbucket": "Bitbucket पुन्हा कनेक्ट करा",

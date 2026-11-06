@@ -697,10 +697,10 @@
     },
     "connect": {
       "checkFailedTitle": "GitHub холболтыг шалгаж чадсангүй.",
-      "checkFailedMessage": "Энэ мэдээллийг ачаалж дуустал нэвтэрсэн эсэхийг харуулах боломжгүй.",
+      "checkFailedMessage": "GitHub-д холбогдож чадсангүй. Холболтоо шалгаад дахин оролдоно уу.",
       "checkFailedTitleGitLab": "GitLab холболтыг шалгаж чадсангүй.",
       "checkFailedTitleBitbucket": "Bitbucket холболтыг шалгаж чадсангүй.",
-      "providerCheckFailedMessage": "Ачаалагдах хүртэл холболтын төлөв харагдахгүй.",
+      "providerCheckFailedMessage": "Үйлчилгээ үзүүлэгчтэй холбогдож чадсангүй. Холболтоо шалгаад дахин оролдоно уу.",
       "reconnectTitle": "GitHub-ыг дахин холбох",
       "reconnectTitleGitLab": "GitLab-ыг дахин холбох",
       "reconnectTitleBitbucket": "Bitbucket-ыг дахин холбох",

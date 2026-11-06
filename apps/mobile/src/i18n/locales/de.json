@@ -2741,10 +2741,10 @@
     },
     "connect": {
       "checkFailedTitle": "Die GitHub-Verbindung konnte nicht geprüft werden.",
-      "checkFailedMessage": "Der Anmeldestatus ist erst verfügbar, wenn die Prüfung abgeschlossen ist.",
+      "checkFailedMessage": "GitHub konnte nicht erreicht werden. Prüfe deine Verbindung und versuche es erneut.",
       "checkFailedTitleGitLab": "Die GitLab-Verbindung konnte nicht geprüft werden.",
       "checkFailedTitleBitbucket": "Die Bitbucket-Verbindung konnte nicht geprüft werden.",
-      "providerCheckFailedMessage": "Der Verbindungsstatus ist erst verfügbar, wenn die Prüfung abgeschlossen ist.",
+      "providerCheckFailedMessage": "Der Anbieter konnte nicht erreicht werden. Prüfe deine Verbindung und versuche es erneut.",
       "reconnectTitle": "GitHub erneut verbinden",
       "reconnectTitleGitLab": "GitLab erneut verbinden",
       "reconnectTitleBitbucket": "Bitbucket erneut verbinden",

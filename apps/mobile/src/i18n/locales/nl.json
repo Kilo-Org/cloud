@@ -2741,10 +2741,10 @@
     },
     "connect": {
       "checkFailedTitle": "De GitHub-verbinding kon niet worden gecontroleerd.",
-      "checkFailedMessage": "De aanmeldstatus is pas beschikbaar zodra het laden is voltooid.",
+      "checkFailedMessage": "GitHub kon niet worden bereikt. Controleer je verbinding en probeer het opnieuw.",
       "checkFailedTitleGitLab": "De GitLab-verbinding kon niet worden gecontroleerd.",
       "checkFailedTitleBitbucket": "De Bitbucket-verbinding kon niet worden gecontroleerd.",
-      "providerCheckFailedMessage": "De verbindingsstatus is pas beschikbaar zodra het laden is voltooid.",
+      "providerCheckFailedMessage": "De provider kon niet worden bereikt. Controleer je verbinding en probeer het opnieuw.",
       "reconnectTitle": "GitHub opnieuw verbinden",
       "reconnectTitleGitLab": "GitLab opnieuw verbinden",
       "reconnectTitleBitbucket": "Bitbucket opnieuw verbinden",

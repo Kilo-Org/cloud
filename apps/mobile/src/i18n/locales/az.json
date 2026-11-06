@@ -697,10 +697,10 @@
     },
     "connect": {
       "checkFailedTitle": "GitHub bağlantısını yoxlamaq mümkün olmadı.",
-      "checkFailedMessage": "Bu məlumat yüklənənədək giriş statusunu göstərmək mümkün deyil.",
+      "checkFailedMessage": "GitHub-a çatmaq mümkün olmadı. Bağlantını yoxla və yenidən cəhd et.",
       "checkFailedTitleGitLab": "GitLab bağlantısını yoxlamaq mümkün olmadı.",
       "checkFailedTitleBitbucket": "Bitbucket bağlantısını yoxlamaq mümkün olmadı.",
-      "providerCheckFailedMessage": "Yüklənənə qədər bağlantı statusu əlçatan deyil.",
+      "providerCheckFailedMessage": "Provayderə çatmaq mümkün olmadı. Bağlantını yoxla və yenidən cəhd et.",
       "reconnectTitle": "GitHub-a yenidən qoşul",
       "reconnectTitleGitLab": "GitLab-a yenidən qoşul",
       "reconnectTitleBitbucket": "Bitbucket-a yenidən qoşul",

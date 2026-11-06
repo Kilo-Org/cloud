@@ -727,10 +727,10 @@
     },
     "connect": {
       "checkFailedTitle": "Не атрымалася праверыць падключэнне да GitHub.",
-      "checkFailedMessage": "Стан уваходу недаступны, пакуль даныя не загрузяцца.",
+      "checkFailedMessage": "Не атрымалася звязацца з GitHub. Правер падключэнне і паспрабуй яшчэ раз.",
       "checkFailedTitleGitLab": "Не ўдалося праверыць падключэнне да GitLab",
       "checkFailedTitleBitbucket": "Не ўдалося праверыць падключэнне да Bitbucket",
-      "providerCheckFailedMessage": "Стан падключэння недаступны, пакуль гэта не загрузіцца.",
+      "providerCheckFailedMessage": "Не атрымалася звязацца з правайдэрам. Правер падключэнне і паспрабуй яшчэ раз.",
       "reconnectTitle": "Падключыць GitHub зноў",
       "reconnectTitleGitLab": "Падключыць GitLab зноў",
       "reconnectTitleBitbucket": "Падключыць Bitbucket зноў",

@@ -697,10 +697,10 @@
     },
     "connect": {
       "checkFailedTitle": "GitHub ಸಂಪರ್ಕವನ್ನು ಪರಿಶೀಲಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
-      "checkFailedMessage": "ಇದು ಲೋಡ್ ಆಗುವವರೆಗೆ ಸೈನ್ ಇನ್ ಸ್ಥಿತಿ ಲಭ್ಯವಿಲ್ಲ.",
+      "checkFailedMessage": "GitHub ಅನ್ನು ಸಂಪರ್ಕಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ನಿಮ್ಮ ಸಂಪರ್ಕವನ್ನು ಪರಿಶೀಲಿಸಿ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
       "checkFailedTitleGitLab": "GitLab ಸಂಪರ್ಕವನ್ನು ಪರಿಶೀಲಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
       "checkFailedTitleBitbucket": "Bitbucket ಸಂಪರ್ಕವನ್ನು ಪರಿಶೀಲಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
-      "providerCheckFailedMessage": "ಇದು ಲೋಡ್ ಆಗುವವರೆಗೆ ಸಂಪರ್ಕ ಸ್ಥಿತಿ ಲಭ್ಯವಿಲ್ಲ.",
+      "providerCheckFailedMessage": "ಪೂರೈಕೆದಾರರನ್ನು ಸಂಪರ್ಕಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ನಿಮ್ಮ ಸಂಪರ್ಕವನ್ನು ಪರಿಶೀಲಿಸಿ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
       "reconnectTitle": "GitHubಗೆ ಮತ್ತೆ ಸಂಪರ್ಕಿಸಿ",
       "reconnectTitleGitLab": "GitLabಗೆ ಮತ್ತೆ ಸಂಪರ್ಕಿಸಿ",
       "reconnectTitleBitbucket": "Bitbucketಗೆ ಮತ್ತೆ ಸಂಪರ್ಕಿಸಿ",

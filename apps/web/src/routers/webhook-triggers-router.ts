@@ -40,7 +40,7 @@ import {
   validateCronExpression,
   enforcesMinimumInterval,
   isValidTimezone,
-} from '@/lib/cron-validation';
+} from '@kilocode/worker-utils/cron';
 import {
   createWorkerTrigger,
   getWorkerTrigger,

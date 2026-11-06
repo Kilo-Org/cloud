@@ -17,7 +17,11 @@ import { internalApiMiddleware } from '../util/auth';
 import { clampRequestLimit } from '../util/constants';
 import { decodeUserIdFromPath, encodeUserIdForPath } from '@kilocode/worker-utils/user-id-encoding';
 import { sandboxAllocationSchema } from '@kilocode/worker-utils/sandbox-allocation';
-import { validateCronExpression, enforcesMinimumInterval, isValidTimezone } from '../util/cron';
+import {
+  validateCronExpression,
+  enforcesMinimumInterval,
+  isValidTimezone,
+} from '@kilocode/worker-utils/cron';
 import type {
   ScheduledInvocationResult,
   TriggerConfigResponse,

@@ -38,7 +38,7 @@ import {
   sandboxAllocationSchema,
   type SandboxAllocation,
 } from '@kilocode/worker-utils/sandbox-allocation';
-import { computeNextCronTime } from '../util/cron';
+import { computeNextCronTime } from '@kilocode/worker-utils/cron';
 
 export type { ProcessStatus, RequestUpdates } from '../db/types';
 

@@ -846,6 +846,10 @@ creates neither credentials nor GO files. Supported cloud profiles are `cold`,
 `renewal`, `hot100`, `slowreader`, `organization`, and `full`; the last fixes
 100,000 sessions and 10,000 actual SDK viewers across 32 shards/four hosts.
 
+Start `perf-teardown.mjs arm <target-manifest.json>` on the owned control VM
+before any refresh or seed command. Require its matching heartbeat and live
+process before approval or admission.
+
 Planning freezes the workload, source hashes, target, and lifetime budget but
 does not freeze live evidence forever. Before **each** seed or launch admission,
 run `perf-plan.mjs refresh <same-manifest.json> <same-output-directory>` from the

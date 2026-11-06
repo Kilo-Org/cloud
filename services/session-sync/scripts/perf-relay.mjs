@@ -273,6 +273,12 @@ server.on('upgrade', (request, socket, head) => {
         frame(ws, 'error', { code: 'invalid_request' });
         return;
       }
+      if (ticket.expiresAt <= Date.now()) {
+        if (message.type === 'reauth') stats.rejectedReauth++;
+        frame(ws, 'error', { code: 'invalid_ticket' });
+        ws.close(1008, 'ticket_expired');
+        return;
+      }
       if (ticket.presence && message.type === 'heartbeat') {
         const parsed = heartbeatSchema.safeParse(message);
         if (

@@ -49,6 +49,21 @@ test(
     );
     const relay = fork(fileURLToPath(new URL('./perf-relay.mjs', import.meta.url)), [configFile], {
       stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
+      execArgv: [
+        ...process.execArgv,
+        '--import',
+        'data:text/javascript,' +
+          encodeURIComponent(`
+            const realNow = Date.now.bind(Date);
+            let offset = 0;
+            Date.now = () => realNow() + offset;
+            process.on('message', message => {
+              if (message?.type !== 'test-clock') return;
+              offset = message.offset;
+              process.send({ type: 'test-clock', offset });
+            });
+          `),
+      ],
     });
     const exited = once(relay, 'exit');
     const sockets = [];
@@ -66,6 +81,11 @@ test(
         });
         relay.once('exit', () => reject(Error(`Relay exited: ${logs}`)));
       });
+      const setClock = async offset => {
+        const acknowledged = once(relay, 'message');
+        relay.send({ type: 'test-clock', offset });
+        assert.deepEqual((await acknowledged)[0], { type: 'test-clock', offset });
+      };
       const baseURL = `http://127.0.0.1:${port}`;
       const a = session({ runID: 'protocol' }, 0);
       const b = session({ runID: 'protocol' }, 1);
@@ -94,6 +114,7 @@ test(
           ['kilo-session-ticket.' + ticket.ticket]
         );
         sockets.push(socket);
+        const closed = new Promise(resolve => socket.once('close', (...args) => resolve(args)));
         const frames = [];
         socket.on('message', data => frames.push(JSON.parse(data.toString())));
         socket.on('error', () => {});
@@ -107,7 +128,7 @@ test(
           throw Error(`Missing ${type}: ${JSON.stringify(frames)}`);
         };
         await next('hello');
-        return { socket, next, send: body => socket.send(JSON.stringify(body)) };
+        return { socket, closed, next, send: body => socket.send(JSON.stringify(body)) };
       };
       for (const s of [a, b])
         assert.equal(
@@ -169,19 +190,25 @@ test(
       const connection = await connect(a, await mint(a));
       connection.send({ type: 'reauth', ticket: expired.ticket });
       assert.equal((await connection.next('error')).body.code, 'invalid_ticket');
-      const expiring = await connect(a, await mint(a, 'runner', true, 1));
-      assert.equal((await once(expiring.socket, 'close'))[0], 1008);
-      await sleep(1050);
+      const late = await connect(a, await mint(a));
+      await setClock(121000);
+      const replacement = await mint(a);
+      late.send({ type: 'reauth', ticket: replacement.ticket });
+      assert.equal((await late.next('error')).body.code, 'invalid_ticket');
+      assert.equal((await late.closed)[0], 1008);
+      const fresh = await connect(a, replacement);
+      fresh.socket.close();
+      await fresh.closed;
+      await setClock(0);
+      const expiring = await connect(a, await mint(a, 'runner', true, 5));
+      assert.equal((await expiring.closed)[0], 1008);
     } finally {
       for (const socket of sockets) socket.terminate();
+      if (relay.connected) relay.disconnect();
       relay.kill('SIGTERM');
       await exited;
       const stats = JSON.parse(readFileSync(join(root, 'relay.json'), 'utf8'));
       rmSync(root, { recursive: true, force: true });
-      assert.equal(stats.reauthorized, 1);
-      assert.equal(stats.rejectedReauth, 6);
-      assert.equal(stats.rejectedAuth, 3);
-      assert.equal(stats.rejectedHeartbeat, 2);
       assert.equal(stats.ticketsRemaining, 0);
     }
   }

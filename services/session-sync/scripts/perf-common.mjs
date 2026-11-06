@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { createHash, createHmac } from 'node:crypto';
 import { readFileSync, statSync } from 'node:fs';
 import { z } from 'zod';
-import { checkWatchdog } from './perf-identity.mjs';
+import { assertManifestIdentity, checkWatchdog } from './perf-identity.mjs';
 
 export const nativeSHA = '5b3069885d3223b96fdf1b1db51a7bda54e566e8';
 export const nativeBundleHash = '9388572658ea4c0a6a3184e872485f51e4959637cafd369fea4d4b70885b6120';
@@ -59,6 +59,7 @@ export const configSchema = z.strictObject({
   targetManifest: z.string().optional(),
   budgetStage: z.string().optional(),
   goFile: z.string().optional(),
+  attestationFile: z.string().optional(),
 });
 
 export function sha256(value) {
@@ -113,7 +114,8 @@ export function readConfig(path) {
     assert(go.expiresAt >= config.stopAt && go.expiresAt > Date.now());
     assert.equal(go.budgetHash, sha256(readFileSync(go.budgetFile)));
     const budget = JSON.parse(readFileSync(go.budgetFile, 'utf8'));
-    validateCloudAdmission(config, manifest, budget);
+    const inspection = validateAttestation(config, manifest, go, path);
+    validateCloudAdmission(config, manifest, budget, Date.now(), inspection);
   }
   event(
     { ...session(config, config.sessions - 1), position: 13 },
@@ -125,6 +127,7 @@ export function readConfig(path) {
 }
 
 export function validateTarget(config, manifest) {
+  assertManifestIdentity(manifest, true);
   assert.equal(manifest.accountID, 'e115e769bcdd4c3d66af59d3332cb394');
   assert.equal(manifest.runID, config.runID);
   assert.equal(manifest.workerName, `session-sync-${config.runID}-loadtest`);
@@ -421,7 +424,9 @@ export class Pending {
 }
 
 export function limiterConfig(runID) {
-  const base = 1000000000 + Number.parseInt(sha256(runID).slice(0, 7), 16) * 8;
+  assert(/^[a-z0-9-]{3,32}$/.test(runID));
+  // Five adjacent IDs in the positive signed-31-bit range; inventory still refuses collisions.
+  const base = 1000000000 + (Number.parseInt(sha256(runID).slice(0, 8), 16) % 143435456) * 8;
   return [
     ['EXCHANGE_IP_LIMITER', 120],
     ['EXCHANGE_ACCOUNT_LIMITER', 60],
@@ -435,6 +440,27 @@ export function limiterConfig(runID) {
   }));
 }
 
+export function validateAttestation(config, manifest, go, configFile) {
+  assert(config.attestationFile, 'Current attestation and renewed parent GO are required');
+  const bytes = readFileSync(config.attestationFile);
+  assert.equal(go.attestationHash, sha256(bytes), 'Parent GO must renew this exact attestation');
+  const attestation = JSON.parse(bytes);
+  assert.equal(attestation.runID, config.runID);
+  assert.equal(attestation.targetManifestHash, go.targetManifestHash);
+  assert(attestation.configHashes.includes(sha256(readFileSync(configFile))));
+  assert.equal(attestation.budgetHash, go.budgetHash);
+  assert.equal(attestation.configHash, manifest.configHash);
+  assert.equal(attestation.sdkModuleHash, config.sdkModuleHash);
+  assert.equal(attestation.nativeModuleHash, config.nativeModuleHash);
+  assert.equal(attestation.resourceCreatedAt, manifest.resourceCreatedAt);
+  assert.equal(attestation.teardownAt, config.stopAt);
+  assert(
+    attestation.issuedAt <= Date.now() && Date.now() - attestation.issuedAt <= 60000,
+    'Attestation is stale; refresh evidence and obtain renewed parent GO'
+  );
+  assert.equal(attestation.watchdogInstanceID, manifest.independentWatchdogID);
+  return attestation.inspection;
+}
 export function validateReceipt(s, batch, value) {
   const receipt = receiptSchema.parse(value);
   assert.equal(receipt.sessionID, s.id);
@@ -451,9 +477,15 @@ export function arrivalAllowed(window, at) {
   return !window || at < window.drainAt;
 }
 
-export function validateCloudAdmission(config, manifest, budget, now = Date.now()) {
+export function validateCloudAdmission(
+  config,
+  manifest,
+  budget,
+  now = Date.now(),
+  currentInspection
+) {
   checkWatchdog(manifest, now);
-  const inspection = JSON.parse(readFileSync(manifest.evidenceFile, 'utf8'));
+  const inspection = currentInspection ?? JSON.parse(readFileSync(manifest.evidenceFile, 'utf8'));
   assert(
     inspection.checkedAt <= now && now - inspection.checkedAt <= 60000,
     'Live deployment inspection is stale'
@@ -503,6 +535,18 @@ export function validateCloudAdmission(config, manifest, budget, now = Date.now(
         config.sdkViewers +
         (config.rawViewers ?? 0) * (config.rawCopies ?? 1)
   );
+}
+
+export async function finalizeClusterResult(result, cleanup, save) {
+  try {
+    await cleanup();
+    result.cleanup = { passed: true };
+  } catch (error) {
+    result.cleanup = { passed: false, error: error.message };
+  }
+  result.passed = result.workloadPassed === true && result.cleanup.passed;
+  save(result);
+  return result;
 }
 
 export function assertReceiptRetry(original, value) {

@@ -3,6 +3,8 @@ import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import { posix } from 'node:path';
+import { setTimeout as sleep } from 'node:timers/promises';
 const execute = promisify(execFile);
 
 export function canonical(value) {
@@ -20,33 +22,176 @@ export function identityHash(value) {
     .update(JSON.stringify(canonical(value)))
     .digest('hex');
 }
-export function operatorAPI(credentials) {
+export const approvedAccountID = 'e115e769bcdd4c3d66af59d3332cb394';
+const resourceID = /^[a-f0-9]{32}$/;
+const atom = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/;
+export function assertManifestIdentity(manifest, deployed = false) {
+  assert.equal(manifest.accountID, approvedAccountID);
+  assert(/^(?=.{3,32}$)[a-z0-9]+(?:-[a-z0-9]+)*$/.test(manifest.runID));
+  assert.equal(manifest.workerName, `session-sync-${manifest.runID}-loadtest`);
+  assert.equal(manifest.r2Bucket, manifest.workerName);
+  for (const key of ['hyperdriveID', 'secretsStoreID'])
+    if (deployed || manifest[key] !== undefined) assert(resourceID.test(manifest[key]), key);
+  for (const key of ['deploymentID', 'versionID', 'r2BucketID'])
+    if (deployed || manifest[key] !== undefined) assert(atom.test(manifest[key]), key);
+  for (const id of manifest.namespaceIDs ?? []) assert(resourceID.test(id), 'namespace ID');
+  for (const row of manifest.namespaces ?? []) assert(resourceID.test(row.id), 'namespace ID');
+  for (const secret of manifest.secrets ?? []) {
+    if (deployed || secret.id !== undefined) assert(resourceID.test(secret.id), 'secret ID');
+    assert(/^[A-Z0-9_]+_STAGING_LOADTEST$/.test(secret.name), 'secret name');
+  }
+  for (const name of manifest.secretNames ?? [])
+    assert(/^[A-Z0-9_]+_STAGING_LOADTEST$/.test(name), 'secret name');
+}
+export function assertGenerator(node) {
+  assert(/^[a-zA-Z0-9](?:[a-zA-Z0-9.-]*[a-zA-Z0-9])?$/.test(node.host), 'Reviewed SSH host');
+  assert(!['localhost', '127.0.0.1'].includes(node.host), 'Use owned test generator hosts');
+  for (const key of ['root', 'repository']) {
+    const path = node[key];
+    assert(
+      typeof path === 'string' &&
+        /^\/[a-zA-Z0-9_./-]+$/.test(path) &&
+        path !== '/' &&
+        posix.normalize(path) === path &&
+        !path.split('/').some(part => part === '.' || part === '..'),
+      'Reviewed absolute generator path'
+    );
+  }
+}
+export async function inventory(api, path, rows = result => result, perPage = 100) {
+  const found = [];
+  const cursors = new Set();
+  let cursor;
+  for (let page = 1; page <= 100; page++) {
+    const query = cursor
+      ? `per_page=${perPage}&cursor=${encodeURIComponent(cursor)}`
+      : `per_page=${perPage}&page=${page}`;
+    const response = await api('GET', `${path}${path.includes('?') ? '&' : '?'}${query}`);
+    assert(!response.absent, 'Inventory unavailable; absence is unproven');
+    const values = rows(response.result);
+    assert(Array.isArray(values), 'Inventory response schema changed');
+    found.push(...values);
+    cursor = response.result?.cursor ?? response.result_info?.cursor;
+    if (cursor) {
+      assert(!cursors.has(cursor), 'Inventory cursor repeated; absence is unproven');
+      cursors.add(cursor);
+      continue;
+    }
+    const info = response.result_info;
+    if (info?.total_pages !== undefined) {
+      if (page >= info.total_pages) return found;
+    } else if (info?.total_count !== undefined) {
+      if (found.length >= info.total_count) return found;
+    } else if (values.length < (info?.per_page ?? perPage)) return found;
+  }
+  throw Error('Inventory page budget exceeded; absence is unproven');
+}
+export async function assertUnusedLimiters(api, workers, namespaceIDs) {
+  const namespaces = new Set(namespaceIDs.map(String));
+  let index = 0;
+  await Promise.all(
+    Array.from({ length: Math.min(8, workers.length) }, async () => {
+      while (index < workers.length) {
+        const worker = workers[index++];
+        assert(/^[a-z0-9][a-z0-9-]{0,62}$/.test(worker.id), 'Inventory Worker ID');
+        const settings = await api(
+          'GET',
+          `/accounts/${approvedAccountID}/workers/scripts/${worker.id}/settings`
+        );
+        assert(
+          !(settings.result.bindings ?? []).some(
+            binding => binding.type === 'ratelimit' && namespaces.has(String(binding.namespace_id))
+          ),
+          'Limiter namespace is already shared with another Worker'
+        );
+      }
+    })
+  );
+}
+export class OperatorHTTPError extends Error {
+  constructor(status) {
+    super(`Cloudflare HTTP ${status}`);
+    this.status = status;
+    this.transient = status === 408 || status === 429 || status >= 500;
+  }
+}
+export async function retryTransient(action, deadline, options = {}) {
+  const now = options.now ?? Date.now;
+  const delay = options.sleep ?? sleep;
+  for (let attempt = 0; ; attempt++) {
+    assert(now() < deadline, 'Teardown deadline exhausted');
+    try {
+      return await action();
+    } catch (error) {
+      if (!error.transient || attempt >= 3 || now() + 250 * 2 ** attempt >= deadline) throw error;
+      await delay(250 * 2 ** attempt);
+    }
+  }
+}
+export function operatorAPI(credentials, options = {}) {
   assert(credentials, 'A scoped operator credential resolver is required');
   const zoneIDs = new Set();
   return async (method, path) => {
-    const zonesList = path.startsWith('/zones?account.id=e115e769bcdd4c3d66af59d3332cb394&');
-    const zoneRoute = /^\/zones\/([a-f0-9]{32})\/workers\/routes(?:\?|$)/.exec(path);
+    const url = new URL('https://api.cloudflare.com/client/v4' + path);
     assert(
-      path.startsWith('/accounts/e115e769bcdd4c3d66af59d3332cb394/') ||
-        (method === 'GET' && (zonesList || (zoneRoute && zoneIDs.has(zoneRoute[1]))))
+      path.startsWith('/') &&
+        !path.includes('#') &&
+        !path.includes('\\') &&
+        url.origin === 'https://api.cloudflare.com' &&
+        url.pathname === '/client/v4' + path.split('?')[0] &&
+        !path.split('?')[0].includes('%') &&
+        !path
+          .split('?')[0]
+          .split('/')
+          .some(part => part === '.' || part === '..'),
+      'Unsafe operator API path'
+    );
+    const pathname = path.split('?')[0];
+    const zonesList =
+      pathname === '/zones' && url.searchParams.get('account.id') === approvedAccountID;
+    const zoneRoute = /^\/zones\/([a-f0-9]{32})\/workers\/routes$/.exec(pathname);
+    const accountPath = pathname.slice(`/accounts/${approvedAccountID}/`.length);
+    const accountRead =
+      pathname.startsWith(`/accounts/${approvedAccountID}/`) &&
+      /^(?:workers\/(?:scripts(?:\/[a-z0-9][a-z0-9-]{0,62}(?:\/(?:deployments|settings|subdomain))?)?|subdomain|domains|durable_objects\/namespaces)|hyperdrive\/configs(?:\/[a-f0-9]{32})?|r2\/buckets(?:\/[a-z0-9][a-z0-9-]{0,62}(?:\/domains\/(?:managed|custom))?)?|secrets_store\/stores\/[a-f0-9]{32}\/secrets(?:\/[a-f0-9]{32})?)$/.test(
+        accountPath
+      );
+    const accountDelete =
+      pathname.startsWith(`/accounts/${approvedAccountID}/`) &&
+      /^(?:hyperdrive\/configs\/[a-f0-9]{32}|secrets_store\/stores\/[a-f0-9]{32}\/secrets\/[a-f0-9]{32})$/.test(
+        accountPath
+      );
+    assert(
+      (method === 'GET' &&
+        (accountRead || zonesList || (zoneRoute && zoneIDs.has(zoneRoute[1])))) ||
+        (method === 'DELETE' && accountDelete),
+      'Operator endpoint is outside the approved account/read-delete scope'
     );
     const token = typeof credentials === 'function' ? await credentials() : credentials;
-    const response = await fetch('https://api.cloudflare.com/client/v4' + path, {
-      method,
-      redirect: 'error',
-      headers: { authorization: `Bearer ${token}` },
-      signal: AbortSignal.timeout(15000),
-    });
+    const remaining = (options.deadline ?? Infinity) - Date.now();
+    assert(remaining > 0, 'Teardown deadline exhausted');
+    let response;
+    try {
+      response = await (options.fetch ?? fetch)(url.href, {
+        method,
+        redirect: 'error',
+        headers: { authorization: `Bearer ${token}` },
+        signal: AbortSignal.timeout(Math.max(1, Math.min(15000, remaining))),
+      });
+    } catch (cause) {
+      throw Object.assign(Error('Operator transport failed'), { transient: true, cause });
+    }
     if (response.status === 404) return { absent: true };
     if (!response.ok) {
       await response.body?.cancel();
-      throw Error(`Cloudflare HTTP ${response.status}`);
+      throw new OperatorHTTPError(response.status);
     }
     const data = await response.json();
     assert(data.success !== false, 'Cloudflare operation unsuccessful');
     if (zonesList)
       for (const zone of data.result) {
-        assert(zone.account.id === 'e115e769bcdd4c3d66af59d3332cb394');
+        assert.equal(zone.account.id, approvedAccountID);
+        assert(resourceID.test(zone.id), 'zone ID');
         zoneIDs.add(zone.id);
       }
     return data;
@@ -107,6 +252,7 @@ export function assertBindings(manifest, bindings) {
   return identityHash(sort(bindings));
 }
 export async function currentDeployment(manifest, api) {
+  assertManifestIdentity(manifest, true);
   const path = `/accounts/${manifest.accountID}/workers/scripts/${manifest.workerName}`;
   const deployments = await api('GET', `${path}/deployments`);
   if (deployments.absent) return { absent: true };
@@ -131,6 +277,7 @@ export async function currentDeployment(manifest, api) {
   return { deploymentID: latest.id, versionID: manifest.versionID, bindingsHash };
 }
 export async function inspectLive(manifest, api) {
+  assertManifestIdentity(manifest, true);
   const current = await currentDeployment(manifest, api);
   assert(!current.absent, 'Expected deployment is absent');
   const account = `/accounts/${manifest.accountID}`;
@@ -140,24 +287,9 @@ export async function inspectLive(manifest, api) {
   const exposure = (await api('GET', `${account}/workers/scripts/${manifest.workerName}/subdomain`))
     .result;
   assert.equal(exposure.enabled, true);
-  const namespaces = [];
-  for (let page = 1; page <= 100; page++) {
-    const list = await api(
-      'GET',
-      `${account}/workers/durable_objects/namespaces?per_page=100&page=${page}`
-    );
-    namespaces.push(
-      ...list.result.filter(
-        row => row.script === manifest.workerName || row.script_name === manifest.workerName
-      )
-    );
-    if (
-      list.result.length < 100 ||
-      (list.result_info?.total_count !== undefined && page * 100 >= list.result_info.total_count)
-    )
-      break;
-    assert(page < 100, 'Namespace inventory page budget');
-  }
+  const namespaces = (await inventory(api, `${account}/workers/durable_objects/namespaces`)).filter(
+    row => row.script === manifest.workerName || row.script_name === manifest.workerName
+  );
   assert.deepEqual(namespaces.map(row => row.id).sort(), [...manifest.namespaceIDs].sort());
   const rendered = JSON.parse(readFileSync(manifest.configFile, 'utf8'));
   for (const expected of manifest.namespaces) {
@@ -190,34 +322,24 @@ export async function inspectLive(manifest, api) {
   const custom = (await api('GET', `${account}/r2/buckets/${manifest.r2Bucket}/domains/custom`))
     .result;
   assert.deepEqual(custom.domains, []);
-  for (let page = 1; page <= 100; page++) {
-    const domains = await api('GET', `${account}/workers/domains?per_page=100&page=${page}`);
+  const domains = await inventory(api, `${account}/workers/domains`);
+  assert(
+    !domains.some(row => row.service === manifest.workerName),
+    'Dedicated Worker must have no custom domain'
+  );
+  const zones = await inventory(
+    api,
+    `/zones?account.id=${manifest.accountID}`,
+    result => result,
+    50
+  );
+  for (const zone of zones) {
+    assert(resourceID.test(zone.id), 'zone ID');
+    const routes = await inventory(api, `/zones/${zone.id}/workers/routes`);
     assert(
-      !domains.result.some(row => row.service === manifest.workerName),
-      'Dedicated Worker must have no custom domain'
+      !routes.some(route => route.script === manifest.workerName),
+      'Dedicated Worker must have no zone route'
     );
-    if (
-      domains.result.length < 100 ||
-      (domains.result_info?.total_count !== undefined &&
-        page * 100 >= domains.result_info.total_count)
-    )
-      break;
-    assert(page < 100, 'Worker domain inventory page budget');
-  }
-  for (let page = 1; page <= 100; page++) {
-    const zones = await api(
-      'GET',
-      `/zones?account.id=${manifest.accountID}&per_page=50&page=${page}`
-    );
-    for (const zone of zones.result) {
-      const routes = await api('GET', `/zones/${zone.id}/workers/routes`);
-      assert(
-        !routes.result.some(route => route.script === manifest.workerName),
-        'Dedicated Worker must have no zone route'
-      );
-    }
-    if (zones.result.length < 50) break;
-    assert(page < 100, 'Zone inventory page budget');
   }
   return {
     runID: manifest.runID,
@@ -250,14 +372,19 @@ export function checkWatchdog(manifest, now = Date.now(), localProcess = false) 
   return ready;
 }
 
-export async function resolveOperatorToken(wrangler) {
+export async function resolveOperatorToken(wrangler, deadline = Infinity) {
   assert(
     wrangler.endsWith('/node_modules/.bin/wrangler'),
     'Use the repository-pinned credential resolver'
   );
+  assert(Date.now() < deadline, 'Teardown deadline exhausted');
+  // Set only by the parent's private wrapper on the reviewed control VM, never a generator.
+  if (process.env.SESSION_SYNC_LOADTEST_OPERATOR_TOKEN)
+    return process.env.SESSION_SYNC_LOADTEST_OPERATOR_TOKEN;
   const environment = { ...process.env, WRANGLER_SEND_METRICS: 'false' };
   for (const key of [
     'SESSION_SYNC_LOADTEST_CF_TOKEN',
+    'SESSION_SYNC_LOADTEST_OPERATOR_TOKEN',
     'CLOUDFLARE_API_TOKEN',
     'CLOUDFLARE_API_KEY',
     'CLOUDFLARE_EMAIL',
@@ -266,7 +393,7 @@ export async function resolveOperatorToken(wrangler) {
   try {
     const { stdout } = await execute(wrangler, ['auth', 'token', '--json'], {
       env: environment,
-      timeout: 10000,
+      timeout: Math.max(1, Math.min(10000, deadline - Date.now())),
       maxBuffer: 65536,
     });
     const token = JSON.parse(stdout).token;

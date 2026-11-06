@@ -2,12 +2,27 @@ import assert from 'node:assert/strict';
 import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { profiles } from './perf-profiles.mjs';
-import { nativeSHA, nativeBundleHash, sha256, validateTarget } from './perf-common.mjs';
+import {
+  nativeSHA,
+  nativeBundleHash,
+  sha256,
+  validateTarget,
+  validateCloudAdmission,
+} from './perf-common.mjs';
+import {
+  assertGenerator,
+  checkWatchdog,
+  inspectLive,
+  operatorAPI,
+  resolveOperatorToken,
+} from './perf-identity.mjs';
 
 const [profile, file, output] = process.argv.slice(2);
 assert(
-  ['full', 'cold', 'renewal', 'hot100', 'slowreader', 'organization'].includes(profile) && output,
-  'Usage: perf-plan.mjs <cloud-profile> verified-manifest.json output-directory'
+  ['refresh', 'full', 'cold', 'renewal', 'hot100', 'slowreader', 'organization'].includes(
+    profile
+  ) && output,
+  'Usage: perf-plan.mjs <cloud-profile|refresh> verified-manifest.json output-directory'
 );
 const manifestFile = resolve(file);
 const manifest = JSON.parse(readFileSync(manifestFile, 'utf8'));
@@ -15,16 +30,88 @@ validateTarget(
   { runID: manifest.runID, baseURL: manifest.baseURL, stopAt: manifest.teardownAt },
   manifest
 );
+for (const node of manifest.generators) assertGenerator(node);
+const root = resolve(output);
+function attest(approval, inspection) {
+  const ready = checkWatchdog(manifest, Date.now(), true);
+  assert(
+    inspection.checkedAt <= Date.now() && Date.now() - inspection.checkedAt <= 60000,
+    'Current live inspection required'
+  );
+  for (const [index, node] of approval.nodes.entries()) {
+    const dir = join(root, `node-${index}`);
+    const bytes = readFileSync(join(dir, 'target.json'));
+    assert.equal(node.targetManifestHash, sha256(bytes), 'Frozen target changed');
+    const target = JSON.parse(bytes);
+    assert.equal(sha256(readFileSync(join(dir, 'budget.json'))), approval.budgetHash);
+    const attestation = {
+      runID: manifest.runID,
+      issuedAt: Date.now(),
+      targetManifestHash: node.targetManifestHash,
+      configHashes: node.configHashes,
+      budgetHash: approval.budgetHash,
+      configHash: manifest.configHash,
+      sdkModuleHash: manifest.sdkModuleHash,
+      nativeModuleHash: nativeBundleHash,
+      resourceCreatedAt: manifest.resourceCreatedAt,
+      teardownAt: manifest.teardownAt,
+      watchdogInstanceID: ready.instanceID,
+      inspection,
+    };
+    const value = JSON.stringify(attestation, null, 2) + '\n';
+    writeFileSync(join(dir, 'attestation.json'), value, { mode: 0o600 });
+    writeFileSync(join(dir, 'watchdog-ready.json'), JSON.stringify(ready), { mode: 0o600 });
+    node.attestationHash = sha256(value);
+    assert.equal(target.teardownAt, manifest.teardownAt);
+  }
+  writeFileSync(join(root, 'approval-request.json'), JSON.stringify(approval, null, 2) + '\n', {
+    mode: 0o600,
+  });
+}
+if (profile === 'refresh') {
+  const approval = JSON.parse(readFileSync(join(root, 'approval-request.json'), 'utf8'));
+  const cluster = JSON.parse(readFileSync(join(root, 'cluster.json'), 'utf8'));
+  assert.equal(
+    approval.operatorManifestHash,
+    sha256(readFileSync(manifestFile)),
+    'Frozen operator manifest changed'
+  );
+  assert.equal(
+    approval.clusterHash,
+    sha256(readFileSync(join(root, 'cluster.json'))),
+    'Frozen cluster changed'
+  );
+  assert.equal(approval.budgetHash, sha256(readFileSync(manifest.budgetFile)));
+  const inspection = await inspectLive(
+    manifest,
+    operatorAPI(() => resolveOperatorToken(manifest.wrangler))
+  );
+  const budget = JSON.parse(readFileSync(manifest.budgetFile, 'utf8'));
+  for (const [index, node] of cluster.nodes.entries()) {
+    const hashes = node.shards.map(shard => {
+      const path = join(root, `node-${index}`, `config-${shard}.json`);
+      const config = JSON.parse(readFileSync(path, 'utf8'));
+      validateCloudAdmission(config, manifest, budget, Date.now(), inspection);
+      return sha256(readFileSync(path));
+    });
+    assert.deepEqual(hashes, approval.nodes[index].configHashes, 'Frozen workload changed');
+  }
+  attest(approval, inspection);
+  console.log(
+    'Fresh attestation written without GO. Transfer attestation/heartbeat and obtain renewed explicit parent GO before seed or launch.'
+  );
+  process.exit(0);
+}
 const shape = { ...profiles[profile] };
 if (profile === 'organization') {
   assert(manifest.syntheticOrganizationID);
   shape.organizationID = manifest.syntheticOrganizationID;
 }
-const shards = profile === 'full' ? 16 : 1;
+const shards = profile === 'full' ? 32 : 1;
 const generators = manifest.generators.slice(0, profile === 'full' ? 4 : 1);
 assert.equal(generators.length, profile === 'full' ? 4 : 1);
 assert.equal(new Set(generators.map(node => node.host)).size, generators.length);
-const root = resolve(output);
+// Immutable workload/config copies stay fixed across explicit re-attestation.
 mkdirSync(root, { mode: 0o700 });
 const approval = {
   runID: manifest.runID,
@@ -36,8 +123,7 @@ const approval = {
 const nodes = [];
 for (let index = 0; index < generators.length; index++) {
   const node = generators[index];
-  assert(/^igor-[a-z0-9-]+\.us-central1-a\.kilocode$/.test(node.host));
-  assert(/^\/home\/igor\/work\/load[a-zA-Z0-9_./-]*$/.test(node.root) && !node.root.includes('..'));
+  assertGenerator(node);
   const artifactDir = join(root, `node-${index}`);
   mkdirSync(artifactDir, { mode: 0o700 });
   const write = (name, value) =>
@@ -107,6 +193,7 @@ for (let index = 0; index < generators.length; index++) {
         organization: 'concentrated-organization',
       }[profile],
       goFile: `${node.root}/go.json`,
+      attestationFile: `${node.root}/attestation.json`,
     };
     const name = `config-${shard}.json`;
     write(name, config);
@@ -146,6 +233,8 @@ const cluster = {
   outputFile: join(root, 'cluster-result.json'),
 };
 writeFileSync(join(root, 'cluster.json'), JSON.stringify(cluster, null, 2) + '\n', { mode: 0o600 });
+approval.operatorManifestHash = sha256(readFileSync(manifestFile));
+approval.clusterHash = sha256(readFileSync(join(root, 'cluster.json')));
 writeFileSync(join(root, 'approval-request.json'), JSON.stringify(approval, null, 2) + '\n', {
   mode: 0o600,
 });

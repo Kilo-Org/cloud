@@ -369,9 +369,11 @@ function heartbeat(s, entry) {
     instanceID: `load-${s.index}`,
     advertisement: {
       name: 'synthetic',
+      projectName: 'synthetic-load',
       version: config.nativeSHA,
       kind: 'cli',
       startedAt: stats.started,
+      gitBranch: null,
       capabilities: ['native-live-v1'],
       sessions: [s.id],
     },
@@ -487,9 +489,11 @@ async function viewer(s) {
         assert.equal(new URL(url).origin, new URL(config.baseURL).origin);
         if (new URL(url).pathname === '/v1/auth/exchange') {
           stats.localExchangeResponses++;
+          const token = bearer(s);
+          const { exp } = JSON.parse(Buffer.from(token.split('.')[1], 'base64url'));
           return Response.json({
-            token: bearer(s),
-            expiresAt: new Date(Date.now() + config.grantTTLseconds * 1000).toISOString(),
+            token,
+            expiresAt: new Date(exp * 1000).toISOString(),
           });
         }
         const path = new URL(url).pathname + new URL(url).search;

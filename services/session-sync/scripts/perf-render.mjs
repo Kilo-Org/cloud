@@ -4,10 +4,12 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parse } from 'jsonc-parser';
 import { limiterConfig } from './perf-common.mjs';
+import { assertManifestIdentity } from './perf-identity.mjs';
 
 const [file] = process.argv.slice(2);
 assert(file, 'Usage: perf-render.mjs verified-resource-manifest.json');
 const manifest = JSON.parse(readFileSync(file, 'utf8'));
+assertManifestIdentity(manifest);
 assert(/^[a-z0-9-]{3,32}$/.test(manifest.runID));
 assert.equal(manifest.accountID, 'e115e769bcdd4c3d66af59d3332cb394');
 assert.equal(manifest.workerName, `session-sync-${manifest.runID}-loadtest`);

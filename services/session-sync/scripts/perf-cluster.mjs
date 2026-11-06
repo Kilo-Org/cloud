@@ -4,14 +4,12 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { z } from 'zod';
 import { fileURLToPath } from 'node:url';
-import { checkWatchdog } from './perf-identity.mjs';
+import { assertGenerator, checkWatchdog } from './perf-identity.mjs';
+import { finalizeClusterResult } from './perf-common.mjs';
 
-const safePath = z
-  .string()
-  .regex(/^\/home\/igor\/work\/load[a-zA-Z0-9_./-]*$/)
-  .refine(path => !path.includes('..'));
+const safePath = z.string().regex(/^\/[a-zA-Z0-9_./-]+$/);
 const nodeSchema = z.strictObject({
-  host: z.string().regex(/^igor-[a-z0-9-]+\.us-central1-a\.kilocode$/),
+  host: z.string(),
   root: safePath,
   repository: safePath,
   configs: z.array(safePath).min(1).max(16),
@@ -37,6 +35,15 @@ const schema = z.strictObject({
 });
 const [file] = process.argv.slice(2);
 const plan = schema.parse(JSON.parse(readFileSync(file, 'utf8')));
+for (const node of plan.nodes) {
+  assertGenerator(node);
+  for (const path of node.configs)
+    assert(
+      path.startsWith(node.root + '/') &&
+        !path.split('/').some(part => part === '.' || part === '..'),
+      'Configuration must stay within its reviewed generator root'
+    );
+}
 const clock = z
   .strictObject({
     capturedAt: z.number(),
@@ -68,11 +75,20 @@ const operatorManifest =
   plan.mode === 'cloud' ? JSON.parse(readFileSync(plan.operatorManifest, 'utf8')) : undefined;
 if (operatorManifest) {
   assert.equal(operatorManifest.runID, plan.runID);
+  for (const node of plan.nodes) {
+    const reviewed = operatorManifest.generators.find(row => row.host === node.host);
+    assert(reviewed, 'Generator host is absent from the reviewed manifest');
+    assert.equal(node.root, reviewed.root);
+    assert.equal(node.repository, reviewed.repository);
+  }
   checkWatchdog(operatorManifest, Date.now(), true);
 }
 const sshEnvironment = { ...process.env };
 delete sshEnvironment.SESSION_SYNC_LOADTEST_CF_TOKEN;
 delete sshEnvironment.CLOUDFLARE_API_TOKEN;
+delete sshEnvironment.SESSION_SYNC_LOADTEST_OPERATOR_TOKEN;
+delete sshEnvironment.CLOUDFLARE_API_KEY;
+delete sshEnvironment.CLOUDFLARE_EMAIL;
 function ssh(node, args, collect = true) {
   const child = spawn(
     'ssh',
@@ -133,6 +149,8 @@ async function watchdog() {
 const start = Date.now();
 let window;
 let completed = false;
+const result = { runID: plan.runID, workloadPassed: false, passed: false };
+let failure;
 try {
   await watchdog();
   for (const node of plan.nodes) {
@@ -212,8 +230,7 @@ try {
     )
   );
   assert(summaries.every(summary => summary.passed));
-  const result = {
-    runID: plan.runID,
+  Object.assign(result, {
     window,
     clockErrorBoundMs: plan.clockErrorBoundMs,
     summaries,
@@ -221,11 +238,13 @@ try {
       (sum, summary) => sum + summary.measuredProducerSends,
       0
     ),
-    passed: true,
-  };
+  });
   assert.equal(result.measuredProducerSends, plan.watched * 10 * 45);
-  writeFileSync(plan.outputFile, JSON.stringify(result, null, 2));
+  result.workloadPassed = true;
   completed = true;
+} catch (error) {
+  failure = error;
+  result.error = error.message;
 } finally {
   if (!completed)
     await Promise.allSettled(
@@ -234,17 +253,27 @@ try {
       )
     );
   for (const child of children) if (child.state.code === undefined) child.child.kill('SIGTERM');
-  if (operatorManifest) {
-    const cleanup = spawn(
-      process.execPath,
-      [
-        fileURLToPath(new URL('./perf-teardown.mjs', import.meta.url)),
-        'now',
-        plan.operatorManifest,
-      ],
-      { stdio: ['ignore', 'inherit', 'inherit'] }
-    );
-    const code = await new Promise(resolve => cleanup.once('exit', resolve));
-    assert.equal(code, 0, 'Owned resource teardown failed; inspect the private teardown proof');
-  }
+  await finalizeClusterResult(
+    result,
+    async () => {
+      if (!operatorManifest) return;
+      const cleanup = spawn(
+        process.execPath,
+        [
+          fileURLToPath(new URL('./perf-teardown.mjs', import.meta.url)),
+          'now',
+          plan.operatorManifest,
+        ],
+        { stdio: ['ignore', 'inherit', 'inherit'] }
+      );
+      const code = await new Promise((resolve, reject) => {
+        cleanup.once('error', reject);
+        cleanup.once('exit', resolve);
+      });
+      assert.equal(code, 0, 'Owned resource teardown failed; inspect the private teardown proof');
+    },
+    value => writeFileSync(plan.outputFile, JSON.stringify(value, null, 2))
+  );
 }
+if (failure) throw failure;
+assert(result.passed, 'Cluster cleanup failed; final artifact is not PASS');

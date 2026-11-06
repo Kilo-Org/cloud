@@ -746,13 +746,16 @@ References:
 The `scripts/perf-*.mjs` tools separate the native publisher, raw wire reader,
 and actual `NativeSyncClient` into independent processes. They use synthetic
 session identities and single-use output directories. Local qualification
-binds a synthetic relay to `127.0.0.1:18829`; it is generator evidence, not a
-measurement of the Worker, Durable Object storage, authentication, or UI rendering.
+binds a synthetic relay to `127.0.0.1:18829`; it validates HS256 grant signatures,
+environment/expiry, scoped one-use expiring renewal tickets, and strict heartbeat
+shape. It remains synthetic generator evidence, not real Worker authentication,
+Durable Object storage, enforcement, or UI-rendering proof. The actual-workerd
+pipeline is separate evidence.
 
 From this package on an isolated work VM:
 
 ```sh
-node --test scripts/perf-common.test.mjs
+node --test scripts/perf-*.test.mjs
 node --import tsx scripts/perf-qualify.mjs smoke /private/native-socket.mjs ../../packages/cloud-agent-sdk/src/native-sync.ts /tmp/sync-smoke
 node --import tsx scripts/perf-qualify.mjs local2x /private/native-socket.mjs ../../packages/cloud-agent-sdk/src/native-sync.ts /tmp/sync-local2x plain
 node --import tsx scripts/perf-qualify.mjs sdk625 /private/native-socket.mjs ../../packages/cloud-agent-sdk/src/native-sync.ts /tmp/sync-sdk625 instrumented
@@ -766,13 +769,13 @@ using checked source anchors. It changes no SDK file or public API. Report it
 separately from the ordinary `plain` run. Its extra parsing/observer work is part
 of its measured overhead.
 
-`local2x` offers 12,500 presence connections, 1,250 watched sessions at 10 Hz,
-1,250 actual SDK viewers, and 2,500 scheduled checkpoints/second. This doubles
-one 6,250-session/625-viewer production-shaped generator shard. `raw2x` is the
-separate raw-reader baseline; `sdk625` exercises 625 actual SDK viewers at 20 Hz.
-The full population shape is 100,000 sessions, 10,000 watched at 10 Hz, and
-exactly one actual SDK viewer per watched session. Raw mirrors are not part of
-that shape.
+`local2x` offers 6,250 presence connections, 626 watched sessions at 10 Hz,
+626 actual SDK viewers, and 1,250 scheduled checkpoints/second. This covers
+twice the largest 3,125-session/313-viewer production generator shard.
+`raw2x` is the separate raw-reader baseline; `sdk625` exercises 625 actual
+SDK viewers at 20 Hz as an additional stress case.
+The full shape remains 100,000 sessions, 10,000 watched at 10 Hz, and one
+actual SDK viewer per watched session. Raw mirrors are not part of that shape.
 
 Each 512-byte event body carries its session/sequence identity, scheduled time,
 and producer-send time. A five-byte unique text token carries transcript
@@ -829,8 +832,11 @@ checks actual deployment/version IDs, the `workers/tag` run marker, deployed
 bindings, namespace ownership/classes, private R2 domains and bucket ID, Hyperdrive
 origin, and explicit synthetic/TLS database evidence. It also checks custom
 domains and zone routes. These are read-only operator commands; their credential
-stays on the operator host. Generator admission requires a fresh hash-bound
-inspection artifact, not a configuration-file hash alone.
+stays on the owned control VM. Generator admission requires a fresh hash-bound
+inspection artifact, not a configuration-file hash alone. Generator hosts,
+repositories, and absolute normalized output roots are explicitly reviewed in
+`manifest.generators`; no developer-specific home-directory prefix is required.
+Cluster nodes must match those exact reviewed entries.
 
 Render the run-specific Worker config with `perf-render.mjs <manifest.json>`;
 it selects runtime code/settings and dedicated resources without deployment.
@@ -838,7 +844,23 @@ it selects runtime code/settings and dedicated resources without deployment.
 target/config packages, the cluster plan, and an approval-request record. It
 creates neither credentials nor GO files. Supported cloud profiles are `cold`,
 `renewal`, `hot100`, `slowreader`, `organization`, and `full`; the last fixes
-100,000 sessions and 10,000 actual SDK viewers across sixteen shards/four hosts.
+100,000 sessions and 10,000 actual SDK viewers across 32 shards/four hosts.
+
+Planning freezes the workload, source hashes, target, and lifetime budget but
+does not freeze live evidence forever. Before **each** seed or launch admission,
+run `perf-plan.mjs refresh <same-manifest.json> <same-output-directory>` from the
+owned control VM. It re-inspects live ownership/bindings and the current local
+watchdog, refuses any frozen config/cluster/manifest/budget change, and writes
+per-node `attestation.json` plus current heartbeat copies and a new
+`approval-request.json`. Transfer those two current artifacts to each reviewed
+root. Parent must explicitly issue renewed `go.json` with `approvedByParent:true`,
+the exact config/target/budget hashes and new `attestationHash`, the unchanged
+$50 hard limit, and expiry covering the unchanged stop time. Refresh never writes
+GO or extends resource lifetime. An old GO cannot authorize refreshed evidence;
+inspection/attestation freshness remains 60 seconds and heartbeat freshness ten
+seconds. After lengthy seeding, repeat refresh and obtain another parent GO
+before launch. Do not overwrite the frozen target/evidence copies or re-plan a
+running resource to work around expiry.
 
 
 Run `perf-control.mjs seed <configs...>` before opening presence sockets.
@@ -858,19 +880,45 @@ Expected activity and pessimistic activity are distinct inputs. A passing plan
 requires at most $35 Cloudflare, $5 VMs, and at least $10 untouched reserve within
 the combined $50 allocation. Analytics lag is not an invoice guarantee.
 
-Arm `perf-teardown.mjs arm <target-manifest.json>` in an independent operator
-process before opening cloud sockets. Operator commands resolve credentials
-internally with the pinned repository `wrangler auth token --json`, capturing
-the token without printing it or reading credential files. The watchdog publishes a matching nonce-bound
-heartbeat; cloud admission consumes it, and the operator cluster controller
-checks heartbeat freshness and local process liveness throughout ramp and load.
-Workload admission binds the absolute resource lifetime to the approved forecast,
-including a 150-second teardown tail. Before deletion the watchdog re-reads the
-current deployment/version and bucket ID, refusing a replacement run. The
-controller also invokes verified teardown after completion or failure. Exact
-known synthetic R2 keys must be listed for cleanup; a nonempty bucket is a
-teardown failure. Generator VMs need their own provider-enforced maximum lifetime.
-Meter polling and operator availability never extend the resource deadline.
+Arm `perf-teardown.mjs arm <target-manifest.json>` as a **finite independent job
+on the owned control VM**, separate from generator VMs, before opening cloud
+sockets. Do not run an operator/watchdog background service on a developer Mac.
+The cluster controller, current inspection, and watchdog PID checks must share
+that explicit control-VM runtime. Only the parent's approved **private wrapper**
+may capture the pinned repository Wrangler credential resolver's JSON token;
+emit status only, never the resolver output/token, and never create credential
+files. Do not run the token resolver standalone in a terminal/logged tool call.
+The private wrapper may provide only the needed operator token in the finite
+control job's `SESSION_SYNC_LOADTEST_OPERATOR_TOKEN` environment (or its private
+stdin-to-environment adapter). Never send operator credentials to generators.
+Without that private environment, helpers privately capture the pinned resolver
+internally; no credential-file parsing is supported.
+
+The watchdog publishes a matching nonce-bound heartbeat; cloud admission consumes
+it, and the cluster controller checks freshness and local PID liveness throughout
+ramp/load. Admission prices absolute resource lifetime including the 150-second
+teardown tail. Transient transport/408/429/5xx REST failures and explicitly
+classified Wrangler transient/timeout failures receive at most four attempts
+with bounded backoff inside the same absolute tail. Wrangler output is captured
+privately within 64 KiB only for safe-category classification: never echo it,
+tokens, or raw subprocess errors. Authorization/permission/syntax/unknown failures
+and output overflow are permanent. Every CLI retry first rechecks resource
+ownership and absence; ambiguous successful Worker/bucket deletion is not repeated,
+and object retry checks the owned bucket and reads the exact known key through
+`r2 object get --remote --file` directed to the operating system's null device.
+Explicit absence counts as already cleaned; object bodies cannot fill the private output buffer.
+Replacement or unverified ownership never permits another destructive attempt.
+Compute cleanup runs first, then each remaining resource is independently
+ownership-checked; unavailable bucket metadata cannot block verified Worker
+deletion. Replacements are refused for that resource without abandoning other
+independently verifiable cleanup. Complete paginated Worker/namespace/secret
+inventories must prove absence. The private proof records exact observed
+leftover IDs/names and `null` for unavailable inventories, never assumed absence.
+Exact known synthetic R2 keys must be listed; nonempty or deletion-failed buckets
+are failures. Cluster artifacts persist `passed:true` only
+after teardown succeeds; workload success with cleanup failure is not PASS.
+Generator VMs need their own provider-enforced maximum lifetime. Meter polling
+and operator availability never extend the resource deadline.
 
 ## Native client demo
 

@@ -2,12 +2,30 @@ import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { WebSocketServer } from 'ws';
+import { jwtVerify } from 'jose';
+import { z } from 'zod';
 import { sha256 } from './perf-common.mjs';
 
 const [configFile] = process.argv.slice(2);
 const config = JSON.parse(readFileSync(configFile, 'utf8'));
 assert.equal(new URL(config.baseURL).hostname, '127.0.0.1');
 assert.equal(config.mode, 'local');
+const keys = JSON.parse(readFileSync(config.keysFile, 'utf8'));
+const signingKey = new TextEncoder().encode(keys.SESSION_SYNC_SECRET);
+const heartbeatSchema = z.strictObject({
+  type: z.literal('heartbeat'),
+  instanceID: z.string().min(1).max(128),
+  advertisement: z.strictObject({
+    name: z.string().max(256),
+    projectName: z.string().max(256),
+    version: z.string().max(64),
+    kind: z.enum(['cli', 'remote']),
+    startedAt: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+    gitBranch: z.string().max(256).nullable(),
+    capabilities: z.array(z.string().min(1).max(64)).max(32),
+    sessions: z.array(z.string().min(1).max(128)).max(100),
+  }),
+});
 const sessions = new Map();
 const tickets = new Map();
 const presence = new Map();
@@ -20,8 +38,64 @@ const stats = {
   backpressure: 0,
   sockets: 0,
   peakSockets: 0,
+  ticketsMinted: 0,
+  ticketsConsumed: 0,
+  ticketsExpired: 0,
+  reauthorized: 0,
+  rejectedAuth: 0,
+  rejectedReauth: 0,
+  rejectedHeartbeat: 0,
 };
-const lifetime = Math.min(120000, (config.grantTTLseconds ?? 300) * 1000);
+function pruneTickets() {
+  const now = Date.now();
+  for (const [id, ticket] of tickets)
+    if (ticket.expiresAt <= now) {
+      tickets.delete(id);
+      stats.ticketsExpired++;
+    }
+}
+function consumeTicket(id, expected) {
+  const ticket = tickets.get(id);
+  if (!ticket) return undefined;
+  tickets.delete(id);
+  if (ticket.expiresAt <= Date.now()) {
+    stats.ticketsExpired++;
+    return undefined;
+  }
+  stats.ticketsConsumed++;
+  if (
+    ticket.presence !== expected.presence ||
+    ticket.id !== expected.id ||
+    (expected.user !== undefined && ticket.user !== expected.user) ||
+    (expected.role !== undefined && ticket.role !== expected.role)
+  )
+    return undefined;
+  return ticket;
+}
+async function authenticate(authorization) {
+  try {
+    assert(authorization?.startsWith('Bearer '));
+    const { payload: claims } = await jwtVerify(authorization.slice(7), signingKey, {
+      algorithms: ['HS256'],
+      issuer: 'session-sync',
+      audience: 'session-sync',
+      requiredClaims: ['sub', 'iat', 'exp'],
+    });
+    const now = Math.floor(Date.now() / 1000);
+    assert.equal(claims.version, 1);
+    assert.equal(claims.env, config.audience);
+    assert(Number.isInteger(claims.iat) && claims.iat <= now + 30);
+    assert(
+      Number.isInteger(claims.exp) && claims.exp > claims.iat && claims.exp - claims.iat <= 300
+    );
+    assert.equal(claims.tenant?.type, config.organizationID ? 'organization' : 'user');
+    assert.equal(claims.tenant?.id, config.organizationID ?? claims.sub);
+    return claims;
+  } catch {
+    stats.rejectedAuth++;
+    return undefined;
+  }
+}
 function state(id) {
   const value = sessions.get(id);
   assert(value, 'Session must be registered');
@@ -49,20 +123,25 @@ const server = createServer(async (request, response) => {
     }
     const body = chunks.length ? JSON.parse(Buffer.concat(chunks)) : undefined;
     const url = new URL(request.url, config.baseURL);
-    const claims = JSON.parse(
-      Buffer.from(request.headers.authorization.split('.')[1], 'base64url')
-    );
+    const claims = await authenticate(request.headers.authorization);
+    if (!claims) return json(response, { error: { code: 'invalid_grant' } }, 401);
     const parts = url.pathname.split('/');
     const id = parts[3];
     if (url.pathname.endsWith('/ticket') || url.pathname.endsWith('/live-ticket')) {
+      const isPresence = url.pathname === '/v1/presence/ticket';
+      assert(['runner', 'viewer', 'controller'].includes(body.role));
+      if (!isPresence) assert.equal(state(id).user, claims.sub);
       const ticket = crypto.randomUUID();
+      const expiresAt = Math.min(Date.now() + 120000, claims.exp * 1000);
       tickets.set(ticket, {
-        id,
+        id: isPresence ? undefined : id,
         role: body.role,
         user: claims.sub,
-        presence: url.pathname === '/v1/presence/ticket',
+        presence: isPresence,
+        expiresAt,
       });
-      return json(response, { ticket, expiresAt: new Date(Date.now() + 120000).toISOString() });
+      stats.ticketsMinted++;
+      return json(response, { ticket, expiresAt: new Date(expiresAt).toISOString() });
     }
     if (request.method === 'PUT') {
       if (!sessions.has(id))
@@ -75,6 +154,7 @@ const server = createServer(async (request, response) => {
           viewers: new Set(),
           receipts: new Map(),
         });
+      assert.equal(state(id).user, claims.sub);
       return json(response, {
         version: 1,
         sessionID: id,
@@ -84,6 +164,7 @@ const server = createServer(async (request, response) => {
       });
     }
     const s = state(id);
+    assert.equal(s.user, claims.sub);
     if (url.pathname.endsWith('/batches')) {
       const previous = s.receipts.get(body.batchID);
       if (previous) {
@@ -136,12 +217,19 @@ const server = createServer(async (request, response) => {
 const wss = new WebSocketServer({ noServer: true, perMessageDeflate: false, maxPayload: 65536 });
 server.on('upgrade', (request, socket, head) => {
   const protocol = request.headers['sec-websocket-protocol'];
-  const ticket = tickets.get(protocol?.replace('kilo-session-ticket.', ''));
+  const url = new URL(request.url, config.baseURL);
+  const isPresence = url.pathname === '/v1/presence';
+  const id = isPresence ? undefined : /^\/v1\/sessions\/([^/]+)\/live$/.exec(url.pathname)?.[1];
+  const ticket =
+    typeof protocol === 'string' &&
+    protocol.startsWith('kilo-session-ticket.') &&
+    (isPresence || id !== undefined)
+      ? consumeTicket(protocol.slice('kilo-session-ticket.'.length), { presence: isPresence, id })
+      : undefined;
   if (!ticket) {
     socket.destroy();
     return;
   }
-  tickets.delete(protocol.replace('kilo-session-ticket.', ''));
   wss.handleUpgrade(request, socket, head, ws => {
     stats.sockets++;
     stats.peakSockets = Math.max(stats.peakSockets, stats.sockets);
@@ -152,14 +240,25 @@ server.on('upgrade', (request, socket, head) => {
       for (const viewer of s.viewers)
         frame(viewer, 'runner_status', { runnerConnected: true }, 'control', s.seq);
     } else s.viewers.add(ws);
+    let expiryTimer;
+    const lifetime = () => {
+      clearTimeout(expiryTimer);
+      expiryTimer = setTimeout(
+        () => ws.close(1008, 'ticket_expired'),
+        ticket.expiresAt - Date.now()
+      );
+      return {
+        expiresAt: new Date(ticket.expiresAt).toISOString(),
+        reauthAt: new Date(ticket.expiresAt - 30000).toISOString(),
+      };
+    };
     frame(
       ws,
       'hello',
       {
         seq: s?.seq ?? 0,
         runnerConnected: Boolean(s?.runner),
-        expiresAt: new Date(Date.now() + lifetime).toISOString(),
-        reauthAt: new Date(Date.now() + lifetime - 30000).toISOString(),
+        ...lifetime(),
         reconnectAfterMs: 1000,
       },
       'control',
@@ -167,14 +266,37 @@ server.on('upgrade', (request, socket, head) => {
     );
     if (s && ticket.role !== 'runner') watch(ticket.id);
     ws.on('message', text => {
-      const message = JSON.parse(text.toString());
-      if (ticket.presence && message.type === 'heartbeat')
-        for (const id of message.advertisement.sessions) watch(id);
-      if (message.type === 'reauth')
-        frame(ws, 'reauthorized', {
-          expiresAt: new Date(Date.now() + lifetime).toISOString(),
-          reauthAt: new Date(Date.now() + lifetime - 30000).toISOString(),
-        });
+      let message;
+      try {
+        message = JSON.parse(text.toString());
+      } catch {
+        frame(ws, 'error', { code: 'invalid_request' });
+        return;
+      }
+      if (ticket.presence && message.type === 'heartbeat') {
+        const parsed = heartbeatSchema.safeParse(message);
+        if (
+          !parsed.success ||
+          parsed.data.advertisement.sessions.some(id => sessions.get(id)?.user !== ticket.user)
+        ) {
+          stats.rejectedHeartbeat++;
+          frame(ws, 'error', { code: 'invalid_request' });
+          return;
+        }
+        for (const id of parsed.data.advertisement.sessions) watch(id);
+      }
+      if (message.type === 'reauth') {
+        const next = consumeTicket(message.ticket, ticket);
+        if (!next) {
+          stats.rejectedReauth++;
+          frame(ws, 'error', { code: 'invalid_ticket' });
+          ws.close(1008, 'invalid_ticket');
+          return;
+        }
+        ticket.expiresAt = next.expiresAt;
+        stats.reauthorized++;
+        frame(ws, 'reauthorized', lifetime());
+      }
       if (s && ticket.role === 'runner' && message.channel === 'events') {
         stats.events++;
         s.seq++;
@@ -200,10 +322,12 @@ server.on('upgrade', (request, socket, head) => {
     });
     ws.on('close', () => {
       stats.sockets--;
+      clearTimeout(expiryTimer);
       if (ticket.presence) presence.delete(ticket.user);
       else {
         s.viewers.delete(ws);
         if (s.runner === ws) s.runner = undefined;
+        watch(ticket.id);
       }
     });
     ws.on('error', () => {});
@@ -212,15 +336,22 @@ server.on('upgrade', (request, socket, head) => {
 await new Promise(resolve =>
   server.listen(Number(new URL(config.baseURL).port), '127.0.0.1', resolve)
 );
-console.log('LOCAL_RELAY_READY');
+console.log(`LOCAL_RELAY_READY ${server.address().port}`);
+const ticketPruner = setInterval(pruneTickets, 1000);
 const timer = setTimeout(close, config.stopAt - Date.now());
 function close() {
   clearTimeout(timer);
+  clearInterval(ticketPruner);
   for (const ws of wss.clients) ws.terminate();
   server.close();
   writeFileSync(
     `${config.root}/relay.json`,
-    JSON.stringify({ ...stats, memory: process.memoryUsage(), cpu: process.cpuUsage() })
+    JSON.stringify({
+      ...stats,
+      ticketsRemaining: tickets.size,
+      memory: process.memoryUsage(),
+      cpu: process.cpuUsage(),
+    })
   );
 }
 process.once('SIGTERM', close);

@@ -379,20 +379,29 @@ test('exact durable receipt validates request bytes and original retry response'
     assert.throws(() => assertReceiptRetry(original, { ...value, [field]: value[field] + 1 }));
   assert.throws(() => validateReceipt(source, batch, { ...value, digest: 'f'.repeat(64) }));
 });
+function targetFixtureForIdentity() {
+  return {
+    accountID: 'e115e769bcdd4c3d66af59d3332cb394',
+    runID: 'identity-probe',
+    workerName: 'session-sync-identity-probe-loadtest',
+    r2Bucket: 'session-sync-identity-probe-loadtest',
+    hyperdriveID: 'a'.repeat(32),
+    secretsStoreID: 'b'.repeat(32),
+    versionID: 'owned-version',
+    r2BucketID: 'owned-bucket',
+  };
+}
 test('replacement deployment is refused before settings or deletion', async () => {
   let calls = 0;
   await assert.rejects(
-    currentDeployment(
-      { accountID: 'test', workerName: 'owned', deploymentID: 'original' },
-      async () => {
-        calls++;
-        return {
-          result: {
-            deployments: [{ id: 'replacement', created_on: '2026-11-06T00:00:00Z', versions: [] }],
-          },
-        };
-      }
-    ),
+    currentDeployment({ ...targetFixtureForIdentity(), deploymentID: 'original' }, async () => {
+      calls++;
+      return {
+        result: {
+          deployments: [{ id: 'replacement', created_on: '2026-11-06T00:00:00Z', versions: [] }],
+        },
+      };
+    }),
     /ownership changed/
   );
   assert.equal(calls, 1);
@@ -436,7 +445,24 @@ test('full cloud plan keeps one SDK viewer per watched session and creates no GO
     assert.equal(child.status, 0, child.stderr);
     const cluster = JSON.parse(readFileSync(join(output, 'cluster.json'), 'utf8'));
     assert.equal(cluster.viewerConnections, 10000);
-    assert.equal(cluster.nodes.flatMap(node => node.shards).length, 16);
+    const ownership = new Uint8Array(cluster.sessions);
+    let assignedViewers = 0;
+    for (const [nodeIndex, node] of cluster.nodes.entries()) {
+      for (const shard of node.shards) {
+        const part = JSON.parse(
+          readFileSync(join(output, `node-${nodeIndex}/config-${shard}.json`), 'utf8')
+        );
+        for (let index = part.shard; index < part.sessions; index += part.shards) {
+          ownership[index]++;
+          if (index < part.sdkViewers) assignedViewers++;
+        }
+      }
+    }
+    assert(
+      ownership.every(count => count === 1),
+      'Every session must have exactly one publisher'
+    );
+    assert.equal(assignedViewers, 10000);
     const config = JSON.parse(readFileSync(join(output, 'node-0/config-0.json'), 'utf8'));
     assert.equal(config.sdkViewers, config.watched);
     assert.equal(existsSync(join(output, 'node-0/go.json')), false);

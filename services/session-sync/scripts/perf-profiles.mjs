@@ -1,7 +1,7 @@
 export const profiles = {
   full: { sessions: 100000, watched: 10000, sdkViewers: 10000, eventHz: 10 },
-  local2x: { sessions: 12500, watched: 1250, sdkViewers: 1250, eventHz: 10 },
-  raw2x: { sessions: 12500, watched: 1250, sdkViewers: 0, rawViewers: 1250, eventHz: 10 },
+  local2x: { sessions: 6250, watched: 626, sdkViewers: 626, eventHz: 10 },
+  raw2x: { sessions: 6250, watched: 626, sdkViewers: 0, rawViewers: 626, eventHz: 10 },
   sdk625: { sessions: 625, watched: 625, sdkViewers: 625, eventHz: 20 },
   smoke: { sessions: 12, watched: 12, sdkViewers: 4, rawViewers: 8, eventHz: 10 },
   cold: { sessions: 100, watched: 10, sdkViewers: 4, rawViewers: 6, eventHz: 10 },

@@ -36,7 +36,7 @@ import type {
   DirectorySyncDeleteResult,
   DirectorySyncUpsertResult,
   DirectoryUserUpsert,
-} from './directory-sync-contracts';
+} from '@kilocode/scim-contracts';
 
 /**
  * Directory-sync mutations, invoked by the `scim-sync` Worker.

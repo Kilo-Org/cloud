@@ -1,4 +1,4 @@
-import type { Event } from '@workos-inc/node';
+import type { DirectoryGroup, DirectoryUser, Event } from '@workos-inc/node';
 
 import { callApp, type AppCallContext, type AttemptOutcome } from './app-client';
 import {
@@ -11,7 +11,7 @@ import {
   type DirectoryOrganizationUpsert,
   type DirectorySubOrganizationUpsert,
   type DirectoryUserUpsert,
-} from './contracts';
+} from '@kilocode/scim-contracts';
 
 /**
  * Maps one WorkOS directory event onto the app's internal endpoints and
@@ -133,10 +133,7 @@ export async function applyEvent(ctx: AppCallContext, event: Event): Promise<Att
   }
 }
 
-function upsertGroup(
-  ctx: AppCallContext,
-  group: { id: string; idpId: string; directoryId: string; name: string }
-): Promise<AttemptOutcome> {
+function upsertGroup(ctx: AppCallContext, group: DirectoryGroup): Promise<AttemptOutcome> {
   const body: DirectorySubOrganizationUpsert = {
     directoryId: group.directoryId,
     directoryIdpId: group.idpId,
@@ -150,16 +147,7 @@ function upsertGroup(
   });
 }
 
-function upsertUser(
-  ctx: AppCallContext,
-  user: {
-    id: string;
-    directoryId: string;
-    email: string | null;
-    firstName: string | null;
-    lastName: string | null;
-  }
-): Promise<AttemptOutcome> {
+function upsertUser(ctx: AppCallContext, user: DirectoryUser): Promise<AttemptOutcome> {
   // The SDK types `email` nullable and the endpoint requires it, because a
   // Kilo account cannot exist without an address. A directory user without
   // one is terminal without a call: no request body can express it, and no

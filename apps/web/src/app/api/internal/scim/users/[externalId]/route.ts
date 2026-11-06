@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 
 import { authorizeInternalApiRequest } from '@/lib/internal-api-auth';
 import { upsertDirectoryUser } from '@/lib/scim/directory-sync';
-import { DirectoryUserUpsertSchema } from '@/lib/scim/directory-sync-contracts';
+import { DirectoryUserUpsertSchema } from '@kilocode/scim-contracts';
 import { directorySyncErrorResponse } from '@/lib/scim/directory-sync-response';
 
 /** Creates a Stripe customer and writes to the primary, so it runs beside it. */

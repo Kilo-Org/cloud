@@ -26,6 +26,7 @@ import {
   getGitLabRepositoryContext,
 } from '@/lib/slack-bot/gitlab-repository-context';
 import { recordBotRequestCloudAgentSession } from '@/lib/bot/request-logging';
+import { resolveOrganizationBotModel } from '@/lib/bot/organization-model';
 
 type AgentOptions = {
   instructions: string;
@@ -67,6 +68,11 @@ jest.mock('@/lib/bot/platforms', () => ({
       getRequesterInfo: async () => ({ displayName: 'Requester', platform: 'github' }),
     }),
   },
+}));
+jest.mock('@/lib/bot/organization-model', () => ({
+  resolveOrganizationBotModel: jest.fn(
+    async ({ storedModelSlug }: { storedModelSlug: string }) => storedModelSlug
+  ),
 }));
 jest.mock('@/lib/bot/request-logging', () => ({
   linkBotRequestToSession: jest.fn(),
@@ -495,5 +501,29 @@ describe.each(['slack', 'linear'] as const)('%s repository selection', platform 
     expect(getGitLabTokenForOrganization).not.toHaveBeenCalled();
     expect(mockPrepareSession).not.toHaveBeenCalled();
     expect(createCloudAgentNextClient).not.toHaveBeenCalled();
+  });
+});
+
+describe('organization model resolution', () => {
+  it('refuses the run when the organization policy allows no model', async () => {
+    jest.mocked(resolveOrganizationBotModel).mockResolvedValueOnce(null);
+
+    const result = await runBotAgent(runParams());
+
+    expect(result.startedCloudAgentSession).toBe(false);
+    expect(result.finalText).toContain('No AI model is configured for this integration');
+    expect(mockAgentOptions).not.toHaveBeenCalled();
+    expect(mockPrepareSession).not.toHaveBeenCalled();
+  });
+
+  it('starts the session on the model the organization policy allows', async () => {
+    jest.mocked(resolveOrganizationBotModel).mockResolvedValueOnce('org/allowed-model');
+
+    const result = await runBotAgent(runParams());
+
+    expect(result.startedCloudAgentSession).toBe(true);
+    expect(mockPrepareSession).toHaveBeenCalledWith(
+      expect.objectContaining({ model: 'org/allowed-model' })
+    );
   });
 });

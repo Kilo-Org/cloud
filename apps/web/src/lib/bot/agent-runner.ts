@@ -10,7 +10,7 @@ import {
   updateBotRequest,
 } from '@/lib/bot/request-logging';
 import { getNextBotCallbackStep, getRemainingBotIterations } from '@/lib/bot/step-budget';
-import { resolveBotModelSlug } from '@/lib/bot/model';
+import { resolveBotRunModel } from '@/lib/bot/model';
 import spawnCloudAgentSession, {
   spawnCloudAgentInputSchema,
   type SpawnCloudAgentInput,
@@ -209,7 +209,7 @@ export async function runBotAgent(params: RunBotAgentParams): Promise<BotAgentCo
     headers,
   });
 
-  const modelSlug = resolveBotModelSlug(params.platformIntegration);
+  const modelSlug = await resolveBotRunModel(params.platformIntegration);
   const owner = ownerFromIntegration(params.platformIntegration);
   const chatPlatform = params.thread.adapter.name;
   const botPlatform = botPlatforms.requireByAdapter(params.thread.adapter);
@@ -240,7 +240,17 @@ export async function runBotAgent(params: RunBotAgentParams): Promise<BotAgentCo
   const collectedSteps: BotRequestStep[] = [];
   let startedCloudAgentSession = false;
 
-  updateBotRequest(params.botRequestId, { modelUsed: modelSlug });
+  updateBotRequest(params.botRequestId, { modelUsed: modelSlug ?? undefined });
+
+  if (modelSlug === null) {
+    return {
+      finalText:
+        'No AI model is configured for this integration that the organization policy allows. Set a model in the integration settings.',
+      startedCloudAgentSession: false,
+      collectedSteps,
+      responseTimeMs: Date.now() - startedAt,
+    };
+  }
 
   if (remainingIterations <= 0) {
     return {

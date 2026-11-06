@@ -233,6 +233,90 @@ describe('public custom model leaderboard usage', () => {
 });
 
 describe('GET /api/public/leaderboard-model-provider-usage', () => {
+  test('aggregates Particle AI aliases before filtering by minimum tokens and calculating ratios', async () => {
+    await jest.isolateModulesAsync(async () => {
+      const snowflake = await import('@/lib/snowflake');
+      jest.mocked(snowflake.resolveSnowflakeConfig).mockReturnValue(FAKE_CONFIG);
+      jest.mocked(snowflake.executeSnowflakeStatement).mockResolvedValue([
+        [
+          'synthetic/alias-test-model',
+          'Particle AI',
+          '6000000',
+          '6000000',
+          '4000000',
+          '1000000',
+          '30',
+          '0',
+        ],
+        [
+          'synthetic/alias-test-model',
+          'particle',
+          '18000000',
+          '6000000',
+          '8000000',
+          '2000000',
+          '70',
+          '0',
+        ],
+      ]);
+      const { GET } = await import('../leaderboard-model-provider-usage/route');
+
+      const response = await GET();
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual([
+        {
+          model: 'alias-test-model',
+          provider: 'Particle AI',
+          sumTokens: 12_000_000,
+          costPerRequest: 0.24,
+          costPerMillionTokens: 2,
+          cacheRatio: 0.25,
+          errorRate: 0,
+          percentageOfModel: 100,
+        },
+      ]);
+    });
+  });
+
+  test('keeps Claude Platform on AWS separate from Amazon Bedrock for the same model', async () => {
+    await jest.isolateModulesAsync(async () => {
+      const snowflake = await import('@/lib/snowflake');
+      jest.mocked(snowflake.resolveSnowflakeConfig).mockReturnValue(FAKE_CONFIG);
+      jest.mocked(snowflake.executeSnowflakeStatement).mockResolvedValue([
+        ['synthetic/model', 'claudeaws', '0', '10000000', '8000000', '0', '100', '0'],
+        ['synthetic/model', 'bedrock', '0', '10000000', '8000000', '0', '100', '0'],
+      ]);
+      const { GET } = await import('../leaderboard-model-provider-usage/route');
+
+      const response = await GET();
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual([
+        {
+          model: 'model',
+          provider: 'Amazon Bedrock',
+          sumTokens: 10_000_000,
+          costPerRequest: 0,
+          costPerMillionTokens: 0,
+          cacheRatio: 0,
+          errorRate: 0,
+          percentageOfModel: 50,
+        },
+        {
+          model: 'model',
+          provider: 'Claude Platform on AWS',
+          sumTokens: 10_000_000,
+          costPerRequest: 0,
+          costPerMillionTokens: 0,
+          cacheRatio: 0,
+          errorRate: 0,
+          percentageOfModel: 50,
+        },
+      ]);
+    });
+  });
+
   test('beautifies the Meituan inference provider', async () => {
     await jest.isolateModulesAsync(async () => {
       const snowflake = await import('@/lib/snowflake');

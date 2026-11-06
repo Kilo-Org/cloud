@@ -274,6 +274,31 @@ describe('Hono Routes', () => {
       expect(body.success).toBe(false);
       expect(body.error).toBe('Too many in-flight requests');
     });
+
+    it('acknowledges but skips a webhook while a skip-if-running trigger has a run in progress', async () => {
+      const id = env.TRIGGER_DO.idFromName(`${namespace}/${testTriggerId}`);
+      const stub = env.TRIGGER_DO.get(id);
+      await stub.configure(namespace, testTriggerId, {
+        githubRepo: 'owner/repo',
+        mode: 'code',
+        model: 'openai/gpt-4.1',
+        promptTemplate: 'Process this webhook:\n\n{{body}}',
+        skipIfRunning: true,
+      });
+      const send = () =>
+        SELF.fetch(`http://localhost/inbound/user/${testUserId}/${testTriggerId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ event: 'push' }),
+        });
+
+      const first = await send();
+      expect(first.status).toBe(200);
+      const skipped = await send();
+      expect(skipped.status).toBe(200);
+      expect(await skipped.json()).toMatchObject({ success: true, data: { skipped: true } });
+      expect((await stub.listRequests()).requests).toHaveLength(1);
+    });
   });
 
   describe('Webhook Ingestion - OAuth User ID (encoded)', () => {

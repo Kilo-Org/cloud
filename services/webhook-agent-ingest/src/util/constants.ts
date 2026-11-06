@@ -11,6 +11,13 @@ export const MAX_REQUESTS = 100;
 /** Maximum number of in-flight requests per trigger */
 export const MAX_INFLIGHT_REQUESTS = 20;
 
+/**
+ * Age after which an unfinished request no longer blocks a skip-if-running trigger.
+ * Cloud Agent runs stop after 2 hours, so an older unfinished request means its
+ * completion callback was lost.
+ */
+export const ACTIVE_RUN_STALE_AFTER_SECONDS = 3 * 60 * 60;
+
 /** Default request limit for list queries */
 export const DEFAULT_REQUEST_LIMIT = 50;
 

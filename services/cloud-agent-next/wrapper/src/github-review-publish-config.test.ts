@@ -82,6 +82,19 @@ const COMMENT_WRITE_COMMANDS: { label: string; command: string }[] = [
     command:
       'gh api repos/acme/widgets/pulls/42/reviews --input - && gh pr comment 42 --body reviewed',
   },
+  {
+    label: 'comment write before an inline review write',
+    command:
+      'gh api repos/acme/widgets/issues/42/comments -f body=reviewed && gh api repos/acme/widgets/pulls/42/reviews --input -',
+  },
+  {
+    label: 'graphql request written to the endpoint path',
+    command: `gh api /graphql -f query='mutation { addComment(input: {}) { comment { id } } }'`,
+  },
+  {
+    label: 'graphql request after a shell prefix',
+    command: `REVIEW=1 sh -c 'gh api graphql -f query="$(cat /tmp/q.graphql)"'`,
+  },
 ];
 
 const ALLOWED_COMMANDS: { label: string; command: string }[] = [
@@ -105,6 +118,19 @@ const ALLOWED_COMMANDS: { label: string; command: string }[] = [
   {
     label: 'atomic inline review write',
     command: 'gh api repos/acme/widgets/pulls/42/reviews --input -',
+  },
+  {
+    label: 'inline review write whose payload arrives on stdin',
+    command:
+      'gh api repos/apollographql/apollo-server/pulls/42/reviews --input - << \'EOF\'\n{"body":"looks good","event":"COMMENT"}\nEOF',
+  },
+  {
+    label: 'inline review write whose payload arrives from a file',
+    command: 'gh api repos/acme/widgets/pulls/42/reviews --input - < /tmp/review.json',
+  },
+  {
+    label: 'paginated review read on a repository named after the endpoint',
+    command: "gh api repos/graphql/graphql-js/pulls/42/reviews --paginate --jq '.[] | {id,state}'",
   },
   {
     label: 'pull request view',

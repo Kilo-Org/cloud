@@ -8,15 +8,13 @@ const SUMMARY_COMMENT_ENDPOINTS = ['repos/*/issues/*/comments', 'repos/*/issues/
 
 const SUMMARY_WRITE_FLAGS = ['--method', '-X', '--input', '-f', '-F', '--field', '--raw-field'];
 
-const GRAPHQL_ENDPOINT = 'graphql';
+// A graphql request is denied whatever operation it carries, because the
+// operation can arrive from a file or from stdin. Each rule names the endpoint
+// argument of `gh api`, so a repository path or a request body that mentions
+// the phrase keeps its own verdict.
+const GRAPHQL_ENDPOINT_TOKENS = ['graphql', '/graphql'];
 
 const COMMENT_SUBCOMMANDS = ['gh issue comment', 'gh pr comment'];
-
-// The atomic inline review write routes through the review endpoint, never
-// through the conversation-comments endpoints.
-// Anchored to the exact form the review skill publishes, so it cannot absorb a
-// later command in the same text.
-const INLINE_REVIEW_ALLOWS = ['gh api repos/*/pulls/*/reviews --input -'];
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -26,10 +24,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * Comment writes on the reviewed pull request belong to the trusted publisher.
  * The map denies every `gh` form that creates or edits a conversation comment,
  * in any flag order and regardless of a command prefix. The CLI matcher
- * anchors whole-command globs and lets the last matching pattern win, so a rule
- * appended here overrides an earlier allow, and a later rule overrides an
- * earlier deny. Paginated reads and inline review writes on pull review
- * endpoints stay allowed.
+ * anchors whole-command globs and lets the last matching pattern win, so the
+ * map holds denials only: no entry here lifts a denial for a longer command
+ * text. Paginated reads and inline review writes on pull review endpoints keep
+ * the verdict of the command guard, which allows them.
  */
 export function buildGitHubReviewBashRules(): Record<string, string> {
   const denies: Record<string, string> = {};
@@ -52,16 +50,15 @@ export function buildGitHubReviewBashRules(): Record<string, string> {
     denies[`${subcommand} *`] = 'deny';
     denies[`*${subcommand}*`] = 'deny';
   }
-  // A graphql request carries its operation in the command text or in a
-  // provided body, and every `gh api` call that reaches graphql is denied.
-  denies[`gh api ${GRAPHQL_ENDPOINT}`] = 'deny';
-  denies[`gh api ${GRAPHQL_ENDPOINT} *`] = 'deny';
-  denies[`*gh api *${GRAPHQL_ENDPOINT}*`] = 'deny';
-  // Appended last: the session matcher resolves whole-command globs in key
-  // order and the last matching rule engages, so the inline review write stays
-  // allowed even when the repository path itself contains the graphql phrase.
-  for (const allow of INLINE_REVIEW_ALLOWS) {
-    denies[allow] = 'allow';
+  // Every `gh api` call that reaches the graphql endpoint is denied, with the
+  // endpoint written first or after a method flag, and with a wrapper prefix or
+  // a surrounding command. The graphql endpoint is the first argument that is
+  // not a flag, so the wildcard before the token covers flags written first.
+  for (const token of GRAPHQL_ENDPOINT_TOKENS) {
+    denies[`gh api ${token}`] = 'deny';
+    denies[`gh api ${token} *`] = 'deny';
+    denies[`*gh api ${token}*`] = 'deny';
+    denies[`*gh api * ${token}*`] = 'deny';
   }
   return denies;
 }

@@ -48,6 +48,7 @@ import {
 import { isMarkdownPath } from '@/components/agents/read-tool-markdown';
 import { MarkdownText } from '@/components/agents/markdown-text';
 import { SessionPageSheet } from '@/components/agents/session-page-sheet';
+import { getDocumentPreviewTarget, previewLocalDocument } from '@/lib/document-preview';
 
 type Props = {
   attachments: AgentAttachment[];
@@ -60,14 +61,24 @@ type Props = {
 };
 
 /**
- * Remove's 28pt visible badge (h-7 w-7) plus slop on every side must reach the
- * platform minimum touch target. Read at render time so it follows the
+ * Remove's visible badge is `h-8 w-8`. NativeWind's rem is 14, so that badge is
+ * 28 dp — the minimum a pressable may be — and the slop on every side brings the
+ * target to the platform minimum. Read at render time so it follows the
  * platform, never captured once at module load.
  */
+const REMOVE_BADGE_DP = 28;
+
 function removeHitSlop() {
-  const slop = ((Platform.OS === 'android' ? 48 : 44) - 28) / 2;
+  const slop = ((Platform.OS === 'android' ? 48 : REMOVE_BADGE_DP + 16) - REMOVE_BADGE_DP) / 2;
   return { top: slop, bottom: slop, left: slop, right: slop };
 }
+
+/**
+ * The document chip is 46 px tall so its body — the whole tap target — is the
+ * 44 dp minimum after the 1 dp border on each side. The chip surface clips its
+ *  children, so slop on the body could not grow that target past the surface.
+ */
+const DOCUMENT_CHIP_SIZE_CLASS = 'h-[46px] w-48';
 
 /** Drag arms only after a long press, so ordinary horizontal scroll still wins. */
 const LONG_PRESS_MS = 300;
@@ -169,6 +180,10 @@ const AttachmentChip = memo(function AttachmentChip({
     mode: 'markdown' | 'text';
     text: string;
   } | null>(null);
+  // A device with no viewer keeps that verdict for the chip: its sheet drops the
+  // preview choice and leaves the text and share choices it always had.
+  const [previewUnavailable, setPreviewUnavailable] = useState(false);
+  const documentTarget = getDocumentPreviewTarget(attachment.mimeType);
   const isImage = attachment.kind === 'image';
   const isUploading = attachment.status === 'pending' || attachment.status === 'uploading';
   const isErrored = attachment.status === 'error';
@@ -276,6 +291,21 @@ const AttachmentChip = memo(function AttachmentChip({
     }
   }
 
+  async function previewDocument() {
+    const outcome = await previewLocalDocument({
+      key: attachment.id,
+      uri: attachment.localUri,
+      mimeType: attachment.mimeType,
+      filename: attachment.filename,
+    });
+    if (outcome === 'unavailable') {
+      setPreviewUnavailable(true);
+      toast.error(t('agentChat.filePart.previewUnavailable'));
+    } else if (outcome === 'failed') {
+      toast.error(t('agentChat.attachmentPreview.openFailedRetry'));
+    }
+  }
+
   function handleOpen() {
     if (attachment.kind === 'image') {
       setViewerVisible(true);
@@ -285,20 +315,28 @@ const AttachmentChip = memo(function AttachmentChip({
       void openLocalText('markdown');
       return;
     }
+    const offerPreview = documentTarget !== null && !previewUnavailable;
+    const previewIndex = offerPreview ? 0 : -1;
+    const textIndex = previewIndex + 1;
+    const shareIndex = textIndex + 1;
+    const cancelIndex = shareIndex + 1;
     showActionSheetWithOptions(
       {
         ...themedSheet,
         options: [
+          ...(offerPreview ? [t('agentChat.filePart.preview', { name: attachment.filename })] : []),
           t('agentChat.filePart.openAsText'),
           t('agentChat.filePart.openInExternalApp'),
           t('common.cancel'),
         ],
-        cancelButtonIndex: 2,
+        cancelButtonIndex: cancelIndex,
       },
       optionIndex => {
-        if (optionIndex === 0) {
+        if (optionIndex === previewIndex) {
+          void previewDocument();
+        } else if (optionIndex === textIndex) {
           void openLocalText('text');
-        } else if (optionIndex === 1) {
+        } else if (optionIndex === shareIndex) {
           void shareUnknown();
         }
       }
@@ -408,7 +446,7 @@ const AttachmentChip = memo(function AttachmentChip({
           <View
             className={cn(
               'overflow-hidden rounded-md border border-border bg-card',
-              isImage ? 'h-16 w-20' : 'h-12 w-48',
+              isImage ? 'h-16 w-20' : DOCUMENT_CHIP_SIZE_CLASS,
               description.showRetry && 'border-destructive',
               isErrored && !description.showRetry && 'border-danger-tile-border'
             )}
@@ -464,26 +502,37 @@ const AttachmentChip = memo(function AttachmentChip({
                 filename: attachment.filename,
               })}
             >
-              <View className="h-7 w-7 items-center justify-center rounded-full bg-background">
+              <View className="h-7 w-7 items-center justify-center rounded-full bg-secondary">
                 <RotateCcw size={14} color={colors.foreground} />
               </View>
             </Pressable>
           ) : null}
 
           {description.showRemove ? (
-            <Pressable
-              onPress={() => {
-                onRemove(attachment.id);
-              }}
-              hitSlop={removeHitSlop()}
-              className="absolute right-1 top-1 h-7 w-7 items-center justify-center rounded-full bg-background active:opacity-70"
-              accessibilityRole="button"
-              accessibilityLabel={t('agentChat.attachmentPreview.removeAttachment', {
-                filename: attachment.filename,
-              })}
+            // The badge rides in a full-surface row so it centers on the chip's
+            // height in both shapes — the 46 dp document chip and the 64 dp
+            // image thumbnail — instead of pinning to a corner. `box-none`
+            // leaves the chip body's tap target whole; only the badge itself
+            // takes a touch. Its end inset matches the content's own `px-2`
+            // start inset, so the badge clears the surface's rounded corner.
+            <View
+              className="absolute inset-0 items-end justify-center pe-2"
+              pointerEvents="box-none"
             >
-              <X size={14} color={colors.foreground} />
-            </Pressable>
+              <Pressable
+                onPress={() => {
+                  onRemove(attachment.id);
+                }}
+                hitSlop={removeHitSlop()}
+                className="h-8 w-8 items-center justify-center rounded-full bg-secondary active:opacity-70"
+                accessibilityRole="button"
+                accessibilityLabel={t('agentChat.attachmentPreview.removeAttachment', {
+                  filename: attachment.filename,
+                })}
+              >
+                <X size={14} color={colors.foreground} />
+              </Pressable>
+            </View>
           ) : null}
         </View>
       </GestureDetector>

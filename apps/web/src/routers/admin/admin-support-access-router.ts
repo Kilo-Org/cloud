@@ -10,6 +10,7 @@ import {
   isSupportAccessEnabled,
 } from '@kilocode/web-shared/lib/admin/support-access';
 import { supportStepUpPort } from '@kilocode/web-shared/lib/admin/support-step-up';
+import { loadEffectiveMembershipRows } from '@kilocode/web-shared/routers/organizations/utils';
 import { userIsSuperadmin } from '@/lib/admin/admin-permissions';
 import { recordAdminAction } from '@/lib/admin/admin-action-audit';
 import {
@@ -25,6 +26,7 @@ import {
   requestSupportGrant,
   reviewSupportGrant,
   revokeSupportGrant,
+  toSupportGrantListItems,
   toSupportGrantSummary,
 } from '@/lib/admin/support-access-service';
 
@@ -248,17 +250,17 @@ export const adminSupportAccessRouter = createTRPCRouter({
 
   listMine: adminProcedure.query(async ({ ctx }) => {
     const grants = await listMySupportGrants(ctx.user.id);
-    return grants.map(toSupportGrantSummary);
+    return toSupportGrantListItems(grants);
   }),
 
   listPending: adminProcedure.query(async () => {
     const grants = await listPendingSupportGrants();
-    return grants.map(toSupportGrantSummary);
+    return toSupportGrantListItems(grants);
   }),
 
   listActive: adminProcedure.query(async () => {
     const grants = await listActiveSupportGrants();
-    return grants.map(toSupportGrantSummary);
+    return toSupportGrantListItems(grants);
   }),
 
   listUnreviewedEmergency: adminProcedure.query(async ({ ctx }) => {
@@ -266,13 +268,33 @@ export const adminSupportAccessRouter = createTRPCRouter({
       throw new TRPCError({ code: 'FORBIDDEN', message: 'Superadmin access required' });
     }
     const grants = await listUnreviewedEmergencyGrants();
-    return grants.map(toSupportGrantSummary);
+    return toSupportGrantListItems(grants);
   }),
 
+  viewAccess: adminProcedure
+    .input(z.object({ organizationId: z.uuid() }))
+    .query(async ({ ctx, input }) => {
+      if (!isSupportAccessEnabled()) return { grantRequired: false, expiresAt: null };
+      const [memberships, grants] = await Promise.all([
+        loadEffectiveMembershipRows(ctx.user.id, input.organizationId),
+        getActiveSupportGrantsForOrganization(input.organizationId),
+      ]);
+      if (memberships.length > 0) return { grantRequired: false, expiresAt: null };
+      const now = Date.now();
+      const ownGrant = grants.find(
+        grant =>
+          grant.actor_kilo_user_id === ctx.user.id &&
+          grant.expires_at !== null &&
+          new Date(grant.expires_at).getTime() > now
+      );
+      return ownGrant
+        ? { grantRequired: false, expiresAt: ownGrant.expires_at }
+        : { grantRequired: true, expiresAt: null };
+    }),
   getActiveForOrganization: adminProcedure
     .input(z.object({ organizationId: z.uuid() }))
     .query(async ({ input }) => {
       const grants = await getActiveSupportGrantsForOrganization(input.organizationId);
-      return grants.map(toSupportGrantSummary);
+      return toSupportGrantListItems(grants);
     }),
 });

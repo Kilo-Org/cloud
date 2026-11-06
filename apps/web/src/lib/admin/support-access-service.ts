@@ -219,6 +219,55 @@ export function toSupportGrantSummary(grant: SupportAccessGrant): SupportGrantSu
   };
 }
 
+export type SupportGrantPerson = { id: string; name: string | null; email: string | null };
+
+export type SupportGrantListItem = SupportGrantSummary & {
+  organizationName: string | null;
+  actor: SupportGrantPerson;
+  approvedBy: SupportGrantPerson | null;
+};
+
+export async function toSupportGrantListItems(
+  grants: SupportAccessGrant[]
+): Promise<SupportGrantListItem[]> {
+  if (grants.length === 0) return [];
+  const organizationIds = [...new Set(grants.map(grant => grant.organization_id))];
+  const userIds = [
+    ...new Set(
+      grants.flatMap(grant =>
+        grant.approved_by_kilo_user_id
+          ? [grant.actor_kilo_user_id, grant.approved_by_kilo_user_id]
+          : [grant.actor_kilo_user_id]
+      )
+    ),
+  ];
+  const [organizationRows, userRows] = await Promise.all([
+    db
+      .select({ id: organizations.id, name: organizations.name })
+      .from(organizations)
+      .where(inArray(organizations.id, organizationIds)),
+    db
+      .select({
+        id: kilocode_users.id,
+        name: kilocode_users.google_user_name,
+        email: kilocode_users.google_user_email,
+      })
+      .from(kilocode_users)
+      .where(inArray(kilocode_users.id, userIds)),
+  ]);
+  const organizationNames = new Map(organizationRows.map(row => [row.id, row.name]));
+  const people = new Map(userRows.map(row => [row.id, row]));
+  const person = (id: string): SupportGrantPerson =>
+    people.get(id) ?? { id, name: null, email: null };
+
+  return grants.map(grant => ({
+    ...toSupportGrantSummary(grant),
+    organizationName: organizationNames.get(grant.organization_id) ?? null,
+    actor: person(grant.actor_kilo_user_id),
+    approvedBy: grant.approved_by_kilo_user_id ? person(grant.approved_by_kilo_user_id) : null,
+  }));
+}
+
 export async function requestSupportGrant(params: {
   actorKiloUserId: string;
   organizationId: string;

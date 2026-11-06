@@ -1,7 +1,7 @@
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import 'server-only'; // This file imports the database and can therefore only be used on the server side.
 import Stripe from 'stripe';
-import { client } from '@kilocode/web-shared/lib/stripe-client';
+import { client, invalidateStripePaymentMethodCache } from '@kilocode/web-shared/lib/stripe-client';
 import {
   getStripeChargeInvoice,
   getStripeInvoiceChargeId,
@@ -686,6 +686,9 @@ export async function detachAllPaymentMethods(user: User) {
       await client.paymentMethods.detach(paymentMethod.id);
     })
   );
+  // Cards changed for this customer; the next payment-method read must ask
+  // Stripe again instead of serving the answer cached before the removal.
+  invalidateStripePaymentMethodCache(user.stripe_customer_id);
 
   // Also clear auto-top-up settings
   await db
@@ -1267,12 +1270,16 @@ async function handlePaymentMethodEvent(
       .update(payment_methods)
       .set({ ...auto_deleted_at })
       .where(eq(payment_methods.stripe_id, paymentMethod.id));
+    const stripeCustomerId = stripeReferenceId(paymentMethod.customer);
+    if (stripeCustomerId) invalidateStripePaymentMethodCache(stripeCustomerId);
     return;
   }
 
   const user = await findUserByStripeCustomer(paymentMethod.customer);
   if (!user) return;
   await ensurePaymentMethodStored(user.id, paymentMethod);
+  // Attaching or updating a card changes the answer for this customer.
+  invalidateStripePaymentMethodCache(user.stripe_customer_id);
 }
 
 type AutoTopUpOwner = { type: 'user'; id: string } | { type: 'organization'; id: string };

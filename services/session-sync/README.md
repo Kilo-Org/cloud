@@ -851,6 +851,9 @@ not measure a browser or native view commit.
 Negative clock/skew samples and latency overflow counts are explicit; the
 overflow percentile bin is not a measured upper latency bound.
 
+The tools retain one sanitized native error and one native close event.
+The `reconnects` counter counts unexpected closes, not completed reconnections.
+
 All rates use the declared 45-second measured denominator after ten seconds of
 warm-up; arrivals have a fixed additional ten-second drain. Late/missing events
 and source underproduction are explicit failures rather than smaller latency
@@ -881,6 +884,17 @@ workers.dev target, identically named R2 bucket, isolated run-specific metrics
 dataset, synthetic uncached Hyperdrive origin, and independent staging secrets.
 Run `perf-inspect.mjs absent <manifest>` before provisioning: it checks complete
 name inventories and verifies the run-derived limiter namespace IDs are unused.
+
+Worker scripts use one unfiltered GET without guessed `page`/`per_page` parameters,
+matching the [Worker scripts API](https://developers.cloudflare.com/api/resources/workers/subresources/scripts/methods/list/)
+and its [SDK `SinglePage` contract](https://github.com/cloudflare/cloudflare-typescript/blob/main/src/resources/workers/scripts/scripts.ts).
+The complete array is checked regardless of length. Numbered inventories honor
+explicit `total_pages`; otherwise a short or empty page terminates traversal using
+the response's actual `per_page` when supplied. `total_count` is advisory, never a
+reason to skip a full page or chase empty pages. Cursor inventories follow returned
+cursors and reject repeats. Unavailable inventories and unsupported pagination or
+response schemas fail closed.
+
 Keep limiter names, limits, and periods unchanged. After deployment, `verify`
 checks actual deployment/version IDs, the `workers/tag` run marker, deployed
 bindings, namespace ownership/classes, private R2 domains and bucket ID, Hyperdrive
@@ -940,12 +954,12 @@ retained before interpreting cross-host latency.
 registration, seed, checkpoint, retry/reconciliation, ticket/exchange, WebSocket,
 SQL, Worker CPU, rounded DO duration, rounded R2 operations, Logpush, analytics,
 downstream ingestion, VM lifetime, storage/egress, and delayed billing reserve.
-Expected activity and pessimistic activity are distinct inputs. The default/legacy
-`hardLimitUSD: 50` plan allows at most $35 Cloudflare, $5 VMs, and at least $10
-untouched reserve. Only a newly forecast plan with explicit parent approval may
-raise `hardLimitUSD` (maximum $100); a $100 plan allows at most $85 Cloudflare,
-the same $5 VMs and $10 reserve. Both include `alreadySpentUSD` from all prior
-attempts in the cumulative ceiling. Run `node scripts/perf-budget.mjs budget-plan.json`
+Expected activity and pessimistic activity are distinct inputs. Plans reserve
+the VM allowance and the full delayed-billing reserve before allocating the
+remaining Cloudflare ceiling. They also deduct `alreadySpentUSD` from every
+earlier attempt; missing cumulative spend fails admission. The default
+`hardLimitUSD` is $50. Only a fresh forecast with explicit parent approval can
+raise it, up to $100. Run `node scripts/perf-budget.mjs budget-plan.json`
 and save its passing output as the forecast; the planner copies that forecast's
 cap into its approval request. Parent GO must explicitly match that exact hashed
 forecast cap: a $100 GO cannot expand a $50 forecast. Analytics lag is not an
@@ -982,8 +996,8 @@ Replacement or unverified ownership never permits another destructive attempt.
 Compute cleanup runs first, then each remaining resource is independently
 ownership-checked; unavailable bucket metadata cannot block verified Worker
 deletion. Replacements are refused for that resource without abandoning other
-independently verifiable cleanup. Complete paginated Worker/namespace/secret
-inventories must prove absence. The private proof records exact observed
+independently verifiable cleanup. The complete single-page Worker array and paginated
+namespace/secret inventories must prove absence. The private proof records exact observed
 leftover IDs/names and `null` for unavailable inventories, never assumed absence.
 Exact known synthetic R2 keys must be listed; nonempty or deletion-failed buckets
 are failures. Cluster artifacts persist `passed:true` only

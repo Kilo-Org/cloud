@@ -5,6 +5,7 @@ import {
   assertUnusedLimiters,
   inspectLive,
   inventory,
+  listWorkerScripts,
   operatorAPI,
   resolveOperatorToken,
 } from './perf-identity.mjs';
@@ -21,7 +22,7 @@ assert(/^[a-f0-9]{32}$/.test(manifest.secretsStoreID), 'Secrets store ID');
 const api = operatorAPI(() => resolveOperatorToken(manifest.wrangler));
 const account = `/accounts/${manifest.accountID}`;
 if (mode === 'absent') {
-  const workers = await inventory(api, `${account}/workers/scripts`);
+  const workers = await listWorkerScripts(api);
   const buckets = await inventory(api, `${account}/r2/buckets`, result => result.buckets);
   const hyperdrives = await inventory(api, `${account}/hyperdrive/configs`);
   const secrets = await inventory(

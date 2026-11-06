@@ -91,6 +91,7 @@ const stats = {
   duplicate: 0,
   outOfOrder: 0,
   resets: 0,
+  // Unexpected closes before drain, not completed reconnects.
   reconnects: 0,
   callbacks: 0,
   projectionFailures: 0,
@@ -299,18 +300,92 @@ function dispatchCheckpoints() {
     stats.checkpointQueueDepth
   );
 }
-function trackSocket(socket, s) {
+function socketReason(value) {
+  if (typeof value !== 'string') return undefined;
+  const bounded = value.length > 2048 ? value.slice(0, 2048).replace(/\S*$/, '[truncated]') : value;
+  return bounded
+    .replace(/\bauthorization\b(?:\s*[:=]|\s+)[\s\S]*/gi, '[redacted]')
+    .replace(/\b(?:[a-z][a-z\d+.-]*:\/\/|www\.)[^\s"'<>]+/gi, '[redacted]')
+    .replace(/\bkilo-session-ticket\.[^\s"',;<>]+/gi, '[redacted]')
+    .replace(/\bbearer\s+(?:"[^"]*(?:"|$)|'[^']*(?:'|$)|[^\s"'<>;,]+)/gi, '[redacted]')
+    .replace(
+      /\b(?:[\w-]*ticket|sec-websocket-protocol|protocols?)\b\s*[:=]?\s*(?:\[[^\]]*(?:\]|$)|"[^"]*(?:"|$)|'[^']*(?:'|$)|[^\s,;]+)/gi,
+      '[redacted]'
+    )
+    .replace(/\b[\w-]+\.[\w-]+\.[\w-]+\b/g, '[redacted]')
+    .replace(/[a-z\d._~+/=-]{24,}/gi, '[redacted]')
+    .replace(/\p{Cc}/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 256);
+}
+function socketErrorCode(value) {
+  return typeof value === 'string' &&
+    /^(?:ECONNRESET|ECONNREFUSED|ECONNABORTED|ENOTFOUND|EAI_AGAIN|ETIMEDOUT|EPIPE|UND_ERR_CONNECT_TIMEOUT|UND_ERR_HEADERS_TIMEOUT|UND_ERR_SOCKET|ERR_TLS_CERT_ALTNAME_INVALID|CERT_HAS_EXPIRED|DEPTH_ZERO_SELF_SIGNED_CERT|UNABLE_TO_VERIFY_LEAF_SIGNATURE)$/.test(
+      value
+    )
+    ? value
+    : undefined;
+}
+function socketHTTPStatus(event, reason) {
+  for (const error of [event.error, event.error?.cause, event]) {
+    for (const status of [error?.status, error?.statusCode, error?.response?.status])
+      if (Number.isInteger(status) && status >= 100 && status <= 599) return status;
+  }
+  const match =
+    /\b(?:unexpected server response|(?:http(?:\/[12](?:\.[01])?)?\s+)?status(?:\s+code)?)\s*[:=]?\s*([1-5]\d{2})\b/i.exec(
+      reason ?? ''
+    ) ?? /\bHTTP\/[12](?:\.[01])?\s+([1-5]\d{2})\b/i.exec(reason ?? '');
+  return match ? Number(match[1]) : undefined;
+}
+function socketContext(socket, s, presence) {
+  return {
+    at: Date.now(),
+    sessionIndex: s.index,
+    socketRole: role === 'producer' ? (presence ? 'presence' : 'runner') : 'viewer',
+    readyState:
+      Number.isInteger(socket.readyState) && socket.readyState >= 0 && socket.readyState <= 3
+        ? socket.readyState
+        : undefined,
+  };
+}
+function trackSocket(socket, s, presence = false) {
   socket.addEventListener('open', () => {
     const entry = entryFor(s);
     if (entry) entry.opens++;
   });
-  socket.addEventListener('close', () => {
+  socket.addEventListener('close', event => {
+    const unexpected = !stopping && !!window && Date.now() < window.drainAt;
+    // Only the wire event, never RemoteSocket's synthetic internal disconnect(1011).
+    if (unexpected)
+      stats.firstSocketClose ??= {
+        ...socketContext(socket, s, presence),
+        event: 'websocket_close',
+        nativeCloseCode:
+          Number.isInteger(event.code) && event.code >= 0 && event.code <= 4999
+            ? event.code
+            : undefined,
+        wasClean: typeof event.wasClean === 'boolean' ? event.wasClean : undefined,
+        reason: socketReason(event.reason),
+        unexpected,
+      };
     if (!stopping && window && Date.now() < window.drainAt) {
       stats.reconnects++;
       stop('unexpected_socket_close');
     }
   });
-  socket.addEventListener('error', () => {
+  socket.addEventListener('error', event => {
+    if (!stats.firstSocketError) {
+      const reason = socketReason(event.error?.message ?? event.message);
+      stats.firstSocketError = {
+        ...socketContext(socket, s, presence),
+        event: 'websocket_error',
+        reason,
+        errorCode: socketErrorCode(event.error?.code ?? event.code),
+        causeCode: socketErrorCode(event.error?.cause?.code ?? event.cause?.code),
+        httpStatus: socketHTTPStatus(event, reason),
+      };
+    }
     if (!stopping) category('socket_error');
   });
 }
@@ -322,7 +397,7 @@ async function remote(s, presence = false, onFrame) {
     constructor(url, options) {
       super(url, ['kilo-session-ticket.' + options.headers.Authorization.slice(7)]);
       wire = this;
-      trackSocket(this, s);
+      trackSocket(this, s, presence);
     }
   }
   const path = presence ? '/v1/presence' : `/v1/sessions/${s.id}/live`;

@@ -199,15 +199,21 @@ export function CenteredState({
       clearTimeout(timer);
     };
   }, []);
-  // The latch is set during render rather than in an effect: a detach clears the
-  // measured placement in a layout effect, so an effect-only latch would still
-  // paint one hidden frame — the same blank body, on the tab a returning screen
-  // is showing.
+  // The latch is a layout effect, and it is declared after the measuring layout
+  // effect above: layout effects flush before the frame is painted, so the
+  // reveal lands in the same commit that placed the state, and a later detach —
+  // which clears the placement in that earlier layout effect — already reads the
+  // latch. An ordinary effect would run after paint and let one hidden frame
+  // through, which is the blank body a returning screen showed; a render-phase
+  // update is not an option either, because it updates a component React has
+  // not mounted yet and surfaces as a development-time state-update warning.
   const [revealed, setRevealed] = useState(false);
   const visible = ready || fallbackElapsed || revealed;
-  if (visible && !revealed) {
-    setRevealed(true);
-  }
+  useLayoutEffect(() => {
+    if (visible && !revealed) {
+      setRevealed(true);
+    }
+  }, [revealed, visible]);
 
   if (!surface) {
     throw new Error('CenteredState requires a StateSurface');

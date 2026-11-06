@@ -9,7 +9,7 @@ const windowDims = vi.hoisted(() => ({ width: 390, height: 844, fontScale: 1, sc
 
 type CardContent = {
   kind: string;
-  state?: { title: string; description: string; action: string; actionLabel: string };
+  state?: { title: string; description: string; action: string; actionLabel: string | null };
 };
 
 const cardState = vi.hoisted(() => {

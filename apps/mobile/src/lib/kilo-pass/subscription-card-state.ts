@@ -19,7 +19,7 @@ type KiloPassSubscriptionCardContentState =
  * everything else renders inert and muted, so the dead end stops reading as a
  * disabled row. One marker for both platforms and every storefront.
  */
-export const UNAVAILABLE_PASS_CARD: KiloPassSubscriptionCardContentState = {
+const UNAVAILABLE_PASS_CARD: KiloPassSubscriptionCardContentState = {
   kind: 'card',
   state: {
     action: 'open-native',

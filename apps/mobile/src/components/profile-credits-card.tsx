@@ -176,15 +176,6 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
     </>
   );
 
-  // The slot's paint while the balance skeleton owns the surface: the card
-  // keeps its full height from the first cell, not from the row's first pass
-  // (Android base cell, design gate 2026-11-06).
-  const expirySlotPending = creditsFailed ? (
-    <Text className="text-xs text-muted-foreground">{t('credits.expiryUnavailable')}</Text>
-  ) : (
-    <Skeleton className="h-[14px] w-40 max-w-full rounded bg-muted-soft" />
-  );
-
   // `shrink-0 grow-0` keeps the amount at its text height: a horizontal
   // ScrollView defaults to `flexGrow: 1`, so inside a column it would take the
   // spare height and push the note away from the amount.
@@ -295,22 +286,23 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
       {showBalanceSkeleton && (
         // Content-shaped skeleton (number bar + note bar in the card's own
         // bg-secondary shell): a plain block read as an empty box in the e5
-        // spot check (2026-09-07). Sized to the card's min-h-16 so the swap
-        // to the balance row does not shift the sections below. The bars are
-        // bg-muted-soft because the theme's bg-muted equals bg-secondary —
-        // default-tone bars were invisible in this shell (b911 e2 spot check:
-        // "blank beige block", e2-nav-profile.png).
+        // spot check (2026-09-07). It holds the balance row's own height: the
+        // column converges on the row's p-2 column (number line + gap + note
+        // line) and the reserved control box matches the row's 48 dp toggle,
+        // which is what sets that row's height. A shorter placeholder left the
+        // sections below moving by the difference when the row arrived (Android
+        // base cell, design gate 2026-11-06). The bars are bg-muted-soft
+        // because the theme's bg-muted equals bg-secondary — default-tone bars
+        // were invisible in this shell (b911 e2 spot check: "blank beige
+        // block", e2-nav-profile.png).
         <View className="min-h-16 flex-row items-center rounded-lg bg-secondary px-3 py-2">
-          <View className="flex-1 gap-1">
-            <Skeleton className="h-8 w-28 rounded-md bg-muted-soft" />
-            <Skeleton className="h-3 w-40 rounded bg-muted-soft" />
+          <View className="min-h-12 flex-1 justify-center gap-1">
+            <Skeleton className="h-7 w-28 rounded-md bg-muted-soft" />
+            <Skeleton className="h-[14px] w-40 rounded bg-muted-soft" />
           </View>
+          <View className="h-12 w-12 shrink-0" />
         </View>
       )}
-      {/* The pending expiry line paints while the balance skeleton owns the
-          surface, so the reserved line already exists when the balance row
-          renders its own slot beneath the amount. */}
-      {showBalanceSkeleton && expirySlotPending}
       {balanceFailed && (
         <Pressable
           className="min-h-16 justify-center rounded-lg bg-secondary px-3 py-3 active:opacity-70"

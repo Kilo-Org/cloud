@@ -750,13 +750,16 @@ describe('CreditsCard balance state', () => {
     settled.unmount();
   });
 
-  it('keeps the expiry line reserved inside the balance skeleton', async () => {
-    // The slot's line paints while the balance skeleton owns the surface, so
-    // the card holds the balance row's height before the row's own first pass.
-    const { texts, unmount } = await mountCard();
-    // The surface skeleton renders two bars; the pending line renders the
-    // third (the note's reserved box) as a sibling below the surface block.
-    expect(texts().filter(text => text === 'SKELETON')).toHaveLength(3);
+  it('holds the balance row height while the balance loads', async () => {
+    // One placeholder carries both reserved lines (the amount's and the
+    // note's) and the control box that sets the row's height, so the row's
+    // arrival cannot move the sections below.
+    const { renderer, texts, unmount } = await mountCard();
+    expect(texts().filter(text => text === 'SKELETON')).toHaveLength(2);
+    const spacer = renderer.root.find(
+      node => String(node.props.className) === 'h-12 w-12 shrink-0'
+    );
+    expect(spacer).toBeTruthy();
     unmount();
   });
 

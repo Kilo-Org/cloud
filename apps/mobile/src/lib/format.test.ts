@@ -33,7 +33,7 @@ describe('formatMoney', () => {
       expect(formatMoney(0, locale)).not.toMatch(/\$\s|\s\$/);
       expect(formatMoney(0, locale)).not.toMatch(/\s/);
     }
-    expect(formatMoney(0, 'ar')).toMatch(/^\u200f?0[.,]00\$$/);
+    expect(formatMoney(0, 'ar')).toMatch(/^\u200F?0[.,]00\$$/);
   });
 
   it('keeps the group separator in space-grouped locales', () => {

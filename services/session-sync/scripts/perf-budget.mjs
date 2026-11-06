@@ -40,7 +40,7 @@ const schema = z.strictObject({
   downstreamLogsUSD: quantity,
   delayedBillingReserveUSD: quantity.min(10),
   alreadySpentUSD: quantity,
-  hardLimitUSD: z.literal(50),
+  hardLimitUSD: z.number().finite().min(50).max(100).default(50),
   workerStoredLogsEnabled: z.literal(false),
   absoluteResourceDeadlineSeconds: z.number().positive().max(900),
 });
@@ -105,9 +105,12 @@ export function forecast(input) {
     alreadySpentUSD: plan.alreadySpentUSD,
     reserveUSD: plan.delayedBillingReserveUSD,
     committedCeilingUSD,
-    hardLimitUSD: 50,
-    targets: { cloudflareUSD: 35, vmUSD: 5, delayedReserveUSD: 10 },
-    passed: committedCeilingUSD <= 50 && pessimisticCFUSD <= 35 && vmUSD <= 5,
+    hardLimitUSD: plan.hardLimitUSD,
+    targets: { cloudflareUSD: plan.hardLimitUSD - 15, vmUSD: 5, delayedReserveUSD: 10 },
+    passed:
+      committedCeilingUSD <= plan.hardLimitUSD &&
+      pessimisticCFUSD <= plan.hardLimitUSD - 15 &&
+      vmUSD <= 5,
     absoluteResourceDeadlineSeconds: plan.absoluteResourceDeadlineSeconds,
     workloadBounds: plan.stages.map(row => ({
       name: row.name,

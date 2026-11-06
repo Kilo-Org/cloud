@@ -110,10 +110,14 @@ export function readConfig(path) {
     );
     assert.equal(go.targetManifestHash, sha256(readFileSync(config.targetManifest)));
     assert.equal(go.approvedByParent, true);
-    assert.equal(go.hardLimitUSD, 50);
     assert(go.expiresAt >= config.stopAt && go.expiresAt > Date.now());
     assert.equal(go.budgetHash, sha256(readFileSync(go.budgetFile)));
     const budget = JSON.parse(readFileSync(go.budgetFile, 'utf8'));
+    assert.equal(
+      go.hardLimitUSD,
+      budget.hardLimitUSD ?? 50,
+      'Parent GO cap must equal the hashed forecast cap'
+    );
     const inspection = validateAttestation(config, manifest, go, path);
     validateCloudAdmission(config, manifest, budget, Date.now(), inspection);
   }
@@ -503,11 +507,19 @@ export function validateCloudAdmission(
   assert.equal(config.stopAt, manifest.teardownAt);
   assert(manifest.teardownAt > now);
   assert.equal(budget.passed, true);
+  const hardLimitUSD = budget.hardLimitUSD ?? 50;
+  const alreadySpentUSD = budget.alreadySpentUSD ?? 0;
+  assert(Number.isFinite(hardLimitUSD) && hardLimitUSD >= 50 && hardLimitUSD <= 100);
+  assert(Number.isFinite(alreadySpentUSD) && alreadySpentUSD >= 0);
   assert(
-    budget.pessimisticCFUSD <= 35 &&
+    budget.pessimisticCFUSD >= 0 &&
+      budget.pessimisticCFUSD <= hardLimitUSD - 15 &&
+      budget.vmUSD >= 0 &&
       budget.vmUSD <= 5 &&
       budget.reserveUSD >= 10 &&
-      budget.committedCeilingUSD <= 50
+      budget.committedCeilingUSD >=
+        budget.pessimisticCFUSD + budget.vmUSD + budget.reserveUSD + alreadySpentUSD &&
+      budget.committedCeilingUSD <= hardLimitUSD
   );
   assert(
     manifest.teardownAt + manifest.teardownTailSeconds * 1000 <=

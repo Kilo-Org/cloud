@@ -108,6 +108,38 @@ test('pessimistic ceiling includes VM time and delayed billing reserve', () => {
   assert(result.vmUSD > 3);
 });
 
+test('forecast caps retain legacy defaults and bound explicit allocations', () => {
+  const legacy = { ...plan };
+  delete legacy.hardLimitUSD;
+  assert.equal(forecast(legacy).hardLimitUSD, 50);
+  assert.deepEqual(forecast(plan).targets, {
+    cloudflareUSD: 35,
+    vmUSD: 5,
+    delayedReserveUSD: 10,
+  });
+  for (const cap of [49, 100.01, Infinity]) {
+    assert.throws(() => forecast({ ...plan, hardLimitUSD: cap }));
+  }
+  const input = {
+    ...plan,
+    hardLimitUSD: 100,
+    stages: [{ ...empty, sqlRowsWritten: 50000000 }],
+  };
+  const result = forecast(input);
+  assert.equal(result.passed, true);
+  assert.equal(result.hardLimitUSD, 100);
+  assert.equal(result.targets.cloudflareUSD, 85);
+  assert.equal(forecast({ ...input, hardLimitUSD: 50 }).passed, false);
+  const remaining = 100 - result.committedCeilingUSD;
+  assert.equal(forecast({ ...input, alreadySpentUSD: remaining }).passed, true);
+  assert.equal(forecast({ ...input, alreadySpentUSD: remaining + 0.01 }).passed, false);
+  assert.equal(
+    forecast({ ...input, stages: [{ ...empty, sqlRowsWritten: 80000000 }] }).passed,
+    false
+  );
+  assert.equal(forecast({ ...input, qualificationVMUSD: 6 }).passed, false);
+});
+
 function targetFixture() {
   const root = mkdtempSync(join(tmpdir(), 'sync-load-guard-'));
   const now = Date.now();
@@ -308,6 +340,43 @@ const allowedBudget = {
     },
   ],
 };
+test('cloud admission enforces bounded cumulative caps, not just passed', () => {
+  const f = targetFixture();
+  try {
+    const budget = {
+      ...allowedBudget,
+      hardLimitUSD: 100,
+      pessimisticCFUSD: 85,
+      vmUSD: 5,
+      reserveUSD: 10,
+      alreadySpentUSD: 0,
+      committedCeilingUSD: 100,
+    };
+    assert.doesNotThrow(() => validateCloudAdmission(f.config, f.manifest, budget));
+    for (const change of [
+      { hardLimitUSD: 50 },
+      { hardLimitUSD: 101 },
+      { hardLimitUSD: NaN },
+      { pessimisticCFUSD: 85.01 },
+      { vmUSD: 5.01 },
+      { reserveUSD: 9.99 },
+      { alreadySpentUSD: 0.01 },
+      { alreadySpentUSD: -1 },
+      { committedCeilingUSD: 100.01 },
+    ]) {
+      assert.throws(() => validateCloudAdmission(f.config, f.manifest, { ...budget, ...change }));
+    }
+    assert.doesNotThrow(() =>
+      validateCloudAdmission(f.config, f.manifest, {
+        ...budget,
+        pessimisticCFUSD: 60,
+        alreadySpentUSD: 25,
+      })
+    );
+  } finally {
+    f.dispose();
+  }
+});
 test('cloud admission requires a matching live watchdog heartbeat', () => {
   const f = targetFixture();
   try {

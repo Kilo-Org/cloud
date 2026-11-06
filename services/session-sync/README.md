@@ -919,7 +919,7 @@ per-node `attestation.json` plus current heartbeat copies and a new
 `approval-request.json`. Transfer those two current artifacts to each reviewed
 root. Parent must explicitly issue renewed `go.json` with `approvedByParent:true`,
 the exact config/target/budget hashes and new `attestationHash`, the unchanged
-$50 hard limit, and expiry covering the unchanged stop time. Refresh never writes
+forecast hard limit, and expiry covering the unchanged stop time. Refresh never writes
 GO or extends resource lifetime. An old GO cannot authorize refreshed evidence;
 inspection/attestation freshness remains 60 seconds and heartbeat freshness ten
 seconds. After lengthy seeding, repeat refresh and obtain another parent GO
@@ -940,9 +940,16 @@ retained before interpreting cross-host latency.
 registration, seed, checkpoint, retry/reconciliation, ticket/exchange, WebSocket,
 SQL, Worker CPU, rounded DO duration, rounded R2 operations, Logpush, analytics,
 downstream ingestion, VM lifetime, storage/egress, and delayed billing reserve.
-Expected activity and pessimistic activity are distinct inputs. A passing plan
-requires at most $35 Cloudflare, $5 VMs, and at least $10 untouched reserve within
-the combined $50 allocation. Analytics lag is not an invoice guarantee.
+Expected activity and pessimistic activity are distinct inputs. The default/legacy
+`hardLimitUSD: 50` plan allows at most $35 Cloudflare, $5 VMs, and at least $10
+untouched reserve. Only a newly forecast plan with explicit parent approval may
+raise `hardLimitUSD` (maximum $100); a $100 plan allows at most $85 Cloudflare,
+the same $5 VMs and $10 reserve. Both include `alreadySpentUSD` from all prior
+attempts in the cumulative ceiling. Run `node scripts/perf-budget.mjs budget-plan.json`
+and save its passing output as the forecast; the planner copies that forecast's
+cap into its approval request. Parent GO must explicitly match that exact hashed
+forecast cap: a $100 GO cannot expand a $50 forecast. Analytics lag is not an
+invoice guarantee.
 
 Arm `perf-teardown.mjs arm <target-manifest.json>` as a **finite independent job
 on the owned control VM**, separate from generator VMs, before opening cloud

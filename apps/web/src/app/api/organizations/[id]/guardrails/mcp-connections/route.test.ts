@@ -34,7 +34,7 @@ async function setup(enforcement: 'off' | 'shadow' | 'enforce', kiloEncrypt = tr
       kind: 'package',
       ecosystem: 'npm',
       identifier: '@acme/server',
-      min_version: '2.0.0',
+      version_spec: '^2.0.0',
     },
     source: { registry: 'custom', id: null },
   });
@@ -120,6 +120,7 @@ describe('POST /api/organizations/[id]/guardrails/mcp-connections', () => {
           identityKey: 'npm:@acme/server',
           action: 'allow',
           recorded: true,
+          versionCheck: 'server',
         },
         {
           decision: 'denied',
@@ -131,7 +132,9 @@ describe('POST /api/organizations/[id]/guardrails/mcp-connections', () => {
         {
           decision: 'denied',
           reason: 'below_min_version',
+          versionReason: 'version_not_allowed',
           identityKey: 'npm:@acme/server',
+          versionCheck: 'server',
           action: 'block',
           recorded: true,
         },
@@ -150,6 +153,64 @@ describe('POST /api/organizations/[id]/guardrails/mcp-connections', () => {
     expect(events.every(event => event.kilo_user_id === user.id)).toBe(true);
     expect(events.every(event => event.organization_id === organization.id)).toBe(true);
     expect(events.every(event => event.client === 'vscode')).toBe(true);
+  });
+
+  test('asks the client to check the range when no version is reported', async () => {
+    const { organization } = await setup('enforce');
+
+    const response = await post(organization.id, {
+      client: 'cli',
+      connections: [{ target: packageTarget }],
+    });
+
+    expect((await response.json()).results).toEqual([
+      {
+        decision: 'allowed',
+        versionCheck: 'client',
+        identityKey: 'npm:@acme/server',
+        action: 'allow',
+        recorded: true,
+      },
+    ]);
+  });
+
+  test('does not ask the client to check a range while auditing', async () => {
+    const { organization } = await setup('shadow');
+
+    const response = await post(organization.id, {
+      client: 'cli',
+      connections: [{ target: packageTarget }],
+    });
+
+    expect((await response.json()).results).toEqual([
+      {
+        decision: 'allowed',
+        identityKey: 'npm:@acme/server',
+        action: 'allow',
+        recorded: true,
+      },
+    ]);
+  });
+
+  test('denies a tag when a resolved version is required', async () => {
+    const { organization } = await setup('enforce');
+
+    const response = await post(organization.id, {
+      client: 'cli',
+      connections: [{ target: packageTarget, version: 'latest' }],
+    });
+
+    expect((await response.json()).results).toEqual([
+      {
+        decision: 'denied',
+        reason: 'below_min_version',
+        versionReason: 'invalid_version',
+        versionCheck: 'server',
+        identityKey: 'npm:@acme/server',
+        action: 'block',
+        recorded: true,
+      },
+    ]);
   });
 
   test('records a violation but does not block it in audit mode', async () => {

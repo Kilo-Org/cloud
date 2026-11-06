@@ -1,7 +1,7 @@
 import type {
+  OrganizationGuardrailConfig,
   OrganizationGuardrailEnforcement,
   OrganizationMcpGuardrailConfig,
-  OrganizationMcpConnectDecision,
 } from '@kilocode/db/schema-types';
 import type { Organization, OrganizationGuardrail } from '@kilocode/db/schema';
 import { organization_guardrails } from '@kilocode/db/schema';
@@ -18,6 +18,13 @@ import {
   normalizeRemoteMcpUrl,
   type McpTarget,
 } from './mcp-identity';
+import {
+  checkVersion,
+  classifyLegacyMinVersion,
+  isValidVersionSpec,
+  minimumVersionForSpec,
+  type VersionCheckResult,
+} from './version-spec';
 
 /** Matches the identity key length accepted by the admin audit log endpoints. */
 export const MAX_MCP_IDENTITY_KEY_LENGTH = 500;
@@ -83,6 +90,41 @@ export function resolveGuardrailsSettings(organization: GuardrailSettingsOrganiz
   };
 }
 
+/**
+ * Fills in the range from a legacy minimum and keeps a conservative minimum for
+ * pre-range clients. Both keys are transitional until client rollout completes.
+ */
+export function normalizeGuardrailConfig(
+  config: OrganizationGuardrailConfig
+): OrganizationGuardrailConfig {
+  if (config.kind !== 'package') return config;
+  if (config.version_spec !== null && config.version_spec !== undefined) {
+    return {
+      ...config,
+      version_spec_invalid: isValidVersionSpec(config.version_spec) ? undefined : true,
+      min_version: config.min_version ?? minimumVersionForSpec(config.version_spec),
+    };
+  }
+  const legacy = classifyLegacyMinVersion(config.min_version);
+  if (legacy.kind === 'range') {
+    return {
+      ...config,
+      version_spec: legacy.value,
+      version_spec_invalid: undefined,
+      min_version: config.min_version ?? minimumVersionForSpec(legacy.value),
+    };
+  }
+  if (legacy.kind === 'invalid') {
+    return { ...config, version_spec: null, version_spec_invalid: true };
+  }
+  return {
+    ...config,
+    version_spec: null,
+    version_spec_invalid: undefined,
+    min_version: config.min_version ?? null,
+  };
+}
+
 function toAllowedMcpServer(
   row: Pick<OrganizationGuardrail, 'identity_key' | 'name' | 'description' | 'config'>
 ): AllowedMcpServer {
@@ -90,7 +132,7 @@ function toAllowedMcpServer(
     identityKey: row.identity_key,
     name: row.name,
     description: row.description,
-    config: row.config,
+    config: normalizeGuardrailConfig(row.config),
   };
 }
 
@@ -160,52 +202,76 @@ export function normalizeMcpConnectTarget(
   return { target, identityKey };
 }
 
-function parseVersion(version: string): number[] | null {
-  const match = /^v?(\d+(?:\.\d+)*)/i.exec(version.trim());
-  return match ? match[1].split('.').map(Number) : null;
-}
+export type McpConnectVersionReason = Exclude<VersionCheckResult, 'match'>;
 
 /**
- * Compares the leading numeric segments only, so `1.2.0rc1` counts as `1.2.0`. Returns null when
- * either version has no numeric prefix.
+ * `reason` keeps the legacy wire value for clients that still switch on it.
+ * `versionReason` carries the precise version failure for new clients.
  */
-export function isVersionAtLeast(version: string, minVersion: string): boolean | null {
-  const actual = parseVersion(version);
-  const minimum = parseVersion(minVersion);
-  if (!actual || !minimum) return null;
-  for (let index = 0; index < Math.max(actual.length, minimum.length); index++) {
-    const difference = (actual[index] ?? 0) - (minimum[index] ?? 0);
-    if (difference !== 0) return difference > 0;
-  }
-  return true;
-}
-
-export type McpConnectVerdict = {
-  decision: OrganizationMcpConnectDecision;
-  /** Why the connect was denied; absent when allowed. */
-  reason?: 'not_allowed' | 'below_min_version' | 'unsupported_target';
-};
+export type McpConnectVerdict =
+  | { decision: 'allowed'; versionCheck?: 'server' | 'client' }
+  | { decision: 'denied'; reason: 'not_allowed' | 'unsupported_target' }
+  | {
+      decision: 'denied';
+      reason: 'below_min_version';
+      versionReason: McpConnectVersionReason;
+      versionCheck: 'server';
+    };
 
 /**
- * Whether the allow list admits a connect. `version` is what the client is about to run; when
- * the client cannot tell, it leaves it out and enforces the minimum version itself. A version
- * that is given but has no numeric prefix, such as `latest`, is denied when the server has a
- * minimum.
+ * Whether the allow list admits a connect. `version` is the resolved version the
+ * client is about to run, not a tag or a range. In enforce mode, a package
+ * server with an allowed-versions range but no reported version is allowed with
+ * `versionCheck: 'client'`, so the client enforces the range itself. Shadow mode
+ * records the decision without asking the client to enforce it.
  */
 export function evaluateMcpConnect(params: {
   allowedServers: readonly Pick<AllowedMcpServer, 'identityKey' | 'config'>[];
   target: NormalizedMcpConnectTarget | null;
   version?: string | null;
+  mcpEnforcement: 'shadow' | 'enforce';
 }): McpConnectVerdict {
   const { target } = params;
   if (!target) return { decision: 'denied', reason: 'unsupported_target' };
   const server = params.allowedServers.find(entry => entry.identityKey === target.identityKey);
   if (!server) return { decision: 'denied', reason: 'not_allowed' };
-  const { config } = server;
-  if (config.kind === 'package' && config.min_version && params.version) {
-    if (isVersionAtLeast(params.version, config.min_version) !== true) {
-      return { decision: 'denied', reason: 'below_min_version' };
-    }
+  const config = normalizeGuardrailConfig(server.config);
+  if (config.kind !== 'package') {
+    return { decision: 'allowed' };
   }
-  return { decision: 'allowed' };
+  if (config.version_spec_invalid) {
+    return {
+      decision: 'denied',
+      reason: 'below_min_version',
+      versionReason: 'invalid_policy',
+      versionCheck: 'server',
+    };
+  }
+  if (!config.version_spec) {
+    return { decision: 'allowed' };
+  }
+  if (!isValidVersionSpec(config.version_spec)) {
+    return {
+      decision: 'denied',
+      reason: 'below_min_version',
+      versionReason: 'invalid_policy',
+      versionCheck: 'server',
+    };
+  }
+  const version = params.version?.trim() ?? '';
+  if (version === '') {
+    return params.mcpEnforcement === 'enforce'
+      ? { decision: 'allowed', versionCheck: 'client' }
+      : { decision: 'allowed' };
+  }
+  const result = checkVersion(version, config.version_spec, config.ecosystem);
+  if (result === 'match') {
+    return { decision: 'allowed', versionCheck: 'server' };
+  }
+  return {
+    decision: 'denied',
+    reason: 'below_min_version',
+    versionReason: result,
+    versionCheck: 'server',
+  };
 }

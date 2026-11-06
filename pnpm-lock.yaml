@@ -1400,6 +1400,9 @@ importers:
       sanitize-html:
         specifier: 2.18.1
         version: 2.18.1
+      semver:
+        specifier: 7.7.4
+        version: 7.7.4
       server-only:
         specifier: 0.0.1
         version: 0.0.1
@@ -1476,6 +1479,9 @@ importers:
       '@types/sanitize-html':
         specifier: 2.16.2
         version: 2.16.2
+      '@types/semver':
+        specifier: 7.7.1
+        version: 7.7.1
       '@typescript/native-preview':
         specifier: 'catalog:'
         version: 7.0.0-dev.20260707.2

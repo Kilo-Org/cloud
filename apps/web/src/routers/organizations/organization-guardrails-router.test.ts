@@ -17,8 +17,15 @@ import {
   createEmptyEnkryptOutputDetectors,
   createKiloDefaultEnkryptInputDetectors,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detectors';
+import { DEFAULT_ORGANIZATION_FEATURES } from '@kilocode/web-shared/lib/ai-gateway/gateway-config';
+import { readOrganizationFeatures } from '@kilocode/web-shared/lib/ai-gateway/organization-features';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { desc, eq } from 'drizzle-orm';
+
+jest.mock('@kilocode/web-shared/lib/ai-gateway/organization-features', () => ({
+  ...jest.requireActual('@kilocode/web-shared/lib/ai-gateway/organization-features'),
+  readOrganizationFeatures: jest.fn(),
+}));
 
 let owner: User;
 let member: User;
@@ -85,6 +92,13 @@ describe('organization guardrails router', () => {
     await addUserToOrganization(organization.id, member.id, 'member');
   });
 
+  beforeEach(() => {
+    jest.mocked(readOrganizationFeatures).mockResolvedValue({
+      ...DEFAULT_ORGANIZATION_FEATURES,
+      enkrypt_output_guardrail: [organization.id],
+    });
+  });
+
   it('returns Kilo Default, off, and no response detector for an organization that never saved guardrails', async () => {
     const caller = await createCallerForUser(owner.id);
 
@@ -94,6 +108,7 @@ describe('organization guardrails router', () => {
       enabled: false,
       detectors: createKiloDefaultEnkryptInputDetectors(),
       output: { enabled: false, detectors: createEmptyEnkryptOutputDetectors() },
+      output_available: true,
       invalid_saved_detectors: false,
       invalid_saved_output_detectors: false,
     });
@@ -110,6 +125,7 @@ describe('organization guardrails router', () => {
 
     expect(saved).toEqual({
       ...config,
+      output_available: true,
       invalid_saved_detectors: false,
       invalid_saved_output_detectors: false,
     });
@@ -157,13 +173,14 @@ describe('organization guardrails router', () => {
     expect(auditLog.message).not.toContain('weapons');
   });
 
-  it('keeps the saved response guardrail when a save omits it', async () => {
+  it('keeps the saved response guardrail when an input-only save follows feature revocation', async () => {
     const caller = await createCallerForUser(owner.id);
     await caller.organizations.guardrails.update({
       organizationId: organization.id,
       ...savedConfig(),
       output: savedOutputConfig(),
     });
+    jest.mocked(readOrganizationFeatures).mockResolvedValue(DEFAULT_ORGANIZATION_FEATURES);
     const { output: _output, ...inputOnly } = savedConfig();
 
     const saved = await caller.organizations.guardrails.update({
@@ -172,8 +189,62 @@ describe('organization guardrails router', () => {
     });
 
     expect(saved.output).toEqual(savedOutputConfig());
+    expect(saved.output_available).toBe(false);
     const updated = await getOrganizationById(organization.id);
     expect(updated?.settings.enkrypt?.output_guardrail).toEqual(savedOutputConfig());
+  });
+
+  it('hides output configuration for an organization not granted the feature', async () => {
+    jest.mocked(readOrganizationFeatures).mockResolvedValue({
+      ...DEFAULT_ORGANIZATION_FEATURES,
+      enkrypt_output_guardrail: [crypto.randomUUID()],
+    });
+    const caller = await createCallerForUser(owner.id);
+
+    await expect(
+      caller.organizations.guardrails.get({ organizationId: organization.id })
+    ).resolves.toMatchObject({ output_available: false });
+  });
+
+  it('rejects direct output updates without the feature, including disabling output checks', async () => {
+    jest.mocked(readOrganizationFeatures).mockResolvedValue(DEFAULT_ORGANIZATION_FEATURES);
+    const caller = await createCallerForUser(owner.id);
+    const previous = await getOrganizationById(organization.id);
+
+    for (const output of [savedOutputConfig(), savedConfig().output]) {
+      await expect(
+        caller.organizations.guardrails.update({
+          organizationId: organization.id,
+          ...savedConfig(),
+          output,
+        })
+      ).rejects.toMatchObject({
+        code: 'FORBIDDEN',
+        message: 'Enkrypt output guardrails are not available for this organization.',
+      });
+    }
+
+    expect((await getOrganizationById(organization.id))?.settings).toEqual(previous?.settings);
+  });
+
+  it('saves input guardrails without creating output settings when the feature was never granted', async () => {
+    const ungranted = await createTestOrganization(
+      'Input Only Guardrails Org',
+      owner.id,
+      0,
+      { kilo_encrypt: true },
+      false
+    );
+    const caller = await createCallerForUser(owner.id);
+    const { output: _output, ...inputOnly } = savedConfig();
+
+    await expect(
+      caller.organizations.guardrails.update({ organizationId: ungranted.id, ...inputOnly })
+    ).resolves.toMatchObject({ ...inputOnly, output_available: false });
+
+    expect((await getOrganizationById(ungranted.id))?.settings.enkrypt).toEqual({
+      input_guardrail: { ...inputOnly, scan_tool_results: true },
+    });
   });
 
   it('rejects enabling the response guardrail with no detector', async () => {
@@ -403,6 +474,7 @@ describe('organization guardrails router', () => {
       enabled: true,
       detectors: createKiloDefaultEnkryptInputDetectors(),
       output: { enabled: false, detectors: createEmptyEnkryptOutputDetectors() },
+      output_available: false,
       invalid_saved_detectors: true,
       invalid_saved_output_detectors: false,
     });
@@ -414,7 +486,7 @@ describe('organization guardrails router', () => {
     ).resolves.toMatchObject({ data_collection: 'deny' });
   });
 
-  it('reports invalid saved response detectors', async () => {
+  it('preserves invalid saved response detectors during input-only saves without the feature', async () => {
     const invalidOrganization = await createTestOrganization(
       'Invalid Response Guardrails Org',
       owner.id,
@@ -431,8 +503,20 @@ describe('organization guardrails router', () => {
       caller.organizations.guardrails.get({ organizationId: invalidOrganization.id })
     ).resolves.toMatchObject({
       output: { enabled: true, detectors: createEmptyEnkryptOutputDetectors() },
+      output_available: false,
       invalid_saved_detectors: false,
       invalid_saved_output_detectors: true,
     });
+
+    const { output: _output, ...inputOnly } = savedConfig();
+    await expect(
+      caller.organizations.guardrails.update({
+        organizationId: invalidOrganization.id,
+        ...inputOnly,
+      })
+    ).resolves.toMatchObject({ output_available: false, invalid_saved_output_detectors: true });
+    expect(
+      (await getOrganizationById(invalidOrganization.id))?.settings.enkrypt?.output_guardrail
+    ).toEqual({ enabled: true, detectors: { pii: true } });
   });
 });

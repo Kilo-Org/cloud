@@ -211,9 +211,12 @@ export function getEnkryptOutputGuardrailIssues(
 /**
  * Issues keyed by the dotted path of the field that caused them; `''` is the whole configuration.
  * Response guardrail paths start with `output.`. Detector settings are validated even while
- * guardrails are off because they are saved either way.
+ * guardrails are off because they are saved either way, unless output is excluded from the save.
  */
-export function getEnkryptGuardrailsIssues(draft: EnkryptGuardrailsDraft): EnkryptGuardrailsIssues {
+export function getEnkryptGuardrailsIssues(
+  draft: EnkryptGuardrailsDraft,
+  includeOutput = true
+): EnkryptGuardrailsIssues {
   const issues = new Map<string, string>();
   if (
     draft.enabled &&
@@ -225,8 +228,10 @@ export function getEnkryptGuardrailsIssues(draft: EnkryptGuardrailsDraft): Enkry
     issues,
     EnkryptInputDetectorsUpdateSchema.safeParse(fromDraftDetectors(draft.detectors))
   );
-  for (const [path, message] of getEnkryptOutputGuardrailIssues(draft.output)) {
-    issues.set(path ? `output.${path}` : 'output', message);
+  if (includeOutput) {
+    for (const [path, message] of getEnkryptOutputGuardrailIssues(draft.output)) {
+      issues.set(path ? `output.${path}` : 'output', message);
+    }
   }
   return issues;
 }
@@ -251,10 +256,16 @@ function sortKeys(value: unknown): unknown {
 }
 
 /** Identifies a configuration by content; PostgreSQL `jsonb` does not preserve key order. */
-export function configKey(config: EnkryptGuardrailsConfig): string {
-  return JSON.stringify(sortKeys(config));
+export function configKey(config: EnkryptGuardrailsConfig, includeOutput = true): string {
+  return JSON.stringify(
+    sortKeys(includeOutput ? config : { enabled: config.enabled, detectors: config.detectors })
+  );
 }
 
-export function draftsEqual(a: EnkryptGuardrailsDraft, b: EnkryptGuardrailsDraft): boolean {
-  return configKey(fromDraft(a)) === configKey(fromDraft(b));
+export function draftsEqual(
+  a: EnkryptGuardrailsDraft,
+  b: EnkryptGuardrailsDraft,
+  includeOutput = true
+): boolean {
+  return configKey(fromDraft(a), includeOutput) === configKey(fromDraft(b), includeOutput);
 }

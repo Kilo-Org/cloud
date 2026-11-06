@@ -100,6 +100,19 @@ describe('draftsEqual', () => {
     edited.detectors.keyword_detector.banned_keywords = 'Acme';
     expect(draftsEqual(draft, edited)).toBe(false);
   });
+
+  it('ignores only output changes when output is excluded', () => {
+    const saved = enabledDraft();
+    const edited = enabledDraft();
+    edited.output.enabled = true;
+    edited.output.detectors.toxicity.enabled = true;
+
+    expect(draftsEqual(saved, edited)).toBe(false);
+    expect(draftsEqual(saved, edited, false)).toBe(true);
+
+    edited.enabled = false;
+    expect(draftsEqual(saved, edited, false)).toBe(false);
+  });
 });
 
 describe('applyKiloDefaultPreset', () => {
@@ -200,6 +213,22 @@ describe('getEnkryptGuardrailsIssues', () => {
       'Describe what the rule forbids or requires.'
     );
     expect(issueAt(issues, 'policy_violation.rules.0.id')).toBeUndefined();
+  });
+
+  it('skips invalid output when excluded without skipping input validation', () => {
+    const draft = enabledDraft();
+    draft.output.enabled = true;
+    draft.output.detectors.topic_detector = { enabled: true, action: 'block', topic: '' };
+
+    expect(getEnkryptGuardrailsIssues(draft).get('output.topic_detector.topic')).toBe(
+      'Add at least one topic.'
+    );
+    expect(getEnkryptGuardrailsIssues(draft, false).size).toBe(0);
+
+    draft.detectors.keyword_detector = { enabled: true, action: 'block', banned_keywords: '' };
+    const issues = getEnkryptGuardrailsIssues(draft, false);
+    expect(issueAt(issues, 'keyword_detector')).toBe('Add at least one keyword.');
+    expect(issueAt(issues, 'output')).toBeUndefined();
   });
 
   it('caps structured rules at five and policy text at 10,000 characters', () => {

@@ -20,6 +20,10 @@ import {
   readStoredEnkryptDetectors,
   readStoredEnkryptOutputDetectors,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/settings';
+import {
+  isOrganizationFeatureEnabled,
+  readOrganizationFeatures,
+} from '@kilocode/web-shared/lib/ai-gateway/organization-features';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
 import { mutateOrganizationSettings } from '@kilocode/web-shared/lib/organizations/organizations';
@@ -45,8 +49,8 @@ const OrganizationGuardrailsConfigSchema = z.object({
 });
 
 /**
- * Saves cap policies at fewer rules than saved settings may hold. `output` is optional so a page
- * loaded before response checks existed can still save.
+ * Saves cap policies at fewer rules than saved settings may hold. Omitting `output` preserves
+ * response checks when their configuration UI is unavailable.
  */
 const OrganizationGuardrailsUpdateSchema = OrganizationGuardrailsConfigSchema.extend({
   detectors: EnkryptInputDetectorsUpdateSchema,
@@ -64,6 +68,7 @@ export type OrganizationGuardrailsConfig = z.infer<typeof OrganizationGuardrails
  * the response guardrail, which then withholds every response and starts from no detector.
  */
 const OrganizationGuardrailsResponseSchema = OrganizationGuardrailsConfigSchema.extend({
+  output_available: z.boolean(),
   invalid_saved_detectors: z.boolean(),
   invalid_saved_output_detectors: z.boolean(),
 });
@@ -149,12 +154,21 @@ function savedOutputGuardrail(organizationId: string, settings: OrganizationSett
   };
 }
 
+async function isOutputGuardrailAvailable(organizationId: string): Promise<boolean> {
+  return isOrganizationFeatureEnabled(
+    await readOrganizationFeatures(db),
+    'enkrypt_output_guardrail',
+    organizationId
+  );
+}
+
 export const organizationGuardrailsRouter = createTRPCRouter({
   get: organizationAdminProcedure
     .output(OrganizationGuardrailsResponseSchema)
     .query(async ({ input }) => {
       const organization = await requireGuardrailsOrganization(input.organizationId);
       return {
+        output_available: await isOutputGuardrailAvailable(input.organizationId),
         ...savedInputGuardrail(input.organizationId, organization.settings),
         ...savedOutputGuardrail(input.organizationId, organization.settings),
       };
@@ -166,6 +180,13 @@ export const organizationGuardrailsRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }) => {
       const { organizationId, output: requestedOutput, ...inputGuardrail } = input;
       const { settings } = await requireGuardrailsOrganization(organizationId);
+      const outputAvailable = await isOutputGuardrailAvailable(organizationId);
+      if (requestedOutput && !outputAvailable) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Enkrypt output guardrails are not available for this organization.',
+        });
+      }
       const { output, invalid_saved_output_detectors } = requestedOutput
         ? { output: requestedOutput, invalid_saved_output_detectors: false }
         : savedOutputGuardrail(organizationId, settings);
@@ -209,6 +230,11 @@ export const organizationGuardrailsRouter = createTRPCRouter({
           tx,
         });
       });
-      return { ...config, invalid_saved_detectors: false, invalid_saved_output_detectors };
+      return {
+        ...config,
+        output_available: outputAvailable,
+        invalid_saved_detectors: false,
+        invalid_saved_output_detectors,
+      };
     }),
 });

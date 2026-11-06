@@ -111,13 +111,15 @@ function GuardrailsLoader({ organizationId }: { organizationId: string }) {
       </Alert>
     );
   }
-  const { invalid_saved_detectors, invalid_saved_output_detectors, ...saved } = configQuery.data;
+  const { invalid_saved_detectors, invalid_saved_output_detectors, output_available, ...saved } =
+    configQuery.data;
   return (
     <GuardrailsForm
       organizationId={organizationId}
       saved={saved}
       invalidSavedDetectors={invalid_saved_detectors}
       invalidSavedOutputDetectors={invalid_saved_output_detectors}
+      outputAvailable={output_available}
     />
   );
 }
@@ -127,11 +129,13 @@ function GuardrailsForm({
   saved,
   invalidSavedDetectors,
   invalidSavedOutputDetectors,
+  outputAvailable,
 }: {
   organizationId: string;
   saved: EnkryptGuardrailsConfig;
   invalidSavedDetectors: boolean;
   invalidSavedOutputDetectors: boolean;
+  outputAvailable: boolean;
 }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -141,9 +145,9 @@ function GuardrailsForm({
   const debouncedDraft = useDebouncedValue(draft, AUTOSAVE_DELAY_MS);
   const attemptedKey = useRef<string | null>(null);
   const failedKey = useRef<string | null>(null);
-  const issues = getEnkryptGuardrailsIssues(draft);
+  const issues = getEnkryptGuardrailsIssues(draft, outputAvailable);
   const outputIssues = getEnkryptOutputGuardrailIssues(draft.output);
-  const isDirty = !draftsEqual(draft, savedDraft);
+  const isDirty = !draftsEqual(draft, savedDraft, outputAvailable);
   const configurationError = issues.get('detectors') ?? issues.get('');
   const firstIssue = issues.values().next().value;
 
@@ -159,6 +163,7 @@ function GuardrailsForm({
         const {
           invalid_saved_detectors: _invalid,
           invalid_saved_output_detectors: _invalidOutput,
+          output_available: _outputAvailable,
           ...savedConfig
         } = result;
         failedKey.current = null;
@@ -186,9 +191,10 @@ function GuardrailsForm({
   }
 
   const save = (toSave: EnkryptGuardrailsDraft) => {
-    attemptedKey.current = configKey(fromDraft(toSave));
+    const { output, ...config } = fromDraft(toSave);
+    attemptedKey.current = configKey({ ...config, output }, outputAvailable);
     failedKey.current = null;
-    saveMutation.mutate({ organizationId, ...fromDraft(toSave) });
+    saveMutation.mutate({ organizationId, ...config, ...(outputAvailable ? { output } : {}) });
   };
 
   // Saves run one at a time. Only a settled draft is saved: while `debouncedDraft` lags `draft`,
@@ -198,14 +204,15 @@ function GuardrailsForm({
   const { isPending, mutate } = saveMutation;
   useEffect(() => {
     if (isPending) return;
-    if (!draftsEqual(debouncedDraft, draft)) return;
-    if (draftsEqual(debouncedDraft, savedDraft)) return;
-    if (getEnkryptGuardrailsIssues(debouncedDraft).size > 0) return;
-    const key = configKey(fromDraft(debouncedDraft));
+    if (!draftsEqual(debouncedDraft, draft, outputAvailable)) return;
+    if (draftsEqual(debouncedDraft, savedDraft, outputAvailable)) return;
+    if (getEnkryptGuardrailsIssues(debouncedDraft, outputAvailable).size > 0) return;
+    const { output, ...config } = fromDraft(debouncedDraft);
+    const key = configKey({ ...config, output }, outputAvailable);
     if (key === failedKey.current) return;
     attemptedKey.current = key;
-    mutate({ organizationId, ...fromDraft(debouncedDraft) });
-  }, [debouncedDraft, draft, savedDraft, isPending, mutate, organizationId]);
+    mutate({ organizationId, ...config, ...(outputAvailable ? { output } : {}) });
+  }, [debouncedDraft, draft, savedDraft, isPending, mutate, organizationId, outputAvailable]);
 
   const updateDetector: UpdateEnkryptDetector = (id, patch) =>
     setDraft(current => ({
@@ -302,7 +309,7 @@ function GuardrailsForm({
         </>
       )}
 
-      {invalidSavedOutputDetectors && (
+      {outputAvailable && invalidSavedOutputDetectors && (
         <Alert variant="destructive">
           <AlertCircle />
           <AlertTitle>Saved response detector settings can&apos;t be read</AlertTitle>
@@ -327,12 +334,14 @@ function GuardrailsForm({
         </Alert>
       )}
 
-      <ResponseGuardrailCard
-        draft={draft}
-        issues={outputIssues}
-        onChange={setDraft}
-        onUpdateDetector={updateOutputDetector}
-      />
+      {outputAvailable && (
+        <ResponseGuardrailCard
+          draft={draft}
+          issues={outputIssues}
+          onChange={setDraft}
+          onUpdateDetector={updateOutputDetector}
+        />
+      )}
 
       <div className="flex flex-wrap items-center gap-3 text-sm" role="status">
         {isDirty && firstIssue ? (

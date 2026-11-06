@@ -6,6 +6,7 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   agent_environment_profile_repo_bindings,
   agent_environment_profiles,
+  cloud_agent_builtin_agent_settings,
   cloud_agent_sandbox_allocation_settings,
   type Organization,
   type User,
@@ -86,6 +87,9 @@ describe('cloud-agent-settings router', () => {
   afterEach(async () => {
     const userIds = [ownerUser.id, memberUser.id, otherUser.id];
     await db
+      .delete(cloud_agent_builtin_agent_settings)
+      .where(inArray(cloud_agent_builtin_agent_settings.user_id, userIds));
+    await db
       .delete(cloud_agent_sandbox_allocation_settings)
       .where(
         or(
@@ -151,6 +155,45 @@ describe('cloud-agent-settings router', () => {
       const result = await otherCaller.cloudAgentSettings.get({});
       expect(result.contextAllocation).toBeNull();
       expect(result.repositories).toEqual([]);
+      expect(result.builtinAgents).toEqual({});
+    });
+
+    test('sets user-scoped built-in agent overrides', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+
+      const saved = await caller.cloudAgentSettings.setBuiltinAgents({
+        agents: {
+          explore: { model: 'kilo/anthropic/claude-haiku-4.5' },
+          compaction: { model: 'kilo/anthropic/claude-haiku-4.5' },
+          plan: { disable: true },
+        },
+      });
+
+      expect(saved.agents).toEqual({
+        explore: { model: 'kilo/anthropic/claude-haiku-4.5' },
+        compaction: { model: 'kilo/anthropic/claude-haiku-4.5' },
+        plan: { disable: true },
+      });
+      expect((await caller.cloudAgentSettings.get({})).builtinAgents).toEqual(saved.agents);
+    });
+
+    test('built-in agent overrides stay user-scoped in an organization context', async () => {
+      const caller = await createCallerForUser(memberUser.id);
+      await caller.cloudAgentSettings.setBuiltinAgents({
+        agents: { explore: { model: 'kilo/anthropic/claude-haiku-4.5' } },
+      });
+
+      const result = await caller.cloudAgentSettings.get({ organizationId: organization.id });
+      expect(result.builtinAgents).toEqual({
+        explore: { model: 'kilo/anthropic/claude-haiku-4.5' },
+      });
+    });
+
+    test('rejects disabling an agent that Cloud Agent requires', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+      await expect(
+        caller.cloudAgentSettings.setBuiltinAgents({ agents: { code: { disable: true } } })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
     });
 
     test('rejects an allocation the owner is not offered', async () => {

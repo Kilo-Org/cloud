@@ -3031,6 +3031,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
           fromState: 'queued',
           toState: 'accepted',
           lifecycleEventInserted: false,
+          runtimeHarness: message.container?.runtimeHarness,
         });
       }
       await this.armAlarm();
@@ -3425,6 +3426,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         terminalAt: message.settledAt,
         lifecycleEventInserted,
         cause: message.reason === null ? undefined : diagnosticCause(message.reason),
+        runtimeHarness: message.container?.runtimeHarness,
       });
     }
     // Persist the callback, attempt delivery now, then arm only what remains:

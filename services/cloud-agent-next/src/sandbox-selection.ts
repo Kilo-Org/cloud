@@ -14,7 +14,6 @@ import {
   type SandboxAllocation,
   type SandboxSelectionCapabilities,
 } from '@kilocode/worker-utils/sandbox-allocation';
-import { isCloudflareContainersEnrolled } from './agent-sandbox/cloudflare-containers/cloudflare-containers-runtime-config.js';
 import { getDefaultSandboxDestination, isOrgInList } from './sandbox-id.js';
 import type { Env } from './types.js';
 
@@ -79,12 +78,6 @@ export function sandboxAllocationUnavailableReason(
       }
       return vercelUnavailableReason;
     case 'cloudflare-containers':
-      // The native default size is the platform default, so it is offered
-      // regardless of enrollment. Larger sizes still need the enrollment gate.
-      if (allocation === CLOUDFLARE_SANDBOX_SMALL_NATIVE_ALLOCATION) return undefined;
-      if (!isCloudflareContainersEnrolled(env, { orgId: owner.orgId })) {
-        return 'Cloudflare containers are not enabled for this account';
-      }
       return undefined;
     default: {
       const exhaustive: never = provider;

@@ -100,6 +100,7 @@ vi.mock('expo-haptics', () => ({
 }));
 vi.mock('sonner-native', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('@/components/ui/icons', () => ({
+  AlertCircle: () => null,
   Clock: () => null,
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
@@ -248,6 +249,7 @@ async function renderBubbleWithHandlers(
   props: {
     deliveryState?: MessageDeliveryState;
     onRetryMessage?: (m: StoredMessage) => void;
+    onAddCredits?: () => void;
     retryAvailable?: boolean;
     onCopyToComposer?: (text: string) => void;
     onRestoreQueued?: (m: StoredMessage) => void;
@@ -272,15 +274,42 @@ function assistantMessageWithText(id: string): StoredMessage {
 function assistantMessageWithError(
   id: string,
   errorName: string,
-  options: { content?: boolean; isRetryable?: boolean } = {}
+  options: {
+    content?: boolean;
+    isRetryable?: boolean;
+    statusCode?: number;
+    responseBody?: string;
+  } = {}
 ): StoredMessage {
   const message = options.content === false ? assistantMessage(id) : assistantMessageWithText(id);
-  (message.info as { error?: { name: string; data: unknown } }).error = {
+  if (message.info.role !== 'assistant') {
+    throw new Error('the fixture builders write an assistant row');
+  }
+  // The name is the case under test, so the payload is written before any one
+  // member of the error union can claim it.
+  const error = {
     name: errorName,
-    data: { message: 'raw', isRetryable: options.isRetryable ?? true },
+    data: {
+      message: 'raw',
+      isRetryable: options.isRetryable ?? true,
+      ...(options.statusCode === undefined ? {} : { statusCode: options.statusCode }),
+      ...(options.responseBody === undefined ? {} : { responseBody: options.responseBody }),
+    },
   };
+  // The APIError payload is the only shape these cases carry.
+  message.info.error = error as NonNullable<typeof message.info.error>;
   return message;
 }
+
+/** The Kilo gateway's answer to a paid request from an account with no balance. */
+const GATEWAY_CREDITS_BODY = JSON.stringify({
+  error: {
+    title: 'Paid Model - Credits Required',
+    message: 'Add credits to continue, or switch to a free model',
+    balance: 0,
+  },
+  error_type: 'usage_limit_exceeded',
+});
 
 describe('MessageBubble failure footer', () => {
   it('wraps the failed bubble and delivery row in one measurable list item', async () => {
@@ -298,7 +327,7 @@ describe('MessageBubble failure footer', () => {
       onRetryMessage: vi.fn<(message: StoredMessage) => void>(),
       onCopyToComposer: vi.fn<(text: string) => void>(),
     });
-    expect(findText(tree, t => t === 'Failed to deliver')).toBe(true);
+    expect(findText(tree, t => t === 'Message not sent')).toBe(true);
     expect(
       findText(tree, t => t === 'We could not deliver this message after several attempts.')
     ).toBe(true);
@@ -347,6 +376,14 @@ describe('MessageBubble failure footer', () => {
       assistantMessageWithError('m-align-asst', 'APIError'),
       { onRetryMessage: vi.fn<(message: StoredMessage) => void>() }
     );
+    // A question whose answer failed: the row is the user's, the statement is
+    // the assistant's, so the footer takes the assistant's column — the same
+    // layout an assistant error draws.
+    const executionTree = await renderBubbleWithHandlers(userMessage('m-align-exec'), {
+      deliveryState: { status: 'failed', error: '', reason: 'execution' },
+      onRetryMessage: vi.fn<(message: StoredMessage) => void>(),
+      onCopyToComposer: vi.fn<(text: string) => void>(),
+    });
 
     const userFooter = footerOf(userTree);
     const userFooterClasses = String(userFooter?.props.className).split(' ');
@@ -377,13 +414,33 @@ describe('MessageBubble failure footer', () => {
       )
     ).toEqual([]);
 
+    const executionFooter = footerOf(executionTree);
+    expect(String(executionFooter?.props.className)).toBe('gap-2 px-4 py-1');
+    expect(
+      classNamesIn(executionFooter?.props.children).filter(name =>
+        name.split(' ').includes('text-right')
+      )
+    ).toEqual([]);
+    // The failed response states its reason under the title, the same way the
+    // provider's own failures do.
+    expect(findText(executionTree, t => t === 'The agent could not run this message.')).toBe(true);
+    // The failed response still offers both recovery actions.
+    expect(
+      findElementByType(executionTree, 'Button', p => p.accessibilityLabel === 'Retry')
+    ).not.toBeNull();
+    expect(
+      findElementByType(executionTree, 'Button', p => p.accessibilityLabel === 'Copy to composer')
+    ).not.toBeNull();
+
     // No start/end text class: NativeWind drops `text-align: end`, and RN
     // already resolves `text-right` against the interface direction.
     const footerClasses = [
       ...classNamesIn(userFooter?.props.children),
       ...classNamesIn(assistantFooter?.props.children),
+      ...classNamesIn(executionFooter?.props.children),
       String(userFooter?.props.className),
       String(assistantFooter?.props.className),
+      String(executionFooter?.props.className),
     ];
     expect(footerClasses.filter(name => /\btext-(start|end)\b/.test(name))).toEqual([]);
   });
@@ -407,7 +464,7 @@ describe('MessageBubble failure footer', () => {
       });
 
       expect(findElementByTypeFn(tree, MockBubble)).toBeNull();
-      expect(findText(tree, text => text === 'Failed to deliver')).toBe(true);
+      expect(findText(tree, text => text === 'Message not sent')).toBe(true);
       expect(
         findElementByType(tree, 'Button', props => props.accessibilityLabel === 'Retry')
       ).not.toBeNull();
@@ -457,7 +514,7 @@ describe('MessageBubble failure footer', () => {
       retryAvailable: false,
     });
 
-    expect(findText(tree, t => t === 'Failed to deliver')).toBe(true);
+    expect(findText(tree, t => t === 'Message not sent')).toBe(true);
     expect(
       findText(tree, t => t === 'We could not deliver this message after several attempts.')
     ).toBe(true);
@@ -476,6 +533,79 @@ describe('MessageBubble failure footer', () => {
     // The transient failure's line is what the terminal row used to repeat.
     expect(findText(tree, t => t === 'The provider returned an error.')).toBe(false);
     expect(findElementByType(tree, 'Button', p => p.accessibilityLabel === 'Retry')).toBeNull();
+  });
+
+  it('states a credits refusal with the cause and offers Add credits', async () => {
+    const onAddCredits = vi.fn<() => void>();
+    const tree = await renderBubbleWithHandlers(
+      assistantMessageWithError('m-asst-credits', 'APIError', {
+        isRetryable: false,
+        statusCode: 402,
+        responseBody: GATEWAY_CREDITS_BODY,
+      }),
+      { onRetryMessage: vi.fn<(message: StoredMessage) => void>(), onAddCredits }
+    );
+
+    expect(findText(tree, t => t === 'Response failed')).toBe(true);
+    expect(findText(tree, t => t === 'Not enough credits to run Cloud Agent.')).toBe(true);
+
+    const addCredits = findElementByType(
+      tree,
+      'Button',
+      p => p.accessibilityLabel === 'Add credits'
+    );
+    if (!addCredits) {
+      throw new Error('the footer drew no Add credits button');
+    }
+    // The row's one recovery action fills with the accent surface the person's
+    // own bubble uses, so it reads as that row's primary action.
+    expect(addCredits.props.className).toContain('bg-accent-soft');
+    const press = addCredits.props.onPress as () => void;
+    press();
+    expect(onAddCredits).toHaveBeenCalledTimes(1);
+
+    // A retry of the same request meets the same block, so the row offers the
+    // action that can settle it instead.
+    expect(findElementByType(tree, 'Button', p => p.accessibilityLabel === 'Retry')).toBeNull();
+    expect(
+      findText(tree, t => t === 'The provider refused this request and it cannot be retried.')
+    ).toBe(false);
+  });
+
+  it('keeps the final-refusal line for a payment block the account provider caused', async () => {
+    const onAddCredits = vi.fn<() => void>();
+    const tree = await renderBubbleWithHandlers(
+      assistantMessageWithError('m-asst-byok-402', 'APIError', {
+        isRetryable: false,
+        statusCode: 402,
+        responseBody: '{"error":{"message":"Upstream request failed"}}',
+      }),
+      { onRetryMessage: vi.fn<(message: StoredMessage) => void>(), onAddCredits }
+    );
+
+    expect(
+      findText(tree, t => t === 'The provider refused this request and it cannot be retried.')
+    ).toBe(true);
+    expect(
+      findElementByType(tree, 'Button', p => p.accessibilityLabel === 'Add credits')
+    ).toBeNull();
+  });
+
+  it('keeps Add credits on a transcript that cannot resend', async () => {
+    const onAddCredits = vi.fn<() => void>();
+    const tree = await renderBubbleWithHandlers(
+      assistantMessageWithError('m-asst-credits-stored', 'APIError', {
+        isRetryable: false,
+        statusCode: 402,
+        responseBody: GATEWAY_CREDITS_BODY,
+      }),
+      { retryAvailable: false, onAddCredits }
+    );
+
+    expect(findText(tree, t => t === 'Response failed')).toBe(true);
+    expect(
+      findElementByType(tree, 'Button', p => p.accessibilityLabel === 'Add credits')
+    ).not.toBeNull();
   });
 
   it('renders no pressable host for an assistant row with nothing to show', async () => {
@@ -512,12 +642,12 @@ describe('MessageBubble failure footer', () => {
     const tree = await renderBubbleWithHandlers(userMessage('m-nohandler'), {
       deliveryState: { status: 'failed', error: 'nope', reason: 'exhausted' },
     });
-    expect(findText(tree, t => t === 'Failed to deliver')).toBe(false);
+    expect(findText(tree, t => t === 'Message not sent')).toBe(false);
   });
 
   it('names the failure row on the title text without grouping the CTA buttons', async () => {
     const tree = await renderBubbleWithHandlers(userMessage('m-a11y'), {
-      deliveryState: { status: 'failed', error: 'nope', reason: 'interrupted' },
+      deliveryState: { status: 'failed', error: 'nope', reason: 'exhausted' },
       onRetryMessage: vi.fn<(message: StoredMessage) => void>(),
       onCopyToComposer: vi.fn<(text: string) => void>(),
     });
@@ -531,16 +661,16 @@ describe('MessageBubble failure footer', () => {
     expect(footer?.props.accessibilityLabel).toBeUndefined();
 
     // The row name lives on the title Text, which still announces the row.
-    const title = findElementByLabel(tree, 'Failed to deliver. Retry available.');
+    const title = findElementByLabel(tree, 'Message not sent. Retry available.');
     expect(title).not.toBeNull();
-    expect(title?.props.children).toBe('Failed to deliver');
+    expect(title?.props.children).toBe('Message not sent');
   });
 
   it('names a German failure row with one full stop, keeping the title line as translated', async () => {
     await i18n.changeLanguage('de');
     try {
       const tree = await renderBubbleWithHandlers(userMessage('m-a11y-de'), {
-        deliveryState: { status: 'failed', error: 'nope', reason: 'interrupted' },
+        deliveryState: { status: 'failed', error: 'nope', reason: 'exhausted' },
         onRetryMessage: vi.fn<(message: StoredMessage) => void>(),
       });
 

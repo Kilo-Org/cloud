@@ -10,7 +10,7 @@ import {
   updateBotRequest,
 } from '@/lib/bot/request-logging';
 import { getNextBotCallbackStep, getRemainingBotIterations } from '@/lib/bot/step-budget';
-import { resolveBotModelSettings } from '@/lib/bot/model';
+import { resolveBotModelSettings, resolveBotRunModel } from '@/lib/bot/model';
 import spawnCloudAgentSession, {
   spawnCloudAgentInputSchema,
   type SpawnCloudAgentInput,
@@ -209,7 +209,11 @@ export async function runBotAgent(params: RunBotAgentParams): Promise<BotAgentCo
     headers,
   });
 
-  const { modelSlug, thinkingEffort } = resolveBotModelSettings(params.platformIntegration);
+  // The model is resolved through the owner's current policy, while the
+  // thinking effort is the stored setting: policy decides which model runs, the
+  // effort is the user's own preference for it.
+  const modelSlug = await resolveBotRunModel(params.platformIntegration);
+  const { thinkingEffort } = resolveBotModelSettings(params.platformIntegration);
   const owner = ownerFromIntegration(params.platformIntegration);
   const chatPlatform = params.thread.adapter.name;
   const botPlatform = botPlatforms.requireByAdapter(params.thread.adapter);

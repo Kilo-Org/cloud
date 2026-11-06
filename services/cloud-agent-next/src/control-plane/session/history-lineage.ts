@@ -57,7 +57,7 @@ export async function readOwnedHistoryLineage(input: {
         and(
           eq(cli_sessions_v2.kilo_user_id, input.userId),
           eq(cli_sessions_v2.session_id, current),
-          eq(cli_sessions_v2.cloud_agent_session_id, input.sessionId)
+          eq(cli_sessions_v2.cloud_agent_session_scope_id, input.sessionId)
         )
       )
       .limit(1);

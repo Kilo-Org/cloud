@@ -41,6 +41,12 @@ export const SessionMetricsParamsSchema = z.object({
 
   terminationReason: z.enum(TerminationReasons),
 
+  /**
+   * True when the counted figures cover only the newest part of the session: the emitting scan
+   * stopped at its read ceiling. `totalCost` stays exact, from the running session total.
+   */
+  metricsBounded: z.boolean().optional().default(false),
+
   model: z.string().optional().default(''),
 
   ingestVersion: z.number().int().nonnegative().default(0),

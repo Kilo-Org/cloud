@@ -3,6 +3,16 @@ import { z } from 'zod';
 
 export { ABUSE_CLASSIFICATION, GatewayApiKindSchema } from './schema-types';
 export type { AbuseClassification, GatewayApiKind } from './schema-types';
+export {
+  EXA_ALLOWED_PATHS,
+  EXA_USAGE_FEATURE_ID_MAX_LENGTH,
+  EXA_USAGE_TYPE_MAX_LENGTH,
+  EXA_USAGE_WRITE_PATH,
+  ExaUsageRecordSchema,
+  ExaUsageWriteResponseSchema,
+  isExaAllowedPath,
+} from './exa';
+export type { ExaAllowedPath, ExaUsageRecord, ExaUsageWriteResponse } from './exa';
 
 /**
  * Wire contract for `POST /api/internal/usage/record`.

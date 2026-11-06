@@ -35,8 +35,8 @@ jest.mock('@kilocode/web-shared/lib/stripe-client', () => ({
   createStripeCustomer: jest.fn(async () => ({ id: 'cus_test' })),
   deleteStripeCustomer: jest.fn(async () => {}),
 }));
-jest.mock('@/lib/auth/claude/access.server', () => ({
-  isClaudeSignInEnabled: jest.fn(async () => true),
+jest.mock('@kilocode/web-shared/lib/auth/claude/feature-flag.server', () => ({
+  isClaudePlatformOAuthEnabled: jest.fn(async () => true),
 }));
 
 import jwt from 'jsonwebtoken';
@@ -50,7 +50,7 @@ import {
   getOrganizationById,
   getUserOrgMemberships,
 } from '@kilocode/web-shared/lib/organizations/organizations';
-import { isClaudeSignInEnabled } from '@/lib/auth/claude/access.server';
+import { isClaudePlatformOAuthEnabled } from '@kilocode/web-shared/lib/auth/claude/feature-flag.server';
 import { CLAUDE_OIDC_ISSUER } from '@kilocode/web-shared/lib/auth/claude/config';
 
 const mockCreateOrUpdateUser = jest.mocked(createOrUpdateUser);
@@ -486,7 +486,7 @@ describe('authOptions.callbacks.signIn for Claude', () => {
   });
 
   it('refuses a Claude sign-in before settlement while it is not launched', async () => {
-    jest.mocked(isClaudeSignInEnabled).mockResolvedValueOnce(false);
+    jest.mocked(isClaudePlatformOAuthEnabled).mockResolvedValueOnce(false);
     setValidTurnstileCookie();
 
     const result = await claudeSignIn({ email_verified: true });

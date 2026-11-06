@@ -11,7 +11,7 @@ import {
   type OpenAiChatGptStoredConnection,
 } from './store';
 import { isOpenAiModelServed } from './served-models';
-import { OPENAI_CHATGPT_API_URL } from './upstream';
+import { OPENAI_CHATGPT_API_KEY_ENV, OPENAI_CHATGPT_API_URL } from './upstream';
 
 /**
  * Routing for the delegated "Sign in with ChatGPT" connection. When a person
@@ -22,13 +22,7 @@ import { OPENAI_CHATGPT_API_URL } from './upstream';
 /** The delegated upstream URL, shared with the served-model lookup. */
 export { OPENAI_CHATGPT_API_URL };
 
-/**
- * The delegated route must carry a key from the project that owns the OAuth
- * client. `OPENAI_API_KEY` is a different project's key: it is handed to the
- * Vercel AI Gateway as an OpenAI BYOK credential. Keep the two apart so neither
- * path inherits the other's project, quota, or billing.
- */
-export const OPENAI_CHATGPT_API_KEY_ENV = 'OPENAI_CHATGPT_API_KEY';
+export { OPENAI_CHATGPT_API_KEY_ENV };
 
 /**
  * The delegated access token travels in its own upstream header. `extraHeaders`

@@ -2388,6 +2388,13 @@
       "when": 1793960900444,
       "tag": "0340_cloud_agent_builtin_agent_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 341,
+      "version": "7",
+      "when": 1793963897465,
+      "tag": "0341_ai_gateway_metadata_cache",
+      "breakpoints": true
     }
   ]
 }

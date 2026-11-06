@@ -52,6 +52,13 @@ import { convertCustomLlmToCatalogModel } from '@kilocode/web-shared/lib/ai-gate
 import { isCustomLlmDeniedInCountry } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/country-deny-list';
 import { addMonths } from 'date-fns';
 import { getModelDisplayPricing } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/display-pricing';
+import {
+  createCachedMetadataReader,
+  type MetadataSource,
+} from '@kilocode/web-shared/lib/ai-gateway/metadata-cache';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
+
+const OPENROUTER_MODELS_CACHE_TTL_MS = 5 * 60 * 1000;
 
 // Re-export from shared module for backwards compatibility
 export { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
@@ -356,24 +363,40 @@ async function fetchOpenRouterModels(
   return parseResult.data;
 }
 
+function openRouterModelsHeaders() {
+  return {
+    Authorization: `Bearer ${OPENROUTER.apiKey}`,
+    ...ATTRIBUTION_HEADERS,
+  };
+}
+
+export const openRouterModelsMetadataSource: MetadataSource<OpenRouterModelsResponse> = {
+  url: `${OPENROUTER.apiUrl}/models`,
+  headers: openRouterModelsHeaders,
+  parse: raw => OpenRouterModelsResponseSchema.parse(removeUpstreamEnkrypt(raw)),
+};
+
+const openRouterModelsReader = createCachedMetadataReader(openRouterModelsMetadataSource, {
+  fromDb: readDb,
+  ttlMs: OPENROUTER_MODELS_CACHE_TTL_MS,
+  fetchFallback: () =>
+    fetchOpenRouterModels(
+      openRouterModelsMetadataSource.url,
+      { method: 'GET', headers: openRouterModelsHeaders() },
+      { subject: 'models', endpoint: 'openrouter/models' }
+    ),
+});
+
 /**
  * Fetch raw, unfiltered models from OpenRouter API
  * Use this for syncing model stats where you need complete data including :free variants
  */
 export async function getRawOpenRouterModels(): Promise<OpenRouterModelsResponse> {
-  return fetchOpenRouterModels(
-    `${OPENROUTER.apiUrl}/models`,
-    {
-      cache: 'force-cache',
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${OPENROUTER.apiKey}`,
-        ...ATTRIBUTION_HEADERS,
-      },
-      next: { revalidate: 60 },
-    },
-    { subject: 'models', endpoint: 'openrouter/models' }
-  );
+  return openRouterModelsReader.get();
+}
+
+export function resetRawOpenRouterModelsCache() {
+  openRouterModelsReader.reset();
 }
 
 /**

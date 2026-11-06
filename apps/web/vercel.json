@@ -183,6 +183,11 @@
       "path": "/api/cron/sync-direct-byok-providers",
       "requestMethod": "GET"
     },
+    "refresh-ai-gateway-metadata-cache": {
+      "schedule": "*/5 * * * *",
+      "path": "/api/cron/refresh-ai-gateway-metadata-cache",
+      "requestMethod": "GET"
+    },
     "cleanup-api-request-log": {
       "schedule": "*/5 * * * *",
       "path": "/api/cron/cleanup-api-request-log",

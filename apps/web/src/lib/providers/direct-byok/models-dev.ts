@@ -6,6 +6,11 @@ import {
   type ReasoningOption,
 } from '@kilocode/db/schema-types';
 import { toLegacyVariants } from '@kilocode/web-shared/lib/ai-gateway/providers/legacy-variants';
+import {
+  getMetadata,
+  type MetadataSource,
+} from '@kilocode/web-shared/lib/ai-gateway/metadata-cache';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 
 export const ModalitySchema = z
   .enum(['text', 'image', 'video', 'pdf', 'audio', 'unknown'])
@@ -49,14 +54,13 @@ export const ModelsDevCatalogSchema = z.record(z.string(), z.unknown());
 
 export type ModelsDevCatalog = z.infer<typeof ModelsDevCatalogSchema>;
 
-export async function fetchModelsDevCatalog(): Promise<ModelsDevCatalog> {
-  const response = await fetch('https://models.dev/api.json');
-  if (!response.ok) {
-    throw new Error(
-      `Failed to fetch models.dev catalog: ${response.status} ${response.statusText}`
-    );
-  }
-  return ModelsDevCatalogSchema.parse(await response.json());
+export const modelsDevCatalogSource: MetadataSource<ModelsDevCatalog> = {
+  url: 'https://models.dev/api.json',
+  parse: raw => ModelsDevCatalogSchema.parse(raw),
+};
+
+export function loadModelsDevCatalog(): Promise<ModelsDevCatalog> {
+  return getMetadata(modelsDevCatalogSource, db);
 }
 
 export type RawModel = {

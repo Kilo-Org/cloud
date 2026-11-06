@@ -245,6 +245,13 @@ function validate(workflow) {
     '${{ needs.check-changes.outputs.suite_run }}',
     'the gate must wait for the run check-changes published'
   );
+  // The gate job has no checkout, so gh has no working tree to resolve the
+  // repository from and the run id alone would not be found.
+  assert.equal(
+    wait.env?.GH_REPO,
+    '${{ github.repository }}',
+    'the gate must name the repository the run belongs to'
+  );
   assert.match(
     wait.run,
     /^gh run watch "\$SUITE_RUN" --exit-status --interval \d+$/m,
@@ -835,6 +842,10 @@ const mutations = {
   'the reuse gate waits for an unpublished run': workflow => {
     const wait = workflow.jobs.reuse.steps.find(item => /gh run watch/.test(item.run ?? ''));
     delete wait.env.SUITE_RUN;
+  },
+  'the reuse gate cannot resolve the repository': workflow => {
+    const wait = workflow.jobs.reuse.steps.find(item => /gh run watch/.test(item.run ?? ''));
+    delete wait.env.GH_REPO;
   },
   'the build runs without a status function': workflow => {
     const job = workflow.jobs['build-and-submit'];

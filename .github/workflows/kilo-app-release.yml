@@ -237,6 +237,9 @@ jobs:
       - name: Wait for the suite run of this commit
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # This job has no checkout, so gh cannot read the repository from a
+          # working tree: the run id alone would not resolve.
+          GH_REPO: ${{ github.repository }}
           SUITE_RUN: ${{ needs.check-changes.outputs.suite_run }}
         run: |
           set -euo pipefail

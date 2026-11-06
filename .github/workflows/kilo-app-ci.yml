@@ -7,8 +7,10 @@ name: kilo-app CI
 # "Expected". A release started by the same main push consumes this run's
 # conclusion for that commit — every release path is inside the detection below,
 # so the run always executes the suite — and calls the suite through
-# `workflow_call` only for the hourly schedule, a manual run, or a reuse the
-# release cannot prove.
+# `workflow_call` only for the hourly schedule, a manual run, or a reuse it
+# cannot prove: no run for the commit, or a run that ended without a pass,
+# including one the cancel-in-progress group above cancels when a later push
+# lands on main.
 
 on:
   push:

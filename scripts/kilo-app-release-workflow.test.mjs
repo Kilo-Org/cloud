@@ -208,20 +208,10 @@ function validate(workflow) {
     'the step must publish the run the gate waits for'
   );
 
-  // Exactly one gate runs: `reuse` waits for the run that exists, `validate`
-  // keeps the in-workflow suite for the schedule and manual paths and for any
-  // reuse the lookup cannot prove.
-  assert.equal(
-    workflow.jobs.validate.uses,
-    './.github/workflows/kilo-app-ci.yml',
-    'the schedule and manual paths must keep the in-workflow suite'
-  );
-  assert.match(
-    workflow.jobs.validate.if,
-    /needs\.check-changes\.outputs\.reuse == 'false'/,
-    'validate must run only when no suite run is reused'
-  );
-
+  // The gate publishes whether the run settled the validation, and the
+  // in-workflow suite covers every case it did not: the schedule and manual
+  // paths, a lookup that cannot prove a run, and a run that ended without a
+  // pass, which includes one a later push cancelled.
   const reuseJob = workflow.jobs.reuse;
   assert.ok(reuseJob, 'the reuse gate job is missing');
   assert.ok(
@@ -238,24 +228,65 @@ function validate(workflow) {
     'read',
     'the reuse gate must read the suite run status'
   );
-  const wait = reuseJob.steps.find(item => /gh run watch/.test(item.run ?? ''));
+  assert.equal(
+    reuseJob.outputs?.suite,
+    '${{ steps.wait.outputs.suite }}',
+    'the gate must publish its decision to the build condition'
+  );
+  const wait = reuseJob.steps.find(item => item.id === 'wait');
   assert.ok(wait, 'the reuse gate must wait for the suite run');
   assert.equal(
     wait.env?.SUITE_RUN,
     '${{ needs.check-changes.outputs.suite_run }}',
     'the gate must wait for the run check-changes published'
   );
-  // The gate job has no checkout, so gh has no working tree to resolve the
-  // repository from and the run id alone would not be found.
-  assert.equal(
-    wait.env?.GH_REPO,
-    '${{ github.repository }}',
-    'the gate must name the repository the run belongs to'
+  // Fail closed: only an observed pass may turn the decision over, so the
+  // default is published before the first read.
+  const fallbackDefault = wait.run.indexOf('echo "suite=fallback" >> "$GITHUB_OUTPUT"');
+  assert.ok(fallbackDefault >= 0, 'the gate must default to the in-workflow suite');
+  assert.ok(
+    fallbackDefault < wait.run.indexOf('gh api'),
+    'the fallback default must be published before the gate reads a run'
   );
+  // The gate has no checkout, so it names the repository in the path and reads
+  // the conclusion instead of the exit code of a watch: a failed or cancelled
+  // run leaves the suite to this workflow rather than failing the release.
   assert.match(
     wait.run,
-    /^gh run watch "\$SUITE_RUN" --exit-status --interval \d+$/m,
-    'a suite run that concludes unsuccessfully must fail the gate'
+    /gh api "repos\/\$GITHUB_REPOSITORY\/actions\/runs\/\$SUITE_RUN"/,
+    'the gate must read the run check-changes published'
+  );
+  assert.match(wait.run, /\[ "\$CONCLUSION" = "success" \]/, 'only a passed run is reused');
+  assert.match(
+    wait.run,
+    /echo "suite=passed" >> "\$GITHUB_OUTPUT"/,
+    'an observed pass must publish the reuse decision'
+  );
+  assert.equal(
+    (wait.run.match(/exit 1\b/g) ?? []).length,
+    1,
+    'the only failing exit is the missing run id; a run without a pass falls back'
+  );
+
+  assert.equal(
+    workflow.jobs.validate.uses,
+    './.github/workflows/kilo-app-ci.yml',
+    'the schedule and manual paths must keep the in-workflow suite'
+  );
+  assert.deepEqual(
+    [...(workflow.jobs.validate.needs ?? [])].sort(),
+    ['check-changes', 'reuse'],
+    'the in-workflow suite must read the gate decision'
+  );
+  assert.match(
+    workflow.jobs.validate.if,
+    /\${{ !cancelled\(\)/,
+    'the in-workflow suite needs a status function because the gate is often skipped'
+  );
+  assert.match(
+    workflow.jobs.validate.if,
+    /needs\.check-changes\.outputs\.reuse == 'false' \|\| needs\.reuse\.outputs\.suite == 'fallback'/,
+    'the in-workflow suite must run when no run is reused or the reused run ended without a pass'
   );
 
   // The cost gate is the last thing before any build: every job that builds or
@@ -296,10 +327,11 @@ function validate(workflow) {
   assert.equal(buildJob.outputs.ios_build, '${{ steps.identity.outputs.ios_build }}');
   assert.equal(buildJob.outputs.android_build, '${{ steps.identity.outputs.android_build }}');
 
-  // The build starts only after a gate proved the suite for this commit: one of
-  // the two gates runs, and the other is skipped. A skipped need skips this job
-  // without a status function, and the status function alone would ignore a
-  // failed gate, so the condition carries both.
+  // The build starts only after a gate proved the suite for this commit, once:
+  // either the gate observed a passed run and the suite did not run here, or
+  // the suite ran here and passed and the gate reused nothing. A skipped need
+  // skips this job without a status function, and the status function alone
+  // would ignore a failed gate, so the condition carries both.
   assert.deepEqual(
     [...(buildJob.needs ?? [])].sort(),
     ['check-changes', 'preflight', 'reuse', 'validate'],
@@ -317,13 +349,13 @@ function validate(workflow) {
   );
   assert.match(
     buildJob.if,
-    /needs\.validate\.result == 'success' && needs\.reuse\.result == 'skipped'/,
-    'the in-workflow suite must pass when it is the gate that ran'
+    /needs\.reuse\.result == 'success' && needs\.reuse\.outputs\.suite == 'passed' && needs\.validate\.result == 'skipped'/,
+    'the reused run must be a passed one when the gate is what proved the suite'
   );
   assert.match(
     buildJob.if,
-    /needs\.reuse\.result == 'success' && needs\.validate\.result == 'skipped'/,
-    'the reused run must pass when it is the gate that ran'
+    /needs\.validate\.result == 'success' && needs\.reuse\.outputs\.suite != 'passed'/,
+    'a passed in-workflow suite must stand in when no run was reused'
   );
 
   // The cap counts iOS submissions, and a run that uploads the IPA and then
@@ -714,6 +746,128 @@ process.stdout.write(run ? [run.id, run.status, run.conclusion ?? ''].join('\\t'
   }
 });
 
+test('the reuse gate waits for the run and falls back when it never passed', () => {
+  const workspace = mkdtempSync(join(tmpdir(), 'kilo-app-gate-'));
+  const stubDir = join(workspace, 'bin');
+  const runsPath = join(workspace, 'run');
+  const callsPath = join(workspace, 'calls');
+  const output = join(workspace, 'output');
+  mkdirSync(stubDir, { recursive: true });
+  // `gh` answers the single-run read in the shape the step asks for: status and
+  // conclusion as two tab-separated fields, one line per read, and the last
+  // line again for every later read. `sleep` is stubbed out so the gate's
+  // interval does not slow the test.
+  writeFileSync(
+    join(stubDir, 'gh'),
+    `#!/bin/sh
+printf '%s\\n' "$*" >> "$GH_STUB_CALLS"
+if [ "$GH_STUB_ERROR" = "1" ]; then
+  echo "HTTP 503: service unavailable" >&2
+  exit 1
+fi
+COUNT=$(wc -l < "$GH_STUB_CALLS")
+TOTAL=$(wc -l < "$GH_STUB_RUN")
+INDEX=$((COUNT - 1))
+if [ "$INDEX" -ge "$TOTAL" ]; then INDEX=$((TOTAL - 1)); fi
+sed -n "$((INDEX + 1))p" "$GH_STUB_RUN"
+`,
+    { mode: 0o755 }
+  );
+  writeFileSync(join(stubDir, 'sleep'), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+
+  const wait = step(readWorkflow(), 'reuse', 'wait');
+  const gate = ({ runs = [], error = false, suiteRun = '77' } = {}) => {
+    writeFileSync(
+      runsPath,
+      runs.map(run => `${[run.status, run.conclusion ?? ''].join('\t')}\n`).join('')
+    );
+    writeFileSync(callsPath, '');
+    writeFileSync(output, '');
+    let status = 0;
+    try {
+      execFileSync('bash', ['-e', '-o', 'pipefail', '-c', wait.run], {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          PATH: `${stubDir}:${process.env.PATH}`,
+          GITHUB_OUTPUT: output,
+          GITHUB_REPOSITORY: 'Kilo-Org/cloud',
+          SUITE_RUN: suiteRun,
+          GH_STUB_RUN: runsPath,
+          GH_STUB_CALLS: callsPath,
+          GH_STUB_ERROR: error ? '1' : '0',
+        },
+        stdio: ['pipe', 'pipe', 'pipe'],
+      });
+    } catch (failure) {
+      status = failure.status;
+    }
+    const outputs = Object.fromEntries(
+      readFileSync(output, 'utf8')
+        .trim()
+        .split('\n')
+        .filter(Boolean)
+        .map(line => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1)])
+    );
+    const calls = readFileSync(callsPath, 'utf8').trim().split('\n').filter(Boolean);
+    return { status, outputs, calls };
+  };
+
+  try {
+    // A run that is still going is waited for, and its pass is the decision.
+    const passed = gate({
+      runs: [
+        { status: 'queued' },
+        { status: 'in_progress' },
+        { status: 'completed', conclusion: 'success' },
+      ],
+    });
+    assert.equal(passed.status, 0);
+    assert.deepEqual(passed.outputs, { suite: 'passed' });
+    assert.equal(passed.calls.length, 3, 'the gate must wait for the run to finish');
+    assert.match(
+      passed.calls[0],
+      /^api repos\/Kilo-Org\/cloud\/actions\/runs\/77 /,
+      'the gate must read the run check-changes published'
+    );
+
+    const settled = gate({ runs: [{ status: 'completed', conclusion: 'success' }] });
+    assert.deepEqual(settled.outputs, { suite: 'passed' });
+    assert.equal(settled.calls.length, 1, 'a settled pass needs one read');
+
+    // A cancelled run carries no verdict about this commit: the suite runs in
+    // this workflow and the release does not fail at the gate. A merge burst
+    // produces exactly this, because the app workflow cancels its own main run.
+    const cancelled = gate({ runs: [{ status: 'completed', conclusion: 'cancelled' }] });
+    assert.equal(cancelled.status, 0, 'a cancelled reuse must not fail the release');
+    assert.deepEqual(cancelled.outputs, { suite: 'fallback' });
+
+    // A failure is no validation of this commit either.
+    const failed = gate({ runs: [{ status: 'completed', conclusion: 'failure' }] });
+    assert.equal(failed.status, 0);
+    assert.deepEqual(failed.outputs, { suite: 'fallback' });
+
+    // An unreadable run and a run that never settles both fall back, and the
+    // wait is bounded.
+    const errored = gate({ error: true });
+    assert.equal(errored.status, 0, 'a failed read must not fail the release');
+    assert.deepEqual(errored.outputs, { suite: 'fallback' });
+    assert.equal(errored.calls.length, 1, 'a failed read must not keep retrying');
+
+    const stalled = gate({ runs: [{ status: 'in_progress' }] });
+    assert.equal(stalled.status, 0);
+    assert.deepEqual(stalled.outputs, { suite: 'fallback' });
+    assert.equal(stalled.calls.length, 110, 'the wait must stay bounded');
+
+    // Only the run id check-changes never published fails the gate.
+    const missing = gate({ suiteRun: '' });
+    assert.equal(missing.status, 1);
+    assert.deepEqual(missing.calls, []);
+  } finally {
+    rmSync(workspace, { recursive: true, force: true });
+  }
+});
+
 test('every path that triggers a release is inside kilo-app CI change detection', () => {
   const ci = load(readFileSync(new URL(`../${ciWorkflowPath}`, import.meta.url), 'utf8'));
   const detect = ci.jobs['mobile-changes'].steps.find(item => item.id === 'detect');
@@ -823,9 +977,9 @@ const mutations = {
   'check-changes cannot read runs': workflow => {
     delete workflow.jobs['check-changes'].permissions.actions;
   },
-  'validate ignores the suite reuse': workflow => {
+  'validate ignores a reuse without a pass': workflow => {
     workflow.jobs.validate.if = workflow.jobs.validate.if.replace(
-      " && needs.check-changes.outputs.reuse == 'false'",
+      " || needs.reuse.outputs.suite == 'fallback'",
       ''
     );
   },
@@ -835,17 +989,28 @@ const mutations = {
       ''
     );
   },
-  'the reuse gate does not fail on a failed suite': workflow => {
-    const wait = workflow.jobs.reuse.steps.find(item => /gh run watch/.test(item.run ?? ''));
-    wait.run = wait.run.replace('"$SUITE_RUN" --exit-status', '"$SUITE_RUN"');
+  'the reuse gate reuses a run that did not pass': workflow => {
+    const wait = workflow.jobs.reuse.steps.find(item => item.id === 'wait');
+    wait.run = wait.run.replace('[ "$CONCLUSION" = "success" ]', '[ "$CONCLUSION" != "success" ]');
+  },
+  'the reuse gate defaults to a passed suite': workflow => {
+    const wait = workflow.jobs.reuse.steps.find(item => item.id === 'wait');
+    wait.run = wait.run.replace('echo "suite=fallback"', 'echo "suite=passed"');
+  },
+  'the reuse gate fails a release whose run never passed': workflow => {
+    const wait = workflow.jobs.reuse.steps.find(item => item.id === 'wait');
+    wait.run = wait.run.replace('echo "The suite runs in this workflow instead."', 'exit 1');
+  },
+  'the reuse gate reads another run': workflow => {
+    const wait = workflow.jobs.reuse.steps.find(item => item.id === 'wait');
+    wait.run = wait.run.replace('/actions/runs/$SUITE_RUN"', '/actions/runs/1"');
   },
   'the reuse gate waits for an unpublished run': workflow => {
-    const wait = workflow.jobs.reuse.steps.find(item => /gh run watch/.test(item.run ?? ''));
+    const wait = workflow.jobs.reuse.steps.find(item => item.id === 'wait');
     delete wait.env.SUITE_RUN;
   },
-  'the reuse gate cannot resolve the repository': workflow => {
-    const wait = workflow.jobs.reuse.steps.find(item => /gh run watch/.test(item.run ?? ''));
-    delete wait.env.GH_REPO;
+  'the reuse gate publishes no decision': workflow => {
+    delete workflow.jobs.reuse.outputs.suite;
   },
   'the build runs without a status function': workflow => {
     const job = workflow.jobs['build-and-submit'];
@@ -855,11 +1020,18 @@ const mutations = {
     const job = workflow.jobs['build-and-submit'];
     job.if = job.if.replace("needs.preflight.result == 'success' && ", '');
   },
-  'the build starts without a passed suite': workflow => {
+  'the build starts when the reused run never passed': workflow => {
     const job = workflow.jobs['build-and-submit'];
     job.if = job.if.replace(
-      "needs.validate.result == 'success' && needs.reuse.result == 'skipped'",
-      "needs.validate.result != 'cancelled' && needs.reuse.result == 'skipped'"
+      "needs.reuse.result == 'success' && needs.reuse.outputs.suite == 'passed' && needs.validate.result == 'skipped'",
+      "needs.validate.result == 'skipped'"
+    );
+  },
+  'the build starts without a passed in-workflow suite': workflow => {
+    const job = workflow.jobs['build-and-submit'];
+    job.if = job.if.replace(
+      "needs.validate.result == 'success' && needs.reuse.outputs.suite != 'passed'",
+      "needs.reuse.outputs.suite != 'passed'"
     );
   },
   'the build drops the reuse gate': workflow => {

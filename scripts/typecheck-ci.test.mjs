@@ -27,12 +27,24 @@ const workflows = Object.fromEntries(
 const harnessBuildAction = load(
   readFileSync(new URL('../.github/actions/harness-sdk-build/action.yml', import.meta.url), 'utf8')
 );
+const pluginCacheActionYaml = load(
+  readFileSync(new URL('../.github/actions/ttsc-plugin-cache/action.yml', import.meta.url), 'utf8')
+);
 const extension = JSON.parse(
   readFileSync(new URL('../apps/extension/package.json', import.meta.url), 'utf8')
 );
 const web = JSON.parse(readFileSync(new URL('../apps/web/package.json', import.meta.url), 'utf8'));
 const rootScript = fileURLToPath(new URL('./typecheck-all.sh', import.meta.url));
 const harnessBuild = 'pnpm --filter @kilocode/harness-sdk run build';
+const pluginCacheAction = './.github/actions/ttsc-plugin-cache';
+const pluginPath = 'node_modules/.cache/ttsc/plugins';
+// The step each plugin saver's save must follow.
+const jobRun = new Map([
+  ['ci.yml:harness-sdk', 'pnpm --filter @kilocode/harness-sdk check:ci'],
+  ['ci.yml:workspace-tests', 'pnpm --filter ${{ matrix.workspace.name }} test'],
+  ['.github/actions/harness-sdk-build', harnessBuild],
+]);
+const ciJobs = workflows['ci.yml'].jobs;
 const pnpmCleanup = fileURLToPath(
   new URL('../.github/actions/pnpm-store/cleanup/cleanup.cjs', import.meta.url)
 );
@@ -254,26 +266,73 @@ for (const [file, name, command, condition] of [
 ]) {
   test(`${file} ${name} restores the compiler plugin cache after install and before use`, () => {
     const steps = workflows[file].jobs[name].steps;
-    const cacheIndex = steps.findIndex(step => step.name === 'Cache compiler plugins');
+    const cacheIndex = steps.findIndex(step => step.uses === pluginCacheAction);
     const installIndex = steps.findIndex(step =>
       /^pnpm install --frozen-lockfile\b/.test(step.run ?? '')
     );
     const buildIndex = steps.findIndex(step => step.run === command);
     assert.ok(installIndex >= 0 && cacheIndex > installIndex && buildIndex > cacheIndex);
     const cache = steps[cacheIndex];
-    assert.equal(cache.uses, 'actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7');
-    assert.equal(cache.with.path, 'node_modules/.cache/ttsc/plugins');
-    assert.equal(
-      cache.with.key,
-      "${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-${{ hashFiles('pnpm-lock.yaml') }}"
-    );
-    assert.equal(
-      cache.with['restore-keys'].trim(),
-      '${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-'
-    );
+    // The harness-sdk row of workspace-tests is the only saver; these jobs
+    // restore through the action and compile on a miss when it was skipped.
+    assert.equal(cache.with, undefined);
     assert.equal(cache.if, condition ?? steps[buildIndex].if);
   });
 }
+
+test('one job saves the compiler plugin cache and every reader restores it', () => {
+  const savers = [];
+  const holders = [
+    ...Object.entries(workflows).flatMap(([file, workflow]) =>
+      Object.entries(workflow.jobs ?? {}).map(([name, job]) => [`${file}:${name}`, job.steps ?? []])
+    ),
+    ['.github/actions/harness-sdk-build', harnessBuildAction.runs.steps],
+  ];
+  for (const [key, steps] of holders) {
+    const saversHere = steps.filter(step => step.uses?.startsWith('actions/cache/save@'));
+    for (const save of saversHere) {
+      assert.equal(save.uses, 'actions/cache/save@668228422ae6a00e4ad889ee87cd7109ec5666a7');
+      assert.ok(
+        (save.if ?? '').includes("steps.plugins.outputs.cache-hit != 'true'"),
+        `${key} saves only what its own restore missed`
+      );
+      assert.equal(save.with.path, pluginPath);
+      assert.equal(
+        save.with.key,
+        '${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-${{ steps.plugins.outputs.key }}',
+        `${key} saves under the key its restore read`
+      );
+      savers.push(key);
+    }
+    const restore = steps.find(step => step.uses === pluginCacheAction);
+    if (restore) {
+      // The save must follow the compilation: an inline save inside a restore
+      // action would fire before ttsc wrote the plugins.
+      if (saversHere.length > 0) {
+        const saveIndex = steps.indexOf(saversHere.at(-1));
+        const runIndex = steps.findIndex(step => step.run === jobRun.get(key));
+        assert.ok(restore.id, `${key} must expose the plugin restore to its save`);
+        assert.ok(saveIndex > runIndex, `${key} saves after its run compiles`);
+      } else {
+        assert.equal(restore.with, undefined, `${key} restores only`);
+      }
+    }
+  }
+  // Each Linux selection path has one saver: the dedicated harness-sdk job
+  // when the packages/harness-sdk filter selected it, and the workspace-tests
+  // row otherwise (whose matrix then carries the harness-sdk work). macOS has
+  // no ci.yml reviewer, so the build action writes the macOS key itself.
+  assert.deepEqual(savers, [
+    'ci.yml:harness-sdk',
+    'ci.yml:workspace-tests',
+    '.github/actions/harness-sdk-build',
+  ]);
+  assert.equal(
+    ciJobs['workspace-tests'].steps.find(step => step.uses?.startsWith('actions/cache/save@')).if,
+    "matrix.workspace.name == '@kilocode/harness-sdk' && steps.plugins.outputs.cache-hit != 'true' && needs.changes.outputs.harness_sdk != 'true'",
+    'the two savers must not both save in one run'
+  );
+});
 
 const harnessBuildGuards = [
   [
@@ -498,7 +557,7 @@ test('the harness SDK action restores dist and builds only on a miss', () => {
   const steps = harnessBuildAction.runs.steps;
   const key = steps.find(step => step.name === 'Hash harness SDK build inputs');
   const cache = steps.find(step => step.name === 'Restore harness SDK build');
-  const plugins = steps.filter(step => step.name === 'Cache compiler plugins');
+  const plugins = steps.filter(step => step.uses === pluginCacheAction);
   const build = steps.find(step => step.name === 'Build harness SDK');
   assert.equal(key.run, 'node scripts/harness-sdk-build-key.mjs >> "$GITHUB_OUTPUT"');
   assert.equal(cache.uses, 'actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7');
@@ -508,15 +567,56 @@ test('the harness SDK action restores dist and builds only on a miss', () => {
   assert.equal(build.run, harnessBuild);
   assert.equal(build.if, "steps.cache.outputs.cache-hit != 'true'");
   // The typia transform takes minutes to compile, so the build's plugin cache
-  // comes from the same action and only when a build will run.
+  // comes from the shared action and only when a build will run.
   assert.equal(plugins.length, 1);
-  assert.equal(plugins[0].uses, 'actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7');
-  assert.equal(plugins[0].with.path, 'node_modules/.cache/ttsc/plugins');
-  assert.equal(
-    plugins[0].with.key,
-    "${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-${{ hashFiles('pnpm-lock.yaml') }}"
-  );
+  assert.equal(plugins[0].uses, pluginCacheAction);
+  assert.equal(plugins[0].with, undefined);
   assert.equal(plugins[0].if, "steps.cache.outputs.cache-hit != 'true'");
+  assert.equal(plugins[0].id, 'plugins');
+  // macOS has no ci.yml writer for its platform-scoped key, so this action
+  // writes the macOS key itself, after the build that compiled the plugins.
+  // The save requires the build path: a skipped restore leaves its outputs
+  // empty, and a save keyed on them would write nothing.
+  const macSave = steps.find(step => step.uses?.startsWith('actions/cache/save@'));
+  assert.ok(macSave, 'the build action writes the macOS key');
+  assert.equal(
+    macSave.if,
+    "runner.os == 'macOS' && steps.cache.outputs.cache-hit != 'true' && steps.plugins.outputs.cache-hit != 'true'"
+  );
+  assert.equal(steps.indexOf(macSave), steps.length - 1);
+});
+
+// The plugin cache action owns the key material and the restore; it cannot
+// save, because ttsc writes the plugins after the action runs.
+test('the compiler plugin cache action restores under one plugin-scoped key', () => {
+  const steps = pluginCacheActionYaml.runs.steps;
+  const hash = steps.find(step => step.name === 'Hash compiler plugin inputs');
+  const restore = steps.find(step => step.name === 'Restore compiler plugins');
+  assert.equal(hash.run, 'node scripts/ttsc-plugin-key.mjs >> "$GITHUB_OUTPUT"');
+  assert.equal(restore.uses, 'actions/cache/restore@668228422ae6a00e4ad889ee87cd7109ec5666a7');
+  assert.equal(restore.with.path, pluginPath);
+  // The whole-lockfile hash and the prefix restore key both crossed versions:
+  // the key covers only the plugin's own closure, and a restore that misses it
+  // compiles again rather than reusing another version's plugin.
+  assert.equal(
+    restore.with.key,
+    '${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-${{ steps.key.outputs.key }}'
+  );
+  assert.equal(
+    restore.with['restore-keys'],
+    undefined,
+    'a partial restore would serve a plugin built from other versions'
+  );
+  assert.equal(
+    steps.find(step => step.uses?.startsWith('actions/cache/save@')),
+    undefined
+  );
+  assert.deepEqual(Object.keys(pluginCacheActionYaml.outputs ?? {}).sort(), ['cache-hit', 'key']);
+  assert.equal(
+    pluginCacheActionYaml.outputs['cache-hit'].value,
+    '${{ steps.restore.outputs.cache-hit }}'
+  );
+  assert.equal(pluginCacheActionYaml.outputs.key.value, '${{ steps.key.outputs.key }}');
 });
 
 // One job compiles the tRPC declarations per commit. The typecheck and lint

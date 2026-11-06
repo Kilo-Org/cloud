@@ -1,6 +1,6 @@
 import { describe, expect, test } from '@jest/globals';
 import { captureMessage } from '@sentry/nextjs';
-import type { CustomPricingConfig } from '@kilocode/db/schema-types';
+import type { CustomPricingConfig, CustomPricingTiers } from '@kilocode/db/schema-types';
 import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { GEMINI_4_ARGON_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
 import {
@@ -48,7 +48,7 @@ const makeUsage = (overrides: Partial<Parameters<typeof calculateCustomCost_mUsd
 
 const config = TEST_CUSTOM_PRICING_CONFIG;
 
-const windowTiers = [
+const windowTiers: CustomPricingTiers = [
   {
     start_context_length: 0,
     pricing: {

@@ -16,6 +16,7 @@ jest.mock('@kilocode/web-shared/lib/redis', () => ({
 
 import { afterEach, beforeEach, describe, expect, test } from '@jest/globals';
 import type { BYOKApiKeyEnvelope } from '@kilocode/db/schema-types';
+import type { ByokKmsContext } from '@kilocode/web-shared/lib/ai-gateway/byok/kms-context';
 import { cacheByokDataKey, evictCachedByokDataKey, getCachedByokDataKey } from './data-key-cache';
 import { REPORT_WINDOW_MS } from '../report-window';
 
@@ -32,7 +33,12 @@ const envelope: BYOKApiKeyEnvelope = {
   envelope_version: 1,
 };
 
-const context = { key_id: 'key-1', owner_type: 'user', owner_id: 'user-1', provider_id: 'openai' };
+const context: ByokKmsContext = {
+  key_id: 'key-1',
+  owner_type: 'user',
+  owner_id: 'user-1',
+  provider_id: 'openai',
+};
 
 let warn: jest.SpiedFunction<typeof console.warn>;
 

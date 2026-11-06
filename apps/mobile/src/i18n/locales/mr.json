@@ -2346,8 +2346,8 @@
     },
     "tasks": {
       "progress": "{{completed}}/{{total}}",
-      "progressAccessibility": "ध्येये, {{total}} पैकी {{completed}} पूर्ण",
-      "rowAccessibility": "ध्येये, {{total}} पैकी {{completed}} पूर्ण. सध्याचे ध्येय: {{task}}"
+      "progressAccessibility": "कार्ये, {{total}} पैकी {{completed}} पूर्ण",
+      "rowAccessibility": "कार्ये, {{total}} पैकी {{completed}} पूर्ण. सध्याचे कार्य: {{task}}"
     },
     "newSession": {
       "recentlyUsed": "अलीकडे वापरलेले",
@@ -2404,7 +2404,7 @@
       "couldNotRefreshRepositories": "रिपॉझिटरींची यादी रिफ्रेश करता आली नाही. कृपया पुन्हा प्रयत्न करा.",
       "discardDraftTitle": "मसुदा रद्द करायचा?",
       "discardDraftMessage": "तुमचा प्रॉम्प्ट हटवला जाईल.",
-      "discardWithUploadsMessage": "तुमचा प्रॉम्प्ट आणि पाठवलेल्या संदेशांना संलग्न नसलेल्या अपलोड केलेल्या फाइल्स हटवल्या जातील.",
+      "discardWithUploadsMessage": "तुमचा प्रॉम्प्ट आणि जोडल्या न गेलेल्या अपलोड केलेल्या फाइल्स हटवल्या जातील.",
       "discardFailed": "मसुदा रद्द करता आला नाही. कृपया पुन्हा प्रयत्न करा.",
       "remoteHint": "तुमच्या संगणकावर चालवण्यासाठी तिथे Kilo सुरू करा आणि ते चालू ठेवा.",
       "continueFrom": "{{title}} हे सत्र पुढे सुरू होत आहे.",
@@ -2422,7 +2422,7 @@
       "manageProfiles": "प्रोफाइल व्यवस्थापित करा",
       "advancedConfig": "प्रगत कॉन्फिगरेशन",
       "advancedConfigDescription": "हे या सत्रावर लागू होते. प्रोफाइल म्हणून सेव्ह केल्यास ते पुढील वेळेसाठी राहते.",
-      "saveAsProfile": "प्रोफाइल म्हणून सेव्ह करा",
+      "saveAsProfile": "प्रोफाइल म्हणून जतन करा",
       "saveProfileDescription": "वर्तमान पर्यावरण व्हेरिएबल्स आणि सेटअप आदेश पुन्हा वापरता येण्याजोग्या प्रोफाइल म्हणून जतन करा.",
       "profileSaved": "प्रोफाइल \"{{name}}\" जतन केले",
       "organizationProfiles": "संस्था प्रोफाइल",
@@ -2432,7 +2432,7 @@
       "descriptionTooLong": "वर्णन खूप मोठे आहे",
       "secretsEncrypted": "स्टोरेज करण्यापूर्वी रहस्ये कूटबद्ध केली जातात.",
       "profileActive": "प्रोफाइल सक्रिय",
-      "profilesActive": "प्रोफाइल सक्रिय",
+      "profilesActive": "प्रोफाइल्स सक्रिय",
       "customConfigActive": "सानुकूल कॉन्फिगरेशन सक्रिय",
       "configNeedsAttention": "कॉन्फिगला लक्ष देणे आवश्यक आहे",
       "repoProfile": "रेपो प्रोफाइल",
@@ -2450,14 +2450,14 @@
       "accessibility": "{{label}} साधन, {{status}}",
       "accessibilityLabel": "{{name}} साधन, {{status}}",
       "noTasks": "कोणतीही कामे नाहीत.",
-      "toolRead": "वाचा",
-      "toolEdit": "संपादित करा",
-      "toolWrite": "लिहा",
+      "toolRead": "वाचन",
+      "toolEdit": "संपादन",
+      "toolWrite": "लेखन",
       "toolBash": "bash",
       "toolGlob": "फाइल शोध",
       "toolGrep": "मजकूर शोध",
-      "toolList": "यादी दाखवा",
-      "toolPatch": "पॅच लागू करा",
+      "toolList": "यादी",
+      "toolPatch": "पॅच लागू करणे",
       "toolTask": "काम",
       "readTodos": "योजना वाचा",
       "updateTodos": "योजना अद्ययावत करा",
@@ -2468,7 +2468,7 @@
       "filesBadge_other": "{{displayCount}} फाइल्स",
       "linesBadge_one": "{{displayCount}} ओळ",
       "linesBadge_other": "{{displayCount}} ओळी",
-      "matchesBadge_one": "{{displayCount}} जुळणारे परिणाम",
+      "matchesBadge_one": "{{displayCount}} जुळणारा परिणाम",
       "matchesBadge_other": "{{displayCount}} जुळणारे परिणाम",
       "noOutput": "कोणतेही आउटपुट नाही.",
       "translationFailed": "अनुवाद अयशस्वी"
@@ -2504,9 +2504,9 @@
       "accessibility": "मोड: {{label}}"
     },
     "modeOptions": {
-      "code": "कोड लिहा",
+      "code": "कोड",
       "plan": "योजना",
-      "debug": "त्रुटी दुरुस्त करा",
+      "debug": "डीबग",
       "orchestrator": "समन्वयक",
       "ask": "विचारा",
       "codeDescription": "कोड लिहा आणि बदला",
@@ -2554,7 +2554,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "तपशील उपलब्ध नाहीत.",
-      "textDisplay": "दाखवलेला मजकूर",
+      "textDisplay": "मजकूर प्रदर्शन",
       "thinking": "विचार करत आहे",
       "thought": "विचार",
       "showDetails": "तपशील दाखवा",
@@ -2664,7 +2664,7 @@
       "errorAgentUnavailable": "एजंट उपलब्ध राहिला नाही",
       "errorBillingBlocked": "सॅंडबॉक्स बिलिंगसाठी अतिरिक्त क्रेडिट्स आवश्यक आहेत",
       "errorBillingUnavailable": "सॅंडबॉक्स बिलिंग किंवा क्षमता पडताळणी उपलब्ध नाही. थोड्या वेळाने पुन्हा प्रयत्न करा.",
-      "errorContainerLimitReached": "कंटेनर मर्यादेत पोहोचले. नवीन सुरू करण्यापूर्वी एक अस्तित्वात असलेला कंटेनर थांबवा.",
+      "errorContainerLimitReached": "कंटेनरची मर्यादा गाठली आहे. नवीन सुरू करण्यापूर्वी एक अस्तित्वात असलेला कंटेनर थांबवा.",
       "errorInvalidConfiguration": "सॅंडबॉक्स कॉन्फिगरेशन अवैध किंवा असमर्थित आहे",
       "errorRuntimeArtifactUnauthorized": "रनटाइम डाउनलोडसाठी अधिकृतता नाही",
       "errorRuntimeArtifactInvalid": "रनटाइम आर्टिफॅक्ट पडताळणी अयशस्वी",
@@ -2691,13 +2691,13 @@
       "retryAllowOnce": "एकदा परवानगी देण्याचा पुन्हा प्रयत्न करा",
       "retryAlwaysAllow": "नेहमी परवानगी देण्याचा पुन्हा प्रयत्न करा",
       "unreadableTitle": "परवानगी विनंती वाचता आली नाही",
-      "unreadableBody": "एजंट ही परवानगी विनंती पाहू शकत नाही अशा निर्णयाची वाट पाहत आहे. पुढे जाण्यासाठी अ‍ॅप किंवा CLI अद्ययावत करा, किंवा CLI मध्येच या विनंतीचे उत्तर द्या."
+      "unreadableBody": "एजंट अशा परवानगी निर्णयाची वाट पाहत आहे जो हे अ‍ॅप दाखवू शकत नाही. पुढे जाण्यासाठी अ‍ॅप किंवा CLI अद्ययावत करा, किंवा CLI मध्येच या विनंतीचे उत्तर द्या."
     },
     "questionCard": {
-      "title": "एजंटला तुमचे उत्तर हवे आहे",
+      "title": "एजंटला इनपुट हवे आहे",
       "skipQuestionsTitle": "प्रश्न वगळायचे?",
       "skipQuestionsMessage": "एजंट ही पायरी वगळेल.",
-      "answerProgress": "{{total}} पैकी {{answered}} ची उत्तरे दिली",
+      "answerProgress": "{{total}} पैकी {{answered}} पूर्ण",
       "selectAllThatApply": "लागू असलेले सर्व पर्याय निवडा.",
       "option": "पर्याय: {{label}}",
       "optionSelected": "{{label}}, निवडलेला पर्याय",
@@ -2705,7 +2705,7 @@
       "typeYourOwnAnswerPlaceholder": "तुमचे स्वतःचे उत्तर…",
       "skip": "वगळा",
       "retrySkip": "वगळण्याचा पुन्हा प्रयत्न करा",
-      "submitting": "उत्तर पाठवत आहे…",
+      "submitting": "उत्तरे पाठवत आहे…",
       "sendAnswers": "उत्तरे पाठवा"
     },
     "blockingCard": {
@@ -2882,7 +2882,7 @@
       "exitSession": "सत्रातून बाहेर पडा",
       "clearSession": "हे सत्र संपवा आणि नवीन सुरू करा",
       "compactDescription": "सध्याच्या सत्राचा संदर्भ संकुचित करा",
-      "goalDescription": "सत्र ध्येयाच्या दिशेने काम सुरू ठेवा. /goal <objective> किंवा pause, resume, clear",
+      "goalDescription": "सत्र ध्येयाच्या दिशेने काम सुरू ठेवा. /goal <objective> किंवा pause, resume, clear. ध्येय नियोजित वेकअप, क्रॉन कार्य किंवा पार्श्वभूमी प्रक्रियेची प्रतीक्षा करू शकते: प्रतीक्षा ध्येयाला ते घडेपर्यंत स्थगित ठेवते आणि ते घडल्यावर ध्येय स्वतःहून पुन्हा सुरू होते; /goal pause आणि /goal clear त्याचे सक्रिय टायमर रद्द करतात. उद्दिष्ट हे डिप्लॉय, बिल्ड किंवा CI जॉबची प्रतीक्षा करणे असेल, तर ती प्रतीक्षा लगेच नियोजित करा; आधी रिपॉझिटरी एक्सप्लोर करू नका.",
       "initDescription": "मार्गदर्शित AGENTS.md सेटअप",
       "resumeClaudeDescription": "Claude Code सत्राचे ट्रान्स्क्रिप्ट आयात करा",
       "resumeCodexDescription": "OpenAI Codex सत्राचे ट्रान्स्क्रिप्ट आयात करा",
@@ -2941,7 +2941,7 @@
       "unavailable": "हे सत्र परवानगी विनंत्या प्राप्त करू शकत नाही."
     },
     "prBadge": {
-      "open": "पुल रिक्वेस्ट उघडा",
+      "open": "उघडलेली पुल रिक्वेस्ट",
       "closed": "बंद केलेली पुल रिक्वेस्ट",
       "merged": "विलीन केलेली पुल रिक्वेस्ट",
       "draft": "पुल रिक्वेस्टचा मसुदा",

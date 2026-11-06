@@ -2036,6 +2036,7 @@
       "assistantContextOverflow": "대화가 너무 길어 모델이 처리할 수 없습니다.",
       "assistantProviderError": "제공업체가 오류를 반환했습니다.",
       "assistantProviderRefused": "제공업체가 이 요청을 거부했으며 다시 시도할 수 없습니다.",
+      "assistantCreditsRefusal": "Cloud Agent를 실행할 크레딧이 부족합니다.",
       "assistantOutputLimit": "응답이 모델의 출력 한도에 도달했습니다.",
       "assistantStructuredOutput": "응답이 필요한 형식과 일치하지 않습니다.",
       "assistantFailed": "응답을 생성하지 못했습니다."

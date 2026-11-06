@@ -2086,6 +2086,7 @@
       "assistantContextOverflow": "Переписка слишком длинная для этой модели.",
       "assistantProviderError": "Провайдер вернул ошибку.",
       "assistantProviderRefused": "Провайдер отклонил этот запрос, повторная попытка невозможна.",
+      "assistantCreditsRefusal": "Недостаточно кредитов для запуска Cloud Agent.",
       "assistantOutputLimit": "Ответ достиг ограничения длины ответа модели.",
       "assistantStructuredOutput": "Ответ не соответствует требуемому формату.",
       "assistantFailed": "Не удалось сформировать ответ."

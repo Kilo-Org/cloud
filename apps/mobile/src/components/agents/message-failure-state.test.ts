@@ -226,8 +226,8 @@ describe('selectMessageFailure', () => {
 
       const result = selectMessageFailure({ info });
 
-      expect(result?.detailKey).toBe('agentChat.session.notEnoughCredits');
-      expect(result?.detail).toBe(i18n.t('agentChat.session.notEnoughCredits'));
+      expect(result?.detailKey).toBe('agentChat.messageFailure.assistantCreditsRefusal');
+      expect(result?.detail).toBe(i18n.t('agentChat.messageFailure.assistantCreditsRefusal'));
       expect(result?.canAddCredits).toBe(true);
       // The same request meets the same block, so the row keeps no resend.
       expect(result?.canRetry).toBe(false);

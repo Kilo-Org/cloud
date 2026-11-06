@@ -236,15 +236,21 @@ function MessageBubbleImpl({
             </Button>
           ) : null}
           {failure.canAddCredits && onAddCredits ? (
+            // The failure's one recovery action, so it takes the accent surface
+            // the person's own bubble and the enabled send control fill with,
+            // in both schemes; the theme's `--primary` is olive in light, which
+            // would read as one more secondary action here. The label uses that
+            // surface's own ink, because the primary label ink is white in the
+            // light scheme.
             <Button
-              variant="outline"
+              variant="default"
               size="sm"
-              className={STATE_ACTION_CLASS}
+              className={cn(STATE_ACTION_CLASS, 'bg-accent-soft')}
               onPress={onAddCredits}
               accessibilityRole="button"
               accessibilityLabel={t('addCredits.cta')}
             >
-              <Text>{t('addCredits.cta')}</Text>
+              <Text className="text-accent-soft-foreground">{t('addCredits.cta')}</Text>
             </Button>
           ) : null}
           {failure.canCopy && onCopyToComposer && copyText !== '' ? (

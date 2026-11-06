@@ -87,7 +87,7 @@ describe('lastVisibleMessageFailure', () => {
       canceledQueuedMessages: nothingCanceled,
     });
     expect(failure?.canAddCredits).toBe(true);
-    expect(failure?.detailKey).toBe('agentChat.session.notEnoughCredits');
+    expect(failure?.detailKey).toBe('agentChat.messageFailure.assistantCreditsRefusal');
   });
 
   it('returns null for an assistant failure with no preceding user row (no Retry)', () => {

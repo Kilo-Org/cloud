@@ -547,9 +547,7 @@ describe('MessageBubble failure footer', () => {
     );
 
     expect(findText(tree, t => t === 'Response failed')).toBe(true);
-    expect(
-      findText(tree, t => t === 'Not enough credits to run Cloud Agent. Add credits and try again.')
-    ).toBe(true);
+    expect(findText(tree, t => t === 'Not enough credits to run Cloud Agent.')).toBe(true);
 
     const addCredits = findElementByType(
       tree,
@@ -559,6 +557,9 @@ describe('MessageBubble failure footer', () => {
     if (!addCredits) {
       throw new Error('the footer drew no Add credits button');
     }
+    // The row's one recovery action fills with the accent surface the person's
+    // own bubble uses, so it reads as that row's primary action.
+    expect(addCredits.props.className).toContain('bg-accent-soft');
     const press = addCredits.props.onPress as () => void;
     press();
     expect(onAddCredits).toHaveBeenCalledTimes(1);

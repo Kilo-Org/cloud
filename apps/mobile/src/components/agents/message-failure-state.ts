@@ -362,11 +362,12 @@ export function selectMessageFailure(input: {
     // transport.
     const retryableByProvider = !assistantErrorMarkedNonRetryable(error);
     const creditsRefusal = assistantCreditsRefusal(error);
-    // A credits refusal states the class the session's terminal error already
-    // names for the same gateway block (`messageForClass('credits')` in
-    // session-terminal-error.ts), so the row's line and the footer's agree.
+    // A credits refusal names its cause, like the session's terminal error does
+    // for the same gateway block (`messageForClass('credits')` in
+    // session-terminal-error.ts). The row says only the cause: the action under
+    // it carries the recovery, so the line does not repeat it.
     const detailKey = creditsRefusal
-      ? 'agentChat.session.notEnoughCredits'
+      ? 'agentChat.messageFailure.assistantCreditsRefusal'
       : assistantDetailKey(errorName, !retryableByProvider);
     return {
       kind: 'assistant',

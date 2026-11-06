@@ -337,8 +337,7 @@ describe('CreditPurchaseScreen', () => {
     // The expiry note names the same balance slice, so it is masked too.
     expect(text).not.toContain('$10.00 in credits expires');
     const masked = renderer.root.findAll(
-      node =>
-        String(node.type) === 'Text' && node.props.accessibilityLabel === 'Balance hidden'
+      node => String(node.type) === 'Text' && node.props.accessibilityLabel === 'Balance hidden'
     );
     expect(masked).toHaveLength(1);
     // The pack rows are catalog prices, not this account's amount, so the

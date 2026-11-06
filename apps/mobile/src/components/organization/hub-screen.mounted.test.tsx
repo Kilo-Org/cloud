@@ -323,7 +323,9 @@ describe('Organization hub balance masking', () => {
     expect(row?.props.valueAccessibilityLabel).toBe(i18n.t('profile.balanceHidden'));
     // No painted node may carry the amount while it is hidden.
     expect(
-      renderer.root.findAll(node => typeof node.props.children === 'string' && node.props.children === '$5')
+      renderer.root.findAll(
+        node => typeof node.props.children === 'string' && node.props.children === '$5'
+      )
     ).toHaveLength(0);
     unmount();
   });

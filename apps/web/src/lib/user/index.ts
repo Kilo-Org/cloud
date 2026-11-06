@@ -520,7 +520,7 @@ async function recordSignupImpactTracking(args: {
  * an optional `email_verified` claim that this table deliberately does not rely
  * on.
  */
-const SETUP_PROVES_EMAIL: Record<string, true | undefined> = {
+const SETUP_PROVES_EMAIL: Partial<Record<AuthProviderId, true>> = {
   google: true,
   apple: true,
   anaconda: true,

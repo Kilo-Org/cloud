@@ -88,10 +88,25 @@ function edit(dir, file, content) {
   writeFileSync(join(dir, file), content);
 }
 
-function runMatrix(fixture, base, args = []) {
+function runMatrix(fixture, base, args = [], extraEnv = {}) {
   const eventPath = join(fixture.dir, 'event.json');
   writeFileSync(eventPath, JSON.stringify({ pull_request: { base: { sha: base } } }));
-  return run(fixture, args, { GITHUB_EVENT_NAME: 'pull_request', GITHUB_EVENT_PATH: eventPath });
+  return run(fixture, args, {
+    GITHUB_EVENT_NAME: 'pull_request',
+    GITHUB_EVENT_PATH: eventPath,
+    ...extraEnv,
+  });
+}
+
+// The document the changes job publishes, from this fixture's own detector.
+function detectorDocument(fixture, base) {
+  const result = spawnSync(
+    'node',
+    [join(fixture.dir, 'scripts', 'affected-workspaces.mjs'), base],
+    { cwd: fixture.dir, encoding: 'utf8' }
+  );
+  assert.equal(result.status, 0, result.stderr);
+  return result.stdout;
 }
 
 // No GitHub event and no origin remote: the script has no base revision, so the
@@ -196,4 +211,99 @@ test('without detector output the matrix covers every workspace with tests', t =
     'reader packages/reader',
     'tool packages/tool',
   ]);
+});
+
+// The changes job in ci.yml runs the detector once and publishes the document to
+// the matrix step as AFFECTED. The fixture has no detector of its own, so a
+// second selection attempt cannot succeed: the rows below come from the document.
+test('a supplied selection for the same base decides the matrix without a second pass', t => {
+  const fixture = createFixture({ withDetector: false });
+  t.after(() => rmSync(fixture.dir, { recursive: true, force: true }));
+  const base = fixture.head();
+  edit(fixture.dir, 'packages/leaf/src/index.ts', 'export const leaf = 5;\n');
+  fixture.git('add', '-A');
+  commit(fixture.git, 'change leaf sources with a supplied selection');
+
+  const result = runMatrix(fixture, base, [], {
+    AFFECTED: JSON.stringify({
+      base,
+      full: false,
+      dirs: ['packages/leaf', 'packages/reader'],
+    }),
+  });
+  assert.doesNotMatch(result.stderr, /selecting every workspace with tests/);
+  assert.match(result.stderr, /reusing the affected-workspace document/);
+  assert.deepEqual(rows(JSON.parse(result.stdout)), [
+    'leaf packages/leaf',
+    'reader packages/reader',
+  ]);
+});
+
+test('a selection computed for another base is ignored', t => {
+  const fixture = createFixture();
+  t.after(() => rmSync(fixture.dir, { recursive: true, force: true }));
+  const base = fixture.head();
+  edit(fixture.dir, 'packages/leaf/src/index.ts', 'export const leaf = 6;\n');
+  fixture.git('add', '-A');
+  commit(fixture.git, 'change leaf sources with a stale document');
+
+  // The document names another revision and selects only `tool`: the real diff
+  // must decide the rows instead.
+  const result = runMatrix(fixture, base, [], {
+    AFFECTED: JSON.stringify({ base: 'a'.repeat(40), full: false, dirs: ['packages/tool'] }),
+  });
+  assert.doesNotMatch(result.stderr, /reusing the affected-workspace document/);
+  assert.deepEqual(rows(JSON.parse(result.stdout)), [
+    'leaf packages/leaf',
+    'reader packages/reader',
+  ]);
+});
+
+test('an unreadable supplied selection keeps the detector and fallback paths', t => {
+  const fixture = createFixture({ withDetector: false });
+  t.after(() => rmSync(fixture.dir, { recursive: true, force: true }));
+  const base = fixture.head();
+  edit(fixture.dir, 'packages/leaf/src/index.ts', 'export const leaf = 7;\n');
+  fixture.git('add', '-A');
+  commit(fixture.git, 'change leaf sources with an unreadable document');
+
+  for (const affected of ['{"broken":', JSON.stringify({ base })]) {
+    const result = runMatrix(fixture, base, [], { AFFECTED: affected });
+    assert.match(result.stderr, /selecting every workspace with tests/, affected);
+    assert.deepEqual(rows(JSON.parse(result.stdout)), [
+      'leaf packages/leaf',
+      'reader packages/reader',
+      'tool packages/tool',
+    ]);
+  }
+});
+
+test('an empty selection for the same base selects no rows', t => {
+  const fixture = createFixture({ withDetector: false });
+  t.after(() => rmSync(fixture.dir, { recursive: true, force: true }));
+  const base = fixture.head();
+
+  const result = runMatrix(fixture, base, [], {
+    AFFECTED: JSON.stringify({ base, full: false, dirs: [] }),
+  });
+  assert.doesNotMatch(result.stderr, /selecting every workspace with tests/);
+  assert.deepEqual(JSON.parse(result.stdout), []);
+});
+
+test('the supplied document yields the same matrix as a fresh selection', t => {
+  const fixture = createFixture();
+  t.after(() => rmSync(fixture.dir, { recursive: true, force: true }));
+  const base = fixture.head();
+  edit(fixture.dir, 'packages/leaf/src/index.ts', 'export const leaf = 8;\n');
+  fixture.git('add', '-A');
+  commit(fixture.git, 'change leaf sources for both paths');
+
+  const document = detectorDocument(fixture, base);
+  assert.equal(JSON.parse(document).base, base);
+  const supplied = runMatrix(fixture, base, [], { AFFECTED: document });
+  assert.match(supplied.stderr, /reusing the affected-workspace document/);
+  assert.deepEqual(
+    rows(JSON.parse(supplied.stdout)),
+    rows(JSON.parse(runMatrix(fixture, base).stdout))
+  );
 });

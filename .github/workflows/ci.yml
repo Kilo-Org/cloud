@@ -258,6 +258,8 @@ jobs:
               - 'pnpm-lock.yaml'
       # Pull requests check only the workspaces a change can affect. Main
       # pushes and the merge queue pass no base, which selects every workspace.
+      # The document names the base it was computed for, so the matrix step
+      # below reuses it instead of selecting the repository again.
       - name: Detect affected workspaces
         id: affected
         env:
@@ -290,7 +292,9 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       # Also test the workspaces whose tests read changed data
-      # (test_only_dirs); their typecheck and lint stay skipped.
+      # (test_only_dirs); their typecheck and lint stay skipped. The matrix
+      # decides from the document the step above published, so one run selects
+      # the repository once.
       - name: Detect changed workspaces with tests
         id: workspaces
         env:

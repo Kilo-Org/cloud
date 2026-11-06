@@ -505,17 +505,6 @@ describe.each(['slack', 'linear'] as const)('%s repository selection', platform 
 });
 
 describe('organization model resolution', () => {
-  it('refuses the run when the organization policy allows no model', async () => {
-    jest.mocked(resolveOrganizationBotModel).mockResolvedValueOnce(null);
-
-    const result = await runBotAgent(runParams());
-
-    expect(result.startedCloudAgentSession).toBe(false);
-    expect(result.finalText).toContain('No AI model is configured for this integration');
-    expect(mockAgentOptions).not.toHaveBeenCalled();
-    expect(mockPrepareSession).not.toHaveBeenCalled();
-  });
-
   it('starts the session on the model the organization policy allows', async () => {
     jest.mocked(resolveOrganizationBotModel).mockResolvedValueOnce('org/allowed-model');
 

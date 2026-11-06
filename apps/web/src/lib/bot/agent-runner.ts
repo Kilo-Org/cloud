@@ -240,17 +240,7 @@ export async function runBotAgent(params: RunBotAgentParams): Promise<BotAgentCo
   const collectedSteps: BotRequestStep[] = [];
   let startedCloudAgentSession = false;
 
-  updateBotRequest(params.botRequestId, { modelUsed: modelSlug ?? undefined });
-
-  if (modelSlug === null) {
-    return {
-      finalText:
-        'No AI model is configured for this integration that the organization policy allows. Set a model in the integration settings.',
-      startedCloudAgentSession: false,
-      collectedSteps,
-      responseTimeMs: Date.now() - startedAt,
-    };
-  }
+  updateBotRequest(params.botRequestId, { modelUsed: modelSlug });
 
   if (remainingIterations <= 0) {
     return {

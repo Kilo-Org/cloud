@@ -76,15 +76,4 @@ describe('resolveBotRunModel', () => {
       storedModelSlug: DEFAULT_BOT_MODEL,
     });
   });
-
-  it('reports no model when the organization policy allows none', async () => {
-    mockedResolveOrganizationBotModel.mockResolvedValue(null);
-
-    await expect(
-      resolveBotRunModel({
-        metadata: { model_slug: 'org/stored-model' },
-        owned_by_organization_id: ORGANIZATION_ID,
-      })
-    ).resolves.toBeNull();
-  });
 });

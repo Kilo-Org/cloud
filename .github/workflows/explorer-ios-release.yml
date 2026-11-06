@@ -262,9 +262,10 @@ jobs:
           if-no-files-found: error
   upload:
     needs: [probe, build]
-    # A build that skipped produced no artifact to upload, and the object the
-    # probe found is the one this job would have written.
-    if: needs.probe.outputs.exists != 'true' && needs.build.result == 'success'
+    # A probe that failed still ran the build, so this job publishes that artifact: only a probe
+    # that found the object skips the upload. `!cancelled()` is a status check, so a failed probe
+    # does not skip the job through an implicit success() on `needs`.
+    if: ${{ !cancelled() && needs.build.result == 'success' && needs.probe.outputs.exists != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:

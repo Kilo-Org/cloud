@@ -118,7 +118,7 @@ const approval = {
   profile,
   nodes: [],
   budgetHash: sha256(readFileSync(manifest.budgetFile)),
-  hardLimitUSD: 50,
+  hardLimitUSD: JSON.parse(readFileSync(manifest.budgetFile, 'utf8')).hardLimitUSD ?? 50,
 };
 const nodes = [];
 for (let index = 0; index < generators.length; index++) {

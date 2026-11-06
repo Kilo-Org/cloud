@@ -13,6 +13,10 @@ concurrency:
 
 jobs:
   deploy:
+    # Guard: this workflow_dispatch is reachable from a fork, and the job
+    # deploys Workers with admin secrets against production Postgres and R2.
+    # Only the canonical repo may run it.
+    if: github.repository == 'Kilo-Org/cloud'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:

@@ -48,7 +48,11 @@ concurrency:
 
 jobs:
   deploy-manual:
-    if: inputs.worker != ''
+    # Guard: this workflow_dispatch is reachable from a fork, and it deploys
+    # Cloudflare Workers using repo secrets. Only the canonical repo may run
+    # it. (Also called as a reusable workflow from deploy-staging.yml, whose
+    # caller job is itself guarded.)
+    if: inputs.worker != '' && github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: ${{ inputs.worker == 'services/cloud-agent-next' && 75 || inputs.worker == 'services/auto-routing-benchmark' && inputs.target_environment == 'production' && 60 || 25 }}
     name: Deploy ${{ inputs.worker }}
@@ -162,7 +166,10 @@ jobs:
           command: ${{ steps.runtime.outputs.command || (inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment)) }} ${{ steps.usage_queues.outputs.queues_required == 'true' && '--experimental-provision=false' || '' }}
 
   detect-changes:
-    if: inputs.worker == '' && inputs.base_sha != ''
+    # Manual dispatch has no `base_sha` (it is a `workflow_call` input only), so
+    # change detection is reachable only through `workflow_call`.
+    # Guard: privileged workflow. Only the canonical repo may run it.
+    if: inputs.worker == '' && inputs.base_sha != '' && github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 5
     outputs:
@@ -350,7 +357,7 @@ jobs:
 
   deploy-changed:
     needs: detect-changes
-    if: needs.detect-changes.outputs.matrix != '[]' && needs.detect-changes.outputs.matrix != ''
+    if: needs.detect-changes.outputs.matrix != '[]' && needs.detect-changes.outputs.matrix != '' && github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: ${{ matrix.worker == 'services/cloud-agent-next' && 75 || matrix.worker == 'services/auto-routing-benchmark' && inputs.target_environment == 'production' && 60 || 25 }}
     environment: ${{ inputs.target_environment }}
@@ -473,7 +480,10 @@ jobs:
 
   deploy-session-ingest:
     needs: detect-changes
-    if: needs.detect-changes.outputs.deploy-cloud-agent-after-session-ingest == 'true'
+    # Guard: this reusable workflow can be invoked from a fork, and the job
+    # deploys to the target environment with inherited repo secrets. Only the
+    # canonical repo may run it.
+    if: github.repository == 'Kilo-Org/cloud' && needs.detect-changes.outputs.deploy-cloud-agent-after-session-ingest == 'true'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 25
     environment: ${{ inputs.target_environment }}
@@ -523,6 +533,7 @@ jobs:
     # GitHub skips a dependent job when a needed job fails: cloud-agent-next never
     # deploys after an unsuccessful session-ingest deployment.
     if: >-
+      github.repository == 'Kilo-Org/cloud' &&
       needs.detect-changes.outputs.deploy-cloud-agent-after-session-ingest == 'true' &&
       needs.deploy-session-ingest.result == 'success'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}

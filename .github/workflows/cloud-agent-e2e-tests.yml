@@ -28,6 +28,10 @@ concurrency:
 
 jobs:
   e2e:
+    # Guard: this workflow_dispatch is reachable from a fork, and the job uses
+    # admin secrets to exercise the production backend. Only the canonical repo
+    # may run it.
+    if: github.repository == 'Kilo-Org/cloud'
     outputs:
       failed: ${{ steps.summarize.outputs.failed }}
       summary: ${{ steps.summarize.outputs.summary }}

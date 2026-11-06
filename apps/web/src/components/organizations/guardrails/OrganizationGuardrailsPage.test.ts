@@ -183,13 +183,18 @@ describe('OrganizationGuardrailsPage output availability', () => {
     });
   }
 
-  it('hides response controls and saved-output warnings without hiding active input or MCP/skill UI', () => {
+  it('hides response controls but keeps saved-output errors and a recovery path visible', () => {
     mockConfig.output.enabled = true;
     mockConfig.invalid_saved_output_detectors = true;
     render();
 
     expect(container.textContent).not.toContain('Response checks');
-    expect(container.textContent).not.toContain("Saved response detector settings can't be read");
+    expect(container.textContent).toContain("Saved response detector settings can't be read");
+    expect(container.textContent).toContain('Responses are withheld');
+    expect(container.textContent).toContain(
+      'Contact Kilo support to restore access to response detector settings.'
+    );
+    expect(container.textContent).not.toContain('Save detector settings');
     expect(container.querySelector('[role="radiogroup"]')).toBeNull();
     expect(switchControl('Enkrypt AI guardrails').getAttribute('aria-checked')).toBe('true');
     expect(switchControl('Prompt injection').getAttribute('aria-checked')).toBe('true');

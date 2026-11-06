@@ -309,7 +309,7 @@ function GuardrailsForm({
         </>
       )}
 
-      {outputAvailable && invalidSavedOutputDetectors && (
+      {invalidSavedOutputDetectors && (
         <Alert variant="destructive">
           <AlertCircle />
           <AlertTitle>Saved response detector settings can&apos;t be read</AlertTitle>
@@ -318,18 +318,22 @@ function GuardrailsForm({
               {saved.output.enabled
                 ? 'Responses are withheld until the response detectors are saved again. '
                 : ''}
-              Choose response detectors below. Your changes save automatically.
+              {outputAvailable
+                ? 'Choose response detectors below. Your changes save automatically.'
+                : 'Contact Kilo support to restore access to response detector settings.'}
             </span>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="w-fit"
-              disabled={issues.size > 0 || isPending}
-              onClick={() => save(draft)}
-            >
-              Save detector settings
-            </Button>
+            {outputAvailable && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="w-fit"
+                disabled={issues.size > 0 || isPending}
+                onClick={() => save(draft)}
+              >
+                Save detector settings
+              </Button>
+            )}
           </AlertDescription>
         </Alert>
       )}

@@ -16,6 +16,7 @@ const wiringSuites = [
   'scripts/changed-dependencies.test.mjs',
   'scripts/build-key-inputs.test.mjs',
   'scripts/affected-workspaces.test.mjs',
+  'scripts/changed-workspaces.test.mjs',
   'scripts/changes-filter-retry.test.mjs',
   'scripts/typecheck-ci.test.mjs',
   'scripts/deployment-workflows.test.mjs',

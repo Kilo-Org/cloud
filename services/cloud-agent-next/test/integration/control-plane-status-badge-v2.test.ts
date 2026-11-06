@@ -238,59 +238,62 @@ describe('sandbox status badge projection (B10)', () => {
     wrapper.close();
   });
 
-  it('reports wrapper versions observed at upgrade and keeps them across eviction', async () => {
-    const provider = createFakeProvider();
-    const { sandboxId, sandbox } = await startOwnedSandbox(provider);
-    const response = await sandbox.fetch(
-      new Request(
-        `https://sandbox.internal/status-stream?ownerId=${USER_ID}&sessionId=workspace_status`,
-        { headers: { Upgrade: 'websocket' } }
-      )
-    );
-    const socket = response.webSocket!;
-    const snapshots: unknown[] = [];
-    socket.addEventListener('message', event => {
-      snapshots.push(JSON.parse(String(event.data)).data);
-    });
-    socket.accept();
-    await waitFor(() => expect(snapshots).toHaveLength(1));
-    expect(SandboxStatusSnapshotSchema.parse(snapshots[0]).runtime?.kiloCliVersion).toBeNull();
-    const launchEnv = provider.launchEnvs[0]!;
-    const wrapper = await FakeWrapper.connect({
-      sandboxId,
-      credential: launchEnv.SANDBOX_CONTROL_CREDENTIAL!,
-      kiloCliVersion: '7.4.20',
-      wrapperVersion: '2.4.0',
-    });
-    expect(
-      await wrapper.hello({
-        wrapperId: WRAPPER_ID,
-        allocationId: launchEnv.CONTROL_PLANE_ALLOCATION_ID!,
-      })
-    ).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
-    await waitFor(async () => (await sandbox.getAllocationState()).kind === 'connected');
+  it.each(['7.4.20', '0.0.0-v2-25'])(
+    'reports CLI version %s and keeps it across eviction',
+    async kiloCliVersion => {
+      const provider = createFakeProvider();
+      const { sandboxId, sandbox } = await startOwnedSandbox(provider);
+      const response = await sandbox.fetch(
+        new Request(
+          `https://sandbox.internal/status-stream?ownerId=${USER_ID}&sessionId=workspace_status`,
+          { headers: { Upgrade: 'websocket' } }
+        )
+      );
+      const socket = response.webSocket!;
+      const snapshots: unknown[] = [];
+      socket.addEventListener('message', event => {
+        snapshots.push(JSON.parse(String(event.data)).data);
+      });
+      socket.accept();
+      await waitFor(() => expect(snapshots).toHaveLength(1));
+      expect(SandboxStatusSnapshotSchema.parse(snapshots[0]).runtime?.kiloCliVersion).toBeNull();
+      const launchEnv = provider.launchEnvs[0]!;
+      const wrapper = await FakeWrapper.connect({
+        sandboxId,
+        credential: launchEnv.SANDBOX_CONTROL_CREDENTIAL!,
+        kiloCliVersion,
+        wrapperVersion: '2.4.0',
+      });
+      expect(
+        await wrapper.hello({
+          wrapperId: WRAPPER_ID,
+          allocationId: launchEnv.CONTROL_PLANE_ALLOCATION_ID!,
+        })
+      ).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
+      await waitFor(async () => (await sandbox.getAllocationState()).kind === 'connected');
 
-    const runtime = {
-      sandboxType: 'containers-standard-3',
-      kiloCliVersion: '7.4.20',
-      wrapperVersion: '2.4.0',
-      startedAt: null,
-      stoppedAt: null,
-    };
-    expect(SandboxStatusSnapshotSchema.parse(await sandbox.getStatusSnapshot()).runtime).toEqual(
-      runtime
-    );
-    await waitFor(() => {
-      expect(SandboxStatusSnapshotSchema.parse(snapshots.at(-1)).runtime).toEqual(runtime);
-    });
+      const runtime = {
+        sandboxType: 'containers-standard-3',
+        kiloCliVersion,
+        wrapperVersion: '2.4.0',
+        startedAt: null,
+        stoppedAt: null,
+      };
+      expect(SandboxStatusSnapshotSchema.parse(await sandbox.getStatusSnapshot()).runtime).toEqual(
+        runtime
+      );
+      await waitFor(() => {
+        expect(SandboxStatusSnapshotSchema.parse(snapshots.at(-1)).runtime).toEqual(runtime);
+      });
 
-    await evictAllDurableObjects();
-    expect(SandboxStatusSnapshotSchema.parse(await sandbox.getStatusSnapshot()).runtime).toEqual(
-      runtime
-    );
-    wrapper.close();
-    socket.close();
-  });
+      await evictAllDurableObjects();
+      expect(SandboxStatusSnapshotSchema.parse(await sandbox.getStatusSnapshot()).runtime).toEqual(
+        runtime
+      );
+      wrapper.close();
+      socket.close();
+    }
+  );
 
   it('resets observed versions for a new allocation and tolerates a wrapper without headers', async () => {
     const provider = createFakeProvider();

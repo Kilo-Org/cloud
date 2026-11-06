@@ -12,7 +12,7 @@ export async function readKiloCliVersion(cli: string): Promise<string | null> {
       killSignal: 'SIGKILL',
       maxBuffer: 4_096,
     });
-    return safeSandboxRuntimeVersion(stdout.trim());
+    return safeSandboxRuntimeVersion(stdout.trim().replace(/^kilo2 v/, ''));
   } catch {
     return null;
   }

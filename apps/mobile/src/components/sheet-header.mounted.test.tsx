@@ -292,6 +292,38 @@ describe('SheetHeader', () => {
     renderer.unmount();
   });
 
+  it('paints a disabled Done in the inactive ink instead of fading the accent', async () => {
+    const props = {
+      title: 'report.pdf',
+      onDone: () => undefined,
+      onCancel: () => undefined,
+    };
+    const renderer = await mount({ ...props, doneDisabled: true });
+
+    const done = pressablesByLabel(renderer.root, 'Done')[0];
+    // Half-opacity over the accent keeps the dark scheme's saturated gold
+    // saturated, so the waiting control still read as the sheet's live action.
+    expect(done?.props.className).not.toContain('disabled:opacity-50');
+
+    const disabledInk = String(
+      renderer.root.findByProps({ children: 'Done' }).props.className
+    ).split(' ');
+    expect(disabledInk).toContain('text-primary-disabled');
+    expect(disabledInk).not.toContain('text-primary');
+
+    await act(async () => {
+      await Promise.resolve();
+      renderer.update(createElement(SheetHeader, { ...props, doneDisabled: false }));
+    });
+    const enabledInk = String(
+      renderer.root.findByProps({ children: 'Done' }).props.className
+    ).split(' ');
+    expect(enabledInk).toContain('text-primary');
+    expect(enabledInk).not.toContain('text-primary-disabled');
+
+    renderer.unmount();
+  });
+
   it('labels the leading control with cancelLabel so Back is not announced as Cancel', async () => {
     const renderer = await mount({
       title: 'report.pdf',

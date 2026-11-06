@@ -52,6 +52,7 @@ export function SheetHeader({
   const insets = useScreenInsets();
   const resolvedDoneLabel = doneLabel ?? t('common.done');
   const resolvedCancelLabel = cancelLabel ?? t('common.cancel');
+  const doneUnavailable = disabled || doneDisabled;
   // The top clearance comes from the same rule (and the same inputs) as the
   // detent cap, so the header and the sheet edge cannot disagree about who
   // clears the status bar. It is known before the first frame, so the header
@@ -125,14 +126,22 @@ export function SheetHeader({
               neutral label. Both keep the same hit box. */}
           <Pressable
             onPress={onDone}
-            disabled={disabled || doneDisabled}
+            disabled={doneUnavailable}
             hitSlop={8}
             accessibilityRole="button"
             accessibilityLabel={resolvedDoneLabel}
-            className="ms-auto min-h-[48px] min-w-[48px] shrink-0 items-center justify-center rounded-md px-2 py-2 active:opacity-70 disabled:opacity-50 will-change-pressable"
+            className="ms-auto min-h-[48px] min-w-[48px] shrink-0 items-center justify-center rounded-md px-2 py-2 active:opacity-70 will-change-pressable"
           >
+            {/* A wait takes the palette's disabled primary ink, the same pair a
+                disabled filled control paints. Fading the enabled accent
+                instead leaves the dark scheme's saturated gold dimmed but
+                still saturated, so the control read as tappable beside the
+                muted light one. */}
             <Text
-              className="text-center text-base font-semibold text-primary"
+              className={cn(
+                'text-center text-base font-semibold',
+                doneUnavailable ? 'text-primary-disabled' : 'text-primary'
+              )}
               numberOfLines={1}
               ellipsizeMode="clip"
             >

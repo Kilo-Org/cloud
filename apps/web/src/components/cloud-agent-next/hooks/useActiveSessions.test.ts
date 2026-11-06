@@ -160,6 +160,71 @@ describe('useActiveSessions live payload helpers', () => {
     ]);
   });
 
+  it('keeps another connection row a heartbeat of the aggregate omits', () => {
+    const sessions = applyActiveSessionsHeartbeat(
+      [
+        { id: 'root-1', status: 'busy', title: 'Owned by conn-1', connectionId: 'conn-1' },
+        { id: 'root-2', status: 'busy', title: 'Owned by conn-2', connectionId: 'conn-2' },
+      ],
+      {
+        connectionId: 'conn-2',
+        sessions: [
+          { id: 'root-2', status: 'idle', title: 'Owned by conn-2', connectionId: 'conn-2' },
+        ],
+      }
+    );
+
+    expect(sessions).toEqual([
+      { id: 'root-2', status: 'idle', title: 'Owned by conn-2', connectionId: 'conn-2' },
+      { id: 'root-1', status: 'busy', title: 'Owned by conn-1', connectionId: 'conn-1' },
+    ]);
+  });
+
+  it('attributes a cached live row from a later poll', () => {
+    const afterHeartbeat = applyActiveSessionsHeartbeat([], {
+      connectionId: 'conn-1',
+      sessions: [{ id: 'root-1', status: 'busy', title: 'Fresh', connectionId: 'conn-1' }],
+    });
+    expect(afterHeartbeat[0]?.organizationId).toBeUndefined();
+
+    const afterPoll = applyActiveSessionsList(afterHeartbeat, [
+      {
+        id: 'root-1',
+        status: 'busy',
+        title: 'Fresh',
+        connectionId: 'conn-1',
+        organizationId: 'org-1',
+      },
+    ]);
+
+    expect(afterPoll).toEqual([
+      {
+        id: 'root-1',
+        status: 'busy',
+        title: 'Fresh',
+        connectionId: 'conn-1',
+        organizationId: 'org-1',
+      },
+    ]);
+  });
+
+  it('takes the polled scope over a stale cached one', () => {
+    const sessions = applyActiveSessionsList(
+      [
+        {
+          id: 'root-1',
+          status: 'busy',
+          title: 'Row',
+          connectionId: 'conn-1',
+          organizationId: 'org-1',
+        },
+      ],
+      [{ id: 'root-1', status: 'busy', title: 'Row', connectionId: 'conn-1', organizationId: null }]
+    );
+
+    expect(sessions[0]?.organizationId).toBeNull();
+  });
+
   it('renders a row another connection takes over once', () => {
     const sessions = applyActiveSessionsHeartbeat(
       [
@@ -194,7 +259,6 @@ describe('useActiveSessions live payload helpers', () => {
           createdOnPlatform: 'cli',
           organizationId: 'org-1',
         },
-        { id: 'root-3', status: 'busy', title: 'Gone', connectionId: 'conn-1' },
       ],
       [{ id: 'root-1', status: 'busy', title: 'Stale CLI title', connectionId: 'conn-1' }]
     );
@@ -206,6 +270,33 @@ describe('useActiveSessions live payload helpers', () => {
         title: 'DB title',
         connectionId: 'conn-1',
         createdOnPlatform: 'cli',
+        organizationId: 'org-1',
+      },
+    ]);
+  });
+
+  it('keeps a cached row the snapshot omits', () => {
+    const sessions = applyActiveSessionsList(
+      [
+        { id: 'root-1', status: 'idle', title: 'Listed', connectionId: 'conn-1' },
+        {
+          id: 'root-2',
+          status: 'busy',
+          title: 'Only on the socket',
+          connectionId: 'conn-2',
+          organizationId: 'org-1',
+        },
+      ],
+      [{ id: 'root-1', status: 'busy', title: 'Stale CLI title', connectionId: 'conn-1' }]
+    );
+
+    expect(sessions).toEqual([
+      { id: 'root-1', status: 'busy', title: 'Listed', connectionId: 'conn-1' },
+      {
+        id: 'root-2',
+        status: 'busy',
+        title: 'Only on the socket',
+        connectionId: 'conn-2',
         organizationId: 'org-1',
       },
     ]);

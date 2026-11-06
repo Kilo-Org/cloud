@@ -92,6 +92,10 @@ const ENRICHED_FIELDS = [
  * the wire entirely. Dropping them on each heartbeat would also drop a live row
  * out of a filtered sidebar until the next poll refetch. A brand-new id still
  * shows exactly what the connection reported.
+ *
+ * `organizationId` is the exception: a row the query has since attributed must
+ * take the query's value. A WebSocket row never carries one, so the fallback
+ * below only applies to an already-attributed cache entry.
  */
 function mergeCachedEnrichment(
   cached: ActiveSession | undefined,
@@ -104,7 +108,7 @@ function mergeCachedEnrichment(
     // `null` is meaningful here: it is the personal scope, which the wire
     // cannot express, so only an absent value falls back to the incoming row.
     organizationId:
-      cached.organizationId !== undefined ? cached.organizationId : incoming.organizationId,
+      incoming.organizationId !== undefined ? incoming.organizationId : cached.organizationId,
   };
   for (const field of ENRICHED_FIELDS) {
     const value = cached[field] !== undefined ? cached[field] : incoming[field];
@@ -123,6 +127,11 @@ function mergeCachedEnrichment(
  * A row another connection now owns is replaced in place rather than kept
  * alongside the reported one: the connection list attributes each session to
  * one connection, so a takeover must not render it twice.
+ *
+ * Only a row the heartbeating connection owns is dropped when the payload omits
+ * it. A row another connection owns is kept even when its id is absent: the
+ * payload is an aggregate that can lag a connection's own report, and a dropped
+ * row is invisible to a scoped sidebar until the next poll attributes it again.
  */
 export function applyActiveSessionsHeartbeat(
   currentSessions: ActiveSession[],
@@ -133,7 +142,7 @@ export function applyActiveSessionsHeartbeat(
   return [
     ...payload.sessions.map(session => mergeCachedEnrichment(cachedById.get(session.id), session)),
     ...currentSessions.filter(
-      session => session.connectionId !== payload.connectionId && !reported.has(session.id)
+      session => !reported.has(session.id) && session.connectionId !== payload.connectionId
     ),
   ];
 }
@@ -142,15 +151,24 @@ export function applyActiveSessionsHeartbeat(
  * Merge the full connection snapshot into the cached list. The payload already
  * carries every connection's rows in the server's order, so only the enriched
  * fields the wire lacks have to be carried over.
+ *
+ * A cached row the snapshot omits keeps its place: the snapshot is one
+ * connection event, not the authoritative set, and dropping the row would hide
+ * it from a scoped sidebar until the next poll attributes it.
  */
 export function applyActiveSessionsList(
   currentSessions: ActiveSession[],
   incomingSessions: ActiveSession[]
 ): ActiveSession[] {
   const cachedById = new Map(currentSessions.map(session => [session.id, session]));
-  return incomingSessions.map(session =>
+  const incomingById = new Map(incomingSessions.map(session => [session.id, session]));
+  const merged = incomingSessions.map(session =>
     mergeCachedEnrichment(cachedById.get(session.id), session)
   );
+  for (const session of currentSessions) {
+    if (!incomingById.has(session.id)) merged.push(session);
+  }
+  return merged;
 }
 
 export function removeActiveSessionsForConnection(

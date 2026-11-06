@@ -16,6 +16,7 @@ const {
   createCliSessionMock,
   deleteCliSessionMock,
   mergeProfileConfigurationMock,
+  getBuiltinAgentSettingsMock,
   organizationMembershipLimitMock,
   assertKiloModelAvailableMock,
   getSandboxAllocationCandidatesMock,
@@ -26,6 +27,7 @@ const {
   createCliSessionMock: vi.fn().mockResolvedValue({ created: true }),
   deleteCliSessionMock: vi.fn().mockResolvedValue({ deleted: true }),
   mergeProfileConfigurationMock: vi.fn(),
+  getBuiltinAgentSettingsMock: vi.fn().mockResolvedValue({}),
   organizationMembershipLimitMock: vi.fn(),
   assertKiloModelAvailableMock: vi.fn(),
   getSandboxAllocationCandidatesMock: vi.fn(),
@@ -38,6 +40,7 @@ vi.mock('@kilocode/cloud-agent-profile', async importActual => {
   return {
     ...actual,
     mergeProfileConfiguration: mergeProfileConfigurationMock,
+    getBuiltinAgentSettings: getBuiltinAgentSettingsMock,
     getSandboxAllocationCandidates: getSandboxAllocationCandidatesMock,
     loadEnvironmentForSession: loadEnvironmentForSessionMock,
   };
@@ -249,6 +252,7 @@ describe('sandbox selection Worker API', () => {
     selectControlPlaneSandboxMock.mockReset();
     organizationMembershipLimitMock.mockResolvedValue([{ id: 'membership' }]);
     mergeProfileConfigurationMock.mockResolvedValue({});
+    getBuiltinAgentSettingsMock.mockResolvedValue({});
     assertKiloModelAvailableMock.mockResolvedValue(undefined);
     getSandboxAllocationCandidatesMock.mockResolvedValue({});
   });

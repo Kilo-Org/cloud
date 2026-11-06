@@ -162,6 +162,72 @@ export const RuntimeAgentsSchema = z
 
 export type RuntimeAgentInput = z.infer<typeof RuntimeAgentSchema>;
 
+/**
+ * Built-in CLI agents whose model or visibility a Cloud Agent user may tune.
+ * Keep this list in sync with `CLOUD_AGENT_BUILTIN_AGENTS` in
+ * `@kilocode/cloud-agent-profile`; a parity test asserts they match.
+ */
+export const RUNTIME_BUILTIN_AGENT_SLUGS = [
+  'code',
+  'plan',
+  'debug',
+  'orchestrator',
+  'ask',
+  'explore',
+  'compaction',
+] as const;
+
+/** Agents whose visibility the user may turn off. `code` is the session default. */
+export const RUNTIME_DISABLEABLE_BUILTIN_AGENT_SLUGS = [
+  'plan',
+  'debug',
+  'orchestrator',
+  'ask',
+] as const;
+
+const RuntimeBuiltinAgentOverrideSchema = z
+  .strictObject({
+    model: z
+      .string()
+      .trim()
+      .min(1)
+      .max(RuntimeProfileLimits.MAX_RUNTIME_AGENT_MODEL_LENGTH)
+      .nullable()
+      .optional(),
+    variant: z.string().trim().min(1).max(50).optional(),
+    disable: z.boolean().optional(),
+  })
+  .refine(override => !override.variant || typeof override.model === 'string', {
+    message: 'variant requires a model — variants are model-specific',
+    path: ['variant'],
+  });
+
+/**
+ * User-scoped overrides for CLI built-in agents. Unlike `runtimeAgents`, these
+ * entries target existing agents and may be disabled rather than replacing
+ * their prompt. Materialized into `KILO_CONFIG_CONTENT.agent.<slug>` beside
+ * custom runtime agents.
+ */
+export const RuntimeBuiltinAgentsSchema = z
+  .partialRecord(z.enum(RUNTIME_BUILTIN_AGENT_SLUGS), RuntimeBuiltinAgentOverrideSchema)
+  .superRefine((agents, ctx) => {
+    for (const [slug, override] of Object.entries(agents)) {
+      if (
+        override.disable === true &&
+        !RUNTIME_DISABLEABLE_BUILTIN_AGENT_SLUGS.includes(
+          slug as (typeof RUNTIME_DISABLEABLE_BUILTIN_AGENT_SLUGS)[number]
+        )
+      ) {
+        ctx.addIssue({
+          code: 'custom',
+          path: [slug, 'disable'],
+          message: 'This built-in agent cannot be disabled',
+        });
+      }
+    }
+  });
+export type RuntimeBuiltinAgents = z.infer<typeof RuntimeBuiltinAgentsSchema>;
+
 export const RuntimeKiloCommandSchema = z.object({
   name: z
     .string()

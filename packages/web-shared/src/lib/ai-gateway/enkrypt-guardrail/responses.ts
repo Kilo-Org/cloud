@@ -44,9 +44,15 @@ type GuardrailRejection = {
   headers: Record<string, string>;
 };
 
+const REVERT_GUIDANCE =
+  ' To change it, use Revert to here under your message (or /undo in the TUI).';
+
 /**
  * A block is final, so clients are told not to retry, and an unavailable guardrail is retried
- * automatically only after a transient failure.
+ * automatically only after a transient failure. A blocked request stays in the conversation, so the
+ * message points at the client's revert affordance, which is how the user edits it and sends a
+ * different one. A blocked response needs no such hint: its reason already says to rephrase the
+ * request.
  */
 function guardrailRejection(
   verdict: EnkryptGuardrailVerdict,
@@ -56,7 +62,7 @@ function guardrailRejection(
   if (verdict.action === 'block') {
     return {
       error: {
-        message: verdict.message,
+        message: guardrail === 'input' ? `${verdict.message}${REVERT_GUIDANCE}` : verdict.message,
         openAiType: 'invalid_request_error',
         openAiCode: ProxyErrorType.guardrail_blocked,
         anthropicType: 'invalid_request_error',

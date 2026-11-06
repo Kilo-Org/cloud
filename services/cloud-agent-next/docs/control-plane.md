@@ -495,8 +495,13 @@ These keep their current owners and evidence; the rewrite ports them, it does no
   obtain a runtime authorization fence. Physical replacement retires scope material through the
   allocation hooks and rebinds preparing routes before sending credentials to the new wrapper,
   without resetting attempt deadlines or starting a sandbox merely to obtain credentials.
-- Worktree deletion reports an incomplete, retryable result when the provider has not confirmed the
-  stop or cleanup (Shared Worktrees rule 13).
+- Worktree deletion commits the authoritative ingest content removal before runtime cleanup, then
+  attempts every journaled runtime location. Missing runtime history or an unconfirmed provider
+  stop returns the logical deletion as successful with `cleanup: 'pending'`, retains the deletion
+  journal and runtime locations and writes no completion tombstone. A retry of the same worktree
+  resumes that journal; only confirmed cleanup of every location writes the tombstone and returns
+  `cleanup: 'complete'`. Pending cleanup is explicit and requires a retry; no background reconciler
+  is implied.
 
 ### Environment snapshots
 
@@ -1085,12 +1090,24 @@ admit no work and open no billing interval, so a sleeping workspace keeps its st
 later prompt still wakes it through the normal Cloud path. A workspace reports one compute rate
 from its sandbox SKU, never one per hosted session.
 
-Whole-workspace deletion is idempotent and runs over the existing journal; a retry resumes from the
-recorded manifest. It fences new prompts and session creation, interrupts active child work and
-removes every hosted root and descendant route, transcript and workspace file, including the last
-root, before recording a content-free tombstone. `getHostedWorkspaceStatus` reports journal progress
-while a deletion is in flight. Removing a workspace from one IDE's Agent Manager is a client-local
-action: it performs no Cloud mutation, and only `deleteWorktree` destroys Cloud state.
+Whole-workspace deletion (`deleteWorktree`) is idempotent and runs over the existing worktree
+journal; a retry resumes from the recorded manifest and does not use an operation-key ledger. It
+fences new prompts and session creation, interrupts active child work and removes every hosted root
+and descendant route, transcript and workspace file, including the last root, before recording a
+content-free tombstone. The ingest content delete commits before runtime cleanup; if cleanup or the
+completion write fails after that commit, the mutation returns the logical deletion as successful
+with `cleanup: 'pending'` and retains the worktree journal and runtime locations. A retry of the
+same worktree resumes that journal. A completed deletion returns `cleanup: 'complete'`.
+
+Hosted session deletion (`deleteHostedWorkspaceSession`) is the operation-key-ledger path. Its
+ingest delete commits before Session DO teardown; if teardown fails after that commit, it returns
+the logical deletion as successful with `cleanup: 'pending'` and leaves the operation ledger
+`reconcile_pending`. A retry with the same operation key resumes the idempotent teardown and settles
+the ledger. A completed deletion returns `cleanup: 'complete'`. For both paths, authorization and
+identity failures remain hard failures and are never downgraded to pending cleanup.
+`getHostedWorkspaceStatus` reports journal progress while a deletion is in flight. Removing a
+workspace from one IDE's Agent Manager is a client-local action: it performs no Cloud mutation, and
+only `deleteWorktree` destroys Cloud state.
 
 Bootstrap → Worker (HTTPS on the `WORKER_URL` host, `downloaded` mode only): `GET` one payload with
 the artifact grant, and `POST` one startup-failure report with the wrapper launch credential. The
@@ -1152,9 +1169,9 @@ remain decisive. No inspected validator enforces task-branch names or parses rec
 | GitHub `kgh2` | HTTPS on `api.github.com`, `github.com`, `uploads.github.com`, and `npm.pkg.github.com`; default port only. No broker method, repository-path, or body restriction. |
 | GitHub operations | REST/PR, GraphQL, identity, upload/npm, Git read/write, LFS, archive requests, and runner operations pass destination validation. Redirects still need separate admission. |
 | GitHub credential selection | Native installation and selected-user sources retain their current identity pins and renewal checks. User-source failure never falls back to installation authority. Installation tokens select repository names but do not narrow App permissions, including organization-level permissions. Selected-user tokens have no broker-side cross-repository path fence. |
-| Legacy GitHub `kgh1` | Repository-bound refs, upload/receive-pack, LFS batch/verify, and enumerated PR/review/comment operations retain the narrower legacy validator. |
+| Legacy GitHub `kgh1` | Legacy unbound capabilities no longer redeem; the credential broker accepts only container-bound `kgh2` values. |
 | GitLab `kgl2` | Exact configured HTTPS origin and base path, including configured non-default ports. Project REST accepts the encoded project path; numeric selectors require the matching project-source capability. Matching REST subpaths have no method restriction. |
-| GitLab Git/LFS | Enumerated refs, upload/receive-pack, batch, locks, verify, and unlock paths. Modern validation does not constrain their methods or queries. Legacy `kgl1` keeps narrower Git/LFS and review operations. |
+| GitLab Git/LFS | Enumerated refs, upload/receive-pack, batch, locks, verify, and unlock paths. Modern validation does not constrain their methods or queries. Legacy unbound capabilities no longer redeem. |
 | Bitbucket `kbb1` | Exact Git/API origins and repository path boundaries. No method/body policy. Encoded slashes remain valid in query data, not paths. Credential-source and repository identity fences remain unchanged. |
 | Carriers | Canonical Basic uses `x-access-token`, `oauth2`, or `x-token-auth` for its provider. API `Bearer`/`token` supports existing casing and whitespace; GitLab permits only `Bearer` or `PRIVATE-TOKEN`. Matching duplicate GitLab carriers redeem once. |
 | Header replacement | Managed requests replace `Authorization` and use manual redirects. GitLab replaces both authorization surfaces. Mixed managed and caller-owned carriers fail closed before resolution or forwarding. |
@@ -1167,7 +1184,7 @@ remain decisive. No inspected validator enforces task-branch names or parses rec
 | Case | Existing decision |
 |---|---|
 | Managed credentials | Unsupported versions/carriers, wrong Basic usernames, malformed aliases, and conflicting managed carriers fail closed. Capability expiry, container binding, source replacement, and revocation remain with their current owners. |
-| GitHub destinations | Non-HTTPS URLs, URL credentials/fragments, non-default ports, raw IPs, and hosts outside the four-host set cannot redeem `kgh2`. Legacy `kgh1` additionally denies identity, GraphQL, upload/npm, runner, and non-enumerated API paths. |
+| GitHub destinations | Non-HTTPS URLs, URL credentials/fragments, non-default ports, raw IPs, and hosts outside the four-host set cannot redeem `kgh2`. Legacy `kgh1` values fail closed with `invalid_capability`. |
 | GitLab | Identity, GraphQL, unrelated projects, origin/base-path escape, traversal, and non-enumerated web/Git paths cannot redeem managed credentials. |
 | Bitbucket | Other repositories, origin changes, traversal, and encoded path slashes cannot redeem managed credentials. |
 | Retry exclusions | Push/discovery for receive-pack, LFS, API requests, 403 responses, and responses without an observable reset never enter the GitHub retry loop. |
@@ -1182,7 +1199,7 @@ BYOC credential lookup and JWKS verification run outside the lifecycle queue. Cu
 admission, alias resolution, bounded capability renewal, and persistence remain one serial operation.
 Already admitted requests may finish after retirement. Later requests must pass admission again.
 
-Cloudflare retains direct encrypted capability compatibility, including supported legacy versions.
+Cloudflare retains direct encrypted capability compatibility with the current container-bound form.
 Vercel accepts aliases only and always requires verified provider identity. Both use the same
 carrier classifier and forwarding pipeline. Cloudflare resolves aliases once and forwards the
 resolved capability without re-entering admission. Native restricted-egress rules still apply

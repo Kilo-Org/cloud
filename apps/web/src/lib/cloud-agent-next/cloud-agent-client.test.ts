@@ -1142,13 +1142,14 @@ describe('CloudAgentNextClient.deleteWorktree', () => {
       };
       const mutate = jest
         .fn<(request: DeleteWorktreeInput) => Promise<DeleteWorktreeOutput>>()
-        .mockResolvedValue({ success: true, deletedSessionIds });
+        .mockResolvedValue({ success: true, deletedSessionIds, cleanup: 'complete' });
       mockCreateTRPCClient.mockReturnValueOnce({ deleteWorktree: { mutate } });
       const client = new CloudAgentNextClient('auth-token');
 
       await expect(client.deleteWorktree(input)).resolves.toEqual({
         success: true,
         deletedSessionIds,
+        cleanup: 'complete',
       });
       expect(mutate).toHaveBeenCalledWith(input);
       expect(mockHttpLink.mock.calls[0]?.[0].headers()).toEqual({
@@ -1157,6 +1158,39 @@ describe('CloudAgentNextClient.deleteWorktree', () => {
       });
     }
   );
+
+  it('forwards onlyIfSoleSessionId to the Worker', async () => {
+    const input: DeleteWorktreeInput = {
+      worktreeId,
+      onlyIfSoleSessionId: 'ses_12345678901234567890123456',
+    };
+    const mutate = jest
+      .fn<(request: DeleteWorktreeInput) => Promise<DeleteWorktreeOutput>>()
+      .mockResolvedValue({ success: true, deletedSessionIds, cleanup: 'complete' });
+    mockCreateTRPCClient.mockReturnValueOnce({ deleteWorktree: { mutate } });
+
+    await expect(new CloudAgentNextClient('auth-token').deleteWorktree(input)).resolves.toEqual({
+      success: true,
+      deletedSessionIds,
+      cleanup: 'complete',
+    });
+    expect(mutate).toHaveBeenCalledWith(input);
+  });
+
+  it('preserves pending cleanup from the Worker', async () => {
+    const mutate = jest
+      .fn<(request: DeleteWorktreeInput) => Promise<DeleteWorktreeOutput>>()
+      .mockResolvedValue({ success: true, deletedSessionIds, cleanup: 'pending' });
+    mockCreateTRPCClient.mockReturnValueOnce({ deleteWorktree: { mutate } });
+
+    await expect(
+      new CloudAgentNextClient('auth-token').deleteWorktree({ worktreeId })
+    ).resolves.toEqual({
+      success: true,
+      deletedSessionIds,
+      cleanup: 'pending',
+    });
+  });
 
   it.each([
     ['CONFLICT', 409],
@@ -1207,6 +1241,7 @@ describe('CloudAgentNextClient.deleteWorktree', () => {
     { success: false, deletedSessionIds: [] },
     { success: true },
     { success: true, deletedSessionIds: [42] },
+    { success: true, deletedSessionIds: [], cleanup: 'partial' },
   ])('rejects an unconfirmed or malformed cleanup result: %p', async output => {
     mockCreateTRPCClient.mockReturnValueOnce({
       deleteWorktree: { mutate: jest.fn(async () => output) },
@@ -1231,7 +1266,28 @@ describe('CloudAgentNextClient.deleteWorktree', () => {
     ).resolves.toEqual({
       success: true,
       deletedSessionIds: [],
+      cleanup: 'complete',
     });
+  });
+});
+
+describe('CloudAgentNextClient.deleteHostedWorkspaceSession', () => {
+  const workspaceId = 'worktree_12345678-1234-4234-9234-123456789abc';
+  const sessionId = 'workspace_12345678-1234-4234-9234-123456789abc';
+  const operationKey = '12345678-1234-4234-9234-123456789abc';
+
+  it('forwards the operation key and preserves pending cleanup', async () => {
+    const input = { workspaceId, sessionId, operationKey };
+    const output = { success: true as const, ...input, cleanup: 'pending' as const };
+    const mutate = jest
+      .fn<(request: typeof input) => Promise<typeof output>>()
+      .mockResolvedValue(output);
+    mockCreateTRPCClient.mockReturnValueOnce({ deleteHostedWorkspaceSession: { mutate } });
+
+    await expect(
+      new CloudAgentNextClient('auth-token').deleteHostedWorkspaceSession(input)
+    ).resolves.toEqual(output);
+    expect(mutate).toHaveBeenCalledWith(input);
   });
 });
 

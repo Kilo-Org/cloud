@@ -279,6 +279,10 @@ for (const [file, name, command, condition] of [
   });
 }
 
+// The explorer release skips every build step when its probe found the
+// immutable artifact, so its guards carry that condition in front.
+const explorerSkip = "needs.probe.outputs.exists != 'true'";
+
 test('one job saves the compiler plugin cache and every reader restores it', () => {
   const savers = [];
   const holders = [
@@ -347,7 +351,7 @@ const harnessBuildGuards = [
   [
     'explorer-ios-release.yml',
     'build',
-    "hashFiles('.github/actions/harness-sdk-build/action.yml') != ''",
+    `${explorerSkip} && hashFiles('.github/actions/harness-sdk-build/action.yml') != ''`,
   ],
 ];
 
@@ -377,8 +381,70 @@ test('every consumer job restores or builds the harness SDK through the action',
       );
     } else {
       assert.equal(plain.length, 1);
-      assert.equal(plain[0].if, "hashFiles('.github/actions/harness-sdk-build/action.yml') == ''");
+      assert.equal(
+        plain[0].if,
+        `${explorerSkip} && hashFiles('.github/actions/harness-sdk-build/action.yml') == ''`
+      );
     }
+  }
+});
+
+// The probe decides whether the build is needed, so every step after the input
+// validation carries the skip condition. An ungated toolchain step would fail a
+// skipped dispatch: a setup-node cache save needs the dependency tree that the
+// skipped install never creates.
+test('explorer-ios-release gates every build step except input validation', () => {
+  const steps = workflows['explorer-ios-release.yml'].jobs.build.steps;
+  const ungated = steps
+    .filter(step => !(step.if ?? '').startsWith(explorerSkip))
+    // Action steps carry no `name`, so fall back to `uses`: an ungated action
+    // must be identifiable in the failure message.
+    .map(step => step.name ?? step.uses);
+  assert.deepEqual(ungated, ['Validate inputs']);
+  assert.equal(steps[0].name, 'Validate inputs', 'validation runs before the gate');
+  assert.equal(steps[0].if, undefined, 'validation stays unconditional');
+});
+
+// A probe with no answer must cost the build and nothing else. Without the
+// tolerated auth failure the whole run ends `failure` after a build and upload
+// that succeeded, so a client waiting on the run reads a published artifact as a
+// broken build. A broken identity still reports itself in `upload`, which mints
+// the same identity.
+test('explorer-ios-release records a probe failure as no answer', () => {
+  const probe = workflows['explorer-ios-release.yml'].jobs.probe;
+  const auth = probe.steps.find(step => step.uses?.startsWith('google-github-actions/auth@'));
+  assert.equal(auth['continue-on-error'], true, 'a refused identity must not fail the run');
+  assert.equal(auth.with.create_credentials_file, false, 'the probe needs no credentials file');
+  const metadata = probe.steps.find(step => step.id === 'metadata');
+  assert.match(
+    metadata.run,
+    /-z "\$\{ACCESS_TOKEN:-\}"[\s\S]*echo 'exists=false'/,
+    'a lookup without a token still answers exists=false'
+  );
+  assert.equal(probe.outputs.exists, '${{ steps.metadata.outputs.exists }}');
+});
+
+// A probe on one object and an upload to another would never agree: a probe
+// pointed at a key that still exists would skip a build the upload cannot reuse.
+test('explorer-ios-release names its artifact object once', () => {
+  const workflow = workflows['explorer-ios-release.yml'];
+  assert.match(workflow.env.ARTIFACT_BUCKET, /^[a-z0-9-]+$/);
+  assert.match(
+    workflow.env.ARTIFACT_OBJECT,
+    /^explorers%2Fios%2F\$\{\{ inputs\.fingerprint \}\}\.app\.tar\.gz$/,
+    'the object name stays percent-encoded and keyed by the build key'
+  );
+  const [probe, upload] = ['probe', 'upload'].map(name =>
+    workflow.jobs[name].steps
+      .map(step => step.run ?? '')
+      .filter(script => script.includes('storage.googleapis.com'))
+  );
+  assert.equal(probe.length, 1);
+  assert.equal(upload.length, 1);
+  for (const script of [probe[0], upload[0]]) {
+    assert.match(script, /\/b\/\$\{ARTIFACT_BUCKET\}\//);
+    assert.match(script, /ARTIFACT_OBJECT/);
+    assert.doesNotMatch(script, /kwf-planner|explorers%2F/);
   }
 });
 

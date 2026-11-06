@@ -236,9 +236,8 @@ const ingestVersionSchema = z.coerce.number().int().nonnegative().catch(0);
 api.post('/session', zodJsonValidator(createSessionSchema), async c => {
   const body = c.req.valid('json');
 
-  // Require available ingest storage before admitting the id, so create never
-  // answers with a session the ingest plane will not accept. A probe error
-  // keeps create available; ingest reports its own state.
+  // Reject known retired ids before inserting. If this initial probe fails,
+  // the required post-insert tombstone check must still confirm availability.
   try {
     const retired = await withDORetry(
       () =>
@@ -289,6 +288,43 @@ api.post('/session', zodJsonValidator(createSessionSchema), async c => {
   }
 
   const { createdRow } = result;
+
+  // Worktree deletion writes this tombstone before deleting rows. Checking after
+  // insertion prevents a still-running runtime from recreating deleted history.
+  let ingestDeleted: boolean;
+  try {
+    ingestDeleted = await withDORetry(
+      () => getSessionIngestDO(c.env, { kiloUserId, sessionId: body.sessionId }),
+      async sessionStub => sessionStub.isDeleted(),
+      'SessionIngestDO.isDeleted'
+    );
+  } catch (error) {
+    if (createdRow) {
+      await db
+        .delete(cli_sessions_v2)
+        .where(
+          and(
+            eq(cli_sessions_v2.session_id, body.sessionId),
+            eq(cli_sessions_v2.kilo_user_id, kiloUserId)
+          )
+        );
+    }
+    throw error;
+  }
+
+  if (ingestDeleted) {
+    if (createdRow) {
+      await db
+        .delete(cli_sessions_v2)
+        .where(
+          and(
+            eq(cli_sessions_v2.session_id, body.sessionId),
+            eq(cli_sessions_v2.kilo_user_id, kiloUserId)
+          )
+        );
+    }
+    return c.json({ success: false, error: 'session_deleted' }, 409);
+  }
 
   if (createdRow) {
     const session = mapSessionEventRow(createdRow);

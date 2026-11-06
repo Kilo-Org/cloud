@@ -413,6 +413,28 @@ export function SessionDetailContent({
   const handleAnchorChange = useCallback((messageId: string) => {
     setAnchor(messageId);
   }, []);
+  // The transcript's open gate holds its rows back until their position is
+  // final and paints the skeleton in the meantime. That verdict decides the
+  // chrome around the transcript too: a finished footer, composer, or header
+  // pill beside a loading body is the screen showing two states at once. Keyed
+  // by session, so a verdict from the previous one cannot leak into this one,
+  // and absent a verdict for this session the chrome stays settled: a host
+  // whose list never reports keeps the behavior it had before this hand-off.
+  const [openSettledReport, setOpenSettledReport] = useState<{
+    sessionId: string;
+    settled: boolean;
+  } | null>(null);
+  const handleOpenSettledChange = useCallback((reportedSessionId: string, settled: boolean) => {
+    setOpenSettledReport(previous =>
+      previous?.sessionId === reportedSessionId && previous.settled === settled
+        ? previous
+        : { sessionId: reportedSessionId, settled }
+    );
+  }, []);
+  const transcriptOpenSettled =
+    openSettledReport === null ||
+    openSettledReport.sessionId !== sessionId ||
+    openSettledReport.settled;
   // The route's `at` is the position this screen resumes at. A resume link
   // dedupes onto an already-mounted route and updates its params instead of
   // remounting, so the position is adopted when the live param changes — unless
@@ -1965,15 +1987,30 @@ export function SessionDetailContent({
   });
   const handleRenameSave = rename.submit;
   const handleRenameClose = rename.closeModal;
+  // The transcript paints a skeleton in two cases: the session's first page has
+  // not arrived, or its rows are mounted but still measuring behind the open
+  // gate. Either way the body is loading, so the chrome around it — the header
+  // pill's value slots and the bottom slot — keeps its loading shape until the
+  // body is painted. A failure, an agent status, or a pending ask is the
+  // session speaking, and each keeps the chrome it already has.
+  const transcriptRowsHidden = transcriptView === 'list' && !transcriptOpenSettled;
+  const isSessionChromePending =
+    (shouldShowLoading || transcriptView === 'older-loading' || transcriptRowsHidden) &&
+    terminalError === null &&
+    activeQuestion === null &&
+    activePermission === null;
   const headerRight = (
     <View className="min-w-0 shrink flex-row items-center gap-2">
       <SessionFollowButton sessionId={sessionId} />
       <SessionContextMetrics
         info={contextInfo}
         totalCostMicrodollars={totalMicrodollars}
-        hasMessages={messages.length > 0}
+        // The pill's value slots read as a settled session. While the body is
+        // still a skeleton they belong to the loading shape instead, so the
+        // pill keeps the bars that hold the row the values will take.
+        hasMessages={messages.length > 0 && !isSessionChromePending}
         autoApproveAvailable={autoApproveAvailable}
-        loading={shouldShowLoading}
+        loading={isSessionChromePending}
         // The sheet is the session's own context/permission surface, so the
         // control opens it in every state of this screen — including while the
         // transcript is still loading and after a failed open. A state that
@@ -2061,14 +2098,14 @@ export function SessionDetailContent({
   // placeholders, so neither offers a control. A failure, an agent status or a
   // pending ask is the session speaking, and each keeps the composer it already
   // has.
-  const isSessionStatePending =
-    shouldShowLoading &&
-    terminalError === null &&
-    activeQuestion === null &&
-    activePermission === null;
-  const isComposerVisible = !hasBlockingInteraction && !isReadOnlySession && !isSessionStatePending;
+  // The slot switches from its reserve to the session's own control only once
+  // the transcript is painted, not merely once the open resolves: a read-only
+  // footer above rows that are still skeletons is the same two states at once,
+  // so the reserve holds for that window too (see `isSessionChromePending`).
+  const isComposerVisible =
+    !hasBlockingInteraction && !isReadOnlySession && !isSessionChromePending;
   const isReadOnlyContinueVisible =
-    isReadOnlySession && !hasBlockingInteraction && !isSessionStatePending;
+    isReadOnlySession && !hasBlockingInteraction && !isSessionChromePending;
   // The pending slot holds the shape its session will end in. The kind is only
   // set once the transport answers, but the metadata read lands before that and
   // names a cloud-agent session, which is writable by construction; the id
@@ -2081,9 +2118,9 @@ export function SessionDetailContent({
     isWritableResolved ||
     (fetchedData?.kiloSessionId === sessionId && fetchedData.cloudAgentSessionId !== null);
   const isReadOnlyFooterPlaceholderVisible =
-    isSessionStatePending && !hasBlockingInteraction && !isPendingComposer;
+    isSessionChromePending && !hasBlockingInteraction && !isPendingComposer;
   const isComposerSkeletonVisible =
-    isSessionStatePending && !hasBlockingInteraction && isPendingComposer;
+    isSessionChromePending && !hasBlockingInteraction && isPendingComposer;
   // Structural locks only. The live send capability is passed separately so a
   // failed turn (or a session that has not resolved yet) keeps the input
   // editable beside the error's Retry instead of locking the composer.
@@ -2753,7 +2790,7 @@ export function SessionDetailContent({
           </View>
         ) : null}
 
-        {isReadOnlySession || isSessionStatePending ? null : (
+        {isReadOnlySession || isSessionChromePending ? null : (
           <View
             className={cn(hasBlockingInteraction && 'hidden')}
             accessibilityElementsHidden={hasBlockingInteraction}
@@ -2981,6 +3018,7 @@ export function SessionDetailContent({
             manager.trimRetainedHistory();
           }}
           onAnchorChange={handleAnchorChange}
+          onOpenSettledChange={handleOpenSettledChange}
           renderItem={renderItem}
           resumeAt={resumeAnchor}
           followTailNonce={followTailNonce}

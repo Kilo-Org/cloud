@@ -10,6 +10,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import jwt from 'jsonwebtoken';
 import { createHash } from 'node:crypto';
+import { TRPCError } from '@trpc/server';
 import {
   createRuntimeAuthorization,
   sealRuntimeAuthorization,
@@ -619,6 +620,68 @@ describe('explicit sandbox session creation', () => {
       sandboxProvider: 'cloudflare-containers',
       egressMode: 'allowlist',
       egressAllowlist: [],
+    });
+  });
+
+  it.each([
+    new TRPCError({ code: 'BAD_REQUEST', message: 'model unavailable' }),
+    new TRPCError({ code: 'FORBIDDEN', message: 'catalog access denied' }),
+    new TRPCError({ code: 'SERVICE_UNAVAILABLE', message: 'catalog unavailable' }),
+    new Error('catalog request failed'),
+  ])('filters unverifiable built-in agent models after %s', async error => {
+    const doStub = makeDoStub();
+    const requestOrganizationId = 'f47ac10b-58cc-4372-a567-0e02b2c3d490';
+    const createdOnPlatform = 'cloud-agent-web';
+    const builtinAgents = {
+      plan: { model: 'blocked/model', variant: 'high', disable: true },
+      debug: { model: 'allowed/model', variant: 'low' },
+      ask: { model: null },
+      orchestrator: { disable: true },
+      compaction: { model: 'blocked/model', variant: 'high' },
+    } as const;
+    const request = makeRequest({
+      options: {
+        operationKey: OPERATION_KEY,
+        kilocodeOrganizationId: requestOrganizationId,
+        createdOnPlatform,
+      },
+      profile: { resolved: { builtinAgents } },
+    });
+    const ctx = modernContext(selectedContext(doStub), requestOrganizationId);
+    vi.mocked(assertKiloModelAvailable).mockImplementation(async ({ submittedModel }) => {
+      if (submittedModel === 'blocked/model') {
+        throw error;
+      }
+    });
+
+    await registerNewSession(request, ctx);
+
+    expect(createdMetadata(doStub)?.profile?.builtinAgents).toEqual({
+      plan: { disable: true },
+      debug: { model: 'allowed/model', variant: 'low' },
+      ask: { model: null },
+      orchestrator: { disable: true },
+    });
+    const validationCalls = vi.mocked(assertKiloModelAvailable).mock.calls;
+    expect(validationCalls.map(call => call[0].submittedModel)).toEqual([
+      'claude-3',
+      'blocked/model',
+      'allowed/model',
+    ]);
+    for (const [validation] of validationCalls) {
+      expect(validation).toMatchObject({
+        originalToken: 'runtime-token',
+        originalOrganizationId: requestOrganizationId,
+        createdOnPlatform,
+      });
+      expect(validation.originalToken).not.toBe(ctx.authToken);
+    }
+    expect(request.profile?.resolved?.builtinAgents).toEqual({
+      plan: { model: 'blocked/model', variant: 'high', disable: true },
+      debug: { model: 'allowed/model', variant: 'low' },
+      ask: { model: null },
+      orchestrator: { disable: true },
+      compaction: { model: 'blocked/model', variant: 'high' },
     });
   });
 
@@ -5518,6 +5581,68 @@ describe('createSessionWithLedger worktree and ownership reconciliation', () => 
       expect(deleteCliSessionMock).not.toHaveBeenCalled();
     }
   );
+
+  it('filters unavailable built-in agent models when resuming an allocation', async () => {
+    const organizationId = 'f47ac10b-58cc-4372-a567-0e02b2c3d491';
+    const createdOnPlatform = 'cloud-agent-web';
+    const builtinAgents = {
+      plan: { model: 'blocked/model', variant: 'high', disable: true },
+      debug: { model: 'allowed/model', variant: 'low' },
+      ask: { model: null },
+    };
+    const input = request({
+      options: { ...request().options, kilocodeOrganizationId: organizationId },
+      profile: { resolved: { builtinAgents } },
+    });
+    const stub = makeDoStub({ getMetadata: vi.fn().mockResolvedValue(null) });
+    const ctx = modernContext(context(stub), organizationId);
+    vi.mocked(assertKiloModelAvailable).mockImplementation(async ({ submittedModel }) => {
+      if (submittedModel === 'blocked/model') {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'model blocked for organization' });
+      }
+    });
+    const progress = await canonicalProgress(input);
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'duplicate_reconcile_pending',
+      row: makeLedgerRow({
+        organization_id: organizationId,
+        status: 'reconcile_pending',
+        canonical_result: progress,
+      }),
+    });
+    getPgDbMock.mockReturnValue(
+      makeDb([[ownershipRow({ organizationId })], [{ email: 'test@example.com' }]])
+    );
+
+    await expect(runCreate(ctx, input)).resolves.toMatchObject({
+      cloudAgentSessionId: WORKSPACE_SESSION_ID,
+      kiloSessionId: KILO_SESSION_ID,
+      replayed: true,
+    });
+
+    expect(createdMetadata(stub)?.profile?.builtinAgents).toEqual({
+      plan: { disable: true },
+      debug: { model: 'allowed/model', variant: 'low' },
+      ask: { model: null },
+    });
+    expect(assertKiloModelAvailable).toHaveBeenCalledWith(
+      expect.objectContaining({
+        submittedModel: 'blocked/model',
+        originalToken: 'runtime-token',
+        originalOrganizationId: organizationId,
+        createdOnPlatform,
+      })
+    );
+    expect(assertKiloModelAvailable).toHaveBeenCalledWith(
+      expect.objectContaining({
+        submittedModel: 'allowed/model',
+        originalToken: 'runtime-token',
+        originalOrganizationId: organizationId,
+        createdOnPlatform,
+      })
+    );
+    expect(input.profile?.resolved?.builtinAgents).toEqual(builtinAgents);
+  });
 
   it.each(['admission', 'model'] as const)(
     'fails closed on resumed modern %s rejection',

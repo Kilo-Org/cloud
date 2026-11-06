@@ -226,6 +226,8 @@ const environmentDetail: EnvironmentResponse = {
   sandboxAllocation: environment.sandboxAllocation,
   egressMode: null,
   egressAllowlist: null,
+  egressRequiredHosts: [],
+  isDraft: false,
   secretKeys: ['API_KEY'],
 };
 

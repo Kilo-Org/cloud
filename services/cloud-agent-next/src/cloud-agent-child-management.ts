@@ -19,6 +19,7 @@ const MANAGEMENT_PROCEDURES = {
   listChildSessions: { base: 'listChildSessions', kind: 'query' },
   getSession: { base: 'getSession', kind: 'query' },
   getMessageResult: { base: 'getMessageResult', kind: 'query' },
+  getEgressAudit: { base: 'getEgressAudit', kind: 'query' },
   interruptSession: { base: 'interruptSession', kind: 'mutation' },
   sendMessageV2: { base: 'sendMessage', kind: 'mutation' },
 } as const;

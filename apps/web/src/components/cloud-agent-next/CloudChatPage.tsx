@@ -72,6 +72,9 @@ import { PreparationDrawer } from './PreparationDrawer';
 import { QuestionToolCard } from './QuestionToolCard';
 import { QuestionContextProvider } from './QuestionContext';
 import { PermissionCard, PermissionContextProvider } from './PermissionCard';
+import { useEnvironmentSetupRunBySession } from '@/hooks/useEnvironmentSetupRuns';
+import { EnvironmentSetupRequestNotice } from './EnvironmentSetupRequestNotice';
+import { EnvironmentSetupRunCard } from './EnvironmentSetupRunCard';
 import { PermissionUnreadableNotice } from './PermissionUnreadableNotice';
 import { SuggestionContextProvider } from './SuggestionCard';
 import { SessionContinuationPanel } from './SessionContinuationPanel';
@@ -274,6 +277,7 @@ export default function CloudChatPage({
   const billingFailure = useAtomValue(manager.atoms.billingFailure);
   const sessionConfig = useAtomValue(manager.atoms.sessionConfig);
   const sessionId = useAtomValue(manager.atoms.sessionId);
+  const setupRunQuery = useEnvironmentSetupRunBySession(sessionId, { organizationId });
   const activity = useAtomValue(manager.atoms.activity);
   const cloudStatus = useAtomValue(manager.atoms.cloudStatus);
   const preparationAttempts = useAtomValue(manager.atoms.preparationAttempts);
@@ -1595,6 +1599,13 @@ export default function CloudChatPage({
                     )}
                   </div>
 
+                  {setupRunQuery.data && (
+                    <EnvironmentSetupRunCard
+                      run={setupRunQuery.data}
+                      organizationId={organizationId}
+                    />
+                  )}
+
                   <div
                     ref={setChildSessionDrawerContainer}
                     className="relative flex min-h-0 flex-1 flex-col"
@@ -1736,6 +1747,14 @@ export default function CloudChatPage({
                               <SessionContinuationPanel sessionId={sessionIdFromParams} />
                             ) : null)}
                           <div hidden={isReadOnly}>
+                            {setupRunQuery.data && (
+                              <div className="px-[max(1rem,calc(50%_-_27rem))] py-2">
+                                <EnvironmentSetupRequestNotice
+                                  run={setupRunQuery.data}
+                                  organizationId={organizationId}
+                                />
+                              </div>
+                            )}
                             {unreadablePermissions.length > 0 && transcriptPhase !== 'opening' && (
                               <div className="border-t px-[max(1rem,calc(50%_-_27rem))] py-4">
                                 <PermissionUnreadableNotice />

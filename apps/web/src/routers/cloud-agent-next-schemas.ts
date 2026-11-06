@@ -316,6 +316,12 @@ export const agentModeSendMessageSchema = z
     message: 'Custom mode requires prepareSession/updateSession, not sendMessage',
   });
 
+/** A thinking-effort variant name, as the Worker accepts it. */
+export const sessionVariantSchema = z
+  .string()
+  .max(50)
+  .regex(/^[a-zA-Z]+$/);
+
 /**
  * Discriminated execution payload for follow-up messages and prepared-session
  * initialization. Mirrors the worker's SendMessageV2Payload schema; both
@@ -330,11 +336,7 @@ export const sendMessageNextPayloadSchema = z.discriminatedUnion('type', [
     prompt: z.string().min(1).max(CLOUD_AGENT_PROMPT_MAX_LENGTH),
     mode: agentModeSendMessageSchema,
     model: z.string().min(1),
-    variant: z
-      .string()
-      .max(50)
-      .regex(/^[a-zA-Z]+$/)
-      .optional(),
+    variant: sessionVariantSchema.optional(),
   }),
   z.object({
     type: z.literal('command'),
@@ -428,11 +430,7 @@ const PrepareSessionSharedFields = {
   // Execution params (required)
   mode: preparedSessionModeSchema,
   model: z.string().min(1),
-  variant: z
-    .string()
-    .max(50)
-    .regex(/^[a-zA-Z]+$/)
-    .optional(),
+  variant: sessionVariantSchema.optional(),
 
   /** The repository environment the user selected, with branches for its additional repositories. */
   requestedEnvironment: requestedEnvironmentSchema.optional(),
@@ -900,6 +898,28 @@ export const baseGetSessionNextOutputSchema = z.object({
 
   // Execution status (grouped for cleaner API)
   execution: executionStatusNextSchema,
+
+  // Setup authority facts read back from a session. Mirrors
+  // cloud-agent-next/router/schemas.ts.
+  environment: z
+    .object({ environmentId: z.string(), configurationRevision: z.number().int() })
+    .optional(),
+  latestPreparation: z
+    .object({
+      status: z.enum(['running', 'completed', 'failed']),
+      startedAt: z.number(),
+      completedAt: z.number().optional(),
+      setupDurationMs: z.number().int().nonnegative().optional(),
+      safeError: z.string().optional(),
+    })
+    .optional(),
+  egress: z
+    .object({
+      mode: z.enum(['unrestricted', 'allowlist']),
+      allowlist: z.array(z.string()).optional(),
+      audit: z.boolean(),
+    })
+    .optional(),
 
   // Lifecycle timestamps
   preparedAt: z.number().optional(),

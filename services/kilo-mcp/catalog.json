@@ -9457,6 +9457,1058 @@
     ],
     "searchBlob": "cloudEnvironments.listAll List every Cloud Agent repository environment for the user or organization, across all repositories. cloudenvironments listall organizationid organizationId"
   },
+  "cloudEnvironments.setupRuns.agent.complete": {
+    "path": "cloudEnvironments.setupRuns.agent.complete",
+    "kind": "mutation",
+    "summary": "Complete the setup run after the server validates the current draft verification and publication gate.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "runId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 5000
+        }
+      },
+      "required": [
+        "runId",
+        "summary"
+      ],
+      "additionalProperties": false
+    },
+    "tags": [
+      "cloudenvironments",
+      "setupruns",
+      "agent",
+      "complete",
+      "runid",
+      "summary"
+    ],
+    "searchBlob": "cloudEnvironments.setupRuns.agent.complete Complete the setup run after the server validates the current draft verification and publication gate. cloudenvironments setupruns agent complete runid summary runId summary"
+  },
+  "cloudEnvironments.setupRuns.agent.fail": {
+    "path": "cloudEnvironments.setupRuns.agent.fail",
+    "kind": "mutation",
+    "summary": "Stop the authorized environment setup run with a specific reason.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "runId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000
+        }
+      },
+      "required": [
+        "runId",
+        "reason"
+      ],
+      "additionalProperties": false
+    },
+    "tags": [
+      "cloudenvironments",
+      "setupruns",
+      "agent",
+      "fail",
+      "runid",
+      "reason"
+    ],
+    "searchBlob": "cloudEnvironments.setupRuns.agent.fail Stop the authorized environment setup run with a specific reason. cloudenvironments setupruns agent fail runid reason runId reason"
+  },
+  "cloudEnvironments.setupRuns.agent.getDraft": {
+    "path": "cloudEnvironments.setupRuns.agent.getDraft",
+    "kind": "query",
+    "summary": "Read the setup draft, final network policy, and paginated discovery audit of observed hosts without exposing secret values.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "runId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "auditCursor": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "runId"
+      ],
+      "additionalProperties": false
+    },
+    "tags": [
+      "cloudenvironments",
+      "setupruns",
+      "agent",
+      "getdraft",
+      "runid",
+      "auditcursor"
+    ],
+    "searchBlob": "cloudEnvironments.setupRuns.agent.getDraft Read the setup draft, final network policy, and paginated discovery audit of observed hosts without exposing secret values. cloudenvironments setupruns agent getdraft runid auditcursor runId auditCursor"
+  },
+  "cloudEnvironments.setupRuns.agent.recordVerification": {
+    "path": "cloudEnvironments.setupRuns.agent.recordVerification",
+    "kind": "mutation",
+    "summary": "Record reported smoke check results alongside observed preparation, revision and network facts.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "runId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "childSessionId": {
+          "type": "string",
+          "pattern": "^workspace_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "results": {
+          "minItems": 1,
+          "maxItems": 10,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "passed": {
+                "type": "boolean"
+              },
+              "evidence": {
+                "type": "string",
+                "maxLength": 2000
+              }
+            },
+            "required": [
+              "name",
+              "passed",
+              "evidence"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "runId",
+        "childSessionId",
+        "results"
+      ],
+      "additionalProperties": false
+    },
+    "tags": [
+      "cloudenvironments",
+      "setupruns",
+      "agent",
+      "recordverification",
+      "runid",
+      "childsessionid",
+      "results"
+    ],
+    "searchBlob": "cloudEnvironments.setupRuns.agent.recordVerification Record reported smoke check results alongside observed preparation, revision and network facts. cloudenvironments setupruns agent recordverification runid childsessionid results runId childSessionId results"
+  },
+  "cloudEnvironments.setupRuns.agent.requestNetworkHosts": {
+    "path": "cloudEnvironments.setupRuns.agent.requestNetworkHosts",
+    "kind": "mutation",
+    "summary": "Recommend required hosts from the setup discovery audit or a bound verification audit for user approval before restricted verification.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "runId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "childSessionId": {
+          "type": "string",
+          "pattern": "^workspace_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "auditCursor": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "hosts": {
+          "minItems": 1,
+          "maxItems": 20,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "host": {
+                "type": "string",
+                "maxLength": 254,
+                "pattern": "^[A-Za-z0-9.-]+$"
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              }
+            },
+            "required": [
+              "host",
+              "reason"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "runId",
+        "hosts"
+      ],
+      "additionalProperties": false
+    },
+    "tags": [
+      "cloudenvironments",
+      "setupruns",
+      "agent",
+      "requestnetworkhosts",
+      "runid",
+      "childsessionid",
+      "auditcursor",
+      "hosts"
+    ],
+    "searchBlob": "cloudEnvironments.setupRuns.agent.requestNetworkHosts Recommend required hosts from the setup discovery audit or a bound verification audit for user approval before restricted verification. cloudenvironments setupruns agent requestnetworkhosts runid childsessionid auditcursor hosts runId childSessionId auditCursor hosts"
+  },
+  "cloudEnvironments.setupRuns.agent.requestSecrets": {
+    "path": "cloudEnvironments.setupRuns.agent.requestSecrets",
+    "kind": "mutation",
+    "summary": "Request user-owned secret keys through the environment editor with repository references.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "runId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "secrets": {
+          "minItems": 1,
+          "maxItems": 10,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              },
+              "references": {
+                "minItems": 1,
+                "maxItems": 5,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "repoFullName": {
+                      "type": "string",
+                      "minLength": 3,
+                      "maxLength": 200
+                    },
+                    "path": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 500
+                    },
+                    "line": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "repoFullName",
+                    "path",
+                    "line"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "key",
+              "reason",
+              "references"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "runId",
+        "secrets"
+      ],
+      "additionalProperties": false
+    },
+    "tags": [
+      "cloudenvironments",
+      "setupruns",
+      "agent",
+      "requestsecrets",
+      "runid",
+      "secrets"
+    ],
+    "searchBlob": "cloudEnvironments.setupRuns.agent.requestSecrets Request user-owned secret keys through the environment editor with repository references. cloudenvironments setupruns agent requestsecrets runid secrets runId secrets"
+  },
+  "cloudEnvironments.setupRuns.agent.startVerification": {
+    "path": "cloudEnvironments.setupRuns.agent.startVerification",
+    "kind": "mutation",
+    "summary": "Rerun setup and smoke checks in a fresh session using the user-selected Full or Restricted network policy.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "runId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "checks": {
+          "minItems": 1,
+          "maxItems": 10,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "command": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2000
+              },
+              "expect": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              }
+            },
+            "required": [
+              "name",
+              "command",
+              "expect"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "runId",
+        "checks"
+      ],
+      "additionalProperties": false
+    },
+    "tags": [
+      "cloudenvironments",
+      "setupruns",
+      "agent",
+      "startverification",
+      "runid",
+      "checks"
+    ],
+    "searchBlob": "cloudEnvironments.setupRuns.agent.startVerification Rerun setup and smoke checks in a fresh session using the user-selected Full or Restricted network policy. cloudenvironments setupruns agent startverification runid checks runId checks"
+  },
+  "cloudEnvironments.setupRuns.agent.updateDraft": {
+    "path": "cloudEnvironments.setupRuns.agent.updateDraft",
+    "kind": "mutation",
+    "summary": "Save setup script, variables, generated secrets, sandbox allocation or required hosts in the authorized draft.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "runId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "expectedRevision": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "script": {
+          "type": "string",
+          "maxLength": 16000
+        },
+        "plainVars": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "additionalProperties": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
+        "secrets": {
+          "maxItems": 50,
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  },
+                  "value": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 8192
+                  }
+                },
+                "required": [
+                  "key",
+                  "value"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  },
+                  "delete": {
+                    "type": "boolean",
+                    "const": true
+                  }
+                },
+                "required": [
+                  "key",
+                  "delete"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "sandboxAllocation": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "requiredHosts": {
+          "maxItems": 50,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 254,
+            "pattern": "^[A-Za-z0-9.-]+$"
+          }
+        }
+      },
+      "required": [
+        "runId",
+        "expectedRevision"
+      ],
+      "additionalProperties": false
+    },
+    "tags": [
+      "cloudenvironments",
+      "setupruns",
+      "agent",
+      "updatedraft",
+      "runid",
+      "expectedrevision",
+      "script",
+      "plainvars",
+      "secrets",
+      "sandboxallocation",
+      "requiredhosts"
+    ],
+    "searchBlob": "cloudEnvironments.setupRuns.agent.updateDraft Save setup script, variables, generated secrets, sandbox allocation or required hosts in the authorized draft. cloudenvironments setupruns agent updatedraft runid expectedrevision script plainvars secrets sandboxallocation requiredhosts runId expectedRevision script plainVars secrets sandboxAllocation requiredHosts"
+  },
+  "cloudEnvironments.setupRuns.buildSnapshot": {
+    "path": "cloudEnvironments.setupRuns.buildSnapshot",
+    "kind": "mutation",
+    "summary": "Build a snapshot of the environment revision published by this setup run.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "runId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "runId"
+      ]
+    },
+    "tags": [
+      "cloudenvironments",
+      "setupruns",
+      "buildsnapshot",
+      "organizationid",
+      "runid"
+    ],
+    "searchBlob": "cloudEnvironments.setupRuns.buildSnapshot Build a snapshot of the environment revision published by this setup run. cloudenvironments setupruns buildsnapshot organizationid runid organizationId runId"
+  },
+  "cloudEnvironments.setupRuns.cancel": {
+    "path": "cloudEnvironments.setupRuns.cancel",
+    "kind": "mutation",
+    "summary": "Cancel an environment setup run and interrupt its setup and verification sessions when possible.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "runId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "runId"
+      ]
+    },
+    "tags": [
+      "cloudenvironments",
+      "setupruns",
+      "cancel",
+      "organizationid",
+      "runid"
+    ],
+    "searchBlob": "cloudEnvironments.setupRuns.cancel Cancel an environment setup run and interrupt its setup and verification sessions when possible. cloudenvironments setupruns cancel organizationid runid organizationId runId"
+  },
+  "cloudEnvironments.setupRuns.get": {
+    "path": "cloudEnvironments.setupRuns.get",
+    "kind": "query",
+    "summary": "Read an environment setup run, its configuration changes and current agent state.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "runId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "runId"
+      ]
+    },
+    "tags": [
+      "cloudenvironments",
+      "setupruns",
+      "get",
+      "organizationid",
+      "runid"
+    ],
+    "searchBlob": "cloudEnvironments.setupRuns.get Read an environment setup run, its configuration changes and current agent state. cloudenvironments setupruns get organizationid runid organizationId runId"
+  },
+  "cloudEnvironments.setupRuns.getBySession": {
+    "path": "cloudEnvironments.setupRuns.getBySession",
+    "kind": "query",
+    "summary": "Find the environment setup run belonging to the supplied Cloud Agent session.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "cloudAgentSessionId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "cloudAgentSessionId"
+      ]
+    },
+    "tags": [
+      "cloudenvironments",
+      "setupruns",
+      "getbysession",
+      "organizationid",
+      "cloudagentsessionid"
+    ],
+    "searchBlob": "cloudEnvironments.setupRuns.getBySession Find the environment setup run belonging to the supplied Cloud Agent session. cloudenvironments setupruns getbysession organizationid cloudagentsessionid organizationId cloudAgentSessionId"
+  },
+  "cloudEnvironments.setupRuns.isEnabled": {
+    "path": "cloudEnvironments.setupRuns.isEnabled",
+    "kind": "query",
+    "summary": "Check whether the environment setup agent is enabled and the caller can start setup.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      }
+    },
+    "tags": [
+      "cloudenvironments",
+      "setupruns",
+      "isenabled",
+      "organizationid"
+    ],
+    "searchBlob": "cloudEnvironments.setupRuns.isEnabled Check whether the environment setup agent is enabled and the caller can start setup. cloudenvironments setupruns isenabled organizationid organizationId"
+  },
+  "cloudEnvironments.setupRuns.listForEnvironment": {
+    "path": "cloudEnvironments.setupRuns.listForEnvironment",
+    "kind": "query",
+    "summary": "List recent setup runs for an environment without configuration changes or live agent state.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "environmentId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "environmentId"
+      ]
+    },
+    "tags": [
+      "cloudenvironments",
+      "setupruns",
+      "listforenvironment",
+      "organizationid",
+      "environmentid"
+    ],
+    "searchBlob": "cloudEnvironments.setupRuns.listForEnvironment List recent setup runs for an environment without configuration changes or live agent state. cloudenvironments setupruns listforenvironment organizationid environmentid organizationId environmentId"
+  },
+  "cloudEnvironments.setupRuns.publish": {
+    "path": "cloudEnvironments.setupRuns.publish",
+    "kind": "mutation",
+    "summary": "Publish a setup draft after management confirmation when the run needs a publication decision.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "runId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "force": {
+          "default": false,
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "runId"
+      ]
+    },
+    "tags": [
+      "cloudenvironments",
+      "setupruns",
+      "publish",
+      "organizationid",
+      "runid",
+      "force"
+    ],
+    "searchBlob": "cloudEnvironments.setupRuns.publish Publish a setup draft after management confirmation when the run needs a publication decision. cloudenvironments setupruns publish organizationid runid force organizationId runId force"
+  },
+  "cloudEnvironments.setupRuns.resolveNetworkRequests": {
+    "path": "cloudEnvironments.setupRuns.resolveNetworkRequests",
+    "kind": "mutation",
+    "summary": "Approve or decline required network hosts requested by the environment setup agent.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "runId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "approved": {
+          "maxItems": 20,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 254,
+            "pattern": "^[A-Za-z0-9.-]+$"
+          }
+        },
+        "declined": {
+          "maxItems": 20,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 254,
+            "pattern": "^[A-Za-z0-9.-]+$"
+          }
+        }
+      },
+      "required": [
+        "runId",
+        "approved",
+        "declined"
+      ]
+    },
+    "tags": [
+      "cloudenvironments",
+      "setupruns",
+      "resolvenetworkrequests",
+      "organizationid",
+      "runid",
+      "approved",
+      "declined"
+    ],
+    "searchBlob": "cloudEnvironments.setupRuns.resolveNetworkRequests Approve or decline required network hosts requested by the environment setup agent. cloudenvironments setupruns resolvenetworkrequests organizationid runid approved declined organizationId runId approved declined"
+  },
+  "cloudEnvironments.setupRuns.resolveSecretRequests": {
+    "path": "cloudEnvironments.setupRuns.resolveSecretRequests",
+    "kind": "mutation",
+    "summary": "Resolve pending secret requests after values are saved in the environment editor or skipped.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "runId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "skipped": {
+          "maxItems": 20,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 128,
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+          }
+        }
+      },
+      "required": [
+        "runId",
+        "skipped"
+      ]
+    },
+    "tags": [
+      "cloudenvironments",
+      "setupruns",
+      "resolvesecretrequests",
+      "organizationid",
+      "runid",
+      "skipped"
+    ],
+    "searchBlob": "cloudEnvironments.setupRuns.resolveSecretRequests Resolve pending secret requests after values are saved in the environment editor or skipped. cloudenvironments setupruns resolvesecretrequests organizationid runid skipped organizationId runId skipped"
+  },
+  "cloudEnvironments.setupRuns.resume": {
+    "path": "cloudEnvironments.setupRuns.resume",
+    "kind": "mutation",
+    "summary": "Resume a stopped environment setup agent and optionally allow more verification attempts.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "runId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "raiseVerificationLimit": {
+          "default": false,
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "runId"
+      ]
+    },
+    "tags": [
+      "cloudenvironments",
+      "setupruns",
+      "resume",
+      "organizationid",
+      "runid",
+      "raiseverificationlimit"
+    ],
+    "searchBlob": "cloudEnvironments.setupRuns.resume Resume a stopped environment setup agent and optionally allow more verification attempts. cloudenvironments setupruns resume organizationid runid raiseverificationlimit organizationId runId raiseVerificationLimit"
+  },
+  "cloudEnvironments.setupRuns.revert": {
+    "path": "cloudEnvironments.setupRuns.revert",
+    "kind": "mutation",
+    "summary": "Restore the environment configuration saved before a published setup run, or delete its new environment.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "runId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "force": {
+          "default": false,
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "runId"
+      ]
+    },
+    "tags": [
+      "cloudenvironments",
+      "setupruns",
+      "revert",
+      "organizationid",
+      "runid",
+      "force"
+    ],
+    "searchBlob": "cloudEnvironments.setupRuns.revert Restore the environment configuration saved before a published setup run, or delete its new environment. cloudenvironments setupruns revert organizationid runid force organizationId runId force"
+  },
+  "cloudEnvironments.setupRuns.start": {
+    "path": "cloudEnvironments.setupRuns.start",
+    "kind": "mutation",
+    "summary": "Start an environment setup agent with the selected Full or Restricted network policy. Existing environments keep their current policy when no choice is supplied.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "repositories": {
+          "minItems": 1,
+          "maxItems": 100,
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "platform": {
+                    "type": "string",
+                    "const": "github"
+                  },
+                  "fullName": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  }
+                },
+                "required": [
+                  "platform",
+                  "fullName"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "platform": {
+                    "type": "string",
+                    "const": "gitlab"
+                  },
+                  "projectPath": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  }
+                },
+                "required": [
+                  "platform",
+                  "projectPath"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "platform": {
+                    "type": "string",
+                    "const": "bitbucket"
+                  },
+                  "fullName": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  },
+                  "workspaceUuid": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "repositoryUuid": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  }
+                },
+                "required": [
+                  "platform",
+                  "fullName",
+                  "workspaceUuid",
+                  "repositoryUuid"
+                ]
+              }
+            ]
+          }
+        },
+        "requirements": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 8000
+        },
+        "model": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "variant": {
+          "type": "string",
+          "maxLength": 50,
+          "pattern": "^[a-zA-Z]+$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "targetEnvironmentId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "egressMode": {
+          "type": "string",
+          "enum": [
+            "unrestricted",
+            "allowlist"
+          ]
+        },
+        "secrets": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "maxLength": 128,
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+          },
+          "additionalProperties": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 8192
+          }
+        }
+      },
+      "required": [
+        "repositories",
+        "requirements",
+        "model"
+      ]
+    },
+    "tags": [
+      "cloudenvironments",
+      "setupruns",
+      "start",
+      "organizationid",
+      "repositories",
+      "requirements",
+      "model",
+      "variant",
+      "name",
+      "targetenvironmentid",
+      "egressmode",
+      "secrets"
+    ],
+    "searchBlob": "cloudEnvironments.setupRuns.start Start an environment setup agent with the selected Full or Restricted network policy. Existing environments keep their current policy when no choice is supplied. cloudenvironments setupruns start organizationid repositories requirements model variant name targetenvironmentid egressmode secrets organizationId repositories requirements model variant name targetEnvironmentId egressMode secrets"
+  },
   "cloudEnvironments.update": {
     "path": "cloudEnvironments.update",
     "kind": "mutation",
@@ -9645,6 +10697,15 @@
             }
           ]
         },
+        "requiredHosts": {
+          "maxItems": 50,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 254,
+            "pattern": "^[A-Za-z0-9.-]+$"
+          }
+        },
         "egressMode": {
           "description": "Defaults to unrestricted when omitted. The allowlist mode permits the Kilo/Git baseline plus optional egressAllowlist domains.",
           "type": "string",
@@ -9683,11 +10744,12 @@
       "commands",
       "startcommands",
       "sandboxallocation",
+      "requiredhosts",
       "egressmode",
       "egressallowlist",
       "egressaudit"
     ],
-    "searchBlob": "cloudEnvironments.update Update a Cloud Agent repository environment: rename it, change setup commands, variables, secrets, or sandbox size. cloudenvironments update organizationid environmentid name repositories plainvars secrets commands startcommands sandboxallocation egressmode egressallowlist egressaudit organizationId environmentId name repositories plainVars secrets commands startCommands sandboxAllocation egressMode egressAllowlist egressAudit"
+    "searchBlob": "cloudEnvironments.update Update a Cloud Agent repository environment: rename it, change setup commands, variables, secrets, or sandbox size. cloudenvironments update organizationid environmentid name repositories plainvars secrets commands sandboxallocation requiredhosts egressmode egressallowlist egressaudit organizationId environmentId name repositories plainVars secrets commands sandboxAllocation requiredHosts egressMode egressAllowlist egressAudit"
   },
   "codeIndexing.delete": {
     "path": "codeIndexing.delete",

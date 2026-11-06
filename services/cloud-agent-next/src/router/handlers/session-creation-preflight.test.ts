@@ -12,6 +12,7 @@ const {
   mergeProfileConfigurationMock,
   getBuiltinAgentSettingsMock,
   loadEnvironmentForSessionMock,
+  loadSetupRunForSessionMock,
   assertKiloModelAvailableMock,
   assertRepositoryAccessMock,
   assertEnvironmentRepositoriesAccessMock,
@@ -24,6 +25,7 @@ const {
   mergeProfileConfigurationMock: vi.fn(),
   getBuiltinAgentSettingsMock: vi.fn(),
   loadEnvironmentForSessionMock: vi.fn(),
+  loadSetupRunForSessionMock: vi.fn(),
   assertKiloModelAvailableMock: vi.fn(),
   assertRepositoryAccessMock: vi.fn(),
   assertEnvironmentRepositoriesAccessMock: vi.fn(),
@@ -40,6 +42,7 @@ vi.mock('@kilocode/cloud-agent-profile', async importActual => {
     mergeProfileConfiguration: mergeProfileConfigurationMock,
     getBuiltinAgentSettings: getBuiltinAgentSettingsMock,
     loadEnvironmentForSession: loadEnvironmentForSessionMock,
+    loadSetupRunForSession: loadSetupRunForSessionMock,
   };
 });
 
@@ -128,6 +131,7 @@ describe('session creation preflight', () => {
     mergeProfileConfigurationMock.mockResolvedValue({});
     getBuiltinAgentSettingsMock.mockResolvedValue({});
     loadEnvironmentForSessionMock.mockResolvedValue({ status: 'none' });
+    loadSetupRunForSessionMock.mockResolvedValue(null);
     assertKiloModelAvailableMock.mockResolvedValue(undefined);
     assertRepositoryAccessMock.mockResolvedValue(undefined);
     assertEnvironmentRepositoriesAccessMock.mockResolvedValue(undefined);
@@ -668,13 +672,18 @@ describe('session creation preflight', () => {
       }
     );
 
-    it('drops a client-supplied environment reference and allocation', async () => {
+    it('drops a client-supplied environment reference, allocation and setup binding', async () => {
       const resolved = await preflightSessionCreation(
         request({
           repository: githubRepository,
           options: webOptions,
           environment: environmentLoad({}, environmentId).reference,
           environmentSandboxAllocation: 'vercel-large',
+          environmentSetup: {
+            runId: '22222222-2222-4222-8222-222222222222',
+            environmentId,
+            role: 'setup',
+          },
         }),
         context,
         'prepareSession'
@@ -682,6 +691,7 @@ describe('session creation preflight', () => {
 
       expect(resolved.environment).toBeUndefined();
       expect(resolved.environmentSandboxAllocation).toBeUndefined();
+      expect(resolved).not.toHaveProperty('environmentSetup');
     });
 
     it('runs without an environment when the repository has none', async () => {
@@ -1365,6 +1375,401 @@ describe('user built-in agent overrides', () => {
   });
 });
 
+describe('environment setup sessions', () => {
+  const draftEnvironmentId = '123e4567-e89b-12d3-a456-426614174088';
+  const otherEnvironmentId = '123e4567-e89b-12d3-a456-426614174077';
+  const runId = '22222222-2222-4222-8222-222222222222';
+  const githubRepository = { type: 'github' as const, repo: 'acme/repo' };
+  const webOptions = { createdOnPlatform: 'cloud-agent-web' };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mergeProfileConfigurationMock.mockResolvedValue({});
+    loadEnvironmentForSessionMock.mockResolvedValue({ status: 'none' });
+    loadSetupRunForSessionMock.mockResolvedValue(null);
+    assertKiloModelAvailableMock.mockResolvedValue(undefined);
+    assertRepositoryAccessMock.mockResolvedValue(undefined);
+    assertEnvironmentRepositoriesAccessMock.mockResolvedValue(undefined);
+    assertOrganizationMembershipMock.mockResolvedValue(undefined);
+    parentSpawnContextMock.mockResolvedValue({
+      token: 'trusted-parent-model-token',
+      createdOnPlatform: 'cloud-agent-web',
+    });
+    parentMetadataMock.mockResolvedValue(parentMetadata());
+    balanceMock.mockResolvedValue({ success: true });
+  });
+
+  function setupRequest(overrides: Partial<SessionCreateRequest> = {}): SessionCreateRequest {
+    return request({
+      repository: githubRepository,
+      options: webOptions,
+      requestedEnvironment: { id: draftEnvironmentId },
+      environmentSetupRunId: runId,
+      ...overrides,
+    });
+  }
+
+  function matchedEnvironment(
+    egress: {
+      egressMode: 'allowlist' | 'unrestricted' | null;
+      egressAllowlist: string[] | null;
+      egressRequiredHosts?: string[];
+    } = { egressMode: null, egressAllowlist: null }
+  ) {
+    return {
+      status: 'match' as const,
+      environment: {
+        ...environmentLoad({}, draftEnvironmentId),
+        ...egress,
+      },
+    };
+  }
+
+  it('binds a setup session to the starting run and resolves the draft', async () => {
+    loadSetupRunForSessionMock.mockResolvedValueOnce({
+      status: 'starting',
+      draftEnvironmentId,
+    });
+    loadEnvironmentForSessionMock.mockResolvedValueOnce(matchedEnvironment());
+
+    const resolved = await preflightSessionCreation(setupRequest(), context, 'prepareSession');
+
+    expect(loadSetupRunForSessionMock).toHaveBeenCalledWith(db, {
+      runId,
+      owner: { type: 'user', id: 'user-123' },
+    });
+    expect(loadEnvironmentForSessionMock).toHaveBeenCalledWith(db, {
+      owner: { type: 'user', id: 'user-123' },
+      repository: { platform: 'github', repoFullName: 'acme/repo' },
+      environmentId: draftEnvironmentId,
+      allowDraft: { setupRunId: runId },
+    });
+    expect(resolved.environmentSetup).toEqual({
+      runId,
+      environmentId: draftEnvironmentId,
+      role: 'setup',
+    });
+    expect(resolved.environment?.environmentId).toBe(draftEnvironmentId);
+  });
+
+  it('gives only the admitted setup session full audited access for discovery', async () => {
+    loadSetupRunForSessionMock.mockResolvedValueOnce({ status: 'starting', draftEnvironmentId });
+    loadEnvironmentForSessionMock.mockResolvedValueOnce(
+      matchedEnvironment({
+        egressMode: 'allowlist',
+        egressAllowlist: ['existing.example.com'],
+        egressRequiredHosts: ['approved.example.com'],
+      })
+    );
+
+    const resolved = await preflightSessionCreation(
+      setupRequest({
+        runtime: { sandboxAllocation: 'cloudflare-containers-standard-3' },
+      }),
+      context,
+      'prepareSession'
+    );
+
+    expect(resolved.runtime).toEqual({
+      sandboxAllocation: 'cloudflare-containers-standard-3',
+      egressMode: 'unrestricted',
+      egressAudit: true,
+    });
+  });
+
+  it.each([
+    { name: 'a wrong draft', run: { status: 'starting', draftEnvironmentId: otherEnvironmentId } },
+    { name: 'an already running run', run: { status: 'running', draftEnvironmentId } },
+    { name: 'a missing run', run: null },
+  ])('rejects a setup session for $name', async ({ run }) => {
+    loadSetupRunForSessionMock.mockResolvedValueOnce(run);
+
+    await expect(
+      preflightSessionCreation(setupRequest(), context, 'prepareSession')
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: 'Environment setup run is not available',
+    });
+
+    expect(loadEnvironmentForSessionMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects a setup session under an authority token', async () => {
+    const authority = {
+      version: 1 as const,
+      ownerId: context.userId,
+      parentSessionId: PARENT_SESSION_ID,
+      organizationId: null,
+      authorizationId: '12345678-1234-4234-8234-123456789abc',
+      expiresAt: Math.floor(Date.now() / 1000) + 24 * 3600,
+    };
+
+    await expect(
+      preflightSessionCreation(
+        setupRequest({ parentCloudAgentSessionId: PARENT_SESSION_ID }),
+        { ...context, cloudAgentAuthority: authority },
+        'prepareSession'
+      )
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+
+    expect(loadSetupRunForSessionMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects a resolved environment that does not match the binding', async () => {
+    loadSetupRunForSessionMock.mockResolvedValueOnce({
+      status: 'starting',
+      draftEnvironmentId,
+    });
+    loadEnvironmentForSessionMock.mockResolvedValueOnce({
+      status: 'match',
+      environment: environmentLoad({}, otherEnvironmentId),
+    });
+
+    await expect(
+      preflightSessionCreation(setupRequest(), context, 'prepareSession')
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: 'Environment setup run is not available',
+    });
+  });
+
+  it.each([
+    {
+      name: 'both fields',
+      overrides: {
+        environmentSetupRunId: runId,
+        verificationOf: { runId },
+      },
+    },
+    {
+      name: 'a setup run without a requested environment',
+      overrides: {
+        environmentSetupRunId: runId,
+        requestedEnvironment: undefined,
+      },
+    },
+  ])('rejects $name', async ({ overrides }) => {
+    await expect(
+      preflightSessionCreation(setupRequest(overrides), context, 'prepareSession')
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+  });
+
+  describe('verification children', () => {
+    const authority = {
+      version: 1 as const,
+      ownerId: context.userId,
+      parentSessionId: PARENT_SESSION_ID,
+      organizationId: null,
+      authorizationId: '12345678-1234-4234-8234-123456789abc',
+      expiresAt: Math.floor(Date.now() / 1000) + 24 * 3600,
+      environmentSetup: { runId, environmentId: draftEnvironmentId },
+    };
+    const parentSetupBinding = {
+      runId,
+      environmentId: draftEnvironmentId,
+      role: 'setup' as const,
+    };
+
+    function verificationRequest(
+      overrides: Partial<SessionCreateRequest> = {}
+    ): SessionCreateRequest {
+      return request({
+        repository: githubRepository,
+        parentCloudAgentSessionId: PARENT_SESSION_ID,
+        options: { createdOnPlatform: 'cloud-agent' },
+        requestedEnvironment: { id: draftEnvironmentId },
+        verificationOf: { runId },
+        ...overrides,
+      });
+    }
+
+    function scopedContext(): TRPCContext {
+      return { ...context, cloudAgentAuthority: authority } as TRPCContext;
+    }
+
+    it('resolves the draft policy, skips the parent policy and copies auditing', async () => {
+      parentSpawnContextMock.mockResolvedValueOnce({
+        token: 'trusted-parent-model-token',
+        createdOnPlatform: 'cloud-agent-web',
+        environmentSetup: parentSetupBinding,
+        egressAudit: true,
+      });
+      loadSetupRunForSessionMock.mockResolvedValueOnce({
+        status: 'running',
+        draftEnvironmentId,
+      });
+      loadEnvironmentForSessionMock.mockResolvedValueOnce(
+        matchedEnvironment({
+          egressMode: 'allowlist',
+          egressAllowlist: ['draft.example.com'],
+          egressRequiredHosts: ['required.example.com'],
+        })
+      );
+      parentMetadataMock.mockResolvedValue(
+        parentMetadata({
+          sandboxProvider: 'cloudflare-containers',
+          sandboxId: 'ses-0123456789abcdef',
+          egressMode: 'allowlist',
+          egressAllowlist: ['parent.example.com'],
+        })
+      );
+
+      const resolved = await preflightSessionCreation(
+        verificationRequest(),
+        scopedContext(),
+        'prepareSession'
+      );
+
+      expect(parentMetadataMock).not.toHaveBeenCalled();
+      expect(loadEnvironmentForSessionMock).toHaveBeenCalledWith(
+        db,
+        expect.objectContaining({
+          environmentId: draftEnvironmentId,
+          allowDraft: { setupRunId: runId },
+        })
+      );
+      expect(resolved.environmentSetup).toEqual({
+        runId,
+        environmentId: draftEnvironmentId,
+        role: 'verification',
+      });
+      expect(resolved.runtime).toEqual({
+        egressMode: 'allowlist',
+        egressAllowlist: ['draft.example.com', 'required.example.com'],
+        egressAudit: true,
+      });
+    });
+
+    it('does not copy the parent audit onto another sandbox provider', async () => {
+      parentSpawnContextMock.mockResolvedValueOnce({
+        token: 'trusted-parent-model-token',
+        createdOnPlatform: 'cloud-agent-web',
+        environmentSetup: parentSetupBinding,
+        egressAudit: true,
+      });
+      loadSetupRunForSessionMock.mockResolvedValueOnce({
+        status: 'running',
+        draftEnvironmentId,
+      });
+      loadEnvironmentForSessionMock.mockResolvedValueOnce(matchedEnvironment());
+
+      const resolved = await preflightSessionCreation(
+        verificationRequest({ runtime: { sandboxAllocation: 'vercel-large' } }),
+        scopedContext(),
+        'prepareSession'
+      );
+
+      expect(resolved.runtime).toEqual({ sandboxAllocation: 'vercel-large' });
+    });
+
+    it.each([
+      {
+        name: 'a claim mismatch',
+        authoritySetup: {
+          runId: '33333333-3333-4333-8333-333333333333',
+          environmentId: draftEnvironmentId,
+        },
+        parentSetup: parentSetupBinding,
+      },
+      {
+        name: 'a parent without the setup binding',
+        authoritySetup: { runId, environmentId: draftEnvironmentId },
+        parentSetup: undefined,
+      },
+    ])('rejects $name', async ({ authoritySetup, parentSetup }) => {
+      parentSpawnContextMock.mockResolvedValueOnce({
+        token: 'trusted-parent-model-token',
+        createdOnPlatform: 'cloud-agent-web',
+        ...(parentSetup ? { environmentSetup: parentSetup } : {}),
+      });
+      loadSetupRunForSessionMock.mockResolvedValueOnce({
+        status: 'running',
+        draftEnvironmentId,
+      });
+
+      await expect(
+        preflightSessionCreation(
+          verificationRequest(),
+          {
+            ...context,
+            cloudAgentAuthority: { ...authority, environmentSetup: authoritySetup },
+          } as TRPCContext,
+          'prepareSession'
+        )
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+
+      expect(loadEnvironmentForSessionMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('required hosts', () => {
+    it('merges the environment hosts into an allowlist session', async () => {
+      loadEnvironmentForSessionMock.mockResolvedValueOnce(
+        matchedEnvironment({
+          egressMode: 'allowlist',
+          egressAllowlist: ['api.example.com'],
+          egressRequiredHosts: ['api.example.com', 'required.example.com'],
+        })
+      );
+
+      const resolved = await preflightSessionCreation(
+        request({ repository: githubRepository, options: webOptions }),
+        context,
+        'start'
+      );
+
+      expect(resolved.runtime).toEqual({
+        egressMode: 'allowlist',
+        egressAllowlist: ['api.example.com', 'required.example.com'],
+      });
+    });
+
+    it('does not add required hosts to an unrestricted session', async () => {
+      loadEnvironmentForSessionMock.mockResolvedValueOnce(
+        matchedEnvironment({
+          egressMode: 'unrestricted',
+          egressAllowlist: null,
+          egressRequiredHosts: ['required.example.com'],
+        })
+      );
+
+      const resolved = await preflightSessionCreation(
+        request({ repository: githubRepository, options: webOptions }),
+        context,
+        'start'
+      );
+
+      expect(resolved).not.toHaveProperty('runtime');
+    });
+
+    it('rejects an effective allowlist that exceeds 100 hosts', async () => {
+      const allowlist = Array.from({ length: 60 }, (_, index) => `saved-${index}.example.com`);
+      const requiredHosts = Array.from(
+        { length: 50 },
+        (_, index) => `required-${index}.example.com`
+      );
+      loadEnvironmentForSessionMock.mockResolvedValueOnce(
+        matchedEnvironment({
+          egressMode: 'allowlist',
+          egressAllowlist: allowlist,
+          egressRequiredHosts: requiredHosts,
+        })
+      );
+
+      await expect(
+        preflightSessionCreation(
+          request({ repository: githubRepository, options: webOptions }),
+          context,
+          'start'
+        )
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: "The allowlist and the environment's required hosts together exceed 100 hostnames",
+      });
+    });
+  });
+});
+
 describe('scoped child network policy', () => {
   const authority = {
     version: 1 as const,
@@ -1402,6 +1807,7 @@ describe('scoped child network policy', () => {
     mergeProfileConfigurationMock.mockResolvedValue({});
     getBuiltinAgentSettingsMock.mockResolvedValue({});
     loadEnvironmentForSessionMock.mockResolvedValue({ status: 'none' });
+    loadSetupRunForSessionMock.mockResolvedValue(null);
     assertRepositoryAccessMock.mockResolvedValue(undefined);
     assertOrganizationMembershipMock.mockResolvedValue(undefined);
     parentSpawnContextMock.mockResolvedValue({

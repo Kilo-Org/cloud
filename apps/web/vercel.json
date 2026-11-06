@@ -3,6 +3,10 @@
   "skipMiddlewareRequestBody": true,
   "crons": [
     {
+      "path": "/api/cron/cleanup-environment-setup-runs",
+      "schedule": "30 4 * * *"
+    },
+    {
       "path": "/api/cron/expire-credits",
       "schedule": "*/5 * * * *"
     },

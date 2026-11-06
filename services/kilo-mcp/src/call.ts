@@ -319,8 +319,9 @@ export async function forwardCatalogCall(options: {
   auth: ForwardedAuth;
   webBaseUrl: string;
   fetchImpl?: typeof fetch;
+  maxResultBytes?: number;
 }): Promise<{ text: string; truncated: boolean }> {
-  return serializeWithCap(await fetchCatalogCall(options));
+  return serializeWithCap(await fetchCatalogCall(options), options.maxResultBytes);
 }
 
 export async function fetchCatalogCall(options: {
@@ -445,6 +446,7 @@ export async function callCatalogEndpoint(options: {
   auth: ForwardedAuth;
   webBaseUrl: string;
   fetchImpl?: typeof fetch;
+  maxResultBytes?: number;
 }): Promise<{ text: string; truncated: boolean }> {
   const { catalog, path, input } = options;
   assertScopedCall(options.auth, path, input);
@@ -468,6 +470,7 @@ export async function callCatalogEndpoint(options: {
     auth: options.auth,
     webBaseUrl: options.webBaseUrl,
     ...(options.fetchImpl ? { fetchImpl: options.fetchImpl } : {}),
+    ...(options.maxResultBytes ? { maxResultBytes: options.maxResultBytes } : {}),
   });
 }
 

@@ -1,10 +1,14 @@
 import { TRPCError } from '@trpc/server';
 import type { WorkerDb } from '@kilocode/db/client';
 import {
+  ENVIRONMENT_SETUP_LIMITS,
   getBuiltinAgentSettings,
   hasBuiltinAgentSettings,
+  isAgentWritableSetupRunStatus,
   loadEnvironmentForSession,
+  loadSetupRunForSession,
   mergeProfileConfiguration,
+  mergeRequiredHosts,
   profileMcpServersToClientRecord,
   ProfileNotFoundError,
   type BuiltinAgentSettings,
@@ -18,12 +22,17 @@ import {
 } from '@kilocode/cloud-agent-profile';
 import { repoFullNameFromGitUrl } from '@kilocode/worker-utils/git-url';
 import type { EgressMode } from '@kilocode/worker-utils/egress-allowlist';
+import {
+  getSandboxAllocationProvider,
+  sandboxAllocationSchema,
+} from '@kilocode/worker-utils/sandbox-allocation';
 import type { CloudAgentAuthority } from '@kilocode/worker-utils/cloud-agent-authority';
 import { getPgDb } from '../../db/pg.js';
 import { assertKiloModelAvailable } from '../../model-validation.js';
 import { CurrentSessionMetadataSchema } from '../../persistence/session-metadata.js';
 import { SessionProfileBundleSchema } from '../../persistence/schemas.js';
 import type { SessionProfileBundle } from '../../session-profile.js';
+import type { EnvironmentSetupBinding } from '../../shared/environment-setup.js';
 import type { SessionCreateRequest } from '../../session/session-requests.js';
 import { launchRepositoryIdentity } from '../../session/environment-launch.js';
 import { isPolicyBearingAuthToken } from '../../session/policy-bearing-token.js';
@@ -98,21 +107,33 @@ function environmentOwnerForSession(
  * names it in `requestedEnvironment`. Without a selection, a client that marks
  * `requireEnvironmentChoice` gets a conflict that names the environments, and
  * every other client runs with no environment.
+ *
+ * A setup or verification session names its binding instead; that resolves the
+ * run's draft even on an origin that has no implicit defaults.
  */
 async function resolveEnvironment(
   ctx: Pick<TRPCContext, 'env' | 'userId'>,
   input: SessionCreateRequest,
   policy: ProfileResolutionPolicy,
-  db?: WorkerDb
+  db?: WorkerDb,
+  binding?: EnvironmentSetupBinding
 ): Promise<EnvironmentForSession | null> {
-  if (policy.defaultProfileResolution !== 'include-web-defaults') return null;
+  if (policy.defaultProfileResolution !== 'include-web-defaults' && binding === undefined)
+    return null;
   const repository = launchRepositoryIdentity(input.repository);
   if (!repository) return null;
 
   const resolution = await loadEnvironmentForSession(db ?? getPgDb(ctx.env), {
     owner: environmentOwnerForSession(ctx, input),
     repository,
-    ...(input.requestedEnvironment ? { environmentId: input.requestedEnvironment.id } : {}),
+    ...(binding
+      ? {
+          environmentId: binding.environmentId,
+          allowDraft: { setupRunId: binding.runId },
+        }
+      : input.requestedEnvironment
+        ? { environmentId: input.requestedEnvironment.id }
+        : {}),
   });
   switch (resolution.status) {
     case 'match':
@@ -282,9 +303,18 @@ export async function resolveEffectiveSessionConfiguration(
   ctx: Pick<TRPCContext, 'env' | 'userId'>,
   input: SessionCreateRequest,
   policy: ProfileResolutionPolicy,
-  db?: WorkerDb
+  db?: WorkerDb,
+  binding?: EnvironmentSetupBinding
 ): Promise<SessionCreateRequest> {
-  const environment = await resolveEnvironment(ctx, input, policy, db);
+  const environment = await resolveEnvironment(ctx, input, policy, db, binding);
+  // The binding is only valid for the environment it names: a run's draft that
+  // did not resolve must never run as an unbound session.
+  if (
+    binding !== undefined &&
+    (environment === null || environment.reference.environmentId !== binding.environmentId)
+  ) {
+    throw new TRPCError({ code: 'FORBIDDEN', message: 'Environment setup run is not available' });
+  }
   assertRequestedRepositories({
     environment: environment?.reference ?? null,
     launch: launchRepositoryIdentity(input.repository),
@@ -301,11 +331,12 @@ export async function resolveEffectiveSessionConfiguration(
 
   const resolvedRequest = applyProfileResolution(input, resolved, builtinAgents);
   assertResolvedConfigurationWithinSessionLimits(resolvedRequest.profile?.resolved);
-  // The reference and the allocation travel beside the merged configuration;
-  // a client cannot set them.
+  // The reference, the allocation and the setup binding travel beside the
+  // merged configuration; a client cannot set them.
   const {
     environment: _clientEnvironment,
     environmentSandboxAllocation: _clientAllocation,
+    environmentSetup: _clientEnvironmentSetup,
     ...withoutEnvironment
   } = resolvedRequest;
   let effectiveRequest: SessionCreateRequest = {
@@ -314,7 +345,17 @@ export async function resolveEffectiveSessionConfiguration(
     ...(environment?.sandboxAllocation
       ? { environmentSandboxAllocation: environment.sandboxAllocation }
       : {}),
+    ...(binding ? { environmentSetup: binding } : {}),
   };
+  // Only the server-admitted setup session discovers hosts with full access.
+  // Verification children resolve the draft's restricted policy below.
+  if (binding?.role === 'setup') {
+    const { egressAllowlist: _allowlist, ...runtime } = effectiveRequest.runtime ?? {};
+    return {
+      ...effectiveRequest,
+      runtime: { ...runtime, egressMode: 'unrestricted', egressAudit: true },
+    };
+  }
   // A saved allowlist enters the same runtime slot as explicit input, but only
   // when the request named no policy. Full and legacy null policies are already
   // the unrestricted default, so they need no write.
@@ -330,6 +371,25 @@ export async function resolveEffectiveSessionConfiguration(
         egressMode: 'allowlist',
         egressAllowlist: environment.egressAllowlist ?? [],
       },
+    };
+  }
+  // A restricted policy always includes the hosts the setup agent found. The
+  // environment's saved policy and an explicit client allowlist both pass
+  // through this merge.
+  if (environment && effectiveRequest.runtime?.egressMode === 'allowlist') {
+    const merged = mergeRequiredHosts(
+      effectiveRequest.runtime.egressAllowlist ?? [],
+      environment.egressRequiredHosts
+    );
+    if (merged && merged.length > ENVIRONMENT_SETUP_LIMITS.MAX_EFFECTIVE_ALLOWLIST) {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: "The allowlist and the environment's required hosts together exceed 100 hostnames",
+      });
+    }
+    effectiveRequest = {
+      ...effectiveRequest,
+      runtime: { ...effectiveRequest.runtime, egressAllowlist: merged ?? [] },
     };
   }
   return effectiveRequest;
@@ -387,6 +447,18 @@ async function readParentEgressPolicy(
   };
 }
 
+/**
+ * Egress auditing exists only on an isolated Cloudflare containers sandbox. A
+ * verification child copies the parent's audit choice only when its own named
+ * allocation keeps it there; an unnamed isolated placement is containers.
+ */
+function supportsEgressAudit(request: SessionCreateRequest): boolean {
+  const allocation = request.runtime?.sandboxAllocation ?? request.environmentSandboxAllocation;
+  if (allocation === undefined) return true;
+  const parsed = sandboxAllocationSchema.safeParse(allocation);
+  return !parsed.success || getSandboxAllocationProvider(parsed.data) === 'cloudflare-containers';
+}
+
 export function assertModeAvailableForProfile(
   mode: string,
   profile: SessionProfileBundle,
@@ -441,6 +513,87 @@ type SessionCreationContext = Pick<
   Partial<Pick<TRPCContext, 'request'>>;
 type EndpointValidator = (request: SessionCreateRequest) => void | Promise<void>;
 
+type ParentSpawnContext = {
+  environmentSetup?: EnvironmentSetupBinding;
+  egressAudit?: boolean;
+};
+
+/**
+ * The setup run a session serves, from the two trusted request fields. A setup
+ * session must be started by the server on a run that is still `starting`, and
+ * its draft must be the requested environment. A verification session is a
+ * child of that setup session, so both its authority claim and the parent's
+ * metadata must agree with the request.
+ */
+async function resolveEnvironmentSetupBinding(
+  ctx: Pick<TRPCContext, 'env' | 'userId' | 'cloudAgentAuthority'>,
+  request: SessionCreateRequest,
+  parentSpawnContext: ParentSpawnContext | undefined,
+  db?: WorkerDb
+): Promise<EnvironmentSetupBinding | undefined> {
+  const setupRunId = request.environmentSetupRunId;
+  if (setupRunId === undefined && request.verificationOf === undefined) return undefined;
+
+  const setupRunDb = db ?? getPgDb(ctx.env);
+  const owner = environmentOwnerForSession(ctx, request);
+
+  if (setupRunId !== undefined) {
+    if (request.verificationOf !== undefined) {
+      throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid environment setup request' });
+    }
+    // The server starts setup sessions on the internal key. A scoped child can
+    // never take the setup role.
+    if (ctx.cloudAgentAuthority !== undefined) {
+      throw new TRPCError({ code: 'FORBIDDEN', message: 'Environment setup run is not available' });
+    }
+    const environmentId = request.requestedEnvironment?.id;
+    if (environmentId === undefined) {
+      throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid environment setup request' });
+    }
+    const run = await loadSetupRunForSession(setupRunDb, { runId: setupRunId, owner });
+    if (!run || run.status !== 'starting' || run.draftEnvironmentId !== environmentId) {
+      throw new TRPCError({ code: 'FORBIDDEN', message: 'Environment setup run is not available' });
+    }
+    return { runId: setupRunId, environmentId, role: 'setup' };
+  }
+
+  const verificationOf = request.verificationOf;
+  if (verificationOf === undefined) return undefined;
+  const environmentId = request.requestedEnvironment?.id;
+  const claim = ctx.cloudAgentAuthority?.environmentSetup;
+  if (
+    claim === undefined ||
+    claim.runId !== verificationOf.runId ||
+    claim.environmentId !== environmentId
+  ) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Environment verification is not permitted',
+    });
+  }
+  const parentBinding = parentSpawnContext?.environmentSetup;
+  if (
+    parentBinding === undefined ||
+    parentBinding.role !== 'setup' ||
+    parentBinding.runId !== verificationOf.runId ||
+    parentBinding.environmentId !== environmentId
+  ) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Environment verification is not permitted',
+    });
+  }
+  const run = await loadSetupRunForSession(setupRunDb, { runId: verificationOf.runId, owner });
+  if (
+    !run ||
+    !isAgentWritableSetupRunStatus(run.status) ||
+    run.draftEnvironmentId !== environmentId
+  ) {
+    throw new TRPCError({ code: 'FORBIDDEN', message: 'Environment setup run is not available' });
+  }
+  return { runId: verificationOf.runId, environmentId, role: 'verification' };
+}
+
 export async function preflightSessionCreation(
   request: SessionCreateRequest,
   ctx: SessionCreationContext,
@@ -448,7 +601,8 @@ export async function preflightSessionCreation(
   validateEndpoint?: EndpointValidator,
   policyOptions?: SessionCreationPolicyOptions
 ): Promise<SessionCreateRequest> {
-  let inheritedEgress: InheritedEgressPolicy | undefined;
+  let parentStub: (() => SessionStub) | undefined;
+  let parentSpawnContext: ParentSpawnContext | undefined;
   if (ctx.cloudAgentAuthority) {
     const authority = ctx.cloudAgentAuthority;
     if (
@@ -458,7 +612,7 @@ export async function preflightSessionCreation(
     ) {
       throw new TRPCError({ code: 'FORBIDDEN', message: 'Cloud Agent parent binding mismatch' });
     }
-    const parentStub = () => getSandboxSessionStub(ctx.env, ctx.userId, authority.parentSessionId);
+    parentStub = () => getSandboxSessionStub(ctx.env, ctx.userId, authority.parentSessionId);
     let token: string;
     let parentCreatedOnPlatform: string | undefined;
     try {
@@ -469,6 +623,10 @@ export async function preflightSessionCreation(
       );
       token = parent.token;
       parentCreatedOnPlatform = parent.createdOnPlatform;
+      parentSpawnContext = {
+        environmentSetup: parent.environmentSetup,
+        egressAudit: parent.egressAudit,
+      };
     } catch {
       throw new TRPCError({
         code: 'FORBIDDEN',
@@ -485,7 +643,6 @@ export async function preflightSessionCreation(
       ...request.options,
       createdOnPlatform: parentCreatedOnPlatform,
     };
-    inheritedEgress = await readParentEgressPolicy(parentStub, authority);
     const internalApiKey = ctx.request?.headers.get('x-internal-api-key');
     const skipBalance =
       ctx.request?.headers.get('x-skip-balance-check') === 'true' &&
@@ -520,10 +677,24 @@ export async function preflightSessionCreation(
     repository: request.repository,
   });
 
+  const binding = await resolveEnvironmentSetupBinding(ctx, request, parentSpawnContext, db);
+  let inheritedEgress: InheritedEgressPolicy | undefined;
+  // A verification child resolves the draft's own network policy. It copies the
+  // parent's audit choice instead of the recorded parent policy.
+  if (ctx.cloudAgentAuthority && binding?.role !== 'verification' && parentStub) {
+    inheritedEgress = await readParentEgressPolicy(parentStub, ctx.cloudAgentAuthority);
+  }
+
   const policy: ProfileResolutionPolicy = policyOptions?.includeWebDefaults
     ? { defaultProfileResolution: 'include-web-defaults' }
     : profileResolutionPolicyForSessionCreateOrigin(request.options?.createdOnPlatform);
-  let resolvedRequest = await resolveEffectiveSessionConfiguration(ctx, request, policy, db);
+  let resolvedRequest = await resolveEffectiveSessionConfiguration(
+    ctx,
+    request,
+    policy,
+    db,
+    binding
+  );
   if (policyOptions?.continuationModeResolution) {
     // Replace the agent object instead of mutating it: the resolution result
     // shares the caller's `agent` reference, and the continuation handler derives
@@ -563,6 +734,16 @@ export async function preflightSessionCreation(
       delete runtime.egressAllowlist;
     }
     resolvedRequest = { ...resolvedRequest, runtime };
+  }
+  if (
+    binding?.role === 'verification' &&
+    parentSpawnContext?.egressAudit === true &&
+    supportsEgressAudit(resolvedRequest)
+  ) {
+    resolvedRequest = {
+      ...resolvedRequest,
+      runtime: { ...resolvedRequest.runtime, egressAudit: true },
+    };
   }
   assertModeAvailableForProfile(
     resolvedRequest.agent.mode,

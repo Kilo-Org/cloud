@@ -16,6 +16,7 @@ import type {
 } from '../execution/types.js';
 import { launchRepositoryIdentity } from './environment-launch.js';
 import type { SessionRepositoryRequest } from './session-requests.js';
+import type { EnvironmentSetupBinding } from '../shared/environment-setup.js';
 
 export type GroupedRegisterSessionInput = {
   allowSubagentSessions?: boolean;
@@ -38,6 +39,8 @@ export type GroupedRegisterSessionInput = {
   profile?: SessionProfileBundle;
   /** The environment scope preflight authorized; registration adds the branch of each V2 repository. */
   environment?: EnvironmentScope;
+  /** The environment setup role preflight bound; never client-controlled. */
+  environmentSetup?: EnvironmentSetupBinding;
   /** The additional-repository branches the client requested for the environment. */
   requestedEnvironmentRepositories?: { repoFullName: string; branch?: string }[];
   finalization?: SessionFinalization;
@@ -248,6 +251,7 @@ export async function buildSessionMetadataFromRegistration(
     finalization: input.finalization,
     profile: input.profile,
     ...(environment.reference ? { environment: environment.reference } : {}),
+    environmentSetup: input.environmentSetup,
     callback: input.callback,
     workspace: {
       ...input.workspace,

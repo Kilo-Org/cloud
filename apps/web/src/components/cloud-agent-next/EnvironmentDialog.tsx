@@ -20,6 +20,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { EnvironmentSecretRequestList } from './EnvironmentSecretRequestList';
+import { omitUnresolvedSeededSecrets, seedPendingSecretKeys } from './environment-setup-secrets';
+import {
+  useEnvironmentSetupRunMutations,
+  type SetupRunResponse,
+} from '@/hooks/useEnvironmentSetupRuns';
+import { useEnvironmentSetupEnabled } from '@/hooks/useEnvironmentSetupRuns';
+import { EnvironmentSetupAgentDialog } from './EnvironmentSetupAgentDialog';
 import { EnvironmentDeleteDialog } from './EnvironmentDeleteDialog';
 import { allocationSupportsMultiRepository } from '@kilocode/worker-utils/sandbox-allocation';
 import {
@@ -36,6 +44,7 @@ import {
   toEnvironmentScript,
   toNetworkAccessDraft,
 } from './environment-form';
+import { EnvironmentRequiredHosts } from './EnvironmentRequiredHosts';
 import { EnvironmentNetworkField } from './EnvironmentNetworkField';
 import { EnvironmentBuildPanel } from './EnvironmentBuildPanel';
 import {
@@ -55,8 +64,11 @@ import { EnvironmentVariablesEditor } from './EnvironmentVariablesEditor';
 import { splitRepositoryName, toSelectableAllocation } from './settings/settings-options';
 
 type EnvironmentDialogProps = {
+  initialPage?: 'overview' | 'scripts' | 'variables' | 'network';
+  setupRun?: SetupRunResponse;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onSetupStarted?: () => void;
   organizationId?: string;
   repository: EnvironmentRepository | undefined;
   repositoryLabel?: string;
@@ -73,6 +85,7 @@ export function EnvironmentDialog({
   environmentId,
   ...props
 }: EnvironmentDialogProps) {
+  const [saving, setSaving] = useState(false);
   const detailQuery = useCloudAgentEnvironment(environmentId, {
     organizationId: props.organizationId,
     enabled: open,
@@ -81,8 +94,13 @@ export function EnvironmentDialog({
   const isError =
     !!environmentId && (detailQuery.isError || (!detailQuery.isLoading && !detailQuery.data));
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[85vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
+    <Dialog
+      open={open}
+      onOpenChange={next => {
+        if (!saving) onOpenChange(next);
+      }}
+    >
+      <DialogContent className="flex max-h-[85vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl [&_button]:pointer-coarse:min-h-11 [&_input]:pointer-coarse:min-h-11">
         {isLoading || isError ? (
           <>
             <DialogHeader className="p-6">
@@ -98,7 +116,16 @@ export function EnvironmentDialog({
             )}
           </>
         ) : (
-          <EnvironmentForm key={environmentId ?? 'new'} {...props} existing={detailQuery.data} />
+          <EnvironmentForm
+            key={environmentId ?? 'new'}
+            {...props}
+            onSetupStarted={() => {
+              onOpenChange(false);
+              props.onSetupStarted?.();
+            }}
+            existing={detailQuery.data}
+            onPendingChange={setSaving}
+          />
         )}
       </DialogContent>
     </Dialog>
@@ -108,22 +135,30 @@ export function EnvironmentDialog({
 type EnvironmentFormProps = Omit<
   EnvironmentDialogProps,
   'open' | 'onOpenChange' | 'environmentId'
-> & { existing: EnvironmentResponse | undefined };
-type EditorPage = 'overview' | 'scripts' | 'start' | 'variables';
+> & { existing: EnvironmentResponse | undefined; onPendingChange: (pending: boolean) => void };
+type EditorPage = 'overview' | 'scripts' | 'start' | 'variables' | 'network';
 
 function EnvironmentForm({
   organizationId,
+  initialPage,
+  setupRun,
   repository,
   repositoryLabel,
   selectedProfileId,
   canManage,
   existing,
+  onPendingChange,
   onSaved,
   onDeleted,
+  onSetupStarted,
 }: EnvironmentFormProps) {
   const { createEnvironment, updateEnvironment, deleteEnvironment } =
     useCloudAgentEnvironmentMutations();
-  const [page, setPage] = useState<EditorPage>('overview');
+  const [setupOpen, setSetupOpen] = useState(false);
+  const setupToggle = useEnvironmentSetupEnabled({ organizationId, enabled: canManage });
+  const [page, setPage] = useState<EditorPage>(initialPage ?? 'overview');
+  const { resolveSecretRequests } = useEnvironmentSetupRunMutations();
+  const [skippedSecrets, setSkippedSecrets] = useState<string[]>([]);
   const [initialRepositories] = useState<EnvironmentRepository[]>(() =>
     existing ? repositoriesForEnvironment(existing) : repository ? [repository] : []
   );
@@ -165,14 +200,20 @@ function EnvironmentForm({
   const startCommands =
     existing && startScript === initialStartScript ? undefined : toEnvironmentCommands(startScript);
   // Retain the baseline shown when editing starts, even if queries refresh in the background.
-  const [savedVariables] = useState(() => ({
+  const [savedVariables, setSavedVariables] = useState<{
+    plainVars: { key: string; value: string }[];
+    secretKeys: string[];
+  }>(() => ({
     plainVars: existing?.plainVars ?? [],
     secretKeys: existing?.secretKeys ?? [],
   }));
   const [initialVariablesText] = useState(() =>
     formatEnvironmentVariables(savedVariables.plainVars, savedVariables.secretKeys)
   );
-  const [variablesText, setVariablesText] = useState(initialVariablesText);
+  const [seededSecrets] = useState(() =>
+    seedPendingSecretKeys(initialVariablesText, setupRun?.secretRequests ?? [])
+  );
+  const [variablesText, setVariablesText] = useState(seededSecrets.text);
   const hasUnsavedChanges =
     hasEnvironmentFormChanges(
       {
@@ -190,7 +231,7 @@ function EnvironmentForm({
   let variablesError: string | null = null;
   try {
     variables = buildEnvironmentVariableChanges(
-      variablesText,
+      omitUnresolvedSeededSecrets(variablesText, seededSecrets.seededKeys, skippedSecrets),
       savedVariables.plainVars,
       savedVariables.secretKeys
     );
@@ -200,7 +241,8 @@ function EnvironmentForm({
   const impact = describeEnvironmentProfileImpact(profileQuery.profiles, variables?.keys ?? []);
   const hasScript = script.trim().length > 0;
   const hasStartScript = startScript.trim().length > 0;
-  const isSaving = createEnvironment.isPending || updateEnvironment.isPending;
+  const isSaving =
+    createEnvironment.isPending || updateEnvironment.isPending || resolveSecretRequests.isPending;
   const changePage = (next: EditorPage) => {
     setError(null);
     setPage(next);
@@ -220,6 +262,7 @@ function EnvironmentForm({
     }
     setNetworkAccessError(null);
     setError(null);
+    onPendingChange(true);
     try {
       validateEnvironmentName(savedName);
       validateEnvironmentCommands(commands);
@@ -237,6 +280,24 @@ function EnvironmentForm({
           sandboxAllocation,
           ...egress.policy,
         });
+        if (setupRun) {
+          setSavedVariables({
+            plainVars: Object.entries(variables.plainVars).map(([key, value]) => ({ key, value })),
+            secretKeys: variables.keys.filter(key => !(key in variables.plainVars)),
+          });
+          try {
+            await resolveSecretRequests.mutateAsync({
+              organizationId,
+              runId: setupRun.id,
+              skipped: skippedSecrets,
+            });
+          } catch (caught) {
+            setError(
+              `The environment was saved, but the requests could not be resolved: ${caught instanceof Error ? caught.message : 'Try saving again.'}`
+            );
+            return;
+          }
+        }
         onSaved(existing.id);
       } else {
         if (repositories.length === 0) {
@@ -263,6 +324,8 @@ function EnvironmentForm({
       }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Could not save the environment.');
+    } finally {
+      onPendingChange(false);
     }
   };
   const handleDelete = async () => {
@@ -276,6 +339,30 @@ function EnvironmentForm({
       throw new Error('Could not delete environment');
     }
   };
+
+  const networkField = (
+    <div className="space-y-3">
+      <EnvironmentNetworkField
+        value={networkAccess}
+        sandboxAllocation={sandboxAllocation}
+        error={networkAccessError}
+        disabled={!canManage || isSaving}
+        onChange={next => {
+          setNetworkAccessError(null);
+          setNetworkAccess(next);
+        }}
+      />
+      {existing && (
+        <EnvironmentRequiredHosts
+          hosts={existing.egressRequiredHosts}
+          environmentId={existing.id}
+          organizationId={organizationId}
+          canManage={canManage}
+          disabled={isSaving}
+        />
+      )}
+    </div>
+  );
 
   return (
     <>
@@ -294,15 +381,19 @@ function EnvironmentForm({
             </Button>
           )}
           <DialogTitle>
-            {page === 'scripts'
-              ? 'Setup script'
-              : page === 'start'
-                ? 'Start script'
-                : page === 'variables'
-                  ? 'Environment variables'
-                  : existing
-                    ? 'Environment'
-                    : 'Set up environment'}
+            {existing?.isDraft
+              ? 'Draft environment'
+              : page === 'scripts'
+                ? 'Setup script'
+                : page === 'start'
+                  ? 'Start script'
+                  : page === 'network'
+                    ? 'Network access'
+                    : page === 'variables'
+                      ? 'Environment variables'
+                      : existing
+                        ? 'Environment'
+                        : 'Set up environment'}
           </DialogTitle>
         </div>
         <DialogDescription className="sr-only">
@@ -318,6 +409,15 @@ function EnvironmentForm({
         <fieldset disabled={isSaving || deleteEnvironment.isPending} className="min-w-0 space-y-5">
           {page === 'overview' && (
             <>
+              {!existing?.isDraft && canManage && setupToggle.data?.canStart === true && (
+                <Button
+                  variant="secondary"
+                  className="pointer-coarse:min-h-11"
+                  onClick={() => setSetupOpen(true)}
+                >
+                  Set up with agent
+                </Button>
+              )}
               <div className="grid gap-2">
                 <Label htmlFor="environment-name" className="text-xs">
                   Name (optional)
@@ -348,16 +448,7 @@ function EnvironmentForm({
                   isAllowed={isMultiRepository ? allocationSupportsMultiRepository : undefined}
                 />
               )}
-              <EnvironmentNetworkField
-                value={networkAccess}
-                sandboxAllocation={sandboxAllocation}
-                error={networkAccessError}
-                disabled={!canManage || isSaving}
-                onChange={next => {
-                  setNetworkAccessError(null);
-                  setNetworkAccess(next);
-                }}
-              />
+              {networkField}
               <div className="space-y-3">
                 <EditorRow
                   icon={<Terminal className="size-4" />}
@@ -394,6 +485,7 @@ function EnvironmentForm({
               </div>
             </>
           )}
+          {page === 'network' && networkField}
           {page === 'scripts' && (
             <EnvironmentScriptsEditor script={script} onChange={setScript} readOnly={!canManage} />
           )}
@@ -406,16 +498,28 @@ function EnvironmentForm({
             />
           )}
           {page === 'variables' && (
-            <EnvironmentVariablesEditor
-              text={variablesText}
-              readOnly={!canManage}
-              onChange={setVariablesText}
-              removedKeys={variables?.removedKeys ?? []}
-              error={variablesError}
-            />
+            <>
+              {setupRun && (
+                <EnvironmentSecretRequestList
+                  run={setupRun}
+                  organizationId={organizationId}
+                  skipped={skippedSecrets}
+                  onSkippedChange={setSkippedSecrets}
+                  disabled={!canManage || isSaving}
+                />
+              )}
+              <EnvironmentVariablesEditor
+                text={variablesText}
+                readOnly={!canManage}
+                onChange={setVariablesText}
+                removedKeys={variables?.removedKeys ?? []}
+                error={variablesError}
+              />
+            </>
           )}
         </fieldset>
         {page === 'overview' &&
+          !existing?.isDraft &&
           (existing ? (
             <EnvironmentBuildPanel
               organizationId={organizationId}
@@ -506,6 +610,15 @@ function EnvironmentForm({
           )}
         </div>
       </DialogFooter>
+      <EnvironmentSetupAgentDialog
+        open={setupOpen}
+        onOpenChange={setSetupOpen}
+        onStarted={onSetupStarted}
+        organizationId={organizationId}
+        initialRepositories={repositories}
+        targetEnvironmentId={existing?.id}
+        targetName={savedName}
+      />
     </>
   );
 }

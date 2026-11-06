@@ -10,6 +10,9 @@ import {
   type EnvironmentSummary,
 } from '@/hooks/useCloudAgentEnvironments';
 import { useCloudAgentSettingsCanManage } from '@/hooks/useCloudAgentSettings';
+import { useEnvironmentSetupEnabled } from '@/hooks/useEnvironmentSetupRuns';
+import { EnvironmentSetupAgentDialog } from './EnvironmentSetupAgentDialog';
+import { repositoriesForEnvironment } from './environment-repositories';
 import { EnvironmentDialog } from './EnvironmentDialog';
 import { additionalEnvironmentMembers } from './environment-display';
 
@@ -39,6 +42,8 @@ export function RepositoryEnvironmentChip({
   onChooseEnvironment,
   selectedProfileId,
 }: RepositoryEnvironmentChipProps) {
+  const [setupOpen, setSetupOpen] = useState(false);
+  const setupToggle = useEnvironmentSetupEnabled({ organizationId });
   const [dialogOpen, setDialogOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const { data: canManageData } = useCloudAgentSettingsCanManage({ organizationId });
@@ -156,6 +161,18 @@ export function RepositoryEnvironmentChip({
                 {canManage ? 'Edit environment' : 'View environment'}
               </button>
             )}
+            {environment && canManage && setupToggle.data?.canStart === true && (
+              <button
+                type="button"
+                className="hover:bg-accent text-muted-foreground mt-1 w-full cursor-pointer rounded-sm px-2 py-1.5 text-left text-xs pointer-coarse:min-h-11"
+                onClick={() => {
+                  setPickerOpen(false);
+                  setSetupOpen(true);
+                }}
+              >
+                Set up with agent
+              </button>
+            )}
           </PopoverContent>
         </Popover>
       ) : (
@@ -169,6 +186,23 @@ export function RepositoryEnvironmentChip({
           {label}
         </button>
       )}
+      {environments.length === 0 && canManage && setupToggle.data?.canStart === true && (
+        <button
+          type="button"
+          className={cn(chipClassName, interactiveClassName, 'pointer-coarse:min-h-11')}
+          onClick={() => setSetupOpen(true)}
+        >
+          Set up automatically
+        </button>
+      )}
+      <EnvironmentSetupAgentDialog
+        open={setupOpen}
+        onOpenChange={setSetupOpen}
+        organizationId={organizationId}
+        initialRepositories={environment ? repositoriesForEnvironment(environment) : [repository]}
+        targetEnvironmentId={environment?.id}
+        targetName={environment?.name}
+      />
       <EnvironmentDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}

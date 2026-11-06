@@ -68,6 +68,8 @@ import {
   baseCreatePreviewNextOutputSchema,
   basePreviewOptionsNextOutputSchema,
   basePreviewOptionsNextSchema,
+  baseListPreviewServicesNextOutputSchema,
+  baseListPreviewServicesNextSchema,
   cloudAgentGetAttachmentUploadUrlSchema,
   cloudAgentGetAttachmentDownloadUrlSchema,
   cloudAgentReleasePendingUploadsSchema,
@@ -547,6 +549,22 @@ export const cloudAgentNextRouter = createTRPCRouter({
         });
       if (!options.enabled) return { enabled: false };
       return { enabled: true, urlTemplate: buildPreviewUrlTemplate(options.hostTemplate) };
+    }),
+
+  /**
+   * List the live services a preview can open for an owned session. Unlike the
+   * cached availability gate above, this read is on demand and its failures
+   * propagate: a failed scan must not look like "no services".
+   */
+  listPreviewServices: baseProcedure
+    .input(baseListPreviewServicesNextSchema)
+    .output(baseListPreviewServicesNextOutputSchema)
+    .query(async ({ ctx, input }) => {
+      await assertUserOwnsSession(ctx.user.id, input.cloudAgentSessionId);
+      const authToken = await createCloudAgentControlToken(ctx.user, ctx.headersList);
+      return await createCloudAgentNextClient(authToken).listPreviewServices({
+        cloudAgentSessionId: input.cloudAgentSessionId,
+      });
     }),
 
   refreshTerminalTicket: baseProcedure

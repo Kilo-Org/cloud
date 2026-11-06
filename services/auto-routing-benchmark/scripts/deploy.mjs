@@ -74,7 +74,7 @@ function runWrangler(args, timeoutMs, signal = abort.signal, capture = false) {
         }
       };
       kill('SIGTERM');
-      killTimer ??= setTimeout(() => kill('SIGKILL'), 250);
+      killTimer ??= setTimeout(() => kill('SIGKILL'), 1000);
     };
     const onAbort = () => terminate(failure?.code ?? 'interrupted');
     const timer = setTimeout(() => terminate('command_timeout'), timeoutMs);

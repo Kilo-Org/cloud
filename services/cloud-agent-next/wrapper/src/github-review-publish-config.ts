@@ -14,10 +14,9 @@ const COMMENT_SUBCOMMANDS = ['gh issue comment', 'gh pr comment'];
 
 // The atomic inline review write routes through the review endpoint, never
 // through the conversation-comments endpoints.
-const INLINE_REVIEW_ALLOWS = [
-  'gh api repos/*/pulls/*/reviews',
-  'gh api repos/*/pulls/*/reviews --input*',
-];
+// Anchored to the exact form the review skill publishes, so it cannot absorb a
+// later command in the same text.
+const INLINE_REVIEW_ALLOWS = ['gh api repos/*/pulls/*/reviews --input -'];
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);

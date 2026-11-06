@@ -77,16 +77,17 @@ const COMMENT_WRITE_COMMANDS: { label: string; command: string }[] = [
     command:
       "env REVIEW_MODE=1 gh api graphql -f query='mutation { addComment(input: {}) { comment { id } } }'",
   },
+  {
+    label: 'comment write after an inline review write',
+    command:
+      'gh api repos/acme/widgets/pulls/42/reviews --input - && gh pr comment 42 --body reviewed',
+  },
 ];
 
 const ALLOWED_COMMANDS: { label: string; command: string }[] = [
   {
     label: 'inline review write on a repository whose path contains the graphql phrase',
     command: 'gh api repos/apollographql/apollo-server/pulls/42/reviews --input -',
-  },
-  {
-    label: 'inline review read on a repository whose path contains the graphql phrase',
-    command: 'gh api repos/apollographql/apollo-server/pulls/42/reviews',
   },
   {
     label: 'paginated conversation read',

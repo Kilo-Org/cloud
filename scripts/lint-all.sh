@@ -9,9 +9,11 @@ set -euo pipefail
 #   scripts/lint-all.sh --group <name>   # CI: one group of KILO_AFFECTED
 #
 # Groups split the work across parallel CI jobs. The trpc group runs on every
-# full lint: a change with no base, a GLOBAL path, this script itself, or the
-# merge queue — which has no extension trigger, so it keeps the extension's
-# gate there. On every other pull request that affects the extension, its own
+# full lint, which `selectAffected` reports whenever a change has no base, hits
+# a GLOBAL path or the group script itself, moves root or unscoped dependencies,
+# or changes a file outside every workspace. The merge queue is one of those
+# runs and has no extension trigger, so the group keeps the extension's gate
+# there. On every other pull request that affects the extension, its own
 # workflow lints it with a stricter, type-aware config for the same selection.
 #   trpc  apps/extension, which lints against the built tRPC types, and
 #         apps/mobile when every workspace is linted

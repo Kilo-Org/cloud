@@ -279,10 +279,6 @@ for (const [file, name, command, condition] of [
   });
 }
 
-// The explorer release skips every build step when its probe found the
-// immutable artifact, so its guards carry that condition in front.
-const explorerSkip = "needs.probe.outputs.exists != 'true'";
-
 test('one job saves the compiler plugin cache and every reader restores it', () => {
   const savers = [];
   const holders = [
@@ -351,7 +347,7 @@ const harnessBuildGuards = [
   [
     'explorer-ios-release.yml',
     'build',
-    `${explorerSkip} && hashFiles('.github/actions/harness-sdk-build/action.yml') != ''`,
+    "hashFiles('.github/actions/harness-sdk-build/action.yml') != ''",
   ],
 ];
 
@@ -381,28 +377,39 @@ test('every consumer job restores or builds the harness SDK through the action',
       );
     } else {
       assert.equal(plain.length, 1);
-      assert.equal(
-        plain[0].if,
-        `${explorerSkip} && hashFiles('.github/actions/harness-sdk-build/action.yml') == ''`
-      );
+      assert.equal(plain[0].if, "hashFiles('.github/actions/harness-sdk-build/action.yml') == ''");
     }
   }
 });
 
-// The probe decides whether the build is needed, so every step after the input
-// validation carries the skip condition. An ungated toolchain step would fail a
-// skipped dispatch: a setup-node cache save needs the dependency tree that the
-// skipped install never creates.
-test('explorer-ios-release gates every build step except input validation', () => {
-  const steps = workflows['explorer-ios-release.yml'].jobs.build.steps;
-  const ungated = steps
-    .filter(step => !(step.if ?? '').startsWith(explorerSkip))
-    // Action steps carry no `name`, so fall back to `uses`: an ungated action
-    // must be identifiable in the failure message.
-    .map(step => step.name ?? step.uses);
-  assert.deepEqual(ungated, ['Validate inputs']);
-  assert.equal(steps[0].name, 'Validate inputs', 'validation runs before the gate');
-  assert.equal(steps[0].if, undefined, 'validation stays unconditional');
+// The probe decides whether the build is needed, and the condition sits on the
+// job: a step condition still reserves the macOS runner for the dispatch it
+// skips. A probe with no answer publishes no output, so the build runs; only a
+// proven `true` skips it.
+test('explorer-ios-release skips the whole build job on a probe hit', () => {
+  const { build, upload } = workflows['explorer-ios-release.yml'].jobs;
+  assert.equal(build.needs, 'probe', 'the job condition reads the probe output');
+  const condition = build.if ?? '';
+  assert.match(condition, /!cancelled\(\)/, 'a failed probe must still reach the build');
+  assert.match(
+    condition,
+    /needs\.probe\.outputs\.exists != 'true'/,
+    'only a proven existing object skips the job'
+  );
+  assert.deepEqual(
+    build.steps
+      .filter(step => (step.if ?? '').includes('needs.probe.outputs.exists'))
+      .map(step => step.name ?? step.uses),
+    [],
+    'a step that repeats the job condition is dead weight'
+  );
+  assert.equal(build.steps[0].name, 'Validate inputs', 'validation stays in the build');
+  assert.equal(build.steps[0].if, undefined, 'every dispatch that builds validates its inputs');
+  assert.match(
+    upload.if,
+    /needs\.build\.result == 'success'/,
+    'a skipped build must leave the upload skipped'
+  );
 });
 
 // A probe with no answer must cost the build and nothing else. Without the

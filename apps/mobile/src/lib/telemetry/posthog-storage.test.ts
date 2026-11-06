@@ -10,8 +10,6 @@ import {
   unsealPostHogStorage,
 } from './posthog-storage';
 
-// ---- mock ----
-
 const expoFileSystemMock = vi.hoisted(() => {
   const File = vi.fn(function FileMock(_base: string, _name: string) {
     const file: MockFileInstance = {
@@ -37,8 +35,6 @@ vi.mock('expo-file-system', () => ({
   File: expoFileSystemMock.File,
   Paths: expoFileSystemMock.Paths,
 }));
-
-// ---- helpers ----
 
 type MockFileInstance = {
   _exists: boolean;
@@ -105,8 +101,6 @@ beforeEach(() => {
   resetPostHogStorageForTests();
   vi.clearAllMocks();
 });
-
-// ---- tests ----
 
 describe('POSTHOG_STORAGE_FILES', () => {
   it('has two entries matching the SDK storage files', () => {
@@ -270,7 +264,6 @@ describe('purgePostHogPersistence', () => {
     expect(paths).toContain('file:///document/.posthog-rn.json');
     expect(paths).toContain('file:///document/.posthog-rn-logs.json');
 
-    // Every File instance had delete() called.
     for (const inst of expoFileSystemMock.File.mock.instances as MockFileInstance[]) {
       expect(inst.delete).toHaveBeenCalled();
     }

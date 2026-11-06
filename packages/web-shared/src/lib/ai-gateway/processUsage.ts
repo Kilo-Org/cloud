@@ -220,6 +220,60 @@ export function stripNulBytesInPlace(obj: Record<string, unknown>, dirtyFields: 
   }
 }
 
+type UnrecordableMetadataValue = {
+  field: 'max_tokens' | 'finish_reason';
+  /** A `typeof` result, or for numbers why the value is not a safe integer. */
+  received:
+    | 'fractional'
+    | 'non_finite'
+    | 'unsafe_integer'
+    | 'string'
+    | 'number'
+    | 'bigint'
+    | 'boolean'
+    | 'symbol'
+    | 'undefined'
+    | 'object'
+    | 'function';
+};
+
+/**
+ * `max_tokens` echoes the client request and `finish_reason` the upstream response, and
+ * neither is validated at runtime. The usage contract types them as a safe integer
+ * (PostgreSQL `bigint` read as a JS number) and a string, and ingress rejects the whole
+ * record, billing fields included, when either is outside that type. A value the contract
+ * cannot represent is therefore recorded as null, meaning not recorded: rounding would
+ * invent a limit, and a number past the safe range already lost precision in `JSON.parse`.
+ * Only the usage record changes; the request forwarded upstream and the billing fields do not.
+ */
+function recordableMaxTokens(
+  value: unknown,
+  unrecordable: UnrecordableMetadataValue[]
+): number | null {
+  if (value == null) return null;
+  if (typeof value === 'number' && Number.isSafeInteger(value)) return value;
+  const received =
+    typeof value !== 'number'
+      ? typeof value
+      : !Number.isFinite(value)
+        ? 'non_finite'
+        : Number.isInteger(value)
+          ? 'unsafe_integer'
+          : 'fractional';
+  unrecordable.push({ field: 'max_tokens', received });
+  return null;
+}
+
+function recordableFinishReason(
+  value: unknown,
+  unrecordable: UnrecordableMetadataValue[]
+): string | null {
+  if (value == null) return null;
+  if (typeof value === 'string') return value;
+  unrecordable.push({ field: 'finish_reason', received: typeof value });
+  return null;
+}
+
 export async function toInsertableDbUsageRecord(
   usageStats: MicrodollarUsageStats,
   usageContextInfo: UsageContextInfo
@@ -256,13 +310,15 @@ export async function toInsertableDbUsageRecord(
     project_id,
   };
 
+  const unrecordable: UnrecordableMetadataValue[] = [];
   const metadata: UsageMetaData = {
     ...metadataFromContext,
     id,
     created_at,
     message_id: usageStats.messageId ?? '<missing>',
+    max_tokens: recordableMaxTokens(metadataFromContext.max_tokens, unrecordable),
     upstream_id: usageStats.upstream_id,
-    finish_reason: usageStats.finish_reason,
+    finish_reason: recordableFinishReason(usageStats.finish_reason, unrecordable),
     latency: usageStats.latency ?? ttfb_ms,
     moderation_latency: usageStats.moderation_latency,
     generation_time: usageStats.generation_time,
@@ -274,6 +330,17 @@ export async function toInsertableDbUsageRecord(
     abuse_delay: metadataFromContext.abuse_delay,
     abuse_downgraded_from: metadataFromContext.abuse_downgraded_from,
   };
+
+  if (unrecordable.length > 0) {
+    // Field names and type labels only: never log the client or upstream value itself.
+    console.warn('usage metadata value outside the usage contract; recorded as null', {
+      source: 'toInsertableDbUsageRecord',
+      usageId: id,
+      fields: unrecordable,
+      requested_model: usageContextInfo.requested_model,
+      provider,
+    });
+  }
 
   if (organization_id) {
     //never log any sensitive data for orgs

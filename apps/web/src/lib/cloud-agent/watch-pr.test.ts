@@ -1,7 +1,6 @@
 import { watchPrPolicySchema } from '@kilocode/db/schema-types';
 import type { CliSessionV2, CloudAgentPrWatch } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { isReleaseToggleEnabled } from '@kilocode/web-shared/lib/posthog-feature-flags';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { generateGitHubInstallationToken } from '@/lib/integrations/platforms/github/adapter';
 import { Octokit } from '@octokit/rest';
@@ -38,9 +37,6 @@ jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
     select: jest.fn(),
     update: jest.fn(),
   },
-}));
-jest.mock('@kilocode/web-shared/lib/posthog-feature-flags', () => ({
-  isReleaseToggleEnabled: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/routers/organizations/utils', () => ({
   ensureOrganizationAccess: jest.fn(),
@@ -130,7 +126,6 @@ const prListCommits = jest.fn();
 
 beforeEach(() => {
   jest.clearAllMocks();
-  jest.mocked(isReleaseToggleEnabled).mockResolvedValue(true);
   jest.mocked(assertGitHubInstallationRuntimeAuthorized).mockResolvedValue(undefined);
   jest.mocked(db.query.platform_integrations.findMany).mockResolvedValue([]);
   jest.mocked(ensureOrganizationAccess).mockResolvedValue('member');
@@ -232,26 +227,11 @@ describe('watch consent and source boundaries', () => {
 });
 
 describe('watch options', () => {
-  it('returns release availability even before a watch exists without GitHub reads', async () => {
-    jest.mocked(isReleaseToggleEnabled).mockResolvedValue(false);
-    await expect(getPrWatchOptions(ctx, queryInput)).resolves.toMatchObject({
-      enabled: false,
-      canEnable: false,
-      integrationOptions: [],
-      defaultIntegrationId: null,
-      defaults: { model: null, profileId: null },
-      automaticRepairsAvailable: false,
-    });
-    expect(prGet).not.toHaveBeenCalled();
-    expect(db.query.platform_integrations.findMany).not.toHaveBeenCalled();
-  });
-
   it('rejects unknown owners before returning options', async () => {
     jest.mocked(db.query.cli_sessions_v2.findFirst).mockResolvedValue(undefined);
     await expect(getPrWatchOptions(ctx, queryInput)).rejects.toMatchObject({
       code: 'NOT_FOUND',
     });
-    expect(isReleaseToggleEnabled).not.toHaveBeenCalled();
   });
 
   it('reports unsupported sources rather than enabling them', async () => {
@@ -430,8 +410,7 @@ describe('watch lookup identity', () => {
     expect(db.transaction).not.toHaveBeenCalled();
   });
 
-  it('rejects stale identity even when enablement is disabled', async () => {
-    jest.mocked(isReleaseToggleEnabled).mockResolvedValue(false);
+  it('rejects stale identity before reading GitHub', async () => {
     await expect(
       getPrWatchOptions(ctx, { ...queryInput, expectedPrNumber: 13 })
     ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
@@ -860,20 +839,6 @@ describe('watch lifecycle authorization', () => {
     }
   );
 
-  it.each(['enable', 'resume'])(
-    'gates %s with the strict release toggle before reading state',
-    async action => {
-      jest.mocked(isReleaseToggleEnabled).mockResolvedValue(false);
-      const result =
-        action === 'enable'
-          ? enableWatchPr(ctx, input)
-          : changeWatchPr(ctx, { watchId: watch.id, generation: 1 }, 'resume');
-      await expect(result).rejects.toMatchObject({ code: 'FORBIDDEN' });
-      expect(isReleaseToggleEnabled).toHaveBeenCalledWith('cloud-agent-watch-pr', ctx.user.id);
-      expect(db.query.cli_sessions_v2.findFirst).not.toHaveBeenCalled();
-      expect(db.query.cloud_agent_pr_watches.findFirst).not.toHaveBeenCalled();
-    }
-  );
   it('rejects absent or inaccessible sessions before GitHub', async () => {
     jest.mocked(db.query.cli_sessions_v2.findFirst).mockResolvedValue(undefined);
     await expect(enableWatchPr(ctx, input)).rejects.toMatchObject({ code: 'NOT_FOUND' });
@@ -932,9 +897,8 @@ describe('watch lifecycle authorization', () => {
     ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
   });
   it.each(['pause', 'stop'] as const)(
-    'keeps %s available with flag off and performs generation CAS',
+    'keeps %s available and performs generation CAS',
     async action => {
-      jest.mocked(isReleaseToggleEnabled).mockResolvedValue(false);
       const updated = {
         ...watch,
         status: action === 'pause' ? 'paused' : 'finished',
@@ -959,7 +923,6 @@ describe('watch lifecycle authorization', () => {
       expect(values).toHaveBeenCalledWith(
         expect.objectContaining({ watch_id: watch.id, generation: 2, kind: action })
       );
-      expect(isReleaseToggleEnabled).not.toHaveBeenCalled();
       expect(generateGitHubInstallationToken).not.toHaveBeenCalled();
     }
   );
@@ -978,8 +941,7 @@ describe('watch lifecycle authorization', () => {
     ).rejects.toMatchObject({ code: 'CONFLICT' });
     expect(tx.insert).not.toHaveBeenCalled();
   });
-  it('keeps get available with the flag off and no GitHub reads', async () => {
-    jest.mocked(isReleaseToggleEnabled).mockResolvedValue(false);
+  it('keeps get available with no GitHub reads', async () => {
     jest.mocked(db.select).mockReturnValue({
       from: () => ({ where: () => ({ orderBy: () => ({ limit: () => Promise.resolve([]) }) }) }),
     } as never);
@@ -987,7 +949,6 @@ describe('watch lifecycle authorization', () => {
       automaticRepairsAvailable: false,
       activity: [],
     });
-    expect(isReleaseToggleEnabled).not.toHaveBeenCalled();
     expect(prGet).not.toHaveBeenCalled();
   });
 });

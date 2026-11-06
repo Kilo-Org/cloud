@@ -335,7 +335,6 @@ let createCaller: (ctx: { user: User; headersList?: Headers }) => {
   }>;
   getPreviewOptions: (input: {
     cloudAgentSessionId: `workspace_${string}`;
-    organizationId?: string;
   }) => Promise<{ enabled: false } | { enabled: true; urlTemplate: string }>;
   checkEligibility: () => Promise<{
     balance: number;
@@ -2255,10 +2254,7 @@ describe('cloudAgentNextRouter.getPreviewOptions', () => {
       enabled: false,
     });
     expect(mockCreateCloudAgentNextClient).toHaveBeenCalledWith('cloud-agent-token');
-    expect(mockGetPreviewOptions).toHaveBeenCalledWith({
-      cloudAgentSessionId,
-      organizationId: undefined,
-    });
+    expect(mockGetPreviewOptions).toHaveBeenCalledWith({ cloudAgentSessionId });
   });
 
   it('returns disabled when the Worker call fails', async () => {
@@ -2271,15 +2267,6 @@ describe('cloudAgentNextRouter.getPreviewOptions', () => {
     });
     expect(warn).toHaveBeenCalledTimes(1);
     warn.mockRestore();
-  });
-
-  it('passes the route organization to the Worker gate', async () => {
-    const organizationId = '11111111-1111-4111-8111-111111111111';
-    mockGetPreviewOptions.mockResolvedValueOnce({ enabled: false });
-    const caller = createCaller({ user: { id: 'oauth/user', is_admin: false } as User });
-
-    await caller.getPreviewOptions({ cloudAgentSessionId, organizationId });
-    expect(mockGetPreviewOptions).toHaveBeenCalledWith({ cloudAgentSessionId, organizationId });
   });
 
   it('puts the Worker host template on the browser-facing Worker scheme', async () => {

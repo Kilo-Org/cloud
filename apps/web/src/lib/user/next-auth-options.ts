@@ -669,6 +669,27 @@ export function parseSignInRedirectContext(
   };
 }
 
+export function getInvitationTokenFromCallbackPath(callbackPath?: string): string | undefined {
+  const match = callbackPath?.match(/^\/users\/accept-invite\/([^/?#]+)(?:[?#].*)?$/);
+  if (!match) return undefined;
+  try {
+    return decodeURIComponent(match[1]);
+  } catch {
+    return undefined;
+  }
+}
+
+export function preserveSignInRedirectContext(url: string, context: SignInRedirectContext): string {
+  const destination = new URL(url, 'http://localhost');
+  if (context.callbackPath && isValidCallbackPath(context.callbackPath)) {
+    destination.searchParams.set('callbackPath', context.callbackPath);
+  }
+  if (context.signup) {
+    destination.searchParams.set('signup', 'true');
+  }
+  return `${destination.pathname}${destination.search}`;
+}
+
 async function getSignInRedirectContext(): Promise<SignInRedirectContext> {
   const cookieStore = await cookies();
   const raw =
@@ -1169,7 +1190,10 @@ export const authOptions: NextAuthOptions = {
               return redirectUrlForCode('UNKNOWN-ERROR');
             }
             if (ssoAuthority.status === 'required') {
-              return ssoSignInRedirectUrl(domainToCheck);
+              return preserveSignInRedirectContext(
+                ssoSignInRedirectUrl(domainToCheck),
+                redirectContext
+              );
             }
           }
         }
@@ -1201,10 +1225,18 @@ export const authOptions: NextAuthOptions = {
             }
           );
 
-          return processSSOUserLogin(accountInfo, requestHeaders, affiliateTrackingId, {
-            ...trackingContext,
-            watchwood,
-          });
+          const result = await processSSOUserLogin(
+            accountInfo,
+            requestHeaders,
+            affiliateTrackingId,
+            { ...trackingContext, watchwood },
+            !isAccountLinking
+              ? getInvitationTokenFromCallbackPath(redirectContext.callbackPath)
+              : undefined
+          );
+          return typeof result === 'string' && !isAccountLinking
+            ? preserveSignInRedirectContext(result, redirectContext)
+            : result;
         }
 
         // Validate Turnstile JWT for real OAuth logins (not fake logins or email auth)

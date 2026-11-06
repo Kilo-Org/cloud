@@ -186,7 +186,7 @@ export function publicEventProperties({
  * assistant message, so each is stored under its own key. Without a repository
  * there is one completion for the message, as before.
  */
-function autocommitEntityId(messageId: string, repository: unknown): string {
+export function autocommitEntityId(messageId: string, repository: unknown): string {
   return typeof repository === 'string'
     ? `autocommit/${messageId}/${repository}`
     : `autocommit/${messageId}`;

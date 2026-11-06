@@ -767,10 +767,27 @@ export function userAgentProductFromHeaders(headersList: Headers): string | null
 }
 
 /**
- * Extract the client IP from request headers. Prefers `x-forwarded-for`, with
- * `x-vercel-forwarded-for` as a fallback; returns the first hop or null.
+ * The usable first hop of a forwarding header, or null when the header is
+ * absent or its first entry is empty.
+ */
+function firstForwardedHop(forwarded: string | null): string | null {
+  if (forwarded === null) return null;
+  const first = forwarded.split(',')[0]?.trim();
+  return first === undefined || first === '' ? null : first;
+}
+
+/**
+ * Extract the client IP from request headers.
+ *
+ * `x-vercel-forwarded-for` is the address the platform observed, so it is read
+ * first: `x-forwarded-for` can be rewritten by a proxy in front of the platform.
+ * `x-forwarded-for` is the fallback for a request the platform did not label
+ * (local development, a direct origin hit). Null when neither header carries a
+ * usable hop, so the event records an explicitly unavailable address.
  */
 export function clientIpFromHeaders(headersList: Headers): string | null {
-  const forwarded = headersList.get('x-forwarded-for') ?? headersList.get('x-vercel-forwarded-for');
-  return forwarded?.split(',')[0]?.trim() || null;
+  return (
+    firstForwardedHop(headersList.get('x-vercel-forwarded-for')) ??
+    firstForwardedHop(headersList.get('x-forwarded-for'))
+  );
 }

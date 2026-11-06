@@ -31,6 +31,11 @@ export type SessionMetrics = {
   terminationReason: TerminationReason;
   platform: string;
   organizationId: string | undefined;
+  /**
+   * True when the counted figures cover only the newest part of the session: the scan that
+   * produced them stopped at its read ceiling.
+   */
+  metricsBounded: boolean;
 };
 
 // -- Zod schemas for the subset of CLI types we need for metrics --
@@ -257,13 +262,18 @@ function processPart(acc: Accumulator, raw: unknown) {
 }
 
 /**
- * Compute aggregate session metrics from all ingested items.
+ * Compute aggregate session metrics from ingested items.
  * Each row's item_data is parsed with Zod — malformed rows are silently skipped.
+ *
+ * `bounded` marks a partial item set: the caller read only the newest part of the session, so
+ * every count covers that part and the time to first response cannot be computed at all.
  */
 export function computeSessionMetrics(
   items: Array<{ item_type: string; item_data: string }>,
-  closeReason: TerminationReason
+  closeReason: TerminationReason,
+  options: { bounded?: boolean } = {}
 ): SessionMetrics {
+  const bounded = options.bounded === true;
   const acc = freshAccumulator();
 
   for (const row of items) {
@@ -302,6 +312,7 @@ export function computeSessionMetrics(
 
   let timeToFirstResponseMs: number | undefined;
   if (
+    !bounded &&
     acc.firstUserMessageCreatedAt !== undefined &&
     acc.firstAssistantMessageCreatedAt !== undefined
   ) {
@@ -334,6 +345,7 @@ export function computeSessionMetrics(
     terminationReason: closeReason,
     platform: acc.platform,
     organizationId: acc.organizationId,
+    metricsBounded: bounded,
   };
 }
 

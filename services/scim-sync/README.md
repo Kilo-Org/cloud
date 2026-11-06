@@ -1,19 +1,15 @@
 # scim-sync
 
 Polls the [WorkOS Events API](https://workos.com/docs/events/data-syncing/events-api)
-for Directory Sync (SCIM) events and logs each one.
-
-**Observe-only, for now.** This Worker still only logs: no directory state is
-applied yet, and no users, organizations, or memberships are mutated. The cursor
-is configuration, not state — see "Cursor" below.
+for Directory Sync (SCIM) events and applies each one.
 
 It holds **no database binding**. Directory state is applied by calling the Kilo
 app's internal REST endpoints, so the app keeps the advisory locks, the depth
 check, the soft-delete side effects and the removal tombstone in one place
-rather than growing a second, divergent copy here.
+rather than growing a second, divergent copy here. See "Mutation endpoints".
 
-The write path it will call already exists, in the Kilo app rather than here:
-see "Mutation endpoints".
+What it *does* hold is a Durable Object SQLite database, for the cursor and for
+the record of what it could not apply: see "Cursor" and "Parking".
 
 ## How it runs
 
@@ -24,8 +20,11 @@ poller would cost roughly 300x more duration for the same work.
 
 | | |
 |---|---|
-| Interval | `SCIM_POLL_INTERVAL_SECONDS`, default 60, clamped to 10..3600 |
-| Page size | 10 events per poll |
+| Idle interval | `SCIM_POLL_INTERVAL_SECONDS`, default 60, clamped to 10..3600 |
+| Page size | 100 events, the Events API's documented `limit` maximum |
+| Drain budget | ~20 seconds of wall clock per poll |
+| Catch-up re-arm | 1 second while pages keep coming back full |
+| Failure backoff | the interval doubled per attempt, capped at 5 minutes |
 | Event filter | all 10 `dsync.*` types |
 | Watchdog | `*/5 * * * *` cron calling `ensureScheduled()` |
 
@@ -37,34 +36,72 @@ tick after a deploy. A blank or unparseable value falls back to 60 seconds. The
 10-second floor exists because a shorter interval would leave no idle window for
 hibernation, billing the object's full 128 MB allocation continuously.
 
+**One poll drains rather than fetching one page.** It keeps requesting the next
+page while the previous one came back full and the budget remains, then re-arms
+at one second if events probably remain and at the configured interval once a
+short page says the stream is caught up. One page per interval is not a rate an
+initial sync can be applied at: a real directory's first sync is tens of
+thousands of events, which at 10 events a minute is days of backlog. The pages
+are still fetched strictly one at a time, because WorkOS prescribes a single
+serial consumer that requests the next page only after finishing the current
+one.
+
+100 is the maximum the `limit` parameter accepts: "Accepts values between 1 and
+100. Default is 10"
+([Events API reference](https://workos.com/docs/reference/events/list)).
+
 ## Cursor
 
-`WORKOS_EVENT_CURSOR` is passed as the Events API `after` parameter. Empty means
-the request is made without `after`, which returns the oldest available events.
+The cursor is **Durable Object state**, committed per event, and `sync_state`
+holds two rows: `cursor`, the id of the last event every call of which
+succeeded, and `seed_cursor`, the `WORKOS_EVENT_CURSOR` value that produced it.
 
-**The cursor does not advance.** It is re-read from configuration on every
-tick, so the same events are logged repeatedly until the value is changed and
-the Worker redeployed. Each poll logs `lastEventId`, and `/status` reports it, so
-the value can be copied forward by hand.
+Nothing but a successful event writes `cursor`. So a crash mid-page replays
+exactly the last event, which every endpoint is an idempotent upsert for, and
+an event that could not be applied holds the cursor where it is
+(`.specs/organization-sso.md`, Directory Sync rule 7).
 
-Moving it into Durable Object storage is what the dispatch loop needs: the spec
-requires that the cursor never advance past an event that could not be applied
-(`.specs/organization-sso.md`, Directory Sync rule 7), and a configured value
-cannot express that. The mutation endpoints already answer 409 for exactly that
-case.
+**`WORKOS_EVENT_CURSOR` is the operator's reset action.** The stored cursor
+normally wins; the var wins only when it differs from the stored `seed_cursor`,
+in which case both rows are rewritten to it. That is what makes changing the var
+and redeploying a deliberate rewind, while an unchanged var never overrides a
+cursor the loop has advanced — a var that always lost could not reset, and one
+that always won would re-apply the same backlog on every deploy. `/status`
+reports which source won.
+
+The var can only ever be an event id. `after` and `range_start` are mutually
+exclusive in the Events API, so recovery from a cursor older than the 90-day
+retention window — `range_start`, which takes an ISO 8601 UTC timestamp with a
+`Z` suffix — is a separate operator action rather than a second meaning for this
+var.
+
+## Parking
+
+An event the loop gives up on is stepped over rather than retried forever: the
+cursor advances past it, a row lands in `parked_events`, and the error log
+carries the event id, type, class, status and reason. Nothing reads those rows
+back; they exist so an event the directory can never satisfy stays recoverable
+by an operator instead of being silently lost, and so `/status` can report a
+count.
+
+While the loop is stuck, `event_failures` holds exactly one row — the stream is
+serial, so a held event blocks everything behind it — carrying the attempt
+count and the first failure time. The row is deleted the moment that event
+applies, or when it is parked. `/status` reports it, which is the thing to look
+at when the cursor stops moving.
 
 ## HTTP surface
 
 | Route | Purpose |
 |---|---|
 | `GET /health` | Worker liveness. Does not touch the Durable Object. |
-| `GET /status` | Environment, interval, cursor, next alarm time, and the last poll result. |
+| `GET /status` | Environment, interval, cursor and its source, the held failure, the parked count, next alarm time, and the last poll result. |
 
 Both routes are unauthenticated, so the Worker has no *HTTP* ingress: no
 `workers_dev` hostname, no `routes`, and no service binding. Neither route is
 callable in production; read the poll output from Workers Logs, or stream it
-with `wrangler tail` — unlike the previous iteration, there is now traffic to
-see, because the cron trigger and the alarm both invoke the Worker. Add
+with `wrangler tail` — the cron trigger and the alarm both invoke the Worker,
+so there is traffic to see. Add
 authentication before exposing either route.
 
 ## Mutation endpoints
@@ -74,29 +111,39 @@ here. The endpoints live in `apps/web/src/app/api/internal/scim/`, over
 `apps/web/src/lib/scim/directory-sync.ts`, and each one is an idempotent upsert
 keyed on a WorkOS identifier, so replaying an event is a no-op.
 
-| Event | Call |
+| Event | Calls, in order |
 |---|---|
 | `dsync.activated` | `PUT /api/internal/scim/organizations/{directory_id}` |
 | `dsync.deleted` | `DELETE /api/internal/scim/organizations/{directory_id}` |
 | `dsync.group.created`, `dsync.group.updated` | `PUT /api/internal/scim/sub-organizations/{directory_group_id}` |
 | `dsync.group.deleted` | `DELETE /api/internal/scim/sub-organizations/{directory_group_id}` |
-| `dsync.user.created`, `dsync.user.updated` | `PUT /api/internal/scim/users/{external_id}` |
-| `dsync.group.user_added` | `PUT /api/internal/scim/memberships` |
-| `dsync.group.user_removed`, `dsync.user.deleted` | `DELETE /api/internal/scim/memberships` |
+| `dsync.user.created`, `dsync.user.updated` with `state: 'active'` | `PUT /api/internal/scim/users/{external_id}` |
+| `dsync.user.updated` with `state: 'inactive'`, `dsync.user.deleted` | `DELETE /api/internal/scim/users/{external_id}/memberships` |
+| `dsync.group.user_added` | `PUT .../sub-organizations/{id}`, then `PUT .../users/{id}`, then `PUT .../memberships` |
+| `dsync.group.user_removed` | `DELETE /api/internal/scim/memberships` |
 
-`dsync.user.deleted` removes memberships and never deletes the account: there is
-no user DELETE, because `softDeleteUser` anonymizes the account and refuses
-outright when a live subscription exists. The membership routes take the
-`{directoryGroupId, externalId}` pair in the body, including `DELETE`, because a
-membership is identified by two WorkOS identifiers.
+`dsync.user.deleted` revokes every directory membership and never deletes the
+account: there is no user DELETE, because `softDeleteUser` anonymizes the
+account and refuses outright when a live subscription exists. An `inactive`
+`dsync.user.updated` takes the same route — the identity provider
+deprovisioning a person without removing them revokes access rather than
+applying attributes. That route converges rather than conflicting: an unknown
+`external_id` answers 200 with `kiloUserId: null` and an empty
+`revokedOrganizationIds`, so a replay is a no-op.
+
+The membership routes take the `{directoryGroupId, externalId}` pair in the
+body, including `DELETE`, because a membership is identified by two WorkOS
+identifiers. The revoke-all route takes no body at all.
 
 The endpoints are reached under `BACKEND_API_URL`, which the staging and
 production environments point at `staging-app.kilo.ai` and `app.kilo.ai`
 respectively. Calling them also requires `INTERNAL_API_SECRET` in the
-`x-internal-api-key` header, which this Worker does not yet hold. Request
-bodies are `z.strictObject`, so an unknown field is a 400 rather than a
-silently dropped one — a new field must land in `directory-sync-contracts.ts`
-as optional before the Worker starts sending it.
+`x-internal-api-key` header, bound from the Secrets Store. Request bodies are
+`z.strictObject`, so an unknown field is a 400 rather than a silently dropped
+one — a new field must land in `directory-sync-contracts.ts` as optional before
+the Worker starts sending it. Every response is parsed with Zod on the way back
+in: a 2xx whose body does not match the contract means the two deployments
+disagree, which retrying the same payload does not fix.
 
 ### Domain capture
 
@@ -177,8 +224,9 @@ domain gate on account takeover resolves the organization from it.
 The directory is deliberately **not** provisioned this way. Nothing in a
 `dsync.group.*` payload distinguishes a directory Kilo never activated from one
 an administrator disconnected, so backfilling it resurrects the organization and
-its groups after a `dsync.deleted`. An unknown directory stays a 409; recovering
-a lost cursor is an operator action, using `range_start`.
+its groups after a `dsync.deleted`. An unknown directory stays a 409
+(`directory_not_found`), which holds the cursor for up to an hour and is then
+parked; recovering a lost cursor is an operator action, using `range_start`.
 
 `dsync.group.user_removed` takes no prerequisite calls. An unknown group or user
 means there is no membership to revoke, which is what the event asserts, so the
@@ -197,15 +245,16 @@ data. Only directory-bound siblings count, and only a directory-provisioned
 account is affected: a membership an administrator created is not directory
 sync's to revoke. See Directory Sync rule 4.
 
-`dsync.user.updated` is not a no-op. A changed name or address is applied to the
-bound account. An address change is a move to a different mailbox, so it carries
-a first bind's protections: the organization must have captured the new domain,
-no other account may hold the address, `web_session_pepper` is rotated so
-sessions issued to the mailbox's previous holder stop authenticating, and
-`user_auth_provider.email` moves too — it is a separate source for address
-lookups, so leaving it behind keeps the old address resolving to the account.
-`normalized_email` is rewritten because `findUserByNormalizedEmail` and the
-signup dedup read it rather than `google_user_email`, and `email_domain` through
+An `active` `dsync.user.updated` is not a no-op. A changed name or address is
+applied to the bound account. An address change is a move to a different
+mailbox, so it carries a first bind's protections: the organization must have
+captured the new domain, no other account may hold the address,
+`web_session_pepper` is rotated so sessions issued to the mailbox's previous
+holder stop authenticating, and `user_auth_provider.email` moves too — it is a
+separate source for address lookups, so leaving it behind keeps the old address
+resolving to the account. `normalized_email` is rewritten because
+`findUserByNormalizedEmail` and the signup dedup read it rather than
+`google_user_email`, and `email_domain` through
 `extractEmailDomain`, the registrable domain the insert path stores.
 
 The `workos` auth provider row this route writes is keyed on the WorkOS
@@ -220,13 +269,35 @@ matches by address and replaces it.
 
 ### Response classes
 
-Three classes, and they decide cursor movement:
+Every attempt lands in exactly one of four classes, and the class decides both
+the cursor and whether the event survives:
 
-| Status | Meaning | Cursor |
+| Class | Cause | Effect |
 |---|---|---|
-| 2xx | Applied, already applied, or nothing to do | Advance |
-| 409 | A dependency is missing — an unactivated directory, or a group whose directory resolves to a sub-organization | Hold and retry; the body names the dependency |
-| 400 / 401 / 5xx | Contract mismatch, missing secret, or an unexpected failure | Hold; 5xx bodies are fixed strings, detail is in the app's log |
+| `applied` | 2xx | Continue to this event's next call, then commit the cursor |
+| `conflict` | 409 whose `code` is retryable, or an unrecognized code | Hold the cursor and retry, bounded by one hour from the first failure, then park |
+| `terminal` | 400, a 409 with a terminal `code`, or a payload that cannot be mapped at all | Park immediately |
+| `unavailable` | 401, 403, 408, 429, any 5xx, a network error, a timeout | Hold the cursor and retry indefinitely with capped backoff; never park |
+
+The 409 body carries a machine-readable `code`, which is what separates the two
+outcomes a conflict can have. Four codes are retryable, because an event
+*behind* the cursor can still supply what is missing: `directory_not_found`,
+`sub_organization_not_found`, `user_not_found`, and
+`user_provisioning_failed`. Four are terminal, because nothing the directory
+can send repairs them: `sub_organization_cannot_nest`, `domain_not_captured`,
+`account_bound_to_other_directory_user`, and
+`address_held_by_another_account`. An unrecognized code is treated as
+retryable, which is the direction that cannot lose an event — the retry budget
+turns a permanently unsatisfiable one into a park an hour later.
+
+Two payload cases are `terminal` with no HTTP call at all, because no request
+body can express them: a directory user whose `email` is null, which the SDK
+types nullable and the endpoint requires, and a `dsync.activated` carrying no
+`organizationId`.
+
+`unavailable` never parks, and the distinction matters most for a missing or
+wrong `INTERNAL_API_SECRET`. That is an operator problem rather than a bad
+event, and parking the stream over one would step past every event behind it.
 
 A 409 is not always recoverable by waiting. A group under a sub-organization is
 structural, and a refused account takeover is a claim the directory cannot
@@ -260,14 +331,17 @@ retrying will not clear it. The app logs it as
 domain, and the 409 body names the domain too — neither carries the address. See
 `.specs/organization-sso.md`, Directory Sync rules 13 and 15.
 
-Separating genuinely terminal failures from the retryable ones is still open,
-and is why the loop needs a retry bound rather than indefinite retry.
+`domain_not_captured` and `account_bound_to_other_directory_user` are both
+terminal codes for exactly this reason: the loop parks them on the first
+attempt rather than retrying something no event will satisfy.
 
 ## Logging
 
-Only envelope fields are logged: `eventId`, `eventType`, and `eventCreatedAt`.
-An event's `data` carries directory user attributes — emails, names, raw IdP
-attributes — and is never logged.
+Only envelope fields and failure reasons are logged: `eventId`, `eventType`,
+`eventCreatedAt`, the class, the status, the conflict code, and the attempt
+count. An event's `data` carries directory user attributes — emails, names, raw
+IdP attributes — and is never logged. A park is logged at error level, a held
+failure at warn.
 
 ## WorkOS client
 
@@ -278,6 +352,11 @@ and `EventName` types so no local schema is needed. The client is constructed
 with `maxRetries: 0`, because the SDK's internal retries would stretch one alarm
 across several attempts and hide the failure — the alarm interval is the retry.
 
+That `workerd` build constructs its HTTP client without forwarding the SDK's
+`fetchFn` option, so the global `fetch` is the only boundary a test can stub —
+which is what the integration tests do, for both origins, rather than the
+Worker carrying an injection seam that exists only for tests.
+
 The SDK costs about 500 KiB of bundle (93 KiB gzipped) against a 3 MiB limit.
 
 ## Environments
@@ -287,6 +366,7 @@ The SDK costs about 500 KiB of bundle (93 KiB gzipped) against a 3 MiB limit.
 | Worker | `cloudflare-scim-sync` | `cloudflare-scim-sync-staging` |
 | `wrangler` env | base config | `--env staging` |
 | WorkOS stream | `WORKOS_API_KEY` / `WORKOS_CLIENT_ID` | `WORKOS_API_KEY_STAGING` / `WORKOS_CLIENT_ID_STAGING` |
+| App secret | `INTERNAL_API_SECRET_PROD` | `INTERNAL_API_SECRET_STAGING` |
 | `BACKEND_API_URL` | `https://app.kilo.ai` | `https://staging-app.kilo.ai` |
 
 The environment is named `staging` because that is the only non-production
@@ -305,16 +385,17 @@ no migration-tag conflict between them.
 
 **The WorkOS keys are what separate the environments, not `ENVIRONMENT`.** The
 Events API is scoped to whichever WorkOS environment issued the key. Two
-deployments holding the same key both consume one stream, and once the write
-path lands they would both apply the same events: the cursor is configuration,
-not a lease. `ENVIRONMENT` is reported by `/status` and otherwise decides
-nothing.
+deployments holding the same key both consume one stream and both apply the
+same events: the cursor is per-deployment Durable Object state, not a lease.
+`ENVIRONMENT` is reported by `/status` and otherwise decides nothing.
 
 ## Secrets
 
-`WORKOS_API_KEY` and `WORKOS_CLIENT_ID` come from the shared Cloudflare Secrets
-Store (`342a86d9e3a94da698e82d0c6e2a36f0`, the account's only store), one pair
-per WorkOS environment under the names in the table above.
+`WORKOS_API_KEY`, `WORKOS_CLIENT_ID` and `INTERNAL_API_SECRET` come from the
+shared Cloudflare Secrets Store (`342a86d9e3a94da698e82d0c6e2a36f0`, the
+account's only store), under the names in the table above. Each is read once
+per isolate through `getCachedSecret`, because all three are needed on every
+poll.
 
 For local work, create the names the target environment binds — omit `--remote`
 and wrangler writes to `.wrangler/` instead of the account:
@@ -324,8 +405,8 @@ npx wrangler secrets-store secret create 342a86d9e3a94da698e82d0c6e2a36f0 \
   --name WORKOS_API_KEY_STAGING --scopes workers
 ```
 
-A binding for a secret that does not exist fails the deploy, so create both
-staging names before the first `--env staging` deploy.
+A binding for a secret that does not exist fails the deploy, so create all
+three staging names before the first `--env staging` deploy.
 
 ## Data model
 
@@ -369,14 +450,35 @@ model-access grants. Re-adding the membership later does not restore them. A
 `dsync.group.user_removed` followed by a re-add therefore loses configuration
 that no directory event describes and that WorkOS cannot replay.
 
+### Durable Object state
+
+The loop's own state, in one Durable Object's SQLite database — the namespace
+holds exactly one instance, because WorkOS prescribes a single serial consumer.
+
+| Table | Holds |
+|---|---|
+| `sync_state` | `cursor` and `seed_cursor` |
+| `event_failures` | The one event the loop is currently stuck on, with `attempts` and `first_failed_at` |
+| `parked_events` | Events it gave up on and stepped over |
+
+Each instance's database is isolated and migrations apply per instance on first
+access after a deploy, so there is no centralized migration step. Changing a
+deployed class's storage backend is not supported, which is why the class has
+been `new_sqlite_classes` since its first deploy.
+
 ## Commands
 
 ```sh
-pnpm dev              # wrangler dev --env staging, port 8819
-pnpm deploy:staging   # wrangler deploy --env staging
-pnpm deploy:prod      # wrangler deploy --env=""
+pnpm dev                 # wrangler dev --env staging, port 8819
+pnpm deploy:staging      # wrangler deploy --env staging
+pnpm deploy:prod         # wrangler deploy --env=""
 pnpm typecheck
-pnpm types            # regenerate worker-configuration.d.ts after config changes
+pnpm lint
+pnpm format:check
+pnpm test                # unit tests, Node
+pnpm test:integration    # Durable Object tests, Workers runtime
+pnpm types               # regenerate worker-configuration.d.ts after config changes
+pnpm drizzle-kit generate  # after editing src/db/sqlite-schema.ts
 ```
 
 `wrangler dev` does not fire cron triggers, so arm the loop by hand. The handler
@@ -387,11 +489,19 @@ curl http://127.0.0.1:8819/cdn-cgi/handler/scheduled
 curl http://127.0.0.1:8819/status
 ```
 
-There are no tests. The poll loop's one branch worth asserting is the interval
-clamp; everything else is the SDK's behavior or WorkOS's, and the directory
-rules are covered where they are implemented, in `apps/web`
-(`src/app/api/internal/scim/scim-routes.test.ts`,
+The loop's behaviour is this service's own rather than the SDK's, so it is
+covered here: `test/integration/` drives the Durable Object through its RPC
+under `@cloudflare/vitest-pool-workers`, with the Events API and the app origin
+stubbed at the `fetch` boundary, and asserts the cursor, the call order per
+event type, and what each response class does. `test/unit/` holds the interval
+clamp. The directory *rules* stay covered where they are implemented, in
+`apps/web` (`src/app/api/internal/scim/scim-routes.test.ts`,
 `src/lib/scim/directory-sync.integration.test.ts`).
+
+A schema change is `src/db/sqlite-schema.ts` plus `pnpm drizzle-kit generate`;
+the `drizzle/` SQL, its barrel and its snapshot are generated, never
+hand-written, and `migrate()` applies them in `blockConcurrencyWhile` on first
+access after a deploy.
 
 ## Deployment
 

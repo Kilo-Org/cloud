@@ -97,7 +97,7 @@ does not require this credential.
 
 ### Analytics & Monitoring
 
-- `NEXT_PUBLIC_POSTHOG_KEY` - PostHog public API key for client-side analytics; used in `apps/web/src/components/PostHogProvider.tsx`. [PUBLIC]
+- `NEXT_PUBLIC_POSTHOG_KEY` - PostHog public project key for client analytics and server feature evaluation. Configure the same project for the web app and AI gateway. The web app has a tracked public default in `apps/web/.env`; verify runtime configuration in both deployments before rollout. [PUBLIC]
 - `NEXT_PUBLIC_POSTHOG_DEBUG` - Enables PostHog debug logging; checked in `apps/web/src/components/PostHogProvider.tsx` and `apps/web/src/lib/stytch.ts`. [PUBLIC]
 - `POSTHOG_PERSONAL_API_KEY` - PostHog personal API key used by user-deletion PostHog cleanup. `[SECRET]`
 - `POSTHOG_ENVIRONMENT_ID` - PostHog project/environment ID used by user-deletion PostHog cleanup. [SERVER]

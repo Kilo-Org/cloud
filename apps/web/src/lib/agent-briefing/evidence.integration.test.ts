@@ -146,6 +146,7 @@ it('sends screened evidence to the model provider', async () => {
   const shellJson = 'nested' + '9';
   const punctuated = 'p@ss' + '?Quokka';
   const alias = 'hunter' + '9';
+  const joined = 'hunter' + '7';
   await db
     .update(cli_sessions_v2)
     .set({
@@ -160,7 +161,11 @@ it('sends screened evidence to the model provider', async () => {
           `Rotated with password=${punctuated} before the run. ` +
           'Shell env MYSQL_' +
           `PWD=${alias} and DB_` +
-          `PASS=${alias}.`,
+          `PASS=${alias}. Keychain PASS` +
+          `KEY=${joined}, pg` +
+          `pass=${joined}, mongo` +
+          `pass=${joined}, oracle` +
+          `pass=${joined}.`,
       },
     })
     .where(eq(cli_sessions_v2.kilo_user_id, user.id));
@@ -184,6 +189,7 @@ it('sends screened evidence to the model provider', async () => {
   expect(prompt).not.toContain(shellJson);
   expect(prompt).not.toContain('Quokka');
   expect(prompt).not.toContain(alias);
+  expect(prompt).not.toContain(joined);
   expect(prompt).toContain('Agent session');
   expect(prompt).toContain('[redacted credential]');
 });

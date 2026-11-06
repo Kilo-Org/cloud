@@ -50,6 +50,7 @@ const SENSITIVE_KEY_WORDS = [
   'credential',
   'key',
   'pass',
+  'passkey',
   'passphrase',
   'password',
   'passwd',
@@ -57,6 +58,10 @@ const SENSITIVE_KEY_WORDS = [
   'secret',
   'token',
 ];
+// A vendor name joined directly to a short password word (`dbpass`, `pgpass`,
+// `mongopass`) is a credential key only when the vendor is listed here, because a
+// broader rule would also classify ordinary words that end in `pass`, such as
+// `compass`. The list holds the products whose clients ship such a key name.
 const SENSITIVE_KEY_QUALIFIERS = [
   'access',
   'account',
@@ -67,8 +72,11 @@ const SENSITIVE_KEY_QUALIFIERS = [
   'db',
   'encryption',
   'master',
+  'mongo',
   'mssql',
   'mysql',
+  'oracle',
+  'pg',
   'postgres',
   'postgresql',
   'private',

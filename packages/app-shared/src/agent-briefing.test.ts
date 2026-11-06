@@ -169,6 +169,11 @@ describe('briefing evidence screening', () => {
       'DB_' + 'PASS',
       'REDIS_' + 'PASSPHRASE',
       'PG' + 'PWD',
+      'PASS' + 'KEY',
+      'pass' + 'key',
+      'pg' + 'pass',
+      'mongo' + 'pass',
+      'oracle' + 'pass',
       'db' + 'pass',
       'db' + 'Pass',
       'mysql' + 'pwd',
@@ -186,7 +191,12 @@ describe('briefing evidence screening', () => {
   });
 
   it('keeps ordinary words that contain a credential word', () => {
-    for (const evidence of ['Passage: open.', 'Overpass: closed.', 'Bypassed: the cache layer.']) {
+    for (const evidence of [
+      'Passage: open.',
+      'Overpass: closed.',
+      'Bypassed: the cache layer.',
+      'Compass: north.',
+    ]) {
       expect(redactBriefingExcerpt(evidence)).toBe(evidence);
     }
   });

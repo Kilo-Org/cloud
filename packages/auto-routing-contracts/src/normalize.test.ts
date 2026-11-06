@@ -297,6 +297,10 @@ describe('classifier input normalization', () => {
     'db_pass',
     'dbpass',
     'redis_passphrase',
+    'passkey',
+    'pgpass',
+    'mongopass',
+    'oraclepass',
     'pwd',
     'passphrase',
   ])('redacts the credential-bearing provider hint key %s', key => {
@@ -350,6 +354,7 @@ describe('classifier input normalization', () => {
       allow_fallbacks: false,
       quantizations: ['int8'],
       monkey: 'banana',
+      compass: 'north',
       trespasses: 'none',
       overpass: 'closed',
       passage: 'open',

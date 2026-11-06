@@ -167,6 +167,7 @@ function targetFixture() {
   const inspection = {
     runID,
     workerName: name,
+    baseURL: `https://${name}.synthetic.workers.dev/`,
     checkedAt: now - 1,
     deploymentID: 'owned-deployment',
     versionID: 'owned-version',
@@ -439,6 +440,23 @@ test('full cloud plan keeps one SDK viewer per watched session and creates no GO
     const config = JSON.parse(readFileSync(join(output, 'node-0/config-0.json'), 'utf8'));
     assert.equal(config.sdkViewers, config.watched);
     assert.equal(existsSync(join(output, 'node-0/go.json')), false);
+  } finally {
+    f.dispose();
+  }
+});
+
+test('cloud origin must match the live account inspection', () => {
+  const f = targetFixture();
+  try {
+    const evidence = JSON.parse(readFileSync(f.manifest.evidenceFile, 'utf8'));
+    writeFileSync(
+      f.manifest.evidenceFile,
+      JSON.stringify({ ...evidence, baseURL: 'https://unowned.workers.dev/' })
+    );
+    assert.throws(
+      () => validateCloudAdmission(f.config, f.manifest, allowedBudget),
+      /Origin differs/
+    );
   } finally {
     f.dispose();
   }

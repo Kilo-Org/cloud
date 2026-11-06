@@ -134,6 +134,12 @@ export async function inspectLive(manifest, api) {
   const current = await currentDeployment(manifest, api);
   assert(!current.absent, 'Expected deployment is absent');
   const account = `/accounts/${manifest.accountID}`;
+  const subdomain = (await api('GET', `${account}/workers/subdomain`)).result.subdomain;
+  const baseURL = `https://${manifest.workerName}.${subdomain}.workers.dev/`;
+  assert.equal(manifest.baseURL, baseURL, 'Worker origin must belong to the inspected account');
+  const exposure = (await api('GET', `${account}/workers/scripts/${manifest.workerName}/subdomain`))
+    .result;
+  assert.equal(exposure.enabled, true);
   const namespaces = [];
   for (let page = 1; page <= 100; page++) {
     const list = await api(
@@ -216,6 +222,7 @@ export async function inspectLive(manifest, api) {
   return {
     runID: manifest.runID,
     workerName: manifest.workerName,
+    baseURL,
     checkedAt: Date.now(),
     ...current,
     r2BucketID: managed.bucketId,

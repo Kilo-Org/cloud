@@ -459,6 +459,11 @@ export function validateCloudAdmission(config, manifest, budget, now = Date.now(
     'Live deployment inspection is stale'
   );
   assert.equal(inspection.runID, config.runID);
+  assert.equal(
+    inspection.baseURL,
+    config.baseURL,
+    'Origin differs from the live account inspection'
+  );
   assert.equal(inspection.deploymentID, manifest.deploymentID);
   assert.equal(inspection.versionID, manifest.versionID);
   assert.equal(inspection.r2BucketID, manifest.r2BucketID);

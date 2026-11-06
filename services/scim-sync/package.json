@@ -21,6 +21,7 @@
     "typecheck": "tsgo --noEmit"
   },
   "dependencies": {
+    "@kilocode/scim-contracts": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
     "@workos-inc/node": "catalog:",
     "drizzle-orm": "catalog:",

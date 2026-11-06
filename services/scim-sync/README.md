@@ -138,12 +138,24 @@ identifiers. The revoke-all route takes no body at all.
 The endpoints are reached under `BACKEND_API_URL`, which the staging and
 production environments point at `staging-app.kilo.ai` and `app.kilo.ai`
 respectively. Calling them also requires `INTERNAL_API_SECRET` in the
-`x-internal-api-key` header, bound from the Secrets Store. Request bodies are
-`z.strictObject`, so an unknown field is a 400 rather than a silently dropped
-one — a new field must land in `directory-sync-contracts.ts` as optional before
-the Worker starts sending it. Every response is parsed with Zod on the way back
-in: a 2xx whose body does not match the contract means the two deployments
-disagree, which retrying the same payload does not fix.
+`x-internal-api-key` header, bound from the Secrets Store.
+
+**Both sides share one contract module**, `@kilocode/scim-contracts`
+(`packages/scim-contracts`). The app validates requests with its schemas and
+types its handlers from them; this Worker builds request bodies and parses
+responses with the same definitions. They deploy independently and the request
+schemas are `z.strictObject`, so an unknown field is a 400 that stalls the
+cursor rather than a silently dropped key — with a mirrored copy per side that
+drift stayed invisible until a real event hit it, and now it is a compile
+error. A new field must still land in the package as optional before the Worker
+starts sending it, because the app deploys on its own cadence.
+
+The package also owns `TERMINAL_CONFLICT_CODES`, so classifying a new conflict
+code is one decision in one place: a code nobody classified fails the
+exhaustive record there instead of defaulting to retryable in a Worker copy
+that was never updated. Every response is parsed with Zod on the way back in: a
+2xx whose body does not match the contract means the two deployments disagree,
+which retrying the same payload does not fix.
 
 ### Domain capture
 

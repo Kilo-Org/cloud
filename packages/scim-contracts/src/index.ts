@@ -3,13 +3,20 @@ import { z } from 'zod';
 /**
  * Request and response contracts for the internal directory-sync endpoints.
  *
- * The `scim-sync` Worker polls the WorkOS Events API and calls these routes for
- * every mutation instead of writing to PostgreSQL itself. Organization, user,
- * and membership writes carry rules that already live here — advisory locks, the
- * sub-organization depth check, the soft-delete side effects, Stripe customer
- * creation, the normalized-email dedup and deletion fences, and the membership
- * removal tombstone — so the Worker reuses them rather than reimplementing
- * them against raw tables.
+ * Shared on purpose. `apps/web` serves these endpoints and the `scim-sync`
+ * Worker calls them, they deploy independently, and the request schemas are
+ * strict — so a field one side invents is a 400 that stalls the Worker's
+ * cursor rather than a dropped key. A mirrored copy per side would make that
+ * drift silent until a directory event hit it; one module makes it a
+ * compile error.
+ *
+ * The Worker calls these routes for every mutation instead of writing to
+ * PostgreSQL itself. Organization, user, and membership writes carry rules
+ * that live in the app — advisory locks, the sub-organization depth check,
+ * the soft-delete side effects, Stripe customer creation, the
+ * normalized-email dedup and deletion fences, and the membership removal
+ * tombstone — so the Worker reuses them rather than reimplementing them
+ * against raw tables.
  *
  * Every route is keyed on a WorkOS identifier and is an idempotent upsert, so
  * replaying an event is a no-op. That matters: the Worker commits its cursor per
@@ -149,20 +156,68 @@ export type DirectorySyncConflictCode =
    */
   | 'address_held_by_another_account';
 
-/** Returned by every upsert so the caller can log what changed. */
-export type DirectorySyncUpsertResult = {
-  /** Kilo's identifier for the affected row. */
-  id: string;
-  /** False when an existing row was matched and updated. */
-  created: boolean;
+/**
+ * Codes no arrival order and no amount of waiting repairs: a structural
+ * hierarchy violation, a claim the directory cannot substantiate, and two
+ * bindings that would have to be broken to proceed. The consumer parks these
+ * on the first attempt. Every other code is retryable, because an event
+ * *behind* the cursor can still supply what is missing.
+ *
+ * Lives beside the union rather than in the consumer, so adding a code is one
+ * decision in one place: a new member that nobody classified fails the
+ * exhaustive `Record` here instead of silently defaulting to retryable in a
+ * Worker whose copy was never updated.
+ */
+export const TERMINAL_CONFLICT_CODES: Record<DirectorySyncConflictCode, boolean> = {
+  directory_not_found: false,
+  sub_organization_cannot_nest: true,
+  sub_organization_not_found: false,
+  user_not_found: false,
+  user_provisioning_failed: false,
+  domain_not_captured: true,
+  account_bound_to_other_directory_user: true,
+  address_held_by_another_account: true,
 };
 
-export type DirectoryMembershipResult = {
-  organizationId: string;
-  parentOrganizationId: string | null;
-  kiloUserId: string;
+/**
+ * The 409 body. `code` is a plain string rather than the union, because a code
+ * the reader does not know must still parse: an unrecognized one is treated as
+ * retryable, which is the direction that cannot lose an event.
+ */
+export const DirectorySyncConflictBodySchema = z.object({
+  error: z.string(),
+  code: z.string(),
+});
+
+/** Whether a conflict code is one waiting cannot clear. Unknown is retryable. */
+export function isTerminalConflictCode(code: string): boolean {
+  return TERMINAL_CONFLICT_CODES[code as DirectorySyncConflictCode] === true;
+}
+
+/**
+ * Response shapes are schemas, not bare types, because the Worker parses them
+ * on the way back in: a 2xx whose body is not the contract means the two
+ * deployments disagree, and a cast would hide that until the parsed value was
+ * used. The app's route handlers are typed by the inferred type, so one
+ * definition serves both directions.
+ */
+
+/** Returned by every upsert so the caller can log what changed. */
+export const DirectorySyncUpsertResultSchema = z.object({
+  /** Kilo's identifier for the affected row. */
+  id: z.string(),
+  /** False when an existing row was matched and updated. */
+  created: z.boolean(),
+});
+
+export type DirectorySyncUpsertResult = z.infer<typeof DirectorySyncUpsertResultSchema>;
+
+export const DirectoryMembershipResultSchema = z.object({
+  organizationId: z.string(),
+  parentOrganizationId: z.string().nullable(),
+  kiloUserId: z.string(),
   /** False when the membership already existed. */
-  created: boolean;
+  created: z.boolean(),
   /**
    * True when a removal tombstone was cleared to admit this member. The
    * directory is authoritative for directory-managed organizations, so an
@@ -170,8 +225,10 @@ export type DirectoryMembershipResult = {
    * but it is worth surfacing, because it means a deliberate removal was
    * reversed.
    */
-  clearedRemovalTombstone: boolean;
-};
+  clearedRemovalTombstone: z.boolean(),
+});
+
+export type DirectoryMembershipResult = z.infer<typeof DirectoryMembershipResultSchema>;
 
 /**
  * Removal is reported separately from an add, because it converges rather than
@@ -188,14 +245,14 @@ export type DirectoryMembershipResult = {
  * before remove is the normal order and WorkOS consumes serially, so this is a
  * rare reordering, and it is preferred over provisioning departing users.
  */
-export type DirectoryMembershipRemovalResult = {
+export const DirectoryMembershipRemovalResultSchema = z.object({
   /** Null when no live sub-organization is bound to the directory group. */
-  organizationId: string | null;
-  parentOrganizationId: string | null;
+  organizationId: z.string().nullable(),
+  parentOrganizationId: z.string().nullable(),
   /** Null when no user is bound to the directory user. */
-  kiloUserId: string | null;
+  kiloUserId: z.string().nullable(),
   /** False when there was nothing to remove, which is the converged case. */
-  removed: boolean;
+  removed: z.boolean(),
   /**
    * True when the parent organization membership was revoked as well, because
    * this was the user's last directory group under it. Group membership is the
@@ -204,8 +261,12 @@ export type DirectoryMembershipRemovalResult = {
    * user removed from every group, or deleted from the directory, keeps access
    * to the organization's seats and data.
    */
-  revokedParentMembership: boolean;
-};
+  revokedParentMembership: z.boolean(),
+});
+
+export type DirectoryMembershipRemovalResult = z.infer<
+  typeof DirectoryMembershipRemovalResultSchema
+>;
 
 /**
  * Revokes every directory membership the account bound to a directory user
@@ -219,19 +280,25 @@ export type DirectoryMembershipRemovalResult = {
  * bound to has nothing to revoke, which is the state the event asserts, so it
  * answers with a null user and an empty list rather than conflicting.
  */
-export type DirectoryMembershipRevokeAllResult = {
+export const DirectoryMembershipRevokeAllResultSchema = z.object({
   /** Null when no Kilo account is bound to the directory user: the converged case. */
-  kiloUserId: string | null;
+  kiloUserId: z.string().nullable(),
   /**
    * Organizations a membership row was actually deleted from, groups and
    * parents. Empty on a replay, which is what makes the route idempotent.
    */
-  revokedOrganizationIds: string[];
-};
+  revokedOrganizationIds: z.array(z.string()),
+});
+
+export type DirectoryMembershipRevokeAllResult = z.infer<
+  typeof DirectoryMembershipRevokeAllResultSchema
+>;
 
 /** Soft delete: `deleted_at` is stamped, nothing is removed. */
-export type DirectorySyncDeleteResult = {
-  id: string;
+export const DirectorySyncDeleteResultSchema = z.object({
+  id: z.string(),
   /** False when no live row matched, which is the idempotent repeat case. */
-  deleted: boolean;
-};
+  deleted: z.boolean(),
+});
+
+export type DirectorySyncDeleteResult = z.infer<typeof DirectorySyncDeleteResultSchema>;

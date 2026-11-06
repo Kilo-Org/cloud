@@ -1,7 +1,8 @@
 import type { z } from 'zod';
 
+import { DirectorySyncConflictBodySchema, isTerminalConflictCode } from '@kilocode/scim-contracts';
+
 import { REQUEST_TIMEOUT_MS } from '../util/constants';
-import { ConflictBodySchema, TERMINAL_CONFLICT_CODES } from './contracts';
 
 /**
  * One call to the Kilo app's internal directory-sync endpoints, classified
@@ -105,7 +106,7 @@ export async function callApp(ctx: AppCallContext, init: CallInit): Promise<Atte
   }
 
   if (response.status === 409) {
-    const conflict = ConflictBodySchema.safeParse(await readJson(response));
+    const conflict = DirectorySyncConflictBodySchema.safeParse(await readJson(response));
     if (!conflict.success) {
       // A 409 is the one status whose body decides the class, so one without a
       // code cannot be classified. Retryable is the direction that cannot lose
@@ -120,7 +121,7 @@ export async function callApp(ctx: AppCallContext, init: CallInit): Promise<Atte
 
     const { code, error } = conflict.data;
     return {
-      class: TERMINAL_CONFLICT_CODES[code] === true ? 'terminal' : 'conflict',
+      class: isTerminalConflictCode(code) ? 'terminal' : 'conflict',
       status: 409,
       code,
       reason: `${init.method} ${init.path} conflicted: ${error}`,

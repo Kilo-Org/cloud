@@ -6,7 +6,7 @@ import {
   deleteDirectorySubOrganization,
   upsertDirectorySubOrganization,
 } from '@/lib/scim/directory-sync';
-import { DirectorySubOrganizationUpsertSchema } from '@/lib/scim/directory-sync-contracts';
+import { DirectorySubOrganizationUpsertSchema } from '@kilocode/scim-contracts';
 import { directorySyncErrorResponse } from '@/lib/scim/directory-sync-response';
 
 /** Writes to the PostgreSQL primary, so it must run beside it. */

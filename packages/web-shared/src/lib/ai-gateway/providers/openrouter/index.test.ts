@@ -5,6 +5,7 @@ import {
   getEnhancedOpenRouterModels,
   getOpenRouterTranscriptionModels,
   getRawOpenRouterModels,
+  resetOpenRouterModelsCaches,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
 import type { StoredModel } from '@kilocode/db/schema-types';
 import {
@@ -49,6 +50,10 @@ jest.mock(
 );
 
 const originalFetch = global.fetch;
+
+beforeEach(() => {
+  resetOpenRouterModelsCaches();
+});
 
 function buildModel(overrides: Partial<OpenRouterModel> = {}): OpenRouterModel {
   return {
@@ -193,13 +198,24 @@ describe('auto models', () => {
     expect(models.data.some(model => model.id === KILO_AUTO_EFFICIENT_MODEL.id)).toBe(true);
   });
 
-  it('explicitly caches authenticated catalog requests', async () => {
+  it('caches authenticated catalog requests in memory and bypasses the framework data cache', async () => {
+    await getEnhancedOpenRouterModels({ countryCode: null });
     await getEnhancedOpenRouterModels({ countryCode: null });
 
-    expect(global.fetch).toHaveBeenCalledWith(
-      'https://openrouter.ai/api/v1/models',
-      expect.objectContaining({ cache: 'force-cache', next: { revalidate: 60 } })
-    );
+    const catalogCalls = jest
+      .mocked(global.fetch)
+      .mock.calls.filter(([url]) => url === 'https://openrouter.ai/api/v1/models');
+    expect(catalogCalls).toEqual([
+      [
+        'https://openrouter.ai/api/v1/models',
+        expect.objectContaining({
+          method: 'GET',
+          cache: 'no-store',
+          headers: expect.objectContaining({ Authorization: expect.stringMatching(/^Bearer /) }),
+        }),
+      ],
+    ]);
+    expect(catalogCalls[0]?.[1]).not.toHaveProperty('next');
   });
 
   it.each([undefined, { name: 'Current model', slug: 'vendor/current' }])(
@@ -643,15 +659,10 @@ describe('OpenRouter transcription model fetcher', () => {
     );
   });
 
-  it('never caches the transcription catalogue so an unreachable gateway surfaces as a failure', async () => {
-    // The Data Cache would keep serving a stale catalogue while the gateway
-    // is down, and the mobile picker would list dead models instead of its
-    // load-failed retry state.
+  it('reuses the fetched transcription catalogue from memory', async () => {
+    await getOpenRouterTranscriptionModels();
     await getOpenRouterTranscriptionModels();
 
-    expect(global.fetch).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.objectContaining({ cache: 'no-store' })
-    );
+    expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 });

@@ -5987,9 +5987,16 @@ export const ai_gateway_sync_providers_state = pgTable(
     stale_alert_last_posted_at: timestamp({ withTimezone: true, mode: 'string' }),
     direct_byok_last_completed_at: timestamp({ withTimezone: true, mode: 'string' }),
     direct_byok_stale_alert_last_posted_at: timestamp({ withTimezone: true, mode: 'string' }),
+    metadata_cache_stale_alert_last_posted_at: timestamp({ withTimezone: true, mode: 'string' }),
   },
   table => [check('ai_gateway_sync_providers_state_singleton', sql`${table.id} = 1`)]
 );
+
+export const ai_gateway_metadata_cache = pgTable('ai_gateway_metadata_cache', {
+  url: text().primaryKey(),
+  updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  data: jsonb().$type<unknown>().notNull(),
+});
 
 export const ai_gateway_request_logging_opt_ins = pgTable(
   'ai_gateway_request_logging_opt_ins',

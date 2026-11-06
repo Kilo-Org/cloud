@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, jest } from '@jest/globals';
 import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
-import { fetchGatewayModels } from './sync-providers';
+import { fetchGatewayModels, gatewayModelsSource } from './sync-providers';
 
 const gateway = {
   type: 'vercel',
@@ -42,7 +42,7 @@ describe('fetchGatewayModels', () => {
     jest.spyOn(console, 'warn').mockImplementation(() => {});
     jest.spyOn(console, 'debug').mockImplementation(() => {});
 
-    const models = await fetchGatewayModels(gateway, '/models');
+    const models = await fetchGatewayModels(gateway, gatewayModelsSource(gateway, '/models'));
 
     expect(Object.keys(models)).toHaveLength(100);
     expect(models['test/model-0-batch']).toBeUndefined();
@@ -52,8 +52,8 @@ describe('fetchGatewayModels', () => {
   it('fails on other endpoint errors', async () => {
     mockGateway(modelId => (modelId === 'test/model-7' ? 500 : 200));
 
-    await expect(fetchGatewayModels(gateway, '/models')).rejects.toThrow(
-      'Fetching model endpoints for vercel/test/model-7 failed: 500'
-    );
+    await expect(
+      fetchGatewayModels(gateway, gatewayModelsSource(gateway, '/models'))
+    ).rejects.toThrow('Fetching model endpoints for vercel/test/model-7 failed: 500');
   });
 });

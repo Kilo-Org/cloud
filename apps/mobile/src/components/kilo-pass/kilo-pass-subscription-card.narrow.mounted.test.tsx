@@ -46,7 +46,14 @@ vi.mock('@/lib/trpc', () => ({
 }));
 
 vi.mock('@tanstack/react-query', () => ({
-  useQuery: () => ({ data: undefined, isError: false, isPending: true, refetch: vi.fn() }),
+  // A web-managed pass with its link: the only answer a reader can act on, so
+  // the card's one pressable exists for the layout under test.
+  useQuery: () => ({
+    data: { kind: 'web_management', webUrl: 'https://example.com/subscriptions/kilo-pass' },
+    isError: false,
+    isPending: false,
+    refetch: vi.fn(),
+  }),
 }));
 
 vi.mock('@/lib/kilo-pass/subscription-card-state', () => ({

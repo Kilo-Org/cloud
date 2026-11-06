@@ -3936,10 +3936,10 @@
     "skillEdit": "Dezie nka {{name}}",
     "skillDelete": "Hichapụ nka {{name}}",
     "mcp": {
-      "title": "Sava MCP",
+      "title": "Ihe nkesa MCP",
       "add": "Tinye ihe nkesa MCP",
-      "empty": "Enweghị sava MCP ma",
-      "name": "Aha sava",
+      "empty": "Enweghị ihe nkesa MCP ma",
+      "name": "Aha ihe nkesa",
       "type": "Ụdị nkesa",
       "localType": "Mpaghara",
       "remoteType": "Ime ime",

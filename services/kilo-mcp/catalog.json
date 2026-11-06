@@ -37555,6 +37555,58 @@
     ],
     "searchBlob": "workspaceFolders.list List the signed-in user's workspace folders, optionally scoped to an organization, including each folder's name, color, and assigned worktrees. workspacefolders list organizationid organizationId"
   },
+  "workspaceFolders.moveSession": {
+    "path": "workspaceFolders.moveSession",
+    "kind": "mutation",
+    "summary": "Move a chat session into a workspace folder, or pass a null folder ID to move it out and leave it ungrouped. Use this to organize sessions into project folders or unfile one.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sessionId": {
+          "type": "string",
+          "pattern": "^workspace_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "folderId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "organizationId",
+        "sessionId",
+        "folderId"
+      ]
+    },
+    "tags": [
+      "workspacefolders",
+      "movesession",
+      "organizationid",
+      "sessionid",
+      "folderid"
+    ],
+    "searchBlob": "workspaceFolders.moveSession Move a chat session into a workspace folder, or pass a null folder ID to move it out and leave it ungrouped. Use this to organize sessions into project folders or unfile one. workspacefolders movesession organizationid sessionid folderid organizationId sessionId folderId"
+  },
   "workspaceFolders.moveWorktree": {
     "path": "workspaceFolders.moveWorktree",
     "kind": "mutation",

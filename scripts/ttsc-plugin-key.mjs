@@ -9,17 +9,26 @@
 // dependency change elsewhere in the monorepo keeps the compiled plugin. A
 // closure failure widens the key to the whole lockfile, so a wider key only
 // costs a miss and never restores a plugin built from other versions.
+//
+// The harness SDK's manifest and tsconfig are deliberately absent. The cache
+// holds the plugin binary, and ttsc keys that binary on the plugin sources, its
+// own overlay, the Go toolchain and the platform: an edit to either file that
+// leaves those four resolutions alone cannot change it. typia reads
+// compilerOptions at transform time from the tsconfig in front of it, so a
+// restored binary still honours the current options.
 import { buildKeyInput } from './build-key-inputs.mjs';
 
 const plugins = ['ttsc', 'typia', '@ttsc/unplugin', 'typescript'];
-const files = [
-  'packages/harness-sdk/package.json',
-  'packages/harness-sdk/tsconfig.json',
-  // The action holds the cache steps, and this script decides the inputs: a
-  // change to either must not reuse plugins restored the old way.
+// The action holds the cache steps, and this script decides the inputs: a
+// change to either must not reuse plugins restored the old way.
+export const files = [
   '.github/actions/ttsc-plugin-cache/action.yml',
   'scripts/ttsc-plugin-key.mjs',
   'scripts/build-key-inputs.mjs',
 ];
 
-console.log(`key=${buildKeyInput(process.cwd(), 'packages/harness-sdk', files, plugins)}`);
+export function pluginKey(root) {
+  return buildKeyInput(root, 'packages/harness-sdk', files, plugins);
+}
+
+if (import.meta.main) console.log(`key=${pluginKey(process.cwd())}`);

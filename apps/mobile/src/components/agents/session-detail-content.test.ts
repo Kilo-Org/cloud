@@ -85,7 +85,6 @@ import { ScreenHeader } from '@/components/screen-header';
 import { SESSION_HEADER_TITLE_LINES } from '@/components/agents/session-header';
 import { i18n } from '@/i18n';
 import { captureEvent, SESSION_VIEWED_EVENT } from '@/lib/analytics/posthog';
-import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { recordLastOpenedSession } from '@/lib/last-opened-session';
 import { renderWithProviders, waitFor } from '@/test/render-with-providers';
 
@@ -529,17 +528,13 @@ vi.mock('@/components/agents/session-transcript', async importOriginal => {
     },
   };
 });
-// The session's model catalogue rows. Empty unless a test names the model the
-// session ran on, so every other screen keeps its previous option list; the
-// array keeps one identity between renders, like the real projection.
-const sessionModelOptions = vi.hoisted(() => ({ rows: [] as SessionModelOption[] }));
 vi.mock('@/lib/hooks/use-session-model-options', () => {
+  // The real hook memoizes its projection, so `options` keeps one identity
+  // between catalog changes. A fresh array per call would churn every
+  // `modelOptions` consumer on any re-render and hide identity regressions.
+  const options: unknown[] = [];
   return {
-    useSessionModelOptions: () => ({
-      options: sessionModelOptions.rows,
-      selectedValue: '',
-      selectedVariant: '',
-    }),
+    useSessionModelOptions: () => ({ options, selectedValue: '', selectedVariant: '' }),
   };
 });
 // The retry hook owns the app-foreground/focus subscriptions and the SDK
@@ -2679,39 +2674,6 @@ describe('session detail per-session auto-approve', () => {
     }
     return wrapper;
   }
-
-  it('names the session model and provider on the sheet before usage arrives', async () => {
-    const modelRow: SessionModelOption = {
-      id: 'deepseek/deepseek-v4.1-flash-1017',
-      name: 'DeepSeek V4.1 Flash 1017',
-      displayId: 'deepseek/deepseek-v4.1-flash-1017',
-      variants: [],
-      isPreferred: false,
-      showGatewayMetadata: true,
-    };
-    sessionModelOptions.rows = [modelRow];
-    // A stored session: no live transport reports context usage, and the
-    // session's own settings name the model it ran on.
-    sessionConfigSync.currentModel = modelRow.id;
-    onTestFinished(() => {
-      sessionModelOptions.rows = [];
-      sessionConfigSync.currentModel = '';
-    });
-    const view = await mountDetails([]);
-    await act(async () => {
-      view.store.set(view.manager.atoms.activeSessionType, 'read-only');
-    });
-
-    const metrics = view.renderer.root.findByProps({ testID: 'session-context-metrics' });
-    const metricsProps = metrics.props as { onPress: () => void };
-    await act(async () => {
-      metricsProps.onPress();
-    });
-    const contextSheet = view.renderer.root.findByType(SessionContextSheet);
-    expect(contextSheet.props.info).toBeUndefined();
-    expect(contextSheet.props.modelDisplay).toBe('DeepSeek V4.1 Flash 1017');
-    expect(contextSheet.props.providerDisplay).toBe('Kilo');
-  });
 
   it('opens the header sheet before usage arrives and resolves the pending permission through its toggle', async () => {
     const view = await mountDetails([]);

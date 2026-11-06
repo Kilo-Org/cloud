@@ -19,6 +19,7 @@ import {
 import { verifyTicket, type LiveTicket } from '../live/ticket';
 import { isBoundedJson, sessionIDSchema, tenantSchema, type Tenant } from '../protocol';
 import { getPresenceStub } from './SessionPresenceDO';
+import { diagnostic, metricsEnabled, phase, syncPhase } from '../metrics';
 
 const commandSchema = z.strictObject({
   channel: z.literal('commands'),
@@ -90,23 +91,26 @@ export class SessionRelayDO extends DurableObject<Env> {
   private alarmAt: number | null = null;
   private watchRefreshAt = Date.now() + watchRefreshMs;
   private watchSerial: Promise<void> = Promise.resolve();
+  private watchQueueDepth = 0;
   private runnerRates = new Map<string, { window: number; count: number }>();
   private attachments = new Map<WebSocket, Attachment>();
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     this.db = drizzle(ctx.storage, { logger: false });
-    void ctx.blockConcurrencyWhile(async () => {
-      await migrate(this.db, migrations);
-      this.db.insert(relayState).values({ id: 1, seq: 0 }).onConflictDoNothing().run();
-      const state = this.db.select().from(relayState).where(eq(relayState.id, 1)).get();
-      this.seq = state?.seq ?? 0;
-      this.ceiling = this.seq;
-      this.purged = state?.purged ?? false;
-      this.replayFloor = this.seq;
-      this.alarmAt = await ctx.storage.getAlarm();
-      for (const ws of ctx.getWebSockets()) this.attachment(ws);
-    });
+    void ctx.blockConcurrencyWhile(() =>
+      phase(env, 'relayInitialize', 'initialize', async () => {
+        await migrate(this.db, migrations);
+        this.db.insert(relayState).values({ id: 1, seq: 0 }).onConflictDoNothing().run();
+        const state = this.db.select().from(relayState).where(eq(relayState.id, 1)).get();
+        this.seq = state?.seq ?? 0;
+        this.ceiling = this.seq;
+        this.purged = state?.purged ?? false;
+        this.replayFloor = this.seq;
+        this.alarmAt = await ctx.storage.getAlarm();
+        for (const ws of ctx.getWebSockets()) this.attachment(ws);
+      })
+    );
   }
 
   override async fetch(request: Request): Promise<Response> {
@@ -474,36 +478,74 @@ export class SessionRelayDO extends DurableObject<Env> {
       tenant: ticket.tenant,
       sessionID: ticket.sessionID,
     };
-    this.db
-      .insert(relayWatches)
-      .values({
-        user_id: subject.userID,
-        tenant: subject.tenant,
-        session_id: subject.sessionID,
-      })
-      .onConflictDoNothing()
-      .run();
+    syncPhase(
+      this.env,
+      'relayWatch',
+      'watch_storage',
+      () =>
+        this.db
+          .insert(relayWatches)
+          .values({
+            user_id: subject.userID,
+            tenant: subject.tenant,
+            session_id: subject.sessionID,
+          })
+          .onConflictDoNothing()
+          .run(),
+      subject.tenant.type
+    );
+    const queuedAt = metricsEnabled(this.env) ? performance.now() : 0;
+    this.watchQueueDepth++;
     const task = this.watchSerial
       .then(async () => {
+        diagnostic(this.env, {
+          operation: 'relayWatch',
+          stage: 'watch_queue',
+          tenant: subject.tenant.type,
+          durationMs: queuedAt ? performance.now() - queuedAt : 0,
+          queueDepth: this.watchQueueDepth,
+        });
         const watching =
           !this.purged &&
           this.sockets().some(
             ([, state]) => state.ticket.role !== 'runner' && state.ticket.userID === subject.userID
           );
-        await getPresenceStub(this.env, subject.userID).watch({
-          tenant: subject.tenant,
-          sessionID: subject.sessionID,
-          watching,
-        });
+        await phase(
+          this.env,
+          'relayWatch',
+          'watch_rpc',
+          () =>
+            getPresenceStub(this.env, subject.userID).watch({
+              tenant: subject.tenant,
+              sessionID: subject.sessionID,
+              watching,
+            }),
+          subject.tenant.type
+        );
         const stillWatching =
           !this.purged &&
           this.sockets().some(
             ([, state]) => state.ticket.role !== 'runner' && state.ticket.userID === subject.userID
           );
         if (!watching && !stillWatching)
-          this.db.delete(relayWatches).where(eq(relayWatches.user_id, subject.userID)).run();
+          syncPhase(
+            this.env,
+            'relayWatch',
+            'watch_storage',
+            () =>
+              this.db.delete(relayWatches).where(eq(relayWatches.user_id, subject.userID)).run(),
+            subject.tenant.type
+          );
       })
-      .catch(() => {
+      .catch(error => {
+        diagnostic(this.env, {
+          operation: 'relayWatch',
+          stage: 'watch_queue',
+          tenant: subject.tenant.type,
+          outcome: 'error',
+          error,
+          queueDepth: this.watchQueueDepth,
+        });
         console.error('Relay presence watch failed');
         for (const [ws, state] of this.sockets()) {
           if (state.ticket.role !== 'runner' && state.ticket.userID === subject.userID)
@@ -512,6 +554,9 @@ export class SessionRelayDO extends DurableObject<Env> {
               message: 'Live publishing could not be enabled',
             });
         }
+      })
+      .finally(() => {
+        this.watchQueueDepth--;
       });
     this.watchSerial = task;
     return task;

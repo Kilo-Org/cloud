@@ -52,7 +52,7 @@
     "link": "njikọ",
     "takingLonger": "Nke a na-ewe oge karịa ka a tụrụ anya. Ị nwere ike imechi nke a ma lelee ọzọ.",
     "model": "Ihe nlereanya",
-    "accessDenied": "Ị nweghị ikike ịbanye.",
+    "accessDenied": "Ị nweghị ikike ịbanye",
     "allRepositories": "Ebe nchekwa koodu niile",
     "personal": "Nkeonwe",
     "connectGithub": "Jikọọ GitHub",
@@ -1487,7 +1487,7 @@
       "retryNeedsSettings": "Onye nyocha koodu agbanyụọla ma ọ bụ ntọala ya chọrọ nlebara anya. Dozie ntọala ndị ahụ, wee nwaa nyocha a ọzọ.",
       "retryNotStarted": "Nwagharị ahụ ebidoghị.",
       "fixSettings": "Dozie ntọala",
-      "couldNotLoad": "Enweghị ike ibudata nyocha.",
+      "couldNotLoad": "Enweghị ike ibudata nyocha",
       "couldNotGetLatest": "Enweghị ike ịnweta nke kachasị ọhụrụ.",
       "byline": "#{{number}} nke {{author}}",
       "noFindings": "Enweghị ihe achọpụtara.",
@@ -1517,7 +1517,7 @@
       "agentIdle": "Onye nnọchi anya anaghị arụ ọrụ",
       "agentWorking": "Onye nnọchi anya na-arụ ọrụ…",
       "anErrorOccurred": "Njehie mere",
-      "errorWithMessage": "Njehie: {{message}}.",
+      "errorWithMessage": "Njehie: {{message}}",
       "executionStarted": "A malitela ịrụ ọrụ",
       "reviewCompleted": "Nyocha gwụchara",
       "reviewInterrupted": "A kwụsịrị nyocha tupu ọ gwụchaa",
@@ -1535,9 +1535,9 @@
     "reviewMemory": {
       "title": "Ncheta nyocha",
       "loading": "Na-ebudata ebe nchekwa nyocha",
-      "couldNotLoad": "Enweghị ike ibudata ebe nchekwa nyocha.",
+      "couldNotLoad": "Enweghị ike ibudata ebe nchekwa nyocha",
       "off": "A gbanyụrụ ebe nchekwa nyocha.",
-      "on": "A gbanyere ebe nchekwa nyocha n'ọnụ.",
+      "on": "A gbanyere ebe nchekwa nyocha",
       "offDescription": "Gbanye ya ka Kilo mụta site na nzaghachi ndị na-elekọta wee tụọ aro nduzi REVIEW.md.",
       "readOnlyDescription": "Naanị ndị nwe nzukọ, ndị nchịkwa, na ndị njikwa ịgba ụgwọ nwere ike ịgbanwe ebe nchekwa nyocha.",
       "enable": "Gbanye ebe nchekwa nyocha",
@@ -1555,7 +1555,7 @@
       "prOpened": "Emeghela arịrịọ ijikọ koodu maka REVIEW.md",
       "alreadyPresent": "Nduzi adịlarị na REVIEW.md",
       "status": {
-        "open": "Mepe",
+        "open": "Emeghe",
         "edited": "Edezigharịrị",
         "opening_change_request": "Na-emepe PR",
         "change_request_failed": "Imepe PR akụrụ afọ n'ala",
@@ -1567,7 +1567,7 @@
       "changeRequestNoGitHubAccess": "Ọnweghị njikọ GitHub nwere ohere ịnweta ebe nchekwa a. Jikọọ GitHub ọzọ nke nwere ohere ịnweta ya, wee nwaa ọzọ.",
       "changeRequestMissingPermissions": "Ngwa GitHub nke Kilo enweghị ike imepe arịrịọ ijikọ koodu na ebe nchekwa a. Onye nwe ebe nchekwa ga-enyerịrị ngwa ahụ ikike ide ihe na arịrịọ ijikọ koodu, wee nwaa ọzọ.",
       "changeRequestFailed": "Kilo enweghị ike imepe arịrịọ ijikọ koodu. Nwaa ọzọ n'oge na-adịghị anya.",
-      "proposalConflict": "Aro ọzọ maka ebe nchekwa a ka na-aga n'ihu, yabụ enweghị ike ichekwa nke a ugbu a.",
+      "proposalConflict": "Aro ọzọ maka ebe nchekwa koodu a ka na-aga n'ihu.",
       "offAction": "A gbanyụrụ ebe nchekwa nyocha. Gbanye ya, wee nwaa ọzọ."
     },
     "manualReview": {
@@ -1596,8 +1596,8 @@
     "gitlab": {
       "notConnectedReadOnly": "E jikọghị {{platform}}. Rịọ ndị nwe nzukọ, ndị nchịkwa, ma ọ bụ ndị njikwa ịgba ụgwọ ka ha jikọọ ya."
     },
-    "webhookSetup": "Nhazi njikọ ngosi ezubeghị.",
-    "webhookSetupDescription": "Ụfọdụ ebe nchekwa nwere ike ghara ịnata nyocha akpaaka.",
+    "webhookSetup": "Nhazi webhook ezubeghị",
+    "webhookSetupDescription": "Ụfọdụ ebe nchekwa koodu nwere ike ghara ịnata nyocha akpaaka.",
     "autoReviews": "Nyocha akpaaka",
     "selectRepository": "Họrọ opekata mpe otu ebe nchekwa iji gbanye nyocha akpaaka.",
     "followReviewMd": "Soro REVIEW.md",
@@ -1618,7 +1618,7 @@
     },
     "reviewList": {
       "title": "Nyocha na-adịbeghị anya",
-      "couldNotLoad": "Enweghị ike ibudata nyocha.",
+      "couldNotLoad": "Enweghị ike ibudata nyocha",
       "noReviews": "Enwebeghị nyocha",
       "noReviewsDescription": "Nyocha na-apụta ebe a mgbe onye nyocha koodu nyochachara arịrịọ ijikọ koodu.",
       "startManualReview": "Jiri aka malite nyocha",
@@ -2471,7 +2471,7 @@
       "matchesBadge_one": "ndakọrịta {{displayCount}}",
       "matchesBadge_other": "ndakọrịta {{displayCount}}",
       "noOutput": "Enweghị mpụta.",
-      "translationFailed": "Ọsịsa agaghị"
+      "translationFailed": "Ntụgharị dara"
     },
     "readToolMarkdown": {
       "linesTruncated": "ahịrị {{start}}–{{end}} (ebipụrụ akụkụ)",
@@ -2545,7 +2545,7 @@
       "cacheRead": "Ọgụgụ nchekwa nwa oge",
       "cacheWrite": "Ide na nchekwa nwa oge",
       "total": "Ngụkọta",
-      "reportAiResponseFailedRetryable": "Enweghị ike ịkọ nzaghachi a.",
+      "reportAiResponseFailedRetryable": "Ịkọ nzaghachi a dara.",
       "reportAiResponseFailedTerminal": "Enweghị ike ịkọ nzaghachi a."
     },
     "modelCost": {
@@ -2939,8 +2939,8 @@
     },
     "prBadge": {
       "open": "meghe arịrịọ ijikọ koodu",
-      "closed": "arịrịọ njikọta koodu emechiri",
-      "merged": "arịrịọ njikọta koodu ejikọtara",
+      "closed": "arịrịọ ijikọ koodu emechiri",
+      "merged": "arịrịọ ijikọ koodu ejikọtara",
       "draft": "arịrịọ ijikọ koodu nke mbido",
       "updating": "Na-emelite, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"

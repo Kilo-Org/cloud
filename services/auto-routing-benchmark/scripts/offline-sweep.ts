@@ -185,6 +185,7 @@ async function main() {
     }
   }
   let unknownCost = sweep.pairs.some(pair => pair.results.some(result => result.costUsd === null));
+  if (unknownCost) sweep.truncated = true;
   const budgetAvailable = () => {
     if (!unknownCost && sweep.costUsd + sweep.graderCostUsd < maxUsd) return true;
     sweep.truncated = true;

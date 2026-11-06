@@ -474,6 +474,49 @@ describe('GET /api/integrations/linear/callback', () => {
     expect(mockedUnlinkTeamKiloUsers).not.toHaveBeenCalled();
     expectRedirectLocation(response, '/integrations/linear?error=workspace_already_connected');
   });
+
+  test('puts back the installation it replaced when the integration write fails', async () => {
+    await insertTestUser({ id: USER_ID });
+    try {
+      const previousInstallation = {
+        accessToken: 'prior_tok',
+        botUserId: 'linear-bot-user',
+        expiresAt: null,
+        organizationId: ORGANIZATION_ID,
+      };
+      const storedInstallations = new Map<string, unknown>().set(
+        ORGANIZATION_ID,
+        previousInstallation
+      );
+      getInstallation.mockImplementation(async (organizationId: string) => {
+        return storedInstallations.get(organizationId) ?? null;
+      });
+      setInstallation.mockImplementation(async (organizationId: string, installation: unknown) => {
+        storedInstallations.set(organizationId, installation);
+      });
+      deleteInstallation.mockImplementation(async (organizationId: string) => {
+        storedInstallations.delete(organizationId);
+      });
+      mockedUpsertLinearInstallation.mockRejectedValue(new Error('integration write failed'));
+      const state = createProviderState();
+
+      const response = await callLinearCallback(
+        makeRequest(`/api/integrations/linear/callback?code=abc&state=${state}`)
+      );
+
+      expectRedirectLocation(response, '/integrations/linear?error=installation_failed');
+      expect(storedInstallations.get(ORGANIZATION_ID)).toEqual(previousInstallation);
+      expect(storedInstallations.size).toBe(1);
+      const stored = await db
+        .select()
+        .from(platform_integrations)
+        .where(eq(platform_integrations.owned_by_user_id, USER_ID));
+      expect(stored).toHaveLength(0);
+      expect(mockedUnlinkTeamKiloUsers).not.toHaveBeenCalled();
+    } finally {
+      await db.delete(kilocode_users).where(eq(kilocode_users.id, USER_ID));
+    }
+  });
 });
 
 describe('verifyOAuthState (self-check, to keep tests honest)', () => {

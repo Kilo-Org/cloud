@@ -308,8 +308,10 @@ describe('Organization hub balance masking', () => {
 
     const row = balanceRow(renderer);
     expect(row?.props.value).toBe('$5');
-    // The spoken label stays the amount itself (no overriding label).
-    expect(row?.props.valueAccessibilityLabel).toBeUndefined();
+    // The spoken label always carries the amount: a node React Native stops
+    // handing a label keeps its previous native value on Android, so the
+    // masked-until-settled flip to visible must not leave "Balance hidden".
+    expect(row?.props.valueAccessibilityLabel).toBe('$5');
     unmount();
   });
 

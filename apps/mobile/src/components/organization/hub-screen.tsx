@@ -205,7 +205,15 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
                   : formatMoney(fromMicrodollars(org.balance), i18n.language)
               }
               valueFace="numeric"
-              valueAccessibilityLabel={hideOrgBalance ? t('profile.balanceHidden') : undefined}
+              // Always pass the label: a node React Native stops handing a
+              // label keeps its previous native value on Android, so a
+              // masked row that reveals its amount would still announce
+              // "Balance hidden" (the credits card's own note).
+              valueAccessibilityLabel={
+                hideOrgBalance
+                  ? t('profile.balanceHidden')
+                  : formatMoney(fromMicrodollars(org.balance), i18n.language)
+              }
             />
           )}
           {showMoney && org.balance === 0 && (

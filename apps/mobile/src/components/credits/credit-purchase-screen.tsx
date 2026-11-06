@@ -133,10 +133,17 @@ export function CreditPurchaseScreen() {
         </Pressable>
       );
     }
+    // Always pass the label: a node React Native stops handing a label keeps
+    // its previous native value on Android, so a masked amount that reveals
+    // itself would still announce "Balance hidden" (the credits card's note).
     return (
       <Text
         className="text-2xl font-bold tabular-nums"
-        accessibilityLabel={hideBalanceAmount ? t('profile.balanceHidden') : undefined}
+        accessibilityLabel={
+          hideBalanceAmount
+            ? t('profile.balanceHidden')
+            : formatMoney(balanceQuery.data.balance, i18n.language)
+        }
       >
         {hideBalanceAmount ? HIDDEN_BALANCE : formatMoney(balanceQuery.data.balance, i18n.language)}
       </Text>

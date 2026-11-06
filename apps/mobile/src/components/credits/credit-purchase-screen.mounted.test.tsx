@@ -359,6 +359,25 @@ describe('CreditPurchaseScreen', () => {
     unmount();
   });
 
+  it('speaks the amount when the balance is visible, not the hidden label', async () => {
+    // The label must always be passed: a node React Native stops handing a
+    // label keeps its previous native value on Android, so a masked node that
+    // reveals itself would otherwise still announce "Balance hidden".
+    const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => packRows(renderer).length === 4);
+
+    const amount = renderer.root.find(
+      node => String(node.type) === 'Text' && node.props.accessibilityLabel === '$1,234.00'
+    );
+    expect(amount.props.children).toBe('$1,234.00');
+    expect(
+      renderer.root.findAll(
+        node => String(node.type) === 'Text' && node.props.accessibilityLabel === 'Balance hidden'
+      )
+    ).toHaveLength(0);
+    unmount();
+  });
+
   it('loading: renders skeleton rows sized like a pack row and no pack row', async () => {
     owner.connected = false;
 

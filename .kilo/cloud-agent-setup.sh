@@ -287,8 +287,10 @@ if [[ ($PWD == "$repo" || $PWD == "$repo"/*) && -f $env_file ]]; then
   # Docker is gone after a workspace tail snapshot resume or an environment
   # snapshot start, and the first command there is usually a pnpm start command.
   docker_pid=$(cat /var/run/docker.pid 2>/dev/null || true)
-  if [[ -n ${KILO_DOCKER_CGROUP:-} && -f ${KILO_DOCKER_CGROUP%/*}/memory.max \
-    && ! ( $docker_pid =~ ^[0-9]+$ && $(cat "/proc/$docker_pid/comm" 2>/dev/null) == dockerd ) ]]; then
+  # A supplied daemon (DOCKER_HOST, or a socket without our pid file) is not ours to restart.
+  if [[ -z ${DOCKER_HOST:-} && -n ${KILO_DOCKER_CGROUP:-} && -f ${KILO_DOCKER_CGROUP%/*}/memory.max ]] \
+    && [[ -f /var/run/docker.pid || ! -S /var/run/docker.sock ]] \
+    && ! [[ $docker_pid =~ ^[0-9]+$ && $(cat "/proc/$docker_pid/comm" 2>/dev/null) == dockerd ]]; then
     printf 'Docker is not running; restarting the sandbox daemons.\n' >&2
     if ! flock -o "${env_file%/*}/resume.lock" bash "$repo/.kilo/cloud-agent-setup.sh" --resume >&2; then
       printf 'Warning: Docker could not be restarted; rerun bash %q/.kilo/cloud-agent-setup.sh.\n' "$repo" >&2
@@ -305,7 +307,7 @@ source "$env_file"
 
 started_docker=0
 if ! docker info >/dev/null 2>&1; then
-  if [[ -z ${DOCKER_HOST:-} ]] && ! pgrep -x dockerd >/dev/null; then
+  if [[ -z ${DOCKER_HOST:-} && -f /var/run/docker.pid ]] && ! pgrep -x dockerd >/dev/null; then
     # A restored disk keeps the socket and pid file of a daemon that no longer exists.
     "${root[@]}" rm -f /var/run/docker.sock /var/run/docker.pid
   fi

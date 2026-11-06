@@ -372,6 +372,12 @@ jobs:
           scripts/meta-janitor-approve.test.mjs
           scripts/mobile-sbom-workflow.test.mjs
 
+      # The same gap for the release workflow: a PR that changes it or its test
+      # does not trip the backend filter either, so its wiring checks run here
+      # and a workflow change cannot drop a release gate unnoticed.
+      - name: Test release workflow wiring
+        run: node --test scripts/kilo-app-release-workflow.test.mjs
+
   # One producer for the tRPC declarations. Both matrices used to run the
   # trpc-declarations action behind `matrix.group == 'trpc'`, so a cache miss
   # compiled the same declaration program in two 4 vCPU jobs that started

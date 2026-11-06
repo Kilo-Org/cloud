@@ -618,6 +618,7 @@
     "pr opened",
     "remediation blocked",
     "remediation failed",
+    "review",
     "superseded"
   ],
   "ms": ["deleted", "dismissed", "open", "open pull request", "review"],

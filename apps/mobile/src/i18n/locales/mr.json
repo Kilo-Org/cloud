@@ -52,7 +52,7 @@
     "link": "लिंक",
     "takingLonger": "यासाठी अपेक्षेपेक्षा जास्त वेळ लागत आहे. तुम्ही हे बंद करून पुन्हा तपासू शकता.",
     "model": "मॉडेल",
-    "accessDenied": "प्रवेशास परवानगी नाही.",
+    "accessDenied": "प्रवेशास परवानगी नाही",
     "allRepositories": "सर्व रिपॉझिटरी",
     "personal": "वैयक्तिक",
     "connectGithub": "GitHub जोडा",
@@ -71,7 +71,7 @@
     "added": "जोडले",
     "cancelled": "रद्द",
     "close": "बंद करा",
-    "codeReviewer": "कोड समीक्षक",
+    "codeReviewer": "कोड पुनरावलोकक",
     "connected": "जोडलेले",
     "couldNotLoadModels": "मॉडेल लोड करता आले नाहीत.",
     "couldNotLoadRepositories": "रिपॉझिटरी लोड करता आल्या नाहीत.",
@@ -83,14 +83,14 @@
     "draft": "मसुदा",
     "enabled": "सुरू",
     "github": "GitHub",
-    "imageUnavailable": "प्रतिमा उपलब्ध नाही.",
+    "imageUnavailable": "प्रतिमा उपलब्ध नाही",
     "loading": "लोड होत आहे…",
     "loadMore": "आणखी दाखवा",
     "message": "संदेश",
     "off": "बंद",
     "organization": "संस्था",
     "platform": "प्लॅटफॉर्म",
-    "prReview": "PR समीक्षा",
+    "prReview": "PR पुनरावलोकन",
     "prReviewSubtitle": "मोबाइलवर पुल रिक्वेस्टचे पुनरावलोकन करा",
     "queued": "रांगेत",
     "remove": "काढा",
@@ -133,7 +133,7 @@
     "newSession": "नवीन सत्र",
     "noKiloclawInstances": "कोणतेही KiloClaw इन्स्टन्स नाहीत",
     "noModelsAvailable": "कोणतेही मॉडेल उपलब्ध नाही",
-    "notFound": "सापडले नाही.",
+    "notFound": "सापडले नाही",
     "online": "ऑनलाइन",
     "open": "{{name}} उघडा",
     "openPullRequest": "पुल रिक्वेस्ट उघडा",
@@ -152,7 +152,7 @@
     "reply": "उत्तर द्या",
     "reportSubmittedReceipt": "तक्रार पाठवली. पावती क्रमांक: {{receiptId}}",
     "retryLoadingMore": "आणखी माहिती लोड करण्याचा पुन्हा प्रयत्न करा",
-    "reviewPr": "PR ची समीक्षा करा",
+    "reviewPr": "PR चे पुनरावलोकन करा",
     "role": "भूमिका",
     "searchModels": "मॉडेल शोधा...",
     "selectedRepositories": "निवडलेल्या रिपॉझिटरी",
@@ -623,7 +623,7 @@
     "reviewServiceUnavailableDescription": "सेवा तात्पुरती अनुपलब्ध आहे. लवकरच पुन्हा प्रयत्न करा.",
     "description": "वर्णन",
     "noDescriptionProvided": "वर्णन दिलेले नाही.",
-    "review": "समीक्षा",
+    "review": "पुनरावलोकन",
     "reviewPullRequest": "पुल रिक्वेस्टचे पुनरावलोकन करा",
     "headLine": "{{counts}} · हेड {{sha}}",
     "entry": {
@@ -730,7 +730,7 @@
       "pendingComment": "प्रलंबित टिप्पण्या",
       "pendingComment_other": "प्रलंबित टिप्पण्या",
       "submitCountOfTotal": "{{displayTotalCount}} पैकी {{displayFreshCount}} टिप्पण्या सादर करा",
-      "submitReview": "समीक्षा सादर करा",
+      "submitReview": "पुनरावलोकन सादर करा",
       "partialPostedFresh": "{{displayFreshCount}} टिप्पण्या पोस्ट केल्या. ",
       "partialPostedFresh_one": "{{displayFreshCount}} टिप्पण्या पोस्ट केल्या. ",
       "partialPostedFresh_other": "{{displayFreshCount}} टिप्पण्या पोस्ट केल्या. ",
@@ -770,13 +770,13 @@
       "mergedByAgo": "{{login}} यांनी {{time}} मर्ज केले",
       "closedAgo": "{{time}} बंद केले",
       "labels": "लेबले",
-      "reviewers": "समीक्षक",
+      "reviewers": "पुनरावलोकक",
       "assignees": "नियुक्त व्यक्ती",
       "linkedIssues": "जोडलेले इश्यू",
       "reviewApproved": "मंजूर",
       "reviewChangesRequested": "बदल मागितले",
       "reviewCommented": "टिप्पणी केली",
-      "reviewPending": "समीक्षेच्या प्रतीक्षेत",
+      "reviewPending": "पुनरावलोकनाच्या प्रतीक्षेत",
       "openIssueA11y": "GitHub वर इश्यू #{{number}} उघडा"
     },
     "pendingComment": {
@@ -1454,7 +1454,7 @@
       "deprecation": "सानुकूल सूचनांची सुविधा बंद करण्याचे नियोजन आहे. त्याऐवजी ही मार्गदर्शक तत्त्वे तुमच्या रिपॉझिटरीतील REVIEW.md फाइलमध्ये ठेवा.",
       "placeholder": "उदा. त्रुटी हाताळण्यासाठीचे आमचे नियम पाळा…",
       "clearTitle": "सानुकूल सूचना काढून टाकायच्या?",
-      "clearMessage": "रिक्त फील्ड जतन केल्यास या समीक्षकासाठी साठवलेल्या सानुकूल सूचना हटवल्या जातील."
+      "clearMessage": "रिक्त फील्ड जतन केल्यास या पुनरावलोककासाठी साठवलेल्या सानुकूल सूचना हटवल्या जातील."
     },
     "repos": {
       "unavailable": "रिपॉझिटरी उपलब्ध नाहीत — kilo.ai वर Bitbucket सेटअप पूर्ण करा.",
@@ -1470,21 +1470,21 @@
       "allModeCount": "उपलब्ध रिपॉझिटरी: {{displayCount}}"
     },
     "style": {
-      "title": "समीक्षेची शैली",
+      "title": "पुनरावलोकनाची शैली",
       "balanced": "अनावश्यक तपशील वगळून महत्त्वाचे निष्कर्ष",
       "lenient": "फक्त गंभीर समस्या",
       "roast": "थेट, स्पष्ट आणि विनोदी टीका",
       "strict": "प्रत्येक समस्या दाखवा आणि कडक निकष लावा"
     },
     "reviewDetail": {
-      "title": "समीक्षा",
+      "title": "पुनरावलोकन",
       "cancelTitle": "पुनरावलोकन रद्द करायचे?",
       "cancelMessage": "यामुळे सुरू असलेले कोडचे पुनरावलोकन थांबेल.",
       "cancelReview": "पुनरावलोकन रद्द करा",
       "retryTitle": "पुनरावलोकन पुन्हा करायचे?",
       "retryMessage": "यामुळे कोडचे पुनरावलोकन पुन्हा केले जाईल.",
       "retryReview": "पुनरावलोकन पुन्हा करा",
-      "retryNeedsSettings": "कोड समीक्षक बंद आहे किंवा त्याच्या सेटिंग्जकडे लक्ष देणे आवश्यक आहे. सेटिंग्ज दुरुस्त करा, नंतर हे पुनरावलोकन पुन्हा करा.",
+      "retryNeedsSettings": "कोड पुनरावलोकक बंद आहे किंवा त्याच्या सेटिंग्जकडे लक्ष देणे आवश्यक आहे. सेटिंग्ज दुरुस्त करा, नंतर हे पुनरावलोकन पुन्हा करा.",
       "retryNotStarted": "पुन्हा प्रयत्न सुरू झाला नाही.",
       "fixSettings": "सेटिंग्ज दुरुस्त करा",
       "couldNotLoad": "पुनरावलोकन लोड करता आले नाही.",
@@ -1498,7 +1498,7 @@
       "reviewFailed": "पुनरावलोकन अयशस्वी झाले. कृपया पुन्हा प्रयत्न करा.",
       "showMore": "आणखी दाखवा",
       "created": "तयार केले",
-      "started": "सुरू केले",
+      "started": "सुरू झाले",
       "reviewEnded": "संपले",
       "severityNitpick": "किरकोळ",
       "tokens": "टोकन",
@@ -1533,7 +1533,7 @@
       "cancelReasonInterrupted": "हे पुनरावलोकन मध्येच थांबवण्यात आले."
     },
     "reviewMemory": {
-      "title": "समीक्षा मेमरी",
+      "title": "पुनरावलोकन मेमरी",
       "loading": "पुनरावलोकन मेमरी लोड होत आहे",
       "couldNotLoad": "पुनरावलोकन मेमरी लोड करता आली नाही.",
       "off": "पुनरावलोकन मेमरी बंद आहे.",
@@ -1573,7 +1573,7 @@
     "manualReview": {
       "invalidMergeRequestUrl": "मर्ज रिक्वेस्टचा वैध URL टाका.",
       "mergeRequestUrl": "मर्ज रिक्वेस्टचा URL",
-      "instructionsAtLimit": "सूचना {{max}} अक्षरांपुरता मर्यादित आहे",
+      "instructionsAtLimit": "सूचना {{max}} अक्षरांपुरता मर्यादित आहे.",
       "title": "मागणीनुसार पुनरावलोकन",
       "invalidUrl": "पुल रिक्वेस्टचा वैध URL टाका.",
       "couldNotCheckProviderStatus": "सेवा पुरवठादाराची स्थिती तपासता आली नाही.",
@@ -1596,7 +1596,7 @@
     "gitlab": {
       "notConnectedReadOnly": "{{platform}} जोडलेले नाही. संस्थेच्या मालक, प्रशासक किंवा बिलिंग व्यवस्थापकाला ते जोडण्यास सांगा."
     },
-    "webhookSetup": "वेबहूक सेटअप अपूर्ण आहे.",
+    "webhookSetup": "वेबहूक सेटअप अपूर्ण आहे",
     "webhookSetupDescription": "काही रिपॉझिटरींचे स्वयंचलित पुनरावलोकन होणार नाही अशी शक्यता आहे.",
     "autoReviews": "स्वयंचलित पुनरावलोकने",
     "selectRepository": "स्वयंचलित पुनरावलोकने चालू करण्यासाठी किमान एक रिपॉझिटरी निवडा.",
@@ -1628,7 +1628,7 @@
       "checking": "तपासत आहे…",
       "statusUnavailable": "स्थिती अनुपलब्ध",
       "platforms": "प्लॅटफॉर्म",
-      "activity": "कृती"
+      "activity": "क्रियाकलाप"
     },
     "providerConnect": {
       "githubApp": "GitHub ॲप",
@@ -1649,11 +1649,11 @@
     },
     "decision": {
       "pass": "उत्तीर्ण",
-      "block": "ब्लॉक करा",
+      "block": "ब्लॉक",
       "noDecision": "निर्णय नाही",
       "noResult": "निकाल नाही"
     },
-    "updateFailed": "कोड पुनरावलोकक अद्ययावत करता आला नाही.",
+    "updateFailed": "कोड पुनरावलोकक अद्ययावत करता आला नाही",
     "configSaveFailed": "पुनरावलोकनाच्या सेटिंग्ज जतन करता आल्या नाहीत.",
     "status": {
       "interrupted": "व्यत्यय आला"
@@ -1697,7 +1697,7 @@
       "repeatedRepositoryCloneTimeout": {
         "description": "आज रिपॉझिटरी क्लोन करताना तीनदा वेळमर्यादा ओलांडल्यामुळे कोड पुनरावलोकक बंद केला आहे. मदतीसाठी {{supportEmail}} वर संपर्क करा आणि मग कोड पुनरावलोकक पुन्हा चालू करा."
       },
-      "title": "कोड समीक्षकाकडे लक्ष देणे आवश्यक आहे.",
+      "title": "कोड पुनरावलोककाकडे लक्ष देणे आवश्यक आहे",
       "recoveryLabel": "मदत पथकाशी संपर्क साधा"
     },
     "unknownError": "अज्ञात त्रुटी"
@@ -2212,14 +2212,14 @@
       "searchSessionsPlaceholder": "सत्रे शोधा"
     },
     "sessionList": {
-      "couldNotLoadActive": "सक्रिय सत्रे लोड करता आली नाहीत.",
+      "couldNotLoadActive": "सक्रिय सत्रे लोड करता आली नाहीत",
       "couldNotRefresh": "रीफ्रेश करता आले नाही",
       "noSessionsYetDescription": "तुमच्या फोनवरून कोडिंगचे काम सुरू करा.",
       "viewHistory": "सत्रांचा इतिहास",
       "noMatches": "जुळणारी सत्रे नाहीत",
       "tryDifferentSearch": "दुसरा शब्द वापरून शोधा.",
       "tryAdjustFilters": "तुमचे फिल्टर बदलून किंवा काढून पहा.",
-      "couldNotSearch": "सत्रे शोधता आली नाहीत.",
+      "couldNotSearch": "सत्रे शोधता आली नाहीत",
       "completedWillAppear": "पूर्ण झालेली सत्रे येथे दिसतील.",
       "noPastSessions": "मागील सत्रे नाहीत",
       "pastSessions": "मागील सत्रे",
@@ -2982,8 +2982,8 @@
     }
   },
   "bootstrap": {
-    "couldNotLoadAccount": "तुमचे खाते लोड करता आले नाही.",
-    "couldNotLoadPrivacy": "गोपनीयतेचे पर्याय लोड करता आले नाहीत.",
+    "couldNotLoadAccount": "तुमचे खाते लोड करता आले नाही",
+    "couldNotLoadPrivacy": "गोपनीयतेचे पर्याय लोड करता आले नाहीत",
     "couldNotLoadPrivacyDescription": "तुमच्या डिव्हाइसची सुरक्षा सेटिंग्ज तपासा आणि पुन्हा प्रयत्न करा.",
     "contentReady": "सामग्री तयार",
     "retryLoadingAccount": "खाते लोड करण्याचा पुन्हा प्रयत्न करा",
@@ -3814,8 +3814,8 @@
       "confirmTitle": "हा एजंट सुरू करायचा का?",
       "promptRequired": "एजंट सुरू करण्यासाठी प्रॉम्प्ट आवश्यक आहे. प्रॉम्प्ट जोडा आणि ते पुन्हा चालवा.",
       "repositoryRequired": "एजंट सुरू करण्यासाठी रिपॉझिटरी आवश्यक आहे. Kilo उघडा आणि एक निवडा, नंतर ते पुन्हा चालवा.",
-      "repositoryUnknown": "Kilo, {{repository}} ला GitHub किंवा GitLab रिपॉझिटरी म्हणून ओळखत नाही. Kilo मध्ये दुसरी रिपॉझिटरी निवडा.",
-      "repositoryUnsupported": "{{repository}} ही Bitbucket रिपॉझिटरी आहे — एजंट सुरू करा अजून ती वापरू शकत नाही. Kilo मध्ये दुसरी रिपॉझिटरी निवडा."
+      "repositoryUnknown": "Kilo {{repository}} ला GitHub किंवा GitLab रिपॉझिटरी म्हणून ओळखत नाही. Kilo मध्ये दुसरी रिपॉझिटरी निवडा.",
+      "repositoryUnsupported": "{{repository}} ही Bitbucket रिपॉझिटरी आहे — ‘एजंट सुरू करा’ अजून ती वापरू शकत नाही. Kilo मध्ये दुसरी रिपॉझिटरी निवडा."
     }
   },
   "launcher": {

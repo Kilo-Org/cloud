@@ -141,10 +141,7 @@ function hasRowOlderThan(db: DrizzleSqliteDODatabase, id: number): boolean {
   return row !== undefined;
 }
 
-function readAnchorRows(
-  db: DrizzleSqliteDODatabase,
-  seenItemIds: Set<string>
-): ScannedRow[] {
+function readAnchorRows(db: DrizzleSqliteDODatabase, seenItemIds: Set<string>): ScannedRow[] {
   const rows = db
     .select(windowColumns())
     .from(ingestItems)

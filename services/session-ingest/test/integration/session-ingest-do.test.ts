@@ -4222,8 +4222,10 @@ describe('SessionIngestDO integration', () => {
       const sessionId = 'ses_metrics_budget_oversized_0001';
       const stub = getStub(kiloUserId, sessionId);
       const oversizedBody = 'x'.repeat(SESSION_METRICS_WINDOW_MAX_ROW_BYTES + 1);
-      expect(encoder.encode(JSON.stringify({ ...userMessage('huge', 1000), text: oversizedBody })).byteLength)
-        .toBeGreaterThan(SESSION_METRICS_WINDOW_MAX_ROW_BYTES);
+      expect(
+        encoder.encode(JSON.stringify({ ...userMessage('huge', 1000), text: oversizedBody }))
+          .byteLength
+      ).toBeGreaterThan(SESSION_METRICS_WINDOW_MAX_ROW_BYTES);
 
       await stub.ingest(
         [

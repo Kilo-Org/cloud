@@ -41,7 +41,6 @@ import {
   SESSION_METRICS_WINDOW_MAX_ROWS,
 } from './session-metrics-window';
 
-
 describe('SessionIngestDO ingest ordering', () => {
   it('uses ingested_at with id only as a tie-breaker for cursor progression', () => {
     expect(ingestOrderCursor({ ingested_at: 100, id: 7 })).toEqual({ ingestedAt: 100, id: 7 });
@@ -948,8 +947,7 @@ describe('SessionIngestDO live activity + cost persist', () => {
           const cursor = boundNumbers[0];
           const rows = [...itemRows.values()]
             .filter(
-              row =>
-                row.item_type !== 'session_diff' && (cursor === undefined || row.id < cursor)
+              row => row.item_type !== 'session_diff' && (cursor === undefined || row.id < cursor)
             )
             .sort((left, right) => right.id - left.id)
             .slice(0, selectLimit);

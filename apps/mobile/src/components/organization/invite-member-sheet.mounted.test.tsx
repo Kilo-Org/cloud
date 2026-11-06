@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the invite sheet suites share one mock harness. */
 import { createElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -32,9 +33,12 @@ const invite = vi.hoisted(() => ({
 // handler on every render, and the test re-runs them to present the sheet
 // again. `useCallback` keeps each identity stable, so a render adds nothing.
 const focus = vi.hoisted(() => ({ effects: [] as (() => void)[] }));
+// The route's own dismissal: one call per leave, however many reasons arrive.
+const popOnce = vi.hoisted(() => vi.fn());
+// The Android Back listener the sheet registers on focus.
+const backPress = vi.hoisted(() => ({ handler: undefined as (() => boolean) | undefined }));
 
 vi.mock('expo-router', () => ({
-  useRouter: () => ({ back: vi.fn() }),
   useFocusEffect: (effect: () => void) => {
     if (!focus.effects.includes(effect)) {
       focus.effects.push(effect);
@@ -45,8 +49,14 @@ vi.mock('react-native', () => ({
   View: 'View',
   ScrollView: 'ScrollView',
   Pressable: 'Pressable',
-  BackHandler: { addEventListener: () => ({ remove: () => undefined }) },
+  BackHandler: {
+    addEventListener: (_event: string, handler: () => boolean) => {
+      backPress.handler = handler;
+      return { remove: () => undefined };
+    },
+  },
 }));
+vi.mock('@/lib/navigation/pop-once', () => ({ usePopOnce: () => popOnce }));
 vi.mock('@/components/organization/organization-boundary', () => ({
   OrganizationBoundary: 'OrganizationBoundary',
 }));
@@ -64,11 +74,15 @@ vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
 // suite models: the sheet still renders its body as the ScrollView host.
 vi.mock('@/components/tab-screen', () => ({ SheetScrollView: 'ScrollView' }));
 // The sheet's own dirty check: what Cancel and Back would ask about.
-const guard = vi.hoisted(() => ({ isDirty: (): boolean => false }));
+const guard = vi.hoisted(() => ({ isDirty: (): boolean => false, requestClose: vi.fn() }));
 vi.mock('@/components/ui/use-sheet-dismiss-guard', () => ({
   useSheetDismissGuard: (options: { isDirty: () => boolean }) => {
     guard.isDirty = options.isDirty;
-    return { requestClose: vi.fn(), requestDismiss: () => true, dialog: null };
+    return {
+      requestClose: guard.requestClose,
+      requestDismiss: () => true,
+      dialog: null,
+    };
   },
 }));
 vi.mock('@/components/ui/radio-group', () => ({
@@ -86,7 +100,8 @@ vi.mock('@/lib/analytics/posthog', () => ({
 vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => ({}) }));
 vi.mock('@/lib/hooks/use-organization-queries', () => ({
   useOrgBoundary: () => boundary,
-  isMoneyRole: (role: string) => role === 'owner' || role === 'billing_manager',
+  // canManageOrganizationBilling: an admin may invite, so it may open the sheet.
+  isMoneyRole: (role: string) => role === 'owner' || role === 'admin' || role === 'billing_manager',
 }));
 vi.mock('@/lib/hooks/use-organization-mutations', () => ({
   useOrganizationMutations: () => ({ invite }),
@@ -104,6 +119,9 @@ beforeEach(() => {
   };
   invite.mutate.mockClear();
   invite.reset.mockClear();
+  popOnce.mockClear();
+  guard.requestClose.mockClear();
+  backPress.handler = undefined;
   focus.effects = [];
 });
 

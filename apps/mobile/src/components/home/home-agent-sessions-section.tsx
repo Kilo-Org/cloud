@@ -24,7 +24,6 @@ import {
 import { LiveSessionFeedback } from '@/components/home/agent-sessions-section';
 import { SectionHeader } from '@/components/home/section-header';
 import { selectReducedMotionEntrance, useMotionPolicy } from '@/lib/a11y/motion';
-import { AGENTS_SESSIONS_HREF } from '@/lib/agents-sessions-route';
 
 /**
  * The briefing that replaces the live card inside the shared adaptive frame.
@@ -53,9 +52,11 @@ export function AgentSessionsSection({
   // previous tap left on the route.
   const openAgentsIndex = useCallback(
     (status?: GlanceableStatusKind) => {
+      // An object href replaces the route params. A bare string would keep a
+      // status param a previous tap left behind, so See all must pass {}.
       const href: Href = status
-        ? { pathname: AGENTS_SESSIONS_HREF, params: { status } }
-        : AGENTS_SESSIONS_HREF;
+        ? { pathname: '/(app)/(tabs)/(2_agents)/', params: { status } }
+        : { pathname: '/(app)/(tabs)/(2_agents)/', params: {} };
       router.navigate(href);
       router.dismissTo(href);
     },

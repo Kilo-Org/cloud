@@ -299,8 +299,15 @@ describe('Home live section', () => {
     await render({ ...settled, activeSessions: [session('a1')] });
     expect(node('SectionHeader').props.label).toBe(i18n.t('home.agentSessions'));
     (node('SectionHeader').props.onActionPress as () => void)();
-    expect(navigateSpy).toHaveBeenCalledWith('/(app)/(tabs)/(2_agents)/');
-    expect(dismissToSpy).toHaveBeenCalledWith('/(app)/(tabs)/(2_agents)/');
+    // An empty params object is what clears a lingering status filter.
+    expect(navigateSpy).toHaveBeenCalledWith({
+      pathname: '/(app)/(tabs)/(2_agents)/',
+      params: {},
+    });
+    expect(dismissToSpy).toHaveBeenCalledWith({
+      pathname: '/(app)/(tabs)/(2_agents)/',
+      params: {},
+    });
     expect(navigateSpy.mock.invocationCallOrder[0] ?? 0).toBeLessThan(
       dismissToSpy.mock.invocationCallOrder[0] ?? 0
     );

@@ -15,6 +15,7 @@ import {
 import { formatScheduledWake } from '@/components/agents/session-list-helpers';
 import { EmptyState } from '@/components/empty-state';
 import { CardControl } from '@/components/home/adaptive-home-card-frame';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { Bot } from '@/components/ui/icons';
 import { SessionStatusIcon } from '@/components/ui/session-status-icon';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -40,7 +41,7 @@ const COUNT_LINES: readonly { kind: GlanceableStatusKind; labelKey: string }[] =
 /** Shared minimum frame; text determines the loaded card's height. */
 const CARD_CLASS = 'overflow-hidden rounded-2xl border border-border bg-card';
 const COUNTS_CLASS = 'gap-2 px-4 py-3';
-const COUNT_ROW_CLASS = 'min-h-6 flex-row items-center gap-2';
+const COUNT_ROW_CLASS = `${ROW_TARGET_CLASS} flex-row items-center gap-2`;
 const DIVIDER_CLASS = 'h-px bg-border';
 const NEWEST_BLOCK_CLASS = 'min-h-[68px] justify-center gap-1 px-4 py-3';
 const NEWEST_ROW_CLASS = 'min-h-5 flex-row items-center gap-2';
@@ -129,9 +130,8 @@ export function GlanceableActiveCard({
                         }
                   }
                   accessibilityRole={onPressStatus === undefined ? undefined : 'button'}
-                  accessibilityLabel={`${counts[line.kind]} ${t(line.labelKey)}`}
                   testID={`home-status-${line.kind}`}
-                  hitSlop={onPressStatus === undefined ? undefined : 8}
+                  hitSlop={onPressStatus === undefined ? undefined : 3}
                   className={COUNT_ROW_CLASS}
                 >
                   <SessionStatusIcon kind={line.kind} />

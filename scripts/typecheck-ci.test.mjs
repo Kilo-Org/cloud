@@ -30,7 +30,6 @@ const harnessBuildAction = load(
 const extension = JSON.parse(
   readFileSync(new URL('../apps/extension/package.json', import.meta.url), 'utf8')
 );
-const web = JSON.parse(readFileSync(new URL('../apps/web/package.json', import.meta.url), 'utf8'));
 const rootScript = fileURLToPath(new URL('./typecheck-all.sh', import.meta.url));
 const harnessBuild = 'pnpm --filter @kilocode/harness-sdk run build';
 const pnpmCleanup = fileURLToPath(
@@ -581,8 +580,8 @@ test('one job builds the tRPC declarations and both matrices download them', () 
     assert.ok(downloadIndex > installIndex, `${name} downloads after install`);
   }
 
-  // The trpc typecheck row consumes the declarations, so its group script and
-  // apps/web's typecheck skip their own build there.
+  // The trpc typecheck row consumes the declarations, so its group script
+  // skips its own build there.
   const typecheck = ci.jobs['typecheck-groups'].steps.find(step =>
     (step.run ?? '').startsWith('scripts/typecheck-all.sh')
   );
@@ -599,15 +598,7 @@ test('one job builds the tRPC declarations and both matrices download them', () 
 
 function runTypecheck(
   t,
-  {
-    root = false,
-    changes = '',
-    buildExit = 0,
-    checkExit = 0,
-    built = '',
-    selected = '',
-    script = extension.scripts.typecheck,
-  } = {}
+  { root = false, changes = '', buildExit = 0, checkExit = 0, built = '', selected = '' } = {}
 ) {
   const dir = mkdtempSync(join(tmpdir(), 'typecheck-ci-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
@@ -654,7 +645,9 @@ if (name === 'git') {
   writeFileSync(log, '');
   const result = spawnSync(
     root ? 'bash' : 'sh',
-    root ? [rootScript, ...(changes ? ['--changes-only'] : [])] : ['-c', script],
+    root
+      ? [rootScript, ...(changes ? ['--changes-only'] : [])]
+      : ['-c', extension.scripts.typecheck],
     {
       cwd: dir,
       encoding: 'utf8',
@@ -694,23 +687,6 @@ test('a failed standalone tRPC build prevents extension compilation', t => {
 
 test('extension compiler errors still fail when tRPC is already built', t => {
   assert.equal(runTypecheck(t, { built: '1', checkExit: 9 }).status, 9);
-});
-
-// apps/web typechecks against the built declarations the same way: CI hands
-// them over as an artifact, so the flag must stop the script rebuilding them.
-test('web checks reuse tRPC built by the producer job', t => {
-  const tsgo = 'tsgo --noEmit --checkers 1 --tsBuildInfoFile .tsbuildinfo/tsgo.tsbuildinfo';
-  const reused = runTypecheck(t, { script: web.scripts.typecheck, built: '1' });
-  assert.equal(reused.status, 0);
-  assert.deepEqual(reused.commands, [tsgo]);
-
-  const standalone = runTypecheck(t, { script: web.scripts.typecheck });
-  assert.equal(standalone.status, 0);
-  assert.deepEqual(standalone.commands, ['pnpm --filter @kilocode/trpc run build', tsgo]);
-
-  const failedBuild = runTypecheck(t, { script: web.scripts.typecheck, buildExit: 7 });
-  assert.equal(failedBuild.status, 7);
-  assert.deepEqual(failedBuild.commands, ['pnpm --filter @kilocode/trpc run build']);
 });
 
 const workspaceFilters = '--filter !kilocode-monorepo --filter !web --filter !@kilocode/trpc';
@@ -804,11 +780,17 @@ const workspaces = (() => {
 })();
 
 const workspaceDirByName = new Map(workspaces.map(({ dir, manifest }) => [manifest.name, dir]));
+const manifestByDir = new Map(workspaces.map(({ dir, manifest }) => [dir, manifest]));
 
-// The workspace members whose `typecheck` one script of `dir` starts.
-function typecheckedWorkspaces(dir, script) {
+// The workspace members one script of `dir` starts with `pnpm ... <verb>`.
+function scriptTargets(dir, script, verb) {
   const targets = new Set();
-  for (const [command] of script.matchAll(/pnpm\s[^&|;\n]*\brun\s+typecheck\b/g)) {
+  for (const [command] of script.matchAll(/pnpm\s[^&|;\n]*/g)) {
+    const verbRan = command
+      .trim()
+      .split(/\s+/)
+      .some(token => token.replace(/[),;]+$/, '') === verb);
+    if (!verbRan) continue;
     for (const [, flag, quoted] of command.matchAll(
       /(-C|--dir|--filter|-F)(?:=|\s+)('[^']*'|"[^"]*"|\S+)/g
     )) {
@@ -823,6 +805,8 @@ function typecheckedWorkspaces(dir, script) {
   return [...targets];
 }
 
+const typecheckedWorkspaces = (dir, script) => scriptTargets(dir, script, 'typecheck');
+
 test('no workspace typecheck starts another workspace typecheck', () => {
   const duplicates = [];
   for (const { dir, manifest } of workspaces) {
@@ -833,6 +817,29 @@ test('no workspace typecheck starts another workspace typecheck', () => {
     }
   }
   assert.deepEqual(duplicates, [], 'a recursive workspace run already typechecks every member');
+});
+
+// A typecheck that also builds another workspace makes every caller pay for a
+// program the checked sources may never read: apps/web rebuilt the tRPC
+// declarations although it declares no dependency on them.
+test('no workspace typecheck builds a workspace it does not depend on', () => {
+  const undeclared = [];
+  for (const { dir, manifest } of workspaces) {
+    const script = manifest.scripts?.typecheck;
+    if (!script) continue;
+    const declared = new Set(
+      ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies'].flatMap(
+        field => Object.keys(manifest[field] ?? {})
+      )
+    );
+    for (const target of scriptTargets(dir, script, 'build')) {
+      const dependency = manifestByDir.get(target)?.name;
+      if (target !== dir && dependency && !declared.has(dependency)) {
+        undeclared.push(`${manifest.name} builds ${dependency}, which it does not depend on`);
+      }
+    }
+  }
+  assert.deepEqual(undeclared, []);
 });
 
 // Dropping the nested call leaves a standalone `typecheck` covering only this

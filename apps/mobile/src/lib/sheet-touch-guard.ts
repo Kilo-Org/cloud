@@ -13,6 +13,13 @@ import { useLayoutEffect } from 'react';
 export const SHEET_TOUCH_HOLD_MS = 800;
 
 /**
+ * How long the gate stays shut after the native sheet reports its dismissal
+ * finished. The sheet's own window is already gone when the report arrives,
+ * so the frames right behind it would land on the screen behind the sheet.
+ */
+export const SHEET_TOUCH_SETTLE_MS = 120;
+
+/**
  * Whether a native sheet is in one of the two windows in which its own window
  * does not take touch: while it opens, and while it dismisses.
  *
@@ -23,12 +30,14 @@ export const SHEET_TOUCH_HOLD_MS = 800;
  * is what makes the window safe: a layer that has to be mounted first is in the
  * touch path after the touch it should have claimed.
  *
- * The dismissal has the same window at its other end. The native sheet stops
- * taking touch when it starts to go away and reports the finished dismissal
- * only after its animation: a second tap, ~50-60 ms behind the one that pressed
- * the sheet's Apply, reached the row that sat underneath the button and opened
- * an unrelated session. The gate therefore stays shut from the close request
- * until the sheet reports the dismissal, not only from the open request.
+ * The dismissal has a settle window at its other end. Measured on the emulator
+ * with this gate's own logs: the sheet's dialog window left the touch path
+ * while the report that ends a close-request lease was still in flight, and a
+ * second tap, a few frames behind the one that pressed the sheet's Apply,
+ * opened the row that sat underneath the button and launched an unrelated
+ * session. The report is therefore not the only end: `Sheet` ends that lease
+ * and holds the settle window from it (see `SHEET_TOUCH_SETTLE_MS`), so the
+ * frames behind the gone window land on this gate instead of the row.
  *
  * Each hold is bounded because the sheet's own content is part of the app's
  * React tree: a gate that never let go would swallow the sheet's own buttons

@@ -18,7 +18,11 @@ import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/rend
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { Sheet } from '@/components/ui/sheet';
-import { isSheetTouchHeld, SHEET_TOUCH_HOLD_MS } from '@/lib/sheet-touch-guard';
+import {
+  isSheetTouchHeld,
+  SHEET_TOUCH_HOLD_MS,
+  SHEET_TOUCH_SETTLE_MS,
+} from '@/lib/sheet-touch-guard';
 import { renderWithProviders } from '@/test/render-with-providers';
 
 const theme = vi.hoisted(() => ({ colors: { card: '#1F1F24' } }));
@@ -340,6 +344,7 @@ describe('Sheet', () => {
   // and the tab bar behind it. Every presentation arms its own hold, because a
   // reopened sheet is a new window with the same opening window.
   it('holds the app window touch while it is presented and re-arms on every presentation', async () => {
+    vi.useFakeTimers();
     const onClose = vi.fn<() => void>();
     const onDismiss = vi.fn<() => void>();
     const { renderer, queryClient } = await mount({ onClose, onDismiss });
@@ -354,6 +359,9 @@ describe('Sheet', () => {
       nativeSheet.dismiss();
       await Promise.resolve();
     });
+    // The report arms the settle hold; the presentation that follows gets its
+    // own opening window once the settle is over.
+    await settleTimers(SHEET_TOUCH_SETTLE_MS + 1);
     expect(isSheetTouchHeld()).toBe(false);
 
     await updateSheet(renderer, queryClient, { visible: true, onClose, onDismiss });
@@ -363,7 +371,8 @@ describe('Sheet', () => {
   // The native sheet lets go of touch when its dismissal starts and reports the
   // finished animation only after it: the second tap of a double press aimed at
   // the sheet's Apply must reach the gate, not the row underneath the button.
-  it('keeps the app window touch from the close request until the native dismissal reports', async () => {
+  it('keeps the app window touch from the close request through the settle window', async () => {
+    vi.useFakeTimers();
     const { renderer, queryClient } = await mount();
 
     await updateSheet(renderer, queryClient, { visible: false });
@@ -375,6 +384,44 @@ describe('Sheet', () => {
       nativeSheet.dismiss();
       await Promise.resolve();
     });
+    // The report ended the close-request lease AND armed the settle hold: the
+    // sheet's window is gone by now, so the frames right behind the report
+    // still belong to the gate.
+    expect(isSheetTouchHeld()).toBe(true);
+
+    await settleTimers(SHEET_TOUCH_SETTLE_MS + 1);
+    expect(isSheetTouchHeld()).toBe(false);
+  });
+
+  it('re-arms the settle hold on every dismissal of the same sheet', async () => {
+    vi.useFakeTimers();
+    const onClose = vi.fn<() => void>();
+    const onDismiss = vi.fn<() => void>();
+    const { renderer, queryClient } = await mount({ onClose, onDismiss });
+
+    // First dismissal. The report arms the settle hold here, in `onDismiss`,
+    // not in a state step that could only flip once.
+    await updateSheet(renderer, queryClient, { visible: false, onClose, onDismiss });
+    expect(isSheetTouchHeld()).toBe(true);
+    await act(async () => {
+      nativeSheet.dismiss();
+      await Promise.resolve();
+    });
+    expect(isSheetTouchHeld()).toBe(true);
+    await settleTimers(SHEET_TOUCH_SETTLE_MS + 1);
+    expect(isSheetTouchHeld()).toBe(false);
+
+    // Reopen; the sheet is the same instance, so the second dismissal proves
+    // the first report's hold did not leave a shape that swallows the second.
+    await updateSheet(renderer, queryClient, { visible: true, onClose, onDismiss });
+    await updateSheet(renderer, queryClient, { visible: false, onClose, onDismiss });
+    expect(isSheetTouchHeld()).toBe(true);
+    await act(async () => {
+      nativeSheet.dismiss();
+      await Promise.resolve();
+    });
+    expect(isSheetTouchHeld()).toBe(true);
+    await settleTimers(SHEET_TOUCH_SETTLE_MS + 1);
     expect(isSheetTouchHeld()).toBe(false);
   });
 
@@ -415,13 +462,17 @@ describe('Sheet', () => {
     expect(onClose).not.toHaveBeenCalled();
     expect(isSheetTouchHeld()).toBe(true);
 
-    // The report releases the gate and the caller learns of the dismissal.
+    // The report keeps the gate shut through the settle window and tells the
+    // caller the dismissal is over.
     await act(async () => {
       nativeSheet.dismiss();
       await Promise.resolve();
     });
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(onDismiss).toHaveBeenCalledTimes(1);
+    expect(isSheetTouchHeld()).toBe(true);
+
+    await settleTimers(SHEET_TOUCH_SETTLE_MS + 1);
     expect(isSheetTouchHeld()).toBe(false);
   });
 

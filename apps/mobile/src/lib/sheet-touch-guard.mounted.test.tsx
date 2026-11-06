@@ -6,7 +6,12 @@
 import { createElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { isSheetTouchHeld, SHEET_TOUCH_HOLD_MS, useSheetTouchHold } from './sheet-touch-guard';
+import {
+  isSheetTouchHeld,
+  SHEET_TOUCH_HOLD_MS,
+  SHEET_TOUCH_SETTLE_MS,
+  useSheetTouchHold,
+} from './sheet-touch-guard';
 import { renderWithProviders } from '@/test/render-with-providers';
 import { act } from '@/test/renderer';
 
@@ -75,7 +80,8 @@ describe('useSheetTouchHold', () => {
     await update(ui, { opening: false, dismissing: true });
     expect(isSheetTouchHeld()).toBe(true);
 
-    // The native sheet reports the dismissal.
+    // The native sheet reports the dismissal, and the reported end ends this
+    // window's hold: the sheet's own settle hold (`Sheet`) covers what follows.
     await update(ui, { opening: false, dismissing: false });
     expect(isSheetTouchHeld()).toBe(false);
   });
@@ -100,6 +106,14 @@ describe('useSheetTouchHold', () => {
     // the sheet dead.
     await settle(SHEET_TOUCH_HOLD_MS + 1);
     expect(isSheetTouchHeld()).toBe(false);
+  });
+
+  it('gives the settle hold a bound the close-request lease outlasts', () => {
+    // `Sheet` arms the settle from the report with `holdSheetTouch`; the
+    // constant it passes must stay the shorter window, so a dismissing sheet
+    // never opens the gate later than the close-request lease would.
+    expect(SHEET_TOUCH_SETTLE_MS).toBeLessThan(SHEET_TOUCH_HOLD_MS);
+    expect(SHEET_TOUCH_SETTLE_MS).toBeGreaterThan(0);
   });
 
   it('lets go when the sheet unmounts mid-dismissal', async () => {

@@ -2484,7 +2484,6 @@
   },
   "addCredits": {
     "cta": "Añadir créditos",
-    "description": "Añade créditos para seguir usando el servicio.",
     "billingPage": "página de facturación"
   },
   "deviceSessions": {

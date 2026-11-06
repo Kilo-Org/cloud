@@ -2452,7 +2452,6 @@
   },
   "addCredits": {
     "cta": "크레딧 충전",
-    "description": "계속 사용하려면 크레딧을 충전하세요.",
     "billingPage": "결제 페이지"
   },
   "deviceSessions": {

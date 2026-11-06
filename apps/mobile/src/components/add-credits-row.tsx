@@ -40,19 +40,22 @@ type AddCreditsRowProps = Readonly<{
 }>;
 
 /**
- * Muted copy + an "Add credits" button. With `onPress` the button is an in-app
- * CTA on every platform. With `url` it opens the external web billing page,
- * which only Android has: iOS has no in-app link to an external purchase
- * (App Store review forbids it), so the gate here keeps that variant off iOS
- * whichever call site renders it. That is the whole platform fork: the row's
- * copy, layout and in-app CTA are identical on both.
+ * An "Add credits" button in its call site's block. With `onPress` the button
+ * is an in-app CTA on every platform. With `url` it opens the external web
+ * billing page, which only Android has: iOS has no in-app link to an external
+ * purchase (App Store review forbids it), so the gate here keeps that variant
+ * off iOS whichever call site renders it. That is the whole platform fork: the
+ * button and its in-app CTA are identical on both.
+ *
+ * The button carries its own label, so the block needs no copy beside it; a
+ * sentence restating it is the redundancy `apps/mobile/AGENTS.md` rules out.
+ * In a wide row it keeps its trailing position inside the caller's padding; in
+ * a window under `NARROW_LAYOUT_WIDTH` it spans the row, which is the tap
+ * target width it had before.
  */
 export function AddCreditsRow({ url, onPress, className }: AddCreditsRowProps) {
   const { t } = useTranslation();
   const { width } = useWindowDimensions();
-  // The button keeps its natural width, so in a narrow window the description
-  // beside it collapses to a column of single letters ("A", 160 dp, e1,
-  // 2026-09-21). Stacking gives the copy the row's full width.
   const narrow = isNarrowLayout(width);
   // App Store review: iOS must not show an in-app CTA that opens an external
   // purchase/billing page, so the external `url` variant stays Android-only —
@@ -62,10 +65,7 @@ export function AddCreditsRow({ url, onPress, className }: AddCreditsRowProps) {
     return null;
   }
   return (
-    <View className={cn(narrow ? 'gap-2' : 'flex-row items-center justify-between', className)}>
-      <Text className={cn(narrow ? undefined : 'flex-1 pr-3', 'text-xs text-muted-foreground')}>
-        {t('addCredits.description')}
-      </Text>
+    <View className={cn(narrow ? undefined : 'flex-row items-center justify-end', className)}>
       <AddCreditsButton
         onPress={
           onPress ??

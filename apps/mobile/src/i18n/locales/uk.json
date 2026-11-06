@@ -2516,7 +2516,6 @@
   },
   "addCredits": {
     "cta": "Поповнити баланс",
-    "description": "Поповніть баланс, щоб продовжити роботу.",
     "billingPage": "сторінка оплати"
   },
   "deviceSessions": {

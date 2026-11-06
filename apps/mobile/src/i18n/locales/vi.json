@@ -2452,7 +2452,6 @@
   },
   "addCredits": {
     "cta": "Nạp tiền",
-    "description": "Nạp tiền để tiếp tục sử dụng.",
     "billingPage": "trang thanh toán"
   },
   "deviceSessions": {

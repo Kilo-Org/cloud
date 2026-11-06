@@ -3058,7 +3058,6 @@
   },
   "addCredits": {
     "cta": "Add credits",
-    "description": "Add credits to keep usage running.",
     "billingPage": "billing page"
   },
   "deviceSessions": {

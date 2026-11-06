@@ -2452,7 +2452,6 @@
   },
   "addCredits": {
     "cta": "充值额度",
-    "description": "充值额度后即可继续使用。",
     "billingPage": "账单页面"
   },
   "deviceSessions": {

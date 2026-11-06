@@ -2991,7 +2991,6 @@
   },
   "addCredits": {
     "cta": "Egyenleg feltöltése",
-    "description": "A további használathoz töltsd fel az egyenlegedet.",
     "billingPage": "számlázási oldal"
   },
   "deviceSessions": {

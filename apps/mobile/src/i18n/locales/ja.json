@@ -2452,7 +2452,6 @@
   },
   "addCredits": {
     "cta": "クレジットを追加",
-    "description": "利用を続けるには、クレジットを追加してください。",
     "billingPage": "請求ページ"
   },
   "deviceSessions": {

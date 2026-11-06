@@ -2991,7 +2991,6 @@
   },
   "addCredits": {
     "cta": "Lisää krediittejä",
-    "description": "Lisää krediittejä, jotta voit jatkaa käyttöä.",
     "billingPage": "laskutussivu"
   },
   "deviceSessions": {

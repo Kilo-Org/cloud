@@ -2452,7 +2452,6 @@
   },
   "addCredits": {
     "cta": "Guthaben aufladen",
-    "description": "Lade Guthaben auf, um Kilo weiter zu nutzen.",
     "billingPage": "abrechnungsseite"
   },
   "deviceSessions": {

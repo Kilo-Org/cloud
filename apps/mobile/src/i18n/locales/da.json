@@ -2991,7 +2991,6 @@
   },
   "addCredits": {
     "cta": "Tilføj kreditter",
-    "description": "Tilføj kreditter for at fortsætte med at bruge tjenesten.",
     "billingPage": "faktureringsside"
   },
   "deviceSessions": {

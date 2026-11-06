@@ -112,9 +112,14 @@ export type AssociatedPullRequest = {
   title: string;
   headSha: string;
   updatedAt: string;
+  createdAt?: string;
   baseRepoFullName?: string;
   headRepoFullName?: string;
   headRef?: string;
+  baseSha?: string;
+  baseRef?: string;
+  mergeable?: boolean | null;
+  mergeableState?: string | null;
   commitShas?: string[];
 };
 
@@ -129,30 +134,62 @@ export class GitHubRateLimitError extends Error {
 
 /**
  * Mirrors the adapter's rule: 429, `x-ratelimit-remaining: 0`, or a 403 whose
- * message names a rate limit or abuse. Keep in step with
+ * Retry-After header or message names a rate limit or abuse. Keep in step with
  * `isGitHubRateLimitError` in the real adapter.
  */
 export function isGitHubRateLimitError(error: unknown): boolean {
   if (typeof error !== 'object' || error === null) return false;
   const status = 'status' in error ? error.status : undefined;
   if (status === 429) return true;
-  const response = 'response' in error ? error.response : undefined;
-  const headers =
-    typeof response === 'object' && response !== null && 'headers' in response
-      ? response.headers
-      : undefined;
-  if (
-    typeof headers === 'object' &&
-    headers !== null &&
-    'x-ratelimit-remaining' in headers &&
-    headers['x-ratelimit-remaining'] === '0'
-  ) {
-    return true;
-  }
+  if (getResponseHeader(error, 'x-ratelimit-remaining') === '0') return true;
   if (status !== 403) return false;
+  if (getResponseHeader(error, 'retry-after') !== undefined) return true;
   const message = 'message' in error ? error.message : undefined;
   const text = typeof message === 'string' ? message.toLowerCase() : '';
   return text.includes('rate limit') || text.includes('abuse');
+}
+
+function getResponseHeader(error: unknown, name: string): string | undefined {
+  if (typeof error !== 'object' || error === null) return undefined;
+  const response = (error as { response?: { headers?: Record<string, unknown> } }).response;
+  const headers = response?.headers;
+  if (!headers) return undefined;
+  const value = headers[name] ?? headers[name.toLowerCase()];
+  return typeof value === 'string' ? value : undefined;
+}
+
+function retryAfterDeadlineMs(error: unknown, now: number): number | null {
+  const header = getResponseHeader(error, 'retry-after')?.trim();
+  if (!header) return null;
+  if (/^\d+$/.test(header)) {
+    const seconds = Number(header);
+    return Number.isFinite(seconds) ? now + seconds * 1000 : null;
+  }
+  const timestamp = Date.parse(header);
+  return Number.isFinite(timestamp) ? timestamp : null;
+}
+
+function primaryResetDeadlineMs(error: unknown): number | null {
+  if (getResponseHeader(error, 'x-ratelimit-remaining') !== '0') return null;
+  const resetHeader = getResponseHeader(error, 'x-ratelimit-reset');
+  if (!resetHeader) return null;
+  const resetSeconds = Number(resetHeader);
+  if (!Number.isFinite(resetSeconds) || resetSeconds <= 0) return null;
+  return resetSeconds * 1000;
+}
+
+function parseRateLimitResetAt(error: unknown, now = Date.now()): Date {
+  const deadlines = [retryAfterDeadlineMs(error, now), primaryResetDeadlineMs(error)].filter(
+    (deadline): deadline is number => deadline !== null && Number.isFinite(deadline)
+  );
+  if (deadlines.length === 0) return new Date(now + 60_000);
+  return new Date(Math.max(...deadlines));
+}
+
+export function toGitHubRateLimitError(error: unknown): GitHubRateLimitError | null {
+  if (error instanceof GitHubRateLimitError) return error;
+  if (!isGitHubRateLimitError(error)) return null;
+  return new GitHubRateLimitError(parseRateLimitResetAt(error));
 }
 
 export async function fetchPullRequestByNumber(_params: {
@@ -163,6 +200,7 @@ export async function fetchPullRequestByNumber(_params: {
   appType: GitHubAppType;
   includeCommits?: boolean;
   expectedHeadSha?: string | null;
+  signal?: AbortSignal;
 }): Promise<AssociatedPullRequest | null> {
   return null;
 }

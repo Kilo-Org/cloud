@@ -354,6 +354,7 @@ exports[`privileged inventory covers discovered tRPC procedures the guarded proc
   "admin.supportAccess.request mutation [admin] -> trpc.admin.supportAccess",
   "admin.supportAccess.review mutation [admin] -> trpc.admin.supportAccess",
   "admin.supportAccess.revoke mutation [admin] -> trpc.admin.supportAccess",
+  "admin.supportAccess.viewAccess query [admin] -> trpc.admin.supportAccess",
   "admin.syncProviders.getLastSync query [admin] -> trpc.admin.syncProviders",
   "admin.syncProviders.getManualSyncEnabled query [admin] -> trpc.admin.syncProviders",
   "admin.syncProviders.postTestStaleAlert mutation [admin] -> trpc.admin.syncProviders",

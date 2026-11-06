@@ -3,6 +3,9 @@ import test from 'node:test';
 
 import { agentDeviceArgs, agentDeviceToProbeDump } from './agent-device';
 import { InfraError } from './capture';
+import { normalize } from './rules';
+import { checkTouchOverlap } from './rules/screen';
+import type { ProbeNode } from './tree';
 
 const APP = 'com.kilocode.kiloapp';
 const node = (fields: Record<string, unknown>) => ({ bundleId: APP, kind: 'group', ...fields });
@@ -168,4 +171,118 @@ test('system bars establish safe insets before their nodes are filtered', () => 
   assert.equal(dump.nodes.length, 2);
   const absent = agentDeviceToProbeDump(SNAPSHOT);
   assert.equal(absent.env.safeAreaKnown, false);
+});
+
+/** Frames measured on a 1080x2400 emulator (density 2.625) over a scrolled transcript. */
+const SCROLLED_TRANSCRIPT = JSON.stringify({
+  data: {
+    androidSnapshot: { pixelDensity: 2.625 },
+    viewport: { width: 1080, height: 2400 },
+    nodes: [
+      {
+        index: 0,
+        bundleId: APP,
+        type: 'android.widget.FrameLayout',
+        rect: { x: 0, y: 0, width: 1080, height: 2400 },
+      },
+      {
+        index: 1,
+        parentIndex: 0,
+        bundleId: APP,
+        type: 'android.widget.ScrollView',
+        kind: 'scroll-area',
+        hittable: true,
+        rect: { x: 0, y: 359, width: 1080, height: 1900 },
+      },
+      {
+        index: 2,
+        parentIndex: 1,
+        bundleId: APP,
+        type: 'android.view.ViewGroup',
+        label: 'User message',
+        hittable: true,
+        rect: { x: 0, y: 359, width: 1080, height: 310 },
+      },
+      {
+        index: 3,
+        parentIndex: 2,
+        bundleId: APP,
+        type: 'android.widget.TextView',
+        kind: 'text',
+        label: 'User message',
+        hittable: true,
+        rect: { x: 0, y: 359, width: 1080, height: 310 },
+      },
+      {
+        index: 4,
+        parentIndex: 2,
+        bundleId: APP,
+        type: 'android.view.ViewGroup',
+        rect: { x: 218, y: 359, width: 825, height: 301 },
+      },
+      {
+        index: 5,
+        parentIndex: 4,
+        bundleId: APP,
+        type: 'android.widget.FrameLayout',
+        rect: { x: 250, y: 359, width: 762, height: 278 },
+      },
+      {
+        index: 6,
+        parentIndex: 5,
+        bundleId: APP,
+        type: 'android.widget.TextView',
+        kind: 'text',
+        hittable: true,
+        rect: { x: 250, y: 359, width: 762, height: 215 },
+      },
+      {
+        index: 7,
+        parentIndex: 6,
+        bundleId: APP,
+        type: 'android.view.View',
+        kind: 'text',
+        label: 'User message 57 of 60.',
+        hittable: true,
+        rect: { x: 250, y: 123, width: 443, height: 73 },
+      },
+      {
+        index: 8,
+        parentIndex: 6,
+        bundleId: APP,
+        type: 'android.view.View',
+        kind: 'text',
+        label: 'Padded so fifty messages overflow the chat viewport.',
+        hittable: true,
+        rect: { x: 250, y: 196, width: 761, height: 378 },
+      },
+      {
+        index: 9,
+        parentIndex: 1,
+        bundleId: APP,
+        type: 'android.view.ViewGroup',
+        label: 'Assistant message',
+        hittable: true,
+        rect: { x: 0, y: 669, width: 1080, height: 406 },
+      },
+    ],
+  },
+});
+
+test('agent-device snapshot clips a text run to the row that draws it', () => {
+  const dump = agentDeviceToProbeDump(SCROLLED_TRANSCRIPT);
+  const byLabel = (query: string): ProbeNode =>
+    dump.nodes.find(entry => entry.label === query || entry.text === query) ?? dump.nodes[0];
+  assert.deepEqual(
+    byLabel('Padded so fifty messages overflow the chat viewport.').rect,
+    [95.24, 136.76, 289.9, 81.9]
+  );
+  assert.deepEqual(byLabel('User message 57 of 60.').rect, [95.24, 136.76, 168.76, 0]);
+  // A child of a scrolling pane keeps the frame the platform gave it.
+  assert.deepEqual(byLabel('Assistant message').rect, [0, 254.86, 411.43, 154.67]);
+});
+
+test('a clipped text run leaves one tap owner on the message row', () => {
+  const findings = checkTouchOverlap(normalize(agentDeviceToProbeDump(SCROLLED_TRANSCRIPT)));
+  assert.deepEqual(findings, []);
 });

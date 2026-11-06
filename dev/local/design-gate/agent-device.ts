@@ -84,6 +84,46 @@ export function snapshotInsets(
   return { insets, known };
 }
 
+/**
+ * Whether a converted node scrolls its children. A scrolled row keeps frames
+ * outside its own viewport, so its children legitimately sit beyond it; every
+ * other box clips its children, so a child frame outside it is a snapshot
+ * offset the platform never applies.
+ */
+function scrollsChildren(entry: ProbeNode): boolean {
+  return (
+    entry.scrollAxes !== undefined ||
+    entry.tag.endsWith('ScrollView') ||
+    entry.tag === 'RecyclerView'
+  );
+}
+
+/**
+ * A snapshot reports a scrolling list's container frames already clipped to the
+ * pane that draws them, while the text inside a row keeps the frame of the whole
+ * row. A text run then measures outside the row that owns it, and two tap owners
+ * appear where the platform has one: `touch-overlap` reports a run against the
+ * row that contains it. Clip a child to the box that draws it, which is what the
+ * platform does, and leave a scrolled box's children alone.
+ */
+function clipToParent(
+  rect: readonly number[],
+  parent: ProbeNode
+): [number, number, number, number] {
+  const [x, y, width, height] = rect;
+  const [px, py, pWidth, pHeight] = parent.rect;
+  const left = Math.max(x, px);
+  const top = Math.max(y, py);
+  const right = Math.min(x + width, px + pWidth);
+  const bottom = Math.min(y + height, py + pHeight);
+  return [
+    round(left),
+    round(top),
+    round(Math.max(0, right - left)),
+    round(Math.max(0, bottom - top)),
+  ];
+}
+
 export function agentDeviceToProbeDump(json: string): ProbeDump {
   const data = (JSON.parse(json) as { data?: AgentSnapshot } | null)?.data;
   const density = data?.androidSnapshot?.pixelDensity;
@@ -118,6 +158,10 @@ export function agentDeviceToProbeDump(json: string): ProbeDump {
       tag: uiautomatorTag(node.type ?? ''),
       rect: [round(x / density), round(y / density), round(w / density), round(h / density)],
     };
+    const parentNode = parent === undefined ? undefined : nodes[converted.parent];
+    if (parentNode !== undefined && !scrollsChildren(parentNode)) {
+      converted.rect = clipToParent(converted.rect, parentNode);
+    }
     const label = node.label ?? undefined;
     if (node.kind === 'text') {
       if (label) converted.text = label;

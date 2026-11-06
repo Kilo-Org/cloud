@@ -100,24 +100,38 @@ describe('draftsEqual', () => {
     edited.detectors.keyword_detector.banned_keywords = 'Acme';
     expect(draftsEqual(draft, edited)).toBe(false);
   });
+
+  it('ignores only output changes when output is excluded', () => {
+    const saved = enabledDraft();
+    const edited = enabledDraft();
+    edited.output.enabled = true;
+    edited.output.detectors.toxicity.enabled = true;
+
+    expect(draftsEqual(saved, edited)).toBe(false);
+    expect(draftsEqual(saved, edited, false)).toBe(true);
+
+    edited.enabled = false;
+    expect(draftsEqual(saved, edited, false)).toBe(false);
+  });
 });
 
 describe('applyKiloDefaultPreset', () => {
   it('restores the default detector selection and turns on the Kilo default policy text', () => {
     const { detectors } = enabledDraft();
     const rules = [{ ...createPolicyRule([]), text: 'No customer data.' }];
-    detectors.injection_attack.enabled = false;
+    detectors.injection_attack = { enabled: true, action: 'log' };
     detectors.toxicity.enabled = true;
     detectors.keyword_detector = { enabled: true, action: 'log', banned_keywords: 'Acme' };
     detectors.policy_violation = {
       enabled: false,
+      action: 'log',
       format: 'rules',
       policy_text: 'Old policy.',
       rules,
     };
 
     const preset = applyKiloDefaultPreset(detectors);
-    expect(preset.injection_attack.enabled).toBe(true);
+    expect(preset.injection_attack).toEqual({ enabled: true, action: 'block' });
     expect(preset.toxicity.enabled).toBe(false);
     expect(preset.keyword_detector).toEqual({
       enabled: false,
@@ -126,6 +140,7 @@ describe('applyKiloDefaultPreset', () => {
     });
     expect(preset.policy_violation).toEqual({
       enabled: true,
+      action: 'block',
       format: 'policy_text',
       policy_text: KILO_DEFAULT_POLICY_TEXT,
       rules,
@@ -157,17 +172,18 @@ describe('getEnkryptGuardrailsIssues', () => {
     expect(getEnkryptGuardrailsIssues({ ...enabledDraft(), enabled: false }).size).toBe(0);
   });
 
-  it('reports when no configurable detector is enabled only while guardrails are on', () => {
+  it('reports when no configurable detector is on, counting log only, only while guardrails are on', () => {
     const draft = enabledDraft();
     draft.detectors.injection_attack.enabled = false;
     draft.detectors.toxicity.enabled = true;
     expect(issueAt(getEnkryptGuardrailsIssues(draft), 'detectors')).toBe(
-      'Turn on at least one detector.'
+      'Turn on at least one input detector.'
     );
     expect(getEnkryptGuardrailsIssues({ ...draft, enabled: false }).size).toBe(0);
 
     draft.detectors.policy_violation = {
       enabled: true,
+      action: 'log',
       format: 'policy_text',
       policy_text: 'No customer data.',
       rules: [],
@@ -187,6 +203,7 @@ describe('getEnkryptGuardrailsIssues', () => {
     const draft = enabledDraft();
     draft.detectors.policy_violation = {
       enabled: true,
+      action: 'block',
       format: 'rules',
       policy_text: '',
       rules: [{ ...createPolicyRule([]), text: '' }],
@@ -202,10 +219,27 @@ describe('getEnkryptGuardrailsIssues', () => {
     expect(issueAt(issues, 'policy_violation.rules.0.id')).toBeUndefined();
   });
 
+  it('skips invalid output when excluded without skipping input validation', () => {
+    const draft = enabledDraft();
+    draft.output.enabled = true;
+    draft.output.detectors.topic_detector = { enabled: true, action: 'block', topic: '' };
+
+    expect(getEnkryptGuardrailsIssues(draft).get('output.topic_detector.topic')).toBe(
+      'Add at least one topic.'
+    );
+    expect(getEnkryptGuardrailsIssues(draft, false).size).toBe(0);
+
+    draft.detectors.keyword_detector = { enabled: true, action: 'block', banned_keywords: '' };
+    const issues = getEnkryptGuardrailsIssues(draft, false);
+    expect(issueAt(issues, 'keyword_detector')).toBe('Add at least one keyword.');
+    expect(issueAt(issues, 'output')).toBeUndefined();
+  });
+
   it('caps structured rules at five and policy text at 10,000 characters', () => {
     const draft = enabledDraft();
     draft.detectors.policy_violation = {
       enabled: true,
+      action: 'block',
       format: 'rules',
       policy_text: '',
       rules: policyRules(5),
@@ -219,6 +253,7 @@ describe('getEnkryptGuardrailsIssues', () => {
 
     draft.detectors.policy_violation = {
       enabled: true,
+      action: 'block',
       format: 'policy_text',
       policy_text: 'x'.repeat(10_000),
       rules: [],
@@ -233,15 +268,15 @@ describe('getEnkryptGuardrailsIssues', () => {
 });
 
 describe('getEnkryptOutputGuardrailIssues', () => {
-  it('reports nothing while response checks are off and no detector is set', () => {
+  it('reports nothing while output guardrails are off and no detector is set', () => {
     expect(getEnkryptOutputGuardrailIssues(enabledDraft().output).size).toBe(0);
   });
 
-  it('requires a response detector while response checks are on', () => {
+  it('requires an output detector while output guardrails are on', () => {
     const { output } = enabledDraft();
     output.enabled = true;
     expect(issueAt(getEnkryptOutputGuardrailIssues(output), 'detectors')).toBe(
-      'Turn on at least one response detector.'
+      'Turn on at least one output detector.'
     );
 
     output.detectors.toxicity = { enabled: true, action: 'log' };

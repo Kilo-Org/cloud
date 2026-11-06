@@ -24,6 +24,7 @@ import {
   ENKRYPT_SUMMARY_DETECTORS,
   enforcedEnkryptInputDetectors,
   enkryptOutputDetectorsAsInputDetectors,
+  storableEnkryptInputDetectors,
 } from './detectors';
 
 const rule: EnkryptPolicyRule = {
@@ -38,11 +39,17 @@ const rule: EnkryptPolicyRule = {
 
 function allEnabled(): EnkryptInputDetectors {
   return {
-    injection_attack: { enabled: true },
+    injection_attack: { enabled: true, action: 'block' },
     pii: { enabled: true, action: 'block', entities: ['pii', 'secrets', 'ip_address', 'url'] },
     keyword_detector: { enabled: true, action: 'block', banned_keywords: ['Project Phoenix'] },
     topic_detector: { enabled: true, topic: ['weapons'] },
-    policy_violation: { enabled: true, format: 'rules', policy_text: 'Old text', rules: [rule] },
+    policy_violation: {
+      enabled: true,
+      action: 'block',
+      format: 'rules',
+      policy_text: 'Old text',
+      rules: [rule],
+    },
     toxicity: { enabled: true },
     nsfw: { enabled: true },
     bias: { enabled: true, action: 'log' },
@@ -110,6 +117,29 @@ describe('EnkryptInputDetectorsSchema', () => {
     ).toBe(false);
   });
 
+  it('reads configurable detectors saved without an action as blocking and accepts log only', () => {
+    const { action: _injectionAction, ...injection_attack } = allEnabled().injection_attack;
+    const { action: _policyAction, ...policy_violation } = allEnabled().policy_violation;
+    const saved = EnkryptInputDetectorsSchema.parse({
+      ...allEnabled(),
+      injection_attack,
+      policy_violation,
+    });
+    expect(saved.injection_attack).toEqual({ enabled: true, action: 'block' });
+    expect(saved.policy_violation.action).toBe('block');
+
+    const logOnly = allEnabled();
+    logOnly.injection_attack.action = 'log';
+    logOnly.policy_violation.action = 'log';
+    expect(EnkryptInputDetectorsSchema.parse(logOnly)).toEqual(logOnly);
+    expect(
+      EnkryptInputDetectorsSchema.safeParse({
+        ...allEnabled(),
+        injection_attack: { enabled: true, action: 'revise' },
+      }).success
+    ).toBe(false);
+  });
+
   it('requires the settings an enabled detector needs', () => {
     const detectors = allEnabled();
     detectors.pii.entities = [];
@@ -126,6 +156,7 @@ describe('EnkryptInputDetectorsSchema', () => {
 
     detectors.policy_violation = {
       enabled: true,
+      action: 'block',
       format: 'policy_text',
       policy_text: ' ',
       rules: [],
@@ -258,12 +289,6 @@ describe('enforcedEnkryptInputDetectors', () => {
 });
 
 describe('detector metadata', () => {
-  it('offers only detectors that always block, so each needs just an on/off switch', () => {
-    for (const id of ENKRYPT_CONFIGURABLE_INPUT_DETECTOR_IDS) {
-      expect(ENKRYPT_DETECTOR_TYPES[id]).toBe('block');
-    }
-  });
-
   it('maps every summary key to a typed detector', () => {
     for (const detector of Object.values(ENKRYPT_SUMMARY_DETECTORS)) {
       expect(ENKRYPT_DETECTOR_TYPES[detector]).toBeDefined();
@@ -290,6 +315,57 @@ describe('blockingEnkryptDetectorIds', () => {
       'nsfw',
       'sponge_attack',
     ]);
+  });
+
+  it('only logs configurable detectors set to log only', () => {
+    const detectors = createKiloDefaultEnkryptInputDetectors();
+    detectors.injection_attack.action = 'log';
+    detectors.policy_violation = { ...allEnabled().policy_violation, action: 'log' };
+
+    expect(enabledEnkryptDetectorIds(detectors)).toEqual([
+      'injection_attack',
+      'pii',
+      'policy_violation',
+      'nsfw',
+    ]);
+    expect(blockingEnkryptDetectorIds(detectors)).toEqual(['nsfw']);
+  });
+});
+
+describe('storableEnkryptInputDetectors', () => {
+  it('saves blocking configurable detectors in the shape read before the action existed', () => {
+    const detectors = allEnabled();
+    const stored = storableEnkryptInputDetectors(detectors);
+
+    expect(stored.injection_attack).toEqual({ enabled: true });
+    expect(stored.policy_violation).not.toHaveProperty('action');
+    expect(stored.toxicity).toEqual(detectors.toxicity);
+    expect(EnkryptInputDetectorsSchema.parse(stored)).toEqual(detectors);
+  });
+
+  it('saves log only configurable detectors with their action', () => {
+    const detectors = allEnabled();
+    detectors.injection_attack.action = 'log';
+    detectors.policy_violation.action = 'log';
+    const stored = storableEnkryptInputDetectors(detectors);
+
+    expect(stored.injection_attack).toEqual({ enabled: true, action: 'log' });
+    expect(stored.policy_violation).toHaveProperty('action', 'log');
+    expect(EnkryptInputDetectorsSchema.parse(stored)).toEqual(detectors);
+  });
+
+  it('drops the log only action from a detector turned off', () => {
+    const detectors = allEnabled();
+    detectors.injection_attack = { enabled: false, action: 'log' };
+    detectors.policy_violation = { ...detectors.policy_violation, enabled: false, action: 'log' };
+    const stored = storableEnkryptInputDetectors(detectors);
+
+    expect(stored.injection_attack).toEqual({ enabled: false });
+    expect(stored.policy_violation).not.toHaveProperty('action');
+    expect(EnkryptInputDetectorsSchema.parse(stored).injection_attack).toEqual({
+      enabled: false,
+      action: 'block',
+    });
   });
 });
 
@@ -324,6 +400,7 @@ describe('buildEnkryptDetectRequestDetectors', () => {
     const detectors = createKiloDefaultEnkryptInputDetectors();
     detectors.policy_violation = {
       enabled: true,
+      action: 'block',
       format: 'policy_text',
       policy_text: 'Do not share customer data.',
       rules: [{ ...rule, display_text: '' }],
@@ -430,12 +507,13 @@ describe('enkryptOutputDetectorsAsInputDetectors', () => {
 
     expect(EnkryptInputDetectorsSchema.safeParse(input).success).toBe(true);
     expect(input).toEqual({
-      injection_attack: { enabled: false },
+      injection_attack: { enabled: false, action: 'block' },
       pii: detectors.pii,
       keyword_detector: detectors.keyword_detector,
       topic_detector: { enabled: true, topic: ['weapons'] },
       policy_violation: {
         enabled: true,
+        action: 'log',
         format: 'policy_text',
         policy_text: 'Do not share customer data.',
         rules: [rule],

@@ -13,6 +13,7 @@ import { rateLimit } from '../rate-limit';
 import { readBoundedStream } from '@kilocode/worker-utils/bounded-stream-reader';
 import { LIVE_LIMITS, socketTicket } from './protocol';
 import { mintTicket, verifyTicket } from './ticket';
+import { phase } from '../metrics';
 
 type C = Context<{ Bindings: Env }>;
 export const live = new Hono<{ Bindings: Env }>();
@@ -45,10 +46,17 @@ async function sessionAuth(c: C) {
   if (auth instanceof Response) return auth;
   const id = sessionIDSchema.safeParse(c.req.param('id'));
   if (!id.success) return error('invalid_request', 'Invalid session ID');
-  const allowed = await getSessionSyncDOStub(c.env, {
-    tenant: auth.tenant,
-    sessionID: id.data,
-  }).authorizeLive({ principal: auth, sessionID: id.data });
+  const allowed = await phase(
+    c.env,
+    'authorizeLive',
+    'rpc',
+    async () =>
+      await getSessionSyncDOStub(c.env, {
+        tenant: auth.tenant,
+        sessionID: id.data,
+      }).authorizeLive({ principal: auth, sessionID: id.data }),
+    auth.tenant.type
+  );
   if (!allowed.ok) return json(errorBody(allowed.error), ERROR_STATUS[allowed.error.code]);
   return { principal: auth, sessionID: id.data };
 }
@@ -77,9 +85,16 @@ live.post('/sessions/:id/live-ticket', async c => {
 live.get('/sessions/:id/live', async c => {
   const token = socketTicket(c.req.raw);
   const ticket = token ? await verifyTicket(token, c.env, 'session-relay') : undefined;
-  if (!ticket || ticket.sessionID !== c.req.param('id'))
+  if (!ticket || !ticket.sessionID || ticket.sessionID !== c.req.param('id'))
     return error('invalid_ticket', 'A valid session ticket is required', 401);
-  return getRelayStub(c.env, ticket.tenant, ticket.sessionID).fetch(c.req.raw);
+  const sessionID = ticket.sessionID;
+  return phase(
+    c.env,
+    'relayConnect',
+    'rpc',
+    () => getRelayStub(c.env, ticket.tenant, sessionID).fetch(c.req.raw),
+    ticket.tenant.type
+  );
 });
 
 live.post('/sessions/:id/commands', async c => {
@@ -137,7 +152,13 @@ live.get('/presence', async c => {
   const token = socketTicket(c.req.raw);
   const ticket = token ? await verifyTicket(token, c.env, 'session-presence') : undefined;
   if (!ticket) return error('invalid_ticket', 'A valid presence ticket is required', 401);
-  return getPresenceStub(c.env, ticket.userID).fetch(c.req.raw);
+  return phase(
+    c.env,
+    'presenceConnect',
+    'rpc',
+    () => getPresenceStub(c.env, ticket.userID).fetch(c.req.raw),
+    ticket.tenant.type
+  );
 });
 
 live.post('/presence/instances/:instanceID/commands', async c => {

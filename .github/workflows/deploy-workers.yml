@@ -76,7 +76,17 @@ jobs:
 
       - name: Install dependencies
         working-directory: ${{ inputs.worker }}
-        run: pnpm install --frozen-lockfile
+        # Only the Worker's own dependency closure plus the root project: a
+        # recursive workspace install links every unrelated package and runs its
+        # lifecycle scripts in each deploy job. A Worker whose predeploy builds a
+        # nested workspace package (the cloud-agent wrapper) needs that package's
+        # closure as well.
+        run: |
+          filters=(--filter '{.}...' --filter kilocode-monorepo)
+          if [ -f wrapper/package.json ]; then
+            filters+=(--filter '@kilocode/cloud-agent-wrapper...')
+          fi
+          pnpm install --frozen-lockfile "${filters[@]}"
 
       - name: Prepare downloaded Cloud Agent runtime
         if: inputs.worker == 'services/cloud-agent-next'
@@ -382,7 +392,17 @@ jobs:
 
       - name: Install dependencies
         working-directory: ${{ matrix.worker }}
-        run: pnpm install --frozen-lockfile
+        # Only the Worker's own dependency closure plus the root project: a
+        # recursive workspace install links every unrelated package and runs its
+        # lifecycle scripts in each matrix job. A Worker whose predeploy builds a
+        # nested workspace package (the cloud-agent wrapper) needs that package's
+        # closure as well.
+        run: |
+          filters=(--filter '{.}...' --filter kilocode-monorepo)
+          if [ -f wrapper/package.json ]; then
+            filters+=(--filter '@kilocode/cloud-agent-wrapper...')
+          fi
+          pnpm install --frozen-lockfile "${filters[@]}"
 
       - name: Prepare downloaded Cloud Agent runtime
         if: matrix.worker == 'services/cloud-agent-next'
@@ -495,7 +515,14 @@ jobs:
 
       - name: Install dependencies
         working-directory: services/session-ingest
-        run: pnpm install --frozen-lockfile
+        # Only the Worker's dependency closure plus the root project; a recursive
+        # workspace install links every unrelated package as well.
+        run: |
+          filters=(--filter '{.}...' --filter kilocode-monorepo)
+          if [ -f wrapper/package.json ]; then
+            filters+=(--filter '@kilocode/cloud-agent-wrapper...')
+          fi
+          pnpm install --frozen-lockfile "${filters[@]}"
 
       - name: Deploy to Cloudflare Workers
         id: deploy
@@ -551,7 +578,15 @@ jobs:
 
       - name: Install cloud-agent-next dependencies
         working-directory: services/cloud-agent-next
-        run: pnpm install --frozen-lockfile
+        # The service's closure plus the wrapper package that its predeploy
+        # builds; a recursive workspace install would link every unrelated
+        # package too.
+        run: |
+          filters=(--filter '{.}...' --filter kilocode-monorepo)
+          if [ -f wrapper/package.json ]; then
+            filters+=(--filter '@kilocode/cloud-agent-wrapper...')
+          fi
+          pnpm install --frozen-lockfile "${filters[@]}"
 
       - name: Prepare downloaded Cloud Agent runtime
         id: runtime

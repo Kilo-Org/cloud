@@ -346,11 +346,11 @@
       "viewedCount": "elelela {{viewed}} n'ime {{total}}",
       "viewedOfListed": "elelela {{viewed}} n'ime faịlụ {{total}} edepụtara",
       "loadingFiles": "Na-ebudata {{loaded}} n'ime {{total}}…",
-      "failedToLoadAllFiles": "Enweghị ike ibudata faịlụ niile.",
+      "failedToLoadAllFiles": "Enweghị ike ibudata faịlụ niile",
       "couldNotLoadMoreFiles": "Enweghị ike ibudata faịlụ ndị ọzọ.",
       "retryLoadingAllFiles": "Nwaa ibudata faịlụ niile ọzọ",
       "retryLoadingMoreFiles": "Nwaa ọzọ ibudata faịlụ ndị ọzọ",
-      "noMatches": "Enweghị faịlụ dabara na \"{{query}}\".",
+      "noMatches": "Enweghị faịlụ dabara na \"{{query}}\"",
       "diffTooLarge": "ọdịiche buru oke ibu",
       "openFile": "Mepee {{path}}",
       "openFileViewed": "Mepee {{path}} (elelela)",
@@ -376,13 +376,13 @@
     },
     "hunkRows": {
       "hunkHeader": "Isi nkeji mgbanwe {{header}}",
-      "contextUnavailable": "Ahịrị gbara ya gburugburu adịghị na ntụaka a.",
+      "contextUnavailable": "Ahịrị gbara ya gburugburu adịghị adị maka ntụaka a",
       "retryLoadingContext": "Nwaa ọzọ ibudata ahịrị gbara ya gburugburu",
       "failedToLoadContext": "Enweghị ike ibudata ahịrị gbara ya gburugburu — pịa ka ị nwaa ọzọ",
       "loadingContext": "Na-ebudata ahịrị gbara ya gburugburu…",
       "loadingLines": "Na-ebudata ahịrị {{loaded}} n'ime {{total}}…",
       "expandContext": "Gosi ahịrị gbara ya gburugburu",
-      "expandMoreContext": "Gosi ahịrị ndị ọzọ gbara ya gburugburu",
+      "expandMoreContext": "Gosi ahịrị ọzọ gbara ya gburugburu",
       "expandLines": "Gosi ahịrị {{displayCount}} ({{start}}–{{end}})",
       "expandMoreLines": "Gosi ahịrị {{displayCount}} ọzọ ({{start}}–{{end}})",
       "expandLinesOfContext": "Gosi ahịrị {{displayCount}} gbara ya gburugburu",
@@ -393,7 +393,7 @@
       "failedToLoadMoreFiles": "Enweghị ike ibudata faịlụ ndị ọzọ — pịa ka ị nwaa ọzọ",
       "loadingAllFiles": "Na-ebudata faịlụ niile — {{loaded}}…",
       "loadingAllFilesOf": "Na-ebudata faịlụ niile — {{loaded}} n'ime {{total}}…",
-      "loadedOfTotalFiles": "ebudatala faịlụ {{loaded}} n'ime {{total}}",
+      "loadedOfTotalFiles": "Ebudatala faịlụ {{loaded}} n'ime {{total}}",
       "loadAllFiles": "Budata faịlụ niile",
       "loadAll": "Budata ha niile",
       "fileLoadedCount_one": "ebudatala faịlụ {{displayCount}}",
@@ -413,8 +413,8 @@
       "expandLinesOfContext_other": "Gosi ahịrị {{displayCount}} gbara ya gburugburu",
       "expandMoreLines_one": "Gosi ahịrị {{displayCount}} ọzọ ({{start}}–{{end}})",
       "expandMoreLines_other": "Gosi ahịrị {{displayCount}} ọzọ ({{start}}–{{end}})",
-      "loadedOfTotalFiles_one": "ebudatala faịlụ {{loaded}} n'ime {{total}}",
-      "loadedOfTotalFiles_other": "ebudatala faịlụ {{loaded}} n'ime {{total}}"
+      "loadedOfTotalFiles_one": "Ebudatala faịlụ {{loaded}} n'ime {{total}}",
+      "loadedOfTotalFiles_other": "Ebudatala faịlụ {{loaded}} n'ime {{total}}"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ enweghị ahịrị ọhụrụ na njedebe faịlụ",
@@ -444,7 +444,7 @@
       "methodLabel": "Usoro",
       "commitTitle": "Aha ndekọ mgbanwe",
       "commitMessage": "Ozi ndekọ mgbanwe",
-      "commitMessagePlaceholder": "Nkọwa ndekọ njikọta (ọ bụghị iwu)",
+      "commitMessagePlaceholder": "Nkọwa ndekọ njikọta (ọ bụghị achọrọ)",
       "deleteBranch": "Hichapụ alaka",
       "deleteBranchAfterMerge": "Hichapụ alaka mgbe ejikọtachara",
       "noEnabledMethods": "Enweghị usoro njikọta agbanyere na ebe nchekwa a. Rịọ onye nchịkwa ebe nchekwa ka ọ gbanye njikọta, nchịkọta ndekọ mgbanwe, ma ọ bụ mgbanwe ntọala.",
@@ -469,7 +469,7 @@
         "closedMergeRequest": "Emechiela arịrịọ njikọta a"
       },
       "partialSuccessBanner": {
-        "body": "Enweghị ike ihichapụ alaka ahụ: {{reason}}.",
+        "body": "Enweghị ike ihichapụ alaka ahụ: {{reason}}",
         "accessibility": "Ejikọtala. Enweghị ike ihichapụ alaka ahụ: {{reason}}"
       },
       "loadFailedTitle": "Enweghị ike ibudata nhọrọ njikọta.",
@@ -482,7 +482,7 @@
         "requiredReviewsDetail": "Ndị nyocha achọrọ enyeghị nkwado ha ma ọ bụ ha ka na-enyocha.",
         "failingChecksTitle": "Nnwale achọrọ na-ada",
         "unstableTitle": "Ụfọdụ nnwale na-ada",
-        "unstableDetail": "Nnwale ndị na-abụghị iwu na-ada. Ha agaghị egbochi njikọta.",
+        "unstableDetail": "Nnwale ndị na-abụghị achọrọ na-ada. Ha agaghị egbochi njikọta.",
         "draftTitle": "Arịrịọ ijikọ koodu nke mbido",
         "draftDetail": "Kaa arịrịọ njikọta ahụ ka nke dị njikere maka nyocha tupu ijikọta.",
         "behindTitle": "Alaka adịla ochie",
@@ -599,9 +599,9 @@
       "anchor": {
         "fileCommentOnPath": "Okwu banyere faịlụ {{path}}",
         "fileComment": "Okwu banyere faịlụ",
-        "outdatedOnPathLines": "Adịla ochie na {{path}} {{lines}}",
-        "outdatedOnLines": "Adịla ochie na {{lines}}",
-        "outdatedOnPath": "Adịla ochie na {{path}}"
+        "outdatedOnPathLines": "Ọ dịla ochie na {{path}} {{lines}}",
+        "outdatedOnLines": "Ọ dịla ochie na {{lines}}",
+        "outdatedOnPath": "Ọ dịla ochie na {{path}}"
       },
       "deletedUser": "onye ọrụ ehichapụrụ",
       "replyForbiddenTerm": "Ị nweghị ikike ịzaghachi {{term}} a.",
@@ -806,7 +806,7 @@
       "selectedTapToChange": "Ahọpụtara {{label}}, pịa iji gbanwee nhọrọ",
       "tapToComment": "{{label}}, pịa ka ị dee okwu",
       "truncationBanner": "A na-egosi faịlụ {{limit}} mbụ n'ime faịlụ {{total}} agbanwere — oke API GitHub.",
-      "statusContext": "Ahịrị gbara ya gburugburu",
+      "statusContext": "Agbanweghị",
       "lineLabel": "Ahịrị {{line}} ({{status}}): {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
       "emptyLine": "(efu)",
@@ -836,7 +836,7 @@
       "couldNotReply": "Enweghị ike ịzaghachi.",
       "couldNotCompleteAction": "Enweghị ike imecha omume a.",
       "mergeResultDefaultError": "GitHub emechaghị njikọta ahụ.",
-      "mergeResultNotCompleted": "Ejighị {{term}} ọnụ. Lelee ọnọdụ ya ma gbalịa ọzọ.",
+      "mergeResultNotCompleted": "Ejikọtaghị {{term}}. Lelee ọnọdụ ya ma gbalịa ọzọ.",
       "ambiguous": "Enweghị ike ịchọpụta ma emechara ya — lelee PR ahụ tupu ị nwaa ọzọ.",
       "forbidden": "A machibidoro nke a."
     },

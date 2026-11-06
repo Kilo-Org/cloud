@@ -50,6 +50,23 @@ const COMMENT_WRITE_COMMANDS: { label: string; command: string }[] = [
     command: 'env REVIEW_MODE=1 gh api repos/acme/widgets/issues/42/comments -f body=reviewed',
   },
   {
+    label: 'comment create whose flag is the first argument after a wrapper prefix',
+    command: 'env REVIEW_MODE=1 gh api -f body=reviewed repos/acme/widgets/issues/42/comments',
+  },
+  {
+    label: 'comment create whose flag follows other flags after a wrapper prefix',
+    command:
+      'env REVIEW_MODE=1 gh api -X POST -f body=reviewed repos/acme/widgets/issues/42/comments',
+  },
+  {
+    label: 'comment create with the field value attached to its flag',
+    command: 'gh api repos/acme/widgets/issues/42/comments -fbody=reviewed',
+  },
+  {
+    label: 'comment create from stdin after a wrapper prefix',
+    command: 'env REVIEW_MODE=1 gh api --input - repos/acme/widgets/issues/42/comments',
+  },
+  {
     label: 'graphql request carrying a mutation',
     command: "gh api graphql -f query='mutation { addComment(input: {}) { comment { id } } }'",
   },
@@ -144,6 +161,16 @@ const ALLOWED_COMMANDS: { label: string; command: string }[] = [
   {
     label: 'paginated review read on a repository named after the endpoint',
     command: "gh api repos/graphql/graphql-js/pulls/42/reviews --paginate --jq '.[] | {id,state}'",
+  },
+  {
+    label: 'paginated conversation read whose filter text carries a field flag token',
+    command:
+      'gh api repos/acme/widgets/issues/42/comments --paginate --jq \'.[] | select(.body | test("-f"))\'',
+  },
+  {
+    label: 'paginated conversation read whose filter text carries the input flag token',
+    command:
+      'gh api repos/acme/widgets/issues/42/comments --paginate --jq \'.[] | select(.body | contains("--input"))\'',
   },
   {
     label: 'pull request view',

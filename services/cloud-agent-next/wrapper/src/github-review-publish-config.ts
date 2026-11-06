@@ -37,9 +37,13 @@ export function buildGitHubReviewBashRules(): Record<string, string> {
       denies[`gh api ${endpoint}* ${flag}*`] = 'deny';
       // Matched anywhere in the command text (a leading wildcard allows a
       // wrapper prefix or a surrounding command), so a write form cannot move
-      // out of reach.
-      denies[`*gh api *${flag}*${endpoint}*`] = 'deny';
-      denies[`*gh api *${endpoint}*${flag}*`] = 'deny';
+      // out of reach. The flag keeps its argument boundary: it is either the
+      // first argument, where the `gh api` separator is the boundary, or a
+      // later argument, written after a space. A flag token quoted inside a
+      // `--jq` expression therefore keeps the command-guard verdict.
+      denies[`*gh api ${flag}*${endpoint}*`] = 'deny';
+      denies[`*gh api * ${flag}*${endpoint}*`] = 'deny';
+      denies[`*gh api *${endpoint}* ${flag}*`] = 'deny';
     }
   }
   // A pull request is an issue, so both comment subcommands reach the same

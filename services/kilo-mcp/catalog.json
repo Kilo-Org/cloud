@@ -36159,6 +36159,7 @@
             "linkedin",
             "discord",
             "openai",
+            "claude",
             "fake-login",
             "workos",
             "passkey"
@@ -36615,6 +36616,7 @@
             "linkedin",
             "discord",
             "openai",
+            "claude",
             "fake-login",
             "workos",
             "passkey"

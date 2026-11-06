@@ -72,6 +72,7 @@ export type RouteRecord = {
 export type RoutePreparationProgress = {
   step: ControlPlanePreparationStep;
   detail?: string;
+  snapshotCapturedAt?: number;
 };
 
 /** The grant outcome for a route attempt: a re-projected spec plus the grant. */

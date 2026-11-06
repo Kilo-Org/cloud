@@ -28,6 +28,9 @@ import { z } from 'zod';
 import {
   readWorkspaceSnapshotAllocation,
   workspaceSnapshotIdentity,
+  workspaceSnapshotIdentitySchema,
+  workspaceSnapshotStatus,
+  type WorkspaceSnapshotIdentity,
   workspaceSnapshotsEnabled,
   selectWorkspaceSnapshot,
   snapshotRestorePending,
@@ -876,16 +879,29 @@ export class SandboxControlV2 extends DurableObject<Env> {
    * state into the public snapshot; it never probes the provider or the wrapper.
    * No owner means no evidence, so the snapshot is `unknown`.
    */
-  async getStatusSnapshot(): Promise<SandboxStatusSnapshot> {
+  async getStatusSnapshot(
+    identity: WorkspaceSnapshotIdentity | null = null
+  ): Promise<SandboxStatusSnapshot> {
     await this.initialized;
     return this.enqueue(async () => {
       const owner = await this.requireOwner();
       const allocation = owner === null ? null : await this.getAllocationState();
-      return projectAllocationStatusSnapshot({
-        allocation,
-        observedAt: Date.now(),
-        inactivityTimeoutMs: this.sandboxIdleTimeoutMs(allocation),
-      });
+      const parsedIdentity = workspaceSnapshotIdentitySchema.safeParse(identity);
+      return {
+        ...projectAllocationStatusSnapshot({
+          allocation,
+          observedAt: Date.now(),
+          inactivityTimeoutMs: this.sandboxIdleTimeoutMs(allocation),
+        }),
+        ...workspaceSnapshotStatus(
+          this.db,
+          parsedIdentity.success &&
+            parsedIdentity.data.sandboxId === this.sandboxId &&
+            parsedIdentity.data.userId === owner
+            ? parsedIdentity.data
+            : null
+        ),
+      };
     });
   }
 
@@ -1029,6 +1045,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
             return result;
           }),
         eligible: route => this.workspaceSnapshotRouteEligible(route),
+        stored: async () => this.broadcastStatusSnapshots(await this.readAllocation()),
         read: async () => {
           const state = await this.readAllocation();
           const socket = this.boundWrapperSocket(state);
@@ -1056,8 +1073,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
   async abort(payload: ControlPlaneSessionRefPayload): Promise<ControlPlaneDispatchResult> {
     await this.initialized;
     const parsed = controlPlaneSessionRefPayloadSchema.parse(payload);
-    return this.enqueue(() => {
-      this.invalidateWorkspaceSnapshot('abort', parsed.sessionId);
+    return this.enqueue(async () => {
+      await this.invalidateWorkspaceSnapshot('abort', parsed.sessionId);
       return this.dispatchToWrapper({ type: 'session.abort', sessionId: parsed.sessionId });
     });
   }
@@ -1079,7 +1096,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     const parsed = controlPlaneSessionRefPayloadSchema.parse(payload);
     await this.enqueue(async () => {
       this.notifications.retire(parsed.sessionId);
-      this.invalidateWorkspaceSnapshot('release', parsed.sessionId);
+      await this.invalidateWorkspaceSnapshot('release', parsed.sessionId);
       const released = await readRoute(this.db, parsed.sessionId);
       // A shared canonical handle survives on the other members, so removing
       // this route's path rules is not worth a policy rebuild: a transient
@@ -1159,8 +1176,9 @@ export class SandboxControlV2 extends DurableObject<Env> {
     const handoff = await this.enqueue(async () => {
       await this.initializeOwner(parsed.kiloUserId);
       const routes = await listRoutes(this.db);
-      deleteWorkspaceSnapshot(this.db, parsed.worktreeId, 'workspace_deleted');
-      this.invalidateWorkspaceSnapshot('workspace_deleted');
+      if (deleteWorkspaceSnapshot(this.db, parsed.worktreeId, 'workspace_deleted'))
+        this.broadcastStatusSnapshots(await this.readAllocation());
+      await this.invalidateWorkspaceSnapshot('workspace_deleted');
       const target = worktreeOwnedRoutes(routes, parsed);
       const state = await this.readAllocation();
       return {
@@ -1445,7 +1463,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
   private async beginTerminalRequest(
     input: ControlPlaneTerminalInput
   ): Promise<ControlRequestHandoff> {
-    this.invalidateWorkspaceSnapshot('terminal', input.session.sessionId);
+    await this.invalidateWorkspaceSnapshot('terminal', input.session.sessionId);
     return this.beginWrapperControlRequest(terminalRequestFrame(crypto.randomUUID(), input));
   }
 
@@ -2020,10 +2038,18 @@ export class SandboxControlV2 extends DurableObject<Env> {
         if (owner === null || owner !== url.searchParams.get('ownerId') || !sessionId)
           return new Response('Sandbox owner mismatch', { status: 403 });
         const allocation = await this.readAllocation();
+        const parsedIdentity = workspaceSnapshotIdentitySchema.safeParse({
+          sandboxId: this.sandboxId,
+          userId: owner,
+          workspaceId: url.searchParams.get('workspaceId'),
+          directory: url.searchParams.get('directory'),
+          orgId: url.searchParams.get('orgId') ?? undefined,
+        });
+        const identity = parsedIdentity.success ? parsedIdentity.data : null;
         const pair = new WebSocketPair();
         this.ctx.acceptWebSocket(pair[1], ['sandbox-status']);
-        pair[1].serializeAttachment({ kind: 'sandbox-status', sessionId });
-        this.sendStatusSnapshot(pair[1], sessionId, allocation);
+        pair[1].serializeAttachment({ kind: 'sandbox-status', sessionId, identity });
+        this.sendStatusSnapshot(pair[1], sessionId, allocation, identity);
         return new Response(null, { status: 101, webSocket: pair[0] });
       });
     }
@@ -2500,7 +2526,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     await this.initializeOwner(source.userId);
     let state = await this.readAllocation();
     if (state.kind === 'connected' || state.kind === 'disconnected')
-      this.invalidateWorkspaceSnapshot('preparation', spec.sessionId);
+      await this.invalidateWorkspaceSnapshot('preparation', spec.sessionId);
     if (
       (sandboxSelection?.provider ?? this.currentProvider()) === 'vercel' &&
       (sandboxSelection?.byoc ?? this.providerPin?.byoc) === undefined
@@ -2923,7 +2949,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     if (adopted) await this.ensureRouteCredentialsCurrent(payload.sessionId, state);
 
     for (const message of payload.messages) {
-      this.invalidateWorkspaceSnapshot('prompt', payload.sessionId);
+      await this.invalidateWorkspaceSnapshot('prompt', payload.sessionId);
       const sent = this.trySendFrame(socket, {
         type: 'session.prompt',
         sessionId: payload.sessionId,
@@ -3367,7 +3393,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     const state = await this.readAllocation();
     const socket = this.boundWrapperSocket(state);
     if (socket === null) return 'not_connected';
-    this.invalidateWorkspaceSnapshot(
+    await this.invalidateWorkspaceSnapshot(
       frame.type === 'session.answer' ? 'answer' : 'abort',
       'sessionId' in frame ? frame.sessionId : undefined
     );
@@ -3563,8 +3589,12 @@ export class SandboxControlV2 extends DurableObject<Env> {
     });
   }
 
-  private invalidateWorkspaceSnapshot(reason = 'mutation', sessionId?: string): void {
-    invalidateWorkspaceSnapshot(this.db, reason, sessionId);
+  private async invalidateWorkspaceSnapshot(
+    reason = 'mutation',
+    sessionId?: string
+  ): Promise<void> {
+    if (invalidateWorkspaceSnapshot(this.db, reason, sessionId))
+      this.broadcastStatusSnapshots(await this.readAllocation());
   }
 
   private forwardOutcome(
@@ -4587,8 +4617,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
             sourceAllocationId: disk.restore.sourceAllocationId,
             reason: launched.startSource === 'repository' ? 'confirmed' : 'image_fallback',
           });
-          if (launched.startSource !== 'repository')
+          if (launched.startSource !== 'repository') {
             deleteWorkspaceSnapshot(this.db, disk.owner.workspaceId, 'image_fallback');
+            this.broadcastStatusSnapshots(await this.readAllocation());
+          }
           const latest = await this.readAllocation();
           if (latest.allocationId !== allocationId || latest.kind !== 'connected') return;
           for (const route of await listRoutes(this.db)) {
@@ -4791,7 +4823,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
       log('selected', candidate.sessionId, candidate.owner.workspaceId);
       await notifyPreparingRoutes(this.routeContext(current), {
         step: 'restore',
-        detail: 'Restoring the workspace tail snapshot',
+        detail: 'Using workspace snapshot',
+        snapshotCapturedAt: descriptor.capturedAt,
       });
       return { snapshotId: descriptor.snapshotId, baseImage: descriptor.baseImage };
     });
@@ -4850,6 +4883,9 @@ export class SandboxControlV2 extends DurableObject<Env> {
     await notifyPreparingRoutes(this.routeContext(state), {
       step: 'environment_snapshot',
       detail: environmentStartDetail(candidate.reference, lookup),
+      ...(lookup.kind === 'resolved' && lookup.resolution.snapshot !== null
+        ? { snapshotCapturedAt: lookup.resolution.snapshot.capturedAt }
+        : {}),
     });
     return { options: snapshot === undefined ? {} : { snapshot }, skipped: false };
   }
@@ -4990,6 +5026,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     const route = routes.find(route => route.state === 'preparing');
     if (route === undefined) return false;
     deleteWorkspaceSnapshot(this.db, undefined, 'restore_retry', route.sessionId);
+    this.broadcastStatusSnapshots(state);
     return this.retryRepositoryPreparation(
       state,
       { sessionId: route.sessionId, attemptId: route.attemptId },
@@ -5358,7 +5395,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         active: frame.active,
       });
       if (frame.active || frame.workspaceBusy === true)
-        this.invalidateWorkspaceSnapshot(frame.active ? 'active' : 'workspace_busy');
+        await this.invalidateWorkspaceSnapshot(frame.active ? 'active' : 'workspace_busy');
       const disk = readWorkspaceSnapshotAllocation(this.db);
       if (
         !frame.active &&
@@ -5704,6 +5741,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
       previous.unconfirmedProviderRef === state.unconfirmedProviderRef
     )
       return;
+    this.broadcastStatusSnapshots(state);
+  }
+
+  private broadcastStatusSnapshots(state: AllocationState): void {
     for (const socket of this.ctx.getWebSockets('sandbox-status')) {
       const attachment: unknown = socket.deserializeAttachment();
       if (
@@ -5711,21 +5752,38 @@ export class SandboxControlV2 extends DurableObject<Env> {
         attachment !== null &&
         'sessionId' in attachment &&
         typeof attachment.sessionId === 'string'
-      )
-        this.sendStatusSnapshot(socket, attachment.sessionId, state);
+      ) {
+        const identity = workspaceSnapshotIdentitySchema.safeParse(
+          'identity' in attachment ? attachment.identity : null
+        );
+        this.sendStatusSnapshot(
+          socket,
+          attachment.sessionId,
+          state,
+          identity.success ? identity.data : null
+        );
+      }
     }
   }
 
-  private sendStatusSnapshot(socket: WebSocket, sessionId: string, state: AllocationState): void {
-    const snapshot = projectAllocationStatusSnapshot({
-      allocation: {
-        ...state,
-        provider: this.currentProvider(),
-        configuration: this.providerPin?.configuration ?? null,
-      },
-      observedAt: Date.now(),
-      inactivityTimeoutMs: this.sandboxIdleTimeoutMs(state),
-    });
+  private sendStatusSnapshot(
+    socket: WebSocket,
+    sessionId: string,
+    state: AllocationState,
+    identity: WorkspaceSnapshotIdentity | null
+  ): void {
+    const snapshot = {
+      ...projectAllocationStatusSnapshot({
+        allocation: {
+          ...state,
+          provider: this.currentProvider(),
+          configuration: this.providerPin?.configuration ?? null,
+        },
+        observedAt: Date.now(),
+        inactivityTimeoutMs: this.sandboxIdleTimeoutMs(state),
+      }),
+      ...workspaceSnapshotStatus(this.db, identity),
+    };
     try {
       socket.send(
         JSON.stringify({

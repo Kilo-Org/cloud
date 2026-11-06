@@ -754,6 +754,7 @@ const controlPlaneRoutePreparingSchema = z
     attemptId: z.string().min(1).max(128),
     step: controlPlanePreparationStepSchema.optional(),
     detail: controlPlanePreparationDetailSchema.optional(),
+    snapshotCapturedAt: z.number().int().nonnegative().max(8_640_000_000_000_000).optional(),
     container: controlPlaneRunContainerSchema.optional(),
   })
   .strict();

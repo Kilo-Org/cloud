@@ -116,6 +116,7 @@ export type SandboxStatusPresentation = {
   wrapperVersion: string | null;
   startedAt: number | null;
   stoppedAt: number | null;
+  snapshotCapturedAt: number | null;
   estimatedSleepAt: number | null;
   sleepMinutesRemaining: number | null;
   nextChangeAt: number | null;
@@ -153,6 +154,7 @@ export function sandboxStatusPresentation({
     wrapperVersion: null,
     startedAt: null,
     stoppedAt: null,
+    snapshotCapturedAt: null,
     estimatedSleepAt: null,
     sleepMinutesRemaining: null,
     nextChangeAt: null,
@@ -238,6 +240,7 @@ export function sandboxStatusPresentation({
     wrapperVersion: runtime?.wrapperVersion ?? null,
     startedAt: runtime?.startedAt ?? null,
     stoppedAt: runtime?.stoppedAt ?? null,
+    snapshotCapturedAt: snapshot.workspaceSnapshot?.capturedAt ?? null,
     estimatedSleepAt,
     sleepMinutesRemaining,
     nextChangeAt: deadlines.length > 0 ? Math.min(...deadlines) : null,

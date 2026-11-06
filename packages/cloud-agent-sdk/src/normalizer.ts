@@ -166,6 +166,7 @@ export type ServiceEvent =
       commandIndex?: number | undefined;
       commandCount?: number | undefined;
       detail?: string | undefined;
+      snapshotCapturedAt?: number | undefined;
       output?: string | undefined;
       safeError?: string | undefined;
       exitCode?: number | undefined;
@@ -557,6 +558,9 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
               ...(r.data.commandIndex === undefined ? {} : { commandIndex: r.data.commandIndex }),
               ...(r.data.commandCount === undefined ? {} : { commandCount: r.data.commandCount }),
               ...(r.data.detail === undefined ? {} : { detail: r.data.detail }),
+              ...(r.data.snapshotCapturedAt === undefined
+                ? {}
+                : { snapshotCapturedAt: r.data.snapshotCapturedAt }),
               ...(r.data.output === undefined ? {} : { output: r.data.output }),
               ...(r.data.safeError === undefined ? {} : { safeError: r.data.safeError }),
               ...(r.data.exitCode === undefined ? {} : { exitCode: r.data.exitCode }),

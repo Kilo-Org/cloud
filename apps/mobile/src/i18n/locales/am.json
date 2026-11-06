@@ -697,10 +697,10 @@
     },
     "connect": {
       "checkFailedTitle": "የGitHub ግንኙነቱን መፈተሽ አልተቻለም።",
-      "checkFailedMessage": "ይህ እስኪጫን ድረስ የመግቢያ ሁኔታውን ማወቅ አይቻልም።",
+      "checkFailedMessage": "GitHub ላይ መድረስ አልተቻለም። ግንኙነትህን ፈትሽና እንደገና ሞክር።",
       "checkFailedTitleGitLab": "የGitLab ግንኙነቱን መፈተሽ አልተቻለም።",
       "checkFailedTitleBitbucket": "የBitbucket ግንኙነቱን መፈተሽ አልተቻለም።",
-      "providerCheckFailedMessage": "ይህ እስኪጫን ድረስ የግንኙነት ሁኔታ አይገኝም።",
+      "providerCheckFailedMessage": "አቅራቢው ላይ መድረስ አልተቻለም። ግንኙነትህን ፈትሽና እንደገና ሞክር።",
       "reconnectTitle": "GitHubን እንደገና ማገናኘት",
       "reconnectTitleGitLab": "GitLabን እንደገና ማገናኘት",
       "reconnectTitleBitbucket": "Bitbucketን እንደገና ማገናኘት",
@@ -2581,6 +2581,7 @@
       "assistantContextOverflow": "ውይይቱ ለሞዴሉ በጣም ረጅም ነው።",
       "assistantProviderError": "አቅራቢው ስህተት መልሷል።",
       "assistantProviderRefused": "አቅራቢው ይህን ጥያቄ ውድቅ አድርጓል፤ እንደገና ማሞከርም አይቻልም።",
+      "assistantCreditsRefusal": "Cloud Agentን ለማስኬድ በቂ ክሬዲት የለዎትም።",
       "assistantOutputLimit": "ምላሹ የሞዴሉን የውጤት ገደብ ደርሷል።",
       "assistantStructuredOutput": "ምላሹ ከተጠየቀው ቅርጸት ጋር አልተመሳሰለም።",
       "assistantFailed": "ምላሹ አልተሳካም።"
@@ -3497,9 +3498,9 @@
       "searching": "የድር ፍለጋ",
       "thinking": "በማሰብ ላይ"
     },
-    "planOf": "ከ",
+    "planProgress": "{{done}} ከ{{total}}",
     "filesChanged": "ፋይሎች ተቀይረዋል",
-    "finishedIn": "ተጠናቅቋል በ",
+    "finishedIn": "በ{{duration}} ተጠናቅቋል",
     "noActivityFor": "ምንም እንቅስቃሴ ለ",
     "prOpened": "የመጎተቻ ጥያቄ ተከፍቷል",
     "permissionWants": "ለማሄድ ይፈልጋል",

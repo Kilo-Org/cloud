@@ -2034,6 +2034,7 @@
       "assistantContextOverflow": "A conversa é longa demais para o modelo.",
       "assistantProviderError": "O provedor retornou um erro.",
       "assistantProviderRefused": "O provedor recusou esta solicitação e não é possível tentar novamente.",
+      "assistantCreditsRefusal": "Créditos insuficientes para executar o Cloud Agent.",
       "assistantOutputLimit": "A resposta atingiu o limite de saída do modelo.",
       "assistantStructuredOutput": "A resposta não correspondeu ao formato exigido.",
       "assistantFailed": "Não foi possível gerar a resposta."
@@ -2786,10 +2787,10 @@
     },
     "connect": {
       "checkFailedTitle": "Não foi possível verificar a conexão com o GitHub.",
-      "checkFailedMessage": "Não é possível saber se você está conectado até o carregamento terminar.",
+      "checkFailedMessage": "Não foi possível acessar o GitHub. Verifique sua conexão e tente novamente.",
       "checkFailedTitleGitLab": "Não foi possível verificar a conexão com o GitLab.",
       "checkFailedTitleBitbucket": "Não foi possível verificar a conexão com o Bitbucket.",
-      "providerCheckFailedMessage": "O status da conexão só fica disponível quando o carregamento terminar.",
+      "providerCheckFailedMessage": "Não foi possível acessar o provedor. Verifique sua conexão e tente novamente.",
       "reconnectTitle": "Reconexão com o GitHub",
       "reconnectTitleGitLab": "Reconexão com o GitLab",
       "reconnectTitleBitbucket": "Reconexão com o Bitbucket",
@@ -3552,9 +3553,9 @@
       "searching": "Pesquisa na Web",
       "thinking": "Pensando"
     },
-    "planOf": "de",
+    "planProgress": "{{done}} de {{total}}",
     "filesChanged": "arquivos alterados",
-    "finishedIn": "Concluído em",
+    "finishedIn": "Concluído em {{duration}}",
     "noActivityFor": "Sem atividade há",
     "prOpened": "Pull request aberto",
     "permissionWants": "Quer executar",

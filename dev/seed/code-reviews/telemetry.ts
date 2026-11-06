@@ -1,6 +1,5 @@
 import { randomUUID } from 'node:crypto';
 
-import { computeDatabaseUrl } from '@kilocode/db';
 import {
   cloud_agent_code_review_attempts,
   cloud_agent_code_reviews,
@@ -9,7 +8,7 @@ import {
 } from '@kilocode/db/schema';
 import { eq, inArray, or } from 'drizzle-orm';
 
-import { getSeedDb } from '../lib/db';
+import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
 import { normalizeSeedEmail } from '../lib/email';
 import { createSeedStripeCustomer, deleteSeedStripeCustomer } from '../lib/stripe';
 import type { SeedResult } from '../index';
@@ -218,22 +217,6 @@ export function parseTelemetryArgs(args: string[]): TelemetryArgs {
   }
 
   return { days, adminEmail };
-}
-
-function assertLocalDatabaseTarget(): string {
-  if (process.env.USE_PRODUCTION_DB === 'true') {
-    throw new Error('Code review telemetry seed refuses to run with USE_PRODUCTION_DB=true.');
-  }
-
-  const databaseUrl = new URL(computeDatabaseUrl());
-  const localHostnames = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
-  if (!localHostnames.has(databaseUrl.hostname)) {
-    throw new Error(
-      `Code review telemetry seed requires a loopback database host; received ${databaseUrl.hostname}.`
-    );
-  }
-
-  return databaseUrl.hostname;
 }
 
 /** Deterministic so reruns produce identical charts. */
@@ -670,7 +653,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   }
 
   const { days, adminEmail } = parseTelemetryArgs(args);
-  const databaseHost = assertLocalDatabaseTarget();
+  const databaseHost = assertLocalSeedDatabase('code-reviews:telemetry');
   const db = getSeedDb();
   const nowMs = Date.now();
 

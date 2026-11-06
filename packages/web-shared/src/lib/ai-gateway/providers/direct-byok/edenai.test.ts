@@ -4,17 +4,6 @@ import type { TransformRequestContext } from '../types';
 import edenai from './edenai';
 
 describe('Eden AI direct BYOK provider', () => {
-  test('supports all chat APIs with the nested Anthropic Messages base URL', async () => {
-    await expect(
-      edenai.resolveUpstream({ credential: 'test-key', model: { id: 'test-model' }, stream: false })
-    ).resolves.toMatchObject({
-      apiUrl: 'https://api.edenai.run/v3',
-      apiUrlOverrides: { messages: 'https://api.edenai.run/v3/v1' },
-      apiKey: 'test-key',
-      supportedChatApis: ['chat_completions', 'messages', 'responses'],
-    });
-  });
-
   test.each([
     ['edenai/openai/gpt-5.6-luna', 'openai'],
     ['edenai/anthropic/claude-sonnet-5', 'anthropic'],

@@ -21,7 +21,7 @@ export const BYTEPLUS_CODING_MODELS = [
     name: 'ByteDance-Seed-Code',
     description:
       "ByteDance's latest code model has been deeply optimized for agentic programming tasks.",
-    flags: ['recommended', 'vision', 'reasoning'],
+    flags: ['vision', 'reasoning'],
     context_length: 262144,
     max_completion_tokens: 32768,
     reasoning_options: REASONING_TOGGLE,

@@ -697,10 +697,10 @@
     },
     "connect": {
       "checkFailedTitle": "GitHub холболтыг шалгаж чадсангүй.",
-      "checkFailedMessage": "Энэ мэдээллийг ачаалж дуустал нэвтэрсэн эсэхийг харуулах боломжгүй.",
+      "checkFailedMessage": "GitHub-д холбогдож чадсангүй. Холболтоо шалгаад дахин оролдоно уу.",
       "checkFailedTitleGitLab": "GitLab холболтыг шалгаж чадсангүй.",
       "checkFailedTitleBitbucket": "Bitbucket холболтыг шалгаж чадсангүй.",
-      "providerCheckFailedMessage": "Ачаалагдах хүртэл холболтын төлөв харагдахгүй.",
+      "providerCheckFailedMessage": "Үйлчилгээ үзүүлэгчтэй холбогдож чадсангүй. Холболтоо шалгаад дахин оролдоно уу.",
       "reconnectTitle": "GitHub-ыг дахин холбох",
       "reconnectTitleGitLab": "GitLab-ыг дахин холбох",
       "reconnectTitleBitbucket": "Bitbucket-ыг дахин холбох",
@@ -2575,6 +2575,7 @@
       "assistantContextOverflow": "Харилцан яриа загварын боловсруулах хэмжээнээс хэтэрсэн байна.",
       "assistantProviderError": "Үйлчилгээ үзүүлэгч алдаа буцаалаа.",
       "assistantProviderRefused": "Үйлчилгээ үзүүлэгч энэ хүсэлтийг татгалзсан тул дахин оролдох боломжгүй.",
+      "assistantCreditsRefusal": "Cloud Agent ажиллуулахад кредит хүрэлцэхгүй байна.",
       "assistantOutputLimit": "Хариулт загварын гаргах хэмжээний хязгаарт хүрлээ.",
       "assistantStructuredOutput": "Хариулт шаардлагатай форматад нийцсэнгүй.",
       "assistantFailed": "Хариулт үүсгэж чадсангүй."
@@ -3491,9 +3492,9 @@
       "searching": "Веб хайлт",
       "thinking": "Бодож байна"
     },
-    "planOf": "ийн",
+    "planProgress": "{{done}} / {{total}}",
     "filesChanged": "файл өөрчлөгдсөн",
-    "finishedIn": "Дууссан",
+    "finishedIn": "{{duration}} хугацаанд дууссан",
     "noActivityFor": "Үйл ажиллагаагүй",
     "prOpened": "Татах хүсэлт нээгдсэн",
     "permissionWants": "Ажиллуулахыг хүсэж байна",

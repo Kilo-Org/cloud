@@ -697,10 +697,10 @@
     },
     "connect": {
       "checkFailedTitle": "Ba a iya duba haɗin GitHub ba.",
-      "checkFailedMessage": "Ba za a iya sanin matsayin shiga ba har sai an loda wannan.",
+      "checkFailedMessage": "Ba a iya haɗawa da GitHub ba. Duba haɗinka na intanet ka sake gwadawa.",
       "checkFailedTitleGitLab": "Ba a iya duba haɗin GitLab ba.",
       "checkFailedTitleBitbucket": "Ba a iya duba haɗin Bitbucket ba.",
-      "providerCheckFailedMessage": "Ba a samun yanayin haɗi har sai wannan ya lodu.",
+      "providerCheckFailedMessage": "Ba a iya haɗawa da mai ba da sabis ba. Duba haɗinka na intanet ka sake gwadawa.",
       "reconnectTitle": "Sake haɗa GitHub",
       "reconnectTitleGitLab": "Sake haɗa GitLab",
       "reconnectTitleBitbucket": "Sake haɗa Bitbucket",
@@ -2575,6 +2575,7 @@
       "assistantContextOverflow": "Tattaunawar ta yi tsawo fiye da abin da samfurin zai iya karɓa.",
       "assistantProviderError": "Mai ba da sabis ya mayar da kuskure.",
       "assistantProviderRefused": "Mai ba da sabis ya ƙi wannan buƙatar, kuma ba za a iya sake gwadawa ba.",
+      "assistantCreditsRefusal": "Kuɗin amfani ba su isa gudanar da Cloud Agent ba.",
       "assistantOutputLimit": "Amsar ta kai iyakar fitar da samfurin.",
       "assistantStructuredOutput": "Amsar ba ta dace da tsarin da ake buƙata ba.",
       "assistantFailed": "An kasa samar da amsar."
@@ -3491,9 +3492,9 @@
       "searching": "Binciken yanar gizo",
       "thinking": "Ana tunani"
     },
-    "planOf": "cikin",
+    "planProgress": "{{done}} cikin {{total}}",
     "filesChanged": "fayiloli sun canza",
-    "finishedIn": "An gama cikin",
+    "finishedIn": "An gama cikin {{duration}}",
     "noActivityFor": "Babu aiki na",
     "prOpened": "An buɗe buƙatar ja",
     "permissionWants": "Yana son gudu",

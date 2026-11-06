@@ -2036,6 +2036,7 @@
       "assistantContextOverflow": "Konuşma model için çok uzun.",
       "assistantProviderError": "Sağlayıcı bir hata döndürdü.",
       "assistantProviderRefused": "Sağlayıcı bu isteği reddetti ve istek yeniden denenemez.",
+      "assistantCreditsRefusal": "Cloud Agent'i çalıştırmak için yeterli kredi yok.",
       "assistantOutputLimit": "Yanıt, modelin çıktı sınırına ulaştı.",
       "assistantStructuredOutput": "Yanıt, gereken biçimle eşleşmedi.",
       "assistantFailed": "Yanıt oluşturulamadı."
@@ -2743,10 +2744,10 @@
     },
     "connect": {
       "checkFailedTitle": "GitHub bağlantısı kontrol edilemedi.",
-      "checkFailedMessage": "Yükleme tamamlanana kadar oturum açma durumu gösterilemiyor.",
+      "checkFailedMessage": "GitHub'a ulaşılamadı. Bağlantını kontrol et ve tekrar dene.",
       "checkFailedTitleGitLab": "GitLab bağlantısı kontrol edilemedi.",
       "checkFailedTitleBitbucket": "Bitbucket bağlantısı kontrol edilemedi.",
-      "providerCheckFailedMessage": "Bağlantı durumu, yüklenene kadar kullanılamıyor.",
+      "providerCheckFailedMessage": "Sağlayıcıya ulaşılamadı. Bağlantını kontrol et ve tekrar dene.",
       "reconnectTitle": "GitHub'a yeniden bağlan",
       "reconnectTitleGitLab": "GitLab'a yeniden bağlan",
       "reconnectTitleBitbucket": "Bitbucket'a yeniden bağlan",
@@ -3491,9 +3492,9 @@
       "searching": "Web araması",
       "thinking": "İyice düşünüyor"
     },
-    "planOf": "/",
+    "planProgress": "{{done}} / {{total}}",
     "filesChanged": "dosya değişti",
-    "finishedIn": "Tamamlanma süresi",
+    "finishedIn": "{{duration}} içinde tamamlandı",
     "noActivityFor": "Etkinlik yok",
     "prOpened": "Pull request açıldı",
     "permissionWants": "Çalıştırmak istiyor",

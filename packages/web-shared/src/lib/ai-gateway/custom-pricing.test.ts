@@ -1,13 +1,15 @@
 import { describe, expect, test } from '@jest/globals';
 import { captureMessage } from '@sentry/nextjs';
-import type { CustomPricingConfig } from '@kilocode/db/schema-types';
+import type { CustomPricingConfig, CustomPricingTiers } from '@kilocode/db/schema-types';
 import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { GEMINI_4_ARGON_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
 import {
   applyCustomPricingToPricing,
   applyCustomPricingToModel,
   calculateCustomCost_mUsd,
+  calculateTieredCost_mUsd,
 } from './custom-pricing';
+import { REPORT_WINDOW_MS } from './report-window';
 import { TEST_CUSTOM_PRICING_CONFIG } from '@kilocode/web-shared/tests/helpers/custom-pricing.helper';
 
 jest.mock('@sentry/nextjs', () => ({ captureMessage: jest.fn() }));
@@ -45,6 +47,18 @@ const makeUsage = (overrides: Partial<Parameters<typeof calculateCustomCost_mUsd
 });
 
 const config = TEST_CUSTOM_PRICING_CONFIG;
+
+const windowTiers: CustomPricingTiers = [
+  {
+    start_context_length: 0,
+    pricing: {
+      prompt_per_million: 1,
+      completion_per_million: 2,
+      input_cache_read_per_million: 0.5,
+      input_cache_write_per_million: 1.5,
+    },
+  },
+];
 
 describe('custom model pricing', () => {
   test('replaces upstream Gemini 3.8 Flash pricing with the promotional rates', () => {
@@ -146,6 +160,45 @@ describe('custom model pricing', () => {
         extra: expect.objectContaining({ model: 'google/gemini-3.8-flash' }),
       })
     );
+  });
+
+  test('reports a repeated negative-token anomaly once per model and report window', () => {
+    const captureMessageMock = jest.mocked(captureMessage);
+    captureMessageMock.mockClear();
+    jest.useFakeTimers();
+    const usage = makeUsage({ inputTokens: 10, cacheHitTokens: 20 });
+
+    try {
+      jest.setSystemTime(new Date('2031-01-01T00:00:00Z'));
+      const start = Date.now();
+      expect(calculateTieredCost_mUsd(windowTiers, 'test/window-a', usage)).toBe(10);
+      expect(captureMessageMock).toHaveBeenCalledTimes(1);
+
+      // The same model inside the window is suppressed, whatever the failing usage.
+      jest.setSystemTime(start + 1_000);
+      calculateTieredCost_mUsd(windowTiers, 'test/window-a', { ...usage, inputTokens: 1_000 });
+      calculateTieredCost_mUsd(windowTiers, 'test/window-a', usage);
+      expect(captureMessageMock).toHaveBeenCalledTimes(1);
+
+      // A different model reports independently inside the same window.
+      jest.setSystemTime(start + 1_000);
+      calculateTieredCost_mUsd(windowTiers, 'test/window-b', usage);
+      expect(captureMessageMock).toHaveBeenCalledTimes(2);
+
+      // After the window, the first model reports again.
+      jest.setSystemTime(start + REPORT_WINDOW_MS);
+      calculateTieredCost_mUsd(windowTiers, 'test/window-a', usage);
+      expect(captureMessageMock).toHaveBeenCalledTimes(3);
+      expect(captureMessageMock).toHaveBeenLastCalledWith(
+        'SUSPICIOUS: negative uncached input tokens for custom pricing',
+        expect.objectContaining({
+          level: 'error',
+          extra: expect.objectContaining({ model: 'test/window-a', usage }),
+        })
+      );
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   test('leaves models without custom pricing unchanged', () => {

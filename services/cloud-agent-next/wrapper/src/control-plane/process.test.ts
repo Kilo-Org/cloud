@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'bun:test';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { chmod, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import {
+  KILO_CLI_VERSION_HEADER,
+  WRAPPER_VERSION_HEADER,
+} from '../../../src/shared/control-plane-runtime-contract.js';
+import { WRAPPER_VERSION } from '../../../src/shared/wrapper-version.js';
 import {
   CONTROL_PLANE_ALLOCATION_ID_ENV,
   CONTROL_PLANE_PROTOCOL_VERSION,
@@ -13,6 +19,7 @@ type ServerState = {
   attempts: number;
   connections: number;
   hellos: Array<Record<string, unknown>>;
+  upgradeHeaders: Headers[];
   mode: 'accept' | 'reject' | 'shutdown';
 };
 
@@ -22,12 +29,13 @@ function startControlServer(mode: ServerState['mode']): {
   send: (frame: unknown) => void;
   stop: () => void;
 } {
-  const state: ServerState = { attempts: 0, connections: 0, hellos: [], mode };
+  const state: ServerState = { attempts: 0, connections: 0, hellos: [], upgradeHeaders: [], mode };
   const sockets = new Set<Bun.ServerWebSocket<undefined>>();
   const server = Bun.serve<undefined>({
     port: 0,
     fetch(request, srv) {
       state.attempts += 1;
+      state.upgradeHeaders.push(request.headers);
       if (state.mode === 'reject') return new Response('rejected', { status: 503 });
       if (srv.upgrade(request)) return undefined;
       return new Response('upgrade failed', { status: 400 });
@@ -158,6 +166,37 @@ function nativeLogsEnv(url: string, uploadPort: number): Record<string, string> 
 }
 
 describe('control-plane wrapper process', () => {
+  it('reports the installed CLI and bundled wrapper versions from the real entrypoint', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'wrapper-versions-'));
+    const cli = join(directory, 'kilo');
+    await writeFile(
+      cli,
+      "#!/bin/sh\n[ \"$1\" = '--version' ] || exit 1\nprintf '7.9.0-canary.123\\n'\n"
+    );
+    await chmod(cli, 0o755);
+    const server = startControlServer('accept');
+    const child = Bun.spawn([process.execPath, 'run', MAIN_PATH], {
+      env: childEnv(`ws://127.0.0.1:${server.port}/sandbox-control-v2/fake`, {
+        PATH: `${directory}:${process.env.PATH ?? ''}`,
+        KILO_RUNTIME_HARNESS: 'kilo',
+      }),
+      stdout: 'ignore',
+      stderr: 'ignore',
+    });
+    try {
+      await waitFor(() => server.state.hellos.length > 0);
+      expect(server.state.upgradeHeaders[0].get(KILO_CLI_VERSION_HEADER)).toBe('7.9.0-canary.123');
+      expect(server.state.upgradeHeaders[0].get(WRAPPER_VERSION_HEADER)).toBe(WRAPPER_VERSION);
+      server.send({ type: 'shutdown', reason: 'test shutdown' });
+      expect(await waitForExit(child, 6_000)).toBe(0);
+    } finally {
+      if (child.exitCode === null) child.kill();
+      await child.exited;
+      server.stop();
+      await rm(directory, { recursive: true });
+    }
+  }, 15_000);
+
   it('exits 0 on terminal admission rejection before welcome without reconnecting', async () => {
     const server = startControlServer('shutdown');
     const child = Bun.spawn([process.execPath, 'run', MAIN_PATH], {

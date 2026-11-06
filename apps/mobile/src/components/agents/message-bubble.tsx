@@ -64,6 +64,12 @@ type MessageBubbleProps = {
   /** Retries a failed message. The failure footer renders only when supplied. */
   onRetryMessage?: (message: StoredMessage) => void;
   /**
+   * Opens the credit purchase screen, for a failed turn the account's own
+   * balance caused. Adding credits never needs the session to accept a
+   * re-send, so this action renders even where `retryAvailable` is false.
+   */
+  onAddCredits?: () => void;
+  /**
    * Whether this row's session can accept a re-send now. When false the failure
    * footer keeps its statement and drops the Retry, so a read-only transcript or
    * a session without a live transport still says why the turn failed. Defaults
@@ -95,6 +101,7 @@ function MessageBubbleImpl({
   onLongPressDetails,
   holdQueuedSlot,
   onRetryMessage,
+  onAddCredits,
   retryAvailable,
   onCopyToComposer,
   onRestoreQueued,
@@ -158,16 +165,17 @@ function MessageBubbleImpl({
 
   // Failed-row footer. Renders when the relevant handler is wired
   // (mobile-w2b wires onRetryMessage/onCopyToComposer); a delivery row needs
-  // Retry or Copy, an assistant row needs Retry only. A caller that already
-  // knows the session cannot accept a re-send passes `retryAvailable: false`:
-  // the footer then still states the failure, with no action that could not
-  // act.
+  // Retry or Copy, an assistant row needs Retry or, when the account's balance
+  // caused the failure, Add credits. A caller that already knows the session
+  // cannot accept a re-send passes `retryAvailable: false`: the footer then
+  // still states the failure, with no action that could not act.
   const failure = selectMessageFailure({ deliveryState, info: message.info, retryAvailable });
   const relevantHandlerWired =
     retryAvailable === false ||
-    (failure?.kind === 'delivery'
-      ? onRetryMessage !== undefined || onCopyToComposer !== undefined
-      : onRetryMessage !== undefined);
+    (failure !== null &&
+      (failure.kind === 'delivery'
+        ? onRetryMessage !== undefined || onCopyToComposer !== undefined
+        : onRetryMessage !== undefined || (failure.canAddCredits && onAddCredits !== undefined)));
   // The footer is the failed turn's status, so it sits in the column that turn
   // occupies rather than the row that carries it: a message that never reached
   // the agent is the user's own row, and its title, detail and action row stay
@@ -225,6 +233,24 @@ function MessageBubbleImpl({
               accessibilityLabel={t('common.retry')}
             >
               <Text>{t('common.retry')}</Text>
+            </Button>
+          ) : null}
+          {failure.canAddCredits && onAddCredits ? (
+            // The failure's one recovery action, so it takes the accent surface
+            // the person's own bubble and the enabled send control fill with,
+            // in both schemes; the theme's `--primary` is olive in light, which
+            // would read as one more secondary action here. The label uses that
+            // surface's own ink, because the primary label ink is white in the
+            // light scheme.
+            <Button
+              variant="default"
+              size="sm"
+              className={cn(STATE_ACTION_CLASS, 'bg-accent-soft')}
+              onPress={onAddCredits}
+              accessibilityRole="button"
+              accessibilityLabel={t('addCredits.cta')}
+            >
+              <Text className="text-accent-soft-foreground">{t('addCredits.cta')}</Text>
             </Button>
           ) : null}
           {failure.canCopy && onCopyToComposer && copyText !== '' ? (

@@ -2036,6 +2036,7 @@
       "assistantContextOverflow": "Percakapan ini terlalu panjang untuk diproses oleh model.",
       "assistantProviderError": "Penyedia mengembalikan error.",
       "assistantProviderRefused": "Penyedia menolak permintaan ini dan permintaan tidak dapat dicoba lagi.",
+      "assistantCreditsRefusal": "Kredit tidak cukup untuk menjalankan Cloud Agent.",
       "assistantOutputLimit": "Respons mencapai batas output model.",
       "assistantStructuredOutput": "Respons tidak sesuai dengan format yang diminta.",
       "assistantFailed": "Gagal menghasilkan respons."
@@ -2743,10 +2744,10 @@
     },
     "connect": {
       "checkFailedTitle": "Tidak dapat memeriksa koneksi GitHub.",
-      "checkFailedMessage": "Status masuk belum tersedia sampai data ini selesai dimuat.",
+      "checkFailedMessage": "Tidak dapat menghubungi GitHub. Periksa koneksimu dan coba lagi.",
       "checkFailedTitleGitLab": "Tidak dapat memeriksa koneksi GitLab.",
       "checkFailedTitleBitbucket": "Tidak dapat memeriksa koneksi Bitbucket.",
-      "providerCheckFailedMessage": "Status koneksi tidak tersedia hingga bagian ini termuat.",
+      "providerCheckFailedMessage": "Tidak dapat menghubungi penyedia. Periksa koneksimu dan coba lagi.",
       "reconnectTitle": "Hubungkan ulang GitHub",
       "reconnectTitleGitLab": "Hubungkan ulang GitLab",
       "reconnectTitleBitbucket": "Hubungkan ulang Bitbucket",
@@ -3491,9 +3492,9 @@
       "searching": "Penelusuran web",
       "thinking": "Berpikir"
     },
-    "planOf": "dari",
+    "planProgress": "{{done}} dari {{total}}",
     "filesChanged": "file diubah",
-    "finishedIn": "Selesai dalam",
+    "finishedIn": "Selesai dalam {{duration}}",
     "noActivityFor": "Tidak ada aktivitas selama",
     "prOpened": "Pull request dibuka",
     "permissionWants": "Ingin menjalankan",

@@ -2,6 +2,7 @@ import 'server-only';
 
 import { captureException } from '@sentry/nextjs';
 import { z } from 'zod';
+import { TRPCError } from '@trpc/server';
 import {
   INTERNAL_API_SECRET,
   SESSION_INGEST_WORKER_URL,
@@ -14,6 +15,9 @@ import {
   kiloSdkMessageHistorySchema,
   sessionDiffReadSchema,
   sessionShareOptionsSchema,
+  WORKSPACE_REQUIRES_ROOT_SESSION,
+  WORKSPACE_DELETING,
+  WORKSPACE_IDENTITY_CONFLICT,
   type SessionShareOptions,
   type KiloSdkMessageHistory,
   type SessionDiffRead,
@@ -665,6 +669,27 @@ export async function deleteSession(sessionId: string, userId: string): Promise<
   if (response.status === 404) {
     // Session already deleted or was never ingested — treat as success (idempotent delete).
     return;
+  }
+
+  if (response.status === 409) {
+    const parsed = z
+      .object({
+        error: z.enum([
+          WORKSPACE_REQUIRES_ROOT_SESSION,
+          WORKSPACE_DELETING,
+          WORKSPACE_IDENTITY_CONFLICT,
+          'worktree_deleting',
+        ]),
+      })
+      .safeParse(
+        await response
+          .clone()
+          .json()
+          .catch(() => null)
+      );
+    if (parsed.success) {
+      throw new TRPCError({ code: 'CONFLICT', message: parsed.data.error });
+    }
   }
 
   if (!response.ok) {

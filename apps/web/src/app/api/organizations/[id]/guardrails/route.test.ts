@@ -103,7 +103,7 @@ describe('GET /api/organizations/[id]/guardrails', () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({
-      inputScan: { enabled: true, scanToolResults: false },
+      inputScan: { enabled: true, scanToolResults: true },
       outputScan: { enabled: false, buffersResponses: false },
       mcp: {
         enforcement: 'enforce',

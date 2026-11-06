@@ -211,13 +211,13 @@
     "resendCode": "कोड पुन्हा पाठवा",
     "termsPrefix": "पुढे गेल्याने तुम्ही खालील बाबींना सहमती देता: ",
     "terms": "अटी",
-    "termsInSentence": "अटी",
+    "termsInSentence": "वापराच्या अटी",
     "termsConnector": " आणि ",
     "termsSuffix": ".",
     "moreSignInOptions": "साइन इन करण्याचे आणखी पर्याय",
     "passkeyCancelled": "पासकीने साइन इन रद्द झाले. कृपया पुन्हा प्रयत्न करा.",
     "passkeyNotFound": "या डिव्हाइससाठी कोणतीही पासकी जतन केलेली नाही. त्याऐवजी Apple, Google किंवा तुमच्या ईमेलने साइन इन करा.",
-    "passkeyUnsupported": "या डिव्हाइसवर पासकी उपलब्ध नाहीत. त्याऐवजी Apple, Google किंवा तुमच्या ईमेलने साइन इन करा.",
+    "passkeyUnsupported": "या डिव्हाइसवर पासक्या उपलब्ध नाहीत. त्याऐवजी Apple, Google किंवा तुमच्या ईमेलने साइन इन करा.",
     "passkeyFailed": "पासकीने साइन इन करता आले नाही. कृपया पुन्हा प्रयत्न करा.",
     "couldNotCompleteSignIn": "साइन इन पूर्ण करता आले नाही. कृपया पुन्हा प्रयत्न करा.",
     "sessionEnded": "तुमचे सत्र संपले आहे. कृपया पुन्हा साइन इन करा.",
@@ -238,7 +238,7 @@
     "linkedAccounts": "जोडलेली खाती",
     "couldNotLoadAccounts": "खाती लोड करता आली नाहीत.",
     "app": "अॅप",
-    "preferencesSubtitle": "स्वरूप, सूचना, विचारप्रक्रिया आणि स्क्रीनचा वापर",
+    "preferencesSubtitle": "स्वरूप, सूचना, विचारप्रक्रिया आणि स्क्रीनचे वर्तन",
     "deviceSessionsSubtitle": "इतर डिव्हाइस तपासा आणि त्यांमधून साइन आउट करा",
     "feedback": "अभिप्राय",
     "privacyChoices": "गोपनीयतेचे पर्याय",
@@ -267,12 +267,12 @@
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
     "providerEnterpriseSso": "एंटरप्राइझ SSO",
-    "passkeysTitle": "पासकी",
+    "passkeysTitle": "पासक्या",
     "passkeysSubtitle": "पासवर्डशिवाय साइन इन करा",
     "passkeysEmpty": "अजून कोणतीही पासकी नाही",
     "passkeysEmptyHint": "$t(profile.addPasskey) करून पासवर्डशिवाय साइन इन करा.",
-    "passkeysCouldNotLoad": "पासकी लोड करता आल्या नाहीत",
-    "passkeysLoadFailed": "हे लोड होईपर्यंत पासकी उपलब्ध नाहीत.",
+    "passkeysCouldNotLoad": "पासक्या लोड करता आल्या नाहीत",
+    "passkeysLoadFailed": "हे लोड होईपर्यंत पासक्या उपलब्ध नाहीत.",
     "addPasskey": "पासकी जोडा",
     "passkeyDefaultName": "पासकी",
     "passkeyAddedOn": "{{date}} रोजी जोडले",
@@ -697,10 +697,10 @@
     },
     "connect": {
       "checkFailedTitle": "GitHub कनेक्शन तपासता आले नाही.",
-      "checkFailedMessage": "हे लोड होईपर्यंत तुम्ही साइन इन केले आहे का ते कळणार नाही.",
+      "checkFailedMessage": "GitHub शी कनेक्ट होऊ शकले नाही. इंटरनेट कनेक्शन तपासा आणि पुन्हा प्रयत्न करा.",
       "checkFailedTitleGitLab": "GitLab कनेक्शन तपासता आले नाही.",
       "checkFailedTitleBitbucket": "Bitbucket कनेक्शन तपासता आले नाही.",
-      "providerCheckFailedMessage": "हे लोड होईपर्यंत कनेक्शनची स्थिती उपलब्ध नाही.",
+      "providerCheckFailedMessage": "प्रदात्याशी कनेक्ट होऊ शकले नाही. इंटरनेट कनेक्शन तपासा आणि पुन्हा प्रयत्न करा.",
       "reconnectTitle": "GitHub पुन्हा कनेक्ट करा",
       "reconnectTitleGitLab": "GitLab पुन्हा कनेक्ट करा",
       "reconnectTitleBitbucket": "Bitbucket पुन्हा कनेक्ट करा",
@@ -903,7 +903,7 @@
     "category": {
       "chatMessagesSubtitle": "तुमच्या संभाषणांमधील उत्तरे",
       "agentAttentionTitle": "एजंटला तुमची गरज आहे",
-      "agentAttentionSubtitle": "प्रश्नांची उत्तरे, परवानगी किंवा माहिती आवश्यक",
+      "agentAttentionSubtitle": "प्रश्न, परवानगी किंवा माहिती आवश्यक",
       "agentUpdatesTitle": "एजंटकडून अपडेट",
       "agentUpdatesSubtitle": "काम सुरू असताना एजंटकडून येणारे संदेश",
       "sessionStatusTitle": "सत्राची स्थिती",
@@ -2575,6 +2575,7 @@
       "assistantContextOverflow": "हे संभाषण मॉडेलच्या मर्यादेपेक्षा मोठे आहे.",
       "assistantProviderError": "सेवा पुरवठादाराने त्रुटी दिली.",
       "assistantProviderRefused": "सेवा पुरवठादाराने ही विनंती नाकारली आणि ती पुन्हा प्रयत्न करता येणार नाही.",
+      "assistantCreditsRefusal": "Cloud Agent चालवण्यासाठी पुरेसे क्रेडिट नाहीत.",
       "assistantOutputLimit": "प्रतिसाद मॉडेलची आउटपुट मर्यादा गाठली.",
       "assistantStructuredOutput": "प्रतिसाद आवश्यक स्वरूपाशी जुळला नाही.",
       "assistantFailed": "प्रतिसाद तयार करता आला नाही."
@@ -3041,7 +3042,7 @@
     "scroll": "स्क्रोल"
   },
   "offline": {
-    "noInternet": "इंटरनेट कनेक्शन नाही.",
+    "noInternet": "इंटरनेट कनेक्शन नाही",
     "internetRestored": "इंटरनेट कनेक्शन पुन्हा सुरू झाले"
   },
   "queryError": {
@@ -3251,11 +3252,11 @@
       "noOrganization": "कोणतीही संस्था नाही",
       "noOrganizationDescription": "हे खाते कोणत्याही संस्थेचा भाग नाही. सदस्य आमंत्रणे आणि कमी शिल्लक सूचना यांसारखी संस्था वैशिष्ट्ये वापरण्यासाठी वेबवर संस्था तयार करा किंवा एकात सामील व्हा.",
       "openWebOrganizations": "वेबवर संस्था उघडा",
-      "organizationUnavailable": "संस्था उपलब्ध नाही.",
+      "organizationUnavailable": "संस्था उपलब्ध नाही",
       "selectDescriptionWithOrganizations": "तुम्ही एक किंवा अधिक संस्थांचे सदस्य आहात. ही स्क्रीन जे खाते वापरावे ते निवडा.",
       "selectOrganization": "संस्था निवडा",
-      "unavailableDescription": "ही संस्था आता उपलब्ध नाही. पुढे जाण्यासाठी तुमच्या प्रोफाइलमधून दुसरी संस्था निवडा.",
-      "unavailableSessionsDescription": "ही संस्था आता उपलब्ध नाही. तिचे सत्र लोड केले जू शकत नाहीत.",
+      "unavailableDescription": "ही संस्था आता उपलब्ध नाही. पुढे जाण्यासाठी खाते निवडण्याच्या सूचीतून दुसरे खाते निवडा.",
+      "unavailableSessionsDescription": "ही संस्था आता उपलब्ध नाही. तिचे सत्र लोड केले जाऊ शकत नाहीत.",
       "accessDeniedDescription": "तुम्हाला या संस्थेमध्ये प्रवेश नाही."
     },
     "creditActivity": {
@@ -3289,7 +3290,7 @@
       "alreadyMember": "ही व्यक्ती या संस्थेचा आधीच सदस्य आहे."
     },
     "invoices": {
-      "downloadA11y": "{{number}} क्रमांकाचे बिल डाउनलोड करा",
+      "downloadA11y": "बिल डाउनलोड करा: {{number}}",
       "emptyDescription": "प्रत्येक बिलिंग कालावधीत बिले आपोआप तयार होतात. तुमच्या संस्थेला बिल आकारल्यानंतर ते येथे दिसेल.",
       "emptyTitle": "बिले नाहीत",
       "invoiceFallback": "बिल",
@@ -3298,7 +3299,7 @@
       "sharingUnavailable": "या डिव्हाइसवर शेअर करण्याची सुविधा नाही.",
       "status": {
         "paid": "भरलेले",
-        "open": "उघडा",
+        "open": "उघडे",
         "void": "रद्द",
         "uncollectible": "वसूल करता न येणारे"
       },
@@ -3316,7 +3317,7 @@
       "saveEmailsError": "काही ईमेल पत्ते स्वीकारले गेले नाहीत. ते तपासा आणि पुन्हा प्रयत्न करा.",
       "saveError": "शिल्लक कमी झाल्याची सूचना जतन करता आली नाही.",
       "thresholdPlaceholder": "रक्कम द्या",
-      "thresholdError": "0 पेक्षा जास्त रक्कम द्या."
+      "thresholdError": "0 पेक्षा जास्त रक्कम द्या"
     },
     "memberLimit": {
       "limitLabel": "मर्यादा (प्रतिदिन USD)",
@@ -3340,7 +3341,7 @@
       "manageInvitationA11y": "{{email}} यांना पाठवलेले आमंत्रण व्यवस्थापित करा",
       "removeMember": "सदस्य काढा",
       "removeMemberMessage": "{{name}} यांना या संस्थेतून काढायचे?",
-      "revokeConfirm": "रद्द करा",
+      "revokeConfirm": "मागे घ्या",
       "revokeInvitation": "आमंत्रण रद्द करा",
       "revokeInvitationMessage": "{{email}} यांना पाठवलेले आमंत्रण रद्द करायचे?",
       "setDailyUsageLimit": "दररोजच्या वापराची मर्यादा ठरवा",
@@ -3384,7 +3385,7 @@
       "ended": "संपले",
       "notSubscribed": "सदस्यत्व घेतलेले नाही",
       "overallocated": "वाटप केलेल्या पासची संख्या खरेदी केलेल्या जागांपेक्षा जास्त आहे",
-      "paidSeat_one": "{{displayCount}} खरेदी केलेली जागा",
+      "paidSeat_one": "{{displayCount}} सशुल्क जागा",
       "paidSeat": "{{displayCount}} सशुल्क जागा",
       "paidSeat_other": "{{displayCount}} सशुल्क जागा",
       "paymentNeedsAttention": "पेमेंटची स्थिती तपासणे आवश्यक आहे",
@@ -3491,9 +3492,9 @@
       "searching": "वेब शोध",
       "thinking": "विचार करत आहे"
     },
-    "planOf": "पैकी",
+    "planProgress": "{{total}} पैकी {{done}}",
     "filesChanged": "फाइल्स बदलल्या",
-    "finishedIn": "पूर्ण झाले",
+    "finishedIn": "{{duration}} मध्ये पूर्ण झाले",
     "noActivityFor": "हालचाल नाही",
     "prOpened": "पुल रिक्वेस्ट उघडली",
     "permissionWants": "चालवायचे आहे",

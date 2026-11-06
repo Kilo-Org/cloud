@@ -727,10 +727,10 @@
     },
     "connect": {
       "checkFailedTitle": "Не атрымалася праверыць падключэнне да GitHub.",
-      "checkFailedMessage": "Стан уваходу недаступны, пакуль даныя не загрузяцца.",
+      "checkFailedMessage": "Не атрымалася звязацца з GitHub. Правер падключэнне і паспрабуй яшчэ раз.",
       "checkFailedTitleGitLab": "Не ўдалося праверыць падключэнне да GitLab",
       "checkFailedTitleBitbucket": "Не ўдалося праверыць падключэнне да Bitbucket",
-      "providerCheckFailedMessage": "Стан падключэння недаступны, пакуль гэта не загрузіцца.",
+      "providerCheckFailedMessage": "Не атрымалася звязацца з правайдэрам. Правер падключэнне і паспрабуй яшчэ раз.",
       "reconnectTitle": "Падключыць GitHub зноў",
       "reconnectTitleGitLab": "Падключыць GitLab зноў",
       "reconnectTitleBitbucket": "Падключыць Bitbucket зноў",
@@ -2667,6 +2667,7 @@
       "assistantContextOverflow": "Размова занадта доўгая для мадэлі.",
       "assistantProviderError": "Пастаўшчык вярнуў памылку.",
       "assistantProviderRefused": "Пастаўшчык адхіліў гэты запыт, і яго нельга паўтарыць.",
+      "assistantCreditsRefusal": "Недастаткова крэдытаў для запуску Cloud Agent.",
       "assistantOutputLimit": "Адказ дасягнуў максімальнай даўжыні вываду мадэлі.",
       "assistantStructuredOutput": "Адказ не адпавядае патрабаванаму фармату.",
       "assistantFailed": "Не ўдалося стварыць адказ."
@@ -3601,9 +3602,9 @@
       "searching": "Вэб-пошук",
       "thinking": "Абдумванне"
     },
-    "planOf": "з",
+    "planProgress": "{{done}} з {{total}}",
     "filesChanged": "файлаў зменена",
-    "finishedIn": "Завершана за",
+    "finishedIn": "Завершана за {{duration}}",
     "noActivityFor": "Няма актыўнасці за",
     "prOpened": "Запыт на зліццё адкрыты",
     "permissionWants": "Хоча запусціць",

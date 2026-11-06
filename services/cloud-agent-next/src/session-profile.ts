@@ -15,11 +15,12 @@ export function readProfileBundle(
 ): SessionProfileBundle {
   const profile = metadata.profile;
   if (!profile) return {};
-  const { runtimeSkills, runtimeAgents, runtimeInstructions, ...rest } = profile;
+  const { runtimeSkills, runtimeAgents, builtinAgents, runtimeInstructions, ...rest } = profile;
   return {
     ...rest,
     runtimeSkills: runtimeSkills ? [...runtimeSkills] : undefined,
     runtimeAgents: runtimeAgents ? [...runtimeAgents] : undefined,
+    ...(builtinAgents ? { builtinAgents: { ...builtinAgents } } : {}),
     runtimeInstructions: runtimeInstructions ? [...runtimeInstructions] : undefined,
   };
 }

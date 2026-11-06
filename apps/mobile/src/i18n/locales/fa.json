@@ -697,10 +697,10 @@
     },
     "connect": {
       "checkFailedTitle": "بررسی اتصال به GitHub ممکن نشد.",
-      "checkFailedMessage": "وضعیت ورود تا بارگذاری این بخش در دسترس نیست.",
+      "checkFailedMessage": "اتصال به GitHub برقرار نشد. اتصال خود را بررسی کنید و دوباره تلاش کنید.",
       "checkFailedTitleGitLab": "بررسی اتصال به GitLab ممکن نشد.",
       "checkFailedTitleBitbucket": "بررسی اتصال به Bitbucket ممکن نشد.",
-      "providerCheckFailedMessage": "وضعیت اتصال تا بارگذاری در دسترس نیست.",
+      "providerCheckFailedMessage": "اتصال به ارائه‌دهنده برقرار نشد. اتصال خود را بررسی کنید و دوباره تلاش کنید.",
       "reconnectTitle": "اتصال مجدد به GitHub",
       "reconnectTitleGitLab": "اتصال مجدد به GitLab",
       "reconnectTitleBitbucket": "اتصال مجدد به Bitbucket",
@@ -2581,6 +2581,7 @@
       "assistantContextOverflow": "گفت‌وگو برای این مدل بیش از حد طولانی است.",
       "assistantProviderError": "ارائه‌دهنده خطا برگرداند.",
       "assistantProviderRefused": "ارائه‌دهنده این درخواست را رد کرد و تلاش دوباره ممکن نیست.",
+      "assistantCreditsRefusal": "اعتبار کافی برای اجرای Cloud Agent وجود ندارد.",
       "assistantOutputLimit": "پاسخ به محدودیت خروجی مدل رسید.",
       "assistantStructuredOutput": "پاسخ با قالب مورد نیاز مطابقت نداشت.",
       "assistantFailed": "تولید پاسخ ناموفق بود."
@@ -3497,9 +3498,9 @@
       "searching": "جستجوی وب",
       "thinking": "در حال تفکر"
     },
-    "planOf": "از",
+    "planProgress": "{{done}} از {{total}}",
     "filesChanged": "فایل‌های تغییریافته",
-    "finishedIn": "تمام‌شده در",
+    "finishedIn": "تمام‌شده در {{duration}}",
     "noActivityFor": "بدون فعالیت برای",
     "prOpened": "پول ریکوئست باز شد",
     "permissionWants": "می‌خواهد اجرا کند",

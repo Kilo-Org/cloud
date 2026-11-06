@@ -2086,6 +2086,7 @@
       "assistantContextOverflow": "Переписка слишком длинная для этой модели.",
       "assistantProviderError": "Провайдер вернул ошибку.",
       "assistantProviderRefused": "Провайдер отклонил этот запрос, повторная попытка невозможна.",
+      "assistantCreditsRefusal": "Недостаточно кредитов для запуска Cloud Agent.",
       "assistantOutputLimit": "Ответ достиг ограничения длины ответа модели.",
       "assistantStructuredOutput": "Ответ не соответствует требуемому формату.",
       "assistantFailed": "Не удалось сформировать ответ."
@@ -2817,10 +2818,10 @@
     },
     "connect": {
       "checkFailedTitle": "Не удалось проверить подключение к GitHub.",
-      "checkFailedMessage": "Пока данные не загрузятся, статус входа будет недоступен.",
+      "checkFailedMessage": "Не удалось связаться с GitHub. Проверьте подключение и попробуйте снова.",
       "checkFailedTitleGitLab": "Не удалось проверить подключение к GitLab",
       "checkFailedTitleBitbucket": "Не удалось проверить подключение к Bitbucket",
-      "providerCheckFailedMessage": "Статус подключения недоступен до загрузки.",
+      "providerCheckFailedMessage": "Не удалось связаться с провайдером. Проверьте подключение и попробуйте снова.",
       "reconnectTitle": "Подключить GitHub снова",
       "reconnectTitleGitLab": "Подключить GitLab снова",
       "reconnectTitleBitbucket": "Подключить Bitbucket снова",
@@ -3601,9 +3602,9 @@
       "searching": "Веб-поиск",
       "thinking": "Обдумывание"
     },
-    "planOf": "из",
+    "planProgress": "{{done}} из {{total}}",
     "filesChanged": "файлов изменено",
-    "finishedIn": "Завершено за",
+    "finishedIn": "Завершено за {{duration}}",
     "noActivityFor": "Нет активности уже",
     "prOpened": "Pull request открыт",
     "permissionWants": "Хочет запустить",

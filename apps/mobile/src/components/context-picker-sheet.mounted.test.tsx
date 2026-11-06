@@ -124,6 +124,19 @@ function list(renderer: ReactTestRenderer) {
   return renderer.root.find(node => node.type === ScrollView);
 }
 
+/** The checked row's one-time reveal: it is the only row carrying `onLayout`. */
+function revealHandler(renderer: ReactTestRenderer) {
+  const [revealing, ...others] = renderer.root
+    .findAll(accountRow)
+    .filter(node => node.props.onLayout !== undefined);
+  expect(others).toHaveLength(0);
+  if (revealing === undefined) {
+    throw new Error('the checked account row must reveal itself');
+  }
+  expect(selectedState(revealing)).toBe(true);
+  return revealing.props.onLayout as (event: unknown) => void;
+}
+
 describe('ContextPickerSheet', () => {
   it('renders nothing while it is closed', async () => {
     const renderer = await mount({ visible: false });
@@ -185,30 +198,40 @@ describe('ContextPickerSheet', () => {
     expect(check[0]?.props.color).toBe(theme.colors.primary);
   });
 
-  it('brings the checked row into view, and never scrolls the list again', async () => {
+  it('leaves the list at its top when the checked row fits inside the cap', async () => {
     const renderer = await mount();
+    const layOut = revealHandler(renderer);
 
-    // A list capped at half the window hides the checked row below the fold
-    // when the account is far down it, and no visible row would mark the
-    // selection: the row the check belongs to is the one that reveals itself.
-    const [revealing, ...others] = renderer.root
-      .findAll(accountRow)
-      .filter(node => node.props.onLayout !== undefined);
-    expect(others).toHaveLength(0);
-    if (revealing === undefined) {
-      throw new Error('the checked account row must reveal itself');
-    }
-    expect(selectedState(revealing)).toBe(true);
-    const layOut = revealing.props.onLayout as (event: unknown) => void;
-
+    // Mocked window height 800 caps the list at 400. The checked row ends at
+    // 96, so it is already visible: scrolling it to the top would clip the row
+    // above it — the personal account — out of the sheet.
     act(() => {
-      layOut({ nativeEvent: { layout: { y: 48 } } });
+      layOut({ nativeEvent: { layout: { y: 48, height: 48 } } });
     });
-    expect(scrollTo).toHaveBeenCalledWith({ y: 48, animated: false });
+    expect(scrollTo).not.toHaveBeenCalled();
+
+    // The reveal is spent even when it changes nothing: a later layout pass
+    // must not scroll a list the user has scrolled.
+    act(() => {
+      layOut({ nativeEvent: { layout: { y: 0, height: 48 } } });
+    });
+    expect(scrollTo).not.toHaveBeenCalled();
+  });
+
+  it('reveals a checked row below the cap, and never scrolls the list again', async () => {
+    const renderer = await mount();
+    const layOut = revealHandler(renderer);
+
+    // 380 + 48 runs 28 past the 400 cap: the reveal stops at the row's bottom
+    // edge instead of pinning it to the top, so the rows above keep their room.
+    act(() => {
+      layOut({ nativeEvent: { layout: { y: 380, height: 48 } } });
+    });
+    expect(scrollTo).toHaveBeenCalledWith({ y: 28, animated: false });
 
     // A later layout pass must not yank the list the user has scrolled.
     act(() => {
-      layOut({ nativeEvent: { layout: { y: 0 } } });
+      layOut({ nativeEvent: { layout: { y: 0, height: 48 } } });
     });
     expect(scrollTo).toHaveBeenCalledTimes(1);
   });

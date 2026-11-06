@@ -2036,6 +2036,7 @@
       "assistantContextOverflow": "Het gesprek is te lang voor het model.",
       "assistantProviderError": "De aanbieder heeft een fout geretourneerd.",
       "assistantProviderRefused": "De aanbieder heeft dit verzoek afgewezen en het kan niet opnieuw worden geprobeerd.",
+      "assistantCreditsRefusal": "Je hebt onvoldoende tegoed om Cloud Agent te starten.",
       "assistantOutputLimit": "Het antwoord bereikte de uitvoerlimiet van het model.",
       "assistantStructuredOutput": "Het antwoord voldeed niet aan het vereiste formaat.",
       "assistantFailed": "Het genereren van het antwoord is mislukt."
@@ -2743,10 +2744,10 @@
     },
     "connect": {
       "checkFailedTitle": "De GitHub-verbinding kon niet worden gecontroleerd.",
-      "checkFailedMessage": "De aanmeldstatus is pas beschikbaar zodra het laden is voltooid.",
+      "checkFailedMessage": "GitHub kon niet worden bereikt. Controleer je verbinding en probeer het opnieuw.",
       "checkFailedTitleGitLab": "De GitLab-verbinding kon niet worden gecontroleerd.",
       "checkFailedTitleBitbucket": "De Bitbucket-verbinding kon niet worden gecontroleerd.",
-      "providerCheckFailedMessage": "De verbindingsstatus is pas beschikbaar zodra het laden is voltooid.",
+      "providerCheckFailedMessage": "De provider kon niet worden bereikt. Controleer je verbinding en probeer het opnieuw.",
       "reconnectTitle": "GitHub opnieuw verbinden",
       "reconnectTitleGitLab": "GitLab opnieuw verbinden",
       "reconnectTitleBitbucket": "Bitbucket opnieuw verbinden",
@@ -3491,9 +3492,9 @@
       "searching": "Webzoekopdracht",
       "thinking": "Nadenken"
     },
-    "planOf": "van",
+    "planProgress": "{{done}} van {{total}}",
     "filesChanged": "bestanden gewijzigd",
-    "finishedIn": "Voltooid in",
+    "finishedIn": "Voltooid in {{duration}}",
     "noActivityFor": "Geen activiteit gedurende",
     "prOpened": "Pull request geopend",
     "permissionWants": "Wil uitvoeren",

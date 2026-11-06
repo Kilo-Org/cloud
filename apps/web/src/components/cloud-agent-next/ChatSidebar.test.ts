@@ -199,12 +199,19 @@ function replaceSession(
   return sessions.map((session, i) => (i === index ? { ...session, ...overrides } : session));
 }
 
-function activeSession(session: StoredSession, status = 'idle') {
+function activeSession(
+  session: StoredSession,
+  status = 'idle',
+  organizationId: string | null = null
+) {
   return {
     id: session.sessionId,
     status,
     title: session.prompt,
     connectionId: 'test-connection',
+    // The router attributes every row it returns; `null` is the personal
+    // scope, and the sidebar filters live rows by it.
+    organizationId,
   };
 }
 
@@ -827,6 +834,26 @@ describe('ChatSidebar row rendering', () => {
       candidate => candidate.textContent === longTitle
     );
     expect(remoteTitle?.getAttribute('title')).toBe(longTitle);
+  });
+
+  it('scopes live rows to the organization the sidebar is showing', () => {
+    const sessions = makeSessions(2);
+    const personal = activeSession(sessions[0]!);
+    const organization = activeSession(sessions[1]!, 'idle', 'org-1');
+
+    // Personal view (no organization prop) keeps the personal row and leaves
+    // the organization row to the stored list.
+    renderSidebar({ sessions: [], activeSessions: [personal, organization] });
+    expect(dom.container.textContent).toContain(sessions[0]!.prompt);
+    expect(dom.container.textContent).not.toContain(sessions[1]!.prompt);
+
+    renderSidebar({
+      sessions: [],
+      organizationId: 'org-1',
+      activeSessions: [personal, organization],
+    });
+    expect(dom.container.textContent).toContain(sessions[1]!.prompt);
+    expect(dom.container.textContent).not.toContain(sessions[0]!.prompt);
   });
 
   it('updates the visible status of a live row without touching its siblings', () => {

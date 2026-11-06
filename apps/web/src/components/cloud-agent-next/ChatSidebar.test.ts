@@ -623,6 +623,7 @@ describe('ChatSidebar row rendering', () => {
       setFolderColor: jest.fn(async () => true),
       deleteFolder: jest.fn(async () => true),
       moveWorktree: jest.fn(async () => false),
+      moveSession: jest.fn(async () => false),
       reorderFolders: jest.fn(async () => true),
       refresh: jest.fn(async () => undefined),
     } satisfies NonNullable<ChatSidebarProps['workspaceFolders']>;
@@ -704,8 +705,50 @@ describe('ChatSidebar row rendering', () => {
     expect(workspaceFolders.reorderFolders).not.toHaveBeenCalled();
   });
 
+  it('drags a standalone ses_ row by its cloud workspace id', () => {
+    const { sessions, workspaceFolders, dataTransfer, dragEvent } = folderDragFixture();
+    const workspaceId = 'workspace_99999999-9999-4999-8999-999999999999';
+    const standalone = makeSession(3, {
+      prompt: 'Standalone cloud chat',
+      cloudAgentSessionId: workspaceId,
+    });
+    renderSidebar({ sessions: [...sessions, standalone], workspaceFolders });
+    const row = Array.from(dom.container.querySelectorAll<HTMLElement>('[draggable="true"]')).find(
+      element => element.textContent?.includes(standalone.prompt)
+    );
+    const folder = dom.container.querySelector('[data-folder-id]');
+    if (!row || !folder) throw new Error('Drag source or target missing');
+    row.getBoundingClientRect = () => ({ left: 10, top: 20, width: 200, height: 36 }) as DOMRect;
+
+    dragEvent(row, 'dragstart');
+    expect(dataTransfer.setData).toHaveBeenCalledWith(
+      'application/x-kilo-workspace-folder',
+      JSON.stringify({ type: 'session', id: workspaceId })
+    );
+    expect(dom.container.querySelectorAll('.opacity-50')).toHaveLength(1);
+
+    dragEvent(folder, 'dragover');
+    dragEvent(folder, 'drop');
+
+    expect(workspaceFolders.moveSession).toHaveBeenCalledTimes(1);
+    expect(workspaceFolders.moveSession).toHaveBeenCalledWith(
+      workspaceId,
+      workspaceFolders.folders[0].id
+    );
+    expect(workspaceFolders.moveSession).not.toHaveBeenCalledWith(
+      standalone.sessionId,
+      expect.anything()
+    );
+    expect(dom.container.querySelectorAll('.opacity-50')).toHaveLength(0);
+  });
+
   it('keeps immutable standalone rows flat when live inputs churn with stable callbacks', () => {
-    const sessions = makeSessions(SESSION_COUNT);
+    // Every row carries a cloud id so the drag props are defined; otherwise a
+    // per-row onDragStart identity leak would go unnoticed by this test.
+    const sessions = makeSessions(SESSION_COUNT).map((session, index) => ({
+      ...session,
+      cloudAgentSessionId: `workspace_00000000-0000-4000-8000-${index.toString().padStart(12, '0')}`,
+    }));
     const onOpenSession = jest.fn();
     const onDeleteSession = jest.fn();
     const onRenameSession = jest.fn(async () => undefined);

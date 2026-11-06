@@ -62,7 +62,7 @@ export const CreateHostedWorkspaceInput = z
     operationKey: z.uuid(),
     clientProvenance: z.literal('agent-manager'),
     repository: RepositoryInputSchema,
-    profile: RequiredProfileInput,
+    profile: RequiredProfileInput.optional(),
     message: z
       .object({
         prompt: z.string().min(1).max(Limits.MAX_PROMPT_LENGTH),

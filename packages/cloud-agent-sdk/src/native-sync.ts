@@ -537,12 +537,18 @@ export class NativeSyncClient {
     };
     let recovery: Recovery | undefined;
     let integrityError: string | undefined;
+    let failureError: string | undefined;
     let integrityGap = false;
     let remoteState: NativeEvent | undefined;
     const clearedIDs = new Set<string>();
     const publish = (patch: Partial<NativeSessionState>) => {
       if (closed) return;
-      state = { ...state, ...patch, ...(integrityError ? { error: integrityError } : {}) };
+      if ('error' in patch) failureError = patch.error;
+      const error =
+        integrityError && failureError && integrityError !== failureError
+          ? `${integrityError} ${failureError}`
+          : (integrityError ?? failureError);
+      state = { ...state, ...patch, error };
       listener(state);
     };
     const visible = (messages: NativeMessage[]) =>
@@ -571,7 +577,7 @@ export class NativeSyncClient {
     const markGap = () => {
       integrityGap = true;
       integrityError = 'Native transcript may be incomplete because live replay is unavailable.';
-      publish({ error: integrityError });
+      publish({});
     };
     const recoverIncomplete = (epoch: SocketEpoch) => {
       if (recovery || !epoch.current() || !state.messages.some(message => message.incomplete))
@@ -616,7 +622,7 @@ export class NativeSyncClient {
             }
             if (current.attempt >= 4) {
               integrityError = `Native transcript recovery is incomplete: ${reason(error)}`;
-              publish({ error: integrityError });
+              publish({});
               return;
             }
             continue;
@@ -648,7 +654,7 @@ export class NativeSyncClient {
           }
           if (current.attempt >= 4) {
             integrityError = 'Native transcript recovery is incomplete.';
-            publish({ error: integrityError });
+            publish({});
             return;
           }
         }
@@ -746,15 +752,20 @@ export class NativeSyncClient {
           recoverIncomplete(epoch);
       },
       (connection, error) => {
-        if (error === 'live_backlog_overflow' || error === 'live_frame_too_large') {
+        const backlog = error === 'live_backlog_overflow' || error === 'live_frame_too_large';
+        if (backlog) {
           if (lastSeq === undefined) integrityGap = true;
+          const exceeded =
+            error === 'live_frame_too_large'
+              ? 'live frame exceeded the size limit'
+              : 'live backlog exceeded the limit';
           integrityError = integrityGap
-            ? 'Native transcript may be incomplete because its live backlog exceeded the limit.'
-            : 'Native live backlog exceeded the limit. Recovering ordered replay.';
+            ? `Native transcript may be incomplete because its ${exceeded}.`
+            : `Native ${exceeded}. Recovering ordered replay.`;
         }
         publish({
           connection,
-          error,
+          error: backlog ? undefined : error,
           ...(connection !== 'connected' ? { runnerConnected: false } : {}),
         });
       }

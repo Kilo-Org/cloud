@@ -769,6 +769,9 @@ that missing volatile live effects reached durable storage. Consumers must rende
 that error alongside the transcript, including when `connection` is `connected`;
 the web native-session demo renders it as an alert. Recovery attempts are bounded,
 and exhausted incomplete snapshots report an error rather than claiming completeness.
+Specific authorization, deletion, and command failures appear alongside the integrity
+warning. An individual oversized frame reports its size limit separately from a
+combined backlog overflow.
 
 The intentionally minimal web demo is `/native-remote`, hidden unless the client-only
 PostHog flag `native-remote-web` is enabled. Its same-origin

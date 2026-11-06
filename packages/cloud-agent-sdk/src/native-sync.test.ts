@@ -706,7 +706,8 @@ test.each(['initial', 'recovery'])(
     socket.frame('hello', hello(), 3);
     await flush();
     if (mode === 'recovery') await jest.advanceTimersByTimeAsync(250);
-    socket.frame('reset_required', { seq: 9 }, 9);
+    if (mode === 'initial') socket.frame('reset_required', { seq: 9 }, 9);
+    expect(signal?.aborted).toBe(false);
     connection.close();
     const before = listener.mock.calls.length;
     const sent = socket.sent.length;
@@ -738,7 +739,8 @@ test.each([
   const socket = connectedSocket();
   socket.frame('hello', hello(), 3);
   await flush();
-  for (let seq = 4; seq < 12_004; seq++)
+  const offered = padding === 0 ? 12_000 : 300;
+  for (let seq = 4; seq < offered + 4; seq++)
     socket.frame('session.status', { padding: 'x'.repeat(padding) }, seq, 'events');
   expect(socket.readyState).toBe(3);
   expect(signal?.aborted).toBe(true);
@@ -761,7 +763,7 @@ test.each(['x'.repeat(262_144), '😀'.repeat(131_072)])(
     connectedSocket().frame('session.status', { padding }, 4, 'events');
     expect(connectedSocket().readyState).toBe(3);
     expect(state?.events).toHaveLength(0);
-    expect(state?.error).toContain('backlog');
+    expect(state?.error).toContain('frame exceeded the size limit');
     connection.close();
   }
 );
@@ -789,7 +791,8 @@ test.each([
     await flush();
     await jest.advanceTimersByTimeAsync(250);
     let accepted = 3;
-    for (let seq = 4; seq < 12_004; seq++) {
+    const offered = padding === 0 ? 12_000 : 300;
+    for (let seq = 4; seq < offered + 4; seq++) {
       socket.frame(
         'session.status',
         { syncPosition: 5, padding: 'x'.repeat(padding) },
@@ -903,4 +906,33 @@ test('projection shares untouched parts and preserves previous tool states', () 
   ]);
   expect(Array.isArray(result[0]?.content) && result[0].content[0]).toBe(parts[0]);
   expect(parts[1]?.state).toEqual({ status: 'running', input: 'old' });
+});
+
+test.each([
+  ['forbidden', () => new NativeSyncError('forbidden', 403)],
+  ['deleted', () => Object.assign(new Error('deleted'), { code: 'session_deleted' })],
+])('keeps a specific %s failure visible alongside an integrity gap', async (cause, failure) => {
+  snapshot.mockResolvedValue(complete(5));
+  const { client } = fixture();
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  await flush();
+  const socket = connectedSocket();
+  socket.frame('hello', hello(), 3);
+  await flush();
+  socket.frame('reset_required', { seq: 50 }, 50);
+  await flush();
+  socket.frame('error', { code: 'specific_command_failure' }, 50);
+  await flush();
+  expect(state?.error).toContain('incomplete');
+  expect(state?.error).toContain('specific_command_failure');
+  snapshot.mockRejectedValueOnce(failure());
+  socket.frame('reset_required', { seq: 60 }, 60);
+  await flush();
+  expect(state?.connection).toBe('disconnected');
+  expect(state?.error).toContain(cause);
+  expect(state?.error).toContain('incomplete');
+  connection.close();
 });

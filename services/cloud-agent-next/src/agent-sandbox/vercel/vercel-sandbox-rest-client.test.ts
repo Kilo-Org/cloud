@@ -806,6 +806,30 @@ describe('VercelSandboxRestClient', () => {
     expect(JSON.parse(init.body as string)).toEqual(policy);
   });
 
+  it('sends a forwardURL rule with the documented path, method, query and header matchers', async () => {
+    const providerFetch = vi.fn().mockResolvedValue(jsonResponse({ session: session() }));
+    const policy: VercelSandboxNetworkPolicy = {
+      allow: {
+        'worker.example.com': [
+          {
+            match: {
+              headers: [{ key: { exact: 'authorization' }, value: { exact: 'Bearer handle' } }],
+              path: { startsWith: '/api/' },
+              method: ['GET', 'POST'],
+              queryString: [{ key: { exact: 'batch' }, value: { regex: '^[0-9]+$' } }],
+            },
+            forwardURL: 'https://worker.example.com/runtime-credential-proxy/vercel/ses-abcdef',
+          },
+        ],
+        '*': [],
+      },
+    };
+
+    await clientFor(providerFetch).updateNetworkPolicy(sessionId, sandboxName, policy);
+
+    expect(JSON.parse(providerFetch.mock.calls[0][1].body as string)).toEqual(policy);
+  });
+
   it.each(['legacy-normalized', 'omitted'] as const)(
     'accepts %s policy readback after modern create and replacement requests',
     async readback => {

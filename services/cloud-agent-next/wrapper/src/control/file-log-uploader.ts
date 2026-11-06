@@ -12,6 +12,7 @@ import {
 import { createTarStream, type TarArchiveEntry } from '../log-uploader.js';
 import { logToFile, withTimeoutAndAbort } from '../utils.js';
 import { defaultHomeRoots } from '../control-plane/workspace-home.js';
+import type { ControlLogUploadCredentialSource } from './log-upload-auth.js';
 
 export type ControlFileLogUploader = {
   start: (intervalMs?: number) => void;
@@ -23,6 +24,8 @@ export type ControlFileLogUploader = {
 type Options = {
   uploadUrl?: string;
   uploadGrant?: string;
+  /** Shared rotating credential; takes precedence over the static grant. */
+  auth?: ControlLogUploadCredentialSource;
   wrapperLogPath?: string;
   /** Roots whose `<home>/.local/share/kilo/log` directories are archived. */
   homeRoots?: readonly string[];
@@ -199,14 +202,20 @@ export function createControlFileLogUploader(options: Options): ControlFileLogUp
   }
 
   function uploadNow(): Promise<void> {
-    if (finalUpload) return finalUpload;
+    return finalUpload ?? queueUpload();
+  }
+
+  function queueUpload(): Promise<void> {
     if (stopped) return Promise.resolve();
     if (queuedUpload) return queuedUpload.promise;
     const uploadUrl = options.uploadUrl;
-    const uploadGrant = options.uploadGrant;
-    if (!uploadUrl || !uploadGrant) return Promise.resolve();
+    const configured = options.auth !== undefined || options.uploadGrant !== undefined;
+    const available =
+      options.auth !== undefined
+        ? options.auth.current() !== undefined
+        : options.uploadGrant !== undefined;
+    if (!uploadUrl || !configured || !available) return Promise.resolve();
     const archiveUrl = `${uploadUrl.replace(/\/$/, '')}/${CONTROL_LOG_ARCHIVE_NAME}`;
-    const authorization = `Bearer ${uploadGrant}`;
 
     const previousUpload = activeUpload;
     const abort = new AbortController();
@@ -241,20 +250,45 @@ export function createControlFileLogUploader(options: Options): ControlFileLogUp
 
             const payload = new ArrayBuffer(body.byteLength);
             new Uint8Array(payload).set(body);
-            const response = await upload(archiveUrl, {
-              method: 'PUT',
-              headers: {
-                Authorization: authorization,
-                'Content-Type': 'application/gzip',
-                'Content-Length': String(payload.byteLength),
-              },
-              body: payload,
-              redirect: 'error',
-              signal: abort.signal,
-            });
+            // Read the shared owner only when the archive is ready to send: a
+            // queued upload must use the newest token, not the one captured
+            // before waiting for its predecessor.
+            let credentials = options.auth
+              ? options.auth.current()
+              : options.uploadGrant
+                ? { token: options.uploadGrant, expiresAt: Number.POSITIVE_INFINITY }
+                : undefined;
+            if (!credentials) return;
+            const put = (token: string) =>
+              upload(archiveUrl, {
+                method: 'PUT',
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                  'Content-Type': 'application/gzip',
+                  'Content-Length': String(payload.byteLength),
+                },
+                body: payload,
+                redirect: 'error',
+                signal: abort.signal,
+              });
+            let response = await put(credentials.token);
+            const replacement = options.auth?.current();
+            if (response.status === 401 && replacement && replacement.token !== credentials.token) {
+              void response.body?.cancel().catch(() => undefined);
+              abort.signal.throwIfAborted();
+              credentials = replacement;
+              response = await put(credentials.token);
+            }
             if (!abort.signal.aborted && response.status !== 204) {
               logToFile(`Control file log upload failed: ${response.status}`);
               reportFailure('http_rejection', response.status);
+              if (response.status === 401) {
+                // Rotation continues in the background; a late rejection for an
+                // already replaced token is ignored by the shared owner.
+                void options.auth?.rejected(credentials.token).catch(() => undefined);
+              } else if (response.status === 403) {
+                stop();
+              }
             } else if (!abort.signal.aborted) {
               // A 204 accepts the archive: the next failure starts a new episode.
               lastFailureSample = undefined;
@@ -292,7 +326,7 @@ export function createControlFileLogUploader(options: Options): ControlFileLogUp
     stop();
     stopped = false;
     finalUpload = undefined;
-    if (!options.uploadUrl || !options.uploadGrant) return;
+    if (!options.uploadUrl || (!options.auth && !options.uploadGrant)) return;
     void uploadNow();
     intervalId = setInterval(() => {
       if (!activeUpload && !queuedUpload) void uploadNow();
@@ -302,8 +336,25 @@ export function createControlFileLogUploader(options: Options): ControlFileLogUp
 
   function finalize(timeoutMs = FINAL_UPLOAD_TIMEOUT_MS): Promise<void> {
     if (finalUpload) return finalUpload;
+    if (stopped) return Promise.resolve();
     clearUploadInterval();
-    finalUpload = withTimeoutAndAbort(uploadNow(), {
+    const abort = new AbortController();
+    const uploadFinal = async (): Promise<void> => {
+      if (options.auth?.current() === undefined && options.auth?.waitForCurrent)
+        await options.auth.waitForCurrent(abort.signal);
+      if (!abort.signal.aborted) await queueUpload();
+      if (
+        !stopped &&
+        !abort.signal.aborted &&
+        options.auth?.current() === undefined &&
+        options.auth?.waitForCurrent
+      ) {
+        await options.auth.waitForCurrent(abort.signal);
+        if (!abort.signal.aborted && options.auth.current() !== undefined) await queueUpload();
+      }
+    };
+    finalUpload = withTimeoutAndAbort(uploadFinal(), {
+      signal: abort.signal,
       timeoutMs,
       timeoutMessage: 'Final control file log upload timed out',
       abortMessage: 'Final control file log upload aborted',
@@ -312,7 +363,10 @@ export function createControlFileLogUploader(options: Options): ControlFileLogUp
         reportFailure('timeout');
         logToFile('Final control file log upload timed out');
       })
-      .finally(stop);
+      .finally(() => {
+        abort.abort();
+        stop();
+      });
     return finalUpload;
   }
 

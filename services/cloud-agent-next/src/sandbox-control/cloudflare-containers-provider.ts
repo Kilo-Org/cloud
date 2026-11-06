@@ -270,6 +270,16 @@ export function createCloudflareContainersProviderAdapter(deps: {
         action: 'activity_timeout_renewal',
       });
     },
+    async rebindOutboundInterception(ref) {
+      if (decodeOwnedProviderRef(ref) === null) {
+        throw new ProviderCreationError('invalid_configuration');
+      }
+      await withDORetry(
+        () => deps.getContainer(deps.logicalSandboxId),
+        stub => stub.rebindOutboundInterception(ref),
+        'rebindSandboxContainersOutbound'
+      );
+    },
     async logs(ref) {
       const decoded = decodeCloudflareProviderRef(ref);
       if (decoded === null) return `cloudflare-containers ${ref}`;

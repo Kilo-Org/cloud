@@ -104,6 +104,10 @@ export function classifyControlPlaneFailure(
     case 'credential_upgrade_required':
     case 'repository_access_failed':
       return { stage: 'pre_dispatch', code: 'workspace_setup_failed' };
+    case 'credentials_expired':
+      return dispatchState === 'accepted'
+        ? POST_DISPATCH_WRAPPER_ERROR_BEFORE_ACTIVITY
+        : { stage: 'pre_dispatch', code: 'workspace_setup_failed' };
     case 'billing_blocked':
       return { stage: 'pre_dispatch', code: 'payment_required' };
     case 'container_limit_reached':

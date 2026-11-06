@@ -1,5 +1,10 @@
 import type { ControlPlaneSandboxPeer } from '../../../src/control-plane/session/session-do.js';
 import type { ControlRuntimeCredentialProxyFence } from '../../../src/control-plane/sandbox/sandbox-do.js';
+import {
+  sameRuntimeProxyOriginBinding,
+  type RuntimeCredentialProxyOrigin,
+  type RuntimeProxyControlBinding,
+} from '../../../src/runtime-credential-proxy-origin.js';
 import type { PreviewTargetResult } from '../../../src/control-plane/sandbox/preview-target.js';
 import type { SandboxStatusSnapshot } from '../../../src/shared/sandbox-status.js';
 import type { WorkspaceBillingProjection } from '../../../src/shared/workspace-runtime-status.js';
@@ -9,6 +14,8 @@ import type {
   ControlPlaneDeliverResult,
   ControlPlanePrepareInput,
   ControlPlaneRouteView,
+  ControlPlaneSessionControlInput,
+  ControlPlaneSessionControlResult,
 } from '../../../src/shared/control-plane-protocol.js';
 
 /**
@@ -60,6 +67,13 @@ export class FakeSandboxPeer implements ControlPlaneSandboxPeer {
   deliverResults: ControlPlaneDeliverResult[] = [];
   readonly prepareCalls: ControlPlanePrepareInput[] = [];
   readonly deliverCalls: ControlPlaneDeliverPayload[] = [];
+  readonly sessionControlCalls: ControlPlaneSessionControlInput[] = [];
+  sessionControlResult: ControlPlaneSessionControlResult = {
+    type: 'coverage',
+    coveredMessageIds: [],
+  };
+  sessionControlResults: ControlPlaneSessionControlResult[] = [];
+  sessionControlError: Error | null = null;
   readonly abortCalls: string[] = [];
   readonly answerCalls: ControlPlaneAnswerPayload[] = [];
 
@@ -88,6 +102,22 @@ export class FakeSandboxPeer implements ControlPlaneSandboxPeer {
     return 'sent';
   }
 
+  async sessionControl(
+    input: ControlPlaneSessionControlInput
+  ): Promise<{ ok: true; result: ControlPlaneSessionControlResult }> {
+    this.sessionControlCalls.push(input);
+    if (this.sessionControlError !== null) throw this.sessionControlError;
+    const queued = this.sessionControlResults.shift();
+    if (queued !== undefined) return { ok: true, result: queued };
+    return {
+      ok: true,
+      result:
+        input.action === 'abandon'
+          ? { type: 'abandon', outcome: 'absent', cleanedMessageIds: [] }
+          : this.sessionControlResult,
+    };
+  }
+
   async answer(payload: ControlPlaneAnswerPayload): Promise<'sent'> {
     this.answerCalls.push(payload);
     return 'sent';
@@ -103,6 +133,41 @@ export class FakeSandboxPeer implements ControlPlaneSandboxPeer {
 
   async getRuntimeCredentialProxyFence(): Promise<ControlRuntimeCredentialProxyFence | null> {
     return this.runtimeCredentialProxyFence;
+  }
+
+  /** Binding snapshot returned by origin admission; null denies. */
+  runtimeProxyOriginBinding: RuntimeProxyControlBinding | null = null;
+  runtimeProxyOriginAdmissionError: Error | null = null;
+  runtimeProxyOriginBindingAdmissionError: Error | null = null;
+  /** Forces the post-resolution binding admission result. */
+  runtimeProxyOriginBindingAdmissionResult: boolean | null = null;
+  readonly runtimeProxyOriginAdmissionCalls: RuntimeCredentialProxyOrigin[] = [];
+  readonly runtimeProxyOriginBindingAdmissionCalls: Array<{
+    origin: RuntimeCredentialProxyOrigin;
+    expected: RuntimeProxyControlBinding;
+  }> = [];
+
+  async admitRuntimeProxyOrigin(input: {
+    origin: RuntimeCredentialProxyOrigin;
+  }): Promise<RuntimeProxyControlBinding | null> {
+    this.runtimeProxyOriginAdmissionCalls.push(input.origin);
+    if (this.runtimeProxyOriginAdmissionError !== null) throw this.runtimeProxyOriginAdmissionError;
+    return this.runtimeProxyOriginBinding;
+  }
+
+  async admitRuntimeProxyOriginBinding(input: {
+    origin: RuntimeCredentialProxyOrigin;
+    expected: RuntimeProxyControlBinding;
+  }): Promise<boolean> {
+    this.runtimeProxyOriginBindingAdmissionCalls.push(input);
+    if (this.runtimeProxyOriginBindingAdmissionError !== null)
+      throw this.runtimeProxyOriginBindingAdmissionError;
+    if (this.runtimeProxyOriginBindingAdmissionResult !== null)
+      return this.runtimeProxyOriginBindingAdmissionResult;
+    return (
+      this.runtimeProxyOriginBinding !== null &&
+      sameRuntimeProxyOriginBinding(this.runtimeProxyOriginBinding, input.expected)
+    );
   }
 
   /** The synthetic peer never has an accepted scope handle. */

@@ -10,6 +10,8 @@ import {
 } from '../../../src/shared/control-plane-runtime-contract.js';
 import {
   CONTROL_PLANE_PROTOCOL_VERSION,
+  CONTROL_PLANE_TURN_COVERAGE_HEADER,
+  CONTROL_PLANE_TURN_COVERAGE_VERSION,
   controlPlaneWrapperFrameSchema,
   type ControlPlaneWrapperFrame,
 } from '../../../src/shared/control-plane-protocol.js';
@@ -67,6 +69,9 @@ type WebSocketWithHeadersCtor = new (
 
 export type ControlPlaneHeartbeat = { active: boolean; degraded: boolean; workspaceBusy?: boolean };
 
+/** What the current Worker welcome acknowledged beyond the base protocol. */
+export type ControlPlaneConnectedCapabilities = { turnCoverage: boolean };
+
 /** The live connection phase, derived from the shared tuple so it cannot drift. */
 export type ControlPlaneConnectionPhase = NativeConnectionPhase;
 
@@ -89,7 +94,7 @@ export type ControlPlaneConnectionOptions = {
   getHeartbeat?: () => ControlPlaneHeartbeat;
   onFrame?: (frame: ControlPlaneWrapperFrame) => void;
   onShutdown?: (reason: string | undefined) => void;
-  onConnected?: () => void;
+  onConnected?: (capabilities: ControlPlaneConnectedCapabilities) => void;
   onDisconnected?: (reason: string) => void;
   random?: () => number;
   outboxMaxFrames?: number;
@@ -396,7 +401,7 @@ export function createControlPlaneConnection(
       disconnectEpisodeReported = false;
       attempt = 0;
       startHeartbeat(target, frame.heartbeatAck === true, frame.workspaceSnapshots === true);
-      options.onConnected?.();
+      options.onConnected?.({ turnCoverage: frame.turnCoverage === true });
       return;
     }
     if (frame.type === 'heartbeat_ack') {
@@ -429,6 +434,7 @@ export function createControlPlaneConnection(
           ...(options.runtimeVersions
             ? { [WRAPPER_VERSION_HEADER]: options.runtimeVersions.wrapperVersion }
             : {}),
+          [CONTROL_PLANE_TURN_COVERAGE_HEADER]: CONTROL_PLANE_TURN_COVERAGE_VERSION,
         },
       });
     } catch (error) {

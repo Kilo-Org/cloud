@@ -118,29 +118,36 @@ export type VercelSandboxRoute = z.infer<typeof routeSchema>;
 export type VercelSandboxCommand = z.infer<typeof commandSchema>;
 export type VercelSandboxSnapshot = z.infer<typeof snapshotSchema>;
 
-export type VercelSandboxMatcher = { exact: string } | { startsWith: string };
+export type VercelSandboxMatcher = { exact: string } | { startsWith: string } | { regex: string };
 
-export type VercelSandboxInjectionRule = {
-  domain: string;
-  headers: Record<string, string>;
-  match: {
-    headers: Array<{ key: { exact: string }; value: { exact: string } }>;
-    path?: VercelSandboxMatcher;
-    method?: string[];
-  };
+export type VercelSandboxKeyValueMatcher = {
+  key?: VercelSandboxMatcher;
+  value?: VercelSandboxMatcher;
 };
 
+export type VercelSandboxMatch = {
+  headers?: VercelSandboxKeyValueMatcher[];
+  path?: VercelSandboxMatcher;
+  method?: string[];
+  queryString?: VercelSandboxKeyValueMatcher[];
+};
+
+export type VercelSandboxTransformRule = {
+  match?: VercelSandboxMatch;
+  transform: Array<{ headers: Record<string, string> }>;
+  forwardURL?: never;
+};
+
+export type VercelSandboxForwardRule = {
+  match?: VercelSandboxMatch;
+  forwardURL: string;
+  transform?: never;
+};
+
+export type VercelSandboxRule = VercelSandboxTransformRule | VercelSandboxForwardRule;
+
 export type VercelSandboxNetworkPolicy = {
-  allow: Record<
-    string,
-    Array<
-      | {
-          match: VercelSandboxInjectionRule['match'];
-          transform: Array<{ headers: Record<string, string> }>;
-        }
-      | { forwardURL: string }
-    >
-  >;
+  allow: Record<string, VercelSandboxRule[]>;
 };
 
 export type VercelSandboxRestClientConfig = {

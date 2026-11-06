@@ -67,6 +67,7 @@ function fakeRuntime(client: Harness): KiloRuntime {
     ensure: async () => client,
     installCredentials: async () => undefined,
     applyPendingCredentials: async () => false,
+    recoverAbandonedAbort: async () => false,
     sessionState: () => undefined,
     refreshActivity: async () => undefined,
     needsCompute: () => false,

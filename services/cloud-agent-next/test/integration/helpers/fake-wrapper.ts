@@ -12,6 +12,8 @@ import {
 import { SELF } from 'cloudflare:test';
 import {
   CONTROL_PLANE_PROTOCOL_VERSION,
+  CONTROL_PLANE_TURN_COVERAGE_HEADER,
+  CONTROL_PLANE_TURN_COVERAGE_VERSION,
   controlPlaneWrapperFrameSchema,
   type ControlPlaneWrapperFrame,
 } from '../../../src/shared/control-plane-protocol.js';
@@ -26,6 +28,7 @@ export type FakeWrapperConnectInput = {
   runtimeHarness?: string;
   kiloCliVersion?: string;
   wrapperVersion?: string;
+  turnCoverage?: boolean;
 };
 
 export type FakeWrapperHelloInput = {
@@ -108,6 +111,9 @@ export class FakeWrapper {
         ...(input.wrapperVersion === undefined
           ? {}
           : { [WRAPPER_VERSION_HEADER]: input.wrapperVersion }),
+        ...(input.turnCoverage
+          ? { [CONTROL_PLANE_TURN_COVERAGE_HEADER]: CONTROL_PLANE_TURN_COVERAGE_VERSION }
+          : {}),
       },
     });
     if (response.status !== 101 || !response.webSocket) {

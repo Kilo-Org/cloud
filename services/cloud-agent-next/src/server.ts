@@ -51,33 +51,11 @@ import { registerControlLogRoutes } from './sandbox-control/log-routes.js';
 import { registerEnvironmentBuildRoutes } from './environment-build/routes.js';
 import {
   runtimeCredentialProxyFacadeBaseUrl,
-  runtimeCredentialProxyUpstream,
-  type RuntimeProxyHandleClaims,
   verifyRuntimeCredentialProxyHandle,
 } from './runtime-credential-proxy.js';
-import {
-  logRuntimeProxyRequestFailed,
-  readUpstreamFailureEvidence,
-} from './runtime-credential-proxy-diagnostics.js';
-import { deriveKiloSandboxTargets, deriveLoopbackFacadeTargets } from './kilo/kilo-targets.js';
-import {
-  inferRuntimeCredentialProxyRoute,
-  resolveRuntimeCredentialProxyScopeIngestRoute,
-  resolveRuntimeCredentialProxyScopedIngestRoute,
-  type RuntimeCredentialProxyRoute,
-} from './kilo/runtime-credential-proxy-routes.js';
-import { readBoundedBody } from './utils/read-bounded-body.js';
-import {
-  encodeCloudAgentSessionScopeV2ViewHeaders,
-  forwardCloudAgentSessionScopeRequest,
-  forwardCloudAgentSessionScopeV2Request,
-} from './cloud-agent-session-scope-proxy.js';
-import type { ScopeGrantView } from './control-plane/sandbox/scope-view.js';
-import {
-  issueRuntimeProxyAttestation,
-  RUNTIME_PROXY_ATTESTATION_HEADER,
-  type RuntimeProxyAttestationAudience,
-} from '@kilocode/worker-utils/runtime-proxy-attestation';
+import { runtimeProxyOriginRequiredResponse } from './runtime-credential-proxy-forwarding.js';
+import { registerVercelRuntimeCredentialProxyRoute } from './runtime-credential-proxy-vercel.js';
+import { inferRuntimeCredentialProxyRoute } from './kilo/runtime-credential-proxy-routes.js';
 import { TRPCError } from '@trpc/server';
 import {
   readWidgetApprovalKey,
@@ -262,6 +240,11 @@ app.use('*', async (c: Context<HonoContext>, next: Next) => {
   });
 });
 
+// Vercel policy forwards sandbox traffic here with the sandbox OIDC proof.
+// Register before the broad facade middleware so its exact-authority route is
+// never mistaken for a public compatibility facade.
+registerVercelRuntimeCredentialProxyRoute(app);
+
 // Kilo 7.4.20 and current releases both append their own `/api/...` route to
 // configured targets. Only a verified opaque handle may turn that otherwise
 // ordinary Worker path into a facade request.
@@ -270,13 +253,14 @@ app.use('*', async (c: Context<HonoContext>, next: Next) => {
     ? runtimeCredentialProxyFacadeBaseUrl(c.env.WORKER_URL)
     : null;
   if (!facadeBase) return next();
-  const facadePath = new URL(facadeBase).pathname.replace(/\/+$/, '');
-  const requestPath = new URL(c.req.url).pathname;
+  const facadeUrl = new URL(facadeBase);
+  const facadePath = facadeUrl.pathname.replace(/\/+$/, '');
+  const requestUrl = new URL(c.req.url);
   const path = facadePath
-    ? requestPath.startsWith(`${facadePath}/`)
-      ? requestPath.slice(facadePath.length)
+    ? requestUrl.pathname.startsWith(`${facadePath}/`)
+      ? requestUrl.pathname.slice(facadePath.length)
       : null
-    : requestPath;
+    : requestUrl.pathname;
   if (!path) return next();
   // This route remains available for already-issued configurations. A prefixed
   // deployment never supported it because Hono registers the legacy route at
@@ -286,9 +270,12 @@ app.use('*', async (c: Context<HonoContext>, next: Next) => {
   if (!handle) return next();
   const claims = await verifyRuntimeCredentialProxyHandle(c.env, handle);
   if (!claims) return next();
+  if (requestUrl.origin !== facadeUrl.origin) return runtimeProxyOriginRequiredResponse();
   const route = inferRuntimeCredentialProxyRoute(path);
   if (!route) return c.text('Not found', 404);
-  return forwardRuntimeCredentialProxy(c, handle, claims, route, path);
+  // A bearer handle alone is not an origin proof. Only a signed provider
+  // adapter may forward, so the public facade always fails closed.
+  return runtimeProxyOriginRequiredResponse();
 });
 
 registerVercelScmBrokerRoute(app);
@@ -453,230 +440,8 @@ function runtimeProxyAuthorization(request: Request): string | null {
   return match?.[1] ?? null;
 }
 
-function runtimeProxyHeaders(request: Request, token: string, organizationId?: string): Headers {
-  const headers = new Headers(request.headers);
-  for (const name of [
-    'Authorization',
-    'X-API-Key',
-    'API-Key',
-    'X-Auth-Token',
-    'Cookie',
-    'Host',
-    'Connection',
-    'Proxy-Connection',
-    'Keep-Alive',
-    'Proxy-Authenticate',
-    'Proxy-Authorization',
-    'TE',
-    'Trailer',
-    'Transfer-Encoding',
-    'Upgrade',
-    'X-Kilocode-OrganizationId',
-  ]) {
-    headers.delete(name);
-  }
-  const attributionHeaders = new Set([
-    'x-kilocode-feature',
-    'x-kilocode-editorname',
-    'x-kilocode-mode',
-    'x-kilocode-machineid',
-    'x-kilocode-taskid',
-    'x-kilocode-projectid',
-    'x-kilocode-version',
-    'x-kilo-session',
-    'x-kilo-request',
-  ]);
-  for (const name of [...headers.keys()]) {
-    if (
-      name.startsWith('proxy-') ||
-      name.startsWith('x-forwarded-') ||
-      name.startsWith('x-internal-') ||
-      ((name.startsWith('x-kilo-') || name.startsWith('x-kilocode-')) &&
-        !attributionHeaders.has(name)) ||
-      name === 'forwarded' ||
-      name === 'x-real-ip' ||
-      name === 'x-kilocode-organizationid'
-    ) {
-      headers.delete(name);
-    }
-  }
-  headers.set('Authorization', `Bearer ${token}`);
-  if (organizationId) headers.set('X-Kilocode-OrganizationId', organizationId);
-  return headers;
-}
-
-function sanitizeRuntimeProxyResponse(response: Response): Response {
-  const headers = new Headers(response.headers);
-  for (const name of [
-    'Set-Cookie',
-    'Connection',
-    'Proxy-Connection',
-    'Keep-Alive',
-    'Proxy-Authenticate',
-    'Proxy-Authorization',
-    'TE',
-    'Trailer',
-    'Transfer-Encoding',
-    'Upgrade',
-  ]) {
-    headers.delete(name);
-  }
-  headers.delete(RUNTIME_PROXY_ATTESTATION_HEADER);
-  return new Response(response.body, {
-    status: response.status,
-    statusText: response.statusText,
-    headers,
-  });
-}
-
-async function routeRuntimeCredentialProxy(c: Context<HonoContext>): Promise<Response> {
-  const handle = runtimeProxyAuthorization(c.req.raw);
-  if (!handle) return c.text('Unauthorized', 401);
-  const claims = await verifyRuntimeCredentialProxyHandle(c.env, handle);
-  if (!claims) return c.text('Unauthorized', 401);
-  const route = c.req.param('route');
-  const prefix = `/api/runtime-credential-proxy/${route}/`;
-  const requestPath = new URL(c.req.url).pathname;
-  if (!requestPath.startsWith(prefix)) return c.text('Not found', 404);
-  const path = `/${requestPath.slice(prefix.length).replace(/^\/+/, '')}`;
-  if (route !== 'backend' && route !== 'provider' && route !== 'ingest' && route !== 'exa')
-    return c.text('Not found', 404);
-  return forwardRuntimeCredentialProxy(c, handle, claims, route, path);
-}
-
-async function forwardRuntimeCredentialProxy(
-  c: Context<HonoContext>,
-  handle: string,
-  claims: RuntimeProxyHandleClaims,
-  route: RuntimeCredentialProxyRoute,
-  path: string
-): Promise<Response> {
-  if (!claims || !isControlSession(claims.sessionId)) return c.text('Unauthorized', 401);
-  let bodyText: string | undefined;
-  if (route === 'ingest' && path === '/api/session' && c.req.method === 'POST') {
-    bodyText = (await readBoundedBody(c.req.raw, 8192)) ?? undefined;
-    if (bodyText === undefined) return c.text('Not found', 404);
-  }
-  let credential: {
-    token: string;
-    organizationId?: string;
-    runtimeAuthorization: { userId: string; authorizationId: string; resourceId: string };
-    scopeView?: ScopeGrantView;
-  } | null;
-  try {
-    credential = await withDORetry(
-      () => getSandboxSessionStub(c.env, claims.userId, claims.sessionId),
-      session => session.resolveRuntimeCredentialProxyGrant(handle),
-      'resolveRuntimeCredentialProxyGrant'
-    );
-  } catch {
-    return c.text('Credential unavailable', 503);
-  }
-  if (!credential) return c.text('Unauthorized', 401);
-  const derivedTargets = deriveKiloSandboxTargets(c.env, credential.token, { requireHttps: true });
-  const targets = derivedTargets.success
-    ? derivedTargets.targets
-    : deriveLoopbackFacadeTargets(c.env);
-  if (!targets) return c.text('Not found', 404);
-
-  const search = new URL(c.req.url).search;
-  const scopeView = route === 'ingest' ? credential.scopeView : undefined;
-  let scopedV1 = false;
-  let scopedV2Headers: Record<string, string> | null = null;
-  let upstream: URL | null;
-  if (scopeView !== undefined) {
-    const adopted = resolveRuntimeCredentialProxyScopeIngestRoute({
-      targets: targets,
-      route,
-      method: c.req.method,
-      pathname: path,
-      search,
-      memberRootKiloSessionIds: scopeView.memberRootKiloSessionIds,
-      organizationId: credential.organizationId,
-      contentType: c.req.header('content-type'),
-      bodyText,
-    });
-    if (adopted === null) return c.text('Not found', 404);
-    upstream = adopted.upstream;
-    if (adopted.kind === 'scoped') {
-      const v2Headers = encodeCloudAgentSessionScopeV2ViewHeaders(scopeView);
-      if (v2Headers === null) return c.text('Credential unavailable', 503);
-      scopedV2Headers = v2Headers;
-    }
-  } else {
-    const scopedUpstream = resolveRuntimeCredentialProxyScopedIngestRoute({
-      targets: targets,
-      route,
-      method: c.req.method,
-      pathname: path,
-      search,
-      kiloSessionId: claims.kiloSessionId,
-      organizationId: credential.organizationId,
-      contentType: c.req.header('content-type'),
-      bodyText,
-    });
-    scopedV1 = scopedUpstream !== null;
-    upstream =
-      scopedUpstream ??
-      runtimeCredentialProxyUpstream(
-        targets,
-        route,
-        c.req.method,
-        path,
-        search,
-        claims.kiloSessionId,
-        credential.organizationId,
-        c.req.header('content-type'),
-        bodyText
-      );
-  }
-  if (!upstream) return c.text('Not found', 404);
-  try {
-    // The route allowlist is resolved above before a proof is issued.
-    const audience: RuntimeProxyAttestationAudience =
-      route === 'backend' ? 'kilo-api' : route === 'ingest' ? 'session-ingest' : 'kilo-gateway';
-    const proof = await issueRuntimeProxyAttestation({
-      secret: await resolveSecret(c.env.NEXTAUTH_SECRET).then(value => {
-        if (!value) throw new Error('Authentication unavailable');
-        return value;
-      }),
-      audience,
-      bearer: credential.token,
-      ...credential.runtimeAuthorization,
-    });
-    const headers = runtimeProxyHeaders(c.req.raw, credential.token, credential.organizationId);
-    headers.set(RUNTIME_PROXY_ATTESTATION_HEADER, proof);
-    const request = createSanitizedForwardRequest(c.req.raw, upstream, headers, bodyText);
-    const response =
-      scopedV2Headers !== null
-        ? await forwardCloudAgentSessionScopeV2Request(request, c.env, {
-            authorization: `Bearer ${credential.token}`,
-            scopeHeaders: scopedV2Headers,
-            runtimeProxyAttestation: proof,
-          })
-        : scopedV1
-          ? await forwardCloudAgentSessionScopeRequest(request, c.env, {
-              authorization: `Bearer ${credential.token}`,
-              sessionIngestScope: {
-                cloudAgentSessionId: claims.sessionId,
-                rootKiloSessionId: claims.kiloSessionId,
-              },
-              runtimeProxyAttestation: proof,
-            })
-          : await fetch(request, { redirect: 'manual' });
-    if (!response.ok) {
-      logRuntimeProxyRequestFailed({
-        upstreamAttempted: true,
-        upstreamStatus: response.status,
-        evidence: await readUpstreamFailureEvidence(response),
-        sessionId: claims.sessionId,
-        kiloSessionId: claims.kiloSessionId,
-      });
-    }
-    return sanitizeRuntimeProxyResponse(response);
-  } catch {
-    return c.text('Upstream unavailable', 502);
-  }
+async function routeRuntimeCredentialProxy(_c: Context<HonoContext>): Promise<Response> {
+  return runtimeProxyOriginRequiredResponse();
 }
 
 function stripPublicCredentialHeaders(headers: Headers): Headers {

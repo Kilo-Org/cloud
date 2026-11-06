@@ -1,8 +1,13 @@
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import { handleManagedScmOutbound } from '../sandbox-outbound.js';
+import {
+  forwardRuntimeCredentialProxy,
+  matchRuntimeCredentialProxyRequest,
+} from '../runtime-credential-proxy-forwarding.js';
 import { withDORetry } from '../utils/do-retry.js';
 import { EgressAuditRequestSchema } from '../shared/egress-audit.js';
 import { isAllowedEgressUrl, nativeEgressAllowlistSchema } from './egress-policy.js';
+import type { Env } from '../types.js';
 
 export type ContainersOutboundProps = {
   containerId: string;
@@ -11,7 +16,12 @@ export type ContainersOutboundProps = {
   allocationRef?: string;
 };
 
-export class ContainersOutbound extends WorkerEntrypoint<Cloudflare.Env, ContainersOutboundProps> {
+type ContainersOutboundEnv = Env & Cloudflare.Env;
+
+export class ContainersOutbound extends WorkerEntrypoint<
+  ContainersOutboundEnv,
+  ContainersOutboundProps
+> {
   async fetch(request: Request): Promise<Response> {
     const { containerId, egressAllowlist, egressAudit, allocationRef } = this.ctx.props;
     if (
@@ -67,6 +77,15 @@ export class ContainersOutbound extends WorkerEntrypoint<Cloudflare.Env, Contain
       }
     }
     if (!allowed) return new Response('Egress destination disallowed', { status: 403 });
+    const runtimeRequest = await matchRuntimeCredentialProxyRequest(request, this.env);
+    if (runtimeRequest !== null) {
+      if (!allocationRef) return new Response('Runtime origin unavailable', { status: 502 });
+      return forwardRuntimeCredentialProxy(request, this.env, runtimeRequest, {
+        type: 'cloudflare-containers',
+        containerId,
+        allocationRef,
+      });
+    }
     if (egressAudit === true || policy.data !== undefined) {
       const headers = new Headers(request.headers);
       if (policy.data !== undefined) headers.set('Host', url.host);

@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { Env } from '../types.js';
 
 vi.mock('cloudflare:workers', () => ({
   WorkerEntrypoint: class {
@@ -15,10 +16,12 @@ vi.mock('../sandbox-outbound.js', () => ({
 import { handleManagedScmOutbound } from '../sandbox-outbound.js';
 import { ContainersOutbound, type ContainersOutboundProps } from './containers-outbound.js';
 
-function outbound(props: ContainersOutboundProps, env: Partial<Cloudflare.Env> = {}) {
+type OutboundEnv = Env & Cloudflare.Env;
+
+function outbound(props: ContainersOutboundProps, env: Partial<OutboundEnv> = {}) {
   return new ContainersOutbound(
     { props } as ExecutionContext<ContainersOutboundProps>,
-    env as Cloudflare.Env
+    env as OutboundEnv
   );
 }
 
@@ -31,7 +34,7 @@ function auditFixture() {
   const recordEgressRequest = vi.fn(async (_input: unknown) => undefined);
   const get = vi.fn(() => ({ recordEgressRequest }));
   const idFromString = vi.fn((id: string) => id);
-  const env = { SANDBOX_CONTAINERS: { get, idFromString } } as unknown as Cloudflare.Env;
+  const env = { SANDBOX_CONTAINERS: { get, idFromString } } as unknown as OutboundEnv;
   const props = {
     containerId: 'container-1',
     allocationRef: 'allocation-1',
@@ -336,7 +339,7 @@ describe('ContainersOutbound egress enforcement', () => {
       {
         props: { containerId: 'container-1', egressAllowlist: [] },
       } as unknown as ExecutionContext<ContainersOutboundProps>,
-      { EGRESS_ALLOWLIST: 'example.com' } as unknown as Cloudflare.Env
+      { EGRESS_ALLOWLIST: 'example.com' } as unknown as OutboundEnv
     );
     const response = await worker.fetch(
       new Request('https://example.com/', {

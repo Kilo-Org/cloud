@@ -11,6 +11,8 @@ import { describe, expect, it } from 'bun:test';
 import { z } from 'zod';
 import {
   CONTROL_PLANE_PROTOCOL_VERSION,
+  CONTROL_PLANE_TURN_COVERAGE_HEADER,
+  CONTROL_PLANE_TURN_COVERAGE_VERSION,
   type ControlPlaneHelloFrame,
   type ControlPlaneWrapperFrame,
 } from '../../../src/shared/control-plane-protocol.js';
@@ -188,6 +190,9 @@ it('advertises worktree support without changing the strict legacy hello', () =>
     expect(socket.options?.headers?.[WORKTREE_RUNTIME_HEADER]).toBe(WORKTREE_RUNTIME_VERSION);
     expect(socket.options?.headers?.[WORKSPACE_CONFIGURATION_HEADER]).toBe(
       WORKSPACE_CONFIGURATION_VERSION
+    );
+    expect(socket.options?.headers?.[CONTROL_PLANE_TURN_COVERAGE_HEADER]).toBe(
+      CONTROL_PLANE_TURN_COVERAGE_VERSION
     );
     socket.onopen?.();
     expect(socket.frames[0]).toEqual({
@@ -924,24 +929,69 @@ async function connect(
   return connection;
 }
 
-describe('control-plane turn cap and accepted backstop', () => {
-  it('derives the 125-minute accepted backstop from the 120-minute cap', () => {
-    expect(CONTROL_PLANE_TIMERS.wrapper.turnHardCapMs).toBe(7_200_000);
+describe('welcome capabilities', () => {
+  it('reports no turn coverage from an older Worker welcome', () => {
+    const acknowledged: boolean[] = [];
+    withControlledConnection(
+      ({ connection }) => {
+        connection.start();
+        const socket = TestSocket.instances[0];
+        socket.onopen?.();
+        socket.receive({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
+        expect(acknowledged).toEqual([false]);
+      },
+      { onConnected: capabilities => acknowledged.push(capabilities.turnCoverage) }
+    );
+  });
+
+  it('downgrades when a reconnect welcome does not acknowledge turn coverage', () => {
+    const acknowledged: boolean[] = [];
+    withControlledConnection(
+      ({ connection }) => {
+        connection.start();
+        const first = TestSocket.instances[0];
+        first.onopen?.();
+        first.receive({
+          type: 'welcome',
+          protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
+          turnCoverage: true,
+        });
+        expect(acknowledged).toEqual([true]);
+
+        connection.recycle();
+        const second = TestSocket.instances[1];
+        second.onopen?.();
+        second.receive({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
+        expect(acknowledged).toEqual([true, false]);
+      },
+      { onConnected: capabilities => acknowledged.push(capabilities.turnCoverage) }
+    );
+  });
+});
+
+describe('control-plane execution cap and message ownership', () => {
+  it('keeps short ownership deadlines independent of the twelve-hour execution cap', () => {
+    expect(CONTROL_PLANE_TIMERS.wrapper.turnHardCapMs).toBe(43_200_000);
+    expect(CONTROL_PLANE_TIMERS.wrapper.noProgressMs).toBe(1_200_000);
+    expect(CONTROL_PLANE_TIMERS.session.acceptedCoverageMs).toBe(180_000);
+    expect(CONTROL_PLANE_TIMERS.session.acceptedProbeMs).toBe(60_000);
+    expect(CONTROL_PLANE_TIMERS.session.acceptedProbeTimeoutMs).toBe(10_000);
     expect(CONTROL_PLANE_TIMERS.session.acceptedBackstopMs).toBe(7_500_000);
 
-    const margin =
-      CONTROL_PLANE_TIMERS.session.acceptedBackstopMs - CONTROL_PLANE_TIMERS.wrapper.turnHardCapMs;
+    const margin = CONTROL_PLANE_TIMERS.session.acceptedBackstopMs - 7_200_000;
     expect(margin).toBe(300_000);
-    expect(CONTROL_PLANE_TIMERS.session.acceptedBackstopMs).toBeGreaterThan(
+    expect(CONTROL_PLANE_TIMERS.session.acceptedBackstopMs).toBeLessThan(
       CONTROL_PLANE_TIMERS.wrapper.turnHardCapMs
     );
 
     const scaled = resolveControlPlaneTimers({ CONTROL_PLANE_TIMER_DIVISOR: '100' });
-    expect(scaled.wrapper.turnHardCapMs).toBe(72_000);
+    expect(scaled.wrapper.turnHardCapMs).toBe(432_000);
     // The accepted-backstop margin is not scaled, so it does not shrink with the cap.
     expect(scaled.session.acceptedBackstopMs).toBe(372_000);
-    expect(scaled.session.acceptedBackstopMs).toBe(scaled.wrapper.turnHardCapMs + margin);
-    expect(scaled.session.acceptedBackstopMs).toBeGreaterThan(scaled.wrapper.turnHardCapMs);
+    expect(scaled.session.acceptedCoverageMs).toBe(1_800);
+    expect(scaled.session.acceptedProbeMs).toBe(600);
+    expect(scaled.session.acceptedProbeTimeoutMs).toBe(10_000);
+    expect(scaled.session.acceptedBackstopMs).toBe(72_000 + margin);
   });
 });
 

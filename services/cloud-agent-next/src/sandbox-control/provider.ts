@@ -177,4 +177,11 @@ export type ProviderAdapter = {
    * provider is a failure the caller treats as fail-closed.
    */
   applyContainedCredentials?(ref: string, grants: readonly SessionCredentialGrant[]): Promise<void>;
+  /**
+   * Re-install the outbound runtime credential proxy origin for an already
+   * running allocation. Called on warm reconnects and maintenance so a sandbox
+   * that survived a deploy stops presenting stale interception props. A missing
+   * hook on a runtime-proxy-capable provider is treated as fail-closed.
+   */
+  rebindOutboundInterception?(ref: string): Promise<void>;
 };

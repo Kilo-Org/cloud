@@ -279,7 +279,11 @@ async function setup(
 async function connectAndHello(
   provider: FakeProvider,
   wrapperId = 'wr_1',
-  options: { workspaceConfiguration?: boolean; runtimeHarness?: string } = {}
+  options: {
+    workspaceConfiguration?: boolean;
+    runtimeHarness?: string;
+    turnCoverage?: boolean;
+  } = {}
 ): Promise<{ wrapper: FakeWrapper; credential: string; allocationId: string }> {
   await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
   const launchEnv = provider.launchEnvs[0];
@@ -287,9 +291,17 @@ async function connectAndHello(
   const credential = launchEnv.SANDBOX_CONTROL_CREDENTIAL;
   const allocationId = launchEnv.CONTROL_PLANE_ALLOCATION_ID;
   if (!credential || !allocationId) throw new Error('launch environment is missing identity');
-  const wrapper = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential, ...options });
+  const wrapper = await FakeWrapper.connect({
+    sandboxId: SANDBOX_ID,
+    credential,
+    ...options,
+  });
   const reply = await wrapper.hello({ wrapperId, allocationId });
-  expect(reply).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
+  expect(reply).toEqual({
+    type: 'welcome',
+    protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
+    ...(options.turnCoverage ? { turnCoverage: true } : {}),
+  });
   return { wrapper, credential, allocationId };
 }
 
@@ -298,6 +310,67 @@ afterEach(async () => {
 });
 
 describe('SandboxControlV2 routes and forwarding', () => {
+  it('acknowledges ownership support only on capable sockets, including reconnects', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION));
+    const { wrapper, credential, allocationId } = await connectAndHello(provider, 'wr_coverage', {
+      turnCoverage: true,
+    });
+    const legacy = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
+    expect(await legacy.hello({ wrapperId: 'wr_legacy', allocationId })).toEqual({
+      type: 'welcome',
+      protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
+    });
+    const capable = await FakeWrapper.connect({
+      sandboxId: SANDBOX_ID,
+      credential,
+      turnCoverage: true,
+    });
+    expect(await capable.hello({ wrapperId: 'wr_capable', allocationId })).toEqual({
+      type: 'welcome',
+      protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
+      turnCoverage: true,
+    });
+    wrapper.close();
+    legacy.close();
+    capable.close();
+  });
+
+  it.each([
+    [undefined, true],
+    [false, true],
+    [true, false],
+    [true, true],
+  ] as const)(
+    'negotiates delivery coverage for caller %s and wrapper %s',
+    async (callerCoverage, wrapperCoverage) => {
+      const provider = createFakeProvider();
+      const { stub } = await setup(provider);
+      await stub.prepare(prepareInput(SESSION));
+      const { wrapper, allocationId } = await connectAndHello(provider, 'wr_coverage', {
+        turnCoverage: wrapperCoverage,
+      });
+      await wrapper.next();
+      wrapper.send({ type: 'session.ready', sessionId: SESSION });
+      await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
+
+      const payload = { sessionId: SESSION, allocationId, messages: [promptPayload('m1')] };
+      const result =
+        callerCoverage === undefined
+          ? await stub.deliver(payload)
+          : await stub.deliver(payload, callerCoverage);
+      expect(result).toEqual(
+        callerCoverage && wrapperCoverage ? { type: 'sent', coverage: true, allocationId } : 'sent'
+      );
+      expect(await wrapper.next()).toMatchObject({
+        type: 'session.prompt',
+        payload: { messageId: 'm1' },
+      });
+      wrapper.close();
+    }
+  );
+
   it.each(['throw', 'invalid'] as const)(
     'keeps preparation and delivery healthy when runtime metadata projection is %s',
     async failure => {
@@ -308,7 +381,9 @@ describe('SandboxControlV2 routes and forwarding', () => {
       };
       const { stub, peer } = await setup(provider);
       await stub.prepare(prepareInput(SESSION));
-      const { wrapper } = await connectAndHello(provider);
+      const { wrapper, allocationId } = await connectAndHello(provider, 'wr_metadata', {
+        turnCoverage: true,
+      });
       await wrapper.next();
       wrapper.send({ type: 'session.ready', sessionId: SESSION });
       await waitFor(() =>
@@ -320,9 +395,13 @@ describe('SandboxControlV2 routes and forwarding', () => {
       expect(status.view.state).toBe('ready');
       expect(status.view).not.toHaveProperty('container');
       expect(await stub.prepare(prepareInput(SESSION))).toMatchObject({ state: 'ready' });
-      expect(await stub.deliver({ sessionId: SESSION, messages: [promptPayload('m1')] })).toBe(
-        'sent'
-      );
+      expect(
+        await stub.deliver({ sessionId: SESSION, messages: [promptPayload('m1')] }, true)
+      ).toEqual({
+        type: 'sent',
+        coverage: true,
+        allocationId,
+      });
       expect(await wrapper.next()).toMatchObject({ type: 'session.prompt' });
       wrapper.close();
     }
@@ -420,6 +499,131 @@ describe('SandboxControlV2 routes and forwarding', () => {
       wrapper.close();
     }
   );
+  it('reports coverage capability and forwards correlated session.control under the allocation fence', async () => {
+    const provider = createFakeProvider();
+    const { stub, peer } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION));
+    const { wrapper, allocationId } = await connectAndHello(provider, 'wr_coverage', {
+      turnCoverage: true,
+    });
+    await wrapper.next();
+    wrapper.send({ type: 'session.ready', sessionId: SESSION });
+    await waitFor(() =>
+      expect(peer.routeUpdatesFor(SESSION)).toContainEqual(
+        expect.objectContaining({ state: 'ready' })
+      )
+    );
+
+    expect(
+      await stub.deliver(
+        {
+          sessionId: SESSION,
+          allocationId,
+          messages: [promptPayload('m1')],
+        },
+        true
+      )
+    ).toEqual({ type: 'sent', coverage: true, allocationId });
+    expect(await wrapper.next()).toMatchObject({ type: 'session.prompt' });
+
+    const control = stub.sessionControl({
+      action: 'coverage',
+      sessionId: SESSION,
+      allocationId,
+      messageIds: ['m1'],
+    });
+    const request = await wrapper.next();
+    expect(request).toMatchObject({
+      type: 'session.control',
+      action: 'coverage',
+      sessionId: SESSION,
+      allocationId,
+      messageIds: ['m1'],
+    });
+    if (request?.type !== 'session.control') throw new Error('expected session.control');
+    wrapper.send({
+      type: 'session.control.result',
+      requestId: request.requestId,
+      ok: true,
+      result: { type: 'coverage', coveredMessageIds: ['m1'] },
+    });
+    await expect(control).resolves.toEqual({
+      ok: true,
+      result: { type: 'coverage', coveredMessageIds: ['m1'] },
+    });
+
+    // A retired allocation confirms cleanup without asking the current socket.
+    await expect(
+      stub.sessionControl({
+        action: 'abandon',
+        sessionId: SESSION,
+        allocationId: 'old-allocation',
+        messageIds: ['m1'],
+      })
+    ).resolves.toEqual({
+      ok: true,
+      result: { type: 'abandon', outcome: 'absent', cleanedMessageIds: [] },
+    });
+    await expect(
+      stub.sessionControl({
+        action: 'coverage',
+        sessionId: SESSION,
+        allocationId: 'old-allocation',
+        messageIds: ['m1'],
+      })
+    ).resolves.toMatchObject({ ok: false, error: { code: 'not_ready' } });
+    wrapper.close();
+  });
+
+  it('rejects a coverage reply from a superseded connection on the same allocation', async () => {
+    const provider = createFakeProvider();
+    const { stub, peer } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION));
+    const { wrapper, credential, allocationId } = await connectAndHello(provider, 'wr_cov_1', {
+      turnCoverage: true,
+    });
+    await wrapper.next();
+    wrapper.send({ type: 'session.ready', sessionId: SESSION });
+    await waitFor(() =>
+      expect(peer.routeUpdatesFor(SESSION)).toContainEqual(
+        expect.objectContaining({ state: 'ready' })
+      )
+    );
+
+    const control = stub.sessionControl({
+      action: 'coverage',
+      sessionId: SESSION,
+      allocationId,
+      messageIds: ['m1'],
+    });
+    const request = await wrapper.next();
+    expect(request).toMatchObject({ type: 'session.control' });
+    if (request?.type !== 'session.control') throw new Error('expected session.control');
+
+    const replacement = await FakeWrapper.connect({
+      sandboxId: SANDBOX_ID,
+      credential,
+      turnCoverage: true,
+    });
+    expect(await replacement.hello({ wrapperId: 'wr_cov_2', allocationId })).toEqual({
+      type: 'welcome',
+      protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
+      turnCoverage: true,
+    });
+
+    wrapper.send({
+      type: 'session.control.result',
+      requestId: request.requestId,
+      ok: true,
+      result: { type: 'coverage', coveredMessageIds: ['m1'] },
+    });
+    await expect(control).resolves.toMatchObject({
+      ok: false,
+      error: { code: 'not_ready' },
+    });
+    wrapper.close();
+    replacement.close();
+  });
 
   it('reconstruction restores no notification backlog or replay and leaves durable route state unchanged', async () => {
     const provider = createFakeProvider();
@@ -1299,25 +1503,31 @@ describe('SandboxControlV2 routes and forwarding', () => {
     ]);
   });
 
-  it('keeps sending session.credentials after a workspace attach', async () => {
-    const provider = createFakeProvider();
-    const { stub } = await setup(provider);
-    await stub.prepare(configuredPrepareInput(SESSION, SHARED_DIRECTORY));
-    const { wrapper } = await connectAndHello(provider, 'wr_1', { workspaceConfiguration: true });
-    expect((await wrapper.next())?.type).toBe('session.attach');
-    wrapper.send({ type: 'session.ready', sessionId: SESSION });
-    await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
+  it.each([false, true])(
+    'keeps sending session.credentials after a workspace attach with turn coverage %s',
+    async turnCoverage => {
+      const provider = createFakeProvider();
+      const { stub } = await setup(provider);
+      await stub.prepare(configuredPrepareInput(SESSION, SHARED_DIRECTORY));
+      const { wrapper, allocationId } = await connectAndHello(provider, 'wr_1', {
+        workspaceConfiguration: true,
+        turnCoverage,
+      });
+      expect((await wrapper.next())?.type).toBe('session.attach');
+      wrapper.send({ type: 'session.ready', sessionId: SESSION });
+      await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
 
-    await patchGrant(stub, SESSION, grant => ({
-      ...grant,
-      expiresAt: Date.now() + TIMERS.credentialGrantReissueBelowMs / 2,
-    }));
-    expect(await stub.deliver({ sessionId: SESSION, messages: [promptPayload('m1')] })).toBe(
-      'sent'
-    );
-    expect((await wrapper.next())?.type).toBe('session.credentials');
-    expect((await wrapper.next())?.type).toBe('session.prompt');
-  });
+      await patchGrant(stub, SESSION, grant => ({
+        ...grant,
+        expiresAt: Date.now() + TIMERS.credentialGrantReissueBelowMs / 2,
+      }));
+      expect(
+        await stub.deliver({ sessionId: SESSION, messages: [promptPayload('m1')] }, true)
+      ).toEqual(turnCoverage ? { type: 'sent', coverage: true, allocationId } : 'sent');
+      expect((await wrapper.next())?.type).toBe('session.credentials');
+      expect((await wrapper.next())?.type).toBe('session.prompt');
+    }
+  );
 
   it('replays the workspace configuration when the wrapper is replaced', async () => {
     const provider = createFakeProvider();

@@ -3,7 +3,7 @@ import {
   RUNTIME_CONTRACT_KEY,
   readRuntimeContract,
 } from '../../src/control-plane/sandbox/runtime-contract.js';
-import { createExecutionContext, runInDurableObject, env, reset } from 'cloudflare:test';
+import { runInDurableObject, env, reset } from 'cloudflare:test';
 import { sealRuntimeAuthorization } from '@kilocode/worker-utils/runtime-authorization';
 import jwt from 'jsonwebtoken';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -19,8 +19,6 @@ import {
   issueRuntimeCredentialProxyHandle,
 } from '../../src/runtime-credential-proxy.js';
 import { RUNTIME_AUTHORIZATION_KEY } from '../../src/session/runtime-authorization-persistence.js';
-import worker from '../../src/server.js';
-import { markHistoryHydrated } from '../../src/control-plane/session/history-hydration.js';
 import {
   addAcceptedHandleSync,
   digestRuntimeProxyHandle,
@@ -29,10 +27,11 @@ import {
 } from '../../src/control-plane/sandbox/accepted-handles.js';
 import { generateSandboxId } from '../../src/sandbox-id.js';
 import { sessionDoName } from '../../src/session-identity.js';
-import type { AgentSandboxProvider, Env } from '../../src/types.js';
+import type { AgentSandboxProvider } from '../../src/types.js';
 import type { ProviderAdapter, StopResult } from '../../src/sandbox-control/provider.js';
 import {
   createFakeCredentialBroker,
+  fakeOutboundContainerId,
   FAKE_SANDBOX_CONTAINERS_NAMESPACE,
   installFakeCredentialEnv,
 } from './helpers/fake-credentials.js';
@@ -69,6 +68,7 @@ function metadata(input: {
   kiloSessionIdValue: string;
   sandboxId: string;
   kiloToken: string;
+  provider?: AgentSandboxProvider;
   worktreeId?: string;
 }) {
   const directory = input.worktreeId ?? input.sessionId;
@@ -92,7 +92,7 @@ function metadata(input: {
       workspacePath: `/workspace/${directory}`,
       branchName: 'kilo/test-branch',
       sandboxId: input.sandboxId,
-      sandboxProvider: 'vercel' as AgentSandboxProvider,
+      sandboxProvider: input.provider ?? ('vercel' as AgentSandboxProvider),
     },
     lifecycle: { version: 1, timestamp: 1 },
   });
@@ -195,8 +195,10 @@ async function createSession(input: {
   sandboxId: string;
   kiloToken: string;
   seal?: string;
+  provider?: AgentSandboxProvider;
   worktreeId?: string;
 }): Promise<DurableObjectStub<SandboxSessionV2>> {
+  const provider = input.provider ?? 'vercel';
   const sessionStub = sessions.getByName(sessionDoName(USER_ID, input.sessionId));
   await runInDurableObject(sessionStub, instance => {
     instance.env.WORKER_URL = WORKER_URL;
@@ -207,6 +209,7 @@ async function createSession(input: {
       kiloSessionIdValue: input.kiloId,
       sandboxId: input.sandboxId,
       kiloToken: input.kiloToken,
+      provider,
       ...(input.worktreeId === undefined ? {} : { worktreeId: input.worktreeId }),
     }),
     message: {
@@ -215,8 +218,15 @@ async function createSession(input: {
       agent: { mode: 'code', model: 'test/model' },
     },
     sandboxSelection: {
-      provider: 'vercel',
-      byoc: { organizationId: ORG_ID, credentialId: '22222222-2222-4222-8222-222222222222' },
+      provider,
+      ...(provider === 'vercel'
+        ? {
+            byoc: {
+              organizationId: ORG_ID,
+              credentialId: '22222222-2222-4222-8222-222222222222',
+            },
+          }
+        : { containment: { kilocode: true, github: true, worktreeScoped: true } }),
     },
     ...(input.seal ? { runtimeAuthorizationSeal: input.seal } : {}),
   });
@@ -248,13 +258,18 @@ type Member = {
  */
 async function createSharedScope(
   memberCount: number,
-  options: { allocation?: 'existing'; wrapper?: 'legacy' | 'worktree' } = {}
+  options: {
+    allocation?: 'existing';
+    wrapper?: 'legacy' | 'worktree';
+    provider?: AgentSandboxProvider;
+  } = {}
 ) {
   const worktreeId = `worktree_${crypto.randomUUID()}`;
   const creatorId = newSessionId();
   const sandboxId = await generateSandboxId(creatorId);
   const provider = createProvider();
   const sandbox = await installSandbox(sandboxId, provider);
+  const sandboxProvider = options.provider ?? 'vercel';
 
   const memberIds = [creatorId];
   for (let index = 1; index < memberCount; index += 1) memberIds.push(newSessionId());
@@ -267,6 +282,7 @@ async function createSharedScope(
     sandboxId,
     kiloToken: auths[0]!.token,
     seal: auths[0]!.seal,
+    provider: sandboxProvider,
     worktreeId,
   });
   await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
@@ -296,6 +312,7 @@ async function createSharedScope(
             sandboxId,
             kiloToken: auths[index]!.token,
             seal: auths[index]!.seal,
+            provider: sandboxProvider,
             worktreeId,
           });
     let frame = await wrapper.next();
@@ -676,5 +693,53 @@ describe('SandboxControlV2 scope-handle resolution', () => {
     expect(outcome.token).toBe(sibling!.token);
     expect(outcome.runtimeAuthorization.resourceId).toBe(sibling!.sessionId);
     expect(outcome.organizationId).toBe(ORG_ID);
+  });
+});
+
+describe('origin-bound runtime credential proxy resolution', () => {
+  it('serves only the surviving allocation origin after the issuer session is deleted', async () => {
+    const { sandbox, sandboxId, members, scopeGrantId } = await createSharedScope(2, {
+      provider: 'cloudflare-containers',
+    });
+    const [creator, sibling] = members;
+    if (!creator || !sibling) throw new Error('Expected two scope members');
+    await seedAccepted(sandbox, scopeGrantId, creator.handle, creator, await currentFence(sandbox));
+    const allocation = await sandbox.getAllocationState();
+    expect(allocation.providerRef).not.toBeNull();
+    const origin = {
+      type: 'cloudflare-containers' as const,
+      containerId: fakeOutboundContainerId(sandboxId),
+      allocationRef: allocation.providerRef!,
+    };
+
+    await creator.stub.deleteSession();
+
+    const outcome = await creator.stub.resolveOriginBoundRuntimeCredentialProxyGrant({
+      handle: creator.handle,
+      origin,
+    });
+    expect(outcome?.token).toBe(sibling.token);
+    expect(outcome?.runtimeAuthorization.resourceId).toBe(sibling.sessionId);
+    expect(outcome?.binding).toMatchObject({
+      plane: 'control',
+      logicalSandboxId: sandboxId,
+      allocationId: allocation.allocationId,
+      provider: 'cloudflare-containers',
+      providerInstanceId: allocation.providerRef,
+      wrapperInstanceId: allocation.wrapperId,
+    });
+
+    await expect(
+      creator.stub.resolveOriginBoundRuntimeCredentialProxyGrant({
+        handle: creator.handle,
+        origin: { ...origin, containerId: 'oc_other' },
+      })
+    ).resolves.toBeNull();
+    await expect(
+      creator.stub.resolveOriginBoundRuntimeCredentialProxyGrant({
+        handle: creator.handle,
+        origin: { ...origin, allocationRef: 'mem_other' },
+      })
+    ).resolves.toBeNull();
   });
 });

@@ -18,6 +18,7 @@ import {
   histogram,
   observe,
   summarize,
+  populationMatches,
 } from './perf-common.mjs';
 import { currentDeployment } from './perf-identity.mjs';
 import { mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
@@ -57,6 +58,12 @@ test('pending observations expire and refuse excess population', () => {
 const empty = {
   name: 'probe',
   registrations: 0,
+  streamingSources: 0,
+  sourceTrafficMode: 'all-streaming-sources',
+  watched: 0,
+  sdkViewers: 0,
+  viewerConnections: 0,
+  eventHz: 0,
   seeds: 0,
   checkpoints: 0,
   finalCheckpoints: 0,
@@ -274,6 +281,8 @@ function targetFixture() {
     stopAt: manifest.teardownAt,
     budgetStage: 'unit',
     sessions: 1,
+    streamingSources: 1,
+    sourceTrafficMode: 'all-streaming-sources',
     watched: 1,
     sdkViewers: 1,
     eventHz: 10,
@@ -356,6 +365,12 @@ const allowedBudget = {
     {
       name: 'unit',
       sessions: 1,
+      streamingSources: 1,
+      sourceTrafficMode: 'all-streaming-sources',
+      watched: 1,
+      sdkViewers: 1,
+      viewerConnections: 1,
+      eventHz: 10,
       checkpoints: 11,
       finalCheckpoints: 1,
       incomingWebSocketMessages: 600,
@@ -530,8 +545,14 @@ test('full cloud plan keeps one SDK viewer per watched session and creates no GO
     assert.equal(child.status, 0, child.stderr);
     const cluster = JSON.parse(readFileSync(join(output, 'cluster.json'), 'utf8'));
     assert.equal(cluster.viewerConnections, 10000);
+    assert.equal(cluster.streamingSources, 100000);
+    assert.equal(cluster.watched, 10000);
+    assert.equal(cluster.sdkViewers, 10000);
+    assert.equal(cluster.eventHz, 10);
+    assert.equal(cluster.sourceTrafficMode, 'all-streaming-sources');
     const ownership = new Uint8Array(cluster.sessions);
     let assignedViewers = 0;
+    let assignedStreamingSources = 0;
     for (const [nodeIndex, node] of cluster.nodes.entries()) {
       for (const shard of node.shards) {
         const part = JSON.parse(
@@ -540,6 +561,7 @@ test('full cloud plan keeps one SDK viewer per watched session and creates no GO
         for (let index = part.shard; index < part.sessions; index += part.shards) {
           ownership[index]++;
           if (index < part.sdkViewers) assignedViewers++;
+          if (index < part.streamingSources) assignedStreamingSources++;
         }
       }
     }
@@ -548,8 +570,11 @@ test('full cloud plan keeps one SDK viewer per watched session and creates no GO
       'Every session must have exactly one publisher'
     );
     assert.equal(assignedViewers, 10000);
+    assert.equal(assignedStreamingSources, 100000);
     const config = JSON.parse(readFileSync(join(output, 'node-0/config-0.json'), 'utf8'));
     assert.equal(config.sdkViewers, config.watched);
+    assert.equal(config.streamingSources, 100000);
+    assert.equal(config.sourceTrafficMode, 'all-streaming-sources');
     assert.equal(existsSync(join(output, 'node-0/go.json')), false);
     const fundedBudget = {
       ...allowedBudget,
@@ -561,11 +586,17 @@ test('full cloud plan keeps one SDK viewer per watched session and creates no GO
       committedCeilingUSD: 100,
       workloadBounds: [
         {
-          name: '100k-10k-sdk-10hz-512b-10warm-45measure-10drain',
+          name: '100k-streaming-10k-sdk-10hz-512b-10warm-45measure-10drain',
           sessions: 100000,
+          streamingSources: 100000,
+          sourceTrafficMode: 'all-streaming-sources',
+          watched: 10000,
+          sdkViewers: 10000,
+          viewerConnections: 10000,
+          eventHz: 10,
           checkpoints: 1100000,
           finalCheckpoints: 100000,
-          incomingWebSocketMessages: 5500000,
+          incomingWebSocketMessages: 55000000,
           ticketRequests: 260000,
         },
       ],
@@ -634,6 +665,81 @@ test('cloud origin must match the live account inspection', () => {
       () => validateCloudAdmission(f.config, f.manifest, allowedBudget),
       /Origin differs/
     );
+  } finally {
+    f.dispose();
+  }
+});
+
+test('forecast retains independent source and consumer population metadata', () => {
+  const workload = {
+    ...empty,
+    registrations: 100000,
+    streamingSources: 100000,
+    watched: 10000,
+    sdkViewers: 10000,
+    viewerConnections: 10000,
+    eventHz: 10,
+  };
+  const bound = forecast({ ...plan, stages: [workload] }).workloadBounds[0];
+  assert.equal(bound.streamingSources, 100000);
+  assert.equal(bound.watched, 10000);
+  assert.equal(bound.sdkViewers, 10000);
+  assert.equal(bound.viewerConnections, 10000);
+  assert.equal(bound.sourceTrafficMode, 'all-streaming-sources');
+  assert.equal(bound.eventHz, 10);
+});
+
+test('cloud admission rejects watched-only budgets for the full streaming-source workload', () => {
+  const f = targetFixture();
+  try {
+    const config = {
+      ...f.config,
+      sessions: 100000,
+      streamingSources: 100000,
+      watched: 10000,
+      sdkViewers: 10000,
+    };
+    const stage = {
+      name: config.budgetStage,
+      sessions: 100000,
+      streamingSources: 100000,
+      sourceTrafficMode: 'all-streaming-sources',
+      watched: 10000,
+      sdkViewers: 10000,
+      viewerConnections: 10000,
+      eventHz: 10,
+      checkpoints: 1100000,
+      finalCheckpoints: 100000,
+      incomingWebSocketMessages: 55000000,
+      ticketRequests: 210000,
+    };
+    const admit = change =>
+      validateCloudAdmission(config, f.manifest, {
+        ...allowedBudget,
+        workloadBounds: [{ ...stage, ...change }],
+      });
+    assert.doesNotThrow(() => admit({}));
+    for (const change of [
+      { streamingSources: 10000 },
+      { sourceTrafficMode: undefined },
+      { sdkViewers: 0 },
+      { viewerConnections: 9999 },
+      { incomingWebSocketMessages: 5500000 },
+      { ticketRequests: 120000 },
+    ])
+      assert.throws(() => admit(change));
+    const ready = {
+      presence: 100000,
+      runners: 100000,
+      streamingSources: 100000,
+      watched: 10000,
+      sdkViewers: 10000,
+      viewers: 10000,
+    };
+    assert.equal(populationMatches(ready, ready), true);
+    for (const key of Object.keys(ready)) {
+      assert.equal(populationMatches({ ...ready, [key]: ready[key] - 1 }, ready), false);
+    }
   } finally {
     f.dispose();
   }

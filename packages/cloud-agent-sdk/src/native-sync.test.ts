@@ -1,14 +1,23 @@
 import {
   NativeSyncClient,
   NativeSyncError,
-  applyNativeEvent,
   type NativeSocket,
   type NativeSessionState,
   type NativePresenceState,
 } from './native-sync';
 import { fetchNativeSnapshot, type NativeSnapshot } from './native-sync-snapshot';
+import type * as NativeSnapshotModule from './native-sync-snapshot';
+import { kilo2AssetKey } from './kilo2-source-messages';
+import { readNativeConversation } from './native-conversation-source';
+import { z } from 'zod';
 
-jest.mock('./native-sync-snapshot', () => ({ fetchNativeSnapshot: jest.fn() }));
+jest.mock('./native-sync-snapshot', () => ({
+  ...jest.requireActual<typeof NativeSnapshotModule>('./native-sync-snapshot'),
+  fetchNativeSnapshot: jest.fn(),
+}));
+const fixtureNativeBodySchema = z
+  .object({ data: z.object({ data: z.record(z.string(), z.unknown()) }).passthrough() })
+  .passthrough();
 const snapshot = jest.mocked(fetchNativeSnapshot);
 class FakeSocket implements NativeSocket {
   static sockets: FakeSocket[] = [];
@@ -32,6 +41,26 @@ class FakeSocket implements NativeSocket {
     this.onclose?.call(this as unknown as WebSocket, { code: 1006 } as CloseEvent);
   }
   frame(type: string, body: unknown, seq = 0, channel = 'control') {
+    const parsed = fixtureNativeBodySchema.safeParse(body);
+    if (channel === 'events' && parsed.success) {
+      const wrapper = parsed.data;
+      body = {
+        ...wrapper,
+        data: {
+          ...wrapper.data,
+          id: `evt_${seq}`,
+          type,
+          created: seq,
+          data: {
+            sessionID: 'ses_a',
+            ...(type === 'session.step.started'
+              ? { started: seq, agent: 'build', model: { id: 'model', providerID: 'kilo' } }
+              : {}),
+            ...wrapper.data.data,
+          },
+        },
+      };
+    }
     this.onmessage?.call(
       this as unknown as WebSocket,
       {
@@ -85,10 +114,21 @@ function fixture() {
   });
   return { client, calls, fetcher };
 }
+const sessionMetadata = {
+  id: 'ses_a',
+  origin: { directory: '/fixture' },
+  time: { created: 1, updated: 1 },
+};
 beforeEach(() => {
   jest.useFakeTimers();
   FakeSocket.sockets = [];
-  snapshot.mockResolvedValue({ position: 0, revision: 1, entities: [], messages: [] });
+  snapshot.mockResolvedValue({
+    position: 0,
+    revision: 1,
+    session: sessionMetadata,
+    entities: [],
+    messages: [],
+  });
 });
 afterEach(() => {
   jest.useRealTimers();
@@ -116,6 +156,26 @@ test('exchanges a versioned organization grant for organization sessions', async
   connection.close();
 });
 
+test('canonical snapshot reads use the selected organization grant and caller cancellation', async () => {
+  const controller = new AbortController();
+  const expected: NativeSnapshot = { position: 4, revision: 2, messages: [], entities: [] };
+  snapshot.mockImplementationOnce(async (request, sessionID, signal) => {
+    expect(sessionID).toBe('ses_canonical');
+    expect(signal).toBe(controller.signal);
+    await request(`/v1/sessions/${sessionID}`, { signal });
+    return expected;
+  });
+  const { client, calls } = fixture();
+  await expect(
+    client.getSnapshot('ses_canonical', 'organization-1', controller.signal)
+  ).resolves.toBe(expected);
+  expect(calls[0]?.body).toEqual({ version: 1, organizationID: 'organization-1' });
+  expect(calls[1]).toMatchObject({
+    path: '/v1/sessions/ses_canonical',
+    authorization: 'Bearer grant',
+  });
+});
+
 test('snapshots before subscribe, ordered sparse replay dedupes and reconnect resumes', async () => {
   const { client } = fixture();
   let state: NativeSessionState | undefined;
@@ -129,13 +189,16 @@ test('snapshots before subscribe, ordered sparse replay dedupes and reconnect re
   expect(socket.sent).toContainEqual({ type: 'subscribe', afterSeq: 10 });
   socket.frame(
     'session.step.started',
-    { syncPosition: 1, data: { data: { assistantMessageID: 'm1' } } },
+    { syncPosition: 1, data: { data: { assistantMessageID: 'msg_m1' } } },
     12,
     'events'
   );
   socket.frame(
     'session.text.delta',
-    { syncPosition: 2, data: { data: { assistantMessageID: 'm1', ordinal: 0, delta: 'hello' } } },
+    {
+      syncPosition: 2,
+      data: { data: { assistantMessageID: 'msg_m1', ordinal: 0, delta: 'hello' } },
+    },
     15,
     'events'
   );
@@ -143,13 +206,13 @@ test('snapshots before subscribe, ordered sparse replay dedupes and reconnect re
     'session.text.delta',
     {
       syncPosition: 2,
-      data: { data: { assistantMessageID: 'm1', ordinal: 0, delta: 'duplicate' } },
+      data: { data: { assistantMessageID: 'msg_m1', ordinal: 0, delta: 'duplicate' } },
     },
     15,
     'events'
   );
   await flush();
-  expect(state?.messages[0]?.content).toEqual([{ type: 'text', text: 'hello' }]);
+  expect(state?.messages[0]?.message.content).toEqual([{ type: 'text', text: 'hello' }]);
   socket.close();
   await jest.advanceTimersByTimeAsync(2001);
   await flush();
@@ -173,13 +236,19 @@ test('reset refetches durable state and explicitly resubscribes from reset high-
   await flush();
   snapshot.mockResolvedValueOnce({
     position: 30,
+    session: sessionMetadata,
     revision: 4,
     entities: [],
-    messages: [{ id: 'durable', role: 'user', content: 'restored', seq: 1 }],
+    messages: [
+      {
+        message: { id: 'msg_durable', type: 'user', text: 'restored', time: { created: 1 } },
+        seq: 1,
+      },
+    ],
   });
   socket.frame('reset_required', { seq: 40 }, 40);
   await flush();
-  expect(state?.messages[0]?.content).toBe('restored');
+  expect(state?.messages[0]?.message.text).toBe('restored');
   expect(socket.sent).toContainEqual({ type: 'subscribe', afterSeq: 40 });
   connection.close();
 });
@@ -230,7 +299,11 @@ test('approvals and abort carry the current incarnation/run and liveOnly', async
   await flush();
   socket.frame(
     'permission.asked',
-    { incarnation: 'runner-1', runID: 'run-2', data: {} },
+    {
+      incarnation: 'runner-1',
+      runID: 'run-2',
+      data: { data: { id: 'approval-3', action: 'shell', resources: ['pwd'] } },
+    },
     1,
     'events'
   );
@@ -262,7 +335,7 @@ test('clear stays local, does not prevent new messages, and rejects unsafe slash
   await flush();
   socket.frame(
     'session.step.started',
-    { syncPosition: 1, data: { data: { assistantMessageID: 'old' } } },
+    { syncPosition: 1, data: { data: { assistantMessageID: 'msg_old' } } },
     1,
     'events'
   );
@@ -272,12 +345,12 @@ test('clear stays local, does not prevent new messages, and rejects unsafe slash
   expect(calls.filter(call => call.path.endsWith('/commands'))).toEqual([]);
   socket.frame(
     'session.step.started',
-    { syncPosition: 2, data: { data: { assistantMessageID: 'new' } } },
+    { syncPosition: 2, data: { data: { assistantMessageID: 'msg_new' } } },
     2,
     'events'
   );
   await flush();
-  expect(state?.messages.map(message => message.id)).toEqual(['new']);
+  expect(state?.messages.map(item => item.message.id)).toEqual(['msg_new']);
   await expect(connection.sendCommand('/delete')).rejects.toMatchObject({ code: 'unsafe_command' });
   connection.close();
 });
@@ -319,9 +392,16 @@ test('presence routes replies to exact calls and treats 10-second timeout as unk
 test('equal-position ephemeral deltas fill incomplete snapshots and terminal state recovers durable history', async () => {
   snapshot.mockResolvedValueOnce({
     position: 10,
+    session: sessionMetadata,
     revision: 1,
     entities: [],
-    messages: [{ id: 'm', role: 'assistant', content: [], seq: 1, incomplete: true }],
+    messages: [
+      {
+        message: { id: 'msg_m', type: 'assistant', time: { created: 1 } },
+        seq: 1,
+        incomplete: true,
+      },
+    ],
   });
   const { client } = fixture();
   let state: NativeSessionState | undefined;
@@ -334,22 +414,29 @@ test('equal-position ephemeral deltas fill incomplete snapshots and terminal sta
   await flush();
   socket.frame(
     'session.text.delta',
-    { syncPosition: 10, data: { data: { assistantMessageID: 'm', ordinal: 2, delta: 'live' } } },
+    {
+      syncPosition: 10,
+      data: { data: { assistantMessageID: 'msg_m', ordinal: 0, delta: 'live' } },
+    },
     1,
     'events'
   );
   await flush();
-  expect(state?.messages[0]?.content).toEqual([{ type: 'text', text: 'live' }]);
+  expect(state?.messages[0]?.message.content).toEqual([{ type: 'text', text: 'live' }]);
   expect(state?.messages[0]?.incomplete).toBe(true);
   snapshot.mockResolvedValueOnce({
     position: 20,
+    session: sessionMetadata,
     revision: 2,
     entities: [],
     messages: [
       {
-        id: 'm',
-        role: 'assistant',
-        content: [{ type: 'text', text: 'full live' }],
+        message: {
+          id: 'msg_m',
+          type: 'assistant',
+          time: { created: 1 },
+          content: [{ type: 'text', text: 'full live' }],
+        },
         seq: 1,
         partOrdinals: [2],
       },
@@ -364,7 +451,7 @@ test('equal-position ephemeral deltas fill incomplete snapshots and terminal sta
   await flush();
   await jest.advanceTimersByTimeAsync(250);
   await flush();
-  expect(state?.messages[0]?.content).toEqual([{ type: 'text', text: 'full live' }]);
+  expect(state?.messages[0]?.message.content).toEqual([{ type: 'text', text: 'full live' }]);
   expect(state?.messages[0]?.incomplete).toBeUndefined();
   connection.close();
 });
@@ -402,73 +489,31 @@ test('first-attachment state supplies identity and quiet reconnect retains it', 
   connection.close();
 });
 
-test('native inbox payloads and sparse part ordinals project correctly', () => {
-  const frame = (type: string, data: unknown) => ({
-    v: 1 as const,
-    channel: 'events' as const,
-    seq: 2,
-    type,
-    from: 'runner',
-    at: 1,
-    body: { data: { data } },
-  });
-  const user = applyNativeEvent(
-    [],
-    frame('session.inbox.enqueued', {
-      inboxID: 'user',
-      item: { type: 'user', payload: { text: 'prompt' } },
-    })
-  );
-  expect(user[0]?.content).toBe('prompt');
-  const messages = [
-    {
-      id: 'm',
-      role: 'assistant',
-      seq: 1,
-      content: [
-        { type: 'text', text: 'two' },
-        { type: 'text', text: 'ten' },
-      ],
-      partOrdinals: [2, 10],
-    },
-  ];
-  expect(
-    applyNativeEvent(
-      messages,
-      frame('session.text.delta', { assistantMessageID: 'm', ordinal: 10, delta: '!' })
-    )[0]?.content
-  ).toEqual([
-    { type: 'text', text: 'two' },
-    { type: 'text', text: 'ten!' },
-  ]);
-  const replaced = applyNativeEvent(
-    messages,
-    frame('session.message.content.updated', {
-      messageID: 'm',
-      content: [{ type: 'text', text: 'replacement' }],
-    })
-  );
-  expect(replaced[0]?.content).toEqual([{ type: 'text', text: 'replacement' }]);
-  expect(replaced[0]?.partOrdinals).toBeUndefined();
-  expect(
-    applyNativeEvent(
-      replaced,
-      frame('session.text.delta', { assistantMessageID: 'm', ordinal: 0, delta: '!' })
-    )[0]?.content
-  ).toEqual([{ type: 'text', text: 'replacement!' }]);
-});
-
 const incomplete = (position: number) => ({
   position,
+  session: sessionMetadata,
   revision: 1,
   entities: [],
-  messages: [{ id: 'm', role: 'assistant', content: [], seq: 1, incomplete: true }],
+  messages: [
+    { message: { id: 'msg_m', type: 'assistant', time: { created: 1 } }, seq: 1, incomplete: true },
+  ],
 });
 const complete = (position: number) => ({
   position,
+  session: sessionMetadata,
   revision: 2,
   entities: [],
-  messages: [{ id: 'm', role: 'assistant', content: [{ type: 'text', text: 'done' }], seq: 1 }],
+  messages: [
+    {
+      message: {
+        id: 'msg_m',
+        type: 'assistant',
+        time: { created: 1 },
+        content: [{ type: 'text', text: 'done' }],
+      },
+      seq: 1,
+    },
+  ],
 });
 
 test('attach to an idle connected runner retries an incomplete snapshot within a bound', async () => {
@@ -509,13 +554,13 @@ test('recovery runs beside live events and reapplies frames newer than its snaps
   const delta = (seq: number, syncPosition: number, text: string) =>
     socket.frame(
       'session.text.delta',
-      { syncPosition, data: { data: { assistantMessageID: 'm', ordinal: 0, delta: text } } },
+      { syncPosition, data: { data: { assistantMessageID: 'msg_m', ordinal: 0, delta: text } } },
       seq,
       'events'
     );
   delta(4, 5, 'live');
   await flush();
-  expect(state?.messages[0]?.content).toEqual([{ type: 'text', text: 'live' }]);
+  expect(state?.messages[0]?.message.content).toEqual([{ type: 'text', text: 'live' }]);
   snapshot.mockReturnValueOnce(
     new Promise<NativeSnapshot>(resolve => {
       release = resolve;
@@ -527,7 +572,7 @@ test('recovery runs beside live events and reapplies frames newer than its snaps
   await flush();
   release(complete(6));
   await flush();
-  expect(state?.messages[0]?.content).toEqual([{ type: 'text', text: 'done more' }]);
+  expect(state?.messages[0]?.message.content).toEqual([{ type: 'text', text: 'done more' }]);
   connection.close();
 });
 
@@ -678,10 +723,23 @@ test('a replacement epoch reads and subscribes while its predecessor is held', a
   expect(oldSignal?.aborted).toBe(true);
   expect(next.sent).toContainEqual({ type: 'subscribe', afterSeq: 30 });
   const before = listener.mock.calls.length;
-  release({ ...complete(99), messages: [{ id: 'old', role: 'user', content: 'old', seq: 1 }] });
+  release({
+    ...complete(99),
+    messages: [{ message: { id: 'old', type: 'user', text: 'old', time: { created: 1 } }, seq: 1 }],
+  });
   await flush();
   expect(listener).toHaveBeenCalledTimes(before);
-  expect(listener.mock.lastCall?.[0].messages).toEqual(complete(20).messages);
+  expect(listener.mock.lastCall?.[0].messages).toEqual([
+    {
+      message: {
+        id: 'msg_m',
+        type: 'assistant',
+        time: { created: 1 },
+        content: [{ type: 'text', text: 'done' }],
+      },
+      seq: 1,
+    },
+  ]);
   expect(connectedSocket().sent).toEqual([]);
   connection.close();
 });
@@ -828,15 +886,20 @@ test('available relay replay restores unique ordered deltas from the accepted cu
   const event = (socket: FakeSocket, seq: number, ordinal: number, delta: string) =>
     socket.frame(
       'session.text.delta',
-      { syncPosition: 0, data: { data: { assistantMessageID: 'm', ordinal, delta } } },
+      { syncPosition: 0, data: { data: { assistantMessageID: 'msg_m', ordinal, delta } } },
       seq,
       'events'
     );
-  first.frame('session.step.started', { data: { data: { assistantMessageID: 'm' } } }, 4, 'events');
+  first.frame(
+    'session.step.started',
+    { data: { data: { assistantMessageID: 'msg_m' } } },
+    4,
+    'events'
+  );
   await flush();
-  event(first, 5, 10, 'ten:5|');
+  event(first, 5, 0, 'ten:5|');
   await flush();
-  for (let seq = 6; seq <= 2000; seq++) event(first, seq, 2, `${seq}|`);
+  for (let seq = 6; seq <= 2000; seq++) event(first, seq, 1, `${seq}|`);
   await flush();
   const accepted = state?.events.at(-1)?.seq ?? 0;
   expect(accepted).toBe(6);
@@ -846,16 +909,16 @@ test('available relay replay restores unique ordered deltas from the accepted cu
   await flush();
   expect(next.sent).toContainEqual({ type: 'subscribe', afterSeq: accepted });
   for (let seq = accepted + 1; seq <= 2000; seq++) {
-    event(next, seq, 2, `${seq}|`);
+    event(next, seq, 1, `${seq}|`);
     await flush();
   }
   next.frame('subscribed', { seq: 2000 }, 2000);
   await flush();
-  expect(state?.messages[0]?.content).toEqual([
-    { type: 'text', text: Array.from({ length: 1995 }, (_, index) => `${index + 6}|`).join('') },
+  expect(state?.messages[0]?.message.content).toEqual([
     { type: 'text', text: 'ten:5|' },
+    { type: 'text', text: Array.from({ length: 1995 }, (_, index) => `${index + 6}|`).join('') },
   ]);
-  expect(state?.messages[0]?.partOrdinals).toEqual([2, 10]);
+  expect(state?.messages[0]?.partOrdinals).toBeUndefined();
   expect(state?.error).toBeUndefined();
   connection.close();
 });
@@ -885,29 +948,6 @@ test('a reset keeps its integrity error through snapshots, reconnect and subscri
   connection.close();
 });
 
-test('projection shares untouched parts and preserves previous tool states', () => {
-  const parts = [
-    { type: 'text', text: 'untouched' },
-    { type: 'tool', id: 'tool', state: { status: 'running', input: 'old' } },
-  ];
-  const messages = [{ id: 'm', role: 'assistant', seq: 1, content: parts, partOrdinals: [2, 10] }];
-  const result = applyNativeEvent(messages, {
-    v: 1,
-    channel: 'events',
-    from: 'runner',
-    at: 0,
-    seq: 2,
-    type: 'session.tool.input.delta',
-    body: { data: { data: { assistantMessageID: 'm', id: 'tool', delta: ' new' } } },
-  });
-  expect(result[0]?.content).toEqual([
-    parts[0],
-    { type: 'tool', id: 'tool', state: { status: 'streaming', input: 'old new' } },
-  ]);
-  expect(Array.isArray(result[0]?.content) && result[0].content[0]).toBe(parts[0]);
-  expect(parts[1]?.state).toEqual({ status: 'running', input: 'old' });
-});
-
 test.each([
   ['forbidden', () => new NativeSyncError('forbidden', 403)],
   ['deleted', () => Object.assign(new Error('deleted'), { code: 'session_deleted' })],
@@ -934,5 +974,538 @@ test.each([
   expect(state?.connection).toBe('disconnected');
   expect(state?.error).toContain(cause);
   expect(state?.error).toContain('incomplete');
+  connection.close();
+});
+
+test('session moves wait for a revision-pinned authoritative canonical message instead of inventing its previous location', async () => {
+  const initial: NativeSnapshot = {
+    position: 1,
+    revision: 1,
+    entities: [],
+    messages: [],
+    session: { id: 'ses_a', origin: { directory: '/before' }, time: { created: 1, updated: 1 } },
+  };
+  snapshot.mockResolvedValueOnce(initial).mockResolvedValueOnce(initial);
+  const { client } = fixture();
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  await flush();
+  connectedSocket().frame('hello', hello(), 1);
+  await flush();
+  connectedSocket().frame(
+    'session.moved',
+    {
+      syncPosition: 1,
+      data: {
+        data: {
+          sessionID: 'ses_a',
+          location: { directory: '/after', workspaceID: 'workspace-new' },
+          projectID: 'project-new',
+        },
+      },
+    },
+    2,
+    'events'
+  );
+  await flush();
+  expect(state?.messages).toEqual([]);
+  expect(state?.pendingSnapshotMessageIDs).toEqual(['msg_2']);
+  if (!state) throw new Error('Missing native state');
+  expect(readNativeConversation(state).error).toContain('incomplete');
+  await jest.advanceTimersByTimeAsync(250);
+  await flush();
+  expect(state.pendingSnapshotMessageIDs).toEqual(['msg_2']);
+  const moved = {
+    id: 'msg_2',
+    type: 'location-switched',
+    time: { created: 2 },
+    location: { directory: '/after', workspaceID: 'workspace-new' },
+    previous: {
+      location: { directory: '/before', workspaceID: 'workspace-old' },
+      projectID: 'project-old',
+      metadata: { exact: 'native-only' },
+    },
+    projectID: 'project-new',
+  };
+  snapshot.mockResolvedValueOnce({
+    ...initial,
+    position: 2,
+    revision: 2,
+    session: { id: 'ses_a', time: { created: 1, updated: 2 }, origin: { directory: '/after' } },
+    messages: [{ message: moved, seq: 2 }],
+  });
+  await jest.advanceTimersByTimeAsync(500);
+  await flush();
+  expect(state.pendingSnapshotMessageIDs).toEqual([]);
+  expect(state.messages[0]?.message).toBe(moved);
+  const conversation = readNativeConversation(state);
+  expect(conversation.nativeMessages[0]?.message['previous']).toEqual(moved.previous);
+  expect(conversation.incompleteMessageIDs).toEqual([]);
+  expect(conversation.error).toBeUndefined();
+  // The existing Cloud projector deliberately does not render location notices.
+  expect(conversation.messages).toEqual([]);
+  connection.close();
+});
+
+test.each(['session.tool.called', 'session.tool.success'])(
+  'retains the triggering %s and refuses unchanged or unrelated snapshots as recovery proof',
+  async type => {
+    const initial: NativeSnapshot = {
+      position: 1,
+      revision: 1,
+      session: sessionMetadata,
+      entities: [],
+      messages: [
+        {
+          seq: 1,
+          message: { id: 'msg_gap', type: 'assistant', time: { created: 1 }, content: [] },
+        },
+      ],
+    };
+    snapshot.mockResolvedValueOnce(initial).mockResolvedValue(initial);
+    const { client } = fixture();
+    let state: NativeSessionState | undefined;
+    const connection = client.connectSession('ses_a', value => {
+      state = value;
+    });
+    await flush();
+    const socket = connectedSocket();
+    socket.frame('hello', hello(), 1);
+    await flush();
+    socket.frame(
+      type,
+      {
+        syncPosition: 2,
+        data: {
+          data: {
+            assistantMessageID: 'msg_gap',
+            id: 'call',
+            executed: true,
+            input: { command: 'pwd' },
+            content: [{ type: 'text', text: '/owned' }],
+            metadata: { terminal: true },
+          },
+        },
+      },
+      2,
+      'events'
+    );
+    await flush();
+    expect(state?.pendingSnapshotMessageIDs).toEqual(['msg_gap']);
+    await jest.advanceTimersByTimeAsync(250);
+    await flush();
+    expect(state?.messages[0]?.incomplete).toBe(true);
+    expect(state?.pendingSnapshotMessageIDs).toEqual(['msg_gap']);
+    snapshot.mockResolvedValueOnce({ ...initial, position: 2, revision: 2 });
+    await jest.advanceTimersByTimeAsync(500);
+    await flush();
+    expect(state?.messages[0]?.incomplete).toBe(true);
+    expect(state?.pendingSnapshotMessageIDs).toEqual(['msg_gap']);
+    const authoritative: NativeSnapshot = {
+      ...initial,
+      position: 3,
+      revision: 3,
+      messages: [
+        {
+          seq: 1,
+          message: {
+            id: 'msg_gap',
+            type: 'assistant',
+            time: { created: 1 },
+            content: [
+              {
+                type: 'tool',
+                id: 'call',
+                name: 'shell',
+                time: {
+                  created: 1,
+                  ran: 2,
+                  ...(type === 'session.tool.success' ? { completed: 2 } : {}),
+                },
+                state:
+                  type === 'session.tool.success'
+                    ? {
+                        status: 'completed',
+                        input: { command: 'pwd' },
+                        content: [{ type: 'text', text: '/owned' }],
+                        metadata: { terminal: true },
+                      }
+                    : { status: 'running', input: { command: 'pwd' }, metadata: {} },
+              },
+            ],
+          },
+        },
+      ],
+    };
+    snapshot.mockResolvedValueOnce(authoritative);
+    await jest.advanceTimersByTimeAsync(1000);
+    await flush();
+    expect(state?.pendingSnapshotMessageIDs).toEqual([]);
+    expect(state?.messages[0]?.incomplete).toBeUndefined();
+    expect(state?.messages[0]?.message.content?.[0]?.state?.status).toBe(
+      type === 'session.tool.success' ? 'completed' : 'running'
+    );
+    expect(state?.error).toBeUndefined();
+    connection.close();
+  }
+);
+
+test('missing initial session metadata recovers while retaining live messages instead of requiring a reopen', async () => {
+  snapshot
+    .mockResolvedValueOnce({ position: 0, revision: 0, entities: [], messages: [] })
+    .mockResolvedValueOnce({
+      position: 1,
+      revision: 1,
+      session: sessionMetadata,
+      entities: [],
+      messages: [],
+    });
+  const { client } = fixture();
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  await flush();
+  const socket = connectedSocket();
+  socket.frame('hello', hello(), 0);
+  await flush();
+  expect(state?.session).toBeUndefined();
+  socket.frame(
+    'remote.state',
+    { incarnation: 'owned', runID: 'run', pending: { permissions: [], questions: [] } },
+    1,
+    'events'
+  );
+  socket.frame(
+    'session.step.started',
+    { syncPosition: 2, data: { data: { assistantMessageID: 'msg_live' } } },
+    2,
+    'events'
+  );
+  socket.frame(
+    'session.text.delta',
+    {
+      syncPosition: 2,
+      data: {
+        data: {
+          assistantMessageID: 'msg_live',
+          ordinal: 0,
+          delta: 'Visible after metadata arrives',
+        },
+      },
+    },
+    3,
+    'events'
+  );
+  await flush();
+  await jest.advanceTimersByTimeAsync(250);
+  await flush();
+  expect(state?.session).toEqual(sessionMetadata);
+  if (!state) throw new Error('Missing recovered state');
+  expect(readNativeConversation(state).messages[0]?.parts[0]).toMatchObject({
+    type: 'text',
+    text: 'Visible after metadata arrives',
+  });
+  expect(snapshot).toHaveBeenCalledTimes(2);
+  expect(state.error).toBeUndefined();
+  connection.close();
+});
+
+test('missing metadata recovery stops at its bound with a visible error, not a complete empty transcript', async () => {
+  snapshot.mockResolvedValue({ position: 0, revision: 0, entities: [], messages: [] });
+  const { client } = fixture();
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  await flush();
+  connectedSocket().frame('hello', hello());
+  await flush();
+  await jest.advanceTimersByTimeAsync(4000);
+  await flush();
+  expect(snapshot).toHaveBeenCalledTimes(5);
+  expect(state?.session).toBeUndefined();
+  expect(state?.error).toContain('incomplete');
+  if (!state) throw new Error('Missing native state');
+  expect(readNativeConversation(state).error).toContain('incomplete');
+  expect(readNativeConversation(state).loading).toBe(false);
+  connection.close();
+});
+
+test('binary snapshot assets share organization grants, renew a 401, and preserve cancellation', async () => {
+  const { client, fetcher, calls } = fixture();
+  const ordinary = fetcher.getMockImplementation();
+  if (!ordinary) throw new Error('Missing fetch fixture');
+  const authorizations: (string | null)[] = [];
+  let assetCalls = 0;
+  const controller = new AbortController();
+  fetcher.mockImplementation(async (input, init) => {
+    if (!new URL(String(input)).pathname.endsWith('/blobs/owned')) return ordinary(input, init);
+    authorizations.push(new Headers(init?.headers).get('Authorization'));
+    expect(init?.signal).toBe(controller.signal);
+    assetCalls++;
+    return assetCalls === 1
+      ? Response.json({ error: { code: 'expired' } }, { status: 401 })
+      : new Response(new Uint8Array([1, 2, 3]).buffer);
+  });
+  const expected: NativeSnapshot = {
+    position: 1,
+    revision: 1,
+    session: sessionMetadata,
+    messages: [],
+    entities: [],
+  };
+  snapshot.mockImplementationOnce(async (_request, _sessionID, signal, readAsset) => {
+    if (!readAsset) throw new Error('Missing authorized asset reader');
+    const bytes = await readAsset('/v1/sessions/ses_a/blobs/owned', { signal });
+    expect([...new Uint8Array(bytes)]).toEqual([1, 2, 3]);
+    return expected;
+  });
+  await expect(client.getSnapshot('ses_a', 'organization-owned', controller.signal)).resolves.toBe(
+    expected
+  );
+  expect(authorizations).toEqual(['Bearer grant', 'Bearer grant']);
+  expect(calls.filter(call => call.path === '/v1/auth/exchange').map(call => call.body)).toEqual([
+    { version: 1, organizationID: 'organization-owned' },
+    { version: 1, organizationID: 'organization-owned' },
+  ]);
+  snapshot.mockImplementationOnce(async (_request, _sessionID, signal, readAsset) => {
+    if (!readAsset) throw new Error('Missing authorized asset reader');
+    await readAsset('/v1/sessions/ses_a/blobs/owned', { signal });
+    return expected;
+  });
+  controller.abort();
+  await expect(
+    client.getSnapshot('ses_a', 'organization-owned', controller.signal)
+  ).rejects.toMatchObject({ code: 'request_canceled' });
+  expect(assetCalls).toBe(2);
+});
+
+test('same-path live native tool files invalidate old bytes and resolve only through a newer authoritative snapshot', async () => {
+  const uri = 'file:///owned/result.png';
+  const key = kilo2AssetKey('msg_file_000000_file_0', uri, 'image/png');
+  const result = [{ type: 'file', uri, mime: 'image/png' }];
+  const initial: NativeSnapshot = {
+    position: 1,
+    revision: 1,
+    session: sessionMetadata,
+    entities: [],
+    assetURLs: { [key]: 'data:image/png;base64,b2xk' },
+    messages: [
+      {
+        seq: 1,
+        message: {
+          id: 'msg_file',
+          type: 'assistant',
+          time: { created: 1 },
+          content: [
+            {
+              type: 'tool',
+              id: 'call',
+              name: 'read',
+              time: { created: 1, ran: 1, completed: 1 },
+              state: { status: 'completed', input: { path: '/owned/result.png' }, content: result },
+            },
+          ],
+        },
+      },
+    ],
+  };
+  snapshot.mockResolvedValueOnce(initial);
+  const { client } = fixture();
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  await flush();
+  const socket = connectedSocket();
+  socket.frame('hello', hello(), 1);
+  await flush();
+  socket.frame(
+    'session.message.content.updated',
+    {
+      syncPosition: 2,
+      data: {
+        data: {
+          messageID: 'msg_file',
+          content: [
+            {
+              type: 'tool',
+              id: 'call',
+              name: 'read',
+              time: { created: 1, ran: 1, completed: 2 },
+              state: { status: 'completed', input: { path: '/owned/result.png' }, content: result },
+            },
+          ],
+        },
+      },
+    },
+    2,
+    'events'
+  );
+  await flush();
+  expect(state?.assetURLs?.[key]).toBeUndefined();
+  expect(state?.pendingSnapshotMessageIDs).toEqual(['msg_file']);
+  const authoritative: NativeSnapshot = {
+    ...initial,
+    position: 2,
+    revision: 2,
+    assetURLs: { [key]: 'data:image/png;base64,bmV3' },
+    messages: [
+      {
+        seq: 1,
+        message: {
+          id: 'msg_file',
+          type: 'assistant',
+          time: { created: 1 },
+          content: [
+            {
+              type: 'tool',
+              id: 'call',
+              name: 'read',
+              time: { created: 1, ran: 1, completed: 2 },
+              state: { status: 'completed', input: { path: '/owned/result.png' }, content: result },
+            },
+          ],
+        },
+      },
+    ],
+  };
+  snapshot.mockResolvedValueOnce(authoritative);
+  await jest.advanceTimersByTimeAsync(250);
+  await flush();
+  expect(state?.pendingSnapshotMessageIDs).toEqual([]);
+  if (!state) throw new Error('Missing native file state');
+  expect(readNativeConversation(state).messages[0]?.parts[1]).toMatchObject({
+    type: 'file',
+    url: 'data:image/png;base64,bmV3',
+  });
+  expect(state.error).toBeUndefined();
+  connection.close();
+});
+
+test('a later missing terminal tool frame keeps its own frontier while an earlier tool call recovers', async () => {
+  const initial: NativeSnapshot = {
+    position: 1,
+    revision: 1,
+    session: sessionMetadata,
+    entities: [],
+    messages: [
+      {
+        seq: 1,
+        message: { id: 'msg_frontier', type: 'assistant', time: { created: 1 }, content: [] },
+      },
+    ],
+  };
+  const running: NativeSnapshot = {
+    ...initial,
+    position: 2,
+    revision: 2,
+    messages: [
+      {
+        seq: 1,
+        message: {
+          id: 'msg_frontier',
+          type: 'assistant',
+          time: { created: 1 },
+          content: [
+            {
+              type: 'tool',
+              id: 'call',
+              name: 'shell',
+              time: { created: 1, ran: 2 },
+              state: { status: 'running', input: { command: 'pwd' } },
+            },
+          ],
+        },
+      },
+    ],
+  };
+  snapshot.mockResolvedValueOnce(initial).mockResolvedValueOnce(running);
+  const { client } = fixture();
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  await flush();
+  const socket = connectedSocket();
+  socket.frame('hello', hello(), 1);
+  await flush();
+  socket.frame(
+    'session.tool.called',
+    {
+      syncPosition: 2,
+      data: {
+        data: {
+          assistantMessageID: 'msg_frontier',
+          id: 'call',
+          input: { command: 'pwd' },
+          executed: true,
+        },
+      },
+    },
+    2,
+    'events'
+  );
+  socket.frame(
+    'session.tool.success',
+    {
+      syncPosition: 3,
+      data: {
+        data: {
+          assistantMessageID: 'msg_frontier',
+          id: 'call',
+          content: [{ type: 'text', text: '/owned' }],
+          executed: true,
+        },
+      },
+    },
+    3,
+    'events'
+  );
+  await flush();
+  await jest.advanceTimersByTimeAsync(250);
+  await flush();
+  expect(state?.pendingSnapshotMessageIDs).toEqual(['msg_frontier']);
+  expect(state?.messages[0]?.message.content?.[0]?.state?.status).toBe('completed');
+  snapshot.mockResolvedValueOnce({ ...running, position: 3, revision: 3 });
+  await jest.advanceTimersByTimeAsync(500);
+  await flush();
+  expect(state?.pendingSnapshotMessageIDs).toEqual(['msg_frontier']);
+  const terminal: NativeSnapshot = {
+    ...running,
+    position: 4,
+    revision: 4,
+    messages: [
+      {
+        seq: 1,
+        message: {
+          id: 'msg_frontier',
+          type: 'assistant',
+          time: { created: 1 },
+          content: [
+            {
+              type: 'tool',
+              id: 'call',
+              name: 'shell',
+              time: { created: 1, ran: 2, completed: 3 },
+              state: {
+                status: 'completed',
+                input: { command: 'pwd' },
+                content: [{ type: 'text', text: '/owned' }],
+              },
+            },
+          ],
+        },
+      },
+    ],
+  };
+  snapshot.mockResolvedValueOnce(terminal);
+  await jest.advanceTimersByTimeAsync(1000);
+  await flush();
+  expect(state?.pendingSnapshotMessageIDs).toEqual([]);
+  expect(state?.error).toBeUndefined();
   connection.close();
 });

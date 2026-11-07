@@ -32,8 +32,9 @@ function positionFromPartId(messageId: string, partId: string): number | undefin
   const prefix = `${messageId}_`;
   if (!partId.startsWith(prefix)) return undefined;
   const suffix = partId.slice(prefix.length);
-  if (!/^\d{6}$/.test(suffix)) return undefined;
-  return Number(suffix);
+  // Tool-result files are derivative attachments of a native content position.
+  if (!/^\d{6}(?:_file_\d+)?$/.test(suffix)) return undefined;
+  return Number(suffix.slice(0, 6));
 }
 
 function layoutFromProjected(

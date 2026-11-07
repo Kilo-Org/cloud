@@ -51,11 +51,12 @@ function retireEverySessionCard(): void {
  * keep it. A card whose record is absent (written by an earlier build) or names
  * another account or organization is out of scope and ends here.
  *
- * `readScope` runs only when a live card can be placed. A keychain that answered
- * with no account is a sign-out this process did not finish: no card can be in
- * scope, so every card ends, as it does on an in-app sign-out. Only a keychain or
- * a record store that cannot be read now, like a locked keychain before first
- * unlock, leaves the cards as they are.
+ * `readScope` runs only when a card decision needs the account: live cards to
+ * place, or a discovery that could not read ActivityKit, whose live set says
+ * nothing. A keychain that answered with no account is a sign-out this process
+ * did not finish: no card can be in scope, so every card ends, as it does on an
+ * in-app sign-out. Only a keychain or a record store that cannot be read now,
+ * like a locked keychain before first unlock, leaves the cards as they are.
  * A registration that failed earlier retries here (spec "Error Handling" 4).
  */
 export async function restoreFollowedSessionCards(
@@ -80,6 +81,11 @@ export async function restoreFollowedSessionCards(
     }
     return;
   }
+  // The record snapshot comes before the stored-account read: a Follow that
+  // lands during the scope await (the keychain read yields) enqueues its
+  // write after this snapshot, so the prune below keeps it, while a restore
+  // from a surface it read before the snapshot cannot resurrect a record.
+  const records = await cardScopes.readSessionCardScopes();
   const stored = await readScope();
   if (stored.kind === 'unreadable') {
     // A keychain that cannot answer says nothing about the stored account, so
@@ -94,7 +100,6 @@ export async function restoreFollowedSessionCards(
     return;
   }
   const ctx = stored.ctx;
-  const records = await cardScopes.readSessionCardScopes();
   if (records === null) {
     return;
   }

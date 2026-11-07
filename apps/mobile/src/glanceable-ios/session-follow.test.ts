@@ -737,6 +737,27 @@ describe('a restore with no live card', () => {
     expect(readScope).toHaveBeenCalledTimes(1);
     expect(mocks.cleanupTokens).toHaveBeenCalledWith('scope');
   });
+
+  it('keeps the record of a follow that lands during the restore', async () => {
+    followSession(RUNNING, CTX, NOW);
+    await _settleSessionCardScopeWritesForTests();
+    // A second follow lands while the restore waits between discovery (which
+    // saw only the first card) and its scope writes: the reader runs after the
+    // record read, and answers only once the follow's scope write has landed,
+    // the worst order for the prune.
+    const second = { ...RUNNING, id: 'session-2' };
+    const restore = restoreFollowedSessionCards(async () => {
+      followSession(second, CTX, NOW);
+      await _settleSessionCardScopeWritesForTests();
+      return { kind: 'account', ctx: CTX };
+    });
+    await restore;
+    await _settleSessionCardScopeWritesForTests();
+
+    expect(isSessionFollowed('session-2')).toBe(true);
+    const records = await readSessionCardScopes();
+    expect(records?.get('session-2')).toEqual(CTX);
+  });
 });
 
 describe('syncFollowedSessionCards against a newer push', () => {

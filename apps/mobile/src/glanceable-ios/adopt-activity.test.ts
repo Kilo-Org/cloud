@@ -216,6 +216,8 @@ describe('adoptPushStartedActivity', () => {
     );
 
     await adoptPushStartedActivity();
+    // The restore asks for the account like it does with a live card to place.
+    await restoredScope();
 
     expect(
       mocks.getItemAsync.mock.calls.filter(([key]) => key === ACTIVE_USER_ID_KEY)

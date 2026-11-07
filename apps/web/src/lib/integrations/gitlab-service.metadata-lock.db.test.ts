@@ -331,7 +331,7 @@ describe('GitLab metadata writes during a webhook-secret regeneration', () => {
   it('keeps the disconnect removals when a real disconnect overlaps a regeneration', async () => {
     const owner = { type: 'user', id: userId } as const;
     const [, regenerated] = await Promise.all([
-      disconnectGitLabIntegration(owner),
+      disconnectGitLabIntegration(owner, userId),
       regenerateWebhookSecret(owner),
     ]);
 

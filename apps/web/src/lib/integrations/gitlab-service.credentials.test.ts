@@ -3,12 +3,15 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, jest } from '@j
 import { generateKeyPairSync } from 'node:crypto';
 import {
   kilocode_users,
+  organization_memberships,
+  organizations,
   platform_access_token_credentials,
   platform_integrations,
   platform_oauth_credentials,
 } from '@kilocode/db/schema';
 import type { PlatformIntegration } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { and, eq, isNull } from 'drizzle-orm';
 import { decryptKeyedEnvelope } from '@kilocode/encryption';
@@ -154,6 +157,8 @@ describe('GitLab encrypted credential persistence', () => {
     await db.delete(platform_oauth_credentials);
     await db.delete(platform_access_token_credentials);
     await db.delete(platform_integrations);
+    await db.delete(organization_memberships);
+    await db.delete(organizations);
     await db.delete(kilocode_users);
   });
 
@@ -327,7 +332,7 @@ describe('GitLab encrypted credential persistence', () => {
     ]);
   });
 
-  it('no-ops removal when only stale legacy metadata remains and no encrypted row exists', async () => {
+  it('revokes a legacy metadata-only project token before dropping its entry', async () => {
     const user = await insertTestUser();
     const connected = await connectWithPAT(
       { type: 'user', id: user.id },
@@ -361,9 +366,68 @@ describe('GitLab encrypted credential persistence', () => {
       .from(platform_integrations)
       .where(eq(platform_integrations.id, integration.id));
 
-    await removeStoredProjectAccessToken(integrationWithStaleMetadata, 42, { userId: user.id });
+    await expect(
+      removeStoredProjectAccessToken(integrationWithStaleMetadata, 42, { userId: user.id })
+    ).resolves.toBe('removed');
 
-    expect(mockRevokeProjectAccessToken).not.toHaveBeenCalled();
+    expect(mockRevokeProjectAccessToken).toHaveBeenCalledWith(
+      'glpat-primary-token',
+      42,
+      991,
+      'https://gitlab.com'
+    );
+    const [updatedIntegration] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, integration.id));
+    expect(updatedIntegration.metadata).toEqual(expect.objectContaining({ project_tokens: {} }));
+  });
+
+  it('keeps a legacy metadata-only entry when GitLab does not settle its revocation', async () => {
+    const user = await insertTestUser();
+    const connected = await connectWithPAT(
+      { type: 'user', id: user.id },
+      'glpat-primary-token',
+      'https://gitlab.com',
+      user.id
+    );
+    const [integration] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, connected.integration.id));
+    await db
+      .update(platform_integrations)
+      .set({
+        metadata: {
+          ...(integration.metadata as Record<string, unknown>),
+          project_tokens: {
+            '42': {
+              token_id: 991,
+              token: 'glpat-legacy-project-token',
+              expires_at: '2027-07-13',
+              created_at: '2026-07-13T00:00:00.000Z',
+              name: 'Kilo Code Review Bot',
+            },
+          },
+        },
+      })
+      .where(eq(platform_integrations.id, integration.id));
+    const [integrationWithStaleMetadata] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, integration.id));
+    mockRevokeProjectAccessToken.mockRejectedValueOnce(
+      new GitLabProjectAccessTokenRevocationError(
+        42,
+        403,
+        'GitLab revoke Project Access Token failed: 403'
+      )
+    );
+
+    await expect(
+      removeStoredProjectAccessToken(integrationWithStaleMetadata, 42, { userId: user.id })
+    ).resolves.toBe('retained');
+
     const [updatedIntegration] = await db
       .select()
       .from(platform_integrations)
@@ -1542,7 +1606,7 @@ describe('GitLab encrypted credential persistence', () => {
     );
   });
 
-  it('disconnects the primary PAT while preserving project credentials', async () => {
+  it('revokes each project token at GitLab and drops its stored handles on disconnect', async () => {
     const user = await insertTestUser();
     const connected = await connectWithPAT(
       { type: 'user', id: user.id },
@@ -1555,8 +1619,74 @@ describe('GitLab encrypted credential persistence', () => {
       .from(platform_integrations)
       .where(eq(platform_integrations.id, connected.integration.id));
     await getOrCreateProjectAccessToken(integration, 42, { userId: user.id });
+    const configuredWebhooks = {
+      '42': { hook_id: 77, created_at: '2026-07-13T00:00:00.000Z' },
+    };
+    await db
+      .update(platform_integrations)
+      .set({
+        metadata: {
+          ...(integration.metadata as Record<string, unknown>),
+          configured_webhooks: configuredWebhooks,
+        },
+      })
+      .where(eq(platform_integrations.id, integration.id));
 
-    await disconnectGitLabIntegration({ type: 'user', id: user.id });
+    await disconnectGitLabIntegration({ type: 'user', id: user.id }, user.id);
+
+    const credentials = await db
+      .select()
+      .from(platform_access_token_credentials)
+      .where(
+        eq(platform_access_token_credentials.platform_integration_id, connected.integration.id)
+      );
+    const [disconnectedIntegration] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, connected.integration.id));
+
+    expect(mockRevokeProjectAccessToken).toHaveBeenCalledWith(
+      'glpat-primary-token',
+      '42',
+      777,
+      'https://gitlab.com'
+    );
+    expect(credentials).toEqual([]);
+    expect(disconnectedIntegration.integration_status).toBe('suspended');
+    expect(disconnectedIntegration.metadata).not.toHaveProperty('access_token');
+    expect(disconnectedIntegration.metadata).toEqual(
+      expect.objectContaining({
+        webhook_secret: expect.any(String),
+        configured_webhooks: configuredWebhooks,
+        project_tokens: {},
+      })
+    );
+  });
+
+  it('keeps a project token whose revocation GitLab refuses', async () => {
+    const user = await insertTestUser();
+    const connected = await connectWithPAT(
+      { type: 'user', id: user.id },
+      'glpat-primary-token',
+      'https://gitlab.com',
+      user.id
+    );
+    const [integration] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, connected.integration.id));
+    await getOrCreateProjectAccessToken(integration, 42, { userId: user.id });
+    mockRevokeProjectAccessToken.mockRejectedValueOnce(
+      new GitLabProjectAccessTokenPermissionError(
+        42,
+        403,
+        'Insufficient permissions to revoke Project Access Token for project 42.'
+      )
+    );
+
+    await expect(
+      disconnectGitLabIntegration({ type: 'user', id: user.id }, user.id)
+    ).resolves.toEqual({ success: true });
 
     const credentials = await db
       .select()
@@ -1570,10 +1700,71 @@ describe('GitLab encrypted credential persistence', () => {
       .where(eq(platform_integrations.id, connected.integration.id));
 
     expect(credentials).toHaveLength(1);
-    expect(credentials[0].provider_resource_id).toBe('42');
+    expect(credentials[0]).toEqual(
+      expect.objectContaining({
+        provider_resource_id: '42',
+        provider_credential_type: 'project_access_token',
+      })
+    );
     expect(disconnectedIntegration.integration_status).toBe('suspended');
-    expect(disconnectedIntegration.metadata).not.toHaveProperty('access_token');
-    expect(disconnectedIntegration.metadata).not.toHaveProperty('project_tokens');
+  });
+
+  it('keeps project tokens when the connected credential cannot be resolved', async () => {
+    const user = await insertTestUser();
+    const connected = await connectWithPAT(
+      { type: 'user', id: user.id },
+      'glpat-primary-token',
+      'https://gitlab.com',
+      user.id
+    );
+    const [integration] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, connected.integration.id));
+    await getOrCreateProjectAccessToken(integration, 42, { userId: user.id });
+    mockFetchGitLabCredential.mockResolvedValueOnce({ status: 'not_connected' });
+
+    await expect(
+      disconnectGitLabIntegration({ type: 'user', id: user.id }, user.id)
+    ).resolves.toEqual({ success: true });
+
+    const credentials = await db
+      .select()
+      .from(platform_access_token_credentials)
+      .where(
+        eq(platform_access_token_credentials.platform_integration_id, connected.integration.id)
+      );
+
+    expect(mockRevokeProjectAccessToken).not.toHaveBeenCalled();
+    expect(credentials).toHaveLength(1);
+    expect(credentials[0].provider_resource_id).toBe('42');
+  });
+
+  it('resolves the disconnect credential as the acting organization member', async () => {
+    const user = await insertTestUser();
+    const organization = await createTestOrganization('GitLab disconnect org', user.id, 0);
+    const connected = await connectWithPAT(
+      { type: 'org', id: organization.id },
+      'glpat-primary-token',
+      'https://gitlab.com',
+      user.id
+    );
+    const [integration] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, connected.integration.id));
+    await getOrCreateProjectAccessToken(integration, 42, {
+      userId: user.id,
+      organizationId: organization.id,
+    });
+    mockFetchGitLabCredential.mockClear();
+
+    await disconnectGitLabIntegration({ type: 'org', id: organization.id }, user.id);
+
+    expect(mockFetchGitLabCredential).toHaveBeenCalledWith(
+      { userId: user.id, organizationId: organization.id },
+      { credential: 'integration', integrationId: integration.id }
+    );
   });
 
   it('keeps a new connection when the repository list cannot be loaded', async () => {

@@ -130,7 +130,7 @@ export const gitlabRouter = createTRPCRouter({
       return { success: false, message: 'Integration not found' };
     }
 
-    return gitlabService.disconnectGitLabIntegration(owner);
+    return gitlabService.disconnectGitLabIntegration(owner, ctx.user.id);
   }),
 
   refreshRepositories: baseProcedure

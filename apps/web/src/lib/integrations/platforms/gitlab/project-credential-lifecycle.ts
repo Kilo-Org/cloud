@@ -1,6 +1,6 @@
 import 'server-only';
 import { and, eq } from 'drizzle-orm';
-import { db } from '@kilocode/web-shared/lib/drizzle';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { platform_access_token_credentials, type PlatformIntegration } from '@kilocode/db/schema';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import {
@@ -53,17 +53,24 @@ function projectTokenMap(metadata: Readonly<Record<string, unknown>>): Record<st
   return typeof value === 'object' && value !== null && !Array.isArray(value) ? { ...value } : {};
 }
 
+async function deleteProjectTokenMetadataEntry(
+  tx: DrizzleTransaction,
+  input: { integrationId: string; projectId: string }
+): Promise<void> {
+  await mutateGitLabMetadataInTransaction(tx, input.integrationId, currentMetadata => {
+    const projectTokens = projectTokenMap(currentMetadata);
+    delete projectTokens[input.projectId];
+    return { set: { project_tokens: projectTokens } };
+  });
+}
+
 export async function deleteStoredProjectCredential(input: {
   integrationId: string;
   projectId: string;
   credential: ProjectCredentialRef;
 }): Promise<void> {
   await db.transaction(async tx => {
-    await mutateGitLabMetadataInTransaction(tx, input.integrationId, currentMetadata => {
-      const projectTokens = projectTokenMap(currentMetadata);
-      delete projectTokens[input.projectId];
-      return { set: { project_tokens: projectTokens } };
-    });
+    await deleteProjectTokenMetadataEntry(tx, input);
     const deleted = await tx
       .delete(platform_access_token_credentials)
       .where(
@@ -80,6 +87,21 @@ export async function deleteStoredProjectCredential(input: {
       throw new Error('GitLab project access token was replaced concurrently');
     }
   });
+}
+
+/**
+ * Removes only the legacy plaintext metadata entry of a project token.
+ *
+ * A leftover entry without an encrypted row is not a usable credential: the
+ * token service resolves project tokens from the encrypted row only. Once the
+ * provider settles the revocation of the token id that entry names, the entry
+ * itself is the last handle to drop.
+ */
+export async function deleteStoredProjectTokenMetadataEntry(input: {
+  integrationId: string;
+  projectId: string;
+}): Promise<void> {
+  await db.transaction(tx => deleteProjectTokenMetadataEntry(tx, input));
 }
 
 export async function markStoredProjectCredentialUnusable(input: {

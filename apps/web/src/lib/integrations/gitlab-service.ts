@@ -1,4 +1,5 @@
 import 'server-only';
+import { z } from 'zod';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import type { PlatformIntegration } from '@kilocode/db/schema';
 import {
@@ -57,6 +58,7 @@ import {
 } from '@/lib/integrations/platforms/gitlab/credential-encryption';
 import {
   deleteStoredProjectCredential,
+  deleteStoredProjectTokenMetadataEntry,
   readGitLabAccountId,
   readProjectRevocationStatus,
   retireProjectCredentialsForReplacedAccount,
@@ -404,14 +406,74 @@ export async function listGitLabBranches(
 }
 
 /**
+ * The actor a credential lookup uses for an owner's integration. An
+ * organization integration resolves only for a member of that organization,
+ * so the acting user must travel with the owner.
+ */
+function gitLabCredentialActor(owner: Owner, actingUserId: string): GitLabCredentialActor {
+  return {
+    userId: actingUserId,
+    ...(owner.type === 'org' ? { organizationId: owner.id } : {}),
+  };
+}
+
+/**
+ * Project ids whose access token belongs to the integration: the encrypted
+ * rows it holds and any legacy metadata entry it still carries. Malformed
+ * metadata keys are not GitLab project ids and cannot be revoked.
+ */
+async function listIntegrationProjectIds(integration: PlatformIntegration): Promise<string[]> {
+  const projectIds = new Set<string>();
+  const metadata = requireMetadataRecord(integration.metadata);
+  const storedTokens = metadata.project_tokens;
+  if (typeof storedTokens === 'object' && storedTokens !== null && !Array.isArray(storedTokens)) {
+    for (const projectId of Object.keys(storedTokens)) {
+      if (/^[1-9][0-9]*$/.test(projectId)) projectIds.add(projectId);
+    }
+  }
+
+  const rows = await db
+    .select({ projectId: platform_access_token_credentials.provider_resource_id })
+    .from(platform_access_token_credentials)
+    .where(
+      and(
+        eq(platform_access_token_credentials.platform_integration_id, integration.id),
+        eq(platform_access_token_credentials.provider_credential_type, 'project_access_token')
+      )
+    );
+  for (const row of rows) {
+    if (row.projectId !== null) projectIds.add(row.projectId);
+  }
+
+  return [...projectIds];
+}
+
+/**
  * Disconnect GitLab integration for an owner
  *
- * Instead of deleting the integration record, we mark it as disconnected.
- * This preserves the webhook_secret, configured_webhooks, and project_tokens
- * so that when the user reconnects (via OAuth or PAT), existing webhook
- * configurations continue to work.
+ * Instead of deleting the integration record, we mark it as disconnected and
+ * settle the provider-side credentials it delegated:
+ *
+ * 1. resolve the connected credential once, while the integration still counts
+ *    as connected — the token service refuses a suspended integration, so this
+ *    is the last moment the credential that can revoke project tokens is
+ *    reachable;
+ * 2. mark the integration suspended and drop the connection's own encrypted
+ *    credentials, which stops every caller and the token service from resolving
+ *    anything against this integration;
+ * 3. revoke each per-project access token at GitLab through the same removal
+ *    contract the review lifecycle uses: a metadata entry and an encrypted row
+ *    are deleted only after GitLab settles the revocation, and any other
+ *    outcome keeps both so a later removal can try again.
+ *
+ * The webhook_secret and configured_webhooks stay, so a reconnect keeps the
+ * existing webhook configuration.
+ *
+ * `actingUserId` is the user who requested the disconnect. It names the actor
+ * for the credential lookup, which for an organization integration must be a
+ * member of that organization.
  */
-export async function disconnectGitLabIntegration(owner: Owner) {
+export async function disconnectGitLabIntegration(owner: Owner, actingUserId: string) {
   const ownershipCondition = ownerCondition(owner);
 
   const [integration] = await db
@@ -431,6 +493,24 @@ export async function disconnectGitLabIntegration(owner: Owner) {
       code: 'NOT_FOUND',
       message: 'GitLab integration not found',
     });
+  }
+
+  const actor = gitLabCredentialActor(owner, actingUserId);
+  // Only decides whether this disconnect has a project token to settle, and so
+  // whether the connected credential must be resolved at all. The list that is
+  // settled is read again after the suspension, where it is final.
+  const projectTokenCandidates = await listIntegrationProjectIds(integration);
+  let userToken: string | undefined;
+  if (projectTokenCandidates.length > 0) {
+    try {
+      userToken = await getValidGitLabToken(integration, actor);
+    } catch (error) {
+      logExceptInTest('[disconnectGitLabIntegration] Project token revocation unsettled', {
+        integrationId: integration.id,
+        projectTokenCount: projectTokenCandidates.length,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
 
   const updatedMetadata = await db.transaction(async tx => {
@@ -465,13 +545,37 @@ export async function disconnectGitLabIntegration(owner: Owner) {
     return nextMetadata;
   });
 
+  let revokedProjectTokens = 0;
+  let retainedProjectTokens = 0;
+  if (userToken !== undefined) {
+    // Read after the suspension: nothing can mint a project token while the
+    // integration is suspended, so this set is final and also covers a token
+    // stored between the first read and the suspension.
+    const projectIds = await listIntegrationProjectIds(integration);
+    for (const projectId of projectIds) {
+      const outcome = await removeStoredProjectAccessToken(integration, projectId, actor, {
+        userToken,
+      }).catch(error => {
+        logExceptInTest('[disconnectGitLabIntegration] Project token settlement failed', {
+          integrationId: integration.id,
+          projectId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        return 'retained' as const;
+      });
+      if (outcome === 'removed') revokedProjectTokens += 1;
+      else if (outcome === 'retained') retainedProjectTokens += 1;
+    }
+  }
+
   logExceptInTest(
     '[disconnectGitLabIntegration] Integration suspended (preserved webhook config)',
     {
       integrationId: integration.id,
       preservedWebhookSecret: !!updatedMetadata.webhook_secret,
       preservedWebhooks: countMetadataObjectEntries(updatedMetadata.configured_webhooks),
-      preservedProjectTokens: countMetadataObjectEntries(updatedMetadata.project_tokens),
+      revokedProjectTokens,
+      retainedProjectTokens,
     }
   );
 
@@ -561,6 +665,27 @@ export type GitLabIntegrationMetadata = {
  * Default name for Kilo Code Review Bot tokens
  */
 const KILO_BOT_TOKEN_NAME = 'Kilo Code Review Bot';
+
+/** The only field of a legacy metadata entry that can still revoke its token. */
+const LegacyStoredProjectAccessTokenSchema = z
+  .object({ token_id: z.number().int().positive() })
+  .passthrough();
+
+const GitLabProjectTokenMetadataSchema = z
+  .object({ project_tokens: z.record(z.string(), z.unknown()).optional() })
+  .passthrough();
+
+/**
+ * Token id named by a legacy plaintext metadata entry, or null when the entry
+ * is absent or does not carry a usable id.
+ */
+function readLegacyProjectTokenId(metadata: unknown, projectId: string): number | null {
+  const parsedMetadata = GitLabProjectTokenMetadataSchema.safeParse(metadata);
+  if (!parsedMetadata.success) return null;
+  const entry = parsedMetadata.data.project_tokens?.[projectId];
+  const parsedEntry = LegacyStoredProjectAccessTokenSchema.safeParse(entry);
+  return parsedEntry.success ? parsedEntry.data.token_id : null;
+}
 
 async function getStoredProjectCredential(integrationId: string, projectId: string) {
   const [row] = await db
@@ -961,56 +1086,78 @@ async function updateStoredProjectAccessToken(
   });
 }
 
+/** Outcome of removing one stored project token. */
+export type StoredProjectTokenRemoval = 'removed' | 'retained' | 'absent';
+
 /**
  * Removes the stored Project Access Token for a project
- * Called when a project is removed from code reviews
+ * Called when a project is removed from code reviews, and by every project on
+ * disconnect
  *
  * The metadata entry and the encrypted credential row are deleted only after
  * GitLab settles the revocation, either by confirming it or by reporting the
  * token as already gone (404). Any other outcome keeps both handles so a later
- * removal can try again.
+ * removal can try again. A legacy metadata entry without an encrypted row names
+ * a token id too, so it follows the same contract: revoke by that id first, then
+ * drop the entry.
+ *
+ * `userToken` lets a caller that already resolved the connected credential — a
+ * disconnect resolves it before the integration stops counting as connected —
+ * reuse it instead of asking the token service per project.
  */
 export async function removeStoredProjectAccessToken(
   integration: PlatformIntegration,
   projectId: string | number,
-  actor: GitLabCredentialActor
-): Promise<void> {
+  actor: GitLabCredentialActor,
+  options: { userToken?: string } = {}
+): Promise<StoredProjectTokenRemoval> {
   const metadata = integration.metadata as GitLabIntegrationMetadata | null;
   const projectIdStr = requireGitLabProjectId(projectId);
   const storedCredential = await getStoredProjectCredential(integration.id, projectIdStr);
-  if (!storedCredential) return;
+  const tokenId =
+    storedCredential?.tokenId ?? readLegacyProjectTokenId(integration.metadata, projectIdStr);
+  if (tokenId === null) return 'absent';
   const instanceUrl = normalizeInstanceUrl(metadata?.gitlab_instance_url);
 
   try {
-    const userToken = await getValidGitLabToken(integration, actor);
-    await revokeProjectAccessToken(userToken, projectId, storedCredential.tokenId, instanceUrl);
+    const userToken = options.userToken ?? (await getValidGitLabToken(integration, actor));
+    await revokeProjectAccessToken(userToken, projectId, tokenId, instanceUrl);
   } catch (error) {
     logExceptInTest(
       '[removeStoredProjectAccessToken] Revocation unsettled; keeping stored project credential',
       {
         projectId,
-        tokenId: storedCredential.tokenId,
+        tokenId,
         status: readProjectRevocationStatus(error),
         error: error instanceof Error ? error.message : String(error),
       }
     );
-    return;
+    return 'retained';
   }
 
   logExceptInTest('[removeStoredProjectAccessToken] Token revoked in GitLab', {
     projectId,
-    tokenId: storedCredential.tokenId,
+    tokenId,
   });
 
-  await deleteStoredProjectCredential({
-    integrationId: integration.id,
-    projectId: projectIdStr,
-    credential: storedCredential,
-  });
+  if (storedCredential) {
+    await deleteStoredProjectCredential({
+      integrationId: integration.id,
+      projectId: projectIdStr,
+      credential: storedCredential,
+    });
+  } else {
+    await deleteStoredProjectTokenMetadataEntry({
+      integrationId: integration.id,
+      projectId: projectIdStr,
+    });
+  }
 
   logExceptInTest('[removeStoredProjectAccessToken] Token removed from metadata', {
     projectId,
   });
+
+  return 'removed';
 }
 
 /**

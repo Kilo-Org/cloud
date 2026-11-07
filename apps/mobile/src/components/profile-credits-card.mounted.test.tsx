@@ -330,6 +330,63 @@ function headerClasses(renderer: ReactTestRenderer): string[] {
   return String(header.props.className).split(' ');
 }
 
+/** A node's class tokens, so a class assertion never depends on their order. */
+function classesOf(node: ReactTestInstance): string[] {
+  return String(node.props.className ?? '')
+    .split(/\s+/)
+    .filter(Boolean);
+}
+
+function hasClasses(node: ReactTestInstance, expected: readonly string[]): boolean {
+  const tokens = classesOf(node);
+  return expected.every(token => tokens.includes(token));
+}
+
+/** Whether `node` or one of its descendants renders the given string. */
+function renders(node: ReactTestInstance, text: string): boolean {
+  return (
+    node.findAll(
+      candidate =>
+        candidate.children.some(child => typeof child === 'string' && child.includes(text)) ||
+        // A mock child rendered as a bare component name, such as the
+        // purchase action, is its own text.
+        (typeof candidate.type === 'string' && candidate.type === text)
+    ).length > 0
+  );
+}
+
+/** Whether `node` is `target` or holds it among its descendants. */
+function contains(node: ReactTestInstance, target: ReactTestInstance): boolean {
+  if (node === target) {
+    return true;
+  }
+  return node.children.some(child => typeof child !== 'string' && contains(child, target));
+}
+
+/** The card's balance shell: its only `min-h-16 rounded-lg bg-secondary` box. */
+function balanceBlock(renderer: ReactTestRenderer): ReactTestInstance {
+  return renderer.root.find(
+    node =>
+      Object.is(node.type, 'View') && hasClasses(node, ['min-h-16', 'rounded-lg', 'bg-secondary'])
+  );
+}
+
+/** The value column of any layout: the amount (or its retry surface) and the note. */
+function valueColumn(renderer: ReactTestRenderer): ReactTestInstance {
+  return renderer.root.find(
+    node => Object.is(node.type, 'View') && hasClasses(node, ['min-h-[48px]', 'flex-1', 'gap-1'])
+  );
+}
+
+/** The value line of the stacked layout: the amount and its visibility toggle. */
+function amountRow(renderer: ReactTestRenderer): ReactTestInstance {
+  return renderer.root.find(
+    node =>
+      Object.is(node.type, 'View') &&
+      String(node.props.className) === 'min-w-0 flex-row items-center gap-1'
+  );
+}
+
 beforeEach(() => {
   Platform.OS = 'ios';
   windowDims.width = 390;
@@ -1179,7 +1236,7 @@ describe('CreditsCard add-credits entry point', () => {
     let ancestor = action.parent;
     let insideBalanceCard = false;
     while (ancestor !== null) {
-      if (String(ancestor.props.className ?? '').includes('min-h-16 rounded-lg bg-secondary')) {
+      if (hasClasses(ancestor, ['min-h-16', 'rounded-lg', 'bg-secondary'])) {
         insideBalanceCard = true;
         break;
       }
@@ -1205,48 +1262,34 @@ describe('CreditsCard add-credits entry point', () => {
     // A retry that succeeds swaps this block for the loaded row, so both states
     // have to paint the same frame: the failure surface and the purchase action
     // inside one block, not a padded pressable with the action beside it.
-    const action = renderer.root.find(node => node.children.includes('ADD_CREDITS_ROW'));
-    const balanceBlock = (() => {
-      let ancestor = action.parent;
-      while (ancestor !== null) {
-        if (String(ancestor.props.className ?? '').includes('min-h-16 rounded-lg bg-secondary')) {
-          return ancestor;
-        }
-        ancestor = ancestor.parent;
-      }
-      return null;
-    })();
-    if (balanceBlock === null) {
-      throw new Error('The purchase action renders outside the balance block');
-    }
+    const block = balanceBlock(renderer);
     expect(
-      balanceBlock.findAll(node => node.children.includes('Failed to load balance. Tap to retry.'))
-        .length
+      block.findAll(node => node.children.includes('Failed to load balance. Tap to retry.')).length
     ).toBeGreaterThan(0);
 
     // No layout pass runs in this suite, so the card stays in its stacked
-    // layout: the block is the control row with the note under it. The retry
-    // surface fills that row, whose 44 dp floor is the height the loaded row
-    // holds, so a retry that succeeds swaps content inside the same frame.
-    const retryRow = balanceBlock.find(node =>
-      String(node.props.className ?? '').includes('min-h-[44px] flex-row items-center')
+    // layout: the retry surface is the value line, the note keeps its own line
+    // under it, and the purchase action centers beside that column. The retry
+    // surface carries its own 44 dp target while adding only the value line's
+    // height, so a retry that succeeds swaps content inside the same frame.
+    const retrySurface = block.find(
+      node =>
+        Object.is(node.type, 'Pressable') &&
+        hasClasses(node, ['min-h-11', '-my-[8px]', 'justify-center'])
     );
-    expect(
-      retryRow.findAll(node => node.children.includes('Failed to load balance. Tap to retry.'))
-        .length
-    ).toBeGreaterThan(0);
-    expect(
-      retryRow.findAll(node => node.children.includes('ADD_CREDITS_ROW')).length
-    ).toBeGreaterThan(0);
-    const retrySurface = retryRow.find(node =>
-      String(node.props.className ?? '').includes('self-stretch')
-    );
+    expect(renders(retrySurface, 'Failed to load balance. Tap to retry.')).toBe(true);
     expect(retrySurface.props.onPress).toBeTypeOf('function');
     // The note reads the credit blocks, not the balance, so the failed block
-    // keeps that line too and the block holds its height.
-    expect(
-      balanceBlock.findAll(node => node.children.includes('No expiring credits.')).length
-    ).toBe(1);
+    // keeps that line under the retry surface and the block holds its height.
+    const column = valueColumn(renderer);
+    expect(renders(column, 'Failed to load balance. Tap to retry.')).toBe(true);
+    expect(renders(column, 'No expiring credits.')).toBe(true);
+    const values = column.children.filter(
+      (child): child is ReactTestInstance => typeof child !== 'string'
+    );
+    expect(values.indexOf(retrySurface)).toBe(0);
+    expect(renders(block, 'ADD_CREDITS_ROW')).toBe(true);
+    expect(renders(column, 'ADD_CREDITS_ROW')).toBe(false);
 
     unmount();
   });
@@ -1287,43 +1330,11 @@ describe('CreditsCard balance row', () => {
     );
   }
 
-  /** The balance shell's classes: the card's only `min-h-16 rounded-lg bg-secondary` box. */
-  function balanceClasses(renderer: ReactTestRenderer): string[] {
-    const balance = renderer.root.find(
-      node =>
-        Object.is(node.type, 'View') &&
-        String(node.props.className).includes('min-h-16 rounded-lg bg-secondary')
-    );
-    return String(balance.props.className).split(' ');
-  }
-
   /** The amount-and-note column of the one-row layout. */
   function wideTextColumn(renderer: ReactTestRenderer): ReactTestInstance {
     return renderer.root.find(
       node =>
         Object.is(node.type, 'View') && String(node.props.className) === 'min-w-0 flex-1 gap-1'
-    );
-  }
-
-  /** The control row of the stacked layout: the amount, the toggle and the action. */
-  function amountRow(renderer: ReactTestRenderer): ReactTestInstance {
-    return renderer.root.find(
-      node =>
-        Object.is(node.type, 'View') &&
-        String(node.props.className) === 'min-w-0 min-h-[44px] flex-row items-center gap-1'
-    );
-  }
-
-  /** Whether `node` or one of its descendants renders the given string. */
-  function renders(node: ReactTestInstance, text: string): boolean {
-    return (
-      node.findAll(
-        candidate =>
-          candidate.children.some(child => typeof child === 'string' && child.includes(text)) ||
-          // A mock child rendered as a bare component name, such as the
-          // purchase action, is its own text.
-          (typeof candidate.type === 'string' && candidate.type === text)
-      ).length > 0
     );
   }
 
@@ -1341,17 +1352,8 @@ describe('CreditsCard balance row', () => {
     return mounted;
   }
 
-  /** The balance shell: the card's only `min-h-16` surface box. */
-  function balanceBlock(renderer: ReactTestRenderer): ReactTestInstance {
-    return renderer.root.find(
-      node =>
-        Object.is(node.type, 'View') &&
-        String(node.props.className).includes('min-h-16 rounded-lg bg-secondary')
-    );
-  }
-
   it.each(['failed', 'loaded'] as const)(
-    'keeps the note one gap under the control row in the %s state',
+    'keeps the note directly under the value line in the %s state',
     async state => {
       currentUser.userId = 'user-1';
       if (state === 'failed') {
@@ -1374,24 +1376,29 @@ describe('CreditsCard balance row', () => {
         )({ nativeEvent: { layout: { width: 332 } } });
       });
 
-      // The note hangs off the block itself, so it takes the block's gap under
-      // the control row: a retry that succeeds swaps content inside one frame
-      // instead of moving the note and every section below the card by the
-      // difference between a nested column's gap and the block's.
-      const block = balanceBlock(renderer);
-      const note = block.find(node =>
+      // The note is the value column's second child in every state, so it holds
+      // the column's own small gap under the amount. Hanging it off a taller
+      // control row instead moved the caption 7 dp further from the value than
+      // the wide card paints it (design review, Profile compact cell,
+      // 2026-11-07), and the action's height decided where it landed.
+      const column = valueColumn(renderer);
+      const note = column.find(node =>
         node.children.some(
           child => typeof child === 'string' && child.includes('No expiring credits.')
         )
       );
+      const children = column.children.filter(
+        (child): child is ReactTestInstance => typeof child !== 'string'
+      );
+      const noteBranch = children.findIndex(child => contains(child, note));
+      expect(noteBranch).toBe(1);
+      // No element of its own adds a second gap between the value and the note.
       const between: string[] = [];
       let ancestor = note.parent;
-      while (ancestor !== null && ancestor !== block) {
+      while (ancestor !== null && ancestor !== column) {
         between.push(String(ancestor.props.className ?? ''));
         ancestor = ancestor.parent;
       }
-      // Only component boundaries stand between the note's text and the block;
-      // no element of its own adds a second gap under the control row.
       expect(between.filter(entry => entry.includes('gap-'))).toEqual([]);
       unmount();
     }
@@ -1417,23 +1424,28 @@ describe('CreditsCard balance row', () => {
     ['the compact cell', 332],
     ['a 390 dp screen', 362],
   ])(
-    'keeps the amount, its toggle and the action on one line with the note under it on %s',
+    'gives the note its own line under the amount and keeps the action beside it on %s',
     async (_name, width) => {
       const { renderer, unmount } = await mountAtCardWidth(width);
 
-      const classes = balanceClasses(renderer);
-      expect(classes).toContain('items-stretch');
-      expect(classes).not.toContain('flex-row');
-      // A stacked card keeps the card compact: the amount, its visibility toggle
-      // and the purchase action share one control line, and the note takes the
-      // row under it at the card's full width. The action used to own a band
-      // below the note, which left the card half empty and its two ends unevenly
-      // padded (design review, Profile compact cell, 2026-11-07).
+      // A stacked card keeps the value and its caption together: the amount and
+      // its visibility toggle share the value line, the note takes the column's
+      // next line at the column's own gap, and the purchase action centers
+      // beside the pair instead of standing in the amount's line, where its
+      // height pushed the caption down (design review, Profile compact cell,
+      // 2026-11-07).
+      const shell = balanceBlock(renderer);
+      expect(hasClasses(shell, ['flex-row', 'items-center'])).toBe(true);
+      const column = valueColumn(renderer);
+      expect(column.parent?.parent).toBe(shell);
+
       const row = amountRow(renderer);
-      expect(renders(row, 'ADD_CREDITS_BUTTON')).toBe(true);
+      expect(row.parent).toBe(column);
       expect(renders(row, 'No expiring credits.')).toBe(false);
-      const card = cardBox(renderer);
-      expect(renders(card, 'No expiring credits.')).toBe(true);
+      expect(renders(row, 'ADD_CREDITS_BUTTON')).toBe(false);
+      expect(renders(column, 'No expiring credits.')).toBe(true);
+      expect(renders(column, 'ADD_CREDITS_BUTTON')).toBe(false);
+      expect(renders(shell, 'ADD_CREDITS_BUTTON')).toBe(true);
       unmount();
     }
   );

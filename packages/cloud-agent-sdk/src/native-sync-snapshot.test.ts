@@ -985,7 +985,7 @@ describe('authorized native snapshot attachments', () => {
         'application/pdf'
       ),
     ]);
-    const readAsset = jest.fn(async (path: string) => {
+    const readAsset = jest.fn(async (path: string, _advertisedBytes: number) => {
       if (path === `${sessionPath}/blobs/${mediaHash}`) return new Uint8Array([1, 2, 3]).buffer;
       if (path === `${sessionPath}/blobs/${pdfHash}`)
         return new Uint8Array([37, 80, 68, 70]).buffer;
@@ -996,9 +996,9 @@ describe('authorized native snapshot attachments', () => {
     expect(snapshot.messages[0]?.message.files?.[0]).not.toHaveProperty('data');
     expect(snapshot.messages[1]?.message.content).toEqual([toolPart]);
     expect(snapshot.messages[1]?.partOrdinals).toEqual([7]);
-    expect(readAsset.mock.calls.map(([path]) => path)).toEqual([
-      `${sessionPath}/blobs/${mediaHash}`,
-      `${sessionPath}/blobs/${pdfHash}`,
+    expect(readAsset.mock.calls.map(([path, bytes]) => [path, bytes])).toEqual([
+      [`${sessionPath}/blobs/${mediaHash}`, 3],
+      [`${sessionPath}/blobs/${pdfHash}`, 4],
     ]);
     const projection = projectNativeSnapshot(snapshot);
     expect(projection.messages[0]?.parts[1]).toMatchObject({
@@ -1177,7 +1177,7 @@ describe('authorized native snapshot attachments', () => {
     const started = new Promise<void>(resolve => {
       markStarted = resolve;
     });
-    const readAsset = jest.fn((_path: string, init?: RequestInit) => {
+    const readAsset = jest.fn((_path: string, _advertisedBytes: number, init?: RequestInit) => {
       signal = init?.signal;
       markStarted();
       // Match the native ES2022/Hermes target, which lacks Promise.withResolvers.
@@ -1246,7 +1246,10 @@ it('restarts the revision-pinned read when an authorized attachment blob was rec
     { path: pagePath(5), body: page(entities, null, 5, 21) },
   ]);
   const readAsset = jest
-    .fn(async (_path: string, _init?: RequestInit) => new Uint8Array([1, 2, 3]).buffer)
+    .fn(
+      async (_path: string, _advertisedBytes: number, _init?: RequestInit) =>
+        new Uint8Array([1, 2, 3]).buffer
+    )
     .mockRejectedValueOnce(Object.assign(new Error('Reclaimed'), { code: 'blob_not_found' }));
   const snapshot = await fetchNativeSnapshot(request, sessionID, undefined, readAsset);
   expect(snapshot).toMatchObject({ revision: 5, position: 21 });

@@ -67,11 +67,12 @@ export type NativePresenceState = {
 export type NativeSessionState = {
   connection: NativeConnection;
   runnerConnected: boolean;
-  session?: NativeSnapshotSession;
-  snapshot?: { position: number; revision: number };
+  /** Snapshot fields accept undefined so merged state patches can explicitly clear them. */
+  session?: NativeSnapshotSession | undefined;
+  snapshot?: { position: number; revision: number } | undefined;
   /** Canonical message identities awaiting a revision-pinned native snapshot. */
-  pendingSnapshotMessageIDs?: string[];
-  assetURLs?: Readonly<Record<string, string>>;
+  pendingSnapshotMessageIDs?: string[] | undefined;
+  assetURLs?: Readonly<Record<string, string>> | undefined;
   messages: NativeSnapshotMessage[];
   pending: NativePendingRequests;
   events: NativeEvent[];
@@ -351,11 +352,51 @@ export class NativeSyncClient {
   }
   private async requestAsset(
     path: string,
+    advertisedBytes: number,
     init?: RequestInit,
     organizationID?: string
   ): Promise<ArrayBuffer> {
     try {
-      return await (await this.authorizedResponse(path, init, organizationID)).arrayBuffer();
+      const response = await this.authorizedResponse(path, init, organizationID);
+      const reader = response.body?.getReader();
+      try {
+        const length = response.headers.get('Content-Length');
+        if (length !== null) {
+          if (!/^\d+$/.test(length) || !Number.isSafeInteger(Number(length))) {
+            throw new NativeSyncError('invalid_content_length');
+          }
+          if (Number(length) > advertisedBytes) {
+            throw new NativeSyncError('blob_hash_mismatch');
+          }
+        }
+        if (!reader) {
+          if (advertisedBytes === 0) return new ArrayBuffer(0);
+          throw new NativeSyncError('blob_hash_mismatch');
+        }
+        const bytes = new Uint8Array(advertisedBytes);
+        let offset = 0;
+        while (true) {
+          const result = await reader.read();
+          if (result.done) {
+            if (offset !== advertisedBytes) throw new NativeSyncError('blob_hash_mismatch');
+            return bytes.buffer;
+          }
+          if (result.value.byteLength > advertisedBytes - offset) {
+            throw new NativeSyncError('blob_hash_mismatch');
+          }
+          bytes.set(result.value, offset);
+          offset += result.value.byteLength;
+        }
+      } catch (error) {
+        try {
+          await reader?.cancel();
+        } catch {
+          // The bounded read fails closed even if the stream cannot be canceled.
+        }
+        throw error;
+      } finally {
+        reader?.releaseLock();
+      }
     } catch (error) {
       if (init?.signal?.aborted) throw new NativeSyncError('request_canceled');
       throw error;
@@ -663,7 +704,8 @@ export class NativeSyncClient {
       <T>(route: string, init?: RequestInit) => this.request<T>(route, init, organizationID),
       sessionID,
       signal,
-      (route: string, init?: RequestInit) => this.requestAsset(route, init, organizationID)
+      (route: string, advertisedBytes: number, init?: RequestInit) =>
+        this.requestAsset(route, advertisedBytes, init, organizationID)
     );
   }
 

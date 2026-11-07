@@ -1259,7 +1259,7 @@ test('binary snapshot assets share organization grants, renew a 401, and preserv
   };
   snapshot.mockImplementationOnce(async (_request, _sessionID, signal, readAsset) => {
     if (!readAsset) throw new Error('Missing authorized asset reader');
-    const bytes = await readAsset('/v1/sessions/ses_a/blobs/owned', { signal });
+    const bytes = await readAsset('/v1/sessions/ses_a/blobs/owned', 3, { signal });
     expect([...new Uint8Array(bytes)]).toEqual([1, 2, 3]);
     return expected;
   });
@@ -1273,7 +1273,7 @@ test('binary snapshot assets share organization grants, renew a 401, and preserv
   ]);
   snapshot.mockImplementationOnce(async (_request, _sessionID, signal, readAsset) => {
     if (!readAsset) throw new Error('Missing authorized asset reader');
-    await readAsset('/v1/sessions/ses_a/blobs/owned', { signal });
+    await readAsset('/v1/sessions/ses_a/blobs/owned', 3, { signal });
     return expected;
   });
   controller.abort();
@@ -1281,6 +1281,162 @@ test('binary snapshot assets share organization grants, renew a 401, and preserv
     client.getSnapshot('ses_a', 'organization-owned', controller.signal)
   ).rejects.toMatchObject({ code: 'request_canceled' });
   expect(assetCalls).toBe(2);
+});
+
+function assetSnapshotFixture(response: Response, advertisedBytes = 3) {
+  const { client, fetcher } = fixture();
+  const ordinary = fetcher.getMockImplementation();
+  if (!ordinary) throw new Error('Missing fetch fixture');
+  const hash = 'c'.repeat(64);
+  const reference = `media:${hash}`;
+  fetcher.mockImplementation(async (input, init) => {
+    const path = new URL(String(input)).pathname;
+    if (path.endsWith(`/blobs/${hash}`)) return response;
+    if (path === '/v1/sessions/ses_a') {
+      return Response.json({
+        version: 1,
+        sessionID: 'ses_a',
+        deleted: false,
+        position: 1,
+        revision: 1,
+      });
+    }
+    if (path === '/v1/sessions/ses_a/entities') {
+      return Response.json({
+        version: 1,
+        sessionID: 'ses_a',
+        position: 1,
+        revision: 1,
+        next: null,
+        entities: [
+          { kind: 'session', id: 'ses_a', revision: 1, value: sessionMetadata },
+          {
+            kind: 'message',
+            id: 'msg_asset',
+            revision: 1,
+            value: {
+              seq: 0,
+              message: {
+                id: 'msg_asset',
+                type: 'user',
+                time: { created: 1 },
+                text: 'inspect',
+                files: [
+                  {
+                    mime: 'image/png',
+                    name: 'image.png',
+                    uri: reference,
+                    source: { type: 'inline' },
+                  },
+                ],
+              },
+            },
+          },
+          {
+            kind: 'asset',
+            id: 'asset_owned',
+            revision: 1,
+            value: {
+              entity: { kind: 'message', id: 'msg_asset' },
+              pointer: '/message/files/0',
+              reference,
+              mime: 'image/png',
+              blob: { hash, bytes: advertisedBytes },
+            },
+          },
+        ],
+      });
+    }
+    return ordinary(input, init);
+  });
+  snapshot.mockImplementationOnce(
+    jest.requireActual<typeof NativeSnapshotModule>('./native-sync-snapshot').fetchNativeSnapshot
+  );
+  return client;
+}
+
+test.each([undefined, '3', '1'])(
+  'cancels an overflowing native asset stream at the advertised byte bound with Content-Length %s',
+  async length => {
+    let pulls = 0;
+    const cancel = jest.fn();
+    const stream = new ReadableStream<Uint8Array>(
+      {
+        pull(controller) {
+          pulls++;
+          controller.enqueue(
+            pulls < 3 ? new Uint8Array([pulls, pulls]) : new Uint8Array(1024 * 1024)
+          );
+          if (pulls === 3) controller.close();
+        },
+        cancel,
+      },
+      { highWaterMark: 0 }
+    );
+    const response = new Response(stream, {
+      headers: length === undefined ? {} : { 'Content-Length': length },
+    });
+    const client = assetSnapshotFixture(response);
+    await expect(client.getSnapshot('ses_a')).rejects.toMatchObject({
+      code: 'blob_hash_mismatch',
+    });
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(pulls).toBe(2);
+    expect(stream.locked).toBe(false);
+  }
+);
+
+test.each(['-1', 'invalid', '', '1.5', '9007199254740992'])(
+  'rejects invalid native asset Content-Length %s before reading the body',
+  async length => {
+    const pull = jest.fn((controller: ReadableStreamDefaultController<Uint8Array>) => {
+      controller.enqueue(new Uint8Array([1, 2, 3]));
+    });
+    const cancel = jest.fn();
+    const stream = new ReadableStream<Uint8Array>({ pull, cancel }, { highWaterMark: 0 });
+    const client = assetSnapshotFixture(
+      new Response(stream, { headers: { 'Content-Length': length } })
+    );
+    await expect(client.getSnapshot('ses_a')).rejects.toMatchObject({
+      code: 'invalid_content_length',
+    });
+    expect(pull).not.toHaveBeenCalled();
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(stream.locked).toBe(false);
+  }
+);
+
+test('rejects a native asset Content-Length above its authorized size before reading', async () => {
+  const pull = jest.fn();
+  const cancel = jest.fn();
+  const stream = new ReadableStream<Uint8Array>({ pull, cancel }, { highWaterMark: 0 });
+  const client = assetSnapshotFixture(new Response(stream, { headers: { 'Content-Length': '4' } }));
+  await expect(client.getSnapshot('ses_a')).rejects.toMatchObject({
+    code: 'blob_hash_mismatch',
+  });
+  expect(pull).not.toHaveBeenCalled();
+  expect(cancel).toHaveBeenCalledTimes(1);
+});
+
+test('assembles fragmented native asset bytes into the authorized snapshot URL', async () => {
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(new Uint8Array([1]));
+      controller.enqueue(new Uint8Array([2, 3]));
+      controller.close();
+    },
+  });
+  const client = assetSnapshotFixture(new Response(stream));
+  const result = await client.getSnapshot('ses_a');
+  expect(Object.values(result.assetURLs ?? {})).toEqual(['data:image/png;base64,AQID']);
+  expect(stream.locked).toBe(false);
+});
+
+test('rejects an asset stream that ends before the advertised byte count', async () => {
+  const client = assetSnapshotFixture(new Response(new Uint8Array([1, 2])));
+  await expect(client.getSnapshot('ses_a')).rejects.toMatchObject({
+    code: 'blob_hash_mismatch',
+  });
 });
 
 test('same-path live native tool files invalidate old bytes and resolve only through a newer authoritative snapshot', async () => {

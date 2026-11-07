@@ -104,7 +104,12 @@ const assetMappingSchema = z
   .passthrough();
 
 type Request = <T>(path: string, init?: RequestInit) => Promise<T>;
-export type NativeAssetReader = (path: string, init?: RequestInit) => Promise<ArrayBuffer>;
+/** Read at most the authorized blob size, canceling the response on overflow. */
+export type NativeAssetReader = (
+  path: string,
+  advertisedBytes: number,
+  init?: RequestInit
+) => Promise<ArrayBuffer>;
 type ResolvedEntity = { entity: NativeEntity; value: unknown };
 
 /** Portable wire entities; blob references remain available to callers. */
@@ -235,7 +240,7 @@ async function resolveSnapshotAssets(
         throw new Error('Native asset mappings disagree about blob size');
       }
       if (!blob) {
-        const buffer = await readAsset(`${path}/blobs/${mapping.blob.hash}`);
+        const buffer = await readAsset(`${path}/blobs/${mapping.blob.hash}`, mapping.blob.bytes);
         if (buffer.byteLength !== mapping.blob.bytes) {
           throw Object.assign(
             new Error('Native attachment bytes do not match the authorized blob size'),
@@ -425,8 +430,9 @@ async function readSnapshot(
  * restart from state, at most three complete attempts. Reads have a two-minute
  * total deadline, a 15-second request deadline, and non-cooperative cancellation.
  * The optional binary reader must use the same session/tenant authorization as
- * JSON reads. Stored media requires it; authorized bytes become content-bound
- * data URLs without modifying canonical messages or exposing credentials.
+ * JSON reads and bound streamed bytes to the advertised blob size. Stored media
+ * requires it; authorized bytes become content-bound data URLs without modifying
+ * canonical messages or exposing credentials.
  */
 export async function fetchNativeSnapshot(
   request: Request,
@@ -476,7 +482,8 @@ export async function fetchNativeSnapshot(
   const cancellable: Request = <T>(path: string) =>
     runRequest(() => request<T>(path, { signal: controller.signal }));
   const cancellableAsset = readAsset
-    ? (path: string) => runRequest(() => readAsset(path, { signal: controller.signal }))
+    ? (path: string, advertisedBytes: number) =>
+        runRequest(() => readAsset(path, advertisedBytes, { signal: controller.signal }))
     : undefined;
   try {
     for (let attempt = 0; ; attempt++) {

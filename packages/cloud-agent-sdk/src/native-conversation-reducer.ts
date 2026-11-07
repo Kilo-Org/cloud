@@ -652,11 +652,12 @@ export function applyNativeEvent(
     }
     const validated = messageSchema.parse(next);
     if (contentToKeep !== undefined) validated.content = contentToKeep;
-    return {
+    const updated: NativeSnapshotMessage = {
       ...item,
       message: validated,
-      ...(frame.type === 'session.message.content.updated' ? { partOrdinals: undefined } : {}),
     };
+    if (frame.type === 'session.message.content.updated') delete updated.partOrdinals;
+    return updated;
   });
 }
 

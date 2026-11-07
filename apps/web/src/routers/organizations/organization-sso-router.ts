@@ -133,38 +133,37 @@ export const organizationSsoRouter = createTRPCRouter({
       });
     }
 
-    if (releasedDomain) {
-      await db.transaction(async tx => {
-        // Lock the organization row before the domain, in the same order as updateSsoDomain, and
-        // release the domain this transaction holds the lock for.
-        const [locked] = await tx
-          .select({ ssoDomain: organizations.sso_domain })
-          .from(organizations)
-          .where(eq(organizations.id, organizationId))
-          .for('update');
-        if (!locked?.ssoDomain) {
-          return;
-        }
+    // Release whatever domain the organization records, and audit it.
+    await db.transaction(async tx => {
+      // Lock the organization row before the domain, in the same order as updateSsoDomain, and
+      // release the domain this transaction holds the lock for.
+      const [locked] = await tx
+        .select({ ssoDomain: organizations.sso_domain })
+        .from(organizations)
+        .where(eq(organizations.id, organizationId))
+        .for('update');
+      if (!locked?.ssoDomain) {
+        return;
+      }
 
-        await tx.execute(
-          sql`SELECT pg_advisory_xact_lock(hashtextextended('sso-domain:' || ${locked.ssoDomain}, 0))`
-        );
-        await tx
-          .update(organizations)
-          .set({ sso_domain: null })
-          .where(eq(organizations.id, organizationId));
+      await tx.execute(
+        sql`SELECT pg_advisory_xact_lock(hashtextextended('sso-domain:' || ${locked.ssoDomain}, 0))`
+      );
+      await tx
+        .update(organizations)
+        .set({ sso_domain: null })
+        .where(eq(organizations.id, organizationId));
 
-        await createAuditLog({
-          action: 'organization.sso.remove_domain',
-          actor_email: opts.ctx.user.google_user_email,
-          actor_id: opts.ctx.user.id,
-          actor_name: opts.ctx.user.google_user_name,
-          message: `Cleared SSO domain ${locked.ssoDomain}`,
-          organization_id: organizationId,
-          tx,
-        });
+      await createAuditLog({
+        action: 'organization.sso.remove_domain',
+        actor_email: opts.ctx.user.google_user_email,
+        actor_id: opts.ctx.user.id,
+        actor_name: opts.ctx.user.google_user_name,
+        message: `Cleared SSO domain ${locked.ssoDomain}`,
+        organization_id: organizationId,
+        tx,
       });
-    }
+    });
 
     return successResult({ message: 'SSO configuration deleted successfully' });
   }),

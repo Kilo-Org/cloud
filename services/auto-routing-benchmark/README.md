@@ -702,6 +702,47 @@ a changed denominator; or a whole-plan bound above the remaining allowance.
 Final dispatch also requires exact successful pilot evidence. The pilot cannot
 prove its own admission retroactively. Report blocked while any applicable gate fails.
 
+The prospective protocol is now implemented by the bundled `repo-study` driver
+and the `router-*` coordinator scripts. Paid execution requires, in order:
+
+1. A prospective authorization whose cumulative new allowance is within the
+   programme ceiling and whose origin snapshot is immutable.
+2. A frozen spec with the complete router, content-blind control and fixed-model
+   arms for each mode, the unchanged task split and resources, and frozen
+   account-plugin evidence supplied as an absolute `account_policy` path.
+   Its bytes are bound into the freeze approval.
+3. A fresh complete tariff quote for every mandatory pair. An unsupported tariff
+   is an accounting failure, not an endpoint outage.
+4. A registered whole-plan financing manifest covering every mandatory row.
+   The pilot has its own independent ceiling inside the same authorization.
+
+The coordinator validates the final text-only payload after variant resolution,
+posts exactly the approved bytes, and consumes each reservation once. It reports
+no pass or savings claim unless every arm has settled charges, determinate grades
+and the frozen coverage.
+
+Recovery releases a coordinator reservation at zero cost only when neither its
+dispatch admission nor its receipt indicates dispatch. Historical and admitted
+requests retain their full holds. Receipt or observer failures cannot overwrite
+a settled charge. Admission denials finalize their receipt and budget-limit
+evidence even when admission already settled the unused reservation.
+
+The isolated runtime uses the installed Miniflare configuration API. Closing a
+run attempts every instance, reports disposal failures, and retains failed
+instances for another cleanup attempt. Package type checks include this runtime.
+
+Run the offline checks with:
+
+```sh
+python3 -m pip install -r repo-study/requirements.txt
+(cd repo-study && python3 -m unittest test_text_tariffs)
+(cd scripts && python3 -m unittest test_router_ledger test_router_study test_router_proof test_router_replay.ReplayInvariants)
+```
+
+Paid admission remains blocked if real account policy evidence is absent, if any
+mandatory pair lacks a finite quote, or if the complete plan does not fit the
+remaining authorization. Do not shrink the plan or raise the cap implicitly.
+
 ### Shadow routing policy
 
 To evaluate an efficient-router candidate without routing traffic to it, put its JSON

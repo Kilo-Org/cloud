@@ -1,14 +1,12 @@
 import { z } from 'zod';
 
-export const RuntimeResourceKindSchema = z.enum(['cloud-agent-next', 'gastown']);
+export const RuntimeResourceKindSchema = z.literal('cloud-agent-next');
 export type RuntimeResourceKind = z.infer<typeof RuntimeResourceKindSchema>;
 
 export function runtimeAuthorizationMaximumLifetimeMs(resourceKind: RuntimeResourceKind): number {
   switch (resourceKind) {
     case 'cloud-agent-next':
       return 24 * 60 * 60_000;
-    case 'gastown':
-      return 30 * 24 * 60 * 60_000;
     default: {
       const exhaustive: never = resourceKind;
       return exhaustive;

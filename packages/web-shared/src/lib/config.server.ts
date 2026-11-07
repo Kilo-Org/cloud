@@ -91,25 +91,8 @@ export function isNativeResourceCredentialIssuanceEnabled(): boolean {
 export function isSharedResourceTokenIssuanceEnabled(): boolean {
   return getEnvVariable('SHARED_RESOURCE_TOKENS_ENABLED') === 'true';
 }
-/**
- * Legacy Worker admin claims (`isAdmin` on the ordinary Gastown/Wasteland
- * identity token). Defaults to on so behavior is unchanged until the operator
- * flips it off during the legacy drain.
- */
-export function isWorkerAdminLegacyClaimIssuanceEnabled(): boolean {
-  return getEnvVariable('WORKER_ADMIN_LEGACY_CLAIM_ISSUANCE') !== 'off';
-}
-/**
- * Worker admin capability issuance. Defaults to off; must stay off in
- * production until session-bound MFA step-up (PR2) is live.
- */
-export function isWorkerAdminCapabilityIssuanceEnabled(): boolean {
-  return getEnvVariable('WORKER_ADMIN_CAPABILITY_ISSUANCE') === 'on';
-}
 const resourceTokenFamilyFlags = {
   'cloud-agent-next': 'CLOUD_AGENT_RESOURCE_TOKENS_ENABLED',
-  gastown: 'GASTOWN_RESOURCE_TOKENS_ENABLED',
-  wasteland: 'WASTELAND_RESOURCE_TOKENS_ENABLED',
   chat: 'CHAT_RESOURCE_TOKENS_ENABLED',
   'delegated-resource': 'DELEGATED_RESOURCE_TOKENS_ENABLED',
   'workflow-gateway': 'WORKFLOW_GATEWAY_RESOURCE_TOKENS_ENABLED',
@@ -310,20 +293,7 @@ export const BOUNCER_URL =
  */
 export const AGENT_ENV_VARS_PUBLIC_KEY = getEnvVariable('AGENT_ENV_VARS_PUBLIC_KEY') || '';
 
-// Gastown Service
-export const GASTOWN_SERVICE_URL =
-  getEnvVariable('GASTOWN_SERVICE_URL') ||
-  (process.env.NODE_ENV === 'production' ? 'https://gastown.kiloapps.io' : null);
-export const GASTOWN_BILLING_ANNOUNCEMENT_ENABLED =
-  process.env.NODE_ENV === 'development' ||
-  getEnvVariable('GASTOWN_BILLING_ANNOUNCEMENT_ENABLED') === 'true';
-
-// Cloudflare dashboard link construction (admin town inspector)
 export const CLOUDFLARE_ACCOUNT_ID = getEnvVariable('CLOUDFLARE_ACCOUNT_ID');
-export const CLOUDFLARE_TOWN_DO_NAMESPACE_ID = getEnvVariable('CLOUDFLARE_TOWN_DO_NAMESPACE_ID');
-export const CLOUDFLARE_CONTAINER_DO_NAMESPACE_ID = getEnvVariable(
-  'CLOUDFLARE_CONTAINER_DO_NAMESPACE_ID'
-);
 // Cloudflare Containers GraphQL Analytics (admin reconciliation). Point-of-use only; do not throw at module load.
 export const CLOUDFLARE_ANALYTICS_API_TOKEN = getEnvVariable('CLOUDFLARE_ANALYTICS_API_TOKEN');
 

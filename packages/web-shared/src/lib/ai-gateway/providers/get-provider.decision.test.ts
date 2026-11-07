@@ -37,13 +37,14 @@ import type { GatewayChatApiKind } from '@kilocode/web-shared/lib/ai-gateway/pro
 import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { byok_api_keys, type User } from '@kilocode/db/schema';
+import { byok_api_keys, claude_billing_connections, type User } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { isAnonymousContext } from '@kilocode/web-shared/lib/anonymous';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { insertCustomLlmForTest } from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
 import type { CustomLlmDefinition } from '@kilocode/db/schema-types';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
+import { isClaudePlatformOAuthEnabled } from '@kilocode/web-shared/lib/auth/claude/feature-flag.server';
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => {
   const actual = jest.requireActual<typeof directByokModule>(
@@ -83,6 +84,9 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing', () => ({
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel', () => ({
   canRouteToVercel: jest.fn(),
   shouldRouteToVercel: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/auth/claude/feature-flag.server', () => ({
+  isClaudePlatformOAuthEnabled: jest.fn(async () => false),
 }));
 
 const MODEL = 'moonshotai/kimi-k2.6';
@@ -215,6 +219,70 @@ afterEach(() => {
 });
 
 describe('getProvider routing decision', () => {
+  test.each([false, true])(
+    'never falls back from a connected Claude payer for an ineligible requester (org=%s)',
+    async organization => {
+      const scope = organization ? 'org' : 'personal';
+      const user = await insertTestUser({ google_user_email: `requester-${scope}@example.com` });
+      const connector = await insertTestUser({
+        google_user_email: `connector-${scope}@kilocode.ai`,
+      });
+      const org = organization
+        ? await createTestOrganization('Claude requester', user.id, 0)
+        : null;
+      await db.insert(claude_billing_connections).values({
+        kilo_user_id: org ? null : user.id,
+        organization_id: org?.id ?? null,
+        user_profile_id: `uprof_${user.id}`,
+        status: 'connected',
+        connection_id: `ocon_${user.id}`,
+        created_by: connector.id,
+      });
+      await insertKeys(user, [{ providerId: 'anthropic' }], org?.id);
+      jest.mocked(getStoredByokKeys).mockClear();
+      jest.mocked(isClaudePlatformOAuthEnabled).mockClear();
+      const model = 'anthropic/claude-sonnet-4.6';
+      const result = await getProvider(
+        getProviderInput({
+          user,
+          organizationId: org?.id,
+          requestedModel: model,
+          request: {
+            kind: 'messages',
+            body: { model, messages: [], max_tokens: 16 },
+          },
+        })
+      );
+      expect(result).toMatchObject({ kind: 'claude-billing-unavailable' });
+      expect(isClaudePlatformOAuthEnabled).toHaveBeenCalledWith(user.google_user_email);
+      expect(isClaudePlatformOAuthEnabled).not.toHaveBeenCalledWith(connector.google_user_email);
+      expect(getStoredByokKeys).not.toHaveBeenCalled();
+      expect(decryptApiKey).not.toHaveBeenCalled();
+      expect(checkOpenAiChatGptByok).not.toHaveBeenCalled();
+    }
+  );
+
+  test('keeps normal routing for a Claude request without a connection and does not evaluate the gate', async () => {
+    const user = await insertTestUser();
+    const model = 'anthropic/claude-sonnet-4.6';
+    jest.mocked(isClaudePlatformOAuthEnabled).mockClear();
+    const result = await getProvider(
+      getProviderInput({
+        user,
+        organizationId: undefined,
+        requestedModel: model,
+        request: {
+          kind: 'messages',
+          body: { model, messages: [], max_tokens: 16 },
+        },
+      })
+    );
+    expect(result).toMatchObject({ kind: 'provider' });
+    expect(isClaudePlatformOAuthEnabled).not.toHaveBeenCalled();
+    if (result.kind !== 'provider') throw new Error('Expected normal gateway routing');
+    expect(result.provider.type).not.toBe('claude-billing');
+  });
+
   describe.each([
     { provider: zaiCodingDefinition, inferenceProviderId: 'z-ai' },
     { provider: neuralwattDefinition, inferenceProviderId: 'neuralwatt' },

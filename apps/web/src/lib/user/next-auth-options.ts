@@ -69,7 +69,7 @@ import {
   OPENAI_CHATGPT_NOT_ELIGIBLE_MESSAGE,
   probeOpenAiChatGptEligibility,
 } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/eligibility';
-import { isClaudeSignInEnabled } from '@/lib/auth/claude/access.server';
+import { isClaudePlatformOAuthEnabled } from '@kilocode/web-shared/lib/auth/claude/feature-flag.server';
 import { claudeSignInProvider } from '@/lib/auth/claude/sign-in-provider';
 import {
   CLAUDE_OIDC_ISSUER,
@@ -149,6 +149,11 @@ function generateAppleClientSecret(): string {
     }
   );
 }
+
+const claudeVerifiedEmailSchema = z.object({
+  email: z.email(),
+  email_verified: z.literal(true),
+});
 
 const anacondaProfileSchema = z.object({
   sub: z.string().trim().min(1),
@@ -1072,12 +1077,6 @@ export const authOptions: NextAuthOptions = {
       try {
         if (!account) return `TRAP: No account found`;
 
-        // Sign in with Claude stays closed until its launch toggle is on, also
-        // for a sign-in or link started by URL instead of the button.
-        if (account.provider === 'claude' && !(await isClaudeSignInEnabled())) {
-          return redirectUrlForCode('UNKNOWN-ERROR');
-        }
-
         // early return for fake auth
         const isFakeLogin = account.provider === 'fake-login';
         if (isFakeLogin && !allow_fake_login)
@@ -1089,6 +1088,16 @@ export const authOptions: NextAuthOptions = {
         // normalize the account, user, and profile objects into a single object
         // why does next-auth have 3 separate objects for this? who knows.
         accountInfo = createAccountInfo(account, user, profile);
+        if (account.provider === 'claude') {
+          const claims = claudeVerifiedEmailSchema.safeParse(profile);
+          if (
+            !claims.success ||
+            claims.data.email !== accountInfo.google_user_email ||
+            !(await isClaudePlatformOAuthEnabled(claims.data.email))
+          ) {
+            return redirectUrlForCode('UNKNOWN-ERROR');
+          }
+        }
 
         linkingSession = await getAccountLinkingSession();
 
@@ -1115,6 +1124,12 @@ export const authOptions: NextAuthOptions = {
               );
             }
             return redirectUrlForCode('LINKING-FAILED');
+          }
+          if (account.provider === 'claude') {
+            const linkingUser = await findUserById(linkingPrincipal.id);
+            if (!(await isClaudePlatformOAuthEnabled(linkingUser?.google_user_email))) {
+              return redirectUrlForCode('LINKING-FAILED');
+            }
           }
         }
 

@@ -256,14 +256,17 @@ jobs:
               - 'packages/worker-utils/**'
               - '.github/workflows/ci.yml'
               - 'pnpm-lock.yaml'
-      # Pull requests check only the workspaces a change can affect. Main
-      # pushes and the merge queue pass no base, which selects every workspace.
-      # The document names the base it was computed for, so the matrix step
-      # below reuses it instead of selecting the repository again.
+      # A pull request and a main push both check only the workspaces their own
+      # diff can affect: the pull request the branch's base, the push the commit
+      # main moved from. The merge queue passes no base, so it still checks
+      # every workspace as the last gate before a merge. A base that is not a
+      # commit in the checkout (a first push or a force push) selects every
+      # workspace too. The document names the base it was computed for, so the
+      # matrix step below reuses it instead of selecting the repository again.
       - name: Detect affected workspaces
         id: affected
         env:
-          BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || '' }}
+          BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event_name == 'push' && github.event.before || '' }}
           CLOUD_AGENT_NEXT_CHANGED: ${{ steps.filter.outputs.cloud_agent_next || steps.filter_retry.outputs.cloud_agent_next }}
         run: |
           affected=$(node scripts/affected-workspaces.mjs "$BASE_SHA")

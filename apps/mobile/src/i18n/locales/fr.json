@@ -3864,7 +3864,7 @@
     "reasoningEffort": {
       "modelFlag": "Ce modèle prend en charge le niveau de réflexion"
     },
-    "creditsRequired": "Pas assez de crédits pour envoyer ce message. Ajoutez des crédits et réessayez."
+    "creditsRequired": "Pas assez de crédits pour envoyer ce message."
   },
   "settingsTools": {
     "confirmTitle": "Confirmer cette modification ?"

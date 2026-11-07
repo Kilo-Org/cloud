@@ -3858,7 +3858,7 @@
     "reasoningEffort": {
       "modelFlag": "Aquest model admet l'esforç de raonament"
     },
-    "creditsRequired": "No hi ha prou crèdits per enviar aquest missatge. Afegeix crèdits i torna-ho a provar."
+    "creditsRequired": "No hi ha prou crèdits per enviar aquest missatge."
   },
   "settingsTools": {
     "confirmTitle": "Confirmar aquest canvi?"

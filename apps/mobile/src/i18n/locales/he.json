@@ -3858,7 +3858,7 @@
     "reasoningEffort": {
       "modelFlag": "המודל הזה תומך במאמץ חשיבה"
     },
-    "creditsRequired": "אין מספיק קרדיטים לשליחת ההודעה הזו. הוסף קרדיטים ונסה שוב."
+    "creditsRequired": "אין מספיק קרדיטים לשליחת ההודעה הזו."
   },
   "settingsTools": {
     "confirmTitle": "לאשר את השינוי הזה?"

@@ -4026,7 +4026,7 @@
     "reasoningEffort": {
       "modelFlag": "Mae'r model hwn yn cefnogi ymdrech feddwl"
     },
-    "creditsRequired": "Dim digon o gredydau i anfon y neges hon. Ychwanegwch gredydau a rhowch gynnig arall arni."
+    "creditsRequired": "Dim digon o gredydau i anfon y neges hon."
   },
   "settingsTools": {
     "confirmTitle": "Cadarnhau'r newid hwn?"

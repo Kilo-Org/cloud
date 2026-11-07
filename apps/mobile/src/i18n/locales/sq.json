@@ -3802,7 +3802,7 @@
     "reasoningEffort": {
       "modelFlag": "Ky model mbështet nivelin e arsyetimit"
     },
-    "creditsRequired": "Nuk ka kredi të mjaftueshme për të dërguar këtë mesazh. Shto kredite dhe provo sërish."
+    "creditsRequired": "Nuk ka kredi të mjaftueshme për të dërguar këtë mesazh."
   },
   "settingsTools": {
     "confirmTitle": "Të konfirmohet ky ndryshim?"

@@ -3802,7 +3802,7 @@
     "reasoningEffort": {
       "modelFlag": "Dit model ondersteunt denkinspanning"
     },
-    "creditsRequired": "Niet genoeg tegoed om dit bericht te verzenden. Vul je tegoed aan en probeer het opnieuw."
+    "creditsRequired": "Niet genoeg tegoed om dit bericht te verzenden."
   },
   "settingsTools": {
     "confirmTitle": "Deze wijziging bevestigen?"

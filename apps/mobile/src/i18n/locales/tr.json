@@ -3802,7 +3802,7 @@
     "reasoningEffort": {
       "modelFlag": "Bu model düşünme düzeyini destekler"
     },
-    "creditsRequired": "Bu mesajı göndermek için yeterli kredi yok. Kredi ekle ve tekrar dene."
+    "creditsRequired": "Bu mesajı göndermek için yeterli kredi yok."
   },
   "settingsTools": {
     "confirmTitle": "Bu değişiklik onaylansın mı?"

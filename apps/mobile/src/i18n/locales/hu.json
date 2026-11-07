@@ -3802,7 +3802,7 @@
     "reasoningEffort": {
       "modelFlag": "Ez a modell támogatja a gondolkodás szintjét"
     },
-    "creditsRequired": "Nincs elég egyenleged ennek az üzenetnek az elküldéséhez. Töltsd fel az egyenleged, és próbáld újra."
+    "creditsRequired": "Nincs elég egyenleged ennek az üzenetnek az elküldéséhez."
   },
   "settingsTools": {
     "confirmTitle": "Megerősíted ezt a módosítást?"

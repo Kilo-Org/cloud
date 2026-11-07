@@ -3802,7 +3802,7 @@
     "reasoningEffort": {
       "modelFlag": "Denne model understøtter ræsonnementsniveau"
     },
-    "creditsRequired": "Ikke nok kreditter til at sende denne besked. Tilføj kreditter, og prøv igen."
+    "creditsRequired": "Ikke nok kreditter til at sende denne besked."
   },
   "settingsTools": {
     "confirmTitle": "Bekræft denne ændring?"

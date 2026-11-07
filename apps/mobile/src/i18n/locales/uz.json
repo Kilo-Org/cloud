@@ -3802,7 +3802,7 @@
     "reasoningEffort": {
       "modelFlag": "Bu model fikrlash darajasini qo‘llab-quvvatlaydi"
     },
-    "creditsRequired": "Bu xabarni yuborish uchun kreditlar yetarli emas. Kreditlar qo'shing va qaytadan urinib ko'ring."
+    "creditsRequired": "Bu xabarni yuborish uchun kreditlar yetarli emas."
   },
   "settingsTools": {
     "confirmTitle": "Bu oʻzgarish tasdiqlansinmi?"

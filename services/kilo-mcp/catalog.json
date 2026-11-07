@@ -6805,6 +6805,31 @@
     ],
     "searchBlob": "cloudAgentNext.listGitLabRepositories List the user's GitLab repositories available for cloud agent use, with optional refresh. cloudagentnext listgitlabrepositories forcerefresh forceRefresh"
   },
+  "cloudAgentNext.listPreviewServices": {
+    "path": "cloudAgentNext.listPreviewServices",
+    "kind": "query",
+    "summary": "List the live services currently running in a Cloud Agent session's sandbox so you can discover open, previewable ports and open a web server in a new tab. Returns each service's name, port, and description along with whether the sandbox is running, not ready, or unsupported.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "cloudAgentSessionId": {
+          "type": "string",
+          "pattern": "^workspace_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "cloudAgentSessionId"
+      ],
+      "additionalProperties": false
+    },
+    "tags": [
+      "cloudagentnext",
+      "listpreviewservices",
+      "cloudagentsessionid"
+    ],
+    "searchBlob": "cloudAgentNext.listPreviewServices List the live services currently running in a Cloud Agent session's sandbox so you can discover open, previewable ports and open a web server in a new tab. Returns each service's name, port, and description along with whether the sandbox is running, not ready, or unsupported. cloudagentnext listpreviewservices cloudagentsessionid cloudAgentSessionId"
+  },
   "cloudAgentNext.listRepositoryBranches": {
     "path": "cloudAgentNext.listRepositoryBranches",
     "kind": "query",
@@ -18436,6 +18461,56 @@
       "forcerefresh"
     ],
     "searchBlob": "organizations.cloudAgentNext.listGitLabRepositories List GitLab repositories available to the organization for Cloud Agent, ordered by recent usage. organizations cloudagentnext listgitlabrepositories organizationid forcerefresh organizationId forceRefresh"
+  },
+  "organizations.cloudAgentNext.listPreviewServices": {
+    "path": "organizations.cloudAgentNext.listPreviewServices",
+    "kind": "query",
+    "summary": "List the preview services running for a cloud agent session, such as web servers or apps exposed by the agent's sandbox, so you can find session preview URLs and ports.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "allOf": [
+        {
+          "type": "object",
+          "properties": {
+            "organizationId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          "required": [
+            "organizationId"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "cloudAgentSessionId": {
+              "type": "string",
+              "pattern": "^workspace_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "organizationId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          "required": [
+            "cloudAgentSessionId",
+            "organizationId"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "tags": [
+      "organizations",
+      "cloudagentnext",
+      "listpreviewservices",
+      "organizationid",
+      "cloudagentsessionid"
+    ],
+    "searchBlob": "organizations.cloudAgentNext.listPreviewServices List the preview services running for a cloud agent session, such as web servers or apps exposed by the agent's sandbox, so you can find session preview URLs and ports. organizations cloudagentnext listpreviewservices organizationid cloudagentsessionid organizationId cloudAgentSessionId"
   },
   "organizations.cloudAgentNext.listRepositoryBranches": {
     "path": "organizations.cloudAgentNext.listRepositoryBranches",

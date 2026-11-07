@@ -37,6 +37,7 @@ import { createNativeStatusReporter } from './native-status.js';
 import { createControlPlaneWorktreeChanges } from './worktree-changes.js';
 import { createControlPlaneWorktreeDeletion } from './worktree-deletion.js';
 import { createControlPlaneKiloRequests } from './kilo-requests.js';
+import { createControlPlanePreviewServices } from './preview-services.js';
 import { createHistoryRequests } from './history-requests.js';
 import { runtimeHarness } from './runtime-harness.js';
 import { readKiloCliVersion } from './runtime-versions.js';
@@ -45,6 +46,7 @@ import {
   CONTROL_SANDBOX_PROVIDER_ENV,
   parseAgentSandboxProvider,
 } from '../../../src/shared/sandbox-provider.js';
+import { reservedPreviewPorts } from '../../../src/shared/reserved-ports.js';
 
 const DIAGNOSTICS_FINALIZE_TIMEOUT_MS = 4_000;
 const FILE_LOG_FINALIZE_TIMEOUT_MS = 5_000;
@@ -228,6 +230,7 @@ export type ControlPlaneFrameDispatcherDeps = {
   worktreeChanges: { current?: ReturnType<typeof createControlPlaneWorktreeChanges> };
   worktreeDeletion: { current?: ReturnType<typeof createControlPlaneWorktreeDeletion> };
   kiloRequests: { current?: ReturnType<typeof createControlPlaneKiloRequests> };
+  previewServices?: { current?: ReturnType<typeof createControlPlanePreviewServices> };
   historyRequests?: { current?: ReturnType<typeof createHistoryRequests> };
   send: (frame: ControlPlaneWrapperFrame) => void;
   log: (message: string) => void;
@@ -309,6 +312,9 @@ export function createControlPlaneFrameDispatcher(
         return;
       case 'kilo.request':
         void deps.kiloRequests.current?.handle(frame);
+        return;
+      case 'preview.list':
+        void deps.previewServices?.current?.handle(frame);
         return;
       case 'history.result':
         deps.historyRequests?.current?.handle(frame);
@@ -403,6 +409,9 @@ export async function runControlPlaneWrapper(
   const kiloRequestsRef: {
     current?: ReturnType<typeof createControlPlaneKiloRequests>;
   } = {};
+  const previewServicesRef: {
+    current?: ReturnType<typeof createControlPlanePreviewServices>;
+  } = {};
   // Wrapper-initiated Cloud history reads answer over the same connection.
   const historyRequestsRef: { current?: ReturnType<typeof createHistoryRequests> } = {};
   const sandboxProvider = parseAgentSandboxProvider(env[CONTROL_SANDBOX_PROVIDER_ENV]);
@@ -444,6 +453,7 @@ export async function runControlPlaneWrapper(
       worktreeChanges: worktreeChangesRef,
       worktreeDeletion: worktreeDeletionRef,
       kiloRequests: kiloRequestsRef,
+      previewServices: previewServicesRef,
       historyRequests: historyRequestsRef,
       send: frame => connection.send(frame),
       log: logToFile,
@@ -511,6 +521,13 @@ export async function runControlPlaneWrapper(
     emit: frame => connection.send(frame),
     preparedRoute: sessionId => preparationRef.current?.preparedRoute(sessionId) ?? null,
     clientFor: key => liveRuntimeClient(runtimes.get(key))?.reads ?? null,
+    log: logToFile,
+  });
+  previewServicesRef.current = createControlPlanePreviewServices({
+    emit: frame => connection.send(frame),
+    ...(sandboxProvider === undefined
+      ? {}
+      : { excludedPorts: reservedPreviewPorts(sandboxProvider) }),
     log: logToFile,
   });
   const nativeStatus = createNativeStatusReporter({

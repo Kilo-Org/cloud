@@ -17,7 +17,8 @@
     "sweep:offline": "tsx scripts/offline-sweep.ts",
     "screen:candidates": "tsx scripts/screen-candidates.ts",
     "smoke:scheduler": "tsx scripts/scheduler-smoke.ts",
-    "test": "vitest run && pnpm run test:deploy",
+    "test": "vitest run && pnpm run test:deploy && pnpm run test:python",
+    "test:python": "python3 -m venv /tmp/kilo-study-venv && /tmp/kilo-study-venv/bin/pip install --quiet -r repo-study/requirements.txt && cd scripts && /tmp/kilo-study-venv/bin/python -m unittest test_router_ledger test_router_study test_router_proof && cd ../repo-study && /tmp/kilo-study-venv/bin/python -m unittest test_text_tariffs",
     "test:deploy": "tsx --test scripts/deploy.test.mjs"
   },
   "dependencies": {

@@ -249,7 +249,9 @@ describe('ContributorChampionsAdminPage credit grants', () => {
     const manualEnroll = buttonContaining('Manual enroll');
     expect(manualEnroll.disabled).toBe(true);
     expect(manualEnroll.title).toBe(noteText);
-    expect(buttonContaining('Upgrade to…').disabled).toBe(true);
+    const upgradeSelect = buttonContaining('Upgrade to…');
+    expect(upgradeSelect.disabled).toBe(true);
+    expect(upgradeSelect.title).toBe(noteText);
     expect(container.textContent).toContain(noteText);
 
     const enrolledSection = section('Enrolled');
@@ -262,12 +264,6 @@ describe('ContributorChampionsAdminPage credit grants', () => {
     );
     if (!enrollButton) throw new Error('Enroll button permission hint missing');
     expect(enrollButton.disabled).toBe(true);
-
-    const upgradeSelect = enrolledSection.querySelector<HTMLButtonElement>(
-      `button[title="${noteText}"]`
-    );
-    if (!upgradeSelect) throw new Error('Upgrade select permission hint missing');
-    expect(upgradeSelect.disabled).toBe(true);
 
     act(() => manualEnroll.click());
     expect(container.querySelector('[role="dialog"]')).toBeNull();

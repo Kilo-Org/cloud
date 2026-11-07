@@ -191,6 +191,11 @@ describe('SessionPageSheet mounted', () => {
     const surface = findByTestID(renderer.root, 'session-page-sheet-surface')[0];
     // The padding keeps the content below the system status bar.
     expect(surface?.props.style).toEqual({ paddingTop: 24 });
+    // The surface clears the status bar, so the sheet must not reserve that inset
+    // too: Android reads a dialog window's insets only after the sheet measured
+    // itself, and the sheet then shrank by the status bar and moved its whole
+    // content — header included — after it had already appeared.
+    expect(sheet(renderer.root).props.contentOwnsTopInset).toBe(true);
 
     renderer.unmount();
   });

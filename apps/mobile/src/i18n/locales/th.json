@@ -2392,7 +2392,7 @@
       "selectRepositoryToStart": "เลือกคลังโค้ดเพื่อเริ่มต้น",
       "enterPromptToStart": "เพิ่มพรอมป์ตเพื่อเริ่มต้น",
       "enterPromptOrFileToStart": "เพิ่มพรอมป์ตหรือไฟล์เพื่อเริ่มต้น",
-      "connectProviderToStart": "เชื่อมต่อผู้ให้บริการเพื่อเริ่มต้น",
+      "connectProviderToStart": "คลังโค้ดจะมาจากบัญชี GitHub, GitLab หรือ Bitbucket ที่เชื่อมต่ออยู่",
       "promptPlaceholder": "อยากทำงานอะไร?",
       "couldNotLoadModels": "ไม่สามารถโหลดโมเดลได้",
       "prefillRepoAndModelUnavailable": "คลังโค้ดและโมเดลของเซสชันเดิมใช้ไม่ได้แล้ว เลือกคลังโค้ดและโมเดลใหม่ด้านล่าง",

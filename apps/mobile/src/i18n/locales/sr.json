@@ -2434,7 +2434,7 @@
       "selectRepositoryToStart": "Izaberi repozitorijum da započneš.",
       "enterPromptToStart": "Dodaj upit da započneš.",
       "enterPromptOrFileToStart": "Dodaj upit ili datoteku da započneš.",
-      "connectProviderToStart": "Poveži platformu da započneš.",
+      "connectProviderToStart": "Repozitorijumi dolaze sa povezanog GitHub, GitLab ili Bitbucket naloga.",
       "promptPlaceholder": "Na čemu želiš da radiš?",
       "couldNotLoadModels": "Učitavanje modela nije uspelo.",
       "prefillRepoAndModelUnavailable": "Repozitorijum i model izvorne sesije više nisu dostupni. Izaberi druge ispod.",

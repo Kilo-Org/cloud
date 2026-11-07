@@ -1853,7 +1853,7 @@
       "selectRepositoryToStart": "选择仓库以开始。",
       "enterPromptToStart": "添加提示词以开始。",
       "enterPromptOrFileToStart": "添加提示词或文件以开始。",
-      "connectProviderToStart": "连接代码托管平台以开始。",
+      "connectProviderToStart": "仓库来自已连接的 GitHub、GitLab 或 Bitbucket 账户。",
       "promptPlaceholder": "你想完成什么任务？",
       "couldNotLoadModels": "无法加载模型。",
       "prefillRepoAndModelUnavailable": "原会话的仓库和模型已不可用。请在下方重新选择。",

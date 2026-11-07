@@ -80,6 +80,19 @@ export function scopeForRun(runId: string): string {
   return `kilo-e2e-${runId}`;
 }
 
+/**
+ * `session.open` proves the IDE can render a stored transcript, so its workspace
+ * is seeded. `prompt.stream` must start empty so the submitted prompt is turn 1.
+ * An unscoped operator prepare keeps the previous seeded default.
+ */
+export function seedPromptForScenario(input: {
+  scenarioId: ProviderPrepareRequest['scenarioId'];
+  scope: string;
+}): string | undefined {
+  if (input.scenarioId === 'prompt.stream') return undefined;
+  return scopedDirective(input.scope, 'idle');
+}
+
 export function resolveGitUrl(input: {
   lane: Lane;
   projectDir: string;
@@ -180,6 +193,10 @@ export async function prepareFixture(input: PrepareInput): Promise<FixtureDescri
   });
   const identity = await input.cloud.identity(request.runId);
   const cleanupToken = randomBytes(24).toString('hex');
+  const seedPrompt = seedPromptForScenario({
+    scenarioId: request.scenarioId,
+    scope: request.fakeLlmScope,
+  });
   let profileId: string | undefined;
   let hosted: HostedResources | undefined;
   try {
@@ -194,6 +211,7 @@ export async function prepareFixture(input: PrepareInput): Promise<FixtureDescri
         profileId,
         gitUrl,
         scope: request.fakeLlmScope,
+        ...(seedPrompt === undefined ? {} : { seedPrompt }),
       });
     }
     const descriptor = buildDescriptor({

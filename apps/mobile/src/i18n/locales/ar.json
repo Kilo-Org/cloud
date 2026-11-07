@@ -1937,7 +1937,7 @@
       "selectRepositoryToStart": "اختر مستودعًا للبدء.",
       "enterPromptToStart": "أضِف موجِّهًا للبدء.",
       "enterPromptOrFileToStart": "أضِف موجِّهًا أو ملفًا للبدء.",
-      "connectProviderToStart": "اربط مزوّدًا للبدء.",
+      "connectProviderToStart": "تأتي المستودعات من حساب مرتبط على GitHub أو GitLab أو Bitbucket.",
       "promptPlaceholder": "ما الذي تريد العمل عليه؟",
       "couldNotLoadModels": "تعذّر تحميل النماذج.",
       "prefillRepoAndModelUnavailable": "لم يعد مستودع الجلسة الأصلية ونموذجها متاحين. اختر مستودعًا ونموذجًا أدناه.",

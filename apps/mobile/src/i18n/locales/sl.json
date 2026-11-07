@@ -2476,7 +2476,7 @@
       "selectRepositoryToStart": "Izberi skladišče za začetek.",
       "enterPromptToStart": "Dodaj poziv za začetek.",
       "enterPromptOrFileToStart": "Dodaj poziv ali datoteko za začetek.",
-      "connectProviderToStart": "Poveži ponudnika za začetek.",
+      "connectProviderToStart": "Skladišča prihajajo iz povezanega računa GitHub, GitLab ali Bitbucket.",
       "promptPlaceholder": "Česa se želiš lotiti?",
       "couldNotLoadModels": "Modelov ni bilo mogoče naložiti.",
       "prefillRepoAndModelUnavailable": "Skladišče in model prvotne seje nista več na voljo. Izberi ju spodaj.",

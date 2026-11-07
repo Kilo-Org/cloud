@@ -2398,7 +2398,7 @@
       "selectRepositoryToStart": "ਸ਼ੁਰੂ ਕਰਨ ਲਈ ਇੱਕ ਰਿਪੋਜ਼ਟਰੀ ਚੁਣੋ।",
       "enterPromptToStart": "ਸ਼ੁਰੂ ਕਰਨ ਲਈ ਇੱਕ ਪ੍ਰਾਂਪਟ ਜੋੜੋ।",
       "enterPromptOrFileToStart": "ਸ਼ੁਰੂ ਕਰਨ ਲਈ ਇੱਕ ਪ੍ਰਾਂਪਟ ਜਾਂ ਫਾਈਲ ਜੋੜੋ।",
-      "connectProviderToStart": "ਸ਼ੁਰੂ ਕਰਨ ਲਈ ਇੱਕ ਪ੍ਰਦਾਤਾ ਕਨੈਕਟ ਕਰੋ।",
+      "connectProviderToStart": "ਰਿਪੋਜ਼ਟਰੀਆਂ ਇੱਕ ਕਨੈਕਟ ਹੋਏ GitHub, GitLab ਜਾਂ Bitbucket ਖਾਤੇ ਤੋਂ ਆਉਂਦੀਆਂ ਹਨ।",
       "promptPlaceholder": "ਤੁਸੀਂ ਕਿਸ 'ਤੇ ਕੰਮ ਕਰਨਾ ਚਾਹੋਗੇ?",
       "couldNotLoadModels": "ਮਾਡਲ ਲੋਡ ਨਹੀਂ ਕੀਤੇ ਜਾ ਸਕੇ।",
       "prefillRepoAndModelUnavailable": "ਮੂਲ ਸੈਸ਼ਨ ਦੀ ਰਿਪੋਜ਼ਟਰੀ ਅਤੇ ਮਾਡਲ ਹੁਣ ਉਪਲਬਧ ਨਹੀਂ ਹਨ। ਹੇਠਾਂ ਨਵੀਂ ਰਿਪੋਜ਼ਟਰੀ ਅਤੇ ਨਵਾਂ ਮਾਡਲ ਚੁਣੋ।",

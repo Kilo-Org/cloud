@@ -77,7 +77,6 @@ function defineDefaultContextInfo(): UsageContextInfo {
   };
 }
 
-// Returns structured type for new usage
 export async function defineMicrodollarUsage(): Promise<CoreUsageWithMetaData> {
   const stats = defineDefaultUsageStats();
   const context = defineDefaultContextInfo();
@@ -89,7 +88,6 @@ export async function defineMicrodollarUsage(): Promise<CoreUsageWithMetaData> {
   };
 }
 
-// Helper to insert usage record with overrides - used in tests
 export async function insertUsageWithOverrides(
   overrides: Partial<MicrodollarUsage>
 ): Promise<void> {

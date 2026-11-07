@@ -40,7 +40,6 @@ describe('Magic Link Tokens', () => {
   const testEmail = 'test@example.com';
 
   beforeEach(async () => {
-    // Clean up test tokens before each test
     await db.execute(sql`DELETE FROM magic_link_tokens WHERE email = ${testEmail}`);
   });
 
@@ -62,7 +61,6 @@ describe('Magic Link Tokens', () => {
       // Verify token hash is 64 characters (SHA-256 hex encoded)
       expect(result.token_hash).toHaveLength(64);
 
-      // Verify they are different
       expect(result.plaintext_token).not.toBe(result.token_hash);
     });
 
@@ -71,7 +69,6 @@ describe('Magic Link Tokens', () => {
       const expiresAt = new Date(result.expires_at);
       const now = new Date();
 
-      // Should expire in approximately 60 minutes (1 hour)
       const minutesDiff = (expiresAt.getTime() - now.getTime()) / (1000 * 60);
       expect(minutesDiff).toBeGreaterThan(59.9);
       expect(minutesDiff).toBeLessThan(60.1);
@@ -117,11 +114,9 @@ describe('Magic Link Tokens', () => {
     it('should not allow consuming the same token twice', async () => {
       const created = await createMagicLinkToken(testEmail);
 
-      // First consumption should succeed
       const firstVerify = await verifyAndConsumeMagicLinkToken(created.plaintext_token);
       expect(firstVerify).toBeDefined();
 
-      // Second consumption should fail
       const secondVerify = await verifyAndConsumeMagicLinkToken(created.plaintext_token);
       expect(secondVerify).toBeNull();
     });
@@ -130,7 +125,6 @@ describe('Magic Link Tokens', () => {
       // Create a token with very short expiration (0.06 minutes = ~3.6 seconds)
       const created = await createMagicLinkToken(testEmail, 0.06);
 
-      // Wait for it to expire
       await new Promise(resolve => setTimeout(resolve, 4000));
 
       const verified = await verifyAndConsumeMagicLinkToken(created.plaintext_token);
@@ -409,7 +403,6 @@ describe('Magic Link Tokens', () => {
       const { code, challengeId } = await createSignInCode(testEmail);
       await reserveSignInCode(testEmail, code, challengeId);
 
-      // Verify a wrong guess does NOT increment attempts
       const [before] = await db
         .select({ attempts: magic_link_tokens.attempts })
         .from(magic_link_tokens)
@@ -434,11 +427,9 @@ describe('Magic Link Tokens', () => {
       await reserveSignInCode(testEmail, code, challengeId);
       await releaseSignInCode(testEmail, code, challengeId);
 
-      // Code should be usable again
       const result = await reserveSignInCode(testEmail, code, challengeId);
       expect(result).toBe('ok');
 
-      // And should not have any attempts consumed
       const [row] = await db
         .select({ attempts: magic_link_tokens.attempts })
         .from(magic_link_tokens)
@@ -455,7 +446,6 @@ describe('Magic Link Tokens', () => {
       const second = await reserveSignInCode(testEmail, code, challengeId);
       expect(second).toBe('in_progress');
 
-      // The code remains unconsumed
       const [row] = await db
         .select()
         .from(magic_link_tokens)
@@ -479,7 +469,6 @@ describe('Magic Link Tokens', () => {
 
       await reserveSignInCode(testEmail, code, challengeId);
 
-      // Force the reservation to expire
       await db
         .update(magic_link_tokens)
         .set({ reserved_until: new Date(Date.now() - 60_000).toISOString() })
@@ -493,7 +482,6 @@ describe('Magic Link Tokens', () => {
       const { code, challengeId } = await createSignInCode(testEmail);
       await reserveSignInCode(testEmail, code, challengeId);
 
-      // Force the reservation to expire
       await db
         .update(magic_link_tokens)
         .set({ reserved_until: new Date(Date.now() - 60_000).toISOString() })
@@ -502,7 +490,6 @@ describe('Magic Link Tokens', () => {
       const committed = await commitSignInCode(testEmail, code, challengeId);
       expect(committed).toBe(false);
 
-      // Code should still be unconsumed
       const [row] = await db
         .select()
         .from(magic_link_tokens)
@@ -514,13 +501,11 @@ describe('Magic Link Tokens', () => {
       const { code, challengeId } = await createSignInCode(testEmail);
       await reserveSignInCode(testEmail, code, challengeId);
 
-      // Force the reservation to expire
       await db
         .update(magic_link_tokens)
         .set({ reserved_until: new Date(Date.now() - 60_000).toISOString() })
         .where(eq(magic_link_tokens.email, testEmail));
 
-      // consumeSignInCode should still work without a live reservation
       const consumed = await consumeSignInCode(testEmail, code, challengeId);
       expect(consumed).toBe(true);
 
@@ -576,14 +561,12 @@ describe('Magic Link Tokens', () => {
         const { code: codeB, challengeId: challengeB } =
           await createSignInCode('other@example.com');
 
-        // Spend challenge A's budget with wrong guesses.
         const wrongCode = codeA === '000000' ? '111111' : '000000';
         for (let i = 0; i < 5; i++) {
           const result = await reserveSignInCode(testEmail, wrongCode, challengeA);
           expect(result).toBe('invalid');
         }
 
-        // Challenge A is now exhausted.
         const exhausted = await reserveSignInCode(testEmail, wrongCode, challengeA);
         expect(exhausted).toBe('too_many_attempts');
 
@@ -593,8 +576,6 @@ describe('Magic Link Tokens', () => {
         const bResult = await reserveSignInCode('other@example.com', wrongCode, challengeB);
         expect(bResult).toBe('invalid');
 
-        // The correct code for B still verifies through verifyAndConsumeSignInCode
-        // using the challenge.
         const verifyResult = await verifyAndConsumeSignInCode(
           'other@example.com',
           codeB,
@@ -607,7 +588,6 @@ describe('Magic Link Tokens', () => {
         const { code, challengeId } = await createSignInCode(testEmail);
         await reserveSignInCode(testEmail, code, challengeId);
 
-        // Commit with the right challenge succeeds.
         const committed = await commitSignInCode(testEmail, code, challengeId);
         expect(committed).toBe(true);
       });
@@ -616,7 +596,6 @@ describe('Magic Link Tokens', () => {
         const { code, challengeId } = await createSignInCode(testEmail);
         await reserveSignInCode(testEmail, code, challengeId);
 
-        // Commit with a different challenge fails.
         const committed = await commitSignInCode(
           testEmail,
           code,
@@ -624,7 +603,6 @@ describe('Magic Link Tokens', () => {
         );
         expect(committed).toBe(false);
 
-        // Code should still be unconsumed.
         const [row] = await db
           .select()
           .from(magic_link_tokens)
@@ -777,7 +755,6 @@ describe('Magic Link Tokens', () => {
       it('returns invalid for a challenge ID that matches no row', async () => {
         const { code } = await createSignInCode(testEmail);
 
-        // Use a challenge ID that does not exist in the database.
         const result = await reserveSignInCode(
           testEmail,
           code,
@@ -826,13 +803,11 @@ describe('Magic Link Tokens', () => {
     it('with the same code, two sequential settle-attempts produce one consumed code', async () => {
       const { code, challengeId } = await createSignInCode(testEmail);
 
-      // First: reserve, then consume unconditionally (simulating a lapse)
       const firstReserve = await reserveSignInCode(testEmail, code, challengeId);
       expect(firstReserve).toBe('ok');
 
       await consumeSignInCode(testEmail, code, challengeId);
 
-      // Second attempt: code should be consumed, so reserve returns 'invalid'
       const secondReserve = await reserveSignInCode(testEmail, code, challengeId);
       expect(secondReserve).toBe('invalid');
     });
@@ -842,7 +817,6 @@ describe('Magic Link Tokens', () => {
       const settledAccounts: string[] = [];
       const issuedSessions: string[] = [];
 
-      // 1. Reserve the code.
       const reserve = await reserveSignInCode(testEmail, code, challengeId);
       expect(reserve).toBe('ok');
 
@@ -850,13 +824,11 @@ describe('Magic Link Tokens', () => {
       // settlement before the reservation lapses, as the native route does.
       settledAccounts.push(testEmail);
 
-      // 2. Force the reservation to expire (simulate mid-settlement timeout).
       await db
         .update(magic_link_tokens)
         .set({ reserved_until: new Date(Date.now() - 60_000).toISOString() })
         .where(eq(magic_link_tokens.email, testEmail));
 
-      // 3. Commit fails because the reservation has lapsed.
       const committed = await commitSignInCode(testEmail, code, challengeId);
       expect(committed).toBe(false);
 
@@ -867,23 +839,19 @@ describe('Magic Link Tokens', () => {
         .where(eq(magic_link_tokens.email, testEmail));
       expect(afterCommit?.consumed_at).toBeNull();
 
-      // 4. Consume unconditionally — the user is legitimately settled.
       const consumed = await consumeSignInCode(testEmail, code, challengeId);
       expect(consumed).toBe(true);
       issuedSessions.push(testEmail);
 
-      // Code is now marked as consumed.
       const [afterConsume] = await db
         .select({ consumed_at: magic_link_tokens.consumed_at })
         .from(magic_link_tokens)
         .where(eq(magic_link_tokens.email, testEmail));
       expect(afterConsume?.consumed_at).not.toBeNull();
 
-      // 5. A second attempt cannot settle or issue another session.
       const secondReserve = await reserveSignInCode(testEmail, code, challengeId);
       expect(secondReserve).toBe('invalid');
 
-      // The consumed code must not be re-usable.
       const secondConsume = await consumeSignInCode(testEmail, code, challengeId);
       expect(secondConsume).toBe(false);
       expect(settledAccounts).toEqual([testEmail]);

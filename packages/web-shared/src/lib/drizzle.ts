@@ -208,7 +208,6 @@ export { sql } from 'drizzle-orm';
 // Helper for automatically updating the deleted_at column with database server time
 export const auto_deleted_at = { deleted_at: drizzleSql`now()` };
 
-// Test cleanup functions
 // NOTE: With this simplified setup, the connection is created eagerly and not reset.
 // Tests should not rely on closing and reopening the connection within the same process.
 

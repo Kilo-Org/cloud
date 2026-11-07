@@ -1143,11 +1143,9 @@ test('promo and bonus are mutually exclusive: parallel calls issue only one', as
 
   await forceImmediateExpirationRecomputation(user.id);
 
-  // Exactly one should have been issued, the other should have been skipped.
   const issuedCount = [promoResult.wasIssued, bonusResult.wasIssued].filter(Boolean).length;
   expect(issuedCount).toBe(1);
 
-  // Verify at the database level: only one of promo or bonus should exist.
   const bonusItems = await db
     .select({ id: kilo_pass_issuance_items.id })
     .from(kilo_pass_issuance_items)

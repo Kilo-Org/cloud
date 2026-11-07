@@ -59,7 +59,6 @@ describe('Usage deduction for migrated users', () => {
     expect(result).not.toBeNull();
     expect(result?.newMicrodollarsUsed).toBe(initialMicrodollarsUsed + usageCost);
 
-    // Verify user's microdollars_used was updated in DB
     const updatedUser = await db.query.kilocode_users.findFirst({
       where: eq(kilocode_users.id, user.id),
     });
@@ -84,7 +83,6 @@ describe('Usage deduction for migrated users', () => {
     expect(result).not.toBeNull();
     expect(result?.newMicrodollarsUsed).toBe(usageCost);
 
-    // Verify usage record was created
     const usageRecords = await db.query.microdollar_usage.findMany({
       where: eq(microdollar_usage.kilo_user_id, user.id),
     });
@@ -115,7 +113,6 @@ describe('Usage deduction for migrated users', () => {
       expect(result?.newMicrodollarsUsed).toBe(currentUsage);
     }
 
-    // Verify final state
     const updatedUser = await db.query.kilocode_users.findFirst({
       where: eq(kilocode_users.id, user.id),
     });
@@ -138,7 +135,6 @@ describe('Usage deduction for migrated users', () => {
 
     await insertUsageRecord(core, metadata);
 
-    // Verify balance calculation
     const updatedUser = await db.query.kilocode_users.findFirst({
       where: eq(kilocode_users.id, user.id),
     });

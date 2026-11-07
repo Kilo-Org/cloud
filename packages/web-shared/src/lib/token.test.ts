@@ -26,7 +26,6 @@ import {
   type JWTTokenPayload,
 } from './tokens';
 
-// Test fixtures
 const mockUser: User = {
   id: 'test-user-123',
   google_user_email: 'test@example.com',
@@ -243,7 +242,6 @@ describe('Token Functions', () => {
       expect(typeof token).toBe('string');
       expect(token.length).toBeGreaterThan(0);
 
-      // Verify token can be decoded
       const decoded = jwt.decode(token) as jwt.JwtPayload & JWTTokenPayload;
       expect(decoded).toBeTruthy();
       expect(decoded.kiloUserId).toBe(mockUser.id);
@@ -273,7 +271,7 @@ describe('Token Functions', () => {
 
       expect(decoded.exp).toBeTruthy();
       expect(decoded.iat).toBeTruthy();
-      // Token should expire in the future (more than 4 years from now)
+
       const fourYearsInSeconds = 4 * 365 * 24 * 60 * 60;
       const actualDuration = decoded.exp! - decoded.iat!;
       expect(actualDuration).toBeGreaterThan(fourYearsInSeconds);
@@ -380,7 +378,6 @@ describe('Token Functions', () => {
     });
 
     it('should return error for JWT token with wrong signature', () => {
-      // Create a token with a different secret
       const wrongToken = jwt.sign(
         {
           env: process.env.NODE_ENV,
@@ -407,7 +404,7 @@ describe('Token Functions', () => {
           env: process.env.NODE_ENV,
           kiloUserId: mockUser.id,
           apiTokenPepper: mockUser.api_token_pepper,
-          version: JWT_TOKEN_VERSION - 1, // Outdated version
+          version: JWT_TOKEN_VERSION - 1,
         },
         getEnvVariable('NEXTAUTH_SECRET'),
         { algorithm: 'HS256', expiresIn: '5y' }
@@ -433,7 +430,7 @@ describe('Token Functions', () => {
           version: JWT_TOKEN_VERSION,
         },
         getEnvVariable('NEXTAUTH_SECRET'),
-        { algorithm: 'HS256', expiresIn: '-1h' } // Expired 1 hour ago
+        { algorithm: 'HS256', expiresIn: '-1h' }
       );
 
       const headers = new Headers();
@@ -448,7 +445,7 @@ describe('Token Functions', () => {
     it('should handle case-insensitive Bearer prefix', () => {
       const token = generateApiToken(mockUser);
       const headers = new Headers();
-      headers.set('authorization', `bearer ${token}`); // lowercase
+      headers.set('authorization', `bearer ${token}`);
 
       const result = validateAuthorizationHeader(headers);
 
@@ -459,7 +456,7 @@ describe('Token Functions', () => {
     it('should handle mixed case Bearer prefix', () => {
       const token = generateApiToken(mockUser);
       const headers = new Headers();
-      headers.set('authorization', `BeArEr ${token}`); // mixed case
+      headers.set('authorization', `BeArEr ${token}`);
 
       const result = validateAuthorizationHeader(headers);
 
@@ -531,18 +528,15 @@ describe('Token Functions', () => {
         expect(result.token.length).toBeGreaterThan(0);
         expect(typeof result.expiresAt).toBe('string');
 
-        // Verify expiresAt is a valid ISO date string
         const expiresAtDate = new Date(result.expiresAt);
         expect(expiresAtDate.toISOString()).toBe(result.expiresAt);
 
-        // Verify expiresAt is approximately 15 minutes in the future
         const now = Date.now();
         const expiresAtMs = expiresAtDate.getTime();
         const diffMs = expiresAtMs - now;
-        expect(diffMs).toBeGreaterThan(14 * 60 * 1000); // At least 14 minutes
-        expect(diffMs).toBeLessThan(16 * 60 * 1000); // At most 16 minutes
+        expect(diffMs).toBeGreaterThan(14 * 60 * 1000);
+        expect(diffMs).toBeLessThan(16 * 60 * 1000);
 
-        // Verify token can be decoded
         const decoded = jwt.decode(result.token) as jwt.JwtPayload & JWTTokenPayload;
         expect(decoded).toBeTruthy();
         expect(decoded.kiloUserId).toBe(mockUser.id);
@@ -560,7 +554,6 @@ describe('Token Functions', () => {
         expect(decoded.exp).toBeTruthy();
         expect(decoded.iat).toBeTruthy();
 
-        // Token should expire in approximately 15 minutes (900 seconds)
         const actualDuration = decoded.exp! - decoded.iat!;
         expect(actualDuration).toBe(900);
       });
@@ -595,7 +588,6 @@ describe('Token Functions', () => {
       });
 
       it('should expire after 15 minutes', () => {
-        // Create a token that expired 1 minute ago
         const expiredToken = jwt.sign(
           {
             env: process.env.NODE_ENV,

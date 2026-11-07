@@ -141,7 +141,6 @@ describe('fetchExpiringTransactionsForOrganization', () => {
     const result = await fetchExpiringTransactionsForOrganization(orgId);
     expect(result).toHaveLength(0);
 
-    // cleanup
     await db
       .delete(creditTransactionsTable)
       .where(eq(creditTransactionsTable.organization_id, otherOrg!.id));
@@ -202,7 +201,6 @@ describe('processOrganizationExpirations', () => {
     // total_acquired should decrease by the expired amount (10M - 3M used = 7M expired)
     expect(result!.total_microdollars_acquired).toBe(10_000_000 - 7_000_000);
 
-    // Verify expiration transaction in DB
     const expirations = await db
       .select()
       .from(creditTransactionsTable)
@@ -213,7 +211,6 @@ describe('processOrganizationExpirations', () => {
     expect(expirations[0].organization_id).toBe(orgId);
     expect(expirations[0].kilo_user_id).toBe('system');
 
-    // Verify org columns updated
     const updatedOrg = await db.query.organizations.findFirst({
       where: eq(organizations.id, orgId),
     });

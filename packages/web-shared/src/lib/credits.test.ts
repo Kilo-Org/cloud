@@ -28,21 +28,18 @@ describe('processTopUp', () => {
     const stripePaymentId = `stripe-test-duplicate-${Date.now()}-${Math.random()}`;
     const amountInCents = 500;
 
-    // First top-up should succeed
     const result1 = await processTopUp(user, amountInCents, {
       type: 'stripe',
       stripe_payment_id: stripePaymentId,
     });
     expect(result1).toBe(true);
 
-    // Second top-up with same stripe_payment_id should be rejected
     const result2 = await processTopUp(user, amountInCents, {
       type: 'stripe',
       stripe_payment_id: stripePaymentId,
     });
     expect(result2).toBe(false);
 
-    // Only one transaction with this stripe_payment_id should exist
     const transactions = await db.query.credit_transactions.findMany({
       where: and(
         eq(credit_transactions.kilo_user_id, user.id),

@@ -79,7 +79,6 @@ describe('openPauseEvent', () => {
       resumesAt: resumesAt1,
     });
 
-    // Call again with a different resumesAt
     await openPauseEvent(db, {
       kiloPassSubscriptionId: subId,
       pausedAt,
@@ -91,9 +90,7 @@ describe('openPauseEvent', () => {
       .from(kilo_pass_pause_events)
       .where(eq(kilo_pass_pause_events.kilo_pass_subscription_id, subId));
 
-    // Should still only have one row
     expect(rows).toHaveLength(1);
-    // resumes_at should be updated to the new value
     expect(rows[0]!.resumes_at).toMatch(/2026-03-01/);
     expect(rows[0]!.resumed_at).toBeNull();
   });
@@ -126,7 +123,6 @@ describe('closePauseEvent', () => {
     const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
     const subId = await insertTestSubscription({ kiloUserId: user.id });
 
-    // No open event exists; should not throw
     await expect(
       closePauseEvent(db, { kiloPassSubscriptionId: subId, resumedAt: '2026-02-10T00:00:00.000Z' })
     ).resolves.not.toThrow();
@@ -153,7 +149,6 @@ describe('closePauseEvent', () => {
       resumedAt: '2026-02-10T00:00:00.000Z',
     });
 
-    // Close again — should be a no-op (no open event)
     await expect(
       closePauseEvent(db, {
         kiloPassSubscriptionId: subId,
@@ -166,7 +161,6 @@ describe('closePauseEvent', () => {
       .from(kilo_pass_pause_events)
       .where(eq(kilo_pass_pause_events.kilo_pass_subscription_id, subId));
 
-    // resumed_at should still be the original close time
     expect(rows[0]!.resumed_at).toMatch(/2026-02-10/);
   });
 });

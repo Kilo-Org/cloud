@@ -1584,6 +1584,126 @@ describe('binary step-up enforcement (REST)', () => {
   });
 });
 
+describe('step-up refusal telemetry (REST)', () => {
+  const originalSwitch = process.env.ADMIN_STEP_UP_ENABLED;
+  let evaluateStepUp: jest.Mock;
+  let events: AdminAccessEvent[];
+
+  beforeAll(() => {
+    ({ evaluateStepUp } = jest.requireMock('@kilocode/web-shared/lib/admin/step-up-store') as {
+      evaluateStepUp: jest.Mock;
+    });
+  });
+
+  beforeEach(() => {
+    events = [];
+    setAdminAccessSinkForTest(event => events.push(event));
+  });
+
+  afterEach(() => {
+    setAdminAccessSinkForTest(null);
+    process.env.ADMIN_STEP_UP_ENABLED = originalSwitch;
+    evaluateStepUp.mockClear();
+  });
+
+  async function bearerAdmin() {
+    const admin = await insertTestUser({
+      google_user_email: `step-up-audit-bearer-${crypto.randomUUID()}@kilocode.ai`,
+      hosted_domain: 'kilocode.ai',
+      is_admin: true,
+      api_token_pepper: `step-up-audit-bearer-${crypto.randomUUID()}`,
+    });
+    mockHeaders.mockResolvedValue(
+      new Headers({
+        Authorization: `Bearer ${generateApiToken(admin)}`,
+        'x-pathname': '/admin/api/safety-identifiers',
+        'x-forwarded-for': '203.0.113.9, 10.0.0.1',
+      })
+    );
+    return admin;
+  }
+
+  async function sessionAdmin() {
+    const admin = await insertTestUser({
+      google_user_email: `step-up-audit-session-${crypto.randomUUID()}@kilocode.ai`,
+      hosted_domain: 'kilocode.ai',
+      is_admin: true,
+      web_session_pepper: 'step-up-audit-session-pepper',
+    });
+    mockHeaders.mockResolvedValue(new Headers({ 'x-pathname': '/admin/api/safety-identifiers' }));
+    mockGetServerSession.mockResolvedValue({
+      kiloUserId: admin.id,
+      webSessionPepper: 'step-up-audit-session-pepper',
+      webSessionId: 'step-up-audit-web-session',
+    });
+    return admin;
+  }
+
+  test('records one denied privileged_access event for a refused API token', async () => {
+    process.env.ADMIN_STEP_UP_ENABLED = 'true';
+    const admin = await bearerAdmin();
+
+    const result = await getUserFromAuth({ adminOnly: true, requestMethod: 'GET' });
+
+    expect((result.authFailedResponse as Response).status).toBe(403);
+    expect(evaluateStepUp).not.toHaveBeenCalled();
+    expect(events.map(event => event.kind)).toEqual(['admin_guard', 'privileged_access']);
+    expect(events[1]).toMatchObject({
+      event: 'admin_access',
+      surface: 'rest',
+      kind: 'privileged_access',
+      credential: 'human_bearer',
+      authVia: 'token',
+      outcome: 'denied',
+      actionClass: 'platform_read',
+      actionId: 'rest.admin.safetyIdentifiers',
+      target: null,
+      wouldBlock: true,
+      kiloUserId: admin.id,
+      adminTier: 'platform_admin',
+      route: '/admin/api/safety-identifiers',
+      method: 'GET',
+      ip: '203.0.113.9',
+      tokenSource: null,
+    });
+  });
+
+  test('records exactly one succeeded event when the API token passes', async () => {
+    process.env.ADMIN_STEP_UP_ENABLED = 'false';
+    const admin = await bearerAdmin();
+
+    const result = await getUserFromAuth({ adminOnly: true, requestMethod: 'GET' });
+
+    expect(result.user?.id).toBe(admin.id);
+    expect(events.map(event => event.kind)).toEqual(['admin_guard', 'privileged_access']);
+    expect(events[1]).toMatchObject({
+      kind: 'privileged_access',
+      credential: 'human_bearer',
+      outcome: 'succeeded',
+      actionClass: 'platform_read',
+      actionId: 'rest.admin.safetyIdentifiers',
+    });
+    expect(
+      events.filter(event => event.kind === 'privileged_access' && event.outcome === 'denied')
+    ).toHaveLength(0);
+  });
+
+  test('leaves a session step-up refusal on the admin guard event', async () => {
+    process.env.ADMIN_STEP_UP_ENABLED = 'true';
+    await sessionAdmin();
+    evaluateStepUp.mockResolvedValueOnce({
+      state: { status: 'not_enrolled' },
+      proof: null,
+      passkeyCount: 0,
+    });
+
+    const result = await getUserFromAuth({ adminOnly: true, requestMethod: 'GET' });
+
+    expect((result.authFailedResponse as Response).status).toBe(403);
+    expect(events.map(event => event.kind)).toEqual(['admin_guard']);
+  });
+});
+
 describe('getUserFromAuth admin_access telemetry (REST)', () => {
   let events: AdminAccessEvent[];
 

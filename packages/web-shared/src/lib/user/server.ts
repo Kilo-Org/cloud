@@ -260,7 +260,7 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
       const surface = opts.stepUpSurface ?? 'rest';
       const route = routeFromHeaders(headersList);
       const method = methodFromHeaders(headersList, opts.requestMethod);
-      const { actionClass } = actionClassForRoute({
+      const { actionClass, inventoryId } = actionClassForRoute({
         surface,
         route: route ?? '',
         method,
@@ -277,6 +277,26 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
           surface,
         });
       } catch (error) {
+        // A refused non-session credential is recorded before the request fails,
+        // matching the tRPC admin guard, so a refused API key stays alertable.
+        // Session refusals stay on `admin_guard`, per the event contract.
+        if (credential !== 'session') {
+          emitPrivilegedAccessEvent({
+            surface,
+            user: result.user,
+            credential,
+            outcome: 'denied',
+            actionClass,
+            actionId: inventoryId,
+            target: null,
+            wouldBlock: true,
+            userAgentProduct: userAgentProductFromHeaders(headersList),
+            tokenSource: result.tokenSource ?? null,
+            route,
+            method,
+            ip: clientIpFromHeaders(headersList),
+          });
+        }
         if (error instanceof TRPCError && error.cause instanceof StepUpRequiredError) {
           return authError(403, error.cause.code, result.user.id);
         }

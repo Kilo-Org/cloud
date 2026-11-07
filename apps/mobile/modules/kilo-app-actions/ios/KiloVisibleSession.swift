@@ -34,6 +34,7 @@ enum KiloVisibleSession {
       return
     }
     let activity = NSUserActivity(activityType: activityType)
+    activity.isEligibleForHandoff = false
     activity.appEntityIdentifier = EntityIdentifier(
       for: KiloSessionEntity.self,
       identifier: trimmed

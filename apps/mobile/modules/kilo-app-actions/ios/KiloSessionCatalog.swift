@@ -20,10 +20,7 @@ struct KiloSessionCatalogEntry: Codable, Equatable {
 /// therefore costs one comparison instead of a disk write.
 ///
 /// Every mutation runs on one serial queue, so a replace and a clear can never
-/// interleave and a clear always wins when it is last. `UserDefaults` only
-/// becomes readable again after the device is unlocked, which is why the
-/// privacy-lock clear is fired from the same place that publishes the locked
-/// state rather than trusted to land later.
+/// interleave and a clear always wins when it is last.
 enum KiloSessionCatalogStore {
   /// The one defaults key. Account scoping is not a namespace here: the
   /// JavaScript owner writes the current account's titles and clears the store

@@ -37,6 +37,9 @@ const query = vi.hoisted(() => ({
 }));
 vi.mock('expo-router', () => ({
   useRouter: () => ({ back: vi.fn() }),
+  // The invite sheet's dismissal reads this through `usePopOnce`; this suite
+  // never drives Android Back, so a focused route with no events is enough.
+  useNavigation: () => ({ isFocused: () => true, addListener: () => () => undefined }),
   // None of these surfaces needs a focus effect to run, and the invite sheet
   // resets its form on every focus after mount, so running one per render
   // would loop.

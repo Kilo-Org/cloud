@@ -16,10 +16,16 @@ vi.mock('@/components/centered-state-surface', () => ({
 vi.mock('@/lib/form-sheet', () => ({
   useFormSheetScreenOptions: () => ({ sheetAllowedDetents: [0.5, 1] }),
 }));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({ card: '#FFFFFF' }),
+}));
 vi.mock('react-native', () => ({
   Platform: { OS: 'android' },
   View: 'View',
-  useWindowDimensions: () => ({ width: 400, height: 800 }),
+  // Above the half-detent threshold, so the shared organization detents are
+  // `[0.5, 1]` and only the invite sheet's own override can yield `[1]`; a
+  // shorter window would pass that expectation without the override.
+  useWindowDimensions: () => ({ width: 400, height: 900 }),
 }));
 
 /**

@@ -1101,7 +1101,9 @@ describe('CreditsCard add-credits entry point', () => {
     listState.payload = orgs;
 
     const { renderer, unmount } = await mountCard(queryClient, orgs);
-    await waitFor(() => renderer.root.findAll(node => node.children.includes('ADD_CREDITS_ROW')).length > 0);
+    await waitFor(
+      () => renderer.root.findAll(node => node.children.includes('ADD_CREDITS_ROW')).length > 0
+    );
 
     // The action shares the balance card, which is the row it tops up: a block
     // of its own held nothing but the button once the copy beside it left.

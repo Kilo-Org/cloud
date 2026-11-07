@@ -10,7 +10,7 @@
 import { readFileSync } from 'node:fs';
 
 import { ORGANIZATION_NAME_MAX_LENGTH } from '@kilocode/app-shared/organizations';
-import { createElement } from 'react';
+import { createElement, isValidElement } from 'react';
 import { act, type TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -18,6 +18,7 @@ import { renderWithProviders } from '@/test/render-with-providers';
 import { compiledDimensions, compiledLengthDp } from '@/test/native-dimensions';
 
 import { i18n } from '@/i18n';
+import { AddCreditsRow } from '@/components/add-credits-row';
 import { type OrgKiloPassRowState, type OrgKiloPassSummary } from './org-kilo-pass-row-state';
 import { OrganizationHubScreen } from './hub-screen';
 
@@ -305,8 +306,8 @@ describe('Organization hub card', () => {
       .find(node => node.props.label === i18n.t('organization.hub.balance'));
     // The control shares the amount's row: a row of its own held nothing but
     // the button once the copy beside it left.
-    expect(balance?.props.trailing).toBeDefined();
-    expect(renderer.root.findAllByType('AddCreditsRow')).toHaveLength(0);
+    const trailing: unknown = balance?.props.trailing;
+    expect(isValidElement(trailing) && trailing.type === AddCreditsRow).toBe(true);
     unmount();
   });
 

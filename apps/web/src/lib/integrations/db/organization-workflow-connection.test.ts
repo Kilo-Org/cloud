@@ -266,6 +266,12 @@ describe('organization GitHub workflow connection lookups', () => {
     await expect(
       assertGitHubInstallationRuntimeAuthorized(installationId, 'standard', association.id)
     ).resolves.toBeUndefined();
+
+    // Webhook and PR-watch consumers ask by installation alone, without naming
+    // the expected association, and must resolve the same connection.
+    await expect(
+      assertGitHubInstallationRuntimeAuthorized(installationId, 'standard')
+    ).resolves.toBeUndefined();
   });
 
   test('keeps a shadowed roleless association unauthorized for runtime use', async () => {
@@ -282,6 +288,9 @@ describe('organization GitHub workflow connection lookups', () => {
     await expect(
       assertGitHubInstallationRuntimeAuthorized(installationId, 'standard', shadowed.id)
     ).rejects.toMatchObject({ reason: 'missing_association' });
+    await expect(
+      assertGitHubInstallationRuntimeAuthorized(installationId, 'standard')
+    ).resolves.toBeUndefined();
   });
 
   test('orders a stored workflow association before an eligible roleless one', async () => {

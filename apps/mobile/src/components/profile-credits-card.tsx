@@ -7,9 +7,9 @@ import { ChevronDown, Eye, EyeOff } from '@/components/ui/icons';
 import { Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
-import Animated, { LinearTransition } from 'react-native-reanimated';
 
 import { AddCreditsButton, AddCreditsRow } from '@/components/add-credits-row';
+import { BalanceBlock, type BalanceBlockState } from '@/components/profile-balance-block';
 import { useContextPicker } from '@/components/context-control';
 import { CreditExpiryNote } from '@/components/credits/credit-expiry-note';
 import { KiloPassSubscriptionCard } from '@/components/kilo-pass/kilo-pass-subscription-card';
@@ -270,18 +270,14 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
       orgAddCreditsAction
     );
 
-  // One shell for the balance block in all three of its states — the loading
-  // skeleton, the failed read and the loaded row — so a change of state swaps
-  // the content and never the frame around it. A stacked card is a column: the
-  // control row on top, the note under it, at the card's own padding. The
-  // purchase action used to take a band of its own below the note, which left
-  // the card half empty and its two ends unevenly padded (design review,
-  // Profile compact cell, 2026-11-07); on the control row it fills the card's
-  // trailing end beside the amount.
-  const balanceBlockClass = cn(
-    'min-h-16 gap-2 rounded-lg bg-secondary px-3 py-2',
-    stackBalance ? 'items-stretch' : 'flex-row items-center'
-  );
+  // The balance slot's state: one shell paints all three, so the card never
+  // moves as the read answers, fails or retries.
+  let balanceState: BalanceBlockState = 'ready';
+  if (showBalanceSkeleton) {
+    balanceState = 'loading';
+  } else if (balanceFailed) {
+    balanceState = 'failed';
+  }
 
   const retryBalance = () => {
     refetchUserId();
@@ -346,132 +342,17 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
         </View>
       )}
 
-      {showBalanceSkeleton && (
-        // Content-shaped skeleton (number bar + note bar in the card's own
-        // bg-secondary shell): a plain block read as an empty box in the e5
-        // spot check (2026-09-07). The bars are bg-muted-soft because the
-        // theme's bg-muted equals bg-secondary — default-tone bars were
-        // invisible in this shell (b911 e2 spot check: "blank beige block",
-        // e2-nav-profile.png).
-        //
-        // The bars hold the loaded block's height in each layout: the wide
-        // card keeps its 48 dp column (amount line 28.19 + gap 3.5 + note line
-        // 14.1, on the 48 dp visibility toggle it shares the row with), so the
-        // shell measures the loaded block's 62.1 dp rather than the 56 dp its
-        // own `min-h-16` and two bars made: the swap to the balance row moved
-        // every section below it by 1.5 dp (design gate, Profile, 2026-11-05).
-        // A stacked card repeats the loaded card's two rows instead: the
-        // control row, with the number bar in the amount's slot and the
-        // purchase action in its own, and the note bar under it. Both rows
-        // carry the loaded block's heights, so the card never moves as the
-        // read answers, fails or retries.
-        //
-        // The purchase action keeps its slot here too, in the same place the
-        // loaded row puts it. A control painted only once the read answered
-        // added its own line to a stacked card and pushed every section below
-        // the card down (design gate, Profile, 2026-11-06).
-        <View className={balanceBlockClass}>
-          {stackBalance ? (
-            <>
-              <View className="min-w-0 min-h-[44px] flex-row items-center gap-1">
-                <View className="min-w-0 flex-1">
-                  <Skeleton className="h-8 w-28 max-w-full rounded-md bg-muted-soft" />
-                </View>
-                {orgAddCreditsAction}
-              </View>
-              <Skeleton className="h-3.5 w-40 max-w-full rounded bg-muted-soft" />
-            </>
-          ) : (
-            <>
-              <View className="min-h-[48px] flex-1 justify-center gap-1">
-                <Skeleton className="h-8 w-28 rounded-md bg-muted-soft" />
-                <Skeleton className="h-3 w-40 rounded bg-muted-soft" />
-              </View>
-              {orgAddCreditsAction}
-            </>
-          )}
-        </View>
-      )}
-      {balanceFailed && (
-        <View className={balanceBlockClass}>
-          {stackBalance ? (
-            <>
-              <View className="min-w-0 min-h-[44px] flex-row items-center gap-1">
-                <Pressable
-                  // The retry surface fills the control row, so a retry that
-                  // succeeds swaps this content for the amount and the controls
-                  // in a row of the same height.
-                  className="min-w-0 flex-1 justify-center self-stretch active:opacity-70"
-                  onPress={retryBalance}
-                >
-                  <Text className="text-sm text-destructive">
-                    {t('profile.failedToLoadBalance')}
-                  </Text>
-                </Pressable>
-                {addCreditsAction}
-              </View>
-              {/* The note reads the credit blocks, not the balance, so it keeps
-                  its line here and the block keeps its height. */}
-              {expirySlot}
-            </>
-          ) : (
-            <>
-              <Pressable
-                // A wide card centres its row's children, so the pressable
-                // stretches to the block on its own 48 dp floor.
-                className="min-h-[48px] flex-1 justify-center active:opacity-70"
-                onPress={retryBalance}
-              >
-                <Text className="text-sm text-destructive">{t('profile.failedToLoadBalance')}</Text>
-              </Pressable>
-              {addCreditsAction}
-            </>
-          )}
-        </View>
-      )}
-      {!showBalanceSkeleton && !balanceFailed && (
-        <View className={balanceBlockClass}>
-          <Animated.View
-            className={cn('min-w-0', stackBalance ? 'gap-1' : 'flex-1 flex-row items-center gap-1')}
-            layout={LinearTransition.duration(200)}
-          >
-            {/* Row 1 holds the amount, the toggle, and on a stacked card the
-                purchase action. The toggle's 48 dp box carries `-my-[10px]`, so
-                it reaches its touch target without adding height. On a wide
-                card the toggle is the row's sibling and the note stays in the
-                amount's column; on a stacked card the row is the whole control
-                line and the note follows it at the card's full width. */}
-            <View
-              className={cn(
-                'min-w-0',
-                // `flex-1` is the row's width share only while this View is the
-                // column's child on a wide card. On a stacked card this View is
-                // the control row inside the column, where `flex-1` sets a 0
-                // vertical basis and the row measured 0 dp tall on the first
-                // layout pass (Android compact cell, 2026-11-03); the card's
-                // `items-stretch` already gives it the full width, and its 44
-                // dp floor is the height the skeleton and the failed read hold
-                // there too.
-                stackBalance ? 'min-h-[44px] flex-row items-center gap-1' : 'flex-1 gap-1'
-              )}
-            >
-              <View className={cn('min-w-0', stackBalance && 'flex-1')}>{amountLine}</View>
-              {stackBalance ? (
-                <>
-                  <View className="shrink-0 -my-[10px]">{visibilityToggle}</View>
-                  {addCreditsAction}
-                </>
-              ) : (
-                expirySlot
-              )}
-            </View>
-            {stackBalance ? expirySlot : visibilityToggle}
-          </Animated.View>
-          {/* A wide card gives the purchase action its own trailing column. A
-              stacked card already holds it on the control row above. */}
-          {stackBalance ? null : addCreditsAction}
-        </View>
-      )}
+      <BalanceBlock
+        state={balanceState}
+        stacked={stackBalance}
+        amount={amountLine}
+        toggle={visibilityToggle}
+        note={expirySlot}
+        loadingAction={orgAddCreditsAction}
+        action={addCreditsAction}
+        retryLabel={t('profile.failedToLoadBalance')}
+        onRetry={retryBalance}
+      />
       {/* One loading indicator per section: while the balance slot shows its
           skeleton, the KiloPass card reserves its slot quietly instead of
           stacking a second skeleton card. The card's queries still run from

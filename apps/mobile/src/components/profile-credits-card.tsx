@@ -1,7 +1,7 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { selectionHaptic } from '@/lib/haptics';
 import { type Href, useRouter } from 'expo-router';
-import { type ReactNode, useState } from 'react';
+import { useState } from 'react';
 import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { ChevronDown, Eye, EyeOff } from '@/components/ui/icons';
 import { Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
@@ -228,9 +228,8 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
       <AddCreditsRow url={`${WEB_BASE_URL}/organizations/${selectedOrgId}/payment-details`} />
     ) : null;
 
-  let addCreditsAction: ReactNode = null;
-  if (selectedOrgId == null) {
-    addCreditsAction = (
+  const addCreditsAction =
+    selectedOrgId == null ? (
       <View className="max-w-full flex-row flex-wrap items-center justify-end gap-2">
         <AddCreditsButton
           className="h-auto min-h-11 max-w-full py-2"
@@ -239,10 +238,21 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
           }}
         />
       </View>
+    ) : (
+      orgAddCreditsAction
     );
-  } else {
-    addCreditsAction = orgAddCreditsAction;
-  }
+
+  // One shell for the balance block in all three of its states — the loading
+  // skeleton, the failed read and the loaded row — so a change of state swaps
+  // the content and never the frame around it.
+  const balanceBlockClass = cn(
+    'min-h-16 gap-2 rounded-lg bg-secondary px-3 py-2',
+    // A stacked card ends on the Add credits button, whose own line
+    // sits inside a 38.5 dp pill. `pb-3` gives that pill more room under
+    // it than the card's 7 dp top padding gives the amount above it, so
+    // the bottom edge does not read as tighter than the top.
+    stackBalance ? 'items-stretch pb-3' : 'flex-row items-center'
+  );
 
   return (
     <View
@@ -321,17 +331,9 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
         // loaded row puts it. A control painted only once the read answered
         // added its own line to a stacked card and pushed every section below
         // the card down (design gate, Profile, 2026-11-06).
-        <View
-          className={cn(
-            'min-h-16 rounded-lg bg-secondary px-3 py-2',
-            stackBalance ? 'items-stretch gap-2 pb-3' : 'flex-row items-center'
-          )}
-        >
+        <View className={balanceBlockClass}>
           <View
-            className={cn(
-              'min-h-[48px] justify-center gap-1',
-              stackBalance ? undefined : 'flex-1'
-            )}
+            className={cn('min-h-[48px] justify-center gap-1', stackBalance ? undefined : 'flex-1')}
           >
             <Skeleton className="h-8 w-28 rounded-md bg-muted-soft" />
             <Skeleton className="h-3 w-40 rounded bg-muted-soft" />
@@ -359,16 +361,7 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
       )}
       {balanceFailed && orgAddCreditsAction}
       {!showBalanceSkeleton && !balanceFailed && (
-        <View
-          className={cn(
-            'min-h-16 gap-2 rounded-lg bg-secondary px-3 py-2',
-            // A stacked card ends on the Add credits button, whose own line
-            // sits inside a 38.5 dp pill. `pb-3` gives that pill more room under
-            // it than the card's 7 dp top padding gives the amount above it, so
-            // the bottom edge does not read as tighter than the top.
-            stackBalance ? 'items-stretch pb-3' : 'flex-row items-center'
-          )}
-        >
+        <View className={balanceBlockClass}>
           <Animated.View
             className={cn('min-w-0', stackBalance ? 'gap-1' : 'flex-1 flex-row items-center gap-1')}
             layout={LinearTransition.duration(200)}

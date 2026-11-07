@@ -750,6 +750,10 @@ requests retain their full holds. Receipt or observer failures cannot overwrite
 a settled charge. Admission denials finalize their receipt and budget-limit
 evidence even when admission already settled the unused reservation.
 
+Classifier settlement uses the solver's billing-evidence rules. Missing billing
+mode or upstream-cost evidence retains the full hold and stops further dispatch.
+Known charge floors remain held even when they exceed the original reservation.
+
 The isolated runtime uses the installed Miniflare configuration API. Closing a
 run attempts every instance, reports disposal failures, and retains failed
 instances for another cleanup attempt. Package type checks include this runtime.
@@ -762,11 +766,13 @@ python3 -m pip install -r repo-study/requirements.txt
 (cd scripts && python3 -m unittest test_router_ledger test_router_study test_router_proof test_router_replay.ReplayInvariants)
 ```
 
-Paid admission remains blocked if real account policy evidence is absent, if
-any mandatory pair lacks a finite quote, or if total billed exposure is unproved.
+Do not authorize paid work without real account-policy evidence, a finite quote
+for every mandatory pair, and independent evidence of total billed exposure.
 A forecast above the remaining authorization can register for offline checks.
-Local admission stops before a request whose reservation exceeds the remaining
-allowance. Do not shrink the plan or raise a cap implicitly.
+The code checks quoted reservations; it does not certify a provider-invoice
+ceiling. Local admission stops before an unaffordable reservation. This protocol
+does not authorize a live run by itself. Do not shrink the plan or raise a cap
+implicitly.
 
 ### Shadow routing policy
 

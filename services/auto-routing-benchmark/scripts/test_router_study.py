@@ -579,6 +579,27 @@ print(admitted)
         with self.assertRaises(self.study.BudgetLimited):
             self.budget.reserve(self.out, "run-a", Decimal("0.01"), 1, cfg=self.cfg, ledger_out=self.out)
 
+    def test_classifier_ambiguous_billing_retains_full_holds_and_known_charge_floors(self):
+        quote = router_study.classifier_quote(classifier_evidence(), "~typesafe/jev-latest", Decimal("0.06"))
+        cases = [({}, "unknown", None, Decimal(0)), ({"is_byok": None}, "unknown", None, Decimal(0)), ({"is_byok": "false"}, "unknown", None, Decimal(0)), ({"is_byok": 0}, "unknown", None, Decimal(0)), ({"is_byok": True}, "unknown", None, Decimal(0)), ({"is_byok": True, "cost": "2"}, "breach", None, Decimal("2")), ({"is_byok": False, "cost": 0}, "settled", Decimal(0), Decimal(0))]
+        for update, state, actual, floor in cases:
+            with self.subTest(update=update), tempfile.TemporaryDirectory() as temporary:
+                out = Path(temporary)
+                ledger = out / "budget.sqlite"
+                ledger.symlink_to(empty_campaign(out))
+                budget = router_study.Budget(ledger, {"study": self.study}, "100")
+                with sqlite3.connect(ledger) as db:
+                    db.execute("INSERT INTO router_runs VALUES ('run','tuning','active',0)")
+                budget.active["run"] = (self.cfg, time.monotonic() + 60)
+                body = {"model": "typesafe/jev-1.13", "usage": {"cost": 0.00005, "input_tokens": 1, "output_tokens": 0, **update}}
+                with mock.patch.dict(os.environ, {"OPENROUTER_API_KEY": "fixture-only"}), router_study.ClassifierBroker(budget, quote, out, transport=lambda url, **options: FakeResponse(body)) as broker:
+                    status, _ = self.broker_post(broker, "run")
+                with sqlite3.connect(ledger) as db:
+                    row, = self.study.request_rows(db)
+                self.assertEqual((status, row["state"], None if row["actual"] is None else Decimal(row["actual"])), (200 if state == "settled" else 503, state, actual))
+                self.assertEqual(Decimal(row["bound"]), max(Decimal(quote["attempt_bound_usd"]), floor))
+                self.assertEqual(bool(budget.stopped("tuning")), state != "settled")
+
     def test_auto_policy_still_stops_classifier_transport_without_response(self):
         quote = router_study.classifier_quote(classifier_evidence(), "~typesafe/jev-latest", Decimal("0.06"))
         self.activate("run-a")

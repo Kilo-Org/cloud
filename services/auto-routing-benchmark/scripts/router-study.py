@@ -1125,20 +1125,6 @@ class Budget:
         return {"orphaned_requests": orphans, "interrupted_runs": interrupted}
 
 
-def classifier_bill(body, fee_fraction, context):
-    usage = body.get("usage") if isinstance(body, dict) else None
-    if not isinstance(usage, dict):
-        raise ValueError("Unknown classifier charge")
-    cost = money(usage.get("cost"))
-    if usage.get("is_byok") is True:
-        upstream = money((usage.get("cost_details") or {}).get("upstream_inference_cost"))
-        if cost > upstream * fee_fraction:
-            raise ValueError("Classifier BYOK fee exceeds its reserved allowance")
-        cost += upstream
-    counts = (usage.get("input_tokens"), usage.get("output_tokens"))
-    if any(type(value) is not int or value < 0 for value in counts) or counts[0] > context:
-        raise ValueError("Classifier token usage is unknown or beyond the quoted context")
-    return cost, sum(counts)
 
 
 class ClassifierBroker:
@@ -1199,6 +1185,7 @@ class ClassifierBroker:
         receipt = {"local_request_id": request_id, "run": run, "kind": "classifier", "input_token_bound": context, "reservation_usd": str(bound), "request_sha256": hashlib.sha256(raw).hexdigest(), "request": payload, "classifier_quote_sha256": digest(self.classifier), "dispatch_entered": False, "started_at": time.time()}
         study.save(receipt_path, receipt)
         actual = None
+        known_floor, fee_breach = Decimal(0), False
         try:
             remaining = min(600, deadline - time.monotonic())
             if remaining <= 0:
@@ -1224,7 +1211,18 @@ class ClassifierBroker:
                 receipt.update(http_status=response.status_code, response_sha256=hashlib.sha256(body).hexdigest())
                 parsed = json.loads(body)
                 receipt["response"] = parsed
-                actual, tokens = classifier_bill(parsed, money(self.classifier["fee_fraction"]), context)
+                usage = parsed.get("usage") if isinstance(parsed, dict) else None
+                if not isinstance(usage, dict):
+                    raise ValueError("Unknown classifier charge")
+                evidence = study.charge_evidence(usage, money(self.classifier["fee_fraction"]))
+                known_floor, fee_breach = evidence.known_floor, evidence.fee_breach
+                actual = evidence.actual if evidence.complete else None
+                if not evidence.complete or fee_breach:
+                    raise ValueError("Incomplete or ambiguous classifier billing evidence")
+                counts = (usage.get("input_tokens"), usage.get("output_tokens"))
+                if any(type(value) is not int or value < 0 for value in counts) or counts[0] > context:
+                    raise ValueError("Classifier token usage is unknown or beyond the quoted context")
+                tokens = sum(counts)
                 if actual > bound:
                     raise ValueError("Classifier charge exceeds its full-context reservation")
                 self.budget.settle(request_id, "settled", bound, actual, tokens)
@@ -1241,8 +1239,8 @@ class ClassifierBroker:
                 raise
             dispatched = receipt["dispatch_entered"]
             if dispatched:
-                state = "breach" if actual is not None and actual > bound or "exceeds" in str(error) or "beyond" in str(error) else "unknown"
-                self.budget.settle(request_id, state, max(bound, actual or Decimal(0)), actual, None, auto_account=self.budget.auto_run is not None, receipt=receipt)
+                state = "breach" if fee_breach or known_floor > bound or actual is not None and actual > bound or "exceeds" in str(error) or "beyond" in str(error) else "unknown"
+                self.budget.settle(request_id, state, max(bound, known_floor, actual or Decimal(0)), actual, None, auto_account=self.budget.auto_run is not None, receipt=receipt)
             else:
                 self.budget.settle(request_id, "settled", Decimal(0), Decimal(0), 0)
             receipt.update(status=state if dispatched else "not_dispatched", error_type=type(error).__name__, finished_at=time.time())

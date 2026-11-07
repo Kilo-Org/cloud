@@ -14,6 +14,7 @@ import AppIntents
 /// report it instead of opening a session, and a title that names several
 /// resolves to every one of them, which makes the system ask. The run never
 /// picks one of a set.
+@available(iOS 17.0, *)
 struct KiloSessionEntity: AppEntity {
   static var typeDisplayRepresentation: TypeDisplayRepresentation = "Session"
   static var defaultQuery = KiloSessionEntityQuery()
@@ -41,6 +42,7 @@ struct KiloSessionEntity: AppEntity {
 /// `EntityStringQuery` supplies the spoken-title lookup Siri uses. The app has
 /// no server here on purpose — a query that reached the network would make
 /// Shortcuts wait, and the cache already holds every session the app can open.
+@available(iOS 17.0, *)
 struct KiloSessionEntityQuery: EntityQuery, EntityStringQuery {
   func entities(for identifiers: [String]) async throws -> [KiloSessionEntity] {
     let wanted = Set(identifiers)

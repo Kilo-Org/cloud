@@ -151,6 +151,7 @@ struct OpenSessionIntent: AppIntent {
 /// The action is not added to `KiloAppShortcuts`. An intent is listed in the
 /// Shortcuts app from the metadata Xcode extracts, so a phrase buys nothing,
 /// and the provider's four existing phrases stay exactly as they are.
+@available(iOS 17.0, *)
 struct OpenNamedSessionIntent: AppIntent {
   static var title: LocalizedStringResource = "Open session by name"
   static var openAppWhenRun: Bool = true

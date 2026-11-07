@@ -4,12 +4,8 @@ import UIKit
 /// Publishes the session the app is showing, so Siri and Apple Intelligence can
 /// resolve "this session" to the one on screen.
 ///
-/// `NSUserActivity.appEntityIdentifier` is the association the system reads for
-/// a person's on-screen content, and it exists from iOS 18.2. Below that
-/// runtime the publisher does nothing at all: every existing action keeps
-/// working, and the entity picker still offers the catalog. There is no
-/// fallback, because the pre-18.2 runtimes have no API to publish on-screen
-/// context with.
+/// On-screen association requires iOS 18.2. Earlier versions skip it.
+/// The framework-backed entity catalog is available from iOS 17.
 ///
 /// The activity is attached to the key window's root view controller, which is
 /// the UIKit form of the association (`UIResponder.userActivity`); the app has

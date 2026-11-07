@@ -2293,6 +2293,7 @@
       "emptyDescription": "A kezdéshez küldj egy üzenetet az alábbi mezőből.",
       "scrollToBottom": "Görgetés az aljára",
       "emptyTitle": "Még nincs üzenet",
+      "emptyReadOnlyTitle": "Nincs üzenet ebben a munkamenetben",
       "renameAccessibility": "Munkamenet átnevezése: {{title}}",
       "cloningSession": "Munkamenet klónozása…",
       "couldNotLoadThisSession": "Nem sikerült betölteni ezt a munkamenetet.",
@@ -2991,7 +2992,6 @@
   },
   "addCredits": {
     "cta": "Egyenleg feltöltése",
-    "description": "A további használathoz töltsd fel az egyenlegedet.",
     "billingPage": "számlázási oldal"
   },
   "deviceSessions": {

@@ -2293,6 +2293,7 @@
       "emptyDescription": "Sendu skilaboð hér að neðan til að byrja.",
       "scrollToBottom": "Skruna neðst",
       "emptyTitle": "Engin skilaboð ennþá",
+      "emptyReadOnlyTitle": "Engin skilaboð í þessari lotu",
       "renameAccessibility": "Endurnefna lotu: {{title}}",
       "cloningSession": "Klónar lotuna",
       "couldNotLoadThisSession": "Ekki tókst að hlaða þessari lotu.",
@@ -2991,7 +2992,6 @@
   },
   "addCredits": {
     "cta": "Bæta við inneign",
-    "description": "Bættu við inneign til að halda áfram að nota þjónustuna.",
     "billingPage": "innheimtusíðu"
   },
   "deviceSessions": {

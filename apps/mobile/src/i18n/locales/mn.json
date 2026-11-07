@@ -2293,6 +2293,7 @@
       "emptyDescription": "Эхлэхийн тулд доор мессеж илгээнэ үү.",
       "scrollToBottom": "Хамгийн доош гүйлгэх",
       "emptyTitle": "Мессеж хараахан алга",
+      "emptyReadOnlyTitle": "Энэ сессид мессеж байхгүй",
       "renameAccessibility": "Сессийн нэрийг өөрчлөх: {{title}}",
       "cloningSession": "Сессийг хуулбарлаж байна",
       "couldNotLoadThisSession": "Энэ сессийг ачаалж чадсангүй.",
@@ -2991,7 +2992,6 @@
   },
   "addCredits": {
     "cta": "Кредит нэмэх",
-    "description": "Үргэлжлүүлэн ашиглахын тулд кредит нэмнэ үү.",
     "billingPage": "төлбөрийн хуудас"
   },
   "deviceSessions": {

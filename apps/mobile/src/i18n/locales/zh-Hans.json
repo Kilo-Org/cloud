@@ -1754,6 +1754,7 @@
       "emptyDescription": "在下方发送消息，开始对话。",
       "scrollToBottom": "滚动到底部",
       "emptyTitle": "暂无消息",
+      "emptyReadOnlyTitle": "此会话中无消息",
       "renameAccessibility": "重命名会话：{{title}}",
       "cloningSession": "正在克隆会话",
       "couldNotLoadThisSession": "无法加载此会话",
@@ -2452,7 +2453,6 @@
   },
   "addCredits": {
     "cta": "充值额度",
-    "description": "充值额度后即可继续使用。",
     "billingPage": "账单页面"
   },
   "deviceSessions": {

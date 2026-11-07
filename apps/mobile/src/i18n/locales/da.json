@@ -2293,6 +2293,7 @@
       "emptyDescription": "Send en besked nedenfor for at komme i gang.",
       "scrollToBottom": "Rul til bunden",
       "emptyTitle": "Ingen beskeder endnu",
+      "emptyReadOnlyTitle": "Ingen beskeder i denne session",
       "renameAccessibility": "Omdøb session: {{title}}",
       "cloningSession": "Kloner session",
       "couldNotLoadThisSession": "Kunne ikke indlæse denne session.",
@@ -2991,7 +2992,6 @@
   },
   "addCredits": {
     "cta": "Tilføj kreditter",
-    "description": "Tilføj kreditter for at fortsætte med at bruge tjenesten.",
     "billingPage": "faktureringsside"
   },
   "deviceSessions": {

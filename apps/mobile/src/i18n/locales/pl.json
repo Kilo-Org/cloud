@@ -1796,6 +1796,7 @@
       "emptyDescription": "Wyślij wiadomość poniżej, aby rozpocząć.",
       "scrollToBottom": "Przewiń na dół",
       "emptyTitle": "Brak wiadomości",
+      "emptyReadOnlyTitle": "Brak wiadomości w tej sesji",
       "renameAccessibility": "Zmień nazwę sesji: {{title}}",
       "cloningSession": "Klonowanie sesji",
       "couldNotLoadThisSession": "Nie udało się wczytać tej sesji.",
@@ -2516,7 +2517,6 @@
   },
   "addCredits": {
     "cta": "Doładuj konto",
-    "description": "Doładuj konto, aby dalej korzystać z usługi.",
     "billingPage": "strona rozliczeń"
   },
   "deviceSessions": {

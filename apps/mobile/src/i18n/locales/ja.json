@@ -1754,6 +1754,7 @@
       "emptyDescription": "下の入力欄からメッセージを送信すると、開始できます。",
       "scrollToBottom": "一番下までスクロール",
       "emptyTitle": "メッセージはまだありません",
+      "emptyReadOnlyTitle": "このセッションにメッセージはありません",
       "renameAccessibility": "セッション「{{title}}」の名前を変更",
       "cloningSession": "セッションを複製中",
       "couldNotLoadThisSession": "このセッションを読み込めませんでした。",
@@ -2452,7 +2453,6 @@
   },
   "addCredits": {
     "cta": "クレジットを追加",
-    "description": "利用を続けるには、クレジットを追加してください。",
     "billingPage": "請求ページ"
   },
   "deviceSessions": {

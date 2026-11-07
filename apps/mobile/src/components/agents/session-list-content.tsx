@@ -1,7 +1,7 @@
 /* eslint-disable max-lines -- Session-list content and its error/empty surfaces are kept together. */
 import { FlashList, type FlashListRef, type ListRenderItemInfo } from '@shopify/flash-list';
 import { useFocusEffect, useScrollToTop } from 'expo-router';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View } from 'react-native';
 import { RefreshControl } from '@/components/ui/refresh-control';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
@@ -62,6 +62,13 @@ type AgentSessionListContentProps = {
    */
   hasFreshHistory: boolean;
   isFetchingNextPage: boolean;
+  /**
+   * The last next-page request failed. The loaded rows stay, and the list
+   * footer carries the retryable line with its Retry action, so the end of the
+   * list never reads as the end of the history.
+   */
+  isFetchNextPageError: boolean;
+  onRetryNextPage: () => void;
   refetch: () => Promise<void>;
   onRetry: () => void;
   onEndReached: () => void;
@@ -93,6 +100,8 @@ export function AgentSessionListContent({
   isError,
   hasFreshHistory,
   isFetchingNextPage,
+  isFetchNextPageError,
+  onRetryNextPage,
   refetch,
   onRetry,
   onEndReached,
@@ -303,6 +312,38 @@ export function AgentSessionListContent({
     }
   }, [onEndReached]);
 
+  // A failed next page keeps every loaded row and says so at the end of the
+  // list: the spinner alone ended the list silently, so the last loaded row
+  // read as the end of the history. The retry calls `fetchNextPage`, and the
+  // end-reach gate stops re-firing while this line stands (see
+  // `shouldLoadMoreSessions`).
+  let listFooter: ReactNode = null;
+  if (isFetchNextPageError) {
+    listFooter = (
+      <View className="items-center gap-3 px-6 py-4">
+        <Text variant="muted" className="text-center text-xs">
+          {t('common.couldnTLoadMore')}
+        </Text>
+        <Button
+          variant="outline"
+          size="sm"
+          className={STATE_ACTION_CLASS}
+          onPress={onRetryNextPage}
+          loading={isFetchingNextPage}
+          accessibilityLabel={t('common.retry')}
+        >
+          <Text>{t('common.retry')}</Text>
+        </Button>
+      </View>
+    );
+  } else if (isFetchingNextPage) {
+    listFooter = (
+      <View className="py-4">
+        <ActivityIndicator color={colors.mutedForeground} />
+      </View>
+    );
+  }
+
   const renderItem = useCallback(
     ({ item }: ListRenderItemInfo<SessionListRow>) => {
       if (item.kind === 'skeleton') {
@@ -444,13 +485,7 @@ export function AgentSessionListContent({
           keyExtractor={keyExtractor}
           getItemType={getItemType}
           extraData={attentionFocusRevision}
-          ListFooterComponent={
-            isFetchingNextPage ? (
-              <View className="py-4">
-                <ActivityIndicator color={colors.mutedForeground} />
-              </View>
-            ) : null
-          }
+          ListFooterComponent={listFooter}
           contentContainerStyle={contentInsetStyle}
           keyboardDismissMode="on-drag"
           onEndReached={handleEndReached}

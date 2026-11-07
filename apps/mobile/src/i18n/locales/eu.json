@@ -2293,6 +2293,7 @@
       "emptyDescription": "Hasteko, bidali mezu bat behean.",
       "scrollToBottom": "Joan behealdera",
       "emptyTitle": "Oraindik ez dago mezurik",
+      "emptyReadOnlyTitle": "Saio honetan ez dago mezurik",
       "renameAccessibility": "Berrizendatu saioa: {{title}}",
       "cloningSession": "Saioa klonatzen",
       "couldNotLoadThisSession": "Ezin izan da saio hau kargatu.",
@@ -2991,7 +2992,6 @@
   },
   "addCredits": {
     "cta": "Gehitu kredituak",
-    "description": "Gehitu kredituak erabiltzen jarraitzeko.",
     "billingPage": "fakturazio-orria"
   },
   "deviceSessions": {

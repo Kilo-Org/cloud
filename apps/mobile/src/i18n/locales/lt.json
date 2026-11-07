@@ -2377,6 +2377,7 @@
       "emptyDescription": "Norėdami pradėti, išsiųskite žinutę žemiau esančiame lauke.",
       "scrollToBottom": "Slinkti į apačią",
       "emptyTitle": "Žinučių dar nėra",
+      "emptyReadOnlyTitle": "Šioje sesijoje nėra žinučių",
       "renameAccessibility": "Pervadinti sesiją: {{title}}",
       "cloningSession": "Klonuojama sesija",
       "couldNotLoadThisSession": "Nepavyko įkelti šios sesijos.",
@@ -3097,7 +3098,6 @@
   },
   "addCredits": {
     "cta": "Papildyti kreditus",
-    "description": "Papildykite kreditus, kad galėtumėte naudotis toliau.",
     "billingPage": "atsiskaitymų puslapis"
   },
   "deviceSessions": {

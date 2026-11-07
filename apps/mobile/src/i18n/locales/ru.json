@@ -1796,6 +1796,7 @@
       "emptyDescription": "Отправьте сообщение ниже, чтобы начать.",
       "scrollToBottom": "Прокрутить вниз",
       "emptyTitle": "Сообщений пока нет",
+      "emptyReadOnlyTitle": "В этом сеансе нет сообщений",
       "renameAccessibility": "Переименовать сеанс: {{title}}",
       "cloningSession": "Клонирование сеанса",
       "couldNotLoadThisSession": "Не удалось загрузить этот сеанс.",
@@ -2516,7 +2517,6 @@
   },
   "addCredits": {
     "cta": "Пополнить баланс",
-    "description": "Пополните баланс, чтобы продолжить работу.",
     "billingPage": "страница оплаты"
   },
   "deviceSessions": {

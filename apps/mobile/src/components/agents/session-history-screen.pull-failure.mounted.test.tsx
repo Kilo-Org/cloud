@@ -219,6 +219,7 @@ vi.mock('@/lib/hooks/use-agent-sessions', () => ({
       storedLoadedPageCount: 1,
       hasNextPage: false,
       isFetchingNextPage: false,
+      isFetchNextPageError: false,
       fetchNextPage: vi.fn(),
       refetch: refetchControl.refetch,
     };
@@ -230,6 +231,7 @@ vi.mock('@/lib/hooks/use-agent-sessions', () => ({
     isPending: false,
     hasNextPage: false,
     isFetchingNextPage: false,
+    isFetchNextPageError: false,
     isPlaceholderData: false,
     fetchNextPage: vi.fn(),
     refetch: vi.fn(),

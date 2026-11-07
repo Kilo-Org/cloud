@@ -1754,6 +1754,7 @@
       "emptyDescription": "Stuur hieronder een bericht om te beginnen.",
       "scrollToBottom": "Naar beneden scrollen",
       "emptyTitle": "Nog geen berichten",
+      "emptyReadOnlyTitle": "Geen berichten in deze sessie",
       "renameAccessibility": "Sessie hernoemen: {{title}}",
       "cloningSession": "Sessie klonen…",
       "couldNotLoadThisSession": "Deze sessie kon niet worden geladen.",
@@ -2452,7 +2453,6 @@
   },
   "addCredits": {
     "cta": "Tegoed aanvullen",
-    "description": "Vul je tegoed aan om door te kunnen gaan.",
     "billingPage": "factureringspagina"
   },
   "deviceSessions": {

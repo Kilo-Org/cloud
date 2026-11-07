@@ -2293,6 +2293,7 @@
       "emptyDescription": "ផ្ញើសារខាងក្រោម ដើម្បីចាប់ផ្តើម។",
       "scrollToBottom": "រំកិលទៅខាងក្រោមបំផុត",
       "emptyTitle": "មិនទាន់មានសារទេ",
+      "emptyReadOnlyTitle": "មិនមានសារនៅក្នុងវគ្គនេះទេ",
       "renameAccessibility": "ប្តូរឈ្មោះវគ្គ: {{title}}",
       "cloningSession": "កំពុងចម្លងវគ្គ",
       "couldNotLoadThisSession": "មិនអាចផ្ទុកវគ្គនេះបានទេ",
@@ -2991,7 +2992,6 @@
   },
   "addCredits": {
     "cta": "បន្ថែមឥណទាន",
-    "description": "បន្ថែមឥណទានដើម្បីបន្តប្រើប្រាស់។",
     "billingPage": "ទំព័រគិតប្រាក់"
   },
   "deviceSessions": {

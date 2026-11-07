@@ -2293,6 +2293,7 @@
       "emptyDescription": "Бастау үшін төмендегі өрістен хабарлама жіберіңіз.",
       "scrollToBottom": "Ең төменге айналдыру",
       "emptyTitle": "Әзірге хабарламалар жоқ",
+      "emptyReadOnlyTitle": "Бұл сессияда хабарламалар жоқ",
       "renameAccessibility": "Сессия атауын өзгерту: {{title}}",
       "cloningSession": "Сессия көшірмесі жасалуда",
       "couldNotLoadThisSession": "Бұл сессияны жүктеу мүмкін болмады.",
@@ -2991,7 +2992,6 @@
   },
   "addCredits": {
     "cta": "Кредит қосу",
-    "description": "Қолдануды жалғастыру үшін кредит қосыңыз.",
     "billingPage": "төлем беті"
   },
   "deviceSessions": {

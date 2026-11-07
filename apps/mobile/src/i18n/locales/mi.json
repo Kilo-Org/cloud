@@ -2293,6 +2293,7 @@
       "emptyDescription": "Tukuna he karere ki raro nei hei tīmata.",
       "scrollToBottom": "Panuku ki raro rawa",
       "emptyTitle": "Kāore anō he karere",
+      "emptyReadOnlyTitle": "Kāore he karere i tēnei wātū",
       "renameAccessibility": "Whakaingoatia anō te wātū: {{title}}",
       "cloningSession": "Kei te tārua i te wātū",
       "couldNotLoadThisSession": "Kāore i taea te uta i tēnei wātū.",
@@ -2991,7 +2992,6 @@
   },
   "addCredits": {
     "cta": "Tāpirihia he moni tōmua",
-    "description": "Tāpirihia he moni tōmua kia haere tonu ai te whakamahinga.",
     "billingPage": "te whārangi utunga"
   },
   "deviceSessions": {

@@ -2293,6 +2293,7 @@
       "emptyDescription": "Hantar mesej di bawah untuk bermula.",
       "scrollToBottom": "Tatal ke bawah",
       "emptyTitle": "Belum ada mesej",
+      "emptyReadOnlyTitle": "Tiada mesej dalam sesi ini",
       "renameAccessibility": "Namakan semula sesi: {{title}}",
       "cloningSession": "Mengklon sesi",
       "couldNotLoadThisSession": "Tidak dapat memuatkan sesi ini.",
@@ -2991,7 +2992,6 @@
   },
   "addCredits": {
     "cta": "Tambah kredit",
-    "description": "Tambah kredit untuk terus menggunakan perkhidmatan.",
     "billingPage": "halaman pengebilan"
   },
   "deviceSessions": {

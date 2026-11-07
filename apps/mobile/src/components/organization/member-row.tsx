@@ -154,8 +154,13 @@ export function MemberRow({
         </Text>
       </View>
       <View className="items-end gap-1">
+        {/* `font-semibold`, not the medium the small chips use elsewhere: the
+            Android Arabic fallback ships Regular and Bold only, so a 500 label
+            paints Regular for Arabic while the Latin label gets Roboto Medium,
+            and at 11px that reads as a faded chip. 600 resolves to Noto Naskh
+            Arabic Bold, so both scripts carry the same ink. */}
         <View className="rounded-full bg-muted px-2 py-0.5">
-          <Text className="text-[11px] font-medium text-muted-foreground">
+          <Text className="text-[11px] font-semibold text-muted-foreground">
             {roleLabel(member.role)}
           </Text>
         </View>

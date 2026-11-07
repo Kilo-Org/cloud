@@ -197,10 +197,14 @@ The employee rollout targets person property `email` ending in `@kilocode.ai`, a
 Every server evaluation supplies `personProperties.email`; results are not globally cached or shared between people.
 Sign-in checks the validated provider email only when `email_verified` is boolean `true`.
 Account linking and billing approval routes also check the authenticated person's current database email.
+Explicit Claude account links require a matching pending link and a current browser session, including its revocation check.
+They bind the verified provider subject, not the provider email, and preserve the initiating browser session.
+An explicit link does not require an email-verification claim and cannot create an account or link accounts by email.
 Gateway requests check the authenticated requester's database email, including organization-scoped requests, after the authoritative payer lookup.
 Missing email or failed evaluation denies access; there is no development bypass.
+Claude authentication refusals log a fixed reason and allowlisted claim names, never identity values or tokens.
 Anonymous visitors can discover Claude through the existing email-first flow without an identified browser PostHog person.
-The submitted discovery email controls offered methods only; the callback independently authorizes the verified provider email.
+The submitted discovery email controls offered methods only; ordinary sign-in independently authorizes the verified provider email.
 The shared server PostHog client deliberately returns no flags outside production, so enabled local server paths require test fixtures.
 Use the focused Claude tests for enabled server behavior and browser-only SDK overrides for UI checks.
 Browser overrides do not bypass the server gate. Do not enable the live rollout for local testing.

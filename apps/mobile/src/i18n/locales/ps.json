@@ -2293,6 +2293,7 @@
       "emptyDescription": "د پیل لپاره لاندې یو پیغام واستوئ.",
       "scrollToBottom": "د پاڼې پای ته ورشئ",
       "emptyTitle": "تر اوسه پیغامونه نشته",
+      "emptyReadOnlyTitle": "په دې ناسته کې پیغامونه نشته",
       "renameAccessibility": "د ناستې نوم بدل کړئ: {{title}}",
       "cloningSession": "د ناستې کاپي جوړېږي",
       "couldNotLoadThisSession": "دا ناسته بار نه شوه.",
@@ -2991,7 +2992,6 @@
   },
   "addCredits": {
     "cta": "کریډیټ زیات کړئ",
-    "description": "د کارونې د دوام لپاره کریډیټ زیات کړئ.",
     "billingPage": "د بلونو پاڼه"
   },
   "deviceSessions": {

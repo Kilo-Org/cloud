@@ -2293,6 +2293,7 @@
       "emptyDescription": "Fi ìfiránṣẹ́ ránṣẹ́ ní ìsàlẹ̀ láti bẹ̀rẹ̀.",
       "scrollToBottom": "Yí lọ sí ìsàlẹ̀",
       "emptyTitle": "Kò tíì sí ìfiránṣẹ́",
+      "emptyReadOnlyTitle": "Kò sí ìfiránṣẹ́ nínú ìgbà iṣẹ́ yìí",
       "renameAccessibility": "Yí orúkọ ìgbà iṣẹ́ padà: {{title}}",
       "cloningSession": "Ń ṣe àdàkọ ìgbà iṣẹ́",
       "couldNotLoadThisSession": "A kò lè gbé ìgbà iṣẹ́ yìí wọlé.",
@@ -2991,7 +2992,6 @@
   },
   "addCredits": {
     "cta": "Fi kirẹ́dítì kún un",
-    "description": "Fi kirẹ́dítì kún un láti tẹ̀síwájú lílo.",
     "billingPage": "ojú ìwé ìsanwó"
   },
   "deviceSessions": {

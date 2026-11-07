@@ -1748,6 +1748,7 @@
       "emptyDescription": "Envie uma mensagem abaixo para começar.",
       "scrollToBottom": "Rolar para o final",
       "emptyTitle": "Nenhuma mensagem ainda",
+      "emptyReadOnlyTitle": "Nenhuma mensagem nesta sessão",
       "renameAccessibility": "Renomear sessão: {{title}}",
       "cloningSession": "Clonando sessão",
       "couldNotLoadThisSession": "Não foi possível carregar esta sessão.",
@@ -2490,7 +2491,6 @@
   },
   "addCredits": {
     "cta": "Adicionar créditos",
-    "description": "Adicione créditos para continuar usando o serviço.",
     "billingPage": "página de cobrança"
   },
   "deviceSessions": {

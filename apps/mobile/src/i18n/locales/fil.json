@@ -2299,6 +2299,7 @@
       "emptyDescription": "Magpadala ng mensahe sa ibaba para magsimula.",
       "scrollToBottom": "I-scroll sa ibaba",
       "emptyTitle": "Wala pang mensahe",
+      "emptyReadOnlyTitle": "Walang mensahe ang sesyong ito",
       "renameAccessibility": "Palitan ang pangalan ng sesyon: {{title}}",
       "cloningSession": "Kinokopya ang sesyon",
       "couldNotLoadThisSession": "Hindi ma-load ang sesyong ito.",
@@ -2997,7 +2998,6 @@
   },
   "addCredits": {
     "cta": "Magdagdag ng kredito",
-    "description": "Magdagdag ng kredito para makapagpatuloy sa paggamit.",
     "billingPage": "pahina ng pagsingil"
   },
   "deviceSessions": {

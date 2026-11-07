@@ -2293,6 +2293,7 @@
       "emptyDescription": "Սկսելու համար ներքևում հաղորդագրություն ուղարկեք։",
       "scrollToBottom": "Ոլորել մինչև վերջ",
       "emptyTitle": "Դեռևս հաղորդագրություններ չկան",
+      "emptyReadOnlyTitle": "Այս նստաշրջանում հաղորդագրություններ չկան",
       "renameAccessibility": "Վերանվանել նստաշրջանը՝ {{title}}",
       "cloningSession": "Նստաշրջանը կլոնավորվում է",
       "couldNotLoadThisSession": "Չհաջողվեց բեռնել այս նստաշրջանը։",
@@ -2991,7 +2992,6 @@
   },
   "addCredits": {
     "cta": "Ավելացնել կրեդիտներ",
-    "description": "Ավելացրեք կրեդիտներ՝ աշխատանքը շարունակելու համար։",
     "billingPage": "վճարումների էջ"
   },
   "deviceSessions": {

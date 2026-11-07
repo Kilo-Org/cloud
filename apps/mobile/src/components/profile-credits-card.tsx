@@ -1,7 +1,7 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { selectionHaptic } from '@/lib/haptics';
 import { type Href, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { type ReactNode, useState } from 'react';
 import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { ChevronDown, Eye, EyeOff } from '@/components/ui/icons';
 import { Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
@@ -215,15 +215,34 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   // switch own the skeleton above; a refresh that fails owns the retry surface.
   // An indicator tied to every in-flight refresh spun for as long as a stalled
   // one lasted (and announced itself as "In progress").
-  const addCreditsAction =
-    selectedOrgId == null ? (
-      <AddCreditsButton
-        className="h-auto min-h-11 max-w-full py-2"
-        onPress={() => {
-          router.push('/(app)/credits' as Href);
-        }}
-      />
+  //
+  // An organization's top-up is the external billing page, so it carries the
+  // row's App Store gate and opens for a member who can manage billing. It uses
+  // the same trailing slot as the personal purchase, and it is offered at any
+  // balance, exactly like the personal action beside it. The balance read no
+  // longer decides whether it exists: mounting the control once that read
+  // answered moved every section below the card with it (design gate, Profile,
+  // 2026-11-06), and the slot it takes is reserved in the card's other states.
+  const orgAddCreditsAction =
+    selectedOrgId != null && canManageOrgBilling ? (
+      <AddCreditsRow url={`${WEB_BASE_URL}/organizations/${selectedOrgId}/payment-details`} />
     ) : null;
+
+  let addCreditsAction: ReactNode = null;
+  if (selectedOrgId == null) {
+    addCreditsAction = (
+      <View className="max-w-full flex-row flex-wrap items-center justify-end gap-2">
+        <AddCreditsButton
+          className="h-auto min-h-11 max-w-full py-2"
+          onPress={() => {
+            router.push('/(app)/credits' as Href);
+          }}
+        />
+      </View>
+    );
+  } else {
+    addCreditsAction = orgAddCreditsAction;
+  }
 
   return (
     <View
@@ -297,11 +316,27 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
         // loaded block's 62.1 dp rather than the 56 dp its own `min-h-16` and
         // two bars made: the swap to the balance row moved every section below
         // it by 1.5 dp (design gate, Profile, 2026-11-05).
-        <View className="min-h-16 flex-row items-center rounded-lg bg-secondary px-3 py-2">
-          <View className="min-h-[48px] flex-1 justify-center gap-1">
+        //
+        // The purchase action keeps its slot here too, in the same place the
+        // loaded row puts it. A control painted only once the read answered
+        // added its own line to a stacked card and pushed every section below
+        // the card down (design gate, Profile, 2026-11-06).
+        <View
+          className={cn(
+            'min-h-16 rounded-lg bg-secondary px-3 py-2',
+            stackBalance ? 'items-stretch gap-2 pb-3' : 'flex-row items-center'
+          )}
+        >
+          <View
+            className={cn(
+              'min-h-[48px] justify-center gap-1',
+              stackBalance ? undefined : 'flex-1'
+            )}
+          >
             <Skeleton className="h-8 w-28 rounded-md bg-muted-soft" />
             <Skeleton className="h-3 w-40 rounded bg-muted-soft" />
           </View>
+          {orgAddCreditsAction}
         </View>
       )}
       {balanceFailed && (
@@ -322,6 +357,7 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
           }}
         />
       )}
+      {balanceFailed && orgAddCreditsAction}
       {!showBalanceSkeleton && !balanceFailed && (
         <View
           className={cn(
@@ -366,23 +402,10 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
           </Animated.View>
           {/* The purchase action keeps the card's trailing end in both
               layouts: the trailing column on a wide card, its own row below
-              the note on a stacked one. */}
-          {addCreditsAction !== null && (
-            <View className="max-w-full flex-row flex-wrap items-center justify-end gap-2">
-              {addCreditsAction}
-            </View>
-          )}
+              the note on a stacked one. The element owns its container, so a
+              card with no action for this platform gains no empty slot. */}
+          {addCreditsAction}
         </View>
-      )}
-      {/* The organization's purchase entry point is part of the card's first
-          paint: mounting it once the balance read answered moved every section
-          below it by the row's 67.4 dp (design gate, Profile, 2026-11-06). It
-          matches the personal action, which is offered at any balance. */}
-      {selectedOrgId != null && canManageOrgBilling && (
-        <AddCreditsRow
-          url={`${WEB_BASE_URL}/organizations/${selectedOrgId}/payment-details`}
-          className="rounded-lg bg-secondary px-3 py-3"
-        />
       )}
       {/* One loading indicator per section: while the balance slot shows its
           skeleton, the KiloPass card reserves its slot quietly instead of

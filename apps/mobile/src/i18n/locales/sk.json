@@ -2377,6 +2377,7 @@
       "emptyDescription": "Začni odoslaním správy v poli nižšie.",
       "scrollToBottom": "Posunúť na koniec",
       "emptyTitle": "Zatiaľ žiadne správy",
+      "emptyReadOnlyTitle": "Žiadne správy v tejto relácii",
       "renameAccessibility": "Premenovať reláciu: {{title}}",
       "cloningSession": "Klonuje sa relácia",
       "couldNotLoadThisSession": "Túto reláciu sa nepodarilo načítať.",
@@ -3097,7 +3098,6 @@
   },
   "addCredits": {
     "cta": "Doplniť kredity",
-    "description": "Doplň kredity, aby si mohol pokračovať v používaní.",
     "billingPage": "stránka fakturácie"
   },
   "deviceSessions": {

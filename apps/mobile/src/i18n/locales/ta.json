@@ -2293,6 +2293,7 @@
       "emptyDescription": "தொடங்குவதற்குக் கீழே ஒரு செய்தியை அனுப்பவும்.",
       "scrollToBottom": "கடைசிக்குச் செல்லவும்",
       "emptyTitle": "இன்னும் செய்திகள் இல்லை",
+      "emptyReadOnlyTitle": "இந்த அமர்வில் செய்திகள் இல்லை",
       "renameAccessibility": "{{title}} அமர்வின் பெயரை மாற்றவும்",
       "cloningSession": "அமர்வு நகலாக்கப்படுகிறது",
       "couldNotLoadThisSession": "இந்த அமர்வை ஏற்ற முடியவில்லை.",
@@ -2991,7 +2992,6 @@
   },
   "addCredits": {
     "cta": "கிரெடிட்களைச் சேர்க்கவும்",
-    "description": "தொடர்ந்து பயன்படுத்த கிரெடிட்களைச் சேர்க்கவும்.",
     "billingPage": "கட்டணப் பக்கம்"
   },
   "deviceSessions": {

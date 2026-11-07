@@ -2335,6 +2335,7 @@
       "emptyDescription": "Pošalji poruku u polju ispod da započneš razgovor.",
       "scrollToBottom": "Pomeri se na dno",
       "emptyTitle": "Još nema poruka",
+      "emptyReadOnlyTitle": "U ovoj sesiji nema poruka",
       "renameAccessibility": "Preimenuj sesiju: {{title}}",
       "cloningSession": "Kloniranje sesije",
       "couldNotLoadThisSession": "Učitavanje ove sesije nije uspelo.",
@@ -3044,7 +3045,6 @@
   },
   "addCredits": {
     "cta": "Dodaj kredite",
-    "description": "Dodaj kredite da nastaviš da koristiš uslugu.",
     "billingPage": "stranica za naplatu"
   },
   "deviceSessions": {

@@ -2293,6 +2293,7 @@
       "emptyDescription": "Aika saƙo a ƙasa domin farawa.",
       "scrollToBottom": "Gungura zuwa ƙasa",
       "emptyTitle": "Babu saƙonni har yanzu",
+      "emptyReadOnlyTitle": "Babu saƙonni a wannan zaman",
       "renameAccessibility": "Canza sunan zaman: {{title}}",
       "cloningSession": "Ana yin kwafin zaman",
       "couldNotLoadThisSession": "An kasa loda wannan zaman.",
@@ -2991,7 +2992,6 @@
   },
   "addCredits": {
     "cta": "Ƙara kuɗin amfani",
-    "description": "Ƙara kuɗin amfani don ci gaba da aiki.",
     "billingPage": "shafin biyan kuɗi"
   },
   "deviceSessions": {

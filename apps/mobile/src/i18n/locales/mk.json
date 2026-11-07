@@ -2293,6 +2293,7 @@
       "emptyDescription": "Испрати порака подолу за да започнеш.",
       "scrollToBottom": "Движи се до крајот",
       "emptyTitle": "Сè уште нема пораки",
+      "emptyReadOnlyTitle": "Нема пораки во оваа сесија",
       "renameAccessibility": "Преименувај ја сесијата: {{title}}",
       "cloningSession": "Клонирање на сесијата",
       "couldNotLoadThisSession": "Не успеа вчитувањето на оваа сесија.",
@@ -2991,7 +2992,6 @@
   },
   "addCredits": {
     "cta": "Додај кредити",
-    "description": "Додај кредити за да продолжиш со користењето.",
     "billingPage": "страница за наплата"
   },
   "deviceSessions": {

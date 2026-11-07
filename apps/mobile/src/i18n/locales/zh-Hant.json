@@ -1754,6 +1754,7 @@
       "emptyDescription": "在下方傳送訊息，即可開始。",
       "scrollToBottom": "捲動到底部",
       "emptyTitle": "尚無訊息",
+      "emptyReadOnlyTitle": "此工作階段中沒有訊息",
       "renameAccessibility": "重新命名工作階段：{{title}}",
       "cloningSession": "複製工作階段中",
       "couldNotLoadThisSession": "無法載入此工作階段。",
@@ -2452,7 +2453,6 @@
   },
   "addCredits": {
     "cta": "加值點數",
-    "description": "加值點數，即可繼續使用。",
     "billingPage": "帳單頁面"
   },
   "deviceSessions": {

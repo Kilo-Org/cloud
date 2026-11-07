@@ -2731,16 +2731,21 @@ describe('session detail per-session auto-approve', () => {
       showGatewayMetadata: true,
     };
     sessionModelOptions.rows = [modelRow];
-    // A stored session: no live transport reports context usage, and the
-    // session's own settings name the model it ran on.
+    // A writable empty session: no live transport reported context usage yet,
+    // and the sheet lists the model the live session runs on. A stored session
+    // with an empty transcript hides this pill instead (its sheet has no
+    // permission settings to offer); the naming sheet stays for a session that
+    // can still send.
     sessionConfigSync.currentModel = modelRow.id;
     onTestFinished(() => {
       sessionModelOptions.rows = [];
       sessionConfigSync.currentModel = '';
     });
+    goalMountOptions = { resolvedType: 'remote' };
     const view = await mountDetails([]);
     await act(async () => {
-      view.store.set(view.manager.atoms.activeSessionType, 'read-only');
+      view.store.set(view.manager.atoms.activeSessionType, 'remote');
+      view.store.set(view.manager.atoms.isReadOnly, false);
       await Promise.resolve();
     });
 
@@ -2961,8 +2966,10 @@ describe.each([true, false])('session detail return with history=%s', hasHistory
   it.each(['loaded after child dismissal', 'empty'] as const)('leaves %s content', async state => {
     const view = await mountDetails(state === 'empty' ? [] : undefined);
     if (state === 'empty') {
+      // The fixture resolves read-only, so the empty title states a fact rather
+      // than a wait: a stored transcript can never gain a row.
       expect(view.renderer.root.findByType(EmptyState).props).toMatchObject({
-        title: i18n.t('agentChat.session.emptyTitle'),
+        title: i18n.t('agentChat.session.emptyReadOnlyTitle'),
       });
     } else {
       pressCard(view.renderer, SELECTED_ID);
@@ -3339,7 +3346,7 @@ describe('session detail zero-render transcript guard (mobile-app e2-open)', () 
 
     expect(messageLists(view.renderer)).toHaveLength(0);
     expect(view.renderer.root.findByType(EmptyState).props).toMatchObject({
-      title: i18n.t('agentChat.session.emptyTitle'),
+      title: i18n.t('agentChat.session.emptyReadOnlyTitle'),
     });
     expect(view.requestedIds()).toEqual([ROOT_ID]);
   });
@@ -3348,9 +3355,100 @@ describe('session detail zero-render transcript guard (mobile-app e2-open)', () 
     const view = await mountDetails([blankAssistantMessage('msg-blank')]);
     expect(messageLists(view.renderer)).toHaveLength(0);
     expect(view.renderer.root.findByType(EmptyState).props).toMatchObject({
-      title: i18n.t('agentChat.session.emptyTitle'),
+      title: i18n.t('agentChat.session.emptyReadOnlyTitle'),
     });
     expect(view.requestedIds()).toEqual([ROOT_ID]);
+  });
+
+  it('keeps the live empty title, with its prompt, for a writable session', async () => {
+    // A session that can still receive a message reads the wait, not the fact:
+    // the title stays "No messages yet" and the composer's prompt comes with it.
+    goalMountOptions = { resolvedType: 'remote' };
+    const view = await mountDetails([blankAssistantMessage('msg-blank')]);
+    expect(messageLists(view.renderer)).toHaveLength(0);
+    expect(view.renderer.root.findByType(EmptyState).props).toMatchObject({
+      title: i18n.t('agentChat.session.emptyTitle'),
+      description: i18n.t('agentChat.session.emptyDescription'),
+    });
+  });
+
+  it('keeps the header pill live so the stored session still names its model', async () => {
+    // The sheet stays reachable in the pill's other states: its rows name the
+    // model the stored session ran on before any usage arrives.
+    const modelRow: SessionModelOption = {
+      id: 'deepseek/deepseek-v4.1-flash-1017',
+      name: 'DeepSeek V4.1 Flash 1017',
+      displayId: 'deepseek/deepseek-v4.1-flash-1017',
+      variants: [],
+      isPreferred: false,
+      showGatewayMetadata: true,
+    };
+    sessionModelOptions.rows = [modelRow];
+    sessionConfigSync.currentModel = modelRow.id;
+    onTestFinished(() => {
+      sessionModelOptions.rows = [];
+      sessionConfigSync.currentModel = '';
+    });
+    goalMountOptions = { resolvedType: 'remote' };
+    const view = await mountDetails([]);
+    await act(async () => {
+      view.store.set(view.manager.atoms.activeSessionType, 'remote');
+      view.store.set(view.manager.atoms.isReadOnly, false);
+      await Promise.resolve();
+    });
+    const metrics = view.renderer.root.findByProps({ testID: 'session-context-metrics' });
+    const metricsProps = metrics.props as { accessibilityRole: string; onPress: () => void };
+    expect(metricsProps.accessibilityRole).toBe('button');
+    await act(async () => {
+      metricsProps.onPress();
+      await Promise.resolve();
+    });
+    const contextSheet = view.renderer.root.findByType(SessionContextSheet);
+    expect(contextSheet.props.modelDisplay).toBe('DeepSeek V4.1 Flash 1017');
+    expect(contextSheet.props.providerDisplay).toBe('Kilo');
+  });
+
+  it('hides the header pill for a stored session with no transcript and no reported usage', async () => {
+    // A settled empty stored session never reports usage, and a read-only
+    // session has no permission settings to open: the pill keeps its reserved
+    // box instead of painting dash placeholders beside the empty state.
+    const view = await mountDetails([]);
+    await act(async () => {
+      view.store.set(view.manager.atoms.activeSessionType, 'read-only');
+      await Promise.resolve();
+    });
+    const metrics = view.renderer.root.findByProps({ testID: 'session-context-metrics' });
+    const metricsProps = metrics.props as {
+      className?: string;
+      onPress?: () => void;
+      accessibilityElementsHidden?: boolean;
+      importantForAccessibility?: string;
+    };
+    expect(metricsProps.onPress).toBeUndefined();
+    expect(metricsProps.className).toContain('opacity-0');
+    expect(metricsProps.accessibilityElementsHidden).toBe(true);
+    expect(metricsProps.importantForAccessibility).toBe('no');
+    // The box stays reserved so the header does not shift when the pill hides.
+    expect(metricsProps.className).toContain('h-[44px]');
+  });
+
+  it('keeps the header pill after a failed stored open leaves nothing to show', async () => {
+    // The sheet still offers the connection reading and its Retry, so a failed
+    // open keeps the live control instead of hiding the pill.
+    const view = await mountDetails([]);
+    act(() => {
+      view.store.set(view.manager.atoms.activeSessionType, 'read-only');
+      view.store.set(view.manager.atoms.isReadOnly, true);
+      view.store.set(view.manager.atoms.isLoading, false);
+      view.store.set<string | null, [string | null], unknown>(
+        view.manager.atoms.error,
+        'connect ECONNREFUSED 127.0.0.1:12000'
+      );
+    });
+    const metrics = view.renderer.root.findByProps({ testID: 'session-context-metrics' });
+    const metricsProps = metrics.props as { accessibilityRole?: string; onPress?: () => void };
+    expect(metricsProps.accessibilityRole).toBe('button');
+    expect(metricsProps.onPress).toBeTypeOf('function');
   });
 
   it('pages older messages into the reserved skeleton while a zero-render transcript has a cursor', async () => {
@@ -3367,7 +3465,7 @@ describe('session detail zero-render transcript guard (mobile-app e2-open)', () 
     expect(view.renderer.root.findAllByType(SessionSkeletonMessages)).toHaveLength(0);
     expect(messageLists(view.renderer)).toHaveLength(0);
     expect(view.renderer.root.findByType(EmptyState).props).toMatchObject({
-      title: i18n.t('agentChat.session.emptyTitle'),
+      title: i18n.t('agentChat.session.emptyReadOnlyTitle'),
     });
   });
 
@@ -3404,7 +3502,7 @@ describe('session detail zero-render transcript guard (mobile-app e2-open)', () 
     expect(messageLists(view.renderer)).toHaveLength(0);
     const empty = view.renderer.root.findByType(EmptyState);
     expect(empty.props).toMatchObject({
-      title: i18n.t('agentChat.session.emptyTitle'),
+      title: i18n.t('agentChat.session.emptyReadOnlyTitle'),
     });
     expect(empty.props.action).toBeUndefined();
   });

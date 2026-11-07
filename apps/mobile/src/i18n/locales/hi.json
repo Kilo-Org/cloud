@@ -1760,6 +1760,7 @@
       "scrollToBottom": "सबसे नीचे स्क्रॉल करें",
       "transcriptAccessibility": "सत्र की बातचीत का रिकॉर्ड",
       "emptyTitle": "अभी कोई संदेश नहीं",
+      "emptyReadOnlyTitle": "इस सत्र में कोई संदेश नहीं",
       "renameAccessibility": "सत्र का नाम बदलें: {{title}}",
       "cloningSession": "सत्र क्लोन किया जा रहा है",
       "couldNotLoadThisSession": "यह सत्र लोड नहीं हो सका।",
@@ -2459,7 +2460,6 @@
   },
   "addCredits": {
     "cta": "क्रेडिट जोड़ें",
-    "description": "इस्तेमाल जारी रखने के लिए क्रेडिट जोड़ें।",
     "billingPage": "बिलिंग पेज"
   },
   "deviceSessions": {

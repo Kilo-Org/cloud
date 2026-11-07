@@ -2293,6 +2293,7 @@
       "emptyDescription": "Jalqabuuf gadiitti ergaa ergi.",
       "scrollToBottom": "Gara jalaatti siqsi",
       "emptyTitle": "Hanga ammaatti ergaan hin jiru",
+      "emptyReadOnlyTitle": "Turtii kana keessatti ergaan hin jiru",
       "renameAccessibility": "Maqaa turtii jijjiiri: {{title}}",
       "cloningSession": "Turtii kopii gochaa jira",
       "couldNotLoadThisSession": "Turtii kana fe'uu hin danda'amne.",
@@ -2991,7 +2992,6 @@
   },
   "addCredits": {
     "cta": "Kiriiditii dabali",
-    "description": "Itti fayyadamuu itti fufuuf kiriiditii dabali.",
     "billingPage": "fuula kaffaltii"
   },
   "deviceSessions": {

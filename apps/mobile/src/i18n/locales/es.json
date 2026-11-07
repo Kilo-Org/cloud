@@ -1775,6 +1775,7 @@
       "emptyDescription": "Envía un mensaje para empezar.",
       "scrollToBottom": "Desplazarse al final",
       "emptyTitle": "Aún no hay mensajes",
+      "emptyReadOnlyTitle": "Esta sesión no tiene mensajes",
       "renameAccessibility": "Cambiar nombre de la sesión: {{title}}",
       "cloningSession": "Clonando sesión",
       "couldNotLoadThisSession": "No se pudo cargar esta sesión.",
@@ -2484,7 +2485,6 @@
   },
   "addCredits": {
     "cta": "Añadir créditos",
-    "description": "Añade créditos para seguir usando el servicio.",
     "billingPage": "página de facturación"
   },
   "deviceSessions": {

@@ -2293,6 +2293,7 @@
       "emptyDescription": "ส่งข้อความด้านล่างเพื่อเริ่มต้น",
       "scrollToBottom": "เลื่อนไปด้านล่าง",
       "emptyTitle": "ยังไม่มีข้อความ",
+      "emptyReadOnlyTitle": "ไม่มีข้อความในเซสชันนี้",
       "renameAccessibility": "เปลี่ยนชื่อเซสชัน: {{title}}",
       "cloningSession": "กำลังคัดลอกเซสชัน",
       "couldNotLoadThisSession": "ไม่สามารถโหลดเซสชันนี้ได้",
@@ -2991,7 +2992,6 @@
   },
   "addCredits": {
     "cta": "เติมเครดิต",
-    "description": "เติมเครดิตเพื่อใช้งานต่อ",
     "billingPage": "หน้าการเรียกเก็บเงิน"
   },
   "deviceSessions": {

@@ -1754,6 +1754,7 @@
       "emptyDescription": "Başlamak için aşağıdan bir mesaj gönder.",
       "scrollToBottom": "En alta kaydır",
       "emptyTitle": "Henüz mesaj yok",
+      "emptyReadOnlyTitle": "Bu oturumda mesaj yok",
       "renameAccessibility": "Oturumu yeniden adlandır: {{title}}",
       "cloningSession": "Oturum kopyalanıyor",
       "couldNotLoadThisSession": "Bu oturum yüklenemedi.",
@@ -2452,7 +2453,6 @@
   },
   "addCredits": {
     "cta": "Kredi ekle",
-    "description": "Kullanmaya devam etmek için kredi ekle.",
     "billingPage": "faturalandırma sayfası"
   },
   "deviceSessions": {

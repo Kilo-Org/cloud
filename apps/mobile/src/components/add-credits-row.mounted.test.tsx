@@ -37,7 +37,7 @@ function renderRow() {
   return renderer.root;
 }
 
-/** The row's only View: the container the copy and the button sit in. */
+/** The row's only View: the block the button sits in. */
 function containerClasses(root: TestRenderer.ReactTestInstance): string[] {
   return String(root.find(node => Object.is(node.type, 'View')).props.className).split(' ');
 }
@@ -50,20 +50,17 @@ afterEach(() => {
 });
 
 describe('AddCreditsRow mounted layout', () => {
-  // At 160 dp the "Add credits" button kept its natural width beside the copy
-  // and collapsed the description to a one-letter column ("A", e1, 2026-09-21).
-  it('stacks the copy above a full-width button in a narrow window', () => {
+  it('spans the row in a narrow window', () => {
     windowDims.width = 160;
     const root = renderRow();
-    expect(containerClasses(root)).toContain('gap-2');
     expect(containerClasses(root)).not.toContain('flex-row');
     expect(String(root.findByType(BUTTON).props.className).split(' ')).toContain('w-full');
   });
 
-  it('keeps the copy and the button on one row at phone widths', () => {
+  it('keeps the button at its natural width at phone widths', () => {
     const root = renderRow();
     expect(containerClasses(root)).toEqual(
-      expect.arrayContaining(['flex-row', 'items-center', 'justify-between'])
+      expect.arrayContaining(['flex-row', 'items-center', 'justify-end'])
     );
     expect(String(root.findByType(BUTTON).props.className)).not.toContain('w-full');
   });
@@ -71,5 +68,43 @@ describe('AddCreditsRow mounted layout', () => {
   it('renders nothing on iOS', () => {
     platform.OS = 'ios';
     expect(renderRow().findAllByType(BUTTON)).toHaveLength(0);
+  });
+});
+
+describe('AddCreditsRow inline placement', () => {
+  /** The button, whether or not a caller block wraps it. */
+  function renderInline() {
+    act(() => {
+      const element = createElement(AddCreditsRow, {
+        url: 'https://example.com/credits',
+        inline: true,
+      });
+      if (renderer) {
+        renderer.update(element);
+      } else {
+        renderer = TestRenderer.create(element);
+      }
+    });
+    if (!renderer) {
+      throw new Error('Missing AddCreditsRow renderer');
+    }
+    return renderer.root;
+  }
+
+  it('hands the button over with no block of its own', () => {
+    const root = renderInline();
+    expect(root.findAllByType('View')).toHaveLength(0);
+    expect(root.findByType(BUTTON)).toBeDefined();
+  });
+
+  it('keeps the button at its natural width even in a narrow window', () => {
+    windowDims.width = 160;
+    const root = renderInline();
+    expect(String(root.findByType(BUTTON).props.className ?? '')).not.toContain('w-full');
+  });
+
+  it('keeps the App Store gate', () => {
+    platform.OS = 'ios';
+    expect(renderInline().findAllByType(BUTTON)).toHaveLength(0);
   });
 });

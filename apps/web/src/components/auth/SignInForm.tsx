@@ -144,7 +144,7 @@ export function SignInForm({
         {errorNotification}
         <ProviderSelectView
           email={flow.email}
-          providers={withLaunchedClaudeSignIn(flow.availableProviders, claudeSignInEnabled)}
+          providers={flow.availableProviders}
           onProviderSelect={flow.handleProviderSelect}
           onBack={flow.handleBack}
           purpose={flow.isNewUser ? 'sign-up' : 'sign-in'}

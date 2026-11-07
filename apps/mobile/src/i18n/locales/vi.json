@@ -1754,6 +1754,7 @@
       "emptyDescription": "Gửi tin nhắn bên dưới để bắt đầu.",
       "scrollToBottom": "Cuộn xuống dưới cùng",
       "emptyTitle": "Chưa có tin nhắn",
+      "emptyReadOnlyTitle": "Phiên này không có tin nhắn",
       "renameAccessibility": "Đổi tên phiên: {{title}}",
       "cloningSession": "Đang sao chép phiên",
       "couldNotLoadThisSession": "Không thể tải phiên này.",

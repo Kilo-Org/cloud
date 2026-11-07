@@ -1796,6 +1796,7 @@
       "emptyDescription": "Надішліть повідомлення нижче, щоб почати.",
       "scrollToBottom": "Прокрутити вниз",
       "emptyTitle": "Повідомлень ще немає",
+      "emptyReadOnlyTitle": "У цьому сеансі немає повідомлень",
       "renameAccessibility": "Перейменувати сеанс: {{title}}",
       "cloningSession": "Клонування сеансу",
       "couldNotLoadThisSession": "Не вдалося завантажити цей сеанс.",

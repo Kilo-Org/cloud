@@ -2335,6 +2335,7 @@
       "emptyDescription": "Trimite un mesaj mai jos pentru a începe.",
       "scrollToBottom": "Derulează la final",
       "emptyTitle": "Încă niciun mesaj",
+      "emptyReadOnlyTitle": "Niciun mesaj în această sesiune",
       "renameAccessibility": "Redenumește sesiunea: {{title}}",
       "cloningSession": "Se clonează sesiunea",
       "couldNotLoadThisSession": "Nu s-a putut încărca această sesiune.",

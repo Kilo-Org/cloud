@@ -2293,6 +2293,7 @@
       "emptyDescription": "Dërgo një mesazh më poshtë për të filluar.",
       "scrollToBottom": "Shko në fund",
       "emptyTitle": "Ende nuk ka mesazhe",
+      "emptyReadOnlyTitle": "Nuk ka mesazhe në këtë seancë",
       "renameAccessibility": "Riemërto seancën: {{title}}",
       "cloningSession": "Duke klonuar seancën",
       "couldNotLoadThisSession": "Nuk u ngarkua kjo seancë.",

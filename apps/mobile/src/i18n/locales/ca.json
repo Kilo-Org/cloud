@@ -2335,6 +2335,7 @@
       "emptyDescription": "Envia un missatge a continuació per començar.",
       "scrollToBottom": "Desplaça't al final",
       "emptyTitle": "Encara no hi ha missatges",
+      "emptyReadOnlyTitle": "No hi ha missatges en aquesta sessió",
       "renameAccessibility": "Reanomena la sessió: {{title}}",
       "cloningSession": "Clonant la sessió…",
       "couldNotLoadThisSession": "No s'ha pogut carregar aquesta sessió.",

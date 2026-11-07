@@ -2299,6 +2299,7 @@
       "emptyDescription": "برای شروع، در کادر زیر پیامی بفرستید.",
       "scrollToBottom": "رفتن به پایین",
       "emptyTitle": "هنوز پیامی وجود ندارد",
+      "emptyReadOnlyTitle": "پیامی در این نشست وجود ندارد",
       "renameAccessibility": "تغییر نام نشست: {{title}}",
       "cloningSession": "در حال کپی کردن نشست",
       "couldNotLoadThisSession": "بارگذاری این نشست ممکن نشد.",

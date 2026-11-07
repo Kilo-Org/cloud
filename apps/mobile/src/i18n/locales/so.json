@@ -2293,6 +2293,7 @@
       "emptyDescription": "Farriin ku dir meesha hoose si aad u bilowdo.",
       "scrollToBottom": "U dhaadhac xagga hoose",
       "emptyTitle": "Weli ma jiraan farriimo",
+      "emptyReadOnlyTitle": "Kalfadhigan farriimo kuma jiraan",
       "renameAccessibility": "Beddel magaca kalfadhiga: {{title}}",
       "cloningSession": "Kalfadhiga waa la nuqulayaa",
       "couldNotLoadThisSession": "Kalfadhigan lama soo shubi karin.",

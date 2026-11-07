@@ -2293,6 +2293,7 @@
       "emptyDescription": "Στείλε ένα μήνυμα παρακάτω για να ξεκινήσεις.",
       "scrollToBottom": "Μετάβαση στο κάτω μέρος",
       "emptyTitle": "Δεν υπάρχουν ακόμα μηνύματα",
+      "emptyReadOnlyTitle": "Δεν υπάρχουν μηνύματα σε αυτή τη συνεδρία",
       "renameAccessibility": "Μετονομασία συνεδρίας: {{title}}",
       "cloningSession": "Κλωνοποίηση συνεδρίας…",
       "couldNotLoadThisSession": "Δεν ήταν δυνατή η φόρτωση αυτής της συνεδρίας.",

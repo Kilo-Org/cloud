@@ -183,32 +183,37 @@ export function CenteredState({
     [bottomReservation, layout, ready]
   );
   const [fallbackElapsed, setFallbackElapsed] = useState(false);
+  // The hidden-until-measured gate keeps a data state from flashing at the wrong
+  // spot on its first frame. It must only ever gate that first frame: once the
+  // state has been painted, a measurement that lands, detaches and lands again
+  // — a restored route, the tab bar's own layout pass, a rotation — must not
+  // hide it again. Re-arming this window on every `ready` transition did
+  // exactly that, and a run of them kept an empty history body invisible for
+  // seconds after a relaunch. The timer starts once at mount, and the reveal is
+  // latched for the life of the mount.
   useEffect(() => {
-    if (ready) {
-      setFallbackElapsed(false);
-      return undefined;
-    }
     const timer = setTimeout(() => {
       setFallbackElapsed(true);
     }, STATE_SURFACE_FALLBACK_MS);
     return () => {
       clearTimeout(timer);
     };
-  }, [ready]);
-  // The placement is hidden until it is known, but only once: a screen that
-  // leaves and comes back re-registers its surface, and the re-measure that
-  // follows nulls the viewport for a frame or two. Re-hiding on that reading
-  // would flash the state empty — the tab that a blurred screen unmounts from
-  // is exactly the one the user is looking at when it comes back. Once the
-  // state has been placed on screen it stays, and the later measurement only
-  // moves it.
+  }, []);
+  // The latch is a layout effect, and it is declared after the measuring layout
+  // effect above: layout effects flush before the frame is painted, so the
+  // reveal lands in the same commit that placed the state, and a later detach —
+  // which clears the placement in that earlier layout effect — already reads the
+  // latch. An ordinary effect would run after paint and let one hidden frame
+  // through, which is the blank body a returning screen showed; a render-phase
+  // update is not an option either, because it updates a component React has
+  // not mounted yet and surfaces as a development-time state-update warning.
   const [revealed, setRevealed] = useState(false);
-  useEffect(() => {
-    if (ready) {
+  const visible = ready || fallbackElapsed || revealed;
+  useLayoutEffect(() => {
+    if (visible && !revealed) {
       setRevealed(true);
     }
-  }, [ready]);
-  const visible = revealed || ready || fallbackElapsed;
+  }, [revealed, visible]);
 
   if (!surface) {
     throw new Error('CenteredState requires a StateSurface');

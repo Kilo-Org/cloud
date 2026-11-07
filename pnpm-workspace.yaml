@@ -2,7 +2,6 @@ packages:
   - apps/*
   - services/*
   - services/cloud-agent-next/wrapper
-  - services/gastown/container
   - services/kiloclaw/controller
   - services/kiloclaw/plugins/*
   - packages/*
@@ -106,9 +105,9 @@ minimumReleaseAgeExclude:
   # enough on its own.
   - react-native-reanimated@4.7.1
   # @types/bun is DefinitelyTyped only: types, no runtime code, no install scripts.
-  # The wrapper and gastown dev types must equal the Bun the sandbox runs. Bun
-  # 1.4.4 is the first release that rejects the compromised eMudhra chains, so
-  # the pair moves before the window.
+  # The wrapper dev types must equal the Bun the sandbox runs, which
+  # sandbox-image-versions.test.ts asserts. Bun 1.4.4 is the first release that
+  # rejects the compromised eMudhra chains, so the pair moves before the window.
   - '@types/bun@1.4.4'
   - bun-types@1.4.4
 overrides:

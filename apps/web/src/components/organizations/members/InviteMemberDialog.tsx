@@ -37,7 +37,23 @@ import {
 } from '@/app/api/organizations/hooks';
 import { usePostHog } from 'posthog-js/react';
 
-const emailSchema = z.email();
+// The procedure's own address rule: syntax plus the 254-character maximum a
+// mail system delivers. Kept beside the field so an over-length address is
+// reported before the round trip, not as a server rejection toast.
+const emailSchema = z
+  .email({ message: 'Please enter a valid email address' })
+  .max(254, 'Email address must be 254 characters or fewer');
+
+/**
+ * The field's own sentence for an address it cannot send: the rule above writes
+ * each one, so a well-formed but over-length address names its length instead of
+ * being called invalid. `null` means the field may send.
+ */
+export function inviteEmailErrorMessage(value: string): string | null {
+  const result = emailSchema.safeParse(value.trim());
+  if (result.success) return null;
+  return result.error.issues[0]?.message ?? 'Please enter a valid email address';
+}
 
 /**
  * Success copy for the invite mutation. The invitation is created but the email
@@ -128,7 +144,7 @@ export function InviteMemberDialog({
 
   const isEmailValid = useMemo(() => {
     if (!email.trim()) return false;
-    return emailSchema.safeParse(email.trim()).success;
+    return inviteEmailErrorMessage(email) === null;
   }, [email]);
 
   const shouldShowEmailError = useMemo(() => {
@@ -163,7 +179,7 @@ export function InviteMemberDialog({
     }
 
     if (!isEmailValid) {
-      toast.error('Please enter a valid email address');
+      toast.error(inviteEmailErrorMessage(email) ?? 'Please enter a valid email address');
       return;
     }
 
@@ -303,7 +319,7 @@ export function InviteMemberDialog({
                     />
                   </svg>
                   <p id="invite-email-error" className="text-sm text-red-300" role="alert">
-                    Please enter a valid email address
+                    {inviteEmailErrorMessage(email) ?? 'Please enter a valid email address'}
                   </p>
                 </div>
               </div>

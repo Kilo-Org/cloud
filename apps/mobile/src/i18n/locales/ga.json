@@ -2419,6 +2419,7 @@
       "emptyDescription": "Seol teachtaireacht thíos chun tosú.",
       "scrollToBottom": "Scrollaigh go dtí an bun",
       "emptyTitle": "Níl aon teachtaireacht ann fós",
+      "emptyReadOnlyTitle": "Níl aon teachtaireacht sa seisiún seo",
       "renameAccessibility": "Athainmnigh seisiún: {{title}}",
       "cloningSession": "Ag clónáil an tseisiúin",
       "couldNotLoadThisSession": "Níorbh fhéidir an seisiún seo a lódáil.",

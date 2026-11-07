@@ -1680,6 +1680,7 @@
       "emptyDescription": "Envoyez un message ci-dessous pour commencer.",
       "scrollToBottom": "Aller en bas de la conversation",
       "emptyTitle": "Aucun message pour l'instant",
+      "emptyReadOnlyTitle": "Aucun message dans cette session",
       "renameAccessibility": "Renommer la session : {{title}}",
       "cloningSession": "Clonage de la session…",
       "couldNotLoadThisSession": "Impossible de charger cette session.",

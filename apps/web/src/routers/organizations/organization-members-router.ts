@@ -68,8 +68,10 @@ const RemoveMemberSchema = OrganizationIdInputSchema.extend({
   memberId: z.string(),
 });
 
+// 254 is the address maximum a mail system delivers (RFC 5321 path limit), so a
+// longer address can never receive the invitation this procedure creates.
 const InviteMemberSchema = OrganizationIdInputSchema.extend({
-  email: z.email('Invalid email address'),
+  email: z.email('Invalid email address').max(254, 'Email address must be 254 characters or fewer'),
   role: OrganizationRoleSchema,
 });
 

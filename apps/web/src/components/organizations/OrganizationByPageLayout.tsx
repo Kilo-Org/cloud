@@ -35,7 +35,7 @@ export async function OrganizationByPageLayout({
    * pages require membership.
    */
   supportRead?: boolean;
-  /** When true, skip the PageContainer wrapper (used by gastown fullscreen pages). */
+  /** When true, skip the PageContainer wrapper. */
   fullBleed?: boolean;
 }) {
   const { id } = await params;

@@ -2293,6 +2293,7 @@
       "emptyDescription": "Başlamaq üçün aşağıdakı sahədən mesaj göndər.",
       "scrollToBottom": "Ən aşağıya sürüşdür",
       "emptyTitle": "Hələ mesaj yoxdur",
+      "emptyReadOnlyTitle": "Bu sessiyada mesaj yoxdur",
       "renameAccessibility": "Sessiyanın adını dəyiş: {{title}}",
       "cloningSession": "Sessiya klonlanır",
       "couldNotLoadThisSession": "Bu sessiyanı yükləmək mümkün olmadı.",

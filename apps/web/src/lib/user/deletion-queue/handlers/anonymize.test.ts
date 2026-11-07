@@ -32,10 +32,16 @@ import { runClaimedDeletionTask } from '@/lib/user/deletion-queue/deletion-task-
 import { handleAnonymize } from '@/lib/user/deletion-queue/handlers/anonymize';
 import type { DeletionHandlerContext } from '@/lib/user/deletion-queue/deletion-types';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import * as ClaudeProfileDeletion from '@/lib/claude-billing/delete';
 
 jest.mock('@/lib/user', () => ({
   anonymizeCloudUserData: jest.fn(async () => undefined),
 }));
+
+jest.mock('@/lib/claude-billing/delete', () => {
+  const actual = jest.requireActual<typeof ClaudeProfileDeletion>('@/lib/claude-billing/delete');
+  return { ...actual, deletePersonalClaudeProfile: jest.fn(actual.deletePersonalClaudeProfile) };
+});
 
 jest.mock('@/lib/user/owned-by-user-batch-delete', () => {
   const actual = jest.requireActual(
@@ -54,12 +60,42 @@ describe('handleAnonymize', () => {
   beforeEach(async () => {
     await cleanupDbForTest();
     anonymizeCloudUserDataMock.mockClear();
+    jest
+      .mocked(ClaudeProfileDeletion.deletePersonalClaudeProfile)
+      .mockReset()
+      .mockImplementation(
+        jest.requireActual<typeof ClaudeProfileDeletion>('@/lib/claude-billing/delete')
+          .deletePersonalClaudeProfile
+      );
     deleteOwnedByUserIdPageMock.mockReset();
     deleteOwnedByUserIdPageMock.mockImplementation(
       (jest.requireActual('@/lib/user/owned-by-user-batch-delete') as typeof OwnedByUserBatchDelete)
         .deleteOwnedByUserIdPage
     );
   });
+
+  it.each([true, false])(
+    'retains local data when remote profile cleanup fails (retryable=%s)',
+    async retryable => {
+      const { request, step, claimToken } = await prepareRunningAnonymize(
+        `profile-cleanup-${crypto.randomUUID()}@example.com`
+      );
+      jest
+        .mocked(ClaudeProfileDeletion.deletePersonalClaudeProfile)
+        .mockRejectedValueOnce(new ClaudeProfileDeletion.ClaudeProfileDeletionError(retryable));
+      const outcome = await handleAnonymize({
+        request,
+        step,
+        context: handlerContext(request.id, claimToken),
+      });
+      expect(outcome).toEqual({
+        kind: retryable ? 'retry' : 'needs_attention',
+        errorCode: 'claude_profile_cleanup_failed',
+      });
+      expect(deleteOwnedByUserIdPageMock).not.toHaveBeenCalled();
+      expect(anonymizeCloudUserDataMock).not.toHaveBeenCalled();
+    }
+  );
 
   it('does not mark the step terminal or write generic disposition evidence', async () => {
     const { request, step, claimToken } = await prepareRunningAnonymize(

@@ -31,6 +31,23 @@ jest.mock('@/lib/bot', () => ({
 jest.mock('@/lib/slack-bot/model-allow-list', () => ({
   getDefaultAllowedModel: jest.fn(async () => 'test/default-model'),
 }));
+jest.mock('@/lib/bot/platforms', () => ({
+  botPlatforms: {
+    require: jest.fn(() => ({
+      withAuthContext: async ({ fn }: { fn: () => Promise<unknown> }) => await fn(),
+    })),
+  },
+}));
+// `chat` ships ESM-only, so jest cannot require it; the install-flow tests never
+// reach message deserialization.
+jest.mock(
+  'chat',
+  () => ({
+    Message: { fromJSON: jest.fn((value: unknown) => value) },
+    ThreadImpl: { fromJSON: jest.fn((value: unknown) => value) },
+  }),
+  { virtual: true }
+);
 jest.mock('@/lib/integrations/provider-oauth-attempts', () => ({
   beginProviderOAuthAttempt: jest.fn(),
   cancelProviderOAuthAttempt: jest.fn(),

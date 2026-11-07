@@ -22,11 +22,28 @@ const mockConsumeProviderOAuthAttempt = jest.fn(async (_input: unknown) => true)
 const mockCancelProviderOAuthAttempt = jest.fn(async (_input: unknown) => true);
 
 jest.mock('@kilocode/web-shared/lib/user/server');
+// `chat` ships ESM-only, so jest cannot require it; the install flow never
+// deserializes a chat message.
+jest.mock(
+  'chat',
+  () => ({
+    Message: { fromJSON: jest.fn((value: unknown) => value) },
+    ThreadImpl: { fromJSON: jest.fn((value: unknown) => value) },
+  }),
+  { virtual: true }
+);
 jest.mock('@/lib/bot', () => ({
   bot: {
     initialize: jest.fn(async () => undefined),
     getAdapter: jest.fn(),
     getState: jest.fn(() => ({ kind: 'state' })),
+  },
+}));
+jest.mock('@/lib/bot/platforms', () => ({
+  botPlatforms: {
+    require: jest.fn(() => ({
+      withAuthContext: async ({ fn }: { fn: () => Promise<unknown> }) => await fn(),
+    })),
   },
 }));
 jest.mock('@/lib/integrations/slack-service', () => {

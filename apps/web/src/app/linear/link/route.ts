@@ -39,9 +39,9 @@ function errorPage(title: string, message: string, status: number): Response {
  * `prompt=consent`) with a signed state. The Linear callback then proves
  * the clicker's Linear identity via `viewer { id }` before linking it.
  *
- * Re-running this flow as a different Linear user in the same workspace
- * is permitted — `linkKiloUser` overwrites unconditionally, mirroring
- * GitHub's behaviour.
+ * A Linear identity resolves to one Kilo account: when it is already linked
+ * to a different Kilo account, the callback renders the "already linked" page
+ * and leaves the existing mapping in place.
  */
 export async function GET(request: NextRequest) {
   const token = request.nextUrl.searchParams.get('token');

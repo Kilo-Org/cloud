@@ -139,7 +139,7 @@ async function handleGitHubBotLinkCallback(request: NextRequest, user: { id: str
   const githubUser = await exchangeGitHubOAuthCode(code, appType);
 
   await bot.initialize();
-  await linkKiloUser(
+  const linkResult = await linkKiloUser(
     bot.getState(),
     {
       platform: PLATFORM.GITHUB,
@@ -149,6 +149,15 @@ async function handleGitHubBotLinkCallback(request: NextRequest, user: { id: str
     },
     user.id
   );
+
+  if (linkResult === 'conflict') {
+    return htmlPage(
+      'Already linked',
+      `This GitHub account is already linked to a different Kilo account. No changes were made.<br>
+       Sign in to the Kilo account that already holds it, then mention Kilo again.`,
+      409
+    );
+  }
 
   return htmlPage(
     'GitHub account linked',

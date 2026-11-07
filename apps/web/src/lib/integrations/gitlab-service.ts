@@ -496,21 +496,18 @@ export async function disconnectGitLabIntegration(owner: Owner, actingUserId: st
   }
 
   const actor = gitLabCredentialActor(owner, actingUserId);
-  // Only decides whether this disconnect has a project token to settle, and so
-  // whether the connected credential must be resolved at all. The list that is
-  // settled is read again after the suspension, where it is final.
-  const projectTokenCandidates = await listIntegrationProjectIds(integration);
+  // The token service refuses a suspended integration, so the credential that
+  // can revoke project tokens must be resolved before the suspension. It is
+  // resolved even when no project token is visible yet: a review that is
+  // already running can store one before the suspension commits.
   let userToken: string | undefined;
-  if (projectTokenCandidates.length > 0) {
-    try {
-      userToken = await getValidGitLabToken(integration, actor);
-    } catch (error) {
-      logExceptInTest('[disconnectGitLabIntegration] Project token revocation unsettled', {
-        integrationId: integration.id,
-        projectTokenCount: projectTokenCandidates.length,
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
+  try {
+    userToken = await getValidGitLabToken(integration, actor);
+  } catch (error) {
+    logExceptInTest('[disconnectGitLabIntegration] Connected credential unavailable', {
+      integrationId: integration.id,
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 
   const updatedMetadata = await db.transaction(async tx => {
@@ -545,16 +542,17 @@ export async function disconnectGitLabIntegration(owner: Owner, actingUserId: st
     return nextMetadata;
   });
 
+  // Read after the suspension: nothing can mint a project token while the
+  // integration is suspended, so this set also covers a token stored between
+  // the first credential lookup and the suspension.
+  const projectIds = await listIntegrationProjectIds(integration);
+
   let revokedProjectTokens = 0;
   let retainedProjectTokens = 0;
   let unsettledProjectTokens = 0;
   if (userToken === undefined) {
-    unsettledProjectTokens = projectTokenCandidates.length;
+    unsettledProjectTokens = projectIds.length;
   } else {
-    // Read after the suspension: nothing can mint a project token while the
-    // integration is suspended, so this set is final and also covers a token
-    // stored between the first read and the suspension.
-    const projectIds = await listIntegrationProjectIds(integration);
     for (const projectId of projectIds) {
       const outcome = await removeStoredProjectAccessToken(integration, projectId, actor, {
         userToken,
@@ -1101,9 +1099,9 @@ export type StoredProjectTokenRemoval = 'removed' | 'retained' | 'absent';
  * The metadata entry and the encrypted credential row are deleted only after
  * GitLab settles the revocation, either by confirming it or by reporting the
  * token as already gone (404). Any other outcome keeps both handles so a later
- * removal can try again. A legacy metadata entry without an encrypted row names
- * a token id too, so it follows the same contract: revoke by that id first, then
- * drop the entry.
+ * removal can try again. A legacy metadata entry names a token id too, and it
+ * keeps the same contract: every stored id for the project is revoked before
+ * either handle is dropped.
  *
  * `userToken` lets a caller that already resolved the connected credential — a
  * disconnect resolves it before the integration stops counting as connected —
@@ -1118,20 +1116,28 @@ export async function removeStoredProjectAccessToken(
   const metadata = integration.metadata as GitLabIntegrationMetadata | null;
   const projectIdStr = requireGitLabProjectId(projectId);
   const storedCredential = await getStoredProjectCredential(integration.id, projectIdStr);
-  const tokenId =
-    storedCredential?.tokenId ?? readLegacyProjectTokenId(integration.metadata, projectIdStr);
-  if (tokenId === null) return 'absent';
+  const tokenIds = [
+    ...new Set(
+      [
+        storedCredential?.tokenId,
+        readLegacyProjectTokenId(integration.metadata, projectIdStr),
+      ].filter((tokenId): tokenId is number => tokenId !== null && tokenId !== undefined)
+    ),
+  ];
+  if (tokenIds.length === 0) return 'absent';
   const instanceUrl = normalizeInstanceUrl(metadata?.gitlab_instance_url);
 
   try {
     const userToken = options.userToken ?? (await getValidGitLabToken(integration, actor));
-    await revokeProjectAccessToken(userToken, projectId, tokenId, instanceUrl);
+    for (const tokenId of tokenIds) {
+      await revokeProjectAccessToken(userToken, projectId, tokenId, instanceUrl);
+    }
   } catch (error) {
     logExceptInTest(
       '[removeStoredProjectAccessToken] Revocation unsettled; keeping stored project credential',
       {
         projectId,
-        tokenId,
+        tokenIds,
         status: readProjectRevocationStatus(error),
         error: error instanceof Error ? error.message : String(error),
       }
@@ -1141,7 +1147,7 @@ export async function removeStoredProjectAccessToken(
 
   logExceptInTest('[removeStoredProjectAccessToken] Token revoked in GitLab', {
     projectId,
-    tokenId,
+    tokenIds,
   });
 
   if (storedCredential) {

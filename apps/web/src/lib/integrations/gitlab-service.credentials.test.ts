@@ -383,6 +383,62 @@ describe('GitLab encrypted credential persistence', () => {
     expect(updatedIntegration.metadata).toEqual(expect.objectContaining({ project_tokens: {} }));
   });
 
+  it('revokes the legacy token id as well when the encrypted row holds a different one', async () => {
+    const user = await insertTestUser();
+    const connected = await connectWithPAT(
+      { type: 'user', id: user.id },
+      'glpat-primary-token',
+      'https://gitlab.com',
+      user.id
+    );
+    const [integration] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, connected.integration.id));
+    await getOrCreateProjectAccessToken(integration, 42, { userId: user.id });
+    await db
+      .update(platform_integrations)
+      .set({
+        metadata: {
+          ...(integration.metadata as Record<string, unknown>),
+          project_tokens: {
+            '42': {
+              token_id: 991,
+              token: 'glpat-legacy-project-token',
+              expires_at: '2027-07-13',
+              created_at: '2026-07-13T00:00:00.000Z',
+              name: 'Kilo Code Review Bot',
+            },
+          },
+        },
+      })
+      .where(eq(platform_integrations.id, integration.id));
+    const [integrationWithLegacy] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, integration.id));
+
+    await expect(
+      removeStoredProjectAccessToken(integrationWithLegacy, 42, { userId: user.id })
+    ).resolves.toBe('removed');
+
+    expect(mockRevokeProjectAccessToken.mock.calls).toEqual([
+      ['glpat-primary-token', 42, 777, 'https://gitlab.com'],
+      ['glpat-primary-token', 42, 991, 'https://gitlab.com'],
+    ]);
+    expect(
+      await db
+        .select()
+        .from(platform_access_token_credentials)
+        .where(eq(platform_access_token_credentials.provider_resource_id, '42'))
+    ).toEqual([]);
+    const [updatedIntegration] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, integration.id));
+    expect(updatedIntegration.metadata).toEqual(expect.objectContaining({ project_tokens: {} }));
+  });
+
   it('keeps a legacy metadata-only entry when GitLab does not settle its revocation', async () => {
     const user = await insertTestUser();
     const connected = await connectWithPAT(

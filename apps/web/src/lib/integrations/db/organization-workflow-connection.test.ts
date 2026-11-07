@@ -8,6 +8,7 @@ import {
   type PlatformIntegration,
 } from '@kilocode/db/schema';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
+import { assertGitHubInstallationRuntimeAuthorized } from '@/lib/integrations/github/runtime-authorization';
 import { fetchAllGitHubRepositoriesForOrganization } from '@/lib/cloud-agent/github-integration-helpers';
 import {
   getGitHubConnectionStatusForOwner,
@@ -251,6 +252,36 @@ describe('organization GitHub workflow connection lookups', () => {
 
     await expect(listedIntegrationIds(organization.id)).resolves.toEqual([association.id]);
     await expect(connectionStatus(organization.id)).resolves.toMatchObject({ connected: true });
+  });
+
+  test('authorizes a runtime token for the connection the listing resolves', async () => {
+    const organization = await createTestOrganization('Runtime gate', ownerId, 0);
+    const installationId = nextInstallationId();
+    const association = await insertAssociation(
+      organizationAssociation(organization.id, { installationId })
+    );
+
+    // The repository sync behind the picker's refresh mints a token for the
+    // listed installation, so the gate it passes must resolve the same row.
+    await expect(
+      assertGitHubInstallationRuntimeAuthorized(installationId, 'standard', association.id)
+    ).resolves.toBeUndefined();
+  });
+
+  test('keeps a shadowed roleless association unauthorized for runtime use', async () => {
+    const organization = await createTestOrganization('Runtime gate shadowed', ownerId, 0);
+    const claimingOrganization = await createTestOrganization('Runtime claimant', ownerId, 0);
+    const installationId = nextInstallationId();
+    await insertAssociation(
+      organizationAssociation(claimingOrganization.id, { installationId, role: 'workflow' })
+    );
+    const shadowed = await insertAssociation(
+      organizationAssociation(organization.id, { installationId })
+    );
+
+    await expect(
+      assertGitHubInstallationRuntimeAuthorized(installationId, 'standard', shadowed.id)
+    ).rejects.toMatchObject({ reason: 'missing_association' });
   });
 
   test('orders a stored workflow association before an eligible roleless one', async () => {

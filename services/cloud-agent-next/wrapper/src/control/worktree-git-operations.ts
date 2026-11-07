@@ -207,24 +207,6 @@ export function createWorktreeGitExecutor(options: WorktreeGitOptions) {
     return null;
   }
 
-  async function remoteDivergence(
-    branch: string
-  ): Promise<{ ahead: number; behind: number } | null> {
-    const remote = await tryResolve(`refs/remotes/origin/${branch}`);
-    if (remote === null) return null;
-    const local = await head();
-    const ahead = await countRange(`${remote}..${local}`);
-    const behind = await countRange(`${local}..${remote}`);
-    return { ahead, behind };
-  }
-
-  async function countRange(range: string): Promise<number> {
-    const result = await exec(['rev-list', '--count', range]);
-    if (result.exitCode !== 0) throw new WorktreeGitError('Unable to compare with the remote');
-    const value = Number(result.stdout.trim());
-    return Number.isSafeInteger(value) && value >= 0 ? value : 0;
-  }
-
   async function seedLastKnownRemoteFromOrigin(branch: string): Promise<string | null> {
     const existing = await resolveLastKnownRemote(branch);
     if (existing !== null) return existing;
@@ -268,7 +250,6 @@ export function createWorktreeGitExecutor(options: WorktreeGitOptions) {
     fetchBranch,
     fetchAll,
     defaultRemoteBranch,
-    remoteDivergence,
     seedLastKnownRemoteFromOrigin,
     rememberPushedRemote,
   };
@@ -814,7 +795,6 @@ export type ChangesRemoteRefresh = {
   /** The request to capture, with `baseRef` pointing at the branch actually compared. */
   request: { baseRef?: string };
   baseRefFallback?: { requested: string; used: string };
-  remoteDivergence?: { ahead: number; behind: number };
 };
 
 function remoteBranchFromRef(ref: string): string | null {
@@ -826,37 +806,19 @@ function remoteBranchFromRef(ref: string): string | null {
 }
 
 /**
- * Refresh the remote refs the Changes panel compares. A not-yet-pushed own
- * branch is skipped (the panel keeps working as before); a missing base branch
- * falls back to the default branch; any other fetch failure is a retryable
- * error so the UI does not silently show stale divergence.
+ * Refresh the base branch the Changes panel compares. A missing base branch
+ * falls back to the default branch; other fetch failures are retryable errors.
  */
 export async function refreshChangesRemotes(
   executor: WorktreeGitExecutorInternal,
   request: { baseRef?: string }
 ): Promise<ChangesRemoteRefresh> {
-  const branch = await executor.currentBranch();
-  let remoteDivergence: ChangesRemoteRefresh['remoteDivergence'];
-  if (branch !== null) {
-    const own = await executor.fetchBranch(branch);
-    if (own.kind === 'failed') {
-      throw new WorktreeGitError(
-        `git fetch origin ${branch} failed: ${own.message}`,
-        'git_network_failed',
-        true
-      );
-    }
-    if (own.kind === 'ok') {
-      remoteDivergence = (await executor.remoteDivergence(branch)) ?? undefined;
-    }
-  }
-
   if (request.baseRef === undefined) {
-    return { request, ...(remoteDivergence === undefined ? {} : { remoteDivergence }) };
+    return { request };
   }
   const baseBranch = remoteBranchFromRef(request.baseRef);
   if (baseBranch === null || baseBranch === 'HEAD') {
-    return { request, ...(remoteDivergence === undefined ? {} : { remoteDivergence }) };
+    return { request };
   }
   const base = await executor.fetchBranch(baseBranch);
   let effectiveBaseRef = request.baseRef;
@@ -883,7 +845,6 @@ export async function refreshChangesRemotes(
   return {
     request: { ...request, baseRef: effectiveBaseRef },
     ...(baseRefFallback === undefined ? {} : { baseRefFallback }),
-    ...(remoteDivergence === undefined ? {} : { remoteDivergence }),
   };
 }
 

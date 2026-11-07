@@ -158,7 +158,7 @@ describe('control-plane wrapper worktree changes', () => {
     ]);
   });
 
-  it('refreshes remotes with the prepared environment and adds divergence and fallback', async () => {
+  it('refreshes the base with the prepared environment and adds its fallback', async () => {
     const calls: Array<{
       payload: SessionGitSummaryPayload;
       environment: unknown;
@@ -171,7 +171,6 @@ describe('control-plane wrapper worktree changes', () => {
           requested: 'refs/remotes/origin/gone',
           used: 'refs/remotes/origin/main',
         },
-        remoteDivergence: { ahead: 1, behind: 2 },
       }),
       captureSnapshot: async (_directory, payload, environment) => {
         calls.push({ payload, environment });
@@ -208,7 +207,6 @@ describe('control-plane wrapper worktree changes', () => {
                 used: 'refs/remotes/origin/main',
               },
             },
-            remoteDivergence: { ahead: 1, behind: 2 },
           },
         },
       },

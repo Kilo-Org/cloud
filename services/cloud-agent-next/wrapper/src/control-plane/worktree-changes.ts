@@ -32,10 +32,9 @@ import type { PreparedGitContext } from './worktree-git.js';
  * registers pending work and rejects while the directory is deleting; it is not
  * a serializer), and the result is validated before it is reported.
  *
- * Before capturing, the remote refs the panel compares are refreshed with the
- * prepared route environment. A not-yet-pushed own branch is skipped, a missing
- * base falls back to the default branch with a notice, and any other fetch
- * failure is reported as retryable rather than as an unchanged snapshot.
+ * Before capturing, the base branch is refreshed with the prepared route
+ * environment. A missing base falls back to the default branch with a notice.
+ * Other fetch failures are reported as retryable.
  */
 export type ControlPlaneWorktreeChangesDeps = {
   emit: (frame: ControlPlaneWrapperFrame) => void;
@@ -107,7 +106,6 @@ export function createControlPlaneWorktreeChanges(deps: ControlPlaneWorktreeChan
         const environment = environmentFor(context);
         let effectivePayload = payload;
         let baseRefFallback: { requested: string; used: string } | undefined;
-        let remoteDivergence: { ahead: number; behind: number } | undefined;
         if (context !== null) {
           const executor = createWorktreeGitExecutor({
             directory: context.directory,
@@ -123,7 +121,6 @@ export function createControlPlaneWorktreeChanges(deps: ControlPlaneWorktreeChan
             effectivePayload = { ...payload, baseRef: refreshed.request.baseRef };
           }
           baseRefFallback = refreshed.baseRefFallback;
-          remoteDivergence = refreshed.remoteDivergence;
         }
         const captured =
           frame.type === 'worktree.snapshot'
@@ -139,7 +136,6 @@ export function createControlPlaneWorktreeChanges(deps: ControlPlaneWorktreeChan
                 ...snapshot.summary.comparison,
                 ...(baseRefFallback === undefined ? {} : { baseRefFallback }),
               },
-              ...(remoteDivergence === undefined ? {} : { remoteDivergence }),
             },
           };
           const parsed = worktreeSnapshotCaptureSchema.safeParse(enriched);
@@ -156,7 +152,6 @@ export function createControlPlaneWorktreeChanges(deps: ControlPlaneWorktreeChan
               ...summary.comparison,
               ...(baseRefFallback === undefined ? {} : { baseRefFallback }),
             },
-            ...(remoteDivergence === undefined ? {} : { remoteDivergence }),
           };
           const parsed = sessionGitSummaryResultSchema.safeParse(enriched);
           if (!parsed.success || !resultMatches(parsed.data, effectivePayload)) {

@@ -425,37 +425,32 @@ describe('worktree Restack', () => {
 });
 
 describe('Changes refresh remotes', () => {
-  it('fetches the own branch and reports how far behind HEAD is', async () => {
+  it('refreshes only the base and leaves the own remote ref unchanged', async () => {
     const fixture = await makeFixture();
     const { branch } = pushFeature(fixture);
+    const previousRemote = run(fixture.work, ['rev-parse', `origin/${branch}`], fixture.env);
     const teammate = clone(fixture, 'refresh-teammate');
     run(teammate, ['checkout', branch], fixture.env);
     await commitFile(teammate, 'remote.txt', 'remote\n', 'remote', fixture.env);
     run(teammate, ['push', 'origin', branch], fixture.env);
 
-    // A prior refresh fetch must not change the outcome.
-    run(fixture.work, ['fetch', 'origin', branch], fixture.env);
     const executor = createWorktreeGitExecutor({ directory: fixture.work, env: fixture.env });
     const refreshed = await refreshChangesRemotes(executor, {
       baseRef: 'refs/remotes/origin/main',
     });
 
-    expect(refreshed.remoteDivergence).toEqual({ ahead: 0, behind: 1 });
+    expect(run(fixture.work, ['rev-parse', `origin/${branch}`], fixture.env)).toBe(previousRemote);
+    expect(refreshed).not.toHaveProperty('remoteDivergence');
     expect(refreshed.baseRefFallback).toBeUndefined();
   });
 
-  it('skips a missing own remote before the first push without failing', async () => {
+  it('does not contact the remote when no base comparison is requested', async () => {
     const fixture = await makeFixture();
-    run(fixture.work, ['checkout', '-b', 'local-only'], fixture.env);
-    await commitFile(fixture.work, 'local.txt', 'local\n', 'local', fixture.env);
+    const missingRemote = path.join(fixture.root, 'missing.git');
+    run(fixture.work, ['remote', 'set-url', 'origin', missingRemote], fixture.env);
 
     const executor = createWorktreeGitExecutor({ directory: fixture.work, env: fixture.env });
-    const refreshed = await refreshChangesRemotes(executor, {
-      baseRef: 'refs/remotes/origin/main',
-    });
-
-    expect(refreshed.remoteDivergence).toBeUndefined();
-    expect(refreshed.baseRefFallback).toBeUndefined();
+    expect(await refreshChangesRemotes(executor, {})).toEqual({ request: {} });
   });
 
   it('falls back to the default branch when the requested base is gone', async () => {
@@ -488,7 +483,7 @@ describe('Changes refresh remotes', () => {
     const executor = createWorktreeGitExecutor({ directory: fixture.work, env: fixture.env });
     let failure: unknown;
     try {
-      await refreshChangesRemotes(executor, {});
+      await refreshChangesRemotes(executor, { baseRef: 'refs/remotes/origin/main' });
     } catch (error) {
       failure = error;
     }

@@ -1,6 +1,6 @@
 /**
- * Legacy V2 execution handlers — thin proxies over the shared `queueMessage`
- * helper.
+ * Legacy V2 execution handlers — thin proxies over the shared
+ * `preflightAndQueuePromptMessage` admission helper.
  *
  * `initiateFromKilocodeSessionV2` queues the first message on a session that
  * was registered via `prepareSession`. Callers do not pass a prompt, so the

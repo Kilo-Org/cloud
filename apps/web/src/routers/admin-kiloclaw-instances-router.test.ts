@@ -2,6 +2,7 @@ import { createCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import type { User } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
+import { client as stripeMock } from '@kilocode/web-shared/lib/stripe-client';
 import {
   kilocode_users,
   kiloclaw_admin_audit_logs,
@@ -31,6 +32,7 @@ const mockGetKiloCliRunStatus: jest.Mock<any, any> = jest.fn();
 const mockCancelKiloCliRun: jest.Mock<any, any> = jest.fn();
 const mockStartKiloCliRun: jest.Mock<any, any> = jest.fn();
 const mockStart: jest.Mock<any, any> = jest.fn();
+const mockDestroy: jest.Mock<any, any> = jest.fn();
 const mockUserClientRestartMachine: jest.Mock<any, any> = jest.fn();
 const mockWakeScheduledAction: jest.Mock<any, any> = jest.fn();
 const startedResponse = {
@@ -53,6 +55,7 @@ function mockKiloClawInternalClient() {
     cancelKiloCliRun: mockCancelKiloCliRun,
     startKiloCliRun: mockStartKiloCliRun,
     start: mockStart,
+    destroy: mockDestroy,
     wakeScheduledAction: mockWakeScheduledAction,
   }));
 }
@@ -68,6 +71,7 @@ jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => ({
     cancelKiloCliRun: mockCancelKiloCliRun,
     startKiloCliRun: mockStartKiloCliRun,
     start: mockStart,
+    destroy: mockDestroy,
     wakeScheduledAction: mockWakeScheduledAction,
   })),
   KiloClawApiError: class KiloClawApiError extends Error {
@@ -173,6 +177,18 @@ beforeEach(async () => {
   mockStartKiloCliRun.mockReset();
   mockStart.mockReset();
   mockStart.mockResolvedValue(startedResponse);
+  mockDestroy.mockReset();
+  mockDestroy.mockResolvedValue({
+    ok: true,
+    finalized: true,
+    destroyedUserId: regularUser.id,
+    destroyedSandboxId: null,
+    pendingMachineId: null,
+    pendingVolumeId: null,
+    lastDestroyErrorOp: null,
+    lastDestroyErrorStatus: null,
+    lastDestroyErrorAt: null,
+  });
   mockUserClientRestartMachine.mockReset();
   mockUserClientRestartMachine.mockResolvedValue({ success: true, message: 'restarting' });
   mockWakeScheduledAction.mockReset();
@@ -1596,6 +1612,575 @@ describe('admin.kiloclawInstances.restartMachine pin override gate', () => {
     ).rejects.toMatchObject({ code: 'NOT_FOUND' });
 
     expect(mockUserClientRestartMachine).not.toHaveBeenCalled();
+  });
+});
+
+describe('admin.kiloclawInstances.bulkDestroy', () => {
+  let instanceIds: string[];
+  let currentInstanceId: string;
+  let legacyInstanceId: string;
+  let destroyedInstanceId: string;
+
+  beforeEach(async () => {
+    currentInstanceId = crypto.randomUUID();
+    legacyInstanceId = crypto.randomUUID();
+    destroyedInstanceId = crypto.randomUUID();
+    instanceIds = [currentInstanceId, legacyInstanceId, destroyedInstanceId];
+
+    await db.insert(kiloclaw_instances).values([
+      {
+        id: currentInstanceId,
+        user_id: regularUser.id,
+        sandbox_id: `ki_${currentInstanceId.replace(/-/g, '')}`,
+      },
+      {
+        id: legacyInstanceId,
+        user_id: regularUser.id,
+        sandbox_id: `legacy_${legacyInstanceId.replace(/-/g, '')}`,
+      },
+      {
+        id: destroyedInstanceId,
+        user_id: regularUser.id,
+        sandbox_id: `ki_${destroyedInstanceId.replace(/-/g, '')}`,
+        destroyed_at: new Date().toISOString(),
+      },
+    ]);
+  });
+
+  afterEach(async () => {
+    /* eslint-disable drizzle/enforce-delete-with-where */
+    await db
+      .delete(kiloclaw_subscriptions)
+      .where(inArray(kiloclaw_subscriptions.instance_id, instanceIds));
+    await db.delete(kiloclaw_instances).where(inArray(kiloclaw_instances.id, instanceIds));
+    /* eslint-enable drizzle/enforce-delete-with-where */
+    jest.restoreAllMocks();
+  });
+
+  it('throws FORBIDDEN for non-admin callers', async () => {
+    const caller = await createCallerForUser(regularUser.id);
+
+    await expect(
+      caller.admin.kiloclawInstances.bulkDestroy({
+        instanceIds: [currentInstanceId],
+        confirmation: 'DESTROY',
+      })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+
+    expect(mockDestroy).not.toHaveBeenCalled();
+  });
+
+  it('rejects batches larger than 25 instances', async () => {
+    const caller = await createCallerForUser(adminUser.id);
+    const tooManyIds = Array.from({ length: 26 }, () => crypto.randomUUID());
+
+    await expect(
+      caller.admin.kiloclawInstances.bulkDestroy({
+        instanceIds: tooManyIds,
+        confirmation: 'DESTROY',
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+
+    expect(mockDestroy).not.toHaveBeenCalled();
+  });
+
+  it.each([undefined, 'DELETE'])(
+    'rejects confirmation %p before billing or destruction',
+    async confirmation => {
+      const caller = await createCallerForUser(adminUser.id);
+
+      await expect(
+        caller.admin.kiloclawInstances.bulkDestroy({
+          instanceIds: [currentInstanceId],
+          ...(confirmation === undefined ? {} : { confirmation }),
+        } as never)
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+
+      expect(mockDestroy).not.toHaveBeenCalled();
+    }
+  );
+
+  it('deduplicates instance ids before stopping', async () => {
+    const caller = await createCallerForUser(adminUser.id);
+
+    const result = await caller.admin.kiloclawInstances.bulkDestroy({
+      instanceIds: [currentInstanceId, currentInstanceId],
+      confirmation: 'DESTROY',
+    });
+
+    expect(result).toEqual({
+      destroyed: [currentInstanceId],
+      pending: [],
+      skipped: [],
+      failed: [],
+      billing: { canceled: [], notNeeded: [currentInstanceId], failed: [] },
+    });
+    expect(mockDestroy).toHaveBeenCalledTimes(1);
+  });
+
+  it('immediately cancels only the selected pure-credit hosting subscription', async () => {
+    const otherInstanceId = crypto.randomUUID();
+    await db.insert(kiloclaw_instances).values({
+      id: otherInstanceId,
+      user_id: regularUser.id,
+      sandbox_id: `ki_${otherInstanceId.replace(/-/g, '')}`,
+    });
+    instanceIds.push(otherInstanceId);
+    const [selectedSubscription, otherSubscription] = await db
+      .insert(kiloclaw_subscriptions)
+      .values([
+        {
+          user_id: regularUser.id,
+          instance_id: currentInstanceId,
+          plan: 'standard',
+          status: 'active',
+          payment_source: 'credits',
+          credit_renewal_at: new Date(Date.now() + 86_400_000).toISOString(),
+        },
+        {
+          user_id: regularUser.id,
+          instance_id: otherInstanceId,
+          plan: 'standard',
+          status: 'active',
+          payment_source: 'credits',
+          credit_renewal_at: new Date(Date.now() + 86_400_000).toISOString(),
+        },
+      ])
+      .returning();
+
+    const caller = await createCallerForUser(adminUser.id);
+    const result = await caller.admin.kiloclawInstances.bulkDestroy({
+      instanceIds: [currentInstanceId],
+      confirmation: 'DESTROY',
+    });
+
+    expect(result.billing).toEqual({
+      canceled: [{ instanceId: currentInstanceId, subscriptionIds: [selectedSubscription.id] }],
+      notNeeded: [],
+      failed: [],
+    });
+    const subscriptions = await db
+      .select({ id: kiloclaw_subscriptions.id, status: kiloclaw_subscriptions.status })
+      .from(kiloclaw_subscriptions)
+      .where(inArray(kiloclaw_subscriptions.id, [selectedSubscription.id, otherSubscription.id]));
+    expect(subscriptions).toEqual(
+      expect.arrayContaining([
+        { id: selectedSubscription.id, status: 'canceled' },
+        { id: otherSubscription.id, status: 'active' },
+      ])
+    );
+  });
+
+  it('cancels a selected hybrid subscription without touching another subscription', async () => {
+    const otherInstanceId = crypto.randomUUID();
+    await db.insert(kiloclaw_instances).values({
+      id: otherInstanceId,
+      user_id: regularUser.id,
+      sandbox_id: `ki_${otherInstanceId.replace(/-/g, '')}`,
+    });
+    instanceIds.push(otherInstanceId);
+    const [selectedSubscription, otherSubscription] = await db
+      .insert(kiloclaw_subscriptions)
+      .values([
+        {
+          user_id: regularUser.id,
+          instance_id: currentInstanceId,
+          plan: 'standard',
+          status: 'active',
+          payment_source: 'credits',
+          stripe_subscription_id: `sub_hybrid_${crypto.randomUUID()}`,
+        },
+        {
+          user_id: regularUser.id,
+          instance_id: otherInstanceId,
+          plan: 'standard',
+          status: 'active',
+          payment_source: 'credits',
+          stripe_subscription_id: `sub_other_${crypto.randomUUID()}`,
+        },
+      ])
+      .returning();
+    jest
+      .spyOn(stripeMock.subscriptions, 'retrieve')
+      .mockResolvedValue({ status: 'active', schedule: null } as never);
+    const cancel = jest.spyOn(stripeMock.subscriptions, 'cancel').mockResolvedValue({} as never);
+
+    const caller = await createCallerForUser(adminUser.id);
+    const result = await caller.admin.kiloclawInstances.bulkDestroy({
+      instanceIds: [currentInstanceId],
+      confirmation: 'DESTROY',
+    });
+
+    expect(result.billing.canceled).toEqual([
+      { instanceId: currentInstanceId, subscriptionIds: [selectedSubscription.id] },
+    ]);
+    expect(cancel).toHaveBeenCalledWith(
+      selectedSubscription.stripe_subscription_id,
+      {
+        prorate: false,
+        invoice_now: false,
+      },
+      {
+        timeout: 10_000,
+        maxNetworkRetries: 0,
+      }
+    );
+    expect(cancel).not.toHaveBeenCalledWith(
+      otherSubscription.stripe_subscription_id,
+      expect.anything()
+    );
+  });
+
+  it('still cancels hosting when the machine stop fails', async () => {
+    const [subscription] = await db
+      .insert(kiloclaw_subscriptions)
+      .values({
+        user_id: regularUser.id,
+        instance_id: currentInstanceId,
+        plan: 'standard',
+        status: 'active',
+        payment_source: 'credits',
+        credit_renewal_at: new Date(Date.now() + 86_400_000).toISOString(),
+      })
+      .returning();
+    mockDestroy.mockRejectedValueOnce(new Error('worker unavailable'));
+    const caller = await createCallerForUser(adminUser.id);
+    const result = await caller.admin.kiloclawInstances.bulkDestroy({
+      instanceIds: [currentInstanceId],
+      confirmation: 'DESTROY',
+    });
+    expect(result.failed).toEqual([{ instanceId: currentInstanceId, error: 'worker unavailable' }]);
+    expect(result.billing.canceled).toEqual([
+      { instanceId: currentInstanceId, subscriptionIds: [subscription.id] },
+    ]);
+    const [after] = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.id, subscription.id));
+    expect(after.status).toBe('canceled');
+  });
+
+  it('blocks destruction when provider cancellation fails', async () => {
+    const [subscription] = await db
+      .insert(kiloclaw_subscriptions)
+      .values({
+        user_id: regularUser.id,
+        instance_id: currentInstanceId,
+        plan: 'standard',
+        status: 'active',
+        payment_source: 'stripe',
+        stripe_subscription_id: `sub_unavailable_${crypto.randomUUID()}`,
+      })
+      .returning();
+    jest
+      .spyOn(stripeMock.subscriptions, 'retrieve')
+      .mockRejectedValueOnce(new Error('Stripe unavailable'));
+    const caller = await createCallerForUser(adminUser.id);
+    const result = await caller.admin.kiloclawInstances.bulkDestroy({
+      instanceIds: [currentInstanceId],
+      confirmation: 'DESTROY',
+    });
+    expect(result.destroyed).toEqual([]);
+    expect(mockDestroy).not.toHaveBeenCalled();
+    expect(result.billing.failed).toEqual([
+      { instanceId: currentInstanceId, error: 'Stripe unavailable' },
+    ]);
+    const [after] = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.id, subscription.id));
+    expect(after.status).toBe('active');
+  });
+
+  it('reconciles local hosting when Stripe is already canceled', async () => {
+    const [subscription] = await db
+      .insert(kiloclaw_subscriptions)
+      .values({
+        user_id: regularUser.id,
+        instance_id: currentInstanceId,
+        plan: 'standard',
+        status: 'active',
+        payment_source: 'stripe',
+        stripe_subscription_id: `sub_canceled_${crypto.randomUUID()}`,
+        pending_conversion: true,
+      })
+      .returning();
+    jest
+      .spyOn(stripeMock.subscriptions, 'retrieve')
+      .mockResolvedValue({ status: 'canceled', schedule: null } as never);
+    const cancel = jest.spyOn(stripeMock.subscriptions, 'cancel');
+    const caller = await createCallerForUser(adminUser.id);
+    const result = await caller.admin.kiloclawInstances.bulkDestroy({
+      instanceIds: [currentInstanceId],
+      confirmation: 'DESTROY',
+    });
+    expect(result.billing.canceled).toEqual([
+      { instanceId: currentInstanceId, subscriptionIds: [subscription.id] },
+    ]);
+    expect(cancel).not.toHaveBeenCalled();
+    const [after] = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.id, subscription.id));
+    expect(after).toMatchObject({ status: 'canceled', pending_conversion: false });
+  });
+
+  it('clears pending conversion before sending provider cancellation', async () => {
+    const [subscription] = await db
+      .insert(kiloclaw_subscriptions)
+      .values({
+        user_id: regularUser.id,
+        instance_id: currentInstanceId,
+        plan: 'standard',
+        status: 'active',
+        payment_source: 'stripe',
+        stripe_subscription_id: `sub_conversion_${crypto.randomUUID()}`,
+        pending_conversion: true,
+      })
+      .returning();
+    jest
+      .spyOn(stripeMock.subscriptions, 'retrieve')
+      .mockResolvedValue({ status: 'active', schedule: null } as never);
+    jest.spyOn(stripeMock.subscriptions, 'cancel').mockImplementationOnce(async () => {
+      const [beforeProviderCancellation] = await db
+        .select()
+        .from(kiloclaw_subscriptions)
+        .where(eq(kiloclaw_subscriptions.id, subscription.id));
+      expect(beforeProviderCancellation.pending_conversion).toBe(false);
+      return {} as never;
+    });
+    const caller = await createCallerForUser(adminUser.id);
+    const result = await caller.admin.kiloclawInstances.bulkDestroy({
+      instanceIds: [currentInstanceId],
+      confirmation: 'DESTROY',
+    });
+    expect(result.billing.failed).toEqual([]);
+    expect(result.billing.canceled).toEqual([
+      { instanceId: currentInstanceId, subscriptionIds: [subscription.id] },
+    ]);
+  });
+
+  it('retries destruction cleanup for destroyed instance-keyed rows after billing cleanup', async () => {
+    const [subscription] = await db
+      .insert(kiloclaw_subscriptions)
+      .values({
+        user_id: regularUser.id,
+        instance_id: destroyedInstanceId,
+        plan: 'standard',
+        status: 'active',
+        payment_source: 'credits',
+        credit_renewal_at: new Date(Date.now() + 86_400_000).toISOString(),
+      })
+      .returning();
+
+    const caller = await createCallerForUser(adminUser.id);
+    const result = await caller.admin.kiloclawInstances.bulkDestroy({
+      instanceIds: [destroyedInstanceId],
+      confirmation: 'DESTROY',
+    });
+
+    expect(result).toEqual({
+      destroyed: [],
+      pending: [],
+      skipped: [{ instanceId: destroyedInstanceId, reason: 'already_destroyed' }],
+      failed: [],
+      billing: {
+        canceled: [{ instanceId: destroyedInstanceId, subscriptionIds: [subscription.id] }],
+        notNeeded: [],
+        failed: [],
+      },
+    });
+    expect(mockDestroy).toHaveBeenCalledWith(regularUser.id, destroyedInstanceId, {
+      reason: 'admin_request',
+    });
+  });
+
+  it('retries scoped cleanup when a destroyed instance-keyed DO is already wiped', async () => {
+    const { KiloClawApiError } = jest.requireMock<{
+      KiloClawApiError: new (statusCode: number, responseBody: string) => Error;
+    }>('@/lib/kiloclaw/kiloclaw-internal-client');
+    mockDestroy.mockRejectedValueOnce(
+      new KiloClawApiError(404, JSON.stringify({ error: 'Instance not provisioned' }))
+    );
+    const caller = await createCallerForUser(adminUser.id);
+
+    await expect(
+      caller.admin.kiloclawInstances.bulkDestroy({
+        instanceIds: [destroyedInstanceId],
+        confirmation: 'DESTROY',
+      })
+    ).resolves.toMatchObject({
+      destroyed: [],
+      pending: [],
+      skipped: [{ instanceId: destroyedInstanceId, reason: 'already_destroyed' }],
+      failed: [],
+    });
+  });
+
+  it('fails closed for a generic 404 from a destroyed instance-keyed row', async () => {
+    const { KiloClawApiError } = jest.requireMock<{
+      KiloClawApiError: new (statusCode: number, responseBody: string) => Error;
+    }>('@/lib/kiloclaw/kiloclaw-internal-client');
+    mockDestroy.mockRejectedValueOnce(
+      new KiloClawApiError(404, JSON.stringify({ error: 'upstream gone' }))
+    );
+    const caller = await createCallerForUser(adminUser.id);
+
+    await expect(
+      caller.admin.kiloclawInstances.bulkDestroy({
+        instanceIds: [destroyedInstanceId],
+        confirmation: 'DESTROY',
+      })
+    ).resolves.toMatchObject({
+      destroyed: [],
+      pending: [],
+      skipped: [],
+      failed: [{ instanceId: destroyedInstanceId }],
+    });
+  });
+
+  it('does not target a legacy runtime for a destroyed historical row', async () => {
+    await db
+      .update(kiloclaw_instances)
+      .set({ destroyed_at: new Date().toISOString() })
+      .where(eq(kiloclaw_instances.id, legacyInstanceId));
+    const caller = await createCallerForUser(adminUser.id);
+
+    await expect(
+      caller.admin.kiloclawInstances.bulkDestroy({
+        instanceIds: [legacyInstanceId],
+        confirmation: 'DESTROY',
+      })
+    ).resolves.toMatchObject({
+      destroyed: [],
+      pending: [],
+      skipped: [],
+      failed: [
+        { instanceId: legacyInstanceId, error: 'legacy_destroy_retry_requires_manual_review' },
+      ],
+    });
+    expect(mockDestroy).not.toHaveBeenCalled();
+  });
+
+  it('targets current and legacy instances with their correct worker identifiers', async () => {
+    const caller = await createCallerForUser(adminUser.id);
+
+    const result = await caller.admin.kiloclawInstances.bulkDestroy({
+      instanceIds: [currentInstanceId, legacyInstanceId],
+      confirmation: 'DESTROY',
+    });
+
+    expect(result.destroyed).toEqual(expect.arrayContaining([currentInstanceId, legacyInstanceId]));
+    expect(mockDestroy).toHaveBeenCalledWith(regularUser.id, currentInstanceId, {
+      reason: 'admin_request',
+    });
+    expect(mockDestroy).toHaveBeenCalledWith(regularUser.id, undefined, {
+      reason: 'admin_request',
+    });
+  });
+
+  it('reports missing instances while retrying destroyed instance-keyed rows', async () => {
+    const caller = await createCallerForUser(adminUser.id);
+    const missingInstanceId = crypto.randomUUID();
+
+    const result = await caller.admin.kiloclawInstances.bulkDestroy({
+      instanceIds: [destroyedInstanceId, missingInstanceId],
+      confirmation: 'DESTROY',
+    });
+
+    expect(result).toEqual({
+      destroyed: [],
+      pending: [],
+      skipped: [{ instanceId: destroyedInstanceId, reason: 'already_destroyed' }],
+      failed: [{ instanceId: missingInstanceId, error: 'not_found' }],
+      billing: {
+        canceled: [],
+        notNeeded: [destroyedInstanceId],
+        failed: [{ instanceId: missingInstanceId, error: 'not_found' }],
+      },
+    });
+    expect(mockDestroy).toHaveBeenCalledWith(regularUser.id, destroyedInstanceId, {
+      reason: 'admin_request',
+    });
+  });
+
+  it('reports independent destroy failures without aborting the batch', async () => {
+    mockDestroy
+      .mockResolvedValueOnce({
+        ok: true,
+        finalized: true,
+        destroyedUserId: regularUser.id,
+        destroyedSandboxId: null,
+        pendingMachineId: null,
+        pendingVolumeId: null,
+        lastDestroyErrorOp: null,
+        lastDestroyErrorStatus: null,
+        lastDestroyErrorAt: null,
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        finalized: false,
+        destroyedUserId: null,
+        destroyedSandboxId: null,
+        pendingMachineId: null,
+        pendingVolumeId: 'vol_pending',
+        lastDestroyErrorOp: 'volume',
+        lastDestroyErrorStatus: 412,
+        lastDestroyErrorAt: 1,
+      })
+      .mockRejectedValueOnce(new Error('worker unavailable'));
+
+    const thirdInstanceId = crypto.randomUUID();
+    instanceIds.push(thirdInstanceId);
+    await db.insert(kiloclaw_instances).values({
+      id: thirdInstanceId,
+      user_id: regularUser.id,
+      sandbox_id: `ki_${thirdInstanceId.replace(/-/g, '')}`,
+    });
+
+    const caller = await createCallerForUser(adminUser.id);
+    const result = await caller.admin.kiloclawInstances.bulkDestroy({
+      instanceIds: [currentInstanceId, legacyInstanceId, thirdInstanceId],
+      confirmation: 'DESTROY',
+    });
+
+    expect(result.destroyed).toEqual([currentInstanceId]);
+    expect(result.pending).toEqual([legacyInstanceId]);
+    expect(result.skipped).toEqual([]);
+    expect(result.failed).toEqual([{ instanceId: thirdInstanceId, error: 'worker unavailable' }]);
+    expect(result.billing).toEqual({
+      canceled: [],
+      notNeeded: [currentInstanceId, legacyInstanceId, thirdInstanceId],
+      failed: [],
+    });
+  });
+
+  it('records the requested and per-instance outcomes in the admin audit log', async () => {
+    const caller = await createCallerForUser(adminUser.id);
+    await caller.admin.kiloclawInstances.bulkDestroy({
+      instanceIds: [currentInstanceId],
+      confirmation: 'DESTROY',
+    });
+
+    const [auditLog] = await db
+      .select()
+      .from(kiloclaw_admin_audit_logs)
+      .where(
+        and(
+          eq(kiloclaw_admin_audit_logs.actor_id, adminUser.id),
+          eq(kiloclaw_admin_audit_logs.action, 'kiloclaw.instance.destroy')
+        )
+      );
+
+    expect(auditLog.target_user_id).toBe(adminUser.id);
+    expect(auditLog.metadata).toMatchObject({
+      requestedInstanceIds: [currentInstanceId],
+      destroyedInstanceIds: [currentInstanceId],
+      pendingInstanceIds: [],
+      skipped: [],
+      failed: [],
+      billing: { canceled: [], notNeeded: [currentInstanceId], failed: [] },
+    });
   });
 });
 

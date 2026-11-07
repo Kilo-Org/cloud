@@ -132,6 +132,16 @@ export const kiloExtras = {
     },
   },
   agents: {
+    // `code` is the canonical primary agent in the kilocode CLI config (the
+    // zod schema in packages/opencode/src/config/config.ts uses `code`).
+    code: agentConfig,
+    // Upstream opencode calls this agent `build`; the kilocode CLI still
+    // accepts `build` as an alias for `code`, so keep the key valid but point
+    // schema users at `code`.
+    build: {
+      ...agentConfig,
+      description: "@deprecated Alias of 'code'. Use 'code' instead.",
+    },
     ask: agentConfig,
     debug: agentConfig,
     orchestrator: agentConfig,

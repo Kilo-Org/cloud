@@ -656,9 +656,11 @@ keep environment snapshots and existing history/worktree recovery.
   supplied provenance. A wrapper without the `workspaceSnapshots` capability fails the restore.
 - **Start fresh.** `getWorkspaceSnapshotRecovery` returns the descriptor's capture time only when
   the session's route failed a tail start on the current allocation. `removeWorkspaceSnapshot`
-  deletes the caller's own workspace descriptor, fences pending capture and clears that recovery
-  state; it is idempotent. The next start uses the environment snapshot or the image. Both are
-  authenticated tRPC procedures forwarded through the Session DO.
+  deletes the caller's own workspace descriptor only while that recovery state exists, fences
+  pending capture and clears it; it is idempotent. A newer capture clears the recovery state, so
+  removal never discards a descriptor newer than the one that failed. When the failed allocation is
+  still live, removal stops it, so the next start uses the environment snapshot or the image on a new
+  sandbox. Both are authenticated tRPC procedures forwarded through the Session DO.
 - **Preparation.** The wrapper validates workspace ID, directory and source allocation stamp.
   It preserves local refs, commits, index, dirty/untracked/ignored files, HOME and native databases.
   It skips environment adoption, checkout, setup and start commands, and older file recovery.

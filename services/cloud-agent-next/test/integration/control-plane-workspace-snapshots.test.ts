@@ -910,6 +910,44 @@ describe('idle workspace disk checkpoint', () => {
     test.wrappers.forEach(wrapper => wrapper.close());
   });
 
+  it('fails and stops an early hello when the snapshot start fails permanently', async () => {
+    const test = await setup();
+    await test.checkpoint();
+    await test.cold();
+    const held = Promise.withResolvers<ProviderLaunchResult>();
+    test.controls.launch = () => held.promise;
+    await test.session.send(prompt('m2'));
+    await waitFor(() => expect(test.launchEnvs).toHaveLength(2));
+    const launch = test.launchEnvs[1];
+    const wrapper = await FakeWrapper.connect({
+      sandboxId: test.registration.sandboxId,
+      credential: launch.SANDBOX_CONTROL_CREDENTIAL,
+    });
+    test.wrappers.push(wrapper);
+    await wrapper.hello({
+      wrapperId: 'early',
+      allocationId: launch.CONTROL_PLANE_ALLOCATION_ID,
+      workspaceSnapshots: true,
+    });
+    held.resolve({
+      startSource: 'repository',
+      snapshotFailed: true,
+      snapshotFailureReason: 'expired',
+    });
+    await waitFor(async () => {
+      const route = await runInDurableObject(test.sandbox, instance =>
+        readRoute(instance['db'], test.sessionId)
+      );
+      expect(route).toMatchObject({ state: 'failed', reason: 'workspace_setup_failed' });
+    });
+    expect(test.launchEnvs).toHaveLength(2);
+    expect((await test.sandbox.getAllocationState()).kind).not.toBe('connected');
+    expect(
+      await test.sandbox.getWorkspaceSnapshotRecovery({ sessionId: test.sessionId })
+    ).toMatchObject({ capturedAt: expect.any(Number) });
+    test.wrappers.forEach(wrapper => wrapper.close());
+  });
+
   it('waits for actual image launch confirmation before preparing an early hello', async () => {
     const test = await setup();
     const held = Promise.withResolvers<ProviderLaunchResult>();
@@ -1368,11 +1406,14 @@ describe('idle workspace disk checkpoint', () => {
     expect(await test.sandbox.getWorkspaceSnapshotRecovery({ sessionId: test.sessionId })).toEqual({
       capturedAt,
     });
+    expect((await test.sandbox.getAllocationState()).kind).toBe('connected');
 
     expect(await test.sandbox.removeWorkspaceSnapshot({ sessionId: test.sessionId })).toEqual({
       success: true,
     });
     expect(await test.snapshot()).toBeUndefined();
+    // The sandbox that failed the restore is not adopted by the next start.
+    expect(['stopping', 'stopped']).toContain((await test.sandbox.getAllocationState()).kind);
     const disk = await runInDurableObject(test.sandbox, instance =>
       readWorkspaceSnapshotAllocation(instance['db'])
     );
@@ -1384,6 +1425,34 @@ describe('idle workspace disk checkpoint', () => {
     expect(await test.sandbox.removeWorkspaceSnapshot({ sessionId: test.sessionId })).toEqual({
       success: true,
     });
+    test.wrappers.forEach(wrapper => wrapper.close());
+  });
+
+  it('withdraws Start fresh after a newer capture, so removal keeps it', async () => {
+    const test = await setup();
+    const wrapper = await test.checkpoint();
+    await runInDurableObject(test.sandbox, instance => {
+      const disk = readWorkspaceSnapshotAllocation(instance['db']);
+      if (disk === undefined) throw new Error('Missing snapshot allocation');
+      writeWorkspaceSnapshotAllocation(instance['db'], {
+        ...disk,
+        recovery: { allocationId: disk.allocationId, reason: 'expired', failedAt: Date.now() },
+      });
+    });
+    wrapper.heartbeat(true);
+    await waitFor(async () => {
+      const disk = await runInDurableObject(test.sandbox, instance =>
+        readWorkspaceSnapshotAllocation(instance['db'])
+      );
+      expect(disk?.invalidationGeneration).toBeGreaterThan(0);
+    });
+    wrapper.heartbeat(false);
+    await test.idle(wrapper);
+    await test.alarm();
+    expect(test.captures).toHaveLength(2);
+    await test.sandbox.removeWorkspaceSnapshot({ sessionId: test.sessionId });
+    expect(await test.snapshot()).toMatchObject({ snapshotId: 'session-snapshot' });
+    expect((await test.sandbox.getAllocationState()).kind).toBe('connected');
     test.wrappers.forEach(wrapper => wrapper.close());
   });
 

@@ -50,6 +50,7 @@ import {
   liveWorkspaceRoutes,
   type WorkspaceSnapshotSelectionReason,
 } from './workspace-snapshot.js';
+import { commandFailureNote, promptWithCommandFailureNote } from './command-failure-note.js';
 import { DEFAULT_DO_RETRY_CONFIG, withTimeout } from '@kilocode/worker-utils';
 import { egressPolicySchema, type EgressMode } from '@kilocode/worker-utils/egress-allowlist';
 import { CloudAgentRunContainerSchema } from '@kilocode/worker-utils/cloud-agent-queue-report';
@@ -239,7 +240,6 @@ import {
   type ControlPlaneFailureReason,
   type ControlPlaneKiloRequestInput,
   type ControlPlaneOutcome,
-  type ControlPlanePromptPayload,
   type ControlPlaneRouteSpec,
   type ControlPlaneRouteUpdate,
   type ControlPlaneRouteView,
@@ -399,53 +399,8 @@ const CREDENTIAL_HASH_KEY = 'wrapper_credential_hash';
 const RUNTIME_HARNESS_KEY = 'runtime_harness';
 const OWNER_KEY = 'control_plane_owner';
 const COMMAND_FAILURE_NOTE_KEY_PREFIX = 'command_failure_note:';
-const COMMAND_FAILURE_NOTE_MAX_LENGTH = 2_000;
-const COMMAND_FAILURE_NOTE_HEADER =
-  'Some startup commands failed during session preparation. The session started anyway.';
 
 type PendingCommandFailureNote = { attemptId: string; note: string };
-
-function commandFailureKindLabel(kind: ControlPlaneCommandFailure['kind']): string {
-  switch (kind) {
-    case 'build':
-      return 'Environment build command';
-    case 'session_setup':
-      return 'Session setup command';
-    case 'start':
-      return 'Start command';
-  }
-}
-
-function commandFailureNote(failures: readonly ControlPlaneCommandFailure[]): string {
-  const lines = [COMMAND_FAILURE_NOTE_HEADER];
-  for (const failure of failures) {
-    const status =
-      failure.terminationReason === undefined
-        ? `exited ${failure.exitCode}`
-        : failure.terminationReason;
-    const output = failure.outputTail?.trim();
-    lines.push(
-      `${commandFailureKindLabel(failure.kind)} ${failure.index} (\`${failure.commandText}\`) ${status}.${
-        output === undefined || output.length === 0 ? '' : ` Last output: ${output}`
-      }`
-    );
-  }
-  return lines.join('\n').slice(0, COMMAND_FAILURE_NOTE_MAX_LENGTH);
-}
-
-function promptWithCommandFailureNote(
-  message: ControlPlanePromptPayload,
-  note: string
-): ControlPlanePromptPayload {
-  const existing = message.context?.trim();
-  if (existing === undefined || existing.length === 0) {
-    return { ...message, context: note.slice(0, COMMAND_FAILURE_NOTE_MAX_LENGTH) };
-  }
-  // The existing server context is kept whole; the note uses what room is left.
-  const room = COMMAND_FAILURE_NOTE_MAX_LENGTH - existing.length - 2;
-  if (room < COMMAND_FAILURE_NOTE_HEADER.length) return message;
-  return { ...message, context: `${note.slice(0, room)}\n\n${existing}` };
-}
 
 const ALLOCATION_ROW_ID = 'current';
 
@@ -1304,8 +1259,9 @@ export class SandboxControlV2 extends DurableObject<Env> {
 
   /**
    * Session DO -> Sandbox DO (explicit user "Start fresh"). Removes the
-   * descriptor of the caller's own workspace only. Idempotent: a session with no
-   * route or no descriptor still succeeds.
+   * descriptor of the caller's own workspace only, and only while a recovery
+   * offer exists: a newer capture clears the offer, so this never discards a
+   * descriptor newer than the one the start failed on. Idempotent.
    */
   async removeWorkspaceSnapshot(
     payload: ControlPlaneSessionRefPayload
@@ -1315,19 +1271,33 @@ export class SandboxControlV2 extends DurableObject<Env> {
     return this.enqueue(async () => {
       const owner = this.routeWorkspaceSnapshotIdentity(await readRoute(this.db, parsed.sessionId));
       if (owner === null) return { success: true };
+      const recovery = readWorkspaceSnapshotAllocation(this.db);
+      if (recovery?.owner.workspaceId !== owner.workspaceId || recovery.recovery === undefined)
+        return { success: true };
       deleteWorkspaceSnapshot(this.db, owner.workspaceId, 'user_removed', parsed.sessionId);
       // The explicit action is also the recovery acknowledgement: a later start
       // must not keep offering "Start fresh" for the discarded snapshot.
       this.fenceWorkspaceSnapshot('user_removed', parsed.sessionId);
       const disk = readWorkspaceSnapshotAllocation(this.db);
-      if (disk !== undefined && disk.owner.workspaceId === owner.workspaceId) {
+      if (disk !== undefined) {
         writeWorkspaceSnapshotAllocation(this.db, {
           ...disk,
           restore: undefined,
           recovery: undefined,
         });
       }
-      await this.armAlarm(await this.readAllocation());
+      const state = await this.readAllocation();
+      // The sandbox that failed the restore must not be adopted by the next
+      // start; Start fresh promises a new sandbox.
+      if (recovery.recovery.allocationId === state.allocationId) {
+        await this.applyEvent({
+          type: 'stop-requested',
+          at: Date.now(),
+          reason: 'workspace_setup_failed',
+        });
+        return { success: true };
+      }
+      await this.armAlarm(state);
       return { success: true };
     });
   }
@@ -3246,16 +3216,16 @@ export class SandboxControlV2 extends DurableObject<Env> {
     let pendingNote = await this.pendingCommandFailureNote(payload.sessionId, route.attemptId);
     for (const message of payload.messages) {
       this.fenceWorkspaceSnapshot('prompt', payload.sessionId);
-      const outbound =
-        pendingNote === null ? message : promptWithCommandFailureNote(message, pendingNote);
+      const withNote =
+        pendingNote === null ? null : promptWithCommandFailureNote(message, pendingNote);
       const sent = this.trySendFrame(socket, {
         type: 'session.prompt',
         sessionId: payload.sessionId,
-        payload: outbound,
+        payload: withNote ?? message,
       });
       if (!sent) return 'not_ready';
-      if (pendingNote !== null) {
-        // Consume only after the first prompt carrying the note was handed off.
+      if (withNote !== null) {
+        // Consume only after a prompt carrying the note was handed off.
         await this.consumeCommandFailureNote(payload.sessionId, route.attemptId);
         pendingNote = null;
       }
@@ -5387,13 +5357,16 @@ export class SandboxControlV2 extends DurableObject<Env> {
       const reason: SnapshotStartFailureReason = result.snapshotFailed
         ? (result.snapshotFailureReason ?? 'transient')
         : 'unsupported';
-      if (snapshotStartFailureIsPermanent(reason)) {
-        throw this.snapshotStartFailure(input.selection, reason);
-      }
+      // An owned allocation fails through `failConnectedSnapshotMiss`, which
+      // handles a connected wrapper; the creation fail path does not.
       if (await this.allocationOwnedElsewhere(input.allocationId)) {
         return { result, owned: true };
       }
-      if (attempt >= 2 || Date.now() >= input.launchDeadline)
+      if (
+        snapshotStartFailureIsPermanent(reason) ||
+        attempt >= 2 ||
+        Date.now() >= input.launchDeadline
+      )
         throw this.snapshotStartFailure(input.selection, reason);
       const retry = await this.stopForSnapshotRetry(input.createdRef, input.allocationId);
       if (retry === 'owned') return { result, owned: true };

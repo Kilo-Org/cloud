@@ -438,34 +438,18 @@ function EnvironmentForm({
             Checking profile settings…
           </p>
         ) : (
-          <>
-            {impact.commandProfiles.length > 0 && (
-              <p
-                role="status"
-                className="text-status-warning rounded-md border border-current/20 px-3 py-2 text-xs leading-5"
-              >
-                {existing
-                  ? 'Profile setup commands are skipped'
-                  : 'Profile setup commands will not run'}
-                : {impact.commandProfiles.join(', ')}.{' '}
-                {!hasScript
-                  ? 'No setup script will run.'
-                  : 'Only the environment scripts will run.'}
-              </p>
-            )}
-            {impact.overrides.length > 0 && (
-              <div className="bg-muted rounded-md px-3 py-2 text-xs leading-5">
-                <p className="font-medium">Profile values override these variables:</p>
-                <ul>
-                  {impact.overrides.map(({ key, profileName }) => (
-                    <li key={key} className="break-words">
-                      <code>{key}</code> · {profileName}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </>
+          impact.overrides.length > 0 && (
+            <div className="bg-muted rounded-md px-3 py-2 text-xs leading-5">
+              <p className="font-medium">Profile values override these variables:</p>
+              <ul>
+                {impact.overrides.map(({ key, profileName }) => (
+                  <li key={key} className="break-words">
+                    <code>{key}</code> · {profileName}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )
         )}
         {error && (
           <p role="alert" className="text-destructive text-sm">

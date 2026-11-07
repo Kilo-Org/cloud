@@ -537,6 +537,10 @@ export async function captureIdleWorkspaceSnapshot(input: {
       .values({ workspace_id: data.workspaceId, data })
       .onConflictDoUpdate({ target: workspaceDiskSnapshots.workspace_id, set: { data } })
       .run();
+    // A recovery offer names the descriptor that failed; a newer one replaces it,
+    // so a pending "Start fresh" can never discard this capture.
+    if (current.disk?.recovery !== undefined)
+      writeWorkspaceSnapshotAllocation(input.db, { ...current.disk, recovery: undefined });
     logControlDiagnostic('workspace_snapshot_captured', {
       sandboxId: input.sandboxId,
       workspaceId: data.workspaceId,

@@ -619,9 +619,9 @@ export class SandboxContainers extends DurableObject<Env> {
   /**
    * Run one physical start. A failed snapshot start is reported with its reason
    * so the Sandbox DO can retry the same artifact or fail the route; it is never
-   * retried from the image here. A runtime installer that exited with a typed
-   * code is reported the same way, so the provider maps it to its reason. Every
-   * other failure throws.
+   * retried from the image here. The reason is classified from the error text
+   * only: a container that stops before confirming the main process carries no
+   * exit code, so it is reported as transient. Every other failure throws.
    */
   private async runStart(
     start: ResolvedStart,

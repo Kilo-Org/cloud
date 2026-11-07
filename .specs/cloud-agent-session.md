@@ -95,7 +95,8 @@ repository.
    launches unchanged. Its setup commands MUST run as preparation steps and
    MUST NOT reveal secret values. When several environments contain the
    repository, rules 14 to 16 decide.
-7. While a repository environment applies, profile setup commands MUST NOT run.
+7. While a repository environment applies, profile setup commands run as
+   session setup commands beside the environment's commands (Preparation rule 5).
    Profile variables, and variables and commands sent with the request, still
    apply over the environment.
 8. The new-session form MUST show the chosen repository's environment beside

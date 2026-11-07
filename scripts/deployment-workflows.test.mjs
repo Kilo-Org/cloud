@@ -468,7 +468,7 @@ test('ai-gateway deploys with each scheduled release after migrations', () => {
     '${{ secrets.VERCEL_TOKEN_AI_GATEWAY }}'
   );
 
-  for (const job of ['deploy-workers', 'deploy-gastown-wasteland']) {
+  for (const job of ['deploy-workers']) {
     for (const dependency of ['stage-ai-gateway', 'promote-ai-gateway']) {
       assert.ok(production.jobs[job].needs.includes(dependency), `${job} needs ${dependency}`);
       assert.match(production.jobs[job].if, new RegExp(`needs\\.${dependency}\\.result`));

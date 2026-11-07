@@ -130,7 +130,7 @@ describe('target builders', () => {
   test('organizationTarget/userTarget/serviceTarget use a <type>:<id> reference', () => {
     expect(organizationTarget('org-1')).toBe('organization:org-1');
     expect(userTarget('user-1')).toBe('user:user-1');
-    expect(serviceTarget('wasteland')).toBe('service:wasteland');
+    expect(serviceTarget('cloud-agent')).toBe('service:cloud-agent');
     expect(UNSCOPED_TARGET).toBe('*');
   });
 
@@ -277,7 +277,7 @@ describe('kilo admin elevation telemetry', () => {
     await recordKiloAdminElevationForRequest({
       user: defineTestUser({ is_admin: true, is_super_admin: true }),
       reason: 'service_token_mint',
-      target: serviceTarget('wasteland'),
+      target: serviceTarget('cloud-agent'),
     });
 
     expect(events).toHaveLength(1);
@@ -290,7 +290,7 @@ describe('kilo admin elevation telemetry', () => {
       method: null,
       ip: null,
       reason: 'service_token_mint',
-      target: 'service:wasteland',
+      target: 'service:cloud-agent',
     });
   });
 

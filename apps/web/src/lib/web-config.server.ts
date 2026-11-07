@@ -18,20 +18,6 @@ export const CALLBACK_TOKEN_SECRET = requireEnv(
   getEnvVariable('CALLBACK_TOKEN_SECRET')
 );
 
-export const GASTOWN_CF_ACCESS_CLIENT_ID = getEnvVariable('GASTOWN_SERVICE_CF_ACCESS_CLIENT_ID');
-export const GASTOWN_CF_ACCESS_CLIENT_SECRET = getEnvVariable(
-  'GASTOWN_SERVICE_CF_ACCESS_CLIENT_SECRET'
-);
-
-if (process.env.NODE_ENV === 'production') {
-  if (!GASTOWN_CF_ACCESS_CLIENT_ID) {
-    throw new Error('GASTOWN_CF_ACCESS_CLIENT_ID is required in production');
-  }
-  if (!GASTOWN_CF_ACCESS_CLIENT_SECRET) {
-    throw new Error('GASTOWN_CF_ACCESS_CLIENT_SECRET is required in production');
-  }
-}
-
 /**
  * User-deletion HMAC key. Required because the sign-in/sign-up identity
  * fence HMACs the email on every account creation and provider link, so a

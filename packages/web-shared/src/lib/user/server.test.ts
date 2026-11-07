@@ -1256,7 +1256,6 @@ describe('credential exchange bearer authentication guard', () => {
     ['token source', { tokenSource: '' }],
     ['admin', { isAdmin: false }],
     ['internal use', { internalApiUse: false }],
-    ['gastown access', { gastownAccess: false }],
   ])('rejects a legacy bearer token with a %s marker', async (_name, marker) => {
     const user = await insertTestUser({ api_token_pepper: 'system-marker-pepper' });
     const now = Math.floor(Date.now() / 1000);

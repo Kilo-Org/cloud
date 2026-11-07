@@ -1,8 +1,7 @@
 'use client';
 
 /**
- * Kilo Chat token management — mirrors the Gastown pattern in
- * apps/web/src/lib/gastown/trpc.ts.
+ * Kilo Chat token management.
  *
  * Fetches a short-lived JWT from /api/kilo-chat/token (session-cookie-authed)
  * and caches it in module scope. Refreshes automatically when near expiry.

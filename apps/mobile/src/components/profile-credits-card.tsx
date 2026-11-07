@@ -342,24 +342,25 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
         </View>
       )}
       {balanceFailed && (
-        <Pressable
-          className="min-h-16 justify-center rounded-lg bg-secondary px-3 py-3 active:opacity-70"
-          onPress={() => {
-            refetchUserId();
-            void refetchBalance();
-          }}
-        >
-          <Text className="text-sm text-destructive">{t('profile.failedToLoadBalance')}</Text>
-        </Pressable>
+        <View className={balanceBlockClass}>
+          <Pressable
+            // The retry surface keeps the block's height: a wide card centres
+            // its row's children, so the pressable stretches to the block
+            // instead of collapsing to the height of its one line.
+            className={cn(
+              'justify-center self-stretch active:opacity-70',
+              stackBalance ? undefined : 'flex-1'
+            )}
+            onPress={() => {
+              refetchUserId();
+              void refetchBalance();
+            }}
+          >
+            <Text className="text-sm text-destructive">{t('profile.failedToLoadBalance')}</Text>
+          </Pressable>
+          {addCreditsAction}
+        </View>
       )}
-      {balanceFailed && selectedOrgId == null && (
-        <AddCreditsButton
-          onPress={() => {
-            router.push('/(app)/credits' as Href);
-          }}
-        />
-      )}
-      {balanceFailed && orgAddCreditsAction}
       {!showBalanceSkeleton && !balanceFailed && (
         <View className={balanceBlockClass}>
           <Animated.View

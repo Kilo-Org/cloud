@@ -322,10 +322,10 @@ async function choose(renderer: ReactTestRenderer, label: string) {
   });
 }
 
-/** The header container's classes: the only View the card gives `min-h-11`. */
+/** The header container's classes: the only View the card gives `min-h-11 gap-3`. */
 function headerClasses(renderer: ReactTestRenderer): string[] {
   const header = renderer.root.find(
-    node => Object.is(node.type, 'View') && String(node.props.className).includes('min-h-11')
+    node => Object.is(node.type, 'View') && String(node.props.className).includes('min-h-11 gap-3')
   );
   return String(header.props.className).split(' ');
 }
@@ -924,6 +924,36 @@ describe('CreditsCard balance state', () => {
     }
   });
 
+  it('keeps the symbol in front of the amount in a right-to-left language', async () => {
+    currentUser.userId = 'user-A';
+    getContextBalanceQueryFn.mockResolvedValue({ balance: 10 });
+    await i18n.changeLanguage('ar');
+    try {
+      const { renderer, texts, unmount } = await mountCard();
+      let amount = '';
+      await waitFor(() => {
+        amount = texts().find(text => text.includes('$')) ?? '';
+        return amount.length > 0;
+      });
+      // The formatter's own pattern for this language puts the currency behind
+      // the number ("0.00 $"), so the same balance read as a different figure
+      // than the "$0.00" the other cells paint (design review, Profile rtl
+      // cell, 2026-11-07). The digits stay the locale's.
+      expect(amount.startsWith('$')).toBe(true);
+      expect(amount).not.toContain('\u00A0');
+      expect(amount).not.toContain(' ');
+      // The run also carries its own direction, so the symbol cannot move
+      // behind the number in a right-to-left paragraph.
+      const amountNode = renderer.root.find(
+        node => Object.is(node.type, 'Text') && node.children.includes(amount)
+      );
+      expect(amountNode.props.style).toEqual({ direction: 'ltr', writingDirection: 'ltr' });
+      unmount();
+    } finally {
+      await i18n.changeLanguage('en');
+    }
+  });
+
   it('shows the nearest paid or bonus deadline and masks its amount with the balance', async () => {
     currentUser.userId = 'user-A';
     getContextBalanceQueryFn.mockResolvedValue({ balance: 65 });
@@ -1182,13 +1212,28 @@ describe('CreditsCard add-credits entry point', () => {
     ).toBeGreaterThan(0);
 
     // No layout pass runs in this suite, so the card stays in its stacked
-    // layout, where the block is a column: the retry surface keeps its own
-    // height there, and the block comes out as tall as the skeleton and the
-    // loaded row only while that surface holds the same content floor they do.
-    const retrySurface = balanceBlock.find(node =>
-      String(node.props.className ?? '').includes('min-h-[48px]')
+    // layout: the block is the control row with the note under it. The retry
+    // surface fills that row, whose 44 dp floor is the height the loaded row
+    // holds, so a retry that succeeds swaps content inside the same frame.
+    const retryRow = balanceBlock.find(node =>
+      String(node.props.className ?? '').includes('min-h-[44px] flex-row items-center')
+    );
+    expect(
+      retryRow.findAll(node => node.children.includes('Failed to load balance. Tap to retry.'))
+        .length
+    ).toBeGreaterThan(0);
+    expect(
+      retryRow.findAll(node => node.children.includes('ADD_CREDITS_ROW')).length
+    ).toBeGreaterThan(0);
+    const retrySurface = retryRow.find(node =>
+      String(node.props.className ?? '').includes('self-stretch')
     );
     expect(retrySurface.props.onPress).toBeTypeOf('function');
+    // The note reads the credit blocks, not the balance, so the failed block
+    // keeps that line too and the block holds its height.
+    expect(
+      balanceBlock.findAll(node => node.children.includes('No expiring credits.')).length
+    ).toBe(1);
 
     unmount();
   });
@@ -1246,12 +1291,12 @@ describe('CreditsCard balance row', () => {
     );
   }
 
-  /** The amount row of the stacked layout: the amount and the hide/show toggle. */
+  /** The control row of the stacked layout: the amount, the toggle and the action. */
   function amountRow(renderer: ReactTestRenderer): ReactTestInstance {
     return renderer.root.find(
       node =>
         Object.is(node.type, 'View') &&
-        String(node.props.className) === 'min-w-0 flex-row items-center gap-1'
+        String(node.props.className) === 'min-w-0 min-h-[44px] flex-row items-center gap-1'
     );
   }
 
@@ -1301,21 +1346,25 @@ describe('CreditsCard balance row', () => {
     // three lines, so both stack instead.
     ['the compact cell', 332],
     ['a 390 dp screen', 362],
-  ])('gives the note its own row under the amount on %s', async (_name, width) => {
-    const { renderer, unmount } = await mountAtCardWidth(width);
+  ])(
+    'keeps the amount, its toggle and the action on one line with the note under it on %s',
+    async (_name, width) => {
+      const { renderer, unmount } = await mountAtCardWidth(width);
 
-    const classes = balanceClasses(renderer);
-    expect(classes).toContain('items-stretch');
-    expect(classes).not.toContain('flex-row');
-    // Row 1 is the amount and the toggle; the note follows it at the card's
-    // full width and the purchase action takes the row below the note, so the
-    // amount keeps the tight gap under it that the wide cells show.
-    const row = amountRow(renderer);
-    expect(renders(row, 'No expiring credits.')).toBe(false);
-    expect(renders(row, 'ADD_CREDITS_BUTTON')).toBe(false);
-    const card = cardBox(renderer);
-    expect(renders(card, 'No expiring credits.')).toBe(true);
-    expect(renders(card, 'ADD_CREDITS_BUTTON')).toBe(true);
-    unmount();
-  });
+      const classes = balanceClasses(renderer);
+      expect(classes).toContain('items-stretch');
+      expect(classes).not.toContain('flex-row');
+      // A stacked card keeps the card compact: the amount, its visibility toggle
+      // and the purchase action share one control line, and the note takes the
+      // row under it at the card's full width. The action used to own a band
+      // below the note, which left the card half empty and its two ends unevenly
+      // padded (design review, Profile compact cell, 2026-11-07).
+      const row = amountRow(renderer);
+      expect(renders(row, 'ADD_CREDITS_BUTTON')).toBe(true);
+      expect(renders(row, 'No expiring credits.')).toBe(false);
+      const card = cardBox(renderer);
+      expect(renders(card, 'No expiring credits.')).toBe(true);
+      unmount();
+    }
+  );
 });

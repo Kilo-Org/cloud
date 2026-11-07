@@ -16,7 +16,19 @@ export const onlineHost: NativePresenceState['instances'][number] = {
 export const readySession: NativeSessionState = {
   connection: 'connected',
   runnerConnected: true,
-  messages: [{ id: 'message-1', role: 'assistant', content: [{ text: 'Snapshot hello' }], seq: 1 }],
+  session: { id: 'ses-first', origin: { directory: '/sample' }, time: { created: 1, updated: 1 } },
+  messages: [
+    {
+      message: {
+        id: 'msg_snapshot',
+        type: 'assistant',
+        time: { created: 1 },
+        content: [{ type: 'text', text: 'Snapshot hello' }],
+      },
+      seq: 1,
+    },
+  ],
+  pending: { permissions: [], questions: [] },
   events: [],
   commands: {},
 };

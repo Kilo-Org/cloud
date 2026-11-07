@@ -20,6 +20,7 @@ import {
   arrivalAllowed,
   validateReceipt,
   assertReceiptRetry,
+  populationMatches,
 } from './perf-common.mjs';
 import { observeSDKSource } from './perf-sdk-hooks.mjs';
 import { WebSocket as RawWebSocket } from 'ws';
@@ -51,6 +52,12 @@ assert(
   ),
   'Saved session identity must match this shard and run'
 );
+assert.equal(
+  sessions.length,
+  Math.max(0, Math.ceil((config.sessions - config.shard) / config.shards)),
+  'Saved shard must contain its entire declared session population'
+);
+assert.equal(new Set(sessions.map(s => s.index)).size, sessions.length);
 const selected =
   role === 'sdk'
     ? sessions.filter(s => s.index < config.sdkViewers)
@@ -69,12 +76,17 @@ const selected =
           )
       : sessions;
 const watched = sessions.filter(s => s.index < config.watched);
+const streaming = sessions.filter(s => s.index < config.streamingSources);
 const stats = {
   version: 1,
   role,
   shard: config.shard,
   runID: config.runID,
   started: Date.now(),
+  sourceTrafficMode: config.sourceTrafficMode,
+  streamingSources: streaming.length,
+  watchedSessions: watched.length,
+  offeredEventsPerSecond: streaming.length * config.eventHz,
   requestCount: 0,
   inFlight: 0,
   peakInFlight: 0,
@@ -623,16 +635,31 @@ async function viewer(s) {
 function sample() {
   if (existsSync(`${config.root}/stop.json`)) stop('cluster_abort');
   pending.expire(performance.now());
-  const population = { presence: 0, runners: 0, viewers: 0, watched: 0 };
+  const population = {
+    presence: 0,
+    runners: 0,
+    streamingSources: 0,
+    viewers: 0,
+    sdkViewers: 0,
+    watched: 0,
+  };
   for (const entry of live.values()) {
     if (entry.presence) population.presence++;
-    if (entry.runner) population.runners++;
-    if (entry.ready) population.viewers++;
+    if (entry.runner) {
+      population.runners++;
+      population.streamingSources++;
+    }
+    if (entry.ready) {
+      population.viewers++;
+      if (role === 'sdk') population.sdkViewers++;
+    }
     if (entry.watching) population.watched++;
   }
   stats.live = population;
   const row = {
     at: Date.now(),
+    role,
+    shard: config.shard,
     ...population,
     requests: stats.inFlight,
     pending: pending.entries.size,
@@ -649,9 +676,12 @@ function sample() {
     failed: failure,
     ready:
       role === 'producer'
-        ? population.presence === sessions.length &&
-          population.runners === watched.length &&
-          population.watched === watched.length
+        ? populationMatches(population, {
+            presence: sessions.length,
+            runners: streaming.length,
+            streamingSources: streaming.length,
+            watched: watched.length,
+          })
         : population.viewers === selected.length,
   });
 }
@@ -685,7 +715,7 @@ try {
           if (frame.type === 'watch' && frame.body.sessionID === s.id)
             entry.watching = frame.body.watching;
         });
-        if (s.index < config.watched) entry.runnerSocket = await remote(s);
+        if (s.index < config.streamingSources) entry.runnerSocket = await remote(s);
       } else await viewer(s);
     });
     const heartbeatTimer =
@@ -749,7 +779,7 @@ try {
     while (Date.now() < window.sendUntil && !stopping) {
       if (role === 'producer') {
         const now = Date.now();
-        for (const s of watched) {
+        for (const s of streaming) {
           const period = 1000 / config.eventHz;
           let scheduled =
             window.startAt + ((s.index % 100) / 100) * period * 0.9 + s.counter * period;
@@ -767,7 +797,12 @@ try {
             const entry = entryFor(s);
             const buffered = entry.runnerSocket.bufferedAmount;
             stats.maxBufferedBytes = Math.max(stats.maxBufferedBytes, buffered);
-            if (!entry.runner || !entry.watching || buffered > config.maxBufferedBytes) {
+            // Synthetic all-streaming-sources overload; real CLI watch suppression is unchanged.
+            if (
+              !entry.runner ||
+              (s.index < config.watched && !entry.watching) ||
+              buffered > config.maxBufferedBytes
+            ) {
               stop('source_unavailable_or_backpressure');
               break;
             }
@@ -833,6 +868,17 @@ try {
       }
     if (role === 'producer' && !stopping) {
       await pool(selected, async s => {
+        if (s.index < config.streamingSources)
+          assert.equal(
+            s.counter,
+            (config.warmSeconds + config.measuredSeconds) * config.eventHz,
+            'Every streaming source must emit every scheduled slot'
+          );
+        assert.equal(
+          s.committed,
+          s.counter,
+          'Final durable checkpoint must cover every source send'
+        );
         const state = await request(s, `/v1/sessions/${s.id}`);
         assert.equal(state.position, s.position);
         assert.equal(state.revision, s.revision);

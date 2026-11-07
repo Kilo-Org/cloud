@@ -5,7 +5,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import { z } from 'zod';
 import { fileURLToPath } from 'node:url';
 import { assertGenerator, checkWatchdog } from './perf-identity.mjs';
-import { finalizeClusterResult } from './perf-common.mjs';
+import { finalizeClusterResult, populationMatches } from './perf-common.mjs';
 
 const safePath = z.string().regex(/^\/[a-zA-Z0-9_./-]+$/);
 const nodeSchema = z.strictObject({
@@ -23,6 +23,10 @@ const schema = z.strictObject({
   nodes: z.array(nodeSchema).min(1).max(4),
   stopAt: z.number(),
   sessions: z.number().int().positive().max(100000),
+  streamingSources: z.number().int().positive().max(100000),
+  sourceTrafficMode: z.literal('all-streaming-sources'),
+  eventHz: z.number().int().positive().max(20),
+  sdkViewers: z.number().int().nonnegative().max(10000),
   watched: z.number().int().positive().max(10000),
   viewerConnections: z.number().int().positive().max(10000),
   warmSeconds: z.literal(10),
@@ -35,6 +39,8 @@ const schema = z.strictObject({
 });
 const [file] = process.argv.slice(2);
 const plan = schema.parse(JSON.parse(readFileSync(file, 'utf8')));
+assert(plan.watched <= plan.streamingSources && plan.streamingSources <= plan.sessions);
+assert(plan.sdkViewers <= plan.viewerConnections);
 for (const node of plan.nodes) {
   assertGenerator(node);
   for (const path of node.configs)
@@ -149,7 +155,19 @@ async function watchdog() {
 const start = Date.now();
 let window;
 let completed = false;
-const result = { runID: plan.runID, workloadPassed: false, passed: false };
+const result = {
+  runID: plan.runID,
+  sourceTrafficMode: plan.sourceTrafficMode,
+  sessions: plan.sessions,
+  streamingSources: plan.streamingSources,
+  watched: plan.watched,
+  sdkViewers: plan.sdkViewers,
+  viewerConnections: plan.viewerConnections,
+  offeredEventsPerSecond: plan.streamingSources * plan.eventHz,
+  expectedMeasuredEvents: plan.streamingSources * plan.eventHz * plan.measuredSeconds,
+  workloadPassed: false,
+  passed: false,
+};
 let failure;
 try {
   await watchdog();
@@ -182,14 +200,24 @@ try {
     ready,
     'Simultaneous fresh population deadline; close every source without waiting on billing'
   );
-  assert.equal(
-    ready.reduce((sum, row) => sum + row.presence, 0),
-    plan.sessions
-  );
-  assert.equal(
-    ready.reduce((sum, row) => sum + row.viewers, 0),
-    plan.viewerConnections,
-    'Declared viewer population must be simultaneously live'
+  const expectedPopulation = {
+    presence: plan.sessions,
+    runners: plan.streamingSources,
+    streamingSources: plan.streamingSources,
+    watched: plan.watched,
+    viewers: plan.viewerConnections,
+    sdkViewers: plan.sdkViewers,
+  };
+  const totalPopulation = rows =>
+    Object.fromEntries(
+      Object.keys(expectedPopulation).map(key => [
+        key,
+        rows.reduce((sum, row) => sum + row[key], 0),
+      ])
+    );
+  assert(
+    populationMatches(totalPopulation(ready), expectedPopulation),
+    'Declared source, watch and actual SDK populations must be simultaneously live'
   );
   const startAt = Date.now() + 3000;
   window = {
@@ -209,13 +237,9 @@ try {
       'Generator failed or status became stale'
     );
     if (Date.now() >= window.startAt && Date.now() < window.sendUntil) {
-      assert.equal(
-        samples.reduce((sum, row) => sum + row.presence, 0),
-        plan.sessions
-      );
-      assert.equal(
-        samples.reduce((sum, row) => sum + row.viewers, 0),
-        plan.viewerConnections
+      assert(
+        populationMatches(totalPopulation(samples), expectedPopulation),
+        'Source, watch or viewer population dropped during the send window'
       );
     }
     await sleep(250);
@@ -233,13 +257,23 @@ try {
   Object.assign(result, {
     window,
     clockErrorBoundMs: plan.clockErrorBoundMs,
+    readiness: totalPopulation(ready),
     summaries,
     measuredProducerSends: summaries.reduce(
       (sum, summary) => sum + summary.measuredProducerSends,
       0
     ),
+    sourceUnsentEvents: summaries.reduce((sum, summary) => sum + summary.sourceUnsentEvents, 0),
+    durableCommittedPrefixEvents: summaries.reduce(
+      (sum, summary) => sum + summary.durableCommittedPrefixEvents,
+      0
+    ),
+    reconciledReceipts: summaries.reduce((sum, summary) => sum + summary.reconciledReceipts, 0),
   });
-  assert.equal(result.measuredProducerSends, plan.watched * 10 * 45);
+  assert.equal(
+    result.measuredProducerSends,
+    plan.streamingSources * plan.eventHz * plan.measuredSeconds
+  );
   result.workloadPassed = true;
   completed = true;
 } catch (error) {

@@ -46,17 +46,11 @@ const connected: NativeSessionState = {
   connection: 'connected',
   runnerConnected: true,
   messages: [],
-  events: [
-    {
-      v: 1,
-      channel: 'control',
-      seq: 1,
-      from: 'runner',
-      at: 1,
-      type: 'remote.state',
-      body: { pending: { permissions: [{ requestID: 'old-permission', tool: 'shell' }] } },
-    },
-  ],
+  pending: {
+    permissions: [{ id: 'old-permission', action: 'shell', resources: [] }],
+    questions: [],
+  },
+  events: [],
   commands: { 'old-command': 'delivered' },
 };
 

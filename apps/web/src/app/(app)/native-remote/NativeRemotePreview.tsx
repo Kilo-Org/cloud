@@ -4,6 +4,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useInfiniteQuery, useMutation, useQuery } from '@tanstack/react-query';
 import {
   NativeSyncClient,
+  listNativeModels,
+  readNativeConversation,
+  type NativePendingQuestion,
   type NativePresenceState,
   type NativeSessionState,
   type NativePresenceConnection,
@@ -13,25 +16,18 @@ import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  commandResult,
-  commandRunner,
-  pendingRequests,
-  transcriptText,
-  sendNativePrompt,
-  type PendingQuestion,
-} from './native-remote-events';
+import { useUrlOrganizationId } from '@/hooks/useUrlOrganizationId';
+import { CloudReadOnlyThread } from '@/components/cloud-agent-next/assistant-ui/CloudThread';
+import { commandResult, commandRunner, sendNativePrompt } from './native-remote-events';
 
 const tokenSchema = z.object({ token: z.string() });
 const directoriesSchema = z.object({
   directory: z.string(),
   directories: z.array(z.object({ name: z.string(), directory: z.string() })),
 });
-const modelsSchema = z.object({
-  models: z.array(z.object({ id: z.string(), providerID: z.string(), name: z.string() })),
-});
 const agentsSchema = z.object({ agents: z.array(z.object({ id: z.string(), name: z.string() })) });
 const createdSchema = z.object({ sessionID: z.string() });
+type NativeSelection = { id: string; organizationID?: string };
 
 async function getCredential() {
   const response = await fetch('/api/native-remote/token', { method: 'POST', cache: 'no-store' });
@@ -40,6 +36,11 @@ async function getCredential() {
 }
 
 export default function NativeRemotePreview() {
+  const organizationID = useUrlOrganizationId() ?? undefined;
+  return <NativeRemoteScope key={organizationID ?? 'personal'} organizationID={organizationID} />;
+}
+
+function NativeRemoteScope({ organizationID }: { organizationID: string | undefined }) {
   const client = useMemo(
     () =>
       new NativeSyncClient({
@@ -57,8 +58,12 @@ export default function NativeRemotePreview() {
   const [directory, setDirectory] = useState('');
   const [model, setModel] = useState('');
   const [agent, setAgent] = useState('');
-  const [session, setSession] = useState<{ id: string; organizationID?: string }>();
-  const [state, setState] = useState<NativeSessionState>();
+  const [session, setSession] = useState<NativeSelection>();
+  const [sessionState, setSessionState] = useState<{
+    selection: NativeSelection;
+    state: NativeSessionState;
+  }>();
+  const state = sessionState?.selection === session ? sessionState?.state : undefined;
   const sessionRef = useRef<NativeSessionConnection | null>(null);
   const [prompt, setPrompt] = useState('');
   const [queue, setQueue] = useState(false);
@@ -68,19 +73,27 @@ export default function NativeRemotePreview() {
   const selected = online.find(instance => instance.instanceID === instanceID);
 
   useEffect(() => {
-    const connection = client.connectPresence(setPresence);
+    const connection = client.connectPresence(setPresence, organizationID);
     presenceRef.current = connection;
     return () => {
       presenceRef.current = null;
       connection.close();
     };
-  }, [client]);
+  }, [client, organizationID]);
   useEffect(() => {
-    setState(undefined);
+    setSessionState(undefined);
     if (!session) return;
-    const connection = client.connectSession(session.id, setState, session.organizationID);
+    let active = true;
+    const connection = client.connectSession(
+      session.id,
+      value => {
+        if (active) setSessionState({ selection: session, state: value });
+      },
+      session.organizationID
+    );
     sessionRef.current = connection;
     return () => {
+      active = false;
       sessionRef.current = null;
       connection.close();
     };
@@ -94,12 +107,13 @@ export default function NativeRemotePreview() {
     refetchInterval: 10000,
   });
   const discovery = useQuery({
-    queryKey: ['native-remote', 'discovery', instanceID],
+    queryKey: ['native-remote', 'discovery', organizationID, instanceID],
     enabled: Boolean(selected),
+    retry: false,
     queryFn: async () => {
       const connection = presenceRef.current;
       if (!connection) throw new Error('Host connection unavailable');
-      const call = async (type: 'list_directories' | 'list_models' | 'list_agents') => {
+      const call = async (type: 'list_directories' | 'list_agents') => {
         const reply = await connection.command(instanceID, type, {});
         if (reply.status === 'unknown')
           throw new Error('Discovery outcome unknown. Refresh to try again.');
@@ -107,12 +121,12 @@ export default function NativeRemotePreview() {
       };
       const [directories, models, agents] = await Promise.all([
         call('list_directories'),
-        call('list_models'),
+        listNativeModels(connection, instanceID),
         call('list_agents'),
       ]);
       return {
         directories: directoriesSchema.parse(directories),
-        models: modelsSchema.parse(models),
+        models: { models },
         agents: agentsSchema.parse(agents),
       };
     },
@@ -156,7 +170,8 @@ export default function NativeRemotePreview() {
     if (!connection || !prompt.trim()) return;
     if (await run('prompt', () => sendNativePrompt(connection, prompt, queue))) setPrompt('');
   }
-  const pending = pendingRequests(state?.events ?? []);
+  const conversation = useMemo(() => (state ? readNativeConversation(state) : undefined), [state]);
+  const pending = conversation?.pending ?? { permissions: [], questions: [] };
   const canControl = state?.connection === 'connected' && state.runnerConnected;
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-6">
@@ -250,6 +265,10 @@ export default function NativeRemotePreview() {
                 </option>
               ))}
             </datalist>
+            {discovery.isPending && <p role="status">Loading host options…</p>}
+            {discovery.isSuccess && discovery.data.models.models.length === 0 && (
+              <p className="text-muted-foreground">No models advertised. Using the host default.</p>
+            )}
             <label>
               Model
               <select
@@ -315,17 +334,22 @@ export default function NativeRemotePreview() {
             {state?.runnerConnected ? 'online' : 'offline'}
           </p>
           <div className="max-h-96 space-y-3 overflow-auto" aria-live="polite">
-            {state?.messages.map(message => (
-              <article key={message.id}>
-                <h3 className="text-muted-foreground text-xs">
-                  {message.role}
-                  {message.incomplete ? ' · streaming' : ''}
-                </h3>
-                <pre className="whitespace-pre-wrap break-words font-sans text-sm">
-                  {transcriptText(message.content)}
-                </pre>
-              </article>
-            ))}
+            {(!conversation || conversation.loading) && <p role="status">Loading transcript…</p>}
+            {conversation?.session && (
+              <CloudReadOnlyThread
+                messages={conversation.messages}
+                isStreaming={conversation.messages.some(
+                  message =>
+                    message.info.role === 'assistant' && message.info.time.completed === undefined
+                )}
+                presentationMode="live"
+              />
+            )}
+            {conversation?.session &&
+              conversation.messages.length === 0 &&
+              conversation.incompleteMessageIDs.length === 0 && (
+                <p className="text-muted-foreground text-sm">This session has no messages yet.</p>
+              )}
           </div>
           {pending.permissions.map(request => (
             <div className="space-y-2 rounded border p-3" key={request.id}>
@@ -421,7 +445,7 @@ export default function NativeRemotePreview() {
               Clear local view
             </Button>
           </div>
-          {(error || state?.error) && <p role="alert">{error || state?.error}</p>}
+          {(error || conversation?.error) && <p role="alert">{error || conversation?.error}</p>}
           {commandID && <p className="break-all text-sm">Last command: {commandID}</p>}
           <ul className="text-muted-foreground text-xs">
             {Object.entries(state?.commands ?? {}).map(([id, status]) => (
@@ -449,7 +473,7 @@ function Question({
   reply,
   reject,
 }: {
-  question: PendingQuestion;
+  question: NativePendingQuestion;
   disabled: boolean;
   reply: (answers: string[][]) => void;
   reject: () => void;
@@ -463,7 +487,7 @@ function Question({
         reply(answers);
       }}
     >
-      <h3>{question.title}</h3>
+      <h3>{question.title ?? 'Question'}</h3>
       {question.fields.map((field, index) => (
         <label className="block" key={field.key}>
           {field.title ?? field.description ?? field.key}

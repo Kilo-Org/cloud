@@ -1464,8 +1464,10 @@ A contained handle is also bound to the sandbox egress that sends it. The platfo
 Containers outbound handler sets it on requests to the facade origin and replaces any value from
 the sandbox. On Vercel, each runtime-proxy injection rule injects it with the handle. The Sandbox
 DO denies a handle without its own proof, so a copied handle fails from another host or through
-another sandbox. Allocations that started before this check are exempt until they stop. The
-facade removes the header before the upstream call.
+another sandbox. Allocations that started before this check are exempt until they stop. A local
+development facade (`http://host.docker.internal:<port>`) is also exempt: local workerd
+intercepts container egress only on ports 80 and 443, so local facade requests never get a proof.
+The facade removes the header before the upstream call.
 
 Because the handle is scope-wide, revoking one member's handle no longer stops another member's
 in-flight model calls while a surviving member can still serve; that member's **new** sends are still

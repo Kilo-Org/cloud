@@ -48,4 +48,20 @@ describe('runtimeProxyOriginAdmitted', () => {
     markRuntimeProxyOriginAllocation(storage, null);
     expect(await check('alloc-2', 'egress-1')).toBe(true);
   });
+
+  it('exempts a local development facade, which container egress does not intercept', async () => {
+    const storage = memoryStorage();
+    markRuntimeProxyOriginAllocation(storage, 'alloc-1');
+    const check = (workerUrl: string) =>
+      runtimeProxyOriginAdmitted({
+        storage,
+        env: { ...env, WORKER_URL: workerUrl },
+        allocationId: 'alloc-1',
+        outboundId: 'egress-1',
+        presented: undefined,
+      });
+    expect(await check('http://host.docker.internal:8794')).toBe(true);
+    expect(await check('http://localhost:8794')).toBe(true);
+    expect(await check('https://cloud-agent.example.com')).toBe(false);
+  });
 });

@@ -36,9 +36,9 @@ def classifier_evidence(prompt="0.000000042", completion="0", context=262144):
 
 
 def arms_spec(fixed=None):
-    """Synthetic v4 arm/objective fixture pieces."""
+    """Synthetic v5 arm/objective fixture pieces."""
     fixed = fixed or {mode: [{"model": "x/y", "variant": "variant=low"}] for mode in ("efficient", "frontier")}
-    return {"fixed_models": fixed, "control": {"seed": "control-seed", "distribution": {mode: [{"model": fixed[mode][0]["model"], "variant": fixed[mode][0]["variant"], "weight": "1"}] for mode in fixed}, "cost_matching": {"criterion": "total-cost-ratio-vs-reference", "reference_arm": "candidate", "tolerance_fraction": "0.1"}}, "objectives": {"efficient": {"kind": "efficient-minimize-cost-preserve-success", "success_floor": {"type": "baseline-relative"}}, "frontier": {"kind": "frontier-maximize-success-within-cost", "cost_budget": {"type": "comparator-relative"}}}, "pilot_cap_usd": "5"}
+    return {"fixed_models": fixed, "control": {"seed": "control-seed", "distribution": {mode: [{"model": fixed[mode][0]["model"], "variant": fixed[mode][0]["variant"], "weight": "1"}] for mode in fixed}, "cost_matching": {"criterion": "total-cost-ratio-vs-reference", "reference_arm": "candidate", "tolerance_fraction": "0.1"}}, "objectives": {"efficient": {"kind": "efficient-minimize-cost-preserve-success", "success_floor": {"type": "baseline-relative"}}, "frontier": {"kind": "frontier-maximize-success-within-cost", "cost_budget": {"type": "comparator-relative"}}}, "pilot_cap_usd": "60"}
 
 
 def task_expectations(instance="task"):
@@ -699,12 +699,12 @@ class PinnedDriverAdapters(unittest.TestCase):
 class ProspectiveBudget(unittest.TestCase):
     FINANCE_CFG = {"run_cost_limit_usd": "3", "step_limit": 2, "max_input_tokens": 100, "max_output_tokens": 10, "wall_seconds": 1800, "action_timeout_seconds": 180}
 
-    def fixture(self, root):
-        ledger, _ = prospective_campaign(root)
+    def fixture(self, root, additional=SYNTHETIC_ADDITIONAL):
+        ledger, _ = prospective_campaign(root, additional=additional)
         out = root / "study"
         configs = [{"id": mode, "router": mode} for mode in ("efficient", "frontier")]
         spec = {"prospective_grant_id": "bounded-two", "campaign_ledger": str(ledger), "experiment_id": "bounded", "seed": "frozen", "repetitions": 2, "tasks": {"tuning": ["pilot-task"], "final": ["holdout"]}, "configurations": configs, "classifier_fee_fraction": "0.06", "resources": {}, **arms_spec()}
-        manifest = {"version": 4, "out_root": str(out), "spec": spec, "approval": {"execution_identity": {version: {"executableSha256": "bundle"} for version in ("baseline", "candidate")}, "mode_pools": {mode: [["x/y", "variant=low"]] for mode in ("efficient", "frontier")}}}
+        manifest = {"version": router_study.SPEC_VERSION, "out_root": str(out), "spec": spec, "approval": {"execution_identity": {version: {"executableSha256": "bundle"} for version in ("baseline", "candidate")}, "mode_pools": {mode: [["x/y", "variant=low"]] for mode in ("efficient", "frontier")}}}
         candidates = []
         for item in configs:
             snapshot = {"baseline": {"real": True}, "candidate": {"mode": item["router"]}}
@@ -743,28 +743,28 @@ class ProspectiveBudget(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Unsafe batch identity"):
             router_study.read_quote(Path("unused"), "../escape", {}, {})
 
-    def test_no_paid_claim_before_whole_plan_financing_is_registered(self):
+    def test_no_paid_claim_before_whole_plan_cost_forecast_is_registered(self):
         with tempfile.TemporaryDirectory() as temporary:
             ledger, out, manifest, plan = self.fixture(Path(temporary))
             budget = router_study.Budget(ledger, {"study": load_study()})
             self.assertEqual(budget.allowance("pilot"), Decimal(SYNTHETIC_BASELINE) + Decimal(SYNTHETIC_ADDITIONAL))
             self.assertEqual(budget.allowance("final"), budget.allowance("pilot"))
-            self.assertEqual(budget.claim(plan["runs"][0], manifest, {"run_cost_limit_usd": "3"}), "whole_plan_not_financed")
+            self.assertEqual(budget.claim(plan["runs"][0], manifest, {"run_cost_limit_usd": "3"}), "cost_forecast_missing")
             self.assertIsNone(router_study.run_state(ledger, plan["runs"][0]["run"]))
 
-    def test_admission_uses_financed_envelopes_and_never_resets_history(self):
+    def test_admission_records_run_cap_without_reserving_it_and_never_resets_history(self):
         with tempfile.TemporaryDirectory() as temporary:
             ledger, out, manifest, plan = self.fixture(Path(temporary))
             financing = self.financing(manifest, plan)
             self.register_financing(ledger, financing)
             budget = router_study.Budget(ledger, {"study": load_study()}, financing=financing)
-            envelopes = {row["run"]: row["envelope_usd"] for row in financing["rows"]}
-            self.assertLess(Decimal(financing["pilot_envelope_usd"]), Decimal("5"))
+            self.assertLess(Decimal(financing["pilot_envelope_usd"]), Decimal("60"))
             for row in plan["runs"][:2]:
                 self.assertIsNone(budget.claim(row, manifest, {"run_cost_limit_usd": "3"}))
             with sqlite3.connect(ledger) as db:
                 recorded = dict(db.execute("SELECT run,maximum_usd FROM campaign_admissions"))
-                self.assertEqual(recorded, {row["run"]: envelopes[row["run"]] for row in plan["runs"][:2]})
+                self.assertEqual(recorded, {row["run"]: "3" for row in plan["runs"][:2]})
+                self.assertEqual(db.execute("SELECT COUNT(*) FROM requests WHERE id!='historical-held'").fetchone()[0], 0)
                 db.execute("UPDATE router_runs SET state='finished'")
                 self.assertEqual(db.execute("SELECT state,bound FROM requests WHERE id='historical-held'").fetchone(), ("unknown", SYNTHETIC_BASELINE))
             fixed = next(row for row in plan["runs"] if row["arm_kind"] == "fixed")
@@ -774,23 +774,26 @@ class ProspectiveBudget(unittest.TestCase):
                 self.assertIsNone(budget.claim(control, manifest, {"run_cost_limit_usd": "3"}))
                 self.assertEqual(budget.claim(fixed, manifest, {"run_cost_limit_usd": "3"}), "never_retry_content_attempt")
 
-    def test_oversubscribed_whole_plan_and_pilot_no_go_block_registration(self):
+    def test_forecast_above_allowance_registers_and_still_requires_registration(self):
         with tempfile.TemporaryDirectory() as temporary:
             ledger, out, manifest, plan = self.fixture(Path(temporary))
             oversubscribed = self.financing(manifest, plan, prompt="0.005", completion="0.01", classifier="0")
             self.assertGreater(Decimal(oversubscribed["total_envelope_usd"]), Decimal(SYNTHETIC_ADDITIONAL))
-            self.assertLessEqual(Decimal(oversubscribed["pilot_envelope_usd"]), Decimal("5"))
-            with self.assertRaisesRegex(ValueError, "Whole-plan financing exceeds"):
-                self.register_financing(ledger, oversubscribed)
-            with sqlite3.connect(ledger) as db:
-                count = db.execute("SELECT COUNT(*) FROM campaign_financing_plans").fetchone()[0] if router_study.CAMPAIGN._table(db, "campaign_financing_plans") else 0
-                self.assertEqual(count, 0)
             budget = router_study.Budget(ledger, {"study": load_study()})
-            self.assertEqual(budget.claim(plan["runs"][0], manifest, {"run_cost_limit_usd": "3"}), "whole_plan_not_financed")
-            with self.assertRaisesRegex(ValueError, "Pilot no-go"):
-                self.financing(manifest, plan, prompt="0.014", completion="0.01", classifier="0")
+            self.assertEqual(budget.claim(plan["runs"][0], manifest, {"run_cost_limit_usd": "3"}), "cost_forecast_missing")
+            result = self.register_financing(ledger, oversubscribed)
+            self.assertTrue(result["fits"])
+            self.assertTrue(result["forecast_exceeds_allowance"])
+            with sqlite3.connect(ledger) as db:
+                self.assertEqual(db.execute("SELECT COUNT(*) FROM campaign_financing_plans").fetchone()[0], 1)
+            funded = router_study.Budget(ledger, {"study": load_study()}, financing=oversubscribed)
+            self.assertIsNone(funded.claim(plan["runs"][0], manifest, {"run_cost_limit_usd": "3"}))
+            small_pilot = json.loads(json.dumps(manifest))
+            small_pilot["spec"]["pilot_cap_usd"] = "1"
+            pilot_forecast = self.financing(small_pilot, plan, prompt="0.005", completion="0.01", classifier="0")
+            self.assertGreater(Decimal(pilot_forecast["pilot_envelope_usd"]), Decimal("1"))
 
-    def test_reserve_enforces_financed_envelope_and_holds_unknowns(self):
+    def test_reserve_releases_unused_hold_after_settlement_and_holds_unknowns(self):
         with tempfile.TemporaryDirectory() as temporary:
             ledger, out, manifest, plan = self.fixture(Path(temporary))
             study = load_study()
@@ -800,19 +803,69 @@ class ProspectiveBudget(unittest.TestCase):
             row = next(item for item in plan["runs"] if item["phase"] == "final" and item["arm_kind"] == "fixed")
             with mock.patch.object(router_study, "final_selection", return_value={"configurations": {"efficient": "efficient", "frontier": "frontier"}}):
                 self.assertIsNone(budget.claim(row, manifest, {"run_cost_limit_usd": "3"}))
-            envelope = Decimal(next(item["envelope_usd"] for item in financing["rows"] if item["run"] == row["run"]))
             cfg = {"router_phase": "final", "run_cost_limit_usd": "3", "run_token_limit": 100}
+            first, _ = budget.reserve(out, row["run"], Decimal("3"), 1, cfg=cfg, ledger_out=out)
             with self.assertRaises(study.BudgetLimited) as caught:
-                budget.reserve(out, row["run"], envelope + Decimal("0.01"), 1, cfg=cfg, ledger_out=out)
-            self.assertIn("financed_envelope_reservation", caught.exception.diagnostics["caps"])
-            request, _ = budget.reserve(out, row["run"], envelope, 1, cfg=cfg, ledger_out=out)
+                budget.reserve(out, row["run"], Decimal("0.01"), 1, cfg=cfg, ledger_out=out)
+            self.assertIn("run_money_reservation", caught.exception.diagnostics["caps"])
+            budget.settle(first, "settled", Decimal("3"), Decimal("0.5"), 1)
+            second, _ = budget.reserve(out, row["run"], Decimal("2.5"), 1, cfg=cfg, ledger_out=out)
             with sqlite3.connect(ledger) as db:
-                db.execute("UPDATE requests SET state='unknown' WHERE id=?", (request,))
+                db.execute("UPDATE requests SET state='unknown' WHERE id=?", (second,))
             with self.assertRaises(study.BudgetLimited):
                 budget.reserve(out, row["run"], Decimal("0"), 1, cfg=cfg, ledger_out=out)
             with router_study.CAMPAIGN.readonly(ledger) as db:
                 liability = router_study.CAMPAIGN.plan_liability(db)
-                self.assertEqual(liability["settled_plus_held_usd"], Decimal(SYNTHETIC_BASELINE) + envelope)
+                self.assertEqual(liability["settled_plus_held_usd"], Decimal(SYNTHETIC_BASELINE) + Decimal("3"))
+                self.assertEqual(db.execute("SELECT state,bound FROM requests WHERE id='historical-held'").fetchone(), ("unknown", SYNTHETIC_BASELINE))
+
+    def test_global_pilot_and_run_ceilings_block_independently_and_atomically(self):
+        study = load_study()
+        for ceiling in ("global", "pilot", "run"):
+            with self.subTest(ceiling=ceiling), tempfile.TemporaryDirectory() as temporary:
+                ledger, out, manifest, plan = self.fixture(Path(temporary), additional="100")
+                financing = self.financing(manifest, plan)
+                self.register_financing(ledger, financing)
+                budget = router_study.Budget(ledger, {"study": study}, financing=financing)
+                claim_cfg = {"run_cost_limit_usd": "60"}
+                if ceiling == "run":
+                    row = next(item for item in plan["runs"] if item["phase"] == "final" and item["arm_kind"] == "fixed")
+                    with mock.patch.object(router_study, "final_selection", return_value={"configurations": {"efficient": "efficient", "frontier": "frontier"}}):
+                        self.assertIsNone(budget.claim(row, manifest, {"run_cost_limit_usd": "1000"}))
+                    cfg = {"router_phase": "final", "run_cost_limit_usd": "1000", "run_token_limit": 100}
+                    with sqlite3.connect(ledger) as db:
+                        before = db.execute("SELECT COUNT(*) FROM requests").fetchone()[0]
+                    with self.assertRaises(study.BudgetLimited) as caught:
+                        budget.reserve(out, row["run"], Decimal("61"), 1, cfg=cfg, ledger_out=out)
+                    self.assertIn("run_money_reservation", caught.exception.diagnostics["caps"])
+                    self.assertNotIn("phase_money_reservation", caught.exception.diagnostics["caps"])
+                elif ceiling == "pilot":
+                    rows = plan["runs"][:2]
+                    for row in rows:
+                        self.assertIsNone(budget.claim(row, manifest, claim_cfg))
+                    cfg = {"router_phase": "pilot", "run_cost_limit_usd": "60", "run_token_limit": 100}
+                    budget.reserve(out, rows[0]["run"], Decimal("60"), 1, cfg=cfg, ledger_out=out)
+                    with sqlite3.connect(ledger) as db:
+                        before = db.execute("SELECT COUNT(*) FROM requests").fetchone()[0]
+                    with self.assertRaises(study.BudgetLimited) as caught:
+                        budget.reserve(out, rows[1]["run"], Decimal("1"), 1, cfg=cfg, ledger_out=out)
+                    self.assertIn("pilot_cap_reservation", caught.exception.diagnostics["caps"])
+                    self.assertNotIn("phase_money_reservation", caught.exception.diagnostics["caps"])
+                else:
+                    rows = [item for item in plan["runs"] if item["phase"] == "final" and item["arm_kind"] == "fixed"][:2]
+                    with mock.patch.object(router_study, "final_selection", return_value={"configurations": {"efficient": "efficient", "frontier": "frontier"}}):
+                        for row in rows:
+                            self.assertIsNone(budget.claim(row, manifest, claim_cfg))
+                    cfg = {"router_phase": "final", "run_cost_limit_usd": "60", "run_token_limit": 100}
+                    budget.reserve(out, rows[0]["run"], Decimal("60"), 1, cfg=cfg, ledger_out=out)
+                    with sqlite3.connect(ledger) as db:
+                        before = db.execute("SELECT COUNT(*) FROM requests").fetchone()[0]
+                    with self.assertRaises(study.BudgetLimited) as caught:
+                        budget.reserve(out, rows[1]["run"], Decimal("41"), 1, cfg=cfg, ledger_out=out)
+                    self.assertIn("phase_money_reservation", caught.exception.diagnostics["caps"])
+                    self.assertNotIn("run_money_reservation", caught.exception.diagnostics["caps"])
+                with sqlite3.connect(ledger) as db:
+                    self.assertEqual(db.execute("SELECT COUNT(*) FROM requests").fetchone()[0], before)
 
     def pilot_fixture(self, root):
         ledger, out, registered, plan = self.fixture(root)
@@ -849,13 +902,27 @@ class ProspectiveBudget(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             ledger, out, manifest, plan, path, evidence = self.pilot_fixture(Path(temporary))
             self.assertEqual(router_study.validate_pilot_evidence(out, manifest, plan, path), evidence)
-            approval = {"authorized": True, "action": "select-final-router-study-v4", "manifest_sha256": router_study.digest(manifest), "prospective_grant_id": "bounded-two", "pilot_evidence_sha256": router_study.digest(evidence), "pilot_evidence_file_sha256": router_study.file_hash(path), "configurations": {"efficient": "efficient", "frontier": "frontier"}}
+            approval = {"authorized": True, "action": "select-final-router-study-v5", "manifest_sha256": router_study.digest(manifest), "prospective_grant_id": "bounded-two", "pilot_evidence_sha256": router_study.digest(evidence), "pilot_evidence_file_sha256": router_study.file_hash(path), "configurations": {"efficient": "efficient", "frontier": "frontier"}}
             router_study.select_final(out, manifest, plan, approval, {}, path)
             self.assertEqual(router_study.final_selection(out, manifest), approval)
             path_in_out = out / "pilot-evidence.json"
             path_in_out.write_text(path_in_out.read_text() + " ")
             with self.assertRaisesRegex(ValueError, "changed"):
                 router_study.final_selection(out, manifest)
+
+    def test_final_budget_stop_still_produces_a_read_only_inconclusive_report(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            ledger, out, manifest, plan, path, evidence = self.pilot_fixture(Path(temporary))
+            approval = {"authorized": True, "action": "select-final-router-study-v5", "manifest_sha256": router_study.digest(manifest), "prospective_grant_id": "bounded-two", "pilot_evidence_sha256": router_study.digest(evidence), "pilot_evidence_file_sha256": router_study.file_hash(path), "configurations": {"efficient": "efficient", "frontier": "frontier"}}
+            router_study.select_final(out, manifest, plan, approval, {}, path)
+            budget = router_study.Budget(ledger, {"study": load_study()})
+            budget.stop("budget_exhausted", "final")
+            report = router_study.analyze(out, manifest, plan, "final", {"study": load_study()})
+            self.assertEqual(report["conclusion"], "inconclusive")
+            self.assertIn("budget_exhausted", report["recorded_stops"])
+            self.assertEqual(len(report["missing_or_invalid"]), len([row for row in plan["runs"] if row["phase"] == "final"]))
+            self.assertFalse(report["both_modes_pass"])
+            self.assertEqual(budget.stopped("final"), ["budget_exhausted"])
 
     def test_pilot_protocol_provider_coverage_cost_and_grade_failures_block_final(self):
         mutations = ("passed", "format", "typed", "dsml", "provider", "premature", "missing_solver", "cost", "evidence", "grade", "unknown", "extra_observation", "nondict_observation")
@@ -899,28 +966,32 @@ class ProspectiveBudget(unittest.TestCase):
     def test_prospective_budget_cannot_raise_pilot_cap_or_auto_clear_unknowns(self):
         with tempfile.TemporaryDirectory() as temporary:
             ledger, _ = prospective_campaign(Path(temporary))
-            for options in ({"pilot_cap_usd": "5.01"}, {"pilot_cap_usd": "0"}, {"auto_run": "old-run"}):
+            for options in ({"pilot_cap_usd": "60.01"}, {"pilot_cap_usd": "0"}, {"auto_run": "old-run"}):
                 with self.subTest(options=options), self.assertRaises(ValueError):
                     router_study.Budget(ledger, {"study": load_study()}, **options)
-            router_study.Budget(ledger, {"study": load_study()}, pilot_cap_usd="5")
+            router_study.Budget(ledger, {"study": load_study()}, pilot_cap_usd="60")
 
 
 class FrozenCoverage(unittest.TestCase):
-    def test_spec_requires_exact_bounded_v4_execution_campaign_contract(self):
+    def test_spec_requires_exact_bounded_v5_execution_campaign_contract(self):
         with tempfile.TemporaryDirectory() as temporary:
+            import census
             root = Path(temporary)
             ledger, _ = prospective_campaign(root)
             execution = root / "execution.json"
             execution.write_text("{}")
-            resources = {"max_input_tokens": 1, "http_request_timeout_seconds": 600, "token_overrun_policy": "settle-known-v1"}
+            resources = {**census.RESOURCES, "run_cost_limit_usd": "60", "max_input_tokens": 1, "http_request_timeout_seconds": 600, "token_overrun_policy": "settle-known-v1"}
             account = root / "account.json"
             account.write_text(json.dumps({"source": "fixture", "captured_at": time.time(), "raw_sha256": "0" * 64, "default_plugins": []}))
-            spec = {"version": 4, "prospective_grant_id": "bounded-two", "experiment_id": "fixture", "configurations": [{"id": mode, "router": mode, "snapshot": "snapshot.json"} for mode in ("efficient", "frontier")], "tasks": {"tuning": [f"tuning-{index}" for index in range(18)], "final": [f"holdout-{index}" for index in range(32)]}, "resources": resources, "classifier_fee_fraction": "0.06", "variant_catalog": "variants.json", "execution_manifest": str(execution), "campaign_ledger": str(ledger), "account_policy": str(account), "repetitions": 2, "seed": "frozen", **arms_spec()}
-            modules = {"census": SimpleNamespace(RESOURCES={})}
+            spec = {"version": 5, "prospective_grant_id": "bounded-two", "experiment_id": "fixture", "configurations": [{"id": mode, "router": mode, "snapshot": "snapshot.json"} for mode in ("efficient", "frontier")], "tasks": {"tuning": [f"tuning-{index}" for index in range(18)], "final": [f"holdout-{index}" for index in range(32)]}, "resources": resources, "classifier_fee_fraction": "0.06", "variant_catalog": "variants.json", "execution_manifest": str(execution), "campaign_ledger": str(ledger), "account_policy": str(account), "repetitions": 2, "seed": "frozen", **arms_spec()}
+            modules = {"census": SimpleNamespace(RESOURCES=census.RESOURCES)}
             self.assertEqual(router_study.validate_spec(spec, modules), spec)
+            for cap in ("0", "60.01", 60, None):
+                with self.subTest(run_cap=cap), self.assertRaises(ValueError):
+                    router_study.validate_spec({**spec, "resources": {**resources, "run_cost_limit_usd": cap}}, modules)
             bad_control = {**spec["control"], "distribution": {mode: [{"model": "x/y", "variant": "variant=low", "weight": "0.5"}] for mode in ("efficient", "frontier")}}
             bad_objectives = {**spec["objectives"], "efficient": {"kind": "frontier-maximize-success-within-cost", "cost_budget": {"type": "absolute", "max_total_usd": "1"}}}
-            for change in ({"version": 3}, {"repetitions": 1}, {"repetitions": 3}, {"repetitions": True}, {"seed": ""}, {"campaign_ledger": "relative.sqlite"}, {"pilot_cap_usd": "5.01"}, {"pilot_cap_usd": "0"}, {"prospective_grant_id": "wrong"}, {"configurations": [spec["configurations"][0]]}, {"configurations": [spec["configurations"][0], {**spec["configurations"][1], "router": "efficient"}]}, {"tasks": {"tuning": ["a"], "final": spec["tasks"]["final"]}}, {"tasks": {"tuning": spec["tasks"]["tuning"], "final": ["b"]}}, {"fixed_models": {"efficient": spec["fixed_models"]["efficient"]}}, {"control": bad_control}, {"objectives": bad_objectives}):
+            for change in ({"version": 4}, {"version": 3}, {"repetitions": 1}, {"repetitions": 3}, {"repetitions": True}, {"seed": ""}, {"campaign_ledger": "relative.sqlite"}, {"pilot_cap_usd": "60.01"}, {"pilot_cap_usd": "0"}, {"prospective_grant_id": "wrong"}, {"configurations": [spec["configurations"][0]]}, {"configurations": [spec["configurations"][0], {**spec["configurations"][1], "router": "efficient"}]}, {"tasks": {"tuning": ["a"], "final": spec["tasks"]["final"]}}, {"tasks": {"tuning": spec["tasks"]["tuning"], "final": ["b"]}}, {"fixed_models": {"efficient": spec["fixed_models"]["efficient"]}}, {"control": bad_control}, {"objectives": bad_objectives}):
                 with self.subTest(change=change), self.assertRaises(ValueError):
                     router_study.validate_spec({**spec, **change}, modules)
 
@@ -928,7 +999,7 @@ class FrozenCoverage(unittest.TestCase):
         command = ["node", "runtime", "--prepared-execution", "{prepared_execution}", "--snapshot", "{snapshot}", "--broker-url", "{broker_url}", "--port", "{port}"]
         identity = {"serving_argv": command}
         authorization = {"grant_id": "bounded-two", "cumulative_additional_cap_usd": "60", "effective_ceiling_usd": "67.25"}
-        manifest = {"spec": {"prospective_grant_id": "bounded-two", "execution_manifest": "/prepared/execution.json", "pilot_cap_usd": "5"}, "approval": {"prospective_grant_approval_sha256": "grant-hash", "execution_identity": identity, "source_sha256": {}, "effective_authorization": authorization}}
+        manifest = {"spec": {"prospective_grant_id": "bounded-two", "execution_manifest": "/prepared/execution.json", "pilot_cap_usd": "60"}, "approval": {"prospective_grant_approval_sha256": "grant-hash", "execution_identity": identity, "source_sha256": {}, "effective_authorization": authorization}}
         plan = {"runs": [{"run": "one", "phase": "pilot"}]}
         pricing, classifier = {"unavailable_pairs": []}, {}
         financing = {"manifest_sha256": router_study.digest(manifest), "pricing_sha256": router_study.digest(pricing), "classifier_quote_sha256": router_study.digest(classifier), "authorization": authorization}
@@ -937,9 +1008,11 @@ class FrozenCoverage(unittest.TestCase):
             approval = router_study.run_approval(Path("unused"), manifest, plan, "pilot", "batch", ["one"], pricing, classifier, command, financing=financing)
             self.assertEqual(approval["execution_identity"], identity)
             self.assertEqual(approval["effective_authorization"], authorization)
-            self.assertEqual(approval["financing_sha256"], router_study.digest(financing))
+            self.assertEqual(approval["cost_forecast_sha256"], router_study.digest(financing))
+            self.assertEqual(approval["action"], "run-router-study-v5")
+            self.assertNotIn("financing_sha256", approval)
             self.assertNotIn("additional_cap_usd", approval)
-            with self.assertRaisesRegex(ValueError, "financing"):
+            with self.assertRaisesRegex(ValueError, "cost forecast"):
                 router_study.run_approval(Path("unused"), manifest, plan, "pilot", "batch", ["one"], pricing, classifier, command)
             for argv in (["other-command"], [*command, "--baseline-root", "/mutable"]):
                 with self.subTest(argv=argv), self.assertRaisesRegex(ValueError, "fixed approved"):
@@ -1000,12 +1073,13 @@ class FrozenCoverage(unittest.TestCase):
                     router_study.panel_inputs(out, "router", modules, {"tasks": split})
 
     def test_old_manifest_is_never_analyzable_as_a_new_pass(self):
-        with self.assertRaisesRegex(ValueError, "audit-only"):
-            router_study.analyze(Path("unused"), {"version": 1}, {}, "final", {})
+        for version in (1, 4):
+            with self.subTest(version=version), self.assertRaisesRegex(ValueError, "audit-only"):
+                router_study.analyze(Path("unused"), {"version": version}, {}, "final", {})
 
 
 class PreAdmission(unittest.TestCase):
-    def test_global_money_stops_before_tail_claim_and_pending_rows_hold_full_envelopes(self):
+    def test_claim_records_its_cap_and_the_next_reservation_stops_at_incurred_money(self):
         study = load_study()
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -1018,16 +1092,22 @@ class PreAdmission(unittest.TestCase):
             cfg = {"run_cost_limit_usd": "100"}
             row = {"run": "first", "phase": "tuning", "version": "candidate", "configuration": "c1", "instance_id": "task", "router": "efficient", "repetition": 0}
             self.assertIsNone(budget.claim(row, manifest, cfg))
-            self.assertEqual(budget.claim({**row, "run": "tail"}, manifest, cfg), "global_budget_pre_admission")
-            self.assertIsNone(router_study.run_state(ledger, "tail"))
-            resumed = router_study.Budget(ledger, {"study": study}, "100")
-            self.assertEqual(resumed.claim({**row, "run": "restart-tail"}, manifest, cfg), "global_budget_pre_admission")
+            self.assertIsNone(budget.claim({**row, "run": "tail", "instance_id": "tail-task"}, manifest, cfg))
             with sqlite3.connect(ledger) as db:
-                db.execute("UPDATE router_runs SET state='finished' WHERE run='first'")
-                db.execute("INSERT INTO requests VALUES ('actual','first','100','149',1,'settled','',1)")
-                db.execute("INSERT INTO router_requests VALUES ('actual','solver')")
-            self.assertEqual(resumed.claim({**row, "run": "spent-tail"}, manifest, {"run_cost_limit_usd": "2"}), "global_budget_pre_admission")
-            self.assertIsNone(router_study.run_state(ledger, "spent-tail"))
+                self.assertEqual(dict(db.execute("SELECT run,maximum_usd FROM campaign_admissions")), {"first": "100", "tail": "100"})
+                self.assertEqual(db.execute("SELECT COUNT(*) FROM requests").fetchone()[0], 0)
+            reserve_cfg = {"router_phase": "tuning", "run_cost_limit_usd": "100", "run_token_limit": 100}
+            budget.reserve(root, "first", Decimal("100"), 1, cfg=reserve_cfg, ledger_out=root)
+            with self.assertRaises(study.BudgetLimited) as caught:
+                budget.reserve(root, "tail", Decimal("100"), 1, cfg=reserve_cfg, ledger_out=root)
+            self.assertIn("phase_money_reservation", caught.exception.diagnostics["caps"])
+            resumed = router_study.Budget(ledger, {"study": study}, "100")
+            self.assertIsNone(resumed.claim({**row, "run": "restart-tail", "instance_id": "restart-task"}, manifest, cfg))
+            with sqlite3.connect(ledger) as db:
+                db.execute("UPDATE requests SET state='settled', actual='149', tokens=1 WHERE run='first'")
+            self.assertIsNone(resumed.claim({**row, "run": "spent-tail", "instance_id": "spent-task"}, manifest, {"run_cost_limit_usd": "2"}))
+            with self.assertRaises(study.BudgetLimited):
+                resumed.reserve(root, "spent-tail", Decimal("2"), 1, cfg={"router_phase": "tuning", "run_cost_limit_usd": "2", "run_token_limit": 100}, ledger_out=root)
 
     def test_unverified_historical_candidates_stop_before_any_claim(self):
         study = load_study()
@@ -1147,6 +1227,9 @@ class Analysis(unittest.TestCase):
         charges = {**outcomes, "c1-t2-1": value(0, 0, "9")}
         comparison = router_study.compare(rows, missing, "c1", "baseline", 4, charges, mode="frontier", objective=frontier)
         self.assertFalse(comparison["complete"])
+        self.assertFalse(comparison["passes"])
+        prefix = {run: result for run, result in outcomes.items() if "-t1-" in run}
+        self.assertFalse(router_study.compare(rows, prefix, "c1", "baseline", 4, mode="frontier", objective=frontier)["passes"])
         self.assertEqual(comparison["candidate"]["expected"], 4)
         self.assertEqual(Decimal(comparison["candidate"]["cost_upper"]), Decimal("12"))
         duplicate = [{**row, "repetition": 0} if row["run"] == "c1-t2-1" else row for row in rows]
@@ -1172,7 +1255,7 @@ class Analysis(unittest.TestCase):
             router_study.frozen_write(out / "snapshots/c2.json", {"baseline": {}, "candidate": {}})
             panel = root / "panel"
             router_study.frozen_write(panel / "evaluator/tasks.json", [task_expectations(task) for task in ("t1", "t2", "f")])
-            manifest = {"version": 4, "panel_root": str(panel), "spec": spec, "approval": {"execution_identity": identity, "snapshot_file_sha256": {key: router_study.file_hash(out / "snapshots" / f"{key}.json") for key in ("c1", "c2")}}}
+            manifest = {"version": router_study.SPEC_VERSION, "panel_root": str(panel), "spec": spec, "approval": {"execution_identity": identity, "snapshot_file_sha256": {key: router_study.file_hash(out / "snapshots" / f"{key}.json") for key in ("c1", "c2")}}}
             router_study.frozen_write(out / router_study.MANIFEST, manifest)
             plan = router_study.make_plan(spec, {task: {"repo": task} for task in ("tuning", "t1", "t2")})
             tuning = [row for row in plan["runs"] if row["phase"] == "final"]
@@ -1181,7 +1264,7 @@ class Analysis(unittest.TestCase):
                 folder = out / "rollouts" / row["run"]
                 unavailable = row == outage
                 router_study.frozen_write(folder / "result.json", {"status": "provider_unavailable" if unavailable else "completed"})
-                router_study.frozen_write(folder / "evaluation.json", {"grade_valid": not unavailable, "result": [None, {row["instance_id"]: complete_grade(row["configuration"] != "baseline")}]})
+                router_study.frozen_write(folder / "evaluation.json", {"grade_valid": not unavailable, "result": [None, {row["instance_id"]: complete_grade(row["configuration"] != "baseline" and row["arm_kind"] != "fixed")}]})
                 if unavailable:
                     router_study.frozen_write(folder / "provider-unavailable.json", {"model": "model", "effort": "variant=low", "reason": "unavailable"})
                 if row["arm_kind"] == "router":
@@ -1202,10 +1285,12 @@ class Analysis(unittest.TestCase):
                 self.assertEqual(comparison["candidate"]["resolved_lower"], 3)
                 self.assertTrue(comparison["passes"])
                 self.assertTrue(report["both_modes_pass"])
+                self.assertEqual((report["conclusion"], report["inconclusive"], report["plan_complete"]), ("complete", False, True))
                 self.assertEqual(set(report["comparisons"]["efficient"]), {"baseline", "control", "fixed-x-y"})
                 self.assertFalse(report["fixed_model_superiority"]["efficient"]["superior_to_every_fixed_model"])
                 self.assertEqual(report["fixed_model_superiority"]["efficient"]["not_established_for"], ["fixed-x-y"])
                 self.assertTrue(report["control_cost_matching"]["efficient"]["claim_allowed"])
+                self.assertTrue(report["fixed_model_superiority"]["frontier"]["per_fixed_model"]["fixed-x-y"])
                 self.assertFalse(report["generalization_claim"])
                 self.assertEqual(report["provider_unavailable_runs"], [outage["run"]])
                 self.assertEqual(Decimal(report["phase_all_arm_cost_upper_usd"]), Decimal("12.8"))
@@ -1213,6 +1298,15 @@ class Analysis(unittest.TestCase):
                 blocked = router_study.analyze(out, manifest, plan, "final", modules)
                 self.assertFalse(blocked["comparisons"]["efficient"]["baseline"]["complete"])
                 self.assertFalse(blocked["both_modes_pass"])
+                self.assertEqual((blocked["conclusion"], blocked["inconclusive"], blocked["can_establish_pass"], blocked["can_establish_superiority"], blocked["can_establish_cost_matching"]), ("inconclusive", True, False, False, False))
+                self.assertFalse(blocked["fixed_model_superiority"]["efficient"]["superior_to_every_fixed_model"])
+                self.assertFalse(blocked["control_cost_matching"]["efficient"]["claim_allowed"])
+                self.assertFalse(any(blocked["fixed_model_superiority"]["frontier"]["per_fixed_model"].values()))
+                self.assertEqual(blocked["fixed_model_superiority"]["frontier"]["not_established_for"], ["fixed-x-y"])
+                for comparisons in blocked["comparisons"].values():
+                    for comparison in comparisons.values():
+                        self.assertFalse(any(comparison["objective_checks"].values()))
+                        self.assertFalse(any(comparison["diagnostic_strict_dominance"].values()))
                 self.assertEqual(Decimal(blocked["phase_all_arm_cost_upper_usd"]), Decimal("12.8"))
                 self.assertEqual(Decimal(blocked["comparisons"]["efficient"]["baseline"]["candidate"]["cost_upper"]), Decimal("0.8"))
 

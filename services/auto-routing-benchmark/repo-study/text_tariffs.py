@@ -325,7 +325,7 @@ def component_maxima(pricing):
 
 EFFORTS = {"none", "minimal", "low", "medium", "high", "xhigh", "max"}
 REASONING_KEYS = {"enabled", "effort", "max_tokens", "exclude"}
-VERBOSITY_VALUES = {"low", "medium", "high", "max"}
+VERBOSITY_VALUES = {"low", "medium", "high", "xhigh", "max"}
 
 
 def validate_reasoning(value, what="reasoning"):

@@ -179,7 +179,6 @@ describe('organization SSO router', () => {
           action: 'organization.sso.config.delete',
           metadata: {
             workosOrganizationId: 'workos_org_deleted',
-            releasedSsoDomain: 'deleted-sso.test',
           },
         },
       ]);
@@ -206,7 +205,7 @@ describe('organization SSO router', () => {
       await expect(readAdminActions(target.id)).resolves.toEqual([
         {
           action: 'organization.sso.config.delete',
-          metadata: { workosOrganizationId: 'workos_org_only', releasedSsoDomain: null },
+          metadata: { workosOrganizationId: 'workos_org_only' },
         },
       ]);
     });

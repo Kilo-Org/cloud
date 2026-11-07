@@ -122,14 +122,15 @@ export const organizationSsoRouter = createTRPCRouter({
     }
 
     // Remove the WorkOS organization before the recorded domain, and record the platform admin
-    // action together with that deletion.
+    // action together with that deletion. The released domain is recorded by the
+    // organization.sso.remove_domain entry below, which reads the value under the row lock.
     if (workOSOrg) {
       await workos.organizations.deleteOrganization(workOSOrg.id);
       await recordAdminAction(opts.ctx, {
         action: 'organization.sso.config.delete',
         target: organizationActionTarget(organizationId),
         message: 'Deleted WorkOS SSO organization',
-        metadata: { workosOrganizationId: workOSOrg.id, releasedSsoDomain: releasedDomain },
+        metadata: { workosOrganizationId: workOSOrg.id },
       });
     }
 

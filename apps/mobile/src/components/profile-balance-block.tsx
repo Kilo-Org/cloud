@@ -89,7 +89,9 @@ export function BalanceBlock({
               <View className="min-w-0 flex-1">{value}</View>
               {/* The toggle's 48 dp box carries `-my-[10px]`, so it reaches its
                   touch target without adding height to the value line. */}
-              <View className="shrink-0 -my-[10px]">{visibilityControl}</View>
+              {state !== 'failed' && (
+                <View className="shrink-0 -my-[10px]">{visibilityControl}</View>
+              )}
             </View>
             {note}
           </View>

@@ -376,7 +376,38 @@ describe('scanRequest', () => {
     );
 
     expect(result.verdict).toEqual({ action: 'allow' });
-    expect(result.usageRecords).toEqual([expect.objectContaining({ decision: 'allowed' })]);
+    expect(result.usageRecords).toEqual([
+      expect.objectContaining({ decision: 'allowed', detectorsFired: ['pii'] }),
+    ]);
+  });
+
+  it('records every detector that fired on a blocked call, blocking or not', async () => {
+    const result = await scanRequest(
+      makeScan(),
+      deps(async () => detectResponse({ summary: { injection_attack: 1, pii: 1 } }))
+    );
+
+    expect(result.usageRecords).toEqual([
+      expect.objectContaining({ decision: 'blocked', detectorsFired: ['injection_attack', 'pii'] }),
+    ]);
+  });
+
+  it('records the detectors that fired only on the attempt that returned them', async () => {
+    let calls = 0;
+    const result = await scanRequest(
+      makeScan(),
+      deps(async () =>
+        ++calls === 1
+          ? new Response('unavailable', { status: 503 })
+          : detectResponse({ summary: { pii: 1 } })
+      )
+    );
+
+    expect(result.usageRecords).toHaveLength(2);
+    expect(result.usageRecords[0]).not.toHaveProperty('detectorsFired');
+    expect(result.usageRecords[1]).toEqual(
+      expect.objectContaining({ decision: 'allowed', detectorsFired: ['pii'] })
+    );
   });
 
   it('makes no call for an empty request', async () => {

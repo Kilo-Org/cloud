@@ -1,0 +1,1 @@
+ALTER TABLE "enkrypt_usage" ADD COLUMN "detectors_fired" text[];

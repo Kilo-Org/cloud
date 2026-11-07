@@ -499,6 +499,7 @@ describe('guardEnkryptOutput', () => {
             decision: 'allowed',
             creditsCost: 2,
             addedLatencyMs: 0,
+            detectorsFired: ['pii'],
           }),
         ],
       ]);
@@ -1069,6 +1070,7 @@ describe('guardEnkryptOutput', () => {
             decision: 'blocked',
             creditsCost: 2,
             addedLatencyMs: expect.any(Number),
+            detectorsFired: ['pii'],
           }),
         ],
       ]);

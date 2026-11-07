@@ -87,6 +87,7 @@ describe('recordEnkryptUsage', () => {
         charged_microdollars: enkrypt_usage.charged_microdollars,
         added_latency_ms: enkrypt_usage.added_latency_ms,
         guardrail: enkrypt_usage_guardrail.guardrail,
+        detectors_fired: enkrypt_usage.detectors_fired,
       })
       .from(enkrypt_usage)
       .innerJoin(api_kind, eq(api_kind.api_kind_id, enkrypt_usage.api_kind_id))
@@ -110,6 +111,7 @@ describe('recordEnkryptUsage', () => {
         charged_microdollars: 7 * MICRODOLLARS_PER_ENKRYPT_CREDIT,
         added_latency_ms: 212,
         guardrail: 'input',
+        detectors_fired: null,
       }),
     ]);
     expect(await organizationBalance(organization.id)).toEqual({
@@ -140,6 +142,23 @@ describe('recordEnkryptUsage', () => {
       microdollarsUsed: 7 * MICRODOLLARS_PER_ENKRYPT_CREDIT,
       microdollarsBalance: 10_000_000 - 7 * MICRODOLLARS_PER_ENKRYPT_CREDIT,
     });
+  });
+
+  it.each<[string, EnkryptUsageRecord['detectorsFired'], string[] | null]>([
+    ['a log-only detection', ['pii', 'toxicity'], ['pii', 'toxicity']],
+    ['no detection', [], null],
+    ['an omitted detection', undefined, null],
+  ])('records the detectors that fired for %s', async (_name, detectorsFired, stored) => {
+    const { user, organization } = await organizationWithMember();
+    await recordEnkryptUsage(
+      usageRecord(organization.id, user.id, { decision: 'allowed', detectorsFired })
+    );
+
+    const rows = await db
+      .select({ detectors_fired: enkrypt_usage.detectors_fired })
+      .from(enkrypt_usage)
+      .where(eq(enkrypt_usage.organization_id, organization.id));
+    expect(rows).toEqual([{ detectors_fired: stored }]);
   });
 
   it('creates and reuses lookup values for concurrent usage records without losing a debit', async () => {

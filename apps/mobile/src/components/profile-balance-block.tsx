@@ -31,26 +31,7 @@ type BalanceBlockProps = Readonly<{
   readonly onRetry: () => void;
 }>;
 
-/**
- * One shell for the balance block in all three of its states — the loading
- * skeleton, the failed read and the loaded row — so a change of state swaps the
- * content and never the frame around it.
- *
- * A stacked card paints the value's column with the purchase action beside it:
- * the amount and its toggle on the line, the note directly under them at the
- * column's own gap, and the action centered against the pair. The note used to
- * hang off a 44 dp control row, which put the caption a further 7 dp below the
- * value than the wide card does and let the action's height push it down
- * (design review, Profile compact cell, 2026-11-07). The column holds a 48 dp
- * floor in all three states, so the block never changes height as the read
- * answers, fails or retries.
- *
- * A wide card keeps its single row: the amount's column holds the note, with
- * the toggle and the action beside it. Its column carries the loading bar pair
- * and the failed read's pressable at the same 48 dp, so that block holds its
- * frame too: the swap to the balance row used to move every section below it
- * by 1.5 dp (design gate, Profile, 2026-11-05).
- */
+/** Balance-state changes preserve the independently loaded note and control slots. */
 export function BalanceBlock({
   state,
   stacked,
@@ -62,12 +43,7 @@ export function BalanceBlock({
   retryLabel,
   onRetry,
 }: BalanceBlockProps) {
-  // One shell in both layouts and in every state: a row whose value column
-  // holds the amount and the note, with the purchase action centered beside it.
   const shellClass = 'min-h-16 flex-row items-center gap-2 rounded-lg bg-secondary px-3 py-2';
-  // The frame all three states share: the loading bar, the failed read's retry
-  // surface and the loaded amount all fit inside this column, so the note and
-  // the sections below the card stay where they are.
   const valueColumnClass = 'min-w-0 min-h-[48px] flex-1 justify-center gap-1';
   const amountRowClass = 'min-w-0 flex-row items-center gap-1';
   const retry = (
@@ -84,50 +60,21 @@ export function BalanceBlock({
     </Text>
   );
 
+  let value = amount;
   if (state === 'loading') {
-    return (
-      <View className={shellClass}>
-        <View className={valueColumnClass}>
-          {/* The bars take the heights of the amount line and the note they
-              stand in for, so the column holds its place as the read answers. */}
-          <Skeleton className="h-8 w-28 max-w-full rounded-md bg-muted-soft" />
-          <Skeleton className="h-3.5 w-40 max-w-full rounded bg-muted-soft" />
-        </View>
-        {loadingAction}
-      </View>
+    value = <Skeleton className="h-8 w-28 max-w-full rounded-md bg-muted-soft" />;
+  } else if (state === 'failed') {
+    value = (
+      <Pressable
+        className="min-h-[44px] -my-[8px] min-w-0 justify-center active:opacity-70"
+        onPress={onRetry}
+      >
+        {retry}
+      </Pressable>
     );
   }
-
-  if (state === 'failed') {
-    return (
-      <View className={shellClass}>
-        {stacked ? (
-          <View className={valueColumnClass}>
-            {/* The retry surface carries its own 44 dp target and keeps the
-                value line's height, so a retry that succeeds swaps this
-                content for the amount and the controls in the same frame. An
-                explicit pixel floor, because this app's rem renders `min-h-11`
-                as 38.5 dp. */}
-            <Pressable
-              className="min-h-[44px] -my-[8px] min-w-0 justify-center active:opacity-70"
-              onPress={onRetry}
-            >
-              {retry}
-            </Pressable>
-            {note}
-          </View>
-        ) : (
-          <Pressable
-            className="min-h-[48px] flex-1 justify-center active:opacity-70"
-            onPress={onRetry}
-          >
-            {retry}
-          </Pressable>
-        )}
-        {action}
-      </View>
-    );
-  }
+  const visibilityControl = state === 'ready' ? toggle : <View className="h-[48px] w-[48px]" />;
+  const purchaseAction = state === 'loading' ? loadingAction : action;
 
   if (stacked) {
     return (
@@ -139,15 +86,15 @@ export function BalanceBlock({
         <Animated.View className="min-w-0 flex-1 flex-row" layout={LinearTransition.duration(200)}>
           <View className={valueColumnClass}>
             <View className={amountRowClass}>
-              <View className="min-w-0 flex-1">{amount}</View>
+              <View className="min-w-0 flex-1">{value}</View>
               {/* The toggle's 48 dp box carries `-my-[10px]`, so it reaches its
                   touch target without adding height to the value line. */}
-              <View className="shrink-0 -my-[10px]">{toggle}</View>
+              <View className="shrink-0 -my-[10px]">{visibilityControl}</View>
             </View>
             {note}
           </View>
         </Animated.View>
-        {action}
+        {purchaseAction}
       </View>
     );
   }
@@ -160,12 +107,12 @@ export function BalanceBlock({
       >
         {/* `flex-1` is a width share here: this View is the row's child. */}
         <View className="min-w-0 flex-1 gap-1">
-          {amount}
+          {value}
           {note}
         </View>
-        {toggle}
+        {visibilityControl}
       </Animated.View>
-      {action}
+      {purchaseAction}
     </View>
   );
 }

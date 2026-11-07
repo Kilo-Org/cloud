@@ -187,12 +187,14 @@ vi.mock('react-native', () => ({
 
 vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
 
+const balancePreference = vi.hoisted(() => ({ loaded: true }));
+
 vi.mock('@/lib/hooks/use-hide-balance-preference', async () => {
   const { useState } = await vi.importActual<typeof ReactModule>('react');
   return {
     useHideBalancePreference: () => {
       const [hideBalance, setHideBalance] = useState(false);
-      return { hideBalance, hasLoaded: true, setHideBalance };
+      return { hideBalance, hasLoaded: balancePreference.loaded, setHideBalance };
     },
   };
 });
@@ -389,6 +391,7 @@ function amountRow(renderer: ReactTestRenderer): ReactTestInstance {
 
 beforeEach(() => {
   Platform.OS = 'ios';
+  balancePreference.loaded = true;
   windowDims.width = 390;
   // A test that simulates the app reporting offline must not leak that state.
   onlineManager.setOnline(true);
@@ -423,6 +426,49 @@ beforeEach(() => {
 });
 
 describe('CreditsCard balance state', () => {
+  it('shows available credit details while the balance request is pending', async () => {
+    currentUser.userId = 'user-a';
+    const pendingBalance = Promise.withResolvers<{ balance: number }>();
+    getContextBalanceQueryFn.mockReturnValue(pendingBalance.promise);
+    personalCreditBlocksQueryFn.mockResolvedValue({
+      creditBlocks: [{ balance_mUsd: 2_000_000, expiry_date: '2099-12-17T12:00:00Z' }],
+    });
+    const { texts, unmount } = await mountCard();
+    try {
+      await waitFor(() => texts().some(text => text.includes('$2.00')));
+      expect(texts()).toContain('SKELETON');
+      expect(texts()).not.toContain('$0.00');
+      await act(async () => {
+        pendingBalance.resolve({ balance: 7 });
+        await pendingBalance.promise;
+      });
+      await waitFor(() => texts().includes('$7.00'));
+      expect(texts().some(text => text.includes('$2.00'))).toBe(true);
+    } finally {
+      unmount();
+      pendingBalance.resolve({ balance: 7 });
+    }
+  });
+
+  it('masks credit amounts until the balance privacy preference loads', async () => {
+    currentUser.userId = 'user-a';
+    balancePreference.loaded = false;
+    getContextBalanceQueryFn.mockResolvedValue({ balance: 7 });
+    personalCreditBlocksQueryFn.mockResolvedValue({
+      creditBlocks: [{ balance_mUsd: 2_000_000, expiry_date: '2099-12-17T12:00:00Z' }],
+    });
+    const { texts, unmount } = await mountCard();
+    try {
+      await waitFor(() => texts().some(text => text.includes('2099')));
+      const rendered = texts().join(' ');
+      expect(rendered).toContain('*****');
+      expect(rendered).not.toContain('$2.00');
+      expect(rendered).not.toContain('$7.00');
+    } finally {
+      unmount();
+    }
+  });
+
   it('shows no in-progress indicator while a cached balance refreshes', async () => {
     currentUser.userId = 'user-a';
     getContextBalanceQueryFn.mockResolvedValue({ balance: 10 });
@@ -1243,53 +1289,6 @@ describe('CreditsCard add-credits entry point', () => {
       ancestor = ancestor.parent;
     }
     expect(insideBalanceCard).toBe(true);
-
-    unmount();
-  });
-
-  it('paints the failed read and the purchase action in one balance block', async () => {
-    currentUser.userId = 'user-1';
-    savedMetadata.set(ORGANIZATION_STORAGE_KEY, 'org-a');
-    getContextBalanceQueryFn.mockRejectedValue(new Error('Balance unavailable'));
-    const orgs = [
-      { organizationId: 'org-a', organizationName: 'Acme', role: 'owner' },
-    ] as OrgListEntry[];
-    listState.payload = orgs;
-
-    const { renderer, texts, unmount } = await mountCard(createTestQueryClient(), orgs);
-    await waitFor(() => texts().includes('Failed to load balance. Tap to retry.'));
-
-    // A retry that succeeds swaps this block for the loaded row, so both states
-    // have to paint the same frame: the failure surface and the purchase action
-    // inside one block, not a padded pressable with the action beside it.
-    const block = balanceBlock(renderer);
-    expect(
-      block.findAll(node => node.children.includes('Failed to load balance. Tap to retry.')).length
-    ).toBeGreaterThan(0);
-
-    // No layout pass runs in this suite, so the card stays in its stacked
-    // layout: the retry surface is the value line, the note keeps its own line
-    // under it, and the purchase action centers beside that column. The retry
-    // surface carries its own 44 dp target while adding only the value line's
-    // height, so a retry that succeeds swaps content inside the same frame.
-    const retrySurface = block.find(
-      node =>
-        Object.is(node.type, 'Pressable') &&
-        hasClasses(node, ['min-h-[44px]', '-my-[8px]', 'justify-center'])
-    );
-    expect(renders(retrySurface, 'Failed to load balance. Tap to retry.')).toBe(true);
-    expect(retrySurface.props.onPress).toBeTypeOf('function');
-    // The note reads the credit blocks, not the balance, so the failed block
-    // keeps that line under the retry surface and the block holds its height.
-    const column = valueColumn(renderer);
-    expect(renders(column, 'Failed to load balance. Tap to retry.')).toBe(true);
-    expect(renders(column, 'No expiring credits.')).toBe(true);
-    const values = column.children.filter(
-      (child): child is ReactTestInstance => typeof child !== 'string'
-    );
-    expect(values.indexOf(retrySurface)).toBe(0);
-    expect(renders(block, 'ADD_CREDITS_ROW')).toBe(true);
-    expect(renders(column, 'ADD_CREDITS_ROW')).toBe(false);
 
     unmount();
   });

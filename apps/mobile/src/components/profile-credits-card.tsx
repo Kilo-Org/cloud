@@ -188,7 +188,7 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
       {!creditsFailed && !creditsPending && (
         <CreditExpiryNote
           creditBlocks={creditData.creditBlocks}
-          hiddenAmount={hideBalance ? HIDDEN_BALANCE : undefined}
+          hiddenAmount={hideBalance || !hideBalanceLoaded ? HIDDEN_BALANCE : undefined}
           emptyMessage={t('credits.noExpiringCredits')}
         />
       )}

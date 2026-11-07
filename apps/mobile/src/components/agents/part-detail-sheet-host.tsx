@@ -1,5 +1,7 @@
 import { type StoredMessage } from '@kilocode/cloud-agent-sdk';
-import { type ReactNode, useCallback, useState } from 'react';
+import { type ReactNode, useCallback, useRef, useState } from 'react';
+import { Keyboard } from 'react-native';
+import { useKeyboardState } from 'react-native-keyboard-controller';
 
 import { OpenPartDetailContext } from './open-part-detail-context';
 import { findPartById } from './part-detail-model';
@@ -12,29 +14,56 @@ type PartDetailSheetHostProps = {
 
 /**
  * Per-transcript-surface host: provides the context opener to the rows it
- * wraps and mounts the detail sheet. Stores only the open part id and
- * re-resolves the part from the live `messages` prop on every render, so an
- * open sheet tracks the part as it streams without a close/reopen. The
- * fragment never wraps children in a layout view — the FlashList needs
- * flex-1 passthrough.
+ * wraps and mounts the detail sheet. The presented part id survives
+ * `visible -> false` and re-resolves from the live `messages` prop on every
+ * render, so the sheet keeps its title and body through the native dismiss
+ * animation and tracks the part as it streams; only the native `onDismiss`
+ * report clears it. Opening while the keyboard is up dismisses the keyboard
+ * first and presents once the provider reports it hidden, the same handoff
+ * as `useNewSessionDiscardGuard`, and nothing restores the composer's focus
+ * afterwards. The fragment never wraps children in a layout view — the
+ * FlashList needs flex-1 passthrough.
  */
 export function PartDetailSheetHost({ messages, children }: Readonly<PartDetailSheetHostProps>) {
-  const [openPartId, setOpenPartId] = useState<string | null>(null);
+  const [presentedPartId, setPresentedPartId] = useState<string | null>(null);
+  const [visible, setVisible] = useState(false);
+  const [pendingPartId, setPendingPartId] = useState<string | null>(null);
+  const keyboardVisible = useKeyboardState(state => state.isVisible);
+  const keyboardVisibleRef = useRef(keyboardVisible);
+  keyboardVisibleRef.current = keyboardVisible;
 
-  const part = openPartId ? findPartById(messages, openPartId) : null;
+  if (pendingPartId !== null && !keyboardVisible) {
+    setPendingPartId(null);
+    setPresentedPartId(pendingPartId);
+    setVisible(true);
+  }
+
+  const part = presentedPartId ? findPartById(messages, presentedPartId) : null;
 
   const open = useCallback((partId: string) => {
-    setOpenPartId(partId);
+    if (keyboardVisibleRef.current) {
+      Keyboard.dismiss();
+      setPendingPartId(partId);
+      return;
+    }
+    setPendingPartId(null);
+    setPresentedPartId(partId);
+    setVisible(true);
   }, []);
 
   const close = useCallback(() => {
-    setOpenPartId(null);
+    setVisible(false);
+  }, []);
+
+  const handleDismiss = useCallback(() => {
+    setVisible(false);
+    setPresentedPartId(null);
   }, []);
 
   return (
     <>
       <OpenPartDetailContext.Provider value={open}>{children}</OpenPartDetailContext.Provider>
-      <PartDetailSheet visible={openPartId !== null} part={part} onClose={close} />
+      <PartDetailSheet visible={visible} part={part} onClose={close} onDismiss={handleDismiss} />
     </>
   );
 }

@@ -96,6 +96,10 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
     if (/(?:^|\/)dev\/transcript-style-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/(auth)/transcript-style-fixture';
     }
+    const partDetailFixture = /(?:^|\/)dev\/part-detail-transition-fixture\/?(\?.*)?$/.exec(path);
+    if (partDetailFixture) {
+      return `/(auth)/part-detail-transition-fixture${partDetailFixture[1] ?? ''}`;
+    }
     if (/(?:^|\/)dev\/attachment-chip-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/(app)/attachment-chip-fixture';
     }

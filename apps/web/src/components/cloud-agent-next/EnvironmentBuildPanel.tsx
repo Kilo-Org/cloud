@@ -41,6 +41,7 @@ type EnvironmentBuildPanelProps = {
   environmentId: string;
   canManage: boolean;
   hasUnsavedChanges: boolean;
+  active?: boolean;
 };
 
 /**
@@ -52,8 +53,13 @@ export function EnvironmentBuildPanel({
   environmentId,
   canManage,
   hasUnsavedChanges,
+  active = true,
 }: EnvironmentBuildPanelProps) {
-  const statusQuery = useEnvironmentBuildStatus(environmentId, { organizationId, poll: true });
+  const statusQuery = useEnvironmentBuildStatus(environmentId, {
+    organizationId,
+    enabled: active,
+    poll: active,
+  });
   const status = statusQuery.data;
   const action = buildAction(status, { canManage, hasUnsavedChanges });
 

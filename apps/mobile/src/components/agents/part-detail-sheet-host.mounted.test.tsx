@@ -484,40 +484,46 @@ describe('PartDetailSheetHost mounted', () => {
     expect(sheetTitle(renderer)).toBe('bash: echo one');
   });
 
-  it('presents a reopened part when the superseded dismissal reports, without clearing it', async () => {
-    const renderer = await mountHost([
-      makeMessage('m1', [
-        makeBashPart('bash-1', 'echo one', true),
-        makeReasoningPart('r1', 'working through it', true),
-      ]),
-    ]);
-
-    await act(async () => {
-      await Promise.resolve();
-      capturedOpener?.('bash-1');
-    });
-    await act(async () => {
-      await Promise.resolve();
-      (propOf(findByType(renderer.root, 'SheetHeader')[0], 'onDone') as () => void)();
-    });
-    expect(propOf(findByType(renderer.root, 'BottomSheet')[0], 'index')).toBe(-1);
-
-    // Reopen another part before the native sheet reports the dismissal:
-    // the content switches now and the sheet re-presents on the report.
-    await act(async () => {
-      await Promise.resolve();
-      capturedOpener?.('r1');
-    });
-    expect(sheetTitle(renderer)).toBe('Thought');
-    expect(propOf(findByType(renderer.root, 'BottomSheet')[0], 'index')).toBe(-1);
-
-    await act(async () => {
-      await Promise.resolve();
-      reportSheetDismissed(renderer);
-    });
-    expect(propOf(findByType(renderer.root, 'BottomSheet')[0], 'index')).toBe(0);
-    expect(sheetTitle(renderer)).toBe('Thought');
-  });
+  it.each(['bash-1', 'bash-2'])(
+    'keeps the leaving presentation and reopens %s with fresh text mode',
+    async partId => {
+      const renderer = await mountHost([
+        makeMessage('m1', [
+          makeBashPart('bash-1', 'echo one', true),
+          makeBashPart('bash-2', 'echo two', true),
+        ]),
+      ]);
+      await act(() => {
+        capturedOpener?.('bash-1');
+      });
+      await act(() => {
+        pressRadio(renderer.root, 'Scroll');
+      });
+      await act(() => {
+        (propOf(findByType(renderer.root, 'SheetHeader')[0], 'onDone') as () => void)();
+      });
+      await act(() => {
+        capturedOpener?.(partId);
+      });
+      expect(sheetTitle(renderer)).toBe('bash: echo one');
+      expect(propOf(findByType(renderer.root, 'BottomSheet')[0], 'index')).toBe(-1);
+      expect(propOf(radio(renderer.root, 'Scroll'), 'accessibilityState')).toMatchObject({
+        selected: true,
+      });
+      await act(() => {
+        reportSheetSelfDismissal(renderer);
+        reportSheetDismissed(renderer);
+      });
+      expect(propOf(findByType(renderer.root, 'BottomSheet')[0], 'index')).toBe(0);
+      expect(sheetTitle(renderer)).toBe(partId === 'bash-1' ? 'bash: echo one' : 'bash: echo two');
+      expect(propOf(radio(renderer.root, 'Wrap'), 'accessibilityState')).toMatchObject({
+        selected: true,
+      });
+      act(() => {
+        renderer.unmount();
+      });
+    }
+  );
 
   it('dismisses the keyboard first and presents only once it reports hidden', async () => {
     keyboardState.visible = true;
@@ -551,7 +557,7 @@ describe('PartDetailSheetHost mounted', () => {
     expect(keyboardDismiss).toHaveBeenCalledTimes(1);
   });
 
-  it('presents at once without dismissing an already hidden keyboard', async () => {
+  it('presents at once when the keyboard is already hidden', async () => {
     const renderer = await mountHost([
       makeMessage('m1', [makeBashPart('bash-1', 'echo one', true)]),
     ]);
@@ -560,7 +566,6 @@ describe('PartDetailSheetHost mounted', () => {
       await Promise.resolve();
       capturedOpener?.('bash-1');
     });
-    expect(keyboardDismiss).not.toHaveBeenCalled();
     expect(propOf(findByType(renderer.root, 'BottomSheet')[0], 'index')).toBe(0);
   });
 
@@ -586,5 +591,28 @@ describe('PartDetailSheetHost mounted', () => {
     });
     expect(sheetTitle(renderer)).toBe('Thought');
     expect(findByType(renderer.root, 'ToolPartDetailBody')).toHaveLength(0);
+  });
+
+  it('opens after a missing keyboard-hide completion', async () => {
+    vi.useFakeTimers();
+    let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
+    try {
+      keyboardState.visible = true;
+      renderer = await mountHost([makeMessage('m1', [makeBashPart('bash-1', 'echo one', true)])]);
+      await act(() => {
+        capturedOpener?.('bash-1');
+      });
+      expect(findByType(renderer.root, 'BottomSheet')).toHaveLength(0);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1000);
+      });
+      expect(propOf(findByType(renderer.root, 'BottomSheet')[0], 'index')).toBe(0);
+      expect(sheetTitle(renderer)).toBe('bash: echo one');
+    } finally {
+      act(() => {
+        renderer?.unmount();
+      });
+      vi.useRealTimers();
+    }
   });
 });

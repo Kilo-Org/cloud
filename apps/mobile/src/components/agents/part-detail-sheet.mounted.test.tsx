@@ -53,6 +53,7 @@ vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   View: 'View',
   Platform: { OS: 'ios' },
+  Keyboard: { dismiss: vi.fn() },
   useWindowDimensions: () => ({ width: 390, height: 844 }),
 }));
 vi.mock('react-native-safe-area-context', () => ({

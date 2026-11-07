@@ -521,7 +521,7 @@ export function remoteSessionEyebrowLabel(session: {
 /**
  * Tint key for a remote row's eyebrow, next to the label it belongs to: `live`
  * for a state word, `platform` for the kind of agent the row ran on, and
- * `project` when the eyebrow names the repository it ran in.
+ * `repository` when the eyebrow names the repository it ran in.
  */
 export function remoteSessionEyebrowState(session: {
   gitUrl?: string | null;
@@ -534,7 +534,7 @@ export function remoteSessionEyebrowState(session: {
 
 /**
  * Tint key for a stored row's eyebrow, next to {@link storedSessionEyebrowLabel}:
- * `project` when the eyebrow names the repository the row ran in, `unknown`
+ * `repository` when the eyebrow names the repository the row ran in, `unknown`
  * for the placeholder of an origin the row cannot name, and `platform` when it
  * names only the kind of agent the row ran on.
  */

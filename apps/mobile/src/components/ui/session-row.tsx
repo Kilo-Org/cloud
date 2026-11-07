@@ -21,7 +21,7 @@ type SessionRowProps = {
    * The row tint to paint for the label: the word's colour must not drift with
    * its translation, so the key pins instead of hashing. `unknown` is a
    * placeholder for a value the row cannot name, `platform` names the kind of
-   * agent the row ran on, and `project` names the repository it ran in; all
+   * agent the row ran on, and `repository` names the repository it ran in; all
    * three label the row's context rather than the session, so they take the
    * muted pair and the title leads. `idle`/`live` keep the ramp entry the
    * English word already hashed to (sky blue). Omit it for a label that is the

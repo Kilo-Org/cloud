@@ -26,12 +26,16 @@ import {
   followSession,
   getSessionFollowsRevision,
   isSessionFollowed,
-  restoreFollowedSessionCards,
   SESSION_FINISHED_DISMISS_MS,
   subscribeSessionFollows,
   syncFollowedSessionCards,
   unfollowSession,
 } from './session-follow';
+import {
+  restoreFollowedSessionCards,
+  type SessionRestoreScope,
+  type SessionRestoreScopeReader,
+} from './session-follow-restore';
 import { sessionCardStaleAfterSeconds } from './session-card-facts';
 import {
   renderSessionCardPress,
@@ -110,6 +114,11 @@ vi.mock('@/lib/glanceable/sink-registry', () => ({
 
 const NOW = Date.parse('2026-10-12T10:00:00.000Z');
 const CTX = { userId: 'user-1', organizationId: 'org-1' };
+
+/** The stored account a restore would read, as the reader it calls. */
+function storedScope(scope: SessionRestoreScope): SessionRestoreScopeReader {
+  return () => Promise.resolve(scope);
+}
 
 // The follow scope records, as the keychain would hold them. A suite that needs
 // an unreadable store replaces `scopeReadsFail`.
@@ -243,7 +252,7 @@ describe('the follow scope record', () => {
     // A fresh process: the native card and its record outlive the map.
     _resetSessionFollowForTests();
 
-    await restoreFollowedSessionCards({ kind: 'account', ctx: CTX });
+    await restoreFollowedSessionCards(storedScope({ kind: 'account', ctx: CTX }));
 
     expect(isSessionFollowed('session-1')).toBe(true);
     expect(mocks.registerSessionActivityToken).toHaveBeenCalledWith(
@@ -302,10 +311,10 @@ describe('discoverSessionCards', () => {
     rememberSessionCardScope('session-1', CTX);
     await _settleSessionCardScopeWritesForTests();
 
-    await restoreFollowedSessionCards({ kind: 'unreadable' });
+    await restoreFollowedSessionCards(storedScope({ kind: 'unreadable' }));
     expect(mocks.registerSessionActivityToken).not.toHaveBeenCalled();
 
-    await restoreFollowedSessionCards({ kind: 'account', ctx: CTX });
+    await restoreFollowedSessionCards(storedScope({ kind: 'account', ctx: CTX }));
     expect(mocks.registerSessionActivityToken).toHaveBeenCalledWith(
       'native-1',
       mocks.instances[0],
@@ -320,7 +329,7 @@ describe('discoverSessionCards', () => {
     rememberSessionCardScope('session-1', { userId: 'user-2', organizationId: 'org-1' });
     await _settleSessionCardScopeWritesForTests();
 
-    await restoreFollowedSessionCards({ kind: 'account', ctx: CTX });
+    await restoreFollowedSessionCards(storedScope({ kind: 'account', ctx: CTX }));
 
     expect(card.end).toHaveBeenCalledWith('immediate', undefined, expect.any(Date), undefined);
     expect(mocks.registerSessionActivityToken).not.toHaveBeenCalled();
@@ -336,7 +345,7 @@ describe('discoverSessionCards', () => {
     rememberSessionCardScope('session-1', { userId: 'user-1', organizationId: 'org-2' });
     await _settleSessionCardScopeWritesForTests();
 
-    await restoreFollowedSessionCards({ kind: 'account', ctx: CTX });
+    await restoreFollowedSessionCards(storedScope({ kind: 'account', ctx: CTX }));
 
     expect(card.end).toHaveBeenCalledWith('immediate', undefined, expect.any(Date), undefined);
     expect(mocks.registerSessionActivityToken).not.toHaveBeenCalled();
@@ -346,7 +355,7 @@ describe('discoverSessionCards', () => {
     const unrecorded = fakeActivity('native-1', { sessionId: 'session-1' });
     mocks.instances = [unrecorded];
 
-    await restoreFollowedSessionCards({ kind: 'account', ctx: CTX });
+    await restoreFollowedSessionCards(storedScope({ kind: 'account', ctx: CTX }));
     expect(unrecorded.end).toHaveBeenCalledWith(
       'immediate',
       undefined,
@@ -365,7 +374,7 @@ describe('discoverSessionCards', () => {
     await _settleSessionCardScopeWritesForTests();
     scopeReadsFail = true;
 
-    await restoreFollowedSessionCards({ kind: 'account', ctx: CTX });
+    await restoreFollowedSessionCards(storedScope({ kind: 'account', ctx: CTX }));
 
     expect(card.end).not.toHaveBeenCalled();
     expect(mocks.registerSessionActivityToken).not.toHaveBeenCalled();
@@ -378,7 +387,7 @@ describe('discoverSessionCards', () => {
       throw new Error('ActivityKit unavailable');
     });
 
-    await restoreFollowedSessionCards({ kind: 'account', ctx: CTX });
+    await restoreFollowedSessionCards(storedScope({ kind: 'account', ctx: CTX }));
     await _settleSessionCardScopeWritesForTests();
 
     // A read that proved nothing must not cost the card its record.
@@ -405,7 +414,7 @@ describe('discoverSessionCards', () => {
       throw new Error('ActivityKit unavailable');
     });
 
-    const restoring = restoreFollowedSessionCards({ kind: 'account', ctx: CTX });
+    const restoring = restoreFollowedSessionCards(storedScope({ kind: 'account', ctx: CTX }));
     // A second discovery, as a foreground restore would run, reads ActivityKit
     // successfully while the first restore still waits on its own record read.
     mocks.instances = [fakeActivity('native-9', { sessionId: 'session-9' })];
@@ -639,7 +648,7 @@ describe('session card tokens', () => {
     const [card] = mocks.instances;
     setLiveActivityEnabledValue(false);
 
-    await restoreFollowedSessionCards({ kind: 'account', ctx: CTX });
+    await restoreFollowedSessionCards(storedScope({ kind: 'account', ctx: CTX }));
 
     expect(mocks.cleanupTokens).toHaveBeenCalledWith('scope');
     expect(card?.end).toHaveBeenCalledWith('immediate');
@@ -658,7 +667,7 @@ describe('a restore with no stored account', () => {
     mocks.registerSessionActivityToken.mockClear();
     const [card] = mocks.instances;
 
-    await restoreFollowedSessionCards({ kind: 'signedOut' });
+    await restoreFollowedSessionCards(storedScope({ kind: 'signedOut' }));
 
     expect(card?.end).toHaveBeenCalledWith('immediate');
     expect(mocks.releaseSessionActivity).toHaveBeenCalledWith('activity-0');
@@ -677,7 +686,7 @@ describe('a restore with no stored account', () => {
     mocks.registerSessionActivityToken.mockClear();
     const [card] = mocks.instances;
 
-    await restoreFollowedSessionCards({ kind: 'unreadable' });
+    await restoreFollowedSessionCards(storedScope({ kind: 'unreadable' }));
 
     expect(card?.end).not.toHaveBeenCalled();
     expect(mocks.cleanupTokens).not.toHaveBeenCalled();
@@ -685,6 +694,48 @@ describe('a restore with no stored account', () => {
     await _settleSessionCardScopeWritesForTests();
     const kept = await readSessionCardScopes();
     expect(kept?.get('session-1')).toEqual(CTX);
+  });
+});
+
+describe('a restore with no live card', () => {
+  it('reads no stored account and ends nothing', async () => {
+    const readScope = vi.fn<SessionRestoreScopeReader>();
+
+    await restoreFollowedSessionCards(readScope);
+
+    expect(readScope).not.toHaveBeenCalled();
+    expect(mocks.cleanupTokens).not.toHaveBeenCalled();
+    expect(mocks.releaseSessionActivity).not.toHaveBeenCalled();
+  });
+
+  it('drops the records a card left behind without reading the account', async () => {
+    followSession(RUNNING, CTX, NOW);
+    await _settleSessionCardScopeWritesForTests();
+    // A fresh process after the card ended: the record outlives it.
+    _resetSessionFollowForTests();
+    mocks.instances = [];
+    const readScope = vi.fn<SessionRestoreScopeReader>();
+
+    await restoreFollowedSessionCards(readScope);
+    await _settleSessionCardScopeWritesForTests();
+
+    expect(readScope).not.toHaveBeenCalled();
+    const cleared = await readSessionCardScopes();
+    expect(cleared?.size).toBe(0);
+  });
+
+  it('reads the stored account when ActivityKit cannot be read', async () => {
+    mocks.getInstances.mockImplementation(() => {
+      throw new Error('ActivityKit unavailable');
+    });
+    const readScope = vi.fn<SessionRestoreScopeReader>(() =>
+      Promise.resolve({ kind: 'signedOut' })
+    );
+
+    await restoreFollowedSessionCards(readScope);
+
+    expect(readScope).toHaveBeenCalledTimes(1);
+    expect(mocks.cleanupTokens).toHaveBeenCalledWith('scope');
   });
 });
 

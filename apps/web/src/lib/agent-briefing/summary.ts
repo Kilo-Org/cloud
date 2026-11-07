@@ -156,14 +156,16 @@ async function attemptBriefingSummary(
 
 /**
  * The briefing text for one generation. A transient gateway decline or transport
- * failure is repeated with backoff, inside the generation's own deadline, so a
- * logged morning briefing survives a blip; a terminal outcome or an exhausted
- * deadline throws the specific failure for the caller to record.
+ * failure is repeated with backoff, inside the generation's own deadline and the
+ * attempt bound, so a logged morning briefing survives a blip; a terminal outcome, an
+ * exhausted deadline, or an attempt the gateway already billed throws the specific
+ * failure for the caller to record.
  */
 async function requestBriefingSummary(
   url: string,
   init: RequestInit,
-  deadlineMs: number
+  deadlineMs: number,
+  wasBilled: () => Promise<boolean>
 ): Promise<string> {
   let failure: unknown;
   for (let attempt = 1; ; attempt++) {
@@ -187,6 +189,9 @@ async function requestBriefingSummary(
     const { promise: slept, resolve } = Promise.withResolvers<void>();
     setTimeout(resolve, delayMs);
     await slept;
+    // The wait covers the gateway's post-response write, so a usage identifier that
+    // exists here belongs to an attempt that was billed.
+    if (await wasBilled()) throw failure;
   }
 }
 
@@ -448,6 +453,32 @@ function chargeAccounting(row: BriefingReportRow) {
   );
 }
 
+/**
+ * Whether this generation has already paid for an attempt. The gateway records a
+ * usage identifier on the attempt it billed, including an answer the caller never
+ * received, so a repeat after one pays twice for one briefing and spends past the
+ * safeguard the person was shown for it. An attempt the gateway read no usage from
+ * keeps a null identifier, so a decline before generation stays repeatable.
+ */
+async function generationBilled(reportId: string, generationId: string): Promise<boolean> {
+  const [current] = await db
+    .select({ summary: agent_briefing_snapshots.summary })
+    .from(agent_briefing_snapshots)
+    .where(
+      and(
+        eq(agent_briefing_snapshots.id, reportId),
+        eq(agent_briefing_snapshots.generation_id, generationId)
+      )
+    );
+  // The snapshot is gone, so a repeat has nowhere to land and would bill for nothing.
+  if (!current) return true;
+  const accounting = briefingChargeAccountingSchema.safeParse(current.summary.chargeAccounting);
+  if (!accounting.success) return false;
+  return accounting.data.generations.some(
+    generation => generation.id === generationId && generation.usageId !== null
+  );
+}
+
 async function reconcileLockedBriefingCharge(
   tx: BriefingTransaction,
   row: BriefingReportRow
@@ -676,7 +707,8 @@ export async function runBriefingSummary(reportId: string): Promise<void> {
           },
         }),
       },
-      deadlineMs
+      deadlineMs,
+      () => generationBilled(row.id, generationId)
     );
     await assertBriefingSourcesAccessible(row);
     const finishedAt = new Date().toISOString();

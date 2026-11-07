@@ -769,6 +769,8 @@ Manual creation, historical period selection, preparation drafts, and manual sum
 Pricing estimates use the model picker's configured provider prices and the stored target for model aliases.
 The gateway preserves bounded-request price ceilings and model access checks.
 Each charged retry retains a distinct usage receipt with its committed or queued delivery state.
+A usage identifier marks an attempt the gateway billed, including an answer the caller never received.
+The summary worker repeats a transient failure only while the generation has no usage identifier.
 Settlement waits for every recorded receipt, within the existing delivery window.
 A later receipt reopens settlement after an earlier attempt settled.
 The displayed cost sums usage rows once, including rows delivered after another attempt.
@@ -794,6 +796,7 @@ Do not treat an unshipped user interface as proof that its ingestion code is ina
 
 The gateway marks a refusal that replaces an already-accounted answer.
 The summary worker must not retry that refusal.
+The repeat guard reads the usage identifier the deployed gateway already writes for a billed attempt, so it adds no gateway behavior.
 The scheduled workflow promotes the gateway marker producer before the matching web retry consumer.
 Web promotion requires successful gateway staging and promotion, or both gateway jobs skipped.
 A failed, cancelled, or mismatched gateway rollout blocks web promotion.

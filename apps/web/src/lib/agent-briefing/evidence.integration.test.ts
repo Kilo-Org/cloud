@@ -97,6 +97,27 @@ async function scheduled(active = true) {
     });
   return { user, now };
 }
+async function recordBilledAttempt(reportId: string) {
+  const [report] = await db
+    .select()
+    .from(agent_briefing_snapshots)
+    .where(eq(agent_briefing_snapshots.id, reportId));
+  if (!report?.generation_id) throw new Error('No generation');
+  const generation = briefingChargeAccountingSchema
+    .parse(report.summary.chargeAccounting)
+    .generations.find(entry => entry.id === report.generation_id);
+  if (!generation?.settlementToken) throw new Error('No settlement token');
+  await recordBriefingUsage({
+    kiloUserId: report.kilo_user_id,
+    generationId: report.generation_id,
+    settlementToken: generation.settlementToken,
+    usage: {
+      status: 'queued',
+      usageId: crypto.randomUUID(),
+      createdAt: new Date().toISOString(),
+    },
+  });
+}
 it('atomically captures one occurrence only for explicitly enabled contexts', async () => {
   const { user, now } = await scheduled();
   const org = await createTestOrganization('Disabled context', user.id, 0);
@@ -224,6 +245,27 @@ it('retries a transient gateway decline and publishes the answer it gets', async
   const [finished] = await db.select().from(agent_briefing_snapshots);
   expect(finished?.summary.status).toBe('ready');
   expect(finished?.summary.text).toBe('Retried morning summary.');
+}, 20_000);
+
+it('does not repeat an attempt the gateway already billed', async () => {
+  const { now } = await scheduled();
+  await sweepAgentBriefings(now);
+  const [row] = await db.select().from(agent_briefing_snapshots);
+  if (!row) throw new Error('No captured snapshot');
+  const fetcher = jest
+    .spyOn(globalThis, 'fetch')
+    // A lost response: the gateway billed the answer and recorded its usage
+    // identifier, then the caller's connection failed. A repeat would pay twice.
+    .mockImplementationOnce(async () => {
+      await recordBilledAttempt(row.id);
+      throw new TypeError('fetch failed');
+    })
+    .mockResolvedValue(Response.json({ choices: [{ message: { content: 'Unbilled repeat.' } }] }));
+  await runBriefingSummary(row.id);
+  expect(fetcher).toHaveBeenCalledTimes(1);
+  const [failed] = await db.select().from(agent_briefing_snapshots);
+  expect(failed?.summary.status).toBe('failed');
+  expect(failed?.summary.error).toBe('generation_failed');
 }, 20_000);
 
 it('fails a terminal decline without a second request', async () => {

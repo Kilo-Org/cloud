@@ -306,7 +306,7 @@ describe('Organization hub card', () => {
       .find(node => node.props.label === i18n.t('organization.hub.balance'));
     // The control shares the amount's row: a row of its own held nothing but
     // the button once the copy beside it left.
-    const trailing: unknown = balance?.props.trailing;
+    const trailing: object | null | undefined = balance?.props.trailing;
     expect(isValidElement(trailing) && trailing.type === AddCreditsRow).toBe(true);
     unmount();
   });

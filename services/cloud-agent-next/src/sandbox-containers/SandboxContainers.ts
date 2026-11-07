@@ -1,8 +1,6 @@
 import {
-  MAX_SNAPSHOT_START_FAILURES,
-  SNAPSHOT_START_FAILURES_KEY,
-  parseSnapshotStartFailures,
-  recordSnapshotStartFailure,
+  classifySnapshotStartFailure,
+  type SnapshotStartFailureReason,
 } from './snapshot-start-failures.js';
 import { getBillingContext } from '@kilocode/container-usage';
 import { withTimeout } from '@kilocode/worker-utils';
@@ -113,6 +111,7 @@ export type ContainersLaunchResult = {
   started: boolean;
   startSource: ContainersStartSource;
   snapshotFailed?: true;
+  snapshotFailureReason?: SnapshotStartFailureReason;
 };
 
 export type ContainersObservation = {
@@ -156,7 +155,10 @@ type ResolvedStart = NativeStartPlan & {
 };
 
 /** A start that did not reach its main process, reported to the caller instead of thrown. */
-type StartFailure = { snapshotFailed: true };
+type StartFailure = {
+  snapshotFailed: true;
+  snapshotFailureReason: SnapshotStartFailureReason;
+};
 
 type DelayedSchedule<T> = {
   taskId: string;
@@ -580,14 +582,6 @@ export class SandboxContainers extends DurableObject<Env> {
     mainProcess: NativeMainProcess,
     allowSnapshot: boolean
   ): Promise<ResolvedStart> {
-    const failures =
-      input.snapshot === undefined
-        ? []
-        : parseSnapshotStartFailures(await this.ctx.storage.get(SNAPSHOT_START_FAILURES_KEY));
-    const snapshotRejected =
-      input.snapshot !== undefined &&
-      (failures.find(record => record.snapshotId === input.snapshot?.snapshotId)?.failures ?? 0) >=
-        MAX_SNAPSHOT_START_FAILURES;
     const plan = planNativeStart(
       {
         image: this.containerImage(input.nativeImage ?? 'all-in-one'),
@@ -602,9 +596,8 @@ export class SandboxContainers extends DurableObject<Env> {
         command: input.command,
         ...(input.snapshot === undefined ? {} : { snapshot: input.snapshot }),
       },
-      allowSnapshot && !snapshotRejected
+      allowSnapshot
     );
-    if (snapshotRejected) plan.reason = 'restore_failures';
     logControlDiagnostic('snapshot_lookup', {
       sandboxId: this.sandboxNameForLog(),
       source: plan.source,
@@ -624,10 +617,11 @@ export class SandboxContainers extends DurableObject<Env> {
   }
 
   /**
-   * Run one physical start. A failed snapshot start is reported, not thrown, so
-   * the caller can retry the same allocation from the image once. A runtime
-   * installer that exited with a typed code is reported the same way, so the
-   * provider maps it to its reason. Every other failure throws.
+   * Run one physical start. A failed snapshot start is reported with its reason
+   * so the Sandbox DO can retry the same artifact or fail the route; it is never
+   * retried from the image here. The reason is classified from the error text
+   * only: a container that stops before confirming the main process carries no
+   * exit code, so it is reported as transient. Every other failure throws.
    */
   private async runStart(
     start: ResolvedStart,
@@ -638,20 +632,14 @@ export class SandboxContainers extends DurableObject<Env> {
       return null;
     } catch (error) {
       if (start.source === 'repository' && start.snapshotId !== null) {
-        const failures = parseSnapshotStartFailures(
-          await this.ctx.storage.get(SNAPSHOT_START_FAILURES_KEY)
-        );
-        await this.ctx.storage.put(
-          SNAPSHOT_START_FAILURES_KEY,
-          recordSnapshotStartFailure(failures, start.snapshotId)
-        );
+        const snapshotFailureReason = classifySnapshotStartFailure(error);
         logControlDiagnostic('snapshot_start_failed', {
           sandboxId: this.sandboxNameForLog(),
-          reason: 'repository_start_failed',
+          reason: snapshotFailureReason,
           errorName: error instanceof Error ? diagnosticCause(error.name) : 'unknown',
           cause: error instanceof Error ? diagnosticCause(error.message) : 'unknown',
         });
-        return { snapshotFailed: true };
+        return { snapshotFailed: true, snapshotFailureReason };
       }
       throw error;
     }

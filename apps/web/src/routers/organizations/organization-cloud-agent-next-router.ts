@@ -915,6 +915,46 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
     }),
 
   /**
+   * The capture time of the session's workspace snapshot, or null when the
+   * workspace has none (organization context).
+   */
+  getWorkspaceSnapshotRecovery: organizationMemberProcedure
+    .input(z.object({ sessionId: z.string().min(1), organizationId: z.uuid() }).strict())
+    .output(
+      z.union([z.object({ capturedAt: z.number().int().nonnegative().nullable() }), z.null()])
+    )
+    .query(async ({ ctx, input }) => {
+      await assertOrganizationOwnsSession({
+        organizationId: input.organizationId,
+        userId: ctx.user.id,
+        cloudAgentSessionId: input.sessionId,
+      });
+      const client = createCloudAgentNextClient(
+        await createCloudAgentControlToken(ctx.user, ctx.headersList, input.organizationId)
+      );
+      return await client.getWorkspaceSnapshotRecovery(input.sessionId);
+    }),
+
+  /**
+   * Remove the session's workspace snapshot on explicit user action
+   * (organization context).
+   */
+  removeWorkspaceSnapshot: organizationMemberMutationProcedure
+    .input(z.object({ sessionId: z.string().min(1), organizationId: z.uuid() }).strict())
+    .output(z.object({ success: z.literal(true) }))
+    .mutation(async ({ ctx, input }) => {
+      await assertOrganizationOwnsSession({
+        organizationId: input.organizationId,
+        userId: ctx.user.id,
+        cloudAgentSessionId: input.sessionId,
+      });
+      const client = createCloudAgentNextClient(
+        await createCloudAgentControlToken(ctx.user, ctx.headersList, input.organizationId)
+      );
+      return await client.removeWorkspaceSnapshot(input.sessionId);
+    }),
+
+  /**
    * Cancel one queued (not yet accepted) message by id. Never interrupts the
    * active run; a missing id or the accepted current message returns
    * `{ dropped: false }`.

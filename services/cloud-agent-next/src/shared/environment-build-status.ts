@@ -55,8 +55,11 @@ export const environmentSnapshotSummarySchema = z
     capturedAt: z.number().int(),
     size: z.number().nonnegative().nullable(),
     setupDurationMs: z.number().int().nonnegative(),
-    /** `revision`: a newer configuration exists; `age`: older than the refresh age. */
-    /** `image`: built for another sandbox image or runtime ABI, so sessions start without it. */
+    /**
+     * `revision`: a newer configuration exists; `age`: older than the refresh age;
+     * `image`: built for another sandbox image or runtime ABI. A previous-image
+     * snapshot stays usable during the rollout window; an incompatible one does not.
+     */
     stale: z.enum(['revision', 'age', 'image']).nullable(),
     expiresAt: z.number().int(),
   })

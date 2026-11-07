@@ -107,7 +107,7 @@ describe('environment build display', () => {
     ).toBe('Environment settings have changed. Refresh the snapshot to include them.');
     expect(stalenessText(status({ published: PUBLISHED }))).toBeNull();
     expect(stalenessText(status({ published: { ...PUBLISHED, stale: 'image' } }))).toBe(
-      'The snapshot was built for an earlier sandbox image. Sessions start without it until a refresh completes.'
+      'The snapshot was built for an earlier sandbox image. Refresh it: sessions can use it for at most 24 hours after capture, and only while the runtime is unchanged.'
     );
   });
 

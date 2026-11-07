@@ -22,6 +22,7 @@ import {
 import {
   failedStageStep,
   findRestoreIncompleteStep,
+  hasReportedCommandFailure,
   incompleteRestoreText,
   preparationGroupExpandedByDefault,
 } from './preparation-group-state';
@@ -32,6 +33,8 @@ const ROW_TOUCH_SLOP = { top: 5, bottom: 5 } as const;
 const STEP_CARET_SIZE = 14;
 /** The status column of a child row: every drawn mark fits this box. */
 const STEP_STATUS_SIZE = 16;
+/** Start commands carry no "Setup command N" wording; the command text names them. */
+const START_COMMANDS_STEP_KEY = 'start_commands';
 
 export function PreparationGroup({ attempt }: { attempt: PreparationAttempt }) {
   const { t } = useTranslation();
@@ -40,9 +43,12 @@ export function PreparationGroup({ attempt }: { attempt: PreparationAttempt }) {
     incompleteText === undefined ? undefined : preparationErrorText(incompleteText, t);
   const [expanded, setExpanded] = useState(() => preparationGroupExpandedByDefault(attempt));
   const colors = useThemeColors();
+  const reportedFailure = hasReportedCommandFailure(attempt);
   useEffect(() => {
-    setExpanded(attempt.status !== 'completed' || incompleteReport !== undefined);
-  }, [attempt.id, attempt.status, incompleteReport]);
+    setExpanded(
+      attempt.status !== 'completed' || incompleteReport !== undefined || reportedFailure
+    );
+  }, [attempt.id, attempt.status, incompleteReport, reportedFailure]);
   const copy = groupCopy(attempt, incompleteReport, t);
   // The header names one step — the restore report, or the stage that failed —
   // so the body does not list that step under the same words again. It keeps
@@ -52,6 +58,9 @@ export function PreparationGroup({ attempt }: { attempt: PreparationAttempt }) {
     copy.namedStep === undefined
       ? attempt.steps
       : attempt.steps.filter(step => step.id !== copy.namedStep?.id);
+  const phaseKeys = new Map(
+    attempt.steps.filter(step => step.kind === 'phase').map(step => [step.id, step.key])
+  );
   return (
     <View className="mx-4 my-2 overflow-hidden rounded-md border border-border bg-card">
       <Pressable
@@ -83,7 +92,13 @@ export function PreparationGroup({ attempt }: { attempt: PreparationAttempt }) {
           ) : null}
           {copy.namedStep === undefined ? null : <PreparationStepDetails step={copy.namedStep} />}
           {steps.map(step => (
-            <PreparationStepRow key={step.id} step={step} />
+            <PreparationStepRow
+              key={step.id}
+              step={step}
+              phaseKey={
+                step.parentStepId === undefined ? undefined : phaseKeys.get(step.parentStepId)
+              }
+            />
           ))}
         </View>
       )}
@@ -194,7 +209,13 @@ function setupCommandLabel(step: PreparationStepSnapshot, t: TFunction): string 
   });
 }
 
-function PreparationStepRow({ step }: { step: PreparationStepSnapshot }) {
+function PreparationStepRow({
+  step,
+  phaseKey,
+}: {
+  step: PreparationStepSnapshot;
+  phaseKey?: string;
+}) {
   const [expanded, setExpanded] = useState(step.status !== 'completed');
   const colors = useThemeColors();
   const { t } = useTranslation();
@@ -208,7 +229,10 @@ function PreparationStepRow({ step }: { step: PreparationStepSnapshot }) {
     step.safeError,
     step.exitCode,
   ].some(value => value !== undefined && value !== '');
-  const label = setupCommandLabel(step, t) ?? preparationStepLabel(step, t);
+  const label =
+    step.kind === 'setup_command' && phaseKey === START_COMMANDS_STEP_KEY
+      ? (step.command ?? preparationStepLabel(step, t))
+      : (setupCommandLabel(step, t) ?? preparationStepLabel(step, t));
   const DetailsIcon = expanded ? ChevronDown : DirectionalChevronRight;
   return (
     <View className="overflow-hidden rounded border border-border">

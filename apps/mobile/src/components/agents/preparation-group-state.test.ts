@@ -112,6 +112,24 @@ describe('failedStageStep', () => {
     expect(failedStageStep(candidate)).toBeUndefined();
   });
 
+  it('does not blame a non-fatal start command when a later stage failed', () => {
+    const startPhase = step({ id: 'start', key: 'start_commands', status: 'completed' });
+    const startCommand = step({
+      id: 'start-command',
+      key: 'start_commands',
+      kind: 'setup_command',
+      parentStepId: 'start',
+      status: 'failed',
+      safeError: 'Start command 1 failed',
+    });
+    const serverFailure = step({ id: 'server', key: 'kilo_server', status: 'failed' });
+    const candidate = attempt({
+      status: 'failed',
+      steps: [startPhase, startCommand, serverFailure],
+    });
+    expect(failedStageStep(candidate)).toBe(serverFailure);
+  });
+
   it('does not count the incomplete-restore report as a failed stage', () => {
     const candidate = attempt({
       status: 'failed',
@@ -139,5 +157,35 @@ describe('preparationGroupExpandedByDefault', () => {
   it('opens a completed attempt that carries the incomplete step', () => {
     const candidate = attempt({ status: 'completed', steps: [INCOMPLETE_STEP] });
     expect(preparationGroupExpandedByDefault(candidate)).toBe(true);
+  });
+
+  it('opens a completed attempt with a non-fatal failed start command', () => {
+    const phase = step({ id: 'start', key: 'start_commands', status: 'completed' });
+    const command = step({
+      id: 'start-command',
+      key: 'start_commands',
+      kind: 'setup_command',
+      status: 'failed',
+      parentStepId: 'start',
+      commandIndex: 0,
+      safeError: 'Start command 1 failed',
+    });
+    expect(
+      preparationGroupExpandedByDefault(attempt({ status: 'completed', steps: [phase, command] }))
+    ).toBe(true);
+  });
+
+  it('keeps a completed attempt collapsed when only build commands failed', () => {
+    const phase = step({ id: 'build', key: 'setup_commands', status: 'completed' });
+    const command = step({
+      id: 'build-command',
+      key: 'setup_commands',
+      kind: 'setup_command',
+      status: 'failed',
+      parentStepId: 'build',
+    });
+    expect(
+      preparationGroupExpandedByDefault(attempt({ status: 'completed', steps: [phase, command] }))
+    ).toBe(false);
   });
 });

@@ -66,20 +66,25 @@ type RuntimeAssociation = {
   userBlockedReason: string | null;
 };
 
+/**
+ * How a caller is asking about an association.
+ *
+ * `resolvedOrganizationWorkflowConnection` states that the caller fetched this
+ * association through the organization workflow connection definition, which
+ * also accepts an eligible organization association that no writer gave a role.
+ * The definition is what established that connection, so a missing role there
+ * is not a sharing decision and must not be rejected as one. Personal
+ * associations always store their role, so the flag cannot widen a personal
+ * lookup.
+ */
+type RuntimeAuthorizationOptions = {
+  purpose?: 'workflow' | 'agent' | 'management';
+  resolvedOrganizationWorkflowConnection?: boolean;
+};
+
 export function getGitHubRuntimeAssociationRejectionReason(
   association: RuntimeAssociation | null | undefined,
-  options?: {
-    purpose?: 'workflow' | 'agent' | 'management';
-    /**
-     * The caller resolved this association through the organization workflow
-     * connection definition, which also accepts an eligible organization
-     * association that no writer gave a role. The definition is what
-     * established that connection, so a missing role there is not a sharing
-     * decision and must not be rejected as one. Personal associations always
-     * store their role, so the flag cannot widen a personal lookup.
-     */
-    resolvedOrganizationWorkflowConnection?: boolean;
-  }
+  options?: RuntimeAuthorizationOptions
 ): GitHubRuntimeAuthorizationRejectionReason | null {
   if (!association) return 'missing_association';
 
@@ -130,7 +135,7 @@ export function getGitHubRuntimeAssociationRejectionReason(
 
 export function isGitHubRuntimeAssociationAuthorized(
   association: RuntimeAssociation | null | undefined,
-  options?: { purpose?: 'workflow' | 'agent' | 'management' }
+  options?: RuntimeAuthorizationOptions
 ): boolean {
   return getGitHubRuntimeAssociationRejectionReason(association, options) === null;
 }

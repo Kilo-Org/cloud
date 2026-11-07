@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 
+import { VerificationException, VerificationStatus } from '@apple/app-store-server-library';
 import type { androidpublisher_v3 } from '@googleapis/androidpublisher';
 
 import { KiloPassPaymentProvider } from '@kilocode/web-shared/lib/kilo-pass/enums';
@@ -157,10 +158,33 @@ export function mapAppleCreditTransaction(
   };
 }
 
+/**
+ * Apple's verifier rejects a transaction it can never accept (undecodable JWS,
+ * bad signature or chain, wrong app or environment) with a terminal status, and
+ * marks only transient problems such as an OCSP lookup failure as retryable.
+ * The refusal message is fixed so neither the JWS nor the library's cause text
+ * reaches the error or telemetry.
+ */
+async function decodeAppleCreditTransaction(
+  signedTransactionJws: string
+): Promise<AppleStoreDecodedTransaction> {
+  try {
+    return await decodeAppleStoreTransactionJws(signedTransactionJws);
+  } catch (error) {
+    if (
+      error instanceof VerificationException &&
+      error.status !== VerificationStatus.RETRYABLE_VERIFICATION_FAILURE
+    ) {
+      throw new StoreVerificationError('Apple transaction could not be verified');
+    }
+    throw error;
+  }
+}
+
 export async function verifyAppleCreditPurchase(
   signedTransactionJws: string
 ): Promise<ValidatedStoreCreditPurchase> {
-  return mapAppleCreditTransaction(await decodeAppleStoreTransactionJws(signedTransactionJws));
+  return mapAppleCreditTransaction(await decodeAppleCreditTransaction(signedTransactionJws));
 }
 
 function googlePlayPurchaseTimeIso(apiData: androidpublisher_v3.Schema$ProductPurchase): string {

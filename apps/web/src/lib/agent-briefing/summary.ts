@@ -443,7 +443,7 @@ function chargeAccounting(row: BriefingReportRow) {
   return briefingChargeAccountingSchema.parse(
     row.summary.chargeAccounting ?? {
       baselineCostMicrodollars: 0,
-      generations: row.generation_id ? [{ id: row.generation_id, usageId: null }] : [],
+      generations: row.generation_id ? [{ id: row.generation_id, receipts: [] }] : [],
     }
   );
 }
@@ -483,24 +483,38 @@ async function reconcileLockedBriefingCharge(
   const now = Date.now();
   const settlements = accounting.generations.map(generation => {
     const charge = chargesByGeneration.get(generation.id);
-    if (generation.usageId !== null && charge?.usageIds.includes(generation.usageId) === true)
-      return 'settled' as const;
     const final = charge === undefined ? ('unreachable' as const) : ('repaired' as const);
     const deadline =
       generation.deadlineAt ??
       (generation.id === row.generation_id ? row.generation_deadline_at : null);
     const deadlineMs = deadline === null ? null : Date.parse(deadline);
-    if (generation.delivery === 'queued') {
-      // Receipts write the delivery time; a record without one falls back to the
-      // request deadline, which is inside the same request lifetime.
-      const anchorMs =
-        generation.deliveryAt === undefined ? deadlineMs : Date.parse(generation.deliveryAt);
-      if (anchorMs === null) return 'waiting' as const;
-      return now < anchorMs + CHARGE_QUEUE_DELIVERY_WINDOW_MS ? ('waiting' as const) : final;
+    if (generation.receipts.length === 0) {
+      if (deadlineMs === null)
+        return generation.settlementToken ? ('waiting' as const) : ('unreachable' as const);
+      return now >= deadlineMs + CHARGE_REPAIR_GRACE_MS ? final : ('waiting' as const);
     }
-    if (deadlineMs === null)
-      return generation.settlementToken ? ('waiting' as const) : ('unreachable' as const);
-    return now >= deadlineMs + CHARGE_REPAIR_GRACE_MS ? final : ('waiting' as const);
+    const missing = generation.receipts.filter(
+      receipt => charge?.usageIds.includes(receipt.usageId) !== true
+    );
+    if (missing.length === 0) return 'settled' as const;
+    const missingStates = missing.map(receipt => {
+      if (receipt.delivery === 'queued') {
+        const anchorMs =
+          receipt.deliveryAt === undefined ? deadlineMs : Date.parse(receipt.deliveryAt);
+        if (anchorMs === null) return 'waiting' as const;
+        return now < anchorMs + CHARGE_QUEUE_DELIVERY_WINDOW_MS
+          ? ('waiting' as const)
+          : ('expired' as const);
+      }
+      if (deadlineMs === null)
+        return generation.settlementToken ? ('waiting' as const) : ('unreachable' as const);
+      return now >= deadlineMs + CHARGE_REPAIR_GRACE_MS
+        ? ('expired' as const)
+        : ('waiting' as const);
+    });
+    if (missingStates.includes('waiting')) return 'waiting' as const;
+    if (missingStates.includes('unreachable')) return 'unreachable' as const;
+    return final;
   });
   const settled = settlements.every(
     settlement => settlement === 'settled' || settlement === 'repaired'
@@ -622,7 +636,7 @@ export async function runBriefingSummary(reportId: string): Promise<void> {
     const settlementToken = crypto.randomUUID();
     const accounting = {
       baselineCostMicrodollars: 0,
-      generations: [{ id: generationId, settlementToken, usageId: null, deadlineAt }],
+      generations: [{ id: generationId, settlementToken, receipts: [], deadlineAt }],
     };
     const [admitted] = await db
       .update(agent_briefing_snapshots)

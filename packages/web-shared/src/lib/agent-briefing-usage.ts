@@ -14,18 +14,45 @@ export const BRIEFING_SETTLEMENT_HEADER = 'X-Kilo-Briefing-Settlement';
  */
 export const briefingChargeDeliverySchema = z.enum(['committed', 'queued']);
 
+const briefingChargeReceiptSchema = z.object({
+  usageId: z.uuid(),
+  deliveryAt: z.string().datetime().optional(),
+  delivery: briefingChargeDeliverySchema.optional(),
+});
+
+const briefingChargeGenerationSchema = z
+  .object({
+    id: z.string(),
+    settlementToken: z.string().optional(),
+    deadlineAt: z.string().datetime().optional(),
+    usageId: z.uuid().nullish(),
+    deliveryAt: z.string().datetime().optional(),
+    delivery: briefingChargeDeliverySchema.optional(),
+    receipts: z.array(briefingChargeReceiptSchema).optional(),
+  })
+  .transform(generation => {
+    const receipts = [...(generation.receipts ?? [])];
+    if (generation.usageId && !receipts.some(receipt => receipt.usageId === generation.usageId)) {
+      receipts.push({
+        usageId: generation.usageId,
+        delivery: generation.delivery,
+        deliveryAt: generation.deliveryAt,
+      });
+    }
+    return {
+      id: generation.id,
+      settlementToken: generation.settlementToken,
+      deadlineAt: generation.deadlineAt,
+      receipts: receipts.filter(
+        (receipt, index) =>
+          receipts.findIndex(candidate => candidate.usageId === receipt.usageId) === index
+      ),
+    };
+  });
+
 export const briefingChargeAccountingSchema = z.object({
   baselineCostMicrodollars: z.number().nonnegative(),
-  generations: z.array(
-    z.object({
-      id: z.string(),
-      settlementToken: z.string().optional(),
-      usageId: z.uuid().nullable(),
-      deadlineAt: z.string().datetime().optional(),
-      deliveryAt: z.string().datetime().optional(),
-      delivery: briefingChargeDeliverySchema.optional(),
-    })
-  ),
+  generations: z.array(briefingChargeGenerationSchema),
 });
 
 export async function recordBriefingUsage(input: {
@@ -67,7 +94,7 @@ export async function recordBriefingUsage(input: {
     if (
       !generation ||
       generation.settlementToken !== input.settlementToken ||
-      generation.usageId !== null ||
+      generation.receipts.some(receipt => receipt.usageId === usage.usageId) ||
       accounting.data.generations.some(
         (entry, otherIndex) => otherIndex !== index && entry.id === input.generationId
       )
@@ -76,11 +103,14 @@ export async function recordBriefingUsage(input: {
     }
 
     const path = sql`ARRAY['chargeAccounting', 'generations', ${String(index)}]::text[]`;
-    const receipt = JSON.stringify({ usageId: usage.usageId, delivery, deliveryAt });
+    const receipts = JSON.stringify({
+      receipts: [...generation.receipts, { usageId: usage.usageId, delivery, deliveryAt }],
+    });
     await tx
       .update(agent_briefing_snapshots)
       .set({
-        summary: sql`jsonb_set(${agent_briefing_snapshots.summary}, ${path}, coalesce(${agent_briefing_snapshots.summary} #> ${path}, '{}'::jsonb) || ${receipt}::jsonb)`,
+        next_charge_check_at: deliveryAt,
+        summary: sql`jsonb_set(${agent_briefing_snapshots.summary} || '{"chargeStatus":"pending"}'::jsonb, ${path}, (coalesce(${agent_briefing_snapshots.summary} #> ${path}, '{}'::jsonb) - 'usageId' - 'delivery' - 'deliveryAt') || ${receipts}::jsonb)`,
       })
       .where(eq(agent_briefing_snapshots.id, report.id));
   });

@@ -11,6 +11,11 @@ import {
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { dispatchAgentBriefingPush } from '@kilocode/web-shared/lib/notifications-worker-client';
+import {
+  briefingChargeAccountingSchema,
+  recordBriefingUsage,
+} from '@kilocode/web-shared/lib/agent-briefing-usage';
+import type { UsageAccountingResult } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import { sweepAgentBriefings, generatePendingAgentBriefings } from './sweep';
 import { reconcileBriefingCharge, runBriefingSummary, SUMMARY_MAX_ATTEMPTS } from './summary';
 import { briefingFactsSchema, buildBriefingSnapshot, collectBriefingSnapshot } from './evidence';
@@ -361,6 +366,154 @@ it('settles a delayed usage delivery against its immutable occurrence generation
   expect(settled.summary.costMicrodollars).toBe(42);
   expect(settled.summary.chargeStatus).toBe('settled');
   expect(settled.next_charge_check_at).toBeNull();
+  expect(settled.summary.chargeAccounting).toEqual({
+    baselineCostMicrodollars: 0,
+    generations: [{ id: generated.generation_id, receipts: [{ usageId }] }],
+  });
+});
+
+describe('briefing charge reconciliation for retried generations', () => {
+  async function generated() {
+    const { now, user } = await scheduled();
+    await sweepAgentBriefings(now);
+    const [row] = await db.select().from(agent_briefing_snapshots);
+    if (!row) throw new Error('No captured snapshot');
+    jest
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(Response.json({ choices: [{ message: { content: 'Summary' } }] }));
+    await runBriefingSummary(row.id);
+    const [report] = await db.select().from(agent_briefing_snapshots);
+    if (!report?.generation_id) throw new Error('No generation');
+    const generation = briefingChargeAccountingSchema
+      .parse(report.summary.chargeAccounting)
+      .generations.find(entry => entry.id === report.generation_id);
+    if (!generation?.settlementToken) throw new Error('No settlement token');
+    return {
+      user,
+      reportId: report.id,
+      generationId: report.generation_id,
+      settlementToken: generation.settlementToken,
+    };
+  }
+
+  async function current(reportId: string) {
+    const [row] = await db
+      .select()
+      .from(agent_briefing_snapshots)
+      .where(eq(agent_briefing_snapshots.id, reportId));
+    if (!row) throw new Error('No report');
+    return row;
+  }
+
+  async function addUsageRow(generationId: string, userId: string, cost: number, usageId: string) {
+    await db.insert(microdollar_usage).values({
+      id: usageId,
+      kilo_user_id: userId,
+      cost,
+      input_tokens: 10,
+      output_tokens: 5,
+      cache_write_tokens: 0,
+      cache_hit_tokens: 0,
+    });
+    await db
+      .insert(microdollar_usage_metadata)
+      .values({ id: usageId, session_id: generationId, message_id: usageId });
+  }
+
+  async function record(
+    prepared: Awaited<ReturnType<typeof generated>>,
+    usageId: string,
+    status: UsageAccountingResult['status'] = 'recorded'
+  ) {
+    await recordBriefingUsage({
+      kiloUserId: prepared.user.id,
+      generationId: prepared.generationId,
+      settlementToken: prepared.settlementToken,
+      usage: { status, usageId, createdAt: new Date().toISOString() },
+    });
+  }
+
+  async function reconcile(reportId: string) {
+    return reconcileBriefingCharge(await current(reportId));
+  }
+
+  function receiptIds(row: Awaited<ReturnType<typeof current>>, generationId: string) {
+    const generation = briefingChargeAccountingSchema
+      .parse(row.summary.chargeAccounting)
+      .generations.find(entry => entry.id === generationId);
+    if (!generation) throw new Error('No generation accounting');
+    return generation.receipts.map(receipt => receipt.usageId);
+  }
+
+  it('keeps a staggered two-attempt generation pending until the queued row lands', async () => {
+    const prepared = await generated();
+    const firstId = crypto.randomUUID();
+    const secondId = crypto.randomUUID();
+    await addUsageRow(prepared.generationId, prepared.user.id, 30, firstId);
+    await record(prepared, firstId);
+    await record(prepared, secondId, 'queued');
+    const pending = await reconcile(prepared.reportId);
+    expect(pending.summary.costMicrodollars).toBe(30);
+    expect(pending.summary.chargeStatus).toBe('pending');
+    expect(pending.next_charge_check_at).not.toBeNull();
+    await addUsageRow(prepared.generationId, prepared.user.id, 12, secondId);
+    const settled = await reconcile(prepared.reportId);
+    expect(settled.summary.costMicrodollars).toBe(42);
+    expect(settled.summary.chargeStatus).toBe('settled');
+    expect(settled.next_charge_check_at).toBeNull();
+    expect(receiptIds(settled, prepared.generationId)).toEqual([firstId, secondId]);
+  });
+
+  it('settles a receipt that arrives after an earlier settlement', async () => {
+    const prepared = await generated();
+    const firstId = crypto.randomUUID();
+    const secondId = crypto.randomUUID();
+    await addUsageRow(prepared.generationId, prepared.user.id, 30, firstId);
+    await record(prepared, firstId);
+    const settled = await reconcile(prepared.reportId);
+    expect(settled.summary.costMicrodollars).toBe(30);
+    expect(settled.summary.chargeStatus).toBe('settled');
+    expect(settled.next_charge_check_at).toBeNull();
+    await addUsageRow(prepared.generationId, prepared.user.id, 12, secondId);
+    await record(prepared, secondId);
+    const rearmed = await current(prepared.reportId);
+    expect(rearmed.summary.chargeStatus).toBe('pending');
+    expect(rearmed.next_charge_check_at).not.toBeNull();
+    const resettled = await reconcile(prepared.reportId);
+    expect(resettled.summary.costMicrodollars).toBe(42);
+    expect(resettled.summary.chargeStatus).toBe('settled');
+    expect(resettled.next_charge_check_at).toBeNull();
+  });
+
+  it('sums receipts delivered in reverse attempt order', async () => {
+    const prepared = await generated();
+    const firstId = crypto.randomUUID();
+    const secondId = crypto.randomUUID();
+    await addUsageRow(prepared.generationId, prepared.user.id, 12, secondId);
+    await record(prepared, secondId);
+    await addUsageRow(prepared.generationId, prepared.user.id, 30, firstId);
+    await record(prepared, firstId);
+    const settled = await reconcile(prepared.reportId);
+    expect(settled.summary.costMicrodollars).toBe(42);
+    expect(settled.summary.chargeStatus).toBe('settled');
+    expect(receiptIds(settled, prepared.generationId)).toEqual([secondId, firstId]);
+  });
+
+  it('counts a duplicate receipt once and does not re-arm after settlement', async () => {
+    const prepared = await generated();
+    const usageId = crypto.randomUUID();
+    await addUsageRow(prepared.generationId, prepared.user.id, 30, usageId);
+    await record(prepared, usageId);
+    await record(prepared, usageId);
+    const settled = await reconcile(prepared.reportId);
+    expect(settled.summary.costMicrodollars).toBe(30);
+    expect(receiptIds(settled, prepared.generationId)).toEqual([usageId]);
+    await record(prepared, usageId);
+    const persisted = await current(prepared.reportId);
+    expect(persisted.summary.chargeStatus).toBe('settled');
+    expect(persisted.next_charge_check_at).toBeNull();
+    expect(receiptIds(persisted, prepared.generationId)).toEqual([usageId]);
+  });
 });
 it('selects latest activity deterministically and keeps organization scope exact', async () => {
   const { user, now } = await scheduled(false);

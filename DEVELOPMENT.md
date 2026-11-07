@@ -768,7 +768,10 @@ Manual creation, historical period selection, preparation drafts, and manual sum
 
 Pricing estimates use the model picker's configured provider prices and the stored target for model aliases.
 The gateway preserves bounded-request price ceilings and model access checks.
-Usage receipts retain the existing committed-versus-queued settlement behavior.
+Each charged retry retains a distinct usage receipt with its committed or queued delivery state.
+Settlement waits for every recorded receipt, within the existing delivery window.
+A later receipt reopens settlement after an earlier attempt settled.
+The displayed cost sums usage rows once, including rows delivered after another attempt.
 Tiered custom pricing uses the highest tier reachable from the request’s bounded input length.
 The default summary model is `~deepseek/deepseek-flash-latest`.
 
@@ -786,3 +789,12 @@ Disable the old briefing cron jobs and settle outstanding briefing usage before 
 Quiesce old event producers before the migration, then deploy the matching web, gateway, notification, and session-ingest code.
 Enable contexts explicitly after deployment.
 Do not treat an unshipped user interface as proof that its ingestion code is inactive.
+
+### Summary retry rollout
+
+The gateway marks a refusal that replaces an already-accounted answer.
+The summary worker must not retry that refusal.
+Deploy the gateway marker producer before enabling the matching web retry consumer.
+The scheduled workflow currently promotes web and gateway independently; it does not enforce this order.
+Keep this change blocked until an enforced deployment sequence or an order-independent protocol is verified.
+Do not treat a rollout note as a deployment safeguard.

@@ -47,6 +47,7 @@ import {
 } from '@/lib/integrations/platforms/gitlab/instance-url';
 import { GITLAB_RECONNECT_REQUIRED_MESSAGE } from '@/lib/integrations/platforms/gitlab/credential-errors';
 import {
+  mutateGitLabMetadata,
   mutateGitLabMetadataInTransaction,
   readGitLabMetadataInTransaction,
 } from '@/lib/integrations/platforms/gitlab/metadata-mutation';
@@ -480,7 +481,10 @@ export async function disconnectGitLabIntegration(owner: Owner) {
 /**
  * Regenerate webhook secret for a GitLab integration
  * This is useful when the user has lost the webhook secret and needs to reconfigure
- * their GitLab webhook settings
+ * their GitLab webhook settings.
+ *
+ * The new secret is merged into the stored metadata under the integration
+ * lifecycle lock, so a concurrent connect or disconnect keeps its own fields.
  */
 export async function regenerateWebhookSecret(owner: Owner): Promise<{ webhookSecret: string }> {
   const ownershipCondition = ownerCondition(owner);
@@ -506,19 +510,7 @@ export async function regenerateWebhookSecret(owner: Owner): Promise<{ webhookSe
 
   const newWebhookSecret = randomBytes(32).toString('hex');
 
-  const existingMetadata = (integration.metadata || {}) as Record<string, unknown>;
-  const updatedMetadata = {
-    ...existingMetadata,
-    webhook_secret: newWebhookSecret,
-  };
-
-  await db
-    .update(platform_integrations)
-    .set({
-      metadata: updatedMetadata,
-      updated_at: new Date().toISOString(),
-    })
-    .where(eq(platform_integrations.id, integration.id));
+  await mutateGitLabMetadata(integration.id, { set: { webhook_secret: newWebhookSecret } });
 
   return { webhookSecret: newWebhookSecret };
 }

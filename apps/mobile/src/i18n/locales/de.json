@@ -2891,7 +2891,6 @@
     },
     "fileList": {
       "filesList": "Dateiliste",
-      "filesViewed": "Dateien · {{viewed}} von {{total}} angesehen",
       "layout": "Darstellung",
       "listed": "(aufgelistet)",
       "loadingFiles": "Dateien werden geladen",

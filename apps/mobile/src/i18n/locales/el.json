@@ -331,7 +331,6 @@
     "noFilesChangedDescription": "Αυτό το αίτημα ενσωμάτωσης δεν περιέχει αλλαγές σε αρχεία.",
     "fileList": {
       "openNavigator": "Άνοιγμα περιήγησης αρχείων",
-      "filesViewed": "Αρχεία · {{viewed}} από {{total}} προβλήθηκαν",
       "listed": "(στη λίστα)",
       "layout": "Διάταξη",
       "unified": "Ενοποιημένη",

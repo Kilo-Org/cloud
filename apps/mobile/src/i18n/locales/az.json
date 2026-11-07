@@ -331,7 +331,6 @@
     "noFilesChangedDescription": "Bu birləşdirmə sorğusunda fayl dəyişikliyi yoxdur.",
     "fileList": {
       "openNavigator": "Fayl siyahısını aç",
-      "filesViewed": "Fayllar · baxılıb: {{viewed}} / {{total}}",
       "listed": "(siyahıda)",
       "layout": "Görünüş",
       "unified": "Vahid",

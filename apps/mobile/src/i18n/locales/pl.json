@@ -2971,7 +2971,6 @@
     },
     "fileList": {
       "filesList": "Lista plików",
-      "filesViewed": "Pliki · przejrzano {{viewed}} z {{total}}",
       "layout": "Układ",
       "listed": "(z listy)",
       "loadingFiles": "Wczytywanie plików",

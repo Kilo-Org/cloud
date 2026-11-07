@@ -331,7 +331,6 @@
     "noFilesChangedDescription": "Táto žiadosť o zlúčenie neobsahuje žiadne zmeny súborov.",
     "fileList": {
       "openNavigator": "Otvoriť zoznam súborov",
-      "filesViewed": "Súbory · prezreté: {{viewed}} z {{total}}",
       "listed": "(v zozname)",
       "layout": "Rozloženie",
       "unified": "Spoločné",

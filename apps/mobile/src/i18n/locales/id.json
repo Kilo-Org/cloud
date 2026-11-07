@@ -2891,7 +2891,6 @@
     },
     "fileList": {
       "filesList": "Daftar file",
-      "filesViewed": "File · {{viewed}} dari {{total}} sudah dilihat",
       "layout": "Tata letak",
       "listed": "(terdaftar)",
       "loadingFiles": "Memuat file",

@@ -331,7 +331,6 @@
     "noFilesChangedDescription": "Este PR não tem alterações nos ficheiros.",
     "fileList": {
       "openNavigator": "Abrir a lista de ficheiros",
-      "filesViewed": "Ficheiros · {{viewed}} de {{total}} vistos",
       "listed": "(listados)",
       "layout": "Disposição",
       "unified": "Unificado",

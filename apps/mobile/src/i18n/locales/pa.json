@@ -331,7 +331,6 @@
     "noFilesChangedDescription": "ਇਸ ਪੁੱਲ ਰਿਕਵੈਸਟ ਵਿੱਚ ਕਿਸੇ ਫਾਈਲ ਵਿੱਚ ਬਦਲਾਅ ਨਹੀਂ ਕੀਤਾ ਗਿਆ।",
     "fileList": {
       "openNavigator": "ਫਾਈਲ ਨੈਵੀਗੇਟਰ ਖੋਲ੍ਹੋ",
-      "filesViewed": "ਫਾਈਲਾਂ · {{total}} ਵਿੱਚੋਂ {{viewed}} ਵੇਖੀਆਂ ਗਈਆਂ",
       "listed": "(ਸੂਚੀਬੱਧ)",
       "layout": "ਲੇਆਉਟ",
       "unified": "ਇਕੱਠੇ",

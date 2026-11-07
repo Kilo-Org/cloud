@@ -331,7 +331,6 @@
     "noFilesChangedDescription": "Bateratze-eskaera honek ez du fitxategi-aldaketarik.",
     "fileList": {
       "openNavigator": "Ireki fitxategi-nabigatzailea",
-      "filesViewed": "Fitxategiak · {{viewed}} / {{total}} ikusita",
       "listed": "(zerrendatuta)",
       "layout": "Antolamendua",
       "unified": "Bateratua",

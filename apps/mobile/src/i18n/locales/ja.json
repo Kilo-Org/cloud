@@ -2891,7 +2891,6 @@
     },
     "fileList": {
       "filesList": "ファイル一覧",
-      "filesViewed": "ファイル · {{total}}件中{{viewed}}件を確認済み",
       "layout": "レイアウト",
       "listed": "（一覧表示）",
       "loadingFiles": "ファイルを読み込み中",

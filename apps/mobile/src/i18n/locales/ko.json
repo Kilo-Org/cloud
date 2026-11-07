@@ -2891,7 +2891,6 @@
     },
     "fileList": {
       "filesList": "파일 목록",
-      "filesViewed": "파일 · {{total}}개 중 {{viewed}}개 확인함",
       "layout": "레이아웃",
       "listed": "(목록에 표시됨)",
       "loadingFiles": "파일 불러오는 중",

@@ -2891,7 +2891,6 @@
     },
     "fileList": {
       "filesList": "Danh sách tệp",
-      "filesViewed": "Tệp · Đã xem {{viewed}}/{{total}}",
       "layout": "Bố cục",
       "listed": "(đã liệt kê)",
       "loadingFiles": "Đang tải tệp",

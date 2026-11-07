@@ -331,7 +331,6 @@
     "noFilesChangedDescription": "په دې پل ریکویسټ کې هېڅ فایل نه دی بدل شوی.",
     "fileList": {
       "openNavigator": "د فایلونو نیویګیټر پرانیزئ",
-      "filesViewed": "فایلونه · له {{total}} څخه {{viewed}} لیدل شوي",
       "listed": "(په لړلیک کې)",
       "layout": "ترتیب",
       "unified": "یوځای",

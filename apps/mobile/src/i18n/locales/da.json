@@ -331,7 +331,6 @@
     "noFilesChangedDescription": "Der er ingen filændringer i denne pull request.",
     "fileList": {
       "openNavigator": "Åbn filoversigten",
-      "filesViewed": "Filer · {{viewed}} af {{total}} gennemset",
       "listed": "(på listen)",
       "layout": "Visning",
       "unified": "Samlet",

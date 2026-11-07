@@ -331,7 +331,6 @@
     "noFilesChangedDescription": "এই পুল রিকোয়েস্টে কোনো ফাইলে পরিবর্তন করা হয়নি।",
     "fileList": {
       "openNavigator": "ফাইল নেভিগেটর খুলুন",
-      "filesViewed": "ফাইল · {{total}}টির মধ্যে {{viewed}}টি দেখা হয়েছে",
       "listed": "(তালিকাভুক্ত)",
       "layout": "বিন্যাস",
       "unified": "একত্রে",

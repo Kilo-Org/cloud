@@ -331,7 +331,6 @@
     "noFilesChangedDescription": "Nid oes unrhyw ffeiliau wedi'u newid yn y cais tynnu hwn.",
     "fileList": {
       "openNavigator": "Agor y llywiwr ffeiliau",
-      "filesViewed": "Ffeiliau · {{viewed}} o {{total}} wedi'u gweld",
       "listed": "(wedi'u rhestru)",
       "layout": "Cynllun",
       "unified": "Cyfun",

@@ -3051,7 +3051,6 @@
     },
     "fileList": {
       "filesList": "قائمة الملفات",
-      "filesViewed": "الملفات · تم الاطلاع على {{viewed}} من {{total}}",
       "layout": "طريقة العرض",
       "listed": "(ضمن القائمة)",
       "loadingFiles": "جارٍ تحميل الملفات",

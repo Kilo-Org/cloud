@@ -331,7 +331,6 @@
     "noFilesChangedDescription": "ამ შერწყმის მოთხოვნაში ფაილები არ შეცვლილა.",
     "fileList": {
       "openNavigator": "ფაილების ნავიგატორის გახსნა",
-      "filesViewed": "ფაილები · ნანახია {{total}}-დან {{viewed}}",
       "listed": "(ჩამოთვლილი)",
       "layout": "განლაგება",
       "unified": "გაერთიანებული",

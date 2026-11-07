@@ -331,7 +331,6 @@
     "noFilesChangedDescription": "Hierdie trekversoek het geen lêerveranderings nie.",
     "fileList": {
       "openNavigator": "Maak lêernavigeerder oop",
-      "filesViewed": "Lêers · {{viewed}} van {{total}} bekyk",
       "listed": "(gelys)",
       "layout": "Uitleg",
       "unified": "Gekombineer",

@@ -331,7 +331,6 @@
     "noFilesChangedDescription": "Šioje pakeitimų užklausoje nėra failų pakeitimų.",
     "fileList": {
       "openNavigator": "Atidaryti failų naršyklę",
-      "filesViewed": "Failai · peržiūrėta {{viewed}} iš {{total}}",
       "listed": "(sąraše)",
       "layout": "Išdėstymas",
       "unified": "Bendras",

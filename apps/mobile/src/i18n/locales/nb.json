@@ -331,7 +331,6 @@
     "noFilesChangedDescription": "Denne PR-en inneholder ingen filendringer.",
     "fileList": {
       "openNavigator": "Åpne filoversikten",
-      "filesViewed": "Filer · {{viewed}} av {{total}} gjennomgått",
       "listed": "(i listen)",
       "layout": "Oppsett",
       "unified": "Samlet",

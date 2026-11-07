@@ -331,7 +331,6 @@
     "noFilesChangedDescription": "لە ئەم داواکارییەی ڕاکێشاندا هیچ فایلێک نەگۆڕاوە.",
     "fileList": {
       "openNavigator": "گەڕۆکی فایلەکان بکەرەوە",
-      "filesViewed": "فایلەکان · {{viewed}} لە {{total}} بینراوە",
       "listed": "(لە لیستدا)",
       "layout": "ڕێکخستن",
       "unified": "یەکگرتوو",

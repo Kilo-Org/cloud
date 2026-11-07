@@ -331,7 +331,6 @@
     "noFilesChangedDescription": "Tässä muutospyynnössä ei ole tiedostomuutoksia.",
     "fileList": {
       "openNavigator": "Avaa tiedostoselain",
-      "filesViewed": "Tiedostot · {{viewed}}/{{total}} katsottu",
       "listed": "(luettelossa)",
       "layout": "Asettelu",
       "unified": "Yhdistetty",

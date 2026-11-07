@@ -2937,7 +2937,6 @@
     },
     "fileList": {
       "filesList": "Lista de arquivos",
-      "filesViewed": "Arquivos · {{viewed}} de {{total}} visualizados",
       "layout": "Disposição",
       "listed": "(listados)",
       "loadingFiles": "Carregando arquivos",

@@ -331,7 +331,6 @@
     "noFilesChangedDescription": "See tõmbetaotlus ei sisalda failimuudatusi.",
     "fileList": {
       "openNavigator": "Ava failinavigaator",
-      "filesViewed": "Failid · {{viewed}}/{{total}} vaadatud",
       "listed": "(loetletud)",
       "layout": "Paigutus",
       "unified": "Ühisvaade",

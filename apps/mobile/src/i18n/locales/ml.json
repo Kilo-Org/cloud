@@ -331,7 +331,6 @@
     "noFilesChangedDescription": "ഈ പുൾ റിക്വസ്റ്റിൽ ഫയലുകളിലൊന്നും മാറ്റങ്ങളില്ല.",
     "fileList": {
       "openNavigator": "ഫയൽ നാവിഗേറ്റർ തുറക്കുക",
-      "filesViewed": "ഫയലുകൾ · {{total}}-ൽ {{viewed}} കണ്ടു",
       "listed": "(പട്ടികയിലുള്ളത്)",
       "layout": "ലേഔട്ട്",
       "unified": "ഒറ്റക്കാഴ്ച",

@@ -2898,7 +2898,6 @@
     },
     "fileList": {
       "filesList": "फ़ाइलों की सूची",
-      "filesViewed": "फ़ाइलें · {{viewed}}/{{total}} देखी गईं",
       "layout": "लेआउट",
       "listed": "(सूचीबद्ध)",
       "loadingFiles": "फ़ाइलें लोड हो रही हैं",

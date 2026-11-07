@@ -331,7 +331,6 @@
     "noFilesChangedDescription": "Бұл біріктіру сұрауында файлдарға өзгеріс енгізілмеген.",
     "fileList": {
       "openNavigator": "Файлдар тізімін ашу",
-      "filesViewed": "Файлдар · {{viewed}}/{{total}} қаралды",
       "listed": "(тізімдегі)",
       "layout": "Көрініс",
       "unified": "Біріктірілген",

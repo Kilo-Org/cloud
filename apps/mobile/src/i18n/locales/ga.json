@@ -331,7 +331,6 @@
     "noFilesChangedDescription": "Níl aon athrú ar chomhaid san iarratas tarraingthe seo.",
     "fileList": {
       "openNavigator": "Oscail an loingseoir comhad",
-      "filesViewed": "Comhaid · {{viewed}} de {{total}} feicthe",
       "listed": "(liostaithe)",
       "layout": "Leagan amach",
       "unified": "Aontaithe",

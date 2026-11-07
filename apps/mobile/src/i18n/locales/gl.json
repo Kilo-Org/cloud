@@ -331,7 +331,6 @@
     "noFilesChangedDescription": "Esta solicitude de integración non contén cambios nos ficheiros.",
     "fileList": {
       "openNavigator": "Abrir o navegador de ficheiros",
-      "filesViewed": "Ficheiros · {{viewed}} de {{total}} vistos",
       "listed": "(da lista)",
       "layout": "Disposición",
       "unified": "Unificado",

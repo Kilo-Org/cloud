@@ -2891,7 +2891,6 @@
     },
     "fileList": {
       "filesList": "文件列表",
-      "filesViewed": "文件 · 已查看 {{viewed}}/{{total}}",
       "layout": "布局",
       "listed": "（已列出）",
       "loadingFiles": "正在加载文件",

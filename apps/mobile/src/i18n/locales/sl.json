@@ -331,7 +331,6 @@
     "noFilesChangedDescription": "Ta zahtevek za združitev ne vsebuje sprememb datotek.",
     "fileList": {
       "openNavigator": "Odpri seznam datotek",
-      "filesViewed": "Datoteke · ogledano: {{viewed}} od {{total}}",
       "listed": "(na seznamu)",
       "layout": "Postavitev",
       "unified": "Združeno",

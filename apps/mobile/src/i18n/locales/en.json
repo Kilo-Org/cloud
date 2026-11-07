@@ -398,7 +398,6 @@
     "noFilesChangedDescription": "This pull request has no file changes.",
     "fileList": {
       "openNavigator": "Open file navigator",
-      "filesViewed": "Files · {{viewed}} of {{total}} viewed",
       "listed": "(listed)",
       "layout": "Layout",
       "unified": "Unified",

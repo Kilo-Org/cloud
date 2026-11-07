@@ -110,6 +110,7 @@ export async function authenticateCaller(env: CallerEnv, headers: Headers): Prom
     db
       .select({
         api_token_pepper: kilocode_users.api_token_pepper,
+        blocked_at: kilocode_users.blocked_at,
         blocked_reason: kilocode_users.blocked_reason,
         google_user_email: kilocode_users.google_user_email,
         total_microdollars_acquired: kilocode_users.total_microdollars_acquired,
@@ -123,7 +124,11 @@ export async function authenticateCaller(env: CallerEnv, headers: Headers): Prom
   if (!user || !isApiTokenPepperCurrent(user.api_token_pepper, payload.apiTokenPepper)) {
     throw new CustomRouterError('unauthorized', 'Invalid token');
   }
-  if (user.blocked_reason) throw new CustomRouterError('forbidden', 'Access denied');
+  // The Worker package does not depend on @kilocode/web-shared, so the account-availability
+  // rule is inlined here: either column marks the account blocked.
+  if (user.blocked_at || user.blocked_reason) {
+    throw new CustomRouterError('forbidden', 'Access denied');
+  }
   // Fail closed: without a blocked-domain list this request cannot be admitted.
   if (blacklistedDomains === null) {
     throw new CustomRouterError(

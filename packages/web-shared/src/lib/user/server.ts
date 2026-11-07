@@ -14,6 +14,7 @@ import { TRPCError } from '@trpc/server';
 import { headers } from 'next/headers';
 
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
+import { isBlockedAccount } from '@kilocode/web-shared/lib/user/account-status';
 import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import type { NextAuthOptions, JWT, LoggerInstance, Session } from 'next-auth';
 import { getServerSession } from 'next-auth';
@@ -371,7 +372,7 @@ export async function getUserFromSessionForCredentialIssuanceOrRedirect(
   if (!user) {
     redirect(await appendCallbackPath(loggedOutRedirectUrl));
   }
-  if (user.blocked_reason) {
+  if (isBlockedAccount(user)) {
     redirect('/account-blocked');
   }
   return user;
@@ -581,7 +582,7 @@ export async function getUserFromAuthOrRedirect(
   if (!user) {
     redirect(await appendCallbackPath(loggedOutRedirectUrl));
   }
-  if (user.blocked_reason) {
+  if (isBlockedAccount(user)) {
     redirect('/account-blocked');
   }
   return user;
@@ -671,7 +672,7 @@ async function validateUserAuthorization({
       tokenSource,
       cloudAgentAuthority,
     });
-  } else if (!opts.DANGEROUS_allowBlockedUsers && user.blocked_reason) {
+  } else if (!opts.DANGEROUS_allowBlockedUsers && isBlockedAccount(user)) {
     return authError(403, 'Access denied (R1)', kiloUserId, {
       internalApiUse,
       tokenSource,

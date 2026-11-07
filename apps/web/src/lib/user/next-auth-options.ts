@@ -3,6 +3,7 @@ import { JWT_TOKEN_VERSION } from '@kilocode/web-shared/lib/tokens';
 import { cookies, headers } from 'next/headers';
 
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
+import { isBlockedAccount } from '@kilocode/web-shared/lib/user/account-status';
 import type { CreateOrUpdateUserArgs, CreateOrUpdateUserTrackingContext } from '@/lib/user';
 import { createOrUpdateUser, findAndSyncExistingUser } from '@/lib/user';
 import { readWatchwoodSignupAssessment } from '@/lib/auth/watchwood';
@@ -1188,7 +1189,7 @@ export const authOptions: NextAuthOptions = {
         // Check if this is an existing user with a different primary email
         const existingUser = await findAndSyncExistingUser(accountInfo);
 
-        if (existingUser?.blocked_reason) {
+        if (existingUser && isBlockedAccount(existingUser)) {
           return redirectUrlForCode('BLOCKED');
         }
 
@@ -1378,7 +1379,7 @@ export const authOptions: NextAuthOptions = {
           );
         }
 
-        if (result.user.blocked_reason) {
+        if (isBlockedAccount(result.user)) {
           return redirectUrlForCode(`BLOCKED`);
         }
 

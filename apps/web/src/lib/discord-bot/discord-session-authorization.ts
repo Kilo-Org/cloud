@@ -11,6 +11,7 @@ import type { OrganizationRole } from '@kilocode/db/schema-types';
 import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import type { Owner } from '@/lib/integrations/core/types';
+import { isBlockedAccount } from '@kilocode/web-shared/lib/user/account-status';
 
 const parentOrganizations = alias(organizations, 'parent_organizations');
 
@@ -93,9 +94,9 @@ export async function authorizeDiscordSessionRequester(
 
   const [user] = await db
     .select({
-      blockedAt: kilocode_users.blocked_at,
-      blockedReason: kilocode_users.blocked_reason,
-      personalAccountDisabled: kilocode_users.personal_account_disabled,
+      blocked_at: kilocode_users.blocked_at,
+      blocked_reason: kilocode_users.blocked_reason,
+      personal_account_disabled: kilocode_users.personal_account_disabled,
     })
     .from(kilocode_users)
     .where(eq(kilocode_users.id, kiloUserId))
@@ -105,7 +106,7 @@ export async function authorizeDiscordSessionRequester(
     return { authorized: false, reason: 'unlinked_account', discordUserId };
   }
 
-  if (user.blockedAt || user.blockedReason || user.personalAccountDisabled) {
+  if (isBlockedAccount(user) || user.personal_account_disabled) {
     return { authorized: false, reason: 'account_unavailable', discordUserId };
   }
 

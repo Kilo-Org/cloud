@@ -727,6 +727,23 @@ describe('public custom router decide', () => {
     expect(benchmarkFetch).not.toHaveBeenCalled();
   });
 
+  it('refuses a user whose block timestamp is set', async () => {
+    dbRows.user = [
+      {
+        api_token_pepper: 'pepper-1',
+        blocked_at: '2026-01-15T12:00:00.000Z',
+        blocked_reason: null,
+        google_user_email: 'dev@example.com',
+        total_microdollars_acquired: 1_000_000,
+        microdollars_used: 0,
+      },
+    ];
+    const decide = await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody());
+    expect(decide.status).toBe(403);
+    expect(await errorCode(decide)).toBe('forbidden');
+    expect(classifyNormalizedInput).not.toHaveBeenCalled();
+  });
+
   it('fails closed with a retryable error before the blocked-domain list has ever loaded', async () => {
     redisAvailable = false;
     const res = await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody());

@@ -767,6 +767,38 @@ describe('Device Auth', () => {
       expect(request?.status).toBe('denied');
     });
 
+    test('returns denied when the block timestamp is set', async () => {
+      const { userCode, deviceCode } = await createDeviceAuthRequest({});
+      await approveDeviceAuthRequest(userCode, testUserId);
+
+      await db
+        .update(kilocode_users)
+        .set({ blocked_reason: null, blocked_at: new Date().toISOString() })
+        .where(eq(kilocode_users.id, testUserId));
+
+      const result = await consumeDeviceAuthByDeviceCode(deviceCode);
+
+      expect(result.status).toBe('denied');
+      expect(result.token).toBeUndefined();
+      expect((await getDeviceAuthRequest(userCode))?.status).toBe('denied');
+    });
+
+    test('issues for an organization user whose personal account is disabled', async () => {
+      await db
+        .update(kilocode_users)
+        .set({ personal_account_disabled: true })
+        .where(eq(kilocode_users.id, testUserId));
+
+      const { userCode, deviceCode } = await createDeviceAuthRequest({});
+      await approveDeviceAuthRequest(userCode, testUserId);
+
+      const result = await consumeDeviceAuthByDeviceCode(deviceCode);
+
+      expect(result.status).toBe('approved');
+      expect(result.token).toBeDefined();
+      expect(result.userId).toBe(testUserId);
+    });
+
     test('failed issuance after consume restores row and removes orphan session (supportsRefresh)', async () => {
       mockedIssueSessionCredentials.mockRejectedValue(new Error('issuance failed'));
 
@@ -1005,6 +1037,22 @@ describe('Device Auth', () => {
       // Verify the request is durably denied, not consumed.
       const request = await getDeviceAuthRequest(userCode);
       expect(request?.status).toBe('denied');
+    });
+
+    test('returns denied when the block timestamp is set (legacy path)', async () => {
+      const { code: pollSecret, userCode } = await createDeviceAuthRequest({});
+      await approveDeviceAuthRequest(userCode, testUserId);
+
+      await db
+        .update(kilocode_users)
+        .set({ blocked_reason: null, blocked_at: new Date().toISOString() })
+        .where(eq(kilocode_users.id, testUserId));
+
+      const result = await pollDeviceAuthRequest(pollSecret);
+
+      expect(result.status).toBe('denied');
+      expect(result.token).toBeUndefined();
+      expect((await getDeviceAuthRequest(userCode))?.status).toBe('denied');
     });
 
     test('failed token generation after consume restores row for re-redemption', async () => {

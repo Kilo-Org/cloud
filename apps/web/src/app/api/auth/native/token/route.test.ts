@@ -1724,6 +1724,27 @@ describe('POST /api/auth/native/token', () => {
       expect(mockPosthogCapture).not.toHaveBeenCalled();
     });
 
+    it('refuses a settled user with a block timestamp before emitting analytics', async () => {
+      mockVerifyNativeGoogleIdToken.mockResolvedValue({
+        sub: 'google-sub-1',
+        email: 'googleuser@example.com',
+      });
+      mockCreateOrUpdateUser.mockResolvedValue({
+        success: true,
+        user: { ...fakeUser, blocked_reason: null, blocked_at: '2026-01-15T12:00:00.000Z' },
+        isNew: false,
+        deferredSignInEvent: deferredEvent,
+      } as never);
+
+      const response = await POST(
+        createRequest({ provider: 'google', idToken: 'google-id-token' })
+      );
+
+      expect(response.status).toBe(403);
+      expect(await response.json()).toEqual({ error: 'BLOCKED' });
+      expect(mockPosthogCapture).not.toHaveBeenCalled();
+    });
+
     it('does not emit deferred sign-in event when SSO is required', async () => {
       mockVerifyNativeGoogleIdToken.mockResolvedValue({
         sub: 'google-sub-1',
@@ -1956,6 +1977,21 @@ describe('POST /api/auth/native/token', () => {
 
     it('rejects a blocked user without minting a session', async () => {
       mockFindUserById.mockResolvedValue({ ...fakeUser, blocked_reason: 'banned' });
+
+      const response = await POST(createRequest({ ...ticketBody, supportsRefresh: true }));
+
+      expect(response.status).toBe(403);
+      expect(await response.json()).toEqual({ error: 'BLOCKED' });
+      expect(mockCreateDeviceSession).not.toHaveBeenCalled();
+      expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
+    });
+
+    it('rejects a user with a block timestamp without minting a session', async () => {
+      mockFindUserById.mockResolvedValue({
+        ...fakeUser,
+        blocked_reason: null,
+        blocked_at: '2026-01-15T12:00:00.000Z',
+      });
 
       const response = await POST(createRequest({ ...ticketBody, supportsRefresh: true }));
 

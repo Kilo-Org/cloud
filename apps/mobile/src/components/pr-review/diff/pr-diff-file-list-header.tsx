@@ -87,6 +87,7 @@ export function PrDiffFileListHeader({
           onPress={handleOpenNavigator}
           accessibilityRole="button"
           accessibilityLabel={t('prReview.fileList.openNavigator')}
+          testID="pr-files-summary"
           className="min-h-9 flex-row items-center gap-1.5 rounded-md px-2 active:opacity-70"
           hitSlop={6}
         >

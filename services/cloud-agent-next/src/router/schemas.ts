@@ -826,6 +826,9 @@ export const PrepareSessionInput = z
 export const PrepareSessionOutput = z.object({
   cloudAgentSessionId: z.string().describe('The generated cloud-agent session ID'),
   kiloSessionId: z.string().describe('The Kilo CLI session ID'),
+  worktreeId: cloudAgentWorktreeIdSchema
+    .optional()
+    .describe('Use this ID to stack another worker workspace on this session.'),
   replayed: z
     .boolean()
     .optional()

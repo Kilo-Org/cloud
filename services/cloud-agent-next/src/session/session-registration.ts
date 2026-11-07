@@ -310,6 +310,7 @@ type SessionCreationLedgerHooks = {
 export type LedgerSessionCreateResult = {
   cloudAgentSessionId: string;
   kiloSessionId: string;
+  worktreeId?: CloudAgentWorktreeId;
   messageId?: string;
   delivery?: 'sent' | 'queued';
   replayed?: boolean;
@@ -613,15 +614,17 @@ export function isTrustedWorktreeCreateOrigin(
   );
 }
 
-function isEligibleFirstWorktreeSession(
+export function isEligibleFirstWorktreeSession(
   input: SessionRegistrationInput,
   ctx: SessionRegistrationContext
 ): boolean {
   return (
-    isTrustedWorktreeCreateOrigin(
+    (isTrustedWorktreeCreateOrigin(
       input.options?.clientProvenance,
       input.options?.createdOnPlatform
-    ) &&
+    ) ||
+      (ctx.cloudAgentAuthority !== undefined &&
+        input.parentCloudAgentSessionId === ctx.cloudAgentAuthority.parentSessionId)) &&
     input.options?.operationKey !== undefined &&
     input.initialTurn !== undefined &&
     input.clone === undefined &&
@@ -1517,6 +1520,7 @@ async function registerAndAdmitInitialTurn(
   const result: StartedSessionResult = {
     cloudAgentSessionId: allocation.cloudAgentSessionId,
     kiloSessionId: allocation.kiloSessionId,
+    ...(allocation.worktreeId === undefined ? {} : { worktreeId: allocation.worktreeId }),
     sandboxId: allocation.sandboxId,
     sandboxProvider: allocation.sandboxProvider,
     ...(allocation.sandboxAllocation ? { sandboxAllocation: allocation.sandboxAllocation } : {}),
@@ -1828,6 +1832,7 @@ export async function sessionCreateIntentFingerprint(
   return sha256Hex(
     canonicalJson({
       parentCloudAgentSessionId: input.parentCloudAgentSessionId,
+      ...stackedOwnershipFields(input),
       initialTurn,
       // Undefined for creates without a proposed ID, so their fingerprint is unchanged.
       kiloSessionId: input.options?.kiloSessionId,
@@ -2101,13 +2106,23 @@ async function replaySettledCreate(
 /** Canonical session IDs recorded by the create's progress write, when present. */
 function canonicalSessionIds(
   row: OperationLedgerRow
-): { cloudAgentSessionId: string; kiloSessionId: string } | undefined {
+):
+  | Pick<LedgerSessionCreateResult, 'cloudAgentSessionId' | 'kiloSessionId' | 'worktreeId'>
+  | undefined {
   const canonical = row.canonical_result ?? {};
   return typeof canonical.cloudAgentSessionId === 'string' &&
     typeof canonical.kiloSessionId === 'string'
     ? {
         cloudAgentSessionId: canonical.cloudAgentSessionId,
         kiloSessionId: canonical.kiloSessionId,
+        ...(canonical[SESSION_CREATE_WORKTREE_ENABLED_KEY] === true &&
+        isControlSession(canonical.cloudAgentSessionId)
+          ? {
+              worktreeId: cloudAgentWorktreeIdSchema.parse(
+                `worktree_${canonical.cloudAgentSessionId.slice('workspace_'.length)}`
+              ),
+            }
+          : {}),
       }
     : undefined;
 }
@@ -2212,6 +2227,7 @@ async function executeLedgerCreate(
   return {
     cloudAgentSessionId: result.cloudAgentSessionId,
     kiloSessionId: result.kiloSessionId,
+    ...(result.worktreeId === undefined ? {} : { worktreeId: result.worktreeId }),
     ...(options.includeInitialMessage
       ? {
           messageId: result.admission.messageId,
@@ -2379,6 +2395,7 @@ async function resumeCloneCreate(
   return {
     cloudAgentSessionId: result.cloudAgentSessionId,
     kiloSessionId: result.kiloSessionId,
+    ...(result.worktreeId === undefined ? {} : { worktreeId: result.worktreeId }),
     ...(options.includeInitialMessage
       ? {
           messageId: result.admission.messageId,
@@ -2463,6 +2480,7 @@ async function resumeFirstWorktreeCreate(
   return {
     cloudAgentSessionId: result.cloudAgentSessionId,
     kiloSessionId: result.kiloSessionId,
+    ...(result.worktreeId === undefined ? {} : { worktreeId: result.worktreeId }),
     ...(options.includeInitialMessage
       ? {
           messageId: result.admission.messageId,

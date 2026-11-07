@@ -29,6 +29,7 @@ const launch = {
   mode: 'code',
   prompt: 'Perform a bounded child task',
   autoInitiate: true,
+  operationKey: '33333333-3333-4333-8333-333333333333',
 };
 const token = `header.${btoa(JSON.stringify({ cloudAgentAuthority: scope }))}.fixture`;
 const props: GrantProps = {
@@ -78,6 +79,10 @@ describe('Cloud Agent MCP authority', () => {
     { githubRepo: 'Other-Owner/Another_Repo', model: 'other-provider/another-model' },
     { callbackTarget: { url: 'session:parent' } },
     {
+      stackOnWorktreeId: 'worktree_11111111-1111-4111-8111-111111111111',
+      operationKey: '33333333-3333-4333-8333-333333333333',
+    },
+    {
       variant: 'high',
       upstreamBranch: 'feature/child-task',
       autoCommit: true,
@@ -98,7 +103,7 @@ describe('Cloud Agent MCP authority', () => {
     expect(fetchImpl.mock.calls[0][1]?.body).toBe(JSON.stringify(input));
   });
 
-  it('forwards an allowed organization launch without changing its organization', async () => {
+  it('forwards an organization stacked launch without changing its organization', async () => {
     const organizationId = '11111111-1111-4111-8111-111111111111';
     const organizationScope: CloudAgentAuthority = {
       ...scope,
@@ -110,15 +115,22 @@ describe('Cloud Agent MCP authority', () => {
       cloudAgentAuthority: organizationScope,
     });
     const fetchImpl = upstream();
+    const input = {
+      ...launch,
+      organizationId,
+      stackOnWorktreeId: 'worktree_11111111-1111-4111-8111-111111111111',
+      operationKey: '33333333-3333-4333-8333-333333333333',
+    };
     await callCatalogEndpoint({
       catalog,
       path: cloudAgentAuthorityProcedure(organizationScope),
-      input: { ...launch, organizationId },
+      input,
       auth: organizationAuth,
       webBaseUrl: 'https://fixture.invalid',
       fetchImpl,
     });
     expect(fetchImpl).toHaveBeenCalledOnce();
+    expect(fetchImpl.mock.calls[0][1]?.body).toBe(JSON.stringify(input));
     expect(fetchImpl.mock.calls[0][1]?.headers).toMatchObject({
       'x-kilocode-organizationid': organizationId,
     });
@@ -152,6 +164,16 @@ describe('Cloud Agent MCP authority', () => {
     { path: 'cloudAgentNext.prepareSession', input: { ...launch, profileId: 'profile' } },
     { path: 'cloudAgentNext.prepareSession', input: { ...launch, mcpServers: {} } },
     { path: 'cloudAgentNext.prepareSession', input: { ...launch, cloudAgentSpawn: scope } },
+    {
+      path: 'cloudAgentNext.prepareSession',
+      input: {
+        ...launch,
+        stackOnWorktreeId: 'worktree_11111111-1111-4111-8111-111111111111',
+        upstreamBranch: 'main',
+        operationKey: '33333333-3333-4333-8333-333333333333',
+      },
+    },
+    { path: 'cloudAgentNext.prepareSession', input: { ...launch, baseSha: 'a'.repeat(40) } },
   ])(
     'denies procedure or request escalation without forwarding: $path',
     async ({ path, input }) => {
@@ -268,8 +290,9 @@ describe('Cloud Agent MCP authority', () => {
       properties: {
         githubRepo: { type: 'string' },
         model: { type: 'string' },
+        stackOnWorktreeId: { type: 'string' },
       },
-      required: expect.arrayContaining(['githubRepo', 'model', 'autoInitiate']),
+      required: expect.arrayContaining(['githubRepo', 'model', 'autoInitiate', 'operationKey']),
       additionalProperties: false,
     });
     expect(outcome.results[0].inputSchema).not.toHaveProperty(
@@ -307,6 +330,11 @@ describe('Cloud Agent MCP authority', () => {
       expect(body.result.instructions).toContain('only when the user explicitly asks');
       expect(body.result.instructions).toContain('own sandbox and worktree');
       expect(body.result.instructions).toContain('fan out independent tasks');
+      expect(body.result.instructions).toContain('stackOnWorktreeId');
+      expect(body.result.instructions).toContain('A.worktreeId');
+      expect(body.result.instructions).toContain('callback target stays the orchestrator');
+      expect(body.result.instructions).toContain('worktree_11111111-1111-4111-8111-111111111111');
+      expect(body.result.instructions).toContain('Omit upstreamBranch for stacked launches');
       expect(body.result.instructions).toContain(cloudAgentAuthorityProcedure(authority));
     }
   );

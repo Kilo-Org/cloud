@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { cloudAgentWorktreeIdSchema } from '@kilocode/session-ingest-contracts';
 import { CLOUD_AGENT_NEXT_AUDIENCE, KILO_API_AUDIENCE } from './internal-service-token-audiences';
 
 export const PARENT_SESSION_CALLBACK_URL = 'session:parent';
@@ -72,19 +73,38 @@ const scopedPrepareSessionSchema = z
       .regex(/^[a-zA-Z]+$/)
       .optional(),
     upstreamBranch: z.string().min(1).max(500).optional(),
+    stackOnWorktreeId: cloudAgentWorktreeIdSchema
+      .describe(
+        'Stack on any pushed worktree in the same repository and owner scope, including another worker session. Use its returned worktreeId. Omit upstreamBranch.'
+      )
+      .optional(),
     autoCommit: z.boolean().optional(),
     autoInitiate: z.literal(true),
-    operationKey: z.uuid().optional(),
+    operationKey: z
+      .uuid()
+      .describe('Use a fresh UUID for each child workspace. Reuse it only for the same launch.'),
     callbackTarget: ParentSessionCallbackTargetSchema.optional(),
     organizationId: z.string().min(1).optional(),
   })
-  .strict();
+  .strict()
+  .refine(input => input.stackOnWorktreeId === undefined || input.upstreamBranch === undefined, {
+    message: 'A stacked workspace cannot use an upstream branch',
+    path: ['upstreamBranch'],
+  });
+
+export function cloudAgentAuthorityWorktreeId(authority: CloudAgentAuthority): string | undefined {
+  if (!authority.parentSessionId.startsWith('workspace_')) return undefined;
+  const parsed = cloudAgentWorktreeIdSchema.safeParse(
+    authority.parentSessionId.replace(/^workspace_/, 'worktree_')
+  );
+  return parsed.success ? parsed.data : undefined;
+}
 
 export function cloudAgentAuthorityInputSchema(
   authority: CloudAgentAuthority
 ): Record<string, unknown> {
   return z.toJSONSchema(
-    scopedPrepareSessionSchema.extend({
+    scopedPrepareSessionSchema.safeExtend({
       organizationId:
         authority.organizationId === null
           ? z.never().optional()

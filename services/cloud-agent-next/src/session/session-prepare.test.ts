@@ -1878,6 +1878,24 @@ describe('explicit sandbox session creation', () => {
 });
 
 describe('sessionCreateIntentFingerprint', () => {
+  it('distinguishes the stack parent, base branch, and resolved base commit', async () => {
+    const repository = {
+      type: 'github' as const,
+      repo: 'acme/repo',
+      baseBranch: 'feature/parent',
+      baseSha: 'a'.repeat(40),
+    };
+    const base = makeRequest({ parentWorktreeId: 'worktree_parent', repository });
+    const fingerprint = await sessionCreateIntentFingerprint(base);
+    const alternatives: SessionCreateRequest[] = [
+      { ...base, parentWorktreeId: 'worktree_other' },
+      { ...base, repository: { ...repository, baseBranch: 'feature/other' } },
+      { ...base, repository: { ...repository, baseSha: 'b'.repeat(40) } },
+    ];
+    for (const changed of alternatives) {
+      expect(await sessionCreateIntentFingerprint(changed)).not.toBe(fingerprint);
+    }
+  });
   it('changes when resolved runtime instructions change', async () => {
     const base = makeRequest({
       profile: { resolved: { runtimeInstructions: [{ name: 'repo-rules', content: 'v1' }] } },
@@ -2249,6 +2267,7 @@ describe('createSessionWithLedger admission ladder', () => {
       });
 
       const result = await runCreate(ctx, request);
+      expect(result.worktreeId).toBe(WORKTREE_ID);
 
       expect(createCliSessionMock).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -2292,6 +2311,7 @@ describe('createSessionWithLedger admission ladder', () => {
       expect(result).toEqual({
         cloudAgentSessionId: WORKSPACE_SESSION_ID,
         kiloSessionId: KILO_SESSION_ID,
+        worktreeId: WORKTREE_ID,
       });
     }
   );
@@ -2361,6 +2381,7 @@ describe('createSessionWithLedger admission ladder', () => {
         cloudAgentSessionId: WORKSPACE_SESSION_ID,
         kiloSessionId: KILO_SESSION_ID,
         replayed: true,
+        ...(worktreeEnabled === true ? { worktreeId: WORKTREE_ID } : {}),
       });
       expect(recordOperationProgressMock).not.toHaveBeenCalled();
       expect(settleOperationMock).not.toHaveBeenCalled();
@@ -4650,6 +4671,7 @@ describe('createSessionWithLedger worktree and ownership reconciliation', () => 
     await expect(runCreate(ctx, input)).resolves.toEqual({
       cloudAgentSessionId: WORKSPACE_SESSION_ID,
       kiloSessionId: KILO_SESSION_ID,
+      worktreeId: WORKTREE_ID,
       replayed: true,
     });
 
@@ -4714,6 +4736,7 @@ describe('createSessionWithLedger worktree and ownership reconciliation', () => 
       expect(result).toEqual({
         cloudAgentSessionId: WORKSPACE_SESSION_ID,
         kiloSessionId: KILO_SESSION_ID,
+        worktreeId: WORKTREE_ID,
         replayed: true,
       });
       expect(createCliSessionMock).toHaveBeenCalledTimes(1);
@@ -4885,6 +4908,7 @@ describe('createSessionWithLedger worktree and ownership reconciliation', () => 
     await expect(runCreate(ctx, input)).resolves.toEqual({
       cloudAgentSessionId: WORKSPACE_SESSION_ID,
       kiloSessionId: KILO_SESSION_ID,
+      worktreeId: WORKTREE_ID,
       replayed: true,
     });
 
@@ -4961,6 +4985,7 @@ describe('createSessionWithLedger worktree and ownership reconciliation', () => 
       ).resolves.toEqual({
         cloudAgentSessionId: WORKSPACE_SESSION_ID,
         kiloSessionId: KILO_SESSION_ID,
+        worktreeId: WORKTREE_ID,
         replayed: true,
       });
 
@@ -5052,6 +5077,7 @@ describe('createSessionWithLedger worktree and ownership reconciliation', () => 
       await expect(runCreate(ctx, input)).resolves.toEqual({
         cloudAgentSessionId: WORKSPACE_SESSION_ID,
         kiloSessionId: KILO_SESSION_ID,
+        worktreeId: WORKTREE_ID,
         replayed: true,
       });
 

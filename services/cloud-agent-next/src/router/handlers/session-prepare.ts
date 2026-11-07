@@ -254,6 +254,7 @@ const prepareSessionHandler = internalApiProtectedProcedure
       const response = {
         cloudAgentSessionId: result.cloudAgentSessionId,
         kiloSessionId: result.kiloSessionId,
+        ...(result.worktreeId === undefined ? {} : { worktreeId: result.worktreeId }),
       };
       if ('replayed' in result && result.replayed === true) {
         return { ...response, replayed: true };

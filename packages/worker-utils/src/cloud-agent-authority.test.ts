@@ -4,6 +4,7 @@ import {
   CloudAgentAuthoritySchema,
   cloudAgentAuthorityInputSchema,
   cloudAgentAuthorityProcedure,
+  cloudAgentAuthorityWorktreeId,
   isCloudAgentAuthorityHttpPathAllowed,
   validateCloudAgentAuthorityRequest,
   type CloudAgentAuthority,
@@ -33,6 +34,7 @@ const launch = {
   mode: 'code',
   prompt: 'Implement the child task',
   autoInitiate: true,
+  operationKey: '33333333-3333-4333-8333-333333333333',
 };
 
 function claims(overrides: Record<string, unknown> = {}) {
@@ -63,6 +65,21 @@ beforeEach(() => {
 afterEach(() => vi.useRealTimers());
 
 describe('Cloud Agent authority contract', () => {
+  it('derives the current worktree only from a canonical workspace root', () => {
+    expect(
+      cloudAgentAuthorityWorktreeId({
+        ...scope,
+        parentSessionId: 'workspace_11111111-1111-4111-8111-111111111111',
+      })
+    ).toBe('worktree_11111111-1111-4111-8111-111111111111');
+    for (const parentSessionId of [
+      'workspace_invalid',
+      'agent_legacy',
+      'worktree_11111111-1111-4111-8111-111111111111',
+    ]) {
+      expect(cloudAgentAuthorityWorktreeId({ ...scope, parentSessionId })).toBeUndefined();
+    }
+  });
   it('accepts session-bound authority without repository, model, or depth policy', () => {
     expect(CloudAgentAuthoritySchema.parse(scope)).toEqual(scope);
     expect(cloudAgentAuthorityProcedure(scope)).toBe('cloudAgentNext.prepareSession');
@@ -135,6 +152,56 @@ describe('Cloud Agent authority contract', () => {
       'properties.callbackTarget.properties.url.const',
       'session:parent'
     );
+  });
+  it.each([null, organizationId])('allows a stacked launch in its pinned scope: %s', orgId => {
+    const authority = { ...scope, organizationId: orgId };
+    const input = {
+      ...launch,
+      stackOnWorktreeId: 'worktree_11111111-1111-4111-8111-111111111111',
+      operationKey: '33333333-3333-4333-8333-333333333333',
+      ...(orgId === null ? {} : { organizationId: orgId }),
+    };
+    expect(
+      validateCloudAgentAuthorityRequest(authority, cloudAgentAuthorityProcedure(authority), input)
+    ).toEqual(input);
+    expect(cloudAgentAuthorityInputSchema(authority)).toHaveProperty(
+      'properties.stackOnWorktreeId.type',
+      'string'
+    );
+  });
+  it.each([
+    { operationKey: undefined },
+    { stackOnWorktreeId: 'worktree_invalid' },
+    { stackOnWorktreeId: 'workspace_11111111-1111-4111-8111-111111111111' },
+    {
+      stackOnWorktreeId: 'worktree_11111111-1111-4111-8111-111111111111',
+      upstreamBranch: 'main',
+      operationKey: '33333333-3333-4333-8333-333333333333',
+    },
+    { stackOnWorktreeId: 'worktree_11111111-1111-4111-8111-111111111111', baseBranch: 'main' },
+    { baseSha: 'a'.repeat(40) },
+    { parentWorktreeId: 'worktree_11111111-1111-4111-8111-111111111111' },
+  ])('rejects malformed or caller-resolved stack input %j', options => {
+    expect(() =>
+      validateCloudAgentAuthorityRequest(scope, cloudAgentAuthorityProcedure(scope), {
+        ...launch,
+        ...options,
+      })
+    ).toThrow();
+  });
+  it('lets an orchestrator stack on another worker while receiving the callback itself', () => {
+    const authority = {
+      ...scope,
+      parentSessionId: 'workspace_11111111-1111-4111-8111-111111111111',
+    };
+    const input = {
+      ...launch,
+      stackOnWorktreeId: 'worktree_44444444-4444-4444-8444-444444444444',
+      callbackTarget: { url: 'session:parent' },
+    };
+    expect(
+      validateCloudAgentAuthorityRequest(authority, cloudAgentAuthorityProcedure(authority), input)
+    ).toEqual(input);
   });
   it.each([
     { parentCloudAgentSessionId: 'workspace_sibling' },

@@ -110,6 +110,7 @@ describe('scoped Cloud Agent Worker authorization', () => {
     githubRepo: 'acme/widgets',
     model: 'kilo/test-model',
     autoInitiate: true,
+    operationKey: '33333333-3333-4333-8333-333333333333',
   };
   const scopedRouter = t.router({
     prepareSession: internalApiProtectedProcedure
@@ -119,6 +120,7 @@ describe('scoped Cloud Agent Worker authorization', () => {
       .input(z.unknown())
       .mutation(() => ({ forbidden: true })),
     send: protectedProcedure.input(z.unknown()).mutation(() => ({ forbidden: true })),
+    getSession: protectedProcedure.input(z.unknown()).query(({ ctx }) => ({ owner: ctx.userId })),
     health: publicProcedure.query(() => ({ forbidden: true })),
   });
   const context = (internalApiKey?: string): TRPCContext => ({
@@ -147,6 +149,25 @@ describe('scoped Cloud Agent Worker authorization', () => {
     await expect(caller.updateSession(input)).rejects.toMatchObject({ code: 'FORBIDDEN' });
     await expect(caller.send(input)).rejects.toMatchObject({ code: 'FORBIDDEN' });
     await expect(caller.health()).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  });
+  it('allows only the trusted web app to read stack-parent metadata with scoped authority', async () => {
+    for (const key of [undefined, 'wrong-key']) {
+      await expect(
+        scopedRouter
+          .createCaller(context(key))
+          .getSession({ cloudAgentSessionId: authority.parentSessionId })
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    }
+    await expect(
+      scopedRouter
+        .createCaller(context('internal-fixture'))
+        .getSession({ cloudAgentSessionId: authority.parentSessionId })
+    ).resolves.toEqual({ owner: authority.ownerId });
+    await expect(
+      scopedRouter
+        .createCaller({ ...context('internal-fixture'), userId: 'other-user' })
+        .getSession({ cloudAgentSessionId: authority.parentSessionId })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
   });
 
   it('refuses caller lineage and unsafe config before an input schema can erase them', async () => {

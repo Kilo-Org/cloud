@@ -1,5 +1,7 @@
 import { z } from 'zod';
+import { cloudAgentWorktreeIdSchema } from '@kilocode/session-ingest-contracts';
 import { TRPCError } from '@trpc/server';
+import { timingSafeEqual } from '@kilocode/encryption';
 import {
   CloudAgentAuthoritySchema,
   cloudAgentAuthorityProcedure,
@@ -33,6 +35,17 @@ export function assertCloudAgentIsolatedAllocation(
 }
 
 export const CLOUD_AGENT_MCP_URL = 'https://mcp.kiloapps.io/mcp';
+
+export function isInternalCloudAgentSessionRead(
+  procedure: string | undefined,
+  suppliedKey: string | null | undefined,
+  internalApiSecret: string | undefined
+): boolean {
+  return (
+    procedure === 'getSession' &&
+    Boolean(suppliedKey && internalApiSecret && timingSafeEqual(suppliedKey, internalApiSecret))
+  );
+}
 
 export type WorkspaceMcpBinding = {
   worktreeId: string;
@@ -98,15 +111,35 @@ const workerPreparationMetadataSchema = z
     githubAccessPurpose: z.enum(['agent', 'workflow']).optional(),
     clientProvenance: z.enum(['browser', 'mobile']).optional(),
     kilocodeOrganizationId: z.string().optional(),
+    // These fields are resolved by the web app, not accepted by the scoped MCP tool.
+    stackOnWorktreeId: z.never().optional(),
+    githubIntegrationId: z.string().min(1).optional(),
+    baseBranch: z.string().min(1).max(256).optional(),
+    baseSha: z
+      .string()
+      .regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i)
+      .optional(),
+    parentWorktreeId: cloudAgentWorktreeIdSchema.optional(),
   })
   .passthrough();
 
 export function validateScopedWorkerPreparation(authority: CloudAgentAuthority, rawInput: unknown) {
   const parsed = workerPreparationMetadataSchema.parse(rawInput);
+  const hasBase = parsed.baseBranch !== undefined || parsed.baseSha !== undefined;
+  if (
+    parsed.parentWorktreeId === undefined
+      ? hasBase
+      : parsed.baseBranch === undefined || parsed.baseSha === undefined
+  ) {
+    throw new Error('Stacked preparation requires a parent worktree, base branch, and base commit');
+  }
   const input = { ...parsed };
   for (const key of Object.keys(workerPreparationMetadataSchema.shape)) delete input[key];
   return validateCloudAgentAuthorityRequest(authority, cloudAgentAuthorityProcedure(authority), {
     ...input,
+    ...(parsed.parentWorktreeId === undefined
+      ? {}
+      : { stackOnWorktreeId: parsed.parentWorktreeId }),
     ...(parsed.kilocodeOrganizationId === undefined
       ? {}
       : { organizationId: parsed.kilocodeOrganizationId }),

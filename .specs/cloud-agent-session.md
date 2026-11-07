@@ -144,6 +144,19 @@ repository.
     own workspace order and smart folders. Single sessions MUST remain sorted
     by actual activity, and PR verification or other metadata writes MUST NOT
     move them or workspaces in activity order.
+11. A Cloud Agent permitted to launch child sessions MUST be able to orchestrate
+    stacked workspaces through its scoped launch tool when the user requests a
+    PR stack. Every new launch MUST use a fresh UUID `operationKey` and create a
+    registered workspace. The response MUST return its `worktreeId`, including
+    on an identical retry. The orchestrator MAY launch worker A independently,
+    then launch B with `stackOnWorktreeId` set to A's returned ID after A pushes.
+    The stack parent MAY be another owned worktree in the same personal or
+    organization scope. Completion callbacks MUST target the launching
+    orchestrator independently of the stack parent. The server MUST resolve the
+    parent repository, branch, and pushed commit with the UI ownership checks.
+    The agent MUST NOT select the resolved commit, override its lineage, or
+    combine stacking with `upstreamBranch`. Each layer MUST receive its PR base
+    instruction and may push only its own branch.
 
 ### Preparation
 

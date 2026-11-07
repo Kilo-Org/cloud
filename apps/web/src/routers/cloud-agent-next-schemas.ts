@@ -538,6 +538,7 @@ export const organizationPrepareSessionNextSchema = basePrepareSessionNextSchema
 export const basePrepareSessionNextOutputSchema = z.object({
   kiloSessionId: kiloSessionIdSchema,
   cloudAgentSessionId: z.string(),
+  worktreeId: cloudAgentWorktreeIdSchema.optional(),
   /** `true` when the response replays an already-settled create for the same `operationKey`. */
   replayed: z.boolean().optional(),
 });

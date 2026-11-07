@@ -1,5 +1,8 @@
 import catalogJson from '../catalog.json';
-import { cloudAgentAuthorityProcedure } from '../../../packages/worker-utils/src/cloud-agent-authority';
+import {
+  cloudAgentAuthorityProcedure,
+  cloudAgentAuthorityWorktreeId,
+} from '../../../packages/worker-utils/src/cloud-agent-authority';
 import {
   classifyToolError,
   createMcpAnalytics,
@@ -761,7 +764,7 @@ async function handleRpcMessage(
           ...(clientName !== undefined ? { clientName } : {}),
         });
         const childSessionInstructions = auth.cloudAgentAuthority
-          ? ` This session may launch child Cloud Agent sessions. Launch one only when the user explicitly asks you to spin up a new Cloud Agent session. Each child session gets its own sandbox and worktree, so use child sessions to fan out independent tasks. Do not use a child session to explore or work in this worktree; use your own tools here. To launch one, run search first, then call ${cloudAgentAuthorityProcedure(auth.cloudAgentAuthority)} with the child's task. To receive the child's completion, failure or interruption as a new message in this parent session, include callbackTarget: { url: "session:parent" }. Omit callbackTarget when no notification is needed. Do not poll or wait in a tool for a callback; finish your turn and resume when it arrives.`
+          ? ` This session may launch child Cloud Agent sessions. Launch one only when the user explicitly asks you to spin up a new Cloud Agent session or stacked PRs. A request to split work into stacked PRs permits the required stacked workspaces. Each child session gets its own sandbox and worktree, so use child sessions to fan out independent tasks. Do not use a child session to explore or work in this worktree; use your own tools here. To launch one, run search first, then call ${cloudAgentAuthorityProcedure(auth.cloudAgentAuthority)} with the child's task. Include a fresh UUID operationKey in every launch. Save the returned worktreeId and session IDs. For an orchestrated stack, launch worker A without stackOnWorktreeId. Wait for A to commit and push its branch. Then launch worker B with stackOnWorktreeId set to A.worktreeId and the same githubRepo. Repeat with each returned worktreeId for later layers. You can select any eligible worktree in the same personal or organization scope, including another worker session. You do not need to stack on this orchestrator workspace. This workspace's worktree ID is ${cloudAgentAuthorityWorktreeId(auth.cloudAgentAuthority) ?? 'unavailable; use a returned worker worktreeId'}. Omit upstreamBranch for stacked launches: it checks out that branch instead of creating a new branch on top. Tell the child to open its PR against the parent branch; the platform also supplies that base instruction. Reuse an operationKey only for an identical launch retry. To receive completion, failure or interruption in this launching orchestrator, include callbackTarget: { url: "session:parent" }. This callback target stays the orchestrator even when the stack parent is another worker. The orchestrator can launch every layer; workers do not need child-session permission. Omit callbackTarget when no notification is needed. Do not poll or wait in a tool for a callback; finish your turn and resume when it arrives.`
           : '';
         return jsonRpcResult(id ?? 0, {
           protocolVersion,

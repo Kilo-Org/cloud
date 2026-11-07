@@ -283,6 +283,11 @@ describe('prepareKiloFilesystem', () => {
       expect(rules).toContain('# Cloud Agent Environment');
       expect(rules).toContain('Port 3000 is used by the sandbox itself.');
       expect(rules).toContain('no more than 3 minutes 30 seconds');
+      expect(rules).toContain('## Stacked Workspaces and Pull Requests');
+      expect(rules).toContain('an internet search is not needed');
+      expect(rules).toContain('**New stacked workspace**');
+      expect(rules).toContain('gh pr create --base <parent-branch>');
+      expect(rules).toContain('Do not rewrite or push parent or sibling branches.');
       expect(
         await fsp.readFile(path.join(home, '.local', 'share', 'kilo', 'auth.json'), 'utf8')
       ).toBe('{"kilo":{}}');

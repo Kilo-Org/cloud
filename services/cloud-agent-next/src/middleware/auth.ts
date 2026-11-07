@@ -6,26 +6,33 @@ import { validateKiloToken } from '../validate-kilo-token.js';
 import { logger } from '../logger.js';
 import { buildTrpcErrorResponse } from '../trpc-error.js';
 import { extractProcedureName } from '../balance-validation.js';
+import { isInternalCloudAgentSessionRead } from '../cloud-agent-authority.js';
 
 export const authMiddleware = createMiddleware<HonoContext>(
   async (c: Context<HonoContext>, next: Next) => {
     const authHeader = c.req.header('authorization');
     const nextAuthSecret = await resolveSecret(c.env.NEXTAUTH_SECRET);
+    const pathname = new URL(c.req.url).pathname;
+    const procedureName = extractProcedureName(pathname) ?? undefined;
+    const allowCloudAgentAuthority =
+      pathname === '/trpc/prepareSession' ||
+      isInternalCloudAgentSessionRead(
+        procedureName,
+        c.req.header('x-internal-api-key'),
+        c.env.INTERNAL_API_SECRET
+      );
     const result = await validateKiloToken(authHeader ?? null, {
       secret: nextAuthSecret,
       connectionString: c.env.HYPERDRIVE.connectionString,
-      ...(new URL(c.req.url).pathname === '/trpc/prepareSession'
-        ? { allowCloudAgentAuthority: true }
-        : {}),
+      ...(allowCloudAgentAuthority ? { allowCloudAgentAuthority: true } : {}),
     });
 
     if (!result.success) {
       logger.withFields({ error: result.error }).warn('Authentication failed');
-      const procedureName = extractProcedureName(new URL(c.req.url).pathname) ?? undefined;
       return buildTrpcErrorResponse(401, result.error, procedureName);
     }
 
-    if (result.cloudAgentAuthority && new URL(c.req.url).pathname !== '/trpc/prepareSession') {
+    if (result.cloudAgentAuthority && !allowCloudAgentAuthority) {
       return buildTrpcErrorResponse(403, 'Cloud Agent authority only permits preparation');
     }
 

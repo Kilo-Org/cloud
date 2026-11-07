@@ -1,7 +1,10 @@
 import { Validator, type OutputUnit, type SchemaDraft } from '@cfworker/json-schema';
 import { ORGANIZATION_ID_HEADER } from './auth';
 import { isGuardedRow } from './search';
-import { validateCloudAgentAuthorityRequest } from '../../../packages/worker-utils/src/cloud-agent-authority';
+import {
+  cloudAgentAuthorityInputSchema,
+  validateCloudAgentAuthorityRequest,
+} from '../../../packages/worker-utils/src/cloud-agent-authority';
 import {
   JsonRpcFailure,
   type Catalog,
@@ -441,7 +444,10 @@ export async function callCatalogEndpoint(options: {
       { path }
     );
   }
-  assertInputMatchesSchema(row, path, input);
+  const inputRow = options.auth.cloudAgentAuthority
+    ? { ...row, inputSchema: cloudAgentAuthorityInputSchema(options.auth.cloudAgentAuthority) }
+    : row;
+  assertInputMatchesSchema(inputRow, path, input);
   return forwardCatalogCall({
     row,
     input,

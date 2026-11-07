@@ -97,7 +97,7 @@ describe('authMiddleware', () => {
     });
   });
 
-  it('preserves verified scope for prepareSession and rejects every other Worker tRPC path', async () => {
+  it('preserves scope only for preparation and trusted parent metadata reads', async () => {
     const cloudAgentAuthority = {
       version: 1 as const,
       ownerId: 'user-1',
@@ -115,9 +115,11 @@ describe('authMiddleware', () => {
     const app = new Hono<HonoContext>();
     app.use('/trpc/*', authMiddleware);
     app.post('/trpc/:procedure', c => c.json({ authority: c.get('cloudAgentAuthority') }));
+    app.get('/trpc/getSession', c => c.json({ authority: c.get('cloudAgentAuthority') }));
     const env = {
       NEXTAUTH_SECRET: 'secret',
       HYPERDRIVE: { connectionString: 'postgres://fixture' },
+      INTERNAL_API_SECRET: 'internal-fixture',
     } as Env;
     const allowed = await app.fetch(
       new Request('https://worker.test/trpc/prepareSession', { method: 'POST' }),
@@ -129,6 +131,14 @@ describe('authMiddleware', () => {
       null,
       expect.objectContaining({ allowCloudAgentAuthority: true })
     );
+    const parentRead = await app.fetch(
+      new Request('https://worker.test/trpc/getSession', {
+        headers: { 'x-internal-api-key': 'internal-fixture' },
+      }),
+      env
+    );
+    expect(parentRead.status).toBe(200);
+    expect(await parentRead.json()).toEqual({ authority: cloudAgentAuthority });
     for (const path of [
       'start',
       'send',

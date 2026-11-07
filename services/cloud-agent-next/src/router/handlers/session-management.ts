@@ -393,6 +393,9 @@ export function createSessionManagementHandlers() {
             env,
             kiloUserId: userId,
             cloudAgentSessionId: sessionId,
+            ...(ctx.cloudAgentAuthority
+              ? { expectedOrganizationId: ctx.cloudAgentAuthority.organizationId }
+              : {}),
           });
 
           // Get DO stub keyed by userId:sessionId for user isolation. The getter

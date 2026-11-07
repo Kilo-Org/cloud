@@ -709,7 +709,8 @@ and the `router-*` coordinator scripts. Paid execution requires, in order:
    programme ceiling and whose origin snapshot is immutable.
 2. A frozen spec with the complete router, content-blind control and fixed-model
    arms for each mode, the unchanged task split and resources, and frozen
-   account-plugin evidence.
+   account-plugin evidence supplied as an absolute `account_policy` path.
+   Its bytes are bound into the freeze approval.
 3. A fresh complete tariff quote for every mandatory pair. An unsupported tariff
    is an accounting failure, not an endpoint outage.
 4. A registered whole-plan financing manifest covering every mandatory row.

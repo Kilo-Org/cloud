@@ -515,6 +515,22 @@ async function recordSignupImpactTracking(args: {
   }
 }
 
+/**
+ * Sign-in method types accepted for the account-sign-in requirement: a
+ * consumed magic link or code, a native token that checked `email_verified`, a
+ * Google profile the acceptance path asserts, an Anaconda profile its parser
+ * refuses without the claim, Apple sign-in, or an enterprise SSO assertion.
+ * OpenAI tokens carry an optional `email_verified` claim that this table does
+ * not rely on.
+ */
+const QUALIFYING_SIGN_IN_METHODS: Partial<Record<AuthProviderId, true>> = {
+  google: true,
+  apple: true,
+  anaconda: true,
+  workos: true,
+  email: true,
+};
+
 export async function createOrUpdateUser(
   args: CreateOrUpdateUserArgs,
   turnstile_guid: UUID | undefined,
@@ -575,10 +591,26 @@ export async function createOrUpdateUser(
     // ownership of the email (consumed magic-link/code, or a provider-asserted
     // email_verified claim). Proof authorizes the link; without proof the
     // sign-in keeps the DIFFERENT-OAUTH refusal below.
-    const shouldRelinkWorkOS =
-      args.provider === 'workos' && hasThisProvider && autoLinkToExistingUser;
+    //
+    // Linking into an existing account also requires that the account currently
+    // carries at least one method from the table above. An account with no
+    // provider row predates provider rows or follows an admin reset, and the
+    // email auto-link is its only way in, so it counts. Sign-in through the
+    // account's own provider resolves by provider identity above and never
+    // reaches this requirement.
+    //
+    // WorkOS SSO settlement keeps its existing behavior: an SSO-required hosted
+    // domain is the only path into the account, and its authority-gated callback
+    // proves the organization controls it, so it always resolves (relaying a
+    // stale profile ID when one is stored).
+    const accountHasQualifyingSignIn =
+      existingProviders.length === 0 ||
+      existingProviders.some(p => QUALIFYING_SIGN_IN_METHODS[p.provider] === true);
+    const workosSettles = args.provider === 'workos' && autoLinkToExistingUser;
     const shouldLink =
-      (!hasThisProvider && (onlyHasFakeLogin || autoLinkToExistingUser)) || shouldRelinkWorkOS;
+      workosSettles ||
+      (!hasThisProvider &&
+        (onlyHasFakeLogin || (autoLinkToExistingUser && accountHasQualifyingSignIn)));
 
     if (shouldLink) {
       let linkedUser = userByEmail;
@@ -668,6 +700,27 @@ export async function createOrUpdateUser(
           new_hosted_domain: args.hosted_domain,
         },
       });
+      // Record the sign-ins the account-sign-in requirement held back, so they
+      // are distinguishable from every other different-account refusal. A
+      // refusal from the provider already on the account is not this
+      // requirement's outcome, so it stays out.
+      const skippedBySignInHistory =
+        !hasThisProvider &&
+        !workosSettles &&
+        autoLinkToExistingUser &&
+        !onlyHasFakeLogin &&
+        !accountHasQualifyingSignIn;
+      if (skippedBySignInHistory) {
+        posthogClient.capture({
+          distinctId: userByEmail.google_user_email,
+          event: 'auto_link_skipped_account_sign_in_history',
+          properties: {
+            existing_provider_count: existingProviders.length,
+            existing_providers: existingProviders.map(p => p.provider),
+            new_provider: args.provider,
+          },
+        });
+      }
       return failureResult('DIFFERENT-OAUTH');
     }
   }

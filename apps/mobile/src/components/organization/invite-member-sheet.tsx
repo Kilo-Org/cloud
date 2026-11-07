@@ -183,6 +183,8 @@ export function InviteMemberSheet() {
       <SheetScrollView
         className="flex-1 bg-card"
         contentContainerClassName="px-6 gap-6 pb-8 pt-4"
+        // The design gate's proof readiness marker for this route.
+        testID="organization-invite-sheet"
         automaticallyAdjustKeyboardInsets
         keyboardShouldPersistTaps="handled"
       >

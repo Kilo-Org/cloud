@@ -18,7 +18,7 @@ it('bounds production EU processing to 450 direct Frankfurt writer calls', () =>
   expect(production.queues.consumers).toEqual([
     {
       queue: 'usage-ingest-processing-eu',
-      max_batch_size: 6,
+      max_batch_size: 3,
       max_batch_timeout: 0,
       max_concurrency: 225,
       max_retries: 20,

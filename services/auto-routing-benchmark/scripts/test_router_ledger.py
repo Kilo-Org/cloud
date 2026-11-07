@@ -400,8 +400,17 @@ class FinancingRegistration(unittest.TestCase):
                 self.assertEqual(ledger.financing_for(db, result["financing_sha256"]), financing)
                 liability = ledger.plan_liability(db, pending=(plan["runs"][0]["run"], "20"))
                 self.assertEqual(liability["total_liability_usd"], Decimal(SYNTHETIC_BASELINE) + Decimal("20"))
-                self.assertEqual(liability["forecast_total_usd"], Decimal("360"))
                 self.assertFalse(ledger.check_financing_fits(db, pending=(plan["runs"][0]["run"], "20.01"))["fits"])
+
+    def test_each_registered_forecast_reports_its_own_total(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path, out, manifest, plan = frozen_plan_campaign(Path(temporary), resource_cap="60", pilot_cap="60")
+            larger = register_financing(path, complete_financing(path, manifest, plan, envelope="60"))
+            smaller = register_financing(path, complete_financing(path, manifest, plan, envelope="1"))
+            self.assertTrue(larger["forecast_exceeds_allowance"])
+            self.assertFalse(smaller["forecast_exceeds_allowance"])
+            self.assertEqual((Decimal(larger["forecast_total_usd"]), Decimal(smaller["forecast_total_usd"])), (Decimal("360"), Decimal("6")))
+            self.assertNotEqual(larger["financing_sha256"], smaller["financing_sha256"])
 
     def test_liability_counts_only_incurred_and_releases_unused_hold_on_settlement(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -415,8 +424,6 @@ class FinancingRegistration(unittest.TestCase):
             with ledger.readonly(path) as db:
                 liability = ledger.plan_liability(db)
                 self.assertEqual(liability["total_liability_usd"], Decimal(SYNTHETIC_BASELINE) + Decimal("10"))
-                self.assertEqual(liability["active_envelope_remaining_usd"], Decimal("50"))
-                self.assertGreater(liability["unattempted_financed_envelope_usd"], Decimal(0))
             with sqlite3.connect(path) as db:
                 db.execute("UPDATE requests SET state='settled', actual='1', tokens=1 WHERE id='next-request'")
             with ledger.readonly(path) as db:
@@ -527,10 +534,14 @@ class FinancingRegistration(unittest.TestCase):
                 db.execute("COMMIT")
                 self.assertEqual(db.execute("SELECT COUNT(*) FROM campaign_financing_plans").fetchone()[0], 1)
                 self.assertEqual(db.execute("SELECT state,bound FROM requests WHERE id='historical-held'").fetchone(), ("unknown", SYNTHETIC_BASELINE))
+            self.assertFalse(ledger.audit(path)["cost_forecasts"][0]["executable_for_v5"])
             refreshed = complete_financing(path, manifest, plan)
             refreshed_result = register_financing(path, refreshed)
             with ledger.readonly(path) as db:
                 self.assertEqual(ledger.require_current_financing(db, refreshed_result["financing_sha256"]), refreshed)
+            forecasts = {row["sha256"]: row for row in ledger.audit(path)["cost_forecasts"]}
+            self.assertFalse(forecasts[result["financing_sha256"]]["executable_for_v5"])
+            self.assertTrue(forecasts[refreshed_result["financing_sha256"]]["executable_for_v5"])
 
 
 class WriterLock(unittest.TestCase):

@@ -462,45 +462,28 @@ def plan_liability(db, pending=None):
     """Incurred liability under capped exploration.
 
     Only settled plus held requests count, plus one hypothetical next
-    reservation in `pending`=(run, amount). Registered forecast envelopes,
-    unused active-run remainders and unattempted rows are reported for audit
-    and never added to the total. Known settlement replaces a hold with its
-    actual charge, so the unused part of the hold stops counting.
+    reservation in `pending`=(run, amount). Forecasts and unused future
+    envelopes are not incurred commitments. Each forecast is reported by
+    its own identity, never as a blend of historical plans.
     """
-    requests = rows(db)
-    held_by_run = {}
-    for row in requests:
-        held_by_run[row["run"]] = held_by_run.get(row["run"], Decimal(0)) + held(row)
+    settled_held = sum((held(row) for row in rows(db)), Decimal(0))
     if pending is not None:
-        run, amount = pending
-        held_by_run[run] = held_by_run.get(run, Decimal(0)) + money(amount)
-    settled_held = sum(held_by_run.values(), Decimal(0))
-    admissions = {run: money(maximum) for run, maximum in db.execute("SELECT run,maximum_usd FROM campaign_admissions")} if _table(db, "campaign_admissions") else {}
-    active = {row[0] for row in db.execute("SELECT run FROM router_runs WHERE state='active'")} if _table(db, "router_runs") else set()
-    active_remaining = sum((max(Decimal(0), admissions[run] - held_by_run.get(run, Decimal(0))) for run in active if run in admissions), Decimal(0))
-    unattempted = Decimal(0)
-    financed_runs = {}
-    if _table(db, "campaign_financing_rows"):
-        for run, envelope in db.execute("SELECT run,envelope_usd FROM campaign_financing_rows"):
-            financed_runs[run] = max(financed_runs.get(run, Decimal(0)), money(envelope))
-        unattempted = sum((envelope for run, envelope in financed_runs.items() if run not in admissions), Decimal(0))
-    forecast_total = sum(financed_runs.values(), Decimal(0))
-    return {"settled_plus_held_usd": settled_held, "active_envelope_remaining_usd": active_remaining, "unattempted_financed_envelope_usd": unattempted, "forecast_total_usd": forecast_total, "total_liability_usd": settled_held, "financed_runs": financed_runs, "admitted_runs": set(admissions)}
+        settled_held += money(pending[1])
+    return {"settled_plus_held_usd": settled_held, "total_liability_usd": settled_held}
 
 
 def check_financing_fits(db, pending=None):
     """True when incurred commitments plus `pending` fit the effective ceiling.
 
-    The registered forecast total is reported but never decides fit. A
-    forecast above the allowance registers and explores until the caps stop it.
+    Forecast size never decides fit. A request must fit the incurred
+    allowance independently of the complete plan's cost forecast.
     """
     authorization = effective_authorization(db)
     if authorization is None:
         raise ValueError("Paid dispatch requires a prospective authorization")
     liability = plan_liability(db, pending)
     ceiling = money(authorization["effective_ceiling_usd"])
-    origin = money(authorization["origin_commitments_usd"])
-    return {"fits": liability["total_liability_usd"] <= ceiling, "forecast_exceeds_allowance": liability["forecast_total_usd"] > max(Decimal(0), ceiling - origin), "effective_ceiling_usd": str(ceiling), **{key: str(value) for key, value in liability.items() if key.endswith("_usd")}}
+    return {"fits": liability["total_liability_usd"] <= ceiling, "effective_ceiling_usd": str(ceiling), **{key: str(value) for key, value in liability.items() if key.endswith("_usd")}}
 
 
 def _registered_plan(db, financing):
@@ -609,7 +592,8 @@ def register_financing(db, financing):
         db.execute("INSERT INTO campaign_financing_plans VALUES (?,?,?,?,?)", (plan_sha, manifest_sha, authorization["effective_approval_sha256"], json.dumps(financing, sort_keys=True), time.time()))
         db.executemany("INSERT INTO campaign_financing_rows VALUES (?,?,?,?)", ((plan_sha, row["run"], row["phase"], str(money(row["envelope_usd"]))) for row in financing["rows"]))
     fits = check_financing_fits(db)
-    return {"financing_sha256": plan_sha, **fits, "forecast_total_usd": str(forecast_total), "forecast_pilot_usd": financing["pilot_envelope_usd"], "funding_guarantee": "none; capped exploration may stop inconclusive"}
+    allowance = max(Decimal(0), money(authorization["effective_ceiling_usd"]) - money(authorization["origin_commitments_usd"]))
+    return {"financing_sha256": plan_sha, **fits, "forecast_total_usd": str(forecast_total), "forecast_exceeds_allowance": forecast_total > allowance, "forecast_pilot_usd": financing["pilot_envelope_usd"], "funding_guarantee": "none; capped exploration may stop inconclusive"}
 
 
 def _revalidate_financing(db, financing_sha, financing, manifest_sha, authorization_sha):
@@ -679,7 +663,11 @@ def audit(path):
         if _table(db, "campaign_financing_plans"):
             for sha, financing_json in db.execute("SELECT sha256,financing_json FROM campaign_financing_plans ORDER BY created,sha256"):
                 stored = json.loads(financing_json)
-                forecasts.append({"sha256": sha, "schema": stored.get("schema"), "hash_matches": digest(stored) == sha, "total_envelope_usd": stored.get("total_envelope_usd"), "executable_for_v5": stored.get("schema") == FINANCING_SCHEMA and stored.get("forecast_only") is True})
+                try:
+                    executable = financing_for(db, sha) is not None
+                except ValueError:
+                    executable = False
+                forecasts.append({"sha256": sha, "schema": stored.get("schema"), "hash_matches": digest(stored) == sha, "total_envelope_usd": stored.get("total_envelope_usd"), "executable_for_v5": executable})
         source_hashes = {name: sha for name, sha in db.execute("SELECT path,sha256 FROM campaign_sources")}
         attributed = dict(db.execute("SELECT id,kind FROM router_requests"))
         receipt_locations = [{"request_id": request_id, "source": source, "original_path": original, "evidence_path": evidence, "sha256": sha} for request_id, source, original, evidence, sha in db.execute("SELECT * FROM campaign_receipt_locations ORDER BY source,request_id")]

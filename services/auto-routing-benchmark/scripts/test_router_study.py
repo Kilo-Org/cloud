@@ -919,6 +919,19 @@ class ProspectiveBudget(unittest.TestCase):
         evidence_path.write_text(json.dumps(evidence))
         return ledger, out, manifest, plan, evidence_path, evidence
 
+    def test_completed_protocol_pilot_cannot_establish_quality_or_cost_claims(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            ledger, out, manifest, plan, path, evidence = self.pilot_fixture(Path(temporary))
+            manifest["approval"]["snapshot_file_sha256"] = {mode: "frozen" for mode in ("efficient", "frontier")}
+            proof = SimpleNamespace(verify_runtime_health=mock.Mock())
+            original_helper = router_study.helper
+            with mock.patch.object(router_study, "helper", side_effect=lambda name: proof if name == "router-proof" else original_helper(name)):
+                report = router_study.analyze(out, manifest, plan, "pilot", {"study": load_study()})
+            self.assertTrue(report["plan_complete"])
+            self.assertFalse(report["can_establish_pass"])
+            self.assertFalse(report["can_establish_superiority"])
+            self.assertFalse(report["can_establish_cost_matching"])
+
     def test_semantic_pilot_failure_with_valid_grade_allows_hash_bound_final_selection(self):
         with tempfile.TemporaryDirectory() as temporary:
             ledger, out, manifest, plan, path, evidence = self.pilot_fixture(Path(temporary))

@@ -728,6 +728,8 @@ manifests are audit-only. Paid execution requires, in order:
    is an accounting failure, not an endpoint outage.
 4. A registered whole-plan cost forecast covering every mandatory row.
    The `finance` command registers that forecast. It does not fund the plan.
+   Audit executability requires current authorization and frozen plan
+   validation. Each forecast keeps its own total.
 
 The coordinator validates the final text-only payload after variant resolution,
 posts exactly the approved bytes, and consumes each reservation once. It reports

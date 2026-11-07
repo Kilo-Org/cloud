@@ -479,6 +479,7 @@ describe('authOptions.callbacks.signIn for Claude', () => {
       user: { id: 'settled-user', blocked_reason: null } as never,
       isNew: false,
     });
+    mockLinkAccountToExistingUser.mockReset();
     mockGetAccountLinkingSession.mockReset().mockResolvedValue(null);
     jest.mocked(isClaudePlatformOAuthEnabled).mockClear().mockResolvedValue(true);
     mockResolveSsoAuthorityForDomain.mockReset().mockResolvedValue({
@@ -555,6 +556,36 @@ describe('authOptions.callbacks.signIn for Claude', () => {
     );
     expect(isClaudePlatformOAuthEnabled).toHaveBeenLastCalledWith(undefined);
     expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+  });
+
+  it('reports rejected claim names without identity or credential values', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      await claudeSignIn({
+        access_token: 'private-access-value',
+        id_token: 'private-id-value',
+        private_claim: 'private-claim-value',
+      });
+      expect(warn.mock.calls[0]?.[1]).toMatchObject({
+        reason: 'invalid_profile_claims',
+        rejectedClaims: ['email_verified'],
+      });
+      const diagnostic = JSON.stringify(warn.mock.calls);
+      for (const value of [
+        'claude-cb@example.com',
+        'pairwise-sub',
+        'private-access-value',
+        'private-id-value',
+        'private-claim-value',
+        'private_claim',
+      ]) {
+        expect(diagnostic).not.toContain(value);
+      }
+      expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+      expect(mockLinkAccountToExistingUser).not.toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it.each([

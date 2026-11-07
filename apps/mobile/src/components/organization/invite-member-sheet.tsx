@@ -23,6 +23,7 @@ import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { captureEvent, ORGANIZATION_MEMBER_INVITED_EVENT } from '@/lib/analytics/posthog';
+import { useFormSheetHeaderTopInset } from '@/lib/form-sheet';
 import { useOrganizationMutations } from '@/lib/hooks/use-organization-mutations';
 import { isMoneyRole, type OrgRole, useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -32,6 +33,7 @@ const INVITABLE_ROLES: OrgRole[] = ['member', 'billing_manager', 'owner'];
 
 export function InviteMemberSheet() {
   const router = useRouter();
+  const sheetTopInset = useFormSheetHeaderTopInset();
   const { t } = useTranslation();
   const colors = useThemeColors();
   const { organizationId, role: myRole, org, isResolving } = useOrgBoundary();
@@ -155,7 +157,7 @@ export function InviteMemberSheet() {
         onCancel={requestClose}
         disabled={mutations.invite.isPending}
         doneDisabled={!canSubmit || mutations.invite.isPending}
-        topInset="bottom-form-sheet"
+        topInset={sheetTopInset}
       />
       <SheetScrollView
         className="flex-1 bg-background"

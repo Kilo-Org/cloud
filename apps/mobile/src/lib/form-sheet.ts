@@ -2,6 +2,7 @@ import { Platform, StatusBar, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useRouteIsStackRoot } from '@/lib/navigation/route-focus';
 import { useScreenInsets } from '@/lib/screen-insets';
 
 // Android formSheets can't hit 1.0 without clipping under the status bar, so
@@ -52,21 +53,27 @@ export function useFormSheetScreenOptions() {
  *
  * - 'always': the surface owns the top of the window (full-screen modals), so
  *   the status-bar inset applies whenever it is non-zero.
- * - 'bottom-form-sheet': a bottom-anchored formSheet. On iOS the native sheet
- *   presents below the status bar, so the header reserves no top clearance
- *   there — the window inset would only be a dead band above the header.
- *   On Android `sheetShouldOverflowTopInset` (useFormSheetScreenOptions)
- *   lets the sheet surface reach the top of the window, and the detent cap
- *   (`useFormSheetDetents`) subtracts the window's own top inset from the
- *   full detent, so a window that reports one always settles the sheet edge
- *   at the status bar and the header reserves nothing. Only a window with no
- *   top inset of its own leaves the sheet edge at the window top, where the
- *   header must clear the status bar (and landscape cutout padding) itself.
+ * - 'bottom-form-sheet': a bottom-anchored formSheet pushed over another
+ *   screen. On iOS the native sheet presents below the status bar, so the
+ *   header reserves no top clearance there — the window inset would only be a
+ *   dead band above the header. On Android `sheetShouldOverflowTopInset`
+ *   (useFormSheetScreenOptions) lets the sheet surface reach the top of the
+ *   window, and the detent cap (`useFormSheetDetents`) subtracts the window's
+ *   own top inset from the full detent, so a window that reports one settles
+ *   the pushed sheet edge at the status bar and the header reserves nothing.
+ *   Only a window with no top inset of its own leaves that edge at the window
+ *   top, where the header must clear the status bar (and landscape cutout
+ *   padding) itself. A sheet that is its stack's first screen can present at
+ *   the window top as well — the invite form does, because its focused email
+ *   field expands the sheet past its detents — so that route registers
+ *   'android-window-top' instead (`useFormSheetHeaderTopInset`).
  * - 'android-window-top': the same Android surface reaches the window top and
  *   the sheet does not settle below the status bar, so the header clears it
  *   itself — measured on the PR review formSheets, whose header sits at the
- *   window top with its own status-bar padding. iOS presents the native sheet
- *   below the status bar, so there the header reserves nothing.
+ *   window top with its own status-bar padding, and registered by the
+ *   formSheet routes that present there, such as the invite form opened as its
+ *   stack's first screen (`useFormSheetHeaderTopInset`). iOS presents the
+ *   native sheet below the status bar, so there the header reserves nothing.
  * - 'ios-page-sheet': the SessionPageSheet surface owns the top of the window
  *   on both platforms, so the header reserves no top clearance — the native
  *   iOS pageSheet presents below the status bar, and the Android full-window
@@ -130,4 +137,25 @@ export function useSheetHeaderTopClearance(topInset: SheetHeaderTopInset): numbe
     windowTopInset,
     statusBarHeight: StatusBar.currentHeight ?? 0,
   });
+}
+
+/**
+ * The top-inset mode a formSheet route's own header registers.
+ *
+ * A formSheet that is its stack's first screen can present with the sheet
+ * surface at the window top, where the route clears the status bar itself: the
+ * invite form does, because its focused email field expands the sheet past its
+ * detents. A sheet pushed over another screen settles at the detent cap, below
+ * the status bar, so there the window inset would only be a dead band above
+ * the title. The route's own position decides (`useRouteIsStackRoot` documents
+ * the measurement), so a route opened straight from a link and the same route
+ * pushed from its parent screen each reserve the clearance their edge leaves.
+ *
+ * A sheet that stays at a half detent never reaches the window top, in either
+ * position — the member limit and low balance alert sheets are measured at the
+ * half detent with their titles clear of the status bar — so those sheets keep
+ * `bottom-form-sheet` and reserve nothing.
+ */
+export function useFormSheetHeaderTopInset(): SheetHeaderTopInset {
+  return useRouteIsStackRoot() ? 'android-window-top' : 'bottom-form-sheet';
 }

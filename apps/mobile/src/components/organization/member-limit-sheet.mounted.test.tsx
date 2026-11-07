@@ -110,6 +110,10 @@ vi.mock('@/lib/hooks/use-organization-mutations', () => ({
 vi.mock('@/lib/hooks/use-current-user-id', () => ({
   useCurrentUserId: () => ({ email: 'test@example.com' }),
 }));
+// The invite sheet's header inset reads the route's position in its stack and
+// the window insets, neither of which this suite models: the surfaces' shared
+// structure is the subject here.
+vi.mock('@/lib/form-sheet', () => ({ useFormSheetHeaderTopInset: () => 'bottom-form-sheet' }));
 
 beforeEach(() => {
   boundary.organizationId = 'org-1';

@@ -91,6 +91,10 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
 vi.mock('@/lib/hooks/use-organization-mutations', () => ({
   useOrganizationMutations: () => ({ invite }),
 }));
+// The header's top inset reads the route's position in its stack and the window
+// insets, neither of which this suite models: the form's own behavior is the
+// subject here.
+vi.mock('@/lib/form-sheet', () => ({ useFormSheetHeaderTopInset: () => 'bottom-form-sheet' }));
 
 beforeEach(() => {
   boundary.organizationId = 'org-1';

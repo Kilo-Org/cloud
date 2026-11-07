@@ -4,6 +4,7 @@ import {
   sheetHeaderTopClearance,
   type SheetHeaderTopInset,
   useFormSheetDetents,
+  useFormSheetHeaderTopInset,
   useFormSheetScreenOptions,
   useSheetHeaderTopClearance,
 } from '@/lib/form-sheet';
@@ -13,11 +14,13 @@ const mocks = vi.hoisted(() => {
   const insets = { top: 0, bottom: 0, left: 0, right: 0 };
   const statusBar = { currentHeight: null as number | null };
   const dimensions = { height: 800 };
+  const route = { stackRoot: true };
   return {
     platform,
     insets,
     statusBar,
     dimensions,
+    route,
     useSafeAreaInsets: vi.fn(() => insets),
     useWindowDimensions: vi.fn(() => dimensions),
   };
@@ -31,6 +34,10 @@ vi.mock('react-native', () => ({
 
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: mocks.useSafeAreaInsets,
+}));
+
+vi.mock('@/lib/navigation/route-focus', () => ({
+  useRouteIsStackRoot: () => mocks.route.stackRoot,
 }));
 
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
@@ -190,5 +197,24 @@ describe('useSheetHeaderTopClearance', () => {
     mocks.insets.top = 51.81;
 
     expect(useSheetHeaderTopClearance('android-window-top')).toBe(51.81);
+  });
+});
+
+describe('useFormSheetHeaderTopInset', () => {
+  beforeEach(() => {
+    mocks.platform.OS = 'android';
+    mocks.insets.top = 0;
+    mocks.statusBar.currentHeight = null;
+    mocks.route.stackRoot = true;
+  });
+
+  it("clears the status bar for the sheet that is its stack's first screen", () => {
+    expect(useFormSheetHeaderTopInset()).toBe('android-window-top');
+  });
+
+  it('leaves the top to the detent cap for a sheet pushed over another screen', () => {
+    mocks.route.stackRoot = false;
+
+    expect(useFormSheetHeaderTopInset()).toBe('bottom-form-sheet');
   });
 });

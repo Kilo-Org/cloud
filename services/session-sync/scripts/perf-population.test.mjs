@@ -172,13 +172,28 @@ function producerFixture(runnerLimit = 3) {
       ],
       { encoding: 'utf8', timeout: 10000 }
     );
+    const readArtifact = name => {
+      try {
+        return JSON.parse(readFileSync(join(root, name), 'utf8'));
+      } catch (cause) {
+        throw new Error(
+          `Producer fixture did not write valid ${name}: ${JSON.stringify({
+            status: child.status,
+            signal: child.signal,
+            error: child.error?.message,
+            output: `${child.stdout ?? ''}${child.stderr ?? ''}`.slice(-8000),
+          })}`,
+          { cause }
+        );
+      }
+    };
     return {
       code: child.status,
       output: child.stdout + child.stderr,
-      result: JSON.parse(readFileSync(join(root, 'result-producer-0.json'), 'utf8')),
-      status: JSON.parse(readFileSync(join(root, 'status-producer-0.json'), 'utf8')),
-      frames: JSON.parse(readFileSync(join(root, 'frames.json'), 'utf8')),
-      sessions: JSON.parse(readFileSync(join(root, 'sessions-0.json'), 'utf8')),
+      result: readArtifact('result-producer-0.json'),
+      status: readArtifact('status-producer-0.json'),
+      frames: readArtifact('frames.json'),
+      sessions: readArtifact('sessions-0.json'),
     };
   } finally {
     rmSync(root, { recursive: true, force: true });

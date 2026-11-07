@@ -547,7 +547,10 @@ export async function disconnectGitLabIntegration(owner: Owner, actingUserId: st
 
   let revokedProjectTokens = 0;
   let retainedProjectTokens = 0;
-  if (userToken !== undefined) {
+  let unsettledProjectTokens = 0;
+  if (userToken === undefined) {
+    unsettledProjectTokens = projectTokenCandidates.length;
+  } else {
     // Read after the suspension: nothing can mint a project token while the
     // integration is suspended, so this set is final and also covers a token
     // stored between the first read and the suspension.
@@ -576,6 +579,7 @@ export async function disconnectGitLabIntegration(owner: Owner, actingUserId: st
       preservedWebhooks: countMetadataObjectEntries(updatedMetadata.configured_webhooks),
       revokedProjectTokens,
       retainedProjectTokens,
+      unsettledProjectTokens,
     }
   );
 

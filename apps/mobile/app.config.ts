@@ -519,6 +519,7 @@ const config: ExpoConfig = {
     // exists only in the androidx compose artifacts.
     './plugins/withAndroidSheetCloseLabel',
     './plugins/withAndroidExpoModuleRepos',
+    './plugins/withKiloAppIntentsPackage',
     // Writes the app target's single `Localizable.strings` per language: the
     // four App Intent actions and their parameters resolve their
     // `LocalizedStringResource` literals against it, and the Focus-filter copy

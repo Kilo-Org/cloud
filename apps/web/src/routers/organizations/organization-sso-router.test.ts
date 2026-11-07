@@ -68,6 +68,51 @@ describe('organization SSO router', () => {
     await db.delete(organizations).where(eq(organizations.id, organization.id));
   });
 
+  const createdOrganizationIds: string[] = [];
+
+  async function createSsoOrganization(name: string, ssoDomain: string | null) {
+    const created = await createOrganization(name, admin.id);
+    createdOrganizationIds.push(created.id);
+    if (ssoDomain) {
+      await db
+        .update(organizations)
+        .set({ sso_domain: ssoDomain })
+        .where(eq(organizations.id, created.id));
+    }
+    return created;
+  }
+
+  async function readSsoDomain(organizationId: string) {
+    const row = await db.query.organizations.findFirst({
+      where: eq(organizations.id, organizationId),
+      columns: { sso_domain: true },
+    });
+    return row?.sso_domain ?? null;
+  }
+
+  async function readDomainAudits(organizationId: string) {
+    return db
+      .select({
+        action: organization_audit_logs.action,
+        actor_id: organization_audit_logs.actor_id,
+        message: organization_audit_logs.message,
+      })
+      .from(organization_audit_logs)
+      .where(eq(organization_audit_logs.organization_id, organizationId));
+  }
+
+  afterAll(async () => {
+    for (const organizationId of createdOrganizationIds) {
+      await db
+        .delete(organization_audit_logs)
+        .where(eq(organization_audit_logs.organization_id, organizationId));
+      await db
+        .delete(admin_action_audit_logs)
+        .where(eq(admin_action_audit_logs.target_id, organizationId));
+      await db.delete(organizations).where(eq(organizations.id, organizationId));
+    }
+  });
+
   test('does not eagerly rotate same-domain credentials when SSO is enabled', async () => {
     const caller = await createCallerForUser(admin.id);
 
@@ -85,39 +130,6 @@ describe('organization SSO router', () => {
   });
 
   describe('deleteConfig', () => {
-    const createdOrganizationIds: string[] = [];
-
-    async function createSsoOrganization(name: string, ssoDomain: string | null) {
-      const created = await createOrganization(name, admin.id);
-      createdOrganizationIds.push(created.id);
-      if (ssoDomain) {
-        await db
-          .update(organizations)
-          .set({ sso_domain: ssoDomain })
-          .where(eq(organizations.id, created.id));
-      }
-      return created;
-    }
-
-    async function readSsoDomain(organizationId: string) {
-      const row = await db.query.organizations.findFirst({
-        where: eq(organizations.id, organizationId),
-        columns: { sso_domain: true },
-      });
-      return row?.sso_domain ?? null;
-    }
-
-    async function readDomainAudits(organizationId: string) {
-      return db
-        .select({
-          action: organization_audit_logs.action,
-          actor_id: organization_audit_logs.actor_id,
-          message: organization_audit_logs.message,
-        })
-        .from(organization_audit_logs)
-        .where(eq(organization_audit_logs.organization_id, organizationId));
-    }
-
     async function readAdminActions(organizationId: string) {
       return db
         .select({
@@ -138,20 +150,6 @@ describe('organization SSO router', () => {
       deleteOrganization.mockReset();
       getOrganizationByExternalId.mockResolvedValue(null);
       deleteOrganization.mockResolvedValue({});
-    });
-
-    afterAll(async () => {
-      if (createdOrganizationIds.length > 0) {
-        for (const organizationId of createdOrganizationIds) {
-          await db
-            .delete(organization_audit_logs)
-            .where(eq(organization_audit_logs.organization_id, organizationId));
-          await db
-            .delete(admin_action_audit_logs)
-            .where(eq(admin_action_audit_logs.target_id, organizationId));
-          await db.delete(organizations).where(eq(organizations.id, organizationId));
-        }
-      }
     });
 
     test('releases the SSO domain together with the WorkOS configuration', async () => {
@@ -291,6 +289,38 @@ describe('organization SSO router', () => {
         status: 'not_required',
         domain: 'leftover.test',
       });
+    });
+  });
+
+  describe('clearSsoDomain', () => {
+    test('releases the recorded domain and lets another organization claim it', async () => {
+      const caller = await createCallerForUser(admin.id);
+      const target = await createSsoOrganization('Cleared Domain Organization', 'cleared.test');
+
+      await caller.organizations.sso.clearSsoDomain({ organizationId: target.id });
+
+      await expect(readSsoDomain(target.id)).resolves.toBeNull();
+      await expect(readDomainAudits(target.id)).resolves.toEqual([
+        {
+          action: 'organization.sso.remove_domain',
+          actor_id: admin.id,
+          message: 'Cleared SSO domain cleared.test',
+        },
+      ]);
+      await expect(resolveSsoAuthorityForDomain('cleared.test')).resolves.toEqual({
+        status: 'not_required',
+        domain: 'cleared.test',
+      });
+    });
+
+    test('writes nothing when the organization records no domain', async () => {
+      const caller = await createCallerForUser(admin.id);
+      const target = await createSsoOrganization('Empty Domain Organization', null);
+
+      await caller.organizations.sso.clearSsoDomain({ organizationId: target.id });
+
+      await expect(readSsoDomain(target.id)).resolves.toBeNull();
+      await expect(readDomainAudits(target.id)).resolves.toEqual([]);
     });
   });
 });

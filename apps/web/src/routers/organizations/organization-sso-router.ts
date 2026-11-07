@@ -10,7 +10,7 @@ import { ORGANIZATION_MANAGE_ROLES } from '@kilocode/app-shared/organizations';
 import { TRPCError } from '@trpc/server';
 import { GenerateLinkIntent, WorkOS, OrganizationDomainState } from '@workos-inc/node';
 import * as z from 'zod';
-import { db } from '@kilocode/web-shared/lib/drizzle';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { organizations } from '@kilocode/db/schema';
 import { eq, sql } from 'drizzle-orm';
 import { OrganizationSSODomainSchema } from '@kilocode/web-shared/lib/organizations/organization-types';
@@ -47,6 +47,50 @@ async function hasWorkOsConnections(organizationId: string) {
     organizationId,
   });
   return connections.data.length > 0;
+}
+
+/**
+ * Releases the SSO domain an organization records, under the same locks a claim takes: the
+ * organization row first, then the advisory lock for the recorded domain. `updateSsoDomain`
+ * and the directory capture take them in that order, so a release cannot interleave with a
+ * claim of the same domain and make it fail on a stale authority read.
+ *
+ * Returns the released domain, or null when the organization records none. A null release
+ * writes nothing, so the audit log records one entry per changed field.
+ */
+async function releaseSsoDomain(
+  tx: DrizzleTransaction,
+  organizationId: string,
+  actor: { id: string; google_user_email: string; google_user_name: string }
+): Promise<string | null> {
+  const [locked] = await tx
+    .select({ ssoDomain: organizations.sso_domain })
+    .from(organizations)
+    .where(eq(organizations.id, organizationId))
+    .for('update');
+  if (!locked?.ssoDomain) {
+    return null;
+  }
+
+  await tx.execute(
+    sql`SELECT pg_advisory_xact_lock(hashtextextended('sso-domain:' || ${locked.ssoDomain}, 0))`
+  );
+  await tx
+    .update(organizations)
+    .set({ sso_domain: null })
+    .where(eq(organizations.id, organizationId));
+
+  await createAuditLog({
+    action: 'organization.sso.remove_domain',
+    actor_email: actor.google_user_email,
+    actor_id: actor.id,
+    actor_name: actor.google_user_name,
+    message: `Cleared SSO domain ${locked.ssoDomain}`,
+    organization_id: organizationId,
+    tx,
+  });
+
+  return locked.ssoDomain;
 }
 
 export const organizationSsoRouter = createTRPCRouter({
@@ -136,34 +180,7 @@ export const organizationSsoRouter = createTRPCRouter({
 
     // Release whatever domain the organization records, and audit it.
     await db.transaction(async tx => {
-      // Lock the organization row before the domain, in the same order as updateSsoDomain, and
-      // release the domain this transaction holds the lock for.
-      const [locked] = await tx
-        .select({ ssoDomain: organizations.sso_domain })
-        .from(organizations)
-        .where(eq(organizations.id, organizationId))
-        .for('update');
-      if (!locked?.ssoDomain) {
-        return;
-      }
-
-      await tx.execute(
-        sql`SELECT pg_advisory_xact_lock(hashtextextended('sso-domain:' || ${locked.ssoDomain}, 0))`
-      );
-      await tx
-        .update(organizations)
-        .set({ sso_domain: null })
-        .where(eq(organizations.id, organizationId));
-
-      await createAuditLog({
-        action: 'organization.sso.remove_domain',
-        actor_email: opts.ctx.user.google_user_email,
-        actor_id: opts.ctx.user.id,
-        actor_name: opts.ctx.user.google_user_name,
-        message: `Cleared SSO domain ${locked.ssoDomain}`,
-        organization_id: organizationId,
-        tx,
-      });
+      await releaseSsoDomain(tx, organizationId, opts.ctx.user);
     });
 
     return successResult({ message: 'SSO configuration deleted successfully' });
@@ -250,18 +267,8 @@ export const organizationSsoRouter = createTRPCRouter({
     const { organizationId } = opts.input;
     await ensureOrganizationAccess(opts.ctx, organizationId, ORGANIZATION_MANAGE_ROLES);
 
-    await db
-      .update(organizations)
-      .set({ sso_domain: null })
-      .where(eq(organizations.id, organizationId));
-
-    await createAuditLog({
-      action: 'organization.sso.remove_domain',
-      actor_email: opts.ctx.user.google_user_email,
-      actor_id: opts.ctx.user.id,
-      actor_name: opts.ctx.user.google_user_name,
-      message: `Cleared SSO domain`,
-      organization_id: organizationId,
+    await db.transaction(async tx => {
+      await releaseSsoDomain(tx, organizationId, opts.ctx.user);
     });
 
     return successResult({ message: 'SSO domain cleared successfully' });

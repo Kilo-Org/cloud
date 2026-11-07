@@ -1437,7 +1437,16 @@ describe('CreditsCard balance row', () => {
       const shell = balanceBlock(renderer);
       expect(hasClasses(shell, ['flex-row', 'items-center'])).toBe(true);
       const column = valueColumn(renderer);
-      expect(column.parent?.parent).toBe(shell);
+      const wrapper = column.parent;
+      expect(wrapper?.parent).toBe(shell);
+      // The column's wrapper is a row, so its child's `flex-1` is a width
+      // share. In a column wrapper it would be a 0 vertical basis, and the
+      // 48 dp floor would pin the column: a longer note would paint outside
+      // the card instead of growing it.
+      if (wrapper === null) {
+        throw new Error('The stacked value column has no wrapper');
+      }
+      expect(classesOf(wrapper)).toContain('flex-row');
 
       const row = amountRow(renderer);
       expect(row.parent).toBe(column);

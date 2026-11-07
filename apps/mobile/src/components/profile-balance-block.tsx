@@ -143,7 +143,11 @@ export function BalanceBlock({
   if (stacked) {
     return (
       <View className={shellClass}>
-        <Animated.View className="min-w-0 flex-1" layout={LinearTransition.duration(200)}>
+        {/* `flex-row` keeps `flex-1` a width share: in a column wrapper it
+            would set a 0 vertical basis, and the 48 dp floor would then pin the
+            column so a longer note paints outside the card instead of growing
+            it (the collapse the wide card's row avoids the same way). */}
+        <Animated.View className="min-w-0 flex-1 flex-row" layout={LinearTransition.duration(200)}>
           <View className={valueColumnClass}>
             <View className={amountRowClass}>
               <View className="min-w-0 flex-1">{amount}</View>

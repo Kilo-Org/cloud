@@ -275,7 +275,53 @@ describe('UserSessionDO', () => {
 
       // The watermark stays within events written to the socket, so the
       // backlog bound still applies.
-      expect(ws.readyState).toBe(3);
+      const closeEvent = await closePromise;
+      expect(closeEvent.code).toBe(4002);
+    }
+  );
+
+  it(
+    'closes a socket that renews its acknowledgement after a stored offset',
+    { timeout: 30000 },
+    async () => {
+      const userId = 'user-stored-watermark';
+      const { ws, stub } = await connectWs(userId);
+
+      ws.send(JSON.stringify({ type: 'context.subscribe', contexts: ['project:stored'] }));
+      await new Promise(r => setTimeout(r, 100));
+
+      // Seed a stored watermark ahead of the socket sequence, then deliver
+      // one event so the sequence is 1.
+      await runInDurableObject(stub, async (_instance, state) => {
+        const serverSocket = state.getWebSockets()[0]!;
+        serverSocket.serializeAttachment({
+          contexts: ['project:stored'],
+          seq: 0,
+          acked: 1_000_000,
+          ackReceived: true,
+        });
+      });
+
+      const msgPromise = nextMessage(ws, 2000);
+      await stub.pushEvent('project:stored', 'e1', {});
+      await msgPromise;
+
+      const { promise: closePromise, resolve: resolveClose } = Promise.withResolvers<CloseEvent>();
+      ws.addEventListener('close', resolveClose);
+
+      // A renewed acknowledgement for the delivered sequence.
+      ws.send(JSON.stringify({ type: 'ack', seq: 1 }));
+      await new Promise(r => setTimeout(r, 100));
+
+      for (let i = 0; i < 1100; i++) {
+        await stub.pushEvent('project:stored', 'fill', {});
+        if (i % 100 === 0) {
+          // Yield so the DO can deliver the close frame.
+          await new Promise(r => setTimeout(r, 10));
+        }
+        if (ws.readyState === 3 /* CLOSED */) break;
+      }
+
       const closeEvent = await closePromise;
       expect(closeEvent.code).toBe(4002);
     }

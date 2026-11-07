@@ -470,7 +470,7 @@ describe('startEnkryptInputGuardrail', () => {
 
     logOnlyResult.resolve({
       verdict: { action: 'allow' },
-      report: scanReport,
+      report: { ...scanReport, scan: 'log_only', decision: 'error_logged', error: 'http_503' },
       usageRecords: [call({ decision: 'error', creditsCost: null }), call({ decision: 'error' })],
     });
     await runAfterTasks();
@@ -479,7 +479,11 @@ describe('startEnkryptInputGuardrail', () => {
       [{ ...call({ decision: 'error', creditsCost: null }), addedLatencyMs: null }],
       [{ ...call({ decision: 'error' }), addedLatencyMs: 0 }],
     ]);
-    expect(mockedRedisSet).not.toHaveBeenCalled();
+    expect(mockedRedisSet).toHaveBeenCalledWith(
+      finalKey(logOnlyScan),
+      'allow',
+      expect.objectContaining({ nx: true })
+    );
   });
 
   it('reports the settings, verdict, wait, and each scan with its cache write', async () => {
@@ -516,7 +520,7 @@ describe('startEnkryptInputGuardrail', () => {
           scan: 'log_only',
           decision: 'error_logged',
           error: 'timeout',
-          verdict_cache_write: 'skipped',
+          verdict_cache_write: 'written',
         },
       ],
     });

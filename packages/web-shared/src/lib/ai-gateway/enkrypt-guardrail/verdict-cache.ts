@@ -167,9 +167,22 @@ function overlapStart(text: string, cachedCharacters: number): number {
 }
 
 /**
+ * A log-only scan gates nothing, so its result is cached even when it fails, unless the client
+ * disconnected. Otherwise a failure that recurs, such as a timeout, a detector error, or a request
+ * too large to scan, would rescan, log, and possibly be charged for a growing suffix on every later
+ * request of the conversation.
+ */
+function isCacheableAllow({ verdict, report, usageRecords }: EnkryptGuardrailScanResult): boolean {
+  if (verdict.action !== 'allow') return false;
+  if (report.scan === 'log_only') return report.decision !== 'client_aborted';
+  return usageRecords.at(-1)?.decision === 'allowed';
+}
+
+/**
  * Scans only the part of the request that no earlier allowed request with the same scope covered,
  * plus an overlap. A cached block rejects requests retaining that prefix. A cache failure scans
- * the request in full, so it never lets unscanned content through.
+ * the request in full, so it never lets unscanned content through. A failed blocking scan is never
+ * cached; see `isCacheableAllow` for log-only scans.
  */
 export async function scanRequestWithVerdictCache(
   { segments, ...request }: EnkryptGuardrailRequest,
@@ -243,7 +256,7 @@ export async function scanRequestWithVerdictCache(
   );
   let cacheEntry: EnkryptVerdictCacheEntry | null = null;
   if (!fullyCached && key) {
-    if (result.verdict.action === 'allow' && finalDecision === 'allowed') {
+    if (isCacheableAllow(result)) {
       cacheEntry = { key, verdict: 'allow' };
     } else if (
       result.verdict.action === 'block' &&

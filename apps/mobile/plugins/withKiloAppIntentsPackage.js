@@ -14,16 +14,19 @@ module.exports = function withKiloAppIntentsPackage(config) {
     if (mod.modResults.language !== 'swift') {
       throw new Error('withKiloAppIntentsPackage: AppDelegate must be Swift.');
     }
-    let contents = mod.modResults.contents;
-    if (!contents.includes('struct KiloAppIntentsPackage: AppIntentsPackage')) {
-      for (const name of ['AppIntents', 'KiloAppActions']) {
-        const declaration = `import ${name}\n`;
-        if (!contents.includes(declaration)) {
-          contents = declaration + contents;
-        }
+    let contents = mod.modResults.contents.replace(
+      /^import KiloAppActions$/m,
+      'internal import KiloAppActions'
+    );
+    for (const declaration of ['import AppIntents\n', 'internal import KiloAppActions\n']) {
+      if (!contents.includes(declaration)) {
+        contents = declaration + contents;
       }
-      mod.modResults.contents = contents.trimEnd() + '\n' + PACKAGE;
     }
+    if (!contents.includes('struct KiloAppIntentsPackage: AppIntentsPackage')) {
+      contents = contents.trimEnd() + '\n' + PACKAGE;
+    }
+    mod.modResults.contents = contents;
     return mod;
   });
 };

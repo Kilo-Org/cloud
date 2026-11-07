@@ -277,15 +277,16 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
           surface,
         });
       } catch (error) {
-        // A refused non-session credential is recorded before the request fails,
-        // matching the tRPC admin guard, so a refused API key stays alertable.
-        // Session refusals stay on `admin_guard`, per the event contract.
-        if (credential !== 'session') {
+        // One measurement per guarded non-session request: `denied` for a
+        // step-up verdict and `failed` for a fault, matching the tRPC admin
+        // guard. Session traffic stays on `admin_guard`.
+        const emitOutcome = (outcome: 'denied' | 'failed') => {
+          if (credential === 'session') return;
           emitPrivilegedAccessEvent({
             surface,
             user: result.user,
             credential,
-            outcome: 'denied',
+            outcome,
             actionClass,
             actionId: inventoryId,
             target: null,
@@ -296,12 +297,14 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
             method,
             ip: clientIpFromHeaders(headersList),
           });
-        }
+        };
         if (error instanceof TRPCError && error.cause instanceof StepUpRequiredError) {
+          emitOutcome('denied');
           return authError(403, error.cause.code, result.user.id);
         }
         // Fail closed. The guard normally converts evaluation failures itself;
         // this covers anything unexpected around it.
+        emitOutcome('failed');
         reportStepUpFailure('admin_step_up_rest', error);
         return authError(403, 'STEP_UP_UNAVAILABLE', result.user.id);
       }

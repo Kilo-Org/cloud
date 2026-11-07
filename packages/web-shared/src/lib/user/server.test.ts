@@ -10,6 +10,13 @@ jest.mock('@kilocode/web-shared/lib/admin/step-up-store', () => {
   return { ...actual, evaluateStepUp: jest.fn(actual.evaluateStepUp) };
 });
 
+// The guard converts an evaluation error into its own verdict, so the fault
+// path needs this seam.
+jest.mock('@kilocode/web-shared/lib/admin/step-up-guard', () => {
+  const actual = jest.requireActual('@kilocode/web-shared/lib/admin/step-up-guard');
+  return { ...actual, runStepUpGuard: jest.fn(actual.runStepUpGuard) };
+});
+
 const mockGetServerSession = jest.fn();
 const mockRedirect = jest.fn((url: string) => {
   throw new Error(`NEXT_REDIRECT:${url}`);
@@ -1587,11 +1594,15 @@ describe('binary step-up enforcement (REST)', () => {
 describe('step-up refusal telemetry (REST)', () => {
   const originalSwitch = process.env.ADMIN_STEP_UP_ENABLED;
   let evaluateStepUp: jest.Mock;
+  let runStepUpGuard: jest.Mock;
   let events: AdminAccessEvent[];
 
   beforeAll(() => {
     ({ evaluateStepUp } = jest.requireMock('@kilocode/web-shared/lib/admin/step-up-store') as {
       evaluateStepUp: jest.Mock;
+    });
+    ({ runStepUpGuard } = jest.requireMock('@kilocode/web-shared/lib/admin/step-up-guard') as {
+      runStepUpGuard: jest.Mock;
     });
   });
 
@@ -1686,6 +1697,28 @@ describe('step-up refusal telemetry (REST)', () => {
     expect(
       events.filter(event => event.kind === 'privileged_access' && event.outcome === 'denied')
     ).toHaveLength(0);
+  });
+
+  test('records a failed event when the guard cannot answer', async () => {
+    process.env.ADMIN_STEP_UP_ENABLED = 'true';
+    await bearerAdmin();
+    runStepUpGuard.mockRejectedValueOnce(new Error('step-up store unavailable'));
+
+    const result = await getUserFromAuth({ adminOnly: true, requestMethod: 'GET' });
+
+    expect((result.authFailedResponse as Response).status).toBe(403);
+    expect(await (result.authFailedResponse as Response).json()).toEqual({
+      success: false,
+      error: 'STEP_UP_UNAVAILABLE',
+    });
+    expect(events.map(event => event.kind)).toEqual(['admin_guard', 'privileged_access']);
+    expect(events[1]).toMatchObject({
+      kind: 'privileged_access',
+      credential: 'human_bearer',
+      outcome: 'failed',
+      actionClass: 'platform_read',
+      actionId: 'rest.admin.safetyIdentifiers',
+    });
   });
 
   test('leaves a session step-up refusal on the admin guard event', async () => {

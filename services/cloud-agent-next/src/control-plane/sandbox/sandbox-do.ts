@@ -296,6 +296,11 @@ import {
 } from './routes.js';
 import { allocation as allocationTable, routes as routesTable } from './sqlite-schema.js';
 import {
+  credentialRenewalDueAt,
+  nextCredentialRenewalAt,
+  pruneCredentialRenewalRetries,
+} from './credential-renewal.js';
+import {
   listScopeGrants,
   readScopeGrant,
   retireScopeGrants,
@@ -756,6 +761,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
   controlRequestTimeoutMs = CONTROL_PLANE_REQUEST_TIMEOUT_MS;
   workspaceSnapshotIdleMs = WORKSPACE_SNAPSHOT_IDLE_MS;
   private workspaceSnapshotCapturePending = false;
+  /** Earliest retry per route after a failed alarm renewal; in memory, so eviction retries once. */
+  private readonly credentialRenewalRetryAt = new Map<string, number>();
   /**
    * Notification factory for the V2 Session DO. The default resolves the
    * `ownerId:sessionId` name through the shared binding accessor; tests inject a
@@ -2149,6 +2156,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       await this.recoverRepositoryPreparationFailures();
       let state = await this.readAllocation();
       await failExpiredRoutes(this.routeContext(state));
+      await this.renewDueRouteGrants(state);
       if (
         state.kind === 'stopped' &&
         !this.createInFlight &&
@@ -2907,26 +2915,12 @@ export class SandboxControlV2 extends DurableObject<Env> {
       adopted = maintained.adopted;
     }
 
-    if (route.grant !== null && this.grantNeedsReissue(route.grant)) {
-      // Credentials half of B3: re-issue below one hour remaining with freshly
-      // selected material and send `session.credentials` before the prompts. A
-      // failure to re-issue must not send the frame: while the previous grant is
-      // still due, deliver the prompts on it and retry the re-issue on the next
-      // send. Once that grant has expired there is no usable grant left for any
-      // re-issue outcome, so the route fails now with the real reason.
-      const outcome = await this.reissueRouteGrant(route, state);
-      if (outcome !== 'issued' && Date.now() >= route.grant.expiresAt) {
-        await onRouteFailed(
-          this.routeContext(state),
-          payload.sessionId,
-          'workspace_setup_failed',
-          undefined,
-          true
-        );
-        return 'not_ready';
-      }
-      route = (await readRoute(this.db, payload.sessionId)) ?? route;
-    }
+    // Credentials half of B3: a due grant is re-issued and `session.credentials`
+    // is sent before the prompts. A failed re-issue still delivers on the
+    // previous grant while it is valid.
+    const renewed = await this.renewRouteGrant(route, state);
+    if (renewed === null) return 'not_ready';
+    route = renewed;
 
     // One verified-expiry check immediately before the prompts, for adopted
     // handles only. A per-session scope keeps its historical behavior: the
@@ -2969,13 +2963,67 @@ export class SandboxControlV2 extends DurableObject<Env> {
   }
 
   /**
+   * Re-issues a ready route's grant once it is inside the re-issue window. Both
+   * `deliver` and the alarm use this, so a long execution without new messages
+   * renews its grant before the lease ends. A failed re-issue keeps the route
+   * while its current grant is valid and lets the alarm retry later; once that
+   * grant has expired there is no usable grant left, so the route fails now
+   * with the real reason. Returns null when the route failed.
+   */
+  private async renewRouteGrant(
+    route: RouteRecord,
+    state: AllocationState
+  ): Promise<RouteRecord | null> {
+    if (route.grant === null || !this.grantNeedsReissue(route.grant)) return route;
+    const outcome = await this.reissueRouteGrant(route, state);
+    if (outcome === 'issued') {
+      this.credentialRenewalRetryAt.delete(route.sessionId);
+    } else if (Date.now() >= route.grant.expiresAt) {
+      this.credentialRenewalRetryAt.delete(route.sessionId);
+      await onRouteFailed(
+        this.routeContext(state),
+        route.sessionId,
+        'workspace_setup_failed',
+        undefined,
+        true
+      );
+      return null;
+    } else {
+      this.credentialRenewalRetryAt.set(
+        route.sessionId,
+        Date.now() + this.sandboxTimers().credentialGrantRenewalRetryMs
+      );
+    }
+    return (await readRoute(this.db, route.sessionId)) ?? route;
+  }
+
+  /**
+   * The alarm half of credential renewal. Runs on the serial queue like
+   * `deliver`, so it never races a sibling join or release. Re-reads each route
+   * because a shared worktree scope renews once for all of its members.
+   */
+  private async renewDueRouteGrants(state: AllocationState): Promise<void> {
+    const routes = await listRoutes(this.db);
+    pruneCredentialRenewalRetries(this.credentialRenewalRetryAt, routes);
+    const threshold = this.sandboxTimers().credentialGrantReissueBelowMs;
+    for (const listed of routes) {
+      const retryAt = this.credentialRenewalRetryAt.get(listed.sessionId);
+      const dueAt = credentialRenewalDueAt(listed, threshold, retryAt);
+      if (dueAt === null || dueAt > Date.now()) continue;
+      const route = await readRoute(this.db, listed.sessionId);
+      if (route?.state !== 'ready') continue;
+      await this.renewRouteGrant(route, state);
+    }
+  }
+
+  /**
    * Re-issues a warm route's grant. The new grant is written only after the
    * provider policy that covers its aliases is applied, so a policy failure
    * leaves the previous grant in place. Any non-`issued` outcome means the
-   * caller must not send `session.credentials`; `runDeliver` keeps the route
-   * while the previous grant is still due and fails it once that grant has
-   * expired, so the Session DO starts a fresh attempt instead of waiting for
-   * the backstop.
+   * caller must not send `session.credentials`; `renewRouteGrant` keeps the
+   * route while the previous grant is still due and fails it once that grant
+   * has expired, so the Session DO starts a fresh attempt instead of waiting
+   * for the backstop.
    */
   private async reissueRouteGrant(
     route: RouteRecord,
@@ -5860,6 +5908,11 @@ export class SandboxControlV2 extends DurableObject<Env> {
     // preparation attempt.
     const allocationAt = nextAllocationAlarmAt(state, this.sandboxTimers());
     const routeAt = await earliestRouteDeadlineAt(this.db);
+    const renewalAt = nextCredentialRenewalAt(
+      await listRoutes(this.db),
+      this.sandboxTimers().credentialGrantReissueBelowMs,
+      this.credentialRenewalRetryAt
+    );
     // Pending work must survive loss of the in-memory launch continuation.
     const retryAt =
       state.kind === 'stopped' &&
@@ -5914,6 +5967,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     const candidates = [
       allocationAt,
       routeAt,
+      renewalAt,
       retryAt,
       snapshotAt,
       this.earliestHelloDeadlineAt(),

@@ -1988,6 +1988,82 @@ describe('SandboxControlV2 credentials (B3)', () => {
     expect(credentialsFrame.sessionId).toBe(SESSION);
   });
 
+  it('renews a due grant from the alarm without a message and keeps the sandbox-visible values', async () => {
+    const provider = createFakeProvider();
+    const broker = createFakeCredentialBroker();
+    const stub = await setup(provider, broker);
+    const { wrapper } = await prepareWarmRoute(stub, provider);
+    const before = JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}') as {
+      kilo: { alias: string; runtimeProxy?: unknown };
+    };
+    const issuedBefore = broker.githubIssued();
+    await setGrantExpiry(stub, SESSION, Date.now() + TIMERS.credentialGrantReissueBelowMs / 2);
+
+    // A long execution sends no message, so only the alarm can renew the lease.
+    await runInDurableObject(stub, instance => instance.alarm());
+
+    const frame = await wrapper.next();
+    if (frame?.type !== 'session.credentials') throw new Error('expected session.credentials');
+    const renewed = JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}') as {
+      kilo: { alias: string; runtimeProxy?: unknown };
+      expiresAt: number;
+    };
+    expect(renewed.kilo.alias === before.kilo.alias).toBe(true);
+    expect(
+      JSON.stringify(renewed.kilo.runtimeProxy) === JSON.stringify(before.kilo.runtimeProxy)
+    ).toBe(true);
+    expect(frame.kilo.token === renewed.kilo.alias).toBe(true);
+    expect(renewed.expiresAt - Date.now()).toBeGreaterThan(TIMERS.credentialGrantReissueBelowMs);
+    expect(broker.githubIssued()).toBe(issuedBefore + 1);
+    expect(await wrapper.next(50)).toBeNull();
+    expect(await stub.status({ sessionId: SESSION })).toMatchObject({ view: { state: 'ready' } });
+
+    // The renewed grant is outside the window, so the next alarm does nothing.
+    await runInDurableObject(stub, instance => instance.alarm());
+    expect(broker.githubIssued()).toBe(issuedBefore + 1);
+  });
+
+  it('retries a failed alarm renewal after a pause and fails the route when the grant expires', async () => {
+    const provider = createFakeProvider();
+    const broker = createFakeCredentialBroker();
+    const stub = await setupVercel(provider, broker);
+    const { wrapper } = await prepareWarmRoute(
+      stub,
+      provider,
+      prepareInput(SESSION, vercelSource(SESSION), routeSpec(SESSION))
+    );
+    await setGrantExpiry(stub, SESSION, Date.now() + TIMERS.credentialGrantReissueBelowMs / 2);
+    const framesBefore = wrapper.receivedFrames();
+    let attempts = 0;
+    const update = provider.adapter.applyContainedCredentials!.bind(provider.adapter);
+    provider.adapter.applyContainedCredentials = async (ref, grants) => {
+      attempts += 1;
+      return update(ref, grants);
+    };
+    provider.failPolicy = true;
+
+    // The grant is still valid: no frame, and the route stays ready.
+    await runInDurableObject(stub, instance => instance.alarm());
+    expect(attempts).toBe(1);
+    expect(wrapper.receivedFrames()).toBe(framesBefore);
+    expect(await stub.status({ sessionId: SESSION })).toMatchObject({ view: { state: 'ready' } });
+
+    // Before the retry time, a second alarm does not attempt again.
+    await runInDurableObject(stub, instance => instance.alarm());
+    expect(attempts).toBe(1);
+
+    // At expiry, the pending retry does not delay the attempt, and the route fails.
+    await setGrantExpiry(stub, SESSION, Date.now() - 1);
+    await runInDurableObject(stub, instance => instance.alarm());
+    expect(attempts).toBe(2);
+    expect(await stub.status({ sessionId: SESSION })).toEqual({
+      sessionId: SESSION,
+      view: { state: 'failed', attemptId: expect.any(String), reason: 'workspace_setup_failed' },
+    });
+    expect(await wrapper.next(50)).toBeNull();
+    expect(wrapper.receivedFrames()).toBe(framesBefore);
+  });
+
   it('replaces scoped MCP credentials on normal warm credential renewal without persisting them', async () => {
     const provider = createFakeProvider();
     const stub = await setup(provider);

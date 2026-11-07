@@ -984,7 +984,7 @@ def paid_model(out, run, candidate, deadline=None, *, cfg=None, ledger_out=None,
                 with (state_guard(ledger_out) if state_guard is not None else nullcontext()), sqlite3.connect(ledger_out / "budget.sqlite") as db:
                     db.execute("BEGIN IMMEDIATE")
                     old_row = next(row for row in request_rows(db) if row["id"] == request_id)
-                    if state == "unknown" and accounting_enabled(db):
+                    if state == "unknown" and cfg.get("allow_unknown_auto_accounting") is True and accounting_enabled(db):
                         state = "accounted_unknown"
                     db.execute("UPDATE requests SET state=?, bound=?, actual=?, tokens=? WHERE id=?", (state, str(retained_bound), str(observed_actual) if observed_actual is not None else None, 0 if not dispatched else None, request_id))
                     if state == "accounted_unknown":

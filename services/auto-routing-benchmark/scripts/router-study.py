@@ -1,6 +1,6 @@
 import argparse
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 from decimal import Decimal, InvalidOperation
 import fcntl
 import hashlib
@@ -1561,7 +1561,7 @@ def row_process(connection, out, directory, manifest, row, task, approval, cfg, 
                 return summary, "finished"
             except modules["modern_eval"].RunStopped as error:
                 summary, state = {"run": row["run"], "status": error.status}, "stopped"
-                with budget.connect() as db:
+                with closing(budget.connect()) as db:
                     own = [item for item in modules["study"].request_rows(db) if item["run"] == row["run"]]
                     unresolved = any(item["state"] == "unknown" and not accounted_row_valid(db, item) for item in own)
                 if error.status == "provider_unavailable" and not unresolved:
@@ -1622,14 +1622,14 @@ def concurrent_row(out, directory, manifest, row, task, approval, cfg, batch, pr
         process.join()
         if result is None or process.exitcode != 0:
             result = {"summary": {"run": row["run"], "status": "infra_invalid", "error": f"Child exited with code{process.exitcode}"}, "state": "interrupted"}
-        with budget.connect() as db:
+        with closing(budget.connect()) as db:
             pending = db.execute("SELECT COUNT(*) FROM requests WHERE run=? AND state='reserved'", (row["run"],)).fetchone()[0]
         if pending:
             budget.stop("outstanding_requests_after_child:" + row["run"])
         if process.exitcode != 0 or result["state"] == "interrupted":
-            with budget.connect() as db:
+            with closing(budget.connect()) as db:
                 db.execute("UPDATE requests SET state='unknown' WHERE run=? AND state='reserved'", (row["run"],))
-        with budget.connect() as db:
+        with closing(budget.connect()) as db:
             db.execute("UPDATE router_runs SET state=? WHERE run=?", (result["state"], row["run"]))
             unknown = any(item["state"] not in {"settled", "reserved"} and not accounted_row_valid(db, item) and not CAMPAIGN.historical_commitment(db, item) for item in budget.modules["study"].request_rows(db))
         if unknown:

@@ -39,7 +39,6 @@ import crypto from 'node:crypto';
 import Stripe from 'stripe';
 import { getPaidCreditTerms } from '@kilocode/web-shared/lib/paidCreditPolicy.server';
 
-// Convert dollars to microdollars
 const toMicrodollars = (dollars: number) => dollars * 1_000_000;
 const ORG_AUTO_TOP_UP_THRESHOLD_DOLLARS = DEFAULT_ORG_AUTO_TOP_UP_THRESHOLD_CENTS / 100;
 
@@ -63,7 +62,6 @@ jest.mock('@kilocode/web-shared/lib/stripe-client', () => {
   };
 });
 
-// Helper to create UserForBalance from test user
 function toUserForBalance(user: User): UserForBalance {
   return {
     id: user.id,
@@ -81,7 +79,6 @@ describe('autoTopUp', () => {
   let orgOwner: User;
 
   beforeAll(async () => {
-    // Create test user for user auto-top-up tests
     testUser = await insertTestUser({
       google_user_email: `auto-topup-test-${Date.now()}@example.com`,
       google_user_name: 'Auto TopUp Test User',
@@ -91,14 +88,12 @@ describe('autoTopUp', () => {
       microdollars_used: 0,
     });
 
-    // Create test org owner
     orgOwner = await insertTestUser({
       google_user_email: `org-owner-${Date.now()}@example.com`,
       google_user_name: 'Org Owner',
       stripe_customer_id: `cus_org_owner_${Date.now()}`,
     });
 
-    // Create test organization
     testOrg = await createOrganization('Auto TopUp Test Org', orgOwner.id);
     await db
       .update(organizations)
@@ -110,7 +105,6 @@ describe('autoTopUp', () => {
   });
 
   afterAll(async () => {
-    // Cleanup
     if (testUser?.id) {
       await db
         .delete(auto_top_up_configs)
@@ -126,7 +120,6 @@ describe('autoTopUp', () => {
 
   describe('maybePerformAutoTopUp (user)', () => {
     beforeEach(async () => {
-      // Reset user state before each test
       await db
         .update(kilocode_users)
         .set({
@@ -150,7 +143,6 @@ describe('autoTopUp', () => {
 
       await maybePerformAutoTopUp(user);
 
-      // Verify no config was created
       const config = await db.query.auto_top_up_configs.findFirst({
         where: eq(auto_top_up_configs.owned_by_user_id, testUser.id),
       });
@@ -168,7 +160,6 @@ describe('autoTopUp', () => {
 
       await maybePerformAutoTopUp(user);
 
-      // Verify no config was created (no lock acquired)
       const config = await db.query.auto_top_up_configs.findFirst({
         where: eq(auto_top_up_configs.owned_by_user_id, testUser.id),
       });
@@ -176,7 +167,6 @@ describe('autoTopUp', () => {
     });
 
     it('disables auto-top-up when no config exists (no payment method saved)', async () => {
-      // Enable auto-top-up on user but don't create config
       await db
         .update(kilocode_users)
         .set({ auto_top_up_enabled: true })
@@ -191,7 +181,6 @@ describe('autoTopUp', () => {
 
       await maybePerformAutoTopUp(user);
 
-      // Verify auto_top_up_enabled was set to false
       const updatedUser = await db.query.kilocode_users.findFirst({
         where: eq(kilocode_users.id, testUser.id),
       });
@@ -199,12 +188,11 @@ describe('autoTopUp', () => {
     });
 
     it('returns concurrent_attempt_in_progress when lock is held', async () => {
-      // Create config with recent attempt_started_at (lock held)
       await db.insert(auto_top_up_configs).values({
         owned_by_user_id: testUser.id,
         stripe_payment_method_id: 'pm_test_123',
         amount_cents: 5000,
-        attempt_started_at: new Date().toISOString(), // Lock is held
+        attempt_started_at: new Date().toISOString(),
       });
 
       await db
@@ -219,10 +207,8 @@ describe('autoTopUp', () => {
         microdollars_used: 0,
       });
 
-      // This should return early due to concurrent attempt
       await maybePerformAutoTopUp(user);
 
-      // Verify the lock is still held (attempt_started_at not cleared)
       const config = await db.query.auto_top_up_configs.findFirst({
         where: eq(auto_top_up_configs.owned_by_user_id, testUser.id),
       });
@@ -234,14 +220,12 @@ describe('autoTopUp', () => {
     // The code handles this case, but we skip testing it to avoid violating DB constraints.
 
     it('releases lock after balance becomes sufficient', async () => {
-      // Create config
       await db.insert(auto_top_up_configs).values({
         owned_by_user_id: testUser.id,
         stripe_payment_method_id: 'pm_test_123',
         amount_cents: 5000,
       });
 
-      // Enable auto-top-up with low balance initially
       await db
         .update(kilocode_users)
         .set({
@@ -267,16 +251,13 @@ describe('autoTopUp', () => {
         microdollars_used: 0,
       });
 
-      // Call auto-top-up - it should acquire lock, re-check balance, and release lock
       await maybePerformAutoTopUp(user);
 
-      // Verify lock was released
       const config = await db.query.auto_top_up_configs.findFirst({
         where: eq(auto_top_up_configs.owned_by_user_id, testUser.id),
       });
       expect(config?.attempt_started_at).toBeNull();
 
-      // Verify auto-top-up is still enabled (not disabled)
       const updatedUser = await db.query.kilocode_users.findFirst({
         where: eq(kilocode_users.id, testUser.id),
       });
@@ -286,7 +267,6 @@ describe('autoTopUp', () => {
 
   describe('maybePerformOrganizationAutoTopUp', () => {
     beforeEach(async () => {
-      // Reset org state before each test
       await db
         .update(organizations)
         .set({
@@ -308,7 +288,6 @@ describe('autoTopUp', () => {
 
       await maybePerformOrganizationAutoTopUp(org);
 
-      // Verify no config was created
       const config = await db.query.auto_top_up_configs.findFirst({
         where: eq(auto_top_up_configs.owned_by_organization_id, testOrg.id),
       });
@@ -326,7 +305,6 @@ describe('autoTopUp', () => {
 
       await maybePerformOrganizationAutoTopUp(org);
 
-      // Verify no config was created (no lock acquired)
       const config = await db.query.auto_top_up_configs.findFirst({
         where: eq(auto_top_up_configs.owned_by_organization_id, testOrg.id),
       });
@@ -334,7 +312,6 @@ describe('autoTopUp', () => {
     });
 
     it('disables auto-top-up when no config exists (no payment method saved)', async () => {
-      // Enable auto-top-up on org but don't create config
       await db
         .update(organizations)
         .set({ auto_top_up_enabled: true })
@@ -349,7 +326,6 @@ describe('autoTopUp', () => {
 
       await maybePerformOrganizationAutoTopUp(org);
 
-      // Verify auto_top_up_enabled was set to false
       const updatedOrg = await db.query.organizations.findFirst({
         where: eq(organizations.id, testOrg.id),
       });
@@ -357,12 +333,10 @@ describe('autoTopUp', () => {
     });
 
     it('returns concurrent_attempt_in_progress when lock is held', async () => {
-      // Create config with recent attempt_started_at (lock held)
       await db.insert(auto_top_up_configs).values({
         owned_by_organization_id: testOrg.id,
         stripe_payment_method_id: 'pm_test_org_123',
         amount_cents: 5000,
-        attempt_started_at: new Date().toISOString(), // Lock is held
       });
 
       await db
@@ -377,10 +351,8 @@ describe('autoTopUp', () => {
         microdollars_used: 0,
       };
 
-      // This should return early due to concurrent attempt
       await maybePerformOrganizationAutoTopUp(org);
 
-      // Verify the lock is still held (attempt_started_at not cleared)
       const config = await db.query.auto_top_up_configs.findFirst({
         where: eq(auto_top_up_configs.owned_by_organization_id, testOrg.id),
       });
@@ -388,20 +360,17 @@ describe('autoTopUp', () => {
     });
 
     it('disables auto-top-up when org has no stripe_customer_id', async () => {
-      // Create config for org
       await db.insert(auto_top_up_configs).values({
         owned_by_organization_id: testOrg.id,
         stripe_payment_method_id: 'pm_test_org_123',
         amount_cents: 5000,
       });
 
-      // Enable auto-top-up
       await db
         .update(organizations)
         .set({ auto_top_up_enabled: true })
         .where(eq(organizations.id, testOrg.id));
 
-      // Remove stripe_customer_id (organizations.stripe_customer_id is nullable)
       await db
         .update(organizations)
         .set({ stripe_customer_id: null })
@@ -416,13 +385,11 @@ describe('autoTopUp', () => {
 
       await maybePerformOrganizationAutoTopUp(org);
 
-      // Verify auto_top_up_enabled was set to false
       const updatedOrg = await db.query.organizations.findFirst({
         where: eq(organizations.id, testOrg.id),
       });
       expect(updatedOrg?.auto_top_up_enabled).toBe(false);
 
-      // Verify disabled_reason was set
       const config = await db.query.auto_top_up_configs.findFirst({
         where: eq(auto_top_up_configs.owned_by_organization_id, testOrg.id),
       });
@@ -430,14 +397,12 @@ describe('autoTopUp', () => {
     });
 
     it('releases lock after balance becomes sufficient', async () => {
-      // Create config
       await db.insert(auto_top_up_configs).values({
         owned_by_organization_id: testOrg.id,
         stripe_payment_method_id: 'pm_test_org_123',
         amount_cents: 5000,
       });
 
-      // Enable auto-top-up with low balance initially
       await db
         .update(organizations)
         .set({
@@ -462,16 +427,13 @@ describe('autoTopUp', () => {
         microdollars_used: 0,
       };
 
-      // Call auto-top-up - it should acquire lock, re-check balance, and release lock
       await maybePerformOrganizationAutoTopUp(org);
 
-      // Verify lock was released
       const config = await db.query.auto_top_up_configs.findFirst({
         where: eq(auto_top_up_configs.owned_by_organization_id, testOrg.id),
       });
       expect(config?.attempt_started_at).toBeNull();
 
-      // Verify auto-top-up is still enabled (not disabled)
       const updatedOrg = await db.query.organizations.findFirst({
         where: eq(organizations.id, testOrg.id),
       });
@@ -507,7 +469,6 @@ describe('autoTopUp', () => {
 
       await maybePerformOrganizationAutoTopUp(org);
 
-      // Should have attempted (and failed due to no config), disabling auto-top-up
       const updatedOrg = await db.query.organizations.findFirst({
         where: eq(organizations.id, testOrg.id),
       });
@@ -524,7 +485,6 @@ describe('autoTopUp', () => {
         microdollars_used: 0,
       };
 
-      // Reset org state
       await db
         .update(organizations)
         .set({ auto_top_up_enabled: true })
@@ -532,7 +492,6 @@ describe('autoTopUp', () => {
 
       await maybePerformOrganizationAutoTopUp(org);
 
-      // Should NOT have attempted - auto_top_up_enabled should still be true
       const updatedOrg = await db.query.organizations.findFirst({
         where: eq(organizations.id, testOrg.id),
       });
@@ -1003,7 +962,6 @@ describe('auto top-up failed email recipients for organizations', () => {
     await addUserToOrganization(org.id, billingManager.id, 'billing_manager');
     await addUserToOrganization(org.id, member.id, 'member');
 
-    // Trigger auto-top-up with no config — causes disable and failure email
     await maybePerformOrganizationAutoTopUp({
       id: org.id,
       auto_top_up_enabled: true,

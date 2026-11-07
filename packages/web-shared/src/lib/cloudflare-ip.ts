@@ -1,8 +1,6 @@
 // Cloudflare IP range detection.
 // Ranges from https://api.cloudflare.com/client/v4/ips (change rarely — last update Sep 2023).
 
-// --- IPv4 helpers ---
-
 type ParsedIPv4Range = {
   maskedAddr: number;
   mask: number;
@@ -30,8 +28,6 @@ function parseIPv4CIDR(cidr: string): ParsedIPv4Range | null {
   const mask = prefixLen === 0 ? 0 : (~0 << (32 - prefixLen)) >>> 0;
   return { maskedAddr: (addr & mask) >>> 0, mask };
 }
-
-// --- IPv6 helpers ---
 
 type ParsedIPv6Range = {
   maskedAddr: bigint;
@@ -76,8 +72,6 @@ function parseIPv6CIDR(cidr: string): ParsedIPv6Range | null {
   return { maskedAddr: addr & mask, mask };
 }
 
-// --- Parsed ranges (computed once at module evaluation) ---
-
 // Source: https://api.cloudflare.com/client/v4/ips
 const IPV4_RANGES = [
   '173.245.48.0/20',
@@ -112,8 +106,6 @@ const IPV6_RANGES = [
   const parsed = parseIPv6CIDR(cidr);
   return parsed ? [parsed] : [];
 });
-
-// --- Public API ---
 
 /** Returns true if the given IP address belongs to Cloudflare's network. */
 export function isCloudflareIP(ip: string): boolean {

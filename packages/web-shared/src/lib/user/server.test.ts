@@ -138,11 +138,9 @@ describe('isEmailBlacklistedByDomain', () => {
   test('should match exact domain endings correctly', () => {
     const blacklist = ['evil.com'];
 
-    // Should match
     expect(isEmailBlacklistedByDomain('user@evil.com', blacklist)).toBe(true);
     expect(isEmailBlacklistedByDomain('something.evil.com', blacklist)).toBe(true);
 
-    // Should NOT match
     expect(isEmailBlacklistedByDomain('user@notevil.com', blacklist)).toBe(false);
     expect(isEmailBlacklistedByDomain('user@evil.com.fake', blacklist)).toBe(false);
   });
@@ -241,7 +239,6 @@ describe('getUserUUID', () => {
 
     const result = getUserUUID(user);
 
-    // Should return a valid UUID
     expect(result).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
     expect(typeof result).toBe('string');
   });
@@ -254,11 +251,9 @@ describe('getUserUUID', () => {
     const result2 = getUserUUID(user);
     const result3 = getUserUUID(user);
 
-    // All calls should return the exact same UUID
     expect(result1).toBe(result2);
     expect(result2).toBe(result3);
 
-    // Verify it matches the expected uuidv5 output
     const expectedUUID = uuidv5(legacyId, USER_UUID_NAMESPACE);
     expect(result1).toBe(expectedUUID);
   });
@@ -290,13 +285,10 @@ describe('getUserUUID', () => {
       const user = { id: legacyId } as User;
       const result = getUserUUID(user);
 
-      // Should always return a valid UUID
       expect(result).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
 
-      // Should be consistent across multiple calls
       expect(getUserUUID(user)).toBe(result);
 
-      // Should match the expected uuidv5 output
       expect(result).toBe(uuidv5(legacyId, USER_UUID_NAMESPACE));
     });
   });
@@ -307,7 +299,6 @@ describe('getUserUUID', () => {
 
     const result = getUserUUID(user);
 
-    // Should generate a new UUID since the input is not a valid UUID
     expect(result).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
     expect(result).toBe(uuidv5(invalidUUID, USER_UUID_NAMESPACE));
   });
@@ -341,10 +332,8 @@ describe('getUserUUID', () => {
     testCases.forEach(legacyId => {
       const user = { id: legacyId } as User;
 
-      // Call the function multiple times
       const results = Array.from({ length: 10 }, () => getUserUUID(user));
 
-      // All results should be identical
       const firstResult = results[0];
       results.forEach(result => {
         expect(result).toBe(firstResult);

@@ -50,7 +50,6 @@ import {
 } from '@kilocode/web-shared/lib/trpc/control-plane-budget';
 
 export { UpstreamApiError } from '@kilocode/web-shared/lib/trpc/transport';
-// Define the context type
 export type TRPCContext = {
   user: User;
   deviceSessionId?: string;

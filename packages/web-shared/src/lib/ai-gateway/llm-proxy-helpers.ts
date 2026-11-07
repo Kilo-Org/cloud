@@ -830,10 +830,6 @@ export async function captureProxyError(params: {
   );
 }
 
-// ============================================================================
-// Shared Helper Functions
-// ============================================================================
-
 /**
  * The organization's data collection setting as an upstream provider config.
  * Enterprise model and provider restrictions are not applied here: the member
@@ -1021,10 +1017,6 @@ export function extractReasoningSetting(body: unknown): string | null {
   if (bucket) labels.push(`reasoning:budget:${bucket}`);
   return labels.length > 0 ? labels.join('+') : null;
 }
-
-// ============================================================================
-// FIM-Specific Code
-// ============================================================================
 
 export type FimUsage = {
   prompt_tokens: number;
@@ -1289,10 +1281,6 @@ export function countAndStoreFimUsage(
     })
   );
 }
-
-// ============================================================================
-// Edit-Specific Code
-// ============================================================================
 
 type EditMessage = { role: string; content: string };
 

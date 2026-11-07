@@ -490,7 +490,6 @@ describe('processLocalExpirations', () => {
       next_credit_expiration_at: '2024-01-10T00:00:00Z',
     });
 
-    // Insert a transaction that should expire
     const initialId = randomUUID();
     await db.insert(creditTransactionsTable).values({
       kilo_user_id: user.id,
@@ -508,7 +507,6 @@ describe('processLocalExpirations', () => {
 
     expect(result).not.toBeNull();
 
-    // Check that expiration transaction was created
     const expirationTxns = await db
       .select()
       .from(creditTransactionsTable)
@@ -590,7 +588,6 @@ describe('processLocalExpirations', () => {
     const second = await processLocalExpirations(user.id, now);
     expect(second).toEqual(first);
 
-    // Should still only have one expiration transaction
     const expirationTxns = await db
       .select()
       .from(creditTransactionsTable)
@@ -667,14 +664,12 @@ describe('processLocalExpirations', () => {
   it('grantCreditForCategory sets next_credit_expiration_at correctly', async () => {
     const year = new Date().getUTCFullYear() + 3;
 
-    // Create user with no expiration date set
     const user = await insertMigratedTestUser({
       microdollars_used: 0,
       total_microdollars_acquired: 0,
       next_credit_expiration_at: null,
     });
 
-    // Grant credits with expiry - should set next_credit_expiration_at
     const expiry1 = new Date(Date.UTC(year, 1, 15));
     await grantCreditForCategory(user, {
       credit_category: 'custom',
@@ -689,7 +684,6 @@ describe('processLocalExpirations', () => {
     });
     expect(new Date(userAfter1!.next_credit_expiration_at!).getTime()).toBe(expiry1.getTime());
 
-    // Grant credits with earlier expiry - should update to earlier date
     const expiry2 = new Date(Date.UTC(year, 0, 10));
     await grantCreditForCategory(userAfter1!, {
       credit_category: 'custom',
@@ -704,7 +698,6 @@ describe('processLocalExpirations', () => {
     });
     expect(new Date(userAfter2!.next_credit_expiration_at!).getTime()).toBe(expiry2.getTime());
 
-    // Grant credits with later expiry - should NOT update (keep earlier date)
     const expiry3 = new Date(Date.UTC(year, 2, 1));
     await grantCreditForCategory(userAfter2!, {
       credit_category: 'custom',
@@ -721,25 +714,13 @@ describe('processLocalExpirations', () => {
   });
 
   it('tracks original_baseline_microdollars_used immutably through full lifecycle', async () => {
-    // Scenario:
-    // 1. Create user with non-zero usage ($2 already spent)
-    // 2. Acquire credits A ($10, expires Jan 10) via grantCreditForCategory - original_baseline = 2M
-    // 3. User spends $3 more (microdollars_used = 5_000_000)
-    // 4. Acquire credits B ($5, expires Jan 20) via grantCreditForCategory - original_baseline = 5M
-    // 5. User spends $2 more (microdollars_used = 7_000_000)
-    // 6. Jan 15: Expire A - should shift B's expiration_baseline but NOT original_baseline
-    // 7. User spends $1 more (microdollars_used = 8_000_000)
-    // 8. Jan 25: Expire B - verify original_baseline unchanged
-
     const year = new Date().getUTCFullYear() + 3;
 
-    // Step 1: Create user with non-zero usage
     const user = await insertMigratedTestUser({
       microdollars_used: 2_000_000, // Start with $2 already spent
       total_microdollars_acquired: 2_000_000,
     });
 
-    // Step 2: Acquire credits A ($10, expires Jan 10) using production function
     const expiryA = new Date(Date.UTC(year, 0, 10));
     const resultA = await grantCreditForCategory(user, {
       credit_category: 'custom',
@@ -750,13 +731,11 @@ describe('processLocalExpirations', () => {
     });
     expect(resultA.success).toBe(true);
 
-    // Verify grantCreditForCategory set next_credit_expiration_at
     const userAfterA = await db.query.kilocode_users.findFirst({
       where: eq(kilocode_users.id, user.id),
     });
     expect(new Date(userAfterA!.next_credit_expiration_at!).getTime()).toBe(expiryA.getTime());
 
-    // Verify A was created with correct original_baseline
     const txnA = await db.query.credit_transactions.findFirst({
       where: eq(creditTransactionsTable.description, 'Credits A'),
     });
@@ -764,18 +743,15 @@ describe('processLocalExpirations', () => {
     expect(txnA!.original_baseline_microdollars_used).toBe(2_000_000);
     expect(txnA!.expiration_baseline_microdollars_used).toBe(2_000_000);
 
-    // Step 3: User spends $3 more (total $5)
     await db
       .update(kilocode_users)
       .set({ microdollars_used: 5_000_000 })
       .where(eq(kilocode_users.id, user.id));
 
-    // Refetch user for next grant
     const userAfterUsage1 = await db.query.kilocode_users.findFirst({
       where: eq(kilocode_users.id, user.id),
     });
 
-    // Step 4: Acquire credits B ($5, expires Jan 20) using production function
     const expiryB = new Date(Date.UTC(year, 0, 20));
     const resultB = await grantCreditForCategory(userAfterUsage1!, {
       credit_category: 'custom',
@@ -786,7 +762,6 @@ describe('processLocalExpirations', () => {
     });
     expect(resultB.success).toBe(true);
 
-    // Verify B was created with correct original_baseline
     const txnB = await db.query.credit_transactions.findFirst({
       where: eq(creditTransactionsTable.description, 'Credits B'),
     });
@@ -794,13 +769,11 @@ describe('processLocalExpirations', () => {
     expect(txnB!.original_baseline_microdollars_used).toBe(5_000_000);
     expect(txnB!.expiration_baseline_microdollars_used).toBe(5_000_000);
 
-    // Step 5: User spends $2 more (total $7)
     await db
       .update(kilocode_users)
       .set({ microdollars_used: 7_000_000 })
       .where(eq(kilocode_users.id, user.id));
 
-    // Step 6: Process expiration at Jan 15 (A expires)
     const userAtJan15 = await db.query.kilocode_users.findFirst({
       where: eq(kilocode_users.id, user.id),
     });
@@ -808,7 +781,6 @@ describe('processLocalExpirations', () => {
 
     await processLocalExpirations(userAtJan15!.id, jan15);
 
-    // Verify: A expired, B's expiration_baseline shifted but original_baseline unchanged
     const txnsAfterFirstExpiry = await db
       .select()
       .from(creditTransactionsTable)
@@ -816,15 +788,12 @@ describe('processLocalExpirations', () => {
 
     const blockB = txnsAfterFirstExpiry.find(t => t.description === 'Credits B');
     expect(blockB).toBeDefined();
-    // B's expiration_baseline should have shifted
     // A's range: 2M-12M, used 2M-7M = 5M usage claimed
     // B's original range: 5M-10M, overlaps with A's claimed 2M-7M by 2M (5M-7M)
     // So B's expiration_baseline shifts from 5M to 7M
     expect(blockB!.expiration_baseline_microdollars_used).toBe(7_000_000);
-    // But original_baseline must remain unchanged
     expect(blockB!.original_baseline_microdollars_used).toBe(5_000_000);
 
-    // Verify expiration transaction for A was created (linked via original_transaction_id)
     const expirationA = txnsAfterFirstExpiry.find(
       t => t.credit_category === 'credits_expired' && t.original_transaction_id === txnA!.id
     );
@@ -832,48 +801,39 @@ describe('processLocalExpirations', () => {
     // A had $10 (range 2M-12M), user at 7M, so 5M used from A (2M-7M), 5M expired
     expect(expirationA!.amount_microdollars).toBe(-5_000_000);
 
-    // Step 7: User spends $1 more (total $8)
     await db
       .update(kilocode_users)
       .set({ microdollars_used: 8_000_000 })
       .where(eq(kilocode_users.id, user.id));
 
-    // Step 8: Process expiration at Jan 25 (B expires)
     const userAtJan25 = await db.query.kilocode_users.findFirst({
       where: eq(kilocode_users.id, user.id),
     });
-    // Verify next_credit_expiration_at was updated to B's expiry after A expired
     expect(new Date(userAtJan25!.next_credit_expiration_at!).getTime()).toBe(expiryB.getTime());
     const jan25 = new Date(Date.UTC(year, 0, 25));
     await processLocalExpirations(userAtJan25!.id, jan25);
 
-    // Final verification
     const finalTxns = await db
       .select()
       .from(creditTransactionsTable)
       .where(eq(creditTransactionsTable.kilo_user_id, user.id));
 
-    // Verify B's original_baseline is still unchanged
     const finalBlockB = finalTxns.find(
       t => t.description === 'Credits B' && t.credit_category !== 'credits_expired'
     );
     expect(finalBlockB!.original_baseline_microdollars_used).toBe(5_000_000);
 
-    // Verify expiration transaction for B was created (linked via original_transaction_id)
     const expirationB = finalTxns.find(
       t => t.credit_category === 'credits_expired' && t.original_transaction_id === txnB!.id
     );
     expect(expirationB).toBeDefined();
     // B had $5 (range 5M-10M), baseline shifted to 7M, user at 8M
-    // So 1M used from B (7M-8M), 4M expired (8M-10M + the 2M that was shifted = wait, let me recalc)
     // After shift: B's range is 7M-12M (baseline 7M + amount 5M)
     // User at 8M, so 1M used from B, 4M expired
     expect(expirationB!.amount_microdollars).toBe(-4_000_000);
   });
 
   it('zero-amount expirations are created, do not affect balance, and refresh the pointer', async () => {
-    // Scenario: User has fully consumed credits before expiration
-    // Should create a zero-amount expiration transaction and not affect balance
     const initialAcquired = 5_000_000; // $5
     const initialUsed = 3_000_000; // $3 (more than the $1 credit, so it's fully consumed)
     const user = await insertMigratedTestUser({
@@ -883,7 +843,6 @@ describe('processLocalExpirations', () => {
     });
 
     const initialId = randomUUID();
-    // Add a credit that will expire with zero amount (fully consumed)
     await db.insert(creditTransactionsTable).values({
       kilo_user_id: user.id,
       amount_microdollars: 1_000_000, // $1
@@ -904,23 +863,20 @@ describe('processLocalExpirations', () => {
       next_credit_expiration_at: null,
     });
 
-    // Verify zero-amount expiration transaction was created
     const expirationTxns = await db
       .select()
       .from(creditTransactionsTable)
       .where(eq(creditTransactionsTable.credit_category, 'credits_expired'));
 
     expect(expirationTxns).toHaveLength(1);
-    expect(expirationTxns[0].amount_microdollars).toBe(0); // Zero amount
+    expect(expirationTxns[0].amount_microdollars).toBe(0);
     expect(expirationTxns[0].original_transaction_id).toBe(initialId);
 
-    // Verify user balance is unchanged (zero-amount expiration)
     const updatedUser = await db.query.kilocode_users.findFirst({
       where: eq(kilocode_users.id, user.id),
     });
 
     // Balance should still be: acquired - used = $5 - $3 = $2
-    // The zero-amount expiration should not change total_microdollars_acquired
     expect(updatedUser?.total_microdollars_acquired).toBe(initialAcquired);
     expect(updatedUser?.microdollars_used).toBe(initialUsed);
 
@@ -966,7 +922,6 @@ describe('computeNextExpirationAmount', () => {
 
     const result = computeNextExpirationAmount(transactions, entity, '2024-02-01');
 
-    // Only Feb 1 grants are summed; Mar 1 grant is excluded
     expect(result).toBe(19_000_000);
   });
 
@@ -974,7 +929,6 @@ describe('computeNextExpirationAmount', () => {
     const transactions = [makeTransaction('t1', '2024-03-01', 0, 50_000_000)];
     const entity = { id: 'org', microdollars_used: 0 };
 
-    // Next expiration is Feb 1 but the only grant expires Mar 1
     const result = computeNextExpirationAmount(transactions, entity, '2024-02-01');
 
     expect(result).toBeNull();

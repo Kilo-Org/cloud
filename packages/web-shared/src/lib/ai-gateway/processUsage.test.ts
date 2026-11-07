@@ -412,7 +412,6 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
   test.each(interruptedStreamErrors)(
     'handles %s gracefully and returns partial data',
     async (_name, streamError) => {
-      // Create a stream that emits some SSE data then fails.
       const partialSSEData = `data: {"id":"gen-123","model":"anthropic/claude-3-5-sonnet","choices":[{"delta":{"content":"Hello"}}]}\n\ndata: {"id":"gen-123","model":"anthropic/claude-3-5-sonnet","choices":[{"delta":{"content":" world"}}]}\n\n`;
 
       let pullCount = 0;
@@ -819,7 +818,6 @@ describe('toMicrodollars', () => {
 
 describe('mapToUsageStats', () => {
   test('applies BYOK multiplier when is_byok is true', () => {
-    // Create a sample OpenRouterGeneration with is_byok set to true
     const byokGeneration: OpenRouterGeneration = {
       data: {
         id: 'test-byok-id',
@@ -836,15 +834,12 @@ describe('mapToUsageStats', () => {
       },
     };
 
-    // Call mapToUsageStats with the BYOK generation
     const result = mapToUsageStats(byokGeneration, 'test response', 'fake-user-id', 'openrouter');
 
-    // Verify that the cost is multiplied by OPENROUTER_BYOK_COST_MULTIPLIER
     expect(result.cost_mUsd).toBe(toMicrodollars(0.1 * 20.0)); // 0.1 * 20 = 2, then convert to microdollars
   });
 
   test('does not apply BYOK multiplier when is_byok is false', () => {
-    // Create a sample OpenRouterGeneration with is_byok set to false
     const nonByokGeneration: OpenRouterGeneration = {
       data: {
         id: 'test-non-byok-id',
@@ -860,7 +855,6 @@ describe('mapToUsageStats', () => {
       },
     };
 
-    // Call mapToUsageStats with the non-BYOK generation
     const result = mapToUsageStats(
       nonByokGeneration,
       'test response',
@@ -868,7 +862,6 @@ describe('mapToUsageStats', () => {
       'openrouter'
     );
 
-    // Verify that the cost is not multiplied
     expect(result.cost_mUsd).toBe(toMicrodollars(0.1)); // Just convert to microdollars without multiplier
   });
 
@@ -1148,7 +1141,6 @@ describe('logMicrodollarUsage', () => {
 
     const usageIdentity = await logMicrodollarUsage(usageStats, usageContext);
 
-    // Verify user microdollars were NOT incremented
     const updatedUser = await findUserById('test-log-user-2');
     expect(updatedUser?.microdollars_used).toBe(2000); // unchanged
 
@@ -1266,7 +1258,6 @@ describe('logMicrodollarUsage', () => {
     const updatedUser = await findUserById('test-dedup-user');
     expect(updatedUser?.microdollars_used).toBe(4200); // 3000 + 300 + 400 + 500
 
-    // Verify all 3 usage records exist
     const usageRecords = await db.query.microdollar_usage.findMany({
       where: eq(microdollar_usage.kilo_user_id, 'test-dedup-user'),
     });
@@ -1279,39 +1270,30 @@ describe('logMicrodollarUsage', () => {
       .where(eq(microdollar_usage.kilo_user_id, 'test-dedup-user'))
       .orderBy(microdollar_usage_metadata.message_id);
 
-    // If we get here, the tables exist and we can test deduplication
     expect(relevantMetadata).toHaveLength(3);
 
-    // Test deduplication by checking that shared values have the same IDs
     const metadata1 = relevantMetadata.find(r => r.message_id === 'dedup-msg-1')!;
     const metadata2 = relevantMetadata.find(r => r.message_id === 'dedup-msg-2')!;
     const metadata3 = relevantMetadata.find(r => r.message_id === 'dedup-msg-3')!;
 
-    // Records 1 and 3 should share the same user-agent ID (both use 'test-agent-1')
     expect(metadata1.http_user_agent_id).toBe(metadata3.http_user_agent_id);
     expect(metadata1.http_user_agent_id).not.toBe(metadata2.http_user_agent_id);
 
-    // Records 1 and 2 should share the same IP ID (both use '192.168.1.1')
     expect(metadata1.http_ip_id).toBe(metadata2.http_ip_id);
     expect(metadata1.http_ip_id).not.toBe(metadata3.http_ip_id);
 
-    // Records 1 and 2 should share the same country ID (both use 'US')
     expect(metadata1.vercel_ip_country_id).toBe(metadata2.vercel_ip_country_id);
     expect(metadata1.vercel_ip_country_id).not.toBe(metadata3.vercel_ip_country_id);
 
-    // Records 1 and 3 should share the same city ID (both use 'NYC')
     expect(metadata1.vercel_ip_city_id).toBe(metadata3.vercel_ip_city_id);
     expect(metadata1.vercel_ip_city_id).not.toBe(metadata2.vercel_ip_city_id);
 
-    // Records 1 and 2 should share the same ja4 ID (both use 'digest1')
     expect(metadata1.ja4_digest_id).toBe(metadata2.ja4_digest_id);
     expect(metadata1.ja4_digest_id).not.toBe(metadata3.ja4_digest_id);
 
-    // Records 1 and 2 should share the same system prompt prefix ID (both use 'You are helpful')
     expect(metadata1.system_prompt_prefix_id).toBe(metadata2.system_prompt_prefix_id);
     expect(metadata1.system_prompt_prefix_id).not.toBe(metadata3.system_prompt_prefix_id);
 
-    // All records should have their expected non-shared metadata
     expect(metadata1.max_tokens).toBe(200);
     expect(metadata2.max_tokens).toBe(200);
     expect(metadata3.max_tokens).toBe(200);
@@ -1359,7 +1341,6 @@ describe('logMicrodollarUsage', () => {
     expect(metadataRecord?.user_prompt_prefix).toBe(null);
     expect(metadataRecord?.system_prompt_prefix_id).toBe(null);
 
-    // Other fields should still be populated normally
     expect(usageRecord?.input_tokens).toBe(100);
     expect(usageRecord?.output_tokens).toBe(50);
     expect(usageRecord?.model).toBe('anthropic/claude-3.7-sonnet');
@@ -1390,23 +1371,19 @@ describe('logMicrodollarUsage', () => {
       google_user_email: 'insertbalance@example.com',
     });
 
-    // Insert usage record directly via insertUsageWithOverrides (which calls insertUsageRecord)
     await insertUsageWithOverrides({
       kilo_user_id: user.id,
       cost: 2500,
     });
 
-    // Verify user balance was updated
     const updatedUser = await findUserById('test-insert-balance-user');
     expect(updatedUser?.microdollars_used).toBe(7500); // 5000 + 2500
 
-    // Insert another usage record
     await insertUsageWithOverrides({
       kilo_user_id: user.id,
       cost: 1000,
     });
 
-    // Verify balance accumulated correctly
     const finalUser = await findUserById('test-insert-balance-user');
     expect(finalUser?.microdollars_used).toBe(8500); // 7500 + 1000
   });
@@ -1418,13 +1395,11 @@ describe('logMicrodollarUsage', () => {
       google_user_email: 'insertzero@example.com',
     });
 
-    // Insert usage record with zero cost
     await insertUsageWithOverrides({
       kilo_user_id: user.id,
       cost: 0,
     });
 
-    // Verify user balance was NOT updated
     const updatedUser = await findUserById('test-insert-zero-cost-user');
     expect(updatedUser?.microdollars_used).toBe(3000); // unchanged
   });
@@ -1438,14 +1413,12 @@ describe('logMicrodollarUsage', () => {
 
     const organization = await createTestOrganization('Insert usage organization', user.id, 10_000);
 
-    // Insert usage record with organization_id (should not update user balance)
     await insertUsageWithOverrides({
       kilo_user_id: user.id,
       organization_id: organization.id,
       cost: 2000,
     });
 
-    // Verify user balance was NOT updated (org usage doesn't deplete user balance)
     const updatedUser = await findUserById('test-insert-org-user');
     expect(updatedUser?.microdollars_used).toBe(4000); // unchanged
   });

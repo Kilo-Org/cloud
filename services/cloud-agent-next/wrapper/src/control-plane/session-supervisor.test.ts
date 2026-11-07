@@ -844,6 +844,41 @@ describe('native session supervision', () => {
     expect(f.failures.map(failure => failure.reason)).toEqual(['no_progress']);
   });
 
+  it('credits a completion that the feed missed exactly once', () => {
+    const f = fixture();
+    f.open();
+    f.advance(19 * MINUTE);
+    // Kilo completed this message during a feed gap; only the snapshot shows it.
+    const snapshot: SessionObservation = {
+      ...observation(),
+      messages: [
+        {
+          sessionId: 'root',
+          id: 'assistant-gap',
+          role: 'assistant',
+          time: { created: 2_000, completed: 1_000 + 19 * MINUTE },
+          parts: [
+            {
+              sessionId: 'root',
+              messageId: 'assistant-gap',
+              id: 'gap-text',
+              kind: 'text',
+              text: 'done during the gap',
+            },
+          ],
+        },
+      ],
+    };
+    f.supervisor.reconcile([snapshot], f.supervisor.beginSnapshot());
+    f.advance(20 * MINUTE - 1);
+    f.supervisor.reconcile([snapshot], f.supervisor.beginSnapshot());
+    f.supervisor.tick();
+    expect(f.failures).toEqual([]);
+    f.advance(1);
+    f.supervisor.tick();
+    expect(f.failures.map(failure => failure.reason)).toEqual(['no_progress']);
+  });
+
   it('pins a live tool while later completed assistants are retired', () => {
     const f = fixture();
     f.open();
@@ -898,6 +933,45 @@ describe('native session supervision', () => {
     expect(f.supervisor.needsCompute()).toBe(true);
     f.advance(20 * MINUTE);
     f.supervisor.reconcile([snapshot], f.supervisor.beginSnapshot());
+    f.supervisor.tick();
+    expect(f.failures.map(failure => failure.reason)).toEqual(['no_progress']);
+  });
+
+  it('re-reading a completed message with a silent pinned tool is not progress', () => {
+    const f = fixture();
+    f.open();
+    const snapshot: SessionObservation = {
+      ...observation(),
+      messages: [
+        {
+          sessionId: 'root',
+          id: 'assistant-tool',
+          role: 'assistant',
+          time: { created: 1_000, completed: 1_100 },
+          parts: [
+            {
+              sessionId: 'root',
+              messageId: 'assistant-tool',
+              id: 'tool-text',
+              kind: 'text',
+              text: 'running a long command',
+            },
+            {
+              sessionId: 'root',
+              messageId: 'assistant-tool',
+              id: 'pinned',
+              kind: 'tool',
+              tool: { callId: 'call', name: 'bash', status: 'running', interactive: false },
+            },
+          ],
+        },
+      ],
+    };
+    f.supervisor.reconcile([snapshot], f.supervisor.beginSnapshot());
+    for (let step = 0; step < 4; step++) {
+      f.advance(5 * MINUTE);
+      f.supervisor.reconcile([snapshot], f.supervisor.beginSnapshot());
+    }
     f.supervisor.tick();
     expect(f.failures.map(failure => failure.reason)).toEqual(['no_progress']);
   });

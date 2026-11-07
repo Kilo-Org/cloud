@@ -193,24 +193,20 @@ export function createSessionSupervisor(options: SessionSupervisorOptions) {
   }
 
   /**
-   * A completed assistant is terminal: its role and non-running parts cannot produce
-   * more progress. Retaining only pinned live tools keeps long serial generations
-   * inside the role and part bounds without discarding in-flight state.
+   * A completed assistant without a running or pending tool is terminal: its role and
+   * parts cannot produce more progress, so retiring them keeps long serial generations
+   * inside the role and part bounds. A completed message with a live tool is kept
+   * whole, so a later re-read sees no change until that tool changes.
    */
   function retireMessage(record: Session, id: string): void {
-    const execution = record.execution;
-    let pinned = false;
-    if (execution) {
-      for (const [partId, part] of execution.parts) {
-        if (part.messageID !== id) continue;
-        if (part.kind === 'tool' && (part.status === 'running' || part.status === 'pending')) {
-          pinned = true;
-          continue;
-        }
-        execution.parts.delete(partId);
-      }
-    }
-    if (!pinned) record.roles.delete(id);
+    const parts = record.execution?.parts;
+    const owned = parts ? [...parts].filter(([, part]) => part.messageID === id) : [];
+    const pinned = owned.some(
+      ([, part]) => part.kind === 'tool' && (part.status === 'running' || part.status === 'pending')
+    );
+    if (pinned) return;
+    for (const [partId] of owned) parts?.delete(partId);
+    record.roles.delete(id);
   }
 
   function creditCompleted(execution: Execution, completedAt: number): void {

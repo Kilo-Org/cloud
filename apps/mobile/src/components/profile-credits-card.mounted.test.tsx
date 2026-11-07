@@ -1069,6 +1069,31 @@ describe('CreditsCard add-credits entry point', () => {
     unmount();
   });
 
+  it('paints the org purchase row before the balance read answers', async () => {
+    currentUser.userId = 'user-1';
+    savedMetadata.set(ORGANIZATION_STORAGE_KEY, 'org-a');
+    // The balance read decides nothing about whether the organization has a
+    // purchase entry point, so the row must be part of the card's first paint:
+    // mounting it when the read lands moved every section below it (design
+    // gate, Profile, 2026-11-06).
+    const balance = Promise.withResolvers<{ balance: number }>();
+    getContextBalanceQueryFn.mockReturnValue(balance.promise);
+    const orgs = [
+      { organizationId: 'org-a', organizationName: 'Acme', role: 'owner' },
+    ] as OrgListEntry[];
+    listState.payload = orgs;
+
+    const { texts, unmount } = await mountCard(createTestQueryClient(), orgs);
+    await waitFor(() => texts().includes('Acme'));
+
+    expect(texts()).toContain('ADD_CREDITS_ROW');
+    expect(addCreditsRowProps.latest?.url).toBe(
+      'https://example.com/organizations/org-a/payment-details'
+    );
+
+    unmount();
+  });
+
   it('renders no row for a non-money-role org member', async () => {
     currentUser.userId = 'user-1';
     savedMetadata.set(ORGANIZATION_STORAGE_KEY, 'org-a');

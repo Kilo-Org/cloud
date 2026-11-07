@@ -374,17 +374,16 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
           )}
         </View>
       )}
-      {selectedOrgId != null &&
-        canManageOrgBilling &&
-        !balanceLoading &&
-        !balancePending &&
-        !balanceFailed &&
-        balanceDollars === 0 && (
-          <AddCreditsRow
-            url={`${WEB_BASE_URL}/organizations/${selectedOrgId}/payment-details`}
-            className="rounded-lg bg-secondary px-3 py-3"
-          />
-        )}
+      {/* The organization's purchase entry point is part of the card's first
+          paint: mounting it once the balance read answered moved every section
+          below it by the row's 67.4 dp (design gate, Profile, 2026-11-06). It
+          matches the personal action, which is offered at any balance. */}
+      {selectedOrgId != null && canManageOrgBilling && (
+        <AddCreditsRow
+          url={`${WEB_BASE_URL}/organizations/${selectedOrgId}/payment-details`}
+          className="rounded-lg bg-secondary px-3 py-3"
+        />
+      )}
       {/* One loading indicator per section: while the balance slot shows its
           skeleton, the KiloPass card reserves its slot quietly instead of
           stacking a second skeleton card. The card's queries still run from

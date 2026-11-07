@@ -12,7 +12,6 @@ import {
   Coins,
   CreditCard,
   Download,
-  Factory,
   Key,
   List,
   MessageSquare,
@@ -162,11 +161,6 @@ const cloudItems: SidebarStoryItem[] = [
     title: 'Security Agent',
     icon: Shield,
     url: '/security-agent',
-  },
-  {
-    title: 'Gas Town',
-    icon: Factory,
-    url: '/gastown',
   },
 ];
 

@@ -2392,7 +2392,7 @@
       "selectRepositoryToStart": "Vælg et kodelager for at starte.",
       "enterPromptToStart": "Tilføj en prompt for at starte.",
       "enterPromptOrFileToStart": "Tilføj en prompt eller en fil for at starte.",
-      "connectProviderToStart": "Tilslut en udbyder for at starte.",
+      "connectProviderToStart": "Kodelagre kommer fra en tilknyttet GitHub-, GitLab- eller Bitbucket-konto.",
       "promptPlaceholder": "Hvad vil du gerne arbejde med?",
       "couldNotLoadModels": "Kunne ikke indlæse modellerne.",
       "prefillRepoAndModelUnavailable": "Kodelageret og modellen fra den oprindelige session er ikke længere tilgængelige. Vælg et andet kodelager og en anden model nedenfor.",

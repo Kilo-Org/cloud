@@ -45,8 +45,6 @@ export function getConfiguredConnectSrcOrigins(
   return compactUnique([
     originFromUrl(env.NEXT_PUBLIC_CLOUD_AGENT_NEXT_WS_URL),
     originFromUrl(env.NEXT_PUBLIC_SESSION_INGEST_WS_URL),
-    originFromUrl(env.NEXT_PUBLIC_GASTOWN_URL),
-    webSocketOriginFromUrl(env.NEXT_PUBLIC_GASTOWN_URL),
     originFromUrl(sessionSyncUrl),
     webSocketOriginFromUrl(sessionSyncUrl),
   ]);

@@ -1,4 +1,10 @@
-import { createElement, type ElementType, type ReactNode } from 'react';
+import {
+  createElement,
+  type ElementType,
+  type ReactNode,
+  useEffect,
+  useSyncExternalStore,
+} from 'react';
 import { act, type ReactTestInstance } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -61,6 +67,34 @@ vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#6F6A61' }),
+}));
+
+// The context picker closes itself when the owning screen loses focus, so the
+// suite can drive that blur through this store.
+const pickerFocus = vi.hoisted(() => {
+  const listeners = new Set<() => void>();
+  const subscribe = (notify: () => void) => {
+    listeners.add(notify);
+    return () => {
+      listeners.delete(notify);
+    };
+  };
+  return {
+    focused: true,
+    setFocused(next: boolean) {
+      pickerFocus.focused = next;
+      for (const notify of listeners) {
+        notify();
+      }
+    },
+    subscribe,
+  };
+});
+vi.mock('expo-router', () => ({
+  useFocusEffect: (effect: Parameters<typeof useEffect>[0]) => {
+    const focused = useSyncExternalStore(pickerFocus.subscribe, () => pickerFocus.focused);
+    useEffect(() => (focused ? effect() : undefined), [effect, focused]);
+  },
 }));
 
 const Text = 'Text' as ElementType;

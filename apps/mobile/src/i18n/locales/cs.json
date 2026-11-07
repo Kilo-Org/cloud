@@ -2476,7 +2476,7 @@
       "selectRepositoryToStart": "Vyberte repozitář, abyste mohli začít.",
       "enterPromptToStart": "Přidejte výzvu, abyste mohli začít.",
       "enterPromptOrFileToStart": "Přidejte výzvu nebo soubor, abyste mohli začít.",
-      "connectProviderToStart": "Připojte poskytovatele, abyste mohli začít.",
+      "connectProviderToStart": "Repozitáře pocházejí z připojeného účtu GitHub, GitLab nebo Bitbucket.",
       "promptPlaceholder": "Na čem chcete pracovat?",
       "couldNotLoadModels": "Modely se nepodařilo načíst.",
       "prefillRepoAndModelUnavailable": "Repozitář a model původní relace už nejsou dostupné. Níže vyberte jiný repozitář a model.",

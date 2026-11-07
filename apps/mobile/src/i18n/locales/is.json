@@ -2392,7 +2392,7 @@
       "selectRepositoryToStart": "Veldu kóðasafn til að byrja.",
       "enterPromptToStart": "Bættu við skipun til að byrja.",
       "enterPromptOrFileToStart": "Bættu við skipun eða skrá til að byrja.",
-      "connectProviderToStart": "Tengdu þjónustuveitanda til að byrja.",
+      "connectProviderToStart": "Kóðasöfn koma frá tengdum reikningi á GitHub, GitLab eða Bitbucket.",
       "promptPlaceholder": "Hvað viltu vinna að?",
       "couldNotLoadModels": "Ekki tókst að hlaða líkönum.",
       "prefillRepoAndModelUnavailable": "Kóðasafn og líkan upprunalegu lotunnar eru ekki lengur tiltæk. Veldu ný hér að neðan.",

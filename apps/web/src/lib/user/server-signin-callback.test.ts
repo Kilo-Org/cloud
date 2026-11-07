@@ -35,8 +35,8 @@ jest.mock('@kilocode/web-shared/lib/stripe-client', () => ({
   createStripeCustomer: jest.fn(async () => ({ id: 'cus_test' })),
   deleteStripeCustomer: jest.fn(async () => {}),
 }));
-jest.mock('@/lib/auth/claude/access.server', () => ({
-  isClaudeSignInEnabled: jest.fn(async () => true),
+jest.mock('@kilocode/web-shared/lib/auth/claude/feature-flag.server', () => ({
+  isClaudePlatformOAuthEnabled: jest.fn(async () => true),
 }));
 
 import jwt from 'jsonwebtoken';
@@ -50,8 +50,9 @@ import {
   getOrganizationById,
   getUserOrgMemberships,
 } from '@kilocode/web-shared/lib/organizations/organizations';
-import { isClaudeSignInEnabled } from '@/lib/auth/claude/access.server';
+import { isClaudePlatformOAuthEnabled } from '@kilocode/web-shared/lib/auth/claude/feature-flag.server';
 import { CLAUDE_OIDC_ISSUER } from '@kilocode/web-shared/lib/auth/claude/config';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 const mockCreateOrUpdateUser = jest.mocked(createOrUpdateUser);
 const mockLinkAccountToExistingUser = jest.mocked(linkAccountToExistingUser);
@@ -478,7 +479,9 @@ describe('authOptions.callbacks.signIn for Claude', () => {
       user: { id: 'settled-user', blocked_reason: null } as never,
       isNew: false,
     });
+    mockLinkAccountToExistingUser.mockReset();
     mockGetAccountLinkingSession.mockReset().mockResolvedValue(null);
+    jest.mocked(isClaudePlatformOAuthEnabled).mockClear().mockResolvedValue(true);
     mockResolveSsoAuthorityForDomain.mockReset().mockResolvedValue({
       status: 'not_required',
       domain: 'example.com',
@@ -486,7 +489,7 @@ describe('authOptions.callbacks.signIn for Claude', () => {
   });
 
   it('refuses a Claude sign-in before settlement while it is not launched', async () => {
-    jest.mocked(isClaudeSignInEnabled).mockResolvedValueOnce(false);
+    jest.mocked(isClaudePlatformOAuthEnabled).mockResolvedValueOnce(false);
     setValidTurnstileCookie();
 
     const result = await claudeSignIn({ email_verified: true });
@@ -495,19 +498,110 @@ describe('authOptions.callbacks.signIn for Claude', () => {
     expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
   });
 
-  it('settles an issuer-qualified Claude account and auto-links only a verified email', async () => {
+  it('settles an issuer-qualified Claude account using the verified provider email', async () => {
     setValidTurnstileCookie();
     await expect(claudeSignIn({ email_verified: true })).resolves.toBe(true);
+    expect(isClaudePlatformOAuthEnabled).toHaveBeenCalledWith('claude-cb@example.com');
     expect(mockCreateOrUpdateUser.mock.calls[0]?.[0]).toMatchObject({
       provider: 'claude',
       provider_account_id: `${CLAUDE_OIDC_ISSUER}#pairwise-sub`,
       hosted_domain: '@@claude@@',
     });
     expect(mockCreateOrUpdateUser.mock.calls[0]?.[2]).toBe(true);
+  });
 
-    // Anthropic omits email_verified when it did not verify the address itself.
+  it.each([true, false])('rechecks the linking session user database email (%s)', async allowed => {
+    const user = await insertTestUser({
+      google_user_email: allowed ? 'claude-link@kilocode.ai' : 'claude-link@example.com',
+    });
+    await setSessionCookie(user.id);
+    mockGetAccountLinkingSession.mockResolvedValueOnce({
+      existingUserId: user.id,
+      targetProvider: 'claude',
+      createdAt: 0,
+    });
+    mockLinkAccountToExistingUser.mockReset().mockResolvedValueOnce({
+      success: true,
+      user,
+    });
+    jest
+      .mocked(isClaudePlatformOAuthEnabled)
+      .mockImplementation(
+        async email => email === 'claude-cb@example.com' || email === 'claude-link@kilocode.ai'
+      );
+
+    const result = await claudeSignIn({ email_verified: true });
+    expect(isClaudePlatformOAuthEnabled).toHaveBeenNthCalledWith(1, 'claude-cb@example.com');
+    expect(isClaudePlatformOAuthEnabled).toHaveBeenNthCalledWith(2, user.google_user_email);
+    if (allowed) {
+      expect(result).toBe(true);
+      expect(mockLinkAccountToExistingUser).toHaveBeenCalled();
+    } else {
+      expect(result).toEqual(expect.stringContaining('error=LINKING-FAILED'));
+      expect(mockLinkAccountToExistingUser).not.toHaveBeenCalled();
+    }
+    expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+  });
+
+  it('refuses a link whose authenticated user no longer exists', async () => {
+    await setSessionCookie('missing-claude-link-user');
+    mockGetAccountLinkingSession.mockResolvedValueOnce({
+      existingUserId: 'missing-claude-link-user',
+      targetProvider: 'claude',
+      createdAt: 0,
+    });
+    jest.mocked(isClaudePlatformOAuthEnabled).mockImplementation(async email => Boolean(email));
+    await expect(claudeSignIn({ email_verified: true })).resolves.toEqual(
+      expect.stringContaining('error=LINKING-FAILED')
+    );
+    expect(isClaudePlatformOAuthEnabled).toHaveBeenLastCalledWith(undefined);
+    expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+  });
+
+  it('reports rejected claim names without identity or credential values', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      await claudeSignIn({
+        access_token: 'private-access-value',
+        id_token: 'private-id-value',
+        private_claim: 'private-claim-value',
+      });
+      expect(warn.mock.calls[0]?.[1]).toMatchObject({
+        reason: 'invalid_profile_claims',
+        rejectedClaims: ['email_verified'],
+      });
+      const diagnostic = JSON.stringify(warn.mock.calls);
+      for (const value of [
+        'claude-cb@example.com',
+        'pairwise-sub',
+        'private-access-value',
+        'private-id-value',
+        'private-claim-value',
+        'private_claim',
+      ]) {
+        expect(diagnostic).not.toContain(value);
+      }
+      expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+      expect(mockLinkAccountToExistingUser).not.toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it.each([
+    {},
+    { email_verified: false },
+    { email_verified: true, email: undefined },
+    { email_verified: true, email: null },
+    { email_verified: 'true' },
+    { email_verified: true, email: 'not-an-email' },
+    { email_verified: true, email: 'different@kilocode.ai' },
+  ])('refuses unverified or mismatched Claude claims before flag evaluation: %s', async profile => {
     setValidTurnstileCookie();
-    await expect(claudeSignIn({})).resolves.toBe(true);
-    expect(mockCreateOrUpdateUser.mock.calls[1]?.[2]).toBe(false);
+    await expect(claudeSignIn(profile)).resolves.toEqual(
+      expect.stringContaining('error=UNKNOWN-ERROR')
+    );
+    expect(isClaudePlatformOAuthEnabled).not.toHaveBeenCalled();
+    expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
   });
 });

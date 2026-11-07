@@ -2392,7 +2392,7 @@
       "selectRepositoryToStart": "စတင်ရန် ကုဒ်သိုလှောင်ခန်းတစ်ခုကို ရွေးပါ။",
       "enterPromptToStart": "စတင်ရန် ညွှန်ကြားချက်တစ်ခု ထည့်ပါ။",
       "enterPromptOrFileToStart": "စတင်ရန် ညွှန်ကြားချက် သို့မဟုတ် ဖိုင်တစ်ခု ထည့်ပါ။",
-      "connectProviderToStart": "စတင်ရန် ဝန်ဆောင်မှုပေးသူတစ်ဦးကို ချိတ်ဆက်ပါ။",
+      "connectProviderToStart": "ကုဒ်သိုလှောင်ခန်းများသည် ချိတ်ဆက်ထားသော GitHub၊ GitLab သို့မဟုတ် Bitbucket အကောင့်မှ လာပါသည်။",
       "promptPlaceholder": "ဘာလုပ်ချင်ပါသလဲ။",
       "couldNotLoadModels": "မော်ဒယ်များကို ရယူ၍မရပါ။",
       "prefillRepoAndModelUnavailable": "မူရင်းစက်ရှင်၏ ကုဒ်သိုလှောင်ခန်းနှင့် မော်ဒယ်ကို အသုံးပြု၍မရတော့ပါ။ အောက်တွင် အသစ်ရွေးပါ။",

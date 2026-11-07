@@ -272,8 +272,6 @@ jobs:
           # Workers excluded from automatic deployment:
           EXCLUDED=(
             services/kiloclaw  # Docker-based deploy in deploy-kiloclaw.yml (manual-only)
-            services/gastown   # Deployed separately
-            services/wasteland # Deployed separately
             services/user-data-export # Automatic deploy suspended
           )
 

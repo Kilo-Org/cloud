@@ -1,5 +1,5 @@
 /* eslint-disable promise/prefer-await-to-callbacks -- controls delivery of the native idle callback */
-import { createElement } from 'react';
+import { createElement, useEffect } from 'react';
 import { type QueryClient } from '@tanstack/react-query';
 import { afterEach, beforeEach, vi } from 'vitest';
 
@@ -81,6 +81,12 @@ vi.mock('react-native-reanimated', () => ({
 
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push: routerPush }),
+  // The account picker closes itself on the owning screen's focus loss; these
+  // suites keep the screen focused, so the effect runs for the tree's lifetime
+  // and its cleanup only runs when the suite unmounts.
+  useFocusEffect: (effect: Parameters<typeof useEffect>[0]) => {
+    useEffect(effect, [effect]);
+  },
 }));
 
 vi.mock('expo-application', () => ({

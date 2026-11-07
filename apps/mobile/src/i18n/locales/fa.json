@@ -2398,7 +2398,7 @@
       "selectRepositoryToStart": "برای شروع یک مخزن انتخاب کنید.",
       "enterPromptToStart": "برای شروع یک پرامپت اضافه کنید.",
       "enterPromptOrFileToStart": "برای شروع یک پرامپت یا فایل اضافه کنید.",
-      "connectProviderToStart": "برای شروع یک ارائه‌دهنده را متصل کنید.",
+      "connectProviderToStart": "مخزن‌ها از یک حساب GitHub، GitLab یا Bitbucket که اتصالش برقرار است می‌آیند.",
       "promptPlaceholder": "می‌خواهید روی چه چیزی کار کنید؟",
       "couldNotLoadModels": "بارگذاری مدل‌ها ممکن نشد.",
       "prefillRepoAndModelUnavailable": "مخزن و مدل نشست اصلی دیگر در دسترس نیستند. از گزینه‌های زیر مخزن و مدل دیگری انتخاب کنید.",

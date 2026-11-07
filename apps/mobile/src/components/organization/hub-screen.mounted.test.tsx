@@ -82,6 +82,21 @@ vi.mock('@/lib/hooks/use-organization-mutations', () => ({
   useOrganizationMutations: () => ({ rename: { mutateAsync: vi.fn() } }),
 }));
 
+// The hub obeys the Profile tab's hide-balance preference; this suite pins both
+// renderings from a hoisted state each case sets.
+const hideBalancePref = vi.hoisted(() => ({
+  hideBalance: false,
+  hasLoaded: true,
+}));
+
+vi.mock('@/lib/hooks/use-hide-balance-preference', () => ({
+  useHideBalancePreference: () => ({
+    hideBalance: hideBalancePref.hideBalance,
+    hasLoaded: hideBalancePref.hasLoaded,
+    setHideBalance: vi.fn(),
+  }),
+}));
+
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: 'gray', foreground: 'black' }),
 }));
@@ -97,11 +112,6 @@ vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
 vi.mock('@/lib/format', () => ({
   formatMoney: (amount: number) => `$${amount}`,
   formatNumber: String,
-}));
-
-vi.mock('@/lib/agent-color', () => ({
-  agentColor: () => ({}),
-  toneColor: () => ({}),
 }));
 
 vi.mock('@/lib/utils', () => ({
@@ -247,6 +257,8 @@ beforeEach(() => {
   boundary.requireSeats = false;
   boundary.seatCount = { used: 1, total: 1 };
   boundary.balance = 5_000_000;
+  hideBalancePref.hideBalance = false;
+  hideBalancePref.hasLoaded = true;
   kiloPassRowState.current = null;
   routerPush.mockClear();
   kiloPassQuery.enabled = [];
@@ -306,6 +318,55 @@ describe('Organization hub card', () => {
       .find(node => node.props.label === i18n.t('organization.hub.balance'));
     expect(balance?.props.value).toBe('$5');
     expect(balance?.props.trailing).toBeUndefined();
+    unmount();
+  });
+});
+
+describe('Organization hub balance masking', () => {
+  // The mocked org carries balance 5_000_000 → the mocked formatMoney paints $5.
+  const balanceRow = (renderer: TestRenderer.ReactTestRenderer) =>
+    renderer.root
+      .findAllByType('KvRow')
+      .find(node => node.props.label === i18n.t('organization.hub.balance'));
+
+  it('paints the amount while the hide-balance preference is off', async () => {
+    const { renderer, unmount } = await renderHub();
+
+    const row = balanceRow(renderer);
+    expect(row?.props.value).toBe('$5');
+    // The spoken label always carries the amount: a node React Native stops
+    // handing a label keeps its previous native value on Android, so the
+    // masked-until-settled flip to visible must not leave "Balance hidden".
+    expect(row?.props.valueAccessibilityLabel).toBe('$5');
+    unmount();
+  });
+
+  it('masks the amount and speaks the hidden label while the preference is on', async () => {
+    hideBalancePref.hideBalance = true;
+
+    const { renderer, unmount } = await renderHub();
+
+    const row = balanceRow(renderer);
+    expect(row?.props.value).toBe('*****');
+    expect(row?.props.valueAccessibilityLabel).toBe(i18n.t('profile.balanceHidden'));
+    // No painted node may carry the amount while it is hidden.
+    expect(
+      renderer.root.findAll(
+        node => typeof node.props.children === 'string' && node.props.children === '$5'
+      )
+    ).toHaveLength(0);
+    unmount();
+  });
+
+  it('keeps the amount masked until the preference read settles', async () => {
+    hideBalancePref.hideBalance = false;
+    hideBalancePref.hasLoaded = false;
+
+    const { renderer, unmount } = await renderHub();
+
+    const row = balanceRow(renderer);
+    expect(row?.props.value).toBe('*****');
+    expect(row?.props.valueAccessibilityLabel).toBe(i18n.t('profile.balanceHidden'));
     unmount();
   });
 });
@@ -697,6 +758,59 @@ describe('Organization hub billing card while its data loads', () => {
     });
     expect(membersQuery.refetch).toHaveBeenCalledOnce();
     expect(kiloPassQuery.enabled.at(-1)).toBe(false);
+    unmount();
+  });
+});
+
+describe('Organization hub Kilo Pass icon tile', () => {
+  /** The tile's own classes: the View that holds the Kilo Pass glyph. */
+  function tileClass(root: TestRenderer.ReactTestInstance): string {
+    const icon = root.findAllByType('KiloPassIcon')[0];
+    if (icon === undefined) {
+      throw new Error('Kilo Pass icon missing');
+    }
+    const tile = icon.parent;
+    if (tile === null) {
+      throw new Error('Kilo Pass tile missing');
+    }
+    return String(tile.props.className);
+  }
+
+  // The row stands beside ConfigureRows that carry no tone, so it takes the
+  // shared neutral tile; a hue hashed from its title would put one accent in a
+  // settings list. Attention is the only state that earns a tone.
+  it('takes the neutral tile when the row needs no attention, never a hashed hue', async () => {
+    kiloPassRowState.current = {
+      subtitle: 'Not subscribed',
+      attention: false,
+      action: 'setup',
+      actionLabel: 'Set up',
+      accessibilityHint: 'Opens Kilo Pass setup on web.',
+      loading: false,
+    };
+    const { renderer, unmount } = await renderHub();
+
+    const tokens = tileClass(renderer.root).split(/\s+/).filter(Boolean);
+    expect(tokens).toContain('bg-hair-soft');
+    expect(tokens).toContain('border-border');
+    expect(tokens.filter(token => token.startsWith('bg-agent-'))).toEqual([]);
+    unmount();
+  });
+
+  it('keeps the warn tile for the attention state', async () => {
+    kiloPassRowState.current = {
+      subtitle: 'Could not load status',
+      attention: true,
+      action: 'retry',
+      actionLabel: 'Retry',
+      accessibilityHint: 'Retries loading Kilo Pass status.',
+      loading: false,
+    };
+    const { renderer, unmount } = await renderHub();
+
+    const tokens = tileClass(renderer.root).split(/\s+/).filter(Boolean);
+    expect(tokens).toContain('bg-warn-tile-bg');
+    expect(tokens).toContain('border-warn-tile-border');
     unmount();
   });
 });

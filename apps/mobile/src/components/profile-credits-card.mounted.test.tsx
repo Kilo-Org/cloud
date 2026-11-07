@@ -5,7 +5,13 @@
 // safe because sign-out clears the React Query cache (`queryClient.clear()`), so
 // a new owner refetches and never reuses the previous owner's cached balance.
 
-import { createElement, type ElementType, type ReactNode } from 'react';
+import {
+  createElement,
+  type ElementType,
+  type ReactNode,
+  useEffect,
+  useSyncExternalStore,
+} from 'react';
 import type * as ReactModule from 'react';
 import { Platform, Pressable } from 'react-native';
 import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
@@ -103,8 +109,33 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
 }));
 
 const routerPush = vi.hoisted(() => vi.fn());
+// The context picker closes itself when the owning screen loses focus, so the
+// suite can drive that blur through this store.
+const pickerFocus = vi.hoisted(() => {
+  const listeners = new Set<() => void>();
+  const subscribe = (notify: () => void) => {
+    listeners.add(notify);
+    return () => {
+      listeners.delete(notify);
+    };
+  };
+  return {
+    focused: true,
+    setFocused(next: boolean) {
+      pickerFocus.focused = next;
+      for (const notify of listeners) {
+        notify();
+      }
+    },
+    subscribe,
+  };
+});
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push: routerPush }),
+  useFocusEffect: (effect: Parameters<typeof useEffect>[0]) => {
+    const focused = useSyncExternalStore(pickerFocus.subscribe, () => pickerFocus.focused);
+    useEffect(() => (focused ? effect() : undefined), [effect, focused]);
+  },
 }));
 
 // The mounted OrganizationProvider reads the shared memberships from this

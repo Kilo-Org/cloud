@@ -55,6 +55,17 @@ type SheetProps = {
    * refusing one is what keeps the sheet open.
    */
   onRequestDismiss?: () => boolean;
+  /**
+   * Whether the content clears the status bar itself, so the sheet does not
+   * reserve that inset for it. On Android the sheet is a dialog window, and the
+   * window reports its insets only after the sheet was measured: the sheet then
+   * first spans the whole window and shrinks by the status bar once that report
+   * arrives, moving everything it holds down by that height after it appeared.
+   * A full-window surface that pads its own top inset passes true from values
+   * it knows before the first frame, and its first painted frame is the settled
+   * one. iOS presents its sheet below the status bar and ignores this.
+   */
+  contentOwnsTopInset?: boolean;
   children: ReactNode;
 };
 
@@ -81,6 +92,7 @@ export function Sheet({
   background,
   dismissGestures = true,
   onRequestDismiss,
+  contentOwnsTopInset = false,
   children,
 }: Readonly<SheetProps>) {
   const colors = useThemeColors();
@@ -178,6 +190,7 @@ export function Sheet({
       handleComponent={showHandle ? undefined : null}
       enablePanDownToClose
       dismissGestures={dismissGestures}
+      contentOwnsTopInset={contentOwnsTopInset}
       // The iOS sheet draws the dimmed backdrop through its presentation, so the
       // app's view tree cannot see that tap: the library reports it and this
       // wrapper answers it the way Android Back is answered, `onRequestDismiss`

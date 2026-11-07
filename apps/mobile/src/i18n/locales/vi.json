@@ -1853,7 +1853,7 @@
       "selectRepositoryToStart": "Chọn một kho mã để bắt đầu.",
       "enterPromptToStart": "Thêm một lời nhắc để bắt đầu.",
       "enterPromptOrFileToStart": "Thêm một lời nhắc hoặc tệp để bắt đầu.",
-      "connectProviderToStart": "Kết nối nhà cung cấp để bắt đầu.",
+      "connectProviderToStart": "Kho mã đến từ một tài khoản GitHub, GitLab hoặc Bitbucket đã kết nối.",
       "promptPlaceholder": "Bạn muốn làm gì?",
       "couldNotLoadModels": "Không thể tải danh sách mô hình.",
       "prefillRepoAndModelUnavailable": "Kho mã và mô hình của phiên gốc không còn dùng được. Hãy chọn kho mã và mô hình khác bên dưới.",

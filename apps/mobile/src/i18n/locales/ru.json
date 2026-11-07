@@ -1895,7 +1895,7 @@
       "selectRepositoryToStart": "Выберите репозиторий, чтобы начать.",
       "enterPromptToStart": "Добавьте промпт, чтобы начать.",
       "enterPromptOrFileToStart": "Добавьте промпт или файл, чтобы начать.",
-      "connectProviderToStart": "Подключите сервис, чтобы начать.",
+      "connectProviderToStart": "Репозитории берутся из подключённого аккаунта GitHub, GitLab или Bitbucket.",
       "promptPlaceholder": "Над чем хотите поработать?",
       "couldNotLoadModels": "Не удалось загрузить модели.",
       "prefillRepoAndModelUnavailable": "Репозиторий и модель исходного сеанса больше недоступны. Выберите другие ниже.",

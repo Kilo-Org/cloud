@@ -2560,7 +2560,7 @@
       "selectRepositoryToStart": "Dewiswch ystorfa i ddechrau.",
       "enterPromptToStart": "Ychwanegwch annogiad i ddechrau.",
       "enterPromptOrFileToStart": "Ychwanegwch annogiad neu ffeil i ddechrau.",
-      "connectProviderToStart": "Cysylltwch â darparwr i ddechrau.",
+      "connectProviderToStart": "Mae ystorfeydd yn dod o gyfrif GitHub, GitLab neu Bitbucket wedi'i gysylltu.",
       "promptPlaceholder": "Ar beth hoffech chi weithio?",
       "couldNotLoadModels": "Methu llwytho'r modelau.",
       "prefillRepoAndModelUnavailable": "Nid yw ystorfa a model y sesiwn wreiddiol ar gael mwyach. Dewiswch rai eraill isod.",

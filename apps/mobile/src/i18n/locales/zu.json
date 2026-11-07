@@ -2398,7 +2398,7 @@
       "selectRepositoryToStart": "Khetha inqolobane yekhodi ukuze uqale.",
       "enterPromptToStart": "Engeza umyalelo ukuze uqale.",
       "enterPromptOrFileToStart": "Engeza umyalelo noma ifayela ukuze uqale.",
-      "connectProviderToStart": "Xhuma umhlinzeki ukuze uqale.",
+      "connectProviderToStart": "Izinqolobane zekhodi zivela ku-akhawunti exhunyiwe ye-GitHub, ye-GitLab, noma ye-Bitbucket.",
       "promptPlaceholder": "Ungathanda ukusebenza ngani?",
       "couldNotLoadModels": "Asikwazanga ukulayisha amamodeli.",
       "prefillRepoAndModelUnavailable": "Inqolobane yekhodi nemodeli yeseshini yokuqala akusatholakali. Khetha okunye ngezansi.",

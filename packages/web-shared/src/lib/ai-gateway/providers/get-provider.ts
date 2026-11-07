@@ -68,6 +68,7 @@ import type {
   DirectByokProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
 import { checkOpenAiChatGptByok } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
+import { checkClaudeBilling } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/routing';
 import { isValidOpenRouterModelId } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import * as z from 'zod';
 import { CustomLlmCredentialsSchema, type CustomLlmCredentials } from '@kilocode/db/schema-types';
@@ -121,6 +122,11 @@ export type DirectByokCatalogOnlyResult = {
 export type GetProviderResult =
   | GetProviderProviderResult
   | { kind: 'chatgpt-reconnect'; message: string }
+  /**
+   * The owner's Claude billing connection cannot bill. Serving the request any
+   * other way would spend a different payer's allowance without telling them.
+   */
+  | { kind: 'claude-billing-unavailable'; message: string; retryable?: boolean }
   /** The id is a custom LLM the caller may not use, or its stored credentials are unusable. */
   | { kind: 'custom-llm-unavailable' }
   | DirectByokCatalogOnlyResult;
@@ -435,6 +441,33 @@ async function selectProvider(
     if (result) return result;
   } else {
     decision.step({ step: 'direct-byok-model', outcome: 'skipped', reason: 'no-match' });
+  }
+
+  const claudeBilling = await checkClaudeBilling({
+    request,
+    requestedModel,
+    userId: isAnonymousContext(user) ? null : user.id,
+    requesterEmail: isAnonymousContext(user) ? null : user.google_user_email,
+    organizationId,
+  });
+  if (claudeBilling?.kind === 'unavailable') {
+    decision.step({ step: 'claude-billing', outcome: 'rejected', reason: 'unavailable' });
+    return {
+      kind: 'claude-billing-unavailable',
+      message: claudeBilling.message,
+      retryable: claudeBilling.retryable,
+    };
+  }
+  if (claudeBilling) {
+    decision.step({ step: 'claude-billing', outcome: 'selected' });
+    return {
+      kind: 'provider',
+      provider: claudeBilling.provider,
+      userByok: null,
+      isFree: isFreeModel(requestedModel),
+      bypassAccessCheck: false,
+      skipBalanceCheck: true,
+    };
   }
 
   let storedKeys: Promise<StoredByokKeys> | undefined;

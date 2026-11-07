@@ -57,8 +57,6 @@ export default function OrganizationAppSidebar({
 
   // Feature flags
   const isChatGptSignInEnabled = useFeatureFlagEnabled(CHATGPT_ACCESS_FLAG);
-  const isGastownEnabled = useFeatureFlagEnabled('gastown-access');
-  const isDevelopment = process.env.NODE_ENV === 'development';
 
   // Get current organization role and data
   const currentOrg = organizationData;
@@ -202,15 +200,6 @@ export default function OrganizationAppSidebar({
       icon: Webhook,
       url: `/organizations/${organizationId}/cloud/triggers`,
     },
-    ...((isGastownEnabled || isDevelopment) && currentRole !== 'billing_manager'
-      ? [
-          {
-            title: 'Gas Town',
-            icon: Bot,
-            url: `/organizations/${organizationId}/gastown`,
-          },
-        ]
-      : []),
     {
       title: 'Code Reviewer',
       icon: Bot,

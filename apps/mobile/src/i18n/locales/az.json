@@ -2392,7 +2392,7 @@
       "selectRepositoryToStart": "Başlamaq üçün repozitoriya seç.",
       "enterPromptToStart": "Başlamaq üçün prompt əlavə et.",
       "enterPromptOrFileToStart": "Başlamaq üçün prompt və ya fayl əlavə et.",
-      "connectProviderToStart": "Başlamaq üçün provayder qoş.",
+      "connectProviderToStart": "Repozitoriyalar qoşulmuş GitHub, GitLab və ya Bitbucket hesabından gəlir.",
       "promptPlaceholder": "Nə üzərində işləmək istəyirsən?",
       "couldNotLoadModels": "Modelləri yükləmək mümkün olmadı.",
       "prefillRepoAndModelUnavailable": "İlkin sessiyanın repozitoriyası və modeli artıq əlçatan deyil. Aşağıdan repozitoriya və model seç.",

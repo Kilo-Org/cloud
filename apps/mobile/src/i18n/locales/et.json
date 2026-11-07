@@ -2392,7 +2392,7 @@
       "selectRepositoryToStart": "Alustamiseks vali hoidla.",
       "enterPromptToStart": "Alustamiseks lisa viip.",
       "enterPromptOrFileToStart": "Alustamiseks lisa viip või fail.",
-      "connectProviderToStart": "Alustamiseks ühenda teenusepakkuja.",
+      "connectProviderToStart": "Hoidlad pärinevad ühendatud GitHubi, GitLabi või Bitbucketi kontost.",
       "promptPlaceholder": "Mille kallal tahaksid töötada?",
       "couldNotLoadModels": "Mudeleid ei õnnestunud laadida.",
       "prefillRepoAndModelUnavailable": "Algse seansi hoidla ja mudel pole enam saadaval. Vali allpool uus hoidla ja mudel.",

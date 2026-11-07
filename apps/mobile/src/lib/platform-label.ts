@@ -57,8 +57,8 @@ export function isUnknownOrigin(platform: string | null | undefined): boolean {
  * because the platform string is this file's input; `remoteAgentLabel`
  * renders the row copy from it.
  *
- * A repository name never reaches this predicate: the caller renders the
- * repository instead of the origin and keeps its own deterministic hash.
+ * A repository name never reaches this predicate: the caller names the
+ * repository instead of the origin.
  */
 export function remoteAgentState(platform: string | null | undefined): 'live' | 'platform' {
   return isUnknownOrigin(platform) ? 'live' : 'platform';

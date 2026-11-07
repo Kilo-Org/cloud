@@ -157,9 +157,9 @@ export function StoredSessionRow({
   // Tint by what the eyebrow names, never by its string: the label predicate
   // decides, so a translated word pins to one token in every script (the hash
   // of a translation would drift per locale and split identical rows), and a
-  // repository named like a label cannot read as one. A repository keeps its
-  // own deterministic hash; a row that can only name its origin takes the
-  // muted pair, because the type is metadata and the title leads.
+  // repository named like a label cannot read as one. The repository, the
+  // origin and the agent type label the row's context, so each takes the muted
+  // pair and the session title leads.
   const agentState = storedSessionEyebrowState(session);
   const timestamp = getAgentSessionTimestamp(session, sortBy);
   const canManage = interactive && Boolean(onDelete) && Boolean(onRename);

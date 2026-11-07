@@ -607,13 +607,16 @@ describe('storedSessionEyebrowState (the tint key beside the label)', () => {
     );
   });
 
-  it('returns null for a repo-name eyebrow, which keeps its own hash', () => {
+  it('names the repository for a repo-name eyebrow, which labels the row context', () => {
+    // The repository names the row's context, not the session: with the
+    // session title leading, the label and its strip take the muted pair
+    // instead of a saturated ramp entry.
     expect(
       storedSessionEyebrowState({
         git_url: 'https://github.com/org/my-repo.git',
         created_on_platform: 'cloud-agent-web',
       })
-    ).toBeNull();
+    ).toBe('repository');
     // A git URL whose project segment is empty renders the label fallback, so
     // the tint falls back with it.
     expect(
@@ -646,8 +649,10 @@ describe('remoteSessionEyebrowState (the tint key beside the label)', () => {
     );
   });
 
-  it('returns null for a repo-name eyebrow, which keeps its own hash', () => {
-    expect(remoteSessionEyebrowState({ gitUrl: 'https://github.com/org/my-repo.git' })).toBeNull();
+  it('names the repository for a repo-name eyebrow, which labels the row context', () => {
+    expect(remoteSessionEyebrowState({ gitUrl: 'https://github.com/org/my-repo.git' })).toBe(
+      'repository'
+    );
   });
 });
 

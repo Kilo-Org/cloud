@@ -15,19 +15,19 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
 type SessionRowProps = {
-  /** Uppercase label shown in the eyebrow (and hashed for the row hue). */
+  /** Uppercase label shown in the eyebrow, and hashed when no `agentState` is passed. */
   agentLabel: string;
   /**
-   * The row tint to paint when the eyebrow names something other than an
-   * agent or repository name: the word's colour must not drift with its
-   * translation, so the key pins instead of hashing. `unknown` is a
-   * placeholder for a value the row cannot name, and `platform` names the kind
-   * of agent the row ran on; both are metadata rather than a name, so they take
-   * the muted pair and the title leads. `idle`/`live` keep the ramp entry the
-   * English word already hashed to (sky blue). Omit it for a repository name,
-   * which keeps its own deterministic hash.
+   * The row tint to paint for the label: the word's colour must not drift with
+   * its translation, so the key pins instead of hashing. `unknown` is a
+   * placeholder for a value the row cannot name, `platform` names the kind of
+   * agent the row ran on, and `project` names the repository it ran in; all
+   * three label the row's context rather than the session, so they take the
+   * muted pair and the title leads. `idle`/`live` keep the ramp entry the
+   * English word already hashed to (sky blue). Omit it for a label that is the
+   * session's own name, such as a chat's model, which hashes.
    */
-  agentState?: 'unknown' | 'platform' | 'idle' | 'live' | null;
+  agentState?: 'unknown' | 'platform' | 'repository' | 'idle' | 'live' | null;
   title: string;
   /** Small line shown below the title (e.g. git branch, a message preview). */
   subtitle?: string | null;
@@ -92,8 +92,9 @@ type SessionRowProps = {
 
 /**
  * Used by Home and Agents list. Composes agent hue strip + eyebrow +
- * ellipsized title + mono meta + chevron. Hue is deterministically hashed
- * from `agentLabel` so the strip, eyebrow and tile always match.
+ * ellipsized title + mono meta + chevron. The strip, eyebrow and tile always
+ * share one tint: the pinned `agentState`, else the hue hashed from
+ * `agentLabel`.
  */
 export function SessionRow({
   agentLabel,

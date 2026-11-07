@@ -41,6 +41,10 @@ import { highlightRunChildren } from '@/components/pr-review/diff/highlight-runs
 const COLUMN_GUTTER_WIDTH = 56;
 const COLUMN_INNER_PADDING = 2;
 const VERTICAL_PADDING = 2;
+// Same edge as the unified `DiffLine`: the column's only horizontal inset is
+// the gutter's trailing `paddingRight`, which mirrors with the row and leaves
+// the LTR code Text flush against the physical left edge in an RTL interface.
+const CODE_END_PADDING = COLUMN_INNER_PADDING;
 
 type SideBySideRowProps = {
   row: SideBySideRowData;
@@ -101,7 +105,10 @@ function SideColumnImpl({ line, side, language, isDark, foreground }: SideColumn
     // centered number drifts onto a later visual line when the code wraps.
     paddingTop: VERTICAL_PADDING,
   };
-  const codeContainerStyle: ViewStyle = { paddingVertical: VERTICAL_PADDING };
+  const codeContainerStyle: ViewStyle = {
+    paddingVertical: VERTICAL_PADDING,
+    paddingEnd: CODE_END_PADDING,
+  };
   const codeBaseStyle: TextStyle = {
     ...LTR_TEXT_DIRECTION,
     fontFamily: 'JetBrainsMono_500Medium',
@@ -174,7 +181,10 @@ function EmptySideColumn({ metrics }: { metrics: BoundedFontMetrics }) {
     width: COLUMN_GUTTER_WIDTH,
     minHeight: metrics.rowMinHeight,
   };
-  const codeContainerStyle: ViewStyle = { paddingVertical: VERTICAL_PADDING };
+  const codeContainerStyle: ViewStyle = {
+    paddingVertical: VERTICAL_PADDING,
+    paddingEnd: CODE_END_PADDING,
+  };
   return (
     <View
       className="flex-1 flex-row items-stretch bg-transparent"

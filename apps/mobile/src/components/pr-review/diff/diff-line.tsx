@@ -65,6 +65,11 @@ import { highlightRunChildren } from '@/components/pr-review/diff/highlight-runs
 
 const GUTTER_WIDTH = 56;
 const VERTICAL_PADDING = 2;
+// The row's only horizontal inset is the gutter's trailing `pr-2`. The row
+// mirrors under an RTL interface, so a physical right inset alone leaves the
+// LTR code Text flush against the physical left edge there. A logical end
+// inset matches the gutter's 8 dp on both sides of the mirrored row.
+const CODE_END_PADDING = 8;
 
 type DiffLineProps = {
   line: ParsedDiffLine;
@@ -142,7 +147,10 @@ function DiffLineImpl({ line, language, onTap, isSelected }: Readonly<DiffLinePr
     // line instead of lining up with the row's start.
     paddingTop: VERTICAL_PADDING,
   };
-  const codeContainerStyle: ViewStyle = { paddingVertical: VERTICAL_PADDING };
+  const codeContainerStyle: ViewStyle = {
+    paddingVertical: VERTICAL_PADDING,
+    paddingEnd: CODE_END_PADDING,
+  };
   const codeBaseStyle: TextStyle = {
     ...LTR_TEXT_DIRECTION,
     fontFamily: 'JetBrainsMono_500Medium',

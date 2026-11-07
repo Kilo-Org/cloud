@@ -94,7 +94,9 @@ export class UserSessionDO extends DurableObject<Env> {
         }
         case 'ack': {
           const state = this.getState(ws);
-          state.acked = Math.max(state.acked, msg.seq);
+          // An ack can only cover events already written to this socket, so
+          // the watermark never rises above the socket's own sequence.
+          state.acked = Math.max(state.acked, Math.min(msg.seq, state.seq));
           state.ackReceived = true;
           this.saveState(ws, state);
           logger.debug('acked', { seq: msg.seq, acked: state.acked });

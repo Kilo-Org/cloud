@@ -35,6 +35,14 @@ function readSource(name: string): string {
 }
 
 const intents = readSource('KiloAppIntents.swift');
+const jsBridgeSource = readFileSync(
+  fileURLToPath(new URL('../../src/lib/app-actions/native-bridge.ts', import.meta.url)),
+  'utf8'
+);
+const collectorSource = readFileSync(
+  fileURLToPath(new URL('../../src/lib/system-search-collect.ts', import.meta.url)),
+  'utf8'
+);
 const configSource = readFileSync(
   fileURLToPath(new URL('../../app.config.ts', import.meta.url)),
   'utf8'
@@ -156,8 +164,9 @@ describe('the four App Intents', () => {
     // `Localizable.strings` carries.
     const labels = intents.split('\n').filter(line => LABEL_LINE.test(line));
     // Four titles, four shortcut titles, the failure copy, and five parameters:
-    // one per action plus the session `StartAgent` takes as well.
-    expect(labels).toHaveLength(APP_ACTION_IDS.length * 3 + 2);
+    // one per action plus the session `StartAgent` takes as well — and, beside
+    // that, the named-session action's own title and its entity parameter.
+    expect(labels).toHaveLength(APP_ACTION_IDS.length * 3 + 4);
     const copy = new Set(Object.values(ENGLISH_COPY));
     for (const line of labels) {
       const literal = /"([^"]+)"/.exec(line)?.[1];
@@ -233,6 +242,71 @@ describe('the Swift action URLs', () => {
     for (const field of ['action', 'prompt', 'repository', 'sessionId', 'pullRequest']) {
       expect(intents, `${field} is not sent`).toContain(`"${field}"`);
     }
+  });
+});
+
+describe('the session entity catalog', () => {
+  const entity = readSource('KiloSessionEntity.swift');
+  const catalog = readSource('KiloSessionCatalog.swift');
+  const visible = readSource('KiloVisibleSession.swift');
+  const module = readSource('KiloAppActionsModule.swift');
+
+  it('resolves a session by id, by list, and by title', () => {
+    expect(entity).toContain('struct KiloSessionEntity: AppEntity {');
+    expect(entity).toContain('struct KiloSessionEntityQuery: EntityQuery, EntityStringQuery {');
+    // `EntityQuery` draws the picker and resolves a saved value; the string
+    // query is what lets Siri match a spoken title. Both are required, and a
+    // plain `EntityQuery` is not enough.
+    expect(entity).toContain('func entities(for identifiers: [String]) async throws');
+    expect(entity).toContain('func suggestedEntities() async throws');
+    expect(entity).toContain('func entities(matching string: String) async throws');
+  });
+
+  it('never answers an ambiguous name with one arbitrary session', () => {
+    // The query returns every match, so the system asks. An exact title narrows
+    // to that title's rows rather than picking the first of a containment set.
+    expect(entity).toContain('let exact = entries.filter');
+    expect(entity).toContain(': exact');
+  });
+
+  it('stores only the two fields the picker needs', () => {
+    const entry = swiftBlock(catalog, 'struct KiloSessionCatalogEntry:');
+    expect(entry.match(/\blet \w+: String/g)).toHaveLength(2);
+    expect(entry).toContain('let id: String');
+    expect(entry).toContain('let title: String');
+  });
+
+  it('keeps the catalog to the same bound the collector applies', () => {
+    expect(catalog).toContain('static let maxEntries = 50');
+    expect(collectorSource).toContain('const SESSION_CATALOG_MAX_ENTRIES = 50;');
+    expect(collectorSource).toContain('.slice(0, SESSION_CATALOG_MAX_ENTRIES)');
+  });
+
+  it('names the functions and the entries key the JS bridge uses', () => {
+    // One name per call, spelled the same on both sides: the JS wrapper is the
+    // only caller, and a rename on either side has to fail here rather than at
+    // run time on a device.
+    for (const name of ['replaceSessionCatalog', 'clearSessionCatalog', 'setVisibleSession']) {
+      expect(module, `${name} is not exported`).toContain(`func ${name}(`);
+      expect(jsBridgeSource, `${name} is not called`).toContain(`${name}?:`);
+    }
+    expect(catalog).toContain('"kilo-app-actions-session-catalog"');
+  });
+
+  it('guards the on-screen cue behind the iOS 18.2 runtime', () => {
+    // `NSUserActivity.appEntityIdentifier` starts at iOS 18.2. The app's floor
+    // is 16.4, so the publisher must return without touching the property and
+    // every older action keeps running.
+    expect(visible).toContain('guard #available(iOS 18.2, *) else {');
+    expect(visible).toContain('activity.appEntityIdentifier = EntityIdentifier(');
+  });
+
+  it('declares the new intent without a new slug or a new provider entry', () => {
+    const intent = swiftStruct('OpenNamedSessionIntent');
+    expect(intent).toContain('@Parameter(title: "Session")');
+    expect(intent).toContain('var session: KiloSessionEntity');
+    expect(intent).toContain('KiloAppActionTarget.openSession');
+    expect(intent).not.toContain('kiloapp:///');
   });
 });
 

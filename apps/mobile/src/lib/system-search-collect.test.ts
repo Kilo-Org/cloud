@@ -262,6 +262,7 @@ describe('collectSystemSearchDocuments', () => {
   it('collects no documents from an empty cache', async () => {
     await expect(collectSystemSearchDocuments(new QueryClient())).resolves.toEqual({
       documents: [],
+      sessions: [],
       observedSources: new Set(RECENTS_SOURCES),
     });
   });
@@ -706,5 +707,175 @@ describe('collectSystemSearchDocuments', () => {
 
     expect(second.documents[0]).not.toBe(first.documents[0]);
     expect(second.documents).toEqual(first.documents);
+  });
+});
+
+describe('collectSystemSearchDocuments session catalog', () => {
+  beforeEach(() => {
+    recentPrs.getRecentPrsForIndex.mockReset();
+    recentPrs.getRecentPrsForIndex.mockResolvedValue([]);
+  });
+
+  it('offers each named session once, keyed by session id', async () => {
+    // The stored list and the live list both carry sessions, and the second
+    // stored page repeats one: the picker must see one entry per session, and
+    // it must be keyed by the id an intent opens, not by the route the search
+    // index names.
+    const client = new QueryClient();
+    seed(client);
+
+    const { sessions } = await collectSystemSearchDocuments(client);
+
+    expect(sessions).toEqual([
+      { id: 'sess-1', title: 'Fix login bug' },
+      { id: 'live-1', title: 'Watch the deploy' },
+    ]);
+  });
+
+  it('keeps the backend placeholder and a blank title out of the picker', async () => {
+    const client = new QueryClient();
+    client.setQueryData(SESSION_LIST_KEY, {
+      pages: [
+        {
+          cliSessions: [
+            { session_id: 'fresh', title: 'New session - 2026-01-01T00:00:00.000Z' },
+            { session_id: 'blank', title: '   ' },
+            { session_id: 'named', title: '  Deploy review  ' },
+          ],
+          nextCursor: null,
+        },
+      ],
+    });
+
+    const { sessions } = await collectSystemSearchDocuments(client);
+
+    expect(sessions).toEqual([{ id: 'named', title: 'Deploy review' }]);
+  });
+
+  it('orders the catalog by each row’s update time across cached queries', async () => {
+    // The cache insertion order is not recency: the older organization's query
+    // can be cached first. The cap and the picker must still see the newest
+    // session first.
+    const client = new QueryClient();
+    client.setQueryData(
+      [['cliSessionsV2', 'list'], { type: 'infinite', input: { organizationId: 'org-1' } }],
+      {
+        pages: [
+          {
+            cliSessions: [
+              {
+                session_id: 'sess-old',
+                title: 'Older session',
+                updated_at: '2026-01-01T00:00:00.000Z',
+              },
+            ],
+            nextCursor: null,
+          },
+        ],
+      }
+    );
+    client.setQueryData(SESSION_LIST_KEY, {
+      pages: [
+        {
+          cliSessions: [
+            {
+              session_id: 'sess-new',
+              title: 'Newer session',
+              updated_at: '2026-06-01T00:00:00.000Z',
+            },
+          ],
+          nextCursor: null,
+        },
+      ],
+    });
+
+    const { sessions } = await collectSystemSearchDocuments(client);
+
+    expect(sessions).toEqual([
+      { id: 'sess-new', title: 'Newer session' },
+      { id: 'sess-old', title: 'Older session' },
+    ]);
+  });
+
+  it('orders by a cached update time in the shapes the read can hand back', async () => {
+    // The payload can hold a Date, an ISO string, or the Postgres rendering of
+    // the column, which an ISO-only parse does not read.
+    const client = new QueryClient();
+    client.setQueryData(SESSION_LIST_KEY, {
+      pages: [
+        {
+          cliSessions: [
+            { session_id: 'sess-iso', title: 'ISO row', updated_at: '2026-01-01T00:00:00.000Z' },
+            { session_id: 'sess-pg', title: 'Postgres row', updated_at: '2026-06-01 10:00:00+00' },
+            {
+              session_id: 'sess-date',
+              title: 'Date row',
+              updated_at: new Date('2026-03-01T00:00:00.000Z'),
+            },
+          ],
+          nextCursor: null,
+        },
+      ],
+    });
+
+    const { sessions } = await collectSystemSearchDocuments(client);
+
+    expect(sessions).toEqual([
+      { id: 'sess-pg', title: 'Postgres row' },
+      { id: 'sess-date', title: 'Date row' },
+      { id: 'sess-iso', title: 'ISO row' },
+    ]);
+  });
+
+  it('keeps a row whose update time cannot be read, without its priority', async () => {
+    const client = new QueryClient();
+    client.setQueryData(SESSION_LIST_KEY, {
+      pages: [
+        {
+          cliSessions: [
+            { session_id: 'sess-broken', title: 'Unreadable time', updated_at: 'yesterday-ish' },
+            { session_id: 'sess-iso', title: 'ISO row', updated_at: '2026-01-01T00:00:00.000Z' },
+          ],
+          nextCursor: null,
+        },
+      ],
+    });
+
+    const { sessions } = await collectSystemSearchDocuments(client);
+
+    expect(sessions).toEqual([
+      { id: 'sess-iso', title: 'ISO row' },
+      { id: 'sess-broken', title: 'Unreadable time' },
+    ]);
+  });
+
+  it('keeps the newest titles and drops the rest past the cap', async () => {
+    const client = new QueryClient();
+    client.setQueryData(SESSION_LIST_KEY, {
+      pages: [
+        {
+          cliSessions: Array.from({ length: 55 }, (_, index) => ({
+            session_id: `sess-${index}`,
+            title: `Session ${index}`,
+          })),
+          nextCursor: null,
+        },
+      ],
+    });
+
+    const { sessions } = await collectSystemSearchDocuments(client);
+
+    expect(sessions).toHaveLength(50);
+    expect(sessions[0]).toEqual({ id: 'sess-0', title: 'Session 0' });
+    expect(sessions.at(-1)).toEqual({ id: 'sess-49', title: 'Session 49' });
+  });
+
+  it('carries no catalog for a cache that holds no session rows', async () => {
+    const client = new QueryClient();
+    client.setQueryData(INBOX_KEY, inbox);
+
+    const { sessions } = await collectSystemSearchDocuments(client);
+
+    expect(sessions).toEqual([]);
   });
 });

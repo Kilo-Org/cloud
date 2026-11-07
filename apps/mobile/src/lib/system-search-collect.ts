@@ -17,6 +17,7 @@ import { z } from 'zod';
 import { collectUnfilteredPages } from '@/lib/agent-session-pages';
 import { getRecentPrsForIndex } from '@/lib/pr-review/recent-prs';
 import { dedupeBy } from '@/lib/query/dedupe-by-id';
+import { sessionDisplayTitle } from '@/lib/session-display-title';
 import {
   activeSessionSearchDocument,
   findingSearchDocument,
@@ -38,11 +39,59 @@ import {
 
 const queryKeyPathSchema = z.array(z.string()).min(1);
 
+const sessionTimestampNumberSchema = z.number();
+const sessionTimestampTextSchema = z.string();
+const sessionTimestampInputSchema = z
+  .union([sessionTimestampTextSchema, sessionTimestampNumberSchema, z.date()])
+  .nullish();
+
+/** The same value, already read as milliseconds, so rows carry a usable time. */
+const sessionTimestampSchema = sessionTimestampInputSchema.transform(readSessionTimestamp);
+
+/**
+ * The row's update time in milliseconds, or null when it cannot be read.
+ *
+ * The read can hand back a `Date`, an ISO string, or a Postgres-rendered string,
+ * and this module must accept all three: a schema that only accepted one would
+ * drop the whole row, which costs the row its search entry as well. An
+ * unreadable time only lowers the row's priority, never removes the row.
+ */
+function readSessionTimestamp(value: z.infer<typeof sessionTimestampInputSchema>): number | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value.getTime();
+  }
+  const timestampNumber = sessionTimestampNumberSchema.safeParse(value);
+  if (timestampNumber.success) {
+    return Number.isFinite(timestampNumber.data) ? timestampNumber.data : null;
+  }
+  const text = sessionTimestampTextSchema.safeParse(value);
+  if (!text.success) {
+    return null;
+  }
+  const iso = Date.parse(text.data);
+  if (!Number.isNaN(iso)) {
+    return iso;
+  }
+  // Postgres renders `YYYY-MM-DD HH:MM:SS[.fff][+TZ]`, which is not the ISO form
+  // every engine parses. Normalise the separator, the offset's hours-only form
+  // and the UTC suffix once, and give up if it still does not read.
+  const normalised = text.data
+    .replace(' ', 'T')
+    .replace(/\s+UTC$/, 'Z')
+    .replace(/([+-]\d{2})$/, '$1:00');
+  const parsed = Date.parse(normalised);
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
 const storedSessionRowSchema = z.object({
   session_id: z.string(),
   title: z.string().nullish(),
   organization_id: z.string().nullish(),
   git_branch: z.string().nullish(),
+  updated_at: sessionTimestampSchema,
 });
 
 const storedSessionsDataSchema = z.object({
@@ -54,6 +103,7 @@ const activeSessionRowSchema = z.object({
   title: z.string().nullish(),
   organizationId: z.string().nullish(),
   gitBranch: z.string().nullish(),
+  updatedAt: sessionTimestampSchema,
 });
 
 const activeSessionsDataSchema = z.object({ sessions: z.array(z.unknown()) });
@@ -131,7 +181,36 @@ type RowDecoder<TRow> = {
 export type SystemSearchCollection = {
   documents: SystemSearchDocument[];
   observedSources: Set<string>;
+  /**
+   * The named sessions this run could see, most recently updated first, for the
+   * App Intents entity catalog.
+   *
+   * The Siri and Shortcuts picker offers the same rows the index carries, but
+   * keyed by session id instead of by the route the index opens, because an
+   * intent names a session and the app's own pipeline builds the destination.
+   * The list is ordered by the row's own update time across every query, then
+   * deduped and capped; `KiloSessionCatalogStore` applies the same bound on the
+   * device.
+   */
+  sessions: SessionCatalogEntry[];
 };
+
+/** One session the App Intents entity catalog can offer, keyed by session id. */
+export type SessionCatalogEntry = { id: string; title: string };
+
+/**
+ * A catalog entry with the row's own update time, so the merge across queries
+ * can order by recency instead of by the order the cache happened to insert
+ * the queries in. The time never leaves this module.
+ */
+type SessionCatalogCandidate = SessionCatalogEntry & { updatedAt: number | null };
+
+/**
+ * How many sessions the catalog keeps. The list is ordered by recency first, so
+ * the cap drops the oldest titles — the ones least likely to be spoken. The
+ * native store carries the same bound.
+ */
+const SESSION_CATALOG_MAX_ENTRIES = 50;
 
 /**
  * One query's collected documents, memoized against the payload identity that
@@ -144,6 +223,7 @@ type QueryCollectionMemo = {
   status: Query['state']['status'];
   maxPages: unknown;
   documents: SystemSearchDocument[];
+  sessions: SessionCatalogCandidate[];
   observedSource: string | null;
 };
 
@@ -159,6 +239,7 @@ export async function collectSystemSearchDocuments(
   queryClient: QueryClient
 ): Promise<SystemSearchCollection> {
   const documents: SystemSearchDocument[] = [];
+  const sessions: SessionCatalogCandidate[] = [];
   const observedSources = new Set<string>();
   const collections = collectionsFor(queryClient);
   const seen = new Set<string>();
@@ -167,6 +248,7 @@ export async function collectSystemSearchDocuments(
     seen.add(queryHash);
     const collected = collectOrReuse(collections, query, queryHash);
     documents.push(...collected.documents);
+    sessions.push(...collected.sessions);
     // Only a successful query that fully enumerated a source scope is
     // authoritative. A query can hold the family path without enumerating it —
     // the findings capacity probe fetches `limit: 1` under `listFindings`, a
@@ -190,7 +272,27 @@ export async function collectSystemSearchDocuments(
   for (const source of recents.observedSources) {
     observedSources.add(source);
   }
-  return { documents: dedupeBy(documents, document => document.id), observedSources };
+  return {
+    documents: dedupeBy(documents, document => document.id),
+    observedSources,
+    sessions: dedupeBy(sortedByRecency(sessions), session => session.id)
+      .slice(0, SESSION_CATALOG_MAX_ENTRIES)
+      .map(session => ({ id: session.id, title: session.title })),
+  };
+}
+
+/**
+ * The candidates by their own update time, newest first, with a row that
+ * carries no time after the rows that do. The sort is stable, so two rows that
+ * share a time keep the order their query produced — the stored history before
+ * the live list — which is what makes the cap drop the oldest titles instead of
+ * whichever query the cache happened to insert last.
+ */
+function sortedByRecency(sessions: readonly SessionCatalogCandidate[]): SessionCatalogCandidate[] {
+  return [...sessions].sort(
+    (left, right) =>
+      (right.updatedAt ?? Number.NEGATIVE_INFINITY) - (left.updatedAt ?? Number.NEGATIVE_INFINITY)
+  );
 }
 
 /** The query memo belonging to one client, created on first use. */
@@ -232,6 +334,7 @@ function collectOrReuse(
     status: query.state.status,
     maxPages: query.options.maxPages,
     documents: collected.documents,
+    sessions: collected.sessions,
     observedSource: collected.observedSource,
   });
   return collected;
@@ -247,10 +350,12 @@ function collectOrReuse(
  */
 type QueryDocuments = {
   documents: SystemSearchDocument[];
+  /** The named sessions this query enumerates, for the intent catalog. */
+  sessions: SessionCatalogCandidate[];
   observedSource: string | null;
 };
 
-const NOT_ENUMERATED: QueryDocuments = { documents: [], observedSource: null };
+const NOT_ENUMERATED: QueryDocuments = { documents: [], sessions: [], observedSource: null };
 
 /** The keys whose presence narrows a source list to a subset of its scope. */
 const SESSION_NARROWING_KEYS = ['createdOnPlatform', 'gitUrl'] as const;
@@ -300,9 +405,11 @@ function documentsFromQuery(query: Query): QueryDocuments {
     const pages = parsed.data.pages.map(page => ({
       cliSessions: decodedRows(page.cliSessions, storedSessionRowSchema),
     }));
+    const rows = collectUnfilteredPages(pages);
     return {
-      documents: collectUnfilteredPages(pages).flatMap(row =>
-        presentOrEmpty(storedSessionSearchDocument(row))
+      documents: rows.flatMap(row => presentOrEmpty(storedSessionSearchDocument(row))),
+      sessions: namedSessions(
+        rows.map(row => ({ id: row.session_id, title: row.title, updatedAt: row.updated_at }))
       ),
       observedSource: sessionObservedSource(query),
     };
@@ -315,9 +422,11 @@ function documentsFromQuery(query: Query): QueryDocuments {
     // The live list enumerates only currently running sessions, a subset of
     // the stored history that already carries every session, so it contributes
     // documents but never authorises a removal.
+    const rows = decodedRows(parsed.data.sessions, activeSessionRowSchema);
     return {
-      documents: decodedRows(parsed.data.sessions, activeSessionRowSchema).flatMap(row =>
-        presentOrEmpty(activeSessionSearchDocument(row))
+      documents: rows.flatMap(row => presentOrEmpty(activeSessionSearchDocument(row))),
+      sessions: namedSessions(
+        rows.map(row => ({ id: row.id, title: row.title, updatedAt: row.updatedAt }))
       ),
       observedSource: null,
     };
@@ -336,6 +445,7 @@ function documentsFromQuery(query: Query): QueryDocuments {
       documents: parsed.data.pages
         .flatMap(page => decodedRows(page.items, inboxItemRowSchema))
         .map(row => inboxPrSearchDocument(row, systemSearchSourceKey('pullRequests', 'github'))),
+      sessions: [],
       observedSource: isDefaultInput
         ? untrimmedSource(query, systemSearchSourceKey('pullRequests', 'github'), cursorHasMore)
         : null,
@@ -362,6 +472,7 @@ function documentsFromQuery(query: Query): QueryDocuments {
             providerInboxSourceScope(row.ref.platform, organizationId)
           )
         ),
+      sessions: [],
       observedSource:
         provider === null
           ? null
@@ -395,6 +506,7 @@ function findingsFromQuery(query: Query, scope: string): QueryDocuments {
     documents: parsed.data.pages
       .flatMap(page => decodedRows(page.findings, findingRowSchema))
       .map(row => findingSearchDocument(row, scope)),
+    sessions: [],
     observedSource: filtered
       ? null
       : untrimmedSource(query, systemSearchSourceKey('findings', scope), findingsHasMore),
@@ -572,6 +684,23 @@ async function recentPrDocuments(): Promise<{
     documents: recents.map(entry => recentPrSearchDocument(entry)),
     observedSources: recentPrSourceScopes(),
   };
+}
+
+/**
+ * The catalog entries for one page of session rows.
+ *
+ * Only the rows a person could recognise are offered, so a title-less session
+ * and the backend's `New session - <ISO>` placeholder stay out of the picker.
+ * `sessionDisplayTitle` owns that rule, which is what keeps the picker and the
+ * search index offering the same names.
+ */
+function namedSessions(
+  rows: readonly { id: string; title: string | null | undefined; updatedAt?: number | null }[]
+): SessionCatalogCandidate[] {
+  return rows.flatMap(row => {
+    const title = sessionDisplayTitle(row.title);
+    return title === undefined ? [] : [{ id: row.id, title, updatedAt: row.updatedAt ?? null }];
+  });
 }
 
 function presentOrEmpty(document: SystemSearchDocument | null): SystemSearchDocument[] {

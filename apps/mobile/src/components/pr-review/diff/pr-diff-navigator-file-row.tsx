@@ -9,7 +9,7 @@ import { Pressable, View } from 'react-native';
 
 import { MarkViewedToggle } from '@/components/pr-review/diff/pr-diff-file-rows';
 import { Text } from '@/components/ui/text';
-import { LTR_ISOLATE_CLOSE, LTR_ISOLATE_OPEN } from '@/lib/bidi';
+import { isolateLtrBidiText, LTR_ISOLATE_CLOSE, LTR_ISOLATE_OPEN } from '@/lib/bidi';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type PrReviewFile } from '@/lib/pr-review/diff/pr-review-file-types';
 import { LTR_TEXT_DIRECTION } from '@/lib/rtl-text';
@@ -75,12 +75,15 @@ export function NavigatorFileRow({
               {basenameRun}
             </Text>
           </Text>
+          {/* Each count is its own run, and a sign is a neutral: an RTL
+              paragraph would take it and paint `+1` as `1+`. The isolate pins
+              the count's order; the row itself still mirrors. */}
           <View className="mt-0.5 flex-row items-center gap-2">
             <Text variant="muted" className="text-xs">
-              +{file.additions}
+              {isolateLtrBidiText(`+${file.additions}`)}
             </Text>
             <Text variant="muted" className="text-xs">
-              -{file.deletions}
+              {isolateLtrBidiText(`-${file.deletions}`)}
             </Text>
             {file.patchMissing ? (
               <Text variant="muted" className="text-xs">

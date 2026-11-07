@@ -15,6 +15,7 @@ import {
 import { useDiffRenderItem } from '@/components/pr-review/diff/pr-diff-file-list-render';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
+import { isolateLtrBidiText } from '@/lib/bidi';
 import { formatNumber } from '@/lib/format';
 import { useDetailScreenBottomPadding, useSideInsetStyle } from '@/lib/screen-insets';
 import { buildFileItems } from '@/lib/pr-review/diff/pr-diff-list-builder';
@@ -82,10 +83,10 @@ export function SessionDiffFileList({ files }: Readonly<{ files: PrReviewFile[] 
               })}
             </Text>
             <Text variant="muted" className="text-xs tabular-nums">
-              +{formatNumber(totals.additions, i18n.language)}
+              {isolateLtrBidiText(`+${formatNumber(totals.additions, i18n.language)}`)}
             </Text>
             <Text variant="muted" className="text-xs tabular-nums">
-              -{formatNumber(totals.deletions, i18n.language)}
+              {isolateLtrBidiText(`-${formatNumber(totals.deletions, i18n.language)}`)}
             </Text>
           </View>
         </View>

@@ -189,6 +189,28 @@ describe('organization SSO router', () => {
       });
     });
 
+    test('removes a WorkOS configuration that has no recorded domain', async () => {
+      const caller = await createCallerForUser(admin.id);
+      const target = await createSsoOrganization('WorkOS Only Organization', null);
+      getOrganizationByExternalId.mockResolvedValue({
+        id: 'workos_org_only',
+        externalId: target.id,
+        domains: [],
+      });
+
+      await caller.organizations.sso.deleteConfig({ organizationId: target.id });
+
+      expect(deleteOrganization).toHaveBeenCalledWith('workos_org_only');
+      await expect(readSsoDomain(target.id)).resolves.toBeNull();
+      await expect(readDomainAudits(target.id)).resolves.toEqual([]);
+      await expect(readAdminActions(target.id)).resolves.toEqual([
+        {
+          action: 'organization.sso.config.delete',
+          metadata: { workosOrganizationId: 'workos_org_only', releasedSsoDomain: null },
+        },
+      ]);
+    });
+
     test('lets another organization claim the released domain', async () => {
       const caller = await createCallerForUser(admin.id);
       const released = await createSsoOrganization('Released Domain Organization', 'released.test');

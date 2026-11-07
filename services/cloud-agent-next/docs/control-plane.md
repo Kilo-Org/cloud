@@ -464,10 +464,11 @@ These keep their current owners and evidence; the rewrite ports them, it does no
   running route and Kilo runtime. The Sandbox DO alarm renews a ready route's grant in the same
   window without a message, so a long execution does not outlive its grant. Renewal keeps the
   sandbox-visible handle and aliases, so Kilo does not restart, and it is not activity. A failed
-  renewal keeps the route while its grant is valid and retries after 5 minutes; at expiry the route
-  fails `workspace_setup_failed`. Modern runtime-authorized sessions use one runtime proxy handle per
-  worktree scope, shared by every member of the scope, on Cloudflare Sandbox, Cloudflare Containers
-  and Vercel instead of a Kilo capability wrapping the registration token. The Session DO owns the
+  renewal keeps the route while its grant is valid and retries after 5 minutes, once for all members
+  of a shared worktree scope; at expiry the routes fail `workspace_setup_failed`. Modern
+  runtime-authorized sessions use one runtime proxy handle per worktree scope, shared by every
+  member of the scope, on Cloudflare Sandbox, Cloudflare Containers and Vercel instead of a Kilo
+  capability wrapping the registration token. The Session DO owns the
   current delegated token and its renewal; registration credentials are route configuration, not
   authority to reuse a create-time delegated token. Grant renewal does not renew delegation.
 - Repeated preparation, new preparation attempts and warm renewal reuse the canonical grant's
@@ -1017,7 +1018,7 @@ them through one development-only override.
 | Sandbox DO | Session notification | 2 s from enqueue including queue wait and RPC retries, not scaled | Drop expired queued work before RPC; bounded best-effort loss, existing Session backstop |
 | Sandbox DO | Idle | 10 min without activity | Stop the sandbox |
 | Sandbox DO | Provider lease | Existing lease length, renewed while active | Provider may stop an inactive sandbox |
-| Sandbox DO | Credential grant | 4 h; re-issued below 1 h by `deliver` or the Sandbox alarm, which retries a failed renewal every 5 min | — |
+| Sandbox DO | Credential grant | 4 h; re-issued below 1 h by `deliver` or the Sandbox alarm, which retries a failed renewal every 5 min, once per grant scope | Route `failed` (`workspace_setup_failed`) when the grant expired and re-issue failed |
 | Sandbox DO | Artifact grant | `createDeadlineAt` plus first connect | Downloads are rejected |
 | Bootstrap | Install | Until the first-connect deadline, rendered by the Worker | Report `deadline_exceeded` and exit |
 | Sandbox DO | Provider stop | Existing ladder | Log unconfirmed stop; routing state `stopped` |

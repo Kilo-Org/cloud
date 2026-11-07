@@ -299,6 +299,7 @@ import {
   credentialRenewalDueAt,
   nextCredentialRenewalAt,
   pruneCredentialRenewalRetries,
+  type CredentialRenewalRetries,
 } from './credential-renewal.js';
 import {
   listScopeGrants,
@@ -761,8 +762,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
   controlRequestTimeoutMs = CONTROL_PLANE_REQUEST_TIMEOUT_MS;
   workspaceSnapshotIdleMs = WORKSPACE_SNAPSHOT_IDLE_MS;
   private workspaceSnapshotCapturePending = false;
-  /** Earliest retry per route after a failed alarm renewal; in memory, so eviction retries once. */
-  private readonly credentialRenewalRetryAt = new Map<string, number>();
+  /** Earliest retry per grant scope after a failed renewal; in memory, so eviction retries once. */
+  private readonly credentialRenewalRetryAt: CredentialRenewalRetries = new Map();
   /**
    * Notification factory for the V2 Session DO. The default resolves the
    * `ownerId:sessionId` name through the shared binding accessor; tests inject a
@@ -2975,44 +2976,58 @@ export class SandboxControlV2 extends DurableObject<Env> {
     state: AllocationState
   ): Promise<RouteRecord | null> {
     if (route.grant === null || !this.grantNeedsReissue(route.grant)) return route;
+    const { scopeId, expiresAt } = route.grant;
     const outcome = await this.reissueRouteGrant(route, state);
     if (outcome === 'issued') {
-      this.credentialRenewalRetryAt.delete(route.sessionId);
-    } else if (Date.now() >= route.grant.expiresAt) {
-      this.credentialRenewalRetryAt.delete(route.sessionId);
-      await onRouteFailed(
-        this.routeContext(state),
-        route.sessionId,
-        'workspace_setup_failed',
-        undefined,
-        true
-      );
+      this.credentialRenewalRetryAt.delete(scopeId);
+    } else if (Date.now() >= expiresAt) {
+      this.credentialRenewalRetryAt.delete(scopeId);
+      await this.failUnrenewableRoute(route.sessionId, state);
       return null;
     } else {
       this.credentialRenewalRetryAt.set(
-        route.sessionId,
+        scopeId,
         Date.now() + this.sandboxTimers().credentialGrantRenewalRetryMs
       );
     }
     return (await readRoute(this.db, route.sessionId)) ?? route;
   }
 
+  /** The route's grant expired and could not be re-issued: fail with the real reason. */
+  private async failUnrenewableRoute(sessionId: string, state: AllocationState): Promise<void> {
+    await onRouteFailed(
+      this.routeContext(state),
+      sessionId,
+      'workspace_setup_failed',
+      undefined,
+      true
+    );
+  }
+
   /**
    * The alarm half of credential renewal. Runs on the serial queue like
-   * `deliver`, so it never races a sibling join or release. Re-reads each route
-   * because a shared worktree scope renews once for all of its members.
+   * `deliver`, so it never races a sibling join or release. A shared worktree
+   * scope is attempted once for all of its members: a success renews the shared
+   * grant, a failure sets the scope's retry, and a failure at expiry fails the
+   * other members without another attempt.
    */
   private async renewDueRouteGrants(state: AllocationState): Promise<void> {
     const routes = await listRoutes(this.db);
-    pruneCredentialRenewalRetries(this.credentialRenewalRetryAt, routes);
+    const retries = this.credentialRenewalRetryAt;
+    pruneCredentialRenewalRetries(retries, routes);
     const threshold = this.sandboxTimers().credentialGrantReissueBelowMs;
+    const expiredScopes = new Set<string>();
     for (const listed of routes) {
-      const retryAt = this.credentialRenewalRetryAt.get(listed.sessionId);
-      const dueAt = credentialRenewalDueAt(listed, threshold, retryAt);
+      const dueAt = credentialRenewalDueAt(listed, threshold, retries);
       if (dueAt === null || dueAt > Date.now()) continue;
       const route = await readRoute(this.db, listed.sessionId);
-      if (route?.state !== 'ready') continue;
-      await this.renewRouteGrant(route, state);
+      if (route?.state !== 'ready' || route.grant === null) continue;
+      const { scopeId } = route.grant;
+      if (expiredScopes.has(scopeId) && Date.now() >= route.grant.expiresAt) {
+        await this.failUnrenewableRoute(route.sessionId, state);
+      } else if ((await this.renewRouteGrant(route, state)) === null) {
+        expiredScopes.add(scopeId);
+      }
     }
   }
 

@@ -2064,6 +2064,53 @@ describe('SandboxControlV2 credentials (B3)', () => {
     expect(wrapper.receivedFrames()).toBe(framesBefore);
   });
 
+  it('attempts a failed shared-scope renewal once for all members', async () => {
+    const provider = createFakeProvider();
+    const broker = createFakeCredentialBroker();
+    const stub = await setupVercel(provider, broker);
+    const input = (sessionId: string) =>
+      prepareInput(
+        sessionId,
+        { ...vercelSource(sessionId), scopeId: 'shared_modern' },
+        {
+          ...routeSpec(sessionId),
+          directory: '/workspace/shared_modern',
+          runtimeIsolation: 'per-session',
+        }
+      );
+    const { wrapper } = await prepareWarmRoute(stub, provider, input(SESSION));
+    await stub.prepare(input(SESSION_NEXT));
+    if ((await wrapper.next())?.type !== 'session.prepare') throw new Error('missing prepare');
+    wrapper.send({ type: 'session.ready', sessionId: SESSION_NEXT });
+    await waitFor(async () => {
+      expect((await stub.status({ sessionId: SESSION_NEXT })).view.state).toBe('ready');
+    });
+    await setGrantExpiry(stub, SESSION, Date.now() + TIMERS.credentialGrantReissueBelowMs / 2);
+    let attempts = 0;
+    const update = provider.adapter.applyContainedCredentials!.bind(provider.adapter);
+    provider.adapter.applyContainedCredentials = async (ref, grants) => {
+      attempts += 1;
+      return update(ref, grants);
+    };
+    provider.failPolicy = true;
+
+    // Both members share one grant, so one failed attempt sets one retry.
+    await runInDurableObject(stub, instance => instance.alarm());
+    expect(attempts).toBe(1);
+    await runInDurableObject(stub, instance => instance.alarm());
+    expect(attempts).toBe(1);
+
+    // At expiry, one more attempt fails both members.
+    await setGrantExpiry(stub, SESSION, Date.now() - 1);
+    await runInDurableObject(stub, instance => instance.alarm());
+    expect(attempts).toBe(2);
+    for (const sessionId of [SESSION, SESSION_NEXT]) {
+      expect(await stub.status({ sessionId })).toMatchObject({
+        view: { state: 'failed', reason: 'workspace_setup_failed' },
+      });
+    }
+  });
+
   it('replaces scoped MCP credentials on normal warm credential renewal without persisting them', async () => {
     const provider = createFakeProvider();
     const stub = await setup(provider);

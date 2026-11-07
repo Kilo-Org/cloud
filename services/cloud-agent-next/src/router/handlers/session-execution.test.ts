@@ -1,16 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { preflightAndQueuePromptMessageMock, queueMessageMock, requireCurrentSessionAccessMock } =
-  vi.hoisted(() => ({
-    preflightAndQueuePromptMessageMock: vi.fn(),
-    queueMessageMock: vi.fn(),
-    requireCurrentSessionAccessMock: vi.fn(),
-  }));
+const { preflightAndQueuePromptMessageMock, requireCurrentSessionAccessMock } = vi.hoisted(() => ({
+  preflightAndQueuePromptMessageMock: vi.fn(),
+  requireCurrentSessionAccessMock: vi.fn(),
+}));
 
 vi.mock('../../session/queue-message.js', () => ({
   preflightAndQueuePromptMessage: preflightAndQueuePromptMessageMock,
   preflightRuntimeAuthorizationRecovery: vi.fn(),
-  queueMessage: queueMessageMock,
 }));
 vi.mock('../../session/prepared-session-admission.js', () => ({
   admitPreparedInitialMessage: vi.fn(),
@@ -46,7 +43,6 @@ beforeEach(() => {
     messageId,
     delivery: 'queued',
   });
-  queueMessageMock.mockReset();
   requireCurrentSessionAccessMock.mockReset().mockResolvedValue({
     kiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa',
     organizationId: null,
@@ -95,7 +91,6 @@ describe('sendMessageV2 command overrides', () => {
       expect.objectContaining({ env: context.env, userId: 'user-1' }),
       'sendMessageV2'
     );
-    expect(queueMessageMock).not.toHaveBeenCalled();
   });
 
   it('keeps omitted command overrides absent so preflight falls back to the stored model', async () => {
@@ -115,6 +110,5 @@ describe('sendMessageV2 command overrides', () => {
       expect.anything(),
       'sendMessageV2'
     );
-    expect(queueMessageMock).not.toHaveBeenCalled();
   });
 });

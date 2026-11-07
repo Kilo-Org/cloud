@@ -1526,23 +1526,6 @@ export async function findGitLabIntegrationByWebhookToken(
 }
 
 /**
- * Updates the metadata for a platform integration
- * Used for storing webhook configuration, tokens, etc.
- */
-export async function updateIntegrationMetadata(
-  integrationId: string,
-  metadata: Record<string, unknown>
-) {
-  await db
-    .update(platform_integrations)
-    .set({
-      metadata,
-      updated_at: new Date().toISOString(),
-    })
-    .where(eq(platform_integrations.id, integrationId));
-}
-
-/**
  * Atomically merges `metadataUpdates` into a platform integration's `metadata`
  * JSONB column, scoped to `owner` + `platform` + `integrationId`.
  *

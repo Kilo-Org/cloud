@@ -1,9 +1,10 @@
-import { type NativeEvent } from '@kilocode/cloud-agent-sdk';
+import { type NativePendingRequests, type StoredMessage } from '@kilocode/cloud-agent-sdk';
 import { createElement, Fragment, type ReactNode, type Ref, useImperativeHandle } from 'react';
 import { afterEach, beforeEach, expect, vi } from 'vitest';
 import { act, type ReactTestInstance, type ReactTestRenderer, TestRenderer } from '@/test/renderer';
 import { NativeRemoteDemo } from './native-remote-demo';
 import { type NativeRemoteClient } from '@/lib/native-remote/use-native-inventory';
+import { useOpenPartDetail } from '@/components/agents/open-part-detail-context';
 
 vi.mock('@/i18n', () => ({ i18n: { t: (key: string) => key } }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
@@ -20,6 +21,34 @@ vi.mock('@/components/ui/input', () => ({
 vi.mock('@/components/ui/switch', () => ({ Switch: 'Switch' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+vi.mock('@/components/agents/message-bubble', () => ({
+  MessageBubble: ({ message, ...props }: { message: StoredMessage }) => {
+    const openToolDetail = useOpenPartDetail();
+    return createElement(
+      'MessageBubble',
+      { message, ...props },
+      message.parts.map(part => (part.type === 'text' ? part.text : '')).join(' '),
+      message.parts
+        .filter(part => part.type === 'tool')
+        .map(part =>
+          createElement(
+            'Button',
+            {
+              key: part.id,
+              disabled: openToolDetail === null,
+              onPress: () => {
+                openToolDetail?.(part.id);
+              },
+            },
+            `Open ${part.tool} details`
+          )
+        )
+    );
+  },
+}));
+vi.mock('@/components/agents/part-detail-sheet', () => ({
+  PartDetailSheet: (props: object) => createElement('PartDetailSheet', props),
+}));
 vi.mock('@shopify/flash-list', () => ({
   FlashList: function FlashList({
     data,
@@ -44,10 +73,12 @@ export async function flush() {
   setTimeout(pending.resolve, 0);
   await pending.promise;
 }
-export async function mount(client: NativeRemoteClient) {
+export async function mount(client: NativeRemoteClient, organizationID?: string) {
   const created: ReactTestRenderer[] = [];
   await act(async () => {
-    created.push(TestRenderer.create(<NativeRemoteDemo client={client} />));
+    created.push(
+      TestRenderer.create(<NativeRemoteDemo client={client} organizationID={organizationID} />)
+    );
     await flush();
   });
   const renderer = created.at(0);
@@ -87,25 +118,16 @@ export async function type(renderer: TestRenderer.ReactTestRenderer, label: stri
     props.onChangeText(value);
   });
 }
-export function inventoryEvent(): NativeEvent {
+export function inventoryPending(): NativePendingRequests {
   return {
-    v: 1,
-    channel: 'events',
-    seq: 1,
-    from: 'runner',
-    at: 1,
-    type: 'remote.state',
-    body: {
-      pending: {
-        permissions: [{ requestID: 'permission', tool: 'shell', summary: 'Run tests' }],
-        questions: [
-          {
-            requestID: 'question',
-            fields: [{ key: 'answer', title: 'Your choice', type: 'text' }],
-          },
-        ],
+    permissions: [{ id: 'permission', action: 'shell', resources: ['Run tests'] }],
+    questions: [
+      {
+        id: 'question',
+        metadata: { kind: 'question' },
+        fields: [{ key: 'answer', title: 'Your choice', type: 'text' }],
       },
-    },
+    ],
   };
 }
 beforeEach(() => {

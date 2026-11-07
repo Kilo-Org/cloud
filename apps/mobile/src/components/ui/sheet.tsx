@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { BackHandler, Platform, View } from 'react-native';
 
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { useSheetTouchHold } from '@/lib/sheet-touch-guard';
+import { holdSheetTouch, SHEET_TOUCH_SETTLE_MS, useSheetTouchHold } from '@/lib/sheet-touch-guard';
 
 /**
  * The app's sheet surface. This file is the only place that imports
@@ -105,12 +105,29 @@ export function Sheet({
   // and the native dismiss event ends it, so unmounting here would cut the sheet
   // off mid-flight.
   const [mounted, setMounted] = useState(visible);
-  // The app-wide touch gate stays shut for as long as this sheet is presented:
-  // until the sheet's own window takes touch, a tap made while it opens would
-  // land on the screen and the tab bar behind it.
-  useSheetTouchHold(visible);
-  // A dismissal handed to the native sheet that has not reported back yet.
-  const [dismissalPending, setDismissalPending] = useState(false);
+  // The app-wide touch gate stays shut in the two windows where this sheet's
+  // own window does not take touch: while it opens, and while it dismisses.
+  // During the dismissal the native sheet has already let go of touch but has
+  // not reported the finished animation, so the tap a double press aimed at the
+  // sheet's Apply would otherwise reach the screen behind it.
+  const [selfDismissalStarted, setSelfDismissalStarted] = useState(false);
+  // A dismissal the caller asked for: `visible` is false while the sheet is
+  // still mounted waiting for the native report.
+  const dismissing = (!visible && mounted) || selfDismissalStarted;
+  useSheetTouchHold({ opening: visible, dismissing });
+  // The settle hold's release from the latest report; a ref keeps `onDismiss`
+  // free of state and `holdSheetTouch` off the render path. Re-arming on the
+  // next report replaces the previous one, so two reports never double-arm.
+  const settleReleaseRef = useRef<(() => void) | null>(null);
+  // The bound covers the report that never comes; unmount drops what is left,
+  // so a removed sheet cannot outlive its own window's settle.
+  useEffect(
+    () => () => {
+      settleReleaseRef.current?.();
+      settleReleaseRef.current = null;
+    },
+    []
+  );
 
   // The caller can reopen (`visible` true) while the dismiss animation is still
   // running, and the native dismissal then reports after the fact. Handing the
@@ -122,6 +139,8 @@ export function Sheet({
   // fires once the transition finished.
   const mountedRef = useRef(mounted);
   mountedRef.current = mounted;
+  // A dismissal handed to the native sheet that has not reported back yet.
+  const [dismissalPending, setDismissalPending] = useState(false);
 
   useEffect(() => {
     if (visible) {
@@ -139,6 +158,18 @@ export function Sheet({
     }
   }, [visible]);
 
+  // A dismissal the sheet starts itself — a downward drag, the backdrop or
+  // Android Back — is granted here and reported later, so the settle window is
+  // armed while the caller still has `visible` true. A refused request keeps
+  // the sheet up and must not arm the gate.
+  const selfDismissRef = useRef<() => boolean>(() => true);
+  selfDismissRef.current = (): boolean => {
+    if (onRequestDismiss?.() === false) {
+      return false;
+    }
+    setSelfDismissalStarted(true);
+    return true;
+  };
   // Before the sheet's own window takes focus, Android Back reaches the app
   // instead of the sheet's native handler, so a press in that window of the
   // opening animation is answered here. Once the window has focus the sheet
@@ -199,7 +230,7 @@ export function Sheet({
       onBackdropTap={() => {
         requestSelfDismissRef.current();
       }}
-      onRequestDismiss={onRequestDismiss}
+      onRequestDismiss={() => selfDismissRef.current()}
       locale={i18n.language}
       onClose={() => {
         // A dismissal the caller already reopened past must not close the sheet
@@ -219,6 +250,19 @@ export function Sheet({
         onClose();
       }}
       onDismiss={() => {
+        // Whatever started the dismissal, the finished report ends the close
+        // request lease. It also arms the settle hold directly here: the host
+        // tears the sheet's window down in the frames around this report,
+        // measured on the emulator (the window went before the report reached
+        // this tree, and a touch between the two opened the row behind it), so
+        // the lease ending together with the window's teardown leaves exactly
+        // the frames no window shields unprotected. Holding here instead of in
+        // the hook keeps the settle off the reopen path: the report the caller
+        // superseded answers a dismissal that is over, so the fresh window has
+        // its own opening window.
+        settleReleaseRef.current?.();
+        settleReleaseRef.current = holdSheetTouch(SHEET_TOUCH_SETTLE_MS);
+        setSelfDismissalStarted(false);
         setDismissalPending(false);
         if (visible && dismissalPending) {
           // Superseded: the caller reopened while this dismissal was in flight.

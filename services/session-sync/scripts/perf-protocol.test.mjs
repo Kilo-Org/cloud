@@ -229,6 +229,8 @@ async function socketFailureResult(scenario) {
     shard: 0,
     shards: 1,
     sessions: 1,
+    streamingSources: 1,
+    sourceTrafficMode: 'all-streaming-sources',
     watched: 1,
     warmSeconds: 1,
     measuredSeconds: 1,

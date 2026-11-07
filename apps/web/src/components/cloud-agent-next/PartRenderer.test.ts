@@ -10,6 +10,9 @@ jest.mock('remark-gfm', () =>
 
 import type { FilePart } from './types';
 import { TextPartRenderer, FilePartRenderer } from './part-content';
+import type { NativeSessionState } from '@kilocode/cloud-agent-sdk';
+import { readNativeConversation } from '@kilocode/cloud-agent-sdk/native-conversation-source';
+import { kilo2AssetKey } from '@kilocode/cloud-agent-sdk/kilo2-source-messages';
 
 Object.assign(globalThis, { React });
 
@@ -153,5 +156,91 @@ describe('FilePartRenderer images', () => {
     expect(markup).toContain('<img');
     expect(markup).toContain('src="https://files.example.com/screenshot.png"');
     expect(markup).toContain('alt="screenshot.png"');
+  });
+});
+
+describe('native tool files through the existing FilePartRenderer', () => {
+  it('renders authorized native image bytes and a real PDF download without another renderer', () => {
+    const imageURI = `media:${'a'.repeat(64)}`;
+    const pdfURI = `media:${'b'.repeat(64)}`;
+    const image =
+      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jDXsAAAAASUVORK5CYII=';
+    const pdf = 'data:application/pdf;base64,JVBERi0xLjcK';
+    const state: NativeSessionState = {
+      connection: 'connected',
+      runnerConnected: true,
+      session: {
+        id: 'ses_native',
+        origin: { directory: '/owned' },
+        time: { created: 1, updated: 2 },
+      },
+      snapshot: { position: 2, revision: 2 },
+      pending: { permissions: [], questions: [] },
+      events: [],
+      commands: {},
+      assetURLs: {
+        [kilo2AssetKey('msg_files_000000_file_0', imageURI, 'image/png')]: image,
+        [kilo2AssetKey('msg_files_000000_file_1', pdfURI, 'application/pdf')]: pdf,
+      },
+      messages: [
+        {
+          seq: 1,
+          message: {
+            id: 'msg_files',
+            type: 'assistant',
+            time: { created: 1, completed: 2 },
+            content: [
+              {
+                type: 'tool',
+                id: 'read-call',
+                name: 'read',
+                time: { created: 1, completed: 2 },
+                state: {
+                  status: 'completed',
+                  input: { path: '/owned' },
+                  content: [
+                    { type: 'file', uri: imageURI, mime: 'image/png', name: 'snapshot.png' },
+                    { type: 'file', uri: pdfURI, mime: 'application/pdf', name: 'report.pdf' },
+                  ],
+                },
+              },
+            ],
+          },
+        },
+      ],
+    };
+    const files = readNativeConversation(state)
+      .messages.flatMap(message => message.parts)
+      .filter(part => part.type === 'file');
+    expect(files).toHaveLength(2);
+    const markup = renderToStaticMarkup(
+      React.createElement(
+        React.Fragment,
+        null,
+        files.map(part => React.createElement(FilePartRenderer, { key: part.id, part }))
+      )
+    );
+    expect(markup).toContain(`src="${image}"`);
+    expect(markup).toContain('alt="snapshot.png"');
+    expect(markup).toContain(`href="${pdf}"`);
+    expect(markup).toContain('download="report.pdf"');
+    expect(markup.match(/<img\b/g)).toHaveLength(1);
+    expect(markup.match(/<a\b/g)).toHaveLength(1);
+    expect(markup).not.toContain('media:');
+    expect(markup).not.toContain('file:///owned');
+  });
+
+  it.each([
+    'data:text/html;base64,PHNjcmlwdD4=',
+    'javascript:alert(1)',
+    'data:application/pdf;base64,not base64',
+  ])('never turns an unsafe PDF attachment into a link (%s)', url => {
+    const markup = renderToStaticMarkup(
+      React.createElement(FilePartRenderer, {
+        part: { ...imageFilePart(url), mime: 'application/pdf', filename: 'report.pdf' },
+      })
+    );
+    expect(markup).not.toContain('<a');
+    expect(markup).not.toContain('href=');
   });
 });

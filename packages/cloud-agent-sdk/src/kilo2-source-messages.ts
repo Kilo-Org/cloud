@@ -1,5 +1,6 @@
 import type { Part, SessionSnapshot } from './types';
 import {
+  kilo2FileContentSchema,
   kilo2PartId,
   type Kilo2Message,
   type Kilo2Session,
@@ -7,6 +8,81 @@ import {
 type ProjectedKilo2Message = SessionSnapshot['messages'][number];
 
 export type Kilo2ContentLayout = { positions: Map<string, number>; next: number };
+
+export type Kilo2ProjectionOptions = {
+  /** Authorized bytes, keyed by kilo2AssetKey; never credential-bearing URLs. */
+  assetURLs?: Readonly<Record<string, string>> | undefined;
+};
+
+/** Stable identity for a file returned inside one native tool content part. */
+export function kilo2ToolFileId(
+  messageID: string,
+  contentIndex: number,
+  fileIndex: number
+): string {
+  return `${kilo2PartId(messageID, contentIndex)}_file_${fileIndex}`;
+}
+
+/** Bind resolved bytes to both display identity and the exact native reference. */
+export function kilo2AssetKey(fileID: string, uri: string, mime: string): string {
+  return JSON.stringify([fileID, uri, mime]);
+}
+
+export type Kilo2FileReference = {
+  id: string;
+  uri: string;
+  mime: string;
+  fileIndex: number;
+  contentIndex?: number;
+};
+
+/** Authoritative native attachment positions, never lookalike tool input/metadata. */
+export function readKilo2FileReferences(message: Kilo2Message): Kilo2FileReference[] {
+  const result: Kilo2FileReference[] = [];
+  if (message.type === 'user' || message.type === 'synthetic') {
+    for (const [fileIndex, file] of (message.files ?? []).entries()) {
+      if (typeof file.data === 'string' || typeof file.uri !== 'string') continue;
+      result.push({
+        id: kilo2PartId(message.id, fileIndex + 1),
+        uri: file.uri,
+        mime: file.mime,
+        fileIndex,
+      });
+    }
+  }
+  const offset = message.type === 'compaction' ? 1 : 0;
+  for (const [contentIndex, part] of (message.content ?? []).entries()) {
+    if (
+      part.type !== 'tool' ||
+      !part.state ||
+      (part.state.status !== 'completed' && part.state.status !== 'error')
+    )
+      continue;
+    for (const [fileIndex, content] of (part.state.content ?? []).entries()) {
+      const file = kilo2FileContentSchema.safeParse(content);
+      if (!file.success) continue;
+      result.push({
+        id: kilo2ToolFileId(message.id, contentIndex + offset, fileIndex),
+        uri: file.data.uri,
+        mime: file.data.mime,
+        fileIndex,
+        contentIndex,
+      });
+    }
+  }
+  return result;
+}
+
+export function hasUnresolvedKilo2Assets(
+  message: Kilo2Message,
+  assetURLs?: Readonly<Record<string, string>>
+): boolean {
+  return readKilo2FileReferences(message).some(
+    file =>
+      assetURLs?.[kilo2AssetKey(file.id, file.uri, file.mime)] === undefined &&
+      !/^(data:|https?:\/\/)/.test(file.uri)
+  );
+}
 
 /**
  * Content positions of one native message, keyed `kind:ordinal`. Text and reasoning
@@ -27,9 +103,18 @@ export function readKilo2ContentLayout(message: Kilo2Message): Kilo2ContentLayou
 /** Project native v2 messages once, for both Cloud history and live observation. */
 export function readKilo2Messages(
   session: Kilo2Session,
-  messages: Kilo2Message[]
+  messages: Kilo2Message[],
+  options: Kilo2ProjectionOptions = {}
 ): ProjectedKilo2Message[] {
   const result: ProjectedKilo2Message[] = [];
+  const fileURL = (id: string, uri: string, mime: string): string => {
+    const resolved = options.assetURLs?.[kilo2AssetKey(id, uri, mime)];
+    if (resolved !== undefined) return resolved;
+    if (/^(data:|https?:\/\/)/.test(uri)) return uri;
+    throw Object.assign(new Error(`Native attachment ${id} requires authorized asset resolution`), {
+      code: 'native_asset_unresolved',
+    });
+  };
   let parentID = '';
   for (const message of messages) {
     const base = { id: message.id, sessionID: session.id };
@@ -54,18 +139,26 @@ export function readKilo2Messages(
             text: message.text ?? '',
             ...(message.type === 'synthetic' ? { synthetic: true } : {}),
           },
-          ...(message.files ?? []).map((file, index): Part => ({
-            ...base,
-            id: kilo2PartId(message.id, index + 1),
-            messageID: message.id,
-            type: 'file',
-            mime: file.mime,
-            url:
-              file.source.type === 'uri'
-                ? file.source.uri
-                : `data:${file.mime};base64,${file.data}`,
-            ...(file.name === undefined ? {} : { filename: file.name }),
-          })),
+          ...(message.files ?? []).map((file, index): Part => {
+            const id = kilo2PartId(message.id, index + 1);
+            const uri =
+              typeof file.data === 'string'
+                ? file.source.type === 'uri' && /^(data:|https?:\/\/)/.test(file.source.uri)
+                  ? file.source.uri
+                  : `data:${file.mime};base64,${file.data}`
+                : typeof file.uri === 'string'
+                  ? file.uri
+                  : '';
+            return {
+              ...base,
+              id,
+              messageID: message.id,
+              type: 'file',
+              mime: file.mime,
+              url: fileURL(id, uri, file.mime),
+              ...(file.name === undefined ? {} : { filename: file.name }),
+            };
+          }),
         ],
       });
       continue;
@@ -149,6 +242,23 @@ export function readKilo2Messages(
           callID: item.id,
           tool: item.name === 'shell' ? 'bash' : item.name === 'subagent' ? 'task' : item.name,
         };
+        const attachments: Extract<Part, { type: 'file' }>[] = [];
+        if (state.status === 'completed' || state.status === 'error') {
+          for (const [fileIndex, content] of (state.content ?? []).entries()) {
+            const file = kilo2FileContentSchema.safeParse(content);
+            if (!file.success) continue;
+            const id = kilo2ToolFileId(message.id, index + offset, fileIndex);
+            attachments.push({
+              ...base,
+              id,
+              messageID: message.id,
+              type: 'file',
+              mime: file.data.mime,
+              url: fileURL(id, file.data.uri, file.data.mime),
+              ...(file.data.name === undefined ? {} : { filename: file.data.name }),
+            });
+          }
+        }
         if (state.status === 'streaming')
           parts.push({
             ...tool,
@@ -168,7 +278,9 @@ export function readKilo2Messages(
               input,
               metadata,
               title: item.name,
-              output: (state.content ?? []).map(part => part.text ?? '').join('\n'),
+              output: (state.content ?? [])
+                .flatMap(part => (part.text === undefined ? [] : [part.text]))
+                .join('\n'),
               time: { start, end: item.time?.completed ?? start },
             },
           });
@@ -183,6 +295,9 @@ export function readKilo2Messages(
               time: { start, end: item.time?.completed ?? start },
             },
           });
+        // One display authority for native files: specialized tool cards need
+        // not handle attachments, and ordinary FileParts avoid duplicate images.
+        parts.push(...attachments);
       }
     }
     result.push({ info, parts });

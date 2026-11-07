@@ -300,6 +300,12 @@ describe('SheetHeader', () => {
     };
     const renderer = await mount({ ...props, doneDisabled: true });
 
+    // The muted ink at full strength reads as a mid gray that matches neither
+    // state, so the control's own disabled opacity is half of the waiting
+    // shade: this pair is the paint contract, not a styling detail.
+    expect(pressablesByLabel(renderer.root, 'Done')[0]?.props.className).toContain(
+      'disabled:opacity-50'
+    );
     const disabledInk = String(
       renderer.root.findByProps({ children: 'Done' }).props.className
     ).split(' ');

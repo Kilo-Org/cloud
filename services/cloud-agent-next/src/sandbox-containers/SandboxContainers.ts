@@ -356,7 +356,11 @@ export class SandboxContainers extends DurableObject<Env> {
     const sameRef = stored.allocationRef === ref;
     const phase = readWrapperAttempt(stored);
     if (stored.state === 'running' && sameRef) {
-      if (input.egressAllowlist !== undefined || input.egressAudit === true) {
+      if (
+        input.containment === true ||
+        input.egressAllowlist !== undefined ||
+        input.egressAudit === true
+      ) {
         await this.installOutboundProxy(this.requiredContainer(), input);
       }
       // A pending (or unknown) phase means a bun exec may still be starting; the
@@ -660,10 +664,41 @@ export class SandboxContainers extends DurableObject<Env> {
   async observe(_allocationRef: string): Promise<ContainersObservation> {
     const record = await this.readRecord();
     return {
-      running: this.ctx.container?.running === true,
+      running: this.ctx.container?.running ?? false,
       state: record.state,
       currentAllocationRef: record.allocationRef,
     };
+  }
+
+  /**
+   * Replace a warm container's outbound interception with one built from its
+   * persisted allocation and policy. Connect calls this before traffic so a
+   * handler installed without the trusted allocation reference fails closed
+   * rather than accepting an unbound origin. Compute is never restarted.
+   */
+  async rebindOutboundInterception(allocationRef: string): Promise<void> {
+    return this.runExclusive(async () => {
+      const record = await this.readRecord();
+      if (record.allocationRef !== allocationRef) {
+        throw new ContainersAllocationConflictError(allocationRef);
+      }
+      if (record.state !== 'running') {
+        throw new Error('Container is not running');
+      }
+      const container = this.requiredContainer();
+      if (container.running !== true) {
+        throw new Error('Container is not running');
+      }
+      const policy = nativeEgressPolicySchema.optional().parse(record.egressPolicy);
+      if (policy !== undefined && policy.allocationRef !== allocationRef) {
+        throw new ContainersAllocationConflictError(allocationRef);
+      }
+      await this.installOutboundProxy(container, {
+        allocationRef,
+        ...(policy?.allowlist === undefined ? {} : { egressAllowlist: policy.allowlist }),
+        ...(policy?.egressAudit === true ? { egressAudit: true } : {}),
+      });
+    });
   }
 
   async recordEgressRequest(input: unknown) {
@@ -1186,16 +1221,15 @@ export class SandboxContainers extends DurableObject<Env> {
 
   private async installOutboundProxy(
     container: Container,
-    input: ContainersLaunchInput
+    input: Pick<ContainersLaunchInput, 'allocationRef' | 'egressAllowlist' | 'egressAudit'>
   ): Promise<void> {
     const outbound = this.ctx.exports.ContainersOutbound;
     const worker = outbound({
       props: {
         containerId: this.ctx.id.toString(),
+        allocationRef: input.allocationRef,
         ...(input.egressAllowlist === undefined ? {} : { egressAllowlist: input.egressAllowlist }),
-        ...(input.egressAudit === true
-          ? { egressAudit: true, allocationRef: input.allocationRef }
-          : {}),
+        ...(input.egressAudit === true ? { egressAudit: true } : {}),
       },
     });
     await container.interceptOutboundHttps('*', worker);

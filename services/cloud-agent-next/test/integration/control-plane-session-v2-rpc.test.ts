@@ -11,6 +11,10 @@ import type {
   SandboxSessionV2,
 } from '../../src/control-plane/session/session-do.js';
 import type {
+  RuntimeCredentialProxyOrigin,
+  RuntimeProxyControlBinding,
+} from '../../src/runtime-credential-proxy-origin.js';
+import type {
   ProviderAdapter,
   ProviderCreateIntent,
   StopResult,
@@ -918,6 +922,151 @@ describe('SandboxSessionV2 worker RPC surface', () => {
     await expect(
       sessionStub.resolveRuntimeCredentialProxyGrant('not-a-handle')
     ).resolves.toBeNull();
+  });
+
+  describe('origin-bound runtime credential proxy resolution', () => {
+    const credential = () => ({
+      token: 'proxy-token',
+      runtimeAuthorization: {
+        userId: USER_ID,
+        authorizationId: 'authorization-1',
+        resourceId: 'workspace_resource',
+      },
+    });
+    const nativeOrigin = (allocationRef = 'allocation-ref-1'): RuntimeCredentialProxyOrigin => ({
+      type: 'cloudflare-containers',
+      containerId: 'container-1',
+      allocationRef,
+    });
+
+    async function setup() {
+      const sessionId = newSessionId();
+      const sandboxId = await generateSandboxId(sessionId);
+      const sessionStub = sessions.getByName(sessionId);
+      const peer = new FakeSandboxPeer();
+      await runInDurableObject(sessionStub, instance => {
+        instance.env.WORKER_URL = 'https://control.test';
+        instance.env.NEXTAUTH_SECRET = env.NEXTAUTH_SECRET;
+        instance.sandboxPeerFor = () => peer;
+      });
+      await sessionStub.registerSessionFromMetadata({
+        metadata: metadata({
+          sessionId,
+          kiloSessionId: kiloSessionId(),
+          sandboxId,
+        }),
+        sandboxSelection: { provider: 'cloudflare-containers' },
+      });
+      const binding: RuntimeProxyControlBinding = {
+        plane: 'control',
+        logicalSandboxId: sandboxId,
+        allocationId: 'allocation-1',
+        provider: 'cloudflare-containers',
+        providerInstanceId: 'allocation-ref-1',
+        connectionId: 'connection-1',
+        wrapperInstanceId: 'wrapper-1',
+      };
+      return { sessionId, sandboxId, sessionStub, peer, binding };
+    }
+
+    it('admits, resolves through the existing resolver, then re-admits the same binding', async () => {
+      const { sessionStub, peer, binding } = await setup();
+      peer.runtimeProxyOriginBinding = binding;
+      const resolveCalls: string[] = [];
+      await runInDurableObject(sessionStub, instance => {
+        instance.resolveRuntimeCredentialProxyGrant = async handle => {
+          resolveCalls.push(handle);
+          return credential();
+        };
+      });
+
+      await expect(
+        sessionStub.resolveOriginBoundRuntimeCredentialProxyGrant({
+          handle: 'handle-1',
+          origin: nativeOrigin(),
+        })
+      ).resolves.toEqual({ ...credential(), binding });
+      expect(resolveCalls).toEqual(['handle-1']);
+      expect(peer.runtimeProxyOriginAdmissionCalls).toEqual([nativeOrigin()]);
+      expect(peer.runtimeProxyOriginBindingAdmissionCalls).toEqual([
+        { origin: nativeOrigin(), expected: binding },
+      ]);
+    });
+
+    it.each([
+      ['the origin is denied', (peer: FakeSandboxPeer) => (peer.runtimeProxyOriginBinding = null)],
+      [
+        'the binding changed during resolution',
+        (peer: FakeSandboxPeer) => (peer.runtimeProxyOriginBindingAdmissionResult = false),
+      ],
+    ])('returns null and no token when %s', async (_label, arrange) => {
+      const { sessionStub, peer, binding } = await setup();
+      peer.runtimeProxyOriginBinding = binding;
+      arrange(peer);
+      let resolverCalled = false;
+      await runInDurableObject(sessionStub, instance => {
+        instance.resolveRuntimeCredentialProxyGrant = async () => {
+          resolverCalled = true;
+          return credential();
+        };
+      });
+
+      await expect(
+        sessionStub.resolveOriginBoundRuntimeCredentialProxyGrant({
+          handle: 'handle-1',
+          origin: nativeOrigin(),
+        })
+      ).resolves.toBeNull();
+      expect(resolverCalled).toBe(peer.runtimeProxyOriginBinding !== null);
+      if (peer.runtimeProxyOriginBinding === null) {
+        expect(peer.runtimeProxyOriginBindingAdmissionCalls).toHaveLength(0);
+      } else {
+        expect(peer.runtimeProxyOriginBindingAdmissionCalls).toHaveLength(1);
+      }
+    });
+
+    it('rejects an invalid origin without touching the sandbox or resolver', async () => {
+      const { sessionStub, peer } = await setup();
+      peer.runtimeProxyOriginBinding = null;
+      let resolverCalled = false;
+      await runInDurableObject(sessionStub, instance => {
+        instance.resolveRuntimeCredentialProxyGrant = async () => {
+          resolverCalled = true;
+          return credential();
+        };
+      });
+
+      await expect(
+        sessionStub.resolveOriginBoundRuntimeCredentialProxyGrant({
+          handle: 'handle-1',
+          origin: { type: 'cloudflare-containers', containerId: '', allocationRef: 'ref' },
+        })
+      ).resolves.toBeNull();
+      expect(resolverCalled).toBe(false);
+      expect(peer.runtimeProxyOriginAdmissionCalls).toHaveLength(0);
+    });
+
+    it('does not fall back to the unbound resolver when origin admission is unavailable', async () => {
+      const { sessionStub, peer } = await setup();
+      peer.runtimeProxyOriginAdmissionError = new Error('origin admission unavailable');
+      let resolverCalled = false;
+      await runInDurableObject(sessionStub, instance => {
+        instance.resolveRuntimeCredentialProxyGrant = async () => {
+          resolverCalled = true;
+          return credential();
+        };
+      });
+
+      await expect(
+        runInDurableObject(sessionStub, instance =>
+          instance.resolveOriginBoundRuntimeCredentialProxyGrant({
+            handle: 'handle-1',
+            origin: nativeOrigin(),
+          })
+        )
+      ).rejects.toThrow('Runtime credential proxy origin admission unavailable');
+      expect(resolverCalled).toBe(false);
+    });
   });
 });
 

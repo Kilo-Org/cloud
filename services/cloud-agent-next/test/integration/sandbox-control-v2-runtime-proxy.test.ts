@@ -1,4 +1,10 @@
-import { createExecutionContext, env, reset, runInDurableObject } from 'cloudflare:test';
+import {
+  createExecutionContext,
+  env,
+  evictDurableObject,
+  reset,
+  runInDurableObject,
+} from 'cloudflare:test';
 import { generateKeyPairSync } from 'node:crypto';
 import {
   renewRuntimeAuthorization,
@@ -13,8 +19,6 @@ import type {
 import type { SandboxSessionV2 } from '../../src/control-plane/session/session-do.js';
 import { parseSessionMetadata } from '../../src/persistence/session-metadata.js';
 import {
-  createRuntimeProxyGrant,
-  issueRuntimeCredentialProxyHandle,
   runtimeCredentialProxyFacadeBaseUrl,
   runtimeProxyHandleGrantId,
   RUNTIME_PROXY_GRANT_KEY,
@@ -33,6 +37,7 @@ import { sessionDoName } from '../../src/session-identity.js';
 import {
   CONTROL_PLANE_PROTOCOL_VERSION,
   type ControlPlanePromptPayload,
+  type ControlPlaneWrapperFrame,
 } from '../../src/shared/control-plane-protocol.js';
 import {
   createFakeCredentialBroker,
@@ -46,6 +51,35 @@ import { encryptWithPublicKey } from '../../src/utils/encryption.js';
 import { routes as routesTable } from '../../src/control-plane/sandbox/sqlite-schema.js';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
+import { ContainersOutbound } from '../../src/sandbox-containers/containers-outbound.js';
+import type { ContainersOutboundProps } from '../../src/sandbox-containers/containers-outbound.js';
+import type * as VercelIdentityModule from '../../src/scm-broker/vercel-identity.js';
+import type * as byocCredentials from '../../src/byoc/vercel-credential-resolver.js';
+import type * as VercelJwksModule from '../../src/scm-broker/vercel-jwks.js';
+
+const syntheticIdentity = vi.hoisted(() => ({
+  contract: null as VercelIdentityModule.VercelSandboxIdentityContract | null,
+  key: vi.fn(),
+  credential: null as byocCredentials.ByocVercelCredential | null,
+}));
+vi.mock('../../src/scm-broker/vercel-identity.js', async importOriginal => ({
+  ...(await importOriginal<typeof VercelIdentityModule>()),
+  get verifiedVercelSandboxIdentityContract() {
+    return syntheticIdentity.contract;
+  },
+}));
+vi.mock('../../src/scm-broker/vercel-jwks.js', async importOriginal => ({
+  ...(await importOriginal<typeof VercelJwksModule>()),
+  vercelJwksCache: { key: (...args: unknown[]) => syntheticIdentity.key(...args) },
+}));
+vi.mock('../../src/byoc/vercel-credential-resolver.js', async importOriginal => {
+  const actual = await importOriginal<typeof byocCredentials>();
+  return {
+    ...actual,
+    fetchByocVercelCredential: (...args: Parameters<typeof actual.fetchByocVercelCredential>) =>
+      syntheticIdentity.credential ?? actual.fetchByocVercelCredential(...args),
+  };
+});
 
 type SandboxControlNamespace = DurableObjectNamespace<SandboxControlV2>;
 type SessionNamespace = DurableObjectNamespace<SandboxSessionV2>;
@@ -61,6 +95,11 @@ const FACADE_BASE = runtimeCredentialProxyFacadeBaseUrl(WORKER_URL);
 type FakeProvider = {
   adapter: ProviderAdapter;
   launchEnvs: Record<string, string>[];
+  rebindCalls: string[];
+  policyCalls: unknown[];
+  stopCalls: string[];
+  rebindHook: ((ref: string) => Promise<void>) | null;
+  policyHook: (() => Promise<void>) | null;
 };
 
 let sequence = 0;
@@ -183,7 +222,15 @@ async function sealedRuntimeAuthorization(
 }
 
 function createProvider(): FakeProvider {
-  const provider: FakeProvider = { adapter: null as unknown as ProviderAdapter, launchEnvs: [] };
+  const provider: FakeProvider = {
+    adapter: null as unknown as ProviderAdapter,
+    launchEnvs: [],
+    rebindCalls: [],
+    policyCalls: [],
+    stopCalls: [],
+    rebindHook: null,
+    policyHook: null,
+  };
   provider.adapter = {
     async ensureBillingAdmission() {},
     async create(intent) {
@@ -196,11 +243,19 @@ function createProvider(): FakeProvider {
     async observe(ref) {
       return { status: 'active', ...(ref === null ? {} : { providerRef: ref }) };
     },
-    async stop() {
+    async stop(ref) {
+      provider.stopCalls.push(ref);
       return 'terminal' as StopResult;
     },
     async ensureLeaseAtLeast() {},
-    async applyContainedCredentials() {},
+    async applyContainedCredentials(_ref, grants) {
+      provider.policyCalls.push(grants);
+      if (provider.policyHook !== null) await provider.policyHook();
+    },
+    async rebindOutboundInterception(ref) {
+      provider.rebindCalls.push(ref);
+      if (provider.rebindHook !== null) await provider.rebindHook(ref);
+    },
     async logs() {
       return '';
     },
@@ -293,7 +348,220 @@ function launchIdentity(provider: FakeProvider): { credential: string; allocatio
   return { credential, allocationId };
 }
 
+const SYNTHETIC_VERCEL = {
+  teamId: 'team-synthetic',
+  projectId: 'project-synthetic',
+  locator: {
+    teamId: 'team-synthetic',
+    projectId: 'project-synthetic',
+    snapshotId: 'snapshot-synthetic',
+    runtimeBuildId: 'runtime-synthetic',
+    runtime: 'node24' as const,
+  },
+};
+
+function setupSyntheticVercelIdentity(): ReturnType<typeof generateKeyPairSync> {
+  syntheticIdentity.contract = {
+    issuerForTeam: () => 'https://oidc.vercel.com/synthetic',
+    sandboxIdForRef: ref => ref.sessionId,
+  };
+  const signing = generateKeyPairSync('rsa', { modulusLength: 2048 });
+  syntheticIdentity.key.mockResolvedValue(signing.publicKey);
+  syntheticIdentity.credential = {
+    userId: USER_ID,
+    credentialId: '22222222-2222-4222-8222-222222222222',
+    setupStatus: 'ready',
+    teamId: SYNTHETIC_VERCEL.teamId,
+    projectId: SYNTHETIC_VERCEL.projectId,
+    teamSlug: 'synthetic',
+  } as byocCredentials.ByocVercelCredential;
+  return signing;
+}
+
+/** The trusted native entrypoint the Cloudflare Containers outbound Worker uses. */
+function nativeOutboundFetch(
+  sandboxId: string,
+  allocationId: string,
+  request: Request,
+  requestEnv: Env
+): Promise<Response> {
+  return new ContainersOutbound(
+    {
+      props: {
+        containerId: fakeOutboundContainerId(sandboxId),
+        allocationRef: `mem_${allocationId}`,
+      },
+    } as ExecutionContext<ContainersOutboundProps>,
+    requestEnv as unknown as Cloudflare.Env
+  ).fetch(request);
+}
+
+function mintVercelOidc(
+  sandboxId: string,
+  allocationId: string,
+  signing: ReturnType<typeof generateKeyPairSync>
+): string {
+  return jwt.sign(
+    {
+      iss: 'https://oidc.vercel.com/synthetic',
+      aud: `${WORKER_URL}/runtime-credential-proxy/vercel/${sandboxId}`,
+      exp: Math.floor(Date.now() / 1000) + 600,
+      team_id: SYNTHETIC_VERCEL.teamId,
+      project_id: SYNTHETIC_VERCEL.projectId,
+      sandbox_id: allocationId,
+    },
+    signing.privateKey,
+    { algorithm: 'RS256', keyid: 'synthetic' }
+  );
+}
+
+/** The real Vercel runtime HTTP route, carrying its OIDC forward proof. */
+function vercelRuntimeFetch(input: {
+  sandboxId: string;
+  allocationId: string;
+  handle: string;
+  path: string;
+  method: string;
+  signing: ReturnType<typeof generateKeyPairSync>;
+  requestEnv: Env;
+}): Promise<Response> {
+  const { sandboxId, allocationId, handle, path, method, signing, requestEnv } = input;
+  const audience = `${WORKER_URL}/runtime-credential-proxy/vercel/${sandboxId}`;
+  const oidc = mintVercelOidc(sandboxId, allocationId, signing);
+  return worker.fetch(
+    new Request(audience, {
+      method,
+      headers: {
+        authorization: `Bearer ${handle}`,
+        'vercel-sandbox-oidc-token': oidc,
+        'vercel-forwarded-host': new URL(WORKER_URL).hostname,
+        'vercel-forwarded-scheme': 'https',
+        'vercel-forwarded-port': '443',
+        'vercel-forwarded-path': path,
+      },
+    }),
+    requestEnv,
+    createExecutionContext()
+  );
+}
+
+function deferred(): {
+  promise: Promise<void>;
+  resolve: () => void;
+  reject: (error: unknown) => void;
+} {
+  const value = Promise.withResolvers<void>();
+  return { promise: value.promise, resolve: value.resolve, reject: value.reject };
+}
+
+function readAlarm(stub: DurableObjectStub<SandboxControlV2>): Promise<number | null> {
+  return runInDurableObject(stub, (_instance, state) => state.storage.getAlarm());
+}
+
+async function sessionRegistration(stub: DurableObjectStub<SandboxSessionV2>): Promise<{
+  spec: unknown;
+  credentials: unknown;
+  sandboxSelection?: unknown;
+  environment?: unknown;
+}> {
+  return runInDurableObject(stub, instance => {
+    const registration = (instance as unknown as { registration: unknown }).registration;
+    if (registration === null || registration === undefined) {
+      throw new Error('session registration is not available');
+    }
+    return registration as {
+      spec: unknown;
+      credentials: unknown;
+      sandboxSelection?: unknown;
+      environment?: unknown;
+    };
+  });
+}
+
+/**
+ * Simulates a Worker code deploy: the running allocation survives, but the DO
+ * generation (and every in-memory routing cache) is gone. The test harness must
+ * reinstall its provider adapter after eviction.
+ */
+async function deployNewGeneration(
+  sandboxId: string,
+  stub: DurableObjectStub<SandboxControlV2>,
+  provider: FakeProvider,
+  wrapper: FakeWrapper,
+  broker = createFakeCredentialBroker()
+): Promise<void> {
+  wrapper.close();
+  await waitFor(async () => {
+    expect((await stub.getAllocationState()).kind).not.toBe('connected');
+  });
+  await evictDurableObject(stub);
+  await installSandbox(sandboxId, provider, broker);
+}
+
+type WarmRoute = {
+  sessionId: string;
+  kiloId: string;
+  sandboxId: string;
+  provider: FakeProvider;
+  broker: ReturnType<typeof createFakeCredentialBroker>;
+  sandboxStub: DurableObjectStub<SandboxControlV2>;
+  sessionStub: DurableObjectStub<SandboxSessionV2>;
+  wrapper: FakeWrapper;
+  identity: { credential: string; allocationId: string };
+  prepareFrame: Extract<Awaited<ReturnType<FakeWrapper['next']>>, { type: 'session.prepare' }>;
+};
+
+async function warmRoute(providerName: AgentSandboxProvider, ready: boolean): Promise<WarmRoute> {
+  const sessionId = newSessionId();
+  const kin = kiloSessionId();
+  const sandboxId = await generateSandboxId(sessionId);
+  const provider = createProvider();
+  const broker = createFakeCredentialBroker();
+  const sandboxStub = await installSandbox(sandboxId, provider, broker);
+  const { seal, token } = await sealedRuntimeAuthorization(sessionId);
+  const sessionStub = await createVercelSession({
+    sessionId,
+    kiloId: kin,
+    sandboxId,
+    kiloToken: token,
+    seal,
+    provider: providerName,
+  });
+  await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
+  const identity = launchIdentity(provider);
+  const wrapper = await FakeWrapper.connect({ sandboxId, credential: identity.credential });
+  expect(await wrapper.hello({ wrapperId: 'wr_1', allocationId: identity.allocationId })).toEqual({
+    type: 'welcome',
+    protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
+  });
+  const prepareFrame = await wrapper.next();
+  if (prepareFrame?.type !== 'session.prepare') throw new Error('expected session.prepare');
+  if (ready) {
+    wrapper.send({ type: 'session.ready', sessionId });
+    await waitFor(async () =>
+      expect((await sandboxStub.status({ sessionId })).view.state).toBe('ready')
+    );
+    const prompt = await wrapper.next();
+    if (prompt?.type !== 'session.prompt') throw new Error('expected session.prompt');
+  }
+  return {
+    sessionId,
+    kiloId: kin,
+    sandboxId,
+    provider,
+    broker,
+    sandboxStub,
+    sessionStub,
+    wrapper,
+    identity,
+    prepareFrame,
+  };
+}
+
 afterEach(async () => {
+  syntheticIdentity.key.mockReset();
+  syntheticIdentity.contract = null;
+  syntheticIdentity.credential = null;
   vi.restoreAllMocks();
   await reset();
 });
@@ -389,6 +657,26 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
       const provider = createProvider();
       const broker = createFakeCredentialBroker();
       const sandboxStub = await installSandbox(sandboxId, provider, broker);
+      let signing: ReturnType<typeof generateKeyPairSync> | undefined;
+      if (providerName === 'vercel') {
+        signing = setupSyntheticVercelIdentity();
+        provider.adapter.create = async intent => ({
+          providerRef: JSON.stringify({
+            sandboxName: intent.allocationName ?? sandboxId,
+            sessionId: intent.intentId,
+          }),
+        });
+        await sandboxStub.ensureAllocation({
+          provider: 'vercel',
+          byoc: {
+            userId: USER_ID,
+            credentialId: '22222222-2222-4222-8222-222222222222',
+          },
+          allocationName: sandboxId,
+          locator: SYNTHETIC_VERCEL.locator,
+          containment: { kilocode: true, github: true, worktreeScoped: true },
+        });
+      }
       const { seal, token, delegationExpiresAt } = await sealedRuntimeAuthorization(sessionId);
       const sessionStub = await createVercelSession({
         sessionId,
@@ -504,20 +792,68 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
         INTERNAL_API_SECRET_PROD: { get: async () => 'integration-test-secret' },
         SESSION_INGEST: { fetch: sessionIngestFetch },
       } as Env;
-      const forward = async (currentHandle: string) => {
-        for (const [index, path] of paths.entries()) {
-          const response = await worker.fetch(
-            new Request(`${WORKER_URL}${path}`, {
-              method: methods[index],
-              headers: { authorization: `Bearer ${currentHandle}` },
-            }),
+      const forwardOne = async (
+        currentHandle: string,
+        path: string,
+        method: string,
+        allocationId: string
+      ): Promise<Response> => {
+        if (providerName === 'vercel') {
+          if (signing === undefined) throw new Error('missing synthetic Vercel identity');
+          return vercelRuntimeFetch({
+            sandboxId,
+            allocationId,
+            handle: currentHandle,
+            path,
+            method,
+            signing,
             requestEnv,
-            createExecutionContext()
+          });
+        }
+        return nativeOutboundFetch(
+          sandboxId,
+          allocationId,
+          new Request(`${WORKER_URL}${path}`, {
+            method,
+            headers: { authorization: `Bearer ${currentHandle}` },
+          }),
+          requestEnv
+        );
+      };
+      const forward = async (currentHandle: string, allocationId = identity.allocationId) => {
+        for (const [index, path] of paths.entries()) {
+          const response = await forwardOne(
+            currentHandle,
+            path,
+            methods[index] ?? 'GET',
+            allocationId
           );
           expect(response.status).toBe(200);
           expect(await response.text()).toBe('authorized');
         }
       };
+      // A public replay of a valid handle is never an origin proof.
+      const publicReplay = await worker.fetch(
+        new Request(`${WORKER_URL}/api/profile`, {
+          headers: { authorization: `Bearer ${handle}` },
+        }),
+        requestEnv,
+        createExecutionContext()
+      );
+      expect(publicReplay.status).toBe(403);
+      expect(await publicReplay.text()).toBe('runtime_proxy_origin_required');
+      if (providerName === 'vercel') {
+        const publicVercel = await worker.fetch(
+          new Request(`${WORKER_URL}/runtime-credential-proxy/vercel/${sandboxId}`, {
+            headers: { authorization: `Bearer ${handle}` },
+          }),
+          requestEnv,
+          createExecutionContext()
+        );
+        expect(publicVercel.status).toBe(403);
+        expect(await publicVercel.text()).toBe('runtime_proxy_origin_required');
+      }
+      expect(destinations).toHaveLength(0);
       await forward(handle);
 
       await sessionStub.stop();
@@ -526,32 +862,45 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
         expect((await sandboxStub.getAllocationState()).kind).toBe('stopped')
       );
       expect(await sessionStub.resolveRuntimeCredentialProxyGrant(handle)).toBeNull();
+      if (providerName === 'vercel') {
+        await sandboxStub.ensureAllocation({
+          provider: 'vercel',
+          byoc: {
+            userId: USER_ID,
+            credentialId: '22222222-2222-4222-8222-222222222222',
+          },
+          allocationName: sandboxId,
+          locator: SYNTHETIC_VERCEL.locator,
+          containment: { kilocode: true, github: true, worktreeScoped: true },
+        });
+      }
       await sessionStub.send(promptPayload(messageId()));
       await waitFor(() => expect(provider.launchEnvs).toHaveLength(2));
       const nextEnv = provider.launchEnvs[1];
+      if (!nextEnv) throw new Error('missing replacement launch environment');
+      const nextAllocationId = nextEnv.CONTROL_PLANE_ALLOCATION_ID;
+      if (!nextAllocationId) throw new Error('missing replacement allocation id');
       const replacement = await FakeWrapper.connect({
         sandboxId,
         credential: nextEnv.SANDBOX_CONTROL_CREDENTIAL,
       });
       await replacement.hello({
         wrapperId: 'wr_2',
-        allocationId: nextEnv.CONTROL_PLANE_ALLOCATION_ID,
+        allocationId: nextAllocationId,
       });
       const nextFrame = await replacement.next();
       if (nextFrame?.type !== 'session.prepare') throw new Error('expected replacement prepare');
       const nextHandle = nextFrame.credentials?.proxy?.handle ?? '';
       expect(nextHandle === handle).toBe(false);
       expect(await sessionStub.resolveRuntimeCredentialProxyGrant(handle)).toBeNull();
-      await forward(nextHandle);
+      await forward(nextHandle, nextAllocationId);
       expect(destinations).toHaveLength(6);
       const siblingKiloSessionId = kiloSessionId();
-      const siblingDenied = await worker.fetch(
-        new Request(`${WORKER_URL}/api/session/${siblingKiloSessionId}/ingest`, {
-          method: 'POST',
-          headers: { authorization: `Bearer ${nextHandle}` },
-        }),
-        requestEnv,
-        createExecutionContext()
+      const siblingDenied = await forwardOne(
+        nextHandle,
+        `/api/session/${siblingKiloSessionId}/ingest`,
+        'POST',
+        nextAllocationId
       );
       expect(siblingDenied.status).toBe(404);
       expect(sessionIngestFetch).toHaveBeenCalledOnce();
@@ -568,25 +917,13 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
         expect(authorization?.delegationExpiresAt).toBe(delegationExpiresAt);
       });
       vi.mocked(Date.now).mockReturnValue(startedAt + 25 * 60 * 60_000);
-      const expired = await worker.fetch(
-        new Request(`${WORKER_URL}/api/profile`, {
-          headers: { authorization: `Bearer ${nextHandle}` },
-        }),
-        requestEnv,
-        createExecutionContext()
-      );
-      expect(expired.status).toBe(404);
+      const expired = await forwardOne(nextHandle, '/api/profile', 'GET', nextAllocationId);
+      expect(expired.status).toBe(401);
       expect(destinations).toHaveLength(6);
 
       membershipPresent = false;
       vi.mocked(Date.now).mockReturnValue(startedAt + 122 * 60_000);
-      const denied = await worker.fetch(
-        new Request(`${WORKER_URL}/api/profile`, {
-          headers: { authorization: `Bearer ${nextHandle}` },
-        }),
-        requestEnv,
-        createExecutionContext()
-      );
+      const denied = await forwardOne(nextHandle, '/api/profile', 'GET', nextAllocationId);
       expect(denied.status).toBe(503);
       expect(destinations).toHaveLength(6);
       await runInDurableObject(sessionStub, async instance => {
@@ -594,13 +931,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
           state: 'revoked',
         });
       });
-      const revoked = await worker.fetch(
-        new Request(`${WORKER_URL}/api/profile`, {
-          headers: { authorization: `Bearer ${nextHandle}` },
-        }),
-        requestEnv,
-        createExecutionContext()
-      );
+      const revoked = await forwardOne(nextHandle, '/api/profile', 'GET', nextAllocationId);
       expect(revoked.status).toBe(503);
       expect(destinations).toHaveLength(6);
     }
@@ -813,6 +1144,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
         sandboxId,
         kiloToken: token,
         seal,
+        provider: 'cloudflare-containers',
       });
 
       await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
@@ -846,13 +1178,14 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
         return new Response('authorized');
       });
       const forward = () =>
-        worker.fetch(
+        nativeOutboundFetch(
+          sandboxId,
+          allocationId,
           new Request(`${WORKER_URL}/api/openrouter/chat/completions`, {
             method: 'POST',
             headers: { authorization: `Bearer ${handle}` },
           }),
-          { ...env, WORKER_URL, KILO_OPENROUTER_BASE: upstream } as Env,
-          createExecutionContext()
+          { ...env, WORKER_URL, KILO_OPENROUTER_BASE: upstream } as Env
         );
       const tokenGate = Promise.withResolvers<void>();
       let resolvingToken = false;
@@ -1338,6 +1671,566 @@ describe('SandboxControlV2 runtime proxy prepare frame secrets', () => {
     );
     expect(await wrapper.next(100)).toBeNull();
     expect(JSON.stringify(await readRouteRow(sandboxStub, sessionId))).not.toContain(SECRET_VALUE);
+  });
+
+  it('rebinds trusted native props once per warm allocation per DO generation', async () => {
+    const warm = await warmRoute('cloudflare-containers', true);
+    const providerRef = (await warm.sandboxStub.getAllocationState()).providerRef;
+    if (providerRef === null) throw new Error('missing provider ref');
+
+    await deployNewGeneration(
+      warm.sandboxId,
+      warm.sandboxStub,
+      warm.provider,
+      warm.wrapper,
+      warm.broker
+    );
+
+    const reconnected = await FakeWrapper.connect({
+      sandboxId: warm.sandboxId,
+      credential: warm.identity.credential,
+    });
+    expect(
+      await reconnected.hello({
+        wrapperId: 'wr_1',
+        allocationId: warm.identity.allocationId,
+      })
+    ).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
+    await waitFor(() => expect(warm.provider.rebindCalls).toEqual([providerRef]));
+
+    reconnected.close();
+    await waitFor(async () =>
+      expect((await warm.sandboxStub.getAllocationState()).kind).toBe('disconnected')
+    );
+    const sameGeneration = await FakeWrapper.connect({
+      sandboxId: warm.sandboxId,
+      credential: warm.identity.credential,
+    });
+    expect(
+      await sameGeneration.hello({
+        wrapperId: 'wr_1',
+        allocationId: warm.identity.allocationId,
+      })
+    ).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
+    await new Promise(resolve => setTimeout(resolve, 100));
+    expect(warm.provider.rebindCalls).toEqual([providerRef]);
+    expect((await warm.sandboxStub.status({ sessionId: warm.sessionId })).view.state).toBe('ready');
+    sameGeneration.close();
+  });
+
+  it('keeps status, Stop and interrupt responsive while a delayed warm refresh gates new work', async () => {
+    const warm = await warmRoute('vercel', true);
+    await deployNewGeneration(
+      warm.sandboxId,
+      warm.sandboxStub,
+      warm.provider,
+      warm.wrapper,
+      warm.broker
+    );
+
+    const gate = deferred();
+    let refreshStarted = false;
+    let policyRefreshes = 0;
+    warm.provider.policyHook = async () => {
+      policyRefreshes += 1;
+      refreshStarted = true;
+      await gate.promise;
+    };
+
+    const socket = await FakeWrapper.connect({
+      sandboxId: warm.sandboxId,
+      credential: warm.identity.credential,
+    });
+    const frames: ControlPlaneWrapperFrame[] = [];
+    socket.onFrame(frame => frames.push(frame));
+    expect(
+      await socket.hello({ wrapperId: 'wr_1', allocationId: warm.identity.allocationId })
+    ).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
+    await waitFor(() => expect(refreshStarted).toBe(true));
+    const registration = await sessionRegistration(warm.sessionStub);
+
+    const queuedSend = warm.sessionStub.send(promptPayload(messageId()));
+    const prepare = warm.sandboxStub.prepare({
+      spec: registration.spec as never,
+      credentials: registration.credentials as never,
+    });
+    const answer = warm.sandboxStub.answer({
+      sessionId: warm.sessionId,
+      reply: { action: 'permission', permissionId: 'permission_1', response: 'once' },
+    });
+    const deliver = warm.sandboxStub.deliver({
+      sessionId: warm.sessionId,
+      messages: [promptPayload(messageId())],
+    });
+
+    const startedStatus = Date.now();
+    await expect(warm.sandboxStub.status({ sessionId: warm.sessionId })).resolves.toMatchObject({
+      view: { state: 'ready' },
+    });
+    expect(Date.now() - startedStatus).toBeLessThan(1_000);
+
+    const abort = warm.sandboxStub.abort({ sessionId: warm.sessionId });
+    await expect(abort).resolves.toBe('sent');
+    await expect(deliver).resolves.toBe('not_ready');
+    const prepared = await prepare;
+    expect(prepared.state).toBe('ready');
+    await waitFor(() => expect(frames.some(frame => frame.type === 'session.abort')).toBe(true));
+    expect(frames.some(frame => frame.type === 'session.prepare')).toBe(false);
+    expect(frames.some(frame => frame.type === 'session.prompt')).toBe(false);
+    expect(frames.some(frame => frame.type === 'session.answer')).toBe(false);
+    let answerSettled = false;
+    void answer.finally(() => {
+      answerSettled = true;
+    });
+    await new Promise(resolve => setTimeout(resolve, 75));
+    expect(answerSettled).toBe(false);
+
+    gate.resolve();
+    await queuedSend;
+    await expect(answer).resolves.toBe('sent');
+    await waitFor(() =>
+      expect(
+        frames.some(frame => frame.type === 'session.prompt' && frame.sessionId === warm.sessionId)
+      ).toBe(true)
+    );
+    await waitFor(() => expect(frames.some(frame => frame.type === 'session.answer')).toBe(true));
+
+    await expect(
+      warm.sandboxStub.deliver({
+        sessionId: warm.sessionId,
+        messages: [promptPayload(messageId())],
+      })
+    ).resolves.toBe('sent');
+    await expect(
+      warm.sandboxStub.answer({
+        sessionId: warm.sessionId,
+        reply: { action: 'permission', permissionId: 'permission_1', response: 'once' },
+      })
+    ).resolves.toBe('sent');
+
+    socket.close();
+    await waitFor(async () =>
+      expect((await warm.sandboxStub.getAllocationState()).kind).toBe('disconnected')
+    );
+    const sameGeneration = await FakeWrapper.connect({
+      sandboxId: warm.sandboxId,
+      credential: warm.identity.credential,
+    });
+    expect(
+      await sameGeneration.hello({
+        wrapperId: 'wr_1',
+        allocationId: warm.identity.allocationId,
+      })
+    ).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
+    await new Promise(resolve => setTimeout(resolve, 100));
+    expect(policyRefreshes).toBe(1);
+    sameGeneration.close();
+  });
+
+  it('retries a transient warm refresh on the short alarm and resumes the pending prepare', async () => {
+    const warm = await warmRoute('cloudflare-containers', false);
+    await deployNewGeneration(
+      warm.sandboxId,
+      warm.sandboxStub,
+      warm.provider,
+      warm.wrapper,
+      warm.broker
+    );
+
+    let attempts = 0;
+    warm.provider.rebindHook = async () => {
+      attempts += 1;
+      if (attempts === 1) throw new Error('transient provider failure');
+    };
+
+    const socket = await FakeWrapper.connect({
+      sandboxId: warm.sandboxId,
+      credential: warm.identity.credential,
+    });
+    const frames: ControlPlaneWrapperFrame[] = [];
+    socket.onFrame(frame => frames.push(frame));
+    expect(
+      await socket.hello({ wrapperId: 'wr_1', allocationId: warm.identity.allocationId })
+    ).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
+    await waitFor(() => expect(attempts).toBe(1));
+
+    // The preparing route has a long attempt deadline; the refresh retry must
+    // still arm a short alarm rather than waiting for that deadline.
+    const retryAt = await readAlarm(warm.sandboxStub);
+    expect(retryAt).not.toBeNull();
+    expect(retryAt!).toBeLessThanOrEqual(Date.now() + 3_000);
+    expect(frames.some(frame => frame.type === 'session.prepare')).toBe(false);
+
+    await new Promise(resolve => setTimeout(resolve, Math.max(0, retryAt! - Date.now()) + 25));
+    await runInDurableObject(warm.sandboxStub, instance => instance.alarm());
+    await waitFor(() => expect(attempts).toBe(2));
+    await waitFor(() =>
+      expect(
+        frames.some(
+          frame => frame.type === 'session.prepare' && frame.spec.sessionId === warm.sessionId
+        )
+      ).toBe(true)
+    );
+    socket.close();
+  });
+
+  it('notifies a pending ready route after a transient warm refresh failure', async () => {
+    const warm = await warmRoute('cloudflare-containers', true);
+    await deployNewGeneration(
+      warm.sandboxId,
+      warm.sandboxStub,
+      warm.provider,
+      warm.wrapper,
+      warm.broker
+    );
+
+    const updates: Array<{ sessionId: string; update: unknown }> = [];
+    await runInDurableObject(warm.sandboxStub, instance => {
+      const peerFor = instance.sessionPeerFor.bind(instance);
+      instance.sessionPeerFor = (ownerId, sessionId) => {
+        const peer = peerFor(ownerId, sessionId);
+        return peer === null
+          ? null
+          : {
+              ...peer,
+              onRoute: async update => {
+                updates.push({ sessionId, update });
+                return peer.onRoute(update);
+              },
+            };
+      };
+    });
+    let attempts = 0;
+    warm.provider.rebindHook = async () => {
+      attempts += 1;
+      if (attempts === 1) throw new Error('transient provider failure');
+    };
+
+    const socket = await FakeWrapper.connect({
+      sandboxId: warm.sandboxId,
+      credential: warm.identity.credential,
+    });
+    expect(
+      await socket.hello({ wrapperId: 'wr_1', allocationId: warm.identity.allocationId })
+    ).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
+    await waitFor(() => expect(attempts).toBe(1));
+    expect(
+      updates.some(
+        entry =>
+          entry.sessionId === warm.sessionId &&
+          (entry.update as { state?: string }).state === 'ready'
+      )
+    ).toBe(false);
+
+    const retryAt = await readAlarm(warm.sandboxStub);
+    if (retryAt === null) throw new Error('missing refresh retry alarm');
+    await new Promise(resolve => setTimeout(resolve, Math.max(0, retryAt - Date.now()) + 25));
+    await runInDurableObject(warm.sandboxStub, instance => instance.alarm());
+    await waitFor(() => expect(attempts).toBe(2));
+    await waitFor(() =>
+      expect(
+        updates.some(
+          entry =>
+            entry.sessionId === warm.sessionId &&
+            (entry.update as { state?: string }).state === 'ready'
+        )
+      ).toBe(true)
+    );
+    socket.close();
+  });
+
+  it('fences a superseding hello without losing the first hello restart effects', async () => {
+    const warm = await warmRoute('cloudflare-containers', true);
+    await deployNewGeneration(
+      warm.sandboxId,
+      warm.sandboxStub,
+      warm.provider,
+      warm.wrapper,
+      warm.broker
+    );
+
+    const gate = deferred();
+    let refreshStarted = false;
+    warm.provider.rebindHook = async () => {
+      refreshStarted = true;
+      await gate.promise;
+    };
+
+    const superseded = await FakeWrapper.connect({
+      sandboxId: warm.sandboxId,
+      credential: warm.identity.credential,
+    });
+    // The persisted wrapper id belongs to the previous generation, so this
+    // hello is a restart.
+    expect(
+      await superseded.hello({ wrapperId: 'wr_2', allocationId: warm.identity.allocationId })
+    ).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
+    await waitFor(() => expect(refreshStarted).toBe(true));
+
+    const current = await FakeWrapper.connect({
+      sandboxId: warm.sandboxId,
+      credential: warm.identity.credential,
+    });
+    expect(
+      await current.hello({ wrapperId: 'wr_2', allocationId: warm.identity.allocationId })
+    ).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
+    const frames: ControlPlaneWrapperFrame[] = [];
+    current.onFrame(frame => frames.push(frame));
+
+    gate.resolve();
+    await waitFor(() =>
+      expect(
+        frames.some(
+          frame => frame.type === 'session.prepare' && frame.spec.sessionId === warm.sessionId
+        )
+      ).toBe(true)
+    );
+    expect(superseded.receivedFrames()).toBe(1);
+    expect((await warm.sandboxStub.status({ sessionId: warm.sessionId })).view.state).toBe(
+      'preparing'
+    );
+    current.close();
+  });
+
+  it('drains a Session-queued prompt after the routing cache resets without a new hello', async () => {
+    const warm = await warmRoute('cloudflare-containers', true);
+    const frames: ControlPlaneWrapperFrame[] = [];
+    warm.wrapper.onFrame(frame => frames.push(frame));
+
+    // Eviction waits for active WebSocket requests in this harness. Reset only
+    // the routing cache to exercise hibernated-socket recovery without a hello.
+    await runInDurableObject(warm.sandboxStub, instance => {
+      const ready: unknown = Reflect.get(instance, 'warmOriginRoutingReady');
+      if (!(ready instanceof Set)) throw new Error('missing warm routing cache');
+      ready.clear();
+    });
+
+    const gate = deferred();
+    let refreshStarted = false;
+    warm.provider.rebindHook = async () => {
+      refreshStarted = true;
+      await gate.promise;
+    };
+    const message = messageId();
+    const queued = warm.sessionStub.send(promptPayload(message));
+    await waitFor(() => expect(refreshStarted).toBe(true));
+    await queued;
+    expect(
+      frames.some(frame => frame.type === 'session.prompt' && frame.payload.messageId === message)
+    ).toBe(false);
+
+    const releasedAt = Date.now();
+    gate.resolve();
+    await waitFor(() =>
+      expect(
+        frames.some(frame => frame.type === 'session.prompt' && frame.payload.messageId === message)
+      ).toBe(true)
+    );
+    expect(Date.now() - releasedAt).toBeLessThan(2_000);
+    warm.wrapper.close();
+  });
+
+  it('refreshes a restored native binding from a heartbeat without a new hello or work', async () => {
+    const warm = await warmRoute('cloudflare-containers', true);
+    const providerRef = (await warm.sandboxStub.getAllocationState()).providerRef;
+    if (providerRef === null) throw new Error('missing provider ref');
+    const frames: ControlPlaneWrapperFrame[] = [];
+    warm.wrapper.onFrame(frame => frames.push(frame));
+
+    // Eviction waits for active WebSocket requests in this harness. Clear only
+    // the routing cache to model a new DO generation that kept the hibernated
+    // wrapper socket.
+    await runInDurableObject(warm.sandboxStub, instance => {
+      const ready: unknown = Reflect.get(instance, 'warmOriginRoutingReady');
+      if (!(ready instanceof Set)) throw new Error('missing warm routing cache');
+      ready.clear();
+    });
+
+    warm.wrapper.heartbeat(false);
+    await waitFor(() => expect(warm.provider.rebindCalls).toEqual([providerRef]));
+
+    // The successful refresh is the cache entry: later idle alarms and
+    // heartbeats must not probe the provider again.
+    await runInDurableObject(warm.sandboxStub, instance => instance.alarm());
+    warm.wrapper.heartbeat(false);
+    await new Promise(resolve => setTimeout(resolve, 100));
+    expect(warm.provider.rebindCalls).toEqual([providerRef]);
+    expect(
+      frames.some(frame => frame.type === 'session.prepare' || frame.type === 'session.prompt')
+    ).toBe(false);
+    warm.wrapper.close();
+  });
+
+  it('migrates a restored Vercel policy from the alarm without a new hello or work', async () => {
+    const warm = await warmRoute('vercel', true);
+    const policyCallsBefore = warm.provider.policyCalls.length;
+    const frames: ControlPlaneWrapperFrame[] = [];
+    warm.wrapper.onFrame(frame => frames.push(frame));
+
+    await runInDurableObject(warm.sandboxStub, instance => {
+      const ready: unknown = Reflect.get(instance, 'warmOriginRoutingReady');
+      if (!(ready instanceof Set)) throw new Error('missing warm routing cache');
+      ready.clear();
+    });
+
+    await runInDurableObject(warm.sandboxStub, instance => instance.alarm());
+    await waitFor(() => expect(warm.provider.policyCalls.length).toBe(policyCallsBefore + 1));
+
+    await runInDurableObject(warm.sandboxStub, instance => instance.alarm());
+    await new Promise(resolve => setTimeout(resolve, 100));
+    expect(warm.provider.policyCalls.length).toBe(policyCallsBefore + 1);
+    expect(
+      frames.some(frame => frame.type === 'session.prepare' || frame.type === 'session.prompt')
+    ).toBe(false);
+    warm.wrapper.close();
+  });
+
+  it('retains restart revocation and route recovery after a failed refresh and eviction', async () => {
+    const warm = await warmRoute('cloudflare-containers', true);
+    const oldHandle = warm.prepareFrame.credentials.proxy?.handle;
+    if (!oldHandle) throw new Error('missing runtime proxy handle');
+    await waitFor(async () =>
+      expect(await warm.sessionStub.resolveRuntimeCredentialProxyGrant(oldHandle)).not.toBeNull()
+    );
+
+    await deployNewGeneration(
+      warm.sandboxId,
+      warm.sandboxStub,
+      warm.provider,
+      warm.wrapper,
+      warm.broker
+    );
+    const gate = deferred();
+    let refreshStarted = false;
+    warm.provider.rebindHook = async () => {
+      refreshStarted = true;
+      await gate.promise;
+    };
+
+    const restarted = await FakeWrapper.connect({
+      sandboxId: warm.sandboxId,
+      credential: warm.identity.credential,
+    });
+    expect(
+      await restarted.hello({ wrapperId: 'wr_2', allocationId: warm.identity.allocationId })
+    ).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
+    await waitFor(() => expect(refreshStarted).toBe(true));
+    // Restart effects are durable before the refresh can succeed or the DO can
+    // be evicted: the old handle is already revoked.
+    await waitFor(async () =>
+      expect(await warm.sessionStub.resolveRuntimeCredentialProxyGrant(oldHandle)).toBeNull()
+    );
+
+    gate.reject(new Error('provider unavailable'));
+    restarted.close();
+    await waitFor(async () => {
+      expect((await warm.sandboxStub.getAllocationState()).kind).toBe('disconnected');
+      expect(
+        await runInDurableObject(warm.sandboxStub, instance =>
+          Reflect.get(instance, 'warmOriginRoutingFlight')
+        )
+      ).toBeNull();
+    });
+    await evictDurableObject(warm.sandboxStub);
+    await installSandbox(warm.sandboxId, warm.provider, warm.broker);
+    expect(await warm.sessionStub.resolveRuntimeCredentialProxyGrant(oldHandle)).toBeNull();
+
+    // The new generation sees the already-persisted wr_2, so this hello is not
+    // a restart. Recovery must not depend on the in-memory pending hello.
+    warm.provider.rebindHook = null;
+    const recovered = await FakeWrapper.connect({
+      sandboxId: warm.sandboxId,
+      credential: warm.identity.credential,
+    });
+    const frames: ControlPlaneWrapperFrame[] = [];
+    recovered.onFrame(frame => frames.push(frame));
+    expect(
+      await recovered.hello({ wrapperId: 'wr_2', allocationId: warm.identity.allocationId })
+    ).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
+    await waitFor(() =>
+      expect(
+        frames.some(
+          frame => frame.type === 'session.prepare' && frame.spec.sessionId === warm.sessionId
+        )
+      ).toBe(true)
+    );
+    expect((await warm.sandboxStub.status({ sessionId: warm.sessionId })).view.state).toBe(
+      'preparing'
+    );
+    recovered.close();
+  });
+
+  it('stops the bound allocation after three consecutive warm refresh failures', async () => {
+    const warm = await warmRoute('cloudflare-containers', true);
+    const providerRef = (await warm.sandboxStub.getAllocationState()).providerRef;
+    if (providerRef === null) throw new Error('missing provider ref');
+    await deployNewGeneration(
+      warm.sandboxId,
+      warm.sandboxStub,
+      warm.provider,
+      warm.wrapper,
+      warm.broker
+    );
+
+    let attempts = 0;
+    warm.provider.rebindHook = async () => {
+      attempts += 1;
+      throw new Error('provider rebind unavailable');
+    };
+    const updates: Array<{ sessionId: string; update: unknown }> = [];
+    await runInDurableObject(warm.sandboxStub, instance => {
+      const peerFor = instance.sessionPeerFor.bind(instance);
+      instance.sessionPeerFor = (ownerId, sessionId) => {
+        const peer = peerFor(ownerId, sessionId);
+        return peer === null
+          ? null
+          : {
+              ...peer,
+              onRoute: async update => {
+                updates.push({ sessionId, update });
+                return peer.onRoute(update);
+              },
+            };
+      };
+    });
+
+    const socket = await FakeWrapper.connect({
+      sandboxId: warm.sandboxId,
+      credential: warm.identity.credential,
+    });
+    expect(
+      await socket.hello({ wrapperId: 'wr_1', allocationId: warm.identity.allocationId })
+    ).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
+    await waitFor(() => expect(attempts).toBe(1));
+
+    for (let failure = 2; failure <= 3; failure += 1) {
+      const retryAt = await readAlarm(warm.sandboxStub);
+      if (retryAt === null) throw new Error('missing refresh retry alarm');
+      await new Promise(resolve => setTimeout(resolve, Math.max(0, retryAt - Date.now()) + 25));
+      await runInDurableObject(warm.sandboxStub, instance => instance.alarm());
+      await waitFor(() => expect(attempts).toBe(failure));
+    }
+
+    await waitFor(async () => {
+      expect(warm.provider.stopCalls).toEqual([providerRef]);
+      const kind = (await warm.sandboxStub.getAllocationState()).kind;
+      expect(kind === 'stopping' || kind === 'stopped').toBe(true);
+    });
+    await waitFor(async () => {
+      expect(await warm.sessionStub.getSession()).toMatchObject({
+        messages: [{ state: 'failed' }],
+      });
+    });
+    expect(updates).toContainEqual({
+      sessionId: warm.sessionId,
+      update: {
+        state: 'lost',
+        attemptId: expect.any(String),
+        reason: 'sandbox_lost',
+      },
+    });
+    expect(warm.provider.launchEnvs).toHaveLength(1);
+    socket.close();
   });
 });
 

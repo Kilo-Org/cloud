@@ -3,8 +3,8 @@ export const CONTROL_PLANE_TIMER_OVERRIDE_ENV = 'CONTROL_PLANE_TIMER_DIVISOR';
 const MINUTE_MS = 60_000;
 const HOUR_MS = 60 * MINUTE_MS;
 
-// Spec §5: queued backstop = reconnect window + one preparation attempt + 3 min;
-// accepted backstop = turn hard cap + 5 min.
+// Older wrappers do not advertise message ownership checks and still have a two-hour cap.
+const LEGACY_TURN_HARD_CAP_MS = 2 * HOUR_MS;
 const QUEUED_BACKSTOP_MARGIN_MS = 3 * MINUTE_MS;
 const ACCEPTED_BACKSTOP_MARGIN_MS = 5 * MINUTE_MS;
 // Spec §8 "provider lease": existing lease length, the idle stop plus 1 min.
@@ -14,6 +14,9 @@ export type ControlPlaneTimers = {
   session: {
     queuedBackstopMs: number;
     acceptedBackstopMs: number;
+    acceptedCoverageMs: number;
+    acceptedProbeMs: number;
+    acceptedProbeTimeoutMs: number;
     sandboxRpcDeadlineMs: number;
     transportRecoveryMs: number;
     /** Total bound on serving one scope handle through a surviving member. */
@@ -62,7 +65,10 @@ export type ControlPlaneTimers = {
      */
     kiloMemoryHoldMs: number;
     noProgressMs: number;
+    /** Configured cap once a Worker welcome acknowledges turn coverage. */
     turnHardCapMs: number;
+    /** Older Workers still fail accepted messages at this age. */
+    legacyTurnHardCapMs: number;
     reconnectBackoffMinMs: number;
     reconnectBackoffMaxMs: number;
   };
@@ -151,7 +157,8 @@ function buildControlPlaneTimers(divisor: number): ControlPlaneTimers {
     // Allow transient reclaim to clear while bounding a sustained memory stall.
     kiloMemoryHoldMs: ms(2 * MINUTE_MS),
     noProgressMs: ms(20 * MINUTE_MS),
-    turnHardCapMs: ms(120 * MINUTE_MS),
+    turnHardCapMs: ms(12 * HOUR_MS),
+    legacyTurnHardCapMs: ms(LEGACY_TURN_HARD_CAP_MS),
     reconnectBackoffMinMs: ms(1_000),
     reconnectBackoffMaxMs: ms(30_000),
   };
@@ -174,7 +181,10 @@ function buildControlPlaneTimers(divisor: number): ControlPlaneTimers {
       transportRecoveryMs: ms(15_000),
       queuedBackstopMs:
         sandbox.reconnectMs + sandbox.routePreparationMs + QUEUED_BACKSTOP_MARGIN_MS,
-      acceptedBackstopMs: wrapper.turnHardCapMs + ACCEPTED_BACKSTOP_MARGIN_MS,
+      acceptedBackstopMs: ms(LEGACY_TURN_HARD_CAP_MS) + ACCEPTED_BACKSTOP_MARGIN_MS,
+      acceptedCoverageMs: ms(3 * MINUTE_MS),
+      acceptedProbeMs: ms(MINUTE_MS),
+      acceptedProbeTimeoutMs: 10_000,
     },
     sandbox: {
       ...sandbox,

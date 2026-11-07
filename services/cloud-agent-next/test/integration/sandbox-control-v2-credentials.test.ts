@@ -9,6 +9,7 @@ import type * as VercelIdentityModule from '../../src/scm-broker/vercel-identity
 import type * as byocCredentials from '../../src/byoc/vercel-credential-resolver.js';
 import type * as VercelJwksModule from '../../src/scm-broker/vercel-jwks.js';
 import { SandboxControlV2 } from '../../src/control-plane/sandbox/sandbox-do.js';
+import { messageFailureText } from '../../src/control-plane/session/failure-messages.js';
 import { startAttempt, type RouteContext } from '../../src/control-plane/sandbox/routes.js';
 import * as scopeHandleAdoption from '../../src/control-plane/sandbox/scope-handle-adoption.js';
 import { logger } from '../../src/logger.js';
@@ -63,6 +64,7 @@ import { waitFor } from './wait-for.js';
 const SANDBOX_ID = 'sbx__control_v2_credentials';
 const SESSION = 'workspace_11111111-1111-1111-1111-111111111111';
 const SESSION_NEXT = 'workspace_22222222-2222-2222-2222-222222222222';
+const SESSION_HEALTHY = 'workspace_44444444-4444-4444-4444-444444444444';
 const OUTBOUND_CONTAINER_ID = fakeOutboundContainerId(SANDBOX_ID);
 const NATIVE_KILO_TOKEN = 'native-kilo-token-user';
 const NATIVE_GIT_TOKEN = 'ghp_nativeGittoken0000000000000000000000';
@@ -170,6 +172,7 @@ function createFakeProvider(): FakeProvider {
       );
       provider.policyFrameCounts.push(provider.framesSeen());
     },
+    async rebindOutboundInterception() {},
     async logs() {
       return '';
     },
@@ -179,9 +182,9 @@ function createFakeProvider(): FakeProvider {
 
 function kiloSessionIdFor(sessionId: string): string {
   if (sessionId === LEGACY_SESSION) return LEGACY_KILO_SESSION;
-  return sessionId === SESSION_NEXT
-    ? 'ses_bbbbbbbbbbbbbbbbbbbbbbbbbb'
-    : 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa';
+  if (sessionId === SESSION_NEXT) return 'ses_bbbbbbbbbbbbbbbbbbbbbbbbbb';
+  if (sessionId === SESSION_HEALTHY) return 'ses_dddddddddddddddddddddddddd';
+  return 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa';
 }
 
 function b64url(value: string): string {
@@ -319,6 +322,38 @@ function setGrantExpiry(
   return patchGrant(stub, sessionId, grant => ({ ...grant, expiresAt }));
 }
 
+/**
+ * Keeps the allocation active at a faked wall-clock time. Without this the
+ * interactive idle timer would stop the sandbox before the 8/12-hour checks.
+ */
+async function touchAllocation(stub: DurableObjectStub<SandboxControlV2>): Promise<void> {
+  await runInDurableObject(stub, async (_instance, state) => {
+    const db = drizzle(state.storage, { logger: false });
+    const now = Date.now();
+    await db
+      .update(allocationTable)
+      .set({ last_frame_at: now, last_activity_at: now })
+      .where(eq(allocationTable.id, 'current'));
+  });
+}
+
+function readAlarm(stub: DurableObjectStub<SandboxControlV2>): Promise<number | null> {
+  return runInDurableObject(stub, (_instance, state) => state.storage.getAlarm());
+}
+
+async function readCredentialRows(stub: DurableObjectStub<SandboxControlV2>): Promise<{
+  routes: number;
+  grants: number;
+}> {
+  return runInDurableObject(stub, (_instance, state) => {
+    const db = drizzle(state.storage, { logger: false });
+    return {
+      routes: db.select().from(routesTable).all().length,
+      grants: db.select().from(scopeGrants).all().length,
+    };
+  });
+}
+
 async function setup(
   provider: FakeProvider,
   broker: FakeCredentialBroker = createFakeCredentialBroker(),
@@ -384,6 +419,33 @@ async function prepareWarmRoute(
     });
   });
   return { wrapper, prepareFrame, credential, allocationId };
+}
+
+/** Adds a second ready route on the existing bound wrapper in a shared scope. */
+async function prepareSibling(
+  stub: DurableObjectStub<SandboxControlV2>,
+  wrapper: FakeWrapper,
+  input: ControlPlanePrepareInput
+): Promise<void> {
+  expect((await stub.prepare(input)).state).toBe('preparing');
+  const frame = await wrapper.next();
+  if (frame?.type !== 'session.prepare') throw new Error('missing sibling prepare');
+  wrapper.send({ type: 'session.ready', sessionId: input.spec.sessionId });
+  await waitFor(async () => {
+    expect((await stub.status({ sessionId: input.spec.sessionId })).view.state).toBe('ready');
+  });
+}
+
+/** The order maintenance uses when it picks one route per shared scope. */
+function readRouteOrder(stub: DurableObjectStub<SandboxControlV2>): Promise<string[]> {
+  return runInDurableObject(stub, (_instance, state) => {
+    const db = drizzle(state.storage, { logger: false });
+    return db
+      .select({ session_id: routesTable.session_id })
+      .from(routesTable)
+      .all()
+      .map(row => row.session_id);
+  });
 }
 
 /** A source that enables the Vercel runtime proxy (Kilo token with runtimeAuthorization). */
@@ -885,7 +947,10 @@ describe('bound Vercel SCM lifecycle with synthetic provider contracts', () => {
       })
     ).toMatchObject({ ok: true, authority: { type: 'managed' } });
     await stub.release({ sessionId: capability.members[0].sessionId });
-    expect(JSON.stringify(provider.policyCalls.at(-1))).not.toContain('forwardURL');
+    const released = provider.policyCalls.at(-1) as ReturnType<typeof buildControlNetworkPolicy>;
+    expect(JSON.stringify(released)).not.toContain(`${VERCEL_TARGET}/scm/vercel/`);
+    expect(released.allow['api.github.com']).toBeUndefined();
+    expect(released.allow['worker.example.com']?.length).toBeGreaterThan(0);
     expect(
       await admission('https://github.com/acme/widgets.git/info/refs', {
         authorization: `Bearer ${capability.scm.alias}`,
@@ -1988,6 +2053,1183 @@ describe('SandboxControlV2 credentials (B3)', () => {
     expect(credentialsFrame.sessionId).toBe(SESSION);
   });
 
+  it('renews a warm route proactively across 4, 8 and 12 hours without a deliver', async () => {
+    const provider = createFakeProvider();
+    const broker = createFakeCredentialBroker();
+    const stub = await setup(provider, broker);
+    const { wrapper } = await prepareWarmRoute(stub, provider);
+    const first = JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}') as {
+      kilo: { alias: string };
+      expiresAt: number;
+    };
+    expect(broker.kiloIssued()).toBe(0);
+
+    const realNow = Date.now.bind(Date);
+    let offset = 0;
+    const clock = vi.spyOn(Date, 'now').mockImplementation(() => realNow() + offset);
+    try {
+      const renewAt = async (at: number): Promise<void> => {
+        offset = at;
+        await touchAllocation(stub);
+        await runInDurableObject(stub, instance => instance.alarm());
+        await waitFor(async () => {
+          const grant = JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}') as {
+            expiresAt: number;
+          };
+          expect(grant.expiresAt).toBeGreaterThan(
+            Date.now() + TIMERS.credentialGrantReissueBelowMs
+          );
+        });
+        expect(await wrapper.next()).toMatchObject({ type: 'session.credentials' });
+        const grant = JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}') as {
+          kilo: { alias: string };
+        };
+        expect(grant.kilo.alias).toBe(first.kilo.alias);
+        expect(await stub.status({ sessionId: SESSION })).toMatchObject({
+          view: { state: 'ready' },
+        });
+      };
+
+      await renewAt(3 * 60 * 60_000 + 5 * 60_000);
+      await renewAt(6 * 60 * 60_000 + 10 * 60_000);
+      await renewAt(10 * 60 * 60_000 + 5 * 60_000);
+    } finally {
+      clock.mockRestore();
+    }
+
+    expect(broker.kiloIssued()).toBe(0);
+    expect(broker.githubIssued()).toBe(4);
+    // The grant renewal is not a restart or reallocation.
+    expect(provider.intents).toHaveLength(1);
+    expect(provider.launchEnvs).toHaveLength(1);
+  });
+
+  it('discards a renewal when a sibling leaves the shared scope during the mint', async () => {
+    const provider = createFakeProvider();
+    const broker = createFakeCredentialBroker();
+    const stub = await setup(provider, broker);
+    const input = (sessionId: string) =>
+      prepareInput(
+        sessionId,
+        { ...credentialsSource(sessionId), scopeId: 'shared_renewal' },
+        { ...routeSpec(sessionId), directory: '/workspace/shared_renewal' }
+      );
+    const { wrapper } = await prepareWarmRoute(stub, provider, input(SESSION));
+    await prepareSibling(stub, wrapper, input(SESSION_NEXT));
+    const order = await readRouteOrder(stub);
+    const targetSession = order[0] === SESSION ? SESSION : SESSION_NEXT;
+    const siblingSession = targetSession === SESSION ? SESSION_NEXT : SESSION;
+    const before = JSON.parse((await readRouteRow(stub, targetSession))?.grant ?? '{}') as {
+      expiresAt: number;
+      members: { sessionId: string }[];
+    };
+    expect(before.members.map(member => member.sessionId).sort()).toEqual(
+      [SESSION, SESSION_NEXT].sort()
+    );
+    const issuedBeforeRenewal = broker.githubIssued();
+
+    const gate = createDeferred();
+    let entered = false;
+    await runInDurableObject(stub, instance => {
+      const current = instance.env.GIT_TOKEN_SERVICE as FakeCredentialBroker;
+      Object.assign(instance.env, {
+        GIT_TOKEN_SERVICE: {
+          ...current,
+          async issueGitHubSessionCapability() {
+            if (!entered) {
+              entered = true;
+              await gate.promise;
+            }
+            return current.issueGitHubSessionCapability();
+          },
+        },
+      });
+    });
+
+    const realNow = Date.now.bind(Date);
+    const clock = vi.spyOn(Date, 'now').mockImplementation(() => realNow() + 3 * 60 * 60_000);
+    try {
+      await touchAllocation(stub);
+      await runInDurableObject(stub, instance => instance.alarm());
+      await waitFor(() => expect(entered).toBe(true));
+      await stub.release({ sessionId: siblingSession });
+      gate.resolve();
+      await waitFor(async () => {
+        const pending = await runInDurableObject(stub, instance =>
+          Boolean(
+            (instance as unknown as { credentialRenewal: { inFlight: boolean } }).credentialRenewal
+              .inFlight
+          )
+        );
+        expect(pending).toBe(false);
+      });
+      const after = JSON.parse((await readRouteRow(stub, targetSession))?.grant ?? '{}') as {
+        expiresAt: number;
+        members: { sessionId: string }[];
+      };
+      // The stale candidate is not published: the released sibling is not
+      // reinserted and the target keeps its authoritative expiry.
+      expect(after.expiresAt).toBe(before.expiresAt);
+      expect(after.members.map(member => member.sessionId)).toEqual([targetSession]);
+      // The candidate really was minted off-queue and then discarded.
+      expect(broker.githubIssued()).toBe(issuedBeforeRenewal + 1);
+      expect((await stub.status({ sessionId: targetSession })).view.state).toBe('ready');
+      expect((await stub.status({ sessionId: siblingSession })).view.state).toBe('unknown');
+      expect(await readCredentialRows(stub)).toEqual({ routes: 1, grants: 1 });
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
+  it('discards a renewal when a sibling joins the shared scope during the mint', async () => {
+    const provider = createFakeProvider();
+    const broker = createFakeCredentialBroker();
+    const stub = await setup(provider, broker);
+    const input = (sessionId: string) =>
+      prepareInput(
+        sessionId,
+        { ...credentialsSource(sessionId), scopeId: 'shared_join' },
+        { ...routeSpec(sessionId), directory: '/workspace/shared_join' }
+      );
+    const { wrapper } = await prepareWarmRoute(stub, provider, input(SESSION));
+
+    const gate = createDeferred();
+    let entered = false;
+    await runInDurableObject(stub, instance => {
+      const current = instance.env.GIT_TOKEN_SERVICE as FakeCredentialBroker;
+      Object.assign(instance.env, {
+        GIT_TOKEN_SERVICE: {
+          ...current,
+          async issueGitHubSessionCapability() {
+            if (!entered) {
+              entered = true;
+              await gate.promise;
+            }
+            return current.issueGitHubSessionCapability();
+          },
+        },
+      });
+    });
+
+    const realNow = Date.now.bind(Date);
+    const clock = vi.spyOn(Date, 'now').mockImplementation(() => realNow() + 3 * 60 * 60_000);
+    try {
+      await touchAllocation(stub);
+      await runInDurableObject(stub, instance => instance.alarm());
+      await waitFor(() => expect(entered).toBe(true));
+      await prepareSibling(stub, wrapper, input(SESSION_NEXT));
+      gate.resolve();
+      await waitFor(async () => {
+        const pending = await runInDurableObject(stub, instance =>
+          Boolean(
+            (instance as unknown as { credentialRenewal: { inFlight: boolean } }).credentialRenewal
+              .inFlight
+          )
+        );
+        expect(pending).toBe(false);
+      });
+      const after = JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}') as {
+        members: { sessionId: string }[];
+      };
+      // The join survives the stale renewal instead of being overwritten by the
+      // membership snapshot taken before the mint.
+      expect(after.members.map(member => member.sessionId).sort()).toEqual(
+        [SESSION, SESSION_NEXT].sort()
+      );
+      expect((await stub.status({ sessionId: SESSION })).view.state).toBe('ready');
+      expect((await stub.status({ sessionId: SESSION_NEXT })).view.state).toBe('ready');
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
+  it('restores the live policy when a sibling releases while a renewal policy is delayed', async () => {
+    const provider = createFakeProvider();
+    const broker = createFakeCredentialBroker();
+    const stub = await setupVercel(provider, broker);
+    const input = (sessionId: string) =>
+      prepareInput(
+        sessionId,
+        {
+          ...credentialsSource(sessionId, {
+            repository: { type: 'git', url: 'https://github.com/acme/widgets.git' },
+          }),
+          scopeId: 'shared_policy',
+        },
+        { ...routeSpec(sessionId), directory: '/workspace/shared_policy' }
+      );
+    const { wrapper } = await prepareWarmRoute(stub, provider, input(SESSION));
+    await prepareSibling(stub, wrapper, input(SESSION_NEXT));
+    const order = await readRouteOrder(stub);
+    const targetSession = order[0] === SESSION ? SESSION : SESSION_NEXT;
+    const siblingSession = targetSession === SESSION ? SESSION_NEXT : SESSION;
+
+    const gate = createDeferred();
+    provider.policyGate = { promise: gate.promise, resolve: gate.resolve };
+    const realNow = Date.now.bind(Date);
+    const clock = vi.spyOn(Date, 'now').mockImplementation(() => realNow() + 3 * 60 * 60_000);
+    try {
+      await touchAllocation(stub);
+      await runInDurableObject(stub, instance => instance.alarm());
+      await waitFor(() => expect(provider.policyBlocked).toBe(true));
+      // The release deletes its route, then joins the same policy chain behind
+      // the delayed candidate update. It must not see a precomputed snapshot.
+      const release = stub.release({ sessionId: siblingSession });
+      await waitFor(async () => {
+        expect(await readRouteRow(stub, siblingSession)).toBeNull();
+      });
+      gate.resolve();
+      await release;
+      await waitFor(async () => {
+        const pending = await runInDurableObject(stub, instance =>
+          Boolean(
+            (instance as unknown as { credentialRenewal: { inFlight: boolean } }).credentialRenewal
+              .inFlight
+          )
+        );
+        expect(pending).toBe(false);
+      });
+
+      const activeJson = (await readRouteRow(stub, targetSession))?.grant ?? 'null';
+      const active = JSON.parse(activeJson) as { members: { sessionId: string }[] };
+      expect(active.members.map(member => member.sessionId)).toEqual([targetSession]);
+      expect(provider.policyCalls.at(-1)).toEqual(
+        buildControlNetworkPolicy([JSON.parse(activeJson)])
+      );
+      // The discarded candidate must not reallow the released sibling.
+      expect(JSON.stringify(provider.policyCalls.at(-1))).not.toContain(
+        kiloSessionIdFor(siblingSession)
+      );
+      expect((await stub.status({ sessionId: targetSession })).view.state).toBe('ready');
+      expect((await stub.status({ sessionId: siblingSession })).view.state).toBe('unknown');
+    } finally {
+      provider.policyGate = null;
+      clock.mockRestore();
+    }
+  });
+
+  it('fails a ready sibling as sandbox_lost when the restored live policy cannot be applied', async () => {
+    const provider = createFakeProvider();
+    const broker = createFakeCredentialBroker();
+    const stub = await setupVercel(provider, broker);
+    const input = (sessionId: string) =>
+      prepareInput(
+        sessionId,
+        {
+          ...credentialsSource(sessionId, {
+            repository: { type: 'git', url: 'https://github.com/acme/widgets.git' },
+          }),
+          scopeId: 'shared_policy_restore_failure',
+        },
+        { ...routeSpec(sessionId), directory: '/workspace/shared_policy_restore_failure' }
+      );
+    const { wrapper } = await prepareWarmRoute(stub, provider, input(SESSION));
+    await prepareSibling(stub, wrapper, input(SESSION_NEXT));
+    const order = await readRouteOrder(stub);
+    const targetSession = order[0] === SESSION ? SESSION : SESSION_NEXT;
+    const siblingSession = targetSession === SESSION ? SESSION_NEXT : SESSION;
+    const updates: Array<{ sessionId: string; update: ControlPlaneRouteUpdate }> = [];
+    await runInDurableObject(stub, instance => {
+      const peerFor = instance.sessionPeerFor.bind(instance);
+      instance.sessionPeerFor = (ownerId, sessionId) => {
+        const peer = peerFor(ownerId, sessionId);
+        return peer === null
+          ? null
+          : {
+              ...peer,
+              onRoute: async update => {
+                updates.push({ sessionId, update });
+                return peer.onRoute(update);
+              },
+            };
+      };
+    });
+
+    const gate = createDeferred();
+    provider.policyGate = { promise: gate.promise, resolve: gate.resolve };
+    const apply = provider.adapter.applyContainedCredentials!.bind(provider.adapter);
+    // The candidate policy spans both members and the release's revocation
+    // policy applies to the survivor alone. Fail the next single-member policy
+    // rebuild, which is repairRenewalPolicy restoring the live grants.
+    let failRestorePolicy = false;
+    provider.adapter.applyContainedCredentials = async (ref, grants) => {
+      if (failRestorePolicy) throw new Error('network policy update failed');
+      const result = await apply(ref, grants);
+      if (grants.every(grant => grant.members.length === 1)) failRestorePolicy = true;
+      return result;
+    };
+    const realNow = Date.now.bind(Date);
+    const clock = vi.spyOn(Date, 'now').mockImplementation(() => realNow() + 3 * 60 * 60_000);
+    try {
+      await touchAllocation(stub);
+      await runInDurableObject(stub, instance => instance.alarm());
+      await waitFor(() => expect(provider.policyBlocked).toBe(true));
+      const release = stub.release({ sessionId: siblingSession });
+      await waitFor(async () => {
+        expect(await readRouteRow(stub, siblingSession)).toBeNull();
+      });
+      gate.resolve();
+      await release;
+      await waitFor(async () => {
+        const pending = await runInDurableObject(stub, instance =>
+          Boolean(
+            (instance as unknown as { credentialRenewal: { inFlight: boolean } }).credentialRenewal
+              .inFlight
+          )
+        );
+        expect(pending).toBe(false);
+      });
+      expect(updates).toContainEqual({
+        sessionId: targetSession,
+        update: {
+          state: 'lost',
+          attemptId: expect.any(String),
+          reason: 'sandbox_lost',
+        },
+      });
+      const state = await stub.getAllocationState();
+      expect(state.kind === 'stopping' || state.kind === 'stopped').toBe(true);
+    } finally {
+      provider.policyGate = null;
+      clock.mockRestore();
+    }
+  });
+
+  it('discards a proactive renewal whose route was released while minting', async () => {
+    const provider = createFakeProvider();
+    const broker = createFakeCredentialBroker();
+    const stub = await setup(provider, broker);
+    const { wrapper } = await prepareWarmRoute(stub, provider);
+    const gate = createDeferred();
+    let entered = false;
+    await runInDurableObject(stub, instance => {
+      const current = instance.env.GIT_TOKEN_SERVICE as FakeCredentialBroker;
+      Object.assign(instance.env, {
+        GIT_TOKEN_SERVICE: {
+          ...current,
+          async issueGitHubSessionCapability() {
+            entered = true;
+            await gate.promise;
+            return current.issueGitHubSessionCapability();
+          },
+        },
+      });
+    });
+
+    const realNow = Date.now.bind(Date);
+    const clock = vi.spyOn(Date, 'now').mockImplementation(() => realNow() + 3 * 60 * 60_000);
+    try {
+      await touchAllocation(stub);
+      await runInDurableObject(stub, instance => instance.alarm());
+      await waitFor(() => expect(entered).toBe(true));
+      await stub.release({ sessionId: SESSION });
+      expect(await readCredentialRows(stub)).toEqual({ routes: 0, grants: 0 });
+      gate.resolve();
+      await waitFor(async () => {
+        const pending = await runInDurableObject(stub, instance =>
+          Boolean(
+            (instance as unknown as { credentialRenewal: { inFlight: boolean } }).credentialRenewal
+              .inFlight
+          )
+        );
+        expect(pending).toBe(false);
+      });
+      // Release survives the late mint: nothing is resurrected and the late
+      // pass does not publish a credentials frame.
+      expect(await readCredentialRows(stub)).toEqual({ routes: 0, grants: 0 });
+      const frame = await wrapper.next(200);
+      expect(frame?.type).not.toBe('session.credentials');
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
+  it('does not install a renewal candidate after the last member released during the mint', async () => {
+    const provider = createFakeProvider();
+    const broker = createFakeCredentialBroker();
+    const stub = await setupVercel(provider, broker);
+    const { wrapper } = await prepareWarmRoute(
+      stub,
+      provider,
+      prepareInput(SESSION, vercelSource(SESSION))
+    );
+    const frames: ControlPlaneWrapperFrame[] = [];
+    wrapper.onFrame(frame => frames.push(frame));
+
+    const gate = createDeferred();
+    let entered = false;
+    await runInDurableObject(stub, instance => {
+      const privateInstance = instance as unknown as {
+        issueRouteGrant(
+          spec: ControlPlaneRouteSpec,
+          source: ControlPlaneCredentialSource
+        ): Promise<unknown>;
+      };
+      const original = privateInstance.issueRouteGrant.bind(instance) as (
+        spec: ControlPlaneRouteSpec,
+        source: ControlPlaneCredentialSource,
+        ...rest: unknown[]
+      ) => Promise<unknown>;
+      privateInstance.issueRouteGrant = async (spec, source, ...rest: unknown[]) => {
+        entered = true;
+        await gate.promise;
+        return original(spec, source, ...rest);
+      };
+    });
+
+    const realNow = Date.now.bind(Date);
+    const clock = vi.spyOn(Date, 'now').mockImplementation(() => realNow() + 3 * 60 * 60_000);
+    try {
+      await touchAllocation(stub);
+      await runInDurableObject(stub, instance => instance.alarm());
+      await waitFor(() => expect(entered).toBe(true));
+      // The only member releases and its revocation policy completes while the
+      // proactive mint is still blocked.
+      await stub.release({ sessionId: SESSION });
+      await waitFor(async () =>
+        expect(await readCredentialRows(stub)).toEqual({ routes: 0, grants: 0 })
+      );
+      const policyCallsAfterRelease = provider.policyCalls.length;
+      gate.resolve();
+      await waitFor(async () => {
+        const pending = await runInDurableObject(stub, instance =>
+          Boolean(
+            (instance as unknown as { credentialRenewal: { inFlight: boolean } }).credentialRenewal
+              .inFlight
+          )
+        );
+        expect(pending).toBe(false);
+      });
+
+      // The resumed mint must not install the retired grant even transiently.
+      for (const call of provider.policyCalls.slice(policyCallsAfterRelease)) {
+        expect(JSON.stringify(call)).not.toContain(kiloSessionIdFor(SESSION));
+      }
+      expect(await readCredentialRows(stub)).toEqual({ routes: 0, grants: 0 });
+      expect(frames.some(frame => frame.type === 'session.credentials')).toBe(false);
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
+  it('keeps valid work on a transient renewal failure and retries after the bounded backoff', async () => {
+    const provider = createFakeProvider();
+    const broker = createFakeCredentialBroker();
+    const stub = await setup(provider, broker);
+    const { wrapper } = await prepareWarmRoute(stub, provider);
+    const first = JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}') as {
+      kilo: { alias: string };
+      expiresAt: number;
+    };
+    let failOnce = true;
+    await runInDurableObject(stub, instance => {
+      const current = instance.env.GIT_TOKEN_SERVICE as FakeCredentialBroker;
+      Object.assign(instance.env, {
+        GIT_TOKEN_SERVICE: {
+          ...current,
+          async issueGitHubSessionCapability() {
+            if (failOnce) {
+              failOnce = false;
+              throw new Error('transient credential broker failure');
+            }
+            return current.issueGitHubSessionCapability();
+          },
+        },
+      });
+    });
+
+    const realNow = Date.now.bind(Date);
+    let offset = 3 * 60 * 60_000 + 5 * 60_000;
+    const clock = vi.spyOn(Date, 'now').mockImplementation(() => realNow() + offset);
+    try {
+      await touchAllocation(stub);
+      await runInDurableObject(stub, instance => instance.alarm());
+      await waitFor(async () => {
+        const pending = await runInDurableObject(stub, instance =>
+          Boolean(
+            (instance as unknown as { credentialRenewal: { inFlight: boolean } }).credentialRenewal
+              .inFlight
+          )
+        );
+        expect(pending).toBe(false);
+      });
+      const failed = JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}') as {
+        expiresAt: number;
+      };
+      expect(failed.expiresAt).toBe(first.expiresAt);
+      expect(await stub.status({ sessionId: SESSION })).toMatchObject({
+        view: { state: 'ready' },
+      });
+      // The retry is scheduled in the future, not re-armed into the past.
+      const alarmAt = await readAlarm(stub);
+      expect(alarmAt).not.toBeNull();
+      expect(alarmAt ?? 0).toBeGreaterThan(Date.now());
+
+      offset += 5 * 60_000 + 1_000;
+      await touchAllocation(stub);
+      await runInDurableObject(stub, instance => instance.alarm());
+      await waitFor(async () => {
+        const grant = JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}') as {
+          expiresAt: number;
+        };
+        expect(grant.expiresAt).toBeGreaterThan(Date.now() + TIMERS.credentialGrantReissueBelowMs);
+      });
+      expect(await wrapper.next()).toMatchObject({ type: 'session.credentials' });
+      const renewed = JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}') as {
+        kilo: { alias: string };
+      };
+      expect(renewed.kilo.alias).toBe(first.kilo.alias);
+      expect(provider.launchEnvs).toHaveLength(1);
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
+  it.each([false, true])(
+    'repairs a renewal candidate that applied then threw (repair fails: %s)',
+    async repairFails => {
+      const provider = createFakeProvider();
+      const broker = createFakeCredentialBroker();
+      const stub = await setupVercel(provider, broker);
+      const { wrapper } = await prepareWarmRoute(
+        stub,
+        provider,
+        prepareInput(SESSION, vercelSource(SESSION))
+      );
+      const originalGrant = JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}') as {
+        expiresAt: number;
+      };
+      const apply = provider.adapter.applyContainedCredentials!.bind(provider.adapter);
+      let candidateDone = false;
+      provider.adapter.applyContainedCredentials = async (ref, grants) => {
+        if (!candidateDone) {
+          candidateDone = true;
+          await apply(ref, grants);
+          throw new Error('policy applied then threw');
+        }
+        if (repairFails) throw new Error('authoritative repair failed');
+        return apply(ref, grants);
+      };
+
+      const realNow = Date.now.bind(Date);
+      const clock = vi.spyOn(Date, 'now').mockImplementation(() => realNow() + 3 * 60 * 60_000);
+      try {
+        await touchAllocation(stub);
+        await runInDurableObject(stub, instance => instance.alarm());
+        await waitFor(async () => {
+          const pending = await runInDurableObject(stub, instance =>
+            Boolean(
+              (instance as unknown as { credentialRenewal: { inFlight: boolean } })
+                .credentialRenewal.inFlight
+            )
+          );
+          expect(pending).toBe(false);
+        });
+
+        if (repairFails) {
+          await waitFor(async () =>
+            expect(['stopping', 'stopped']).toContain((await stub.getAllocationState()).kind)
+          );
+        } else {
+          expect(await stub.status({ sessionId: SESSION })).toMatchObject({
+            view: { state: 'ready' },
+          });
+          const current = JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}') as {
+            expiresAt: number;
+          };
+          expect(current.expiresAt).toBe(originalGrant.expiresAt);
+          const live = await runInDurableObject(stub, (_instance, state) =>
+            buildControlNetworkPolicy(
+              listScopeGrants(drizzle(state.storage)).filter(grant => grant.expiresAt > Date.now())
+            )
+          );
+          expect(provider.policyCalls.at(-1)).toEqual(live);
+          const frame = await wrapper.next(200);
+          expect(frame?.type).not.toBe('session.credentials');
+        }
+      } finally {
+        clock.mockRestore();
+      }
+    }
+  );
+
+  it('revokes an expired grant when issuance fails after crossing expiry', async () => {
+    const provider = createFakeProvider();
+    const stub = await setupVercel(provider, createFakeCredentialBroker());
+    const { wrapper } = await prepareWarmRoute(
+      stub,
+      provider,
+      prepareInput(SESSION, vercelSource(SESSION))
+    );
+    const frames: ControlPlaneWrapperFrame[] = [];
+    wrapper.onFrame(frame => frames.push(frame));
+
+    const gate = createDeferred();
+    let entered = false;
+    await runInDurableObject(stub, instance => {
+      const privateInstance = instance as unknown as {
+        issueRouteGrant(
+          spec: ControlPlaneRouteSpec,
+          source: ControlPlaneCredentialSource
+        ): Promise<unknown>;
+      };
+      privateInstance.issueRouteGrant = async () => {
+        entered = true;
+        await gate.promise;
+        throw new Error('issuance failed after the grant expired');
+      };
+    });
+    await setGrantExpiry(stub, SESSION, Date.now() + 1_000);
+
+    const policyCallsBefore = provider.policyCalls.length;
+    await touchAllocation(stub);
+    await runInDurableObject(stub, instance => instance.alarm());
+    await waitFor(() => expect(entered).toBe(true));
+    // The mint is in flight while the grant crosses its expiry.
+    await setGrantExpiry(stub, SESSION, Date.now() - 1);
+    gate.resolve();
+
+    await waitFor(async () => expect(await readRouteRow(stub, SESSION)).toBeNull());
+    await waitFor(() => expect(provider.policyCalls.length).toBeGreaterThan(policyCallsBefore));
+    expect(JSON.stringify(provider.policyCalls.at(-1))).not.toContain(kiloSessionIdFor(SESSION));
+    await waitFor(() =>
+      expect(
+        frames.filter(
+          frame =>
+            frame.type === 'session.release' &&
+            (frame as { sessionId: string }).sessionId === SESSION
+        )
+      ).toHaveLength(1)
+    );
+  });
+
+  it('serializes a proactive policy failure stop behind queued work', async () => {
+    const provider = createFakeProvider();
+    const stub = await setupVercel(provider, createFakeCredentialBroker());
+    await prepareWarmRoute(stub, provider, prepareInput(SESSION, vercelSource(SESSION)));
+    await setGrantExpiry(stub, SESSION, Date.now() + TIMERS.credentialGrantReissueBelowMs / 2);
+    const candidateGate = createDeferred();
+    const queueGate = createDeferred();
+    let candidateStarted = false;
+    let repairStarted = false;
+    let queueHeld = false;
+    let queuedWork: Promise<void> | undefined;
+    provider.adapter.applyContainedCredentials = async () => {
+      if (!candidateStarted) {
+        candidateStarted = true;
+        await candidateGate.promise;
+      } else {
+        repairStarted = true;
+      }
+      throw new Error('policy update failed');
+    };
+    try {
+      await touchAllocation(stub);
+      await runInDurableObject(stub, instance => instance.alarm());
+      await waitFor(() => expect(candidateStarted).toBe(true));
+      await runInDurableObject(stub, instance => {
+        const coordinator = instance as unknown as {
+          enqueue(work: () => Promise<void>): Promise<void>;
+        };
+        queuedWork = coordinator.enqueue(async () => {
+          queueHeld = true;
+          await queueGate.promise;
+        });
+      });
+      await waitFor(() => expect(queueHeld).toBe(true));
+      candidateGate.resolve();
+      await waitFor(() => expect(repairStarted).toBe(true));
+      expect((await stub.getAllocationState()).kind).toBe('connected');
+      queueGate.resolve();
+      await queuedWork;
+      await waitFor(async () =>
+        expect(['stopping', 'stopped']).toContain((await stub.getAllocationState()).kind)
+      );
+    } finally {
+      candidateGate.resolve();
+      queueGate.resolve();
+      await queuedWork;
+    }
+  });
+
+  it('does not publish when the write-time guard is stale and the scope returns to the captured state', async () => {
+    const provider = createFakeProvider();
+    const stub = await setupVercel(provider, createFakeCredentialBroker());
+    const { wrapper } = await prepareWarmRoute(
+      stub,
+      provider,
+      prepareInput(SESSION, vercelSource(SESSION))
+    );
+    const frames: ControlPlaneWrapperFrame[] = [];
+    wrapper.onFrame(frame => frames.push(frame));
+
+    await setGrantExpiry(stub, SESSION, Date.now() + 1_000);
+    const captured = JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}') as Record<
+      string,
+      unknown
+    >;
+    const gate = createDeferred();
+    let entered = false;
+    await runInDurableObject(stub, (instance, state) => {
+      const db = drizzle(state.storage, { logger: false });
+      const privateInstance = instance as unknown as {
+        issueRouteGrant(
+          spec: ControlPlaneRouteSpec,
+          source: ControlPlaneCredentialSource
+        ): Promise<unknown>;
+        renewalCandidateGuard(target: {
+          scopeKey: string;
+          scopeGrantJson: string;
+        }): () => 'current' | 'stale' | 'released' | 'replaced';
+      };
+      const originalIssue = privateInstance.issueRouteGrant.bind(instance) as (
+        spec: ControlPlaneRouteSpec,
+        source: ControlPlaneCredentialSource,
+        ...rest: unknown[]
+      ) => Promise<unknown>;
+      privateInstance.issueRouteGrant = async (spec, source, ...rest: unknown[]) => {
+        entered = true;
+        await gate.promise;
+        return originalIssue(spec, source, ...rest);
+      };
+      const originalGuard = privateInstance.renewalCandidateGuard.bind(instance);
+      privateInstance.renewalCandidateGuard = target => {
+        const guard = originalGuard(target);
+        return () => {
+          const verdict = guard();
+          if (verdict !== 'current') {
+            // The captured membership returns before the queued commit would
+            // run. A stale write-time verdict must still discard the candidate.
+            db.update(scopeGrants)
+              .set({ grant: target.scopeGrantJson })
+              .where(eq(scopeGrants.id, target.scopeKey))
+              .run();
+          }
+          return verdict;
+        };
+      };
+    });
+
+    const policyCallsBefore = provider.policyCalls.length;
+    await touchAllocation(stub);
+    await runInDurableObject(stub, instance => instance.alarm());
+    await waitFor(() => expect(entered).toBe(true));
+    await patchGrant(stub, SESSION, grant => ({
+      ...grant,
+      kilo: { ...(grant.kilo as Record<string, unknown>), alias: 'changed-during-mint' },
+    }));
+    gate.resolve();
+
+    await waitFor(async () => {
+      const pending = await runInDurableObject(stub, instance =>
+        Boolean(
+          (instance as unknown as { credentialRenewal: { inFlight: boolean } }).credentialRenewal
+            .inFlight
+        )
+      );
+      expect(pending).toBe(false);
+    });
+    expect(provider.policyCalls.length).toBe(policyCallsBefore);
+    expect(frames.some(frame => frame.type === 'session.credentials')).toBe(false);
+    const current = JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}');
+    expect(current).toEqual(captured);
+  });
+
+  it('never stops a replacement allocation with a timed-out old allocation result', async () => {
+    const provider = createFakeProvider();
+    const stub = await setupVercel(provider, createFakeCredentialBroker());
+    await prepareWarmRoute(stub, provider, prepareInput(SESSION, vercelSource(SESSION)));
+    await setGrantExpiry(stub, SESSION, Date.now() + 1_000);
+    const oldAllocationId = (await stub.getAllocationState()).allocationId;
+    if (oldAllocationId === null) throw new Error('missing allocation id');
+    await runInDurableObject(stub, instance => {
+      const current = instance as unknown as { sandboxTimers(): typeof TIMERS };
+      const timers = current.sandboxTimers.bind(instance);
+      current.sandboxTimers = () => ({ ...timers(), providerStopAttemptMs: 50 });
+    });
+    const gate = createDeferred();
+    provider.policyGate = { promise: gate.promise, resolve: gate.resolve };
+    try {
+      await touchAllocation(stub);
+      await runInDurableObject(stub, instance => instance.alarm());
+      await waitFor(async () =>
+        expect(['stopping', 'stopped']).toContain((await stub.getAllocationState()).kind)
+      );
+      gate.resolve();
+      provider.policyGate = null;
+      await waitFor(async () => expect((await stub.getAllocationState()).kind).toBe('stopped'));
+
+      expect(await stub.prepare(prepareInput(SESSION, vercelSource(SESSION)))).toMatchObject({
+        state: 'preparing',
+      });
+      const replacement = await stub.getAllocationState();
+      expect(replacement.allocationId).not.toBe(oldAllocationId);
+      await runInDurableObject(stub, instance =>
+        (
+          instance as unknown as {
+            stopCapturedAllocation(allocationId: string): Promise<void>;
+          }
+        ).stopCapturedAllocation(oldAllocationId)
+      );
+      const after = await stub.getAllocationState();
+      expect(after.allocationId).toBe(replacement.allocationId);
+      expect(after.kind).not.toBe('stopping');
+      expect(after.kind).not.toBe('stopped');
+      const policyCallsBefore = provider.policyCalls.length;
+      await runInDurableObject(stub, instance =>
+        (
+          instance as unknown as {
+            repairRenewalPolicy(target: {
+              allocationId: string;
+              scopeKey: string;
+            }): Promise<boolean>;
+          }
+        ).repairRenewalPolicy({ allocationId: oldAllocationId, scopeKey: 'retired-scope' })
+      );
+      expect(provider.policyCalls.length).toBe(policyCallsBefore);
+      expect((await stub.getAllocationState()).allocationId).toBe(replacement.allocationId);
+    } finally {
+      gate.resolve();
+      provider.policyGate = null;
+    }
+  });
+
+  it('fails the captured allocation closed when a candidate policy outlives its deadline', async () => {
+    const provider = createFakeProvider();
+    const stub = await setupVercel(provider, createFakeCredentialBroker());
+    const { wrapper } = await prepareWarmRoute(
+      stub,
+      provider,
+      prepareInput(SESSION, vercelSource(SESSION))
+    );
+    const frames: ControlPlaneWrapperFrame[] = [];
+    wrapper.onFrame(frame => frames.push(frame));
+    await runInDurableObject(stub, instance => {
+      const current = instance as unknown as { sandboxTimers(): typeof TIMERS };
+      const timers = current.sandboxTimers.bind(instance);
+      current.sandboxTimers = () => ({ ...timers(), providerStopAttemptMs: 50 });
+    });
+    const gate = createDeferred();
+    provider.policyGate = { promise: gate.promise, resolve: gate.resolve };
+    const realNow = Date.now.bind(Date);
+    const clock = vi.spyOn(Date, 'now').mockImplementation(() => realNow() + 3 * 60 * 60_000);
+    try {
+      await touchAllocation(stub);
+      await runInDurableObject(stub, instance => instance.alarm());
+      await waitFor(() => expect(provider.policyBlocked).toBe(true));
+      await waitFor(async () =>
+        expect(['stopping', 'stopped']).toContain((await stub.getAllocationState()).kind)
+      );
+      // The candidate never reached the durable route or the wrapper.
+      expect(frames.some(frame => frame.type === 'session.credentials')).toBe(false);
+    } finally {
+      gate.resolve();
+      provider.policyGate = null;
+      clock.mockRestore();
+    }
+  });
+
+  it('fails and releases only the route whose authority expired', async () => {
+    const provider = createFakeProvider();
+    const stub = await setup(provider);
+    const { wrapper } = await prepareWarmRoute(stub, provider);
+    await prepareSibling(stub, wrapper, prepareInput(SESSION_NEXT));
+    const updates: ControlPlaneRouteUpdate[] = [];
+    await runInDurableObject(stub, instance => {
+      const peerFor = instance.sessionPeerFor.bind(instance);
+      instance.sessionPeerFor = (ownerId, sessionId) => {
+        const peer = peerFor(ownerId, sessionId);
+        return peer === null
+          ? null
+          : {
+              ...peer,
+              onRoute: async update => {
+                updates.push(update);
+                return peer.onRoute(update);
+              },
+            };
+      };
+    });
+    await setGrantExpiry(stub, SESSION, Date.now() - 1);
+    await runInDurableObject(stub, instance => instance.alarm());
+    await waitFor(async () => {
+      expect(await stub.status({ sessionId: SESSION })).toMatchObject({
+        view: { state: 'unknown' },
+      });
+      expect(updates).toContainEqual(
+        expect.objectContaining({ state: 'failed', reason: 'credentials_expired' })
+      );
+    });
+    expect(messageFailureText('credentials_expired')).toBe(
+      'Session credentials expired and could not be renewed. Send a new message to continue.'
+    );
+    expect(await readCredentialRows(stub)).toMatchObject({ routes: 1 });
+    // The expired route is released, not left as a ghost member, while its live
+    // sibling, the sandbox and the wrapper connection stay up.
+    expect(await stub.status({ sessionId: SESSION_NEXT })).toMatchObject({
+      view: { state: 'ready' },
+    });
+    expect(await stub.getAllocationState()).toMatchObject({ kind: 'connected' });
+    expect(provider.launchEnvs).toHaveLength(1);
+    expect(await wrapper.next()).toMatchObject({ type: 'session.release' });
+  });
+
+  it.each(['disconnected', 'send-failed'] as const)(
+    'does not publish an undelivered proactive grant when %s, then recovers delivery',
+    async failure => {
+      const provider = createFakeProvider();
+      const broker = createFakeCredentialBroker();
+      const stub = await setup(provider, broker);
+      const { wrapper, credential, allocationId } = await prepareWarmRoute(stub, provider);
+      await setGrantExpiry(stub, SESSION, Date.now() + TIMERS.credentialGrantReissueBelowMs / 2);
+      const original = JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}');
+      const gate = createDeferred();
+      let entered = false;
+      let failSend = failure === 'send-failed';
+      await runInDurableObject(stub, instance => {
+        installFakeCredentialEnv(instance.env, {
+          ...broker,
+          async issueGitHubSessionCapability() {
+            entered = true;
+            await gate.promise;
+            return broker.issueGitHubSessionCapability();
+          },
+        });
+        const transport = instance as unknown as {
+          trySendFrame(ws: WebSocket, frame: ControlPlaneWrapperFrame): boolean;
+        };
+        const send = transport.trySendFrame.bind(instance);
+        transport.trySendFrame = (ws, frame) =>
+          failSend && frame.type === 'session.credentials' ? false : send(ws, frame);
+      });
+      const realNow = Date.now.bind(Date);
+      let offset = 0;
+      const clock = vi.spyOn(Date, 'now').mockImplementation(() => realNow() + offset);
+      try {
+        await touchAllocation(stub);
+        await runInDurableObject(stub, instance => instance.alarm());
+        await waitFor(() => expect(entered).toBe(true));
+        if (failure === 'disconnected') {
+          wrapper.close();
+          await waitFor(async () =>
+            expect((await stub.getAllocationState()).kind).toBe('disconnected')
+          );
+        }
+        gate.resolve();
+        await waitFor(async () =>
+          expect(
+            await runInDurableObject(stub, instance =>
+              Boolean(
+                (instance as unknown as { credentialRenewal: { inFlight: boolean } })
+                  .credentialRenewal.inFlight
+              )
+            )
+          ).toBe(false)
+        );
+        expect(JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}').expiresAt).toBe(
+          original.expiresAt
+        );
+        expect(await readAlarm(stub)).toBeGreaterThan(Date.now());
+
+        failSend = false;
+        const active =
+          failure === 'disconnected'
+            ? await FakeWrapper.connect({
+                sandboxId: SANDBOX_ID,
+                credential,
+                runtimeContract: 'worktree',
+              })
+            : wrapper;
+        const frames: ControlPlaneWrapperFrame[] = [];
+        active.onFrame(frame => frames.push(frame));
+        if (failure === 'disconnected')
+          expect(await active.hello({ wrapperId: 'wr_1', allocationId })).toMatchObject({
+            type: 'welcome',
+          });
+        offset += 5 * 60_000 + 1000;
+        await touchAllocation(stub);
+        await runInDurableObject(stub, instance => instance.alarm());
+        await waitFor(async () =>
+          expect(
+            JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}').expiresAt
+          ).toBeGreaterThan(original.expiresAt)
+        );
+        await waitFor(() =>
+          expect(frames.some(frame => frame.type === 'session.credentials')).toBe(true)
+        );
+        expect(
+          await stub.deliver({ sessionId: SESSION, messages: [promptPayload('after-renewal')] })
+        ).toBe('sent');
+        await waitFor(() =>
+          expect(
+            frames.some(
+              frame =>
+                frame.type === 'session.prompt' && frame.payload.messageId === 'after-renewal'
+            )
+          ).toBe(true)
+        );
+      } finally {
+        gate.resolve();
+        clock.mockRestore();
+      }
+    }
+  );
+
+  it.each([false, true])(
+    'revokes expired last-member Vercel scope policy with provider failure %s',
+    async failPolicy => {
+      const provider = createFakeProvider();
+      const stub = await setupVercel(provider, createFakeCredentialBroker());
+      const { wrapper, allocationId } = await prepareWarmRoute(
+        stub,
+        provider,
+        prepareInput(SESSION, vercelSource(SESSION))
+      );
+      await prepareSibling(stub, wrapper, prepareInput(SESSION_NEXT, vercelSource(SESSION_NEXT)));
+      provider.failPolicy = failPolicy;
+      const policyCallsBefore = provider.policyCalls.length;
+      await setGrantExpiry(stub, SESSION, Date.now() - 1);
+      await runInDurableObject(stub, instance => instance.alarm());
+      await waitFor(async () => expect(await readRouteRow(stub, SESSION)).toBeNull());
+      if (failPolicy) {
+        await waitFor(async () =>
+          expect(['stopping', 'stopped']).toContain((await stub.getAllocationState()).kind)
+        );
+        provider.failPolicy = false;
+        await waitFor(async () => expect((await stub.getAllocationState()).kind).toBe('stopped'));
+        expect(
+          await stub.sessionControl({
+            action: 'abandon',
+            sessionId: SESSION,
+            allocationId,
+            messageIds: ['expired'],
+          })
+        ).toEqual({
+          ok: true,
+          result: { type: 'abandon', outcome: 'absent', cleanedMessageIds: [] },
+        });
+        expect(await stub.prepare(prepareInput(SESSION, vercelSource(SESSION)))).toMatchObject({
+          state: 'preparing',
+        });
+      } else {
+        await waitFor(() => expect(provider.policyCalls.length).toBe(policyCallsBefore + 1));
+        const expected = await runInDurableObject(stub, (_instance, state) =>
+          buildControlNetworkPolicy(
+            listScopeGrants(drizzle(state.storage)).filter(grant => grant.expiresAt > Date.now())
+          )
+        );
+        expect(JSON.stringify(provider.policyCalls.at(-1)) === JSON.stringify(expected)).toBe(true);
+        expect((await stub.getAllocationState()).kind).toBe('connected');
+        expect(
+          await stub.deliver({
+            sessionId: SESSION_NEXT,
+            messages: [promptPayload('sibling-continues')],
+          })
+        ).toBe('sent');
+      }
+    }
+  );
+
+  it('retires a shared expired scope once and keeps status responsive while revocation is gated', async () => {
+    const provider = createFakeProvider();
+    const stub = await setupVercel(provider, createFakeCredentialBroker());
+    const sharedInput = (sessionId: string) =>
+      prepareInput(
+        sessionId,
+        { ...vercelSource(sessionId), scopeId: 'shared_expiry' },
+        { ...routeSpec(sessionId), directory: '/workspace/shared_expiry' }
+      );
+    const { wrapper } = await prepareWarmRoute(stub, provider, sharedInput(SESSION));
+    await prepareSibling(stub, wrapper, sharedInput(SESSION_NEXT));
+    const healthy = prepareInput(SESSION_HEALTHY, vercelSource(SESSION_HEALTHY));
+    await prepareSibling(stub, wrapper, healthy);
+    const frames: ControlPlaneWrapperFrame[] = [];
+    wrapper.onFrame(frame => frames.push(frame));
+
+    await setGrantExpiry(stub, SESSION, Date.now() - 1);
+    await setGrantExpiry(stub, SESSION_NEXT, Date.now() - 1);
+    const gate = createDeferred();
+    provider.policyGate = { promise: gate.promise, resolve: gate.resolve };
+    const policyCallsBefore = provider.policyCalls.length;
+    try {
+      await runInDurableObject(stub, instance => {
+        void instance.alarm().catch(() => undefined);
+      });
+      await waitFor(() => expect(provider.policyBlocked).toBe(true));
+
+      // Both expired routes are retired locally before the provider gate opens.
+      expect(await readRouteRow(stub, SESSION)).toBeNull();
+      expect(await readRouteRow(stub, SESSION_NEXT)).toBeNull();
+      await waitFor(() => {
+        const released = frames
+          .filter(frame => frame.type === 'session.release')
+          .map(frame => (frame as { sessionId: string }).sessionId)
+          .sort();
+        expect(released).toEqual([SESSION, SESSION_NEXT].sort());
+      });
+
+      // The serial queue is free: a healthy route still answers status while the
+      // single provider revocation is blocked.
+      expect(await stub.status({ sessionId: SESSION_HEALTHY })).toMatchObject({
+        view: { state: 'ready' },
+      });
+      expect(provider.policyCalls.length).toBe(policyCallsBefore);
+
+      gate.resolve();
+      await waitFor(() => expect(provider.policyCalls.length).toBe(policyCallsBefore + 1));
+      const expected = await runInDurableObject(stub, (_instance, state) =>
+        buildControlNetworkPolicy(
+          listScopeGrants(drizzle(state.storage)).filter(grant => grant.expiresAt > Date.now())
+        )
+      );
+      expect(provider.policyCalls.at(-1)).toEqual(expected);
+      expect(await stub.status({ sessionId: SESSION_HEALTHY })).toMatchObject({
+        view: { state: 'ready' },
+      });
+    } finally {
+      provider.policyGate = null;
+    }
+  });
+
+  it('keeps the old valid grant when a delivery renewal frame fails and retries on the next prompt', async () => {
+    const provider = createFakeProvider();
+    const stub = await setup(provider);
+    const { wrapper } = await prepareWarmRoute(stub, provider);
+    await setGrantExpiry(stub, SESSION, Date.now() + TIMERS.credentialGrantReissueBelowMs / 2);
+    const original = JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}');
+    let failSend = true;
+    await runInDurableObject(stub, instance => {
+      const transport = instance as unknown as {
+        trySendFrame(ws: WebSocket, frame: ControlPlaneWrapperFrame): boolean;
+      };
+      const send = transport.trySendFrame.bind(instance);
+      transport.trySendFrame = (ws, frame) =>
+        failSend && frame.type === 'session.credentials' ? false : send(ws, frame);
+    });
+    expect(await stub.deliver({ sessionId: SESSION, messages: [promptPayload('old-valid')] })).toBe(
+      'sent'
+    );
+    expect(JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}').expiresAt).toBe(
+      original.expiresAt
+    );
+    expect(await wrapper.next()).toMatchObject({
+      type: 'session.prompt',
+      payload: { messageId: 'old-valid' },
+    });
+    failSend = false;
+    expect(await stub.deliver({ sessionId: SESSION, messages: [promptPayload('renewed')] })).toBe(
+      'sent'
+    );
+    expect(await wrapper.next()).toMatchObject({ type: 'session.credentials' });
+    expect(await wrapper.next()).toMatchObject({
+      type: 'session.prompt',
+      payload: { messageId: 'renewed' },
+    });
+    expect(
+      JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}').expiresAt
+    ).toBeGreaterThan(original.expiresAt);
+  });
+
   it('replaces scoped MCP credentials on normal warm credential renewal without persisting them', async () => {
     const provider = createFakeProvider();
     const stub = await setup(provider);
@@ -2285,7 +3527,20 @@ describe('SandboxControlV2 credentials (B3)', () => {
       kilo: { alias: string };
     };
 
-    provider.failPolicy = true;
+    // Fail only candidate policies (a fresh grant's expiry is far beyond the
+    // reissue window); an authoritative repair of the still-due live grant
+    // succeeds, so a concurrent proactive pass preserves the old work too.
+    const apply = provider.adapter.applyContainedCredentials!.bind(provider.adapter);
+    let failCandidate = true;
+    provider.adapter.applyContainedCredentials = async (ref, grants) => {
+      if (
+        failCandidate &&
+        grants.some(grant => grant.expiresAt > Date.now() + TIMERS.credentialGrantReissueBelowMs)
+      ) {
+        throw new Error('network policy update failed');
+      }
+      return apply(ref, grants);
+    };
     const result = await stub.deliver({ sessionId: SESSION, messages: [promptPayload('m1')] });
 
     // The still-due previous grant carries the prompts: no `session.credentials`
@@ -2306,7 +3561,7 @@ describe('SandboxControlV2 credentials (B3)', () => {
 
     // Recovery: a later send retries the re-issue and sends the fresh frame
     // before the prompt.
-    provider.failPolicy = false;
+    failCandidate = false;
     const retry = await stub.deliver({ sessionId: SESSION, messages: [promptPayload('m2')] });
     expect(retry).toBe('sent');
     const credentialsFrame = await wrapper.next();
@@ -2319,7 +3574,7 @@ describe('SandboxControlV2 credentials (B3)', () => {
     expect(credentialsFrame.kilo.token).toBe(grantAfterRetry.kilo.alias);
   });
 
-  it('fails the route as workspace_setup_failed when re-issue policy fails and the old grant expired', async () => {
+  it('fails a ready route as credentials_expired when re-issue policy fails and the old grant expired', async () => {
     const provider = createFakeProvider();
     const broker = createFakeCredentialBroker();
     const stub = await setupVercel(provider, broker);
@@ -2337,7 +3592,20 @@ describe('SandboxControlV2 credentials (B3)', () => {
     };
     provider.policyCalls.length = 0;
 
-    provider.failPolicy = true;
+    // Fail only the fresh candidate; the authoritative repair of the expired
+    // live set succeeds, so the route fails for the real expiry reason.
+    const apply = provider.adapter.applyContainedCredentials!.bind(provider.adapter);
+    let failCandidate = true;
+    provider.adapter.applyContainedCredentials = async (ref, grants) => {
+      if (
+        failCandidate &&
+        grants.some(grant => grant.expiresAt > Date.now() + TIMERS.credentialGrantReissueBelowMs)
+      ) {
+        failCandidate = false;
+        throw new Error('network policy update failed');
+      }
+      return apply(ref, grants);
+    };
     const result = await stub.deliver({ sessionId: SESSION, messages: [promptPayload('m1')] });
 
     // No usable grant and no frame: the route leaves `ready` so the Session DO
@@ -2349,11 +3617,11 @@ describe('SandboxControlV2 credentials (B3)', () => {
       view: {
         state: 'failed',
         attemptId: expect.any(String),
-        reason: 'workspace_setup_failed',
+        reason: 'credentials_expired',
       },
     });
     expect((await stub.getAllocationState()).kind).toBe('connected');
-    expect(provider.policyCalls.length).toBe(0);
+    expect(JSON.stringify(provider.policyCalls.at(-1))).not.toContain(kiloSessionIdFor(SESSION));
     expect(await wrapper.next(50)).toBeNull();
     expect(wrapper.receivedFrames()).toBe(framesBefore);
     // The previous (already-applied) grant is kept; the failed policy did not
@@ -2362,6 +3630,97 @@ describe('SandboxControlV2 credentials (B3)', () => {
       kilo: { alias: string };
     };
     expect(grantAfterFailure.kilo.alias).toBe(grantBefore.kilo.alias);
+  });
+
+  it.each([false, true])(
+    'repairs a warm re-issue candidate that applied then threw (repair fails: %s)',
+    async repairFails => {
+      const provider = createFakeProvider();
+      const stub = await setupVercel(provider, createFakeCredentialBroker());
+      const { wrapper } = await prepareWarmRoute(
+        stub,
+        provider,
+        prepareInput(SESSION, vercelSource(SESSION), routeSpec(SESSION))
+      );
+      await setGrantExpiry(stub, SESSION, Date.now() + TIMERS.credentialGrantReissueBelowMs / 2);
+      const framesBefore = wrapper.receivedFrames();
+      const before = JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}') as {
+        kilo: { alias: string };
+        expiresAt: number;
+      };
+
+      const apply = provider.adapter.applyContainedCredentials!.bind(provider.adapter);
+      let firstCandidate = true;
+      provider.adapter.applyContainedCredentials = async (ref, grants) => {
+        const candidate = grants.some(
+          grant => grant.expiresAt > Date.now() + TIMERS.credentialGrantReissueBelowMs
+        );
+        if (candidate) {
+          if (firstCandidate) {
+            firstCandidate = false;
+            await apply(ref, grants);
+          }
+          throw new Error('candidate policy applied then threw');
+        }
+        if (repairFails) throw new Error('authoritative repair failed');
+        return apply(ref, grants);
+      };
+
+      const result = await stub.deliver({ sessionId: SESSION, messages: [promptPayload('m1')] });
+      if (repairFails) {
+        expect(result).toBe('not_ready');
+        await waitFor(async () =>
+          expect(['stopping', 'stopped']).toContain((await stub.getAllocationState()).kind)
+        );
+        expect(wrapper.receivedFrames()).toBe(framesBefore);
+      } else {
+        expect(result).toBe('sent');
+        expect(await wrapper.next()).toMatchObject({ type: 'session.prompt', sessionId: SESSION });
+        expect(wrapper.receivedFrames()).toBe(framesBefore + 1);
+        expect(await stub.status({ sessionId: SESSION })).toMatchObject({
+          view: { state: 'ready' },
+        });
+        const after = JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}') as {
+          kilo: { alias: string };
+          expiresAt: number;
+        };
+        expect(after).toEqual(before);
+      }
+    }
+  );
+
+  it('fails closed and refuses a second prompt when a warm re-issue policy hangs', async () => {
+    const provider = createFakeProvider();
+    const stub = await setupVercel(provider, createFakeCredentialBroker());
+    const { wrapper } = await prepareWarmRoute(
+      stub,
+      provider,
+      prepareInput(SESSION, vercelSource(SESSION), routeSpec(SESSION))
+    );
+    await setGrantExpiry(stub, SESSION, Date.now() + TIMERS.credentialGrantReissueBelowMs / 2);
+    await runInDurableObject(stub, instance => {
+      const current = instance as unknown as { sandboxTimers(): typeof TIMERS };
+      const timers = current.sandboxTimers.bind(instance);
+      current.sandboxTimers = () => ({ ...timers(), providerStopAttemptMs: 50 });
+    });
+    const framesBefore = wrapper.receivedFrames();
+    const gate = createDeferred();
+    provider.policyGate = { promise: gate.promise, resolve: gate.resolve };
+    try {
+      expect(await stub.deliver({ sessionId: SESSION, messages: [promptPayload('m1')] })).toBe(
+        'not_ready'
+      );
+      await waitFor(async () =>
+        expect(['stopping', 'stopped']).toContain((await stub.getAllocationState()).kind)
+      );
+      expect(await stub.deliver({ sessionId: SESSION, messages: [promptPayload('m2')] })).toBe(
+        'not_ready'
+      );
+      expect(wrapper.receivedFrames()).toBe(framesBefore);
+    } finally {
+      gate.resolve();
+      provider.policyGate = null;
+    }
   });
 
   it('stops the sandbox as a platform failure when a Vercel release cannot apply the policy', async () => {

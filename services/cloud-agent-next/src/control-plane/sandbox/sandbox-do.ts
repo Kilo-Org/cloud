@@ -15,6 +15,15 @@ import {
   resetRuntimeContract,
   runtimeSpecForContract,
 } from './runtime-contract.js';
+import {
+  admitExpectedRuntimeProxyOriginBinding as admitExpectedOriginBinding,
+  admitRuntimeProxyOrigin as admitOrigin,
+  type RuntimeProxyOriginAdmissionContext,
+} from './runtime-proxy-admission.js';
+import type {
+  RuntimeCredentialProxyOrigin,
+  RuntimeProxyControlBinding,
+} from '../../runtime-credential-proxy-origin.js';
 import { DurableObject } from 'cloudflare:workers';
 import { admitVercelScmForward } from '../../scm-broker/vercel-admission.js';
 import { admitScmRequest } from '../../scm-broker/admission.js';
@@ -95,6 +104,10 @@ import {
   type VercelProviderLocator,
 } from '../../sandbox-control/vercel-provider.js';
 import { buildControlWrapperLaunchEnv } from '../../sandbox-control/wrapper-launch-env.js';
+import {
+  mintControlLogUploadCredential,
+  validateControlLogRenewal,
+} from '../../sandbox-control/log-upload-grant.js';
 import { downloadedStartup } from '../../sandbox-control/downloaded-startup.js';
 import {
   newSandboxHarness,
@@ -209,11 +222,16 @@ import {
   CONTROL_PLANE_ALLOCATION_ID_ENV,
   CONTROL_PLANE_PROTOCOL_VERSION,
   CONTROL_PLANE_REQUEST_TIMEOUT_MS,
+  CONTROL_PLANE_SESSION_CONTROL_TIMEOUT_MS,
+  CONTROL_PLANE_TURN_COVERAGE_HEADER,
+  CONTROL_PLANE_TURN_COVERAGE_VERSION,
   controlPlaneAnswerPayloadSchema,
   controlPlaneDeliverPayloadSchema,
   controlPlaneKiloRequestInputSchema,
   controlPlanePrepareInputSchema,
   controlPlaneRouteSpecSchema,
+  controlPlaneSessionControlInputSchema,
+  controlPlaneSessionControlResultSchema,
   controlPlaneSessionCredentialsPayloadSchema,
   controlPlaneSessionRefPayloadSchema,
   controlPlaneTerminalInputSchema,
@@ -234,6 +252,7 @@ import {
   type ControlPlaneRouteSpec,
   type ControlPlaneRouteUpdate,
   type ControlPlaneRouteView,
+  type ControlPlaneSessionControlInput,
   type ControlPlaneSessionCredentialsPayload,
   type ControlPlaneSessionRefPayload,
   type ControlPlaneStatusResult,
@@ -286,8 +305,10 @@ import {
   onRouteReady,
   onWrapperConnected,
   readRoute,
+  routeFromRow,
   routeRetryAllowed,
   routeView,
+  startAttempt,
   writeRoute,
   type RouteContext,
   type RouteGrantIssue,
@@ -295,6 +316,20 @@ import {
   type RouteRecord,
 } from './routes.js';
 import { allocation as allocationTable, routes as routesTable } from './sqlite-schema.js';
+import {
+  createCredentialPolicyOwner,
+  type CredentialPolicyOutcome,
+  type PolicyWriteResolution,
+} from './credential-policy.js';
+import {
+  createCredentialRenewalCoordinator,
+  decideRenewalTargetVerdict,
+  type CredentialRenewalOutcome,
+  type CredentialRenewalTarget,
+  type RenewalFence,
+  type RenewalRouteSnapshot,
+  type RenewalVerdict,
+} from './credential-renewal.js';
 import {
   listScopeGrants,
   readScopeGrant,
@@ -432,6 +467,7 @@ const wrapperSocketAttachmentSchema = z.object({
   kiloCliVersion: SandboxRuntimeVersionSchema.optional(),
   wrapperVersion: SandboxRuntimeVersionSchema.optional(),
   billingCheckedAt: z.number().finite().nonnegative().optional(),
+  turnCoverage: z.literal(true).optional(),
 });
 type WrapperSocketAttachment = z.infer<typeof wrapperSocketAttachmentSchema>;
 
@@ -659,11 +695,12 @@ const CORRELATED_RESULT_FRAME_TYPES = new Set<string>([
   'worktree.result',
   'terminal.result',
   'kilo.result',
+  'session.control.result',
 ]);
 
 type CorrelatedResultFrame = Extract<
   ControlPlaneWrapperFrame,
-  { type: 'worktree.result' | 'terminal.result' | 'kilo.result' }
+  { type: 'worktree.result' | 'terminal.result' | 'kilo.result' | 'session.control.result' }
 >;
 
 function isCorrelatedResultFrame(frame: unknown): frame is CorrelatedResultFrame {
@@ -711,6 +748,57 @@ function terminalRequestFrame(
   }
 }
 
+type RenewedRouteGrant = {
+  grant: SessionCredentialGrant;
+  spec: ControlPlaneRouteSpec;
+  cloudAgentMcp: { url: string; token: string; expiresAt: number } | undefined;
+  /** True when the candidate policy write reached the provider. */
+  policyWritten: boolean;
+};
+
+type RenewalPreparation =
+  | { kind: 'renewed'; renewed: RenewedRouteGrant }
+  | { kind: 'skipped' }
+  | { kind: 'issue_failed' }
+  | {
+      kind: 'policy_stale';
+      verdict: Exclude<RenewalVerdict, 'current'>;
+      allocationId: string | null;
+    }
+  | { kind: 'policy_failed' }
+  | { kind: 'policy_uncertain'; allocationId: string | null }
+  | { kind: 'policy_repair_failed'; allocationId: string | null }
+  | { kind: 'policy_obsolete' };
+
+/**
+ * One off-queue provider rebind/policy refresh for a warm allocation. The
+ * allocation/provider identity is the cache and completion fence; the wrapper
+ * epoch is carried by the pending hello, not here, because one provider
+ * binding serves every wrapper reconnect.
+ */
+type WarmOriginRoutingFlight = {
+  key: string;
+  allocationId: string;
+  providerRef: string;
+  provider: AgentSandboxProvider;
+  adapter: ProviderAdapter;
+  failures: number;
+};
+
+/**
+ * A hello whose non-restart routes wait for the provider binding to be
+ * refreshed. Restart retirement/route loss is applied synchronously on hello
+ * and therefore does not live here. Completion applies only when this is still
+ * the current connection/wrapper, so a superseding hello is never served stale.
+ */
+type PendingWarmHello = {
+  key: string;
+  allocationId: string;
+  providerRef: string;
+  connectionId: string;
+  wrapperId: string;
+};
+
 export class SandboxControlV2 extends DurableObject<Env> {
   readonly sandboxId: string;
   private readonly db: ReturnType<typeof drizzle>;
@@ -719,6 +807,33 @@ export class SandboxControlV2 extends DurableObject<Env> {
   private provider: ProviderAdapter;
   private providerPin: StoredProviderPin | null = null;
   private createInFlight = false;
+  /**
+   * One proactive credential maintenance pass at a time. The pass runs outside
+   * the serial queue (external mint/policy calls must not hold it) and only its
+   * final rechecked commit re-enters the queue.
+   */
+  private readonly credentialRenewal = createCredentialRenewalCoordinator();
+  /**
+   * All Vercel policy writes are serialized per physical allocation. The owner
+   * resolves the live grants at write time, so an off-queue renewal cannot
+   * install a candidate after a queued release/revocation.
+   */
+  private readonly credentialPolicy = createCredentialPolicyOwner({
+    deadlineMs: () => this.sandboxTimers().providerStopAttemptMs,
+    resolveWrite: () => this.resolveCredentialPolicyWriteSync(),
+    liveGrants: () => this.activeGrantsSync(Date.now()),
+  });
+  /**
+   * Provider bindings this DO generation has already made routable. A fresh
+   * launch is added before the wrapper can hello; anything else (a warm
+   * allocation that survived a deploy or eviction) is refreshed once here.
+   */
+  private readonly warmOriginRoutingReady = new Set<string>();
+  private warmOriginRoutingFlight: WarmOriginRoutingFlight | null = null;
+  private warmOriginRoutingFailures: { key: string; count: number } | null = null;
+  private warmOriginRoutingRetryAt: number | null = null;
+  private pendingWarmHello: PendingWarmHello | null = null;
+
   private readonly worktreeChanges = createSharedWorktreeChanges({
     storage: this.ctx.storage,
     capture: input => this.worktreeCapture(input),
@@ -981,10 +1096,14 @@ export class SandboxControlV2 extends DurableObject<Env> {
     );
   }
 
-  async deliver(payload: ControlPlaneDeliverPayload): Promise<ControlPlaneDeliverResult> {
+  /** Older Sandbox DOs ignore this opt-in without changing their strict payload schema. */
+  async deliver(
+    payload: ControlPlaneDeliverPayload,
+    turnCoverage = false
+  ): Promise<ControlPlaneDeliverResult> {
     await this.initialized;
     const parsed = controlPlaneDeliverPayloadSchema.parse(payload);
-    return this.enqueue(() => this.runDeliver(parsed));
+    return this.enqueue(() => this.runDeliver(parsed, turnCoverage));
   }
 
   private workspaceSnapshotRouteEligible(route: RouteRecord): boolean {
@@ -1084,13 +1203,21 @@ export class SandboxControlV2 extends DurableObject<Env> {
   async answer(payload: ControlPlaneAnswerPayload): Promise<ControlPlaneDispatchResult> {
     await this.initialized;
     const parsed = controlPlaneAnswerPayloadSchema.parse(payload);
-    return this.enqueue(() =>
-      this.dispatchToWrapper({
+    // An answer continues a live turn that depends on the same runtime
+    // credential boundary as a prompt. A warm refresh is bounded-waited off
+    // the serial queue, so Stop/status stay responsive and a transient refresh
+    // does not surface a spurious answer error.
+    if (!(await this.awaitWarmOriginRoutingReady())) return 'not_connected';
+    return this.enqueue(async () => {
+      const state = await this.readAllocation();
+      const key = this.warmOriginRoutingKey(state);
+      if (key === null || !this.warmOriginRoutingReady.has(key)) return 'not_connected';
+      return this.dispatchToWrapper({
         type: 'session.answer',
         sessionId: parsed.sessionId,
         reply: parsed.reply,
-      })
-    );
+      });
+    });
   }
 
   async release(payload: ControlPlaneSessionRefPayload): Promise<void> {
@@ -1113,7 +1240,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       if (!sharedHandleSurvives) {
         // Rebuild the policy inside the queue; if it cannot apply, stop the
         // sandbox as a platform failure so the alias is not left injected.
-        await this.applyVercelNetworkPolicyOrStop('sandbox_lost');
+        await this.applyVercelNetworkPolicyOrStop();
       }
       const state = await this.readAllocation();
       await this.armAlarm(state);
@@ -1495,6 +1622,76 @@ export class SandboxControlV2 extends DurableObject<Env> {
   }
 
   /**
+   * Session DO -> Sandbox DO turn coverage/abandon. Reuses the correlated
+   * request path without waking or preparing. The exact allocation + connection
+   * that accepted the request is re-checked after the reply, so a superseded
+   * socket on the same allocation cannot settle a newer turn.
+   */
+  async sessionControl(input: ControlPlaneSessionControlInput): Promise<ControlPlaneControlResult> {
+    await this.initialized;
+    const parsed = controlPlaneSessionControlInputSchema.parse(input);
+    let requestedConnectionId: string | null = null;
+    const handoff = await this.enqueue(async () => {
+      const state = await this.readAllocation();
+      if (
+        parsed.action === 'abandon' &&
+        (state.allocationId !== parsed.allocationId || state.kind === 'stopped')
+      ) {
+        return {
+          reply: {
+            ok: true,
+            result: { type: 'abandon', outcome: 'absent', cleanedMessageIds: [] },
+          } satisfies ControlPlaneControlResult,
+        };
+      }
+      // Coverage reads require a live runtime; an in-flight refresh must not
+      // answer for the old origin. `abandon` is interrupt and always passes.
+      if (parsed.action !== 'abandon' && !this.warmOriginRoutingReadyOrSchedule(state)) {
+        return {
+          error: controlRequestFailure('not_ready', 'Runtime origin routing is not ready', true),
+        };
+      }
+      if (
+        state.kind !== 'connected' ||
+        state.allocationId !== parsed.allocationId ||
+        state.connectionId === null
+      ) {
+        return {
+          error: controlRequestFailure('not_ready', 'Wrapper is not connected', true),
+        };
+      }
+      requestedConnectionId = state.connectionId;
+      const frame: ControlPlaneWrapperFrame = {
+        type: 'session.control',
+        requestId: crypto.randomUUID(),
+        action: parsed.action,
+        sessionId: parsed.sessionId,
+        allocationId: parsed.allocationId,
+        messageIds: parsed.messageIds,
+      };
+      return this.beginWrapperControlRequest(frame, CONTROL_PLANE_SESSION_CONTROL_TIMEOUT_MS);
+    });
+    if ('reply' in handoff) return handoff.reply;
+    if ('error' in handoff) return handoff.error;
+    const result = await handoff.promise;
+    if (!result.ok) return result;
+    const current = await this.readAllocation();
+    if (
+      current.kind !== 'connected' ||
+      current.allocationId !== parsed.allocationId ||
+      current.connectionId !== requestedConnectionId ||
+      this.boundWrapperSocket(current) === null
+    ) {
+      return controlRequestFailure('not_ready', 'Wrapper connection changed', true);
+    }
+    const typed = controlPlaneSessionControlResultSchema.safeParse(result.result);
+    if (!typed.success || typed.data.type !== parsed.action) {
+      return controlRequestFailure('invalid_result', 'Wrapper returned an invalid result', true);
+    }
+    return { ok: true, result: typed.data };
+  }
+
+  /**
    * Off-queue read the Session DO uses to resolve one preview's provider
    * coordinates. It never enqueues, so a preview never waits behind the control
    * operation queue. The allocation and route are two separate reads, not one
@@ -1761,6 +1958,54 @@ export class SandboxControlV2 extends DurableObject<Env> {
       }
       return { ...fence, scopeView: readScopeGrantView(this.db, scopeGrant) };
     });
+  }
+
+  /**
+   * Passive origin admission for the runtime credential proxy. Reads current
+   * allocation/provider evidence only; it never enqueues or writes, so a slow
+   * control operation cannot delay or reorder an admission.
+   */
+  async admitRuntimeProxyOrigin(input: {
+    origin: RuntimeCredentialProxyOrigin;
+  }): Promise<RuntimeProxyControlBinding | null> {
+    await this.initialized;
+    const context = await this.runtimeProxyOriginAdmissionContext();
+    return admitOrigin({ origin: input.origin, context, env: this.env });
+  }
+
+  /**
+   * Passive re-admission after token resolution. The origin is verified again
+   * and the allocation must still match the caller's admitted binding.
+   */
+  async admitRuntimeProxyOriginBinding(input: {
+    origin: RuntimeCredentialProxyOrigin;
+    expected: RuntimeProxyControlBinding;
+  }): Promise<boolean> {
+    await this.initialized;
+    return admitExpectedOriginBinding({
+      origin: input.origin,
+      expected: input.expected,
+      context: await this.runtimeProxyOriginAdmissionContext(),
+      // Re-read after the provider/JWKS awaits so the CURRENT authoritative
+      // binding (owner, allocation, provider, wrapper) is compared, not the
+      // pre-authentication snapshot.
+      readContext: () => this.runtimeProxyOriginAdmissionContext(),
+      env: this.env,
+    });
+  }
+
+  private async runtimeProxyOriginAdmissionContext(): Promise<RuntimeProxyOriginAdmissionContext> {
+    const allocation = await this.readAllocation();
+    return {
+      ownerId: await this.requireOwner(),
+      logicalSandboxId: this.sandboxId,
+      provider: this.currentProvider(),
+      allocation,
+      outboundContainerId: this.outboundContainerIdFor(),
+      physicalName: this.providerPin?.allocationName ?? this.sandboxId,
+      ...(this.providerPin?.byoc === undefined ? {} : { byoc: this.providerPin.byoc }),
+      locator: this.providerPin?.locator ?? null,
+    };
   }
 
   /** Binds a verified runtime credential proxy handle to the route's grant. */
@@ -2094,6 +2339,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
         ...(observedRuntime.wrapperVersion === null
           ? {}
           : { wrapperVersion: observedRuntime.wrapperVersion }),
+        ...(request.headers.get(CONTROL_PLANE_TURN_COVERAGE_HEADER) ===
+        CONTROL_PLANE_TURN_COVERAGE_VERSION
+          ? { turnCoverage: true as const }
+          : {}),
         helloDeadlineAt: Date.now() + this.sandboxTimers().wrapperHelloMs,
       } satisfies WrapperSocketAttachment);
       await this.armAlarm(await this.readAllocation());
@@ -2148,7 +2397,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
       this.expireUnboundSockets(Date.now());
       await this.recoverRepositoryPreparationFailures();
       let state = await this.readAllocation();
+      this.retryWarmOriginRouting(state);
       await failExpiredRoutes(this.routeContext(state));
+      await this.failExpiredCredentialRoutes();
+      await this.scheduleCredentialMaintenance();
       if (
         state.kind === 'stopped' &&
         !this.createInFlight &&
@@ -2168,6 +2420,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
           Math.min(
             Date.now() + this.sandboxTimers().providerCreateMs,
             (await earliestRouteDeadlineAt(this.db)) ?? Infinity,
+            (await this.nextCredentialRenewalAt(Date.now())) ?? Infinity,
             this.earliestHelloDeadlineAt() ?? Infinity
           )
         );
@@ -2811,19 +3064,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
     });
   }
 
-  private applyCandidateGrantPolicy(candidate: SessionCredentialGrant): Promise<boolean> {
-    const now = Date.now();
-    return this.refreshVercelNetworkPolicy([
-      ...listScopeGrants(this.db).filter(
-        grant =>
-          hasRuntimeCredentialProxy(grant) &&
-          scopeGrantId(grant) !== scopeGrantId(candidate) &&
-          grant.expiresAt > now
-      ),
-      candidate,
-    ]);
-  }
-
   private projectRouteSpec(
     spec: ControlPlaneRouteSpec,
     payload: {
@@ -2871,11 +3111,17 @@ export class SandboxControlV2 extends DurableObject<Env> {
   }
 
   private async runDeliver(
-    payload: ControlPlaneDeliverPayload
+    payload: ControlPlaneDeliverPayload,
+    turnCoverage: boolean
   ): Promise<ControlPlaneDeliverResult> {
     const state = await this.readAllocation();
     let route = await readRoute(this.db, payload.sessionId);
-    if (state.kind !== 'connected' || route === null || route.state !== 'ready') {
+    if (
+      state.kind !== 'connected' ||
+      state.allocationId === null ||
+      route === null ||
+      route.state !== 'ready'
+    ) {
       return 'not_ready';
     }
     if (payload.allocationId !== undefined && payload.allocationId !== state.allocationId) {
@@ -2883,6 +3129,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     }
     const socket = this.boundWrapperSocket(state);
     if (socket === null) return 'not_ready';
+    if (!this.warmOriginRoutingReadyOrSchedule(state)) return 'not_ready';
     if (route.grant === null || !hasRuntimeCredentialProxy(route.grant)) {
       await onRouteFailed(
         this.routeContext(state),
@@ -2915,11 +3162,20 @@ export class SandboxControlV2 extends DurableObject<Env> {
       // send. Once that grant has expired there is no usable grant left for any
       // re-issue outcome, so the route fails now with the real reason.
       const outcome = await this.reissueRouteGrant(route, state);
+      if (
+        outcome === 'policy_uncertain' ||
+        outcome === 'policy_repair_failed' ||
+        outcome === 'policy_obsolete'
+      ) {
+        // The raw write may still land (or the allocation changed). Fail the
+        // turn; a captured write failure has already requested a fenced stop.
+        return 'not_ready';
+      }
       if (outcome !== 'issued' && Date.now() >= route.grant.expiresAt) {
         await onRouteFailed(
           this.routeContext(state),
           payload.sessionId,
-          'workspace_setup_failed',
+          'credentials_expired',
           undefined,
           true
         );
@@ -2939,7 +3195,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       await onRouteFailed(
         this.routeContext(state),
         payload.sessionId,
-        'workspace_setup_failed',
+        'credentials_expired',
         undefined,
         true
       );
@@ -2961,11 +3217,228 @@ export class SandboxControlV2 extends DurableObject<Env> {
       if (!sent) return 'not_ready';
     }
     await this.touchActivity(Date.now());
-    return 'sent';
+    return turnCoverage === true && this.readAttachment(socket)?.turnCoverage === true
+      ? { type: 'sent', coverage: true, allocationId: state.allocationId }
+      : 'sent';
   }
 
   private grantNeedsReissue(grant: SessionCredentialGrant): boolean {
     return grant.expiresAt - Date.now() < this.sandboxTimers().credentialGrantReissueBelowMs;
+  }
+
+  /** Ready routes with a stored grant, as a renewal coordinator snapshot. */
+  private async renewalRouteSnapshots(): Promise<RenewalRouteSnapshot[]> {
+    const routes: RenewalRouteSnapshot[] = [];
+    for (const route of await listRoutes(this.db)) {
+      if (route.state !== 'ready' || route.grant === null) continue;
+      routes.push({
+        sessionId: route.sessionId,
+        scopeKey: scopeGrantId(route.grant),
+        scopeGrantJson: JSON.stringify(route.grant),
+        attemptId: route.attemptId,
+        grantExpiresAt: route.grant.expiresAt,
+        hasCredentialSource: route.credentialSource !== null,
+      });
+    }
+    return routes;
+  }
+
+  /**
+   * The one proactive-renewal deadline, derived from the stored grants so no
+   * route write can leave it stale. A grant that is already due resolves to
+   * `now`; a failed renewal resolves to its per-scope backoff, capped by the
+   * grant's expiry so a retry never runs past the authority it is renewing.
+   */
+  private async nextCredentialRenewalAt(now: number): Promise<number | null> {
+    const state = await this.readAllocation();
+    return this.credentialRenewal.nextDeadline({
+      routes: await this.renewalRouteSnapshots(),
+      now,
+      reissueBelowMs: this.sandboxTimers().credentialGrantReissueBelowMs,
+      canRenew: this.runtimeProxyFenceFor(state) !== null,
+    });
+  }
+
+  /**
+   * Starts one maintenance pass when a ready route's grant is due. Runs on the
+   * alarm's serial turn only long enough to snapshot the routes and reserve
+   * their retry slots; the mint, optional MCP issuance and provider policy run
+   * off the queue in `runCredentialMaintenance`.
+   */
+  private async scheduleCredentialMaintenance(): Promise<void> {
+    if (this.credentialRenewal.inFlight) return;
+    const state = await this.readAllocation();
+    const fence = this.runtimeProxyFenceFor(state);
+    const targets = this.credentialRenewal.selectTargets({
+      routes: await this.renewalRouteSnapshots(),
+      fence,
+      now: Date.now(),
+      reissueBelowMs: this.sandboxTimers().credentialGrantReissueBelowMs,
+    });
+    if (targets.length === 0) return;
+    const flight = this.credentialRenewal.track(
+      () =>
+        this.runCredentialMaintenance(targets).catch(() => {
+          logger
+            .withFields({ sandboxId: this.sandboxId })
+            .warn('Credential maintenance pass failed');
+        }),
+      () => {
+        this.ctx.waitUntil(
+          this.enqueue(async () => this.armAlarm(await this.readAllocation())).catch(
+            () => undefined
+          )
+        );
+      }
+    );
+    if (flight !== null) this.ctx.waitUntil(flight);
+  }
+
+  /** One off-queue pass: every due scope is renewed independently. */
+  private async runCredentialMaintenance(
+    targets: readonly CredentialRenewalTarget[]
+  ): Promise<void> {
+    for (const target of targets) {
+      const route = await readRoute(this.db, target.sessionId);
+      if (route === null || route.grant === null || route.state !== 'ready') {
+        this.credentialRenewal.clear(target.scopeKey);
+        continue;
+      }
+      if (Date.now() >= target.grantExpiresAt) {
+        await this.expireCredentialTarget(target, 'credential_grant_expired');
+        continue;
+      }
+      const preparation = await this.prepareRouteGrantRenewal(route, target);
+      if (preparation.kind === 'policy_uncertain' || preparation.kind === 'policy_repair_failed') {
+        const allocationId = preparation.allocationId;
+        if (allocationId !== null) {
+          await this.enqueue(() => this.stopCapturedAllocation(allocationId));
+        }
+        this.credentialRenewal.clear(target.scopeKey);
+        continue;
+      }
+      if (preparation.kind === 'policy_obsolete') {
+        this.credentialRenewal.clear(target.scopeKey);
+        continue;
+      }
+      if (preparation.kind === 'policy_stale') {
+        if (preparation.verdict === 'released' || preparation.verdict === 'replaced') {
+          this.credentialRenewal.clear(target.scopeKey);
+        } else {
+          await this.retryOrExpireCredentialTarget(target, 'credential_renewal_stale');
+        }
+        continue;
+      }
+      if (preparation.kind === 'policy_failed') {
+        await this.retryOrExpireCredentialTarget(target, 'credential_policy_unavailable');
+        continue;
+      }
+      if (preparation.kind !== 'renewed') {
+        await this.retryOrExpireCredentialTarget(target, 'credential_grant_issue');
+        continue;
+      }
+
+      const renewed = preparation.renewed;
+      const outcome = await this.commitRenewedRouteGrant(target, renewed);
+      if (outcome === 'renewed') {
+        this.credentialRenewal.clear(target.scopeKey);
+        continue;
+      }
+      if (renewed.policyWritten && !(await this.repairRenewalPolicy(target))) continue;
+      if (outcome === 'released' || outcome === 'replaced') {
+        this.credentialRenewal.clear(target.scopeKey);
+      } else {
+        await this.retryOrExpireCredentialTarget(target, 'credential_renewal_stale');
+      }
+    }
+  }
+
+  private async repairRenewalPolicy(target: CredentialRenewalTarget): Promise<boolean> {
+    const outcome = await this.credentialPolicy.applyLive(target.allocationId);
+    if (outcome.result === 'applied' || outcome.result === 'obsolete') return true;
+    this.credentialRenewal.clear(target.scopeKey);
+    await this.enqueue(() => this.stopCapturedAllocation(target.allocationId));
+    return false;
+  }
+
+  /**
+   * The issue/MCP/policy core shared by warm `deliver` re-issue and proactive
+   * maintenance. It performs no route write: the caller publishes on the queue
+   * or rechecks the captured fence before publishing. A proactive caller
+   * supplies its captured target so the same verdict gates policy installation
+   * and queued publication.
+   */
+  private async prepareRouteGrantRenewal(
+    route: RouteRecord,
+    target?: CredentialRenewalTarget
+  ): Promise<RenewalPreparation> {
+    const source = route.credentialSource;
+    if (source === null) return { kind: 'skipped' };
+    let issued: RouteGrantIssue;
+    try {
+      issued = await withTimeout(
+        this.issueRouteGrant(route.spec, source, route.environment),
+        this.grantIssueTimeoutMs(),
+        'Credential grant renewal timed out'
+      );
+    } catch {
+      return { kind: 'issue_failed' };
+    }
+    const cloudAgentMcp = await this.tryIssueCloudAgentMcpGrant(route);
+    let policy: CredentialPolicyOutcome;
+    let verdict: RenewalVerdict | null = null;
+    if (target === undefined) {
+      policy = await this.credentialPolicy.applyCandidate(issued.grant);
+    } else {
+      const renewal = await this.credentialPolicy.applyRenewalCandidate(
+        issued.grant,
+        this.renewalCandidateGuard(target)
+      );
+      policy = renewal;
+      verdict = renewal.verdict;
+    }
+    if (policy.result === 'obsolete') return { kind: 'policy_obsolete' };
+    if (verdict !== null && verdict !== 'current') {
+      return { kind: 'policy_stale', verdict, allocationId: policy.allocationId };
+    }
+    if (policy.result === 'uncertain') {
+      return { kind: 'policy_uncertain', allocationId: policy.allocationId };
+    }
+    if (policy.result === 'failed') {
+      // A confirmed rejection may still have applied remotely (for example an
+      // adapter that throws after the REST call). Repair before old work is used.
+      const repair = await this.credentialPolicy.applyLive(policy.allocationId);
+      if (repair.result === 'applied') return { kind: 'policy_failed' };
+      if (repair.result === 'obsolete') return { kind: 'policy_obsolete' };
+      return {
+        kind: repair.result === 'uncertain' ? 'policy_uncertain' : 'policy_repair_failed',
+        allocationId: repair.allocationId,
+      };
+    }
+    return {
+      kind: 'renewed',
+      renewed: {
+        grant: issued.grant,
+        spec: issued.spec,
+        cloudAgentMcp,
+        policyWritten: policy.wrote,
+      },
+    };
+  }
+
+  /**
+   * The renewal verdict is evaluated inside the policy lane, immediately before
+   * the raw provider call. Initial/queued candidates do not use this guard: they
+   * are admitted before their scope exists, and the queued publication is
+   * already fenced.
+   */
+  private renewalCandidateGuard(target: CredentialRenewalTarget): () => RenewalVerdict {
+    return () =>
+      this.credentialTargetVerdict(
+        target,
+        this.readAllocationSync(),
+        this.readRouteSync(target.sessionId)
+      );
   }
 
   /**
@@ -2980,38 +3453,280 @@ export class SandboxControlV2 extends DurableObject<Env> {
   private async reissueRouteGrant(
     route: RouteRecord,
     state: AllocationState
-  ): Promise<'issued' | 'policy_failed' | 'skipped' | 'failed'> {
-    const source = route.credentialSource;
-    if (source === null) return 'skipped';
+  ): Promise<
+    | 'issued'
+    | 'policy_uncertain'
+    | 'policy_repair_failed'
+    | 'policy_obsolete'
+    | 'policy_failed'
+    | 'skipped'
+    | 'failed'
+  > {
     const socket = this.boundWrapperSocket(state);
     if (socket === null) return 'skipped';
-    let issued: RouteGrantIssue;
-    try {
-      // Bound the token-service round trip so a warm-route `deliver` cannot
-      // hang forever; the grant-issue bound is the provider-stop bound.
-      issued = await withTimeout(
-        this.issueRouteGrant(route.spec, source, route.environment),
-        this.grantIssueTimeoutMs(),
-        'Credential grant re-issue timed out'
-      );
-    } catch {
-      return 'failed';
+    const preparation = await this.prepareRouteGrantRenewal(route);
+    if (preparation.kind === 'skipped') return 'skipped';
+    if (preparation.kind === 'issue_failed') return 'failed';
+    if (preparation.kind === 'policy_failed') return 'policy_failed';
+    if (preparation.kind === 'policy_obsolete') return 'policy_obsolete';
+    if (preparation.kind === 'policy_stale') return 'failed';
+    if (preparation.kind === 'policy_uncertain' || preparation.kind === 'policy_repair_failed') {
+      if (preparation.allocationId !== null) {
+        this.requestStopCapturedAllocation(preparation.allocationId);
+      }
+      return preparation.kind;
     }
-    const cloudAgentMcp = await this.tryIssueCloudAgentMcpGrant(route);
-    if (!(await this.applyCandidateGrantPolicy(issued.grant))) return 'policy_failed';
-    const next: RouteRecord = { ...route, grant: issued.grant, spec: issued.spec };
+    const renewed = preparation.renewed;
+    const next: RouteRecord = { ...route, grant: renewed.grant, spec: renewed.spec };
     this.publishRouteGrant(next);
     // Git/alias material is independent of the runtime-proxy handle, so a
     // re-issue still sends the frame even when the handle string did not change.
     // The canonical handoff runs separately in `runDeliver` maintenance.
     const payload = controlPlaneSessionCredentialsPayloadSchema.parse({
-      ...sessionCredentialsPayloadFromGrant(issued.grant, route.sessionId),
-      ...(cloudAgentMcp ? { cloudAgentMcp } : {}),
+      ...sessionCredentialsPayloadFromGrant(renewed.grant, route.sessionId),
+      ...(renewed.cloudAgentMcp ? { cloudAgentMcp: renewed.cloudAgentMcp } : {}),
     });
-    if (this.trySendFrame(socket, { type: 'session.credentials', ...payload })) {
-      await this.markRouteCredentialsSent(route.sessionId, issued.grant);
+    if (!this.trySendFrame(socket, { type: 'session.credentials', ...payload })) {
+      this.publishRouteGrant(route);
+      await this.applyVercelNetworkPolicyOrStop();
+      return 'failed';
     }
+    await this.markRouteCredentialsSent(route.sessionId, renewed.grant);
     return 'issued';
+  }
+
+  /**
+   * Publishes a proactively renewed grant only if the exact allocation,
+   * connection, attempt and scope grant captured before the external calls are
+   * still current. A released or replaced scope is discarded, never resurrected.
+   */
+  private commitRenewedRouteGrant(
+    target: CredentialRenewalTarget,
+    renewed: RenewedRouteGrant
+  ): Promise<CredentialRenewalOutcome> {
+    return this.enqueue(async () => {
+      const state = await this.readAllocation();
+      const latest = await readRoute(this.db, target.sessionId);
+      if (latest === null || latest.grant === null) return 'released';
+      const verdict = this.credentialTargetVerdict(target, state, latest);
+      if (verdict !== 'current') return verdict;
+      const socket = this.boundWrapperSocket(state);
+      if (socket === null) return 'stale';
+      const next: RouteRecord = { ...latest, grant: renewed.grant, spec: renewed.spec };
+      this.publishRouteGrant(next);
+      const payload = controlPlaneSessionCredentialsPayloadSchema.parse({
+        ...sessionCredentialsPayloadFromGrant(renewed.grant, target.sessionId),
+        ...(renewed.cloudAgentMcp ? { cloudAgentMcp: renewed.cloudAgentMcp } : {}),
+      });
+      if (!this.trySendFrame(socket, { type: 'session.credentials', ...payload })) {
+        this.publishRouteGrant(latest);
+        return 'stale';
+      }
+      await this.markRouteCredentialsSent(target.sessionId, renewed.grant);
+      logControlDiagnostic('credential_renewal', {
+        sandboxId: this.sandboxId,
+        sessionId: target.sessionId,
+        scopeId: latest.grant?.scopeId,
+        stage: 'proactive',
+        outcome: 'renewed',
+      });
+      return 'renewed';
+    });
+  }
+
+  /** A transient renewal failure keeps valid work; expiry fails it specifically. */
+  private retryOrExpireCredentialTarget(
+    target: CredentialRenewalTarget,
+    stage: string
+  ): Promise<void> {
+    return this.enqueue(async () => {
+      const state = await this.readAllocation();
+      const route = await readRoute(this.db, target.sessionId);
+      const verdict = this.credentialTargetVerdict(target, state, route);
+      if (verdict === 'released' || verdict === 'replaced') {
+        this.credentialRenewal.clear(target.scopeKey);
+        return;
+      }
+      if (route === null || route.grant === null) return;
+      if (Date.now() >= route.grant.expiresAt) {
+        const fence = await this.retireExpiredCredentialTargetsInQueue([
+          {
+            sessionId: route.sessionId,
+            scopeKey: target.scopeKey,
+            stage: 'credential_grant_expired',
+            issueStage: stage,
+          },
+        ]);
+        if (fence !== null) this.scheduleExpiredCredentialPolicyRefresh(fence);
+        return;
+      }
+      if (this.credentialRenewal.isRetryReady(target.scopeKey, Date.now())) {
+        this.credentialRenewal.reserveRetry(target.scopeKey, Date.now(), route.grant.expiresAt);
+      }
+      logControlDiagnostic('credential_renewal', {
+        sandboxId: this.sandboxId,
+        sessionId: target.sessionId,
+        scopeId: route.grant.scopeId,
+        stage,
+        outcome: 'retry',
+      });
+    });
+  }
+
+  /**
+   * Retires every expired route locally, then launches one authoritative policy
+   * refresh for the whole sweep. The refresh runs off the serial queue so a
+   * closed provider gate cannot hold heartbeats, status or Stop; it stops the
+   * captured allocation only if revocation cannot be confirmed.
+   */
+  private async failExpiredCredentialRoutes(): Promise<void> {
+    const now = Date.now();
+    const expired: Array<{ sessionId: string; scopeKey: string }> = [];
+    for (const route of await listRoutes(this.db)) {
+      if (route.state !== 'ready' || route.grant === null || route.grant.expiresAt > now) continue;
+      expired.push({ sessionId: route.sessionId, scopeKey: scopeGrantId(route.grant) });
+    }
+    if (expired.length === 0) return;
+    const fence = await this.retireExpiredCredentialTargetsInQueue(
+      expired.map(route => ({
+        sessionId: route.sessionId,
+        scopeKey: route.scopeKey,
+        stage: 'credential_grant_expired',
+      }))
+    );
+    if (fence !== null) this.scheduleExpiredCredentialPolicyRefresh(fence);
+  }
+
+  private async expireCredentialTarget(
+    target: CredentialRenewalTarget,
+    stage: string
+  ): Promise<void> {
+    const fence = await this.enqueue(() =>
+      this.retireExpiredCredentialTargetsInQueue([
+        {
+          sessionId: target.sessionId,
+          scopeKey: target.scopeKey,
+          stage: 'credential_grant_expired',
+          issueStage: stage,
+        },
+      ])
+    );
+    if (fence !== null) this.scheduleExpiredCredentialPolicyRefresh(fence);
+  }
+
+  /**
+   * Retires one or more expired routes on the serial queue and returns the
+   * captured fence when at least one was retired. Callers schedule exactly one
+   * policy reconciliation for the batch.
+   */
+  private async retireExpiredCredentialTargetsInQueue(
+    routes: readonly {
+      sessionId: string;
+      scopeKey: string;
+      stage: string;
+      issueStage?: string;
+    }[]
+  ): Promise<RenewalFence | null> {
+    let retired = false;
+    for (const route of routes) {
+      retired =
+        (await this.retireExpiredCredentialRoute(
+          route.sessionId,
+          route.scopeKey,
+          route.stage,
+          route.issueStage
+        )) || retired;
+    }
+    return retired ? this.runtimeProxyFenceFor(await this.readAllocation()) : null;
+  }
+
+  /**
+   * Expired authority is a per-route failure: notify that attempt as failed and
+   * release its native route (row, scope membership, accepted handles, wrapper
+   * session) so no unusable alias or membership survives. The provider policy is
+   * reconciled once per sweep by `scheduleExpiredCredentialPolicyRefresh`.
+   */
+  private async retireExpiredCredentialRoute(
+    sessionId: string,
+    scopeKey: string,
+    stage: string,
+    issueStage?: string
+  ): Promise<boolean> {
+    const state = await this.readAllocation();
+    const route = await readRoute(this.db, sessionId);
+    if (route === null || route.state !== 'ready' || route.grant === null) {
+      this.credentialRenewal.clear(scopeKey);
+      return false;
+    }
+    if (scopeGrantId(route.grant) !== scopeKey) {
+      this.credentialRenewal.clear(scopeKey);
+      return false;
+    }
+    if (route.grant.expiresAt > Date.now()) {
+      // A concurrent renewal won; the normal deadline will take it from here.
+      this.credentialRenewal.clear(scopeKey);
+      return false;
+    }
+    logControlDiagnostic('credential_renewal', {
+      sandboxId: this.sandboxId,
+      sessionId,
+      scopeId: route.grant.scopeId,
+      stage: issueStage ?? stage,
+      outcome: 'expired',
+    });
+    await onRouteFailed(
+      this.routeContext(state),
+      sessionId,
+      'credentials_expired',
+      undefined,
+      true
+    );
+    await deleteRoute(this.db, this.ctx.storage.kv, sessionId);
+    this.credentialRenewal.clear(scopeKey);
+    const socket = this.boundWrapperSocket(await this.readAllocation());
+    if (socket !== null) {
+      this.trySendFrame(socket, { type: 'session.release', sessionId });
+    }
+    return true;
+  }
+
+  /**
+   * One authoritative revocation per expiry sweep, off the serial queue. A
+   * failed or unordered update stops the captured allocation; a replacement
+   * allocation is never touched.
+   */
+  private scheduleExpiredCredentialPolicyRefresh(fence: RenewalFence): void {
+    this.ctx.waitUntil(
+      this.credentialPolicy
+        .applyLive(fence.allocationId)
+        .then(async outcome => {
+          if (outcome.result === 'applied' || outcome.result === 'obsolete') return;
+          await this.enqueue(() => this.stopCapturedAllocation(fence.allocationId));
+        })
+        .catch(() => undefined)
+    );
+  }
+
+  private credentialTargetVerdict(
+    target: CredentialRenewalTarget,
+    state: AllocationState,
+    route: RouteRecord | null
+  ): CredentialRenewalOutcome | 'current' {
+    const authoritative = readScopeGrant(this.db, target.scopeKey);
+    return decideRenewalTargetVerdict({
+      target,
+      route:
+        route === null || route.grant === null
+          ? null
+          : {
+              scopeKey: scopeGrantId(route.grant),
+              grantExpiresAt: route.grant.expiresAt,
+              state: route.state,
+              attemptId: route.attemptId,
+            },
+      authoritativeScopeGrantJson: authoritative === null ? null : JSON.stringify(authoritative),
+      fence: this.runtimeProxyFenceFor(state),
+    });
   }
 
   /**
@@ -3342,52 +4057,118 @@ export class SandboxControlV2 extends DurableObject<Env> {
   }
 
   private async activeGrants(now: number): Promise<SessionCredentialGrant[]> {
+    return this.activeGrantsSync(now);
+  }
+
+  private activeGrantsSync(now: number): SessionCredentialGrant[] {
     return listScopeGrants(this.db).filter(
       grant => hasRuntimeCredentialProxy(grant) && grant.expiresAt > now
     );
   }
 
+  /** Synchronous allocation projection for the policy lane's write-time guard. */
+  private readAllocationSync(): AllocationState {
+    const row = this.db
+      .select()
+      .from(allocationTable)
+      .where(eq(allocationTable.id, ALLOCATION_ROW_ID))
+      .get();
+    return row === undefined ? initialAllocationState() : rowToState(row);
+  }
+
+  private readRouteSync(sessionId: string): RouteRecord | null {
+    const row = this.db
+      .select()
+      .from(routesTable)
+      .where(eq(routesTable.session_id, sessionId))
+      .get();
+    return row === undefined ? null : routeFromRow(this.db, row);
+  }
+
   /**
-   * Rebuilds the Vercel network policy from the stored grants (or a caller's
-   * candidate set) through the provider's contained-credential hook. Runs inside
-   * the operation queue and does not stop the sandbox: it returns `false` on
-   * failure so callers can decide (retry vs. fail closed). Transient failures
-   * keep the route alive so a later send can retry (N2). A live Vercel sandbox
-   * whose adapter lacks the hook cannot apply the policy, so it fails closed
-   * exactly like a throwing hook.
+   * Resolves the provider surface at write time. Returning `skip` mirrors the
+   * pre-existing no-op when the sandbox is not run by a policy-capable provider;
+   * `unavailable` still fails closed.
    */
-  private async refreshVercelNetworkPolicy(
-    grantsOverride?: readonly SessionCredentialGrant[]
-  ): Promise<boolean> {
-    if (this.currentProvider() !== 'vercel') return true;
-    try {
-      const state = await this.readAllocation();
-      const providerRef = state.providerRef;
-      const provider = this.provider;
-      if (state.kind === 'stopping' || state.kind === 'stopped') return true;
-      if (providerRef === null) return true;
-      if (!provider.applyContainedCredentials) return false;
-      const grants = grantsOverride ?? (await this.activeGrants(Date.now()));
-      await withTimeout(
-        provider.applyContainedCredentials(providerRef, grants),
-        this.sandboxTimers().providerStopAttemptMs,
-        'Sandbox network policy update timed out'
-      );
-      return true;
-    } catch {
-      return false;
+  private resolveCredentialPolicyWriteSync(): PolicyWriteResolution {
+    const state = this.readAllocationSync();
+    const allocationId = state.allocationId;
+    if (this.currentProvider() !== 'vercel') return { kind: 'skip', allocationId };
+    if (state.kind === 'stopping' || state.kind === 'stopped') {
+      return { kind: 'skip', allocationId };
     }
+    const providerRef = state.providerRef;
+    if (providerRef === null || allocationId === null) {
+      return { kind: 'skip', allocationId };
+    }
+    const provider = this.provider;
+    if (!provider.applyContainedCredentials) return { kind: 'unavailable', allocationId };
+    const apply = provider.applyContainedCredentials.bind(provider);
+    return {
+      kind: 'write',
+      allocationId,
+      apply: grants => apply(providerRef, grants),
+    };
+  }
+
+  /**
+   * Rebuilds the Vercel policy from the grants live when the lane executes. The
+   * owner serializes raw writes per physical allocation and keeps settlement
+   * ordering separate from this bounded caller, so a timed-out write can never
+   * advance the lane into a later repair.
+   */
+  private refreshVercelNetworkPolicy(): Promise<boolean> {
+    return this.credentialPolicy
+      .applyLive()
+      .then(outcome => this.settleCredentialPolicyOutcome(outcome));
+  }
+
+  private applyCandidateGrantPolicy(candidate: SessionCredentialGrant): Promise<boolean> {
+    return this.credentialPolicy
+      .applyCandidate(candidate)
+      .then(outcome => this.settleCredentialPolicyOutcome(outcome));
+  }
+
+  private settleCredentialPolicyOutcome(outcome: CredentialPolicyOutcome): boolean {
+    if (outcome.result === 'applied') return true;
+    if (outcome.result === 'uncertain') {
+      this.requestStopCapturedAllocation(outcome.allocationId);
+    }
+    return false;
+  }
+
+  /**
+   * Stops the allocation the policy operation was actually bound to. Must run on
+   * the serial queue; callers outside it enqueue this helper.
+   */
+  private async stopCapturedAllocation(allocationId: string): Promise<void> {
+    const state = await this.readAllocation();
+    if (state.allocationId !== allocationId) return;
+    if (state.kind === 'stopped' || state.kind === 'stopping') return;
+    await this.applyEvent({
+      type: 'stop-requested',
+      at: Date.now(),
+      reason: 'sandbox_lost',
+    });
+  }
+
+  private requestStopCapturedAllocation(allocationId: string | null): void {
+    if (allocationId === null) return;
+    this.ctx.waitUntil(
+      this.enqueue(() => this.stopCapturedAllocation(allocationId)).catch(() => undefined)
+    );
   }
 
   /**
    * Fail-closed revocation path: if the released session's alias cannot be
    * removed from the provider policy, stop the sandbox as a platform failure.
    */
-  private async applyVercelNetworkPolicyOrStop(reason: ControlPlaneFailureReason): Promise<void> {
-    if (await this.refreshVercelNetworkPolicy()) return;
-    const state = await this.readAllocation();
-    if (state.kind === 'stopped' || state.kind === 'stopping') return;
-    await this.applyEvent({ type: 'stop-requested', at: Date.now(), reason });
+  private async applyVercelNetworkPolicyOrStop(): Promise<void> {
+    const outcome = await this.credentialPolicy.applyLive();
+    if (outcome.result === 'applied') return;
+    if (outcome.allocationId !== null) {
+      await this.stopCapturedAllocation(outcome.allocationId);
+    }
   }
 
   private async dispatchToWrapper(
@@ -3402,6 +4183,328 @@ export class SandboxControlV2 extends DurableObject<Env> {
     );
     if (frame.type === 'session.answer') await this.touchActivity(Date.now());
     return this.trySendFrame(socket, frame) ? 'sent' : 'not_connected';
+  }
+
+  /**
+   * Identity key for one provider binding. The same allocation and physical
+   * provider ref is one binding: every wrapper reconnect within a DO generation
+   * shares the refresh, while a reallocation or provider change is a new key.
+   */
+  private warmOriginRoutingBindingKey(state: AllocationState): string | null {
+    if (state.allocationId === null || state.providerRef === null) return null;
+    return `${this.currentProvider()}:${state.allocationId}:${state.providerRef}`;
+  }
+
+  /** The binding key only while the allocation can carry runtime traffic. */
+  private warmOriginRoutingKey(state: AllocationState): string | null {
+    if (state.kind !== 'connected' && state.kind !== 'disconnected') return null;
+    return this.warmOriginRoutingBindingKey(state);
+  }
+
+  /** True when new session work may use this binding's runtime origin. */
+  private warmOriginRoutingReadyFor(state: AllocationState): boolean {
+    const key = this.warmOriginRoutingKey(state);
+    return key === null || this.warmOriginRoutingReady.has(key);
+  }
+
+  /**
+   * A binding this DO generation created and launched already has current
+   * native props and a current Vercel policy, so its first hello is not a warm
+   * refresh. A later generation starts with an empty set and refreshes it.
+   */
+  private markWarmOriginRoutingReady(state: AllocationState): void {
+    const key = this.warmOriginRoutingBindingKey(state);
+    if (key !== null) this.warmOriginRoutingReady.add(key);
+  }
+
+  /**
+   * Gate for new delivery/prepare/answer work. A warm binding starts its one
+   * refresh and reports not-ready; provider I/O runs outside the serial queue.
+   */
+  private warmOriginRoutingReadyOrSchedule(state: AllocationState): boolean {
+    if (this.warmOriginRoutingReadyFor(state)) return true;
+    this.scheduleWarmOriginRoutingRefresh(state);
+    return false;
+  }
+
+  /**
+   * Waits for a warm binding to become routable without occupying the serial
+   * queue. The bound is short: a transient refresh can finish and the answer
+   * proceeds; a real failure still returns promptly and the route's
+   * sandbox_lost notification carries the specific reason.
+   */
+  private async awaitWarmOriginRoutingReady(): Promise<boolean> {
+    const alreadyReady = await this.enqueue(async () => {
+      const state = await this.readAllocation();
+      const key = this.warmOriginRoutingKey(state);
+      if (key === null) return false;
+      if (this.warmOriginRoutingReady.has(key)) return true;
+      this.scheduleWarmOriginRoutingRefresh(state);
+      return false;
+    });
+    if (alreadyReady) return true;
+    const deadline = Date.now() + this.sandboxTimers().sessionNotifyDeadlineMs;
+    while (Date.now() < deadline) {
+      await new Promise(resolve => setTimeout(resolve, 25));
+      const state = await this.readAllocation();
+      const key = this.warmOriginRoutingKey(state);
+      if (key === null) return false;
+      if (this.warmOriginRoutingReady.has(key)) return true;
+    }
+    return false;
+  }
+
+  private setPendingWarmHello(state: AllocationState): void {
+    const key = this.warmOriginRoutingKey(state);
+    if (
+      key === null ||
+      state.allocationId === null ||
+      state.providerRef === null ||
+      state.connectionId === null ||
+      state.wrapperId === null
+    ) {
+      return;
+    }
+    this.pendingWarmHello = {
+      key,
+      allocationId: state.allocationId,
+      providerRef: state.providerRef,
+      connectionId: state.connectionId,
+      wrapperId: state.wrapperId,
+    };
+  }
+
+  private pendingWarmHelloMatches(state: AllocationState, pending: PendingWarmHello): boolean {
+    return (
+      state.kind === 'connected' &&
+      state.allocationId === pending.allocationId &&
+      state.providerRef === pending.providerRef &&
+      state.connectionId === pending.connectionId &&
+      state.wrapperId === pending.wrapperId
+    );
+  }
+
+  private scheduleWarmOriginRoutingRefresh(state: AllocationState): void {
+    const key = this.warmOriginRoutingKey(state);
+    if (
+      key === null ||
+      state.allocationId === null ||
+      state.providerRef === null ||
+      this.warmOriginRoutingReady.has(key) ||
+      this.warmOriginRoutingFlight?.key === key
+    ) {
+      return;
+    }
+    if (this.warmOriginRoutingRetryAt !== null && this.warmOriginRoutingRetryAt > Date.now()) {
+      // A hello that supersedes a failed refresh waits for the armed backoff;
+      // it merged its pending state and will be resumed by that retry.
+      return;
+    }
+    const flight: WarmOriginRoutingFlight = {
+      key,
+      allocationId: state.allocationId,
+      providerRef: state.providerRef,
+      provider: this.currentProvider(),
+      adapter: this.provider,
+      failures:
+        this.warmOriginRoutingFailures?.key === key ? this.warmOriginRoutingFailures.count : 0,
+    };
+    this.warmOriginRoutingFlight = flight;
+    this.warmOriginRoutingRetryAt = null;
+    this.ctx.waitUntil(this.runWarmOriginRouting(flight));
+  }
+
+  /**
+   * Provider rebind/policy I/O. Bounded and single-flight per binding. It must
+   * not hold the serial queue: Stop, status and interrupt keep running while a
+   * deploy's old forward URL is replaced.
+   */
+  private async refreshWarmOriginRouting(flight: WarmOriginRoutingFlight): Promise<void> {
+    const current = await this.readAllocation();
+    if (this.warmOriginRoutingKey(current) !== flight.key) return;
+    if (flight.provider === 'cloudflare-containers') {
+      const rebind = flight.adapter.rebindOutboundInterception?.bind(flight.adapter);
+      if (rebind === undefined) throw new Error('Provider cannot rebind outbound interception');
+      await withTimeout(
+        rebind(flight.providerRef),
+        this.sandboxTimers().providerStopAttemptMs,
+        'Warm origin routing rebind timed out'
+      );
+      return;
+    }
+    if (flight.provider === 'vercel') {
+      const outcome = await this.credentialPolicy.applyLive(flight.allocationId);
+      if (outcome.result === 'applied' || outcome.result === 'obsolete') return;
+      if (outcome.result === 'uncertain') {
+        this.requestStopCapturedAllocation(outcome.allocationId);
+      }
+      throw new Error('Vercel network policy refresh failed');
+    }
+    // Providers without a runtime-proxy binding have nothing to refresh.
+  }
+
+  private async runWarmOriginRouting(flight: WarmOriginRoutingFlight): Promise<void> {
+    let failure: unknown = null;
+    try {
+      await this.refreshWarmOriginRouting(flight);
+    } catch (error) {
+      failure = error;
+    }
+    await this.enqueue(async () => {
+      if (this.warmOriginRoutingFlight === flight) this.warmOriginRoutingFlight = null;
+      const state = await this.readAllocation();
+      if (this.warmOriginRoutingKey(state) !== flight.key) {
+        if (this.pendingWarmHello?.key === flight.key) this.pendingWarmHello = null;
+        if (this.warmOriginRoutingFailures?.key === flight.key) {
+          this.warmOriginRoutingFailures = null;
+          this.warmOriginRoutingRetryAt = null;
+        }
+        return;
+      }
+      if (failure === null) {
+        this.warmOriginRoutingReady.add(flight.key);
+        this.warmOriginRoutingFailures = null;
+        this.warmOriginRoutingRetryAt = null;
+        const pending = this.pendingWarmHello;
+        if (pending !== null && pending.key === flight.key) {
+          this.pendingWarmHello = null;
+          if (!this.pendingWarmHelloMatches(state, pending)) return;
+          logControlDiagnostic('warm_origin_routing', {
+            sandboxId: this.sandboxId,
+            allocationId: pending.allocationId,
+            provider: flight.provider,
+            stage: 'ready',
+          });
+        } else if (state.kind !== 'connected') {
+          return;
+        }
+        // A warm allocation can keep its hibernated socket across a deploy, so
+        // there may be no pending hello at all. onWrapperConnected re-sends
+        // preparing frames and re-notifies ready routes so queued prompts do
+        // not wait for the next heartbeat.
+        await this.applyHelloRouteEffects(state);
+        return;
+      }
+      const failures = flight.failures + 1;
+      this.warmOriginRoutingFailures = { key: flight.key, count: failures };
+      this.warmOriginRoutingRetryAt = null;
+      logControlDiagnostic(
+        'warm_origin_routing',
+        {
+          sandboxId: this.sandboxId,
+          allocationId: flight.allocationId,
+          provider: flight.provider,
+          stage: 'failed',
+          failures,
+          errorName: failure instanceof Error ? failure.name : 'unknown',
+        },
+        'warn'
+      );
+      if (failures >= 3) {
+        this.pendingWarmHello = null;
+        this.warmOriginRoutingFailures = null;
+        logControlDiagnostic(
+          'warm_origin_routing',
+          {
+            sandboxId: this.sandboxId,
+            allocationId: flight.allocationId,
+            provider: flight.provider,
+            stage: 'stopping_allocation',
+            failures,
+          },
+          'warn'
+        );
+        await this.stopCapturedAllocation(flight.allocationId);
+        return;
+      }
+      this.warmOriginRoutingRetryAt = Date.now() + Math.min(1000 * 2 ** (failures - 1), 5000);
+      await this.armAlarm(state);
+    });
+  }
+
+  /**
+   * Hibernated sockets can survive deployment without a new hello. Refresh live
+   * bindings off-queue; disconnected bindings only retry recorded failures.
+   */
+  private retryWarmOriginRouting(state: AllocationState): void {
+    if (this.warmOriginRoutingReadyFor(state)) return;
+    if (this.warmOriginRoutingFlight !== null) return;
+    if (this.warmOriginRoutingRetryAt !== null) {
+      if (this.warmOriginRoutingRetryAt > Date.now()) return;
+    } else if (state.kind !== 'connected' || this.boundWrapperSocket(state) === null) {
+      return;
+    }
+    this.scheduleWarmOriginRoutingRefresh(state);
+  }
+
+  private warmOriginRoutingRetryAtForAlarm(state: AllocationState): number | null {
+    if (this.warmOriginRoutingRetryAt === null) return null;
+    if (this.warmOriginRoutingKey(state) === null) return null;
+    return this.warmOriginRoutingReadyFor(state) ? null : this.warmOriginRoutingRetryAt;
+  }
+
+  private resetWarmOriginRouting(): void {
+    this.pendingWarmHello = null;
+    this.warmOriginRoutingFlight = null;
+    this.warmOriginRoutingFailures = null;
+    this.warmOriginRoutingRetryAt = null;
+  }
+
+  /**
+   * Restart effects are applied to durable state as soon as the hello is
+   * processed, before any provider refresh can be lost to eviction. Handles
+   * minted for the old wrapper are revoked and ready routes start a fresh
+   * attempt; only preparation dispatch waits for the routing refresh.
+   */
+  private async applyRestartRouteEffects(next: AllocationState): Promise<void> {
+    this.ctx.storage.transactionSync(() => {
+      retireAcceptedHandlesSync(this.ctx.storage.kv);
+      for (const grant of listScopeGrants(this.db)) {
+        const cleared = clearRuntimeProxyMembers(grant);
+        if (cleared !== grant) writeScopeGrant(this.db, cleared);
+      }
+    });
+    for (const route of await listRoutes(this.db)) {
+      if (route.state !== 'ready') continue;
+      await this.routeContext(next).notify(route.sessionId, {
+        state: 'lost',
+        attemptId: route.attemptId,
+        reason: 'agent_restarted',
+      });
+      await startAttempt(
+        this.routeContext(next),
+        route.spec,
+        route.credentialSource,
+        route.environment
+      );
+    }
+  }
+
+  private async applyHelloRouteEffects(next: AllocationState): Promise<void> {
+    for (const route of await listRoutes(this.db)) {
+      if (route.state !== 'preparing' || route.grant !== null) continue;
+      if (route.credentialSource === null) continue;
+      try {
+        const issued = await withTimeout(
+          this.issueRouteGrant(route.spec, route.credentialSource, route.environment),
+          this.grantIssueTimeoutMs(),
+          'Credential binding timed out'
+        );
+        if (!(await this.applyCandidateGrantPolicy(issued.grant)))
+          throw new Error('Credential policy unavailable');
+        this.publishRouteGrant({ ...route, ...issued });
+      } catch (error) {
+        const failure = grantIssueFailure(error, 'runtime_proxy_bind_failed');
+        await failCurrentAttempt(
+          this.routeContext(next),
+          route.sessionId,
+          route.attemptId,
+          failure.reason,
+          failure.stage
+        );
+      }
+    }
+    await onWrapperConnected(this.routeContext(next), false);
   }
 
   /**
@@ -3424,6 +4527,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     stopReason: ControlPlaneFailureReason | undefined
   ): Promise<void> {
     if (previous.allocationId !== null && previous.allocationId !== next.allocationId) {
+      this.resetWarmOriginRouting();
       this.db.transaction(tx => retireScopeGrants(tx, this.ctx.storage.kv));
     }
     // Until the wrapper connects, the allocation is the preparation progress:
@@ -3444,43 +4548,14 @@ export class SandboxControlV2 extends DurableObject<Env> {
     }
     if (event.type === 'hello-accepted' && next.kind === 'connected') {
       const restarted = previous.wrapperId !== null && previous.wrapperId !== next.wrapperId;
-      if (restarted) {
-        // A new wrapper instance supersedes the previous fence's accepted
-        // handles and every member's stored handle string. Retire both before
-        // the bind/adoption scan so a handle minted for the new fence during the
-        // scan is not deleted by this.
-        this.ctx.storage.transactionSync(() => {
-          retireAcceptedHandlesSync(this.ctx.storage.kv);
-          for (const grant of listScopeGrants(this.db)) {
-            const cleared = clearRuntimeProxyMembers(grant);
-            if (cleared !== grant) writeScopeGrant(this.db, cleared);
-          }
-        });
+      if (restarted) await this.applyRestartRouteEffects(next);
+      const key = this.warmOriginRoutingKey(next);
+      if (key === null || this.warmOriginRoutingReady.has(key)) {
+        await this.applyHelloRouteEffects(next);
+        return;
       }
-      for (const route of await listRoutes(this.db)) {
-        if (route.state !== 'preparing' || route.grant !== null) continue;
-        if (route.credentialSource === null) continue;
-        try {
-          const issued = await withTimeout(
-            this.issueRouteGrant(route.spec, route.credentialSource, route.environment),
-            this.grantIssueTimeoutMs(),
-            'Credential binding timed out'
-          );
-          if (!(await this.applyCandidateGrantPolicy(issued.grant)))
-            throw new Error('Credential policy unavailable');
-          this.publishRouteGrant({ ...route, ...issued });
-        } catch (error) {
-          const failure = grantIssueFailure(error, 'runtime_proxy_bind_failed');
-          await failCurrentAttempt(
-            this.routeContext(next),
-            route.sessionId,
-            route.attemptId,
-            failure.reason,
-            failure.stage
-          );
-        }
-      }
-      await onWrapperConnected(this.routeContext(next), restarted);
+      this.setPendingWarmHello(next);
+      this.scheduleWarmOriginRoutingRefresh(next);
       return;
     }
     if (previous.kind === 'connected' && next.kind === 'disconnected') {
@@ -3659,6 +4734,9 @@ export class SandboxControlV2 extends DurableObject<Env> {
       );
       return;
     }
+    // A warm binding must not receive `session.prepare` before its runtime
+    // origin is routable. A successful refresh re-sends it.
+    if (!this.warmOriginRoutingReadyOrSchedule(state)) return;
     // Minting calls the Session DO and must stay outside this serial queue.
     this.ctx.waitUntil(this.sendSessionPrepareWithRuntimeProxy(route.sessionId, route.attemptId));
   }
@@ -3808,6 +4886,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       const route = await readRoute(this.db, sessionId);
       if (!isCurrentPreparingAttempt(route, attemptId)) return;
       if (route.grant === null || route.grant.kilo.runtimeProxy === undefined) return;
+      if (!this.warmOriginRoutingReadyOrSchedule(await this.readAllocation())) return;
       // One owner per sandbox (B3 review 5), stored on first prepare/registration;
       // the Session DO name is `ownerId:sessionId`.
       const ownerId = await this.requireOwner();
@@ -3995,6 +5074,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
     const state = await this.readAllocation();
     const socket = this.boundWrapperSocket(state);
     if (socket === null) return;
+    if (!this.warmOriginRoutingReadyFor(state)) {
+      this.scheduleWarmOriginRoutingRefresh(state);
+      return;
+    }
     if (snapshotRestorePending(this.db, state.allocationId)) return;
     const latest = await readRoute(this.db, sessionId);
     if (!isCurrentPreparingAttempt(latest, attemptId)) return;
@@ -4528,6 +5611,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
           await this.stopRef(createdRef, allocationId);
           return;
         }
+        this.markWarmOriginRoutingReady(current);
         const launchDeadline = current.createDeadlineAt ?? createDeadline;
         const workspaceSnapshot = await this.workspaceSnapshotLaunch(
           allocationId,
@@ -5326,6 +6410,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         ...(attachment?.runtimeCapability
           ? { runtimeCapability: attachment.runtimeCapability }
           : {}),
+        ...(attachment?.turnCoverage ? { turnCoverage: true } : {}),
         ...(frame.heartbeatAck ? { heartbeatAck: true } : {}),
         ...(frame.workspaceSnapshots ? { workspaceSnapshots: true } : {}),
         ...(frame.redactsNamedSecrets ? { redactsNamedSecrets: true } : {}),
@@ -5351,6 +6436,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
         ...(frame.heartbeatAck ? { heartbeatAck: true } : {}),
         ...(frame.workspaceSnapshots ? { workspaceSnapshots: true } : {}),
+        ...(attachment?.turnCoverage ? { turnCoverage: true } : {}),
       });
       writeRuntimeIdentity(this.ctx.storage.kv, frame.allocationId, {
         kiloCliVersion: attachment?.kiloCliVersion ?? null,
@@ -5429,6 +6515,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         });
       }
       await this.armAlarm(await this.readAllocation());
+      this.retryWarmOriginRouting(state);
       if (
         !frame.active &&
         state.lastActivityAt !== null &&
@@ -5448,6 +6535,38 @@ export class SandboxControlV2 extends DurableObject<Env> {
       ) {
         this.sendFrame(ws, { type: 'heartbeat_ack' });
       }
+      return;
+    }
+
+    if (frame.type === 'logs.refresh') {
+      const state = await this.readAllocation();
+      // Renewal authority is the current bound socket, never the grant itself.
+      const socketAuthorized = connectionMatches(
+        state,
+        attachment.allocationId,
+        attachment.connectionId
+      );
+      const secret = socketAuthorized
+        ? await withTimeout(
+            resolveSecret(this.env.NEXTAUTH_SECRET),
+            1_000,
+            'Log upload renewal signing secret lookup timed out'
+          ).catch(() => null)
+        : null;
+      const identity = validateControlLogRenewal({
+        proof: frame.grant,
+        secret,
+        socketAuthorized,
+        sandboxId: this.sandboxId,
+        allocationId: attachment.allocationId,
+      });
+      if (!identity || !secret) return;
+      const credential = mintControlLogUploadCredential(identity, secret);
+      this.sendFrame(ws, {
+        type: 'logs.credentials',
+        grant: credential.grant,
+        expiresAt: credential.expiresAt,
+      });
       return;
     }
 
@@ -5860,6 +6979,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     // preparation attempt.
     const allocationAt = nextAllocationAlarmAt(state, this.sandboxTimers());
     const routeAt = await earliestRouteDeadlineAt(this.db);
+    const credentialAt = await this.nextCredentialRenewalAt(Date.now());
     // Pending work must survive loss of the in-memory launch continuation.
     const retryAt =
       state.kind === 'stopped' &&
@@ -5914,9 +7034,11 @@ export class SandboxControlV2 extends DurableObject<Env> {
     const candidates = [
       allocationAt,
       routeAt,
+      credentialAt,
       retryAt,
       snapshotAt,
       this.earliestHelloDeadlineAt(),
+      this.warmOriginRoutingRetryAtForAlarm(state),
     ].filter((at): at is number => at !== null);
     if (candidates.length === 0) {
       await this.ctx.storage.deleteAlarm();

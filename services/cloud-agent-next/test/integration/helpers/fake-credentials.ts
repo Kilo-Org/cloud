@@ -13,6 +13,8 @@ export const FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN =
  */
 export type FakeCredentialBroker = {
   githubIssued: () => number;
+  /** The broker never issues Kilo capabilities; the Session DO owns them. */
+  kiloIssued: () => 0;
   /** The repository each GitHub capability was issued for, by capability. */
   githubCapabilityRepositories: () => ReadonlyMap<string, string>;
   issueGitHubSessionCapability: (params?: { githubRepo?: string }) => Promise<{
@@ -32,6 +34,7 @@ export function createFakeCredentialBroker(
   const repositories = new Map<string, string>();
   return {
     githubIssued: () => githubIssued,
+    kiloIssued: () => 0,
     githubCapabilityRepositories: () => repositories,
     async issueGitHubSessionCapability(params) {
       githubIssued += 1;

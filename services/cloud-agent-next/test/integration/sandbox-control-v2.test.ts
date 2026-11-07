@@ -150,6 +150,7 @@ function createFakeProvider(options: FakeProviderOptions = {}): FakeProvider {
       provider.leaseRefs.push(ref);
     },
     async applyContainedCredentials() {},
+    async rebindOutboundInterception() {},
     async logs() {
       return '';
     },

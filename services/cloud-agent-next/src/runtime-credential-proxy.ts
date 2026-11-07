@@ -265,7 +265,7 @@ export async function resolveRuntimeProxyCredential(input: {
   now?: number;
   token: string;
   renew: () => Promise<string>;
-}): Promise<{ token: string; transportProofRequired: boolean } | null> {
+}): Promise<{ token: string } | null> {
   const claims = await verifyRuntimeCredentialProxyHandle(input.env, input.handle);
   const now = input.now ?? Date.now();
   const parsedGrant = runtimeProxyGrantSchema.safeParse(input.grant);
@@ -291,10 +291,7 @@ export async function resolveRuntimeProxyCredential(input: {
       ? decoded.exp * 1000
       : 0;
   const token = exp > now + 5 * 60_000 ? input.token : await input.renew();
-  return {
-    token,
-    transportProofRequired: true,
-  };
+  return { token };
 }
 
 export function runtimeCredentialProxyBaseUrl(workerUrl: string): string | null {
@@ -342,6 +339,59 @@ export function runtimeCredentialProxyFacadeBaseUrl(workerUrl: string): string |
   } catch {
     return null;
   }
+}
+
+/**
+ * The reserved sandbox-facing facade for local development. Native outbound
+ * interception only sees default HTTP/HTTPS ports, so a local WORKER_URL with an
+ * offset port cannot be reached from inside the sandbox. This authority is
+ * never valid outside a local HTTP WORKER_URL.
+ */
+export const RUNTIME_CREDENTIAL_PROXY_CLIENT_HOSTNAME = 'runtime-credential-proxy.invalid';
+
+function safeFacadePrefix(url: URL): string | null {
+  const prefix = url.pathname.replace(/\/+$/, '');
+  const segments = prefix.split('/').filter(Boolean);
+  if (
+    prefix.includes('\\') ||
+    prefix.includes('//') ||
+    segments.some(segment => segment === 'api' || segment === '.' || segment === '..')
+  ) {
+    return null;
+  }
+  return prefix;
+}
+
+export function isRuntimeCredentialProxyClientTarget(value: string | URL): boolean {
+  const raw = typeof value === 'string' ? value : value.toString();
+  if (hasUnsafeFacadePathEncoding(raw)) return false;
+  try {
+    const url = new URL(raw);
+    if (
+      url.protocol !== 'http:' ||
+      url.hostname !== RUNTIME_CREDENTIAL_PROXY_CLIENT_HOSTNAME ||
+      url.port !== '' ||
+      url.username ||
+      url.password ||
+      url.search ||
+      url.hash
+    ) {
+      return false;
+    }
+    const prefix = safeFacadePrefix(url);
+    if (prefix === null) return false;
+    return `${url.origin}${prefix}` === raw.replace(/\/+$/, '');
+  } catch {
+    return false;
+  }
+}
+
+export function runtimeCredentialProxyClientBaseUrl(workerUrl: string): string | null {
+  const facade = runtimeCredentialProxyFacadeBaseUrl(workerUrl);
+  if (!facade) return null;
+  const url = new URL(facade);
+  if (url.protocol !== 'http:' || !isLocalFacadeUrl(url)) return facade;
+  return `http://${RUNTIME_CREDENTIAL_PROXY_CLIENT_HOSTNAME}${url.pathname.replace(/\/+$/, '')}`;
 }
 
 function hasUnsafeFacadePathEncoding(value: string): boolean {

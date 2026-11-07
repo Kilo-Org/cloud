@@ -74,6 +74,26 @@ describe('Vercel credentials with private control-plane upstreams', () => {
     input.env.WORKER_URL = 'http://worker.example.com';
     await expect(prepareCredentialGrant(input)).rejects.toThrow();
   });
+
+  it('propagates the reserved client root to every runtime target for a local HTTP Worker', async () => {
+    const input = localPreparation();
+    input.provider = 'cloudflare-containers';
+    input.env.WORKER_URL = 'http://host.docker.internal:11694/runtime';
+    const { grant } = await prepareCredentialGrant(input);
+    const expected = {
+      backendBaseUrl: 'http://runtime-credential-proxy.invalid/runtime',
+      providerBaseUrl: 'http://runtime-credential-proxy.invalid/runtime',
+      sessionIngestBaseUrl: 'http://runtime-credential-proxy.invalid/runtime',
+    };
+    expect(grant.kilo.runtimeProxy?.targets).toEqual(expected);
+    grant.kilo.runtimeProxy!.members.push({
+      sessionId,
+      kiloSessionId,
+      handle: 'test-session-handle',
+    });
+    expect(persistedSessionCredentialGrantSchema.safeParse(grant).success).toBe(true);
+    expect(sessionCredentialsPayloadFromGrant(grant, sessionId).proxy?.targets).toEqual(expected);
+  });
 });
 
 async function boundVercelGrant() {

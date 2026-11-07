@@ -10,10 +10,6 @@ import {
   createRuntimeProxyGrant,
   issueRuntimeCredentialProxyHandle,
 } from './runtime-credential-proxy.js';
-import {
-  RUNTIME_PROXY_ATTESTATION_HEADER,
-  verifyRuntimeProxyAttestation,
-} from '@kilocode/worker-utils/runtime-proxy-attestation';
 
 const {
   getRunningTerminalClientMock,
@@ -711,7 +707,7 @@ describe('server /terminal', () => {
   });
 });
 
-describe('server runtime credential proxy', () => {
+describe('server runtime credential proxy public boundary', () => {
   async function handle(
     kiloSessionId = 'kilo_proxy',
     sessionId = 'workspace_proxy'
@@ -734,34 +730,19 @@ describe('server runtime credential proxy', () => {
     );
   }
 
-  it('denies invalid handles before resolving a session or fetching', async () => {
-    const env = createEnv();
-    const upstream = vi.fn();
-    vi.stubGlobal('fetch', upstream);
-    const response = await fetchWorker(
-      new Request('https://worker.test/api/runtime-credential-proxy/provider/models', {
-        headers: { Authorization: 'Bearer invalid' },
-      }),
-      env
-    );
-    expect(response.status).toBe(401);
-    expect(env.SANDBOX_SESSION.get).not.toHaveBeenCalled();
-    expect(upstream).not.toHaveBeenCalled();
-    vi.unstubAllGlobals();
-  });
-
-  it('denies retired agent session handles before resolving a session', async () => {
-    const env = createEnv();
+  it('rejects a valid handle on the inferred facade with runtime_proxy_origin_required', async () => {
+    const env = Object.assign(createEnv(), { WORKER_URL: 'https://worker.test' });
     const upstream = vi.fn();
     vi.stubGlobal('fetch', upstream);
     try {
       const response = await fetchWorker(
-        new Request('https://worker.test/api/runtime-credential-proxy/provider/models', {
-          headers: { Authorization: `Bearer ${await handle('kilo_proxy', 'agent_proxy')}` },
+        new Request('https://worker.test/api/profile', {
+          headers: { Authorization: `Bearer ${await handle()}` },
         }),
         env
       );
-      expect(response.status).toBe(401);
+      expect(response.status).toBe(403);
+      await expect(response.text()).resolves.toBe('runtime_proxy_origin_required');
       expect(env.SANDBOX_SESSION.get).not.toHaveBeenCalled();
       expect(upstream).not.toHaveBeenCalled();
     } finally {
@@ -769,716 +750,71 @@ describe('server runtime credential proxy', () => {
     }
   });
 
-  it('routes verified facade requests and leaves non-handles to ordinary routing', async () => {
+  it('rejects the inferred facade on a foreign host even with a valid handle', async () => {
     const env = Object.assign(createEnv(), { WORKER_URL: 'https://worker.test' });
-    const resolve = vi.fn().mockResolvedValue({
-      token: 'https://api.kilo.ai:backing-token',
-      organizationId: 'org_proxy',
-      runtimeAuthorization: {
-        userId: 'usr_proxy',
-        authorizationId: '11111111-1111-4111-8111-111111111111',
-        resourceId: 'workspace_proxy',
-      },
-    });
-    env.SANDBOX_SESSION.get.mockReturnValue({ resolveRuntimeCredentialProxyGrant: resolve });
-    const upstream = vi.fn().mockResolvedValue(new Response('ok'));
-    vi.stubGlobal('fetch', upstream);
-    try {
-      const authorization = `Bearer ${await handle()}`;
-      const requests = [
-        ['GET', '/api/profile', undefined],
-        ['GET', '/api/defaults', undefined],
-        ['GET', '/api/openrouter/models', undefined],
-        ['POST', '/api/openrouter/chat/completions', '{}'],
-        ['POST', '/api/gateway/chat/completions', '{}'],
-        ['POST', '/api/gateway/v1/chat/completions', '{}'],
-        ['POST', '/api/gateway/v1/responses', '{}'],
-        ['POST', '/api/session', '{"sessionId":"kilo_proxy"}'],
-        ['GET', '/api/session/kilo_proxy/export', undefined],
-        ['POST', '/api/session/kilo_proxy/ingest', '{}'],
-        ['POST', '/api/session/kilo_proxy/title', '{}'],
-        ['POST', '/api/exa/search', '{}'],
-      ] as const;
-      for (const [method, path, body] of requests) {
-        const response = await fetchWorker(
-          new Request(`https://worker.test${path}`, {
-            method,
-            headers: {
-              Authorization: authorization,
-              ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
-            },
-            ...(body === undefined ? {} : { body }),
-          }),
-          env
-        );
-        expect(response.status).toBe(200);
-      }
-      expect(
-        upstream.mock.calls.map(([request]) => new URL((request as Request).url).pathname)
-      ).toEqual([
-        '/api/profile',
-        '/api/defaults',
-        '/api/gateway/models',
-        '/api/gateway/chat/completions',
-        '/api/gateway/chat/completions',
-        '/api/gateway/v1/chat/completions',
-        '/api/gateway/v1/responses',
-        '/api/session',
-        '/api/session/kilo_proxy/export',
-        '/api/session/kilo_proxy/ingest',
-        '/api/session/kilo_proxy/title',
-        '/api/exa/search',
-      ]);
-      const createRequest = upstream.mock.calls[7]?.[0] as Request;
-      expect(await createRequest.text()).toBe('{"sessionId":"kilo_proxy"}');
-
-      const invalid = await fetchWorker(
-        new Request('https://worker.test/api/profile', {
-          headers: { Authorization: 'Bearer invalid' },
-        }),
-        env
-      );
-      const unknown = await fetchWorker(
-        new Request('https://worker.test/api/not-allowed', {
-          headers: { Authorization: authorization },
-        }),
-        env
-      );
-      expect(invalid.status).toBe(404);
-      expect(unknown.status).toBe(404);
-      expect(upstream).toHaveBeenCalledTimes(requests.length);
-    } finally {
-      vi.unstubAllGlobals();
-    }
-  });
-
-  it('does not let one root handle access a sibling path or body-bound ingest request', async () => {
-    const env = Object.assign(createEnv(), { WORKER_URL: 'https://worker.test' });
-    const firstHandle = await handle();
-    const secondHandle = await issueRuntimeCredentialProxyHandle(
-      { NEXTAUTH_SECRET: secret } as never,
-      createRuntimeProxyGrant({
-        plane: 'control',
-        authorizationId: '22222222-2222-4222-8222-222222222222',
-        sessionId: 'workspace_sibling',
-        kiloSessionId: 'kilo_sibling',
-        userId: 'usr_proxy',
-        mode: 'contained',
-        allocationId: 'allocation_proxy',
-        providerInstanceId: 'provider_proxy',
-        connectionId: 'connection_proxy',
-        wrapperInstanceId: 'wrapper_proxy',
-        leaseExpiresAt: Date.now() + 60_000,
-        state: 'active',
-      })
-    );
-    const firstResolve = vi.fn().mockResolvedValue({
-      token: 'https://api.kilo.ai:backing-token',
-      runtimeAuthorization: {
-        userId: 'usr_proxy',
-        authorizationId: '11111111-1111-4111-8111-111111111111',
-        resourceId: 'workspace_proxy',
-      },
-    });
-    const secondResolve = vi.fn().mockResolvedValue({
-      token: 'https://api.kilo.ai:backing-token',
-      runtimeAuthorization: {
-        userId: 'usr_proxy',
-        authorizationId: '22222222-2222-4222-8222-222222222222',
-        resourceId: 'workspace_sibling',
-      },
-    });
-    env.SANDBOX_SESSION.idFromName.mockImplementation((name: string) => name);
-    env.SANDBOX_SESSION.get.mockImplementation((id: string) =>
-      id === 'usr_proxy:workspace_proxy'
-        ? { resolveRuntimeCredentialProxyGrant: firstResolve }
-        : { resolveRuntimeCredentialProxyGrant: secondResolve }
-    );
-    const upstream = vi.fn().mockResolvedValue(new Response('ok'));
-    vi.stubGlobal('fetch', upstream);
-    try {
-      for (const [path, body] of [
-        ['/api/session/kilo_sibling/export', undefined],
-        ['/api/session', '{"sessionId":"kilo_sibling"}'],
-      ] as const) {
-        const response = await fetchWorker(
-          new Request(`https://worker.test${path}`, {
-            method: body === undefined ? 'GET' : 'POST',
-            headers: {
-              Authorization: `Bearer ${firstHandle}`,
-              ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
-            },
-            ...(body === undefined ? {} : { body }),
-          }),
-          env
-        );
-        expect(response.status).toBe(404);
-      }
-      expect(upstream).not.toHaveBeenCalled();
-
-      firstResolve.mockResolvedValue(null);
-
-      const surviving = await fetchWorker(
-        new Request('https://worker.test/api/session/kilo_sibling/export', {
-          headers: { Authorization: `Bearer ${secondHandle}` },
-        }),
-        env
-      );
-      expect(surviving.status).toBe(200);
-      expect(secondResolve).toHaveBeenCalledOnce();
-      expect(upstream).toHaveBeenCalledOnce();
-    } finally {
-      vi.unstubAllGlobals();
-    }
-  });
-
-  it('recognizes only paths under a safe configured facade prefix', async () => {
-    const env = Object.assign(createEnv(), { WORKER_URL: 'https://worker.test/runtime' });
-    env.SANDBOX_SESSION.get.mockReturnValue({
-      resolveRuntimeCredentialProxyGrant: vi.fn().mockResolvedValue({
-        token: 'https://api.kilo.ai:backing-token',
-        runtimeAuthorization: {
-          userId: 'usr_proxy',
-          authorizationId: '11111111-1111-4111-8111-111111111111',
-          resourceId: 'workspace_proxy',
-        },
-      }),
-    });
-    const upstream = vi.fn().mockResolvedValue(new Response('ok'));
-    vi.stubGlobal('fetch', upstream);
-    try {
-      const authorization = `Bearer ${await handle()}`;
-      expect(
-        (
-          await fetchWorker(
-            new Request('https://worker.test/runtime/api/profile', {
-              headers: { Authorization: authorization },
-            }),
-            env
-          )
-        ).status
-      ).toBe(200);
-      expect(
-        (
-          await fetchWorker(
-            new Request('https://worker.test/api/profile', {
-              headers: { Authorization: authorization },
-            }),
-            env
-          )
-        ).status
-      ).toBe(404);
-      expect(upstream).toHaveBeenCalledOnce();
-    } finally {
-      vi.unstubAllGlobals();
-    }
-  });
-
-  it('replaces caller credentials, enforces organization identity, and preserves request shape', async () => {
-    const env = createEnv();
-    const resolve = vi.fn().mockResolvedValue({
-      token: 'https://provider.example.test/api/openrouter:backing-token',
-      organizationId: 'org_proxy',
-      runtimeAuthorization: {
-        userId: 'usr_proxy',
-        authorizationId: '11111111-1111-4111-8111-111111111111',
-        resourceId: 'workspace_proxy',
-      },
-    });
-    env.SANDBOX_SESSION.get.mockReturnValue({ resolveRuntimeCredentialProxyGrant: resolve });
-    const upstream = vi.fn(async (request: Request) => {
-      expect(request.method).toBe('POST');
-      expect(new URL(request.url).pathname).toBe('/api/openrouter/chat/completions');
-      expect(await request.text()).toBe('{"stream":true}');
-      expect(request.headers.get('authorization')).toMatch(/^Bearer /);
-      expect(request.headers.get('authorization')).not.toBe('Bearer caller-token');
-      expect(request.headers.get(RUNTIME_PROXY_ATTESTATION_HEADER)).not.toBe(
-        'caller-supplied-proof'
-      );
-      expect(request.headers.get('cookie')).toBeNull();
-      expect(request.headers.get('x-kilocode-organizationid')).toBe('org_proxy');
-      await expect(
-        verifyRuntimeProxyAttestation({
-          value: request.headers.get(RUNTIME_PROXY_ATTESTATION_HEADER),
-          secret,
-          audience: 'kilo-gateway',
-          userId: 'usr_proxy',
-          authorizationId: '11111111-1111-4111-8111-111111111111',
-          resourceId: 'workspace_proxy',
-          bearer: 'https://provider.example.test/api/openrouter:backing-token',
-        })
-      ).resolves.toBe(true);
-      return new Response('stream-body', {
-        status: 307,
-        headers: { Location: 'https://other.test' },
-      });
-    });
-    vi.stubGlobal('fetch', upstream);
-    const response = await fetchWorker(
-      new Request(
-        'https://worker.test/api/runtime-credential-proxy/provider/api/openrouter/chat/completions?stream=true',
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${await handle()}`,
-            Cookie: 'session=caller',
-            'X-Kilocode-OrganizationId': 'attacker-org',
-            [RUNTIME_PROXY_ATTESTATION_HEADER]: 'caller-supplied-proof',
-            'Content-Type': 'application/json',
-          },
-          body: '{"stream":true}',
-        }
-      ),
-      env
-    );
-    expect(response.status).toBe(307);
-    expect(response.headers.get('location')).toBe('https://other.test');
-    await expect(response.text()).resolves.toBe('stream-body');
-    expect(resolve).toHaveBeenCalledOnce();
-    vi.unstubAllGlobals();
-  });
-
-  it('removes every adjacent prohibited header before injecting runtime credentials', async () => {
-    const env = createEnv();
-    env.SANDBOX_SESSION.get.mockReturnValue({
-      resolveRuntimeCredentialProxyGrant: vi.fn().mockResolvedValue({
-        token: 'https://provider.example.test/api/openrouter:backing-token',
-        organizationId: 'org_proxy',
-        runtimeAuthorization: {
-          userId: 'usr_proxy',
-          authorizationId: '11111111-1111-4111-8111-111111111111',
-          resourceId: 'workspace_proxy',
-        },
-      }),
-    });
-    const prohibited = [
-      'forwarded',
-      'proxy-connection',
-      'proxy-a',
-      'proxy-b',
-      'x-forwarded-a',
-      'x-forwarded-b',
-      'x-internal-a',
-      'x-internal-b',
-      'x-kilo-a',
-      'x-kilo-b',
-      'x-kilocode-a',
-      'x-kilocode-b',
-      'x-real-ip',
-    ];
-    const upstream = vi.fn().mockResolvedValue(new Response('ok'));
-    vi.stubGlobal('fetch', upstream);
-    try {
-      const response = await fetchWorker(
-        new Request(
-          'https://worker.test/api/runtime-credential-proxy/provider/api/openrouter/models',
-          {
-            headers: {
-              ...Object.fromEntries(prohibited.map(name => [name, 'untrusted'])),
-              Authorization: `Bearer ${await handle()}`,
-              'X-Kilocode-OrganizationId': 'attacker-org',
-              'X-Client-Request-Id': 'request_proxy',
-            },
-          }
-        ),
-        env
-      );
-      expect(response.status).toBe(200);
-      expect(upstream).toHaveBeenCalledOnce();
-      const forwarded = upstream.mock.calls[0][0] as Request;
-      for (const name of prohibited) expect(forwarded.headers.get(name)).toBeNull();
-      expect(forwarded.headers.get('authorization')).toBe(
-        'Bearer https://provider.example.test/api/openrouter:backing-token'
-      );
-      expect(forwarded.headers.get('x-kilocode-organizationid')).toBe('org_proxy');
-      expect(forwarded.headers.get('x-client-request-id')).toBe('request_proxy');
-    } finally {
-      vi.unstubAllGlobals();
-    }
-  });
-
-  it('forwards gateway attribution headers while still replacing the organization header', async () => {
-    const env = createEnv();
-    env.SANDBOX_SESSION.get.mockReturnValue({
-      resolveRuntimeCredentialProxyGrant: vi.fn().mockResolvedValue({
-        token: 'https://provider.example.test/api/openrouter:backing-token',
-        organizationId: 'org_proxy',
-        runtimeAuthorization: {
-          userId: 'usr_proxy',
-          authorizationId: '11111111-1111-4111-8111-111111111111',
-          resourceId: 'workspace_proxy',
-        },
-      }),
-    });
-    const attributionHeaders = {
-      'X-Kilocode-Feature': 'code-review',
-      'X-KILOCODE-EDITORNAME': 'Kilo Cloud Agent',
-      'x-kilocode-mode': 'code',
-      'X-KILOCODE-MACHINEID': 'machine_proxy',
-      'X-KILOCODE-TASKID': 'task_proxy',
-      'X-KILOCODE-PROJECTID': 'project_proxy',
-      'X-KiloCode-Version': '7.8.1',
-      'x-kilo-session': 'session_proxy',
-      'x-kilo-request': 'request_proxy',
-    };
-    const upstream = vi.fn().mockResolvedValue(new Response('ok'));
-    vi.stubGlobal('fetch', upstream);
-    try {
-      const response = await fetchWorker(
-        new Request(
-          'https://worker.test/api/runtime-credential-proxy/provider/api/openrouter/chat/completions',
-          {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${await handle()}`,
-              ...attributionHeaders,
-              'X-Kilocode-OrganizationId': 'attacker-org',
-              'Content-Type': 'application/json',
-            },
-            body: '{}',
-          }
-        ),
-        env
-      );
-      expect(response.status).toBe(200);
-      expect(upstream).toHaveBeenCalledOnce();
-      const forwarded = upstream.mock.calls[0][0] as Request;
-      for (const [name, value] of Object.entries(attributionHeaders)) {
-        expect(forwarded.headers.get(name)).toBe(value);
-      }
-      expect(forwarded.headers.get('x-kilocode-organizationid')).toBe('org_proxy');
-    } finally {
-      vi.unstubAllGlobals();
-    }
-  });
-
-  it('removes generic caller credential headers before injecting runtime credentials', async () => {
-    const env = createEnv();
-    env.SANDBOX_SESSION.get.mockReturnValue({
-      resolveRuntimeCredentialProxyGrant: vi.fn().mockResolvedValue({
-        token: 'https://provider.example.test/api/openrouter:backing-token',
-        runtimeAuthorization: {
-          userId: 'usr_proxy',
-          authorizationId: '11111111-1111-4111-8111-111111111111',
-          resourceId: 'workspace_proxy',
-        },
-      }),
-    });
-    const callerCredentials = ['x-api-key', 'api-key', 'x-auth-token'];
-    const upstream = vi.fn().mockResolvedValue(new Response('ok'));
-    vi.stubGlobal('fetch', upstream);
-    try {
-      const response = await fetchWorker(
-        new Request(
-          'https://worker.test/api/runtime-credential-proxy/provider/api/openrouter/models',
-          {
-            headers: {
-              ...Object.fromEntries(callerCredentials.map(name => [name, 'caller-credential'])),
-              Authorization: `Bearer ${await handle()}`,
-            },
-          }
-        ),
-        env
-      );
-      expect(response.status).toBe(200);
-      const forwarded = upstream.mock.calls[0][0] as Request;
-      for (const name of callerCredentials) expect(forwarded.headers.get(name)).toBeNull();
-      expect(forwarded.headers.get('authorization')).toBe(
-        'Bearer https://provider.example.test/api/openrouter:backing-token'
-      );
-    } finally {
-      vi.unstubAllGlobals();
-    }
-  });
-
-  it('removes unsafe upstream response headers while preserving redirects and streaming', async () => {
-    const env = createEnv();
-    env.SANDBOX_SESSION.get.mockReturnValue({
-      resolveRuntimeCredentialProxyGrant: vi.fn().mockResolvedValue({
-        token: 'https://provider.example.test/api/openrouter:backing-token',
-        runtimeAuthorization: {
-          userId: 'usr_proxy',
-          authorizationId: '11111111-1111-4111-8111-111111111111',
-          resourceId: 'workspace_proxy',
-        },
-      }),
-    });
-    const unsafeHeaders = [
-      'connection',
-      'proxy-connection',
-      'keep-alive',
-      'proxy-authenticate',
-      'proxy-authorization',
-      'te',
-      'trailer',
-      'transfer-encoding',
-      'upgrade',
-      'set-cookie',
-    ];
-    const stream = new ReadableStream({
-      start(controller) {
-        controller.enqueue(new TextEncoder().encode('stream-body'));
-        controller.close();
-      },
-    });
-    const upstream = vi.fn().mockResolvedValue(
-      new Response(stream, {
-        status: 307,
-        statusText: 'Temporary Redirect',
-        headers: {
-          ...Object.fromEntries(unsafeHeaders.map(name => [name, 'unsafe'])),
-          'content-type': 'text/event-stream',
-          'cache-control': 'no-cache',
-          location: 'https://other.test/continue',
-          [RUNTIME_PROXY_ATTESTATION_HEADER]: 'upstream-proof',
-        },
-      })
-    );
-    vi.stubGlobal('fetch', upstream);
-    try {
-      const response = await fetchWorker(
-        new Request(
-          'https://worker.test/api/runtime-credential-proxy/provider/api/openrouter/models',
-          { headers: { Authorization: `Bearer ${await handle()}` } }
-        ),
-        env
-      );
-      expect(response.status).toBe(307);
-      expect(response.statusText).toBe('Temporary Redirect');
-      expect(response.headers.get('location')).toBe('https://other.test/continue');
-      expect(response.headers.get('content-type')).toBe('text/event-stream');
-      expect(response.headers.get('cache-control')).toBe('no-cache');
-      for (const name of unsafeHeaders) expect(response.headers.get(name)).toBeNull();
-      expect(response.headers.get(RUNTIME_PROXY_ATTESTATION_HEADER)).toBeNull();
-      await expect(response.text()).resolves.toBe('stream-body');
-      expect(upstream.mock.calls[0][1]).toEqual({ redirect: 'manual' });
-    } finally {
-      vi.unstubAllGlobals();
-    }
-  });
-
-  it('forwards packaged CLI inference requests to the production gateway', async () => {
-    const env = createEnv();
-    const resolve = vi.fn().mockResolvedValue({
-      token: jwt.sign({ exp: 4_000_000_000 }, secret),
-      runtimeAuthorization: {
-        userId: 'usr_proxy',
-        authorizationId: '11111111-1111-4111-8111-111111111111',
-        resourceId: 'workspace_proxy',
-      },
-    });
-    env.SANDBOX_SESSION.get.mockReturnValue({ resolveRuntimeCredentialProxyGrant: resolve });
-    const upstream = vi.fn(async (request: Request) => {
-      expect(request.method).toBe('POST');
-      expect(request.url).toBe('https://api.kilo.ai/api/gateway/chat/completions?stream=true');
-      return new Response('ok');
-    });
-    vi.stubGlobal('fetch', upstream);
-
-    const response = await fetchWorker(
-      new Request(
-        'https://worker.test/api/runtime-credential-proxy/provider/api/openrouter/chat/completions?stream=true',
-        { method: 'POST', headers: { Authorization: `Bearer ${await handle()}` } }
-      ),
-      env
-    );
-
-    expect(response.status).toBe(200);
-    expect(upstream).toHaveBeenCalledOnce();
-    vi.unstubAllGlobals();
-  });
-
-  it('forwards allowlisted Exa requests with a kilo-gateway attestation', async () => {
-    const env = createEnv();
-    const backingToken = jwt.sign({ exp: 4_000_000_000 }, secret);
-    env.SANDBOX_SESSION.get.mockReturnValue({
-      resolveRuntimeCredentialProxyGrant: vi.fn().mockResolvedValue({
-        token: backingToken,
-        organizationId: 'org_proxy',
-        runtimeAuthorization: {
-          userId: 'usr_proxy',
-          authorizationId: '11111111-1111-4111-8111-111111111111',
-          resourceId: 'workspace_proxy',
-        },
-      }),
-    });
-    const upstream = vi.fn(async (request: Request) => {
-      expect(request.method).toBe('POST');
-      expect(request.url).toBe('https://api.kilo.ai/api/exa/search');
-      expect(request.headers.get('authorization')).toBe(`Bearer ${backingToken}`);
-      expect(request.headers.get('x-kilocode-organizationid')).toBe('org_proxy');
-      await expect(
-        verifyRuntimeProxyAttestation({
-          value: request.headers.get(RUNTIME_PROXY_ATTESTATION_HEADER),
-          secret,
-          audience: 'kilo-gateway',
-          userId: 'usr_proxy',
-          authorizationId: '11111111-1111-4111-8111-111111111111',
-          resourceId: 'workspace_proxy',
-          bearer: backingToken,
-        })
-      ).resolves.toBe(true);
-      return new Response('ok');
-    });
-    vi.stubGlobal('fetch', upstream);
-    try {
-      const response = await fetchWorker(
-        new Request('https://worker.test/api/runtime-credential-proxy/exa/api/exa/search', {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${await handle()}`,
-            'Content-Type': 'application/json',
-          },
-          body: '{}',
-        }),
-        env
-      );
-      expect(response.status).toBe(200);
-      expect(upstream).toHaveBeenCalledOnce();
-    } finally {
-      vi.unstubAllGlobals();
-    }
-  });
-
-  it('validates the body-bound ingest identity before fetching upstream', async () => {
-    const env = createEnv();
-    const resolve = vi.fn().mockResolvedValue({
-      token: jwt.sign({ exp: 4_000_000_000 }, secret),
-      runtimeAuthorization: {
-        userId: 'usr_proxy',
-        authorizationId: '11111111-1111-4111-8111-111111111111',
-        resourceId: 'workspace_proxy',
-      },
-    });
-    env.SANDBOX_SESSION.get.mockReturnValue({ resolveRuntimeCredentialProxyGrant: resolve });
     const upstream = vi.fn();
     vi.stubGlobal('fetch', upstream);
-    const response = await fetchWorker(
-      new Request('https://worker.test/api/runtime-credential-proxy/ingest/api/session', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${await handle()}`, 'Content-Type': 'application/json' },
-        body: '{"sessionId":"other"}',
-      }),
-      env
-    );
-    expect(response.status).toBe(404);
-    expect(upstream).not.toHaveBeenCalled();
-    vi.unstubAllGlobals();
+    try {
+      const response = await fetchWorker(
+        new Request('https://foreign.test/api/profile', {
+          headers: { Authorization: `Bearer ${await handle()}` },
+        }),
+        env
+      );
+      expect(response.status).toBe(403);
+      await expect(response.text()).resolves.toBe('runtime_proxy_origin_required');
+      expect(env.SANDBOX_SESSION.get).not.toHaveBeenCalled();
+      expect(upstream).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
-  it.each(['explicit', 'facade'] as const)(
-    'bootstraps and ingests descendants through the scoped binding via %s routing',
-    async routing => {
-      const root = 'ses_12345678901234567890123456';
-      const child = 'ses_abcdefghijklmnopqrstuvwxyz';
-      const grandchild = 'ses_ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-      const token = jwt.sign({ exp: 4_000_000_000 }, secret);
-      const binding = vi.fn(async (request: Request) => {
-        expect(request.headers.get('Authorization')).toBe(`Bearer ${token}`);
-        expect(request.headers.get('X-Internal-Secret')).toBe('internal-secret');
-        expect(request.headers.get('X-Kilo-Cloud-Agent-Session')).toBe('workspace_proxy');
-        expect(request.headers.get('X-Kilo-Root-Session')).toBe(root);
-        expect(request.headers.get('X-Kilo-Session-Scope-Protocol')).toBe('1');
-        expect(request.headers.get('X-Kilo-Trusted-Session-Lineage')).toBeNull();
-        expect(request.headers.get('Cookie')).toBeNull();
-        expect(request.headers.get('X-API-Key')).toBeNull();
-        expect(request.redirect).toBe('manual');
-        expect(
-          await verifyRuntimeProxyAttestation({
-            value: request.headers.get(RUNTIME_PROXY_ATTESTATION_HEADER),
-            secret,
-            audience: 'session-ingest',
-            userId: 'usr_proxy',
-            authorizationId: '11111111-1111-4111-8111-111111111111',
-            resourceId: 'workspace_proxy',
-            bearer: token,
-          })
-        ).toBe(true);
-        return new Response('ok', { headers: { 'Set-Cookie': 'unsafe=1' } });
-      });
-      const env = Object.assign(createEnv(), {
-        WORKER_URL: 'https://worker.test/runtime',
-        INTERNAL_API_SECRET_PROD: { get: async () => 'internal-secret' },
-        SESSION_INGEST: { fetch: binding },
-      });
-      env.SANDBOX_SESSION.get.mockReturnValue({
-        resolveRuntimeCredentialProxyGrant: vi.fn().mockResolvedValue({
-          token,
-          runtimeAuthorization: {
-            userId: 'usr_proxy',
-            authorizationId: '11111111-1111-4111-8111-111111111111',
-            resourceId: 'workspace_proxy',
-          },
+  it('rejects the prefixed facade authority with runtime_proxy_origin_required', async () => {
+    const env = Object.assign(createEnv(), { WORKER_URL: 'https://worker.test/runtime' });
+    const upstream = vi.fn();
+    vi.stubGlobal('fetch', upstream);
+    try {
+      const response = await fetchWorker(
+        new Request('https://worker.test/runtime/api/profile', {
+          headers: { Authorization: `Bearer ${await handle()}` },
         }),
-      });
-      const upstream = vi.fn();
-      vi.stubGlobal('fetch', upstream);
-      try {
-        const authorization = `Bearer ${await handle(root)}`;
-        const requests = [
-          ['/api/session', { sessionId: child }],
-          ['/api/session', { sessionId: grandchild, parentSessionId: child }],
-          [`/api/session/${child}/ingest?v=2`, { data: [] }],
-          [`/api/session/${grandchild}/ingest?v=2`, { data: [] }],
-        ] as const;
-        for (const [path, body] of requests) {
-          const prefix = routing === 'facade' ? '/runtime' : '/api/runtime-credential-proxy/ingest';
-          const response = await fetchWorker(
-            new Request(`https://worker.test${prefix}${path}`, {
-              method: 'POST',
-              headers: {
-                Authorization: authorization,
-                'Content-Type': 'application/json',
-                'X-Internal-Secret': 'forged-secret',
-                'X-Kilo-Root-Session': grandchild,
-                'X-Kilo-Cloud-Agent-Session': 'workspace_unrelated',
-                'X-Kilo-Session-Scope-Protocol': '999',
-                'X-Kilo-Trusted-Session-Lineage': '1',
-                [RUNTIME_PROXY_ATTESTATION_HEADER]: 'forged-proof',
-                Cookie: 'unsafe=1',
-                'X-API-Key': 'forged-key',
-              },
-              body: JSON.stringify(body),
-            }),
-            env
-          );
-          expect(response.status).toBe(200);
-          expect(response.headers.get('Set-Cookie')).toBeNull();
-        }
-        expect(binding.mock.calls.map(([request]) => new URL(request.url).pathname)).toEqual([
-          '/internal/cloud-agent/v1/session',
-          '/internal/cloud-agent/v1/session',
-          `/internal/cloud-agent/v1/session/${child}/ingest`,
-          `/internal/cloud-agent/v1/session/${grandchild}/ingest`,
-        ]);
-        for (const [index, [request]] of binding.mock.calls.entries()) {
-          expect(await request.text()).toBe(JSON.stringify(requests[index]?.[1]));
-          if (index >= 2) expect(new URL(request.url).search).toBe('?v=2');
-        }
-        expect(upstream).not.toHaveBeenCalled();
-      } finally {
-        vi.unstubAllGlobals();
-      }
+        env
+      );
+      expect(response.status).toBe(403);
+      await expect(response.text()).resolves.toBe('runtime_proxy_origin_required');
+      expect(env.SANDBOX_SESSION.get).not.toHaveBeenCalled();
+      expect(upstream).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
     }
-  );
+  });
 
-  it('fails closed when scoped forwarding cannot obtain its internal secret', async () => {
-    const root = 'ses_12345678901234567890123456';
-    const binding = vi.fn();
-    const env = Object.assign(createEnv(), {
-      INTERNAL_API_SECRET_PROD: { get: async () => null },
-      SESSION_INGEST: { fetch: binding },
-    });
-    env.SANDBOX_SESSION.get.mockReturnValue({
-      resolveRuntimeCredentialProxyGrant: vi.fn().mockResolvedValue({
-        token: jwt.sign({ exp: 4_000_000_000 }, secret),
-        runtimeAuthorization: {
-          userId: 'usr_proxy',
-          authorizationId: '11111111-1111-4111-8111-111111111111',
-          resourceId: 'workspace_proxy',
-        },
-      }),
-    });
+  it('rejects the explicit compatibility route with a valid bearer', async () => {
+    const env = createEnv();
+    const upstream = vi.fn();
+    vi.stubGlobal('fetch', upstream);
+    try {
+      const response = await fetchWorker(
+        new Request(
+          'https://worker.test/api/runtime-credential-proxy/provider/api/openrouter/models',
+          {
+            headers: { Authorization: `Bearer ${await handle()}` },
+          }
+        ),
+        env
+      );
+      expect(response.status).toBe(403);
+      await expect(response.text()).resolves.toBe('runtime_proxy_origin_required');
+      expect(env.SANDBOX_SESSION.get).not.toHaveBeenCalled();
+      expect(upstream).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('rejects spoofed provider headers on the compatibility route', async () => {
+    const env = createEnv();
     const upstream = vi.fn();
     vi.stubGlobal('fetch', upstream);
     try {
@@ -1486,219 +822,50 @@ describe('server runtime credential proxy', () => {
         new Request('https://worker.test/api/runtime-credential-proxy/ingest/api/session', {
           method: 'POST',
           headers: {
-            Authorization: `Bearer ${await handle(root)}`,
-            'Content-Type': 'application/json',
+            Authorization: `Bearer ${await handle()}`,
+            'content-type': 'application/json',
+            'vercel-sandbox-oidc-token': 'forged-oidc',
+            'vercel-forwarded-host': 'worker.test',
+            'vercel-forwarded-scheme': 'https',
+            'vercel-forwarded-port': '443',
+            'vercel-forwarded-path': '/api/session',
           },
-          body: JSON.stringify({ sessionId: 'ses_abcdefghijklmnopqrstuvwxyz' }),
+          body: '{"sessionId":"kilo_proxy"}',
         }),
         env
       );
-      expect(response.status).toBe(502);
-      expect(binding).not.toHaveBeenCalled();
-      expect(upstream).not.toHaveBeenCalled();
-    } finally {
-      vi.unstubAllGlobals();
-    }
-  });
-
-  it('preserves root public routes and denies unsafe descendant routes without forwarding', async () => {
-    const root = 'ses_12345678901234567890123456';
-    const child = 'ses_abcdefghijklmnopqrstuvwxyz';
-    const binding = vi.fn();
-    const env = Object.assign(createEnv(), {
-      WORKER_URL: 'https://worker.test',
-      INTERNAL_API_SECRET_PROD: { get: async () => 'internal-secret' },
-      SESSION_INGEST: { fetch: binding },
-    });
-    env.SANDBOX_SESSION.get.mockReturnValue({
-      resolveRuntimeCredentialProxyGrant: vi.fn().mockResolvedValue({
-        token: jwt.sign({ exp: 4_000_000_000 }, secret),
-        runtimeAuthorization: {
-          userId: 'usr_proxy',
-          authorizationId: '11111111-1111-4111-8111-111111111111',
-          resourceId: 'workspace_proxy',
-        },
-      }),
-    });
-    const upstream = vi.fn().mockImplementation(async () => new Response('ok'));
-    vi.stubGlobal('fetch', upstream);
-    try {
-      const authorization = `Bearer ${await handle(root)}`;
-      for (const [method, path, body] of [
-        ['POST', '/api/session', JSON.stringify({ sessionId: root })],
-        ['POST', `/api/session/${root}/ingest`, '{}'],
-        ['GET', `/api/session/${root}/export`, undefined],
-        ['POST', `/api/session/${root}/title`, '{}'],
-      ] as const) {
-        const response = await fetchWorker(
-          new Request(`https://worker.test${path}`, {
-            method,
-            headers: { Authorization: authorization, 'Content-Type': 'application/json' },
-            body,
-          }),
-          env
-        );
-        expect(response.status).toBe(200);
-      }
-      expect(upstream).toHaveBeenCalledTimes(4);
-      for (const [method, path, body] of [
-        ['GET', `/api/session/${child}/export`, undefined],
-        ['POST', `/api/session/${child}/title`, '{}'],
-        ['GET', `/api/session/${child}/ingest`, undefined],
-        ['PUT', `/api/session/${child}/ingest`, '{}'],
-        ['POST', `/api/session/${child}/ingest/`, '{}'],
-        ['POST', `/api/session/${child}%252fother/ingest`, '{}'],
-        ['POST', '/api/session', JSON.stringify({ sessionId: child, extra: true })],
-        ['POST', '/api/session', JSON.stringify({ sessionId: child, parentSessionId: 'other' })],
-        ['POST', '/api/session', '{'],
-        ['POST', '/api/session', ' '.repeat(8193)],
-      ] as const) {
-        const response = await fetchWorker(
-          new Request(`https://worker.test${path}`, {
-            method,
-            headers: { Authorization: authorization, 'Content-Type': 'application/json' },
-            body,
-          }),
-          env
-        );
-        expect(response.status).toBe(404);
-      }
-      expect(upstream).toHaveBeenCalledTimes(4);
-      expect(binding).not.toHaveBeenCalled();
-    } finally {
-      vi.unstubAllGlobals();
-    }
-  });
-
-  it('emits the upstream status for a failed model-proxy request', async () => {
-    const env = Object.assign(createEnv(), { WORKER_URL: 'https://worker.test' });
-    const resolve = vi.fn().mockResolvedValue({
-      token: 'https://api.kilo.ai:backing-token',
-      runtimeAuthorization: {
-        userId: 'usr_proxy',
-        authorizationId: '11111111-1111-4111-8111-111111111111',
-        resourceId: 'workspace_proxy',
-      },
-    });
-    env.SANDBOX_SESSION.get.mockReturnValue({ resolveRuntimeCredentialProxyGrant: resolve });
-    const upstream = vi.fn().mockResolvedValue(
-      new Response('<html><head><title>403 Forbidden</title></head></html>', {
-        status: 403,
-        headers: {
-          'Content-Type': 'text/html; charset=utf-8',
-          Server: 'Vercel',
-          'X-Vercel-Id': 'fra1::abc-123',
-          'X-Vercel-Mitigated': 'deny',
-        },
-      })
-    );
-    vi.stubGlobal('fetch', upstream);
-    try {
-      const response = await fetchWorker(
-        new Request(
-          'https://worker.test/api/runtime-credential-proxy/provider/api/openrouter/chat/completions',
-          {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${await handle()}`,
-              'Content-Type': 'application/json',
-            },
-            body: '{}',
-          }
-        ),
-        env
-      );
       expect(response.status).toBe(403);
-      await expect(response.text()).resolves.toBe(
-        '<html><head><title>403 Forbidden</title></head></html>'
-      );
-      expect(upstream).toHaveBeenCalledOnce();
-      expect(loggerWithFieldsMock).toHaveBeenCalledTimes(1);
-      expect(loggerWithFieldsMock).toHaveBeenCalledWith({
-        logTag: 'runtime_proxy_request_failed',
-        upstreamAttempted: true,
-        upstreamStatus: 403,
-        upstreamServer: 'Vercel',
-        upstreamContentType: 'text/html; charset=utf-8',
-        upstreamVercelId: 'fra1::abc-123',
-        upstreamVercelMitigated: 'deny',
-        upstreamErrorExcerpt: '403 Forbidden',
-        sessionId: 'workspace_proxy',
-        kiloSessionId: 'kilo_proxy',
-      });
-    } finally {
-      vi.unstubAllGlobals();
-    }
-  });
-
-  it('emits no diagnostic for a successful model-proxy request', async () => {
-    const env = Object.assign(createEnv(), { WORKER_URL: 'https://worker.test' });
-    env.SANDBOX_SESSION.get.mockReturnValue({
-      resolveRuntimeCredentialProxyGrant: vi.fn().mockResolvedValue({
-        token: 'https://api.kilo.ai:backing-token',
-        runtimeAuthorization: {
-          userId: 'usr_proxy',
-          authorizationId: '11111111-1111-4111-8111-111111111111',
-          resourceId: 'workspace_proxy',
-        },
-      }),
-    });
-    const upstream = vi.fn().mockResolvedValue(new Response('ok'));
-    vi.stubGlobal('fetch', upstream);
-    try {
-      const response = await fetchWorker(
-        new Request(
-          'https://worker.test/api/runtime-credential-proxy/provider/api/openrouter/chat/completions',
-          {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${await handle()}`,
-              'Content-Type': 'application/json',
-            },
-            body: '{}',
-          }
-        ),
-        env
-      );
-      expect(response.status).toBe(200);
-      expect(loggerWithFieldsMock).not.toHaveBeenCalled();
-    } finally {
-      vi.unstubAllGlobals();
-    }
-  });
-
-  it('attempts no upstream and emits no upstream diagnostic when credential resolution rejects', async () => {
-    const env = Object.assign(createEnv(), { WORKER_URL: 'https://worker.test' });
-    env.SANDBOX_SESSION.get.mockReturnValue({
-      resolveRuntimeCredentialProxyGrant: vi.fn().mockResolvedValue(null),
-    });
-    const upstream = vi.fn();
-    vi.stubGlobal('fetch', upstream);
-    try {
-      const response = await fetchWorker(
-        new Request(
-          'https://worker.test/api/runtime-credential-proxy/provider/api/openrouter/chat/completions',
-          {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${await handle()}`,
-              'Content-Type': 'application/json',
-            },
-            body: '{}',
-          }
-        ),
-        env
-      );
-      expect(response.status).toBe(401);
-      await expect(response.text()).resolves.toBe('Unauthorized');
+      await expect(response.text()).resolves.toBe('runtime_proxy_origin_required');
+      expect(env.SANDBOX_SESSION.get).not.toHaveBeenCalled();
       expect(upstream).not.toHaveBeenCalled();
-      expect(loggerWithFieldsMock).not.toHaveBeenCalled();
     } finally {
       vi.unstubAllGlobals();
     }
+  });
+
+  it('leaves invalid handles to ordinary routing', async () => {
+    const env = Object.assign(createEnv(), { WORKER_URL: 'https://worker.test' });
+    const response = await fetchWorker(
+      new Request('https://worker.test/api/profile', {
+        headers: { Authorization: 'Bearer invalid' },
+      }),
+      env
+    );
+    expect(response.status).toBe(404);
+    expect(env.SANDBOX_SESSION.get).not.toHaveBeenCalled();
+  });
+
+  it('registers the Vercel runtime route before the public facade boundary', async () => {
+    const env = Object.assign(createEnv(), { WORKER_URL: 'https://worker.test' });
+    const response = await fetchWorker(
+      new Request('https://worker.test/runtime-credential-proxy/vercel/ses-abcdef'),
+      env
+    );
+    expect(response.status).toBe(403);
+    await expect(response.text()).resolves.toBe('runtime_proxy_origin_required');
+    expect(env.SANDBOX_SESSION.get).not.toHaveBeenCalled();
   });
 });
-
 describe('server /kilo facade route', () => {
   for (const path of ['/kilo', '/kilo/event', '/kilo/cloud-agent/event']) {
     it(`returns 401 before facade dispatch when auth is missing for ${path}`, async () => {

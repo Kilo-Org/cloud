@@ -181,7 +181,8 @@ export function openMessages(messages: readonly SessionMessage[]): SessionMessag
 export function dueBackstopMessages(
   messages: readonly SessionMessage[],
   now: number,
-  timers: ControlPlaneTimers['session']
+  timers: ControlPlaneTimers['session'],
+  coverageOwnedIds?: ReadonlySet<string>
 ): Array<{
   message: SessionMessage;
   status: 'failed';
@@ -198,6 +199,7 @@ export function dueBackstopMessages(
     } else if (
       message.state === 'accepted' &&
       message.acceptedAt !== null &&
+      !coverageOwnedIds?.has(message.messageId) &&
       message.acceptedAt + timers.acceptedBackstopMs <= now
     ) {
       due.push({ message, status: 'failed', reason: 'no_outcome' });
@@ -209,12 +211,17 @@ export function dueBackstopMessages(
 /** The earliest backstop deadline of the open messages, or null when none. */
 export function nextBackstopAt(
   messages: readonly SessionMessage[],
-  timers: ControlPlaneTimers['session']
+  timers: ControlPlaneTimers['session'],
+  coverageOwnedIds?: ReadonlySet<string>
 ): number | null {
   const deadlines: number[] = [];
   for (const message of messages) {
     if (message.state === 'queued') deadlines.push(message.createdAt + timers.queuedBackstopMs);
-    else if (message.state === 'accepted' && message.acceptedAt !== null) {
+    else if (
+      message.state === 'accepted' &&
+      message.acceptedAt !== null &&
+      !coverageOwnedIds?.has(message.messageId)
+    ) {
       deadlines.push(message.acceptedAt + timers.acceptedBackstopMs);
     }
   }

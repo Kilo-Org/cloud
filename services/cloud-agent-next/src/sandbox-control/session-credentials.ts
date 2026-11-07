@@ -22,6 +22,8 @@ import {
 import { readProfileBundle } from '../session-profile.js';
 import {
   isLocalFacadeUrl,
+  isRuntimeCredentialProxyClientTarget,
+  runtimeCredentialProxyClientBaseUrl,
   runtimeCredentialProxyFacadeBaseUrl,
 } from '../runtime-credential-proxy.js';
 import { CONTROL_RUNTIME_RESERVED_ENV_VARS } from '../shared/runtime-environment.js';
@@ -54,7 +56,7 @@ import {
 } from './session-credential-members.js';
 import {
   buildVercelCredentialNetworkPolicy,
-  buildVercelTransformNetworkPolicy,
+  buildVercelForwardNetworkPolicy,
 } from './vercel-network-policy.js';
 import {
   CAPABILITY_FAMILY_PATTERN_SOURCE,
@@ -564,29 +566,35 @@ function deriveRuntimeProxyTargets(targets: z.infer<typeof targetsSchema>): { fa
     targets.sessionIngestBaseUrl,
   ].map(safeUrl);
   const [backend, provider, ingest] = parsed;
-  if (
-    !backend ||
-    !provider ||
-    !ingest ||
-    !isFacadeTarget(backend) ||
-    !isFacadeTarget(provider) ||
-    !isFacadeTarget(ingest) ||
-    backend.toString().replace(/\/+$/, '') !== provider.toString().replace(/\/+$/, '') ||
-    backend.toString().replace(/\/+$/, '') !== ingest.toString().replace(/\/+$/, '') ||
-    backend.search ||
-    provider.search ||
-    ingest.search ||
-    runtimeCredentialProxyFacadeBaseUrl(backend.toString()) !==
-      backend.toString().replace(/\/+$/, '')
-  ) {
-    return null;
+  if (!backend || !provider || !ingest) return null;
+  const canonical = [backend, provider, ingest].map(url => url.toString().replace(/\/+$/, ''));
+  const base = canonical[0];
+  if (!base || !canonical.every(value => value === base)) return null;
+  const clientTarget = isRuntimeCredentialProxyClientTarget(base);
+  if (!clientTarget) {
+    if (
+      !isFacadeTarget(backend) ||
+      !isFacadeTarget(provider) ||
+      !isFacadeTarget(ingest) ||
+      backend.search ||
+      provider.search ||
+      ingest.search ||
+      runtimeCredentialProxyFacadeBaseUrl(backend.toString()) !== canonical[0]
+    ) {
+      return null;
+    }
   }
   return { facade: backend };
 }
 
+/**
+ * Every runtime root the sandbox sees is the same facade. A local HTTP Worker
+ * uses the reserved default-port client authority so the sandbox can reach it
+ * without knowing the Worker's offset port.
+ */
 function runtimeProxyTargets(env: CredentialEnv): z.infer<typeof targetsSchema> | null {
   if (!env.WORKER_URL) return null;
-  const base = runtimeCredentialProxyFacadeBaseUrl(env.WORKER_URL);
+  const base = runtimeCredentialProxyClientBaseUrl(env.WORKER_URL);
   if (!base) return null;
   const targets = {
     backendBaseUrl: base,
@@ -1564,8 +1572,7 @@ export function buildControlNetworkPolicy(
     }
     if (!grant.kilo.runtimeProxy) invalidCredentials();
     return buildVercelCredentialNetworkPolicy({
-      rootSessionIds: grant.members.map(member => member.kiloSessionId),
-      organizationId: grant.orgId,
+      sandboxId: grant.sandboxId,
       runtimeProxy: {
         ...grant.kilo.runtimeProxy,
         handles: acceptedHandlesByScopeId?.get(grant.scopeId) ?? [],
@@ -1577,15 +1584,8 @@ export function buildControlNetworkPolicy(
     ...(grant.scm ? [grant.scm.alias] : []),
   ]);
   if (new Set(aliases).size !== aliases.length) invalidCredentials();
-  const injectionRules = policies.flatMap(policy => policy.injectionRules);
   return addVercelScmForwarding(
-    buildVercelTransformNetworkPolicy(
-      [
-        ...new Set(policies.flatMap(policy => policy.allowedDomains)),
-        ...(policies.length === 0 ? ['*'] : []),
-      ],
-      injectionRules
-    ),
+    buildVercelForwardNetworkPolicy(policies.flatMap(policy => policy.forwardRules)),
     grants,
     env
   );

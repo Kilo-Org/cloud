@@ -6,8 +6,10 @@ import {
   matchesRuntimeProxyGrant,
   runtimeProxyGrantSchema,
   runtimeCredentialProxyBaseUrl,
+  runtimeCredentialProxyClientBaseUrl,
   runtimeCredentialProxyFacadeBaseUrl,
   runtimeCredentialProxyUpstream,
+  isRuntimeCredentialProxyClientTarget,
   verifyRuntimeCredentialProxyHandle,
   type RuntimeProxyFence,
 } from './runtime-credential-proxy.js';
@@ -19,7 +21,7 @@ import {
 } from './kilo/runtime-credential-proxy-routes.js';
 import {
   buildVercelCredentialNetworkPolicy,
-  findMatchingCredentialInjectionRule,
+  findMatchingVercelRule,
 } from './sandbox-control/vercel-network-policy.js';
 
 type ControlFence = Extract<RuntimeProxyFence, { plane: 'control' }>;
@@ -405,6 +407,48 @@ describe('runtime credential proxy', () => {
     expect(runtimeCredentialProxyFacadeBaseUrl(workerUrl)).toBe(expected);
   });
 
+  it('derives a default-port client facade only for a local HTTP worker', () => {
+    expect(runtimeCredentialProxyClientBaseUrl('http://host.docker.internal:11694')).toBe(
+      'http://runtime-credential-proxy.invalid'
+    );
+    expect(runtimeCredentialProxyClientBaseUrl('http://localhost:8794/runtime/')).toBe(
+      'http://runtime-credential-proxy.invalid/runtime'
+    );
+    expect(runtimeCredentialProxyClientBaseUrl('http://127.0.0.1:8794')).toBe(
+      'http://runtime-credential-proxy.invalid'
+    );
+    expect(runtimeCredentialProxyClientBaseUrl('https://worker.example.test/runtime')).toBe(
+      'https://worker.example.test/runtime'
+    );
+    expect(runtimeCredentialProxyClientBaseUrl('https://127.0.0.1:8794')).toBe(
+      'https://127.0.0.1:8794'
+    );
+    expect(runtimeCredentialProxyClientBaseUrl('http://worker.example.test')).toBeNull();
+    expect(runtimeCredentialProxyFacadeBaseUrl('http://host.docker.internal:11694')).toBe(
+      'http://host.docker.internal:11694'
+    );
+  });
+
+  it.each([
+    ['origin', 'http://runtime-credential-proxy.invalid', true],
+    ['safe prefix', 'http://runtime-credential-proxy.invalid/runtime/', true],
+    ['HTTPS', 'https://runtime-credential-proxy.invalid', false],
+    ['non-default port', 'http://runtime-credential-proxy.invalid:8794', false],
+    ['foreign host', 'http://evil.invalid', false],
+    ['suffix host', 'http://runtime-credential-proxy.invalid.evil.test', false],
+    ['api prefix', 'http://runtime-credential-proxy.invalid/runtime/api', false],
+    ['traversal', 'http://runtime-credential-proxy.invalid/runtime/../other', false],
+    [
+      'encoded traversal',
+      'http://runtime-credential-proxy.invalid/runtime/%252e%252e/other',
+      false,
+    ],
+    ['credentials', 'http://user@runtime-credential-proxy.invalid', false],
+    ['query', 'http://runtime-credential-proxy.invalid/runtime?next=x', false],
+  ])('accepts only the exact reserved client target %s', (_name, value, accepted) => {
+    expect(isRuntimeCredentialProxyClientTarget(value)).toBe(accepted);
+  });
+
   it('keeps raw credentials root-only while allowing exact scoped descendant POST routes', () => {
     const root = 'ses_12345678901234567890123456';
     const child = 'ses_abcdefghijklmnopqrstuvwxyz';
@@ -467,38 +511,53 @@ describe('runtime credential proxy', () => {
     }
   });
 
-  it('mediates descendant POSTs in Vercel without injecting a raw bearer or expanding child reads', () => {
+  it('forwards Vercel facade traffic by exact handle and leaves route permissions to the receiver', () => {
     const root = 'ses_12345678901234567890123456';
     const child = 'ses_abcdefghijklmnopqrstuvwxyz';
     const base = 'https://worker.example.test/runtime';
     const handle = 'opaque-handle';
     const policy = buildVercelCredentialNetworkPolicy({
-      rootSessionIds: [root],
+      sandboxId: 'ses-abcdef',
       runtimeProxy: {
         targets: { backendBaseUrl: base, providerBaseUrl: base, sessionIngestBaseUrl: base },
         members: [{ sessionId: 'agent_proxy', kiloSessionId: root, handle }],
       },
     });
-    const rules = policy.injectionRules ?? [];
-    for (const path of ['/api/session', `/api/session/${child}/ingest`]) {
-      const rule = findMatchingCredentialInjectionRule(rules, {
-        url: new URL(`${base}${path}`),
-        method: 'POST',
-        headers: new Headers({ Authorization: `Bearer ${handle}` }),
-      });
-      expect(rule?.headers.authorization).toBe(`Bearer ${handle}`);
-    }
+    const rules = policy.forwardRules;
+    expect(rules).toHaveLength(1);
+    expect(rules[0]?.forwardURL).toBe(
+      'https://worker.example.test/runtime-credential-proxy/vercel/ses-abcdef'
+    );
     for (const [method, path] of [
+      ['POST', '/api/session'],
+      ['POST', `/api/session/${child}/ingest`],
       ['GET', `/api/session/${child}/export`],
-      ['GET', `/api/session/${child}/ingest`],
       ['PUT', `/api/session/${child}/ingest`],
       ['POST', '/internal/cloud-agent/v1/session'],
-    ]) {
+      ['POST', '/api/exa/search'],
+    ] as const) {
+      const candidate = new Request(`${base}${path}`, {
+        method,
+        headers: { Authorization: `Bearer ${handle}` },
+      });
       expect(
-        findMatchingCredentialInjectionRule(rules, {
-          url: new URL(`${base}${path}`),
+        findMatchingVercelRule(rules, {
+          url: new URL(candidate.url),
           method,
-          headers: new Headers({ Authorization: `Bearer ${handle}` }),
+          headers: candidate.headers,
+        })?.forwardURL
+      ).toBe(rules[0]?.forwardURL);
+    }
+    for (const authorization of ['Bearer forged-handle', `Bearer ${root}`, 'token opaque-handle']) {
+      const candidate = new Request(`${base}/api/session`, {
+        method: 'POST',
+        headers: { Authorization: authorization },
+      });
+      expect(
+        findMatchingVercelRule(rules, {
+          url: new URL(candidate.url),
+          method: 'POST',
+          headers: candidate.headers,
         })
       ).toBeUndefined();
     }

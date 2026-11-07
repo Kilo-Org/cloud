@@ -761,7 +761,7 @@ describe('SandboxContainers egress enforcement', () => {
         },
       });
       expect(outbound).toHaveBeenCalledWith({
-        props: { containerId: 'do-id', egressAllowlist: expectedPolicy },
+        props: { containerId: 'do-id', allocationRef: REF_A, egressAllowlist: expectedPolicy },
       });
       expect(readRecord().egressPolicy).toEqual({
         allocationRef: REF_A,
@@ -817,7 +817,7 @@ describe('SandboxContainers egress enforcement', () => {
     });
     expect(restored.container.calls).toEqual(['https-intercept', 'http-intercept']);
     expect(outbound).toHaveBeenCalledWith({
-      props: { containerId: 'do-id', egressAllowlist: ['example.com'] },
+      props: { containerId: 'do-id', allocationRef: REF_A, egressAllowlist: ['example.com'] },
     });
     expect(restored.readRecord().egressPolicy?.allowlist).toEqual(['example.com']);
   });
@@ -985,7 +985,7 @@ describe('SandboxContainers egress enforcement', () => {
       SANDBOX_INTERCEPT_HTTPS: '1',
     });
     expect(outbound).toHaveBeenCalledWith({
-      props: { containerId: 'do-id', egressAllowlist: ['example.com'] },
+      props: { containerId: 'do-id', allocationRef: REF_A, egressAllowlist: ['example.com'] },
     });
   });
 
@@ -2906,8 +2906,8 @@ describe('SandboxContainers environment snapshot starts', () => {
     for (const [call] of outbound.mock.calls) {
       expect(call.props).toEqual({
         containerId: 'do-id',
+        allocationRef: REF_A,
         ...policy,
-        ...(policy.egressAudit ? { allocationRef: REF_A } : {}),
       });
     }
     expect(outbound).toHaveBeenCalledTimes(2);

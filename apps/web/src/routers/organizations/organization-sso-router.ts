@@ -110,16 +110,61 @@ export const organizationSsoRouter = createTRPCRouter({
     const { organizationId } = opts.input;
     await ensureOrganizationAccess(opts.ctx, organizationId, ORGANIZATION_MANAGE_ROLES);
     const workOSOrg = await getWorkOsOrganizationByExternalId(organizationId);
-    if (!workOSOrg) {
+    // Read the local SSO state without the soft-delete filter: removing the SSO configuration is
+    // part of offboarding an organization that is already marked deleted.
+    const [organization] = await db
+      .select({ ssoDomain: organizations.sso_domain })
+      .from(organizations)
+      .where(eq(organizations.id, organizationId));
+    if (!organization) {
+      throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
+    }
+    // The organization owns its SSO state, in WorkOS and in `sso_domain`. Delete only when at
+    // least one of them is still configured, so a delete that already removed the WorkOS
+    // organization can finish releasing the domain on the next attempt.
+    const releasedDomain = organization.ssoDomain;
+    if (!workOSOrg && !releasedDomain) {
       throw new TRPCError({ code: 'NOT_FOUND', message: 'SSO configuration not found' });
     }
-    await workos.organizations.deleteOrganization(workOSOrg.id);
-    await recordAdminAction(opts.ctx, {
-      action: 'organization.sso.config.delete',
-      target: organizationActionTarget(organizationId),
-      message: 'Deleted WorkOS SSO organization',
-      metadata: { workosOrganizationId: workOSOrg.id },
-    });
+
+    // Delete the WorkOS organization first: releasing the domain while a live WorkOS connection
+    // still enforces SSO would drop the local policy that requires it.
+    if (workOSOrg) {
+      await workos.organizations.deleteOrganization(workOSOrg.id);
+    }
+
+    if (releasedDomain) {
+      await db.transaction(async tx => {
+        // Serialize against a claim of the same domain, which locks this same key.
+        await tx.execute(
+          sql`SELECT pg_advisory_xact_lock(hashtextextended('sso-domain:' || ${releasedDomain}, 0))`
+        );
+        await tx
+          .update(organizations)
+          .set({ sso_domain: null })
+          .where(eq(organizations.id, organizationId));
+
+        await createAuditLog({
+          action: 'organization.sso.remove_domain',
+          actor_email: opts.ctx.user.google_user_email,
+          actor_id: opts.ctx.user.id,
+          actor_name: opts.ctx.user.google_user_name,
+          message: `Cleared SSO domain ${releasedDomain}`,
+          organization_id: organizationId,
+          tx,
+        });
+      });
+    }
+
+    if (workOSOrg) {
+      await recordAdminAction(opts.ctx, {
+        action: 'organization.sso.config.delete',
+        target: organizationActionTarget(organizationId),
+        message: 'Deleted WorkOS SSO organization',
+        metadata: { workosOrganizationId: workOSOrg.id, releasedSsoDomain: releasedDomain },
+      });
+    }
+
     return successResult({ message: 'SSO configuration deleted successfully' });
   }),
   generateAdminPortalLink: adminProcedure.input(AdminPortalSchema).mutation(async opts => {

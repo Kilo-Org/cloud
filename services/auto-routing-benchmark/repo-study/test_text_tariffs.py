@@ -438,7 +438,7 @@ class PaidSettlement(unittest.TestCase):
 
         modules = {"minisweagent.exceptions": SimpleNamespace(FormatError=ValueError), "minisweagent.models.openrouter_textbased_model": SimpleNamespace(OpenRouterTextbasedModel=BaseModel)}
 
-        for failure in (None, "receipt", "observer", "competing_writer"):
+        for failure in (None, "receipt", "observer", "competing_writer", "admission_denied"):
             with self.subTest(failure=failure), tempfile.TemporaryDirectory() as temporary:
                 out = Path(temporary)
                 receipt_path = out / "receipt.json"
@@ -449,6 +449,10 @@ class PaidSettlement(unittest.TestCase):
                 body = {"usage": {"prompt_tokens": 1, "completion_tokens": 1, "is_byok": False, "cost": "0.01"}, "choices": [{"message": {"role": "assistant", "content": "done"}, "finish_reason": "stop"}]}
 
                 def complete(payload, deadline, receipt, path, **options):
+                    if failure == "admission_denied":
+                        with sqlite3.connect(out / "budget.sqlite") as db:
+                            db.execute("UPDATE requests SET state='settled',bound='0',actual='0',tokens=0 WHERE id='request'")
+                        raise study.BudgetLimited("Dispatch admission denied", {"caps": ["aggregate_money_reservation"]})
                     receipt["dispatch_entered"] = True
                     if failure == "competing_writer":
                         with sqlite3.connect(out / "budget.sqlite") as db:
@@ -471,10 +475,16 @@ class PaidSettlement(unittest.TestCase):
                     else:
                         self.assertEqual(model.query(messages)["content"], "done")
                 with sqlite3.connect(out / "budget.sqlite") as db:
-                    self.assertEqual(db.execute("SELECT state,actual,tokens FROM requests").fetchone(), ("settled", "0.02", 3) if failure == "competing_writer" else ("settled", "0.01", 2))
+                    expected = ("settled", "0", 0) if failure == "admission_denied" else ("settled", "0.02", 3) if failure == "competing_writer" else ("settled", "0.01", 2)
+                    self.assertEqual(db.execute("SELECT state,actual,tokens FROM requests").fetchone(), expected)
                 if failure in (None, "observer"):
                     receipt = study.load(receipt_path)
                     self.assertEqual((receipt["status"], receipt["actual_usd"]), ("settled", "0.01"))
+                if failure == "admission_denied":
+                    receipt = study.load(receipt_path)
+                    self.assertEqual((receipt["status"], receipt["retained_bound_usd"]), ("not_dispatched", "0"))
+                    events = [study.load(path) for path in (out / "resource-limits/run").glob("*.json")]
+                    self.assertEqual([event["caps"] for event in events], [["aggregate_money_reservation"]])
 
 
 if __name__ == "__main__":

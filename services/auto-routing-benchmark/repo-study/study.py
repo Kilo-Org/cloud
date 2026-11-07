@@ -980,7 +980,8 @@ def paid_model(out, run, candidate, deadline=None, *, cfg=None, ledger_out=None,
                 with (state_guard(ledger_out) if state_guard is not None else nullcontext()), sqlite3.connect(ledger_out / "budget.sqlite") as db:
                     db.execute("BEGIN IMMEDIATE")
                     old_row = next(row for row in request_rows(db) if row["id"] == request_id)
-                    if old_row["state"] != "reserved":
+                    cancelled_before_dispatch = not dispatched and old_row["state"] == "settled" and old_row["actual"] is not None and Decimal(old_row["actual"]) == 0
+                    if old_row["state"] != "reserved" and not cancelled_before_dispatch:
                         raise
                     if state == "unknown" and cfg.get("allow_unknown_auto_accounting") is True and accounting_enabled(db):
                         state = "accounted_unknown"

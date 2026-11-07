@@ -724,7 +724,8 @@ and the frozen coverage.
 Recovery releases a coordinator reservation at zero cost only when neither its
 dispatch admission nor its receipt indicates dispatch. Historical and admitted
 requests retain their full holds. Receipt or observer failures cannot overwrite
-a settled charge.
+a settled charge. Admission denials finalize their receipt and budget-limit
+evidence even when admission already settled the unused reservation.
 
 The isolated runtime uses the installed Miniflare configuration API. Closing a
 run attempts every instance, reports disposal failures, and retains failed

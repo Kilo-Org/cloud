@@ -288,7 +288,11 @@ test('one job saves the compiler plugin cache and every reader restores it', () 
     ['.github/actions/harness-sdk-build', harnessBuildAction.runs.steps],
   ];
   for (const [key, steps] of holders) {
-    const saversHere = steps.filter(step => step.uses?.startsWith('actions/cache/save@'));
+    // An action may also save another cache (the harness SDK dist is one), so
+    // pick the plugin saves by their path rather than by the action.
+    const saversHere = steps.filter(
+      step => step.uses?.startsWith('actions/cache/save@') && step.with?.path === pluginPath
+    );
     for (const save of saversHere) {
       assert.equal(save.uses, 'actions/cache/save@668228422ae6a00e4ad889ee87cd7109ec5666a7');
       assert.ok(
@@ -660,35 +664,66 @@ test('kilo-app CI builds the tRPC declarations once and both checks download the
   );
 });
 
-test('the harness SDK action restores dist and builds only on a miss', () => {
+test('the harness SDK action shares one dist entry across runner operating systems', () => {
   const steps = harnessBuildAction.runs.steps;
   const key = steps.find(step => step.name === 'Hash harness SDK build inputs');
   const cache = steps.find(step => step.name === 'Restore harness SDK build');
+  const restored = steps.find(step => step.name === 'Check the restored build');
   const plugins = steps.filter(step => step.uses === pluginCacheAction);
   const build = steps.find(step => step.name === 'Build harness SDK');
+  const save = steps.find(step => step.name === 'Save harness SDK build');
   assert.equal(key.run, 'node scripts/harness-sdk-build-key.mjs >> "$GITHUB_OUTPUT"');
-  assert.equal(cache.uses, 'actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7');
+  // The dist cache is split: only a completed build saves, so a failed or
+  // cancelled build cannot take the key with the tree it half wrote.
+  assert.equal(cache.uses, 'actions/cache/restore@668228422ae6a00e4ad889ee87cd7109ec5666a7');
   assert.equal(cache.with.path, 'packages/harness-sdk/dist');
-  assert.equal(cache.with.key, '${{ runner.os }}-harness-sdk-build-${{ steps.key.outputs.key }}');
+  // The dist is a TypeScript emit and actions/cache derives the same version on
+  // Linux and macOS, so an OS prefix would only split one build into a family
+  // per runner and leave the macOS jobs unable to hit an ubuntu save.
+  const distKey = 'harness-sdk-build-${{ steps.key.outputs.key }}';
+  assert.equal(cache.with.key, distKey);
   assert.equal(cache.with['restore-keys'], undefined, 'a partial restore would serve stale dist');
+  // A hit alone is not a build: a restore missing the package entry rebuilds.
+  assert.ok(
+    steps.indexOf(cache) < steps.indexOf(restored) &&
+      steps.indexOf(restored) < steps.indexOf(build),
+    'the check runs between the restore and the build'
+  );
+  assert.equal(restored.id, 'restored');
+  assert.equal(restored.shell, 'bash');
+  assert.equal(restored.if, undefined, 'the check runs on a miss too');
+  for (const entry of [
+    'packages/harness-sdk/dist/index.js',
+    'packages/harness-sdk/dist/index.d.ts',
+  ]) {
+    assert.ok(restored.run.includes(entry), `the check requires ${entry}`);
+  }
+  assert.match(restored.run, /^usable='false'$/m);
+  assert.match(restored.run, /echo "usable=\$usable" >> "\$GITHUB_OUTPUT"/m);
+  const rebuild = "steps.restored.outputs.usable != 'true'";
   assert.equal(build.run, harnessBuild);
-  assert.equal(build.if, "steps.cache.outputs.cache-hit != 'true'");
+  assert.equal(build.if, rebuild);
+  assert.equal(save.uses, 'actions/cache/save@668228422ae6a00e4ad889ee87cd7109ec5666a7');
+  assert.equal(save.if, rebuild, 'only a build that runs is saved');
+  assert.equal(save.with.path, 'packages/harness-sdk/dist');
+  assert.equal(save.with.key, distKey, 'the save writes the key the restore reads');
+  assert.ok(steps.indexOf(build) < steps.indexOf(save), 'the save follows the build');
   // The typia transform takes minutes to compile, so the build's plugin cache
   // comes from the shared action and only when a build will run.
   assert.equal(plugins.length, 1);
   assert.equal(plugins[0].uses, pluginCacheAction);
   assert.equal(plugins[0].with, undefined);
-  assert.equal(plugins[0].if, "steps.cache.outputs.cache-hit != 'true'");
+  assert.equal(plugins[0].if, rebuild);
   assert.equal(plugins[0].id, 'plugins');
   // macOS has no ci.yml writer for its platform-scoped key, so this action
   // writes the macOS key itself, after the build that compiled the plugins.
   // The save requires the build path: a skipped restore leaves its outputs
   // empty, and a save keyed on them would write nothing.
-  const macSave = steps.find(step => step.uses?.startsWith('actions/cache/save@'));
+  const macSave = steps.find(step => step.name === 'Save compiler plugins');
   assert.ok(macSave, 'the build action writes the macOS key');
   assert.equal(
     macSave.if,
-    "runner.os == 'macOS' && steps.cache.outputs.cache-hit != 'true' && steps.plugins.outputs.cache-hit != 'true'"
+    "runner.os == 'macOS' && steps.restored.outputs.usable != 'true' && steps.plugins.outputs.cache-hit != 'true'"
   );
   assert.equal(steps.indexOf(macSave), steps.length - 1);
 });

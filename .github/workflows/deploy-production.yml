@@ -89,7 +89,17 @@ jobs:
       VERCEL_PROJECT_TOKEN: ${{ secrets.VERCEL_TOKEN_AI_GATEWAY }}
 
   promote-app:
-    needs: [stage-app, db-gate]
+    needs: [stage-app, db-gate, stage-ai-gateway, promote-ai-gateway]
+    if: >-
+      ${{
+        !cancelled() &&
+        needs.stage-app.result == 'success' &&
+        needs.db-gate.result == 'success' &&
+        (
+          (needs.stage-ai-gateway.result == 'success' && needs.promote-ai-gateway.result == 'success') ||
+          (needs.stage-ai-gateway.result == 'skipped' && needs.promote-ai-gateway.result == 'skipped')
+        )
+      }}
     uses: ./.github/workflows/promote-vercel-deployment.yml
     with:
       deployment_url: ${{ needs.stage-app.outputs.deployment_url }}

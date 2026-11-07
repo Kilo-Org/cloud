@@ -39,14 +39,21 @@ const briefingChargeGenerationSchema = z
         deliveryAt: generation.deliveryAt,
       });
     }
+    const unique = receipts.filter(
+      (receipt, index) =>
+        receipts.findIndex(candidate => candidate.usageId === receipt.usageId) === index
+    );
+    const first = unique[0];
     return {
       id: generation.id,
       settlementToken: generation.settlementToken,
       deadlineAt: generation.deadlineAt,
-      receipts: receipts.filter(
-        (receipt, index) =>
-          receipts.findIndex(candidate => candidate.usageId === receipt.usageId) === index
-      ),
+      // A build that predates `receipts` reads one scalar receipt per generation.
+      // Naming the first receipt here keeps the node readable by either build.
+      usageId: first?.usageId ?? null,
+      delivery: first?.delivery,
+      deliveryAt: first?.deliveryAt,
+      receipts: unique,
     };
   });
 
@@ -103,14 +110,19 @@ export async function recordBriefingUsage(input: {
     }
 
     const path = sql`ARRAY['chargeAccounting', 'generations', ${String(index)}]::text[]`;
-    const receipts = JSON.stringify({
-      receipts: [...generation.receipts, { usageId: usage.usageId, delivery, deliveryAt }],
+    const receipts = [...generation.receipts, { usageId: usage.usageId, delivery, deliveryAt }];
+    const first = receipts[0];
+    const node = JSON.stringify({
+      usageId: first.usageId,
+      delivery: first.delivery,
+      deliveryAt: first.deliveryAt,
+      receipts,
     });
     await tx
       .update(agent_briefing_snapshots)
       .set({
         next_charge_check_at: deliveryAt,
-        summary: sql`jsonb_set(${agent_briefing_snapshots.summary} || '{"chargeStatus":"pending"}'::jsonb, ${path}, (coalesce(${agent_briefing_snapshots.summary} #> ${path}, '{}'::jsonb) - 'usageId' - 'delivery' - 'deliveryAt') || ${receipts}::jsonb)`,
+        summary: sql`jsonb_set(${agent_briefing_snapshots.summary} || '{"chargeStatus":"pending"}'::jsonb, ${path}, (coalesce(${agent_briefing_snapshots.summary} #> ${path}, '{}'::jsonb) - 'usageId' - 'delivery' - 'deliveryAt') || ${node}::jsonb)`,
       })
       .where(eq(agent_briefing_snapshots.id, report.id));
   });

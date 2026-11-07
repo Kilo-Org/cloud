@@ -368,7 +368,7 @@ it('settles a delayed usage delivery against its immutable occurrence generation
   expect(settled.next_charge_check_at).toBeNull();
   expect(settled.summary.chargeAccounting).toEqual({
     baselineCostMicrodollars: 0,
-    generations: [{ id: generated.generation_id, receipts: [{ usageId }] }],
+    generations: [{ id: generated.generation_id, usageId, receipts: [{ usageId }] }],
   });
 });
 
@@ -444,6 +444,14 @@ describe('briefing charge reconciliation for retried generations', () => {
     if (!generation) throw new Error('No generation accounting');
     return generation.receipts.map(receipt => receipt.usageId);
   }
+
+  it('admits a generation node a build without receipts parses', async () => {
+    const prepared = await generated();
+    const row = await current(prepared.reportId);
+    expect(row.summary.chargeAccounting).toMatchObject({
+      generations: [expect.objectContaining({ id: prepared.generationId, usageId: null })],
+    });
+  });
 
   it('keeps a staggered two-attempt generation pending until the queued row lands', async () => {
     const prepared = await generated();

@@ -1,11 +1,34 @@
 import { randomUUID } from 'crypto';
 import { eq } from 'drizzle-orm';
+import * as z from 'zod';
 import { agent_briefing_snapshots } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
-import { briefingChargeAccountingSchema, recordBriefingUsage } from './agent-briefing-usage';
+import {
+  briefingChargeAccountingSchema,
+  briefingChargeDeliverySchema,
+  recordBriefingUsage,
+} from './agent-briefing-usage';
 import type { UsageAccountingResult } from './ai-gateway/processUsage.types';
+
+/**
+ * The generation shape a build that predates `receipts` parses. Every receipt
+ * write must stay readable by it until no such build serves traffic.
+ */
+const previousAccountingReader = z.object({
+  baselineCostMicrodollars: z.number().nonnegative(),
+  generations: z.array(
+    z.object({
+      id: z.string(),
+      settlementToken: z.string().optional(),
+      usageId: z.uuid().nullable(),
+      deadlineAt: z.string().datetime().optional(),
+      deliveryAt: z.string().datetime().optional(),
+      delivery: briefingChargeDeliverySchema.optional(),
+    })
+  ),
+});
 
 async function fixture(organizationId?: string) {
   const user = await insertTestUser();
@@ -96,6 +119,9 @@ describe('recordBriefingUsage', () => {
               ? {
                   id: entry.id,
                   settlementToken: prepared.input.settlementToken,
+                  usageId: result.usageId,
+                  delivery: status === 'queued' ? 'queued' : 'committed',
+                  deliveryAt: expect.any(String),
                   receipts: [
                     {
                       usageId: result.usageId,
@@ -120,6 +146,23 @@ describe('recordBriefingUsage', () => {
       );
     }
   );
+
+  it('keeps the receipt fields a build without receipts parses', async () => {
+    const prepared = await fixture();
+    const first = usage('queued');
+    const second = usage();
+    await recordBriefingUsage({ ...prepared.input, usage: first });
+    await recordBriefingUsage({ ...prepared.input, usage: second });
+    const persisted = await readReport(prepared.report.id);
+    const previous = previousAccountingReader.parse(persisted.summary.chargeAccounting);
+    expect(previous.generations.find(entry => entry.id === prepared.input.generationId)).toEqual({
+      id: prepared.input.generationId,
+      settlementToken: prepared.input.settlementToken,
+      usageId: first.usageId,
+      delivery: 'queued',
+      deliveryAt: expect.any(String),
+    });
+  });
 
   it('stores every distinct receipt and ignores a duplicate receipt', async () => {
     const prepared = await fixture();

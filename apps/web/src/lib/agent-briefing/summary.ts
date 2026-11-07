@@ -636,7 +636,7 @@ export async function runBriefingSummary(reportId: string): Promise<void> {
     const settlementToken = crypto.randomUUID();
     const accounting = {
       baselineCostMicrodollars: 0,
-      generations: [{ id: generationId, settlementToken, receipts: [], deadlineAt }],
+      generations: [{ id: generationId, settlementToken, usageId: null, receipts: [], deadlineAt }],
     };
     const [admitted] = await db
       .update(agent_briefing_snapshots)

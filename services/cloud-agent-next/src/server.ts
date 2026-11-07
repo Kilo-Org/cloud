@@ -57,6 +57,7 @@ import {
   type RuntimeProxyHandleClaims,
   verifyRuntimeCredentialProxyHandle,
 } from './runtime-credential-proxy.js';
+import { RUNTIME_PROXY_ORIGIN_HEADER } from './runtime-credential-proxy-origin.js';
 import {
   logRuntimeProxyRequestFailed,
   readUpstreamFailureEvidence,
@@ -497,6 +498,7 @@ function runtimeProxyHeaders(request: Request, token: string, organizationId?: s
     'Transfer-Encoding',
     'Upgrade',
     'X-Kilocode-OrganizationId',
+    RUNTIME_PROXY_ORIGIN_HEADER,
   ]) {
     headers.delete(name);
   }
@@ -610,7 +612,11 @@ async function forwardRuntimeCredentialProxy(
   try {
     credential = await withDORetry(
       () => getSandboxSessionStub(c.env, claims.userId, claims.sessionId),
-      session => session.resolveRuntimeCredentialProxyGrant(handle),
+      session =>
+        session.resolveRuntimeCredentialProxyGrant(
+          handle,
+          c.req.header(RUNTIME_PROXY_ORIGIN_HEADER) ?? undefined
+        ),
       'resolveRuntimeCredentialProxyGrant'
     );
   } catch {

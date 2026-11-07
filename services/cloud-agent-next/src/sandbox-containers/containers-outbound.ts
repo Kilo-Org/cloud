@@ -1,5 +1,6 @@
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import { handleManagedScmOutbound } from '../sandbox-outbound.js';
+import { withRuntimeProxyOrigin } from '../runtime-credential-proxy-origin.js';
 import { withDORetry } from '../utils/do-retry.js';
 import { EgressAuditRequestSchema } from '../shared/egress-audit.js';
 import { isAllowedEgressUrl, nativeEgressAllowlistSchema } from './egress-policy.js';
@@ -76,6 +77,7 @@ export class ContainersOutbound extends WorkerEntrypoint<Cloudflare.Env, Contain
       if (policy.data !== undefined) headers.set('Host', url.host);
       request = new Request(request, { headers, redirect: 'manual' });
     }
+    request = await withRuntimeProxyOrigin(request, this.env, containerId);
     // Match the allowlist's canonical form so `session-sync.kiloapps.io.` cannot skip the binding.
     if (egressDomainSchema.safeParse(url.hostname).data === SESSION_SYNC_HOSTNAME) {
       // The runtime handle must reach Session Sync only through its binding.

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { CLOUD_AGENT_SESSION_SYNC_ORIGIN } from '@kilocode/worker-utils/cloud-agent-session-sync';
 import type { VercelSandboxNetworkPolicy } from '../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
+import { RUNTIME_PROXY_ORIGIN_HEADER } from '../runtime-credential-proxy-origin.js';
 import { createControlPlaneCredential } from './managed-credential.js';
 import { buildControlNetworkPolicy, type SessionCredentialGrant } from './session-credentials.js';
 import {
@@ -260,5 +262,30 @@ describe('contained Vercel modern policy composition', () => {
     const url = `https://worker.example.com/api/session/${otherRoot}/export`;
     expect(matchingTransform(policy, request(url, 'GET', 'Bearer adopted-handle'))).toBeDefined();
     expect(matchingTransform(policy, request(url, 'GET', 'Bearer member-handle'))).toBeUndefined();
+  });
+});
+
+describe('Vercel runtime proxy origin proof', () => {
+  it('injects the sandbox proof only with runtime proxy facade credentials', () => {
+    const policy = buildControlNetworkPolicy([grant('kilo')], undefined, {}, 'proof-1');
+    const transforms = (policy.allow['worker.example.com'] ?? []).filter(
+      rule => 'transform' in rule
+    );
+    expect(transforms.length).toBeGreaterThan(0);
+    for (const rule of transforms) {
+      expect(rule.transform[0]?.headers[RUNTIME_PROXY_ORIGIN_HEADER]).toBe('proof-1');
+    }
+    const sessionSync = request(
+      `${CLOUD_AGENT_SESSION_SYNC_ORIGIN}/v1/sessions`,
+      'GET',
+      'Bearer kilo'
+    );
+    expect(matchingTransform(policy, sessionSync)).toBeDefined();
+    expect(applyPolicy(policy, sessionSync).headers.has(RUNTIME_PROXY_ORIGIN_HEADER)).toBe(false);
+  });
+
+  it('does not add the header without a proof', () => {
+    const policy = buildControlNetworkPolicy([grant('kilo')]);
+    expect(JSON.stringify(policy)).not.toContain(RUNTIME_PROXY_ORIGIN_HEADER);
   });
 });

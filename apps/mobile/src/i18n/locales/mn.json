@@ -2992,7 +2992,6 @@
   },
   "addCredits": {
     "cta": "Кредит нэмэх",
-    "description": "Үргэлжлүүлэн ашиглахын тулд кредит нэмнэ үү.",
     "billingPage": "төлбөрийн хуудас"
   },
   "deviceSessions": {

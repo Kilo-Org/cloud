@@ -2992,7 +2992,6 @@
   },
   "addCredits": {
     "cta": "Fyll på krediter",
-    "description": "Fyll på krediter för att fortsätta använda tjänsten.",
     "billingPage": "faktureringssidan"
   },
   "deviceSessions": {

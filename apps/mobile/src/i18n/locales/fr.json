@@ -2423,7 +2423,6 @@
   },
   "addCredits": {
     "cta": "Ajouter des crédits",
-    "description": "Ajoutez des crédits pour continuer à utiliser le service.",
     "billingPage": "page de facturation"
   },
   "deviceSessions": {

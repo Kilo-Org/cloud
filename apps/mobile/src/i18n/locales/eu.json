@@ -2992,7 +2992,6 @@
   },
   "addCredits": {
     "cta": "Gehitu kredituak",
-    "description": "Gehitu kredituak erabiltzen jarraitzeko.",
     "billingPage": "fakturazio-orria"
   },
   "deviceSessions": {

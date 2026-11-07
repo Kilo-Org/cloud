@@ -2992,7 +2992,6 @@
   },
   "addCredits": {
     "cta": "Kreditlar qo'shish",
-    "description": "Foydalanishni davom ettirish uchun kreditlar qo'shing.",
     "billingPage": "to'lov sahifasi"
   },
   "deviceSessions": {

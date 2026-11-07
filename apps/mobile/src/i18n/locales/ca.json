@@ -3045,7 +3045,6 @@
   },
   "addCredits": {
     "cta": "Afegeix crèdits",
-    "description": "Afegeix crèdits per continuar utilitzant el servei.",
     "billingPage": "pàgina de facturació"
   },
   "deviceSessions": {

@@ -2453,7 +2453,6 @@
   },
   "addCredits": {
     "cta": "加值點數",
-    "description": "加值點數，即可繼續使用。",
     "billingPage": "帳單頁面"
   },
   "deviceSessions": {

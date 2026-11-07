@@ -206,6 +206,16 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
                   : formatMoney(fromMicrodollars(org.balance), i18n.language)
               }
               valueFace="numeric"
+              // An empty balance offers the top-up on the amount's own line: a
+              // row of its own would hold nothing but this control.
+              trailing={
+                org.balance === 0 ? (
+                  <AddCreditsRow
+                    inline
+                    url={`${WEB_BASE_URL}/organizations/${organizationId}/payment-details`}
+                  />
+                ) : undefined
+              }
               // Always pass the label: a node React Native stops handing a
               // label keeps its previous native value on Android, so a
               // masked row that reveals its amount would still announce
@@ -215,12 +225,6 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
                   ? t('profile.balanceHidden')
                   : formatMoney(fromMicrodollars(org.balance), i18n.language)
               }
-            />
-          )}
-          {showMoney && org.balance === 0 && (
-            <AddCreditsRow
-              url={`${WEB_BASE_URL}/organizations/${organizationId}/payment-details`}
-              className="border-b-[0.5px] border-hair-soft py-3"
             />
           )}
           <KvRow

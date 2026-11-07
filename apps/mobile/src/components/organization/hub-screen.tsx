@@ -28,7 +28,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { i18n } from '@/i18n';
-import { agentColor, type Tint, toneColor } from '@/lib/agent-color';
+import { NEUTRAL_TINT, type Tint, toneColor } from '@/lib/agent-color';
 import { isolateLtrBidiText } from '@/lib/bidi';
 import { WEB_BASE_URL } from '@/lib/config';
 import { openExternalUrl } from '@/lib/external-link';
@@ -369,12 +369,14 @@ type OrgKiloPassRowProps = Readonly<{
  * a plain function component, not a LucideIcon) and sets explicit
  * accessibility roles/labels for the manage, setup, and retry actions. Never
  * the last row — "Low balance alert" always follows it — so the divider is
- * permanent.
+ * permanent. Its icon tile follows ConfigureRow's rule too: the shared neutral
+ * tile unless the state needs attention (warn), never a hue hashed from the
+ * title.
  */
 function OrgKiloPassRow({ state, onManage, onSetup, onRetry }: OrgKiloPassRowProps) {
   const colors = useThemeColors();
   const { t } = useTranslation();
-  const tint: Tint = state.attention ? toneColor('warn') : agentColor('Kilo Pass');
+  const tint: Tint = state.attention ? toneColor('warn') : NEUTRAL_TINT;
   let onPress: (() => void) | null = null;
   if (state.action === 'manage') {
     onPress = onManage;

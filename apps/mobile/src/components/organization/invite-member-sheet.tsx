@@ -1,6 +1,6 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Check } from '@/components/ui/icons';
-import { useCallback, useRef, useState } from 'react';
+import { type ReactNode, useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BackHandler, Pressable, View } from 'react-native';
 
@@ -16,6 +16,7 @@ import { SheetHeader } from '@/components/sheet-header';
 import { SheetScrollView } from '@/components/tab-screen';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { FormField } from '@/components/ui/form-field';
+import { FormFieldLabel } from '@/components/ui/form-field-label';
 import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -30,6 +31,14 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
 const INVITABLE_ROLES: OrgRole[] = ['member', 'billing_manager', 'owner'];
+
+// The design gate's collector builds each node's `owners` list from the
+// rendered component's ancestor chain, so a component that carries this name
+// and owns the sheet content marks it as hosted inside a native presented
+// surface: the gate measures those frames from the surface's own origin, and
+// the window's inset rule does not apply to them. It renders the children
+// unchanged, so the native child order stays header-then-scroll.
+const PresentedContent = ({ children }: { children?: ReactNode }) => children;
 
 export function InviteMemberSheet() {
   const router = useRouter();
@@ -149,7 +158,7 @@ export function InviteMemberSheet() {
   };
 
   return (
-    <>
+    <PresentedContent>
       <SheetHeader
         title={t('organization.inviteMember.title')}
         onDone={onSubmit}
@@ -157,6 +166,10 @@ export function InviteMemberSheet() {
         onCancel={requestClose}
         disabled={mutations.invite.isPending}
         doneDisabled={!canSubmit || mutations.invite.isPending}
+        // A formSheet that is its stack's root presents at the window top, so
+        // its header clears the status bar itself; a sheet pushed over another
+        // screen settles an inset lower and reserves nothing. The shared rule
+        // picks the case this route is in (`useFormSheetHeaderTopInset`).
         topInset={sheetTopInset}
       />
       <SheetScrollView
@@ -198,9 +211,7 @@ export function InviteMemberSheet() {
           <Text variant="muted">{t('organization.inviteMember.roleMember')}</Text>
         ) : (
           <View className="gap-2">
-            <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-              {t('common.role')}
-            </Text>
+            <FormFieldLabel label={t('common.role')} />
             <RadioGroup
               label={t('common.role')}
               className="overflow-hidden rounded-lg bg-secondary"
@@ -230,6 +241,6 @@ export function InviteMemberSheet() {
         )}
       </SheetScrollView>
       {dialog}
-    </>
+    </PresentedContent>
   );
 }

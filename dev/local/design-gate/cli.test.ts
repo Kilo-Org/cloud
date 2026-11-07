@@ -18,6 +18,7 @@ import {
   UsageError,
 } from './cli';
 import { uiautomatorToProbeDump } from './uiautomator';
+import { captureAlignment } from './capture-evidence';
 import type { ProbeDump } from './tree';
 
 // A scrolled new-session screen with the environment sheet open, captured on an Android
@@ -66,6 +67,7 @@ test('a scan that never settles exits 2 instead of reporting a pass', async () =
   const xmls = [MOVING_SHEET_XML, CLAMPED_SHEET_XML];
   let reads = 0;
   let now = 0;
+  let screenshots = 0;
   const shellCalls: Record<string, string> = {
     'wm density': 'Physical density: 420',
     'wm size': 'Physical size: 1080x2400',
@@ -86,7 +88,10 @@ test('a scan that never settles exits 2 instead of reporting a pass', async () =
       if (command === 'ffmpeg') return Buffer.alloc(4);
       if (args[0] === 'devices') return Buffer.from('Listed\nemulator-5554\tdevice\n');
       if (args[1] === 'emu') return Buffer.from('omp36\n');
-      if (args.includes('screencap')) return Buffer.alloc(0);
+      if (args.includes('screencap')) {
+        screenshots += 1;
+        return Buffer.alloc(0);
+      }
       if (args.includes('cat')) {
         const xml = xmls[reads % xmls.length] ?? '';
         reads += 1;
@@ -112,10 +117,20 @@ test('a scan that never settles exits 2 instead of reporting a pass', async () =
       throw new Error('no exit expected');
     },
   });
+  const evidence = JSON.parse(
+    fs.readFileSync(path.join(out, 'cells/current/current.capture.json'), 'utf8')
+  ) as { status: string };
+  assert.equal(evidence.status, 'mismatch');
+  assert.equal(
+    screenshots,
+    1,
+    'retain the actual screenshot; never retry blank/mismatched captures away'
+  );
+  assert.equal(fs.existsSync(path.join(out, 'cells/current/current.png')), true);
   fs.rmSync(out, { recursive: true, force: true });
   assert.equal(code, 2);
-  assert.match(lines.join('\n'), /the screen did not settle, so nothing was measured/);
-  assert.match(lines.join('\n'), /1 warnings across 1 cells/);
+  assert.match(lines.join('\n'), /capture is inconclusive/);
+  assert.match(lines.join('\n'), /2 warnings across 1 cells/);
 });
 
 test('readSettledDump measures a layout that repeats across reads', async () => {
@@ -369,4 +384,135 @@ test('SIGINT runs registered restores once, then exits 130; disposal removes han
   assert.equal(timeoutMs, 180_000);
   abort.dispose();
   assert.equal(handlers.size, 0);
+});
+
+test('prepared proof commands require exact identities and paired source flags', () => {
+  const base = 'a'.repeat(40);
+  const head = 'b'.repeat(40);
+  const prepared = parseCliArgs([
+    'prepare',
+    '--base',
+    base,
+    '--head',
+    head,
+    '--targets',
+    'proof.json',
+    '--out',
+    '/tmp/new-proof',
+  ]);
+  assert.equal(prepared.command, 'prepare');
+  if (prepared.command === 'prepare')
+    assert.deepEqual([prepared.base, prepared.head, prepared.targets], [base, head, 'proof.json']);
+  assert.throws(
+    () =>
+      parseCliArgs([
+        'prepare',
+        '--base',
+        'main',
+        '--head',
+        head,
+        '--targets',
+        'proof.json',
+        '--out',
+        '/tmp/new-proof',
+      ]),
+    /exact lowercase 40-hex/
+  );
+  assert.throws(
+    () => parseCliArgs(['prepare', '--base', base, '--head', head, '--targets', 'proof.json']),
+    /--out/
+  );
+  assert.throws(
+    () =>
+      parseCliArgs([
+        'prepare',
+        '--base',
+        base,
+        '--head',
+        head,
+        '--targets',
+        'proof.json',
+        '--out',
+        '/tmp/new-proof',
+        '--metro',
+        'x',
+      ]),
+    /not valid for prepare/
+  );
+  assert.throws(
+    () => parseCliArgs(['run', '--targets', 'proof.json', '--preparation', 'receipt.json']),
+    /both/
+  );
+  assert.throws(
+    () =>
+      parseCliArgs([
+        'run',
+        '--targets',
+        'proof.json',
+        '--preparation',
+        'receipt.json',
+        '--revision',
+        'other',
+      ]),
+    /--revision/
+  );
+  assert.throws(
+    () =>
+      parseCliArgs([
+        'run',
+        '--link',
+        'kiloapp:///card',
+        '--preparation',
+        'receipt.json',
+        '--revision',
+        'base',
+      ]),
+    /--targets only/
+  );
+  const run = parseCliArgs([
+    'run',
+    '--targets',
+    'proof.json',
+    '--preparation',
+    'receipt.json',
+    '--revision',
+    'base',
+  ]);
+  assert.equal(run.command === 'run' && run.revision, 'base');
+  const comparison = parseCliArgs([
+    'compare',
+    '--preparation',
+    'receipt.json',
+    '--base-run',
+    'base-run',
+    '--head-run',
+    'head-run',
+    '--out',
+    'result',
+  ]);
+  assert.equal(comparison.command, 'compare');
+});
+
+test('scan retains bracket mismatch and possible blank observations even when unsettled', () => {
+  const beforeDump = dumpFrom(CLAMPED_SHEET_XML);
+  const afterDump = dumpFrom(MOVING_SHEET_XML);
+  const alignment = captureAlignment(
+    { startedMs: 0, completedMs: 1, dump: beforeDump },
+    { startedMs: 1, completedMs: 2 },
+    { startedMs: 2, completedMs: 3, dump: afterDump },
+    dump => JSON.stringify(dump),
+    { pixels: 'uniform', expectedText: true }
+  );
+  const findings = scanScreenFindings({
+    dump: beforeDump,
+    settled: false,
+    elapsedMs: 12_500,
+    alignment,
+  });
+  assert.deepEqual(findings.map(finding => finding.rule).sort(), [
+    'blank-frame',
+    'capture-alignment',
+    'unsettled',
+  ]);
+  assert.ok(findings.every(finding => finding.severity === 'warning'));
 });

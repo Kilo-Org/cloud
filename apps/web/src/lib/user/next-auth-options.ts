@@ -107,6 +107,7 @@ import { getLowerDomainFromEmail } from '@kilocode/web-shared/lib/email-address'
 import { z } from 'zod';
 import {
   getUserFromSession,
+  getUserFromSessionForCredentialIssuance,
   isBlockedTLD,
   isEmailBlacklistedByDomainAsync,
   sessionAuthOptions,
@@ -1088,16 +1089,6 @@ export const authOptions: NextAuthOptions = {
         // normalize the account, user, and profile objects into a single object
         // why does next-auth have 3 separate objects for this? who knows.
         accountInfo = createAccountInfo(account, user, profile);
-        if (account.provider === 'claude') {
-          const claims = claudeVerifiedEmailSchema.safeParse(profile);
-          if (
-            !claims.success ||
-            claims.data.email !== accountInfo.google_user_email ||
-            !(await isClaudePlatformOAuthEnabled(claims.data.email))
-          ) {
-            return redirectUrlForCode('UNKNOWN-ERROR');
-          }
-        }
 
         linkingSession = await getAccountLinkingSession();
 
@@ -1109,7 +1100,12 @@ export const authOptions: NextAuthOptions = {
         // ordinary linking failure. The read above consumed the cookie, so a
         // refusal is final.
         if (isAccountLinking && linkingSession) {
-          const linkingPrincipal = await getUserFromSession();
+          const claudeLinkingUser =
+            account.provider === 'claude'
+              ? (await getUserFromSessionForCredentialIssuance()).user
+              : undefined;
+          const linkingPrincipal =
+            account.provider === 'claude' ? claudeLinkingUser : await getUserFromSession();
           if (linkingPrincipal?.id !== linkingSession.existingUserId) {
             warnInSentry('SECURITY: Account link refused: the session does not match the link', {
               extra: { provider: accountInfo.provider },
@@ -1125,11 +1121,33 @@ export const authOptions: NextAuthOptions = {
             }
             return redirectUrlForCode('LINKING-FAILED');
           }
-          if (account.provider === 'claude') {
-            const linkingUser = await findUserById(linkingPrincipal.id);
-            if (!(await isClaudePlatformOAuthEnabled(linkingUser?.google_user_email))) {
-              return redirectUrlForCode('LINKING-FAILED');
-            }
+          if (
+            account.provider === 'claude' &&
+            !(await isClaudePlatformOAuthEnabled(claudeLinkingUser?.google_user_email))
+          ) {
+            return redirectUrlForCode('LINKING-FAILED');
+          }
+        }
+        if (account.provider === 'claude' && !isAccountLinking) {
+          const claims = claudeVerifiedEmailSchema.safeParse(profile);
+          if (!claims.success) {
+            console.warn('[claude-auth] authorization refused', {
+              reason: 'invalid_profile_claims',
+              claimNames: Object.keys(profile ?? {}).filter(
+                key =>
+                  key === 'sub' || key === 'email' || key === 'email_verified' || key === 'name'
+              ),
+              rejectedClaims: claims.error.issues.map(issue => issue.path.map(String).join('.')),
+            });
+            return redirectUrlForCode('UNKNOWN-ERROR');
+          }
+          if (claims.data.email !== accountInfo.google_user_email) {
+            console.warn('[claude-auth] authorization refused', { reason: 'email_mismatch' });
+            return redirectUrlForCode('UNKNOWN-ERROR');
+          }
+          if (!(await isClaudePlatformOAuthEnabled(claims.data.email))) {
+            console.warn('[claude-auth] authorization refused', { reason: 'release_denied' });
+            return redirectUrlForCode('UNKNOWN-ERROR');
           }
         }
 
@@ -1377,6 +1395,9 @@ export const authOptions: NextAuthOptions = {
           !(await mayConnectOpenAiChatGptSharedServices(result.user, linkingSession.organizationId))
         ) {
           return openAiChatGptConnectFailureUrl(linkingSession.organizationId, 'LINKING-FAILED');
+        }
+        if (account.provider === 'claude' && isAccountLinking) {
+          return '/connected-accounts?linked=claude';
         }
 
         // NOTE(bmc): this is sad but its here for a reason, don't change it

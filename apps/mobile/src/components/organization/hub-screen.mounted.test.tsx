@@ -113,11 +113,6 @@ vi.mock('@/lib/format', () => ({
   formatNumber: String,
 }));
 
-vi.mock('@/lib/agent-color', () => ({
-  agentColor: () => ({}),
-  toneColor: () => ({}),
-}));
-
 vi.mock('@/lib/utils', () => ({
   cn: (...args: unknown[]) => args.filter(Boolean).join(' '),
 }));
@@ -735,6 +730,59 @@ describe('Organization hub billing card while its data loads', () => {
     });
     expect(membersQuery.refetch).toHaveBeenCalledOnce();
     expect(kiloPassQuery.enabled.at(-1)).toBe(false);
+    unmount();
+  });
+});
+
+describe('Organization hub Kilo Pass icon tile', () => {
+  /** The tile's own classes: the View that holds the Kilo Pass glyph. */
+  function tileClass(root: TestRenderer.ReactTestInstance): string {
+    const icon = root.findAllByType('KiloPassIcon')[0];
+    if (icon === undefined) {
+      throw new Error('Kilo Pass icon missing');
+    }
+    const tile = icon.parent;
+    if (tile === null) {
+      throw new Error('Kilo Pass tile missing');
+    }
+    return String(tile.props.className);
+  }
+
+  // The row stands beside ConfigureRows that carry no tone, so it takes the
+  // shared neutral tile; a hue hashed from its title would put one accent in a
+  // settings list. Attention is the only state that earns a tone.
+  it('takes the neutral tile when the row needs no attention, never a hashed hue', async () => {
+    kiloPassRowState.current = {
+      subtitle: 'Not subscribed',
+      attention: false,
+      action: 'setup',
+      actionLabel: 'Set up',
+      accessibilityHint: 'Opens Kilo Pass setup on web.',
+      loading: false,
+    };
+    const { renderer, unmount } = await renderHub();
+
+    const tokens = tileClass(renderer.root).split(/\s+/).filter(Boolean);
+    expect(tokens).toContain('bg-hair-soft');
+    expect(tokens).toContain('border-border');
+    expect(tokens.filter(token => token.startsWith('bg-agent-'))).toEqual([]);
+    unmount();
+  });
+
+  it('keeps the warn tile for the attention state', async () => {
+    kiloPassRowState.current = {
+      subtitle: 'Could not load status',
+      attention: true,
+      action: 'retry',
+      actionLabel: 'Retry',
+      accessibilityHint: 'Retries loading Kilo Pass status.',
+      loading: false,
+    };
+    const { renderer, unmount } = await renderHub();
+
+    const tokens = tileClass(renderer.root).split(/\s+/).filter(Boolean);
+    expect(tokens).toContain('bg-warn-tile-bg');
+    expect(tokens).toContain('border-warn-tile-border');
     unmount();
   });
 });

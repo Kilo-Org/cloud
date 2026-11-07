@@ -9,6 +9,7 @@ import {
   enkrypt_usage_guardrail,
 } from '@kilocode/db/schema';
 import type {
+  EnkryptDetectorId,
   EnkryptGuardrailApiKind,
   EnkryptGuardrailDecision,
   EnkryptGuardrailDirection,
@@ -42,6 +43,11 @@ export type EnkryptGuardrailCall = {
   decision: EnkryptGuardrailDecision;
   /** Enkrypt's `X-Enkrypt-Credits-Cost` header, or null when the call returned none. */
   creditsCost: number | null;
+  /**
+   * The detectors that fired on this call, blocking or log-only. A log-only detection is an
+   * `allowed` call with detectors here.
+   */
+  detectorsFired?: EnkryptDetectorId[];
 };
 
 export type EnkryptUsageRecord = EnkryptGuardrailCall & {
@@ -63,11 +69,14 @@ export function enkryptCreditsToMicrodollars(creditsCost: number | null): number
  * defer it with `after()`.
  */
 export async function recordEnkryptUsage(usageRecord: EnkryptUsageRecord): Promise<void> {
-  const { guardrail = 'input', ...call } = usageRecord;
+  const { guardrail = 'input', detectorsFired = [], ...call } = usageRecord;
+  const [firstDetector, ...otherDetectors] = detectorsFired;
   const usageWrite: EnkryptUsageWriteInput = {
     ...call,
-    // Input calls omit the field, so a web app deployed before it still accepts them.
+    // Input calls and calls without a detection omit these fields, so a web app deployed before
+    // them still accepts the write.
     ...(guardrail === 'output' ? { guardrail } : {}),
+    ...(firstDetector ? { detectorsFired: [firstDetector, ...otherDetectors] } : {}),
     id: randomUUID(),
     occurredAt: new Date().toISOString(),
   };
@@ -160,6 +169,7 @@ export async function recordEnkryptUsageLocally(
         charged_microdollars: chargedMicrodollars,
         added_latency_ms: usageWrite.addedLatencyMs,
         guardrail_id: guardrailId,
+        detectors_fired: usageWrite.detectorsFired ?? null,
         created_at: occurredAt,
       })
       .onConflictDoNothing({ target: [enkrypt_usage.id, enkrypt_usage.created_at] })

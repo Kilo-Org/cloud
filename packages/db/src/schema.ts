@@ -115,6 +115,7 @@ import {
   EnkryptBenchmarkSchema,
 } from './schema-types';
 import type {
+  EnkryptDetectorId,
   EnkryptGuardrailDecision,
   EnkryptGuardrailDirection,
   WatchPrPolicy,
@@ -10945,6 +10946,10 @@ export const enkrypt_usage = pgTable(
     added_latency_ms: integer(),
     // Null on rows recorded before the output guardrail existed, which are all input guardrail calls.
     guardrail_id: integer().references(() => enkrypt_usage_guardrail.guardrail_id),
+    // Detectors that fired on this call, blocking or log-only; null when none fired, the call
+    // failed, or the row predates the column. A log-only detection is an `allowed` row with
+    // detectors here.
+    detectors_fired: text().array().$type<EnkryptDetectorId[]>(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },
   table => [

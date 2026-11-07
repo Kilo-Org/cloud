@@ -178,7 +178,7 @@ export function InviteMemberSheet() {
         // full-detent Android layout is a stack root, and the base-route runs
         // measure exactly that case (shared rule at the route-focus helper).
         topInset={isStackRoot ? 'android-window-top' : 'bottom-form-sheet'}
-        surfaceClassName="bg-card"
+        surfaceClassName="bg-card border-t border-border"
       />
       <SheetScrollView
         className="flex-1 bg-card"

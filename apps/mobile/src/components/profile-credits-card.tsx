@@ -137,11 +137,15 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   // no-break space ("0.00 $"), so the same balance read as a different figure
   // in that cell than the "$0.00" the other cells show (design review, Profile
   // rtl cell, 2026-11-07). The digits and their separators still come from the
-  // locale's number formatter.
-  const amountText = `$${formatNumber(balanceDollars, i18n.language, {
+  // locale's number formatter, and the formatter's own minus sign stays in
+  // front of the symbol: a balance can be negative, and "-$5.00" is the
+  // figure a reader expects, not "$-5.00".
+  const amountSign = balanceDollars < 0 ? '-' : '';
+  const amountDigits = formatNumber(Math.abs(balanceDollars), i18n.language, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  })}`;
+  });
+  const amountText = `${amountSign}$${amountDigits}`;
   // A read that has not answered yet is pending without fetching while the
   // owner is still unresolved (the balance query is gated on the identity), so
   // `balanceLoading` (isLoading) is false while `balance` is still undefined.

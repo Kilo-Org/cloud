@@ -63,8 +63,10 @@ export function BalanceBlock({
   onRetry,
 }: BalanceBlockProps) {
   const shellClass = cn(
-    'min-h-16 gap-2 rounded-lg bg-secondary px-3 py-2',
-    stacked ? 'items-stretch' : 'flex-row items-center'
+    'min-h-16 rounded-lg bg-secondary px-3 py-2',
+    // The stacked card keeps one gap under the control row in every state, so
+    // a state change never moves the note or the sections below the card.
+    stacked ? 'items-stretch gap-1' : 'flex-row items-center gap-2'
   );
   const controlRowClass = 'min-w-0 min-h-[44px] flex-row items-center gap-1';
   const retry = <Text className="text-sm text-destructive">{retryLabel}</Text>;
@@ -129,38 +131,40 @@ export function BalanceBlock({
     );
   }
 
+  if (stacked) {
+    return (
+      <View className={shellClass}>
+        <Animated.View className="min-w-0" layout={LinearTransition.duration(200)}>
+          {/* The toggle's 48 dp box carries `-my-[10px]`, so it reaches its
+              touch target without adding height to the row. */}
+          <View className={controlRowClass}>
+            <View className="min-w-0 flex-1">{amount}</View>
+            <View className="shrink-0 -my-[10px]">{toggle}</View>
+            {action}
+          </View>
+        </Animated.View>
+        {note}
+      </View>
+    );
+  }
+
   return (
     <View className={shellClass}>
       <Animated.View
-        className={cn('min-w-0', stacked ? 'gap-1' : 'flex-1 flex-row items-center gap-1')}
+        className="min-w-0 flex-1 flex-row items-center gap-1"
         layout={LinearTransition.duration(200)}
       >
-        {stacked ? (
-          <>
-            {/* The toggle's 48 dp box carries `-my-[10px]`, so it reaches its
-                touch target without adding height to the row. */}
-            <View className={controlRowClass}>
-              <View className="min-w-0 flex-1">{amount}</View>
-              <View className="shrink-0 -my-[10px]">{toggle}</View>
-              {action}
-            </View>
-            {note}
-          </>
-        ) : (
-          <>
-            {/* `flex-1` is a width share here: this View is the shell row's
-                child. A stacked card is a column, where `flex-1` would set a 0
-                vertical basis and the row would measure 0 dp tall on the first
-                layout pass (Android compact cell, 2026-11-03). */}
-            <View className="min-w-0 flex-1 gap-1">
-              {amount}
-              {note}
-            </View>
-            {toggle}
-          </>
-        )}
+        {/* `flex-1` is a width share here: this View is the shell row's child.
+            A stacked card is a column, where `flex-1` would set a 0 vertical
+            basis and the row would measure 0 dp tall on the first layout pass
+            (Android compact cell, 2026-11-03). */}
+        <View className="min-w-0 flex-1 gap-1">
+          {amount}
+          {note}
+        </View>
+        {toggle}
       </Animated.View>
-      {stacked ? null : action}
+      {action}
     </View>
   );
 }

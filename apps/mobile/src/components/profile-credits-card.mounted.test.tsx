@@ -924,6 +924,19 @@ describe('CreditsCard balance state', () => {
     }
   });
 
+  it('paints a negative balance with the sign in front of the symbol', async () => {
+    currentUser.userId = 'user-A';
+    getContextBalanceQueryFn.mockResolvedValue({ balance: -5 });
+
+    const { texts, unmount } = await mountCard();
+    await waitFor(() => texts().includes('-$5.00'));
+
+    // A balance can go negative; the sign leads the whole amount, and no
+    // "$-5.00" form of the same figure.
+    expect(texts()).not.toContain('$-5.00');
+    unmount();
+  });
+
   it('keeps the symbol in front of the amount in a right-to-left language', async () => {
     currentUser.userId = 'user-A';
     getContextBalanceQueryFn.mockResolvedValue({ balance: 10 });
@@ -1166,7 +1179,7 @@ describe('CreditsCard add-credits entry point', () => {
     let ancestor = action.parent;
     let insideBalanceCard = false;
     while (ancestor !== null) {
-      if (String(ancestor.props.className ?? '').includes('min-h-16 gap-2')) {
+      if (String(ancestor.props.className ?? '').includes('min-h-16 rounded-lg bg-secondary')) {
         insideBalanceCard = true;
         break;
       }
@@ -1196,7 +1209,7 @@ describe('CreditsCard add-credits entry point', () => {
     const balanceBlock = (() => {
       let ancestor = action.parent;
       while (ancestor !== null) {
-        if (String(ancestor.props.className ?? '').includes('min-h-16 gap-2')) {
+        if (String(ancestor.props.className ?? '').includes('min-h-16 rounded-lg bg-secondary')) {
           return ancestor;
         }
         ancestor = ancestor.parent;
@@ -1274,11 +1287,12 @@ describe('CreditsCard balance row', () => {
     );
   }
 
-  /** The balance shell's classes: the card's only `min-h-16 gap-2` box. */
+  /** The balance shell's classes: the card's only `min-h-16 rounded-lg bg-secondary` box. */
   function balanceClasses(renderer: ReactTestRenderer): string[] {
     const balance = renderer.root.find(
       node =>
-        Object.is(node.type, 'View') && String(node.props.className).includes('min-h-16 gap-2')
+        Object.is(node.type, 'View') &&
+        String(node.props.className).includes('min-h-16 rounded-lg bg-secondary')
     );
     return String(balance.props.className).split(' ');
   }

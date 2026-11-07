@@ -62,6 +62,18 @@ class ComponentBounds(unittest.TestCase):
         self.assertEqual(quote["quantities"]["input_tokens"], 5000)
         self.assertEqual(Decimal(quote["upstream_bound_usd"]), Decimal("0.105"))
 
+    def test_xhigh_variant_keeps_full_financial_and_payload_bounds(self):
+        cfg = contract_cfg(candidate={"model": "x/y", "effort": "variant=xhigh"}, variant_catalog={"x/y": {"xhigh": {"reasoning": {"enabled": True, "effort": "xhigh"}, "verbosity": "xhigh"}}})
+        quote = tariffs.endpoint_quote([endpoint()], cfg)
+        self.assertEqual(Decimal(quote["attempt_bound_usd"]), Decimal("0.10706"))
+        candidate = {**cfg["candidate"], "context_length": 300000, "financial_quote": quote, "quote_fetched_at": time.time()}
+        contract = tariffs.request_contract(candidate, cfg, quote_fetched_at=candidate["quote_fetched_at"])
+        payload = study.build_payload(candidate, [{"role": "user", "content": "task"}], contract, cfg)
+        tariffs.validate_final_payload(payload, contract)
+        payload["verbosity"] = "high"
+        with self.assertRaises(tariffs.RequestContractError):
+            tariffs.validate_final_payload(payload, contract)
+
     def test_negative_discount_is_markup_positive_discount_is_forgone(self):
         for discount, expected in ((-0.5, "0.1515"), (0.5, "0.101")):
             with self.subTest(discount=discount):

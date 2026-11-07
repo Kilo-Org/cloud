@@ -586,15 +586,11 @@ That request-validation proxy can select a candidate policy. It cannot prove
 full-task success, full-task cost, or a routing improvement. Only frozen,
 untouched full tasks with complete charges can supply that evidence.
 
-Current enforced behavior stays narrower than this protocol. The worker ranks
-requests, replays benchmark cases, and keeps its own paid-execution ledger for
-decider cases. The sweep settles known receipts as described above. Preserved
-research scripts outside this package contain partial checks for repetitions,
-unknown-charge stops, and a strict both-better comparison. Those scripts are not
-imported here, are not admitted under this protocol, and do not enforce it.
-
-The preserved runner remains outside this package. A financing no-go does not
-justify importing another execution framework.
+The production worker and sweep keep their own paid-execution ledger. The
+bundled `repo-study` driver and `router-*` scripts implement the separate
+full-task research protocol below. Historical scripts and evidence remain
+audit-only; they cannot authorize new dispatch. Use the bundled runner rather
+than introducing another execution framework.
 
 **Frozen design.** Freeze the spec before any paid request, and bind it by hash.
 
@@ -603,7 +599,8 @@ justify importing another execution framework.
   is a repeat measurement, not a new independent task. Include any paid tuning
   in the frozen plan and allowance; this protocol does not add a tuning campaign.
 - Per-run limits: 60 steps, 1800 s wall time, 180 s per action, 16384 requested
-  output tokens, and a $3 resource limit. Prove a finite hidden-output ceiling.
+  output tokens, and the approved $60 per-run ceiling. The other pinned
+  resource limits stay unchanged. Prove a finite hidden-output ceiling.
 - Tune only on tuning tasks. Keep final tasks untouched until final selection.
 - Do not add tuning tasks, repetitions, arms, or limits silently. Any change is
   a prospective amendment with a new freeze, quote, and admission decision.
@@ -632,7 +629,8 @@ and interval rule frozen before outcomes exist.
 - Do not shrink the denominator after dispatch. Missing, failed, and invalid
   rows stay visible with their reason and charges.
 
-**Financial admission gates.** All gates must pass before the first request.
+**Financial admission gates.** Version 5 is capped exploration. It has no
+full-plan funding guarantee. A budget stop leaves the plan inconclusive.
 
 1. **Continuity.** Retain all historical settled charges, unknown holds at
    their full bound, router fees, and upstream BYOK charges. Do not reset the
@@ -640,32 +638,42 @@ and interval rule frozen before outcomes exist.
    across all amendments stays at or below the authorized $100. An amendment
    never rebases the allowance, and a tranche inside it is not new allowance.
    A larger legacy ledger cap is not spending permission.
-2. **Whole-plan financing.** Finance the whole remaining plan, not a favorable
-   prefix: every arm, task, repetition, failed attempt, classifier and grader
-   charge, and cache rebuild. Price every `(model, variant)` pair reachable
-   from the baseline and candidate tables, not only first picks. If the bound
-   exceeds the remaining allowance, stop; do not dispatch a partial plan.
-3. **Pilot ceiling.** A baseline-only protocol pilot has an independent $5
-   ceiling inside the same cumulative allowance. It checks execution, grading,
-   and receipts only. It cannot certify either objective. No final request may
-   run before exact successful pilot evidence exists.
-4. **Component tariffs.** Keep immutable raw price evidence with units and
+2. **Whole-plan cost forecast.** Register one hash-bound forecast for the whole
+   plan: every arm, task, and repetition. Price every `(model, variant)` pair
+   reachable from the baseline and candidate tables, not only first picks. A
+   missing or unpriced mandatory pair blocks registration. The forecast total
+   can exceed $100. The forecast is evidence, not funding.
+3. **Nested caps at dispatch.** Reserve each request in full before dispatch.
+   Settled plus held plus the next bound must fit three nested caps: the $100
+   cumulative new allowance, the $60 pilot ceiling for pilot work, and the $60
+   per-run ceiling. The frozen per-run resource limit can bind first. Count
+   incurred commitments only. Do not count unattempted rows. Do not count the
+   unused part of an active run cap. A claim records its per-run cap. The claim
+   reserves no money. Known settlement replaces a hold with the actual charge.
+   The unused part then stops counting. An unknown or breached charge stays at
+   its full bound and stops dispatch.
+4. **Pilot ceiling.** A baseline-only protocol pilot has an independent $60
+   ceiling inside the same cumulative allowance. A frozen pilot cap can be
+   lower. The pilot checks execution, grading, and receipts only. It cannot
+   certify either objective. No final request may run before exact successful
+   pilot evidence exists.
+5. **Component tariffs.** Keep immutable raw price evidence with units and
    quantities for every component: input, cached read, cache write and storage
    with its time-to-live bound, output, hidden reasoning, and per-request fees.
    Prove whether hidden-reasoning and completion rates are additive or alternative.
    If both quantities have finite bounds, sum their rates conservatively or reject
    the quote; never assume a component is free. BYOK totals are
    the router fee plus the upstream charge; either part alone is unknown.
-5. **Provider closure.** Prove the exact provider, descendant-model, and
+6. **Provider closure.** Prove the exact provider, descendant-model, and
    service-tier set that the frozen request constraints admit. Price the worst
    reachable member of that closure, not the cheapest endpoint. Keep privacy,
    parameter, and no-fallback constraints in the frozen request.
-6. **Payload guard.** After all variant mutation, validate the final serialized
+7. **Payload guard.** After all variant mutation, validate the final serialized
    payload. Admit string text only. Reject media, files, native tools, search
    plugins, cache controls, automatic continuation, budget escalation, and any
    passthrough field that can add billable work. Reject; do not silently strip.
    Bind the guard, its hash, and negative proofs to the executable identity.
-7. **Identity.** Bind the complete executable and input identity before
+8. **Identity.** Bind the complete executable and input identity before
    dispatch: source and bundle hashes, runtime argv, parser and grader
    revisions, task split, arm snapshots, variant catalog, run order seed,
    resource limits, classifier identity, and quote evidence. Dispatch only
@@ -693,39 +701,60 @@ reduce the denominator to escape it.
 - A provider outage with a valid outage record is an arm failure.
   Infrastructure and grader failures block completeness instead. They are not
   model-quality failures.
+- Budget stop: a cap stops a later request. The plan is partial and
+  inconclusive. A favorable prefix cannot establish a pass, superiority over a
+  fixed model, or control cost matching.
 
 **No-go states.** Paid dispatch stays blocked while an applicable gate fails:
 unaccounted unknown charges; unresolved historical candidate uncertainty;
 incomplete or expired tariff coverage; an unbounded tariff component; unresolved
 provider closure; a missing payload guard; an executable identity mismatch;
-a changed denominator; or a whole-plan bound above the remaining allowance.
+or a changed denominator. A forecast above the caps is not a no-go. The next
+unaffordable request is the stop.
 Final dispatch also requires exact successful pilot evidence. The pilot cannot
 prove its own admission retroactively. Report blocked while any applicable gate fails.
 
-The prospective protocol is now implemented by the bundled `repo-study` driver
-and the `router-*` coordinator scripts. Paid execution requires, in order:
+The version 5 prospective protocol is implemented by the bundled `repo-study`
+driver and the `router-*` coordinator scripts. Old manifests and old financing
+manifests are audit-only. Paid execution requires, in order:
 
-1. A prospective authorization whose cumulative new allowance is within the
-   programme ceiling and whose origin snapshot is immutable.
-2. A frozen spec with the complete router, content-blind control and fixed-model
-   arms for each mode, the unchanged task split and resources, and frozen
-   account-plugin evidence supplied as an absolute `account_policy` path.
+1. A capped-exploration authorization whose cumulative new allowance is within
+   the $100 programme ceiling and whose origin snapshot is immutable.
+2. A frozen version 5 spec with the complete router, content-blind control and
+   fixed-model arms for each mode, the unchanged task split and resources, and
+   frozen account-plugin evidence supplied as an absolute `account_policy` path.
    Its bytes are bound into the freeze approval.
 3. A fresh complete tariff quote for every mandatory pair. An unsupported tariff
    is an accounting failure, not an endpoint outage.
-4. A registered whole-plan financing manifest covering every mandatory row.
-   The pilot has its own independent ceiling inside the same authorization.
+4. A registered whole-plan cost forecast covering every mandatory row.
+   The `finance` command registers that forecast. It does not fund the plan.
+   Audit executability requires current authorization and frozen plan
+   validation. Each forecast keeps its own total.
 
 The coordinator validates the final text-only payload after variant resolution,
 posts exactly the approved bytes, and consumes each reservation once. It reports
 no pass or savings claim unless every arm has settled charges, determinate grades
-and the frozen coverage.
+and the frozen coverage. An incomplete analysis is `inconclusive`.
+
+Variant validation accepts the shared gateway catalog's complete verbosity
+vocabulary, including `xhigh`, without dropping its frozen reasoning controls.
+
+These are pre-dispatch reservation checks, not a guaranteed ceiling on final
+provider charges. An over-bound charge is detected after billing and stops
+further dispatch. A provider dashboard budget is not a hard cap either:
+already-dispatched requests can finish after that budget is reached. Real
+dispatch requires independent evidence that all billed exposure stays inside
+the authorization; a quote or dashboard limit alone does not prove that.
 
 Recovery releases a coordinator reservation at zero cost only when neither its
 dispatch admission nor its receipt indicates dispatch. Historical and admitted
 requests retain their full holds. Receipt or observer failures cannot overwrite
 a settled charge. Admission denials finalize their receipt and budget-limit
 evidence even when admission already settled the unused reservation.
+
+Classifier settlement uses the solver's billing-evidence rules. Missing billing
+mode or upstream-cost evidence retains the full hold and stops further dispatch.
+Known charge floors remain held even when they exceed the original reservation.
 
 The isolated runtime uses the installed Miniflare configuration API. Closing a
 run attempts every instance, reports disposal failures, and retains failed
@@ -739,9 +768,13 @@ python3 -m pip install -r repo-study/requirements.txt
 (cd scripts && python3 -m unittest test_router_ledger test_router_study test_router_proof test_router_replay.ReplayInvariants)
 ```
 
-Paid admission remains blocked if real account policy evidence is absent, if any
-mandatory pair lacks a finite quote, or if the complete plan does not fit the
-remaining authorization. Do not shrink the plan or raise the cap implicitly.
+Do not authorize paid work without real account-policy evidence, a finite quote
+for every mandatory pair, and independent evidence of total billed exposure.
+A forecast above the remaining authorization can register for offline checks.
+The code checks quoted reservations; it does not certify a provider-invoice
+ceiling. Local admission stops before an unaffordable reservation. This protocol
+does not authorize a live run by itself. Do not shrink the plan or raise a cap
+implicitly.
 
 ### Shadow routing policy
 

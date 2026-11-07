@@ -49,14 +49,14 @@ def prospective_campaign(root, baseline=SYNTHETIC_BASELINE, additional=SYNTHETIC
     ledger.import_campaign(path.parent, inventory(root, [source], [None], complete=False))
     with ledger.readonly(path) as db:
         values = ledger.metadata(db)
-    approval = {"schema": ledger.PROSPECTIVE_SCHEMA, "authorized": True, "action": "authorize-prospective-router-study", "grant_id": "bounded-two", "campaign_id": values["campaign_id"], "inventory_sha256": values["inventory_sha256"], "committed_upper_baseline_usd": baseline, "additional_cap_usd": additional, "total_cap_usd": "250", "candidate_slots": {"efficient": 1, "frontier": 1}, "historical_unknown_policy": "immutable-funded-historical-commitments", "accepted_proposal": "Synthetic two-mode candidate fixture.", "user_response": "Accepted."}
+    approval = {"schema": ledger.PROSPECTIVE_SCHEMA, "authorized": True, "action": "authorize-capped-exploration-router-study", "grant_id": "bounded-two", "campaign_id": values["campaign_id"], "inventory_sha256": values["inventory_sha256"], "committed_upper_baseline_usd": baseline, "additional_cap_usd": additional, "total_cap_usd": "250", "candidate_slots": {"efficient": 1, "frontier": 1}, "historical_unknown_policy": "immutable-funded-historical-commitments", "accepted_proposal": "Synthetic two-mode candidate fixture.", "user_response": "Accepted."}
     approval_path = root / "grant.json"
     approval_path.write_text(json.dumps(approval))
     ledger.authorize(path, approval_path)
     return path, approval_path
 
 
-def frozen_plan_campaign(root):
+def frozen_plan_campaign(root, resource_cap="3", pilot_cap="5"):
     """A real registered manifest plus its frozen execution-plan file."""
     path, _ = prospective_campaign(root)
     out = root / "study"
@@ -71,8 +71,8 @@ def frozen_plan_campaign(root):
     ]
     plan = {"experiment_id": "exp", "expected_runs": len(runs), "runs": runs}
     (out / "execution-plan.json").write_text(json.dumps(plan, indent=2, sort_keys=True))
-    spec = {"prospective_grant_id": "bounded-two", "resources": {"run_cost_limit_usd": "3"}, "pilot_cap_usd": "5"}
-    manifest = {"version": 4, "spec": spec, "approval": {"execution_plan_sha256": ledger.digest(plan)}, "out_root": str(out)}
+    spec = {"prospective_grant_id": "bounded-two", "resources": {"run_cost_limit_usd": resource_cap}, "pilot_cap_usd": pilot_cap}
+    manifest = {"version": ledger.MANIFEST_VERSION, "spec": spec, "approval": {"execution_plan_sha256": ledger.digest(plan)}, "out_root": str(out)}
     candidates = [{"router": mode, "executableSha256": "synthetic-bundle", "config": {"table": mode}} for mode in ("efficient", "frontier")]
     with sqlite3.connect(path) as db:
         db.execute("BEGIN IMMEDIATE")
@@ -83,9 +83,10 @@ def frozen_plan_campaign(root):
 def complete_financing(path, manifest, plan, envelope="0.4"):
     with ledger.readonly(path) as db:
         authorization = ledger.authorization_summary(ledger.effective_authorization(db, "bounded-two"))
-    rows = [{"run": row["run"], "phase": row["phase"], "arm_id": row["arm_id"], "arm_kind": "router", "router": row["router"], "envelope_usd": envelope, "proved_envelope_usd": envelope, "resource_cap_usd": "3", "basis": {"synthetic": True}} for row in plan["runs"]]
+    resource_cap = manifest["spec"]["resources"]["run_cost_limit_usd"]
+    rows = [{"run": row["run"], "phase": row["phase"], "arm_id": row["arm_id"], "arm_kind": "router", "router": row["router"], "envelope_usd": envelope, "proved_envelope_usd": envelope, "resource_cap_usd": resource_cap, "basis": {"synthetic": True}} for row in plan["runs"]]
     pilot = sum((Decimal(envelope) for row in rows if row["phase"] == "pilot"), Decimal(0))
-    return {"schema": ledger.FINANCING_SCHEMA, "manifest_sha256": ledger.digest(manifest), "execution_plan_sha256": ledger.digest(plan), "authorization": authorization, "resources": {"run_cost_limit_usd": "3"}, "pilot_cap_usd": "5", "pilot_envelope_usd": str(pilot), "total_envelope_usd": str(Decimal(envelope) * len(rows)), "rows": rows}
+    return {"schema": ledger.FINANCING_SCHEMA, "forecast_only": True, "funding_guarantee": "none; capped exploration may stop inconclusive", "manifest_sha256": ledger.digest(manifest), "execution_plan_sha256": ledger.digest(plan), "authorization": authorization, "resources": {"run_cost_limit_usd": resource_cap}, "pilot_cap_usd": manifest["spec"]["pilot_cap_usd"], "pilot_envelope_usd": str(pilot), "total_envelope_usd": str(Decimal(envelope) * len(rows)), "rows": rows}
 
 
 def register_financing(path, financing):
@@ -95,7 +96,7 @@ def register_financing(path, financing):
 
 
 def write_amendment(root, cumulative, prior_sha256, slots=None, name="amendment.json"):
-    amendment = {"schema": ledger.AMENDMENT_SCHEMA, "authorized": True, "action": "amend-prospective-router-study-authorization", "amendment_id": f"amend-{cumulative}", "grant_id": "bounded-two", "prior_approval_sha256": prior_sha256, "cumulative_additional_cap_usd": cumulative, "candidate_slots": slots or {"efficient": 1, "frontier": 1}, "accepted_proposal": "Raise the cumulative synthetic allowance.", "user_response": "Accepted."}
+    amendment = {"schema": ledger.AMENDMENT_SCHEMA, "authorized": True, "action": "amend-capped-exploration-router-study-authorization", "amendment_id": f"amend-{cumulative}", "grant_id": "bounded-two", "prior_approval_sha256": prior_sha256, "cumulative_additional_cap_usd": cumulative, "candidate_slots": slots or {"efficient": 1, "frontier": 1}, "accepted_proposal": "Raise the cumulative synthetic allowance.", "user_response": "Accepted."}
     path = root / name
     path.write_text(json.dumps(amendment))
     return path
@@ -289,7 +290,7 @@ class ProspectiveGrant(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             path, _ = prospective_campaign(Path(temporary))
             candidates = [{"router": mode, "executableSha256": "actual-bundle", "config": {"table": mode}} for mode in ("efficient", "frontier")]
-            manifest = {"version": 4, "spec": {"prospective_grant_id": "bounded-two"}, "out_root": "one"}
+            manifest = {"version": ledger.MANIFEST_VERSION, "spec": {"prospective_grant_id": "bounded-two"}, "out_root": "one"}
             with sqlite3.connect(path) as db:
                 db.execute("BEGIN IMMEDIATE")
                 ledger.register(db, manifest, candidates)
@@ -325,7 +326,7 @@ class ProspectiveGrant(unittest.TestCase):
             ledger.import_campaign(path.parent, inventory(root, [source], [None], complete=False))
             with ledger.readonly(path) as db:
                 values = ledger.metadata(db)
-            approval = {"schema": ledger.PROSPECTIVE_SCHEMA, "authorized": True, "action": "authorize-prospective-router-study", "grant_id": "bounded-two", "campaign_id": values["campaign_id"], "inventory_sha256": values["inventory_sha256"], "committed_upper_baseline_usd": "12.5", "additional_cap_usd": "20", "total_cap_usd": "250", "candidate_slots": {"efficient": 1, "frontier": 1}, "historical_unknown_policy": "immutable-funded-historical-commitments", "accepted_proposal": "Synthetic.", "user_response": "Accepted."}
+            approval = {"schema": ledger.PROSPECTIVE_SCHEMA, "authorized": True, "action": "authorize-capped-exploration-router-study", "grant_id": "bounded-two", "campaign_id": values["campaign_id"], "inventory_sha256": values["inventory_sha256"], "committed_upper_baseline_usd": "12.5", "additional_cap_usd": "20", "total_cap_usd": "250", "candidate_slots": {"efficient": 1, "frontier": 1}, "historical_unknown_policy": "immutable-funded-historical-commitments", "accepted_proposal": "Synthetic.", "user_response": "Accepted."}
             bad = root / "bad-grant.json"
             bad.write_text(json.dumps(approval))
             with self.assertRaisesRegex(ValueError, "origin rows exactly"):
@@ -384,6 +385,72 @@ class FinancingRegistration(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     ledger.require_current_financing(db, "0" * 64)
 
+    def test_forecast_above_allowance_and_pilot_cap_registers_without_funding_it(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path, out, manifest, plan = frozen_plan_campaign(Path(temporary), resource_cap="60", pilot_cap="60")
+            financing = complete_financing(path, manifest, plan, envelope="60")
+            self.assertEqual(Decimal(financing["total_envelope_usd"]), Decimal("360"))
+            self.assertEqual(Decimal(financing["pilot_envelope_usd"]), Decimal("120"))
+            result = register_financing(path, financing)
+            self.assertTrue(result["fits"])
+            self.assertTrue(result["forecast_exceeds_allowance"])
+            self.assertEqual(Decimal(result["forecast_total_usd"]), Decimal("360"))
+            self.assertEqual(Decimal(result["total_liability_usd"]), Decimal(SYNTHETIC_BASELINE))
+            with ledger.readonly(path) as db:
+                self.assertEqual(ledger.financing_for(db, result["financing_sha256"]), financing)
+                liability = ledger.plan_liability(db, pending=(plan["runs"][0]["run"], "20"))
+                self.assertEqual(liability["total_liability_usd"], Decimal(SYNTHETIC_BASELINE) + Decimal("20"))
+                self.assertFalse(ledger.check_financing_fits(db, pending=(plan["runs"][0]["run"], "20.01"))["fits"])
+
+    def test_each_registered_forecast_reports_its_own_total(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path, out, manifest, plan = frozen_plan_campaign(Path(temporary), resource_cap="60", pilot_cap="60")
+            larger = register_financing(path, complete_financing(path, manifest, plan, envelope="60"))
+            smaller = register_financing(path, complete_financing(path, manifest, plan, envelope="1"))
+            self.assertTrue(larger["forecast_exceeds_allowance"])
+            self.assertFalse(smaller["forecast_exceeds_allowance"])
+            self.assertEqual((Decimal(larger["forecast_total_usd"]), Decimal(smaller["forecast_total_usd"])), (Decimal("360"), Decimal("6")))
+            self.assertNotEqual(larger["financing_sha256"], smaller["financing_sha256"])
+
+    def test_liability_counts_only_incurred_and_releases_unused_hold_on_settlement(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path, out, manifest, plan = frozen_plan_campaign(Path(temporary), resource_cap="60", pilot_cap="60")
+            register_financing(path, complete_financing(path, manifest, plan, envelope="60"))
+            run = plan["runs"][2]["run"]
+            with sqlite3.connect(path) as db:
+                db.execute("INSERT INTO campaign_admissions VALUES (?,?,?,?)", (run, ledger.digest(manifest), "60", "attempt-fixture"))
+                db.execute("INSERT INTO router_runs VALUES (?, 'final', 'active', 0)", (run,))
+                db.execute("INSERT INTO requests VALUES ('next-request', ?, '10', NULL, NULL, 'reserved', '', 1)", (run,))
+            with ledger.readonly(path) as db:
+                liability = ledger.plan_liability(db)
+                self.assertEqual(liability["total_liability_usd"], Decimal(SYNTHETIC_BASELINE) + Decimal("10"))
+            with sqlite3.connect(path) as db:
+                db.execute("UPDATE requests SET state='settled', actual='1', tokens=1 WHERE id='next-request'")
+            with ledger.readonly(path) as db:
+                self.assertEqual(ledger.plan_liability(db)["total_liability_usd"], Decimal(SYNTHETIC_BASELINE) + Decimal("1"))
+                self.assertEqual(db.execute("SELECT state,bound FROM requests WHERE id='historical-held'").fetchone(), ("unknown", SYNTHETIC_BASELINE))
+
+    def test_legacy_financing_stays_auditable_but_never_authorizes_dispatch(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path, out, manifest, plan = frozen_plan_campaign(Path(temporary))
+            legacy = complete_financing(path, manifest, plan)
+            legacy["schema"] = ledger.LEGACY_FINANCING_SCHEMA
+            del legacy["forecast_only"], legacy["funding_guarantee"]
+            legacy_sha = ledger.digest(legacy)
+            with ledger.readonly(path) as read_db:
+                authorization_sha = ledger.effective_authorization(read_db)["effective_approval_sha256"]
+            with sqlite3.connect(path) as db:
+                db.execute("BEGIN IMMEDIATE")
+                ledger.financing_tables(db)
+                db.execute("INSERT INTO campaign_financing_plans VALUES (?,?,?,?,?)", (legacy_sha, ledger.digest(manifest), authorization_sha, json.dumps(legacy, sort_keys=True), 0))
+                db.executemany("INSERT INTO campaign_financing_rows VALUES (?,?,?,?)", ((legacy_sha, row["run"], row["phase"], row["envelope_usd"]) for row in legacy["rows"]))
+                db.execute("COMMIT")
+                with self.assertRaisesRegex(ValueError, "audit-only"):
+                    ledger.financing_for(db, legacy_sha)
+            report = ledger.audit(path)
+            self.assertEqual(report["cost_forecasts"], [{"sha256": legacy_sha, "schema": ledger.LEGACY_FINANCING_SCHEMA, "hash_matches": True, "total_envelope_usd": legacy["total_envelope_usd"], "executable_for_v5": False}])
+            self.assertEqual(report["settled_plus_held_usd"], SYNTHETIC_BASELINE)
+
     def test_omitted_extra_duplicate_and_reordered_rows_reject(self):
         mutations = ("omitted", "pilot_prefix", "extra", "duplicate", "reordered")
         for mutation in mutations:
@@ -413,7 +480,7 @@ class FinancingRegistration(unittest.TestCase):
                 self.assert_rejected_without_registration(path, self.retotal(financing))
 
     def test_envelope_must_equal_min_proved_and_unchanged_cap(self):
-        mutations = ("above_proved", "changed_cap", "missing_proved")
+        mutations = ("above_proved", "changed_cap", "missing_proved", "missing_forecast_only", "resource_cap_above_ceiling", "pilot_cap_above_ceiling")
         for mutation in mutations:
             with self.subTest(mutation=mutation), tempfile.TemporaryDirectory() as temporary:
                 root = Path(temporary)
@@ -423,8 +490,16 @@ class FinancingRegistration(unittest.TestCase):
                     financing["rows"][0]["envelope_usd"] = "0.5"
                 elif mutation == "changed_cap":
                     financing["rows"][0].update(envelope_usd="0.4", proved_envelope_usd="0.4", resource_cap_usd="2")
-                else:
+                elif mutation == "missing_proved":
                     del financing["rows"][0]["proved_envelope_usd"]
+                elif mutation == "missing_forecast_only":
+                    del financing["forecast_only"]
+                elif mutation == "resource_cap_above_ceiling":
+                    financing["resources"]["run_cost_limit_usd"] = "61"
+                    for row in financing["rows"]:
+                        row["resource_cap_usd"] = "61"
+                else:
+                    financing["pilot_cap_usd"] = "61"
                 self.assert_rejected_without_registration(path, self.retotal(financing))
 
     def test_changed_plan_file_and_wrong_plan_hash_reject(self):
@@ -459,10 +534,14 @@ class FinancingRegistration(unittest.TestCase):
                 db.execute("COMMIT")
                 self.assertEqual(db.execute("SELECT COUNT(*) FROM campaign_financing_plans").fetchone()[0], 1)
                 self.assertEqual(db.execute("SELECT state,bound FROM requests WHERE id='historical-held'").fetchone(), ("unknown", SYNTHETIC_BASELINE))
+            self.assertFalse(ledger.audit(path)["cost_forecasts"][0]["executable_for_v5"])
             refreshed = complete_financing(path, manifest, plan)
             refreshed_result = register_financing(path, refreshed)
             with ledger.readonly(path) as db:
                 self.assertEqual(ledger.require_current_financing(db, refreshed_result["financing_sha256"]), refreshed)
+            forecasts = {row["sha256"]: row for row in ledger.audit(path)["cost_forecasts"]}
+            self.assertFalse(forecasts[result["financing_sha256"]]["executable_for_v5"])
+            self.assertTrue(forecasts[refreshed_result["financing_sha256"]]["executable_for_v5"])
 
 
 class WriterLock(unittest.TestCase):

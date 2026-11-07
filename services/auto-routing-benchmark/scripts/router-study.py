@@ -31,11 +31,12 @@ from text_tariffs import resolve_variant
 
 
 MANIFEST = "router-study-manifest.json"
-SPEC_VERSION = 4
+SPEC_VERSION = 5
 # Legacy ledger ceiling from imported metadata; never by itself permission.
 CAP = Decimal("250")
-# Independent pilot ceiling inside the cumulative new authorization.
-PILOT_CAP_USD = Decimal("5")
+# Nested capped-exploration ceilings inside the cumulative new authorization.
+PILOT_CAP_USD = Decimal("60")
+RUN_CAP_USD = Decimal("60")
 MODES = ("efficient", "frontier")
 ROUTING_TABLE_KEYS = {"efficient": "routing_table_v1", "frontier": "routing_table_frontier_v1"}
 CLASSIFIER_BOUND_SOURCES = {
@@ -311,7 +312,7 @@ def _validate_arms_spec(spec):
 def validate_spec(spec, modules):
     expected = {"version", "experiment_id", "configurations", "tasks", "resources", "pilot_cap_usd", "classifier_fee_fraction", "variant_catalog", "execution_manifest", "campaign_ledger", "repetitions", "seed", "prospective_grant_id", "fixed_models", "control", "objectives", "account_policy"}
     if not isinstance(spec, dict) or set(spec) != expected or spec["version"] != SPEC_VERSION or not isinstance(spec["experiment_id"], str) or not SAFE.fullmatch(spec["experiment_id"]):
-        raise ValueError("Exact version4 prospective router study spec required; old manifests are audit-only")
+        raise ValueError("Exact version5 capped-exploration router study spec required; old manifests are audit-only")
     if type(spec["repetitions"]) is not int or spec["repetitions"] != 2 or not isinstance(spec["seed"], str) or not spec["seed"]:
         raise ValueError("Exactly two paired repetitions and a frozen nonempty order seed are required")
     for key in ("campaign_ledger", "execution_manifest", "account_policy"):
@@ -324,12 +325,14 @@ def validate_spec(spec, modules):
     if not isinstance(tasks, dict) or set(tasks) != {"tuning", "final"} or any(not isinstance(ids, list) or not ids or len(ids) != len(set(ids)) for ids in tasks.values()) or set(tasks["tuning"]) & set(tasks["final"]):
         raise ValueError("Tuning and final task sets must be nonempty, distinct and disjoint")
     resources, base = spec["resources"], modules["census"].RESOURCES
-    if not isinstance(resources, dict) or set(resources) != set(base) | {"max_input_tokens", "http_request_timeout_seconds", "token_overrun_policy"} or any(resources[key] != value for key, value in base.items()):
-        raise ValueError("Use the unchanged pinned census solver resources")
+    if not isinstance(resources, dict) or set(resources) != set(base) | {"max_input_tokens", "http_request_timeout_seconds", "token_overrun_policy", "run_cost_limit_usd"} or any(resources[key] != value for key, value in base.items() if key != "run_cost_limit_usd"):
+        raise ValueError("Use the pinned census solver resources with the approved per-run money cap")
     if type(resources["max_input_tokens"]) is not int or resources["max_input_tokens"] <= 0 or resources["http_request_timeout_seconds"] != 600 or resources["token_overrun_policy"] != "settle-known-v1":
         raise ValueError("Invalid frozen solver input, timeout or settlement contract")
     if not isinstance(spec["pilot_cap_usd"], str) or money(spec["pilot_cap_usd"]) <= 0 or money(spec["pilot_cap_usd"]) > PILOT_CAP_USD:
         raise ValueError("Pilot cap must be a positive frozen amount within the independent pilot ceiling")
+    if not isinstance(resources["run_cost_limit_usd"], str) or money(resources["run_cost_limit_usd"]) <= 0 or money(resources["run_cost_limit_usd"]) > RUN_CAP_USD:
+        raise ValueError("Frozen per-run resource cap must stay within the per-run ceiling")
     if len(tasks["tuning"]) != 18 or len(tasks["final"]) != 32:
         raise ValueError("Retain all 18 tuning and 32 final tasks; do not shrink the panel")
     if spec["classifier_fee_fraction"] != str(CLASSIFIER_FEE_FRACTION):
@@ -352,7 +355,7 @@ def router_panel(modules):
 
 def panel_inputs(panel_out, kind, modules, spec):
     if kind != "router":
-        raise ValueError("Version4 requires the preregistered router panel and exact frozen split")
+        raise ValueError("Version5 requires the preregistered router panel and exact frozen split")
     module, panel_driver = router_panel(modules)
     panel_spec = module.frozen_spec(panel_out)
     panel, private = module.check_panel(panel_driver, panel_out, panel_spec)
@@ -442,7 +445,7 @@ def freeze_inputs(panel_out, kind, directory, spec, modules):
     with CAMPAIGN.readonly(spec["campaign_ledger"]) as db:
         campaign = CAMPAIGN.metadata(db)
         authorization = CAMPAIGN.effective_authorization(db, spec["prospective_grant_id"])
-    approval = {"authorized": True, "action": "freeze-router-study-v4", "prospective_grant_id": spec["prospective_grant_id"], "prospective_grant_approval_sha256": authorization["approval_sha256"], "effective_authorization": CAMPAIGN.authorization_summary(authorization), "spec_sha256": digest(spec), "source_sha256": sources(directory), "snapshot_file_sha256": {key: hashlib.sha256(value).hexdigest() for key, value in raw.items()}, "account_policy_sha256": file_hash(spec["account_policy"]), "candidate_fingerprints": fingerprints, "variant_catalog_sha256": file_hash(spec["variant_catalog"]), "classifier_model": classifiers.pop(), "model_variants": [list(pair) for pair in sorted(pairs)], "mode_pools": {mode: [list(pair) for pair in pools[mode]] for mode in MODES}, "arms": plan["arms"], "execution_plan_sha256": digest(plan), "execution_identity": execution, "campaign_metadata": campaign, **bindings}
+    approval = {"authorized": True, "action": "freeze-router-study-v5", "prospective_grant_id": spec["prospective_grant_id"], "prospective_grant_approval_sha256": authorization["approval_sha256"], "effective_authorization": CAMPAIGN.authorization_summary(authorization), "spec_sha256": digest(spec), "source_sha256": sources(directory), "snapshot_file_sha256": {key: hashlib.sha256(value).hexdigest() for key, value in raw.items()}, "account_policy_sha256": file_hash(spec["account_policy"]), "candidate_fingerprints": fingerprints, "variant_catalog_sha256": file_hash(spec["variant_catalog"]), "classifier_model": classifiers.pop(), "model_variants": [list(pair) for pair in sorted(pairs)], "mode_pools": {mode: [list(pair) for pair in pools[mode]] for mode in MODES}, "arms": plan["arms"], "execution_plan_sha256": digest(plan), "execution_identity": execution, "campaign_metadata": campaign, **bindings}
     return approval, plan
 
 
@@ -671,13 +674,20 @@ def verified_classifier_attempts(execution):
 
 
 def build_financing(manifest, plan, pricing, classifier, cfg):
-    """Per-row envelope = min(resource cap, proved call-count envelope)."""
+    """Whole-plan cost forecast. Per-row envelope = min(resource cap, proved bound).
+
+    The forecast prices every mandatory row. It guarantees no funding. Its
+    total may exceed the cumulative allowance and its pilot total may exceed
+    the pilot cap. Dispatch reserves each request against the nested caps.
+    """
     spec = manifest["spec"]
     fee = Decimal(spec["classifier_fee_fraction"])
     run_cap = money(cfg["run_cost_limit_usd"])
+    if run_cap <= 0 or run_cap > RUN_CAP_USD:
+        raise ValueError("Cost forecast per-run resource cap must stay within the per-run ceiling")
     steps = cfg["step_limit"]
     if type(steps) is not int or steps <= 0:
-        raise ValueError("Financing requires a proved positive solver/classifier call-count bound")
+        raise ValueError("Cost forecast requires a proved positive solver/classifier call-count bound")
     classifier_attempts = verified_classifier_attempts(manifest["approval"].get("execution_identity", {}))
     by_pair = {(row["model"], row["effort"]): row for row in pricing["models"]}
     unavailable = {(row["model"], row["effort"]) for row in pricing.get("unavailable_pairs", [])}
@@ -691,7 +701,7 @@ def build_financing(manifest, plan, pricing, classifier, cfg):
         if row["arm_kind"] == "router":
             reachable = [solver_bound[pair] for pair in pools[row["router"]] if pair in solver_bound]
             if not reachable:
-                raise ValueError("Router arm has no quoted reachable solver pair to finance")
+                raise ValueError("Router arm has no quoted reachable solver pair to forecast")
             if classifier_attempts is None:
                 proved = run_cap
                 basis = {"solver_calls_max": steps, "classifier_attempts_max": None, "bound": "unchanged run money cap; classifier call count is not proved for both executables"}
@@ -701,18 +711,16 @@ def build_financing(manifest, plan, pricing, classifier, cfg):
         else:
             pair = (row["model"], row["variant"])
             if pair in unavailable or pair not in solver_bound:
-                raise ValueError(f"Mandatory {row['arm_kind']} arm pair has no proved quote and cannot be financed: {pair}")
+                raise ValueError(f"Mandatory {row['arm_kind']} arm pair has no proved quote and cannot be forecast: {pair}")
             proved = steps * solver_bound[pair]
             basis = {"solver_calls_max": steps, "classifier_attempts_max": 0, "solver_attempt_bound_usd": str(solver_bound[pair]), "classifier_attempt_bound_usd": "0", "model": pair[0], "variant": pair[1]}
         envelope = min(run_cap, proved)
         rows.append({"run": row["run"], "phase": row["phase"], "arm_id": row["arm_id"], "arm_kind": row["arm_kind"], "router": row["router"], "envelope_usd": str(envelope), "proved_envelope_usd": str(proved), "resource_cap_usd": str(run_cap), "basis": basis})
     pilot_total = sum((money(row["envelope_usd"]) for row in rows if row["phase"] == "pilot"), Decimal(0))
     pilot_cap = money(spec["pilot_cap_usd"])
-    if pilot_total > pilot_cap:
-        raise ValueError(f"Pilot no-go: proved pilot envelopes total {pilot_total}USD above the frozen pilot cap {pilot_cap}USD; do not dispatch or shrink resources")
     with CAMPAIGN.readonly(spec["campaign_ledger"]) as db:
         authorization = CAMPAIGN.effective_authorization(db, spec["prospective_grant_id"])
-    return {"schema": CAMPAIGN.FINANCING_SCHEMA, "manifest_sha256": digest(manifest), "execution_plan_sha256": digest(plan), "authorization": CAMPAIGN.authorization_summary(authorization), "pricing_sha256": digest(pricing), "classifier_quote_sha256": digest(classifier), "resources": {key: cfg[key] for key in ("step_limit", "wall_seconds", "action_timeout_seconds", "max_output_tokens", "max_input_tokens", "run_cost_limit_usd") if key in cfg}, "call_count_bound_source": {"solver": "clean pinned mini-SWE-agent DefaultAgent.query increments n_calls before each query, including format errors", "classifier": "one classification per decision, at most two HTTP attempts for supported source hashes; otherwise retain the full run cap", "supported_classifier_sources": CLASSIFIER_BOUND_SOURCES}, "pilot_cap_usd": str(pilot_cap), "pilot_envelope_usd": str(pilot_total), "total_envelope_usd": str(sum((money(row["envelope_usd"]) for row in rows), Decimal(0))), "rows": rows}
+    return {"schema": CAMPAIGN.FINANCING_SCHEMA, "forecast_only": True, "funding_guarantee": "none; capped exploration may stop inconclusive", "manifest_sha256": digest(manifest), "execution_plan_sha256": digest(plan), "authorization": CAMPAIGN.authorization_summary(authorization), "pricing_sha256": digest(pricing), "classifier_quote_sha256": digest(classifier), "resources": {key: cfg[key] for key in ("step_limit", "wall_seconds", "action_timeout_seconds", "max_output_tokens", "max_input_tokens", "run_cost_limit_usd") if key in cfg}, "call_count_bound_source": {"solver": "clean pinned mini-SWE-agent DefaultAgent.query increments n_calls before each query, including format errors", "classifier": "one classification per decision, at most two HTTP attempts for supported source hashes; otherwise retain the full run cap", "supported_classifier_sources": CLASSIFIER_BOUND_SOURCES}, "pilot_cap_usd": str(pilot_cap), "pilot_envelope_usd": str(pilot_total), "total_envelope_usd": str(sum((money(row["envelope_usd"]) for row in rows), Decimal(0))), "rows": rows}
 
 
 def financing_path(out, batch):
@@ -733,7 +741,7 @@ def finance_plan(out, panel_out, directory, modules, batch):
                 result = CAMPAIGN.register_financing(db, financing)
                 if destination.is_file():
                     if load(destination) != financing:
-                        raise ValueError("Frozen financing file differs from the registered financing")
+                        raise ValueError("Frozen cost forecast file differs from the registered forecast")
                 else:
                     frozen_write(destination, financing)
                 db.execute("COMMIT")
@@ -747,15 +755,13 @@ def finance_plan(out, panel_out, directory, modules, batch):
 def load_financing(out, batch, manifest):
     path = financing_path(out, batch)
     if not path.is_file():
-        raise ValueError("Whole-plan financing must be registered before any paid dispatch; run finance first")
+        raise ValueError("Whole-plan cost forecast must be registered before any paid dispatch; run finance first")
     financing = load(path)
     if financing.get("manifest_sha256") != digest(manifest):
-        raise ValueError("Financing belongs to another frozen manifest")
+        raise ValueError("Cost forecast belongs to another frozen manifest")
     with CAMPAIGN.readonly(campaign_path(out)) as db:
         if CAMPAIGN.financing_for(db, digest(financing)) != financing:
-            raise ValueError("Financing is not the registered hash-bound financing manifest")
-        if not CAMPAIGN.check_financing_fits(db)["fits"]:
-            raise ValueError("Whole-plan financing no longer fits the effective authorization")
+            raise ValueError("Cost forecast is not the registered hash-bound forecast")
     return financing
 
 
@@ -920,31 +926,17 @@ class Budget:
             return money(authorization["effective_ceiling_usd"])
         return CAP if phase == "final" else CAP - self.final_reserve
 
-    def pilot_committed(self, db, request_rows, extra_run=None, extra_envelope=Decimal(0), pending=None):
+    def pilot_committed(self, db, request_rows, pending=None):
+        """Incurred pilot commitments only: settled plus held pilot requests.
+
+        Forecast envelopes, unused active-run remainders and unattempted
+        pilot rows never count. `pending` adds the next pilot reservation.
+        """
         phases = dict(db.execute("SELECT run,phase FROM router_runs"))
-        if extra_run is not None:
-            phases[extra_run] = "pilot"
         held = sum((CAMPAIGN.held(row) for row in request_rows if phases.get(row["run"]) == "pilot"), Decimal(0))
         if pending is not None and phases.get(pending[0]) == "pilot":
             held += money(pending[1])
-        remaining = Decimal(0)
-        for run, maximum in db.execute("SELECT a.run,a.maximum_usd FROM campaign_admissions a JOIN router_runs r USING(run) WHERE r.state='active' AND r.phase='pilot'"):
-            own = sum((CAMPAIGN.held(row) for row in request_rows if row["run"] == run), Decimal(0))
-            if pending is not None and pending[0] == run:
-                own += money(pending[1])
-            remaining += max(Decimal(0), money(maximum) - own)
-        if extra_run is not None:
-            remaining += extra_envelope
-        unattempted = Decimal(0)
-        if CAMPAIGN._table(db, "campaign_financing_rows"):
-            admitted = {row[0] for row in db.execute("SELECT run FROM campaign_admissions")}
-            if extra_run is not None:
-                admitted.add(extra_run)
-            pilot_rows = {}
-            for run, envelope in db.execute("SELECT run,envelope_usd FROM campaign_financing_rows WHERE phase='pilot'"):
-                pilot_rows[run] = max(pilot_rows.get(run, Decimal(0)), money(envelope))
-            unattempted = sum((envelope for run, envelope in pilot_rows.items() if run not in admitted), Decimal(0))
-        return held + remaining + unattempted
+        return held
 
     def claim(self, row, manifest, cfg):
         with self.connect() as db:
@@ -965,28 +957,21 @@ class Budget:
                 reason = "recorded_stop"
             if reason is None and any(item["state"] not in {"settled", "reserved"} and not accounted_row_valid(db, item) and not CAMPAIGN.historical_commitment(db, item) for item in rows):
                 reason = "unknown_charge_stop"
-            envelope = None
             if grant is not None:
                 if self.financing is None or row["run"] not in self.financing_envelopes:
                     db.execute("COMMIT")
-                    return "whole_plan_not_financed"
+                    return "cost_forecast_missing"
                 CAMPAIGN.require_current_financing(db, self.financing_sha)
-                envelope = self.financing_envelopes[row["run"]]
-                if not CAMPAIGN.check_financing_fits(db)["fits"]:
-                    db.execute("COMMIT")
-                    return "whole_plan_financing_exceeded"
-                if phase == "pilot" and self.pilot_committed(db, rows, extra_run=row["run"], extra_envelope=envelope) > self.pilot_cap:
+                if phase == "pilot" and self.pilot_committed(db, rows) >= self.pilot_cap:
                     db.execute("COMMIT")
                     return "pilot_cap_pre_admission"
+            # A claim records the per-run cap as identity only. It reserves no
+            # money. Each request reserves its own bound before dispatch.
             committed = sum((CAMPAIGN.held(item) for item in rows), Decimal(0))
-            for run, maximum in db.execute("SELECT a.run,a.maximum_usd FROM campaign_admissions a JOIN router_runs r USING(run) WHERE r.state='active'"):
-                own = sum((CAMPAIGN.held(item) for item in rows if item["run"] == run), Decimal(0))
-                committed += max(Decimal(0), money(maximum) - own)
-            if grant is not None:
-                liability = CAMPAIGN.plan_liability(db)
-                committed = max(committed, liability["total_liability_usd"] - self.financing_envelopes[row["run"]])
-            maximum = envelope if envelope is not None else money(cfg["run_cost_limit_usd"])
-            if reason is None and committed + maximum > self.allowance(phase, db):
+            maximum = min(money(cfg["run_cost_limit_usd"]), RUN_CAP_USD) if grant is not None else money(cfg["run_cost_limit_usd"])
+            if maximum <= 0:
+                raise ValueError("Per-run cost cap must be positive")
+            if reason is None and committed >= self.allowance(phase, db):
                 reason = "global_budget_pre_admission"
             if reason is not None:
                 db.execute("COMMIT")
@@ -998,7 +983,7 @@ class Budget:
                 snapshot_id = row["configuration"] if row["version"] == "candidate" else manifest["spec"]["configurations"][0]["id"]
                 snapshot = load(Path(manifest["out_root"]) / "snapshots" / f"{snapshot_id}.json")
                 executable = manifest["approval"]["execution_identity"][row["version"]]["executableSha256"]
-                # Keep the pre-v4 router fingerprint bytes: attempt identity must not move.
+                # Keep the frozen router fingerprint bytes: attempt identity must not move.
                 fingerprint = digest({"router": row["router"], "executableSha256": executable, "config": snapshot[row["version"]]})
             else:
                 catalog = load(Path(manifest["out_root"]) / "variant-catalog.json")
@@ -1049,28 +1034,21 @@ class Budget:
                     caps.append("phase_money_reservation")
                 if held + bound > CAP:
                     caps.append("aggregate_money_reservation")
-                envelopes = held + bound
-                for admitted_run, maximum in db.execute("SELECT a.run,a.maximum_usd FROM campaign_admissions a JOIN router_runs r USING(run) WHERE r.state='active'"):
-                    own = sum((CAMPAIGN.held(row) for row in rows if row["run"] == admitted_run), Decimal(0))
-                    if admitted_run == run:
-                        own += bound
-                    envelopes += max(Decimal(0), money(maximum) - own)
-                if envelopes > self.allowance(phase, db):
-                    caps.append("admitted_envelope_reservation")
                 if self.grant is not None:
-                    if run not in self.financing_envelopes or CAMPAIGN.plan_liability(db, pending=(run, bound))["total_liability_usd"] > self.allowance(phase, db):
-                        caps.append("whole_plan_financing_reservation")
-                    if run in self.financing_envelopes and run_held + bound > self.financing_envelopes[run]:
-                        caps.append("financed_envelope_reservation")
+                    if run not in self.financing_envelopes:
+                        caps.append("cost_forecast_reservation")
+                    if CAMPAIGN.plan_liability(db, pending=(run, bound))["total_liability_usd"] > self.allowance(phase, db):
+                        caps.append("phase_money_reservation")
                     if phase == "pilot" and self.pilot_committed(db, rows, pending=(run, bound)) > self.pilot_cap:
                         caps.append("pilot_cap_reservation")
-                if run_held + bound > money(cfg["run_cost_limit_usd"]):
+                run_cap = min(money(cfg["run_cost_limit_usd"]), RUN_CAP_USD) if self.grant is not None else money(cfg["run_cost_limit_usd"])
+                if run_held + bound > run_cap:
                     caps.append("run_money_reservation")
                 if tokens + token_bound > cfg["run_token_limit"]:
                     caps.append("run_token_reservation")
                 if caps:
                     diagnostics = {"caps": caps, "settled_plus_held_usd": str(held), "run_settled_plus_held_usd": str(run_held), "next_money_bound_usd": str(bound), "kind": kind}
-                    if {"phase_money_reservation", "aggregate_money_reservation", "admitted_envelope_reservation", "whole_plan_financing_reservation", "financed_envelope_reservation", "pilot_cap_reservation"} & set(caps):
+                    if {"phase_money_reservation", "aggregate_money_reservation", "cost_forecast_reservation", "pilot_cap_reservation"} & set(caps):
                         raise self.limited(out, run, "BudgetLimited: reservation exceeds a frozen global cap", diagnostics)
                     raise study.BudgetLimited("BudgetLimited: reservation exceeds a frozen run cap", diagnostics)
                 request_id = uuid.uuid4().hex
@@ -1147,20 +1125,6 @@ class Budget:
         return {"orphaned_requests": orphans, "interrupted_runs": interrupted}
 
 
-def classifier_bill(body, fee_fraction, context):
-    usage = body.get("usage") if isinstance(body, dict) else None
-    if not isinstance(usage, dict):
-        raise ValueError("Unknown classifier charge")
-    cost = money(usage.get("cost"))
-    if usage.get("is_byok") is True:
-        upstream = money((usage.get("cost_details") or {}).get("upstream_inference_cost"))
-        if cost > upstream * fee_fraction:
-            raise ValueError("Classifier BYOK fee exceeds its reserved allowance")
-        cost += upstream
-    counts = (usage.get("input_tokens"), usage.get("output_tokens"))
-    if any(type(value) is not int or value < 0 for value in counts) or counts[0] > context:
-        raise ValueError("Classifier token usage is unknown or beyond the financed context")
-    return cost, sum(counts)
 
 
 class ClassifierBroker:
@@ -1221,6 +1185,7 @@ class ClassifierBroker:
         receipt = {"local_request_id": request_id, "run": run, "kind": "classifier", "input_token_bound": context, "reservation_usd": str(bound), "request_sha256": hashlib.sha256(raw).hexdigest(), "request": payload, "classifier_quote_sha256": digest(self.classifier), "dispatch_entered": False, "started_at": time.time()}
         study.save(receipt_path, receipt)
         actual = None
+        known_floor, fee_breach = Decimal(0), False
         try:
             remaining = min(600, deadline - time.monotonic())
             if remaining <= 0:
@@ -1246,7 +1211,18 @@ class ClassifierBroker:
                 receipt.update(http_status=response.status_code, response_sha256=hashlib.sha256(body).hexdigest())
                 parsed = json.loads(body)
                 receipt["response"] = parsed
-                actual, tokens = classifier_bill(parsed, money(self.classifier["fee_fraction"]), context)
+                usage = parsed.get("usage") if isinstance(parsed, dict) else None
+                if not isinstance(usage, dict):
+                    raise ValueError("Unknown classifier charge")
+                evidence = study.charge_evidence(usage, money(self.classifier["fee_fraction"]))
+                known_floor, fee_breach = evidence.known_floor, evidence.fee_breach
+                actual = evidence.actual if evidence.complete else None
+                if not evidence.complete or fee_breach:
+                    raise ValueError("Incomplete or ambiguous classifier billing evidence")
+                counts = (usage.get("input_tokens"), usage.get("output_tokens"))
+                if any(type(value) is not int or value < 0 for value in counts) or counts[0] > context:
+                    raise ValueError("Classifier token usage is unknown or beyond the quoted context")
+                tokens = sum(counts)
                 if actual > bound:
                     raise ValueError("Classifier charge exceeds its full-context reservation")
                 self.budget.settle(request_id, "settled", bound, actual, tokens)
@@ -1263,8 +1239,8 @@ class ClassifierBroker:
                 raise
             dispatched = receipt["dispatch_entered"]
             if dispatched:
-                state = "breach" if actual is not None and actual > bound or "exceeds" in str(error) or "beyond" in str(error) else "unknown"
-                self.budget.settle(request_id, state, max(bound, actual or Decimal(0)), actual, None, auto_account=self.budget.auto_run is not None, receipt=receipt)
+                state = "breach" if fee_breach or known_floor > bound or actual is not None and actual > bound or "exceeds" in str(error) or "beyond" in str(error) else "unknown"
+                self.budget.settle(request_id, state, max(bound, known_floor, actual or Decimal(0)), actual, None, auto_account=self.budget.auto_run is not None, receipt=receipt)
             else:
                 self.budget.settle(request_id, "settled", Decimal(0), Decimal(0), 0)
             receipt.update(status=state if dispatched else "not_dispatched", error_type=type(error).__name__, finished_at=time.time())
@@ -1492,15 +1468,15 @@ def run_approval(out, manifest, plan, phase, batch, runs, pricing, classifier, r
     if execution != manifest["approval"]["execution_identity"] or runtime_command != execution["serving_argv"]:
         raise ValueError("Runtime argv must equal the fixed approved prepared-execution serving command")
     if financing is None:
-        raise ValueError("Run approval must bind the registered whole-plan financing manifest")
+        raise ValueError("Run approval must bind the registered whole-plan cost forecast")
     if financing.get("manifest_sha256") != digest(manifest) or financing.get("pricing_sha256") != digest(pricing) or financing.get("classifier_quote_sha256") != digest(classifier):
-        raise ValueError("Financing must bind this exact manifest and quote batch")
+        raise ValueError("Cost forecast must bind this exact manifest and quote batch")
     authorization = authorization if authorization is not None else manifest["approval"]["effective_authorization"]
     if financing.get("authorization") != authorization:
-        raise ValueError("Financing and run approval must bind the same effective authorization")
+        raise ValueError("Cost forecast and run approval must bind the same effective authorization")
     # This template grants nothing by itself: execute() re-reads the ledger,
-    # the registered financing and the effective authorization before dispatch.
-    required = {"authorized": True, "action": "run-router-study-v4", "prospective_grant_id": manifest["spec"]["prospective_grant_id"], "prospective_grant_approval_sha256": manifest["approval"]["prospective_grant_approval_sha256"], "effective_authorization": authorization, "financing_sha256": digest(financing), "manifest_sha256": digest(manifest), "execution_plan_sha256": digest(plan), "source_sha256": manifest["approval"]["source_sha256"], "execution_identity": execution, "phase": phase, "batch": batch, "runs": runs, "pricing_sha256": digest(pricing), "classifier_quote_sha256": digest(classifier), "runtime_command": runtime_command, "pilot_cap_usd": manifest["spec"]["pilot_cap_usd"], "unknown_charge_policy": "stop-all-dispatch-hold-full-bound"}
+    # the registered cost forecast and the effective authorization before dispatch.
+    required = {"authorized": True, "action": "run-router-study-v5", "prospective_grant_id": manifest["spec"]["prospective_grant_id"], "prospective_grant_approval_sha256": manifest["approval"]["prospective_grant_approval_sha256"], "effective_authorization": authorization, "cost_forecast_sha256": digest(financing), "manifest_sha256": digest(manifest), "execution_plan_sha256": digest(plan), "source_sha256": manifest["approval"]["source_sha256"], "execution_identity": execution, "phase": phase, "batch": batch, "runs": runs, "pricing_sha256": digest(pricing), "classifier_quote_sha256": digest(classifier), "runtime_command": runtime_command, "pilot_cap_usd": manifest["spec"]["pilot_cap_usd"], "unknown_charge_policy": "stop-all-dispatch-hold-full-bound"}
     required["concurrency"] = concurrency
     required["unavailable_pairs_sha256"] = digest(pricing["unavailable_pairs"])
     if auto_account_unknown is not False:
@@ -1667,7 +1643,7 @@ def execute(out, panel_out, directory, modules, batch, phase, approval, runtime_
     with CAMPAIGN.readonly(campaign_path(out)) as db:
         authorization = CAMPAIGN.authorization_summary(CAMPAIGN.effective_authorization(db, manifest["spec"]["prospective_grant_id"]))
     if approval != run_approval(out, manifest, plan, phase, batch, approval.get("runs"), pricing, classifier, runtime_command, concurrency, auto_account_unknown, financing=financing, authorization=authorization):
-        raise ValueError("Exact parent approval for frozen phase, runs, quotes, financing, authorization, runtime, source, concurrency and caps is required")
+        raise ValueError("Exact parent approval for frozen phase, runs, quotes, cost forecast, authorization, runtime, source, concurrency and caps is required")
     if not os.environ.get("OPENROUTER_API_KEY"):
         raise ValueError("A host-only OPENROUTER_API_KEY is required")
     if isinstance(lease_deadline, bool) or not math.isfinite(lease_deadline):
@@ -1789,7 +1765,7 @@ def outcome(out, row, bills, kinds, accounted_ids=(), task=None):
     result = load(result_path)
     evaluation = load(evaluation_path) if evaluation_path.is_file() else {}
     status = result.get("status")
-    global_caps = {"recorded_stop", "unknown_charge_stop", "dispatch_stop", "never_retry", "global_candidate_cap", "phase_money_reservation", "aggregate_money_reservation", "admitted_envelope_reservation", "whole_plan_financing_reservation", "financed_envelope_reservation", "pilot_cap_reservation"}
+    global_caps = {"recorded_stop", "unknown_charge_stop", "dispatch_stop", "never_retry", "global_candidate_cap", "phase_money_reservation", "aggregate_money_reservation", "admitted_envelope_reservation", "whole_plan_financing_reservation", "financed_envelope_reservation", "cost_forecast_reservation", "pilot_cap_reservation"}
     caps = list((result.get("resources") or {}).get("caps_fired", []))
     caps += [cap for path in (Path(out) / "resource-limits" / row["run"]).glob("*.json") for cap in load(path).get("caps", [])]
     if status == "budget_limited" and global_caps.intersection(caps):
@@ -1925,7 +1901,7 @@ def analyze(out, manifest, plan, phase, modules):
         configurations = sorted({row["configuration"] for row in mode_rows})
         arms_report[router] = {configuration: arm_stats(mode_rows, outcomes, configuration, count, charges) for configuration in configurations}
         objective = spec["objectives"][router]
-        comparisons[router] = {comparator: compare(mode_rows, outcomes, candidate_ids[router], comparator, count, charges, mode=router, objective=objective, expected_keys=expected_keys) for comparator in configurations if comparator != candidate_ids[router]}
+        comparisons[router] = {comparator: compare(mode_rows, outcomes, candidate_ids[router], comparator, count, charges, mode=router, objective=objective, expected_keys=expected_keys) for comparator in configurations if comparator != candidate_ids[router]} if phase == "final" else {}
         fixed_ids = [row["configuration"] for row in mode_rows if row.get("arm_kind") == "fixed"]
         fixed_ids = sorted(set(fixed_ids))
         superiority[router] = {"per_fixed_model": {fixed: comparisons[router][fixed]["passes"] for fixed in fixed_ids}, "superior_to_every_fixed_model": bool(fixed_ids) and all(comparisons[router][fixed]["passes"] for fixed in fixed_ids), "not_established_for": [fixed for fixed in fixed_ids if not comparisons[router][fixed]["passes"]]}
@@ -1935,17 +1911,23 @@ def analyze(out, manifest, plan, phase, modules):
             complete_arms = control["valid"] == control["planned"] == count and reference["valid"] == reference["planned"] == count and not control["uncertain_runs"] and not reference["uncertain_runs"] and money(control["cost_lower"]) == money(control["cost_upper"]) and money(reference["cost_lower"]) == money(reference["cost_upper"])
             matched = complete_arms and money(control["cost_upper"]) <= money(reference["cost_lower"]) * (1 + tolerance) and money(control["cost_lower"]) >= money(reference["cost_upper"]) * (1 - tolerance)
             cost_matching[router] = {"criterion": spec["control"]["cost_matching"], "control_cost_lower_usd": control["cost_lower"], "control_cost_upper_usd": control["cost_upper"], "reference_cost_lower_usd": reference["cost_lower"], "reference_cost_upper_usd": reference["cost_upper"], "cost_matched": bool(matched), "claim_allowed": bool(matched and not stops and not invalid)}
-    if stops:
+    plan_complete = not invalid and not stops and all(stats["valid"] == stats["planned"] for mode_arms in arms_report.values() for stats in mode_arms.values()) and all(value["complete"] for values in comparisons.values() for value in values.values())
+    if not plan_complete:
         for values in comparisons.values():
             for value in values.values():
-                value.update(complete=False, passes=False)
+                value.update(complete=False, passes=False, strictly_higher_pass_rate=False, strictly_lower_total_cost=False)
+                value["objective_checks"] = {key: False for key in value["objective_checks"]}
+                value["diagnostic_strict_dominance"] = {key: False for key in value["diagnostic_strict_dominance"]}
         for value in superiority.values():
             value["superior_to_every_fixed_model"] = False
+            value["per_fixed_model"] = {key: False for key in value["per_fixed_model"]}
+            value["not_established_for"] = sorted(value["per_fixed_model"])
         for value in cost_matching.values():
             value.update(cost_matched=False, claim_allowed=False)
-    report = {"version": 3, "phase": phase, "manifest_sha256": digest(manifest), "missing_or_invalid": invalid, "recorded_stops": stops, "campaign_settled_plus_held_usd": str(sum((CAMPAIGN.held(row) for row in ledger), Decimal(0))), "phase_all_arm_cost_lower_usd": str(sum((value["cost_lower"] for value in charges.values()), Decimal(0))), "phase_all_arm_cost_upper_usd": str(sum((value["cost_upper"] for value in charges.values()), Decimal(0))), "arms": arms_report, "comparisons": comparisons, "fixed_model_superiority": superiority, "control_cost_matching": cost_matching, "provider_unavailable_runs": providers, "generalization_claim": False, "denominator_note": "Repetitions are repeated observations of the same frozen tasks, not independent tasks; no generalization or statistical-power claim is made.", "outcome_rule": "Full frozen task x arm x repetition denominator for every mandatory arm. Provider unavailability is an arm failure. Audited ambiguous transport has quality interval [0,1]. Infrastructure/grader failures and incomplete grades block completeness. Undispatched rows are missing, never failures.", "cost_rule": "Every arm charge is retained even for invalid outcomes, including failed attempts and full unknown holds. Objectives are the preregistered per-mode rules; strict-both-better is diagnostic only."}
+    claims_allowed = phase == "final" and plan_complete
+    report = {"version": 4, "phase": phase, "manifest_sha256": digest(manifest), "missing_or_invalid": invalid, "recorded_stops": stops, "campaign_settled_plus_held_usd": str(sum((CAMPAIGN.held(row) for row in ledger), Decimal(0))), "phase_all_arm_cost_lower_usd": str(sum((value["cost_lower"] for value in charges.values()), Decimal(0))), "phase_all_arm_cost_upper_usd": str(sum((value["cost_upper"] for value in charges.values()), Decimal(0))), "arms": arms_report, "comparisons": comparisons, "fixed_model_superiority": superiority, "control_cost_matching": cost_matching, "provider_unavailable_runs": providers, "generalization_claim": False, "plan_complete": plan_complete, "conclusion": "complete" if plan_complete else "inconclusive", "inconclusive": not plan_complete, "can_establish_pass": claims_allowed, "can_establish_superiority": claims_allowed, "can_establish_cost_matching": claims_allowed, "denominator_note": "Repetitions are repeated observations of the same frozen tasks, not independent tasks; no generalization or statistical-power claim is made.", "outcome_rule": "Full frozen task x arm x repetition denominator for every mandatory arm. Provider unavailability is an arm failure. Audited ambiguous transport has quality interval [0,1]. Infrastructure/grader failures and incomplete grades block completeness. Undispatched rows are missing, never failures. A budget stop or any partial plan is inconclusive and cannot establish a pass, superiority or cost matching from a favorable prefix.", "cost_rule": "Every arm charge is retained even for invalid outcomes, including failed attempts and full unknown holds. Objectives are the preregistered per-mode rules; strict-both-better is diagnostic only."}
     if phase == "final":
-        report["both_modes_pass"] = not invalid and not stops and all(comparisons[mode]["baseline"]["passes"] and comparisons[mode]["baseline"]["complete"] for mode in MODES) and all(stats["valid"] == stats["planned"] for mode_arms in arms_report.values() for stats in mode_arms.values())
+        report["both_modes_pass"] = plan_complete and all(comparisons[mode]["baseline"]["passes"] and comparisons[mode]["baseline"]["complete"] for mode in MODES)
     modules["study"].save(out / f"{phase}-analysis.json", report)
     return report
 
@@ -1988,8 +1970,6 @@ def validate_pilot_evidence(out, manifest, plan, evidence_path):
     with CAMPAIGN.readonly(campaign_path(out)) as db:
         ledger = CAMPAIGN.rows(db)
         kinds = dict(db.execute("SELECT id,kind FROM router_requests"))
-        if active_stops(db):
-            raise ValueError("A recorded stop blocks successful pilot evidence")
         tasks = {task["instance_id"]: task for task in load(Path(manifest["panel_root"]) / "evaluator" / "tasks.json")}
         for row in pilot:
             bills = [bill for bill in ledger if bill["run"] == row["run"]]
@@ -2012,10 +1992,12 @@ def validate_pilot_evidence(out, manifest, plan, evidence_path):
 def select_final(out, manifest, plan, approval, modules, pilot_evidence):
     evidence = validate_pilot_evidence(out, manifest, plan, pilot_evidence)
     configurations = {item["router"]: item["id"] for item in manifest["spec"]["configurations"]}
-    required = {"authorized": True, "action": "select-final-router-study-v4", "manifest_sha256": digest(manifest), "prospective_grant_id": manifest["spec"]["prospective_grant_id"], "pilot_evidence_sha256": digest(evidence), "pilot_evidence_file_sha256": file_hash(pilot_evidence), "configurations": configurations}
+    required = {"authorized": True, "action": "select-final-router-study-v5", "manifest_sha256": digest(manifest), "prospective_grant_id": manifest["spec"]["prospective_grant_id"], "pilot_evidence_sha256": digest(evidence), "pilot_evidence_file_sha256": file_hash(pilot_evidence), "configurations": configurations}
     if approval != required:
         raise ValueError("Exact parent final approval bound to the successful baseline protocol pilot required")
     with CAMPAIGN.readonly(campaign_path(out)) as db:
+        if active_stops(db):
+            raise ValueError("A recorded stop blocks final selection")
         if db.execute("SELECT 1 FROM campaign_admissions a JOIN router_runs r USING(run) WHERE a.manifest_sha256=? AND r.phase='final'", (digest(manifest),)).fetchone():
             raise ValueError("Final selection must precede every final attempt in this manifest")
     destination = Path(out) / "pilot-evidence.json"

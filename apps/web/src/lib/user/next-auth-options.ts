@@ -1090,11 +1090,23 @@ export const authOptions: NextAuthOptions = {
         accountInfo = createAccountInfo(account, user, profile);
         if (account.provider === 'claude') {
           const claims = claudeVerifiedEmailSchema.safeParse(profile);
-          if (
-            !claims.success ||
-            claims.data.email !== accountInfo.google_user_email ||
-            !(await isClaudePlatformOAuthEnabled(claims.data.email))
-          ) {
+          if (!claims.success) {
+            console.warn('[claude-auth] authorization refused', {
+              reason: 'invalid_profile_claims',
+              claimNames: Object.keys(profile ?? {}).filter(
+                key =>
+                  key === 'sub' || key === 'email' || key === 'email_verified' || key === 'name'
+              ),
+              rejectedClaims: claims.error.issues.map(issue => issue.path.map(String).join('.')),
+            });
+            return redirectUrlForCode('UNKNOWN-ERROR');
+          }
+          if (claims.data.email !== accountInfo.google_user_email) {
+            console.warn('[claude-auth] authorization refused', { reason: 'email_mismatch' });
+            return redirectUrlForCode('UNKNOWN-ERROR');
+          }
+          if (!(await isClaudePlatformOAuthEnabled(claims.data.email))) {
+            console.warn('[claude-auth] authorization refused', { reason: 'release_denied' });
             return redirectUrlForCode('UNKNOWN-ERROR');
           }
         }

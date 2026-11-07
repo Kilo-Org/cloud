@@ -199,6 +199,7 @@ Sign-in checks the validated provider email only when `email_verified` is boolea
 Account linking and billing approval routes also check the authenticated person's current database email.
 Gateway requests check the authenticated requester's database email, including organization-scoped requests, after the authoritative payer lookup.
 Missing email or failed evaluation denies access; there is no development bypass.
+Claude authentication refusals log a fixed reason and allowlisted claim names, never identity values or tokens.
 Anonymous visitors can discover Claude through the existing email-first flow without an identified browser PostHog person.
 The submitted discovery email controls offered methods only; the callback independently authorizes the verified provider email.
 The shared server PostHog client deliberately returns no flags outside production, so enabled local server paths require test fixtures.

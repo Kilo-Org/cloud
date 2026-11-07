@@ -2293,6 +2293,7 @@
       "emptyDescription": "Aloita lähettämällä viesti alla olevasta kentästä.",
       "scrollToBottom": "Vieritä alareunaan",
       "emptyTitle": "Ei vielä viestejä",
+      "emptyReadOnlyTitle": "Tässä istunnossa ei ole viestejä",
       "renameAccessibility": "Nimeä istunto uudelleen: {{title}}",
       "cloningSession": "Kloonataan istuntoa",
       "couldNotLoadThisSession": "Tätä istuntoa ei voitu ladata",

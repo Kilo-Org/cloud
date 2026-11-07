@@ -2377,6 +2377,7 @@
       "emptyDescription": "Адпраўце паведамленне ніжэй, каб пачаць.",
       "scrollToBottom": "Пракруціць уніз",
       "emptyTitle": "Паведамленняў яшчэ няма",
+      "emptyReadOnlyTitle": "У гэтым сеансе няма паведамленняў",
       "renameAccessibility": "Перайменаваць сеанс: {{title}}",
       "cloningSession": "Кланаванне сеанса",
       "couldNotLoadThisSession": "Не ўдалося загрузіць гэты сеанс.",

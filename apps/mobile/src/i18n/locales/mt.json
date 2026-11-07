@@ -2419,6 +2419,7 @@
       "emptyDescription": "Ibgħat messaġġ hawn taħt biex tibda.",
       "scrollToBottom": "Skrollja sal-qiegħ",
       "emptyTitle": "L-ebda messaġġ s'issa",
+      "emptyReadOnlyTitle": "L-ebda messaġġ f'din is-sessjoni",
       "renameAccessibility": "Ibdel l-isem tas-sessjoni: {{title}}",
       "cloningSession": "Qed tiġi kklonjata s-sessjoni",
       "couldNotLoadThisSession": "Ma setgħetx titgħabba din is-sessjoni.",

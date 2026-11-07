@@ -2293,6 +2293,7 @@
       "emptyDescription": "Boshlash uchun quyida xabar yuboring.",
       "scrollToBottom": "Eng pastga o'tish",
       "emptyTitle": "Hali xabarlar yo'q",
+      "emptyReadOnlyTitle": "Bu sessiyada xabarlar yo'q",
       "renameAccessibility": "Sessiya nomini o'zgartirish: {{title}}",
       "cloningSession": "Sessiya klonlanmoqda",
       "couldNotLoadThisSession": "Bu sessiyani yuklab bo'lmadi.",

@@ -2293,6 +2293,7 @@
       "emptyDescription": "بۆ دەستپێکردن، لە خوارەوە پەیامێک بنێرە.",
       "scrollToBottom": "چوون بۆ کۆتایی",
       "emptyTitle": "هێشتا هیچ پەیامێک نییە",
+      "emptyReadOnlyTitle": "هیچ پەیامێک لەم سێشنەدا نییە",
       "renameAccessibility": "گۆڕینی ناوی سێشن: {{title}}",
       "cloningSession": "سێشنەکە کۆپی دەکرێت",
       "couldNotLoadThisSession": "نەتوانرا ئەم سێشنە بار بکرێت.",

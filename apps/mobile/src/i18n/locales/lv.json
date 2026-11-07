@@ -2335,6 +2335,7 @@
       "emptyDescription": "Lai sāktu, nosūti ziņojumu zemāk esošajā laukā.",
       "scrollToBottom": "Ritināt līdz apakšai",
       "emptyTitle": "Ziņojumu vēl nav",
+      "emptyReadOnlyTitle": "Šajā sesijā nav ziņojumu",
       "renameAccessibility": "Pārdēvēt sesiju: {{title}}",
       "cloningSession": "Klonē sesiju…",
       "couldNotLoadThisSession": "Neizdevās ielādēt šo sesiju.",

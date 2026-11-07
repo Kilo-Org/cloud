@@ -2299,6 +2299,7 @@
       "emptyDescription": "શરૂ કરવા નીચે સંદેશ મોકલો.",
       "scrollToBottom": "નીચે સ્ક્રોલ કરો",
       "emptyTitle": "હજુ કોઈ સંદેશ નથી",
+      "emptyReadOnlyTitle": "આ સત્રમાં કોઈ સંદેશ નથી",
       "renameAccessibility": "સત્રનું નામ બદલો: {{title}}",
       "cloningSession": "સત્રની નકલ બની રહી છે",
       "couldNotLoadThisSession": "આ સત્ર લોડ કરી શકાયું નહીં",

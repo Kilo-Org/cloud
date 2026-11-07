@@ -2293,6 +2293,7 @@
       "emptyDescription": "ആരംഭിക്കാൻ താഴെ ഒരു സന്ദേശം അയയ്ക്കുക.",
       "scrollToBottom": "ഏറ്റവും താഴേക്ക് സ്ക്രോൾ ചെയ്യുക",
       "emptyTitle": "ഇതുവരെ സന്ദേശങ്ങളൊന്നുമില്ല",
+      "emptyReadOnlyTitle": "ഈ സെഷനിൽ സന്ദേശങ്ങളില്ല",
       "renameAccessibility": "{{title}} എന്ന സെഷന്റെ പേര് മാറ്റുക",
       "cloningSession": "സെഷൻ ക്ലോൺ ചെയ്യുന്നു",
       "couldNotLoadThisSession": "ഈ സെഷൻ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല.",

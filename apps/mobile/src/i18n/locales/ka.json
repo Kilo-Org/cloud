@@ -2293,6 +2293,7 @@
       "emptyDescription": "დასაწყებად ქვემოთ გაგზავნეთ შეტყობინება.",
       "scrollToBottom": "ბოლომდე გადახვევა",
       "emptyTitle": "შეტყობინებები ჯერ არ არის",
+      "emptyReadOnlyTitle": "ამ სესიაში შეტყობინებები არ არის",
       "renameAccessibility": "სესიის სახელის შეცვლა: {{title}}",
       "cloningSession": "სესია კლონირდება…",
       "couldNotLoadThisSession": "ამ სესიის ჩატვირთვა ვერ მოხერხდა.",

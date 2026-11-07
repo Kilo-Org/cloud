@@ -2293,6 +2293,7 @@
       "emptyDescription": "Alustamiseks kirjuta allolevale väljale sõnum ja saada see.",
       "scrollToBottom": "Keri lõppu",
       "emptyTitle": "Sõnumeid pole veel",
+      "emptyReadOnlyTitle": "Selles seansis pole sõnumeid",
       "renameAccessibility": "Nimeta seanss ümber: {{title}}",
       "cloningSession": "Seanssi kloonitakse",
       "couldNotLoadThisSession": "Seda seanssi ei õnnestunud laadida.",

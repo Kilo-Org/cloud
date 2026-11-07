@@ -42,6 +42,7 @@ const worktreeId = 'worktree_11111111-1111-4111-8111-111111111111';
 const secondWorktreeId = 'worktree_22222222-2222-4222-8222-222222222222';
 const rootSessionId = 'ses_rootrootrootrootrootroot01';
 const scopedChildSessionId = 'ses_childchildchildchildchildc';
+const unscopedFallbackChildSessionId = 'ses_childfallbackfallbackfallx';
 const rootLeafSessionId = 'ses_leafleafleafleafleafleafle';
 const rootCloudSessionId = 'workspace_11111111-1111-4111-8111-111111111111';
 
@@ -125,11 +126,12 @@ beforeEach(async () => {
   await client.db.execute(sql`
     INSERT INTO pg_temp.cli_sessions_v2 (
       session_id, kilo_user_id, cloud_agent_session_id, cloud_agent_session_scope_id,
-      cloud_agent_worktree_id
+      cloud_agent_worktree_id, parent_session_id
     ) VALUES
-      (${rootSessionId}, ${owner}, ${rootCloudSessionId}, NULL, ${worktreeId}),
-      (${scopedChildSessionId}, ${owner}, NULL, ${rootCloudSessionId}, NULL),
-      (${rootLeafSessionId}, ${owner}, NULL, NULL, ${secondWorktreeId})
+      (${rootSessionId}, ${owner}, ${rootCloudSessionId}, NULL, ${worktreeId}, NULL),
+      (${scopedChildSessionId}, ${owner}, NULL, ${rootCloudSessionId}, ${worktreeId}, ${rootSessionId}),
+      (${unscopedFallbackChildSessionId}, ${owner}, NULL, ${rootCloudSessionId}, NULL, ${rootSessionId}),
+      (${rootLeafSessionId}, ${owner}, NULL, NULL, ${secondWorktreeId}, NULL)
   `);
 });
 
@@ -166,55 +168,96 @@ async function sessionCount(): Promise<number> {
   return Number(result.rows[0]?.n ?? 0);
 }
 
-async function setRootDeletionStarted(started: boolean): Promise<void> {
+async function startWorktreeDeletion(sessionIds: string[]): Promise<void> {
   await client.db.execute(sql`
     UPDATE pg_temp.cloud_agent_worktrees
-    SET deletion_started_at = ${started ? '2026-11-06T00:00:00.000Z' : null}::timestamptz
+    SET deletion_started_at = now(),
+        deletion_manifest = ${JSON.stringify({
+          version: 1,
+          sessions: sessionIds.map(sessionId => ({ sessionId, cloudAgentSessionId: null })),
+        })}::jsonb
+    WHERE worktree_id = ${worktreeId}
+  `);
+}
+
+// Mirrors the worktree deletion's content stage, which removes the member rows,
+// and its finalize stage, which keeps the start marker and completes the fence.
+async function finishWorktreeDeletion(sessionIds: string[]): Promise<void> {
+  const inList = sql.join(
+    sessionIds.map(sessionId => sql`${sessionId}`),
+    sql`, `
+  );
+  await client.db.execute(sql`
+    DELETE FROM pg_temp.cli_sessions_v2
+    WHERE kilo_user_id = ${owner} AND session_id IN (${inList})
+  `);
+  await client.db.execute(sql`
+    UPDATE pg_temp.cloud_agent_worktrees
+    SET deletion_completed_at = now(),
+        deletion_manifest = NULL,
+        deleted_session_ids = ARRAY[${inList}]::text[]
     WHERE worktree_id = ${worktreeId}
   `);
 }
 
 describe('DELETE /session/:sessionId with a user-deletion audience', () => {
-  it('refuses leaf deletes while the worktree deletion runs and resumes after it clears', async () => {
+  it('refuses leaf deletes while the worktree deletion runs', async () => {
     const app = makeApp();
     const env = boundEnv();
-    await setRootDeletionStarted(true);
+    await startWorktreeDeletion([
+      rootSessionId,
+      scopedChildSessionId,
+      unscopedFallbackChildSessionId,
+    ]);
 
-    const blockedRoot = await app.request(
-      `/api/session/${rootSessionId}`,
-      { method: 'DELETE' },
-      env
+    for (const sessionId of [rootSessionId, scopedChildSessionId, unscopedFallbackChildSessionId]) {
+      const res = await app.request(`/api/session/${sessionId}`, { method: 'DELETE' }, env);
+      expect(res.status).toBe(409);
+      expect(await res.json()).toEqual({ success: false, error: 'worktree_deleting' });
+    }
+
+    expect(await sessionCount()).toBe(4);
+    expect(await sessionIds()).toEqual(
+      expect.arrayContaining([
+        rootSessionId,
+        scopedChildSessionId,
+        unscopedFallbackChildSessionId,
+        rootLeafSessionId,
+      ])
     );
-    expect(blockedRoot.status).toBe(409);
-    expect(await blockedRoot.json()).toEqual({ success: false, error: 'worktree_deleting' });
-
-    const blockedChild = await app.request(
-      `/api/session/${scopedChildSessionId}`,
-      { method: 'DELETE' },
-      env
-    );
-    expect(blockedChild.status).toBe(409);
-    expect(await blockedChild.json()).toEqual({ success: false, error: 'worktree_deleting' });
-
-    expect(await sessionCount()).toBe(3);
-    expect(await sessionIds()).toEqual(expect.arrayContaining([rootSessionId, rootLeafSessionId]));
     expect(clearSessionLocalState).not.toHaveBeenCalled();
+  });
 
-    await setRootDeletionStarted(false);
-    const resumedChild = await app.request(
+  it('continues the account-deletion delete after the worktree deletion removes the rows', async () => {
+    const app = makeApp();
+    const env = boundEnv();
+    const deletedDuringWorktreeDeletion = [
+      rootSessionId,
+      scopedChildSessionId,
+      unscopedFallbackChildSessionId,
+    ];
+    await startWorktreeDeletion(deletedDuringWorktreeDeletion);
+
+    const blocked = await app.request(`/api/session/${rootSessionId}`, { method: 'DELETE' }, env);
+    expect(blocked.status).toBe(409);
+
+    await finishWorktreeDeletion(deletedDuringWorktreeDeletion);
+
+    const afterRoot = await app.request(`/api/session/${rootSessionId}`, { method: 'DELETE' }, env);
+    expect(afterRoot.status).toBe(404);
+    expect(await afterRoot.json()).toEqual({
+      success: false,
+      error: 'session_not_found',
+      cleanup: 'done',
+    });
+    const afterChild = await app.request(
       `/api/session/${scopedChildSessionId}`,
       { method: 'DELETE' },
       env
     );
-    expect(resumedChild.status).toBe(200);
-    const resumedRoot = await app.request(
-      `/api/session/${rootSessionId}`,
-      { method: 'DELETE' },
-      env
-    );
-    expect(resumedRoot.status).toBe(200);
-    expect(await sessionIds()).toEqual([rootLeafSessionId]);
+    expect(afterChild.status).toBe(404);
     expect(clearSessionLocalState).toHaveBeenCalledTimes(2);
+    expect(await sessionIds()).toEqual([rootLeafSessionId]);
   });
 
   it('deletes a leaf whose worktree is not deleting', async () => {
@@ -225,7 +268,7 @@ describe('DELETE /session/:sessionId with a user-deletion audience', () => {
 
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ success: true });
-    expect(await sessionCount()).toBe(2);
+    expect(await sessionCount()).toBe(3);
     expect(await sessionIds()).not.toContain(rootLeafSessionId);
     expect(clearSessionLocalState).toHaveBeenCalledTimes(1);
   });

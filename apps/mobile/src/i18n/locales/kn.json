@@ -331,7 +331,6 @@
     "noFilesChangedDescription": "ಈ ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್‌ನಲ್ಲಿ ಯಾವುದೇ ಫೈಲ್ ಬದಲಾವಣೆಗಳಿಲ್ಲ.",
     "fileList": {
       "openNavigator": "ಫೈಲ್‌ಗಳ ಪಟ್ಟಿಯನ್ನು ತೆರೆಯಿರಿ",
-      "filesViewed": "ಫೈಲ್‌ಗಳು · {{total}}ರಲ್ಲಿ {{viewed}} ವೀಕ್ಷಿಸಲಾಗಿದೆ",
       "listed": "(ಪಟ್ಟಿಯಲ್ಲಿರುವ)",
       "layout": "ವಿನ್ಯಾಸ",
       "unified": "ಏಕೀಕೃತ",

@@ -331,7 +331,6 @@
     "noFilesChangedDescription": "Ова барање за спојување не содржи промени во датотеките.",
     "fileList": {
       "openNavigator": "Отвори го навигаторот за датотеки",
-      "filesViewed": "Датотеки · {{viewed}} од {{total}} прегледани",
       "listed": "(наведени)",
       "layout": "Распоред",
       "unified": "Обединето",

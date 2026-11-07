@@ -2891,7 +2891,6 @@
     },
     "fileList": {
       "filesList": "Dosya listesi",
-      "filesViewed": "Dosyalar · {{viewed}}/{{total}} görüntülendi",
       "layout": "Düzen",
       "listed": "(listelenen)",
       "loadingFiles": "Dosyalar yükleniyor",

@@ -331,7 +331,6 @@
     "noFilesChangedDescription": "اس پل ریکویسٹ میں کسی فائل میں تبدیلی نہیں کی گئی۔",
     "fileList": {
       "openNavigator": "فائل نیویگیٹر کھولیں",
-      "filesViewed": "فائلیں · {{total}} میں سے {{viewed}} دیکھی گئیں",
       "listed": "(فہرست میں)",
       "layout": "ترتیب",
       "unified": "یکجا",

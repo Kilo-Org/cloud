@@ -331,7 +331,6 @@
     "noFilesChangedDescription": "Tiada perubahan pada fail dalam permintaan tarik ini.",
     "fileList": {
       "openNavigator": "Buka penavigasi fail",
-      "filesViewed": "Fail · {{viewed}} daripada {{total}} sudah dilihat",
       "listed": "(disenaraikan)",
       "layout": "Susun atur",
       "unified": "Bersepadu",

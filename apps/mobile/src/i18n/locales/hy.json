@@ -331,7 +331,6 @@
     "noFilesChangedDescription": "Այս pull request-ում ֆայլերի փոփոխություններ չկան։",
     "fileList": {
       "openNavigator": "Բացել ֆայլերի նավարկիչը",
-      "filesViewed": "Ֆայլեր · դիտված է {{total}}-ից {{viewed}}-ը",
       "listed": "(ցուցակված)",
       "layout": "Տեսք",
       "unified": "Միավորված",

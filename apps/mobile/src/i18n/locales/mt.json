@@ -331,7 +331,6 @@
     "noFilesChangedDescription": "Din it-talba għall-għaqda ma fiha l-ebda bidla fil-fajls.",
     "fileList": {
       "openNavigator": "Iftaħ in-navigatur tal-fajls",
-      "filesViewed": "Fajls · rajt {{viewed}} minn {{total}}",
       "listed": "(imniżżla)",
       "layout": "Tqassim",
       "unified": "Magħqud",

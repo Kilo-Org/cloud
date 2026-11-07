@@ -331,7 +331,6 @@
     "noFilesChangedDescription": "මෙම පුල් ඉල්ලීමේ ගොනු වෙනස්කම් නොමැත.",
     "fileList": {
       "openNavigator": "ගොනු සංචාලකය විවෘත කරන්න",
-      "filesViewed": "ගොනු · {{total}} න් {{viewed}} ක් බලා ඇත",
       "listed": "(ලැයිස්තුගත)",
       "layout": "පිරිසැලසුම",
       "unified": "ඒකාබද්ධ",

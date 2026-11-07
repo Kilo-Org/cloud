@@ -331,7 +331,6 @@
     "noFilesChangedDescription": "આ પુલ રિક્વેસ્ટમાં કોઈ ફાઇલમાં ફેરફાર નથી.",
     "fileList": {
       "openNavigator": "ફાઇલ નેવિગેટર ખોલો",
-      "filesViewed": "ફાઇલો · {{total}}માંથી {{viewed}} જોયેલી",
       "listed": "(યાદીમાં)",
       "layout": "ગોઠવણી",
       "unified": "એકીકૃત",

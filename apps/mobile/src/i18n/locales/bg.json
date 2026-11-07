@@ -331,7 +331,6 @@
     "noFilesChangedDescription": "В тази заявка за обединяване няма промени по файловете.",
     "fileList": {
       "openNavigator": "Отвори навигатора за файлове",
-      "filesViewed": "Файлове · прегледани {{viewed}} от {{total}}",
       "listed": "(в списъка)",
       "layout": "Оформление",
       "unified": "Обединено",

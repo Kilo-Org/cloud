@@ -69,6 +69,13 @@ function findNavigatorPressable(
   return root.findByProps({ accessibilityLabel: 'Open file navigator' });
 }
 
+/** Every rendered string under a node, in render order. */
+function textChildren(node: TestRenderer.ReactTestInstance): string[] {
+  return node.children.flatMap(child =>
+    typeof child === 'string' ? [child] : textChildren(child)
+  );
+}
+
 describe('PrDiffFileListHeader side insets (landscape)', () => {
   beforeEach(() => {
     insets.top = 0;
@@ -118,6 +125,40 @@ describe('PrDiffFileListHeader side insets (landscape)', () => {
     // GitHub keeps the existing three-segment sibling; `providerPrChildRoutePath`
     // resolves the ref to a string href (locked by provider-pr-ref.test.ts).
     expect(routerPush).toHaveBeenCalledWith('/(app)/pr-review/octocat/hello/7/file-navigator');
+  });
+});
+
+describe('PrDiffFileListHeader summary copy', () => {
+  beforeEach(() => {
+    insets.top = 0;
+    insets.bottom = 0;
+    insets.left = 0;
+    insets.right = 0;
+  });
+
+  function summaryTexts(truncated: boolean): string[] {
+    const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
+    act(() => {
+      ref.current = TestRenderer.create(
+        createElement(PrDiffFileListHeader, { ...baseProps, isTruncated: truncated })
+      );
+    });
+    const renderer = ref.current;
+    if (!renderer) {
+      throw new Error('renderer was not created');
+    }
+    const pressable = findNavigatorPressable(renderer.root);
+    return textChildren(pressable);
+  }
+
+  // The screen title above the row already says "Files", so the counter must not
+  // repeat it.
+  it('reads as a bare viewed count without a leading Files prefix', () => {
+    expect(summaryTexts(false)).toEqual(['1 of 3 viewed']);
+  });
+
+  it('keeps the truncated list marker after the count', () => {
+    expect(summaryTexts(true)).toEqual(['1 of 3 viewed', '(listed)']);
   });
 });
 

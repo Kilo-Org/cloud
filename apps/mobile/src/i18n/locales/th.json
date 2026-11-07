@@ -331,7 +331,6 @@
     "noFilesChangedDescription": "PR นี้ไม่มีการเปลี่ยนแปลงไฟล์",
     "fileList": {
       "openNavigator": "เปิดแถบนำทางไฟล์",
-      "filesViewed": "ไฟล์ · ดูแล้ว {{viewed}} จาก {{total}} ไฟล์",
       "listed": "(ในรายการ)",
       "layout": "เค้าโครง",
       "unified": "แบบรวม",

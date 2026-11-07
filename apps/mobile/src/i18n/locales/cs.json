@@ -331,7 +331,6 @@
     "noFilesChangedDescription": "Tento PR neobsahuje žádné změny souborů.",
     "fileList": {
       "openNavigator": "Otevřít prohlížeč souborů",
-      "filesViewed": "Soubory · prohlédnuto {{viewed}} z {{total}}",
       "listed": "(v seznamu)",
       "layout": "Rozložení",
       "unified": "Sloučené",

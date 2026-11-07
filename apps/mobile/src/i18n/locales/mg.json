@@ -331,7 +331,6 @@
     "noFilesChangedDescription": "Tsy misy rakitra novaina ao amin'ity fangatahana fampiraisana ity.",
     "fileList": {
       "openNavigator": "Sokafy ny fitetezana rakitra",
-      "filesViewed": "Rakitra · {{viewed}} amin'ny {{total}} voajery",
       "listed": "(voatanisa)",
       "layout": "Fandaminana",
       "unified": "Mitambatra",

@@ -331,7 +331,6 @@
     "noFilesChangedDescription": "Aquesta sol·licitud d'integració no modifica cap fitxer.",
     "fileList": {
       "openNavigator": "Obre el navegador de fitxers",
-      "filesViewed": "Fitxers · {{viewed}} de {{total}} vistos",
       "listed": "(llistats)",
       "layout": "Disposició",
       "unified": "Unificat",

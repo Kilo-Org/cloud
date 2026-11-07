@@ -96,10 +96,6 @@ export const NO_AGREEMENT = new Map([
     'fixed total: "{{displayCount}} of 2 enabled" reads the same at every count',
   ],
   [
-    'prReview.fileList.filesViewed',
-    'counts of a total, not a count of the noun: "Files · {{viewed}} of {{total}} viewed"',
-  ],
-  [
     'prReview.fileNavigator.viewedCount',
     'counts of a total, not a count of the noun: "{{viewed}} of {{total}} viewed"',
   ],

@@ -331,7 +331,6 @@
     "noFilesChangedDescription": "Walang binagong file sa pull request na ito.",
     "fileList": {
       "openNavigator": "Buksan ang listahan ng mga file",
-      "filesViewed": "Mga file · {{viewed}} sa {{total}} ang natingnan",
       "listed": "(nakalista)",
       "layout": "Ayos",
       "unified": "Pinagsama",

@@ -331,7 +331,6 @@
     "noFilesChangedDescription": "Engar skrár hafa breyst í þessari sameiningarbeiðni.",
     "fileList": {
       "openNavigator": "Opna skráayfirlit",
-      "filesViewed": "Skrár · {{viewed}} af {{total}} skoðaðar",
       "listed": "(á listanum)",
       "layout": "Framsetning",
       "unified": "Sameinað",

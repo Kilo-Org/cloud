@@ -331,7 +331,6 @@
     "noFilesChangedDescription": "Den här PR:en innehåller inga filändringar.",
     "fileList": {
       "openNavigator": "Öppna filnavigeringen",
-      "filesViewed": "Filer · {{viewed}} av {{total}} visade",
       "listed": "(listade)",
       "layout": "Visningsläge",
       "unified": "Enhetlig",

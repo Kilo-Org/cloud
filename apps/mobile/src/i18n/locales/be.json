@@ -331,7 +331,6 @@
     "noFilesChangedDescription": "У гэтым запыце на зліццё няма змен у файлах.",
     "fileList": {
       "openNavigator": "Адкрыць навігатар файлаў",
-      "filesViewed": "Файлы · прагледжана {{viewed}} з {{total}}",
       "listed": "(са спіса)",
       "layout": "Выгляд",
       "unified": "Аб'яднаны",

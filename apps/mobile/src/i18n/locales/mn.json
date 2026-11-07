@@ -331,7 +331,6 @@
     "noFilesChangedDescription": "Энэ нэгтгэх хүсэлтэд файлын өөрчлөлт байхгүй.",
     "fileList": {
       "openNavigator": "Файлын жагсаалтыг нээх",
-      "filesViewed": "Файлууд · Үзсэн: {{viewed}} / {{total}}",
       "listed": "(жагсаасан)",
       "layout": "Харагдац",
       "unified": "Нэгдсэн",

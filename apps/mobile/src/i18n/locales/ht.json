@@ -331,7 +331,6 @@
     "noFilesChangedDescription": "Pa gen chanjman nan fichye yo nan demann fizyon sa a.",
     "fileList": {
       "openNavigator": "Louvri navigatè fichye a",
-      "filesViewed": "Fichye · {{viewed}} sou {{total}} deja wè",
       "listed": "(nan lis la)",
       "layout": "Dispozisyon",
       "unified": "Inifye",

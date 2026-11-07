@@ -8,6 +8,7 @@ jest.mock('./gateway-models-cache', () => ({
   ...jest.requireActual('./gateway-models-cache'),
   getOpenRouterModelsMetadataFromDatabase: jest.fn(),
   getOpenRouterModelsFromDatabase: jest.fn(),
+  getVercelModelsFromDatabase: jest.fn(async () => new Set(['alibaba/qwen3.5-flash'])),
   isValidOpenRouterModelId: jest.fn(),
 }));
 jest.mock('./openrouter', () => ({
@@ -338,6 +339,20 @@ describe('upstream model catalog validation', () => {
       );
     }
   );
+
+  it.each([
+    ['vercel', 'success'],
+    ['openrouter', 'invalid-openrouter-model'],
+  ] as const)('accepts a Vercel-only model only on the %s route', async (providerId, type) => {
+    jest.mocked(isValidOpenRouterModelId).mockResolvedValue(false);
+    const result = await attempt({
+      providerId,
+      requestedModel: 'qwen/qwen3.5-flash',
+      wireModel: 'alibaba/qwen3.5-flash',
+    });
+
+    expect(result.type).toBe(type);
+  });
 
   it.each(['direct-byok', 'mistral', 'inception', 'custom', 'custom-public', 'dev-tools'] as const)(
     'does not validate %s models against the OpenRouter catalog',

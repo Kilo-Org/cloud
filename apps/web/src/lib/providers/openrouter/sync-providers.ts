@@ -32,10 +32,11 @@ import {
   applyFreeEndpointDataPolicy,
   getOpenRouterFreeEndpoints,
 } from '@/lib/providers/openrouter/free-endpoint-data-policy';
+import { injectVercelModels } from '@/lib/providers/openrouter/inject-vercel-models';
 import {
-  injectExtraProviderModels,
-  injectVercelOnlyProviders,
-} from '@/lib/providers/openrouter/inject-extra-provider-models';
+  getVercelCatalog,
+  type VercelCatalog,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/vercel-catalog';
 import { withWorstProviderDataPolicy } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/model-data-policy';
 import { getUnavailableModelIds } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
 import {
@@ -164,6 +165,7 @@ async function syncProviders(params: {
   openRouterModels: Record<string, StoredModel>;
   openRouterCatalogModels: CatalogModel[];
   vercelModels: Record<string, StoredModel>;
+  vercelCatalog: VercelCatalog;
   vercelModelIdOverrides: VercelModelIdOverrides;
   customLlms: CustomLlm[];
 }) {
@@ -172,6 +174,7 @@ async function syncProviders(params: {
     openRouterModels,
     openRouterCatalogModels,
     vercelModels,
+    vercelCatalog,
     vercelModelIdOverrides,
     customLlms,
   } = params;
@@ -209,8 +212,18 @@ async function syncProviders(params: {
     unavailableModelIds
   );
 
-  injectExtraProviderModels(vercelModels, providerModelData, vercelModelIdOverrides);
-  injectVercelOnlyProviders(vercelModels, providerModelData, vercelModelIdOverrides);
+  injectVercelModels({
+    vercelModels,
+    vercelCatalog,
+    openRouterCatalogModels,
+    openRouterModelIds: [
+      ...Object.keys(openRouterModels),
+      ...openRouterCatalogModels.map(model => model.id),
+    ],
+    providerModelData,
+    vercelModelIdOverrides,
+    updatedAt: new Date().toISOString(),
+  });
 
   const mappedExtraModels = buildPublicCustomLlmSnapshotModels(
     customLlms,
@@ -432,7 +445,10 @@ export async function syncAndStoreProviders() {
     );
   }
 
-  const openRouterCatalog = await getRawOpenRouterModels();
+  const [openRouterCatalog, vercelCatalog] = await Promise.all([
+    getRawOpenRouterModels(),
+    getVercelCatalog(),
+  ]);
 
   const generatedVercelModelIdOverrides = await generateVercelModelIdOverrides(
     openrouter_data,
@@ -452,6 +468,7 @@ export async function syncAndStoreProviders() {
     openRouterModels: openrouter_data,
     openRouterCatalogModels: openRouterCatalog.data,
     vercelModels: vercel_data,
+    vercelCatalog,
     vercelModelIdOverrides,
     customLlms: await fetchCustomLlmsFromDatabase(),
   });

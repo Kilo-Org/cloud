@@ -140,12 +140,12 @@ export function SheetHeader({
             hitSlop={8}
             accessibilityRole="button"
             accessibilityLabel={resolvedDoneLabel}
-            className="ms-auto min-h-[48px] min-w-[48px] shrink-0 items-center justify-center rounded-md px-2 py-2 active:opacity-70 will-change-pressable"
+            className="ms-auto min-h-[48px] min-w-[48px] shrink-0 items-center justify-center rounded-md px-2 py-2 active:opacity-70 disabled:opacity-50 will-change-pressable"
           >
-            {/* A fill-weight label that `disabled:opacity-50` dims reads as
-                enabled in dark mode: half the accent over a near-black surface
-                keeps its hue. A disabled commit stays pale in both themes, so
-                the enabled state is the only one that reads ready. */}
+            {/* The muted ink alone is a mid gray; the control's disabled
+                opacity is what makes it read as unavailable. The enabled label
+                keeps the accent at full strength, so the accent is the only
+                state that reads ready. */}
             <Text
               className={cn(
                 'text-center text-base font-semibold',

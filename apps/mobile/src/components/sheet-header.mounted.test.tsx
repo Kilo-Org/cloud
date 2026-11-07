@@ -292,18 +292,13 @@ describe('SheetHeader', () => {
     renderer.unmount();
   });
 
-  it('paints a disabled Done in the inactive ink instead of fading the accent', async () => {
+  it('paints a disabled Done in the inactive ink instead of the accent', async () => {
     const props = {
       title: 'report.pdf',
       onDone: () => undefined,
       onCancel: () => undefined,
     };
     const renderer = await mount({ ...props, doneDisabled: true });
-
-    const done = pressablesByLabel(renderer.root, 'Done')[0];
-    // Half-opacity over the accent keeps the dark scheme's saturated gold
-    // saturated, so the waiting control still read as the sheet's live action.
-    expect(done?.props.className).not.toContain('disabled:opacity-50');
 
     const disabledInk = String(
       renderer.root.findByProps({ children: 'Done' }).props.className

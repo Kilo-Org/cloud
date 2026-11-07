@@ -18,6 +18,9 @@ import {
 } from '../part-content';
 import { MessageErrorBoundary } from '../MessageErrorBoundary';
 import { isPartStreaming } from '../types';
+import { getVisibleAssistantParts } from '../message-presentation';
+import { groupAssistantParts, summarizeAgentWork } from '../shared-transcript-presentation';
+import { AgentWorkGroup } from './AgentWorkGroup';
 import { CloudToolRenderer } from './CloudToolRenderer';
 import {
   useCloudMessagePresentation,
@@ -95,8 +98,28 @@ function renderCloudPart({ part }: { part: EnrichedPartState }) {
   }
 }
 
-export function CloudMessageParts() {
-  return <MessagePrimitive.Parts>{renderCloudPart}</MessagePrimitive.Parts>;
+export function CloudMessageParts({ collapseTools = false }: { collapseTools?: boolean }) {
+  const presentation = useCloudMessagePresentation();
+  if (!collapseTools) return <MessagePrimitive.Parts>{renderCloudPart}</MessagePrimitive.Parts>;
+
+  const parts = getVisibleAssistantParts(presentation.parts.map(part => part.source));
+  const indices = new Map(parts.map((part, index) => [part, index]));
+  return groupAssistantParts(parts, 'live').map(segment => {
+    const content = segment.parts.map(part => {
+      const index = indices.get(part);
+      return index === undefined ? null : <CloudMessagePartByIndex key={part.id} index={index} />;
+    });
+    const key = segment.parts[0]?.id;
+    if (segment.type === 'chat') return <React.Fragment key={key}>{content}</React.Fragment>;
+    const working = presentation.isStreaming && segment.parts.some(isPartStreaming);
+    return (
+      <div key={key} className="py-1">
+        <AgentWorkGroup summary={summarizeAgentWork(segment.parts, working)} working={working}>
+          {content}
+        </AgentWorkGroup>
+      </div>
+    );
+  });
 }
 
 export function CloudMessagePartByIndex({ index }: { index: number }) {

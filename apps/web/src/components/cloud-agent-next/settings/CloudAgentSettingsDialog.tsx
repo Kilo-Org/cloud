@@ -20,6 +20,7 @@ import { BuiltinAgentsSection } from './BuiltinAgentsSection';
 import { DefaultSandboxSection } from './DefaultSandboxSection';
 import { EnvironmentsSection } from './EnvironmentsSection';
 import { RepositoryOverridesSection } from './RepositoryOverridesSection';
+import { TranscriptPreferencesSection } from './TranscriptPreferencesSection';
 import { VercelComputeSettings } from './VercelComputeSettings';
 
 type CloudAgentSettingsDialogProps = {
@@ -148,6 +149,7 @@ function CloudAgentSettings({
           className="mt-0 min-h-0 min-w-0 flex-1 overflow-y-auto px-6 py-5"
         >
           <div className="flex flex-col gap-8">
+            <TranscriptPreferencesSection />
             {settings ? (
               <>
                 <div className="flex flex-col gap-6">

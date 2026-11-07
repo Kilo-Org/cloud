@@ -134,7 +134,7 @@ export function CloudMessage({ child = false }: { child?: boolean }) {
           ) : (
             <>
               <div className="space-y-0.5">
-                <CloudMessageParts />
+                <CloudMessageParts collapseTools={actions.collapseTools} />
               </div>
               {showError && !interrupted && error && (
                 <p className={`${statusClass} text-sm`}>{getAssistantErrorMessage(error)}</p>

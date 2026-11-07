@@ -124,6 +124,7 @@ import type { KnownModel } from './known-models';
 import { useSlashCommandSets } from '@/hooks/useSlashCommandSets';
 import { useCelebrationSound } from '@/hooks/useCelebrationSound';
 import { useCliSessionPresence } from '@/hooks/useCliSessionPresence';
+import { useCollapseToolsPreference } from './collapse-tools-preference';
 import type { CloudAgentAttachments } from '@/lib/cloud-agent/constants';
 
 import { cn } from '@/lib/utils';
@@ -572,6 +573,7 @@ export default function CloudChatPage({
   const { availableCommands } = useSlashCommandSets();
 
   const { play: playCelebrationSound, soundEnabled, setSoundEnabled } = useCelebrationSound();
+  const { collapseTools } = useCollapseToolsPreference();
 
   const prevActivityRef = useRef<string | null>(null);
   useEffect(() => {
@@ -1680,6 +1682,7 @@ export default function CloudChatPage({
                                   <PreviewLinksContext.Provider value={preview.links}>
                                     <CloudThread
                                       active={chatTabActive}
+                                      collapseTools={collapseTools}
                                       getChildMessages={getChildMessages}
                                       onOpenChildSession={handleOpenTopLevelChildSession}
                                       onOpenPreparationDetails={handleOpenPreparationDetails}

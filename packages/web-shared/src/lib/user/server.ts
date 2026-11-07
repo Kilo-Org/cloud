@@ -260,7 +260,7 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
       const surface = opts.stepUpSurface ?? 'rest';
       const route = routeFromHeaders(headersList);
       const method = methodFromHeaders(headersList, opts.requestMethod);
-      const { actionClass } = actionClassForRoute({
+      const { actionClass, inventoryId } = actionClassForRoute({
         surface,
         route: route ?? '',
         method,
@@ -277,11 +277,34 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
           surface,
         });
       } catch (error) {
+        // One measurement per guarded non-session request: `denied` for a
+        // step-up verdict and `failed` for a fault, matching the tRPC admin
+        // guard. Session traffic stays on `admin_guard`.
+        const emitOutcome = (outcome: 'denied' | 'failed') => {
+          if (credential === 'session') return;
+          emitPrivilegedAccessEvent({
+            surface,
+            user: result.user,
+            credential,
+            outcome,
+            actionClass,
+            actionId: inventoryId,
+            target: null,
+            wouldBlock: true,
+            userAgentProduct: userAgentProductFromHeaders(headersList),
+            tokenSource: result.tokenSource ?? null,
+            route,
+            method,
+            ip: clientIpFromHeaders(headersList),
+          });
+        };
         if (error instanceof TRPCError && error.cause instanceof StepUpRequiredError) {
+          emitOutcome('denied');
           return authError(403, error.cause.code, result.user.id);
         }
         // Fail closed. The guard normally converts evaluation failures itself;
         // this covers anything unexpected around it.
+        emitOutcome('failed');
         reportStepUpFailure('admin_step_up_rest', error);
         return authError(403, 'STEP_UP_UNAVAILABLE', result.user.id);
       }

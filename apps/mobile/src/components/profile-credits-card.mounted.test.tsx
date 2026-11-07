@@ -1341,6 +1341,62 @@ describe('CreditsCard balance row', () => {
     return mounted;
   }
 
+  /** The balance shell: the card's only `min-h-16` surface box. */
+  function balanceBlock(renderer: ReactTestRenderer): ReactTestInstance {
+    return renderer.root.find(
+      node =>
+        Object.is(node.type, 'View') &&
+        String(node.props.className).includes('min-h-16 rounded-lg bg-secondary')
+    );
+  }
+
+  it.each(['failed', 'loaded'] as const)(
+    'keeps the note one gap under the control row in the %s state',
+    async state => {
+      currentUser.userId = 'user-1';
+      if (state === 'failed') {
+        getContextBalanceQueryFn.mockRejectedValue(new Error('Balance unavailable'));
+      } else {
+        getContextBalanceQueryFn.mockResolvedValue({ balance: 0 });
+      }
+
+      const { renderer, texts, unmount } = await mountCard();
+      await waitFor(() =>
+        texts().includes(
+          state === 'failed' ? 'Failed to load balance. Tap to retry.' : 'No expiring credits.'
+        )
+      );
+      await act(() => {
+        (
+          cardBox(renderer).props.onLayout as (event: {
+            nativeEvent: { layout: { width: number } };
+          }) => void
+        )({ nativeEvent: { layout: { width: 332 } } });
+      });
+
+      // The note hangs off the block itself, so it takes the block's gap under
+      // the control row: a retry that succeeds swaps content inside one frame
+      // instead of moving the note and every section below the card by the
+      // difference between a nested column's gap and the block's.
+      const block = balanceBlock(renderer);
+      const note = block.find(node =>
+        node.children.some(
+          child => typeof child === 'string' && child.includes('No expiring credits.')
+        )
+      );
+      const between: string[] = [];
+      let ancestor = note.parent;
+      while (ancestor !== null && ancestor !== block) {
+        between.push(String(ancestor.props.className ?? ''));
+        ancestor = ancestor.parent;
+      }
+      // Only component boundaries stand between the note's text and the block;
+      // no element of its own adds a second gap under the control row.
+      expect(between.filter(entry => entry.includes('gap-'))).toEqual([]);
+      unmount();
+    }
+  );
+
   it('keeps the note in the amount column on a wide card, with the purchase action in its own column', async () => {
     const { renderer, unmount } = await mountAtCardWidth(383);
 

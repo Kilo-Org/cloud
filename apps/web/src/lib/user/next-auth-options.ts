@@ -107,6 +107,7 @@ import { getLowerDomainFromEmail } from '@kilocode/web-shared/lib/email-address'
 import { z } from 'zod';
 import {
   getUserFromSession,
+  getUserFromSessionForCredentialIssuance,
   isBlockedTLD,
   isEmailBlacklistedByDomainAsync,
   sessionAuthOptions,
@@ -1088,7 +1089,46 @@ export const authOptions: NextAuthOptions = {
         // normalize the account, user, and profile objects into a single object
         // why does next-auth have 3 separate objects for this? who knows.
         accountInfo = createAccountInfo(account, user, profile);
-        if (account.provider === 'claude') {
+
+        linkingSession = await getAccountLinkingSession();
+
+        isAccountLinking = linkingSession && linkingSession.targetProvider === accountInfo.provider;
+
+        // Account linking requires the person who started it: the pending link
+        // names a user, and the request must carry that user's web session. A
+        // request whose session does not name the same user is refused with the
+        // ordinary linking failure. The read above consumed the cookie, so a
+        // refusal is final.
+        if (isAccountLinking && linkingSession) {
+          const claudeLinkingUser =
+            account.provider === 'claude'
+              ? (await getUserFromSessionForCredentialIssuance()).user
+              : undefined;
+          const linkingPrincipal =
+            account.provider === 'claude' ? claudeLinkingUser : await getUserFromSession();
+          if (linkingPrincipal?.id !== linkingSession.existingUserId) {
+            warnInSentry('SECURITY: Account link refused: the session does not match the link', {
+              extra: { provider: accountInfo.provider },
+            });
+            // An organization-scoped connect starts on the organization's BYOK
+            // card, which reads `openai_error`; return the refusal there the
+            // same way the shared-services re-check below does.
+            if (account.provider === 'openai' && linkingSession.organizationId) {
+              return openAiChatGptConnectFailureUrl(
+                linkingSession.organizationId,
+                'LINKING-FAILED'
+              );
+            }
+            return redirectUrlForCode('LINKING-FAILED');
+          }
+          if (
+            account.provider === 'claude' &&
+            !(await isClaudePlatformOAuthEnabled(claudeLinkingUser?.google_user_email))
+          ) {
+            return redirectUrlForCode('LINKING-FAILED');
+          }
+        }
+        if (account.provider === 'claude' && !isAccountLinking) {
           const claims = claudeVerifiedEmailSchema.safeParse(profile);
           if (!claims.success) {
             console.warn('[claude-auth] authorization refused', {
@@ -1108,40 +1148,6 @@ export const authOptions: NextAuthOptions = {
           if (!(await isClaudePlatformOAuthEnabled(claims.data.email))) {
             console.warn('[claude-auth] authorization refused', { reason: 'release_denied' });
             return redirectUrlForCode('UNKNOWN-ERROR');
-          }
-        }
-
-        linkingSession = await getAccountLinkingSession();
-
-        isAccountLinking = linkingSession && linkingSession.targetProvider === accountInfo.provider;
-
-        // Account linking requires the person who started it: the pending link
-        // names a user, and the request must carry that user's web session. A
-        // request whose session does not name the same user is refused with the
-        // ordinary linking failure. The read above consumed the cookie, so a
-        // refusal is final.
-        if (isAccountLinking && linkingSession) {
-          const linkingPrincipal = await getUserFromSession();
-          if (linkingPrincipal?.id !== linkingSession.existingUserId) {
-            warnInSentry('SECURITY: Account link refused: the session does not match the link', {
-              extra: { provider: accountInfo.provider },
-            });
-            // An organization-scoped connect starts on the organization's BYOK
-            // card, which reads `openai_error`; return the refusal there the
-            // same way the shared-services re-check below does.
-            if (account.provider === 'openai' && linkingSession.organizationId) {
-              return openAiChatGptConnectFailureUrl(
-                linkingSession.organizationId,
-                'LINKING-FAILED'
-              );
-            }
-            return redirectUrlForCode('LINKING-FAILED');
-          }
-          if (account.provider === 'claude') {
-            const linkingUser = await findUserById(linkingPrincipal.id);
-            if (!(await isClaudePlatformOAuthEnabled(linkingUser?.google_user_email))) {
-              return redirectUrlForCode('LINKING-FAILED');
-            }
           }
         }
 
@@ -1389,6 +1395,9 @@ export const authOptions: NextAuthOptions = {
           !(await mayConnectOpenAiChatGptSharedServices(result.user, linkingSession.organizationId))
         ) {
           return openAiChatGptConnectFailureUrl(linkingSession.organizationId, 'LINKING-FAILED');
+        }
+        if (account.provider === 'claude' && isAccountLinking) {
+          return '/connected-accounts?linked=claude';
         }
 
         // NOTE(bmc): this is sad but its here for a reason, don't change it

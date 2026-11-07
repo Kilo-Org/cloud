@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { paintSignature } from '../../../apps/mobile/src/lib/design-gate/sampler';
+import { paintSignature } from '../../../apps/mobile/src/lib/design-gate/paint-state';
 import { captureAlignment, screenshotObservation } from './capture-evidence';
 import type { Rgba } from './pixels';
 import { dump } from './rules/test-dump';

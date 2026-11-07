@@ -5,47 +5,13 @@
  * Consecutive identical states collapse, retaining the latest dump. State is not proof of paint.
  */
 
-type Layout = Readonly<{
-  env: Readonly<{ route: string; screen?: string }>;
-  nodes: readonly Readonly<{
-    rect: readonly number[];
-    layoutRect?: readonly number[];
-    parent?: number;
-    tag?: string;
-    text?: string;
-    label?: string;
-    testID?: string;
-    role?: string;
-    screenState?: number;
-    style?: Readonly<Record<string, string | number>>;
-  }>[];
-}>;
+import { paintSignature, type PaintState } from './paint-state';
 
 export type Sample<T> = Readonly<{ t: number; repeat: number; dump: T }>;
 
 const MAX_SAMPLES = 400;
 
-/** Includes focused screen and paint inputs even when every frame stays fixed. */
-export function paintSignature(dump: Layout): string {
-  return JSON.stringify([
-    dump.env.route,
-    dump.env.screen,
-    dump.nodes.map(node => [
-      node.parent,
-      node.tag,
-      node.rect,
-      node.layoutRect,
-      node.text,
-      node.label,
-      node.testID,
-      node.role,
-      node.screenState,
-      Object.entries(node.style ?? {}).sort(([left], [right]) => left.localeCompare(right)),
-    ]),
-  ]);
-}
-
-export function createSampler<T extends Layout>(snapshot: () => T) {
+export function createSampler<T extends PaintState>(snapshot: () => T) {
   let samples: Sample<T>[] = [];
   let stopTimers: (() => void) | undefined = undefined;
   let truncated = false;

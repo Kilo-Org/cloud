@@ -628,28 +628,50 @@ export async function main(argv: readonly string[], deps: CliDeps = defaultDeps)
   const abort =
     args.command === 'run' || args.command === 'motion' ? installAbortRestore(deps) : undefined;
   try {
-    if (args.command === 'prepare') {
-      const prepared = prepareProof({
-        repo: process.cwd(),
-        base: args.base,
-        head: args.head,
-        targets: args.targets,
-        out: path.resolve(args.out),
-      });
-      deps.log(`design-gate: ${path.resolve(args.out, 'preparation.json')}`);
-      deps.log(`design-gate: base ${prepared.base.directory}; head ${prepared.head.directory}`);
-      return 0;
-    }
-    if (args.command === 'compare') {
-      const result = compareProof(
-        readPreparation(args.preparation),
-        args.baseRun,
-        args.headRun,
-        args.out
-      );
-      deps.log(`design-gate: ${path.resolve(args.out, 'comparison.json')}; ${result.status}`);
-      if (result.status === 'inconclusive') return 2;
-      return result.introduced.length > 0 ? 1 : 0;
+    if (args.command === 'prepare' || args.command === 'compare') {
+      const controller = new AbortController();
+      let interrupted: AbortSignalName | undefined;
+      const interrupt = (signal: AbortSignalName) => {
+        interrupted ??= signal;
+        controller.abort(signal);
+      };
+      const off = [
+        deps.onSignal('SIGINT', () => interrupt('SIGINT')),
+        deps.onSignal('SIGTERM', () => interrupt('SIGTERM')),
+      ];
+      try {
+        if (args.command === 'prepare') {
+          const prepared = await prepareProof(
+            {
+              repo: process.cwd(),
+              base: args.base,
+              head: args.head,
+              targets: args.targets,
+              out: path.resolve(args.out),
+            },
+            controller.signal
+          );
+          deps.log(`design-gate: ${path.resolve(args.out, 'preparation.json')}`);
+          deps.log(`design-gate: base ${prepared.base.directory}; head ${prepared.head.directory}`);
+          return 0;
+        }
+        const result = await compareProof(
+          readPreparation(args.preparation),
+          args.baseRun,
+          args.headRun,
+          args.out,
+          controller.signal
+        );
+        deps.log(`design-gate: ${path.resolve(args.out, 'comparison.json')}; ${result.status}`);
+        if (result.status === 'inconclusive') return 2;
+        return result.introduced.length > 0 ? 1 : 0;
+      } catch (error) {
+        if (interrupted === undefined) throw error;
+        deps.warn(`design-gate: ${interrupted}: interrupted proof operation: ${String(error)}`);
+        return SIGNAL_EXIT_CODES[interrupted];
+      } finally {
+        for (const remove of off) remove();
+      }
     }
     const out = path.resolve(args.out ?? fs.mkdtempSync(path.join(os.tmpdir(), 'design-gate-')));
     fs.mkdirSync(out, { recursive: true });

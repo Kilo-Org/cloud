@@ -161,6 +161,17 @@ A mutation promise can settle before React Query publishes its observer state.
 Use `waitFor` from `@/test/render-with-providers` before asserting a rendered mutation result.
 Awaiting `mutateAsync` inside `act` does not replace that wait.
 
+## Remote native verification
+
+Keep `KILO_REMOTE_NATIVE=required` when a local iOS build is prohibited.
+Compatible producers are joined before another workflow is dispatched.
+Unknown producer evidence stops the request without dispatching another build.
+Dispatch rechecks the requested local and remote head after a producer wait.
+
+The cache records the simulator SDK from the executable's load commands.
+Old cache identities refresh through the remote artifact path.
+A failed producer or unsupported simulator runtime never supplies an installable artifact.
+
 ## Design proof comparisons
 
 Prepare exact base and head revisions before comparing a changed screen:

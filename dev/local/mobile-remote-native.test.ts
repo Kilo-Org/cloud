@@ -11,6 +11,7 @@ import {
   assertSimulatorRuntimeSupports,
   parseNativeProducerJobs,
   parseNativeProducerRuns,
+  parseRemoteBranchTip,
   pickDispatchedRun,
   producerPlatformEvidence,
   selectCompatibleProducer,
@@ -360,6 +361,30 @@ test('producer jobs parse fails closed on malformed or foreign jobs evidence', (
       () => parseNativeProducerJobs(listing, 301),
       /Invalid native producer jobs listing/,
       JSON.stringify(listing)
+    );
+  }
+});
+
+test('remote branch tip parse accepts only the requested branch commit', () => {
+  assert.equal(
+    parseRemoteBranchTip(
+      { ref: 'refs/heads/feature/native', object: { sha: HEAD, type: 'commit' } },
+      'feature/native'
+    ),
+    HEAD
+  );
+  for (const input of [
+    null,
+    {},
+    { ref: 'refs/heads/main', object: { sha: HEAD, type: 'commit' } },
+    { ref: 'refs/heads/feature/native', object: { sha: HEAD, type: 'tag' } },
+    { ref: 'refs/heads/feature/native', object: { sha: 'abc', type: 'commit' } },
+    { ref: 'refs/heads/feature/native', object: null },
+  ]) {
+    assert.throws(
+      () => parseRemoteBranchTip(input, 'feature/native'),
+      /Invalid remote branch tip response/,
+      JSON.stringify(input)
     );
   }
 });
@@ -773,6 +798,9 @@ type ProducerScenario = {
   artifactsAfterFirstLookup?: unknown[];
   watchExitCodes?: Record<string, number>;
   producerLookupFailures?: number;
+  advanceLocalAfterWatch?: boolean;
+  advanceRemoteAfterWatch?: boolean;
+  remoteTipResponse?: unknown;
 };
 
 // Offline end-to-end fetch: stub `gh`, `git`, and `unzip` on PATH. State
@@ -797,6 +825,8 @@ function withProducerScenario(
     artifactsAfterFirstLookup: scenario.artifactsAfterFirstLookup ?? null,
     watchExitCodes: scenario.watchExitCodes ?? {},
     producerLookupFailures: scenario.producerLookupFailures ?? 0,
+    advanceRemoteAfterWatch: scenario.advanceRemoteAfterWatch ?? false,
+    remoteTipResponse: scenario.remoteTipResponse ?? null,
   };
   fs.writeFileSync(logPath, '');
   fs.writeFileSync(unexpectedPath, '');
@@ -843,7 +873,14 @@ if (endpoint.startsWith(prefix + '/actions/artifacts/') && endpoint.endsWith('/z
   process.exit(0);
 }
 let result;
-if (endpoint === prefix) result = fixture.repository;
+if (endpoint === prefix + '/git/ref/heads/${producerBranch}') {
+  if (fixture.remoteTipResponse !== null) result = fixture.remoteTipResponse;
+  else {
+    const sha = fixture.advanceRemoteAfterWatch && marker('producer-watched') ? ${JSON.stringify(OTHER)} : ${JSON.stringify(HEAD)};
+    result = { ref: 'refs/heads/${producerBranch}', object: { sha, type: 'commit' } };
+  }
+}
+else if (endpoint === prefix) result = fixture.repository;
 else if (endpoint === prefix + '/actions/workflows/mobile-native-build.yml') result = fixture.workflow;
 else if (endpoint === prefix + '/actions/workflows/mobile-native-build.yml/runs?head_sha=${HEAD}&per_page=30') {
   if (bump('producer-lookups') <= fixture.producerLookupFailures) {
@@ -879,9 +916,11 @@ process.stdout.write(JSON.stringify(result));
     `#!${process.execPath}
 const fs = require('node:fs');
 const args = process.argv.slice(2);
-if (JSON.stringify(args) === JSON.stringify(['rev-parse', 'HEAD'])) process.stdout.write(${JSON.stringify(HEAD)} + '\\n');
+const advanced = ${scenario.advanceLocalAfterWatch ? 'true' : 'false'} && fs.existsSync(${JSON.stringify(dir)} + '/producer-watched');
+const head = advanced ? ${JSON.stringify(OTHER)} : ${JSON.stringify(HEAD)};
+if (JSON.stringify(args) === JSON.stringify(['rev-parse', 'HEAD'])) process.stdout.write(head + '\\n');
 else if (JSON.stringify(args) === JSON.stringify(['rev-parse', '--abbrev-ref', 'HEAD'])) process.stdout.write(${JSON.stringify(producerBranch)} + '\\n');
-else if (JSON.stringify(args) === JSON.stringify(['rev-parse', '@{u}'])) process.stdout.write(${JSON.stringify(HEAD)} + '\\n');
+else if (JSON.stringify(args) === JSON.stringify(['rev-parse', '@{u}'])) process.stdout.write(head + '\\n');
 else {
   fs.appendFileSync(${JSON.stringify(unexpectedPath)}, JSON.stringify(args) + '\\n');
   process.exit(92);
@@ -1138,6 +1177,107 @@ test('fetch stops without dispatch on malformed producer detail', () => {
     (invoke, log, dir) => {
       assert.equal(fetchScenarioApk(invoke, dir), 'undefined');
       assert.doesNotMatch(log(), /\["workflow","run"|\["run","watch"|\/zip|cancel/);
+      assert.equal(fs.existsSync(path.join(dir, 'Kilo-remote.apk')), false);
+    }
+  );
+});
+
+test('fetch rediscovers an older producer after the joined producer fails', () => {
+  withProducerScenario(
+    {
+      producerRuns: [producerApiRun({ id: 302 }), producerApiRun()],
+      runsBefore: { 301: producerApiRun(), 302: producerApiRun({ id: 302 }) },
+      runsAfter: {
+        301: producerApiRun({ status: 'completed', conclusion: 'success' }),
+        302: producerApiRun({ id: 302, status: 'completed', conclusion: 'failure' }),
+      },
+      jobs: { 301: androidProducerJobs(), 302: androidProducerJobs(302) },
+      // The failed run's claimed artifact is listed first; only the
+      // successful older producer's artifact may download.
+      artifactsAfterProducer: [nativeArtifact(402, 302), nativeArtifact(401, 301)],
+      watchExitCodes: { 302: 1 },
+    },
+    (invoke, log, dir) => {
+      assert.equal(JSON.parse(fetchScenarioApk(invoke, dir)), path.join(dir, 'Kilo-remote.apk'));
+      assert.match(log(), /\["run","watch","302"/);
+      assert.match(log(), /\["run","watch","301"/);
+      assert.doesNotMatch(log(), /\["workflow","run"|cancel/);
+      assert.match(log(), /artifacts\/401\/zip/);
+      assert.doesNotMatch(log(), /artifacts\/402\/zip/);
+    }
+  );
+});
+
+test('fetch reuses the artifact when the watch fails but the producer succeeded', () => {
+  withProducerScenario(
+    {
+      producerRuns: [producerApiRun()],
+      runsBefore: { 301: producerApiRun() },
+      runsAfter: { 301: producerApiRun({ status: 'completed', conclusion: 'success' }) },
+      jobs: { 301: androidProducerJobs() },
+      artifactsAfterProducer: [nativeArtifact(401, 301)],
+      // The watcher itself exits nonzero (timeout/network) even though
+      // the run completes successfully behind it.
+      watchExitCodes: { 301: 1 },
+    },
+    (invoke, log, dir) => {
+      assert.equal(JSON.parse(fetchScenarioApk(invoke, dir)), path.join(dir, 'Kilo-remote.apk'));
+      assert.match(log(), /\["run","watch","301"/);
+      assert.doesNotMatch(log(), /\["workflow","run"|cancel/);
+      assert.match(log(), /artifacts\/401\/zip/);
+    }
+  );
+});
+
+test('fetch stops without dispatch when the local ref advances during the join', () => {
+  withProducerScenario(
+    {
+      producerRuns: [producerApiRun()],
+      runsBefore: { 301: producerApiRun() },
+      runsAfter: { 301: producerApiRun({ status: 'completed', conclusion: 'failure' }) },
+      jobs: { 301: androidProducerJobs() },
+      watchExitCodes: { 301: 1 },
+      advanceLocalAfterWatch: true,
+    },
+    (invoke, log, dir) => {
+      assert.equal(fetchScenarioApk(invoke, dir), 'undefined');
+      assert.doesNotMatch(log(), /\["workflow","run"|\["run","list"|\/zip|cancel/);
+      assert.equal(fs.existsSync(path.join(dir, 'Kilo-remote.apk')), false);
+    }
+  );
+});
+
+test('fetch stops without dispatch when the remote tip advances during the join', () => {
+  withProducerScenario(
+    {
+      producerRuns: [producerApiRun()],
+      runsBefore: { 301: producerApiRun() },
+      runsAfter: { 301: producerApiRun({ status: 'completed', conclusion: 'failure' }) },
+      jobs: { 301: androidProducerJobs() },
+      watchExitCodes: { 301: 1 },
+      advanceRemoteAfterWatch: true,
+    },
+    (invoke, log, dir) => {
+      assert.equal(fetchScenarioApk(invoke, dir), 'undefined');
+      assert.match(log(), /git\/ref\/heads\/feature\/native/);
+      assert.doesNotMatch(log(), /\["workflow","run"|\["run","list"|\/zip|cancel/);
+      assert.equal(fs.existsSync(path.join(dir, 'Kilo-remote.apk')), false);
+    }
+  );
+});
+
+test('fetch stops without dispatch on an unverifiable remote tip response', () => {
+  withProducerScenario(
+    {
+      producerRuns: [],
+      runsBefore: {},
+      runsAfter: {},
+      remoteTipResponse: {},
+    },
+    (invoke, log, dir) => {
+      assert.equal(fetchScenarioApk(invoke, dir), 'undefined');
+      assert.equal(log().split('git/ref/heads/').length - 1, 3, 'bounded tip reads are retried');
+      assert.doesNotMatch(log(), /\["workflow","run"|\["run","list"|\/zip|cancel/);
       assert.equal(fs.existsSync(path.join(dir, 'Kilo-remote.apk')), false);
     }
   );

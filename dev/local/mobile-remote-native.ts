@@ -447,7 +447,7 @@ export function selectCompatibleProducer(
 
 function fetchProducerJobs(base: string, runId: number): NativeProducerJob[] {
   return parseNativeProducerJobs(
-    JSON.parse(gh(['api', `${base}/actions/runs/${runId}/jobs?per_page=100`])) as unknown,
+    JSON.parse(gh(['api', `${base}/actions/runs/${runId}/jobs?per_page=100`])),
     runId
   );
 }
@@ -472,12 +472,12 @@ export function findNativeProducer(
     branch: args.branch,
     defaultBranch: verified.defaultBranch,
   };
-  const listing = JSON.parse(
+  const listing: unknown = JSON.parse(
     gh([
       'api',
       `${verified.base}/actions/workflows/${WORKFLOW_FILE}/runs?head_sha=${encodeURIComponent(args.headSha)}&per_page=30`,
     ])
-  ) as unknown;
+  );
   const listed = parseNativeProducerRuns(listing);
   // Jobs are fetched lazily per candidate and cached for one lookup; a
   // refreshed candidate is re-checked against fresh jobs below.
@@ -505,7 +505,7 @@ export function findNativeProducer(
     }
     const picked = selection.run;
     const refreshed = parseNativeProducerRun(
-      JSON.parse(gh(['api', `${verified.base}/actions/runs/${picked.id}`])) as unknown
+      JSON.parse(gh(['api', `${verified.base}/actions/runs/${picked.id}`]))
     );
     if (refreshed.id !== picked.id) throw new Error('Invalid native producer run');
     const reselection = selectCompatibleProducer([refreshed], expected, run => evidence(run, true));
@@ -526,7 +526,7 @@ function refreshNativeProducer(runId: number): NativeProducerRun | undefined {
   for (let attempt = 1; attempt <= PRODUCER_LOOKUP_ATTEMPTS; attempt++) {
     try {
       const run = parseNativeProducerRun(
-        JSON.parse(gh(['api', `repos/{owner}/{repo}/actions/runs/${runId}`])) as unknown
+        JSON.parse(gh(['api', `repos/{owner}/{repo}/actions/runs/${runId}`]))
       );
       if (run.id !== runId) throw new Error('Invalid native producer run');
       return run;
@@ -631,6 +631,70 @@ function currentPushedRef(): PushedRef | undefined {
   return { branch, headSha: head };
 }
 
+const RemoteBranchTipSchema = z.object({
+  ref: z.string().min(1),
+  object: z.object({
+    sha: z.string().regex(/^[a-f0-9]{40}$/),
+    type: z.literal('commit'),
+  }),
+});
+
+// The commit an actual remote branch ref points at, from the git ref
+// response. A response for another ref, a non-commit object, or any
+// malformed shape is unknown evidence and throws.
+export function parseRemoteBranchTip(input: unknown, branch: string): string {
+  const parsed = RemoteBranchTipSchema.safeParse(input);
+  if (!parsed.success || parsed.data.ref !== `refs/heads/${branch}`) {
+    throw new Error('Invalid remote branch tip response');
+  }
+  return parsed.data.object.sha;
+}
+
+function fetchRemoteBranchTip(branch: string): string {
+  return parseRemoteBranchTip(
+    JSON.parse(gh(['api', `repos/{owner}/{repo}/git/ref/heads/${branch}`])),
+    branch
+  );
+}
+
+// The dispatch fence. The pushed-ref snapshot can be a full producer
+// watch old by the time a dispatch is considered, and dispatching builds
+// whatever the remote branch points at then — silently retargeting the
+// build away from the commit this host computed its nativeHash from.
+// Immediately before dispatch, prove the local branch, HEAD, and
+// upstream still equal the snapshot and that the actual remote tip
+// (read from the API, not the possibly stale tracking ref) is still the
+// requested SHA. Anything moved or unverifiable stops without dispatch.
+function revalidatePushedRef(ref: PushedRef): boolean {
+  const current = currentPushedRef();
+  if (!current) return false;
+  if (current.branch !== ref.branch || current.headSha !== ref.headSha) {
+    log(
+      `local ref moved from ${ref.branch}@${ref.headSha} to ${current.branch}@${current.headSha} while waiting; not dispatching under the original native inputs`
+    );
+    return false;
+  }
+  for (let attempt = 1; attempt <= PRODUCER_LOOKUP_ATTEMPTS; attempt++) {
+    try {
+      const tip = fetchRemoteBranchTip(ref.branch);
+      if (tip !== ref.headSha) {
+        log(
+          `remote branch ${ref.branch} is at ${tip}, not the requested ${ref.headSha}; not dispatching under the original native inputs`
+        );
+        return false;
+      }
+      return true;
+    } catch (error) {
+      if (attempt === PRODUCER_LOOKUP_ATTEMPTS) {
+        log(`could not verify remote branch tip (${message(error)}); no run was dispatched`);
+        return false;
+      }
+      sleepSync(PRODUCER_LOOKUP_RETRY_MS);
+    }
+  }
+  return false;
+}
+
 function watchRun(runId: number, startedAt: number): boolean {
   try {
     execFileSync('gh', ['run', 'watch', String(runId), '--exit-status', '--interval', '30'], {
@@ -647,49 +711,79 @@ function watchRun(runId: number, startedAt: number): boolean {
   }
 }
 
-// Join an existing compatible producer instead of dispatching a duplicate.
-// 'reused' means the producer succeeded and its artifact may now be looked
-// up; 'dispatch' means no usable producer exists; 'failed' means the watch
-// itself gave up without a terminal producer result to react to. The
-// producer run is never cancelled or otherwise mutated.
-function joinExistingProducer(
+// One validated producer discovery with bounded read retries. Returns
+// the producer, `undefined` when discovery proves none is usable, or
+// `null` when reads stayed unverifiable — unknown evidence, never a
+// reason to dispatch a duplicate.
+function discoverProducer(
   platform: 'ios' | 'android',
   ref: PushedRef
-): 'reused' | 'dispatch' | 'failed' {
-  let producer: NativeProducerRun | undefined;
+): NativeProducerRun | undefined | null {
   for (let attempt = 1; attempt <= PRODUCER_LOOKUP_ATTEMPTS; attempt++) {
     try {
-      producer = findNativeProducer({ platform, ...ref });
-      break;
+      return findNativeProducer({ platform, ...ref });
     } catch (error) {
       if (attempt === PRODUCER_LOOKUP_ATTEMPTS) {
         log(`existing producer lookup failed (${message(error)}); no run was dispatched`);
-        return 'failed';
+        return null;
       }
       sleepSync(PRODUCER_LOOKUP_RETRY_MS);
     }
   }
-  if (!producer) return 'dispatch';
-  if (producer.status === 'completed') {
-    log(`existing producer run ${producer.id} already succeeded; reusing its artifact`);
-    return 'reused';
-  }
-  const startedAt = Date.now();
-  log(
-    `joining existing producer run ${producer.id} on ${producer.headBranch} at ${producer.headSha}; waiting for the run`
-  );
-  if (watchRun(producer.id, startedAt)) return 'reused';
-  // The watch failed. A producer that ended failed or cancelled leaves no
-  // trusted artifact, so dispatch a fresh run. A producer that is still
-  // active means the watch timed out: give up as a dispatched run would.
-  const refreshed = refreshNativeProducer(producer.id);
-  if (refreshed?.status === 'completed' && refreshed.conclusion !== 'success') {
+  return null;
+}
+
+// Join an existing compatible producer instead of dispatching a duplicate.
+// 'reused' means a producer succeeded and its artifact may now be looked
+// up; 'dispatch' means discovery proved no usable producer exists;
+// 'failed' means a watch or a read gave up on unknown evidence. Each
+// watched run is joined at most once, and no run is ever cancelled or
+// otherwise mutated.
+function joinExistingProducer(
+  platform: 'ios' | 'android',
+  ref: PushedRef
+): 'reused' | 'dispatch' | 'failed' {
+  const joinedRunIds = new Set<number>();
+  for (;;) {
+    const producer = discoverProducer(platform, ref);
+    if (producer === null) return 'failed';
+    if (!producer) return 'dispatch';
+    if (joinedRunIds.has(producer.id)) return 'failed';
+    if (producer.status === 'completed') {
+      log(`existing producer run ${producer.id} already succeeded; reusing its artifact`);
+      return 'reused';
+    }
+    joinedRunIds.add(producer.id);
+    const startedAt = Date.now();
     log(
-      `existing producer run ${producer.id} ended ${refreshed.conclusion ?? 'without success'}; dispatching a new run instead`
+      `joining existing producer run ${producer.id} on ${producer.headBranch} at ${producer.headSha}; waiting for the run`
     );
-    return 'dispatch';
+    if (watchRun(producer.id, startedAt)) return 'reused';
+    // The watch failed, which can be a watcher timeout or network error
+    // after the run itself finished. A refresh that positively proves
+    // completed success is reused exactly like a clean watch — the
+    // caller still validates the artifact through the trusted lookup. A
+    // producer proven terminal-failed or cancelled leaves no trusted
+    // artifact, but another compatible producer may still be active
+    // behind it: rediscover before dispatching a duplicate. A producer
+    // that is still active (or stays unreadable) means the watch timed
+    // out on unknown evidence: give up as a dispatched run would,
+    // without dispatching.
+    const refreshed = refreshNativeProducer(producer.id);
+    if (refreshed?.status === 'completed' && refreshed.conclusion === 'success') {
+      log(
+        `existing producer run ${producer.id} succeeded despite the failed watch; reusing its artifact`
+      );
+      return 'reused';
+    }
+    if (refreshed?.status === 'completed' && refreshed.conclusion !== 'success') {
+      log(
+        `existing producer run ${producer.id} ended ${refreshed.conclusion ?? 'without success'}; looking for another compatible producer`
+      );
+      continue;
+    }
+    return 'failed';
   }
-  return 'failed';
 }
 
 type DispatchRun = { databaseId: number; headSha: string };
@@ -714,7 +808,7 @@ function listDispatchRuns(branch: string): DispatchRun[] {
     '--json',
     'databaseId,headSha',
   ]);
-  return z.array(DispatchRunSchema).parse(JSON.parse(raw) as unknown);
+  return z.array(DispatchRunSchema).parse(JSON.parse(raw));
 }
 
 // `gh workflow run` reports no run id, and no listing exposes the dispatch
@@ -731,8 +825,11 @@ export function pickDispatchedRun(
 }
 
 // Dispatch the workflow for the pushed branch and wait for it to finish.
+// The ref fence runs first, so a moved or unverifiable ref stops here
+// without any dispatch or new-run lookup.
 function dispatchAndWatch(platform: 'ios' | 'android', ref: PushedRef): boolean {
   const startedAt = Date.now();
+  if (!revalidatePushedRef(ref)) return false;
   const { branch, headSha: head } = ref;
   let before: Set<number>;
   try {

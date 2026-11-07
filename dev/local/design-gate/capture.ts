@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { paintSignature } from '../../../apps/mobile/src/lib/design-gate/sampler';
+import { paintSignature } from '../../../apps/mobile/src/lib/design-gate/paint-state';
 import {
   captureAlignment,
   screenshotObservation,

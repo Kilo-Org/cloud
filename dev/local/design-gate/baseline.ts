@@ -9,6 +9,7 @@ import type { RunOutcome } from './capture';
 import { normalize, parseDump } from './tree';
 import type { Finding } from './findings';
 import { collapseFindings, type CollapsedFinding } from './report';
+import { baselineGit, containedProofSource } from './baseline-preflight';
 
 const Sha = z.string().regex(/^[0-9a-f]{40}$/);
 const Id = z.string().regex(/^[a-z][a-z0-9-]{0,63}$/);
@@ -173,13 +174,16 @@ export function sourceMarker(preparation: Preparation, revision: Revision): stri
 }
 
 /** Creates only new detached worktrees. Existing branches, env and runtime are untouched. */
-export function prepareProof(input: {
-  repo: string;
-  base: string;
-  head: string;
-  targets: string;
-  out: string;
-}): Preparation {
+export async function prepareProof(
+  input: {
+    repo: string;
+    base: string;
+    head: string;
+    targets: string;
+    out: string;
+  },
+  signal?: AbortSignal
+): Promise<Preparation> {
   Sha.parse(input.base);
   Sha.parse(input.head);
   const repo = fs.realpathSync(input.repo);
@@ -196,6 +200,7 @@ export function prepareProof(input: {
     return {
       revision,
       commit,
+      productTree: git(repo, ['rev-parse', `${commit}^{tree}`]).trim(),
       files: generatedFiles(repo, commit, manifest, `${commit}:${manifestSha256}`),
     };
   });
@@ -205,44 +210,61 @@ export function prepareProof(input: {
   const outputIdentity = fs.statSync(output);
   const attempted: string[] = [];
   try {
+    signal?.throwIfAborted();
     const revisions = {} as Record<Revision, z.infer<typeof RevisionSchema>>;
     for (const plan of plans) {
       const directory = path.join(output, plan.revision);
       attempted.push(directory);
-      git(repo, ['worktree', 'add', '--detach', directory, plan.commit]);
+      await baselineGit(repo, ['worktree', 'add', '--detach', directory, plan.commit], signal);
       const prepared: z.infer<typeof PreparedFileSchema>[] = [];
       for (const [file, text] of plan.files) {
-        fs.mkdirSync(path.dirname(path.join(directory, file)), { recursive: true });
-        fs.writeFileSync(path.join(directory, file), text);
+        signal?.throwIfAborted();
+        const destination = containedProofSource(directory, file, true);
+        await fs.promises.writeFile(destination, text, {
+          signal,
+          flag:
+            fs.constants.O_WRONLY |
+            fs.constants.O_CREAT |
+            fs.constants.O_TRUNC |
+            fs.constants.O_NOFOLLOW,
+        });
         prepared.push({ path: file, sha256: digest(text) });
       }
       revisions[plan.revision] = {
         directory,
         commit: plan.commit,
-        productTree: git(repo, ['rev-parse', `${plan.commit}^{tree}`]).trim(),
+        productTree: plan.productTree,
         prepared,
       };
     }
     const preparation: Preparation = { version: 1, ...revisions, manifest, manifestSha256 };
-    fs.writeFileSync(path.join(output, 'preparation.json'), JSON.stringify(preparation, null, 2));
+    await fs.promises.writeFile(
+      path.join(output, 'preparation.json'),
+      JSON.stringify(preparation, null, 2),
+      { signal, flag: 'wx' }
+    );
+    signal?.throwIfAborted();
     return preparation;
   } catch (error) {
     const cleanupErrors: unknown[] = [];
     for (const directory of attempted.reverse()) {
       try {
-        const registered = git(repo, ['worktree', 'list', '--porcelain', '-z'])
+        const registered = (await baselineGit(repo, ['worktree', 'list', '--porcelain', '-z']))
           .split('\0')
           .includes(`worktree ${directory}`);
-        if (registered) git(repo, ['worktree', 'remove', '--force', directory]);
+        if (registered)
+          await baselineGit(repo, ['worktree', 'remove', '--force', '--force', directory]);
       } catch (cleanupError) {
         cleanupErrors.push(cleanupError);
       }
     }
     if (cleanupErrors.length === 0) {
       try {
-        const currentIdentity = fs.statSync(output);
+        const currentIdentity = fs.lstatSync(output);
         if (
           currentIdentity.dev !== outputIdentity.dev ||
+          !currentIdentity.isDirectory() ||
+          currentIdentity.isSymbolicLink() ||
           currentIdentity.ino !== outputIdentity.ino
         ) {
           throw new Error('Preparation output ownership changed; refusing cleanup');
@@ -289,10 +311,8 @@ export function validatePreparedSource(
     throw new Error('Diagnostic provenance differs from generated plumbing');
   }
   for (const [file, text] of expected) {
-    if (
-      fs.lstatSync(path.join(cwd, file)).isSymbolicLink() ||
-      fs.readFileSync(path.join(cwd, file), 'utf8') !== text
-    ) {
+    const sourceFile = containedProofSource(cwd, file);
+    if (fs.readFileSync(sourceFile, 'utf8') !== text) {
       throw new Error(`Prepared diagnostic source changed: ${file}`);
     }
   }
@@ -316,17 +336,32 @@ export async function verifyRuntimeSource(
   preparation: Preparation,
   revision: Revision,
   metro: string,
-  names: readonly string[]
+  names: readonly string[],
+  deps: {
+    listPages: typeof listPages;
+    openSession: typeof openSession;
+    evaluate: typeof evaluate;
+  } = { listPages, openSession, evaluate }
 ): Promise<void> {
-  const pages = await listPages(metro);
-  if (pages.filter(page => page.webSocketDebuggerUrl !== undefined).length !== 1) {
-    throw new Error('Prepared proof requires exactly one connected runtime');
+  const pages = await deps.listPages(metro);
+  const wanted = names.map(name => name.toLowerCase()).filter(name => name.length > 0);
+  const matching = pages.filter(
+    page =>
+      (page.webSocketDebuggerUrl ?? '').length > 0 &&
+      wanted.some(name =>
+        [page.deviceName, page.title].some(field => field?.toLowerCase().includes(name) === true)
+      )
+  );
+  if (matching.length !== 1) {
+    throw new Error(
+      'Prepared proof requires exactly one positively device-matched connected runtime'
+    );
   }
-  const page = selectPage(pages, names);
+  const page = selectPage(matching, names);
   if (page?.webSocketDebuggerUrl === undefined) throw new Error('No unique prepared runtime');
-  const session = await openSession(page.webSocketDebuggerUrl);
+  const session = await deps.openSession(page.webSocketDebuggerUrl);
   try {
-    const observed = await evaluate(session, `globalThis.${MARKER}`);
+    const observed = await deps.evaluate(session, `globalThis.${MARKER}`);
     if (observed !== sourceMarker(preparation, revision))
       throw new Error('Runtime is stale or not the prepared product bundle');
   } finally {
@@ -519,12 +554,17 @@ const FindingsSchema = z.object({
   ),
   findings: z.array(ComparisonFindingSchema),
 });
-export function compareProof(
+export async function compareProof(
   preparation: Preparation,
   baseRun: string,
   headRun: string,
-  out: string
-): { status: 'comparable' | 'inconclusive'; introduced: CollapsedFinding[]; reasons: string[] } {
+  out: string,
+  signal?: AbortSignal
+): Promise<{
+  status: 'comparable' | 'inconclusive';
+  introduced: CollapsedFinding[];
+  reasons: string[];
+}> {
   if (fs.existsSync(out))
     throw new Error(
       'Comparison output must be a new directory; prior evidence is never overwritten'
@@ -625,19 +665,41 @@ export function compareProof(
     reasons: [...new Set(reasons)],
   };
   fs.mkdirSync(out);
-  fs.writeFileSync(
-    path.join(out, '.comparison.json.tmp'),
-    JSON.stringify(
-      {
-        ...result,
-        base: preparation.base.commit,
-        head: preparation.head.commit,
-        manifestSha256: preparation.manifestSha256,
-      },
-      null,
-      2
-    )
-  );
-  fs.renameSync(path.join(out, '.comparison.json.tmp'), path.join(out, 'comparison.json'));
-  return result;
+  const outputIdentity = fs.lstatSync(out);
+  try {
+    signal?.throwIfAborted();
+    await fs.promises.writeFile(
+      path.join(out, '.comparison.json.tmp'),
+      JSON.stringify(
+        {
+          ...result,
+          base: preparation.base.commit,
+          head: preparation.head.commit,
+          manifestSha256: preparation.manifestSha256,
+        },
+        null,
+        2
+      ),
+      { signal, flag: 'wx' }
+    );
+    signal?.throwIfAborted();
+    await fs.promises.rename(
+      path.join(out, '.comparison.json.tmp'),
+      path.join(out, 'comparison.json')
+    );
+    signal?.throwIfAborted();
+    return result;
+  } catch (error) {
+    const current = fs.lstatSync(out);
+    if (
+      !current.isDirectory() ||
+      current.isSymbolicLink() ||
+      current.dev !== outputIdentity.dev ||
+      current.ino !== outputIdentity.ino
+    ) {
+      throw new AggregateError([error], 'Comparison output ownership changed; refusing cleanup');
+    }
+    await fs.promises.rm(out, { recursive: true });
+    throw error;
+  }
 }

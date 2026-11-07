@@ -24,7 +24,20 @@ export default function OrganizationLayout() {
     <Stack screenLayout={appScreenLayout} screenOptions={{ headerShown: false }}>
       <Stack.Screen
         name="invite-member"
-        options={{ ...organizationSheetOptions, gestureEnabled: false }}
+        options={{
+          ...organizationSheetOptions,
+          // The invite form auto-focuses its email field, so the keyboard opens
+          // while the sheet is still at the half detent and covers the field
+          // and the role list. The fields sit at the sheet's top, so a half
+          // sheet cannot keep them above the IME: one full detent keeps the
+          // form above the keyboard and the dismissal inside the sheet, the
+          // same single-detent layout every other Android formSheet with a
+          // focused input carries.
+          ...(Platform.OS === 'android'
+            ? { sheetAllowedDetents: [sheetOptions.sheetAllowedDetents[1]] }
+            : {}),
+          gestureEnabled: false,
+        }}
       />
       <Stack.Screen name="member-limit" options={organizationSheetOptions} />
       <Stack.Screen name="low-balance-alert" options={organizationSheetOptions} />

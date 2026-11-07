@@ -23,6 +23,7 @@ import {
   count,
   ne,
   inArray,
+  or,
   sql,
   gte,
   lte,
@@ -1440,40 +1441,63 @@ function buildCodeReviewUsageUpdateData(
 }
 
 /**
- * Records usage on a code review at most once.
+ * Records usage on a code review once per metered column.
  *
- * The write is a compare-and-set on the three metered columns: it applies only
- * while the review has no recorded token or cost totals, so a call that repeats
- * or arrives after another writer recorded usage leaves the stored values
- * unchanged. Only {@link backfillCodeReviewUsage} may overwrite recorded usage;
- * it runs from the terminal status callback with the billing totals, which are
- * the source of truth for token usage.
+ * Each metered column is written only while it is still empty, so a call that
+ * repeats or arrives after another writer recorded usage leaves the stored
+ * values unchanged and fills only totals that are still missing. The model is
+ * recorded with the first usage write and is never replaced here. A call
+ * without metered values records nothing.
  *
- * Returns whether the row changed. A payload without usage values records
- * nothing and reports `false`.
+ * Only {@link backfillCodeReviewUsage} may replace recorded usage; it runs from
+ * the terminal status callback with the billing totals, which are the source of
+ * truth for token usage.
+ *
+ * Returns whether the row changed.
  */
 export async function settleCodeReviewUsage(
   reviewId: string,
   usage: CodeReviewUsage
 ): Promise<boolean> {
-  const updateData = buildCodeReviewUsageUpdateData(usage);
-  const hasUsageValue = Object.keys(updateData).length > 0;
-  if (!hasUsageValue) {
+  const unsettledColumns: SQL[] = [];
+  if (usage.totalTokensIn !== undefined) {
+    unsettledColumns.push(isNull(cloud_agent_code_reviews.total_tokens_in));
+  }
+  if (usage.totalTokensOut !== undefined) {
+    unsettledColumns.push(isNull(cloud_agent_code_reviews.total_tokens_out));
+  }
+  if (usage.totalCostMusd !== undefined) {
+    unsettledColumns.push(isNull(cloud_agent_code_reviews.total_cost_musd));
+  }
+  if (unsettledColumns.length === 0) {
     return false;
   }
 
   try {
     const updated = await db
       .update(cloud_agent_code_reviews)
-      .set({ ...updateData, updated_at: new Date().toISOString() })
-      .where(
-        and(
-          eq(cloud_agent_code_reviews.id, reviewId),
-          isNull(cloud_agent_code_reviews.total_tokens_in),
-          isNull(cloud_agent_code_reviews.total_tokens_out),
-          isNull(cloud_agent_code_reviews.total_cost_musd)
-        )
-      )
+      .set({
+        ...(usage.model !== undefined
+          ? { model: sql`COALESCE(${cloud_agent_code_reviews.model}, ${usage.model})` }
+          : {}),
+        ...(usage.totalTokensIn !== undefined
+          ? {
+              total_tokens_in: sql`COALESCE(${cloud_agent_code_reviews.total_tokens_in}, ${usage.totalTokensIn})`,
+            }
+          : {}),
+        ...(usage.totalTokensOut !== undefined
+          ? {
+              total_tokens_out: sql`COALESCE(${cloud_agent_code_reviews.total_tokens_out}, ${usage.totalTokensOut})`,
+            }
+          : {}),
+        ...(usage.totalCostMusd !== undefined
+          ? {
+              total_cost_musd: sql`COALESCE(${cloud_agent_code_reviews.total_cost_musd}, ${usage.totalCostMusd})`,
+            }
+          : {}),
+        updated_at: new Date().toISOString(),
+      })
+      .where(and(eq(cloud_agent_code_reviews.id, reviewId), or(...unsettledColumns)))
       .returning({ id: cloud_agent_code_reviews.id });
 
     return updated.length > 0;

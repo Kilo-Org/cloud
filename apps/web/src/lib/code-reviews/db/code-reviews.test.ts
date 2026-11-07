@@ -3142,17 +3142,71 @@ describe('code review usage writes', () => {
     expect(stored.total_cost_musd).toBe(90000);
   });
 
-  it('records nothing for a call that carries no usage, so a later call still settles', async () => {
+  it('fills a metered value that an earlier call left out without changing the recorded ones', async () => {
     const reviewId = await insertReview();
 
-    await expect(settleCodeReviewUsage(reviewId, {})).resolves.toBe(false);
-    const empty = await readReview(reviewId);
-    expect(empty.total_tokens_in).toBeNull();
+    await expect(
+      settleCodeReviewUsage(reviewId, {
+        model: 'anthropic/claude-sonnet-4.6',
+        totalTokensIn: 1200,
+        totalTokensOut: 340,
+      })
+    ).resolves.toBe(true);
+
+    const partial = await readReview(reviewId);
+    expect(partial.total_tokens_in).toBe(1200);
+    expect(partial.total_tokens_out).toBe(340);
+    expect(partial.total_cost_musd).toBeNull();
 
     await expect(
-      settleCodeReviewUsage(reviewId, { totalTokensIn: 5, totalTokensOut: 6, totalCostMusd: 7 })
+      settleCodeReviewUsage(reviewId, {
+        model: 'openai/gpt-5',
+        totalTokensIn: 9,
+        totalTokensOut: 9,
+        totalCostMusd: 56780,
+      })
+    ).resolves.toBe(true);
+
+    const completed = await readReview(reviewId);
+    expect(completed.model).toBe('anthropic/claude-sonnet-4.6');
+    expect(completed.total_tokens_in).toBe(1200);
+    expect(completed.total_tokens_out).toBe(340);
+    expect(completed.total_cost_musd).toBe(56780);
+
+    await expect(
+      settleCodeReviewUsage(reviewId, {
+        model: 'openai/gpt-5',
+        totalTokensIn: 9,
+        totalTokensOut: 9,
+        totalCostMusd: 1,
+      })
+    ).resolves.toBe(false);
+    const unchanged = await readReview(reviewId);
+    expect(unchanged.total_cost_musd).toBe(56780);
+  });
+
+  it('ignores a call without metered values and records usage when it arrives later', async () => {
+    const reviewId = await insertReview();
+
+    await expect(
+      settleCodeReviewUsage(reviewId, { model: 'anthropic/claude-sonnet-4.6' })
+    ).resolves.toBe(false);
+    const empty = await readReview(reviewId);
+    expect(empty.model).toBeNull();
+    expect(empty.total_tokens_in).toBeNull();
+    expect(empty.total_tokens_out).toBeNull();
+    expect(empty.total_cost_musd).toBeNull();
+
+    await expect(
+      settleCodeReviewUsage(reviewId, {
+        model: 'anthropic/claude-sonnet-4.6',
+        totalTokensIn: 5,
+        totalTokensOut: 6,
+        totalCostMusd: 7,
+      })
     ).resolves.toBe(true);
     const stored = await readReview(reviewId);
+    expect(stored.model).toBe('anthropic/claude-sonnet-4.6');
     expect(stored.total_tokens_in).toBe(5);
     expect(stored.total_tokens_out).toBe(6);
     expect(stored.total_cost_musd).toBe(7);

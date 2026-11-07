@@ -75,8 +75,9 @@ export async function POST(
       totalCostMusd: totalCostMusd,
     });
 
-    // Usage is recorded once per review. A repeated or late callback leaves the
-    // stored values alone and still succeeds, so the caller has nothing to retry.
+    // Each metered value is recorded once. A repeated or late callback keeps the
+    // stored values, fills only totals that are still missing, and still
+    // succeeds, so the caller has nothing to retry.
     logExceptInTest('[code-review-usage] Usage data settled', { reviewId, stored });
 
     return NextResponse.json({ success: true });

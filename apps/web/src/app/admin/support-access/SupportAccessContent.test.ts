@@ -100,8 +100,14 @@ jest.mock('@/lib/trpc/utils', () => ({
     admin: {
       supportAccess: {
         listMine: { queryOptions: () => ({ kind: 'mine' }), queryKey: () => ['support-mine'] },
-        listPending: { queryOptions: () => ({ kind: 'pending' }), queryKey: () => ['support-pending'] },
-        listActive: { queryOptions: () => ({ kind: 'active' }), queryKey: () => ['support-active'] },
+        listPending: {
+          queryOptions: () => ({ kind: 'pending' }),
+          queryKey: () => ['support-pending'],
+        },
+        listActive: {
+          queryOptions: () => ({ kind: 'active' }),
+          queryKey: () => ['support-active'],
+        },
         listUnreviewedEmergency: {
           queryOptions: () => ({ kind: 'emergencies' }),
           queryKey: () => ['support-emergencies'],
@@ -259,7 +265,14 @@ describe('SupportAccessContent', () => {
   });
 
   it('disables Mark reviewed while the session is unresolved and for the issuing viewer', () => {
-    mockEmergencies.data = [writeRow({ id: requestId, actorKiloUserId: requesterId, grantKind: 'emergency', status: 'active' })];
+    mockEmergencies.data = [
+      writeRow({
+        id: requestId,
+        actorKiloUserId: requesterId,
+        grantKind: 'emergency',
+        status: 'active',
+      }),
+    ];
     mockSession = { status: 'loading', data: null };
     render();
     expect(rowFor('holder-user-requester@example.com').find('Mark reviewed').disabled).toBe(true);
@@ -273,7 +286,12 @@ describe('SupportAccessContent', () => {
   it('enables Mark reviewed for a grant issued by someone else', () => {
     const thirdId = 'user-third';
     mockEmergencies.data = [
-      writeRow({ id: requestId, actorKiloUserId: requesterId, grantKind: 'emergency', status: 'active' }),
+      writeRow({
+        id: requestId,
+        actorKiloUserId: requesterId,
+        grantKind: 'emergency',
+        status: 'active',
+      }),
       writeRow({ id: otherId, actorKiloUserId: thirdId, grantKind: 'emergency', status: 'active' }),
     ];
     mockSession = { status: 'authenticated', data: { kiloUserId: approverId } };
@@ -288,8 +306,18 @@ describe('SupportAccessContent', () => {
 
   it('disables Mark reviewed for the issuer’s own grant', () => {
     mockEmergencies.data = [
-      writeRow({ id: requestId, actorKiloUserId: requesterId, grantKind: 'emergency', status: 'active' }),
-      writeRow({ id: otherId, actorKiloUserId: approverId, grantKind: 'emergency', status: 'active' }),
+      writeRow({
+        id: requestId,
+        actorKiloUserId: requesterId,
+        grantKind: 'emergency',
+        status: 'active',
+      }),
+      writeRow({
+        id: otherId,
+        actorKiloUserId: approverId,
+        grantKind: 'emergency',
+        status: 'active',
+      }),
     ];
     mockSession = { status: 'authenticated', data: { kiloUserId: requesterId } };
     render();

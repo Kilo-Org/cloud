@@ -20,6 +20,7 @@ export function SheetHeader({
   disabled = false,
   doneDisabled = false,
   topInset = 'always',
+  surfaceClassName = 'bg-background',
 }: {
   title: string;
   /**
@@ -46,6 +47,12 @@ export function SheetHeader({
    */
   doneDisabled?: boolean;
   topInset?: SheetHeaderTopInset;
+  /**
+   * The surface the sheet paints behind the header. A sheet that sits on the
+   * raised dark surface passes `bg-card` so its top edge separates from the
+   * near-black window behind it; the app canvas colour is the default.
+   */
+  surfaceClassName?: string;
 }) {
   const { t } = useTranslation();
   const colors = useThemeColors();
@@ -72,7 +79,10 @@ export function SheetHeader({
     // collapsable={false}: react-native-screens lays out a formSheet's scroll
     // view by finding the header at the screen content's subview index 0 — a
     // flattened header breaks that native pass and the list paints over it.
-    <View collapsable={false} className="border-b border-border bg-background px-4 pb-3 pt-4">
+    <View
+      collapsable={false}
+      className={cn('border-b border-border px-4 pb-3 pt-4', surfaceClassName)}
+    >
       <View style={safeAreaStyle}>
         <View className="min-h-[48px] flex-row items-center gap-x-3">
           {onShare !== undefined ? (

@@ -308,7 +308,7 @@ describe('SheetHeader', () => {
     const disabledInk = String(
       renderer.root.findByProps({ children: 'Done' }).props.className
     ).split(' ');
-    expect(disabledInk).toContain('text-primary-disabled');
+    expect(disabledInk).toContain('text-muted-foreground');
     expect(disabledInk).not.toContain('text-primary');
 
     await act(async () => {

@@ -130,10 +130,7 @@ export function InviteMemberSheet() {
 
   if (isResolving) {
     return (
-      <SheetScrollView
-        className="flex-1 bg-background"
-        contentContainerClassName="px-6 gap-6 pb-8 pt-4"
-      >
+      <SheetScrollView className="flex-1 bg-card" contentContainerClassName="px-6 gap-6 pb-8 pt-4">
         <Skeleton className="h-11 rounded-lg" />
         <Skeleton className="h-11 rounded-lg" />
       </SheetScrollView>
@@ -181,9 +178,10 @@ export function InviteMemberSheet() {
         // full-detent Android layout is a stack root, and the base-route runs
         // measure exactly that case (shared rule at the route-focus helper).
         topInset={isStackRoot ? 'android-window-top' : 'bottom-form-sheet'}
+        surfaceClassName="bg-card"
       />
       <SheetScrollView
-        className="flex-1 bg-background"
+        className="flex-1 bg-card"
         contentContainerClassName="px-6 gap-6 pb-8 pt-4"
         automaticallyAdjustKeyboardInsets
         keyboardShouldPersistTaps="handled"

@@ -1119,10 +1119,28 @@ class Budget:
         if state != "settled" and not accounted:
             self.stop(f"{state}_charge:{request_id}")
 
+    def recover_reservations(self, db, run=None):
+        rows = db.execute("SELECT id,receipt FROM requests WHERE state='reserved' AND (? IS NULL OR run=?)", (run, run)).fetchall()
+        unknown = []
+        for request_id, receipt_path in rows:
+            admitted = db.execute("SELECT 1 FROM router_dispatches WHERE request_id=?", (request_id,)).fetchone() is not None
+            registered = db.execute("SELECT 1 FROM router_requests WHERE id=?", (request_id,)).fetchone() is not None
+            try:
+                receipt = load(receipt_path) if Path(receipt_path).is_file() else {}
+            except (OSError, ValueError):
+                receipt = {}
+            if not isinstance(receipt, dict):
+                receipt = {}
+            if registered and not admitted and receipt.get("dispatch_entered", False) is False:
+                db.execute("UPDATE requests SET state='settled',bound='0',actual='0',tokens=0 WHERE id=? AND state='reserved'", (request_id,))
+            else:
+                db.execute("UPDATE requests SET state='unknown' WHERE id=? AND state='reserved'", (request_id,))
+                unknown.append(request_id)
+        return unknown
+
     def orphan_stop(self):
         with MUTEX, self.connect() as db:
-            orphans = [row[0] for row in db.execute("SELECT id FROM requests WHERE state='reserved'")]
-            db.executemany("UPDATE requests SET state='unknown' WHERE id=? AND state='reserved'", ((request_id,) for request_id in orphans))
+            orphans = self.recover_reservations(db)
             interrupted = db.execute("UPDATE router_runs SET state='interrupted' WHERE state='active'").rowcount
         if orphans:
             self.stop("orphaned_reservations:" + ",".join(orphans))
@@ -1628,7 +1646,7 @@ def concurrent_row(out, directory, manifest, row, task, approval, cfg, batch, pr
             budget.stop("outstanding_requests_after_child:" + row["run"])
         if process.exitcode != 0 or result["state"] == "interrupted":
             with closing(budget.connect()) as db:
-                db.execute("UPDATE requests SET state='unknown' WHERE run=? AND state='reserved'", (row["run"],))
+                budget.recover_reservations(db, row["run"])
         with closing(budget.connect()) as db:
             db.execute("UPDATE router_runs SET state=? WHERE run=?", (result["state"], row["run"]))
             unknown = any(item["state"] not in {"settled", "reserved"} and not accounted_row_valid(db, item) and not CAMPAIGN.historical_commitment(db, item) for item in budget.modules["study"].request_rows(db))
@@ -1945,7 +1963,7 @@ def validate_pilot_evidence(out, manifest, plan, evidence_path):
     if evidence["parser"]["revision"] != helper("router-replay").MINI_REVISION:
         raise ValueError("Pilot parser revision differs from the pinned text transport")
     observations = evidence["observations"]
-    if not isinstance(observations, list) or [item.get("run") for item in observations if isinstance(item, dict)] != evidence["runs"]:
+    if not isinstance(observations, list) or len(observations) != len(pilot) or not all(isinstance(item, dict) for item in observations) or [item.get("run") for item in observations] != evidence["runs"]:
         raise ValueError("Pilot observations must cover both baseline runs in frozen order")
     for observation, row in zip(observations, pilot):
         if any(observation.get(key) != row[key] for key in ("run", "router", "instance_id", "configuration", "repetition")) or observation.get("status") != "completed" or observation.get("exit_status") != "Submitted" or type(observation.get("resolved")) is not bool:

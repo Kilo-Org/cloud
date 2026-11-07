@@ -87,6 +87,16 @@ class ReplayInvariants(unittest.TestCase):
             self.assertFalse(summary['receipt_reconciliation']['all_requests_attributed'])
             self.assertEqual(before, {str(path): path.read_bytes() for path in evidence.rglob('*') if path.is_file()})
 
+    def test_infrastructure_failures_never_become_model_quality_failures(self):
+        for status, reason in (("completed", "grader_infra_invalid"), ("infra_invalid", "infra_invalid"), ("infra_invalid", None)):
+            with self.subTest(status=status, reason=reason), tempfile.TemporaryDirectory() as directory:
+                folder = Path(directory)
+                (folder / 'result.json').write_text(json.dumps({'status': status, 'result': {'exit_status': 'Submitted'}}))
+                (folder / 'evaluation.json').write_text(json.dumps({'reason': reason, 'result': ['case', {'case': {'resolved': False}}]}))
+                value = replay.inspect_rollout(folder, {'run': 'run', 'instance_id': 'case', 'router': 'efficient', 'configuration': 'baseline'}, [])
+                self.assertEqual(value['category'], 'grader_infrastructure_failure')
+                self.assertFalse(value['model_quality_inference_allowed'])
+
 
 class ReceiptReplay(unittest.TestCase):
     @classmethod
@@ -153,14 +163,6 @@ class ReceiptReplay(unittest.TestCase):
         self.assertIsNone(value['text_parser'])
         self.assertEqual(value['category'], 'missing_or_invalid_provider_response')
 
-    def test_grader_timeout_remains_infrastructure_even_with_a_partial_grade(self):
-        with tempfile.TemporaryDirectory() as directory:
-            folder = Path(directory)
-            (folder / 'result.json').write_text(json.dumps({'status': 'completed', 'result': {'exit_status': 'Submitted'}}))
-            (folder / 'evaluation.json').write_text(json.dumps({'reason': 'grader_infra_invalid', 'error': {'message': 'Test timed out after bounded execution'}, 'result': ['case', {'case': {'resolved': False}}]}))
-            value = replay.inspect_rollout(folder, {'run': 'run', 'instance_id': 'case', 'router': 'efficient', 'configuration': 'baseline'}, [])
-            self.assertEqual(value['category'], 'grader_infrastructure_failure')
-            self.assertFalse(value['model_quality_inference_allowed'])
 
     def test_network_guard_denies_transport_without_attempting_a_connection(self):
         with replay.no_network() as attempts:

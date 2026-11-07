@@ -218,6 +218,36 @@ class LedgerBoundaries(unittest.TestCase):
         with sqlite3.connect(self.ledger) as db:
             return self.study.request_rows(db), dict(db.execute("SELECT id,kind FROM router_requests")), db.execute("SELECT reason FROM router_stop").fetchall()
 
+    def test_recovery_releases_only_reservations_that_never_entered_dispatch(self):
+        cases = ("missing_receipt", "unused_receipt", "invalid_receipt", "admitted", "dispatched", "historical")
+        requests = {}
+        for run in cases:
+            self.activate(run)
+            if run == "historical":
+                request, receipt = "historical-request", self.out / "historical-receipt.json"
+                with sqlite3.connect(self.ledger) as db:
+                    db.execute("INSERT INTO requests VALUES (?,?, '1',NULL,NULL,'reserved',?,1)", (request, run, str(receipt)))
+            else:
+                request, receipt = self.budget.reserve(self.out, run, Decimal("1"), 1, cfg=self.cfg, ledger_out=self.out)
+            requests[run] = request
+            if run == "invalid_receipt":
+                receipt.write_text("{")
+            elif run != "missing_receipt":
+                self.study.save(receipt, {"dispatch_entered": run == "dispatched"})
+            with sqlite3.connect(self.ledger) as db:
+                if run == "admitted":
+                    db.execute("INSERT INTO router_dispatches VALUES (?,?,?,?)", (request, run, "a" * 64, time.time()))
+        recovered = self.budget.orphan_stop()
+        self.assertEqual(set(recovered["orphaned_requests"]), {requests[run] for run in ("admitted", "dispatched", "historical")})
+        rows, _, _ = self.rows()
+        for row in rows:
+            if row["run"] in ("missing_receipt", "unused_receipt", "invalid_receipt"):
+                self.assertEqual((row["state"], row["bound"], row["actual"], row["tokens"]), ("settled", "0", "0", 0))
+            else:
+                self.assertEqual((row["state"], row["bound"], row["actual"]), ("unknown", "1", None))
+        self.assertTrue(self.budget.stopped("tuning"))
+        self.assertEqual(self.budget.orphan_stop()["orphaned_requests"], [])
+
     def test_tuning_keeps_final_reserve_and_requires_active_run(self):
         with self.assertRaises(RuntimeError):
             self.budget.reserve(self.out, "run-a", Decimal("1"), 1, cfg=self.cfg, ledger_out=self.out)
@@ -828,13 +858,17 @@ class ProspectiveBudget(unittest.TestCase):
                 router_study.final_selection(out, manifest)
 
     def test_pilot_protocol_provider_coverage_cost_and_grade_failures_block_final(self):
-        mutations = ("passed", "format", "typed", "dsml", "provider", "premature", "missing_solver", "cost", "evidence", "grade", "unknown")
+        mutations = ("passed", "format", "typed", "dsml", "provider", "premature", "missing_solver", "cost", "evidence", "grade", "unknown", "extra_observation", "nondict_observation")
         for mutation in mutations:
             with self.subTest(mutation=mutation), tempfile.TemporaryDirectory() as temporary:
                 ledger, out, manifest, plan, path, evidence = self.pilot_fixture(Path(temporary))
                 request = evidence["observations"][0]["requests"][0]
                 if mutation == "passed":
                     evidence["passed"] = False
+                elif mutation == "extra_observation":
+                    evidence["observations"].append("invalid")
+                elif mutation == "nondict_observation":
+                    evidence["observations"][0] = None
                 elif mutation == "format":
                     request["text_parser"]["accepted"] = False
                 elif mutation == "typed":

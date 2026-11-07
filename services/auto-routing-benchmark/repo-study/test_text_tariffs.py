@@ -56,6 +56,12 @@ class ComponentBounds(unittest.TestCase):
         with self.assertRaisesRegex(tariffs.TariffError, "explicit approved BYOK fee"):
             tariffs.endpoint_quote([endpoint()], without_fee)
 
+    def test_configured_input_limit_does_not_replace_endpoint_financing_capacity(self):
+        quote = tariffs.endpoint_quote([endpoint(max_prompt_tokens=5000)], CFG)
+        self.assertEqual(quote["public_constraints"]["input_bound"], CFG["max_input_tokens"])
+        self.assertEqual(quote["quantities"]["input_tokens"], 5000)
+        self.assertEqual(Decimal(quote["upstream_bound_usd"]), Decimal("0.105"))
+
     def test_negative_discount_is_markup_positive_discount_is_forgone(self):
         for discount, expected in ((-0.5, "0.1515"), (0.5, "0.101")):
             with self.subTest(discount=discount):
@@ -415,6 +421,60 @@ class Settlement(unittest.TestCase):
         candidate = quoted_candidate()
         upstream, attempt = study.financial_prices(candidate)
         self.assertEqual(attempt, upstream * Decimal("1.06"))
+
+class PaidSettlement(unittest.TestCase):
+    def test_settlement_survives_receipt_observer_and_competing_writer_failures(self):
+        import sqlite3
+        from types import SimpleNamespace
+        class BaseModel:
+            def __init__(self, **kwargs):
+                pass
+
+            def _prepare_messages_for_api(self, messages):
+                return messages
+
+            def _parse_actions(self, body):
+                return []
+
+        modules = {"minisweagent.exceptions": SimpleNamespace(FormatError=ValueError), "minisweagent.models.openrouter_textbased_model": SimpleNamespace(OpenRouterTextbasedModel=BaseModel)}
+
+        for failure in (None, "receipt", "observer", "competing_writer"):
+            with self.subTest(failure=failure), tempfile.TemporaryDirectory() as temporary:
+                out = Path(temporary)
+                receipt_path = out / "receipt.json"
+                with sqlite3.connect(out / "budget.sqlite") as db:
+                    db.execute("CREATE TABLE requests (id TEXT PRIMARY KEY, run TEXT, bound TEXT, actual TEXT, tokens INTEGER, state TEXT, receipt TEXT)")
+                    db.execute("INSERT INTO requests VALUES ('request','run','1',NULL,NULL,'reserved',?)", (str(receipt_path),))
+                bounder = SimpleNamespace(bound=lambda messages: 1, observe=mock.Mock(side_effect=RuntimeError("observer failed") if failure == "observer" else None))
+                body = {"usage": {"prompt_tokens": 1, "completion_tokens": 1, "is_byok": False, "cost": "0.01"}, "choices": [{"message": {"role": "assistant", "content": "done"}, "finish_reason": "stop"}]}
+
+                def complete(payload, deadline, receipt, path, **options):
+                    receipt["dispatch_entered"] = True
+                    if failure == "competing_writer":
+                        with sqlite3.connect(out / "budget.sqlite") as db:
+                            db.execute("UPDATE requests SET state='settled',actual='0.02',tokens=3 WHERE id='request'")
+                    return SimpleNamespace(raise_for_status=lambda: None), body
+
+                save = study.save
+                def save_receipt(path, value):
+                    if failure == "receipt" and value.get("status") == "settled":
+                        raise OSError("receipt write failed")
+                    save(path, value)
+
+                cfg = {**contract_cfg(), "wall_seconds": 60, "http_request_timeout_seconds": 30}
+                messages = [{"role": "user", "content": "task"}]
+                with mock.patch.dict(sys.modules, modules), mock.patch.object(study, "agent_settings", return_value={"model": {}}), mock.patch.object(study, "completion_http", side_effect=complete), mock.patch.object(study, "save", side_effect=save_receipt):
+                    model = study.paid_model(out, "run", quoted_candidate(), cfg=cfg, input_bounder=bounder, reservation=lambda *args, **kwargs: ("request", receipt_path), transport_admission=lambda *args: nullcontext(), state_guard=lambda *args: nullcontext())
+                    if failure:
+                        with self.assertRaises((RuntimeError, OSError)):
+                            model.query(messages)
+                    else:
+                        self.assertEqual(model.query(messages)["content"], "done")
+                with sqlite3.connect(out / "budget.sqlite") as db:
+                    self.assertEqual(db.execute("SELECT state,actual,tokens FROM requests").fetchone(), ("settled", "0.02", 3) if failure == "competing_writer" else ("settled", "0.01", 2))
+                if failure in (None, "observer"):
+                    receipt = study.load(receipt_path)
+                    self.assertEqual((receipt["status"], receipt["actual_usd"]), ("settled", "0.01"))
 
 
 if __name__ == "__main__":

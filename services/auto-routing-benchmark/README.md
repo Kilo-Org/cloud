@@ -721,12 +721,21 @@ posts exactly the approved bytes, and consumes each reservation once. It reports
 no pass or savings claim unless every arm has settled charges, determinate grades
 and the frozen coverage.
 
+Recovery releases a coordinator reservation at zero cost only when neither its
+dispatch admission nor its receipt indicates dispatch. Historical and admitted
+requests retain their full holds. Receipt or observer failures cannot overwrite
+a settled charge.
+
+The isolated runtime uses the installed Miniflare configuration API. Closing a
+run attempts every instance, reports disposal failures, and retains failed
+instances for another cleanup attempt. Package type checks include this runtime.
+
 Run the offline checks with:
 
 ```sh
 python3 -m pip install -r repo-study/requirements.txt
 (cd repo-study && python3 -m unittest test_text_tariffs)
-(cd scripts && python3 -m unittest test_router_ledger test_router_study)
+(cd scripts && python3 -m unittest test_router_ledger test_router_study test_router_proof test_router_replay.ReplayInvariants)
 ```
 
 Paid admission remains blocked if real account policy evidence is absent, if any

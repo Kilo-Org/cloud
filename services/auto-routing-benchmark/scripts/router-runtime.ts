@@ -31,7 +31,15 @@ import {
   type AutoRouter,
   type MirrorPayload,
 } from '@kilocode/auto-routing-contracts';
-import { Miniflare, type MiniflareOptions } from 'miniflare';
+import {
+  Headers,
+  Miniflare,
+  Response,
+  fetch,
+  type Request,
+  type MiniflareOptions,
+  type WorkerOptions,
+} from 'miniflare';
 import * as z from 'zod';
 import { parse as parseJsonc } from 'jsonc-parser';
 
@@ -192,11 +200,7 @@ type WorkerBundle = {
   entry: string;
   workerRoot: string;
   workerBundleSha256: string;
-  modules: {
-    type: 'ESModule' | 'Text' | 'Data' | 'CompiledWasm';
-    path: string;
-    contents: Uint8Array;
-  }[];
+  manifest: NonNullable<WorkerOptions['config']['manifest']>;
 };
 
 const VersionIdentitySchema = z.looseObject({
@@ -424,7 +428,7 @@ async function loadBundle(
   const versionIdentity = identity[version];
   const dir = path.join(preparedDirectory, version, 'bundle');
   const entry = path.join(preparedDirectory, versionIdentity.bundleEntry);
-  const modules: WorkerBundle['modules'] = [];
+  const modules: WorkerBundle['manifest']['modules'] = {};
   async function visit(directory: string): Promise<void> {
     for (const item of await readdir(directory, { withFileTypes: true })) {
       const filename = path.join(directory, item.name);
@@ -432,18 +436,18 @@ async function loadBundle(
       else if (item.isFile() && !item.name.endsWith('.map')) {
         const type =
           item.name.endsWith('.js') || item.name.endsWith('.mjs')
-            ? 'ESModule'
+            ? 'esm'
             : item.name.endsWith('.wasm')
-              ? 'CompiledWasm'
+              ? 'wasm'
               : item.name.endsWith('.txt') || item.name.endsWith('.html')
-                ? 'Text'
-                : 'Data';
-        modules.push({ type, path: filename, contents: await readFile(filename) });
+                ? 'text'
+                : 'data';
+        modules[path.relative(dir, filename)] = { type, contents: await readFile(filename) };
       } else if (!item.isFile()) fail('Prepared bundle contains a non-regular file');
     }
   }
   await visit(dir);
-  const entryModule = modules.find(module => module.path === entry);
+  const entryModule = modules[path.relative(dir, entry)];
   if (entryModule === undefined) fail(`${version}: prepared entry is missing`);
   const workerBundleSha256 = createHash('sha256').update(entryModule.contents).digest('hex');
   if (workerBundleSha256 !== versionIdentity.workerBundleSha256) {
@@ -454,7 +458,7 @@ async function loadBundle(
     entry,
     workerRoot: versionIdentity.workerRoot,
     workerBundleSha256,
-    modules: [entryModule, ...modules.filter(module => module !== entryModule)],
+    manifest: { mainModule: path.relative(dir, entry), modulesRoot: dir, modules },
   };
 }
 
@@ -630,36 +634,52 @@ async function createRuntime(options: {
       cf: false,
       workers: [
         {
-          name: 'router',
-          modules: bundle.modules,
-          modulesRoot: bundle.dir,
-          compatibilityDate: COMPATIBILITY_DATE,
-          compatibilityFlags: COMPATIBILITY_FLAGS,
-          kvNamespaces: ['AUTO_ROUTING_CONFIG'],
-          durableObjects: {
-            AUTO_ROUTING_DECISION_CACHE: {
-              className: 'AutoRoutingDecisionCacheDO',
-              useSQLite: true,
+          config: {
+            name: 'router',
+            type: 'worker',
+            manifest: bundle.manifest,
+            compatibilityDate: COMPATIBILITY_DATE,
+            compatibilityFlags: COMPATIBILITY_FLAGS,
+            exports: {
+              AutoRoutingDecisionCacheDO: { type: 'durable-object', storage: 'sqlite' },
+              AutoRoutingModeConfigDO: { type: 'durable-object', storage: 'sqlite' },
             },
-            AUTO_ROUTING_MODE_CONFIG: { className: 'AutoRoutingModeConfigDO', useSQLite: true },
+            env: {
+              AUTO_ROUTING_CONFIG: { type: 'kv' },
+              AUTO_ROUTING_DECISION_CACHE: {
+                type: 'durable-object',
+                worker: 'router',
+                exportName: 'AutoRoutingDecisionCacheDO',
+              },
+              AUTO_ROUTING_MODE_CONFIG: {
+                type: 'durable-object',
+                worker: 'router',
+                exportName: 'AutoRoutingModeConfigDO',
+              },
+              AUTO_ROUTING_CLASSIFIER_METRICS_V2: {
+                type: 'analytics-engine-dataset',
+                name: 'benchmark_local_metrics',
+              },
+              BENCHMARK_INTERNAL_TOKEN: { type: 'text', value: token },
+              O11Y_CF_ACCOUNT_ID: { type: 'text', value: 'benchmark-local' },
+              KILO_WEB_API_BASE_URL: { type: 'text', value: new URL(USAGE_URL).origin },
+              KILO_AI_GATEWAY_BASE_URL: { type: 'text', value: 'http://benchmark-gateway.invalid' },
+            },
           },
-          analyticsEngineDatasets: {
-            AUTO_ROUTING_CLASSIFIER_METRICS_V2: { dataset: 'benchmark_local_metrics' },
-          },
-          bindings: {
-            BENCHMARK_INTERNAL_TOKEN: token,
-            O11Y_CF_ACCOUNT_ID: 'benchmark-local',
-            KILO_WEB_API_BASE_URL: new URL(USAGE_URL).origin,
-            KILO_AI_GATEWAY_BASE_URL: 'http://benchmark-gateway.invalid',
-          },
-          outboundService: 'egress',
+          dev: { outboundService: { type: 'worker', worker: 'egress' } },
         },
         {
-          name: 'egress',
-          modules: true,
-          script: EGRESS_SCRIPT,
-          compatibilityDate: COMPATIBILITY_DATE,
-          serviceBindings: { BROKER: egress },
+          config: {
+            name: 'egress',
+            type: 'worker',
+            manifest: {
+              mainModule: 'egress.js',
+              modulesRoot: bundle.dir,
+              modules: { 'egress.js': { type: 'esm', contents: EGRESS_SCRIPT } },
+            },
+            compatibilityDate: COMPATIBILITY_DATE,
+            env: { BROKER: { type: 'fetcher', handler: egress } },
+          },
         },
       ],
     };
@@ -802,21 +822,33 @@ async function createRuntime(options: {
       closedRuns.add(runId);
       const prefix = `${runId}\u0000`;
       const closed: Record<string, unknown>[] = [];
+      const errors: unknown[] = [];
       for (const [key, pending] of [...instances]) {
         if (!key.startsWith(prefix)) continue;
-        instances.delete(key);
         const [, version, router] = key.split('\u0000');
         const instance = await pending.catch(() => null);
-        if (instance === null) continue;
+        if (instance === null) {
+          instances.delete(key);
+          continue;
+        }
         await Promise.allSettled([...instance.inflight]);
-        await instance.mf.dispose();
-        closed.push({
-          version,
-          router,
-          usageRecords: instance.usageRecords,
-          denials: instance.denials,
-        });
+        try {
+          await instance.mf.dispose();
+          instances.delete(key);
+          closed.push({
+            version,
+            router,
+            usageRecords: instance.usageRecords,
+            denials: instance.denials,
+          });
+        } catch (error) {
+          errors.push(error);
+          console.error(
+            JSON.stringify({ event: 'router_runtime_close_error', error: String(error) })
+          );
+        }
       }
+      if (errors.length > 0) throw new AggregateError(errors, 'Router runtime close failed');
       return { runId, closed };
     },
 

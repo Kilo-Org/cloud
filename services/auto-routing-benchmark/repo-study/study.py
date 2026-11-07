@@ -971,12 +971,6 @@ def paid_model(out, run, candidate, deadline=None, *, cfg=None, ledger_out=None,
                     changed = db.execute("UPDATE requests SET actual=?, tokens=?, state='settled' WHERE id=? AND state='reserved'", (str(actual), prompt_tokens + completion_tokens, request_id)).rowcount
                     if changed != 1:
                         raise RuntimeError("Reservation changed before settlement")
-                receipt.update(status="settled", actual_usd=str(actual), finished_at=time.time())
-                if token_overrun:
-                    receipt.update(token_estimate_overrun=True, native_prompt_tokens=prompt_tokens, native_completion_tokens=completion_tokens, token_overrun_policy=overrun_policy)
-                save(receipt_path, receipt)
-                if input_bounder is not None:
-                    input_bounder.observe(prepared, usage)
             except BaseException as error:
                 dispatched = receipt["dispatch_entered"]
                 retained_bound = max(bound, known_floor, observed_actual if observed_actual is not None else Decimal(0))
@@ -986,9 +980,11 @@ def paid_model(out, run, candidate, deadline=None, *, cfg=None, ledger_out=None,
                 with (state_guard(ledger_out) if state_guard is not None else nullcontext()), sqlite3.connect(ledger_out / "budget.sqlite") as db:
                     db.execute("BEGIN IMMEDIATE")
                     old_row = next(row for row in request_rows(db) if row["id"] == request_id)
+                    if old_row["state"] != "reserved":
+                        raise
                     if state == "unknown" and cfg.get("allow_unknown_auto_accounting") is True and accounting_enabled(db):
                         state = "accounted_unknown"
-                    db.execute("UPDATE requests SET state=?, bound=?, actual=?, tokens=? WHERE id=?", (state, str(retained_bound), str(observed_actual) if observed_actual is not None else None, 0 if not dispatched else None, request_id))
+                    db.execute("UPDATE requests SET state=?, bound=?, actual=?, tokens=? WHERE id=? AND state='reserved'", (state, str(retained_bound), str(observed_actual) if observed_actual is not None else None, 0 if not dispatched else None, request_id))
                     if state == "accounted_unknown":
                         authorization_hash = db.execute("SELECT value FROM metadata WHERE key='unknown_accounting_authorization_sha256'").fetchone()[0]
                         new_row = next(row for row in request_rows(db) if row["id"] == request_id)
@@ -999,6 +995,12 @@ def paid_model(out, run, candidate, deadline=None, *, cfg=None, ledger_out=None,
                     error.diagnostics.update(diagnostics)
                     save(out / "resource-limits" / run / f"{uuid.uuid4().hex}.json", error.diagnostics)
                 raise
+            receipt.update(status="settled", actual_usd=str(actual), finished_at=time.time())
+            if token_overrun:
+                receipt.update(token_estimate_overrun=True, native_prompt_tokens=prompt_tokens, native_completion_tokens=completion_tokens, token_overrun_policy=overrun_policy)
+            save(receipt_path, receipt)
+            if input_bounder is not None:
+                input_bounder.observe(prepared, usage)
             for choice in body.get("choices", []):
                 if choice.get("native_finish_reason") == "refusal" or choice.get("finish_reason") == "content_filter" or (choice.get("message") or {}).get("refusal"):
                     receipt["provider_refused"] = True

@@ -591,7 +591,7 @@ def endpoint_quote(endpoints, cfg):
         "financial_endpoint_tags": sorted(endpoint.tag for endpoint, _, _, _ in financial),
         "endpoint_evidence": evidence,
         "endpoints_sha256": digest(endpoints),
-        "public_constraints": {"input_bound": input_financial, "max_tokens": cfg["max_output_tokens"], "required_parameters": ["reasoning", "max_tokens"], "status": 0},
+        "public_constraints": {"input_bound": cfg["max_input_tokens"], "max_tokens": cfg["max_output_tokens"], "required_parameters": ["reasoning", "max_tokens"], "status": 0},
         "selector_closure": "provider.only witness tags plus every active regional/tier descendant that could be admitted; raw base prices never exclude a selector-matching endpoint from financial coverage",
         "routing_uncertainty": tier_notes + ["max_price evaluation under discounts/overrides is not fully documented; selector-matching endpoints are financed regardless of raw base prices", "public endpoint data does not prove account privacy, BYOK or workspace eligibility"],
         "privacy_eligibility": "Unproven by endpoint metadata; data_collection=deny and require_parameters remain mandatory at dispatch",

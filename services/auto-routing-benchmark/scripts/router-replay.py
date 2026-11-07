@@ -178,7 +178,7 @@ def inspect_rollout(folder, row, receipts, task=None):
     exit_status = (result.get('result') or {}).get('exit_status')
     resolved = grade_case(evaluation, row['instance_id'], task)
     categories = collections.Counter(receipt['category'] for receipt in receipts)
-    if evaluation.get('reason') == 'grader_infra_invalid':
+    if evaluation.get('reason') in {'grader_infra_invalid', 'infra_invalid'} or result.get('status') == 'infra_invalid':
         category = 'grader_infrastructure_failure'
     elif evaluation.get('result') is not None and resolved is None:
         category = 'invalid_grade_completeness'

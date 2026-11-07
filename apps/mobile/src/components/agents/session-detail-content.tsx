@@ -208,6 +208,7 @@ import { agentComposerDraftKey } from '@/lib/persist/drafts';
 import { useFencedDraftLoad } from '@/lib/persist/use-draft-load';
 import { useKeepScreenOnPreference } from '@/lib/hooks/use-keep-screen-on-preference';
 import { useKeepAwake } from '@/lib/keep-awake';
+import { useSideInsetStyle } from '@/lib/screen-insets';
 import { useHideThinkingPreference } from '@/lib/hooks/use-hide-thinking-preference';
 import { useReasoningPreference } from '@/lib/hooks/use-reasoning-preference';
 import { useCondenseToolCallsPreference } from '@/lib/hooks/use-condense-tool-calls-preference';
@@ -493,6 +494,7 @@ export function SessionDetailContent({
   // above does not add it again (`containerReservesBottomInset`), so the space
   // is resolved once per screen instead of twice.
   const { bottom } = useSafeAreaInsets();
+  const sideInsetStyle = useSideInsetStyle();
   const themedSheet = useThemedActionSheetOptions();
   const { showActionSheetWithOptions } = useActionSheet();
 
@@ -2784,28 +2786,32 @@ export function SessionDetailContent({
         {isComposerSkeletonVisible ? <SessionComposerSkeleton /> : null}
 
         {isReadOnlyContinueVisible ? (
-          <View className="gap-3 border-t border-border bg-secondary px-4 py-3">
-            <Text className="text-center text-sm text-muted-foreground">
-              {t('agentChat.session.readOnly')}
-            </Text>
-            {/* The footer's one action, and the only control on this screen:
-                a filled primary. Light already fills it with the palette's
-                muted olive; dark's primary (#ffdd00) is the full brand accent
-                and glares as a full-width fill under the near-black page. Dark
-                takes `--selection` instead — the same olive hue lifted to stand
-                off the page — with its own label tone, so the control keeps the
-                light mode's weight in both schemes. */}
-            <Button
-              variant="default"
-              size="action"
-              className="bg-primary dark:bg-selection"
-              accessibilityLabel={t('agentChat.session.continueInNewSession')}
-              onPress={handleContinueInNewSession}
-            >
-              <Text className="text-primary-foreground dark:text-selection-foreground">
-                {t('agentChat.session.continueInNewSession')}
-              </Text>
-            </Button>
+          <View className="border-t border-border bg-secondary">
+            <View style={sideInsetStyle}>
+              <View className="gap-3 px-4 py-3">
+                <Text className="text-center text-sm text-muted-foreground">
+                  {t('agentChat.session.readOnly')}
+                </Text>
+                {/* The footer's one action, and the only control on this screen:
+                    a filled primary. Light already fills it with the palette's
+                    muted olive; dark's primary (#ffdd00) is the full brand accent
+                    and glares as a full-width fill under the near-black page. Dark
+                    takes `--selection` instead — the same olive hue lifted to stand
+                    off the page — with its own label tone, so the control keeps the
+                    light mode's weight in both schemes. */}
+                <Button
+                  variant="default"
+                  size="action"
+                  className="bg-primary dark:bg-selection"
+                  accessibilityLabel={t('agentChat.session.continueInNewSession')}
+                  onPress={handleContinueInNewSession}
+                >
+                  <Text className="text-primary-foreground dark:text-selection-foreground">
+                    {t('agentChat.session.continueInNewSession')}
+                  </Text>
+                </Button>
+              </View>
+            </View>
           </View>
         ) : null}
 

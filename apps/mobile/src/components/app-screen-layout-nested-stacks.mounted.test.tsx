@@ -60,7 +60,11 @@ const scenes = vi.hoisted(() => {
     navigation: {
       isFocused: () => boolean;
       addListener: (event: string, listener: () => void) => () => void;
-      getState: () => { index: number; routes: { key: string; name: string }[] };
+      getState: () => {
+        index: number;
+        routes: { key: string; name: string }[];
+        routeNames: string[];
+      };
       reset: () => void;
     };
     setFocused: (next: boolean) => void;
@@ -78,9 +82,14 @@ const scenes = vi.hoisted(() => {
           listeners.set(event, registered);
           return () => registered.delete(listener);
         },
-        // The gate is this suite's subject; the Security Agent layout's own
-        // repair reads a Stack that already has its dashboard, so it no-ops.
-        getState: () => ({ index: 0, routes: [{ key: 'dashboard', name: 'index' }] }),
+        // The gate is this suite's subject. Both repairs below read a Stack
+        // that already holds its base screen — the Security Agent dashboard,
+        // the tab root — so they no-op.
+        getState: () => ({
+          index: 0,
+          routes: [{ key: 'dashboard', name: 'index' }],
+          routeNames: ['index'],
+        }),
         reset: () => undefined,
       },
       setFocused(next: boolean) {

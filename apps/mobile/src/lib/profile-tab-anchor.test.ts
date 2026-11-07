@@ -99,6 +99,31 @@ describe('profile tab anchor', () => {
   it("declares initialRouteName: 'index'", () => {
     expect(layoutSource).toMatch(/initialRouteName:\s*'index'/);
   });
+
+  // The anchor only helps a navigation that can READ this layout's settings,
+  // which a release build cannot do for a layout the cold-start URL never
+  // loaded. Pin the repair that makes every restored subpage sit on the tab's
+  // root: without it, Back leaves the tab and the tab press cannot reach the
+  // profile page.
+  it('repairs a stack restored without the tab root', () => {
+    expect(layoutSource).toMatch(/screenLayout=\{TabStackRootRepairSceneLayout\}/);
+  });
+});
+
+describe('tab stack root repair wiring', () => {
+  // Every tab Stack that has subpages carries the repair, because a restore
+  // builds a fresh destination the same way in each of them. The Home tab has
+  // no subpage to restore, and the tabs outside this change's scope are left
+  // as they are.
+  it.each([
+    '../app/(app)/(tabs)/(2_agents)/_layout.tsx',
+    '../app/(app)/(tabs)/(3_profile)/_layout.tsx',
+  ])('%s renders every scene through the repair', relativePath => {
+    const source = readFileSync(fileURLToPath(new URL(relativePath, import.meta.url)), 'utf8');
+
+    expect(source).toMatch(/screenLayout=\{TabStackRootRepairSceneLayout\}/);
+    expect(source).toMatch(/initialRouteName:\s*'index'/);
+  });
 });
 
 describe('profile tab press', () => {

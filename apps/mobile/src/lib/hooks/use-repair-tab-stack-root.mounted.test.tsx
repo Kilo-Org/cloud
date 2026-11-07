@@ -1,0 +1,213 @@
+import { createElement, Fragment } from 'react';
+import { describe, expect, it } from 'vitest';
+
+import { act, TestRenderer } from '@/test/renderer';
+
+import { type TabStackNavigation, useRepairTabStackRoot } from './use-repair-tab-stack-root';
+
+type Route = { name: string; key: string; params?: object };
+/** A state the harness accepts; `routeNames` defaults to every route it holds. */
+type State = { index: number; routes: Route[]; routeNames?: string[] };
+
+/** The fake tab Stack the repair reads, dispatches into, and listens to. */
+type NavigationHarness = {
+  navigation: TabStackNavigation;
+  /** Every reset the repair dispatched, in order. */
+  resets: State[];
+  state: () => State;
+  /** A navigation the app dispatched: the state changes and listeners fire. */
+  deliver: (next: State) => void;
+  /** Apply the resets recorded so far, then notify the state listeners. */
+  commitResets: () => void;
+};
+
+/**
+ * A tab Stack's navigation: the state the repair reads, the resets it
+ * dispatches, and the listeners it subscribes.
+ *
+ * A reset is only RECORDED; `commitResets` applies it and notifies the state
+ * listeners. A navigator commits a reset within the same dispatch, but every
+ * scene of the Stack runs this hook from its own effect, and they all read the
+ * state from before that commit. Deferring the commit here is what reproduces
+ * that: it is the only way to see whether the repair acts once per state or
+ * once per scene.
+ */
+function createNavigation(initial: State): NavigationHarness {
+  // A Stack always declares its route names; every state below is one of a
+  // Stack that declares the tab root, which is what a tab layout does.
+  let state: State = {
+    ...initial,
+    routeNames: initial.routeNames ?? ['index', ...initial.routes.map(r => r.name)],
+  };
+  const listeners = new Set<() => void>();
+  const resets: State[] = [];
+
+  const commit = (next: State) => {
+    state = { ...next, routeNames: next.routeNames ?? state.routeNames };
+    for (const listener of listeners) {
+      listener();
+    }
+  };
+
+  const commitResets = () => {
+    const last = resets.at(-1);
+    if (last !== undefined) {
+      commit(last);
+    }
+  };
+
+  const navigation: TabStackNavigation = {
+    getState: () => state as never,
+    reset: next => {
+      resets.push(next as unknown as State);
+    },
+    addListener: (_event, listener) => {
+      const entry = () => {
+        listener(undefined as never);
+      };
+      listeners.add(entry);
+      return () => {
+        listeners.delete(entry);
+      };
+    },
+  };
+
+  return { navigation, resets, state: () => state, deliver: commit, commitResets };
+}
+
+/**
+ * Mount one scene wrapper per Stack screen, the way every scene of the Stack
+ * renders its own layout and so runs its own repair.
+ */
+function mount(harness: NavigationHarness, sceneCount = 1): TestRenderer.ReactTestRenderer {
+  function Scene(): null {
+    useRepairTabStackRoot(harness.navigation);
+    return null;
+  }
+
+  const scenes = Array.from({ length: sceneCount }, (_, index) =>
+    createElement(Scene, { key: index })
+  );
+  const created: { renderer: TestRenderer.ReactTestRenderer | undefined } = { renderer: undefined };
+  act(() => {
+    created.renderer = TestRenderer.create(createElement(Fragment, null, ...scenes));
+  });
+  const renderer = created.renderer;
+  if (!renderer) {
+    throw new Error('renderer was not created');
+  }
+  return renderer;
+}
+
+describe('useRepairTabStackRoot', () => {
+  it('puts the tab root beneath a subpage the Stack restored on its own', () => {
+    const harness = createNavigation({
+      index: 0,
+      routes: [{ name: 'preferences', key: 'preferences' }],
+    });
+    mount(harness);
+
+    expect(harness.resets).toHaveLength(1);
+    act(() => {
+      harness.commitResets();
+    });
+    // The inserted root is keyless: the reset action mints its key from the
+    // state's own sequence, which is the chain the tab's screens derive from.
+    expect(harness.state()).toMatchObject({
+      index: 1,
+      routes: [
+        { key: '', name: 'index', params: {} },
+        { name: 'preferences', key: 'preferences' },
+      ],
+    });
+    // The restored screen keeps its key, so it is not remounted.
+    expect(harness.state().routes[1]?.key).toBe('preferences');
+    // And the repair settles: the inserted root satisfies the next read.
+    expect(harness.resets).toHaveLength(1);
+  });
+
+  it('inserts once for every scene of the same state', () => {
+    // Every scene of the Stack mounts this hook, and they all read the state
+    // object from before the first reset committed: three scenes, one insert.
+    const harness = createNavigation({
+      index: 0,
+      routes: [{ name: 'history', key: 'history' }],
+    });
+    mount(harness, 3);
+
+    expect(harness.resets).toHaveLength(1);
+  });
+
+  it('leaves a Stack that already holds the root beneath the subpage', () => {
+    const harness = createNavigation({
+      index: 1,
+      routes: [
+        { name: 'index', key: 'root' },
+        { name: 'preferences', key: 'preferences' },
+      ],
+    });
+    mount(harness);
+
+    expect(harness.resets).toHaveLength(0);
+  });
+
+  it('leaves the tab root itself alone', () => {
+    const harness = createNavigation({ index: 0, routes: [{ name: 'index', key: 'root' }] });
+    mount(harness);
+
+    expect(harness.resets).toHaveLength(0);
+  });
+
+  it('repairs a subpage a later link leaves as the only route', () => {
+    const harness = createNavigation({ index: 0, routes: [{ name: 'index', key: 'root' }] });
+    mount(harness);
+    expect(harness.resets).toHaveLength(0);
+
+    // A link delivered later replaces the focused route with a fresh
+    // destination, which leaves the subpage as the Stack's only route.
+    act(() => {
+      harness.deliver({
+        index: 0,
+        routeNames: ['index', 'history'],
+        routes: [{ name: 'history', key: 'history' }],
+      });
+    });
+
+    expect(harness.resets).toHaveLength(1);
+    act(() => {
+      harness.commitResets();
+    });
+    expect(harness.state()).toMatchObject({
+      index: 1,
+      routes: [
+        { key: '', name: 'index', params: {} },
+        { name: 'history', key: 'history' },
+      ],
+    });
+  });
+
+  it('does not spend the repair on a Stack that declares no root route', () => {
+    // The reset would be rejected for a route the Stack does not declare, and
+    // remembering that state would stop the repair from ever trying again.
+    const harness = createNavigation({ index: 0, routes: [{ name: 'history', key: 'history' }] });
+    harness.deliver({
+      index: 0,
+      routeNames: ['history'],
+      routes: [{ name: 'history', key: 'history' }],
+    });
+    mount(harness);
+
+    expect(harness.resets).toHaveLength(0);
+
+    // Once the Stack declares its root, the same screen is repaired.
+    act(() => {
+      harness.deliver({
+        index: 0,
+        routeNames: ['index', 'history'],
+        routes: [{ name: 'history', key: 'history' }],
+      });
+    });
+
+    expect(harness.resets).toHaveLength(1);
+  });
+});

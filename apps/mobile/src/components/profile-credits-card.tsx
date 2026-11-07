@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the credits card renders the balance's loading, error, personal and org states beside the header's account picker; each branch is a small surface over the same queries, and splitting it would pass four query states across files. */
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { selectionHaptic } from '@/lib/haptics';
 import { type Href, useRouter } from 'expo-router';
@@ -17,7 +18,12 @@ import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { WEB_BASE_URL } from '@/lib/config';
-import { ICON_TARGET_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import {
+  ICON_TARGET_BOX_CLASS,
+  LINE_ACTION_BOX_CLASS,
+  LINE_ACTION_HIT_SLOP,
+  STATE_ACTION_CLASS,
+} from '@/lib/a11y/tap-target';
 import { formatMoney } from '@/lib/format';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useHideBalancePreference } from '@/lib/hooks/use-hide-balance-preference';
@@ -254,9 +260,13 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
         setAvailableWidth(event.nativeEvent.layout.width);
       }}
     >
+      {/* The picker is a line action: its box cancels its layout height and
+          overflows the eyebrow's line instead of lifting the row to its own
+          height, which centred the eyebrow in the box and opened the gap to
+          the credits card to twice the other sections' gap to their rows. */}
       <View
         className={cn(
-          'min-h-11 gap-3',
+          'gap-3',
           narrow ? 'flex-col items-stretch' : 'flex-row items-center justify-between'
         )}
       >
@@ -266,14 +276,15 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
         {canPickContext && (
           <Pressable
             className={cn(
-              'min-h-11 min-w-0 flex-row items-center gap-1 active:opacity-70',
+              LINE_ACTION_BOX_CLASS,
+              'min-w-0 flex-row items-center gap-1 active:opacity-70',
               narrow ? 'max-w-full justify-start' : 'max-w-[65%] shrink justify-end'
             )}
             onPress={openPicker}
             accessibilityRole="button"
             accessibilityLabel={selectedLabel}
             accessibilityHint={t('profile.selectAccount')}
-            hitSlop={8}
+            hitSlop={LINE_ACTION_HIT_SLOP}
           >
             <Text
               className="min-w-0 shrink text-xs font-medium text-muted-foreground"

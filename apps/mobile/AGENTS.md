@@ -182,6 +182,7 @@ Keep `pt-5` for the sheet grabber on top of that clearance.
 - A single-line caller can change horizontal padding, text size, and minimum height.
 - All inputs use physical `pl-*`/`pr-*` for horizontal padding, including caller overrides and zero-inset search fields; Android `TextInput` does not apply logical `paddingInline` from `px-*`.
 - A multiline caller keeps its alignment and line breaks; its physical padding classes override the shared `pl-3 pr-3 pt-2.5 pb-2.5` inset.
+- A text area's accessible name is its label alone. `patches/react-native@0.88.0.patch` keeps `Libraries/Text/TextInput/Multiline/RCTUITextView.mm` from appending the placeholder to an explicit `accessibilityLabel`, and only a text area with no name of its own takes the placeholder as its name; do not re-create a placeholder in JavaScript to work around it.
 - Put input screens in a `ScrollView` with `automaticallyAdjustKeyboardInsets`.
 
 ## UI and UX Rules

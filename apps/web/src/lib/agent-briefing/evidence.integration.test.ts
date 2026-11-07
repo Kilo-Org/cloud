@@ -366,10 +366,6 @@ it('settles a delayed usage delivery against its immutable occurrence generation
   expect(settled.summary.costMicrodollars).toBe(42);
   expect(settled.summary.chargeStatus).toBe('settled');
   expect(settled.next_charge_check_at).toBeNull();
-  expect(settled.summary.chargeAccounting).toEqual({
-    baselineCostMicrodollars: 0,
-    generations: [{ id: generated.generation_id, receipts: [{ usageId }] }],
-  });
 });
 
 describe('briefing charge reconciliation for retried generations', () => {
@@ -437,13 +433,28 @@ describe('briefing charge reconciliation for retried generations', () => {
     return reconcileBriefingCharge(await current(reportId));
   }
 
-  function receiptIds(row: Awaited<ReturnType<typeof current>>, generationId: string) {
-    const generation = briefingChargeAccountingSchema
+  function entries(row: Awaited<ReturnType<typeof current>>, generationId: string) {
+    return briefingChargeAccountingSchema
       .parse(row.summary.chargeAccounting)
-      .generations.find(entry => entry.id === generationId);
-    if (!generation) throw new Error('No generation accounting');
-    return generation.receipts.map(receipt => receipt.usageId);
+      .generations.filter(entry => entry.id === generationId);
   }
+
+  function receiptIds(row: Awaited<ReturnType<typeof current>>, generationId: string) {
+    return entries(row, generationId).map(entry => entry.usageId);
+  }
+
+  it('admits one empty receipt placeholder for a generation', async () => {
+    const prepared = await generated();
+    const admitted = await current(prepared.reportId);
+    expect(entries(admitted, prepared.generationId)).toEqual([
+      {
+        id: prepared.generationId,
+        settlementToken: prepared.settlementToken,
+        usageId: null,
+        deadlineAt: expect.any(String),
+      },
+    ]);
+  });
 
   it('keeps a staggered two-attempt generation pending until the queued row lands', async () => {
     const prepared = await generated();
@@ -452,10 +463,19 @@ describe('briefing charge reconciliation for retried generations', () => {
     await addUsageRow(prepared.generationId, prepared.user.id, 30, firstId);
     await record(prepared, firstId);
     await record(prepared, secondId, 'queued');
+    const recorded = await current(prepared.reportId);
+    expect(entries(recorded, prepared.generationId)).toMatchObject([
+      { usageId: firstId, delivery: 'committed', deadlineAt: expect.any(String) },
+      { usageId: secondId, delivery: 'queued', deadlineAt: expect.any(String) },
+    ]);
+    expect(entries(recorded, prepared.generationId)[1]?.deadlineAt).toBe(
+      entries(recorded, prepared.generationId)[0]?.deadlineAt
+    );
     const pending = await reconcile(prepared.reportId);
     expect(pending.summary.costMicrodollars).toBe(30);
     expect(pending.summary.chargeStatus).toBe('pending');
     expect(pending.next_charge_check_at).not.toBeNull();
+    expect(receiptIds(pending, prepared.generationId)).toEqual([firstId, secondId]);
     await addUsageRow(prepared.generationId, prepared.user.id, 12, secondId);
     const settled = await reconcile(prepared.reportId);
     expect(settled.summary.costMicrodollars).toBe(42);
@@ -508,11 +528,54 @@ describe('briefing charge reconciliation for retried generations', () => {
     const settled = await reconcile(prepared.reportId);
     expect(settled.summary.costMicrodollars).toBe(30);
     expect(receiptIds(settled, prepared.generationId)).toEqual([usageId]);
+    expect(entries(settled, prepared.generationId)).toMatchObject([
+      { usageId, delivery: 'committed', deliveryAt: expect.any(String) },
+    ]);
     await record(prepared, usageId);
     const persisted = await current(prepared.reportId);
     expect(persisted.summary.chargeStatus).toBe('settled');
     expect(persisted.next_charge_check_at).toBeNull();
     expect(receiptIds(persisted, prepared.generationId)).toEqual([usageId]);
+  });
+
+  it('finalizes a missing queued receipt after its delivery window closes', async () => {
+    const prepared = await generated();
+    const firstId = crypto.randomUUID();
+    const secondId = crypto.randomUUID();
+    await addUsageRow(prepared.generationId, prepared.user.id, 30, firstId);
+    await record(prepared, firstId);
+    await record(prepared, secondId, 'queued');
+    const pending = await reconcile(prepared.reportId);
+    expect(pending.summary.chargeStatus).toBe('pending');
+    const accounting = briefingChargeAccountingSchema.parse(pending.summary.chargeAccounting);
+    const expiredDeliveryAt = new Date(Date.now() - 15 * 86_400_000).toISOString();
+    const expiredAccounting = {
+      ...accounting,
+      generations: accounting.generations.map(generation =>
+        generation.usageId === secondId
+          ? { ...generation, deliveryAt: expiredDeliveryAt }
+          : generation
+      ),
+    };
+    await db
+      .update(agent_briefing_snapshots)
+      .set({
+        summary: {
+          ...pending.summary,
+          chargeAccounting: expiredAccounting,
+        },
+      })
+      .where(eq(agent_briefing_snapshots.id, prepared.reportId));
+    const expired = await current(prepared.reportId);
+    expect(entries(expired, prepared.generationId)).toMatchObject([
+      { usageId: firstId },
+      { usageId: secondId, delivery: 'queued', deliveryAt: expiredDeliveryAt },
+    ]);
+    const settled = await reconcile(prepared.reportId);
+    expect(settled.summary.costMicrodollars).toBe(30);
+    expect(settled.summary.chargeStatus).toBe('settled');
+    expect(settled.next_charge_check_at).toBeNull();
+    expect(receiptIds(settled, prepared.generationId)).toEqual([firstId, secondId]);
   });
 });
 it('selects latest activity deterministically and keeps organization scope exact', async () => {

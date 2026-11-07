@@ -4447,11 +4447,7 @@ describe('briefing gateway accounting receipts', () => {
     await finishAfterTasks();
     expect(await persistedSummary(prepared.report.id)).toMatchObject({
       chargeAccounting: {
-        generations: [
-          expect.objectContaining({
-            receipts: [expect.objectContaining({ usageId: prepared.usage.usageId })],
-          }),
-        ],
+        generations: [expect.objectContaining({ usageId: prepared.usage.usageId })],
       },
     });
   });
@@ -4469,11 +4465,7 @@ describe('briefing gateway accounting receipts', () => {
     await finishAfterTasks();
     expect(await persistedSummary(prepared.report.id)).toMatchObject({
       chargeAccounting: {
-        generations: [
-          expect.objectContaining({
-            receipts: [expect.objectContaining({ usageId: prepared.usage.usageId })],
-          }),
-        ],
+        generations: [expect.objectContaining({ usageId: prepared.usage.usageId })],
       },
     });
   });

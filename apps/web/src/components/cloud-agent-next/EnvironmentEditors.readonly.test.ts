@@ -41,6 +41,7 @@ describe('EnvironmentScriptsEditor readOnly', () => {
     expect(tag(markup, 'input')).toMatch(/\sdisabled=""/i);
     expect(markup).not.toContain('Choose file');
     expect(markup).toContain('Runs when a snapshot is built');
+    expect(markup).toContain('Snapshot build script');
     expect(markup).not.toContain('For longer scripts');
     expect(markup).toContain('pnpm install');
   });
@@ -57,7 +58,7 @@ describe('EnvironmentScriptsEditor readOnly', () => {
   it('labels the start script as running when a workspace starts', () => {
     const markup = renderScripts(false, 'start');
 
-    expect(markup).toContain('Start script');
+    expect(markup).toContain('Workspace start script');
     expect(markup).toContain('Runs each time a workspace starts');
     expect(markup).not.toContain('Setup script');
   });

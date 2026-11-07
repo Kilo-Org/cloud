@@ -17,6 +17,11 @@ let mockEnvironments: EnvironmentSummary[] = [];
 let mockDetails: Record<string, EnvironmentResponse | undefined> = {};
 let mockRepoChoices: EnvironmentRepositoryChoice[] = [];
 let mockDetailErrorId: string | null = null;
+let mockListHasData = true;
+let mockListLoading = false;
+let mockListError = false;
+let mockListOptions: { organizationId?: string; enabled?: boolean } | null = null;
+let mockBuildStatusOptions: Record<string, { organizationId?: string; enabled?: boolean }> = {};
 
 const mockRefetchList = jest.fn(async () => undefined);
 const mockRefetchDetail = jest.fn(async () => undefined);
@@ -86,12 +91,18 @@ jest.mock('@/hooks/useCloudAgentEnvironments', () => {
 
   return {
     ...jest.requireActual<typeof EnvironmentHooks>('@/hooks/useCloudAgentEnvironments'),
-    useCloudAgentEnvironmentsForOwner: () => ({
-      data: mockEnvironments,
-      isLoading: false,
-      isError: false,
-      refetch: mockRefetchList,
-    }),
+    useCloudAgentEnvironmentsForOwner: (options: {
+      organizationId?: string;
+      enabled?: boolean;
+    }) => {
+      mockListOptions = options;
+      return {
+        data: mockListHasData ? mockEnvironments : undefined,
+        isLoading: mockListLoading,
+        isError: mockListError,
+        refetch: mockRefetchList,
+      };
+    },
     useCloudAgentEnvironment: (environmentId: string | null) => ({
       data:
         environmentId && environmentId !== mockDetailErrorId
@@ -106,7 +117,13 @@ jest.mock('@/hooks/useCloudAgentEnvironments', () => {
       updateEnvironment: usePendingMutation(mockUpdate),
       deleteEnvironment: usePendingMutation(mockDelete),
     }),
-    useEnvironmentBuildStatus: () => ({ data: undefined }),
+    useEnvironmentBuildStatus: (
+      environmentId: string,
+      options: { organizationId?: string; enabled?: boolean }
+    ) => {
+      mockBuildStatusOptions[environmentId] = options;
+      return { data: undefined };
+    },
   };
 });
 
@@ -258,6 +275,11 @@ beforeEach(() => {
   ];
   nextCreatedId = 'env-created';
   mockDetailErrorId = null;
+  mockListHasData = true;
+  mockListLoading = false;
+  mockListError = false;
+  mockListOptions = null;
+  mockBuildStatusOptions = {};
   mockConfirm.mockReset();
   mockConfirm.mockReturnValue(true);
   mockToastSuccess.mockClear();
@@ -372,12 +394,17 @@ function installLinkedomDom(): { cleanup: () => void; container: HTMLElement } {
 
 const bootstrapDom = installLinkedomDom();
 const { EnvironmentsSection } = require('./EnvironmentsSection') as {
-  EnvironmentsSection: React.ComponentType<{ organizationId?: string; canManage: boolean }>;
+  EnvironmentsSection: React.ComponentType<{
+    organizationId?: string;
+    canManage: boolean;
+    active?: boolean;
+  }>;
 };
 bootstrapDom.cleanup();
 
 function mount(element: React.ReactElement): {
   container: HTMLElement;
+  rerender: (element: React.ReactElement) => void;
   cleanup: () => void;
 } {
   const dom = installLinkedomDom();
@@ -390,6 +417,11 @@ function mount(element: React.ReactElement): {
 
   return {
     container: dom.container,
+    rerender: (nextElement: React.ReactElement) => {
+      act(() => {
+        root.render(nextElement);
+      });
+    },
     cleanup: () => {
       act(() => {
         root.unmount();
@@ -467,6 +499,9 @@ describe('EnvironmentsSection inline detail pane', () => {
   test('selects the first environment and switches the detail pane on selection', () => {
     const mounted = mount(renderSection(true));
     try {
+      expect(mounted.container.textContent).not.toContain('New sessions use');
+      expect(mockListOptions).toMatchObject({ enabled: true });
+      expect(mockBuildStatusOptions['env-1']).toMatchObject({ enabled: true });
       expect(selectedLabel(mounted.container)).toBe('Edit environment Kilo Environment');
       const nameInput = mounted.container.querySelector<HTMLInputElement>('#environment-name');
       expect(nameInput?.value).toBe('Kilo Environment');
@@ -478,6 +513,127 @@ describe('EnvironmentsSection inline detail pane', () => {
         'Other Environment'
       );
       expect(mounted.container.textContent).toContain('Kilo-Org/cloud');
+    } finally {
+      mounted.cleanup();
+    }
+  });
+
+  test('falls back to the remaining environment when a successful refetch removes the selection', () => {
+    const mounted = mount(renderSection(true));
+    try {
+      click(mounted.container.querySelector('[aria-label="Edit environment Other Environment"]'));
+      expect(selectedLabel(mounted.container)).toBe('Edit environment Other Environment');
+
+      mockEnvironments = mockEnvironments.filter(environment => environment.id !== 'env-2');
+      mounted.rerender(renderSection(true));
+
+      expect(selectedLabel(mounted.container)).toBe('Edit environment Kilo Environment');
+      expect(mounted.container.querySelector<HTMLInputElement>('#environment-name')?.value).toBe(
+        'Kilo Environment'
+      );
+      expect(mounted.container.textContent).not.toContain('Could not load this environment.');
+    } finally {
+      mounted.cleanup();
+    }
+  });
+
+  test('restores the previous selection and overview page when cancelling a create', async () => {
+    const mounted = mount(renderSection(true));
+    try {
+      click(mounted.container.querySelector('[aria-label="Edit environment Other Environment"]'));
+      expect(selectedLabel(mounted.container)).toBe('Edit environment Other Environment');
+
+      await activateTab(mounted.container, 'Variables');
+      expect(mounted.container.querySelector('textarea')).not.toBeNull();
+
+      clickButton(mounted.container, 'Kilo-Org/new-repo');
+      expect(mounted.container.textContent).toContain('New environment');
+      await activateTab(mounted.container, 'Variables');
+      expect(mounted.container.querySelector('textarea')).not.toBeNull();
+
+      clickButton(mounted.container, 'Cancel');
+
+      expect(selectedLabel(mounted.container)).toBe('Edit environment Other Environment');
+      expect(mounted.container.querySelector<HTMLInputElement>('#environment-name')?.value).toBe(
+        'Other Environment'
+      );
+      expect(mounted.container.querySelector('textarea')).toBeNull();
+    } finally {
+      mounted.cleanup();
+    }
+  });
+
+  test('does not reconcile selection before a pending deletion selects its neighbour', async () => {
+    mockEnvironments.push(makeEnvironmentSummary('env-3', 'Third Environment', 'Kilo-Org/cli'));
+    mockDetails['env-3'] = makeEnvironmentDetail('env-3', 'Third Environment', 'Kilo-Org/cli');
+    const deletion = Promise.withResolvers<void>();
+    mockDelete.mockImplementationOnce(async ({ environmentId }) => {
+      mockEnvironments = mockEnvironments.filter(environment => environment.id !== environmentId);
+      await deletion.promise;
+    });
+    const mounted = mount(renderSection(true));
+    try {
+      click(mounted.container.querySelector('[aria-label="Edit environment Other Environment"]'));
+      await clickButtonAndFlush(mounted.container, 'Delete environment test');
+      mounted.rerender(renderSection(true));
+      expect(mounted.container.querySelector<HTMLInputElement>('#environment-name')?.value).toBe(
+        'Other Environment'
+      );
+      await act(async () => {
+        deletion.resolve();
+        await deletion.promise;
+      });
+      expect(selectedLabel(mounted.container)).toBe('Edit environment Third Environment');
+    } finally {
+      deletion.resolve();
+      mounted.cleanup();
+    }
+  });
+
+  test('shows the list error in the detail pane instead of an empty state', () => {
+    mockListHasData = false;
+    mockListError = true;
+    const mounted = mount(renderSection(true));
+    try {
+      const messages = Array.from(mounted.container.querySelectorAll('p')).filter(
+        paragraph => paragraph.textContent === 'Failed to load environments.'
+      );
+      expect(messages).toHaveLength(2);
+      expect(mounted.container.textContent).not.toContain('No environments');
+    } finally {
+      mounted.cleanup();
+    }
+  });
+
+  test('keeps cached rows and an unsaved draft when the list refetch fails', () => {
+    const mounted = mount(renderSection(true));
+    try {
+      const input = mounted.container.querySelector<HTMLInputElement>('#environment-name');
+      if (!input) throw new Error('environment name input not found');
+      setInputValue(input, 'Edited environment');
+
+      mockListError = true;
+      mounted.rerender(renderSection(true));
+
+      expect(mounted.container.textContent).not.toContain('Failed to load environments.');
+      expect(findButton(mounted.container, 'Other Environment')).toBeDefined();
+      expect(selectedLabel(mounted.container)).toBe('Edit environment Kilo Environment');
+      expect(mounted.container.querySelector<HTMLInputElement>('#environment-name')?.value).toBe(
+        'Edited environment'
+      );
+    } finally {
+      mounted.cleanup();
+    }
+  });
+
+  test('disables owner and build status queries when inactive', () => {
+    const mounted = mount(
+      React.createElement(EnvironmentsSection, { canManage: true, active: false })
+    );
+    try {
+      expect(mockListOptions).toMatchObject({ enabled: false });
+      expect(mockBuildStatusOptions['env-1']).toMatchObject({ enabled: false });
+      expect(mockBuildStatusOptions['env-2']).toMatchObject({ enabled: false });
     } finally {
       mounted.cleanup();
     }

@@ -87,8 +87,7 @@ export function EnvironmentDialog({
     enabled: open,
   });
   const isLoading = !!environmentId && detailQuery.isLoading;
-  const isError =
-    !!environmentId && (detailQuery.isError || (!detailQuery.isLoading && !detailQuery.data));
+  const isError = !!environmentId && !detailQuery.data && !detailQuery.isLoading;
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex max-h-[85vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
@@ -120,6 +119,7 @@ export function EnvironmentDialog({
 }
 
 type EnvironmentDetailPaneProps = {
+  active?: boolean;
   environmentId: string | null;
   organizationId?: string;
   repository?: EnvironmentRepository;
@@ -136,6 +136,7 @@ type EnvironmentDetailPaneProps = {
 };
 
 export function EnvironmentDetailPane({
+  active = true,
   environmentId,
   onCancel,
   onDirtyChange,
@@ -146,11 +147,10 @@ export function EnvironmentDetailPane({
 }: EnvironmentDetailPaneProps) {
   const detailQuery = useCloudAgentEnvironment(environmentId, {
     organizationId: props.organizationId,
-    enabled: !!environmentId,
+    enabled: active && !!environmentId,
   });
   const isLoading = !!environmentId && detailQuery.isLoading;
-  const isError =
-    !!environmentId && (detailQuery.isError || (!detailQuery.isLoading && !detailQuery.data));
+  const isError = !!environmentId && !detailQuery.data && !detailQuery.isLoading;
 
   if (isLoading) {
     return (
@@ -178,6 +178,7 @@ export function EnvironmentDetailPane({
       {...props}
       existing={detailQuery.data}
       variant="inline"
+      active={active}
       initialPage={initialPage}
       onPageChange={onPageChange}
       onSavingChange={onSavingChange}
@@ -194,6 +195,7 @@ type EnvironmentFormProps = Omit<
   repository?: EnvironmentRepository;
   existing: EnvironmentResponse | undefined;
   variant: 'dialog' | 'inline';
+  active?: boolean;
   initialPage?: EnvironmentEditorPage;
   onPageChange?: (page: EnvironmentEditorPage) => void;
   onSavingChange?: (saving: boolean) => void;
@@ -214,6 +216,7 @@ function EnvironmentForm({
   canManage,
   existing,
   variant,
+  active = true,
   initialPage,
   onPageChange,
   onSavingChange,
@@ -252,6 +255,7 @@ function EnvironmentForm({
     ? { platform: repositories[0].platform, fullName: repositoryName(repositories[0]) }
     : undefined;
   const profileQuery = useEnvironmentProfiles({
+    enabled: active,
     organizationId,
     repository: sandboxRepository,
     selectedProfileId,
@@ -446,6 +450,7 @@ function EnvironmentForm({
       environmentId={existing.id}
       canManage={canManage}
       hasUnsavedChanges={hasUnsavedChanges || isSaving || deletePending}
+      active={active}
     />
   ) : (
     <p className="text-muted-foreground text-xs">Save to enable snapshot builds.</p>
@@ -522,10 +527,10 @@ function EnvironmentForm({
               Overview
             </TabsTrigger>
             <TabsTrigger value="scripts" className="gap-1 text-xs pointer-coarse:min-h-11">
-              Setup
+              Snapshot
             </TabsTrigger>
             <TabsTrigger value="start" className="gap-1 text-xs pointer-coarse:min-h-11">
-              Start
+              Workspace start
             </TabsTrigger>
             <TabsTrigger value="variables" className="gap-1 text-xs pointer-coarse:min-h-11">
               Variables
@@ -533,6 +538,7 @@ function EnvironmentForm({
           </TabsList>
         </div>
         <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-4">
+          {page === 'scripts' && buildPanel}
           <fieldset disabled={isSaving || deletePending} className="min-w-0 space-y-5">
             <TabsContent value="overview" className="mt-0 space-y-5">
               {overviewBaseFields}
@@ -562,7 +568,6 @@ function EnvironmentForm({
               />
             </TabsContent>
           </fieldset>
-          {page === 'overview' && buildPanel}
           {profileFeedback}
           {errorMessage}
         </div>
@@ -618,9 +623,9 @@ function EnvironmentForm({
           )}
           <DialogTitle>
             {page === 'scripts'
-              ? 'Setup script'
+              ? 'Snapshot build script'
               : page === 'start'
-                ? 'Start script'
+                ? 'Workspace start script'
                 : page === 'variables'
                   ? 'Environment variables'
                   : existing
@@ -629,7 +634,8 @@ function EnvironmentForm({
           </DialogTitle>
         </div>
         <DialogDescription className="sr-only">
-          Configure repositories, setup and start scripts, and environment variables.
+          Configure repositories, snapshot build and workspace start scripts, and environment
+          variables.
         </DialogDescription>
         {!canManage && (
           <p className="text-muted-foreground text-xs">
@@ -645,20 +651,20 @@ function EnvironmentForm({
               <div className="space-y-3">
                 <EditorRow
                   icon={<Terminal className="size-4" />}
-                  label="Setup script"
+                  label="Snapshot build script"
                   detail={
                     hasScript
-                      ? 'Configure your setup script'
+                      ? 'Configure your snapshot build script'
                       : 'Install dependencies and prepare your repository'
                   }
                   onClick={() => changePage('scripts')}
                 />
                 <EditorRow
                   icon={<Play className="size-4" />}
-                  label="Start script"
+                  label="Workspace start script"
                   detail={
                     hasStartScript
-                      ? 'Configure your start script'
+                      ? 'Configure your workspace start script'
                       : 'Start services when a workspace starts'
                   }
                   onClick={() => changePage('start')}
@@ -699,7 +705,7 @@ function EnvironmentForm({
             />
           )}
         </fieldset>
-        {page === 'overview' && buildPanel}
+        {(page === 'overview' || page === 'scripts') && buildPanel}
         {profileFeedback}
         {errorMessage}
       </div>

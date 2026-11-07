@@ -31,12 +31,19 @@ import { snapshotBadge } from '../environment-build-display';
 type EnvironmentsSectionProps = {
   organizationId?: string;
   canManage: boolean;
+  active?: boolean;
 };
 
-export function EnvironmentsSection({ organizationId, canManage }: EnvironmentsSectionProps) {
-  const query = useCloudAgentEnvironmentsForOwner({ organizationId });
+export function EnvironmentsSection({
+  organizationId,
+  canManage,
+  active = true,
+}: EnvironmentsSectionProps) {
+  const query = useCloudAgentEnvironmentsForOwner({ organizationId, enabled: active });
   const repoChoices = useEnvironmentRepositoryChoices(organizationId);
   const environments = query.data ?? [];
+  const listLoading = query.isLoading && !query.data;
+  const listError = query.isError && !query.data;
 
   const [pickerOpen, setPickerOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -48,10 +55,13 @@ export function EnvironmentsSection({ organizationId, canManage }: EnvironmentsS
   const [editorVersion, setEditorVersion] = useState(0);
 
   useEffect(() => {
-    if (createRepository || selectedId !== null) return;
-    const first = environments[0];
-    if (first) setSelectedId(first.id);
-  }, [createRepository, environments, selectedId]);
+    if (!active || createRepository || saving || query.isError) return;
+    if (selectedId !== null && environments.some(environment => environment.id === selectedId)) {
+      return;
+    }
+    const next = environments[0]?.id ?? null;
+    if (next !== selectedId) setSelectedId(next);
+  }, [active, createRepository, environments, query.isError, saving, selectedId]);
 
   const canLeaveEditor = useCallback(() => {
     if (!dirty) return true;
@@ -77,13 +87,13 @@ export function EnvironmentsSection({ organizationId, canManage }: EnvironmentsS
     setPickerOpen(false);
     setCreateVersion(version => version + 1);
     setCreateRepository(choice.repository);
-    setSelectedId(null);
   };
 
   const cancelCreate = () => {
     if (saving) return;
     if (!canLeaveEditor()) return;
     setDirty(false);
+    setEditorPage('overview');
     setCreateRepository(null);
   };
 
@@ -118,15 +128,11 @@ export function EnvironmentsSection({ organizationId, canManage }: EnvironmentsS
     <div className="flex min-h-0 flex-1 flex-col md:flex-row">
       <div className="flex max-h-40 shrink-0 flex-col border-b md:max-h-none md:w-64 md:border-r md:border-b-0 lg:w-72">
         <div className="min-h-0 min-w-0 flex-1 overflow-y-auto">
-          <p className="text-muted-foreground hidden border-b px-3 py-2 text-xs leading-5 md:block">
-            New sessions use the environment containing their repository. When several match, you
-            choose one.
-          </p>
-          {query.isLoading ? (
+          {listLoading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="text-muted-foreground h-5 w-5 animate-spin" />
             </div>
-          ) : query.isError ? (
+          ) : listError ? (
             <div className="flex flex-col items-center gap-2 py-8 text-center">
               <p className="text-destructive text-xs">Failed to load environments.</p>
               <Button variant="outline" size="sm" onClick={() => void query.refetch()}>
@@ -145,6 +151,7 @@ export function EnvironmentsSection({ organizationId, canManage }: EnvironmentsS
                   environment={environment}
                   organizationId={organizationId}
                   canManage={canManage}
+                  active={active}
                   selected={!createRepository && selectedId === environment.id}
                   disabled={saving}
                   onSelect={() => selectEnvironment(environment.id)}
@@ -212,11 +219,7 @@ export function EnvironmentsSection({ organizationId, canManage }: EnvironmentsS
       </div>
 
       <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
-        {query.isLoading ? (
-          <div className="flex h-full items-center justify-center">
-            <Loader2 className="text-muted-foreground h-5 w-5 animate-spin" />
-          </div>
-        ) : createRepository ? (
+        {createRepository ? (
           <EnvironmentDetailPane
             key={`new:${repositoryLabel(createRepository)}:${createVersion}`}
             environmentId={null}
@@ -224,6 +227,7 @@ export function EnvironmentsSection({ organizationId, canManage }: EnvironmentsS
             repository={createRepository}
             repositoryLabel={repositoryLabel(createRepository)}
             canManage={canManage}
+            active={active}
             initialPage={editorPage}
             onPageChange={setEditorPage}
             onSavingChange={setSaving}
@@ -232,12 +236,24 @@ export function EnvironmentsSection({ organizationId, canManage }: EnvironmentsS
             onCancel={cancelCreate}
             onDirtyChange={setDirty}
           />
+        ) : listLoading ? (
+          <div className="flex h-full items-center justify-center">
+            <Loader2 className="text-muted-foreground h-5 w-5 animate-spin" />
+          </div>
+        ) : listError ? (
+          <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
+            <p className="text-destructive text-xs">Failed to load environments.</p>
+            <Button variant="outline" size="sm" onClick={() => void query.refetch()}>
+              Retry
+            </Button>
+          </div>
         ) : selectedId ? (
           <EnvironmentDetailPane
             key={`${selectedId}:${editorVersion}`}
             environmentId={selectedId}
             organizationId={organizationId}
             canManage={canManage}
+            active={active}
             initialPage={editorPage}
             onPageChange={setEditorPage}
             onSavingChange={setSaving}
@@ -267,6 +283,7 @@ function EnvironmentRow({
   environment,
   organizationId,
   canManage,
+  active = true,
   selected,
   disabled,
   onSelect,
@@ -274,11 +291,15 @@ function EnvironmentRow({
   environment: EnvironmentSummary;
   organizationId?: string;
   canManage: boolean;
+  active?: boolean;
   selected: boolean;
   disabled: boolean;
   onSelect: () => void;
 }) {
-  const { data: buildStatus } = useEnvironmentBuildStatus(environment.id, { organizationId });
+  const { data: buildStatus } = useEnvironmentBuildStatus(environment.id, {
+    organizationId,
+    enabled: active,
+  });
   const badge = snapshotBadge(buildStatus, Date.now());
   const members = environmentMembers(environment);
   const primary = members[0];

@@ -110,34 +110,44 @@ export const organizationSsoRouter = createTRPCRouter({
     const { organizationId } = opts.input;
     await ensureOrganizationAccess(opts.ctx, organizationId, ORGANIZATION_MANAGE_ROLES);
     const workOSOrg = await getWorkOsOrganizationByExternalId(organizationId);
-    // Read the local SSO state without the soft-delete filter: removing the SSO configuration is
-    // part of offboarding an organization that is already marked deleted.
-    const [organization] = await db
-      .select({ ssoDomain: organizations.sso_domain })
-      .from(organizations)
-      .where(eq(organizations.id, organizationId));
+    const organization = await getOrganizationById(organizationId);
     if (!organization) {
       throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
     }
-    // The organization owns its SSO state, in WorkOS and in `sso_domain`. Delete only when at
-    // least one of them is still configured, so a delete that already removed the WorkOS
-    // organization can finish releasing the domain on the next attempt.
-    const releasedDomain = organization.ssoDomain;
+    // A configuration is the WorkOS organization, the recorded domain, or both; the procedure
+    // removes whatever the organization holds.
+    const releasedDomain = organization.sso_domain;
     if (!workOSOrg && !releasedDomain) {
       throw new TRPCError({ code: 'NOT_FOUND', message: 'SSO configuration not found' });
     }
 
-    // Delete the WorkOS organization first: releasing the domain while a live WorkOS connection
-    // still enforces SSO would drop the local policy that requires it.
+    // Remove the WorkOS organization before the recorded domain, and record the platform admin
+    // action together with that deletion.
     if (workOSOrg) {
       await workos.organizations.deleteOrganization(workOSOrg.id);
+      await recordAdminAction(opts.ctx, {
+        action: 'organization.sso.config.delete',
+        target: organizationActionTarget(organizationId),
+        message: 'Deleted WorkOS SSO organization',
+        metadata: { workosOrganizationId: workOSOrg.id, releasedSsoDomain: releasedDomain },
+      });
     }
 
     if (releasedDomain) {
       await db.transaction(async tx => {
-        // Serialize against a claim of the same domain, which locks this same key.
+        // Lock the organization row before the domain, in the same order as updateSsoDomain, and
+        // release the domain this transaction holds the lock for.
+        const [locked] = await tx
+          .select({ ssoDomain: organizations.sso_domain })
+          .from(organizations)
+          .where(eq(organizations.id, organizationId))
+          .for('update');
+        if (!locked?.ssoDomain) {
+          return;
+        }
+
         await tx.execute(
-          sql`SELECT pg_advisory_xact_lock(hashtextextended('sso-domain:' || ${releasedDomain}, 0))`
+          sql`SELECT pg_advisory_xact_lock(hashtextextended('sso-domain:' || ${locked.ssoDomain}, 0))`
         );
         await tx
           .update(organizations)
@@ -149,19 +159,10 @@ export const organizationSsoRouter = createTRPCRouter({
           actor_email: opts.ctx.user.google_user_email,
           actor_id: opts.ctx.user.id,
           actor_name: opts.ctx.user.google_user_name,
-          message: `Cleared SSO domain ${releasedDomain}`,
+          message: `Cleared SSO domain ${locked.ssoDomain}`,
           organization_id: organizationId,
           tx,
         });
-      });
-    }
-
-    if (workOSOrg) {
-      await recordAdminAction(opts.ctx, {
-        action: 'organization.sso.config.delete',
-        target: organizationActionTarget(organizationId),
-        message: 'Deleted WorkOS SSO organization',
-        metadata: { workosOrganizationId: workOSOrg.id, releasedSsoDomain: releasedDomain },
       });
     }
 

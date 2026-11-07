@@ -57,6 +57,7 @@ import { processTopUp } from '@kilocode/web-shared/lib/credits';
 import type { PaidCreditGrant } from '@kilocode/web-shared/lib/paidCreditPolicy';
 import { getPaidCreditTerms } from '@kilocode/web-shared/lib/paidCreditPolicy.server';
 import { processTopupForOrganization } from '@/lib/organizations/organization-billing';
+import { sanitizeErrorForTelemetry } from '@/lib/sanitize-error-for-telemetry';
 import {
   STRIPE_SUB_QUERY_STRING_KEY,
   TOPUP_CANCELED_QUERY_STRING_KEY,
@@ -777,9 +778,10 @@ export async function ensurePaymentMethodStored(
         organizationId,
       },
     };
-    captureException(error, context);
+    const safeError = sanitizeErrorForTelemetry(error);
+    captureException(safeError, context);
     if (process.env.NODE_ENV !== 'test')
-      console.error('Error saving payment method for user ' + kiloUserId, error, context);
+      console.error('Error saving payment method for user ' + kiloUserId, safeError, context);
     return null;
   }
 }
@@ -980,6 +982,7 @@ function getSafeStripeChargeLogContext(charge: Stripe.Charge, paymentIntent: Str
     chargeId: charge.id,
     paymentIntentId: paymentIntent.id,
     customerId: stripeReferenceId(charge.customer) ?? null,
+    paymentIntentType: paymentIntent.metadata.type ?? null,
   };
 }
 
@@ -1014,8 +1017,7 @@ export async function handleSuccessfulChargeWithPayment(
       sentryLogger('stripe', 'warning')('Org top-up missing kiloUserId in PaymentIntent metadata', {
         payment_intent_id: paymentIntent.id,
         charge_id: charge.id,
-        has_organization_id: Boolean(organizationId),
-        has_kilo_user_id: Boolean(kiloUserId),
+        organization_id: organizationId,
       });
       return;
     }

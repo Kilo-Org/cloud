@@ -3239,7 +3239,7 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
         metadata: {
           kiloUserId: user.id,
           type: 'something-else',
-          privateMetadata: 'sensitive-metadata',
+          serviceFeeFlow: 'sensitive-metadata',
         },
         payment_method: null,
       }),
@@ -3254,6 +3254,7 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
         chargeId: chId,
         paymentIntentId: piId,
         customerId: user.stripe_customer_id,
+        paymentIntentType: 'something-else',
       }
     );
     const warningLogs = JSON.stringify(jest.mocked(warnExceptInTest).mock.calls);
@@ -3335,7 +3336,12 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
 
     expect(warnExceptInTest).toHaveBeenCalledWith(
       'No user found for Stripe charge; skipping processing.',
-      { chargeId: chId, paymentIntentId: piId, customerId: 'cus_nonexistent' }
+      {
+        chargeId: chId,
+        paymentIntentId: piId,
+        customerId: 'cus_nonexistent',
+        paymentIntentType: null,
+      }
     );
     const warningLogs = JSON.stringify(jest.mocked(warnExceptInTest).mock.calls);
     expect(warningLogs).not.toContain('pi_no_user_secret_sensitive');

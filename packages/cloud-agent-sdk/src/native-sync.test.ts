@@ -489,6 +489,60 @@ test('first-attachment state supplies identity and quiet reconnect retains it', 
   connection.close();
 });
 
+test('unreadable pending inventory clears controls without blocking later ordered frames', async () => {
+  const { client } = fixture();
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  await flush();
+  const socket = connectedSocket();
+  socket.frame('hello', hello());
+  await flush();
+  socket.frame(
+    'remote.state',
+    {
+      incarnation: 'runner',
+      runID: 'run',
+      pending: {
+        permissions: [{ requestID: 'old', tool: 'edit', summary: 'file' }],
+        questions: [],
+      },
+    },
+    1,
+    'events'
+  );
+  await flush();
+  expect(state?.pending.permissions.map(item => item.id)).toEqual(['old']);
+  socket.frame('remote.state', { incarnation: 'runner', runID: 'run', pending: null }, 2, 'events');
+  await flush();
+  expect(state?.pending).toEqual({ permissions: [], questions: [] });
+  socket.frame(
+    'permission.asked',
+    { incarnation: 'runner', runID: 'run', data: { data: { id: 'invalid' } } },
+    3,
+    'events'
+  );
+  socket.frame(
+    'remote.state',
+    {
+      incarnation: 'runner',
+      runID: 'run',
+      pending: {
+        permissions: [{ requestID: 'new', tool: 'edit', summary: 'file' }],
+        questions: [],
+      },
+    },
+    4,
+    'events'
+  );
+  await flush();
+  expect(state?.pending.permissions.map(item => item.id)).toEqual(['new']);
+  expect(state?.connection).toBe('connected');
+  expect(FakeSocket.sockets).toHaveLength(1);
+  connection.close();
+});
+
 const incomplete = (position: number) => ({
   position,
   session: sessionMetadata,

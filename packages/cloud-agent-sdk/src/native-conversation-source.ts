@@ -62,28 +62,33 @@ export function reduceNativePendingRequests(
   pending: NativePendingRequests,
   event: NativeEvent
 ): NativePendingRequests {
-  const wrapper = recordSchema.parse(event.body);
+  const wrapper = recordSchema.safeParse(event.body);
   if (event.type === 'remote.state') {
-    const inventory = inventorySchema.parse(wrapper['pending']);
+    const inventory = inventorySchema.safeParse(
+      wrapper.success ? wrapper.data['pending'] : undefined
+    );
+    if (!inventory.success) return { permissions: [], questions: [] };
     return {
-      permissions: inventory.permissions.map(item => ({
+      permissions: inventory.data.permissions.map(item => ({
         ...item,
         id: item.requestID,
         action: item.tool,
         resources: [item.summary],
       })),
-      questions: inventory.questions.map(item => ({
+      questions: inventory.data.questions.map(item => ({
         ...item,
         id: item.requestID,
         metadata: { kind: 'question' as const },
       })),
     };
   }
-  const native = recordSchema.safeParse(wrapper['data']);
+  const native = recordSchema.safeParse(wrapper.success ? wrapper.data['data'] : undefined);
   const data = recordSchema.safeParse(native.success ? native.data['data'] : undefined);
   if (!data.success) return pending;
   if (event.type === 'permission.asked') {
-    const permission = permissionSchema.parse(data.data);
+    const parsed = permissionSchema.safeParse(data.data);
+    if (!parsed.success) return pending;
+    const permission = parsed.data;
     return {
       ...pending,
       permissions: [...pending.permissions.filter(item => item.id !== permission.id), permission],

@@ -379,9 +379,30 @@ test('pending inventory, full permission/form metadata and settlements survive a
     body: { pending: { permissions: [], questions: [] } },
   });
   expect(pending).toEqual({ permissions: [], questions: [] });
-  expect(() =>
-    reduceNativePendingRequests(pending, { ...frame('remote.state', {}), body: { pending: null } })
-  ).toThrow();
+});
+
+test.each([null, {}, { pending: null }, { pending: { permissions: [] } }])(
+  'clears stale controls when authoritative inventory is unreadable: %j',
+  body => {
+    const pending = {
+      permissions: [{ id: 'stale', action: 'edit', resources: ['file'] }],
+      questions: [{ id: 'stale-question', metadata: { kind: 'question' as const }, fields: [] }],
+    };
+    expect(reduceNativePendingRequests(pending, { ...frame('remote.state', {}), body })).toEqual({
+      permissions: [],
+      questions: [],
+    });
+  }
+);
+
+test('ignores a malformed live permission without losing valid pending requests', () => {
+  const pending = {
+    permissions: [{ id: 'current', action: 'edit', resources: ['file'] }],
+    questions: [],
+  };
+  expect(
+    reduceNativePendingRequests(pending, frame('permission.asked', { id: 'invalid' }))
+  ).toEqual(pending);
 });
 
 test('native live reduction shares untouched content, ignores late deltas and flags missing ordinals', () => {

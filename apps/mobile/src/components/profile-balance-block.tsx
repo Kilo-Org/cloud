@@ -69,7 +69,19 @@ export function BalanceBlock({
     stacked ? 'items-stretch gap-1' : 'flex-row items-center gap-2'
   );
   const controlRowClass = 'min-w-0 min-h-[44px] flex-row items-center gap-1';
-  const retry = <Text className="text-sm text-destructive">{retryLabel}</Text>;
+  const retry = (
+    // Two lines is the most a retry label can take and still fit the control
+    // row's 44 dp floor: the longest shipped values run past sixty characters
+    // and wrap inside the row's remaining width, and a third line would make
+    // the failed block taller than the row it swaps into.
+    <Text
+      className="text-sm text-destructive"
+      numberOfLines={stacked ? 2 : undefined}
+      ellipsizeMode="tail"
+    >
+      {retryLabel}
+    </Text>
+  );
 
   if (state === 'loading') {
     return (

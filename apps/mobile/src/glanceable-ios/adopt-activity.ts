@@ -18,7 +18,7 @@ import {
 } from '@/lib/storage-keys';
 
 import { adoptNativeActivity, sweepStrayActivities } from './ios-sink';
-import { restoreFollowedSessionCards, type SessionRestoreScope } from './session-follow';
+import { restoreFollowedSessionCards, type SessionRestoreScope } from './session-follow-restore';
 
 /**
  * A stored value, `null` when the keychain holds nothing under the key, or
@@ -79,6 +79,9 @@ async function hasStoredCredential(): Promise<boolean | undefined> {
  * which ends every card. A device that keeps a credential but cannot name its
  * account, and one whose keychain could not answer at all, leave the cards as
  * they are.
+ *
+ * Only a step that can act on the answer reads it: the restore when a card is
+ * live to place, and the adoption when a snapshot can own a card.
  */
 async function readStoredContext(): Promise<SessionRestoreScope> {
   const userId = await readKey(ACTIVE_USER_ID_KEY);
@@ -103,11 +106,11 @@ async function readStoredContext(): Promise<SessionRestoreScope> {
 
 /**
  * Rebuild the followed session cards from native truth and register again the
- * ones this account and organization followed (`session-follow.ts`). Runs at
- * launch and on every foreground.
+ * ones this account and organization followed (`session-follow-restore.ts`).
+ * Runs at launch and on every foreground.
  */
 export async function restoreStoredSessionCards(): Promise<void> {
-  await restoreFollowedSessionCards(await readStoredContext());
+  await restoreFollowedSessionCards(readStoredContext);
 }
 
 /**
@@ -133,9 +136,17 @@ export async function adoptPushStartedActivity(): Promise<void> {
   // return below would otherwise leave it on the Lock Screen forever.
   sweepStrayActivities();
   const snapshot = getGlanceableSnapshotForSignedInScope();
+  if (snapshot === null) {
+    // Nothing can be adopted, so this launch has no use for the stored account
+    // until a live card needs one: the restore reads it then.
+    await restoreFollowedSessionCards(readStoredContext);
+    return;
+  }
+  // The adoption names the stored account itself, so the read is shared with
+  // the restore instead of repeated.
   const scope = await readStoredContext();
-  await restoreFollowedSessionCards(scope);
-  if (snapshot === null || scope.kind !== 'account') {
+  await restoreFollowedSessionCards(() => Promise.resolve(scope));
+  if (scope.kind !== 'account') {
     return;
   }
   adoptNativeActivity(snapshot, scope.ctx);

@@ -9,13 +9,15 @@ import {
   REFRESH_TOKEN_KEY,
 } from '@/lib/storage-keys';
 
+import { type SessionRestoreScope, type SessionRestoreScopeReader } from './session-follow-restore';
+
 const mocks = vi.hoisted(() => ({
   sweepStrayActivities: vi.fn(),
   adoptNativeActivity: vi.fn(),
   getLastGlanceableSnapshot: vi.fn<() => GlanceableAgentsSnapshot | null>(),
   restorePersistedGlanceable: vi.fn().mockResolvedValue(undefined),
   getItemAsync: vi.fn<(key: string) => Promise<string | null>>(),
-  restoreFollowedSessionCards: vi.fn(),
+  restoreFollowedSessionCards: vi.fn<(read: SessionRestoreScopeReader) => Promise<void>>(),
   reportSecureStoreFailure: vi.fn(),
 }));
 
@@ -34,7 +36,7 @@ vi.mock('./ios-sink', () => ({
   adoptNativeActivity: mocks.adoptNativeActivity,
   sweepStrayActivities: mocks.sweepStrayActivities,
 }));
-vi.mock('./session-follow', () => ({
+vi.mock('./session-follow-restore', () => ({
   restoreFollowedSessionCards: mocks.restoreFollowedSessionCards,
 }));
 vi.mock('@/lib/telemetry/secure-store-events', () => ({
@@ -44,6 +46,15 @@ vi.mock('@/lib/telemetry/secure-store-events', () => ({
 const { adoptPushStartedActivity, restoreStoredSessionCards } = await import('./adopt-activity');
 
 const SNAPSHOT = { status: 'happy', scopeKey: 'scope' } as unknown as GlanceableAgentsSnapshot;
+
+/** The scope the restore would read, through the reader the call received. */
+function restoredScope(): Promise<SessionRestoreScope | undefined> {
+  const read = mocks.restoreFollowedSessionCards.mock.lastCall?.[0];
+  if (read === undefined) {
+    return Promise.resolve(undefined);
+  }
+  return read();
+}
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -87,7 +98,7 @@ describe('adoptPushStartedActivity', () => {
 
     await adoptPushStartedActivity();
 
-    expect(mocks.restoreFollowedSessionCards).toHaveBeenLastCalledWith({
+    expect(await restoredScope()).toEqual({
       kind: 'account',
       ctx: { userId: 'user-1', organizationId: null },
     });
@@ -95,11 +106,11 @@ describe('adoptPushStartedActivity', () => {
 
   it('reports a keychain with no account and no credential as signed out', async () => {
     await adoptPushStartedActivity();
-    expect(mocks.restoreFollowedSessionCards).toHaveBeenLastCalledWith({ kind: 'signedOut' });
+    expect(await restoredScope()).toEqual({ kind: 'signedOut' });
     expect(mocks.adoptNativeActivity).not.toHaveBeenCalled();
 
     await restoreStoredSessionCards();
-    expect(mocks.restoreFollowedSessionCards).toHaveBeenLastCalledWith({ kind: 'signedOut' });
+    expect(await restoredScope()).toEqual({ kind: 'signedOut' });
   });
 
   it('keeps the cards when a credential is stored but the account hint is not', async () => {
@@ -111,7 +122,7 @@ describe('adoptPushStartedActivity', () => {
 
     await adoptPushStartedActivity();
 
-    expect(mocks.restoreFollowedSessionCards).toHaveBeenLastCalledWith({ kind: 'unreadable' });
+    expect(await restoredScope()).toEqual({ kind: 'unreadable' });
     expect(mocks.adoptNativeActivity).not.toHaveBeenCalled();
   });
 
@@ -122,7 +133,7 @@ describe('adoptPushStartedActivity', () => {
 
     await adoptPushStartedActivity();
 
-    expect(mocks.restoreFollowedSessionCards).toHaveBeenLastCalledWith({ kind: 'unreadable' });
+    expect(await restoredScope()).toEqual({ kind: 'unreadable' });
   });
 
   it('keeps the cards when the credential read cannot answer', async () => {
@@ -132,7 +143,7 @@ describe('adoptPushStartedActivity', () => {
 
     await adoptPushStartedActivity();
 
-    expect(mocks.restoreFollowedSessionCards).toHaveBeenLastCalledWith({ kind: 'unreadable' });
+    expect(await restoredScope()).toEqual({ kind: 'unreadable' });
   });
 
   it('retries a null credential read before reporting a sign-out', async () => {
@@ -148,14 +159,14 @@ describe('adoptPushStartedActivity', () => {
 
     await adoptPushStartedActivity();
 
-    expect(mocks.restoreFollowedSessionCards).toHaveBeenLastCalledWith({ kind: 'unreadable' });
+    expect(await restoredScope()).toEqual({ kind: 'unreadable' });
   });
 
   it('reports a keychain that cannot answer as unreadable', async () => {
     mocks.getItemAsync.mockRejectedValue(KEYCHAIN_LOCKED);
 
     await adoptPushStartedActivity();
-    expect(mocks.restoreFollowedSessionCards).toHaveBeenLastCalledWith({ kind: 'unreadable' });
+    expect(await restoredScope()).toEqual({ kind: 'unreadable' });
     expect(mocks.adoptNativeActivity).not.toHaveBeenCalled();
   });
 
@@ -163,6 +174,9 @@ describe('adoptPushStartedActivity', () => {
     mocks.getItemAsync.mockRejectedValue(KEYCHAIN_LOCKED);
 
     await adoptPushStartedActivity();
+    // The launch reads the keychain only when the restore asks for the stored
+    // account, as it does with a live card to place.
+    await restoredScope();
 
     // The guarded keychain module files the report for a read failure. Filing a
     // second one here would surface one failure as two issues, on every launch
@@ -180,7 +194,36 @@ describe('adoptPushStartedActivity', () => {
 
     // A read that failed proves nothing about the organization, so nothing is
     // adopted and no card is treated as out of scope.
-    expect(mocks.restoreFollowedSessionCards).toHaveBeenLastCalledWith({ kind: 'unreadable' });
+    expect(await restoredScope()).toEqual({ kind: 'unreadable' });
     expect(mocks.adoptNativeActivity).not.toHaveBeenCalled();
+  });
+
+  it('reads no keychain for a launch that has nothing to adopt', async () => {
+    // No snapshot can own a card, so nothing at launch needs the stored
+    // account: the restore asks for it only when a card is live.
+    await adoptPushStartedActivity();
+    expect(mocks.getItemAsync).not.toHaveBeenCalled();
+
+    await restoreStoredSessionCards();
+    expect(mocks.getItemAsync).not.toHaveBeenCalled();
+    expect(mocks.restoreFollowedSessionCards).toHaveBeenCalledTimes(2);
+  });
+
+  it('reads the stored account once for a launch that can adopt', async () => {
+    mocks.getLastGlanceableSnapshot.mockReturnValue(SNAPSHOT);
+    mocks.getItemAsync.mockImplementation((key: string) =>
+      Promise.resolve(key === ACTIVE_USER_ID_KEY ? 'user-1' : null)
+    );
+
+    await adoptPushStartedActivity();
+
+    expect(
+      mocks.getItemAsync.mock.calls.filter(([key]) => key === ACTIVE_USER_ID_KEY)
+    ).toHaveLength(1);
+    expect(await restoredScope()).toEqual({
+      kind: 'account',
+      ctx: { userId: 'user-1', organizationId: null },
+    });
+    expect(mocks.adoptNativeActivity).toHaveBeenCalledTimes(1);
   });
 });

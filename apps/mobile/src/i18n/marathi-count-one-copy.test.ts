@@ -20,23 +20,23 @@ afterAll(async () => {
 
 describe('Marathi count-one copy', () => {
   it('inflects the updated-file count to the singular at one', () => {
-    expect(
-      i18n.t('agentChat.partRenderer.updatedFileCount', { count: 1, displayCount: '1' })
-    ).toBe('1 फाइल अद्ययावत केली.');
+    expect(i18n.t('agentChat.partRenderer.updatedFileCount', { count: 1, displayCount: '1' })).toBe(
+      '1 फाइल अद्ययावत केली.'
+    );
   });
 
   it('keeps the plural above one', () => {
-    expect(
-      i18n.t('agentChat.partRenderer.updatedFileCount', { count: 2, displayCount: '2' })
-    ).toBe('2 फाइल्स अद्ययावत केल्या.');
+    expect(i18n.t('agentChat.partRenderer.updatedFileCount', { count: 2, displayCount: '2' })).toBe(
+      '2 फाइल्स अद्ययावत केल्या.'
+    );
   });
 
   it('keeps the PR-review families on the shared plural', () => {
     expect(i18n.t('prReview.fileNavigator.title')).toBe('फाइल्स');
     expect(i18n.t('prReview.tabs.files')).toBe('फाइल्स');
     expect(i18n.t('prReview.overview.file')).toBe('फाइल्स');
-    expect(
-      i18n.t('prReview.diff.truncationBanner', { count: 1, limit: '3,000', total: '1' })
-    ).toBe('GitHub API च्या मर्यादेमुळे बदललेल्या 1 फाइलपैकी पहिल्या 3,000 फाइल्स दाखवल्या आहेत.');
+    expect(i18n.t('prReview.diff.truncationBanner', { count: 1, limit: '3,000', total: '1' })).toBe(
+      'GitHub API च्या मर्यादेमुळे बदललेल्या 1 फाइलपैकी पहिल्या 3,000 फाइल्स दाखवल्या आहेत.'
+    );
   });
 });

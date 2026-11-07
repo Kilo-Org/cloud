@@ -202,6 +202,7 @@ vi.mock('@/components/ui/icons', () => ({
   Smartphone: 'Smartphone',
   Sparkles: 'Sparkles',
   Trash2: 'Trash2',
+  Users: 'Users',
 }));
 
 vi.mock('@/components/profile-action-tile', () => ({ ActionTile: 'ActionTile' }));

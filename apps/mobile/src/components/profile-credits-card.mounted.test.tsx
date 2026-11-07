@@ -322,12 +322,69 @@ async function choose(renderer: ReactTestRenderer, label: string) {
   });
 }
 
-/** The header container's classes: the only View the card gives `min-h-11`. */
+/** The header container's classes: the only View the card gives `min-h-11 gap-3`. */
 function headerClasses(renderer: ReactTestRenderer): string[] {
   const header = renderer.root.find(
-    node => Object.is(node.type, 'View') && String(node.props.className).includes('min-h-11')
+    node => Object.is(node.type, 'View') && String(node.props.className).includes('min-h-11 gap-3')
   );
   return String(header.props.className).split(' ');
+}
+
+/** A node's class tokens, so a class assertion never depends on their order. */
+function classesOf(node: ReactTestInstance): string[] {
+  return String(node.props.className ?? '')
+    .split(/\s+/)
+    .filter(Boolean);
+}
+
+function hasClasses(node: ReactTestInstance, expected: readonly string[]): boolean {
+  const tokens = classesOf(node);
+  return expected.every(token => tokens.includes(token));
+}
+
+/** Whether `node` or one of its descendants renders the given string. */
+function renders(node: ReactTestInstance, text: string): boolean {
+  return (
+    node.findAll(
+      candidate =>
+        candidate.children.some(child => typeof child === 'string' && child.includes(text)) ||
+        // A mock child rendered as a bare component name, such as the
+        // purchase action, is its own text.
+        (typeof candidate.type === 'string' && candidate.type === text)
+    ).length > 0
+  );
+}
+
+/** Whether `node` is `target` or holds it among its descendants. */
+function contains(node: ReactTestInstance, target: ReactTestInstance): boolean {
+  if (node === target) {
+    return true;
+  }
+  return node.children.some(child => typeof child !== 'string' && contains(child, target));
+}
+
+/** The card's balance shell: its only `min-h-16 rounded-lg bg-secondary` box. */
+function balanceBlock(renderer: ReactTestRenderer): ReactTestInstance {
+  return renderer.root.find(
+    node =>
+      Object.is(node.type, 'View') && hasClasses(node, ['min-h-16', 'rounded-lg', 'bg-secondary'])
+  );
+}
+
+/** The value column of any layout: the amount (or its retry surface) and the note. */
+function valueColumn(renderer: ReactTestRenderer): ReactTestInstance {
+  return renderer.root.find(
+    node => Object.is(node.type, 'View') && hasClasses(node, ['min-h-[48px]', 'flex-1', 'gap-1'])
+  );
+}
+
+/** The value line of the stacked layout: the amount and its visibility toggle. */
+function amountRow(renderer: ReactTestRenderer): ReactTestInstance {
+  return renderer.root.find(
+    node =>
+      Object.is(node.type, 'View') &&
+      String(node.props.className) === 'min-w-0 flex-row items-center gap-1'
+  );
 }
 
 beforeEach(() => {
@@ -924,6 +981,49 @@ describe('CreditsCard balance state', () => {
     }
   });
 
+  it('paints a negative balance with the sign in front of the symbol', async () => {
+    currentUser.userId = 'user-A';
+    getContextBalanceQueryFn.mockResolvedValue({ balance: -5 });
+
+    const { texts, unmount } = await mountCard();
+    await waitFor(() => texts().includes('-$5.00'));
+
+    // A balance can go negative; the sign leads the whole amount, and no
+    // "$-5.00" form of the same figure.
+    expect(texts()).not.toContain('$-5.00');
+    unmount();
+  });
+
+  it('keeps the symbol in front of the amount in a right-to-left language', async () => {
+    currentUser.userId = 'user-A';
+    getContextBalanceQueryFn.mockResolvedValue({ balance: 10 });
+    await i18n.changeLanguage('ar');
+    try {
+      const { renderer, texts, unmount } = await mountCard();
+      let amount = '';
+      await waitFor(() => {
+        amount = texts().find(text => text.includes('$')) ?? '';
+        return amount.length > 0;
+      });
+      // The formatter's own pattern for this language puts the currency behind
+      // the number ("0.00 $"), so the same balance read as a different figure
+      // than the "$0.00" the other cells paint (design review, Profile rtl
+      // cell, 2026-11-07). The digits stay the locale's.
+      expect(amount.startsWith('$')).toBe(true);
+      expect(amount).not.toContain('\u00A0');
+      expect(amount).not.toContain(' ');
+      // The run also carries its own direction, so the symbol cannot move
+      // behind the number in a right-to-left paragraph.
+      const amountNode = renderer.root.find(
+        node => Object.is(node.type, 'Text') && node.children.includes(amount)
+      );
+      expect(amountNode.props.style).toEqual({ direction: 'ltr', writingDirection: 'ltr' });
+      unmount();
+    } finally {
+      await i18n.changeLanguage('en');
+    }
+  });
+
   it('shows the nearest paid or bonus deadline and masks its amount with the balance', async () => {
     currentUser.userId = 'user-A';
     getContextBalanceQueryFn.mockResolvedValue({ balance: 65 });
@@ -1069,6 +1169,31 @@ describe('CreditsCard add-credits entry point', () => {
     unmount();
   });
 
+  it('paints the org purchase row before the balance read answers', async () => {
+    currentUser.userId = 'user-1';
+    savedMetadata.set(ORGANIZATION_STORAGE_KEY, 'org-a');
+    // The balance read decides nothing about whether the organization has a
+    // purchase entry point, so the row must be part of the card's first paint:
+    // mounting it when the read lands moved every section below it (design
+    // gate, Profile, 2026-11-06).
+    const balance = Promise.withResolvers<{ balance: number }>();
+    getContextBalanceQueryFn.mockReturnValue(balance.promise);
+    const orgs = [
+      { organizationId: 'org-a', organizationName: 'Acme', role: 'owner' },
+    ] as OrgListEntry[];
+    listState.payload = orgs;
+
+    const { texts, unmount } = await mountCard(createTestQueryClient(), orgs);
+    await waitFor(() => texts().includes('Acme'));
+
+    expect(texts()).toContain('ADD_CREDITS_ROW');
+    expect(addCreditsRowProps.latest?.url).toBe(
+      'https://example.com/organizations/org-a/payment-details'
+    );
+
+    unmount();
+  });
+
   it('renders no row for a non-money-role org member', async () => {
     currentUser.userId = 'user-1';
     savedMetadata.set(ORGANIZATION_STORAGE_KEY, 'org-a');
@@ -1111,13 +1236,60 @@ describe('CreditsCard add-credits entry point', () => {
     let ancestor = action.parent;
     let insideBalanceCard = false;
     while (ancestor !== null) {
-      if (String(ancestor.props.className ?? '').includes('min-h-16 gap-2')) {
+      if (hasClasses(ancestor, ['min-h-16', 'rounded-lg', 'bg-secondary'])) {
         insideBalanceCard = true;
         break;
       }
       ancestor = ancestor.parent;
     }
     expect(insideBalanceCard).toBe(true);
+
+    unmount();
+  });
+
+  it('paints the failed read and the purchase action in one balance block', async () => {
+    currentUser.userId = 'user-1';
+    savedMetadata.set(ORGANIZATION_STORAGE_KEY, 'org-a');
+    getContextBalanceQueryFn.mockRejectedValue(new Error('Balance unavailable'));
+    const orgs = [
+      { organizationId: 'org-a', organizationName: 'Acme', role: 'owner' },
+    ] as OrgListEntry[];
+    listState.payload = orgs;
+
+    const { renderer, texts, unmount } = await mountCard(createTestQueryClient(), orgs);
+    await waitFor(() => texts().includes('Failed to load balance. Tap to retry.'));
+
+    // A retry that succeeds swaps this block for the loaded row, so both states
+    // have to paint the same frame: the failure surface and the purchase action
+    // inside one block, not a padded pressable with the action beside it.
+    const block = balanceBlock(renderer);
+    expect(
+      block.findAll(node => node.children.includes('Failed to load balance. Tap to retry.')).length
+    ).toBeGreaterThan(0);
+
+    // No layout pass runs in this suite, so the card stays in its stacked
+    // layout: the retry surface is the value line, the note keeps its own line
+    // under it, and the purchase action centers beside that column. The retry
+    // surface carries its own 44 dp target while adding only the value line's
+    // height, so a retry that succeeds swaps content inside the same frame.
+    const retrySurface = block.find(
+      node =>
+        Object.is(node.type, 'Pressable') &&
+        hasClasses(node, ['min-h-[44px]', '-my-[8px]', 'justify-center'])
+    );
+    expect(renders(retrySurface, 'Failed to load balance. Tap to retry.')).toBe(true);
+    expect(retrySurface.props.onPress).toBeTypeOf('function');
+    // The note reads the credit blocks, not the balance, so the failed block
+    // keeps that line under the retry surface and the block holds its height.
+    const column = valueColumn(renderer);
+    expect(renders(column, 'Failed to load balance. Tap to retry.')).toBe(true);
+    expect(renders(column, 'No expiring credits.')).toBe(true);
+    const values = column.children.filter(
+      (child): child is ReactTestInstance => typeof child !== 'string'
+    );
+    expect(values.indexOf(retrySurface)).toBe(0);
+    expect(renders(block, 'ADD_CREDITS_ROW')).toBe(true);
+    expect(renders(column, 'ADD_CREDITS_ROW')).toBe(false);
 
     unmount();
   });
@@ -1158,42 +1330,11 @@ describe('CreditsCard balance row', () => {
     );
   }
 
-  /** The balance shell's classes: the card's only `min-h-16 gap-2` box. */
-  function balanceClasses(renderer: ReactTestRenderer): string[] {
-    const balance = renderer.root.find(
-      node =>
-        Object.is(node.type, 'View') && String(node.props.className).includes('min-h-16 gap-2')
-    );
-    return String(balance.props.className).split(' ');
-  }
-
   /** The amount-and-note column of the one-row layout. */
   function wideTextColumn(renderer: ReactTestRenderer): ReactTestInstance {
     return renderer.root.find(
       node =>
         Object.is(node.type, 'View') && String(node.props.className) === 'min-w-0 flex-1 gap-1'
-    );
-  }
-
-  /** The amount row of the stacked layout: the amount and the hide/show toggle. */
-  function amountRow(renderer: ReactTestRenderer): ReactTestInstance {
-    return renderer.root.find(
-      node =>
-        Object.is(node.type, 'View') &&
-        String(node.props.className) === 'min-w-0 flex-row items-center gap-1'
-    );
-  }
-
-  /** Whether `node` or one of its descendants renders the given string. */
-  function renders(node: ReactTestInstance, text: string): boolean {
-    return (
-      node.findAll(
-        candidate =>
-          candidate.children.some(child => typeof child === 'string' && child.includes(text)) ||
-          // A mock child rendered as a bare component name, such as the
-          // purchase action, is its own text.
-          (typeof candidate.type === 'string' && candidate.type === text)
-      ).length > 0
     );
   }
 
@@ -1210,6 +1351,58 @@ describe('CreditsCard balance row', () => {
     });
     return mounted;
   }
+
+  it.each(['failed', 'loaded'] as const)(
+    'keeps the note directly under the value line in the %s state',
+    async state => {
+      currentUser.userId = 'user-1';
+      if (state === 'failed') {
+        getContextBalanceQueryFn.mockRejectedValue(new Error('Balance unavailable'));
+      } else {
+        getContextBalanceQueryFn.mockResolvedValue({ balance: 0 });
+      }
+
+      const { renderer, texts, unmount } = await mountCard();
+      await waitFor(() =>
+        texts().includes(
+          state === 'failed' ? 'Failed to load balance. Tap to retry.' : 'No expiring credits.'
+        )
+      );
+      await act(() => {
+        (
+          cardBox(renderer).props.onLayout as (event: {
+            nativeEvent: { layout: { width: number } };
+          }) => void
+        )({ nativeEvent: { layout: { width: 332 } } });
+      });
+
+      // The note is the value column's second child in every state, so it holds
+      // the column's own small gap under the amount. Hanging it off a taller
+      // control row instead moved the caption 7 dp further from the value than
+      // the wide card paints it (design review, Profile compact cell,
+      // 2026-11-07), and the action's height decided where it landed.
+      const column = valueColumn(renderer);
+      const note = column.find(node =>
+        node.children.some(
+          child => typeof child === 'string' && child.includes('No expiring credits.')
+        )
+      );
+      const children = column.children.filter(
+        (child): child is ReactTestInstance => typeof child !== 'string'
+      );
+      const noteBranch = children.findIndex(child => contains(child, note));
+      expect(noteBranch).toBe(1);
+      // No element of its own adds a second gap between the value and the note.
+      const between: string[] = [];
+      let ancestor = note.parent;
+      while (ancestor !== null && ancestor !== column) {
+        between.push(String(ancestor.props.className ?? ''));
+        ancestor = ancestor.parent;
+      }
+      expect(between.filter(entry => entry.includes('gap-'))).toEqual([]);
+      unmount();
+    }
+  );
 
   it('keeps the note in the amount column on a wide card, with the purchase action in its own column', async () => {
     const { renderer, unmount } = await mountAtCardWidth(383);
@@ -1230,21 +1423,39 @@ describe('CreditsCard balance row', () => {
     // three lines, so both stack instead.
     ['the compact cell', 332],
     ['a 390 dp screen', 362],
-  ])('gives the note its own row under the amount on %s', async (_name, width) => {
-    const { renderer, unmount } = await mountAtCardWidth(width);
+  ])(
+    'gives the note its own line under the amount and keeps the action beside it on %s',
+    async (_name, width) => {
+      const { renderer, unmount } = await mountAtCardWidth(width);
 
-    const classes = balanceClasses(renderer);
-    expect(classes).toContain('items-stretch');
-    expect(classes).not.toContain('flex-row');
-    // Row 1 is the amount and the toggle; the note follows it at the card's
-    // full width and the purchase action takes the row below the note, so the
-    // amount keeps the tight gap under it that the wide cells show.
-    const row = amountRow(renderer);
-    expect(renders(row, 'No expiring credits.')).toBe(false);
-    expect(renders(row, 'ADD_CREDITS_BUTTON')).toBe(false);
-    const card = cardBox(renderer);
-    expect(renders(card, 'No expiring credits.')).toBe(true);
-    expect(renders(card, 'ADD_CREDITS_BUTTON')).toBe(true);
-    unmount();
-  });
+      // A stacked card keeps the value and its caption together: the amount and
+      // its visibility toggle share the value line, the note takes the column's
+      // next line at the column's own gap, and the purchase action centers
+      // beside the pair instead of standing in the amount's line, where its
+      // height pushed the caption down (design review, Profile compact cell,
+      // 2026-11-07).
+      const shell = balanceBlock(renderer);
+      expect(hasClasses(shell, ['flex-row', 'items-center'])).toBe(true);
+      const column = valueColumn(renderer);
+      const wrapper = column.parent;
+      expect(wrapper?.parent).toBe(shell);
+      // The column's wrapper is a row, so its child's `flex-1` is a width
+      // share. In a column wrapper it would be a 0 vertical basis, and the
+      // 48 dp floor would pin the column: a longer note would paint outside
+      // the card instead of growing it.
+      if (wrapper === null) {
+        throw new Error('The stacked value column has no wrapper');
+      }
+      expect(classesOf(wrapper)).toContain('flex-row');
+
+      const row = amountRow(renderer);
+      expect(row.parent).toBe(column);
+      expect(renders(row, 'No expiring credits.')).toBe(false);
+      expect(renders(row, 'ADD_CREDITS_BUTTON')).toBe(false);
+      expect(renders(column, 'No expiring credits.')).toBe(true);
+      expect(renders(column, 'ADD_CREDITS_BUTTON')).toBe(false);
+      expect(renders(shell, 'ADD_CREDITS_BUTTON')).toBe(true);
+      unmount();
+    }
+  );
 });

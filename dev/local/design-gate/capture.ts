@@ -1,6 +1,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+import { paintSignature } from '../../../apps/mobile/src/lib/design-gate/paint-state';
+import {
+  captureAlignment,
+  screenshotObservation,
+  type CaptureAlignment,
+  type TimedTree,
+} from './capture-evidence';
 import type { ProbeClient, ProbeSample } from './cdp';
 import type { ElementRef, Finding } from './findings';
 import { enterTouchMode } from './input-mode';
@@ -48,6 +55,7 @@ export type Screen = {
   screenshot: string;
   annotated: string;
   dump: string;
+  capture?: string;
   env: ProbeEnv;
 };
 
@@ -83,8 +91,10 @@ const LTR_FALLBACK_LANGUAGE = 'en';
 export type Sampled = {
   dump: ProbeDump;
   timeline: ProbeDump[];
+  /** Consecutive probe states agree; this does not establish native paint. */
   settled: boolean;
   elapsedMs: number;
+  alignment?: CaptureAlignment;
 };
 
 export async function sampleUntilSettled(
@@ -159,21 +169,51 @@ export function screenFindings(args: {
   image?: Rgba;
   sampled?: Sampled;
 }): Finding[] {
-  const findings = [...checkScreen(args.tree, args.image)];
+  const alignment = args.sampled?.alignment;
+  const image =
+    alignment === undefined || alignment.status === 'bracketed' ? args.image : undefined;
+  const findings: Finding[] = [];
+  if (args.sampled?.settled !== false) findings.push(...checkScreen(args.tree, image));
+  if (alignment !== undefined && alignment.status !== 'bracketed') {
+    findings.push({
+      rule: 'capture-alignment',
+      severity: 'warning',
+      cell: args.cell,
+      target: args.target,
+      element: rootRef(args.dump),
+      measured: alignment.after.completedMs - alignment.before.startedMs,
+      expected: `matching probe states bracketing a screenshot within ${alignment.budgetMs} ms`,
+      unit: 'ms',
+      message: `${alignment.reason} The screenshot is preserved; pixel-to-tree rules were skipped.`,
+    });
+  }
+  if (alignment?.pixels === 'uniform' && alignment.expectedText) {
+    findings.push({
+      rule: 'blank-frame',
+      severity: 'warning',
+      cell: args.cell,
+      target: args.target,
+      element: rootRef(args.dump),
+      measured: 0,
+      expected: 'inspect the preserved screenshot for the intended screen content',
+      unit: 'ratio',
+      message:
+        'The captured content viewport is a uniform color while the probe contains visible text. ' +
+        'This is a possible blank frame, not proof of a product defect or successful paint; ' +
+        'the original screenshot was retained without retrying it away.',
+    });
+  }
   if (args.sampled !== undefined) {
     findings.push(...checkShift(args.sampled.timeline.map(normalize), SAMPLE_INTERVAL_MS));
     if (!args.sampled.settled) {
-      findings.push({
-        rule: 'unsettled',
-        severity: 'warning',
-        cell: args.cell,
-        target: args.target,
-        element: rootRef(args.dump),
-        measured: args.sampled.elapsedMs,
-        expected: `${STABLE_SAMPLES} identical samples within ${SETTLE_TIMEOUT_MS} ms`,
-        unit: 'ms',
-        message: `Layout kept changing for ${args.sampled.elapsedMs} ms; findings for this screen may describe an intermediate frame.`,
-      });
+      findings.push(
+        unsettledFinding({
+          cell: args.cell,
+          target: args.target,
+          dump: args.dump,
+          elapsedMs: args.sampled.elapsedMs,
+        })
+      );
     }
   }
   return findings.map(finding => ({ ...finding, cell: args.cell, target: args.target }));
@@ -210,11 +250,12 @@ export function captureFiles(out: string, cell: string, target: string) {
     annotated: `${base}.annotated.png`,
     dump: `${base}.json`,
     timeline: `${base}.timeline.json`,
+    capture: `${base}.capture.json`,
     absolute: (relative: string) => path.join(out, relative),
   };
 }
 
-/** The text on glass, sorted: what the screen really shows, without the route. */
+/** Visible text reported by the probe, not evidence that those glyphs reached the glass. */
 export function screenTexts(dump: ProbeDump): string {
   return normalize(dump)
     .nodes.flatMap(node => (node.probe.text === undefined ? [] : [node.probe.text]))
@@ -223,7 +264,7 @@ export function screenTexts(dump: ProbeDump): string {
 }
 
 export function screenIdentity(dump: ProbeDump): string {
-  return [dump.env.route, screenTexts(dump)].join('\n');
+  return [dump.env.route, dump.env.screen ?? '', screenTexts(dump)].join('\n');
 }
 
 export async function waitForStableLayout(
@@ -291,14 +332,13 @@ async function captureScreen(ctx: CaptureContext, cell: string, target: Target, 
   enterTouchMode(ctx, beforeDump);
   const beforeTexts = screenTexts(beforeDump);
   const beforeRoute = beforeDump.env.route.split('?')[0];
-  // A route name is not proof that the screen painted. Right after a language
-  // switch the runtime reloads, restores its initial route and then overwrites a
-  // push that landed mid-restore: the router reports the target route while the
-  // previous screen is still on glass. The link counts as opened when the text
-  // on screen changed, or when it re-opens the route the app was already on, so
-  // the one re-send below happens on evidence, never on a fixed retry count.
+  const beforeScreen = beforeDump.env.screen;
+  // Route and probe text can reveal stale navigation, but neither proves native paint.
+  // Keep this bounded navigation retry separate from screenshot capture: a genuine
+  // blank screenshot must survive as evidence rather than be retried until it disappears.
   const opened = (dump: ProbeDump) =>
     screenTexts(dump) !== beforeTexts ||
+    (dump.env.screen !== undefined && dump.env.screen !== beforeScreen) ||
     (beforeRoute === linkRoute && dump.env.route.split('?')[0] === linkRoute);
   await ctx.probe.startSampling(SAMPLE_INTERVAL_MS, ctx.observeMs + IN_APP_SAMPLING_SLACK_MS);
   await ctx.probe.openLink(target.link);
@@ -316,20 +356,52 @@ async function captureScreen(ctx: CaptureContext, cell: string, target: Target, 
       `design-gate: ${target.id} retained only the newest layouts; older samples were dropped`
     );
   }
-  const sampled: Sampled = { ...settled, timeline: expandSamples(samples) };
   const files = captureFiles(ctx.out, cell, target.id);
-  writeJson(files.absolute(files.dump), sampled.dump);
   writeJson(files.absolute(files.timeline), { samples, truncated });
+  const started = ctx.clock.now();
+  const readTree = async (): Promise<TimedTree> => {
+    const startedMs = ctx.clock.now() - started;
+    try {
+      const dump = await ctx.probe.dump();
+      return { startedMs, completedMs: ctx.clock.now() - started, dump };
+    } catch (error) {
+      return { startedMs, completedMs: ctx.clock.now() - started, error: String(error) };
+    }
+  };
+  const before = await readTree();
+  const dump = before.dump ?? settled.dump;
+  // Preserve collected tree evidence even if the native screenshot or its decode fails.
+  writeJson(files.absolute(files.dump), dump);
+  const screenshot = { startedMs: ctx.clock.now() - started, completedMs: 0 };
   ctx.device.screenshot(files.absolute(files.screenshot));
+  screenshot.completedMs = ctx.clock.now() - started;
+  const after = await readTree();
+  const image = ctx.readImage(files.absolute(files.screenshot));
+  const alignment = captureAlignment(
+    before,
+    screenshot,
+    after,
+    layoutSignature,
+    screenshotObservation(dump, image)
+  );
+  const sampled: Sampled = {
+    ...settled,
+    dump,
+    timeline: expandSamples(samples),
+    alignment,
+    settled: settled.settled && layoutSignature(settled.dump) === layoutSignature(dump),
+  };
+  writeJson(files.absolute(files.capture), alignment);
   const screen: Screen = {
     target: target.id,
     link: target.link,
     screenshot: files.screenshot,
     annotated: files.annotated,
     dump: files.dump,
+    capture: files.capture,
     env: sampled.dump.env,
   };
-  return { sampled, screen, unopened, png: files.absolute(files.screenshot) };
+  return { sampled, screen, unopened, image };
 }
 
 export function expandSamples(samples: readonly ProbeSample[]): ProbeDump[] {
@@ -365,7 +437,7 @@ async function ensureLanguage(ctx: CaptureContext, want: LanguageTarget): Promis
 }
 
 export function layoutSignature(dump: ProbeDump): string {
-  return dump.nodes.map(node => node.rect.join(',')).join(';');
+  return paintSignature(dump);
 }
 
 /**
@@ -473,7 +545,7 @@ export async function runMatrix(
         // target itself caused (the previous target switched the app language)
         // leaves this target cold whatever its index.
         const warm = targetLanguage.reloaded || (cellLanguage.reloaded && index === 0);
-        const { sampled, screen, unopened, png } = await captureScreen(
+        const { sampled, screen, unopened, image } = await captureScreen(
           ctx,
           config.id,
           target,
@@ -525,17 +597,18 @@ export async function runMatrix(
           continue;
         }
         const tree = normalize(dump);
-        trees.set(`${config.id}/${target.id}`, tree);
         outcome.findings.push(
           ...screenFindings({
             cell: config.id,
             target: target.id,
             dump,
             tree,
-            image: ctx.readImage(png),
+            image,
             sampled,
           })
         );
+        if (!sampled.settled) continue;
+        trees.set(`${config.id}/${target.id}`, tree);
         const reference = config.rtl
           ? trees.get(`${mirrorReference(config)}/${target.id}`)
           : undefined;

@@ -153,7 +153,6 @@ describe('Cloud Agent MCP authority', () => {
           { repoFullName: 'acme/third' },
         ],
       },
-      requireEnvironmentChoice: true,
     },
   ])('forwards normally-valid child options without additional restrictions: %j', async options => {
     const fetchImpl = upstream();
@@ -346,7 +345,6 @@ describe('Cloud Agent MCP authority', () => {
       input: {
         ...launch,
         requestedEnvironment: { id: 'not-a-uuid' },
-        requireEnvironmentChoice: true,
       },
     },
     {
@@ -365,6 +363,10 @@ describe('Cloud Agent MCP authority', () => {
           repositories: [{ repoFullName: 'acme/other', branch: '' }],
         },
       },
+    },
+    {
+      path: 'cloudAgentNext.prepareSession',
+      input: { ...launch, requireEnvironmentChoice: true },
     },
     {
       path: 'cloudAgentNext.prepareSession',

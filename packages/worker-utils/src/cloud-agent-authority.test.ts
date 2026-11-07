@@ -673,7 +673,7 @@ describe('Cloud Agent authority contract', () => {
     ).toBe(false);
   });
 
-  it('accepts the requested environment and explicit choice flag on a launch', () => {
+  it('accepts the requested environment on a launch', () => {
     const requestedEnvironment = {
       id: organizationId,
       repositories: [
@@ -681,14 +681,13 @@ describe('Cloud Agent authority contract', () => {
         { repoFullName: 'acme/third' },
       ],
     };
-    const request = { ...launch, requestedEnvironment, requireEnvironmentChoice: true };
+    const request = { ...launch, requestedEnvironment };
     expect(
       validateCloudAgentAuthorityRequest(scope, 'cloudAgentNext.prepareSession', request)
     ).toEqual(request);
     expect(cloudAgentAuthorityInputSchema(scope)).toMatchObject({
       properties: {
         requestedEnvironment: { type: 'object' },
-        requireEnvironmentChoice: { type: 'boolean', const: true },
       },
     });
     expect(
@@ -697,13 +696,6 @@ describe('Cloud Agent authority contract', () => {
         requestedEnvironment: { id: organizationId },
       })
     ).toMatchObject({ requestedEnvironment: { id: organizationId } });
-    expect(
-      validateCloudAgentAuthorityRequest(scope, 'cloudAgentNext.prepareSession', {
-        ...launch,
-        requestedEnvironment,
-        requireEnvironmentChoice: true,
-      })
-    ).toEqual(request);
   });
 
   it.each([
@@ -734,6 +726,7 @@ describe('Cloud Agent authority contract', () => {
         repositories: [{ repoFullName: 'acme/other', extra: true }],
       },
     },
+    { requireEnvironmentChoice: true },
     { requireEnvironmentChoice: false },
     { requireEnvironmentChoice: 'true' },
   ])('rejects widened or invalid launch environment input: %j', override => {

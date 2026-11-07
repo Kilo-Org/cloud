@@ -240,14 +240,12 @@ describe('Cloud Agent spawn authority', () => {
       ...webForwardedLaunch,
       kilocodeOrganizationId: organizationId,
       requestedEnvironment,
-      requireEnvironmentChoice: true,
     };
 
     expect(validateScopedWorkerPreparation(organizationScope, input)).toEqual({
       ...launch,
       organizationId,
       requestedEnvironment,
-      requireEnvironmentChoice: true,
     });
 
     for (const invalid of [
@@ -269,12 +267,14 @@ describe('Cloud Agent spawn authority', () => {
         })
       ).toThrow();
     }
-    expect(() =>
-      validateScopedWorkerPreparation(organizationScope, {
-        ...input,
-        requireEnvironmentChoice: false,
-      })
-    ).toThrow();
+    for (const requireEnvironmentChoice of [true, false]) {
+      expect(() =>
+        validateScopedWorkerPreparation(organizationScope, {
+          ...input,
+          requireEnvironmentChoice,
+        })
+      ).toThrow();
+    }
   });
 
   it('rejects a malformed trusted GitHub integration identity', () => {

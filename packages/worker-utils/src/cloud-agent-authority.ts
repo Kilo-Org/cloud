@@ -126,7 +126,6 @@ const scopedPrepareSessionSchema = z
     operationKey: z.uuid().optional(),
     callbackTarget: ParentCallbackTargetSchema.optional(),
     requestedEnvironment: requestedEnvironmentSchema.optional(),
-    requireEnvironmentChoice: z.literal(true).optional(),
     organizationId: z.string().min(1).optional(),
   })
   .strict();

@@ -131,8 +131,6 @@ const fieldDescriptions: Record<string, string> = {
   upstreamBranch: 'Repository branch to start from; omit to use the repository default.',
   requestedEnvironment:
     "Repository environment the user selected, discovered with list_environments for the launch repository. Pass its id; include repositories with repoFullName and optional branch for each additional repository of a multi-repository environment. Omit to leave environment selection to the server's automatic/default behavior.",
-  requireEnvironmentChoice:
-    "Set true only when a client can ask its user to choose: if several environments contain the repository and none is selected, the start fails and names them. Omit to preserve the server's default behavior.",
   repository:
     'GitHub repository identity in {platform:"github",fullName:"owner/repo"} form. Spawn currently supports only GitHub repositories, so this is the launch repository whose environments to list.',
   callbackTarget:

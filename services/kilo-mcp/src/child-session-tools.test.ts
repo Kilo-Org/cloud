@@ -258,34 +258,31 @@ describe('dedicated child session tools', () => {
     });
   });
 
-  it.each([null, organizationId])(
-    'forwards a selected environment and explicit choice flag for scope %s',
-    async org => {
-      const connection = {
-        ...auth,
-        ...(org ? { organizationId: org } : {}),
-        cloudAgentAuthority: { ...authority, organizationId: org },
-      };
-      const requestedEnvironment = {
-        id: '88888888-8888-4888-8888-888888888888',
-        repositories: [
-          { repoFullName: 'acme/other', branch: 'feature/child' },
-          { repoFullName: 'acme/third' },
-        ],
-      };
-      const args = { ...launch, requestedEnvironment, requireEnvironmentChoice: true };
-      await run('spawn_session', args, connection);
-      const request = new Request(...fetchImpl.mock.calls[0]!);
-      expect(new URL(request.url).pathname).toBe(
-        `/api/trpc/${org ? 'organizations.' : ''}cloudAgentNext.prepareSession`
-      );
-      expect(await request.json()).toEqual({
-        ...args,
-        autoInitiate: true,
-        ...(org ? { organizationId: org } : {}),
-      });
-    }
-  );
+  it.each([null, organizationId])('forwards a selected environment for scope %s', async org => {
+    const connection = {
+      ...auth,
+      ...(org ? { organizationId: org } : {}),
+      cloudAgentAuthority: { ...authority, organizationId: org },
+    };
+    const requestedEnvironment = {
+      id: '88888888-8888-4888-8888-888888888888',
+      repositories: [
+        { repoFullName: 'acme/other', branch: 'feature/child' },
+        { repoFullName: 'acme/third' },
+      ],
+    };
+    const args = { ...launch, requestedEnvironment };
+    await run('spawn_session', args, connection);
+    const request = new Request(...fetchImpl.mock.calls[0]!);
+    expect(new URL(request.url).pathname).toBe(
+      `/api/trpc/${org ? 'organizations.' : ''}cloudAgentNext.prepareSession`
+    );
+    expect(await request.json()).toEqual({
+      ...args,
+      autoInitiate: true,
+      ...(org ? { organizationId: org } : {}),
+    });
+  });
 
   it('forwards a workspace session callback target', async () => {
     const callbackTarget = {
@@ -338,6 +335,7 @@ describe('dedicated child session tools', () => {
       },
     },
     { requestedEnvironment: { id: '88888888-8888-4888-8888-888888888888', extra: true } },
+    { requireEnvironmentChoice: true },
     { requireEnvironmentChoice: false },
     { operationKey: 'invalid' },
   ])('rejects extra or invalid launch arguments before forwarding: %j', async override => {
@@ -418,9 +416,11 @@ describe('dedicated child session tools', () => {
       required: expect.arrayContaining(['operationKey', 'model', 'prompt']),
       properties: {
         requestedEnvironment: { type: 'object' },
-        requireEnvironmentChoice: { type: 'boolean', const: true },
       },
     });
+    expect(tools.find(tool => tool.name === 'spawn_session')?.inputSchema).not.toHaveProperty(
+      'properties.requireEnvironmentChoice'
+    );
     expect(tools.find(tool => tool.name === 'list_environments')?.inputSchema).toMatchObject({
       properties: { repository: { type: 'object' } },
       required: ['repository'],

@@ -2581,7 +2581,6 @@
   },
   "addCredits": {
     "cta": "شحن الرصيد",
-    "description": "اشحن رصيدك لمواصلة الاستخدام.",
     "billingPage": "صفحة الفوترة"
   },
   "deviceSessions": {
@@ -3495,7 +3494,7 @@
     },
     "inviteMember": {
       "emailError": "أدخل عنوان بريد إلكتروني صالحًا.",
-      "emailPlaceholder": "name@company.com",
+      "emailPlaceholder": "user@example.com",
       "permissionDenied": "ليست لديك صلاحية لدعوة الأعضاء.",
       "roleMember": "الدور هو عضو.",
       "sendInvite": "إرسال الدعوة",

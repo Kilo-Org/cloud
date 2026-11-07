@@ -449,6 +449,22 @@ async function listIntegrationProjectIds(integration: PlatformIntegration): Prom
 }
 
 /**
+ * Attempts the disconnect makes to settle a project token the provider did not
+ * settle. Every attempt needs the connected credential, which the suspension
+ * drops, so the attempts share one request.
+ */
+const PROJECT_TOKEN_SETTLEMENT_ATTEMPTS = 2;
+
+/** Pause between settlement attempts, so a transient provider error can clear. */
+const PROJECT_TOKEN_SETTLEMENT_RETRY_DELAY_MS = 250;
+
+function waitForSettlementRetry(): Promise<void> {
+  const { promise, resolve } = Promise.withResolvers<void>();
+  setTimeout(resolve, PROJECT_TOKEN_SETTLEMENT_RETRY_DELAY_MS);
+  return promise;
+}
+
+/**
  * Disconnect GitLab integration for an owner
  *
  * Instead of deleting the integration record, we mark it as disconnected and
@@ -464,7 +480,13 @@ async function listIntegrationProjectIds(integration: PlatformIntegration): Prom
  * 3. revoke each per-project access token at GitLab through the same removal
  *    contract the review lifecycle uses: a metadata entry and an encrypted row
  *    are deleted only after GitLab settles the revocation, and any other
- *    outcome keeps both so a later removal can try again.
+ *    outcome keeps both.
+ *
+ * The settlement runs inside this request, over a bounded number of attempts,
+ * because step 2 drops the credential that can revoke a token: a suspended
+ * integration resolves nothing, so a repeated disconnect answers as not found.
+ * A handle that stays unrevoked keeps neither reading nor revoking anything
+ * through this integration.
  *
  * The webhook_secret and configured_webhooks stay, so a reconnect keeps the
  * existing webhook configuration.
@@ -544,29 +566,51 @@ export async function disconnectGitLabIntegration(owner: Owner, actingUserId: st
 
   // Read after the suspension: nothing can mint a project token while the
   // integration is suspended, so this set also covers a token stored between
-  // the first credential lookup and the suspension.
-  const projectIds = await listIntegrationProjectIds(integration);
+  // the first credential lookup and the suspension. The integration is
+  // suspended already, so an unreadable project list cannot fail the
+  // disconnect; the kept handles stay unusable through it.
+  let projectIds: string[] | null = null;
+  try {
+    projectIds = await listIntegrationProjectIds(integration);
+  } catch (error) {
+    logExceptInTest('[disconnectGitLabIntegration] Project token list unavailable', {
+      integrationId: integration.id,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 
   let revokedProjectTokens = 0;
   let retainedProjectTokens = 0;
   let unsettledProjectTokens = 0;
-  if (userToken === undefined) {
+  if (projectIds === null) {
+    // Nothing was listed, so nothing is counted. The log line below records
+    // that the list was unavailable.
+  } else if (userToken === undefined) {
     unsettledProjectTokens = projectIds.length;
   } else {
-    for (const projectId of projectIds) {
-      const outcome = await removeStoredProjectAccessToken(integration, projectId, actor, {
-        userToken,
-      }).catch(error => {
-        logExceptInTest('[disconnectGitLabIntegration] Project token settlement failed', {
-          integrationId: integration.id,
-          projectId,
-          error: error instanceof Error ? error.message : String(error),
+    const pendingProjectIds = new Set(projectIds);
+    for (let attempt = 0; attempt < PROJECT_TOKEN_SETTLEMENT_ATTEMPTS; attempt++) {
+      if (attempt > 0 && pendingProjectIds.size > 0) {
+        await waitForSettlementRetry();
+      }
+      for (const projectId of pendingProjectIds) {
+        const outcome = await removeStoredProjectAccessToken(integration, projectId, actor, {
+          userToken,
+        }).catch(error => {
+          logExceptInTest('[disconnectGitLabIntegration] Project token settlement failed', {
+            integrationId: integration.id,
+            projectId,
+            error: error instanceof Error ? error.message : String(error),
+          });
+          return 'retained' as const;
         });
-        return 'retained' as const;
-      });
-      if (outcome === 'removed') revokedProjectTokens += 1;
-      else if (outcome === 'retained') retainedProjectTokens += 1;
+        if (outcome === 'retained') continue;
+        pendingProjectIds.delete(projectId);
+        if (outcome === 'removed') revokedProjectTokens += 1;
+      }
+      if (pendingProjectIds.size === 0) break;
     }
+    retainedProjectTokens = pendingProjectIds.size;
   }
 
   logExceptInTest(
@@ -578,6 +622,7 @@ export async function disconnectGitLabIntegration(owner: Owner, actingUserId: st
       revokedProjectTokens,
       retainedProjectTokens,
       unsettledProjectTokens,
+      projectTokenListUnavailable: projectIds === null,
     }
   );
 

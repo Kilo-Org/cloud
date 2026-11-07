@@ -88,23 +88,10 @@ export function BalanceBlock({
     return (
       <View className={shellClass}>
         <View className={valueColumnClass}>
-          {/* The stacked card's bar is the height of the amount line it
-              replaces, so the note under it holds its place as the read
-              answers. */}
-          <Skeleton
-            className={
-              stacked
-                ? 'h-7 w-28 max-w-full rounded-md bg-muted-soft'
-                : 'h-8 w-28 rounded-md bg-muted-soft'
-            }
-          />
-          <Skeleton
-            className={
-              stacked
-                ? 'h-3.5 w-40 max-w-full rounded bg-muted-soft'
-                : 'h-3 w-40 rounded bg-muted-soft'
-            }
-          />
+          {/* The bars take the heights of the amount line and the note they
+              stand in for, so the column holds its place as the read answers. */}
+          <Skeleton className="h-8 w-28 max-w-full rounded-md bg-muted-soft" />
+          <Skeleton className="h-3.5 w-40 max-w-full rounded bg-muted-soft" />
         </View>
         {loadingAction}
       </View>
@@ -118,9 +105,11 @@ export function BalanceBlock({
           <View className={valueColumnClass}>
             {/* The retry surface carries its own 44 dp target and keeps the
                 value line's height, so a retry that succeeds swaps this
-                content for the amount and the controls in the same frame. */}
+                content for the amount and the controls in the same frame. An
+                explicit pixel floor, because this app's rem renders `min-h-11`
+                as 38.5 dp. */}
             <Pressable
-              className="min-h-11 -my-[8px] min-w-0 justify-center active:opacity-70"
+              className="min-h-[44px] -my-[8px] min-w-0 justify-center active:opacity-70"
               onPress={onRetry}
             >
               {retry}

@@ -1275,7 +1275,7 @@ describe('CreditsCard add-credits entry point', () => {
     const retrySurface = block.find(
       node =>
         Object.is(node.type, 'Pressable') &&
-        hasClasses(node, ['min-h-11', '-my-[8px]', 'justify-center'])
+        hasClasses(node, ['min-h-[44px]', '-my-[8px]', 'justify-center'])
     );
     expect(renders(retrySurface, 'Failed to load balance. Tap to retry.')).toBe(true);
     expect(retrySurface.props.onPress).toBeTypeOf('function');

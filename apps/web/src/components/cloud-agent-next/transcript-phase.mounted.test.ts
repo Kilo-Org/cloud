@@ -89,6 +89,7 @@ jest.mock('@tanstack/react-query', () => ({
 }));
 jest.mock('@/lib/trpc/utils', () => ({ useTRPC: () => mockTrpc }));
 jest.mock('./use-cached-transcript-page', () => ({ useCachedTranscriptPage: () => null }));
+jest.mock('./useChatStackInfo', () => ({ useChatStackInfo: () => null }));
 jest.mock('./use-preview', () => ({
   ...jest.requireActual('./use-preview'),
   usePreviewUrlTemplate: () => null,

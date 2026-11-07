@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useMemo, useState } from 'react';
-import { AlertTriangle, ArrowDownToLine, ExternalLink, GitMerge, LoaderCircle } from 'lucide-react';
+import { AlertTriangle, ExternalLink, GitMerge, LoaderCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -31,21 +31,18 @@ type StackedWorkspaceActionsProps = {
   onCompleted?: () => void;
 };
 
-function operationMessage(
-  result: WorktreeBranchOperationResult,
-  requested: 'sync' | 'restack'
-): string | null {
+function operationMessage(result: WorktreeBranchOperationResult): string | null {
   if (result.status === 'conflict') return null;
   if (result.status === 'refused') {
     return ('message' in result ? result.message : null) ?? 'The branch operation was refused.';
   }
-  if (requested === 'restack' && result.operation === 'sync') {
+  if (result.operation === 'sync') {
     return 'GitHub had already rebased this layer, so this was applied as a sync. Retry Restack to verify the branch.';
   }
   if (result.status === 'unchanged') {
-    return requested === 'sync' ? 'The branch is already up to date.' : 'Nothing to restack.';
+    return 'Nothing to restack.';
   }
-  return requested === 'sync' ? 'Synced the branch.' : 'Restacked the branch.';
+  return 'Restacked the branch.';
 }
 
 export function StackedWorkspaceActions({
@@ -75,7 +72,7 @@ export function StackedWorkspaceActions({
     target: WorktreeBranchOperationTarget;
     instruction: string;
   } | null>(null);
-  const [running, setRunning] = useState<'sync' | 'restack' | 'stack' | null>(null);
+  const [running, setRunning] = useState<'restack' | 'stack' | null>(null);
 
   const current = stack.find(target => target.worktreeId === worktreeId);
   const root = stack.find(target => target.isRoot);
@@ -107,47 +104,16 @@ export function StackedWorkspaceActions({
   );
 
   const finish = useCallback(
-    async (
-      requested: 'sync' | 'restack',
-      result: WorktreeBranchOperationResult,
-      target: WorktreeBranchOperationTarget
-    ) => {
+    async (result: WorktreeBranchOperationResult, target: WorktreeBranchOperationTarget) => {
       if (result.status === 'conflict') {
         setMessage('The branch operation stopped on a conflict.');
         await sendConflictToAgent(target, result);
         return;
       }
-      setMessage(operationMessage(result, requested));
+      setMessage(operationMessage(result));
     },
     [sendConflictToAgent]
   );
-
-  const handleSync = async () => {
-    setRunning('sync');
-    setMessage(null);
-    try {
-      const result = await operations.sync(worktreeId, cloudAgentSessionId);
-      await finish(
-        'sync',
-        result,
-        current ?? {
-          worktreeId,
-          cloudAgentSessionId,
-          branch,
-          baseBranch,
-          label: branch ?? 'this workspace',
-          prNumber: null,
-          prState: null,
-          prUrl: null,
-          stackNumber: null,
-          stackPosition: 0,
-          isRoot,
-        }
-      );
-    } finally {
-      setRunning(null);
-    }
-  };
 
   const handleRestack = async () => {
     setRunning('restack');
@@ -167,7 +133,7 @@ export function StackedWorkspaceActions({
         isRoot,
       };
       const result = await operations.restack(target);
-      await finish('restack', result, target);
+      await finish(result, target);
     } finally {
       setRunning(null);
     }
@@ -180,7 +146,7 @@ export function StackedWorkspaceActions({
       const { results, stopped } = await operations.restackStack(stack);
       if (stopped) {
         if (stopped.result.status === 'conflict') {
-          await finish('restack', stopped.result, stopped.target);
+          await finish(stopped.result, stopped.target);
         } else if (stopped.result.operation === 'sync') {
           setMessage(
             'The restack stopped because the server only synced this layer. Retry Restack to verify the branch.'
@@ -206,7 +172,6 @@ export function StackedWorkspaceActions({
   };
 
   const busy = running !== null || operations.isPending;
-  const syncMessage = message;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -214,8 +179,7 @@ export function StackedWorkspaceActions({
         <DialogHeader>
           <DialogTitle>Branch operations</DialogTitle>
           <DialogDescription>
-            Sync or restack the branch in its own sandbox. This may wake the sandbox and take a few
-            minutes.
+            Restack the branch in its own sandbox. This may wake the sandbox and take a few minutes.
           </DialogDescription>
         </DialogHeader>
 
@@ -234,19 +198,6 @@ export function StackedWorkspaceActions({
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              disabled={busy}
-              onClick={() => void handleSync()}
-            >
-              {running === 'sync' ? (
-                <LoaderCircle className="size-4 animate-spin motion-reduce:animate-none" />
-              ) : (
-                <ArrowDownToLine className="size-4" />
-              )}
-              Sync
-            </Button>
             {isRoot && stack.length > 1 && (
               <Button
                 type="button"
@@ -285,9 +236,9 @@ export function StackedWorkspaceActions({
             )}
           </div>
 
-          {syncMessage && (
+          {message && (
             <p role="status" className="text-muted-foreground text-sm">
-              {syncMessage}
+              {message}
             </p>
           )}
 

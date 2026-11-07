@@ -4,7 +4,6 @@ import { createRequire } from 'node:module';
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import type { WorktreeBranchOperationResult as WorkerResult } from '@kilocode/worker-utils/cloud-agent-worktree-operations';
 
-const mockSync = jest.fn<() => Promise<WorkerResult>>();
 const mockRestack = jest.fn<() => Promise<WorkerResult>>();
 const mockDispatch =
   jest.fn<
@@ -25,7 +24,6 @@ jest.mock('./useWorktreeBranchOperations', () => ({
     isPending: false,
     lastResult: null,
     currentCloudAgentSessionId: 'workspace_root',
-    sync: mockSync,
     restack: mockRestack,
     restackStack: mockRestackStack,
   }),
@@ -156,7 +154,6 @@ describe('StackedWorkspaceActions', () => {
   beforeEach(() => {
     dom = installDom();
     root = createRoot(dom.container);
-    mockSync.mockReset();
     mockRestack.mockReset();
     mockRestackStack.mockReset();
     mockDispatch.mockReset();
@@ -199,7 +196,7 @@ describe('StackedWorkspaceActions', () => {
 
   it('sends a conflict instruction automatically and only retries after an explicit click', async () => {
     mockDispatch.mockResolvedValue('manual');
-    mockSync.mockResolvedValue(
+    mockRestack.mockResolvedValue(
       result({
         status: 'conflict',
         operation: 'restack',
@@ -209,9 +206,9 @@ describe('StackedWorkspaceActions', () => {
       })
     );
     await render();
-    await click('Sync');
+    await click('Restack');
 
-    expect(mockSync).toHaveBeenCalledTimes(1);
+    expect(mockRestack).toHaveBeenCalledTimes(1);
     expect(mockDispatch).toHaveBeenCalledTimes(1);
     expect(mockDispatch).toHaveBeenCalledWith(target, 'Resolve src/a.ts and run tests.');
     expect(text(dom.container)).toContain(

@@ -5,7 +5,6 @@ import {
   cli_sessions_v2,
   cloud_agent_worktrees,
   github_branch_pull_requests,
-  kilocode_users,
 } from '@kilocode/db/schema';
 import { GITHUB_ACTION } from '@/lib/integrations/core/constants';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
@@ -13,8 +12,6 @@ import { parseRepoReference } from '@/lib/integrations/platforms/github/pr-link-
 import { generateGitHubInstallationToken } from '@/lib/integrations/platforms/github/adapter';
 import type { GitHubAppType } from '@/lib/integrations/platforms/github/app-selector';
 import type { PullRequestPayload } from '@/lib/integrations/platforms/github/webhook-schemas';
-import { CLOUD_AGENT_STACKED_WORKSPACES_FLAG } from '@/components/cloud-agent-next/feature-flags';
-import { isFeatureFlagEnabled } from '@kilocode/web-shared/lib/posthog-feature-flags';
 import type { WebhookInstallationOwner } from './upsert-cli-session-pull-requests';
 
 const GITHUB_API_BASE = 'https://api.github.com';
@@ -92,7 +89,6 @@ type PairArgs = {
   token: string;
   fetchImpl: typeof fetch;
   sleep: (milliseconds: number) => Promise<void>;
-  flagCache: Map<string, boolean>;
 };
 
 function defaultSleep(milliseconds: number): Promise<void> {
@@ -328,26 +324,6 @@ async function eligibleChildren(
     .limit(MAX_ELIGIBLE_CHILDREN);
 }
 
-async function stackFlagEnabled(kiloUserId: string, cache: Map<string, boolean>): Promise<boolean> {
-  const known = cache.get(kiloUserId);
-  if (known !== undefined) return known;
-  const [user] = await db
-    .select({ email: kilocode_users.google_user_email })
-    .from(kilocode_users)
-    .where(eq(kilocode_users.id, kiloUserId))
-    .limit(1);
-  if (!user?.email) {
-    cache.set(kiloUserId, false);
-    return false;
-  }
-  // The browser calls `posthog.identify(email)`, so the server flag check must
-  // use the same distinct id. An owner id or organization id would resolve a
-  // different person (or no person) and split the rollout.
-  const enabled = await isFeatureFlagEnabled(CLOUD_AGENT_STACKED_WORKSPACES_FLAG, user.email);
-  cache.set(kiloUserId, enabled);
-  return enabled;
-}
-
 async function persistStackMembership(args: {
   gitUrl: string;
   owner: WebhookInstallationOwner;
@@ -391,8 +367,6 @@ async function attemptPair(args: PairArgs): Promise<PairOutcome> {
   if (childSessions.length === 0) return 'skipped';
 
   const childSession = childSessions[0];
-  if (!(await stackFlagEnabled(childSession.kiloUserId, args.flagCache))) return 'skipped';
-
   const childCache = await readCache(args.gitUrl, childSession.prNumber, args.owner);
   if (childCache === null) return 'skipped';
   // Already linked: skip regardless of what the parent cache says. A linked
@@ -579,7 +553,6 @@ export async function linkStackedPullRequestsFromWebhook(
     const tokenData = await generateGitHubInstallationToken(installationId, appType);
     const fetchImpl = params.fetchImpl ?? fetch;
     const sleep = params.sleep ?? defaultSleep;
-    const flagCache = new Map<string, boolean>();
     const pairBase = {
       gitUrl: repo.url,
       repoOwner: repo.owner,
@@ -588,7 +561,6 @@ export async function linkStackedPullRequestsFromWebhook(
       token: tokenData.token,
       fetchImpl,
       sleep,
-      flagCache,
     };
 
     if (currentWorktree.parentWorktreeId !== null) {

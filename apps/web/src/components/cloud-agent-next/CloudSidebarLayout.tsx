@@ -20,7 +20,6 @@ import {
 } from '@tanstack/react-query';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { toast } from 'sonner';
-import { useFeatureFlagEnabled } from 'posthog-js/react';
 import { formatSessionError } from '@kilocode/cloud-agent-sdk';
 import { cloudAgentWorktreeIdSchema } from '@kilocode/session-ingest-contracts';
 import { useRawTRPCClient, useTRPC } from '@/lib/trpc/utils';
@@ -67,7 +66,6 @@ import type { SidebarPreferences } from './sidebar-preferences';
 import { useClosedWorktreeChatTabs } from './hooks/useClosedWorktreeChatTabs';
 import { useWorkspaceFolders } from './hooks/useWorkspaceFolders';
 import { createdOnPlatformForFilter } from './hooks/sidebar-queries';
-import { CLOUD_AGENT_STACKED_WORKSPACES_FLAG } from './feature-flags';
 import {
   getClosedWorktreeChatTabsStorageKey,
   getClosedWorktreeChatSessionIds,
@@ -259,7 +257,6 @@ function CloudSidebarLayoutContent({
       organizationId: organizationId ?? null,
     });
   const workspaceFolders = useWorkspaceFolders(currentUserId, organizationId, collapsed);
-  const stackedWorkspacesEnabled = useFeatureFlagEnabled(CLOUD_AGENT_STACKED_WORKSPACES_FLAG);
   const {
     closedSessionIds,
     sessionOrderByWorktree,
@@ -313,7 +310,6 @@ function CloudSidebarLayoutContent({
     cachedSessions: listedCachedSessions,
     worktreeDetails,
     loadingWorktreeIds,
-    workspaceGroups: listedWorkspaceGroups,
     workspaceRows,
     workspaceOrder,
     workspaceRowsTruncated,
@@ -326,7 +322,6 @@ function CloudSidebarLayoutContent({
     searchQuery,
     createdOnPlatform,
     gitUrl: projectFilter.length > 0 ? projectFilter : undefined,
-    workspaceRowsEnabled: stackedWorkspacesEnabled,
   });
   // Chats this client created show from the first frame, until the server lists
   // them. They follow the sidebar's filters, as the server's list does.
@@ -367,17 +362,8 @@ function CloudSidebarLayoutContent({
     [loadingWorktreeIds, sidebarWorktreeDetails, worktreeDetails]
   );
   const sidebarWorkspaceGroups = useMemo(
-    () =>
-      stackedWorkspacesEnabled
-        ? groupSidebarWorkspaces(sessions, sidebarWorktreeDetails, workspaceRows)
-        : listedWorkspaceGroups,
-    [
-      listedWorkspaceGroups,
-      sessions,
-      sidebarWorktreeDetails,
-      stackedWorkspacesEnabled,
-      workspaceRows,
-    ]
+    () => groupSidebarWorkspaces(sessions, sidebarWorktreeDetails, workspaceRows),
+    [sessions, sidebarWorktreeDetails, workspaceRows]
   );
   const sidebarWorkspaceFolders = {
     ...workspaceFolders,
@@ -988,7 +974,6 @@ function CloudSidebarLayoutContent({
               workspaceGroups={sidebarWorkspaceGroups}
               workspaceOrder={workspaceOrder}
               workspaceRowsTruncated={workspaceRowsTruncated}
-              stackedWorkspacesEnabled={stackedWorkspacesEnabled}
               isLoading={isLoadingSessions}
               onRenameWorktree={handleRenameWorktree}
               onDeleteWorktree={setWorktreePendingDeletion}
@@ -1027,7 +1012,6 @@ function CloudSidebarLayoutContent({
             workspaceGroups={sidebarWorkspaceGroups}
             workspaceOrder={workspaceOrder}
             workspaceRowsTruncated={workspaceRowsTruncated}
-            stackedWorkspacesEnabled={stackedWorkspacesEnabled}
             isLoading={isLoadingSessions}
             onRenameWorktree={handleRenameWorktree}
             onDeleteWorktree={setWorktreePendingDeletion}

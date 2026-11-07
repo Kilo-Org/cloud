@@ -381,8 +381,8 @@ One provider call answers both "is the base branch pushed?" and "which commit do
     will be pushed after the next successful turn, or enable auto-commit".
   - It is also disabled when the worktree is being deleted.
 - **Composer.** The action opens the existing new-session composer with the repository locked and
-  a chip reading "Stacked on `feat-a` (#12)". The chip can be removed, which falls back to a
-  normal new session.
+  a segment next to it reading "Stacked on #12 `feat-a`". The segment can be removed, which falls
+  back to a normal new session.
 - **Agent instruction.** Add a short instruction through `appendSystemPrompt` or a named runtime
   instruction: "This workspace is stacked on `<base>`. Open pull requests with `--base <base>`. Do
   not rebase or push branches other than `<branch>`."
@@ -814,8 +814,8 @@ choice and Remove. Smart folders are added from Settings only.
    independent of stacking and can run in parallel with steps 3-5. Manual order is needed before
    stacks get large.
 
-Gate each user-visible phase behind the web app's existing feature-flag mechanism until the end to
-end checks pass.
+Stacked workspaces are available by default. Do not gate the UI or GitHub stack linking behind a
+feature flag. Keep ownership, pushed-branch, clean-worktree, and idle-chat checks.
 
 ## Edge cases
 

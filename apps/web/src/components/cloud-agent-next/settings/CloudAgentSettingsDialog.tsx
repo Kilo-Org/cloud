@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { useFeatureFlagEnabled } from 'posthog-js/react';
 import { Boxes, Cpu, FolderCog, LayoutList, Lock, SlidersHorizontal } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -22,7 +21,6 @@ import { EnvironmentsSection } from './EnvironmentsSection';
 import { RepositoryOverridesSection } from './RepositoryOverridesSection';
 import { SidebarSettingsSection } from './SidebarSettingsSection';
 import { VercelComputeSettings } from './VercelComputeSettings';
-import { CLOUD_AGENT_STACKED_WORKSPACES_FLAG } from '../feature-flags';
 
 type CloudAgentSettingsDialogProps = {
   organizationId?: string;
@@ -69,16 +67,12 @@ function CloudAgentSettings({
   initialSelectedProfileId,
 }: Omit<CloudAgentSettingsDialogProps, 'open' | 'onOpenChange'>) {
   const [section, setSection] = useState(initialSection);
-  const sidebarEnabled = useFeatureFlagEnabled(CLOUD_AGENT_STACKED_WORKSPACES_FLAG);
   const isMobile = useIsMobile();
   const settingsQuery = useCloudAgentSettings({ organizationId });
   const settings = settingsQuery.data;
   const canManage = organizationId ? (settings?.canManage ?? false) : true;
   const activeSection =
-    (section === 'compute' && settings && !settings.canManage) ||
-    (section === 'sidebar' && !sidebarEnabled)
-      ? 'general'
-      : section;
+    section === 'compute' && settings && !settings.canManage ? 'general' : section;
 
   return (
     <>
@@ -139,15 +133,13 @@ function CloudAgentSettings({
             <FolderCog className="size-4 shrink-0" aria-hidden />
             Profiles
           </TabsTrigger>
-          {sidebarEnabled && (
-            <TabsTrigger
-              value="sidebar"
-              className="gap-2 pointer-coarse:min-h-11 md:w-full md:justify-start"
-            >
-              <LayoutList className="size-4 shrink-0" aria-hidden />
-              Sidebar
-            </TabsTrigger>
-          )}
+          <TabsTrigger
+            value="sidebar"
+            className="gap-2 pointer-coarse:min-h-11 md:w-full md:justify-start"
+          >
+            <LayoutList className="size-4 shrink-0" aria-hidden />
+            Sidebar
+          </TabsTrigger>
           {settings?.canManage && (
             <TabsTrigger
               value="compute"
@@ -197,14 +189,12 @@ function CloudAgentSettings({
             initialSelectedProfileId={initialSelectedProfileId}
           />
         </TabsContent>
-        {sidebarEnabled && (
-          <TabsContent
-            value="sidebar"
-            className="mt-0 min-h-0 min-w-0 flex-1 overflow-y-auto px-6 py-5"
-          >
-            <SidebarSettingsSection organizationId={organizationId} />
-          </TabsContent>
-        )}
+        <TabsContent
+          value="sidebar"
+          className="mt-0 min-h-0 min-w-0 flex-1 overflow-y-auto px-6 py-5"
+        >
+          <SidebarSettingsSection organizationId={organizationId} />
+        </TabsContent>
         <TabsContent
           value="compute"
           className="mt-0 min-h-0 min-w-0 flex-1 overflow-y-auto px-6 py-5"

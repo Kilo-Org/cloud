@@ -8,7 +8,6 @@ import {
 import { and, eq, inArray } from 'drizzle-orm';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import type { PullRequestPayload } from '@/lib/integrations/platforms/github/webhook-schemas';
-import { isFeatureFlagEnabled } from '@kilocode/web-shared/lib/posthog-feature-flags';
 import { linkStackedPullRequestsFromWebhook } from './stack-linking';
 import { upsertCliSessionPullRequestsFromWebhook } from './upsert-cli-session-pull-requests';
 
@@ -18,12 +17,6 @@ jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
     expires_at: '2026-01-01T01:00:00.000Z',
   })),
 }));
-
-jest.mock('@kilocode/web-shared/lib/posthog-feature-flags', () => ({
-  isFeatureFlagEnabled: jest.fn(async () => true),
-}));
-
-const mockFlag = isFeatureFlagEnabled as jest.MockedFunction<typeof isFeatureFlagEnabled>;
 
 const REPO = 'stack-link-tests/widgets';
 const GIT_URL = `https://github.com/${REPO}`;
@@ -168,10 +161,6 @@ describe('linkStackedPullRequestsFromWebhook', () => {
         .where(inArray(github_branch_pull_requests.owned_by_user_id, userIds));
       await db.delete(kilocode_users).where(inArray(kilocode_users.id, userIds));
     }
-  });
-
-  beforeEach(() => {
-    mockFlag.mockResolvedValue(true);
   });
 
   let counter = 0;
@@ -705,58 +694,6 @@ describe('linkStackedPullRequestsFromWebhook', () => {
     });
 
     expect(calls).toHaveLength(0);
-  });
-
-  it('does not call the API when the stacked-workspaces flag is disabled', async () => {
-    const parentWorktree = unique('wt-parent');
-    const childWorktree = unique('wt-child');
-    await seedWorktree({ worktreeId: parentWorktree, userId: OWNER.userId });
-    await seedWorktree({
-      worktreeId: childWorktree,
-      userId: OWNER.userId,
-      parentWorktreeId: parentWorktree,
-      baseBranch: 'feature/parent',
-    });
-    await seedSession({
-      sessionId: unique('ses-parent'),
-      worktreeId: parentWorktree,
-      userId: OWNER.userId,
-      prNumber: 1901,
-      branch: 'feature/parent',
-    });
-    await seedSession({
-      sessionId: unique('ses-child'),
-      worktreeId: childWorktree,
-      userId: OWNER.userId,
-      prNumber: 1902,
-      branch: 'feature/child',
-    });
-    await seedCache({ userId: OWNER.userId, prNumber: 1901, branch: 'feature/parent' });
-    await seedCache({
-      userId: OWNER.userId,
-      prNumber: 1902,
-      branch: 'feature/child',
-      baseRef: 'feature/parent',
-    });
-    mockFlag.mockResolvedValue(false);
-
-    const { fetchImpl, calls } = fetchSequence([]);
-
-    await linkStackedPullRequestsFromWebhook({
-      payload: makePayload({ prNumber: 1902, headRef: 'feature/child', baseRef: 'feature/parent' }),
-      owner: OWNER,
-      installationId: '98765',
-      appType: 'standard',
-      fetchImpl,
-      sleep: async () => {},
-    });
-
-    expect(calls).toHaveLength(0);
-    // The child owner's browser identity (email), never the owner id.
-    expect(mockFlag).toHaveBeenCalledWith(
-      'cloud-agent-stacked-workspaces',
-      expect.stringContaining('@example.com')
-    );
   });
 
   it('links the child when the parent PR becomes verified after the child exists', async () => {

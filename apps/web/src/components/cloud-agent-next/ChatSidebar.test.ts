@@ -342,7 +342,7 @@ describe('ChatSidebar row rendering', () => {
     const session = makeSession(0, { worktreeId: 'worktree_loading' });
     renderSidebar({ sessions: [session], loadingWorktreeIds: ['worktree_loading'] });
     const row = dom.container.querySelector('[data-worktree-id="worktree_loading"]');
-    expect(row?.querySelector('[role="tooltip"]')).toBeNull();
+    expect(row?.querySelector('[role="tooltip"][data-side="top"]')).toBeNull();
     expect(row?.textContent).not.toContain(session.repository);
     expect(
       row?.querySelector('button[aria-label="Open worktree Loading worktree…"]')
@@ -1062,30 +1062,41 @@ describe('ChatSidebar stacked workspaces', () => {
     };
   }
 
-  it('renders a stack root and its layers once, with a collapsible stack count', () => {
+  it('uses the base row as the stack header and collapses its layers without a feature flag', () => {
     renderSidebar({
       sessions: [],
       workspaceGroups: [stackedGroup()],
-      stackedWorkspacesEnabled: true,
     });
 
     expect(dom.container.querySelectorAll('[data-worktree-id="worktree_root"]')).toHaveLength(1);
     expect(dom.container.querySelectorAll('[data-worktree-id="worktree_child"]')).toHaveLength(1);
-    expect(
-      dom.container
-        .querySelector('[data-worktree-id="worktree_child"]')
-        ?.getAttribute('data-stack-depth')
-    ).toBe('1');
-    expect(dom.container.textContent).toContain('stack · 2');
-
-    const collapse = dom.container.querySelector<HTMLButtonElement>(
-      '[aria-label="Collapse stack of 2 workspaces"]'
+    const baseRow = () => dom.container.querySelector('[data-worktree-id="worktree_root"]');
+    const collapse = baseRow()?.querySelector<HTMLButtonElement>(
+      '[aria-label="Collapse stack Root workspace"]'
     );
     expect(collapse).not.toBeNull();
+    expect(
+      dom.container.querySelector(
+        '[aria-label="Layers on Root workspace"] [data-worktree-id="worktree_root"]'
+      )
+    ).toBeNull();
+    expect(baseRow()?.querySelector('[title="2 workspaces in stack"]')).toBeNull();
     act(() => collapse?.click());
 
-    expect(dom.container.querySelector('[data-worktree-id="worktree_child"]')).toBeNull();
-    expect(dom.container.textContent).toContain('stack · 2');
+    expect(collapse?.getAttribute('aria-expanded')).toBe('false');
+    expect(
+      dom.container
+        .querySelector('[aria-label="Layers on Root workspace"]')
+        ?.getAttribute('data-state')
+    ).toBe('closed');
+    expect(dom.container.querySelectorAll('[data-worktree-id="worktree_root"]')).toHaveLength(1);
+    expect(baseRow()?.querySelector('[title="2 workspaces in stack"]')?.textContent).toBe('2');
+    const expand = baseRow()?.querySelector<HTMLButtonElement>(
+      '[aria-label="Expand stack Root workspace"]'
+    );
+    expect(expand).not.toBeNull();
+    act(() => expand?.click());
+    expect(dom.container.querySelectorAll('[data-worktree-id]')).toHaveLength(2);
   });
 
   it('sets the stacked workspace target from the worktree row menu', () => {
@@ -1093,7 +1104,6 @@ describe('ChatSidebar stacked workspaces', () => {
       sessions: [],
       organizationId: 'org_1',
       workspaceGroups: [stackedGroup()],
-      stackedWorkspacesEnabled: true,
     });
 
     const item = [...dom.container.querySelectorAll('[role="menuitem"]')].find(node =>
@@ -1230,7 +1240,6 @@ describe('ChatSidebar phase 4 drag ordering', () => {
       sessions: [],
       workspaceFolders: folders,
       workspaceGroups: [phase4Group(0, null), phase4Group(1, null)],
-      stackedWorkspacesEnabled: true,
     });
 
     const rows = dom.container.querySelectorAll<HTMLElement>('[data-worktree-id]');
@@ -1253,7 +1262,6 @@ describe('ChatSidebar phase 4 drag ordering', () => {
       sessions: [],
       workspaceFolders: folders,
       workspaceGroups: [phase4Group(0, 'a1'), phase4Group(1, 'a2')],
-      stackedWorkspacesEnabled: true,
     });
 
     const rows = dom.container.querySelectorAll<HTMLElement>('[data-worktree-id]');
@@ -1277,7 +1285,6 @@ describe('ChatSidebar phase 4 drag ordering', () => {
       sessions: [],
       workspaceFolders: folders,
       workspaceGroups: [phase4Group(0, 'a2'), phase4Group(1, 'a3')],
-      stackedWorkspacesEnabled: true,
     });
 
     const rows = dom.container.querySelectorAll<HTMLElement>('[data-worktree-id]');
@@ -1342,7 +1349,6 @@ describe('ChatSidebar stacked workspace preflight', () => {
           baseProps({
             sessions: [],
             workspaceGroups: [group],
-            stackedWorkspacesEnabled: true,
           })
         )
       );
@@ -1444,7 +1450,6 @@ describe('ChatSidebar phase 4 drag ordering end placement', () => {
             sessions: [],
             workspaceFolders: folders,
             workspaceGroups: [session(0, 'a1'), session(1, 'a2')],
-            stackedWorkspacesEnabled: true,
           })
         )
       );

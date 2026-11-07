@@ -1,9 +1,3 @@
-export type WorktreeRemoteDivergence = {
-  ahead: number;
-  behind: number;
-  diverged: boolean;
-};
-
 export type WorktreeBaseRefFallback = {
   requested: string;
   used: string;
@@ -13,45 +7,18 @@ function record(value: unknown): Record<string, unknown> | null {
   return typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : null;
 }
 
-function count(value: unknown): number {
-  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
-}
-
-/**
- * Older worker contracts do not carry divergence yet, so read the additive
- * fields defensively instead of claiming either state is present.
- */
 export function readWorktreeSnapshotMeta(snapshot: unknown): {
-  remoteDivergence: WorktreeRemoteDivergence | null;
   baseRefFallback: WorktreeBaseRefFallback | null;
 } {
   const root = record(snapshot);
-  const divergence = record(root?.remoteDivergence);
   const fallback = record(record(root?.comparison)?.baseRefFallback);
 
-  const ahead = count(divergence?.ahead);
-  const behind = count(divergence?.behind);
   return {
-    remoteDivergence: divergence
-      ? {
-          ahead,
-          behind,
-          diverged:
-            typeof divergence.diverged === 'boolean'
-              ? divergence.diverged
-              : ahead > 0 && behind > 0,
-        }
-      : null,
     baseRefFallback:
       typeof fallback?.requested === 'string' && typeof fallback.used === 'string'
         ? { requested: fallback.requested, used: fallback.used }
         : null,
   };
-}
-
-export function isRemoteBranchChanged(snapshot: unknown): boolean {
-  const divergence = readWorktreeSnapshotMeta(snapshot).remoteDivergence;
-  return divergence !== null && (divergence.behind > 0 || divergence.diverged);
 }
 
 /**

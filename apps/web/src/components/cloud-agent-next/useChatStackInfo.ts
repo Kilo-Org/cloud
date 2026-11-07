@@ -1,18 +1,16 @@
 'use client';
 
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useInfiniteQuery, useQueries, useQuery } from '@tanstack/react-query';
 import type { inferRouterOutputs } from '@trpc/server';
-import { useAtom, useAtomValue, useSetAtom } from 'jotai';
+import { useSetAtom } from 'jotai';
 import { usePathname, useRouter } from 'next/navigation';
 import type { RootRouter } from '@/routers/root-router';
 import { useRawTRPCClient, useTRPC } from '@/lib/trpc/utils';
 import type { ChatStackInfo } from './ChatHeader';
-import { useManager } from './CloudAgentProvider';
 import { stackedWorkspaceTargetAtom } from './store/stacked-workspace-atoms';
-import { worktreeRemoteBranchChangedAtom } from './store/remote-branch-atoms';
 import { sidebarWorkspaceListInput, worktreeDetailsBatches } from './hooks/sidebar-queries';
-import { isRemoteBranchChanged, repositoryKey, shortBranchRef } from './worktree-meta';
+import { repositoryKey, shortBranchRef } from './worktree-meta';
 import { stackedWorkspacePushReason } from './stacked-workspace-preparation';
 import type { WorktreeBranchOperationTarget } from './useWorktreeBranchOperations';
 import {
@@ -193,13 +191,7 @@ export function useChatStackInfo({
   const trpcClient = useRawTRPCClient();
   const router = useRouter();
   const pathname = usePathname();
-  const manager = useManager();
-  const commits = useAtomValue(manager.atoms.commits);
   const setStackedWorkspaceTarget = useSetAtom(stackedWorkspaceTargetAtom);
-  const [remoteChangedByWorktree, setRemoteChangedByWorktree] = useAtom(
-    worktreeRemoteBranchChangedAtom
-  );
-
   const workspaceListOptions = trpc.cliSessionsV2.listWorkspaces.infiniteQueryOptions(
     sidebarWorkspaceListInput({
       organizationId: organizationId ?? null,
@@ -472,35 +464,6 @@ export function useChatStackInfo({
     currentSnapshot.comparison.mergeBase !== parentHead
   );
 
-  const latestCommit = commits.reduce<(typeof commits)[number] | null>(
-    (latest, commit) =>
-      latest === null || commit.committedAt >= latest.committedAt ? commit : latest,
-    null
-  );
-  const failedCommitHash = latestCommit?.pushStatus === 'failed' ? latestCommit.commitHash : null;
-  const handledPushFailureRef = useRef<string | null>(null);
-
-  const remoteBranchChanged = Boolean(
-    currentWorktreeId && remoteChangedByWorktree[currentWorktreeId]
-  );
-  useEffect(() => {
-    if (!enabled || !currentWorktreeId || !currentSnapshot) return;
-    if (!isRemoteBranchChanged(currentSnapshot)) return;
-    setRemoteChangedByWorktree(previous =>
-      previous[currentWorktreeId] ? previous : { ...previous, [currentWorktreeId]: true }
-    );
-  }, [currentSnapshot, currentWorktreeId, enabled, setRemoteChangedByWorktree]);
-
-  useEffect(() => {
-    if (!enabled || !currentWorktreeId || !failedCommitHash) return;
-    const marker = `${currentWorktreeId}:${failedCommitHash}`;
-    if (handledPushFailureRef.current === marker) return;
-    handledPushFailureRef.current = marker;
-    setRemoteChangedByWorktree(previous =>
-      previous[currentWorktreeId] ? previous : { ...previous, [currentWorktreeId]: true }
-    );
-  }, [currentWorktreeId, enabled, failedCommitHash, setRemoteChangedByWorktree]);
-
   const branchOperations = useMemo<ChatStackInfo['branchOperations']>(() => {
     if (!currentWorktreeId) return undefined;
     const targets: WorktreeBranchOperationTarget[] = operationWorkspaces.flatMap(
@@ -554,7 +517,6 @@ export function useChatStackInfo({
   return {
     entries,
     behindParent,
-    remoteBranchChanged,
     canCreateStackedWorkspace,
     createStackedWorkspaceDisabledReason: !currentBranch
       ? stackedWorkspacePushReason(repository || 'this branch')

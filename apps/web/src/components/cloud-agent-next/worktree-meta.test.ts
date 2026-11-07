@@ -1,6 +1,5 @@
 import { describe, expect, it } from '@jest/globals';
 import {
-  isRemoteBranchChanged,
   readWorktreeSnapshotMeta,
   repositoryKey,
   repositoryKeyFromGitUrl,
@@ -31,26 +30,17 @@ describe('repositoryKey', () => {
 });
 
 describe('snapshot metadata', () => {
-  it('reads additive divergence and fallback fields defensively', () => {
+  it('reads base fallback fields defensively', () => {
     expect(
       readWorktreeSnapshotMeta({
         comparison: { baseRefFallback: { requested: 'main', used: 'trunk' } },
-        remoteDivergence: { ahead: 1, behind: 2 },
       })
     ).toEqual({
-      remoteDivergence: { ahead: 1, behind: 2, diverged: true },
       baseRefFallback: { requested: 'main', used: 'trunk' },
     });
     expect(readWorktreeSnapshotMeta({})).toEqual({
-      remoteDivergence: null,
       baseRefFallback: null,
     });
-  });
-
-  it('flags only a missing or diverged remote, not ordinary unpushed ahead commits', () => {
-    expect(isRemoteBranchChanged({ remoteDivergence: { ahead: 3, behind: 0 } })).toBe(false);
-    expect(isRemoteBranchChanged({ remoteDivergence: { ahead: 1, behind: 1 } })).toBe(true);
-    expect(isRemoteBranchChanged({ remoteDivergence: { ahead: 0, behind: 2 } })).toBe(true);
   });
 
   it('normalizes remote and local branch refs', () => {

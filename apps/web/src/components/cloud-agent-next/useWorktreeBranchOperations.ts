@@ -1,6 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useSetAtom } from 'jotai';
 import { generateMessageId } from '@kilocode/cloud-agent-sdk/message-id';
 import {
   cloudAgentSessionIdSchema,
@@ -11,11 +10,8 @@ import type {
   WorktreeBranchOperationResult,
 } from '@kilocode/worker-utils/cloud-agent-worktree-operations';
 import { useRawTRPCClient } from '@/lib/trpc/utils';
-import { worktreeRemoteBranchChangedAtom } from './store/remote-branch-atoms';
 
 export type { WorktreeBranchOperationResult };
-
-export type WorktreeBranchOperation = 'sync' | 'restack';
 
 export type WorktreeBranchOperationTarget = {
   worktreeId: string;
@@ -51,13 +47,12 @@ export type WorktreeInstructionDispatchResult = 'sent' | 'manual' | 'failed';
 type SendInstruction = (instruction: string) => Promise<boolean | void> | boolean | void;
 
 function refused(
-  operation: WorktreeBranchOperation,
   reason: WorktreeBranchOperationRefusalReason,
   message: string
 ): WorktreeBranchOperationResult {
   return {
     status: 'refused',
-    operation,
+    operation: 'restack',
     branch: null,
     baseBranch: null,
     baseSha: null,
@@ -109,47 +104,31 @@ export function useWorktreeBranchOperations({
 }) {
   const trpcClient = useRawTRPCClient();
   const queryClient = useQueryClient();
-  const setRemoteBranchChanged = useSetAtom(worktreeRemoteBranchChangedAtom);
   const [isPending, setIsPending] = useState(false);
   const pendingRef = useRef(false);
   const [lastResult, setLastResult] = useState<WorktreeBranchOperationResult | null>(null);
 
   const run = useCallback(
-    async (
-      operation: WorktreeBranchOperation,
-      target: WorktreeBranchOperationTargetInput
-    ): Promise<WorktreeBranchOperationResult> => {
+    async (target: WorktreeBranchOperationTargetInput): Promise<WorktreeBranchOperationResult> => {
       let result: WorktreeBranchOperationResult;
       const sessionId = cloudAgentSessionIdSchema.safeParse(target.cloudAgentSessionId);
       if (!sessionId.success) {
         result = refused(
-          operation,
           'branch_mismatch',
           'The worktree does not have a Cloud Agent session to operate on.'
         );
       } else {
         try {
-          result =
-            operation === 'sync'
-              ? organizationId
-                ? await trpcClient.organizations.cloudAgentNext.syncWorktreeBranch.mutate({
-                    organizationId,
-                    cloudAgentSessionId: sessionId.data,
-                  })
-                : await trpcClient.cloudAgentNext.syncWorktreeBranch.mutate({
-                    cloudAgentSessionId: sessionId.data,
-                  })
-              : organizationId
-                ? await trpcClient.organizations.cloudAgentNext.restackWorktreeBranch.mutate({
-                    organizationId,
-                    cloudAgentSessionId: sessionId.data,
-                  })
-                : await trpcClient.cloudAgentNext.restackWorktreeBranch.mutate({
-                    cloudAgentSessionId: sessionId.data,
-                  });
+          result = organizationId
+            ? await trpcClient.organizations.cloudAgentNext.restackWorktreeBranch.mutate({
+                organizationId,
+                cloudAgentSessionId: sessionId.data,
+              })
+            : await trpcClient.cloudAgentNext.restackWorktreeBranch.mutate({
+                cloudAgentSessionId: sessionId.data,
+              });
         } catch (error) {
           result = refused(
-            operation,
             'remote_branch_not_changed',
             error instanceof Error ? error.message : 'The branch operation failed.'
           );
@@ -157,9 +136,6 @@ export function useWorktreeBranchOperations({
       }
       setLastResult(result);
       if (completed(result)) {
-        setRemoteBranchChanged(previous =>
-          previous[target.worktreeId] ? { ...previous, [target.worktreeId]: false } : previous
-        );
         void queryClient.invalidateQueries({
           predicate: query => {
             const scope = query.queryKey[3];
@@ -175,21 +151,18 @@ export function useWorktreeBranchOperations({
       }
       return result;
     },
-    [onCompleted, organizationId, queryClient, setRemoteBranchChanged, trpcClient]
+    [onCompleted, organizationId, queryClient, trpcClient]
   );
 
   const runOne = useCallback(
-    async (
-      operation: WorktreeBranchOperation,
-      target: WorktreeBranchOperationTargetInput
-    ): Promise<WorktreeBranchOperationResult> => {
+    async (target: WorktreeBranchOperationTargetInput): Promise<WorktreeBranchOperationResult> => {
       if (pendingRef.current) {
-        return refused(operation, 'turn_running', 'Another branch operation is already running.');
+        return refused('turn_running', 'Another branch operation is already running.');
       }
       pendingRef.current = true;
       setIsPending(true);
       try {
-        return await run(operation, target);
+        return await run(target);
       } finally {
         pendingRef.current = false;
         setIsPending(false);
@@ -198,14 +171,8 @@ export function useWorktreeBranchOperations({
     [run]
   );
 
-  const sync = useCallback(
-    (worktreeId: string, cloudAgentSessionId: string) =>
-      runOne('sync', { worktreeId, cloudAgentSessionId }),
-    [runOne]
-  );
-
   const restack = useCallback(
-    (target: WorktreeBranchOperationTargetInput) => runOne('restack', target),
+    (target: WorktreeBranchOperationTargetInput) => runOne(target),
     [runOne]
   );
 
@@ -218,11 +185,7 @@ export function useWorktreeBranchOperations({
           stopped: target
             ? {
                 target,
-                result: refused(
-                  'restack',
-                  'turn_running',
-                  'Another branch operation is already running.'
-                ),
+                result: refused('turn_running', 'Another branch operation is already running.'),
               }
             : null,
         };
@@ -230,7 +193,7 @@ export function useWorktreeBranchOperations({
       pendingRef.current = true;
       setIsPending(true);
       try {
-        return await restackStackTargets(targets, target => run('restack', target));
+        return await restackStackTargets(targets, target => run(target));
       } finally {
         pendingRef.current = false;
         setIsPending(false);
@@ -243,7 +206,6 @@ export function useWorktreeBranchOperations({
     isPending,
     lastResult,
     currentCloudAgentSessionId,
-    sync,
     restack,
     restackStack,
   };

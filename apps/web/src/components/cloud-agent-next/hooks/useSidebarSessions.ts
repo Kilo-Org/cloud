@@ -1090,8 +1090,6 @@ type UseSidebarSessionsOptions = {
   searchQuery?: string;
   createdOnPlatform?: string | string[];
   gitUrl?: string | string[];
-  /** Phase 4 workspace rows, independent of the five-day chat list. */
-  workspaceRowsEnabled?: boolean;
 };
 
 type UseSidebarSessionsReturn = {
@@ -1155,7 +1153,6 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
     searchQuery = '',
     createdOnPlatform,
     gitUrl,
-    workspaceRowsEnabled = false,
   } = options ?? {};
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -1256,28 +1253,24 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
       getNextPageParam: lastPage => lastPage.nextCursor ?? undefined,
     }),
     staleTime: 5000,
-    enabled: workspaceRowsEnabled,
   });
   const workspacePreferencesQuery = useQuery({
     ...trpc.cloudAgentSidebarPreferences.get.queryOptions(
       sidebarWorkspacePreferencesInput({ organizationId })
     ),
     staleTime: 60_000,
-    enabled: workspaceRowsEnabled,
   });
   const workspaceRows = useMemo<SidebarWorkspaceListRow[]>(
     () => workspaceListQuery.data?.pages.flatMap(page => page.workspaces) ?? [],
     [workspaceListQuery.data?.pages]
   );
   useEffect(() => {
-    if (!workspaceRowsEnabled) return;
     if (!workspaceListQuery.hasNextPage || workspaceListQuery.isFetchingNextPage) return;
     void workspaceListQuery.fetchNextPage();
   }, [
     workspaceListQuery.fetchNextPage,
     workspaceListQuery.hasNextPage,
     workspaceListQuery.isFetchingNextPage,
-    workspaceRowsEnabled,
   ]);
 
   // Track last processed data key to avoid unnecessary atom updates
@@ -1637,18 +1630,12 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
     },
   });
   const mergedWorktreeDetails = useMemo(
-    () =>
-      workspaceRowsEnabled
-        ? mergeWorkspaceRowDetails(worktreeDetailsQueries.details, workspaceRows)
-        : worktreeDetailsQueries.details,
-    [worktreeDetailsQueries.details, workspaceRows, workspaceRowsEnabled]
+    () => mergeWorkspaceRowDetails(worktreeDetailsQueries.details, workspaceRows),
+    [worktreeDetailsQueries.details, workspaceRows]
   );
   const workspaceGroups = useMemo(
-    () =>
-      workspaceRowsEnabled
-        ? groupSidebarWorkspaces(sessions, mergedWorktreeDetails, workspaceRows)
-        : [],
-    [mergedWorktreeDetails, sessions, workspaceRows, workspaceRowsEnabled]
+    () => groupSidebarWorkspaces(sessions, mergedWorktreeDetails, workspaceRows),
+    [mergedWorktreeDetails, sessions, workspaceRows]
   );
   const workspaceRowsTruncated = useMemo(
     () => workspaceListQuery.data?.pages.some(page => page.truncated) ?? false,

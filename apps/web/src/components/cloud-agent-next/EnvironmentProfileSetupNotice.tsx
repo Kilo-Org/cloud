@@ -1,7 +1,6 @@
 'use client';
 
 import { TriangleAlert } from 'lucide-react';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import type { EnvironmentRepository } from '@/hooks/useCloudAgentEnvironments';
 import { useEnvironmentProfiles } from '@/hooks/useEnvironmentProfiles';
 import { describeEnvironmentProfileImpact } from './environment-profile-impact';
@@ -30,19 +29,9 @@ export function EnvironmentProfileSetupNotice({
   if (commandProfiles.length === 0) return null;
 
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <button
-          type="button"
-          aria-label="Environment setup replaces profile setup."
-          className="text-status-warning focus-visible:ring-ring inline-flex size-6 shrink-0 cursor-help items-center justify-center rounded-sm focus-visible:ring-2 focus-visible:outline-none"
-        >
-          <TriangleAlert className="size-4" aria-hidden />
-        </button>
-      </TooltipTrigger>
-      <TooltipContent side="top" sideOffset={4}>
-        Environment setup replaces profile setup.
-      </TooltipContent>
-    </Tooltip>
+    <p role="status" className="text-status-warning flex items-center justify-end gap-1 text-xs">
+      <TriangleAlert className="size-3 shrink-0" aria-hidden />
+      Environment setup replaces profile setup.
+    </p>
   );
 }

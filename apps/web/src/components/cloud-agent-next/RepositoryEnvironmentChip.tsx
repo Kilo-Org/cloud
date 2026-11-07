@@ -6,11 +6,10 @@ import { cn } from '@/lib/utils';
 import type { EnvironmentRepository, EnvironmentSummary } from '@/hooks/useCloudAgentEnvironments';
 import { useCloudAgentSettingsCanManage } from '@/hooks/useCloudAgentSettings';
 import { EnvironmentDialog } from './EnvironmentDialog';
-
-const chipClassName =
-  'inline-flex max-w-full items-center gap-1.5 rounded-md border border-border/50 bg-muted/30 px-2 py-1 text-xs text-muted-foreground';
-const interactiveClassName =
-  'cursor-pointer transition-colors hover:border-border hover:bg-muted/60 hover:text-foreground';
+import {
+  contextSegmentClassName,
+  interactiveContextSegmentClassName,
+} from './session-context-segments';
 
 type RepositoryEnvironmentChipProps = {
   organizationId?: string;
@@ -35,36 +34,29 @@ export function RepositoryEnvironmentChip({
   if (!repository || environment === undefined) return null;
   if (!environment && !canManage) return null;
 
-  const label = environment ? (
-    <>
-      <Boxes className="size-3 shrink-0" aria-hidden />
-      <span className="font-medium">Env</span>
-    </>
-  ) : (
-    <>
-      <Plus className="size-3 shrink-0" aria-hidden />
-      <span>Set up environment</span>
-    </>
-  );
+  const Icon = environment ? Boxes : Plus;
 
   return (
     <>
       <button
         type="button"
-        className={cn(chipClassName, interactiveClassName)}
+        className={cn(
+          contextSegmentClassName,
+          interactiveContextSegmentClassName,
+          environment && 'text-foreground'
+        )}
         aria-label={
           environment ? (canManage ? 'Edit environment' : 'View environment') : 'Set up environment'
         }
         title={
           environment
-            ? canManage
-              ? 'Edit environment'
-              : 'View environment'
-            : 'Save setup commands, variables, secrets, and a sandbox size for this repository.'
+            ? `${canManage ? 'Edit' : 'View'} the environment of ${repositoryLabel}`
+            : `Save setup commands, variables, secrets, and a sandbox size for ${repositoryLabel}.`
         }
         onClick={() => setDialogOpen(true)}
       >
-        {label}
+        <Icon className="size-3.5 shrink-0" aria-hidden />
+        <span className="font-medium">Env</span>
       </button>
       <EnvironmentDialog
         open={dialogOpen}

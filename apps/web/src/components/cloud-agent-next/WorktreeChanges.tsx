@@ -9,10 +9,9 @@ import {
   type RefObject,
 } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useAtomValue, useSetAtom } from 'jotai';
+import { useAtomValue } from 'jotai';
 import {
   ArrowLeft,
-  ArrowDownToLine,
   ChevronRight,
   FileDiff,
   GitBranch,
@@ -26,20 +25,12 @@ import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
-import { useFeatureFlagEnabled } from 'posthog-js/react';
-import { CLOUD_AGENT_STACKED_WORKSPACES_FLAG } from './feature-flags';
 import { useResizableSidebar } from '@/hooks/useResizableSidebar';
 import { useRawTRPCClient } from '@/lib/trpc/utils';
 import { useManager } from './CloudAgentProvider';
 import { WorktreeFilePane } from './WorktreeFilePane';
 import { useSavedWorktreeChanges } from './useSavedWorktreeChanges';
-import {
-  useWorktreeBranchOperations,
-  buildBranchConflictInstruction,
-  useWorktreeInstructionDispatcher,
-} from './useWorktreeBranchOperations';
-import { isRemoteBranchChanged, readWorktreeSnapshotMeta } from './worktree-meta';
-import { worktreeRemoteBranchChangedAtom } from './store/remote-branch-atoms';
+import { readWorktreeSnapshotMeta } from './worktree-meta';
 import type { WorktreeFileReviewBindings } from './worktree-review-bindings';
 import type { WorktreeFileViewMode } from './workspace-tabs';
 import {
@@ -460,7 +451,6 @@ function WorktreeChanges({
 }) {
   const trpcClient = useRawTRPCClient();
   const queryClient = useQueryClient();
-  const stackedWorkspacesEnabled = useFeatureFlagEnabled(CLOUD_AGENT_STACKED_WORKSPACES_FLAG);
   const { saved, queryKey } = useSavedWorktreeChanges({
     userId,
     cloudAgentSessionId,
@@ -484,16 +474,6 @@ function WorktreeChanges({
     retry: false,
   });
   const { mutate } = refresh;
-  const branchOperations = useWorktreeBranchOperations({
-    organizationId,
-    currentCloudAgentSessionId: cloudAgentSessionId,
-    onCompleted: () => mutate(),
-  });
-  const dispatchInstruction = useWorktreeInstructionDispatcher({
-    organizationId,
-    currentCloudAgentSessionId: cloudAgentSessionId,
-  });
-  const [branchMessage, setBranchMessage] = useState<string | null>(null);
   const attemptedOpeningRefresh = useRef(false);
   useEffect(() => {
     if (!open) {
@@ -507,14 +487,6 @@ function WorktreeChanges({
 
   const snapshot = saved.data?.snapshot;
   const snapshotMeta = readWorktreeSnapshotMeta(snapshot);
-  const remoteBehind = snapshotMeta.remoteDivergence?.behind ?? 0;
-  const setRemoteBranchChanged = useSetAtom(worktreeRemoteBranchChangedAtom);
-  useEffect(() => {
-    if (!worktreeId || !snapshot || !isRemoteBranchChanged(snapshot)) return;
-    setRemoteBranchChanged(previous =>
-      previous[worktreeId] ? previous : { ...previous, [worktreeId]: true }
-    );
-  }, [setRemoteBranchChanged, snapshot, worktreeId]);
   const sections = groupWorktreeChangesByScope(snapshot?.files ?? []);
   const messages = worktreeChangesMessages({
     snapshot,
@@ -550,53 +522,6 @@ function WorktreeChanges({
             Tree
           </TabsTrigger>
         </TabsList>
-        {stackedWorkspacesEnabled && worktreeId && remoteBehind > 0 && (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="text-muted-foreground h-11 shrink-0 gap-1.5 px-2 text-xs sm:h-8"
-            disabled={branchOperations.isPending || refresh.isPending}
-            title={`The remote has ${remoteBehind} commit${remoteBehind === 1 ? '' : 's'} this worktree lacks. Sync the branch.`}
-            onClick={() =>
-              void branchOperations
-                .sync(worktreeId ?? cloudAgentSessionId, cloudAgentSessionId)
-                .then(async result => {
-                  if (result.status === 'conflict') {
-                    const target = {
-                      worktreeId: worktreeId ?? cloudAgentSessionId,
-                      cloudAgentSessionId,
-                      branch: null,
-                      baseBranch: snapshot?.comparison.baseRef ?? null,
-                      label: 'this workspace',
-                    };
-                    const sent = await dispatchInstruction(
-                      target,
-                      buildBranchConflictInstruction(target, result)
-                    );
-                    setBranchMessage(
-                      sent === 'sent'
-                        ? 'The agent is resolving the conflict.'
-                        : 'The conflict instruction could not be sent. Open Branch operations to retry.'
-                    );
-                    return;
-                  }
-                  if (result.status === 'refused') {
-                    setBranchMessage(result.message);
-                    return;
-                  }
-                  setBranchMessage(
-                    result.status === 'changed'
-                      ? 'Synced the branch.'
-                      : 'The branch is already up to date.'
-                  );
-                })
-            }
-          >
-            <ArrowDownToLine aria-hidden="true" className="size-3.5" />
-            Sync
-          </Button>
-        )}
         <Button
           type="button"
           variant="ghost"
@@ -613,12 +538,6 @@ function WorktreeChanges({
           />
         </Button>
       </div>
-
-      {branchMessage && (
-        <p role="status" className="text-muted-foreground shrink-0 px-3 py-2 text-xs">
-          {branchMessage}
-        </p>
-      )}
 
       <div className="min-h-0 flex-1 overflow-y-auto p-1">
         {messages.empty && (
@@ -718,12 +637,6 @@ function WorktreeChanges({
               <p>
                 Base branch <code>{snapshotMeta.baseRefFallback.requested}</code> no longer exists;
                 comparing with <code>{snapshotMeta.baseRefFallback.used}</code>.
-              </p>
-            )}
-            {remoteBehind > 0 && (
-              <p>
-                The remote branch has {remoteBehind} commit{remoteBehind === 1 ? '' : 's'} this
-                worktree lacks. Use Sync to fast-forward before starting another turn.
               </p>
             )}
             {messages.notice && <p>{messages.notice}</p>}

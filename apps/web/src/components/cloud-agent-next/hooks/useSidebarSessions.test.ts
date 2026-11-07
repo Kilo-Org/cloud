@@ -2032,9 +2032,8 @@ describe('ChatSidebar worktree controls', () => {
       true
     );
 
-    expect(html.includes('Worktree actions for')).toBe(
-      capabilities.create || capabilities.rename || capabilities.remove
-    );
+    expect(html).toContain('Worktree actions for');
+    expect(html).toContain('New stacked workspace');
     expect(html.includes('New chat')).toBe(capabilities.create);
     expect(html.includes('Rename worktree')).toBe(capabilities.rename);
     expect(html.includes('Delete worktree')).toBe(capabilities.remove);

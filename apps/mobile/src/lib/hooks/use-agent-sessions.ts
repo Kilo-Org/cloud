@@ -126,6 +126,7 @@ export function useAgentSessionSearch(options: UseAgentSessionSearchOptions) {
     refetch: query.refetch,
     hasNextPage: query.hasNextPage,
     isFetchingNextPage: query.isFetchingNextPage,
+    isFetchNextPageError: query.isFetchNextPageError,
     isPlaceholderData: query.isPlaceholderData,
     fetchNextPage: query.fetchNextPage,
   };
@@ -335,6 +336,11 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
     activeIsPaused: active.isPaused,
     hasNextPage: stored.hasNextPage,
     isFetchingNextPage: stored.isFetchingNextPage,
+    // The last next-page attempt failed. The loaded rows stay, so the footer
+    // owns a Retry that calls `fetchNextPage`, and the end-reach gate must stop
+    // re-firing until a page lands: the other paginated lists read the same
+    // flag for the same reason.
+    isFetchNextPageError: stored.isFetchNextPageError,
     fetchNextPage,
     // Pull-to-refresh, retry and the Share Gate's refresh reconcile page one
     // as well: after `maxPages` evicts page one, a plain stored `refetch()`

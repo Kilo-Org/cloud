@@ -34,6 +34,7 @@ import type { ProviderAdapter, StopResult } from '../../src/sandbox-control/prov
 import {
   createFakeCredentialBroker,
   FAKE_SANDBOX_CONTAINERS_NAMESPACE,
+  fakeRuntimeProxyOrigin,
   installFakeSandboxEnv,
 } from './helpers/fake-credentials.js';
 import { FakeWrapper } from './helpers/fake-wrapper.js';
@@ -255,6 +256,7 @@ async function createSharedScope(
   const sandboxId = await generateSandboxId(creatorId);
   const provider = createProvider();
   const sandbox = await installSandbox(sandboxId, provider);
+  const origin = await fakeRuntimeProxyOrigin(sandboxId, 'vercel');
 
   const memberIds = [creatorId];
   for (let index = 1; index < memberCount; index += 1) memberIds.push(newSessionId());
@@ -327,7 +329,7 @@ async function createSharedScope(
   }
 
   const scopeGrantId = `${worktreeId}:runtime`;
-  return { sandbox, provider, wrapper, sandboxId, worktreeId, scopeGrantId, members };
+  return { sandbox, provider, wrapper, sandboxId, worktreeId, scopeGrantId, members, origin };
 }
 
 async function currentFence(
@@ -385,9 +387,10 @@ async function setAuthorizationState(
 
 function resolveHandle(
   sandbox: DurableObjectStub<SandboxControlV2>,
-  handle: string
+  handle: string,
+  originProof: string | undefined
 ): Promise<ScopeHandleResolution> {
-  return sandbox.resolveScopeHandle({ handle });
+  return sandbox.resolveScopeHandle({ handle, originProof });
 }
 
 afterEach(async () => {
@@ -519,7 +522,7 @@ describe('rolling runtime compatibility', () => {
 
 describe('adopted-handle proxy scope view', () => {
   it('reads only member identities without parsing unrelated routes or credentials', async () => {
-    const { sandbox, worktreeId, members } = await createSharedScope(2);
+    const { sandbox, worktreeId, members, origin } = await createSharedScope(2);
     const [creator, sibling] = members;
     if (!creator || !sibling) throw new Error('Expected two scope members');
     await runInDurableObject(sandbox, (_instance, state) => {
@@ -545,6 +548,7 @@ describe('adopted-handle proxy scope view', () => {
       kiloSessionId: creator.kiloId,
       directory: creator.directory,
       handle: creator.handle,
+      originProof: origin,
     });
     expect(fence?.scopeView).toEqual({
       scopeId: worktreeId,
@@ -556,7 +560,7 @@ describe('adopted-handle proxy scope view', () => {
   it.each(['failed', 'missing', 'wrong-kilo', 'wrong-directory'])(
     'excludes a %s member from the current scope view',
     async condition => {
-      const { sandbox, members } = await createSharedScope(2);
+      const { sandbox, members, origin } = await createSharedScope(2);
       const [creator, sibling] = members;
       if (!creator || !sibling) throw new Error('Expected two scope members');
       const input = {
@@ -565,6 +569,7 @@ describe('adopted-handle proxy scope view', () => {
         kiloSessionId: creator.kiloId,
         directory: creator.directory,
         handle: creator.handle,
+        originProof: origin,
       };
       expect(
         (await sandbox.getRuntimeCredentialProxyFence(input))?.scopeView?.memberRootKiloSessionIds
@@ -600,7 +605,7 @@ describe('adopted-handle proxy scope view', () => {
 
 describe('SandboxControlV2 scope-handle resolution', () => {
   it('denies a handle that is not in the accepted set', async () => {
-    const { sandbox, members } = await createSharedScope(2);
+    const { sandbox, members, origin } = await createSharedScope(2);
     const issuer = members[0]!;
     const fence = await currentFence(sandbox);
     const unattached = createRuntimeProxyGrant({
@@ -619,12 +624,12 @@ describe('SandboxControlV2 scope-handle resolution', () => {
       state: 'active',
     });
     const handle = await issueRuntimeCredentialProxyHandle(env, unattached);
-    const outcome = await resolveHandle(sandbox, handle);
+    const outcome = await resolveHandle(sandbox, handle, origin);
     expect(outcome).toEqual({ type: 'denied' });
   });
 
   it('denies a handle for a different user without returning a sibling token', async () => {
-    const { sandbox, members, scopeGrantId } = await createSharedScope(2);
+    const { sandbox, members, scopeGrantId, origin } = await createSharedScope(2);
     const [issuer] = members;
     const fence = await currentFence(sandbox);
     const grant = createRuntimeProxyGrant({
@@ -654,12 +659,12 @@ describe('SandboxControlV2 scope-handle resolution', () => {
       });
     });
 
-    const outcome = await resolveHandle(sandbox, foreignHandle);
+    const outcome = await resolveHandle(sandbox, foreignHandle, origin);
     expect(outcome).toEqual({ type: 'denied' });
   });
 
   it('serves through a sibling when the issuer is locally revoked', async () => {
-    const { sandbox, members, scopeGrantId } = await createSharedScope(2);
+    const { sandbox, members, scopeGrantId, origin } = await createSharedScope(2);
     const [creator, sibling] = members;
     await seedAccepted(
       sandbox,
@@ -670,11 +675,31 @@ describe('SandboxControlV2 scope-handle resolution', () => {
     );
     await setAuthorizationState(creator!.stub, 'revoked');
 
-    const outcome = await resolveHandle(sandbox, creator!.handle);
+    const outcome = await resolveHandle(sandbox, creator!.handle, origin);
     expect(outcome.type).toBe('served');
     if (outcome.type !== 'served') throw new Error('expected served');
     expect(outcome.token).toBe(sibling!.token);
     expect(outcome.runtimeAuthorization.resourceId).toBe(sibling!.sessionId);
     expect(outcome.organizationId).toBe(ORG_ID);
+  });
+
+  it('serves a scope handle only with this sandbox origin proof', async () => {
+    const { sandbox, members, scopeGrantId, origin } = await createSharedScope(2);
+    const [creator] = members;
+    await seedAccepted(
+      sandbox,
+      scopeGrantId,
+      creator!.handle,
+      creator!,
+      await currentFence(sandbox)
+    );
+    await setAuthorizationState(creator!.stub, 'revoked');
+    const otherSandboxId = await generateSandboxId(newSessionId());
+    const otherOrigin = await fakeRuntimeProxyOrigin(otherSandboxId, 'vercel');
+
+    for (const proof of [undefined, otherOrigin]) {
+      expect(await resolveHandle(sandbox, creator!.handle, proof)).toEqual({ type: 'denied' });
+    }
+    expect((await resolveHandle(sandbox, creator!.handle, origin)).type).toBe('served');
   });
 });

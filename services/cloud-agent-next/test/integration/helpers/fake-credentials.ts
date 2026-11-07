@@ -93,6 +93,20 @@ export function fakeOutboundContainerId(logicalSandboxId: string): string {
   return FAKE_SANDBOX_CONTAINERS_NAMESPACE.idFromName(logicalSandboxId).toString();
 }
 
+/** The origin proof added by platform egress for one sandbox. */
+export async function fakeRuntimeProxyOrigin(
+  sandboxId: string,
+  provider: 'vercel' | 'cloudflare-containers'
+): Promise<string> {
+  const { env } = await import('cloudflare:test');
+  const { runtimeProxyOriginProof } =
+    await import('../../../src/runtime-credential-proxy-origin.js');
+  const outboundId = provider === 'vercel' ? sandboxId : fakeOutboundContainerId(sandboxId);
+  const proof = await runtimeProxyOriginProof(env, outboundId);
+  if (proof === null) throw new Error('NEXTAUTH_SECRET is not configured');
+  return proof;
+}
+
 /**
  * Installs the fakes a Sandbox DO fixture needs: the credential bindings the
  * fake-provider suite has no binding for, and a current organization membership

@@ -1459,6 +1459,14 @@ served it. A socket reconnect on the same wrapper keeps the handle valid; alloca
 replacement and authorization revocation invalidate it. Renewal checks current principal and
 organization membership bindings and never extends the delegation lifetime.
 
+A contained handle is also bound to the sandbox egress that sends it. The platform adds
+`x-kilo-runtime-proxy-origin`, an HMAC of the sandbox egress ID, outside the sandbox. The
+Containers outbound handler sets it on requests to the facade origin and replaces any value from
+the sandbox. On Vercel, each runtime-proxy injection rule injects it with the handle. The Sandbox
+DO denies a handle without its own proof, so a copied handle fails from another host or through
+another sandbox. Allocations that started before this check are exempt until they stop. The
+facade removes the header before the upstream call.
+
 Because the handle is scope-wide, revoking one member's handle no longer stops another member's
 in-flight model calls while a surviving member can still serve; that member's **new** sends are still
 denied. The usage `session_id` attribute on a forwarded request is the wrapper's forwarded

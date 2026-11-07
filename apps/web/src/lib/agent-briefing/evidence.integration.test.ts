@@ -455,7 +455,6 @@ describe('briefing charge reconciliation for retried generations', () => {
       },
     ]);
   });
-
   it('keeps a staggered two-attempt generation pending until the queued row lands', async () => {
     const prepared = await generated();
     const firstId = crypto.randomUUID();

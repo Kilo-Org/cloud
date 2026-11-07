@@ -1,11 +1,31 @@
 import { randomUUID } from 'crypto';
 import { eq } from 'drizzle-orm';
+import * as z from 'zod';
 import { agent_briefing_snapshots } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
-import { briefingChargeAccountingSchema, recordBriefingUsage } from './agent-briefing-usage';
+import {
+  briefingChargeAccountingSchema,
+  briefingChargeDeliverySchema,
+  recordBriefingUsage,
+} from './agent-briefing-usage';
 import type { UsageAccountingResult } from './ai-gateway/processUsage.types';
+
+/** Freeze the deployed parser so schema changes cannot silently discard charged attempts. */
+const previousAccountingReader = z.object({
+  baselineCostMicrodollars: z.number().nonnegative(),
+  generations: z.array(
+    z.object({
+      id: z.string(),
+      settlementToken: z.string().optional(),
+      usageId: z.uuid().nullable(),
+      deadlineAt: z.string().datetime().optional(),
+      deliveryAt: z.string().datetime().optional(),
+      delivery: briefingChargeDeliverySchema.optional(),
+    })
+  ),
+});
 
 async function fixture(organizationId?: string) {
   const user = await insertTestUser();
@@ -113,6 +133,28 @@ describe('recordBriefingUsage', () => {
       );
     }
   );
+
+  it('retains every charged attempt for the deployed accounting reader', async () => {
+    const prepared = await fixture();
+    const first = usage('queued');
+    const second = usage();
+    await recordBriefingUsage({ ...prepared.input, usage: first });
+    await recordBriefingUsage({ ...prepared.input, usage: second });
+    const persisted = await readReport(prepared.report.id);
+    const previous = previousAccountingReader.parse(persisted.summary.chargeAccounting);
+    expect(
+      previous.generations
+        .filter(entry => entry.id === prepared.input.generationId)
+        .map(entry => entry.usageId)
+    ).toEqual([first.usageId, second.usageId]);
+    expect(previous.generations.find(entry => entry.id === prepared.input.generationId)).toEqual({
+      id: prepared.input.generationId,
+      settlementToken: prepared.input.settlementToken,
+      usageId: first.usageId,
+      delivery: 'queued',
+      deliveryAt: expect.any(String),
+    });
+  });
 
   it('stores every distinct receipt and ignores a duplicate receipt', async () => {
     const prepared = await fixture();

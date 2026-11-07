@@ -795,6 +795,9 @@ Do not treat an unshipped user interface as proof that its ingestion code is ina
 The gateway marks a refusal that replaces an already-accounted answer.
 The summary worker must not retry that refusal.
 Deploy the gateway marker producer before enabling the matching web retry consumer.
-The scheduled workflow currently promotes web and gateway independently; it does not enforce this order.
-Keep this change blocked until an enforced deployment sequence or an order-independent protocol is verified.
-Do not treat a rollout note as a deployment safeguard.
+The scheduled workflow currently promotes web and gateway independently.
+Keep the production hold until the deployment sequence enforces producer-before-consumer promotion.
+
+Charge accounting retains the deployed receipt fields in `chargeAccounting.generations`.
+Charged attempts share a generation identifier but retain distinct usage identifiers and delivery states.
+An older reader therefore retains every attempt when it reconciles or rewrites the accounting record.

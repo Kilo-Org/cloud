@@ -195,12 +195,16 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
               label={t('organization.hub.balance')}
               value={formatMoney(fromMicrodollars(org.balance), i18n.language)}
               valueFace="numeric"
-            />
-          )}
-          {showMoney && org.balance === 0 && (
-            <AddCreditsRow
-              url={`${WEB_BASE_URL}/organizations/${organizationId}/payment-details`}
-              className="border-b-[0.5px] border-hair-soft py-3"
+              // An empty balance offers the top-up on the amount's own line: a
+              // row of its own would hold nothing but this control.
+              trailing={
+                org.balance === 0 ? (
+                  <AddCreditsRow
+                    inline
+                    url={`${WEB_BASE_URL}/organizations/${organizationId}/payment-details`}
+                  />
+                ) : undefined
+              }
             />
           )}
           <KvRow

@@ -37,6 +37,12 @@ type AddCreditsRowProps = Readonly<{
   /** In-app destination (the credit purchase screen); platform-agnostic. */
   onPress?: () => void;
   className?: string;
+  /**
+   * Hand the button to the caller's own row — the balance line it tops up —
+   * with no wrapper and no full-width branch. The row and its padding belong to
+   * that caller, so the button sits at its natural size beside the amount.
+   */
+  inline?: boolean;
 }>;
 
 /**
@@ -51,9 +57,11 @@ type AddCreditsRowProps = Readonly<{
  * sentence restating it is the redundancy `apps/mobile/AGENTS.md` rules out.
  * In a wide row it keeps its trailing position inside the caller's padding; in
  * a window under `NARROW_LAYOUT_WIDTH` it spans the row, which is the tap
- * target width it had before.
+ * target width it had before. With `inline` the caller's row is the row: the
+ * button is returned alone, at its natural size, so it can sit on the balance
+ * line instead of filling a block of its own.
  */
-export function AddCreditsRow({ url, onPress, className }: AddCreditsRowProps) {
+export function AddCreditsRow({ url, onPress, className, inline }: AddCreditsRowProps) {
   const { t } = useTranslation();
   const { width } = useWindowDimensions();
   const narrow = isNarrowLayout(width);
@@ -64,19 +72,25 @@ export function AddCreditsRow({ url, onPress, className }: AddCreditsRowProps) {
   if (!onPress && Platform.OS === 'ios') {
     return null;
   }
+  const button = (
+    <AddCreditsButton
+      onPress={
+        onPress ??
+        (() => {
+          if (url) {
+            void openExternalUrl(url, { label: t('addCredits.billingPage') });
+          }
+        })
+      }
+      className={inline || !narrow ? undefined : 'w-full'}
+    />
+  );
+  if (inline) {
+    return button;
+  }
   return (
     <View className={cn(narrow ? undefined : 'flex-row items-center justify-end', className)}>
-      <AddCreditsButton
-        onPress={
-          onPress ??
-          (() => {
-            if (url) {
-              void openExternalUrl(url, { label: t('addCredits.billingPage') });
-            }
-          })
-        }
-        className={narrow ? 'w-full' : undefined}
-      />
+      {button}
     </View>
   );
 }

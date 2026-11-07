@@ -1058,6 +1058,36 @@ describe('CreditsCard add-credits entry point', () => {
 
     unmount();
   });
+
+  it('keeps the org action on the balance card instead of a block below it', async () => {
+    currentUser.userId = 'user-1';
+    savedMetadata.set(ORGANIZATION_STORAGE_KEY, 'org-a');
+    const queryClient = createTestQueryClient();
+    queryClient.setQueryData([...BALANCE_KEY], { balance: 0 });
+    const orgs = [
+      { organizationId: 'org-a', organizationName: 'Acme', role: 'owner' },
+    ] as OrgListEntry[];
+    listState.payload = orgs;
+
+    const { renderer, unmount } = await mountCard(queryClient, orgs);
+    await waitFor(() => renderer.root.findAll(node => node.children.includes('ADD_CREDITS_ROW')).length > 0);
+
+    // The action shares the balance card, which is the row it tops up: a block
+    // of its own held nothing but the button once the copy beside it left.
+    const action = renderer.root.find(node => node.children.includes('ADD_CREDITS_ROW'));
+    let ancestor = action.parent;
+    let insideBalanceCard = false;
+    while (ancestor !== null) {
+      if (String(ancestor.props.className ?? '').includes('min-h-16 gap-2')) {
+        insideBalanceCard = true;
+        break;
+      }
+      ancestor = ancestor.parent;
+    }
+    expect(insideBalanceCard).toBe(true);
+
+    unmount();
+  });
 });
 
 describe('CreditsCard credits header', () => {

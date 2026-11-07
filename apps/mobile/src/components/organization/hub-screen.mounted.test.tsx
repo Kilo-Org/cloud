@@ -34,6 +34,7 @@ const boundary = vi.hoisted(() => ({
   parentOrganizationId: null as string | null | undefined,
   requireSeats: false,
   seatCount: { used: 1, total: 1 },
+  balance: 5_000_000,
 }));
 const routerPush = vi.hoisted(() => vi.fn());
 const kiloPassQuery = vi.hoisted(() => ({ enabled: [] as boolean[] }));
@@ -64,7 +65,7 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
       organizationId: 'org-1',
       organizationName: boundary.name,
       parentOrganizationId: boundary.parentOrganizationId,
-      balance: 5_000_000,
+      balance: boundary.balance,
       requireSeats: boundary.requireSeats,
       seatCount: boundary.seatCount,
     },
@@ -245,6 +246,7 @@ beforeEach(() => {
   boundary.parentOrganizationId = null;
   boundary.requireSeats = false;
   boundary.seatCount = { used: 1, total: 1 };
+  boundary.balance = 5_000_000;
   kiloPassRowState.current = null;
   routerPush.mockClear();
   kiloPassQuery.enabled = [];
@@ -278,6 +280,32 @@ describe('Organization hub card', () => {
     // Left-to-right isolate (U+2066) and pop-directional-isolate (U+2069): the
     // pair reads 1 of 5 in either interface direction.
     expect(seats?.props.value).toBe('\u20661 / 5\u2069');
+    unmount();
+  });
+
+  it('offers the top-up on the balance line of an empty balance', async () => {
+    boundary.balance = 0;
+
+    const { renderer, unmount } = await renderHub();
+
+    const balance = renderer.root
+      .findAllByType('KvRow')
+      .find(node => node.props.label === i18n.t('organization.hub.balance'));
+    // The control shares the amount's row: a row of its own held nothing but
+    // the button once the copy beside it left.
+    expect(balance?.props.trailing).toBeDefined();
+    expect(renderer.root.findAllByType('AddCreditsRow')).toHaveLength(0);
+    unmount();
+  });
+
+  it('keeps a funded organization on its balance line alone', async () => {
+    const { renderer, unmount } = await renderHub();
+
+    const balance = renderer.root
+      .findAllByType('KvRow')
+      .find(node => node.props.label === i18n.t('organization.hub.balance'));
+    expect(balance?.props.value).toBe('$5');
+    expect(balance?.props.trailing).toBeUndefined();
     unmount();
   });
 });

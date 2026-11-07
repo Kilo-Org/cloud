@@ -70,3 +70,41 @@ describe('AddCreditsRow mounted layout', () => {
     expect(renderRow().findAllByType(BUTTON)).toHaveLength(0);
   });
 });
+
+describe('AddCreditsRow inline placement', () => {
+  /** The button, whether or not a caller block wraps it. */
+  function renderInline() {
+    act(() => {
+      const element = createElement(AddCreditsRow, {
+        url: 'https://example.com/credits',
+        inline: true,
+      });
+      if (renderer) {
+        renderer.update(element);
+      } else {
+        renderer = TestRenderer.create(element);
+      }
+    });
+    if (!renderer) {
+      throw new Error('Missing AddCreditsRow renderer');
+    }
+    return renderer.root;
+  }
+
+  it('hands the button over with no block of its own', () => {
+    const root = renderInline();
+    expect(root.findAllByType('View')).toHaveLength(0);
+    expect(root.findByType(BUTTON)).toBeDefined();
+  });
+
+  it('keeps the button at its natural width even in a narrow window', () => {
+    windowDims.width = 160;
+    const root = renderInline();
+    expect(String(root.findByType(BUTTON).props.className ?? '')).not.toContain('w-full');
+  });
+
+  it('keeps the App Store gate', () => {
+    platform.OS = 'ios';
+    expect(renderInline().findAllByType(BUTTON)).toHaveLength(0);
+  });
+});

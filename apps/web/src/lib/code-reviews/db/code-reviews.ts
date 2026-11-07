@@ -1411,35 +1411,99 @@ export async function reviewIsSuperseded(reviewId: string): Promise<boolean> {
   }
 }
 
-/**
- * Updates only usage-related columns on a code review, without touching status or timestamps.
- */
-export async function updateCodeReviewUsage(
-  reviewId: string,
-  usage: {
-    model?: string;
-    totalTokensIn?: number;
-    totalTokensOut?: number;
-    totalCostMusd?: number;
+export type CodeReviewUsage = {
+  model?: string;
+  totalTokensIn?: number;
+  totalTokensOut?: number;
+  totalCostMusd?: number;
+};
+
+function buildCodeReviewUsageUpdateData(
+  usage: CodeReviewUsage
+): Partial<typeof cloud_agent_code_reviews.$inferInsert> {
+  const updateData: Partial<typeof cloud_agent_code_reviews.$inferInsert> = {};
+
+  if (usage.model !== undefined) {
+    updateData.model = usage.model;
   }
+  if (usage.totalTokensIn !== undefined) {
+    updateData.total_tokens_in = usage.totalTokensIn;
+  }
+  if (usage.totalTokensOut !== undefined) {
+    updateData.total_tokens_out = usage.totalTokensOut;
+  }
+  if (usage.totalCostMusd !== undefined) {
+    updateData.total_cost_musd = usage.totalCostMusd;
+  }
+
+  return updateData;
+}
+
+/**
+ * Records usage on a code review at most once.
+ *
+ * The write is a compare-and-set on the three metered columns: it applies only
+ * while the review has no recorded token or cost totals, so a call that repeats
+ * or arrives after another writer recorded usage leaves the stored values
+ * unchanged. Only {@link backfillCodeReviewUsage} may overwrite recorded usage;
+ * it runs from the terminal status callback with the billing totals, which are
+ * the source of truth for token usage.
+ *
+ * Returns whether the row changed. A payload without usage values records
+ * nothing and reports `false`.
+ */
+export async function settleCodeReviewUsage(
+  reviewId: string,
+  usage: CodeReviewUsage
+): Promise<boolean> {
+  const updateData = buildCodeReviewUsageUpdateData(usage);
+  const hasUsageValue = Object.keys(updateData).length > 0;
+  if (!hasUsageValue) {
+    return false;
+  }
+
+  try {
+    const updated = await db
+      .update(cloud_agent_code_reviews)
+      .set({ ...updateData, updated_at: new Date().toISOString() })
+      .where(
+        and(
+          eq(cloud_agent_code_reviews.id, reviewId),
+          isNull(cloud_agent_code_reviews.total_tokens_in),
+          isNull(cloud_agent_code_reviews.total_tokens_out),
+          isNull(cloud_agent_code_reviews.total_cost_musd)
+        )
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    return updated.length > 0;
+  } catch (error) {
+    captureException(error, {
+      tags: { operation: 'settleCodeReviewUsage' },
+      extra: { reviewId, usage },
+    });
+    throw error;
+  }
+}
+
+/**
+ * Overwrites the usage columns of a code review with the authoritative billing
+ * totals, without touching status or timestamps.
+ *
+ * The terminal status callback calls this after it aggregates the review's
+ * billing rows, so it deliberately ignores the compare-and-set of
+ * {@link settleCodeReviewUsage}: billing totals replace whatever an earlier
+ * writer recorded. Do not call it from a callback that can repeat.
+ */
+export async function backfillCodeReviewUsage(
+  reviewId: string,
+  usage: CodeReviewUsage
 ): Promise<void> {
   try {
     const updateData: Partial<typeof cloud_agent_code_reviews.$inferInsert> = {
+      ...buildCodeReviewUsageUpdateData(usage),
       updated_at: new Date().toISOString(),
     };
-
-    if (usage.model !== undefined) {
-      updateData.model = usage.model;
-    }
-    if (usage.totalTokensIn !== undefined) {
-      updateData.total_tokens_in = usage.totalTokensIn;
-    }
-    if (usage.totalTokensOut !== undefined) {
-      updateData.total_tokens_out = usage.totalTokensOut;
-    }
-    if (usage.totalCostMusd !== undefined) {
-      updateData.total_cost_musd = usage.totalCostMusd;
-    }
 
     await db
       .update(cloud_agent_code_reviews)
@@ -1447,7 +1511,7 @@ export async function updateCodeReviewUsage(
       .where(eq(cloud_agent_code_reviews.id, reviewId));
   } catch (error) {
     captureException(error, {
-      tags: { operation: 'updateCodeReviewUsage' },
+      tags: { operation: 'backfillCodeReviewUsage' },
       extra: { reviewId, usage },
     });
     throw error;

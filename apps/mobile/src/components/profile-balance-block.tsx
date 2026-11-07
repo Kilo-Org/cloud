@@ -26,8 +26,8 @@ type BalanceBlockProps = Readonly<{
   readonly loadingAction: ReactNode;
   /** The purchase action of the failed and the loaded states. */
   readonly action: ReactNode;
-  /** The failed read's copy. */
   readonly retryLabel: string;
+  readonly retryActionLabel: string;
   readonly onRetry: () => void;
 }>;
 
@@ -41,24 +41,12 @@ export function BalanceBlock({
   loadingAction,
   action,
   retryLabel,
+  retryActionLabel,
   onRetry,
 }: BalanceBlockProps) {
   const shellClass = 'min-h-16 flex-row items-center gap-2 rounded-lg bg-secondary px-3 py-2';
   const valueColumnClass = 'min-w-0 min-h-[48px] flex-1 justify-center gap-1';
   const amountRowClass = 'min-w-0 flex-row items-center gap-1';
-  const retry = (
-    // Two lines is the most a retry label can take and still fit the value
-    // line: the longest shipped values run past sixty characters and wrap
-    // inside the column's remaining width, and a third line would make the
-    // failed block taller than the row it swaps into.
-    <Text
-      className="text-sm text-destructive"
-      numberOfLines={stacked ? 2 : undefined}
-      ellipsizeMode="tail"
-    >
-      {retryLabel}
-    </Text>
-  );
 
   let value = amount;
   if (state === 'loading') {
@@ -68,12 +56,18 @@ export function BalanceBlock({
       <Pressable
         className="min-h-[44px] -my-[8px] min-w-0 justify-center active:opacity-70"
         onPress={onRetry}
+        accessibilityRole="button"
+        accessibilityLabel={retryLabel}
       >
-        {retry}
+        <Text className="text-sm text-destructive">{retryActionLabel}</Text>
       </Pressable>
     );
   }
-  const visibilityControl = state === 'ready' ? toggle : <View className="h-[48px] w-[48px]" />;
+  let visibilityControl = toggle;
+  if (state !== 'ready') {
+    visibilityControl =
+      stacked && state === 'failed' ? null : <View className="h-[48px] w-[48px]" />;
+  }
   const purchaseAction = state === 'loading' ? loadingAction : action;
 
   if (stacked) {

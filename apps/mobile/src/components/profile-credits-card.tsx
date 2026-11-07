@@ -353,6 +353,7 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
         loadingAction={orgAddCreditsAction}
         action={addCreditsAction}
         retryLabel={t('profile.failedToLoadBalance')}
+        retryActionLabel={t('common.retry')}
         onRetry={retryBalance}
       />
       {/* One loading indicator per section: while the balance slot shows its

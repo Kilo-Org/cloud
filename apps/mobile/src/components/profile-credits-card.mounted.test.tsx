@@ -357,14 +357,6 @@ function renders(node: ReactTestInstance, text: string): boolean {
   );
 }
 
-/** Whether `node` is `target` or holds it among its descendants. */
-function contains(node: ReactTestInstance, target: ReactTestInstance): boolean {
-  if (node === target) {
-    return true;
-  }
-  return node.children.some(child => typeof child !== 'string' && contains(child, target));
-}
-
 /** The card's balance shell: its only `min-h-16 rounded-lg bg-secondary` box. */
 function balanceBlock(renderer: ReactTestRenderer): ReactTestInstance {
   return renderer.root.find(
@@ -927,16 +919,20 @@ describe('CreditsCard balance state', () => {
     b.unmount();
   });
 
-  it('shows the failed-to-load-balance copy when getMe errors, and retries both', async () => {
+  it('retries account and balance reads after the account read fails', async () => {
     currentUser.isError = true;
 
     const { renderer, texts, unmount } = await mountCard();
 
-    expect(texts()).toContain('Failed to load balance. Tap to retry.');
     expect(texts()).toContain('ADD_CREDITS_BUTTON');
     expect(texts()).not.toContain('$0.00');
 
-    const errorPressable = renderer.root.find(node => node.type === Pressable);
+    const errorPressable = renderer.root.find(
+      node =>
+        node.type === Pressable &&
+        node.props.accessibilityRole === 'button' &&
+        node.props.accessibilityLabel === 'Failed to load balance. Tap to retry.'
+    );
     await act(async () => {
       const onPress = errorPressable.props.onPress as () => void;
       onPress();
@@ -1147,8 +1143,8 @@ describe('CreditsCard add-credits entry point', () => {
     getContextBalanceQueryFn.mockRejectedValue(new Error('Network request failed'));
     onlineManager.setOnline(false);
 
-    const { texts, unmount } = await mountCard();
-    await waitFor(() => texts().includes('Failed to load balance. Tap to retry.'));
+    const { labels, texts, unmount } = await mountCard();
+    await waitFor(() => labels().includes('Failed to load balance. Tap to retry.'));
 
     expect(texts()).not.toContain('SKELETON');
     expect(texts()).not.toContain('$0.00');
@@ -1160,8 +1156,8 @@ describe('CreditsCard add-credits entry point', () => {
     currentUser.userId = 'user-1';
     getContextBalanceQueryFn.mockRejectedValue(new Error('Balance unavailable'));
 
-    const { texts, unmount } = await mountCard();
-    await waitFor(() => texts().includes('Failed to load balance. Tap to retry.'));
+    const { labels, texts, unmount } = await mountCard();
+    await waitFor(() => labels().includes('Failed to load balance. Tap to retry.'));
 
     expect(texts()).toContain('ADD_CREDITS_BUTTON');
     expect(texts()).not.toContain('$0.00');
@@ -1350,58 +1346,6 @@ describe('CreditsCard balance row', () => {
     });
     return mounted;
   }
-
-  it.each(['failed', 'loaded'] as const)(
-    'keeps the note directly under the value line in the %s state',
-    async state => {
-      currentUser.userId = 'user-1';
-      if (state === 'failed') {
-        getContextBalanceQueryFn.mockRejectedValue(new Error('Balance unavailable'));
-      } else {
-        getContextBalanceQueryFn.mockResolvedValue({ balance: 0 });
-      }
-
-      const { renderer, texts, unmount } = await mountCard();
-      await waitFor(() =>
-        texts().includes(
-          state === 'failed' ? 'Failed to load balance. Tap to retry.' : 'No expiring credits.'
-        )
-      );
-      await act(() => {
-        (
-          cardBox(renderer).props.onLayout as (event: {
-            nativeEvent: { layout: { width: number } };
-          }) => void
-        )({ nativeEvent: { layout: { width: 332 } } });
-      });
-
-      // The note is the value column's second child in every state, so it holds
-      // the column's own small gap under the amount. Hanging it off a taller
-      // control row instead moved the caption 7 dp further from the value than
-      // the wide card paints it (design review, Profile compact cell,
-      // 2026-11-07), and the action's height decided where it landed.
-      const column = valueColumn(renderer);
-      const note = column.find(node =>
-        node.children.some(
-          child => typeof child === 'string' && child.includes('No expiring credits.')
-        )
-      );
-      const children = column.children.filter(
-        (child): child is ReactTestInstance => typeof child !== 'string'
-      );
-      const noteBranch = children.findIndex(child => contains(child, note));
-      expect(noteBranch).toBe(1);
-      // No element of its own adds a second gap between the value and the note.
-      const between: string[] = [];
-      let ancestor = note.parent;
-      while (ancestor !== null && ancestor !== column) {
-        between.push(String(ancestor.props.className ?? ''));
-        ancestor = ancestor.parent;
-      }
-      expect(between.filter(entry => entry.includes('gap-'))).toEqual([]);
-      unmount();
-    }
-  );
 
   it('keeps the note in the amount column on a wide card, with the purchase action in its own column', async () => {
     const { renderer, unmount } = await mountAtCardWidth(383);

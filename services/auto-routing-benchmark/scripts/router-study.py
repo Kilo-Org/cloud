@@ -602,6 +602,8 @@ def quote(out, panel_out, directory, modules, batch, classifier_evidence):
 
 
 def read_quote(out, batch, manifest, modules):
+    if not SAFE.fullmatch(batch):
+        raise ValueError("Unsafe batch identity")
     folder = out / "quotes" / batch
     pricing = load(folder / "pricing.json")
     classifier = load(folder / "classifier-quote.json")
@@ -1559,7 +1561,10 @@ def row_process(connection, out, directory, manifest, row, task, approval, cfg, 
                 return summary, "finished"
             except modules["modern_eval"].RunStopped as error:
                 summary, state = {"run": row["run"], "status": error.status}, "stopped"
-                if error.status == "provider_unavailable":
+                with budget.connect() as db:
+                    own = [item for item in modules["study"].request_rows(db) if item["run"] == row["run"]]
+                    unresolved = any(item["state"] == "unknown" and not accounted_row_valid(db, item) for item in own)
+                if error.status == "provider_unavailable" and not unresolved:
                     state = "finished"
                 return summary, state
 

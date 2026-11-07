@@ -44,7 +44,7 @@ def load(path):
 def save(path, value):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary = path.with_suffix(path.suffix + f".{os.getpid()}.{uuid.uuid4().hex}.tmp")
     temporary.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n")
     temporary.replace(path)
 
@@ -968,7 +968,9 @@ def paid_model(out, run, candidate, deadline=None, *, cfg=None, ledger_out=None,
                 if not money_valid or not counts_valid or token_overrun and overrun_policy != "settle-known-v1":
                     raise RuntimeError("Provider cost/token bound violation")
                 with (state_guard(ledger_out) if state_guard is not None else nullcontext()), sqlite3.connect(ledger_out / "budget.sqlite") as db:
-                    db.execute("UPDATE requests SET actual=?, tokens=?, state='settled' WHERE id=? AND state='reserved'", (str(actual), prompt_tokens + completion_tokens, request_id))
+                    changed = db.execute("UPDATE requests SET actual=?, tokens=?, state='settled' WHERE id=? AND state='reserved'", (str(actual), prompt_tokens + completion_tokens, request_id)).rowcount
+                    if changed != 1:
+                        raise RuntimeError("Reservation changed before settlement")
                 receipt.update(status="settled", actual_usd=str(actual), finished_at=time.time())
                 if token_overrun:
                     receipt.update(token_estimate_overrun=True, native_prompt_tokens=prompt_tokens, native_completion_tokens=completion_tokens, token_overrun_policy=overrun_policy)

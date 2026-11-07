@@ -50,6 +50,11 @@ class ComponentBounds(unittest.TestCase):
         self.assertEqual(evidence["components"]["image"]["quantity_bound"], 0)
         self.assertEqual(Decimal(evidence["components"]["input_cache_write_1h"]["max_charge_usd"]), Decimal("0.0004"))
         self.assertEqual(set(quote["routing_max_price"]), {"prompt", "completion"})
+        self.assertEqual(quote["public_constraints"]["input_bound"], 1000)
+        without_fee = dict(CFG)
+        without_fee.pop("byok_fee_ceiling_fraction")
+        with self.assertRaisesRegex(tariffs.TariffError, "explicit approved BYOK fee"):
+            tariffs.endpoint_quote([endpoint()], without_fee)
 
     def test_negative_discount_is_markup_positive_discount_is_forgone(self):
         for discount, expected in ((-0.5, "0.1515"), (0.5, "0.101")):

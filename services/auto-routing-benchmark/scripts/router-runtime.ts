@@ -765,6 +765,7 @@ async function createRuntime(options: {
             'content-type': 'application/json',
           },
           body: JSON.stringify(payload),
+          signal: AbortSignal.timeout(300_000),
         });
         return { status: response.status, text: await response.text(), response };
       })();
@@ -822,8 +823,17 @@ async function createRuntime(options: {
     async dispose() {
       const pending = [...instances.values()];
       instances.clear();
-      for (const instance of await Promise.allSettled(pending)) {
-        if (instance.status === 'fulfilled') await instance.value.mf.dispose();
+      await Promise.allSettled(pending);
+      for (const settled of await Promise.allSettled(
+        pending.map(async item => {
+          const instance = await item;
+          await instance.mf.dispose();
+        })
+      )) {
+        if (settled.status === 'rejected')
+          console.error(
+            JSON.stringify({ event: 'router_runtime_dispose_error', error: String(settled.reason) })
+          );
       }
     },
   };

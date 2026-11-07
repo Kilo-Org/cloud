@@ -709,6 +709,10 @@ class ProspectiveBudget(unittest.TestCase):
             db.execute("BEGIN IMMEDIATE")
             return router_study.CAMPAIGN.register_financing(db, financing)
 
+    def test_read_quote_rejects_path_traversal_batch(self):
+        with self.assertRaisesRegex(ValueError, "Unsafe batch identity"):
+            router_study.read_quote(Path("unused"), "../escape", {}, {})
+
     def test_no_paid_claim_before_whole_plan_financing_is_registered(self):
         with tempfile.TemporaryDirectory() as temporary:
             ledger, out, manifest, plan = self.fixture(Path(temporary))

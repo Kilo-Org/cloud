@@ -244,7 +244,7 @@ def readonly(path):
                 raise ValueError("Source ledger changed while copying its read-only snapshot")
             uri = copy.as_uri() + "?mode=ro"
         else:
-            uri = path.as_uri() + "?mode=ro&immutable=1"
+            uri = path.as_uri() + "?mode=ro"
         db = sqlite3.connect(uri, uri=True)
         try:
             yield db
@@ -663,7 +663,9 @@ def audit(path):
         origin = money(authorization["origin_commitments_usd"])
         cumulative = money(authorization["cumulative_additional_cap_usd"])
         new_upper = upper - origin
-        accounting = {"historical_origin_commitments_usd": str(origin), "new_settled_plus_held_usd": str(new_upper), "cumulative_authorized_new_usd": str(cumulative), "unused_authorization_usd": str(cumulative - new_upper), "effective_campaign_ceiling_usd": authorization["effective_ceiling_usd"], "legacy_total_cap_usd": authorization["legacy_total_cap_usd"], "whole_plan_liability": liability}
+        legacy_ceiling = money(authorization["legacy_total_cap_usd"])
+        effective_remaining = min(cumulative - new_upper, legacy_ceiling - upper)
+        accounting = {"historical_origin_commitments_usd": str(origin), "new_settled_plus_held_usd": str(new_upper), "cumulative_authorized_new_usd": str(cumulative), "unused_authorization_usd": str(effective_remaining), "effective_campaign_ceiling_usd": authorization["effective_ceiling_usd"], "legacy_total_cap_usd": authorization["legacy_total_cap_usd"], "whole_plan_liability": liability}
     return {"schema": SCHEMA, "campaign_id": values["campaign_id"], "inventory_sha256": values["inventory_sha256"], "settled_actual_usd": str(settled), "settled_plus_held_usd": str(upper), "unsettled_upper_usd": str(upper - settled), "requests": len(requests), "unattributed_request_ids": [row["id"] for row in requests if row["id"] not in attributed], "receipt_locations_count": len(receipt_locations), "receipt_locations_sha256": digest(receipt_locations), "candidates": candidates, "admission_block": block, "source_sha256": source_hashes, "historical_evidence_can_establish_pass": False, "prospective_grant": None if grant is None else {key: value for key, value in grant.items() if key != "historical_rows"}, "effective_authorization": None if authorization is None else authorization_summary(authorization), "authorization_accounting": accounting}
 
 

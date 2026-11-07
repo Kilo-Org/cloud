@@ -114,7 +114,7 @@ def inspect_receipt(receipt, text_parser, native_parser):
         category = 'provider_error'
     elif not choices or malformed_choice:
         category = 'missing_or_invalid_provider_response'
-    elif choice.get('finish_reason') == 'content_filter' or message.get('refusal'):
+    elif choice.get('finish_reason') in {'content_filter', 'refusal'} or choice.get('native_finish_reason') in {'content_filter', 'refusal'} or message.get('refusal'):
         category = 'provider_refusal'
     elif native_calls and native and native['accepted'] and text and not text['accepted']:
         category = 'native_tool_calls_rejected_by_text_transport'
@@ -149,7 +149,7 @@ def grade_error(case, task):
     for kind in ('FAIL_TO_PASS', 'PASS_TO_PASS'):
         expected = task.get(kind)
         observed = statuses.get(kind)
-        if not isinstance(expected, list) or not all(isinstance(test, str) for test in expected) or not isinstance(observed, dict):
+        if not isinstance(expected, list) or not expected or not all(isinstance(test, str) for test in expected) or not isinstance(observed, dict):
             return 'missing_task_test_expectations_or_status'
         success, failure = observed.get('success'), observed.get('failure')
         if not isinstance(success, list) or not isinstance(failure, list) or not all(isinstance(test, str) for test in success + failure):
@@ -182,6 +182,8 @@ def inspect_rollout(folder, row, receipts, task=None):
         category = 'grader_infrastructure_failure'
     elif evaluation.get('result') is not None and resolved is None:
         category = 'invalid_grade_completeness'
+    elif result.get('status') == 'provider_refused' or any(receipt['category'] == 'provider_refusal' for receipt in receipts):
+        category = 'provider_refusal'
     elif result.get('status') == 'provider_unavailable' or exit_status == 'ProviderUnavailable':
         category = 'provider_failure'
     elif result.get('status') == 'transport_unknown':
@@ -268,7 +270,7 @@ def replay(evidence_root, mini_root):
                    'unattributed_request_rows': unattributed_requests,
                    'receipt_reconciliation': {'ledger_partition_complete': ledger_requests == solver_requests + classifier_requests + synthetic_requests + len(unattributed_requests),
                                               'solver_receipt_accounting_reconciled': solver_requests == len(receipts) + len(missing_receipts),
-                                              'solver_receipts_complete': not missing_receipts and solver_requests == len(receipts),
+                                              'solver_receipts_complete': solver_requests > 0 and not missing_receipts and solver_requests == len(receipts),
                                               'all_requests_attributed': not unattributed_requests},
                    'task_expectation_evidence': task_expectation_evidence,
                    'historical_router_quality_claim_allowed': False,

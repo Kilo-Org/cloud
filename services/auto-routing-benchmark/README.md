@@ -737,9 +737,12 @@ and the frozen coverage. An incomplete analysis is `inconclusive`.
 Variant validation accepts the shared gateway catalog's complete verbosity
 vocabulary, including `xhigh`, without dropping its frozen reasoning controls.
 
-Reservations cover quoted liability, including in-flight requests. A provider
-dashboard budget alone is not a hard billing cap: already-dispatched requests
-can finish after that budget is reached. It does not replace these local checks.
+These are pre-dispatch reservation checks, not a guaranteed ceiling on final
+provider charges. An over-bound charge is detected after billing and stops
+further dispatch. A provider dashboard budget is not a hard cap either:
+already-dispatched requests can finish after that budget is reached. Real
+dispatch requires independent evidence that all billed exposure stays inside
+the authorization; a quote or dashboard limit alone does not prove that.
 
 Recovery releases a coordinator reservation at zero cost only when neither its
 dispatch admission nor its receipt indicates dispatch. Historical and admitted
@@ -759,10 +762,11 @@ python3 -m pip install -r repo-study/requirements.txt
 (cd scripts && python3 -m unittest test_router_ledger test_router_study test_router_proof test_router_replay.ReplayInvariants)
 ```
 
-Paid admission remains blocked if real account policy evidence is absent or if
-any mandatory pair lacks a finite quote. A forecast above the remaining
-authorization can register and explore. Dispatch stops at the caps. Do not
-shrink the plan or raise a cap implicitly.
+Paid admission remains blocked if real account policy evidence is absent, if
+any mandatory pair lacks a finite quote, or if total billed exposure is unproved.
+A forecast above the remaining authorization can register for offline checks.
+Local admission stops before a request whose reservation exceeds the remaining
+allowance. Do not shrink the plan or raise a cap implicitly.
 
 ### Shadow routing policy
 

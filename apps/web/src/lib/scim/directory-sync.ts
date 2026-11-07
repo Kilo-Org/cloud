@@ -29,12 +29,14 @@ import type {
   DirectoryMembership,
   DirectoryMembershipRemovalResult,
   DirectoryMembershipResult,
+  DirectoryMembershipRevokeAllResult,
   DirectoryOrganizationUpsert,
   DirectorySubOrganizationUpsert,
+  DirectorySyncConflictCode,
   DirectorySyncDeleteResult,
   DirectorySyncUpsertResult,
   DirectoryUserUpsert,
-} from './directory-sync-contracts';
+} from '@kilocode/scim-contracts';
 
 /**
  * Directory-sync mutations, invoked by the `scim-sync` Worker.
@@ -66,7 +68,22 @@ function directoryOwner(directoryId: string): SQL | undefined {
   );
 }
 
-export class DirectorySyncConflictError extends Error {}
+/**
+ * A directory-sync write the current state cannot accept.
+ *
+ * The `code` is required rather than derived from the message, because it is
+ * what the Worker branches on: a retryable missing dependency keeps the cursor
+ * where it is, a terminal refusal parks the event. A message alone would make
+ * that decision depend on prose.
+ */
+export class DirectorySyncConflictError extends Error {
+  constructor(
+    public readonly code: DirectorySyncConflictCode,
+    message: string
+  ) {
+    super(message);
+  }
+}
 
 /**
  * Bind a WorkOS directory to a parent organization.
@@ -248,11 +265,15 @@ export async function upsertDirectorySubOrganization(
       .where(and(eq(organizations.directory_id, input.directoryId), liveOrganization))
       .limit(1);
     const parented = parentedRows.at(0);
-    throw new DirectorySyncConflictError(
-      parented
-        ? `Organization ${parented.id} is itself a sub-organization and cannot take children`
-        : `No live organization is bound to directory ${input.directoryId}`
-    );
+    throw parented
+      ? new DirectorySyncConflictError(
+          'sub_organization_cannot_nest',
+          `Organization ${parented.id} is itself a sub-organization and cannot take children`
+        )
+      : new DirectorySyncConflictError(
+          'directory_not_found',
+          `No live organization is bound to directory ${input.directoryId}`
+        );
   }
 
   const existingRows = await db
@@ -349,6 +370,7 @@ export async function upsertDirectoryUser(
     // silently rather than conflict.
     if (existing.external_id !== null && existing.external_id !== externalId) {
       throw new DirectorySyncConflictError(
+        'account_bound_to_other_directory_user',
         `A Kilo account for this address is already bound to directory user ${existing.external_id}`
       );
     }
@@ -408,7 +430,10 @@ export async function upsertDirectoryUser(
   );
 
   if (!result.success) {
-    throw new DirectorySyncConflictError(`Could not provision directory user: ${result.error}`);
+    throw new DirectorySyncConflictError(
+      'user_provisioning_failed',
+      `Could not provision directory user: ${result.error}`
+    );
   }
 
   await db
@@ -467,6 +492,7 @@ async function applyDirectoryUserChanges(
     const holder = await findUserByNormalizedEmail(input.email);
     if (holder && holder.id !== bound.id) {
       throw new DirectorySyncConflictError(
+        'address_held_by_another_account',
         `Cannot move directory user ${externalId} to an address another Kilo account already holds`
       );
     }
@@ -522,6 +548,7 @@ async function assertDirectoryOwnsEmailDomain(directoryId: string, email: string
     // logged again by `directorySyncErrorResponse`, and the directory id plus
     // the reason are what an operator acts on.
     throw new DirectorySyncConflictError(
+      'domain_not_captured',
       `An existing Kilo account holds an address at ${getLowerDomainFromEmail(email)}, which directory ${directoryId} has not captured: ${reason}`
     );
   };
@@ -576,6 +603,7 @@ export async function addDirectoryMembership(
   const group = groupRows.at(0);
   if (!group) {
     throw new DirectorySyncConflictError(
+      'sub_organization_not_found',
       `No live sub-organization is bound to directory group ${input.directoryGroupId}`
     );
   }
@@ -588,7 +616,10 @@ export async function addDirectoryMembership(
 
   const user = userRows.at(0);
   if (!user) {
-    throw new DirectorySyncConflictError(`No user is bound to directory user ${input.externalId}`);
+    throw new DirectorySyncConflictError(
+      'user_not_found',
+      `No user is bound to directory user ${input.externalId}`
+    );
   }
 
   const targets = group.parent === null ? [group.id] : [group.parent, group.id];
@@ -738,6 +769,108 @@ async function revokeParentWhenLastGroupLeft(
 
   const { rowCount } = await removeUserFromOrganization(parentOrganizationId, kiloUserId);
   return (rowCount ?? 0) > 0;
+}
+
+/**
+ * Revoke every directory membership the account bound to a directory user
+ * holds.
+ *
+ * Applied for `dsync.user.deleted` and for a `dsync.user.updated` that reports
+ * the user `inactive` — most identity providers soft-delete, so `inactive` is
+ * the common offboarding signal and ignoring it would leave a departed user
+ * holding the organization's seats and data.
+ *
+ * The account is never deleted or anonymized (Directory Sync rule 10): the
+ * memberships are the directory's to revoke, the account is not.
+ * `softDeleteUser` would anonymize it, rotate its credentials, and refuse
+ * outright on a live subscription, none of which a directory event authorizes.
+ *
+ * Each group membership goes through `removeUserFromOrganization`, so the
+ * removal tombstone and the model-access group cascade behave exactly as they
+ * do for a single `dsync.group.user_removed`.
+ *
+ * The rule-4 parent test then runs over two sets of candidate parents:
+ *
+ * - the parents of the groups just left, and
+ * - every live unparented organization carrying a `directory_id` the user still
+ *   holds a membership in.
+ *
+ * The second set is load-bearing, not defensive. A user whose groups were
+ * deleted before they were — a disbanded group, or a `dsync.group.deleted`
+ * that arrived first — holds no group membership at all, only the parent one.
+ * With the first set alone that user would keep their membership in the
+ * enterprise organization after being deleted from the directory, which is
+ * precisely the access rule 4 exists to revoke.
+ *
+ * Converges like the single removal: an `externalId` no account is bound to has
+ * nothing to revoke, which is the state the event asserts, so it reports a null
+ * user rather than conflicting. `revokedOrganizationIds` lists only the
+ * organizations a row was actually deleted from, so a replay reports an empty
+ * list.
+ */
+export async function revokeAllDirectoryMemberships(
+  externalId: string
+): Promise<DirectoryMembershipRevokeAllResult> {
+  const userRows = await db
+    .select({ id: kilocode_users.id })
+    .from(kilocode_users)
+    .where(eq(kilocode_users.external_id, externalId))
+    .limit(1);
+
+  const user = userRows.at(0);
+  // No bound account means there is nothing to revoke, which is the state the
+  // event asks for. Provisioning one for a departing user would be absurd, and
+  // a 409 would hold the cursor for an add that may never arrive.
+  if (!user) {
+    return { kiloUserId: null, revokedOrganizationIds: [] };
+  }
+
+  const memberships = await db
+    .select({
+      id: organizations.id,
+      parent: organizations.parent_organization_id,
+      directoryGroupId: organizations.directory_group_id,
+      directoryId: organizations.directory_id,
+    })
+    .from(organizations)
+    .innerJoin(
+      organization_memberships,
+      eq(organization_memberships.organization_id, organizations.id)
+    )
+    .where(and(liveOrganization, eq(organization_memberships.kilo_user_id, user.id)));
+
+  const groups = memberships.filter(row => row.directoryGroupId !== null);
+
+  // Parents of the groups being left, plus the directory organizations the user
+  // is directly a member of — the latter is the only candidate left once the
+  // groups themselves are gone.
+  const candidateParents = new Set<string>();
+  for (const group of groups) {
+    if (group.parent !== null) candidateParents.add(group.parent);
+  }
+  for (const row of memberships) {
+    if (row.parent === null && row.directoryId !== null) candidateParents.add(row.id);
+  }
+
+  const revokedOrganizationIds: string[] = [];
+
+  // Sorted so the work, the log, and the response are the same on every run;
+  // the order itself carries no meaning.
+  for (const group of groups.map(row => row.id).toSorted()) {
+    const { rowCount } = await removeUserFromOrganization(group, user.id);
+    if ((rowCount ?? 0) > 0) revokedOrganizationIds.push(group);
+  }
+
+  // After the groups, so the test sees the memberships this call removed. A
+  // sibling group the user remains in — one with no directory binding, or one
+  // under a different parent — still keeps its parent membership alive.
+  for (const parent of [...candidateParents].toSorted()) {
+    if (await revokeParentWhenLastGroupLeft(parent, user.id)) {
+      revokedOrganizationIds.push(parent);
+    }
+  }
+
+  return { kiloUserId: user.id, revokedOrganizationIds };
 }
 
 /**

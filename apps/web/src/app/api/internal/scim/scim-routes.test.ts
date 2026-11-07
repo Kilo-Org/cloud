@@ -14,6 +14,7 @@ import {
   PUT as putSubOrganization,
   DELETE as deleteSubOrganization,
 } from './sub-organizations/[directoryGroupId]/route';
+import { DELETE as revokeAllMemberships } from './users/[externalId]/memberships/route';
 import { PUT as putUser } from './users/[externalId]/route';
 
 // The routes are a transport shell over `@/lib/scim/directory-sync`, whose
@@ -22,7 +23,14 @@ import { PUT as putUser } from './users/[externalId]/route';
 // shell owns: authentication, body validation, and the conflict status mapping
 // the Worker depends on to decide whether to advance its cursor.
 jest.mock('@/lib/scim/directory-sync', () => {
-  class DirectorySyncConflictError extends Error {}
+  class DirectorySyncConflictError extends Error {
+    constructor(
+      public readonly code: string,
+      message: string
+    ) {
+      super(message);
+    }
+  }
   return {
     DirectorySyncConflictError,
     upsertDirectoryOrganization: jest.fn(async () => ({ id: 'org-1', created: true })),
@@ -43,6 +51,10 @@ jest.mock('@/lib/scim/directory-sync', () => {
       kiloUserId: 'user-1',
       removed: true,
       revokedParentMembership: false,
+    })),
+    revokeAllDirectoryMemberships: jest.fn(async () => ({
+      kiloUserId: 'user-1',
+      revokedOrganizationIds: ['org-2', 'org-1'],
     })),
   };
 });
@@ -106,6 +118,10 @@ describe('authentication', () => {
     [
       'DELETE memberships',
       () => deleteMembership(request(membershipBody, { authenticated: false })),
+    ],
+    [
+      'DELETE user memberships',
+      () => revokeAllMemberships(request(null, { authenticated: false }), userParams),
     ],
   ])('%s rejects an unauthenticated request', async (_name, call) => {
     const response = await call();
@@ -215,6 +231,37 @@ describe('success', () => {
       revokedParentMembership: false,
     });
   });
+
+  test('DELETE user memberships passes the path identifier through and returns the result', async () => {
+    const response = await revokeAllMemberships(request(null), userParams);
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      kiloUserId: 'user-1',
+      revokedOrganizationIds: ['org-2', 'org-1'],
+    });
+    expect(directorySync.revokeAllDirectoryMemberships).toHaveBeenCalledWith('directory_user_1');
+  });
+
+  test('DELETE user memberships converges for a directory user no account is bound to', async () => {
+    jest
+      .mocked(directorySync.revokeAllDirectoryMemberships)
+      .mockResolvedValueOnce({ kiloUserId: null, revokedOrganizationIds: [] });
+
+    const response = await revokeAllMemberships(request(null), userParams);
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ kiloUserId: null, revokedOrganizationIds: [] });
+  });
+
+  test('DELETE user memberships rejects an empty external id', async () => {
+    const response = await revokeAllMemberships(request(null), {
+      params: Promise.resolve({ externalId: '' }),
+    });
+
+    expect(response.status).toBe(400);
+    expect(directorySync.revokeAllDirectoryMemberships).not.toHaveBeenCalled();
+  });
 });
 
 describe('error mapping', () => {
@@ -222,14 +269,37 @@ describe('error mapping', () => {
     jest
       .mocked(directorySync.upsertDirectorySubOrganization)
       .mockRejectedValueOnce(
-        new directorySync.DirectorySyncConflictError('No organization is bound to directory x')
+        new directorySync.DirectorySyncConflictError(
+          'directory_not_found',
+          'No organization is bound to directory x'
+        )
       );
 
     const response = await putSubOrganization(request(subOrganizationBody), groupParams);
 
     expect(response.status).toBe(409);
-    // The message names the missing dependency, which the Worker logs.
-    expect(await response.json()).toEqual({ error: 'No organization is bound to directory x' });
+    // The message names the missing dependency, which the Worker logs; the code
+    // is what it branches on to choose between holding its cursor and parking.
+    expect(await response.json()).toEqual({
+      error: 'No organization is bound to directory x',
+      code: 'directory_not_found',
+    });
+  });
+
+  test('a terminal conflict carries its code, so the Worker can park rather than retry', async () => {
+    jest
+      .mocked(directorySync.revokeAllDirectoryMemberships)
+      .mockRejectedValueOnce(
+        new directorySync.DirectorySyncConflictError(
+          'domain_not_captured',
+          'An existing Kilo account holds an address at acme.test'
+        )
+      );
+
+    const response = await revokeAllMemberships(request(null), userParams);
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ code: 'domain_not_captured' });
   });
 
   test('an unexpected failure is 500 and does not leak driver detail', async () => {

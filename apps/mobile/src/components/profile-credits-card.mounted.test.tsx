@@ -1146,6 +1146,41 @@ describe('CreditsCard add-credits entry point', () => {
 
     unmount();
   });
+
+  it('paints the failed read and the purchase action in one balance block', async () => {
+    currentUser.userId = 'user-1';
+    savedMetadata.set(ORGANIZATION_STORAGE_KEY, 'org-a');
+    getContextBalanceQueryFn.mockRejectedValue(new Error('Balance unavailable'));
+    const orgs = [
+      { organizationId: 'org-a', organizationName: 'Acme', role: 'owner' },
+    ] as OrgListEntry[];
+    listState.payload = orgs;
+
+    const { renderer, texts, unmount } = await mountCard(createTestQueryClient(), orgs);
+    await waitFor(() => texts().includes('Failed to load balance. Tap to retry.'));
+
+    // A retry that succeeds swaps this block for the loaded row, so both states
+    // have to paint the same frame: the failure surface and the purchase action
+    // inside one block, not a padded pressable with the action beside it.
+    const action = renderer.root.find(node => node.children.includes('ADD_CREDITS_ROW'));
+    const balanceBlock = (() => {
+      let ancestor = action.parent;
+      while (ancestor !== null) {
+        if (String(ancestor.props.className ?? '').includes('min-h-16 gap-2')) return ancestor;
+        ancestor = ancestor.parent;
+      }
+      return null;
+    })();
+    if (balanceBlock === null) {
+      throw new Error('The purchase action renders outside the balance block');
+    }
+    expect(
+      balanceBlock.findAll(node => node.children.includes('Failed to load balance. Tap to retry.'))
+        .length
+    ).toBeGreaterThan(0);
+
+    unmount();
+  });
 });
 
 describe('CreditsCard credits header', () => {

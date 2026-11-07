@@ -403,14 +403,67 @@ describe('PreviewPortDialog', () => {
     expect(text()).toContain(message);
   });
 
-  it('disables the manual fallback when discovery is unavailable', async () => {
-    mockPersonalList.mockResolvedValue({ status: 'not_running', services: [] });
+  it.each(['not_running', 'unsupported'] as const)(
+    'disables the manual fallback without a spinner when discovery is %s',
+    async status => {
+      mockPersonalList.mockResolvedValue({ status, services: [] });
 
+      render(true);
+      await settle();
+
+      expect(portInput().disabled).toBe(true);
+      expect((buttonByText('Open port') as HTMLButtonElement).disabled).toBe(true);
+      expect(buttonByText('Open port').querySelector('.animate-spin')).toBeNull();
+      setInputValue(portInput(), '5173');
+      submitPortForm();
+      await settle();
+      expect(mockCreatePersonal).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(['not_running', 'unsupported'] as const)(
+    'allows manual preview after a failed refresh of a %s result',
+    async status => {
+      mockPersonalList.mockResolvedValue({ status, services: [] });
+      render(true);
+      await settle();
+      expect(portInput().disabled).toBe(true);
+
+      mockPersonalList.mockRejectedValue(new Error('Scan failed'));
+      click(buttonByText('Refresh'));
+      await settle();
+
+      expect(dom.container.querySelector('[role="alert"]')).not.toBeNull();
+      expect(portInput().disabled).toBe(false);
+      expect((buttonByText('Open port') as HTMLButtonElement).disabled).toBe(false);
+      setInputValue(portInput(), '5173');
+      submitPortForm();
+      await settle();
+
+      expect(mockCreatePersonal.mock.calls[0]?.[0]).toEqual({
+        cloudAgentSessionId: sessionId,
+        port: 5173,
+        path: undefined,
+      });
+    }
+  );
+
+  it('shows the manual spinner only while opening a preview', async () => {
+    let resolve!: (result: { url: string; expiresAt: number }) => void;
+    mockCreatePersonal.mockReturnValue(new Promise(r => (resolve = r)));
     render(true);
+    await settle();
+    setInputValue(portInput(), '5173');
+    submitPortForm();
     await settle();
 
     expect(portInput().disabled).toBe(true);
-    expect((buttonByText('Open port') as HTMLButtonElement).disabled).toBe(true);
+    expect(buttonByText('Open port').querySelector('.animate-spin')).not.toBeNull();
+
+    resolve({ url: 'https://preview.test/personal', expiresAt: 1 });
+    await settle();
+
+    expect(buttonByText('Open port').querySelector('.animate-spin')).toBeNull();
   });
 
   it('shows a discovery failure instead of an empty result', async () => {

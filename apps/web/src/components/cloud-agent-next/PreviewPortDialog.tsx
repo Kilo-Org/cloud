@@ -81,7 +81,8 @@ function PreviewServices({
       setOpeningPort(null);
     }
   };
-  const unavailable = data?.status === 'not_running' || data?.status === 'unsupported';
+  const unavailable =
+    !query.isError && (data?.status === 'not_running' || data?.status === 'unsupported');
   const emptyMessage =
     data?.status === 'not_running'
       ? 'This sandbox is stopped. Send the agent a message to start it again.'
@@ -92,7 +93,7 @@ function PreviewServices({
           : 'No listening services found. Ask the agent to start a web server, then refresh.';
 
   return (
-    <div className="space-y-4">
+    <div className="min-w-0 space-y-4">
       <div className="flex items-center justify-between gap-3">
         <h3 className="text-sm font-medium">Listening services</h3>
         <Button
@@ -128,15 +129,20 @@ function PreviewServices({
                 <Button
                   type="button"
                   variant="outline"
-                  className="h-auto w-full justify-start gap-3 px-3 py-3 text-left"
+                  size="lg"
+                  className="h-auto w-full justify-start gap-3 px-4 py-3 text-left"
                   disabled={isOpening || query.isFetching}
                   onClick={() => void openPort(service.port)}
                   aria-label={`Open ${service.name} on port ${service.port}`}
                 >
                   <Globe className="text-muted-foreground size-4 shrink-0" aria-hidden="true" />
-                  <span className="min-w-0 flex-1 space-y-1">
-                    <span className="flex items-center gap-2">
-                      <span className="truncate font-medium">{service.name}</span>
+                  <span className="flex min-w-0 flex-1 flex-col gap-1">
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span
+                        className={`shrink-0 truncate font-medium ${service.description ? 'max-w-3/5' : 'max-w-full'}`}
+                      >
+                        {service.name}
+                      </span>
                       {service.description && (
                         <span className="text-muted-foreground truncate text-xs font-normal">
                           {service.description}
@@ -167,7 +173,11 @@ function PreviewServices({
           Enter a port manually
         </summary>
         <div className="pt-3">
-          <PreviewPortForm isOpening={isOpening || unavailable} onOpenPort={openPort} />
+          <PreviewPortForm
+            isOpening={isOpening}
+            disabled={isOpening || unavailable}
+            onOpenPort={openPort}
+          />
         </div>
       </details>
     </div>
@@ -176,9 +186,11 @@ function PreviewServices({
 
 function PreviewPortForm({
   isOpening,
+  disabled,
   onOpenPort,
 }: {
   isOpening: boolean;
+  disabled: boolean;
   onOpenPort: (port: number) => Promise<void>;
 }) {
   const [port, setPort] = useState('');
@@ -188,7 +200,7 @@ function PreviewPortForm({
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
-    if (isOpening) return;
+    if (disabled) return;
 
     const parsedPort = Number(port);
     if (
@@ -213,7 +225,7 @@ function PreviewPortForm({
           autoComplete="off"
           placeholder="e.g. 5173"
           value={port}
-          disabled={isOpening}
+          disabled={disabled}
           aria-invalid={Boolean(error)}
           aria-describedby={error ? errorId : undefined}
           onChange={event => {
@@ -228,7 +240,7 @@ function PreviewPortForm({
         )}
       </div>
       <div className="flex justify-end">
-        <Button type="submit" disabled={isOpening}>
+        <Button type="submit" disabled={disabled}>
           {isOpening && <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />}
           Open port
         </Button>

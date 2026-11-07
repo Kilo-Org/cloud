@@ -249,7 +249,7 @@ function frameworkLabel(argv: readonly string[]): string | undefined {
   }
   for (const argument of argv) {
     const token = safeToken(argument)?.toLowerCase();
-    if (token === undefined) continue;
+    if (token === undefined || !Object.hasOwn(FRAMEWORK_LABELS, token)) continue;
     const label = FRAMEWORK_LABELS[token];
     if (label !== undefined) return label;
   }
@@ -259,7 +259,8 @@ function frameworkLabel(argv: readonly string[]): string | undefined {
 function executableLabel(entry: ProcessEntry): string | undefined {
   const executable = safeToken(entry.argv[0]);
   if (executable === undefined) return undefined;
-  return EXECUTABLE_LABELS[executable.toLowerCase()];
+  const token = executable.toLowerCase();
+  return Object.hasOwn(EXECUTABLE_LABELS, token) ? EXECUTABLE_LABELS[token] : undefined;
 }
 
 function deriveServiceName(entry: ProcessEntry | undefined): string {

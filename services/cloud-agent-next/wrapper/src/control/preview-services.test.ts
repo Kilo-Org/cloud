@@ -116,6 +116,21 @@ describe('preview service discovery scanner', () => {
     expect(services).toEqual([]);
   });
 
+  it('ignores inherited object properties in framework and executable labels', async () => {
+    const root = makeProcRoot([
+      { pid: 200, argv: ['node', '/workspace/constructor'], socketInodes: [20] },
+      { pid: 201, argv: ['/usr/bin/constructor'], socketInodes: [21] },
+      { pid: 202, argv: ['node', 'constructor', 'vite'], socketInodes: [22] },
+    ]);
+    writeTcp(root, [tcpLine(4000, 20), tcpLine(4001, 21), tcpLine(4002, 22)]);
+
+    expect(await scanPreviewServices({ procRoot: root })).toEqual([
+      { port: 4000, name: 'Node.js' },
+      { port: 4001, name: 'HTTP server' },
+      { port: 4002, name: 'Vite' },
+    ]);
+  });
+
   it('never returns raw argv, environment-like flags or full paths', async () => {
     const root = makeProcRoot([
       {

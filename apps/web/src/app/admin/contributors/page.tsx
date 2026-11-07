@@ -60,6 +60,9 @@ type DrillInWindow = 'all_time' | 'rolling_30_days';
 
 const PAGE_SIZE = 10;
 
+const creditManagerRequirementNote =
+  'Read-only: the credit manager permission is required to enroll or upgrade contributors.';
+
 const breadcrumbs = (
   <>
     <BreadcrumbItem>
@@ -610,6 +613,7 @@ export default function ContributorChampionsAdminPage() {
                 size="sm"
                 disabled={!canManageContributorCredits}
                 onClick={() => setManualEnrollOpen(true)}
+                title={canManageContributorCredits ? undefined : creditManagerRequirementNote}
               >
                 <UserPlus className="mr-2 h-4 w-4" />
                 Manual enroll
@@ -618,10 +622,7 @@ export default function ContributorChampionsAdminPage() {
           </div>
 
           {!canManageContributorCredits ? (
-            <p className="text-muted-foreground text-sm">
-              Read-only: the credit manager permission is required to enroll or upgrade
-              contributors.
-            </p>
+            <p className="text-muted-foreground text-sm">{creditManagerRequirementNote}</p>
           ) : null}
 
           <div className="flex flex-wrap items-end gap-3">
@@ -847,7 +848,14 @@ export default function ContributorChampionsAdminPage() {
                                 }));
                               }}
                             >
-                              <SelectTrigger className="h-8 w-[130px]">
+                              <SelectTrigger
+                                className="h-8 w-[130px]"
+                                title={
+                                  canManageContributorCredits
+                                    ? undefined
+                                    : creditManagerRequirementNote
+                                }
+                              >
                                 <SelectValue placeholder="Upgrade to…" />
                               </SelectTrigger>
                               <SelectContent>
@@ -881,9 +889,11 @@ export default function ContributorChampionsAdminPage() {
                                 });
                               }}
                               title={
-                                upgradeSelections[row.contributorId]
-                                  ? `Upgrade to ${upgradeSelections[row.contributorId]}`
-                                  : 'Select a tier to upgrade to'
+                                !canManageContributorCredits
+                                  ? creditManagerRequirementNote
+                                  : upgradeSelections[row.contributorId]
+                                    ? `Upgrade to ${upgradeSelections[row.contributorId]}`
+                                    : 'Select a tier to upgrade to'
                               }
                             >
                               <ArrowUpCircle className="h-4 w-4" />
@@ -915,6 +925,10 @@ export default function ContributorChampionsAdminPage() {
             <h2 className="text-2xl font-bold">Review Queue</h2>
             <p className="text-muted-foreground text-sm">Pending candidates to enroll</p>
           </div>
+
+          {!canManageContributorCredits ? (
+            <p className="text-muted-foreground text-sm">{creditManagerRequirementNote}</p>
+          ) : null}
 
           <div className="flex flex-wrap items-end gap-3">
             <div className="flex flex-col gap-1">
@@ -1157,9 +1171,11 @@ export default function ContributorChampionsAdminPage() {
                               });
                             }}
                             title={
-                              effectiveTier
-                                ? `Add contributor as ${effectiveTier}`
-                                : 'Select a tier before enrolling'
+                              !canManageContributorCredits
+                                ? creditManagerRequirementNote
+                                : effectiveTier
+                                  ? `Add contributor as ${effectiveTier}`
+                                  : 'Select a tier before enrolling'
                             }
                           >
                             <Plus className="h-4 w-4" />

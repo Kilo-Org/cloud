@@ -141,7 +141,8 @@ type LinkedomModule = {
   parseHTML: (html: string) => { window: typeof globalThis; document: Document };
 };
 
-const noteText = 'credit manager permission is required to enroll or upgrade contributors';
+const noteText =
+  'Read-only: the credit manager permission is required to enroll or upgrade contributors.';
 
 describe('ContributorChampionsAdminPage credit grants', () => {
   let root: Root;
@@ -220,6 +221,14 @@ describe('ContributorChampionsAdminPage credit grants', () => {
     return match;
   }
 
+  function section(heading: string): HTMLElement {
+    const match = Array.from(container.querySelectorAll('section')).find(
+      element => element.querySelector('h2')?.textContent === heading
+    );
+    if (!match) throw new Error(`Section "${heading}" missing`);
+    return match;
+  }
+
   it('enables the credit-granting controls for an operator with the credit manager permission', () => {
     mockPermission.canManageCredits = true;
     mockPermission.isPermissionResolved = true;
@@ -228,7 +237,8 @@ describe('ContributorChampionsAdminPage credit grants', () => {
     expect(buttonContaining('Manual enroll').disabled).toBe(false);
     expect(buttonWithTitle('Add contributor as ambassador').disabled).toBe(false);
     expect(buttonContaining('Upgrade to…').disabled).toBe(false);
-    expect(container.textContent).not.toContain(noteText);
+    expect(section('Enrolled').textContent).not.toContain(noteText);
+    expect(section('Review Queue').textContent).not.toContain(noteText);
   });
 
   it('disables the credit-granting controls for a plain admin', () => {
@@ -238,9 +248,26 @@ describe('ContributorChampionsAdminPage credit grants', () => {
 
     const manualEnroll = buttonContaining('Manual enroll');
     expect(manualEnroll.disabled).toBe(true);
-    expect(buttonWithTitle('Add contributor as ambassador').disabled).toBe(true);
+    expect(manualEnroll.title).toBe(noteText);
     expect(buttonContaining('Upgrade to…').disabled).toBe(true);
     expect(container.textContent).toContain(noteText);
+
+    const enrolledSection = section('Enrolled');
+    const reviewQueueSection = section('Review Queue');
+    expect(enrolledSection.textContent).toContain(noteText);
+    expect(reviewQueueSection.textContent).toContain(noteText);
+
+    const enrollButton = reviewQueueSection.querySelector<HTMLButtonElement>(
+      `button[title="${noteText}"]`
+    );
+    if (!enrollButton) throw new Error('Enroll button permission hint missing');
+    expect(enrollButton.disabled).toBe(true);
+
+    const upgradeSelect = enrolledSection.querySelector<HTMLButtonElement>(
+      `button[title="${noteText}"]`
+    );
+    if (!upgradeSelect) throw new Error('Upgrade select permission hint missing');
+    expect(upgradeSelect.disabled).toBe(true);
 
     act(() => manualEnroll.click());
     expect(container.querySelector('[role="dialog"]')).toBeNull();
@@ -252,9 +279,15 @@ describe('ContributorChampionsAdminPage credit grants', () => {
     render();
 
     expect(buttonContaining('Manual enroll').disabled).toBe(true);
-    expect(buttonWithTitle('Add contributor as ambassador').disabled).toBe(true);
     expect(buttonContaining('Upgrade to…').disabled).toBe(true);
-    expect(container.textContent).toContain(noteText);
+    expect(section('Enrolled').textContent).toContain(noteText);
+    expect(section('Review Queue').textContent).toContain(noteText);
+
+    const enrollButton = section('Review Queue').querySelector<HTMLButtonElement>(
+      `button[title="${noteText}"]`
+    );
+    if (!enrollButton) throw new Error('Enroll button permission hint missing');
+    expect(enrollButton.disabled).toBe(true);
   });
 
   it('closes the enrollment confirm button when the permission stops allowing credit grants', () => {

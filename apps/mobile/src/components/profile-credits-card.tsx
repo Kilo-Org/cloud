@@ -344,11 +344,13 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
       {balanceFailed && (
         <View className={balanceBlockClass}>
           <Pressable
-            // The retry surface keeps the block's height: a wide card centres
-            // its row's children, so the pressable stretches to the block
-            // instead of collapsing to the height of its one line.
+            // The retry surface keeps the block's height in both layouts: a
+            // wide card centres its row's children, so the pressable stretches
+            // to the block, while a stacked card is a column whose children
+            // keep their own height, so the same content floor the skeleton's
+            // column uses holds the block open there.
             className={cn(
-              'justify-center self-stretch active:opacity-70',
+              'min-h-[48px] justify-center self-stretch active:opacity-70',
               stackBalance ? undefined : 'flex-1'
             )}
             onPress={() => {

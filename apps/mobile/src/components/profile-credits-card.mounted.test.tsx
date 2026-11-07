@@ -1166,7 +1166,9 @@ describe('CreditsCard add-credits entry point', () => {
     const balanceBlock = (() => {
       let ancestor = action.parent;
       while (ancestor !== null) {
-        if (String(ancestor.props.className ?? '').includes('min-h-16 gap-2')) return ancestor;
+        if (String(ancestor.props.className ?? '').includes('min-h-16 gap-2')) {
+          return ancestor;
+        }
         ancestor = ancestor.parent;
       }
       return null;
@@ -1178,6 +1180,15 @@ describe('CreditsCard add-credits entry point', () => {
       balanceBlock.findAll(node => node.children.includes('Failed to load balance. Tap to retry.'))
         .length
     ).toBeGreaterThan(0);
+
+    // No layout pass runs in this suite, so the card stays in its stacked
+    // layout, where the block is a column: the retry surface keeps its own
+    // height there, and the block comes out as tall as the skeleton and the
+    // loaded row only while that surface holds the same content floor they do.
+    const retrySurface = balanceBlock.find(node =>
+      String(node.props.className ?? '').includes('min-h-[48px]')
+    );
+    expect(retrySurface.props.onPress).toBeTypeOf('function');
 
     unmount();
   });

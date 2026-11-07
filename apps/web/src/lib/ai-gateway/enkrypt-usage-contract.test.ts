@@ -87,6 +87,7 @@ async function ledgerRows(organizationId: string) {
     chargedMicrodollars: row.charged_microdollars,
     addedLatencyMs: row.added_latency_ms,
     guardrail,
+    detectorsFired: row.detectors_fired,
   }));
 }
 
@@ -116,6 +117,7 @@ async function expectWrittenOnceAndReplayedAsDuplicate(usageWrite: EnkryptUsageW
       chargedMicrodollars: charged,
       addedLatencyMs: usageWrite.addedLatencyMs,
       guardrail: usageWrite.guardrail,
+      detectorsFired: usageWrite.detectorsFired ?? null,
     },
   ]);
   expect(await microdollarsUsed(usageWrite.organizationId)).toBe(charged);
@@ -150,6 +152,36 @@ describe('Enkrypt usage write across gateway, contract and writer', () => {
     expect(writeInput).not.toHaveProperty('guardrail');
     const usageWrite = parseWireCopy(writeInput);
     expect(usageWrite).toStrictEqual({ ...writeInput, guardrail: 'input' });
+
+    await expectWrittenOnceAndReplayedAsDuplicate(usageWrite);
+  });
+
+  test('carries the detectors of a log-only detection into the ledger row', async () => {
+    const usageRecord = await usageRecordForNewOrganization({
+      decision: 'allowed',
+      detectorsFired: ['pii', 'toxicity'],
+    });
+
+    const writeInput = await writeInputFromGateway(usageRecord);
+
+    expect(writeInput).toStrictEqual({
+      ...usageRecord,
+      id: expect.any(String),
+      occurredAt: expect.any(String),
+    });
+    const usageWrite = parseWireCopy(writeInput);
+    expect(usageWrite).toStrictEqual({ ...writeInput, guardrail: 'input' });
+
+    await expectWrittenOnceAndReplayedAsDuplicate(usageWrite);
+  });
+
+  test('omits an empty detector list, so an older writer still accepts the write', async () => {
+    const usageRecord = await usageRecordForNewOrganization({ detectorsFired: [] });
+
+    const writeInput = await writeInputFromGateway(usageRecord);
+
+    expect(writeInput).not.toHaveProperty('detectorsFired');
+    const usageWrite = parseWireCopy(writeInput);
 
     await expectWrittenOnceAndReplayedAsDuplicate(usageWrite);
   });

@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import {
   agent_briefing_context_preferences,
@@ -266,6 +266,29 @@ it('does not repeat an attempt the gateway already billed', async () => {
   const [failed] = await db.select().from(agent_briefing_snapshots);
   expect(failed?.summary.status).toBe('failed');
   expect(failed?.summary.error).toBe('generation_failed');
+}, 20_000);
+
+it('does not repeat while the generation accounting is unreadable', async () => {
+  const { now } = await scheduled();
+  await sweepAgentBriefings(now);
+  const [row] = await db.select().from(agent_briefing_snapshots);
+  if (!row) throw new Error('No captured snapshot');
+  const fetcher = jest
+    .spyOn(globalThis, 'fetch')
+    .mockImplementationOnce(async () => {
+      await db
+        .update(agent_briefing_snapshots)
+        .set({
+          summary: sql`${agent_briefing_snapshots.summary} || ${JSON.stringify({ chargeAccounting: { unreadable: true } })}::jsonb`,
+        })
+        .where(eq(agent_briefing_snapshots.id, row.id));
+      throw new TypeError('fetch failed');
+    })
+    .mockResolvedValue(Response.json({ choices: [{ message: { content: 'Unbilled repeat.' } }] }));
+  await runBriefingSummary(row.id);
+  expect(fetcher).toHaveBeenCalledTimes(1);
+  const [failed] = await db.select().from(agent_briefing_snapshots);
+  expect(failed?.summary.status).toBe('failed');
 }, 20_000);
 
 it('fails a terminal decline without a second request', async () => {

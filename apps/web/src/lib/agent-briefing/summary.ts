@@ -472,8 +472,10 @@ async function generationBilled(reportId: string, generationId: string): Promise
     );
   // The snapshot is gone, so a repeat has nowhere to land and would bill for nothing.
   if (!current) return true;
+  // A record this build cannot read cannot rule out a charge either, and the receipt
+  // writer skips its own write for that record, so the charge would stay untracked.
   const accounting = briefingChargeAccountingSchema.safeParse(current.summary.chargeAccounting);
-  if (!accounting.success) return false;
+  if (!accounting.success) return true;
   return accounting.data.generations.some(
     generation => generation.id === generationId && generation.usageId !== null
   );

@@ -42,6 +42,7 @@ export type ReconciliationAttemptOutcome =
   | { kind: 'expired-discarded' }
   | { kind: 'expired-retained' }
   | { kind: 'different-user-retained' }
+  /** The store could not be read, or holds a payload this build cannot interpret. */
   | { kind: 'unreadable-store' }
   | { kind: 'corrupt-repaired' }
   | { kind: 'corrupt-retained' }
@@ -99,18 +100,33 @@ export async function awaitLogoutReconciliationSettled(): Promise<void> {
 }
 
 /**
- * True while a record that can belong to this session still needs an
- * activity-token unregister. A pending reconciliation retry owns those
- * recorded tokens, so a new session must not re-register them: the next
- * attempt would delete the new session's rows. This covers the spacing-skipped
- * case where `attemptLogoutReconciliation` made no new in-flight attempt to
- * await. Wait for scope cleanup to finish its write. A different known owner
- * cannot retry under this user's auth; unknown ownership remains conservative.
+ * True while activity-token registration stays parked for a record that can
+ * belong to this session. A pending reconciliation retry owns those recorded
+ * tokens, so a new session keeps them unregistered until that retry settles.
+ * This covers the spacing-skipped case where `attemptLogoutReconciliation`
+ * made no new in-flight attempt to await. Wait for scope cleanup to finish its
+ * write.
+ *
+ * A store that could not be read answers as parked: the read failed (a locked
+ * device or a keychain error), so a record may still be stored and registration
+ * waits for a later read to decide. Every caller retries registration on the
+ * next token event, publish or foreground, so the wait ends as soon as a read
+ * succeeds.
+ *
+ * A store of an unsupported shape answers as free: it holds no records this
+ * build can decode, and its payload stays until the build that wrote it
+ * replaces it, so registration continues while it exists.
+ *
+ * A different known owner cannot retry under this user's auth; unknown
+ * ownership remains conservative.
  */
 export async function hasPendingActivityUnregister(userId: string | null): Promise<boolean> {
   await awaitActivityCleanupSettled();
   const read = await readLogoutCleanupStore();
   if (read.status === 'unreadable') {
+    return true;
+  }
+  if (read.status === 'unsupported') {
     return false;
   }
   const records = read.status === 'records' ? read.records : [];
@@ -126,7 +142,7 @@ async function runReconciliation(
   epoch: number
 ): Promise<ReconciliationAttemptOutcome> {
   const stored = await readLogoutCleanupStore();
-  if (stored.status === 'unreadable') {
+  if (stored.status === 'unreadable' || stored.status === 'unsupported') {
     // Nothing safe to retry or rewrite: keep the payload for the build that
     // wrote it.
     return { kind: 'unreadable-store' };

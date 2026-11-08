@@ -1,6 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { NextRequest } from 'next/server';
+import { privilegedGuardTiers } from '@kilocode/web-shared/lib/admin/privileged-inventory';
+import { rootRouter } from '@/routers/root-router';
 import type { NextFetchEvent } from 'next/server';
 import type { JWT } from 'next-auth/jwt';
 import type {
@@ -15,6 +17,21 @@ import {
 } from './withAuthenticatedAdminApiRoutes';
 
 jest.mock('next-auth/middleware', () => ({ withAuth: mockWithAuth }));
+
+// The mounted router carries every module its routers import, and those modules
+// construct clients at load time that this suite never exercises.
+jest.mock('@kilocode/web-shared/lib/redis', () => ({ redisClient: {} }));
+jest.mock('@kilocode/web-shared/lib/posthog', () => ({
+  __esModule: true,
+  default: () => ({
+    capture: () => {},
+    isFeatureEnabled: async () => false,
+    getFeatureFlag: async () => undefined,
+    debug: () => {},
+    alias: () => {},
+  }),
+  flushPostHog: async () => undefined,
+}));
 
 /**
  * Stands in for `next-auth/middleware`'s `withAuth`: it runs the configured
@@ -102,7 +119,8 @@ const USER_ROUTE_ROOT = path.join(APP_ROOT, 'admin/api/users');
 // The listed user routes each verify admin access with `getUserFromAuth`, so the
 // middleware must keep them in the list as route files come and go. The
 // enrichment route is left out of this scan, because it verifies through the
-// admin tRPC procedure its handler calls.
+// admin tRPC procedure its handler calls; `unguardedListedRoutePaths` below
+// covers that shape.
 function adminGuardedUserRoutePaths(): string[] {
   return fs
     .readdirSync(USER_ROUTE_ROOT, { recursive: true, withFileTypes: true })
@@ -119,6 +137,34 @@ function listedUserRoutePaths(): string[] {
   return ADMIN_API_ROUTES_WITH_OWN_ADMIN_CHECK.filter(
     route => route === '/admin/api/users' || route.startsWith('/admin/api/users/')
   ).sort();
+}
+
+type MountedProcedure = { _def?: { middlewares?: readonly unknown[] } };
+
+const MOUNTED_PROCEDURES = rootRouter._def.procedures as Record<string, MountedProcedure>;
+
+/** The mounted procedures a handler calls through the tRPC caller it receives. */
+function delegatedProcedurePaths(route: string): string[] {
+  const source = fs.readFileSync(path.join(APP_ROOT, route, 'route.ts'), 'utf8');
+  const calls = source.matchAll(/\bcaller\.([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)+)\s*\(/g);
+  return [...calls].map(call => call[1]);
+}
+
+/**
+ * A listed handler proves admin access either by calling
+ * `getUserFromAuth({ adminOnly: true })` itself or by reaching a mounted tRPC
+ * procedure that carries a privileged guard. Every privileged guard tier chains
+ * on `adminProcedure`, so any tier proves the admin check.
+ */
+function unguardedListedRoutePaths(): string[] {
+  return ADMIN_API_ROUTES_WITH_OWN_ADMIN_CHECK.filter(route => {
+    const source = fs.readFileSync(path.join(APP_ROOT, route, 'route.ts'), 'utf8');
+    if (/getUserFromAuth\(\s*\{\s*adminOnly:\s*true/.test(source)) return false;
+    return !delegatedProcedurePaths(route).some(
+      procedure =>
+        privilegedGuardTiers(MOUNTED_PROCEDURES[procedure]?._def?.middlewares ?? []).length > 0
+    );
+  });
 }
 
 describe('withAuthenticatedAdminApiRoutes', () => {
@@ -161,6 +207,14 @@ describe('withAuthenticatedAdminApiRoutes', () => {
 
   it('lists every user route that verifies admin access itself', () => {
     expect(adminGuardedUserRoutePaths()).toEqual(listedUserRoutePaths());
+  });
+
+  // A listed handler is exempt from the middleware admin check only because it
+  // verifies admin access itself. Directly guarded handlers are covered by the
+  // scan above; this test covers a handler that delegates its check to the
+  // tRPC procedure it calls, so downgrading that procedure fails here.
+  it('reaches a guarded admin procedure in every listed handler without its own guard', () => {
+    expect(unguardedListedRoutePaths()).toEqual([]);
   });
 
   it('treats only a one-segment dynamic name as a wildcard', () => {

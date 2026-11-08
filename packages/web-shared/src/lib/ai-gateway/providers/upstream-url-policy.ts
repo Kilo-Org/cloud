@@ -140,13 +140,17 @@ function resolveSharedHostAddresses(
   const resolution = Promise.resolve().then(() => resolveHostAddresses(hostname));
   inFlightHostnameResolutions.set(hostname, resolution);
   const forget = () => forgetInFlightResolution(hostname, resolution);
-  void resolution.then(forget, forget);
   // `dns.lookup` cannot be cancelled, so a stalled lookup can outlive every
   // caller and holds its worker until getaddrinfo returns. Keep the entry for a
   // server-side cap that outlasts the caller deadline, so repeated validations
   // of the same host reuse the one lookup instead of queuing another.
   const settleDeadline = setTimeout(forget, DNS_LOOKUP_SETTLE_DEADLINE_MS);
   settleDeadline.unref?.();
+  const forgetSettled = () => {
+    clearTimeout(settleDeadline);
+    forget();
+  };
+  void resolution.then(forgetSettled, forgetSettled);
   return resolution;
 }
 

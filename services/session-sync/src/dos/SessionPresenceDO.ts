@@ -82,6 +82,16 @@ const attachmentSchema = z.strictObject({
   closed: z.boolean(),
 });
 type Attachment = z.infer<typeof attachmentSchema>;
+/** Why a presence fan-out happened; recorded on the `presence_broadcast` metric. */
+type BroadcastReason =
+  | 'heartbeat'
+  | 'ticket_expired'
+  | 'heartbeat_stale'
+  | 'message_too_large'
+  | 'rate_limited'
+  | 'reauthorization_failed'
+  | 'socket_closed'
+  | 'socket_error';
 const watchSchema = z.strictObject({
   tenant: tenantSchema,
   sessionID: sessionIDSchema,
@@ -284,20 +294,17 @@ export class SessionPresenceDO extends DurableObject<Env> {
     if (!state || state.closed) return;
     const now = Date.now();
     if (state.ticket.exp * 1000 <= now) {
-      this.close(ws, state, 4001, 'Ticket expired');
-      this.broadcast();
+      this.closeAndBroadcast(ws, state, 4001, 'Ticket expired', 'ticket_expired');
       return;
     }
     if (state.ticket.role === 'runner' && state.lastHeartbeatAt + LIVE_LIMITS.staleMs <= now) {
-      this.close(ws, state, 4000, 'Heartbeat stale');
-      this.broadcast();
+      this.closeAndBroadcast(ws, state, 4000, 'Heartbeat stale', 'heartbeat_stale');
       return;
     }
     const bytes =
       typeof message === 'string' ? encoder.encode(message).byteLength : message.byteLength;
     if (bytes > LIVE_LIMITS.messageBytes) {
-      this.close(ws, state, 1009, 'Message too large');
-      this.broadcast();
+      this.closeAndBroadcast(ws, state, 1009, 'Message too large', 'message_too_large');
       return;
     }
     let value: unknown;
@@ -313,8 +320,7 @@ export class SessionPresenceDO extends DurableObject<Env> {
     state.rateCount++;
     this.saveAttachment(ws, state);
     if (state.rateCount > LIVE_LIMITS.rates[state.ticket.role]) {
-      this.close(ws, state, 1008, 'Rate limit exceeded');
-      this.broadcast();
+      this.closeAndBroadcast(ws, state, 1008, 'Rate limit exceeded', 'rate_limited');
       return;
     }
     const commandFrame =
@@ -363,14 +369,24 @@ export class SessionPresenceDO extends DurableObject<Env> {
         ticket.exp * 1000 <= Date.now() ||
         state.ticket.exp * 1000 <= Date.now()
       ) {
-        this.close(ws, state, 4001, 'Invalid reauthorization');
-        this.broadcast();
+        this.closeAndBroadcast(
+          ws,
+          state,
+          4001,
+          'Invalid reauthorization',
+          'reauthorization_failed'
+        );
         return;
       }
       const fresh = ticketSchema.safeParse(ticket);
       if (!fresh.success) {
-        this.close(ws, state, 4001, 'Invalid reauthorization');
-        this.broadcast();
+        this.closeAndBroadcast(
+          ws,
+          state,
+          4001,
+          'Invalid reauthorization',
+          'reauthorization_failed'
+        );
         return;
       }
       state.ticket = fresh.data;
@@ -439,6 +455,9 @@ export class SessionPresenceDO extends DurableObject<Env> {
         });
         return;
       }
+      // Viewers only need a new snapshot when this heartbeat changes what they can
+      // see; a heartbeat that refreshes the timestamp alone must not fan out.
+      const signatureBefore = this.presenceSignature(tenant);
       const encoded = JSON.stringify(frame.advertisement);
       if (this.advertisements.get(next.connectionID)?.encoded !== encoded) {
         this.db
@@ -472,7 +491,7 @@ export class SessionPresenceDO extends DurableObject<Env> {
           });
         }
       }
-      this.broadcast();
+      if (this.presenceSignature(tenant) !== signatureBefore) this.broadcast('heartbeat');
       await this.schedule();
     } else {
       this.emit(ws, state, 'error', {
@@ -807,15 +826,13 @@ export class SessionPresenceDO extends DurableObject<Env> {
 
   async webSocketClose(ws: WebSocket, code: number, reason: string): Promise<void> {
     const state = this.attachment(ws);
-    if (state && !state.closed) this.close(ws, state, code, reason);
-    this.broadcast();
+    if (state && !state.closed) this.closeAndBroadcast(ws, state, code, reason, 'socket_closed');
     await this.schedule();
   }
 
   async webSocketError(ws: WebSocket): Promise<void> {
     const state = this.attachment(ws);
-    if (state) this.close(ws, state, 1011, 'Transport unavailable');
-    this.broadcast();
+    if (state) this.closeAndBroadcast(ws, state, 1011, 'Transport unavailable', 'socket_error');
     await this.schedule();
   }
 
@@ -899,20 +916,32 @@ export class SessionPresenceDO extends DurableObject<Env> {
     );
   }
 
-  private instances(tenant?: Tenant): Instance[] {
-    const now = Date.now();
-    const result: Instance[] = [];
+  /** Instances a viewer could see, with the advertisement text already serialized. */
+  private *advertisedInstances(tenant?: Tenant) {
     for (const [, state] of this.connections()) {
-      const advertisement = this.advertisements.get(state.connectionID)?.value;
+      const advertisement = this.advertisements.get(state.connectionID);
       if (
         state.ticket.role !== 'runner' ||
-        !state.instanceID ||
+        state.instanceID === undefined ||
         !advertisement ||
         (tenant && !sameTenant(tenant, state.ticket.tenant))
       )
         continue;
-      result.push({
+      yield {
         instanceID: state.instanceID,
+        state,
+        advertisement: advertisement.value,
+        encoded: advertisement.encoded,
+      };
+    }
+  }
+
+  private instances(tenant?: Tenant): Instance[] {
+    const now = Date.now();
+    const result: Instance[] = [];
+    for (const { instanceID, state, advertisement } of this.advertisedInstances(tenant)) {
+      result.push({
+        instanceID,
         tenant: state.ticket.tenant,
         advertisement,
         online: this.online(state, now),
@@ -920,6 +949,25 @@ export class SessionPresenceDO extends DurableObject<Env> {
       });
     }
     return result;
+  }
+
+  /** What a subscribed viewer would receive, excluding the per-heartbeat timestamp. */
+  private presenceSignature(tenant: Tenant): string {
+    const now = Date.now();
+    const entries: string[] = [];
+    for (const { instanceID, state, encoded } of this.advertisedInstances(tenant)) {
+      entries.push(JSON.stringify([instanceID, encoded, this.online(state, now)]));
+    }
+    return entries.sort().join('\n');
+  }
+
+  /** Only an advertised runner appears in a viewer's instance list. */
+  private contributesToInstances(state: Attachment): boolean {
+    return (
+      state.ticket.role === 'runner' &&
+      state.instanceID !== undefined &&
+      this.advertisements.has(state.connectionID)
+    );
   }
 
   private emit(
@@ -943,7 +991,7 @@ export class SessionPresenceDO extends DurableObject<Env> {
         body,
       })
     ) {
-      this.close(ws, state, 1011, 'Transport unavailable');
+      this.closeAndBroadcast(ws, state, 1011, 'Transport unavailable', 'socket_error');
       return false;
     }
     return true;
@@ -977,7 +1025,19 @@ export class SessionPresenceDO extends DurableObject<Env> {
     }
   }
 
-  private broadcast(): void {
+  private closeAndBroadcast(
+    ws: WebSocket,
+    state: Attachment,
+    code: number,
+    closeReason: string,
+    reason: BroadcastReason
+  ): void {
+    const visible = this.contributesToInstances(state);
+    this.close(ws, state, code, closeReason);
+    if (visible) this.broadcast(reason);
+  }
+
+  private broadcast(reason: BroadcastReason): void {
     let fanout = 0;
     const snapshots = new Map<string, Instance[]>();
     for (const [ws, state] of this.connections()) {
@@ -996,25 +1056,26 @@ export class SessionPresenceDO extends DurableObject<Env> {
         fanout++;
       }
     }
-    liveMetric(this.env, { route: 'presence_broadcast', role: 'viewer', fanout });
+    liveMetric(this.env, { route: 'presence_broadcast', role: 'viewer', reason, fanout });
   }
 
   private async sweep(): Promise<void> {
     const now = Date.now();
     this.expireCommands(now);
-    let changed = false;
+    let reason: BroadcastReason | undefined;
     for (const [ws, state] of this.connections()) {
       const expired = state.ticket.exp * 1000 <= now;
       const stale =
         state.ticket.role === 'runner' && state.lastHeartbeatAt + LIVE_LIMITS.staleMs <= now;
       if (expired || stale) {
+        if (this.contributesToInstances(state))
+          reason ??= expired ? 'ticket_expired' : 'heartbeat_stale';
         this.close(
           ws,
           state,
           expired ? 4001 : 4000,
           expired ? 'Ticket expired' : 'Heartbeat stale'
         );
-        changed = true;
       }
     }
     const expired = this.watches.filter(watch => watch.expiresAt <= now);
@@ -1038,7 +1099,7 @@ export class SessionPresenceDO extends DurableObject<Env> {
       }
       await persisted;
     }
-    if (changed) this.broadcast();
+    if (reason) this.broadcast(reason);
   }
 
   private async schedule(): Promise<void> {

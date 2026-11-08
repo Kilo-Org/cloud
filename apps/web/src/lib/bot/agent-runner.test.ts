@@ -122,6 +122,9 @@ jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
 jest.mock('@/lib/integrations/github/runtime-authorization', () => ({
   assertGitHubInstallationRuntimeAuthorized: jest.fn(),
 }));
+jest.mock('@/lib/integrations/platforms/github/identity-store', () => ({
+  getLinkedGitHubLogin: jest.fn(async () => 'requester-github'),
+}));
 jest.mock('@/lib/web-config.server', () => ({ CALLBACK_TOKEN_SECRET: 'callback-secret' }));
 jest.mock('@kilocode/web-shared/lib/constants', () => ({
   APP_URL: 'https://app.example.test',
@@ -240,6 +243,7 @@ beforeEach(() => {
   mockGetGitHubIntegrationById.mockResolvedValue({
     ...runParams().platformIntegration,
     id: 'github-association-1',
+    platform_installation_id: 'installation-1',
     repositories: githubRepositories,
   });
   jest.mocked(getGitLabRepositoryContext).mockResolvedValue({

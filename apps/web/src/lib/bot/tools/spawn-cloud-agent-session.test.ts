@@ -293,6 +293,8 @@ describe('spawnCloudAgentSession delegation', () => {
       repository: 'other/repo',
       threadRepository: 'owner/repo',
       actorLogin: 'octocat',
+      requesterUserId: undefined,
+      purpose: 'workflow',
     });
     expect(mockResolveGitHubRepositoryForOwner).not.toHaveBeenCalled();
     expect(mockPrepareSession).not.toHaveBeenCalled();
@@ -314,8 +316,44 @@ describe('spawnCloudAgentSession delegation', () => {
       repository: 'owner/repo',
       threadRepository: 'owner/repo',
       actorLogin: 'octocat',
+      requesterUserId: undefined,
+      purpose: 'workflow',
     });
     expect(mockPrepareSession).toHaveBeenCalled();
+  });
+
+  it('authorizes a chat integration repository with the requesting account', async () => {
+    const slackIntegration = {
+      owned_by_organization_id: 'organization-1',
+      owned_by_user_id: null,
+      platform: 'slack',
+    } as PlatformIntegration;
+    mockAuthorizeGitHubRepositoryFn.mockResolvedValue({
+      allowed: false,
+      markdown: 'I could not confirm write access to `acme/private`.',
+    });
+
+    await expect(
+      spawnCloudAgentSession(
+        { githubRepo: 'acme/private', prompt: 'Read the source', mode: 'ask' },
+        'model',
+        slackIntegration,
+        'auth-token',
+        'request-chat-denied',
+        undefined,
+        { chatPlatform: 'slack', requesterUserId: 'user-9' }
+      )
+    ).resolves.toEqual({ response: 'I could not confirm write access to `acme/private`.' });
+
+    expect(mockAuthorizeGitHubRepositoryFn).toHaveBeenCalledWith({
+      platformIntegration: slackIntegration,
+      repository: 'acme/private',
+      threadRepository: undefined,
+      actorLogin: undefined,
+      requesterUserId: 'user-9',
+      purpose: 'agent',
+    });
+    expect(mockPrepareSession).not.toHaveBeenCalled();
   });
 
   it('rejects GitHub repositories outside the owner inventory', async () => {

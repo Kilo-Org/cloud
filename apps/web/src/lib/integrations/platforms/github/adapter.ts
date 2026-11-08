@@ -464,13 +464,15 @@ export async function getCollaboratorPermissionLevel(
   repo: string,
   username: string,
   appType: GitHubAppType = 'standard',
-  expectedIntegrationId?: string
+  expectedIntegrationId?: string,
+  purpose: 'workflow' | 'agent' = 'workflow'
 ): Promise<CollaboratorPermission | null> {
   try {
     const tokenData = await generateGitHubInstallationToken(
       installationId,
       appType,
-      expectedIntegrationId
+      expectedIntegrationId,
+      purpose
     );
     const octokit = new Octokit({ auth: tokenData.token });
 

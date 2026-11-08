@@ -43,10 +43,13 @@ export type BotPlatform = {
     platformIntegration: PlatformIntegration;
   }): Promise<boolean> | boolean;
   /**
-   * Authorization gate for bot actions that can change code. Runs after the
-   * account is resolved and before any bot request is created. GitHub checks
-   * that the triggering account can write to the conversation's repository.
-   * Platforms without this hook allow every message.
+   * Conversation-level authorization gate for bot actions that can change
+   * code. Runs after the account is resolved and before any bot request is
+   * created. GitHub checks that the triggering account can write to the
+   * conversation's repository. Slack and Linear have no repository of their
+   * own in the thread; the tool that starts a Cloud Agent session authorizes
+   * any repository it names against the requesting account. Platforms without
+   * this hook allow every message.
    */
   authorizeBotActions?(params: {
     thread: Thread;

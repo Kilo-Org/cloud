@@ -102,6 +102,8 @@ export default async function spawnCloudAgentSession(
     attachments?: CloudAgentAttachments;
     /** Linked Kilo user the caller authenticates as; selects the balance-check client for org payers. */
     payerUserId?: string;
+    /** Linked Kilo user that triggered this bot run; authorizes repository access. */
+    requesterUserId?: string;
     /** GitHub login of the account that triggered this bot run. */
     actorLogin?: string;
     /** Repository of the conversation the bot was mentioned in. */
@@ -135,12 +137,21 @@ export default async function spawnCloudAgentSession(
     return { response: 'Error: You must specify either a githubRepo or a gitlabProject.' };
   }
 
+  // The repository authorization below must read the same connection the
+  // session will use, so resolve the purpose first.
+  const githubAccessPurpose =
+    options?.chatPlatform === 'slack' && platformIntegration.platform === 'slack'
+      ? 'agent'
+      : 'workflow';
+
   if (args.githubRepo) {
     const targetAuthorization = await authorizeGitHubRepository({
       platformIntegration,
       repository: args.githubRepo,
       threadRepository: options?.threadRepository,
       actorLogin: options?.actorLogin,
+      requesterUserId: options?.requesterUserId,
+      purpose: githubAccessPurpose,
     });
     if (!targetAuthorization.allowed) {
       return { response: targetAuthorization.markdown };
@@ -239,10 +250,6 @@ export default async function spawnCloudAgentSession(
       return { response: 'Error: You must specify either a githubRepo or a gitlabProject.' };
     }
 
-    const githubAccessPurpose =
-      options?.chatPlatform === 'slack' && platformIntegration.platform === 'slack'
-        ? 'agent'
-        : 'workflow';
     const repository = await resolveGitHubRepositoryForOwner(
       owner,
       args.githubRepo,

@@ -18,6 +18,7 @@ import {
 } from '../part-content';
 import { MessageErrorBoundary } from '../MessageErrorBoundary';
 import { isPartStreaming } from '../types';
+import { getToolActivity } from '../toolCardUtils';
 import { getVisibleAssistantParts } from '../message-presentation';
 import { groupAssistantParts, summarizeAgentWork } from '../shared-transcript-presentation';
 import { AgentWorkGroup } from './AgentWorkGroup';
@@ -112,10 +113,23 @@ export function CloudMessageParts({ collapseTools = false }: { collapseTools?: b
     if (segment.type === 'chat')
       return <React.Fragment key={segment.parts[0]?.id}>{content}</React.Fragment>;
     const key = `agent-work:${segments[segmentIndex - 1]?.parts.at(-1)?.id ?? 'start'}`;
-    const working = presentation.isStreaming && segment.parts.some(isPartStreaming);
+    const activePart = presentation.isStreaming
+      ? segment.parts.findLast(isPartStreaming)
+      : undefined;
+    const working = activePart !== undefined;
     return (
       <div key={key} className="py-1">
-        <AgentWorkGroup summary={summarizeAgentWork(segment.parts, working)} working={working}>
+        <AgentWorkGroup
+          summary={summarizeAgentWork(segment.parts, working)}
+          working={working}
+          activity={
+            activePart?.type === 'tool'
+              ? getToolActivity(activePart)
+              : working
+                ? 'Thinking'
+                : undefined
+          }
+        >
           {content}
         </AgentWorkGroup>
       </div>

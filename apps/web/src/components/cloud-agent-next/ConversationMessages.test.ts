@@ -494,7 +494,101 @@ describe('ConversationMessages', () => {
     ]);
     if (isStreaming) expect(html).toContain('animate-spin');
     else expect(html).not.toContain('animate-spin');
-    expect(html).not.toContain('pnpm lint');
+    if (isStreaming) expect(buttons(html)[0]).toContain('bash: pnpm lint');
+    else expect(html).not.toContain('pnpm lint');
+    expect(html).not.toContain('Output for');
+  });
+
+  it.each([
+    {
+      tool: 'read',
+      input: { filePath: '/workspace/app/src/index.ts' },
+      activity: 'read: src/index.ts',
+    },
+    { tool: 'grep', input: { pattern: 'render.*Tool' }, activity: 'grep: render.*Tool' },
+    { tool: 'glob', input: { pattern: '**/*.tsx' }, activity: 'glob: **/*.tsx' },
+    { tool: 'websearch', input: { query: 'tool grouping' }, activity: 'websearch: tool grouping' },
+    {
+      tool: 'bash',
+      input: { command: 'pnpm test\n  --runInBand' },
+      activity: 'bash: pnpm test --runInBand',
+    },
+    {
+      tool: 'mcp',
+      input: { server_name: 'github', tool_name: 'search', arguments: { query: 'tool grouping' } },
+      activity: 'github/search: tool grouping',
+    },
+    { tool: 'custom_tool', input: {}, activity: 'custom_tool' },
+    {
+      tool: 'custom_tool',
+      input: { command: {}, pattern: '  ', description: 'Preparing tools' },
+      activity: 'custom_tool: Preparing tools',
+    },
+  ])('previews pending $tool activity without expanding the group', ({ tool, input, activity }) => {
+    const html = renderConversation(
+      [
+        assistantMessage('assistant-1', [
+          toolPart('pending', tool, { status: 'pending', input, raw: '' }),
+        ]),
+      ],
+      { collapseTools: true, isStreaming: true }
+    );
+
+    expect(buttons(html)).toEqual([expect.stringContaining(activity)]);
+    expect(buttons(html)[0]).toContain('aria-expanded="false"');
+    expect(html).toContain(`title="${activity}"`);
+    expect(html).toContain('truncate');
+    expect(html).toContain('Working · 1 tool call');
+  });
+
+  it('shows only the latest active tool even when a later parallel tool has completed', () => {
+    const html = renderConversation(
+      [
+        assistantMessage('assistant-1', [
+          toolPart('earlier', 'read', {
+            status: 'running',
+            input: { filePath: '/workspace/app/src/earlier.ts' },
+            time: { start: 1 },
+          }),
+          toolPart('running', 'read', {
+            status: 'running',
+            input: { filePath: '/workspace/app/src/current.ts' },
+            time: { start: 3 },
+          }),
+          toolPart('completed'),
+        ]),
+      ],
+      { collapseTools: true, isStreaming: true }
+    );
+
+    expect(buttons(html)[0]).toContain('read: src/current.ts');
+    expect(html).not.toContain('src/earlier.ts');
+    expect(html).not.toContain('pnpm test');
+  });
+
+  it('bounds activity previews for long commands, including their accessible text', () => {
+    const command = 'x'.repeat(500);
+    const html = renderConversation(
+      [
+        assistantMessage('assistant-1', [
+          toolPart('pending', 'bash', { status: 'pending', input: { command }, raw: '' }),
+        ]),
+      ],
+      { collapseTools: true, isStreaming: true }
+    );
+
+    expect(buttons(html)[0]).toContain(`bash: ${'x'.repeat(197)}...`);
+    expect(html).not.toContain('x'.repeat(198));
+  });
+
+  it('shows thinking without exposing reasoning text in a collapsed group', () => {
+    const html = renderConversation(
+      [assistantMessage('assistant-1', [reasoningPart('active', { time: { start: 1 } })])],
+      { collapseTools: true, isStreaming: true }
+    );
+
+    expect(buttons(html)[0]).toContain('Thinking');
+    expect(html).not.toContain('Reasoning details');
   });
 
   it('keeps failed tools, assistant errors, and snapshot progress visible with tools collapsed', () => {
@@ -1478,6 +1572,57 @@ describe('ConversationMessages memoization', () => {
     return markdownRenders().filter(rendered => rendered === text).length;
   }
 
+  it('updates collapsed activity as tools and reasoning finish without reopening the group', () => {
+    const props = baseProps({ collapseTools: true, isStreaming: true });
+    function renderParts(parts: Part[], isStreaming = true) {
+      renderConversationMessages({
+        ...props,
+        isStreaming,
+        dynamicMessages: [assistantMessage('assistant-1', parts, { time: { created: 1 } })],
+      });
+    }
+    renderParts([
+      toolPart('read', 'read', {
+        status: 'running',
+        input: { filePath: '/workspace/app/src/index.ts' },
+        time: { start: 1 },
+      }),
+    ]);
+    const group = container.querySelector<HTMLButtonElement>('button[aria-expanded="false"]');
+    expect(group?.textContent).toContain('read: src/index.ts');
+
+    const completed = toolPart('read', 'read', {
+      status: 'completed',
+      input: { filePath: '/workspace/app/src/index.ts' },
+      output: 'Hidden file contents',
+      title: 'Read file',
+      metadata: {},
+      time: { start: 1, end: 2 },
+    });
+    renderParts([
+      completed,
+      toolPart('grep', 'grep', {
+        status: 'running',
+        input: { pattern: 'getToolActivity' },
+        time: { start: 3 },
+      }),
+    ]);
+    expect(group?.textContent).toContain('grep: getToolActivity');
+    expect(group?.textContent).not.toContain('read:');
+    expect(container.textContent).not.toContain('Hidden file contents');
+
+    renderParts([completed, reasoningPart('thinking', { time: { start: 4 } })]);
+    expect(group?.textContent).toContain('Thinking');
+    expect(group?.textContent).not.toContain('grep:');
+
+    renderParts([completed, reasoningPart('thinking')], false);
+    expect(container.contains(group)).toBe(true);
+    expect(group?.getAttribute('aria-expanded')).toBe('false');
+    expect(group?.textContent).toContain('Worked for');
+    expect(group?.textContent).not.toContain('Thinking');
+    expect(group?.querySelector('[title]')).toBeNull();
+  });
+
   it('expands grouped parts at their projected indices and preserves expansion while streaming', () => {
     const props = baseProps({
       collapseTools: true,
@@ -1502,7 +1647,8 @@ describe('ConversationMessages memoization', () => {
     renderConversationMessages(props);
     expect(container.textContent).toContain('Working');
     expect(container.textContent).toContain('1 tool call');
-    expect(container.textContent).not.toContain('pnpm test');
+    expect(container.textContent).toContain('bash: pnpm test -- bash-1');
+    expect(container.querySelector('[data-tool-card]')).toBeNull();
     const group = container.querySelector<HTMLButtonElement>('button[aria-expanded="false"]');
     expect(group).not.toBeNull();
     act(() => group?.click());
@@ -1529,6 +1675,12 @@ describe('ConversationMessages memoization', () => {
     expect(container.textContent).toContain('Working');
     expect(container.textContent).toContain('2 tool calls');
     expect(container.textContent).toContain('pnpm test -- bash-2');
+    expect(group?.textContent).toContain('bash: pnpm test -- bash-2');
+    expect(group?.getAttribute('aria-expanded')).toBe('true');
+
+    renderConversationMessages({ ...props, isStreaming: false });
+    expect(group?.textContent).not.toContain('bash:');
+    expect(group?.textContent).not.toContain('Working');
     expect(group?.getAttribute('aria-expanded')).toBe('true');
 
     renderConversationMessages({ ...props, collapseTools: false });

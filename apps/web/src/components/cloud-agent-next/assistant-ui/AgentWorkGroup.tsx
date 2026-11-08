@@ -7,10 +7,12 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 export function AgentWorkGroup({
   summary,
   working = false,
+  activity,
   children,
 }: {
   summary: string;
   working?: boolean;
+  activity?: string;
   children: ReactNode;
 }) {
   return (
@@ -22,7 +24,14 @@ export function AgentWorkGroup({
             aria-hidden
           />
         )}
-        <span className="text-muted-foreground min-w-0 flex-1 text-sm">{summary}</span>
+        <span className="text-muted-foreground min-w-0 flex-1 text-sm">
+          <span className="block">{summary}</span>
+          {activity && (
+            <span className="mt-1 block truncate font-mono text-xs" title={activity}>
+              {activity}
+            </span>
+          )}
+        </span>
         <ChevronDown
           className="text-muted-foreground size-4 shrink-0 transition-transform group-data-[state=open]:rotate-180 motion-reduce:transition-none"
           aria-hidden

@@ -2,7 +2,7 @@ import 'server-only';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import type { PlatformIntegration } from '@kilocode/db/schema';
 import { platform_integrations } from '@kilocode/db/schema';
-import { eq, and, isNull } from 'drizzle-orm';
+import { eq, and, isNull, or, sql } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import type { Owner } from '@/lib/integrations/core/types';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
@@ -159,6 +159,29 @@ export async function getInstallation(
 }
 
 /**
+ * A row can record its server in `platform_account_id` while
+ * `platform_installation_id` is empty. The lifecycle still supports that row
+ * shape, so the lookups below cover it wherever a server is resolved.
+ */
+function legacyDiscordGuildCondition(guildId: string) {
+  return and(
+    eq(platform_integrations.platform_account_id, guildId),
+    isNull(platform_integrations.platform_installation_id)
+  );
+}
+
+/**
+ * Rows that record a server: its canonical row, plus a legacy row that carries
+ * the server id only in `platform_account_id`.
+ */
+function recordsDiscordGuildCondition(guildId: string) {
+  return or(
+    eq(platform_integrations.platform_installation_id, guildId),
+    legacyDiscordGuildCondition(guildId)
+  );
+}
+
+/**
  * Get Discord installation by guild ID
  * Used to identify which Kilo Code user/org owns the installation when receiving Discord events
  */
@@ -171,8 +194,15 @@ export async function getInstallationByGuildId(
     .where(
       and(
         eq(platform_integrations.platform, PLATFORM.DISCORD),
-        eq(platform_integrations.platform_installation_id, guildId)
+        recordsDiscordGuildCondition(guildId)
       )
+    )
+    // A row that records the server in `platform_installation_id` is the one
+    // inbound events resolve to. Prefer it over a legacy row that carries the
+    // server id only in `platform_account_id`.
+    .orderBy(
+      sql`${platform_integrations.platform_installation_id} IS NULL`,
+      platform_integrations.id
     )
     .limit(1);
 
@@ -180,16 +210,21 @@ export async function getInstallationByGuildId(
 }
 
 /**
- * Find a Discord installation for `guildId` that belongs to a different Kilo
- * owner. Callers use this before persisting a connection so a server owned
- * elsewhere is rejected without touching either row.
+ * Find a Discord installation that already records `guildId` for a different
+ * Kilo owner. Callers use this before persisting a connection so each server
+ * stays bound to one owner and the write is refused without touching either row.
+ *
+ * A server resolves to the row that holds it as its canonical installation id.
+ * Only when no such row exists do rows that record the server in
+ * `platform_account_id` take part, matching how `upsertDiscordInstallation`
+ * reads the bound server of an existing row.
  */
 export async function getConflictingDiscordInstallation(
   owner: Owner,
   guildId: string,
   database: typeof db | DrizzleTransaction = db
 ): Promise<PlatformIntegration | null> {
-  const integrations = await database
+  const canonical = await database
     .select()
     .from(platform_integrations)
     .where(
@@ -200,13 +235,44 @@ export async function getConflictingDiscordInstallation(
     )
     .limit(2);
 
-  return integrations.find(integration => !isOwnedBy(integration, owner)) ?? null;
+  const foreignCanonical = canonical.find(integration => !isOwnedBy(integration, owner));
+  if (foreignCanonical) {
+    return foreignCanonical;
+  }
+  if (canonical.length > 0) {
+    return null;
+  }
+
+  const [conflicting] = await database
+    .select()
+    .from(platform_integrations)
+    .where(
+      and(
+        eq(platform_integrations.platform, PLATFORM.DISCORD),
+        legacyDiscordGuildCondition(guildId),
+        isOwnedByAnotherOwner(owner)
+      )
+    )
+    .limit(1);
+
+  return conflicting ?? null;
 }
 
 function isOwnedBy(integration: PlatformIntegration, owner: Owner): boolean {
   return owner.type === 'user'
     ? integration.owned_by_user_id === owner.id && integration.owned_by_organization_id === null
     : integration.owned_by_organization_id === owner.id && integration.owned_by_user_id === null;
+}
+
+/**
+ * The complement of `isOwnedBy` as a filter. `NOT` over the nullable owner columns
+ * would drop rows, so each owner is compared with `IS NOT DISTINCT FROM` and the
+ * other owner column with `IS NULL`.
+ */
+function isOwnedByAnotherOwner(owner: Owner) {
+  return owner.type === 'user'
+    ? sql`NOT (${platform_integrations.owned_by_user_id} IS NOT DISTINCT FROM ${owner.id} AND ${platform_integrations.owned_by_organization_id} IS NULL)`
+    : sql`NOT (${platform_integrations.owned_by_organization_id} IS NOT DISTINCT FROM ${owner.id} AND ${platform_integrations.owned_by_user_id} IS NULL)`;
 }
 
 /**

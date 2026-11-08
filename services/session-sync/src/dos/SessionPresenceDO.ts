@@ -991,7 +991,7 @@ export class SessionPresenceDO extends DurableObject<Env> {
         body,
       })
     ) {
-      this.close(ws, state, 1011, 'Transport unavailable');
+      this.closeAndBroadcast(ws, state, 1011, 'Transport unavailable', 'socket_error');
       return false;
     }
     return true;

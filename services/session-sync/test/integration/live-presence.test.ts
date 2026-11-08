@@ -337,6 +337,30 @@ describe('live presence', () => {
     expect(viewer.received.filter(frame => frame.type === 'instances')).toHaveLength(2);
   });
 
+  it('publishes a removal when a server frame fails on a runner transport', async () => {
+    const principal = personal(`usr-${crypto.randomUUID()}`);
+    const stub = getPresenceStub(testEnv, principal.userID);
+    const sessionID = newSessionID();
+    const runner = await connect(principal, 'runner');
+    await heartbeat(runner, 'failed-transport', advertisement([sessionID]));
+    const viewer = await connect(principal, 'viewer');
+    viewer.ws.send(JSON.stringify({ type: 'subscribe' }));
+    await viewer.next('instances');
+    await runInDurableObject(stub, async (_instance, state) => {
+      for (const ws of state.getWebSockets()) {
+        const saved = ws.deserializeAttachment() as { ticket: { role: string } };
+        if (saved.ticket.role === 'runner') {
+          ws.send = () => {
+            throw new Error('Synthetic transport failure');
+          };
+        }
+      }
+    });
+    await stub.watch({ tenant: principal.tenant, sessionID, watching: true });
+    expect((await viewer.next('instances')).body).toEqual({ instances: [] });
+    expect(await stub.list()).toEqual([]);
+  });
+
   it('records why each presence broadcast happened', async () => {
     const principal = personal(`usr-${crypto.randomUUID()}`);
     const stub = getPresenceStub(testEnv, principal.userID);

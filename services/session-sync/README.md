@@ -575,7 +575,9 @@ event delivery. Refetch the durable snapshot, then explicitly resubscribe from
 the supplied boundary. A socket that is already subscribed replays only the
 entries above the highest sequence it has received, so a repeated `subscribe`
 sends the `subscribed` control frame alone; a client that needs an earlier
-cursor reconnects instead.
+cursor reconnects instead. The `subscribed` body is `{seq,cursor}`: `seq` is the
+current event sequence and `cursor` is the position the replay continued from,
+so a client can detect that its requested cursor was advanced.
 The `hello` control frame includes the current event sequence, runner connectivity,
 ticket lifetime, and a jittered `reconnectAfterMs`.
 

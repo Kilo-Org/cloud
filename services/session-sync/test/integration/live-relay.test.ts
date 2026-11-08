@@ -348,8 +348,10 @@ it('coalesces a repeated subscribe to the entries a socket has not received', as
     captureRelaySend(server, frames);
     try {
       await instance.webSocketMessage(server, JSON.stringify({ type: 'subscribe', afterSeq: 0 }));
+      const sent = frames.map(frame => envelopeSchema.parse(JSON.parse(frame)));
       return {
-        frames: frames.map(frame => envelopeSchema.parse(JSON.parse(frame)).type),
+        frames: sent.map(envelope => envelope.type),
+        body: sent.at(-1)?.body,
         sweeps: sweeping.mock.calls.length,
         watches: watching.mock.calls.length,
       };
@@ -359,7 +361,12 @@ it('coalesces a repeated subscribe to the entries a socket has not received', as
       watching.mockRestore();
     }
   });
-  expect(repeat).toEqual({ frames: ['subscribed'], sweeps: 0, watches: 0 });
+  expect(repeat).toEqual({
+    frames: ['subscribed'],
+    body: { seq: 4, cursor: 4 },
+    sweeps: 0,
+    watches: 0,
+  });
   runner.ws.send(JSON.stringify({ channel: 'events', type: 'five', body: 5 }));
   expect((await viewer.next('five')).seq).toBe(5);
   const afterLive = await runInDurableObject(fixture.stub, async (instance, state) => {
@@ -368,15 +375,23 @@ it('coalesces a repeated subscribe to the entries a socket has not received', as
     captureRelaySend(server, frames);
     try {
       await instance.webSocketMessage(server, JSON.stringify({ type: 'subscribe', afterSeq: 0 }));
+      const sent = frames.map(frame => envelopeSchema.parse(JSON.parse(frame)));
+      // Private relay state holds the delivered position this test needs to check.
+      const relay = instance as unknown as { attachments: Map<WebSocket, SocketAttachment> };
       return {
-        frames: frames.map(frame => envelopeSchema.parse(JSON.parse(frame)).type),
-        highWater: socketAttachmentSchema.parse(server.deserializeAttachment()).highWater,
+        frames: sent.map(envelope => envelope.type),
+        body: sent.at(-1)?.body,
+        highWater: relay.attachments.get(server)?.highWater,
       };
     } finally {
       vi.mocked(server.send).mockRestore();
     }
   });
-  expect(afterLive).toEqual({ frames: ['subscribed'], highWater: 5 });
+  expect(afterLive).toEqual({
+    frames: ['subscribed'],
+    body: { seq: 5, cursor: 5 },
+    highWater: 5,
+  });
   await fixture.connect('viewer');
   const catchUp = await runInDurableObject(fixture.stub, async (instance, state) => {
     const server = relaySocket(state, saved => saved.ticket.role === 'viewer' && !saved.subscribed);

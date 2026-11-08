@@ -608,8 +608,7 @@ export class SessionRelayDO extends DurableObject<Env> {
       replayed = true;
     }
     state.highWater = this.seq;
-    this.saveAttachment(ws, state);
-    this.control(ws, 'subscribed', { seq: this.seq });
+    this.control(ws, 'subscribed', { seq: this.seq, cursor });
     return !wasSubscribed || replayed;
   }
 
@@ -658,7 +657,6 @@ export class SessionRelayDO extends DurableObject<Env> {
       if (state.ticket.role !== 'runner' && state.subscribed) {
         if (!this.sendEncoded(viewer, state, encoded)) continue;
         state.highWater = seq;
-        this.saveAttachment(viewer, state);
         fanout++;
       }
     }

@@ -669,10 +669,11 @@ async function decideChildOrganizationMembership(
   organizationId: Organization['id'],
   subject: MembershipSubject
 ): Promise<ChildOrganizationMembershipDecision> {
-  // The invitation path takes the target organization row lock; the account
-  // paths deliberately take none: their callers already hold it, and taking it
-  // again would order this read against neighbors that wait for the
-  // organization group-policy lock first.
+  // The invitation path takes the target organization row lock. The account
+  // paths deliberately take none: taking the row lock here would order this
+  // read against neighbors that wait for the organization group-policy lock
+  // first, and the membership lock below settles the account outcome against
+  // removals.
   const parentRelation = tx
     .select({ parentOrganizationId: organizations.parent_organization_id })
     .from(organizations)

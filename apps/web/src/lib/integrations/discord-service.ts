@@ -153,6 +153,14 @@ export async function getInstallation(
     .where(
       and(...getOwnershipConditions(owner), eq(platform_integrations.platform, PLATFORM.DISCORD))
     )
+    // A row that records the server in `platform_installation_id` is the one
+    // inbound events resolve to. Prefer it over a row that carries the server id
+    // only in `platform_account_id`, so an update targets the same row and the
+    // owner keeps one connection.
+    .orderBy(
+      sql`${platform_integrations.platform_installation_id} IS NULL`,
+      platform_integrations.id
+    )
     .limit(1);
 
   return integration || null;

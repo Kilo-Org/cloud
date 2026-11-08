@@ -28,6 +28,7 @@ import {
   userIDSchema,
   type Tenant,
 } from '../protocol';
+import { diagnostic, phase } from '../metrics';
 
 const WATCH_LEASE_MS = 5 * 60_000;
 const WATCH_LIMIT = 128;
@@ -81,6 +82,16 @@ const attachmentSchema = z.strictObject({
   closed: z.boolean(),
 });
 type Attachment = z.infer<typeof attachmentSchema>;
+/** Why a presence fan-out happened; recorded on the `presence_broadcast` metric. */
+type BroadcastReason =
+  | 'heartbeat'
+  | 'ticket_expired'
+  | 'heartbeat_stale'
+  | 'message_too_large'
+  | 'rate_limited'
+  | 'reauthorization_failed'
+  | 'socket_closed'
+  | 'socket_error';
 const watchSchema = z.strictObject({
   tenant: tenantSchema,
   sessionID: sessionIDSchema,
@@ -151,64 +162,66 @@ export class SessionPresenceDO extends DurableObject<Env> {
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     this.db = drizzle(ctx.storage, { logger: false });
-    void ctx.blockConcurrencyWhile(async () => {
-      await migrate(this.db, migrations);
-      const active = new Set<string>();
-      for (const ws of ctx.getWebSockets()) {
-        let value: unknown;
-        try {
-          value = ws.deserializeAttachment();
-        } catch {
-          value = undefined;
-        }
-        const saved = attachmentSchema.safeParse(value);
-        if (saved.success && !saved.data.closed) {
-          active.add(saved.data.connectionID);
-          this.attachments.set(ws, saved.data);
-        } else {
+    void ctx.blockConcurrencyWhile(() =>
+      phase(env, 'presenceInitialize', 'initialize', async () => {
+        await migrate(this.db, migrations);
+        const active = new Set<string>();
+        for (const ws of ctx.getWebSockets()) {
+          let value: unknown;
           try {
-            ws.close(
-              saved.success ? 1000 : 1008,
-              saved.success ? 'Connection already closed' : 'Invalid connection metadata'
-            );
+            value = ws.deserializeAttachment();
           } catch {
-            // A transport that already disconnected has no open socket to reclaim.
+            value = undefined;
+          }
+          const saved = attachmentSchema.safeParse(value);
+          if (saved.success && !saved.data.closed) {
+            active.add(saved.data.connectionID);
+            this.attachments.set(ws, saved.data);
+          } else {
+            try {
+              ws.close(
+                saved.success ? 1000 : 1008,
+                saved.success ? 'Connection already closed' : 'Invalid connection metadata'
+              );
+            } catch {
+              // A transport that already disconnected has no open socket to reclaim.
+            }
           }
         }
-      }
-      for (const row of this.db.select().from(presenceAdvertisements).all()) {
-        let value: unknown;
-        try {
-          value = JSON.parse(row.advertisement);
-        } catch {
-          value = undefined;
+        for (const row of this.db.select().from(presenceAdvertisements).all()) {
+          let value: unknown;
+          try {
+            value = JSON.parse(row.advertisement);
+          } catch {
+            value = undefined;
+          }
+          const advertisement = advertisementSchema.safeParse(value);
+          if (active.has(row.connection_id) && advertisement.success) {
+            this.advertisements.set(row.connection_id, {
+              value: advertisement.data,
+              encoded: row.advertisement,
+            });
+          } else {
+            this.db
+              .delete(presenceAdvertisements)
+              .where(eq(presenceAdvertisements.connection_id, row.connection_id))
+              .run();
+          }
         }
-        const advertisement = advertisementSchema.safeParse(value);
-        if (active.has(row.connection_id) && advertisement.success) {
-          this.advertisements.set(row.connection_id, {
-            value: advertisement.data,
-            encoded: row.advertisement,
-          });
-        } else {
-          this.db
-            .delete(presenceAdvertisements)
-            .where(eq(presenceAdvertisements.connection_id, row.connection_id))
-            .run();
+        const saved = await ctx.storage.get<unknown>('watches');
+        if (saved !== undefined) this.watches = z.array(watchSchema).max(WATCH_LIMIT).parse(saved);
+        this.alarmAt = await ctx.storage.getAlarm();
+        this.expireCommands(Date.now());
+        for (const route of this.db.select().from(presenceCommandRoutes).all()) {
+          if (
+            !active.has(route.runner_connection_id) ||
+            route.controller_connection_id === null ||
+            !active.has(route.controller_connection_id)
+          )
+            this.finishUnknown(route);
         }
-      }
-      const saved = await ctx.storage.get<unknown>('watches');
-      if (saved !== undefined) this.watches = z.array(watchSchema).max(WATCH_LIMIT).parse(saved);
-      this.alarmAt = await ctx.storage.getAlarm();
-      this.expireCommands(Date.now());
-      for (const route of this.db.select().from(presenceCommandRoutes).all()) {
-        if (
-          !active.has(route.runner_connection_id) ||
-          route.controller_connection_id === null ||
-          !active.has(route.controller_connection_id)
-        )
-          this.finishUnknown(route);
-      }
-    });
+      })
+    );
   }
 
   async fetch(request: Request): Promise<Response> {
@@ -281,20 +294,17 @@ export class SessionPresenceDO extends DurableObject<Env> {
     if (!state || state.closed) return;
     const now = Date.now();
     if (state.ticket.exp * 1000 <= now) {
-      this.close(ws, state, 4001, 'Ticket expired');
-      this.broadcast();
+      this.closeAndBroadcast(ws, state, 4001, 'Ticket expired', 'ticket_expired');
       return;
     }
     if (state.ticket.role === 'runner' && state.lastHeartbeatAt + LIVE_LIMITS.staleMs <= now) {
-      this.close(ws, state, 4000, 'Heartbeat stale');
-      this.broadcast();
+      this.closeAndBroadcast(ws, state, 4000, 'Heartbeat stale', 'heartbeat_stale');
       return;
     }
     const bytes =
       typeof message === 'string' ? encoder.encode(message).byteLength : message.byteLength;
     if (bytes > LIVE_LIMITS.messageBytes) {
-      this.close(ws, state, 1009, 'Message too large');
-      this.broadcast();
+      this.closeAndBroadcast(ws, state, 1009, 'Message too large', 'message_too_large');
       return;
     }
     let value: unknown;
@@ -310,8 +320,7 @@ export class SessionPresenceDO extends DurableObject<Env> {
     state.rateCount++;
     this.saveAttachment(ws, state);
     if (state.rateCount > LIVE_LIMITS.rates[state.ticket.role]) {
-      this.close(ws, state, 1008, 'Rate limit exceeded');
-      this.broadcast();
+      this.closeAndBroadcast(ws, state, 1008, 'Rate limit exceeded', 'rate_limited');
       return;
     }
     const commandFrame =
@@ -360,14 +369,24 @@ export class SessionPresenceDO extends DurableObject<Env> {
         ticket.exp * 1000 <= Date.now() ||
         state.ticket.exp * 1000 <= Date.now()
       ) {
-        this.close(ws, state, 4001, 'Invalid reauthorization');
-        this.broadcast();
+        this.closeAndBroadcast(
+          ws,
+          state,
+          4001,
+          'Invalid reauthorization',
+          'reauthorization_failed'
+        );
         return;
       }
       const fresh = ticketSchema.safeParse(ticket);
       if (!fresh.success) {
-        this.close(ws, state, 4001, 'Invalid reauthorization');
-        this.broadcast();
+        this.closeAndBroadcast(
+          ws,
+          state,
+          4001,
+          'Invalid reauthorization',
+          'reauthorization_failed'
+        );
         return;
       }
       state.ticket = fresh.data;
@@ -436,6 +455,9 @@ export class SessionPresenceDO extends DurableObject<Env> {
         });
         return;
       }
+      // Viewers only need a new snapshot when this heartbeat changes what they can
+      // see; a heartbeat that refreshes the timestamp alone must not fan out.
+      const signatureBefore = this.presenceSignature(tenant);
       const encoded = JSON.stringify(frame.advertisement);
       if (this.advertisements.get(next.connectionID)?.encoded !== encoded) {
         this.db
@@ -469,7 +491,7 @@ export class SessionPresenceDO extends DurableObject<Env> {
           });
         }
       }
-      this.broadcast();
+      if (this.presenceSignature(tenant) !== signatureBefore) this.broadcast('heartbeat');
       await this.schedule();
     } else {
       this.emit(ws, state, 'error', {
@@ -804,15 +826,13 @@ export class SessionPresenceDO extends DurableObject<Env> {
 
   async webSocketClose(ws: WebSocket, code: number, reason: string): Promise<void> {
     const state = this.attachment(ws);
-    if (state && !state.closed) this.close(ws, state, code, reason);
-    this.broadcast();
+    if (state && !state.closed) this.closeAndBroadcast(ws, state, code, reason, 'socket_closed');
     await this.schedule();
   }
 
   async webSocketError(ws: WebSocket): Promise<void> {
     const state = this.attachment(ws);
-    if (state) this.close(ws, state, 1011, 'Transport unavailable');
-    this.broadcast();
+    if (state) this.closeAndBroadcast(ws, state, 1011, 'Transport unavailable', 'socket_error');
     await this.schedule();
   }
 
@@ -826,9 +846,24 @@ export class SessionPresenceDO extends DurableObject<Env> {
         !(sameTenant(watch.tenant, tenant) && watch.sessionID === sessionID)
     );
     if (watching) next.push({ tenant, sessionID, expiresAt: now + WATCH_LEASE_MS });
-    if (next.length > WATCH_LIMIT || byteLength(next) > 100_000)
+    if (next.length > WATCH_LIMIT || byteLength(next) > 100_000) {
+      diagnostic(this.env, {
+        operation: 'relayWatch',
+        stage: 'watch_budget',
+        tenant: tenant.type,
+        outcome: 'error',
+        cause: 'watch_budget',
+        queueDepth: next.length,
+      });
       throw new Error('Presence watch budget exceeded');
-    const persisted = this.ctx.storage.put('watches', next);
+    }
+    const persisted = phase(
+      this.env,
+      'relayWatch',
+      'watch_storage',
+      () => this.ctx.storage.put('watches', next),
+      tenant.type
+    );
     this.watches = next;
     for (const [ws, state] of this.connections()) {
       if (
@@ -841,7 +876,7 @@ export class SessionPresenceDO extends DurableObject<Env> {
       }
     }
     await persisted;
-    await this.schedule();
+    await phase(this.env, 'relayWatch', 'schedule', () => this.schedule(), tenant.type);
   }
 
   async list(): Promise<Instance[]> {
@@ -881,20 +916,32 @@ export class SessionPresenceDO extends DurableObject<Env> {
     );
   }
 
-  private instances(tenant?: Tenant): Instance[] {
-    const now = Date.now();
-    const result: Instance[] = [];
+  /** Instances a viewer could see, with the advertisement text already serialized. */
+  private *advertisedInstances(tenant?: Tenant) {
     for (const [, state] of this.connections()) {
-      const advertisement = this.advertisements.get(state.connectionID)?.value;
+      const advertisement = this.advertisements.get(state.connectionID);
       if (
         state.ticket.role !== 'runner' ||
-        !state.instanceID ||
+        state.instanceID === undefined ||
         !advertisement ||
         (tenant && !sameTenant(tenant, state.ticket.tenant))
       )
         continue;
-      result.push({
+      yield {
         instanceID: state.instanceID,
+        state,
+        advertisement: advertisement.value,
+        encoded: advertisement.encoded,
+      };
+    }
+  }
+
+  private instances(tenant?: Tenant): Instance[] {
+    const now = Date.now();
+    const result: Instance[] = [];
+    for (const { instanceID, state, advertisement } of this.advertisedInstances(tenant)) {
+      result.push({
+        instanceID,
         tenant: state.ticket.tenant,
         advertisement,
         online: this.online(state, now),
@@ -902,6 +949,25 @@ export class SessionPresenceDO extends DurableObject<Env> {
       });
     }
     return result;
+  }
+
+  /** What a subscribed viewer would receive, excluding the per-heartbeat timestamp. */
+  private presenceSignature(tenant: Tenant): string {
+    const now = Date.now();
+    const entries: string[] = [];
+    for (const { instanceID, state, encoded } of this.advertisedInstances(tenant)) {
+      entries.push(JSON.stringify([instanceID, encoded, this.online(state, now)]));
+    }
+    return entries.sort().join('\n');
+  }
+
+  /** Only an advertised runner appears in a viewer's instance list. */
+  private contributesToInstances(state: Attachment): boolean {
+    return (
+      state.ticket.role === 'runner' &&
+      state.instanceID !== undefined &&
+      this.advertisements.has(state.connectionID)
+    );
   }
 
   private emit(
@@ -925,7 +991,7 @@ export class SessionPresenceDO extends DurableObject<Env> {
         body,
       })
     ) {
-      this.close(ws, state, 1011, 'Transport unavailable');
+      this.closeAndBroadcast(ws, state, 1011, 'Transport unavailable', 'socket_error');
       return false;
     }
     return true;
@@ -959,7 +1025,19 @@ export class SessionPresenceDO extends DurableObject<Env> {
     }
   }
 
-  private broadcast(): void {
+  private closeAndBroadcast(
+    ws: WebSocket,
+    state: Attachment,
+    code: number,
+    closeReason: string,
+    reason: BroadcastReason
+  ): void {
+    const visible = this.contributesToInstances(state);
+    this.close(ws, state, code, closeReason);
+    if (visible) this.broadcast(reason);
+  }
+
+  private broadcast(reason: BroadcastReason): void {
     let fanout = 0;
     const snapshots = new Map<string, Instance[]>();
     for (const [ws, state] of this.connections()) {
@@ -978,25 +1056,26 @@ export class SessionPresenceDO extends DurableObject<Env> {
         fanout++;
       }
     }
-    liveMetric(this.env, { route: 'presence_broadcast', role: 'viewer', fanout });
+    liveMetric(this.env, { route: 'presence_broadcast', role: 'viewer', reason, fanout });
   }
 
   private async sweep(): Promise<void> {
     const now = Date.now();
     this.expireCommands(now);
-    let changed = false;
+    let reason: BroadcastReason | undefined;
     for (const [ws, state] of this.connections()) {
       const expired = state.ticket.exp * 1000 <= now;
       const stale =
         state.ticket.role === 'runner' && state.lastHeartbeatAt + LIVE_LIMITS.staleMs <= now;
       if (expired || stale) {
+        if (this.contributesToInstances(state))
+          reason ??= expired ? 'ticket_expired' : 'heartbeat_stale';
         this.close(
           ws,
           state,
           expired ? 4001 : 4000,
           expired ? 'Ticket expired' : 'Heartbeat stale'
         );
-        changed = true;
       }
     }
     const expired = this.watches.filter(watch => watch.expiresAt <= now);
@@ -1020,7 +1099,7 @@ export class SessionPresenceDO extends DurableObject<Env> {
       }
       await persisted;
     }
-    if (changed) this.broadcast();
+    if (reason) this.broadcast(reason);
   }
 
   private async schedule(): Promise<void> {

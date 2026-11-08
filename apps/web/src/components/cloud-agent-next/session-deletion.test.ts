@@ -4,13 +4,144 @@ import { createTRPCClient } from '@trpc/client';
 import type { inferRouterOutputs } from '@trpc/server';
 import { createTRPCOptionsProxy } from '@trpc/tanstack-react-query';
 import { createStore } from 'jotai/vanilla';
+import {
+  WORKSPACE_REQUIRES_ROOT_SESSION,
+  WORKTREE_MEMBERSHIP_CHANGED,
+} from '@kilocode/session-ingest-contracts';
 import type { RootRouter } from '@/routers/root-router';
 import { apiSessionToDbSession, dbSessionsAtom } from './store/db-session-atoms';
 import {
+  createSessionDeletionFlow,
+  getDeletionErrorMessage,
   getWorktreeDeletionRedirect,
   invalidateSessionQueries,
+  isWorkspaceRequiresRootSessionError,
+  isWorktreeMembershipChangedError,
   removeDeletedSession,
+  removeDeletedSessions,
+  type SessionDeletionConfirmOptions,
+  type SessionDeletionEvent,
+  type SessionDeletionFlowDependencies,
+  type SessionDeletionTarget,
 } from './session-deletion';
+
+type DeleteSessionDependency = SessionDeletionFlowDependencies['deleteSession'];
+type DeleteWorktreeDependency = SessionDeletionFlowDependencies['deleteWorktree'];
+type ConfirmDependency = SessionDeletionFlowDependencies['confirm'];
+
+function trpcCodeError(code: string, message = code): Error {
+  return Object.assign(new Error(message), { data: { code } });
+}
+
+function createDeletionFlowHarness() {
+  const confirmCalls: SessionDeletionConfirmOptions[] = [];
+  const deleteSessionCalls: Parameters<DeleteSessionDependency>[0][] = [];
+  const deleteWorktreeCalls: Parameters<DeleteWorktreeDependency>[0][] = [];
+  const deletedEvents: SessionDeletionEvent[] = [];
+  const removedBatches: string[][] = [];
+  const sessionPending: Array<[string, boolean]> = [];
+  const worktreePending: Array<[string, boolean]> = [];
+  const droppedOperationKeys: string[] = [];
+  const successMessages: string[] = [];
+  const warningMessages: string[] = [];
+  const errors: Array<{ title: string; description: string }> = [];
+  const stats = { invalidations: 0 };
+  const operationKeys = new Map<string, string>();
+  let confirmImpl: ConfirmDependency = async () => true;
+  let deleteSessionImpl: DeleteSessionDependency = async input => ({
+    success: true,
+    session_id: input.session_id,
+    cleanup: 'complete',
+  });
+  let deleteWorktreeImpl: DeleteWorktreeDependency = async () => ({
+    success: true,
+    deletedSessionIds: [],
+    cleanup: 'complete',
+  });
+
+  const deps: SessionDeletionFlowDependencies = {
+    organizationId: null,
+    confirm: options => {
+      confirmCalls.push(options);
+      return confirmImpl(options);
+    },
+    deleteSession: input => {
+      deleteSessionCalls.push(input);
+      return deleteSessionImpl(input);
+    },
+    deleteWorktree: input => {
+      deleteWorktreeCalls.push(input);
+      return deleteWorktreeImpl(input);
+    },
+    removeDeletedSessions: async sessionIds => {
+      removedBatches.push([...sessionIds]);
+    },
+    invalidateQueries: async () => {
+      stats.invalidations += 1;
+    },
+    notifyDeleted: event => {
+      deletedEvents.push(event);
+    },
+    setSessionPending: (sessionId, pending) => {
+      sessionPending.push([sessionId, pending]);
+    },
+    setWorktreePending: (worktreeId, pending) => {
+      worktreePending.push([worktreeId, pending]);
+    },
+    getOperationKey: sessionId => {
+      const existing = operationKeys.get(sessionId);
+      if (existing) return existing;
+      const key = `key-${sessionId}`;
+      operationKeys.set(sessionId, key);
+      return key;
+    },
+    dropOperationKey: sessionId => {
+      droppedOperationKeys.push(sessionId);
+      operationKeys.delete(sessionId);
+    },
+    notifySuccess: message => {
+      successMessages.push(message);
+    },
+    notifyWarning: message => {
+      warningMessages.push(message);
+    },
+    notifyError: (title, description) => {
+      errors.push({ title, description });
+    },
+  };
+
+  return {
+    flow: createSessionDeletionFlow(),
+    deps,
+    confirmCalls,
+    deleteSessionCalls,
+    deleteWorktreeCalls,
+    deletedEvents,
+    removedBatches,
+    sessionPending,
+    worktreePending,
+    droppedOperationKeys,
+    successMessages,
+    warningMessages,
+    errors,
+    stats,
+    setConfirmImpl: (impl: ConfirmDependency) => {
+      confirmImpl = impl;
+    },
+    setDeleteSessionImpl: (impl: DeleteSessionDependency) => {
+      deleteSessionImpl = impl;
+    },
+    setDeleteWorktreeImpl: (impl: DeleteWorktreeDependency) => {
+      deleteWorktreeImpl = impl;
+    },
+  };
+}
+
+const deletionTarget: SessionDeletionTarget = {
+  sessionId: 'ses_00000000000000000000000001',
+  title: 'Fix auth',
+  worktreeId: 'worktree_12345678-1234-4234-9234-123456789abc',
+};
 
 type ApiSession = inferRouterOutputs<RootRouter>['cliSessionsV2']['list']['cliSessions'][number];
 
@@ -58,6 +189,7 @@ function createFixture() {
   const recentKey = trpc.cliSessionsV2.recentRepositories.queryKey({
     updatedSince: '2026-08-01T00:00:00.000Z',
   });
+  const foldersKey = trpc.workspaceFolders.list.queryKey({ organizationId: null });
   const worktreeDetailsKey = trpc.cliSessionsV2.worktreeDetails.queryKey({
     worktreeIds: ['worktree_12345678-1234-4234-9234-123456789abc'],
     organizationId: null,
@@ -88,6 +220,7 @@ function createFixture() {
   };
   seedSessions(sessions);
   queryClient.setQueryData(recentKey, { repositories: [] });
+  queryClient.setQueryData(foldersKey, { folders: [] });
   queryClient.setQueryData(worktreeDetailsKey, {
     worktrees: {
       'worktree_12345678-1234-4234-9234-123456789abc': {
@@ -132,6 +265,7 @@ function createFixture() {
     recentKey,
     worktreeDetailsKey,
     worktreeParentKey,
+    foldersKey,
     seedSessions,
   };
 }
@@ -201,6 +335,27 @@ describe('worktree deletion navigation', () => {
   );
 });
 
+describe('session deletion conflicts', () => {
+  it('escalates only the exact final-root conflict to deleting the workspace', () => {
+    expect(isWorkspaceRequiresRootSessionError(new Error(WORKSPACE_REQUIRES_ROOT_SESSION))).toBe(
+      true
+    );
+    expect(
+      isWorkspaceRequiresRootSessionError(new Error(`${WORKSPACE_REQUIRES_ROOT_SESSION}: details`))
+    ).toBe(false);
+    expect(isWorkspaceRequiresRootSessionError(new Error('session_deletion_conflict'))).toBe(false);
+    expect(isWorkspaceRequiresRootSessionError(undefined)).toBe(false);
+  });
+
+  it('recognizes a membership change without treating it as a final-root conflict', () => {
+    expect(isWorktreeMembershipChangedError(new Error(WORKTREE_MEMBERSHIP_CHANGED))).toBe(true);
+    expect(
+      isWorktreeMembershipChangedError(new Error('worktree_membership_changed elsewhere'))
+    ).toBe(false);
+    expect(isWorkspaceRequiresRootSessionError(new Error(WORKTREE_MEMBERSHIP_CHANGED))).toBe(false);
+  });
+});
+
 describe('session deletion', () => {
   it('removes confirmed rows from all caches before persistence finishes, preserving metadata and unrelated data', async () => {
     const { context, persisted, listKeys, searchKeys } = fixture;
@@ -235,6 +390,15 @@ describe('session deletion', () => {
     persistence.resolve();
     await deletion;
     expect([...persisted]).toEqual(['ses_b', 'ses_c']);
+  });
+
+  it('removes every returned deleted id', async () => {
+    const { context, persisted } = fixture;
+
+    await removeDeletedSessions({ ...context, sessionIds: ['ses_a', 'ses_c'] });
+
+    expectCachedSessions(['ses_b']);
+    expect([...persisted]).toEqual(['ses_b']);
   });
 
   it('cancels stale list, search and active-session responses so they cannot restore a deleted row', async () => {
@@ -292,6 +456,7 @@ describe('session deletion', () => {
       recentKey,
       worktreeDetailsKey,
       worktreeParentKey,
+      foldersKey,
     } = fixture;
     await removeDeletedSession({ ...context, sessionId: 'ses_b' });
     seedSessions([
@@ -306,6 +471,7 @@ describe('session deletion', () => {
       recentKey,
       worktreeDetailsKey,
       worktreeParentKey,
+      foldersKey,
     ];
     const currentData = keys.map(key => context.queryClient.getQueryData(key));
 
@@ -333,5 +499,298 @@ describe('session deletion', () => {
 
     expectCachedSessions(['ses_b', 'ses_c']);
     expect(fixture.persisted.has('ses_a')).toBe(true);
+  });
+});
+
+describe('session deletion flow', () => {
+  it('escalates only the exact final-root conflict and deletes the guarded workspace', async () => {
+    const harness = createDeletionFlowHarness();
+    harness.setDeleteSessionImpl(async () => {
+      throw trpcCodeError('CONFLICT', WORKSPACE_REQUIRES_ROOT_SESSION);
+    });
+    harness.setDeleteWorktreeImpl(async () => ({
+      success: true,
+      deletedSessionIds: [deletionTarget.sessionId, 'ses_descendant'],
+      cleanup: 'pending',
+    }));
+
+    await expect(harness.flow.deleteSession(deletionTarget, harness.deps)).resolves.toBe(true);
+
+    expect(harness.confirmCalls).toHaveLength(2);
+    expect(harness.confirmCalls[0]).toMatchObject({
+      title: 'Delete session?',
+      queue: true,
+    });
+    expect(harness.confirmCalls[0].description).toContain(deletionTarget.sessionId);
+    expect(harness.confirmCalls[0].description).toContain(deletionTarget.title ?? '');
+    expect(harness.confirmCalls[1]).toMatchObject({
+      title: 'Delete workspace and last session?',
+      queue: true,
+    });
+    expect(harness.confirmCalls[1].description).toContain(deletionTarget.sessionId);
+    expect(harness.confirmCalls[1].description).toContain(deletionTarget.worktreeId ?? '');
+    expect(harness.deleteSessionCalls).toEqual([
+      {
+        session_id: deletionTarget.sessionId,
+        operationKey: `key-${deletionTarget.sessionId}`,
+      },
+    ]);
+    expect(harness.deleteWorktreeCalls).toEqual([
+      {
+        worktreeId: deletionTarget.worktreeId,
+        organizationId: null,
+        onlyIfSoleSessionId: deletionTarget.sessionId,
+      },
+    ]);
+    expect(harness.worktreePending).toEqual([
+      [deletionTarget.worktreeId, true],
+      [deletionTarget.worktreeId, false],
+    ]);
+    expect(harness.deletedEvents).toEqual([
+      {
+        scope: 'workspace',
+        deletedSessionIds: [deletionTarget.sessionId, 'ses_descendant'],
+        worktreeId: deletionTarget.worktreeId,
+        cleanup: 'pending',
+      },
+    ]);
+    expect(harness.warningMessages).toEqual(['Workspace removed; runtime cleanup is incomplete.']);
+    expect(harness.droppedOperationKeys).toContain(deletionTarget.sessionId);
+    expect(harness.droppedOperationKeys).toContain('ses_descendant');
+  });
+
+  it.each(['session', 'workspace'] as const)(
+    'preserves confirmed %s deletion when client reconciliation fails',
+    async scope => {
+      for (const step of ['removeDeletedSessions', 'notifyDeleted', 'invalidateQueries'] as const) {
+        const harness = createDeletionFlowHarness();
+        if (scope === 'workspace') {
+          harness.setDeleteSessionImpl(async () => {
+            throw trpcCodeError('CONFLICT', WORKSPACE_REQUIRES_ROOT_SESSION);
+          });
+          harness.setDeleteWorktreeImpl(async () => ({
+            success: true,
+            deletedSessionIds: [deletionTarget.sessionId, 'ses_descendant'],
+            cleanup: 'pending',
+          }));
+        }
+        harness.deps[step] = () => {
+          throw new Error('Client reconciliation failed');
+        };
+
+        await expect(harness.flow.deleteSession(deletionTarget, harness.deps)).resolves.toBe(true);
+
+        expect(harness.errors).toEqual([]);
+        expect(harness.warningMessages).toContain(
+          'History deleted, but the page could not update completely. Refresh the page.'
+        );
+        if (step !== 'notifyDeleted') expect(harness.deletedEvents).toHaveLength(1);
+        if (step !== 'invalidateQueries') expect(harness.stats.invalidations).toBe(1);
+        if (scope === 'workspace') {
+          expect(harness.droppedOperationKeys).toContain('ses_descendant');
+          expect(harness.warningMessages).toContain(
+            'Workspace removed; runtime cleanup is incomplete.'
+          );
+        }
+        expect(harness.flow.isActive()).toBe(false);
+        expect(harness.sessionPending.at(-1)).toEqual([deletionTarget.sessionId, false]);
+      }
+    }
+  );
+
+  it('cancels workspace escalation without deleting anything', async () => {
+    const harness = createDeletionFlowHarness();
+    harness.setConfirmImpl(async () => harness.confirmCalls.length === 1);
+    harness.setDeleteSessionImpl(async () => {
+      throw trpcCodeError('CONFLICT', WORKSPACE_REQUIRES_ROOT_SESSION);
+    });
+
+    await expect(harness.flow.deleteSession(deletionTarget, harness.deps)).resolves.toBe(false);
+
+    expect(harness.confirmCalls).toHaveLength(2);
+    expect(harness.deleteWorktreeCalls).toHaveLength(0);
+    expect(harness.deletedEvents).toHaveLength(0);
+    expect(harness.removedBatches).toHaveLength(0);
+  });
+
+  it('cancels the initial confirmation without contacting the server', async () => {
+    const harness = createDeletionFlowHarness();
+    harness.setConfirmImpl(async () => false);
+
+    await expect(harness.flow.deleteSession(deletionTarget, harness.deps)).resolves.toBe(false);
+
+    expect(harness.deleteSessionCalls).toHaveLength(0);
+    expect(harness.deleteWorktreeCalls).toHaveLength(0);
+  });
+
+  it('treats a typed NOT_FOUND retry as removed with pending cleanup', async () => {
+    const harness = createDeletionFlowHarness();
+    harness.setDeleteSessionImpl(async () => {
+      throw trpcCodeError('NOT_FOUND');
+    });
+
+    await expect(harness.flow.deleteSession(deletionTarget, harness.deps)).resolves.toBe(true);
+
+    expect(harness.confirmCalls).toHaveLength(1);
+    expect(harness.deleteWorktreeCalls).toHaveLength(0);
+    expect(harness.removedBatches).toEqual([[deletionTarget.sessionId]]);
+    expect(harness.deletedEvents).toEqual([
+      {
+        scope: 'session',
+        deletedSessionIds: [deletionTarget.sessionId],
+        worktreeId: deletionTarget.worktreeId,
+        cleanup: 'pending',
+      },
+    ]);
+    expect(harness.warningMessages).toEqual(['Session removed; runtime cleanup is incomplete.']);
+    expect(harness.droppedOperationKeys).toContain(deletionTarget.sessionId);
+  });
+
+  it('treats a typed workspace NOT_FOUND retry as removed with pending cleanup', async () => {
+    const harness = createDeletionFlowHarness();
+    harness.setDeleteSessionImpl(async () => {
+      throw trpcCodeError('CONFLICT', WORKSPACE_REQUIRES_ROOT_SESSION);
+    });
+    harness.setDeleteWorktreeImpl(async () => {
+      throw trpcCodeError('NOT_FOUND');
+    });
+
+    await expect(harness.flow.deleteSession(deletionTarget, harness.deps)).resolves.toBe(true);
+
+    expect(harness.deleteWorktreeCalls).toHaveLength(1);
+    expect(harness.deletedEvents).toEqual([
+      {
+        scope: 'workspace',
+        deletedSessionIds: [deletionTarget.sessionId],
+        worktreeId: deletionTarget.worktreeId,
+        cleanup: 'pending',
+      },
+    ]);
+    expect(harness.warningMessages).toEqual(['Workspace removed; runtime cleanup is incomplete.']);
+  });
+
+  it('refreshes and reports a workspace membership race without falling back to an unguarded delete', async () => {
+    const harness = createDeletionFlowHarness();
+    harness.setDeleteSessionImpl(async () => {
+      throw trpcCodeError('CONFLICT', WORKSPACE_REQUIRES_ROOT_SESSION);
+    });
+    harness.setDeleteWorktreeImpl(async () => {
+      throw trpcCodeError('CONFLICT', WORKTREE_MEMBERSHIP_CHANGED);
+    });
+
+    await expect(harness.flow.deleteSession(deletionTarget, harness.deps)).resolves.toBe(false);
+
+    expect(harness.deleteSessionCalls).toHaveLength(1);
+    expect(harness.deleteWorktreeCalls).toHaveLength(1);
+    expect(harness.stats.invalidations).toBeGreaterThan(0);
+    expect(harness.errors).toEqual([
+      {
+        title: 'Could not delete the workspace',
+        description: 'The workspace changed. Refresh the list and try again.',
+      },
+    ]);
+  });
+
+  it('does not escalate a generic conflict and drops the settled operation key', async () => {
+    const harness = createDeletionFlowHarness();
+    harness.setDeleteSessionImpl(async () => {
+      throw trpcCodeError('CONFLICT', 'session_deletion_conflict');
+    });
+
+    await expect(harness.flow.deleteSession(deletionTarget, harness.deps)).resolves.toBe(false);
+
+    expect(harness.deleteWorktreeCalls).toHaveLength(0);
+    expect(harness.droppedOperationKeys).toContain(deletionTarget.sessionId);
+    expect(harness.errors[0]?.title).toBe('Could not delete the session');
+  });
+
+  it('retains the operation key for an ambiguous failure', async () => {
+    const harness = createDeletionFlowHarness();
+    harness.setDeleteSessionImpl(async () => {
+      throw trpcCodeError('INTERNAL_SERVER_ERROR');
+    });
+
+    await expect(harness.flow.deleteSession(deletionTarget, harness.deps)).resolves.toBe(false);
+
+    expect(harness.droppedOperationKeys).toHaveLength(0);
+    expect(harness.errors[0]?.description).toBe(
+      'Deletion could not be confirmed. Refresh the list before retrying.'
+    );
+  });
+
+  it('reuses an ambiguous failure operation key on retry and drops it after success', async () => {
+    const harness = createDeletionFlowHarness();
+    let attempts = 0;
+    harness.setDeleteSessionImpl(async input => {
+      attempts += 1;
+      if (attempts === 1) throw trpcCodeError('INTERNAL_SERVER_ERROR');
+      return { success: true, session_id: input.session_id, cleanup: 'complete' };
+    });
+
+    await expect(harness.flow.deleteSession(deletionTarget, harness.deps)).resolves.toBe(false);
+    await expect(harness.flow.deleteSession(deletionTarget, harness.deps)).resolves.toBe(true);
+
+    expect(harness.deleteSessionCalls).toHaveLength(2);
+    expect(harness.deleteSessionCalls[0].operationKey).toBe(
+      harness.deleteSessionCalls[1].operationKey
+    );
+    expect(harness.droppedOperationKeys).toContain(deletionTarget.sessionId);
+  });
+
+  it('uses the latest deleted callback after the request settles', async () => {
+    const harness = createDeletionFlowHarness();
+    const deletedWithLatestValue: string[] = [];
+    let latestValue = 'before';
+    harness.deps.notifyDeleted = () => {
+      deletedWithLatestValue.push(latestValue);
+    };
+    const started = Promise.withResolvers<void>();
+    const response = Promise.withResolvers<Awaited<ReturnType<DeleteSessionDependency>>>();
+    harness.setDeleteSessionImpl(() => {
+      started.resolve();
+      return response.promise;
+    });
+
+    const deletion = harness.flow.deleteSession(deletionTarget, harness.deps);
+    await started.promise;
+    latestValue = 'after';
+    response.resolve({
+      success: true,
+      session_id: deletionTarget.sessionId,
+      cleanup: 'complete',
+    });
+
+    await expect(deletion).resolves.toBe(true);
+    expect(deletedWithLatestValue).toEqual(['after']);
+  });
+
+  it('rejects a second destructive flow while one is still confirming', async () => {
+    const harness = createDeletionFlowHarness();
+    const confirmation = Promise.withResolvers<boolean>();
+    harness.setConfirmImpl(() => confirmation.promise);
+
+    const first = harness.flow.deleteSession(deletionTarget, harness.deps);
+    const second = harness.flow.deleteSession(
+      { ...deletionTarget, sessionId: 'ses_00000000000000000000000002' },
+      harness.deps
+    );
+
+    await expect(second).resolves.toBe(false);
+    expect(harness.confirmCalls).toHaveLength(1);
+
+    confirmation.resolve(true);
+    await expect(first).resolves.toBe(true);
+  });
+
+  it('maps known deletion failure codes and falls back safely', () => {
+    expect(getDeletionErrorMessage(trpcCodeError('FORBIDDEN'))).toBe(
+      'You do not have permission to delete this.'
+    );
+    expect(getDeletionErrorMessage(trpcCodeError('CONFLICT'))).toBe(
+      'This item changed while it was being deleted. Refresh and try again.'
+    );
+    expect(getDeletionErrorMessage(new Error('unexpected'))).toBe(
+      'Could not delete this item. Please try again.'
+    );
   });
 });

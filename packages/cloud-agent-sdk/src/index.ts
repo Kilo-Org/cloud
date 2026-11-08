@@ -1,3 +1,34 @@
+export { NativeSyncClient, NativeSyncError } from './native-sync';
+export type {
+  NativeSyncOptions,
+  NativeEvent,
+  NativeSessionSummary,
+  NativePresenceState,
+  NativeSessionState,
+  NativePresenceConnection,
+  NativeSessionConnection,
+  NativeInstanceReply,
+  NativeSocket,
+  NativeSocketConstructor,
+} from './native-sync';
+export { listNativeModels } from './native-sync-discovery';
+export type { NativeDiscoveredModel } from './native-sync-discovery';
+export { projectNativeSnapshot } from './native-sync-snapshot';
+export type {
+  NativeEntity,
+  NativeAssetReader,
+  NativeSnapshot,
+  NativeSnapshotMessage,
+  NativeSnapshotProjection,
+  NativeSnapshotSession,
+} from './native-sync-snapshot';
+export { readNativeConversation } from './native-conversation-source';
+export type {
+  NativeConversation,
+  NativePendingRequests,
+  NativePendingQuestion,
+} from './native-conversation-source';
+
 export { isStreamError, isValidCloudAgentEvent } from './schemas';
 export type { CloudAgentEvent, StreamError, StreamErrorCode } from './schemas';
 

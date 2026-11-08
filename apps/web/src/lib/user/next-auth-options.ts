@@ -69,6 +69,12 @@ import {
   OPENAI_CHATGPT_NOT_ELIGIBLE_MESSAGE,
   probeOpenAiChatGptEligibility,
 } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/eligibility';
+import { isClaudePlatformOAuthEnabled } from '@kilocode/web-shared/lib/auth/claude/feature-flag.server';
+import { claudeSignInProvider } from '@/lib/auth/claude/sign-in-provider';
+import {
+  CLAUDE_OIDC_ISSUER,
+  CLAUDE_SIGN_IN_CLIENT_ID,
+} from '@kilocode/web-shared/lib/auth/claude/config';
 import {
   GITHUB_CLIENT_ID,
   GITHUB_CLIENT_SECRET,
@@ -101,6 +107,7 @@ import { getLowerDomainFromEmail } from '@kilocode/web-shared/lib/email-address'
 import { z } from 'zod';
 import {
   getUserFromSession,
+  getUserFromSessionForCredentialIssuance,
   isBlockedTLD,
   isEmailBlacklistedByDomainAsync,
   sessionAuthOptions,
@@ -143,6 +150,11 @@ function generateAppleClientSecret(): string {
     }
   );
 }
+
+const claudeVerifiedEmailSchema = z.object({
+  email: z.email(),
+  email_verified: z.literal(true),
+});
 
 const anacondaProfileSchema = z.object({
   sub: z.string().trim().min(1),
@@ -252,6 +264,27 @@ function createOpenAiAccountInfo(
     // Issuer-qualified subject: a `sub` from any other issuer or client can
     // never collide with an OpenAI account.
     provider_account_id: `${OPENAI_ISSUER}#${sub}`,
+    display_name: null,
+  };
+}
+
+function createClaudeAccountInfo(
+  account: Account,
+  user: NextUser | AdapterUser
+): CreateOrUpdateUserArgs | null {
+  if (account.provider !== 'claude') return null;
+  assert(user.email, 'User email is required for Claude auth');
+
+  return {
+    google_user_email: user.email,
+    google_user_name: user.name || user.email.split('@')[0],
+    google_user_image_url: user.image || '',
+    hosted_domain: hosted_domain_specials.claude,
+    provider: account.provider,
+    // Issuer-qualified subject: a `sub` from any other issuer or client can
+    // never collide with a Claude account. NextAuth sets `providerAccountId`
+    // from `parseClaudeProfile`, which requires a non-empty `sub`.
+    provider_account_id: `${CLAUDE_OIDC_ISSUER}#${account.providerAccountId}`,
     display_name: null,
   };
 }
@@ -584,6 +617,7 @@ function createAccountInfo(
     createGoogleAccountInfo(account, user, profile) ??
     createAnacondaAccountInfo(account, user) ??
     createOpenAiAccountInfo(account, user, profile) ??
+    createClaudeAccountInfo(account, user) ??
     createAppleAccountInfo(account, user) ??
     createGitHubAccountInfo(account, user, profile) ??
     createGitlabAccountInfo(account, user) ??
@@ -639,6 +673,27 @@ export function parseSignInRedirectContext(
         : undefined,
     signup: nestedSignup || undefined,
   };
+}
+
+export function getInvitationTokenFromCallbackPath(callbackPath?: string): string | undefined {
+  const match = callbackPath?.match(/^\/users\/accept-invite\/([^/?#]+)(?:[?#].*)?$/);
+  if (!match) return undefined;
+  try {
+    return decodeURIComponent(match[1]);
+  } catch {
+    return undefined;
+  }
+}
+
+export function preserveSignInRedirectContext(url: string, context: SignInRedirectContext): string {
+  const destination = new URL(url, 'http://localhost');
+  if (context.callbackPath && isValidCallbackPath(context.callbackPath)) {
+    destination.searchParams.set('callbackPath', context.callbackPath);
+  }
+  if (context.signup) {
+    destination.searchParams.set('signup', 'true');
+  }
+  return `${destination.pathname}${destination.search}`;
 }
 
 async function getSignInRedirectContext(): Promise<SignInRedirectContext> {
@@ -806,6 +861,8 @@ export const authOptions: NextAuthOptions = {
       clientSecret: GOOGLE_CLIENT_SECRET,
     }),
     openAiProvider,
+    // Registered only where the Claude sign-in app is configured.
+    ...(CLAUDE_SIGN_IN_CLIENT_ID ? [claudeSignInProvider] : []),
     {
       id: 'anaconda',
       name: 'Anaconda',
@@ -839,6 +896,7 @@ export const authOptions: NextAuthOptions = {
     DiscordProvider({
       clientId: DISCORD_OAUTH_CLIENT_ID ?? '',
       clientSecret: DISCORD_OAUTH_CLIENT_SECRET ?? '',
+      issuer: 'https://discord.com',
     }),
     LinkedInProvider({
       clientId: LINKEDIN_CLIENT_ID,
@@ -1042,7 +1100,12 @@ export const authOptions: NextAuthOptions = {
         // ordinary linking failure. The read above consumed the cookie, so a
         // refusal is final.
         if (isAccountLinking && linkingSession) {
-          const linkingPrincipal = await getUserFromSession();
+          const claudeLinkingUser =
+            account.provider === 'claude'
+              ? (await getUserFromSessionForCredentialIssuance()).user
+              : undefined;
+          const linkingPrincipal =
+            account.provider === 'claude' ? claudeLinkingUser : await getUserFromSession();
           if (linkingPrincipal?.id !== linkingSession.existingUserId) {
             warnInSentry('SECURITY: Account link refused: the session does not match the link', {
               extra: { provider: accountInfo.provider },
@@ -1057,6 +1120,34 @@ export const authOptions: NextAuthOptions = {
               );
             }
             return redirectUrlForCode('LINKING-FAILED');
+          }
+          if (
+            account.provider === 'claude' &&
+            !(await isClaudePlatformOAuthEnabled(claudeLinkingUser?.google_user_email))
+          ) {
+            return redirectUrlForCode('LINKING-FAILED');
+          }
+        }
+        if (account.provider === 'claude' && !isAccountLinking) {
+          const claims = claudeVerifiedEmailSchema.safeParse(profile);
+          if (!claims.success) {
+            console.warn('[claude-auth] authorization refused', {
+              reason: 'invalid_profile_claims',
+              claimNames: Object.keys(profile ?? {}).filter(
+                key =>
+                  key === 'sub' || key === 'email' || key === 'email_verified' || key === 'name'
+              ),
+              rejectedClaims: claims.error.issues.map(issue => issue.path.map(String).join('.')),
+            });
+            return redirectUrlForCode('UNKNOWN-ERROR');
+          }
+          if (claims.data.email !== accountInfo.google_user_email) {
+            console.warn('[claude-auth] authorization refused', { reason: 'email_mismatch' });
+            return redirectUrlForCode('UNKNOWN-ERROR');
+          }
+          if (!(await isClaudePlatformOAuthEnabled(claims.data.email))) {
+            console.warn('[claude-auth] authorization refused', { reason: 'release_denied' });
+            return redirectUrlForCode('UNKNOWN-ERROR');
           }
         }
 
@@ -1132,7 +1223,10 @@ export const authOptions: NextAuthOptions = {
               return redirectUrlForCode('UNKNOWN-ERROR');
             }
             if (ssoAuthority.status === 'required') {
-              return ssoSignInRedirectUrl(domainToCheck);
+              return preserveSignInRedirectContext(
+                ssoSignInRedirectUrl(domainToCheck),
+                redirectContext
+              );
             }
           }
         }
@@ -1164,10 +1258,18 @@ export const authOptions: NextAuthOptions = {
             }
           );
 
-          return processSSOUserLogin(accountInfo, requestHeaders, affiliateTrackingId, {
-            ...trackingContext,
-            watchwood,
-          });
+          const result = await processSSOUserLogin(
+            accountInfo,
+            requestHeaders,
+            affiliateTrackingId,
+            { ...trackingContext, watchwood },
+            !isAccountLinking
+              ? getInvitationTokenFromCallbackPath(redirectContext.callbackPath)
+              : undefined
+          );
+          return typeof result === 'string' && !isAccountLinking
+            ? preserveSignInRedirectContext(result, redirectContext)
+            : result;
         }
 
         // Validate Turnstile JWT for real OAuth logins (not fake logins or email auth)
@@ -1293,6 +1395,9 @@ export const authOptions: NextAuthOptions = {
           !(await mayConnectOpenAiChatGptSharedServices(result.user, linkingSession.organizationId))
         ) {
           return openAiChatGptConnectFailureUrl(linkingSession.organizationId, 'LINKING-FAILED');
+        }
+        if (account.provider === 'claude' && isAccountLinking) {
+          return '/connected-accounts?linked=claude';
         }
 
         // NOTE(bmc): this is sad but its here for a reason, don't change it

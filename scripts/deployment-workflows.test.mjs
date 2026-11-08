@@ -375,17 +375,44 @@ test('production EU preparation, rollback and historical source use the selected
   }
 });
 
-test('production and staging schedule independently on main every 20 minutes', () => {
+test('both deploys start from a successful main CI run and keep an hourly catch-up poll', () => {
   for (const [name, deployment] of [
     ['production', production],
     ['staging', staging],
   ]) {
     assert.equal(deployment.on.push, undefined, `${name} must not deploy on every merge`);
-    assert.deepEqual(deployment.on.schedule, [{ cron: '7,27,47 * * * *' }]);
+    assert.deepEqual(deployment.on.workflow_run, {
+      workflows: [ci.name],
+      types: ['completed'],
+      branches: ['main'],
+    });
+    assert.deepEqual(deployment.on.schedule, [{ cron: '7 * * * *' }]);
     assert.ok(Object.hasOwn(deployment.on, 'workflow_dispatch'));
     assert.equal(deployment.concurrency['cancel-in-progress'], false);
     assert.equal(deployment.jobs['check-changes'].with.workflow_file, `deploy-${name}.yml`);
-    assert.equal(deployment.jobs['check-changes'].needs, undefined);
+    assert.equal(deployment.jobs['check-changes'].needs, 'admit');
+    const admitted = (eventName, conclusion) =>
+      runInNewContext(deployment.jobs.admit.if, {
+        github: { event_name: eventName, event: { workflow_run: { conclusion } } },
+      });
+    assert.equal(admitted('workflow_run', 'success'), true);
+    for (const conclusion of ['failure', 'cancelled', 'skipped', 'neutral', 'timed_out', null]) {
+      assert.equal(admitted('workflow_run', conclusion), false, `${name} must skip ${conclusion}`);
+    }
+    assert.equal(admitted('schedule', null), true);
+    assert.equal(admitted('workflow_dispatch', null), true);
+    assert.deepEqual(
+      Object.entries(deployment.jobs)
+        .filter(([, job]) => job.needs === undefined)
+        .map(([id]) => id),
+      ['admit'],
+      `${name} must admit the trigger before any candidate lookup`
+    );
+    assert.doesNotMatch(
+      JSON.stringify(deployment.jobs),
+      /workflow_run\.head_sha/,
+      `${name} must not deploy a SHA taken from the event payload`
+    );
   }
   assert.notEqual(production.concurrency.group, staging.concurrency.group);
 });
@@ -434,6 +461,48 @@ test('successful main CI selects the tested deployment SHA', () => {
   }
 });
 
+test('web promotion waits for a completed or deliberately skipped gateway rollout', () => {
+  const job = production.jobs['promote-app'];
+  const condition = (job.if ?? 'success()')
+    .replace(/^\$\{\{|\}\}$/g, '')
+    .replace(/needs\.([\w-]+)\.result/g, 'needs["$1"].result');
+  const expression = /\b(always|cancelled|failure|success)\(/.test(condition)
+    ? condition
+    : `success() && (${condition})`;
+  for (const [stage, promotion, app, database, cancelled, expected] of [
+    ['success', 'success', 'success', 'success', false, true],
+    ['skipped', 'skipped', 'success', 'success', false, true],
+    ['success', 'failure', 'success', 'success', false, false],
+    ['failure', 'skipped', 'success', 'success', false, false],
+    ['cancelled', 'skipped', 'success', 'success', false, false],
+    ['success', 'cancelled', 'success', 'success', false, false],
+    ['success', 'skipped', 'success', 'success', false, false],
+    ['skipped', 'success', 'success', 'success', false, false],
+    ['skipped', 'skipped', 'failure', 'success', false, false],
+    ['success', 'success', 'success', 'failure', false, false],
+    ['skipped', 'skipped', 'success', 'skipped', false, false],
+    ['success', 'success', 'success', 'success', true, false],
+  ]) {
+    const results = {
+      'stage-app': app,
+      'db-gate': database,
+      'stage-ai-gateway': stage,
+      'promote-ai-gateway': promotion,
+    };
+    const needs = Object.fromEntries(job.needs.map(name => [name, { result: results[name] }]));
+    assert.equal(
+      runInNewContext(expression, {
+        needs,
+        github: { repository: 'Kilo-Org/cloud' },
+        cancelled: () => cancelled,
+        success: () => Object.values(needs).every(dependency => dependency.result === 'success'),
+      }),
+      expected,
+      JSON.stringify({ stage, promotion, app, database, cancelled })
+    );
+  }
+});
+
 test('ai-gateway deploys with each scheduled release after migrations', () => {
   const stageAiGateway = production.jobs['stage-ai-gateway'];
   assert.equal(stageAiGateway.needs, 'check-changes');
@@ -468,7 +537,7 @@ test('ai-gateway deploys with each scheduled release after migrations', () => {
     '${{ secrets.VERCEL_TOKEN_AI_GATEWAY }}'
   );
 
-  for (const job of ['deploy-workers', 'deploy-gastown-wasteland']) {
+  for (const job of ['deploy-workers']) {
     for (const dependency of ['stage-ai-gateway', 'promote-ai-gateway']) {
       assert.ok(production.jobs[job].needs.includes(dependency), `${job} needs ${dependency}`);
       assert.match(production.jobs[job].if, new RegExp(`needs\\.${dependency}\\.result`));
@@ -489,6 +558,15 @@ test('ai-gateway deploys with each scheduled release after migrations', () => {
 });
 
 test('one database gate per deployment checks out, installs and migrates once', () => {
+  const dbGateInstall =
+    "pnpm install --frozen-lockfile --filter '@kilocode/db...' --filter kilocode-monorepo";
+  // The deploy gate narrows its install to the workspace set the CI drizzle
+  // check already proves: the probe and drizzle-kit both resolve there.
+  const ciDrizzleInstall = ci.jobs['drizzle-check'].steps.find(
+    step => step.name === 'Install dependencies'
+  ).run;
+  assert.equal(dbGateInstall, ciDrizzleInstall);
+
   for (const [name, deployment, startupStep, migrateStep, environment] of [
     [
       'production',
@@ -511,7 +589,7 @@ test('one database gate per deployment checks out, installs and migrates once', 
 
     const steps = job.steps;
     assert.equal(steps.filter(step => step.uses?.startsWith('useblacksmith/checkout@')).length, 1);
-    assert.equal(steps.filter(step => step.run === 'pnpm install --frozen-lockfile').length, 1);
+    assert.equal(steps.filter(step => step.run === dbGateInstall).length, 1);
     assert.equal(
       steps.find(step => step.uses?.startsWith('useblacksmith/checkout@')).with.ref,
       '${{ needs.check-changes.outputs.target_sha }}'
@@ -519,7 +597,7 @@ test('one database gate per deployment checks out, installs and migrates once', 
 
     const startupIndex = steps.findIndex(step => step.name === startupStep);
     const migrateIndex = steps.findIndex(step => step.name === migrateStep);
-    const installIndex = steps.findIndex(step => step.run === 'pnpm install --frozen-lockfile');
+    const installIndex = steps.findIndex(step => step.run === dbGateInstall);
     assert.ok(installIndex < startupIndex && startupIndex < migrateIndex);
     assert.match(steps[startupIndex].run, /scripts\/check-production-db-startup\.ts/);
     assert.equal(steps[migrateIndex].run, 'NODE_ENV=production pnpm run drizzle migrate');
@@ -542,6 +620,39 @@ test('one database gate per deployment checks out, installs and migrates once', 
     assert.match(production.jobs[job].if, /needs\.db-gate\.result == 'success'/);
   }
   assert.match(staging.jobs['record-deployment'].if, /needs\.db-gate\.result == 'success'/);
+});
+
+test('every Worker deploy job installs only the Worker closure and the root project', () => {
+  // A recursive workspace install from inside a Worker links every unrelated
+  // project and runs its lifecycle scripts once per deploy job. The closure
+  // install links the Worker, its workspace dependencies, the root project and,
+  // where the Worker builds the nested wrapper package, that package too.
+  for (const [job, workingDirectory] of [
+    ['deploy-manual', '${{ inputs.worker }}'],
+    ['deploy-changed', '${{ matrix.worker }}'],
+    ['deploy-session-ingest', 'services/session-ingest'],
+    ['deploy-cloud-agent-after-session-ingest', 'services/cloud-agent-next'],
+  ]) {
+    const installs = workers.jobs[job].steps.filter(step =>
+      (step.run ?? '').includes('pnpm install')
+    );
+    assert.equal(installs.length, 1, `${job} installs once`);
+    assert.equal(installs[0]['working-directory'], workingDirectory);
+    const run = installs[0].run;
+    assert.ok(run.includes("filters=(--filter '{.}...' --filter kilocode-monorepo)"), job);
+    assert.ok(run.includes('if [ -f wrapper/package.json ]; then'), job);
+    assert.ok(run.includes("filters+=(--filter '@kilocode/cloud-agent-wrapper...')"), job);
+    assert.ok(run.includes('pnpm install --frozen-lockfile "${filters[@]}"'), job);
+    assert.ok(!run.includes('pnpm install --frozen-lockfile\n'), job);
+  }
+
+  // The change-detection job installs the root project alone: it only runs the
+  // lockfile-dependent scripts that the root dependencies provide.
+  assert.equal(
+    workers.jobs['detect-changes'].steps.find(step => step.name === 'Install root dependencies')
+      .run,
+    'pnpm --filter kilocode-monorepo install --frozen-lockfile --ignore-scripts'
+  );
 });
 
 test('staging and production Worker changes use independent deployment baselines', () => {
@@ -827,55 +938,107 @@ test('deployment gate only deploys changes since the last complete run', () => {
   }
 });
 
-test('both Worker deployment paths retry a deploy once', () => {
+test('every Worker deployment path retries a deploy once', () => {
   // Cloudflare's upload validation rejected a script that it accepted with a
   // byte-identical bundle a moment earlier, so one retry stands between that
   // noise and a failed release.
-  for (const name of ['deploy-manual', 'deploy-changed']) {
+  for (const [name, deployName, deployId] of [
+    ['deploy-manual', 'Deploy to Cloudflare Workers', 'deploy'],
+    ['deploy-changed', 'Deploy to Cloudflare Workers', 'deploy'],
+    ['deploy-session-ingest', 'Deploy to Cloudflare Workers', 'deploy'],
+    ['deploy-cloud-agent-after-session-ingest', 'Deploy cloud-agent-next', 'deploy-cloud-agent'],
+  ]) {
     const steps = workers.jobs[name].steps;
-    const first = steps.findIndex(step => step.name === 'Deploy to Cloudflare Workers');
+    const first = steps.findIndex(step => step.name === deployName);
     assert.ok(first >= 0, `${name} must deploy the Worker`);
-    assert.equal(steps[first].id, 'deploy');
+    assert.equal(steps[first].id, deployId);
     assert.equal(steps[first]['continue-on-error'], true);
     const retry = steps[first + 1];
-    assert.equal(retry.name, 'Deploy to Cloudflare Workers (retry)');
-    assert.equal(retry.if, "steps.deploy.outcome == 'failure'");
+    assert.equal(retry.name, `${deployName} (retry)`);
+    assert.equal(retry.if, `steps.${deployId}.outcome == 'failure'`);
     assert.equal(retry.with.command, steps[first].with.command);
     assert.equal(retry.with.workingDirectory, steps[first].with.workingDirectory);
   }
 });
 
-test('production deploys cloud-agent-next after a changed session-ingest contract', () => {
+test('production deploys cloud-agent-next after the session-ingest job', () => {
   const detect = workers.jobs['detect-changes'];
   assert.equal(
     detect.outputs['deploy-cloud-agent-after-session-ingest'],
     '${{ steps.set-matrix.outputs.deploy-cloud-agent-after-session-ingest }}'
   );
+
+  const ingest = workers.jobs['deploy-session-ingest'];
+  assert.equal(ingest.needs, 'detect-changes');
+  assert.equal(
+    ingest.if,
+    "github.repository == 'Kilo-Org/cloud' && needs.detect-changes.outputs.deploy-cloud-agent-after-session-ingest == 'true'"
+  );
+  assert.equal(ingest.environment, '${{ inputs.target_environment }}');
+  assert.equal(ingest['timeout-minutes'], 25);
+
   const ordered = workers.jobs['deploy-cloud-agent-after-session-ingest'];
-  assert.equal(ordered.needs, 'detect-changes');
+  assert.deepEqual([ordered.needs].flat(), ['detect-changes', 'deploy-session-ingest']);
   assert.match(ordered.if, /deploy-cloud-agent-after-session-ingest == 'true'/);
-  const wait = ordered.steps.find(step => step.name === 'Wait for session-ingest deployment');
-  assert.match(wait.run, /Deploy services\/session-ingest/);
-  assert.match(wait.run, /seq 1 360/);
-  assert.match(wait.run, /queued/);
-  assert.match(wait.run, /in_progress/);
+  assert.match(ordered.if, /needs\.deploy-session-ingest\.result == 'success'/);
+  assert.equal(ordered.environment, '${{ inputs.target_environment }}');
+
+  // The order is a job dependency, so no job holds a runner while it waits: no
+  // step reads the run's jobs or sleeps.
+  for (const [name, job] of Object.entries(workers.jobs)) {
+    for (const step of job.steps) {
+      assert.doesNotMatch(step.name ?? '', /Wait for session-ingest/, name);
+      assert.doesNotMatch(step.run ?? '', /actions\/runs\/.*\/jobs|sleep \d/, name);
+    }
+  }
+
   const prepare = ordered.steps.findIndex(step => step.id === 'runtime');
   const deploy = ordered.steps.findIndex(step => step.name === 'Deploy cloud-agent-next');
   assert.ok(prepare >= 0 && prepare < deploy);
 
-  // Only the deploy steps depend on session-ingest: the install and the runtime
-  // preparation must run while the sibling deployment is still in flight.
-  const setup = ordered.steps.findIndex(step => step.name === 'Setup Bun');
-  const install = ordered.steps.findIndex(
-    step => step.name === 'Install cloud-agent-next dependencies'
-  );
-  const gate = ordered.steps.indexOf(wait);
-  assert.ok(
-    setup >= 0 && setup < install && install < prepare && prepare < gate,
-    'the setup steps must precede the session-ingest gate'
-  );
-  assert.equal(gate + 1, deploy, 'the session-ingest gate must immediately precede the deploy');
-
   assert.equal(ordered.steps[deploy].with.preCommands, 'pnpm run predeploy');
   assert.equal(ordered.steps[deploy + 1].with.preCommands, 'pnpm run predeploy');
+});
+
+test('the ordered production path takes both workers out of the parallel matrix', () => {
+  const detect = workers.jobs['detect-changes'];
+  const script = detect.steps.find(step => step.id === 'set-matrix').run;
+  const start = script.indexOf('FILTERED=()');
+  const reassignment = 'CHANGED=("${FILTERED[@]}")';
+  const end = script.indexOf(reassignment);
+  assert.ok(start >= 0 && end > start, 'the matrix filter must exist');
+  const loop = script.slice(start, end + reassignment.length);
+
+  const filter = (changed, ordered) =>
+    execFileSync(
+      'bash',
+      [
+        '--noprofile',
+        '--norc',
+        '-eo',
+        'pipefail',
+        '-c',
+        [
+          `DEPLOY_CLOUD_AGENT_AFTER_SESSION_INGEST=${ordered}`,
+          `CHANGED=(${changed.map(dir => `'${dir}'`).join(' ')})`,
+          loop,
+          'printf "%s\\n" "${CHANGED[@]}"',
+        ].join('\n'),
+      ],
+      { encoding: 'utf8' }
+    )
+      .trim()
+      .split('\n')
+      .filter(Boolean);
+
+  assert.deepEqual(filter(['services/session-ingest', 'services/cloud-agent-next'], 'true'), []);
+  assert.deepEqual(
+    filter(['services/session-ingest', 'services/cloud-agent-next', 'services/scim-sync'], 'true'),
+    ['services/scim-sync']
+  );
+  assert.deepEqual(
+    filter(['services/session-ingest', 'services/cloud-agent-next'], 'false'),
+    ['services/session-ingest', 'services/cloud-agent-next'],
+    'every other deployment path keeps both workers in the matrix'
+  );
 });

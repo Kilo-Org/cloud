@@ -4,10 +4,12 @@ import {
   type CloudAgentQueueReport,
   type CloudAgentRunStateReport,
 } from '@kilocode/worker-utils/cloud-agent-queue-report';
-import type {
-  CloudAgentAssistantFailureReason,
-  CloudAgentProviderOwnership,
-  WorkspaceFailureSubtype,
+import {
+  CLOUD_AGENT_FAILURE_CODES,
+  type CloudAgentAssistantFailureReason,
+  type CloudAgentFailureCode,
+  type CloudAgentProviderOwnership,
+  type WorkspaceFailureSubtype,
 } from '@kilocode/worker-utils/cloud-agent-failure';
 import { logger } from '../../logger.js';
 import {
@@ -17,7 +19,7 @@ import {
   type SafeFailureProjection,
 } from '../../session/safe-failure-projection.js';
 import {
-  FAILED_RUN_DIAGNOSTIC_MESSAGES,
+  failedRunDiagnosticMessage,
   buildRunStateReport,
   type RunReportAnchor,
 } from '../../telemetry/queue-reports.js';
@@ -116,8 +118,9 @@ function diagnosticForFailure(
   code: string,
   facts: ControlPlaneReportFacts
 ): CloudAgentRunStateReport['run']['diagnostic'] {
-  let errorMessageRedacted =
-    FAILED_RUN_DIAGNOSTIC_MESSAGES[code as keyof typeof FAILED_RUN_DIAGNOSTIC_MESSAGES];
+  let errorMessageRedacted = CLOUD_AGENT_FAILURE_CODES.includes(code as CloudAgentFailureCode)
+    ? failedRunDiagnosticMessage(code as CloudAgentFailureCode)
+    : undefined;
   if (code === 'workspace_setup_failed') {
     errorMessageRedacted = facts.workspaceSubtype
       ? workspaceFailureMessage(facts.workspaceSubtype)

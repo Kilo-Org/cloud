@@ -28,6 +28,10 @@ concurrency:
 
 jobs:
   e2e:
+    # Guard: this workflow_dispatch is reachable from a fork, and the job uses
+    # admin secrets to exercise the production backend. Only the canonical repo
+    # may run it.
+    if: github.repository == 'Kilo-Org/cloud'
     outputs:
       failed: ${{ steps.summarize.outputs.failed }}
       summary: ${{ steps.summarize.outputs.summary }}
@@ -91,7 +95,9 @@ jobs:
 
   notify-failure:
     needs: e2e
-    if: always() && github.ref == 'refs/heads/main' && contains(join(needs.*.result, ','), 'failure')
+    # Guard: this workflow_dispatch is reachable from a fork, and the job posts
+    # to Slack using a repo secret. Only the canonical repo may run it.
+    if: always() && github.repository == 'Kilo-Org/cloud' && github.ref == 'refs/heads/main' && contains(join(needs.*.result, ','), 'failure')
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

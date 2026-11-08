@@ -39,6 +39,8 @@ import {
   findPreviousCompletedReview,
   updateCodeReviewStatus,
   updateCodeReviewStatusIfNonTerminal,
+  settleCodeReviewUsage,
+  backfillCodeReviewUsage,
   resetCodeReviewForRetry,
   failReservedQueuedReview,
   updatePreviousReviewSummary,
@@ -3033,6 +3035,208 @@ describe('code review status writes', () => {
 
     const unchanged = await readReview(reviewId);
     expect(unchanged.status).toBe('completed');
+  });
+});
+
+describe('code review usage writes', () => {
+  let testUser: User;
+  const reviewIds: string[] = [];
+
+  beforeAll(async () => {
+    testUser = await insertTestUser();
+  });
+
+  afterEach(async () => {
+    if (reviewIds.length === 0) return;
+    await db
+      .delete(cloud_agent_code_reviews)
+      .where(inArray(cloud_agent_code_reviews.id, reviewIds));
+    reviewIds.length = 0;
+  });
+
+  afterAll(async () => {
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, testUser.id));
+  });
+
+  async function insertReview(overrides: Record<string, unknown> = {}) {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values({
+        owned_by_user_id: testUser.id,
+        repo_full_name: REPO,
+        pr_number: 2,
+        pr_url: `https://github.com/${REPO}/pull/2`,
+        pr_title: 'Test PR',
+        pr_author: 'octocat',
+        base_ref: 'main',
+        head_ref: 'feature/usage',
+        head_sha: `sha-${crypto.randomUUID()}`,
+        ...overrides,
+      })
+      .returning({ id: cloud_agent_code_reviews.id });
+    reviewIds.push(review.id);
+    return review.id;
+  }
+
+  async function readReview(reviewId: string) {
+    const stored = await db.query.cloud_agent_code_reviews.findFirst({
+      where: eq(cloud_agent_code_reviews.id, reviewId),
+    });
+    if (!stored) throw new Error('Expected stored review');
+    return stored;
+  }
+
+  it('records usage once and leaves it unchanged when a second call arrives', async () => {
+    const reviewId = await insertReview();
+
+    await expect(
+      settleCodeReviewUsage(reviewId, {
+        model: 'anthropic/claude-sonnet-4.6',
+        totalTokensIn: 1200,
+        totalTokensOut: 340,
+        totalCostMusd: 56780,
+      })
+    ).resolves.toBe(true);
+
+    const first = await readReview(reviewId);
+    expect(first.model).toBe('anthropic/claude-sonnet-4.6');
+    expect(first.total_tokens_in).toBe(1200);
+    expect(first.total_tokens_out).toBe(340);
+    expect(first.total_cost_musd).toBe(56780);
+
+    await expect(
+      settleCodeReviewUsage(reviewId, {
+        model: 'openai/gpt-5',
+        totalTokensIn: 7,
+        totalTokensOut: 9,
+        totalCostMusd: 11,
+      })
+    ).resolves.toBe(false);
+
+    const unchanged = await readReview(reviewId);
+    expect(unchanged.model).toBe('anthropic/claude-sonnet-4.6');
+    expect(unchanged.total_tokens_in).toBe(1200);
+    expect(unchanged.total_tokens_out).toBe(340);
+    expect(unchanged.total_cost_musd).toBe(56780);
+  });
+
+  it('lets the billing back-fill replace usage that was already recorded', async () => {
+    const reviewId = await insertReview();
+
+    await settleCodeReviewUsage(reviewId, {
+      model: 'anthropic/claude-sonnet-4.6',
+      totalTokensIn: 1200,
+      totalTokensOut: 340,
+      totalCostMusd: 56780,
+    });
+    await backfillCodeReviewUsage(reviewId, {
+      totalTokensIn: 2000,
+      totalTokensOut: 400,
+      totalCostMusd: 90000,
+    });
+
+    const stored = await readReview(reviewId);
+    expect(stored.model).toBe('anthropic/claude-sonnet-4.6');
+    expect(stored.total_tokens_in).toBe(2000);
+    expect(stored.total_tokens_out).toBe(400);
+    expect(stored.total_cost_musd).toBe(90000);
+  });
+
+  it('fills a metered value that an earlier call left out without changing the recorded ones', async () => {
+    const reviewId = await insertReview();
+
+    await expect(
+      settleCodeReviewUsage(reviewId, {
+        model: 'anthropic/claude-sonnet-4.6',
+        totalTokensIn: 1200,
+        totalTokensOut: 340,
+      })
+    ).resolves.toBe(true);
+
+    const partial = await readReview(reviewId);
+    expect(partial.total_tokens_in).toBe(1200);
+    expect(partial.total_tokens_out).toBe(340);
+    expect(partial.total_cost_musd).toBeNull();
+
+    await expect(
+      settleCodeReviewUsage(reviewId, {
+        model: 'openai/gpt-5',
+        totalTokensIn: 9,
+        totalTokensOut: 9,
+        totalCostMusd: 56780,
+      })
+    ).resolves.toBe(true);
+
+    const completed = await readReview(reviewId);
+    expect(completed.model).toBe('anthropic/claude-sonnet-4.6');
+    expect(completed.total_tokens_in).toBe(1200);
+    expect(completed.total_tokens_out).toBe(340);
+    expect(completed.total_cost_musd).toBe(56780);
+
+    await expect(
+      settleCodeReviewUsage(reviewId, {
+        model: 'openai/gpt-5',
+        totalTokensIn: 9,
+        totalTokensOut: 9,
+        totalCostMusd: 1,
+      })
+    ).resolves.toBe(false);
+    const unchanged = await readReview(reviewId);
+    expect(unchanged.total_cost_musd).toBe(56780);
+  });
+
+  it('ignores a call without metered values and records usage when it arrives later', async () => {
+    const reviewId = await insertReview();
+
+    await expect(
+      settleCodeReviewUsage(reviewId, { model: 'anthropic/claude-sonnet-4.6' })
+    ).resolves.toBe(false);
+    const empty = await readReview(reviewId);
+    expect(empty.model).toBeNull();
+    expect(empty.total_tokens_in).toBeNull();
+    expect(empty.total_tokens_out).toBeNull();
+    expect(empty.total_cost_musd).toBeNull();
+
+    await expect(
+      settleCodeReviewUsage(reviewId, {
+        model: 'anthropic/claude-sonnet-4.6',
+        totalTokensIn: 5,
+        totalTokensOut: 6,
+        totalCostMusd: 7,
+      })
+    ).resolves.toBe(true);
+    const stored = await readReview(reviewId);
+    expect(stored.model).toBe('anthropic/claude-sonnet-4.6');
+    expect(stored.total_tokens_in).toBe(5);
+    expect(stored.total_tokens_out).toBe(6);
+    expect(stored.total_cost_musd).toBe(7);
+  });
+
+  it('settles again after a retry reset the review usage', async () => {
+    const reviewId = await insertReview();
+    await settleCodeReviewUsage(reviewId, {
+      model: 'anthropic/claude-sonnet-4.6',
+      totalTokensIn: 1200,
+      totalTokensOut: 340,
+      totalCostMusd: 56780,
+    });
+
+    await updateCodeReviewStatus(reviewId, 'failed');
+    await expect(resetCodeReviewForRetry(reviewId)).resolves.toBe(1);
+    await expect(
+      settleCodeReviewUsage(reviewId, {
+        model: 'openai/gpt-5',
+        totalTokensIn: 10,
+        totalTokensOut: 20,
+        totalCostMusd: 30,
+      })
+    ).resolves.toBe(true);
+
+    const stored = await readReview(reviewId);
+    expect(stored.model).toBe('openai/gpt-5');
+    expect(stored.total_tokens_in).toBe(10);
+    expect(stored.total_tokens_out).toBe(20);
+    expect(stored.total_cost_musd).toBe(30);
   });
 });
 

@@ -1,4 +1,14 @@
 import 'server-only';
+import { isSupportAccessEnabled } from '@kilocode/web-shared/lib/admin/support-access';
+import {
+  GitHubIdentityConflictError,
+  GitHubIdentityPreconditionSchema,
+} from '@kilocode/db/github-identity';
+import {
+  connectProvidedGitHubToken,
+  ProvidedGitHubTokenInputSchema,
+  ProvidedGitHubTokenError,
+} from '@/lib/integrations/platforms/github/provided-token';
 import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import * as z from 'zod';
 import * as githubAppsService from '@/lib/integrations/github-apps-service';
@@ -59,6 +69,13 @@ import {
   disconnectGitHubInstallation,
   observeGitHubInstallationLifecycle,
 } from '@/lib/integrations/db/github-installations';
+
+const PROVIDED_TOKEN_ERROR_CODES = {
+  connection_conflict: 'CONFLICT',
+  invalid_token: 'BAD_REQUEST',
+  rate_limited: 'TOO_MANY_REQUESTS',
+  temporarily_unavailable: 'BAD_GATEWAY',
+} as const satisfies Record<ProvidedGitHubTokenError['reason'], TRPCError['code']>;
 
 export const githubAppsRouter = createTRPCRouter({
   disconnectConnection: baseProcedure
@@ -248,7 +265,7 @@ export const githubAppsRouter = createTRPCRouter({
                     : 'needs_attention';
             const canCancel =
               status === 'pending' &&
-              (ctx.user.is_admin ||
+              ((ctx.user.is_admin && !isSupportAccessEnabled()) ||
                 role === 'owner' ||
                 role === 'admin' ||
                 integration.kilo_requester_user_id === ctx.user.id);
@@ -271,7 +288,9 @@ export const githubAppsRouter = createTRPCRouter({
               canDisconnect:
                 canManageConnections && status !== 'disconnected' && status !== 'pending',
               canUninstall:
-                (ctx.user.is_admin || role === 'owner' || role === 'admin') &&
+                ((ctx.user.is_admin && !isSupportAccessEnabled()) ||
+                  role === 'owner' ||
+                  role === 'admin') &&
                 (await canUninstallGitHubInstallation(integration)),
               canCancel,
               modelSlug: (metadata?.model_slug as string) || null,
@@ -282,9 +301,9 @@ export const githubAppsRouter = createTRPCRouter({
       };
     }),
 
-  getUserAuthorization: baseProcedure.query(async ({ ctx }) => {
-    return getGitHubUserAuthorizationStatus(ctx.user.id);
-  }),
+  getUserAuthorization: baseProcedure.query(({ ctx }) =>
+    getGitHubUserAuthorizationStatus(ctx.user.id)
+  ),
 
   connectUserAuthorization: baseProcedure.mutation(async ({ ctx }) => {
     const authorization = await getGitHubUserAuthorizationStatus(ctx.user.id);
@@ -301,7 +320,10 @@ export const githubAppsRouter = createTRPCRouter({
         message: 'GitHub App is not configured',
       });
     }
-    const { state, codeChallenge } = await createGitHubUserAuthorizationState(ctx.user.id);
+    const { state, codeChallenge } = await createGitHubUserAuthorizationState(ctx.user.id, {
+      authorizationId: authorization.authorizationId,
+      credentialVersion: authorization.credentialVersion,
+    });
     const authorizeUrl = new URL('https://github.com/login/oauth/authorize');
     authorizeUrl.searchParams.set('client_id', credentials.clientId);
     authorizeUrl.searchParams.set(
@@ -314,10 +336,41 @@ export const githubAppsRouter = createTRPCRouter({
     return { authorizationUrl: authorizeUrl.toString() };
   }),
 
-  disconnectUserAuthorization: baseProcedure.mutation(async ({ ctx }) => {
-    await disconnectGitHubUserAuthorization(ctx.user.id);
-    return { success: true };
-  }),
+  disconnectUserAuthorization: baseProcedure
+    .input(GitHubIdentityPreconditionSchema)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        await disconnectGitHubUserAuthorization(ctx.user.id, input);
+      } catch (error) {
+        if (error instanceof GitHubIdentityConflictError)
+          throw new TRPCError({ code: 'CONFLICT', message: 'connection_conflict' });
+        throw error;
+      }
+      return { success: true };
+    }),
+
+  provideUserToken: baseProcedure
+    .use(async ({ next }) => {
+      const result = await next();
+      if (!result.ok && result.error.cause instanceof z.ZodError) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'invalid_github_token_request' });
+      }
+      return result;
+    })
+    .input(ProvidedGitHubTokenInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const result = await connectProvidedGitHubToken(ctx.user.id, input);
+        if (result.status !== 'connected')
+          throw new TRPCError({ code: 'CONFLICT', message: result.status });
+        return result;
+      } catch (error) {
+        if (error instanceof TRPCError) throw error;
+        const reason =
+          error instanceof ProvidedGitHubTokenError ? error.reason : 'temporarily_unavailable';
+        throw new TRPCError({ code: PROVIDED_TOKEN_ERROR_CODES[reason], message: reason });
+      }
+    }),
 
   getAppType: baseProcedure.input(optionalOrgInput).query(async ({ ctx, input }) => {
     if (input?.organizationId) {
@@ -575,7 +628,7 @@ export const githubAppsRouter = createTRPCRouter({
       }
       const canCancel =
         !input.organizationId ||
-        ctx.user.is_admin ||
+        (ctx.user.is_admin && !isSupportAccessEnabled()) ||
         role === 'owner' ||
         role === 'admin' ||
         integration.kilo_requester_user_id === ctx.user.id;

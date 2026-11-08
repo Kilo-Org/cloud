@@ -14,6 +14,7 @@ import { SecurityAuditLogAction } from '../core/enums';
 import type { SecurityReviewOwner } from '../core/types';
 import { captureException } from '@sentry/nextjs';
 import { REPORTABLE_SECURITY_FINDING_AUDIT_ACTIONS } from '@kilocode/worker-utils/security-finding-audit';
+import { currentUserHasPermission } from '@/lib/admin/admin-permissions';
 
 export { SecurityAuditLogAction };
 
@@ -125,6 +126,15 @@ export async function logSecurityAuditAndWait(
       clearTimeout(timeoutId);
     }
   }
+}
+
+/**
+ * Whether the caller may read staff actor details. The platform admin
+ * permission decides. The check reads the primary row, so a granted or revoked
+ * permission applies to a session that is already signed in.
+ */
+export function canCallerReadStaffAuditActors(callerUserId: string): Promise<boolean> {
+  return currentUserHasPermission(callerUserId, user => user.is_admin);
 }
 
 /** Replace internal Kilo admin actor details with a generic placeholder for non-admin requestors. */

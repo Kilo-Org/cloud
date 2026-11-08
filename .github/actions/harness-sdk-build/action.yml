@@ -4,8 +4,12 @@ description: >-
   hashes every repository file of the tsconfig.build.json program (from
   `tsgo --listFilesOnly`), the build configuration, and the lockfile entries of
   the package's importer closure, which pin every file the build reads under
-  node_modules. A hit therefore restores exactly what the build would write. Run
-  it after `pnpm install`.
+  node_modules. A hit therefore restores exactly what the build would write. The
+  dist is a TypeScript emit, so one entry serves every runner operating system:
+  actions/cache derives its version from the paths, the compression method and
+  the platform only on Windows, and the Linux and macOS images both compress
+  with zstd. Only a completed build saves, so a failed build cannot take the
+  key. Run it after `pnpm install`.
 
 runs:
   using: composite
@@ -17,23 +21,64 @@ runs:
 
     - name: Restore harness SDK build
       id: cache
-      uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+      uses: actions/cache/restore@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
       with:
         path: packages/harness-sdk/dist
-        key: ${{ runner.os }}-harness-sdk-build-${{ steps.key.outputs.key }}
+        key: harness-sdk-build-${{ steps.key.outputs.key }}
+
+    # A hit proves the key, not the tree: a restore that failed halfway, or an
+    # entry written by a future build step that emits something else, would
+    # otherwise be served as a build. Only a hit that carries the package entry
+    # skips the build.
+    - name: Check the restored build
+      id: restored
+      shell: bash
+      run: |
+        set -euo pipefail
+        usable='false'
+        if [ '${{ steps.cache.outputs.cache-hit }}' = 'true' ]; then
+          usable='true'
+          for file in packages/harness-sdk/dist/index.js packages/harness-sdk/dist/index.d.ts; do
+            if [ ! -f "$file" ]; then
+              echo "::warning::the restored harness SDK build has no $file"
+              usable='false'
+            fi
+          done
+        fi
+        echo "usable=$usable" >> "$GITHUB_OUTPUT"
 
     # ttsc compiles the typia transform on its first build, which takes minutes
-    # on a cold Go cache. Only a miss builds, so only a miss needs the plugin.
-    - name: Cache compiler plugins
-      if: steps.cache.outputs.cache-hit != 'true'
-      uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
-      with:
-        path: node_modules/.cache/ttsc/plugins
-        key: ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-${{ hashFiles('pnpm-lock.yaml') }}
-        restore-keys: |
-          ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-
+    # on a cold Go cache. Only a build needs the plugin, so only a build needs
+    # the plugin cache.
+    - name: Restore compiler plugins
+      if: steps.restored.outputs.usable != 'true'
+      id: plugins
+      uses: ./.github/actions/ttsc-plugin-cache
 
     - name: Build harness SDK
-      if: steps.cache.outputs.cache-hit != 'true'
+      if: steps.restored.outputs.usable != 'true'
       shell: bash
       run: pnpm --filter @kilocode/harness-sdk run build
+
+    # Saving here rather than in a post step keeps a tree that no build
+    # finished out of the key: a failed or cancelled build would otherwise take
+    # the key with the partial dist it wrote, and every later run with this
+    # input hash would restore that tree and rebuild. A second job that loses
+    # the reserve race only logs it.
+    - name: Save harness SDK build
+      if: steps.restored.outputs.usable != 'true'
+      uses: actions/cache/save@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+      with:
+        path: packages/harness-sdk/dist
+        key: harness-sdk-build-${{ steps.key.outputs.key }}
+
+    # The key embeds the runner platform, and ci.yml only writes it on Linux,
+    # so these macOS builds write their own key here; the Linux rows never see
+    # it. On Linux this stays read-only, and ci.yml keeps its one writer. The
+    # save follows the build, which is what may have compiled the plugins.
+    - name: Save compiler plugins
+      if: runner.os == 'macOS' && steps.restored.outputs.usable != 'true' && steps.plugins.outputs.cache-hit != 'true'
+      uses: actions/cache/save@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+      with:
+        path: node_modules/.cache/ttsc/plugins
+        key: ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-${{ steps.plugins.outputs.key }}

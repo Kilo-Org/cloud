@@ -297,6 +297,9 @@ export function ToolPartRenderer({ part }: { part: Extract<Part, { type: 'tool' 
   }
 }
 
+const SAFE_PDF_DATA_URL =
+  /^data:application\/pdf;base64,(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
+
 /**
  * Renders a FilePart
  * For images, renders an img tag
@@ -306,7 +309,10 @@ export function ToolPartRenderer({ part }: { part: Extract<Part, { type: 'tool' 
 export function FilePartRenderer({ part }: { part: Extract<Part, { type: 'file' }> }) {
   const isImage = part.mime.startsWith('image/');
   const imageSrc = isImage ? toSafeImageSrc(part.url) : undefined;
-  const fileHref = isImage ? undefined : toSafeHttpUrl(part.url);
+  const inlinePdf = part.mime === 'application/pdf' && SAFE_PDF_DATA_URL.test(part.url);
+  const fileHref = isImage
+    ? undefined
+    : (toSafeHttpUrl(part.url) ?? (inlinePdf ? part.url : undefined));
   const hasUrl = Boolean(imageSrc ?? fileHref);
 
   // Handle stripped file parts (content not stored in memory/IndexedDB)
@@ -339,7 +345,8 @@ export function FilePartRenderer({ part }: { part: Extract<Part, { type: 'file' 
       {fileHref && (
         <a
           href={fileHref}
-          target="_blank"
+          download={inlinePdf ? part.filename || 'attachment.pdf' : undefined}
+          target={inlinePdf ? undefined : '_blank'}
           rel="noopener noreferrer"
           className="text-primary text-xs hover:underline"
         >

@@ -19,14 +19,15 @@ import {
 import { resolveSessionPrTapTarget } from '@/lib/session-pr-navigation';
 import { namedSessionTitle, useUserSessionTitlesRevision } from './session-detail-rename-state';
 import {
-  composeSessionProvenanceSubtitle,
   composeStoredSessionSpokenMeta,
   composeStoredSessionVisibleMeta,
   formatScheduledWake,
   formatSessionTotalCost,
   sectionAwareTimeMeta,
   storedSessionEyebrowLabel,
+  storedSessionEyebrowState,
 } from './session-list-helpers';
+import { composeSessionProvenanceSubtitle } from './session-provenance-subtitle';
 import { sessionTranscriptQueryOptions } from './session-transcript-page';
 import { selectRowPlatformPresentation, SessionPlatformIcon } from './session-platform-icon';
 import { openSessionPreviewStore } from './session-preview-state';
@@ -153,6 +154,13 @@ export function StoredSessionRow({
   // Both save paths refuse an unchanged or blank value.
   const renameInitialValue = namedSessionTitle(session.title, session.session_id) ?? '';
   const agentLabel = storedSessionEyebrowLabel(session);
+  // Tint by what the eyebrow names, never by its string: the label predicate
+  // decides, so a translated word pins to one token in every script (the hash
+  // of a translation would drift per locale and split identical rows), and a
+  // repository named like a label cannot read as one. The repository, the
+  // origin and the agent type label the row's context, so each takes the muted
+  // pair and the session title leads.
+  const agentState = storedSessionEyebrowState(session);
   const timestamp = getAgentSessionTimestamp(session, sortBy);
   const canManage = interactive && Boolean(onDelete) && Boolean(onRename);
   // The scheduled branch keys off the status, not the `live` flag: a stored
@@ -304,6 +312,7 @@ export function StoredSessionRow({
     >
       <SessionRow
         agentLabel={agentLabel}
+        agentState={agentState}
         title={title}
         subtitle={subtitle}
         meta={visibleMeta}

@@ -17,29 +17,13 @@ function callerFor(env: Partial<Env>, userId = 'user-1') {
 }
 
 describe('getPreviewOptions', () => {
-  it.each([
-    [undefined, undefined, false],
-    ['', undefined, false],
-    ['user-2', undefined, false],
-    ['user-1', undefined, true],
-    ['org-1', undefined, false],
-    ['org-1', 'org-1', true],
-    ['*', undefined, true],
-  ] as const)(
-    'gates PREVIEW_ENABLED_IDS=%s for user-1 in org %s as %s',
-    async (ids, organizationId, enabled) => {
-      const result = await callerFor({ PREVIEW_ENABLED_IDS: ids }).getPreviewOptions({
-        cloudAgentSessionId: SESSION_ID,
-        organizationId,
-      });
-      expect(result).toEqual(
-        enabled ? { enabled: true, hostTemplate: HOST_TEMPLATE } : { enabled: false }
-      );
-    }
-  );
+  it('offers preview to every owner when the suffix is configured', async () => {
+    const result = await callerFor({}).getPreviewOptions({ cloudAgentSessionId: SESSION_ID });
+    expect(result).toEqual({ enabled: true, hostTemplate: HOST_TEMPLATE });
+  });
 
-  it('stays off without a preview suffix even for an enrolled owner', async () => {
-    const caller = callerFor({ PREVIEW_HOST_SUFFIX: '', PREVIEW_ENABLED_IDS: '*' });
+  it('stays off without a preview suffix', async () => {
+    const caller = callerFor({ PREVIEW_HOST_SUFFIX: '' });
     await expect(caller.getPreviewOptions({ cloudAgentSessionId: SESSION_ID })).resolves.toEqual({
       enabled: false,
     });

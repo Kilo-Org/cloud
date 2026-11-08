@@ -133,6 +133,7 @@ describe('mcp-catalog catalog', () => {
       // Native-only credential issuers are withheld by exact path.
       expect(isDenylistedPath('activeSessions.widgetCredential')).toBe(true);
       expect(isDenylistedPath('agentBriefing.updateContextPreferences')).toBe(true);
+      expect(isDenylistedPath('githubApps.provideUserToken')).toBe(true);
       expect(isDenylistedPath('agentBriefing.estimateSummary')).toBe(false);
       expect(isDenylistedPath('agentBriefing.dismiss')).toBe(false);
       expect(isDenylistedPath('activeSessions.getToken')).toBe(false);

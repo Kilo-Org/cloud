@@ -1,5 +1,5 @@
 /* eslint-disable promise/prefer-await-to-callbacks -- controls delivery of the native idle callback */
-import { createElement } from 'react';
+import { createElement, useEffect } from 'react';
 import { type QueryClient } from '@tanstack/react-query';
 import { afterEach, beforeEach, vi } from 'vitest';
 
@@ -53,6 +53,7 @@ export {
 };
 
 vi.mock('react-native', () => ({
+  useWindowDimensions: () => ({ width: 400, height: 800 }),
   Alert: { alert: vi.fn() },
   Platform: { OS: 'ios' },
   Pressable: 'Pressable',
@@ -65,6 +66,7 @@ vi.mock('react-native-safe-area-context', () => ({
 }));
 
 beforeEach(() => {
+  vi.stubGlobal('__DEV__', false);
   vi.stubGlobal('requestIdleCallback', captureIdle);
   vi.stubGlobal('cancelIdleCallback', idleState.cancel);
 });
@@ -79,6 +81,12 @@ vi.mock('react-native-reanimated', () => ({
 
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push: routerPush }),
+  // The account picker closes itself on the owning screen's focus loss; these
+  // suites keep the screen focused, so the effect runs for the tree's lifetime
+  // and its cleanup only runs when the suite unmounts.
+  useFocusEffect: (effect: Parameters<typeof useEffect>[0]) => {
+    useEffect(effect, [effect]);
+  },
 }));
 
 vi.mock('expo-application', () => ({
@@ -104,6 +112,8 @@ vi.mock('@/lib/trpc', () => ({
 vi.mock('@/lib/auth/auth-context', () => ({
   useAuth: () => ({ signOut: signOutFn, token: authState.token }),
 }));
+
+vi.mock('@/lib/config', () => ({ SESSION_SYNC_URL: 'http://localhost:8817' }));
 
 vi.mock('@/lib/organization-context', () => ({
   useOrganization: () => ({
@@ -192,6 +202,7 @@ vi.mock('@/components/ui/icons', () => ({
   Smartphone: 'Smartphone',
   Sparkles: 'Sparkles',
   Trash2: 'Trash2',
+  Users: 'Users',
 }));
 
 vi.mock('@/components/profile-action-tile', () => ({ ActionTile: 'ActionTile' }));

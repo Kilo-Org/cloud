@@ -78,21 +78,26 @@ export async function generateGitHubInstallationToken(
   installationId: string,
   appType: GitHubAppType = 'standard',
   expectedIntegrationId?: string,
-  purpose: 'workflow' | 'agent' | 'management' = 'workflow'
+  purpose: 'workflow' | 'agent' | 'management' = 'workflow',
+  signal?: AbortSignal
 ): Promise<InstallationToken> {
+  signal?.throwIfAborted();
   await assertGitHubInstallationRuntimeAuthorized(
     installationId,
     appType,
     expectedIntegrationId,
     purpose
   );
-  return await generateGitHubInstallationTokenForMaintenance(installationId, appType);
+  signal?.throwIfAborted();
+  return await generateGitHubInstallationTokenForMaintenance(installationId, appType, signal);
 }
 
 export async function generateGitHubInstallationTokenForMaintenance(
   installationId: string,
-  appType: GitHubAppType = 'standard'
+  appType: GitHubAppType = 'standard',
+  signal?: AbortSignal
 ): Promise<InstallationToken> {
+  signal?.throwIfAborted();
   const credentials = getGitHubAppCredentials(appType);
 
   if (!credentials.appId || !credentials.privateKey) {
@@ -103,6 +108,7 @@ export async function generateGitHubInstallationTokenForMaintenance(
     appId: credentials.appId,
     privateKey: credentials.privateKey,
     installationId,
+    ...(signal ? { request: new Octokit({ request: { signal } }).request } : {}),
   });
 
   const authResult = await auth({ type: 'installation' });
@@ -458,13 +464,15 @@ export async function getCollaboratorPermissionLevel(
   repo: string,
   username: string,
   appType: GitHubAppType = 'standard',
-  expectedIntegrationId?: string
+  expectedIntegrationId?: string,
+  purpose: 'workflow' | 'agent' = 'workflow'
 ): Promise<CollaboratorPermission | null> {
   try {
     const tokenData = await generateGitHubInstallationToken(
       installationId,
       appType,
-      expectedIntegrationId
+      expectedIntegrationId,
+      purpose
     );
     const octokit = new Octokit({ auth: tokenData.token });
 
@@ -1120,6 +1128,10 @@ export type AssociatedPullRequest = {
   headRepoFullName?: string;
   /** Branch the PR was opened from, as reported by GitHub. */
   headRef?: string;
+  baseSha?: string;
+  baseRef?: string;
+  mergeable?: boolean | null;
+  mergeableState?: string | null;
   /**
    * SHAs of the PR's commits. Populated only when the caller passes
    * `includeCommits` and the session SHA is not already the PR head. `undefined`
@@ -1161,15 +1173,39 @@ function getResponseHeader(error: unknown, name: string): string | undefined {
   return typeof value === 'string' ? value : undefined;
 }
 
-function parseRateLimitResetAt(error: unknown): Date {
-  const resetHeader = getResponseHeader(error, 'x-ratelimit-reset');
-  const resetSeconds = resetHeader ? Number(resetHeader) : NaN;
-  if (Number.isFinite(resetSeconds) && resetSeconds > 0) {
-    return new Date(resetSeconds * 1000);
+function retryAfterDeadlineMs(error: unknown, now: number): number | null {
+  const header = getResponseHeader(error, 'retry-after')?.trim();
+  if (!header) return null;
+  // A bare number is a delta in seconds; anything else is an HTTP date.
+  if (/^\d+$/.test(header)) {
+    const seconds = Number(header);
+    return Number.isFinite(seconds) ? now + seconds * 1000 : null;
   }
-  // Fall back to "retry in 60s" if the header is missing/invalid, so callers
-  // always have a usable Date to show.
-  return new Date(Date.now() + 60_000);
+  const timestamp = Date.parse(header);
+  return Number.isFinite(timestamp) ? timestamp : null;
+}
+
+function primaryResetDeadlineMs(error: unknown): number | null {
+  // The primary reset only applies once the quota is exhausted; otherwise the
+  // future reset of a still-usable quota would over-wait secondary limits.
+  if (getResponseHeader(error, 'x-ratelimit-remaining') !== '0') return null;
+  const resetHeader = getResponseHeader(error, 'x-ratelimit-reset');
+  if (!resetHeader) return null;
+  const resetSeconds = Number(resetHeader);
+  if (!Number.isFinite(resetSeconds) || resetSeconds <= 0) return null;
+  return resetSeconds * 1000;
+}
+
+function parseRateLimitResetAt(error: unknown, now = Date.now()): Date {
+  const deadlines = [retryAfterDeadlineMs(error, now), primaryResetDeadlineMs(error)].filter(
+    (deadline): deadline is number =>
+      deadline !== null && Number.isFinite(new Date(deadline).getTime())
+  );
+  // Retry-After applies to secondary limits; the primary reset applies while
+  // the quota is exhausted. When both apply, wait for the later deadline.
+  // Without a usable signal, wait the documented minimum.
+  if (deadlines.length === 0) return new Date(now + 60_000);
+  return new Date(Math.max(...deadlines));
 }
 
 function getErrorMessage(error: unknown): string {
@@ -1192,10 +1228,10 @@ export function isGitHubRateLimitError(error: unknown): boolean {
   const remaining = getResponseHeader(error, 'x-ratelimit-remaining');
   if (remaining === '0') return true;
   // 403 is overloaded: it can mean rate/abuse limiting OR a plain permission
-  // denial (e.g. installation lacks pull request access). Only treat 403 as
-  // rate-limited when the message indicates so, so that genuine permission
-  // failures are surfaced to the caller.
+  // denial (e.g. installation lacks pull request access). A Retry-After header
+  // is GitHub's secondary-limit signal even when the message omits the phrase.
   if (error.status === 403) {
+    if (getResponseHeader(error, 'retry-after') !== undefined) return true;
     const message = getErrorMessage(error).toLowerCase();
     return (
       message.includes('rate limit') ||
@@ -1204,6 +1240,18 @@ export function isGitHubRateLimitError(error: unknown): boolean {
     );
   }
   return false;
+}
+
+/**
+ * Normalize a GitHub failure into the typed rate-limit error that callers
+ * propagate across refresh legs. Returns `null` when the failure is not a rate
+ * limit, and returns the existing error unchanged when it is already typed so
+ * its deadline is not recomputed or lost.
+ */
+export function toGitHubRateLimitError(error: unknown): GitHubRateLimitError | null {
+  if (error instanceof GitHubRateLimitError) return error;
+  if (!isGitHubRateLimitError(error)) return null;
+  return new GitHubRateLimitError(parseRateLimitResetAt(error));
 }
 
 /**
@@ -1236,6 +1284,12 @@ export async function fetchPullRequestByNumber(params: {
    * `MAX_COMMIT_PAGES`.
    */
   expectedHeadSha?: string | null;
+  /**
+   * Shared deadline for every GitHub request this call makes, including the
+   * installation-token mint. Optional so existing callers keep their current
+   * behaviour.
+   */
+  signal?: AbortSignal;
 }): Promise<AssociatedPullRequest | null> {
   const {
     installationId,
@@ -1245,9 +1299,19 @@ export async function fetchPullRequestByNumber(params: {
     appType,
     includeCommits = false,
     expectedHeadSha = null,
+    signal,
   } = params;
 
-  const tokenData = await generateGitHubInstallationToken(String(installationId), appType);
+  const requestOptions = signal ? { request: { signal } } : {};
+  const tokenData = await generateGitHubInstallationToken(
+    String(installationId),
+    appType,
+    undefined,
+    'workflow',
+    signal
+  ).catch((error: unknown) => {
+    throw toGitHubRateLimitError(error) ?? error;
+  });
   const octokit = new Octokit({ auth: tokenData.token });
 
   try {
@@ -1255,6 +1319,7 @@ export async function fetchPullRequestByNumber(params: {
       owner,
       repo,
       pull_number: number,
+      ...requestOptions,
     });
 
     const state: AssociatedPullRequest['state'] =
@@ -1283,6 +1348,7 @@ export async function fetchPullRequestByNumber(params: {
             pull_number: number,
             per_page: COMMITS_PER_PAGE,
             page,
+            ...requestOptions,
           });
           for (const commit of data) {
             if (typeof commit.sha === 'string') commitShas.push(commit.sha);
@@ -1303,12 +1369,15 @@ export async function fetchPullRequestByNumber(params: {
       baseRepoFullName: pr.base.repo?.full_name ?? `${owner}/${repo}`,
       headRepoFullName: pr.head.repo?.full_name ?? '',
       headRef: pr.head.ref,
+      baseSha: pr.base.sha,
+      baseRef: pr.base.ref,
+      mergeable: pr.mergeable,
+      mergeableState: pr.mergeable_state,
       ...(commitShas ? { commitShas } : {}),
     };
   } catch (error) {
-    if (isGitHubRateLimitError(error)) {
-      throw new GitHubRateLimitError(parseRateLimitResetAt(error));
-    }
+    const rateLimitError = toGitHubRateLimitError(error);
+    if (rateLimitError) throw rateLimitError;
     if (isHttpError(error) && error.status === 404) {
       warnExceptInTest('[fetchPullRequestByNumber] PR not found or repo not accessible', {
         owner,

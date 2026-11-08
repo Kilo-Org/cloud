@@ -2,7 +2,6 @@ packages:
   - apps/*
   - services/*
   - services/cloud-agent-next/wrapper
-  - services/gastown/container
   - services/kiloclaw/controller
   - services/kiloclaw/plugins/*
   - packages/*
@@ -42,6 +41,9 @@ catalog:
   jose: 6.2.12
   jsonwebtoken: 9.0.3
   p-limit: 7.3.0
+  # apps/web builds its CSS with this and the workspace override below forces one
+  # copy across the tree, so both read the pin from here.
+  postcss: 8.5.30
   stripe: 23.0.0
   tsx: 4.23.15
   # TypeScript 7 is the native compiler and ships no compiler JS API. The
@@ -103,9 +105,9 @@ minimumReleaseAgeExclude:
   # enough on its own.
   - react-native-reanimated@4.7.1
   # @types/bun is DefinitelyTyped only: types, no runtime code, no install scripts.
-  # The wrapper and gastown dev types must equal the Bun the sandbox runs. Bun
-  # 1.4.4 is the first release that rejects the compromised eMudhra chains, so
-  # the pair moves before the window.
+  # The wrapper dev types must equal the Bun the sandbox runs, which
+  # sandbox-image-versions.test.ts asserts. Bun 1.4.4 is the first release that
+  # rejects the compromised eMudhra chains, so the pair moves before the window.
   - '@types/bun@1.4.4'
   - bun-types@1.4.4
 overrides:
@@ -137,12 +139,15 @@ overrides:
   # the entry moves only through a reviewed change to this file and the lockfile.
   # A 'catalog:' entry takes that package's catalog pin, which sits in this same
   # file, so it obeys the same rule.
-  # esbuild below keeps a floor without an upper bound; see its own note.
+  # esbuild also states its upper bound; its own note says why that bound is a
+  # whole minor version rather than a deeper pin.
   glob: 13.0.6
   google-auth-library: 10.6.2
-  # Two 0.28.x copies are in the tree as peer variants of the vite/vitest/storybook
-  # graph, so a bound here re-points those dependents. Not narrowed in this change.
-  esbuild: '>=0.28.1'
+  # The vite/vitest/storybook graph picks up this copy, so the bound names the
+  # whole current minor line. The allowBuilds entry below permits the install
+  # script, and a 0.29 release resolves only through a reviewed change here, in
+  # the lockfile, and in that entry.
+  esbuild: '>=0.28.1 <0.29'
   lodash: 4.18.1
   diff: 8.0.3
   fast-xml-parser: 5.7.3
@@ -162,12 +167,12 @@ overrides:
   compression: 1.8.2
   source-map-js: 1.2.2
   tinypool: 2.1.2
-  postcss: 8.5.30
-  # @modelcontextprotocol/sdk declares zod as a peer and packages/harness-sdk
-  # relies on the auto-installed peer. Without this line, a dependency that
-  # brings a newer zod into the dev graph (knip) would silently change the zod
-  # the shipped MCP client is built against. Follow the catalog pin so the two
-  # cannot drift apart.
+  postcss: 'catalog:'
+  # @modelcontextprotocol/sdk declares zod as both a dependency and a required
+  # peer, so this override pins that resolution to the catalog version. Without
+  # this line, a dependency that brings a newer zod into the dev graph (knip)
+  # would silently change the zod the shipped MCP client is built against.
+  # Follow the catalog pin so the two cannot drift apart.
   '@modelcontextprotocol/sdk>zod': 'catalog:'
   picomatch@^2: 2.3.2
   picomatch@^4: 4.0.4
@@ -282,6 +287,9 @@ patchedDependencies:
   # Android closes through native hide before unmounting. Keep src/ and build/
   # bottom-sheet implementations aligned: the default export resolves to build/.
   # The dialog key listener covers Back before Compose's lifecycle handler starts.
+  # A sheet whose content clears the status bar itself can say so, and then
+  # Material3 stops reserving that inset: a dialog window reports it only after
+  # the sheet was measured, which used to move the sheet's whole content.
   '@expo/ui@58.0.17': patches/@expo+ui@58.0.17.patch
   expo-dev-launcher@58.0.14: patches/expo-dev-launcher@58.0.14.patch
   # The app owns the layout direction: the picker forces RTL for an RTL language

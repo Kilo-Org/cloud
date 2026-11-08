@@ -1,11 +1,14 @@
 import 'server-only';
 
+import { isSupportAccessEnabled } from '@kilocode/web-shared/lib/admin/support-access';
+
 import { createPublicKey, randomUUID } from 'node:crypto';
 import {
   BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_KEY_ID,
   BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_PUBLIC_KEY,
 } from '@kilocode/web-shared/lib/config.server';
-import { db } from '@kilocode/web-shared/lib/drizzle';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
 import type { Owner } from '@/lib/integrations/core/types';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
@@ -92,6 +95,36 @@ function ownerCondition(owner: Owner) {
     : eq(platform_integrations.owned_by_organization_id, owner.id);
 }
 
+function organizationConnectAuditMessage(input: {
+  integrationId: string;
+  workspace: BitbucketWorkspace | undefined;
+}): string {
+  const workspace = input.workspace
+    ? `workspace ${input.workspace.uuid}, slug ${input.workspace.slug}`
+    : 'workspace selection pending';
+  return `Bitbucket OAuth integration connected (integration ${input.integrationId}, ${workspace})`;
+}
+
+async function writeOrganizationConnectAudit(input: {
+  tx: DrizzleTransaction;
+  organizationId: string;
+  actorUserId: string;
+  actorEmail: string | null;
+  actorName: string | null;
+  integrationId: string;
+  workspace: BitbucketWorkspace | undefined;
+}): Promise<void> {
+  await createAuditLog({
+    tx: input.tx,
+    action: 'organization.settings.change',
+    actor_email: input.actorEmail,
+    actor_id: input.actorUserId,
+    actor_name: input.actorName,
+    organization_id: input.organizationId,
+    message: organizationConnectAuditMessage(input),
+  });
+}
+
 export async function storeBitbucketIntegration(input: StoreBitbucketIntegrationInput): Promise<{
   status: 'connected' | 'workspace_selection_required';
   integrationId: string;
@@ -153,9 +186,17 @@ export async function storeBitbucketIntegration(input: StoreBitbucketIntegration
       sql`SELECT pg_advisory_xact_lock(hashtextextended(${`bitbucket-oauth-owner:${input.owner.type}:${input.owner.id}`}, 0))`
     );
 
+    // The authorizer row is read inside the organization guard below; its
+    // identity also attributes the durable organization audit entry.
+    let organizationAuthorizer: { email: string | null; name: string | null } | null = null;
+
     if (input.owner.type === 'org') {
       const [authorizer] = await tx
-        .select({ isAdmin: kilocode_users.is_admin })
+        .select({
+          isAdmin: kilocode_users.is_admin,
+          email: kilocode_users.google_user_email,
+          name: kilocode_users.google_user_name,
+        })
         .from(kilocode_users)
         .where(
           and(
@@ -170,7 +211,7 @@ export async function storeBitbucketIntegration(input: StoreBitbucketIntegration
         );
       }
 
-      if (!authorizer.isAdmin) {
+      if (!authorizer.isAdmin || isSupportAccessEnabled()) {
         const [membership] = await tx
           .select({ id: organization_memberships.id })
           .from(organization_memberships)
@@ -188,6 +229,8 @@ export async function storeBitbucketIntegration(input: StoreBitbucketIntegration
           );
         }
       }
+
+      organizationAuthorizer = { email: authorizer.email, name: authorizer.name };
     }
 
     const [currentIntegration] = await tx
@@ -221,6 +264,18 @@ export async function storeBitbucketIntegration(input: StoreBitbucketIntegration
       metadata,
     });
     await tx.insert(platform_oauth_credentials).values(credentialValues);
+
+    if (input.owner.type === 'org' && organizationAuthorizer) {
+      await writeOrganizationConnectAudit({
+        tx,
+        organizationId: input.owner.id,
+        actorUserId: input.authorizedByUserId,
+        actorEmail: organizationAuthorizer.email,
+        actorName: organizationAuthorizer.name,
+        integrationId,
+        workspace: selectedWorkspace,
+      });
+    }
 
     return { status, integrationId };
   });

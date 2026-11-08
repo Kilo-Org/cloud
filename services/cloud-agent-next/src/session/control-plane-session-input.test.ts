@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { Env } from '../types.js';
+import type { SessionMetadata } from '../persistence/session-metadata.js';
 import {
   buildControlPlaneCreateInput,
+  buildControlPlaneMessagePayload,
   buildControlPlaneRegisterInput,
   buildControlPlanePromptPayload,
 } from './control-plane-session-input.js';
@@ -50,6 +52,62 @@ describe('buildControlPlanePromptPayload', () => {
       agent: { mode: 'code', model: FULL_MODEL },
     });
     expect(payload.agent.model).toBe('fake-deterministic');
+  });
+});
+
+describe('buildControlPlaneMessagePayload variant inheritance', () => {
+  const storedMetadata = {
+    agent: { mode: 'code', model: 'kilo/anthropic/claude-sonnet-4', variant: 'high' },
+  } as SessionMetadata;
+
+  function buildCommandPayload(agentOverride?: {
+    mode?: string;
+    model?: string;
+    variant?: string;
+  }) {
+    return buildControlPlaneMessagePayload({
+      env: {} as Env,
+      userId: 'user-1',
+      sessionId: 'workspace_12345678-1234-4234-8234-123456789012' as never,
+      metadata: storedMetadata,
+      turn: { type: 'command', command: 'compact', arguments: '' },
+      ...(agentOverride ? { agentOverride } : {}),
+    });
+  }
+
+  it('does not pair a new model with the stored model variant', async () => {
+    const payload = await buildCommandPayload({ model: 'kilo/anthropic/claude-opus-4' });
+    expect(payload.agent).toEqual({ mode: 'code', model: 'anthropic/claude-opus-4' });
+  });
+
+  it('inherits the stored variant when the override keeps the stored model', async () => {
+    const payload = await buildCommandPayload({ model: 'anthropic/claude-sonnet-4' });
+    expect(payload.agent).toEqual({
+      mode: 'code',
+      model: 'anthropic/claude-sonnet-4',
+      variant: 'high',
+    });
+  });
+
+  it('inherits the stored model and variant when the model is not overridden', async () => {
+    const payload = await buildCommandPayload({ mode: 'code' });
+    expect(payload.agent).toEqual({
+      mode: 'code',
+      model: 'anthropic/claude-sonnet-4',
+      variant: 'high',
+    });
+  });
+
+  it('uses an explicit variant alongside a model override', async () => {
+    const payload = await buildCommandPayload({
+      model: 'kilo/anthropic/claude-opus-4',
+      variant: 'low',
+    });
+    expect(payload.agent).toEqual({
+      mode: 'code',
+      model: 'anthropic/claude-opus-4',
+      variant: 'low',
+    });
   });
 });
 

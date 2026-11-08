@@ -215,6 +215,31 @@ describe('authorizeDiscordSessionRequester', () => {
     ).resolves.toMatchObject({ authorized: false, reason: 'not_organization_member' });
   });
 
+  it('denies organization installations whose parent organization was deleted', async () => {
+    const discordUserId = nextDiscordUserId();
+    const parentAdmin = await insertTestUser();
+    await linkDiscordAccount(parentAdmin.id, discordUserId);
+    const parent = await createTestOrganization('Session deleted parent', installationOwner.id, 0);
+    const child = await createTestOrganization(
+      'Session child of deleted parent',
+      installationOwner.id,
+      0
+    );
+    await db
+      .update(organizations)
+      .set({ parent_organization_id: parent.id })
+      .where(eq(organizations.id, child.id));
+    await addMembership(parent.id, parentAdmin.id, 'owner');
+    await db
+      .update(organizations)
+      .set({ deleted_at: new Date().toISOString() })
+      .where(eq(organizations.id, parent.id));
+
+    await expect(
+      authorizeDiscordSessionRequester({ type: 'org', id: child.id }, discordUserId)
+    ).resolves.toMatchObject({ authorized: false, reason: 'not_organization_member' });
+  });
+
   it('denies organization installations whose organization was deleted', async () => {
     const discordUserId = nextDiscordUserId();
     const member = await insertTestUser();

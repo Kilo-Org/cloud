@@ -15,6 +15,7 @@ import { SessionDetailContent } from '@/components/agents/session-detail-content
 import { SESSION_HEADER_TITLE_LINES } from '@/components/agents/session-header';
 import {
   SessionComposerSkeleton,
+  SessionReadOnlyFooterPlaceholder,
   SessionSkeletonMessages,
 } from '@/components/agents/session-detail-skeleton';
 import { SessionContextMetrics } from '@/components/agents/session-context-metrics';
@@ -30,7 +31,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { parseParam } from '@/lib/route-params';
-import { AGENTS_SESSIONS_HREF } from '@/lib/agents-sessions-route';
+import { AGENTS_SESSIONS_HREF, AGENTS_SESSIONS_INDEX_HREF } from '@/lib/agents-sessions-route';
 import { isAddressableStoredSessionId } from '@/lib/session-id-shape';
 import { sessionDisplayTitle } from '@/lib/session-display-title';
 import { parseResumeAnchor } from '@/lib/session-resume';
@@ -255,13 +256,21 @@ export default function SessionDetailScreen() {
   // store issued.
   const addressable = isAddressableStoredSessionId(sessionId);
 
+  // The remote-spawn params mark the opens the spawn itself created for a
+  // writer (`kilo remote`, and the clone onto its live CLI). Every other open
+  // here has no metadata row yet (this window implies `sessionQuery` has no
+  // data) and no resolved kind, so its bottom slot reserves the read-only
+  // footer's shape — the bar and the continue control a stored session ends in
+  // — rather than painting a composer the session may not get.
+  const isPendingWritable = spawned === '1' || cloned === '1';
+
   if (
     !identityFailed &&
     addressable &&
     (identityPending ||
       (metadataPhase === 'loading' && displayedProviderKey.current !== providerKey))
   ) {
-    // The composer placeholder holds its own height: nothing may shift when
+    // The bottom placeholder holds its own height: nothing may shift when
     // the query resolves. Route title hints are not bound to an account.
     // The loading header reserves the loaded header's context pill (the loaded
     // right cluster is that pill plus an optional PR badge) so the swap cannot
@@ -290,7 +299,7 @@ export default function SessionDetailScreen() {
           className="pb-1"
         />
         <SessionSkeletonMessages sessionId={sessionId} />
-        <SessionComposerSkeleton />
+        {isPendingWritable ? <SessionComposerSkeleton /> : <SessionReadOnlyFooterPlaceholder />}
       </View>
     );
   }
@@ -398,7 +407,7 @@ export default function SessionDetailScreen() {
                   // POP_TO reuses the `(tabs)` route under this screen and
                   // truncates every `agent-chat` route above it, so a composer
                   // still on the stack under a missing session is gone with it.
-                  router.dismissTo(AGENTS_SESSIONS_HREF);
+                  router.dismissTo(AGENTS_SESSIONS_INDEX_HREF);
                 }}
               >
                 <Text>{t('agentChat.session.backToSessions')}</Text>

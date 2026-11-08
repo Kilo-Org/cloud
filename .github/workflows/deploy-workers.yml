@@ -48,7 +48,11 @@ concurrency:
 
 jobs:
   deploy-manual:
-    if: inputs.worker != ''
+    # Guard: this workflow_dispatch is reachable from a fork, and it deploys
+    # Cloudflare Workers using repo secrets. Only the canonical repo may run
+    # it. (Also called as a reusable workflow from deploy-staging.yml, whose
+    # caller job is itself guarded.)
+    if: inputs.worker != '' && github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: ${{ inputs.worker == 'services/cloud-agent-next' && 75 || inputs.worker == 'services/auto-routing-benchmark' && inputs.target_environment == 'production' && 60 || 25 }}
     name: Deploy ${{ inputs.worker }}
@@ -76,7 +80,17 @@ jobs:
 
       - name: Install dependencies
         working-directory: ${{ inputs.worker }}
-        run: pnpm install --frozen-lockfile
+        # Only the Worker's own dependency closure plus the root project: a
+        # recursive workspace install links every unrelated package and runs its
+        # lifecycle scripts in each deploy job. A Worker whose predeploy builds a
+        # nested workspace package (the cloud-agent wrapper) needs that package's
+        # closure as well.
+        run: |
+          filters=(--filter '{.}...' --filter kilocode-monorepo)
+          if [ -f wrapper/package.json ]; then
+            filters+=(--filter '@kilocode/cloud-agent-wrapper...')
+          fi
+          pnpm install --frozen-lockfile "${filters[@]}"
 
       - name: Prepare downloaded Cloud Agent runtime
         if: inputs.worker == 'services/cloud-agent-next'
@@ -162,7 +176,10 @@ jobs:
           command: ${{ steps.runtime.outputs.command || (inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment)) }} ${{ steps.usage_queues.outputs.queues_required == 'true' && '--experimental-provision=false' || '' }}
 
   detect-changes:
-    if: inputs.worker == '' && inputs.base_sha != ''
+    # Manual dispatch has no `base_sha` (it is a `workflow_call` input only), so
+    # change detection is reachable only through `workflow_call`.
+    # Guard: privileged workflow. Only the canonical repo may run it.
+    if: inputs.worker == '' && inputs.base_sha != '' && github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 5
     outputs:
@@ -262,8 +279,6 @@ jobs:
           # Workers excluded from automatic deployment:
           EXCLUDED=(
             services/kiloclaw  # Docker-based deploy in deploy-kiloclaw.yml (manual-only)
-            services/gastown   # Deployed separately
-            services/wasteland # Deployed separately
             services/user-data-export # Automatic deploy suspended
           )
 
@@ -328,12 +343,16 @@ jobs:
           fi
           echo "deploy-cloud-agent-after-session-ingest=$DEPLOY_CLOUD_AGENT_AFTER_SESSION_INGEST" >> "$GITHUB_OUTPUT"
 
+          # The ordered deployment path owns both workers: session-ingest runs as its
+          # own job and cloud-agent-next needs that job, so neither may also sit in
+          # the parallel matrix.
           FILTERED=()
           for dir in "${CHANGED[@]}"; do
-            if [ "$DEPLOY_CLOUD_AGENT_AFTER_SESSION_INGEST" != true ] \
-              || [ "$dir" != services/cloud-agent-next ]; then
-              FILTERED+=("$dir")
+            if [ "$DEPLOY_CLOUD_AGENT_AFTER_SESSION_INGEST" = true ] \
+              && { [ "$dir" = services/session-ingest ] || [ "$dir" = services/cloud-agent-next ]; }; then
+              continue
             fi
+            FILTERED+=("$dir")
           done
           CHANGED=("${FILTERED[@]}")
 
@@ -346,7 +365,7 @@ jobs:
 
   deploy-changed:
     needs: detect-changes
-    if: needs.detect-changes.outputs.matrix != '[]' && needs.detect-changes.outputs.matrix != ''
+    if: needs.detect-changes.outputs.matrix != '[]' && needs.detect-changes.outputs.matrix != '' && github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: ${{ matrix.worker == 'services/cloud-agent-next' && 75 || matrix.worker == 'services/auto-routing-benchmark' && inputs.target_environment == 'production' && 60 || 25 }}
     environment: ${{ inputs.target_environment }}
@@ -378,7 +397,17 @@ jobs:
 
       - name: Install dependencies
         working-directory: ${{ matrix.worker }}
-        run: pnpm install --frozen-lockfile
+        # Only the Worker's own dependency closure plus the root project: a
+        # recursive workspace install links every unrelated package and runs its
+        # lifecycle scripts in each matrix job. A Worker whose predeploy builds a
+        # nested workspace package (the cloud-agent wrapper) needs that package's
+        # closure as well.
+        run: |
+          filters=(--filter '{.}...' --filter kilocode-monorepo)
+          if [ -f wrapper/package.json ]; then
+            filters+=(--filter '@kilocode/cloud-agent-wrapper...')
+          fi
+          pnpm install --frozen-lockfile "${filters[@]}"
 
       - name: Prepare downloaded Cloud Agent runtime
         if: matrix.worker == 'services/cloud-agent-next'
@@ -467,11 +496,73 @@ jobs:
             if [ "$(jq -r '.scripts.predeploy // empty' package.json)" != "" ]; then pnpm run predeploy; fi
           command: ${{ steps.runtime.outputs.command || (inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment)) }} ${{ steps.usage_queues.outputs.queues_required == 'true' && '--experimental-provision=false' || '' }}
 
-  deploy-cloud-agent-after-session-ingest:
+  deploy-session-ingest:
     needs: detect-changes
-    if: needs.detect-changes.outputs.deploy-cloud-agent-after-session-ingest == 'true'
+    # Guard: this reusable workflow can be invoked from a fork, and the job
+    # deploys to the target environment with inherited repo secrets. Only the
+    # canonical repo may run it.
+    if: github.repository == 'Kilo-Org/cloud' && needs.detect-changes.outputs.deploy-cloud-agent-after-session-ingest == 'true'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
-    timeout-minutes: 100
+    timeout-minutes: 25
+    environment: ${{ inputs.target_environment }}
+    name: Deploy session-ingest before cloud-agent-next
+    steps:
+      - name: Checkout code
+        uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        working-directory: services/session-ingest
+        # Only the Worker's dependency closure plus the root project; a recursive
+        # workspace install links every unrelated package as well.
+        run: |
+          filters=(--filter '{.}...' --filter kilocode-monorepo)
+          if [ -f wrapper/package.json ]; then
+            filters+=(--filter '@kilocode/cloud-agent-wrapper...')
+          fi
+          pnpm install --frozen-lockfile "${filters[@]}"
+
+      - name: Deploy to Cloudflare Workers
+        id: deploy
+        continue-on-error: true
+        uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65 # v3.14.1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          workingDirectory: services/session-ingest
+          preCommands: |
+            if [ "$(jq -r '.scripts.predeploy // empty' package.json)" != "" ]; then pnpm run predeploy; fi
+          command: ${{ inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment) }}
+
+      - name: Deploy to Cloudflare Workers (retry)
+        if: steps.deploy.outcome == 'failure'
+        uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65 # v3.14.1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          workingDirectory: services/session-ingest
+          preCommands: |
+            if [ "$(jq -r '.scripts.predeploy // empty' package.json)" != "" ]; then pnpm run predeploy; fi
+          command: ${{ inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment) }}
+
+  deploy-cloud-agent-after-session-ingest:
+    needs: [detect-changes, deploy-session-ingest]
+    # GitHub skips a dependent job when a needed job fails: cloud-agent-next never
+    # deploys after an unsuccessful session-ingest deployment.
+    if: >-
+      github.repository == 'Kilo-Org/cloud' &&
+      needs.detect-changes.outputs.deploy-cloud-agent-after-session-ingest == 'true' &&
+      needs.deploy-session-ingest.result == 'success'
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 75
     environment: ${{ inputs.target_environment }}
     name: Deploy cloud-agent-next after session-ingest
     steps:
@@ -489,8 +580,6 @@ jobs:
           node-version-file: '.nvmrc'
           cache: 'pnpm'
 
-      # Only the deploy steps depend on session-ingest, so the setup runs before the
-      # gate below: the install and the runtime preparation overlap the sibling deployment.
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
         with:
@@ -498,7 +587,15 @@ jobs:
 
       - name: Install cloud-agent-next dependencies
         working-directory: services/cloud-agent-next
-        run: pnpm install --frozen-lockfile
+        # The service's closure plus the wrapper package that its predeploy
+        # builds; a recursive workspace install would link every unrelated
+        # package too.
+        run: |
+          filters=(--filter '{.}...' --filter kilocode-monorepo)
+          if [ -f wrapper/package.json ]; then
+            filters+=(--filter '@kilocode/cloud-agent-wrapper...')
+          fi
+          pnpm install --frozen-lockfile "${filters[@]}"
 
       - name: Prepare downloaded Cloud Agent runtime
         id: runtime
@@ -518,25 +615,6 @@ jobs:
           if [ -f scripts/prepare-runtime-deploy.ts ] || [ -f runtime-targets.json ]; then
             pnpm exec tsx scripts/prepare-runtime-deploy.ts "$TARGET_ENVIRONMENT" "$SOURCE_SHA"
           fi
-
-      - name: Wait for session-ingest deployment
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          for attempt in $(seq 1 360); do
-            conclusion=$(gh api \
-              "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs?per_page=100" \
-              --jq '.jobs[] | select(.name == "Deploy services/session-ingest" or (.name | endswith(" / Deploy services/session-ingest"))) | (.conclusion // .status)' \
-              | head -n 1)
-            if [ "$conclusion" = success ]; then exit 0; fi
-            if [ -n "$conclusion" ] \
-              && [ "$conclusion" != queued ] \
-              && [ "$conclusion" != in_progress ]; then
-              exit 1
-            fi
-            sleep 5
-          done
-          exit 1
 
       - name: Deploy cloud-agent-next
         id: deploy-cloud-agent

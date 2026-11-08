@@ -7,9 +7,9 @@ import { ChevronDown, Eye, EyeOff } from '@/components/ui/icons';
 import { Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
-import Animated, { LinearTransition } from 'react-native-reanimated';
 
 import { AddCreditsButton, AddCreditsRow } from '@/components/add-credits-row';
+import { BalanceBlock, type BalanceBlockState } from '@/components/profile-balance-block';
 import { useContextPicker } from '@/components/context-control';
 import { CreditExpiryNote } from '@/components/credits/credit-expiry-note';
 import { KiloPassSubscriptionCard } from '@/components/kilo-pass/kilo-pass-subscription-card';
@@ -18,7 +18,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { WEB_BASE_URL } from '@/lib/config';
 import { ICON_TARGET_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
-import { formatMoney } from '@/lib/format';
+import { formatPrefixedUsd } from '@/lib/format';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useHideBalancePreference } from '@/lib/hooks/use-hide-balance-preference';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -27,14 +27,20 @@ import { isNarrowLayout } from '@/lib/narrow-layout';
 import { useOrganization } from '@/lib/organization-context';
 import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { useTRPC } from '@/lib/trpc';
+import { HIDDEN_BALANCE } from '@/lib/storage-keys';
 import { cn } from '@/lib/utils';
-
-const HIDDEN_BALANCE = '*****';
 
 type CreditsCardProps = {
   readonly enabled: boolean;
   orgs: OrgListEntry[] | undefined;
 };
+
+/**
+ * The amount's own line direction: a currency figure keeps its
+ * left-to-right order in a right-to-left interface, so the symbol stays in
+ * front of the number instead of moving behind it.
+ */
+const AMOUNT_DIRECTION = { direction: 'ltr', writingDirection: 'ltr' } as const;
 
 export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   const trpc = useTRPC();
@@ -122,10 +128,22 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
     creditData === undefined || (Boolean(selectedOrgId) && orgCreditsPlaceholder);
 
   const balanceDollars = balance?.balance ?? 0;
-  // One formatted amount for the painted value and its spoken label: a label
-  // that stops being passed keeps its old native value, so the shown amount
-  // would otherwise still be announced as the hidden one.
-  const balanceText = formatMoney(balanceDollars, i18n.language);
+  // One amount for the painted value and its spoken label: a label that stops
+  // being passed keeps its old native value, so the shown amount would
+  // otherwise still be announced as the hidden one.
+  //
+  // The symbol leads the number whatever the app language's own money pattern
+  // says: a right-to-left locale puts the currency after the amount behind a
+  // no-break space ("0.00 $"), so the same balance read as a different figure
+  // in that cell than the "$0.00" the other cells show (design review, Profile
+  // rtl cell, 2026-11-07). The digits and their separators still come from the
+  // locale's number formatter, and the formatter's own minus sign stays in
+  // front of the symbol: a balance can be negative, and "-$5.00" is the
+  // figure a reader expects, not "$-5.00".
+  const amountText = formatPrefixedUsd(balanceDollars, i18n.language, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
   // A read that has not answered yet is pending without fetching while the
   // owner is still unresolved (the balance query is gated on the identity), so
   // `balanceLoading` (isLoading) is false while `balance` is still undefined.
@@ -170,7 +188,7 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
       {!creditsFailed && !creditsPending && (
         <CreditExpiryNote
           creditBlocks={creditData.creditBlocks}
-          hiddenAmount={hideBalance ? HIDDEN_BALANCE : undefined}
+          hiddenAmount={hideBalance || !hideBalanceLoaded ? HIDDEN_BALANCE : undefined}
           emptyMessage={t('credits.noExpiringCredits')}
         />
       )}
@@ -184,9 +202,13 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
     <ScrollView horizontal className="min-w-0 shrink-0 grow-0">
       <Text
         className="text-2xl font-bold tabular-nums"
-        accessibilityLabel={hideBalance ? t('profile.balanceHidden') : balanceText}
+        // A reader compares the amount digit by digit, and its symbol is
+        // neutral to the line's direction, so the run keeps its own
+        // left-to-right order whatever the interface language.
+        style={AMOUNT_DIRECTION}
+        accessibilityLabel={hideBalance ? t('profile.balanceHidden') : amountText}
       >
-        {hideBalance ? HIDDEN_BALANCE : balanceText}
+        {hideBalance ? HIDDEN_BALANCE : amountText}
       </Text>
     </ScrollView>
   );
@@ -216,15 +238,54 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   // switch own the skeleton above; a refresh that fails owns the retry surface.
   // An indicator tied to every in-flight refresh spun for as long as a stalled
   // one lasted (and announced itself as "In progress").
-  const addCreditsAction =
-    selectedOrgId == null ? (
-      <AddCreditsButton
-        className="h-auto min-h-11 max-w-full py-2"
-        onPress={() => {
-          router.push('/(app)/credits' as Href);
-        }}
+  //
+  // An organization's top-up is the external billing page, so it carries the
+  // row's App Store gate and opens for a member who can manage billing. It uses
+  // the same trailing slot as the personal purchase, and it is offered at any
+  // balance, exactly like the personal action beside it. The balance read no
+  // longer decides whether it exists: mounting the control once that read
+  // answered moved every section below the card with it (design gate, Profile,
+  // 2026-11-06), and the slot it takes is reserved in the card's other states.
+  //
+  // A stacked card holds the action on its own end-aligned row inside the
+  // balance block, so it takes the inline form: the button keeps its natural
+  // size there instead of the block width `AddCreditsRow` gives a window under
+  // the narrow threshold.
+  const orgAddCreditsAction =
+    selectedOrgId != null && canManageOrgBilling ? (
+      <AddCreditsRow
+        url={`${WEB_BASE_URL}/organizations/${selectedOrgId}/payment-details`}
+        inline={stackBalance}
       />
     ) : null;
+
+  const addCreditsAction =
+    selectedOrgId == null ? (
+      <View className="max-w-full flex-row flex-wrap items-center justify-end gap-2">
+        <AddCreditsButton
+          className="h-auto min-h-11 max-w-full py-2"
+          onPress={() => {
+            router.push('/(app)/credits' as Href);
+          }}
+        />
+      </View>
+    ) : (
+      orgAddCreditsAction
+    );
+
+  // The balance slot's state: one shell paints all three, so the card never
+  // moves as the read answers, fails or retries.
+  let balanceState: BalanceBlockState = 'ready';
+  if (showBalanceSkeleton) {
+    balanceState = 'loading';
+  } else if (balanceFailed) {
+    balanceState = 'failed';
+  }
+
+  const retryBalance = () => {
+    refetchUserId();
+    void refetchBalance();
+  };
 
   return (
     <View
@@ -284,102 +345,18 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
         </View>
       )}
 
-      {showBalanceSkeleton && (
-        // Content-shaped skeleton (number bar + note bar in the card's own
-        // bg-secondary shell): a plain block read as an empty box in the e5
-        // spot check (2026-09-07). Sized to the card's min-h-16 so the swap
-        // to the balance row does not shift the sections below. The bars are
-        // bg-muted-soft because the theme's bg-muted equals bg-secondary —
-        // default-tone bars were invisible in this shell (b911 e2 spot check:
-        // "blank beige block", e2-nav-profile.png).
-        <View className="min-h-16 flex-row items-center rounded-lg bg-secondary px-3 py-2">
-          <View className="flex-1 gap-1">
-            <Skeleton className="h-8 w-28 rounded-md bg-muted-soft" />
-            <Skeleton className="h-3 w-40 rounded bg-muted-soft" />
-          </View>
-        </View>
-      )}
-      {balanceFailed && (
-        <Pressable
-          className="min-h-16 justify-center rounded-lg bg-secondary px-3 py-3 active:opacity-70"
-          onPress={() => {
-            refetchUserId();
-            void refetchBalance();
-          }}
-        >
-          <Text className="text-sm text-destructive">{t('profile.failedToLoadBalance')}</Text>
-        </Pressable>
-      )}
-      {balanceFailed && selectedOrgId == null && (
-        <AddCreditsButton
-          onPress={() => {
-            router.push('/(app)/credits' as Href);
-          }}
-        />
-      )}
-      {!showBalanceSkeleton && !balanceFailed && (
-        <View
-          className={cn(
-            'min-h-16 gap-2 rounded-lg bg-secondary px-3 py-2',
-            // A stacked card ends on the Add credits button, whose own line
-            // sits inside a 38.5 dp pill. `pb-3` gives that pill more room under
-            // it than the card's 7 dp top padding gives the amount above it, so
-            // the bottom edge does not read as tighter than the top.
-            stackBalance ? 'items-stretch pb-3' : 'flex-row items-center'
-          )}
-        >
-          <Animated.View
-            className={cn('min-w-0', stackBalance ? 'gap-1' : 'flex-1 flex-row items-center gap-1')}
-            layout={LinearTransition.duration(200)}
-          >
-            {/* Row 1 holds the amount, and the toggle on a stacked card. Its
-                48 dp box carries `-my-[10px]`, so it reaches its touch target
-                without adding height: the row ends at the amount's own line and
-                the note below keeps the wide cells' 3.4 dp gap. On a wide card
-                the toggle is the row's sibling and the note stays in the
-                amount's column. */}
-            <View
-              className={cn(
-                'min-w-0',
-                // `flex-1` is the row's width share only while this View is the
-                // column's child on a wide card. On a stacked card this View is
-                // the amount row inside the column, where `flex-1` sets a 0
-                // vertical basis and the row measured 0 dp tall on the first
-                // layout pass (Android compact cell, 2026-11-03); the card's
-                // `items-stretch` already gives it the full width.
-                stackBalance ? 'flex-row items-center gap-1' : 'flex-1 gap-1'
-              )}
-            >
-              <View className={cn('min-w-0', stackBalance && 'flex-1')}>{amountLine}</View>
-              {stackBalance ? (
-                <View className="shrink-0 -my-[10px]">{visibilityToggle}</View>
-              ) : (
-                expirySlot
-              )}
-            </View>
-            {stackBalance ? expirySlot : visibilityToggle}
-          </Animated.View>
-          {/* The purchase action keeps the card's trailing end in both
-              layouts: the trailing column on a wide card, its own row below
-              the note on a stacked one. */}
-          {addCreditsAction !== null && (
-            <View className="max-w-full flex-row flex-wrap items-center justify-end gap-2">
-              {addCreditsAction}
-            </View>
-          )}
-        </View>
-      )}
-      {selectedOrgId != null &&
-        canManageOrgBilling &&
-        !balanceLoading &&
-        !balancePending &&
-        !balanceFailed &&
-        balanceDollars === 0 && (
-          <AddCreditsRow
-            url={`${WEB_BASE_URL}/organizations/${selectedOrgId}/payment-details`}
-            className="rounded-lg bg-secondary px-3 py-3"
-          />
-        )}
+      <BalanceBlock
+        state={balanceState}
+        stacked={stackBalance}
+        amount={amountLine}
+        toggle={visibilityToggle}
+        note={expirySlot}
+        failureLabel={t('profile.balanceLoadFailed')}
+        action={addCreditsAction}
+        retryLabel={t('profile.failedToLoadBalance')}
+        retryActionLabel={t('common.retry')}
+        onRetry={retryBalance}
+      />
       {/* One loading indicator per section: while the balance slot shows its
           skeleton, the KiloPass card reserves its slot quietly instead of
           stacking a second skeleton card. The card's queries still run from

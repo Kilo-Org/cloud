@@ -15,6 +15,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
 import { canManageOrganization } from '@kilocode/app-shared/organizations';
 import { CHATGPT_ACCESS_FLAG } from '@/lib/auth/openai/access';
+import { ClaudeBillingCard } from './byok/ClaudeBillingCard';
 
 export function BYOKContent({
   organizationId,
@@ -53,27 +54,30 @@ export function BYOKContent({
           title="Bring Your Own Key"
           showBackButton={false}
         />
-        {/*
+        <div className="space-y-4">
+          <ClaudeBillingCard organizationId={organizationId} />
+          {/*
           The ChatGPT connection is personal, so every member manages their own
           for this organization and sees only that card. The pasted-key manager
           stays owner/admin only, so a member never sees the access-denied block.
         */}
-        {hasPermission ? (
-          <div className="space-y-4">
-            {chatGptCard}
-            <BYOKKeysManager organizationId={organizationId} />
-          </div>
-        ) : chatGptEnabled !== false ? (
-          <div className="space-y-4">{chatGptCard}</div>
-        ) : (
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Access Denied</AlertTitle>
-            <AlertDescription>
-              You must be an organization owner to manage organization API keys.
-            </AlertDescription>
-          </Alert>
-        )}
+          {hasPermission ? (
+            <div className="space-y-4">
+              {chatGptCard}
+              <BYOKKeysManager organizationId={organizationId} />
+            </div>
+          ) : chatGptEnabled !== false ? (
+            <div className="space-y-4">{chatGptCard}</div>
+          ) : (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Access Denied</AlertTitle>
+              <AlertDescription>
+                You must be an organization owner to manage organization API keys.
+              </AlertDescription>
+            </Alert>
+          )}
+        </div>
       </div>
     </OrganizationContextProvider>
   );

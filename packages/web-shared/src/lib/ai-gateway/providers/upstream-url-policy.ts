@@ -32,6 +32,15 @@ const DNS_LOOKUP_ATTEMPTS = 2;
 const DNS_RETRY_DELAY_MS = 100;
 const DNS_LOOKUP_TIMEOUT_MS = 2_000;
 const publicHostnameExpiresAt = new Map<string, number>();
+/**
+ * Resolutions in flight, keyed by normalized hostname. A validation reuses the
+ * entry for its host while that resolution is pending. The entry is removed
+ * when the resolution settles, and at the latest after one lookup deadline, so
+ * a resolution that never settles cannot pin the host. Removal only stops new
+ * validations from reusing the entry. Callers that already hold the promise
+ * keep it, with their own signal and deadline.
+ */
+const inFlightHostnameResolutions = new Map<string, Promise<string[]>>();
 
 const REJECTION_MESSAGES = {
   invalid_url: 'The upstream provider URL is not a valid URL.',
@@ -88,6 +97,43 @@ function cachePublicHostname(hostname: string, now: number): void {
 }
 
 /**
+ * Removes the entry for `hostname` only if it still holds `resolution`. A
+ * stale resolution must not remove a newer entry for the same host.
+ */
+function forgetInFlightResolution(hostname: string, resolution: Promise<string[]>): void {
+  if (inFlightHostnameResolutions.get(hostname) === resolution) {
+    inFlightHostnameResolutions.delete(hostname);
+  }
+}
+
+/**
+ * Returns the resolution already in flight for `hostname`, or starts one. The
+ * entry stays recorded until the resolution settles or one lookup deadline
+ * passes, whichever comes first. Every validation of the same host that starts
+ * in that window awaits that one resolution. Each caller applies its own
+ * signal and deadline to the promise it receives.
+ */
+function resolveSharedHostAddresses(
+  hostname: string,
+  resolveHostAddresses: ResolveHostAddresses
+): Promise<string[]> {
+  const pending = inFlightHostnameResolutions.get(hostname);
+  if (pending) return pending;
+
+  const resolution = Promise.resolve().then(() => resolveHostAddresses(hostname));
+  inFlightHostnameResolutions.set(hostname, resolution);
+  const forget = () => forgetInFlightResolution(hostname, resolution);
+  void resolution.then(forget, forget);
+  // `dns.lookup` cannot be cancelled, so a stalled lookup can outlive every
+  // caller. Bound the entry to one deadline, including when every caller left
+  // by abort. No caller that starts with the resolution can still use it
+  // after that point.
+  const retention = setTimeout(forget, DNS_LOOKUP_TIMEOUT_MS);
+  retention.unref?.();
+  return resolution;
+}
+
+/**
  * Settles with `promise`, or rejects with the abort reason as soon as `signal`
  * aborts. `dns.lookup` cannot be cancelled, so a stalled getaddrinfo keeps its
  * thread-pool slot, but the request no longer waits for it.
@@ -106,6 +152,9 @@ function untilAborted<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
  * attempt has its own deadline, and a resolver that does not answer within it
  * ends the validation in `dns_lookup_failed`. An abort of `signal` (client
  * disconnect or the request budget) rejects at once with its reason.
+ *
+ * Both attempts resolve through `resolveSharedHostAddresses`, so they start a
+ * system lookup only when no other validation already awaits one for the host.
  */
 async function resolveWithRetry(
   hostname: string,
@@ -119,17 +168,24 @@ async function resolveWithRetry(
     }
     signal?.throwIfAborted();
     const deadline = AbortSignal.timeout(DNS_LOOKUP_TIMEOUT_MS);
+    const shared = resolveSharedHostAddresses(hostname, resolveHostAddresses);
     try {
       const addresses = await untilAborted(
-        resolveHostAddresses(hostname),
+        shared,
         signal ? AbortSignal.any([signal, deadline]) : deadline
       );
       if (addresses.length > 0) return addresses;
     } catch {
       if (signal?.aborted) throw signal.reason;
       // A resolution that reaches its deadline ends the validation here; the
-      // caller reports the retryable `dns_lookup_failed` outcome.
-      if (deadline.aborted) return null;
+      // caller reports the retryable `dns_lookup_failed` outcome. Forget the
+      // entry now, without waiting for the retention timer, so the next
+      // validation starts a fresh resolution. Callers that still await this
+      // resolution keep their promise and their own deadline.
+      if (deadline.aborted) {
+        forgetInFlightResolution(hostname, shared);
+        return null;
+      }
       // A resolution that finished with a transient failure is retried; the
       // caller reports dns_lookup_failed once attempts run out.
     }
@@ -139,6 +195,7 @@ async function resolveWithRetry(
 
 export function clearUpstreamUrlPolicyCache(): void {
   publicHostnameExpiresAt.clear();
+  inFlightHostnameResolutions.clear();
 }
 
 /**

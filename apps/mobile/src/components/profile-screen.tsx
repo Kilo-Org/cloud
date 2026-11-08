@@ -17,6 +17,7 @@ import {
   SlidersHorizontal,
   Sparkles,
   Trash2,
+  Users,
 } from '@/components/ui/icons';
 import { type LayoutChangeEvent, type ScrollViewInstance, View } from 'react-native';
 import Animated, { FadeOut } from 'react-native-reanimated';
@@ -37,6 +38,7 @@ import { useDeleteAccount } from '@/components/use-delete-account';
 import { useFeedbackPrompt } from '@/components/use-feedback-prompt';
 import { i18n } from '@/i18n';
 import { useAuth } from '@/lib/auth/auth-context';
+import { SESSION_SYNC_URL } from '@/lib/config';
 import { openExternalUrl } from '@/lib/external-link';
 import { useAfterIdle } from '@/lib/hooks/use-after-idle';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
@@ -287,7 +289,7 @@ export function ProfileScreen() {
             }}
           />
           <ConfigureRow
-            icon={SlidersHorizontal}
+            icon={Users}
             title={t('profiles.title')}
             subtitle={t('profiles.entrySubtitle')}
             // Agents step: the row lists the agent profiles, and its two
@@ -347,6 +349,17 @@ export function ProfileScreen() {
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
             {t('profile.app')}
           </Text>
+          {__DEV__ && SESSION_SYNC_URL && (
+            <ConfigureRow
+              icon={SlidersHorizontal}
+              title={t('nativeRemote.title')}
+              hue="sage"
+              className="rounded-lg bg-secondary px-3"
+              onPress={() => {
+                router.push('/(app)/native-remote' as Href);
+              }}
+            />
+          )}
           <ConfigureRow
             icon={SlidersHorizontal}
             title={t('common.preferences')}

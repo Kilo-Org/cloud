@@ -97,7 +97,6 @@ const adminAreaPolicies: Record<string, AdminAreaPolicy> = {
   enrichmentData: { read: 'platform_read', write: 'platform_write', target: 'none' },
   extendClawTrial: platform,
   featureInterest: platform,
-  gastown: support,
   gatewayConfig: platform,
   gatewayModelLists: platform,
   github: platform,
@@ -118,6 +117,7 @@ const adminAreaPolicies: Record<string, AdminAreaPolicy> = {
   serviceFeeRollback: { read: 'platform_read', write: 'sensitive_write', target: 'none' },
   securityAdvisorContent: support,
   sessionTraces: { read: 'support_read', write: 'support_write', target: 'user' },
+  supportAccess: support,
   syncProviders: platform,
   userDataExports: { read: 'support_read', write: 'support_write', target: 'user' },
   userDeletionQueue: { read: 'platform_read', write: 'sensitive_write', target: 'user' },
@@ -359,6 +359,11 @@ const trpcEntries: PrivilegedInventoryEntry[] = [
     write: 'support_write',
     target: 'user',
   }),
+  adminEntry('trpc.githubApps', 'githubApps.*', {
+    read: 'support_read',
+    write: 'support_write',
+    target: 'organization',
+  }),
   {
     id: 'trpc.securityAgent.getAuditReport',
     surface: 'trpc',
@@ -451,13 +456,6 @@ const restEntries: PrivilegedInventoryEntry[] = [
     route: '/admin/api/auto-routing*',
     read: 'platform_read',
     write: 'platform_write',
-    target: 'none',
-  },
-  {
-    id: 'rest.admin.analytics',
-    surface: 'rest',
-    route: '/admin/api/gastown-analytics*',
-    read: 'support_read',
     target: 'none',
   },
   {
@@ -574,20 +572,6 @@ const restEntries: PrivilegedInventoryEntry[] = [
     target: 'user',
   },
   {
-    id: 'rest.wastelandToken',
-    surface: 'rest',
-    route: '/api/wasteland/token',
-    write: 'worker_admin',
-    target: 'service',
-  },
-  {
-    id: 'rest.gastownToken',
-    surface: 'rest',
-    route: '/api/gastown/token',
-    write: 'worker_admin',
-    target: 'service',
-  },
-  {
     id: 'rest.organizationTokens',
     surface: 'rest',
     route: '/api/organizations/[id]/user-tokens',
@@ -629,63 +613,10 @@ const serverComponentEntries: PrivilegedInventoryEntry[] = [
   },
 ];
 
-const workerEntries: PrivilegedInventoryEntry[] = [
-  {
-    id: 'worker.gastown.admin',
-    surface: 'worker',
-    route: 'gastown.admin*',
-    actionClass: 'worker_admin',
-    target: 'service',
-  },
-  {
-    id: 'worker.gastown.debugAgentMetadata',
-    surface: 'worker',
-    route: 'gastown.debugAgentMetadata',
-    actionClass: 'worker_admin',
-    target: 'service',
-  },
-  {
-    id: 'worker.wasteland.admin',
-    surface: 'worker',
-    route: 'wasteland.admin*',
-    actionClass: 'worker_admin',
-    target: 'service',
-  },
-  {
-    id: 'worker.gastown.ownershipBypass',
-    surface: 'worker',
-    route: 'trpc:gastown.* ownership bypass',
-    actionClass: 'worker_admin',
-    target: 'service',
-  },
-  {
-    id: 'worker.gastown.townRestBypass',
-    surface: 'worker',
-    route: 'rest:/api/towns/:townId/* admin bypass',
-    actionClass: 'worker_admin',
-    target: 'service',
-  },
-  {
-    id: 'worker.gastown.userRestAdminRead',
-    surface: 'worker',
-    route: 'rest:GET /api/users/:userId/* admin read',
-    actionClass: 'worker_admin',
-    target: 'service',
-  },
-  {
-    id: 'worker.wasteland.ownershipBypass',
-    surface: 'worker',
-    route: 'trpc:wasteland.* ownership bypass',
-    actionClass: 'worker_admin',
-    target: 'service',
-  },
-];
-
 export const privilegedInventory: readonly PrivilegedInventoryEntry[] = [
   ...trpcEntries,
   ...restEntries,
   ...serverComponentEntries,
-  ...workerEntries,
 ];
 
 /**
@@ -703,83 +634,6 @@ export type InternalElevationSite = {
 };
 
 export const internalElevationSites: readonly InternalElevationSite[] = [
-  {
-    id: 'internal.app.gastown.agents',
-    file: 'apps/web/src/app/(app)/gastown/[townId]/agents/page.tsx',
-    actionClass: 'support_read',
-    surface: 'server-component',
-    occurrences: 1,
-  },
-  {
-    id: 'internal.app.gastown.beads',
-    file: 'apps/web/src/app/(app)/gastown/[townId]/beads/page.tsx',
-    actionClass: 'support_read',
-    surface: 'server-component',
-    occurrences: 1,
-  },
-  {
-    id: 'internal.app.gastown.mail',
-    file: 'apps/web/src/app/(app)/gastown/[townId]/mail/page.tsx',
-    actionClass: 'support_read',
-    surface: 'server-component',
-    occurrences: 1,
-  },
-  {
-    id: 'internal.app.gastown.merges',
-    file: 'apps/web/src/app/(app)/gastown/[townId]/merges/page.tsx',
-    actionClass: 'support_read',
-    surface: 'server-component',
-    occurrences: 1,
-  },
-  {
-    id: 'internal.app.gastown.observability',
-    file: 'apps/web/src/app/(app)/gastown/[townId]/observability/page.tsx',
-    actionClass: 'support_read',
-    surface: 'server-component',
-    occurrences: 1,
-  },
-  {
-    id: 'internal.app.gastown.overview',
-    file: 'apps/web/src/app/(app)/gastown/[townId]/page.tsx',
-    actionClass: 'support_read',
-    surface: 'server-component',
-    occurrences: 1,
-  },
-  {
-    id: 'internal.app.gastown.rig',
-    file: 'apps/web/src/app/(app)/gastown/[townId]/rigs/[rigId]/page.tsx',
-    actionClass: 'support_read',
-    surface: 'server-component',
-    occurrences: 1,
-  },
-  {
-    id: 'internal.app.gastown.rigSettings',
-    file: 'apps/web/src/app/(app)/gastown/[townId]/rigs/[rigId]/settings/page.tsx',
-    actionClass: 'support_read',
-    surface: 'server-component',
-    occurrences: 1,
-  },
-  {
-    id: 'internal.app.gastown.settings',
-    file: 'apps/web/src/app/(app)/gastown/[townId]/settings/page.tsx',
-    actionClass: 'support_read',
-    surface: 'server-component',
-    occurrences: 1,
-  },
-  {
-    id: 'internal.app.gastown.onboarding',
-    file: 'apps/web/src/app/(app)/gastown/onboarding/page.tsx',
-    actionClass: 'support_read',
-    surface: 'server-component',
-    occurrences: 1,
-  },
-  {
-    id: 'internal.app.gastown.root',
-    file: 'apps/web/src/app/(app)/gastown/page.tsx',
-    actionClass: 'support_read',
-    surface: 'server-component',
-    occurrences: 1,
-  },
   {
     id: 'internal.app.organizations.welcome',
     file: 'apps/web/src/app/(app)/organizations/[id]/welcome/layout.tsx',
@@ -830,20 +684,6 @@ export const internalElevationSites: readonly InternalElevationSite[] = [
     occurrences: 2,
   },
   {
-    id: 'internal.app.gastownToken',
-    file: 'apps/web/src/app/api/gastown/token/route.ts',
-    actionClass: 'worker_admin',
-    surface: 'rest',
-    occurrences: 4,
-  },
-  {
-    id: 'internal.app.wastelandToken',
-    file: 'apps/web/src/app/api/wasteland/token/route.ts',
-    actionClass: 'worker_admin',
-    surface: 'rest',
-    occurrences: 4,
-  },
-  {
     id: 'internal.abuse.blockBlacklistedDomains',
     file: 'apps/web/src/lib/abuse/block-blacklisted-domains.ts',
     actionClass: 'sensitive_write',
@@ -863,6 +703,13 @@ export const internalElevationSites: readonly InternalElevationSite[] = [
     actionClass: 'platform_read',
     surface: 'trpc',
     occurrences: 3,
+  },
+  {
+    id: 'internal.admin.supportAccessResolver',
+    file: 'packages/web-shared/src/lib/admin/support-access-resolver.ts',
+    actionClass: 'support_read',
+    surface: 'trpc',
+    occurrences: 1,
   },
   {
     id: 'internal.admin.creditManagement',
@@ -900,10 +747,10 @@ export const internalElevationSites: readonly InternalElevationSite[] = [
     occurrences: 1,
   },
   {
-    id: 'internal.organizations.organizationAuth',
-    file: 'apps/web/src/lib/organizations/organization-auth.ts',
-    actionClass: 'support_write',
-    surface: 'rest',
+    id: 'internal.securityAgent.auditLogService',
+    file: 'apps/web/src/lib/security-agent/services/audit-log-service.ts',
+    actionClass: 'platform_read',
+    surface: 'trpc',
     occurrences: 1,
   },
   {
@@ -911,7 +758,7 @@ export const internalElevationSites: readonly InternalElevationSite[] = [
     file: 'apps/web/src/lib/security-agent/router/shared-handlers.ts',
     actionClass: 'support_read',
     surface: 'trpc',
-    occurrences: 5,
+    occurrences: 3,
   },
   {
     id: 'internal.user.deletionLegacyBackfill',
@@ -926,27 +773,6 @@ export const internalElevationSites: readonly InternalElevationSite[] = [
     actionClass: 'platform_read',
     surface: 'server-component',
     occurrences: 3,
-  },
-  {
-    id: 'internal.workerAdmin.actorGuard',
-    file: 'apps/web/src/lib/worker-admin/actor-guard.ts',
-    actionClass: 'worker_admin',
-    surface: 'rest',
-    occurrences: 1,
-  },
-  {
-    id: 'internal.workerAdmin.capabilityIntrospection',
-    file: 'apps/web/src/app/api/internal/worker-admin-capabilities/introspect/route.ts',
-    actionClass: 'worker_admin',
-    surface: 'rest',
-    occurrences: 1,
-  },
-  {
-    id: 'internal.wasteland.serverResolve',
-    file: 'apps/web/src/lib/wasteland/server-resolve.ts',
-    actionClass: 'support_read',
-    surface: 'rest',
-    occurrences: 2,
   },
   {
     id: 'internal.routers.adminKiloclawInstances',
@@ -1033,11 +859,25 @@ export const internalElevationSites: readonly InternalElevationSite[] = [
     occurrences: 1,
   },
   {
+    id: 'internal.admin.supportAccessService',
+    file: 'apps/web/src/lib/admin/support-access-service.ts',
+    actionClass: 'support_write',
+    surface: 'trpc',
+    occurrences: 3,
+  },
+  {
+    id: 'internal.organizations.organizationAuth',
+    file: 'apps/web/src/lib/organizations/organization-auth.ts',
+    actionClass: 'support_read',
+    surface: 'rest',
+    occurrences: 2,
+  },
+  {
     id: 'internal.webShared.organizationsUtils',
     file: 'packages/web-shared/src/routers/organizations/utils.ts',
     actionClass: 'support_write',
     surface: 'trpc',
-    occurrences: 3,
+    occurrences: 5,
   },
 ];
 

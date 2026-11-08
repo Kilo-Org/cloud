@@ -188,6 +188,7 @@ const routingTableFields = {
   version: z.string().min(1),
   generatedAt: z.string().min(1),
   minAccuracy: z.number().min(0).max(1),
+  accuracyNoiseBand: z.number().min(0).max(1).optional(),
   // Keep a session's incumbent model unless the fresh pick is cheaper by
   // more than this factor (see BenchmarkConfigSchema.switchCostFactor).
   switchCostFactor: z.number().min(1),
@@ -262,7 +263,7 @@ export const LATENCY_TOTAL_WEIGHT = 0.15;
 const ACCURACY_WEIGHT = 15;
 // Part of every registry table version: a policy change must republish tables
 // built from unchanged measurements.
-export const RANKING_POLICY_VERSION = 'value-ttft-prodcost-wilson-v5';
+export const RANKING_POLICY_VERSION = 'value-ttft-prodcost-request-pairs-v6';
 
 type RankInput = Omit<RankedCandidate, 'meetsThreshold'> & {
   meetsThreshold?: boolean;
@@ -293,9 +294,10 @@ export function rankValue(c: {
   cases?: number | null;
   p50LatencyMs: number | null;
   p50TtftMs?: number | null;
+  ignoreLatency?: boolean;
 }) {
   const accuracy = c.cases == null ? c.accuracy : wilsonLowerBound(c.accuracy, c.cases);
-  const effectiveLatency = effectiveLatencyMs(c);
+  const effectiveLatency = c.ignoreLatency ? 1 : effectiveLatencyMs(c);
   if (effectiveLatency === null || accuracy <= 0) return Number.POSITIVE_INFINITY;
   return (c.avgCostUsd * effectiveLatency ** LATENCY_WEIGHT) / accuracy ** ACCURACY_WEIGHT;
 }
@@ -308,9 +310,10 @@ export function rankFreeValue(c: {
   cases?: number | null;
   p50LatencyMs: number | null;
   p50TtftMs?: number | null;
+  ignoreLatency?: boolean;
 }) {
   const accuracy = c.cases == null ? c.accuracy : wilsonLowerBound(c.accuracy, c.cases);
-  const effectiveLatency = effectiveLatencyMs(c);
+  const effectiveLatency = c.ignoreLatency ? 1 : effectiveLatencyMs(c);
   if (effectiveLatency === null || accuracy <= 0) return Number.POSITIVE_INFINITY;
   return effectiveLatency ** LATENCY_WEIGHT / accuracy ** ACCURACY_WEIGHT;
 }
@@ -322,12 +325,26 @@ export function rankFreeValue(c: {
 export function rankCandidates(
   candidates: ReadonlyArray<RankInput>,
   minAccuracy: number,
-  options?: { profile?: ProductionTokenProfile | null; accuracyNoiseBand?: number }
+  options?: {
+    profile?: ProductionTokenProfile | null;
+    accuracyNoiseBand?: number;
+    // Actual prompt size of one request. Priced candidates are charged cold
+    // input (cache state is unmeasured); unpriced candidates retain their
+    // published estimate. Takes precedence over `profile`.
+    requestTokens?: number | null;
+    ignoreLatency?: boolean;
+  }
 ): RankedCandidate[] {
   const floor = minAccuracy - (options?.accuracyNoiseBand ?? ACCURACY_NOISE_BAND);
+  const requestTokens = options?.requestTokens ?? null;
   return candidates
     .map(({ p50LatencyMs, ...c }) => {
-      const estimatedRequestCostUsd = estimateRequestCostUsd(c, options?.profile ?? null);
+      const estimatedRequestCostUsd =
+        requestTokens !== null && c.pricing != null
+          ? c.avgCostUsd + requestTokens * c.pricing.promptUsdPerToken
+          : requestTokens !== null && c.estimatedRequestCostUsd != null
+            ? c.estimatedRequestCostUsd
+            : estimateRequestCostUsd(c, options?.profile ?? null);
       const competes = c.accuracy > 0 && c.accuracy >= floor;
       const free = estimatedRequestCostUsd === 0;
       return {
@@ -345,6 +362,7 @@ export function rankCandidates(
               cases: c.cases,
               p50LatencyMs,
               p50TtftMs: c.p50TtftMs,
+              ignoreLatency: options?.ignoreLatency,
             })
           : rankValue({
               avgCostUsd: estimatedRequestCostUsd,
@@ -352,6 +370,7 @@ export function rankCandidates(
               cases: c.cases,
               p50LatencyMs,
               p50TtftMs: c.p50TtftMs,
+              ignoreLatency: options?.ignoreLatency,
             }),
       };
     })

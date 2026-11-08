@@ -14,7 +14,7 @@ const runtimeAdmission = z.object({
 });
 const runtimeAuthorization = z.object({
   id: z.string().uuid(),
-  resourceKind: z.enum(['cloud-agent-next', 'gastown']),
+  resourceKind: z.literal('cloud-agent-next'),
   resourceId: z.string().min(1),
 });
 
@@ -32,7 +32,6 @@ export const kiloTokenPayload = z.object({
   env: z.string().optional(),
   // Optional extras from JWTTokenExtraPayload
   isAdmin: z.boolean().optional(),
-  gastownAccess: z.boolean().optional(),
   botId: z.string().optional(),
   organizationId: z.string().optional(),
   organizationRole: organizationRole.optional(),
@@ -41,7 +40,7 @@ export const kiloTokenPayload = z.object({
   tokenSource: z.string().optional(),
   deviceAuthRequestCode: z.string().optional(),
   deviceSessionId: z.string().optional(),
-  // Org memberships (baked into gastown tokens to avoid DB lookups)
+  // Org memberships (baked into tokens to avoid DB lookups)
   orgMemberships: z.array(z.object({ orgId: z.string(), role: organizationRole })).optional(),
   runtimeAdmission: runtimeAdmission.optional(),
   runtimeAuthorization: runtimeAuthorization.optional(),
@@ -61,7 +60,6 @@ const signKiloTokenPayload = kiloTokenPayload.omit({ iat: true, exp: true }).str
 export type SignKiloTokenExtra = Pick<
   KiloTokenPayload,
   | 'isAdmin'
-  | 'gastownAccess'
   | 'botId'
   | 'organizationId'
   | 'organizationRole'

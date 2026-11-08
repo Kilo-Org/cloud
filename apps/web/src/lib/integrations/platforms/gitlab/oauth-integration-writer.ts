@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { randomBytes, randomUUID } from 'node:crypto';
+import { z } from 'zod';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
 import type { Owner, PlatformRepository } from '@/lib/integrations/core/types';
@@ -17,6 +18,10 @@ import {
 } from './metadata-mutation';
 import { retireProjectCredentialsForReplacedAccount } from './project-credential-lifecycle';
 import { isDefaultGitLabInstanceUrl, normalizeGitLabInstanceUrl } from './instance-url';
+import {
+  gitLabCredentialActor,
+  settleStoredProjectTokens,
+} from '@/lib/integrations/gitlab-service';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 export type StoreGitLabOAuthIntegrationInput = {
@@ -67,11 +72,39 @@ function readOptionalMetadataString(
   return value;
 }
 
+const GitLabMetadataSnapshotSchema = z
+  .object({ gitlab_instance_url: z.string().optional() })
+  .passthrough();
+
+/** Instance URL a stored integration row names, read before its transaction. */
+function readStoredInstanceUrl(metadata: unknown): string | undefined {
+  const parsed = GitLabMetadataSnapshotSchema.safeParse(metadata);
+  return parsed.success ? parsed.data.gitlab_instance_url : undefined;
+}
+
+/**
+ * Stores an OAuth connection, replacing the previous credential of the same
+ * owner.
+ *
+ * Reconnecting a suspended integration of the same account on the same instance
+ * settles the project access tokens a disconnect could not revoke. The
+ * presented credential is the only one that can revoke them, and it is offered
+ * only when the granted scopes include `api`, so a scope that cannot revoke
+ * does not spend a refusal per stored handle. The settlement runs before the
+ * transaction that makes the integration active, so no caller can mint or reuse
+ * a project token while it runs.
+ */
 export async function storeGitLabOAuthIntegration(
   input: StoreGitLabOAuthIntegrationInput
 ): Promise<StoreGitLabOAuthIntegrationResult> {
   const [existing] = await db
-    .select({ id: platform_integrations.id })
+    .select({
+      id: platform_integrations.id,
+      metadata: platform_integrations.metadata,
+      platform_account_id: platform_integrations.platform_account_id,
+      platform_installation_id: platform_integrations.platform_installation_id,
+      integration_status: platform_integrations.integration_status,
+    })
     .from(platform_integrations)
     .where(and(ownerCondition(input.owner), eq(platform_integrations.platform, PLATFORM.GITLAB)))
     .limit(1);
@@ -98,6 +131,25 @@ export async function storeGitLabOAuthIntegration(
     let changedInstance = false;
     let changedAccount = false;
     let previousAccountId: string | null = null;
+    const previousStoredAccountId =
+      existing.platform_account_id ?? existing.platform_installation_id ?? null;
+    if (
+      existing.integration_status === INTEGRATION_STATUS.SUSPENDED &&
+      !instanceUrlChanged(readStoredInstanceUrl(existing.metadata), input.providerBaseUrl) &&
+      (previousStoredAccountId === null || previousStoredAccountId === input.providerUser.id) &&
+      input.scopes.includes('api')
+    ) {
+      const settlement = await settleStoredProjectTokens(
+        existing,
+        gitLabCredentialActor(input.owner, input.authorizedByUserId),
+        input.accessToken
+      );
+      logExceptInTest('[storeGitLabOAuthIntegration] Reconnect settled retained project tokens', {
+        integrationId: existing.id,
+        settledProjectTokens: settlement,
+      });
+    }
+
     await db.transaction(async tx => {
       const currentMetadata = await readGitLabMetadataInTransaction(tx, integrationId);
       const [currentIntegration] = await tx

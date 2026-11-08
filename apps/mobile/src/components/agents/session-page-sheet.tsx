@@ -78,6 +78,12 @@ export function SessionPageSheet({
       onDismiss={onDismiss}
       onRequestDismiss={onRequestDismiss}
       dismissGestures={dragDismisses}
+      // The surface below pads the status bar itself, from the inset the app
+      // reads before it renders, so the sheet must not reserve that inset too.
+      // On Android it otherwise measures taller by the inset and shrinks once
+      // the dialog window reports it, which moves the whole sheet content — the
+      // header with it — down by the status-bar height after it appeared.
+      contentOwnsTopInset
       snapPoints={SHEET_SNAP_POINTS}
       showHandle={false}
       background={colors.background}

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getAuthorizedOrgContext } from '@/lib/organizations/organization-auth';
+import { getAuthorizedOrgContextOrSupport } from '@/lib/organizations/organization-auth';
 import type { NextRequest } from 'next/server';
 import type { OrganizationMode } from '@/lib/organizations/organization-modes';
 import { getAllOrganizationModes } from '@/lib/organizations/organization-modes';
@@ -9,9 +9,12 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse<{ modes: OrganizationMode[] } | { error: string }>> {
   const organizationId = (await params).id;
-  const { success, data, nextResponse } = await getAuthorizedOrgContext(organizationId, undefined, {
-    requestMethod: request.method,
-  });
+  const { success, data, nextResponse } = await getAuthorizedOrgContextOrSupport(
+    organizationId,
+    '/api/organizations/[id]/modes',
+    undefined,
+    { requestMethod: request.method }
+  );
   if (!success) {
     return nextResponse;
   }

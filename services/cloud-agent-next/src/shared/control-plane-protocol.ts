@@ -2,6 +2,7 @@ import { environmentSetupCommandCountSchema, setupCommandsSchema } from './setup
 import {
   RuntimeSkillsSchema,
   RuntimeAgentsSchema,
+  RuntimeBuiltinAgentsSchema,
   RuntimeKiloCommandsSchema,
 } from './runtime-profile.js';
 import type {
@@ -11,6 +12,7 @@ import type {
 } from '@kilocode/worker-utils/cloud-agent-failure';
 import { z } from 'zod';
 import type { CloudAgentRunContainer } from '@kilocode/worker-utils/cloud-agent-queue-report';
+import { RUNTIME_HARNESSES } from './control-plane-runtime-contract.js';
 import { gitAuthorSchema, sessionAttachMcpServersSchema } from './sandbox-control-protocol.js';
 import {
   sessionTerminalClosePayloadSchema,
@@ -116,6 +118,7 @@ export const CONTROL_PLANE_FAILURE_REASON_VALUES = [
   'container_limit_reached',
   'account_blocked',
   'invalid_configuration',
+  'sandbox_create_failed',
   'runtime_artifact_unauthorized',
   'runtime_artifact_invalid',
   'runtime_cli_probe_failed',
@@ -240,6 +243,7 @@ export const controlPlaneRunContainerSchema = z
     snapshotId: controlPlaneRunContainerIdentifierSchema.optional(),
     runtimeBuildId: controlPlaneRunContainerIdentifierSchema.optional(),
     startSource: z.enum(['image', 'snapshot']).optional(),
+    runtimeHarness: z.enum(RUNTIME_HARNESSES).optional(),
   })
   .strict();
 export type ControlPlaneRunContainer = z.infer<typeof controlPlaneRunContainerSchema>;
@@ -388,6 +392,7 @@ const routeSpecObjectSchema = z
     environmentSetupCommandCount: environmentSetupCommandCountSchema.optional(),
     runtimeSkills: RuntimeSkillsSchema.optional(),
     runtimeAgents: RuntimeAgentsSchema.optional(),
+    builtinAgents: RuntimeBuiltinAgentsSchema.optional(),
     kiloCommands: RuntimeKiloCommandsSchema.optional(),
     /**
      * Preserves the runtime key and HOME of existing allocations. The Sandbox
@@ -442,6 +447,7 @@ export const workspaceConfigSchema = routeSpecObjectSchema
     environmentSetupCommandCount: true,
     runtimeSkills: true,
     runtimeAgents: true,
+    builtinAgents: true,
     kiloCommands: true,
   })
   .strict();
@@ -457,6 +463,7 @@ export const attachmentSpecSchema = routeSpecObjectSchema
     environmentSetupCommandCount: true,
     runtimeSkills: true,
     runtimeAgents: true,
+    builtinAgents: true,
     kiloCommands: true,
   })
   .strict()

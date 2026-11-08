@@ -49,13 +49,14 @@ export async function isFeatureFlagEnabledOrDevelopment(
  */
 export async function isReleaseToggleEnabled(
   flagName: string,
-  distinctId: string = 'server-config-fetch'
+  distinctId: string = 'server-config-fetch',
+  personProperties?: Record<string, string>
 ): Promise<boolean> {
   try {
     const flagValue = await startSpan(
       { name: flagName, op: 'posthog-feature-flag-boolean' },
       async () => {
-        return await posthogClient.getFeatureFlag(flagName, distinctId);
+        return await posthogClient.getFeatureFlag(flagName, distinctId, { personProperties });
       }
     );
     return flagValue === true;
@@ -63,7 +64,7 @@ export async function isReleaseToggleEnabled(
     console.error('Error checking boolean feature flag:', flagName, error);
     captureException(error, {
       tags: { source: 'posthog_feature_flag_boolean_enabled' },
-      extra: { flagName, distinctId },
+      extra: { flagName },
     });
     return false;
   }

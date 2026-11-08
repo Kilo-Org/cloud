@@ -406,6 +406,7 @@
     "remediation failed",
     "remediation requested",
     "review",
+    "search repositories",
     "stopped",
     "superseded",
     "tokens"
@@ -423,7 +424,8 @@
     "pr opened",
     "remediation blocked",
     "remediation failed",
-    "superseded"
+    "superseded",
+    "tokens"
   ],
   "is": [
     "dismissed",
@@ -609,12 +611,16 @@
     "block",
     "cancelled",
     "dismissed",
+    "edit",
     "manual review",
     "no changes needed",
+    "none",
+    "open",
     "open pull request",
     "pr opened",
     "remediation blocked",
     "remediation failed",
+    "review",
     "superseded"
   ],
   "ms": ["deleted", "dismissed", "open", "open pull request", "review"],

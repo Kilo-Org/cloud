@@ -68,7 +68,9 @@ const VERTICAL_PADDING = 2;
 // The row's only horizontal inset is the gutter's trailing `pr-2`. The row
 // mirrors under an RTL interface, so a physical right inset alone leaves the
 // LTR code Text flush against the physical left edge there. A logical end
-// inset matches the gutter's 8 dp on both sides of the mirrored row.
+// inset keeps both ends of the mirrored row clear of the edge; 8 dp is this
+// row's chosen inset, while the gutter's `pr-2` utility resolves to 7 dp at
+// this app's rem.
 const CODE_END_PADDING = 8;
 
 type DiffLineProps = {

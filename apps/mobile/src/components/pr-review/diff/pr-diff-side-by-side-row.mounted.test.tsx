@@ -119,9 +119,7 @@ describe('SideBySideRow code end inset', () => {
   // so a physical-only gutter inset leaves each LTR code Text flush against
   // the column's mirrored end. Every column's code container names a logical
   // end inset instead, and the empty column keeps the same shape.
-  it('names a logical end inset on both column code containers', () => {
-    const renderer = mountRow(row());
-
+  function codeContainers(renderer: TestRenderer.ReactTestRenderer) {
     const columns = renderer.root.findAll(
       node =>
         node.type === ('View' as never) &&
@@ -129,21 +127,37 @@ describe('SideBySideRow code end inset', () => {
         node.props.className.includes('flex-1 flex-row items-stretch')
     );
     expect(columns).toHaveLength(2);
-
-    for (const column of columns) {
+    return columns.map(column => {
       const children = column.props.children as TestRenderer.ReactTestInstance[];
       const code = children[1];
       if (code === undefined) {
         throw new Error('the column rendered without a code container');
       }
-      const style = code.props.style as {
-        paddingEnd?: number;
-        paddingLeft?: number;
-        paddingRight?: number;
-      };
-      expect(style.paddingEnd).toBe(2);
-      expect(style.paddingLeft).toBeUndefined();
-      expect(style.paddingRight).toBeUndefined();
+      return code;
+    });
+  }
+
+  function expectEndInset(code: TestRenderer.ReactTestInstance) {
+    const style = code.props.style as {
+      paddingEnd?: number;
+      paddingLeft?: number;
+      paddingRight?: number;
+    };
+    expect(style.paddingEnd).toBe(2);
+    expect(style.paddingLeft).toBeUndefined();
+    expect(style.paddingRight).toBeUndefined();
+  }
+
+  it('names a logical end inset on both column code containers', () => {
+    for (const code of codeContainers(mountRow(row()))) {
+      expectEndInset(code);
+    }
+  });
+
+  it('names the same inset on the code container of an empty column', () => {
+    const renderer = mountRow({ left: { line: line() }, right: null });
+    for (const code of codeContainers(renderer)) {
+      expectEndInset(code);
     }
   });
 });

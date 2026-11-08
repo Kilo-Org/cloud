@@ -192,16 +192,9 @@ export default async function spawnCloudAgentSession(
               "Error: That GitLab project is not available through this account's GitLab integration.",
           };
         }
-        const requesterAccess = await getGitLabProjectAccessForRequester(
-          options.requesterUserId,
-          args.gitlabProject
-        );
-        if (requesterAccess.outcome !== 'allowed') {
-          return {
-            response:
-              "Error: That GitLab project is not available through this account's GitLab integration.",
-          };
-        }
+        // A project path means the same thing only on the instance the
+        // session will clone from, so a requester whose own connection lives
+        // elsewhere gets a verdict, never a cross-instance lookup.
         const [requesterInstanceUrl, orgInstanceUrl] = await Promise.all([
           getGitLabInstanceUrlForUser(options.requesterUserId),
           getGitLabInstanceUrlForOrganization(owner.id),
@@ -210,6 +203,16 @@ export default async function spawnCloudAgentSession(
           requesterInstanceUrl.replace(/\/$/, '').toLowerCase() !==
           orgInstanceUrl.replace(/\/$/, '').toLowerCase()
         ) {
+          return {
+            response:
+              "Error: That GitLab project is not available through this account's GitLab integration.",
+          };
+        }
+        const requesterAccess = await getGitLabProjectAccessForRequester(
+          options.requesterUserId,
+          args.gitlabProject
+        );
+        if (requesterAccess.outcome !== 'allowed') {
           return {
             response:
               "Error: That GitLab project is not available through this account's GitLab integration.",

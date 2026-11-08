@@ -14,17 +14,24 @@ import { type LiveSessionsHold, resolveLiveSessionsHold } from '@/lib/live-sessi
  * the window expires so a finished session is still reported as empty.
  *
  * The release is a timer because nothing else re-renders at the window's end:
- * without it a held emptiness would pin stale rows forever.
+ * without it a held emptiness would pin stale rows forever. The timer is
+ * paused while the caller marks the emptiness unconfirmed (`pauseUnconfirmed`,
+ * the last accepted server answer still listed the rows): a resolution the
+ * server has not made yet must not resolve on a timer — the caller's
+ * confirmation fetch settles it, onto the confirmed rows or onto the zero
+ * state.
  */
 export function useLiveSessionsHold<T>(input: {
   /** Live rows for the current context (empty while the socket state is empty). */
-  current: T[];
+  current: readonly T[];
   /** Stable identity of the query the rows belong to. */
   scopeKey: string;
   /** False when the caller may not read (signed out, not ready): never hold. */
   canHold: boolean;
-}): T[] {
-  const { current, scopeKey, canHold } = input;
+  /** True while the caller's accepted answer has not confirmed the emptiness. */
+  pauseUnconfirmed?: boolean;
+}): readonly T[] {
+  const { current, scopeKey, canHold, pauseUnconfirmed = false } = input;
   const holdRef = useRef<LiveSessionsHold<T> | null>(null);
   // Bumped when the window expires so the hold decision runs again.
   const [, setRelease] = useState(0);
@@ -37,6 +44,7 @@ export function useLiveSessionsHold<T>(input: {
     // stretch the window: `Date.now()` would hold the stale rows longer.
     now: performance.now(),
     previousHold: holdRef.current,
+    pauseUnconfirmed,
   });
 
   useEffect(() => {

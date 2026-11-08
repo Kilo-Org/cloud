@@ -33,7 +33,7 @@ export type LiveSessionsHold<T> = {
   /** Query key the held rows belong to. */
   key: string;
   /** Last non-empty rows to keep rendering while the live set is empty. */
-  sessions: T[];
+  sessions: readonly T[];
   /**
    * Monotonic clock reading when the live set first went empty inside this
    * hold, or null while rows are being delivered.
@@ -43,7 +43,7 @@ export type LiveSessionsHold<T> = {
 
 type ResolvedLiveSessionsHold<T> = {
   /** Rows to render: the live rows, or the held rows through the window. */
-  sessions: T[];
+  sessions: readonly T[];
   /** Hold to carry into the next render, or null when there is none. */
   hold: LiveSessionsHold<T> | null;
   /** Milliseconds until the held emptiness must release, or null. */
@@ -52,7 +52,7 @@ type ResolvedLiveSessionsHold<T> = {
 
 export function resolveLiveSessionsHold<T>(input: {
   /** Live rows for the current context (empty while the socket state is empty). */
-  current: T[];
+  current: readonly T[];
   /** Stable identity of the query the rows belong to. */
   scopeKey: string;
   /** False when the caller may not read (signed out, not ready): never hold. */
@@ -61,8 +61,14 @@ export function resolveLiveSessionsHold<T>(input: {
   now: number;
   /** Hold carried from the previous render, or null. */
   previousHold: LiveSessionsHold<T> | null;
+  /**
+   * True while the caller's accepted server answer has not confirmed the
+   * emptiness: the timer releases nothing then, so rows the server still
+   * listed never resolve to the zero state on a clock reading alone.
+   */
+  pauseUnconfirmed?: boolean;
 }): ResolvedLiveSessionsHold<T> {
-  const { current, scopeKey, canHold, now, previousHold } = input;
+  const { current, scopeKey, canHold, now, previousHold, pauseUnconfirmed = false } = input;
   if (current.length > 0) {
     return {
       sessions: current,
@@ -83,6 +89,15 @@ export function resolveLiveSessionsHold<T>(input: {
   const elapsedMs = now - emptySince;
   if (elapsedMs >= LIVE_SESSIONS_EMPTY_HOLD_MS) {
     return { sessions: current, hold: null, releaseDelayMs: null };
+  }
+  if (pauseUnconfirmed) {
+    // The caller is asking the server; the resolved answer, not a clock
+    // reading, ends this hold.
+    return {
+      sessions: previousHold.sessions,
+      hold: { key: scopeKey, sessions: previousHold.sessions, emptySince },
+      releaseDelayMs: null,
+    };
   }
   return {
     sessions: previousHold.sessions,

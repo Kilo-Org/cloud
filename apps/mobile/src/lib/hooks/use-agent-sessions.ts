@@ -134,6 +134,15 @@ export function useAgentSessionSearch(options: UseAgentSessionSearchOptions) {
 
 // ── Main hook ────────────────────────────────────────────────────────
 
+/**
+ * Retention bound for the last server-confirmed rows the live-only hook keeps
+ * across an unconfirmed emptiness. Matches the tray's own candidate ceiling
+ * (`CLOUD_AGENT_CANDIDATE_LIMIT` in `apps/web/src/lib/active-sessions-list.ts`):
+ * a retention that can hold more rows than the context provides is not a
+ * bound.
+ */
+const LAST_CONFIRMED_LIMIT = 500;
+
 export function useAgentSessions(options?: UseAgentSessionsOptions) {
   const sortBy = resolveSortBy(options?.sortBy);
   const trpc = useTRPC();
@@ -369,7 +378,7 @@ export function useLiveAgentSessions(options?: UseAgentSessionsOptions) {
   );
   const getSnapshot = useCallback(() => getActiveSessionsQueryMetadata(query), [query]);
   const metadata = useSyncExternalStore(subscribe, getSnapshot);
-  const activeSessions = useMemo(
+  const cacheSessions = useMemo(
     () =>
       sortActiveSessionsByCreatedAt(
         filterActiveSessionsByOrganization(
@@ -380,6 +389,49 @@ export function useLiveAgentSessions(options?: UseAgentSessionsOptions) {
     [active.canRead, active.data, options?.organizationId]
   );
 
+  // The last accepted server answer lists sessions while the cache reads
+  // empty. The emptiness came from a write no server answer confirmed (a
+  // socket write, or the floor poll's own manual `setQueryData`), so it is not
+  // proof that nothing runs. The surface keeps the last confirmed rows when
+  // this hook instance saw them, and stays unresolved (its loading state, then
+  // the answer) when it did not — a remount, such as the route reset to Home
+  // this finding reports, starts from the completed answer's ids alone. Only
+  // an accepted answer that lists no sessions resolves the zero state. The
+  // retention is capped at the tray's own candidate ceiling.
+  const lastConfirmedRef = useRef<readonly ActiveSession[]>([]);
+  const confirmedScopeRef = useRef('');
+  const scopeKey = JSON.stringify(active.queryKey);
+  if (confirmedScopeRef.current !== scopeKey) {
+    confirmedScopeRef.current = scopeKey;
+    // A context change must never show the previous context's rows (the same
+    // rule the render hold's scope key keeps).
+    lastConfirmedRef.current = [];
+  }
+  if (cacheSessions.length > 0) {
+    lastConfirmedRef.current = cacheSessions.slice(0, LAST_CONFIRMED_LIMIT);
+  }
+  const unconfirmedEmpty = cacheSessions.length === 0 && metadata.acceptedSessionIds.size > 0;
+  const activeSessions = unconfirmedEmpty ? lastConfirmedRef.current : cacheSessions;
+  // One confirmation per emptiness episode: the answer either lists the rows
+  // again or confirms the emptiness, and a repeated empty (rows back, then
+  // gone again) re-arms it. Without the latch a failing answer would loop.
+  const confirmationRequestedRef = useRef(false);
+  // Aliased so the confirmation effect lists stable values (the query object
+  // itself is rebuilt every render).
+  const activeCanRead = active.canRead;
+  const activeRefetch = active.refetch;
+  useEffect(() => {
+    if (!unconfirmedEmpty) {
+      confirmationRequestedRef.current = false;
+      return;
+    }
+    if (!activeCanRead || confirmationRequestedRef.current) {
+      return;
+    }
+    confirmationRequestedRef.current = true;
+    void activeRefetch();
+  }, [unconfirmedEmpty, activeCanRead, activeRefetch]);
+
   // The socket writers (`sessions.list`, `sessions.heartbeat`,
   // `cli.disconnected`) empty the live set the moment a CLI socket blips, and
   // the reconnect restores the rows a moment later. Hold the last rows through
@@ -387,8 +439,12 @@ export function useLiveAgentSessions(options?: UseAgentSessionsOptions) {
   // the hold is scoped to the query key so a context change still loads.
   const renderedActiveSessions = useLiveSessionsHold({
     current: activeSessions,
-    scopeKey: JSON.stringify(active.queryKey),
+    scopeKey,
     canHold: active.canRead,
+    // While the last accepted answer still lists the rows, only its answer
+    // resolves the card; the hold's reconnect timer must not end a window the
+    // server has not ruled on.
+    pauseUnconfirmed: unconfirmedEmpty,
   });
 
   return {
@@ -397,7 +453,10 @@ export function useLiveAgentSessions(options?: UseAgentSessionsOptions) {
     // to distinguish unconfirmed empty data from accepted empty success.
     isLoading: active.isLoading,
     isError: active.isError,
-    hasAcceptedSuccess: metadata.acceptedRevision > 0,
+    // Empty success needs the accepted answer to be the empty list. While an
+    // earlier answer still lists rows, the surface stays unresolved instead of
+    // presenting those rows as gone.
+    hasAcceptedSuccess: metadata.acceptedRevision > 0 && !unconfirmedEmpty,
     terminalError: metadata.terminalError,
     isFetching: active.canRead && active.isFetching,
     isPaused: active.canRead && active.isPaused,

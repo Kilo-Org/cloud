@@ -161,14 +161,15 @@ export function userActionTarget(userId: string): AdminActionTarget {
   return { type: 'user', id: userId };
 }
 
-const EMAIL_ADDRESS_PATTERN = /[\p{L}\p{N}._%+-]+@(?:[\p{L}\p{N}-]+\.)+[\p{L}]{2,}/gu;
+const EMAIL_ADDRESS_PATTERN =
+  /[\p{L}\p{M}\p{N}._%+-]+@(?:[\p{L}\p{M}\p{N}-]+\.)+[\p{L}\p{M}]{2,}/gu;
 
 /**
  * Replaces email addresses in operator-typed free text, such as the reason an
  * admin gives for a refund. The table is browsable by every platform admin, so
  * an address the operator pasted must not reach it; the rest of the text stays.
- * The local part is matched by Unicode letter category so a non-ASCII address is
- * caught too.
+ * Both the local part and the domain match Unicode letters and combining marks,
+ * so a non-ASCII address is caught in either its composed or decomposed form.
  */
 export function redactEmailAddressesInAuditText(text: string): string {
   return text.replace(EMAIL_ADDRESS_PATTERN, '[redacted-email]');

@@ -166,6 +166,10 @@ describe('redactEmailAddressesInAuditText', () => {
       )
     ).toBe('chargeback, contacted by [redacted-email] and [redacted-email]');
 
+    expect(redactEmailAddressesInAuditText('politique: jean-zoe\u0301@example.com')).toBe(
+      'politique: [redacted-email]'
+    );
+
     expect(redactEmailAddressesInAuditText('policy violation, tier_19, 2nd offence')).toBe(
       'policy violation, tier_19, 2nd offence'
     );

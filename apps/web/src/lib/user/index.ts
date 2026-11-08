@@ -47,9 +47,6 @@ import {
   organization_audit_logs,
   organization_recommendation_dismissals,
   magic_link_tokens,
-  passkey_credentials,
-  passkey_challenges,
-  passkey_sign_in_tickets,
   device_auth_requests,
   device_sessions,
   native_attested_keys,
@@ -169,6 +166,7 @@ import { bareIpLiteral } from '@kilocode/web-shared/lib/bouncer/inference';
 import { recordWatchwoodSignupShadow, type WatchwoodSignupAssessment } from '@/lib/auth/watchwood';
 import { getDomain } from 'tldts';
 import { authPassesDeletionFence } from '@/lib/user/deletion-queue/deletion-identity-fence';
+import { deleteUserPasskeys } from '@/lib/user/session-revocation';
 import {
   deleteAllOwnedByUserIdPages,
   OWNED_BY_USER_DELETE_PAGE_SIZE,
@@ -1390,22 +1388,9 @@ export async function anonymizeCloudUserData(
   await tx.delete(referral_codes).where(eq(referral_codes.kilo_user_id, userId));
   await tx.delete(magic_link_tokens).where(eq(magic_link_tokens.email, originalEmail));
   // Passkey credentials are PII: the credential id, public key and user-facing
-  // label identify the user's device. Drop any challenge still open for a
-  // ceremony so a deleted account cannot complete a pending registration or
-  // authentication. Usernameless challenges (kilo_user_id IS NULL) are not
-  // attributable to this user; the device-auth cleanup cron removes them once
-  // they expire.
-  await tx.delete(passkey_credentials).where(eq(passkey_credentials.kilo_user_id, userId));
-  await tx
-    .delete(passkey_challenges)
-    .where(
-      and(eq(passkey_challenges.kilo_user_id, userId), isNull(passkey_challenges.consumed_at))
-    );
-  // A sign-in ticket is a live proof that a passkey assertion verified, so it
-  // is deleted with the credentials it was minted for rather than left to
-  // expire. Consumed tickets are removed too: their `kilo_user_id` still names
-  // the deleted account.
-  await tx.delete(passkey_sign_in_tickets).where(eq(passkey_sign_in_tickets.kilo_user_id, userId));
+  // label identify the user's device. Consumed sign-in tickets are removed too:
+  // their `kilo_user_id` still names the deleted account.
+  await deleteUserPasskeys(tx, userId);
   // Step-up challenges and proofs are PII and session-bound; a deleted account
   // must not leave either behind.
   await deleteStepUpRowsForUser(tx, userId);

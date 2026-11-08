@@ -1,15 +1,7 @@
-jest.mock('@sentry/nextjs', () => ({
-  ...jest.requireActual('@sentry/nextjs'),
-  captureException: jest.fn(),
-}));
-jest.mock('@kilocode/web-shared/lib/admin/step-up-store', () => {
-  const actual = jest.requireActual('@kilocode/web-shared/lib/admin/step-up-store');
-  return { ...actual, revokeStepUpProofs: jest.fn(actual.revokeStepUpProofs) };
-});
-
-import { afterEach, describe, expect, test } from '@jest/globals';
-import { eq } from 'drizzle-orm';
-import { captureException } from '@sentry/nextjs';
+import { describe, expect, test } from '@jest/globals';
+import { eq, sql } from 'drizzle-orm';
+import { TRPCError } from '@trpc/server';
+import { isoBase64URL } from '@simplewebauthn/server/helpers';
 import {
   admin_action_audit_logs,
   device_auth_requests,
@@ -17,17 +9,28 @@ import {
   device_sessions,
   kilocode_users,
   native_attested_keys,
+  passkey_challenges,
   passkey_credentials,
+  passkey_sign_in_tickets,
+  session_step_up_proofs,
   user_auth_provider,
 } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { revokeStepUpProofs } from '@kilocode/web-shared/lib/admin/step-up-store';
 import { isWebSessionCurrent } from '@kilocode/web-shared/lib/web-session-revocation';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import {
+  buildAuthenticationResponse,
+  createTestAuthenticator,
+  type TestAuthenticator,
+} from '@/tests/helpers/webauthn-test-authenticator';
+import {
+  consumeSignInTicket,
+  createAuthenticationOptions,
+  PasskeyVerificationError,
+  verifyAuthentication,
+} from '@/lib/auth/passkey';
+import { getPostgresErrorCode } from '@/lib/db-errors';
 import { createCallerForUser } from '@/routers/test-utils';
-
-const mockRevokeStepUpProofs = jest.mocked(revokeStepUpProofs);
-const mockCaptureException = jest.mocked(captureException);
 
 async function insertHeldAccount() {
   const user = await insertTestUser({
@@ -66,12 +69,42 @@ async function insertHeldAccount() {
     public_key: 'public-key',
     attested_at: new Date().toISOString(),
   });
-  await db.insert(passkey_credentials).values({
+  const authenticator = createTestAuthenticator();
+  const passkeyId = await insertPasskey(user.id, authenticator);
+  await db.insert(session_step_up_proofs).values({
     kilo_user_id: user.id,
-    credential_id: `passkey-${user.id}`,
-    public_key: 'passkey-public-key',
+    session_id_hash: `session-${user.id}`,
+    method: 'webauthn_uv',
+    passkey_credential_id: passkeyId,
+    purpose: 'session',
+    verified_at: new Date().toISOString(),
+    expires_at: new Date(Date.now() + 600_000).toISOString(),
+  });
+  await db.insert(passkey_challenges).values({
+    id: crypto.randomUUID(),
+    challenge: `challenge-${user.id}`,
+    kind: 'registration',
+    kilo_user_id: user.id,
+    expires_at: new Date(Date.now() + 600_000).toISOString(),
+  });
+  await db.insert(passkey_sign_in_tickets).values({
+    ticket_hash: `ticket-${user.id}`,
+    kilo_user_id: user.id,
+    expires_at: new Date(Date.now() + 600_000).toISOString(),
   });
   return { user };
+}
+
+async function insertPasskey(userId: string, authenticator: TestAuthenticator) {
+  const [passkey] = await db
+    .insert(passkey_credentials)
+    .values({
+      kilo_user_id: userId,
+      credential_id: authenticator.credentialId,
+      public_key: isoBase64URL.fromBuffer(authenticator.cosePublicKey),
+    })
+    .returning({ id: passkey_credentials.id });
+  return passkey.id;
 }
 
 async function accountState(userId: string) {
@@ -99,20 +132,84 @@ async function accountState(userId: string) {
     .select({ key_id: native_attested_keys.key_id })
     .from(native_attested_keys)
     .where(eq(native_attested_keys.kilo_user_id, userId));
+  const stepUpProofs = await db
+    .select({ revoked_reason: session_step_up_proofs.revoked_reason })
+    .from(session_step_up_proofs)
+    .where(eq(session_step_up_proofs.kilo_user_id, userId));
   const passkeys = await db
     .select({ id: passkey_credentials.id })
     .from(passkey_credentials)
     .where(eq(passkey_credentials.kilo_user_id, userId));
-  return { user, providers, sessions, refreshTokens, authRequests, attestedKeys, passkeys };
+  const challenges = await db
+    .select({ id: passkey_challenges.id })
+    .from(passkey_challenges)
+    .where(eq(passkey_challenges.kilo_user_id, userId));
+  const tickets = await db
+    .select({ id: passkey_sign_in_tickets.id })
+    .from(passkey_sign_in_tickets)
+    .where(eq(passkey_sign_in_tickets.kilo_user_id, userId));
+  return {
+    user,
+    providers,
+    sessions,
+    refreshTokens,
+    authRequests,
+    attestedKeys,
+    stepUpProofs,
+    passkeys,
+    challenges,
+    tickets,
+  };
 }
 
-afterEach(() => {
-  mockRevokeStepUpProofs.mockClear();
-  mockCaptureException.mockClear();
-});
+async function adminAudits(adminId: string) {
+  return db
+    .select()
+    .from(admin_action_audit_logs)
+    .where(eq(admin_action_audit_logs.actor_id, adminId));
+}
+
+/**
+ * Makes deleting this user's passkey sign-in tickets raise `sqlState`. That
+ * delete is the last statement of the reset, so every other write has already
+ * run inside the transaction when the real driver error surfaces.
+ */
+async function withFailingTicketDelete<T>(
+  userId: string,
+  sqlState: string,
+  run: () => Promise<T>
+): Promise<T> {
+  const name = `fail_ticket_delete_${crypto.randomUUID().replaceAll('-', '')}`;
+  await db.execute(
+    sql.raw(
+      `CREATE FUNCTION ${name}() RETURNS trigger LANGUAGE plpgsql AS $$ ` +
+        `BEGIN RAISE EXCEPTION 'injected recovery failure' USING ERRCODE = '${sqlState}'; END $$`
+    )
+  );
+  await db.execute(
+    sql.raw(
+      `CREATE TRIGGER ${name} BEFORE DELETE ON passkey_sign_in_tickets FOR EACH ROW ` +
+        `WHEN (OLD.kilo_user_id = '${userId}') EXECUTE FUNCTION ${name}()`
+    )
+  );
+  try {
+    return await run();
+  } finally {
+    await db.execute(sql.raw(`DROP TRIGGER ${name} ON passkey_sign_in_tickets`));
+    await db.execute(sql.raw(`DROP FUNCTION ${name}()`));
+  }
+}
+
+async function signInWithPasskey(authenticator: TestAuthenticator, counter: number) {
+  const { challengeId, options } = await createAuthenticationOptions();
+  return verifyAuthentication(
+    challengeId,
+    buildAuthenticationResponse(authenticator, { challenge: options.challenge, counter })
+  );
+}
 
 describe('admin.users.resetToMagicLinkLogin', () => {
-  test('removes providers and evicts every live credential of the prior holder', async () => {
+  test('removes providers and passkeys and evicts every live credential of the prior holder', async () => {
     const admin = await insertTestUser({ is_admin: true });
     const { user } = await insertHeldAccount();
 
@@ -132,65 +229,83 @@ describe('admin.users.resetToMagicLinkLogin', () => {
     expect(after.refreshTokens).toEqual([]);
     expect(after.authRequests).toEqual([{ status: 'denied' }]);
     expect(after.attestedKeys).toEqual([]);
-    expect(after.passkeys).toHaveLength(1);
-    expect(mockRevokeStepUpProofs).toHaveBeenCalledWith(
-      user.id,
-      'account_recovery',
-      expect.anything()
-    );
+    // Revoked first, then removed with the passkey it was bound to.
+    expect(after.stepUpProofs).toEqual([]);
+    expect(after.passkeys).toEqual([]);
+    expect(after.challenges).toEqual([]);
+    expect(after.tickets).toEqual([]);
 
-    const audits = await db
-      .select()
-      .from(admin_action_audit_logs)
-      .where(eq(admin_action_audit_logs.actor_id, admin.id));
+    const audits = await adminAudits(admin.id);
     expect(audits).toHaveLength(1);
     expect(audits[0]).toMatchObject({
       action: 'user.login.reset_to_magic_link',
       target_id: user.id,
-      metadata: { removedProviders: ['github'], revokedDeviceSessionCount: 1 },
+      metadata: {
+        removedProviders: ['github'],
+        removedPasskeyCount: 1,
+        revokedDeviceSessionCount: 1,
+      },
     });
   });
 
+  test('a passkey the prior holder registered no longer signs in after recovery', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const user = await insertTestUser();
+    const authenticator = createTestAuthenticator();
+    await insertPasskey(user.id, authenticator);
+
+    const { ticket: pendingTicket } = await signInWithPasskey(authenticator, 1);
+
+    const caller = await createCallerForUser(admin.id);
+    await caller.admin.users.resetToMagicLinkLogin({ userId: user.id });
+
+    await expect(consumeSignInTicket(pendingTicket)).resolves.toBeNull();
+    const refusal: unknown = await signInWithPasskey(authenticator, 2).then(
+      () => null,
+      (error: unknown) => error
+    );
+    expect(refusal).toBeInstanceOf(PasskeyVerificationError);
+    expect((refusal as PasskeyVerificationError).code).toBe('UNKNOWN_CREDENTIAL');
+  });
+
   test.each([
-    [
-      'a retryable',
-      Object.assign(new Error('deadlock detected'), { code: '40P01' }),
-      'Account recovery did not complete and the previous sessions were not revoked. Retry the reset.',
-      false,
-    ],
-    [
-      'a non-retryable',
-      new Error('relation is missing'),
-      'Account recovery failed and the previous sessions were not revoked. Investigate the error before retrying.',
-      true,
-    ],
+    {
+      label: 'a retryable',
+      sqlState: '40P01',
+      code: 'CONFLICT',
+      message:
+        'Account recovery did not complete and the previous sessions were not revoked. Retry the reset.',
+    },
+    {
+      label: 'a non-retryable',
+      sqlState: 'P0001',
+      code: 'INTERNAL_SERVER_ERROR',
+      message:
+        'Account recovery failed and the previous sessions were not revoked. Investigate the error before retrying.',
+    },
   ])(
-    'surfaces %s revocation failure and leaves the account unchanged',
-    async (_label, failure, message, reported) => {
+    'surfaces $label failure after the revocation writes and rolls all of them back',
+    async ({ sqlState, code, message }) => {
       const admin = await insertTestUser({ is_admin: true });
       const { user } = await insertHeldAccount();
-      mockRevokeStepUpProofs.mockRejectedValueOnce(failure);
+      const before = await accountState(user.id);
 
       const caller = await createCallerForUser(admin.id);
-      await expect(
-        caller.admin.users.resetToMagicLinkLogin({ userId: user.id })
-      ).rejects.toMatchObject({ code: 'INTERNAL_SERVER_ERROR', message });
+      const error: unknown = await withFailingTicketDelete(user.id, sqlState, () =>
+        caller.admin.users.resetToMagicLinkLogin({ userId: user.id }).then(
+          () => null,
+          (rejection: unknown) => rejection
+        )
+      );
+
+      expect(error).toBeInstanceOf(TRPCError);
+      expect(error).toMatchObject({ code, message });
+      // The cause is the driver error as Drizzle surfaced it, not a fixture.
+      expect(getPostgresErrorCode((error as TRPCError).cause)).toBe(sqlState);
 
       const after = await accountState(user.id);
-      expect(after.providers).toEqual([{ provider: 'github' }]);
-      expect(after.user.api_token_pepper).toBe('prior-holder-api-pepper');
-      expect(after.user.web_session_pepper).toBe('prior-holder-web-pepper');
-      expect(after.sessions).toEqual([{ revoked_at: null, revoked_reason: null }]);
-      expect(after.refreshTokens).toHaveLength(1);
-      expect(after.authRequests).toEqual([{ status: 'approved' }]);
-      expect(after.attestedKeys).toHaveLength(1);
-      expect(mockCaptureException).toHaveBeenCalledTimes(reported ? 1 : 0);
-
-      const audits = await db
-        .select()
-        .from(admin_action_audit_logs)
-        .where(eq(admin_action_audit_logs.actor_id, admin.id));
-      expect(audits).toEqual([]);
+      expect(after).toEqual(before);
+      expect(await adminAudits(admin.id)).toEqual([]);
     }
   );
 

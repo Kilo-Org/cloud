@@ -47,9 +47,9 @@ export default function ResetToMagicLinkLoginButton({ userId }: { userId: string
           <DialogTitle>Reset to magic link login</DialogTitle>
           <DialogDescription>
             Are you sure you want to reset this account to magic link login? This removes all
-            connected authentication providers (Google, GitHub, etc.) and signs the account out of
-            every browser, API token, mobile app and device session. Passkeys are kept, so a
-            registered passkey can still sign in.
+            connected authentication providers (Google, GitHub, etc.) and every passkey, and signs
+            the account out of every browser, API token, mobile app and device session. The user
+            will only be able to log in via magic link email.
           </DialogDescription>
         </DialogHeader>
 

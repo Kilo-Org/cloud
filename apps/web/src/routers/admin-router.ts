@@ -120,7 +120,6 @@ import {
   resetAccountToMagicLink,
   type MagicLinkRecoveryResult,
 } from '@/lib/user/account-recovery';
-import { captureException } from '@sentry/nextjs';
 import { getBlobContent } from '@/lib/r2/cli-sessions';
 import { getLowerDomainFromEmail, normalizeEmail } from '@kilocode/web-shared/lib/email-address';
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
@@ -761,16 +760,17 @@ export const adminRouter = createTRPCRouter({
         } catch (error) {
           // The reset runs in one transaction, so a failed revocation also
           // keeps the provider rows: never report a recovery that left the
-          // prior holder signed in.
+          // prior holder signed in. A transient failure is a CONFLICT, which
+          // Sentry's `beforeSend` drops as a 4xx; any other failure stays a
+          // 500 and the tRPC Sentry middleware reports it once.
           if (isRetryableRecoveryError(error)) {
             throw new TRPCError({
-              code: 'INTERNAL_SERVER_ERROR',
+              code: 'CONFLICT',
               message:
                 'Account recovery did not complete and the previous sessions were not revoked. Retry the reset.',
               cause: error,
             });
           }
-          captureException(error, { tags: { operation: 'reset_to_magic_link_login' } });
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
             message:
@@ -786,9 +786,10 @@ export const adminRouter = createTRPCRouter({
           action: 'user.login.reset_to_magic_link',
           target: userActionTarget(input.userId),
           message:
-            'Reset login to magic link (removed linked auth providers, revoked browser, API and device sessions)',
+            'Reset login to magic link (removed linked auth providers and passkeys, revoked browser, API and device sessions)',
           metadata: {
             removedProviders: recovery.removedProviders,
+            removedPasskeyCount: recovery.removedPasskeyCount,
             revokedDeviceSessionCount: recovery.revokedDeviceSessionCount,
           },
         });

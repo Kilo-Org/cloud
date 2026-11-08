@@ -178,6 +178,26 @@ describe('redactEmailAddressesInAuditText', () => {
       'policy violation, tier_19, 2nd offence'
     );
   });
+
+  test('keeps the bracket or quote around a pasted address', () => {
+    expect(redactEmailAddressesInAuditText('see (victim@example.com) in the thread')).toBe(
+      'see ([redacted-email]) in the thread'
+    );
+
+    expect(redactEmailAddressesInAuditText('quoted "victim@example.com" here')).toBe(
+      'quoted "[redacted-email]" here'
+    );
+
+    expect(redactEmailAddressesInAuditText('list: <victim@example.com>, ok')).toBe(
+      'list: <[redacted-email]>, ok'
+    );
+  });
+
+  test('leaves host forms without a dotted domain alone', () => {
+    expect(redactEmailAddressesInAuditText('intranet user@localhost and user@[192.0.2.1]')).toBe(
+      'intranet user@localhost and user@[192.0.2.1]'
+    );
+  });
 });
 
 describe('recordElevatedOrganizationAdminAction', () => {

@@ -228,7 +228,11 @@ describe('admin.kiloPass.cancelAndRefundKiloPassBulk', () => {
     const stripeMock = getStripeMock();
     setupHappyPathStripe(stripeMock);
 
-    const first = await insertTestUser({ google_user_email: 'bulk-batch-1@example.com' });
+    const first = await insertTestUser({
+      google_user_email: 'bulk-batch-1@example.com',
+      total_microdollars_acquired: 5_000_000,
+      microdollars_used: 0,
+    });
     const second = await insertTestUser({ google_user_email: 'bulk-batch-2@example.com' });
     const third = await insertTestUser({ google_user_email: 'bulk-batch-3@example.com' });
     await insertActiveKiloPass(first.id, 'sub_batch_1');
@@ -261,6 +265,34 @@ describe('admin.kiloPass.cancelAndRefundKiloPassBulk', () => {
       );
       expect(JSON.stringify(row.metadata)).not.toContain('example.com');
     }
+
+    // The block reason and the admin note are read by admins too, so each target
+    // carries the same replaced address.
+    for (const target of [first, second, third]) {
+      const blocked = await db.query.kilocode_users.findFirst({
+        where: eq(kilocode_users.id, target.id),
+        columns: { blocked_reason: true },
+      });
+      expect(blocked?.blocked_reason).toBe('chargeback reported by [redacted-email]');
+      const notes = await db
+        .select()
+        .from(user_admin_notes)
+        .where(eq(user_admin_notes.kilo_user_id, target.id));
+      expect(notes).toHaveLength(1);
+      expect(notes[0]?.note_content).toContain('Reason: chargeback reported by [redacted-email]');
+      expect(notes[0]?.note_content).not.toContain('victim@example.com');
+    }
+
+    // The balance-zero transaction is part of the user ledger, so it carries the
+    // same replaced address.
+    const ledger = await db
+      .select()
+      .from(credit_transactions)
+      .where(eq(credit_transactions.kilo_user_id, first.id));
+    expect(ledger).toHaveLength(1);
+    expect(ledger[0]?.description).toBe(
+      'Balance zeroed by admin: chargeback reported by [redacted-email]'
+    );
   });
 
   it('skips unknown emails without failing the batch', async () => {

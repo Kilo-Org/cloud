@@ -5,6 +5,7 @@ import {
   kilo_pass_subscriptions,
   kilocode_users,
   organizations,
+  user_admin_notes,
   user_auth_provider,
 } from '@kilocode/db/schema';
 import {
@@ -629,6 +630,18 @@ describe('admin.cancelAndRefundKiloPass', () => {
       }),
     ]);
     expect(JSON.stringify(audits[0]?.metadata)).not.toContain('example.com');
+
+    // The block reason and the admin note hold the same text an admin can read,
+    // so they carry the same replaced address.
+    const blockState = await getBlockState(target.id);
+    expect(blockState?.blocked_reason).toBe('chargeback reported by [redacted-email]');
+    const notes = await db
+      .select()
+      .from(user_admin_notes)
+      .where(eq(user_admin_notes.kilo_user_id, target.id));
+    expect(notes).toHaveLength(1);
+    expect(notes[0]?.note_content).toContain('Reason: chargeback reported by [redacted-email]');
+    expect(notes[0]?.note_content).not.toContain('victim@example.com');
   });
 
   test('a cancellation with no refundable payment is recorded as such', async () => {

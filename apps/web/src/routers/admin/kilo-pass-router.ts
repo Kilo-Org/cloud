@@ -238,8 +238,8 @@ function bulkAuditEntry(
 
   // No provider error text: the audit table is browsable by every platform
   // admin and the message can quote arbitrary Stripe or database values.
-  // `batchId` groups the rows one request wrote; the reason is operator free
-  // text, so its email addresses are redacted.
+  // `batchId` groups the rows one request wrote; the caller passes the reason
+  // already sanitized for recording.
   return {
     action: 'kilo_pass.cancel_refund',
     target: userActionTarget(row.userId),
@@ -247,7 +247,7 @@ function bulkAuditEntry(
     metadata: {
       batchId: params.batchId,
       status: row.status,
-      reason: redactEmailAddressesInAuditText(params.reason),
+      reason: params.reason,
       refundLatestPayment: params.refundLatestPayment,
       refundedAmountCents: row.refundedAmountCents,
       balanceResetAmountUsd: row.balanceResetAmountUsd,
@@ -261,16 +261,19 @@ export const adminKiloPassRouter = createTRPCRouter({
     .input(BulkCancelSchema)
     .mutation(async ({ input, ctx }) => {
       const batchId = crypto.randomUUID();
+      // The helper writes the reason to the target user records (block reason,
+      // admin note and credit transaction description); the audit rows repeat it.
+      const reason = redactEmailAddressesInAuditText(input.reason);
       const outcome = await runBulkCancelAndRefundKiloPass({
         emails: input.emails,
         adminKiloUserId: ctx.user.id,
         stripe: stripeClient,
-        reason: input.reason,
+        reason,
         refundLatestPayment: input.refundLatestPayment,
         onResult: async row => {
           const entry = bulkAuditEntry(row, {
             batchId,
-            reason: input.reason,
+            reason,
             refundLatestPayment: input.refundLatestPayment,
           });
           if (entry) await recordAdminAction(ctx, entry);

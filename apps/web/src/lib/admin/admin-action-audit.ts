@@ -161,15 +161,27 @@ export function userActionTarget(userId: string): AdminActionTarget {
   return { type: 'user', id: userId };
 }
 
-const EMAIL_ADDRESS_PATTERN = /[^\s@]+@[^\s@]+\.[\p{L}\p{M}]{2,}/gu;
+// A local part starts with a character that cannot also be prose punctuation,
+// so the replacement does not swallow the bracket that precedes a pasted
+// address. Everything after that first character is replaced, whatever it is,
+// so no fragment of the local part survives. Quotes are written as escapes so
+// the admin-read inventory scanner, which strips quoted text, still reads the
+// rest of this file.
+const EMAIL_ADDRESS_PATTERN = /[^\s@()[\]{}<>\x22\x27,;:][^\s@]*@[^\s@]+\.[\p{L}\p{M}]{2,}/gu;
 
 /**
  * Replaces email addresses in operator-typed free text, such as the reason an
- * admin gives for a refund. The table is browsable by every platform admin, so
- * an address the operator pasted must not reach it; the rest of the text stays.
- * The local part is the whole non-space run before the at-sign, so no character
- * of it survives whatever form the address was pasted in, and the domain match
- * accepts Unicode letters and combining marks.
+ * admin gives for a refund. Apply it at the boundary where operator text enters
+ * and use the result for every record written from it: the audit table is
+ * browsable by every platform admin, and the target user records hold block
+ * reason, admin note and credit transaction description that admins read too.
+ *
+ * The local part is the whole non-space run after a non-punctuation first
+ * character, so no fragment of it survives whatever form the address was pasted
+ * in, and the domain match accepts Unicode letters and combining marks. The
+ * match requires a dotted domain of at least two letters: an intranet host
+ * without a dot, and a bracketed IP literal, are not treated as customer
+ * addresses and stay in the text.
  */
 export function redactEmailAddressesInAuditText(text: string): string {
   return text.replace(EMAIL_ADDRESS_PATTERN, '[redacted-email]');

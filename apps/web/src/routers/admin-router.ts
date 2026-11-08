@@ -1841,13 +1841,17 @@ export const adminRouter = createTRPCRouter({
           throw new TRPCError({ code: 'NOT_FOUND', message: 'User not found' });
         }
 
+        // The helper writes the reason to the target user records (block reason,
+        // admin note and credit transaction description); the audit row repeats it.
+        const reason = redactEmailAddressesInAuditText(input.reason);
+
         let result: CancelAndRefundKiloPassResult;
         try {
           result = await cancelAndRefundKiloPassForUser({
             db,
             stripe: stripeClient,
             userId: input.userId,
-            reason: input.reason,
+            reason,
             adminKiloUserId: ctx.user.id,
           });
         } catch (error) {
@@ -1857,7 +1861,7 @@ export const adminRouter = createTRPCRouter({
             action: 'kilo_pass.cancel_refund',
             target: userActionTarget(input.userId),
             message: 'Kilo Pass cancel attempted with unknown outcome',
-            metadata: { reason: redactEmailAddressesInAuditText(input.reason) },
+            metadata: { reason },
           });
           throw error;
         }
@@ -1896,7 +1900,7 @@ export const adminRouter = createTRPCRouter({
             refundedAmountCents: result.refundedAmountCents,
             balanceResetAmountUsd: result.balanceResetAmountUsd,
             alreadyBlocked: result.alreadyBlocked,
-            reason: redactEmailAddressesInAuditText(input.reason),
+            reason,
           },
         });
 

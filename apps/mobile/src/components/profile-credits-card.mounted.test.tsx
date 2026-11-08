@@ -1375,18 +1375,17 @@ describe('CreditsCard balance row', () => {
     ['the compact cell', 332],
     ['a 390 dp screen', 362],
   ])(
-    'gives the note its own line under the amount and keeps the action beside it on %s',
+    'gives the note its own line under the amount and the purchase action its own row on %s',
     async (_name, width) => {
       const { renderer, unmount } = await mountAtCardWidth(width);
 
       // A stacked card keeps the value and its caption together: the amount and
       // its visibility toggle share the value line, the note takes the column's
-      // next line at the column's own gap, and the purchase action centers
-      // beside the pair instead of standing in the amount's line, where its
-      // height pushed the caption down (design review, Profile compact cell,
-      // 2026-11-07).
+      // next line at the column's own gap, and the purchase action takes its
+      // own row under the pair, so no control sits beside the toggle at another
+      // height and the note keeps the card's full width.
       const shell = balanceBlock(renderer);
-      expect(hasClasses(shell, ['flex-row', 'items-center'])).toBe(true);
+      expect(classesOf(shell)).not.toContain('flex-row');
       const column = valueColumn(renderer);
       const wrapper = column.parent;
       expect(wrapper?.parent).toBe(shell);
@@ -1405,7 +1404,12 @@ describe('CreditsCard balance row', () => {
       expect(renders(row, 'ADD_CREDITS_BUTTON')).toBe(false);
       expect(renders(column, 'No expiring credits.')).toBe(true);
       expect(renders(column, 'ADD_CREDITS_BUTTON')).toBe(false);
-      expect(renders(shell, 'ADD_CREDITS_BUTTON')).toBe(true);
+      const actionRow = shell.children.at(-1);
+      if (actionRow === undefined || typeof actionRow === 'string') {
+        throw new Error('The stacked card has no purchase row');
+      }
+      expect(actionRow).not.toBe(wrapper);
+      expect(renders(actionRow, 'ADD_CREDITS_BUTTON')).toBe(true);
       unmount();
     }
   );

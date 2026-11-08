@@ -247,9 +247,10 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   // answered moved every section below the card with it (design gate, Profile,
   // 2026-11-06), and the slot it takes is reserved in the card's other states.
   //
-  // A stacked card holds the action on the balance's own row, so it takes the
-  // inline form: the button keeps its natural size there instead of the block
-  // width `AddCreditsRow` gives a window under the narrow threshold.
+  // A stacked card holds the action on its own end-aligned row inside the
+  // balance block, so it takes the inline form: the button keeps its natural
+  // size there instead of the block width `AddCreditsRow` gives a window under
+  // the narrow threshold.
   const orgAddCreditsAction =
     selectedOrgId != null && canManageOrgBilling ? (
       <AddCreditsRow

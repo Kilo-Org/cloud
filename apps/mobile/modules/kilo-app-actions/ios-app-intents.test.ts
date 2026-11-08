@@ -291,11 +291,63 @@ describe('the session entity catalog', () => {
     // One name per call, spelled the same on both sides: the JS wrapper is the
     // only caller, and a rename on either side has to fail here rather than at
     // run time on a device.
-    for (const name of ['replaceSessionCatalog', 'clearSessionCatalog', 'setVisibleSession']) {
+    for (const name of [
+      'replaceSessionCatalog',
+      'clearSessionCatalog',
+      'setSessionCatalogLock',
+      'setSessionCatalogVisible',
+      'setVisibleSession',
+    ]) {
       expect(module, `${name} is not exported`).toContain(`func ${name}(`);
       expect(jsBridgeSource, `${name} is not called`).toContain(`${name}?:`);
     }
     expect(catalog).toContain('"kilo-app-actions-session-catalog"');
+  });
+
+  it('keeps every title out of the answers the lock covers', () => {
+    // The entity queries answer Siri and Shortcuts from a launch the lock
+    // surface never draws on, so the store decides: this process starts closed,
+    // opens when the app says it is unlocked, and closes again once the app has
+    // been in the background past the interval the lock allows. Nothing is
+    // wiped on those edges — the account boundaries own that — because a run
+    // the system starts still has to resolve the session a saved shortcut
+    // names.
+    expect(catalog).toContain('guard defaults.bool(forKey: lockEnabledKey)');
+    expect(catalog).toContain('guard visibility.isVisible else');
+    expect(catalog).toContain('UIApplication.didEnterBackgroundNotification');
+    expect(catalog).toContain('UIApplication.didBecomeActiveNotification');
+    expect(catalog).toContain('static func setVisible(');
+    expect(module).toContain('func setSessionCatalogVisible(visible: Bool)');
+    // The switch and the interval arrive together, and turning the lock off
+    // drops the window with them.
+    expect(module).toContain('func setSessionCatalogLock(enabled: Bool, intervalMs: Double)');
+    expect(catalog).toContain('defaults.removeObject(forKey: backgroundedAtKey)');
+    // Visibility is this process's, never the stored one: a persisted `true`
+    // would open the window a fresh launch has to keep closed.
+    expect(catalog).not.toContain('set(visible, forKey:');
+
+    const mountSource = readFileSync(
+      fileURLToPath(new URL('../../src/lib/system-search-index-mount.tsx', import.meta.url)),
+      'utf8'
+    );
+    // The mount hides and shows, and never wipes, on the lock's edges.
+    expect(mountSource).toContain("setSessionCatalogVisibleBestEffort(status === 'unlocked')");
+    expect(mountSource).toContain('setSessionCatalogLockBestEffort(enabled, BACKGROUND_LOCK_MS)');
+    expect(mountSource).not.toContain('clearSessionCatalogBestEffort');
+    // The interval has one source: the lock provider the app itself applies.
+    const lockSource = readFileSync(
+      fileURLToPath(new URL('../../src/lib/app-unlock-context.tsx', import.meta.url)),
+      'utf8'
+    );
+    expect(lockSource).toContain('export const BACKGROUND_LOCK_MS');
+  });
+
+  it('declares the value a stored session has to carry', () => {
+    // The system archives an entity through the properties it declares, so the
+    // title a shortcut shows is declared as one. The identifier is the entity's
+    // identity and needs no wrapper.
+    expect(entity).toContain('@Property var title: String');
+    expect(entity).toContain('let id: String');
   });
 
   it('guards the on-screen cue behind the iOS 18.2 runtime', () => {

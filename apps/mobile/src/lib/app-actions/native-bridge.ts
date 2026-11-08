@@ -38,12 +38,23 @@ type KiloAppActionsModule = InstanceType<typeof NativeModule> & {
   registerAppActionDispatcher: (handler: NativeAppActionHandler) => unknown;
   /**
    * The App Intents entity catalog, optional because a development client built
-   * before the catalog shipped has none of these three. Each is absent on an
-   * older binary, so every wrapper below answers "nothing happened" instead of
+   * before the catalog shipped has none of these. Each is absent on an older
+   * binary, so every wrapper below answers "nothing happened" instead of
    * throwing.
    */
   replaceSessionCatalog?: (entries: NativeSessionCatalogEntry[]) => boolean | Promise<boolean>;
   clearSessionCatalog?: () => boolean | Promise<boolean>;
+  /**
+   * The app lock's terms for the catalog: whether it is on, and how long the
+   * app may stay in the background before the entity queries stop answering,
+   * in milliseconds.
+   */
+  setSessionCatalogLock?: (enabled: boolean, intervalMs: number) => void;
+  /**
+   * Whether this launch is showing unlocked content. The store starts closed,
+   * so this is the call that lets an App Intents answer use the titles.
+   */
+  setSessionCatalogVisible?: (visible: boolean) => void;
   setVisibleSession?: (sessionId: string | null) => Promise<void>;
 };
 
@@ -78,6 +89,44 @@ export async function clearNativeSessionCatalog(): Promise<boolean> {
   }
   const cleared = await clear();
   return cleared;
+}
+
+/**
+ * Hands the native catalog the app lock's terms: whether the lock is on, and
+ * how long the app may sit in the background before the entity queries stop
+ * answering.
+ *
+ * The store keeps the background instant itself, because the App Intents answer
+ * from a launched process where no JavaScript runs, and the lock surface only
+ * covers the foreground. A binary built before this call exists keeps
+ * answering: it has no window to keep, and the in-app lock's own clears are all
+ * it had.
+ */
+export function setNativeSessionCatalogLock(enabled: boolean, intervalMs: number): void {
+  const set = nativeModule?.setSessionCatalogLock;
+  if (set === undefined) {
+    return;
+  }
+  // The native setter is synchronous: it stores two values and starts the
+  // lifecycle observers on its first call.
+  set(enabled, intervalMs);
+}
+
+/**
+ * Tells the native catalog whether this launch is showing unlocked content.
+ *
+ * The store starts closed, so a launch the system starts to answer an App
+ * Intent gets nothing until the app says it is unlocked — and a lock-enabled
+ * device therefore keeps its titles to itself while the lock surface stands. A
+ * binary built before this call exists keeps answering, which is what it always
+ * did.
+ */
+export function setNativeSessionCatalogVisible(visible: boolean): void {
+  const set = nativeModule?.setSessionCatalogVisible;
+  if (set === undefined) {
+    return;
+  }
+  set(visible);
 }
 
 /**

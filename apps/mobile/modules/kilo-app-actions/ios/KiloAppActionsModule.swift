@@ -26,6 +26,28 @@ public final class KiloAppActionsModule: Module {
     KiloSessionCatalogStore.clear()
   }
 
+  /// Takes the app lock's terms, so the entity queries stop answering while the
+  /// app sits in the background past the interval the lock allows.
+  ///
+  /// The interval comes from the lock's own owner, so the store cannot drift
+  /// from the interval the app applies to its surface. JavaScript counts in
+  /// milliseconds; the store keeps seconds.
+  @JS
+  func setSessionCatalogLock(enabled: Bool, intervalMs: Double) {
+    KiloSessionCatalogStore.setLock(enabled: enabled, interval: intervalMs / 1000)
+  }
+
+  /// Tells the catalog whether this launch is showing unlocked content.
+  ///
+  /// The store starts closed on every launch, so a launch the system starts to
+  /// answer an App Intent cannot answer with titles the lock keeps from the
+  /// person holding the device, and a saved shortcut still resolves the session
+  /// it names once the app says it is unlocked.
+  @JS
+  func setSessionCatalogVisible(visible: Bool) {
+    KiloSessionCatalogStore.setVisible(visible)
+  }
+
   /// Publishes the session the app is showing, or clears it. `nil` means no
   /// session is visible.
   @JS

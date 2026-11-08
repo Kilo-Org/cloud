@@ -5,13 +5,19 @@ import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // The provider is the lock's only source of truth; this suite moves its status
-// the way a cold start, a background return and a successful unlock do.
+// the way a cold start, a background return and a successful unlock do, and its
+// switch the way Preferences does.
 const unlock = vi.hoisted(() => ({
   status: 'unlocked' as 'locked' | 'preference-loading' | 'unlocked',
-  useAppUnlock: () => ({ status: unlock.status }),
+  enabled: false,
+  intervalMs: 1_234,
+  useAppUnlock: () => ({ status: unlock.status, enabled: unlock.enabled }),
 }));
 
-vi.mock('@/lib/app-unlock-context', () => ({ useAppUnlock: unlock.useAppUnlock }));
+vi.mock('@/lib/app-unlock-context', () => ({
+  useAppUnlock: unlock.useAppUnlock,
+  BACKGROUND_LOCK_MS: unlock.intervalMs,
+}));
 
 const nativeSearch = vi.hoisted(() => ({
   applySystemSearchUpdate: vi.fn(async () => undefined),
@@ -27,6 +33,8 @@ vi.mock('@/lib/native-system-search', () => ({
 const nativeBridge = vi.hoisted(() => ({
   replaceNativeSessionCatalog: vi.fn<(entries: readonly { id: string }[]) => Promise<boolean>>(),
   clearNativeSessionCatalog: vi.fn<() => Promise<boolean>>(),
+  setNativeSessionCatalogLock: vi.fn<() => void>(),
+  setNativeSessionCatalogVisible: vi.fn<() => void>(),
 }));
 
 vi.mock('@/lib/app-actions/native-bridge', () => nativeBridge);
@@ -98,6 +106,7 @@ function seedSession(title: string): void {
 
 type Mounted = {
   update: (status: 'locked' | 'preference-loading' | 'unlocked') => Promise<void>;
+  setLock: (enabled: boolean) => Promise<void>;
   unmount: () => void;
 };
 
@@ -117,13 +126,20 @@ async function mountSync(): Promise<Mounted> {
     // The sync awaits its own run queue on the unlock edge.
     await Promise.resolve();
   });
+  const rerender = async (): Promise<void> => {
+    await act(async () => {
+      renderer?.update(createElement(SystemSearchIndexMount));
+      await Promise.resolve();
+    });
+  };
   return {
     update: async status => {
       unlock.status = status;
-      await act(async () => {
-        renderer?.update(createElement(SystemSearchIndexMount));
-        await Promise.resolve();
-      });
+      await rerender();
+    },
+    setLock: async enabled => {
+      unlock.enabled = enabled;
+      await rerender();
     },
     unmount: () => {
       act(() => {
@@ -137,6 +153,7 @@ async function mountSync(): Promise<Mounted> {
 beforeEach(() => {
   vi.clearAllMocks();
   unlock.status = 'unlocked';
+  unlock.enabled = false;
   appState.listeners.length = 0;
   client().clear();
   nativeBridge.replaceNativeSessionCatalog.mockResolvedValue(true);
@@ -164,8 +181,11 @@ describe('the App Intents catalog and the privacy lock', () => {
 
     expect(nativeBridge.replaceNativeSessionCatalog).not.toHaveBeenCalled();
     // The lock surface already covers the app during that read, so the titles
-    // the previous process persisted are wiped for its length.
-    expect(nativeBridge.clearNativeSessionCatalog).toHaveBeenCalledOnce();
+    // the previous process persisted stay hidden for its length — hidden, not
+    // wiped, because a launch the system starts for an App Intent still has to
+    // be able to resolve a session a saved shortcut names.
+    expect(nativeBridge.setNativeSessionCatalogVisible).toHaveBeenLastCalledWith(false);
+    expect(nativeBridge.clearNativeSessionCatalog).not.toHaveBeenCalled();
 
     // The unlock edge is the retry for a publish the gate refused.
     await mounted.update('unlocked');
@@ -173,10 +193,11 @@ describe('the App Intents catalog and the privacy lock', () => {
     expect(nativeBridge.replaceNativeSessionCatalog).toHaveBeenCalledWith([
       { id: 'sess-1', title: 'Fix login bug' },
     ]);
+    expect(nativeBridge.setNativeSessionCatalogVisible).toHaveBeenLastCalledWith(true);
     mounted.unmount();
   });
 
-  it('wipes the titles when the lock closes and refuses to republish them', async () => {
+  it('hides the titles when the lock closes and refuses to republish them', async () => {
     seedSession('Fix login bug');
     const mounted = await mountSync();
     nativeBridge.replaceNativeSessionCatalog.mockClear();
@@ -185,7 +206,7 @@ describe('the App Intents catalog and the privacy lock', () => {
     // publishes `locked`, and the mount follows it.
     await mounted.update('locked');
 
-    expect(nativeBridge.clearNativeSessionCatalog).toHaveBeenCalledOnce();
+    expect(nativeBridge.setNativeSessionCatalogVisible).toHaveBeenLastCalledWith(false);
 
     // A return to the foreground while the lock stands must not put the titles
     // back.
@@ -211,6 +232,19 @@ describe('the App Intents catalog and the privacy lock', () => {
     expect(nativeBridge.replaceNativeSessionCatalog).toHaveBeenCalledWith([
       { id: 'sess-1', title: 'Fix login bug' },
     ]);
+    mounted.unmount();
+  });
+
+  it('hands the native catalog the lock switch and the interval it allows', async () => {
+    const mounted = await mountSync();
+
+    // The interval is the provider's, not a second copy: the store withholds
+    // the titles at exactly the point the app would lock its own surface.
+    expect(nativeBridge.setNativeSessionCatalogLock).toHaveBeenCalledWith(false, 1_234);
+
+    await mounted.setLock(true);
+
+    expect(nativeBridge.setNativeSessionCatalogLock).toHaveBeenLastCalledWith(true, 1_234);
     mounted.unmount();
   });
 });

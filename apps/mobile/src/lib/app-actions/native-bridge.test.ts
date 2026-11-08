@@ -7,6 +7,8 @@ const native = vi.hoisted(() => ({
   registerAppActionDispatcher: vi.fn(),
   replaceSessionCatalog: vi.fn(),
   clearSessionCatalog: vi.fn(),
+  setSessionCatalogLock: vi.fn(),
+  setSessionCatalogVisible: vi.fn(),
   setVisibleSession: vi.fn(),
 }));
 
@@ -103,6 +105,10 @@ describe('the session catalog bridge', () => {
       bridge.replaceNativeSessionCatalog([{ id: 'sess-1', title: 'Fix' }])
     ).resolves.toBe(false);
     await expect(bridge.clearNativeSessionCatalog()).resolves.toBe(false);
+    // The two lock calls are absent on that binary, so the pushes are no-ops
+    // rather than throws.
+    bridge.setNativeSessionCatalogLock(true, 300_000);
+    bridge.setNativeSessionCatalogVisible(true);
     await expect(bridge.setNativeVisibleSession('sess-1')).resolves.toBeUndefined();
   });
 
@@ -153,6 +159,29 @@ describe('the session catalog bridge', () => {
 
     native.clearSessionCatalog.mockResolvedValueOnce(true);
     await expect(bridge.clearNativeSessionCatalog()).resolves.toBe(true);
+  });
+
+  it('hands the lock switch and its interval over in one call', async () => {
+    const bridge = await import('./native-bridge');
+
+    bridge.setNativeSessionCatalogLock(true, 300_000);
+
+    // One call, so the store can never hold one half of the pair: the switch
+    // alone would withhold an unlocked device's titles, the interval alone
+    // would withhold nothing.
+    expect(native.setSessionCatalogLock).toHaveBeenCalledExactlyOnceWith(true, 300_000);
+  });
+
+  it('hands the launch’s visibility over on every edge', async () => {
+    const bridge = await import('./native-bridge');
+
+    bridge.setNativeSessionCatalogVisible(false);
+    bridge.setNativeSessionCatalogVisible(true);
+
+    // Both answers reach the store in the order the lock produced them: the
+    // store starts closed, so a dropped `true` would hide an unlocked app's
+    // titles and a dropped `false` would expose a locked one's.
+    expect(native.setSessionCatalogVisible.mock.calls).toEqual([[false], [true]]);
   });
 
   it('publishes the visible session in the order the screen produced it', async () => {

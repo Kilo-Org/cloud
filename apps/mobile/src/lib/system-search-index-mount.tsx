@@ -5,9 +5,12 @@ import {
   indexedSystemSearchFingerprints,
 } from '@/lib/native-system-search';
 import { replaceNativeSessionCatalog } from '@/lib/app-actions/native-bridge';
-import { clearSessionCatalogBestEffort } from '@/lib/app-actions/session-catalog';
+import {
+  setSessionCatalogLockBestEffort,
+  setSessionCatalogVisibleBestEffort,
+} from '@/lib/app-actions/session-catalog';
 import { isCatalogPublishAllowed, setAppLockStatus } from '@/lib/app-lock-state';
-import { useAppUnlock } from '@/lib/app-unlock-context';
+import { BACKGROUND_LOCK_MS, useAppUnlock } from '@/lib/app-unlock-context';
 import { queryClient } from '@/lib/query-client';
 import {
   collectSystemSearchDocuments,
@@ -60,9 +63,8 @@ function applySessionCatalog(sessions: readonly SessionCatalogEntry[]): Promise<
  * coalescing and the fencing to reach the same guarantee.
  */
 export function SystemSearchIndexMount(): null {
-  const { status } = useAppUnlock();
+  const { status, enabled } = useAppUnlock();
   const syncRef = useRef<SystemSearchIndexSync | null>(null);
-  const lastStatus = useRef<string | null>(null);
 
   useEffect(() => {
     const sync = new SystemSearchIndexSync({
@@ -90,25 +92,33 @@ export function SystemSearchIndexMount(): null {
     };
   }, []);
 
-  // The catalog follows the one gate that hides content. Entering the lock wipes
-  // the titles, and so does a launch that is still reading the preference: the
-  // lock surface already covers the app then, so the catalog the previous
-  // process persisted must not stay readable for the length of that read. The
-  // publish above refuses while any status other than `unlocked` stands.
+  // The catalog follows the one gate that hides content. Every status other
+  // than `unlocked` hides the titles — including a launch that is still reading
+  // the preference, which the lock surface already covers — and the unlock edge
+  // shows them again. Hiding, not wiping: the App Intents can be asked to
+  // resolve a session a saved shortcut names while the system starts the app for
+  // a run, and that answer must not depend on a publish that has not happened
+  // yet in this process. The publish above still refuses while the gate stands,
+  // and the account boundaries are the ones that wipe.
   //
   // The unlock edge is also the retry for a publish that the gate refused: the
   // run that would have carried the titles happened while the lock stood, so
   // nothing else would re-publish them until an unrelated cache write.
   useEffect(() => {
     setAppLockStatus(status);
-    const closed = status !== 'unlocked' && lastStatus.current !== status;
-    lastStatus.current = status;
-    if (closed) {
-      clearSessionCatalogBestEffort();
-    }
+    setSessionCatalogVisibleBestEffort(status === 'unlocked');
     if (status === 'unlocked') {
       void syncRef.current?.syncNow();
     }
   }, [status]);
+
+  // The lock's own switch, and the interval it allows in the background, reach
+  // the native store. Without them the entity queries would keep answering for
+  // the whole time the app sits in the background past the interval: they run
+  // in a launched process, where no JavaScript and no lock surface exists. The
+  // status edges above still own what the person can see in the foreground.
+  useEffect(() => {
+    setSessionCatalogLockBestEffort(enabled, BACKGROUND_LOCK_MS);
+  }, [enabled]);
   return null;
 }

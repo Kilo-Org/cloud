@@ -111,7 +111,7 @@ function formatUsd(cents: number): string {
 
 export function KiloPassBulkCancel() {
   const trpc = useTRPC();
-  const { isSuperadmin, isPermissionResolved } = useAdminPermissions();
+  const { isSuperadmin, isPermissionResolved, isError } = useAdminPermissions();
   const [rawEmails, setRawEmails] = useState('');
   const [reason, setReason] = useState('');
   const [refundLatestPayment, setRefundLatestPayment] = useState(true);
@@ -227,7 +227,13 @@ export function KiloPassBulkCancel() {
             </div>
           </div>
 
-          {!isPermissionResolved ? (
+          {isError ? (
+            <Alert>
+              <AlertDescription>
+                The permission check failed. Reload the page to try again.
+              </AlertDescription>
+            </Alert>
+          ) : !isPermissionResolved ? (
             <Alert>
               <AlertDescription>Checking permissions…</AlertDescription>
             </Alert>

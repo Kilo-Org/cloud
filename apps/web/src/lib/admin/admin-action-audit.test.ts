@@ -12,6 +12,7 @@ import {
   recordAdminAction,
   recordElevatedOrganizationAdminAction,
   recordAdminActions,
+  redactEmailAddressesInAuditText,
   setAdminActionSinkForTest,
   userActionTarget,
   type AdminActionContext,
@@ -154,6 +155,20 @@ describe('recordAdminAction', () => {
 
     expect(await db.select().from(admin_action_audit_logs)).toHaveLength(0);
     expect(events).toHaveLength(0);
+  });
+});
+
+describe('redactEmailAddressesInAuditText', () => {
+  test('replaces ASCII and non-ASCII addresses and leaves other text alone', () => {
+    expect(
+      redactEmailAddressesInAuditText(
+        'chargeback, contacted by victim@example.com and josé.muñoz@example.co.uk'
+      )
+    ).toBe('chargeback, contacted by [redacted-email] and [redacted-email]');
+
+    expect(redactEmailAddressesInAuditText('policy violation, tier_19, 2nd offence')).toBe(
+      'policy violation, tier_19, 2nd offence'
+    );
   });
 });
 

@@ -38,7 +38,7 @@ export function UserAdminKiloPass({ userId }: { userId: string }) {
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const queryClient = useQueryClient();
-  const { isSuperadmin, isPermissionResolved } = useAdminPermissions();
+  const { isSuperadmin, isPermissionResolved, isError } = useAdminPermissions();
   const canAct = isPermissionResolved && isSuperadmin;
 
   const cancelMutation = useMutation(
@@ -182,7 +182,11 @@ export function UserAdminKiloPass({ userId }: { userId: string }) {
             >
               Nuke Pass
             </Button>
-            {!isPermissionResolved ? (
+            {isError ? (
+              <p className="text-muted-foreground text-xs">
+                The permission check failed. Reload the page to try again.
+              </p>
+            ) : !isPermissionResolved ? (
               <p className="text-muted-foreground text-xs">Checking permissions…</p>
             ) : !isSuperadmin ? (
               <p className="text-muted-foreground text-xs">

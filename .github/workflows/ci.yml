@@ -416,8 +416,13 @@ jobs:
         with:
           node-version-file: '.nvmrc'
 
+      # Only the two dependency closures this job reads and the root project are
+      # installed. The composite action below builds `@kilocode/trpc` alone, but
+      # that declaration program also reads web-shared and apps/web sources
+      # through their path aliases. Widen the filter when a step here imports a
+      # workspace outside these closures.
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --filter '@kilocode/trpc...' --filter 'web...' --filter kilocode-monorepo
 
       - name: Restore or build tRPC declarations
         uses: ./.github/actions/trpc-declarations
@@ -804,8 +809,11 @@ jobs:
         with:
           node-version-file: '.nvmrc'
 
+      # Only the web app's dependency closure and the root project are
+      # installed: the step below runs `--filter web`. Widen the filter when a
+      # step here imports a workspace outside the closure.
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --filter 'web...' --filter kilocode-monorepo
 
       - name: Dependency cycle check
         run: pnpm run dependency-cycle-check

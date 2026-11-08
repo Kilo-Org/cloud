@@ -12,9 +12,9 @@ export type BalanceBlockState = 'loading' | 'failed' | 'ready';
 type BalanceBlockProps = Readonly<{
   readonly state: BalanceBlockState;
   /**
-   * A card too narrow for the note to keep its lines beside the amount keeps
-   * the toggle on the amount's line and gives the note its own line under it.
-   * The purchase action sits beside that column either way.
+   * A card too narrow for the note to keep its lines beside the amount gives
+   * the value column a 48 dp floor. The toggle and the purchase action sit
+   * beside that column either way.
    */
   readonly stacked: boolean;
   /** The amount line, which the loading state replaces with a bar. */
@@ -50,9 +50,7 @@ export function BalanceBlock({
   const valueColumnClass = stacked
     ? 'min-w-0 min-h-[48px] flex-1 justify-center gap-1'
     : 'min-w-0 flex-1 gap-1';
-  const contentClass = stacked
-    ? 'min-w-0 flex-1 flex-row'
-    : 'min-w-0 flex-1 flex-row items-center gap-1';
+  const contentClass = 'min-w-0 flex-1 flex-row items-center gap-1';
   const amountRowClass = 'min-w-0 flex-row items-center gap-1';
   // Match the hit slop's parent padding without changing the value line's layout share.
   const valueWrapperClass =
@@ -83,19 +81,13 @@ export function BalanceBlock({
       </Pressable>
     );
   }
-  let visibilityControl = toggle;
-  if (state !== 'ready') {
-    visibilityControl =
-      stacked && state === 'failed' ? null : <View className="h-[48px] w-[48px]" />;
-  }
+  // Every state reserves the toggle's box, so the note's width never changes with the balance.
+  const visibilityControl = state === 'ready' ? toggle : <View className="h-[48px] w-[48px]" />;
   // The noninteractive caption must not intercept the retry target's hit slop.
   const expiryNote = state === 'failed' ? <View pointerEvents="none">{note}</View> : note;
   const valueRow = (
     <View className={amountRowClass}>
       <View className={valueWrapperClass}>{value}</View>
-      {stacked && state !== 'failed' && (
-        <View className="shrink-0 -my-[10px]">{visibilityControl}</View>
-      )}
     </View>
   );
 
@@ -107,7 +99,7 @@ export function BalanceBlock({
           {valueRow}
           {expiryNote}
         </View>
-        {!stacked && visibilityControl}
+        {visibilityControl}
       </Animated.View>
       {action}
     </View>

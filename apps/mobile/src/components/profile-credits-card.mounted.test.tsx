@@ -1339,6 +1339,31 @@ describe('CreditsCard balance row', () => {
     return mounted;
   }
 
+  /** The nearest host View above the note: the column the note shares with the amount. */
+  function noteColumn(renderer: ReactTestRenderer): ReactTestInstance {
+    const [note] = renderer.root.findAll(
+      node => typeof node.type === 'string' && node.props.children === 'No expiring credits.'
+    );
+    let current = note?.parent ?? null;
+    while (current !== null && !Object.is(current.type, 'View')) {
+      current = current.parent;
+    }
+    if (current === null) {
+      throw new Error('The note has no host column');
+    }
+    return current;
+  }
+
+  it('keeps the note in the amount column on a wide card, with the purchase action in its own column', async () => {
+    const { renderer, unmount } = await mountAtCardWidth(383);
+
+    const column = noteColumn(renderer);
+    expect(renders(column, '$12.34')).toBe(true);
+    expect(renders(column, 'ADD_CREDITS_BUTTON')).toBe(false);
+    expect(renders(balanceBlock(renderer), 'ADD_CREDITS_BUTTON')).toBe(true);
+    unmount();
+  });
+
   it.each<[string, number]>([
     // The standard matrix's compact cell (360 dp screen) and a 390 dp screen:
     // in the one-row layout the note's column there wrapped the sentence to

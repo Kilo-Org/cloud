@@ -4,6 +4,7 @@ import Animated, { LinearTransition } from 'react-native-reanimated';
 
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { LINE_ACTION_HIT_SLOP } from '@/lib/a11y/tap-target';
 
 /** The balance slot's three states: the loading skeleton, the failed read, the loaded row. */
 export type BalanceBlockState = 'loading' | 'failed' | 'ready';
@@ -44,9 +45,18 @@ export function BalanceBlock({
   retryActionLabel,
   onRetry,
 }: BalanceBlockProps) {
-  const shellClass = 'min-h-16 flex-row items-center gap-2 rounded-lg bg-secondary px-3 py-2';
-  const valueColumnClass = 'min-w-0 min-h-[48px] flex-1 justify-center gap-1';
+  // Keep the expanded line-action target inside the card even when the note wraps.
+  const shellClass = 'min-h-16 flex-row items-center gap-2 rounded-lg bg-secondary px-3 py-3';
+  const valueColumnClass = stacked
+    ? 'min-w-0 min-h-[48px] flex-1 justify-center gap-1'
+    : 'min-w-0 flex-1 gap-1';
+  const contentClass = stacked
+    ? 'min-w-0 flex-1 flex-row'
+    : 'min-w-0 flex-1 flex-row items-center gap-1';
   const amountRowClass = 'min-w-0 flex-row items-center gap-1';
+  // Match the hit slop's parent padding without changing the value line's layout share.
+  const valueWrapperClass =
+    state === 'failed' ? 'min-w-0 flex-1 -my-[9px] py-[9px]' : 'min-w-0 flex-1';
 
   let value = amount;
   if (state === 'loading') {
@@ -55,7 +65,7 @@ export function BalanceBlock({
     value = (
       <Pressable
         className="min-h-[28px] min-w-0 justify-center active:opacity-70"
-        hitSlop={8}
+        hitSlop={LINE_ACTION_HIT_SLOP}
         onPress={onRetry}
         accessibilityRole="button"
         accessibilityLabel={retryLabel}
@@ -72,44 +82,24 @@ export function BalanceBlock({
   const purchaseAction = state === 'loading' ? loadingAction : action;
   // The noninteractive caption must not intercept the retry target's hit slop.
   const expiryNote = state === 'failed' ? <View pointerEvents="none">{note}</View> : note;
-
-  if (stacked) {
-    return (
-      <View className={shellClass}>
-        {/* `flex-row` keeps `flex-1` a width share: in a column wrapper it
-            would set a 0 vertical basis, and the 48 dp floor would then pin the
-            column so a longer note paints outside the card instead of growing
-            it (the collapse the wide card's row avoids the same way). */}
-        <Animated.View className="min-w-0 flex-1 flex-row" layout={LinearTransition.duration(200)}>
-          <View className={valueColumnClass}>
-            <View className={amountRowClass}>
-              <View className="min-w-0 flex-1">{value}</View>
-              {/* The toggle's 48 dp box carries `-my-[10px]`, so it reaches its
-                  touch target without adding height to the value line. */}
-              {state !== 'failed' && (
-                <View className="shrink-0 -my-[10px]">{visibilityControl}</View>
-              )}
-            </View>
-            {expiryNote}
-          </View>
-        </Animated.View>
-        {purchaseAction}
-      </View>
-    );
-  }
+  const valueRow = (
+    <View className={amountRowClass}>
+      <View className={valueWrapperClass}>{value}</View>
+      {stacked && state !== 'failed' && (
+        <View className="shrink-0 -my-[10px]">{visibilityControl}</View>
+      )}
+    </View>
+  );
 
   return (
     <View className={shellClass}>
-      <Animated.View
-        className="min-w-0 flex-1 flex-row items-center gap-1"
-        layout={LinearTransition.duration(200)}
-      >
-        {/* `flex-1` is a width share here: this View is the row's child. */}
-        <View className="min-w-0 flex-1 gap-1">
-          {value}
+      <Animated.View className={contentClass} layout={LinearTransition.duration(200)}>
+        {/* `flex-row` keeps the column's `flex-1` on the horizontal axis. */}
+        <View className={valueColumnClass}>
+          {valueRow}
           {expiryNote}
         </View>
-        {visibilityControl}
+        {!stacked && visibilityControl}
       </Animated.View>
       {purchaseAction}
     </View>

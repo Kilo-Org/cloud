@@ -117,8 +117,19 @@ export function SystemSearchIndexMount(): null {
   // the whole time the app sits in the background past the interval: they run
   // in a launched process, where no JavaScript and no lock surface exists. The
   // status edges above still own what the person can see in the foreground.
+  //
+  // That push waits for the preference read to settle. The native store's
+  // withholding check returns early while the persisted switch is off, before
+  // it consults the visibility the status effect pushes, so writing this
+  // process's not-yet-read `false` would open the previous process's titles for
+  // the length of the read — and persist that through a launch killed inside
+  // it. Until the read answers, the switch the last launch stored keeps doing
+  // what the person chose.
   useEffect(() => {
+    if (status === 'preference-loading') {
+      return;
+    }
     setSessionCatalogLockBestEffort(enabled, BACKGROUND_LOCK_MS);
-  }, [enabled]);
+  }, [enabled, status]);
   return null;
 }

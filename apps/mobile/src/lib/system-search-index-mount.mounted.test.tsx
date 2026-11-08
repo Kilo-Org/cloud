@@ -186,6 +186,10 @@ describe('the App Intents catalog and the privacy lock', () => {
     // be able to resolve a session a saved shortcut names.
     expect(nativeBridge.setNativeSessionCatalogVisible).toHaveBeenLastCalledWith(false);
     expect(nativeBridge.clearNativeSessionCatalog).not.toHaveBeenCalled();
+    // The stored switch is the last launch's answer, and the store checks it
+    // before the visibility above: writing this process's unread `false` here
+    // would open the titles the visibility flag just closed.
+    expect(nativeBridge.setNativeSessionCatalogLock).not.toHaveBeenCalled();
 
     // The unlock edge is the retry for a publish the gate refused.
     await mounted.update('unlocked');
@@ -194,6 +198,7 @@ describe('the App Intents catalog and the privacy lock', () => {
       { id: 'sess-1', title: 'Fix login bug' },
     ]);
     expect(nativeBridge.setNativeSessionCatalogVisible).toHaveBeenLastCalledWith(true);
+    expect(nativeBridge.setNativeSessionCatalogLock).toHaveBeenCalledWith(false, 1_234);
     mounted.unmount();
   });
 

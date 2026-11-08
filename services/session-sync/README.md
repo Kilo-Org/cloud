@@ -611,7 +611,9 @@ One hibernatable runner socket per CLI process advertises via
 `startedAt` is Unix milliseconds, `gitBranch` is string or null, capabilities and
 sessions are string arrays. Advertisements are bounded; no heartbeat means
 offline after 90 seconds. Presence viewer `{type:"subscribe"}` receives `instances`
-snapshots, including removals. Records include `{instanceID,tenant,advertisement,
+snapshots, including removals. Snapshots are change-driven: a new or changed
+advertisement, an online-state change, or an instance leaving produces one snapshot,
+and `lastHeartbeatAt` is the value at that snapshot. Records include `{instanceID,tenant,advertisement,
 online,lastHeartbeatAt}`. Same-user/tenant/instance reconnect replaces the previous
 socket with code 4009; presence 4009 may retry, unlike session-relay 4009.
 No disconnected-instance history is retained. Ads are held
@@ -686,8 +688,9 @@ decision. The SyncDO tombstone retains intent until purge is acknowledged.
 Sessions never authorized for live access skip relay creation and purge.
 
 Relay/presence Analytics Engine points index the normalized live operation, with
-blobs `[route,role]` and doubles `[bytes,fanout,latencyMs]`; payloads and identities
-are excluded. HTTP request points retain the schema documented above.
+blobs `[route,role,reason?]` and doubles `[bytes,fanout,latencyMs]`; payloads and identities
+are excluded. Presence fan-out points carry the cause of the fan-out in the reason blob.
+HTTP request points retain the schema documented above.
 
 ### Local end-to-end proof
 

@@ -116,6 +116,7 @@ import { createMessageId } from './message-id.js';
 import { canonicalRequestedEnvironment } from './requested-environment-intent.js';
 import { isPolicyBearingAuthToken } from './policy-bearing-token.js';
 import type { MessageResultRPCResponse } from './message-result.js';
+import { classifyStoredInitialTurn, initialTurnTerminalFailure } from './initial-turn-outcome.js';
 import type {
   AcceptedExecutionTurn,
   ExecutionTurnSubmission,
@@ -2985,8 +2986,7 @@ async function confirmInitialMessageAdmitted(args: {
   // admitted and then died: replaying success would hand back a dead session and
   // a later fresh create would double-admit the turn, so settle the row failed
   // and surface the typed non-retryable failure.
-  const failed =
-    messageResult.result.status === 'failed' || messageResult.result.status === 'interrupted';
+  const failed = classifyStoredInitialTurn(messageResult.result).type === 'terminal-failure';
   const distinctId = await resolveSessionCreateDistinctId(db, ctx.userId);
   await settleTerminalOutcome(db, {
     rowId: row.id,
@@ -3003,7 +3003,7 @@ async function confirmInitialMessageAdmitted(args: {
     }),
   });
   if (failed) {
-    throw new TRPCError({ code: 'BAD_REQUEST', message: 'session_creation_failed' });
+    throw initialTurnTerminalFailure();
   }
   const worktreeId = recordedChildWorktreeId(row, ids.cloudAgentSessionId);
   await recordParentChildSession(args.input, ctx, {

@@ -248,6 +248,7 @@
     "confirmDeletion": "ਮਿਟਾਉਣ ਦੀ ਪੁਸ਼ਟੀ ਕਰੋ",
     "credits": "ਕ੍ਰੈਡਿਟ",
     "failedToLoadBalance": "ਬੈਲੰਸ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰਨ ਲਈ ਟੈਪ ਕਰੋ।",
+    "balanceLoadFailed": "ਬੈਲੰਸ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕਿਆ",
     "hideBalance": "ਬੈਲੰਸ ਲੁਕਾਓ",
     "showBalance": "ਬੈਲੰਸ ਵਿਖਾਓ",
     "balanceHidden": "ਬੈਲੰਸ ਲੁਕਾਇਆ ਗਿਆ",

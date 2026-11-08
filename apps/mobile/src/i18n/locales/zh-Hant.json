@@ -248,6 +248,7 @@
     "confirmDeletion": "確認刪除",
     "credits": "點數",
     "failedToLoadBalance": "無法載入餘額。點一下即可再試一次。",
+    "balanceLoadFailed": "無法載入餘額",
     "hideBalance": "隱藏餘額",
     "showBalance": "顯示餘額",
     "balanceHidden": "餘額已隱藏",

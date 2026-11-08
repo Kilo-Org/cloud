@@ -248,6 +248,7 @@
     "confirmDeletion": "Ikkonferma t-tħassir",
     "credits": "Krediti",
     "failedToLoadBalance": "Ma setax jitgħabba l-bilanċ. Tektek biex terġa' tipprova.",
+    "balanceLoadFailed": "Ma setax jitgħabba l-bilanċ",
     "hideBalance": "Aħbi l-bilanċ",
     "showBalance": "Uri l-bilanċ",
     "balanceHidden": "Il-bilanċ huwa moħbi",

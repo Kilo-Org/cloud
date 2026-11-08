@@ -248,6 +248,7 @@
     "confirmDeletion": "אישור המחיקה",
     "credits": "קרדיטים",
     "failedToLoadBalance": "לא ניתן לטעון את היתרה. הקש כדי לנסות שוב.",
+    "balanceLoadFailed": "לא ניתן לטעון את היתרה",
     "hideBalance": "הסתר יתרה",
     "showBalance": "הצג יתרה",
     "balanceHidden": "היתרה מוסתרת",

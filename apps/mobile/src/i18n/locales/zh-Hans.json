@@ -248,6 +248,7 @@
     "confirmDeletion": "确认删除",
     "credits": "额度",
     "failedToLoadBalance": "加载余额失败。点击重试。",
+    "balanceLoadFailed": "加载余额失败",
     "hideBalance": "隐藏余额",
     "showBalance": "显示余额",
     "balanceHidden": "余额已隐藏",

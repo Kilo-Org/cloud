@@ -248,6 +248,7 @@
     "confirmDeletion": "Confirmer la suppression",
     "credits": "Crédits",
     "failedToLoadBalance": "Échec du chargement du solde. Touchez pour réessayer.",
+    "balanceLoadFailed": "Échec du chargement du solde",
     "hideBalance": "Masquer le solde",
     "showBalance": "Afficher le solde",
     "balanceHidden": "Solde masqué",

@@ -248,6 +248,7 @@
     "confirmDeletion": "تأیید حذف",
     "credits": "اعتبار",
     "failedToLoadBalance": "بارگذاری موجودی ممکن نشد. برای تلاش مجدد ضربه بزنید.",
+    "balanceLoadFailed": "بارگذاری موجودی ممکن نشد",
     "hideBalance": "پنهان کردن موجودی",
     "showBalance": "نمایش موجودی",
     "balanceHidden": "موجودی پنهان است",

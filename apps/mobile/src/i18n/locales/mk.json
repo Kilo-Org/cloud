@@ -248,6 +248,7 @@
     "confirmDeletion": "Потврди бришење",
     "credits": "Кредити",
     "failedToLoadBalance": "Не успеа вчитувањето на состојбата. Допри за да се обидеш повторно.",
+    "balanceLoadFailed": "Не се вчита состојбата",
     "hideBalance": "Скриј ја состојбата",
     "showBalance": "Прикажи ја состојбата",
     "balanceHidden": "Состојбата е скриена",

@@ -248,6 +248,7 @@
     "confirmDeletion": "Apstiprināt dzēšanu",
     "credits": "Kredīti",
     "failedToLoadBalance": "Neizdevās ielādēt atlikumu. Pieskaries, lai mēģinātu vēlreiz.",
+    "balanceLoadFailed": "Neizdevās ielādēt atlikumu",
     "hideBalance": "Slēpt atlikumu",
     "showBalance": "Rādīt atlikumu",
     "balanceHidden": "Atlikums ir paslēpts",

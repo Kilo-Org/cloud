@@ -248,6 +248,7 @@
     "confirmDeletion": "Qinisekisa ukususa",
     "credits": "Amakhredithi",
     "failedToLoadBalance": "Asikwazanga ukulayisha ibhalansi. Thepha ukuze uzame futhi.",
+    "balanceLoadFailed": "Asikwazanga ukulayisha ibhalansi",
     "hideBalance": "Fihla ibhalansi",
     "showBalance": "Bonisa ibhalansi",
     "balanceHidden": "Ibhalansi ifihliwe",

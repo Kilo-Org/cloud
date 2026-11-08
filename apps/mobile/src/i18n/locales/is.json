@@ -248,6 +248,7 @@
     "confirmDeletion": "Staðfesta eyðingu",
     "credits": "Inneign",
     "failedToLoadBalance": "Ekki tókst að hlaða inneigninni. Ýttu til að reyna aftur.",
+    "balanceLoadFailed": "Ekki tókst að hlaða inneigninni",
     "hideBalance": "Fela inneign",
     "showBalance": "Sýna inneign",
     "balanceHidden": "Inneign falin",

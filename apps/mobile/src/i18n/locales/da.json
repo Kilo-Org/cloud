@@ -248,6 +248,7 @@
     "confirmDeletion": "Bekræft sletning",
     "credits": "Kreditter",
     "failedToLoadBalance": "Kunne ikke indlæse saldoen. Tryk for at prøve igen.",
+    "balanceLoadFailed": "Kunne ikke indlæse saldoen",
     "hideBalance": "Skjul saldo",
     "showBalance": "Vis saldo",
     "balanceHidden": "Saldo skjult",

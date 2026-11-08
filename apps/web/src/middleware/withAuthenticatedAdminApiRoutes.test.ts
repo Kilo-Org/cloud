@@ -10,6 +10,7 @@ import type {
 } from 'next-auth/middleware';
 import {
   ADMIN_API_ROUTES_WITH_OWN_ADMIN_CHECK,
+  toRoutePattern,
   withAuthenticatedAdminApiRoutes,
 } from './withAuthenticatedAdminApiRoutes';
 
@@ -160,5 +161,15 @@ describe('withAuthenticatedAdminApiRoutes', () => {
 
   it('lists every user route that verifies admin access itself', () => {
     expect(adminGuardedUserRoutePaths()).toEqual(listedUserRoutePaths());
+  });
+
+  it('treats only a one-segment dynamic name as a wildcard', () => {
+    const dynamic = new RegExp(`^${toRoutePattern('/admin/api/users/[id]/referrals')}$`);
+    expect(dynamic.test(`/admin/api/users/${USER_ID}/referrals`)).toBe(true);
+    expect(dynamic.test(`/admin/api/users/${USER_ID}/nested/referrals`)).toBe(false);
+
+    const catchAll = new RegExp(`^${toRoutePattern('/admin/api/users/[...slug]')}$`);
+    expect(catchAll.test('/admin/api/users/audit-log')).toBe(false);
+    expect(catchAll.test('/admin/api/users/audit-log/nested')).toBe(false);
   });
 });

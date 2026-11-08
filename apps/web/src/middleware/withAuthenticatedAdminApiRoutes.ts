@@ -25,16 +25,15 @@ export const ADMIN_API_ROUTES_WITH_OWN_ADMIN_CHECK = [
   '/admin/api/users/[id]/referrals',
 ];
 
-// A bracketed segment is dynamic and matches one path segment. A catch-all
-// segment matches its own literal name, so such a handler keeps the middleware
-// admin check until this function gives it a pattern.
-function toRoutePattern(route: string): string {
+// Only a one-segment dynamic name such as `[id]` is a wildcard, and it matches
+// exactly one path segment. Any other bracketed segment stays literal, so a
+// catch-all handler can never widen an entry: it is not exempted here, and the
+// middleware keeps applying its admin check to the requests it serves.
+export function toRoutePattern(route: string): string {
   return route
     .split('/')
     .map(segment =>
-      segment.startsWith('[') && segment.endsWith(']')
-        ? '[^/]+'
-        : segment.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      /^\[[^[\].]+\]$/.test(segment) ? '[^/]+' : segment.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
     )
     .join('/');
 }
@@ -45,11 +44,15 @@ const ADMIN_API_ROUTE_WITH_OWN_ADMIN_CHECK = new RegExp(
   `^(?:${ADMIN_API_ROUTES_WITH_OWN_ADMIN_CHECK.map(toRoutePattern).join('|')})/?$`
 );
 
+export function hasOwnAdminCheck(pathname: string): boolean {
+  return ADMIN_API_ROUTE_WITH_OWN_ADMIN_CHECK.test(pathname);
+}
+
 export const withAuthenticatedAdminApiRoutes: MiddlewareFactory = nextMiddleware => {
   return async (request: NextRequestWithAuth, nextFetchEvent: NextFetchEvent) => {
     if (
       request.nextUrl.pathname.startsWith('/admin/api/') &&
-      !ADMIN_API_ROUTE_WITH_OWN_ADMIN_CHECK.test(request.nextUrl.pathname)
+      !hasOwnAdminCheck(request.nextUrl.pathname)
     ) {
       return withAuth(nextMiddleware, {
         callbacks: {

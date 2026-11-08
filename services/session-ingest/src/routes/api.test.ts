@@ -2930,6 +2930,8 @@ describe('api routes', () => {
       cloud_agent_worktree_id: 'worktree_12345678-1234-4234-9234-123456789abc',
     };
     fns.selectResult
+      .mockResolvedValueOnce([{ worktreeId: orgSession.cloud_agent_worktree_id, scopeId: null }])
+      .mockResolvedValueOnce([{ started: null }])
       .mockResolvedValueOnce([orgSession])
       .mockResolvedValueOnce([orgSession])
       .mockResolvedValueOnce([]);
@@ -2981,6 +2983,7 @@ describe('api routes', () => {
     fns.selectResult
       .mockResolvedValueOnce([parentRow])
       .mockResolvedValueOnce([parentRow])
+      .mockResolvedValueOnce([parentRow])
       .mockResolvedValueOnce([{ session_id: childSessionId }]);
 
     const sessionCache = { remove: vi.fn(async () => undefined) };
@@ -3021,6 +3024,7 @@ describe('api routes', () => {
     fns.selectResult
       .mockResolvedValueOnce([childRow])
       .mockResolvedValueOnce([childRow])
+      .mockResolvedValueOnce([childRow])
       .mockResolvedValueOnce([]);
 
     const sessionCache = { remove: vi.fn(async () => undefined) };
@@ -3054,6 +3058,71 @@ describe('api routes', () => {
       kiloUserId: 'usr_test',
       sessionId: childSessionId,
     });
+  });
+
+  it('DELETE /session/:sessionId service audience refuses a session whose worktree is deleting', async () => {
+    const sessionId = 'ses_12345678901234567890123456';
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult
+      .mockResolvedValueOnce([
+        { worktreeId: 'worktree_12345678-1234-4234-9234-123456789abc', scopeId: null },
+      ])
+      .mockResolvedValueOnce([{ started: '2026-11-06T00:00:00.000Z' }]);
+
+    const sessionCache = { remove: vi.fn(async () => undefined) };
+    vi.mocked(getSessionAccessCacheDO).mockReturnValue(
+      sessionCache as unknown as ReturnType<typeof getSessionAccessCacheDO>
+    );
+    const ingestStub = { clear: vi.fn(async () => undefined) };
+    vi.mocked(getSessionIngestDO).mockReturnValue(
+      ingestStub as unknown as ReturnType<typeof getSessionIngestDO>
+    );
+
+    const res = await makeApiApp({ deletionAudience: true }).fetch(
+      new Request(`http://local/session/${sessionId}`, { method: 'DELETE' }),
+      makeTestEnv()
+    );
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ success: false, error: 'worktree_deleting' });
+    expect(fns.transaction).not.toHaveBeenCalled();
+    expect(fns.delete).not.toHaveBeenCalled();
+    expect(sessionCache.remove).not.toHaveBeenCalled();
+    expect(ingestStub.clear).not.toHaveBeenCalled();
+  });
+
+  it('DELETE /session/:sessionId service audience refuses a scoped session whose root worktree is deleting', async () => {
+    const sessionId = 'ses_abcdefghijklmnopqrstuvwxyz';
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult
+      .mockResolvedValueOnce([
+        { worktreeId: null, scopeId: 'workspace_12345678-1234-4234-9234-123456789abc' },
+      ])
+      .mockResolvedValueOnce([{ worktreeId: 'worktree_12345678-1234-4234-9234-123456789abc' }])
+      .mockResolvedValueOnce([{ started: '2026-11-06T00:00:00.000Z' }]);
+
+    const sessionCache = { remove: vi.fn(async () => undefined) };
+    vi.mocked(getSessionAccessCacheDO).mockReturnValue(
+      sessionCache as unknown as ReturnType<typeof getSessionAccessCacheDO>
+    );
+    const ingestStub = { clear: vi.fn(async () => undefined) };
+    vi.mocked(getSessionIngestDO).mockReturnValue(
+      ingestStub as unknown as ReturnType<typeof getSessionIngestDO>
+    );
+
+    const res = await makeApiApp({ deletionAudience: true }).fetch(
+      new Request(`http://local/session/${sessionId}`, { method: 'DELETE' }),
+      makeTestEnv()
+    );
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ success: false, error: 'worktree_deleting' });
+    expect(fns.transaction).not.toHaveBeenCalled();
+    expect(fns.delete).not.toHaveBeenCalled();
+    expect(sessionCache.remove).not.toHaveBeenCalled();
+    expect(ingestStub.clear).not.toHaveBeenCalled();
   });
 
   it('DELETE /session/:sessionId service audience clears DO/cache when the row is already gone', async () => {

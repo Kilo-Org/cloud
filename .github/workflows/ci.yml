@@ -41,6 +41,10 @@ jobs:
       session_sync: ${{ steps.filter_session_sync.outputs.session_sync || steps.filter_session_sync_retry.outputs.session_sync }}
       # Every input the ci-wiring job reads, also its own pair.
       wiring: ${{ steps.filter_wiring.outputs.wiring || steps.filter_wiring_retry.outputs.wiring }}
+      # The resource manifests the detector parses with a dependency
+      # (DEPENDENCY_MANIFESTS in scripts/affected-workspaces.mjs). Gates the
+      # root install below; its own pair.
+      resources: ${{ steps.filter_resources.outputs.resources || steps.filter_resources_retry.outputs.resources }}
       workspace_matrix: ${{ steps.workspaces.outputs.matrix }}
       # JSON from scripts/affected-workspaces.mjs, and the typecheck and lint
       # groups and cloud-agent-next parts it needs.
@@ -56,9 +60,66 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
 
-      # scripts/changed-dependencies.mjs parses pnpm-lock.yaml with js-yaml
-      # when a change touches the lockfile, so detection needs the root
-      # dependencies. The warm store keeps that install short.
+      # dorny/paths-filter has no built-in retry: one dropped connection to
+      # api.github.com ("other side closed" while listing the PR's changed
+      # files) fails the step and, with it, every check that needs this job.
+      # The first attempt is allowed to fail so the retry below absorbs
+      # transient resets; a persistent failure still fails the job.
+      - name: Detect resource-manifest changes
+        id: filter_resources
+        continue-on-error: true
+        uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
+        with:
+          filters: |
+            resources:
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+      - name: Detect resource-manifest changes (retry)
+        id: filter_resources_retry
+        if: steps.filter_resources.outcome == 'failure'
+        uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
+        with:
+          filters: |
+            resources:
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+
+      # dorny/paths-filter answers from the pull request's own diff (its
+      # merge-base), while scripts/affected-workspaces.mjs diffs the base tip.
+      # On a branch that is behind main the two disagree about a manifest main
+      # changed after the branch point: only the detector's diff names it, and
+      # its run then calls scripts/changed-dependencies.mjs, which imports
+      # js-yaml. This check diffs the detector's own base for that run. The
+      # manifest list comes from the detector, so the set stays in one place.
+      - name: Detect resource-manifest changes against the detector base
+        id: resources_base
+        env:
+          BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event_name == 'push' && github.event.before || '' }}
+        run: |
+          manifests=$(node -e 'import("./scripts/affected-workspaces.mjs").then(module => console.log([...module.DEPENDENCY_MANIFESTS].join("\n")))' 2>/dev/null || true)
+          if [ -z "$manifests" ]; then
+            # An unreadable detector list cannot prove the diff is clean, so
+            # keep the install rather than risk a run without js-yaml.
+            echo "manifests=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          manifests_changed=false
+          # A base that is not a commit in the checkout selects every
+          # workspace, and that selection parses no manifest.
+          if [ -n "$BASE_SHA" ] && git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
+            while IFS= read -r file; do
+              if grep -qxF "$file" <<< "$manifests"; then
+                manifests_changed=true
+                break
+              fi
+            done < <(git diff --name-only "$BASE_SHA" HEAD)
+          fi
+          echo "manifests=$manifests_changed" >> "$GITHUB_OUTPUT"
+
+      # scripts/changed-dependencies.mjs parses a resource manifest with
+      # js-yaml when the diff touches one, so the root install runs only on
+      # that run: every detection step would otherwise read the repository,
+      # not node_modules.
       - name: Mount pnpm store
         uses: ./.github/actions/pnpm-store
 
@@ -67,14 +128,12 @@ jobs:
         with:
           node-version-file: '.nvmrc'
 
+      # The detector runs without the install unless a diff touches a resource
+      # manifest, so a wrong skip fails its step and the run.
       - name: Install root dependencies
+        if: steps.filter_resources.outputs.resources == 'true' || steps.filter_resources_retry.outputs.resources == 'true' || steps.resources_base.outputs.manifests == 'true'
         run: pnpm --filter kilocode-monorepo install --frozen-lockfile --ignore-scripts
 
-      # dorny/paths-filter has no built-in retry: one dropped connection to
-      # api.github.com ("other side closed" while listing the PR's changed
-      # files) fails the step and, with it, every check that needs this job.
-      # The first attempt is allowed to fail so the retry below absorbs
-      # transient resets; a persistent failure still fails the job.
       - name: Detect changes
         id: filter
         continue-on-error: true
@@ -1346,7 +1405,14 @@ jobs:
       # without declaring them (kiloclaw reaches kiloclaw-billing and
       # event-service), and packages/harness-sdk documents that a filtered
       # install breaks its ttsx transform.
+      #
+      # The extension row installs and tests only in the merge queue, which
+      # extension-ci.yml does not enter: on a pull request and a main push that
+      # workflow's `verify` runs the same `pnpm --filter kilo-extension test`
+      # behind its own install. The row stays in the matrix so the check keeps
+      # reporting on every run, and a skipped step passes the required `test`.
       - name: Install dependencies
+        if: matrix.workspace.name != 'kilo-extension' || github.event_name == 'merge_group'
         run: pnpm install --frozen-lockfile
 
       # The harness SDK's own vitest run compiles the typia plugin through
@@ -1359,6 +1425,7 @@ jobs:
         uses: ./.github/actions/ttsc-plugin-cache
 
       - name: Run tests
+        if: matrix.workspace.name != 'kilo-extension' || github.event_name == 'merge_group'
         run: pnpm --filter ${{ matrix.workspace.name }} test
 
       # Stores what the run compiled, unless this run selected the harness-sdk

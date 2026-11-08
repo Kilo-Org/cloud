@@ -157,8 +157,15 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: pnpm
+      # Only the projects this build reads. The app's own closure covers prebuild,
+      # autolinking and the embedded bundle. The web closure is what the tRPC
+      # declarations build typechecks, since its program includes apps/web sources,
+      # so dropping it breaks that step on a cache miss. The harness SDK and the
+      # root project supply their own builds and the key scripts. A full workspace
+      # install links every project in the monorepo and runs each project's
+      # lifecycle scripts here.
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --filter 'kilo-app...' --filter 'web...' --filter '@kilocode/harness-sdk...' --filter 'kilocode-monorepo'
       # The dispatch runs this file from main but checks out `cloud_ref`, which
       # can be any earlier commit: a checkout that predates either action still
       # has to build, so the plain command stays as its fallback.

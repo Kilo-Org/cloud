@@ -464,6 +464,79 @@ function waitForSettlementRetry(): Promise<void> {
   return promise;
 }
 
+type ProjectTokenSettlement = {
+  /** Tokens the provider confirmed revoked, whose stored handles are gone. */
+  revoked: number;
+  /** Stored handles that remain. */
+  retained: number;
+  /** Handles that were listed but not attempted, because no credential was available. */
+  unattempted: number;
+};
+
+/**
+ * Settles every project access token the integration stores, with a credential
+ * the caller already holds.
+ *
+ * Every stored id of a project is revoked before either handle for that project
+ * is dropped, so a project is retained whole or settled whole. Only an answer a
+ * repeat can change is attempted again: no answer, a rate limit, or a server
+ * error. A permission or authentication refusal keeps its handle and is not
+ * repeated.
+ *
+ * Returns null when the stored project list cannot be read, which a caller
+ * reports separately from a token the provider refused.
+ */
+async function settleStoredProjectTokens(
+  integration: PlatformIntegration,
+  actor: GitLabCredentialActor,
+  userToken: string | undefined
+): Promise<ProjectTokenSettlement | null> {
+  let projectIds: string[];
+  try {
+    projectIds = await listIntegrationProjectIds(integration);
+  } catch (error) {
+    logExceptInTest('[settleStoredProjectTokens] Project token list unavailable', {
+      integrationId: integration.id,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return null;
+  }
+
+  if (userToken === undefined) {
+    return { revoked: 0, retained: 0, unattempted: projectIds.length };
+  }
+
+  const outstandingProjectIds = new Set(projectIds);
+  const retryProjectIds = new Set<string>();
+  let revoked = 0;
+  for (let attempt = 0; attempt < PROJECT_TOKEN_SETTLEMENT_ATTEMPTS; attempt++) {
+    if (attempt > 0 && retryProjectIds.size === 0) break;
+    if (attempt > 0) await waitForSettlementRetry();
+    const attemptProjectIds = attempt === 0 ? [...outstandingProjectIds] : [...retryProjectIds];
+    retryProjectIds.clear();
+    for (const projectId of attemptProjectIds) {
+      const outcome = await removeStoredProjectAccessToken(integration, projectId, actor, {
+        userToken,
+      }).catch(error => {
+        logExceptInTest('[settleStoredProjectTokens] Project token settlement failed', {
+          integrationId: integration.id,
+          projectId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        return { outcome: 'retained' as const, retryable: false };
+      });
+      if (outcome.outcome === 'removed') {
+        outstandingProjectIds.delete(projectId);
+        revoked += 1;
+      } else if (outcome.outcome === 'retained' && outcome.retryable) {
+        retryProjectIds.add(projectId);
+      }
+    }
+  }
+
+  return { revoked, retained: outstandingProjectIds.size, unattempted: 0 };
+}
+
 /**
  * Disconnect GitLab integration for an owner
  *
@@ -486,7 +559,9 @@ function waitForSettlementRetry(): Promise<void> {
  * because step 2 drops the credential that can revoke a token: a suspended
  * integration resolves nothing, so a repeated disconnect answers as not found.
  * A handle that stays unrevoked keeps neither reading nor revoking anything
- * through this integration.
+ * through this integration. It does stay revocable: a reconnect of the same
+ * integration settles it with the credential it presents, so a disconnect that
+ * could not finish converges without a new bot token being minted on top of it.
  *
  * The webhook_secret and configured_webhooks stay, so a reconnect keeps the
  * existing webhook configuration.
@@ -564,58 +639,12 @@ export async function disconnectGitLabIntegration(owner: Owner, actingUserId: st
     return nextMetadata;
   });
 
-  // Read after the suspension: nothing can mint a project token while the
-  // integration is suspended, so this set also covers a token stored between
-  // the first credential lookup and the suspension. The integration is
-  // suspended already, so an unreadable project list cannot fail the
-  // disconnect; the kept handles stay unusable through it.
-  let projectIds: string[] | null = null;
-  try {
-    projectIds = await listIntegrationProjectIds(integration);
-  } catch (error) {
-    logExceptInTest('[disconnectGitLabIntegration] Project token list unavailable', {
-      integrationId: integration.id,
-      error: error instanceof Error ? error.message : String(error),
-    });
-  }
-
-  let revokedProjectTokens = 0;
-  let retainedProjectTokens = 0;
-  let unsettledProjectTokens = 0;
-  if (projectIds === null) {
-    // Nothing was listed, so nothing is counted. The log line below records
-    // that the list was unavailable.
-  } else if (userToken === undefined) {
-    unsettledProjectTokens = projectIds.length;
-  } else {
-    const outstandingProjectIds = new Set(projectIds);
-    const retryProjectIds = new Set<string>();
-    for (let attempt = 0; attempt < PROJECT_TOKEN_SETTLEMENT_ATTEMPTS; attempt++) {
-      if (attempt > 0 && retryProjectIds.size === 0) break;
-      if (attempt > 0) await waitForSettlementRetry();
-      const attemptProjectIds = attempt === 0 ? [...outstandingProjectIds] : [...retryProjectIds];
-      retryProjectIds.clear();
-      for (const projectId of attemptProjectIds) {
-        const outcome = await removeStoredProjectAccessToken(integration, projectId, actor, {
-          userToken,
-        }).catch(error => {
-          logExceptInTest('[disconnectGitLabIntegration] Project token settlement failed', {
-            integrationId: integration.id,
-            projectId,
-            error: error instanceof Error ? error.message : String(error),
-          });
-          return { outcome: 'retained' as const, retryable: false };
-        });
-        if (outcome.outcome === 'removed') {
-          outstandingProjectIds.delete(projectId);
-          revokedProjectTokens += 1;
-        } else if (outcome.outcome === 'retained' && outcome.retryable) {
-          retryProjectIds.add(projectId);
-        }
-      }
-    }
-    retainedProjectTokens = outstandingProjectIds.size;
-  }
+  // Settle after the suspension: nothing can mint a project token while the
+  // integration is suspended, so the list read here also covers a token stored
+  // between the first credential lookup and the suspension. The integration is
+  // suspended already, so an unreadable project list cannot fail the disconnect;
+  // the kept handles stay unusable through it.
+  const settlement = await settleStoredProjectTokens(integration, actor, userToken);
 
   logExceptInTest(
     '[disconnectGitLabIntegration] Integration suspended (preserved webhook config)',
@@ -623,10 +652,10 @@ export async function disconnectGitLabIntegration(owner: Owner, actingUserId: st
       integrationId: integration.id,
       preservedWebhookSecret: !!updatedMetadata.webhook_secret,
       preservedWebhooks: countMetadataObjectEntries(updatedMetadata.configured_webhooks),
-      revokedProjectTokens,
-      retainedProjectTokens,
-      unsettledProjectTokens,
-      projectTokenListUnavailable: projectIds === null,
+      revokedProjectTokens: settlement?.revoked ?? 0,
+      retainedProjectTokens: settlement?.retained ?? 0,
+      unsettledProjectTokens: settlement?.unattempted ?? 0,
+      projectTokenListUnavailable: settlement === null,
     }
   );
 
@@ -1349,6 +1378,11 @@ async function cacheConnectedGitLabRepositories(
  * Replacing a credential clears its authentication invalidation in the same
  * transaction; connection health does not depend on the repository-cache sync.
  *
+ * Reconnecting a suspended integration of the same account on the same instance
+ * settles the project access tokens a disconnect could not revoke. The
+ * presented credential is the only one that can revoke them, so this is the
+ * point where a partially completed disconnect converges.
+ *
  * @param owner - User or organization owner
  * @param token - Personal Access Token
  * @param instanceUrl - GitLab instance URL
@@ -1404,6 +1438,7 @@ export async function connectWithPAT(
     let existingMetadata: Record<string, unknown> = {};
     let isInstanceChange = false;
     let isAccountChange = false;
+    let reconnectedAfterDisconnect = false;
     const existingAccountId = readGitLabAccountId(existingIntegration);
     const connectedAccountId = String(validatedUser.id);
 
@@ -1415,6 +1450,10 @@ export async function connectWithPAT(
       );
       isAccountChange =
         !isInstanceChange && existingAccountId !== null && existingAccountId !== connectedAccountId;
+      reconnectedAfterDisconnect =
+        existingIntegration.integration_status === INTEGRATION_STATUS.SUSPENDED &&
+        !isInstanceChange &&
+        !isAccountChange;
       const [existingPrimaryCredential] = await tx
         .select()
         .from(platform_access_token_credentials)
@@ -1551,6 +1590,24 @@ export async function connectWithPAT(
         integrationId: existingIntegration.id,
         retired: retirement.retired,
         retained: retirement.retained,
+      });
+    }
+
+    // A disconnect that could not settle a project token kept its handles and
+    // dropped the credential that could revoke it. This reconnect presents the
+    // only credential that can finish the job, so it settles them before a new
+    // project token is minted for the same project. An instance or account
+    // change is not this case: those retire their own stored credentials below
+    // and, for an instance change, would send this instance's token elsewhere.
+    if (reconnectedAfterDisconnect) {
+      const settlement = await settleStoredProjectTokens(
+        existingIntegration,
+        gitLabCredentialActor(owner, authorizedByUserId),
+        token
+      );
+      logExceptInTest('[connectWithPAT] Reconnect settled retained project tokens', {
+        integrationId: existingIntegration.id,
+        settledProjectTokens: settlement === null ? null : settlement,
       });
     }
 

@@ -1870,6 +1870,177 @@ describe('GitLab encrypted credential persistence', () => {
     expect(credentials[0].provider_resource_id).toBe('42');
   });
 
+  it('settles the project token a disconnect kept when the integration is reconnected', async () => {
+    const user = await insertTestUser();
+    const connected = await connectWithPAT(
+      { type: 'user', id: user.id },
+      'glpat-primary-token',
+      'https://gitlab.com',
+      user.id
+    );
+    const [integration] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, connected.integration.id));
+    await getOrCreateProjectAccessToken(integration, 42, { userId: user.id });
+    mockRevokeProjectAccessToken.mockRejectedValueOnce(
+      new GitLabProjectAccessTokenPermissionError(
+        42,
+        403,
+        'Insufficient permissions to revoke Project Access Token for project 42.'
+      )
+    );
+
+    await disconnectGitLabIntegration({ type: 'user', id: user.id }, user.id);
+
+    const keptBeforeReconnect = await db
+      .select()
+      .from(platform_access_token_credentials)
+      .where(
+        eq(platform_access_token_credentials.platform_integration_id, connected.integration.id)
+      );
+    expect(keptBeforeReconnect).toHaveLength(1);
+
+    mockRevokeProjectAccessToken.mockClear();
+
+    await connectWithPAT(
+      { type: 'user', id: user.id },
+      'glpat-reconnect-token',
+      'https://gitlab.com',
+      user.id
+    );
+
+    const credentials = await db
+      .select()
+      .from(platform_access_token_credentials)
+      .where(
+        eq(platform_access_token_credentials.platform_integration_id, connected.integration.id)
+      );
+    const [reconnected] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, connected.integration.id));
+
+    expect(mockRevokeProjectAccessToken).toHaveBeenCalledWith(
+      'glpat-reconnect-token',
+      '42',
+      777,
+      'https://gitlab.com'
+    );
+    expect(credentials).toEqual([
+      expect.objectContaining({
+        provider_credential_type: 'personal_access_token',
+        provider_resource_id: null,
+      }),
+    ]);
+    expect(reconnected.integration_status).toBe('active');
+    expect(reconnected.metadata).toEqual(expect.objectContaining({ project_tokens: {} }));
+  });
+
+  it('keeps a project token a reconnect cannot settle and still connects', async () => {
+    const user = await insertTestUser();
+    const connected = await connectWithPAT(
+      { type: 'user', id: user.id },
+      'glpat-primary-token',
+      'https://gitlab.com',
+      user.id
+    );
+    const [integration] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, connected.integration.id));
+    await getOrCreateProjectAccessToken(integration, 42, { userId: user.id });
+    mockRevokeProjectAccessToken.mockRejectedValue(
+      new GitLabProjectAccessTokenPermissionError(
+        42,
+        403,
+        'Insufficient permissions to revoke Project Access Token for project 42.'
+      )
+    );
+
+    await disconnectGitLabIntegration({ type: 'user', id: user.id }, user.id);
+    mockRevokeProjectAccessToken.mockClear();
+
+    const result = await connectWithPAT(
+      { type: 'user', id: user.id },
+      'glpat-reconnect-token',
+      'https://gitlab.com',
+      user.id
+    );
+
+    const credentials = await db
+      .select()
+      .from(platform_access_token_credentials)
+      .where(
+        eq(platform_access_token_credentials.platform_integration_id, connected.integration.id)
+      );
+    const [reconnected] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, connected.integration.id));
+
+    expect(result.success).toBe(true);
+    expect(mockRevokeProjectAccessToken).toHaveBeenCalledTimes(1);
+    expect(credentials).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          provider_resource_id: '42',
+          provider_credential_type: 'project_access_token',
+        }),
+      ])
+    );
+    expect(credentials).toHaveLength(2);
+    expect(reconnected.integration_status).toBe('active');
+  });
+
+  it('does not settle project tokens against a previous instance on a reconnect', async () => {
+    const user = await insertTestUser();
+    const connected = await connectWithPAT(
+      { type: 'user', id: user.id },
+      'glpat-primary-token',
+      'https://gitlab.com',
+      user.id
+    );
+    const [integration] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, connected.integration.id));
+    await getOrCreateProjectAccessToken(integration, 42, { userId: user.id });
+    mockRevokeProjectAccessToken.mockRejectedValueOnce(
+      new GitLabProjectAccessTokenPermissionError(
+        42,
+        403,
+        'Insufficient permissions to revoke Project Access Token for project 42.'
+      )
+    );
+
+    await disconnectGitLabIntegration({ type: 'user', id: user.id }, user.id);
+    mockRevokeProjectAccessToken.mockClear();
+
+    await connectWithPAT(
+      { type: 'user', id: user.id },
+      'glpat-reconnect-token',
+      'https://selfhosted.test',
+      user.id
+    );
+
+    const credentials = await db
+      .select()
+      .from(platform_access_token_credentials)
+      .where(
+        eq(platform_access_token_credentials.platform_integration_id, connected.integration.id)
+      );
+    const [reconnected] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, connected.integration.id));
+
+    expect(mockRevokeProjectAccessToken).not.toHaveBeenCalled();
+    expect(credentials).toHaveLength(1);
+    expect(credentials[0].provider_credential_type).toBe('personal_access_token');
+    expect(reconnected.metadata).not.toHaveProperty('project_tokens');
+  });
+
   it('resolves the disconnect credential as the acting organization member', async () => {
     const user = await insertTestUser();
     const organization = await createTestOrganization('GitLab disconnect org', user.id, 0);

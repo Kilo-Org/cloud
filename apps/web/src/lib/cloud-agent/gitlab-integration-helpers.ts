@@ -5,7 +5,10 @@ import {
   updateRepositoriesForIntegration,
 } from '@/lib/integrations/db/platform-integrations';
 import { getGitLabIntegration, getValidGitLabToken } from '@/lib/integrations/gitlab-service';
-import { fetchGitLabProjects } from '@/lib/integrations/platforms/gitlab/adapter';
+import {
+  fetchGitLabProjects,
+  getGitLabProject as readGitLabProject,
+} from '@/lib/integrations/platforms/gitlab/adapter';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { isPlatformIntegrationSuspended } from '@/lib/integrations/core/health';
 import {
@@ -15,6 +18,43 @@ import {
 } from '@/lib/integrations/core/types';
 
 const DEFAULT_GITLAB_URL = 'https://gitlab.com';
+
+/**
+ * An HTTP refusal from the GitLab single-project read. The status is the only
+ * provider detail a caller can act on; the response body is never included,
+ * so a message built from this error cannot leak a token or a project path.
+ */
+export class GitLabProjectLookupError extends Error {
+  constructor(
+    readonly status: number,
+    message: string
+  ) {
+    super(message);
+    this.name = 'GitLabProjectLookupError';
+  }
+}
+
+/**
+ * Read one GitLab project by path with explicit credentials, converting the
+ * adapter's status-bearing failure text into a typed status refusal.
+ */
+async function getGitLabProjectForCredentials(
+  accessToken: string,
+  projectPath: string,
+  instanceUrl: string
+): Promise<void> {
+  try {
+    await readGitLabProject(accessToken, projectPath, instanceUrl);
+  } catch (error) {
+    const statusPattern = /(\d{3})$/;
+    const message = error instanceof Error ? error.message : '';
+    const match = statusPattern.exec(message);
+    throw new GitLabProjectLookupError(
+      match ? Number(match[1]) : 0,
+      'GitLab project lookup failed'
+    );
+  }
+}
 
 type GitLabRepositoriesResult = {
   integrationInstalled: boolean;
@@ -251,6 +291,49 @@ export async function validateGitLabRepoAccessForUser(
       message: 'Failed to validate GitLab repository access',
     });
   }
+}
+
+/**
+ * Access verdict for a requester's own GitLab connection, resolved live: the
+ * requester's credential reads the project from their own GitLab instance.
+ */
+export type GitLabRequesterAccess = { outcome: 'allowed' } | { outcome: 'refused' };
+
+/**
+ * What a Kilo account's own GitLab connection can see live.
+ *
+ * `refused`: the account holds no GitLab connection of its own, or its
+ * credential's instance answered that the account cannot read the project
+ * (404, or a 401/403 the account's own credential cannot clear). All three
+ * are verdicts about this requester, so the caller answers with the
+ * refusal line and starts no session.
+ *
+ * Everything else (a 5xx, a rate limit, a transport failure, a credential
+ * resolution outage) propagates: the caller's failure path answers with the
+ * retryable message and starts no session.
+ * @param userId - The Kilo user ID
+ * @param projectPath - GitLab project path (e.g., "group/project" or "group/subgroup/project")
+ */
+export async function getGitLabProjectAccessForRequester(
+  userId: string,
+  projectPath: string
+): Promise<GitLabRequesterAccess> {
+  const instanceUrl = await getGitLabInstanceUrlForUser(userId);
+  const token = await getGitLabTokenForUser(userId);
+  if (!token) return { outcome: 'refused' };
+
+  try {
+    await getGitLabProjectForCredentials(token, projectPath, instanceUrl);
+  } catch (error) {
+    if (
+      error instanceof GitLabProjectLookupError &&
+      (error.status === 404 || error.status === 401 || error.status === 403)
+    ) {
+      return { outcome: 'refused' };
+    }
+    throw error;
+  }
+  return { outcome: 'allowed' };
 }
 
 /**

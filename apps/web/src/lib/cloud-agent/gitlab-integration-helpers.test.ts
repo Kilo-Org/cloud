@@ -20,6 +20,8 @@ const mockUpdateRepositoriesForIntegration =
   jest.fn<(integrationId: string, repositories: unknown[]) => Promise<void>>();
 const mockFetchGitLabProjects =
   jest.fn<(accessToken: string, instanceUrl: string) => Promise<unknown[]>>();
+const mockGetGitLabProject =
+  jest.fn<(accessToken: string, projectPath: string, instanceUrl: string) => Promise<unknown>>();
 
 // Wire up the mocks
 jest.mock('@/lib/integrations/gitlab-service', () => ({
@@ -35,6 +37,7 @@ jest.mock('@/lib/integrations/db/platform-integrations', () => ({
 
 jest.mock('@/lib/integrations/platforms/gitlab/adapter', () => ({
   fetchGitLabProjects: mockFetchGitLabProjects,
+  getGitLabProject: mockGetGitLabProject,
 }));
 
 describe('gitlab-integration-helpers', () => {
@@ -275,6 +278,66 @@ describe('gitlab-integration-helpers', () => {
 
       await expect(getGitLabTokenForOrganization('org-123', 'actor-123')).rejects.toThrow(
         'Failed to authenticate with GitLab integration'
+      );
+    });
+  });
+
+  describe('getGitLabProjectAccessForRequester', () => {
+    it('allows a project the requester credential reads successfully', async () => {
+      mockGetGitLabIntegration.mockResolvedValue({
+        id: 'integration-1',
+        metadata: {},
+      } as PlatformIntegration);
+      mockGetValidGitLabToken.mockResolvedValue('requester-token');
+      mockGetGitLabProject.mockResolvedValue({ id: 7 });
+
+      const { getGitLabProjectAccessForRequester } = await import('./gitlab-integration-helpers');
+      await expect(getGitLabProjectAccessForRequester('user-1', 'group/repo')).resolves.toEqual({
+        outcome: 'allowed',
+      });
+      expect(mockGetGitLabProject).toHaveBeenCalledWith(
+        'requester-token',
+        'group/repo',
+        'https://gitlab.com'
+      );
+    });
+
+    it('refuses a 404 from the requester instance without retrying', async () => {
+      mockGetGitLabIntegration.mockResolvedValue({
+        id: 'integration-1',
+        metadata: {},
+      } as PlatformIntegration);
+      mockGetValidGitLabToken.mockResolvedValue('requester-token');
+      mockGetGitLabProject.mockRejectedValue(new Error('GitLab project fetch failed: 404'));
+
+      const { getGitLabProjectAccessForRequester } = await import('./gitlab-integration-helpers');
+      await expect(getGitLabProjectAccessForRequester('user-1', 'group/repo')).resolves.toEqual({
+        outcome: 'refused',
+      });
+      expect(mockGetGitLabProject).toHaveBeenCalledTimes(1);
+    });
+
+    it('refuses a requester with no GitLab connection of their own', async () => {
+      mockGetGitLabIntegration.mockResolvedValue(null);
+
+      const { getGitLabProjectAccessForRequester } = await import('./gitlab-integration-helpers');
+      await expect(getGitLabProjectAccessForRequester('user-1', 'group/repo')).resolves.toEqual({
+        outcome: 'refused',
+      });
+      expect(mockGetGitLabProject).not.toHaveBeenCalled();
+    });
+
+    it('propagates a transient lookup failure for the retry response', async () => {
+      mockGetGitLabIntegration.mockResolvedValue({
+        id: 'integration-1',
+        metadata: {},
+      } as PlatformIntegration);
+      mockGetValidGitLabToken.mockResolvedValue('requester-token');
+      mockGetGitLabProject.mockRejectedValue(new Error('GitLab project fetch failed: 503'));
+
+      const { getGitLabProjectAccessForRequester } = await import('./gitlab-integration-helpers');
+      await expect(getGitLabProjectAccessForRequester('user-1', 'group/repo')).rejects.toThrow(
+        'GitLab project lookup failed'
       );
     });
   });

@@ -20,6 +20,7 @@ import {
   getGitLabInstanceUrlForOrganization,
   getGitLabInstanceUrlForUser,
   buildGitLabCloneUrl,
+  getGitLabProjectAccessForRequester,
   validateGitLabRepoAccessForOrganization,
   validateGitLabRepoAccessForUser,
 } from '@/lib/cloud-agent/gitlab-integration-helpers';
@@ -175,18 +176,53 @@ export default async function spawnCloudAgentSession(
       return { response: 'Error: No acting user is configured for this GitLab organization.' };
     }
 
-    // Resolve the project through the account's GitLab connection first, as
-    // the GitHub branch of this tool does.
+    // Resolve the project through the connection's inventory, as the GitHub
+    // branch of this tool resolves the repository through its connection
+    // inventory. An organization-owned integration first requires the
+    // requesting account to reach the project through its own GitLab
+    // connection: the org connection later supplies only the session
+    // credential, not the authorization. Runs without a requesting account
+    // name no project.
     let projectResolved: boolean;
     try {
-      projectResolved =
-        owner.type === 'org'
-          ? await validateGitLabRepoAccessForOrganization(
-              owner.id,
-              gitLabActorUserId,
-              args.gitlabProject
-            )
-          : await validateGitLabRepoAccessForUser(owner.id, args.gitlabProject);
+      if (owner.type === 'org') {
+        if (!options?.requesterUserId) {
+          return {
+            response:
+              "Error: That GitLab project is not available through this account's GitLab integration.",
+          };
+        }
+        const requesterAccess = await getGitLabProjectAccessForRequester(
+          options.requesterUserId,
+          args.gitlabProject
+        );
+        if (requesterAccess.outcome !== 'allowed') {
+          return {
+            response:
+              "Error: That GitLab project is not available through this account's GitLab integration.",
+          };
+        }
+        const [requesterInstanceUrl, orgInstanceUrl] = await Promise.all([
+          getGitLabInstanceUrlForUser(options.requesterUserId),
+          getGitLabInstanceUrlForOrganization(owner.id),
+        ]);
+        if (
+          requesterInstanceUrl.replace(/\/$/, '').toLowerCase() !==
+          orgInstanceUrl.replace(/\/$/, '').toLowerCase()
+        ) {
+          return {
+            response:
+              "Error: That GitLab project is not available through this account's GitLab integration.",
+          };
+        }
+        projectResolved = await validateGitLabRepoAccessForOrganization(
+          owner.id,
+          gitLabActorUserId,
+          args.gitlabProject
+        );
+      } else {
+        projectResolved = await validateGitLabRepoAccessForUser(owner.id, args.gitlabProject);
+      }
     } catch (error) {
       captureException(error, {
         tags: { component: 'kilo-bot', op: 'spawn-cloud-agent-session-gitlab-project' },

@@ -11,6 +11,8 @@ import type { SpawnCloudAgentInput as SpawnInput } from './tools/spawn-cloud-age
 import {
   buildGitLabCloneUrl,
   getGitLabInstanceUrlForOrganization,
+  getGitLabInstanceUrlForUser,
+  getGitLabProjectAccessForRequester,
   getGitLabTokenForOrganization,
   getGitLabTokenForUser,
   validateGitLabRepoAccessForOrganization,
@@ -108,6 +110,7 @@ jest.mock('@/lib/cloud-agent/gitlab-integration-helpers', () => ({
   getGitLabInstanceUrlForOrganization: jest.fn(),
   getGitLabInstanceUrlForUser: jest.fn(),
   buildGitLabCloneUrl: jest.fn(),
+  getGitLabProjectAccessForRequester: jest.fn(),
   validateGitLabRepoAccessForOrganization: jest.fn(),
   validateGitLabRepoAccessForUser: jest.fn(),
 }));
@@ -255,9 +258,11 @@ beforeEach(() => {
   });
   jest.mocked(validateGitLabRepoAccessForOrganization).mockResolvedValue(true);
   jest.mocked(validateGitLabRepoAccessForUser).mockResolvedValue(true);
+  jest.mocked(getGitLabProjectAccessForRequester).mockResolvedValue({ outcome: 'allowed' });
   jest.mocked(getGitLabTokenForOrganization).mockResolvedValue('gitlab-token');
   jest.mocked(getGitLabTokenForUser).mockResolvedValue('gitlab-token');
   jest.mocked(getGitLabInstanceUrlForOrganization).mockResolvedValue('https://gitlab.com');
+  jest.mocked(getGitLabInstanceUrlForUser).mockResolvedValue('https://gitlab.com');
   jest.mocked(buildGitLabCloneUrl).mockReturnValue(`https://gitlab.com/${gitlabProject}.git`);
 });
 

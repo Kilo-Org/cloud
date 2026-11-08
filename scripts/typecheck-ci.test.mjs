@@ -333,6 +333,42 @@ test('one job saves the compiler plugin cache and every reader restores it', () 
   );
 });
 
+// A workspace row runs its package's own `test` script, and the
+// auto-routing-benchmark row builds a temporary virtualenv and downloads
+// repo-study/requirements.txt inside it. Every other dependency source the
+// matrix restores is a pnpm source, so that row restores the wheels under a key
+// on the requirements file and points pip at the same directory: a cache with a
+// different path, or a run command that does not read it, downloads again.
+const pipCacheDir = '${{ runner.temp }}/pip-cache';
+const pipRequirements = 'services/auto-routing-benchmark/repo-study/requirements.txt';
+
+test('the benchmark row restores the Python wheel cache it installs from', () => {
+  const steps = ciJobs['workspace-tests'].steps;
+  const cacheIndex = steps.findIndex(
+    step => String(step.uses).startsWith('actions/cache@') && step.with?.path === pipCacheDir
+  );
+  assert.ok(cacheIndex >= 0, 'workspace-tests restores the wheel cache');
+  assert.equal(
+    steps[cacheIndex].if,
+    "matrix.workspace.name == 'auto-routing-benchmark'",
+    'only the row whose script installs the requirements restores it'
+  );
+  assert.equal(
+    steps[cacheIndex].with.key,
+    `\${{ runner.os }}-pip-\${{ hashFiles('${pipRequirements}') }}`,
+    'the key covers the requirements file'
+  );
+  const runIndex = steps.findIndex(
+    step => step.run === 'pnpm --filter ${{ matrix.workspace.name }} test'
+  );
+  assert.ok(cacheIndex < runIndex, 'the cache restores before the row runs');
+  assert.equal(
+    steps[runIndex].env?.PIP_CACHE_DIR,
+    pipCacheDir,
+    'pip reads the restored directory'
+  );
+});
+
 const harnessBuildGuards = [
   [
     'ci.yml',

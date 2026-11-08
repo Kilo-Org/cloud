@@ -315,8 +315,6 @@ describe('Cloud Agent authority contract', () => {
   });
   it.each([
     undefined,
-    '/api/gastown/token',
-    '/api/wasteland/token',
     '/api/profile',
     '/api/trpc/cloudAgentNext.deleteSession',
     '/api/trpc/cloudAgentNext.prepareSession,user.getMe',

@@ -2429,13 +2429,17 @@ export async function rotateProjectAccessToken(
  * @throws {GitLabAuthenticationError} When GitLab rejects the credential (HTTP 401)
  * @throws {GitLabProjectAccessTokenPermissionError} When user doesn't have Maintainer+ role (HTTP 403)
  *
+ * `signal` carries a caller's deadline, so a settlement that has spent its
+ * budget does not keep one revocation open for the per-request timeout.
+ *
  * @see https://docs.gitlab.com/ee/api/project_access_tokens.html#revoke-a-project-access-token
  */
 export async function revokeProjectAccessToken(
   accessToken: string,
   projectId: string | number,
   tokenId: number,
-  instanceUrl: string = DEFAULT_GITLAB_URL
+  instanceUrl: string = DEFAULT_GITLAB_URL,
+  signal?: AbortSignal
 ): Promise<void> {
   const encodedProjectId =
     typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
@@ -2447,6 +2451,7 @@ export async function revokeProjectAccessToken(
       headers: {
         Authorization: `Bearer ${accessToken}`,
       },
+      ...(signal === undefined ? {} : { signal }),
     }
   );
 

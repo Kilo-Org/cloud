@@ -30,8 +30,9 @@ export function NativeRemoteTranscript({
   remote: NativeRemoteSession;
 }) {
   const { t } = useTranslation();
-  const { state, pending, canControl } = remote;
+  const { state, conversation, pending, canControl } = remote;
   const commandStatus = state?.commands[remote.commandID];
+  const loading = !state || conversation?.loading;
   return (
     <View className="gap-3 border-t border-border pt-4">
       <Text accessibilityRole="header" selectable className="font-mono text-sm">
@@ -43,11 +44,12 @@ export function NativeRemoteTranscript({
           runner: state?.runnerConnected ? t('common.online') : t('chat.botStatus.offline'),
         })}
       </Text>
-      {!state || state.connection === 'connecting' ? (
-        <Skeleton className="h-80 rounded-md" />
-      ) : (
-        <NativeRemoteMessages messages={state.messages} />
-      )}
+      {loading && <Skeleton className="h-80 rounded-md" />}
+      {!loading &&
+        conversation?.session &&
+        (conversation.messages.length > 0 || conversation.incompleteMessageIDs.length === 0) && (
+          <NativeRemoteMessages messages={conversation.messages} />
+        )}
       {pending.permissions.map(permission => (
         <View key={permission.id} className="gap-2 rounded-lg border border-border p-3">
           <Text>{permission.action}</Text>
@@ -95,9 +97,9 @@ export function NativeRemoteTranscript({
         />
       ))}
       <NativeRemoteComposer remote={remote} />
-      {remote.error || state?.error ? (
+      {remote.error || conversation?.error ? (
         <Text accessibilityRole="alert" className="text-destructive">
-          {remote.error || state?.error}
+          {remote.error || conversation?.error}
         </Text>
       ) : null}
       {commandStatus ? (

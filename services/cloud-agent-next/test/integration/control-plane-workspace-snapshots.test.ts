@@ -115,7 +115,6 @@ async function setup(
     installFakeCredentialEnv(instance['env'], createFakeCredentialBroker(), {
       WORKSPACE_SNAPSHOT_USER_IDS: options.enabled === false ? '' : USER,
       WORKSPACE_SNAPSHOT_ORG_IDS: '',
-      ENVIRONMENT_SNAPSHOT_ORG_IDS: '',
       RUNTIME_STARTUP_MODE: 'preinstalled',
       NATIVE_RUNTIME_IMAGE: 'all-in-one',
       RUNTIME_RELEASE_DESCRIPTOR: '',

@@ -8,6 +8,7 @@ import {
   OpenAiChatGptCardView,
 } from '@/components/organizations/byok/OpenAiChatGptCard';
 import { CHATGPT_ACCESS_FLAG } from '@/lib/auth/openai/access';
+import { ClaudeBillingCard } from '@/components/organizations/byok/ClaudeBillingCard';
 
 export default function PersonalBYOKPage() {
   // The flag's release condition matches the `email` person property against the
@@ -17,6 +18,7 @@ export default function PersonalBYOKPage() {
   return (
     <PageLayout title="Bring Your Own Key">
       <div className="space-y-4">
+        <ClaudeBillingCard />
         {chatGptEnabled === true ? (
           <OpenAiChatGptCard />
         ) : chatGptEnabled === undefined ? (

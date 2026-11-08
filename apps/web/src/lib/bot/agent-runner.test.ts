@@ -26,6 +26,7 @@ import {
   getGitLabRepositoryContext,
 } from '@/lib/slack-bot/gitlab-repository-context';
 import { recordBotRequestCloudAgentSession } from '@/lib/bot/request-logging';
+import { resolveOrganizationBotModel } from '@/lib/bot/organization-model';
 
 type AgentOptions = {
   instructions: string;
@@ -67,6 +68,11 @@ jest.mock('@/lib/bot/platforms', () => ({
       getRequesterInfo: async () => ({ displayName: 'Requester', platform: 'github' }),
     }),
   },
+}));
+jest.mock('@/lib/bot/organization-model', () => ({
+  resolveOrganizationBotModel: jest.fn(
+    async ({ storedModelSlug }: { storedModelSlug: string }) => storedModelSlug
+  ),
 }));
 jest.mock('@/lib/bot/request-logging', () => ({
   linkBotRequestToSession: jest.fn(),
@@ -115,6 +121,9 @@ jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
 }));
 jest.mock('@/lib/integrations/github/runtime-authorization', () => ({
   assertGitHubInstallationRuntimeAuthorized: jest.fn(),
+}));
+jest.mock('@/lib/integrations/platforms/github/identity-store', () => ({
+  getLinkedGitHubLogin: jest.fn(async () => 'requester-github'),
 }));
 jest.mock('@/lib/web-config.server', () => ({ CALLBACK_TOKEN_SECRET: 'callback-secret' }));
 jest.mock('@kilocode/web-shared/lib/constants', () => ({
@@ -234,6 +243,7 @@ beforeEach(() => {
   mockGetGitHubIntegrationById.mockResolvedValue({
     ...runParams().platformIntegration,
     id: 'github-association-1',
+    platform_installation_id: 'installation-1',
     repositories: githubRepositories,
   });
   jest.mocked(getGitLabRepositoryContext).mockResolvedValue({
@@ -495,5 +505,18 @@ describe.each(['slack', 'linear'] as const)('%s repository selection', platform 
     expect(getGitLabTokenForOrganization).not.toHaveBeenCalled();
     expect(mockPrepareSession).not.toHaveBeenCalled();
     expect(createCloudAgentNextClient).not.toHaveBeenCalled();
+  });
+});
+
+describe('organization model resolution', () => {
+  it('starts the session on the model the organization policy allows', async () => {
+    jest.mocked(resolveOrganizationBotModel).mockResolvedValueOnce('org/allowed-model');
+
+    const result = await runBotAgent(runParams());
+
+    expect(result.startedCloudAgentSession).toBe(true);
+    expect(mockPrepareSession).toHaveBeenCalledWith(
+      expect.objectContaining({ model: 'org/allowed-model' })
+    );
   });
 });

@@ -9,10 +9,7 @@ import {
   type EnkryptOutputDetectorId,
   type EnkryptPiiEntity,
 } from '@kilocode/db/schema-types';
-import {
-  ENKRYPT_BLOCK_DETECTOR_IDS,
-  ENKRYPT_REVISE_DETECTOR_IDS,
-} from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detectors';
+import { ENKRYPT_CONFIGURABLE_INPUT_DETECTOR_IDS } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detectors';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
@@ -38,8 +35,6 @@ export type UpdateEnkryptOutputDetector = <K extends EnkryptOutputDetectorId>(
   id: K,
   patch: Partial<EnkryptOutputDetectorsDraft[K]>
 ) => void;
-
-type ReviseDetectorId = (typeof ENKRYPT_REVISE_DETECTOR_IDS)[number];
 
 type DetectorDetails = { label: string; description: string };
 
@@ -127,6 +122,7 @@ const REVISE_CHOICES: { value: ReviseChoice; label: string }[] = [
   { value: 'block', label: 'Block' },
 ];
 
+/** Only the configurable detectors are shown; the gateway applies Kilo Default to the others. */
 export function EnkryptDetectorList({
   detectors,
   issues,
@@ -136,63 +132,26 @@ export function EnkryptDetectorList({
   issues: EnkryptGuardrailsIssues;
   onUpdate: UpdateEnkryptDetector;
 }) {
-  const options = (id: EnkryptDetectorId) => (
-    <DetectorOptions id={id} detectors={detectors} issues={issues} onUpdate={onUpdate} />
-  );
-
   return (
-    <div className="grid gap-8">
-      <DetectorSection
-        title="Always block"
-        description="When one of these detects something, the request is blocked before it reaches the model."
-      >
-        {ENKRYPT_BLOCK_DETECTOR_IDS.map(id => (
-          <DetectorRow
-            key={id}
-            details={DETECTOR_DETAILS[id]}
-            enabled={detectors[id].enabled}
-            control={(labelId, descriptionId) => (
-              <Switch
-                checked={detectors[id].enabled}
-                aria-labelledby={labelId}
-                aria-describedby={descriptionId}
-                onCheckedChange={enabled => onUpdate(id, { enabled })}
-              />
-            )}
-          >
-            {options(id)}
-          </DetectorRow>
-        ))}
-      </DetectorSection>
-
-      <DetectorSection
-        title="Block or log"
-        description="Enkrypt flags these without blocking. Choose whether a detection blocks the request or is only logged, in which case the request reaches the model without waiting for the detector."
-      >
-        {ENKRYPT_REVISE_DETECTOR_IDS.map(id => (
-          <DetectorRow
-            key={id}
-            details={DETECTOR_DETAILS[id]}
-            enabled={detectors[id].enabled}
-            control={(labelId, descriptionId) => (
-              <ReviseChoiceControl
-                labelId={labelId}
-                descriptionId={descriptionId}
-                value={reviseChoice(detectors, id)}
-                onChange={choice =>
-                  onUpdate(
-                    id,
-                    choice === 'off' ? { enabled: false } : { enabled: true, action: choice }
-                  )
-                }
-              />
-            )}
-          >
-            {options(id)}
-          </DetectorRow>
-        ))}
-      </DetectorSection>
-    </div>
+    <ul className="divide-border divide-y rounded-md border px-4">
+      {ENKRYPT_CONFIGURABLE_INPUT_DETECTOR_IDS.map(id => (
+        <DetectorRow
+          key={id}
+          details={DETECTOR_DETAILS[id]}
+          enabled={detectors[id].enabled}
+          control={(labelId, descriptionId) => (
+            <Switch
+              checked={detectors[id].enabled}
+              aria-labelledby={labelId}
+              aria-describedby={descriptionId}
+              onCheckedChange={enabled => onUpdate(id, { enabled })}
+            />
+          )}
+        >
+          <DetectorOptions id={id} detectors={detectors} issues={issues} onUpdate={onUpdate} />
+        </DetectorRow>
+      ))}
+    </ul>
   );
 }
 
@@ -242,10 +201,6 @@ export function EnkryptOutputDetectorList({
 
 function detectorChoice(detector: { enabled: boolean; action: 'log' | 'block' }): ReviseChoice {
   return detector.enabled ? detector.action : 'off';
-}
-
-function reviseChoice(detectors: EnkryptInputDetectorsDraft, id: ReviseDetectorId): ReviseChoice {
-  return detectorChoice(detectors[id]);
 }
 
 function DetectorSection({

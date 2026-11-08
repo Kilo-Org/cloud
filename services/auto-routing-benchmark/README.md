@@ -352,13 +352,23 @@ Expand a route to inspect every ranked model/effort pair.
 - `rankCandidates` (`@kilocode/auto-routing-contracts`) orders every route's candidates.
 - A candidate competes within the router's `accuracyNoiseBand` of its effective `minAccuracy` (default noise band 0.05).
 - Frontier's effective threshold is `min(1, minAccuracy + frontierMinAccuracyDelta)`. The delta is fixed at 0, so the frontier router uses its own system-computed `minAccuracy`.
-- Both routers use the same best-value formula, selecting models and efforts from their own measured pools.
-- Daily re-evaluation: `minAccuracy`/`accuracyNoiseBand` come from a held-out grid over the
-  registry's measurements, `productionTokenProfile`/`switchHorizonTurns` from production auto
-  usage (mean uncached/cached input tokens per request, median requests per session), and the
-  rest are fixed constants. Admin overrides win over the computed values.
+- Both routers share candidate ranking, with separate validation objectives over their own measured pools.
+- Efficient minimizes estimated request cost without reducing the current policy's validation accuracy.
+- Frontier maximizes validation accuracy without increasing the current policy's estimated request cost.
+- Daily re-evaluation includes the current effective thresholds in its validation grid.
+  Incomplete, unmatched, or duplicate case coverage leaves the current settings unchanged.
+  Equivalent outcomes keep the current thresholds.
+- These request-level validation objectives are proxies, not verified full-task success or total task cost.
+  The grid selects settings; it does not provide independent evidence of improvement.
+  Freeze the policy before evaluating untouched full tasks and their complete costs.
+- `productionTokenProfile` and `switchHorizonTurns` still use production usage estimates.
+  Admin overrides retain precedence over computed settings.
 - Competing candidates are ordered by `estimatedRequestCostUsd × effectiveLatency^1.5 / wilson^15`, lowest first. With known TTFT, `effectiveLatency = p50TtftMs + LATENCY_TOTAL_WEIGHT × p50LatencyMs`, where the exported `LATENCY_TOTAL_WEIGHT` is 0.15 (tuned on a fully streamed offline sweep); without TTFT, total `p50LatencyMs` alone preserves legacy ordering.
-- `estimatedRequestCostUsd` adds the configured `productionTokenProfile` prompt cost at catalog prices to `avgCostUsd`. Without a profile or pricing, it equals `avgCostUsd`.
+- Published `estimatedRequestCostUsd` adds the configured input profile to the observed per-pair benchmark cost.
+  Fresh selection uses known request tokens at the prompt price, without assuming cache hits.
+  Unpriced candidates retain their published estimates.
+  The observed benchmark cost remains a limited base estimate, not a prediction of full-task output or remaining turns.
+  Tables without stored noise-band metadata retain their published ordering until republished.
 - `wilson` is the Wilson lower bound (z = 1) of accuracy over the candidate's measured `cases`. A well-measured candidate beats a thinly measured one at equal accuracy. Without `cases`, raw accuracy is used.
 - A candidate whose `estimatedRequestCostUsd` is exactly 0 outranks every paid candidate inside the accuracy band and takes no cost term (ADR 0005): $0 candidates are ordered by `effectiveLatency^1.5 / wilson^15` alone, so a free-but-slow or thinly measured one still loses to a free candidate with latency and coverage. Paid ordering is unchanged. Client models in a custom router are the usual source of $0.
 - The other candidates follow by accuracy, then cost.
@@ -366,17 +376,16 @@ Expand a route to inspect every ranked model/effort pair.
 - `meetsThreshold` stays strict (`accuracy >= minAccuracy`) for sticky routing.
 - The ranking policy version is part of every registry table version, so a policy change republishes.
 
-Production CLI benchmarks currently record total latency only, so published D1
-tables use the total-latency fallback. Offline sweep and candidate-screen
-summaries carry measured TTFT and use the TTFT-aware formula; missing TTFT is
-never fabricated.
+Published tables retain measured total latency, time to first token, and the policy noise band through D1 storage.
+If every final candidate lacks total latency, request-time repricing compares cost and Wilson-adjusted accuracy without a latency factor.
+Unknown measurements remain unknown; a candidate missing latency remains conservative when another candidate has measured latency.
 
-The optional `effortByComplexity` table mapping selects a variant after the model
-has been picked, using the production classifier's `low`, `medium`, or `high`
-reasoning-complexity bucket. It never changes models or restores a candidate
-excluded by the decision filters. Same-model effort changes retain the prompt
-cache and do not trigger cost-switch logic; sticky-immediate turns retain the
-incumbent variant until a classification is available.
+The optional `effortByComplexity` mapping filters each model to its measured variant before fresh model selection.
+The filter preserves published relative ordering and cannot restore an ineligible pair.
+Known request pricing then re-ranks those final pairs within the stored quality band.
+Cheapest mode skips the complexity mapping.
+Sticky decisions keep their existing exact-pair identity and cache-switch economics.
+Sticky-immediate turns retain the incumbent variant until classification is available.
 
 Platform and custom-table builds read `case_results` for each ready pair's exact
 provenance run and join the committed `src/datasets/case-complexity.json` labels.
@@ -384,6 +393,11 @@ Missing labels are ignored. Each route/model/bucket ranks its measured variants
 with the same value policy, falling back to the route-level variant when fewer
 than six distinct graded cases are available. Mappings are persisted with the
 table and included in its version identity.
+
+Apply the additive routing-evidence migration before deploying readers that select its columns.
+Deploy the benchmark writer and republish from ready measurements to populate the new evidence.
+Do not backfill old policy bands or latency from current configuration or unrelated profiles.
+
 
 Regenerate the labels with the production classifier and gateway normalization:
 
@@ -472,18 +486,35 @@ cases only. Held-out accuracy, cost, latency, and TTFT then aggregate the raw
 per-case results of the mapped variant for each bucket, not the route-level
 variant's overall summary. Without labels, the existing route-level evaluation
 is unchanged.
-Direct TTFT is time to the first nonempty content or reasoning delta; final streaming
-usage supplies cost. Container TTFT uses the first text event timestamp (or text
+Direct TTFT is time to the first nonempty content or reasoning delta. Streaming
+usage frames are cumulative receipts: a later billing frame supersedes an earlier
+one and is never added to it. Without BYOK, `usage.cost` is the total charge.
+With BYOK, `usage.cost` is only the router fee, so the row cost is that fee plus
+`cost_details.upstream_inference_cost`; either value alone leaves the total
+unknown (`costUsd: null`). Container TTFT uses the first text event timestamp (or text
 `time.start`) relative to request start, and is null when timestamps are unavailable.
 Legacy sweeps without TTFT remain readable and do not substitute total latency.
 Missing picks are excluded; `quality.heldOut.routes` reports coverage.
-`--max-usd` includes model and grader spend (in-flight requests can overshoot).
+`--max-usd` compares known model and grader spend only. In-flight requests can
+overshoot it; this stop is not a financed bound on total charges.
+An unknown model cost stops new model and paid-judge requests across workers.
+Mechanical checks continue. Already dispatched work finishes and retains its receipts.
+Resume preserves this stop when any stored row has unknown cost. A request blocked
+before dispatch creates no result row and remains unattempted for a later resume.
+Direct and container requests send one attempt. HTTP and transport failures do not
+trigger automatic redispatch because the earlier attempt can have an unknown charge.
+The row retains an unknown cost; this does not create a funded reservation.
+An HTTP status alone does not supply a complete billing receipt, including BYOK
+provider charges and auxiliary service fees. Do not infer a zero total charge.
+Legacy null-cost rows remain blocked without independent billing evidence;
+an old error string is not proof that no earlier request reached a provider.
 Atomic checkpoints every 200 cases retain each pair's raw `results`;
 `--resume sweep.json` requires the same suite and pairs, skips completed
 pair/case/repetitions, and retains accumulated spend.
 Infrastructure/grader failures are excluded from graded `cases` and counted in summary
-`errors`; empty answers score zero. Missing usage still permits grading but makes
-`costUsd` null and excludes that row only from the cost mean. Graded training candidates
+`errors`; empty answers score zero. Missing usage still permits mechanical grading.
+New paid judging stays blocked; judged rows without a grade record `grader_failed`.
+An unknown `costUsd` excludes that row from the cost mean. Graded training candidates
 with unknown cost still compete at the route's maximum known request-cost estimate
 (or benchmark cost zero if the entire route lacks costs), without imputing held-out cost.
 Recompute old summaries without
@@ -543,6 +574,207 @@ route mix, table, and pricing snapshot for base and head; use saved table and pr
 files if the live inputs may change between builds. `benchmarkPerTaskUsdWeighted`
 remains the benchmark-only cost and can move differently from this production-input
 estimate.
+
+### Prospective full-task experiment protocol (not admitted)
+
+This section states requirements for a future full-task experiment. It does not
+describe an admitted runner, a passed gate, or a measured result. No quality or
+cost gain is claimed under this protocol.
+
+The scoreboard, sweep, and policy grid above optimize and check single requests.
+That request-validation proxy can select a candidate policy. It cannot prove
+full-task success, full-task cost, or a routing improvement. Only frozen,
+untouched full tasks with complete charges can supply that evidence.
+
+The production worker and sweep keep their own paid-execution ledger. The
+bundled `repo-study` driver and `router-*` scripts implement the separate
+full-task research protocol below. Historical scripts and evidence remain
+audit-only; they cannot authorize new dispatch. Use the bundled runner rather
+than introducing another execution framework.
+
+**Frozen design.** Freeze the spec before any paid request, and bind it by hash.
+
+- Tasks: the frozen 18 tuning tasks and 32 final tasks, disjoint and unchanged.
+- Every final arm runs every final task with exactly 2 repetitions. A repetition
+  is a repeat measurement, not a new independent task. Include any paid tuning
+  in the frozen plan and allowance; this protocol does not add a tuning campaign.
+- Per-run limits: 60 steps, 1800 s wall time, 180 s per action, 16384 requested
+  output tokens, and the approved $60 per-run ceiling. The other pinned
+  resource limits stay unchanged. Prove a finite hidden-output ceiling.
+- Tune only on tuning tasks. Keep final tasks untouched until final selection.
+- Do not add tuning tasks, repetitions, arms, or limits silently. Any change is
+  a prospective amendment with a new freeze, quote, and admission decision.
+
+**Objectives.** Judge Efficient and Frontier separately, with the floor, bound,
+and interval rule frozen before outcomes exist.
+
+- Efficient: minimize total full-task cost subject to meeting the frozen
+  full-task success floor.
+- Frontier: maximize verified full-task success subject to the frozen
+  total-cost bound.
+- A rule that requires both strictly higher success and strictly lower cost for
+  both routers is a strict diagnostic only. It replaces neither objective.
+
+**Mandatory comparisons.** The denominator is every arm × task × repetition.
+
+- Arms: the unchanged router, the candidate router, a cost-matched
+  content-blind control, and every fixed pool model. Give each fixed model its
+  frozen variant policy.
+- The content-blind control selects without task content and matches the
+  candidate cost budget. It separates routing signal from spend alone.
+- Share one physical observation between arms only under an immutable,
+  hash-bound identical-intervention mapping. The mapping must prove the same
+  executable, task revision, model, variant, payload, limits, and grader.
+  Any other observation is a separate run.
+- Do not shrink the denominator after dispatch. Missing, failed, and invalid
+  rows stay visible with their reason and charges.
+
+**Financial admission gates.** Version 5 is capped exploration. It has no
+full-plan funding guarantee. A budget stop leaves the plan inconclusive.
+
+1. **Continuity.** Retain all historical settled charges, unknown holds at
+   their full bound, router fees, and upstream BYOK charges. Do not reset the
+   ledger, attempt history, or candidate history. Cumulative new allowance
+   across all amendments stays at or below the authorized $100. An amendment
+   never rebases the allowance, and a tranche inside it is not new allowance.
+   A larger legacy ledger cap is not spending permission.
+2. **Whole-plan cost forecast.** Register one hash-bound forecast for the whole
+   plan: every arm, task, and repetition. Price every `(model, variant)` pair
+   reachable from the baseline and candidate tables, not only first picks. A
+   missing or unpriced mandatory pair blocks registration. The forecast total
+   can exceed $100. The forecast is evidence, not funding.
+3. **Nested caps at dispatch.** Reserve each request in full before dispatch.
+   Settled plus held plus the next bound must fit three nested caps: the $100
+   cumulative new allowance, the $60 pilot ceiling for pilot work, and the $60
+   per-run ceiling. The frozen per-run resource limit can bind first. Count
+   incurred commitments only. Do not count unattempted rows. Do not count the
+   unused part of an active run cap. A claim records its per-run cap. The claim
+   reserves no money. Known settlement replaces a hold with the actual charge.
+   The unused part then stops counting. An unknown or breached charge stays at
+   its full bound and stops dispatch.
+4. **Pilot ceiling.** A baseline-only protocol pilot has an independent $60
+   ceiling inside the same cumulative allowance. A frozen pilot cap can be
+   lower. The pilot checks execution, grading, and receipts only. It cannot
+   certify either objective. No final request may run before exact successful
+   pilot evidence exists.
+5. **Component tariffs.** Keep immutable raw price evidence with units and
+   quantities for every component: input, cached read, cache write and storage
+   with its time-to-live bound, output, hidden reasoning, and per-request fees.
+   Prove whether hidden-reasoning and completion rates are additive or alternative.
+   If both quantities have finite bounds, sum their rates conservatively or reject
+   the quote; never assume a component is free. BYOK totals are
+   the router fee plus the upstream charge; either part alone is unknown.
+6. **Provider closure.** Prove the exact provider, descendant-model, and
+   service-tier set that the frozen request constraints admit. Price the worst
+   reachable member of that closure, not the cheapest endpoint. Keep privacy,
+   parameter, and no-fallback constraints in the frozen request.
+7. **Payload guard.** After all variant mutation, validate the final serialized
+   payload. Admit string text only. Reject media, files, native tools, search
+   plugins, cache controls, automatic continuation, budget escalation, and any
+   passthrough field that can add billable work. Reject; do not silently strip.
+   Bind the guard, its hash, and negative proofs to the executable identity.
+8. **Identity.** Bind the complete executable and input identity before
+   dispatch: source and bundle hashes, runtime argv, parser and grader
+   revisions, task split, arm snapshots, variant catalog, run order seed,
+   resource limits, classifier identity, and quote evidence. Dispatch only
+   inside the quote validity window; an expired quote needs a fresh quote.
+   Any identity mismatch blocks dispatch.
+
+**Tariff incompatibility is a no-go, not an outage.** If a tariff cannot be
+bounded under this contract, record an accounting failure. Do not mark the
+endpoint unavailable, invent an outage, strip tariff fields, drop a pair, or
+reduce the denominator to escape it.
+
+**Outcome interpretation.** Never retry an attempt that may have been paid.
+
+- Happy path: the run completes, the deterministic grade is valid, and every
+  charge settles. Record resolved or not, with settled total cost.
+- Empty: a dispatched attempt returns no answer or no submission, with settled
+  charges. Score it as a failure, retain its charges, and do not retry it.
+- Retryable: only an attempt proven not dispatched, with no paid call started.
+  It stays undispatched and missing, never a failure, and may run later under
+  the same frozen identity.
+- Nonretryable: any attempt that may have reached a provider. Never dispatch it
+  again. Hold an unknown charge at its full bound, stop further dispatch until
+  the stop is cleared under the frozen policy, and give ambiguous quality the
+  full interval instead of an invented score.
+- A provider outage with a valid outage record is an arm failure.
+  Infrastructure and grader failures block completeness instead. They are not
+  model-quality failures.
+- Budget stop: a cap stops a later request. The plan is partial and
+  inconclusive. A favorable prefix cannot establish a pass, superiority over a
+  fixed model, or control cost matching.
+
+**No-go states.** Paid dispatch stays blocked while an applicable gate fails:
+unaccounted unknown charges; unresolved historical candidate uncertainty;
+incomplete or expired tariff coverage; an unbounded tariff component; unresolved
+provider closure; a missing payload guard; an executable identity mismatch;
+or a changed denominator. A forecast above the caps is not a no-go. The next
+unaffordable request is the stop.
+Final dispatch also requires exact successful pilot evidence. The pilot cannot
+prove its own admission retroactively. Report blocked while any applicable gate fails.
+
+The version 5 prospective protocol is implemented by the bundled `repo-study`
+driver and the `router-*` coordinator scripts. Old manifests and old financing
+manifests are audit-only. Paid execution requires, in order:
+
+1. A capped-exploration authorization whose cumulative new allowance is within
+   the $100 programme ceiling and whose origin snapshot is immutable.
+2. A frozen version 5 spec with the complete router, content-blind control and
+   fixed-model arms for each mode, the unchanged task split and resources, and
+   frozen account-plugin evidence supplied as an absolute `account_policy` path.
+   Its bytes are bound into the freeze approval.
+3. A fresh complete tariff quote for every mandatory pair. An unsupported tariff
+   is an accounting failure, not an endpoint outage.
+4. A registered whole-plan cost forecast covering every mandatory row.
+   The `finance` command registers that forecast. It does not fund the plan.
+   Audit executability requires current authorization and frozen plan
+   validation. Each forecast keeps its own total.
+
+The coordinator validates the final text-only payload after variant resolution,
+posts exactly the approved bytes, and consumes each reservation once. It reports
+no pass or savings claim unless every arm has settled charges, determinate grades
+and the frozen coverage. An incomplete analysis is `inconclusive`.
+
+Variant validation accepts the shared gateway catalog's complete verbosity
+vocabulary, including `xhigh`, without dropping its frozen reasoning controls.
+
+These are pre-dispatch reservation checks, not a guaranteed ceiling on final
+provider charges. An over-bound charge is detected after billing and stops
+further dispatch. A provider dashboard budget is not a hard cap either:
+already-dispatched requests can finish after that budget is reached. Real
+dispatch requires independent evidence that all billed exposure stays inside
+the authorization; a quote or dashboard limit alone does not prove that.
+
+Recovery releases a coordinator reservation at zero cost only when neither its
+dispatch admission nor its receipt indicates dispatch. Historical and admitted
+requests retain their full holds. Receipt or observer failures cannot overwrite
+a settled charge. Admission denials finalize their receipt and budget-limit
+evidence even when admission already settled the unused reservation.
+
+Classifier settlement uses the solver's billing-evidence rules. Missing billing
+mode or upstream-cost evidence retains the full hold and stops further dispatch.
+Known charge floors remain held even when they exceed the original reservation.
+
+The isolated runtime uses the installed Miniflare configuration API. Closing a
+run attempts every instance, reports disposal failures, and retains failed
+instances for another cleanup attempt. Package type checks include this runtime.
+
+Run the offline checks with:
+
+```sh
+python3 -m pip install -r repo-study/requirements.txt
+(cd repo-study && python3 -m unittest test_text_tariffs)
+(cd scripts && python3 -m unittest test_router_ledger test_router_study test_router_proof test_router_replay.ReplayInvariants)
+```
+
+Do not authorize paid work without real account-policy evidence, a finite quote
+for every mandatory pair, and independent evidence of total billed exposure.
+A forecast above the remaining authorization can register for offline checks.
+The code checks quoted reservations; it does not certify a provider-invoice
+ceiling. Local admission stops before an unaffordable reservation. This protocol
+does not authorize a live run by itself. Do not shrink the plan or raise a cap
+implicitly.
 
 ### Shadow routing policy
 
@@ -612,8 +844,9 @@ explicitly listed in `excludedRoutes`, never simulated by direct completions.
 A shared worker pool pulls requests in round-robin order, alternating each model's
 variants within its case sequence. `--concurrency <n>` defaults to 24. Dispatch
 order spreads partial-run coverage across models; completions may arrive out of order.
-Direct requests, streaming TTFT, retries, long-context materialization, and grading
-reuse the offline sweep path. Set `OPENROUTER_API_KEY`; no container is required.
+Direct requests, streaming TTFT, long-context materialization, and grading reuse
+the offline sweep path. Direct model requests are not automatically retried.
+Set `OPENROUTER_API_KEY`; no container is required.
 
 The report contains model-wide and per-variant accuracy, Wilson lower bounds,
 benchmark and estimated production request cost, p50 TTFT and total latency, raw

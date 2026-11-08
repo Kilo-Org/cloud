@@ -173,6 +173,13 @@ export const CommandSendPayload = z.object({
   command: z.string().min(1, 'Command name is required'),
   /** Verbatim args. Kilo expands $1/$2/$ARGUMENTS server-side. */
   arguments: z.string().default(''),
+  mode: ModeSlugSchema.optional(),
+  model: modelIdSchema.optional(),
+  variant: z
+    .string()
+    .max(50)
+    .regex(/^[a-zA-Z]+$/)
+    .optional(),
 });
 
 export const SendMessageV2Payload = z.discriminatedUnion('type', [
@@ -325,6 +332,13 @@ export const SendMessageV2Input = z
             code: 'custom',
             path: ['attachments'],
             message: 'Attachments cannot be attached to slash commands',
+          });
+        }
+        if (input.payload.mode === 'custom') {
+          ctx.addIssue({
+            code: 'custom',
+            path: ['payload', 'mode'],
+            message: 'custom mode requires appendSystemPrompt (use prepareSession/updateSession)',
           });
         }
         return;

@@ -87,6 +87,20 @@ vi.mock('@/lib/credits/use-store-credit-purchase', () => ({
 vi.mock('@/lib/hooks/use-current-user-id', () => ({
   useCurrentUserId: () => ({ userId: 'user-1', isLoading: false, isError: false }),
 }));
+
+// The screen obeys the Profile tab's hide-balance preference, the same store
+// the credits card reads. Mocked here for the same reason as the card's own
+// suite: the real store reaches the secure-store chain this project's
+// react-native mock cannot resolve.
+const hideBalancePref = vi.hoisted(() => ({ hideBalance: false, hasLoaded: true }));
+
+vi.mock('@/lib/hooks/use-hide-balance-preference', () => ({
+  useHideBalancePreference: () => ({
+    hideBalance: hideBalancePref.hideBalance,
+    hasLoaded: hideBalancePref.hasLoaded,
+    setHideBalance: vi.fn(),
+  }),
+}));
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
     credits: {
@@ -231,6 +245,8 @@ describe('CreditPurchaseScreen', () => {
     owner.completedPurchaseCount = 0;
     balance.balance = 1234;
     creditBlocks.entries = [];
+    hideBalancePref.hideBalance = false;
+    hideBalancePref.hasLoaded = true;
   });
 
   it('happy: renders one row per pack with its amount and store price, purchase enabled', async () => {
@@ -296,15 +312,70 @@ describe('CreditPurchaseScreen', () => {
       { balance_mUsd: 500_000_000, expiry_date: null },
     ];
     const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
-    await waitFor(() => allText(renderer).includes('$10.00 in credits expires'));
-    expect(allText(renderer)).not.toContain('$60.00 in credits');
-    expect(allText(renderer)).not.toContain('bonus credits');
-    // The zone marker carries a bidi isolate and a no-break space on the date;
-    // this assertion is about the sentence, not that carriage.
-    const readable = allText(renderer)
-      .replaceAll(/[\u2068\u2069]/g, '')
-      .replaceAll('\u00A0', ' ');
-    expect(readable).toContain('(UTC). Credits with the earliest expiry are used first.');
+    // The amount and the zone marker carry bidi isolates and the date a no-break
+    // space; these assertions are about the sentence, not that carriage.
+    const readable = () =>
+      allText(renderer)
+        .replaceAll(/[\u2066\u2068\u2069]/g, '')
+        .replaceAll('\u00A0', ' ');
+    await waitFor(() => readable().includes('$10.00 in credits expires'));
+    expect(readable()).not.toContain('$60.00 in credits');
+    expect(readable()).not.toContain('bonus credits');
+    expect(readable()).toContain('(UTC). Credits with the earliest expiry are used first.');
+    unmount();
+  });
+
+  it('masks the balance and the next expiry amount while the hide-balance preference is on', async () => {
+    hideBalancePref.hideBalance = true;
+    creditBlocks.entries = [{ balance_mUsd: 10_000_000, expiry_date: '2027-10-15T00:00:00Z' }];
+
+    const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => allText(renderer).includes('***** in credits expires'));
+
+    const text = allText(renderer);
+    expect(text).toContain('*****');
+    expect(text).not.toContain('$1,234.00');
+    // The expiry note names the same balance slice, so it is masked too.
+    expect(text).not.toContain('$10.00 in credits expires');
+    const masked = renderer.root.findAll(
+      node => String(node.type) === 'Text' && node.props.accessibilityLabel === 'Balance hidden'
+    );
+    expect(masked).toHaveLength(1);
+    // The pack rows are catalog prices, not this account's amount, so the
+    // preference leaves them alone.
+    expect(text).toContain('Add $10.00 of credits');
+    unmount();
+  });
+
+  it('keeps the amounts masked until the preference read settles', async () => {
+    hideBalancePref.hasLoaded = false;
+
+    const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => packRows(renderer).length === 4);
+
+    // Not yet known is not the same as known visible: the amount stays off
+    // screen until the store answers.
+    expect(allText(renderer)).toContain('*****');
+    expect(allText(renderer)).not.toContain('$1,234.00');
+    unmount();
+  });
+
+  it('speaks the amount when the balance is visible, not the hidden label', async () => {
+    // The label must always be passed: a node React Native stops handing a
+    // label keeps its previous native value on Android, so a masked node that
+    // reveals itself would otherwise still announce "Balance hidden".
+    const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => packRows(renderer).length === 4);
+
+    const amount = renderer.root.find(
+      node => String(node.type) === 'Text' && node.props.accessibilityLabel === '$1,234.00'
+    );
+    expect(amount.props.children).toBe('$1,234.00');
+    expect(
+      renderer.root.findAll(
+        node => String(node.type) === 'Text' && node.props.accessibilityLabel === 'Balance hidden'
+      )
+    ).toHaveLength(0);
     unmount();
   });
 

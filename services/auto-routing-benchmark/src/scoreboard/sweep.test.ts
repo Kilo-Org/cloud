@@ -1,7 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 import { DECIDER_CASES, FRONTIER_CASES } from '../datasets/decider-cases';
 import { OfflineSweepSchema, type OfflineSweep } from './schema';
-import { containerTtftMs, readSweepCompletion, selectSweepCases, summarizeSweep } from './sweep';
+import {
+  containerTtftMs,
+  readSweepCompletion,
+  requestDirectSweepCompletion,
+  selectSweepCases,
+  summarizeSweep,
+} from './sweep';
 
 type SweepResult = OfflineSweep['pairs'][number]['results'][number];
 const result: SweepResult = {
@@ -193,6 +199,41 @@ describe('selectSweepCases', () => {
   });
 });
 
+describe('requestDirectSweepCompletion', () => {
+  it.each(['transport', 'incomplete-stream', 'http-error'])(
+    'retains one unknown-cost attempt after %s without automatic redispatch',
+    async failure => {
+      const fetchImpl = vi.fn<typeof fetch>().mockImplementation(async () => {
+        if (failure === 'transport') throw new Error('Connection closed');
+        if (failure === 'http-error') return new Response('', { status: 503 });
+        return new Response('data: {"choices":[{"delta":{"content":"partial"}}]}\n\n');
+      });
+      const onAttemptComplete = vi.fn();
+      const completion = await requestDirectSweepCompletion({
+        model: 'fixture/model',
+        fragment: {},
+        systemPrompt: 'system',
+        userPrompt: 'user',
+        apiKey: 'fixture-key',
+        attributionHeaders: {},
+        budgetAvailable: () => true,
+        fetchImpl,
+        onAttemptComplete,
+      });
+      expect(fetchImpl).toHaveBeenCalledTimes(1);
+      expect(completion).toMatchObject({
+        output: null,
+        costUsd: null,
+        error:
+          failure === 'http-error'
+            ? 'OpenRouter returned HTTP 503'
+            : 'OpenRouter transport or body read failed',
+      });
+      expect(onAttemptComplete).toHaveBeenCalledExactlyOnceWith(completion);
+    }
+  );
+});
+
 describe('readSweepCompletion', () => {
   it.each(['content', 'reasoning', 'reasoning_content', 'reasoning_details'])(
     'measures first %s delta from a fragmented SSE fixture and retains final usage',
@@ -249,9 +290,9 @@ describe('readSweepCompletion', () => {
 
   it.each([
     [
-      'the provider-billed upstream cost for BYOK',
+      'the router fee plus provider-billed upstream cost for BYOK',
       { cost: 0.0004, is_byok: true, cost_details: { upstream_inference_cost: 0.008 } },
-      0.008,
+      0.0084,
     ],
     [
       'the router cost without BYOK',
@@ -259,11 +300,112 @@ describe('readSweepCompletion', () => {
       0.012,
     ],
     ['an unknown cost when BYOK omits the upstream cost', { cost: 0.0004, is_byok: true }, null],
+    [
+      'an unknown cost when BYOK omits the router fee',
+      { is_byok: true, cost_details: { upstream_inference_cost: 0.008 } },
+      null,
+    ],
+    [
+      'an unknown cost when BYOK reports a null upstream cost',
+      { cost: 0.0004, is_byok: true, cost_details: { upstream_inference_cost: null } },
+      null,
+    ],
+    [
+      'a known zero cost when BYOK reports zero fee and zero upstream cost',
+      { cost: 0, is_byok: true, cost_details: { upstream_inference_cost: 0 } },
+      0,
+    ],
+    [
+      'a known zero cost without BYOK',
+      { cost: 0, is_byok: false, cost_details: { upstream_inference_cost: 0.009 } },
+      0,
+    ],
   ])('reports %s', async (_label, usage, expected) => {
     const response = new Response(
       `data: {"choices":[{"delta":{"content":"answer"}}]}\n\ndata: ${JSON.stringify({ choices: [], usage })}\n\ndata: [DONE]\n\n`
     );
-    expect((await readSweepCompletion(response, 100, () => 175)).costUsd).toBe(expected);
+    const costUsd = (await readSweepCompletion(response, 100, () => 175)).costUsd;
+    if (expected === null) expect(costUsd).toBeNull();
+    else expect(costUsd).toBeCloseTo(expected, 12);
+  });
+
+  it.each([
+    [
+      'settles the final complete BYOK receipt after a partial fee-only frame',
+      [
+        { cost: 0.0002, is_byok: true },
+        { cost: 0.0004, is_byok: true, cost_details: { upstream_inference_cost: 0.008 } },
+      ],
+      0.0084,
+    ],
+    [
+      'replaces an intermediate cumulative BYOK receipt with the final one instead of adding them',
+      [
+        { cost: 0.0002, is_byok: true, cost_details: { upstream_inference_cost: 0.004 } },
+        { cost: 0.0004, is_byok: true, cost_details: { upstream_inference_cost: 0.008 } },
+      ],
+      0.0084,
+    ],
+    [
+      'leaves cost unknown when the final BYOK receipt is partial after a complete intermediate receipt',
+      [
+        { cost: 0.0002, is_byok: true, cost_details: { upstream_inference_cost: 0.004 } },
+        { cost: 0.0004, is_byok: true },
+      ],
+      null,
+    ],
+    [
+      'leaves cost unknown when the final BYOK receipt nulls both charges',
+      [
+        { cost: 0.0004, is_byok: true, cost_details: { upstream_inference_cost: 0.008 } },
+        { cost: null, is_byok: true, cost_details: { upstream_inference_cost: null } },
+      ],
+      null,
+    ],
+    [
+      'leaves cost unknown when the final ordinary receipt nulls the total',
+      [{ cost: 0.012 }, { cost: null, prompt_tokens: 10 }],
+      null,
+    ],
+    [
+      'leaves cost unknown when the final ordinary receipt gives only its upstream breakdown',
+      [{ cost: 0.012 }, { cost_details: { upstream_inference_cost: 0.009 } }],
+      null,
+    ],
+    [
+      'leaves cost unknown when a later frame affirms BYOK without the upstream cost',
+      [{ cost: 0.012 }, { cost: 0.0004, is_byok: true }],
+      null,
+    ],
+    [
+      'leaves cost unknown when a trailing frame first affirms BYOK with no charges',
+      [{ cost: 0.012 }, { is_byok: true, prompt_tokens: 10 }],
+      null,
+    ],
+    [
+      'keeps the settled BYOK receipt when a trailing frame carries only token counts',
+      [
+        { cost: 0.0004, is_byok: true, cost_details: { upstream_inference_cost: 0.008 } },
+        { prompt_tokens: 10, completion_tokens: 5 },
+      ],
+      0.0084,
+    ],
+    [
+      'settles a known zero from the final receipt after a partial frame',
+      [
+        { prompt_tokens: 10 },
+        { cost: 0, is_byok: true, cost_details: { upstream_inference_cost: 0 } },
+      ],
+      0,
+    ],
+  ])('%s', async (_label, usages, expected) => {
+    const events = ['data: {"choices":[{"delta":{"content":"answer"}}]}', ''];
+    for (const usage of usages) events.push(`data: ${JSON.stringify({ choices: [], usage })}`, '');
+    events.push('data: [DONE]', '', '');
+    const response = new Response(events.join('\n'));
+    const costUsd = (await readSweepCompletion(response, 100, () => 175)).costUsd;
+    if (expected === null) expect(costUsd).toBeNull();
+    else expect(costUsd).toBeCloseTo(expected, 12);
   });
 
   it('accepts explicit null error fields in answer and usage chunks', async () => {

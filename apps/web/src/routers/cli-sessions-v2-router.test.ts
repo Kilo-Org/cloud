@@ -1718,22 +1718,26 @@ describe('cli-sessions-v2-router', () => {
         'throws an operational failure',
         () => mockDeleteCloudAgentSession.mockRejectedValueOnce(new Error('Worker unavailable')),
       ],
-    ])('preserves the real ownership row when the Worker %s', async (_, failDeletion) => {
-      failDeletion();
-      const caller = await createCallerForUser(regularUser.id);
+    ])(
+      'continues ingest cleanup with pending cleanup when the Worker %s',
+      async (_, failDeletion) => {
+        failDeletion();
+        const caller = await createCallerForUser(regularUser.id);
 
-      await expect(caller.cliSessionsV2.delete({ session_id: sessionId })).rejects.toMatchObject({
-        code: 'INTERNAL_SERVER_ERROR',
-        message: 'Failed to clean up cloud-agent session',
-      });
+        await expect(caller.cliSessionsV2.delete({ session_id: sessionId })).resolves.toEqual({
+          success: true,
+          session_id: sessionId,
+          cleanup: 'pending',
+        });
 
-      const [persisted] = await db
-        .select({ sessionId: cli_sessions_v2.session_id })
-        .from(cli_sessions_v2)
-        .where(eq(cli_sessions_v2.session_id, sessionId));
-      expect(persisted?.sessionId).toBe(sessionId);
-      expect(fetchSpy).not.toHaveBeenCalled();
-    });
+        expect(mockDeleteCloudAgentSession).toHaveBeenCalledWith(cloudAgentSessionId);
+        expect(fetchSpy).toHaveBeenCalledWith(
+          `https://test-ingest.example.com/api/session/${encodeURIComponent(sessionId)}`,
+          expect.objectContaining({ method: 'DELETE' })
+        );
+        expect(jest.mocked(captureException)).toHaveBeenCalled();
+      }
+    );
 
     it('continues idempotent ownership cleanup after a typed runtime NOT_FOUND', async () => {
       const error = new TRPCClientError('Runtime session not found', {
@@ -1751,6 +1755,7 @@ describe('cli-sessions-v2-router', () => {
       await expect(caller.cliSessionsV2.delete({ session_id: sessionId })).resolves.toEqual({
         success: true,
         session_id: sessionId,
+        cleanup: 'complete',
       });
 
       expect(mockDeleteCloudAgentSession).toHaveBeenCalledWith(cloudAgentSessionId);
@@ -1770,6 +1775,7 @@ describe('cli-sessions-v2-router', () => {
       await expect(caller.cliSessionsV2.delete({ session_id: sessionId })).resolves.toEqual({
         success: true,
         session_id: sessionId,
+        cleanup: 'complete',
       });
 
       expect(mockDeleteCloudAgentSession).not.toHaveBeenCalled();

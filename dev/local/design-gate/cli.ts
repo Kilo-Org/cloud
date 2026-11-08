@@ -7,13 +7,23 @@ import { parseArgs } from 'node:util';
 
 import { agentDeviceArgs, agentDeviceToProbeDump } from './agent-device';
 import {
+  compareProof,
+  prepareProof,
+  readPreparation,
+  readProofManifest,
+  sourceMarker,
+  validatePreparedSource,
+  verifyRuntimeSource,
+  writeCaptureReceipt,
+  type Revision,
+} from './baseline';
+import {
   captureFiles,
   DEFAULT_OBSERVE_MS,
   InfraError,
   layoutSignature,
   runMatrix,
   screenFindings,
-  unsettledFinding,
   waitForApp,
   writeJson,
   type Clock,
@@ -23,6 +33,12 @@ import {
   type Spawn,
   type Target,
 } from './capture';
+import {
+  captureAlignment,
+  screenshotObservation,
+  type CaptureAlignment,
+  type TimedTree,
+} from './capture-evidence';
 import { createProbeClient } from './cdp';
 import { createAndroidDevice, parseAdbDevices, resolveSerial } from './devices/android';
 import { createIosDevice, resolveSimulator } from './devices/ios';
@@ -51,6 +67,8 @@ export type CliArgs =
       targets?: string;
       matrix: MatrixName;
       observeMs: number;
+      preparation?: string;
+      revision?: Revision;
     })
   | (Common & { command: 'scan'; source: ScanSource; session?: string })
   | (Common & {
@@ -59,14 +77,32 @@ export type CliArgs =
       tap?: string;
       seconds: number;
       observeMs: number;
+    })
+  | (Common & { command: 'prepare'; base: string; head: string; targets: string; out: string })
+  | (Common & {
+      command: 'compare';
+      preparation: string;
+      baseRun: string;
+      headRun: string;
+      out: string;
     });
 
 export const USAGE = `Usage: pnpm dev:mobile:design-gate <command> [flags]
   run    --link <deeplink> [--link ...] [--targets <file>] [--matrix base|standard|full] [--observe-ms ${DEFAULT_OBSERVE_MS}]
   scan   [--source probe|uiautomator|agent-device] [--session <agent-device session>]   waits for a settled layout on the accessibility sources
   motion --link <deeplink> [--tap <text|testID|label>] [--seconds 3] [--observe-ms ${DEFAULT_OBSERVE_MS}]   exit 1 on an interaction layout shift
+  prepare --base <exact-40hex> --head <exact-40hex> --targets <proof-manifest.json> --out <new-dir>
+          creates detached worktrees and preparation.json; never copies head product source onto base
+  run     --targets <proof-manifest.json> --preparation <preparation.json> --revision base|head [common flags]
+          run from that prepared worktree with its fresh Metro bundle connected
+  compare --preparation <preparation.json> --base-run <dir> --head-run <dir> --out <new-dir>
+          exit 2 when either target is unreachable or unready; atomic comparison.json contains introduced findings; never reuses output
   help   print this text
 Common: [--platform android|ios] [--device <serial|udid>] [--metro ${DEFAULT_METRO}] [--out <dir>]
+Proof manifest: {"version":1,"targets":[{"id":"card","link":"kiloapp:///card","route":"/card","screen":"card","readyTestID":"card-ready"}]}
+Optional target diagnostic: {"component":"apps/mobile/src/components/card.tsx","exportName":"default","props":{}}
+  uses link kiloapp:///design-proof-<id>, route /design-proof-<id>, screen (auth)/design-proof-<id>; component must exist in BOTH revisions.
+  Generated routes are temporary __DEV__-only data fixtures; auth, environment and product implementations are not copied or replaced.
 App: ${APP_ID}; ${PROBE_REQUIREMENT}.`;
 
 export function isHelpRequest(argv: readonly string[]): boolean {
@@ -74,9 +110,11 @@ export function isHelpRequest(argv: readonly string[]): boolean {
 }
 
 const COMMAND_FLAGS: Record<CliArgs['command'], readonly string[]> = {
-  run: ['link', 'targets', 'matrix', 'observe-ms'],
+  run: ['link', 'targets', 'matrix', 'observe-ms', 'preparation', 'revision'],
   scan: ['source', 'session'],
   motion: ['link', 'tap', 'seconds', 'observe-ms'],
+  prepare: ['base', 'head', 'targets'],
+  compare: ['preparation', 'base-run', 'head-run'],
 };
 const COMMON_FLAGS = ['platform', 'device', 'metro', 'out'];
 
@@ -114,6 +152,12 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
         device: { type: 'string' },
         metro: { type: 'string' },
         out: { type: 'string' },
+        base: { type: 'string' },
+        head: { type: 'string' },
+        preparation: { type: 'string' },
+        revision: { type: 'string' },
+        'base-run': { type: 'string' },
+        'head-run': { type: 'string' },
       },
     });
   } catch (error) {
@@ -121,10 +165,17 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
   }
   const { values, positionals } = parsed;
   const [commandName, ...extra] = positionals;
-  const command = oneOf('command', commandName, ['run', 'scan', 'motion'] as const);
+  const command = oneOf('command', commandName, [
+    'run',
+    'scan',
+    'motion',
+    'prepare',
+    'compare',
+  ] as const);
   if (command === undefined) throw new UsageError('Missing command');
   if (extra.length > 0) throw new UsageError(`Unexpected arguments: ${extra.join(' ')}`);
-  const allowed = [...COMMON_FLAGS, ...COMMAND_FLAGS[command]];
+  const commonFlags = command === 'prepare' || command === 'compare' ? ['out'] : COMMON_FLAGS;
+  const allowed = [...commonFlags, ...COMMAND_FLAGS[command]];
   for (const [flag, value] of Object.entries(values)) {
     if (value !== undefined && !allowed.includes(flag)) {
       throw new UsageError(`--${flag} is not valid for ${command}`);
@@ -143,9 +194,57 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
     throw new UsageError('--observe-ms must be an integer from 0 to 60000');
   }
   switch (command) {
+    case 'prepare': {
+      if (
+        values.base === undefined ||
+        values.head === undefined ||
+        values.targets === undefined ||
+        values.out === undefined
+      ) {
+        throw new UsageError('prepare needs --base, --head, --targets and --out');
+      }
+      if (![values.base, values.head].every(value => /^[0-9a-f]{40}$/.test(value))) {
+        throw new UsageError('--base and --head must be exact lowercase 40-hex commit identities');
+      }
+      return {
+        ...common,
+        command,
+        base: values.base,
+        head: values.head,
+        targets: values.targets,
+        out: values.out,
+      };
+    }
+    case 'compare': {
+      if (
+        values.preparation === undefined ||
+        values['base-run'] === undefined ||
+        values['head-run'] === undefined ||
+        values.out === undefined
+      ) {
+        throw new UsageError('compare needs --preparation, --base-run, --head-run and --out');
+      }
+      return {
+        ...common,
+        command,
+        preparation: values.preparation,
+        baseRun: values['base-run'],
+        headRun: values['head-run'],
+        out: values.out,
+      };
+    }
     case 'run': {
       if (links.length === 0 && values.targets === undefined) {
         throw new UsageError('run needs --link or --targets');
+      }
+      if ((values.preparation === undefined) !== (values.revision === undefined)) {
+        throw new UsageError('run needs both --preparation and --revision');
+      }
+      if (
+        values.preparation !== undefined &&
+        (values.targets === undefined || links.length !== 0)
+      ) {
+        throw new UsageError('prepared run needs --targets only, no --link overrides');
       }
       return {
         ...common,
@@ -154,6 +253,12 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
         targets: values.targets,
         matrix: oneOf('matrix', values.matrix, MATRIX_NAMES) ?? 'standard',
         observeMs,
+        ...(values.preparation === undefined
+          ? {}
+          : {
+              preparation: values.preparation,
+              revision: oneOf('revision', values.revision, ['base', 'head'] as const),
+            }),
       };
     }
     case 'scan':
@@ -387,23 +492,21 @@ export function scanScreenFindings(args: {
   image?: Rgba;
   settled: boolean;
   elapsedMs: number;
+  alignment?: CaptureAlignment;
 }): Finding[] {
-  if (!args.settled) {
-    return [
-      unsettledFinding({
-        cell: 'current',
-        target: 'current',
-        dump: args.dump,
-        elapsedMs: args.elapsedMs,
-      }),
-    ];
-  }
   return screenFindings({
     cell: 'current',
     target: 'current',
     dump: args.dump,
     tree: normalize(args.dump),
     image: args.image,
+    sampled: {
+      dump: args.dump,
+      timeline: [],
+      settled: args.settled,
+      elapsedMs: args.elapsedMs,
+      alignment: args.alignment,
+    },
   });
 }
 
@@ -426,14 +529,17 @@ async function scanOutcome(
   let dump: ProbeDump;
   let settled = true;
   let elapsedMs = 0;
+  let readCurrentDump: () => Promise<ProbeDump>;
   if (args.source === 'probe') {
     const probe = createProbeClient({ metro: args.metro, names: device.names });
     dump = await waitForApp(probe, deps.clock, undefined, 5_000);
+    readCurrentDump = () => probe.dump();
   } else {
     const read = await readSettledDump(readAccessibilityDump, deps.clock);
     dump = read.dump;
     settled = read.settled;
     elapsedMs = read.elapsedMs;
+    readCurrentDump = async () => readAccessibilityDump();
     deps.log(
       settled
         ? `design-gate: layout settled after ${read.reads} reads (${elapsedMs} ms)`
@@ -441,14 +547,37 @@ async function scanOutcome(
     );
   }
   const files = captureFiles(out, 'current', 'current');
+  const started = deps.clock.now();
+  const readTree = async (): Promise<TimedTree> => {
+    const startedMs = deps.clock.now() - started;
+    try {
+      const current = await readCurrentDump();
+      return { startedMs, completedMs: deps.clock.now() - started, dump: current };
+    } catch (error) {
+      return { startedMs, completedMs: deps.clock.now() - started, error: String(error) };
+    }
+  };
+  const before = await readTree();
+  settled =
+    settled &&
+    (before.dump === undefined || layoutSignature(dump) === layoutSignature(before.dump));
+  dump = before.dump ?? dump;
+  // Keep the latest tree even when native screenshot capture or pixel decoding fails.
   writeJson(files.absolute(files.dump), dump);
+  const screenshot = { startedMs: deps.clock.now() - started, completedMs: 0 };
   device.screenshot(files.absolute(files.screenshot));
-  const findings = scanScreenFindings({
-    dump,
-    image: readRgba(files.absolute(files.screenshot), deps.exec),
-    settled,
-    elapsedMs,
-  });
+  screenshot.completedMs = deps.clock.now() - started;
+  const after = await readTree();
+  const image = readRgba(files.absolute(files.screenshot), deps.exec);
+  const alignment = captureAlignment(
+    before,
+    screenshot,
+    after,
+    layoutSignature,
+    screenshotObservation(dump, image)
+  );
+  writeJson(files.absolute(files.capture), alignment);
+  const findings = scanScreenFindings({ dump, image, settled, elapsedMs, alignment });
   return {
     cells: [
       {
@@ -468,13 +597,18 @@ async function scanOutcome(
             screenshot: files.screenshot,
             annotated: files.annotated,
             dump: files.dump,
+            capture: files.capture,
             env: dump.env,
           },
         ],
       },
     ],
     findings,
-    ...(settled ? {} : { unmeasured: true as const }),
+    ...(settled &&
+    alignment.status === 'bracketed' &&
+    !(alignment.pixels === 'uniform' && alignment.expectedText)
+      ? {}
+      : { unmeasured: true as const }),
   };
 }
 
@@ -491,8 +625,54 @@ export async function main(argv: readonly string[], deps: CliDeps = defaultDeps)
     return 2;
   }
   const startedAt = new Date();
-  const abort = args.command === 'scan' ? undefined : installAbortRestore(deps);
+  const abort =
+    args.command === 'run' || args.command === 'motion' ? installAbortRestore(deps) : undefined;
   try {
+    if (args.command === 'prepare' || args.command === 'compare') {
+      const controller = new AbortController();
+      let interrupted: AbortSignalName | undefined;
+      const interrupt = (signal: AbortSignalName) => {
+        interrupted ??= signal;
+        controller.abort(signal);
+      };
+      const off = [
+        deps.onSignal('SIGINT', () => interrupt('SIGINT')),
+        deps.onSignal('SIGTERM', () => interrupt('SIGTERM')),
+      ];
+      try {
+        if (args.command === 'prepare') {
+          const prepared = await prepareProof(
+            {
+              repo: process.cwd(),
+              base: args.base,
+              head: args.head,
+              targets: args.targets,
+              out: path.resolve(args.out),
+            },
+            controller.signal
+          );
+          deps.log(`design-gate: ${path.resolve(args.out, 'preparation.json')}`);
+          deps.log(`design-gate: base ${prepared.base.directory}; head ${prepared.head.directory}`);
+          return 0;
+        }
+        const result = await compareProof(
+          readPreparation(args.preparation),
+          args.baseRun,
+          args.headRun,
+          args.out,
+          controller.signal
+        );
+        deps.log(`design-gate: ${path.resolve(args.out, 'comparison.json')}; ${result.status}`);
+        if (result.status === 'inconclusive') return 2;
+        return result.introduced.length > 0 ? 1 : 0;
+      } catch (error) {
+        if (interrupted === undefined) throw error;
+        deps.warn(`design-gate: ${interrupted}: interrupted proof operation: ${String(error)}`);
+        return SIGNAL_EXIT_CODES[interrupted];
+      } finally {
+        for (const remove of off) remove();
+      }
+    }
     const out = path.resolve(args.out ?? fs.mkdtempSync(path.join(os.tmpdir(), 'design-gate-')));
     fs.mkdirSync(out, { recursive: true });
     const device = openDevice(args, deps);
@@ -546,7 +726,21 @@ export async function main(argv: readonly string[], deps: CliDeps = defaultDeps)
     if (args.command === 'run') {
       const targetsJson =
         args.targets === undefined ? undefined : fs.readFileSync(args.targets, 'utf8');
-      const targets = resolveTargets(args.links, targetsJson);
+      const preparation =
+        args.preparation === undefined ? undefined : readPreparation(args.preparation);
+      if (preparation !== undefined && args.revision !== undefined) {
+        validatePreparedSource(preparation, args.revision, process.cwd());
+        if (args.targets === undefined) throw new UsageError('Prepared run needs --targets');
+        const requested = readProofManifest(args.targets);
+        if (JSON.stringify(requested) !== JSON.stringify(preparation.manifest)) {
+          throw new UsageError('Targets must match the preparation manifest exactly');
+        }
+        await verifyRuntimeSource(preparation, args.revision, args.metro, device.names);
+        deps.log(
+          `design-gate: verified product bundle ${sourceMarker(preparation, args.revision)}`
+        );
+      }
+      const targets = preparation?.manifest.targets ?? resolveTargets(args.links, targetsJson);
       const result = await runMatrix(
         {
           device,
@@ -569,6 +763,15 @@ export async function main(argv: readonly string[], deps: CliDeps = defaultDeps)
         return 2;
       }
       outcome = result;
+      if (preparation !== undefined && args.revision !== undefined) {
+        validatePreparedSource(preparation, args.revision, process.cwd());
+        await verifyRuntimeSource(preparation, args.revision, args.metro, device.names);
+        const readiness = writeCaptureReceipt(preparation, args.revision, result, out);
+        if (readiness.length > 0) {
+          deps.log(`design-gate: inconclusive target readiness: ${readiness.join('; ')}`);
+          return 2;
+        }
+      }
     } else {
       const scanned = await scanOutcome(args, device, deps, out);
       outcome = scanned;
@@ -581,7 +784,9 @@ export async function main(argv: readonly string[], deps: CliDeps = defaultDeps)
       `design-gate: ${counts.errors} errors, ${counts.warnings} warnings across ${outcome.cells.length} cells`
     );
     if (unmeasured) {
-      deps.log('design-gate: the screen did not settle, so nothing was measured; exit 2');
+      deps.log(
+        'design-gate: capture is inconclusive (unsettled screen, alignment or possible blank frame); exit 2'
+      );
       return 2;
     }
     return counts.errors > 0 ? 1 : 0;

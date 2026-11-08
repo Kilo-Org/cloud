@@ -75,6 +75,7 @@ import {
 } from '@/components/agents/session-goal-collapse';
 import { SessionContextMetrics } from '@/components/agents/session-context-metrics';
 import { SessionContextSheet } from '@/components/agents/session-context-sheet';
+import { resolveSelectionModelDisplay } from '@/components/agents/session-model-display';
 import { SessionFollowButton } from '@/components/agents/session-follow-button';
 import {
   canAutoApprovePermissions,
@@ -223,7 +224,7 @@ import {
 } from '@/components/agents/new-session-prefill';
 import { type ForkCut, resolveForkCut } from '@/components/agents/fork-cut';
 import { useNewSessionNavigator } from '@/components/agents/use-new-session-navigator';
-import { AGENTS_SESSIONS_HREF } from '@/lib/agents-sessions-route';
+import { AGENTS_SESSIONS_HREF, AGENTS_SESSIONS_INDEX_HREF } from '@/lib/agents-sessions-route';
 import { recordLastOpenedSession } from '@/lib/last-opened-session';
 import { resolveSessionContextInfo } from '@/lib/session-context-info';
 import {
@@ -291,6 +292,13 @@ export function SessionDetailContent({
   const router = useRouter();
   const { openNewSessionHref } = useNewSessionNavigator();
   const { confirm, dialog } = useConfirmDialog();
+  // The router behind the failure row's one navigation. Read through a ref so a
+  // callback the memoized rows receive keeps its identity: a router object
+  // captured in that callback's dependencies would re-create it whenever the
+  // caller returns a new one, and every row would re-render with it. Assigned
+  // during render, the same way the live message list below is.
+  const routerRef = useRef(router);
+  routerRef.current = router;
   // Session-route navigation only: `replace` in one native-stack commit crashes
   // Android Fabric (KILO-APP-25). Other `router` uses here are unaffected.
   const sessionRouter = useStackSafeReplace();
@@ -405,6 +413,28 @@ export function SessionDetailContent({
   const handleAnchorChange = useCallback((messageId: string) => {
     setAnchor(messageId);
   }, []);
+  // The transcript's open gate holds its rows back until their position is
+  // final and paints the skeleton in the meantime. That verdict decides the
+  // chrome around the transcript too: a finished footer, composer, or header
+  // pill beside a loading body is the screen showing two states at once. Keyed
+  // by session, so a verdict from the previous one cannot leak into this one,
+  // and absent a verdict for this session the chrome stays settled: a host
+  // whose list never reports keeps the behavior it had before this hand-off.
+  const [openSettledReport, setOpenSettledReport] = useState<{
+    sessionId: string;
+    settled: boolean;
+  } | null>(null);
+  const handleOpenSettledChange = useCallback((reportedSessionId: string, settled: boolean) => {
+    setOpenSettledReport(previous =>
+      previous?.sessionId === reportedSessionId && previous.settled === settled
+        ? previous
+        : { sessionId: reportedSessionId, settled }
+    );
+  }, []);
+  const transcriptOpenSettled =
+    openSettledReport === null ||
+    openSettledReport.sessionId !== sessionId ||
+    openSettledReport.settled;
   // The route's `at` is the position this screen resumes at. A resume link
   // dedupes onto an already-mounted route and updates its params instead of
   // remounting, so the position is adopted when the live param changes — unless
@@ -624,25 +654,6 @@ export function SessionDetailContent({
     () => resolveSessionContextInfo(contextUsage, sessionModels.options),
     [contextUsage, sessionModels.options]
   );
-  const contextModelAndProvider = useMemo(() => {
-    if (!contextInfo) {
-      return { model: '', provider: '' };
-    }
-    const match = sessionModels.options.find(
-      option =>
-        (option.modelRef?.providerID === contextInfo.providerID &&
-          option.modelRef.modelID === contextInfo.modelID) ||
-        (contextInfo.providerID === 'kilo' &&
-          option.showGatewayMetadata &&
-          option.id === contextInfo.modelID)
-    );
-    return {
-      model: match?.name ?? match?.displayId ?? contextInfo.modelID,
-      provider:
-        match?.provider?.name ??
-        (contextInfo.providerID === 'kilo' ? 'Kilo' : contextInfo.providerID),
-    };
-  }, [contextInfo, sessionModels.options]);
   const sheetMountState = getContextSheetMountState(contextInfo, openContextSheetIdentity, {
     sessionId,
     autoApproveAvailable,
@@ -737,6 +748,28 @@ export function SessionDetailContent({
       ? modelOptions
       : [...modelOptions, lockedModelOption(pinned)];
   }, [modelLocked, pinned, modelOptions]);
+  // What the context sheet names as the session's model. The reported usage
+  // wins; before it arrives the sheet names the model the composer chip shows,
+  // resolved through the same catalog rows.
+  const contextModelAndProvider = useMemo(() => {
+    if (!contextInfo) {
+      return resolveSelectionModelDisplay(displayModel, modelOptionsForToolbar);
+    }
+    const match = modelOptionsForToolbar.find(
+      option =>
+        (option.modelRef?.providerID === contextInfo.providerID &&
+          option.modelRef.modelID === contextInfo.modelID) ||
+        (contextInfo.providerID === 'kilo' &&
+          option.showGatewayMetadata &&
+          option.id === contextInfo.modelID)
+    );
+    return {
+      model: match?.name ?? match?.displayId ?? contextInfo.modelID,
+      provider:
+        match?.provider?.name ??
+        (contextInfo.providerID === 'kilo' ? 'Kilo' : contextInfo.providerID),
+    };
+  }, [contextInfo, displayModel, modelOptionsForToolbar]);
   const setSessionConfig = useSetAtom(manager.atoms.sessionConfig);
 
   // Sync the cloud-agent override to the selected agent's pin (or clear it)
@@ -1337,6 +1370,15 @@ export function SessionDetailContent({
     composerControlRef.current?.setText(text);
   }, []);
 
+  // Where the account settles a turn its balance refused. The action reads no
+  // session state, so it stays wired for a read-only transcript too. It reads
+  // the router through the ref `renderItem` already holds its identity across a
+  // publish with: a router object captured here would re-create the callback on
+  // every render that returns a new one, and with it every memoized row.
+  const handleAddCredits = useCallback(() => {
+    routerRef.current.push('/(app)/credits' as Href);
+  }, []);
+
   const handleRetryMessage = useCallback(
     (message: StoredMessage) => {
       // Read the live capability at tap time: a stale row could outlive the
@@ -1596,6 +1638,7 @@ export function SessionDetailContent({
           onLongPressDetails={handleOpenDetails}
           holdQueuedSlot={isStreaming && heldQueuedIds.has(item.message.info.id)}
           onRetryMessage={retryPrompt !== null ? handleRetryMessage : undefined}
+          onAddCredits={handleAddCredits}
           retryAvailable={retryAvailable}
           onCopyToComposer={handleCopyToComposer}
           onRestoreQueued={
@@ -1631,6 +1674,7 @@ export function SessionDetailContent({
       heldQueuedIds,
       retryAvailable,
       handleRetryMessage,
+      handleAddCredits,
       handleCopyToComposer,
       handleOpenDetails,
       handleRestoreQueued,
@@ -1651,7 +1695,7 @@ export function SessionDetailContent({
     // POP_TO reuses the `(tabs)` route under this screen and truncates every
     // `agent-chat` route above it, so a composer still on the stack under a
     // missing session is gone with it.
-    router.dismissTo(AGENTS_SESSIONS_HREF);
+    router.dismissTo(AGENTS_SESSIONS_INDEX_HREF);
   }, [router]);
 
   const handleModelSelect = useCallback(
@@ -1943,26 +1987,60 @@ export function SessionDetailContent({
   });
   const handleRenameSave = rename.submit;
   const handleRenameClose = rename.closeModal;
+  // The transcript paints a skeleton in two cases: the session's first page has
+  // not arrived, or its rows are mounted but still measuring behind the open
+  // gate. Either way the body is loading, so the chrome around it — the header
+  // pill's value slots and the bottom slot — keeps its loading shape until the
+  // body is painted. A failure, an agent status, or a pending ask is the
+  // session speaking, and each keeps the chrome it already has.
+  const transcriptRowsHidden = transcriptView === 'list' && !transcriptOpenSettled;
+  const isSessionChromePending =
+    (shouldShowLoading || transcriptView === 'older-loading' || transcriptRowsHidden) &&
+    terminalError === null &&
+    activeQuestion === null &&
+    activePermission === null;
+  // A settled stored session with an empty transcript has nothing for the
+  // header pill to show and nothing for its sheet to do: it reports no usage,
+  // and a session opened read-only cannot auto-approve, so the pill would only
+  // paint its two dash placeholders beside the finished empty state (design
+  // gate, empty read-only fixture). The pill keeps its reserved box instead,
+  // exactly like the unresolved placeholder; a failed open keeps the live
+  // control, whose sheet still offers the connection reading and its Retry.
+  const contextPillHasNothingToReport =
+    isReadOnly &&
+    messages.length === 0 &&
+    contextInfo === undefined &&
+    terminalError === null &&
+    !isSessionChromePending;
   const headerRight = (
     <View className="min-w-0 shrink flex-row items-center gap-2">
       <SessionFollowButton sessionId={sessionId} />
       <SessionContextMetrics
         info={contextInfo}
         totalCostMicrodollars={totalMicrodollars}
-        hasMessages={messages.length > 0}
+        // The pill's value slots read as a settled session. While the body is
+        // still a skeleton they belong to the loading shape instead, so the
+        // pill keeps the bars that hold the row the values will take.
+        hasMessages={messages.length > 0 && !isSessionChromePending}
         autoApproveAvailable={autoApproveAvailable}
-        loading={shouldShowLoading}
+        loading={isSessionChromePending}
+        onNothingToReport={contextPillHasNothingToReport}
         // The sheet is the session's own context/permission surface, so the
         // control opens it in every state of this screen — including while the
         // transcript is still loading and after a failed open. A state that
-        // hides the control locks the user out of the settings behind it.
-        onPress={() => {
-          setOpenContextSheetIdentity({
-            sessionId,
-            providerID: contextInfo?.providerID,
-            modelID: contextInfo?.modelID,
-          });
-        }}
+        // hides the control locks the user out of the settings behind it; the
+        // one state with neither settings nor usage to open is excluded above.
+        onPress={
+          contextPillHasNothingToReport
+            ? undefined
+            : () => {
+                setOpenContextSheetIdentity({
+                  sessionId,
+                  providerID: contextInfo?.providerID,
+                  modelID: contextInfo?.modelID,
+                });
+              }
+        }
       />
     </View>
   );
@@ -2039,14 +2117,14 @@ export function SessionDetailContent({
   // placeholders, so neither offers a control. A failure, an agent status or a
   // pending ask is the session speaking, and each keeps the composer it already
   // has.
-  const isSessionStatePending =
-    shouldShowLoading &&
-    terminalError === null &&
-    activeQuestion === null &&
-    activePermission === null;
-  const isComposerVisible = !hasBlockingInteraction && !isReadOnlySession && !isSessionStatePending;
+  // The slot switches from its reserve to the session's own control only once
+  // the transcript is painted, not merely once the open resolves: a read-only
+  // footer above rows that are still skeletons is the same two states at once,
+  // so the reserve holds for that window too (see `isSessionChromePending`).
+  const isComposerVisible =
+    !hasBlockingInteraction && !isReadOnlySession && !isSessionChromePending;
   const isReadOnlyContinueVisible =
-    isReadOnlySession && !hasBlockingInteraction && !isSessionStatePending;
+    isReadOnlySession && !hasBlockingInteraction && !isSessionChromePending;
   // The pending slot holds the shape its session will end in. The kind is only
   // set once the transport answers, but the metadata read lands before that and
   // names a cloud-agent session, which is writable by construction; the id
@@ -2059,9 +2137,9 @@ export function SessionDetailContent({
     isWritableResolved ||
     (fetchedData?.kiloSessionId === sessionId && fetchedData.cloudAgentSessionId !== null);
   const isReadOnlyFooterPlaceholderVisible =
-    isSessionStatePending && !hasBlockingInteraction && !isPendingComposer;
+    isSessionChromePending && !hasBlockingInteraction && !isPendingComposer;
   const isComposerSkeletonVisible =
-    isSessionStatePending && !hasBlockingInteraction && isPendingComposer;
+    isSessionChromePending && !hasBlockingInteraction && isPendingComposer;
   // Structural locks only. The live send capability is passed separately so a
   // failed turn (or a session that has not resolved yet) keeps the input
   // editable beside the error's Retry instead of locking the composer.
@@ -2731,7 +2809,7 @@ export function SessionDetailContent({
           </View>
         ) : null}
 
-        {isReadOnlySession || isSessionStatePending ? null : (
+        {isReadOnlySession || isSessionChromePending ? null : (
           <View
             className={cn(hasBlockingInteraction && 'hidden')}
             accessibilityElementsHidden={hasBlockingInteraction}
@@ -2933,7 +3011,11 @@ export function SessionDetailContent({
       return (
         <EmptyState
           icon={MessageSquare}
-          title={t('agentChat.session.emptyTitle')}
+          title={
+            isReadOnly
+              ? t('agentChat.session.emptyReadOnlyTitle')
+              : t('agentChat.session.emptyTitle')
+          }
           description={isReadOnly ? undefined : t('agentChat.session.emptyDescription')}
         />
       );
@@ -2959,6 +3041,7 @@ export function SessionDetailContent({
             manager.trimRetainedHistory();
           }}
           onAnchorChange={handleAnchorChange}
+          onOpenSettledChange={handleOpenSettledChange}
           renderItem={renderItem}
           resumeAt={resumeAnchor}
           followTailNonce={followTailNonce}

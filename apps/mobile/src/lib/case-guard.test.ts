@@ -40,6 +40,7 @@ const ALLOWED_NON_DISPLAY: Readonly<Record<string, string>> = {
   'lib/use-new-session-repos.ts': 'repo key normalization',
   'lib/organization-invoice-download.ts': 'filename comparison',
   'lib/agent-attachments/validate.ts': 'file-extension normalization',
+  'lib/document-preview.ts': 'document MIME and file-extension normalization',
   'lib/agent-profile-forms.ts': 'environment-variable key normalization',
   'lib/chat/remote-mcp-store.ts': 'callable-name slug normalization',
   'lib/chat/backend-request.ts': 'HTTP header-name normalization',

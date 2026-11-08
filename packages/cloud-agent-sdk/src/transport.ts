@@ -105,6 +105,9 @@ type SendCommandPayload = {
   command: string;
   /** Verbatim args after the command name; kilo expands $1/$2/$ARGUMENTS. */
   arguments: string;
+  mode?: string;
+  model?: ModelRef;
+  variant?: string;
 };
 type TransportSendPayload = SendPromptPayload | SendCommandPayload;
 
@@ -115,7 +118,15 @@ type CloudAgentPromptPayload = {
   model: string;
   variant?: string;
 };
-type CloudAgentSendPayload = CloudAgentPromptPayload | SendCommandPayload;
+type CloudAgentCommandPayload = {
+  type: 'command';
+  command: string;
+  arguments: string;
+  mode?: string;
+  model?: string;
+  variant?: string;
+};
+type CloudAgentSendPayload = CloudAgentPromptPayload | CloudAgentCommandPayload;
 
 type TransportSendInput = {
   payload: TransportSendPayload;
@@ -230,6 +241,7 @@ type CloudAgentApi = {
 
 export type {
   CloudAgentApi,
+  CloudAgentCommandPayload,
   CloudAgentPromptPayload,
   CloudAgentSendPayload,
   CloudAgentStreamTicket,

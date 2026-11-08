@@ -8,6 +8,8 @@ import {
   linkPath,
   runMatrix,
   sampleUntilSettled,
+  screenFindings,
+  screenIdentity,
   waitForStableLayout,
   type CaptureContext,
   type Clock,
@@ -15,7 +17,7 @@ import {
 } from './capture';
 import type { ProbeClient } from './cdp';
 import { matrixCells } from './matrix';
-import type { ProbeDump } from './tree';
+import { normalize, type ProbeDump } from './tree';
 
 function fakeClock(): Clock & { elapsed: () => number } {
   let now = 0;
@@ -29,7 +31,16 @@ function fakeClock(): Clock & { elapsed: () => number } {
 }
 
 function dumpWith(
-  options: { y?: number; isRTL?: boolean; language?: string; route?: string; text?: string } = {}
+  options: {
+    y?: number;
+    isRTL?: boolean;
+    language?: string;
+    route?: string;
+    text?: string;
+    screen?: string;
+    opacity?: number;
+    display?: string;
+  } = {}
 ): ProbeDump {
   return {
     version: 1,
@@ -37,6 +48,7 @@ function dumpWith(
       platform: 'android',
       osVersion: '15',
       route: options.route ?? '/',
+      screen: options.screen,
       window: { width: 100, height: 200 },
       pixelRatio: 1,
       fontScale: 1,
@@ -54,6 +66,7 @@ function dumpWith(
         tag: 'Paragraph',
         rect: [10, options.y ?? 50, 50, 20],
         text: options.text ?? 'Title',
+        style: { opacity: options.opacity ?? 1, display: options.display ?? 'flex' },
       },
     ],
   };
@@ -88,6 +101,82 @@ test('sampleUntilSettled keeps observing for the window before settling', async 
   assert.equal(sampled.timeline.length, samples);
 });
 
+test('settling observes paint inputs and focused-screen changes with identical rectangles', async () => {
+  const clock = fakeClock();
+  const states = [
+    { screen: '(app)/agents', opacity: 0, display: 'none' },
+    { screen: '(app)/agents', opacity: 1, display: 'none' },
+    { screen: '(app)/agents', opacity: 1, display: 'flex' },
+    { screen: '(app)/settings', opacity: 1, display: 'flex' },
+  ];
+  let index = 0;
+  const sampled = await sampleUntilSettled(
+    {
+      dump: async () => dumpWith(states[Math.min(index++, states.length - 1)]),
+    },
+    clock
+  );
+  assert.equal(sampled.settled, true);
+  assert.equal(sampled.timeline.length, 6);
+  assert.equal(sampled.dump.env.screen, '(app)/settings');
+  assert.notEqual(
+    screenIdentity(dumpWith({ screen: '(app)/agents' })),
+    screenIdentity(dumpWith({ screen: '(app)/settings' }))
+  );
+  // Only the probe state settled. There was no pixel capture to certify paint.
+  assert.equal(sampled.alignment, undefined);
+});
+
+test('an unsettled tree preserves uncertainty without reporting intermediate geometry defects', () => {
+  const dump = dumpWith({ y: 195 });
+  const args = { cell: 'base', target: 'moving', dump, tree: normalize(dump) };
+  assert.ok(screenFindings(args).some(finding => finding.severity === 'error'));
+  const findings = screenFindings({
+    ...args,
+    sampled: {
+      dump,
+      timeline: [dumpWith({ y: 50 }), dump],
+      settled: false,
+      elapsedMs: 8_000,
+    },
+  });
+  assert.deepEqual(
+    findings.map(finding => finding.rule),
+    ['unsettled']
+  );
+  assert.match(findings[0]?.message ?? '', /layout rules were skipped/);
+});
+
+test('an unsettled final frame does not erase shifts between independently resting timeline segments', () => {
+  const dump = dumpWith({ y: 195 });
+  const findings = screenFindings({
+    cell: 'base',
+    target: 'moving',
+    dump,
+    tree: normalize(dump),
+    sampled: {
+      dump,
+      timeline: [
+        dumpWith({ y: 50 }),
+        dumpWith({ y: 50 }),
+        dumpWith({ y: 50 }),
+        dumpWith({ y: 80 }),
+        dumpWith({ y: 80 }),
+        dumpWith({ y: 80 }),
+        dump,
+      ],
+      settled: false,
+      elapsedMs: 8_000,
+    },
+  });
+  assert.deepEqual(
+    findings.map(finding => finding.rule),
+    ['layout-shift', 'unsettled']
+  );
+  assert.equal(findings[0]?.measured, 30);
+  assert.ok(!findings.some(finding => finding.rule === 'clipped' || finding.rule === 'cut-off'));
+});
+
 test('linkPath maps deep links to router paths', () => {
   assert.equal(linkPath('kiloapp:///login'), '/login');
   assert.equal(linkPath('kiloapp://sessions/abc?tab=1'), '/sessions/abc');
@@ -106,6 +195,7 @@ test('sampleUntilSettled gives up after 8 s', async () => {
 type ProbeState = {
   language: string;
   route: string;
+  screen?: string;
   text: string;
   languageCalls: string[];
   persisted: string;
@@ -132,6 +222,7 @@ function fakeProbe(state: ProbeState): ProbeClient {
         language: state.language,
         route: state.route,
         text: state.text,
+        screen: state.screen,
       }),
     setLanguage: async (preference, resolved) => {
       state.languageCalls.push(`${preference}/${resolved}`);
@@ -159,6 +250,7 @@ function fakeProbe(state: ProbeState): ProbeClient {
             language: state.language,
             route: state.route,
             text: state.text,
+            screen: state.screen,
           }),
         },
       ],
@@ -175,12 +267,14 @@ function fakeDevice(
     routes?: Record<string, string>;
     texts?: Record<string, string | string[]>;
     languages?: Record<string, string>;
+    screens?: Record<string, string>;
   } = {}
 ): Device {
   let current = 'base';
   state.open = url => {
     calls.push(`open:${url}`);
     state.route = options.routes?.[url] ?? `/${new URL(url).host}`;
+    state.screen = options.screens?.[url] ?? state.screen;
     // A text list models a router that reports the target route while the
     // previous screen is still on glass; the last entry repeats.
     const texts = options.texts?.[url];
@@ -215,7 +309,11 @@ function context(device: Device, probe: ProbeClient): CaptureContext {
     probe,
     clock: fakeClock(),
     out: fs.mkdtempSync(path.join(os.tmpdir(), 'design-gate-test-')),
-    readImage: () => ({ width: 100, height: 200, data: new Uint8Array(100 * 200 * 4) }),
+    readImage: () => {
+      const data = new Uint8Array(100 * 200 * 4).fill(255);
+      data[0] = 0;
+      return { width: 100, height: 200, data };
+    },
     observeMs: 0,
     log: () => undefined,
   };
@@ -471,6 +569,25 @@ test('runMatrix restores device and language when a capture fails', async () => 
   );
   assert.deepEqual(state.languageCalls, ['ar/ar', 'system/en']);
   assert.equal(calls.at(-1), 'restore');
+  assert.ok(fs.existsSync(path.join(ctx.out, 'cells/rtl/home.json')));
+  assert.ok(fs.existsSync(path.join(ctx.out, 'cells/rtl/home.timeline.json')));
+});
+
+test('a screenshot decode failure preserves the latest tree and collected timeline', async () => {
+  const calls: string[] = [];
+  const state = probeState();
+  const ctx = context(fakeDevice(calls, state), fakeProbe(state));
+  ctx.readImage = () => {
+    throw new Error('decode failed');
+  };
+  await assert.rejects(runMatrix(ctx, matrixCells('android', 'base'), HOME), /decode failed/);
+  const dump: ProbeDump = JSON.parse(
+    fs.readFileSync(path.join(ctx.out, 'cells/base/home.json'), 'utf8')
+  );
+  assert.equal(dump.nodes[1]?.text, 'Screen /home');
+  assert.ok(fs.existsSync(path.join(ctx.out, 'cells/base/home.timeline.json')));
+  assert.ok(fs.existsSync(path.join(ctx.out, 'cells/base/home.png')));
+  assert.equal(calls.at(-1), 'restore');
 });
 
 test('a capture returns the device to touch mode before it opens each link', async () => {
@@ -493,4 +610,151 @@ test('a capture returns the device to touch mode before it opens each link', asy
     calls.filter(call => call.startsWith('open:')),
     ['open:kiloapp://a', 'open:kiloapp://b']
   );
+});
+
+test('capture brackets the screenshot with the latest tree and persists alignment evidence', async () => {
+  const calls: string[] = [];
+  const state = probeState();
+  const probe = fakeProbe(state);
+  const originalStop = probe.stopSampling;
+  probe.stopSampling = async () => {
+    const samples = await originalStop();
+    state.text = 'Latest before capture';
+    return samples;
+  };
+  const ctx = context(fakeDevice(calls, state), probe);
+  const outcome = await runMatrix(ctx, matrixCells('android', 'base'), HOME);
+  const screen = outcome.cells[0]?.screens[0];
+  assert.ok(screen?.capture);
+  const dump: ProbeDump = JSON.parse(fs.readFileSync(path.join(ctx.out, screen.dump), 'utf8'));
+  const alignment = JSON.parse(fs.readFileSync(path.join(ctx.out, screen.capture), 'utf8'));
+  assert.equal(dump.nodes[1]?.text, 'Latest before capture');
+  assert.ok(outcome.findings.some(finding => finding.rule === 'unsettled'));
+  assert.equal(alignment.status, 'bracketed');
+  assert.equal(alignment.before.dump.nodes[1].text, 'Latest before capture');
+  assert.equal(alignment.after.dump.nodes[1].text, 'Latest before capture');
+  assert.match(alignment.reason, /paint is not certified/);
+});
+
+test('capture retains a mismatched screenshot and reports inconclusive pixel alignment', async () => {
+  const calls: string[] = [];
+  const state = probeState();
+  const device = fakeDevice(calls, state);
+  const screenshot = device.screenshot;
+  let captures = 0;
+  device.screenshot = file => {
+    captures += 1;
+    screenshot(file);
+    state.text = 'Changed during screenshot';
+  };
+  const ctx = context(device, fakeProbe(state));
+  ctx.readImage = () => ({
+    width: 100,
+    height: 200,
+    data: new Uint8Array(100 * 200 * 4).fill(255),
+  });
+  const outcome = await runMatrix(ctx, matrixCells('android', 'base'), HOME);
+  assert.equal(captures, 1);
+  assert.ok(outcome.findings.some(finding => finding.rule === 'blank-frame'));
+  assert.equal(
+    outcome.findings.find(finding => finding.rule === 'capture-alignment')?.severity,
+    'warning'
+  );
+  const screen = outcome.cells[0]?.screens[0];
+  assert.ok(screen?.capture);
+  const alignment = JSON.parse(fs.readFileSync(path.join(ctx.out, screen.capture), 'utf8'));
+  assert.equal(alignment.status, 'mismatch');
+  assert.ok(fs.existsSync(path.join(ctx.out, screen.screenshot)));
+});
+
+test('capture marks slow bracketing reads inconclusive instead of certifying paint', async () => {
+  const calls: string[] = [];
+  const state = probeState();
+  const device = fakeDevice(calls, state);
+  const probe = fakeProbe(state);
+  const ctx = context(device, probe);
+  const screenshot = device.screenshot;
+  let captured = false;
+  device.screenshot = file => {
+    screenshot(file);
+    captured = true;
+  };
+  const originalDump = probe.dump;
+  probe.dump = async () => {
+    if (captured) await ctx.clock.sleep(2_001);
+    return originalDump();
+  };
+  const outcome = await runMatrix(ctx, matrixCells('android', 'base'), HOME);
+  const screen = outcome.cells[0]?.screens[0];
+  assert.ok(screen?.capture);
+  const alignment = JSON.parse(fs.readFileSync(path.join(ctx.out, screen.capture), 'utf8'));
+  assert.equal(alignment.status, 'inconclusive');
+  assert.match(alignment.reason, /bounded alignment window/);
+  assert.ok(outcome.findings.some(finding => finding.rule === 'capture-alignment'));
+});
+
+test('uniform captured content remains visible as possible blank-frame evidence without recapture', async () => {
+  const calls: string[] = [];
+  const state = probeState();
+  const device = fakeDevice(calls, state);
+  const screenshot = device.screenshot;
+  let captures = 0;
+  device.screenshot = file => {
+    captures += 1;
+    screenshot(file);
+  };
+  const ctx = context(device, fakeProbe(state));
+  ctx.readImage = () => ({
+    width: 100,
+    height: 200,
+    data: new Uint8Array(100 * 200 * 4).fill(255),
+  });
+  const outcome = await runMatrix(ctx, matrixCells('android', 'base'), HOME);
+  assert.equal(captures, 1);
+  const blank = outcome.findings.find(finding => finding.rule === 'blank-frame');
+  assert.equal(blank?.severity, 'warning');
+  assert.match(blank?.message ?? '', /not proof of a product defect/);
+  const screen = outcome.cells[0]?.screens[0];
+  assert.ok(screen?.capture);
+  const alignment = JSON.parse(fs.readFileSync(path.join(ctx.out, screen.capture), 'utf8'));
+  assert.equal(alignment.pixels, 'uniform');
+  assert.equal(alignment.status, 'bracketed');
+  assert.ok(fs.existsSync(path.join(ctx.out, screen.screenshot)));
+});
+
+test('an intentionally empty uniform viewport does not become a blank-frame finding', async () => {
+  const calls: string[] = [];
+  const state = probeState();
+  const ctx = context(
+    fakeDevice(calls, state, { texts: { 'kiloapp://home': '' } }),
+    fakeProbe(state)
+  );
+  ctx.readImage = () => ({
+    width: 100,
+    height: 200,
+    data: new Uint8Array(100 * 200 * 4).fill(255),
+  });
+  const outcome = await runMatrix(ctx, matrixCells('android', 'base'), HOME);
+  assert.ok(!outcome.findings.some(finding => finding.rule === 'blank-frame'));
+});
+
+test('a focused-screen transition is retained when route, text and geometry stay identical', async () => {
+  const calls: string[] = [];
+  const state = probeState();
+  state.screen = '(app)/(tabs)/agents';
+  const ctx = context(
+    fakeDevice(calls, state, {
+      routes: { 'kiloapp://settings': '/' },
+      texts: { 'kiloapp://settings': screenTextFor('/') },
+      screens: { 'kiloapp://settings': '(app)/(tabs)/settings' },
+    }),
+    fakeProbe(state)
+  );
+  const outcome = await runMatrix(ctx, matrixCells('android', 'base'), [
+    { id: 'settings', link: 'kiloapp://settings' },
+  ]);
+  assert.equal(calls.filter(call => call === 'open:kiloapp://settings').length, 1);
+  assert.ok(!outcome.findings.some(finding => finding.rule === 'env-mismatch'));
+  const screen = outcome.cells[0]?.screens[0];
+  assert.equal(screen?.env.screen, '(app)/(tabs)/settings');
 });

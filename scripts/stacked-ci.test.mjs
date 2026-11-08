@@ -8,7 +8,25 @@ import { load } from 'js-yaml';
 const rootPath = '.github/workflows/ci.yml';
 const mobilePath = '.github/workflows/kilo-app-ci.yml';
 const checkPath = 'scripts/stacked-ci.test.mjs';
-const command = `node --test ${checkPath}`;
+// ci-wiring runs the wiring suites in one `node --test` invocation. The exact
+// command is pinned here, so splitting the suite back into per-file steps, or
+// dropping or reordering a suite, fails this validation.
+const wiringSuites = [
+  checkPath,
+  'scripts/changed-dependencies.test.mjs',
+  'scripts/build-key-inputs.test.mjs',
+  'scripts/ttsc-plugin-key.test.mjs',
+  'scripts/affected-workspaces.test.mjs',
+  'scripts/changed-workspaces.test.mjs',
+  'scripts/changes-filter-retry.test.mjs',
+  'scripts/typecheck-ci.test.mjs',
+  'scripts/deployment-workflows.test.mjs',
+  'scripts/main-workflow-failure.test.mjs',
+  'scripts/production-deploy-failure.test.mjs',
+  'scripts/meta-janitor-approve.test.mjs',
+  'scripts/mobile-sbom-workflow.test.mjs',
+];
+const command = `node --test ${wiringSuites.join(' ')}`;
 // The path families the mobile change-detection grep must recognise. The PR
 // admission and the `push` trigger carry no filter, so this grep is the only
 // thing that gates the suite; a dropped or mistyped family silently reports
@@ -54,10 +72,19 @@ function admits(workflow, event, base, files) {
   );
 }
 
+// The job runs exactly when a path its suites read changed. A run that changes
+// no workflow, action, script or manifest cannot change what this check decides,
+// and the required `test` fan-in passes a skipped job, so the gate itself must be
+// exact: a wider skip, or a different output, would drop the admission silently.
+const wiringGate = { needs: 'changes', if: "needs.changes.outputs.wiring == 'true'" };
+
 function validateCheck(workflow, jobName) {
   const job = workflow.jobs[jobName];
-  assert.equal(job.if, undefined, `${jobName}: check job must be unconditional`);
-  assert.equal(job.needs, undefined, `${jobName}: check job must not depend on filtering`);
+  assert.deepEqual(
+    { needs: job.needs, if: job.if },
+    wiringGate,
+    `${jobName}: the check must run exactly when the changes job reports a wiring change`
+  );
   assert.equal(job['continue-on-error'], undefined, `${jobName}: check failure must fail the job`);
   const steps = job.steps;
   const checks = steps.filter(step => step.run === command);
@@ -166,6 +193,7 @@ for (const [index, jobName] of [[0, 'ci-wiring']]) {
     'missing',
     'conditional-step',
     'conditional-job',
+    'ungated',
     'ignored',
     'directory',
     'before-install',
@@ -179,6 +207,10 @@ for (const [index, jobName] of [[0, 'ci-wiring']]) {
       if (defect === 'missing') job.steps.splice(checkIndex, 1);
       if (defect === 'conditional-step') check.if = 'false';
       if (defect === 'conditional-job') job.if = 'false';
+      if (defect === 'ungated') {
+        delete job.if;
+        delete job.needs;
+      }
       if (defect === 'ignored') check['continue-on-error'] = true;
       if (defect === 'directory') job.defaults = { run: { 'working-directory': 'apps/mobile' } };
       if (defect === 'before-install') job.steps.unshift(...job.steps.splice(checkIndex, 1));

@@ -22,7 +22,7 @@ import * as z from 'zod';
 import {
   updateCodeReviewStatus,
   updateCodeReviewStatusIfNonTerminal,
-  updateCodeReviewUsage,
+  backfillCodeReviewUsage,
   getCodeReviewById,
   getSessionUsageFromBilling,
   updateCodeReviewAttemptForCallback,
@@ -743,7 +743,7 @@ async function getReviewUsageData(reviewId: string) {
     return persistedUsage;
   }
 
-  updateCodeReviewUsage(reviewId, {
+  backfillCodeReviewUsage(reviewId, {
     ...(review.model == null ? { model: billing.model } : {}),
     totalTokensIn: billing.totalTokensIn,
     totalTokensOut: billing.totalTokensOut,

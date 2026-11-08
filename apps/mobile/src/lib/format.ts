@@ -42,6 +42,31 @@ export function formatMoney(amount: number, locale: string): string {
 }
 
 /**
+ * A USD amount with the symbol in front of the number whatever the locale's
+ * money pattern says. A right-to-left language puts the currency behind the
+ * amount behind a no-break space ("0.00 $"), which reads as a different figure
+ * beside the "$0.00" the same screen paints elsewhere; here the digits and
+ * their separators are the locale's, and the sign the locale writes leads the
+ * symbol (`-$5.00`, or the locale's own minus glyph).
+ */
+export function formatPrefixedUsd(
+  amount: number,
+  locale: string,
+  options: Intl.NumberFormatOptions = {}
+): string {
+  const parts = numberFormat(locale, { ...options, style: 'decimal' }).formatToParts(amount);
+  const sign = parts
+    .filter(candidate => candidate.type === 'minusSign')
+    .map(candidate => candidate.value)
+    .join('');
+  const digits = parts
+    .filter(candidate => candidate.type !== 'minusSign')
+    .map(candidate => candidate.value)
+    .join('');
+  return `${sign}$${digits}`;
+}
+
+/**
  * Currency with an explicit fraction-digit count. Session cost surfaces need
  * four decimals below half a cent and two above; the shared `formatMoney`
  * always pins two.
@@ -164,7 +189,9 @@ export function formatFileSize(bytes: number, locale: string): string {
   return formatNumber(value, locale, {
     style: 'unit',
     unit: units[unit],
-    unitDisplay: 'short',
+    // CLDR has no plural for the abbreviated byte unit ("564 byte"), so a whole
+    // byte count takes the long form: "1 byte", "564 bytes", "564 octets".
+    unitDisplay: unit === 0 ? 'long' : 'short',
     maximumFractionDigits: unit === 0 ? 0 : 2,
   });
 }

@@ -31,6 +31,10 @@ const listState = vi.hoisted(() => ({
   storedIsFetching: false,
   storedFetchedSinceMount: true,
   storedLoadedPageCount: 1,
+  hasNextPage: false,
+  isFetchingNextPage: false,
+  isFetchNextPageError: false,
+  fetchNextPage: vi.fn<() => Promise<void>>(),
   organization: { organizationId: null as string | null, isLoaded: true },
   organizations: [] as { organizationId: string; organizationName: string }[],
   storedQuery: vi.fn<(options: Parameters<typeof useAgentSessions>[0]) => void>(),
@@ -198,9 +202,10 @@ vi.mock('@/lib/hooks/use-agent-sessions', async () => {
         storedIsFetching: listState.storedIsFetching,
         storedFetchedSinceMount: listState.storedFetchedSinceMount,
         storedLoadedPageCount: listState.storedLoadedPageCount,
-        hasNextPage: false,
-        isFetchingNextPage: false,
-        fetchNextPage: vi.fn(),
+        hasNextPage: listState.hasNextPage,
+        isFetchingNextPage: listState.isFetchingNextPage,
+        isFetchNextPageError: listState.isFetchNextPageError,
+        fetchNextPage: listState.fetchNextPage,
         refetch: handleRefetchSpy,
       };
     },
@@ -211,10 +216,11 @@ vi.mock('@/lib/hooks/use-agent-sessions', async () => {
         isError: listState.isError,
         isFetching: false,
         isPending: false,
-        hasNextPage: false,
-        isFetchingNextPage: false,
+        hasNextPage: listState.hasNextPage,
+        isFetchingNextPage: listState.isFetchingNextPage,
+        isFetchNextPageError: listState.isFetchNextPageError,
         isPlaceholderData: false,
-        fetchNextPage: vi.fn(),
+        fetchNextPage: listState.fetchNextPage,
         refetch: handleRefetchSpy,
       };
     },
@@ -343,6 +349,10 @@ describe('SessionHistoryScreen', () => {
     listState.storedIsFetching = false;
     listState.storedFetchedSinceMount = true;
     listState.storedLoadedPageCount = 1;
+    listState.hasNextPage = false;
+    listState.isFetchingNextPage = false;
+    listState.isFetchNextPageError = false;
+    listState.fetchNextPage.mockClear();
     Object.assign(listState.organization, { organizationId: null, isLoaded: true });
     listState.organizations = [];
     listState.storedQuery.mockClear();
@@ -948,5 +958,50 @@ describe('SessionHistoryScreen', () => {
 
     expect(findNodeByType(renderer, 'KeyboardAvoidingView')).toBe(container);
     expect(container.findAllByType('AgentSessionListContent')).toHaveLength(1);
+  });
+
+  it('hands a failed next page to the body and retries it from there', async () => {
+    listState.storedSessions = sessions;
+    listState.hasNextPage = true;
+    listState.isFetchNextPageError = true;
+    const renderer = await renderScreen();
+
+    const content = findNodeByType(renderer, 'AgentSessionListContent');
+    expect(content.props.isFetchNextPageError).toBe(true);
+    // The loaded rows stay rendered: a failed older page never replaces them.
+    expect(storedSessionIds(renderer)).toEqual(['workflow', 'code-cloud', 'code-cli', 'other']);
+
+    act(() => {
+      (content.props.onRetryNextPage as () => void)();
+    });
+    expect(listState.fetchNextPage).toHaveBeenCalledOnce();
+  });
+
+  it('stops auto-loading at the end of the list while the failed page stands', async () => {
+    listState.storedSessions = sessions;
+    listState.hasNextPage = true;
+    listState.isFetchNextPageError = true;
+    const renderer = await renderScreen();
+
+    // The end of a list is reached again on every content-size change, and the
+    // footer's retry line changes it. Re-firing there would replace the retry
+    // with another failing request before the reader could tap it.
+    act(() => {
+      (findNodeByType(renderer, 'AgentSessionListContent').props.onEndReached as () => void)();
+    });
+    expect(listState.fetchNextPage).not.toHaveBeenCalled();
+  });
+
+  it('loads the next page on end-reach once the previous attempt succeeded', async () => {
+    listState.storedSessions = sessions;
+    listState.hasNextPage = true;
+    const renderer = await renderScreen();
+
+    const content = findNodeByType(renderer, 'AgentSessionListContent');
+    expect(content.props.isFetchNextPageError).toBe(false);
+    act(() => {
+      (content.props.onEndReached as () => void)();
+    });
+    expect(listState.fetchNextPage).toHaveBeenCalledOnce();
   });
 });

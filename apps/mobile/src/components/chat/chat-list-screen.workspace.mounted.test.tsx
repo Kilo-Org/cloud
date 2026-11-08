@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- the account row is proven against the real account provider and picker, which needs the app's whole provider-mock surface in one file. */
-import { createElement, type ReactNode } from 'react';
+import { createElement, type ReactNode, useEffect } from 'react';
 import { act, type ReactTestInstance } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -115,7 +115,14 @@ vi.mock('@/lib/tab-bar-layout', () => ({ getEffectiveTabBarHeight: () => 0 }));
 vi.mock('sonner-native', () => ({
   toast: { error: state.toastError, dismiss: state.toastDismiss },
 }));
-vi.mock('expo-router', () => ({ useRouter: () => ({ push: state.push }) }));
+vi.mock('expo-router', () => ({
+  useRouter: () => ({ push: state.push }),
+  // The account picker closes itself on the owning screen's focus loss; this
+  // suite keeps the screen focused, so the effect lives as long as the tree.
+  useFocusEffect: (effect: Parameters<typeof useEffect>[0]) => {
+    useEffect(effect, [effect]);
+  },
+}));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));

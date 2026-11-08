@@ -88,6 +88,17 @@ const contentLayout: Partial<LayoutChangeEvent> = {
   nativeEvent: { layout: { x: 0, y: 0, width: 400, height: 700 } },
 };
 
+/**
+ * The placement a state carries while its geometry is pending or rejected: the
+ * content stays where it is, centered, until a measurement places it.
+ */
+const UNPLACED_FALLBACK_STYLE = {
+  flexGrow: 1,
+  justifyContent: 'center',
+  paddingTop: 16,
+  paddingBottom: 16,
+};
+
 async function mount(props: Partial<ComponentPropsWithRef<typeof CenteredState>> = {}) {
   let rerender: (() => void) | undefined = undefined;
   function Harness() {
@@ -274,33 +285,51 @@ describe('CenteredState measurements', () => {
     mounted.unmount();
   });
 
-  it('rejects old viewport results after the surface changes', async () => {
+  it('keeps a revealed state on screen and ignores stale geometry after the surface changes', async () => {
     const mounted = await mount();
     mounted.settle();
     act(() => {
       mounted.scroll().onLayout?.(contentLayout as LayoutChangeEvent);
     });
+    expect(mounted.scroll().contentContainerStyle).toMatchObject({ minHeight: 340 });
     const stale = native.measurements.splice(0);
     native.surface.frame = { top: 300, bottom: 800 };
     mounted.rerender();
-    expect(mounted.content().accessibilityElementsHidden).toBe(true);
+    // The measured placement drops back to the centering fallback, but the
+    // state stays painted: a surface change never blanks what is on screen.
+    expect(mounted.content().accessibilityElementsHidden).toBe(false);
+    expect(mounted.scroll().contentContainerStyle).toEqual({
+      flexGrow: 1,
+      justifyContent: 'center',
+      paddingTop: 16,
+      paddingBottom: 16,
+    });
     act(() => {
       for (const onMeasure of stale) {
         onMeasure(0, 80, 400, 340);
       }
     });
-    expect(mounted.content().accessibilityElementsHidden).toBe(true);
+    // A viewport measured against the old frame is not reused for the new one.
+    expect(mounted.content().accessibilityElementsHidden).toBe(false);
+    expect(mounted.scroll().contentContainerStyle).toEqual({
+      flexGrow: 1,
+      justifyContent: 'center',
+      paddingTop: 16,
+      paddingBottom: 16,
+    });
     mounted.settle(380, 340);
     expect(mounted.content().accessibilityElementsHidden).toBe(false);
+    expect(mounted.scroll().contentContainerStyle).toMatchObject({ minHeight: 340 });
     mounted.unmount();
   });
 
-  it('clears readiness on detach and ignores the detached request', async () => {
+  it('keeps a revealed state on screen with its placement when its scroller detaches', async () => {
     const mounted = await mount();
     mounted.settle();
     act(() => {
       mounted.scroll().onLayout?.(contentLayout as LayoutChangeEvent);
     });
+    const placed = mounted.scroll().contentContainerStyle;
     const stale = native.measurements.splice(0);
     const props = mounted.renderer.root.findByType(ScrollView).props as ComponentPropsWithRef<
       typeof ScrollView
@@ -312,38 +341,55 @@ describe('CenteredState measurements', () => {
     act(() => {
       ref(null);
     });
-    expect(mounted.content().accessibilityElementsHidden).toBe(true);
+    // The host view re-attaches on a screen's return, and the band it had is
+    // the band it still has: the placement must survive the gap rather than
+    // re-center and jump back.
+    expect(mounted.content().accessibilityElementsHidden).toBe(false);
+    expect(mounted.scroll().contentContainerStyle).toEqual(placed);
     act(() => {
       for (const onMeasure of stale) {
         onMeasure(0, 80, 400, 340);
       }
     });
-    expect(mounted.content().accessibilityElementsHidden).toBe(true);
+    expect(mounted.content().accessibilityElementsHidden).toBe(false);
+    expect(mounted.scroll().contentContainerStyle).toEqual(placed);
     act(() => {
       ref(native.scroll as ScrollViewInstance);
     });
     mounted.settle();
     expect(mounted.content().accessibilityElementsHidden).toBe(false);
+    expect(mounted.scroll().contentContainerStyle).toEqual(placed);
     mounted.unmount();
   });
 
-  it('waits for a new valid measurement after the surface detaches', async () => {
+  it('keeps the painted state visible while the surface re-measures', async () => {
     const mounted = await mount();
     mounted.settle();
+    expect(mounted.content().accessibilityElementsHidden).toBe(false);
     const frame = native.surface.frame;
     native.surface.frame = null;
     mounted.rerender();
-    expect(mounted.content().accessibilityElementsHidden).toBe(true);
+    // The placement falls back to the centering style, the state stays painted.
+    expect(mounted.content().accessibilityElementsHidden).toBe(false);
+    expect(mounted.scroll().contentContainerStyle).toEqual(UNPLACED_FALLBACK_STYLE);
     native.surface.frame = frame;
     mounted.rerender();
-    expect(mounted.content().accessibilityElementsHidden).toBe(true);
+    expect(mounted.content().accessibilityElementsHidden).toBe(false);
+    expect(mounted.scroll().contentContainerStyle).toEqual(UNPLACED_FALLBACK_STYLE);
     mounted.settle(0, 0);
-    expect(mounted.content().accessibilityElementsHidden).toBe(true);
+    expect(mounted.content().accessibilityElementsHidden).toBe(false);
+    expect(mounted.scroll().contentContainerStyle).toEqual(UNPLACED_FALLBACK_STYLE);
     act(() => {
       mounted.scroll().onLayout?.(contentLayout as LayoutChangeEvent);
     });
     mounted.settle();
     expect(mounted.content().accessibilityElementsHidden).toBe(false);
+    expect(mounted.scroll().contentContainerStyle).toEqual({
+      flexGrow: 1,
+      minHeight: 340,
+      paddingTop: 16,
+      paddingBottom: 16,
+    });
     mounted.unmount();
   });
 });
@@ -389,6 +435,38 @@ describe('CenteredState measurement fallback', () => {
         await Promise.resolve();
       });
       expect(mounted.content().accessibilityElementsHidden).toBe(true);
+      mounted.unmount();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps a revealed state visible when the measurement run never settles', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      // A restored route measures late, and the surface can detach and
+      // re-attach several times while the tab bar and the nav transition land.
+      // Every 'ready' transition used to re-arm the hidden window, so a run of
+      // them left a settled state (an empty history body) invisible for
+      // seconds. The reveal must be latched for the mount instead.
+      const mounted = await mount();
+      await act(async () => {
+        vi.advanceTimersByTime(STATE_SURFACE_FALLBACK_MS);
+        await Promise.resolve();
+      });
+      expect(mounted.content().accessibilityElementsHidden).toBe(false);
+
+      const cycle = () => {
+        native.surface.frame = null;
+        mounted.rerender();
+        expect(mounted.content().accessibilityElementsHidden).toBe(false);
+        native.surface.frame = { top: 0, bottom: 500 };
+        mounted.rerender();
+        expect(mounted.content().accessibilityElementsHidden).toBe(false);
+      };
+      cycle();
+      cycle();
+      cycle();
       mounted.unmount();
     } finally {
       vi.useRealTimers();

@@ -2374,6 +2374,27 @@
       "when": 1793899074271,
       "tag": "0338_support_access_grants",
       "breakpoints": true
+    },
+    {
+      "idx": 339,
+      "version": "7",
+      "when": 1793911550611,
+      "tag": "0339_public_roland_deschain",
+      "breakpoints": true
+    },
+    {
+      "idx": 340,
+      "version": "7",
+      "when": 1793960900444,
+      "tag": "0340_cloud_agent_builtin_agent_settings",
+      "breakpoints": true
+    },
+    {
+      "idx": 341,
+      "version": "7",
+      "when": 1793981793196,
+      "tag": "0341_claude_billing_connections",
+      "breakpoints": true
     }
   ]
 }

@@ -2,6 +2,7 @@ import { after, type NextResponse as NextResponseType } from 'next/server';
 import type { Span } from '@sentry/nextjs';
 import type { User } from '@kilocode/db';
 import { applyUpstreamErrorPolicy } from '@kilocode/web-shared/lib/ai-gateway/upstream-error-policy';
+import { REPLACED_ANSWER_HEADER } from '@kilocode/web-shared/lib/ai-gateway/replaced-answer-header';
 import { recordBriefingUsage } from '@kilocode/web-shared/lib/agent-briefing-usage';
 import type { sendUpstreamAttempt } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-attempt';
 import type { GetProviderProviderResult } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
@@ -108,6 +109,16 @@ export async function respondToUpstream(input: RespondInput): Promise<NextRespon
     input.upstreamSpan,
     provider
   );
+  // This answer is now accounted, so a decline that replaces it may already be
+  // charged. `x-should-retry` describes the replacement's own condition, such as an
+  // unavailable output guardrail, not the charge: the marker is what tells a client
+  // that a repeat can pay for the same generation twice. A decline of an upstream
+  // error is not marked, because that error carries no usage to charge again.
+  const answered = response.ok;
+  const declineAfterAnswer = <T extends Response>(replacement: T): T => {
+    if (answered && !replacement.ok) replacement.headers.set(REPLACED_ANSWER_HEADER, 'true');
+    return replacement;
+  };
   const settlementToken = input.briefingSettlementToken;
   const sessionId = usageContext.session_id;
   if (
@@ -150,7 +161,7 @@ export async function respondToUpstream(input: RespondInput): Promise<NextRespon
       logging: input.logging,
       error: null,
     });
-    return errorResponse;
+    return declineAfterAnswer(errorResponse);
   }
 
   let outputRequestLogs: RequestLoggingParams['enkrypt'];
@@ -164,37 +175,39 @@ export async function respondToUpstream(input: RespondInput): Promise<NextRespon
       return [...(inputLogs ?? []), ...(outputLogs ?? [])];
     },
   };
-  return await guardEnkryptOutput({
-    response,
-    scan: input.enkryptOutputScan,
-    kind: request.kind,
-    stream: usageContext.isStreaming,
-    signal: input.signal,
-    release: released =>
-      rewriteModelResponse({
-        response: released,
-        model,
-        providerId: provider.type,
-        kind: request.kind,
-        isFree: usageContext.is_free,
-        userByok: usageContext.user_byok,
-        customLlmPricing: usageContext.custom_llm_pricing,
-        logging,
-        responseTransforms: provider.responseTransforms,
-      }),
-    captureReport: input.captureEnkryptOutputReport,
-    captureRequestLogs: logs => {
-      outputRequestLogs = logs;
-    },
-    onReject: async (rejection, verdict) => {
-      if (input.signal.aborted) return;
-      await logUnrewrittenResponse({
-        response: rejection.clone(),
-        model,
-        providerId: provider.type,
-        logging,
-        error: { guardrail_rejection: verdict.action, guardrail: 'output' },
-      });
-    },
-  });
+  return declineAfterAnswer(
+    await guardEnkryptOutput({
+      response,
+      scan: input.enkryptOutputScan,
+      kind: request.kind,
+      stream: usageContext.isStreaming,
+      signal: input.signal,
+      release: released =>
+        rewriteModelResponse({
+          response: released,
+          model,
+          providerId: provider.type,
+          kind: request.kind,
+          isFree: usageContext.is_free,
+          userByok: usageContext.user_byok,
+          customLlmPricing: usageContext.custom_llm_pricing,
+          logging,
+          responseTransforms: provider.responseTransforms,
+        }),
+      captureReport: input.captureEnkryptOutputReport,
+      captureRequestLogs: logs => {
+        outputRequestLogs = logs;
+      },
+      onReject: async (rejection, verdict) => {
+        if (input.signal.aborted) return;
+        await logUnrewrittenResponse({
+          response: rejection.clone(),
+          model,
+          providerId: provider.type,
+          logging,
+          error: { guardrail_rejection: verdict.action, guardrail: 'output' },
+        });
+      },
+    })
+  );
 }

@@ -5,13 +5,13 @@ import { knownServerErrorMessage } from '@/lib/server-error-copy';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 
 /**
- * The procedure's own address rule (`z.email('Invalid email address')` on
- * `InviteMemberSchema` in `organization-members-router.ts`). Mirroring it here
- * means the field can never enable Send for an entry the server rejects, so a
- * malformed address is reported where it was typed instead of after a round
- * trip.
+ * The procedure's own address rule (`z.email('Invalid email address').max(254)`
+ * on `InviteMemberSchema` in `organization-members-router.ts`). Mirroring it
+ * here means the field can never enable Send for an entry the server rejects,
+ * so a malformed or over-length address is reported where it was typed instead
+ * of after a round trip.
  */
-const EMAIL_SCHEMA = z.email();
+const EMAIL_SCHEMA = z.email().max(254);
 
 export function inviteEmailError(value: string): string | null {
   return EMAIL_SCHEMA.safeParse(value.trim()).success

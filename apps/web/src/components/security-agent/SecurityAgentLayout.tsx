@@ -13,7 +13,7 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet';
 import { SidebarTrigger } from '@/components/ui/sidebar';
-import { HideAppTopbar } from '@/components/gastown/HideAppTopbar';
+import { HideAppTopbar } from '@/components/HideAppTopbar';
 import {
   AlertTriangle,
   BookOpenText,

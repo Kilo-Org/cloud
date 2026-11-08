@@ -8,8 +8,11 @@ import {
   user_auth_provider,
 } from '@kilocode/db/schema';
 import type { OrganizationRole } from '@kilocode/db/schema-types';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, isNull } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import type { Owner } from '@/lib/integrations/core/types';
+
+const parentOrganizations = alias(organizations, 'parent_organizations');
 
 /**
  * Organization roles whose members may start a Cloud Agent session from a
@@ -156,16 +159,28 @@ async function isOrganizationSessionMember(
     return false;
   }
 
+  // A parent organization that is not live confers no inherited authority: the
+  // membership join carries the parent's `deleted_at IS NULL`, so a missing or
+  // soft-deleted parent row leaves no inherited role.
   const [inheritedMembership] = await db
     .select({ role: organization_memberships.role })
-    .from(organization_memberships)
-    .where(
+    .from(organizations)
+    .innerJoin(
+      parentOrganizations,
       and(
-        eq(organization_memberships.organization_id, parentOrganizationId),
+        eq(parentOrganizations.id, organizations.parent_organization_id),
+        isNull(parentOrganizations.deleted_at)
+      )
+    )
+    .innerJoin(
+      organization_memberships,
+      and(
+        eq(organization_memberships.organization_id, parentOrganizations.id),
         eq(organization_memberships.kilo_user_id, kiloUserId),
         inArray(organization_memberships.role, SESSION_PARENT_ORGANIZATION_ROLES)
       )
     )
+    .where(and(eq(organizations.id, organizationId), isNull(organizations.deleted_at)))
     .limit(1);
 
   return inheritedMembership !== undefined;

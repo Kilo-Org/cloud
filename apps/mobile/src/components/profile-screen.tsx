@@ -17,6 +17,7 @@ import {
   SlidersHorizontal,
   Sparkles,
   Trash2,
+  Users,
 } from '@/components/ui/icons';
 import { type LayoutChangeEvent, type ScrollViewInstance, View } from 'react-native';
 import Animated, { FadeOut } from 'react-native-reanimated';
@@ -37,7 +38,6 @@ import { useDeleteAccount } from '@/components/use-delete-account';
 import { useFeedbackPrompt } from '@/components/use-feedback-prompt';
 import { i18n } from '@/i18n';
 import { useAuth } from '@/lib/auth/auth-context';
-import { useFeatureFlag } from '@/lib/analytics/posthog';
 import { SESSION_SYNC_URL } from '@/lib/config';
 import { openExternalUrl } from '@/lib/external-link';
 import { useAfterIdle } from '@/lib/hooks/use-after-idle';
@@ -84,7 +84,6 @@ function providerLabel(provider: string) {
 export function ProfileScreen() {
   const { signOut, token } = useAuth();
   const router = useRouter();
-  const nativeRemoteEnabled = useFeatureFlag('native-remote-mobile', false);
   const trpc = useTRPC();
   const deleteScrollRef = useRef<ScrollViewInstance>(null);
   const [deleteKeyboardOcclusion, setDeleteKeyboardOcclusion] = useState(0);
@@ -290,7 +289,7 @@ export function ProfileScreen() {
             }}
           />
           <ConfigureRow
-            icon={SlidersHorizontal}
+            icon={Users}
             title={t('profiles.title')}
             subtitle={t('profiles.entrySubtitle')}
             // Agents step: the row lists the agent profiles, and its two
@@ -350,7 +349,7 @@ export function ProfileScreen() {
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
             {t('profile.app')}
           </Text>
-          {nativeRemoteEnabled && SESSION_SYNC_URL && (
+          {__DEV__ && SESSION_SYNC_URL && (
             <ConfigureRow
               icon={SlidersHorizontal}
               title={t('nativeRemote.title')}

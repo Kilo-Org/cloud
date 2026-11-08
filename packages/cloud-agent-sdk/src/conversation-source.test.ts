@@ -2,7 +2,13 @@ import { createConversationSourceReader } from './conversation-source';
 import { cloudSessionMessagesPageSchema, cloudSessionMessagesPageWireSchema } from './schemas';
 import type { CloudAgentEvent } from './cloud-conversation-schemas';
 import type { MessageInfo } from './types';
-import { readKilo2Messages } from './kilo2-source-messages';
+import {
+  hasUnresolvedKilo2Assets,
+  kilo2AssetKey,
+  kilo2ToolFileId,
+  readKilo2Messages,
+} from './kilo2-source-messages';
+import { kilo2MessageSchema, kilo2PartId } from '@kilocode/session-ingest-contracts';
 
 const session = {
   id: 'ses_source',
@@ -239,6 +245,59 @@ describe('versioned native conversation sources', () => {
     expect(reader.read(raw)).toEqual([]);
   });
 
+  it.each([false, true])(
+    'preserves reasoning duration after a live start or a projected page (%p)',
+    projected => {
+      const reader = createConversationSourceReader();
+      const reasoning = (type: string, created: number) =>
+        reader.read(
+          wire('conversation.event', {
+            sessionID: session.id,
+            source: { version: 'v2' },
+            event: {
+              id: `evt_${type}`,
+              type,
+              created,
+              data: {
+                sessionID: session.id,
+                assistantMessageID: 'msg_live',
+                ordinal: 0,
+                text: 'thinking',
+              },
+            },
+          })
+        ).events;
+      if (projected)
+        reader.observeProjected([
+          {
+            info: {
+              id: 'msg_live',
+              sessionID: session.id,
+              role: 'assistant',
+              time: { created: 1 },
+            } as MessageInfo,
+            parts: [
+              {
+                id: 'msg_live_000000',
+                sessionID: session.id,
+                messageID: 'msg_live',
+                type: 'reasoning',
+                text: 'thinking',
+                time: { start: 10 },
+              },
+            ],
+          },
+        ]);
+      else reasoning('session.reasoning.started', 10);
+      expect(reasoning('session.reasoning.ended', 30)).toEqual([
+        expect.objectContaining({
+          type: 'message.part.updated',
+          part: expect.objectContaining({ time: { start: 10, end: 30 } }),
+        }),
+      ]);
+    }
+  );
+
   it('orders live text after a tool by native content position', () => {
     const sourceReader = createConversationSourceReader();
     const read = (type: string, properties: object) =>
@@ -425,3 +484,208 @@ describe('versioned native conversation sources', () => {
     });
   });
 });
+
+describe('native file result projection', () => {
+  it.each(['read', 'mcp__fixture__image', 'shell', 'send_file'])(
+    'preserves image/PDF results from %s once as ordinary files',
+    name => {
+      const message = kilo2MessageSchema.parse({
+        id: 'msg_file_results',
+        type: 'assistant',
+        time: { created: 1, completed: 2 },
+        content: [
+          {
+            type: 'tool',
+            id: 'call_files',
+            name,
+            state: {
+              status: 'completed',
+              input: { path: 'document.pdf' },
+              content: [
+                { type: 'text', text: 'document result' },
+                {
+                  type: 'file',
+                  uri: 'data:image/png;base64,AQID',
+                  mime: 'image/png',
+                  name: 'page.png',
+                },
+                {
+                  type: 'file',
+                  uri: 'data:application/pdf;base64,JVBERg==',
+                  mime: 'application/pdf',
+                  name: 'document.pdf',
+                },
+              ],
+            },
+          },
+        ],
+      });
+      const projected = readKilo2Messages(session, [message]);
+      expect(projected[0]?.parts[0]).toMatchObject({
+        type: 'tool',
+        state: {
+          status: 'completed',
+          output: 'document result',
+        },
+      });
+      const tool = projected[0]?.parts[0];
+      if (tool?.type !== 'tool' || tool.state.status !== 'completed') {
+        throw new Error('Expected a completed tool result');
+      }
+      expect(tool.state).not.toHaveProperty('attachments');
+      expect(projected[0]?.parts.slice(1)).toMatchObject([
+        {
+          id: kilo2ToolFileId(message.id, 0, 1),
+          type: 'file',
+          mime: 'image/png',
+          url: 'data:image/png;base64,AQID',
+        },
+        {
+          id: kilo2ToolFileId(message.id, 0, 2),
+          type: 'file',
+          mime: 'application/pdf',
+          url: 'data:application/pdf;base64,JVBERg==',
+        },
+      ]);
+      expect(hasUnresolvedKilo2Assets(message)).toBe(false);
+    }
+  );
+
+  it('keeps failure status while preserving files returned with an error', () => {
+    const message = kilo2MessageSchema.parse({
+      id: 'msg_error_files',
+      type: 'assistant',
+      time: { created: 1 },
+      content: [
+        {
+          type: 'tool',
+          id: 'call_error',
+          name: 'read',
+          state: {
+            status: 'error',
+            input: {},
+            error: { type: 'partial', message: 'Partial result' },
+            content: [{ type: 'file', uri: 'data:image/png;base64,AQID', mime: 'image/png' }],
+          },
+        },
+      ],
+    });
+    expect(readKilo2Messages(session, [message])[0]?.parts).toMatchObject([
+      { type: 'tool', state: { status: 'error', error: 'Partial result' } },
+      {
+        type: 'file',
+        id: kilo2ToolFileId(message.id, 0, 0),
+        mime: 'image/png',
+        url: 'data:image/png;base64,AQID',
+      },
+    ]);
+  });
+
+  it('requires resolved private assets without fabricating inline data or using local paths as display URLs', () => {
+    const hash = 'a'.repeat(64);
+    const message = kilo2MessageSchema.parse({
+      id: 'msg_stored_file',
+      type: 'user',
+      time: { created: 1 },
+      text: 'inspect',
+      files: [{ mime: 'image/png', uri: `media:${hash}`, source: { type: 'inline' } }],
+    });
+    const id = kilo2PartId(message.id, 1);
+    expect(hasUnresolvedKilo2Assets(message)).toBe(true);
+    expect(() => readKilo2Messages(session, [message])).toThrow('authorized asset resolution');
+    const assetURLs = {
+      [kilo2AssetKey(id, `media:${hash}`, 'image/png')]: 'data:image/png;base64,AQID',
+    };
+    expect(hasUnresolvedKilo2Assets(message, assetURLs)).toBe(false);
+    expect(readKilo2Messages(session, [message], { assetURLs })[0]?.parts[1]).toMatchObject({
+      id,
+      type: 'file',
+      url: 'data:image/png;base64,AQID',
+    });
+    expect(message.files?.[0]).not.toHaveProperty('data');
+    const replaced = kilo2MessageSchema.parse({
+      ...message,
+      files: [{ mime: 'image/png', uri: `media:${'b'.repeat(64)}`, source: { type: 'inline' } }],
+    });
+    expect(hasUnresolvedKilo2Assets(replaced, assetURLs)).toBe(true);
+    expect(() => readKilo2Messages(session, [replaced], { assetURLs })).toThrow(
+      'authorized asset resolution'
+    );
+    const retyped = kilo2MessageSchema.parse({
+      ...message,
+      files: [{ mime: 'application/pdf', uri: `media:${hash}`, source: { type: 'inline' } }],
+    });
+    expect(hasUnresolvedKilo2Assets(retyped, assetURLs)).toBe(true);
+    expect(() => readKilo2Messages(session, [retyped], { assetURLs })).toThrow(
+      'authorized asset resolution'
+    );
+
+    const tool = kilo2MessageSchema.parse({
+      id: 'msg_local_file',
+      type: 'assistant',
+      time: { created: 1 },
+      content: [
+        {
+          type: 'tool',
+          id: 'call_local',
+          name: 'read',
+          state: {
+            status: 'completed',
+            input: {},
+            content: [{ type: 'file', uri: 'file:///synthetic/private.png', mime: 'image/png' }],
+          },
+        },
+      ],
+    });
+    expect(hasUnresolvedKilo2Assets(tool)).toBe(true);
+    expect(() => readKilo2Messages(session, [tool])).toThrow('authorized asset resolution');
+  });
+});
+
+it.each(['completed', 'error'])(
+  'retains seeded native text positions beside derivative files from %s tools',
+  status => {
+    const message = kilo2MessageSchema.parse({
+      id: 'msg_seeded_error_file',
+      type: 'assistant',
+      time: { created: 1 },
+      content: [
+        {
+          type: 'tool',
+          id: 'call_error',
+          name: 'read',
+          state: {
+            status,
+            input: {},
+            ...(status === 'error'
+              ? { error: { type: 'partial', message: 'Partial result' } }
+              : {}),
+            content: [{ type: 'file', uri: 'data:image/png;base64,AQID', mime: 'image/png' }],
+          },
+        },
+        { type: 'text', text: 'existing' },
+      ],
+    });
+    const reader = createConversationSourceReader();
+    reader.observeProjected(readKilo2Messages(session, [message]));
+    const events = reader.read(
+      wire('conversation.event', {
+        sessionID: session.id,
+        source: { version: 'v2' },
+        event: {
+          id: 'evt_seeded_error_file',
+          type: 'session.text.delta',
+          data: {
+            sessionID: session.id,
+            assistantMessageID: message.id,
+            ordinal: 0,
+            delta: '!',
+          },
+        },
+      })
+    ).events;
+    expect(events).toEqual([
+      expect.objectContaining({ type: 'message.part.delta', partId: kilo2PartId(message.id, 1) }),
+    ]);
+  }
+);

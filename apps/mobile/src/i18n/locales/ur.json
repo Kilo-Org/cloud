@@ -248,6 +248,7 @@
     "confirmDeletion": "حذف کرنے کی تصدیق کریں",
     "credits": "کریڈٹس",
     "failedToLoadBalance": "بیلنس لوڈ نہیں ہو سکا۔ دوبارہ کوشش کرنے کے لیے ٹیپ کریں۔",
+    "balanceLoadFailed": "بیلنس لوڈ نہیں ہو سکا",
     "hideBalance": "بیلنس چھپائیں",
     "showBalance": "بیلنس دکھائیں",
     "balanceHidden": "بیلنس چھپا ہوا ہے",

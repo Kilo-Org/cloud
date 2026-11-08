@@ -248,6 +248,7 @@
     "confirmDeletion": "Устгахыг баталгаажуулах",
     "credits": "Кредит",
     "failedToLoadBalance": "Үлдэгдлийг ачаалж чадсангүй. Дахин оролдохын тулд товшино уу.",
+    "balanceLoadFailed": "Үлдэгдлийг ачаалж чадсангүй",
     "hideBalance": "Үлдэгдэл нуух",
     "showBalance": "Үлдэгдэл харуулах",
     "balanceHidden": "Үлдэгдэл нуугдсан",

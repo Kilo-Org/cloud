@@ -248,6 +248,7 @@
     "confirmDeletion": "Törlés megerősítése",
     "credits": "Kreditek",
     "failedToLoadBalance": "Nem sikerült betölteni az egyenleget. Az újrapróbáláshoz koppints.",
+    "balanceLoadFailed": "Nem tölthető be az egyenleg",
     "hideBalance": "Egyenleg elrejtése",
     "showBalance": "Egyenleg megjelenítése",
     "balanceHidden": "Egyenleg elrejtve",

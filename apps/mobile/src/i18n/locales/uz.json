@@ -248,6 +248,7 @@
     "confirmDeletion": "O'chirishni tasdiqlash",
     "credits": "Kreditlar",
     "failedToLoadBalance": "Balansni yuklab bo'lmadi. Qayta urinish uchun bosing.",
+    "balanceLoadFailed": "Balansni yuklab bo'lmadi",
     "hideBalance": "Balansni yashirish",
     "showBalance": "Balansni ko'rsatish",
     "balanceHidden": "Balans yashirilgan",

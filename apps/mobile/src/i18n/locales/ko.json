@@ -248,6 +248,7 @@
     "confirmDeletion": "삭제 확인",
     "credits": "크레딧",
     "failedToLoadBalance": "잔액을 불러오지 못했습니다. 눌러서 다시 시도하세요.",
+    "balanceLoadFailed": "잔액을 불러오지 못했습니다",
     "hideBalance": "잔액 숨기기",
     "showBalance": "잔액 표시",
     "balanceHidden": "잔액이 숨겨짐",

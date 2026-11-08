@@ -248,6 +248,7 @@
     "confirmDeletion": "Whakaūngia te mukunga",
     "credits": "Ngā moni tōmua",
     "failedToLoadBalance": "Kāore i taea te uta i te toenga. Pāwhiria hei whakamātau anō.",
+    "balanceLoadFailed": "Kāore i taea te uta i te toenga",
     "hideBalance": "Hunaia te toenga",
     "showBalance": "Whakaaturia te toenga",
     "balanceHidden": "Kua huna te toenga",

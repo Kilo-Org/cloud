@@ -248,6 +248,7 @@
     "confirmDeletion": "ړنګول تایید کړئ",
     "credits": "کریډیټ",
     "failedToLoadBalance": "بیلانس بار نه شو. د بیا هڅې لپاره ټک وکړئ.",
+    "balanceLoadFailed": "بیلانس بار نه شو",
     "hideBalance": "بیلانس پټ کړئ",
     "showBalance": "بیلانس ښکاره کړئ",
     "balanceHidden": "بیلانس پټ دی",

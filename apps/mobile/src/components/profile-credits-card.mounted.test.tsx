@@ -429,6 +429,7 @@ describe('CreditsCard balance state', () => {
     try {
       await waitFor(() => texts().some(text => text.includes('$2.00')));
       expect(texts()).toContain('SKELETON');
+      expect(texts()).toContain('ADD_CREDITS_BUTTON');
       expect(texts()).not.toContain('$0.00');
       await act(async () => {
         pendingBalance.resolve({ balance: 7 });
@@ -1146,6 +1147,8 @@ describe('CreditsCard add-credits entry point', () => {
     const { labels, texts, unmount } = await mountCard();
     await waitFor(() => labels().includes('Failed to load balance. Tap to retry.'));
 
+    expect(texts()).toContain("Couldn't load balance");
+    expect(texts()).toContain('Retry');
     expect(texts()).not.toContain('SKELETON');
     expect(texts()).not.toContain('$0.00');
     unmount();

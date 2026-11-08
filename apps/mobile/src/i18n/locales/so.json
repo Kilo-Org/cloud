@@ -248,6 +248,7 @@
     "confirmDeletion": "Xaqiiji tirtirista",
     "credits": "Lacagta isticmaalka",
     "failedToLoadBalance": "Hadhaaga lama soo shubi karin. Taabo si aad mar kale isku daydo.",
+    "balanceLoadFailed": "Hadhaaga lama soo shubi karin",
     "hideBalance": "Qari hadhaaga",
     "showBalance": "Muuji hadhaaga",
     "balanceHidden": "Hadhaaga waa la qariyay",

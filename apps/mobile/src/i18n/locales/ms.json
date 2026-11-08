@@ -248,6 +248,7 @@
     "confirmDeletion": "Sahkan pemadaman",
     "credits": "Kredit",
     "failedToLoadBalance": "Gagal memuatkan baki. Ketik untuk mencuba semula.",
+    "balanceLoadFailed": "Gagal memuatkan baki",
     "hideBalance": "Sembunyikan baki",
     "showBalance": "Tunjukkan baki",
     "balanceHidden": "Baki disembunyikan",

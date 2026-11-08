@@ -248,6 +248,7 @@
     "confirmDeletion": "Potvrdit smazání",
     "credits": "Kredity",
     "failedToLoadBalance": "Zůstatek se nepodařilo načíst. Klepnutím to zkuste znovu.",
+    "balanceLoadFailed": "Zůstatek se nepodařilo načíst",
     "hideBalance": "Skrýt zůstatek",
     "showBalance": "Zobrazit zůstatek",
     "balanceHidden": "Zůstatek je skrytý",

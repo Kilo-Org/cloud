@@ -315,6 +315,7 @@
     "confirmDeletion": "Confirm deletion",
     "credits": "Credits",
     "failedToLoadBalance": "Failed to load balance. Tap to retry.",
+    "balanceLoadFailed": "Couldn't load balance",
     "hideBalance": "Hide balance",
     "showBalance": "Show balance",
     "balanceHidden": "Balance hidden",

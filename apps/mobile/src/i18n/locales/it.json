@@ -248,6 +248,7 @@
     "confirmDeletion": "Conferma l'eliminazione",
     "credits": "Crediti",
     "failedToLoadBalance": "Impossibile caricare il saldo. Tocca per riprovare.",
+    "balanceLoadFailed": "Impossibile caricare il saldo",
     "hideBalance": "Nascondi saldo",
     "showBalance": "Mostra saldo",
     "balanceHidden": "Saldo nascosto",

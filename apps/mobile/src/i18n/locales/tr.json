@@ -248,6 +248,7 @@
     "confirmDeletion": "Silmeyi onayla",
     "credits": "Krediler",
     "failedToLoadBalance": "Bakiye yüklenemedi. Tekrar denemek için dokun.",
+    "balanceLoadFailed": "Bakiye yüklenemedi",
     "hideBalance": "Bakiyeyi gizle",
     "showBalance": "Bakiyeyi göster",
     "balanceHidden": "Bakiye gizli",

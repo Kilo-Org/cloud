@@ -248,6 +248,7 @@
     "confirmDeletion": "Vahvista poisto",
     "credits": "Krediitit",
     "failedToLoadBalance": "Saldoa ei voitu ladata. Yritä uudelleen napauttamalla.",
+    "balanceLoadFailed": "Saldoa ei voitu ladata",
     "hideBalance": "Piilota saldo",
     "showBalance": "Näytä saldo",
     "balanceHidden": "Saldo piilotettu",

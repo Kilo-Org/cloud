@@ -248,6 +248,7 @@
     "confirmDeletion": "削除を確定",
     "credits": "クレジット",
     "failedToLoadBalance": "残高を読み込めませんでした。タップして再試行してください。",
+    "balanceLoadFailed": "残高を読み込めませんでした",
     "hideBalance": "残高を非表示",
     "showBalance": "残高を表示",
     "balanceHidden": "残高は非表示です",

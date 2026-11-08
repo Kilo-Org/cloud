@@ -248,6 +248,7 @@
     "confirmDeletion": "Thibitisha kufuta",
     "credits": "Salio",
     "failedToLoadBalance": "Imeshindikana kupakia salio. Gusa ili ujaribu tena.",
+    "balanceLoadFailed": "Imeshindikana kupakia salio",
     "hideBalance": "Ficha salio",
     "showBalance": "Onyesha salio",
     "balanceHidden": "Salio limefichwa",

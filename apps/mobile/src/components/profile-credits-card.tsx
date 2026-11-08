@@ -350,7 +350,7 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
         amount={amountLine}
         toggle={visibilityToggle}
         note={expirySlot}
-        loadingAction={orgAddCreditsAction}
+        failureLabel={t('profile.balanceLoadFailed')}
         action={addCreditsAction}
         retryLabel={t('profile.failedToLoadBalance')}
         retryActionLabel={t('common.retry')}

@@ -248,6 +248,7 @@
     "confirmDeletion": "መሰረዙን ያረጋግጡ",
     "credits": "ክሬዲት",
     "failedToLoadBalance": "ቀሪ ሂሳቡን መጫን አልተሳካም። እንደገና ለመሞከር ይንኩ።",
+    "balanceLoadFailed": "ቀሪ ሂሳቡን መጫን አልተሳካም",
     "hideBalance": "ቀሪ ሂሳብ ደብቅ",
     "showBalance": "ቀሪ ሂሳብ አሳይ",
     "balanceHidden": "ቀሪ ሂሳብ ተደብቋል",

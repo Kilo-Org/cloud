@@ -23,10 +23,10 @@ type BalanceBlockProps = Readonly<{
   readonly toggle: ReactNode;
   /** The expiry note. It reads the credit blocks, not the balance. */
   readonly note: ReactNode;
-  /** The purchase action that holds its slot while the balance read runs. */
-  readonly loadingAction: ReactNode;
-  /** The purchase action of the failed and the loaded states. */
+  /** The purchase action, the same in every state so its slot never changes. */
   readonly action: ReactNode;
+  /** The visible failure line beside the retry action. */
+  readonly failureLabel: string;
   readonly retryLabel: string;
   readonly retryActionLabel: string;
   readonly onRetry: () => void;
@@ -39,7 +39,7 @@ export function BalanceBlock({
   amount,
   toggle,
   note,
-  loadingAction,
+  failureLabel,
   action,
   retryLabel,
   retryActionLabel,
@@ -64,13 +64,22 @@ export function BalanceBlock({
   } else if (state === 'failed') {
     value = (
       <Pressable
-        className="min-h-[28px] min-w-0 justify-center active:opacity-70"
+        className="min-h-[28px] min-w-0 flex-row items-center gap-2 active:opacity-70"
         hitSlop={LINE_ACTION_HIT_SLOP}
         onPress={onRetry}
         accessibilityRole="button"
         accessibilityLabel={retryLabel}
       >
-        <Text className="text-sm text-destructive">{retryActionLabel}</Text>
+        <Text
+          className="min-w-0 shrink text-sm text-destructive"
+          numberOfLines={1}
+          ellipsizeMode="tail"
+        >
+          {failureLabel}
+        </Text>
+        <Text className="shrink-0 text-sm text-primary" numberOfLines={1}>
+          {retryActionLabel}
+        </Text>
       </Pressable>
     );
   }
@@ -79,7 +88,6 @@ export function BalanceBlock({
     visibilityControl =
       stacked && state === 'failed' ? null : <View className="h-[48px] w-[48px]" />;
   }
-  const purchaseAction = state === 'loading' ? loadingAction : action;
   // The noninteractive caption must not intercept the retry target's hit slop.
   const expiryNote = state === 'failed' ? <View pointerEvents="none">{note}</View> : note;
   const valueRow = (
@@ -101,7 +109,7 @@ export function BalanceBlock({
         </View>
         {!stacked && visibilityControl}
       </Animated.View>
-      {purchaseAction}
+      {action}
     </View>
   );
 }

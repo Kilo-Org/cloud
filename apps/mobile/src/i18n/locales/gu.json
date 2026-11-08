@@ -248,6 +248,7 @@
     "confirmDeletion": "કાઢી નાખવાની પુષ્ટિ કરો",
     "credits": "ક્રેડિટ",
     "failedToLoadBalance": "બેલેન્સ લોડ કરી શકાયું નહીં. ફરી પ્રયાસ કરવા ટેપ કરો.",
+    "balanceLoadFailed": "બેલેન્સ લોડ કરી શકાયું નહીં",
     "hideBalance": "બેલેન્સ છુપાવો",
     "showBalance": "બેલેન્સ બતાવો",
     "balanceHidden": "બેલેન્સ છુપાયેલ છે",

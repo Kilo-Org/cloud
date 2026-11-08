@@ -248,6 +248,7 @@
     "confirmDeletion": "Bevestig skrapping",
     "credits": "Krediete",
     "failedToLoadBalance": "Die saldo kon nie gelaai word nie. Tik om weer te probeer.",
+    "balanceLoadFailed": "Kon nie saldo laai nie",
     "hideBalance": "Versteek saldo",
     "showBalance": "Wys saldo",
     "balanceHidden": "Saldo versteek",

@@ -248,6 +248,7 @@
     "confirmDeletion": "Deimhnigh scriosadh",
     "credits": "Creidmheasanna",
     "failedToLoadBalance": "Níorbh fhéidir an t-iarmhéid a lódáil. Tapáil chun triail eile a bhaint as.",
+    "balanceLoadFailed": "Níorbh fhéidir an t-iarmhéid a lódáil",
     "hideBalance": "Folaigh an t-iarmhéid",
     "showBalance": "Taispeáin an t-iarmhéid",
     "balanceHidden": "Tá an t-iarmhéid folaithe",

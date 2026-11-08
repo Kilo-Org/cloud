@@ -248,6 +248,7 @@
     "confirmDeletion": "हटवण्याची पुष्टी करा",
     "credits": "क्रेडिट",
     "failedToLoadBalance": "शिल्लक लोड करता आली नाही. पुन्हा प्रयत्न करण्यासाठी टॅप करा.",
+    "balanceLoadFailed": "शिल्लक लोड करता आली नाही",
     "hideBalance": "शिल्लक लपवा",
     "showBalance": "शिल्लक दाखवा",
     "balanceHidden": "शिल्लक लपवली आहे",

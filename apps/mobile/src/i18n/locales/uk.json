@@ -248,6 +248,7 @@
     "confirmDeletion": "Підтвердити видалення",
     "credits": "Кредити",
     "failedToLoadBalance": "Не вдалося завантажити баланс. Торкніться, щоб повторити.",
+    "balanceLoadFailed": "Не вдалося завантажити баланс",
     "hideBalance": "Приховати баланс",
     "showBalance": "Показати баланс",
     "balanceHidden": "Баланс приховано",

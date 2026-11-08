@@ -248,6 +248,7 @@
     "confirmDeletion": "Confirmar a eliminación",
     "credits": "Créditos",
     "failedToLoadBalance": "Non se puido cargar o saldo. Toca para volver tentalo.",
+    "balanceLoadFailed": "Non se puido cargar o saldo",
     "hideBalance": "Agochar o saldo",
     "showBalance": "Amosar o saldo",
     "balanceHidden": "Saldo agochado",

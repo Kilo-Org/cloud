@@ -248,6 +248,7 @@
     "confirmDeletion": "Konfirmo fshirjen",
     "credits": "Kreditet",
     "failedToLoadBalance": "Nuk u ngarkua gjendja. Prek për të provuar përsëri.",
+    "balanceLoadFailed": "Nuk u ngarkua gjendja",
     "hideBalance": "Fshih gjendjen",
     "showBalance": "Shfaq gjendjen",
     "balanceHidden": "Gjendja është e fshehur",

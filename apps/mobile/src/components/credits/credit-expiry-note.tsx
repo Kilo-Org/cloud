@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Text } from '@/components/ui/text';
 import { isolateBidiText } from '@/lib/bidi';
 import { getNextCreditExpiry } from '@/lib/credits/credit-expiry';
-import { formatDate, formatMoney } from '@/lib/format';
+import { formatDate, formatPrefixedUsd } from '@/lib/format';
 import { parseTimestamp } from '@/lib/utils';
 
 type CreditExpiryNoteProps = {
@@ -54,7 +54,10 @@ export function CreditExpiryNote({
         t('credits.nextExpiry', {
           amount:
             hiddenAmount ??
-            formatMoney(fromMicrodollars(nextExpiry.balanceMicrodollars), i18n.language),
+            formatPrefixedUsd(fromMicrodollars(nextExpiry.balanceMicrodollars), i18n.language, {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            }),
           date: formatDate(parseTimestamp(nextExpiry.expiryDate), i18n.language, {
             timeZone: 'UTC',
           }),

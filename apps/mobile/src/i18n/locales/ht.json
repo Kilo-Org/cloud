@@ -248,6 +248,7 @@
     "confirmDeletion": "Konfime efasman",
     "credits": "Kredi",
     "failedToLoadBalance": "Nou pa t ka chaje balans lan. Peze pou eseye ankò.",
+    "balanceLoadFailed": "Nou pa t ka chaje balans lan",
     "hideBalance": "Kache balans",
     "showBalance": "Montre balans",
     "balanceHidden": "Balans kache",

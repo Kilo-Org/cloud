@@ -248,6 +248,7 @@
     "confirmDeletion": "Potrdi izbris",
     "credits": "Krediti",
     "failedToLoadBalance": "Stanja ni bilo mogoče naložiti. Tapni za ponovni poskus.",
+    "balanceLoadFailed": "Stanja ni bilo mogoče naložiti",
     "hideBalance": "Skrij stanje",
     "showBalance": "Prikaži stanje",
     "balanceHidden": "Stanje je skrito",

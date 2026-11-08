@@ -248,6 +248,7 @@
     "confirmDeletion": "Hamarino ny famafana",
     "credits": "Kireditra",
     "failedToLoadBalance": "Tsy voaray ny ambim-bola. Tsindrio hanandramana indray.",
+    "balanceLoadFailed": "Tsy voaray ny ambim-bola",
     "hideBalance": "Afeno ny ambim-bola",
     "showBalance": "Aseho ny ambim-bola",
     "balanceHidden": "Voafeno ny ambim-bola",

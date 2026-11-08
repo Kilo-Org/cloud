@@ -248,6 +248,7 @@
     "confirmDeletion": "Confirma l'eliminació",
     "credits": "Crèdits",
     "failedToLoadBalance": "No s'ha pogut carregar el saldo. Toca per tornar-ho a provar.",
+    "balanceLoadFailed": "No s'ha pogut carregar el saldo",
     "hideBalance": "Amaga el saldo",
     "showBalance": "Mostra el saldo",
     "balanceHidden": "Saldo amagat",

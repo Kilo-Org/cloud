@@ -248,6 +248,7 @@
     "confirmDeletion": "Potvrdi brisanje",
     "credits": "Krediti",
     "failedToLoadBalance": "Učitavanje salda nije uspelo. Dodirni za ponovni pokušaj.",
+    "balanceLoadFailed": "Učitavanje salda nije uspelo",
     "hideBalance": "Sakrij saldo",
     "showBalance": "Prikaži saldo",
     "balanceHidden": "Saldo je sakriven",

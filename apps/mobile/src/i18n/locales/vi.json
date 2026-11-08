@@ -248,6 +248,7 @@
     "confirmDeletion": "Xác nhận xóa",
     "credits": "Số dư",
     "failedToLoadBalance": "Không thể tải số dư. Chạm để thử lại.",
+    "balanceLoadFailed": "Không thể tải số dư",
     "hideBalance": "Ẩn số dư",
     "showBalance": "Hiện số dư",
     "balanceHidden": "Số dư đã ẩn",

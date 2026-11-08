@@ -248,6 +248,7 @@
     "confirmDeletion": "Potvrdi brisanje",
     "credits": "Krediti",
     "failedToLoadBalance": "Nije moguće učitati saldo. Dodirni za ponovni pokušaj.",
+    "balanceLoadFailed": "Nije moguće učitati saldo",
     "hideBalance": "Sakrij saldo",
     "showBalance": "Prikaži saldo",
     "balanceHidden": "Saldo je skriven",

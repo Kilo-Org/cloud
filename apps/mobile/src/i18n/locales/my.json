@@ -248,6 +248,7 @@
     "confirmDeletion": "ဖျက်ခြင်းကို အတည်ပြုပါ",
     "credits": "ခရက်ဒစ်များ",
     "failedToLoadBalance": "လက်ကျန်ကို ရယူ၍မရပါ။ ထပ်ကြိုးစားရန် နှိပ်ပါ။",
+    "balanceLoadFailed": "လက်ကျန်ကို ရယူ၍မရပါ",
     "hideBalance": "လက်ကျန် ဖျောက်ရန်",
     "showBalance": "လက်ကျန် ပြရန်",
     "balanceHidden": "လက်ကျန် ဖျောက်ထားသည်",

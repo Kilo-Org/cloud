@@ -248,6 +248,7 @@
     "confirmDeletion": "Bekräfta borttagning",
     "credits": "Krediter",
     "failedToLoadBalance": "Kunde inte läsa in saldot. Tryck för att försöka igen.",
+    "balanceLoadFailed": "Kunde inte läsa in saldot",
     "hideBalance": "Dölj saldo",
     "showBalance": "Visa saldo",
     "balanceHidden": "Saldo dolt",

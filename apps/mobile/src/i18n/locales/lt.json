@@ -248,6 +248,7 @@
     "confirmDeletion": "Patvirtinti ištrynimą",
     "credits": "Kreditai",
     "failedToLoadBalance": "Nepavyko įkelti likučio. Bakstelėkite, kad bandytumėte dar kartą.",
+    "balanceLoadFailed": "Nepavyko įkelti likučio",
     "hideBalance": "Slėpti likutį",
     "showBalance": "Rodyti likutį",
     "balanceHidden": "Likutis paslėptas",

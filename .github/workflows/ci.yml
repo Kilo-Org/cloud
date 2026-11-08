@@ -39,6 +39,8 @@ jobs:
       mobile_diagram_host: ${{ steps.filter_diagram.outputs.mobile_diagram_host || steps.filter_diagram_retry.outputs.mobile_diagram_host }}
       # The session-sync account database suite, also its own pair.
       session_sync: ${{ steps.filter_session_sync.outputs.session_sync || steps.filter_session_sync_retry.outputs.session_sync }}
+      # Every input the ci-wiring job reads, also its own pair.
+      wiring: ${{ steps.filter_wiring.outputs.wiring || steps.filter_wiring_retry.outputs.wiring }}
       workspace_matrix: ${{ steps.workspaces.outputs.matrix }}
       # JSON from scripts/affected-workspaces.mjs, and the typecheck and lint
       # groups and cloud-agent-next parts it needs.
@@ -256,6 +258,58 @@ jobs:
               - 'packages/worker-utils/**'
               - '.github/workflows/ci.yml'
               - 'pnpm-lock.yaml'
+      # The ci-wiring job reads more than one workflow: two of its suites scan
+      # .github/workflows/ as a directory, so every workflow there is an input.
+      # The paths below are the inputs those suites read, each one taken from
+      # the suite that reads it: the workflows and the actions their cache keys
+      # hash, the scripts they execute, the workspace manifests and the lockfile
+      # they parse, the files two suites copy into a fixture root, and the node
+      # version and install policy every step runs on. A path that cannot reach
+      # one of them belongs elsewhere; a wider list only costs this one job.
+      - name: Detect wiring changes
+        id: filter_wiring
+        continue-on-error: true
+        uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
+        with:
+          filters: |
+            wiring:
+              - '.github/workflows/**'
+              - '.github/actions/**'
+              - 'scripts/**'
+              - 'services/cloud-agent-next/scripts/**'
+              - 'services/usage-ingest/scripts/provision-queues.mjs'
+              - 'packages/harness-sdk/tsconfig.json'
+              - 'package.json'
+              - '**/package.json'
+              - 'pnpm-workspace.yaml'
+              - 'pnpm-lock.yaml'
+              - 'patches/**'
+              - 'apps/mobile/eas.json'
+              - '.gitignore'
+              - '.nvmrc'
+              - '.npmrc'
+      - name: Detect wiring changes (retry)
+        id: filter_wiring_retry
+        if: steps.filter_wiring.outcome == 'failure'
+        uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
+        with:
+          filters: |
+            wiring:
+              - '.github/workflows/**'
+              - '.github/actions/**'
+              - 'scripts/**'
+              - 'services/cloud-agent-next/scripts/**'
+              - 'services/usage-ingest/scripts/provision-queues.mjs'
+              - 'packages/harness-sdk/tsconfig.json'
+              - 'package.json'
+              - '**/package.json'
+              - 'pnpm-workspace.yaml'
+              - 'pnpm-lock.yaml'
+              - 'patches/**'
+              - 'apps/mobile/eas.json'
+              - '.gitignore'
+              - '.nvmrc'
+              - '.npmrc'
       # A pull request and a main push both check only the workspaces their own
       # diff can affect: the pull request the branch's base, the push the commit
       # main moved from. The merge queue passes no base, so it still checks
@@ -316,10 +370,19 @@ jobs:
           matrix=$(scripts/changed-workspaces.sh "${excludes[@]}" "${includes[@]}")
           echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
 
-  # The CI wiring and plugin manifest checks. No job waits for this one, so it
-  # adds no time before the workspace checks start; the required `test` job
-  # needs it, so a failure still blocks the merge.
+  # The workflow wiring suites and the checks that read the workflows. No job
+  # waits for this one, so it adds no time before the workspace checks start;
+  # the required `test` job needs it, so a failure still blocks the merge.
+  # Every suite here parses .github/workflows/ or the scripts that select
+  # workspaces, so a run that changes none of the paths the `wiring` filter lists
+  # cannot change a result here. On such a run the job is skipped, and the `test`
+  # fan-in passes a skipped job. The plugin contract checks this job used to
+  # carry now run in their own job: their inputs are product files rather than
+  # workflow wiring, so gating them here would skip them on the very changes
+  # they protect.
   ci-wiring:
+    needs: changes
+    if: needs.changes.outputs.wiring == 'true'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 10
     steps:
@@ -344,26 +407,20 @@ jobs:
       - name: Check runtime publication workflow admission
         run: pnpm --filter cloud-agent-next test:runtime-ci
 
-      - name: Plugin shared-schemas sync check
-        run: bash scripts/sync-plugin-shared.sh --check
-
-      - name: Plugin openclaw peer-dep pin check
-        run: bash scripts/check-plugin-openclaw-pin.sh
-
       # The relay regression executes Wrangler's real config parser.
       - name: Install usage-ingest deployment test dependencies
         run: pnpm --filter cloudflare-usage-ingest install --frozen-lockfile --ignore-scripts
 
-      # The stacked-CI admission is checked on every PR. All wiring suites run
-      # in one invocation: the test runner starts the named files concurrently,
-      # so the step pays one start-up and one parse of the YAML they share. The
-      # job is off the critical path, and the required `test` job needs it, so
-      # a broken admission still blocks the merge. sbom.yml is only reached by
-      # a PR that changes the workflow or its test, and that path set does not
-      # trip the kilocode_backend filter that gates test-scripts, so its wiring
-      # check runs here. This list is the only place that suite runs: the
-      # `test:mobile-sbom` script that test-scripts reaches must not name it,
-      # or one run executes the file in two jobs.
+      # The stacked-CI admission runs on every change to a wiring input. All
+      # wiring suites run in one invocation: the test runner starts the named
+      # files concurrently, so the step pays one start-up and one parse of the
+      # YAML they share. The job is off the critical path, and the required
+      # `test` job needs it, so a broken admission still blocks the merge.
+      # sbom.yml is only reached by a PR that changes the workflow or its test,
+      # and that path set does not trip the kilocode_backend filter that gates
+      # test-scripts, so its wiring check runs here. This list is the only place
+      # that suite runs: the `test:mobile-sbom` script that test-scripts reaches
+      # must not name it, or one run executes the file in two jobs.
       - name: Test workflow wiring
         run: >-
           node --test
@@ -387,6 +444,30 @@ jobs:
       # the only place the suite runs, for the same reason as the list above.
       - name: Test release workflow wiring
         run: node --test scripts/kilo-app-release-workflow.test.mjs
+
+  # The bundled plugins' contract checks: each plugin's copy of the shared wire
+  # schemas must match the package it is synced from, and every exact runtime pin
+  # must match the version the image installs. Both read product files rather
+  # than the workflows, so a path filter that gates them would have to name those
+  # product paths. This job therefore runs on every run, installs nothing, and
+  # the required `test` job needs it, so a drift still blocks the merge.
+  plugin-contract:
+    needs: changes
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 5
+    steps:
+      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+
+      - name: Setup Node
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Plugin shared-schemas sync check
+        run: bash scripts/sync-plugin-shared.sh --check
+
+      - name: Plugin openclaw peer-dep pin check
+        run: bash scripts/check-plugin-openclaw-pin.sh
 
   # One producer for the tRPC declarations. Both matrices used to run the
   # trpc-declarations action behind `matrix.group == 'trpc'`, so a cache miss
@@ -416,8 +497,13 @@ jobs:
         with:
           node-version-file: '.nvmrc'
 
+      # Only the two dependency closures this job reads and the root project are
+      # installed. The composite action below builds `@kilocode/trpc` alone, but
+      # that declaration program also reads web-shared and apps/web sources
+      # through their path aliases. Widen the filter when a step here imports a
+      # workspace outside these closures.
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --filter '@kilocode/trpc...' --filter 'web...' --filter kilocode-monorepo
 
       - name: Restore or build tRPC declarations
         uses: ./.github/actions/trpc-declarations
@@ -804,20 +890,25 @@ jobs:
         with:
           node-version-file: '.nvmrc'
 
+      # Only the web app's dependency closure and the root project are
+      # installed: the step below runs `--filter web`. Widen the filter when a
+      # step here imports a workspace outside the closure.
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --filter 'web...' --filter kilocode-monorepo
 
       - name: Dependency cycle check
         run: pnpm run dependency-cycle-check
 
   # Required check. A skipped job (nothing relevant changed) passes; a failed
   # or cancelled job fails this one. Besides the web tests it covers the
-  # workspace tests, the dependency cycle check, drizzle-check, harness-sdk and
-  # the ai-gateway builds, which have no required check of their own.
+  # workspace tests, the dependency cycle check, drizzle-check, harness-sdk, the
+  # plugin contract checks and the ai-gateway builds, which have no required
+  # check of their own.
   test:
     needs:
       - changes
       - ci-wiring
+      - plugin-contract
       - web-test
       - test-scripts
       - dependency-cycle-check

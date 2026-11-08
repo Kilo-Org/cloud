@@ -248,6 +248,7 @@
     "confirmDeletion": "پشتڕاستکردنەوەی سڕینەوە",
     "credits": "کرێدیت",
     "failedToLoadBalance": "نەتوانرا باڵانسەکە بار بکرێت. بۆ دووبارە هەوڵدانەوە، لێی بدە.",
+    "balanceLoadFailed": "نەتوانرا باڵانسەکە بار بکرێت",
     "hideBalance": "شاردنەوەی باڵانس",
     "showBalance": "پیشاندانی باڵانس",
     "balanceHidden": "باڵانس شاردراوەتەوە",

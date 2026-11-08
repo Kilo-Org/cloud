@@ -248,6 +248,7 @@
     "confirmDeletion": "Silməni təsdiqlə",
     "credits": "Kreditlər",
     "failedToLoadBalance": "Balansı yükləmək mümkün olmadı. Yenidən cəhd etmək üçün toxun.",
+    "balanceLoadFailed": "Balansı yükləmək mümkün olmadı",
     "hideBalance": "Balansı gizlət",
     "showBalance": "Balansı göstər",
     "balanceHidden": "Balans gizlidir",

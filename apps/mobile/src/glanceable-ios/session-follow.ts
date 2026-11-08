@@ -18,7 +18,6 @@ import {
   observedSessionActivityIds,
   registerSessionActivityToken,
   releaseSessionActivity,
-  retrySessionActivityTokens,
 } from '@/lib/glanceable/session-activity-tokens';
 import { getGlanceableDelivery } from '@/lib/glanceable/sink-registry';
 import { launcherSessionUrl } from '@/lib/launcher-surfaces';
@@ -55,7 +54,9 @@ import { liveActivitiesAllowedBySystem } from './system-switch';
  * field of its content state says which: the server rebuilds that state on
  * every push. The device keeps the scope per session in
  * `session-card-scope.ts`, writes it on Follow, and the launch/foreground
- * restore ends any card it cannot place in the current scope.
+ * restore ends any card it cannot place in the current scope. No stored account
+ * puts every card outside the scope, so a card left live by a process that did
+ * not finish its sign-out ends there too.
  */
 
 export type SessionFollowContext = { userId: string; organizationId: string | null };
@@ -120,7 +121,7 @@ async function readToken(
  * End one card and release its push token on the server. The token read starts
  * before the end, because ActivityKit drops the token with the card.
  */
-function endCard(
+export function endCard(
   activity: SessionActivity,
   dismissal: 'immediate' | { after: Date },
   props?: SessionLiveActivityProps
@@ -135,7 +136,7 @@ function endCard(
  * Stop following one session in this process: its card, its press state, and
  * the scope record it was followed under.
  */
-function forgetFollow(sessionId: string): void {
+export function forgetFollow(sessionId: string): void {
   clearSessionCardPress(sessionId);
   cardScopes.forgetSessionCardScopes([sessionId]);
   if (cards.delete(sessionId)) {
@@ -198,58 +199,9 @@ export function discoverSessionCards(): SessionActivity[] {
   return [...next.values()];
 }
 
-/**
- * Launch and foreground: rebuild the map, then register again the cards this
- * account and organization followed. A card's follow scope travels in the
- * device record (`session-card-scope.ts`), never in the card: the server
- * replaces the card's whole content state on every push, so the card cannot
- * keep it. A card whose record is absent (written by an earlier build) or names
- * another account or organization is out of scope and ends here; only a store
- * that cannot be read now, like a locked keychain, leaves the cards as they are.
- * A registration that failed earlier retries here (spec "Error Handling" 4).
- */
-export async function restoreFollowedSessionCards(ctx: SessionFollowContext | null): Promise<void> {
-  if (!getLiveActivityEnabled()) {
-    // The in-app switch turned off while no process ran: no card may stay.
-    // Retire the token scope first, so it reads each card's token before the
-    // end drops it.
-    getGlanceableDelivery().cleanupTokens('scope');
-    endAllSessionCards();
-    return;
-  }
-  const live = discoverSessionCards();
-  // Capture this restore's own discovery result before the await: another
-  // restore or a Follow can run a different discovery in the meantime.
-  const discoveryRead = discoveryReadable;
-  if (ctx === null) {
-    return;
-  }
-  const records = await cardScopes.readSessionCardScopes();
-  if (records === null) {
-    return;
-  }
-  const kept: string[] = [];
-  for (const activity of live) {
-    const sessionId = activity.getProps()?.sessionId;
-    const scope = sessionId === undefined ? undefined : records.get(sessionId);
-    if (sessionId === undefined) {
-      endCard(activity, 'immediate');
-    } else if (scope !== undefined && cardScopes.isSessionCardScopeCurrent(scope, ctx)) {
-      kept.push(sessionId);
-      registerSessionActivityToken(activity.getId(), activity, { sessionId, ...scope });
-    } else {
-      // A card no record names (an earlier build kept none), or one followed
-      // under another account or organization: it is out of scope.
-      forgetFollow(sessionId);
-      endCard(activity, 'immediate');
-    }
-  }
-  // An unreadable ActivityKit read proves nothing about which cards are live, so
-  // its empty result must not prune the records the cards still rely on.
-  if (discoveryRead) {
-    cardScopes.pruneSessionCardScopes(kept, records);
-  }
-  retrySessionActivityTokens();
+/** True when the last `discoverSessionCards` read ActivityKit itself. */
+export function isSessionCardDiscoveryReadable(): boolean {
+  return discoveryReadable;
 }
 
 /** Start the card collapsed and silent, or null when iOS refuses it. */

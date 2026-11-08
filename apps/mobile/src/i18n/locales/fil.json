@@ -248,6 +248,7 @@
     "confirmDeletion": "Kumpirmahin ang pagbura",
     "credits": "Kredito",
     "failedToLoadBalance": "Hindi ma-load ang balanse. I-tap para subukang muli.",
+    "balanceLoadFailed": "Hindi ma-load ang balanse",
     "hideBalance": "Itago ang balanse",
     "showBalance": "Ipakita ang balanse",
     "balanceHidden": "Nakatago ang balanse",

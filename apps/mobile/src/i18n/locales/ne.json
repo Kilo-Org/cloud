@@ -248,6 +248,7 @@
     "confirmDeletion": "मेटाउने पुष्टि गर्नुहोस्",
     "credits": "क्रेडिटहरू",
     "failedToLoadBalance": "मौज्दात लोड गर्न सकिएन। पुनः प्रयास गर्न ट्याप गर्नुहोस्।",
+    "balanceLoadFailed": "मौज्दात लोड गर्न सकिएन",
     "hideBalance": "मौज्दात लुकाउनुहोस्",
     "showBalance": "मौज्दात देखाउनुहोस्",
     "balanceHidden": "मौज्दात लुकाइएको छ",

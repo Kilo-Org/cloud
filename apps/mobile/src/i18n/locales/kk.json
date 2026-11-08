@@ -248,6 +248,7 @@
     "confirmDeletion": "Жоюды растау",
     "credits": "Кредиттер",
     "failedToLoadBalance": "Балансты жүктеу мүмкін болмады. Қайталап көру үшін түртіңіз.",
+    "balanceLoadFailed": "Теңгерімді жүктеу мүмкін болмады",
     "hideBalance": "Теңгерімді жасыру",
     "showBalance": "Теңгерімді көрсету",
     "balanceHidden": "Теңгерім жасырылған",

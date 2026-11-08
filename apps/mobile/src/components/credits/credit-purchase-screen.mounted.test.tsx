@@ -312,15 +312,16 @@ describe('CreditPurchaseScreen', () => {
       { balance_mUsd: 500_000_000, expiry_date: null },
     ];
     const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
-    await waitFor(() => allText(renderer).includes('$10.00 in credits expires'));
-    expect(allText(renderer)).not.toContain('$60.00 in credits');
-    expect(allText(renderer)).not.toContain('bonus credits');
-    // The zone marker carries a bidi isolate and a no-break space on the date;
-    // this assertion is about the sentence, not that carriage.
-    const readable = allText(renderer)
-      .replaceAll(/[\u2068\u2069]/g, '')
-      .replaceAll('\u00A0', ' ');
-    expect(readable).toContain('(UTC). Credits with the earliest expiry are used first.');
+    // The amount and the zone marker carry bidi isolates and the date a no-break
+    // space; these assertions are about the sentence, not that carriage.
+    const readable = () =>
+      allText(renderer)
+        .replaceAll(/[\u2066\u2068\u2069]/g, '')
+        .replaceAll('\u00A0', ' ');
+    await waitFor(() => readable().includes('$10.00 in credits expires'));
+    expect(readable()).not.toContain('$60.00 in credits');
+    expect(readable()).not.toContain('bonus credits');
+    expect(readable()).toContain('(UTC). Credits with the earliest expiry are used first.');
     unmount();
   });
 

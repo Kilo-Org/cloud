@@ -248,6 +248,7 @@
     "confirmDeletion": "हटाने की पुष्टि करें",
     "credits": "क्रेडिट",
     "failedToLoadBalance": "बैलेंस लोड नहीं हो सका। फिर से कोशिश करने के लिए टैप करें।",
+    "balanceLoadFailed": "बैलेंस लोड नहीं हो सका",
     "hideBalance": "बैलेंस छिपाएँ",
     "showBalance": "बैलेंस दिखाएँ",
     "balanceHidden": "बैलेंस छिपा हुआ है",

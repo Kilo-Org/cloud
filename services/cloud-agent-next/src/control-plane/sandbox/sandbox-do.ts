@@ -583,6 +583,7 @@ function stateToRow(state: AllocationState): typeof allocationTable.$inferInsert
     last_activity_at: state.lastActivityAt,
     create_deadline_at: state.createDeadlineAt,
     first_connect_deadline_at: state.firstConnectDeadlineAt,
+    create_attempt: state.createAttempt,
     stop_attempt: state.stopAttempt,
     stop_pending: state.stopPending,
     stop_at: state.stopAt,
@@ -601,6 +602,7 @@ function rowToState(row: AllocationRow): AllocationState {
     lastActivityAt: row.last_activity_at,
     createDeadlineAt: row.create_deadline_at,
     firstConnectDeadlineAt: row.first_connect_deadline_at,
+    createAttempt: row.create_attempt,
     stopAttempt: row.stop_attempt,
     stopPending: row.stop_pending,
     stopAt: row.stop_at,
@@ -2429,7 +2431,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         timers.providerCreateMs = DEADLINE_MS.repositoryStartup;
       }
     }
-    const { state, effects, stopReason } = reduceAllocation(previous, event, timers);
+    const { state, effects, stopReason, routeFailure } = reduceAllocation(previous, event, timers);
     if (
       state.kind === 'creating' &&
       state.allocationId !== null &&
@@ -2462,13 +2464,40 @@ export class SandboxControlV2 extends DurableObject<Env> {
         toAllocationId: state.allocationId,
         stopAttempt: state.stopAttempt,
         stopReason: stopReason ?? 'none',
+        routeFailure: routeFailure ?? 'none',
         unconfirmedProviderRef: state.unconfirmedProviderRef !== null,
       });
     }
     await this.armAlarm(state);
+    // Fail the routes before the stopped sweep: a failed route has no attempt
+    // time left, so nothing else retries a create that just spent its budget.
+    if (routeFailure !== undefined) {
+      await this.failPreparingRoutesNow(routeFailure);
+    }
     await this.applyRouteEffects(previous, state, event, stopReason);
     for (const effect of effects) {
       await this.runEffect(effect, state);
+    }
+  }
+
+  /**
+   * Fails every preparing route with one reason, from inside the serialized
+   * queue: the create attempt budget is spent, so the session DO must learn
+   * that now, not at the routes' attempt deadline. Same mechanism as
+   * `failCreationRoutes` for a permanent create failure.
+   */
+  private async failPreparingRoutesNow(reason: ControlPlaneFailureReason): Promise<void> {
+    const state = await this.readAllocation();
+    for (const route of await listRoutes(this.db)) {
+      if (route.state === 'preparing') {
+        await failCurrentAttempt(
+          this.routeContext(state),
+          route.sessionId,
+          route.attemptId,
+          reason,
+          'create_exhausted'
+        );
+      }
     }
   }
 

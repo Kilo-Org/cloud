@@ -248,6 +248,7 @@
     "confirmDeletion": "Հաստատել ջնջումը",
     "credits": "Կրեդիտներ",
     "failedToLoadBalance": "Չհաջողվեց բեռնել մնացորդը։ Հպեք՝ կրկին փորձելու համար։",
+    "balanceLoadFailed": "Չհաջողվեց բեռնել մնացորդը",
     "hideBalance": "Թաքցնել մնացորդը",
     "showBalance": "Ցուցադրել մնացորդը",
     "balanceHidden": "Մնացորդը թաքցված է",

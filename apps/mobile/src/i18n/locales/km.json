@@ -248,6 +248,7 @@
     "confirmDeletion": "បញ្ជាក់ការលុប",
     "credits": "ឥណទាន",
     "failedToLoadBalance": "មិនអាចផ្ទុកសមតុល្យបានទេ។ ប៉ះដើម្បីព្យាយាមម្តងទៀត។",
+    "balanceLoadFailed": "មិនអាចផ្ទុកសមតុល្យបានទេ",
     "hideBalance": "លាក់សមតុល្យ",
     "showBalance": "បង្ហាញសមតុល្យ",
     "balanceHidden": "សមតុល្យត្រូវបានលាក់",

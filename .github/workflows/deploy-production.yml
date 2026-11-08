@@ -1,8 +1,15 @@
 name: Deploy to Production
 
 on:
+  # A completed main CI run is the normal start: a new deployable candidate can
+  # only appear when CI turns a main push green. The hourly poll is the catch-up
+  # path when a completion event is missed, and dispatch stays manual.
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
   schedule:
-    - cron: '7,27,47 * * * *'
+    - cron: '7 * * * *'
   workflow_dispatch:
 
 permissions:
@@ -19,7 +26,27 @@ env:
   VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
 
 jobs:
+  # Only a successful CI run may start an automatic deploy. The poll and
+  # dispatch are admitted unchanged. Every later job depends on this one, and
+  # the deployed SHA is still chosen by check-deployment-changes.yml.
+  admit:
+    if: >-
+      github.event_name != 'workflow_run' ||
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 2
+    steps:
+      - name: Record admitted trigger
+        env:
+          TRIGGERING_RUN: ${{ github.event.workflow_run.html_url }}
+        run: |
+          echo "Admitted \`$GITHUB_EVENT_NAME\` trigger." >> "$GITHUB_STEP_SUMMARY"
+          if [ -n "$TRIGGERING_RUN" ]; then
+            echo "Triggering CI run: $TRIGGERING_RUN" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
   check-changes:
+    needs: admit
     # Guard: privileged workflow — only the canonical repo may run it.
     if: github.repository == 'Kilo-Org/cloud'
     uses: ./.github/workflows/check-deployment-changes.yml

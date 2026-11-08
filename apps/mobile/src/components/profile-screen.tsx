@@ -17,6 +17,7 @@ import {
   SlidersHorizontal,
   Sparkles,
   Trash2,
+  Users,
 } from '@/components/ui/icons';
 import { type LayoutChangeEvent, type ScrollViewInstance, View } from 'react-native';
 import Animated, { FadeOut } from 'react-native-reanimated';
@@ -288,7 +289,7 @@ export function ProfileScreen() {
             }}
           />
           <ConfigureRow
-            icon={SlidersHorizontal}
+            icon={Users}
             title={t('profiles.title')}
             subtitle={t('profiles.entrySubtitle')}
             // Agents step: the row lists the agent profiles, and its two

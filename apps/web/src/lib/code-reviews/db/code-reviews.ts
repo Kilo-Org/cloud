@@ -23,6 +23,7 @@ import {
   count,
   ne,
   inArray,
+  or,
   sql,
   gte,
   lte,
@@ -1411,35 +1412,122 @@ export async function reviewIsSuperseded(reviewId: string): Promise<boolean> {
   }
 }
 
-/**
- * Updates only usage-related columns on a code review, without touching status or timestamps.
- */
-export async function updateCodeReviewUsage(
-  reviewId: string,
-  usage: {
-    model?: string;
-    totalTokensIn?: number;
-    totalTokensOut?: number;
-    totalCostMusd?: number;
+export type CodeReviewUsage = {
+  model?: string;
+  totalTokensIn?: number;
+  totalTokensOut?: number;
+  totalCostMusd?: number;
+};
+
+function buildCodeReviewUsageUpdateData(
+  usage: CodeReviewUsage
+): Partial<typeof cloud_agent_code_reviews.$inferInsert> {
+  const updateData: Partial<typeof cloud_agent_code_reviews.$inferInsert> = {};
+
+  if (usage.model !== undefined) {
+    updateData.model = usage.model;
   }
+  if (usage.totalTokensIn !== undefined) {
+    updateData.total_tokens_in = usage.totalTokensIn;
+  }
+  if (usage.totalTokensOut !== undefined) {
+    updateData.total_tokens_out = usage.totalTokensOut;
+  }
+  if (usage.totalCostMusd !== undefined) {
+    updateData.total_cost_musd = usage.totalCostMusd;
+  }
+
+  return updateData;
+}
+
+/**
+ * Records usage on a code review once per metered column.
+ *
+ * Each metered column is written only while it is still empty, so a call that
+ * repeats or arrives after another writer recorded usage leaves the stored
+ * values unchanged and fills only totals that are still missing. The model is
+ * recorded with the first usage write and is never replaced here. A call
+ * without metered values records nothing.
+ *
+ * Only {@link backfillCodeReviewUsage} may replace recorded usage; it runs from
+ * the terminal status callback with the billing totals, which are the source of
+ * truth for token usage.
+ *
+ * Returns whether the row changed.
+ */
+export async function settleCodeReviewUsage(
+  reviewId: string,
+  usage: CodeReviewUsage
+): Promise<boolean> {
+  const unsettledColumns: SQL[] = [];
+  if (usage.totalTokensIn !== undefined) {
+    unsettledColumns.push(isNull(cloud_agent_code_reviews.total_tokens_in));
+  }
+  if (usage.totalTokensOut !== undefined) {
+    unsettledColumns.push(isNull(cloud_agent_code_reviews.total_tokens_out));
+  }
+  if (usage.totalCostMusd !== undefined) {
+    unsettledColumns.push(isNull(cloud_agent_code_reviews.total_cost_musd));
+  }
+  if (unsettledColumns.length === 0) {
+    return false;
+  }
+
+  try {
+    const updated = await db
+      .update(cloud_agent_code_reviews)
+      .set({
+        ...(usage.model !== undefined
+          ? { model: sql`COALESCE(${cloud_agent_code_reviews.model}, ${usage.model})` }
+          : {}),
+        ...(usage.totalTokensIn !== undefined
+          ? {
+              total_tokens_in: sql`COALESCE(${cloud_agent_code_reviews.total_tokens_in}, ${usage.totalTokensIn})`,
+            }
+          : {}),
+        ...(usage.totalTokensOut !== undefined
+          ? {
+              total_tokens_out: sql`COALESCE(${cloud_agent_code_reviews.total_tokens_out}, ${usage.totalTokensOut})`,
+            }
+          : {}),
+        ...(usage.totalCostMusd !== undefined
+          ? {
+              total_cost_musd: sql`COALESCE(${cloud_agent_code_reviews.total_cost_musd}, ${usage.totalCostMusd})`,
+            }
+          : {}),
+        updated_at: new Date().toISOString(),
+      })
+      .where(and(eq(cloud_agent_code_reviews.id, reviewId), or(...unsettledColumns)))
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    return updated.length > 0;
+  } catch (error) {
+    captureException(error, {
+      tags: { operation: 'settleCodeReviewUsage' },
+      extra: { reviewId, usage },
+    });
+    throw error;
+  }
+}
+
+/**
+ * Overwrites the usage columns of a code review with the authoritative billing
+ * totals, without touching status or timestamps.
+ *
+ * The terminal status callback calls this after it aggregates the review's
+ * billing rows, so it deliberately ignores the compare-and-set of
+ * {@link settleCodeReviewUsage}: billing totals replace whatever an earlier
+ * writer recorded. Do not call it from a callback that can repeat.
+ */
+export async function backfillCodeReviewUsage(
+  reviewId: string,
+  usage: CodeReviewUsage
 ): Promise<void> {
   try {
     const updateData: Partial<typeof cloud_agent_code_reviews.$inferInsert> = {
+      ...buildCodeReviewUsageUpdateData(usage),
       updated_at: new Date().toISOString(),
     };
-
-    if (usage.model !== undefined) {
-      updateData.model = usage.model;
-    }
-    if (usage.totalTokensIn !== undefined) {
-      updateData.total_tokens_in = usage.totalTokensIn;
-    }
-    if (usage.totalTokensOut !== undefined) {
-      updateData.total_tokens_out = usage.totalTokensOut;
-    }
-    if (usage.totalCostMusd !== undefined) {
-      updateData.total_cost_musd = usage.totalCostMusd;
-    }
 
     await db
       .update(cloud_agent_code_reviews)
@@ -1447,7 +1535,7 @@ export async function updateCodeReviewUsage(
       .where(eq(cloud_agent_code_reviews.id, reviewId));
   } catch (error) {
     captureException(error, {
-      tags: { operation: 'updateCodeReviewUsage' },
+      tags: { operation: 'backfillCodeReviewUsage' },
       extra: { reviewId, usage },
     });
     throw error;

@@ -411,16 +411,16 @@ jobs:
       - name: Install usage-ingest deployment test dependencies
         run: pnpm --filter cloudflare-usage-ingest install --frozen-lockfile --ignore-scripts
 
-      # The stacked-CI admission is checked on every PR. All wiring suites run
-      # in one invocation: the test runner starts the named files concurrently,
-      # so the step pays one start-up and one parse of the YAML they share. The
-      # job is off the critical path, and the required `test` job needs it, so
-      # a broken admission still blocks the merge. sbom.yml is only reached by
-      # a PR that changes the workflow or its test, and that path set does not
-      # trip the kilocode_backend filter that gates test-scripts, so its wiring
-      # check runs here. This list is the only place that suite runs: the
-      # `test:mobile-sbom` script that test-scripts reaches must not name it,
-      # or one run executes the file in two jobs.
+      # The stacked-CI admission runs on every change to a wiring input. All
+      # wiring suites run in one invocation: the test runner starts the named
+      # files concurrently, so the step pays one start-up and one parse of the
+      # YAML they share. The job is off the critical path, and the required
+      # `test` job needs it, so a broken admission still blocks the merge.
+      # sbom.yml is only reached by a PR that changes the workflow or its test,
+      # and that path set does not trip the kilocode_backend filter that gates
+      # test-scripts, so its wiring check runs here. This list is the only place
+      # that suite runs: the `test:mobile-sbom` script that test-scripts reaches
+      # must not name it, or one run executes the file in two jobs.
       - name: Test workflow wiring
         run: >-
           node --test

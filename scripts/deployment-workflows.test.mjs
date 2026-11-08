@@ -493,6 +493,7 @@ test('web promotion waits for a completed or deliberately skipped gateway rollou
     assert.equal(
       runInNewContext(expression, {
         needs,
+        github: { repository: 'Kilo-Org/cloud' },
         cancelled: () => cancelled,
         success: () => Object.values(needs).every(dependency => dependency.result === 'success'),
       }),
@@ -971,7 +972,7 @@ test('production deploys cloud-agent-next after the session-ingest job', () => {
   assert.equal(ingest.needs, 'detect-changes');
   assert.equal(
     ingest.if,
-    "needs.detect-changes.outputs.deploy-cloud-agent-after-session-ingest == 'true'"
+    "github.repository == 'Kilo-Org/cloud' && needs.detect-changes.outputs.deploy-cloud-agent-after-session-ingest == 'true'"
   );
   assert.equal(ingest.environment, '${{ inputs.target_environment }}');
   assert.equal(ingest['timeout-minutes'], 25);

@@ -47,6 +47,8 @@ jobs:
 
   check-changes:
     needs: admit
+    # Guard: privileged workflow — only the canonical repo may run it.
+    if: github.repository == 'Kilo-Org/cloud'
     uses: ./.github/workflows/check-deployment-changes.yml
     with:
       workflow_file: deploy-production.yml
@@ -56,7 +58,8 @@ jobs:
   # the same connection.
   db-gate:
     needs: check-changes
-    if: needs.check-changes.outputs.should_deploy == 'true'
+    # Guard: privileged workflow — only the canonical repo may run it.
+    if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 45
     environment: production
@@ -95,7 +98,8 @@ jobs:
 
   stage-app:
     needs: check-changes
-    if: needs.check-changes.outputs.should_deploy == 'true'
+    # Guard: privileged workflow — only the canonical repo may run it.
+    if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
     uses: ./.github/workflows/stage-vercel-deployment.yml
     with:
       target_environment: production
@@ -106,7 +110,8 @@ jobs:
 
   stage-ai-gateway:
     needs: check-changes
-    if: needs.check-changes.outputs.should_deploy == 'true'
+    # Guard: privileged workflow — only the canonical repo may run it.
+    if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
     uses: ./.github/workflows/stage-vercel-deployment.yml
     with:
       target_environment: production
@@ -117,8 +122,10 @@ jobs:
 
   promote-app:
     needs: [stage-app, db-gate, stage-ai-gateway, promote-ai-gateway]
+    # Guard: privileged workflow — only the canonical repo may run it.
     if: >-
       ${{
+        github.repository == 'Kilo-Org/cloud' &&
         !cancelled() &&
         needs.stage-app.result == 'success' &&
         needs.db-gate.result == 'success' &&
@@ -137,6 +144,9 @@ jobs:
 
   promote-ai-gateway:
     needs: [stage-ai-gateway, db-gate]
+    # stage-ai-gateway skips when there is nothing to deploy, which skips this job too.
+    # Guard: privileged workflow — only the canonical repo may run it.
+    if: github.repository == 'Kilo-Org/cloud'
     uses: ./.github/workflows/promote-vercel-deployment.yml
     with:
       deployment_url: ${{ needs.stage-ai-gateway.outputs.deployment_url }}
@@ -153,6 +163,7 @@ jobs:
     needs: [db-gate, check-changes, stage-app, stage-ai-gateway, promote-app, promote-ai-gateway]
     if: >-
       ${{
+        github.repository == 'Kilo-Org/cloud' &&
         !cancelled() &&
         needs.check-changes.outputs.should_deploy == 'true' &&
         needs.db-gate.result == 'success' &&
@@ -171,7 +182,7 @@ jobs:
   # successful worker deploy and releases only when the kilo-mcp bundle changed.
   kilo-mcp-release:
     needs: [check-changes, deploy-workers]
-    if: ${{ !cancelled() && needs.deploy-workers.result == 'success' }}
+    if: ${{ github.repository == 'Kilo-Org/cloud' && !cancelled() && needs.deploy-workers.result == 'success' }}
     # Ceiling for the reusable workflow's GITHUB_TOKEN (a called workflow cannot
     # exceed the caller).
     permissions:
@@ -200,6 +211,7 @@ jobs:
       ]
     if: >-
       ${{
+        github.repository == 'Kilo-Org/cloud' &&
         !cancelled() &&
         needs.check-changes.outputs.should_deploy == 'true' &&
         needs.db-gate.result == 'success' &&

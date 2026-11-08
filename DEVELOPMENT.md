@@ -770,7 +770,8 @@ Pricing estimates use the model picker's configured provider prices and the stor
 The gateway preserves bounded-request price ceilings and model access checks.
 Each charged retry retains a distinct usage receipt with its committed or queued delivery state.
 A usage identifier marks an attempt the gateway billed, including an answer the caller never received.
-The summary worker repeats a transient failure only while the generation has no usage identifier.
+The summary worker stops a transient retry when it observes that identifier.
+A delayed receipt can still permit another charged attempt; this check does not enforce a cumulative spending ceiling.
 Settlement waits for every recorded receipt, within the existing delivery window.
 A later receipt reopens settlement after an earlier attempt settled.
 The displayed cost sums usage rows once, including rows delivered after another attempt.

@@ -189,8 +189,7 @@ async function requestBriefingSummary(
     const { promise: slept, resolve } = Promise.withResolvers<void>();
     setTimeout(resolve, delayMs);
     await slept;
-    // The wait covers the gateway's post-response write, so a usage identifier that
-    // exists here belongs to an attempt that was billed.
+    // A receipt can arrive after this check; absence does not prove that the attempt was unbilled.
     if (await wasBilled()) throw failure;
   }
 }
@@ -453,13 +452,6 @@ function chargeAccounting(row: BriefingReportRow) {
   );
 }
 
-/**
- * Whether this generation has already paid for an attempt. The gateway records a
- * usage identifier on the attempt it billed, including an answer the caller never
- * received, so a repeat after one pays twice for one briefing and spends past the
- * safeguard the person was shown for it. An attempt the gateway read no usage from
- * keeps a null identifier, so a decline before generation stays repeatable.
- */
 async function generationBilled(reportId: string, generationId: string): Promise<boolean> {
   const [current] = await db
     .select({ summary: agent_briefing_snapshots.summary })

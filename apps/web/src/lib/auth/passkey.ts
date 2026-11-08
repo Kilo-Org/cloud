@@ -14,6 +14,7 @@ import {
 } from '@simplewebauthn/server';
 import { decodeClientDataJSON, isoBase64URL } from '@simplewebauthn/server/helpers';
 import {
+  kilocode_users,
   passkey_challenges,
   passkey_credentials,
   passkey_sign_in_tickets,
@@ -25,6 +26,7 @@ import {
 import assetLinks from '../../../public/.well-known/assetlinks.json';
 import { NEXTAUTH_URL } from '@kilocode/web-shared/lib/config.server';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { isWebSessionCurrent } from '@kilocode/web-shared/lib/web-session-revocation';
 
 /**
  * WebAuthn ceremonies for passkey registration and sign-in.
@@ -264,11 +266,19 @@ export async function createRegistrationOptions(
  * attestation that does not verify (including one signed for another origin or
  * rpId, both of which the library checks against this configuration), and
  * refuses a credential id that is already bound to a user.
+ *
+ * `sessionPepper` is the pepper of the browser session that started this
+ * request. The credential is inserted while the user row is locked, and only if
+ * that session is still current. Account recovery rotates the pepper on the
+ * same row before it deletes passkeys. It therefore either commits first, and
+ * this registration is refused, or waits for this insert and then deletes the
+ * new credential.
  */
 export async function verifyRegistration(
   kiloUserId: string,
   challengeId: string,
-  response: RegistrationResponseJSON
+  response: RegistrationResponseJSON,
+  sessionPepper: string | null | undefined
 ): Promise<PasskeyCredential> {
   const { rpId, expectedOrigins } = getRelyingParty();
 
@@ -309,34 +319,45 @@ export async function verifyRegistration(
 
   const { credential, credentialDeviceType, credentialBackedUp, aaguid } = registrationInfo;
 
-  const [bound] = await db
-    .select({ kilo_user_id: passkey_credentials.kilo_user_id })
-    .from(passkey_credentials)
-    .where(eq(passkey_credentials.credential_id, credential.id))
-    .limit(1);
-  if (bound) {
-    // A credential id is unique per user and is never re-bound.
-    throw new PasskeyVerificationError('VERIFICATION_FAILED');
-  }
+  return db.transaction(async tx => {
+    const [owner] = await tx
+      .select({ web_session_pepper: kilocode_users.web_session_pepper })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, kiloUserId))
+      .for('update');
+    if (!owner || !isWebSessionCurrent(sessionPepper, owner)) {
+      throw new PasskeyVerificationError('VERIFICATION_FAILED');
+    }
 
-  const [inserted] = await db
-    .insert(passkey_credentials)
-    .values({
-      kilo_user_id: kiloUserId,
-      credential_id: credential.id,
-      public_key: isoBase64URL.fromBuffer(credential.publicKey),
-      sign_count: credential.counter,
-      transports: credential.transports ?? null,
-      device_type: credentialDeviceType,
-      backed_up: credentialBackedUp,
-      aaguid,
-    })
-    .returning();
+    const [bound] = await tx
+      .select({ kilo_user_id: passkey_credentials.kilo_user_id })
+      .from(passkey_credentials)
+      .where(eq(passkey_credentials.credential_id, credential.id))
+      .limit(1);
+    if (bound) {
+      // A credential id is unique per user and is never re-bound.
+      throw new PasskeyVerificationError('VERIFICATION_FAILED');
+    }
 
-  if (!inserted) {
-    throw new PasskeyVerificationError('VERIFICATION_FAILED');
-  }
-  return inserted;
+    const [inserted] = await tx
+      .insert(passkey_credentials)
+      .values({
+        kilo_user_id: kiloUserId,
+        credential_id: credential.id,
+        public_key: isoBase64URL.fromBuffer(credential.publicKey),
+        sign_count: credential.counter,
+        transports: credential.transports ?? null,
+        device_type: credentialDeviceType,
+        backed_up: credentialBackedUp,
+        aaguid,
+      })
+      .returning();
+
+    if (!inserted) {
+      throw new PasskeyVerificationError('VERIFICATION_FAILED');
+    }
+    return inserted;
+  });
 }
 
 /**

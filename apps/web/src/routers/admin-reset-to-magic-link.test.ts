@@ -1,5 +1,11 @@
+jest.mock('@kilocode/web-shared/lib/admin/step-up-store', () => {
+  const actual = jest.requireActual('@kilocode/web-shared/lib/admin/step-up-store');
+  return { ...actual, revokeStepUpProofs: jest.fn(actual.revokeStepUpProofs) };
+});
+
 import { describe, expect, test } from '@jest/globals';
 import { eq, sql } from 'drizzle-orm';
+import { revokeStepUpProofs } from '@kilocode/web-shared/lib/admin/step-up-store';
 import { TRPCError } from '@trpc/server';
 import { isoBase64URL } from '@simplewebauthn/server/helpers';
 import {
@@ -20,14 +26,17 @@ import { isWebSessionCurrent } from '@kilocode/web-shared/lib/web-session-revoca
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   buildAuthenticationResponse,
+  buildRegistrationResponse,
   createTestAuthenticator,
   type TestAuthenticator,
 } from '@/tests/helpers/webauthn-test-authenticator';
 import {
   consumeSignInTicket,
   createAuthenticationOptions,
+  createRegistrationOptions,
   PasskeyVerificationError,
   verifyAuthentication,
+  verifyRegistration,
 } from '@/lib/auth/passkey';
 import { getPostgresErrorCode } from '@/lib/db-errors';
 import { createCallerForUser } from '@/routers/test-utils';
@@ -229,12 +238,15 @@ async function isWaitingOnLock(statementPrefix: string): Promise<boolean> {
 }
 
 /**
- * Parks every ticket insert for `userId` on an advisory lock until the returned
- * release runs, so a test can act between a passkey's counter update and the
- * insert of the ticket it mints. Deletes are not affected.
+ * Parks every insert into `table` for `userId` on an advisory lock until the
+ * returned release runs, so a test can act between a passkey ceremony's lock
+ * and the row it writes. Deletes are not affected.
  */
-async function holdTicketInserts(userId: string) {
-  const name = `hold_ticket_insert_${crypto.randomUUID().replaceAll('-', '')}`;
+async function holdInserts(
+  table: 'passkey_sign_in_tickets' | 'passkey_credentials',
+  userId: string
+) {
+  const name = `hold_insert_${crypto.randomUUID().replaceAll('-', '')}`;
   const lockKey = 10064;
   await db.execute(
     sql.raw(
@@ -244,7 +256,7 @@ async function holdTicketInserts(userId: string) {
   );
   await db.execute(
     sql.raw(
-      `CREATE TRIGGER ${name} BEFORE INSERT ON passkey_sign_in_tickets FOR EACH ROW ` +
+      `CREATE TRIGGER ${name} BEFORE INSERT ON ${table} FOR EACH ROW ` +
         `WHEN (NEW.kilo_user_id = '${userId}') EXECUTE FUNCTION ${name}()`
     )
   );
@@ -262,7 +274,7 @@ async function holdTicketInserts(userId: string) {
       await holder;
     },
     async drop() {
-      await db.execute(sql.raw(`DROP TRIGGER ${name} ON passkey_sign_in_tickets`));
+      await db.execute(sql.raw(`DROP TRIGGER ${name} ON ${table}`));
       await db.execute(sql.raw(`DROP FUNCTION ${name}()`));
     },
   };
@@ -289,8 +301,14 @@ describe('admin.users.resetToMagicLinkLogin', () => {
     expect(after.refreshTokens).toEqual([]);
     expect(after.authRequests).toEqual([{ status: 'denied' }]);
     expect(after.attestedKeys).toEqual([]);
-    // Revoked first, then removed with the passkey it was bound to.
+    // A proof is bound to a passkey and cascades away with it, so the row
+    // alone cannot show the revocation; the spy does.
     expect(after.stepUpProofs).toEqual([]);
+    expect(jest.mocked(revokeStepUpProofs)).toHaveBeenCalledWith(
+      user.id,
+      'account_recovery',
+      expect.anything()
+    );
     expect(after.passkeys).toEqual([]);
     expect(after.challenges).toEqual([]);
     expect(after.tickets).toEqual([]);
@@ -340,7 +358,7 @@ describe('admin.users.resetToMagicLinkLogin', () => {
     });
     const caller = await createCallerForUser(admin.id);
 
-    const hold = await holdTicketInserts(user.id);
+    const hold = await holdInserts('passkey_sign_in_tickets', user.id);
     try {
       // The assertion verifies and its counter update runs, then the ticket
       // insert parks on the hold. The no-op catch keeps an early rejection
@@ -378,6 +396,93 @@ describe('admin.users.resetToMagicLinkLogin', () => {
       await hold.release();
       await hold.drop();
     }
+  });
+
+  test('recovery during a passkey registration leaves no credential', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const user = await insertTestUser({ web_session_pepper: 'holder-session-pepper' });
+    const authenticator = createTestAuthenticator();
+    const { challengeId, options } = await createRegistrationOptions(
+      user.id,
+      user.google_user_email
+    );
+    const attestation = buildRegistrationResponse(authenticator, {
+      challenge: options.challenge,
+    });
+    const caller = await createCallerForUser(admin.id);
+
+    const hold = await holdInserts('passkey_credentials', user.id);
+    try {
+      // The registration locks the user row, finds its session current, and
+      // its credential insert parks on the hold.
+      const registration = verifyRegistration(
+        user.id,
+        challengeId,
+        attestation,
+        'holder-session-pepper'
+      );
+      void registration.catch(() => undefined);
+      await waitUntil(
+        () => isWaitingOnLock('insert into "passkey_credentials"'),
+        'the credential insert to park'
+      );
+
+      // Recovery rotates the pepper on the row the registration holds, so it
+      // waits for the registration to commit before it deletes passkeys.
+      let recoverySettled = false;
+      const recovery = caller.admin.users
+        .resetToMagicLinkLogin({ userId: user.id })
+        .finally(() => (recoverySettled = true));
+      await waitUntil(
+        async () => recoverySettled || isWaitingOnLock('update "kilocode_users"'),
+        'recovery to finish or wait on the user row'
+      );
+      expect(recoverySettled).toBe(false);
+
+      await hold.release();
+      await expect(registration).resolves.toMatchObject({ kilo_user_id: user.id });
+      await expect(recovery).resolves.toEqual({ success: true });
+
+      const passkeys = await db
+        .select({ id: passkey_credentials.id })
+        .from(passkey_credentials)
+        .where(eq(passkey_credentials.kilo_user_id, user.id));
+      expect(passkeys).toEqual([]);
+    } finally {
+      await hold.release();
+      await hold.drop();
+    }
+  });
+
+  test('a registration from a session that recovery revoked is refused', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const user = await insertTestUser({ web_session_pepper: 'holder-session-pepper' });
+    const caller = await createCallerForUser(admin.id);
+    await caller.admin.users.resetToMagicLinkLogin({ userId: user.id });
+
+    // Recovery deletes open challenges, so the ceremony starts afterwards: only
+    // the revoked session pepper can refuse it.
+    const { challengeId, options } = await createRegistrationOptions(
+      user.id,
+      user.google_user_email
+    );
+
+    const refusal: unknown = await verifyRegistration(
+      user.id,
+      challengeId,
+      buildRegistrationResponse(createTestAuthenticator(), { challenge: options.challenge }),
+      'holder-session-pepper'
+    ).then(
+      () => null,
+      (error: unknown) => error
+    );
+    expect(refusal).toBeInstanceOf(PasskeyVerificationError);
+    expect((refusal as PasskeyVerificationError).code).toBe('VERIFICATION_FAILED');
+    const passkeys = await db
+      .select({ id: passkey_credentials.id })
+      .from(passkey_credentials)
+      .where(eq(passkey_credentials.kilo_user_id, user.id));
+    expect(passkeys).toEqual([]);
   });
 
   test.each([

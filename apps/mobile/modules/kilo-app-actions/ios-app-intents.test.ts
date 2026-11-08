@@ -354,6 +354,18 @@ describe('the session entity catalog', () => {
     expect(entity).toContain('func entities(for identifiers: [String])');
     expect(entity).toContain('func suggestedEntities()');
     expect(entity).toContain('func entities(matching string: String)');
+    // The identity lookup goes to the identifier resolver, so a run a person
+    // already configured still resolves while the lock withholds the list.
+    expect(entity).toContain('KiloSessionCatalogStore.entries(forIdentifiers: identifiers)');
+    expect(entity).not.toContain('let wanted = Set(identifiers)');
+    // Listing and spoken matching stay behind the lock.
+    expect(entity).toContain(
+      'KiloSessionCatalogStore.entries().map(KiloSessionEntity.init(entry:))'
+    );
+    // The resolver hands back the session without its title while withheld.
+    expect(catalog).toContain('static func entries(forIdentifiers identifiers: [String])');
+    expect(catalog).toContain('let withheld = isWithheld()');
+    expect(catalog).toContain('KiloSessionCatalogEntry(id: $0.id, title: "")');
   });
 
   it('guards the on-screen cue behind the iOS 18.2 runtime', () => {

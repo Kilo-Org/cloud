@@ -77,6 +77,25 @@ public enum KiloSessionCatalogStore {
     }
   }
 
+  /// The stored sessions a caller already names, by identifier.
+  ///
+  /// A saved shortcut stores the identifier of the session it opens, and the
+  /// system rebuilds the entity by asking for that identifier before the run
+  /// starts — in a launch where no JavaScript and no unlock has happened yet.
+  /// Withholding the whole list there would turn a working shortcut into an
+  /// unsupported-value error, so the identifier still resolves. The title is
+  /// what the lock protects, and a withheld answer carries none: the entity
+  /// exists to open the session the person already chose.
+  public static func entries(forIdentifiers identifiers: [String]) -> [KiloSessionCatalogEntry] {
+    let wanted = Set(identifiers)
+    return queue.sync {
+      let withheld = isWithheld()
+      return read()
+        .filter { wanted.contains($0.id) }
+        .map { withheld ? KiloSessionCatalogEntry(id: $0.id, title: "") : $0 }
+    }
+  }
+
   /// Replaces the whole list. True means the stored bytes changed.
   @discardableResult
   static func replace(_ entries: [KiloSessionCatalogEntry]) -> Bool {

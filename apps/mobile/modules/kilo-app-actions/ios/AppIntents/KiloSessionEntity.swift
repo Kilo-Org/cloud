@@ -43,13 +43,17 @@ struct KiloSessionEntity: AppEntity {
 /// `EntityStringQuery` supplies the spoken-title lookup Siri uses. The app has
 /// no server here on purpose — a query that reached the network would make
 /// Shortcuts wait, and the cache already holds every session the app can open.
+///
+/// The two questions have different answers behind the app lock: listing and
+/// title matching offer nothing while the lock withholds the catalog, and the
+/// identity lookup still answers for the identifiers a stored shortcut names,
+/// without their titles. A run the person already configured therefore opens
+/// the session it names, and a lock that engages later still keeps every title
+/// out of Siri's answers.
 @available(iOS 17.0, *)
 struct KiloSessionEntityQuery: EntityQuery, EntityStringQuery {
   func entities(for identifiers: [String]) async throws -> [KiloSessionEntity] {
-    let wanted = Set(identifiers)
-    return KiloSessionCatalogStore.entries()
-      .filter { wanted.contains($0.id) }
-      .map(KiloSessionEntity.init(entry:))
+    KiloSessionCatalogStore.entries(forIdentifiers: identifiers).map(KiloSessionEntity.init(entry:))
   }
 
   func suggestedEntities() async throws -> [KiloSessionEntity] {

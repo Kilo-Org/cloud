@@ -76,6 +76,7 @@ describe('POST /api/auth/passkey/register', () => {
       user: fakeUser,
       authFailedResponse: null,
       webSessionId: 'session-1',
+      webSessionPepper: 'session-pepper-1',
       authenticatedAt: Math.floor(Date.now() / 1000),
     } as never);
   });
@@ -170,7 +171,12 @@ describe('POST /api/auth/passkey/register', () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ credentialId: 'credential-1' });
-    expect(mockVerifyRegistration).toHaveBeenCalledWith('user-1', challengeId, attestation);
+    expect(mockVerifyRegistration).toHaveBeenCalledWith(
+      'user-1',
+      challengeId,
+      attestation,
+      'session-pepper-1'
+    );
   });
 
   it('returns 400 for an invalid request', async () => {

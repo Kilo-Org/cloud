@@ -22,10 +22,31 @@ runs:
         path: packages/trpc/dist
         key: ${{ runner.os }}-trpc-declarations-${{ steps.key.outputs.key }}
 
+    # A hit proves the key, not the tree: a restore that failed halfway, or an
+    # entry written by a future build step that emits something else, would
+    # otherwise be served as a build. Only a hit that carries the package's two
+    # declaration entries skips the build.
+    - name: Check the restored declarations
+      id: restored
+      shell: bash
+      run: |
+        set -euo pipefail
+        usable='false'
+        if [ '${{ steps.cache.outputs.cache-hit }}' = 'true' ]; then
+          usable='true'
+          for file in packages/trpc/dist/index.d.ts packages/trpc/dist/mobile.d.ts; do
+            if [ ! -f "$file" ]; then
+              echo "::warning::the restored tRPC declarations have no $file"
+              usable='false'
+            fi
+          done
+        fi
+        echo "usable=$usable" >> "$GITHUB_OUTPUT"
+
     # The build script keeps tsgo under 2 GiB for memory-capped sandboxes. CI
     # runners have at least 8 GB, where that limit only slows the build down.
     - name: Build trpc types
-      if: steps.cache.outputs.cache-hit != 'true'
+      if: steps.restored.outputs.usable != 'true'
       shell: bash
       env:
         GOMEMLIMIT: 'off'

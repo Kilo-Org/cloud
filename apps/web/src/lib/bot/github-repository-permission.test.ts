@@ -276,7 +276,9 @@ describe('authorizeGitHubRepository', () => {
     });
 
     test('refuses when the connection cannot mint a token for the repository', async () => {
-      jest.mocked(getGitHubIntegrationById).mockResolvedValue(null);
+      jest
+        .mocked(getGitHubIntegrationById)
+        .mockResolvedValue({ ...githubConnection, platform_installation_id: null });
       const fetchPermission = createFetchPermission('write');
 
       const result = await authorizeGitHubRepository({

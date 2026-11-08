@@ -5022,6 +5022,28 @@ describe('session detail duplicate failure state', () => {
     sessionConfigSync.currentModel = 'anthropic/claude-sonnet-4';
     const question = 'please refactor';
     const view = await mountDetails([rootUserMessage(question)]);
+    const placeholder = () =>
+      view.renderer.root.find(node => Object.is(node.type, 'ChatComposer')).props.placeholder;
+
+    // While the sandbox is still being prepared the composer states the setup
+    // phase and its send control is locked: the state the reader was stuck in.
+    act(() => {
+      view.store.set<boolean, [boolean], unknown>(view.manager.atoms.canSend, false);
+      view.store.set<CloudStatus | null, [CloudStatus | null], unknown>(
+        view.manager.atoms.cloudStatus,
+        {
+          type: 'preparing',
+          step: 'sandbox_create',
+          message: 'Retrying sandbox creation',
+        }
+      );
+    });
+    expect(placeholder()).toBe(i18n.t('agentChat.composer.preparingPlaceholder'));
+    expect(composerProps(view).sendDisabled).toBe(true);
+
+    // Setup gave up: the queued question carries the failure, the send control
+    // is usable, and the composer no longer claims the environment is being set
+    // up.
     const failedAttempt: PreparationAttempt = {
       id: 'attempt-1',
       triggerMessageId: USER_ID,
@@ -5033,6 +5055,7 @@ describe('session detail duplicate failure state', () => {
       steps: [],
     };
     act(() => {
+      view.store.set<boolean, [boolean], unknown>(view.manager.atoms.canSend, true);
       view.store.set<CloudStatus | null, [CloudStatus | null], unknown>(
         view.manager.atoms.cloudStatus,
         { type: 'error', message: 'sandbox_create_failed' }
@@ -5059,8 +5082,7 @@ describe('session detail duplicate failure state', () => {
     const text = renderedText(view.renderer.root);
     expect(text).toContain(i18n.t('agentChat.messageFailure.assistantTitle'));
     expect(text).toContain(i18n.t('agentChat.messageFailure.deliveryExecution'));
-    // The environment is no longer "being set up": the send control is live and
-    // states no setup reason beside it.
+    expect(placeholder()).toBe(i18n.t('common.message'));
     expect(composerProps(view).sendDisabled).toBe(false);
     expect(composerProps(view).sendDisabledReason).toBeNull();
     const labels = view.renderer.root

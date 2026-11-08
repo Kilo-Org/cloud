@@ -1039,7 +1039,7 @@ them through one development-only override.
 
 | Failure | Detected by | Recovery | Message effect |
 |---|---|---|---|
-| Transient provider create error | Sandbox DO | One retry after a 10 s pause, within the unchanged route deadline | A third create error fails queued promptly (`sandbox_create_failed`); otherwise queued fail at the deadline |
+| Transient provider create error | Sandbox DO | One retry after a 10 s pause, within the unchanged route deadline | A second create error fails queued promptly (`sandbox_create_failed`); otherwise queued fail at the deadline |
 | Actual compute credit denial | Provider adapter / existing Vercel billing admission | New message after adding credits | Queued fail promptly (`billing_blocked`) |
 | Proven invalid/unsupported provider configuration | Provider adapter | New message after correcting configuration | Queued fail promptly (`invalid_configuration`) |
 | Wrapper never connects | Sandbox DO, 5 min | Stop; new allocation within the route deadline | Queued fail at the deadline |

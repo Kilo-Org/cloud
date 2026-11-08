@@ -2718,19 +2718,26 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
 
     // The retry runs and fails: two attempts, and the budget is spent long
     // before the attempt deadline could expire.
-    for (let attempt = 1; attempt <= 2; attempt += 1) {
-      await waitFor(async () => expect(provider.createCalls).toBe(attempt));
-      if (attempt === 1) {
-        await runInDurableObject(sandboxStub, async (instance, state) => {
-          drizzle(state.storage)
-            .update(allocationTable)
-            .set({ create_deadline_at: Date.now() - 1 })
-            .where(eq(allocationTable.id, 'current'))
-            .run();
-          await instance.alarm();
-        });
-      }
-    }
+    await waitFor(async () => {
+      const allocation = await sandboxStub.getAllocationState();
+      expect(provider.createCalls).toBe(1);
+      expect(allocation.kind).toBe('creating');
+      // The pause the first failure persisted, not the first create deadline.
+      expect(allocation.createDeadlineAt).toBeLessThanOrEqual(
+        Date.now() + CONTROL_PLANE_TIMERS.sandbox.providerCreateRetryMs
+      );
+    });
+    await waitFor(async () => {
+      await runInDurableObject(sandboxStub, async (instance, state) => {
+        drizzle(state.storage)
+          .update(allocationTable)
+          .set({ create_deadline_at: Date.now() - 1 })
+          .where(eq(allocationTable.id, 'current'))
+          .run();
+        await instance.alarm();
+      });
+      expect(provider.createCalls).toBe(2);
+    });
     await waitFor(async () => expect(await messageStatus(sessionStub, 'm1')).toBe('failed'));
     expect(Date.now() - startedAt).toBeLessThan(
       CONTROL_PLANE_TIMERS.sandbox.providerCreateRetryMs * 3

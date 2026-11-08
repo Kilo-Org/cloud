@@ -664,6 +664,39 @@ test('kilo-app CI builds the tRPC declarations once and both checks download the
   );
 });
 
+// The tRPC action gets the same guard as the harness SDK build action: a hit
+// proves the key, not the tree.
+test('the tRPC declarations action rebuilds a hit that misses an entry point', () => {
+  const action = load(
+    readFileSync(
+      new URL('../.github/actions/trpc-declarations/action.yml', import.meta.url),
+      'utf8'
+    )
+  );
+  const steps = action.runs.steps;
+  const cache = steps.find(step => step.name === 'Restore tRPC declarations');
+  const restored = steps.find(step => step.name === 'Check the restored declarations');
+  const build = steps.find(step => step.name === 'Build trpc types');
+  assert.equal(cache.uses, 'actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7');
+  assert.equal(cache.with.path, 'packages/trpc/dist');
+  assert.ok(
+    steps.indexOf(cache) < steps.indexOf(restored) &&
+      steps.indexOf(restored) < steps.indexOf(build),
+    'the check runs between the restore and the build'
+  );
+  assert.equal(restored.id, 'restored');
+  assert.equal(restored.shell, 'bash');
+  assert.equal(restored.if, undefined, 'the check runs on a miss too');
+  for (const entry of ['packages/trpc/dist/index.d.ts', 'packages/trpc/dist/mobile.d.ts']) {
+    assert.ok(restored.run.includes(entry), `the check requires ${entry}`);
+  }
+  assert.match(restored.run, /^usable='false'$/m);
+  assert.match(restored.run, /echo "usable=\$usable" >> "\$GITHUB_OUTPUT"/m);
+  const rebuild = "steps.restored.outputs.usable != 'true'";
+  assert.equal(build.if, rebuild, 'the build gates on the check, not the raw cache hit');
+  assert.doesNotMatch(build.if, /cache-hit/, 'the raw cache hit no longer gates the build');
+});
+
 test('the harness SDK action shares one dist entry across runner operating systems', () => {
   const steps = harnessBuildAction.runs.steps;
   const key = steps.find(step => step.name === 'Hash harness SDK build inputs');

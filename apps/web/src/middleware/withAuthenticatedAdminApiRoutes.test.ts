@@ -1,14 +1,17 @@
-// `next/server` exports `NextFetchEvent` as a type only in this Next version,
-// so the test builds the event with the class Next itself constructs.
-import { NextFetchEvent } from 'next/dist/server/web/spec-extension/fetch-event';
+import fs from 'node:fs';
+import path from 'node:path';
 import { NextRequest } from 'next/server';
+import type { NextFetchEvent } from 'next/server';
 import type { JWT } from 'next-auth/jwt';
 import type {
   NextAuthMiddlewareOptions,
   NextMiddlewareWithAuth,
   NextRequestWithAuth,
 } from 'next-auth/middleware';
-import { withAuthenticatedAdminApiRoutes } from './withAuthenticatedAdminApiRoutes';
+import {
+  ADMIN_API_ROUTES_WITH_OWN_ADMIN_CHECK,
+  withAuthenticatedAdminApiRoutes,
+} from './withAuthenticatedAdminApiRoutes';
 
 jest.mock('next-auth/middleware', () => ({ withAuth: mockWithAuth }));
 
@@ -53,12 +56,12 @@ function requestWithSession(pathname: string, session: Session): NextRequestWith
   return Object.assign(request, { nextauth: { token: TOKENS[session] } });
 }
 
+// `next/server` exports `NextFetchEvent` as a type only, and the middleware
+// under test just forwards the event to the next middleware, so a stub keeps
+// the test off Next internals that an upgrade may move. A real event cannot be
+// built from its public type, because its state lives behind private symbols.
 function nextFetchEvent(): NextFetchEvent {
-  return new NextFetchEvent({
-    request: new NextRequest('http://localhost/'),
-    page: '/',
-    context: undefined,
-  });
+  return {} as NextFetchEvent;
 }
 
 async function callMiddleware(pathname: string, session: Session) {
@@ -73,30 +76,49 @@ async function callMiddleware(pathname: string, session: Session) {
   return { result, nextMiddleware };
 }
 
+const USER_ID = '6f1c2d3e-0000-4000-8000-000000000001';
+
+// Driven from the list itself, so a path added there is also driven here. The
+// trailing-slash entry is the request path Next.js serves the same handler on.
 const OWN_ADMIN_CHECK_PATHS = [
-  '/admin/api/enrichment-data/upsert',
-  '/admin/api/users',
+  ...ADMIN_API_ROUTES_WITH_OWN_ADMIN_CHECK.map(route => route.replace('[id]', USER_ID)),
   '/admin/api/users/',
-  '/admin/api/users/add-credit',
-  '/admin/api/users/credit-transactions',
-  '/admin/api/users/gdpr-removal',
-  '/admin/api/users/heuristic-analysis/grouped',
-  '/admin/api/users/heuristic-analysis/raw',
-  '/admin/api/users/payment-methods',
-  '/admin/api/users/6f1c2d3e-0000-4000-8000-000000000001/dev/insert-usage-record',
-  '/admin/api/users/6f1c2d3e-0000-4000-8000-000000000001/kill-balance-cache',
-  '/admin/api/users/6f1c2d3e-0000-4000-8000-000000000001/referrals',
 ];
 
 const MIDDLEWARE_CHECKED_PATHS = [
   '/admin/api/users/audit-log',
-  '/admin/api/users/6f1c2d3e-0000-4000-8000-000000000001',
-  '/admin/api/users/6f1c2d3e-0000-4000-8000-000000000001/dev',
-  '/admin/api/users/6f1c2d3e-0000-4000-8000-000000000001/kill-balance-cache/now',
+  `/admin/api/users/${USER_ID}`,
+  `/admin/api/users/${USER_ID}/dev`,
+  `/admin/api/users/${USER_ID}/kill-balance-cache/now`,
   '/admin/api/users-export',
   '/admin/api/enrichment-data/upsert-v2',
   '/admin/api/abuse/blacklisted-domains',
 ];
+
+const APP_ROOT = path.resolve(__dirname, '../app');
+const USER_ROUTE_ROOT = path.join(APP_ROOT, 'admin/api/users');
+
+// The listed user routes each verify admin access with `getUserFromAuth`, so the
+// middleware must keep them in the list as route files come and go. The
+// enrichment route is left out of this scan, because it verifies through the
+// admin tRPC procedure its handler calls.
+function adminGuardedUserRoutePaths(): string[] {
+  return fs
+    .readdirSync(USER_ROUTE_ROOT, { recursive: true, withFileTypes: true })
+    .filter(entry => entry.isFile() && entry.name === 'route.ts')
+    .map(entry => path.join(entry.parentPath, entry.name))
+    .filter(file =>
+      /getUserFromAuth\(\s*\{\s*adminOnly:\s*true/.test(fs.readFileSync(file, 'utf8'))
+    )
+    .map(file => `/${path.relative(APP_ROOT, path.dirname(file)).split(path.sep).join('/')}`)
+    .sort();
+}
+
+function listedUserRoutePaths(): string[] {
+  return ADMIN_API_ROUTES_WITH_OWN_ADMIN_CHECK.filter(
+    route => route === '/admin/api/users' || route.startsWith('/admin/api/users/')
+  ).sort();
+}
 
 describe('withAuthenticatedAdminApiRoutes', () => {
   it.each(OWN_ADMIN_CHECK_PATHS)(
@@ -134,5 +156,9 @@ describe('withAuthenticatedAdminApiRoutes', () => {
 
     expect(result.status).toBe(200);
     expect(nextMiddleware).toHaveBeenCalledTimes(1);
+  });
+
+  it('lists every user route that verifies admin access itself', () => {
+    expect(adminGuardedUserRoutePaths()).toEqual(listedUserRoutePaths());
   });
 });

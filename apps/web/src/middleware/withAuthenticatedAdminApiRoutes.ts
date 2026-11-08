@@ -6,12 +6,12 @@ import { withAuth } from 'next-auth/middleware';
 /**
  * Each path below belongs to a handler that verifies admin access itself: it
  * either calls `getUserFromAuth({ adminOnly: true })` or reaches an
- * `adminProcedure`, so the middleware lets the request through. `[id]` matches
- * one dynamic segment. A new handler must add its exact path here together with
- * that verification, or leave the path out and let the middleware apply its own
- * admin check.
+ * `adminProcedure`, so the middleware lets the request through. A dynamic
+ * segment matches one path segment. A new handler must add its exact path here
+ * together with that verification, or leave the path out and let the middleware
+ * apply its own admin check.
  */
-const ADMIN_API_ROUTES_WITH_OWN_ADMIN_CHECK = [
+export const ADMIN_API_ROUTES_WITH_OWN_ADMIN_CHECK = [
   '/admin/api/enrichment-data/upsert',
   '/admin/api/users',
   '/admin/api/users/add-credit',
@@ -25,10 +25,17 @@ const ADMIN_API_ROUTES_WITH_OWN_ADMIN_CHECK = [
   '/admin/api/users/[id]/referrals',
 ];
 
+// A bracketed segment is dynamic and matches one path segment. A catch-all
+// segment matches its own literal name, so such a handler keeps the middleware
+// admin check until this function gives it a pattern.
 function toRoutePattern(route: string): string {
   return route
     .split('/')
-    .map(segment => (segment === '[id]' ? '[^/]+' : segment.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
+    .map(segment =>
+      segment.startsWith('[') && segment.endsWith(']')
+        ? '[^/]+'
+        : segment.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    )
     .join('/');
 }
 

@@ -659,23 +659,24 @@ type ChildOrganizationMembershipDecision = 'permitted' | 'refused' | 'organizati
  *
  * An account subject is asked under the membership lock the other membership
  * mutations take, so a removal that committed first leaves no member to find;
- * an address subject keeps the invitation path's share-lock read. A top-level
- * target organization has no such requirement.
+ * an address subject keeps the invitation path's organization row lock and its
+ * share-lock read. None of the paths take a row lock on the parent relation, so
+ * a membership follows the hierarchy in place when the path's transaction
+ * started. A top-level target organization has no such requirement.
  */
 async function decideChildOrganizationMembership(
   tx: DrizzleTransaction,
   organizationId: Organization['id'],
   subject: MembershipSubject
 ): Promise<ChildOrganizationMembershipDecision> {
+  // The invitation path takes the target organization row lock; the account
+  // paths deliberately take none: their callers already hold it, and taking it
+  // again would order this read against neighbors that wait for the
+  // organization group-policy lock first.
   const parentRelation = tx
     .select({ parentOrganizationId: organizations.parent_organization_id })
     .from(organizations)
     .where(and(eq(organizations.id, organizationId), isNull(organizations.deleted_at)));
-
-  // Only the address branch does not hold the organization row already: the
-  // invitation path locks the row itself, and the account paths hold it. Locking
-  // an account subject's row again would order this read against neighbors that
-  // wait for the group-policy lock first.
   const [organization] =
     'email' in subject ? await parentRelation.for('update') : await parentRelation;
   if (!organization) {

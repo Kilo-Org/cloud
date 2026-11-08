@@ -248,6 +248,7 @@
     "confirmDeletion": "Potvrdi brisanje",
     "credits": "Krediti",
     "failedToLoadBalance": "Nije moguće učitati saldo. Dodirni za ponovni pokušaj.",
+    "balanceLoadFailed": "Nije moguće učitati saldo",
     "hideBalance": "Sakrij saldo",
     "showBalance": "Prikaži saldo",
     "balanceHidden": "Saldo je skriven",
@@ -331,7 +332,6 @@
     "noFilesChangedDescription": "U ovom zahtjevu za spajanje nema izmjena datoteka.",
     "fileList": {
       "openNavigator": "Otvori preglednik datoteka",
-      "filesViewed": "Datoteke · pregledano {{viewed}} od {{total}}",
       "listed": "(navedeno)",
       "layout": "Raspored",
       "unified": "Objedinjeno",
@@ -2335,6 +2335,7 @@
       "emptyDescription": "Za početak pošalji poruku u nastavku.",
       "scrollToBottom": "Pomakni se na dno",
       "emptyTitle": "Još nema poruka",
+      "emptyReadOnlyTitle": "U ovoj sesiji nema poruka",
       "renameAccessibility": "Preimenuj sesiju: {{title}}",
       "cloningSession": "Kloniranje sesije",
       "couldNotLoadThisSession": "Nije moguće učitati ovu sesiju.",
@@ -2434,7 +2435,7 @@
       "selectRepositoryToStart": "Odaberi repozitorij za početak.",
       "enterPromptToStart": "Dodaj upit za početak.",
       "enterPromptOrFileToStart": "Dodaj upit ili datoteku za početak.",
-      "connectProviderToStart": "Poveži pružatelja za početak.",
+      "connectProviderToStart": "Repozitoriji dolaze s povezanog GitHub, GitLab ili Bitbucket računa.",
       "promptPlaceholder": "Na čemu želiš raditi?",
       "couldNotLoadModels": "Nije moguće učitati modele.",
       "prefillRepoAndModelUnavailable": "Repozitorij i model izvorne sesije više nisu dostupni. Odaberi ih u nastavku.",
@@ -3044,7 +3045,6 @@
   },
   "addCredits": {
     "cta": "Dodaj kredite",
-    "description": "Dodaj kredite za nastavak korištenja.",
     "billingPage": "stranica za naplatu"
   },
   "deviceSessions": {

@@ -248,6 +248,7 @@
     "confirmDeletion": "បញ្ជាក់ការលុប",
     "credits": "ឥណទាន",
     "failedToLoadBalance": "មិនអាចផ្ទុកសមតុល្យបានទេ។ ប៉ះដើម្បីព្យាយាមម្តងទៀត។",
+    "balanceLoadFailed": "មិនអាចផ្ទុកសមតុល្យបានទេ",
     "hideBalance": "លាក់សមតុល្យ",
     "showBalance": "បង្ហាញសមតុល្យ",
     "balanceHidden": "សមតុល្យត្រូវបានលាក់",
@@ -331,7 +332,6 @@
     "noFilesChangedDescription": "សំណើបញ្ចូលកូដនេះមិនមានការកែប្រែឯកសារទេ។",
     "fileList": {
       "openNavigator": "បើកបញ្ជីរុករកឯកសារ",
-      "filesViewed": "ឯកសារ · បានមើល {{viewed}} ក្នុងចំណោម {{total}}",
       "listed": "(បានរាយបញ្ជី)",
       "layout": "ប្លង់",
       "unified": "រួមគ្នា",
@@ -2293,6 +2293,7 @@
       "emptyDescription": "ផ្ញើសារខាងក្រោម ដើម្បីចាប់ផ្តើម។",
       "scrollToBottom": "រំកិលទៅខាងក្រោមបំផុត",
       "emptyTitle": "មិនទាន់មានសារទេ",
+      "emptyReadOnlyTitle": "មិនមានសារនៅក្នុងវគ្គនេះទេ",
       "renameAccessibility": "ប្តូរឈ្មោះវគ្គ: {{title}}",
       "cloningSession": "កំពុងចម្លងវគ្គ",
       "couldNotLoadThisSession": "មិនអាចផ្ទុកវគ្គនេះបានទេ",
@@ -2392,7 +2393,7 @@
       "selectRepositoryToStart": "ដើម្បីចាប់ផ្តើម សូមជ្រើសរើសឃ្លាំងកូដ។",
       "enterPromptToStart": "ដើម្បីចាប់ផ្តើម សូមបន្ថែមសំណើ។",
       "enterPromptOrFileToStart": "ដើម្បីចាប់ផ្តើម សូមបន្ថែមសំណើ ឬឯកសារ។",
-      "connectProviderToStart": "ដើម្បីចាប់ផ្តើម សូមភ្ជាប់អ្នកផ្តល់សេវា។",
+      "connectProviderToStart": "ឃ្លាំងកូដមកពីគណនី GitHub, GitLab ឬ Bitbucket ដែលបានភ្ជាប់។",
       "promptPlaceholder": "តើអ្នកចង់ធ្វើការលើអ្វី?",
       "couldNotLoadModels": "មិនអាចផ្ទុកម៉ូដែលបានទេ។",
       "prefillRepoAndModelUnavailable": "ឃ្លាំងកូដ និងម៉ូដែលរបស់វគ្គដើមលែងអាចប្រើបានទៀតហើយ។ សូមជ្រើសរើសឃ្លាំងកូដ និងម៉ូដែលខាងក្រោម។",
@@ -2991,7 +2992,6 @@
   },
   "addCredits": {
     "cta": "បន្ថែមឥណទាន",
-    "description": "បន្ថែមឥណទានដើម្បីបន្តប្រើប្រាស់។",
     "billingPage": "ទំព័រគិតប្រាក់"
   },
   "deviceSessions": {

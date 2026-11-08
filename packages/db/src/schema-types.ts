@@ -816,6 +816,25 @@ export const ImpactAdvocateRewardRedemptionState = {
 export type ImpactAdvocateRewardRedemptionState =
   (typeof ImpactAdvocateRewardRedemptionState)[keyof typeof ImpactAdvocateRewardRedemptionState];
 
+// --- Claude billing connections ---
+
+/**
+ * - `pending`: the owner's Anthropic user profile exists; no approval completed yet.
+ * - `connected`: Anthropic issued a connection; Claude requests bill the customer.
+ * - `billing_unavailable`: Anthropic answered `user_profile_not_billable`; requests
+ *   fail without an upstream call until an admin reconnects or removes it.
+ * - `removed`: removed in Kilo; the profile is kept so a reconnect reuses it.
+ */
+export const ClaudeBillingConnectionStatus = {
+  Pending: 'pending',
+  Connected: 'connected',
+  BillingUnavailable: 'billing_unavailable',
+  Removed: 'removed',
+} as const;
+
+export type ClaudeBillingConnectionStatus =
+  (typeof ClaudeBillingConnectionStatus)[keyof typeof ClaudeBillingConnectionStatus];
+
 // --- Coding Plan enums ---
 
 export const BYOKManagementSource = {
@@ -1849,6 +1868,7 @@ export type AuthProviderId =
   | 'linkedin'
   | 'discord'
   | 'openai'
+  | 'claude'
   | 'fake-login'
   | 'workos';
 

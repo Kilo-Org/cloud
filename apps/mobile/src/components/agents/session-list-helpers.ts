@@ -7,7 +7,7 @@ import {
   formatNumber,
 } from '@/lib/format';
 import { type StoredSession } from '@/lib/hooks/use-agent-sessions';
-import { platformLabel, remoteAgentState } from '@/lib/platform-label';
+import { isUnknownOrigin, platformLabel, remoteAgentState } from '@/lib/platform-label';
 import { parseTimestamp, timeAgo } from '@/lib/utils';
 
 /**
@@ -519,16 +519,33 @@ export function remoteSessionEyebrowLabel(session: {
 }
 
 /**
- * Tint key for a remote row's eyebrow, next to the label it belongs to: a
- * state word when the eyebrow renders one, `null` when it renders a repo or
- * platform name (which keeps its deterministic hash).
+ * Tint key for a remote row's eyebrow, next to the label it belongs to: `live`
+ * for a state word, `platform` for the kind of agent the row ran on, and
+ * `repository` when the eyebrow names the repository it ran in.
  */
 export function remoteSessionEyebrowState(session: {
   gitUrl?: string | null;
   createdOnPlatform?: string;
-}): 'live' | null {
-  const repo = repoNameFromGitUrl(session.gitUrl);
-  return repo ? null : remoteAgentState(session.createdOnPlatform);
+}): 'live' | 'platform' | 'repository' {
+  return repoNameFromGitUrl(session.gitUrl)
+    ? 'repository'
+    : remoteAgentState(session.createdOnPlatform);
+}
+
+/**
+ * Tint key for a stored row's eyebrow, next to {@link storedSessionEyebrowLabel}:
+ * `repository` when the eyebrow names the repository the row ran in, `unknown`
+ * for the placeholder of an origin the row cannot name, and `platform` when it
+ * names only the kind of agent the row ran on.
+ */
+export function storedSessionEyebrowState(session: {
+  git_url: string | null;
+  created_on_platform: string;
+}): 'unknown' | 'platform' | 'repository' {
+  if (repoNameFromGitUrl(session.git_url)) {
+    return 'repository';
+  }
+  return isUnknownOrigin(session.created_on_platform) ? 'unknown' : 'platform';
 }
 
 /**

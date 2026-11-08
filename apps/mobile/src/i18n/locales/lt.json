@@ -248,6 +248,7 @@
     "confirmDeletion": "Patvirtinti ištrynimą",
     "credits": "Kreditai",
     "failedToLoadBalance": "Nepavyko įkelti likučio. Bakstelėkite, kad bandytumėte dar kartą.",
+    "balanceLoadFailed": "Nepavyko įkelti likučio",
     "hideBalance": "Slėpti likutį",
     "showBalance": "Rodyti likutį",
     "balanceHidden": "Likutis paslėptas",
@@ -331,7 +332,6 @@
     "noFilesChangedDescription": "Šioje pakeitimų užklausoje nėra failų pakeitimų.",
     "fileList": {
       "openNavigator": "Atidaryti failų naršyklę",
-      "filesViewed": "Failai · peržiūrėta {{viewed}} iš {{total}}",
       "listed": "(sąraše)",
       "layout": "Išdėstymas",
       "unified": "Bendras",
@@ -2377,6 +2377,7 @@
       "emptyDescription": "Norėdami pradėti, išsiųskite žinutę žemiau esančiame lauke.",
       "scrollToBottom": "Slinkti į apačią",
       "emptyTitle": "Žinučių dar nėra",
+      "emptyReadOnlyTitle": "Šioje sesijoje nėra žinučių",
       "renameAccessibility": "Pervadinti sesiją: {{title}}",
       "cloningSession": "Klonuojama sesija",
       "couldNotLoadThisSession": "Nepavyko įkelti šios sesijos.",
@@ -2476,7 +2477,7 @@
       "selectRepositoryToStart": "Norėdami pradėti, pasirinkite saugyklą.",
       "enterPromptToStart": "Norėdami pradėti, pridėkite promptą.",
       "enterPromptOrFileToStart": "Norėdami pradėti, pridėkite promptą arba failą.",
-      "connectProviderToStart": "Norėdami pradėti, prijunkite paslaugų teikėją.",
+      "connectProviderToStart": "Saugyklos gaunamos iš susietos GitHub, GitLab arba Bitbucket paskyros.",
       "promptPlaceholder": "Ką norėtumėte atlikti?",
       "couldNotLoadModels": "Nepavyko įkelti modelių.",
       "prefillRepoAndModelUnavailable": "Pradinės sesijos saugykla ir modelis nebepasiekiami. Pasirinkite kitus žemiau.",
@@ -3097,7 +3098,6 @@
   },
   "addCredits": {
     "cta": "Papildyti kreditus",
-    "description": "Papildykite kreditus, kad galėtumėte naudotis toliau.",
     "billingPage": "atsiskaitymų puslapis"
   },
   "deviceSessions": {

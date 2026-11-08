@@ -248,6 +248,7 @@
     "confirmDeletion": "मेटाउने पुष्टि गर्नुहोस्",
     "credits": "क्रेडिटहरू",
     "failedToLoadBalance": "मौज्दात लोड गर्न सकिएन। पुनः प्रयास गर्न ट्याप गर्नुहोस्।",
+    "balanceLoadFailed": "मौज्दात लोड गर्न सकिएन",
     "hideBalance": "मौज्दात लुकाउनुहोस्",
     "showBalance": "मौज्दात देखाउनुहोस्",
     "balanceHidden": "मौज्दात लुकाइएको छ",
@@ -331,7 +332,6 @@
     "noFilesChangedDescription": "यो पुल रिक्वेस्टमा कुनै पनि फाइल परिवर्तन भएको छैन।",
     "fileList": {
       "openNavigator": "फाइल नेभिगेसन खोल्नुहोस्",
-      "filesViewed": "फाइलहरू · {{total}} मध्ये {{viewed}} हेरियो",
       "listed": "(सूचीबद्ध)",
       "layout": "लेआउट",
       "unified": "एकीकृत",
@@ -2293,6 +2293,7 @@
       "emptyDescription": "सुरु गर्न तल सन्देश पठाउनुहोस्।",
       "scrollToBottom": "तल स्क्रोल गर्नुहोस्",
       "emptyTitle": "अहिलेसम्म कुनै सन्देश छैन",
+      "emptyReadOnlyTitle": "यो सत्रमा कुनै सन्देश छैन",
       "renameAccessibility": "सत्रको नाम बदल्नुहोस्: {{title}}",
       "cloningSession": "सत्रको प्रतिलिपि बनाउँदै",
       "couldNotLoadThisSession": "यो सत्र लोड गर्न सकिएन।",
@@ -2392,7 +2393,7 @@
       "selectRepositoryToStart": "सुरु गर्नको लागि रिपोजिटरी छान्नुहोस्।",
       "enterPromptToStart": "सुरु गर्नको लागि प्रोम्प्ट थप्नुहोस्।",
       "enterPromptOrFileToStart": "सुरु गर्नको लागि प्रोम्प्ट वा फाइल थप्नुहोस्।",
-      "connectProviderToStart": "सुरु गर्नको लागि प्रदायक जडान गर्नुहोस्।",
+      "connectProviderToStart": "रिपोजिटरीहरू जडान भएको GitHub, GitLab वा Bitbucket खाताबाट आउँछन्।",
       "promptPlaceholder": "तपाईं केमा काम गर्न चाहनुहुन्छ?",
       "couldNotLoadModels": "मोडेलहरू लोड गर्न सकिएन।",
       "prefillRepoAndModelUnavailable": "मूल सत्रको रिपोजिटरी र मोडेल अब उपलब्ध छैनन्। तल दुवै छान्नुहोस्।",
@@ -2991,7 +2992,6 @@
   },
   "addCredits": {
     "cta": "क्रेडिट थप्नुहोस्",
-    "description": "प्रयोग जारी राख्न क्रेडिट थप्नुहोस्।",
     "billingPage": "बिलिङ पृष्ठ"
   },
   "deviceSessions": {

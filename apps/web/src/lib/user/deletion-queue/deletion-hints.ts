@@ -320,6 +320,11 @@ const KNOWN_HINTS: Record<string, DeletionAttentionHint> = {
     title: 'Session cleanup was not confirmed',
     action: 'Retry. If the sessions are already gone, Mark done with evidence.',
   },
+  session_worktree_deleting: {
+    title: 'A worktree deletion keeps refusing session deletes',
+    action:
+      'Check the hosted worktree deletion for these sessions. Once it finishes or is repaired, Retry. If the sessions are already gone, Mark done with evidence.',
+  },
   teardown_incomplete: {
     title: 'Teardown tasks are not finished',
     action: 'Finish or Mark done the remaining teardown tasks, then Retry anonymize.',

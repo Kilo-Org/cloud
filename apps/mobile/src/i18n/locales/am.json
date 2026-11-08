@@ -248,6 +248,7 @@
     "confirmDeletion": "መሰረዙን ያረጋግጡ",
     "credits": "ክሬዲት",
     "failedToLoadBalance": "ቀሪ ሂሳቡን መጫን አልተሳካም። እንደገና ለመሞከር ይንኩ።",
+    "balanceLoadFailed": "ቀሪ ሂሳቡን መጫን አልተሳካም",
     "hideBalance": "ቀሪ ሂሳብ ደብቅ",
     "showBalance": "ቀሪ ሂሳብ አሳይ",
     "balanceHidden": "ቀሪ ሂሳብ ተደብቋል",
@@ -331,7 +332,6 @@
     "noFilesChangedDescription": "ይህ የማዋሃድ ጥያቄ ምንም የፋይል ለውጥ አልያዘም።",
     "fileList": {
       "openNavigator": "የፋይል መዳሰሻውን ክፈት",
-      "filesViewed": "ፋይሎች · ከ{{total}} ውስጥ {{viewed}} ታይተዋል",
       "listed": "(የተዘረዘሩ)",
       "layout": "አቀማመጥ",
       "unified": "የተዋሃደ",
@@ -2299,6 +2299,7 @@
       "emptyDescription": "ለመጀመር ከታች መልእክት ይላኩ።",
       "scrollToBottom": "ወደ ታች ይሸብልሉ",
       "emptyTitle": "እስካሁን ምንም መልእክቶች የሉም",
+      "emptyReadOnlyTitle": "በዚህ ክፍለ ጊዜ ውስጥ ምንም መልእክቶች የሉም",
       "renameAccessibility": "የክፍለ ጊዜውን ስም ይቀይሩ፦ {{title}}",
       "cloningSession": "የክፍለ ጊዜውን ቅጂ በመፍጠር ላይ",
       "couldNotLoadThisSession": "ይህን ክፍለ ጊዜ መጫን አልተቻለም።",
@@ -2398,7 +2399,7 @@
       "selectRepositoryToStart": "ለመጀመር ማከማቻ ይምረጡ።",
       "enterPromptToStart": "ለመጀመር ትዕዛዝ ያክሉ።",
       "enterPromptOrFileToStart": "ለመጀመር ትዕዛዝ ወይም ፋይል ያክሉ።",
-      "connectProviderToStart": "ለመጀመር አቅራቢ ያገናኙ።",
+      "connectProviderToStart": "ማከማቻዎች ከተገናኘ GitHub፣ GitLab ወይም Bitbucket መለያ ይመጣሉ።",
       "promptPlaceholder": "በምን ላይ መስራት ይፈልጋሉ?",
       "couldNotLoadModels": "ሞዴሎችን መጫን አልተቻለም።",
       "prefillRepoAndModelUnavailable": "የመጀመሪያው ክፍለ ጊዜ ማከማቻና ሞዴል ከእንግዲህ አይገኙም። ከታች ሌሎችን ይምረጡ።",
@@ -2997,7 +2998,6 @@
   },
   "addCredits": {
     "cta": "ክሬዲት ያክሉ",
-    "description": "አጠቃቀሙን ለመቀጠል ክሬዲት ያክሉ።",
     "billingPage": "የክፍያ ገጽ"
   },
   "deviceSessions": {

@@ -62,3 +62,69 @@ test('sampling keeps layout changes even when a transform holds the painted fram
     ]
   );
 });
+
+test('same geometry retains opacity, visibility, native screen state and focused-screen transitions', context => {
+  context.mock.timers.enable({ apis: ['setInterval', 'setTimeout', 'Date'] });
+  let opacity = 0;
+  let display = 'none';
+  let screenState = 0;
+  let screen = '(app)/(tabs)/agents';
+  const sampler = createSampler(() => ({
+    env: { route: '/', screen },
+    nodes: [{ tag: 'RNSScreen', rect: [0, 0, 100, 200], screenState, style: { opacity, display } }],
+  }));
+  sampler.start(120, 5_000);
+  opacity = 1;
+  context.mock.timers.tick(120);
+  display = 'flex';
+  context.mock.timers.tick(120);
+  screenState = 2;
+  context.mock.timers.tick(120);
+  screen = '(app)/(tabs)/settings';
+  context.mock.timers.tick(120);
+  const samples = sampler.stop();
+  assert.equal(samples.length, 5);
+  assert.deepEqual(
+    samples.map(sample => sample.repeat),
+    [1, 1, 1, 1, 1]
+  );
+  assert.equal(samples.at(-1)?.dump.env.screen, '(app)/(tabs)/settings');
+});
+
+test('repeated screen state retains the newest dump rather than the first snapshot', context => {
+  context.mock.timers.enable({ apis: ['setInterval', 'setTimeout', 'Date'] });
+  let revision = 0;
+  const sampler = createSampler(() => ({
+    env: { route: '/fixture', revision: revision++ },
+    nodes: [{ rect: [0, 0, 100, 20] }],
+  }));
+  sampler.start(120, 5_000);
+  context.mock.timers.tick(240);
+  const samples = sampler.stop();
+  assert.equal(samples.length, 1);
+  assert.equal(samples[0]?.repeat, 3);
+  assert.equal(samples[0]?.dump.env.revision, 2);
+  assert.equal(samples[0]?.t, 0);
+});
+
+test('same geometry retains new text and ignores style property insertion order', context => {
+  context.mock.timers.enable({ apis: ['setInterval', 'setTimeout', 'Date'] });
+  let text = 'Loading';
+  let style: Record<string, string | number> = { opacity: 1, display: 'flex' };
+  const sampler = createSampler(() => ({
+    env: { route: '/fixture' },
+    nodes: [{ rect: [0, 0, 100, 20], text, style }],
+  }));
+  sampler.start(120, 5_000);
+  style = { display: 'flex', opacity: 1 };
+  context.mock.timers.tick(120);
+  text = 'Loaded';
+  context.mock.timers.tick(120);
+  assert.deepEqual(
+    sampler.stop().map(sample => [sample.dump.nodes[0]?.text, sample.repeat]),
+    [
+      ['Loading', 2],
+      ['Loaded', 1],
+    ]
+  );
+});

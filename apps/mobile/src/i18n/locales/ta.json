@@ -248,6 +248,7 @@
     "confirmDeletion": "நீக்குவதை உறுதிப்படுத்தவும்",
     "credits": "கிரெடிட்கள்",
     "failedToLoadBalance": "இருப்பை ஏற்ற முடியவில்லை. மீண்டும் முயற்சிக்கத் தட்டவும்.",
+    "balanceLoadFailed": "இருப்பை ஏற்ற முடியவில்லை",
     "hideBalance": "இருப்பை மறை",
     "showBalance": "இருப்பைக் காட்டு",
     "balanceHidden": "இருப்பு மறைக்கப்பட்டது",
@@ -331,7 +332,6 @@
     "noFilesChangedDescription": "இந்த இணைப்புக் கோரிக்கையில் கோப்பு மாற்றங்கள் எதுவும் இல்லை.",
     "fileList": {
       "openNavigator": "கோப்பு வழிசெலுத்தியைத் திறக்கவும்",
-      "filesViewed": "கோப்புகள் · {{total}}-இல் {{viewed}} பார்க்கப்பட்டன",
       "listed": "(பட்டியலிலுள்ளவை)",
       "layout": "தளவமைப்பு",
       "unified": "ஒருங்கிணைந்த",
@@ -2293,6 +2293,7 @@
       "emptyDescription": "தொடங்குவதற்குக் கீழே ஒரு செய்தியை அனுப்பவும்.",
       "scrollToBottom": "கடைசிக்குச் செல்லவும்",
       "emptyTitle": "இன்னும் செய்திகள் இல்லை",
+      "emptyReadOnlyTitle": "இந்த அமர்வில் செய்திகள் இல்லை",
       "renameAccessibility": "{{title}} அமர்வின் பெயரை மாற்றவும்",
       "cloningSession": "அமர்வு நகலாக்கப்படுகிறது",
       "couldNotLoadThisSession": "இந்த அமர்வை ஏற்ற முடியவில்லை.",
@@ -2392,7 +2393,7 @@
       "selectRepositoryToStart": "தொடங்க ஒரு களஞ்சியத்தைத் தேர்ந்தெடுக்கவும்.",
       "enterPromptToStart": "தொடங்க ஒரு ப்ராம்ப்ட்டைச் சேர்க்கவும்.",
       "enterPromptOrFileToStart": "தொடங்க ஒரு ப்ராம்ப்ட் அல்லது கோப்பைச் சேர்க்கவும்.",
-      "connectProviderToStart": "தொடங்க ஒரு வழங்குநரை இணைக்கவும்.",
+      "connectProviderToStart": "களஞ்சியங்கள் இணைக்கப்பட்ட GitHub, GitLab அல்லது Bitbucket கணக்கிலிருந்து வருகின்றன.",
       "promptPlaceholder": "எந்தப் பணியைச் செய்ய விரும்புகிறீர்கள்?",
       "couldNotLoadModels": "மாதிரிகளை ஏற்ற முடியவில்லை.",
       "prefillRepoAndModelUnavailable": "அசல் அமர்வின் களஞ்சியமும் மாதிரியும் இனி கிடைக்கவில்லை. கீழே வேறொன்றைத் தேர்ந்தெடுக்கவும்.",
@@ -2991,7 +2992,6 @@
   },
   "addCredits": {
     "cta": "கிரெடிட்களைச் சேர்க்கவும்",
-    "description": "தொடர்ந்து பயன்படுத்த கிரெடிட்களைச் சேர்க்கவும்.",
     "billingPage": "கட்டணப் பக்கம்"
   },
   "deviceSessions": {

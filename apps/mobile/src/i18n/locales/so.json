@@ -248,6 +248,7 @@
     "confirmDeletion": "Xaqiiji tirtirista",
     "credits": "Lacagta isticmaalka",
     "failedToLoadBalance": "Hadhaaga lama soo shubi karin. Taabo si aad mar kale isku daydo.",
+    "balanceLoadFailed": "Hadhaaga lama soo shubi karin",
     "hideBalance": "Qari hadhaaga",
     "showBalance": "Muuji hadhaaga",
     "balanceHidden": "Hadhaaga waa la qariyay",
@@ -331,7 +332,6 @@
     "noFilesChangedDescription": "Codsigan isku-darka kuma jiraan isbeddello faylal.",
     "fileList": {
       "openNavigator": "Fur hagaha faylasha",
-      "filesViewed": "Faylal · {{viewed}} ka mid ah {{total}} la arkay",
       "listed": "(liiska ku jira)",
       "layout": "Qaabka bandhigga",
       "unified": "Midaysan",
@@ -2293,6 +2293,7 @@
       "emptyDescription": "Farriin ku dir meesha hoose si aad u bilowdo.",
       "scrollToBottom": "U dhaadhac xagga hoose",
       "emptyTitle": "Weli ma jiraan farriimo",
+      "emptyReadOnlyTitle": "Kalfadhigan farriimo kuma jiraan",
       "renameAccessibility": "Beddel magaca kalfadhiga: {{title}}",
       "cloningSession": "Kalfadhiga waa la nuqulayaa",
       "couldNotLoadThisSession": "Kalfadhigan lama soo shubi karin.",
@@ -2392,7 +2393,7 @@
       "selectRepositoryToStart": "Dooro kayd si aad u bilowdo.",
       "enterPromptToStart": "Ku dar fariin si aad u bilowdo.",
       "enterPromptOrFileToStart": "Ku dar fariin ama fayl si aad u bilowdo.",
-      "connectProviderToStart": "Ku xidh bixiye si aad u bilowdo.",
+      "connectProviderToStart": "Kaydadka waxay ka yimaadaan akoon GitHub, GitLab ama Bitbucket oo la xiriiriyay.",
       "promptPlaceholder": "Maxaad rabtaa inaad ka shaqayso?",
       "couldNotLoadModels": "Moodeellada lama soo shubi karin.",
       "prefillRepoAndModelUnavailable": "Kaydka iyo moodeelka kalfadhigii asalka ahaa mar dambe lama heli karo. Hoos ka dooro kuwo kale.",
@@ -2991,7 +2992,6 @@
   },
   "addCredits": {
     "cta": "Ku dar lacagta isticmaalka",
-    "description": "Ku dar lacagta isticmaalka si aad u sii isticmaasho.",
     "billingPage": "bogga biilasha"
   },
   "deviceSessions": {

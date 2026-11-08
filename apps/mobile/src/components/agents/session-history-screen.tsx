@@ -169,6 +169,12 @@ export function SessionHistoryScreen() {
     }
   }, [paging]);
 
+  // The footer's own retry: it bypasses the end-reach gate, which stays shut
+  // while the last attempt failed.
+  const handleRetryNextPage = useCallback(() => {
+    void paging.fetchNextPage();
+  }, [paging]);
+
   const hasActiveQuery = isSearching || activeFilterCount > 0;
   // History has no live tray, so "any sessions" means stored rows or an active
   // query — never the active set.
@@ -209,6 +215,8 @@ export function SessionHistoryScreen() {
       isError={contentIsError}
       hasFreshHistory={storedFetchedSinceMount}
       isFetchingNextPage={paging.isFetchingNextPage}
+      isFetchNextPageError={paging.isFetchNextPageError}
+      onRetryNextPage={handleRetryNextPage}
       refetch={handleRefetch}
       onRetry={handleRetry}
       onEndReached={handleEndReached}

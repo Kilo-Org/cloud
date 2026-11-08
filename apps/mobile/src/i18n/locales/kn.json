@@ -248,6 +248,7 @@
     "confirmDeletion": "ಅಳಿಸುವಿಕೆಯನ್ನು ದೃಢೀಕರಿಸಿ",
     "credits": "ಕ್ರೆಡಿಟ್‌ಗಳು",
     "failedToLoadBalance": "ಉಳಿಕೆಯನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಲು ಟ್ಯಾಪ್ ಮಾಡಿ.",
+    "balanceLoadFailed": "ಉಳಿಕೆಯನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
     "hideBalance": "ಉಳಿಕೆ ಮರೆಮಾಡಿ",
     "showBalance": "ಉಳಿಕೆ ತೋರಿಸಿ",
     "balanceHidden": "ಉಳಿಕೆ ಮರೆಮಾಡಲಾಗಿದೆ",
@@ -331,7 +332,6 @@
     "noFilesChangedDescription": "ಈ ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್‌ನಲ್ಲಿ ಯಾವುದೇ ಫೈಲ್ ಬದಲಾವಣೆಗಳಿಲ್ಲ.",
     "fileList": {
       "openNavigator": "ಫೈಲ್‌ಗಳ ಪಟ್ಟಿಯನ್ನು ತೆರೆಯಿರಿ",
-      "filesViewed": "ಫೈಲ್‌ಗಳು · {{total}}ರಲ್ಲಿ {{viewed}} ವೀಕ್ಷಿಸಲಾಗಿದೆ",
       "listed": "(ಪಟ್ಟಿಯಲ್ಲಿರುವ)",
       "layout": "ವಿನ್ಯಾಸ",
       "unified": "ಏಕೀಕೃತ",
@@ -2299,6 +2299,7 @@
       "emptyDescription": "ಪ್ರಾರಂಭಿಸಲು ಕೆಳಗೆ ಸಂದೇಶ ಕಳುಹಿಸಿ.",
       "scrollToBottom": "ಕೊನೆಯವರೆಗೆ ಸ್ಕ್ರಾಲ್ ಮಾಡಿ",
       "emptyTitle": "ಇನ್ನೂ ಯಾವುದೇ ಸಂದೇಶಗಳಿಲ್ಲ",
+      "emptyReadOnlyTitle": "ಈ ಸೆಶನ್ನಲ್ಲಿ ಯಾವುದೇ ಸಂದೇಶಗಳಿಲ್ಲ",
       "renameAccessibility": "{{title}} ಸೆಶನ್‌ನ ಹೆಸರು ಬದಲಾಯಿಸಿ",
       "cloningSession": "ಸೆಶನ್‌ನ ಪ್ರತಿ ರಚಿಸಲಾಗುತ್ತಿದೆ",
       "couldNotLoadThisSession": "ಈ ಸೆಶನ್ ಅನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
@@ -2398,7 +2399,7 @@
       "selectRepositoryToStart": "ಪ್ರಾರಂಭಿಸಲು ರೆಪೊಸಿಟರಿಯನ್ನು ಆಯ್ಕೆಮಾಡಿ.",
       "enterPromptToStart": "ಪ್ರಾರಂಭಿಸಲು ಪ್ರಾಂಪ್ಟ್ ಅನ್ನು ಸೇರಿಸಿ.",
       "enterPromptOrFileToStart": "ಪ್ರಾರಂಭಿಸಲು ಪ್ರಾಂಪ್ಟ್ ಅಥವಾ ಫೈಲ್ ಅನ್ನು ಸೇರಿಸಿ.",
-      "connectProviderToStart": "ಪ್ರಾರಂಭಿಸಲು ಸೇವಾ ಪೂರೈಕೆದಾರರನ್ನು ಸಂಪರ್ಕಿಸಿ.",
+      "connectProviderToStart": "ರೆಪೊಸಿಟರಿಗಳು ಸಂಪರ್ಕಗೊಂಡ GitHub, GitLab ಅಥವಾ Bitbucket ಖಾತೆಯಿಂದ ಬರುತ್ತವೆ.",
       "promptPlaceholder": "ಯಾವ ಕೆಲಸ ಮಾಡಲು ಬಯಸುತ್ತೀರಿ?",
       "couldNotLoadModels": "ಮಾದರಿಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
       "prefillRepoAndModelUnavailable": "ಮೂಲ ಸೆಶನ್‌ನ ರೆಪೊಸಿಟರಿ ಮತ್ತು ಮಾದರಿ ಇನ್ನು ಲಭ್ಯವಿಲ್ಲ. ಕೆಳಗೆ ಅವುಗಳನ್ನು ಆಯ್ಕೆಮಾಡಿ.",
@@ -2997,7 +2998,6 @@
   },
   "addCredits": {
     "cta": "ಕ್ರೆಡಿಟ್‌ಗಳನ್ನು ಸೇರಿಸಿ",
-    "description": "ಬಳಕೆಯನ್ನು ಮುಂದುವರಿಸಲು ಕ್ರೆಡಿಟ್‌ಗಳನ್ನು ಸೇರಿಸಿ.",
     "billingPage": "ಬಿಲ್ಲಿಂಗ್ ಪುಟ"
   },
   "deviceSessions": {

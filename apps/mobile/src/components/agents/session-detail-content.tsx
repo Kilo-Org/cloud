@@ -224,7 +224,7 @@ import {
 } from '@/components/agents/new-session-prefill';
 import { type ForkCut, resolveForkCut } from '@/components/agents/fork-cut';
 import { useNewSessionNavigator } from '@/components/agents/use-new-session-navigator';
-import { AGENTS_SESSIONS_HREF } from '@/lib/agents-sessions-route';
+import { AGENTS_SESSIONS_HREF, AGENTS_SESSIONS_INDEX_HREF } from '@/lib/agents-sessions-route';
 import { recordLastOpenedSession } from '@/lib/last-opened-session';
 import { resolveSessionContextInfo } from '@/lib/session-context-info';
 import {
@@ -1695,7 +1695,7 @@ export function SessionDetailContent({
     // POP_TO reuses the `(tabs)` route under this screen and truncates every
     // `agent-chat` route above it, so a composer still on the stack under a
     // missing session is gone with it.
-    router.dismissTo(AGENTS_SESSIONS_HREF);
+    router.dismissTo(AGENTS_SESSIONS_INDEX_HREF);
   }, [router]);
 
   const handleModelSelect = useCallback(
@@ -1999,6 +1999,19 @@ export function SessionDetailContent({
     terminalError === null &&
     activeQuestion === null &&
     activePermission === null;
+  // A settled stored session with an empty transcript has nothing for the
+  // header pill to show and nothing for its sheet to do: it reports no usage,
+  // and a session opened read-only cannot auto-approve, so the pill would only
+  // paint its two dash placeholders beside the finished empty state (design
+  // gate, empty read-only fixture). The pill keeps its reserved box instead,
+  // exactly like the unresolved placeholder; a failed open keeps the live
+  // control, whose sheet still offers the connection reading and its Retry.
+  const contextPillHasNothingToReport =
+    isReadOnly &&
+    messages.length === 0 &&
+    contextInfo === undefined &&
+    terminalError === null &&
+    !isSessionChromePending;
   const headerRight = (
     <View className="min-w-0 shrink flex-row items-center gap-2">
       <SessionFollowButton sessionId={sessionId} />
@@ -2011,17 +2024,23 @@ export function SessionDetailContent({
         hasMessages={messages.length > 0 && !isSessionChromePending}
         autoApproveAvailable={autoApproveAvailable}
         loading={isSessionChromePending}
+        onNothingToReport={contextPillHasNothingToReport}
         // The sheet is the session's own context/permission surface, so the
         // control opens it in every state of this screen — including while the
         // transcript is still loading and after a failed open. A state that
-        // hides the control locks the user out of the settings behind it.
-        onPress={() => {
-          setOpenContextSheetIdentity({
-            sessionId,
-            providerID: contextInfo?.providerID,
-            modelID: contextInfo?.modelID,
-          });
-        }}
+        // hides the control locks the user out of the settings behind it; the
+        // one state with neither settings nor usage to open is excluded above.
+        onPress={
+          contextPillHasNothingToReport
+            ? undefined
+            : () => {
+                setOpenContextSheetIdentity({
+                  sessionId,
+                  providerID: contextInfo?.providerID,
+                  modelID: contextInfo?.modelID,
+                });
+              }
+        }
       />
     </View>
   );
@@ -2992,7 +3011,11 @@ export function SessionDetailContent({
       return (
         <EmptyState
           icon={MessageSquare}
-          title={t('agentChat.session.emptyTitle')}
+          title={
+            isReadOnly
+              ? t('agentChat.session.emptyReadOnlyTitle')
+              : t('agentChat.session.emptyTitle')
+          }
           description={isReadOnly ? undefined : t('agentChat.session.emptyDescription')}
         />
       );

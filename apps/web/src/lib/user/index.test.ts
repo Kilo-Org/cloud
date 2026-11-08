@@ -125,6 +125,7 @@ import {
   coding_plan_subscriptions,
   byok_api_keys,
   openai_chatgpt_connections,
+  claude_billing_connections,
   operation_ledgers,
   analytics_event_outbox,
   bouncer_credit_event_outbox,
@@ -2338,6 +2339,40 @@ describe('User', () => {
           .from(openai_chatgpt_connections)
           .where(eq(openai_chatgpt_connections.kilo_user_id, user.id))
       ).toHaveLength(0);
+    });
+
+    it("removes the deleted user's personal Claude billing connection and keeps the organization's", async () => {
+      const user = await insertTestUser({
+        google_user_email: `claude-billing-cleanup-${randomUUID()}@example.com`,
+      });
+      const organization = await createTestOrganization(
+        `Claude billing cleanup ${randomUUID()}`,
+        user.id,
+        0
+      );
+      await db.insert(claude_billing_connections).values([
+        { kilo_user_id: user.id, user_profile_id: `uprof_${randomUUID()}`, created_by: user.id },
+        {
+          organization_id: organization.id,
+          user_profile_id: `uprof_${randomUUID()}`,
+          created_by: user.id,
+        },
+      ]);
+
+      await db.transaction(tx => anonymizeCloudUserData(tx, user.id));
+
+      expect(
+        await db
+          .select()
+          .from(claude_billing_connections)
+          .where(eq(claude_billing_connections.kilo_user_id, user.id))
+      ).toHaveLength(0);
+      expect(
+        await db
+          .select()
+          .from(claude_billing_connections)
+          .where(eq(claude_billing_connections.organization_id, organization.id))
+      ).toHaveLength(1);
     });
 
     it("keeps the organization's shared-services row when the connector is deleted", async () => {

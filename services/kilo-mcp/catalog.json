@@ -4195,6 +4195,50 @@
     ],
     "searchBlob": "byok.update Replace the API key of an existing BYOK provider credential for the current user or an organization. Use to rotate or change a stored provider key without deleting it. byok update organizationid id api_key organizationId id api_key"
   },
+  "claudeBilling.remove": {
+    "path": "claudeBilling.remove",
+    "kind": "mutation",
+    "summary": "Disconnect Claude billing for a user or organization so it stops charging, keeping the profile for future reconnects; owner or admin only.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      }
+    },
+    "tags": [
+      "claudebilling",
+      "remove",
+      "organizationid"
+    ],
+    "searchBlob": "claudeBilling.remove Disconnect Claude billing for a user or organization so it stops charging, keeping the profile for future reconnects; owner or admin only. claudebilling remove organizationid organizationId"
+  },
+  "claudeBilling.status": {
+    "path": "claudeBilling.status",
+    "kind": "query",
+    "summary": "Check whether Claude billing is connected for a user or organization, including connection state and whether the caller can manage it.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      }
+    },
+    "tags": [
+      "claudebilling",
+      "status",
+      "organizationid"
+    ],
+    "searchBlob": "claudeBilling.status Check whether Claude billing is connected for a user or organization, including connection state and whether the caller can manage it. claudebilling status organizationid organizationId"
+  },
   "cliSessions.create": {
     "path": "cliSessions.create",
     "kind": "mutation",
@@ -6986,6 +7030,21 @@
                       "default": "",
                       "type": "string",
                       "maxLength": 100000
+                    },
+                    "mode": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 50,
+                      "pattern": "^[a-z][a-z0-9-]*$"
+                    },
+                    "model": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "variant": {
+                      "type": "string",
+                      "maxLength": 50,
+                      "pattern": "^[a-zA-Z]+$"
                     }
                   },
                   "required": [
@@ -8447,6 +8506,21 @@
                   "default": "",
                   "type": "string",
                   "maxLength": 100000
+                },
+                "mode": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 50,
+                  "pattern": "^[a-z][a-z0-9-]*$"
+                },
+                "model": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "variant": {
+                  "type": "string",
+                  "maxLength": 50,
+                  "pattern": "^[a-zA-Z]+$"
                 }
               },
               "required": [
@@ -18633,6 +18707,21 @@
                           "default": "",
                           "type": "string",
                           "maxLength": 100000
+                        },
+                        "mode": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 50,
+                          "pattern": "^[a-z][a-z0-9-]*$"
+                        },
+                        "model": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "variant": {
+                          "type": "string",
+                          "maxLength": 50,
+                          "pattern": "^[a-zA-Z]+$"
                         }
                       },
                       "required": [
@@ -20167,6 +20256,21 @@
                   "default": "",
                   "type": "string",
                   "maxLength": 100000
+                },
+                "mode": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 50,
+                  "pattern": "^[a-z][a-z0-9-]*$"
+                },
+                "model": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "variant": {
+                  "type": "string",
+                  "maxLength": 50,
+                  "pattern": "^[a-zA-Z]+$"
                 }
               },
               "required": [
@@ -24800,6 +24904,7 @@
         },
         "email": {
           "type": "string",
+          "maxLength": 254,
           "format": "email",
           "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
         },
@@ -28948,12 +29053,18 @@
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
         "sessionId": {
           "type": "string",
           "minLength": 1
         }
       },
       "required": [
+        "organizationId",
         "sessionId"
       ]
     },
@@ -28961,9 +29072,10 @@
       "organizations",
       "subscription",
       "getbystripesessionid",
+      "organizationid",
       "sessionid"
     ],
-    "searchBlob": "organizations.subscription.getByStripeSessionId Verify that a Stripe checkout session was paid for and that its subscription exists. organizations subscription getbystripesessionid sessionid sessionId"
+    "searchBlob": "organizations.subscription.getByStripeSessionId Verify that a Stripe checkout session was paid for and that its subscription exists. organizations subscription getbystripesessionid organizationid sessionid organizationId sessionId"
   },
   "organizations.subscription.getCustomerPortalUrl": {
     "path": "organizations.subscription.getCustomerPortalUrl",
@@ -36099,6 +36211,7 @@
             "linkedin",
             "discord",
             "openai",
+            "claude",
             "fake-login",
             "workos",
             "passkey"
@@ -36555,6 +36668,7 @@
             "linkedin",
             "discord",
             "openai",
+            "claude",
             "fake-login",
             "workos",
             "passkey"
@@ -37613,6 +37727,58 @@
       "organizationid"
     ],
     "searchBlob": "workspaceFolders.list List the signed-in user's workspace folders, optionally scoped to an organization, including each folder's name, color, and assigned worktrees. workspacefolders list organizationid organizationId"
+  },
+  "workspaceFolders.moveSession": {
+    "path": "workspaceFolders.moveSession",
+    "kind": "mutation",
+    "summary": "Move a chat session into a workspace folder, or pass a null folder ID to move it out and leave it ungrouped. Use this to organize sessions into project folders or unfile one.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sessionId": {
+          "type": "string",
+          "pattern": "^workspace_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "folderId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "organizationId",
+        "sessionId",
+        "folderId"
+      ]
+    },
+    "tags": [
+      "workspacefolders",
+      "movesession",
+      "organizationid",
+      "sessionid",
+      "folderid"
+    ],
+    "searchBlob": "workspaceFolders.moveSession Move a chat session into a workspace folder, or pass a null folder ID to move it out and leave it ungrouped. Use this to organize sessions into project folders or unfile one. workspacefolders movesession organizationid sessionid folderid organizationId sessionId folderId"
   },
   "workspaceFolders.moveWorktree": {
     "path": "workspaceFolders.moveWorktree",

@@ -248,6 +248,7 @@
     "confirmDeletion": "Thibitisha kufuta",
     "credits": "Salio",
     "failedToLoadBalance": "Imeshindikana kupakia salio. Gusa ili ujaribu tena.",
+    "balanceLoadFailed": "Imeshindikana kupakia salio",
     "hideBalance": "Ficha salio",
     "showBalance": "Onyesha salio",
     "balanceHidden": "Salio limefichwa",
@@ -331,7 +332,6 @@
     "noFilesChangedDescription": "Ombi hili la kuunganisha halina mabadiliko ya faili.",
     "fileList": {
       "openNavigator": "Fungua kivinjari cha faili",
-      "filesViewed": "Faili · {{viewed}} kati ya {{total}} zimeangaliwa",
       "listed": "(zimeorodheshwa)",
       "layout": "Mpangilio",
       "unified": "Pamoja",
@@ -2293,6 +2293,7 @@
       "emptyDescription": "Tuma ujumbe hapa chini ili uanze.",
       "scrollToBottom": "Tembeza hadi chini",
       "emptyTitle": "Bado hakuna ujumbe",
+      "emptyReadOnlyTitle": "Hakuna ujumbe katika kikao hiki",
       "renameAccessibility": "Badilisha jina la kikao: {{title}}",
       "cloningSession": "Inanakili kikao",
       "couldNotLoadThisSession": "Imeshindikana kupakia kikao hiki.",
@@ -2392,7 +2393,7 @@
       "selectRepositoryToStart": "Chagua hazina ili kuanza.",
       "enterPromptToStart": "Ongeza maelekezo ili kuanza.",
       "enterPromptOrFileToStart": "Ongeza maelekezo au faili ili kuanza.",
-      "connectProviderToStart": "Unganisha mtoa huduma ili kuanza.",
+      "connectProviderToStart": "Hazina zinatoka kwenye akaunti ya GitHub, GitLab au Bitbucket ambayo imeunganishwa.",
       "promptPlaceholder": "Ungependa kufanya kazi gani?",
       "couldNotLoadModels": "Imeshindikana kupakia modeli.",
       "prefillRepoAndModelUnavailable": "Hazina na modeli ya kikao cha awali hazipatikani tena. Chagua hazina na modeli hapa chini.",
@@ -2991,7 +2992,6 @@
   },
   "addCredits": {
     "cta": "Ongeza salio",
-    "description": "Ongeza salio ili uendelee kutumia.",
     "billingPage": "ukurasa wa malipo"
   },
   "deviceSessions": {

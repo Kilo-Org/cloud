@@ -248,6 +248,7 @@
     "confirmDeletion": "Confirma l'eliminació",
     "credits": "Crèdits",
     "failedToLoadBalance": "No s'ha pogut carregar el saldo. Toca per tornar-ho a provar.",
+    "balanceLoadFailed": "No s'ha pogut carregar el saldo",
     "hideBalance": "Amaga el saldo",
     "showBalance": "Mostra el saldo",
     "balanceHidden": "Saldo amagat",
@@ -331,7 +332,6 @@
     "noFilesChangedDescription": "Aquesta sol·licitud d'integració no modifica cap fitxer.",
     "fileList": {
       "openNavigator": "Obre el navegador de fitxers",
-      "filesViewed": "Fitxers · {{viewed}} de {{total}} vistos",
       "listed": "(llistats)",
       "layout": "Disposició",
       "unified": "Unificat",
@@ -2335,6 +2335,7 @@
       "emptyDescription": "Envia un missatge a continuació per començar.",
       "scrollToBottom": "Desplaça't al final",
       "emptyTitle": "Encara no hi ha missatges",
+      "emptyReadOnlyTitle": "No hi ha missatges en aquesta sessió",
       "renameAccessibility": "Reanomena la sessió: {{title}}",
       "cloningSession": "Clonant la sessió…",
       "couldNotLoadThisSession": "No s'ha pogut carregar aquesta sessió.",
@@ -2434,7 +2435,7 @@
       "selectRepositoryToStart": "Selecciona un repositori per començar.",
       "enterPromptToStart": "Afegeix un prompt per començar.",
       "enterPromptOrFileToStart": "Afegeix un prompt o un fitxer per començar.",
-      "connectProviderToStart": "Connecta un proveïdor per començar.",
+      "connectProviderToStart": "Els repositoris provenen d'un compte connectat de GitHub, GitLab o Bitbucket.",
       "promptPlaceholder": "En què vols treballar?",
       "couldNotLoadModels": "No s'han pogut carregar els models.",
       "prefillRepoAndModelUnavailable": "El repositori i el model de la sessió original ja no estan disponibles. Tria'ls a continuació.",
@@ -3044,7 +3045,6 @@
   },
   "addCredits": {
     "cta": "Afegeix crèdits",
-    "description": "Afegeix crèdits per continuar utilitzant el servei.",
     "billingPage": "pàgina de facturació"
   },
   "deviceSessions": {

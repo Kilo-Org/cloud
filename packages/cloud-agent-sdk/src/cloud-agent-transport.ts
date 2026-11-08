@@ -39,7 +39,19 @@ import type {
 } from './transport';
 
 function normalizeCloudAgentPayload(payload: TransportSendPayload): CloudAgentSendPayload {
-  if (payload.type === 'command') return payload;
+  if (payload.type === 'command') {
+    if (payload.model && payload.model.providerID !== 'kilo') {
+      throw new Error('Cloud Agent only supports Kilo models');
+    }
+    return {
+      type: 'command',
+      command: payload.command,
+      arguments: payload.arguments,
+      ...(payload.mode ? { mode: payload.mode } : {}),
+      ...(payload.model ? { model: payload.model.modelID } : {}),
+      ...(payload.variant ? { variant: payload.variant } : {}),
+    };
+  }
   if (!payload.mode) throw new Error('Cloud Agent mode is required');
   if (!payload.model) throw new Error('Cloud Agent model is required');
   if (payload.model.providerID !== 'kilo') {

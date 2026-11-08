@@ -27,6 +27,7 @@ import {
   sectionAwareTimeMeta,
   selectRemoteRowSpokenMeta,
   storedSessionEyebrowLabel,
+  storedSessionEyebrowState,
 } from './session-list-helpers';
 import { composeSessionProvenanceSubtitle } from './session-provenance-subtitle';
 
@@ -587,6 +588,43 @@ describe('remoteSessionEyebrowLabel (canonical eyebrow — repo-name-first)', ()
   });
 });
 
+describe('storedSessionEyebrowState (the tint key beside the label)', () => {
+  it('names the placeholder for an origin the row cannot name', () => {
+    for (const created_on_platform of ['', 'unknown']) {
+      expect(storedSessionEyebrowState({ git_url: null, created_on_platform })).toBe('unknown');
+    }
+  });
+
+  it('names the platform for an eyebrow that only states the agent type', () => {
+    // The type is metadata: the row takes the muted pair instead of an
+    // accent, so the session title leads. `CLOUD AGENT` hashed to the amber
+    // ramp entry before this key existed, and drew the eye away from the title.
+    expect(
+      storedSessionEyebrowState({ git_url: null, created_on_platform: 'cloud-agent-web' })
+    ).toBe('platform');
+    expect(storedSessionEyebrowState({ git_url: null, created_on_platform: 'cli' })).toBe(
+      'platform'
+    );
+  });
+
+  it('names the repository for a repo-name eyebrow, which labels the row context', () => {
+    // The repository names the row's context, not the session: with the
+    // session title leading, the label and its strip take the muted pair
+    // instead of a saturated ramp entry.
+    expect(
+      storedSessionEyebrowState({
+        git_url: 'https://github.com/org/my-repo.git',
+        created_on_platform: 'cloud-agent-web',
+      })
+    ).toBe('repository');
+    // A git URL whose project segment is empty renders the label fallback, so
+    // the tint falls back with it.
+    expect(
+      storedSessionEyebrowState({ git_url: 'git@github.com:/', created_on_platform: 'cli' })
+    ).toBe('platform');
+  });
+});
+
 describe('remoteSessionEyebrowState (the tint key beside the label)', () => {
   it('names the live state for every unrecorded origin the label renders as LIVE', async () => {
     for (const createdOnPlatform of [undefined, '', 'unknown']) {
@@ -601,9 +639,20 @@ describe('remoteSessionEyebrowState (the tint key beside the label)', () => {
     await i18n.changeLanguage('en');
   });
 
-  it('returns null for a repo-name or platform-name eyebrow', () => {
-    expect(remoteSessionEyebrowState({ gitUrl: null, createdOnPlatform: 'cli' })).toBeNull();
-    expect(remoteSessionEyebrowState({ gitUrl: 'https://github.com/org/my-repo.git' })).toBeNull();
+  it('names the platform for an eyebrow that only states the agent type', () => {
+    // The type is metadata: the row takes the muted pair instead of an
+    // accent, so the session title leads. `CLOUD AGENT` hashed to the amber
+    // ramp entry before this key existed, and drew the eye away from the title.
+    expect(remoteSessionEyebrowState({ gitUrl: null, createdOnPlatform: 'cli' })).toBe('platform');
+    expect(remoteSessionEyebrowState({ gitUrl: '', createdOnPlatform: 'cloud-agent-web' })).toBe(
+      'platform'
+    );
+  });
+
+  it('names the repository for a repo-name eyebrow, which labels the row context', () => {
+    expect(remoteSessionEyebrowState({ gitUrl: 'https://github.com/org/my-repo.git' })).toBe(
+      'repository'
+    );
   });
 });
 

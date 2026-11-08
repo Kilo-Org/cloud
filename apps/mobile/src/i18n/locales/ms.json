@@ -248,6 +248,7 @@
     "confirmDeletion": "Sahkan pemadaman",
     "credits": "Kredit",
     "failedToLoadBalance": "Gagal memuatkan baki. Ketik untuk mencuba semula.",
+    "balanceLoadFailed": "Gagal memuatkan baki",
     "hideBalance": "Sembunyikan baki",
     "showBalance": "Tunjukkan baki",
     "balanceHidden": "Baki disembunyikan",
@@ -331,7 +332,6 @@
     "noFilesChangedDescription": "Tiada perubahan pada fail dalam permintaan tarik ini.",
     "fileList": {
       "openNavigator": "Buka penavigasi fail",
-      "filesViewed": "Fail · {{viewed}} daripada {{total}} sudah dilihat",
       "listed": "(disenaraikan)",
       "layout": "Susun atur",
       "unified": "Bersepadu",
@@ -2293,6 +2293,7 @@
       "emptyDescription": "Hantar mesej di bawah untuk bermula.",
       "scrollToBottom": "Tatal ke bawah",
       "emptyTitle": "Belum ada mesej",
+      "emptyReadOnlyTitle": "Tiada mesej dalam sesi ini",
       "renameAccessibility": "Namakan semula sesi: {{title}}",
       "cloningSession": "Mengklon sesi",
       "couldNotLoadThisSession": "Tidak dapat memuatkan sesi ini.",
@@ -2392,7 +2393,7 @@
       "selectRepositoryToStart": "Pilih repositori untuk bermula.",
       "enterPromptToStart": "Tambahkan prompt untuk bermula.",
       "enterPromptOrFileToStart": "Tambahkan prompt atau fail untuk bermula.",
-      "connectProviderToStart": "Sambungkan penyedia untuk bermula.",
+      "connectProviderToStart": "Repositori datang daripada akaun GitHub, GitLab atau Bitbucket yang disambungkan.",
       "promptPlaceholder": "Apa yang ingin anda usahakan?",
       "couldNotLoadModels": "Tidak dapat memuatkan model.",
       "prefillRepoAndModelUnavailable": "Repositori dan model sesi asal tidak lagi tersedia. Pilih repositori dan model lain di bawah.",
@@ -2991,7 +2992,6 @@
   },
   "addCredits": {
     "cta": "Tambah kredit",
-    "description": "Tambah kredit untuk terus menggunakan perkhidmatan.",
     "billingPage": "halaman pengebilan"
   },
   "deviceSessions": {

@@ -248,6 +248,7 @@
     "confirmDeletion": "Konfirmo fshirjen",
     "credits": "Kreditet",
     "failedToLoadBalance": "Nuk u ngarkua gjendja. Prek për të provuar përsëri.",
+    "balanceLoadFailed": "Nuk u ngarkua gjendja",
     "hideBalance": "Fshih gjendjen",
     "showBalance": "Shfaq gjendjen",
     "balanceHidden": "Gjendja është e fshehur",
@@ -331,7 +332,6 @@
     "noFilesChangedDescription": "Kjo kërkesë për bashkim nuk përmban ndryshime në skedarë.",
     "fileList": {
       "openNavigator": "Hap shfletuesin e skedarëve",
-      "filesViewed": "Skedarë · {{viewed}} nga {{total}} të parë",
       "listed": "(të listuar)",
       "layout": "Paraqitja",
       "unified": "E bashkuar",
@@ -2293,6 +2293,7 @@
       "emptyDescription": "Dërgo një mesazh më poshtë për të filluar.",
       "scrollToBottom": "Shko në fund",
       "emptyTitle": "Ende nuk ka mesazhe",
+      "emptyReadOnlyTitle": "Nuk ka mesazhe në këtë seancë",
       "renameAccessibility": "Riemërto seancën: {{title}}",
       "cloningSession": "Duke klonuar seancën",
       "couldNotLoadThisSession": "Nuk u ngarkua kjo seancë.",
@@ -2392,7 +2393,7 @@
       "selectRepositoryToStart": "Zgjidh një depo për të filluar.",
       "enterPromptToStart": "Shto një kërkesë për të filluar.",
       "enterPromptOrFileToStart": "Shto një kërkesë ose një skedar për të filluar.",
-      "connectProviderToStart": "Lidh një ofrues për të filluar.",
+      "connectProviderToStart": "Depot vijnë nga një llogari e lidhur e GitHub, GitLab ose Bitbucket.",
       "promptPlaceholder": "Me çfarë do të punosh?",
       "couldNotLoadModels": "Nuk u ngarkuan modelet.",
       "prefillRepoAndModelUnavailable": "Depoja dhe modeli i seancës fillestare nuk janë më të disponueshëm. Zgjidhi më poshtë.",
@@ -2991,7 +2992,6 @@
   },
   "addCredits": {
     "cta": "Shto kredite",
-    "description": "Shto kredite për të vazhduar përdorimin.",
     "billingPage": "faqja e faturimit"
   },
   "deviceSessions": {

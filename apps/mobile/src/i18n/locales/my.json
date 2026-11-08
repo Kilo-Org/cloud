@@ -248,6 +248,7 @@
     "confirmDeletion": "ဖျက်ခြင်းကို အတည်ပြုပါ",
     "credits": "ခရက်ဒစ်များ",
     "failedToLoadBalance": "လက်ကျန်ကို ရယူ၍မရပါ။ ထပ်ကြိုးစားရန် နှိပ်ပါ။",
+    "balanceLoadFailed": "လက်ကျန်ကို ရယူ၍မရပါ",
     "hideBalance": "လက်ကျန် ဖျောက်ရန်",
     "showBalance": "လက်ကျန် ပြရန်",
     "balanceHidden": "လက်ကျန် ဖျောက်ထားသည်",
@@ -331,7 +332,6 @@
     "noFilesChangedDescription": "ဒီ PR တွင် ဖိုင်ပြောင်းလဲမှု မရှိပါ။",
     "fileList": {
       "openNavigator": "ဖိုင်လမ်းညွှန်ကို ဖွင့်ပါ",
-      "filesViewed": "ဖိုင်များ · {{total}} ခုအနက် {{viewed}} ခု ကြည့်ပြီး",
       "listed": "(စာရင်းပါဖိုင်များ)",
       "layout": "အပြင်အဆင်",
       "unified": "တစ်စုတည်း",
@@ -2293,6 +2293,7 @@
       "emptyDescription": "စတင်ရန် အောက်တွင် မက်ဆေ့ခ်ျတစ်ခု ပို့ပါ။",
       "scrollToBottom": "အောက်ခြေသို့ ဆွဲချပါ",
       "emptyTitle": "မက်ဆေ့ခ်ျ မရှိသေးပါ",
+      "emptyReadOnlyTitle": "ဤစက်ရှင်တွင် မက်ဆေ့ခ်ျ မရှိပါ",
       "renameAccessibility": "{{title}} စက်ရှင်ကို အမည်ပြောင်းပါ",
       "cloningSession": "စက်ရှင်ကို မိတ္တူပွားနေသည်",
       "couldNotLoadThisSession": "ဤစက်ရှင်ကို ဖွင့်၍မရပါ။",
@@ -2392,7 +2393,7 @@
       "selectRepositoryToStart": "စတင်ရန် ကုဒ်သိုလှောင်ခန်းတစ်ခုကို ရွေးပါ။",
       "enterPromptToStart": "စတင်ရန် ညွှန်ကြားချက်တစ်ခု ထည့်ပါ။",
       "enterPromptOrFileToStart": "စတင်ရန် ညွှန်ကြားချက် သို့မဟုတ် ဖိုင်တစ်ခု ထည့်ပါ။",
-      "connectProviderToStart": "စတင်ရန် ဝန်ဆောင်မှုပေးသူတစ်ဦးကို ချိတ်ဆက်ပါ။",
+      "connectProviderToStart": "ကုဒ်သိုလှောင်ခန်းများသည် ချိတ်ဆက်ထားသော GitHub၊ GitLab သို့မဟုတ် Bitbucket အကောင့်မှ လာပါသည်။",
       "promptPlaceholder": "ဘာလုပ်ချင်ပါသလဲ။",
       "couldNotLoadModels": "မော်ဒယ်များကို ရယူ၍မရပါ။",
       "prefillRepoAndModelUnavailable": "မူရင်းစက်ရှင်၏ ကုဒ်သိုလှောင်ခန်းနှင့် မော်ဒယ်ကို အသုံးပြု၍မရတော့ပါ။ အောက်တွင် အသစ်ရွေးပါ။",
@@ -2991,7 +2992,6 @@
   },
   "addCredits": {
     "cta": "ခရက်ဒစ်ဖြည့်ပါ",
-    "description": "ဆက်လက်အသုံးပြုနိုင်ရန် ခရက်ဒစ်ဖြည့်ပါ။",
     "billingPage": "ငွေပေးချေမှု စာမျက်နှာ"
   },
   "deviceSessions": {

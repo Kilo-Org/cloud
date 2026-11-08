@@ -248,6 +248,7 @@
     "confirmDeletion": "Verwijderen bevestigen",
     "credits": "Tegoed",
     "failedToLoadBalance": "Het saldo kon niet worden geladen. Tik om het opnieuw te proberen.",
+    "balanceLoadFailed": "Saldo laden mislukt",
     "hideBalance": "Saldo verbergen",
     "showBalance": "Saldo tonen",
     "balanceHidden": "Saldo verborgen",
@@ -1754,6 +1755,7 @@
       "emptyDescription": "Stuur hieronder een bericht om te beginnen.",
       "scrollToBottom": "Naar beneden scrollen",
       "emptyTitle": "Nog geen berichten",
+      "emptyReadOnlyTitle": "Geen berichten in deze sessie",
       "renameAccessibility": "Sessie hernoemen: {{title}}",
       "cloningSession": "Sessie klonen…",
       "couldNotLoadThisSession": "Deze sessie kon niet worden geladen.",
@@ -1853,7 +1855,7 @@
       "selectRepositoryToStart": "Selecteer een repository om te starten.",
       "enterPromptToStart": "Voeg een prompt toe om te starten.",
       "enterPromptOrFileToStart": "Voeg een prompt of een bestand toe om te starten.",
-      "connectProviderToStart": "Koppel een platform om te starten.",
+      "connectProviderToStart": "Repositories komen van een gekoppeld GitHub-, GitLab- of Bitbucket-account.",
       "promptPlaceholder": "Waar wil je aan werken?",
       "couldNotLoadModels": "De modellen konden niet worden geladen.",
       "prefillRepoAndModelUnavailable": "De repository en het model van de oorspronkelijke sessie zijn niet meer beschikbaar. Kies hieronder een andere repository en een ander model.",
@@ -2452,7 +2454,6 @@
   },
   "addCredits": {
     "cta": "Tegoed aanvullen",
-    "description": "Vul je tegoed aan om door te kunnen gaan.",
     "billingPage": "factureringspagina"
   },
   "deviceSessions": {
@@ -2891,7 +2892,6 @@
     },
     "fileList": {
       "filesList": "Bestandenlijst",
-      "filesViewed": "Bestanden · {{viewed}} van {{total}} bekeken",
       "layout": "Indeling",
       "listed": "(in de lijst)",
       "loadingFiles": "Bestanden laden",

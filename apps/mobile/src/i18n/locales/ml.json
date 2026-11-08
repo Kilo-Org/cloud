@@ -248,6 +248,7 @@
     "confirmDeletion": "ഇല്ലാതാക്കൽ സ്ഥിരീകരിക്കുക",
     "credits": "ക്രെഡിറ്റുകൾ",
     "failedToLoadBalance": "ബാലൻസ് ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല. വീണ്ടും ശ്രമിക്കാൻ ടാപ്പ് ചെയ്യുക.",
+    "balanceLoadFailed": "ബാലൻസ് ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല",
     "hideBalance": "ബാലൻസ് മറയ്ക്കുക",
     "showBalance": "ബാലൻസ് കാണിക്കുക",
     "balanceHidden": "ബാലൻസ് മറച്ചിരിക്കുന്നു",
@@ -331,7 +332,6 @@
     "noFilesChangedDescription": "ഈ പുൾ റിക്വസ്റ്റിൽ ഫയലുകളിലൊന്നും മാറ്റങ്ങളില്ല.",
     "fileList": {
       "openNavigator": "ഫയൽ നാവിഗേറ്റർ തുറക്കുക",
-      "filesViewed": "ഫയലുകൾ · {{total}}-ൽ {{viewed}} കണ്ടു",
       "listed": "(പട്ടികയിലുള്ളത്)",
       "layout": "ലേഔട്ട്",
       "unified": "ഒറ്റക്കാഴ്ച",
@@ -2293,6 +2293,7 @@
       "emptyDescription": "ആരംഭിക്കാൻ താഴെ ഒരു സന്ദേശം അയയ്ക്കുക.",
       "scrollToBottom": "ഏറ്റവും താഴേക്ക് സ്ക്രോൾ ചെയ്യുക",
       "emptyTitle": "ഇതുവരെ സന്ദേശങ്ങളൊന്നുമില്ല",
+      "emptyReadOnlyTitle": "ഈ സെഷനിൽ സന്ദേശങ്ങളില്ല",
       "renameAccessibility": "{{title}} എന്ന സെഷന്റെ പേര് മാറ്റുക",
       "cloningSession": "സെഷൻ ക്ലോൺ ചെയ്യുന്നു",
       "couldNotLoadThisSession": "ഈ സെഷൻ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല.",
@@ -2392,7 +2393,7 @@
       "selectRepositoryToStart": "ആരംഭിക്കാൻ ഒരു റിപ്പോസിറ്ററി തിരഞ്ഞെടുക്കുക.",
       "enterPromptToStart": "ആരംഭിക്കാൻ ഒരു പ്രോംപ്റ്റ് ചേർക്കുക.",
       "enterPromptOrFileToStart": "ആരംഭിക്കാൻ ഒരു പ്രോംപ്റ്റ് അല്ലെങ്കിൽ ഒരു ഫയൽ ചേർക്കുക.",
-      "connectProviderToStart": "ആരംഭിക്കാൻ ഒരു സേവനദാതാവിനെ കണക്റ്റ് ചെയ്യുക.",
+      "connectProviderToStart": "റിപ്പോസിറ്ററികൾ വരുന്നത് GitHub, GitLab അല്ലെങ്കിൽ Bitbucket എന്നിവയുടെ കണക്റ്റ് ചെയ്ത അക്കൗണ്ടിൽ നിന്നാണ്.",
       "promptPlaceholder": "എന്ത് ജോലിയാണ് ചെയ്യേണ്ടത്?",
       "couldNotLoadModels": "മോഡലുകൾ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല.",
       "prefillRepoAndModelUnavailable": "മൂല സെഷന്റെ റിപ്പോസിറ്ററിയും മോഡലും ഇനി ലഭ്യമല്ല. പകരമുള്ളവ താഴെ തിരഞ്ഞെടുക്കുക.",
@@ -2991,7 +2992,6 @@
   },
   "addCredits": {
     "cta": "ക്രെഡിറ്റുകൾ ചേർക്കുക",
-    "description": "ഉപയോഗം തുടരാൻ ക്രെഡിറ്റുകൾ ചേർക്കുക.",
     "billingPage": "ബില്ലിംഗ് പേജ്"
   },
   "deviceSessions": {

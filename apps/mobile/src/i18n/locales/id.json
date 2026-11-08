@@ -248,6 +248,7 @@
     "confirmDeletion": "Konfirmasi penghapusan",
     "credits": "Kredit",
     "failedToLoadBalance": "Gagal memuat saldo. Ketuk untuk mencoba lagi.",
+    "balanceLoadFailed": "Gagal memuat saldo",
     "hideBalance": "Sembunyikan saldo",
     "showBalance": "Tampilkan saldo",
     "balanceHidden": "Saldo tersembunyi",
@@ -1754,6 +1755,7 @@
       "emptyDescription": "Kirim pesan di bawah untuk memulai.",
       "scrollToBottom": "Gulir ke bawah",
       "emptyTitle": "Belum ada pesan",
+      "emptyReadOnlyTitle": "Tidak ada pesan dalam sesi ini",
       "renameAccessibility": "Ganti nama sesi: {{title}}",
       "cloningSession": "Menyalin sesi",
       "couldNotLoadThisSession": "Tidak dapat memuat sesi ini.",
@@ -1853,7 +1855,7 @@
       "selectRepositoryToStart": "Pilih repositori untuk memulai.",
       "enterPromptToStart": "Tambahkan prompt untuk memulai.",
       "enterPromptOrFileToStart": "Tambahkan prompt atau file untuk memulai.",
-      "connectProviderToStart": "Hubungkan penyedia untuk memulai.",
+      "connectProviderToStart": "Repositori berasal dari akun GitHub, GitLab, atau Bitbucket yang terhubung.",
       "promptPlaceholder": "Apa yang ingin kamu kerjakan?",
       "couldNotLoadModels": "Tidak dapat memuat model.",
       "prefillRepoAndModelUnavailable": "Repositori dan model dari sesi asal sudah tidak tersedia. Pilih penggantinya di bawah.",
@@ -2452,7 +2454,6 @@
   },
   "addCredits": {
     "cta": "Tambah kredit",
-    "description": "Tambah kredit agar kamu dapat terus menggunakan layanan ini.",
     "billingPage": "halaman penagihan"
   },
   "deviceSessions": {
@@ -2891,7 +2892,6 @@
     },
     "fileList": {
       "filesList": "Daftar file",
-      "filesViewed": "File · {{viewed}} dari {{total}} sudah dilihat",
       "layout": "Tata letak",
       "listed": "(terdaftar)",
       "loadingFiles": "Memuat file",

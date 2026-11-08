@@ -479,9 +479,9 @@ export async function verifyDoltHubUpstreamExists(
 }
 
 /**
- * Persist the DoltHub username on the integration metadata so subsequent
- * wasteland connects can skip the prompt. Idempotent — overwrites whatever
- * was there before.
+ * Persist the DoltHub username on the integration metadata so it can be
+ * reused without prompting again. Idempotent — overwrites whatever was there
+ * before.
  */
 export async function rememberDoltHubUsername(
   integration: PlatformIntegration,

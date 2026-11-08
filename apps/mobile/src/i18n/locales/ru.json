@@ -248,6 +248,7 @@
     "confirmDeletion": "Подтвердить удаление",
     "credits": "Кредиты",
     "failedToLoadBalance": "Не удалось загрузить баланс. Нажмите, чтобы повторить.",
+    "balanceLoadFailed": "Не удалось загрузить баланс",
     "hideBalance": "Скрыть баланс",
     "showBalance": "Показать баланс",
     "balanceHidden": "Баланс скрыт",
@@ -1796,6 +1797,7 @@
       "emptyDescription": "Отправьте сообщение ниже, чтобы начать.",
       "scrollToBottom": "Прокрутить вниз",
       "emptyTitle": "Сообщений пока нет",
+      "emptyReadOnlyTitle": "В этом сеансе нет сообщений",
       "renameAccessibility": "Переименовать сеанс: {{title}}",
       "cloningSession": "Клонирование сеанса",
       "couldNotLoadThisSession": "Не удалось загрузить этот сеанс.",
@@ -1895,7 +1897,7 @@
       "selectRepositoryToStart": "Выберите репозиторий, чтобы начать.",
       "enterPromptToStart": "Добавьте промпт, чтобы начать.",
       "enterPromptOrFileToStart": "Добавьте промпт или файл, чтобы начать.",
-      "connectProviderToStart": "Подключите сервис, чтобы начать.",
+      "connectProviderToStart": "Репозитории берутся из подключённого аккаунта GitHub, GitLab или Bitbucket.",
       "promptPlaceholder": "Над чем хотите поработать?",
       "couldNotLoadModels": "Не удалось загрузить модели.",
       "prefillRepoAndModelUnavailable": "Репозиторий и модель исходного сеанса больше недоступны. Выберите другие ниже.",
@@ -2516,7 +2518,6 @@
   },
   "addCredits": {
     "cta": "Пополнить баланс",
-    "description": "Пополните баланс, чтобы продолжить работу.",
     "billingPage": "страница оплаты"
   },
   "deviceSessions": {
@@ -2971,7 +2972,6 @@
     },
     "fileList": {
       "filesList": "Список файлов",
-      "filesViewed": "Файлы · просмотрено {{viewed}} из {{total}}",
       "layout": "Вид",
       "listed": "(в списке)",
       "loadingFiles": "Загрузка файлов",

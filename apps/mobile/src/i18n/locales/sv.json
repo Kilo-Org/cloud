@@ -248,6 +248,7 @@
     "confirmDeletion": "Bekräfta borttagning",
     "credits": "Krediter",
     "failedToLoadBalance": "Kunde inte läsa in saldot. Tryck för att försöka igen.",
+    "balanceLoadFailed": "Kunde inte läsa in saldot",
     "hideBalance": "Dölj saldo",
     "showBalance": "Visa saldo",
     "balanceHidden": "Saldo dolt",
@@ -331,7 +332,6 @@
     "noFilesChangedDescription": "Den här PR:en innehåller inga filändringar.",
     "fileList": {
       "openNavigator": "Öppna filnavigeringen",
-      "filesViewed": "Filer · {{viewed}} av {{total}} visade",
       "listed": "(listade)",
       "layout": "Visningsläge",
       "unified": "Enhetlig",
@@ -2293,6 +2293,7 @@
       "emptyDescription": "Skicka ett meddelande nedan för att komma igång.",
       "scrollToBottom": "Rulla längst ned",
       "emptyTitle": "Inga meddelanden ännu",
+      "emptyReadOnlyTitle": "Inga meddelanden i den här sessionen",
       "renameAccessibility": "Byt namn på sessionen: {{title}}",
       "cloningSession": "Klonar sessionen",
       "couldNotLoadThisSession": "Det gick inte att läsa in den här sessionen",
@@ -2392,7 +2393,7 @@
       "selectRepositoryToStart": "Välj ett kodarkiv för att starta.",
       "enterPromptToStart": "Lägg till en uppmaning för att starta.",
       "enterPromptOrFileToStart": "Lägg till en uppmaning eller en fil för att starta.",
-      "connectProviderToStart": "Anslut en leverantör för att starta.",
+      "connectProviderToStart": "Kodarkiv kommer från ett anslutet GitHub-, GitLab- eller Bitbucket-konto.",
       "promptPlaceholder": "Vad vill du arbeta med?",
       "couldNotLoadModels": "Det gick inte att läsa in modellerna.",
       "prefillRepoAndModelUnavailable": "Den ursprungliga sessionens kodarkiv och modell är inte längre tillgängliga. Välj ett nytt kodarkiv och en ny modell nedan.",
@@ -2991,7 +2992,6 @@
   },
   "addCredits": {
     "cta": "Fyll på krediter",
-    "description": "Fyll på krediter för att fortsätta använda tjänsten.",
     "billingPage": "faktureringssidan"
   },
   "deviceSessions": {

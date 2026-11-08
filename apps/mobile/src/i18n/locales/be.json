@@ -248,6 +248,7 @@
     "confirmDeletion": "Пацвердзіць выдаленне",
     "credits": "Крэдыты",
     "failedToLoadBalance": "Не ўдалося загрузіць баланс. Націсніце, каб паўтарыць спробу.",
+    "balanceLoadFailed": "Не ўдалося загрузіць баланс",
     "hideBalance": "Схаваць баланс",
     "showBalance": "Паказаць баланс",
     "balanceHidden": "Баланс схаваны",
@@ -331,7 +332,6 @@
     "noFilesChangedDescription": "У гэтым запыце на зліццё няма змен у файлах.",
     "fileList": {
       "openNavigator": "Адкрыць навігатар файлаў",
-      "filesViewed": "Файлы · прагледжана {{viewed}} з {{total}}",
       "listed": "(са спіса)",
       "layout": "Выгляд",
       "unified": "Аб'яднаны",
@@ -2377,6 +2377,7 @@
       "emptyDescription": "Адпраўце паведамленне ніжэй, каб пачаць.",
       "scrollToBottom": "Пракруціць уніз",
       "emptyTitle": "Паведамленняў яшчэ няма",
+      "emptyReadOnlyTitle": "У гэтым сеансе няма паведамленняў",
       "renameAccessibility": "Перайменаваць сеанс: {{title}}",
       "cloningSession": "Кланаванне сеанса",
       "couldNotLoadThisSession": "Не ўдалося загрузіць гэты сеанс.",
@@ -2476,7 +2477,7 @@
       "selectRepositoryToStart": "Выберыце рэпазіторый, каб пачаць.",
       "enterPromptToStart": "Дадайце запыт, каб пачаць.",
       "enterPromptOrFileToStart": "Дадайце запыт ці файл, каб пачаць.",
-      "connectProviderToStart": "Падключыце платформу, каб пачаць.",
+      "connectProviderToStart": "Рэпазіторыі бяруцца з падключанага ўліковага запісу GitHub, GitLab або Bitbucket.",
       "promptPlaceholder": "Над чым будзем працаваць?",
       "couldNotLoadModels": "Не ўдалося загрузіць мадэлі.",
       "prefillRepoAndModelUnavailable": "Рэпазіторый і мадэль зыходнага сеанса больш недаступныя. Выберыце іншыя ніжэй.",
@@ -3097,7 +3098,6 @@
   },
   "addCredits": {
     "cta": "Папоўніць баланс",
-    "description": "Папоўніце баланс, каб працягнуць карыстанне.",
     "billingPage": "старонка аплаты"
   },
   "deviceSessions": {

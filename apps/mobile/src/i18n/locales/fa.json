@@ -248,6 +248,7 @@
     "confirmDeletion": "تأیید حذف",
     "credits": "اعتبار",
     "failedToLoadBalance": "بارگذاری موجودی ممکن نشد. برای تلاش مجدد ضربه بزنید.",
+    "balanceLoadFailed": "بارگذاری موجودی ممکن نشد",
     "hideBalance": "پنهان کردن موجودی",
     "showBalance": "نمایش موجودی",
     "balanceHidden": "موجودی پنهان است",
@@ -331,7 +332,6 @@
     "noFilesChangedDescription": "در این درخواست ادغام هیچ فایلی تغییر نکرده است.",
     "fileList": {
       "openNavigator": "باز کردن فهرست فایل‌ها",
-      "filesViewed": "فایل‌ها · {{viewed}} از {{total}} مشاهده‌شده",
       "listed": "(فهرست‌شده)",
       "layout": "چیدمان",
       "unified": "یکپارچه",
@@ -2299,6 +2299,7 @@
       "emptyDescription": "برای شروع، در کادر زیر پیامی بفرستید.",
       "scrollToBottom": "رفتن به پایین",
       "emptyTitle": "هنوز پیامی وجود ندارد",
+      "emptyReadOnlyTitle": "پیامی در این نشست وجود ندارد",
       "renameAccessibility": "تغییر نام نشست: {{title}}",
       "cloningSession": "در حال کپی کردن نشست",
       "couldNotLoadThisSession": "بارگذاری این نشست ممکن نشد.",
@@ -2398,7 +2399,7 @@
       "selectRepositoryToStart": "برای شروع یک مخزن انتخاب کنید.",
       "enterPromptToStart": "برای شروع یک پرامپت اضافه کنید.",
       "enterPromptOrFileToStart": "برای شروع یک پرامپت یا فایل اضافه کنید.",
-      "connectProviderToStart": "برای شروع یک ارائه‌دهنده را متصل کنید.",
+      "connectProviderToStart": "مخزن‌ها از یک حساب GitHub، GitLab یا Bitbucket که اتصالش برقرار است می‌آیند.",
       "promptPlaceholder": "می‌خواهید روی چه چیزی کار کنید؟",
       "couldNotLoadModels": "بارگذاری مدل‌ها ممکن نشد.",
       "prefillRepoAndModelUnavailable": "مخزن و مدل نشست اصلی دیگر در دسترس نیستند. از گزینه‌های زیر مخزن و مدل دیگری انتخاب کنید.",
@@ -2997,7 +2998,6 @@
   },
   "addCredits": {
     "cta": "افزودن اعتبار",
-    "description": "برای ادامه استفاده، اعتبار اضافه کنید.",
     "billingPage": "صفحه صورتحساب"
   },
   "deviceSessions": {

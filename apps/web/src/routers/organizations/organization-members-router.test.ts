@@ -2217,6 +2217,52 @@ describe('organizations members trpc router', () => {
       expect(result).toHaveProperty('emailStatus', 'pending');
     });
 
+    it('refuses an address past the 254-character maximum and creates no invitation', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+
+      // A 64-character local part then three 63-character labels: 254 characters
+      // is the longest address a mail system delivers.
+      const longest = `${'a'.repeat(64)}@${'b'.repeat(63)}.${'c'.repeat(63)}.${'d'.repeat(61)}`;
+      const oneMore = `${'a'.repeat(64)}@${'b'.repeat(63)}.${'c'.repeat(63)}.${'d'.repeat(62)}`;
+      expect(longest).toHaveLength(254);
+      expect(oneMore).toHaveLength(255);
+
+      const accepted = await caller.organizations.members.invite({
+        organizationId: testOrganization.id,
+        email: longest,
+        role: 'member',
+      });
+      expect(accepted).toHaveProperty('invitationId');
+
+      await expect(
+        caller.organizations.members.invite({
+          organizationId: testOrganization.id,
+          email: oneMore,
+          role: 'member',
+        })
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: expect.stringContaining('Email address must be 254 characters or fewer'),
+      });
+
+      const overLengthInvitations = await db
+        .select()
+        .from(organization_invitations)
+        .where(
+          and(
+            eq(organization_invitations.organization_id, testOrganization.id),
+            eq(organization_invitations.email, oneMore)
+          )
+        );
+      expect(overLengthInvitations).toHaveLength(0);
+
+      const queuedForOverLength = await db
+        .select()
+        .from(external_side_effect_outbox)
+        .where(sql`${external_side_effect_outbox.payload}->>'to' = ${oneMore}`);
+      expect(queuedForOverLength).toHaveLength(0);
+    });
+
     it('writes an invitation and outbox row and does not send mail in the mutation', async () => {
       const sendInviteEmail = jest.mocked(sendOrganizationInviteEmail);
       sendInviteEmail.mockClear();

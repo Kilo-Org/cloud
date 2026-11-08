@@ -248,6 +248,7 @@
     "confirmDeletion": "O'chirishni tasdiqlash",
     "credits": "Kreditlar",
     "failedToLoadBalance": "Balansni yuklab bo'lmadi. Qayta urinish uchun bosing.",
+    "balanceLoadFailed": "Balansni yuklab bo'lmadi",
     "hideBalance": "Balansni yashirish",
     "showBalance": "Balansni ko'rsatish",
     "balanceHidden": "Balans yashirilgan",
@@ -331,7 +332,6 @@
     "noFilesChangedDescription": "Bu PRda hech bir fayl o'zgarmagan.",
     "fileList": {
       "openNavigator": "Fayllar ro'yxatini ochish",
-      "filesViewed": "Fayllar · {{total}} tadan {{viewed}} tasi ko'rildi",
       "listed": "(ro'yxatda)",
       "layout": "Ko'rinish",
       "unified": "Birlashtirilgan",
@@ -2293,6 +2293,7 @@
       "emptyDescription": "Boshlash uchun quyida xabar yuboring.",
       "scrollToBottom": "Eng pastga o'tish",
       "emptyTitle": "Hali xabarlar yo'q",
+      "emptyReadOnlyTitle": "Bu sessiyada xabarlar yo'q",
       "renameAccessibility": "Sessiya nomini o'zgartirish: {{title}}",
       "cloningSession": "Sessiya klonlanmoqda",
       "couldNotLoadThisSession": "Bu sessiyani yuklab bo'lmadi.",
@@ -2392,7 +2393,7 @@
       "selectRepositoryToStart": "Boshlash uchun repozitoriya tanlang.",
       "enterPromptToStart": "Boshlash uchun so'rov qo'shing.",
       "enterPromptOrFileToStart": "Boshlash uchun so'rov yoki fayl qo'shing.",
-      "connectProviderToStart": "Boshlash uchun provayderni ulang.",
+      "connectProviderToStart": "Repozitoriyalar ulangan GitHub, GitLab yoki Bitbucket hisobidan keladi.",
       "promptPlaceholder": "Nima ustida ishlashni xohlaysiz?",
       "couldNotLoadModels": "Modellarni yuklab bo'lmadi.",
       "prefillRepoAndModelUnavailable": "Asl sessiyadagi repozitoriya va model endi mavjud emas. Quyida boshqa repozitoriya va modelni tanlang.",
@@ -2991,7 +2992,6 @@
   },
   "addCredits": {
     "cta": "Kreditlar qo'shish",
-    "description": "Foydalanishni davom ettirish uchun kreditlar qo'shing.",
     "billingPage": "to'lov sahifasi"
   },
   "deviceSessions": {

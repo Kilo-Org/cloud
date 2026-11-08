@@ -248,6 +248,7 @@
     "confirmDeletion": "Confirmă ștergerea",
     "credits": "Credite",
     "failedToLoadBalance": "Încărcarea soldului a eșuat. Atinge pentru a reîncerca.",
+    "balanceLoadFailed": "Încărcarea soldului a eșuat",
     "hideBalance": "Ascunde soldul",
     "showBalance": "Afișează soldul",
     "balanceHidden": "Sold ascuns",
@@ -331,7 +332,6 @@
     "noFilesChangedDescription": "Acest PR nu conține modificări ale fișierelor.",
     "fileList": {
       "openNavigator": "Deschide lista de fișiere",
-      "filesViewed": "Fișiere · {{viewed}} din {{total}} vizualizate",
       "listed": "(afișate)",
       "layout": "Aranjare",
       "unified": "Unificat",
@@ -2335,6 +2335,7 @@
       "emptyDescription": "Trimite un mesaj mai jos pentru a începe.",
       "scrollToBottom": "Derulează la final",
       "emptyTitle": "Încă niciun mesaj",
+      "emptyReadOnlyTitle": "Niciun mesaj în această sesiune",
       "renameAccessibility": "Redenumește sesiunea: {{title}}",
       "cloningSession": "Se clonează sesiunea",
       "couldNotLoadThisSession": "Nu s-a putut încărca această sesiune.",
@@ -2434,7 +2435,7 @@
       "selectRepositoryToStart": "Selectează un depozit pentru a începe.",
       "enterPromptToStart": "Adaugă un prompt pentru a începe.",
       "enterPromptOrFileToStart": "Adaugă un prompt sau un fișier pentru a începe.",
-      "connectProviderToStart": "Conectează un furnizor pentru a începe.",
+      "connectProviderToStart": "Depozitele provin dintr-un cont GitHub, GitLab sau Bitbucket conectat.",
       "promptPlaceholder": "La ce vrei să lucrezi?",
       "couldNotLoadModels": "Nu s-au putut încărca modelele.",
       "prefillRepoAndModelUnavailable": "Depozitul și modelul sesiunii inițiale nu mai sunt disponibile. Alege altele mai jos.",
@@ -3044,7 +3045,6 @@
   },
   "addCredits": {
     "cta": "Adaugă credite",
-    "description": "Adaugă credite pentru a continua să folosești serviciul.",
     "billingPage": "pagina de facturare"
   },
   "deviceSessions": {

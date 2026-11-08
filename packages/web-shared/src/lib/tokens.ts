@@ -76,7 +76,6 @@ export type JWTTokenExtraPayload = {
   organizationRole?: OrganizationRole;
   internalApiUse?: boolean;
   isAdmin?: boolean;
-  gastownAccess?: boolean;
   createdOnPlatform?: string;
   tokenSource?: string;
   orgMemberships?: Array<{ orgId: string; role: OrganizationRole }>;

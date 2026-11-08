@@ -248,6 +248,7 @@
     "confirmDeletion": "Berretsi ezabaketa",
     "credits": "Kredituak",
     "failedToLoadBalance": "Ezin izan da saldoa kargatu. Sakatu berriro saiatzeko.",
+    "balanceLoadFailed": "Ezin izan da saldoa kargatu",
     "hideBalance": "Ezkutatu saldoa",
     "showBalance": "Erakutsi saldoa",
     "balanceHidden": "Saldoa ezkutatuta dago",
@@ -331,7 +332,6 @@
     "noFilesChangedDescription": "Bateratze-eskaera honek ez du fitxategi-aldaketarik.",
     "fileList": {
       "openNavigator": "Ireki fitxategi-nabigatzailea",
-      "filesViewed": "Fitxategiak · {{viewed}} / {{total}} ikusita",
       "listed": "(zerrendatuta)",
       "layout": "Antolamendua",
       "unified": "Bateratua",
@@ -2293,6 +2293,7 @@
       "emptyDescription": "Hasteko, bidali mezu bat behean.",
       "scrollToBottom": "Joan behealdera",
       "emptyTitle": "Oraindik ez dago mezurik",
+      "emptyReadOnlyTitle": "Saio honetan ez dago mezurik",
       "renameAccessibility": "Berrizendatu saioa: {{title}}",
       "cloningSession": "Saioa klonatzen",
       "couldNotLoadThisSession": "Ezin izan da saio hau kargatu.",
@@ -2392,7 +2393,7 @@
       "selectRepositoryToStart": "Hautatu biltegi bat hasteko.",
       "enterPromptToStart": "Gehitu eskaera bat hasteko.",
       "enterPromptOrFileToStart": "Gehitu eskaera bat edo fitxategi bat hasteko.",
-      "connectProviderToStart": "Konektatu hornitzaile bat hasteko.",
+      "connectProviderToStart": "Biltegiak konektatuta dagoen GitHub, GitLab edo Bitbucket kontu batetik datoz.",
       "promptPlaceholder": "Zertan lan egin nahi zenuke?",
       "couldNotLoadModels": "Ezin izan dira modeloak kargatu.",
       "prefillRepoAndModelUnavailable": "Jatorrizko saioaren biltegia eta modeloa jada ez daude erabilgarri. Aukeratu beste batzuk behean.",
@@ -2991,7 +2992,6 @@
   },
   "addCredits": {
     "cta": "Gehitu kredituak",
-    "description": "Gehitu kredituak erabiltzen jarraitzeko.",
     "billingPage": "fakturazio-orria"
   },
   "deviceSessions": {

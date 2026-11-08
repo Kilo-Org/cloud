@@ -248,6 +248,7 @@
     "confirmDeletion": "કાઢી નાખવાની પુષ્ટિ કરો",
     "credits": "ક્રેડિટ",
     "failedToLoadBalance": "બેલેન્સ લોડ કરી શકાયું નહીં. ફરી પ્રયાસ કરવા ટેપ કરો.",
+    "balanceLoadFailed": "બેલેન્સ લોડ કરી શકાયું નહીં",
     "hideBalance": "બેલેન્સ છુપાવો",
     "showBalance": "બેલેન્સ બતાવો",
     "balanceHidden": "બેલેન્સ છુપાયેલ છે",
@@ -331,7 +332,6 @@
     "noFilesChangedDescription": "આ પુલ રિક્વેસ્ટમાં કોઈ ફાઇલમાં ફેરફાર નથી.",
     "fileList": {
       "openNavigator": "ફાઇલ નેવિગેટર ખોલો",
-      "filesViewed": "ફાઇલો · {{total}}માંથી {{viewed}} જોયેલી",
       "listed": "(યાદીમાં)",
       "layout": "ગોઠવણી",
       "unified": "એકીકૃત",
@@ -2299,6 +2299,7 @@
       "emptyDescription": "શરૂ કરવા નીચે સંદેશ મોકલો.",
       "scrollToBottom": "નીચે સ્ક્રોલ કરો",
       "emptyTitle": "હજુ કોઈ સંદેશ નથી",
+      "emptyReadOnlyTitle": "આ સત્રમાં કોઈ સંદેશ નથી",
       "renameAccessibility": "સત્રનું નામ બદલો: {{title}}",
       "cloningSession": "સત્રની નકલ બની રહી છે",
       "couldNotLoadThisSession": "આ સત્ર લોડ કરી શકાયું નહીં",
@@ -2398,7 +2399,7 @@
       "selectRepositoryToStart": "શરૂ કરવા માટે રિપોઝિટરી પસંદ કરો.",
       "enterPromptToStart": "શરૂ કરવા માટે એક પ્રોમ્પ્ટ ઉમેરો.",
       "enterPromptOrFileToStart": "શરૂ કરવા માટે પ્રોમ્પ્ટ કે ફાઇલ ઉમેરો.",
-      "connectProviderToStart": "શરૂ કરવા માટે સેવા પ્રદાતા જોડો.",
+      "connectProviderToStart": "રિપોઝિટરીઓ કનેક્ટ થયું GitHub, GitLab અથવા Bitbucket એકાઉન્ટમાંથી આવે છે.",
       "promptPlaceholder": "તમે શેના પર કામ કરવા માંગો છો?",
       "couldNotLoadModels": "મોડલ લોડ કરી શકાયાં નહીં.",
       "prefillRepoAndModelUnavailable": "મૂળ સત્રની રિપોઝિટરી અને મોડલ હવે ઉપલબ્ધ નથી. નીચે નવી રિપોઝિટરી અને મોડલ પસંદ કરો.",
@@ -2997,7 +2998,6 @@
   },
   "addCredits": {
     "cta": "ક્રેડિટ ઉમેરો",
-    "description": "વપરાશ ચાલુ રાખવા માટે ક્રેડિટ ઉમેરો.",
     "billingPage": "બિલિંગ પૃષ્ઠ"
   },
   "deviceSessions": {

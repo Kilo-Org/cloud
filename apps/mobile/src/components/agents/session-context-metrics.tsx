@@ -31,6 +31,15 @@ type SessionContextMetricsProps = {
    * nothing to open.
    */
   loading?: boolean;
+  /**
+   * Marks a settled session that will never report usage and cannot open any
+   * sheet: an empty stored transcript reports no usage, and its sheet has no
+   * permission settings (read-only sessions cannot auto-approve). The layout
+   * box stays reserved so the header does not shift; the dash value slots
+   * would otherwise read as a permanent placeholder beside the finished
+   * empty state.
+   */
+  onNothingToReport?: boolean;
 };
 
 const RING_SIZE = 28;
@@ -68,6 +77,7 @@ export function SessionContextMetrics({
   autoApproveAvailable = false,
   onPress,
   loading = false,
+  onNothingToReport = false,
 }: Readonly<SessionContextMetricsProps>) {
   const content = getHeaderPillContent({ info, totalCostMicrodollars, hasMessages, loading });
   // This pill is the only way into the session's context sheet, which owns the
@@ -79,8 +89,11 @@ export function SessionContextMetrics({
   const pressable = onPress != null;
   // Without an `onPress` this is the unresolved-session placeholder: the layout
   // box keeps its space in every state, and stays invisible while there is
-  // nothing to open.
-  const hidden = !pressable && (loading || (!hasMessages && !autoApproveAvailable));
+  // nothing to open. A settled session that will never report usage and cannot
+  // open the sheet hides the same way, so its dash value slots never paint as a
+  // permanent placeholder.
+  const hidden =
+    !pressable && (loading || (!hasMessages && !autoApproveAvailable) || onNothingToReport);
   const accessibilityLabel = getMetricsAccessibilityLabel({
     info,
     totalCostMicrodollars,

@@ -18,10 +18,9 @@ import { UserAdminInvoices } from './UserAdminInvoices';
 import { UserAdminOrganizations } from './UserAdminOrganizations';
 import { UserAdminKiloPass } from './UserAdminKiloPass';
 import { UserAdminKiloClaw } from './UserAdminKiloClaw';
-import { UserAdminGastown } from './UserAdminGastown';
 import { ReleaseEmailAddressButton } from './ReleaseEmailAddressButton';
 
-const VALID_TABS = ['billing', 'organizations', 'kiloclaw', 'gastown', 'admin-tools'] as const;
+const VALID_TABS = ['billing', 'organizations', 'kiloclaw', 'admin-tools'] as const;
 type Tab = (typeof VALID_TABS)[number];
 const isValidTab = (value: string | null): value is Tab =>
   value !== null && (VALID_TABS as readonly string[]).includes(value);
@@ -69,9 +68,6 @@ export function UserAdminTabbedSections(
           <TabsTrigger value="kiloclaw" className={tabTriggerClass}>
             KiloClaw
           </TabsTrigger>
-          <TabsTrigger value="gastown" className={tabTriggerClass}>
-            Gas Town
-          </TabsTrigger>
           <TabsTrigger value="admin-tools" className={tabTriggerClass}>
             Admin Tools
           </TabsTrigger>
@@ -98,10 +94,6 @@ export function UserAdminTabbedSections(
           <div className="grid grid-cols-1 gap-8 lg:grid-cols-4">
             <UserAdminKiloClaw userId={user.id} />
           </div>
-        </TabsContent>
-
-        <TabsContent value="gastown" className="mt-4">
-          <UserAdminGastown userId={user.id} />
         </TabsContent>
 
         <TabsContent value="admin-tools" className="mt-4">

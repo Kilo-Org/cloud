@@ -248,6 +248,7 @@
     "confirmDeletion": "ړنګول تایید کړئ",
     "credits": "کریډیټ",
     "failedToLoadBalance": "بیلانس بار نه شو. د بیا هڅې لپاره ټک وکړئ.",
+    "balanceLoadFailed": "بیلانس بار نه شو",
     "hideBalance": "بیلانس پټ کړئ",
     "showBalance": "بیلانس ښکاره کړئ",
     "balanceHidden": "بیلانس پټ دی",
@@ -331,7 +332,6 @@
     "noFilesChangedDescription": "په دې پل ریکویسټ کې هېڅ فایل نه دی بدل شوی.",
     "fileList": {
       "openNavigator": "د فایلونو نیویګیټر پرانیزئ",
-      "filesViewed": "فایلونه · له {{total}} څخه {{viewed}} لیدل شوي",
       "listed": "(په لړلیک کې)",
       "layout": "ترتیب",
       "unified": "یوځای",
@@ -2293,6 +2293,7 @@
       "emptyDescription": "د پیل لپاره لاندې یو پیغام واستوئ.",
       "scrollToBottom": "د پاڼې پای ته ورشئ",
       "emptyTitle": "تر اوسه پیغامونه نشته",
+      "emptyReadOnlyTitle": "په دې ناسته کې پیغامونه نشته",
       "renameAccessibility": "د ناستې نوم بدل کړئ: {{title}}",
       "cloningSession": "د ناستې کاپي جوړېږي",
       "couldNotLoadThisSession": "دا ناسته بار نه شوه.",
@@ -2392,7 +2393,7 @@
       "selectRepositoryToStart": "د پیل لپاره یو زېرمتون وټاکئ.",
       "enterPromptToStart": "د پیل لپاره یو پرامپټ اضافه کړئ.",
       "enterPromptOrFileToStart": "د پیل لپاره یو پرامپټ یا فایل اضافه کړئ.",
-      "connectProviderToStart": "د پیل لپاره د خدمت چمتو کوونکی ونښلوئ.",
+      "connectProviderToStart": "زېرمتونونه د GitHub، GitLab یا Bitbucket له نښلول شوي حسابه راځي.",
       "promptPlaceholder": "غواړئ پر څه کار وکړئ؟",
       "couldNotLoadModels": "ماډلونه بار نه شول.",
       "prefillRepoAndModelUnavailable": "د اصلي ناستې زېرمتون او ماډل نور د لاسرسي وړ نه دي. لاندې یې غوره کړئ.",
@@ -2991,7 +2992,6 @@
   },
   "addCredits": {
     "cta": "کریډیټ زیات کړئ",
-    "description": "د کارونې د دوام لپاره کریډیټ زیات کړئ.",
     "billingPage": "د بلونو پاڼه"
   },
   "deviceSessions": {

@@ -22,6 +22,11 @@ jest.mock('@/lib/stripe', () => ({
 
 jest.mock('@kilocode/web-shared/lib/stripe-client', () => ({
   client: {
+    checkout: {
+      sessions: {
+        retrieve: jest.fn(),
+      },
+    },
     subscriptionSchedules: {
       create: jest.fn(),
       retrieve: jest.fn(),
@@ -211,10 +216,44 @@ function duplicateAttachmentError() {
 }
 
 let user: User;
+let outsider: User;
+
+const organizationCustomerId = `cus_${randomUUID()}`;
+const organizationWithoutCustomerId = randomUUID();
 
 async function changeBillingCycle() {
   const caller = organizationsSubscriptionRouter.createCaller({ user, headersList: new Headers() });
   return caller.changeBillingCycle({ organizationId, targetCycle: 'annual' });
+}
+
+async function getSessionStatus(
+  input: { organizationId: string; sessionId: string },
+  callerUser: User = user
+) {
+  const caller = organizationsSubscriptionRouter.createCaller({
+    user: callerUser,
+    headersList: new Headers(),
+  });
+  return caller.getByStripeSessionId(input);
+}
+
+/**
+ * A test fixture, not provider input: `retrieve` answers `Stripe.Response`, and the
+ * router reads only these fields, so the cast fills the response envelope.
+ */
+function checkoutSession(params: {
+  customer: string | null;
+  paymentStatus?: Stripe.Checkout.Session['payment_status'];
+  subscription?: string | null;
+}): Stripe.Response<Stripe.Checkout.Session> {
+  return {
+    id: `cs_${randomUUID()}`,
+    object: 'checkout.session',
+    customer: params.customer,
+    payment_status: params.paymentStatus ?? 'paid',
+    subscription: params.subscription ?? null,
+    lastResponse: { headers: {}, requestId: `req_${randomUUID()}`, statusCode: 200 },
+  } as Stripe.Response<Stripe.Checkout.Session>;
 }
 
 async function expectOriginalFailure(error: Error) {
@@ -229,14 +268,26 @@ async function expectOriginalFailure(error: Error) {
 
 beforeAll(async () => {
   user = await insertTestUser();
+  outsider = await insertTestUser();
   await db.insert(organizations).values({
     id: organizationId,
     name: 'Billing cycle race regression',
     created_by_kilo_user_id: user.id,
+    stripe_customer_id: organizationCustomerId,
   });
   await db
     .insert(organization_memberships)
     .values({ organization_id: organizationId, kilo_user_id: user.id, role: 'owner' });
+  await db.insert(organizations).values({
+    id: organizationWithoutCustomerId,
+    name: 'Organization without a Stripe customer',
+    created_by_kilo_user_id: user.id,
+  });
+  await db.insert(organization_memberships).values({
+    organization_id: organizationWithoutCustomerId,
+    kilo_user_id: user.id,
+    role: 'owner',
+  });
   await db.insert(organization_seats_purchases).values({
     organization_id: organizationId,
     subscription_stripe_id: subscriptionId,
@@ -254,6 +305,7 @@ beforeEach(() => {
   jest.mocked(retrieveSubscription).mockResolvedValueOnce(subscription);
   jest.mocked(client.subscriptionSchedules.create).mockReset();
   jest.mocked(client.subscriptionSchedules.retrieve).mockReset();
+  jest.mocked(client.checkout.sessions.retrieve).mockReset();
 });
 
 describe('concurrent organization billing cycle changes', () => {
@@ -336,5 +388,98 @@ describe('concurrent organization billing cycle changes', () => {
     jest.mocked(retrieveSubscription).mockRejectedValueOnce(new Error('Read failed'));
 
     await expectOriginalFailure(error);
+  });
+});
+
+describe('checkout session status of an organization', () => {
+  const notFound = {
+    code: 'NOT_FOUND',
+    message: 'Checkout session not found or payment not completed',
+  };
+
+  it('returns the status of a paid checkout of the caller organization', async () => {
+    jest
+      .mocked(client.checkout.sessions.retrieve)
+      .mockResolvedValue(
+        checkoutSession({ customer: organizationCustomerId, subscription: subscriptionId })
+      );
+
+    await expect(
+      getSessionStatus({ organizationId, sessionId: 'cs_paid_own_org' })
+    ).resolves.toEqual({ status: 'paid' });
+
+    expect(client.checkout.sessions.retrieve).toHaveBeenCalledWith('cs_paid_own_org');
+    expect(retrieveSubscription).toHaveBeenCalledWith(subscriptionId);
+  });
+
+  it('answers not found for an unpaid checkout of the caller organization', async () => {
+    jest
+      .mocked(client.checkout.sessions.retrieve)
+      .mockResolvedValue(
+        checkoutSession({ customer: organizationCustomerId, paymentStatus: 'unpaid' })
+      );
+
+    await expect(
+      getSessionStatus({ organizationId, sessionId: 'cs_unpaid_own_org' })
+    ).rejects.toMatchObject(notFound);
+    expect(retrieveSubscription).not.toHaveBeenCalled();
+  });
+
+  it('answers the same not found for a paid checkout of another organization', async () => {
+    jest
+      .mocked(client.checkout.sessions.retrieve)
+      .mockResolvedValue(
+        checkoutSession({ customer: `cus_${randomUUID()}`, subscription: subscriptionId })
+      );
+
+    await expect(
+      getSessionStatus({ organizationId, sessionId: 'cs_paid_other_org' })
+    ).rejects.toMatchObject(notFound);
+    expect(retrieveSubscription).not.toHaveBeenCalled();
+  });
+
+  it('refuses a caller outside the organization before reading the checkout', async () => {
+    await expect(
+      getSessionStatus({ organizationId, sessionId: 'cs_outsider' }, outsider)
+    ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+
+    expect(client.checkout.sessions.retrieve).not.toHaveBeenCalled();
+  });
+
+  it('answers not found when the provider has no such checkout session', async () => {
+    jest.mocked(client.checkout.sessions.retrieve).mockRejectedValue(
+      new Stripe.errors.StripeInvalidRequestError({
+        type: 'invalid_request_error',
+        code: 'resource_missing',
+        message: 'No such checkout.session',
+      })
+    );
+
+    await expect(
+      getSessionStatus({ organizationId, sessionId: 'cs_unknown' })
+    ).rejects.toMatchObject(notFound);
+  });
+
+  it('keeps a provider transport failure as an internal error', async () => {
+    jest.mocked(client.checkout.sessions.retrieve).mockRejectedValue(
+      new Stripe.errors.StripeConnectionError({
+        message: 'An error occurred with our connection',
+      })
+    );
+
+    await expect(
+      getSessionStatus({ organizationId, sessionId: 'cs_transport' })
+    ).rejects.toMatchObject({ code: 'INTERNAL_SERVER_ERROR' });
+  });
+
+  it('answers not found for an organization without a Stripe customer', async () => {
+    await expect(
+      getSessionStatus({
+        organizationId: organizationWithoutCustomerId,
+        sessionId: 'cs_no_customer',
+      })
+    ).rejects.toMatchObject(notFound);
+
+    expect(client.checkout.sessions.retrieve).not.toHaveBeenCalled();
   });
 });

@@ -248,6 +248,7 @@
     "confirmDeletion": "Konfime efasman",
     "credits": "Kredi",
     "failedToLoadBalance": "Nou pa t ka chaje balans lan. Peze pou eseye ankò.",
+    "balanceLoadFailed": "Nou pa t ka chaje balans lan",
     "hideBalance": "Kache balans",
     "showBalance": "Montre balans",
     "balanceHidden": "Balans kache",
@@ -331,7 +332,6 @@
     "noFilesChangedDescription": "Pa gen chanjman nan fichye yo nan demann fizyon sa a.",
     "fileList": {
       "openNavigator": "Louvri navigatè fichye a",
-      "filesViewed": "Fichye · {{viewed}} sou {{total}} deja wè",
       "listed": "(nan lis la)",
       "layout": "Dispozisyon",
       "unified": "Inifye",
@@ -2293,6 +2293,7 @@
       "emptyDescription": "Voye yon mesaj anba a pou kòmanse.",
       "scrollToBottom": "Desann jis anba",
       "emptyTitle": "Pa gen mesaj ankò",
+      "emptyReadOnlyTitle": "Pa gen mesaj nan sesyon sa a",
       "renameAccessibility": "Chanje non sesyon an: {{title}}",
       "cloningSession": "Ap klone sesyon an",
       "couldNotLoadThisSession": "Nou pa t ka chaje sesyon sa a.",
@@ -2392,7 +2393,7 @@
       "selectRepositoryToStart": "Chwazi yon depo pou kòmanse.",
       "enterPromptToStart": "Ajoute yon pwomt pou kòmanse.",
       "enterPromptOrFileToStart": "Ajoute yon pwomt oswa yon fichye pou kòmanse.",
-      "connectProviderToStart": "Konekte yon founisè pou kòmanse.",
+      "connectProviderToStart": "Depo yo soti nan yon kont GitHub, GitLab, oswa Bitbucket ki konekte.",
       "promptPlaceholder": "Sou ki sa ou ta renmen travay?",
       "couldNotLoadModels": "Nou pa t ka chaje modèl yo.",
       "prefillRepoAndModelUnavailable": "Depo ak modèl sesyon orijinal la pa disponib ankò. Chwazi lòt anba a.",
@@ -2991,7 +2992,6 @@
   },
   "addCredits": {
     "cta": "Ajoute kredi",
-    "description": "Ajoute kredi pou kontinye itilize sèvis la.",
     "billingPage": "paj faktirasyon an"
   },
   "deviceSessions": {

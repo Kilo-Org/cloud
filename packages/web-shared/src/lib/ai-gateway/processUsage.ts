@@ -1,4 +1,5 @@
 import { OPENAI_CHATGPT_PROVIDER_ID } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/provider-id';
+import { CLAUDE_BILLING_PROVIDER_ID } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/provider-id';
 import { randomUUID } from 'crypto';
 import { db, isUSRegion } from '../drizzle';
 import { recordUsageInPrimaryRegion } from './usage-record-client';
@@ -1272,7 +1273,9 @@ export function countAndStoreUsage(
   };
 
   const usesUserCredentials =
-    usageContext.user_byok || usageContext.provider === OPENAI_CHATGPT_PROVIDER_ID;
+    usageContext.user_byok ||
+    usageContext.provider === OPENAI_CHATGPT_PROVIDER_ID ||
+    usageContext.provider === CLAUDE_BILLING_PROVIDER_ID;
 
   if (clonedReponse.body) {
     if (usageContext.api_kind === 'responses') {

@@ -97,7 +97,7 @@ does not require this credential.
 
 ### Analytics & Monitoring
 
-- `NEXT_PUBLIC_POSTHOG_KEY` - PostHog public API key for client-side analytics; used in `apps/web/src/components/PostHogProvider.tsx`. [PUBLIC]
+- `NEXT_PUBLIC_POSTHOG_KEY` - PostHog public project key for client analytics and server feature evaluation. Configure the same project for the web app and AI gateway. The web app has a tracked public default in `apps/web/.env`; verify runtime configuration in both deployments before rollout. [PUBLIC]
 - `NEXT_PUBLIC_POSTHOG_DEBUG` - Enables PostHog debug logging; checked in `apps/web/src/components/PostHogProvider.tsx` and `apps/web/src/lib/stytch.ts`. [PUBLIC]
 - `POSTHOG_PERSONAL_API_KEY` - PostHog personal API key used by user-deletion PostHog cleanup. `[SECRET]`
 - `POSTHOG_ENVIRONMENT_ID` - PostHog project/environment ID used by user-deletion PostHog cleanup. [SERVER]
@@ -158,13 +158,6 @@ Usage-accounting transport is selected from deployment labels alone: staging wit
 - `NATIVE_RESOURCE_TOKENS_ENABLED` - Set to exact `true` to permit fresh native adoption of separate one-hour API/gateway access tokens only for clients explicitly requesting `api-gateway-v1`, provided `SHARED_RESOURCE_TOKENS_ENABLED` is also exact `true`. Default-off. Unsupported clients keep legacy responses. Turning this flag off affects subsequent native issuance/refreshes only; active modern device credentials can continue receiving bounded control tokens while their owned device session and current user pepper remain valid. [SERVER]
 - `SHARED_RESOURCE_TOKENS_ENABLED` - Master default-off readiness gate. Fresh modern producer issuance requires both this flag and its family flag below to be exact `true`; unset or any other value disables adoption. Native adoption separately requires `NATIVE_RESOURCE_TOKENS_ENABLED` and this master, independent of producer families; old CLI negotiation is unchanged. These flags do not revoke existing credentials. Valid modern device access credentials retain bounded control issuance after rollback, with current owned-session, pepper, and requested organization membership validation and a one-hour/parent-expiry cap. Chat likewise retains bounded three-audience issuance for validated modern devices; modern credentials never fall back to broad legacy tokens. Persisted modern workload renewal does not use adoption gates. Separately deployed readers/producers must be verified before activation. [SERVER]
 - `CLOUD_AGENT_RESOURCE_TOKENS_ENABLED` - Default-off family gate for Cloud Agent Next request control and workflow control tokens; requires the master and exact `true`. [SERVER]
-- `GASTOWN_RESOURCE_TOKENS_ENABLED` - Default-off family gate for Gastown control tokens; requires the master and exact `true`. This is not a safe-activation declaration: known ingest-audience and live-token-transport blockers remain deferred. [SERVER]
-- `WASTELAND_RESOURCE_TOKENS_ENABLED` - Default-off family gate for Wasteland control tokens; requires the master and exact `true`. [SERVER]
-- `WORKER_ADMIN_LEGACY_CLAIM_ISSUANCE` - `on` by default. Controls whether `/api/gastown/token`, `/api/wasteland/token`, Wasteland server resolution, and the admin Gastown REST client still put `isAdmin` on the ordinary Worker identity token. Set to `off` only during the legacy drain; Workers independently cap any legacy `isAdmin` claim at one hour and reject dateless claims. [SERVER]
-- `WORKER_ADMIN_CAPABILITY_ISSUANCE` - Default off; requires exact `on`. Enables minting short-lived ES256 Worker admin capabilities from a browser session endpoint. Must stay off until session-bound MFA step-up (PR2) is live; the interim actor adapter always fails closed. [SERVER]
-- `WORKER_ADMIN_CAPABILITY_PRIVATE_JWK` - `[SECRET]` ES256 private JWK (with `kid`) used to sign Worker admin capabilities. Never commit a private key; rotate by publishing a new `kid` before signing with it. [SECRET]
-- `WORKER_ADMIN_CAPABILITY_PUBLIC_KEYS` - Worker-side JSON JWKS (`{"keys":[...]}`) of public capability keys, including retired keys during rotation. [SERVER]
-- `LEGACY_ADMIN_CLAIM_MODE` - Worker-side `honor` (default), `observe`, or `reject`. `honor` keeps legacy `isAdmin` support access; `observe` grants but emits `observe_would_deny`; `reject` stops granting legacy admin. Applies to both Gastown and Wasteland. [SERVER]
 - `CHAT_RESOURCE_TOKENS_ENABLED` - Default-off family gate for fresh chat resource issuance; requires the master and exact `true`. Validated modern devices retain chat/event-service/notifications issuance after rollback, capped by one hour and parent expiry. [SERVER]
 - `DELEGATED_RESOURCE_TOKENS_ENABLED` - Default-off family gate for explicit API, gateway, and attribution delegation, including the organization user-token resource route; requires the master and exact `true`. Disabled explicit delegation remains unavailable. [SERVER]
 - `WORKFLOW_GATEWAY_RESOURCE_TOKENS_ENABLED` - Default-off family gate for server workflow gateway tokens; requires the master and exact `true`. [SERVER]
@@ -184,6 +177,48 @@ Usage-accounting transport is selected from deployment labels alone: staging wit
 - `OPENAI_DISCOVERY_URL` - Optional override for the OpenAI OpenID Connect discovery document; defaults to the production issuer's document. [SERVER]
 - `OPENAI_TOKEN_ENDPOINT` - Optional override for the OpenAI token endpoint; defaults to the production issuer's endpoint. [SERVER]
 - `OPENAI_CHATGPT_API_URL` - Optional override for the base URL that token-sharing requests use with a "Sign in with ChatGPT" connection; defaults to `https://api.openai.com/v1`. Set it wherever `OPENAI_DISCOVERY_URL`/`OPENAI_TOKEN_ENDPOINT` are overridden, so delegated inference stays in the same environment as the token issuer. [SERVER]
+- `CLAUDE_SIGN_IN_CLIENT_ID` - Client ID of the "Sign in with Claude" OAuth app in the Claude Console. Register `<APP_URL>/api/auth/callback/claude` as its redirect URI. The Claude provider is registered only when this value is set. The person-targeted PostHog release toggle `claude-platform-oauth` controls sign-in, account linking, Linked billing with Claude Platform, and customer-billed inference. [SERVER]
+- `CLAUDE_SIGN_IN_ASSERTION_AUDIENCE` - The audience that the sign-in app's **Client authentication** tab shows; the `aud` of its client assertions. [SERVER]
+- `CLAUDE_FEDERATION_ISSUER` - The issuer URL of Kilo's federation issuer registered with Anthropic (inline JWKS); the `iss` of every Kilo-signed Claude JWT. [SERVER]
+- `CLAUDE_FEDERATION_SUBJECT` - The `sub` of every Kilo-signed Claude JWT; must match the subject pattern of the OAuth apps and the federation rule. [SERVER]
+- `CLAUDE_FEDERATION_KEY_ID` - The `kid` of the federation signing key, as registered in the inline JWKS. [SERVER]
+- `CLAUDE_FEDERATION_PRIVATE_KEY` - PKCS#8 PEM of Kilo's P-256 federation signing key; `\n` escapes are accepted. Anthropic holds only the public key. `[SECRET]`
+- `CLAUDE_OIDC_ISSUER` - Optional override for the Claude ID-token issuer and discovery base; defaults to `https://identity.anthropic.com/users`. Set it only for the local stub (`pnpm dev:mock-anthropic`). [SERVER]
+- `CLAUDE_AUTH_BASE_URL` - Optional override for the Claude authorization server; defaults to `https://auth.claude.com`. Set it only for the local stub. [SERVER]
+- `CLAUDE_API_BASE_URL` - Optional override for the Claude API; defaults to `https://api.anthropic.com`. Set it only for the local stub. [SERVER]
+- `CLAUDE_BILLING_CLIENT_ID` - Client ID of the Claude OAuth app for Linked billing with Claude Platform. It links customer organizations. Register `<APP_URL>/claude/billing/callback` as its redirect URI. [SERVER]
+- `CLAUDE_BILLING_ASSERTION_AUDIENCE` - The audience that the billing app's **Client authentication** tab shows. [SERVER]
+- `CLAUDE_OPERATOR_FEDERATION_RULE_ID`, `CLAUDE_OPERATOR_ORGANIZATION_ID`, `CLAUDE_OPERATOR_SERVICE_ACCOUNT_ID` - Identify the Kilo operator service account and the federation rule that maps Kilo-signed JWTs to it. Without them, a linked owner's requests fail with an explicit error instead of falling back to Kilo credits. [SERVER]
+- `CLAUDE_OPERATOR_WORKSPACE_ID` - Optional; needed only when the operator federation rule covers more than one workspace. [SERVER]
+- `CLAUDE_OPERATOR_TOKEN_AUDIENCE` - The audience the operator federation rule expects on the identity JWT Kilo signs. [SERVER]
+
+The `claude-platform-oauth` release toggle defaults to off and requires the boolean value `true`, including in development.
+The employee rollout targets person property `email` ending in `@kilocode.ai`, at 100% of that audience only.
+Every server evaluation supplies `personProperties.email`; results are not globally cached or shared between people.
+Sign-in checks the validated provider email only when `email_verified` is boolean `true`.
+Account linking and billing approval routes also check the authenticated person's current database email.
+Explicit Claude account links require a matching pending link and a current browser session, including its revocation check.
+They bind the verified provider subject, not the provider email, and preserve the initiating browser session.
+An explicit link does not require an email-verification claim and cannot create an account or link accounts by email.
+Gateway requests check the authenticated requester's database email, including organization-scoped requests, after the authoritative payer lookup.
+Missing email or failed evaluation denies access; there is no development bypass.
+Claude authentication refusals log a fixed reason and allowlisted claim names, never identity values or tokens.
+Anonymous visitors can discover Claude through the existing email-first flow without an identified browser PostHog person.
+The submitted discovery email controls offered methods only; ordinary sign-in independently authorizes the verified provider email.
+The shared server PostHog client deliberately returns no flags outside production, so enabled local server paths require test fixtures.
+Use the focused Claude tests for enabled server behavior and browser-only SDK overrides for UI checks.
+Browser overrides do not bypass the server gate. Do not enable the live rollout for local testing.
+When disabled, linked owners cannot use customer-billed inference; requests fail explicitly rather than switch payer.
+Existing link status and removal stay available, while new links and linking again remain hidden and refused.
+
+Customer-billed Claude requests require a current link check. Frankfurt reads the authoritative link directly.
+The US gateway delegates this check to the web application with `INTERNAL_API_SECRET`.
+A failed check returns a retryable error; it never selects another payer.
+Keep the internal secret consistent across both applications before enabling customer billing.
+Provider billing failures remain customer failures, including spend-limit refusals.
+A generic permission refusal does not disable the link. Only explicit profile refusals trigger that transition.
+Account erasure retries temporary remote cleanup failures before deleting the stored profile identifier.
+
 - `GITHUB_CLIENT_ID` - GitHub OAuth app client ID. `[PUBLIC]`
 - `GITHUB_CLIENT_SECRET` - GitHub OAuth app client secret. `[SECRET]`
 - `GITHUB_APP_ID` - GitHub App ID; used in integration adapter and tests. `[SECRET]`
@@ -207,11 +242,9 @@ The connection-role migration preserves a sole eligible connection, prefers an u
   - Keep disabled for at least one OAuth state TTL (10 minutes) after deploying reservation-aware callbacks so purpose-less states issued by the previous version can complete.
   - During the migration-to-app promotion window, old pending-install callbacks may fail against the replaced pending indexes. Keep the window brief, monitor deploy health, and retry the GitHub connection after promotion completes.
 - `GITHUB_ADMIN_STATS_TOKEN` - Token for admin GitHub API stats lookups; used in `apps/web/src/scripts/backfill-pr-author-github-ids.ts`. `[SECRET]`
-- `GITHUB_CLI_PAT` - GitHub personal access token for `gh` CLI operations inside contractors; used in `services/gastown/container/src/process-manager.ts`. `[SECRET]`
-- `GITHUB_TOKEN` - Generic GitHub token for API calls used as fallback when `GIT_TOKEN` or `GITHUB_CLI_PAT` is absent; used in `services/gastown/container/src/process-manager.ts`. `[SECRET]`
 - `GH_TOKEN` - Short alias used by GitHub CLI processes. `[SECRET]`
 - `GITHUB_USER_TOKEN_SOURCE_METADATA_ENABLED` - Enables App source/refresh metadata in git-token-service responses after tolerant web readers deploy. Defaults to disabled; provided-token responses always carry this metadata. `[SERVER]`
-- `GIT_TOKEN` - Dynamic git credential token (often a GitHub App installation token) scoped for git clone/push; propagated from Town DO to containers in `services/gastown/src/dos/town/container-dispatch.ts` and `services/gastown/container/src/agent-runner.ts`. `[SECRET]`
+- `GIT_TOKEN` - Dynamic git credential token (often a GitHub App installation token) scoped for git clone/push; consumed by the Cloud Agent Next wrapper in `services/cloud-agent-next/wrapper/src/control-plane/prepare.ts`. `[SECRET]`
 - `GOOGLE_WORKSPACE_OAUTH_CLIENT_ID` - Google Workspace OAuth client ID; used in tests and integration code. [PUBLIC]
 - `GOOGLE_WORKSPACE_OAUTH_CLIENT_SECRET` - Google Workspace OAuth client secret. `[SECRET]`
 - `GOOGLE_WORKSPACE_OAUTH_REDIRECT_URI` - Redirect URI for Google Workspace OAuth flow. [SERVER]
@@ -239,7 +272,6 @@ The connection-role migration preserves a sole eligible connection, prefers an u
 - `DOLTHUB_APP_CLIENT_SECRET` - DoltHub OAuth app client secret. `[SECRET]`
 - `DOLTHUB_APP_DEV_CLIENT_ID` - Dev-only DoltHub OAuth client ID; used in `apps/web/.env.test`. `[PUBLIC]`
 - `DOLTHUB_APP_DEV_CLIENT_SECRET` - Dev-only DoltHub OAuth client secret; used in `apps/web/.env.test`. `[SECRET]`
-- `DOLTHUB_TOKEN` - DoltHub personal access token; used by the `wl-sdk` package for Dolt operations. `[SECRET]`
 
 ### Billing & Stripe
 
@@ -347,17 +379,13 @@ admission responses within the same slot and deadline.
 - `AUTO_ROUTING_DECISION_SECRET` - HMAC secret the AI gateway uses to verify `x-kilo-auto-decision` custom router decisions signed by the auto-routing worker (ADR 0005). Must match the worker's `AUTO_ROUTING_DECISION_SECRET` Secrets Store binding. When unset, the gateway answers requests that carry the header with HTTP 503. `[SECRET]`
 - `USER_DATA_EXPORT_WORKER_URL` - Internal user data export Worker URL. Production: `https://user-data-export.kilosessions.ai`; local development is generated by `dev:env`. [SERVER]
 - `NEXT_PUBLIC_SESSION_INGEST_WS_URL` - WebSocket URL for session ingest from the browser. [PUBLIC]
-- `NEXT_PUBLIC_SESSION_SYNC_URL` - Optional native-v2 remote demo relay URL. Defaults to `https://session-sync.kiloapps.io`; set `http://localhost:8817` for the isolated local session-sync Worker. The client-only `native-remote-web` PostHog flag hides `/native-remote` when off; it never changes server authorization. [PUBLIC]
+- `NEXT_PUBLIC_SESSION_SYNC_URL` - Optional development-only native remote preview relay URL, defaulting to `http://localhost:8817` for the isolated local session-sync Worker. `/native-remote`, its credential endpoint, and its CSP connection permissions require `NODE_ENV=development`; production feature flags cannot enable the preview. This does not change the native CLI or session-sync service endpoints. [PUBLIC]
 - `CODE_REVIEW_WORKER_URL` - URL for the code review worker. [SERVER]
 - `CODE_REVIEW_WORKER_AUTH_TOKEN` - Auth token for the code review worker. `[SECRET]`
 - `KILOCLAW_API_URL` - Base URL for KiloClaw API; used heavily by `apps/web/src/routers/kiloclaw-router.ts` and tests. [SERVER]
 - `CLOUD_AGENT_NEXT_API_URL` - URL for the Cloud Agent Next API. [SERVER]
 - `NEXT_PUBLIC_CLOUD_AGENT_NEXT_WS_URL` - WebSocket URL for Cloud Agent Next from the browser. [PUBLIC]
 - `CLOUD_AGENT_R2_ATTACHMENTS_BUCKET_NAME` - R2 bucket for cloud agent file attachments. [SERVER]
-- `GASTOWN_SERVICE_URL` - URL for the Gastown service. [SERVER]
-- `GASTOWN_BILLING_ENABLED` - Enables Gastown container usage billing _enforcement_: admission checks and low-balance stops. Does not control metering — usage is always reported to the meter whenever the `CONTAINER_USAGE` binding is present. Enabled in the Gastown Wrangler development environment and defaults to `false` in production. [SERVER]
-- `GASTOWN_BILLING_ANNOUNCEMENT_ENABLED` - Set to exactly `true` to show the upcoming usage-based container billing announcement on Gastown town overview pages. Always enabled when Next.js runs in development and defaults to off otherwise. [SERVER]
-- `NEXT_PUBLIC_GASTOWN_URL` - Client-side base URL for Gastown. [PUBLIC]
 - `O11Y_SERVICE_URL` - URL for the observability (O11Y) service. [SERVER]
 - `O11Y_KILO_GATEWAY_CLIENT_SECRET` - Client secret for the O11Y Kilo Gateway. `[SECRET]`
 - `BOUNCER_URL` - Bouncer Worker URL. Defaults to `https://bouncer.kiloapps.io` in production. Every inference endpoint awaits one decide immediately before its provider request. [SERVER]
@@ -464,7 +492,6 @@ When `VERCEL_TARGET_ENV` is absent in local development or a script process, tra
 - `ENKRYPT_PUBLICATION_ENABLED` - Exposes stored Enkrypt scores through public model catalogs and model-statistics endpoints only when exactly `true`; defaults to disabled. Does not enable ingestion. Keep disabled until redistribution approval and the release gates in [Enkrypt operations](docs/enkrypt-sync-operations.md) are satisfied. Disabling suppresses existing and cached scores after the updated deployment is serving traffic; previously delivered client responses cannot be recalled. [SERVER]
 - `KILOCLAW_BILLING_ENFORCEMENT` - Feature flag controlling KiloClaw billing enforcement. [SERVER]
 - `BRIEFING_DEBUG` - Enables verbose debug logging for the KiloClaw morning briefing plugin; checked in `services/kiloclaw/plugins/kiloclaw-morning-briefing/src/index.ts`. [SERVER]
-- `KILOCLAW_DISABLE_AI_COAUTHOR` - Disables AI co-author features in Gastown; checked in `services/gastown/container/src/control-server.ts`. [SERVER]
 - `KILOCLAW_GOOGLE_LEGACY_MIGRATION_FAILED` - Set when the legacy Google migration flow fails in the KiloClaw controller. [SERVER]
 - `KILOCLAW_GOOGLE_LEGACY_MIGRATION_REASON` - Human-readable reason for legacy Google migration failure in the KiloClaw controller. [SERVER]
 - `IMPACT_ADVOCATE_DEBUG_LOGGING` - Enables verbose Impact Advocate debug logs. [SERVER]
@@ -546,11 +573,11 @@ The key is team-scoped for all topics and valid in both the sandbox and producti
 - `KILOCODE_API_BASE_URL` - KiloCode API base URL for the customizer plugin. [SERVER]
 - `KILOCODE_ORGANIZATION_ID` - Organization ID for KiloCode API calls. [SERVER]
 - `OPENCODE_CONFIG_CONTENT` - JSON/Toml/YAML string containing OpenCode configuration injected into agent environments at runtime (used as an alternative to `KILO_CONFIG_CONTENT`). [SERVER]
-- `KILO_CONFIG_CONTENT` - JSON/Toml/YAML string containing Kilo configuration injected into agent environments at runtime (session config, skills, etc.); read by `@kilocode/sdk` and Gastown process manager. [SERVER]
+- `KILO_CONFIG_CONTENT` - JSON/Toml/YAML string containing Kilo configuration injected into agent environments at runtime (session config, skills, etc.); read by `@kilocode/sdk`. [SERVER]
 
 ### Cloud Agent Services
 
-- `KILOCODE_TOKEN` - Auth token for KiloCode/Session service identity; used by the Cloud Agent Next wrapper and Gastown containers. `[SECRET]`
+- `KILOCODE_TOKEN` - Auth token for KiloCode/Session service identity; used by the Cloud Agent Next wrapper. `[SECRET]`
 - `KILOCODE_TOKEN_FILE` - Path to a file containing the KiloCode token (alternative to the env var). [SERVER]
 - `KILO_SESSION_INGEST_URL` - URL used by the Cloud Agent Next wrapper to ingest session data. [SERVER]
 - `KILO_PLATFORM` - Target platform identifier used by the Cloud Agent Next wrapper (`darwin`, `linux`, etc.). [SERVER]
@@ -564,21 +591,6 @@ The key is team-scoped for all topics and valid in both the sandbox and producti
 - `PREVIEW_HOST_SUFFIX` - Hostname suffix the Cloud Agent Next Worker dispatches preview hosts under; a preview host is `p<port>-<workspace-uuid-hex>.<suffix>`. Unset or empty disables preview dispatch and the `/preview/open` hop, and the web app hides the preview button (it reads availability from the Worker's `getPreviewOptions`). The web app needs no preview setting. Production `wrangler.jsonc` sets `cloud-agent.kiloapps.ai`. `services/cloud-agent-next/.dev.vars.example` sets `localhost`. [SERVER]
 - `BYOC_VERCEL_IDS` - Comma-separated user or organization IDs enrolled in customer-paid Vercel compute. Empty is off; `*` enrolls both personal accounts and organizations. An enrolled owner fails closed when its ready credential is absent. [SERVER]
 - `HOME` - Reserved in `RESERVED_ENV_VARS` for cloud-agent-next session home management. [SYSTEM]
-
-### Gastown
-
-- `GASTOWN_TOWN_ID` - Unique identifier for a Gastown town (isolated environment/agent pool). [SERVER]
-- `GASTOWN_RIG_ID` - Rig (hardware profile) identifier for Gastown scheduling. [SERVER]
-- `GASTOWN_AGENT_ID` - Unique identifier for an individual Gastown agent instance. [SERVER]
-- `GASTOWN_AGENT_ROLE` - Role assigned to a Gastown agent (e.g. `coder`, `reviewer`). [SERVER]
-- `GASTOWN_API_URL` - Base URL for the Gastown control API. [SERVER]
-- `GASTOWN_CONTAINER_TOKEN` - Auth token for Gastown container authentication; refreshed via `token-refresh.ts`. `[SECRET]`
-- `GASTOWN_SESSION_TOKEN` - Per-session auth token for Gastown. `[SECRET]`
-- `GASTOWN_ORGANIZATION_ID` - Organization ID associated with the Gastown town. [SERVER]
-- `GASTOWN_GIT_AUTHOR_NAME` - Git author name used by agents in Gastown for commits. [SERVER]
-- `GASTOWN_GIT_AUTHOR_EMAIL` - Git author email used by agents in Gastown for commits. [SERVER]
-- `AGENT_IDLE_TIMEOUT_MS` - Timeout in ms before an idle Gastown agent is terminated; used in `services/gastown/container/src/process-manager.ts`. [SERVER]
-- `REFINERY_IDLE_TIMEOUT_MS` - Timeout in ms before an idle Refinery sub-process is killed; used in `services/gastown/container/src/process-manager.ts`. [SERVER]
 
 ### Auto Routing Worker
 
@@ -605,7 +617,7 @@ The key is team-scoped for all topics and valid in both the sandbox and producti
 - `WEB_BASE_URL` - Base HTTPS URL for the mobile in-app web views (e.g. `https://app.kilo.ai`). Bundled into the binary. [PUBLIC]
 - `CLOUD_AGENT_WS_URL` - WebSocket URL for Cloud Agent Next streaming in the mobile app. Bundled into the binary. [PUBLIC]
 - `SESSION_INGEST_WS_URL` - WebSocket URL for session ingest from the mobile app. Bundled into the binary. [PUBLIC]
-- `EXPO_PUBLIC_SESSION_SYNC_URL` - Optional native-v2 remote mobile demo relay URL, inlined into the JS bundle. Production builds default to `https://session-sync.kiloapps.io`; non-production builds require an explicit isolated Worker URL (for example, `http://localhost:8817`). The client-only `native-remote-mobile` flag (minimum app version `1.0.15`, default off) gates both the Profile entry and `/native-remote`. It does not change server authorization. [PUBLIC]
+- `EXPO_PUBLIC_SESSION_SYNC_URL` - Native remote preview relay URL for development bundles, inlined into the JS bundle. The preview requires `__DEV__` and an explicit isolated Worker URL, such as `http://localhost:8817`. Release bundles ignore this setting and expose neither the Profile entry nor the `/native-remote` screen. [PUBLIC]
 - `APPSFLYER_DEV_KEY` - AppsFlyer development key for mobile attribution. Bundled into the binary (not secret — it's a device-level SDK key). [PUBLIC]
 - `APPSFLYER_APP_ID` - AppsFlyer app ID for mobile attribution tracking. [PUBLIC]
 - `KILO_CHAT_URL` - Base URL for Kilo Chat in the mobile app. Bundled into the binary. [PUBLIC]

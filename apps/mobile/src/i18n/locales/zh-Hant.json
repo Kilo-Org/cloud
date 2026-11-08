@@ -248,6 +248,7 @@
     "confirmDeletion": "確認刪除",
     "credits": "點數",
     "failedToLoadBalance": "無法載入餘額。點一下即可再試一次。",
+    "balanceLoadFailed": "無法載入餘額",
     "hideBalance": "隱藏餘額",
     "showBalance": "顯示餘額",
     "balanceHidden": "餘額已隱藏",
@@ -1754,6 +1755,7 @@
       "emptyDescription": "在下方傳送訊息，即可開始。",
       "scrollToBottom": "捲動到底部",
       "emptyTitle": "尚無訊息",
+      "emptyReadOnlyTitle": "此工作階段中沒有訊息",
       "renameAccessibility": "重新命名工作階段：{{title}}",
       "cloningSession": "複製工作階段中",
       "couldNotLoadThisSession": "無法載入此工作階段。",
@@ -1853,7 +1855,7 @@
       "selectRepositoryToStart": "選取儲存庫以開始。",
       "enterPromptToStart": "新增提示詞以開始。",
       "enterPromptOrFileToStart": "新增提示詞或檔案以開始。",
-      "connectProviderToStart": "連結平台以開始。",
+      "connectProviderToStart": "儲存庫來自已連結的 GitHub、GitLab 或 Bitbucket 帳戶。",
       "promptPlaceholder": "你想處理什麼？",
       "couldNotLoadModels": "無法載入模型。",
       "prefillRepoAndModelUnavailable": "原工作階段的儲存庫與模型已無法使用。請在下方重新選取。",
@@ -2452,7 +2454,6 @@
   },
   "addCredits": {
     "cta": "加值點數",
-    "description": "加值點數，即可繼續使用。",
     "billingPage": "帳單頁面"
   },
   "deviceSessions": {
@@ -2891,7 +2892,6 @@
     },
     "fileList": {
       "filesList": "檔案清單",
-      "filesViewed": "檔案 · 已檢視 {{viewed}} / {{total}}",
       "layout": "版面配置",
       "listed": "（已列出）",
       "loadingFiles": "正在載入檔案",

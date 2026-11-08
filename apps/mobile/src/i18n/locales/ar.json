@@ -248,6 +248,7 @@
     "confirmDeletion": "تأكيد الحذف",
     "credits": "الرصيد",
     "failedToLoadBalance": "تعذّر تحميل الرصيد. اضغط لإعادة المحاولة.",
+    "balanceLoadFailed": "تعذّر تحميل الرصيد",
     "hideBalance": "إخفاء الرصيد",
     "showBalance": "إظهار الرصيد",
     "balanceHidden": "الرصيد مخفي",
@@ -1838,6 +1839,7 @@
       "emptyDescription": "أرسل رسالة أدناه للبدء.",
       "scrollToBottom": "التمرير إلى الأسفل",
       "emptyTitle": "لا توجد رسائل بعد",
+      "emptyReadOnlyTitle": "لا توجد رسائل في هذه الجلسة",
       "renameAccessibility": "إعادة تسمية الجلسة: {{title}}",
       "cloningSession": "جارٍ استنساخ الجلسة",
       "couldNotLoadThisSession": "تعذّر تحميل هذه الجلسة.",
@@ -1937,7 +1939,7 @@
       "selectRepositoryToStart": "اختر مستودعًا للبدء.",
       "enterPromptToStart": "أضِف موجِّهًا للبدء.",
       "enterPromptOrFileToStart": "أضِف موجِّهًا أو ملفًا للبدء.",
-      "connectProviderToStart": "اربط مزوّدًا للبدء.",
+      "connectProviderToStart": "تأتي المستودعات من حساب مرتبط على GitHub أو GitLab أو Bitbucket.",
       "promptPlaceholder": "ما الذي تريد العمل عليه؟",
       "couldNotLoadModels": "تعذّر تحميل النماذج.",
       "prefillRepoAndModelUnavailable": "لم يعد مستودع الجلسة الأصلية ونموذجها متاحين. اختر مستودعًا ونموذجًا أدناه.",
@@ -2580,7 +2582,6 @@
   },
   "addCredits": {
     "cta": "شحن الرصيد",
-    "description": "اشحن رصيدك لمواصلة الاستخدام.",
     "billingPage": "صفحة الفوترة"
   },
   "deviceSessions": {
@@ -3051,7 +3052,6 @@
     },
     "fileList": {
       "filesList": "قائمة الملفات",
-      "filesViewed": "الملفات · تم الاطلاع على {{viewed}} من {{total}}",
       "layout": "طريقة العرض",
       "listed": "(ضمن القائمة)",
       "loadingFiles": "جارٍ تحميل الملفات",

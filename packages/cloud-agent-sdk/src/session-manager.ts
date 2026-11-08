@@ -85,7 +85,8 @@ import { CLI_MODEL_ID, cliModelLabel } from './cli-model';
 
 type StoredMessage = { info: MessageInfo; parts: Part[] };
 type SessionManagerPromptPayload = Omit<SendPromptPayload, 'model'> & { model?: string };
-type SessionManagerSendPayload = SessionManagerPromptPayload | SendCommandPayload;
+type SessionManagerCommandPayload = Omit<SendCommandPayload, 'model'> & { model?: string };
+type SessionManagerSendPayload = SessionManagerPromptPayload | SessionManagerCommandPayload;
 /** In-session cloud-agent model pick. Separate from remoteModelOverride — no remote clear rules. */
 type CloudAgentModelOverride = {
   model: string;
@@ -3511,7 +3512,28 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     const cloudAgentModelOverride = store.get(cloudAgentModelOverrideAtom);
     let transportPayload: TransportSendPayload;
     if (input.payload.type === 'command') {
-      transportPayload = input.payload;
+      if (sessionType === 'remote') {
+        transportPayload = {
+          type: 'command',
+          command: input.payload.command,
+          arguments: input.payload.arguments,
+        };
+      } else {
+        // Mirror prompt sends: the in-session override wins over the payload,
+        // so a stale composer selection cannot bypass this source of truth.
+        const cloudModel = cloudAgentModelOverride?.model ?? input.payload.model;
+        const cloudVariant = cloudAgentModelOverride
+          ? cloudAgentModelOverride.variant
+          : input.payload.variant;
+        transportPayload = {
+          type: 'command',
+          command: input.payload.command,
+          arguments: input.payload.arguments,
+          ...(input.payload.mode ? { mode: input.payload.mode } : {}),
+          ...(cloudModel ? { model: { providerID: 'kilo', modelID: cloudModel } } : {}),
+          ...(cloudModel && cloudVariant ? { variant: cloudVariant } : {}),
+        };
+      }
     } else if (sessionType === 'remote') {
       // Capture mode for `/new` agent inheritance (Decision 6).
       if (input.payload.mode) {

@@ -248,6 +248,7 @@
     "confirmDeletion": "Qinisekisa ukususa",
     "credits": "Amakhredithi",
     "failedToLoadBalance": "Asikwazanga ukulayisha ibhalansi. Thepha ukuze uzame futhi.",
+    "balanceLoadFailed": "Asikwazanga ukulayisha ibhalansi",
     "hideBalance": "Fihla ibhalansi",
     "showBalance": "Bonisa ibhalansi",
     "balanceHidden": "Ibhalansi ifihliwe",
@@ -331,7 +332,6 @@
     "noFilesChangedDescription": "Lesi sicelo sokuhlanganisa asinazo izinguquko zamafayela.",
     "fileList": {
       "openNavigator": "Vula isitholi samafayela",
-      "filesViewed": "Amafayela · kubukwe angu-{{viewed}} kwangu-{{total}}",
       "listed": "(asohlwini)",
       "layout": "Ukwakheka",
       "unified": "Okuhlanganisiwe",
@@ -2299,6 +2299,7 @@
       "emptyDescription": "Thumela umlayezo ngezansi ukuze uqale.",
       "scrollToBottom": "Skrolela phansi",
       "emptyTitle": "Ayikho imilayezo okwamanje",
+      "emptyReadOnlyTitle": "Ayikho imilayezo kulesi seshini",
       "renameAccessibility": "Qamba kabusha iseshini: {{title}}",
       "cloningSession": "Iseshini iyakopishwa",
       "couldNotLoadThisSession": "Asikwazanga ukulayisha le seshini.",
@@ -2398,7 +2399,7 @@
       "selectRepositoryToStart": "Khetha inqolobane yekhodi ukuze uqale.",
       "enterPromptToStart": "Engeza umyalelo ukuze uqale.",
       "enterPromptOrFileToStart": "Engeza umyalelo noma ifayela ukuze uqale.",
-      "connectProviderToStart": "Xhuma umhlinzeki ukuze uqale.",
+      "connectProviderToStart": "Izinqolobane zekhodi zivela ku-akhawunti exhunyiwe ye-GitHub, ye-GitLab, noma ye-Bitbucket.",
       "promptPlaceholder": "Ungathanda ukusebenza ngani?",
       "couldNotLoadModels": "Asikwazanga ukulayisha amamodeli.",
       "prefillRepoAndModelUnavailable": "Inqolobane yekhodi nemodeli yeseshini yokuqala akusatholakali. Khetha okunye ngezansi.",
@@ -2997,7 +2998,6 @@
   },
   "addCredits": {
     "cta": "Engeza amakhredithi",
-    "description": "Engeza amakhredithi ukuze uqhubeke usebenzisa isevisi.",
     "billingPage": "ikhasi lokukhokha"
   },
   "deviceSessions": {

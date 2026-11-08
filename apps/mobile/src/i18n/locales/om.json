@@ -248,6 +248,7 @@
     "confirmDeletion": "Haquu mirkaneessi",
     "credits": "Kiriiditii",
     "failedToLoadBalance": "Haftee fe'uu hin danda'amne. Deebi'anii yaaluuf tuqi.",
+    "balanceLoadFailed": "Haftee fe'uu hin danda'amne",
     "hideBalance": "Haftee dhoksi",
     "showBalance": "Haftee agarsiisi",
     "balanceHidden": "Hafteen dhokateera",
@@ -331,7 +332,6 @@
     "noFilesChangedDescription": "Gaaffiin walitti makuu kun jijjiirama faayilii hin qabu.",
     "fileList": {
       "openNavigator": "Tarree faayilootaa bani",
-      "filesViewed": "Faayiloota · {{total}} keessaa {{viewed}} ilaalaman",
       "listed": "(tarreeffame)",
       "layout": "Teessuma",
       "unified": "Walitti makame",
@@ -2293,6 +2293,7 @@
       "emptyDescription": "Jalqabuuf gadiitti ergaa ergi.",
       "scrollToBottom": "Gara jalaatti siqsi",
       "emptyTitle": "Hanga ammaatti ergaan hin jiru",
+      "emptyReadOnlyTitle": "Turtii kana keessatti ergaan hin jiru",
       "renameAccessibility": "Maqaa turtii jijjiiri: {{title}}",
       "cloningSession": "Turtii kopii gochaa jira",
       "couldNotLoadThisSession": "Turtii kana fe'uu hin danda'amne.",
@@ -2392,7 +2393,7 @@
       "selectRepositoryToStart": "Jalqabuuf kuusaa koodii filadhu.",
       "enterPromptToStart": "Jalqabuuf gaaffii dabaladhu.",
       "enterPromptOrFileToStart": "Jalqabuuf gaaffii ykn faayilii dabaladhu.",
-      "connectProviderToStart": "Jalqabuuf waltajjii walqabsiisi.",
+      "connectProviderToStart": "Kuusaawwan koodii herrega GitHub, GitLab yookiin Bitbucket walqabate irraa dhufu.",
       "promptPlaceholder": "Maal irratti hojjechuu barbaadda?",
       "couldNotLoadModels": "Moodeloota fe'uu hin danda'amne.",
       "prefillRepoAndModelUnavailable": "Kuusaan koodii fi moodeli turtii jalqabaa kana booda hin argaman. Gadiitti isaan filadhu.",
@@ -2991,7 +2992,6 @@
   },
   "addCredits": {
     "cta": "Kiriiditii dabali",
-    "description": "Itti fayyadamuu itti fufuuf kiriiditii dabali.",
     "billingPage": "fuula kaffaltii"
   },
   "deviceSessions": {

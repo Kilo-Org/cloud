@@ -74,7 +74,7 @@ No main signer or verifier changes in Phase 1. In particular, this module does n
 - no `aud`;
 - no modern policy fields;
 - `apiTokenPepper` is present, whether a string or `null`;
-- only the exchange-safe claim names listed above; this excludes `tokenSource`, `botId`, `internalApiUse`, `createdOnPlatform`, `deviceSessionId`, `gastownAccess`, `isAdmin`, `orgMemberships`, `organizationId`, `organizationRole`, and any future or unknown claim;
+- only the exchange-safe claim names listed above; this excludes `tokenSource`, `botId`, `internalApiUse`, `createdOnPlatform`, `deviceSessionId`, `isAdmin`, `orgMemberships`, `organizationId`, `organizationRole`, and any future or unknown claim;
 - `deviceAuthRequestCode` is allowed, preserving legacy device authorization output.
 
 Known marked automation and system-style issuers fail this shape. Residual risk remains from historical or current unmarked automation that happens to match it; the class must never be labeled or relied on as definitive human identity.
@@ -92,8 +92,6 @@ This is a concrete, selective map from the shared Kilo token entry points. It do
 | Code Review | `apps/web/src/lib/code-reviews/triggers/prepare-review-payload.ts` | `services/code-review-infra/src/code-review-orchestrator.ts` forwards to Cloud Agent Next | None; default five-year token with `botId: 'reviewer'` | Cloud Agent control and downstream API/gateway boundaries | Preserve delegated workload purpose through forwarding and renewal. |
 | Security Auto Analysis | `services/security-auto-analysis/src/token.ts` | `services/security-auto-analysis/src/launch.ts`, `remediation.ts`, and `manual-analysis.ts` forward user credentials to Cloud Agent Next | None; one-hour marked user tokens and separate minimal internal assertions | Cloud Agent control and downstream API/gateway boundaries for user tokens; identify each internal assertion consumer separately | Keep internal assertions distinct from runtime user credentials. |
 | Webhook Agent Ingest | `services/webhook-agent-ingest/src/services/token-minting-service.ts` | `services/webhook-agent-ingest/src/queue-consumer.ts` forwards to Cloud Agent Next | None; one-hour personal/bot-user token branches | Cloud Agent control and downstream API/gateway boundaries | Preserve non-exchangeable classification for both personal and bot-user branches. |
-| Gastown and Wasteland control | `apps/web/src/app/api/gastown/token/route.ts`; `apps/web/src/app/api/wasteland/token/route.ts` | `services/gastown/src/middleware/kilo-auth.middleware.ts`; `services/wasteland/src/middleware/kilo-auth.middleware.ts` | None | `gastown`; `wasteland` | Keep the two control planes separate. |
-| Gastown agent runtime | `services/gastown/src/util/kilo-token.util.ts` | Kilo LLM gateway through the stored `kilocode_token` path | None | `kilo-gateway` | Runtime token is distinct from Gastown control despite its issuer. |
 | KiloClaw control and cookie | `apps/web/src/routers/kiloclaw-router.ts`; cookie minted in `services/kiloclaw/src/routes/access-gateway.ts` | `services/kiloclaw/src/auth/middleware.ts` | None | `kiloclaw` | Bearer control and 24-hour cookie share the verifier but may need different later purposes. |
 | KiloClaw runtime | `apps/web/src/routers/kiloclaw-router.ts`; reminted in `services/kiloclaw/src/durable-objects/kiloclaw-instance/config.ts` | OpenClaw KiloCode provider configuration in `services/kiloclaw/controller/src/config-writer.ts` | None | `kilo-gateway` | Separate runtime credential from KiloClaw control. |
 | Session ingest | `packages/web-shared/src/lib/tokens.ts` (`generateInternalServiceToken`) | `services/session-ingest/src/middleware/kilo-jwt-auth.ts` | Generic tokens plus unchanged deletion audience | `session-ingest` | Generic service JWT, deletion JWT, opaque web ticket, and Cloud Agent contained access are different families. |
@@ -105,7 +103,7 @@ This is a concrete, selective map from the shared Kilo token entry points. It do
 
 ## Existing markers and excluded families
 
-Core optional markers accepted by the shared schema are documented in `packages/worker-utils/src/kilo-token.ts`: `tokenSource`, `botId`, `internalApiUse`, `createdOnPlatform`, `deviceAuthRequestCode`, `deviceSessionId`, admin/Gastown flags, and organization claims.
+Core optional markers accepted by the shared schema are documented in `packages/worker-utils/src/kilo-token.ts`: `tokenSource`, `botId`, `internalApiUse`, `createdOnPlatform`, `deviceAuthRequestCode`, `deviceSessionId`, admin flags, and organization claims.
 
 - Confirmed `tokenSource` values: `cloud-agent`, `kilo-chat`, `mcp-catalog`, `internal-bot`.
 - Confirmed `botId` values: `reviewer`, `discord-bot`, `webhook-bot`.
@@ -121,7 +119,7 @@ Excluded from the credential-exchange compatibility class or treated as separate
 - encrypted Git/Kilo session capabilities, which have their own `purpose` field (for example `kilo_api_session`) in `services/git-token-service/src/kilo-session-capability.ts`;
 - container, share, repository, and MCP credentials, which require separate family-specific analysis rather than automatic migration as core Kilo API tokens.
 
-KiloClaw's five-minute control tokens (one-hour setup token), 24-hour access cookies, and 30-day runtime keys are distinct. Gastown runtime credentials also last 30 days; organization tokens last 15 minutes and internal bot tokens, including the decider benchmark's, one hour. None qualifies for the five-year exchange compatibility class.
+KiloClaw's five-minute control tokens (one-hour setup token), 24-hour access cookies, and 30-day runtime keys are distinct. Organization tokens last 15 minutes and internal bot tokens, including the decider benchmark's, one hour. None qualifies for the five-year exchange compatibility class.
 
 ## Phase 4: web readers
 
@@ -133,8 +131,6 @@ The earlier sections describe the Phase 1 contracts. The web reader integration 
 - A rejected bearer fails with `401 INVALID_TOKEN` instead of continuing anonymously. The caller presented a credential and believes it is authenticated, so answering it as anonymous would drop its account, organization, BYOK, bot, source, and billing identity, and would hide the refused credential from the client. This covers an unverifiable, expired, outdated, or revoked token, and an operation-scoped `kilo-api` token sent to a `kilo-gateway` operation; mint that token with `resource: 'gateway'` from `/api/auth/resource-token` or `/api/organizations/[id]/user-tokens`.
 
 Both resource boundaries retain supported audience-less legacy tokens. Explicit audiences require exact matching, or membership in a valid audience array; null, empty, malformed, duplicate, and mismatched audiences are rejected. These changes do not add an environment check to ordinary web authentication, alter its historical timestamp handling, or migrate any signers.
-
-The Gastown Git-credentials callback uses the general `kilo-api` boundary. Its current audience-less runtime token remains accepted, but a future gateway-only token must not retrieve Git credentials. Split those runtime credentials or explicitly authorize the necessary resource set before migrating that issuer. This callback still has its existing integration-ownership checks, not newly added general account/pepper checks.
 
 Do not treat every legacy-only verifier as a resource-migration target. Cloud Agent wrapper fallback must remain audience-less-only; REST `cloud-agent-next` tokens are not wrapper-dispatch capabilities. Existing deletion/export/Git operation audiences stay mandatory. Git user-authorization disconnect currently has a legacy-only contract and needs a dedicated operation-contract decision before its producer adopts an audience; do not widen it with the general API or gateway audience. Stored-token renewal and runtime reuse checks are separate issuer-migration work.
 
@@ -177,7 +173,7 @@ The disconnect reader accepts its dedicated operation audience or legacy audienc
 
 ### Explicit PR 5.2 allocation
 
-Gastown/Wasteland control issuers are deferred with their delegation adapters: current paths discard bearer expiry/signed restrictions into a bare user record, and Gastown can derive and renew broader 30-day runtime credentials. A source/audience stamp alone would not close that path. Modern-builder organization roles also require a deliberate compatibility decision for web `admin` memberships; do not cast or promote them to owner. The generic organization-token issuer is not proven attribution-only and is likewise deferred. User/native credentials, Chat fan-out, Cloud Agent/automation runtime forwarding, Gastown renewal, and other shared credentials remain PR 5.2 work. The separate Worker-local `services/security-auto-analysis/src/token.ts` snapshot assertion is not one of these 16 web callsites; migrate it with that Worker's other token paths and rollout configuration in PR 5.2. KiloClaw stays minimal for its October EOL. These reallocations keep Phase 5 at exactly two PRs, rather than claiming unsafe control-plane migrations are bounded.
+Modern-builder organization roles also require a deliberate compatibility decision for web `admin` memberships; do not cast or promote them to owner. The generic organization-token issuer is not proven attribution-only and is likewise deferred. User/native credentials, Chat fan-out, Cloud Agent/automation runtime forwarding, and other shared credentials remain PR 5.2 work. The separate Worker-local `services/security-auto-analysis/src/token.ts` snapshot assertion is not one of these 16 web callsites; migrate it with that Worker's other token paths and rollout configuration in PR 5.2. KiloClaw stays minimal for its October EOL. These reallocations keep Phase 5 at exactly two PRs, rather than claiming unsafe control-plane migrations are bounded.
 
 This PR does not retire legacy native exchange, shorten user credentials, change global pepper/session semantics, or remove ordinary legacy resource access.
 
@@ -249,3 +245,15 @@ user returns to an unfinished request.
 
 Deploy the shared database migration, apps/web, then the MCP worker. The worker's
 SQLite migration runs on first access to its authorization store.
+
+## GitHub GraphQL session identity
+
+GraphQL redemption preserves the credential source selected when the session capability is issued.
+Webhook runs with selected user authorization perform approvals as that user, not the installation bot.
+This is intentional: substituting an installation token changes the reviewer and can prevent approvals of bot-authored pull requests.
+
+GraphQL has no repository URL scope.
+User-source GraphQL requests retain the user's GitHub permissions; they are not restricted to the capability's repository.
+Repository-only and installation-source capabilities continue to use their scoped installation credentials.
+Redemption still checks the container binding, current authorization, integration, and recorded identity.
+If the selected user authorization disappears, redemption fails without falling back to the bot.

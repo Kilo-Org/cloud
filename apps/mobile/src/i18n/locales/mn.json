@@ -248,6 +248,7 @@
     "confirmDeletion": "Устгахыг баталгаажуулах",
     "credits": "Кредит",
     "failedToLoadBalance": "Үлдэгдлийг ачаалж чадсангүй. Дахин оролдохын тулд товшино уу.",
+    "balanceLoadFailed": "Үлдэгдлийг ачаалж чадсангүй",
     "hideBalance": "Үлдэгдэл нуух",
     "showBalance": "Үлдэгдэл харуулах",
     "balanceHidden": "Үлдэгдэл нуугдсан",
@@ -331,7 +332,6 @@
     "noFilesChangedDescription": "Энэ нэгтгэх хүсэлтэд файлын өөрчлөлт байхгүй.",
     "fileList": {
       "openNavigator": "Файлын жагсаалтыг нээх",
-      "filesViewed": "Файлууд · Үзсэн: {{viewed}} / {{total}}",
       "listed": "(жагсаасан)",
       "layout": "Харагдац",
       "unified": "Нэгдсэн",
@@ -2293,6 +2293,7 @@
       "emptyDescription": "Эхлэхийн тулд доор мессеж илгээнэ үү.",
       "scrollToBottom": "Хамгийн доош гүйлгэх",
       "emptyTitle": "Мессеж хараахан алга",
+      "emptyReadOnlyTitle": "Энэ сессид мессеж байхгүй",
       "renameAccessibility": "Сессийн нэрийг өөрчлөх: {{title}}",
       "cloningSession": "Сессийг хуулбарлаж байна",
       "couldNotLoadThisSession": "Энэ сессийг ачаалж чадсангүй.",
@@ -2392,7 +2393,7 @@
       "selectRepositoryToStart": "Эхлэхийн тулд кодын сангаа сонгоно уу.",
       "enterPromptToStart": "Эхлэхийн тулд заавар нэмнэ үү.",
       "enterPromptOrFileToStart": "Эхлэхийн тулд заавар эсвэл файл нэмнэ үү.",
-      "connectProviderToStart": "Эхлэхийн тулд үйлчилгээ үзүүлэгчийг холбоно уу.",
+      "connectProviderToStart": "Кодын сан нь холбогдсон GitHub, GitLab эсвэл Bitbucket бүртгэлээс ирдэг.",
       "promptPlaceholder": "Юун дээр ажиллах вэ?",
       "couldNotLoadModels": "Загваруудыг ачаалж чадсангүй.",
       "prefillRepoAndModelUnavailable": "Анхны сессийн кодын сан болон загварыг ашиглах боломжгүй болсон. Доороос өөр кодын сан, загвар сонгоно уу.",
@@ -2991,7 +2992,6 @@
   },
   "addCredits": {
     "cta": "Кредит нэмэх",
-    "description": "Үргэлжлүүлэн ашиглахын тулд кредит нэмнэ үү.",
     "billingPage": "төлбөрийн хуудас"
   },
   "deviceSessions": {

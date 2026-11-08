@@ -248,6 +248,7 @@
     "confirmDeletion": "Confirmer la suppression",
     "credits": "Crédits",
     "failedToLoadBalance": "Échec du chargement du solde. Touchez pour réessayer.",
+    "balanceLoadFailed": "Échec du chargement du solde",
     "hideBalance": "Masquer le solde",
     "showBalance": "Afficher le solde",
     "balanceHidden": "Solde masqué",
@@ -1680,6 +1681,7 @@
       "emptyDescription": "Envoyez un message ci-dessous pour commencer.",
       "scrollToBottom": "Aller en bas de la conversation",
       "emptyTitle": "Aucun message pour l'instant",
+      "emptyReadOnlyTitle": "Aucun message dans cette session",
       "renameAccessibility": "Renommer la session : {{title}}",
       "cloningSession": "Clonage de la session…",
       "couldNotLoadThisSession": "Impossible de charger cette session.",
@@ -1779,7 +1781,7 @@
       "selectRepositoryToStart": "Sélectionnez un dépôt pour commencer.",
       "enterPromptToStart": "Ajoutez une invite pour commencer.",
       "enterPromptOrFileToStart": "Ajoutez une invite ou un fichier pour commencer.",
-      "connectProviderToStart": "Connectez un fournisseur pour commencer.",
+      "connectProviderToStart": "Les dépôts proviennent d'un compte GitHub, GitLab ou Bitbucket connecté.",
       "promptPlaceholder": "Sur quoi souhaitez-vous travailler ?",
       "couldNotLoadModels": "Impossible de charger les modèles.",
       "prefillRepoAndModelUnavailable": "Le dépôt et le modèle de la session d'origine ne sont plus disponibles. Choisissez-en d'autres ci-dessous.",
@@ -2422,7 +2424,6 @@
   },
   "addCredits": {
     "cta": "Ajouter des crédits",
-    "description": "Ajoutez des crédits pour continuer à utiliser le service.",
     "billingPage": "page de facturation"
   },
   "deviceSessions": {
@@ -2937,7 +2938,6 @@
     },
     "fileList": {
       "filesList": "Liste des fichiers",
-      "filesViewed": "Fichiers · {{viewed}} sur {{total}} consultés",
       "layout": "Disposition",
       "listed": "(affichés)",
       "loadingFiles": "Chargement des fichiers",

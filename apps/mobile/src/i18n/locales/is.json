@@ -248,6 +248,7 @@
     "confirmDeletion": "Staðfesta eyðingu",
     "credits": "Inneign",
     "failedToLoadBalance": "Ekki tókst að hlaða inneigninni. Ýttu til að reyna aftur.",
+    "balanceLoadFailed": "Ekki tókst að hlaða inneigninni",
     "hideBalance": "Fela inneign",
     "showBalance": "Sýna inneign",
     "balanceHidden": "Inneign falin",
@@ -331,7 +332,6 @@
     "noFilesChangedDescription": "Engar skrár hafa breyst í þessari sameiningarbeiðni.",
     "fileList": {
       "openNavigator": "Opna skráayfirlit",
-      "filesViewed": "Skrár · {{viewed}} af {{total}} skoðaðar",
       "listed": "(á listanum)",
       "layout": "Framsetning",
       "unified": "Sameinað",
@@ -2293,6 +2293,7 @@
       "emptyDescription": "Sendu skilaboð hér að neðan til að byrja.",
       "scrollToBottom": "Skruna neðst",
       "emptyTitle": "Engin skilaboð ennþá",
+      "emptyReadOnlyTitle": "Engin skilaboð í þessari lotu",
       "renameAccessibility": "Endurnefna lotu: {{title}}",
       "cloningSession": "Klónar lotuna",
       "couldNotLoadThisSession": "Ekki tókst að hlaða þessari lotu.",
@@ -2392,7 +2393,7 @@
       "selectRepositoryToStart": "Veldu kóðasafn til að byrja.",
       "enterPromptToStart": "Bættu við skipun til að byrja.",
       "enterPromptOrFileToStart": "Bættu við skipun eða skrá til að byrja.",
-      "connectProviderToStart": "Tengdu þjónustuveitanda til að byrja.",
+      "connectProviderToStart": "Kóðasöfn koma frá tengdum reikningi á GitHub, GitLab eða Bitbucket.",
       "promptPlaceholder": "Hvað viltu vinna að?",
       "couldNotLoadModels": "Ekki tókst að hlaða líkönum.",
       "prefillRepoAndModelUnavailable": "Kóðasafn og líkan upprunalegu lotunnar eru ekki lengur tiltæk. Veldu ný hér að neðan.",
@@ -2991,7 +2992,6 @@
   },
   "addCredits": {
     "cta": "Bæta við inneign",
-    "description": "Bættu við inneign til að halda áfram að nota þjónustuna.",
     "billingPage": "innheimtusíðu"
   },
   "deviceSessions": {

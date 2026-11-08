@@ -248,6 +248,7 @@
     "confirmDeletion": "Conferma l'eliminazione",
     "credits": "Crediti",
     "failedToLoadBalance": "Impossibile caricare il saldo. Tocca per riprovare.",
+    "balanceLoadFailed": "Impossibile caricare il saldo",
     "hideBalance": "Nascondi saldo",
     "showBalance": "Mostra saldo",
     "balanceHidden": "Saldo nascosto",
@@ -1742,6 +1743,7 @@
       "emptyDescription": "Invia un messaggio qui sotto per iniziare.",
       "scrollToBottom": "Scorri fino in fondo",
       "emptyTitle": "Ancora nessun messaggio",
+      "emptyReadOnlyTitle": "Nessun messaggio in questa sessione",
       "renameAccessibility": "Rinomina la sessione: {{title}}",
       "cloningSession": "Clonazione in corso…",
       "couldNotLoadThisSession": "Impossibile caricare questa sessione.",
@@ -1841,7 +1843,7 @@
       "selectRepositoryToStart": "Seleziona un repository per iniziare.",
       "enterPromptToStart": "Aggiungi un prompt per iniziare.",
       "enterPromptOrFileToStart": "Aggiungi un prompt o un file per iniziare.",
-      "connectProviderToStart": "Connetti una piattaforma per iniziare.",
+      "connectProviderToStart": "I repository provengono da un account GitHub, GitLab o Bitbucket collegato.",
       "promptPlaceholder": "Su cosa vuoi lavorare?",
       "couldNotLoadModels": "Impossibile caricare i modelli.",
       "prefillRepoAndModelUnavailable": "Il repository e il modello della sessione originale non sono più disponibili. Selezionali qui sotto.",
@@ -2484,7 +2486,6 @@
   },
   "addCredits": {
     "cta": "Aggiungi crediti",
-    "description": "Aggiungi crediti per continuare a usare il servizio.",
     "billingPage": "pagina di fatturazione"
   },
   "deviceSessions": {
@@ -2931,7 +2932,6 @@
     },
     "fileList": {
       "filesList": "Elenco file",
-      "filesViewed": "File · {{viewed}} su {{total}} visualizzati",
       "layout": "Disposizione",
       "listed": "(elencati)",
       "loadingFiles": "Caricamento dei file",

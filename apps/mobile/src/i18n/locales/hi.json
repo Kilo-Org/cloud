@@ -248,6 +248,7 @@
     "confirmDeletion": "हटाने की पुष्टि करें",
     "credits": "क्रेडिट",
     "failedToLoadBalance": "बैलेंस लोड नहीं हो सका। फिर से कोशिश करने के लिए टैप करें।",
+    "balanceLoadFailed": "बैलेंस लोड नहीं हो सका",
     "hideBalance": "बैलेंस छिपाएँ",
     "showBalance": "बैलेंस दिखाएँ",
     "balanceHidden": "बैलेंस छिपा हुआ है",
@@ -1760,6 +1761,7 @@
       "scrollToBottom": "सबसे नीचे स्क्रॉल करें",
       "transcriptAccessibility": "सत्र की बातचीत का रिकॉर्ड",
       "emptyTitle": "अभी कोई संदेश नहीं",
+      "emptyReadOnlyTitle": "इस सत्र में कोई संदेश नहीं",
       "renameAccessibility": "सत्र का नाम बदलें: {{title}}",
       "cloningSession": "सत्र क्लोन किया जा रहा है",
       "couldNotLoadThisSession": "यह सत्र लोड नहीं हो सका।",
@@ -1859,7 +1861,7 @@
       "selectRepositoryToStart": "शुरू करने के लिए रिपॉज़िटरी चुनें।",
       "enterPromptToStart": "शुरू करने के लिए एक प्रॉम्प्ट जोड़ें।",
       "enterPromptOrFileToStart": "शुरू करने के लिए प्रॉम्प्ट या फ़ाइल जोड़ें।",
-      "connectProviderToStart": "शुरू करने के लिए प्रदाता कनेक्ट करें।",
+      "connectProviderToStart": "रिपॉज़िटरी किसी कनेक्ट किए गए GitHub, GitLab या Bitbucket खाते से आती है।",
       "promptPlaceholder": "आप किस पर काम करना चाहेंगे?",
       "couldNotLoadModels": "मॉडल लोड नहीं हो सके।",
       "prefillRepoAndModelUnavailable": "मूल सत्र की रिपॉज़िटरी और मॉडल अब उपलब्ध नहीं हैं। नीचे दूसरी रिपॉज़िटरी और मॉडल चुनें।",
@@ -2459,7 +2461,6 @@
   },
   "addCredits": {
     "cta": "क्रेडिट जोड़ें",
-    "description": "इस्तेमाल जारी रखने के लिए क्रेडिट जोड़ें।",
     "billingPage": "बिलिंग पेज"
   },
   "deviceSessions": {
@@ -2898,7 +2899,6 @@
     },
     "fileList": {
       "filesList": "फ़ाइलों की सूची",
-      "filesViewed": "फ़ाइलें · {{viewed}}/{{total}} देखी गईं",
       "layout": "लेआउट",
       "listed": "(सूचीबद्ध)",
       "loadingFiles": "फ़ाइलें लोड हो रही हैं",

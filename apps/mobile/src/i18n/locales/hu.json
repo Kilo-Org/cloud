@@ -248,6 +248,7 @@
     "confirmDeletion": "Törlés megerősítése",
     "credits": "Kreditek",
     "failedToLoadBalance": "Nem sikerült betölteni az egyenleget. Az újrapróbáláshoz koppints.",
+    "balanceLoadFailed": "Nem tölthető be az egyenleg",
     "hideBalance": "Egyenleg elrejtése",
     "showBalance": "Egyenleg megjelenítése",
     "balanceHidden": "Egyenleg elrejtve",
@@ -331,7 +332,6 @@
     "noFilesChangedDescription": "Ez a módosítási kérelem nem tartalmaz fájlmódosításokat.",
     "fileList": {
       "openNavigator": "Fájlböngésző megnyitása",
-      "filesViewed": "Fájlok · {{viewed}} / {{total}} megtekintve",
       "listed": "(felsorolva)",
       "layout": "Elrendezés",
       "unified": "Egyesített",
@@ -2293,6 +2293,7 @@
       "emptyDescription": "A kezdéshez küldj egy üzenetet az alábbi mezőből.",
       "scrollToBottom": "Görgetés az aljára",
       "emptyTitle": "Még nincs üzenet",
+      "emptyReadOnlyTitle": "Nincs üzenet ebben a munkamenetben",
       "renameAccessibility": "Munkamenet átnevezése: {{title}}",
       "cloningSession": "Munkamenet klónozása…",
       "couldNotLoadThisSession": "Nem sikerült betölteni ezt a munkamenetet.",
@@ -2392,7 +2393,7 @@
       "selectRepositoryToStart": "Válassz egy adattárat az indításhoz.",
       "enterPromptToStart": "Adj hozzá egy promptot az indításhoz.",
       "enterPromptOrFileToStart": "Adj hozzá egy promptot vagy egy fájlt az indításhoz.",
-      "connectProviderToStart": "Csatlakoztass egy szolgáltatót az indításhoz.",
+      "connectProviderToStart": "Az adattárak egy csatlakoztatott GitHub-, GitLab- vagy Bitbucket-fiókból származnak.",
       "promptPlaceholder": "Min szeretnél dolgozni?",
       "couldNotLoadModels": "Nem sikerült betölteni a modelleket.",
       "prefillRepoAndModelUnavailable": "Az eredeti munkamenet adattára és modellje már nem érhető el. Válassz helyettük másikat az alábbiak közül.",
@@ -2991,7 +2992,6 @@
   },
   "addCredits": {
     "cta": "Egyenleg feltöltése",
-    "description": "A további használathoz töltsd fel az egyenlegedet.",
     "billingPage": "számlázási oldal"
   },
   "deviceSessions": {

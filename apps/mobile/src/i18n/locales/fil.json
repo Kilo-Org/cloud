@@ -248,6 +248,7 @@
     "confirmDeletion": "Kumpirmahin ang pagbura",
     "credits": "Kredito",
     "failedToLoadBalance": "Hindi ma-load ang balanse. I-tap para subukang muli.",
+    "balanceLoadFailed": "Hindi ma-load ang balanse",
     "hideBalance": "Itago ang balanse",
     "showBalance": "Ipakita ang balanse",
     "balanceHidden": "Nakatago ang balanse",
@@ -331,7 +332,6 @@
     "noFilesChangedDescription": "Walang binagong file sa pull request na ito.",
     "fileList": {
       "openNavigator": "Buksan ang listahan ng mga file",
-      "filesViewed": "Mga file · {{viewed}} sa {{total}} ang natingnan",
       "listed": "(nakalista)",
       "layout": "Ayos",
       "unified": "Pinagsama",
@@ -2299,6 +2299,7 @@
       "emptyDescription": "Magpadala ng mensahe sa ibaba para magsimula.",
       "scrollToBottom": "I-scroll sa ibaba",
       "emptyTitle": "Wala pang mensahe",
+      "emptyReadOnlyTitle": "Walang mensahe ang sesyong ito",
       "renameAccessibility": "Palitan ang pangalan ng sesyon: {{title}}",
       "cloningSession": "Kinokopya ang sesyon",
       "couldNotLoadThisSession": "Hindi ma-load ang sesyong ito.",
@@ -2398,7 +2399,7 @@
       "selectRepositoryToStart": "Pumili ng imbakan ng code para magsimula.",
       "enterPromptToStart": "Magdagdag ng prompt para magsimula.",
       "enterPromptOrFileToStart": "Magdagdag ng prompt o file para magsimula.",
-      "connectProviderToStart": "Ikonekta ang isang provider para magsimula.",
+      "connectProviderToStart": "Nagmumula ang mga imbakan ng code sa isang konektadong akawnt sa GitHub, GitLab, o Bitbucket.",
       "promptPlaceholder": "Ano ang gusto mong gawin?",
       "couldNotLoadModels": "Hindi ma-load ang mga modelo.",
       "prefillRepoAndModelUnavailable": "Hindi na magamit ang imbakan ng code at modelo ng orihinal na sesyon. Pumili ng mga kapalit sa ibaba.",
@@ -2997,7 +2998,6 @@
   },
   "addCredits": {
     "cta": "Magdagdag ng kredito",
-    "description": "Magdagdag ng kredito para makapagpatuloy sa paggamit.",
     "billingPage": "pahina ng pagsingil"
   },
   "deviceSessions": {

@@ -43,7 +43,6 @@ const config: Config = {
     '<rootDir>/../../services/cloud-agent-next/',
     '<rootDir>/../../services/webhook-agent-ingest/',
     '<rootDir>/../../services/session-ingest/',
-    '<rootDir>/../../services/gastown/',
     '<rootDir>/../../services/gmail-push/',
     '<rootDir>/../../services/security-auto-analysis/',
     '<rootDir>/../../services/kiloclaw/',

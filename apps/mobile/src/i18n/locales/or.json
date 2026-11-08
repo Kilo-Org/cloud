@@ -248,6 +248,7 @@
     "confirmDeletion": "ବିଲୋପ ନିଶ୍ଚିତ କରନ୍ତୁ",
     "credits": "କ୍ରେଡିଟ୍",
     "failedToLoadBalance": "ବ୍ୟାଲାନ୍ସ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରିବାକୁ ଟାପ୍ କରନ୍ତୁ।",
+    "balanceLoadFailed": "ବ୍ୟାଲାନ୍ସ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ",
     "hideBalance": "ବ୍ୟାଲାନ୍ସ ଲୁଚାନ୍ତୁ",
     "showBalance": "ବ୍ୟାଲାନ୍ସ ଦେଖାନ୍ତୁ",
     "balanceHidden": "ବ୍ୟାଲାନ୍ସ ଲୁଚିଛି",
@@ -331,7 +332,6 @@
     "noFilesChangedDescription": "ଏହି ପୁଲ୍ ରିକ୍ୱେଷ୍ଟରେ କୌଣସି ଫାଇଲ୍ ପରିବର୍ତ୍ତନ ନାହିଁ।",
     "fileList": {
       "openNavigator": "ଫାଇଲ୍ ତାଲିକା ଖୋଲନ୍ତୁ",
-      "filesViewed": "ଫାଇଲ୍ · {{total}} ମଧ୍ୟରୁ {{viewed}} ଦେଖିସାରିଛନ୍ତି",
       "listed": "(ତାଲିକାଭୁକ୍ତ)",
       "layout": "ବିନ୍ୟାସ",
       "unified": "ଏକାଠି",
@@ -2293,6 +2293,7 @@
       "emptyDescription": "ଆରମ୍ଭ କରିବାକୁ ନିମ୍ନରେ ଏକ ବାର୍ତ୍ତା ପଠାନ୍ତୁ।",
       "scrollToBottom": "ସବୁଠାରୁ ତଳକୁ ସ୍କ୍ରୋଲ୍ କରନ୍ତୁ",
       "emptyTitle": "ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି ବାର୍ତ୍ତା ନାହିଁ",
+      "emptyReadOnlyTitle": "ଏହି ସେସନରେ କୌଣସି ବାର୍ତ୍ତା ନାହିଁ",
       "renameAccessibility": "{{title}} ସେସନର ନାମ ବଦଳାନ୍ତୁ",
       "cloningSession": "ସେସନର ନକଲ ତିଆରି ହେଉଛି",
       "couldNotLoadThisSession": "ଏହି ସେସନ୍ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
@@ -2392,7 +2393,7 @@
       "selectRepositoryToStart": "ଆରମ୍ଭ କରିବାକୁ ଏକ ରିପୋଜିଟୋରୀ ବାଛନ୍ତୁ।",
       "enterPromptToStart": "ଆରମ୍ଭ କରିବାକୁ ଏକ ପ୍ରମ୍ପ୍ଟ ଯୋଗ କରନ୍ତୁ।",
       "enterPromptOrFileToStart": "ଆରମ୍ଭ କରିବାକୁ ଏକ ପ୍ରମ୍ପ୍ଟ କିମ୍ବା ଫାଇଲ୍ ଯୋଗ କରନ୍ତୁ।",
-      "connectProviderToStart": "ଆରମ୍ଭ କରିବାକୁ ଏକ ସେବା ପ୍ରଦାତାଙ୍କୁ ସଂଯୋଗ କରନ୍ତୁ।",
+      "connectProviderToStart": "ରିପୋଜିଟୋରୀଗୁଡ଼ିକ ଏକ ସଂଯୋଜିତ GitHub, GitLab କିମ୍ବା Bitbucket ଆକାଉଣ୍ଟରୁ ଆସନ୍ତି।",
       "promptPlaceholder": "କେଉଁ କାମ କରିବାକୁ ଚାହୁଁଛନ୍ତି?",
       "couldNotLoadModels": "ମଡେଲ୍ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
       "prefillRepoAndModelUnavailable": "ମୂଳ ସେସନର ରିପୋଜିଟୋରୀ ଓ ମଡେଲ୍ ଆଉ ଉପଲବ୍ଧ ନାହିଁ। ନିମ୍ନରେ ନୂଆ ରିପୋଜିଟୋରୀ ଓ ମଡେଲ୍ ବାଛନ୍ତୁ।",
@@ -2991,7 +2992,6 @@
   },
   "addCredits": {
     "cta": "କ୍ରେଡିଟ୍ ଯୋଡ଼ନ୍ତୁ",
-    "description": "ବ୍ୟବହାର ଜାରି ରଖିବାକୁ କ୍ରେଡିଟ୍ ଯୋଡ଼ନ୍ତୁ।",
     "billingPage": "ବିଲିଂ ପୃଷ୍ଠା"
   },
   "deviceSessions": {

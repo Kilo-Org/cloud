@@ -248,6 +248,7 @@
     "confirmDeletion": "削除を確定",
     "credits": "クレジット",
     "failedToLoadBalance": "残高を読み込めませんでした。タップして再試行してください。",
+    "balanceLoadFailed": "残高を読み込めませんでした",
     "hideBalance": "残高を非表示",
     "showBalance": "残高を表示",
     "balanceHidden": "残高は非表示です",
@@ -1754,6 +1755,7 @@
       "emptyDescription": "下の入力欄からメッセージを送信すると、開始できます。",
       "scrollToBottom": "一番下までスクロール",
       "emptyTitle": "メッセージはまだありません",
+      "emptyReadOnlyTitle": "このセッションにメッセージはありません",
       "renameAccessibility": "セッション「{{title}}」の名前を変更",
       "cloningSession": "セッションを複製中",
       "couldNotLoadThisSession": "このセッションを読み込めませんでした。",
@@ -1853,7 +1855,7 @@
       "selectRepositoryToStart": "開始するにはリポジトリを選択してください。",
       "enterPromptToStart": "開始するにはプロンプトを追加してください。",
       "enterPromptOrFileToStart": "開始するにはプロンプトまたはファイルを追加してください。",
-      "connectProviderToStart": "開始するにはプロバイダーを接続してください。",
+      "connectProviderToStart": "リポジトリは、連携済みのGitHub、GitLab、またはBitbucketアカウントから取得されます。",
       "promptPlaceholder": "何に取り組みますか？",
       "couldNotLoadModels": "モデルを読み込めませんでした。",
       "prefillRepoAndModelUnavailable": "元のセッションのリポジトリとモデルは利用できなくなりました。以下で選択してください。",
@@ -2452,7 +2454,6 @@
   },
   "addCredits": {
     "cta": "クレジットを追加",
-    "description": "利用を続けるには、クレジットを追加してください。",
     "billingPage": "請求ページ"
   },
   "deviceSessions": {
@@ -2891,7 +2892,6 @@
     },
     "fileList": {
       "filesList": "ファイル一覧",
-      "filesViewed": "ファイル · {{total}}件中{{viewed}}件を確認済み",
       "layout": "レイアウト",
       "listed": "（一覧表示）",
       "loadingFiles": "ファイルを読み込み中",

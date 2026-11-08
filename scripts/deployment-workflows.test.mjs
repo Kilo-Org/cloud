@@ -375,17 +375,44 @@ test('production EU preparation, rollback and historical source use the selected
   }
 });
 
-test('production and staging schedule independently on main every 20 minutes', () => {
+test('both deploys start from a successful main CI run and keep an hourly catch-up poll', () => {
   for (const [name, deployment] of [
     ['production', production],
     ['staging', staging],
   ]) {
     assert.equal(deployment.on.push, undefined, `${name} must not deploy on every merge`);
-    assert.deepEqual(deployment.on.schedule, [{ cron: '7,27,47 * * * *' }]);
+    assert.deepEqual(deployment.on.workflow_run, {
+      workflows: [ci.name],
+      types: ['completed'],
+      branches: ['main'],
+    });
+    assert.deepEqual(deployment.on.schedule, [{ cron: '7 * * * *' }]);
     assert.ok(Object.hasOwn(deployment.on, 'workflow_dispatch'));
     assert.equal(deployment.concurrency['cancel-in-progress'], false);
     assert.equal(deployment.jobs['check-changes'].with.workflow_file, `deploy-${name}.yml`);
-    assert.equal(deployment.jobs['check-changes'].needs, undefined);
+    assert.equal(deployment.jobs['check-changes'].needs, 'admit');
+    const admitted = (eventName, conclusion) =>
+      runInNewContext(deployment.jobs.admit.if, {
+        github: { event_name: eventName, event: { workflow_run: { conclusion } } },
+      });
+    assert.equal(admitted('workflow_run', 'success'), true);
+    for (const conclusion of ['failure', 'cancelled', 'skipped', 'neutral', 'timed_out', null]) {
+      assert.equal(admitted('workflow_run', conclusion), false, `${name} must skip ${conclusion}`);
+    }
+    assert.equal(admitted('schedule', null), true);
+    assert.equal(admitted('workflow_dispatch', null), true);
+    assert.deepEqual(
+      Object.entries(deployment.jobs)
+        .filter(([, job]) => job.needs === undefined)
+        .map(([id]) => id),
+      ['admit'],
+      `${name} must admit the trigger before any candidate lookup`
+    );
+    assert.doesNotMatch(
+      JSON.stringify(deployment.jobs),
+      /workflow_run\.head_sha/,
+      `${name} must not deploy a SHA taken from the event payload`
+    );
   }
   assert.notEqual(production.concurrency.group, staging.concurrency.group);
 });

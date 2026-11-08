@@ -1,4 +1,4 @@
-import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import { createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users } from '@kilocode/db/schema';
 import { sql } from 'drizzle-orm';
@@ -9,6 +9,12 @@ import {
   cancelAndRefundKiloPassForUser,
   type CancelAndRefundKiloPassStripeClient,
 } from '@/lib/kilo-pass/cancel-and-refund';
+import {
+  type AdminActionEntry,
+  recordAdminActions,
+  userActionTarget,
+} from '@/lib/admin/admin-action-audit';
+import { superadminProcedure } from '@/lib/trpc/admin-procedures';
 
 const BulkCancelSchema = z.object({
   emails: z.array(z.string().email()).min(1).max(500),
@@ -188,8 +194,46 @@ export async function runBulkCancelAndRefundKiloPass({
   return { results, summary };
 }
 
+/**
+ * One entry per account the batch acted on. Skipped accounts are not audited: no
+ * action ran for them. A row that errored mid-way may have created a Stripe
+ * refund before the failure, so it is recorded as an attempt with an unknown
+ * outcome rather than left unattributed.
+ */
+function bulkAuditEntry(
+  row: BulkResultRow,
+  params: { reason: string; refundLatestPayment: boolean }
+): AdminActionEntry | null {
+  if (!row.userId) return null;
+
+  const message =
+    row.status === 'cancelled_and_refunded'
+      ? 'Cancelled Kilo Pass and refunded the latest payment via bulk admin cancel'
+      : row.status === 'cancelled'
+        ? 'Cancelled Kilo Pass and reset the balance via bulk admin cancel'
+        : row.status === 'error'
+          ? 'Kilo Pass cancel and refund attempted with unknown outcome via bulk admin cancel'
+          : null;
+  if (!message) return null;
+
+  return {
+    action: 'kilo_pass.cancel_refund',
+    target: userActionTarget(row.userId),
+    message,
+    metadata: {
+      status: row.status,
+      reason: params.reason,
+      refundLatestPayment: params.refundLatestPayment,
+      refundedAmountCents: row.refundedAmountCents,
+      balanceResetAmountUsd: row.balanceResetAmountUsd,
+      alreadyBlocked: row.alreadyBlocked,
+      error: row.error,
+    },
+  };
+}
+
 export const adminKiloPassRouter = createTRPCRouter({
-  cancelAndRefundKiloPassBulk: adminProcedure
+  cancelAndRefundKiloPassBulk: superadminProcedure
     .input(BulkCancelSchema)
     .mutation(async ({ input, ctx }) => {
       const outcome = await runBulkCancelAndRefundKiloPass({
@@ -199,6 +243,17 @@ export const adminKiloPassRouter = createTRPCRouter({
         stripe: stripeClient,
         refundLatestPayment: input.refundLatestPayment,
       });
+
+      await recordAdminActions(
+        ctx,
+        outcome.results.flatMap(row => {
+          const entry = bulkAuditEntry(row, {
+            reason: input.reason,
+            refundLatestPayment: input.refundLatestPayment,
+          });
+          return entry ? [entry] : [];
+        })
+      );
 
       console.log(
         `[admin.kiloPass.cancelAndRefundKiloPassBulk] admin=${ctx.user.id} total=${outcome.summary.total} cancelled=${outcome.summary.cancelled} skipped=${outcome.summary.skipped} errored=${outcome.summary.errored} refundLatestPayment=${input.refundLatestPayment} refundedCents=${outcome.summary.totalRefundedCents}`

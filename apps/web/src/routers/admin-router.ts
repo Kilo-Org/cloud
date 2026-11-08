@@ -1826,7 +1826,7 @@ export const adminRouter = createTRPCRouter({
         return { success: true };
       }),
 
-    cancelAndRefundKiloPass: adminProcedure
+    cancelAndRefundKiloPass: superadminProcedure
       .input(CancelAndRefundKiloPassSchema)
       .mutation(async ({ input, ctx }) => {
         const userExists = await db.query.kilocode_users.findFirst({
@@ -1864,6 +1864,22 @@ export const adminRouter = createTRPCRouter({
             message: 'Kilo Pass subscription is already canceled',
           });
         }
+
+        await recordAdminAction(ctx, {
+          action: 'kilo_pass.cancel_refund',
+          target: userActionTarget(input.userId),
+          message:
+            result.refundedAmountCents != null
+              ? 'Cancelled Kilo Pass and refunded the latest payment'
+              : 'Cancelled Kilo Pass without a Stripe refund',
+          metadata: {
+            status: result.status,
+            reason: input.reason,
+            refundedAmountCents: result.refundedAmountCents,
+            balanceResetAmountUsd: result.balanceResetAmountUsd,
+            alreadyBlocked: result.alreadyBlocked,
+          },
+        });
 
         return {
           success: true,

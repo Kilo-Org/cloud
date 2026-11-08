@@ -3,6 +3,7 @@ import type Stripe from 'stripe';
 
 import { db, cleanupDbForTest } from '@kilocode/web-shared/lib/drizzle';
 import {
+  admin_action_audit_logs,
   kilo_pass_subscriptions,
   kilocode_users,
   user_admin_notes,
@@ -117,6 +118,13 @@ function setupNoInvoiceStripe(stripe: StripeMock) {
   stripe.invoices.list.mockResolvedValue({ data: [] });
 }
 
+async function refundAuditRows() {
+  return db
+    .select()
+    .from(admin_action_audit_logs)
+    .where(eq(admin_action_audit_logs.action, 'kilo_pass.cancel_refund'));
+}
+
 describe('admin.kiloPass.cancelAndRefundKiloPassBulk', () => {
   let adminUser: Awaited<ReturnType<typeof insertTestUser>>;
 
@@ -134,11 +142,83 @@ describe('admin.kiloPass.cancelAndRefundKiloPassBulk', () => {
     adminUser = await insertTestUser({
       google_user_email: 'bulk-admin@example.com',
       is_admin: true,
+      is_super_admin: true,
     });
   });
 
   afterEach(async () => {
     await cleanupDbForTest();
+  });
+
+  it('refuses a platform admin who is not a superadmin', async () => {
+    const stripeMock = getStripeMock();
+    setupHappyPathStripe(stripeMock);
+
+    const platformAdmin = await insertTestUser({
+      google_user_email: 'bulk-platform-admin@example.com',
+      is_admin: true,
+    });
+    const target = await insertTestUser({ google_user_email: 'bulk-refused@example.com' });
+    await insertActiveKiloPass(target.id, 'sub_refused');
+
+    const caller = await createCallerForUser(platformAdmin.id);
+    await expect(
+      caller.admin.kiloPass.cancelAndRefundKiloPassBulk({
+        emails: ['bulk-refused@example.com'],
+        reason: 'abuse',
+      })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+
+    expect(stripeMock.subscriptions.cancel).not.toHaveBeenCalled();
+    expect(stripeMock.refunds.create).not.toHaveBeenCalled();
+    const subRow = await db.query.kilo_pass_subscriptions.findFirst({
+      where: eq(kilo_pass_subscriptions.stripe_subscription_id, 'sub_refused'),
+    });
+    expect(subRow?.status).toBe('active');
+    expect(await refundAuditRows()).toEqual([]);
+  });
+
+  it('records one audit entry per cancelled account and none for skipped accounts', async () => {
+    const stripeMock = getStripeMock();
+    setupHappyPathStripe(stripeMock);
+
+    const refunded = await insertTestUser({
+      google_user_email: 'bulk-audit-refunded@example.com',
+    });
+    await insertActiveKiloPass(refunded.id, 'sub_audit_refunded');
+    await insertTestUser({ google_user_email: 'bulk-audit-no-sub@example.com' });
+
+    const caller = await createCallerForUser(adminUser.id);
+    const result = await caller.admin.kiloPass.cancelAndRefundKiloPassBulk({
+      emails: ['bulk-audit-refunded@example.com', 'bulk-audit-no-sub@example.com'],
+      reason: 'chargeback',
+    });
+    expect(result.summary).toEqual({
+      total: 2,
+      cancelled: 1,
+      skipped: 1,
+      errored: 0,
+      totalRefundedCents: 1900,
+    });
+
+    const audits = await refundAuditRows();
+    expect(audits).toHaveLength(1);
+    expect(audits[0]).toEqual(
+      expect.objectContaining({
+        actor_id: adminUser.id,
+        target_type: 'user',
+        target_id: refunded.id,
+        message: 'Cancelled Kilo Pass and refunded the latest payment via bulk admin cancel',
+        metadata: expect.objectContaining({
+          status: 'cancelled_and_refunded',
+          reason: 'chargeback',
+          refundedAmountCents: 1900,
+        }),
+      })
+    );
+    // The audit table is browsable by every platform admin, so it must not
+    // carry the customer email.
+    expect(JSON.stringify(audits[0]?.metadata)).not.toContain('example.com');
   });
 
   it('skips unknown emails without failing the batch', async () => {
@@ -463,6 +543,16 @@ describe('admin.kiloPass.cancelAndRefundKiloPassBulk', () => {
     expect(sub1?.status).toBe('canceled');
     expect(sub2?.status).toBe('active');
     expect(sub3?.status).toBe('canceled');
+
+    // Every account the batch touched is attributed to the actor, including the
+    // one whose Stripe call failed after it may have created a refund.
+    const audits = await refundAuditRows();
+    const auditByTarget = new Map(audits.map(row => [row.target_id, row]));
+    expect([...auditByTarget.keys()].sort()).toEqual([u1.id, u2.id, u3.id].sort());
+    expect(auditByTarget.get(u2.id)?.message).toBe(
+      'Kilo Pass cancel and refund attempted with unknown outcome via bulk admin cancel'
+    );
+    expect(audits.every(row => row.actor_id === adminUser.id)).toBe(true);
   });
 
   it('deduplicates emails case-insensitively before iterating', async () => {

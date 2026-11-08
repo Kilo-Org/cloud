@@ -1275,23 +1275,8 @@ jobs:
         if: matrix.workspace.name == '@kilocode/harness-sdk'
         uses: ./.github/actions/ttsc-plugin-cache
 
-      # This row's own test script builds a temporary virtualenv and installs
-      # repo-study/requirements.txt on every run. Those wheels are the matrix's
-      # only dependency source that is not a pnpm source, so restore them under
-      # a key on the requirements file and point pip at that directory. The
-      # virtualenv itself stays temporary inside the test script.
-      - name: Restore the Python wheel cache
-        if: matrix.workspace.name == 'auto-routing-benchmark'
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
-        with:
-          path: ${{ runner.temp }}/pip-cache
-          key: ${{ runner.os }}-pip-${{ hashFiles('services/auto-routing-benchmark/repo-study/requirements.txt') }}
-
       - name: Run tests
         run: pnpm --filter ${{ matrix.workspace.name }} test
-        env:
-          # Read only by the row whose wheels the cache above restored.
-          PIP_CACHE_DIR: ${{ runner.temp }}/pip-cache
 
       # Stores what the run compiled, unless this run selected the harness-sdk
       # job, which stores it then.

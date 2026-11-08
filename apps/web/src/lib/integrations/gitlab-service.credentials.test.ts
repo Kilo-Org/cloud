@@ -368,7 +368,7 @@ describe('GitLab encrypted credential persistence', () => {
 
     await expect(
       removeStoredProjectAccessToken(integrationWithStaleMetadata, 42, { userId: user.id })
-    ).resolves.toBe('removed');
+    ).resolves.toEqual({ outcome: 'removed' });
 
     expect(mockRevokeProjectAccessToken).toHaveBeenCalledWith(
       'glpat-primary-token',
@@ -420,7 +420,7 @@ describe('GitLab encrypted credential persistence', () => {
 
     await expect(
       removeStoredProjectAccessToken(integrationWithLegacy, 42, { userId: user.id })
-    ).resolves.toBe('removed');
+    ).resolves.toEqual({ outcome: 'removed' });
 
     expect(mockRevokeProjectAccessToken.mock.calls).toEqual([
       ['glpat-primary-token', 42, 777, 'https://gitlab.com'],
@@ -482,7 +482,7 @@ describe('GitLab encrypted credential persistence', () => {
 
     await expect(
       removeStoredProjectAccessToken(integrationWithStaleMetadata, 42, { userId: user.id })
-    ).resolves.toBe('retained');
+    ).resolves.toEqual({ outcome: 'retained', retryable: false });
 
     const [updatedIntegration] = await db
       .select()
@@ -1755,7 +1755,7 @@ describe('GitLab encrypted credential persistence', () => {
       .from(platform_integrations)
       .where(eq(platform_integrations.id, connected.integration.id));
 
-    expect(mockRevokeProjectAccessToken).toHaveBeenCalledTimes(2);
+    expect(mockRevokeProjectAccessToken).toHaveBeenCalledTimes(1);
     expect(credentials).toHaveLength(1);
     expect(credentials[0]).toEqual(
       expect.objectContaining({
@@ -1804,6 +1804,39 @@ describe('GitLab encrypted credential persistence', () => {
     expect(disconnectedIntegration.metadata).toEqual(
       expect.objectContaining({ project_tokens: {} })
     );
+  });
+
+  it('keeps a project token whose revocation fails twice with a server error', async () => {
+    const user = await insertTestUser();
+    const connected = await connectWithPAT(
+      { type: 'user', id: user.id },
+      'glpat-primary-token',
+      'https://gitlab.com',
+      user.id
+    );
+    const [integration] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, connected.integration.id));
+    await getOrCreateProjectAccessToken(integration, 42, { userId: user.id });
+    mockRevokeProjectAccessToken.mockRejectedValue(
+      new GitLabProjectAccessTokenRevocationError(42, 503, 'GitLab responded with HTTP 503.')
+    );
+
+    await expect(
+      disconnectGitLabIntegration({ type: 'user', id: user.id }, user.id)
+    ).resolves.toEqual({ success: true });
+
+    const credentials = await db
+      .select()
+      .from(platform_access_token_credentials)
+      .where(
+        eq(platform_access_token_credentials.platform_integration_id, connected.integration.id)
+      );
+
+    expect(mockRevokeProjectAccessToken).toHaveBeenCalledTimes(2);
+    expect(credentials).toHaveLength(1);
+    expect(credentials[0].provider_resource_id).toBe('42');
   });
 
   it('keeps project tokens when the connected credential cannot be resolved', async () => {

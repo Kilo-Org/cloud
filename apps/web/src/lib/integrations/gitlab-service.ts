@@ -588,12 +588,14 @@ export async function disconnectGitLabIntegration(owner: Owner, actingUserId: st
   } else if (userToken === undefined) {
     unsettledProjectTokens = projectIds.length;
   } else {
-    const pendingProjectIds = new Set(projectIds);
+    const outstandingProjectIds = new Set(projectIds);
+    const retryProjectIds = new Set<string>();
     for (let attempt = 0; attempt < PROJECT_TOKEN_SETTLEMENT_ATTEMPTS; attempt++) {
-      if (attempt > 0 && pendingProjectIds.size > 0) {
-        await waitForSettlementRetry();
-      }
-      for (const projectId of pendingProjectIds) {
+      if (attempt > 0 && retryProjectIds.size === 0) break;
+      if (attempt > 0) await waitForSettlementRetry();
+      const attemptProjectIds = attempt === 0 ? [...outstandingProjectIds] : [...retryProjectIds];
+      retryProjectIds.clear();
+      for (const projectId of attemptProjectIds) {
         const outcome = await removeStoredProjectAccessToken(integration, projectId, actor, {
           userToken,
         }).catch(error => {
@@ -602,15 +604,17 @@ export async function disconnectGitLabIntegration(owner: Owner, actingUserId: st
             projectId,
             error: error instanceof Error ? error.message : String(error),
           });
-          return 'retained' as const;
+          return { outcome: 'retained' as const, retryable: false };
         });
-        if (outcome === 'retained') continue;
-        pendingProjectIds.delete(projectId);
-        if (outcome === 'removed') revokedProjectTokens += 1;
+        if (outcome.outcome === 'removed') {
+          outstandingProjectIds.delete(projectId);
+          revokedProjectTokens += 1;
+        } else if (outcome.outcome === 'retained' && outcome.retryable) {
+          retryProjectIds.add(projectId);
+        }
       }
-      if (pendingProjectIds.size === 0) break;
     }
-    retainedProjectTokens = pendingProjectIds.size;
+    retainedProjectTokens = outstandingProjectIds.size;
   }
 
   logExceptInTest(
@@ -1133,8 +1137,17 @@ async function updateStoredProjectAccessToken(
   });
 }
 
-/** Outcome of removing one stored project token. */
-export type StoredProjectTokenRemoval = 'removed' | 'retained' | 'absent';
+/**
+ * Outcome of removing one stored project token. A retained outcome says whether
+ * a repeated attempt can settle it, so a caller that can try again does not
+ * repeat a refusal the provider will keep answering. Only a missing answer, a
+ * rate limit, or a server error can change on a repeat; a permission or
+ * authentication refusal cannot.
+ */
+export type StoredProjectTokenRemoval =
+  | { outcome: 'removed' }
+  | { outcome: 'absent' }
+  | { outcome: 'retained'; retryable: boolean };
 
 /**
  * Removes the stored Project Access Token for a project
@@ -1169,7 +1182,7 @@ export async function removeStoredProjectAccessToken(
       ].filter((tokenId): tokenId is number => tokenId !== null && tokenId !== undefined)
     ),
   ];
-  if (tokenIds.length === 0) return 'absent';
+  if (tokenIds.length === 0) return { outcome: 'absent' };
   const instanceUrl = normalizeInstanceUrl(metadata?.gitlab_instance_url);
 
   try {
@@ -1178,16 +1191,20 @@ export async function removeStoredProjectAccessToken(
       await revokeProjectAccessToken(userToken, projectId, tokenId, instanceUrl);
     }
   } catch (error) {
+    const status = readProjectRevocationStatus(error);
     logExceptInTest(
       '[removeStoredProjectAccessToken] Revocation unsettled; keeping stored project credential',
       {
         projectId,
         tokenIds,
-        status: readProjectRevocationStatus(error),
+        status,
         error: error instanceof Error ? error.message : String(error),
       }
     );
-    return 'retained';
+    return {
+      outcome: 'retained',
+      retryable: status === undefined || status === 429 || status >= 500,
+    };
   }
 
   logExceptInTest('[removeStoredProjectAccessToken] Token revoked in GitLab', {
@@ -1212,7 +1229,7 @@ export async function removeStoredProjectAccessToken(
     projectId,
   });
 
-  return 'removed';
+  return { outcome: 'removed' };
 }
 
 /**

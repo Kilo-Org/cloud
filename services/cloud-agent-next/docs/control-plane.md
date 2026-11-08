@@ -278,7 +278,7 @@ so a later report changes nothing.
 | `stopped` | `creating` | `prepare` for a session or pending retry work after reconstruction | Existing route retry interval when work remains |
 | `creating` | `starting` | Provider created the sandbox and launched the startup command | Provider call 2 min |
 | `creating` or `starting` | `stopping` | Accepted `startup-failed` report: a permanent code fails preparing routes at once; a retryable code keeps them `preparing` | Existing ladder |
-| `creating` | `creating` or `stopped` | Transient create error: retry after a 10 s pause while a route deadline remains, else stop | — |
+| `creating` | `creating` or `stopped` | Transient create error: one create retry after a 10 s pause while a route deadline remains, else stop | — |
 | `creating` | `stopping` or `stopped` | Classified permanent create/launch error: fail preparing routes immediately; an owned physical ref uses the existing stop ladder | Existing ladder when a ref exists |
 | `starting` | `connected` | Wrapper `hello` accepted | 5 min without `hello` → `stopping` |
 | `connected` | `disconnected` | Socket closed, or no heartbeat for 45 s | — |
@@ -308,13 +308,17 @@ so a later report changes nothing.
 - On `stopping` or `stopped`, every `ready` route is removed and its session gets `route lost`. A
   session with queued messages calls `prepare` again, which creates a new allocation.
 - A `preparing` route stays across a failed allocation (create error, connect timeout, sandbox gone)
-  while its attempt deadline remains, except a classified permanent creation failure; the Sandbox DO creates a new allocation for it. At the
+  while its attempt deadline remains, except a classified permanent creation failure, or a create
+  error that exhausts the attempt budget (one create retry per attempt): both fail the preparing
+  routes at once, the permanent one with its classified reason and the exhausted budget with
+  `sandbox_create_failed`; the Sandbox DO creates a new allocation for the remaining cases. At the
   deadline the route fails.
 - Provider adapters preserve structured admission causes. Only actual `insufficient_credits` fails
   as `billing_blocked`; `stopping`, meter outages, network/5xx, throttling and recoverable conflicts
-  retain the ten-second retry pause and the original attempt deadline. Error text or an HTTP 4xx
-  alone never proves permanence. Proven local invalid/unsupported configuration fails as
-  `invalid_configuration`; Vercel's local REST validation kinds, not remote status codes, establish it.
+  retain the ten-second retry pause and the original attempt deadline for the attempt's one create
+  retry. Error text or an HTTP 4xx alone never proves permanence. Proven local invalid/unsupported
+  configuration fails as `invalid_configuration`; Vercel's local REST validation kinds, not remote
+  status codes, establish it.
 - A permanent error applies only while its allocation is still current and `creating`. It fails
   preparing routes through the normal fenced route notification/message settlement path, without
   waiting for physical cleanup. An owned physical ref enters the allocation owner's existing stop
@@ -1004,7 +1008,7 @@ them through one development-only override.
 | Session DO | Sandbox transport pass / best-effort abort | 2 s including RPC retries, not scaled | Retain queued intent / return from abort |
 | Session DO | Queued transport recovery | 15 s after exhaustion; development-only scaling | Consume once; passive status then bounded prepare/deliver, no self-rearm |
 | Sandbox DO | Provider create call | 2 min | Retry after the pause below while a route deadline remains |
-| Sandbox DO | Provider create retry pause | 10 s after a transient failed create | Create again within the unchanged route attempt; classified permanent errors fail promptly |
+| Sandbox DO | Provider create retry pause | 10 s after a transient failed create | One create retry within the unchanged route attempt; the next create error fails the preparing routes with `sandbox_create_failed`. Classified permanent errors still fail promptly |
 | Sandbox DO | Wrapper first connect | 5 min from launch; includes the `downloaded` install | Stop the sandbox |
 | Sandbox DO | Unbound wrapper hello | 30 s from socket admission, not scaled | Close candidate only; attachment deadline survives hibernation and participates in the existing alarm even while stopped |
 | Sandbox DO | Heartbeat | 45 s | Treat the socket as lost |
@@ -1035,7 +1039,7 @@ them through one development-only override.
 
 | Failure | Detected by | Recovery | Message effect |
 |---|---|---|---|
-| Transient provider create error | Sandbox DO | Retry after a 10 s pause, within the unchanged route deadline | Queued fail at the deadline |
+| Transient provider create error | Sandbox DO | One retry after a 10 s pause, within the unchanged route deadline | A third create error fails queued promptly (`sandbox_create_failed`); otherwise queued fail at the deadline |
 | Actual compute credit denial | Provider adapter / existing Vercel billing admission | New message after adding credits | Queued fail promptly (`billing_blocked`) |
 | Proven invalid/unsupported provider configuration | Provider adapter | New message after correcting configuration | Queued fail promptly (`invalid_configuration`) |
 | Wrapper never connects | Sandbox DO, 5 min | Stop; new allocation within the route deadline | Queued fail at the deadline |
@@ -1639,6 +1643,7 @@ failure monitors keep working.
 | `billing_blocked` (actual compute credit denial) | `pre_dispatch` / `payment_required` |
 | `billing_unavailable` (existing Vercel admission failure) | `pre_dispatch` / `admission_billing_unavailable` |
 | `invalid_configuration` (proven provider configuration failure) | `pre_dispatch` / `sandbox_connect_failed` |
+| `sandbox_create_failed` (create attempt budget spent) | `pre_dispatch` / `sandbox_connect_failed` |
 | `agent_unavailable` | queued: `pre_dispatch` / `kilo_server_failed`; accepted: `post_dispatch_no_activity` / `wrapper_disconnected` |
 | `connection_lost`, `sandbox_lost`, `agent_restarted`, `agent_unresponsive`, `sandbox_out_of_memory` | `post_dispatch_no_activity` / `wrapper_disconnected` |
 | `no_progress`, `no_outcome` | `post_dispatch_no_activity` / `wrapper_no_output` |

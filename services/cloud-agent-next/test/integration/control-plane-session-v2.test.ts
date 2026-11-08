@@ -2064,7 +2064,18 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
         });
         for (const [key, value] of retained) await state.storage.put(key, value);
         expect(await state.storage.get('control_plane_generation')).toBe(2);
-        db.insert(allocationTable).values(allocation).run();
+        // Raw SQL: the pre-B allocation table predates `create_attempt`.
+        db.run(
+          sql`INSERT INTO allocation (id, state, allocation_id, connection_id, provider_ref, wrapper_id,
+                  last_frame_at, last_activity_at, create_deadline_at, first_connect_deadline_at,
+                  stop_attempt, stop_pending, stop_at, unconfirmed_provider_ref, provider_pin)
+              VALUES (${allocation.id}, ${allocation.state}, ${allocation.allocation_id},
+                  ${allocation.connection_id}, ${allocation.provider_ref}, ${allocation.wrapper_id},
+                  ${allocation.last_frame_at}, ${allocation.last_activity_at},
+                  ${allocation.create_deadline_at}, ${allocation.first_connect_deadline_at},
+                  ${allocation.stop_attempt}, ${allocation.stop_pending}, ${allocation.stop_at},
+                  ${allocation.unconfirmed_provider_ref}, ${allocation.provider_pin})`
+        );
         // Raw SQL: the pre-B routes table predates `repo_key`, which the schema now carries.
         db.run(
           sql`INSERT INTO routes (session_id, spec, grant, credential_source, state, attempt_id, attempt_deadline_at, reason, updated_at)
@@ -2664,6 +2675,103 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
     expect(provider.createCalls).toBe(2);
     wrapper.close();
   });
+
+  it('fails the queued message when the create attempt budget is spent', async () => {
+    const sessionId = newSessionId();
+    const sandboxId = isolatedSandboxId();
+    const provider = createFakeProvider();
+    provider.failure = new Error('provider unavailable');
+    const sandboxStub = sandboxes.getByName(sandboxId);
+    await runInDurableObject(sandboxStub, async instance => {
+      await instance.getAllocationState();
+      installFakeCredentialEnv(instance.env, createFakeCredentialBroker());
+      installFakeRuntimeProxyPeer(instance, async (ownerId, sessionId) => {
+        const stored = await sessions.getByName(sessionDoName(ownerId, sessionId)).getMetadata();
+        const kiloId = stored?.auth.kiloSessionId ?? registeredKiloSessions.get(sessionId);
+        return kiloId ? { userId: ownerId, kiloSessionId: kiloId } : null;
+      });
+      Object.assign(instance, {
+        createProviderAdapter: () => provider.adapter,
+        provider: provider.adapter,
+      });
+    });
+    const sessionName = sessionDoName(SESSION_OWNER_ID, sessionId);
+    const sessionStub = sessions.getByName(sessionName);
+    await sessionStub.registerSession(registration(sandboxId, sessionId));
+    const reports: CloudAgentQueueReport[] = [];
+    const callbacks: CallbackJob[] = [];
+    await runInDurableObject(sessionStub, instance => {
+      instance.env.CLOUD_AGENT_REPORT_QUEUE = {
+        send: async (report: CloudAgentQueueReport) => {
+          reports.push(report);
+        },
+      } as never;
+      instance.env.CALLBACK_QUEUE = {
+        send: async (job: CallbackJob) => {
+          callbacks.push(job);
+        },
+      } as never;
+    });
+    const stream = await connectStream(sessionName);
+    const startedAt = Date.now();
+    await sessionStub.send(promptPayload('m1'));
+
+    // The retry runs and fails: two attempts, and the budget is spent long
+    // before the attempt deadline could expire.
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      await waitFor(async () => expect(provider.createCalls).toBe(attempt));
+      if (attempt === 1) {
+        await runInDurableObject(sandboxStub, async (instance, state) => {
+          drizzle(state.storage)
+            .update(allocationTable)
+            .set({ create_deadline_at: Date.now() - 1 })
+            .where(eq(allocationTable.id, 'current'))
+            .run();
+          await instance.alarm();
+        });
+      }
+    }
+    await waitFor(async () => expect(await messageStatus(sessionStub, 'm1')).toBe('failed'));
+    expect(Date.now() - startedAt).toBeLessThan(
+      CONTROL_PLANE_TIMERS.sandbox.providerCreateRetryMs * 3
+    );
+    expect(await readMessageReason(sessionStub, 'm1')).toBe('sandbox_create_failed');
+    expect((await sandboxStub.status({ sessionId })).view).toMatchObject({
+      state: 'failed',
+      reason: 'sandbox_create_failed',
+    });
+    const failed = await waitForStreamEvent(stream, 'cloud.message.failed');
+    expect(failed.data).toMatchObject({
+      messageId: 'm1',
+      status: 'failed',
+      reason: 'sandbox_create_failed',
+      error: 'The sandbox could not be created',
+      accepted: false,
+    });
+    await runSessionAlarm(sessionStub);
+    expect(reports).toHaveLength(1);
+    expect(reports[0]?.run).toMatchObject({
+      status: 'failed',
+      failureStage: 'pre_dispatch',
+      failureCode: 'sandbox_connect_failed',
+    });
+    expect(reports[0]?.run.diagnostic).toMatchObject({
+      errorMessageRedacted: 'Sandbox connection failed',
+    });
+    await waitFor(async () =>
+      expect((await sandboxStub.getAllocationState()).kind).toBe('stopped')
+    );
+    expect(provider.createCalls).toBe(2);
+    stream.close();
+    // A fresh client opens into the same error status rather than a retrying
+    // preparation: the failure survives the session's own reconnect.
+    const reopened = await connectStream(sessionName);
+    const connected = await waitForStreamEvent(reopened, 'connected');
+    expect(connected.data).toMatchObject({
+      cloudStatus: { type: 'error', message: 'sandbox_create_failed' },
+    });
+    reopened.close();
+  }, 20_000);
 
   it('completes a cold message and streams queued, sent, and completed', async () => {
     const sessionId = newSessionId();

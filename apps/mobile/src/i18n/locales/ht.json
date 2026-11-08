@@ -4010,7 +4010,7 @@
       "duplicateName": "Yon kòmandman ki gen non sa a deja egziste nan pwofil sa a"
     },
     "repoBindings": {
-      "title": "Default Profiles pou Repos",
+      "title": "Default profiles pou Repos",
       "add": "Ajoute default",
       "empty": "Pa gen par défaut configuré",
       "emptyDescription": "Ajoute yon default pou aplike otomatikman yon pwofil lè w kòmanse sesyon yo pou yon repo.",

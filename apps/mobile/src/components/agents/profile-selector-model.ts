@@ -5,7 +5,7 @@
  * cloud-agent/ProfileSelector.tsx:84-102,173-222`) to the mobile selector
  * sheet: the no-override row, an Organization Profiles group and a Personal
  * Profiles group (owner icons, effective-default star), then the
- * `Manage profiles...` and `Default Profiles for Repos` entries. The
+ * `Manage profiles...` and `Default profiles for repos` entries. The
  * no-override row drops the override and the effective default still applies,
  * so it is labeled `Default profile` whenever the context has one and only
  * says `No profile` when nothing applies at all.

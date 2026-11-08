@@ -4077,7 +4077,7 @@
       "duplicateName": "A command with this name already exists in this profile"
     },
     "repoBindings": {
-      "title": "Default Profiles for Repos",
+      "title": "Default profiles for repos",
       "add": "Add default",
       "empty": "No defaults configured",
       "emptyDescription": "Add a default to automatically apply a profile when starting sessions for a repo.",

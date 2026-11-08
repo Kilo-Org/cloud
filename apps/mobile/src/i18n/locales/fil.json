@@ -4016,7 +4016,7 @@
       "duplicateName": "Mayroon nang command na may ganyang pangalan sa profile na ito"
     },
     "repoBindings": {
-      "title": "Mga Default na Profile para sa Repos",
+      "title": "Mga default na profile para sa Repos",
       "add": "Magdagdag ng default",
       "empty": "Walang mga default na na-configure",
       "emptyDescription": "Magdagdag ng default para awtomatikong maglapat ng profile kapag nagsisimula ng mga session para sa isang repo.",

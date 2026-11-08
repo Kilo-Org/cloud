@@ -431,6 +431,12 @@ describe('admin.kiloPass.cancelAndRefundKiloPassBulk', () => {
     expect(result.results[0].refundedAmountCents).toBeNull();
     expect(stripeMock.subscriptions.cancel).toHaveBeenCalledWith('sub_no_refund');
     expect(stripeMock.invoices.list).not.toHaveBeenCalled();
+    expect(await refundAuditRows()).toEqual([
+      expect.objectContaining({
+        target_id: target.id,
+        message: 'Cancelled Kilo Pass without a Stripe refund via bulk admin cancel',
+      }),
+    ]);
     expect(stripeMock.invoicePayments.list).not.toHaveBeenCalled();
     expect(stripeMock.refunds.create).not.toHaveBeenCalled();
 
@@ -476,6 +482,12 @@ describe('admin.kiloPass.cancelAndRefundKiloPassBulk', () => {
     expect(result.summary.cancelled).toBe(1);
     expect(result.summary.totalRefundedCents).toBe(0);
     expect(result.results[0].refundedAmountCents).toBeNull();
+    expect(await refundAuditRows()).toEqual([
+      expect.objectContaining({
+        target_id: target.id,
+        message: 'Cancelled Kilo Pass with no refundable payment via bulk admin cancel',
+      }),
+    ]);
   });
 
   it('continues the batch when one user throws; committed users stay committed', async () => {

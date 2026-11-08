@@ -630,6 +630,35 @@ describe('admin.cancelAndRefundKiloPass', () => {
     ]);
   });
 
+  test('a cancellation with no refundable payment is recorded as such', async () => {
+    const superadmin = await insertTestUser({ is_admin: true, is_super_admin: true });
+    const target = await insertTestUser();
+    await insertActiveKiloPass(target.id, `sub_no_invoice_${crypto.randomUUID()}`);
+
+    jest.spyOn(stripeClient.subscriptions, 'cancel').mockResolvedValue({} as never);
+    jest.spyOn(stripeClient.invoices, 'list').mockResolvedValue({ data: [] } as never);
+
+    const caller = await createCallerForUser(superadmin.id);
+    const result = await caller.admin.users.cancelAndRefundKiloPass({
+      userId: target.id,
+      reason: 'policy',
+    });
+    expect(result).toEqual({
+      success: true,
+      refundedAmountCents: null,
+      balanceResetAmountUsd: null,
+      alreadyBlocked: false,
+    });
+
+    const audits = await kiloPassAuditRows(target.id);
+    expect(audits).toEqual([
+      expect.objectContaining({
+        actor_id: superadmin.id,
+        message: 'Cancelled Kilo Pass with no refundable payment',
+      }),
+    ]);
+  });
+
   test('a refund that fails after the subscription was cancelled is still attributed', async () => {
     const superadmin = await insertTestUser({ is_admin: true, is_super_admin: true });
     const target = await insertTestUser();

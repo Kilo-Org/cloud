@@ -253,6 +253,28 @@ describe('live Agents list across a transient socket empty', () => {
     expect(liveSessionContent(readyContext, live())).toBe('rows');
   });
 
+  it('keeps the confirmed rows when the confirmation answer fails', async () => {
+    state.request
+      .mockResolvedValueOnce({ sessions: [liveRow] })
+      .mockRejectedValue(new Error('worker unavailable'));
+    await render();
+    expect(ids()).toEqual(['a1']);
+
+    await act(async () => {
+      client.setQueryData(QUERY_KEY, { sessions: [] });
+      await flush();
+    });
+    expect(ids()).toEqual(['a1']);
+
+    await settleFetch();
+    // A failed answer cannot confirm the emptiness either: the rows stay, and
+    // the section reports its retryable failure beside them instead of the
+    // zero state.
+    expect(ids()).toEqual(['a1']);
+    expect(live().terminalError?.kind).toBe('retryable');
+    expect(liveSessionContent(readyContext, live())).toBe('rows');
+  });
+
   it('reports the zero state once an accepted answer confirms the emptiness', async () => {
     state.request.mockResolvedValueOnce({ sessions: [liveRow] });
     const confirmation = deferred<CachedActiveSessionsData>();

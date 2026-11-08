@@ -134,14 +134,8 @@ export function useAgentSessionSearch(options: UseAgentSessionSearchOptions) {
 
 // ── Main hook ────────────────────────────────────────────────────────
 
-/**
- * Retention bound for the last server-confirmed rows the live-only hook keeps
- * across an unconfirmed emptiness. Matches the tray's own candidate ceiling
- * (`CLOUD_AGENT_CANDIDATE_LIMIT` in `apps/web/src/lib/active-sessions-list.ts`):
- * a retention that can hold more rows than the context provides is not a
- * bound.
- */
-const LAST_CONFIRMED_LIMIT = 500;
+/** Nothing retained for this scope, shared so the empty case allocates nothing. */
+const NO_CONFIRMED_ROWS: ActiveSession[] = [];
 
 export function useAgentSessions(options?: UseAgentSessionsOptions) {
   const sortBy = resolveSortBy(options?.sortBy);
@@ -389,32 +383,37 @@ export function useLiveAgentSessions(options?: UseAgentSessionsOptions) {
     [active.canRead, active.data, options?.organizationId]
   );
 
-  // The last accepted server answer lists sessions while the cache reads
-  // empty. The emptiness came from a write no server answer confirmed (a
-  // socket write, or the floor poll's own manual `setQueryData`), so it is not
-  // proof that nothing runs. The surface keeps the last confirmed rows when
-  // this hook instance saw them, and stays unresolved (its loading state, then
-  // the answer) when it did not — a remount, such as the route reset to Home
-  // this finding reports, starts from the completed answer's ids alone. Only
-  // an accepted answer that lists no sessions resolves the zero state. The
-  // retention is capped at the tray's own candidate ceiling.
-  const lastConfirmedRef = useRef<readonly ActiveSession[]>([]);
-  const confirmedScopeRef = useRef('');
+  // The last accepted server answer listed sessions while the cache reads
+  // empty: that emptiness came from a write no server answer confirmed (a
+  // socket write, or the floor poll's own `setQueryData`), so it is not proof
+  // that nothing runs. The surface keeps the rows this hook instance last
+  // rendered, and a fresh instance (a remount, such as the route reset this
+  // finding reports) paints its loading card until the confirmation answer
+  // lands. Only an accepted answer that lists no sessions resolves the zero
+  // state.
+  const confirmedRowsRef = useRef<{ scopeKey: string; rows: ActiveSession[] }>({
+    scopeKey: '',
+    rows: NO_CONFIRMED_ROWS,
+  });
   const scopeKey = JSON.stringify(active.queryKey);
-  if (confirmedScopeRef.current !== scopeKey) {
-    confirmedScopeRef.current = scopeKey;
-    // A context change must never show the previous context's rows (the same
-    // rule the render hold's scope key keeps).
-    lastConfirmedRef.current = [];
-  }
-  if (cacheSessions.length > 0) {
-    lastConfirmedRef.current = cacheSessions.slice(0, LAST_CONFIRMED_LIMIT);
-  }
+  useEffect(() => {
+    if (cacheSessions.length > 0) {
+      confirmedRowsRef.current = { scopeKey, rows: cacheSessions };
+    } else if (confirmedRowsRef.current.scopeKey !== scopeKey) {
+      // A context change must never show the previous context's rows (the same
+      // rule the render hold's scope key keeps).
+      confirmedRowsRef.current = { scopeKey, rows: NO_CONFIRMED_ROWS };
+    }
+  }, [cacheSessions, scopeKey]);
+  const retained = confirmedRowsRef.current;
+  const confirmedRows = retained.scopeKey === scopeKey ? retained.rows : NO_CONFIRMED_ROWS;
   const unconfirmedEmpty = cacheSessions.length === 0 && metadata.acceptedSessionIds.size > 0;
-  const activeSessions = unconfirmedEmpty ? lastConfirmedRef.current : cacheSessions;
+  const activeSessions = unconfirmedEmpty ? confirmedRows : cacheSessions;
   // One confirmation per emptiness episode: the answer either lists the rows
   // again or confirms the emptiness, and a repeated empty (rows back, then
-  // gone again) re-arms it. Without the latch a failing answer would loop.
+  // gone again) re-arms it. Without the latch a failing answer would loop. The
+  // fetch is also what a remount needs: the cached empty list can be fresh
+  // enough that mounting the query fetches nothing.
   const confirmationRequestedRef = useRef(false);
   // Aliased so the confirmation effect lists stable values (the query object
   // itself is rebuilt every render).
@@ -441,10 +440,6 @@ export function useLiveAgentSessions(options?: UseAgentSessionsOptions) {
     current: activeSessions,
     scopeKey,
     canHold: active.canRead,
-    // While the last accepted answer still lists the rows, only its answer
-    // resolves the card; the hold's reconnect timer must not end a window the
-    // server has not ruled on.
-    pauseUnconfirmed: unconfirmedEmpty,
   });
 
   return {

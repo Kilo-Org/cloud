@@ -170,6 +170,10 @@ describe('redactEmailAddressesInAuditText', () => {
       'politique: [redacted-email]'
     );
 
+    expect(redactEmailAddressesInAuditText("blocked after o'brien@example.com wrote in")).toBe(
+      'blocked after [redacted-email] wrote in'
+    );
+
     expect(redactEmailAddressesInAuditText('policy violation, tier_19, 2nd offence')).toBe(
       'policy violation, tier_19, 2nd offence'
     );

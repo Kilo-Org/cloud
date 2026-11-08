@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- The mounted Home matrix covers live provenance, admission, and independent recovery actions. */
-import { createElement, type ReactNode } from 'react';
+import { createElement, type ReactNode, useEffect } from 'react';
 import * as ReactQuery from '@tanstack/react-query';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -91,6 +91,11 @@ vi.mock('@/lib/a11y/motion', () => ({
 }));
 vi.mock('expo-router', () => ({
   useNavigationContainerRef: () => ({ addListener: () => () => undefined }),
+  // The account picker closes itself on the owning screen's focus loss; this
+  // suite keeps Home focused, so the effect lives as long as the tree.
+  useFocusEffect: (effect: Parameters<typeof useEffect>[0]) => {
+    useEffect(effect, [effect]);
+  },
   useRouter: () => ({
     canGoBack: () => false,
     push: (path: string) => {
@@ -132,6 +137,7 @@ vi.mock('@/components/ui/text', async () => {
 });
 vi.mock('@/components/ui/icons', () => ({
   AlertCircle: 'AlertCircle',
+  Bot: 'Bot',
   ChevronDown: 'ChevronDown',
   GitMerge: 'GitMerge',
   GitPullRequest: 'GitPullRequest',
@@ -176,11 +182,14 @@ vi.mock('@/lib/a11y/announce', () => ({
   },
 }));
 vi.mock('@/lib/hooks/use-agent-sessions', async () => {
-  const { useEffect } = await import('react');
+  // `vi.mock` factories are hoisted above the file's imports, so React has to
+  // be loaded here; binding it to a name keeps the file's own `useEffect` import
+  // from being shadowed.
+  const react = await import('react');
   return {
     useLiveAgentSessions: (options: Parameters<typeof useLiveAgentSessions>[0]) => {
       state.liveQuery(options);
-      useEffect(() => {
+      react.useEffect(() => {
         state.owners += 1;
         return () => {
           state.owners -= 1;

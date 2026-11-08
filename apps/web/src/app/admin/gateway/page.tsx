@@ -16,6 +16,7 @@ import { PreferredProviderOrderContent } from '@/app/admin/gateway/PreferredProv
 import { CustomPricingContent } from '@/app/admin/gateway/CustomPricingContent';
 import { OrganizationFeaturesContent } from '@/app/admin/gateway/OrganizationFeaturesContent';
 import ApiRequestLogPage from '@/app/admin/api-request-log/page';
+import { ProviderMetadataContent } from '@/app/admin/gateway/ProviderMetadataContent';
 import RequestLoggingOptInsContent from '@/app/admin/request-logging-opt-ins/RequestLoggingOptInsContent';
 
 const VALID_TABS: readonly string[] = [
@@ -29,6 +30,7 @@ const VALID_TABS: readonly string[] = [
   'custom-pricing',
   'organization-features',
   'api-request-log',
+  'provider-metadata',
 ];
 type Tab =
   | 'sync-providers'
@@ -40,7 +42,8 @@ type Tab =
   | 'provider-order'
   | 'custom-pricing'
   | 'organization-features'
-  | 'api-request-log';
+  | 'api-request-log'
+  | 'provider-metadata';
 const isValidTab = (value: string | null): value is Tab =>
   value !== null && VALID_TABS.includes(value);
 
@@ -111,6 +114,9 @@ export default function AdminGatewayPage() {
             <TabsTrigger value="api-request-log" className={tabTriggerClass}>
               API Request Log
             </TabsTrigger>
+            <TabsTrigger value="provider-metadata" className={tabTriggerClass}>
+              Provider Metadata
+            </TabsTrigger>
           </TabsList>
           <TabsContent value="sync-providers" className="mt-4">
             <SyncProvidersContent />
@@ -175,6 +181,9 @@ export default function AdminGatewayPage() {
             <div className="mt-8">
               <RequestLoggingOptInsContent />
             </div>
+          </TabsContent>
+          <TabsContent value="provider-metadata" className="mt-4">
+            <ProviderMetadataContent />
           </TabsContent>
         </Tabs>
       </div>

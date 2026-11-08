@@ -9,6 +9,10 @@ import {
 import { eq, and, isNull } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import {
+  GITLAB_PROJECT_NOT_IN_CACHE_MESSAGE,
+  matchCachedGitLabProject,
+} from '@/lib/integrations/platforms/gitlab/project-scope';
+import {
   requireNumericPlatformRepositories,
   shouldSyncProviderRepositories,
   type Owner,
@@ -43,6 +47,7 @@ import {
 } from '@/lib/integrations/platforms/gitlab/instance-url';
 import { GITLAB_RECONNECT_REQUIRED_MESSAGE } from '@/lib/integrations/platforms/gitlab/credential-errors';
 import {
+  mutateGitLabMetadata,
   mutateGitLabMetadataInTransaction,
   readGitLabMetadataInTransaction,
 } from '@/lib/integrations/platforms/gitlab/metadata-mutation';
@@ -348,7 +353,7 @@ export async function listGitLabBranches(
   owner: Owner,
   integrationId: string,
   actor: GitLabCredentialActor,
-  projectPath: string // e.g., "group/project" or project ID
+  projectPath: string // must be a cached full path, e.g. "group/project"
 ) {
   const ownershipCondition = ownerCondition(owner);
 
@@ -371,11 +376,24 @@ export async function listGitLabBranches(
     });
   }
 
+  // The connection's cached repository set is the project authorization
+  // scope: a caller-supplied path must be one of its full paths, compared
+  // case-insensitively end-to-end (the same rule authorizeProject enforces
+  // for the review layer). The refusal comes before any token is minted, and
+  // the fetch uses the cache's canonical full path in stored casing.
+  const match = matchCachedGitLabProject(integration, projectPath);
+  if (!match) {
+    throw new TRPCError({
+      code: 'NOT_FOUND',
+      message: GITLAB_PROJECT_NOT_IN_CACHE_MESSAGE,
+    });
+  }
+
   const accessToken = await getValidGitLabToken(integration, actor);
   const metadata = integration.metadata as { gitlab_instance_url?: string } | null;
   const instanceUrl = normalizeInstanceUrl(metadata?.gitlab_instance_url);
 
-  const branches = await fetchGitLabBranches(accessToken, projectPath, instanceUrl);
+  const branches = await fetchGitLabBranches(accessToken, match.full_name, instanceUrl);
 
   return {
     branches: branches.map(b => ({
@@ -463,7 +481,10 @@ export async function disconnectGitLabIntegration(owner: Owner) {
 /**
  * Regenerate webhook secret for a GitLab integration
  * This is useful when the user has lost the webhook secret and needs to reconfigure
- * their GitLab webhook settings
+ * their GitLab webhook settings.
+ *
+ * The new secret is merged into the stored metadata under the integration
+ * lifecycle lock, so a concurrent connect or disconnect keeps its own fields.
  */
 export async function regenerateWebhookSecret(owner: Owner): Promise<{ webhookSecret: string }> {
   const ownershipCondition = ownerCondition(owner);
@@ -489,19 +510,7 @@ export async function regenerateWebhookSecret(owner: Owner): Promise<{ webhookSe
 
   const newWebhookSecret = randomBytes(32).toString('hex');
 
-  const existingMetadata = (integration.metadata || {}) as Record<string, unknown>;
-  const updatedMetadata = {
-    ...existingMetadata,
-    webhook_secret: newWebhookSecret,
-  };
-
-  await db
-    .update(platform_integrations)
-    .set({
-      metadata: updatedMetadata,
-      updated_at: new Date().toISOString(),
-    })
-    .where(eq(platform_integrations.id, integration.id));
+  await mutateGitLabMetadata(integration.id, { set: { webhook_secret: newWebhookSecret } });
 
   return { webhookSecret: newWebhookSecret };
 }

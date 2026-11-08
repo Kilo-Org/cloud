@@ -2,8 +2,16 @@
 // Select the workspaces whose typecheck and lint results a change can alter.
 //
 // Usage: node scripts/affected-workspaces.mjs <base-sha>
-// Prints JSON: { full, reasons, full_checks, dirs, packages, test_only_dirs,
-// test_only_packages, test_only_files }.
+//        node scripts/affected-workspaces.mjs --groups
+// Prints JSON: { base, full, reasons, full_checks, dirs, packages,
+// test_only_dirs, test_only_packages, test_only_files }, where `base` is the
+// revision the selection was computed for. `dirs` is also the selection the test
+// matrix consumes (scripts/changed-workspaces.sh), so it already carries the
+// workspace-despite-document rule: paths no check reads select nothing. `base`
+// lets that consumer reuse this document instead of selecting a second time in
+// one CI run.
+// With --groups it instead prints the CI matrix groups for the selection JSON on
+// standard input.
 //
 // A workspace is affected when one of its files changed, or when it reads an
 // affected workspace. A workspace reads another through a workspace:* entry in
@@ -23,11 +31,11 @@ import { posix } from 'node:path';
 
 // Root paths that change how every workspace is checked.
 const GLOBAL = [
-  /^(package\.json|pnpm-workspace\.yaml|\.npmrc|\.pnpmfile\.cjs|\.nvmrc|\.oxlintrc\.json|\.oxfmtrc\.json|oxlint-plugin-drizzle\.js|tsconfig[^/]*\.json)$/,
+  /^(package\.json|\.npmrc|\.pnpmfile\.cjs|\.nvmrc|\.oxlintrc\.json|\.oxfmtrc\.json|oxlint-plugin-drizzle\.js|tsconfig[^/]*\.json)$/,
   /^(patches|tools\/oxlint)\//,
   /^\.github\/workflows\/(ci|kilo-app-ci)\.yml$/,
   /^\.github\/actions\//,
-  /^scripts\/(affected-workspaces\.mjs|changed-dependencies\.mjs|trpc-declaration-key\.mjs|harness-sdk-build-key\.mjs)$/,
+  /^scripts\/(affected-workspaces\.mjs|changed-dependencies\.mjs|build-key-inputs\.mjs|trpc-declaration-key\.mjs|harness-sdk-build-key\.mjs|ttsc-plugin-key\.mjs)$/,
 ];
 
 // Root scripts that change one check for every workspace, and nothing else.
@@ -56,6 +64,20 @@ const NEUTRAL = [
   /^(\.specs|\.plans|docs|dev|\.kilo|\.agents|\.vscode|\.husky|\.cursor|script|\.github|scripts)\//,
   /^(LICENSE|skills-lock\.json|kilo\.json|flake\.nix|flake\.lock|\.syft\.yaml|\.gitignore|\.gitattributes|\.envrc|\.kilocodeignore|\.prettierignore|\.env\.local\.example)$/,
 ];
+
+// Paths that no check reads on its own: documents, and the root locations above
+// that hold no workspace input. A suite that reads a document as data selects
+// itself through `test_only_*` instead.
+export function isNeutral(file) {
+  return NEUTRAL.some(pattern => pattern.test(file));
+}
+
+// Manifests whose effect reaches one workspace at a time through its resolved
+// dependency graph (scripts/changed-dependencies.mjs). They select the
+// workspaces whose graph moved, and everything only when the graph cannot
+// attribute the change: a root or unscoped dependency, a workspace glob or an
+// installation-policy key, or an unreadable manifest.
+const DEPENDENCY_MANIFESTS = new Set(['pnpm-lock.yaml', 'pnpm-workspace.yaml']);
 
 const SOURCE_GLOBS = ['ts', 'tsx', 'mts', 'cts', 'js', 'mjs', 'cjs', 'json', 'jsonc'];
 
@@ -179,7 +201,7 @@ function relativeReferences(dirs) {
   return references;
 }
 
-export function selectAffected({ items, changedFiles, lockfileDirs, references }) {
+export function selectAffected({ items, changedFiles, dependencyDirs, references }) {
   const dirs = items.map(item => item.dir);
   const dirOf = new Map(items.map(item => [item.name, item.dir]));
   const nameOf = new Map(items.map(item => [item.dir, item.name]));
@@ -248,11 +270,13 @@ export function selectAffected({ items, changedFiles, lockfileDirs, references }
       fullChecks.add(script[1]);
       continue;
     }
-    if (file === 'pnpm-lock.yaml') {
-      if (lockfileDirs.includes('*') || lockfileDirs.includes('.')) {
-        reasons.push('pnpm-lock.yaml changes root or unscoped dependencies');
+    if (DEPENDENCY_MANIFESTS.has(file)) {
+      if (dependencyDirs.includes('*') || dependencyDirs.includes('.')) {
+        reasons.push(`${file} changes root or unscoped dependencies`);
       }
-      for (const lockDir of lockfileDirs) if (readers.has(lockDir)) changed.add(lockDir);
+      for (const dependencyDir of dependencyDirs) {
+        if (readers.has(dependencyDir)) changed.add(dependencyDir);
+      }
       continue;
     }
     const rootReaders = rootReads.filter(
@@ -264,7 +288,7 @@ export function selectAffected({ items, changedFiles, lockfileDirs, references }
     }
     const owned = OWNED.find(([pattern]) => pattern.test(file));
     if (owned) changed.add(owned[1]);
-    if (owned || rootReaders.length || NEUTRAL.some(pattern => pattern.test(file))) continue;
+    if (owned || rootReaders.length || isNeutral(file)) continue;
     reasons.push(`${file} is outside every workspace`);
   }
 
@@ -298,8 +322,52 @@ export function selectAffected({ items, changedFiles, lockfileDirs, references }
   };
 }
 
-if (import.meta.main) {
-  const base = process.argv[2] ?? '';
+// Workspaces whose typecheck runs beside apps/web (scripts/web-env rides along
+// with it).
+const TYPECHECK_WEB_PACKAGES = ['web', '@kilocode/storybook'];
+
+// Workspaces that another check owns: the web and trpc groups, kilo-app CI and
+// extension CI. The packages group covers everything else.
+const PACKAGES_GROUP_EXCLUDED = [
+  'web',
+  '@kilocode/trpc',
+  '@kilocode/storybook',
+  'kilo-app',
+  'kilo-extension',
+];
+
+// Workspaces the rest lint group leaves out: kilo-app CI lints the app, and the
+// extension belongs to the trpc group.
+const LINT_REST_EXCLUDED_DIRS = ['apps/mobile', 'apps/extension'];
+
+// The CI matrix groups that a selection pays for (the ci.yml `changes` job).
+// The trpc rows repeat the extension's own typecheck and lint against the built
+// tRPC declarations, and extension-ci.yml runs both for the same selection:
+// `scripts/changed-workspaces.sh` reads this detector's `dirs`, so a pull
+// request that selects the extension there also runs its `verify` job. The rows
+// therefore run only when the selection is a full check of that check, they
+// keep the extension's gate on the merge queue, whose workflow has no
+// extension trigger, and a full lint also covers apps/mobile there, because
+// kilo-app CI lints the app only when the app is affected.
+export function selectGroups({ full_checks: fullChecks = [], dirs = [], packages = [] }) {
+  const everyTypecheck = fullChecks.includes('typecheck');
+  const everyLint = fullChecks.includes('lint');
+  const typecheck_groups = [];
+  if (everyTypecheck || TYPECHECK_WEB_PACKAGES.some(name => packages.includes(name))) {
+    typecheck_groups.push('web');
+  }
+  if (everyTypecheck) typecheck_groups.push('trpc');
+  if (everyTypecheck || packages.some(name => !PACKAGES_GROUP_EXCLUDED.includes(name))) {
+    typecheck_groups.push('packages');
+  }
+  const lint_groups = [];
+  if (everyLint) lint_groups.push('trpc');
+  if (everyLint || dirs.some(dir => !LINT_REST_EXCLUDED_DIRS.includes(dir)))
+    lint_groups.push('rest');
+  return { typecheck_groups, lint_groups };
+}
+
+function detect(base) {
   const items = workspaces();
   const valid =
     /^[0-9a-f]{40}$/.test(base) &&
@@ -314,11 +382,26 @@ if (import.meta.main) {
   const changedFiles = valid
     ? git('diff', '--name-only', base, 'HEAD').split('\n').filter(Boolean)
     : ['<no base revision>'];
-  const lockfileDirs = changedFiles.includes('pnpm-lock.yaml')
+  const dependencyDirs = changedFiles.some(file => DEPENDENCY_MANIFESTS.has(file))
     ? execFileSync('node', ['scripts/changed-dependencies.mjs', base], { encoding: 'utf8' })
         .split('\n')
         .filter(Boolean)
     : [];
   const references = valid ? relativeReferences(items.map(item => item.dir)) : [];
-  console.log(JSON.stringify(selectAffected({ items, changedFiles, lockfileDirs, references })));
+  console.log(
+    JSON.stringify({
+      base,
+      ...selectAffected({ items, changedFiles, dependencyDirs, references }),
+    })
+  );
+}
+
+// Print the CI matrix groups for the selection JSON on standard input.
+function printGroups() {
+  console.log(JSON.stringify(selectGroups(JSON.parse(readFileSync(0, 'utf8')))));
+}
+
+if (import.meta.main) {
+  if (process.argv[2] === '--groups') printGroups();
+  else detect(process.argv[2] ?? '');
 }

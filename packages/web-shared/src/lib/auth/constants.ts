@@ -40,6 +40,7 @@ export const hosted_domain_specials = {
   linkedin: '@@linkedin@@',
   discord: '@@discord@@',
   openai: '@@openai@@',
+  claude: '@@claude@@',
   email: '@@email@@',
   fake_devonly: '@@fake@@',
   kilocode_admin: 'kilocode.ai',

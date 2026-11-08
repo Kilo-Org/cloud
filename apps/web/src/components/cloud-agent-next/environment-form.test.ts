@@ -45,6 +45,7 @@ describe('hasEnvironmentFormChanges', () => {
   const saved = {
     name: 'Saved environment',
     script: toEnvironmentScript(['export A=1', 'echo "$A"']),
+    startScript: '',
     variablesText: 'TOKEN=<unchanged>\nPLAIN="saved"',
     sandboxAllocation: 'cloudflare-single',
     networkAccess: { mode: 'full', domains: '' } satisfies NetworkAccessDraft,
@@ -57,6 +58,7 @@ describe('hasEnvironmentFormChanges', () => {
   test.each([
     { name: 'Renamed environment' },
     { script: 'pnpm install' },
+    { startScript: 'docker compose up -d' },
     { variablesText: 'TOKEN="replacement"' },
     { variablesText: 'PLAIN="saved"' },
     { variablesText: 'TOKEN=<unchanged>\nPLAIN="changed"' },

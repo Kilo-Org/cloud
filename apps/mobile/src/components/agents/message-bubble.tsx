@@ -1,10 +1,11 @@
+/* eslint-disable max-lines -- the transcript element-tree suite asserts this component's unrendered tree, so splitting the failure footer behind a component boundary would hide every assertion's target */
 import { memo, useCallback, useMemo } from 'react';
 import {
   type MessageDeliveryState,
   type Part,
   type StoredMessage,
 } from '@kilocode/cloud-agent-sdk';
-import { Clock } from '@/components/ui/icons';
+import { AlertCircle, Clock } from '@/components/ui/icons';
 import { type AccessibilityActionEvent, Platform, Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
@@ -62,6 +63,19 @@ type MessageBubbleProps = {
   holdQueuedSlot?: boolean;
   /** Retries a failed message. The failure footer renders only when supplied. */
   onRetryMessage?: (message: StoredMessage) => void;
+  /**
+   * Opens the credit purchase screen, for a failed turn the account's own
+   * balance caused. Adding credits never needs the session to accept a
+   * re-send, so this action renders even where `retryAvailable` is false.
+   */
+  onAddCredits?: () => void;
+  /**
+   * Whether this row's session can accept a re-send now. When false the failure
+   * footer keeps its statement and drops the Retry, so a read-only transcript or
+   * a session without a live transport still says why the turn failed. Defaults
+   * to true.
+   */
+  retryAvailable?: boolean;
   /** Copies a failed user message's text back into the composer. */
   onCopyToComposer?: (text: string) => void;
   /** Restores a canceled queued message's prompt back into the composer. */
@@ -87,6 +101,8 @@ function MessageBubbleImpl({
   onLongPressDetails,
   holdQueuedSlot,
   onRetryMessage,
+  onAddCredits,
+  retryAvailable,
   onCopyToComposer,
   onRestoreQueued,
   condenseToolCalls,
@@ -147,32 +163,60 @@ function MessageBubbleImpl({
     );
   }
 
-  // Failed-row footer. Renders only when the relevant handler is wired
+  // Failed-row footer. Renders when the relevant handler is wired
   // (mobile-w2b wires onRetryMessage/onCopyToComposer); a delivery row needs
-  // Retry or Copy, an assistant row needs Retry only.
-  const failure = selectMessageFailure({ deliveryState, info: message.info });
+  // Retry or Copy, an assistant row needs Retry or, when the account's balance
+  // caused the failure, Add credits. A caller that already knows the session
+  // cannot accept a re-send passes `retryAvailable: false`: the footer then
+  // still states the failure, with no action that could not act.
+  const failure = selectMessageFailure({ deliveryState, info: message.info, retryAvailable });
   const relevantHandlerWired =
-    failure?.kind === 'delivery'
-      ? onRetryMessage !== undefined || onCopyToComposer !== undefined
-      : onRetryMessage !== undefined;
-  // The footer is the failed row's status, so it sits under the row it names: a
-  // user row's bubble is end-aligned, so its title, detail and action row are
-  // too; an assistant row's stays on the leading edge. `items-end` is logical.
+    retryAvailable === false ||
+    (failure !== null &&
+      (failure.kind === 'delivery'
+        ? onRetryMessage !== undefined || onCopyToComposer !== undefined
+        : onRetryMessage !== undefined || (failure.canAddCredits && onAddCredits !== undefined)));
+  // The footer is the failed turn's status, so it sits in the column that turn
+  // occupies rather than the row that carries it: a message that never reached
+  // the agent is the user's own row, and its title, detail and action row stay
+  // under that bubble, which is end-aligned; a failed response — the
+  // assistant's own error, and an execution failure carried by the question —
+  // takes the assistant's leading edge like every other block of that turn.
+  // `items-end` is logical, so the user's column mirrors with the interface.
   // `text-right` is how a line end-aligns here: NativeWind drops
   // `text-align: end`, and RN resolves `right` against the interface direction,
-  // so the copy still ends on the trailing side in an RTL interface.
-  const trailingFailure = isUser;
+  // so the copy still ends on the trailing side in an RTL interface. The
+  // assistant's column names no alignment: its title and detail keep the
+  // interface's own start edge, as the assistant rows around them do.
+  const trailingFailure = failure?.side === 'user';
   const failureFooter =
     failure !== null && relevantHandlerWired ? (
-      <View className={cn('gap-1 px-4 py-1', trailingFailure && 'items-end')}>
-        <Text
-          className={cn('text-sm text-destructive', trailingFailure && 'text-right')}
-          accessibilityLabel={messageFailureLabel(failure)}
-        >
-          {failure.title}
-        </Text>
+      <View className={cn('gap-2 px-4 py-1', trailingFailure && 'items-end')}>
+        <View className={cn('flex-row items-center gap-1.5', trailingFailure && 'justify-end')}>
+          {failure.error ? (
+            // Every failure that reports an error carries the same marker; a
+            // message the person stopped reports a neutral status and carries
+            // none. The marker is the state, not copy: the title beside it says
+            // what happened, so it carries no text of its own for a screen
+            // reader.
+            <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+              <AlertCircle size={14} color={colors.destructive} />
+            </View>
+          ) : null}
+          <Text
+            className={cn('text-sm text-destructive', trailingFailure && 'text-right')}
+            accessibilityLabel={messageFailureLabel(failure)}
+          >
+            {failure.title}
+          </Text>
+        </View>
         {failure.detail !== null ? (
-          <Text className={cn('text-xs text-muted-foreground', trailingFailure && 'text-right')}>
+          <Text
+            className={cn(
+              'text-sm leading-[1.25rem] text-muted-foreground',
+              trailingFailure && 'text-right'
+            )}
+          >
             {failure.detail}
           </Text>
         ) : null}
@@ -189,6 +233,24 @@ function MessageBubbleImpl({
               accessibilityLabel={t('common.retry')}
             >
               <Text>{t('common.retry')}</Text>
+            </Button>
+          ) : null}
+          {failure.canAddCredits && onAddCredits ? (
+            // The failure's one recovery action, so it takes the accent surface
+            // the person's own bubble and the enabled send control fill with,
+            // in both schemes; the theme's `--primary` is olive in light, which
+            // would read as one more secondary action here. The label uses that
+            // surface's own ink, because the primary label ink is white in the
+            // light scheme.
+            <Button
+              variant="default"
+              size="sm"
+              className={cn(STATE_ACTION_CLASS, 'bg-accent-soft')}
+              onPress={onAddCredits}
+              accessibilityRole="button"
+              accessibilityLabel={t('addCredits.cta')}
+            >
+              <Text className="text-accent-soft-foreground">{t('addCredits.cta')}</Text>
             </Button>
           ) : null}
           {failure.canCopy && onCopyToComposer && copyText !== '' ? (

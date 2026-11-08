@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { SessionMessageList } from './session-message-list';
 import { getSessionTranscriptItemKey, type SessionTranscriptItem } from './session-transcript';
+import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
 import { MAX_RESUME_OLDER_LOADS } from '@/lib/session-resume';
 import { stubTextPart, stubUserMessage } from '@kilocode/cloud-agent-sdk/test-helpers';
 
@@ -333,6 +334,27 @@ describe('SessionMessageList pagination header', () => {
   });
 });
 
+describe('SessionMessageList scroll-to-bottom control', () => {
+  it('carries the full touch target on its own pressable node', () => {
+    const renderer = mountList();
+    scrollAwayFromBottom();
+
+    // A control-size audit reads the pressable's own rect, and `hitSlop` does
+    // not move it, so the target has to be the class. The shared 48pt box is
+    // the Android minimum and clears the 44pt design target on iOS.
+    const button = renderer.root.find(node => Object.is(node.type, 'Pressable'));
+    expect(String(button.props.className)).toContain(ICON_TARGET_BOX_CLASS);
+    expect(button.props.hitSlop).toBeUndefined();
+
+    // The visible circle stays compact inside the enlarged target. Its explicit
+    // px keep NativeWind's 14pt rem from shrinking it back below the look it
+    // shipped with (`h-10` renders at 35pt).
+    const circle = button.find(node => Object.is(node.type, 'View'));
+    expect(String(circle.props.className)).toContain('h-[35px] w-[35px]');
+    expect(String(circle.props.className)).toContain('rounded-full');
+  });
+});
+
 describe('SessionMessageList landscape side insets', () => {
   it('keeps the module style reference and a 16pt control offset in portrait', () => {
     const renderer = mountList();
@@ -366,6 +388,9 @@ describe('SessionMessageList landscape side insets', () => {
       paddingRight: 59,
     });
     expect(scrollButton(renderer).props.style).toEqual({ right: 75 });
+    // The control box grows inward from that offset, so only the wrapper's own
+    // style decides its distance from the screen edge: the raised end inset
+    // still clears the 48pt box.
   });
 
   it('carries the side paddings when a content bottom inset is provided', () => {

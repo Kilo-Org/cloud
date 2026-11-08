@@ -1,5 +1,5 @@
 import { ReasoningDetailsTransform } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
-import { cachedEnhancedDirectByokModelList } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/model-list';
+import { cachedDirectByokModelList } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/model-list';
 import {
   apiKeyUpstream,
   type DirectByokProvider,
@@ -15,51 +15,5 @@ export default {
     responseTransforms: ReasoningDetailsTransform.ReasoningContent,
   }),
   transformRequest() {},
-  models: cachedEnhancedDirectByokModelList({
-    providerId: 'morph-byok',
-    recommendedModels: [
-      {
-        id: 'morph-qwen35-397b',
-        name: 'Qwen 3.5 397B',
-        flags: ['vision', 'reasoning'],
-        context_length: 262144,
-        max_completion_tokens: 131072,
-      },
-      {
-        id: 'morph-minimax27-230b',
-        name: 'MiniMax M2.7',
-        flags: ['reasoning'],
-        context_length: 196608,
-        max_completion_tokens: 196608,
-      },
-      {
-        id: 'morph-minimax3-428b',
-        name: 'MiniMax M3',
-        flags: ['vision', 'reasoning'],
-        context_length: 256000,
-        max_completion_tokens: 256000,
-      },
-      {
-        id: 'morph-glm52-744b',
-        name: 'GLM-5.2',
-        flags: ['reasoning'],
-        context_length: 1048576,
-        max_completion_tokens: 1048576,
-      },
-      {
-        id: 'morph-qwen36-27b',
-        name: 'Qwen 3.6 27B',
-        flags: ['reasoning'],
-        context_length: 131072,
-        max_completion_tokens: 131072,
-      },
-      {
-        id: 'morph-dsv4flash',
-        name: 'DeepSeek V4 Flash',
-        flags: ['reasoning'],
-        context_length: 1048576,
-        max_completion_tokens: 1048576,
-      },
-    ],
-  }),
+  models: cachedDirectByokModelList('morph-byok'),
 } satisfies DirectByokProvider;

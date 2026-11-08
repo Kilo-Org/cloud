@@ -85,10 +85,15 @@ type TableMeta = {
   effectiveGranularity: Granularity;
 };
 
-function resolveTier(granularity: Granularity, startDate: string): TableMeta {
+export function resolveTier(
+  granularity: Granularity,
+  startDate: string,
+  endDate: string
+): TableMeta {
   const now = Date.now();
-  const startMs = new Date(startDate).getTime();
-  const ageDays = (now - startMs) / (24 * 60 * 60 * 1000);
+  // The clamp keys on the earliest boundary of the window.
+  const earliestMs = Math.min(new Date(startDate).getTime(), new Date(endDate).getTime());
+  const ageDays = (now - earliestMs) / (24 * 60 * 60 * 1000);
 
   if (granularity === 'hour') {
     // Use < 8 rather than <= 7: periodToDateRange('7d') snaps the start to
@@ -672,7 +677,7 @@ export const usageAnalyticsRouter = createTRPCRouter({
       await ensureScopeAccess(ctx, input);
 
       const config = requireSnowflakeConfig();
-      const meta = resolveTier(input.granularity, input.startDate);
+      const meta = resolveTier(input.granularity, input.startDate, input.endDate);
       const table = getTableName(meta.tier);
       const where = buildWhereClause(meta.tier, input, ctx.user.id, true);
       const generationTimeCountExpr = generationTimeCountExprSql(meta.tier);
@@ -773,7 +778,7 @@ export const usageAnalyticsRouter = createTRPCRouter({
       await ensureScopeAccess(ctx, input);
 
       const config = requireSnowflakeConfig();
-      const meta = resolveTier(input.granularity, input.startDate);
+      const meta = resolveTier(input.granularity, input.startDate, input.endDate);
       const table = getTableName(meta.tier);
       const bucketExpr = bucketExprSql(meta.effectiveGranularity, meta.tier);
       const metricExpr = metricExprSql(input.metric, meta.tier, input.costSource);
@@ -840,7 +845,7 @@ export const usageAnalyticsRouter = createTRPCRouter({
       await ensureScopeAccess(ctx, input);
 
       const config = requireSnowflakeConfig();
-      const meta = resolveTier(input.granularity, input.startDate);
+      const meta = resolveTier(input.granularity, input.startDate, input.endDate);
       const table = getTableName(meta.tier);
       const dimCol = dimensionColumn(input.dimension);
       const metricExpr = metricExprSql(input.metric, meta.tier, input.costSource);
@@ -905,7 +910,7 @@ export const usageAnalyticsRouter = createTRPCRouter({
       await ensureScopeAccess(ctx, input);
 
       const config = requireSnowflakeConfig();
-      const meta = resolveTier(input.granularity, input.startDate);
+      const meta = resolveTier(input.granularity, input.startDate, input.endDate);
       const table = getTableName(meta.tier);
       const bucketExpr = bucketExprSql(meta.effectiveGranularity, meta.tier);
       const where = buildWhereClause(meta.tier, input, ctx.user.id, true);

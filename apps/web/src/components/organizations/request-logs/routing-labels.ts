@@ -14,6 +14,7 @@ export type DescribedStep = {
 const GATEWAY_NAMES: Record<string, string> = {
   openrouter: 'OpenRouter',
   vercel: 'Vercel AI Gateway',
+  'claude-billing': 'Claude API',
 };
 
 const BYOK_ROUTE_LABELS: Record<string, string> = {
@@ -42,6 +43,7 @@ const PAYER_LABELS: Record<string, string> = {
   'custom-llm-credential': 'Custom model credential',
   'owner-byok-key': 'BYOK key',
   'chatgpt-subscription': 'ChatGPT subscription',
+  'customer-claude-organization': 'Claude organization',
   kilo: 'Kilo credits',
 };
 
@@ -52,6 +54,7 @@ const PROVIDER_TYPE_LABELS: Record<string, string> = {
   inception: 'Inception',
   mistral: 'Mistral',
   'openai-chatgpt': 'ChatGPT',
+  'claude-billing': 'Claude organization',
   custom: 'Custom model',
   'custom-public': 'Public custom model',
   'dev-tools': 'Development tools',
@@ -59,6 +62,7 @@ const PROVIDER_TYPE_LABELS: Record<string, string> = {
 
 const REJECTED_RESULT_LABELS: Record<string, string> = {
   'chatgpt-reconnect': 'Rejected: the ChatGPT connection must be reconnected',
+  'claude-billing-unavailable': 'Rejected: Claude organization billing is unavailable',
   'custom-llm-unavailable': 'Rejected: the custom model is unavailable',
   'direct-byok-catalog-only': 'Rejected: this model is only available through the catalog',
 };
@@ -181,6 +185,15 @@ export function describeStep(step: RequestLogRoutingStep): DescribedStep {
     }
     case 'chatgpt':
       return { title: 'ChatGPT subscription', detail: describeChatGpt(step), tone };
+    case 'claude-billing':
+      return {
+        title: 'Claude organization',
+        detail:
+          step.outcome === 'selected'
+            ? 'Paid by the connected Claude organization.'
+            : 'Claude organization billing is unavailable.',
+        tone,
+      };
     case 'byok-key':
       return { title: 'BYOK keys', detail: describeByokKey(step), tone };
     case 'unsupported-api-kind': {

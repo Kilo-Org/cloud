@@ -56,6 +56,8 @@ import {
   baseGetSessionNextOutputSchema,
   baseGetEgressAuditNextSchema,
   baseGetEgressAuditNextOutputSchema,
+  baseGetSessionMessagesPageNextSchema,
+  baseGetSessionMessagesPageNextOutputSchema,
   baseGetSandboxStatusNextSchema,
   baseGetSandboxStatusNextOutputSchema,
   baseGetPendingInteractionsNextSchema,
@@ -217,6 +219,10 @@ const GetEgressAuditInput = baseGetEgressAuditNextSchema.extend({
 });
 
 const ListChildSessionsInput = baseListChildSessionsNextSchema.extend({
+  organizationId: z.uuid(),
+});
+
+const GetSessionMessagesPageInput = baseGetSessionMessagesPageNextSchema.extend({
   organizationId: z.uuid(),
 });
 
@@ -558,21 +564,14 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         ctx.headersList,
         input.organizationId
       );
-      // Prompt turns carry their own model; command turns run the session's
-      // stored model, so resolve it to apply the same free/BYOK eligibility
-      // to every follow-up that queues a model-using turn. If the worker
-      // can't return the session model, fall back to the balance-checked
-      // client (the safe default) rather than failing the mutation on a
-      // read-side error.
-      let modelId: string | undefined;
-      if (input.payload.type === 'prompt') {
-        modelId = input.payload.model;
-      } else {
+      let modelId = input.payload.model;
+      if (modelId === undefined) {
         try {
           modelId = (
             await createCloudAgentNextClient(authToken).getSession(input.cloudAgentSessionId)
           ).model;
         } catch {
+          // A failed fallback read must not bypass balance checks.
           modelId = undefined;
         }
       }
@@ -1033,6 +1032,28 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
    * Get session state from cloud-agent-next DO (organization context).
    * Returns sanitized session info (no secrets).
    */
+  getSessionMessagesPage: organizationMemberProcedure
+    .input(GetSessionMessagesPageInput)
+    .output(baseGetSessionMessagesPageNextOutputSchema)
+    .query(async ({ ctx, input }) => {
+      await assertOrganizationOwnsSession({
+        organizationId: input.organizationId,
+        userId: ctx.user.id,
+        cloudAgentSessionId: input.sessionId,
+      });
+      const authToken = await createCloudAgentControlToken(
+        ctx.user,
+        ctx.headersList,
+        input.organizationId
+      );
+      return createCloudAgentNextClient(authToken).getSessionMessagesPage({
+        sessionId: input.sessionId,
+        kiloSessionId: input.kiloSessionId,
+        cursor: input.cursor,
+        limit: input.limit,
+      });
+    }),
+
   getSession: organizationMemberProcedure
     .input(GetSessionInput)
     .output(baseGetSessionNextOutputSchema)

@@ -1,4 +1,7 @@
 import {
+  KILO_CLI_VERSION_HEADER,
+  WRAPPER_VERSION_HEADER,
+  RUNTIME_HARNESS_HEADER,
   WORKTREE_RUNTIME_HEADER,
   WORKTREE_RUNTIME_VERSION,
   WORKSPACE_CONFIGURATION_HEADER,
@@ -25,7 +28,7 @@ import {
 
 type WrapperTimerOverrides = Partial<ControlPlaneTimers['wrapper']>;
 
-// The hello accepted by the Worker before sessionSnapshots was added. Its schema is strict,
+// The hello accepted by the Worker before workspaceSnapshots was added. Its schema is strict,
 // so the extra field is rejected and the wrapper must retry without it.
 const previousWorkerHelloSchema = z
   .object({
@@ -37,6 +40,11 @@ const previousWorkerHelloSchema = z
     redactsNamedSecrets: z.literal(true).optional(),
     installsSkillsSh: z.literal(true).optional(),
   })
+  .strict();
+
+/** A Worker that predates the startCommands capability. */
+const startCommandsPredatingWorkerHelloSchema = previousWorkerHelloSchema
+  .extend({ workspaceSnapshots: z.literal(true).optional() })
   .strict();
 
 const legacyWorkerHelloSchema = z
@@ -160,6 +168,7 @@ async function withTestSocket(
     }),
     random: () => 0,
     onDisconnected: reason => disconnected.push(reason),
+    getHeartbeat: () => ({ active: false, degraded: false, workspaceBusy: true }),
   });
   try {
     connection.start();
@@ -187,11 +196,65 @@ it('advertises worktree support without changing the strict legacy hello', () =>
       allocationId: 'alloc-1',
       protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
       heartbeatAck: true,
-      sessionSnapshots: true,
+      workspaceSnapshots: true,
       redactsNamedSecrets: true,
       installsSkillsSh: true,
+      startCommands: true,
     });
   });
+});
+
+it.each(['kilo', 'kilo2'] as const)(
+  'reports the %s runtime harness as an upgrade header, not a hello field',
+  runtimeHarness => {
+    withControlledConnection(
+      ({ connection }) => {
+        connection.start();
+        const socket = TestSocket.instances[0];
+        expect(socket.options?.headers?.[RUNTIME_HARNESS_HEADER]).toBe(runtimeHarness);
+        socket.onopen?.();
+        expect(socket.frames[0]).not.toHaveProperty('runtimeHarness');
+      },
+      { runtimeHarness }
+    );
+  }
+);
+
+it('omits the runtime harness header when no harness is configured', () => {
+  withControlledConnection(({ connection }) => {
+    connection.start();
+    expect(TestSocket.instances[0].options?.headers).not.toHaveProperty(RUNTIME_HARNESS_HEADER);
+  });
+});
+
+it('reports observed runtime versions on every upgrade without changing hello', () => {
+  withControlledConnection(
+    ({ connection }) => {
+      const socket = TestSocket.instances[0];
+      expect(socket.options?.headers?.[KILO_CLI_VERSION_HEADER]).toBe('7.9.0-canary.123');
+      expect(socket.options?.headers?.[WRAPPER_VERSION_HEADER]).toBe('2.4.0');
+      socket.onopen?.();
+      expect(socket.frames[0]).not.toHaveProperty('runtimeVersions');
+      expect(socket.frames[0]).not.toHaveProperty('kiloCliVersion');
+      expect(socket.frames[0]).not.toHaveProperty('wrapperVersion');
+      connection.recycle();
+      expect(TestSocket.instances[1].options?.headers?.[KILO_CLI_VERSION_HEADER]).toBe(
+        '7.9.0-canary.123'
+      );
+      expect(TestSocket.instances[1].options?.headers?.[WRAPPER_VERSION_HEADER]).toBe('2.4.0');
+    },
+    { runtimeVersions: { kiloCliVersion: '7.9.0-canary.123', wrapperVersion: '2.4.0' } }
+  );
+});
+
+it('still reports the wrapper version when the CLI version probe fails', () => {
+  withControlledConnection(
+    () => {
+      expect(TestSocket.instances[0].options?.headers).not.toHaveProperty(KILO_CLI_VERSION_HEADER);
+      expect(TestSocket.instances[0].options?.headers?.[WRAPPER_VERSION_HEADER]).toBe('2.4.0');
+    },
+    { runtimeVersions: { kiloCliVersion: null, wrapperVersion: '2.4.0' } }
+  );
 });
 
 describe('acknowledged heartbeat', () => {
@@ -247,17 +310,24 @@ describe('acknowledged heartbeat', () => {
   });
   it('falls back through the capability hello before the bare legacy hello', async () => {
     await withTestSocket(async (connection, socket, disconnected) => {
-      expect(previousWorkerHelloSchema.safeParse(socket.frames[0]).success).toBe(false);
+      expect(startCommandsPredatingWorkerHelloSchema.safeParse(socket.frames[0]).success).toBe(
+        false
+      );
       await waitFor(() => socket.frames.length === 2);
-      expect(previousWorkerHelloSchema.safeParse(socket.frames[1]).success).toBe(true);
+      expect(startCommandsPredatingWorkerHelloSchema.safeParse(socket.frames[1]).success).toBe(
+        true
+      );
+      expect(socket.frames[1]).toMatchObject({ workspaceSnapshots: true });
       await waitFor(() => socket.frames.length === 3);
-      expect(socket.frames[2]).toEqual({
+      expect(previousWorkerHelloSchema.safeParse(socket.frames[2]).success).toBe(true);
+      await waitFor(() => socket.frames.length === 4);
+      expect(socket.frames[3]).toEqual({
         type: 'hello',
         wrapperId: socket.frames[0].type === 'hello' ? socket.frames[0].wrapperId : '',
         allocationId: 'alloc-1',
         protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
       });
-      expect(legacyWorkerHelloSchema.safeParse(socket.frames[2]).success).toBe(true);
+      expect(legacyWorkerHelloSchema.safeParse(socket.frames[3]).success).toBe(true);
       socket.receive({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
       await Bun.sleep(120);
       expect(connection.snapshot().phase).toBe('connected');
@@ -266,20 +336,38 @@ describe('acknowledged heartbeat', () => {
     });
   });
 
-  it('keeps prior capabilities when the peer only predates sessionSnapshots', async () => {
+  it.each([false, true])(
+    'sends snapshot-only busy state only after capability confirmation: %s',
+    async supported => {
+      await withTestSocket(async (_connection, socket) => {
+        socket.receive({
+          type: 'welcome',
+          protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
+          ...(supported ? { workspaceSnapshots: true } : {}),
+        });
+        await waitFor(() => socket.frames.some(frame => frame.type === 'heartbeat'));
+        const heartbeat = socket.frames.find(frame => frame.type === 'heartbeat');
+        expect(heartbeat?.active).toBe(false);
+        if (supported) expect(heartbeat?.workspaceBusy).toBe(true);
+        else expect(heartbeat).not.toHaveProperty('workspaceBusy');
+      });
+    }
+  );
+
+  it('keeps prior capabilities when the peer only predates workspaceSnapshots', async () => {
     await withTestSocket(async (connection, socket, disconnected) => {
-      await waitFor(() => socket.frames.length === 2);
-      expect(previousWorkerHelloSchema.safeParse(socket.frames[1]).success).toBe(true);
-      expect(socket.frames[1]).toMatchObject({
+      await waitFor(() => socket.frames.length === 3);
+      expect(previousWorkerHelloSchema.safeParse(socket.frames[2]).success).toBe(true);
+      expect(socket.frames[2]).toMatchObject({
         heartbeatAck: true,
         redactsNamedSecrets: true,
         installsSkillsSh: true,
       });
-      expect(socket.frames[1]).not.toHaveProperty('sessionSnapshots');
+      expect(socket.frames[2]).not.toHaveProperty('workspaceSnapshots');
       socket.receive({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
       await Bun.sleep(120);
       expect(connection.snapshot().phase).toBe('connected');
-      expect(socket.frames.filter(frame => frame.type === 'hello')).toHaveLength(2);
+      expect(socket.frames.filter(frame => frame.type === 'hello')).toHaveLength(3);
       expect(disconnected).toEqual([]);
       expect(TestSocket.instances).toHaveLength(1);
     });
@@ -934,9 +1022,10 @@ describe('createControlPlaneConnection', () => {
         allocationId: 'alloc-1',
         protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
         heartbeatAck: true,
-        sessionSnapshots: true,
+        workspaceSnapshots: true,
         redactsNamedSecrets: true,
         installsSkillsSh: true,
+        startCommands: true,
       });
       expect(sandbox.authorizations[0]).toBe('Bearer secret-credential');
 

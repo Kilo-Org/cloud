@@ -5,6 +5,7 @@ import { type QueryErrorVariant } from '@/components/query-error';
 
 import { type MessageFailure } from './message-failure-state';
 import { isSafeFailureMessage } from './safe-failure-messages';
+import { TERMINAL_SESSION_HISTORY_FAILURE_MESSAGES } from './session-history-failures';
 
 /**
  * Terminal error class for a session startup failure. The session manager's
@@ -279,9 +280,17 @@ export function statusIndicatorDuplicatesMessageFailure(input: {
   if (failure.detailKey !== null && copy === i18n.t(failure.detailKey)) {
     return true;
   }
+  // A credits refusal states its cause on the row, and the row's Add credits
+  // action is the recovery; the footer's credits line names the same cause and
+  // would restate it. The two lines are worded for their own surface — the row
+  // keeps the cause, the footer adds the instruction — so they are compared by
+  // class, not by string.
+  if (failure.canAddCredits && copy === i18n.t('agentChat.session.notEnoughCredits')) {
+    return true;
+  }
   // An agent-execution delivery failure renders the assistant-failure title
   // (message-failure-state.ts) while the SDK's status indicator for it is the
-  // delivery-failed line ("Message delivery failed" -> "Failed to deliver",
+  // delivery-failed line ("Message delivery failed" -> "Message not sent",
   // normalizer.ts). The row already states that failed run, so the delivery
   // line would restate it.
   if (
@@ -407,11 +416,18 @@ export function resolveSessionTerminalError(input: {
   if (input.error !== null) {
     // The atom carries the transport's own English text. Show the reader a
     // translated line and keep the original for the clipboard.
+    //
+    // A typed transcript failure that a retry cannot recover (the stored page
+    // is oversize or unreadable) is the same permanent state as a denial: the
+    // same read answers the same way every time, so a Retry would only repeat
+    // it. Every other error keeps its Retry, which is what recovers a lost
+    // connection or a transient server failure.
+    const terminalTranscript = TERMINAL_SESSION_HISTORY_FAILURE_MESSAGES.includes(input.error);
     return {
       variant: 'server',
       title: i18n.t('agentChat.session.couldNotLoadThisSession'),
       message: i18n.t('agentChat.session.failedToLoadDetails'),
-      retryable: true,
+      retryable: !terminalTranscript,
       retryWith: 'session',
       detail: input.error,
     };

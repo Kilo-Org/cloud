@@ -21,6 +21,7 @@ import {
 } from '@/components/pr-review/pr-form-sheet-chrome';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
+import { isolateLtrBidiText } from '@/lib/bidi';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type DiffSelection } from '@/lib/pr-review/diff-selection-bridge';
 import { resolveAlphaColor } from '@/lib/theme-color';
@@ -183,18 +184,15 @@ export function ContextPreview({
   selection,
   fallbackPath,
   fallbackLineLabel,
-  fallbackSide,
   preferFallback,
 }: {
   selection: DiffSelection | null;
   fallbackPath: string;
   fallbackLineLabel: string;
-  fallbackSide: 'LEFT' | 'RIGHT';
   /** When true, never prefer the live bridge over route/item params. */
   preferFallback: boolean;
 }) {
   const path = preferFallback ? fallbackPath : (selection?.path ?? fallbackPath);
-  const side = preferFallback ? fallbackSide : (selection?.side ?? fallbackSide);
   const lineLabel =
     preferFallback || !selection
       ? fallbackLineLabel
@@ -204,7 +202,7 @@ export function ContextPreview({
   return (
     <View className="gap-0.5 rounded-lg border border-hair-soft bg-secondary px-4 py-2">
       <Text className="font-mono-medium text-[11px] text-muted-foreground" numberOfLines={1}>
-        {path} {side} {lineLabel}
+        {`${isolateLtrBidiText(path)} ${lineLabel}`}
       </Text>
       {previewText.length > 0 ? (
         <Text

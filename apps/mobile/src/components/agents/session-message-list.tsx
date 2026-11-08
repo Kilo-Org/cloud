@@ -19,6 +19,8 @@ import {
   type SessionTranscriptItem,
 } from '@/components/agents/session-transcript';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
+import { cn } from '@/lib/utils';
 import {
   getOlderMessagesArrivedAnnouncement,
   shouldAnnounceOlderMessagesArrival,
@@ -87,6 +89,16 @@ type SessionMessageListProps<T> = {
    * history exactly when the user returns to the live tail.
    */
   onReachedBottom?: () => void;
+  /**
+   * Optional callback that publishes the open gate's verdict, keyed by the
+   * session it belongs to: the rows are still measuring and the skeleton is
+   * what the body paints. A host that owns chrome around the transcript — the
+   * composer slot, the read-only footer, the header pill — must hold that
+   * chrome in its loading shape until this reports settled, or the screen
+   * shows finished controls beside a loading body. Absent keeps every other
+   * caller byte-identical.
+   */
+  onOpenSettledChange?: (sessionId: string, settled: boolean) => void;
 };
 
 export function SessionMessageList<T>({
@@ -104,6 +116,7 @@ export function SessionMessageList<T>({
   contentBottomInset,
   onReachedBottom,
   onAnchorChange,
+  onOpenSettledChange,
   resumeAt,
   followTailNonce,
 }: Readonly<SessionMessageListProps<T>>) {
@@ -169,6 +182,12 @@ export function SessionMessageList<T>({
     onContentSizeChange: handleContentSizeChange,
     onLayout: handleListLayout,
   });
+  // The host holds the chrome around this list — the bottom slot and the header
+  // pill — in its loading shape while the gate hides the rows, so it needs the
+  // gate's verdict, keyed by the session it describes.
+  useEffect(() => {
+    onOpenSettledChange?.(sessionId, openSettled);
+  }, [onOpenSettledChange, openSettled, sessionId]);
   const colors = useThemeColors();
   const { t } = useTranslation();
   const { left, right } = useSafeAreaInsets();
@@ -425,10 +444,17 @@ export function SessionMessageList<T>({
               accessibilityRole="button"
               accessibilityLabel={t('agentChat.session.scrollToBottom')}
               onPress={scrollToLatestAnimated}
-              hitSlop={2}
-              className="h-10 w-10 items-center justify-center rounded-full border border-border bg-card shadow-lg shadow-[#00000040] active:opacity-70"
+              // The pressable is the touch target a control-size audit
+              // measures, and `hitSlop` never moves that rect: the 48pt floor
+              // has to be this node's own box.
+              className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
             >
-              <ChevronDown size={20} color={colors.foreground} />
+              {/* The visible circle stays compact (explicit px, because
+                  NativeWind's 14pt rem renders `h-10` at 35pt): DESIGN.md keeps
+                  the target, not the visual, at 44pt. */}
+              <View className="h-[35px] w-[35px] items-center justify-center rounded-full border border-border bg-card shadow-lg shadow-[#00000040]">
+                <ChevronDown size={20} color={colors.foreground} />
+              </View>
             </Pressable>
           </Animated.View>
         ) : null}

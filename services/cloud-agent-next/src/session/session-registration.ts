@@ -131,6 +131,10 @@ import {
 import type { SessionCreateRequest, SessionRepositoryRequest } from './session-requests.js';
 import { isInteractiveSessionOrigin } from '../shared/control-plane-permission.js';
 import { egressAllowlistSchema, egressPolicySchema } from '@kilocode/worker-utils/egress-allowlist';
+import {
+  RUNTIME_BUILTIN_AGENT_SLUGS,
+  type RuntimeBuiltinAgents,
+} from '../shared/runtime-profile.js';
 
 export type SessionRegistrationInput = SessionCreateRequest;
 
@@ -264,6 +268,7 @@ type NewSessionAllocation = SessionRegistrationResult & {
   credentialContainment: CredentialContainment;
   rollbackCliSession: () => Promise<void>;
   runtimeAuthorization?: { token: string; seal: string };
+  builtinAgents?: RuntimeBuiltinAgents;
 };
 
 /**
@@ -673,13 +678,18 @@ export function isEligibleFirstWorktreeSession(
       input.clone !== undefined
     );
   }
+  // Only the IDE Agent Manager may create a workspace with no first turn; the
+  // first prompt arrives later through the same root session.
   return (
     (isTrustedWorktreeCreateOrigin(
       input.options?.clientProvenance,
       input.options?.createdOnPlatform
     ) ||
       isAuthenticatedChildWorktreeCreate(input, ctx)) &&
-    input.initialTurn !== undefined &&
+    (input.initialTurn !== undefined ||
+      (input.parentCloudAgentSessionId === undefined &&
+        input.options?.clientProvenance === 'agent-manager' &&
+        input.options?.createdOnPlatform === 'agent-manager')) &&
     input.clone === undefined
   );
 }
@@ -707,11 +717,6 @@ function worktreeEnabledForCreate(
   if (recordedIds) return isControlSession(recordedIds.cloudAgentSessionId);
 
   return true;
-}
-
-export function assertRuntimeIsolationAdmission(env: Pick<Env, 'RUNTIME_ISOLATION_ENABLED'>): void {
-  if (env.RUNTIME_ISOLATION_ENABLED === 'true') return;
-  throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'runtime_isolation_unavailable' });
 }
 
 function finalizationVersionForCreate(row: OperationLedgerRow): 1 | 2 {
@@ -800,7 +805,6 @@ async function issueSessionRuntimeAuthorization(
     });
   }
   if (ctx.cloudAgentAuthority) {
-    assertRuntimeIsolationAdmission(ctx.env);
     const authority = ctx.cloudAgentAuthority;
     const runtimeAuthorization = await withDORetry(
       () => getSandboxSessionStub(ctx.env, ctx.userId, authority.parentSessionId),
@@ -824,7 +828,6 @@ async function issueSessionRuntimeAuthorization(
   }
   let runtimeAuthorization: NewSessionAllocation['runtimeAuthorization'];
   if (isPolicyBearingAuthToken(ctx.authToken)) {
-    assertRuntimeIsolationAdmission(ctx.env);
     const secret = ctx.env.NEXTAUTH_SECRET;
     const nextAuthSecret = typeof secret === 'string' ? secret : await secret.get();
     if (!nextAuthSecret)
@@ -854,6 +857,61 @@ async function issueSessionRuntimeAuthorization(
   }
 
   return runtimeAuthorization;
+}
+
+async function filterUnavailableBuiltinAgentModels(
+  builtinAgents: RuntimeBuiltinAgents | undefined,
+  input: SessionRegistrationInput,
+  ctx: SessionRegistrationContext,
+  runtimeAuthorization: NewSessionAllocation['runtimeAuthorization']
+): Promise<RuntimeBuiltinAgents | undefined> {
+  if (builtinAgents === undefined) return undefined;
+  const organizationId = input.options?.kilocodeOrganizationId;
+  const availability = new Map<string, Promise<boolean>>();
+  const filtered: RuntimeBuiltinAgents = {};
+  await Promise.all(
+    RUNTIME_BUILTIN_AGENT_SLUGS.map(async slug => {
+      const override = builtinAgents[slug];
+      if (override === undefined) return;
+      const model = override.model;
+      if (typeof model !== 'string') {
+        filtered[slug] = override;
+        return;
+      }
+      let validation = availability.get(model);
+      if (!validation) {
+        validation = assertKiloModelAvailable({
+          env: ctx.env,
+          submittedModel: model,
+          originalToken: runtimeAuthorization?.token ?? ctx.authToken,
+          originalOrganizationId: organizationId,
+          createdOnPlatform: input.options?.createdOnPlatform,
+          procedure: 'builtin_agent_model_validation',
+        }).then(
+          () => true,
+          (error: unknown) => {
+            logger
+              .withFields({
+                userId: ctx.userId,
+                orgId: organizationId,
+                slug,
+                errorClass: error instanceof Error ? error.name : typeof error,
+                ...(error instanceof TRPCError ? { errorCode: error.code } : {}),
+              })
+              .warn('Dropping built-in agent model override that failed availability validation');
+            return false;
+          }
+        );
+        availability.set(model, validation);
+      }
+      if (await validation) {
+        filtered[slug] = override;
+      } else if (override.disable !== undefined) {
+        filtered[slug] = { disable: override.disable };
+      }
+    })
+  );
+  return filtered;
 }
 
 async function assertSandboxAllocationMembership(
@@ -937,6 +995,12 @@ async function allocateNewSession(
     ctx,
     cloudAgentSessionId,
     initialTurn
+  );
+  const builtinAgents = await filterUnavailableBuiltinAgentModels(
+    input.profile?.resolved?.builtinAgents,
+    input,
+    ctx,
+    runtimeAuthorization
   );
 
   try {
@@ -1147,6 +1211,16 @@ async function allocateNewSession(
       throw creationInProgressError();
     }
     // `ready` continues normally.
+  } else if (ingestResult !== undefined && ingestResult.status === 'rejected') {
+    // The ingest plane declined this create (the destination is not accepting
+    // data, the source is unreadable, or the identity conflicts). Record the
+    // destination IDs as retired so a same-key retry allocates fresh ones
+    // instead of resuming IDs the ingest plane will not admit.
+    if (ledger) {
+      await recordCloneTombstone(ledger, { cloudAgentSessionId, kiloSessionId });
+      await ledger.onFailure('ownership_row', ingestResult.code);
+    }
+    throw new TRPCError({ code: 'BAD_REQUEST', message: ingestResult.code });
   }
 
   return {
@@ -1160,6 +1234,7 @@ async function allocateNewSession(
     sandboxProviderBinding,
     initialTurn,
     credentialContainment,
+    builtinAgents,
     rollbackCliSession: async () => {
       try {
         await ctx.env.SESSION_INGEST.deleteSessionForCloudAgent({
@@ -1187,7 +1262,7 @@ async function allocateNewSession(
  * instead of allocating fresh ones. When the create carried an initial turn it
  * keeps the stored `initialMessageId` (the retry's own message id is never
  * used) with the turn content from `input.initialTurn`, which the intent
- * fingerprint already proved unchanged. A clone-only create recorded no
+ * fingerprint already proved unchanged. A prompt-less create recorded no
  * `initialMessageId` and rebuilds no initial turn.
  */
 function rebuildRecordedSessionAllocation(
@@ -1377,7 +1452,12 @@ function buildSessionRegistrationCommand(
       appendSystemPrompt: input.profile?.overrides?.appendSystemPrompt,
     },
     repository: input.repository,
-    profile: input.profile?.resolved,
+    profile: input.profile?.resolved
+      ? {
+          ...input.profile.resolved,
+          builtinAgents: allocation.builtinAgents,
+        }
+      : input.profile?.resolved,
     ...(input.environment
       ? {
           environment: input.environment,
@@ -1675,9 +1755,10 @@ async function allocateSessionForCreate(
 
 /**
  * Registers an already allocated session in its Durable Object without
- * admitting an initial turn. Used by the clone-only create, which has no
- * synthetic initial turn. Mirrors `registerNewSession` but threads the ledger
- * hooks so the create effect settles exactly once.
+ * admitting an initial turn. Used by the clone-only create and the prompt-less
+ * hosted workspace create, neither of which has a synthetic initial turn.
+ * Mirrors `registerNewSession` but threads the ledger hooks so the create
+ * effect settles exactly once.
  */
 async function registerAllocatedSession(
   input: SessionRegistrationInput,
@@ -1922,9 +2003,14 @@ function profileCreateIntent(
   return {
     ...(profile?.id ? { id: profile.id } : {}),
     setupCommands: resolved.setupCommands,
+    ...(resolved.startCommands ? { startCommands: resolved.startCommands } : {}),
+    ...(resolved.environmentSetupCommandCount === undefined
+      ? {}
+      : { environmentSetupCommandCount: resolved.environmentSetupCommandCount }),
     ...(mcpServers ? { mcpServers } : {}),
     runtimeSkills: resolved.runtimeSkills,
     runtimeAgents: resolved.runtimeAgents,
+    builtinAgents: resolved.builtinAgents,
     kiloCommands: resolved.kiloCommands,
     runtimeInstructions: resolved.runtimeInstructions,
   };
@@ -2574,6 +2660,14 @@ async function resumeFirstWorktreeCreate(
     }
 
     if (ingestResult?.status === 'rejected') {
+      // A destination the ingest plane refuses must not be resumed: record
+      // the IDs as retired so a same-key retry allocates fresh ones.
+      if (ingestResult.code === 'session_retired') {
+        await recordCloneTombstone(hooks, {
+          cloudAgentSessionId: allocation.cloudAgentSessionId,
+          kiloSessionId: allocation.kiloSessionId,
+        });
+      }
       await hooks.onFailure('ownership_row', ingestResult.code);
       throw new TRPCError({ code: 'BAD_REQUEST', message: ingestResult.code });
     }
@@ -2598,6 +2692,12 @@ async function resumeAllocatedSession(
     ctx,
     allocation.cloudAgentSessionId,
     allocation.initialTurn
+  );
+  allocation.builtinAgents = await filterUnavailableBuiltinAgentModels(
+    input.profile?.resolved?.builtinAgents,
+    input,
+    ctx,
+    allocation.runtimeAuthorization
   );
   const billingOrigin = { billingOrigin: options.billingOrigin };
   if (input.initialTurn === undefined) {

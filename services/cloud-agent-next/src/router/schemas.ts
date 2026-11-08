@@ -173,6 +173,13 @@ export const CommandSendPayload = z.object({
   command: z.string().min(1, 'Command name is required'),
   /** Verbatim args. Kilo expands $1/$2/$ARGUMENTS server-side. */
   arguments: z.string().default(''),
+  mode: ModeSlugSchema.optional(),
+  model: modelIdSchema.optional(),
+  variant: z
+    .string()
+    .max(50)
+    .regex(/^[a-zA-Z]+$/)
+    .optional(),
 });
 
 export const SendMessageV2Payload = z.discriminatedUnion('type', [
@@ -325,6 +332,13 @@ export const SendMessageV2Input = z
             code: 'custom',
             path: ['attachments'],
             message: 'Attachments cannot be attached to slash commands',
+          });
+        }
+        if (input.payload.mode === 'custom') {
+          ctx.addIssue({
+            code: 'custom',
+            path: ['payload', 'mode'],
+            message: 'custom mode requires appendSystemPrompt (use prepareSession/updateSession)',
           });
         }
         return;
@@ -1164,8 +1178,28 @@ export const ExecutionStatusSchema = z
 export const GetSessionOutput = z.object({
   sessionId: z.string().describe('Cloud-agent session ID'),
   kiloSessionId: z.string().optional().describe('Kilo CLI session ID'),
+  title: z.string().nullable().optional(),
+  associatedPr: z
+    .object({
+      url: z.string(),
+      number: z.number(),
+      state: z.string(),
+      title: z.string().nullable(),
+      headSha: z.string().nullable(),
+      lastSyncedAt: z.string().datetime(),
+      platform: z.string().optional(),
+      reviewDecision: z.enum(['approved', 'changes_requested', 'review_required']).nullable(),
+      reviewDecisionPending: z.boolean(),
+    })
+    .nullable()
+    .optional(),
+  totalCostMicrodollars: z.number().finite().nonnegative().nullable().optional(),
+  createdOnPlatform: z.string().nullable().optional(),
+  profileId: z.string().nullable().optional(),
+  updateCursor: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).optional(),
   userId: z.string().describe('Owner user ID'),
   orgId: z.string().optional().describe('Organization ID if applicable'),
+  environmentId: z.string().uuid().optional().describe('Environment used to create the workspace'),
   sandboxId: z
     .string()
     .optional()
@@ -1358,38 +1392,6 @@ export const GetMessageResultOutput = z
   });
 
 export type GetMessageResultResponse = z.infer<typeof GetMessageResultOutput>;
-
-export const GetLatestAssistantMessageInput = z.object({
-  cloudAgentSessionId: sessionIdSchema.describe('Cloud-agent session ID to inspect'),
-});
-
-export const AssistantMessageInfoSchema = z
-  .object({
-    id: z.string().describe('Assistant message ID'),
-    role: z.literal('assistant'),
-  })
-  .passthrough();
-
-export const AssistantMessagePartSchema = z
-  .object({
-    id: z.string().describe('Message part ID'),
-    messageID: z.string().describe('Parent message ID'),
-  })
-  .passthrough();
-
-export const LatestAssistantMessageSchema = z.object({
-  eventId: z.number().describe('Stored event ID for the message.updated event'),
-  timestamp: z.number().describe('Stored event timestamp in milliseconds'),
-  info: AssistantMessageInfoSchema,
-  parts: z.array(AssistantMessagePartSchema),
-});
-
-export const GetLatestAssistantMessageOutput = z.object({
-  cloudAgentSessionId: sessionIdSchema,
-  message: LatestAssistantMessageSchema.nullable(),
-});
-
-export type GetLatestAssistantMessageResponse = z.infer<typeof GetLatestAssistantMessageOutput>;
 
 /**
  * Compatibility response schema for public send/V2 endpoints.

@@ -30,6 +30,7 @@ import { AUTO_SMALL_TARGET_MODELS } from '@kilocode/web-shared/lib/ai-gateway/au
 import { EmptyFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
 import {
   getOpenAiChatGptStoredConnection,
+  readOpenAiChatGptUsageLimit,
   saveOpenAiChatGptConnection,
   type OpenAiChatGptOwner,
 } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
@@ -84,7 +85,11 @@ describe('bounded spending provider enforcement', () => {
     });
   });
 
-  function attempt(providerId: string, userByok: BYOKResult[] | null) {
+  function attempt(
+    providerId: string,
+    userByok: BYOKResult[] | null,
+    availableBalanceMicrodollars = 2_000_000
+  ) {
     jest.mocked(upstreamRequest).mockResolvedValue({
       type: 'success',
       response: jsonResponse(200, { ok: true }),
@@ -111,9 +116,22 @@ describe('bounded spending provider enforcement', () => {
       isNonTrialEnterprise: false,
       search: '',
       method: 'POST',
-      costLimit: { maximumMicrodollars: '500', availableBalanceMicrodollars: 2_000_000 },
+      costLimit: { maximumMicrodollars: '500', availableBalanceMicrodollars },
     });
   }
+
+  it('serves a connected customer without applying a Kilo debit limit to the external bill', async () => {
+    jest
+      .mocked(applyProviderSpecificLogic)
+      .mockImplementationOnce(async (_provider, _model, request) => {
+        Object.assign(request.body, {
+          billing_policy: { type: 'billing_policy', bill_to: 'user_profile' },
+        });
+      });
+    const result = await attempt('claude-billing', null, 0);
+    expect(result.type).toBe('success');
+    expect(upstreamRequest).toHaveBeenCalledTimes(1);
+  });
 
   it('refuses a managed Vercel route the quoted ceiling cannot cover', async () => {
     const result = await attempt('vercel', null);
@@ -412,5 +430,58 @@ describe('sendUpstreamAttempt with a ChatGPT connection (real database)', () => 
     const stored = await getOpenAiChatGptStoredConnection(owner);
     expect(stored?.isEnabled).toBe(true);
     expect(stored?.connection.status).toBe('connected');
+  });
+
+  const RECONNECTED_TOKEN = 'reconnected-access-token';
+
+  function usageLimitResponse(): Response {
+    return jsonResponse(429, {
+      error: {
+        message: 'The app usage limit for this account was exceeded.',
+        code: 'subscription_sharing_usage_limit_exceeded',
+      },
+    });
+  }
+
+  it('records a plan limit on the connection that served the request', async () => {
+    const result = await send(usageLimitResponse());
+
+    expect(result.type === 'success' && result.response.status).toBe(429);
+    await expect(readOpenAiChatGptUsageLimit(owner)).resolves.toMatchObject({
+      code: 'subscription_sharing_usage_limit_exceeded',
+    });
+  });
+
+  it('leaves a reconnected row without a limit that the replaced credential reported', async () => {
+    // The person reconnects while a request on the previous credential is in
+    // flight; the reply for that request arrives afterwards.
+    await saveOpenAiChatGptConnection(
+      owner,
+      {
+        access_token: RECONNECTED_TOKEN,
+        refresh_token: 'refresh',
+        expires_at: 1_800_000_000,
+        issuer: 'https://auth.openai.com',
+        client_id: 'client-id',
+        subject: 'subject',
+        connected_at: '2026-10-05T00:00:00.000Z',
+        status: 'connected',
+      },
+      owner.kiloUserId as string
+    );
+
+    await send(usageLimitResponse());
+    await expect(readOpenAiChatGptUsageLimit(owner)).resolves.toBeNull();
+
+    // The credential the row holds now still records its own limit.
+    jest
+      .mocked(applyProviderSpecificLogic)
+      .mockImplementation(async (_provider, _model, _request, extraHeaders) => {
+        extraHeaders[OPENAI_ON_BEHALF_OF_TOKEN_HEADER] = RECONNECTED_TOKEN;
+      });
+    await send(usageLimitResponse());
+    await expect(readOpenAiChatGptUsageLimit(owner)).resolves.toMatchObject({
+      code: 'subscription_sharing_usage_limit_exceeded',
+    });
   });
 });

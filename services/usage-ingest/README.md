@@ -8,18 +8,15 @@ matching recorded/duplicate writer response permits ACK; invalid events and
 missing writer configuration retry and can exhaust into the DLQ.
 
 The gateway selects queued accounting for staging (`VERCEL_TARGET_ENV=staging`
-and `VERCEL_ENV` not `production`), for eligible production Frankfurt
-deployments, or for the production SFO cohort controlled by
-`USAGE_QUEUE_SFO_EXPOSURE` (`0`–`1`, default `0`). The optional
-`USAGE_QUEUE_SFO_USER_IDS` restricts only SFO. Production Frankfurt accounting
-has no exposure control; it queues every payer with an identity. FRA deployments
-other than staging and production `fra1`, and SFO payers outside the cohort,
-keep direct accounting or the existing SFO handoff. Background shadow
+and `VERCEL_ENV` not `production`) or for production (`VERCEL_ENV=production` and
+`VERCEL_TARGET_ENV=production`).
+There is no per-region or exposure selector; every production function region
+that runs the gateway queues. Deployments whose labels match neither branch keep
+direct accounting or the existing primary-region handoff. Background shadow
 publication and its flag have been removed. Reconcile and drain historically
 accepted shadow events before deploying processing; this change does not remove
-old messages. Keep SFO production selection off until the processing consumer is
-independently verified. Production FRA has no exposure switch, so do not deploy
-this gateway source to production until then. Selection being off does not stop
+old messages. Do not deploy this gateway source to production until the
+processing consumer is independently verified. Selection being off does not stop
 processing of queued events. Follow the
 [production merge gates](eu-queues.md#production-merge-gate).
 
@@ -87,7 +84,18 @@ writer URLs, or exception details are included in these logs.
 Publisher and consumer delivery diagnostics (`usage_ingest_enqueue_start`,
 `usage_ingest_enqueue`, `usage_ingest_handler_entry`, and the batch identity on
 `usage_ingest_processing`) are always emitted; see
-[queue delivery diagnostics](diagnostics.md).
+[queue delivery diagnostics](diagnostics.md). The best-effort completion observation
+(`usage_ingest_enqueue_observed`) is described next.
+
+`usage_ingest_enqueue_observed` is registered on `ExecutionContext.waitUntil` before the
+single send is awaited, so it is intended to report the completion of that same send even
+when the caller has already disconnected. It records only the validated usage ID, the
+outcome and the monotonic send duration; it adds no send, retry, response or authentication
+change. This extends only the post-response observation lifetime: the HTTP status still
+comes from the awaited send, and no log proves the consumer committed a database row. A
+stall longer than Cloudflare's `waitUntil` allowance after the response or disconnect (30 s)
+can still end before the send settles, and a hard kill can lose the observation entirely; a
+missing observation is therefore not evidence that the send failed.
 
 Processing also logs `queue_wait_ms` from the queue message timestamp to the start
 of handling that message, independently of writer duration. Selected existing processing
@@ -166,14 +174,16 @@ SFO HTTP handoffs record `fra1`; a local fallback in SFO records `sfo1`.
 Missing or unrecognized `VERCEL_REGION` values are reported as `unknown`.
 After attempting queue publication, the gateway never falls back to a billing
 writer. Existing direct fallbacks for missing publisher configuration or failed
-lifetime registration remain safe because no publication was attempted. The Cloudflare HTTP publisher retries transient failures up to four total
-attempts, with up to five seconds for each confirmation and a 25-second overall
-elapsed retry budget. Before retries it uses exponential full jitter: uniformly
-zero up to (excluding) 500 ms, 1,000 ms, then 2,000 ms. Attempt timeouts and sleeps
-are clipped to remaining budget; no new attempt starts after exhaustion. Runtime
-scheduling can delay observation of these deadlines. Non-retry calls retain one
-two-second attempt; the separate Vercel queue transport is unchanged. Every attempt
-reuses the same serialized event and usage ID;
+lifetime registration remain safe because no publication was attempted. The
+Cloudflare HTTP publisher retries transient failures up to four total attempts,
+with up to twenty seconds for the first confirmation and five seconds for each later
+one, inside a 40-second overall elapsed retry budget. Before retries it uses
+exponential full jitter: uniformly zero up to (excluding) 500 ms, 1,000 ms, then
+2,000 ms. Attempt timeouts and sleeps are clipped to remaining budget; no new
+attempt starts after exhaustion. Runtime scheduling can delay observation of
+these deadlines. Non-retry calls retain one two-second attempt; the separate
+Vercel queue transport is unchanged. Every attempt reuses the same serialized
+event and usage ID;
 ambiguous acceptance can create duplicate messages, which the writer deduplicates.
 Configuration failures and HTTP outcomes other than 408/429/5xx are not retried.
 Redirects are terminal 3xx failures; their targets are never followed.
@@ -218,6 +228,18 @@ OpenTelemetry export destination; external export can be configured separately.
 Each selected persistence attempt adds one completion line; IDs remain log
 fields, not metric labels. Logs can be dropped, and are not durable accounting:
 reconcile against persisted usage rows when exact completeness matters.
+
+Both environments also persist [Workers traces](https://developers.cloudflare.com/workers/observability/traces/)
+for a 5% head sample of invocations (`observability.traces`, inherited by
+`env.staging`). Trace sampling is independent of Workers Logs, which keep their unsampled default.
+Sampled traces show the fetch and queue handler spans, `queue_send`, and the
+outbound writer `fetch` with timing and status. In the dashboard, filter by
+`$metadata.service` (`usage-ingest` or `usage-ingest-staging`) rather than
+`service.name`. Trace IDs are not propagated to the Vercel writer, spans do not
+show time a message waits in the queue before the consumer handler starts, and a
+5% sample cannot count rare events; use the logs above for those. No custom spans
+are added. See the [span attributes](https://developers.cloudflare.com/workers/observability/traces/spans-and-attributes/)
+and [known limitations](https://developers.cloudflare.com/workers/observability/traces/known-limitations/).
 
 ## Queue policy
 
@@ -332,13 +354,34 @@ or authorize a production rollout, capacity increase, or replay.
 ### Writer admission protection
 
 The Frankfurt HTTP writer authenticates and validates the request before applying
-one immediate, nonwaiting admission guard to `queue` and `queue_vercel` callers.
-Both transports share a per-runtime active-call limit of
-`max(1, pool.options.max - 2)`, currently **8** with the unchanged pool maximum of
-10. The writer returns HTTP **429** before usage database work when that limit
-is occupied, when the primary pool has waiting clients, or when checked-out
-connections (`totalCount - idleCount`) reach the same limit. The response reason
-is bounded to `queue_limit`, `pool_waiting`, or `pool_busy`.
+one admission guard to `queue` and `queue_vercel` callers. Both transports share a
+per-runtime active-call limit of `max(1, pool.options.max - 2)`, currently **8**
+with the unchanged pool maximum of 10. The writer returns HTTP **429** before usage
+database work as follows:
+
+- While the active-call limit has room, the request is rejected immediately when
+  the primary pool has waiting clients (`pool_waiting`) or when checked-out
+  connections (`totalCount - idleCount`) reach the same limit (`pool_busy`).
+- When the active-call limit is occupied, the request is still rejected
+  immediately with `pool_waiting` if the pool has waiting clients. Otherwise it
+  waits up to **250 ms** in a per-runtime FIFO capped at the same limit (8
+  waiters). `pool_busy` is not checked on arrival in this case: this runtime's
+  own active writers can occupy the pool, so checked-out connections are not
+  independent evidence of additional pressure. A slot is held through awaited
+  post-commit work and can outlive its connection, so 8 active calls do not imply
+  8 checked-out connections either way.
+- A finished call hands its slot to the oldest waiter, which is rechecked against
+  both `pool_waiting` and `pool_busy` before it is admitted; a waiter that fails
+  the recheck is rejected with that pool reason, and the slot passes to the next
+  waiter or is freed.
+- A caller beyond the FIFO cap is rejected immediately, and a waiter not granted
+  within 250 ms is rejected, both with `queue_limit`.
+
+The response reason is bounded to `queue_limit`, `pool_waiting`, or `pool_busy`.
+The `usage_writer_admission` log reports `slot_wait_ms` (0 for immediate
+decisions) and `waited: true` on a rejection after waiting. The 250 ms bounds only
+the admission wait; the rest of the request, including the write and awaited
+post-commit work, is not bounded by it.
 
 A slot remains held until the awaited persistence call completes, including
 awaited post-commit work, and is released on success, duplicate, `not_recorded`,
@@ -461,12 +504,11 @@ deployment, append `/usage` to the hostname shown for `usage-ingest` or
 `POST /usage` requires `Authorization: Bearer <USAGE_INGEST_PUBLISH_SECRET>`; configure
 the same dedicated publisher secret in the Worker and gateway. Set the gateway URL
 and secret before gateway startup; redeploy the gateway after changing either.
-Provision and verify the Worker-side publisher secret before selecting staging
-or the SFO cohort; a missing Worker secret returns 503.
-The HTTP address alone selects no traffic: production SFO selection still requires
-both production environment labels, a trusted `sfo1` function region and the SFO
-cohort control above; production FRA selection requires both production labels and
-`fra1`.
+Provision and verify the Worker-side publisher secret before enabling staging
+or production traffic; a missing Worker secret returns 503.
+The HTTP address alone selects no traffic: production selection requires both
+production environment labels, in any function region the
+gateway runs. There is no per-region, per-payer or exposure control.
 Verify the deployed gateway version and effective settings before drawing conclusions
 about live selection; source defaults alone do not establish deployed state. No custom
 routes or preview URLs are configured. The consumer is attached to each environment's producer queue.

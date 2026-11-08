@@ -890,6 +890,7 @@ describe('a question with images', () => {
       model: 'kilo/one',
       effort: null,
       images: [image],
+      failureKey: null,
     });
   });
 
@@ -977,6 +978,39 @@ describe('a send the account cannot pay for', () => {
 
     finish?.();
     await settled();
+    expect(snapshotOf(opened)).toMatchObject({ asked: null, failureKey: null });
+  });
+
+  it('still says why after the chat is opened again', async () => {
+    storedHistory = [];
+    creditsFailureFor = 's1';
+
+    await say(opened, { text: 'first', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+
+    await releaseChat(opened);
+    await enterChat(place, opened);
+
+    /* The reason is kept with the question that waits, so a chat opened again —
+       after a restart, or after the app reloads to switch language — still says
+       the balance stopped the send instead of reading as a message the person
+       stopped. The banner and its Add credits control hang off this key. */
+    expect(snapshotOf(opened)).toMatchObject({
+      status: 'idle',
+      asked: 'first',
+      askedModel: 'kilo/one',
+      failureKey: CREDITS_FAILURE_KEY,
+    });
+    expect(await askedIn(opened)).toMatchObject({ failureKey: CREDITS_FAILURE_KEY });
+
+    creditsFailureFor = undefined;
+    await retryChat(opened);
+    await settled();
+    finish?.();
+    await settled();
+
+    await releaseChat(opened);
+    await enterChat(place, opened);
     expect(snapshotOf(opened)).toMatchObject({ asked: null, failureKey: null });
   });
 });
@@ -1489,6 +1523,7 @@ describe('custom backend question targets', () => {
         model: target,
         effort: null,
         images: [],
+        failureKey: errorKey,
       });
 
       await retryChat(opened);
@@ -1597,6 +1632,7 @@ describe('custom backend question targets', () => {
         model: target,
         effort: null,
         images: [],
+        failureKey: errorKey,
       });
       await retryChat(opened);
       expect(asked).toHaveLength(2);
@@ -1681,6 +1717,7 @@ describe('custom backend question targets', () => {
       model: target,
       effort: null,
       images: [],
+      failureKey: 'common.somethingWentWrong',
     });
 
     // The route still names s1; Retry must follow the installed custom session.
@@ -1721,6 +1758,7 @@ describe('custom backend question targets', () => {
       model: target,
       effort: null,
       images: [],
+      failureKey: 'common.somethingWentWrong',
     });
 
     backendState.profiles = [];
@@ -1751,6 +1789,7 @@ describe('custom backend question targets', () => {
       model: 'kilo/one',
       effort: null,
       images: [],
+      failureKey: null,
     });
     finish?.();
     await settled();
@@ -1767,10 +1806,16 @@ describe('custom backend question targets', () => {
     await enterChat(place, opened);
 
     expect(snapshotOf(opened)).toMatchObject({ asked: text, askedModel: 'kilo/one' });
-    expect(await askedIn(opened)).toEqual({ text, model: 'kilo/one', effort: null, images: [] });
+    expect(await askedIn(opened)).toEqual({
+      text,
+      model: 'kilo/one',
+      effort: null,
+      images: [],
+      failureKey: null,
+    });
     expect(storedQuestions.has(`chat-asked:${opened}`)).toBe(false);
     expect(storedQuestions.get(`chat-asked-target:${opened}`)).toBe(
-      JSON.stringify({ text, model: 'kilo/one', effort: null, images: [] })
+      JSON.stringify({ text, model: 'kilo/one', effort: null, images: [], failureKey: null })
     );
   });
 
@@ -1792,6 +1837,7 @@ describe('custom backend question targets', () => {
       model: 'kilo/one',
       effort: null,
       images: [],
+      failureKey: null,
     });
     expect(storedQuestions.has('chat-asked:s1')).toBe(false);
   });

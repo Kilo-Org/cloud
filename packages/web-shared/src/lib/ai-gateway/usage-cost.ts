@@ -4,6 +4,7 @@ import {
   calculateTieredCost_mUsd,
 } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing';
 import { OPENAI_CHATGPT_PROVIDER_ID } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/provider-id';
+import { CLAUDE_BILLING_PROVIDER_ID } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/provider-id';
 import type {
   JustTheCostsUsageStats,
   MicrodollarUsageContext,
@@ -30,7 +31,13 @@ export function applyUsagePricing(
     usage.cost_mUsd = customCost_mUsd + nonInferenceCost_mUsd;
   }
 
-  if (context.is_free || context.user_byok || context.provider === OPENAI_CHATGPT_PROVIDER_ID) {
+  if (
+    context.is_free ||
+    context.user_byok ||
+    context.provider === OPENAI_CHATGPT_PROVIDER_ID ||
+    // A customer's Claude organization paid; Kilo charges nothing.
+    context.provider === CLAUDE_BILLING_PROVIDER_ID
+  ) {
     usage.cost_mUsd = 0;
     usage.cacheDiscount_mUsd = 0;
   }

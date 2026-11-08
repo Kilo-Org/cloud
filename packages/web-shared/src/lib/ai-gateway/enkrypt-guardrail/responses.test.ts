@@ -1,10 +1,14 @@
 import { describe, expect, it } from '@jest/globals';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import {
   enkryptGuardrailRejectionResponse,
+  enkryptOrganizationCreditsRequiredResponse,
   enkryptOutputGuardrailRejectionResponse,
 } from './responses';
 
 const block = { action: 'block', message: 'Blocked: prompt injection.' } as const;
+const blockWithRevertGuidance =
+  'Blocked: prompt injection. To change it, use Revert to here under your message (or /undo in the TUI).';
 
 describe('enkryptGuardrailRejectionResponse', () => {
   it.each(['skip', 'allow'] as const)('sends the request upstream on %s', action => {
@@ -20,7 +24,7 @@ describe('enkryptGuardrailRejectionResponse', () => {
       expect(response?.headers.get('x-should-retry')).toBe('false');
       expect(await response?.json()).toEqual({
         error: {
-          message: 'Blocked: prompt injection.',
+          message: blockWithRevertGuidance,
           type: 'invalid_request_error',
           code: 'guardrail_blocked',
           param: null,
@@ -36,7 +40,7 @@ describe('enkryptGuardrailRejectionResponse', () => {
     expect(response?.status).toBe(400);
     expect(await response?.json()).toEqual({
       type: 'error',
-      error: { type: 'invalid_request_error', message: 'Blocked: prompt injection.' },
+      error: { type: 'invalid_request_error', message: blockWithRevertGuidance },
       error_type: 'guardrail_blocked',
     });
   });
@@ -239,5 +243,24 @@ describe('enkryptOutputGuardrailRejectionResponse', () => {
       },
       error_type: 'guardrail_unavailable',
     });
+  });
+});
+
+describe('enkryptOrganizationCreditsRequiredResponse', () => {
+  it('links the organization and omits the free-model advice', async () => {
+    const response = enkryptOrganizationCreditsRequiredResponse('org-1', -0.5);
+
+    expect(response.status).toBe(402);
+    const body = (await response.json()) as { error: { message: string } };
+    expect(body).toEqual({
+      error: {
+        title: 'Organization Credits Required',
+        message: expect.stringContaining('including on free models and BYOK requests'),
+        balance: -0.5,
+        buyCreditsUrl: `${APP_URL}/organizations/org-1`,
+      },
+      error_type: 'usage_limit_exceeded',
+    });
+    expect(body.error.message).not.toMatch(/switch to a free model/i);
   });
 });

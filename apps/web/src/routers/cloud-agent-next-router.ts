@@ -45,6 +45,8 @@ import {
   baseGetSessionNextOutputSchema,
   baseGetEgressAuditNextSchema,
   baseGetEgressAuditNextOutputSchema,
+  baseGetSessionMessagesPageNextSchema,
+  baseGetSessionMessagesPageNextOutputSchema,
   baseGetSandboxStatusNextSchema,
   baseGetSandboxStatusNextOutputSchema,
   baseGetPendingInteractionsNextSchema,
@@ -370,21 +372,14 @@ export const cloudAgentNextRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       await assertUserOwnsSession(ctx.user.id, input.cloudAgentSessionId, input.expectedWorktreeId);
       const authToken = await createCloudAgentControlToken(ctx.user, ctx.headersList);
-      // Prompt turns carry their own model; command turns run the session's
-      // stored model, so resolve it to apply the same free/BYOK eligibility
-      // to every follow-up that queues a model-using turn. If the worker
-      // can't return the session model, fall back to the balance-checked
-      // client (the safe default) rather than failing the mutation on a
-      // read-side error.
-      let modelId: string | undefined;
-      if (input.payload.type === 'prompt') {
-        modelId = input.payload.model;
-      } else {
+      let modelId = input.payload.model;
+      if (modelId === undefined) {
         try {
           modelId = (
             await createCloudAgentNextClient(authToken).getSession(input.cloudAgentSessionId)
           ).model;
         } catch {
+          // A failed fallback read must not bypass balance checks.
           modelId = undefined;
         }
       }
@@ -543,10 +538,7 @@ export const cloudAgentNextRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const authToken = await createCloudAgentControlToken(ctx.user, ctx.headersList);
       const options = await createCloudAgentNextClient(authToken)
-        .getPreviewOptions({
-          cloudAgentSessionId: input.cloudAgentSessionId,
-          organizationId: input.organizationId,
-        })
+        .getPreviewOptions({ cloudAgentSessionId: input.cloudAgentSessionId })
         .catch((error: unknown) => {
           console.warn('[cloud-agent-next.getPreviewOptions] Worker call failed:', {
             error: error instanceof Error ? error.message : String(error),
@@ -733,6 +725,15 @@ export const cloudAgentNextRouter = createTRPCRouter({
       return await createCloudAgentNextClient(
         await createCloudAgentControlToken(ctx.user, ctx.headersList)
       ).getEgressAudit(input);
+    }),
+
+  getSessionMessagesPage: baseProcedure
+    .input(baseGetSessionMessagesPageNextSchema)
+    .output(baseGetSessionMessagesPageNextOutputSchema)
+    .query(async ({ ctx, input }) => {
+      await assertUserOwnsSession(ctx.user.id, input.sessionId);
+      const authToken = await createCloudAgentControlToken(ctx.user, ctx.headersList);
+      return createCloudAgentNextClient(authToken).getSessionMessagesPage(input);
     }),
 
   getSandboxStatus: baseProcedure

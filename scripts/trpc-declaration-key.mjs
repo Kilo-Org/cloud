@@ -2,14 +2,15 @@
 // Print `key=<sha256>` for the inputs of the @kilocode/trpc declaration build.
 //
 // The key covers every file the declaration program reads that lives in the
-// repository (from `tsgo --listFilesOnly`), the build configuration, and
-// pnpm-lock.yaml. Files under node_modules are pinned by the lockfile, so they
-// are left out of the per-file hash. Any failure exits non-zero: a key that
-// misses an input would restore stale declarations.
-import { createHash } from 'node:crypto';
+// repository (from `tsgo --listFilesOnly`), the build configuration, and the
+// lockfile entries of the package's importer closure, which pin every file the
+// build reads under node_modules. A dependency change in another workspace does
+// not move it. Any failure exits non-zero: a key that misses an input would
+// restore stale declarations.
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
 import { relative, resolve } from 'node:path';
+
+import { buildKeyInput } from './build-key-inputs.mjs';
 
 const root = process.cwd();
 const trpc = resolve(root, 'packages/trpc');
@@ -24,7 +25,6 @@ const listed = execFileSync(
 if (listed.length === 0) throw new Error('tsgo listed no files for packages/trpc');
 
 const files = new Set([
-  'pnpm-lock.yaml',
   'packages/trpc/package.json',
   'packages/trpc/tsconfig.json',
   'packages/trpc/tsconfig.build.json',
@@ -33,6 +33,7 @@ const files = new Set([
   // a change to either must not reuse declarations built the old way.
   '.github/actions/trpc-declarations/action.yml',
   'scripts/trpc-declaration-key.mjs',
+  'scripts/build-key-inputs.mjs',
 ]);
 for (const file of listed) {
   const path = relative(root, resolve(trpc, file));
@@ -40,12 +41,4 @@ for (const file of listed) {
   files.add(path);
 }
 
-const hash = createHash('sha256');
-for (const path of [...files].sort()) {
-  hash
-    .update(path)
-    .update('\0')
-    .update(readFileSync(resolve(root, path)))
-    .update('\0');
-}
-console.log(`key=${hash.digest('hex')}`);
+console.log(`key=${buildKeyInput(root, 'packages/trpc', files)}`);

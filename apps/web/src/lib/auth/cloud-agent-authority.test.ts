@@ -19,8 +19,6 @@ import {
   getResourceDelegationAuthority,
 } from './resource-delegation';
 import { GET as getIdentity } from '@/app/api/user/route';
-import { POST as mintGastownToken } from '@/app/api/gastown/token/route';
-import { POST as mintWastelandToken } from '@/app/api/wasteland/token/route';
 import {
   personalPrepareSessionNextSchema,
   organizationPrepareSessionNextSchema,
@@ -33,8 +31,6 @@ const mockMembership = jest.fn();
 const mockDirectMembership = jest.fn();
 const mockGetServerSession = jest.fn();
 const mockResolver = jest.fn();
-const mockOrgMemberships = jest.fn();
-const mockGastownEnabled = jest.fn();
 let resourceMigrationEnabled = true;
 
 jest.mock('next/headers', () => ({ headers: () => mockHeaders(), cookies: jest.fn() }));
@@ -66,10 +62,6 @@ jest.mock('@kilocode/worker-utils/account-access', () => ({
 }));
 jest.mock('@kilocode/web-shared/lib/organizations/organizations', () => ({
   isOrganizationMember: (...args: unknown[]) => mockMembership(...args),
-  getUserOrgMemberships: (...args: unknown[]) => mockOrgMemberships(...args),
-}));
-jest.mock('@/lib/gastown/feature-flags', () => ({
-  isGastownEnabled: (...args: unknown[]) => mockGastownEnabled(...args),
 }));
 jest.mock('@/lib/organizations/organization-auth', () => ({ getAuthorizedOrgContext: jest.fn() }));
 jest.mock('@kilocode/web-shared/lib/constants', () => ({
@@ -87,7 +79,15 @@ jest.mock('@kilocode/web-shared/lib/admin/admin-access-log', () => ({
   authViaTokenFromHeaders: (headers: Headers) => headers.has('authorization'),
   clientIpFromHeaders: () => null,
   routeFromHeaders: () => null,
+  methodFromHeaders: (_headers: Headers, requestMethod?: string | null) => requestMethod ?? null,
+  userAgentProductFromHeaders: () => null,
   emitAdminAccessEvent: jest.fn(),
+  emitPrivilegedAccessEvent: jest.fn(),
+  recordKiloAdminElevation: jest.fn(),
+  recordKiloAdminElevationForRequest: jest.fn(),
+  elevateViaKiloAdmin: async (_ctx: unknown, params: { grant: unknown }) => params.grant,
+  serviceTarget: (service: string) => `service:${service}`,
+  organizationTarget: (id: string) => `organization:${id}`,
 }));
 jest.mock('@kilocode/web-shared/lib/web-session-revocation', () => ({
   isWebSessionCurrent: () => true,
@@ -181,8 +181,6 @@ beforeEach(() => {
   mockMembership.mockResolvedValue(true);
   mockDirectMembership.mockResolvedValue([{ id: 'fixture-membership' }]);
   mockGetServerSession.mockResolvedValue({ kiloUserId: user.id });
-  mockOrgMemberships.mockResolvedValue([]);
-  mockGastownEnabled.mockResolvedValue(true);
   mockResolver.mockResolvedValue('launched');
   jest.spyOn(console, 'warn').mockImplementation(() => {});
 });
@@ -213,8 +211,6 @@ describe('verified scoped web authentication', () => {
   });
   it.each([
     undefined,
-    '/api/gastown/token',
-    '/api/wasteland/token',
     '/api/profile',
     '/api/trpc/user.getMe',
     '/api/trpc/cloudAgentNext.prepareSession,user.getMe',
@@ -258,17 +254,6 @@ describe('verified scoped web authentication', () => {
     headers.set('X-KiloCode-OrganizationId', organizationId);
     mockHeaders.mockResolvedValue(headers);
     expect((await getIdentity()).status).toBe(403);
-  });
-  it('cannot reach direct REST credential mint paths even with a valid browser cookie', async () => {
-    const headers = bearer();
-    headers.set('cookie', 'next-auth.session-token=fixture');
-    headers.set('x-pathname', '/api/user');
-    mockHeaders.mockResolvedValue(headers);
-    expect((await mintGastownToken()).status).toBe(401);
-    expect((await mintWastelandToken()).status).toBe(401);
-    expect(mockOrgMemberships).not.toHaveBeenCalled();
-    expect(mockGastownEnabled).not.toHaveBeenCalled();
-    expect(mockGetServerSession).not.toHaveBeenCalled();
   });
   it('rechecks scope expiry after awaiting current-user authorization', async () => {
     mockFindUser.mockImplementation(async () => {
@@ -411,7 +396,6 @@ describe('scope-preserving control token exchange', () => {
     const result = await createControlTokenForRequest(user, 'cloud-agent-next', {
       headers: bearer(),
       expiresIn: 100_000,
-      extra: { isAdmin: true },
     });
     const claims = jwt.verify(result.token, secret) as jwt.JwtPayload;
     expect(claims).toMatchObject({
@@ -425,11 +409,6 @@ describe('scope-preserving control token exchange', () => {
     expect(claims.runtimeAuthorization).toBeUndefined();
     expect(claims.isAdmin).toBeUndefined();
     expect(result.expiresAt).toBe(new Date(scope.expiresAt * 1000).toISOString());
-  });
-  it.each(['gastown', 'wasteland'] as const)('cannot mint %s control', async resource => {
-    await expect(
-      createControlTokenForRequest(user, resource, { headers: bearer() })
-    ).rejects.toMatchObject({ status: 403 });
   });
   it('cannot mint other delegations, change org, re-exchange control, or use stale principal', async () => {
     await expect(getResourceDelegationAuthority(user, { headers: bearer() })).rejects.toMatchObject(

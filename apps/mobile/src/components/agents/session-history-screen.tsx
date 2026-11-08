@@ -139,8 +139,9 @@ export function SessionHistoryScreen() {
   );
 
   // App-foreground refresh for stored history. `navigation.isFocused()` is
-  // read live because a frozen (unfocused) tab does not re-render. History
-  // shows no tray, so only stored queries are touched.
+  // read live because a focus value carried through React state or a ref lags
+  // the navigation state. History shows no tray, so only stored queries are
+  // touched.
   useEffect(() => {
     const subscription = AppState.addEventListener('change', nextState => {
       if (nextState === 'active' && navigation.isFocused()) {
@@ -166,6 +167,12 @@ export function SessionHistoryScreen() {
     if (shouldLoadMoreSessions(paging)) {
       void paging.fetchNextPage();
     }
+  }, [paging]);
+
+  // The footer's own retry: it bypasses the end-reach gate, which stays shut
+  // while the last attempt failed.
+  const handleRetryNextPage = useCallback(() => {
+    void paging.fetchNextPage();
   }, [paging]);
 
   const hasActiveQuery = isSearching || activeFilterCount > 0;
@@ -208,6 +215,8 @@ export function SessionHistoryScreen() {
       isError={contentIsError}
       hasFreshHistory={storedFetchedSinceMount}
       isFetchingNextPage={paging.isFetchingNextPage}
+      isFetchNextPageError={paging.isFetchNextPageError}
+      onRetryNextPage={handleRetryNextPage}
       refetch={handleRefetch}
       onRetry={handleRetry}
       onEndReached={handleEndReached}

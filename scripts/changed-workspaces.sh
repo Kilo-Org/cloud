@@ -5,6 +5,16 @@ set -euo pipefail
 # Excludes the root package and packages listed in --exclude arguments. Each
 # --include dir is selected as if it had file changes.
 #
+# The selection comes from one invocation of scripts/affected-workspaces.mjs: it
+# owns the workspace inventory, the reader and dependent closure, the lockfile
+# closure (scripts/changed-dependencies.mjs), and it excludes documents and
+# neutral root locations before any manifest read or file probe. The matrix then
+# keeps, of the selected directories, the ones with a test script and a test file.
+#
+# A caller that already ran the detector for the same base passes its document as
+# AFFECTED (ci.yml's changes job does), and the matrix decides from it instead of
+# selecting the repository a second time in the same run.
+#
 # Usage:
 #   scripts/changed-workspaces.sh                                    # all changed workspaces with tests
 #   scripts/changed-workspaces.sh --exclude services/cloud-agent-next --exclude apps/web  # skip specific dirs
@@ -60,67 +70,65 @@ else
   fi
 fi
 
-force_all=false
-dependent_dirs_file=$(mktemp)
-trap 'rm -f "$dependent_dirs_file"' EXIT
-if [ -n "$base" ]; then
-  if ! git diff --quiet "$base" -- pnpm-lock.yaml pnpm-workspace.yaml 'patches/**'; then
-    if ! node scripts/changed-dependencies.mjs "$base" > "$dependent_dirs_file"; then
-      force_all=true
-    elif grep -qxF '*' "$dependent_dirs_file"; then
-      force_all=true
-    fi
-  fi
-
-  # List files changed under packages/**. Anything that doesn't match
-  # `packages/<name>/` (e.g. `packages/README.md`) is a loose file with no
-  # single owning package — fall back to force_all.
-  pkg_changes=$(git diff --name-only "$base" -- 'packages/**' || true)
-  if [ -n "$pkg_changes" ]; then
-    loose=$(printf '%s\n' "$pkg_changes" | grep -vE '^packages/[^/]+/' | head -1 || true)
-    if [ -n "$loose" ]; then
-      force_all=true
-    else
-      # Collect the top-level changed package dirs and union their transitive
-      # workspace:* dependents via pnpm's `...^<name>` selector.
-      changed_pkg_dirs=$(printf '%s\n' "$pkg_changes" | awk -F/ '{print $1"/"$2}' | sort -u)
-      for pkg_dir in $changed_pkg_dirs; do
-        [ -f "$pkg_dir/package.json" ] || continue
-        pkg_name=$(node -e "console.log(require('./$pkg_dir/package.json').name)" 2>/dev/null) || continue
-        [ -n "$pkg_name" ] || continue
-        pnpm --filter "...^$pkg_name" ls --json --depth -1 2>/dev/null | node -e "
-          const pkgs = JSON.parse(require('fs').readFileSync('/dev/stdin','utf8'));
-          for (const p of pkgs) {
-            if (!p.path) continue;
-            const rel = require('path').relative(process.cwd(), p.path);
-            if (rel && rel !== '.') console.log(rel);
-          }
-        " 2>/dev/null >> "$dependent_dirs_file" || true
-        # Always include the changed package itself; `...^<name>` only matches
-        # true dependents, not the named package.
-        echo "$pkg_dir" >> "$dependent_dirs_file"
-      done
-      sort -u "$dependent_dirs_file" -o "$dependent_dirs_file"
-    fi
-  fi
-fi
-if [ ${#includes[@]} -gt 0 ]; then
-  printf '%s\n' "${includes[@]}" >> "$dependent_dirs_file"
+# Reuse the document the caller computed for this base (AFFECTED). A document is
+# usable only when its directory list is an array and it names the same base: one
+# computed for another revision describes other changes, so it is ignored and the
+# detector runs below. A local run supplies nothing here, and an unreadable
+# document fails the same check.
+selection=""
+if [ -n "${AFFECTED:-}" ] \
+    && [ "$(jq -r --arg base "$base" 'if (.dirs | type) == "array" and ((.base // "") == $base) then 1 else 0 end' <<< "$AFFECTED" 2>/dev/null)" = "1" ]; then
+  selection="$AFFECTED"
+  echo "selection: reusing the affected-workspace document for ${base:-no base revision}" >&2
 fi
 
-# Read workspace dirs using pnpm (handles glob expansion in pnpm-workspace.yaml)
-workspace_dirs=$(pnpm ls --json -r --depth -1 2>/dev/null | node -e "
-  const pkgs = JSON.parse(require('fs').readFileSync('/dev/stdin','utf8'));
-  for (const p of pkgs) {
-    if (!p.path) continue;
-    const rel = require('path').relative(process.cwd(), p.path);
-    if (rel && rel !== '.') console.log(rel);
-  }
-")
+# One selection pass unless one was supplied. The detector answers with every
+# workspace when no base is available, which is the selection the script used
+# before.
+if [ -z "$selection" ]; then
+  selection=$(node scripts/affected-workspaces.mjs "$base") || selection=""
+fi
 
-# Collect entries as newline-delimited "name\tdir" pairs, then serialize to JSON once
-entries=""
-for dir in $workspace_dirs; do
+if [ -n "$selection" ]; then
+  candidate_dirs=$(jq -r '.dirs[]' <<< "$selection")
+else
+  # Standalone path for a local run without detector output, for example when
+  # the root dependencies are not installed. The selection is unknown, so cover
+  # every workspace rather than drop a suite.
+  candidate_dirs=$(pnpm ls --json -r --depth -1 2>/dev/null | node -e "
+    const pkgs = JSON.parse(require('fs').readFileSync('/dev/stdin','utf8'));
+    for (const p of pkgs) {
+      if (!p.path) continue;
+      const rel = require('path').relative(process.cwd(), p.path);
+      if (rel && rel !== '.') console.log(rel);
+    }
+  ")
+  echo "warning: workspace detection produced no selection; selecting every workspace with tests" >&2
+fi
+
+# --include dirs join the selection before the filter, as they did when the
+# script appended them to the dependent-dirs file.
+all_dirs="$candidate_dirs"
+for dir in ${includes[@]+"${includes[@]}"}; do
+  all_dirs+=$'\n'"$dir"
+done
+
+# Drop excluded dirs and duplicates; --include dirs join before this filter.
+kept_dirs=()
+in_list() {
+  local needle="$1" dir
+  for dir in ${kept_dirs[@]+"${kept_dirs[@]}"}; do
+    if [[ "$dir" == "$needle" ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+while IFS= read -r dir; do
+  [ -n "$dir" ] || continue
+  in_list "$dir" && continue
+
   # Skip excluded dirs
   skip=false
   for ex in "${excludes[@]+"${excludes[@]}"}"; do
@@ -131,37 +139,45 @@ for dir in $workspace_dirs; do
   done
   $skip && continue
 
-  # Must have a package.json with a test script
-  [ -f "$dir/package.json" ] || continue
-  has_test=$(node -e "const p=require('./$dir/package.json'); console.log(p.scripts?.test ? '1' : '')" 2>/dev/null)
-  [ -n "$has_test" ] || continue
+  kept_dirs+=("$dir")
+done <<< "$all_dirs"
 
-  # Skip workspaces whose test script exists but has no test files.
-  # `-print -quit` stops find after the first match and prints it, avoiding
-  # a `find | head -1` pipeline — on Linux that produces SIGPIPE on find,
-  # which under `set -o pipefail` propagates as a non-zero pipeline exit.
-  test_file_count=$(find "$dir" -type f \( -name '*.test.ts' -o -name '*.test.tsx' -o -name '*.test.js' -o -name '*.test.jsx' -o -name '*.spec.ts' -o -name '*.spec.tsx' -o -name '*.spec.js' -o -name '*.spec.jsx' \) -not -path '*/node_modules/*' -print -quit 2>/dev/null)
-  [ -n "$test_file_count" ] || continue
+# Read the surviving manifests in one Node invocation: the workspace name and
+# its test script decide the row without a process per workspace.
+entries=$(printf '%s\n' ${kept_dirs[@]+"${kept_dirs[@]}"} | node -e '
+  const fs = require("fs");
+  const lines = fs.readFileSync(0, "utf8").split("\n").filter(Boolean);
+  for (const dir of lines) {
+    let manifest;
+    try {
+      manifest = JSON.parse(fs.readFileSync(`${dir}/package.json`, "utf8"));
+    } catch {
+      continue;
+    }
+    if (!manifest.name || !manifest.scripts?.test) continue;
+    console.log(`${manifest.name}\t${dir}`);
+  }
+')
 
-  # Check for file changes (if we have a merge base)
-  if [ -n "$base" ] && ! $force_all; then
-    if [ -s "$dependent_dirs_file" ] && grep -qxF "$dir" "$dependent_dirs_file"; then
-      :
-    else
-      changed_file=$(git diff --name-only "$base" -- "$dir/" | head -1 || true)
-      [ -n "$changed_file" ] || continue
-    fi
-  fi
-
-  name=$(node -e "console.log(require('./$dir/package.json').name)" 2>/dev/null)
-  entries+="${name}"$'\t'"${dir}"$'\n'
-done
+# Keep a row only when the workspace's test script has a test file to run.
+# `-print -quit` stops find after the first match and prints it, avoiding
+# a `find | head -1` pipeline — on Linux that produces SIGPIPE on find,
+# which under `set -o pipefail` propagates as a non-zero pipeline exit.
+# The prune form skips real files under node_modules instead of only
+# filtering them out of the result.
+rows=""
+while IFS=$'\t' read -r name dir; do
+  [ -n "$dir" ] || continue
+  test_file=$(find "$dir" -path '*/node_modules' -prune -o -type f \( -name '*.test.ts' -o -name '*.test.tsx' -o -name '*.test.js' -o -name '*.test.jsx' -o -name '*.spec.ts' -o -name '*.spec.tsx' -o -name '*.spec.js' -o -name '*.spec.jsx' \) -print -quit 2>/dev/null)
+  [ -n "$test_file" ] || continue
+  rows+="${name}"$'\t'"${dir}"$'\n'
+done <<< "$entries"
 
 # Serialize all entries to JSON in a single node invocation (avoids shell interpolation issues)
-if [ -z "$entries" ]; then
+if [ -z "$rows" ]; then
   echo "[]"
 else
-  echo -n "$entries" | node -e "
+  echo -n "$rows" | node -e "
     const lines = require('fs').readFileSync('/dev/stdin','utf8').trim().split('\n');
     const matrix = lines.map(line => {
       const [name, dir] = line.split('\t');

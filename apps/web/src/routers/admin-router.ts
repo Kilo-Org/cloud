@@ -10,6 +10,7 @@ import {
   userCanViewSessions,
   userIsSuperadmin,
 } from '@/lib/admin/admin-permissions';
+import { revokeOpenSupportGrants } from '@/lib/admin/support-access-revocation';
 import { userCanManageCredits } from '@/lib/admin/credit-management';
 import { isEligibleForPlatformAdmin, platformAdminDomains } from '@/lib/admin/platform-admin';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
@@ -61,7 +62,6 @@ import { creditCampaignsRouter } from '@/routers/admin/credit-campaigns-router';
 import { adminInternalBotUsersRouter } from '@/routers/admin/internal-bot-users-router';
 import { cloudBillingSkusRouter } from '@/routers/admin/cloud-billing-skus-router';
 import { emailTestingRouter } from '@/routers/admin/email-testing-router';
-import { adminGastownRouter } from '@/routers/admin/gastown-router';
 import { extendClawTrialRouter } from '@/routers/admin/extend-claw-trial-router';
 import { adminCustomLlmRouter } from '@/routers/admin/custom-llm-router';
 import { adminGatewayConfigRouter } from '@/routers/admin/gateway-config-router';
@@ -86,6 +86,7 @@ import { adminBotRequestsRouter } from '@/routers/admin-bot-requests-router';
 import { adminModelTrafficRouter } from '@/routers/admin/model-traffic-router';
 import { adminModelEvalIngestRouter } from '@/routers/admin-model-eval-ingest-router';
 import { adminUserDataExportsRouter } from '@/routers/admin/user-data-exports-router';
+import { adminSupportAccessRouter } from '@/routers/admin/admin-support-access-router';
 import { adminUserDeletionQueueRouter } from '@/routers/admin/user-deletion-queue-router';
 import { workerInstanceId } from '@/lib/kiloclaw/instance-registry';
 import { clearTrialInactivityStopAfterStart } from '@/lib/kiloclaw/instance-lifecycle';
@@ -122,6 +123,7 @@ import { assertNoError, successResult } from '@kilocode/web-shared/lib/maybe-res
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@kilocode/web-shared/lib/kilo-pass/usage-triggered-bonus';
 import { getKiloPassStateForUser } from '@kilocode/web-shared/lib/kilo-pass/state';
 import { revokeWebSessions } from '@kilocode/web-shared/lib/web-session-revocation';
+import { revokeStepUpProofs } from '@kilocode/web-shared/lib/admin/step-up-store';
 import {
   kilo_pass_issuances,
   kilo_pass_issuance_items,
@@ -2022,6 +2024,17 @@ export const adminRouter = createTRPCRouter({
               });
             }
 
+            if (!input.isAdmin) {
+              await revokeOpenSupportGrants(tx, {
+                actorKiloUserId: target.id,
+                reason: 'platform admin access revoked',
+                performedByKiloUserId: actor.id,
+              });
+            }
+            // The session pepper and API pepper rotated above, so every step-up
+            // proof bound to the old credentials is no longer usable.
+            await revokeStepUpProofs(target.id, 'role_change', tx);
+
             await tx.insert(user_admin_notes).values({
               kilo_user_id: target.id,
               admin_kilo_user_id: actor.id,
@@ -2151,6 +2164,8 @@ export const adminRouter = createTRPCRouter({
               message: 'Failed to update target user',
             });
           }
+
+          await revokeStepUpProofs(target.id, 'permission_change', tx);
 
           const notes = [
             changes.is_super_admin !== undefined &&
@@ -2769,7 +2784,6 @@ export const adminRouter = createTRPCRouter({
   cloudBillingSkus: cloudBillingSkusRouter,
   emailTesting: emailTestingRouter,
   botRequests: adminBotRequestsRouter,
-  gastown: adminGastownRouter,
   extendClawTrial: extendClawTrialRouter,
   customLlm: adminCustomLlmRouter,
   gatewayConfig: adminGatewayConfigRouter,
@@ -2795,4 +2809,5 @@ export const adminRouter = createTRPCRouter({
   modelEvalIngest: adminModelEvalIngestRouter,
   userDataExports: adminUserDataExportsRouter,
   userDeletionQueue: adminUserDeletionQueueRouter,
+  supportAccess: adminSupportAccessRouter,
 });

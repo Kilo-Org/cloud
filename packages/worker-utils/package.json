@@ -20,7 +20,6 @@
     "./runtime-authorization": "./src/runtime-authorization.ts",
     "./runtime-authorization-contract": "./src/runtime-authorization-contract.ts",
     "./runtime-proxy-attestation": "./src/runtime-proxy-attestation.ts",
-    "./kilo-auth-middleware": "./src/kilo-auth-middleware.ts",
     "./sandbox-id": "./src/sandbox-id.ts",
     "./sandbox-allocation": "./src/sandbox-allocation.ts",
     "./egress-allowlist": "./src/egress-allowlist.ts",

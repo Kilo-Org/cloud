@@ -8,6 +8,8 @@ import type { ChatEvent, ServiceEvent } from './normalizer';
 import type { SessionStatus } from './schemas';
 import { createCloudAgentTransport } from './cloud-agent-transport';
 import { createServiceState } from './service-state';
+import { createMemoryStorage } from './storage/memory';
+import { createChatProcessor } from './chat-processor';
 import type { SessionSnapshot, SessionSnapshotPageOutcome } from './types';
 import { kiloId, cloudAgentId, makeSnapshot, stubUserMessage } from './test-helpers';
 
@@ -50,6 +52,218 @@ async function flushPromises(): Promise<void> {
 }
 
 const emptySnapshot = makeSnapshot({ id: 'ses-1' });
+
+it('renders native v2 parts through the workspace transport without v1 identifier rules', async () => {
+  const sessionId = 'workspace_native';
+  const nativeId = `ses_${'a'.repeat(26)}`;
+  const source = {
+    version: 'v2' as const,
+    session: {
+      id: nativeId,
+      location: { directory: '/workspace/app' },
+      time: { created: 1, updated: 2 },
+    },
+  };
+  const storage = createMemoryStorage();
+  const processor = createChatProcessor(storage);
+  const factory = createCloudAgentTransport({
+    sessionId: cloudAgentId(sessionId),
+    kiloSessionId: kiloId(nativeId),
+    api: createMockApi(),
+    getTicket: () => 'local-ticket',
+    websocketBaseUrl: 'ws://localhost:9999',
+    fetchCloudSnapshotPage: async () => ({
+      kind: 'success',
+      source,
+      info: { id: nativeId },
+      messages: [],
+      nextCursor: null,
+      omittedItemCount: 0,
+      updateCursor: 0,
+      totalCostMicrodollars: 0,
+    }),
+  });
+  const transport = factory({
+    onChatEvent: event => {
+      processor.process(event);
+    },
+    onServiceEvent() {},
+  });
+  try {
+    transport.connect();
+    await flushPromises();
+    const user = {
+      id: 'msg_native_user',
+      type: 'user',
+      time: { created: 1 },
+      text: 'native prompt',
+    };
+    const assistant = {
+      id: 'msg_native_reply',
+      type: 'assistant',
+      time: { created: 2, completed: 3 },
+      content: [{ type: 'text', text: 'visible native reply' }],
+    };
+    for (const [index, message] of [user, assistant].entries())
+      sendRaw({
+        eventId: index + 1,
+        cursor: index + 1,
+        sessionId,
+        streamEventType: 'kilocode',
+        timestamp: '2026-10-23T09:00:00Z',
+        data: {
+          type: 'conversation.message.updated',
+          properties: { sessionID: nativeId, source, message, parentID: user.id },
+        },
+      });
+    expect(storage.getParts(assistant.id)).toEqual([
+      expect.objectContaining({ type: 'text', text: 'visible native reply' }),
+    ]);
+    expect(storage.getMessageInfo(assistant.id)).toMatchObject({
+      role: 'assistant',
+      parentID: user.id,
+    });
+  } finally {
+    transport.destroy();
+  }
+});
+
+it('continues a streaming child message after the parts of a page read outside the transport', async () => {
+  const sessionId = 'workspace_child_positions';
+  const childId = `ses_${'c'.repeat(26)}`;
+  const chatEvents: ChatEvent[] = [];
+  const factory = createCloudAgentTransport({
+    sessionId: cloudAgentId(sessionId),
+    kiloSessionId: kiloId(`ses_${'r'.repeat(26)}`),
+    api: createMockApi(),
+    getTicket: () => 'local-ticket',
+    websocketBaseUrl: 'ws://localhost:9999',
+    fetchCloudSnapshotPage: async () => ({
+      kind: 'success',
+      info: { id: `ses_${'r'.repeat(26)}` },
+      messages: [],
+      nextCursor: null,
+      omittedItemCount: 0,
+      updateCursor: 0,
+      totalCostMicrodollars: 0,
+    }),
+  });
+  const transport = factory({ onChatEvent: event => chatEvents.push(event), onServiceEvent() {} });
+  try {
+    transport.connect();
+    await flushPromises();
+    transport.observeProjected?.([
+      {
+        info: {
+          id: 'msg_child',
+          sessionID: childId,
+          role: 'assistant',
+          time: { created: 2 },
+        } as SessionSnapshot['messages'][number]['info'],
+        parts: [
+          {
+            id: 'msg_child_000000',
+            sessionID: childId,
+            messageID: 'msg_child',
+            type: 'text',
+            text: 'a',
+          },
+          {
+            id: 'msg_child_000001',
+            sessionID: childId,
+            messageID: 'msg_child',
+            type: 'tool',
+            callID: 'call_shell',
+            tool: 'bash',
+            state: { status: 'running', input: { command: 'pwd' }, time: { start: 2 } },
+          },
+        ],
+      },
+    ]);
+    sendRaw({
+      eventId: 1,
+      cursor: 1,
+      sessionId,
+      streamEventType: 'kilocode',
+      timestamp: '2026-11-04T09:00:00Z',
+      data: {
+        type: 'conversation.event',
+        properties: {
+          sessionID: childId,
+          source: { version: 'v2' },
+          event: {
+            id: 'evt_child_text_1',
+            type: 'session.text.delta',
+            data: { sessionID: childId, assistantMessageID: 'msg_child', ordinal: 1, delta: 'b' },
+          },
+        },
+      },
+    });
+    expect(chatEvents).toEqual([
+      expect.objectContaining({ type: 'message.part.delta', partId: 'msg_child_000002' }),
+    ]);
+  } finally {
+    transport.destroy();
+  }
+});
+
+it('bounds session info versions and keeps the stale guard for recently updated sessions', async () => {
+  const sessionId = 'workspace_children';
+  const serviceEvents: ServiceEvent[] = [];
+  const factory = createCloudAgentTransport({
+    sessionId: cloudAgentId(sessionId),
+    kiloSessionId: kiloId('ses-root'),
+    api: createMockApi(),
+    getTicket: () => 'local-ticket',
+    websocketBaseUrl: 'ws://localhost:9999',
+    fetchCloudSnapshotPage: async () => ({
+      kind: 'success',
+      info: { id: 'ses-root' },
+      messages: [],
+      nextCursor: null,
+      omittedItemCount: 0,
+      updateCursor: 0,
+      totalCostMicrodollars: 0,
+    }),
+  });
+  const transport = factory({
+    onChatEvent() {},
+    onServiceEvent: event => serviceEvents.push(event),
+  });
+  let cursor = 0;
+  const updated = (id: string, at = ++cursor) =>
+    sendRaw({
+      eventId: 0,
+      cursor: at,
+      sessionId,
+      streamEventType: 'kilocode',
+      timestamp: '2026-10-23T09:00:00Z',
+      data: { type: 'session.updated', properties: { info: { id } } },
+    });
+  const delivered = (id: string) =>
+    serviceEvents.filter(event => event.type === 'session.updated' && event.info.id === id).length;
+  try {
+    transport.connect();
+    await flushPromises();
+    updated('ses-first');
+    let rootCursor = 0;
+    for (let index = 0; index < 3000; index += 1) {
+      updated(`ses-child-${index}`);
+      if (index % 100 === 0) {
+        updated('ses-root');
+        rootCursor = cursor;
+      }
+    }
+    updated('ses-root', rootCursor - 1);
+    updated('ses-first', 0);
+    // The root stays recent, so its stale update is dropped; the first child
+    // was evicted long ago and is no longer tracked.
+    expect(delivered('ses-root')).toBe(30);
+    expect(delivered('ses-first')).toBe(2);
+  } finally {
+    transport.destroy();
+  }
+});
 
 function sendRaw(event: CloudAgentEvent): void {
   mockWs.onmessage?.({ data: JSON.stringify(event) } as MessageEvent);
@@ -907,6 +1121,76 @@ describe('CloudAgentTransport command delegation', () => {
         mode: 'code',
         model: 'gpt-4',
       },
+    });
+
+    transport.destroy();
+  });
+
+  it('converts a Kilo model ref and forwards mode and variant for a command', async () => {
+    const api = createMockApi();
+    const { transport } = createTransportWithSinks(undefined, undefined, api);
+
+    await transport.send!({
+      messageId: 'msg_123456789abc123456789AB008',
+      payload: {
+        type: 'command',
+        command: 'compact',
+        arguments: '--aggressive',
+        mode: 'code',
+        model: { providerID: 'kilo', modelID: 'gpt-4' },
+        variant: 'high',
+      },
+    });
+
+    expect(api.send).toHaveBeenCalledWith({
+      sessionId: 'ses-1',
+      messageId: 'msg_123456789abc123456789AB008',
+      payload: {
+        type: 'command',
+        command: 'compact',
+        arguments: '--aggressive',
+        mode: 'code',
+        model: 'gpt-4',
+        variant: 'high',
+      },
+    });
+
+    transport.destroy();
+  });
+
+  it('rejects a non-Kilo model ref on a command before calling the Cloud Agent API', async () => {
+    const api = createMockApi();
+    const { transport } = createTransportWithSinks(undefined, undefined, api);
+
+    await expect(
+      transport.send!({
+        messageId: 'msg_123456789abc123456789AB009',
+        payload: {
+          type: 'command',
+          command: 'compact',
+          arguments: '',
+          model: { providerID: 'anthropic', modelID: 'claude-sonnet-4' },
+        },
+      })
+    ).rejects.toThrow('Cloud Agent only supports Kilo models');
+    expect(api.send).not.toHaveBeenCalled();
+
+    transport.destroy();
+  });
+
+  it('keeps a command without overrides backward compatible on the wire', async () => {
+    const api = createMockApi();
+    const { transport } = createTransportWithSinks(undefined, undefined, api);
+
+    await transport.send!({
+      messageId: 'msg_123456789abc123456789AB00A',
+      payload: { type: 'command', command: 'help', arguments: '' },
+    });
+
+    expect(api.send).toHaveBeenCalledWith({
+      sessionId: 'ses-1',
+      messageId: 'msg_123456789abc123456789AB00A',
+      payload: { type: 'command', command: 'help', arguments: '' },
     });
 
     transport.destroy();

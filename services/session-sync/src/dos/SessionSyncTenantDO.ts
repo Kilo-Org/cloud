@@ -1,11 +1,11 @@
 import { DurableObject } from 'cloudflare:workers';
-import { eq } from 'drizzle-orm';
+import { and, desc, eq, lt, or } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import { z } from 'zod';
 
 import migrations from '../../drizzle-tenant/migrations';
-import { createdSessions, leases, usage } from '../db/tenant-sqlite-schema';
+import { createdSessions, leases, usage, userErasure } from '../db/tenant-sqlite-schema';
 import type { Env } from '../env';
 import {
   LIMITS,
@@ -122,6 +122,52 @@ export class SessionSyncTenantDO extends DurableObject<Env> {
     return ok(null);
   }
 
+  async listCreatedSessions(input: unknown) {
+    const parsed = z
+      .strictObject({
+        limit: z.number().int().min(1).max(100),
+        before: z
+          .strictObject({
+            createdAt: z.number().int().nonnegative(),
+            target: z.string().max(2048),
+          })
+          .optional(),
+      })
+      .safeParse(input);
+    if (!parsed.success) return fail('invalid_request', 'Invalid session list page');
+    if (this.db.select().from(userErasure).get()) {
+      return ok({ items: [], next: null });
+    }
+    const { before, limit } = parsed.data;
+    const rows = this.db
+      .select()
+      .from(createdSessions)
+      .where(
+        before
+          ? or(
+              lt(createdSessions.created_at, before.createdAt),
+              and(
+                eq(createdSessions.created_at, before.createdAt),
+                lt(createdSessions.target, before.target)
+              )
+            )
+          : undefined
+      )
+      .orderBy(desc(createdSessions.created_at), desc(createdSessions.target))
+      .limit(limit + 1)
+      .all();
+    const items = rows.slice(0, limit);
+    const last = items.at(-1);
+    return ok({
+      items: items.map(row => ({
+        sessionID: row.session_id,
+        tenant: { type: row.tenant_type, id: row.tenant_id },
+        createdAt: row.created_at,
+      })),
+      next:
+        rows.length > limit && last ? { createdAt: last.created_at, target: last.target } : null,
+    });
+  }
   async eraseUser(input: unknown): Promise<Result<null>> {
     return erasure.begin(this.db, this.ctx, input);
   }

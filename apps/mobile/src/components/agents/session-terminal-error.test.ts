@@ -6,6 +6,7 @@ import { type SdkStatusMessageCode } from '@kilocode/cloud-agent-sdk';
 import { i18n } from '@/i18n';
 
 import { type MessageFailure } from './message-failure-state';
+import { SESSION_HISTORY_FAILURES } from './session-history-failures';
 import {
   buildTerminalErrorCopyText,
   classifyTerminalError,
@@ -189,6 +190,28 @@ describe('resolveSessionTerminalError', () => {
       retryWith: 'session',
       detail: 'boom',
     });
+  });
+
+  it.each([
+    SESSION_HISTORY_FAILURES.too_large.message,
+    SESSION_HISTORY_FAILURES.invalid_data.message,
+  ])('offers no Retry for a stored transcript that cannot be read: %s', message => {
+    // The stored page is oversize or unreadable, so the same read answers the
+    // same way every time: the reader gets the permanent not-available state
+    // instead of a Retry that cannot succeed.
+    expect(
+      resolveSessionTerminalError({ error: message, statusIndicator: null, messageCount: 0 })
+    ).toMatchObject({ retryable: false, detail: message });
+  });
+
+  it('still offers Retry for a transient transcript read failure', () => {
+    expect(
+      resolveSessionTerminalError({
+        error: SESSION_HISTORY_FAILURES.retryable_failure.message,
+        statusIndicator: null,
+        messageCount: 0,
+      })
+    ).toMatchObject({ retryable: true });
   });
 
   it('never shows the English transport message to the reader', () => {
@@ -409,8 +432,8 @@ describe('sessionStatusErrorMessage', () => {
     // Both SDK status strings for a failed delivery reach the delivery copy:
     // session-manager's exhaustion indicator and the cloud status written for
     // `cloud.message.failed` (also the normalizer's fallback).
-    ['Message failed to deliver', 'Failed to deliver'],
-    ['Message delivery failed', 'Failed to deliver'],
+    ['Message failed to deliver', 'Message not sent'],
+    ['Message delivery failed', 'Message not sent'],
   ] as const)('maps %s to typed copy', (raw, expected) => {
     expect(sessionStatusErrorMessage({ message: raw })).toBe(expected);
   });
@@ -423,7 +446,7 @@ describe('sessionStatusErrorMessage', () => {
     ['session-stopped', 'Session stopped', 'Session stopped'],
     ['session-terminated', 'Session terminated', 'The response failed.'],
     ['failed-to-stop-execution', 'Failed to stop execution', 'Failed to stop execution'],
-    ['message-delivery-failed', 'Message failed to deliver', 'Failed to deliver'],
+    ['message-delivery-failed', 'Message failed to deliver', 'Message not sent'],
     ['commit-failed', 'Commit failed', 'Commit failed'],
     [
       'not-authorized',
@@ -473,7 +496,7 @@ describe('sessionStatusErrorMessage', () => {
     ['Agent connection lost', 'The response failed.'],
     ['Session terminated', 'The response failed.'],
     ['Failed to stop execution', 'The response failed.'],
-    ['Message failed to deliver', 'Failed to deliver'],
+    ['Message failed to deliver', 'Message not sent'],
   ] as const)('keeps the code-less fallback for %s', (raw, expected) => {
     expect(sessionStatusErrorMessage({ message: raw })).toBe(expected);
   });
@@ -523,12 +546,15 @@ describe('sessionStatusErrorMessage', () => {
 function assistantFailure(detail: string | null): MessageFailure {
   return {
     kind: 'assistant',
+    side: 'assistant',
+    error: true,
     titleKey: 'agentChat.messageFailure.assistantTitle',
     title: 'Response failed',
     detailKey: null,
     detail,
     copyDetail: '',
     canRetry: true,
+    canAddCredits: false,
     canCopy: false,
   };
 }
@@ -536,12 +562,15 @@ function assistantFailure(detail: string | null): MessageFailure {
 describe('statusIndicatorDuplicatesMessageFailure', () => {
   const deliveryFailure: MessageFailure = {
     kind: 'delivery',
+    side: 'user',
+    error: true,
     titleKey: 'agentChat.messageFailure.deliveryTitle',
-    title: 'Failed to deliver',
+    title: 'Message not sent',
     detailKey: 'agentChat.messageFailure.deliveryExhausted',
     detail: 'We could not deliver this message after several attempts.',
     copyDetail: 'Unauthorized: Unauthorized',
     canRetry: true,
+    canAddCredits: false,
     canCopy: true,
   };
 
@@ -550,14 +579,39 @@ describe('statusIndicatorDuplicatesMessageFailure', () => {
   // failure a second time in either of its two copies.
   const executionFailure: MessageFailure = {
     kind: 'delivery',
+    side: 'assistant',
+    error: true,
     titleKey: 'agentChat.messageFailure.assistantTitle',
     title: 'Response failed',
-    detailKey: null,
-    detail: null,
+    detailKey: 'agentChat.messageFailure.deliveryExecution',
+    detail: 'The agent could not run this message.',
     copyDetail: 'Message delivery failed',
     canRetry: true,
+    canAddCredits: false,
     canCopy: true,
   };
+
+  it('suppresses the credits line a credits failure row already carries', () => {
+    const failure: MessageFailure = {
+      kind: 'assistant',
+      side: 'assistant',
+      error: true,
+      titleKey: 'agentChat.messageFailure.assistantTitle',
+      title: 'Response failed',
+      detailKey: 'agentChat.messageFailure.assistantCreditsRefusal',
+      detail: i18n.t('agentChat.messageFailure.assistantCreditsRefusal'),
+      copyDetail: '',
+      canRetry: false,
+      canAddCredits: true,
+      canCopy: false,
+    };
+    expect(
+      statusIndicatorDuplicatesMessageFailure({
+        indicator: { type: 'error', message: 'Assistant request failed: insufficient credits' },
+        failure,
+      })
+    ).toBe(true);
+  });
 
   it('suppresses an unclassified session error the last row already states', () => {
     expect(
@@ -628,7 +682,7 @@ describe('statusIndicatorDuplicatesMessageFailure', () => {
   it('suppresses the SDK delivery line the agent-execution row states as a response failure', () => {
     // `normalizer.ts` writes `Message delivery failed` as the status indicator
     // for an execution failure with no error text, while the row renders the
-    // assistant-failure title. The footer's "Failed to deliver" would restate
+    // assistant-failure title. The footer's delivery line would restate
     // the same failed run.
     expect(
       statusIndicatorDuplicatesMessageFailure({

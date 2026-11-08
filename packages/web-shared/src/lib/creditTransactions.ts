@@ -22,6 +22,7 @@ export async function getCreditTransactionsSummaryByUserId(
       count(*) as credit_transaction_count
     from public.credit_transactions
     where kilo_user_id = ${kiloUserId}
+      and organization_id is null
   `
   );
   const result = rows[0] as {
@@ -83,6 +84,7 @@ export async function summarizeUserPayments(kiloUserId: string, fromDb: typeof d
         and(
           eq(credit_transactions.kilo_user_id, kiloUserId),
           eq(credit_transactions.is_free, false),
+          isNull(credit_transactions.organization_id),
           gt(credit_transactions.amount_microdollars, 0),
           notExists(
             fromDb

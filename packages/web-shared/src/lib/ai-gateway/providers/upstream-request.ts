@@ -25,6 +25,7 @@ import {
   rejectDisallowedUpstreamUrls,
   rejectUpstreamRedirect,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-url-policy';
+import { fetchClaudeWithRetry } from '@kilocode/web-shared/lib/auth/claude/http';
 
 type UpstreamFetchFailureFamily =
   | 'request_timeout'
@@ -392,15 +393,23 @@ export async function upstreamRequest({
       return { type: 'error', response: urlRejection };
     }
 
-    const response = await fetch(outgoing.url, {
+    const requestOptions: RequestInit & { duplex: 'half' } = {
       method,
       headers: outgoing.headers,
       body: outgoing.body,
       redirect: enforceUrlPolicy ? 'manual' : 'follow',
-      // @ts-expect-error see https://github.com/node-fetch/node-fetch/issues/1769
       duplex: 'half',
       signal: combinedSignal,
-    });
+    };
+    const response =
+      provider.type === 'claude-billing'
+        ? await fetchClaudeWithRetry(
+            outgoing.url,
+            async () => requestOptions,
+            status => status === 503,
+            combinedSignal
+          )
+        : await fetch(outgoing.url, requestOptions);
     headersReceivedAfterMs = performance.now() - fetchStartedAt;
     const redirectRejection = enforceUrlPolicy
       ? await rejectUpstreamRedirect({

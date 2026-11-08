@@ -7,7 +7,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import { notificationHaptic, selectionHaptic } from '@/lib/haptics';
 import { type Href, useRouter } from 'expo-router';
-import { type ReactNode, useRef, useState } from 'react';
+import { type ComponentProps, type ReactNode, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, View } from 'react-native';
 
@@ -283,10 +283,10 @@ function SpendAlertsForm({
 
   const spend24h = spend?.spend24hMicrodollars ?? 0;
   const spend7d = spend?.spend7dMicrodollars ?? 0;
-  const spendValue =
-    spend24h > 0 || spend7d > 0
-      ? formatMoney(fromMicrodollars(spend24h), i18n.language)
-      : t('spendAlerts.noSpend');
+  const hasSpend = spend24h > 0 || spend7d > 0;
+  const spendValue = hasSpend
+    ? formatMoney(fromMicrodollars(spend24h), i18n.language)
+    : t('spendAlerts.noSpend');
 
   const windowOptions: readonly { value: WindowOption; label: string }[] = [
     { value: '24', label: t(WINDOW_LABEL_KEYS['24']) },
@@ -429,13 +429,28 @@ function SpendAlertsForm({
 
       <View className="rounded-lg bg-secondary px-3">
         <KvRow label={scopeLabel} value={scopeName} selectable />
-        <KvRow label={t('spendAlerts.spend24h')} value={spendValue} last selectable />
+        {/* A selectable value is exempt from the row's one-line clamp (Android's
+            selection path re-applies selection and drops it), so only the amount
+            — the value someone copies — is selectable. The empty placeholder is
+            a sentence, so it paints in the sans face: monospace there reads as a
+            value and wraps the row on a compact phone. */}
+        <KvRow
+          label={t('spendAlerts.spend24h')}
+          value={spendValue}
+          valueFace={hasSpend ? 'mono' : 'text'}
+          selectable={hasSpend}
+          last
+        />
       </View>
 
-      <View className="flex-row items-center justify-between rounded-lg bg-secondary p-4">
-        <Text className="text-sm font-medium">{t('notifications.channel.spend')}</Text>
-        <Switch
-          accessibilityLabel={t('notifications.channel.spend')}
+      {/* One 44dp row on the same 10.5dp inset as the KvRow card above: the
+          switch's own box sets the height, so the card adds no vertical
+          padding of its own. The switch's end inset lives in CardSwitch, so
+          every switch on the screen ends level with the label's start. */}
+      <View className="min-h-11 flex-row items-center justify-between rounded-lg bg-secondary px-3">
+        <Text className="text-sm font-medium">{t('spendAlerts.sendAlerts')}</Text>
+        <CardSwitch
+          accessibilityLabel={t('spendAlerts.sendAlerts')}
           value={enabled}
           onValueChange={value => {
             selectionHaptic();
@@ -548,10 +563,9 @@ function SpendAlertsForm({
         </>
       ) : (
         <>
-          <Text variant="muted" className="text-sm">
-            {t('spendAlerts.empty')}
-          </Text>
-          {/* A disable save lands with the stored value now false, so
+          {/* The switch row above is the whole off state: it already says alerts
+              are off, and the subtitle names who they reach. A disable save
+              lands with the stored value now false, so
               `masterDirty` clears on its own refetch. Keep the controls while a
               confirmation is live, or the saved line (and its reserved slot)
               would vanish the moment the save settles. An edit clears `saved`
@@ -561,6 +575,29 @@ function SpendAlertsForm({
         </>
       )}
     </>
+  );
+}
+
+/**
+ * The shared `Switch`, pulled out to sit level with the row's label.
+ *
+ * The card ends its content at `px-3` = 10.5dp (the native rem here is 14dp),
+ * and the label's ink starts about 10dp in. An unpulled switch's painted end
+ * (the thumb at its travel limit, about 3dp past the track's own end) lands
+ * about 14dp from the card edge, visibly deeper than the label. Pulling the
+ * node out by one spacing unit (`-me-1` = 3.5dp) puts the painted thumb end
+ * about 10–11dp from the edge, level with the label's start, and keeps about
+ * 7dp of the node's hit area inside the card.
+ *
+ * The pull is on the END edge, so it stays logical: `marginInlineEnd` follows
+ * the writing direction, where a hand-picked `-mr-1` would land on the label's
+ * side under RTL.
+ */
+function CardSwitch(props: ComponentProps<typeof Switch>) {
+  return (
+    <View className="-me-1">
+      <Switch {...props} />
+    </View>
   );
 }
 
@@ -604,14 +641,19 @@ function RuleCard({
 
   return (
     <View className="gap-3">
-      <View className="flex-row items-center justify-between rounded-lg bg-secondary p-4">
-        <View className="flex-1 pr-3">
+      {/* Same 10.5dp scale as the cards around it: px-3 matches the KvRow card
+          above, and py-3 is that card's row padding, so the title and subtitle
+          keep 10.5dp from the card's edges. The switch's own box is taller than a
+          single line and taller than the two-line block, so it sets nothing
+          here. */}
+      <View className="flex-row items-center justify-between rounded-lg bg-secondary px-3 py-3">
+        <View className="flex-1 pe-3">
           <Text className="text-sm font-medium">{title}</Text>
           <Text variant="muted" className="mt-0.5 text-xs">
             {subtitle}
           </Text>
         </View>
-        <Switch accessibilityLabel={title} value={enabled} onValueChange={onEnabledChange} />
+        <CardSwitch accessibilityLabel={title} value={enabled} onValueChange={onEnabledChange} />
       </View>
 
       {children}
@@ -621,7 +663,7 @@ function RuleCard({
           <Text className="text-sm">{t('common.email')}</Text>
           {/* The row's own label names the channel; the card's kind is composed
               into the switch label, so the two Email rows stay distinct. */}
-          <Switch
+          <CardSwitch
             accessibilityLabel={emailLabel}
             value={emailEnabled}
             onValueChange={onEmailChange}
@@ -644,7 +686,7 @@ function RuleCard({
         ) : (
           <View className="min-h-11 flex-row items-center justify-between">
             <Text className="text-sm">{t('notifications.push')}</Text>
-            <Switch
+            <CardSwitch
               accessibilityLabel={pushLabel}
               value={pushEnabled}
               onValueChange={onPushChange}
@@ -681,7 +723,7 @@ function SpendAlertsSkeleton() {
             spend); each row is py-3 (24) plus a text-sm line (20) = 44, so the
             block reserves 88 and the loaded rows swap in without moving Save. */}
         <Skeleton className="h-[88px] rounded-lg" />
-        <Skeleton className="h-[56px] rounded-lg" />
+        <Skeleton className="h-11 rounded-lg" />
         <RuleCardSkeleton />
         <RuleCardSkeleton />
         <Skeleton className="h-11 rounded-md" />

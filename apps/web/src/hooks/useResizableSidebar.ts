@@ -56,5 +56,14 @@ export function useResizableSidebar(initialWidth = 220, min = 140, max = 500, st
     [width]
   );
 
-  return { width, startDrag };
+  const resizeTo = useCallback(
+    (nextWidth: number) => {
+      const clamped = clamp(nextWidth, min, max);
+      setWidth(clamped);
+      if (storageKey) safeLocalStorage.setItem(storageKey, String(clamped));
+    },
+    [min, max, storageKey]
+  );
+
+  return { width, startDrag, resizeTo };
 }

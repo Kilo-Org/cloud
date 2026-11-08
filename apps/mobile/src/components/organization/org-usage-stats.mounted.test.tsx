@@ -29,12 +29,8 @@ vi.mock('@/lib/format', () => ({
 }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('react-native', () => ({ View: 'View' }));
-vi.mock('react-native-reanimated', () => ({
-  default: { View: 'AnimatedView' },
-  FadeIn: { duration: () => ({}) },
-  LinearTransition: {},
-}));
 
 beforeEach(() => {
   query.data = undefined;
@@ -44,6 +40,25 @@ beforeEach(() => {
 });
 
 describe('Organization usage availability', () => {
+  it('fills every value slot with a loading block before the first totals arrive', async () => {
+    query.isPaused = false;
+
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(OrgUsageStats, { organizationId: 'org-1' })
+    );
+    const text = renderer.root.findAllByType('Text').map(node => node.props.children);
+    for (const key of [
+      'common.cost',
+      'organization.usageStats.requests',
+      'organization.usageStats.inputTokens',
+      'organization.usageStats.outputTokens',
+    ] as const) {
+      expect(text).toContain(i18n.t(key));
+    }
+    expect(text).not.toContain('—');
+    expect(renderer.root.findAllByType('Skeleton')).toHaveLength(4);
+    unmount();
+  });
   it.each(['paused', 'failed'] as const)(
     'keeps labeled placeholders and recovery when %s',
     async state => {

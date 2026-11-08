@@ -111,6 +111,7 @@ const mockSession = {
   dismissSuggestion: jest.fn(),
   retryRemoteModels: jest.fn(),
   retryRemoteCommands: jest.fn(),
+  observeProjected: jest.fn(),
   createRemoteSession: jest.fn(() => Promise.resolve(kiloId('ses_12345678901234567890123456'))),
   exitRemoteSession: jest.fn(() => Promise.resolve()),
   canSend: true,
@@ -439,6 +440,7 @@ describe('createSessionManager', () => {
     mockSession.exitRemoteSession.mockClear();
     mockSession.exitRemoteSession.mockResolvedValue();
     mockSession.respondToPermission.mockClear();
+    mockSession.observeProjected.mockClear();
     mockSession.canSend = true;
     mockSession.canInterrupt = true;
     mockSession.state.subscribe.mockImplementation(callback => {
@@ -3200,6 +3202,85 @@ describe('createSessionManager', () => {
       });
     });
 
+    it('forwards command mode, model, and variant to a cloud-agent transport', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+
+      mockSession.send.mockResolvedValue(undefined);
+      const accepted = await mgr.send({
+        payload: {
+          type: 'command',
+          command: 'compact',
+          arguments: '--aggressive',
+          mode: 'code',
+          model: 'selected/model',
+          variant: 'high',
+        },
+      });
+
+      expect(accepted).toBe(true);
+      expect(mockSession.send).toHaveBeenCalledWith({
+        messageId: expect.stringMatching(/^msg_/),
+        payload: {
+          type: 'command',
+          command: 'compact',
+          arguments: '--aggressive',
+          mode: 'code',
+          model: { providerID: 'kilo', modelID: 'selected/model' },
+          variant: 'high',
+        },
+      });
+    });
+
+    it('prefers the in-session cloud agent override for a command', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mgr.setCloudAgentModelOverride({ model: 'override/model', variant: 'low' });
+
+      mockSession.send.mockResolvedValue(undefined);
+      await mgr.send({
+        payload: {
+          type: 'command',
+          command: 'compact',
+          arguments: '',
+          mode: 'code',
+          model: 'stale/model',
+          variant: 'high',
+        },
+      });
+
+      expect(mockSession.send).toHaveBeenCalledWith({
+        messageId: expect.stringMatching(/^msg_/),
+        payload: {
+          type: 'command',
+          command: 'compact',
+          arguments: '',
+          mode: 'code',
+          model: { providerID: 'kilo', modelID: 'override/model' },
+          variant: 'low',
+        },
+      });
+    });
+
+    it('leaves a command without overrides to the stored session default', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+
+      mockSession.send.mockResolvedValue(undefined);
+      await mgr.send({ payload: { type: 'command', command: 'help', arguments: '' } });
+
+      expect(mockSession.send).toHaveBeenCalledWith({
+        messageId: expect.stringMatching(/^msg_/),
+        payload: { type: 'command', command: 'help', arguments: '' },
+      });
+    });
+
     it('inserts one optimistic row before cloud.message.queued arrives', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);
@@ -5601,6 +5682,11 @@ describe('createSessionManager', () => {
       expect(childMessages('child-old')).toEqual([
         { info: firstMessage.info, parts: [firstPart] },
         { info: secondMessage.info, parts: [secondPart] },
+      ]);
+      // Both child pages seed the live part positions.
+      expect(mockSession.observeProjected.mock.calls).toEqual([
+        [[{ info: firstMessage.info, parts: [firstPart] }]],
+        [[{ info: secondMessage.info, parts: [secondPart] }]],
       ]);
       const state = atomValue<
         (childSessionId: string) => {

@@ -42,6 +42,34 @@ server save finishes, so reopening the form does not restore an older cached
 choice. Older in-flight preference reads are cancelled before that update.
 The existing server, local, and default-model fallback order is unchanged.
 
+## New-session keyboard and Back
+
+Back keeps a dirty editor mounted while the keyboard closes, then opens the
+discard confirmation. Keep editing restores input focus only after the sheet
+closes. Discard and Save as to-do leave the keyboard closed.
+
+The prompt interpolates whole-line heights from the app-root keyboard motion
+provider. Screens do not register keyboard listeners. Native progress is bounded
+before interpolation because keyboard height changes can exceed its normal range.
+The iOS swipe guard requires a native build with the `react-native-screens` patch.
+
+For local computer, folder, model, and effort picker verification, run
+`pnpm dev:seed app:connected-computer kilo-<name>@example.com`.
+The fixture requires an existing fake account, a localhost database,
+`NEXTAUTH_SECRET`, and a running local `cloudflare-session-ingest` service.
+The optional `sessionIngestPort` argument selects an explicit local port.
+The fixture serves read-only picker commands and rejects execution commands.
+
+## Organization credit-activity links
+
+Credit activity treats a scalar `org` or the first value of a repeated `org`
+parameter as its explicit scope. An empty first value means no explicit scope;
+later values are not fallbacks. The route guard and screen share this rule.
+Explicit links remain on their named organization after an account switch, while
+plain account-scoped routes leave. Membership validation still gates the data
+query: a foreign or malformed explicit organization never falls back to the
+selected organization's transactions.
+
 ## Organization hub connectivity
 
 Usage tiles retain labels and show cached totals or em dash placeholders.
@@ -132,6 +160,48 @@ Both platforms preserve the button dimensions, accessible busy name, and disable
 A mutation promise can settle before React Query publishes its observer state.
 Use `waitFor` from `@/test/render-with-providers` before asserting a rendered mutation result.
 Awaiting `mutateAsync` inside `act` does not replace that wait.
+
+## Remote native verification
+
+Keep `KILO_REMOTE_NATIVE=required` when a local iOS build is prohibited.
+Compatible producers are joined before another workflow is dispatched.
+Unknown producer evidence stops the request without dispatching another build.
+Dispatch rechecks the requested local and remote head after a producer wait.
+
+The cache records the simulator SDK from the executable's load commands.
+Old cache identities refresh through the remote artifact path.
+A failed producer or unsupported simulator runtime never supplies an installable artifact.
+
+## Design proof comparisons
+
+Prepare exact base and head revisions before comparing a changed screen:
+
+```sh
+pnpm dev:mobile:design-gate prepare --base <base-sha> --head <head-sha> --targets <manifest.json> --out <new-directory>
+```
+
+The manifest names each target's link, route, focused screen, and readiness test ID.
+An optional diagnostic wrapper imports each revision's own component with identical declared props.
+Preparation never copies head product code into the base.
+
+Start an isolated development stack in each prepared worktree.
+Run the tool from that worktree with its preparation receipt:
+
+```sh
+pnpm exec tsx <tool-checkout>/dev/local/design-gate/cli.ts run --preparation <preparation.json> --revision base --targets <manifest.json> --platform android --device <serial> --metro <url> --out <base-run>
+pnpm exec tsx <tool-checkout>/dev/local/design-gate/cli.ts run --preparation <preparation.json> --revision head --targets <manifest.json> --platform android --device <serial> --metro <url> --out <head-run>
+pnpm dev:mobile:design-gate compare --preparation <preparation.json> --base-run <base-run> --head-run <head-run> --out <comparison>
+```
+
+Login, splash, unopened, or mismatched targets make the comparison inconclusive.
+They do not establish an introduced defect.
+The runtime marker binds the loaded source to the preparation receipt.
+
+Captures retain the original screenshot and a `.capture.json` alignment record.
+Matching probe states bracket the screenshot but do not certify native paint.
+Uncertain alignment skips pixel-to-tree rules; unsettled state skips single-frame geometry rules.
+Timeline shifts still use their own resting-state checks.
+Possible blank frames remain visible as observations, not confirmed defects.
 
 ## Getting started
 

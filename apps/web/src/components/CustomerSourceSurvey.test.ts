@@ -12,7 +12,6 @@ describe('shouldShowCustomerSourceSurvey', () => {
   });
 
   it('does not show during product setup flows', () => {
-    expect(shouldShowCustomerSourceSurvey(null, '/gastown/onboarding')).toBe(false);
     expect(
       shouldShowCustomerSourceSurvey(
         null,
@@ -22,7 +21,6 @@ describe('shouldShowCustomerSourceSurvey', () => {
   });
 
   it('shows on routes adjacent to product setup flows', () => {
-    expect(shouldShowCustomerSourceSurvey(null, '/gastown/onboarding-complete')).toBe(true);
     expect(
       shouldShowCustomerSourceSurvey(
         null,

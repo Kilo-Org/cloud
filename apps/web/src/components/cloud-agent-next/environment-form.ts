@@ -18,6 +18,7 @@ export function hasEnvironmentFormChanges(
   saved: {
     name: string;
     script: string;
+    startScript: string;
     variablesText: string;
     sandboxAllocation: string | null;
     networkAccess: NetworkAccessDraft;
@@ -25,6 +26,7 @@ export function hasEnvironmentFormChanges(
   draft: {
     name: string;
     script: string;
+    startScript: string;
     variablesText: string;
     sandboxAllocation: string | null;
     networkAccess: NetworkAccessDraft;
@@ -33,6 +35,7 @@ export function hasEnvironmentFormChanges(
   return (
     saved.name !== draft.name ||
     saved.script !== draft.script ||
+    saved.startScript !== draft.startScript ||
     saved.variablesText !== draft.variablesText ||
     saved.sandboxAllocation !== draft.sandboxAllocation ||
     saved.networkAccess.mode !== draft.networkAccess.mode ||

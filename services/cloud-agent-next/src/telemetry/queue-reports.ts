@@ -1,7 +1,15 @@
 import { type CloudAgentRunStateReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
 
-import type { CloudAgentFailureCode } from '@kilocode/worker-utils/cloud-agent-failure';
+import {
+  userVisibleFailureMessage,
+  type CloudAgentFailureCode,
+} from '@kilocode/worker-utils/cloud-agent-failure';
 
+/**
+ * Operator-grade diagnostic copied into cloud_agent_session_runs.error_message_redacted.
+ * Keep separate from USER_FAILURE_MESSAGES: this text is what support reads in a
+ * diagnostics export and must not be softened into user-facing copy.
+ */
 export const FAILED_RUN_DIAGNOSTIC_MESSAGES: Partial<Record<CloudAgentFailureCode, string>> = {
   sandbox_connect_failed: 'Sandbox connection failed',
   workspace_setup_failed: 'Workspace setup failed',
@@ -21,6 +29,12 @@ export const FAILED_RUN_DIAGNOSTIC_MESSAGES: Partial<Record<CloudAgentFailureCod
   payment_required: 'Model request failed: insufficient credits',
   unclassified: 'Run failed without a classified cause',
 };
+
+export function failedRunDiagnosticMessage(code: CloudAgentFailureCode): string {
+  // Codes added after this map was written still get a specific diagnostic
+  // instead of falling through to the unclassified fallback.
+  return FAILED_RUN_DIAGNOSTIC_MESSAGES[code] ?? userVisibleFailureMessage(code);
+}
 
 export type RunReportAnchor = {
   kiloSessionId?: string;

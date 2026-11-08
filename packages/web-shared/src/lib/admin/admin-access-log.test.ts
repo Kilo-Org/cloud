@@ -3,14 +3,17 @@ import {
   authViaTokenFromHeaders,
   clientIpFromHeaders,
   elevateViaKiloAdmin,
+  emitPrivilegedAccessEvent,
   organizationTarget,
   organizationsTarget,
   recordKiloAdminElevation,
   recordKiloAdminElevationForRequest,
+  methodFromHeaders,
   routeFromHeaders,
   serviceTarget,
   setAdminAccessSinkForTest,
   userTarget,
+  userAgentProductFromHeaders,
   UNSCOPED_TARGET,
   type AdminAccessEvent,
   type AdminAuditContext,
@@ -18,7 +21,18 @@ import {
 import { defineTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 describe('clientIpFromHeaders', () => {
-  test('returns the first hop of x-forwarded-for', () => {
+  test('prefers x-vercel-forwarded-for when both headers are present', () => {
+    expect(
+      clientIpFromHeaders(
+        new Headers({
+          'x-forwarded-for': '203.0.113.7, 10.0.0.1',
+          'x-vercel-forwarded-for': '198.51.100.5, 10.0.0.2',
+        })
+      )
+    ).toBe('198.51.100.5');
+  });
+
+  test('returns the first hop of x-forwarded-for when it is the only forwarding header', () => {
     expect(clientIpFromHeaders(new Headers({ 'x-forwarded-for': '203.0.113.7, 10.0.0.1' }))).toBe(
       '203.0.113.7'
     );
@@ -30,7 +44,7 @@ describe('clientIpFromHeaders', () => {
     ).toBe('203.0.113.9');
   });
 
-  test('falls back to x-vercel-forwarded-for when x-forwarded-for is absent', () => {
+  test('returns the first hop of x-vercel-forwarded-for when x-forwarded-for is absent', () => {
     expect(clientIpFromHeaders(new Headers({ 'x-vercel-forwarded-for': '198.51.100.5' }))).toBe(
       '198.51.100.5'
     );
@@ -43,6 +57,14 @@ describe('clientIpFromHeaders', () => {
   test('returns null for an empty x-forwarded-for header', () => {
     expect(clientIpFromHeaders(new Headers({ 'x-forwarded-for': '' }))).toBeNull();
   });
+
+  test('falls back to x-forwarded-for when x-vercel-forwarded-for is empty', () => {
+    expect(
+      clientIpFromHeaders(
+        new Headers({ 'x-vercel-forwarded-for': '   ', 'x-forwarded-for': '203.0.113.7' })
+      )
+    ).toBe('203.0.113.7');
+  });
 });
 
 describe('authViaTokenFromHeaders', () => {
@@ -54,10 +76,8 @@ describe('authViaTokenFromHeaders', () => {
     expect(authViaTokenFromHeaders(new Headers())).toBe(false);
   });
 
-  test('is false for an empty Authorization header (matches the session auth branch)', () => {
-    // An empty header is non-null but falsy; getUserFromAuth treats it as the
-    // session path, so the discriminator must agree.
-    expect(authViaTokenFromHeaders(new Headers({ Authorization: '' }))).toBe(false);
+  test('is true for an empty Authorization header (the header still selects the bearer branch)', () => {
+    expect(authViaTokenFromHeaders(new Headers({ Authorization: '' }))).toBe(true);
   });
 });
 
@@ -81,11 +101,36 @@ describe('routeFromHeaders', () => {
   });
 });
 
+describe('methodFromHeaders', () => {
+  test('reads the method forwarded by proxy.ts', () => {
+    expect(methodFromHeaders(new Headers({ 'x-http-method': 'post' }))).toBe('POST');
+  });
+
+  test('returns null when the proxy did not forward a method', () => {
+    expect(methodFromHeaders(new Headers())).toBeNull();
+    expect(methodFromHeaders(new Headers({ 'x-http-method': '' }))).toBeNull();
+  });
+});
+
+describe('userAgentProductFromHeaders', () => {
+  test('keeps only the first product token', () => {
+    expect(
+      userAgentProductFromHeaders(
+        new Headers({ 'user-agent': 'kilo-cli/1.2.3 (darwin; arm64) another/1.0' })
+      )
+    ).toBe('kilo-cli/1.2.3');
+  });
+
+  test('returns null without a User-Agent', () => {
+    expect(userAgentProductFromHeaders(new Headers())).toBeNull();
+  });
+});
+
 describe('target builders', () => {
   test('organizationTarget/userTarget/serviceTarget use a <type>:<id> reference', () => {
     expect(organizationTarget('org-1')).toBe('organization:org-1');
     expect(userTarget('user-1')).toBe('user:user-1');
-    expect(serviceTarget('wasteland')).toBe('service:wasteland');
+    expect(serviceTarget('cloud-agent')).toBe('service:cloud-agent');
     expect(UNSCOPED_TARGET).toBe('*');
   });
 
@@ -144,11 +189,21 @@ describe('kilo admin elevation telemetry', () => {
       adminTier: 'platform_admin',
       authVia: 'session',
       tokenSource: null,
+      credential: 'session',
+      membershipRole: null,
+      wouldPassWithoutAdmin: null,
+      wouldBlock: false,
+      userAgentProduct: null,
       route: 'organizations.getSettings',
       method: 'query',
       ip: '203.0.113.7',
       reason: 'organization_access',
       target: 'organization:org-1',
+      supportDecision: null,
+      supportGrantId: null,
+      supportActionId: null,
+      inventoryId: null,
+      issuanceId: null,
     });
   });
 
@@ -222,7 +277,7 @@ describe('kilo admin elevation telemetry', () => {
     await recordKiloAdminElevationForRequest({
       user: defineTestUser({ is_admin: true, is_super_admin: true }),
       reason: 'service_token_mint',
-      target: serviceTarget('wasteland'),
+      target: serviceTarget('cloud-agent'),
     });
 
     expect(events).toHaveLength(1);
@@ -235,7 +290,7 @@ describe('kilo admin elevation telemetry', () => {
       method: null,
       ip: null,
       reason: 'service_token_mint',
-      target: 'service:wasteland',
+      target: 'service:cloud-agent',
     });
   });
 
@@ -255,5 +310,125 @@ describe('kilo admin elevation telemetry', () => {
       reason: 'organization_access_rest',
       target: 'organization:org-1',
     });
+  });
+});
+
+describe('privileged access telemetry', () => {
+  let events: AdminAccessEvent[];
+
+  beforeEach(() => {
+    events = [];
+    setAdminAccessSinkForTest(event => events.push(event));
+  });
+
+  afterEach(() => {
+    setAdminAccessSinkForTest(null);
+  });
+
+  test('emits the bearer discriminator, action class, and outcome without request secrets', () => {
+    emitPrivilegedAccessEvent({
+      surface: 'rest',
+      user: defineTestUser({ is_admin: true }),
+      credential: 'human_bearer',
+      outcome: 'succeeded',
+      actionClass: 'sensitive_write',
+      actionId: 'rest.admin.users',
+      target: 'user:user-1',
+      tokenSource: null,
+      route: '/admin/api/users',
+      method: null,
+      ip: '203.0.113.7',
+    });
+
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      event: 'admin_access',
+      kind: 'privileged_access',
+      credential: 'human_bearer',
+      outcome: 'succeeded',
+      actionClass: 'sensitive_write',
+      actionId: 'rest.admin.users',
+      target: 'user:user-1',
+      authVia: 'token',
+      route: '/admin/api/users',
+      ip: '203.0.113.7',
+    });
+    expect(JSON.stringify(events[0])).not.toMatch(/authorization|cookie|bearer /i);
+  });
+
+  test('records a refused credential even when no user could be resolved', () => {
+    emitPrivilegedAccessEvent({
+      surface: 'rest',
+      credential: 'human_bearer',
+      outcome: 'denied',
+      actionClass: 'support_read',
+      tokenSource: null,
+      route: '/admin/api/users',
+      method: null,
+      ip: null,
+    });
+
+    expect(events[0]).toMatchObject({
+      kind: 'privileged_access',
+      kiloUserId: null,
+      email: null,
+      adminTier: null,
+      outcome: 'denied',
+    });
+  });
+
+  test('records real membership and the planned-policy wouldBlock signal', async () => {
+    await recordKiloAdminElevation(
+      {
+        user: defineTestUser({ is_admin: true }),
+        authViaToken: true,
+        tokenSource: 'cloud-agent',
+        trpcPath: 'organizations.getSettings',
+        trpcType: 'query',
+      },
+      {
+        reason: 'organization_access',
+        target: organizationTarget('org-1'),
+        membershipRole: 'member',
+        wouldPassWithoutAdmin: false,
+      }
+    );
+
+    expect(events[0]).toMatchObject({
+      kind: 'kilo_admin_elevation',
+      credential: 'delegated_workload',
+      membershipRole: 'member',
+      wouldPassWithoutAdmin: false,
+      wouldBlock: true,
+    });
+    expect(events[1]).toMatchObject({ kind: 'privileged_access', wouldBlock: true });
+  });
+
+  test('derives delegated workload and service assertion credentials separately', () => {
+    emitPrivilegedAccessEvent({
+      surface: 'trpc',
+      credential: 'delegated_workload',
+      outcome: 'succeeded',
+      actionClass: 'support_read',
+      tokenSource: 'cloud-agent',
+      route: 'organizations.getSettings',
+      method: 'query',
+      ip: null,
+    });
+    emitPrivilegedAccessEvent({
+      surface: 'rest',
+      credential: 'service_assertion',
+      outcome: 'succeeded',
+      actionClass: 'platform_read',
+      tokenSource: null,
+      route: '/admin/api/users',
+      method: null,
+      ip: null,
+    });
+
+    expect(events.map(event => event.kind === 'privileged_access' && event.credential)).toEqual([
+      'delegated_workload',
+      'service_assertion',
+    ]);
   });
 });

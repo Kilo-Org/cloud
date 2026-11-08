@@ -22,6 +22,8 @@ import type { SessionMetricsParams } from './session-metrics-schema';
  *   double9 = stuckToolCallCount
  *   double10 = autoCompactionCount
  *   double11 = ingestVersion
+ *   double12 = metricsBounded (1 when the counted figures cover only the newest part of the
+ *              session, 0 otherwise; totalCost stays exact in both cases)
  */
 export async function writeSessionMetricsDataPoint(
   params: SessionMetricsParams,
@@ -55,6 +57,7 @@ export async function writeSessionMetricsDataPoint(
       params.stuckToolCallCount,
       params.autoCompactionCount,
       params.ingestVersion,
+      params.metricsBounded ? 1 : 0,
     ],
   });
 

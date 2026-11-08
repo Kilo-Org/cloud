@@ -13,6 +13,16 @@ export const LIMITS = {
   inlineBytes: 64 * 1024,
   /** Nesting depth of one inline value. */
   jsonDepth: 64,
+  /** JSON values plus object keys in one inline value. */
+  jsonValueNodes: 8_192,
+  /** JSON values plus object keys in the complete batch, including its envelope. */
+  jsonBatchNodes: 32_768,
+  /** Batch object, changes array, and change object above an inline value. */
+  jsonBatchDepth: 67,
+  /** Active and queued batch request strings, conservatively charged as UTF-16. */
+  batchQueueBytes: 4 * 1024 * 1024,
+  /** Active and queued batch calls, including tiny/empty bodies. */
+  batchQueueRequests: 8,
   /** Bytes of one blob. */
   blobBytes: 8 * 1024 * 1024,
   /** Reserved and stored blob bytes for one session. */
@@ -38,6 +48,7 @@ export const LIMITS = {
   uploadMs: 5 * 60_000,
   /** Grace period for verified blobs without a current entity reference. */
   unreferencedMs: 15 * 60_000,
+  tenantInitialLeaseBytes: 1024 * 1024,
   tenantLeaseBytes: 32 * 1024 * 1024,
   userTenantSessions: 10_000,
   userTenantBytes: 100 * 1024 * 1024 * 1024,
@@ -48,6 +59,7 @@ export const LIMITS = {
 /** The session entity leaves only through cloud deletion, never through a batch removal. */
 export const REMOVABLE_KINDS = [
   'message',
+  'message-part',
   'inbox',
   'instruction-entry',
   'instruction-state',
@@ -57,25 +69,93 @@ export const REMOVABLE_KINDS = [
 
 export const ENTITY_KINDS = ['session', ...REMOVABLE_KINDS] as const;
 
-export const REMOVE_CAUSES = ['revert', 'cancel', 'instruction-removed', 'consumed'] as const;
+export const REMOVE_CAUSES = [
+  'revert',
+  'cancel',
+  'instruction-removed',
+  'consumed',
+  'part-removed',
+] as const;
 
 export type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
 
-function isBoundedJson(value: unknown, depth: number): value is Json {
+/** Counts keys as well as values, without allocating an array for object properties. */
+export function isBoundedJson(
+  value: unknown,
+  depth = 0,
+  budget: { nodes: number; exceeded?: boolean } = { nodes: 0 }
+): value is Json {
+  if (++budget.nodes > LIMITS.jsonValueNodes) {
+    budget.exceeded = true;
+    return false;
+  }
   if (value === null || typeof value === 'boolean' || typeof value === 'string') return true;
   if (typeof value === 'number') return Number.isFinite(value);
-  if (depth >= LIMITS.jsonDepth || typeof value !== 'object') return false;
-  if (Array.isArray(value)) return value.every(item => isBoundedJson(item, depth + 1));
+  if (typeof value !== 'object') return false;
+  if (depth >= LIMITS.jsonDepth) {
+    budget.exceeded = true;
+    return false;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      if (!isBoundedJson(item, depth + 1, budget)) return false;
+    }
+    return true;
+  }
   if (Object.getPrototypeOf(value) !== Object.prototype) return false;
-  return Object.values(value).every(item => isBoundedJson(item, depth + 1));
+  const record = value as Record<string, unknown>;
+  for (const key in value) {
+    if (!Object.hasOwn(value, key)) continue;
+    if (++budget.nodes > LIMITS.jsonValueNodes) {
+      budget.exceeded = true;
+      return false;
+    }
+    if (!isBoundedJson(record[key], depth + 1, budget)) return false;
+  }
+  return true;
+}
+
+/**
+ * Lexical preflight BEFORE JSON.parse: adversarial small-token/deep bodies cannot
+ * allocate an unbounded object graph. JSON.parse still owns syntax validation.
+ * Strings (including object keys), containers, and primitives each cost a node.
+ */
+export function batchJsonWithinBudget(body: string): boolean {
+  let nodes = 0;
+  let depth = 0;
+  let primitive = false;
+  for (let index = 0; index < body.length; index++) {
+    const code = body.charCodeAt(index);
+    if (code === 0x22) {
+      if (++nodes > LIMITS.jsonBatchNodes) return false;
+      for (index++; index < body.length; index++) {
+        const next = body.charCodeAt(index);
+        if (next === 0x5c) index++;
+        else if (next === 0x22) break;
+      }
+      primitive = false;
+    } else if (code === 0x7b || code === 0x5b) {
+      if (++nodes > LIMITS.jsonBatchNodes || ++depth > LIMITS.jsonBatchDepth) return false;
+      primitive = false;
+    } else if (code === 0x7d || code === 0x5d) {
+      depth--;
+      primitive = false;
+    } else if (code === 0x2c || code === 0x3a || code <= 0x20) {
+      primitive = false;
+    } else if (!primitive) {
+      if (++nodes > LIMITS.jsonBatchNodes) return false;
+      primitive = true;
+    }
+  }
+  return true;
 }
 
 export function utf8Bytes(text: string): number {
   return new TextEncoder().encode(text).byteLength;
 }
 
-export const jsonSchema = z.custom<Json>(value => isBoundedJson(value, 0), {
-  message: `Expected JSON nested at most ${LIMITS.jsonDepth} levels`,
+export const jsonSchema = z.custom<Json>(value => isBoundedJson(value), {
+  message: `Expected JSON with at most ${LIMITS.jsonDepth} levels and ${LIMITS.jsonValueNodes} nodes`,
 });
 
 function hasControlCharacter(value: string): boolean {
@@ -142,26 +222,35 @@ export const blobRefSchema = z.strictObject({
 });
 export type BlobRef = z.infer<typeof blobRefSchema>;
 
-export const changeSchema = z.union([
-  z.strictObject({
-    op: z.literal('put'),
-    kind: kindSchema,
-    id: entityIDSchema,
-    value: jsonSchema,
-  }),
-  z.strictObject({
-    op: z.literal('put'),
-    kind: kindSchema,
-    id: entityIDSchema,
-    blob: blobRefSchema,
-  }),
-  z.strictObject({
-    op: z.literal('remove'),
-    kind: z.enum(REMOVABLE_KINDS),
-    id: entityIDSchema,
-    cause: z.enum(REMOVE_CAUSES),
-  }),
-]);
+export const changeSchema = z
+  .union([
+    z.strictObject({
+      op: z.literal('put'),
+      kind: kindSchema,
+      id: entityIDSchema,
+      value: jsonSchema,
+    }),
+    z.strictObject({
+      op: z.literal('put'),
+      kind: kindSchema,
+      id: entityIDSchema,
+      blob: blobRefSchema,
+    }),
+    z.strictObject({
+      op: z.literal('remove'),
+      kind: z.enum(REMOVABLE_KINDS),
+      id: entityIDSchema,
+      cause: z.enum(REMOVE_CAUSES),
+    }),
+  ])
+  .refine(
+    change =>
+      change.op !== 'remove' ||
+      change.cause !== 'part-removed' ||
+      change.kind === 'message-part' ||
+      change.kind === 'asset',
+    { message: '`part-removed` only removes message-part or asset entities' }
+  );
 export type Change = z.infer<typeof changeSchema>;
 
 export const registerRequestSchema = z.strictObject({
@@ -302,6 +391,7 @@ export const pageSchema = z.strictObject({
   version: z.literal(1),
   sessionID: sessionIDSchema,
   revision: revisionSchema,
+  position: positionSchema,
   entities: z.array(entitySchema),
   next: z.string().nullable(),
 });
@@ -333,10 +423,12 @@ export const ERROR_STATUS = {
   session_deleted: 410,
   length_required: 411,
   request_too_large: 413,
+  json_budget_exceeded: 413,
   storage_budget_exceeded: 413,
   tenant_budget_exceeded: 413,
   rate_limited: 429,
   tenant_unavailable: 503,
+  service_overloaded: 503,
   internal_error: 500,
 } as const;
 export type ErrorCode = keyof typeof ERROR_STATUS;

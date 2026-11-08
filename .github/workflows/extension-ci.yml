@@ -47,6 +47,7 @@ jobs:
               - 'apps/extension/**'
               - '.github/workflows/extension-ci.yml'
               - 'scripts/changed-workspaces.sh'
+              - 'scripts/affected-workspaces.mjs'
               - 'scripts/changed-dependencies.mjs'
               - 'scripts/changed-dependencies.test.mjs'
               - 'package.json'
@@ -65,8 +66,12 @@ jobs:
           matrix=$(scripts/changed-workspaces.sh)
           echo "extension=$(jq -r 'any(.[]; .dir == "apps/extension")' <<< "$matrix")" >> "$GITHUB_OUTPUT"
 
-  # Compiler, linter, formatting and unit tests, via the extension's own `verify`
-  # script so the extension's stricter (type-aware) oxlint config is what runs.
+  # Compiler, linter and unit tests, via the extension's own `verify` script so
+  # the extension's stricter (type-aware) oxlint config is what runs.
+  #
+  # The extension's formatting is gated by the repo-wide `format-check` job in
+  # ci.yml: `oxfmt --list-different .` covers apps/extension on every PR,
+  # merge-queue entry and main push, so `verify` does not format-check it again.
   verify:
     needs: changes
     if: needs.changes.outputs.extension == 'true'
@@ -89,7 +94,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Verify (typecheck, lint, format, unit tests)
+      - name: Restore or build tRPC declarations
+        uses: ./.github/actions/trpc-declarations
+
+      - name: Verify (typecheck, lint, unit tests)
+        env:
+          KILO_TYPECHECK_TRPC_BUILT: '1'
         run: pnpm --filter kilo-extension verify
 
   # Prove the Firefox MV3 target still builds (the Chrome build runs inside e2e).

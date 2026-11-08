@@ -5,6 +5,7 @@ import type {
   EnkryptUnavailableReason,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detect';
 import type { GatewayChatApiKind } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 
 const UNAVAILABLE_MESSAGES: Record<
@@ -43,9 +44,15 @@ type GuardrailRejection = {
   headers: Record<string, string>;
 };
 
+const REVERT_GUIDANCE =
+  ' To change it, use Revert to here under your message (or /undo in the TUI).';
+
 /**
  * A block is final, so clients are told not to retry, and an unavailable guardrail is retried
- * automatically only after a transient failure.
+ * automatically only after a transient failure. A blocked request stays in the conversation, so the
+ * message points at the client's revert affordance, which is how the user edits it and sends a
+ * different one. A blocked response needs no such hint: its reason already says to rephrase the
+ * request.
  */
 function guardrailRejection(
   verdict: EnkryptGuardrailVerdict,
@@ -55,7 +62,7 @@ function guardrailRejection(
   if (verdict.action === 'block') {
     return {
       error: {
-        message: verdict.message,
+        message: guardrail === 'input' ? `${verdict.message}${REVERT_GUIDANCE}` : verdict.message,
         openAiType: 'invalid_request_error',
         openAiCode: ProxyErrorType.guardrail_blocked,
         anthropicType: 'invalid_request_error',
@@ -124,6 +131,29 @@ function streamErrorEvent(kind: GatewayChatApiKind, error: GuardrailError): stri
     error_type: error.errorType,
   };
   return `event: error\ndata: ${JSON.stringify(event)}\n\n`;
+}
+
+/**
+ * Uses the body shape of `usageLimitExceededResponse`, which Kilo clients render as a low-credit
+ * prompt, but without its advice to switch to a free model: free models are scanned too.
+ */
+export function enkryptOrganizationCreditsRequiredResponse(
+  organizationId: string,
+  balance: number
+): NextResponse {
+  return NextResponse.json(
+    {
+      error: {
+        title: 'Organization Credits Required',
+        message:
+          'Your organization needs credits to run Enkrypt guardrails, including on free models and BYOK requests. Ask an organization owner to add credits.',
+        balance,
+        buyCreditsUrl: `${APP_URL}/organizations/${organizationId}`,
+      },
+      error_type: ProxyErrorType.usage_limit_exceeded,
+    },
+    { status: 402 }
+  );
 }
 
 /** Maps an input guardrail verdict to the gateway's rejection, or null to send the request upstream. */

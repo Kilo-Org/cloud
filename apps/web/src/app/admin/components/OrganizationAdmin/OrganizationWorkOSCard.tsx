@@ -72,6 +72,13 @@ function useDeleteSSOConfig() {
             organizationId: variables.organizationId,
           }),
         });
+        // The delete also releases the organization's SSO domain, which this card reads from the
+        // organization record.
+        void queryClient.invalidateQueries({
+          queryKey: trpc.organizations.withMembers.queryKey({
+            organizationId: variables.organizationId,
+          }),
+        });
         toast.success('SSO configuration deleted successfully');
       },
       onError: error => {
@@ -250,7 +257,8 @@ export function OrganizationWorkOSCard({ organizationId }: OrganizationWorkOSCar
     if (
       await confirm({
         title: 'Delete the SSO configuration?',
-        description: 'This permanently removes the WorkOS SSO configuration and cannot be undone.',
+        description:
+          "This permanently removes the WorkOS SSO configuration and releases this organization's SSO domain. This cannot be undone.",
         confirmLabel: 'Delete configuration',
         destructive: true,
       })

@@ -33,10 +33,12 @@ const PRODUCTION_MCP_URL = 'https://mcp.kiloapps.io';
 beforeEach(() => {
   vi.resetModules();
   vi.stubGlobal('__DEV__', false);
+  vi.stubEnv('EXPO_PUBLIC_SESSION_SYNC_URL', undefined);
 });
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
 });
 
 // vitest.setup.ts stubs '@/lib/config' for every pure suite, so a plain import
@@ -64,5 +66,43 @@ describe('KILO_MCP_URL', () => {
       kiloMcpUrl: 'http://localhost:8815',
     };
     await expect(mcpUrl()).resolves.toBe('http://localhost:8815');
+  });
+});
+
+describe('SESSION_SYNC_URL', () => {
+  async function syncUrl() {
+    const config = await vi.importActual<typeof Config>('@/lib/config');
+    return config.SESSION_SYNC_URL;
+  }
+
+  it.each([undefined, 'https://session-sync.kiloapps.io', 'http://localhost:8817'])(
+    'keeps release preview unavailable with relay override %s',
+    async override => {
+      if (override !== undefined) {
+        vi.stubEnv('EXPO_PUBLIC_SESSION_SYNC_URL', override);
+      }
+      state.extra = { ...REQUIRED_EXTRA, isProductionBuild: true };
+      await expect(syncUrl()).resolves.toBeUndefined();
+    }
+  );
+
+  it('requires an explicit relay in a development bundle', async () => {
+    vi.stubGlobal('__DEV__', true);
+    state.extra = REQUIRED_EXTRA;
+    await expect(syncUrl()).resolves.toBeUndefined();
+  });
+
+  it('accepts the local relay in a development bundle', async () => {
+    vi.stubGlobal('__DEV__', true);
+    vi.stubEnv('EXPO_PUBLIC_SESSION_SYNC_URL', 'http://localhost:8817');
+    state.extra = REQUIRED_EXTRA;
+    await expect(syncUrl()).resolves.toBe('http://localhost:8817');
+  });
+
+  it('rejects unsupported development relay schemes', async () => {
+    vi.stubGlobal('__DEV__', true);
+    vi.stubEnv('EXPO_PUBLIC_SESSION_SYNC_URL', 'file:///native-preview');
+    state.extra = REQUIRED_EXTRA;
+    await expect(syncUrl()).rejects.toThrow('Invalid scheme');
   });
 });

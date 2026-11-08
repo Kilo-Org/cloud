@@ -35,6 +35,7 @@ async function grant(
     version: 1,
     iss: 'session-sync',
     aud: 'session-sync',
+    env: 'development',
     sub: USER,
     iat: now,
     exp: now + 60,
@@ -102,6 +103,18 @@ describe('authorize', () => {
     });
   });
 
+  it.each([0, 5, 6])('allows at most five seconds of grant issue-time skew: %s', async skew => {
+    const now = nowSeconds();
+    vi.spyOn(Date, 'now').mockReturnValue(now * 1000);
+    const token = await grant({ iat: now + skew, exp: now + 120 });
+    const result = await authorize(dataRequest(token), env());
+    if (skew <= 5) {
+      expect(result).toMatchObject({ userID: USER });
+    } else {
+      expect(await errorCode(result)).toEqual({ status: 401, code: 'invalid_grant' });
+    }
+  });
+
   it('requires a bearer grant', async () => {
     expect(await errorCode(await authorize(dataRequest(), env()))).toEqual({
       status: 401,
@@ -116,6 +129,8 @@ describe('authorize', () => {
     ['a foreign audience', () => grant({ aud: 'kilo-api' })],
     ['an audience array', () => grant({ aud: ['session-sync'] })],
     ['a foreign issuer', () => grant({ iss: 'kilo' })],
+    ['a missing environment', () => grant({ env: undefined })],
+    ['a foreign environment', () => grant({ env: 'production' })],
     ['an expired grant', () => grant({ iat: nowSeconds() - 120, exp: nowSeconds() - 60 })],
     ['a lifetime above five minutes', () => grant({ exp: nowSeconds() + 301 })],
     ['a future issue time', () => grant({ iat: nowSeconds() + 30, exp: nowSeconds() + 60 })],

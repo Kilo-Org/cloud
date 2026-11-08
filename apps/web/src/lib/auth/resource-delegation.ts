@@ -7,7 +7,7 @@ import {
   organization_memberships,
   organizations,
 } from '@kilocode/db/schema';
-import { and, eq, isNull, ne } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import jwt from 'jsonwebtoken';
 import { TRPCError } from '@trpc/server';
 import { headers as nextHeaders } from 'next/headers';
@@ -15,11 +15,9 @@ import { extractBearerToken } from '@kilocode/worker-utils/extract-bearer-token'
 import {
   AI_ATTRIBUTION_AUDIENCE,
   CLOUD_AGENT_NEXT_AUDIENCE,
-  GASTOWN_AUDIENCE,
   HTML_DEPLOY_AUDIENCE,
   KILO_API_AUDIENCE,
   KILO_GATEWAY_AUDIENCE,
-  WASTELAND_AUDIENCE,
 } from '@kilocode/worker-utils/internal-service-token-audiences';
 import {
   buildModernKiloTokenPayload,
@@ -47,7 +45,7 @@ const LEGACY_DEVICE_SESSION_LIFETIMES_SECONDS: readonly number[] = [
 ];
 
 export type DelegableResource = 'api' | 'gateway' | 'attribution' | 'html-deploy';
-export type ControlResource = 'cloud-agent-next' | 'gastown' | 'wasteland';
+export type ControlResource = 'cloud-agent-next';
 type Resource = DelegableResource | ControlResource;
 type CredentialKind = 'human-api' | 'device-access';
 
@@ -93,12 +91,6 @@ export type CreateControlTokenOptions = {
   extra?: {
     botId?: string;
     createdOnPlatform?: string;
-    isAdmin?: boolean;
-    gastownAccess?: boolean;
-    orgMemberships?: Array<{
-      orgId: string;
-      role: 'owner' | 'admin' | 'member' | 'billing_manager';
-    }>;
   };
 };
 
@@ -117,8 +109,6 @@ function resourceAudience(resource: Resource): string {
     attribution: AI_ATTRIBUTION_AUDIENCE,
     'html-deploy': HTML_DEPLOY_AUDIENCE,
     'cloud-agent-next': CLOUD_AGENT_NEXT_AUDIENCE,
-    gastown: GASTOWN_AUDIENCE,
-    wasteland: WASTELAND_AUDIENCE,
   }[resource];
 }
 
@@ -193,21 +183,6 @@ async function assertActiveDeviceSession(id: string, userId: string): Promise<vo
     ),
   });
   if (!session) unauthorized();
-}
-
-async function membershipsFor(userId: string) {
-  return db
-    .select({
-      orgId: organization_memberships.organization_id,
-      role: organization_memberships.role,
-    })
-    .from(organization_memberships)
-    .where(
-      and(
-        eq(organization_memberships.kilo_user_id, userId),
-        ne(organization_memberships.role, 'billing_manager')
-      )
-    );
 }
 
 async function assertCurrentOrganizationMembership(
@@ -371,8 +346,6 @@ async function createModernControlToken(
     authority.expiresAt ? authority.expiresAt - now : requested
   );
   if (expiresIn <= 0) unauthorized('Resource delegation authority has expired');
-  const memberships =
-    resource === 'cloud-agent-next' ? undefined : await membershipsFor(authority.user.id);
   const payload = buildModernKiloTokenPayload({
     userId: authority.user.id,
     pepper: authority.user.api_token_pepper,
@@ -388,10 +361,7 @@ async function createModernControlToken(
       deviceSessionId: authority.deviceSessionId,
       botId: options?.extra?.botId,
       createdOnPlatform: options?.extra?.createdOnPlatform,
-      isAdmin: options?.extra?.isAdmin === true && authority.user.is_admin,
-      gastownAccess: options?.extra?.gastownAccess,
-      orgMemberships: memberships,
-      ...(resource === 'wasteland' ? {} : { runtimeAdmission: authority.runtimeAdmission }),
+      runtimeAdmission: authority.runtimeAdmission,
     },
   });
   const token = jwt.sign(payload, NEXTAUTH_SECRET, { algorithm: 'HS256' });
@@ -477,20 +447,12 @@ export async function createControlTokenForRequest(
         'Shared resource token migration is unavailable'
       );
     }
-    const expiresIn =
-      options?.legacyExpiresIn ??
-      (resource === 'cloud-agent-next' ? TOKEN_EXPIRY.default : ONE_HOUR_SECONDS);
+    const expiresIn = options?.legacyExpiresIn ?? TOKEN_EXPIRY.default;
     const token = generateApiToken(
       authority.user,
       {
         ...options?.extra,
         tokenSource: options?.tokenSource,
-        ...(resource === 'cloud-agent-next'
-          ? {}
-          : {
-              isAdmin: options?.extra?.isAdmin === true && authority.user.is_admin,
-              orgMemberships: await membershipsFor(authority.user.id),
-            }),
       },
       { expiresIn }
     );

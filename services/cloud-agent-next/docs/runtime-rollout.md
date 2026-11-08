@@ -83,12 +83,36 @@ are used together, including snapshot fallback. Existing allocations keep their 
 An absent `interactiveOrgIds` means deployment-wide startup selection; an empty catalog list is
 rejected. A complete rollback must change the downloaded default; see Rollback below.
 
-Environment snapshot builders use only `runtime-free` with downloaded startup. Snapshot enrollment
-remains controlled by `ENVIRONMENT_SNAPSHOT_ORG_IDS`, independently of startup selection. Production
-and development set `*`, enrolling every organization and personal account; native-container enrollment
-and repository authorization are still required. Personal-owned Bitbucket environments cannot build
-snapshots because managed Bitbucket repository access requires an organization. Personal GitHub and
-GitLab environments are supported.
+### Kilo v2 harness
+
+A downloaded target can also name `kilo2: { orgIds }`. Without it, new sandboxes select v1.
+A sandbox's first allocation selects v2 when its downloaded start passes the `interactiveOrgIds` rule
+above for the `kilo2.orgIds` list. The Sandbox DO stores that harness, and every later allocation of the
+sandbox uses it, because native history does not move between v1 and v2. A sandbox that allocated
+before this record existed stays on v1. The harness is stored after startup preflight and capacity
+checks, before provider creation. A failed preflight does not fix the harness for later attempts.
+Changing the v2 organization list affects only sandboxes without a stored harness.
+
+Existing v2 sandboxes cannot move back to v1. Removing the v2 release, selecting preinstalled mode,
+or excluding their organizations from downloaded startup prevents their next allocation with
+`invalid_configuration`. Recovery of existing v2 sessions after these changes is unsupported.
+New sandboxes select v1 and can start under the rollback configuration. To keep existing v2
+sessions recoverable, retain downloaded startup, their organization scope, and the v2 release.
+
+Each publication packages the pinned v1 and v2 CLIs (`PINNED_CLIS` in
+`scripts/runtime-cli-artifact.ts`) with the same control payload. It verifies both on the base and
+records the v2 descriptor in the exact-SHA handoff. Deployment renders `RUNTIME_KILO2_ORG_IDS` and
+`RUNTIME_RELEASE_DESCRIPTOR_KILO2` from the catalog and that handoff, and fails when a `kilo2` target
+has no v2 release. The release names its harness through its CLI executable (`package/bin/kilo2`).
+A start whose release harness differs from the sandbox's stored harness fails as
+`invalid_configuration`. Session snapshots are keyed by the selected descriptor, and environment
+snapshots do not depend on the runtime release, so neither needs a harness namespace.
+
+Environment snapshot builders use only `runtime-free` with downloaded startup. Snapshots are
+available to every organization and personal account, independently of startup selection. Repository
+authorization is still required. Personal-owned Bitbucket environments cannot build snapshots because
+managed Bitbucket repository access requires an organization. Personal GitHub and GitLab environments
+are supported.
 Builds require a downloaded runtime-free deployment and a published runtime release. Existing
 all-in-one environment snapshots are incompatible and trigger replacement builds. Sessions on `app`
 start from the image instead of restoring split-image snapshots. Runtime-only updates retain snapshot

@@ -1,6 +1,6 @@
 ---
 name: kilo-mcp
-description: Use when working with the Kilo MCP server, its general kilo_search and kilo_call tools, or its parent-scoped child-session tools. Covers model ID discovery, child workspace launches and callbacks, API discovery, query/mutation safety, and the top-level catalog areas.
+description: Use when working with the Kilo MCP server, its general kilo_search and kilo_call tools, or its parent-scoped child-session tools. Covers model ID discovery, child workspace launches and callbacks, API discovery, query/mutation safety.
 ---
 
 <!--
@@ -34,9 +34,8 @@ an admin guard carries `admin: true`; an opted-in admin connection also gets
 and `submit_otp`, which runs it once the user approves with their authenticator
 code. A row whose top segment is `debug` carries `debug: true`.
 
-The catalog is `services/kilo-mcp/catalog.json`. This skill is generated from
-it, and the catalog wins when the two disagree — read the catalog, not this
-file, for current detail.
+The catalog at `services/kilo-mcp/catalog.json` is authoritative.
+Read it for current endpoint details.
 
 ## Parent-scoped child sessions
 
@@ -113,9 +112,11 @@ exist as an org-scoped mirror under `organizations`, for example
 - `agentProfiles`
 - `appReportedMessages`
 - `byok`
+- `claudeBilling`
 - `cliSessions`
 - `cliSessionsV2`
 - `cloudAgentNext`
+- `cloudAgentNextFailures`
 - `cloudAgentNextFeedback`
 - `cloudAgentSettings`
 - `cloudEnvironments`
@@ -147,6 +148,7 @@ exist as an org-scoped mirror under `organizations`, for example
 - `securityAuditLog`
 - `slack`
 - `spendAlerts`
+- `stepUp`
 - `todos`
 - `unifiedSessions`
 - `usageAnalytics`

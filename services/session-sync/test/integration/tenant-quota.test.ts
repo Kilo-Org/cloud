@@ -292,7 +292,7 @@ it.each([false, true])(
     await accepted.json();
     await runInDurableObject(tenantStub, (_instance, state) => {
       expect(state.storage.sql.exec<{ bytes: number }>('SELECT bytes FROM usage').one().bytes).toBe(
-        LIMITS.tenantLeaseBytes
+        LIMITS.tenantInitialLeaseBytes
       );
     });
   }
@@ -317,7 +317,7 @@ it.each([false, true])(
     const tenantStub = getTenantStub(testEnv, principal.tenant);
     await runInDurableObject(tenantStub, (_instance, state) => {
       expect(state.storage.sql.exec<{ bytes: number }>('SELECT bytes FROM usage').one().bytes).toBe(
-        LIMITS.tenantLeaseBytes
+        LIMITS.tenantInitialLeaseBytes
       );
     });
     if (restart) {
@@ -462,7 +462,7 @@ it('adopts the old local tenant tables without rewriting leases or usage', async
     const sql = state.storage.sql;
     expect(
       sql.exec<{ count: number }>('SELECT COUNT(*) AS count FROM __drizzle_migrations').one().count
-    ).toBe(2);
+    ).toBe(tenantMigrations.journal.entries.length);
     // Recreate the raw-table layout used by earlier, never-deployed local fixtures.
     sql.exec('DROP TABLE leases');
     sql.exec('DROP TABLE usage');
@@ -489,7 +489,7 @@ it('adopts the old local tenant tables without rewriting leases or usage', async
     });
     expect(
       sql.exec<{ count: number }>('SELECT COUNT(*) AS count FROM __drizzle_migrations').one().count
-    ).toBe(2);
+    ).toBe(tenantMigrations.journal.entries.length);
   });
   expect(await stub.reserve({ tenant, sessionID: newSessionID(), bytes: 256 })).toEqual({
     ok: true,

@@ -7,6 +7,8 @@ import Link from 'next/link';
 import { format, formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
 import { getWebhookRoutes } from '@/lib/webhook-routes';
+import type { EnrichedCapturedRequest } from '@/lib/webhook-agent/webhook-agent-client';
+import type { AdminWebhookRequestSummary } from '@/lib/webhook-agent/request-projection';
 import { useAdminPermissions } from '@/app/admin/useAdminPermissions';
 import { WebhookRequestLogs } from './WebhookRequestLogs';
 
@@ -109,16 +111,16 @@ function formatTimestamp(isoString: string): { absolute: string; relative: strin
   };
 }
 
-function maskHeaderValue(value: string): string {
-  if (!value) return '';
-  if (value.length <= 4) return '****';
-  return `${'*'.repeat(Math.min(value.length, 8))}`;
+function isAdminSummary(
+  request: EnrichedCapturedRequest | AdminWebhookRequestSummary
+): request is AdminWebhookRequestSummary {
+  return 'bodyByteLength' in request;
 }
 
-function maskHeaders(headers: Record<string, string>): Record<string, string> {
-  return Object.fromEntries(
-    Object.entries(headers).map(([key, value]) => [key, maskHeaderValue(value)])
-  );
+function headersForDisplay(request: EnrichedCapturedRequest | AdminWebhookRequestSummary) {
+  return isAdminSummary(request)
+    ? Object.fromEntries(request.headers.map(header => [header.name, header.valueMask]))
+    : request.headers;
 }
 
 export function WebhookRequestsContent({
@@ -188,28 +190,49 @@ export function WebhookRequestsContent({
         })
   );
 
-  // Fetch requests with auto-refresh every 10 seconds
+  // Fetch requests with auto-refresh every 10 seconds. The admin query returns
+  // the server-side projection; the owner query returns raw captured requests.
   const {
-    data: requests,
-    isLoading: isLoadingRequests,
-    isError: isRequestsError,
-    error: requestsError,
-    refetch: refetchRequests,
+    data: adminRequests,
+    isLoading: isLoadingAdminRequests,
+    isError: isAdminRequestsError,
+    error: adminRequestsError,
+    refetch: refetchAdminRequests,
   } = useQuery({
-    ...(adminScope
-      ? trpc.admin.webhookTriggers.listRequests.queryOptions({
-          ...adminScope,
-          triggerId,
-          limit: 50,
-        })
-      : trpc.webhookTriggers.listRequests.queryOptions({
-          triggerId,
-          organizationId: organizationId ?? undefined,
-          limit: 50,
-        })),
+    ...trpc.admin.webhookTriggers.listRequests.queryOptions(
+      adminScope
+        ? { ...adminScope, triggerId, limit: 50 }
+        : { scope: 'user', userId: '', triggerId, limit: 50 },
+      { enabled: !!adminScope }
+    ),
     refetchOnMount: 'always', // Always fetch fresh data on navigation
     refetchInterval: 10000, // Auto-refresh every 10 seconds
   });
+  const {
+    data: ownerRequests,
+    isLoading: isLoadingOwnerRequests,
+    isError: isOwnerRequestsError,
+    error: ownerRequestsError,
+    refetch: refetchOwnerRequests,
+  } = useQuery({
+    ...trpc.webhookTriggers.listRequests.queryOptions(
+      {
+        triggerId,
+        organizationId: organizationId ?? undefined,
+        limit: 50,
+      },
+      { enabled: !adminScope }
+    ),
+    refetchOnMount: 'always', // Always fetch fresh data on navigation
+    refetchInterval: 10000, // Auto-refresh every 10 seconds
+  });
+
+  const adminQueryActive = !!adminScope;
+  const requests = adminQueryActive ? adminRequests : ownerRequests;
+  const isLoadingRequests = adminQueryActive ? isLoadingAdminRequests : isLoadingOwnerRequests;
+  const isRequestsError = adminQueryActive ? isAdminRequestsError : isOwnerRequestsError;
+  const requestsError = adminQueryActive ? adminRequestsError : ownerRequestsError;
+  const refetchRequests = adminQueryActive ? refetchAdminRequests : refetchOwnerRequests;
 
   // Copy webhook URL to clipboard
   const handleCopyUrl = useCallback(async () => {
@@ -582,13 +605,7 @@ export function WebhookRequestsContent({
                                       className="bg-muted max-h-48 overflow-auto rounded-md p-3 text-xs"
                                     >
                                       <code>
-                                        {JSON.stringify(
-                                          isAdminView
-                                            ? maskHeaders(request.headers)
-                                            : request.headers,
-                                          null,
-                                          2
-                                        )}
+                                        {JSON.stringify(headersForDisplay(request), null, 2)}
                                       </code>
                                     </pre>
                                   </div>
@@ -596,10 +613,9 @@ export function WebhookRequestsContent({
                                   {/* Body */}
                                   <div>
                                     <p className="mb-2 text-sm font-medium">Body</p>
-                                    {isAdminView ? (
+                                    {isAdminSummary(request) ? (
                                       <p className="text-muted-foreground text-xs">
-                                        Payload body length:{' '}
-                                        {new TextEncoder().encode(request.body).byteLength} bytes
+                                        Payload body length: {request.bodyByteLength} bytes
                                       </p>
                                     ) : (
                                       <pre

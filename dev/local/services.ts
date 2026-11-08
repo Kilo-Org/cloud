@@ -44,7 +44,6 @@ const groups: ServiceGroup[] = [
     groupDependsOn: ['git-token-service', 'notifications'],
   },
   { id: 'code-review', label: 'Code Review', alwaysOn: false, groupDependsOn: ['cloud-agent'] },
-  { id: 'gastown', label: 'Gastown', alwaysOn: false, groupDependsOn: ['git-token-service'] },
   {
     id: 'security-agent',
     label: 'Security Agent',
@@ -299,16 +298,6 @@ const serviceMeta: Record<string, ServiceMeta> = {
     group: 'deletion-mock',
     dependsOn: [],
     dir: 'dev/local/scripts',
-  },
-  'cloudflare-gastown': {
-    group: 'gastown',
-    dependsOn: ['postgres', 'cloudflare-git-token-service', 'container-usage-meter', 'nextjs'],
-    dir: 'services/gastown',
-  },
-  'cloudflare-wasteland': {
-    group: 'gastown',
-    dependsOn: ['postgres', 'nextjs'],
-    dir: 'services/wasteland',
   },
 };
 

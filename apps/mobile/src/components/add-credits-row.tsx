@@ -37,22 +37,33 @@ type AddCreditsRowProps = Readonly<{
   /** In-app destination (the credit purchase screen); platform-agnostic. */
   onPress?: () => void;
   className?: string;
+  /**
+   * Hand the button to the caller's own row — the balance line it tops up —
+   * with no wrapper and no full-width branch. The row and its padding belong to
+   * that caller, so the button sits at its natural size beside the amount.
+   */
+  inline?: boolean;
 }>;
 
 /**
- * Muted copy + an "Add credits" button. With `onPress` the button is an in-app
- * CTA on every platform. With `url` it opens the external web billing page,
- * which only Android has: iOS has no in-app link to an external purchase
- * (App Store review forbids it), so the gate here keeps that variant off iOS
- * whichever call site renders it. That is the whole platform fork: the row's
- * copy, layout and in-app CTA are identical on both.
+ * An "Add credits" button in its call site's block. With `onPress` the button
+ * is an in-app CTA on every platform. With `url` it opens the external web
+ * billing page, which only Android has: iOS has no in-app link to an external
+ * purchase (App Store review forbids it), so the gate here keeps that variant
+ * off iOS whichever call site renders it. That is the whole platform fork: the
+ * button and its in-app CTA are identical on both.
+ *
+ * The button carries its own label, so the block needs no copy beside it; a
+ * sentence restating it is the redundancy `apps/mobile/AGENTS.md` rules out.
+ * In a wide row it keeps its trailing position inside the caller's padding; in
+ * a window under `NARROW_LAYOUT_WIDTH` it spans the row, which is the tap
+ * target width it had before. With `inline` the caller's row is the row: the
+ * button is returned alone, at its natural size, so it can sit on the balance
+ * line instead of filling a block of its own.
  */
-export function AddCreditsRow({ url, onPress, className }: AddCreditsRowProps) {
+export function AddCreditsRow({ url, onPress, className, inline }: AddCreditsRowProps) {
   const { t } = useTranslation();
   const { width } = useWindowDimensions();
-  // The button keeps its natural width, so in a narrow window the description
-  // beside it collapses to a column of single letters ("A", 160 dp, e1,
-  // 2026-09-21). Stacking gives the copy the row's full width.
   const narrow = isNarrowLayout(width);
   // App Store review: iOS must not show an in-app CTA that opens an external
   // purchase/billing page, so the external `url` variant stays Android-only —
@@ -61,22 +72,25 @@ export function AddCreditsRow({ url, onPress, className }: AddCreditsRowProps) {
   if (!onPress && Platform.OS === 'ios') {
     return null;
   }
+  const button = (
+    <AddCreditsButton
+      onPress={
+        onPress ??
+        (() => {
+          if (url) {
+            void openExternalUrl(url, { label: t('addCredits.billingPage') });
+          }
+        })
+      }
+      className={inline || !narrow ? undefined : 'w-full'}
+    />
+  );
+  if (inline) {
+    return button;
+  }
   return (
-    <View className={cn(narrow ? 'gap-2' : 'flex-row items-center justify-between', className)}>
-      <Text className={cn(narrow ? undefined : 'flex-1 pr-3', 'text-xs text-muted-foreground')}>
-        {t('addCredits.description')}
-      </Text>
-      <AddCreditsButton
-        onPress={
-          onPress ??
-          (() => {
-            if (url) {
-              void openExternalUrl(url, { label: t('addCredits.billingPage') });
-            }
-          })
-        }
-        className={narrow ? 'w-full' : undefined}
-      />
+    <View className={cn(narrow ? undefined : 'flex-row items-center justify-end', className)}>
+      {button}
     </View>
   );
 }

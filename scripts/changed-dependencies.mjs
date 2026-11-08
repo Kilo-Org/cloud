@@ -11,7 +11,7 @@ function withoutKeys(value, keys) {
   return result;
 }
 
-function dependencyGraph(lockfile, workspace, patches, directory) {
+function dependencyGraph(lockfile, workspace, patches, directory, roots) {
   const graph = new Map();
   const names = new Set();
   const nativeNames = new Set();
@@ -52,7 +52,19 @@ function dependencyGraph(lockfile, workspace, patches, directory) {
     visitDependencies(importer.optionalDependencies, directory);
   }
 
-  visitImporter(directory);
+  function visitPackages(rootNames) {
+    const importer = lockfile.importers[directory];
+    if (!importer) throw new Error(`Missing lockfile importer: ${directory}`);
+    const groups = [importer.dependencies, importer.devDependencies, importer.optionalDependencies];
+    for (const name of rootNames) {
+      const dependency = groups.map(group => group?.[name]).find(Boolean);
+      if (!dependency) throw new Error(`Missing lockfile dependency: ${directory} ${name}`);
+      visitDependencies({ [name]: dependency }, directory);
+    }
+  }
+
+  if (roots) visitPackages(roots);
+  else visitImporter(directory);
   const importer = lockfile.importers[directory];
   const usesNative = ['dependencies', 'devDependencies', 'optionalDependencies'].some(group =>
     Object.hasOwn(importer[group] ?? {}, 'react-native')
@@ -79,6 +91,30 @@ function dependencyGraph(lockfile, workspace, patches, directory) {
   let serialized = JSON.stringify([...graph]);
   for (const hash of ignoredHashes) serialized = serialized.replaceAll(hash, '');
   return new Map(JSON.parse(serialized));
+}
+
+// Everything in the lockfile that can decide what one workspace installs: its
+// importer entry, every snapshot and package metadata entry its graph resolves,
+// and the patched content inside that graph. A caller that cannot get a closure
+// must widen its input: an unreadable entry here is not a reason to guess.
+export function importerClosure(snapshot, directory) {
+  const { lockfile } = snapshot;
+  if (lockfile.lockfileVersion !== '9.0' || !lockfile.importers || !lockfile.snapshots) {
+    throw new Error('Unsupported pnpm lockfile');
+  }
+  return dependencyGraph(lockfile, snapshot.workspace, snapshot.patches, directory);
+}
+
+// What one importer resolves for the named packages: every snapshot and package
+// metadata entry those packages resolve, and the patched content inside that
+// graph. An entry the importer does not resolve is an error, not an empty
+// closure, because a caller would then key on the wrong inputs.
+export function packageClosure(snapshot, directory, names) {
+  const { lockfile } = snapshot;
+  if (lockfile.lockfileVersion !== '9.0' || !lockfile.importers || !lockfile.snapshots) {
+    throw new Error('Unsupported pnpm lockfile');
+  }
+  return dependencyGraph(lockfile, snapshot.workspace, snapshot.patches, directory, names);
 }
 
 function nativeOnlyPatch(content) {
@@ -136,9 +172,7 @@ export function changedDependencyWorkspaces(before, after) {
     return ['*'];
   }
 
-  const graph = (snapshot, directory) =>
-    dependencyGraph(snapshot.lockfile, snapshot.workspace, snapshot.patches, directory);
-  if (!isDeepStrictEqual(graph(before, '.'), graph(after, '.'))) return ['*'];
+  if (!isDeepStrictEqual(importerClosure(before, '.'), importerClosure(after, '.'))) return ['*'];
 
   const directories = new Set([
     ...Object.keys(before.lockfile.importers),
@@ -147,11 +181,14 @@ export function changedDependencyWorkspaces(before, after) {
   directories.delete('.');
   return [...directories].filter(directory => {
     if (!before.lockfile.importers[directory] || !after.lockfile.importers[directory]) return true;
-    return !isDeepStrictEqual(graph(before, directory), graph(after, directory));
+    return !isDeepStrictEqual(
+      importerClosure(before, directory),
+      importerClosure(after, directory)
+    );
   });
 }
 
-function readSnapshot(read) {
+export function readDependencySnapshot(read) {
   const workspace = load(read('pnpm-workspace.yaml'));
   const patches = {};
   for (const path of Object.values(workspace.patchedDependencies ?? {})) {
@@ -167,14 +204,14 @@ if (import.meta.main) {
   try {
     const base = process.argv[2];
     if (!base) throw new Error('A Git base revision is required');
-    const before = readSnapshot(path =>
+    const before = readDependencySnapshot(path =>
       execFileSync('git', ['show', `${base}:${path}`], {
         encoding: 'utf8',
         maxBuffer: 16 * 1024 * 1024,
       })
     );
     const head = process.argv[3];
-    const after = readSnapshot(path =>
+    const after = readDependencySnapshot(path =>
       head
         ? execFileSync('git', ['show', `${head}:${path}`], {
             encoding: 'utf8',

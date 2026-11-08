@@ -6,12 +6,17 @@ import jwt from 'jsonwebtoken';
 import { randomUUID } from 'crypto';
 import { assertNotNullish } from '@/lib/utils';
 import type { TurnstileJwtPayload } from '@/lib/user/next-auth-options';
+import { getTrustedSignupClientIp } from '@/lib/auth/trusted-signup-ip';
 
 // JWT secret for signing Turnstile verification tokens
 const JWT_SECRET = NEXTAUTH_SECRET;
 
 export async function POST(request: NextRequest) {
-  const { token } = await request.json();
+  const body: unknown = await request.json().catch(() => undefined);
+  const token =
+    typeof body === 'object' && body !== null && 'token' in body && typeof body.token === 'string'
+      ? body.token
+      : undefined;
 
   if (!token) {
     return NextResponse.json({ error: 'Token is required' }, { status: 400 });
@@ -47,6 +52,7 @@ export async function POST(request: NextRequest) {
   const jwtPayload: TurnstileJwtPayload = {
     guid: randomUUID(), // Unique identifier to prevent reuse, will be used as user id
     ip: clientIP,
+    watchwoodIp: getTrustedSignupClientIp(request.headers),
     iat: Math.floor(Date.now() / 1000),
     exp: Math.floor(Date.now() / 1000) + 60 * 60,
   };

@@ -18,6 +18,8 @@ import { fileURLToPath } from 'node:url';
 
 import { load } from 'js-yaml';
 
+import { DEPENDENCY_MANIFESTS } from './affected-workspaces.mjs';
+
 const workflows = Object.fromEntries(
   ['ci.yml', 'kilo-app-ci.yml', 'mobile-native-build.yml', 'explorer-ios-release.yml'].map(file => [
     file,
@@ -885,6 +887,82 @@ test('the matrix step decides from the document the affected step published', ()
     /matrix=\$\(scripts\/changed-workspaces\.sh "\$\{excludes\[@\]\}" "\$\{includes\[@\]\}"\)/,
     'the matrix still comes from the matrix script'
   );
+});
+
+// The gating job reads the repository, not node_modules: only
+// scripts/changed-dependencies.mjs imports a package (js-yaml), and the detector
+// calls it only for a resource manifest. The install therefore follows a filter
+// over exactly that set; a manifest the detector gained without the filter
+// would run the detector without js-yaml.
+test('the changes job installs the root project only for a resource manifest', () => {
+  const steps = ciJobs.changes.steps;
+  const filter = steps.find(step => step.id === 'filter_resources');
+  assert.ok(filter, 'changes: the resource-manifest filter is missing');
+  assert.deepEqual(
+    Object.keys(load(filter.with.filters)),
+    ['resources'],
+    'the filter publishes one output that the install reads'
+  );
+  assert.deepEqual(
+    load(filter.with.filters).resources,
+    [...DEPENDENCY_MANIFESTS],
+    'the filter matches the detector set exactly'
+  );
+  const install = steps.find(step => step.name === 'Install root dependencies');
+  assert.equal(
+    install.if,
+    "steps.filter_resources.outputs.resources == 'true' || steps.filter_resources_retry.outputs.resources == 'true'",
+    'the install runs on the filter answer, first attempt or retry'
+  );
+  assert.ok(
+    steps.indexOf(install) >
+      steps.indexOf(steps.find(step => step.id === 'filter_resources_retry')),
+    'the install reads an answer the filter already wrote'
+  );
+});
+
+// The extension's unit suite runs in extension-ci.yml for a pull request and a
+// main push, and that workflow has no merge_queue trigger: the ci.yml row is the
+// merge-queue gate, and it installs and tests nothing on the events the other
+// workflow covers. The row stays in the matrix either way, so the check still
+// reports and the required `test` passes while its steps are skipped.
+test('the extension matrix row defers to extension CI outside the merge queue', () => {
+  const gate = "matrix.workspace.name != 'kilo-extension' || github.event_name == 'merge_group'";
+  const steps = ciJobs['workspace-tests'].steps;
+  for (const name of ['Install dependencies', 'Run tests']) {
+    assert.equal(
+      steps.find(step => step.name === name).if,
+      gate,
+      `workspace-tests: ${name} must run for the extension only in the merge queue`
+    );
+  }
+  const matrix = ciJobs.changes.steps.find(step => step.id === 'workspaces');
+  assert.doesNotMatch(
+    matrix.run,
+    /--exclude apps\/extension/,
+    'the merge queue has no other extension gate, so the row stays in the matrix'
+  );
+
+  const extensionCi = load(
+    readFileSync(new URL('../.github/workflows/extension-ci.yml', import.meta.url), 'utf8')
+  );
+  assert.deepEqual(
+    Object.keys(extensionCi.on).sort(),
+    ['pull_request', 'push'],
+    'extension CI covers the events the ci.yml row now defers on'
+  );
+  const verify = extensionCi.jobs.verify.steps.find(
+    step => step.run === `pnpm --filter ${extension.name} verify`
+  );
+  assert.ok(verify, 'extension CI runs the extension verify script');
+  const commands = extension.scripts.verify.split('&&').map(command => command.trim());
+  assert.ok(
+    commands.includes('pnpm run test'),
+    'the retained job runs the same unit tests the skipped step did'
+  );
+  for (const command of ['pnpm run typecheck', 'pnpm run lint']) {
+    assert.ok(commands.includes(command), `the retained job keeps ${command}`);
+  }
 });
 
 function runTypecheck(

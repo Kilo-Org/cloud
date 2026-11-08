@@ -365,6 +365,55 @@ test('the benchmark row restores the Python wheel cache it installs from', () =>
   assert.equal(steps[runIndex].env?.PIP_CACHE_DIR, pipCacheDir, 'pip reads the restored directory');
 });
 
+// `test:scripts` starts one runner per configuration, so its argument lists
+// restate the file lists of the per-suite scripts. Derive the expected lists
+// from those scripts instead of trusting the copy: a file added to a suite must
+// reach the chain, or the job silently stops running it, and a file removed from
+// a suite must leave the chain.
+const scriptSuites = [
+  'test:web-rewrites',
+  'test:web-env',
+  'test:dev-local',
+  'test:oxlint-plugins',
+  'test:mobile-artifacts',
+  'test:mobile-sbom',
+  'test:kilo-app-release',
+  'test:kilo-mcp-release',
+];
+
+test('test:scripts runs exactly the files its per-suite scripts name', () => {
+  const manifest = JSON.parse(
+    readFileSync(new URL('../package.json', import.meta.url), 'utf8')
+  ).scripts;
+  const invocations = manifest['test:scripts'].split(' && ');
+  const filesByInvocation = new Map();
+  for (const suite of scriptSuites) {
+    assert.ok(manifest[suite], `${suite} stays available on its own`);
+    const words = manifest[suite].split(/\s+/).filter(Boolean);
+    const testIndex = words.indexOf('--test');
+    assert.ok(testIndex > 0, `${suite} runs a test runner`);
+    // The runner and its flags select the chain invocation that must carry the
+    // files, so a suite that needs its own configuration needs its own
+    // invocation.
+    const runner = words.slice(0, testIndex).join(' ');
+    const invocation = invocations.find(candidate => candidate.startsWith(`${runner} `));
+    assert.ok(invocation, `test:scripts starts ${runner} for ${suite}`);
+    const expected = filesByInvocation.get(invocation) ?? new Set();
+    for (const file of words.slice(testIndex + 1)) expected.add(file);
+    filesByInvocation.set(invocation, expected);
+  }
+  assert.equal(filesByInvocation.size, invocations.length, 'every invocation carries a suite');
+  for (const [invocation, expected] of filesByInvocation) {
+    const words = invocation.split(/\s+/);
+    const actual = words.slice(words.indexOf('--test') + 1).sort();
+    assert.deepEqual(
+      actual,
+      [...expected].sort(),
+      `the invocation starting ${words[0]} names exactly its suites' files`
+    );
+  }
+});
+
 const harnessBuildGuards = [
   [
     'ci.yml',

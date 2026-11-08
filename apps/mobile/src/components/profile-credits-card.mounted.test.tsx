@@ -1019,6 +1019,8 @@ describe('CreditsCard balance state', () => {
       });
       expect(note).toContain('\u00A0\u2068(UTC)\u2069');
       expect(note).not.toContain(' (UTC)');
+      // The amount reads symbol-first like the headline, not `2.00$`.
+      expect(note).toMatch(/\u2066\$[^\u2069]+\u2069/);
       unmount();
     } finally {
       await i18n.changeLanguage('en');
@@ -1402,6 +1404,11 @@ describe('CreditsCard balance row', () => {
       expect(row.parent).toBe(column);
       expect(renders(row, 'No expiring credits.')).toBe(false);
       expect(renders(row, 'ADD_CREDITS_BUTTON')).toBe(false);
+      // The toggle shares the amount's line, so the note under it keeps the
+      // column's full width instead of the width left beside a toggle column.
+      const toggle = renderer.root.findByProps({ accessibilityLabel: 'Hide balance' });
+      expect(row.findAll(node => node === toggle)).toHaveLength(1);
+      expect(wrapper.children.at(-1)).toBe(column);
       expect(renders(column, 'No expiring credits.')).toBe(true);
       expect(renders(column, 'ADD_CREDITS_BUTTON')).toBe(false);
       const actionRow = shell.children.at(-1);

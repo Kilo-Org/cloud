@@ -85,9 +85,10 @@ test('ci.yml retries the changes filter after a transient GitHub API failure', (
 
 // Every filter pair in the job follows that contract, not only the shared one:
 // the retry evaluates the same paths as the attempt whose result it replaces,
-// and each output falls back to it. A pair that drifts decides a gated job from
-// paths its failed attempt never reported, and a path-gated job that reads a
-// missing output is skipped as if nothing changed.
+// and every filter the pair declares publishes an output that falls back to it.
+// A pair that drifts decides a gated job from paths its failed attempt never
+// reported, and a filter without that output leaves `needs.changes.outputs.*`
+// empty on the normal path, so a gated job is silently skipped on every run.
 function validatePairs(job) {
   const ids = job.steps.map(item => item.id).filter(id => typeof id === 'string');
   const pairs = ids.filter(id => !id.endsWith('_retry') && ids.includes(`${id}_retry`));
@@ -113,10 +114,9 @@ function validatePairs(job) {
       first.with.filters,
       `${id}: retry filters must be byte-identical to the first attempt`
     );
-    for (const [name, value] of Object.entries(job.outputs)) {
-      if (!String(value).includes(`steps.${id}.outputs.`)) continue;
+    for (const name of Object.keys(load(first.with.filters))) {
       assert.equal(
-        value,
+        job.outputs[name],
         `\${{ steps.${id}.outputs.${name} || steps.${id}_retry.outputs.${name} }}`,
         `changes: output ${name} must fall back to its retry attempt`
       );
@@ -137,6 +137,14 @@ test('changes rejects a drifted pair and an output without its fallback', () => 
   const unfallen = readChangesJob();
   unfallen.outputs.wiring = '${{ steps.filter_wiring.outputs.wiring }}';
   assert.throws(() => validatePairs(unfallen), assert.AssertionError);
+
+  const retryOnly = readChangesJob();
+  retryOnly.outputs.wiring = '${{ steps.filter_wiring_retry.outputs.wiring }}';
+  assert.throws(() => validatePairs(retryOnly), assert.AssertionError);
+
+  const deleted = readChangesJob();
+  delete deleted.outputs.wiring;
+  assert.throws(() => validatePairs(deleted), assert.AssertionError);
 });
 
 for (const defect of [

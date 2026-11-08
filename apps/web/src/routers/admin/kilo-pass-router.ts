@@ -12,6 +12,7 @@ import {
 import {
   type AdminActionEntry,
   recordAdminAction,
+  redactEmailAddressesInAuditText,
   userActionTarget,
 } from '@/lib/admin/admin-action-audit';
 import { superadminProcedure } from '@/lib/trpc/admin-procedures';
@@ -215,7 +216,7 @@ export async function runBulkCancelAndRefundKiloPass({
  */
 function bulkAuditEntry(
   row: BulkResultRow,
-  params: { reason: string; refundLatestPayment: boolean }
+  params: { batchId: string; reason: string; refundLatestPayment: boolean }
 ): AdminActionEntry | null {
   if (!row.userId) return null;
 
@@ -237,13 +238,16 @@ function bulkAuditEntry(
 
   // No provider error text: the audit table is browsable by every platform
   // admin and the message can quote arbitrary Stripe or database values.
+  // `batchId` groups the rows one request wrote; the reason is operator free
+  // text, so its email addresses are redacted.
   return {
     action: 'kilo_pass.cancel_refund',
     target: userActionTarget(row.userId),
     message,
     metadata: {
+      batchId: params.batchId,
       status: row.status,
-      reason: params.reason,
+      reason: redactEmailAddressesInAuditText(params.reason),
       refundLatestPayment: params.refundLatestPayment,
       refundedAmountCents: row.refundedAmountCents,
       balanceResetAmountUsd: row.balanceResetAmountUsd,
@@ -256,6 +260,7 @@ export const adminKiloPassRouter = createTRPCRouter({
   cancelAndRefundKiloPassBulk: superadminProcedure
     .input(BulkCancelSchema)
     .mutation(async ({ input, ctx }) => {
+      const batchId = crypto.randomUUID();
       const outcome = await runBulkCancelAndRefundKiloPass({
         emails: input.emails,
         adminKiloUserId: ctx.user.id,
@@ -264,6 +269,7 @@ export const adminKiloPassRouter = createTRPCRouter({
         refundLatestPayment: input.refundLatestPayment,
         onResult: async row => {
           const entry = bulkAuditEntry(row, {
+            batchId,
             reason: input.reason,
             refundLatestPayment: input.refundLatestPayment,
           });
@@ -272,7 +278,7 @@ export const adminKiloPassRouter = createTRPCRouter({
       });
 
       console.log(
-        `[admin.kiloPass.cancelAndRefundKiloPassBulk] admin=${ctx.user.id} total=${outcome.summary.total} cancelled=${outcome.summary.cancelled} skipped=${outcome.summary.skipped} errored=${outcome.summary.errored} refundLatestPayment=${input.refundLatestPayment} refundedCents=${outcome.summary.totalRefundedCents}`
+        `[admin.kiloPass.cancelAndRefundKiloPassBulk] admin=${ctx.user.id} batch=${batchId} total=${outcome.summary.total} cancelled=${outcome.summary.cancelled} skipped=${outcome.summary.skipped} errored=${outcome.summary.errored} refundLatestPayment=${input.refundLatestPayment} refundedCents=${outcome.summary.totalRefundedCents}`
       );
 
       return outcome;

@@ -182,11 +182,13 @@ export function UserAdminKiloPass({ userId }: { userId: string }) {
             >
               Nuke Pass
             </Button>
-            {isPermissionResolved && !isSuperadmin && (
+            {!isPermissionResolved ? (
+              <p className="text-muted-foreground text-xs">Checking permissions…</p>
+            ) : !isSuperadmin ? (
               <p className="text-muted-foreground text-xs">
                 Superadmin access is required to cancel and refund a Kilo Pass subscription.
               </p>
-            )}
+            ) : null}
           </div>
         )}
 

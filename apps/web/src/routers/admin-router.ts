@@ -155,6 +155,7 @@ import {
 import { createKiloClawAdminAuditLog } from '@/lib/kiloclaw/admin-audit-log';
 import {
   recordAdminAction,
+  redactEmailAddressesInAuditText,
   userActionTarget,
   type AdminActionContext,
 } from '@/lib/admin/admin-action-audit';
@@ -1856,7 +1857,7 @@ export const adminRouter = createTRPCRouter({
             action: 'kilo_pass.cancel_refund',
             target: userActionTarget(input.userId),
             message: 'Kilo Pass cancel attempted with unknown outcome',
-            metadata: { reason: input.reason },
+            metadata: { reason: redactEmailAddressesInAuditText(input.reason) },
           });
           throw error;
         }
@@ -1895,7 +1896,7 @@ export const adminRouter = createTRPCRouter({
             refundedAmountCents: result.refundedAmountCents,
             balanceResetAmountUsd: result.balanceResetAmountUsd,
             alreadyBlocked: result.alreadyBlocked,
-            reason: input.reason,
+            reason: redactEmailAddressesInAuditText(input.reason),
           },
         });
 

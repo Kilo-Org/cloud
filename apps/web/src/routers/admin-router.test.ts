@@ -608,7 +608,7 @@ describe('admin.cancelAndRefundKiloPass', () => {
     const caller = await createCallerForUser(superadmin.id);
     const result = await caller.admin.users.cancelAndRefundKiloPass({
       userId: target.id,
-      reason: 'chargeback',
+      reason: 'chargeback reported by victim@example.com',
     });
 
     expect(result).toEqual({
@@ -625,9 +625,10 @@ describe('admin.cancelAndRefundKiloPass', () => {
         target_type: 'user',
         target_id: target.id,
         message: 'Cancelled Kilo Pass and refunded the latest payment',
-        metadata: expect.objectContaining({ reason: 'chargeback' }),
+        metadata: expect.objectContaining({ reason: 'chargeback reported by [redacted-email]' }),
       }),
     ]);
+    expect(JSON.stringify(audits[0]?.metadata)).not.toContain('example.com');
   });
 
   test('a cancellation with no refundable payment is recorded as such', async () => {

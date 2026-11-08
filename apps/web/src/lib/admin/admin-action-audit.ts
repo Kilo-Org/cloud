@@ -34,7 +34,9 @@ import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
  *
  * `message` and `metadata` are stored and logged verbatim. Never include
  * tokens, credentials, or customer email addresses; reference users and
- * organizations by ID through `target`.
+ * organizations by ID through `target`. Operator-typed free text can name a
+ * customer, so pass it through {@link redactEmailAddressesInAuditText} before it
+ * becomes part of an entry.
  */
 
 export type AdminActionContext = Omit<AdminAuditContext, 'user'> & {
@@ -157,6 +159,17 @@ function emit(event: AdminActionEvent): void {
 
 export function userActionTarget(userId: string): AdminActionTarget {
   return { type: 'user', id: userId };
+}
+
+const EMAIL_ADDRESS_PATTERN = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
+
+/**
+ * Replaces email addresses in operator-typed free text, such as the reason an
+ * admin gives for a refund. The table is browsable by every platform admin, so
+ * an address the operator pasted must not reach it; the rest of the text stays.
+ */
+export function redactEmailAddressesInAuditText(text: string): string {
+  return text.replace(EMAIL_ADDRESS_PATTERN, '[redacted-email]');
 }
 
 export function organizationActionTarget(organizationId: string): AdminActionTarget {

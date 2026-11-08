@@ -227,13 +227,17 @@ export function KiloPassBulkCancel() {
             </div>
           </div>
 
-          {isPermissionResolved && !isSuperadmin && (
+          {!isPermissionResolved ? (
+            <Alert>
+              <AlertDescription>Checking permissions…</AlertDescription>
+            </Alert>
+          ) : !isSuperadmin ? (
             <Alert>
               <AlertDescription>
                 Superadmin access is required to cancel and refund Kilo Pass subscriptions.
               </AlertDescription>
             </Alert>
-          )}
+          ) : null}
 
           <Alert>
             <AlertDescription>

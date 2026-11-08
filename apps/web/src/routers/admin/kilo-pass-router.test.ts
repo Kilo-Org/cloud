@@ -224,6 +224,45 @@ describe('admin.kiloPass.cancelAndRefundKiloPassBulk', () => {
     expect(JSON.stringify(audits[0]?.metadata)).not.toContain('example.com');
   });
 
+  it('groups one request under one batch id and redacts an address in the reason', async () => {
+    const stripeMock = getStripeMock();
+    setupHappyPathStripe(stripeMock);
+
+    const first = await insertTestUser({ google_user_email: 'bulk-batch-1@example.com' });
+    const second = await insertTestUser({ google_user_email: 'bulk-batch-2@example.com' });
+    const third = await insertTestUser({ google_user_email: 'bulk-batch-3@example.com' });
+    await insertActiveKiloPass(first.id, 'sub_batch_1');
+    await insertActiveKiloPass(second.id, 'sub_batch_2');
+    await insertActiveKiloPass(third.id, 'sub_batch_3');
+
+    const caller = await createCallerForUser(adminUser.id);
+    const reason = 'chargeback reported by victim@example.com';
+    await caller.admin.kiloPass.cancelAndRefundKiloPassBulk({
+      emails: ['bulk-batch-1@example.com', 'bulk-batch-2@example.com'],
+      reason,
+    });
+    await caller.admin.kiloPass.cancelAndRefundKiloPassBulk({
+      emails: ['bulk-batch-3@example.com'],
+      reason,
+    });
+
+    const audits = await refundAuditRows();
+    expect(audits).toHaveLength(3);
+
+    const batchIds = new Map(audits.map(row => [row.target_id, row.metadata?.batchId]));
+    expect(batchIds.get(first.id)).toEqual(expect.any(String));
+    expect(batchIds.get(second.id)).toBe(batchIds.get(first.id));
+    expect(batchIds.get(third.id)).toEqual(expect.any(String));
+    expect(batchIds.get(third.id)).not.toBe(batchIds.get(first.id));
+
+    for (const row of audits) {
+      expect(row.metadata).toEqual(
+        expect.objectContaining({ reason: 'chargeback reported by [redacted-email]' })
+      );
+      expect(JSON.stringify(row.metadata)).not.toContain('example.com');
+    }
+  });
+
   it('skips unknown emails without failing the batch', async () => {
     const stripeMock = getStripeMock();
     setupHappyPathStripe(stripeMock);

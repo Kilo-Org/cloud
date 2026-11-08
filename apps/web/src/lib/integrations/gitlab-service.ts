@@ -249,7 +249,7 @@ function requireAvailableGitLabCredential(
 }
 
 export async function getValidGitLabToken(
-  integration: PlatformIntegration,
+  integration: Pick<PlatformIntegration, 'id' | 'metadata'>,
   actor: GitLabCredentialActor
 ): Promise<string> {
   const metadata = requireMetadataRecord(integration.metadata);
@@ -422,7 +422,9 @@ function gitLabCredentialActor(owner: Owner, actingUserId: string): GitLabCreden
  * rows it holds and any legacy metadata entry it still carries. Malformed
  * metadata keys are not GitLab project ids and cannot be revoked.
  */
-async function listIntegrationProjectIds(integration: PlatformIntegration): Promise<string[]> {
+async function listIntegrationProjectIds(
+  integration: Pick<PlatformIntegration, 'id' | 'metadata'>
+): Promise<string[]> {
   const projectIds = new Set<string>();
   const metadata = requireMetadataRecord(integration.metadata);
   const storedTokens = metadata.project_tokens;
@@ -449,14 +451,22 @@ async function listIntegrationProjectIds(integration: PlatformIntegration): Prom
 }
 
 /**
- * Attempts the disconnect makes to settle a project token the provider did not
- * settle. Every attempt needs the connected credential, which the suspension
- * drops, so the attempts share one request.
+ * Attempts the settlement makes to revoke a project token the provider did not
+ * settle. Every attempt needs the credential the caller holds, which the
+ * suspension drops, so the attempts share one request.
  */
 const PROJECT_TOKEN_SETTLEMENT_ATTEMPTS = 2;
 
 /** Pause between settlement attempts, so a transient provider error can clear. */
 const PROJECT_TOKEN_SETTLEMENT_RETRY_DELAY_MS = 250;
+
+/**
+ * Wall-clock budget for settling one integration's project tokens inside one
+ * request. A settlement that reaches it stops attempting further projects and
+ * skips its second attempt: the handles it did not reach stay stored, and a
+ * reconnect of the same account settles them.
+ */
+const PROJECT_TOKEN_SETTLEMENT_BUDGET_MS = 20_000;
 
 function waitForSettlementRetry(): Promise<void> {
   const { promise, resolve } = Promise.withResolvers<void>();
@@ -467,9 +477,11 @@ function waitForSettlementRetry(): Promise<void> {
 type ProjectTokenSettlement = {
   /** Tokens the provider confirmed revoked, whose stored handles are gone. */
   revoked: number;
-  /** Stored handles that remain. */
+  /** Entries dropped because they named no revocable token id. */
+  scrubbed: number;
+  /** Stored handles that remain, including the ones not attempted. */
   retained: number;
-  /** Handles that were listed but not attempted, because no credential was available. */
+  /** Handles that were listed but never attempted, for lack of credential or budget. */
   unattempted: number;
 };
 
@@ -478,18 +490,26 @@ type ProjectTokenSettlement = {
  * the caller already holds.
  *
  * Every stored id of a project is revoked before either handle for that project
- * is dropped, so a project is retained whole or settled whole. Only an answer a
+ * is dropped, so a project is retained whole or settled whole. A metadata entry
+ * that names no revocable token id is dropped instead, because it is the last
+ * stored copy of a secret that no revocation handle can reach. Only an answer a
  * repeat can change is attempted again: no answer, a rate limit, or a server
  * error. A permission or authentication refusal keeps its handle and is not
  * repeated.
  *
+ * The work is bounded twice: by the attempt count, and by `options.signal`,
+ * which defaults to a wall-clock budget. When the signal aborts, the remaining
+ * projects are left as they are, so the request answers instead of being cut
+ * off with live handles unattempted.
+ *
  * Returns null when the stored project list cannot be read, which a caller
  * reports separately from a token the provider refused.
  */
-async function settleStoredProjectTokens(
-  integration: PlatformIntegration,
+export async function settleStoredProjectTokens(
+  integration: Pick<PlatformIntegration, 'id' | 'metadata'>,
   actor: GitLabCredentialActor,
-  userToken: string | undefined
+  userToken: string | undefined,
+  options: { signal?: AbortSignal } = {}
 ): Promise<ProjectTokenSettlement | null> {
   let projectIds: string[];
   try {
@@ -503,20 +523,34 @@ async function settleStoredProjectTokens(
   }
 
   if (userToken === undefined) {
-    return { revoked: 0, retained: 0, unattempted: projectIds.length };
+    return {
+      revoked: 0,
+      scrubbed: 0,
+      retained: projectIds.length,
+      unattempted: projectIds.length,
+    };
   }
 
+  const signal = options.signal ?? AbortSignal.timeout(PROJECT_TOKEN_SETTLEMENT_BUDGET_MS);
   const outstandingProjectIds = new Set(projectIds);
+  const attemptedProjectIds = new Set<string>();
   const retryProjectIds = new Set<string>();
   let revoked = 0;
+  let scrubbed = 0;
   for (let attempt = 0; attempt < PROJECT_TOKEN_SETTLEMENT_ATTEMPTS; attempt++) {
     if (attempt > 0 && retryProjectIds.size === 0) break;
-    if (attempt > 0) await waitForSettlementRetry();
+    if (attempt > 0) {
+      if (signal.aborted) break;
+      await waitForSettlementRetry();
+    }
     const attemptProjectIds = attempt === 0 ? [...outstandingProjectIds] : [...retryProjectIds];
     retryProjectIds.clear();
     for (const projectId of attemptProjectIds) {
+      if (signal.aborted) break;
+      attemptedProjectIds.add(projectId);
       const outcome = await removeStoredProjectAccessToken(integration, projectId, actor, {
         userToken,
+        signal,
       }).catch(error => {
         logExceptInTest('[settleStoredProjectTokens] Project token settlement failed', {
           integrationId: integration.id,
@@ -528,13 +562,19 @@ async function settleStoredProjectTokens(
       if (outcome.outcome === 'removed') {
         outstandingProjectIds.delete(projectId);
         revoked += 1;
+      } else if (outcome.outcome === 'scrubbed') {
+        outstandingProjectIds.delete(projectId);
+        scrubbed += 1;
       } else if (outcome.outcome === 'retained' && outcome.retryable) {
         retryProjectIds.add(projectId);
       }
     }
   }
 
-  return { revoked, retained: outstandingProjectIds.size, unattempted: 0 };
+  const unattempted = [...outstandingProjectIds].filter(
+    projectId => !attemptedProjectIds.has(projectId)
+  ).length;
+  return { revoked, scrubbed, retained: outstandingProjectIds.size, unattempted };
 }
 
 /**
@@ -555,13 +595,18 @@ async function settleStoredProjectTokens(
  *    are deleted only after GitLab settles the revocation, and any other
  *    outcome keeps both.
  *
- * The settlement runs inside this request, over a bounded number of attempts,
- * because step 2 drops the credential that can revoke a token: a suspended
- * integration resolves nothing, so a repeated disconnect answers as not found.
- * A handle that stays unrevoked keeps neither reading nor revoking anything
- * through this integration. It does stay revocable: a reconnect of the same
- * integration settles it with the credential it presents, so a disconnect that
- * could not finish converges without a new bot token being minted on top of it.
+ * The settlement runs inside this request, over a bounded number of attempts
+ * and a wall-clock budget, because step 2 drops the credential that can revoke
+ * a token: a suspended integration resolves nothing, so a repeated disconnect
+ * answers as not found. Reaching the budget stops the settlement and keeps the
+ * handles it did not reach; each such handle keeps neither reading nor revoking
+ * anything through this integration. Both stay revocable: a reconnect of the
+ * same account, through a personal access token or OAuth, settles them with the
+ * credential it presents, so a disconnect that could not finish converges
+ * without a new bot token being minted on top of it.
+ *
+ * A metadata entry that names no revocable token id is dropped, because it is
+ * the last stored copy of a secret that no revocation handle can reach.
  *
  * The webhook_secret and configured_webhooks stay, so a reconnect keeps the
  * existing webhook configuration.
@@ -653,6 +698,7 @@ export async function disconnectGitLabIntegration(owner: Owner, actingUserId: st
       preservedWebhookSecret: !!updatedMetadata.webhook_secret,
       preservedWebhooks: countMetadataObjectEntries(updatedMetadata.configured_webhooks),
       revokedProjectTokens: settlement?.revoked ?? 0,
+      scrubbedProjectTokens: settlement?.scrubbed ?? 0,
       retainedProjectTokens: settlement?.retained ?? 0,
       unsettledProjectTokens: settlement?.unattempted ?? 0,
       projectTokenListUnavailable: settlement === null,
@@ -765,6 +811,13 @@ function readLegacyProjectTokenId(metadata: unknown, projectId: string): number 
   const entry = parsedMetadata.data.project_tokens?.[projectId];
   const parsedEntry = LegacyStoredProjectAccessTokenSchema.safeParse(entry);
   return parsedEntry.success ? parsedEntry.data.token_id : null;
+}
+
+/** True when the integration still carries any metadata entry for the project. */
+function hasLegacyProjectTokenEntry(metadata: unknown, projectId: string): boolean {
+  const parsedMetadata = GitLabProjectTokenMetadataSchema.safeParse(metadata);
+  if (!parsedMetadata.success) return false;
+  return parsedMetadata.data.project_tokens?.[projectId] !== undefined;
 }
 
 async function getStoredProjectCredential(integrationId: string, projectId: string) {
@@ -1171,11 +1224,14 @@ async function updateStoredProjectAccessToken(
  * a repeated attempt can settle it, so a caller that can try again does not
  * repeat a refusal the provider will keep answering. Only a missing answer, a
  * rate limit, or a server error can change on a repeat; a permission or
- * authentication refusal cannot.
+ * authentication refusal cannot. A scrubbed outcome drops an entry that named
+ * no revocable token id, so nothing is left at the provider that this path
+ * could reach.
  */
 export type StoredProjectTokenRemoval =
   | { outcome: 'removed' }
   | { outcome: 'absent' }
+  | { outcome: 'scrubbed' }
   | { outcome: 'retained'; retryable: boolean };
 
 /**
@@ -1188,17 +1244,19 @@ export type StoredProjectTokenRemoval =
  * token as already gone (404). Any other outcome keeps both handles so a later
  * removal can try again. A legacy metadata entry names a token id too, and it
  * keeps the same contract: every stored id for the project is revoked before
- * either handle is dropped.
+ * either handle is dropped. An entry that names no revocable id is dropped
+ * instead of kept, because no stored reader uses its plaintext token.
  *
  * `userToken` lets a caller that already resolved the connected credential — a
  * disconnect resolves it before the integration stops counting as connected —
- * reuse it instead of asking the token service per project.
+ * reuse it instead of asking the token service per project. `signal` carries
+ * that caller's deadline into the provider request.
  */
 export async function removeStoredProjectAccessToken(
-  integration: PlatformIntegration,
+  integration: Pick<PlatformIntegration, 'id' | 'metadata'>,
   projectId: string | number,
   actor: GitLabCredentialActor,
-  options: { userToken?: string } = {}
+  options: { userToken?: string; signal?: AbortSignal } = {}
 ): Promise<StoredProjectTokenRemoval> {
   const metadata = integration.metadata as GitLabIntegrationMetadata | null;
   const projectIdStr = requireGitLabProjectId(projectId);
@@ -1211,13 +1269,25 @@ export async function removeStoredProjectAccessToken(
       ].filter((tokenId): tokenId is number => tokenId !== null && tokenId !== undefined)
     ),
   ];
-  if (tokenIds.length === 0) return { outcome: 'absent' };
+  if (tokenIds.length === 0) {
+    if (!hasLegacyProjectTokenEntry(integration.metadata, projectIdStr)) {
+      return { outcome: 'absent' };
+    }
+    await deleteStoredProjectTokenMetadataEntry({
+      integrationId: integration.id,
+      projectId: projectIdStr,
+    });
+    logExceptInTest('[removeStoredProjectAccessToken] Dropped entry with no revocable token id', {
+      projectId,
+    });
+    return { outcome: 'scrubbed' };
+  }
   const instanceUrl = normalizeInstanceUrl(metadata?.gitlab_instance_url);
 
   try {
     const userToken = options.userToken ?? (await getValidGitLabToken(integration, actor));
     for (const tokenId of tokenIds) {
-      await revokeProjectAccessToken(userToken, projectId, tokenId, instanceUrl);
+      await revokeProjectAccessToken(userToken, projectId, tokenId, instanceUrl, options.signal);
     }
   } catch (error) {
     const status = readProjectRevocationStatus(error);

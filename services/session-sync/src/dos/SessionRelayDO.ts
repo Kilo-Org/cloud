@@ -55,6 +55,8 @@ const attachmentSchema = z.strictObject({
     iat: z.number(),
   }),
   subscribed: z.boolean(),
+  // Highest event sequence already handed to this socket, by replay or by live fanout.
+  highWater: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).default(0),
   reauthNotified: z.boolean(),
   closed: z.boolean(),
 });
@@ -138,7 +140,13 @@ export class SessionRelayDO extends DurableObject<Env> {
     const pair = new WebSocketPair();
     const client = pair[0];
     const server = pair[1];
-    const state: Attachment = { ticket, subscribed: false, reauthNotified: false, closed: false };
+    const state: Attachment = {
+      ticket,
+      subscribed: false,
+      highWater: 0,
+      reauthNotified: false,
+      closed: false,
+    };
     this.ctx.acceptWebSocket(server);
     this.saveAttachment(server, state);
     this.control(server, 'hello', {
@@ -236,7 +244,6 @@ export class SessionRelayDO extends DurableObject<Env> {
       await this.schedule();
       return;
     }
-    if (state.ticket.role !== 'runner') this.sweep();
     if (!this.takeRate(state.ticket)) {
       this.control(ws, 'error', { code: 'rate_limit_exceeded' });
       return;
@@ -257,6 +264,16 @@ export class SessionRelayDO extends DurableObject<Env> {
       return;
     }
     const frame = frameSchema.safeParse(value);
+    if (frame.success && frame.data.type === 'subscribe' && state.ticket.role !== 'runner') {
+      // An unchanged subscription leaves the sweep and the presence watch to the alarm.
+      if (this.subscribe(ws, state, frame.data.afterSeq)) {
+        this.sweep();
+        this.ctx.waitUntil(this.notifyWatch(state.ticket));
+      }
+      await this.schedule();
+      return;
+    }
+    if (state.ticket.role !== 'runner') this.sweep();
     if (frame.success) {
       if (frame.data.type === 'reauth') {
         const ticket = await this.authorize(frame.data.ticket);
@@ -280,9 +297,6 @@ export class SessionRelayDO extends DurableObject<Env> {
           });
           if (ticket.role !== 'runner') this.ctx.waitUntil(this.notifyWatch(ticket));
         }
-      } else if (frame.data.type === 'subscribe' && state.ticket.role !== 'runner') {
-        this.subscribe(ws, state, frame.data.afterSeq);
-        this.ctx.waitUntil(this.notifyWatch(state.ticket));
       } else if (frame.data.type === 'ack' && state.ticket.role === 'runner') {
         this.ack(frame.data.commandID);
       } else {
@@ -576,18 +590,27 @@ export class SessionRelayDO extends DurableObject<Env> {
     }
   }
 
-  private subscribe(ws: WebSocket, state: Attachment, afterSeq: number): void {
+  /** Replays only what this socket has not received; true when its subscription changed. */
+  private subscribe(ws: WebSocket, state: Attachment, afterSeq: number): boolean {
     this.trimRing(Date.now());
+    const wasSubscribed = state.subscribed;
     state.subscribed = afterSeq >= this.replayFloor && afterSeq <= this.seq;
     this.saveAttachment(ws, state);
     if (afterSeq < this.replayFloor || afterSeq > this.seq) {
       this.control(ws, 'reset_required', { seq: this.seq });
-      return;
+      return wasSubscribed;
     }
+    const cursor = Math.max(afterSeq, state.highWater);
+    let replayed = false;
     for (const entry of this.ring) {
-      if (entry.seq > afterSeq && !this.sendEncoded(ws, state, entry.encoded)) return;
+      if (entry.seq <= cursor) continue;
+      if (!this.sendEncoded(ws, state, entry.encoded)) return false;
+      replayed = true;
     }
+    state.highWater = this.seq;
+    this.saveAttachment(ws, state);
     this.control(ws, 'subscribed', { seq: this.seq });
+    return !wasSubscribed || replayed;
   }
 
   private sendEncoded(ws: WebSocket, state: Attachment, encoded: string): boolean {
@@ -633,7 +656,10 @@ export class SessionRelayDO extends DurableObject<Env> {
     let fanout = 0;
     for (const [viewer, state] of this.sockets()) {
       if (state.ticket.role !== 'runner' && state.subscribed) {
-        if (this.sendEncoded(viewer, state, encoded)) fanout++;
+        if (!this.sendEncoded(viewer, state, encoded)) continue;
+        state.highWater = seq;
+        this.saveAttachment(viewer, state);
+        fanout++;
       }
     }
     liveMetric(this.env, {

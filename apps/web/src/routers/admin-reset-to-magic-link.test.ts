@@ -3,7 +3,12 @@ jest.mock('@kilocode/web-shared/lib/admin/step-up-store', () => {
   return { ...actual, revokeStepUpProofs: jest.fn(actual.revokeStepUpProofs) };
 });
 
+// The concurrency cases poll for a Postgres lock wait, so a single case needs
+// more than the default 5s budget.
+jest.setTimeout(30_000);
+
 import { describe, expect, test } from '@jest/globals';
+import { createHash } from 'node:crypto';
 import { eq, sql } from 'drizzle-orm';
 import { revokeStepUpProofs } from '@kilocode/web-shared/lib/admin/step-up-store';
 import { TRPCError } from '@trpc/server';
@@ -218,36 +223,98 @@ async function signInWithPasskey(authenticator: TestAuthenticator, counter: numb
 }
 
 /**
- * Polls until `condition` holds. Postgres exposes a blocked statement only
- * through `pg_stat_activity`, so there is no event to await instead.
+ * A lock probe gives up after this long. A shared CI database can hold the
+ * probe behind another suite's transaction, so the budget is generous enough
+ * that only a genuinely stuck test reaches it.
  */
-async function waitUntil(condition: () => Promise<boolean>, what: string): Promise<void> {
-  const deadline = Date.now() + 4_000;
-  while (!(await condition())) {
-    if (Date.now() > deadline) throw new Error(`Timed out waiting for ${what}`);
-    await new Promise(resolve => setTimeout(resolve, 25));
+const LOCK_PROBE_DEADLINE_MS = 20_000;
+const LOCK_PROBE_INTERVAL_MS = 25;
+
+/**
+ * The advisory key a test parks a ceremony's inserts on, derived from the user
+ * id under test. A key from one test cannot park or release another test's
+ * statements, so no constant key is shared across the suite or its workers.
+ */
+function advisoryKeyFor(userId: string): string {
+  const digest = createHash('sha256').update(userId).digest();
+  return BigInt.asUintN(63, digest.readBigUInt64BE(0)).toString();
+}
+
+/**
+ * Polls `probe` until it answers. Postgres reports a blocked statement only
+ * through `pg_locks` and `pg_stat_activity`, so there is no event to await.
+ */
+async function waitFor<T>(probe: () => Promise<T | null>, what: string): Promise<T> {
+  const deadline = Date.now() + LOCK_PROBE_DEADLINE_MS;
+  for (;;) {
+    const answer = await probe();
+    if (answer !== null) return answer;
+    if (Date.now() > deadline) {
+      throw new Error(
+        `Timed out after ${LOCK_PROBE_DEADLINE_MS} ms waiting for ${what}; ` +
+          `lock waits in this database: ${await describeLockWaits()}`
+      );
+    }
+    await new Promise(resolve => setTimeout(resolve, LOCK_PROBE_INTERVAL_MS));
   }
 }
 
-async function isWaitingOnLock(statementPrefix: string): Promise<boolean> {
-  const result = await db.execute<{ waiting: number }>(
-    sql`SELECT count(*)::int AS waiting FROM pg_stat_activity
-        WHERE wait_event_type = 'Lock' AND query ILIKE ${`${statementPrefix}%`}`
+async function waitUntil(condition: () => Promise<boolean>, what: string): Promise<void> {
+  await waitFor(async () => ((await condition()) ? true : null), what);
+}
+
+/** What this test process is waiting on, for a timeout message. */
+async function describeLockWaits(): Promise<string> {
+  const result = await db.execute<{ pid: number; wait: string }>(
+    sql`SELECT pid, coalesce(wait_event_type || ':' || wait_event, 'none') AS wait
+          FROM pg_stat_activity
+         WHERE datname = current_database()
+           AND application_name = current_setting('application_name')
+           AND pid <> pg_backend_pid()
+           AND wait_event_type = 'Lock'`
   );
-  return result.rows[0].waiting > 0;
+  return JSON.stringify(result.rows);
+}
+
+/**
+ * The backend parked on `key`. Only the key this test derived is read, so a
+ * lock wait in another test or another worker of the shared database cannot be
+ * mistaken for this one.
+ */
+async function parkedBackendPid(key: string): Promise<number | null> {
+  const result = await db.execute<{ pid: number }>(
+    sql`SELECT pid FROM pg_locks
+         WHERE locktype = 'advisory' AND objsubid = 1 AND NOT granted
+           AND ((classid::bigint << 32) | objid::bigint) = ${key}::bigint
+         LIMIT 1`
+  );
+  return result.rows[0]?.pid ?? null;
+}
+
+/** True when another backend waits for the transaction of `pid` to end. */
+async function isBlockedBy(pid: number): Promise<boolean> {
+  const result = await db.execute<{ blocked: boolean }>(
+    sql`SELECT EXISTS (
+          SELECT 1 FROM pg_stat_activity
+           WHERE wait_event_type = 'Lock' AND pid <> pg_backend_pid()
+             AND ${pid} = ANY(pg_blocking_pids(pid))
+        ) AS blocked`
+  );
+  return result.rows[0].blocked;
 }
 
 /**
  * Parks every insert into `table` for `userId` on an advisory lock until the
  * returned release runs, so a test can act between a passkey ceremony's lock
- * and the row it writes. Deletes are not affected.
+ * and the row it writes. Deletes are not affected. The returned `key` names the
+ * only lock the hold can park a statement on.
  */
 async function holdInserts(
   table: 'passkey_sign_in_tickets' | 'passkey_credentials',
   userId: string
 ) {
   const name = `hold_insert_${crypto.randomUUID().replaceAll('-', '')}`;
-  const lockKey = 10064;
+  const lockKey = advisoryKeyFor(userId);
   await db.execute(
     sql.raw(
       `CREATE FUNCTION ${name}() RETURNS trigger LANGUAGE plpgsql AS $$ ` +
@@ -269,6 +336,7 @@ async function holdInserts(
   });
   await locked.promise;
   return {
+    key: lockKey,
     async release() {
       released.resolve();
       await holder;
@@ -365,8 +433,8 @@ describe('admin.users.resetToMagicLinkLogin', () => {
       // from going unhandled; the promise is still awaited below.
       const verification = verifyAuthentication(challengeId, response);
       void verification.catch(() => undefined);
-      await waitUntil(
-        () => isWaitingOnLock('insert into "passkey_sign_in_tickets"'),
+      const ceremonyPid = await waitFor(
+        () => parkedBackendPid(hold.key),
         'the ticket insert to park'
       );
 
@@ -377,7 +445,7 @@ describe('admin.users.resetToMagicLinkLogin', () => {
         .resetToMagicLinkLogin({ userId: user.id })
         .finally(() => (recoverySettled = true));
       await waitUntil(
-        async () => recoverySettled || isWaitingOnLock('delete from "passkey_credentials"'),
+        async () => recoverySettled || (await isBlockedBy(ceremonyPid)),
         'recovery to finish or wait on the credential'
       );
       expect(recoverySettled).toBe(false);
@@ -422,8 +490,8 @@ describe('admin.users.resetToMagicLinkLogin', () => {
         'holder-session-pepper'
       );
       void registration.catch(() => undefined);
-      await waitUntil(
-        () => isWaitingOnLock('insert into "passkey_credentials"'),
+      const ceremonyPid = await waitFor(
+        () => parkedBackendPid(hold.key),
         'the credential insert to park'
       );
 
@@ -434,7 +502,7 @@ describe('admin.users.resetToMagicLinkLogin', () => {
         .resetToMagicLinkLogin({ userId: user.id })
         .finally(() => (recoverySettled = true));
       await waitUntil(
-        async () => recoverySettled || isWaitingOnLock('update "kilocode_users"'),
+        async () => recoverySettled || (await isBlockedBy(ceremonyPid)),
         'recovery to finish or wait on the user row'
       );
       expect(recoverySettled).toBe(false);

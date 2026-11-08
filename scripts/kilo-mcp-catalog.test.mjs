@@ -165,11 +165,14 @@ function resolveSpecifier(specifier, fromFile, byName) {
  */
 function webTestFilterPaths() {
   const ci = load(readFileSync(join(repoRoot, '.github/workflows/ci.yml'), 'utf8'));
-  const step = (ci.jobs?.changes?.steps ?? []).find(
-    candidate => typeof candidate.with?.filters === 'string'
-  );
-  assert.ok(step, 'ci.yml: the changes job must carry its filters inline');
-  const filters = load(step.with.filters);
+  // The changes job carries several inline filter documents (resource
+  // manifests, the backend set, and further per-area retries), so read the one
+  // that declares this filter rather than the first one in the job.
+  const documents = (ci.jobs?.changes?.steps ?? [])
+    .filter(candidate => typeof candidate.with?.filters === 'string')
+    .map(candidate => load(candidate.with.filters));
+  const filters = documents.find(document => document.kilocode_backend !== undefined);
+  assert.ok(filters, 'ci.yml: the changes job must filter kilocode_backend inline');
   assert.ok(
     Array.isArray(filters.kilocode_backend),
     'ci.yml: kilocode_backend must be a path list'

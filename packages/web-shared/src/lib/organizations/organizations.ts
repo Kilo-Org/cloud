@@ -40,7 +40,7 @@ import {
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { resolveEffectiveOrganizationSsoPolicy } from './organization-sso-policy';
 import { classifyOrganizationEntitlement } from './trial-utils';
-import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+import { logExceptInTest, warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
 import { captureOrganizationMemberJoined } from '@kilocode/web-shared/lib/organizations/organization-member-analytics';
@@ -441,6 +441,15 @@ export async function addSsoUserToOrganization(
       }
     }
 
+    const membershipRule = await decideChildOrganizationMembership(tx, organizationId, { userId });
+    if (membershipRule !== 'permitted') {
+      warnExceptInTest(
+        `SSO join refused by the child-organization membership rule (${membershipRule})`,
+        { organizationId, userId }
+      );
+      return false;
+    }
+
     const added = await addUserToOrganization(organizationId, userId, 'member', tx);
 
     // A brand-new account provisioned through SSO exists only because of the
@@ -602,12 +611,24 @@ async function organizationMembersMatchingEmail(
   return candidates.filter(candidate => invitationAddressesAccount(email, candidate));
 }
 
+/**
+ * The account that holds a live membership in the given parent organization and
+ * belongs to the given address, or `null` when the parent organization is gone or
+ * nobody there owns the address.
+ */
 async function parentOrganizationMemberIdForEmail(
   tx: DrizzleTransaction,
   parentOrganizationId: Organization['id'],
   email: string
 ): Promise<User['id'] | null> {
-  const members = await organizationMembersMatchingEmail(tx, parentOrganizationId, email);
+  const [parentOrganization] = await tx
+    .select({ id: organizations.id })
+    .from(organizations)
+    .where(and(eq(organizations.id, parentOrganizationId), isNull(organizations.deleted_at)))
+    .limit(1);
+  if (!parentOrganization) return null;
+
+  const members = await organizationMembersMatchingEmail(tx, parentOrganization.id, email);
   const member = members.find(candidate => !candidate.isBot);
   if (!member) return null;
 
@@ -622,6 +643,76 @@ async function parentOrganizationMemberIdForEmail(
   return lockedMembership ? member.userId : null;
 }
 
+/**
+ * The identity a membership path can name: the account, or the address an
+ * invitation names before that account exists.
+ */
+type MembershipSubject = { userId: User['id'] } | { email: string };
+
+type ChildOrganizationMembershipDecision = 'permitted' | 'refused' | 'organization_missing';
+
+/**
+ * The module's child-organization membership rule, in one place: a child
+ * organization admits only live, non-bot members of its live parent. Invite,
+ * accept, and SSO provisioning all ask this before a membership row is created,
+ * so the three paths cannot disagree about who may become a member.
+ *
+ * The target organization is read under its row lock, and the parent membership
+ * under the same membership lock the other membership mutations take, so a
+ * removal that committed first leaves no member to find. A top-level target
+ * organization has no such requirement.
+ */
+async function decideChildOrganizationMembership(
+  tx: DrizzleTransaction,
+  organizationId: Organization['id'],
+  subject: MembershipSubject
+): Promise<ChildOrganizationMembershipDecision> {
+  const [organization] = await tx
+    .select({ parentOrganizationId: organizations.parent_organization_id })
+    .from(organizations)
+    .where(and(eq(organizations.id, organizationId), isNull(organizations.deleted_at)))
+    .for('update');
+  if (!organization) {
+    return 'organization_missing';
+  }
+  const parentOrganizationId = organization.parentOrganizationId;
+  if (!parentOrganizationId) {
+    return 'permitted';
+  }
+
+  if ('email' in subject) {
+    const parentMemberId = await parentOrganizationMemberIdForEmail(
+      tx,
+      parentOrganizationId,
+      subject.email
+    );
+    return parentMemberId ? 'permitted' : 'refused';
+  }
+
+  await lockOrganizationMembershipMutation(tx, parentOrganizationId, subject.userId);
+  const [parentMembership] = await tx
+    .select({ id: organization_memberships.id })
+    .from(organization_memberships)
+    .innerJoin(kilocode_users, eq(kilocode_users.id, organization_memberships.kilo_user_id))
+    .innerJoin(
+      organizations,
+      and(
+        eq(organizations.id, organization_memberships.organization_id),
+        isNull(organizations.deleted_at)
+      )
+    )
+    .where(
+      and(
+        eq(organization_memberships.organization_id, parentOrganizationId),
+        eq(organization_memberships.kilo_user_id, subject.userId),
+        eq(kilocode_users.is_bot, false)
+      )
+    )
+    .limit(1);
+
+  return parentMembership ? 'permitted' : 'refused';
+}
+
 export async function inviteUserToOrganization(
   organizationId: Organization['id'],
   invitingUserId: User['id'],
@@ -630,32 +721,13 @@ export async function inviteUserToOrganization(
   txn?: DrizzleTransaction
 ): Promise<OrganizationInvitation> {
   const run = async (tx: DrizzleTransaction): Promise<OrganizationInvitation> => {
-    const [organization] = await tx
-      .select({ parentOrganizationId: organizations.parent_organization_id })
-      .from(organizations)
-      .where(and(eq(organizations.id, organizationId), isNull(organizations.deleted_at)))
-      .for('update');
-    if (!organization) {
+    const membershipRule = await decideChildOrganizationMembership(tx, organizationId, { email });
+    if (membershipRule === 'organization_missing') {
       throw new Error('Organization SSO policy is misconfigured');
     }
     // A child org can invite only people who already belong to its live parent.
-    if (organization.parentOrganizationId) {
-      const [parentOrganization] = await tx
-        .select({ id: organizations.id })
-        .from(organizations)
-        .where(
-          and(
-            eq(organizations.id, organization.parentOrganizationId),
-            isNull(organizations.deleted_at)
-          )
-        )
-        .limit(1);
-      const parentMemberId = parentOrganization
-        ? await parentOrganizationMemberIdForEmail(tx, parentOrganization.id, email)
-        : null;
-      if (!parentMemberId) {
-        throw new Error(CHILD_ORGANIZATION_INVITE_REQUIRES_PARENT_MEMBER);
-      }
+    if (membershipRule === 'refused') {
+      throw new Error(CHILD_ORGANIZATION_INVITE_REQUIRES_PARENT_MEMBER);
     }
 
     const policy = await resolveEffectiveOrganizationSsoPolicy(organizationId, tx);
@@ -936,30 +1008,11 @@ export async function acceptOrganizationInvite(
       }
       // Joining a child org still requires a live parent membership, including
       // invitations created before the invitee left the parent.
-      if (organization.parent_organization_id) {
-        await lockOrganizationMembershipMutation(tx, organization.parent_organization_id, userId);
-        const [parentMembership] = await tx
-          .select({ id: organization_memberships.id })
-          .from(organization_memberships)
-          .innerJoin(kilocode_users, eq(kilocode_users.id, organization_memberships.kilo_user_id))
-          .innerJoin(
-            organizations,
-            and(
-              eq(organizations.id, organization_memberships.organization_id),
-              isNull(organizations.deleted_at)
-            )
-          )
-          .where(
-            and(
-              eq(organization_memberships.organization_id, organization.parent_organization_id),
-              eq(organization_memberships.kilo_user_id, userId),
-              eq(kilocode_users.is_bot, false)
-            )
-          )
-          .limit(1);
-        if (!parentMembership) {
-          return failureResult(CHILD_ORGANIZATION_ACCEPT_REQUIRES_PARENT_MEMBER);
-        }
+      const membershipRule = await decideChildOrganizationMembership(tx, organization.id, {
+        userId,
+      });
+      if (membershipRule !== 'permitted') {
+        return failureResult(CHILD_ORGANIZATION_ACCEPT_REQUIRES_PARENT_MEMBER);
       }
 
       const ssoPolicy = await resolveEffectiveOrganizationSsoPolicy(organization.id, tx);

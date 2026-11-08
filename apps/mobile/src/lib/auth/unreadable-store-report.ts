@@ -1,20 +1,23 @@
 import * as Sentry from '@sentry/react-native';
 
 /**
- * One Sentry report per unreadable logout-cleanup store state per app process.
+ * One Sentry report per store state this build cannot read, per app process.
  *
- * Both state kinds persist until a write replaces the payload: `corrupt` until
- * the next write repairs it, `unreadable` (an unknown store version) on
- * purpose, for the build that wrote it. Every logout-cleanup transaction and
- * every read-only view reads the store again, so an ungated capture files an
- * identical event per read for one unchanged condition.
+ * `unreadable` is a read that failed (a locked device, a keychain error) and it
+ * clears as soon as a later read succeeds. `unsupported` is a valid payload
+ * this build cannot interpret (an unknown store version, or neither known
+ * shape) and `corrupt` is a payload that is not valid JSON; both persist until
+ * a write replaces the payload - `unsupported` on purpose, for the build that
+ * wrote it. Every logout-cleanup transaction and every read-only view reads the
+ * store again, so an ungated capture files an identical event per read for one
+ * unchanged condition.
  *
  * The claim lives here rather than in the store module so the process-lifetime
  * state and the report it guards stay in one place with nothing else.
  */
 
-/** A store state this build cannot interpret; each one reports once. */
-type UnreadableStoreStatus = 'unreadable' | 'corrupt';
+/** A store state this build cannot read; each one reports once. */
+type UnreadableStoreStatus = 'unreadable' | 'unsupported' | 'corrupt';
 
 const reportedStatuses = new Set<UnreadableStoreStatus>();
 

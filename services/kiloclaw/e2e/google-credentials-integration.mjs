@@ -21,10 +21,6 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// ---------------------------------------------------------------------------
-// Load secrets from .dev.vars (same file wrangler uses)
-// ---------------------------------------------------------------------------
-
 function loadDevVars() {
   const devVarsPath = path.resolve(__dirname, '../.dev.vars');
   const vars = {};
@@ -55,10 +51,6 @@ let pass = 0;
 let fail = 0;
 const errors = [];
 const cleanupFns = [];
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 function green(msg) {
   console.log(`\x1b[32m  ✓ ${msg}\x1b[0m`);
@@ -152,10 +144,6 @@ const DUMMY_CREDS = {
   email: 'test@example.com',
 };
 
-// ---------------------------------------------------------------------------
-// DB: create/remove test user via psql
-// ---------------------------------------------------------------------------
-
 function sql(query) {
   return execSync('psql "$PGURL" -tAc "$PGQUERY"', {
     encoding: 'utf8',
@@ -185,10 +173,6 @@ function checkDbConnection() {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Generate JWT (needed for both public-key and admin routes)
-// ---------------------------------------------------------------------------
-
 async function generateJwt(userId) {
   return new SignJWT({
     kiloUserId: userId,
@@ -202,13 +186,8 @@ async function generateJwt(userId) {
     .sign(new TextEncoder().encode(NEXTAUTH_SECRET));
 }
 
-// ---------------------------------------------------------------------------
-// Preflight
-// ---------------------------------------------------------------------------
-
 bold('Preflight');
 
-// Check worker
 try {
   const health = await fetch(`${WORKER_URL}/health`);
   if (!health.ok) throw new Error(`status ${health.status}`);
@@ -219,7 +198,6 @@ try {
   process.exit(1);
 }
 
-// Connect to DB and create test user
 let dbConnected = false;
 if (checkDbConnection()) {
   try {
@@ -234,10 +212,6 @@ if (checkDbConnection()) {
   console.log(`   Ensure Postgres is running at ${DATABASE_URL}`);
 }
 
-// ---------------------------------------------------------------------------
-// 1. Public key endpoint (requires JWT auth at /api/admin/public-key)
-// ---------------------------------------------------------------------------
-
 bold('1. Public key endpoint');
 
 if (dbConnected) {
@@ -250,10 +224,6 @@ if (dbConnected) {
 } else {
   bold('1. Public key endpoint — SKIPPED (no DB for JWT)');
 }
-
-// ---------------------------------------------------------------------------
-// 2. Provision a test instance
-// ---------------------------------------------------------------------------
 
 bold(`2. Provision test instance (userId=${USER_ID})`);
 
@@ -268,7 +238,6 @@ const provisionPromise = fetch(`${WORKER_URL}/api/platform/provision`, {
 }).catch(() => {});
 green('Provision request fired (not waiting for completion)');
 
-// Poll status until the DO is reachable (google-credentials endpoint works once DO exists)
 let doReachable = false;
 for (let i = 0; i < 30; i++) {
   const { status } = await internalGet(`/api/platform/status?userId=${USER_ID}`);
@@ -284,10 +253,6 @@ if (!doReachable) {
   red('Instance DO never became reachable after 30s — provision may have failed');
   process.exit(1);
 }
-
-// ---------------------------------------------------------------------------
-// 3. Platform API: store Google credentials
-// ---------------------------------------------------------------------------
 
 bold('3. Platform API: store Google credentials');
 
@@ -307,10 +272,6 @@ assertEq('GET status shows googleConnected=true', true, statusAfterStore?.google
 const { json: debugAfterStore } = await internalGet(`/api/platform/debug-status?userId=${USER_ID}`);
 assertEq('GET debug-status shows googleConnected=true', true, debugAfterStore?.googleConnected);
 
-// ---------------------------------------------------------------------------
-// 4. Platform API: clear Google credentials
-// ---------------------------------------------------------------------------
-
 bold('4. Platform API: clear Google credentials');
 
 const { json: clearResult } = await internalDelete(
@@ -325,22 +286,15 @@ assertEq(
 const { json: statusAfterClear } = await internalGet(`/api/platform/status?userId=${USER_ID}`);
 assertEq('GET status shows googleConnected=false', false, statusAfterClear?.googleConnected);
 
-// ---------------------------------------------------------------------------
-// 5. User-facing routes (JWT auth)
-// ---------------------------------------------------------------------------
-
 if (dbConnected) {
   bold('5. User-facing routes (JWT auth)');
 
-  // JWT already generated in section 1
   assertNotEmpty('JWT generated', JWT);
 
-  // Auth check — GET /api/admin/google-credentials returns 200 with googleConnected status
   const { status: authCode, json: authJson } = await jwtGet('/api/admin/google-credentials');
   assertEq('Auth check returns 200', 200, authCode);
   assertEq('Auth check returns googleConnected field', false, authJson?.googleConnected);
 
-  // Store via user-facing route
   const { json: storeJwt } = await jwtPost('/api/admin/google-credentials', {
     googleCredentials: DUMMY_CREDS,
   });
@@ -350,7 +304,6 @@ if (dbConnected) {
     storeJwt?.googleConnected
   );
 
-  // Verify via platform status
   const { json: statusJwt } = await internalGet(`/api/platform/status?userId=${USER_ID}`);
   assertEq(
     'Status confirms googleConnected=true after JWT store',
@@ -358,7 +311,6 @@ if (dbConnected) {
     statusJwt?.googleConnected
   );
 
-  // Clear via user-facing route
   const { json: clearJwt } = await jwtDelete('/api/admin/google-credentials');
   assertEq(
     'DELETE /api/admin/google-credentials returns googleConnected=false',
@@ -366,7 +318,6 @@ if (dbConnected) {
     clearJwt?.googleConnected
   );
 
-  // Verify cleared
   const { json: statusJwt2 } = await internalGet(`/api/platform/status?userId=${USER_ID}`);
   assertEq(
     'Status confirms googleConnected=false after JWT clear',
@@ -377,27 +328,20 @@ if (dbConnected) {
   bold('5. User-facing routes (JWT auth) — SKIPPED (no DB)');
 }
 
-// ---------------------------------------------------------------------------
-// 6. Validation: bad input rejected
-// ---------------------------------------------------------------------------
-
 bold('6. Validation: bad input rejected');
 
-// Missing googleCredentials field (internal API)
 const { status: badCode1 } = await internalPost('/api/platform/google-credentials', {
   userId: USER_ID,
   wrong: 'field',
 });
 assertEq('Rejects missing googleCredentials (400)', 400, badCode1);
 
-// Invalid envelope schema (internal API)
 const { status: badCode2 } = await internalPost('/api/platform/google-credentials', {
   userId: USER_ID,
   googleCredentials: { gogConfigTarball: { bad: 'data' } },
 });
 assertEq('Rejects invalid envelope schema (400)', 400, badCode2);
 
-// Unauthenticated request (user-facing route, no token)
 const unauthRes = await fetch(`${WORKER_URL}/api/admin/google-credentials`, {
   method: 'POST',
   headers: { 'content-type': 'application/json' },
@@ -405,7 +349,6 @@ const unauthRes = await fetch(`${WORKER_URL}/api/admin/google-credentials`, {
 });
 assertEq('Rejects unauthenticated request (401)', 401, unauthRes.status);
 
-// No internal API key (platform route)
 const noKeyRes = await fetch(`${WORKER_URL}/api/platform/google-credentials`, {
   method: 'POST',
   headers: { 'content-type': 'application/json' },
@@ -413,7 +356,6 @@ const noKeyRes = await fetch(`${WORKER_URL}/api/platform/google-credentials`, {
 });
 assertEq('Rejects request without internal API key (403)', 403, noKeyRes.status);
 
-// Bad JWT (user-facing route)
 if (dbConnected) {
   const badJwtRes = await fetch(`${WORKER_URL}/api/admin/google-credentials`, {
     method: 'POST',
@@ -422,10 +364,6 @@ if (dbConnected) {
   });
   assertEq('Rejects bad JWT (401)', 401, badJwtRes.status);
 }
-
-// ---------------------------------------------------------------------------
-// 7. Idempotency (via internal API)
-// ---------------------------------------------------------------------------
 
 bold('7. Idempotency');
 
@@ -445,10 +383,6 @@ const { json: secondClear } = await internalDelete(
 );
 assertEq('Double clear still returns googleConnected=false', false, secondClear?.googleConnected);
 
-// ---------------------------------------------------------------------------
-// Cleanup
-// ---------------------------------------------------------------------------
-
 bold('Cleanup');
 await internalPost('/api/platform/destroy', { userId: USER_ID }).catch(() => {});
 green('Test instance destroyed');
@@ -459,10 +393,6 @@ for (const fn of cleanupFns) {
   } catch {}
 }
 green('Test user removed from DB');
-
-// ---------------------------------------------------------------------------
-// Summary
-// ---------------------------------------------------------------------------
 
 console.log('');
 bold(`Results: ${pass} passed, ${fail} failed`);

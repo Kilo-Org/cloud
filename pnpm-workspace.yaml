@@ -139,12 +139,15 @@ overrides:
   # the entry moves only through a reviewed change to this file and the lockfile.
   # A 'catalog:' entry takes that package's catalog pin, which sits in this same
   # file, so it obeys the same rule.
-  # esbuild below keeps a floor without an upper bound; see its own note.
+  # esbuild also states its upper bound; its own note says why that bound is a
+  # whole minor version rather than a deeper pin.
   glob: 13.0.6
   google-auth-library: 10.6.2
-  # Two 0.28.x copies are in the tree as peer variants of the vite/vitest/storybook
-  # graph, so a bound here re-points those dependents. Not narrowed in this change.
-  esbuild: '>=0.28.1'
+  # The vite/vitest/storybook graph picks up this copy, so the bound names the
+  # whole current minor line. The allowBuilds entry below permits the install
+  # script, and a 0.29 release resolves only through a reviewed change here, in
+  # the lockfile, and in that entry.
+  esbuild: '>=0.28.1 <0.29'
   lodash: 4.18.1
   diff: 8.0.3
   fast-xml-parser: 5.7.3

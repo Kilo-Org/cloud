@@ -464,14 +464,22 @@ export async function verifyAuthentication(
   }
 
   // Advance the counter as a compare-and-set against the value that was
-  // verified. A concurrent assertion for the same credential read the same
-  // counter and reaches this write with a stale expectation, so it updates no
-  // row: only the assertion that won the row is allowed to mint a ticket.
-  if (!(await advancePasskeyCounter(credential, newCounter))) {
-    throw new PasskeyVerificationError('VERIFICATION_FAILED');
-  }
-
-  const ticket = await createSignInTicket(credential.kilo_user_id);
+  // verified, and mint the ticket in the same transaction. A concurrent
+  // assertion for the same credential read the same counter and reaches this
+  // write with a stale expectation, so it updates no row: only the assertion
+  // that won the row is allowed to mint a ticket.
+  //
+  // The update also holds the credential's row lock until the ticket commits.
+  // Account recovery and account deletion delete the credential and then the
+  // user's tickets, so they either commit first, and this update matches no
+  // row, or wait for this commit and then delete the ticket minted here.
+  // Neither can leave a ticket that outlives the removed credential.
+  const ticket = await db.transaction(async tx => {
+    if (!(await advancePasskeyCounter(credential, newCounter, tx))) {
+      throw new PasskeyVerificationError('VERIFICATION_FAILED');
+    }
+    return createSignInTicket(credential.kilo_user_id, tx);
+  });
   return { ticket };
 }
 
@@ -481,11 +489,14 @@ export async function verifyAuthentication(
  * that a WebAuthn assertion verified, and the sign-in provider exchanges it for
  * a session.
  */
-export async function createSignInTicket(kiloUserId: string): Promise<string> {
+export async function createSignInTicket(
+  kiloUserId: string,
+  fromDb: typeof db | DrizzleTransaction = db
+): Promise<string> {
   const ticket = randomBytes(32).toString('hex');
   const ticket_hash = createHash('sha256').update(ticket).digest('hex');
 
-  await db.insert(passkey_sign_in_tickets).values({
+  await fromDb.insert(passkey_sign_in_tickets).values({
     ticket_hash,
     kilo_user_id: kiloUserId,
     expires_at: new Date(Date.now() + SIGN_IN_TICKET_TTL_MS).toISOString(),

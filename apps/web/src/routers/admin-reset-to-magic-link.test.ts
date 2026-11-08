@@ -208,6 +208,66 @@ async function signInWithPasskey(authenticator: TestAuthenticator, counter: numb
   );
 }
 
+/**
+ * Polls until `condition` holds. Postgres exposes a blocked statement only
+ * through `pg_stat_activity`, so there is no event to await instead.
+ */
+async function waitUntil(condition: () => Promise<boolean>, what: string): Promise<void> {
+  const deadline = Date.now() + 4_000;
+  while (!(await condition())) {
+    if (Date.now() > deadline) throw new Error(`Timed out waiting for ${what}`);
+    await new Promise(resolve => setTimeout(resolve, 25));
+  }
+}
+
+async function isWaitingOnLock(statementPrefix: string): Promise<boolean> {
+  const result = await db.execute<{ waiting: number }>(
+    sql`SELECT count(*)::int AS waiting FROM pg_stat_activity
+        WHERE wait_event_type = 'Lock' AND query ILIKE ${`${statementPrefix}%`}`
+  );
+  return result.rows[0].waiting > 0;
+}
+
+/**
+ * Parks every ticket insert for `userId` on an advisory lock until the returned
+ * release runs, so a test can act between a passkey's counter update and the
+ * insert of the ticket it mints. Deletes are not affected.
+ */
+async function holdTicketInserts(userId: string) {
+  const name = `hold_ticket_insert_${crypto.randomUUID().replaceAll('-', '')}`;
+  const lockKey = 10064;
+  await db.execute(
+    sql.raw(
+      `CREATE FUNCTION ${name}() RETURNS trigger LANGUAGE plpgsql AS $$ ` +
+        `BEGIN PERFORM pg_advisory_xact_lock(${lockKey}); RETURN NEW; END $$`
+    )
+  );
+  await db.execute(
+    sql.raw(
+      `CREATE TRIGGER ${name} BEFORE INSERT ON passkey_sign_in_tickets FOR EACH ROW ` +
+        `WHEN (NEW.kilo_user_id = '${userId}') EXECUTE FUNCTION ${name}()`
+    )
+  );
+  const locked = Promise.withResolvers<void>();
+  const released = Promise.withResolvers<void>();
+  const holder = db.transaction(async tx => {
+    await tx.execute(sql.raw(`SELECT pg_advisory_xact_lock(${lockKey})`));
+    locked.resolve();
+    await released.promise;
+  });
+  await locked.promise;
+  return {
+    async release() {
+      released.resolve();
+      await holder;
+    },
+    async drop() {
+      await db.execute(sql.raw(`DROP TRIGGER ${name} ON passkey_sign_in_tickets`));
+      await db.execute(sql.raw(`DROP FUNCTION ${name}()`));
+    },
+  };
+}
+
 describe('admin.users.resetToMagicLinkLogin', () => {
   test('removes providers and passkeys and evicts every live credential of the prior holder', async () => {
     const admin = await insertTestUser({ is_admin: true });
@@ -266,6 +326,58 @@ describe('admin.users.resetToMagicLinkLogin', () => {
     );
     expect(refusal).toBeInstanceOf(PasskeyVerificationError);
     expect((refusal as PasskeyVerificationError).code).toBe('UNKNOWN_CREDENTIAL');
+  });
+
+  test('recovery during a passkey sign-in leaves no redeemable ticket', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const user = await insertTestUser();
+    const authenticator = createTestAuthenticator();
+    await insertPasskey(user.id, authenticator);
+    const { challengeId, options } = await createAuthenticationOptions();
+    const response = buildAuthenticationResponse(authenticator, {
+      challenge: options.challenge,
+      counter: 1,
+    });
+    const caller = await createCallerForUser(admin.id);
+
+    const hold = await holdTicketInserts(user.id);
+    try {
+      // The assertion verifies and its counter update runs, then the ticket
+      // insert parks on the hold. The no-op catch keeps an early rejection
+      // from going unhandled; the promise is still awaited below.
+      const verification = verifyAuthentication(challengeId, response);
+      void verification.catch(() => undefined);
+      await waitUntil(
+        () => isWaitingOnLock('insert into "passkey_sign_in_tickets"'),
+        'the ticket insert to park'
+      );
+
+      // Recovery now runs. It must not finish before the in-flight sign-in
+      // does: it waits on the credential row the sign-in still holds.
+      let recoverySettled = false;
+      const recovery = caller.admin.users
+        .resetToMagicLinkLogin({ userId: user.id })
+        .finally(() => (recoverySettled = true));
+      await waitUntil(
+        async () => recoverySettled || isWaitingOnLock('delete from "passkey_credentials"'),
+        'recovery to finish or wait on the credential'
+      );
+      expect(recoverySettled).toBe(false);
+
+      await hold.release();
+      const { ticket } = await verification;
+      await expect(recovery).resolves.toEqual({ success: true });
+
+      await expect(consumeSignInTicket(ticket)).resolves.toBeNull();
+      const tickets = await db
+        .select({ id: passkey_sign_in_tickets.id })
+        .from(passkey_sign_in_tickets)
+        .where(eq(passkey_sign_in_tickets.kilo_user_id, user.id));
+      expect(tickets).toEqual([]);
+    } finally {
+      await hold.release();
+      await hold.drop();
+    }
   });
 
   test.each([

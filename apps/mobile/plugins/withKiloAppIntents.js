@@ -3,22 +3,14 @@ const path = require('path');
 
 const { withAppDelegate, withDangerousMod, withXcodeProject } = require('expo/config-plugins');
 
+const { APP_TARGET_SOURCES, installPublisher, sourceFiles } = require('./kilo-app-intents-sources');
+
 // App Intents must compile in the app target: the static KiloAppActions pod
 // has no bundle in the built app for the system to load intents metadata
-// from. The pod keeps the Expo bridge and catalog store; these sources are
-// copied into the generated app target at prebuild.
+// from. The pod keeps the Expo bridge and catalog store; every Swift file in
+// `ios/AppIntents` is copied into the generated app target at prebuild.
 
-const SOURCE_FILES = [
-  'KiloAppIntents.swift',
-  'KiloSessionEntity.swift',
-  'KiloVisibleSession.swift',
-];
-const APP_TARGET_SOURCES = path.join('modules', 'kilo-app-actions', 'ios', 'AppIntents');
 const APPLICATION_PRODUCT_TYPE = 'com.apple.product-type.application';
-const INSTALL_CALL = 'KiloVisibleSessionBridge.install(publisher: KiloVisibleSession.publish)';
-const CREATE_REACT_DELEGATE = /^([ \t]*)let delegate = ReactNativeDelegate\(\)/m;
-const LEGACY_PACKAGE =
-  /\n@available\(iOS 17\.0, \*\)\nstruct KiloAppIntentsPackage: AppIntentsPackage \{[\s\S]*?\n\}\n?/;
 
 const unquote = value => String(value ?? '').replaceAll('"', '');
 
@@ -42,7 +34,7 @@ function withCopiedSources(config) {
       if (!fs.existsSync(path.join(targetRoot, 'Info.plist')))
         throw new Error(`withKiloAppIntents: the app target is not at ios/${cfg.name}`);
       const sourceRoot = path.join(cfg.modRequest.projectRoot, APP_TARGET_SOURCES);
-      for (const name of SOURCE_FILES) {
+      for (const name of sourceFiles(cfg.modRequest.projectRoot)) {
         const source = path.join(sourceRoot, name);
         if (!fs.existsSync(source)) throw new Error(`withKiloAppIntents: ${source} is missing`);
         fs.copyFileSync(source, path.join(targetRoot, name));
@@ -67,7 +59,7 @@ function withSources(config) {
     if (groupPath && groupPath !== cfg.name) {
       throw new Error(`withKiloAppIntents: unexpected app group path ${groupPath}`);
     }
-    for (const file of SOURCE_FILES) {
+    for (const file of sourceFiles(cfg.modRequest.projectRoot)) {
       const filePath = groupPath ? file : path.posix.join(cfg.name, file);
       if (!project.hasFile(filePath)) {
         project.addSourceFile(filePath, { target: uuid }, groupKey);
@@ -75,26 +67,6 @@ function withSources(config) {
     }
     return cfg;
   });
-}
-
-function installPublisher(contents) {
-  if (LEGACY_PACKAGE.test(contents)) {
-    // The previous plugin owned both this struct and the AppIntents import it
-    // needed; remove them together and leave every other import alone.
-    contents = contents.replace(LEGACY_PACKAGE, '\n').replace(/^import AppIntents\n/m, '');
-  }
-  contents = contents.replace(/^import KiloAppActions$/m, 'internal import KiloAppActions');
-  if (!contents.includes('internal import KiloAppActions\n')) {
-    contents = 'internal import KiloAppActions\n' + contents;
-  }
-  if (contents.includes(INSTALL_CALL)) return contents;
-  if (!CREATE_REACT_DELEGATE.test(contents)) {
-    throw new Error('withKiloAppIntents: AppDelegate has no ReactNativeDelegate initialization');
-  }
-  return contents.replace(
-    CREATE_REACT_DELEGATE,
-    (match, indent) => `${indent}${INSTALL_CALL}\n${match}`
-  );
 }
 
 function withPublisherInstall(config) {

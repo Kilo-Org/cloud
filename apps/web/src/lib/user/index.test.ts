@@ -196,6 +196,7 @@ import {
   SecurityFindingNotificationStatus,
   UserDeletionCloudSubjectResolution,
   UserDeletionRequestStatus,
+  type AuthProviderId,
   type VercelComputeCredentialEnvelope,
 } from '@kilocode/db/schema-types';
 
@@ -2135,26 +2136,100 @@ describe('User', () => {
       expect(providerRows.some(row => row.provider === 'github')).toBe(true);
     });
 
-    it('keeps the different-provider refusal when the existing account has no qualifying sign-in method', async () => {
-      const existing = await insertTestUser({
-        google_user_email: 'existing-other-method@example.com',
-        google_user_name: 'Existing Other Method',
+    async function insertUserWithProviders(
+      primaryEmail: string,
+      providers: Array<{ provider: AuthProviderId; email: string }>
+    ) {
+      const user = await insertTestUser({
+        google_user_email: primaryEmail,
+        google_user_name: 'Existing Account',
       });
-      await db.insert(user_auth_provider).values({
-        kilo_user_id: existing.id,
-        provider: 'github',
-        provider_account_id: 'github-n',
-        email: 'existing-other-method@example.com',
-        avatar_url: '',
-        display_name: null,
-        hosted_domain: hosted_domain_specials.github,
-      });
+      if (providers.length > 0) {
+        await db.insert(user_auth_provider).values(
+          providers.map(({ provider, email }) => ({
+            kilo_user_id: user.id,
+            provider,
+            provider_account_id: `${provider}-${email}`,
+            email,
+            avatar_url: '',
+            display_name: null,
+            hosted_domain: 'example.com',
+          }))
+        );
+      }
+      return user;
+    }
 
+    async function providerTypesFor(userId: string) {
+      const rows = await db
+        .select({ provider: user_auth_provider.provider })
+        .from(user_auth_provider)
+        .where(eq(user_auth_provider.kilo_user_id, userId));
+      return rows.map(row => row.provider).sort();
+    }
+
+    function magicLinkSignIn(email: string) {
+      return createOrUpdateUser(
+        {
+          google_user_email: email,
+          google_user_name: 'Magic Link',
+          google_user_image_url: '',
+          hosted_domain: 'example.com',
+          provider: 'email',
+          provider_account_id: email,
+        },
+        undefined,
+        true
+      );
+    }
+
+    it('auto-links when a verified method holds the primary address', async () => {
+      const existing = await insertUserWithProviders('primary-match@example.com', [
+        { provider: 'google', email: 'primary-match@example.com' },
+      ]);
+
+      const result = await magicLinkSignIn('primary-match@example.com');
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.user.id).toBe(existing.id);
+      await expect(providerTypesFor(existing.id)).resolves.toEqual(['email', 'google']);
+    });
+
+    it('refuses auto-link when the verified method holds a different address', async () => {
+      const existing = await insertUserWithProviders('primary-a@example.com', [
+        { provider: 'github', email: 'primary-a@example.com' },
+        { provider: 'google', email: 'linked-b@example.com' },
+      ]);
       mockCapture.mockClear();
+
+      const result = await magicLinkSignIn('primary-a@example.com');
+
+      expect(result.success).toBe(false);
+      if (result.success) return;
+      expect(result.error).toBe('DIFFERENT-OAUTH');
+      expect(mockCapture).toHaveBeenCalledWith(
+        expect.objectContaining({
+          distinctId: 'primary-a@example.com',
+          event: 'auto_link_skipped_unverified_primary_address',
+          properties: {
+            existing_provider_count: 2,
+            existing_providers: expect.arrayContaining(['github', 'google']),
+            new_provider: 'email',
+          },
+        })
+      );
+      await expect(providerTypesFor(existing.id)).resolves.toEqual(['github', 'google']);
+    });
+
+    it('refuses auto-link when the account holds no verified method', async () => {
+      const existing = await insertUserWithProviders('github-only@example.com', [
+        { provider: 'github', email: 'github-only@example.com' },
+      ]);
 
       const result = await createOrUpdateUser(
         {
-          google_user_email: 'existing-other-method@example.com',
+          google_user_email: 'github-only@example.com',
           google_user_name: 'Google Later',
           google_user_image_url: 'https://example.com/avatar.png',
           hosted_domain: 'example.com',
@@ -2168,40 +2243,76 @@ describe('User', () => {
       expect(result.success).toBe(false);
       if (result.success) return;
       expect(result.error).toBe('DIFFERENT-OAUTH');
-      expect(mockCapture).toHaveBeenCalledWith(
-        expect.objectContaining({
-          distinctId: 'existing-other-method@example.com',
-          event: 'auto_link_skipped_account_sign_in_history',
-          properties: {
-            existing_provider_count: 1,
-            existing_providers: ['github'],
-            new_provider: 'google',
-          },
-        })
-      );
-
-      const providerRows = await db
-        .select()
-        .from(user_auth_provider)
-        .where(eq(user_auth_provider.kilo_user_id, existing.id));
-      expect(providerRows).toHaveLength(1);
-      expect(providerRows[0]?.provider).toBe('github');
+      await expect(providerTypesFor(existing.id)).resolves.toEqual(['github']);
     });
 
-    it('does not attribute a same-provider refusal to the account sign-in requirement', async () => {
-      const existing = await insertTestUser({
-        google_user_email: 'same-provider-event@example.com',
-        google_user_name: 'Same Provider Event',
-      });
-      await db.insert(user_auth_provider).values({
-        kilo_user_id: existing.id,
-        provider: 'github',
-        provider_account_id: 'github-same-provider-old',
-        email: 'same-provider-event@example.com',
-        avatar_url: '',
-        display_name: null,
-        hosted_domain: hosted_domain_specials.github,
-      });
+    it('matches the primary address regardless of case', async () => {
+      const existing = await insertUserWithProviders('case.match@example.com', [
+        { provider: 'anaconda', email: 'Case.Match@Example.COM' },
+      ]);
+
+      const result = await magicLinkSignIn('case.match@example.com');
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.user.id).toBe(existing.id);
+    });
+
+    it.each([
+      ['a plus alias of the primary address', 'alias+tag@example.com', 'alias@example.com'],
+      [
+        'a Gmail dot variant of the primary address',
+        'dot.variant@gmail.com',
+        'dotvariant@gmail.com',
+      ],
+    ])(
+      'refuses auto-link when the verified method holds %s',
+      async (_label, rowEmail, primaryEmail) => {
+        const existing = await insertUserWithProviders(primaryEmail, [
+          { provider: 'google', email: rowEmail },
+        ]);
+
+        const result = await magicLinkSignIn(primaryEmail);
+
+        expect(result.success).toBe(false);
+        if (result.success) return;
+        expect(result.error).toBe('DIFFERENT-OAUTH');
+        await expect(providerTypesFor(existing.id)).resolves.toEqual(['google']);
+      }
+    );
+
+    it.each(['apple', 'workos'] as const)(
+      'does not count a %s method at the primary address as verified',
+      async provider => {
+        const primaryEmail = `${provider}-primary@example.com`;
+        const existing = await insertUserWithProviders(primaryEmail, [
+          { provider, email: primaryEmail },
+        ]);
+
+        const result = await magicLinkSignIn(primaryEmail);
+
+        expect(result.success).toBe(false);
+        if (result.success) return;
+        expect(result.error).toBe('DIFFERENT-OAUTH');
+        await expect(providerTypesFor(existing.id)).resolves.toEqual([provider]);
+      }
+    );
+
+    it('keeps auto-link for an account with no provider rows', async () => {
+      const existing = await insertUserWithProviders('rowless-primary@example.com', []);
+
+      const result = await magicLinkSignIn('rowless-primary@example.com');
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.user.id).toBe(existing.id);
+      await expect(providerTypesFor(existing.id)).resolves.toEqual(['email']);
+    });
+
+    it('does not attribute a same-provider refusal to the primary-address requirement', async () => {
+      await insertUserWithProviders('same-provider-event@example.com', [
+        { provider: 'github', email: 'same-provider-event@example.com' },
+      ]);
       mockCapture.mockClear();
 
       const result = await createOrUpdateUser(
@@ -2221,89 +2332,8 @@ describe('User', () => {
       if (result.success) return;
       expect(result.error).toBe('DIFFERENT-OAUTH');
       expect(mockCapture).not.toHaveBeenCalledWith(
-        expect.objectContaining({ event: 'auto_link_skipped_account_sign_in_history' })
+        expect.objectContaining({ event: 'auto_link_skipped_unverified_primary_address' })
       );
-    });
-
-    it('allows auto-link when the existing account has a qualifying sign-in method', async () => {
-      const existing = await insertTestUser({
-        google_user_email: 'existing-qualifying@example.com',
-        google_user_name: 'Existing Qualifying',
-      });
-      await db.insert(user_auth_provider).values({
-        kilo_user_id: existing.id,
-        provider: 'apple',
-        provider_account_id: 'apple-n',
-        email: 'existing-qualifying@example.com',
-        avatar_url: '',
-        display_name: null,
-        hosted_domain: hosted_domain_specials.apple,
-      });
-
-      const result = await createOrUpdateUser(
-        {
-          google_user_email: 'existing-qualifying@example.com',
-          google_user_name: 'Google Later Two',
-          google_user_image_url: 'https://example.com/avatar.png',
-          hosted_domain: 'example.com',
-          provider: 'google',
-          provider_account_id: 'google-new',
-        },
-        undefined,
-        true
-      );
-
-      expect(result.success).toBe(true);
-      if (!result.success) return;
-      expect(result.user.id).toBe(existing.id);
-
-      const providerRows = await db
-        .select()
-        .from(user_auth_provider)
-        .where(eq(user_auth_provider.kilo_user_id, existing.id));
-      expect(providerRows).toHaveLength(2);
-      expect(providerRows.some(row => row.provider === 'apple')).toBe(true);
-      expect(providerRows.some(row => row.provider === 'google')).toBe(true);
-    });
-
-    it('keeps the different-provider refusal for a magic-link sign-in into that account', async () => {
-      const existing = await insertTestUser({
-        google_user_email: 'magic-other-method@example.com',
-        google_user_name: 'Magic Other Method',
-      });
-      await db.insert(user_auth_provider).values({
-        kilo_user_id: existing.id,
-        provider: 'github',
-        provider_account_id: 'github-magic-other-method',
-        email: 'magic-other-method@example.com',
-        avatar_url: '',
-        display_name: null,
-        hosted_domain: hosted_domain_specials.github,
-      });
-
-      const result = await createOrUpdateUser(
-        {
-          google_user_email: 'magic-other-method@example.com',
-          google_user_name: 'Magic Later',
-          google_user_image_url: '',
-          hosted_domain: 'example.com',
-          provider: 'email',
-          provider_account_id: 'magic-other-method@example.com',
-        },
-        undefined,
-        true
-      );
-
-      expect(result.success).toBe(false);
-      if (result.success) return;
-      expect(result.error).toBe('DIFFERENT-OAUTH');
-
-      const providerRows = await db
-        .select()
-        .from(user_auth_provider)
-        .where(eq(user_auth_provider.kilo_user_id, existing.id));
-      expect(providerRows).toHaveLength(1);
-      expect(providerRows[0]?.provider).toBe('github');
     });
 
     it('keeps WorkOS SSO settlement unchanged', async () => {

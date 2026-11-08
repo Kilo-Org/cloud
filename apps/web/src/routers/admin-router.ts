@@ -115,6 +115,12 @@ import {
   inferRowlessAuthProviders,
 } from '@/lib/user';
 import { blockUser } from '@/lib/user/block';
+import {
+  isRetryableRecoveryError,
+  resetAccountToMagicLink,
+  type MagicLinkRecoveryResult,
+} from '@/lib/user/account-recovery';
+import { captureException } from '@sentry/nextjs';
 import { getBlobContent } from '@/lib/r2/cli-sessions';
 import { getLowerDomainFromEmail, normalizeEmail } from '@kilocode/web-shared/lib/email-address';
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
@@ -749,16 +755,42 @@ export const adminRouter = createTRPCRouter({
           }
         }
 
-        const removedProviders = await db
-          .delete(user_auth_provider)
-          .where(eq(user_auth_provider.kilo_user_id, input.userId))
-          .returning({ provider: user_auth_provider.provider });
+        let recovery: MagicLinkRecoveryResult | null;
+        try {
+          recovery = await resetAccountToMagicLink(input.userId);
+        } catch (error) {
+          // The reset runs in one transaction, so a failed revocation also
+          // keeps the provider rows: never report a recovery that left the
+          // prior holder signed in.
+          if (isRetryableRecoveryError(error)) {
+            throw new TRPCError({
+              code: 'INTERNAL_SERVER_ERROR',
+              message:
+                'Account recovery did not complete and the previous sessions were not revoked. Retry the reset.',
+              cause: error,
+            });
+          }
+          captureException(error, { tags: { operation: 'reset_to_magic_link_login' } });
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message:
+              'Account recovery failed and the previous sessions were not revoked. Investigate the error before retrying.',
+            cause: error,
+          });
+        }
+        if (!recovery) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'User not found' });
+        }
 
         await recordAdminAction(ctx, {
           action: 'user.login.reset_to_magic_link',
           target: userActionTarget(input.userId),
-          message: 'Reset login to magic link (removed linked auth providers)',
-          metadata: { removedProviders: removedProviders.map(row => row.provider) },
+          message:
+            'Reset login to magic link (removed linked auth providers, revoked browser, API and device sessions)',
+          metadata: {
+            removedProviders: recovery.removedProviders,
+            revokedDeviceSessionCount: recovery.revokedDeviceSessionCount,
+          },
         });
 
         return successResult();

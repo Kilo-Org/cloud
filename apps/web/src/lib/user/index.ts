@@ -513,20 +513,41 @@ async function recordSignupImpactTracking(args: {
 }
 
 /**
- * Sign-in method types accepted for the account-sign-in requirement: a
- * consumed magic link or code, a native token that checked `email_verified`, a
- * Google profile the acceptance path asserts, an Anaconda profile its parser
- * refuses without the claim, Apple sign-in, or an enterprise SSO assertion.
- * OpenAI tokens carry an optional `email_verified` claim that this table does
- * not rely on.
+ * Provider types whose every `user_auth_provider` writer stores an address the
+ * credential verified: Google (the browser profile asserts `email_verified`,
+ * the native token verifier refuses without it), Anaconda (its profile parser
+ * requires `email_verified: true`), and email (a consumed magic link or code
+ * delivered to that address).
+ *
+ * Apple is excluded because the browser path stores the ID token's address
+ * without checking `email_verified`, which Apple leaves false for some Work &
+ * School accounts. WorkOS is excluded because directory sync provisions a new
+ * address without a domain check, so its rows can carry an address nobody
+ * verified.
  */
-const QUALIFYING_SIGN_IN_METHODS: Partial<Record<AuthProviderId, true>> = {
+const VERIFIED_ADDRESS_PROVIDERS: Partial<Record<AuthProviderId, true>> = {
   google: true,
-  apple: true,
   anaconda: true,
-  workos: true,
   email: true,
 };
+
+/**
+ * Whether the account holds a sign-in method that verified its primary
+ * address. An explicitly linked method verifies only its own address, so a row
+ * for a different address does not count. The comparison ignores case only:
+ * `normalizeEmail` strips `+` aliases, which can name a different mailbox.
+ */
+function hasVerifiedPrimaryAddress(
+  primaryEmail: string,
+  providers: readonly Pick<UserAuthProvider, 'provider' | 'email'>[]
+): boolean {
+  const primary = getDeliveredEmailAddress(primaryEmail);
+  return providers.some(
+    p =>
+      VERIFIED_ADDRESS_PROVIDERS[p.provider] === true &&
+      getDeliveredEmailAddress(p.email) === primary
+  );
+}
 
 export async function createOrUpdateUser(
   args: CreateOrUpdateUserArgs,
@@ -589,25 +610,25 @@ export async function createOrUpdateUser(
     // email_verified claim). Proof authorizes the link; without proof the
     // sign-in keeps the DIFFERENT-OAUTH refusal below.
     //
-    // Linking into an existing account also requires that the account currently
-    // carries at least one method from the table above. An account with no
-    // provider row predates provider rows or follows an admin reset, and the
-    // email auto-link is its only way in, so it counts. Sign-in through the
-    // account's own provider resolves by provider identity above and never
-    // reaches this requirement.
+    // Linking into an existing account also requires that the account holds a
+    // method that verified its primary address (`hasVerifiedPrimaryAddress`).
+    // An account with no provider row predates provider rows or follows an
+    // admin reset, and the email auto-link is its only way in, so it counts.
+    // Sign-in through the account's own provider resolves by provider identity
+    // above and never reaches this requirement.
     //
     // WorkOS SSO settlement keeps its existing behavior: an SSO-required hosted
     // domain is the only path into the account, and its authority-gated callback
     // proves the organization controls it, so it always resolves (relaying a
     // stale profile ID when one is stored).
-    const accountHasQualifyingSignIn =
+    const accountHasVerifiedPrimaryAddress =
       existingProviders.length === 0 ||
-      existingProviders.some(p => QUALIFYING_SIGN_IN_METHODS[p.provider] === true);
+      hasVerifiedPrimaryAddress(userByEmail.google_user_email, existingProviders);
     const workosSettles = args.provider === 'workos' && autoLinkToExistingUser;
     const shouldLink =
       workosSettles ||
       (!hasThisProvider &&
-        (onlyHasFakeLogin || (autoLinkToExistingUser && accountHasQualifyingSignIn)));
+        (onlyHasFakeLogin || (autoLinkToExistingUser && accountHasVerifiedPrimaryAddress)));
 
     if (shouldLink) {
       let linkedUser = userByEmail;
@@ -697,20 +718,20 @@ export async function createOrUpdateUser(
           new_hosted_domain: args.hosted_domain,
         },
       });
-      // Record the sign-ins the account-sign-in requirement held back, so they
+      // Record the sign-ins the primary-address requirement held back, so they
       // are distinguishable from every other different-account refusal. A
       // refusal from the provider already on the account is not this
       // requirement's outcome, so it stays out.
-      const skippedBySignInHistory =
+      const skippedByPrimaryAddress =
         !hasThisProvider &&
         !workosSettles &&
         autoLinkToExistingUser &&
         !onlyHasFakeLogin &&
-        !accountHasQualifyingSignIn;
-      if (skippedBySignInHistory) {
+        !accountHasVerifiedPrimaryAddress;
+      if (skippedByPrimaryAddress) {
         posthogClient.capture({
           distinctId: userByEmail.google_user_email,
-          event: 'auto_link_skipped_account_sign_in_history',
+          event: 'auto_link_skipped_unverified_primary_address',
           properties: {
             existing_provider_count: existingProviders.length,
             existing_providers: existingProviders.map(p => p.provider),

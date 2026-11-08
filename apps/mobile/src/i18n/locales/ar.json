@@ -248,6 +248,7 @@
     "confirmDeletion": "تأكيد الحذف",
     "credits": "الرصيد",
     "failedToLoadBalance": "تعذّر تحميل الرصيد. اضغط لإعادة المحاولة.",
+    "balanceLoadFailed": "تعذّر تحميل الرصيد",
     "hideBalance": "إخفاء الرصيد",
     "showBalance": "إظهار الرصيد",
     "balanceHidden": "الرصيد مخفي",

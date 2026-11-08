@@ -248,6 +248,7 @@
     "confirmDeletion": "Cadarnhau dileu",
     "credits": "Credydau",
     "failedToLoadBalance": "Methu llwytho'r balans. Tapiwch i geisio eto.",
+    "balanceLoadFailed": "Methu llwytho'r balans",
     "hideBalance": "Cuddio'r balans",
     "showBalance": "Dangos y balans",
     "balanceHidden": "Balans wedi'i guddio",

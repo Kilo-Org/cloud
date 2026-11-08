@@ -77,7 +77,7 @@ export function isNeutral(file) {
 // workspaces whose graph moved, and everything only when the graph cannot
 // attribute the change: a root or unscoped dependency, a workspace glob or an
 // installation-policy key, or an unreadable manifest.
-const DEPENDENCY_MANIFESTS = new Set(['pnpm-lock.yaml', 'pnpm-workspace.yaml']);
+export const DEPENDENCY_MANIFESTS = new Set(['pnpm-lock.yaml', 'pnpm-workspace.yaml']);
 
 const SOURCE_GLOBS = ['ts', 'tsx', 'mts', 'cts', 'js', 'mjs', 'cjs', 'json', 'jsonc'];
 

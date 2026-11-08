@@ -248,6 +248,7 @@
     "confirmDeletion": "Potwierdź usunięcie",
     "credits": "Środki",
     "failedToLoadBalance": "Nie udało się wczytać salda. Dotknij, aby spróbować ponownie.",
+    "balanceLoadFailed": "Nie udało się wczytać salda",
     "hideBalance": "Ukryj saldo",
     "showBalance": "Pokaż saldo",
     "balanceHidden": "Saldo ukryte",

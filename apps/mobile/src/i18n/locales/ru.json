@@ -248,6 +248,7 @@
     "confirmDeletion": "Подтвердить удаление",
     "credits": "Кредиты",
     "failedToLoadBalance": "Не удалось загрузить баланс. Нажмите, чтобы повторить.",
+    "balanceLoadFailed": "Не удалось загрузить баланс",
     "hideBalance": "Скрыть баланс",
     "showBalance": "Показать баланс",
     "balanceHidden": "Баланс скрыт",

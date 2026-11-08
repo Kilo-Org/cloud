@@ -198,10 +198,12 @@ import {
   SecurityFindingNotificationStatus,
   UserDeletionCloudSubjectResolution,
   UserDeletionRequestStatus,
+  type AuthProviderId,
   type VercelComputeCredentialEnvelope,
 } from '@kilocode/db/schema-types';
 
 import type * as StripeClient from '@kilocode/web-shared/lib/stripe-client';
+import type * as PostHogModule from '@kilocode/web-shared/lib/posthog';
 import type * as BouncerClient from '@kilocode/web-shared/lib/bouncer/client';
 import type { WatchwoodSignupAssessment } from '@/lib/auth/watchwood';
 
@@ -233,6 +235,27 @@ const { createStripeCustomer, deleteStripeCustomer } = jest.requireMock<typeof S
   '@kilocode/web-shared/lib/stripe-client'
 );
 
+jest.mock<typeof PostHogModule>('@kilocode/web-shared/lib/posthog', () => {
+  const mockCapture = jest.fn();
+  return {
+    __esModule: true,
+    default: jest.fn(() => ({
+      capture: mockCapture,
+      alias: jest.fn(),
+      debug: jest.fn(),
+      isFeatureEnabled: jest.fn(),
+      getFeatureFlag: jest.fn(),
+    })),
+    flushPostHog: jest.fn(async () => {}),
+    shutdownPosthog: jest.fn(async () => {}),
+    mockCapture,
+  };
+});
+
+const { mockCapture } = jest.requireMock('@kilocode/web-shared/lib/posthog') as {
+  mockCapture: jest.Mock;
+};
+
 jest.mock('@/lib/impact/affiliate-events', () => ({
   recordAffiliateAttributionAndQueueParentEvent: jest.fn(async () => null),
 }));
@@ -254,6 +277,10 @@ const mockRecordAffiliateAttributionAndQueueParentEvent = jest.mocked(
 
 describe('User', () => {
   // Shared cleanup for all tests in this suite to prevent data pollution
+  beforeEach(() => {
+    mockCapture.mockReset();
+  });
+
   afterEach(async () => {
     await db.delete(cloud_agent_pr_watches);
     await db.delete(cloud_agent_worktrees);
@@ -2109,6 +2136,247 @@ describe('User', () => {
         .where(eq(user_auth_provider.kilo_user_id, existing.id));
       expect(providerRows).toHaveLength(2);
       expect(providerRows.some(row => row.provider === 'github')).toBe(true);
+    });
+
+    async function insertUserWithProviders(
+      primaryEmail: string,
+      providers: Array<{ provider: AuthProviderId; email: string }>
+    ) {
+      const user = await insertTestUser({
+        google_user_email: primaryEmail,
+        google_user_name: 'Existing Account',
+      });
+      if (providers.length > 0) {
+        await db.insert(user_auth_provider).values(
+          providers.map(({ provider, email }) => ({
+            kilo_user_id: user.id,
+            provider,
+            provider_account_id: `${provider}-${email}`,
+            email,
+            avatar_url: '',
+            display_name: null,
+            hosted_domain: 'example.com',
+          }))
+        );
+      }
+      return user;
+    }
+
+    async function providerTypesFor(userId: string) {
+      const rows = await db
+        .select({ provider: user_auth_provider.provider })
+        .from(user_auth_provider)
+        .where(eq(user_auth_provider.kilo_user_id, userId));
+      return rows.map(row => row.provider).sort();
+    }
+
+    function magicLinkSignIn(email: string) {
+      return createOrUpdateUser(
+        {
+          google_user_email: email,
+          google_user_name: 'Magic Link',
+          google_user_image_url: '',
+          hosted_domain: 'example.com',
+          provider: 'email',
+          provider_account_id: email,
+        },
+        undefined,
+        true
+      );
+    }
+
+    it('auto-links when a verified method holds the primary address', async () => {
+      const existing = await insertUserWithProviders('primary-match@example.com', [
+        { provider: 'google', email: 'primary-match@example.com' },
+      ]);
+
+      const result = await magicLinkSignIn('primary-match@example.com');
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.user.id).toBe(existing.id);
+      await expect(providerTypesFor(existing.id)).resolves.toEqual(['email', 'google']);
+    });
+
+    it('refuses auto-link when the verified method holds a different address', async () => {
+      const existing = await insertUserWithProviders('primary-a@example.com', [
+        { provider: 'github', email: 'primary-a@example.com' },
+        { provider: 'google', email: 'linked-b@example.com' },
+      ]);
+      mockCapture.mockClear();
+
+      const result = await magicLinkSignIn('primary-a@example.com');
+
+      expect(result.success).toBe(false);
+      if (result.success) return;
+      expect(result.error).toBe('DIFFERENT-OAUTH');
+      expect(mockCapture).toHaveBeenCalledWith(
+        expect.objectContaining({
+          distinctId: 'primary-a@example.com',
+          event: 'auto_link_skipped_unverified_primary_address',
+          properties: {
+            existing_provider_count: 2,
+            existing_providers: expect.arrayContaining(['github', 'google']),
+            new_provider: 'email',
+          },
+        })
+      );
+      await expect(providerTypesFor(existing.id)).resolves.toEqual(['github', 'google']);
+    });
+
+    it('refuses auto-link when the account holds no verified method', async () => {
+      const existing = await insertUserWithProviders('github-only@example.com', [
+        { provider: 'github', email: 'github-only@example.com' },
+      ]);
+
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: 'github-only@example.com',
+          google_user_name: 'Google Later',
+          google_user_image_url: 'https://example.com/avatar.png',
+          hosted_domain: 'example.com',
+          provider: 'google',
+          provider_account_id: 'google-new',
+        },
+        undefined,
+        true
+      );
+
+      expect(result.success).toBe(false);
+      if (result.success) return;
+      expect(result.error).toBe('DIFFERENT-OAUTH');
+      await expect(providerTypesFor(existing.id)).resolves.toEqual(['github']);
+    });
+
+    it('matches the primary address regardless of case', async () => {
+      const existing = await insertUserWithProviders('case.match@example.com', [
+        { provider: 'anaconda', email: 'Case.Match@Example.COM' },
+      ]);
+
+      const result = await magicLinkSignIn('case.match@example.com');
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.user.id).toBe(existing.id);
+    });
+
+    it.each([
+      ['a plus alias of the primary address', 'alias+tag@example.com', 'alias@example.com'],
+      [
+        'a Gmail dot variant of the primary address',
+        'dot.variant@gmail.com',
+        'dotvariant@gmail.com',
+      ],
+    ])(
+      'refuses auto-link when the verified method holds %s',
+      async (_label, rowEmail, primaryEmail) => {
+        const existing = await insertUserWithProviders(primaryEmail, [
+          { provider: 'google', email: rowEmail },
+        ]);
+
+        const result = await magicLinkSignIn(primaryEmail);
+
+        expect(result.success).toBe(false);
+        if (result.success) return;
+        expect(result.error).toBe('DIFFERENT-OAUTH');
+        await expect(providerTypesFor(existing.id)).resolves.toEqual(['google']);
+      }
+    );
+
+    it.each(['apple', 'workos'] as const)(
+      'does not count a %s method at the primary address as verified',
+      async provider => {
+        const primaryEmail = `${provider}-primary@example.com`;
+        const existing = await insertUserWithProviders(primaryEmail, [
+          { provider, email: primaryEmail },
+        ]);
+
+        const result = await magicLinkSignIn(primaryEmail);
+
+        expect(result.success).toBe(false);
+        if (result.success) return;
+        expect(result.error).toBe('DIFFERENT-OAUTH');
+        await expect(providerTypesFor(existing.id)).resolves.toEqual([provider]);
+      }
+    );
+
+    it('keeps auto-link for an account with no provider rows', async () => {
+      const existing = await insertUserWithProviders('rowless-primary@example.com', []);
+
+      const result = await magicLinkSignIn('rowless-primary@example.com');
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.user.id).toBe(existing.id);
+      await expect(providerTypesFor(existing.id)).resolves.toEqual(['email']);
+    });
+
+    it('does not attribute a same-provider refusal to the primary-address requirement', async () => {
+      await insertUserWithProviders('same-provider-event@example.com', [
+        { provider: 'github', email: 'same-provider-event@example.com' },
+      ]);
+      mockCapture.mockClear();
+
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: 'same-provider-event@example.com',
+          google_user_name: 'Same Provider Event',
+          google_user_image_url: 'https://example.com/avatar.png',
+          hosted_domain: hosted_domain_specials.github,
+          provider: 'github',
+          provider_account_id: 'github-same-provider-new',
+        },
+        undefined,
+        true
+      );
+
+      expect(result.success).toBe(false);
+      if (result.success) return;
+      expect(result.error).toBe('DIFFERENT-OAUTH');
+      expect(mockCapture).not.toHaveBeenCalledWith(
+        expect.objectContaining({ event: 'auto_link_skipped_unverified_primary_address' })
+      );
+    });
+
+    it('keeps WorkOS SSO settlement unchanged', async () => {
+      const existing = await insertTestUser({
+        google_user_email: 'workos-other-method@example.com',
+        google_user_name: 'WorkOS Other Method',
+      });
+      await db.insert(user_auth_provider).values({
+        kilo_user_id: existing.id,
+        provider: 'github',
+        provider_account_id: 'github-workos-other-method',
+        email: 'workos-other-method@example.com',
+        avatar_url: '',
+        display_name: null,
+        hosted_domain: hosted_domain_specials.github,
+      });
+
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: 'workos-other-method@example.com',
+          google_user_name: 'WorkOS Later',
+          google_user_image_url: 'https://example.com/avatar.png',
+          hosted_domain: 'example.com',
+          provider: 'workos',
+          provider_account_id: 'workos-other-method',
+        },
+        undefined,
+        true
+      );
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.user.id).toBe(existing.id);
+
+      const providerRows = await db
+        .select()
+        .from(user_auth_provider)
+        .where(eq(user_auth_provider.kilo_user_id, existing.id));
+      expect(providerRows).toHaveLength(1);
+      expect(providerRows[0]?.provider).toBe('workos');
+      expect(providerRows[0]?.provider_account_id).toBe('workos-other-method');
     });
   });
 

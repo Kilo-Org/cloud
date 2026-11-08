@@ -18,6 +18,8 @@ import { fileURLToPath } from 'node:url';
 
 import { load } from 'js-yaml';
 
+import { DEPENDENCY_MANIFESTS } from './affected-workspaces.mjs';
+
 const workflows = Object.fromEntries(
   ['ci.yml', 'kilo-app-ci.yml', 'mobile-native-build.yml', 'explorer-ios-release.yml'].map(file => [
     file,
@@ -288,7 +290,11 @@ test('one job saves the compiler plugin cache and every reader restores it', () 
     ['.github/actions/harness-sdk-build', harnessBuildAction.runs.steps],
   ];
   for (const [key, steps] of holders) {
-    const saversHere = steps.filter(step => step.uses?.startsWith('actions/cache/save@'));
+    // An action may also save another cache (the harness SDK dist is one), so
+    // pick the plugin saves by their path rather than by the action.
+    const saversHere = steps.filter(
+      step => step.uses?.startsWith('actions/cache/save@') && step.with?.path === pluginPath
+    );
     for (const save of saversHere) {
       assert.equal(save.uses, 'actions/cache/save@668228422ae6a00e4ad889ee87cd7109ec5666a7');
       assert.ok(
@@ -660,35 +666,99 @@ test('kilo-app CI builds the tRPC declarations once and both checks download the
   );
 });
 
-test('the harness SDK action restores dist and builds only on a miss', () => {
+// The tRPC action gets the same guard as the harness SDK build action: a hit
+// proves the key, not the tree.
+test('the tRPC declarations action rebuilds a hit that misses an entry point', () => {
+  const action = load(
+    readFileSync(
+      new URL('../.github/actions/trpc-declarations/action.yml', import.meta.url),
+      'utf8'
+    )
+  );
+  const steps = action.runs.steps;
+  const cache = steps.find(step => step.name === 'Restore tRPC declarations');
+  const restored = steps.find(step => step.name === 'Check the restored declarations');
+  const build = steps.find(step => step.name === 'Build trpc types');
+  assert.equal(cache.uses, 'actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7');
+  assert.equal(cache.with.path, 'packages/trpc/dist');
+  assert.ok(
+    steps.indexOf(cache) < steps.indexOf(restored) &&
+      steps.indexOf(restored) < steps.indexOf(build),
+    'the check runs between the restore and the build'
+  );
+  assert.equal(restored.id, 'restored');
+  assert.equal(restored.shell, 'bash');
+  assert.equal(restored.if, undefined, 'the check runs on a miss too');
+  for (const entry of ['packages/trpc/dist/index.d.ts', 'packages/trpc/dist/mobile.d.ts']) {
+    assert.ok(restored.run.includes(entry), `the check requires ${entry}`);
+  }
+  assert.match(restored.run, /^usable='false'$/m);
+  assert.match(restored.run, /echo "usable=\$usable" >> "\$GITHUB_OUTPUT"/m);
+  const rebuild = "steps.restored.outputs.usable != 'true'";
+  assert.equal(build.if, rebuild, 'the build gates on the check, not the raw cache hit');
+  assert.doesNotMatch(build.if, /cache-hit/, 'the raw cache hit no longer gates the build');
+});
+
+test('the harness SDK action shares one dist entry across runner operating systems', () => {
   const steps = harnessBuildAction.runs.steps;
   const key = steps.find(step => step.name === 'Hash harness SDK build inputs');
   const cache = steps.find(step => step.name === 'Restore harness SDK build');
+  const restored = steps.find(step => step.name === 'Check the restored build');
   const plugins = steps.filter(step => step.uses === pluginCacheAction);
   const build = steps.find(step => step.name === 'Build harness SDK');
+  const save = steps.find(step => step.name === 'Save harness SDK build');
   assert.equal(key.run, 'node scripts/harness-sdk-build-key.mjs >> "$GITHUB_OUTPUT"');
-  assert.equal(cache.uses, 'actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7');
+  // The dist cache is split: only a completed build saves, so a failed or
+  // cancelled build cannot take the key with the tree it half wrote.
+  assert.equal(cache.uses, 'actions/cache/restore@668228422ae6a00e4ad889ee87cd7109ec5666a7');
   assert.equal(cache.with.path, 'packages/harness-sdk/dist');
-  assert.equal(cache.with.key, '${{ runner.os }}-harness-sdk-build-${{ steps.key.outputs.key }}');
+  // The dist is a TypeScript emit and actions/cache derives the same version on
+  // Linux and macOS, so an OS prefix would only split one build into a family
+  // per runner and leave the macOS jobs unable to hit an ubuntu save.
+  const distKey = 'harness-sdk-build-${{ steps.key.outputs.key }}';
+  assert.equal(cache.with.key, distKey);
   assert.equal(cache.with['restore-keys'], undefined, 'a partial restore would serve stale dist');
+  // A hit alone is not a build: a restore missing the package entry rebuilds.
+  assert.ok(
+    steps.indexOf(cache) < steps.indexOf(restored) &&
+      steps.indexOf(restored) < steps.indexOf(build),
+    'the check runs between the restore and the build'
+  );
+  assert.equal(restored.id, 'restored');
+  assert.equal(restored.shell, 'bash');
+  assert.equal(restored.if, undefined, 'the check runs on a miss too');
+  for (const entry of [
+    'packages/harness-sdk/dist/index.js',
+    'packages/harness-sdk/dist/index.d.ts',
+  ]) {
+    assert.ok(restored.run.includes(entry), `the check requires ${entry}`);
+  }
+  assert.match(restored.run, /^usable='false'$/m);
+  assert.match(restored.run, /echo "usable=\$usable" >> "\$GITHUB_OUTPUT"/m);
+  const rebuild = "steps.restored.outputs.usable != 'true'";
   assert.equal(build.run, harnessBuild);
-  assert.equal(build.if, "steps.cache.outputs.cache-hit != 'true'");
+  assert.equal(build.if, rebuild);
+  assert.equal(save.uses, 'actions/cache/save@668228422ae6a00e4ad889ee87cd7109ec5666a7');
+  assert.equal(save.if, rebuild, 'only a build that runs is saved');
+  assert.equal(save.with.path, 'packages/harness-sdk/dist');
+  assert.equal(save.with.key, distKey, 'the save writes the key the restore reads');
+  assert.ok(steps.indexOf(build) < steps.indexOf(save), 'the save follows the build');
   // The typia transform takes minutes to compile, so the build's plugin cache
   // comes from the shared action and only when a build will run.
   assert.equal(plugins.length, 1);
   assert.equal(plugins[0].uses, pluginCacheAction);
   assert.equal(plugins[0].with, undefined);
-  assert.equal(plugins[0].if, "steps.cache.outputs.cache-hit != 'true'");
+  assert.equal(plugins[0].if, rebuild);
   assert.equal(plugins[0].id, 'plugins');
   // macOS has no ci.yml writer for its platform-scoped key, so this action
   // writes the macOS key itself, after the build that compiled the plugins.
   // The save requires the build path: a skipped restore leaves its outputs
   // empty, and a save keyed on them would write nothing.
-  const macSave = steps.find(step => step.uses?.startsWith('actions/cache/save@'));
+  const macSave = steps.find(step => step.name === 'Save compiler plugins');
   assert.ok(macSave, 'the build action writes the macOS key');
   assert.equal(
     macSave.if,
-    "runner.os == 'macOS' && steps.cache.outputs.cache-hit != 'true' && steps.plugins.outputs.cache-hit != 'true'"
+    "runner.os == 'macOS' && steps.restored.outputs.usable != 'true' && steps.plugins.outputs.cache-hit != 'true'"
   );
   assert.equal(steps.indexOf(macSave), steps.length - 1);
 });
@@ -850,6 +920,111 @@ test('the matrix step decides from the document the affected step published', ()
     /matrix=\$\(scripts\/changed-workspaces\.sh "\$\{excludes\[@\]\}" "\$\{includes\[@\]\}"\)/,
     'the matrix still comes from the matrix script'
   );
+});
+
+// The gating job reads the repository, not node_modules: only
+// scripts/changed-dependencies.mjs imports a package (js-yaml), and the detector
+// calls it only for a resource manifest. The install therefore follows a filter
+// over exactly that set; a manifest the detector gained without the filter
+// would run the detector without js-yaml.
+test('the changes job installs the root project only for a resource manifest', () => {
+  const steps = ciJobs.changes.steps;
+  const filter = steps.find(step => step.id === 'filter_resources');
+  assert.ok(filter, 'changes: the resource-manifest filter is missing');
+  assert.deepEqual(
+    Object.keys(load(filter.with.filters)),
+    ['resources'],
+    'the filter publishes one output that the install reads'
+  );
+  assert.deepEqual(
+    load(filter.with.filters).resources,
+    [...DEPENDENCY_MANIFESTS],
+    'the filter matches the detector set exactly'
+  );
+  const install = steps.find(step => step.name === 'Install root dependencies');
+  assert.equal(
+    install.if,
+    "steps.filter_resources.outputs.resources == 'true' || steps.filter_resources_retry.outputs.resources == 'true' || steps.resources_base.outputs.manifests == 'true'",
+    'the install runs on the filter answer, first attempt or retry, or the detector-base diff'
+  );
+  assert.ok(
+    steps.indexOf(install) >
+      steps.indexOf(steps.find(step => step.id === 'filter_resources_retry')),
+    'the install reads an answer the filter already wrote'
+  );
+  // dorny/paths-filter answers from the pull request's merge-base diff and
+  // scripts/affected-workspaces.mjs diffs the base tip, so on a branch that is
+  // behind main their manifest answers can disagree and only the detector's
+  // diff saves the run. The check step must reuse the detector's base, read the
+  // manifest set from it (never hardcode it), and land before the install.
+  const affected = steps.find(step => step.id === 'affected');
+  const local = steps.find(step => step.id === 'resources_base');
+  assert.ok(local, 'changes: the detector-base manifest check is missing');
+  assert.equal(
+    local.env.BASE_SHA,
+    affected.env.BASE_SHA,
+    'the check diffs the base the detector diffs, or the answers can drift'
+  );
+  assert.match(local.run, /DEPENDENCY_MANIFESTS/);
+  assert.doesNotMatch(
+    local.run,
+    /pnpm-(lock|workspace)\.yaml/,
+    'the manifest set stays in scripts/affected-workspaces.mjs'
+  );
+  assert.match(local.run, /echo "manifests=\$manifests_changed"/);
+  assert.match(
+    local.run,
+    /if \[ -z "\$manifests" \]; then[\s\S]*echo "manifests=true"/,
+    'an unreadable detector list keeps the install instead of risking a detector without js-yaml'
+  );
+  assert.ok(
+    steps.indexOf(install) > steps.indexOf(local),
+    'the install reads an answer the check wrote'
+  );
+});
+
+// The extension's unit suite runs in extension-ci.yml for a pull request and a
+// main push, and that workflow has no merge_queue trigger: the ci.yml row is the
+// merge-queue gate, and it installs and tests nothing on the events the other
+// workflow covers. The row stays in the matrix either way, so the check still
+// reports and the required `test` passes while its steps are skipped.
+test('the extension matrix row defers to extension CI outside the merge queue', () => {
+  const gate = "matrix.workspace.name != 'kilo-extension' || github.event_name == 'merge_group'";
+  const steps = ciJobs['workspace-tests'].steps;
+  for (const name of ['Install dependencies', 'Run tests']) {
+    assert.equal(
+      steps.find(step => step.name === name).if,
+      gate,
+      `workspace-tests: ${name} must run for the extension only in the merge queue`
+    );
+  }
+  const matrix = ciJobs.changes.steps.find(step => step.id === 'workspaces');
+  assert.doesNotMatch(
+    matrix.run,
+    /--exclude apps\/extension/,
+    'the merge queue has no other extension gate, so the row stays in the matrix'
+  );
+
+  const extensionCi = load(
+    readFileSync(new URL('../.github/workflows/extension-ci.yml', import.meta.url), 'utf8')
+  );
+  assert.deepEqual(
+    Object.keys(extensionCi.on).sort(),
+    ['pull_request', 'push'],
+    'extension CI covers the events the ci.yml row now defers on'
+  );
+  const verify = extensionCi.jobs.verify.steps.find(
+    step => step.run === `pnpm --filter ${extension.name} verify`
+  );
+  assert.ok(verify, 'extension CI runs the extension verify script');
+  const commands = extension.scripts.verify.split('&&').map(command => command.trim());
+  assert.ok(
+    commands.includes('pnpm run test'),
+    'the retained job runs the same unit tests the skipped step did'
+  );
+  for (const command of ['pnpm run typecheck', 'pnpm run lint']) {
+    assert.ok(commands.includes(command), `the retained job keeps ${command}`);
+  }
 });
 
 function runTypecheck(

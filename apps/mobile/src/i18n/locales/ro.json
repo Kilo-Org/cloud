@@ -248,6 +248,7 @@
     "confirmDeletion": "Confirmă ștergerea",
     "credits": "Credite",
     "failedToLoadBalance": "Încărcarea soldului a eșuat. Atinge pentru a reîncerca.",
+    "balanceLoadFailed": "Încărcarea soldului a eșuat",
     "hideBalance": "Ascunde soldul",
     "showBalance": "Afișează soldul",
     "balanceHidden": "Sold ascuns",

@@ -248,6 +248,7 @@
     "confirmDeletion": "Haquu mirkaneessi",
     "credits": "Kiriiditii",
     "failedToLoadBalance": "Haftee fe'uu hin danda'amne. Deebi'anii yaaluuf tuqi.",
+    "balanceLoadFailed": "Haftee fe'uu hin danda'amne",
     "hideBalance": "Haftee dhoksi",
     "showBalance": "Haftee agarsiisi",
     "balanceHidden": "Hafteen dhokateera",

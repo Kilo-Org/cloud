@@ -248,6 +248,7 @@
     "confirmDeletion": "Verwijderen bevestigen",
     "credits": "Tegoed",
     "failedToLoadBalance": "Het saldo kon niet worden geladen. Tik om het opnieuw te proberen.",
+    "balanceLoadFailed": "Saldo laden mislukt",
     "hideBalance": "Saldo verbergen",
     "showBalance": "Saldo tonen",
     "balanceHidden": "Saldo verborgen",

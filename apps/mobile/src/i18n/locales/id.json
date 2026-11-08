@@ -248,6 +248,7 @@
     "confirmDeletion": "Konfirmasi penghapusan",
     "credits": "Kredit",
     "failedToLoadBalance": "Gagal memuat saldo. Ketuk untuk mencoba lagi.",
+    "balanceLoadFailed": "Gagal memuat saldo",
     "hideBalance": "Sembunyikan saldo",
     "showBalance": "Tampilkan saldo",
     "balanceHidden": "Saldo tersembunyi",

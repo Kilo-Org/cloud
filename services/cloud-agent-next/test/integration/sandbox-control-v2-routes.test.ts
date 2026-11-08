@@ -1211,6 +1211,44 @@ describe('SandboxControlV2 routes and forwarding', () => {
     await waitFor(async () => expect((await readState(stub)).kind).toBe('starting'));
   });
 
+  it('fails the preparing route once the create attempt budget is spent', async () => {
+    const provider = createFakeProvider({ failCreates: 2 });
+    const { stub, peer } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION));
+    const attemptId = (await readRouteRow(stub, SESSION))?.attempt_id;
+    const deadline = (await readRouteRow(stub, SESSION))?.attempt_deadline_at;
+    expect(deadline).toBeGreaterThan(Date.now());
+
+    // Attempt 1 fails, spends the retry pause, and the tick starts the retry.
+    await waitFor(async () => expect(provider.createCalls).toBe(1));
+    await setAllocationField(stub, { create_deadline_at: Date.now() - 1 });
+    await waitFor(async () => {
+      await runAlarm(stub);
+      expect(provider.createCalls).toBe(2);
+    });
+    // Attempt 2 fails too: the budget is spent, so the episode stops even though
+    // the attempt deadline still had time left.
+    await waitFor(async () => {
+      await runAlarm(stub);
+      expect((await readState(stub)).kind).toBe('stopped');
+      expect(provider.createCalls).toBe(2);
+    });
+
+    await waitFor(() =>
+      expect(peer.routeUpdatesFor(SESSION)).toContainEqual({
+        state: 'failed',
+        attemptId,
+        reason: 'sandbox_create_failed',
+      })
+    );
+    const route = await readRouteRow(stub, SESSION);
+    expect(route).toMatchObject({ state: 'failed', reason: 'sandbox_create_failed' });
+    expect(route?.attempt_deadline_at).toBe(0);
+    // Budget spent and route failed: the stopped allocation starts no create.
+    expect(await readAlarm(stub)).toBeNull();
+    expect(provider.createCalls).toBe(2);
+  });
+
   it('sends every attachment its own workspace configuration', async () => {
     const provider = createFakeProvider();
     const { stub } = await setup(provider);

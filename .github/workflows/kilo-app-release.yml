@@ -34,6 +34,11 @@ permissions:
 
 jobs:
   check-changes:
+    # Guard: this workflow_dispatch/schedule is reachable from a fork, and it
+    # submits a mobile build to the App Store / Google Play using repo secrets.
+    # Only the canonical repo may run it. (For push: main, github.repository is
+    # already the canonical repo, so the guard is a no-op there.)
+    if: github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 10
     permissions:
@@ -230,7 +235,7 @@ jobs:
   reuse:
     name: Reuse the same-commit suite run
     needs: [check-changes]
-    if: needs.check-changes.outputs.should_build == 'true' && needs.check-changes.outputs.allowed == 'true' && needs.check-changes.outputs.reuse == 'true'
+    if: needs.check-changes.outputs.should_build == 'true' && needs.check-changes.outputs.allowed == 'true' && needs.check-changes.outputs.reuse == 'true' && github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 60
     permissions:
@@ -295,12 +300,12 @@ jobs:
   # starts a YAML tag, so the status function is explicit.
   validate:
     needs: [check-changes, reuse]
-    if: ${{ !cancelled() && needs.check-changes.result == 'success' && needs.check-changes.outputs.should_build == 'true' && needs.check-changes.outputs.allowed == 'true' && (needs.check-changes.outputs.reuse == 'false' || needs.reuse.outputs.suite == 'fallback') }}
+    if: ${{ !cancelled() && needs.check-changes.result == 'success' && needs.check-changes.outputs.should_build == 'true' && needs.check-changes.outputs.allowed == 'true' && (needs.check-changes.outputs.reuse == 'false' || needs.reuse.outputs.suite == 'fallback') && github.repository == 'Kilo-Org/cloud' }}
     uses: ./.github/workflows/kilo-app-ci.yml
 
   preflight:
     needs: [check-changes]
-    if: needs.check-changes.outputs.should_build == 'true' && github.ref == 'refs/heads/main' && needs.check-changes.outputs.allowed == 'true'
+    if: needs.check-changes.outputs.should_build == 'true' && github.ref == 'refs/heads/main' && needs.check-changes.outputs.allowed == 'true' && github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     permissions:
@@ -372,7 +377,7 @@ jobs:
     # and the status function alone would ignore a failed gate, so both the
     # status function and the per-gate conditions are required. The expression
     # is wrapped because a bare condition that starts with `!` is a YAML tag.
-    if: ${{ !cancelled() && needs.check-changes.result == 'success' && needs.preflight.result == 'success' && needs.check-changes.outputs.should_build == 'true' && needs.check-changes.outputs.allowed == 'true' && github.ref == 'refs/heads/main' && ((needs.reuse.result == 'success' && needs.reuse.outputs.suite == 'passed' && needs.validate.result == 'skipped') || (needs.validate.result == 'success' && needs.reuse.outputs.suite != 'passed')) }}
+    if: ${{ !cancelled() && needs.check-changes.result == 'success' && needs.preflight.result == 'success' && needs.check-changes.outputs.should_build == 'true' && needs.check-changes.outputs.allowed == 'true' && github.ref == 'refs/heads/main' && ((needs.reuse.result == 'success' && needs.reuse.outputs.suite == 'passed' && needs.validate.result == 'skipped') || (needs.validate.result == 'success' && needs.reuse.outputs.suite != 'passed')) && github.repository == 'Kilo-Org/cloud' }}
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 60
     outputs:
@@ -619,7 +624,7 @@ jobs:
   # the section lands, which loses the build's changelog line for ever.
   bump-version:
     needs: [check-changes]
-    if: needs.check-changes.outputs.should_build == 'true' && github.ref == 'refs/heads/main' && needs.check-changes.outputs.allowed == 'true'
+    if: needs.check-changes.outputs.should_build == 'true' && github.ref == 'refs/heads/main' && needs.check-changes.outputs.allowed == 'true' && github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 10
     permissions:
@@ -697,7 +702,7 @@ jobs:
   # build writes it above its own section.
   changelog:
     needs: [check-changes, bump-version, build-and-submit]
-    if: needs.check-changes.outputs.should_build == 'true' && needs.check-changes.outputs.allowed == 'true' && github.ref == 'refs/heads/main'
+    if: needs.check-changes.outputs.should_build == 'true' && needs.check-changes.outputs.allowed == 'true' && github.ref == 'refs/heads/main' && github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 10
     permissions:

@@ -83,6 +83,62 @@ test('ci.yml retries the changes filter after a transient GitHub API failure', (
   validate(readChangesJob());
 });
 
+// Every filter pair in the job follows that contract, not only the shared one:
+// the retry evaluates the same paths as the attempt whose result it replaces,
+// and each output falls back to it. A pair that drifts decides a gated job from
+// paths its failed attempt never reported, and a path-gated job that reads a
+// missing output is skipped as if nothing changed.
+function validatePairs(job) {
+  const ids = job.steps.map(item => item.id).filter(id => typeof id === 'string');
+  const pairs = ids.filter(id => !id.endsWith('_retry') && ids.includes(`${id}_retry`));
+  assert.ok(pairs.length >= 2, 'changes: every filter runs as an attempt and a retry');
+  for (const id of pairs) {
+    const first = job.steps.find(item => item.id === id);
+    const retry = job.steps.find(item => item.id === `${id}_retry`);
+    assert.equal(first.uses, actionRef, `${id}: first attempt must use the pinned paths-filter`);
+    assert.equal(retry.uses, actionRef, `${id}: retry must use the same pinned paths-filter`);
+    assert.equal(first['continue-on-error'], true, `${id}: first attempt must tolerate failure`);
+    assert.equal(
+      retry['continue-on-error'],
+      undefined,
+      `${id}: a persistent filter failure must fail the job`
+    );
+    assert.equal(
+      retry.if,
+      `steps.${id}.outcome == 'failure'`,
+      `${id}: retry must run only after a failed first attempt`
+    );
+    assert.equal(
+      retry.with.filters,
+      first.with.filters,
+      `${id}: retry filters must be byte-identical to the first attempt`
+    );
+    for (const [name, value] of Object.entries(job.outputs)) {
+      if (!String(value).includes(`steps.${id}.outputs.`)) continue;
+      assert.equal(
+        value,
+        `\${{ steps.${id}.outputs.${name} || steps.${id}_retry.outputs.${name} }}`,
+        `changes: output ${name} must fall back to its retry attempt`
+      );
+    }
+  }
+}
+
+test('every filter pair retries with the same filters and publishes a fallback', () => {
+  validatePairs(readChangesJob());
+});
+
+test('changes rejects a drifted pair and an output without its fallback', () => {
+  const drifted = readChangesJob();
+  const retry = drifted.steps.find(item => item.id === 'filter_wiring_retry');
+  retry.with.filters = retry.with.filters.replace("'scripts/**'", "'script/**'");
+  assert.throws(() => validatePairs(drifted), assert.AssertionError);
+
+  const unfallen = readChangesJob();
+  unfallen.outputs.wiring = '${{ steps.filter_wiring.outputs.wiring }}';
+  assert.throws(() => validatePairs(unfallen), assert.AssertionError);
+});
+
 for (const defect of [
   'missing-retry',
   'fatal-first-attempt',

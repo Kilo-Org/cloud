@@ -390,6 +390,15 @@ Use `emptyDeepLink` for empty history.
 The fixture requires a development build and refuses non-loopback API URLs or accounts outside the reserved example domain.
 Keep optional analytics off and avoid billing surfaces; the seed creates no Stripe customer.
 
+### Mobile Profile credits
+
+Balance reads preserve the expiry note and purchase action across loading, failed, and ready states.
+The failed state shows a localized retry action with a complete spoken failure label.
+The note remains readable to screen readers without intercepting the retry touch area.
+Balance and expiry amounts stay masked until the stored privacy preference loads.
+
+An empty credit block list shows no expiring credits, not an error.
+
 ## Common Development Commands
 
 | Command | Description |

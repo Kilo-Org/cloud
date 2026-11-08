@@ -54,7 +54,8 @@ export function BalanceBlock({
   } else if (state === 'failed') {
     value = (
       <Pressable
-        className="min-h-[44px] -my-[8px] min-w-0 justify-center active:opacity-70"
+        className="min-h-[28px] min-w-0 justify-center active:opacity-70"
+        hitSlop={8}
         onPress={onRetry}
         accessibilityRole="button"
         accessibilityLabel={retryLabel}
@@ -69,6 +70,8 @@ export function BalanceBlock({
       stacked && state === 'failed' ? null : <View className="h-[48px] w-[48px]" />;
   }
   const purchaseAction = state === 'loading' ? loadingAction : action;
+  // The noninteractive caption must not intercept the retry target's hit slop.
+  const expiryNote = state === 'failed' ? <View pointerEvents="none">{note}</View> : note;
 
   if (stacked) {
     return (
@@ -87,7 +90,7 @@ export function BalanceBlock({
                 <View className="shrink-0 -my-[10px]">{visibilityControl}</View>
               )}
             </View>
-            {note}
+            {expiryNote}
           </View>
         </Animated.View>
         {purchaseAction}
@@ -104,7 +107,7 @@ export function BalanceBlock({
         {/* `flex-1` is a width share here: this View is the row's child. */}
         <View className="min-w-0 flex-1 gap-1">
           {value}
-          {note}
+          {expiryNote}
         </View>
         {visibilityControl}
       </Animated.View>

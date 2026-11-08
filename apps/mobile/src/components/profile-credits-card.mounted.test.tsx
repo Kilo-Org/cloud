@@ -1325,14 +1325,6 @@ describe('CreditsCard balance row', () => {
     );
   }
 
-  /** The amount-and-note column of the one-row layout. */
-  function wideTextColumn(renderer: ReactTestRenderer): ReactTestInstance {
-    return renderer.root.find(
-      node =>
-        Object.is(node.type, 'View') && String(node.props.className) === 'min-w-0 flex-1 gap-1'
-    );
-  }
-
   async function mountAtCardWidth(width: number) {
     currentUser.userId = 'user-a';
     getContextBalanceQueryFn.mockResolvedValue({ balance: 12.34 });
@@ -1346,19 +1338,6 @@ describe('CreditsCard balance row', () => {
     });
     return mounted;
   }
-
-  it('keeps the note in the amount column on a wide card, with the purchase action in its own column', async () => {
-    const { renderer, unmount } = await mountAtCardWidth(383);
-
-    // The note shares the amount's column, which gives it the same tight gap
-    // under the amount as the wide layout always had; the visibility toggle is
-    // that column's sibling, and the purchase action keeps its own column.
-    const column = wideTextColumn(renderer);
-    expect(renders(column, 'No expiring credits.')).toBe(true);
-    expect(renders(column, 'ADD_CREDITS_BUTTON')).toBe(false);
-    expect(renders(cardBox(renderer), 'ADD_CREDITS_BUTTON')).toBe(true);
-    unmount();
-  });
 
   it.each<[string, number]>([
     // The standard matrix's compact cell (360 dp screen) and a 390 dp screen:

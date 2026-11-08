@@ -342,12 +342,18 @@ describe('the session entity catalog', () => {
     expect(lockSource).toContain('export const BACKGROUND_LOCK_MS');
   });
 
-  it('declares the value a stored session has to carry', () => {
-    // The system archives an entity through the properties it declares, so the
-    // title a shortcut shows is declared as one. The identifier is the entity's
-    // identity and needs no wrapper.
-    expect(entity).toContain('@Property var title: String');
+  it('keeps the entity inside the deployment target the app builds for', () => {
+    // The app target builds for a floor below iOS 18, so the entity cannot
+    // declare a `@Property`: its synthesized `init()` needs a newer runtime and
+    // the whole target fails to compile.
+    expect(entity).not.toContain('@Property');
     expect(entity).toContain('let id: String');
+    expect(entity).toContain('let title: String');
+    // A stored session is rebuilt by its identifier, so the query has to answer
+    // for identifiers as well as for titles.
+    expect(entity).toContain('func entities(for identifiers: [String])');
+    expect(entity).toContain('func suggestedEntities()');
+    expect(entity).toContain('func entities(matching string: String)');
   });
 
   it('guards the on-screen cue behind the iOS 18.2 runtime', () => {

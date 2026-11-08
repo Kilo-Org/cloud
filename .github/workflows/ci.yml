@@ -84,6 +84,38 @@ jobs:
               - 'pnpm-lock.yaml'
               - 'pnpm-workspace.yaml'
 
+      # dorny/paths-filter answers from the pull request's own diff (its
+      # merge-base), while scripts/affected-workspaces.mjs diffs the base tip.
+      # On a branch that is behind main the two disagree about a manifest main
+      # changed after the branch point: only the detector's diff names it, and
+      # its run then calls scripts/changed-dependencies.mjs, which imports
+      # js-yaml. This check diffs the detector's own base for that run. The
+      # manifest list comes from the detector, so the set stays in one place.
+      - name: Detect resource-manifest changes against the detector base
+        id: resources_base
+        env:
+          BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event_name == 'push' && github.event.before || '' }}
+        run: |
+          manifests=$(node -e 'import("./scripts/affected-workspaces.mjs").then(module => console.log([...module.DEPENDENCY_MANIFESTS].join("\n")))' 2>/dev/null || true)
+          if [ -z "$manifests" ]; then
+            # An unreadable detector list cannot prove the diff is clean, so
+            # keep the install rather than risk a run without js-yaml.
+            echo "manifests=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          manifests_changed=false
+          # A base that is not a commit in the checkout selects every
+          # workspace, and that selection parses no manifest.
+          if [ -n "$BASE_SHA" ] && git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
+            while IFS= read -r file; do
+              if grep -qxF "$file" <<< "$manifests"; then
+                manifests_changed=true
+                break
+              fi
+            done < <(git diff --name-only "$BASE_SHA" HEAD)
+          fi
+          echo "manifests=$manifests_changed" >> "$GITHUB_OUTPUT"
+
       # scripts/changed-dependencies.mjs parses a resource manifest with
       # js-yaml when the diff touches one, so the root install runs only on
       # that run: every detection step would otherwise read the repository,
@@ -96,10 +128,10 @@ jobs:
         with:
           node-version-file: '.nvmrc'
 
-      # The detector runs without the install unless the diff touches a
-      # resource manifest, so a wrong skip fails its step and the run.
+      # The detector runs without the install unless a diff touches a resource
+      # manifest, so a wrong skip fails its step and the run.
       - name: Install root dependencies
-        if: steps.filter_resources.outputs.resources == 'true' || steps.filter_resources_retry.outputs.resources == 'true'
+        if: steps.filter_resources.outputs.resources == 'true' || steps.filter_resources_retry.outputs.resources == 'true' || steps.resources_base.outputs.manifests == 'true'
         run: pnpm --filter kilocode-monorepo install --frozen-lockfile --ignore-scripts
 
       - name: Detect changes

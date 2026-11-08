@@ -911,13 +911,42 @@ test('the changes job installs the root project only for a resource manifest', (
   const install = steps.find(step => step.name === 'Install root dependencies');
   assert.equal(
     install.if,
-    "steps.filter_resources.outputs.resources == 'true' || steps.filter_resources_retry.outputs.resources == 'true'",
-    'the install runs on the filter answer, first attempt or retry'
+    "steps.filter_resources.outputs.resources == 'true' || steps.filter_resources_retry.outputs.resources == 'true' || steps.resources_base.outputs.manifests == 'true'",
+    'the install runs on the filter answer, first attempt or retry, or the detector-base diff'
   );
   assert.ok(
     steps.indexOf(install) >
       steps.indexOf(steps.find(step => step.id === 'filter_resources_retry')),
     'the install reads an answer the filter already wrote'
+  );
+  // dorny/paths-filter answers from the pull request's merge-base diff and
+  // scripts/affected-workspaces.mjs diffs the base tip, so on a branch that is
+  // behind main their manifest answers can disagree and only the detector's
+  // diff saves the run. The check step must reuse the detector's base, read the
+  // manifest set from it (never hardcode it), and land before the install.
+  const affected = steps.find(step => step.id === 'affected');
+  const local = steps.find(step => step.id === 'resources_base');
+  assert.ok(local, 'changes: the detector-base manifest check is missing');
+  assert.equal(
+    local.env.BASE_SHA,
+    affected.env.BASE_SHA,
+    'the check diffs the base the detector diffs, or the answers can drift'
+  );
+  assert.match(local.run, /DEPENDENCY_MANIFESTS/);
+  assert.doesNotMatch(
+    local.run,
+    /pnpm-(lock|workspace)\.yaml/,
+    'the manifest set stays in scripts/affected-workspaces.mjs'
+  );
+  assert.match(local.run, /echo "manifests=\$manifests_changed"/);
+  assert.match(
+    local.run,
+    /if \[ -z "\$manifests" \]; then[\s\S]*echo "manifests=true"/,
+    'an unreadable detector list keeps the install instead of risking a detector without js-yaml'
+  );
+  assert.ok(
+    steps.indexOf(install) > steps.indexOf(local),
+    'the install reads an answer the check wrote'
   );
 });
 

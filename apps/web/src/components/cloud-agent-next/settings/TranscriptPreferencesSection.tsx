@@ -1,7 +1,6 @@
 'use client';
 
 import { useId } from 'react';
-import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { useCollapseToolsPreference } from '../collapse-tools-preference';
@@ -15,14 +14,11 @@ export function TranscriptPreferencesSection() {
   return (
     <section aria-labelledby={headingId} className="flex flex-col gap-3">
       <div className="flex flex-col gap-1">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <h3 id={headingId} className="text-sm font-medium">
-            Transcript display
-          </h3>
-          <Badge variant="secondary">Personal</Badge>
-        </div>
+        <h4 id={headingId} className="text-sm font-medium">
+          Transcript display
+        </h4>
         <p className="text-muted-foreground text-xs">
-          Saved in this browser and applied across your personal and organization Cloud Agent chats.
+          Display preferences are saved in this browser.
         </p>
       </div>
       <div className="flex items-start justify-between gap-4 rounded-lg border px-3 py-2.5">

@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Bot, Check, Lock } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import { VariantCombobox } from '@/components/shared/VariantCombobox';
@@ -83,21 +82,19 @@ export function BuiltinAgentsSection({ organizationId, settings }: BuiltinAgents
       <div className="flex flex-col gap-1">
         <div className="flex items-center gap-1.5">
           <Bot className="size-4" aria-hidden />
-          <h3 id="builtin-agents-heading" className="text-sm font-medium">
-            Your agent preferences
-          </h3>
-          <Badge variant="secondary">Personal</Badge>
+          <h4 id="builtin-agents-heading" className="text-sm font-medium">
+            Agent preferences
+          </h4>
         </div>
         <p className="text-muted-foreground text-xs">
-          Only affects sessions you start, including organization sessions. These preferences do not
-          change settings for other members.
+          Used for sessions you start, including organization sessions.
         </p>
       </div>
       <div className="flex flex-col gap-3">
         <div className="flex flex-col gap-1">
-          <h4 id="agent-modes-heading" className="text-sm font-medium">
+          <h5 id="agent-modes-heading" className="text-sm font-medium">
             Agent modes
-          </h4>
+          </h5>
           <p className="text-muted-foreground text-xs">
             Enable or disable modes in your agent picker. Choose the model in each session.
           </p>
@@ -159,7 +156,7 @@ export function BuiltinAgentsSection({ organizationId, settings }: BuiltinAgents
       </div>
       <div className="flex flex-col gap-3">
         <div className="flex flex-col gap-1">
-          <h4 className="text-sm font-medium">Background models</h4>
+          <h5 className="text-sm font-medium">Background models</h5>
           <p className="text-muted-foreground text-xs">
             Choose models for Explore and Compaction, or use the session model. Overrides apply only
             when the model is available to the session.

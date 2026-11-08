@@ -1,13 +1,3 @@
-// The App Intents compile in the app target, not in the static pod: the pod
-// has no bundle for the system to load intents metadata from, so
-// `plugins/withKiloAppIntents` copies every Swift file in `ios/AppIntents` into
-// the generated application target and the podspec excludes that directory.
-//
-// The native module is not built on this host, so this suite reads the same
-// file set the app target compiles — derived from the directory, never a hand
-// list — and checks the contracts between the sources, the JS grammar and the
-// copy the plugin renders.
-
 // eslint-disable-next-line import/no-nodejs-modules -- vitest-only contract check, runs in node, never bundled into the app
 import { mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 // eslint-disable-next-line import/no-nodejs-modules -- vitest-only contract check, runs in node, never bundled into the app
@@ -38,36 +28,32 @@ import {
 } from '../../src/lib/app-actions/app-action-contract';
 import { SUPPORTED_LANGUAGES } from '../../src/i18n/languages';
 
-const PROJECT_ROOT = fileURLToPath(new URL('../../', import.meta.url));
-const POD_DIRECTORY = new URL('ios/', import.meta.url);
-const INTENTS_DIRECTORY = new URL('ios/AppIntents/', import.meta.url);
+// The native module is not built on this host, so this suite reads the sources
+// it ships. Each check is a contract between two files that must not drift: the
+// Swift intents and the JS grammar (s1), the Swift copy and the plugin's
+// translations, and the module handshake and the JS dispatcher registration.
 
-/** The directory the plugin compiles, relative to the project root. */
-const APP_TARGET_PATH = join('modules', 'kilo-app-actions', 'ios', 'AppIntents');
+const iosModuleDirectory = new URL('ios/', import.meta.url);
 
-/** The app-target set, read by the plugin's own directory listing. */
-const COPIED_FILES: string[] = sourceFiles(PROJECT_ROOT);
-
-/** One file the app target compiles, with the name failure messages cite. */
-type CopiedSource = { name: string; source: string };
-
-const COPIED: CopiedSource[] = COPIED_FILES.map(name => ({
-  name,
-  source: readFileSync(new URL(name, INTENTS_DIRECTORY), 'utf8'),
-}));
-
-function copiedSource(name: string): string {
-  const found = COPIED.find(entry => entry.name === name);
-  if (found === undefined) {
-    throw new Error(`${name} is not in the app-target set: ${COPIED_FILES.join(', ')}`);
-  }
-  return found.source;
+function readSource(name: string): string {
+  return readFileSync(fileURLToPath(new URL(name, iosModuleDirectory)), 'utf8');
 }
 
-const intents = copiedSource('KiloAppIntents.swift');
-const configSource = readFileSync(new URL('../../app.config.ts', import.meta.url), 'utf8');
-const localizationPluginSource = readFileSync(
-  new URL('../../plugins/withAppIntentLocalizations.js', import.meta.url),
+const intents = readSource('AppIntents/KiloAppIntents.swift');
+const jsBridgeSource = readFileSync(
+  fileURLToPath(new URL('../../src/lib/app-actions/native-bridge.ts', import.meta.url)),
+  'utf8'
+);
+const collectorSource = readFileSync(
+  fileURLToPath(new URL('../../src/lib/system-search-collect.ts', import.meta.url)),
+  'utf8'
+);
+const configSource = readFileSync(
+  fileURLToPath(new URL('../../app.config.ts', import.meta.url)),
+  'utf8'
+);
+const pluginSource = readFileSync(
+  fileURLToPath(new URL('../../plugins/withAppIntentLocalizations.js', import.meta.url)),
   'utf8'
 );
 
@@ -87,11 +73,7 @@ const URL_ACTIONS = ['OpenNeedsInput', 'OpenSession', 'OpenPullRequest'] as cons
 
 /** The lines that hand a label to the App Intents metadata extractor. */
 const LABEL_LINE =
-  /static var title: LocalizedStringResource|@Parameter\(title:|shortTitle:|String\(localized:|typeDisplayRepresentation:/;
-
-/** A `LocalizedStringResource` the metadata processor accepts: a literal or an explicit literal init. */
-const LITERAL_RESOURCE =
-  /LocalizedStringResource = "[^"]*"|LocalizedStringResource\(stringLiteral:/;
+  /static var title: LocalizedStringResource|@Parameter\(title:|shortTitle:|String\(localized:/;
 
 /** The body of the braced block `declaration` opens in `source`, braces balanced. */
 function swiftBlock(source: string, declaration: string): string {
@@ -173,117 +155,48 @@ function projectAfterAddBuildPhase() {
   };
 }
 
-/** A generated `AppDelegate` in the shape the App Intents plugin edits. */
-const APP_DELEGATE = `import ExpoModulesCore
-import KiloAppActions
-
-@main
-class AppDelegate: ExpoAppDelegate {
-  override func application(
-    _ application: UIApplication,
-    didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
-  ) -> Bool {
-    let delegate = ReactNativeDelegate()
-    let factory = ExpoReactNativeFactory(delegate: delegate)
-    return super.application(application, didFinishLaunchingWithOptions: launchOptions)
-  }
-}
-`;
-
-/** A generated `AppDelegate` still carrying the declaration this plugin retired. */
-const APP_DELEGATE_WITH_RETIRED_PACKAGE = `import AppIntents
-import ExpoModulesCore
-
-@available(iOS 17.0, *)
-struct KiloAppIntentsPackage: AppIntentsPackage {
-  static var includedPackages: [any AppIntentsPackage.Type] {
-    []
-  }
-}
-
-@main
-class AppDelegate: ExpoAppDelegate {
-  override func application(
-    _ application: UIApplication,
-    didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
-  ) -> Bool {
-    let delegate = ReactNativeDelegate()
-    return super.application(application, didFinishLaunchingWithOptions: launchOptions)
-  }
-}
-`;
-
-describe('the sources the app target compiles', () => {
-  it('takes the set from the directory, not from a hand-kept list', () => {
-    // The pod excludes `ios/AppIntents`, so a Swift file the plugin does not
-    // copy is compiled by neither target and nothing fails. Every `.swift` file
-    // in the directory must be in the set, and nothing else may be.
-    const projectRoot = mkdtempSync(join(tmpdir(), 'kilo-app-intents-'));
-    const directory = join(projectRoot, APP_TARGET_PATH);
-    mkdirSync(directory, { recursive: true });
-    for (const name of ['KiloSecond.swift', 'KiloFirst.swift', 'notes.md']) {
-      writeFileSync(join(directory, name), '');
-    }
-
-    expect(sourceFiles(projectRoot)).toEqual(['KiloFirst.swift', 'KiloSecond.swift']);
-  });
-
-  it('holds every Swift file in the intents directory', () => {
-    const onDisk = readdirSync(INTENTS_DIRECTORY)
-      .filter(name => name.endsWith('.swift'))
-      .sort();
-
-    expect(COPIED_FILES).toEqual(onDisk);
-  });
-
-  it('keeps the intents out of the pod, which has no bundle for them', () => {
-    // A second copy of these sources in the static pod is a duplicate-symbol
-    // build failure at best and an unloadable intent at worst.
-    const podspec = readFileSync(new URL('KiloAppActions.podspec', POD_DIRECTORY), 'utf8');
-    expect(podspec).toContain("s.exclude_files = '**/AppIntents/**/*'");
-
-    for (const name of readdirSync(POD_DIRECTORY).filter(entry => entry.endsWith('.swift'))) {
-      const source = readFileSync(new URL(name, POD_DIRECTORY), 'utf8');
-      expect(
-        source,
-        `${name} declares an App Intents type and must live in ios/AppIntents`
-      ).not.toMatch(
-        /: AppIntent \{|: AppEntity \{|: AppShortcutsProvider \{|: (EntityQuery|EntityStringQuery)\b/
-      );
-    }
-  });
-});
-
 describe('the four App Intents', () => {
   it.each(APP_ACTION_IDS)('declares the %s intent', action => {
     expect(intents).toContain(`struct ${INTENT_TYPES[action]}: AppIntent {`);
   });
 
-  it('opens the app for every action', () => {
-    const declared = [...intents.matchAll(/struct (\w+): AppIntent \{/g)].map(match => match[1]);
-    expect(declared).toEqual(expect.arrayContaining(Object.values(INTENT_TYPES)));
-    for (const name of declared) {
-      expect(openAppWhenRun(swiftStruct(name ?? '')), `${name} must open the app`).toBe('true');
+  it('spells every label the plugin translates as a literal', () => {
+    // App Intents metadata is extracted from these sources at build time, and
+    // `appintentsmetadataprocessor` halts the target for anything but a literal
+    // — the ios job failed with "'LocalizedStringResource' must be initialized
+    // with a call to its initializer or a string literal" — so the copy cannot
+    // live behind a shared table. Every literal here is a key the plugin's
+    // `Localizable.strings` carries.
+    const labels = intents.split('\n').filter(line => LABEL_LINE.test(line));
+    // Four titles, four shortcut titles, the failure copy, and five parameters:
+    // one per action plus the session `StartAgent` takes as well — and, beside
+    // that, the named-session action's own title and its entity parameter.
+    expect(labels).toHaveLength(APP_ACTION_IDS.length * 3 + 4);
+    const copy = new Set(Object.values(ENGLISH_COPY));
+    for (const line of labels) {
+      const literal = /"([^"]+)"/.exec(line)?.[1];
+      expect(literal, `${line.trim()} is not a literal label`).toBeDefined();
+      expect(copy.has(literal ?? ''), `${literal} is not copy the plugin renders`).toBe(true);
     }
   });
 
-  it('gates the title-based action to the runtime that has entity queries', () => {
-    // Saved identifier-based shortcuts keep running on the older supported
-    // runtimes, so the additive action carries the availability gate instead
-    // of the whole file.
-    expect(intents).toContain(
-      '@available(iOS 17.0, *)\nstruct OpenNamedSessionIntent: AppIntent {'
-    );
-    expect(openAppWhenRun(swiftStruct('OpenNamedSessionIntent'))).toBe('true');
-    expect(swiftStruct('OpenNamedSessionIntent')).toContain('var session: KiloSessionEntity');
+  it('declares no OS surface beyond the provider', () => {
+    expect(intents).not.toContain('SiriTipView');
+    expect(intents).not.toMatch(/donat/i);
+    expect(intents).not.toContain('INIntent');
   });
 
-  it('keeps the title-based action out of the phrase provider', () => {
-    // The four existing phrases stay exactly as they are: the action is listed
-    // from the metadata Xcode extracts, so a phrase buys nothing and a change
-    // to the provider would rewrite what people already say.
+  it('opens the app for every action', () => {
+    for (const action of APP_ACTION_IDS) {
+      expect(openAppWhenRun(swiftStruct(INTENT_TYPES[action])), `${action} must open the app`).toBe(
+        'true'
+      );
+    }
+  });
+
+  it('lists every action in the AppShortcutsProvider', () => {
+    expect(intents).toContain('struct KiloAppShortcuts: AppShortcutsProvider {');
     const provider = swiftStruct('KiloAppShortcuts');
-    expect(provider).not.toContain('OpenNamedSessionIntent');
     expect(provider.match(/AppShortcut\(/g)).toHaveLength(APP_ACTION_IDS.length);
     for (const action of APP_ACTION_IDS) {
       expect(provider).toContain(`intent: ${INTENT_TYPES[action]}()`);
@@ -292,14 +205,6 @@ describe('the four App Intents', () => {
     // the app name. Nothing else is declared: no tips, no donations.
     expect(provider.match(/phrases: \[/g)).toHaveLength(APP_ACTION_IDS.length);
     expect(provider.match(/\\\(\.applicationName\)/g)).toHaveLength(APP_ACTION_IDS.length);
-  });
-
-  it('declares no OS surface beyond the provider', () => {
-    for (const { name, source } of COPIED) {
-      expect(source, `${name} tips the system`).not.toContain('SiriTipView');
-      expect(source, `${name} donates to the system`).not.toMatch(/donat/i);
-      expect(source, `${name} declares a legacy intent`).not.toContain('INIntent');
-    }
   });
 });
 
@@ -343,45 +248,89 @@ describe('the Swift action URLs', () => {
       expect(intents, `${field} is not sent`).toContain(`"${field}"`);
     }
   });
+});
 
-  it('passes the picked entity through the same open-session target', () => {
-    // The typed action adds a discovery surface, not a second dispatcher: the
-    // entity resolves to an id and the id goes to the same URL.
-    const body = swiftStruct('OpenNamedSessionIntent');
-    expect(body).toContain('KiloAppActionTarget.openSession');
-    expect(body).toContain('"sessionId": session.id');
+describe('the session entity catalog', () => {
+  const entity = readSource('AppIntents/KiloSessionEntity.swift');
+  const catalog = readSource('KiloSessionCatalog.swift');
+  const visible = readSource('AppIntents/KiloVisibleSession.swift');
+  const module = readSource('KiloAppActionsModule.swift');
+
+  it('resolves a session by id, by list, and by title', () => {
+    expect(entity).toContain('struct KiloSessionEntity: AppEntity {');
+    expect(entity).toContain('struct KiloSessionEntityQuery: EntityQuery, EntityStringQuery {');
+    // `EntityQuery` draws the picker and resolves a saved value; the string
+    // query is what lets Siri match a spoken title. Both are required, and a
+    // plain `EntityQuery` is not enough.
+    expect(entity).toContain('func entities(for identifiers: [String]) async throws');
+    expect(entity).toContain('func suggestedEntities() async throws');
+    expect(entity).toContain('func entities(matching string: String) async throws');
+  });
+
+  it('never answers an ambiguous name with one arbitrary session', () => {
+    // The query returns every match, so the system asks. An exact title narrows
+    // to that title's rows rather than picking the first of a containment set.
+    expect(entity).toContain('let exact = entries.filter');
+    expect(entity).toContain(': exact');
+  });
+
+  it('stores only the two fields the picker needs', () => {
+    const entry = swiftBlock(catalog, 'struct KiloSessionCatalogEntry:');
+    expect(entry.match(/\blet \w+: String/g)).toHaveLength(2);
+    expect(entry).toContain('let id: String');
+    expect(entry).toContain('let title: String');
+  });
+
+  it('keeps the catalog to the same bound the collector applies', () => {
+    expect(catalog).toContain('static let maxEntries = 50');
+    expect(collectorSource).toContain('const SESSION_CATALOG_MAX_ENTRIES = 50;');
+    expect(collectorSource).toContain('.slice(0, SESSION_CATALOG_MAX_ENTRIES)');
+  });
+
+  it('names the functions and the entries key the JS bridge uses', () => {
+    // One name per call, spelled the same on both sides: the JS wrapper is the
+    // only caller, and a rename on either side has to fail here rather than at
+    // run time on a device.
+    for (const name of ['replaceSessionCatalog', 'clearSessionCatalog', 'setVisibleSession']) {
+      expect(module, `${name} is not exported`).toContain(`func ${name}(`);
+      expect(jsBridgeSource, `${name} is not called`).toContain(`${name}?:`);
+    }
+    expect(catalog).toContain('"kilo-app-actions-session-catalog"');
+  });
+
+  it('guards the on-screen cue behind the iOS 18.2 runtime', () => {
+    // `NSUserActivity.appEntityIdentifier` starts at iOS 18.2. The app's floor
+    // is 16.4, so the publisher must return without touching the property and
+    // every older action keeps running.
+    expect(visible).toContain('guard #available(iOS 18.2, *) else {');
+    expect(visible).toContain('activity.appEntityIdentifier = EntityIdentifier(');
+  });
+
+  it('declares the new intent without a new slug or a new provider entry', () => {
+    const intent = swiftStruct('OpenNamedSessionIntent');
+    expect(intent).toContain('@Parameter(title: "Session")');
+    expect(intent).toContain('var session: KiloSessionEntity');
+    expect(intent).toContain('KiloAppActionTarget.openSession');
+    expect(intent).not.toContain('kiloapp:///');
   });
 });
 
 describe('the App Intent copy', () => {
-  it('spells every label the plugin translates as a literal', () => {
-    // App Intents metadata is extracted from these sources at build time, and
-    // `appintentsmetadataprocessor` halts the target for anything but a literal
-    // — the ios job failed with "'LocalizedStringResource' must be initialized
-    // with a call to its initializer or a string literal" — so the copy cannot
-    // live behind a shared table. Every literal here is a key the plugin's
-    // `Localizable.strings` carries, and every key is spelled by a source.
-    const labels = COPIED.flatMap(({ source }) =>
-      source.split('\n').filter(line => LABEL_LINE.test(line))
-    );
-    for (const line of labels) {
-      expect(line, `${line.trim()} is not a literal label`).toMatch(/"([^"]+)"/);
-    }
-    const literals = labels.map(line => /"([^"]+)"/.exec(line)?.[1]);
-
-    expect(new Set(literals)).toEqual(new Set(Object.values(ENGLISH_COPY)));
+  it('holds exactly the keys the plugin renders', () => {
+    expect(Object.keys(ENGLISH_COPY).toSorted()).toEqual([...INTENT_COPY_KEYS].toSorted());
   });
 
-  it('initializes every localized resource from a literal', () => {
-    for (const { name, source } of COPIED) {
-      const resources = source
-        .split('\n')
-        .filter(line => line.includes('LocalizedStringResource'))
-        .filter(line => !/^\s*(\/\/|\*|\/\*)/.test(line));
-      for (const line of resources) {
-        expect(line, `${name}: ${line.trim()}`).toMatch(LITERAL_RESOURCE);
-      }
-    }
+  it('renders one escaped line per key for en', () => {
+    const lines = renderLocalizableStrings(APP_INTENT_COPY, 'en').split('\n');
+    expect(lines.at(-1)).toBe('');
+    const entries = lines.slice(0, -1);
+    expect(entries).toHaveLength(INTENT_COPY_KEYS.length);
+    expect(entries.toSorted()).toEqual(
+      Object.values(ENGLISH_COPY)
+        .map(value => `"${value}" = "${value}";`)
+        .toSorted()
+    );
+    expect(entries[0]).toBe('"Start agent" = "Start agent";');
   });
 
   it('escapes a quote and a backslash in the key and the value', () => {
@@ -406,7 +355,31 @@ describe('the App Intent copy', () => {
   });
 });
 
-describe('App Intent catalog validation', () => {
+describe('app.config.ts', () => {
+  it('registers the app-target localizations with every supported language', () => {
+    expect(configSource).toContain("from './plugins/app-intent-copy.json'");
+    expect(configSource).toContain("'./plugins/withAppIntentLocalizations'");
+    expect(configSource).toContain('languages: [...SUPPORTED_LANGUAGES]');
+  });
+
+  it('hands the Focus-filter catalog to that single app-target writer', () => {
+    // The app target has exactly one `<tag>.lproj/Localizable.strings`. The
+    // Focus-filter copy travels to the App Intent plugin with
+    // `additionalStrings`; declaring it for Expo's `withLocales` too (the
+    // `ios['Localizable.strings']` key) registers a second copy of the same
+    // bundle file and the ios job fails with "Multiple commands produce".
+    // The fork is the capability: `.lproj/Localizable.strings` is an Xcode
+    // bundle resource and the App Intent metadata that reads it is iOS-only.
+    // Android's action surface (exported entry points plus
+    // `res/xml/shortcuts.xml`) is held by `android-app-actions.test.ts`, so no
+    // part of the user-visible behaviour is missing there.
+    expect(configSource).toContain('additionalStrings: focusFilterCatalog');
+    expect(configSource, 'a second Localizable.strings producer').not.toContain(
+      "'Localizable.strings'"
+    );
+    expect(configSource).not.toContain('withFocusFilterLocalizations');
+  });
+
   it('declares no language the app does not support', () => {
     for (const tag of Object.keys(APP_INTENT_COPY)) {
       expect(SUPPORTED_LANGUAGES, `${tag} is not a supported language`).toContain(tag);
@@ -422,67 +395,6 @@ describe('App Intent catalog validation', () => {
     expect(() => {
       assertIntentCopy({ en: ENGLISH_COPY }, 'de');
     }).toThrow(/de/);
-  });
-});
-
-describe('the app-target publisher install', () => {
-  it('starts the visible-session publisher before React', () => {
-    const lines = installPublisher(APP_DELEGATE).split('\n');
-    const install = lines.findIndex(line => line.includes('KiloVisibleSessionBridge.install'));
-    const react = lines.findIndex(line => line.includes('let delegate = ReactNativeDelegate()'));
-
-    expect(install).toBeGreaterThanOrEqual(0);
-    expect(install).toBeLessThan(react);
-    // The app delegate belongs to the app target, so it imports the pod's
-    // module internally: the intent sources reach the publisher that way.
-    expect(lines[install]).toContain('KiloVisibleSession.publish)');
-    expect(installPublisher(APP_DELEGATE)).toContain('internal import KiloAppActions');
-  });
-
-  it('is idempotent', () => {
-    const installed = installPublisher(APP_DELEGATE);
-    expect(installPublisher(installed)).toBe(installed);
-  });
-
-  it('drops the retired package declaration and its import together', () => {
-    const installed = installPublisher(APP_DELEGATE_WITH_RETIRED_PACKAGE);
-
-    expect(installed).not.toContain('KiloAppIntentsPackage');
-    expect(installed).not.toMatch(/^import AppIntents$/m);
-    expect(installed).toContain('internal import KiloAppActions');
-    expect(installed).toContain('import ExpoModulesCore');
-  });
-
-  it('fails a prebuild whose AppDelegate has no ReactNativeDelegate initialization', () => {
-    expect(() => installPublisher('class AppDelegate {}\n')).toThrow(/ReactNativeDelegate/);
-  });
-});
-
-describe('app.config.ts', () => {
-  it('registers the plugin that compiles the intents in the app target', () => {
-    expect(configSource).toContain("'./plugins/withKiloAppIntents'");
-  });
-
-  it('registers the app-target localizations with every supported language', () => {
-    expect(configSource).toContain("from './plugins/app-intent-copy.json'");
-    expect(configSource).toContain("'./plugins/withAppIntentLocalizations'");
-    expect(configSource).toContain('languages: [...SUPPORTED_LANGUAGES]');
-    expect(configSource).toContain('copy: APP_INTENT_COPY');
-  });
-
-  it('hands the Focus-filter catalog to that single app-target writer', () => {
-    // The app target has exactly one `<tag>.lproj/Localizable.strings`. The
-    // Focus-filter copy travels to the App Intent plugin with
-    // `additionalStrings`; declaring it for Expo's `withLocales` too (the
-    // `ios['Localizable.strings']` key) registers a second copy of the same
-    // bundle file and the ios job fails with "Multiple commands produce".
-    // The fork is the capability: `.lproj/Localizable.strings` is an Xcode
-    // bundle resource and the App Intent metadata that reads it is iOS-only.
-    expect(configSource).toContain('additionalStrings: focusFilterCatalog');
-    expect(configSource, 'a second Localizable.strings producer').not.toContain(
-      "'Localizable.strings'"
-    );
-    expect(configSource).not.toContain('withFocusFilterLocalizations');
   });
 });
 
@@ -508,9 +420,7 @@ describe('the app-target Resources phase', () => {
   });
 
   it('runs that merge in the prebuild mod, after the phase is attached', () => {
-    expect(localizationPluginSource).toContain(
-      'mergeIntoResourcesPhase(project, targetUuid, phase);'
-    );
+    expect(pluginSource).toContain('mergeIntoResourcesPhase(project, targetUuid, phase);');
   });
 
   it('fails the prebuild when the app target has no Resources phase', () => {
@@ -519,5 +429,140 @@ describe('the app-target Resources phase', () => {
     expect(() => {
       mergeIntoResourcesPhase(project, 'app-target', created);
     }).toThrow(/no Resources phase to extend/);
+  });
+});
+
+// The intents compile in the app target and the pod excludes their directory:
+// a Swift file the plugin does not copy is compiled by neither target and
+// nothing fails. The set is the directory's own, so these checks pin the
+// derivation, both mods that consume it, and the AppDelegate edit.
+
+const INTENTS_PLUGIN = readFileSync(
+  fileURLToPath(new URL('../../plugins/withKiloAppIntents.js', import.meta.url)),
+  'utf8'
+);
+
+/** The directory the app target compiles, relative to the project root. */
+const APP_TARGET_PATH = join('modules', 'kilo-app-actions', 'ios', 'AppIntents');
+
+/** A generated `AppDelegate` in the shape the App Intents plugin edits. */
+const APP_DELEGATE = `import ExpoModulesCore
+import KiloAppActions
+
+@main
+class AppDelegate: ExpoAppDelegate {
+  override func application(
+    _ application: UIApplication,
+    didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
+  ) -> Bool {
+    let delegate = ReactNativeDelegate()
+    return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+  }
+}
+`;
+
+/** A generated `AppDelegate` still carrying the declaration this plugin retired. */
+const APP_DELEGATE_WITH_RETIRED_PACKAGE = `import AppIntents
+import ExpoModulesCore
+
+@available(iOS 17.0, *)
+struct KiloAppIntentsPackage: AppIntentsPackage {
+  static var includedPackages: [any AppIntentsPackage.Type] {
+    []
+  }
+}
+
+@main
+class AppDelegate: ExpoAppDelegate {
+  override func application(
+    _ application: UIApplication,
+    didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
+  ) -> Bool {
+    let delegate = ReactNativeDelegate()
+    return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+  }
+}
+`;
+
+describe('the app-target source set', () => {
+  it('reads every Swift file in the directory, and nothing else', () => {
+    const projectRoot = mkdtempSync(join(tmpdir(), 'kilo-app-intents-'));
+    const directory = join(projectRoot, APP_TARGET_PATH);
+    mkdirSync(directory, { recursive: true });
+    for (const name of ['KiloSecond.swift', 'KiloFirst.swift', 'notes.md']) {
+      writeFileSync(join(directory, name), '');
+    }
+
+    expect(sourceFiles(projectRoot)).toEqual(['KiloFirst.swift', 'KiloSecond.swift']);
+  });
+
+  it('holds every Swift file in the intents directory', () => {
+    const onDisk = readdirSync(new URL('ios/AppIntents/', import.meta.url))
+      .filter(name => name.endsWith('.swift'))
+      .sort();
+
+    expect(sourceFiles(fileURLToPath(new URL('../../', import.meta.url)))).toEqual(onDisk);
+  });
+
+  it('compiles that set in both prebuild mods', () => {
+    // A hand-kept list here would skip a new file silently; the copy mod and
+    // the Sources phase mod must both read the directory.
+    expect(INTENTS_PLUGIN).not.toContain('SOURCE_FILES');
+    expect(INTENTS_PLUGIN.match(/sourceFiles\(cfg\.modRequest\.projectRoot\)/g)).toHaveLength(2);
+  });
+
+  it('registers the plugin that compiles them in app.config.ts', () => {
+    expect(configSource).toContain("'./plugins/withKiloAppIntents'");
+  });
+
+  it('keeps the intents out of the pod, which has no bundle for them', () => {
+    const podspec = readSource('KiloAppActions.podspec');
+    expect(podspec).toContain("s.exclude_files = '**/AppIntents/**/*'");
+
+    for (const name of readdirSync(iosModuleDirectory).filter(entry => entry.endsWith('.swift'))) {
+      const source = readSource(name);
+      expect(
+        source,
+        `${name} declares an App Intents type and must live in ios/AppIntents`
+      ).not.toMatch(
+        /: AppIntent \{|: AppEntity \{|: AppShortcutsProvider \{|: (EntityQuery|EntityStringQuery)\b/
+      );
+    }
+  });
+});
+
+describe('the app-target publisher install', () => {
+  it('starts the visible-session publisher before React', () => {
+    const lines = installPublisher(APP_DELEGATE).split('\n');
+    const install = lines.findIndex(line => line.includes('KiloVisibleSessionBridge.install'));
+    const react = lines.findIndex(line => line.includes('let delegate = ReactNativeDelegate()'));
+
+    expect(install).toBeGreaterThanOrEqual(0);
+    expect(install).toBeLessThan(react);
+    expect(lines[install]).toContain('KiloVisibleSession.publish)');
+  });
+
+  it('imports the module internally, so the app target reaches the bridge', () => {
+    const source = installPublisher(APP_DELEGATE);
+
+    expect(source).toContain('internal import KiloAppActions');
+    expect(source).not.toMatch(/^import KiloAppActions$/m);
+  });
+
+  it('is idempotent', () => {
+    const installed = installPublisher(APP_DELEGATE);
+    expect(installPublisher(installed)).toBe(installed);
+  });
+
+  it('drops the retired package declaration and its import together', () => {
+    const installed = installPublisher(APP_DELEGATE_WITH_RETIRED_PACKAGE);
+
+    expect(installed).not.toContain('KiloAppIntentsPackage');
+    expect(installed).not.toMatch(/^import AppIntents$/m);
+    expect(installed).toContain('import ExpoModulesCore');
+  });
+
+  it('fails a prebuild whose AppDelegate has no ReactNativeDelegate initialization', () => {
+    expect(() => installPublisher('class AppDelegate {}\n')).toThrow(/ReactNativeDelegate/);
   });
 });

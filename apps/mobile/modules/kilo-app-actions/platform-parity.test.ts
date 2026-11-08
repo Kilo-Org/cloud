@@ -10,13 +10,10 @@
 // it for what each platform actually built.
 //
 // Like the other native-module suites, this one runs in node and reads the
-// sources the app ships; nothing here proves a device. The iOS side is the set
-// the app target compiles plus the pod's own files: the intents live in
-// `ios/AppIntents` because the static pod has no bundle to load their metadata
-// from, and `plugins/withKiloAppIntents` copies that directory.
+// sources the app ships; nothing here proves a device.
 
 // eslint-disable-next-line import/no-nodejs-modules -- vitest-only parity check, runs in node, never bundled into the app
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 // eslint-disable-next-line import/no-nodejs-modules -- vitest-only parity check, runs in node, never bundled into the app
 import { fileURLToPath } from 'node:url';
 
@@ -31,54 +28,43 @@ import {
   parseAppActionUrl,
 } from '../../src/lib/app-actions/app-action-contract';
 
-const IOS_POD_DIRECTORY = './ios/';
-const IOS_APP_TARGET_DIRECTORY = './ios/AppIntents/';
+const IOS_DIRECTORY = './ios/';
+const APP_INTENTS_DIRECTORY = './ios/AppIntents/';
 const ANDROID_MAIN = './android/src/main/';
 const ANDROID_KOTLIN = `${ANDROID_MAIN}java/expo/modules/kiloappactions/`;
 
-function readModuleSource(path: string): string {
+function readSource(path: string): string {
   return readFileSync(fileURLToPath(new URL(path, import.meta.url)), 'utf8');
 }
 
-function swiftFiles(directory: string): string[] {
-  return readdirSync(fileURLToPath(new URL(directory, import.meta.url)))
-    .filter(name => name.endsWith('.swift'))
-    .sort();
-}
+const intentsSource = readSource(`${APP_INTENTS_DIRECTORY}KiloAppIntents.swift`);
+const bridgeSource = readSource(`${IOS_DIRECTORY}KiloAppActionBridge.swift`);
+const iosModuleSource = readSource(`${IOS_DIRECTORY}KiloAppActionsModule.swift`);
+const manifestSource = readSource(`${ANDROID_MAIN}AndroidManifest.xml`);
+const androidModuleSource = readSource(`${ANDROID_KOTLIN}KiloAppActionsModule.kt`);
+const activitySource = readSource(`${ANDROID_KOTLIN}KiloActionActivity.kt`);
+const shortcutsXml = readSource(`${ANDROID_MAIN}res/xml/shortcuts.xml`);
 
 /** One native source file, with the name failure messages cite. */
 type NamedSource = readonly [file: string, source: string];
 
 const IOS_SOURCES: readonly NamedSource[] = [
-  ...swiftFiles(IOS_APP_TARGET_DIRECTORY).map(
-    name => [name, readModuleSource(`${IOS_APP_TARGET_DIRECTORY}${name}`)] as const
-  ),
-  ...swiftFiles(IOS_POD_DIRECTORY).map(
-    name => [name, readModuleSource(`${IOS_POD_DIRECTORY}${name}`)] as const
-  ),
+  ['KiloAppIntents.swift', intentsSource],
+  ['KiloAppActionBridge.swift', bridgeSource],
+  ['KiloAppActionsModule.swift', iosModuleSource],
+  ['KiloSessionEntity.swift', readSource(`${APP_INTENTS_DIRECTORY}KiloSessionEntity.swift`)],
+  ['KiloSessionCatalog.swift', readSource(`${IOS_DIRECTORY}KiloSessionCatalog.swift`)],
+  ['KiloVisibleSession.swift', readSource(`${APP_INTENTS_DIRECTORY}KiloVisibleSession.swift`)],
 ];
 
 const ANDROID_SOURCES: readonly NamedSource[] = [
-  ['AndroidManifest.xml', readModuleSource(`${ANDROID_MAIN}AndroidManifest.xml`)],
-  ['KiloAppActionsModule.kt', readModuleSource(`${ANDROID_KOTLIN}KiloAppActionsModule.kt`)],
-  ['KiloActionActivity.kt', readModuleSource(`${ANDROID_KOTLIN}KiloActionActivity.kt`)],
-  ['shortcuts.xml', readModuleSource(`${ANDROID_MAIN}res/xml/shortcuts.xml`)],
+  ['AndroidManifest.xml', manifestSource],
+  ['KiloAppActionsModule.kt', androidModuleSource],
+  ['KiloActionActivity.kt', activitySource],
+  ['shortcuts.xml', shortcutsXml],
 ];
 
 const BOTH_TREES: readonly NamedSource[] = [...IOS_SOURCES, ...ANDROID_SOURCES];
-
-function sourceOf(name: string): string {
-  const found = BOTH_TREES.find(([file]) => file === name);
-  if (found === undefined) {
-    throw new Error(`${name} is not a source of this module`);
-  }
-  return found[1];
-}
-
-const intentsSource = sourceOf('KiloAppIntents.swift');
-const bridgeSource = sourceOf('KiloAppActionBridge.swift');
-const androidModuleSource = sourceOf('KiloAppActionsModule.kt');
-const activitySource = sourceOf('KiloActionActivity.kt');
 
 const CONTRACT_SLUGS: string[] = APP_ACTION_IDS.map(id => APP_ACTION_SLUGS[id]);
 
@@ -228,19 +214,27 @@ describe('the same four actions on both platforms', () => {
 });
 
 describe('the same native identifiers on both platforms', () => {
-  it('declares one App Intent per action id, plus the gated discovery action', () => {
+  /**
+   * The intents that are not one of the four contract actions, and why each is
+   * iOS-only. `OpenNamedSessionIntent` is the additive session picker the owner
+   * asked for: it opens the same `open-session` target through the same
+   * `KiloAppActionTarget.open`, adds no slug and no payload, and leaves the
+   * four existing intents — and every shortcut saved against them — untouched.
+   * Android keeps its four exported entry points; its assistant surface is not
+   * part of that change.
+   */
+  const IOS_ONLY_INTENTS = ['OpenNamedSessionIntent'];
+
+  it('declares one App Intent per action id, plus the iOS-only session picker', () => {
     for (const id of APP_ACTION_IDS) {
       expect(intentsSource, `${id} has no App Intent`).toContain(`struct ${id}Intent: AppIntent {`);
     }
-    // The title-based action is additive and availability-gated: it opens the
-    // same session target as `OpenSessionIntent`, carries an entity instead of
-    // an id, and adds no slug, no phrase and no entry point.
-    const declared = [...intentsSource.matchAll(/^struct (\w+): AppIntent \{/gm)].map(
-      match => match[1]
+    for (const name of IOS_ONLY_INTENTS) {
+      expect(intentsSource, `${name} is not declared`).toContain(`struct ${name}: AppIntent {`);
+    }
+    expect(intentsSource.match(/: AppIntent \{/g)).toHaveLength(
+      APP_ACTION_IDS.length + IOS_ONLY_INTENTS.length
     );
-    expect(declared).toHaveLength(APP_ACTION_IDS.length + 1);
-    expect(declared).toContain('OpenNamedSessionIntent');
-    expect(intentsSource).toContain('@available(iOS 17.0, *)\nstruct OpenNamedSessionIntent:');
   });
 
   it('lists exactly one AppShortcut per action in the AppShortcutsProvider', () => {
@@ -252,7 +246,6 @@ describe('the same native identifiers on both platforms', () => {
   });
 
   it('declares one exported intent-filter per action id, and no fifth', () => {
-    const manifestSource = sourceOf('AndroidManifest.xml');
     const filters = [
       ...manifestSource.matchAll(/<intent-filter[^>]*>([\s\S]*?)<\/intent-filter>/g),
     ].map(match => match[1] ?? '');
@@ -267,7 +260,6 @@ describe('the same native identifiers on both platforms', () => {
   it('declares one capability per action in the file the manifest references', () => {
     // `shortcuts.xml` is the single capability declaration file; the manifest's
     // `android.app.shortcuts` meta-data is what makes it effective.
-    const shortcutsXml = sourceOf('shortcuts.xml');
     const capabilities = [...shortcutsXml.matchAll(/<capability\s+android:name="([^"]+)"/g)].map(
       match => match[1] ?? ''
     );

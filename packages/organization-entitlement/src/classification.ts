@@ -1,8 +1,9 @@
 import { getDaysRemainingInTrial, getOrgTrialStatusFromDays } from './trial';
-import type {
-  OrganizationEntitlementBypassReason,
-  OrganizationEntitlementClassification,
-  OrganizationEntitlementInput,
+import {
+  isPaidOrganizationSeatSubscriptionStatus,
+  type OrganizationEntitlementBypassReason,
+  type OrganizationEntitlementClassification,
+  type OrganizationEntitlementInput,
 } from './types';
 
 export function classifyOrganizationEntitlement({
@@ -17,7 +18,8 @@ export function classifyOrganizationEntitlement({
   );
   const trialStatus = getOrgTrialStatusFromDays(daysRemaining);
   const hasPaidSeatEntitlement =
-    latestSeatPurchaseStatus != null && latestSeatPurchaseStatus !== 'ended';
+    latestSeatPurchaseStatus != null &&
+    isPaidOrganizationSeatSubscriptionStatus(latestSeatPurchaseStatus);
 
   let bypassReason: OrganizationEntitlementBypassReason = null;
   if (hasPaidSeatEntitlement) {

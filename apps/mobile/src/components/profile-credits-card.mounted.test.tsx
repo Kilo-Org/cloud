@@ -851,9 +851,9 @@ describe('CreditsCard balance state', () => {
 
     expect(texts()).toContain('SKELETON');
     expect(texts()).not.toContain('$0.00');
-    // The personal CTA lives inside the balance card, so it arrives with the
-    // card instead of beside the balance skeleton.
-    expect(texts()).not.toContain('ADD_CREDITS_BUTTON');
+    // The personal purchase holds its slot while the balance loads, so it never
+    // pops in when the read answers.
+    expect(texts()).toContain('ADD_CREDITS_BUTTON');
 
     unmount();
   });

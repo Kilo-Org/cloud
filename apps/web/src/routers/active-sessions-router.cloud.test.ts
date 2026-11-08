@@ -698,10 +698,9 @@ describe('active-sessions-router.list cloud merge', () => {
     expect(result.sessions[0]?.status).toBe('question');
   });
 
-  it('worker fetch failure + flag on → a retryable failure, not an empty list', async () => {
-    // A tray read merges cloud rows, so an unreadable worker must not answer
-    // with an empty list: the app cannot tell that from "nothing runs" and
-    // would report a live session as gone.
+  it('worker fetch failure + flag on → a user with live rows still gets them', async () => {
+    // The merged answer is what decides: with a live cloud row the read is
+    // complete enough to return, so the tray keeps the row the DB can prove.
     const sessionId = nextId('worker-fail');
     const casId = nextId('cas');
     await seedCloudSession({
@@ -715,11 +714,20 @@ describe('active-sessions-router.list cloud merge', () => {
     fetchSpy = mockWorkerFailure();
     const caller = await createCallerForUser(regularUser.id);
 
-    // BAD_GATEWAY is not a terminal code, so the app surfaces its load failure
-    // with Retry rather than an accepted empty list.
+    const result = await caller.activeSessions.list({ includeCloudAgentSessions: true });
+    expect(result.sessions.map(s => s.id)).toEqual([sessionId]);
+  });
+
+  it('worker fetch failure + flag on → nothing provable reads as a retryable failure', async () => {
+    // An unreadable worker answers "no live rows", which the wire cannot tell
+    // from a user with nothing running and the app would report a live CLI
+    // session as gone across a worker restart. Fail the answer instead.
+    fetchSpy = mockWorkerFailure();
+    const caller = await createCallerForUser(regularUser.id);
+
     await expect(
       caller.activeSessions.list({ includeCloudAgentSessions: true })
-    ).rejects.toMatchObject({ code: 'BAD_GATEWAY' });
+    ).rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE' });
   });
 
   it('worker fetch failure without the cloud flag keeps the legacy empty answer', async () => {

@@ -393,6 +393,14 @@ export async function listActiveSessions({
   // Normal list callers retain best-effort behavior. Background snapshots
   // require an authoritative read so outages never erase last-known work.
   let parsed: { sessions: ActiveSession[] } = { sessions: [] };
+  /**
+   * The worker read could not answer. The full merge is still built (an empty
+   * heartbeat part is a real part of it), but the caller learns about the read
+   * failure at the end instead of receiving a bare `{ sessions: [] }` — that
+   * body is indistinguishable on the wire from a user with nothing running,
+   * and the tray must not report live work as gone.
+   */
+  let upstreamReadFailed = false;
 
   if (!SESSION_INGEST_WORKER_URL) {
     if (requireCompleteSnapshot) {
@@ -435,12 +443,10 @@ export async function listActiveSessions({
         if (!includeCloudAgentSessions) {
           return { sessions: [] as ActiveSession[] };
         }
-        // The tray read must not present a failed worker as an empty list: the
-        // app would report that nothing runs while every CLI session is live.
-        throw new TRPCError({
-          code: 'BAD_GATEWAY',
-          message: `Session ingest failed to list active sessions (status ${response.status})`,
-        });
+        // The merged answer decides at the end of this function (see
+        // `upstreamReadFailed`): an empty one here would read as "nothing
+        // runs".
+        upstreamReadFailed = true;
       } else {
         const raw = await response.json();
         parsed = activeSessionsResponseSchema.parse(raw);
@@ -454,19 +460,12 @@ export async function listActiveSessions({
         });
       }
       console.warn('[active-sessions] error:', error);
-      if (error instanceof TRPCError) {
-        throw error;
-      }
       if (!includeCloudAgentSessions) {
         return { sessions: [] as ActiveSession[] };
       }
-      // Same reason as the non-OK branch above: an unreachable worker is not
-      // evidence that nothing runs.
-      throw new TRPCError({
-        code: 'SERVICE_UNAVAILABLE',
-        message: 'Session ingest is unavailable',
-        cause: error,
-      });
+      // Same reason as the non-OK branch above: an unreachable worker must not
+      // read as "nothing runs".
+      upstreamReadFailed = true;
     }
   }
 
@@ -678,6 +677,24 @@ export async function listActiveSessions({
       }
       // Unfiltered: skip cloud merge, return heartbeat rows as built.
     }
+  }
+
+  // The merged list is built now, so an empty answer is only authoritative
+  // when the worker read succeeded. A failed read stays a failure for the
+  // caller that merges cloud rows (the tray); the unconfigured-source case
+  // above cannot mask live rows, because no live row can exist without the
+  // worker.
+  if (upstreamReadFailed && requireCompleteSnapshot) {
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'Failed to fetch active sessions',
+    });
+  }
+  if (upstreamReadFailed && sessions.length === 0) {
+    throw new TRPCError({
+      code: 'SERVICE_UNAVAILABLE',
+      message: 'Session ingest is unavailable',
+    });
   }
 
   return { sessions };

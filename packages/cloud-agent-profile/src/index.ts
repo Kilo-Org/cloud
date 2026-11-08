@@ -221,6 +221,29 @@ export {
   type RepositoryAllocationSetting,
 } from './sandbox-allocation-settings-service';
 
+// User-scoped built-in agent overrides (model, variant, visibility)
+export {
+  CLOUD_AGENT_BUILTIN_AGENTS,
+  CLOUD_AGENT_BUILTIN_AGENT_SLUGS,
+  BuiltinAgentOverrideSchema,
+  BuiltinAgentSettingsSchema,
+  BuiltinAgentSettingsInputSchema,
+  getCloudAgentBuiltinAgent,
+  normalizeBuiltinAgentSettings,
+  hasBuiltinAgentSettings,
+  MAX_BUILTIN_AGENT_MODEL_LENGTH,
+  MAX_BUILTIN_AGENT_VARIANT_LENGTH,
+  type CloudAgentBuiltinAgentDefinition,
+  type CloudAgentBuiltinAgentSlug,
+  type BuiltinAgentOverride,
+  type BuiltinAgentSettings,
+} from './builtin-agents';
+export {
+  getBuiltinAgentSettings,
+  setBuiltinAgentSettings,
+  clearBuiltinAgentSettings,
+} from './builtin-agent-settings-service';
+
 // Local config import (preview diff + selective upsert)
 export {
   buildImportPreview,

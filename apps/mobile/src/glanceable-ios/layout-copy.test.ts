@@ -131,6 +131,16 @@ describe('withGlanceableCopy', () => {
     expect(copy.approve).not.toBe('common.approve');
   });
 
+  it('bakes the plan-progress and finished-in templates, not bare separators', () => {
+    // Both used to be bare fragments the layout placed itself; they are whole
+    // patterns now, so the layout can hand each language's word order back.
+    const copy = glanceableLayoutCopy();
+    expect(copy.planProgress).toBe(i18n.t('glanceable.planProgress'));
+    expect(copy.planProgress).toContain('{{done}}');
+    expect(copy.planProgress).toContain('{{total}}');
+    expect(copy.finishedIn).toContain('{{duration}}');
+  });
+
   it('bakes the scheduled row label from the reviewed key', () => {
     // The Live Activity cannot translate: the notifications Worker pushes the
     // raw content state, so the scheduled row's label has to arrive in the

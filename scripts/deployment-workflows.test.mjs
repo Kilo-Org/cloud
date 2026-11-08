@@ -434,6 +434,48 @@ test('successful main CI selects the tested deployment SHA', () => {
   }
 });
 
+test('web promotion waits for a completed or deliberately skipped gateway rollout', () => {
+  const job = production.jobs['promote-app'];
+  const condition = (job.if ?? 'success()')
+    .replace(/^\$\{\{|\}\}$/g, '')
+    .replace(/needs\.([\w-]+)\.result/g, 'needs["$1"].result');
+  const expression = /\b(always|cancelled|failure|success)\(/.test(condition)
+    ? condition
+    : `success() && (${condition})`;
+  for (const [stage, promotion, app, database, cancelled, expected] of [
+    ['success', 'success', 'success', 'success', false, true],
+    ['skipped', 'skipped', 'success', 'success', false, true],
+    ['success', 'failure', 'success', 'success', false, false],
+    ['failure', 'skipped', 'success', 'success', false, false],
+    ['cancelled', 'skipped', 'success', 'success', false, false],
+    ['success', 'cancelled', 'success', 'success', false, false],
+    ['success', 'skipped', 'success', 'success', false, false],
+    ['skipped', 'success', 'success', 'success', false, false],
+    ['skipped', 'skipped', 'failure', 'success', false, false],
+    ['success', 'success', 'success', 'failure', false, false],
+    ['skipped', 'skipped', 'success', 'skipped', false, false],
+    ['success', 'success', 'success', 'success', true, false],
+  ]) {
+    const results = {
+      'stage-app': app,
+      'db-gate': database,
+      'stage-ai-gateway': stage,
+      'promote-ai-gateway': promotion,
+    };
+    const needs = Object.fromEntries(job.needs.map(name => [name, { result: results[name] }]));
+    assert.equal(
+      runInNewContext(expression, {
+        needs,
+        github: { repository: 'Kilo-Org/cloud' },
+        cancelled: () => cancelled,
+        success: () => Object.values(needs).every(dependency => dependency.result === 'success'),
+      }),
+      expected,
+      JSON.stringify({ stage, promotion, app, database, cancelled })
+    );
+  }
+});
+
 test('ai-gateway deploys with each scheduled release after migrations', () => {
   const stageAiGateway = production.jobs['stage-ai-gateway'];
   assert.equal(stageAiGateway.needs, 'check-changes');
@@ -468,7 +510,7 @@ test('ai-gateway deploys with each scheduled release after migrations', () => {
     '${{ secrets.VERCEL_TOKEN_AI_GATEWAY }}'
   );
 
-  for (const job of ['deploy-workers', 'deploy-gastown-wasteland']) {
+  for (const job of ['deploy-workers']) {
     for (const dependency of ['stage-ai-gateway', 'promote-ai-gateway']) {
       assert.ok(production.jobs[job].needs.includes(dependency), `${job} needs ${dependency}`);
       assert.match(production.jobs[job].if, new RegExp(`needs\\.${dependency}\\.result`));
@@ -551,6 +593,39 @@ test('one database gate per deployment checks out, installs and migrates once', 
     assert.match(production.jobs[job].if, /needs\.db-gate\.result == 'success'/);
   }
   assert.match(staging.jobs['record-deployment'].if, /needs\.db-gate\.result == 'success'/);
+});
+
+test('every Worker deploy job installs only the Worker closure and the root project', () => {
+  // A recursive workspace install from inside a Worker links every unrelated
+  // project and runs its lifecycle scripts once per deploy job. The closure
+  // install links the Worker, its workspace dependencies, the root project and,
+  // where the Worker builds the nested wrapper package, that package too.
+  for (const [job, workingDirectory] of [
+    ['deploy-manual', '${{ inputs.worker }}'],
+    ['deploy-changed', '${{ matrix.worker }}'],
+    ['deploy-session-ingest', 'services/session-ingest'],
+    ['deploy-cloud-agent-after-session-ingest', 'services/cloud-agent-next'],
+  ]) {
+    const installs = workers.jobs[job].steps.filter(step =>
+      (step.run ?? '').includes('pnpm install')
+    );
+    assert.equal(installs.length, 1, `${job} installs once`);
+    assert.equal(installs[0]['working-directory'], workingDirectory);
+    const run = installs[0].run;
+    assert.ok(run.includes("filters=(--filter '{.}...' --filter kilocode-monorepo)"), job);
+    assert.ok(run.includes('if [ -f wrapper/package.json ]; then'), job);
+    assert.ok(run.includes("filters+=(--filter '@kilocode/cloud-agent-wrapper...')"), job);
+    assert.ok(run.includes('pnpm install --frozen-lockfile "${filters[@]}"'), job);
+    assert.ok(!run.includes('pnpm install --frozen-lockfile\n'), job);
+  }
+
+  // The change-detection job installs the root project alone: it only runs the
+  // lockfile-dependent scripts that the root dependencies provide.
+  assert.equal(
+    workers.jobs['detect-changes'].steps.find(step => step.name === 'Install root dependencies')
+      .run,
+    'pnpm --filter kilocode-monorepo install --frozen-lockfile --ignore-scripts'
+  );
 });
 
 test('staging and production Worker changes use independent deployment baselines', () => {
@@ -870,7 +945,7 @@ test('production deploys cloud-agent-next after the session-ingest job', () => {
   assert.equal(ingest.needs, 'detect-changes');
   assert.equal(
     ingest.if,
-    "needs.detect-changes.outputs.deploy-cloud-agent-after-session-ingest == 'true'"
+    "github.repository == 'Kilo-Org/cloud' && needs.detect-changes.outputs.deploy-cloud-agent-after-session-ingest == 'true'"
   );
   assert.equal(ingest.environment, '${{ inputs.target_environment }}');
   assert.equal(ingest['timeout-minutes'], 25);

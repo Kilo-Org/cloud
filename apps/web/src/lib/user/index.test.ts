@@ -125,6 +125,7 @@ import {
   coding_plan_subscriptions,
   byok_api_keys,
   openai_chatgpt_connections,
+  claude_billing_connections,
   operation_ledgers,
   analytics_event_outbox,
   bouncer_credit_event_outbox,
@@ -155,6 +156,7 @@ import {
 import { hashWebSessionId } from '@kilocode/web-shared/lib/admin/step-up-store';
 
 import { eq, count, inArray, and, isNull, sql } from 'drizzle-orm';
+import { lockGitHubIdentity } from '@kilocode/db/github-identity';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import {
   softDeleteUser,
@@ -2114,6 +2116,35 @@ describe('User', () => {
     const userId = 'oauth/google/Legacy.User';
     const deletedEmail = `deleted+${userId}@deleted.invalid`;
 
+    it('waits for an in-flight GitHub identity writer before it locks the user', async () => {
+      const user = await insertTestUser();
+      let release: () => void = () => {};
+      const held = new Promise<void>(resolve => {
+        release = resolve;
+      });
+      let acquired: () => void = () => {};
+      const locked = new Promise<void>(resolve => {
+        acquired = resolve;
+      });
+      const writer = db.transaction(async tx => {
+        await lockGitHubIdentity(tx, user.id, { authorizationId: null, credentialVersion: null });
+        acquired();
+        await held;
+      });
+      await locked;
+      try {
+        await expect(
+          db.transaction(async tx => {
+            await tx.execute(sql`SET LOCAL lock_timeout = '200ms'`);
+            await anonymizeCloudUserData(tx, user.id);
+          })
+        ).rejects.toMatchObject({ cause: expect.objectContaining({ code: '55P03' }) });
+      } finally {
+        release();
+        await writer;
+      }
+    });
+
     it.each([null, deletedEmail, 'deleted@deleted.invalid'])(
       'preserves deletion history and scrubs new PII on replay with normalized_email %p',
       async normalizedEmail => {
@@ -2308,6 +2339,40 @@ describe('User', () => {
           .from(openai_chatgpt_connections)
           .where(eq(openai_chatgpt_connections.kilo_user_id, user.id))
       ).toHaveLength(0);
+    });
+
+    it("removes the deleted user's personal Claude billing connection and keeps the organization's", async () => {
+      const user = await insertTestUser({
+        google_user_email: `claude-billing-cleanup-${randomUUID()}@example.com`,
+      });
+      const organization = await createTestOrganization(
+        `Claude billing cleanup ${randomUUID()}`,
+        user.id,
+        0
+      );
+      await db.insert(claude_billing_connections).values([
+        { kilo_user_id: user.id, user_profile_id: `uprof_${randomUUID()}`, created_by: user.id },
+        {
+          organization_id: organization.id,
+          user_profile_id: `uprof_${randomUUID()}`,
+          created_by: user.id,
+        },
+      ]);
+
+      await db.transaction(tx => anonymizeCloudUserData(tx, user.id));
+
+      expect(
+        await db
+          .select()
+          .from(claude_billing_connections)
+          .where(eq(claude_billing_connections.kilo_user_id, user.id))
+      ).toHaveLength(0);
+      expect(
+        await db
+          .select()
+          .from(claude_billing_connections)
+          .where(eq(claude_billing_connections.organization_id, organization.id))
+      ).toHaveLength(1);
     });
 
     it("keeps the organization's shared-services row when the connector is deleted", async () => {
@@ -6459,47 +6524,53 @@ describe('User', () => {
       expect(rows).toHaveLength(0);
     });
 
-    it('should delete stored GitHub user authorization credentials', async () => {
-      const user = await insertTestUser();
-      const otherUser = await insertTestUser();
+    it.each(['github_app', 'provided_token'] as const)(
+      'deletes %s identity credentials and advances the retained revision',
+      async credentialSource => {
+        const user = await insertTestUser();
+        const otherUser = await insertTestUser();
 
-      await db.insert(user_github_app_tokens).values([
-        {
-          kilo_user_id: user.id,
-          github_app_type: 'standard',
-          github_user_id: '101',
-          github_login: 'deleted-user',
-          access_token_encrypted: 'encrypted-access-deleted',
-          access_token_expires_at: '2026-06-01T00:00:00.000Z',
-          refresh_token_encrypted: 'encrypted-refresh-deleted',
-          refresh_token_expires_at: '2026-11-01T00:00:00.000Z',
-        },
-        {
-          kilo_user_id: otherUser.id,
-          github_app_type: 'standard',
-          github_user_id: '102',
-          github_login: 'retained-user',
-          access_token_encrypted: 'encrypted-access-retained',
-          access_token_expires_at: '2026-06-01T00:00:00.000Z',
-          refresh_token_encrypted: 'encrypted-refresh-retained',
-          refresh_token_expires_at: '2026-11-01T00:00:00.000Z',
-        },
-      ]);
+        await db.insert(user_github_app_tokens).values([
+          {
+            kilo_user_id: user.id,
+            credential_source: credentialSource,
+            github_app_type: 'standard',
+            github_user_id: '101',
+            github_login: 'deleted-user',
+            access_token_encrypted: 'encrypted-access-deleted',
+            access_token_expires_at: '2026-06-01T00:00:00.000Z',
+            refresh_token_encrypted:
+              credentialSource === 'github_app' ? 'encrypted-refresh-deleted' : null,
+            refresh_token_expires_at:
+              credentialSource === 'github_app' ? '2026-11-01T00:00:00.000Z' : null,
+          },
+          {
+            kilo_user_id: otherUser.id,
+            github_app_type: 'standard',
+            github_user_id: '102',
+            github_login: 'retained-user',
+            access_token_encrypted: 'encrypted-access-retained',
+            access_token_expires_at: '2026-06-01T00:00:00.000Z',
+            refresh_token_encrypted: 'encrypted-refresh-retained',
+            refresh_token_expires_at: '2026-11-01T00:00:00.000Z',
+          },
+        ]);
 
-      await softDeleteUser(user.id);
+        await softDeleteUser(user.id);
 
-      const deletedCredentials = await db
-        .select()
-        .from(user_github_app_tokens)
-        .where(eq(user_github_app_tokens.kilo_user_id, user.id));
-      const retainedCredentials = await db
-        .select()
-        .from(user_github_app_tokens)
-        .where(eq(user_github_app_tokens.kilo_user_id, otherUser.id));
+        const deletedCredentials = await db
+          .select()
+          .from(user_github_app_tokens)
+          .where(eq(user_github_app_tokens.kilo_user_id, user.id));
+        const retainedCredentials = await db
+          .select()
+          .from(user_github_app_tokens)
+          .where(eq(user_github_app_tokens.kilo_user_id, otherUser.id));
 
-      expect(deletedCredentials).toHaveLength(0);
-      expect(retainedCredentials).toHaveLength(1);
-    });
+        expect(deletedCredentials).toHaveLength(0);
+        expect(retainedCredentials).toHaveLength(1);
+      }
+    );
 
     it('deletes an unshared personal canonical GitHub installation', async () => {
       const user = await insertTestUser();

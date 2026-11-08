@@ -99,11 +99,12 @@ function planText(content: SessionLiveActivityContentState): string | null {
   if (plan === null || plan === undefined || plan.total <= 0) {
     return null;
   }
-  return [
-    formatGlanceableCount(plan.done),
-    translate('glanceable.planOf'),
-    formatGlanceableCount(plan.total),
-  ].join(' ');
+  // One template, so each language places the two counts where its own grammar
+  // needs them: a bare separator between them cannot be reordered.
+  return i18n.t('glanceable.planProgress', {
+    done: formatGlanceableCount(plan.done),
+    total: formatGlanceableCount(plan.total),
+  });
 }
 
 type QuietFields = Pick<

@@ -21,7 +21,18 @@ import {
 import { defineTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 describe('clientIpFromHeaders', () => {
-  test('returns the first hop of x-forwarded-for', () => {
+  test('prefers x-vercel-forwarded-for when both headers are present', () => {
+    expect(
+      clientIpFromHeaders(
+        new Headers({
+          'x-forwarded-for': '203.0.113.7, 10.0.0.1',
+          'x-vercel-forwarded-for': '198.51.100.5, 10.0.0.2',
+        })
+      )
+    ).toBe('198.51.100.5');
+  });
+
+  test('returns the first hop of x-forwarded-for when it is the only forwarding header', () => {
     expect(clientIpFromHeaders(new Headers({ 'x-forwarded-for': '203.0.113.7, 10.0.0.1' }))).toBe(
       '203.0.113.7'
     );
@@ -33,7 +44,7 @@ describe('clientIpFromHeaders', () => {
     ).toBe('203.0.113.9');
   });
 
-  test('falls back to x-vercel-forwarded-for when x-forwarded-for is absent', () => {
+  test('returns the first hop of x-vercel-forwarded-for when x-forwarded-for is absent', () => {
     expect(clientIpFromHeaders(new Headers({ 'x-vercel-forwarded-for': '198.51.100.5' }))).toBe(
       '198.51.100.5'
     );
@@ -45,6 +56,14 @@ describe('clientIpFromHeaders', () => {
 
   test('returns null for an empty x-forwarded-for header', () => {
     expect(clientIpFromHeaders(new Headers({ 'x-forwarded-for': '' }))).toBeNull();
+  });
+
+  test('falls back to x-forwarded-for when x-vercel-forwarded-for is empty', () => {
+    expect(
+      clientIpFromHeaders(
+        new Headers({ 'x-vercel-forwarded-for': '   ', 'x-forwarded-for': '203.0.113.7' })
+      )
+    ).toBe('203.0.113.7');
   });
 });
 
@@ -111,7 +130,7 @@ describe('target builders', () => {
   test('organizationTarget/userTarget/serviceTarget use a <type>:<id> reference', () => {
     expect(organizationTarget('org-1')).toBe('organization:org-1');
     expect(userTarget('user-1')).toBe('user:user-1');
-    expect(serviceTarget('wasteland')).toBe('service:wasteland');
+    expect(serviceTarget('cloud-agent')).toBe('service:cloud-agent');
     expect(UNSCOPED_TARGET).toBe('*');
   });
 
@@ -258,7 +277,7 @@ describe('kilo admin elevation telemetry', () => {
     await recordKiloAdminElevationForRequest({
       user: defineTestUser({ is_admin: true, is_super_admin: true }),
       reason: 'service_token_mint',
-      target: serviceTarget('wasteland'),
+      target: serviceTarget('cloud-agent'),
     });
 
     expect(events).toHaveLength(1);
@@ -271,7 +290,7 @@ describe('kilo admin elevation telemetry', () => {
       method: null,
       ip: null,
       reason: 'service_token_mint',
-      target: 'service:wasteland',
+      target: 'service:cloud-agent',
     });
   });
 

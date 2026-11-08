@@ -360,6 +360,7 @@ Use the supplied 4px-based spacing ladder. `spacing.2`, `spacing.3`, `spacing.4`
 - Table rows target `48px` in dense desktop UI.
 - Prefer `gap` over ad hoc margins.
 - Never nest cards. Use spacing, dividers, headings, or inset regions for internal grouping.
+- On mobile Home, stack active-status touch targets without an extra vertical gap.
 
 Product UI must reflow at narrow widths. Test around 375px, 768–1024px, and 1440px. Required actions cannot depend on hover. On touch surfaces, preserve at least a 44px target even when the visual control is compact.
 

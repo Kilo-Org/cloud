@@ -6,6 +6,7 @@ import { GitLabLogo } from '@/components/auth/GitLabLogo';
 import { GoogleLogo } from '@/components/auth/GoogleLogo';
 import { LinkedInLogo } from '@/components/auth/LinkedInLogo';
 import { OpenAILogo } from '@/components/auth/OpenAILogo';
+import { ClaudeLogo } from '@/components/auth/ClaudeLogo';
 import { KeyRound, Mail, SquareUserRound } from 'lucide-react';
 import React, { type JSX } from 'react';
 import * as z from 'zod';
@@ -39,6 +40,12 @@ const AllAuthProviders = [
     signInLabel: 'Continue with ChatGPT',
     icon: <OpenAILogo />,
   },
+  {
+    id: 'claude',
+    name: 'Claude',
+    signInLabel: 'Continue with Claude',
+    icon: <ClaudeLogo />,
+  },
   { id: 'fake-login', name: 'Test Account', icon: fakeLoginIcon },
   { id: 'workos', name: 'Enterprise SSO', icon: <SquareUserRound /> },
   // Passkeys are not an OAuth account to link or unlink: they are listed and
@@ -53,7 +60,8 @@ export const AuthProviderIdSchema = z.enum(AuthProviderIds);
 import type { AuthProviderId } from '@kilocode/db/schema-types';
 
 // Subset offered for OAuth sign-in: every provider except SSO, email, passkeys
-// and the dev-only one.
+// and the dev-only one. Claude is listed here, and the offering surfaces drop it
+// until it is launched (`withLaunchedClaudeSignIn`).
 const isLinkableAuthProvider = (p: ProviderMetadata) =>
   p.id !== 'workos' && p.id !== 'fake-login' && p.id !== 'email' && p.id !== 'passkey';
 

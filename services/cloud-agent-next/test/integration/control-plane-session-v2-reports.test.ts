@@ -756,6 +756,58 @@ describe('SandboxSessionV2 reports and callbacks', () => {
     expect(callbacks).toHaveLength(1);
   });
 
+  it('attributes initial and follow-up turns to the runtime harness the connected wrapper reported', async () => {
+    const { sessionId, stub, peer } = await setup();
+    const captured = await installCapturedQueues(stub);
+    const preparing = {
+      provider: 'cloudflare-containers' as const,
+      sandboxId: 'sandbox-1',
+      allocationId: 'allocation-1',
+      instanceId: 'allocation-1',
+    };
+    const connected = { ...preparing, runtimeHarness: 'kilo2' as const };
+    peer.prepareView = { state: 'preparing', attemptId: peer.attemptId, container: preparing };
+    const committed = await runInDurableObject(stub, async instance => {
+      const withFields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+      const info = vi.spyOn(logger, 'info').mockImplementation(() => {});
+      const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+      const error = vi.spyOn(logger, 'error').mockImplementation(() => {});
+      const running = (messageId: string) =>
+        waitFor(async () => {
+          const result = await instance.getMessageResult(messageId);
+          expect(result.type === 'found' ? result.result.status : null).toBe('running');
+        });
+      try {
+        await instance.send(promptPayload('initial'));
+        peer.prepareView = { state: 'ready', attemptId: peer.attemptId, container: connected };
+        await instance.onRoute(peer.prepareView);
+        await running('initial');
+        await instance.onOutcome({ sessionId, status: 'completed', lastMessageId: 'initial' });
+        await instance.send(promptPayload('follow-up'));
+        await running('follow-up');
+        await instance.onOutcome({ sessionId, status: 'completed', lastMessageId: 'follow-up' });
+        await instance.alarm();
+        return withFields.mock.calls
+          .map(call => call[0] as Record<string, unknown>)
+          .filter(fields => fields.diagnosticEvent === 'session_message_committed');
+      } finally {
+        withFields.mockRestore();
+        info.mockRestore();
+        warn.mockRestore();
+        error.mockRestore();
+      }
+    });
+
+    for (const messageId of ['initial', 'follow-up']) {
+      expect(
+        captured.reports.find(report => report.run.messageId === messageId)?.run
+      ).toMatchObject({ status: 'completed', container: connected });
+      expect(committed).toContainEqual(
+        expect.objectContaining({ messageId, toState: 'completed', runtimeHarness: 'kilo2' })
+      );
+    }
+  });
+
   it('emits the session_message_committed diagnostic for accepted and terminal transitions', async () => {
     const { sessionId, stub } = await setup();
     await installCapturedQueues(stub);

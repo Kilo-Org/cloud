@@ -9,6 +9,8 @@ import { getDirectByokModelsForUser } from '@kilocode/web-shared/lib/ai-gateway/
 import { ORGANIZATION_ID_HEADER } from '@kilocode/web-shared/lib/constants';
 import { appendLocalFakeDeterministicCatalogModels } from '@kilocode/web-shared/lib/ai-gateway/local-fake-llm';
 import { requestCountryCode } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/country-deny-list';
+import { customRouterModelId, isCustomRouterModelId } from '@kilocode/auto-routing-contracts';
+import { listUsableCustomRouters } from '@kilocode/web-shared/lib/ai-gateway/custom-routers';
 
 async function tryGetUserFromAuth() {
   try {
@@ -44,9 +46,17 @@ export async function handleModelValidationRequest(request: NextRequest) {
       throw new Error('Model catalog returned invalid data');
     }
     const byokModels = auth?.user ? await getDirectByokModelsForUser(auth.user.id) : [];
-    const available = appendLocalFakeDeterministicCatalogModels(
-      models.data.concat(byokModels)
-    ).some(model => model.id === bodyResult.data.modelId);
+    const customRouters =
+      auth?.user && isCustomRouterModelId(bodyResult.data.modelId)
+        ? await listUsableCustomRouters({ userId: auth.user.id, organizationId: null })
+        : [];
+    const available =
+      appendLocalFakeDeterministicCatalogModels(models.data.concat(byokModels)).some(
+        model => model.id === bodyResult.data.modelId
+      ) ||
+      customRouters.some(
+        router => customRouterModelId(router.ownerType, router.slug) === bodyResult.data.modelId
+      );
     return NextResponse.json(available ? { valid: true } : { valid: false, reason: 'unavailable' });
   } catch (error) {
     captureException(error, {

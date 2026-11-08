@@ -139,6 +139,7 @@ function ingestRequest(body: string, contentLength = new TextEncoder().encode(bo
 
 function r2StagingStub(env: Parameters<typeof getSessionIngestDO>[0]) {
   return {
+    isDeleted: async () => false,
     stageR2Object: async (
       params: { key: string },
       body: ReadableStream<Uint8Array> | Uint8Array
@@ -377,6 +378,106 @@ describe('api routes', () => {
     expect(unshareRes.status).toBe(400);
   });
 
+  it('POST /session answers a conflict for an id the ingest plane rejects', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    const isDeleted = vi.fn(async () => true);
+    vi.mocked(getSessionIngestDO).mockReturnValue({ isDeleted } as never);
+
+    const app = makeApiApp();
+    const res = await app.fetch(
+      new Request('http://local/session', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sessionId: 'ses_12345678901234567890123456' }),
+      }),
+      makeTestEnv()
+    );
+
+    expect(res.status).toBe(409);
+    await expect(res.json()).resolves.toEqual({ success: false, error: 'session_retired' });
+    expect(isDeleted).toHaveBeenCalledOnce();
+    expect(fns.insert).not.toHaveBeenCalled();
+    expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+  });
+
+  it('POST /session probes ingest availability before the insert transaction', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    const probeOrder: string[] = [];
+    fns.selectResult.mockResolvedValueOnce([{ blocked_reason: null }]);
+    fns.insertResult.mockResolvedValueOnce([]);
+    fns.transaction.mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => {
+      probeOrder.push('insert-transaction');
+      return fn(db);
+    });
+    vi.mocked(getSessionIngestDO).mockImplementation(
+      () =>
+        ({
+          isDeleted: vi.fn(async () => {
+            probeOrder.push('availability-probe');
+            return false;
+          }),
+        }) as never
+    );
+
+    const app = makeApiApp();
+    const res = await app.fetch(
+      new Request('http://local/session', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sessionId: 'ses_12345678901234567890123456' }),
+      }),
+      makeTestEnv()
+    );
+
+    expect(res.status).toBe(200);
+    expect(probeOrder).toEqual(['availability-probe', 'insert-transaction', 'availability-probe']);
+  });
+
+  it('POST /session recovers when the initial ingest probe fails but the final check succeeds', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValueOnce([{ blocked_reason: null }]);
+    fns.insertResult.mockResolvedValueOnce([
+      {
+        session_id: 'ses_12345678901234567890123456',
+        created_at: '2026-01-01T00:00:00.000Z',
+        updated_at: '2026-01-01T00:00:00.000Z',
+        title: null,
+        created_on_platform: null,
+        organization_id: null,
+        git_url: null,
+        git_branch: null,
+        parent_session_id: null,
+        status: null,
+        status_updated_at: null,
+      },
+    ]);
+    vi.mocked(getSessionIngestDO).mockImplementationOnce(() => {
+      throw new Error('probe unavailable');
+    });
+    const warn = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const app = makeApiApp();
+    const res = await app.fetch(
+      new Request('http://local/session', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sessionId: 'ses_12345678901234567890123456' }),
+      }),
+      makeTestEnv()
+    );
+
+    warn.mockRestore();
+    expect(res.status).toBe(200);
+    expect(notifyUserSessionEvent).toHaveBeenCalledWith(
+      expect.anything(),
+      'usr_test',
+      expect.objectContaining({ type: 'session.created' })
+    );
+  });
+
   it('POST /session emits created only for newly inserted rows', async () => {
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);
@@ -457,6 +558,164 @@ describe('api routes', () => {
     expect(res.status).toBe(200);
     expect(notifyUserSessionEvent).not.toHaveBeenCalled();
     expect(env.NOTIFICATIONS.sendSessionReadyNotification).not.toHaveBeenCalled();
+  });
+
+  it('POST /session rejects a tombstoned session and removes the resurrected row', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValueOnce([{ blocked_reason: null }]);
+    fns.insertResult.mockResolvedValueOnce([
+      {
+        session_id: 'ses_12345678901234567890123456',
+        created_at: '2026-01-01T00:00:00.000Z',
+        updated_at: '2026-01-01T00:00:00.000Z',
+        title: null,
+        created_on_platform: null,
+        organization_id: null,
+        git_url: null,
+        git_branch: null,
+        parent_session_id: null,
+        status: null,
+        status_updated_at: null,
+      },
+    ]);
+    vi.mocked(getSessionIngestDO).mockReturnValue({
+      isDeleted: vi.fn(async () => true).mockResolvedValueOnce(false),
+    } as never);
+    const sessionCache = { putValidated: vi.fn(async () => undefined) };
+    vi.mocked(getSessionAccessCacheDO).mockReturnValue(sessionCache as never);
+
+    const res = await makeApiApp().fetch(
+      new Request('http://local/session', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sessionId: 'ses_12345678901234567890123456' }),
+      }),
+      makeTestEnv()
+    );
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ success: false, error: 'session_deleted' });
+    expect(fns.delete).toHaveBeenCalledTimes(1);
+    expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+    expect(sessionCache.putValidated).not.toHaveBeenCalled();
+  });
+
+  it('POST /session rejects an existing tombstoned parent without deleting its row', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValueOnce([{ blocked_reason: null }]);
+    fns.insertResult.mockResolvedValueOnce([]);
+    fns.delete.mockImplementation(() => {
+      throw new Error('parent row is still referenced by descendants');
+    });
+    vi.mocked(getSessionIngestDO).mockReturnValue({
+      isDeleted: vi.fn(async () => true).mockResolvedValueOnce(false),
+    } as never);
+
+    const res = await makeApiApp().fetch(
+      new Request('http://local/session', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sessionId: 'ses_12345678901234567890123456' }),
+      }),
+      makeTestEnv()
+    );
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ success: false, error: 'session_deleted' });
+    expect(fns.delete).not.toHaveBeenCalled();
+    expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+  });
+
+  it('POST /session keeps a newly created row when the ingest tombstone is absent', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValueOnce([{ blocked_reason: null }]);
+    fns.insertResult.mockResolvedValueOnce([
+      {
+        session_id: 'ses_12345678901234567890123456',
+        created_at: '2026-01-01T00:00:00.000Z',
+        updated_at: '2026-01-01T00:00:00.000Z',
+        title: null,
+        created_on_platform: null,
+        organization_id: null,
+        git_url: null,
+        git_branch: null,
+        parent_session_id: null,
+        status: null,
+        status_updated_at: null,
+      },
+    ]);
+    const isDeleted = vi.fn(async () => false);
+    vi.mocked(getSessionIngestDO).mockReturnValue({ isDeleted } as never);
+    vi.mocked(getSessionAccessCacheDO).mockReturnValue({
+      putValidated: vi.fn(async () => undefined),
+    } as never);
+
+    const res = await makeApiApp().fetch(
+      new Request('http://local/session', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sessionId: 'ses_12345678901234567890123456' }),
+      }),
+      makeTestEnv()
+    );
+
+    expect(res.status).toBe(200);
+    expect(isDeleted).toHaveBeenCalledTimes(2);
+    expect(fns.delete).not.toHaveBeenCalled();
+    expect(notifyUserSessionEvent).toHaveBeenCalledWith(
+      expect.anything(),
+      'usr_test',
+      expect.objectContaining({ type: 'session.created' })
+    );
+  });
+
+  it('POST /session removes a newly created row when the tombstone check fails', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValueOnce([{ blocked_reason: null }]);
+    fns.insertResult.mockResolvedValueOnce([
+      {
+        session_id: 'ses_12345678901234567890123456',
+        created_at: '2026-01-01T00:00:00.000Z',
+        updated_at: '2026-01-01T00:00:00.000Z',
+        title: null,
+        created_on_platform: null,
+        organization_id: null,
+        git_url: null,
+        git_branch: null,
+        parent_session_id: null,
+        status: null,
+        status_updated_at: null,
+      },
+    ]);
+    vi.mocked(getSessionIngestDO).mockReturnValue({
+      isDeleted: vi.fn(async () => {
+        throw new Error('DO unavailable');
+      }),
+    } as never);
+    const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    try {
+      const res = await makeApiApp().fetch(
+        new Request('http://local/session', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ sessionId: 'ses_12345678901234567890123456' }),
+        }),
+        makeTestEnv()
+      );
+      expect(res.status).toBe(500);
+    } finally {
+      consoleWarn.mockRestore();
+      consoleError.mockRestore();
+    }
+
+    expect(fns.delete).toHaveBeenCalledTimes(1);
+    expect(notifyUserSessionEvent).not.toHaveBeenCalled();
   });
 
   it('POST /session caches a newly created personal session', async () => {

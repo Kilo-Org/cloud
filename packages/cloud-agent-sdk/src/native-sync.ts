@@ -1,10 +1,22 @@
 import { z } from 'zod';
 import {
   fetchNativeSnapshot,
-  type NativeMessage,
   type NativeSnapshot,
+  type NativeSnapshotMessage,
+  type NativeSnapshotSession,
 } from './native-sync-snapshot';
+import { applyNativeEvent, applyNativeSessionEvent } from './native-conversation-reducer';
+import {
+  reduceNativePendingRequests,
+  type NativePendingRequests,
+} from './native-conversation-source';
 import { cloudAgentSdkRuntime } from './runtime';
+import {
+  hasUnresolvedKilo2Assets,
+  kilo2AssetKey,
+  readKilo2FileReferences,
+  type Kilo2FileReference,
+} from './kilo2-source-messages';
 
 const tenantSchema = z.object({ type: z.enum(['user', 'organization']), id: z.string() });
 const envelopeSchema = z.object({
@@ -51,10 +63,18 @@ export type NativePresenceState = {
   instances: z.infer<typeof instanceSchema>[];
   error?: string | undefined;
 };
+
 export type NativeSessionState = {
   connection: NativeConnection;
   runnerConnected: boolean;
-  messages: NativeMessage[];
+  /** Snapshot fields accept undefined so merged state patches can explicitly clear them. */
+  session?: NativeSnapshotSession | undefined;
+  snapshot?: { position: number; revision: number } | undefined;
+  /** Canonical message identities awaiting a revision-pinned native snapshot. */
+  pendingSnapshotMessageIDs?: string[] | undefined;
+  assetURLs?: Readonly<Record<string, string>> | undefined;
+  messages: NativeSnapshotMessage[];
+  pending: NativePendingRequests;
   events: NativeEvent[];
   commands: Record<string, 'queued' | 'delivered' | 'expired'>;
   error?: string | undefined;
@@ -118,10 +138,11 @@ export class NativeSyncError extends Error {
     this.name = 'NativeSyncError';
   }
 }
-const record = (value: unknown): Record<string, unknown> =>
-  value !== null && typeof value === 'object' && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {};
+const recordSchema = z.record(z.string(), z.unknown());
+function record(value: unknown) {
+  const parsed = recordSchema.safeParse(value);
+  return parsed.success ? parsed.data : {};
+}
 const reason = (error: unknown) =>
   error instanceof Error ? error['message'] : 'Native connection failed';
 /**
@@ -131,6 +152,112 @@ const reason = (error: unknown) =>
 const isPermanent = (error: unknown) =>
   (error instanceof NativeSyncError && (error.status === 401 || error.status === 403)) ||
   (error instanceof Error && 'code' in error && error.code === 'session_deleted');
+
+// Count UTF-16 storage conservatively for raw frames and retained parsed replay.
+const liveFrameBytes = 512 * 1024;
+const liveBacklogBytes = 4 * 1024 * 1024;
+const liveBacklogCount = 1024;
+type SocketEpoch = {
+  signal: AbortSignal;
+  current: () => boolean;
+  retain: (bytes: number) => boolean;
+  release: (bytes: number) => void;
+  fail: (error: unknown) => void;
+};
+
+type NativeRecoveryRequirement = {
+  frame: NativeEvent;
+  messageID: string;
+  revision: number;
+  position: number;
+  files: Kilo2FileReference[];
+};
+
+/** A newer unrelated snapshot is not proof that a missing native tool was stored. */
+function snapshotCoversLiveGap(
+  snapshot: NativeSnapshot,
+  requirement: NativeRecoveryRequirement
+): boolean {
+  if (snapshot.revision <= requirement.revision || snapshot.position < requirement.position)
+    return false;
+  const item = snapshot.messages.find(item => item.message.id === requirement.messageID);
+  if (!item || item.incomplete || hasUnresolvedKilo2Assets(item.message, snapshot.assetURLs))
+    return false;
+  const files = readKilo2FileReferences(item.message);
+  if (
+    requirement.files.some(
+      expected =>
+        !files.some(
+          file =>
+            file.id === expected.id && file.uri === expected.uri && file.mime === expected.mime
+        )
+    )
+  )
+    return false;
+  const native = record(record(requirement.frame.body)['data']);
+  const data = record(native['data']);
+  const created = native['created'];
+  if (requirement.frame.type.startsWith('session.tool.')) {
+    let part: NonNullable<NativeSnapshotMessage['message']['content']>[number] | undefined;
+    for (let index = (item.message.content?.length ?? 0) - 1; index >= 0; index--) {
+      const candidate = item.message.content?.[index];
+      if (candidate?.type === 'tool' && candidate.id === data['id']) {
+        part = candidate;
+        break;
+      }
+    }
+    if (!part?.state) return false;
+    if (requirement.frame.type === 'session.tool.called')
+      return (
+        typeof created === 'number' && (part.time?.ran ?? part.time?.completed ?? -1) >= created
+      );
+    if (
+      requirement.frame.type === 'session.tool.success' ||
+      requirement.frame.type === 'session.tool.failed'
+    )
+      return (
+        typeof created === 'number' &&
+        (part.time?.completed ?? -1) >= created &&
+        (part.state.status === 'completed' || part.state.status === 'error')
+      );
+    return (
+      part.state.status !== 'streaming' ||
+      (requirement.frame.type === 'session.tool.input.ended' && part.state.input === data['text'])
+    );
+  }
+  if (/^session\.(text|reasoning)\./.test(requirement.frame.type))
+    return item.message.time.completed !== undefined;
+  if (requirement.frame.type === 'session.inbox.enqueued')
+    return typeof created === 'number' && item.message.time.created >= created;
+  return true;
+}
+
+/** Non-content-addressed native files need fresh authorization after their content is replaced. */
+function nativeAssetURLsAfterMessages(
+  previous: NativeSnapshotMessage[],
+  messages: NativeSnapshotMessage[],
+  assetURLs: Readonly<Record<string, string>> | undefined
+) {
+  if (!assetURLs) return assetURLs;
+  let changed: Record<string, string> | undefined;
+  for (const item of messages) {
+    const before = previous.find(candidate => candidate.message.id === item.message.id);
+    if (before?.message === item.message) continue;
+    for (const file of readKilo2FileReferences(item.message)) {
+      const key = kilo2AssetKey(file.id, file.uri, file.mime);
+      if (/^(media:|data:|https?:\/\/)/.test(file.uri) || assetURLs[key] === undefined) continue;
+      const replaced =
+        file.contentIndex === undefined
+          ? before?.message.files !== item.message.files
+          : before?.message.content?.[file.contentIndex]?.state?.content !==
+            item.message.content?.[file.contentIndex]?.state?.content;
+      if (!replaced) continue;
+      changed ??= { ...assetURLs };
+      delete changed[key];
+    }
+  }
+  return changed ?? assetURLs;
+}
 
 /** Native v2 only. The legacy session-ingest/cloud-agent transport is deliberately unchanged. */
 export class NativeSyncClient {
@@ -151,11 +278,13 @@ export class NativeSyncClient {
     const pending = (async () => {
       const credential = await this.options.getCredential();
       return grantSchema.parse(
-        await this.json('/v1/auth/exchange', {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${credential}` },
-          body: JSON.stringify({ version: 1, ...(organizationID ? { organizationID } : {}) }),
-        })
+        await (
+          await this.response('/v1/auth/exchange', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${credential}` },
+            body: JSON.stringify({ version: 1, ...(organizationID ? { organizationID } : {}) }),
+          })
+        ).json()
       );
     })();
     this.grants.set(key, pending);
@@ -166,7 +295,7 @@ export class NativeSyncClient {
       throw error;
     }
   }
-  private async json(path: string, init?: RequestInit): Promise<unknown> {
+  private async response(path: string, init?: RequestInit): Promise<Response> {
     const response = await this.fetcher(new URL(path, this.options.baseUrl).href, {
       ...init,
       headers: { 'Content-Type': 'application/json', ...init?.headers },
@@ -186,24 +315,91 @@ export class NativeSyncClient {
         retryAfterMs
       );
     }
-    return response.json();
+    return response;
   }
-  async request<T>(path: string, init?: RequestInit, organizationID?: string): Promise<T> {
+  private async authorizedResponse(
+    path: string,
+    init?: RequestInit,
+    organizationID?: string
+  ): Promise<Response> {
     const grant = await this.grant(organizationID);
+    if (init?.signal?.aborted) throw new NativeSyncError('request_canceled');
     try {
-      // Snapshot parsing lives at the snapshot boundary; all other callers validate their responses below.
-      return (await this.json(path, {
+      return await this.response(path, {
         ...init,
         headers: { ...init?.headers, Authorization: `Bearer ${grant.token}` },
-      })) as T;
+      });
     } catch (error) {
+      if (init?.signal?.aborted) throw new NativeSyncError('request_canceled');
       if (!(error instanceof NativeSyncError) || error['status'] !== 401) throw error;
       this.grants.delete(organizationID ?? '');
       const renewed = await this.grant(organizationID);
-      return (await this.json(path, {
+      if (init?.signal?.aborted) throw new NativeSyncError('request_canceled');
+      return await this.response(path, {
         ...init,
         headers: { ...init?.headers, Authorization: `Bearer ${renewed.token}` },
-      })) as T;
+      });
+    }
+  }
+  async request<T>(path: string, init?: RequestInit, organizationID?: string): Promise<T> {
+    // Snapshot parsing lives at its canonical boundary; other callers validate below.
+    try {
+      return (await (await this.authorizedResponse(path, init, organizationID)).json()) as T;
+    } catch (error) {
+      if (init?.signal?.aborted) throw new NativeSyncError('request_canceled');
+      throw error;
+    }
+  }
+  private async requestAsset(
+    path: string,
+    advertisedBytes: number,
+    init?: RequestInit,
+    organizationID?: string
+  ): Promise<ArrayBuffer> {
+    try {
+      const response = await this.authorizedResponse(path, init, organizationID);
+      const reader = response.body?.getReader();
+      try {
+        const length = response.headers.get('Content-Length');
+        if (length !== null) {
+          if (!/^\d+$/.test(length) || !Number.isSafeInteger(Number(length))) {
+            throw new NativeSyncError('invalid_content_length');
+          }
+          if (Number(length) > advertisedBytes) {
+            throw new NativeSyncError('blob_hash_mismatch');
+          }
+        }
+        if (!reader) {
+          if (advertisedBytes === 0) return new ArrayBuffer(0);
+          throw new NativeSyncError('blob_hash_mismatch');
+        }
+        const bytes = new Uint8Array(advertisedBytes);
+        let offset = 0;
+        while (true) {
+          const result = await reader.read();
+          if (result.done) {
+            if (offset !== advertisedBytes) throw new NativeSyncError('blob_hash_mismatch');
+            return bytes.buffer;
+          }
+          if (result.value.byteLength > advertisedBytes - offset) {
+            throw new NativeSyncError('blob_hash_mismatch');
+          }
+          bytes.set(result.value, offset);
+          offset += result.value.byteLength;
+        }
+      } catch (error) {
+        try {
+          await reader?.cancel();
+        } catch {
+          // The bounded read fails closed even if the stream cannot be canceled.
+        }
+        throw error;
+      } finally {
+        reader?.releaseLock();
+      }
+    } catch (error) {
+      if (init?.signal?.aborted) throw new NativeSyncError('request_canceled');
+      throw error;
     }
   }
   async listSessions(cursor?: string) {
@@ -217,7 +413,12 @@ export class NativeSyncClient {
     path: string,
     ticketPath: string,
     organizationID: string | undefined,
-    onFrame: (frame: NativeEvent, send: (value: unknown) => boolean) => Promise<void> | void,
+    onFrame: (
+      frame: NativeEvent,
+      send: (value: unknown) => boolean,
+      epoch: SocketEpoch,
+      bytes: number
+    ) => Promise<void> | void,
     onConnection: (state: NativeConnection, error?: string) => void
   ) {
     let stopped = false;
@@ -226,7 +427,7 @@ export class NativeSyncClient {
     let renewalTimer: ReturnType<typeof setTimeout> | undefined;
     let reconnectAfterMs = 1000;
     let generation = 0;
-    let frames = Promise.resolve();
+    let retire: (() => void) | undefined;
     const send = (value: unknown) => {
       if (stopped || socket?.readyState !== 1) return false;
       socket.send(JSON.stringify(value));
@@ -269,10 +470,12 @@ export class NativeSyncClient {
     };
     const reconnect = (error?: unknown) => {
       if (stopped) return;
-      // Retire the current socket so its queued frames and renewal cannot act.
       generation++;
+      retire?.();
+      retire = undefined;
       clearTimeout(renewalTimer);
       socket?.close();
+      socket = undefined;
       onConnection('disconnected', error ? reason(error) : undefined);
       if (isPermanent(error)) {
         stopped = true;
@@ -290,28 +493,57 @@ export class NativeSyncClient {
     const connect = async () => {
       if (stopped) return;
       const current = ++generation;
+      const controller = new AbortController();
+      const queue: { data: string; bytes: number }[] = [];
+      let retainedBytes = 0;
+      let retainedCount = 0;
+      let draining = false;
+      const epoch: SocketEpoch = {
+        signal: controller.signal,
+        current: () => !stopped && current === generation && !controller.signal.aborted,
+        retain: bytes => {
+          if (
+            !epoch.current() ||
+            retainedCount >= liveBacklogCount ||
+            retainedBytes + bytes > liveBacklogBytes
+          )
+            return false;
+          retainedCount++;
+          retainedBytes += bytes;
+          return true;
+        },
+        release: bytes => {
+          retainedCount--;
+          retainedBytes -= bytes;
+        },
+        fail: error => {
+          if (epoch.current()) reconnect(error);
+        },
+      };
+      retire = () => {
+        for (const item of queue) epoch.release(item.bytes);
+        queue.length = 0;
+        controller.abort();
+      };
       onConnection('connecting');
       try {
         const ticket = await mint();
-        if (stopped || current !== generation) return;
+        if (!epoch.current()) return;
         const url = new URL(path, this.options.baseUrl);
         url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
         const next = new this.socketConstructor(url.href, [`kilo-session-ticket.${ticket.ticket}`]);
         socket = next;
-        const sendCurrent = (value: unknown) => !stopped && current === generation && send(value);
-        next.onerror = () => {
-          if (current === generation) next.close();
-        };
-        next.onclose = () => {
-          if (current === generation) reconnect();
-        };
-        next.onmessage = event => {
-          if (typeof event['data'] !== 'string') return;
-          const data = event['data'];
-          frames = frames
-            .then(async () => {
-              if (stopped || current !== generation) return;
-              const frame = envelopeSchema.parse(JSON.parse(data));
+        const sendCurrent = (value: unknown) => epoch.current() && send(value);
+        const drain = async () => {
+          if (draining) return;
+          draining = true;
+          try {
+            while (epoch.current() && queue.length > 0) {
+              const item = queue.shift();
+              if (!item) return;
+              epoch.release(item.bytes);
+              const frame = envelopeSchema.parse(JSON.parse(item.data));
+              item.data = '';
               if (frame.channel === 'control') {
                 const body = record(frame.body);
                 if (frame.type === 'hello') {
@@ -322,19 +554,40 @@ export class NativeSyncClient {
                 }
                 if (frame.type === 'reauth_required') {
                   const ticket = await mint();
-                  if (!stopped && current === generation)
-                    send({ type: 'reauth', ticket: ticket.ticket });
+                  if (!epoch.current()) return;
+                  sendCurrent({ type: 'reauth', ticket: ticket.ticket });
                 }
                 if (frame.type === 'reauthorized') scheduleRenewal(body);
               }
-              await onFrame(frame, sendCurrent);
-            })
-            .catch((error: unknown) => {
-              if (!stopped && current === generation) reconnect(error);
-            });
+              await onFrame(frame, sendCurrent, epoch, item.bytes);
+            }
+          } catch (error) {
+            epoch.fail(error);
+          } finally {
+            draining = false;
+          }
+        };
+        next.onerror = () => {
+          if (epoch.current()) next.close();
+        };
+        next.onclose = () => epoch.fail(undefined);
+        next.onmessage = event => {
+          if (!epoch.current() || typeof event['data'] !== 'string') return;
+          const data = event['data'];
+          const bytes = data.length * 2;
+          if (bytes > liveFrameBytes || !epoch.retain(bytes)) {
+            epoch.fail(
+              new NativeSyncError(
+                bytes > liveFrameBytes ? 'live_frame_too_large' : 'live_backlog_overflow'
+              )
+            );
+            return;
+          }
+          queue.push({ data, bytes });
+          void drain();
         };
       } catch (error) {
-        if (current === generation) reconnect(error);
+        epoch.fail(error);
       }
     };
     void connect();
@@ -343,9 +596,12 @@ export class NativeSyncClient {
       close: () => {
         stopped = true;
         generation++;
+        retire?.();
+        retire = undefined;
         clearTimeout(reconnectTimer);
         clearTimeout(renewalTimer);
         socket?.close();
+        socket = undefined;
       },
     };
   }
@@ -438,6 +694,21 @@ export class NativeSyncClient {
       },
     };
   }
+  /** Read canonical native history using the same tenant-scoped grant as live control. */
+  getSnapshot(
+    sessionID: string,
+    organizationID?: string,
+    signal?: AbortSignal
+  ): Promise<NativeSnapshot> {
+    return fetchNativeSnapshot(
+      <T>(route: string, init?: RequestInit) => this.request<T>(route, init, organizationID),
+      sessionID,
+      signal,
+      (route: string, advertisedBytes: number, init?: RequestInit) =>
+        this.requestAsset(route, advertisedBytes, init, organizationID)
+    );
+  }
+
   connectSession(
     sessionID: string,
     listener: (state: NativeSessionState) => void,
@@ -448,6 +719,7 @@ export class NativeSyncClient {
       connection: 'connecting',
       runnerConnected: false,
       messages: [],
+      pending: { permissions: [], questions: [] },
       events: [],
       commands: {},
     };
@@ -455,18 +727,31 @@ export class NativeSyncClient {
     let snapshotPosition = -1;
     let identity: { incarnation: string; runID?: string } | undefined;
     let closed = false;
-    let recoveryTimer: ReturnType<typeof setTimeout> | undefined;
-    let cancelRecovery: (() => void) | undefined;
-    let recovery: { attempt: number; replay: NativeEvent[] } | undefined;
+    type Recovery = {
+      attempt: number;
+      replay: { frame: NativeEvent; bytes: number }[];
+      requirements: Map<number, NativeRecoveryRequirement>;
+      completed: boolean;
+      cancel: () => void;
+    };
+    let recovery: Recovery | undefined;
+    let integrityError: string | undefined;
+    let failureError: string | undefined;
+    let integrityGap = false;
     let remoteState: NativeEvent | undefined;
     const clearedIDs = new Set<string>();
     const publish = (patch: Partial<NativeSessionState>) => {
       if (closed) return;
-      state = { ...state, ...patch };
+      if ('error' in patch) failureError = patch.error;
+      const error =
+        integrityError && failureError && integrityError !== failureError
+          ? `${integrityError} ${failureError}`
+          : (integrityError ?? failureError);
+      state = { ...state, ...patch, error };
       listener(state);
     };
-    const visible = (messages: NativeMessage[]) =>
-      messages.filter(message => !clearedIDs.has(message.id));
+    const visible = (messages: NativeSnapshotMessage[]) =>
+      clearedIDs.size === 0 ? messages : messages.filter(item => !clearedIDs.has(item.message.id));
     const beyond = (frame: NativeEvent, position: number) => {
       const syncPosition = record(frame.body)['syncPosition'];
       const ephemeral = frame.type.endsWith('.delta') || frame.type === 'session.tool.progress';
@@ -476,85 +761,216 @@ export class NativeSyncClient {
         (ephemeral && syncPosition === position)
       );
     };
-    const readSnapshot = () =>
-      fetchNativeSnapshot(
-        <T>(route: string) => this.request<T>(route, undefined, organizationID),
-        sessionID
-      );
-    const snapshot = async () => {
-      const next = await readSnapshot();
-      // A recovery read that finished first may already hold a newer durable position.
-      if (next.position < snapshotPosition) return;
+    const readSnapshot = (epoch: SocketEpoch, signal = epoch.signal) =>
+      this.getSnapshot(sessionID, organizationID, signal);
+    const snapshot = async (epoch: SocketEpoch) => {
+      const next = await readSnapshot(epoch);
+      if (!epoch.current() || next.position < snapshotPosition) return;
       snapshotPosition = next.position;
-      publish({ messages: visible(next.messages) });
+      publish({
+        session: next.session,
+        snapshot: { position: next.position, revision: next.revision },
+        messages: visible(next.messages),
+        assetURLs: next.assetURLs,
+        pendingSnapshotMessageIDs: state.pendingSnapshotMessageIDs?.filter(
+          id =>
+            !next.messages.some(
+              item =>
+                item.message.id === id &&
+                !item.incomplete &&
+                !hasUnresolvedKilo2Assets(item.message, next.assetURLs)
+            )
+        ),
+      });
     };
-    // The producer uploads asynchronously. Recover omitted or deferred parts only
-    // from a complete durable snapshot, never by declaring partial text complete.
-    // Recovery runs beside the live stream and reapplies events newer than each snapshot.
-    const recoverIncomplete = () => {
-      if (recovery) {
-        recovery.attempt = 0;
+    const markGap = () => {
+      integrityGap = true;
+      integrityError = 'Native transcript may be incomplete because live replay is unavailable.';
+      publish({});
+    };
+    const recoverIncomplete = (epoch: SocketEpoch, force = false) => {
+      if (
+        recovery ||
+        !epoch.current() ||
+        (!force &&
+          state.session &&
+          !state.messages.some(message => message.incomplete) &&
+          !state.pendingSnapshotMessageIDs?.length)
+      )
         return;
-      }
-      if (!state.messages.some(message => message.incomplete)) return;
-      const current: { attempt: number; replay: NativeEvent[] } = { attempt: 0, replay: [] };
+      const controller = new AbortController();
+      const current: Recovery = {
+        attempt: 0,
+        replay: [],
+        requirements: new Map(),
+        completed: false,
+        cancel: () => {
+          if (current.replay.length > 0) markGap();
+          dispose();
+        },
+      };
       recovery = current;
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      let wake: (() => void) | undefined;
+      const dispose = () => {
+        clearTimeout(timer);
+        controller.abort();
+        wake?.();
+        for (const item of current.replay) epoch.release(item.bytes);
+        current.replay.length = 0;
+        current.requirements.clear();
+        if (recovery === current) recovery = undefined;
+      };
+      epoch.signal.addEventListener('abort', current.cancel, { once: true });
       void (async () => {
         for (;;) {
+          // ES2022/Hermes consumers do not provide Promise.withResolvers.
           await new Promise<void>(resolve => {
-            cancelRecovery = resolve;
-            recoveryTimer = setTimeout(resolve, 250 * 2 ** current.attempt++);
+            wake = resolve;
+            timer = setTimeout(resolve, 250 * 2 ** current.attempt++);
           });
-          if (closed) return;
+          if (!epoch.current() || recovery !== current) return;
           let next: NativeSnapshot;
           try {
-            next = await readSnapshot();
+            next = await readSnapshot(epoch, controller.signal);
           } catch (error) {
-            // A transient read keeps the remaining attempts; permanent authorization and
-            // deletion failures end recovery.
-            if (isPermanent(error) || current.attempt >= 4) {
-              publish({ error: reason(error) });
+            if (!epoch.current() || recovery !== current) return;
+            if (isPermanent(error)) {
+              epoch.fail(error);
+              return;
+            }
+            if (current.attempt >= 4) {
+              integrityError = `Native transcript recovery is incomplete: ${reason(error)}`;
+              publish({});
               return;
             }
             continue;
           }
+          if (!epoch.current() || recovery !== current) return;
           const stale = next.position < snapshotPosition;
           let messages = next.messages;
-          for (const frame of current.replay)
-            if (beyond(frame, next.position)) messages = applyNativeEvent(messages, frame);
-          // A snapshot behind the published position yields no state; its frames still replay.
-          if (!stale) snapshotPosition = next.position;
-          if (!stale) publish({ messages: visible(messages) });
-          current.replay = current.replay.filter(frame => beyond(frame, next.position));
-          if (!state.messages.some(item => item.incomplete) || current.attempt >= 4) return;
+          let session = next.session;
+          let assetURLs = next.assetURLs;
+          const requiredReplay = new Set(current.requirements.keys());
+          if (!stale) {
+            for (const [seq, requirement] of current.requirements)
+              if (snapshotCoversLiveGap(next, requirement)) current.requirements.delete(seq);
+          }
+          for (const item of current.replay) {
+            const ephemeral =
+              item.frame.type.endsWith('.delta') || item.frame.type === 'session.tool.progress';
+            if (
+              !ephemeral &&
+              requiredReplay.has(item.frame.seq) &&
+              !current.requirements.has(item.frame.seq)
+            )
+              continue;
+            if (
+              !beyond(item.frame, next.position) &&
+              !current.requirements.has(item.frame.seq) &&
+              !(ephemeral && requiredReplay.has(item.frame.seq))
+            )
+              continue;
+            const previous = messages;
+            messages = applyNativeEvent(messages, item.frame, session);
+            assetURLs = nativeAssetURLsAfterMessages(previous, messages, assetURLs);
+            session = applyNativeSessionEvent(session, item.frame);
+          }
+          if (!stale) {
+            snapshotPosition = next.position;
+            publish({
+              session,
+              snapshot: { position: next.position, revision: next.revision },
+              messages: visible(messages),
+              assetURLs,
+              pendingSnapshotMessageIDs: state.pendingSnapshotMessageIDs?.filter(
+                id =>
+                  [...current.requirements.values()].some(
+                    requirement => requirement.messageID === id
+                  ) ||
+                  !next.messages.some(
+                    item =>
+                      item.message.id === id &&
+                      !item.incomplete &&
+                      !hasUnresolvedKilo2Assets(item.message, next.assetURLs)
+                  )
+              ),
+            });
+          }
+          // A stale snapshot cannot prune replay needed by a later consistent read.
+          if (!stale) {
+            current.replay = current.replay.filter(item => {
+              if (beyond(item.frame, next.position) || current.requirements.has(item.frame.seq))
+                return true;
+              epoch.release(item.bytes);
+              return false;
+            });
+          }
+          if (
+            state.session &&
+            !state.messages.some(
+              item => item.incomplete || hasUnresolvedKilo2Assets(item.message, state.assetURLs)
+            ) &&
+            !state.pendingSnapshotMessageIDs?.length
+          ) {
+            if (!integrityGap) {
+              integrityError = undefined;
+              publish({ error: undefined });
+            }
+            current.completed = true;
+            return;
+          }
+          if (current.attempt >= 4) {
+            integrityError = 'Native transcript recovery is incomplete.';
+            publish({});
+            return;
+          }
         }
       })()
-        .catch((error: unknown) => publish({ error: reason(error) }))
+        .catch((error: unknown) => {
+          if (epoch.current() && recovery === current) publish({ error: reason(error) });
+        })
         .finally(() => {
-          if (recovery === current) recovery = undefined;
+          epoch.signal.removeEventListener('abort', current.cancel);
+          if (!current.completed && current.replay.length > 0 && epoch.current()) markGap();
+          dispose();
         });
     };
     const connection = this.socket(
       `${path}/live`,
       `${path}/live-ticket`,
       organizationID,
-      async (frame, send) => {
+      async (frame, send, epoch, bytes) => {
         const body = record(frame.body);
         if (frame.channel === 'control') {
           if (frame.type === 'hello') {
             publish({ runnerConnected: body['runnerConnected'] === true });
             if (lastSeq === undefined) {
-              await snapshot();
+              await snapshot(epoch);
+              if (!epoch.current()) return;
               lastSeq = frame.seq;
             }
-            if (!closed) send({ type: 'subscribe', afterSeq: lastSeq });
-            recoverIncomplete();
+            send({ type: 'subscribe', afterSeq: lastSeq });
+            recoverIncomplete(epoch);
           }
           if (frame.type === 'reset_required') {
-            await snapshot();
+            markGap();
+            recovery?.cancel();
+            await snapshot(epoch);
+            if (!epoch.current()) return;
             lastSeq = typeof body['seq'] === 'number' ? body['seq'] : frame.seq;
-            if (!closed) send({ type: 'subscribe', afterSeq: lastSeq });
-            recoverIncomplete();
+            send({ type: 'subscribe', afterSeq: lastSeq });
+            recoverIncomplete(epoch);
+          }
+          if (
+            frame.type === 'subscribed' &&
+            state.session &&
+            !integrityGap &&
+            !state.messages.some(message => message.incomplete) &&
+            !state.pendingSnapshotMessageIDs?.length
+          ) {
+            integrityError = undefined;
+            publish({ error: undefined });
           }
           if (frame.type === 'runner_status') {
             if (body['runnerConnected'] !== true) identity = undefined;
@@ -572,6 +988,60 @@ export class NativeSyncClient {
           return;
         }
         if (frame.channel !== 'events' || (lastSeq !== undefined && frame.seq <= lastSeq)) return;
+        // Validate/project before accepting the relay cursor. A malformed native
+        // value must not acknowledge an event that this client failed to retain.
+        const messages = beyond(frame, snapshotPosition)
+          ? visible(applyNativeEvent(state.messages, frame, state.session))
+          : state.messages;
+        const pending = reduceNativePendingRequests(state.pending, frame);
+        const session = applyNativeSessionEvent(state.session, frame);
+        const assetURLs = nativeAssetURLsAfterMessages(state.messages, messages, state.assetURLs);
+        const newGaps = messages.filter(item => {
+          const previous = state.messages.find(previous => previous.message.id === item.message.id);
+          const missingDependency =
+            item.incomplete &&
+            (!previous?.incomplete || (item !== previous && item.message === previous.message));
+          return (
+            missingDependency ||
+            (!item.incomplete &&
+              hasUnresolvedKilo2Assets(item.message, assetURLs) &&
+              !state.pendingSnapshotMessageIDs?.includes(item.message.id))
+          );
+        });
+        let pendingSnapshotMessageIDs = state.pendingSnapshotMessageIDs;
+        if (newGaps.length)
+          pendingSnapshotMessageIDs = [
+            ...new Set([
+              ...(pendingSnapshotMessageIDs ?? []),
+              ...newGaps.map(item => item.message.id),
+            ]),
+          ];
+        if (frame.type === 'session.moved') {
+          const eventID = z.string().startsWith('evt_').parse(record(body['data'])['id']);
+          const messageID = `msg_${eventID.slice(4)}`;
+          if (!messages.some(item => item.message.id === messageID && !item.incomplete))
+            pendingSnapshotMessageIDs = [
+              ...new Set([...(pendingSnapshotMessageIDs ?? []), messageID]),
+            ];
+        }
+        if (!recovery && (!session || newGaps.length || pendingSnapshotMessageIDs?.length))
+          recoverIncomplete(epoch, true);
+        if (recovery) {
+          if (!epoch.retain(bytes)) {
+            epoch.fail(new NativeSyncError('live_backlog_overflow'));
+            return;
+          }
+          recovery.replay.push({ frame, bytes });
+          for (const item of newGaps)
+            recovery.requirements.set(frame.seq, {
+              frame,
+              messageID: item.message.id,
+              revision: state.snapshot?.revision ?? -1,
+              position:
+                typeof body['syncPosition'] === 'number' ? body['syncPosition'] : snapshotPosition,
+              files: readKilo2FileReferences(item.message),
+            });
+        }
         lastSeq = frame.seq;
         if (typeof body['incarnation'] === 'string')
           identity = {
@@ -587,23 +1057,38 @@ export class NativeSyncClient {
           frame.type === 'remote.state'
             ? [frame]
             : [...(remoteState ? [remoteState] : []), ...recent, frame];
-        recovery?.replay.push(frame);
         publish({
           events,
-          messages: beyond(frame, snapshotPosition)
-            ? visible(applyNativeEvent(state.messages, frame))
-            : state.messages,
+          session,
+          pending,
+          messages,
+          assetURLs,
+          pendingSnapshotMessageIDs,
         });
         if (
-          frame.type.startsWith('session.execution.') &&
-          frame.type !== 'session.execution.started'
+          frame.type === 'session.moved' ||
+          (frame.type.startsWith('session.execution.') &&
+            frame.type !== 'session.execution.started') ||
+          newGaps.length ||
+          !session
         )
-          recoverIncomplete();
+          recoverIncomplete(epoch);
       },
       (connection, error) => {
+        const backlog = error === 'live_backlog_overflow' || error === 'live_frame_too_large';
+        if (backlog) {
+          if (lastSeq === undefined) integrityGap = true;
+          const exceeded =
+            error === 'live_frame_too_large'
+              ? 'live frame exceeded the size limit'
+              : 'live backlog exceeded the limit';
+          integrityError = integrityGap
+            ? `Native transcript may be incomplete because its ${exceeded}.`
+            : `Native ${exceeded}. Recovering ordered replay.`;
+        }
         publish({
           connection,
-          error,
+          error: backlog ? undefined : error,
           ...(connection !== 'connected' ? { runnerConnected: false } : {}),
         });
       }
@@ -656,7 +1141,7 @@ export class NativeSyncClient {
       sendCommand: (input: string, args?: string) => {
         const name = input.trim().replace(/^\//, '').split(/\s+/, 1)[0];
         if (name === 'clear') {
-          for (const message of state.messages) clearedIDs.add(message.id);
+          for (const item of state.messages) clearedIDs.add(item.message.id);
           publish({ messages: [] });
           return Promise.resolve('local-clear');
         }
@@ -682,115 +1167,28 @@ export class NativeSyncClient {
         return result.status;
       },
       clear: () => {
-        for (const message of state.messages) clearedIDs.add(message.id);
+        for (const item of state.messages) clearedIDs.add(item.message.id);
         publish({ messages: [] });
       },
       close: () => {
         closed = true;
-        clearTimeout(recoveryTimer);
-        cancelRecovery?.();
         connection.close();
+        recovery?.cancel();
+        state = {
+          ...state,
+          session: undefined,
+          snapshot: undefined,
+          pendingSnapshotMessageIDs: undefined,
+          assetURLs: undefined,
+          messages: [],
+          pending: { permissions: [], questions: [] },
+          events: [],
+          commands: {},
+        };
+        clearedIDs.clear();
+        remoteState = undefined;
+        identity = undefined;
       },
     };
   }
-}
-
-/** Projects native public events, not the unrelated v1 transcript format. */
-export function applyNativeEvent(messages: NativeMessage[], frame: NativeEvent): NativeMessage[] {
-  const event = record(record(frame.body)['data']);
-  const data = record(event['data']);
-  const messageID =
-    typeof data['assistantMessageID'] === 'string'
-      ? data['assistantMessageID']
-      : frame.type === 'session.message.content.updated' && typeof data['messageID'] === 'string'
-        ? data['messageID']
-        : undefined;
-  if (frame.type === 'session.step.started' && messageID) {
-    if (messages.some(message => message.id === messageID)) return messages;
-    return [...messages, { id: messageID, role: 'assistant', content: [], seq: frame.seq }];
-  }
-  if (frame.type === 'session.inbox.enqueued') {
-    const item = record(data['item']);
-    const payload = record(item['payload']);
-    const text =
-      item['type'] === 'user' && typeof payload['text'] === 'string' ? payload['text'] : undefined;
-    const inboxID = typeof data['inboxID'] === 'string' ? data['inboxID'] : undefined;
-    if (inboxID && text && !messages.some(entry => entry.id === inboxID))
-      return [...messages, { id: inboxID, role: 'user', content: text, seq: frame.seq }];
-  }
-  if (!messageID) return messages;
-  return messages.map(message => {
-    if (message.id !== messageID) return message;
-    const parts = Array.isArray(message['content'])
-      ? message['content'].map(part => ({ ...record(part) }))
-      : [];
-    const partOrdinals = message.partOrdinals
-      ? [...message.partOrdinals]
-      : parts.map((_, index) => index);
-    const ordinal = typeof data['ordinal'] === 'number' ? data['ordinal'] : 0;
-    const kind = frame.type.startsWith('session.reasoning.') ? 'reasoning' : 'text';
-    if (/^session\.(text|reasoning)\.(started|delta|ended)$/.test(frame.type)) {
-      let index = partOrdinals.indexOf(ordinal);
-      if (index < 0) {
-        index = parts.length;
-        partOrdinals.push(ordinal);
-      }
-      const previous = record(parts[index]);
-      parts[index] = {
-        ...previous,
-        type: kind,
-        text: frame.type.endsWith('.started')
-          ? ''
-          : frame.type.endsWith('.ended')
-            ? data['text']
-            : `${typeof previous['text'] === 'string' ? previous['text'] : ''}${typeof data['delta'] === 'string' ? data['delta'] : ''}`,
-      };
-      const ordered = partOrdinals
-        .map((ordinal, index) => ({ ordinal, part: parts[index] }))
-        .sort((a, b) => a.ordinal - b.ordinal);
-      return {
-        ...message,
-        content: ordered.map(item => item.part),
-        partOrdinals: ordered.map(item => item.ordinal),
-      };
-    }
-    if (frame.type.startsWith('session.tool.')) {
-      let index = parts.findIndex(part => part['id'] === data['id']);
-      if (index < 0) {
-        index = parts.length;
-        parts.push({ type: 'tool', id: data['id'], name: data['name'], state: {} });
-        partOrdinals.push((partOrdinals.at(-1) ?? -1) + 1);
-      }
-      const part = parts[index];
-      if (!part) return message;
-      const state = record(part['state']);
-      if (frame.type === 'session.tool.input.delta')
-        part['state'] = {
-          ...state,
-          status: 'streaming',
-          input: `${typeof state['input'] === 'string' ? state['input'] : ''}${typeof data['delta'] === 'string' ? data['delta'] : ''}`,
-        };
-      else if (frame.type === 'session.tool.input.ended')
-        part['state'] = { ...state, status: 'streaming', input: data['text'] };
-      else if (frame.type === 'session.tool.called')
-        part['state'] = { status: 'running', input: data['input'] };
-      else if (frame.type === 'session.tool.success')
-        part['state'] = {
-          ...state,
-          status: 'completed',
-          content: data['content'],
-          metadata: data['metadata'],
-        };
-      else if (frame.type === 'session.tool.failed')
-        part['state'] = { ...state, status: 'error', error: data['error'] };
-      else if (frame.type === 'session.tool.progress')
-        part['state'] = { ...state, metadata: data['metadata'] };
-      return { ...message, content: parts, partOrdinals };
-    }
-    if (frame.type === 'session.message.content.updated' && Array.isArray(data['content'])) {
-      const { partOrdinals: _replaced, ...rest } = message;
-      return { ...rest, content: data['content'] };
-    }
-    return message;
-  });
 }

@@ -9,6 +9,40 @@ const tokens = z.object({
   cache: z.object({ read: z.number(), write: z.number() }),
 });
 const error = z.object({ type: z.string(), message: z.string(), status: z.number().optional() });
+/** Native tool results carry files by URI, including stored media references. */
+export const kilo2FileContentSchema = z
+  .object({
+    type: z.literal('file'),
+    uri: z.string().min(1),
+    mime: z.string().min(1),
+    name: z.string().optional(),
+    text: z.string().optional(),
+  })
+  .passthrough();
+const toolContent = z.union([
+  kilo2FileContentSchema,
+  z
+    .object({ type: z.string(), text: z.string().optional() })
+    .passthrough()
+    .refine(value => value.type !== 'file', 'File content requires URI and MIME'),
+]);
+const fileAttachment = z
+  .object({
+    mime: z.string(),
+    name: z.string().optional(),
+    source: z.discriminatedUnion('type', [
+      z.object({ type: z.literal('inline') }),
+      z.object({ type: z.literal('uri'), uri: z.string() }),
+    ]),
+  })
+  .passthrough();
+const userFile = z.union([
+  fileAttachment.extend({ data: z.string() }),
+  fileAttachment.extend({
+    uri: z.string().regex(/^media:[0-9a-f]{64}$/),
+    data: z.never().optional(),
+  }),
+]);
 const content = z
   .object({
     type: z.string(),
@@ -19,9 +53,7 @@ const content = z
       .object({
         status: z.enum(['streaming', 'running', 'completed', 'error']),
         input: z.union([z.string(), z.record(z.string(), z.unknown())]),
-        content: z
-          .array(z.object({ type: z.string(), text: z.string().optional() }).passthrough())
-          .optional(),
+        content: z.array(toolContent).optional(),
         metadata: z.record(z.string(), z.unknown()).optional(),
         error: error.optional(),
       })
@@ -39,21 +71,7 @@ export const kilo2MessageSchema = z
     time: z.object({ created: timestamp, completed: timestamp.optional() }).passthrough(),
     text: z.string().optional(),
     content: z.array(content).optional(),
-    files: z
-      .array(
-        z
-          .object({
-            data: z.string(),
-            mime: z.string(),
-            name: z.string().optional(),
-            source: z.discriminatedUnion('type', [
-              z.object({ type: z.literal('inline') }),
-              z.object({ type: z.literal('uri'), uri: z.string() }),
-            ]),
-          })
-          .passthrough()
-      )
-      .optional(),
+    files: z.array(userFile).optional(),
     agent: z.string().optional(),
     model: model.optional(),
     cost: z.number().optional(),

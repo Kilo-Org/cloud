@@ -340,6 +340,13 @@ export const sendMessageNextPayloadSchema = z.discriminatedUnion('type', [
     type: z.literal('command'),
     command: z.string().min(1),
     arguments: z.string().max(CLOUD_AGENT_PROMPT_MAX_LENGTH).default(''),
+    mode: agentModeSendMessageSchema.optional(),
+    model: z.string().min(1).optional(),
+    variant: z
+      .string()
+      .max(50)
+      .regex(/^[a-zA-Z]+$/)
+      .optional(),
   }),
 ]);
 
@@ -819,8 +826,6 @@ export const baseCreatePreviewNextOutputSchema = z.object({
 
 export const basePreviewOptionsNextSchema = z.object({
   cloudAgentSessionId: previewSessionIdSchema,
-  /** The route's organization; the Worker uses it only to decide whether to show preview. */
-  organizationId: z.uuid().optional(),
 });
 
 /** The Worker's answer: its preview hostname with a `{port}` placeholder. */

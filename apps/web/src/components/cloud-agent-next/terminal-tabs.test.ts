@@ -1353,6 +1353,81 @@ describe('CloudChatPage terminal ownership across navigation', () => {
 
     expect(chatUiWrites()).toEqual([]);
   });
+
+  it('carries the selected model and variant when a slash command is sent', async () => {
+    mockAtomValues.sessionConfig = {
+      sessionId: 'workspace_recent',
+      repository: 'owner/repo',
+      mode: 'plan',
+      model: 'selected/model',
+      variant: 'high',
+      runtimeAgents: [],
+    };
+    mockManager.send.mockClear();
+    render();
+
+    await act(async () => {
+      await (
+        mockChatInput?.onSendCommand as
+          | ((command: string, args: string) => Promise<unknown>)
+          | undefined
+      )?.('review', 'main');
+    });
+
+    expect(mockManager.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: {
+          type: 'command',
+          command: 'review',
+          arguments: 'main',
+          mode: 'plan',
+          model: 'selected/model',
+          variant: 'high',
+        },
+      })
+    );
+  });
+
+  it('carries a pinned runtime-agent model and variant when a slash command is sent', async () => {
+    mockAtomValues.sessionConfig = {
+      sessionId: 'workspace_recent',
+      repository: 'owner/repo',
+      mode: 'reviewer',
+      model: 'session/model',
+      variant: 'session-variant',
+      runtimeAgents: [
+        {
+          slug: 'reviewer',
+          name: 'Reviewer',
+          model: 'pinned/model',
+          variant: 'pinned-variant',
+        },
+      ],
+    };
+    mockManager.send.mockClear();
+    render();
+
+    await act(async () => {
+      await (
+        mockChatInput?.onSendCommand as
+          | ((command: string, args: string) => Promise<unknown>)
+          | undefined
+      )?.('review', 'main');
+    });
+
+    expect(mockManager.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: {
+          type: 'command',
+          command: 'review',
+          arguments: 'main',
+          mode: 'reviewer',
+          model: 'pinned/model',
+          variant: 'pinned-variant',
+        },
+      })
+    );
+  });
 });
 
 describe('getWorkspaceTabScope', () => {

@@ -94,9 +94,19 @@ jobs:
       VERCEL_PROJECT_TOKEN: ${{ secrets.VERCEL_TOKEN_AI_GATEWAY }}
 
   promote-app:
-    needs: [stage-app, db-gate]
+    needs: [stage-app, db-gate, stage-ai-gateway, promote-ai-gateway]
     # Guard: privileged workflow — only the canonical repo may run it.
-    if: github.repository == 'Kilo-Org/cloud'
+    if: >-
+      ${{
+        github.repository == 'Kilo-Org/cloud' &&
+        !cancelled() &&
+        needs.stage-app.result == 'success' &&
+        needs.db-gate.result == 'success' &&
+        (
+          (needs.stage-ai-gateway.result == 'success' && needs.promote-ai-gateway.result == 'success') ||
+          (needs.stage-ai-gateway.result == 'skipped' && needs.promote-ai-gateway.result == 'skipped')
+        )
+      }}
     uses: ./.github/workflows/promote-vercel-deployment.yml
     with:
       deployment_url: ${{ needs.stage-app.outputs.deployment_url }}
@@ -157,138 +167,6 @@ jobs:
       source_sha: ${{ needs.check-changes.outputs.target_sha }}
     secrets: inherit
 
-  detect-gastown-wasteland-changes:
-    needs: check-changes
-    # Guard: privileged workflow — only the canonical repo may run it.
-    if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
-    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
-    timeout-minutes: 5
-    outputs:
-      deploy_wasteland: ${{ steps.detect.outputs.deploy_wasteland }}
-      deploy_gastown: ${{ steps.detect.outputs.deploy_gastown }}
-
-    steps:
-      - name: Checkout code
-        uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
-        with:
-          fetch-depth: 0
-          ref: ${{ needs.check-changes.outputs.target_sha }}
-
-      - name: Detect Gastown and Wasteland changes
-        id: detect
-        run: |
-          BASE_SHA="${{ needs.check-changes.outputs.base_sha }}"
-
-          changed_any() {
-            git diff --name-only "$BASE_SHA" HEAD -- "$@" | grep -q .
-          }
-
-          SHARED_WORKER_INPUTS=(
-            pnpm-lock.yaml
-            pnpm-workspace.yaml
-            patches
-            packages/worker-utils
-          )
-
-          WASTELAND_INPUTS=(
-            services/wasteland
-            packages/wl-sdk
-            "${SHARED_WORKER_INPUTS[@]}"
-          )
-
-          GASTOWN_INPUTS=(
-            services/gastown
-            packages/db
-            "${SHARED_WORKER_INPUTS[@]}"
-          )
-
-          deploy_wasteland=false
-          deploy_gastown=false
-
-          if changed_any "${WASTELAND_INPUTS[@]}"; then
-            deploy_wasteland=true
-          fi
-
-          if changed_any "${GASTOWN_INPUTS[@]}"; then
-            deploy_gastown=true
-          fi
-
-          echo "deploy_wasteland=$deploy_wasteland" >> "$GITHUB_OUTPUT"
-          echo "deploy_gastown=$deploy_gastown" >> "$GITHUB_OUTPUT"
-
-          echo "deploy_wasteland=$deploy_wasteland"
-          echo "deploy_gastown=$deploy_gastown"
-
-  deploy-gastown-wasteland:
-    needs:
-      [
-        db-gate,
-        check-changes,
-        detect-gastown-wasteland-changes,
-        stage-app,
-        stage-ai-gateway,
-        promote-app,
-        promote-ai-gateway,
-      ]
-    if: >-
-      ${{
-        github.repository == 'Kilo-Org/cloud' &&
-        !cancelled() &&
-        needs.check-changes.outputs.should_deploy == 'true' &&
-        needs.db-gate.result == 'success' &&
-        needs.detect-gastown-wasteland-changes.result == 'success' &&
-        contains(fromJSON('["success","skipped"]'), needs.stage-app.result) &&
-        contains(fromJSON('["success","skipped"]'), needs.stage-ai-gateway.result) &&
-        contains(fromJSON('["success","skipped"]'), needs.promote-app.result) &&
-        contains(fromJSON('["success","skipped"]'), needs.promote-ai-gateway.result) &&
-        (
-          needs.detect-gastown-wasteland-changes.outputs.deploy_wasteland == 'true' ||
-          needs.detect-gastown-wasteland-changes.outputs.deploy_gastown == 'true'
-        )
-      }}
-    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
-    timeout-minutes: 45
-    environment: production
-    env:
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-
-    steps:
-      - name: Checkout code
-        uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
-        with:
-          ref: ${{ needs.check-changes.outputs.target_sha }}
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
-
-      - name: Setup Node.js
-        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
-        with:
-          node-version-file: '.nvmrc'
-          cache: 'pnpm'
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Deploy Wasteland
-        if: needs.detect-gastown-wasteland-changes.outputs.deploy_wasteland == 'true'
-        run: pnpm --filter cloudflare-wasteland deploy:prod
-
-      - name: Upload Wasteland source maps
-        if: needs.detect-gastown-wasteland-changes.outputs.deploy_wasteland == 'true'
-        continue-on-error: true
-        run: pnpm --filter cloudflare-wasteland sentry:sourcemaps
-
-      - name: Deploy Gastown
-        if: needs.detect-gastown-wasteland-changes.outputs.deploy_gastown == 'true'
-        run: pnpm --filter cloudflare-gastown deploy:prod
-
-      - name: Upload Gastown source maps
-        if: needs.detect-gastown-wasteland-changes.outputs.deploy_gastown == 'true'
-        continue-on-error: true
-        run: pnpm --filter cloudflare-gastown sentry:sourcemaps
-
   # The KiloClaw image and worker deploy (deploy-kiloclaw.yml) is not part of
   # the scheduled pipeline. It runs manually via workflow_dispatch from the
   # Actions tab.
@@ -303,8 +181,6 @@ jobs:
         promote-app,
         promote-ai-gateway,
         deploy-workers,
-        detect-gastown-wasteland-changes,
-        deploy-gastown-wasteland,
       ]
     if: >-
       ${{
@@ -316,9 +192,7 @@ jobs:
         needs.stage-ai-gateway.result == 'success' &&
         needs.promote-app.result == 'success' &&
         needs.promote-ai-gateway.result == 'success' &&
-        needs.deploy-workers.result == 'success' &&
-        needs.detect-gastown-wasteland-changes.result == 'success' &&
-        contains(fromJSON('["success","skipped"]'), needs.deploy-gastown-wasteland.result)
+        needs.deploy-workers.result == 'success'
       }}
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 5

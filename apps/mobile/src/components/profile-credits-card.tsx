@@ -1,7 +1,7 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { selectionHaptic } from '@/lib/haptics';
 import { type Href, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { type ReactNode, useState } from 'react';
 import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { ChevronDown, Eye, EyeOff } from '@/components/ui/icons';
 import { Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
@@ -27,9 +27,8 @@ import { isNarrowLayout } from '@/lib/narrow-layout';
 import { useOrganization } from '@/lib/organization-context';
 import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { useTRPC } from '@/lib/trpc';
+import { HIDDEN_BALANCE } from '@/lib/storage-keys';
 import { cn } from '@/lib/utils';
-
-const HIDDEN_BALANCE = '*****';
 
 type CreditsCardProps = {
   readonly enabled: boolean;
@@ -216,15 +215,37 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   // switch own the skeleton above; a refresh that fails owns the retry surface.
   // An indicator tied to every in-flight refresh spun for as long as a stalled
   // one lasted (and announced itself as "In progress").
-  const addCreditsAction =
-    selectedOrgId == null ? (
-      <AddCreditsButton
-        className="h-auto min-h-11 max-w-full py-2"
-        onPress={() => {
-          router.push('/(app)/credits' as Href);
-        }}
-      />
-    ) : null;
+  //
+  // An organization's top-up is the external billing page, so it carries the
+  // row's App Store gate and opens only for a member who can manage billing at
+  // an empty balance. It uses the same trailing slot as the personal purchase:
+  // a block of its own held nothing but the control once the copy beside it
+  // left.
+  const orgAddCreditsEligible =
+    selectedOrgId != null &&
+    canManageOrgBilling &&
+    !balanceLoading &&
+    !balancePending &&
+    !balanceFailed &&
+    balanceDollars === 0;
+
+  let addCreditsAction: ReactNode = null;
+  if (selectedOrgId == null) {
+    addCreditsAction = (
+      <View className="max-w-full flex-row flex-wrap items-center justify-end gap-2">
+        <AddCreditsButton
+          className="h-auto min-h-11 max-w-full py-2"
+          onPress={() => {
+            router.push('/(app)/credits' as Href);
+          }}
+        />
+      </View>
+    );
+  } else if (orgAddCreditsEligible) {
+    addCreditsAction = (
+      <AddCreditsRow url={`${WEB_BASE_URL}/organizations/${selectedOrgId}/payment-details`} />
+    );
+  }
 
   return (
     <View
@@ -367,25 +388,11 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
           </Animated.View>
           {/* The purchase action keeps the card's trailing end in both
               layouts: the trailing column on a wide card, its own row below
-              the note on a stacked one. */}
-          {addCreditsAction !== null && (
-            <View className="max-w-full flex-row flex-wrap items-center justify-end gap-2">
-              {addCreditsAction}
-            </View>
-          )}
+              the note on a stacked one. The element owns its container, so a
+              card with no action for this platform gains no empty slot. */}
+          {addCreditsAction}
         </View>
       )}
-      {selectedOrgId != null &&
-        canManageOrgBilling &&
-        !balanceLoading &&
-        !balancePending &&
-        !balanceFailed &&
-        balanceDollars === 0 && (
-          <AddCreditsRow
-            url={`${WEB_BASE_URL}/organizations/${selectedOrgId}/payment-details`}
-            className="rounded-lg bg-secondary px-3 py-3"
-          />
-        )}
       {/* One loading indicator per section: while the balance slot shows its
           skeleton, the KiloPass card reserves its slot quietly instead of
           stacking a second skeleton card. The card's queries still run from

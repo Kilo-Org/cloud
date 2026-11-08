@@ -22,6 +22,54 @@ export const client: Stripe = new Stripe(stripeSecretKey, {
   maxNetworkRetries: STRIPE_MAX_NETWORK_RETRIES,
 });
 
+// The profile page asks whether a customer has a card on every render, and the
+// answer only changes when a card is attached to or detached from that
+// customer. Serve the last answer for a short window so a render does not wait
+// on a Stripe round trip (which the client retries up to 4 times); callers clear
+// it through `invalidateStripePaymentMethodCache` when the cards change.
+const PAYMENT_METHOD_LOOKUP_TTL_MS = 60 * 1000;
+const PAYMENT_METHOD_LOOKUP_MAX_ENTRIES = 2000;
+
+type PaymentMethodLookup = { hasPaymentMethod: boolean; expiresAt: number };
+
+const paymentMethodLookups = new Map<string, PaymentMethodLookup>();
+
+/**
+ * Drops the cached payment-method answer for a customer. Call it after a card
+ * is attached to or detached from that customer, so the next read goes back to
+ * Stripe. A webhook and a page render can run in different server instances, so
+ * this only clears the instance that handles the change; the cache lifetime
+ * bounds how long any other instance keeps the previous answer.
+ */
+export function invalidateStripePaymentMethodCache(stripeCustomerId: string): void {
+  paymentMethodLookups.delete(stripeCustomerId);
+}
+
+function readCachedPaymentMethodLookup(stripeCustomerId: string): boolean | undefined {
+  const lookup = paymentMethodLookups.get(stripeCustomerId);
+  if (!lookup) return undefined;
+  if (lookup.expiresAt <= Date.now()) {
+    paymentMethodLookups.delete(stripeCustomerId);
+    return undefined;
+  }
+  return lookup.hasPaymentMethod;
+}
+
+function writeCachedPaymentMethodLookup(stripeCustomerId: string, hasPaymentMethod: boolean) {
+  if (!paymentMethodLookups.has(stripeCustomerId)) {
+    // Map iteration follows insertion order, so the first key is the oldest
+    // entry; one eviction keeps the map bounded on a long-lived instance.
+    const oldest = paymentMethodLookups.keys().next();
+    if (paymentMethodLookups.size >= PAYMENT_METHOD_LOOKUP_MAX_ENTRIES && !oldest.done) {
+      paymentMethodLookups.delete(oldest.value);
+    }
+  }
+  paymentMethodLookups.set(stripeCustomerId, {
+    hasPaymentMethod,
+    expiresAt: Date.now() + PAYMENT_METHOD_LOOKUP_TTL_MS,
+  });
+}
+
 type ConstrainedMetadata = UserConstrainedMetadata | OrganizationConstrainedMetdata;
 
 type OrganizationConstrainedMetdata = {
@@ -94,13 +142,18 @@ export async function hasPaymentMethodInStripe({
 }): Promise<boolean> {
   if (skipStripeApi) return false;
 
+  const cached = readCachedPaymentMethodLookup(stripeCustomerId);
+  if (cached !== undefined) return cached;
+
   // This function may become redundant if our in-db administration is accurate.
   try {
     const paymentMethods = await client.paymentMethods.list({
       customer: stripeCustomerId,
       type: 'card',
     });
-    return paymentMethods.data.length > 0;
+    const hasPaymentMethod = paymentMethods.data.length > 0;
+    writeCachedPaymentMethodLookup(stripeCustomerId, hasPaymentMethod);
+    return hasPaymentMethod;
   } catch (error) {
     if (!isMissingStripeCustomerError(error)) throw error;
     // The profile page reads this on every render. A stored id Stripe no
@@ -113,6 +166,7 @@ export async function hasPaymentMethodInStripe({
       level: 'info',
       tags: { source: 'stripe-payment-method-lookup' },
     });
+    writeCachedPaymentMethodLookup(stripeCustomerId, false);
     return false;
   }
 }

@@ -1,7 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { posix } from 'node:path';
 
-import { computeDatabaseUrl } from '@kilocode/db';
 import { kilocode_users } from '@kilocode/db/schema';
 import { signKiloToken } from '@kilocode/worker-utils';
 import { eq } from 'drizzle-orm';
@@ -18,7 +17,7 @@ import {
   type CLIOutboundMessage,
 } from '../../../services/session-ingest/src/types/user-connection-protocol';
 import type { SeedResult } from '../index';
-import { getSeedDb } from '../lib/db';
+import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
 import { parseSessionIngestServiceStatus } from '../lib/mobile-sheet-fixtures';
 
 export const usage = '<email> [seconds] [sessionIngestPort]';
@@ -48,13 +47,7 @@ function printUsage(): void {
 }
 
 function localDatabase() {
-  if (process.env.USE_PRODUCTION_DB === 'true') {
-    throw new Error('Connected computer fixture refuses USE_PRODUCTION_DB=true.');
-  }
-  const databaseUrl = new URL(computeDatabaseUrl());
-  if (!['localhost', '127.0.0.1', '::1', '[::1]'].includes(databaseUrl.hostname)) {
-    throw new Error('Connected computer fixture requires a loopback database host.');
-  }
+  assertLocalSeedDatabase('app:connected-computer');
   return getSeedDb();
 }
 

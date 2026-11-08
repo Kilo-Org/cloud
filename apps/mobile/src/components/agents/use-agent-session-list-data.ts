@@ -45,6 +45,7 @@ export function useAgentSessionListData(options: {
     storedFetchedSinceMount,
     hasNextPage,
     isFetchingNextPage,
+    isFetchNextPageError,
     fetchNextPage,
     refetch,
   } = useAgentSessions({
@@ -103,12 +104,14 @@ export function useAgentSessionListData(options: {
         ? {
             hasNextPage: search.hasNextPage,
             isFetchingNextPage: search.isFetchingNextPage,
+            isFetchNextPageError: search.isFetchNextPageError,
             isPlaceholderData: search.isPlaceholderData,
             fetchNextPage: search.fetchNextPage,
           }
         : {
             hasNextPage,
             isFetchingNextPage,
+            isFetchNextPageError,
             isPlaceholderData: false,
             fetchNextPage,
           },
@@ -116,9 +119,11 @@ export function useAgentSessionListData(options: {
       effectiveSearchQuery,
       hasNextPage,
       isFetchingNextPage,
+      isFetchNextPageError,
       fetchNextPage,
       search.hasNextPage,
       search.isFetchingNextPage,
+      search.isFetchNextPageError,
       search.isPlaceholderData,
       search.fetchNextPage,
     ]

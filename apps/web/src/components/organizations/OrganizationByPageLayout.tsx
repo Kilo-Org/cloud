@@ -35,7 +35,7 @@ export async function OrganizationByPageLayout({
    * pages require membership.
    */
   supportRead?: boolean;
-  /** When true, skip the PageContainer wrapper (used by gastown fullscreen pages). */
+  /** When true, skip the PageContainer wrapper. */
   fullBleed?: boolean;
 }) {
   const { id } = await params;
@@ -58,7 +58,7 @@ export async function OrganizationByPageLayout({
   const role =
     isSupportAccessEnabled() || isSupport ? user.role : user.is_admin ? 'owner' : user.role;
   return (
-    <OrganizationTrialWrapper organizationId={organization.id} fullBleed={fullBleed}>
+    <OrganizationTrialWrapper organizationId={organization.id} role={role} fullBleed={fullBleed}>
       {access.kind === 'support' && <SupportAccessBanner access={access} />}
       {render({ role, organization, isGlobalAdmin: user.is_admin && !isSupport })}
     </OrganizationTrialWrapper>

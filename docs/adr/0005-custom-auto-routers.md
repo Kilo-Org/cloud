@@ -52,6 +52,9 @@ Split auto routing into platform routers and custom routers.
   The organization model catalog lists that organization's routers for both the fallback and
   custom-mode pickers, excluding personal routers. The gateway resolves the target with gateway
   candidates only.
+- Personal model validation includes the authenticated user's custom routers, matching the model
+  catalog. Missing routers and routers owned by another user return `unavailable`; a router lookup
+  failure returns a service error so Cloud Agent can retry.
 
 ## Router definition
 

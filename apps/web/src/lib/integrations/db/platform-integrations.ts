@@ -18,7 +18,11 @@ import { isPlatformIntegrationHealthy, platformIntegrationHealthSql } from '../c
 import { PendingInstallationMetadataWrapperSchema } from '../core/schemas';
 import type { GitHubAppType } from '../platforms/github/app-selector';
 import { canOrganizationUseMultipleGitHubInstallations } from '../github/multiple-installations';
-import { effectiveAppTypeCondition, ownerCondition } from './predicates';
+import {
+  effectiveAppTypeCondition,
+  occupiesAnotherGitHubInstallationSlot,
+  ownerCondition,
+} from './predicates';
 
 /**
  * Exact app-type scope. The writers below must not reach a row whose app type
@@ -1375,23 +1379,26 @@ export async function upsertPlatformIntegrationForOwner(
 
       if (requiresOwnerCardinalityLock) {
         const ownerIntegrations = await tx
-          .select({ installationId: platform_integrations.platform_installation_id })
+          .select({
+            installationId: platform_integrations.platform_installation_id,
+            appType: platform_integrations.github_app_type,
+          })
           .from(platform_integrations)
           .where(
             and(
               eq(platform_integrations.owned_by_organization_id, owner.id),
               eq(platform_integrations.platform, PLATFORM.GITHUB),
               // A locally disconnected connection has relinquished its slot;
-              // it must not block attaching a different installation. Matches
-              // the equivalent guard in connectVerifiedGitHubInstallation.
+              // it must not block attaching a different installation.
               isNull(platform_integrations.github_disconnected_at)
             )
           );
         if (
-          ownerIntegrations.some(
-            integration =>
-              integration.installationId !== null &&
-              integration.installationId !== data.platformInstallationId
+          ownerIntegrations.some(integration =>
+            occupiesAnotherGitHubInstallationSlot(integration, {
+              installationId: data.platformInstallationId,
+              appType,
+            })
           )
         ) {
           return { ok: false, reason: 'multiple_installations_disabled' };
@@ -1516,23 +1523,6 @@ export async function findGitLabIntegrationByWebhookToken(
     .limit(1);
 
   return integration ?? null;
-}
-
-/**
- * Updates the metadata for a platform integration
- * Used for storing webhook configuration, tokens, etc.
- */
-export async function updateIntegrationMetadata(
-  integrationId: string,
-  metadata: Record<string, unknown>
-) {
-  await db
-    .update(platform_integrations)
-    .set({
-      metadata,
-      updated_at: new Date().toISOString(),
-    })
-    .where(eq(platform_integrations.id, integrationId));
 }
 
 /**

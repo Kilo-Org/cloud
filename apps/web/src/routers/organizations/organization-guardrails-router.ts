@@ -2,16 +2,19 @@ import {
   ENKRYPT_DETECTOR_IDS,
   ENKRYPT_OUTPUT_DETECTOR_IDS,
   EnkryptInputDetectorsSchema,
+  EnkryptInputDetectorsUpdateSchema,
   EnkryptInputGuardrailSettingsSchema,
   EnkryptOutputDetectorsSchema,
+  EnkryptOutputDetectorsUpdateSchema,
   EnkryptOutputGuardrailSettingsSchema,
   type OrganizationSettings,
 } from '@kilocode/db/schema-types';
 import {
   createEmptyEnkryptOutputDetectors,
   createKiloDefaultEnkryptInputDetectors,
-  enabledEnkryptDetectorIds,
   enabledEnkryptOutputDetectorIds,
+  ENKRYPT_CONFIGURABLE_INPUT_DETECTOR_IDS,
+  enforcedEnkryptInputDetectors,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detectors';
 import {
   readStoredEnkryptDetectors,
@@ -37,14 +40,19 @@ const OrganizationOutputGuardrailConfigSchema = z.object({
 
 const OrganizationGuardrailsConfigSchema = z.object({
   enabled: z.boolean(),
-  scan_tool_results: z.boolean(),
   detectors: EnkryptInputDetectorsSchema,
   output: OrganizationOutputGuardrailConfigSchema,
 });
 
-/** `output` is optional so a page loaded before response checks existed can still save. */
+/**
+ * Saves cap policies at fewer rules than saved settings may hold. `output` is optional so a page
+ * loaded before response checks existed can still save.
+ */
 const OrganizationGuardrailsUpdateSchema = OrganizationGuardrailsConfigSchema.extend({
-  output: OrganizationOutputGuardrailConfigSchema.optional(),
+  detectors: EnkryptInputDetectorsUpdateSchema,
+  output: OrganizationOutputGuardrailConfigSchema.extend({
+    detectors: EnkryptOutputDetectorsUpdateSchema,
+  }).optional(),
 });
 
 export type OrganizationGuardrailsConfig = z.infer<typeof OrganizationGuardrailsConfigSchema>;
@@ -92,13 +100,14 @@ function describeDetectors<Id extends string>(
   return summaries.join(', ') || 'none';
 }
 
-/** Describes a saved configuration for the audit log without keywords, topics, or policy text. */
+/**
+ * Describes a saved configuration for the audit log without keywords, topics, or policy text.
+ * Input detectors are described as the gateway enforces them.
+ */
 export function describeGuardrailsConfig(config: OrganizationGuardrailsConfig): string {
-  const scope = config.scan_tool_results ? 'every input' : 'conversation without tool results';
   return [
     `Updated AI guardrails: ${config.enabled ? 'enabled' : 'disabled'}`,
-    `checking ${scope}`,
-    `detectors: ${describeDetectors(ENKRYPT_DETECTOR_IDS, config.detectors)}`,
+    `detectors: ${describeDetectors(ENKRYPT_DETECTOR_IDS, enforcedEnkryptInputDetectors(config.detectors))}`,
     `response checks: ${config.output.enabled ? 'enabled' : 'disabled'}`,
     `response detectors: ${describeDetectors(ENKRYPT_OUTPUT_DETECTOR_IDS, config.output.detectors)}`,
   ].join('; ');
@@ -109,7 +118,6 @@ function savedInputGuardrail(organizationId: string, settings: OrganizationSetti
   if (!saved.success) {
     return {
       enabled: false,
-      scan_tool_results: false,
       detectors: createKiloDefaultEnkryptInputDetectors(),
       invalid_saved_detectors: false,
     };
@@ -117,7 +125,6 @@ function savedInputGuardrail(organizationId: string, settings: OrganizationSetti
   const stored = readStoredEnkryptDetectors(organizationId, saved.data.detectors);
   return {
     enabled: saved.data.enabled,
-    scan_tool_results: saved.data.scan_tool_results ?? true,
     detectors:
       stored.status === 'found' ? stored.detectors : createKiloDefaultEnkryptInputDetectors(),
     invalid_saved_detectors: stored.status === 'invalid',
@@ -165,7 +172,7 @@ export const organizationGuardrailsRouter = createTRPCRouter({
       const config = { ...inputGuardrail, output };
       if (
         inputGuardrail.enabled &&
-        enabledEnkryptDetectorIds(inputGuardrail.detectors).length === 0
+        !ENKRYPT_CONFIGURABLE_INPUT_DETECTOR_IDS.some(id => inputGuardrail.detectors[id].enabled)
       ) {
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'Turn on at least one detector.' });
       }
@@ -185,7 +192,8 @@ export const organizationGuardrailsRouter = createTRPCRouter({
             ...organization.settings,
             enkrypt: {
               ...organization.settings.enkrypt,
-              input_guardrail: inputGuardrail,
+              // Still written so a rollback to a version that reads it keeps scanning every input.
+              input_guardrail: { ...inputGuardrail, scan_tool_results: true },
               ...(requestedOutput ? { output_guardrail: requestedOutput } : {}),
             },
           }),

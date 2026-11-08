@@ -229,6 +229,18 @@ Each selected persistence attempt adds one completion line; IDs remain log
 fields, not metric labels. Logs can be dropped, and are not durable accounting:
 reconcile against persisted usage rows when exact completeness matters.
 
+Both environments also persist [Workers traces](https://developers.cloudflare.com/workers/observability/traces/)
+for a 5% head sample of invocations (`observability.traces`, inherited by
+`env.staging`). Trace sampling is independent of Workers Logs, which keep their unsampled default.
+Sampled traces show the fetch and queue handler spans, `queue_send`, and the
+outbound writer `fetch` with timing and status. In the dashboard, filter by
+`$metadata.service` (`usage-ingest` or `usage-ingest-staging`) rather than
+`service.name`. Trace IDs are not propagated to the Vercel writer, spans do not
+show time a message waits in the queue before the consumer handler starts, and a
+5% sample cannot count rare events; use the logs above for those. No custom spans
+are added. See the [span attributes](https://developers.cloudflare.com/workers/observability/traces/spans-and-attributes/)
+and [known limitations](https://developers.cloudflare.com/workers/observability/traces/known-limitations/).
+
 ## Queue policy
 
 Production uses batch size 6 and staging keeps batch size 2. Both allow at most
@@ -342,13 +354,34 @@ or authorize a production rollout, capacity increase, or replay.
 ### Writer admission protection
 
 The Frankfurt HTTP writer authenticates and validates the request before applying
-one immediate, nonwaiting admission guard to `queue` and `queue_vercel` callers.
-Both transports share a per-runtime active-call limit of
-`max(1, pool.options.max - 2)`, currently **8** with the unchanged pool maximum of
-10. The writer returns HTTP **429** before usage database work when that limit
-is occupied, when the primary pool has waiting clients, or when checked-out
-connections (`totalCount - idleCount`) reach the same limit. The response reason
-is bounded to `queue_limit`, `pool_waiting`, or `pool_busy`.
+one admission guard to `queue` and `queue_vercel` callers. Both transports share a
+per-runtime active-call limit of `max(1, pool.options.max - 2)`, currently **8**
+with the unchanged pool maximum of 10. The writer returns HTTP **429** before usage
+database work as follows:
+
+- While the active-call limit has room, the request is rejected immediately when
+  the primary pool has waiting clients (`pool_waiting`) or when checked-out
+  connections (`totalCount - idleCount`) reach the same limit (`pool_busy`).
+- When the active-call limit is occupied, the request is still rejected
+  immediately with `pool_waiting` if the pool has waiting clients. Otherwise it
+  waits up to **250 ms** in a per-runtime FIFO capped at the same limit (8
+  waiters). `pool_busy` is not checked on arrival in this case: this runtime's
+  own active writers can occupy the pool, so checked-out connections are not
+  independent evidence of additional pressure. A slot is held through awaited
+  post-commit work and can outlive its connection, so 8 active calls do not imply
+  8 checked-out connections either way.
+- A finished call hands its slot to the oldest waiter, which is rechecked against
+  both `pool_waiting` and `pool_busy` before it is admitted; a waiter that fails
+  the recheck is rejected with that pool reason, and the slot passes to the next
+  waiter or is freed.
+- A caller beyond the FIFO cap is rejected immediately, and a waiter not granted
+  within 250 ms is rejected, both with `queue_limit`.
+
+The response reason is bounded to `queue_limit`, `pool_waiting`, or `pool_busy`.
+The `usage_writer_admission` log reports `slot_wait_ms` (0 for immediate
+decisions) and `waited: true` on a rejection after waiting. The 250 ms bounds only
+the admission wait; the rest of the request, including the write and awaited
+post-commit work, is not bounded by it.
 
 A slot remains held until the awaited persistence call completes, including
 awaited post-commit work, and is released on success, duplicate, `not_recorded`,

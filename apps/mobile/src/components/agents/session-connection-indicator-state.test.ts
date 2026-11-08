@@ -43,14 +43,18 @@ describe('resolveSessionConnectionState - remote', () => {
     }
   });
 
-  it('reports down for a disconnected agent status even while the user-web leg is up', () => {
+  it('offers connection recovery when the remote owner is absent on a connected viewer', () => {
     expect(
-      resolve({
-        activeSessionType: 'remote',
-        agentStatusType: 'disconnected',
+      resolveDisplay({
+        transport: resolve({
+          activeSessionType: 'remote',
+          agentStatusType: 'disconnected',
+          userWebConnected: true,
+        }),
         userWebConnected: true,
+        everConnected: true,
       })
-    ).toBe('down');
+    ).toBe('lost');
   });
 
   it('reports up for agent lifecycle statuses other than disconnected while connected', () => {
@@ -120,15 +124,19 @@ describe('resolveSessionConnectionState - exhausted', () => {
     ).toBe('exhausted');
   });
 
-  it('reports exhausted for a remote disconnected agent status while reconnects are exhausted', () => {
+  it('keeps connection recovery available for an absent owner after reconnect exhaustion', () => {
     expect(
-      resolve({
-        activeSessionType: 'remote',
-        agentStatusType: 'disconnected',
+      resolveDisplay({
+        transport: resolve({
+          activeSessionType: 'remote',
+          agentStatusType: 'disconnected',
+          userWebConnected: true,
+          reconnectExhausted: true,
+        }),
         userWebConnected: true,
         reconnectExhausted: true,
       })
-    ).toBe('exhausted');
+    ).toBe('lost');
   });
 
   it('reports down (not exhausted) for a remote session while the user-web leg is down and reconnects remain', () => {

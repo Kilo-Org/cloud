@@ -1,4 +1,38 @@
+import type * as watchwoodModule from '@/lib/auth/watchwood';
+import type * as linkingModule from '@/lib/account-linking-session';
+import type * as userModule from '@/lib/user';
+import type * as userServerModule from '@kilocode/web-shared/lib/user/server';
+
+jest.mock('next/headers', () => ({ cookies: jest.fn(), headers: jest.fn() }));
+jest.mock('@/lib/auth/watchwood', () => ({
+  ...jest.requireActual<typeof watchwoodModule>('@/lib/auth/watchwood'),
+  readWatchwoodSignupAssessment: jest.fn(),
+}));
+jest.mock('@/lib/user/sso', () => ({ processSSOUserLogin: jest.fn() }));
+jest.mock('@/lib/user', () => ({
+  ...jest.requireActual<typeof userModule>('@/lib/user'),
+  findAndSyncExistingUser: jest.fn(
+    jest.requireActual<typeof userModule>('@/lib/user').findAndSyncExistingUser
+  ),
+}));
+jest.mock('@kilocode/web-shared/lib/user/server', () => ({
+  ...jest.requireActual<typeof userServerModule>('@kilocode/web-shared/lib/user/server'),
+  getUserFromSession: jest.fn(),
+  isEmailBlacklistedByDomainAsync: jest.fn(),
+  isBlockedTLD: jest.fn(),
+}));
+jest.mock('@/lib/account-linking-session', () => ({
+  ...jest.requireActual<typeof linkingModule>('@/lib/account-linking-session'),
+  getAccountLinkingSession: jest.fn(),
+}));
+
 import { describe, test, expect } from '@jest/globals';
+import { cookies, headers } from 'next/headers';
+import { readWatchwoodSignupAssessment } from '@/lib/auth/watchwood';
+import { processSSOUserLogin } from '@/lib/user/sso';
+import { getAccountLinkingSession } from '@/lib/account-linking-session';
+import * as userServer from '@kilocode/web-shared/lib/user/server';
+import * as userLib from '@/lib/user';
 import { sessionAuthOptions } from '@kilocode/web-shared/lib/user/server';
 import {
   parseLinkedInProfileName,
@@ -7,9 +41,12 @@ import {
   profileProvesEmailOwnership,
   authOptions,
   parseSignInRedirectContext,
+  getInvitationTokenFromCallbackPath,
+  preserveSignInRedirectContext,
 } from '@/lib/user/next-auth-options';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { createSignInTicket } from '@/lib/auth/passkey';
+import getSignInCallbackUrl from '@/lib/getSignInCallbackUrl';
 import {
   openai_chatgpt_connections,
   organizations,
@@ -524,6 +561,144 @@ describe('parseSignInRedirectContext', () => {
     expect(parseSignInRedirectContext(cookie)).toEqual({
       callbackPath: '/device-auth?code=xyz',
     });
+  });
+});
+
+describe('getInvitationTokenFromCallbackPath', () => {
+  test('extracts an invitation token from the WorkOS sign-in callback URL', () => {
+    const callbackUrl = getSignInCallbackUrl({ callbackPath: '/users/accept-invite/invite-token' });
+    const context = parseSignInRedirectContext(callbackUrl);
+    expect(getInvitationTokenFromCallbackPath(context.callbackPath)).toBe('invite-token');
+  });
+
+  test('decodes the token and ignores the query and fragment', () => {
+    expect(getInvitationTokenFromCallbackPath('/users/accept-invite/invite%2Dtoken?x=1#next')).toBe(
+      'invite-token'
+    );
+  });
+
+  test.each([
+    undefined,
+    '/users/accept-invite',
+    '/users/accept-invite/',
+    '/users/accept-invite/token/more',
+    '/users/accept-invited/token',
+    'https://example.com/users/accept-invite/token',
+    '/users/accept-invite/%invalid',
+  ])('ignores non-invitation or malformed callback %s', callback => {
+    expect(getInvitationTokenFromCallbackPath(callback)).toBeUndefined();
+  });
+});
+
+describe('preserveSignInRedirectContext', () => {
+  test('preserves the invitation when SSO sign-in fails or is enforced', () => {
+    for (const url of [
+      '/users/sign_in?error=OAUTH_ERROR',
+      '/users/sign_in?sso=true&domain=example.com',
+    ]) {
+      const result = new URL(
+        preserveSignInRedirectContext(url, {
+          callbackPath: '/users/accept-invite/invite-token',
+        }),
+        'https://example.com'
+      );
+      expect(result.searchParams.get('callbackPath')).toBe('/users/accept-invite/invite-token');
+    }
+  });
+
+  test('does not preserve an unsafe callback', () => {
+    expect(
+      preserveSignInRedirectContext('/users/sign_in?error=OAUTH_ERROR', {
+        callbackPath: 'https://evil.example.com',
+      })
+    ).toBe('/users/sign_in?error=OAUTH_ERROR');
+  });
+});
+
+describe('WorkOS sign-in callback', () => {
+  const callbackPath = '/users/accept-invite/invite-token';
+  const requestHeaders = new Headers({ 'accept-language': 'en-US', 'x-vercel-ip-country': 'US' });
+  const watchwood = { status: 'assessed', riskScore: 0.4, latencyMs: 12, assessedAt: 123 } as const;
+  const signInArgs = {
+    user: { id: 'workos-user', email: 'user@example.com', name: 'Test User', image: null },
+    account: { provider: 'workos', providerAccountId: 'workos-user', type: 'oauth' as const },
+    profile: undefined,
+  };
+
+  beforeEach(() => {
+    const callbackUrl = getSignInCallbackUrl({ callbackPath });
+    jest.mocked(cookies).mockResolvedValue({
+      get: (name: string) => {
+        if (name === 'next-auth.callback-url') return { name, value: callbackUrl };
+        if (name === 'impact_click_id') return { name, value: 'impact-click' };
+        return undefined;
+      },
+    } as Awaited<ReturnType<typeof cookies>>);
+    jest.mocked(headers).mockResolvedValue(requestHeaders as Awaited<ReturnType<typeof headers>>);
+    jest.mocked(getAccountLinkingSession).mockResolvedValue(null);
+    jest.mocked(readWatchwoodSignupAssessment).mockResolvedValue(watchwood);
+    jest.mocked(processSSOUserLogin).mockResolvedValue(true);
+    jest.mocked(userLib.findAndSyncExistingUser).mockResolvedValue(null);
+    jest.mocked(userServer.isEmailBlacklistedByDomainAsync).mockResolvedValue(false);
+    jest.mocked(userServer.isBlockedTLD).mockResolvedValue(false);
+  });
+
+  afterEach(() => {
+    jest
+      .mocked(userLib.findAndSyncExistingUser)
+      .mockImplementation(
+        jest.requireActual<typeof userModule>('@/lib/user').findAndSyncExistingUser
+      );
+    jest.clearAllMocks();
+  });
+
+  test('forwards the Watchwood assessment, tracking context and invitation token', async () => {
+    await expect(authOptions.callbacks!.signIn!(signInArgs)).resolves.toBe(true);
+
+    expect(processSSOUserLogin).toHaveBeenCalledTimes(1);
+    expect(processSSOUserLogin).toHaveBeenCalledWith(
+      expect.objectContaining({ provider: 'workos', google_user_email: 'user@example.com' }),
+      requestHeaders,
+      'impact-click',
+      expect.objectContaining({ watchwood, locale: 'en-US', countryCode: 'US' }),
+      'invite-token'
+    );
+  });
+
+  test('preserves the invitation callback on an SSO error redirect', async () => {
+    jest.mocked(processSSOUserLogin).mockResolvedValue('/users/sign_in?error=OAUTH_ERROR');
+
+    const result = await authOptions.callbacks!.signIn!(signInArgs);
+    expect(typeof result).toBe('string');
+    if (typeof result !== 'string') throw new Error('Expected an SSO error redirect');
+    const redirect = new URL(result, 'https://example.com');
+    expect(redirect.pathname).toBe('/users/sign_in');
+    expect(redirect.searchParams.get('error')).toBe('OAUTH_ERROR');
+    expect(redirect.searchParams.get('callbackPath')).toBe(callbackPath);
+  });
+
+  test('does not forward the invitation or Watchwood context during account linking', async () => {
+    jest.mocked(getAccountLinkingSession).mockResolvedValue({
+      existingUserId: 'existing-user',
+      targetProvider: 'workos',
+      createdAt: Date.now(),
+    });
+    jest
+      .mocked(userServer.getUserFromSession)
+      .mockResolvedValue({ id: 'existing-user' } as Awaited<
+        ReturnType<typeof userServer.getUserFromSession>
+      >);
+
+    await expect(authOptions.callbacks!.signIn!(signInArgs)).resolves.toBe(true);
+    expect(processSSOUserLogin).toHaveBeenCalledTimes(1);
+    expect(processSSOUserLogin).toHaveBeenCalledWith(
+      expect.objectContaining({ provider: 'workos' }),
+      requestHeaders,
+      null,
+      { watchwood: undefined },
+      undefined
+    );
+    expect(readWatchwoodSignupAssessment).not.toHaveBeenCalled();
   });
 });
 

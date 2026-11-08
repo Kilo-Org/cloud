@@ -8,7 +8,25 @@ import { load } from 'js-yaml';
 const rootPath = '.github/workflows/ci.yml';
 const mobilePath = '.github/workflows/kilo-app-ci.yml';
 const checkPath = 'scripts/stacked-ci.test.mjs';
-const command = `node --test ${checkPath}`;
+// ci-wiring runs the wiring suites in one `node --test` invocation. The exact
+// command is pinned here, so splitting the suite back into per-file steps, or
+// dropping or reordering a suite, fails this validation.
+const wiringSuites = [
+  checkPath,
+  'scripts/changed-dependencies.test.mjs',
+  'scripts/build-key-inputs.test.mjs',
+  'scripts/ttsc-plugin-key.test.mjs',
+  'scripts/affected-workspaces.test.mjs',
+  'scripts/changed-workspaces.test.mjs',
+  'scripts/changes-filter-retry.test.mjs',
+  'scripts/typecheck-ci.test.mjs',
+  'scripts/deployment-workflows.test.mjs',
+  'scripts/main-workflow-failure.test.mjs',
+  'scripts/production-deploy-failure.test.mjs',
+  'scripts/meta-janitor-approve.test.mjs',
+  'scripts/mobile-sbom-workflow.test.mjs',
+];
+const command = `node --test ${wiringSuites.join(' ')}`;
 // The path families the mobile change-detection grep must recognise. The PR
 // admission and the `push` trigger carry no filter, so this grep is the only
 // thing that gates the suite; a dropped or mistyped family silently reports

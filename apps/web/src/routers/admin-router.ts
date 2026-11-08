@@ -140,7 +140,10 @@ import { recomputeUserBalances } from '@/lib/user/recompute-balances';
 import { getStripeInvoices } from '@/lib/stripe';
 import { client as stripeClient } from '@kilocode/web-shared/lib/stripe-client';
 import { resolveSsoAuthorityForDomain } from '@kilocode/web-shared/lib/organizations/organization-sso-policy';
-import { cancelAndRefundKiloPassForUser } from '@/lib/kilo-pass/cancel-and-refund';
+import {
+  cancelAndRefundKiloPassForUser,
+  type CancelAndRefundKiloPassResult,
+} from '@/lib/kilo-pass/cancel-and-refund';
 import { KILOCLAW_EARLYBIRD_EXPIRY_DATE } from '@/lib/kiloclaw/constants';
 import {
   CurrentPersonalSubscriptionResolutionError,
@@ -1837,13 +1840,26 @@ export const adminRouter = createTRPCRouter({
           throw new TRPCError({ code: 'NOT_FOUND', message: 'User not found' });
         }
 
-        const result = await cancelAndRefundKiloPassForUser({
-          db,
-          stripe: stripeClient,
-          userId: input.userId,
-          reason: input.reason,
-          adminKiloUserId: ctx.user.id,
-        });
+        let result: CancelAndRefundKiloPassResult;
+        try {
+          result = await cancelAndRefundKiloPassForUser({
+            db,
+            stripe: stripeClient,
+            userId: input.userId,
+            reason: input.reason,
+            adminKiloUserId: ctx.user.id,
+          });
+        } catch (error) {
+          // The helper creates the Stripe refund before its local transaction, so
+          // a failure here can leave a refund with no other attribution.
+          await recordAdminAction(ctx, {
+            action: 'kilo_pass.cancel_refund',
+            target: userActionTarget(input.userId),
+            message: 'Kilo Pass cancel attempted with unknown outcome',
+            metadata: { reason: input.reason },
+          });
+          throw error;
+        }
 
         if (result.status === 'skipped') {
           if (result.reason.kind === 'no_subscription') {
@@ -1868,16 +1884,18 @@ export const adminRouter = createTRPCRouter({
         await recordAdminAction(ctx, {
           action: 'kilo_pass.cancel_refund',
           target: userActionTarget(input.userId),
+          // `cancelled_and_refunded` is reported whenever a refund was requested,
+          // even when no paid invoice or payment intent existed, so the wording
+          // keys off the amount Stripe actually refunded.
           message:
             result.refundedAmountCents != null
               ? 'Cancelled Kilo Pass and refunded the latest payment'
-              : 'Cancelled Kilo Pass without a Stripe refund',
+              : 'Cancelled Kilo Pass with no refundable payment',
           metadata: {
-            status: result.status,
-            reason: input.reason,
             refundedAmountCents: result.refundedAmountCents,
             balanceResetAmountUsd: result.balanceResetAmountUsd,
             alreadyBlocked: result.alreadyBlocked,
+            reason: input.reason,
           },
         });
 

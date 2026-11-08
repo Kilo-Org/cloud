@@ -31,6 +31,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import Link from 'next/link';
+import { useAdminPermissions } from '@/app/admin/useAdminPermissions';
 
 const MAX_EMAILS = 500;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -110,6 +111,7 @@ function formatUsd(cents: number): string {
 
 export function KiloPassBulkCancel() {
   const trpc = useTRPC();
+  const { isSuperadmin, isPermissionResolved } = useAdminPermissions();
   const [rawEmails, setRawEmails] = useState('');
   const [reason, setReason] = useState('');
   const [refundLatestPayment, setRefundLatestPayment] = useState(true);
@@ -134,8 +136,9 @@ export function KiloPassBulkCancel() {
     })
   );
 
+  const canAct = isPermissionResolved && isSuperadmin;
   const canSubmit =
-    emails.length > 0 && !overLimit && reason.trim().length > 0 && !mutation.isPending;
+    canAct && emails.length > 0 && !overLimit && reason.trim().length > 0 && !mutation.isPending;
 
   function handleSubmitClick() {
     if (!canSubmit) return;
@@ -180,6 +183,7 @@ export function KiloPassBulkCancel() {
               placeholder="alice@example.com&#10;bob@example.com&#10;..."
               value={rawEmails}
               onChange={e => setRawEmails(e.target.value)}
+              disabled={!canAct}
             />
             <div className="text-muted-foreground flex flex-wrap gap-x-4 text-xs">
               <span>{emails.length.toLocaleString()} valid unique emails</span>
@@ -200,6 +204,7 @@ export function KiloPassBulkCancel() {
               placeholder="e.g. abuse/chargeback-fraud/policy-violation"
               value={reason}
               onChange={e => setReason(e.target.value)}
+              disabled={!canAct}
             />
           </div>
 
@@ -208,7 +213,7 @@ export function KiloPassBulkCancel() {
               id="refund-latest-payment"
               checked={refundLatestPayment}
               onCheckedChange={setRefundLatestPayment}
-              disabled={mutation.isPending}
+              disabled={mutation.isPending || !canAct}
               className="accent-primary focus:ring-ring"
             />
             <div className="space-y-1">
@@ -221,6 +226,14 @@ export function KiloPassBulkCancel() {
               </p>
             </div>
           </div>
+
+          {isPermissionResolved && !isSuperadmin && (
+            <Alert>
+              <AlertDescription>
+                Superadmin access is required to cancel and refund Kilo Pass subscriptions.
+              </AlertDescription>
+            </Alert>
+          )}
 
           <Alert>
             <AlertDescription>

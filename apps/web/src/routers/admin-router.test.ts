@@ -625,10 +625,36 @@ describe('admin.cancelAndRefundKiloPass', () => {
         target_type: 'user',
         target_id: target.id,
         message: 'Cancelled Kilo Pass and refunded the latest payment',
-        metadata: expect.objectContaining({
-          status: 'cancelled_and_refunded',
-          reason: 'chargeback',
-        }),
+        metadata: expect.objectContaining({ reason: 'chargeback' }),
+      }),
+    ]);
+  });
+
+  test('a refund that fails after the subscription was cancelled is still attributed', async () => {
+    const superadmin = await insertTestUser({ is_admin: true, is_super_admin: true });
+    const target = await insertTestUser();
+    await insertActiveKiloPass(target.id, `sub_fail_${crypto.randomUUID()}`);
+
+    jest.spyOn(stripeClient.subscriptions, 'cancel').mockResolvedValue({} as never);
+    jest.spyOn(stripeClient.invoices, 'list').mockResolvedValue({
+      data: [{ id: 'in_admin_router_fail' }],
+    } as never);
+    jest.spyOn(stripeClient.invoicePayments, 'list').mockResolvedValue({
+      data: [{ payment: { payment_intent: 'pi_admin_router_fail' } }],
+    } as never);
+    jest.spyOn(stripeClient.refunds, 'create').mockRejectedValue(new Error('Stripe boom'));
+
+    const caller = await createCallerForUser(superadmin.id);
+    await expect(
+      caller.admin.users.cancelAndRefundKiloPass({ userId: target.id, reason: 'chargeback' })
+    ).rejects.toThrow('Stripe boom');
+
+    const audits = await kiloPassAuditRows(target.id);
+    expect(audits).toEqual([
+      expect.objectContaining({
+        actor_id: superadmin.id,
+        target_id: target.id,
+        message: 'Kilo Pass cancel attempted with unknown outcome',
       }),
     ]);
   });

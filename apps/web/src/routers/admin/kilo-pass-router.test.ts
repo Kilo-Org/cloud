@@ -167,7 +167,10 @@ describe('admin.kiloPass.cancelAndRefundKiloPassBulk', () => {
         emails: ['bulk-refused@example.com'],
         reason: 'abuse',
       })
-    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: 'Superadmin access required',
+    });
 
     expect(stripeMock.subscriptions.cancel).not.toHaveBeenCalled();
     expect(stripeMock.refunds.create).not.toHaveBeenCalled();
@@ -544,13 +547,18 @@ describe('admin.kiloPass.cancelAndRefundKiloPassBulk', () => {
     expect(sub2?.status).toBe('active');
     expect(sub3?.status).toBe('canceled');
 
-    // Every account the batch touched is attributed to the actor, including the
-    // one whose Stripe call failed after it may have created a refund.
+    // Every account the batch touched is attributed to the actor exactly once,
+    // including the one whose Stripe call failed after it may have created a
+    // refund.
     const audits = await refundAuditRows();
-    const auditByTarget = new Map(audits.map(row => [row.target_id, row]));
-    expect([...auditByTarget.keys()].sort()).toEqual([u1.id, u2.id, u3.id].sort());
-    expect(auditByTarget.get(u2.id)?.message).toBe(
-      'Kilo Pass cancel and refund attempted with unknown outcome via bulk admin cancel'
+    expect(audits).toHaveLength(3);
+    const auditTargets = audits.map(row => row.target_id);
+    expect(auditTargets.filter(id => id === u1.id)).toHaveLength(1);
+    expect(auditTargets.filter(id => id === u2.id)).toHaveLength(1);
+    expect(auditTargets.filter(id => id === u3.id)).toHaveLength(1);
+    const failedAudit = audits.find(row => row.target_id === u2.id);
+    expect(failedAudit?.message).toBe(
+      'Kilo Pass cancel attempted with unknown outcome via bulk admin cancel'
     );
     expect(audits.every(row => row.actor_id === adminUser.id)).toBe(true);
   });

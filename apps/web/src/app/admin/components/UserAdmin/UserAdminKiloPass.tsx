@@ -19,6 +19,7 @@ import { useState } from 'react';
 import { formatMicrodollars, formatDate } from '@/lib/admin-utils';
 import { useTRPC } from '@/lib/trpc/utils';
 import { toast } from 'sonner';
+import { useAdminPermissions } from '@/app/admin/useAdminPermissions';
 import CheckKiloPassButton from './CheckKiloPassButton';
 import { KiloPassIssuanceItemKind } from '@kilocode/web-shared/lib/kilo-pass/enums';
 
@@ -37,6 +38,8 @@ export function UserAdminKiloPass({ userId }: { userId: string }) {
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const queryClient = useQueryClient();
+  const { isSuperadmin, isPermissionResolved } = useAdminPermissions();
+  const canAct = isPermissionResolved && isSuperadmin;
 
   const cancelMutation = useMutation(
     trpc.admin.users.cancelAndRefundKiloPass.mutationOptions({
@@ -170,10 +173,20 @@ export function UserAdminKiloPass({ userId }: { userId: string }) {
           </div>
         </div>
         {canCancel && (
-          <div>
-            <Button size="sm" variant="destructive" onClick={() => setCancelDialogOpen(true)}>
+          <div className="space-y-2">
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={() => setCancelDialogOpen(true)}
+              disabled={!canAct}
+            >
               Nuke Pass
             </Button>
+            {isPermissionResolved && !isSuperadmin && (
+              <p className="text-muted-foreground text-xs">
+                Superadmin access is required to cancel and refund a Kilo Pass subscription.
+              </p>
+            )}
           </div>
         )}
 
@@ -334,7 +347,7 @@ export function UserAdminKiloPass({ userId }: { userId: string }) {
             </Button>
             <Button
               variant="destructive"
-              disabled={cancelMutation.isPending || cancelReason.trim().length === 0}
+              disabled={cancelMutation.isPending || cancelReason.trim().length === 0 || !canAct}
               onClick={() => cancelMutation.mutate({ userId, reason: cancelReason.trim() })}
             >
               {cancelMutation.isPending ? 'Processing...' : 'Confirm'}

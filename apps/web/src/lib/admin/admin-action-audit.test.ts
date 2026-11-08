@@ -193,6 +193,24 @@ describe('redactEmailAddressesInAuditText', () => {
     );
   });
 
+  test('keeps prose punctuation that runs into a pasted address', () => {
+    expect(redactEmailAddressesInAuditText('refund for ...victim@example.com')).toBe(
+      'refund for ...[redacted-email]'
+    );
+
+    expect(redactEmailAddressesInAuditText('blocked -victim@example.com for fraud')).toBe(
+      'blocked -[redacted-email] for fraud'
+    );
+
+    expect(redactEmailAddressesInAuditText('watch victim@example.com! and ?two/more')).toBe(
+      'watch [redacted-email]! and ?two/more'
+    );
+
+    expect(redactEmailAddressesInAuditText('forward /victim@example.com to abuse')).toBe(
+      'forward /[redacted-email] to abuse'
+    );
+  });
+
   test('leaves host forms without a dotted domain alone', () => {
     expect(redactEmailAddressesInAuditText('intranet user@localhost and user@[192.0.2.1]')).toBe(
       'intranet user@localhost and user@[192.0.2.1]'

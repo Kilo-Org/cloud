@@ -507,7 +507,7 @@ const GetUserInvoicesSchema = z.object({
 
 const CancelAndRefundKiloPassSchema = z.object({
   userId: z.string(),
-  reason: z.string().min(1, 'Reason is required').trim(),
+  reason: z.string().trim().min(1, 'Reason is required').max(500),
 });
 
 const GetKiloClawStateSchema = z.object({

@@ -34,6 +34,7 @@ import Link from 'next/link';
 import { useAdminPermissions } from '@/app/admin/useAdminPermissions';
 
 const MAX_EMAILS = 500;
+const MAX_REASON_LENGTH = 500;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 type BulkResultStatus =
@@ -202,6 +203,7 @@ export function KiloPassBulkCancel() {
             <Input
               id="reason"
               placeholder="e.g. abuse/chargeback-fraud/policy-violation"
+              maxLength={MAX_REASON_LENGTH}
               value={reason}
               onChange={e => setReason(e.target.value)}
               disabled={!canAct}

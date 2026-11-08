@@ -29,6 +29,8 @@ function formatUsd(value: number | string | null | undefined): string {
   return `$${num.toFixed(2)}`;
 }
 
+const MAX_REASON_LENGTH = 500;
+
 export function UserAdminKiloPass({ userId }: { userId: string }) {
   const trpc = useTRPC();
   const { data, isLoading, error } = useQuery(
@@ -338,6 +340,7 @@ export function UserAdminKiloPass({ userId }: { userId: string }) {
             <Label htmlFor="cancel-reason">Reason (required)</Label>
             <Textarea
               id="cancel-reason"
+              maxLength={MAX_REASON_LENGTH}
               value={cancelReason}
               onChange={e => setCancelReason(e.target.value)}
               placeholder="Enter the reason for this action..."

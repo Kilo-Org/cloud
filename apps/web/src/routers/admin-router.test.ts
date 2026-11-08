@@ -701,6 +701,20 @@ describe('admin.cancelAndRefundKiloPass', () => {
       }),
     ]);
   });
+
+  test('rejects a reason longer than the bounded length', async () => {
+    const superadmin = await insertTestUser({ is_admin: true, is_super_admin: true });
+
+    const caller = await createCallerForUser(superadmin.id);
+    await expect(
+      caller.admin.users.cancelAndRefundKiloPass({
+        userId: 'length-bound-target',
+        reason: 'x'.repeat(501),
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+
+    expect(await kiloPassAuditRows('length-bound-target')).toEqual([]);
+  });
 });
 
 describe('admin.syncProviders manual sync', () => {

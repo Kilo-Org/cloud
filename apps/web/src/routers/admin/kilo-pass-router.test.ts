@@ -746,4 +746,21 @@ describe('admin.kiloPass.cancelAndRefundKiloPassBulk', () => {
     expect(sub2?.status).toBe('active');
     expect(stripeMock.subscriptions.cancel).not.toHaveBeenCalled();
   });
+
+  it('rejects a reason longer than the bounded length', async () => {
+    const stripeMock = getStripeMock();
+
+    const caller = await createCallerForUser(adminUser.id);
+    await expect(
+      caller.admin.kiloPass.cancelAndRefundKiloPassBulk({
+        emails: ['bulk-length-bound@example.com'],
+        reason: 'x'.repeat(501),
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+
+    expect(stripeMock.subscriptions.cancel).not.toHaveBeenCalled();
+    expect(stripeMock.invoices.list).not.toHaveBeenCalled();
+    expect(stripeMock.refunds.create).not.toHaveBeenCalled();
+    expect(await refundAuditRows()).toEqual([]);
+  });
 });

@@ -19,7 +19,7 @@ import { superadminProcedure } from '@/lib/trpc/admin-procedures';
 
 const BulkCancelSchema = z.object({
   emails: z.array(z.string().email()).min(1).max(500),
-  reason: z.string().min(1).trim(),
+  reason: z.string().trim().min(1).max(500),
   refundLatestPayment: z.boolean().default(true),
 });
 

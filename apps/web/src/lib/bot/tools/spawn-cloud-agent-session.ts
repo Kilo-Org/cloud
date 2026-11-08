@@ -24,6 +24,7 @@ import {
   validateGitLabRepoAccessForOrganization,
   validateGitLabRepoAccessForUser,
 } from '@/lib/cloud-agent/gitlab-integration-helpers';
+import { normalizeGitLabInstanceUrl } from '@/lib/integrations/platforms/gitlab/instance-url';
 import type { CloudAgentAttachments } from '@/lib/cloud-agent/constants';
 import { linkUploadedAttachments, releaseRefusedAttachments } from '@/lib/bot/attachments';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
@@ -200,8 +201,8 @@ export default async function spawnCloudAgentSession(
           getGitLabInstanceUrlForOrganization(owner.id),
         ]);
         if (
-          requesterInstanceUrl.replace(/\/$/, '').toLowerCase() !==
-          orgInstanceUrl.replace(/\/$/, '').toLowerCase()
+          normalizeGitLabInstanceUrl(requesterInstanceUrl) !==
+          normalizeGitLabInstanceUrl(orgInstanceUrl)
         ) {
           return {
             response:

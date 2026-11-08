@@ -564,6 +564,7 @@ describe('spawnCloudAgentSession delegation', () => {
         response: expect.stringContaining('not available through this account'),
       })
     );
+    expect(mockGetGitLabProjectAccessForRequester).not.toHaveBeenCalled();
     expect(mockValidateGitLabRepoAccessForOrganization).not.toHaveBeenCalled();
     expect(mockPrepareSession).not.toHaveBeenCalled();
   });

@@ -768,7 +768,13 @@ Manual creation, historical period selection, preparation drafts, and manual sum
 
 Pricing estimates use the model picker's configured provider prices and the stored target for model aliases.
 The gateway preserves bounded-request price ceilings and model access checks.
-Usage receipts retain the existing committed-versus-queued settlement behavior.
+Each charged retry retains a distinct usage receipt with its committed or queued delivery state.
+A usage identifier marks an attempt the gateway billed, including an answer the caller never received.
+The summary worker stops a transient retry when it observes that identifier.
+A delayed receipt can still permit another charged attempt; this check does not enforce a cumulative spending ceiling.
+Settlement waits for every recorded receipt, within the existing delivery window.
+A later receipt reopens settlement after an earlier attempt settled.
+The displayed cost sums usage rows once, including rows delivered after another attempt.
 Tiered custom pricing uses the highest tier reachable from the request’s bounded input length.
 The default summary model is `~deepseek/deepseek-flash-latest`.
 
@@ -786,3 +792,17 @@ Disable the old briefing cron jobs and settle outstanding briefing usage before 
 Quiesce old event producers before the migration, then deploy the matching web, gateway, notification, and session-ingest code.
 Enable contexts explicitly after deployment.
 Do not treat an unshipped user interface as proof that its ingestion code is inactive.
+
+### Summary retry rollout
+
+The gateway marks a refusal that replaces an already-accounted answer.
+The summary worker must not retry that refusal.
+The repeat guard reads the usage identifier the deployed gateway already writes for a billed attempt, so it adds no gateway behavior.
+The scheduled workflow promotes the gateway marker producer before the matching web retry consumer.
+Web promotion requires successful gateway staging and promotion, or both gateway jobs skipped.
+A failed, cancelled, or mismatched gateway rollout blocks web promotion.
+Manual deployments must use the same producer-first order.
+
+Charge accounting retains the deployed receipt fields in `chargeAccounting.generations`.
+Charged attempts share a generation identifier but retain distinct usage identifiers and delivery states.
+An older reader therefore retains every attempt when it reconciles or rewrites the accounting record.

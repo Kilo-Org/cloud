@@ -434,6 +434,47 @@ test('successful main CI selects the tested deployment SHA', () => {
   }
 });
 
+test('web promotion waits for a completed or deliberately skipped gateway rollout', () => {
+  const job = production.jobs['promote-app'];
+  const condition = (job.if ?? 'success()')
+    .replace(/^\$\{\{|\}\}$/g, '')
+    .replace(/needs\.([\w-]+)\.result/g, 'needs["$1"].result');
+  const expression = /\b(always|cancelled|failure|success)\(/.test(condition)
+    ? condition
+    : `success() && (${condition})`;
+  for (const [stage, promotion, app, database, cancelled, expected] of [
+    ['success', 'success', 'success', 'success', false, true],
+    ['skipped', 'skipped', 'success', 'success', false, true],
+    ['success', 'failure', 'success', 'success', false, false],
+    ['failure', 'skipped', 'success', 'success', false, false],
+    ['cancelled', 'skipped', 'success', 'success', false, false],
+    ['success', 'cancelled', 'success', 'success', false, false],
+    ['success', 'skipped', 'success', 'success', false, false],
+    ['skipped', 'success', 'success', 'success', false, false],
+    ['skipped', 'skipped', 'failure', 'success', false, false],
+    ['success', 'success', 'success', 'failure', false, false],
+    ['skipped', 'skipped', 'success', 'skipped', false, false],
+    ['success', 'success', 'success', 'success', true, false],
+  ]) {
+    const results = {
+      'stage-app': app,
+      'db-gate': database,
+      'stage-ai-gateway': stage,
+      'promote-ai-gateway': promotion,
+    };
+    const needs = Object.fromEntries(job.needs.map(name => [name, { result: results[name] }]));
+    assert.equal(
+      runInNewContext(expression, {
+        needs,
+        cancelled: () => cancelled,
+        success: () => Object.values(needs).every(dependency => dependency.result === 'success'),
+      }),
+      expected,
+      JSON.stringify({ stage, promotion, app, database, cancelled })
+    );
+  }
+});
+
 test('ai-gateway deploys with each scheduled release after migrations', () => {
   const stageAiGateway = production.jobs['stage-ai-gateway'];
   assert.equal(stageAiGateway.needs, 'check-changes');

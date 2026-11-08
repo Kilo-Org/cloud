@@ -150,6 +150,23 @@ describe('readLogoutCleanupStore', () => {
     await expect(readLogoutCleanupStore()).resolves.toEqual({ status: 'unreadable' });
   });
 
+  it('files no store-state report for a failed read', async () => {
+    const { captureException } = await import('@sentry/react-native');
+    const { getItemAsync } = await import('expo-secure-store');
+    vi.mocked(getItemAsync).mockRejectedValueOnce(new Error('keychain unavailable'));
+
+    await readLogoutCleanupStore();
+
+    // The secure-store read path reports the failure at warning level, and a
+    // locked device is not filed at all.
+    expect(captureException).not.toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        tags: expect.objectContaining({ 'error.operation': 'read_logout_cleanup_store' }),
+      })
+    );
+  });
+
   it('reads a payload of an unknown version as unsupported', async () => {
     store.set(LOGOUT_CLEANUP_TOMBSTONE_KEY, JSON.stringify({ version: 3, records: [] }));
 

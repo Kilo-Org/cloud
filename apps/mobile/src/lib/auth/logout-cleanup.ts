@@ -113,6 +113,9 @@ export type LogoutCleanupStoreRead =
 
 type ParsedJson = { readonly ok: true; readonly value: unknown } | { readonly ok: false };
 
+/** What parsing a stored string can report; a failed read never reaches here. */
+type ParsedStoreRead = Exclude<LogoutCleanupStoreRead, { status: 'unreadable' }>;
+
 function parseJson(raw: string): ParsedJson {
   try {
     return { ok: true, value: JSON.parse(raw) };
@@ -121,7 +124,7 @@ function parseJson(raw: string): ParsedJson {
   }
 }
 
-function parseStoredRecords(raw: string | null): LogoutCleanupStoreRead {
+function parseStoredRecords(raw: string | null): ParsedStoreRead {
   if (raw === null) {
     return { status: 'records', records: [] };
   }
@@ -185,9 +188,9 @@ function dedupeByOwner(records: readonly LogoutCleanupRecord[]): LogoutCleanupRe
  * decode. A malformed entry inside the current version is discarded on its own
  * so the valid records survive.
  *
- * An unreadable, unsupported or corrupt payload is reported once per process
- * and state, so one unchanged store state is one event rather than one per
- * read.
+ * An unsupported or corrupt payload is reported once per process and state, so
+ * one unchanged store state is one event rather than one per read. A failed
+ * read is reported by the secure-store read path instead.
  */
 export async function readLogoutCleanupStore(): Promise<LogoutCleanupStoreRead> {
   const stored = await readStoredValueForUpdate(LOGOUT_CLEANUP_TOMBSTONE_KEY);

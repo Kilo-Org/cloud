@@ -29,7 +29,8 @@ import { createTestQueryClient, renderWithProviders, waitFor } from '@/test/rend
 // The expiry sentence keeps its zone marker on the date's line with a no-break
 // space inside a bidi isolate. Content assertions compare the readable text;
 // the marker itself is asserted only where the wrapping behavior is under test.
-const readable = (text: string) => text.replaceAll(/[\u2068\u2069]/g, '').replaceAll('\u00A0', ' ');
+const readable = (text: string) =>
+  text.replaceAll(/[\u2066\u2068\u2069]/g, '').replaceAll('\u00A0', ' ');
 
 // ── Hoisted mocks ──────────────────────────────────────────────────────────
 
@@ -1078,9 +1079,9 @@ describe('CreditsCard balance state', () => {
       ],
     });
     const { renderer, texts, unmount } = await mountCard();
-    await waitFor(() => texts().some(text => text.includes('$15.00 in credits expires')));
-    expect(texts().some(text => text.includes('$65.00 in credits expires'))).toBe(false);
-    expect(texts().some(text => text.includes('bonus credits'))).toBe(false);
+    await waitFor(() => texts().some(text => readable(text).includes('$15.00 in credits expires')));
+    expect(texts().some(text => readable(text).includes('$65.00 in credits expires'))).toBe(false);
+    expect(texts().some(text => readable(text).includes('bonus credits'))).toBe(false);
 
     const hide = renderer.root.findByProps({ accessibilityLabel: 'Hide balance' });
     await act(() => {

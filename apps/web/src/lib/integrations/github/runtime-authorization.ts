@@ -10,6 +10,7 @@ import {
   organizations,
   platform_integrations,
 } from '@kilocode/db/schema';
+import { organizationWorkflowGitHubConnectionSql } from '@kilocode/db';
 import { and, eq, isNull, notExists, or } from 'drizzle-orm';
 
 export type GitHubRuntimeAuthorizationRejectionReason =
@@ -65,11 +66,25 @@ type RuntimeAssociation = {
   userBlockedReason: string | null;
 };
 
+/**
+ * How a caller is asking about an association.
+ *
+ * `resolvedOrganizationWorkflowConnection` states that the caller fetched this
+ * association through the organization workflow connection definition, which
+ * also accepts an eligible organization association that no writer gave a role.
+ * The definition is what established that connection, so a missing role there
+ * is not a sharing decision and must not be rejected as one. Personal
+ * associations always store their role, so the flag cannot widen a personal
+ * lookup.
+ */
+type RuntimeAuthorizationOptions = {
+  purpose?: 'workflow' | 'agent' | 'management';
+  resolvedOrganizationWorkflowConnection?: boolean;
+};
+
 export function getGitHubRuntimeAssociationRejectionReason(
   association: RuntimeAssociation | null | undefined,
-  options?: {
-    purpose?: 'workflow' | 'agent' | 'management';
-  }
+  options?: RuntimeAuthorizationOptions
 ): GitHubRuntimeAuthorizationRejectionReason | null {
   if (!association) return 'missing_association';
 
@@ -90,8 +105,13 @@ export function getGitHubRuntimeAssociationRejectionReason(
   if (integration.auth_invalid_at !== null) return 'auth_invalid';
   if (integration.github_disconnected_at != null) return 'disconnected';
 
+  const isWorkflowConnection =
+    integration.github_connection_role === 'workflow' ||
+    (integration.github_connection_role === null &&
+      integration.owned_by_organization_id !== null &&
+      options?.resolvedOrganizationWorkflowConnection === true);
   if (
-    integration.github_connection_role !== 'workflow' &&
+    !isWorkflowConnection &&
     !(
       integration.github_connection_role === 'agent_only' &&
       (options?.purpose === 'agent' || options?.purpose === 'management')
@@ -115,7 +135,7 @@ export function getGitHubRuntimeAssociationRejectionReason(
 
 export function isGitHubRuntimeAssociationAuthorized(
   association: RuntimeAssociation | null | undefined,
-  options?: { purpose?: 'workflow' | 'agent' | 'management' }
+  options?: RuntimeAuthorizationOptions
 ): boolean {
   return getGitHubRuntimeAssociationRejectionReason(association, options) === null;
 }
@@ -147,12 +167,20 @@ export async function assertGitHubInstallationRuntimeAuthorized(
     .where(
       and(
         eq(platform_integrations.platform, PLATFORM.GITHUB),
+        // The workflow branch admits the organization workflow connection
+        // definition next to the stored role, so an installation the product
+        // reports as connected can mint a token for this organization. Any row
+        // it returns without a role was resolved by that definition, which is
+        // what the rejection check is told below.
         allowAgentOnly
           ? or(
               eq(platform_integrations.github_connection_role, 'workflow'),
               eq(platform_integrations.github_connection_role, 'agent_only')
             )
-          : eq(platform_integrations.github_connection_role, 'workflow'),
+          : or(
+              eq(platform_integrations.github_connection_role, 'workflow'),
+              organizationWorkflowGitHubConnectionSql()
+            ),
         eq(platform_integrations.integration_status, INTEGRATION_STATUS.ACTIVE),
         isNull(platform_integrations.github_disconnected_at),
         isNull(platform_integrations.suspended_at),
@@ -204,6 +232,10 @@ export async function assertGitHubInstallationRuntimeAuthorized(
       ? 'ambiguous_association'
       : getGitHubRuntimeAssociationRejectionReason(associations[0], {
           purpose: allowAgentOnly ? purpose : 'workflow',
+          // The query above accepted this row on the workflow path, so a row
+          // without a role is the organization workflow connection it
+          // resolved, not a shared association this caller may not use.
+          resolvedOrganizationWorkflowConnection: !allowAgentOnly,
         });
   if (reason) {
     throw new GitHubRuntimeAuthorizationError(reason, {

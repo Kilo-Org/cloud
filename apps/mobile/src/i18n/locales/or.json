@@ -331,7 +331,6 @@
     "noFilesChangedDescription": "ଏହି ପୁଲ୍ ରିକ୍ୱେଷ୍ଟରେ କୌଣସି ଫାଇଲ୍ ପରିବର୍ତ୍ତନ ନାହିଁ।",
     "fileList": {
       "openNavigator": "ଫାଇଲ୍ ତାଲିକା ଖୋଲନ୍ତୁ",
-      "filesViewed": "ଫାଇଲ୍ · {{total}} ମଧ୍ୟରୁ {{viewed}} ଦେଖିସାରିଛନ୍ତି",
       "listed": "(ତାଲିକାଭୁକ୍ତ)",
       "layout": "ବିନ୍ୟାସ",
       "unified": "ଏକାଠି",

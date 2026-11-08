@@ -331,7 +331,6 @@
     "noFilesChangedDescription": "ຄຳຂໍລວມໂຄດນີ້ບໍ່ມີການປ່ຽນແປງໄຟລ໌.",
     "fileList": {
       "openNavigator": "ເປີດແຖບນຳທາງໄຟລ໌",
-      "filesViewed": "ໄຟລ໌ · ເບິ່ງແລ້ວ {{viewed}} ຈາກ {{total}}",
       "listed": "(ທີ່ຢູ່ໃນລາຍການ)",
       "layout": "ຮູບແບບການຈັດວາງ",
       "unified": "ແບບລວມ",

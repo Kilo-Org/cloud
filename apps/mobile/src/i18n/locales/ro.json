@@ -331,7 +331,6 @@
     "noFilesChangedDescription": "Acest PR nu conține modificări ale fișierelor.",
     "fileList": {
       "openNavigator": "Deschide lista de fișiere",
-      "filesViewed": "Fișiere · {{viewed}} din {{total}} vizualizate",
       "listed": "(afișate)",
       "layout": "Aranjare",
       "unified": "Unificat",

@@ -331,7 +331,6 @@
     "noFilesChangedDescription": "Lesi sicelo sokuhlanganisa asinazo izinguquko zamafayela.",
     "fileList": {
       "openNavigator": "Vula isitholi samafayela",
-      "filesViewed": "Amafayela · kubukwe angu-{{viewed}} kwangu-{{total}}",
       "listed": "(asohlwini)",
       "layout": "Ukwakheka",
       "unified": "Okuhlanganisiwe",

@@ -331,7 +331,6 @@
     "noFilesChangedDescription": "Bu PRda hech bir fayl o'zgarmagan.",
     "fileList": {
       "openNavigator": "Fayllar ro'yxatini ochish",
-      "filesViewed": "Fayllar · {{total}} tadan {{viewed}} tasi ko'rildi",
       "listed": "(ro'yxatda)",
       "layout": "Ko'rinish",
       "unified": "Birlashtirilgan",

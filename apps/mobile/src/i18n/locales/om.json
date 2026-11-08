@@ -331,7 +331,6 @@
     "noFilesChangedDescription": "Gaaffiin walitti makuu kun jijjiirama faayilii hin qabu.",
     "fileList": {
       "openNavigator": "Tarree faayilootaa bani",
-      "filesViewed": "Faayiloota · {{total}} keessaa {{viewed}} ilaalaman",
       "listed": "(tarreeffame)",
       "layout": "Teessuma",
       "unified": "Walitti makame",

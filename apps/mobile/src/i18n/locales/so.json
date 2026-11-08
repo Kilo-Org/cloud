@@ -331,7 +331,6 @@
     "noFilesChangedDescription": "Codsigan isku-darka kuma jiraan isbeddello faylal.",
     "fileList": {
       "openNavigator": "Fur hagaha faylasha",
-      "filesViewed": "Faylal · {{viewed}} ka mid ah {{total}} la arkay",
       "listed": "(liiska ku jira)",
       "layout": "Qaabka bandhigga",
       "unified": "Midaysan",

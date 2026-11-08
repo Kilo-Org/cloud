@@ -331,7 +331,6 @@
     "noFilesChangedDescription": "Ombi hili la kuunganisha halina mabadiliko ya faili.",
     "fileList": {
       "openNavigator": "Fungua kivinjari cha faili",
-      "filesViewed": "Faili · {{viewed}} kati ya {{total}} zimeangaliwa",
       "listed": "(zimeorodheshwa)",
       "layout": "Mpangilio",
       "unified": "Pamoja",

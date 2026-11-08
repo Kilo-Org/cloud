@@ -331,7 +331,6 @@
     "noFilesChangedDescription": "Kāore he huringa kōnae i tēnei tono kume.",
     "fileList": {
       "openNavigator": "Whakatuwheratia te pūwhakatere kōnae",
-      "filesViewed": "Ngā kōnae · {{viewed}} o te {{total}} kua tirohia",
       "listed": "(kua rārangihia)",
       "layout": "Tahora",
       "unified": "Kotahi",

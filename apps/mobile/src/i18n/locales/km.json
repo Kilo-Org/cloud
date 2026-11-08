@@ -331,7 +331,6 @@
     "noFilesChangedDescription": "សំណើបញ្ចូលកូដនេះមិនមានការកែប្រែឯកសារទេ។",
     "fileList": {
       "openNavigator": "បើកបញ្ជីរុករកឯកសារ",
-      "filesViewed": "ឯកសារ · បានមើល {{viewed}} ក្នុងចំណោម {{total}}",
       "listed": "(បានរាយបញ្ជី)",
       "layout": "ប្លង់",
       "unified": "រួមគ្នា",

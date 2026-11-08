@@ -331,7 +331,6 @@
     "noFilesChangedDescription": "Kjo kërkesë për bashkim nuk përmban ndryshime në skedarë.",
     "fileList": {
       "openNavigator": "Hap shfletuesin e skedarëve",
-      "filesViewed": "Skedarë · {{viewed}} nga {{total}} të parë",
       "listed": "(të listuar)",
       "layout": "Paraqitja",
       "unified": "E bashkuar",

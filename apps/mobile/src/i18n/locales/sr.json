@@ -331,7 +331,6 @@
     "noFilesChangedDescription": "U ovom zahtevu za spajanje nema izmena datoteka.",
     "fileList": {
       "openNavigator": "Otvori pregled datoteka",
-      "filesViewed": "Datoteke · pregledano {{viewed}} od {{total}}",
       "listed": "(navedeno)",
       "layout": "Raspored",
       "unified": "Objedinjeno",

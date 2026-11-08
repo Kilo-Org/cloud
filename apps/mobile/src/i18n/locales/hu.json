@@ -331,7 +331,6 @@
     "noFilesChangedDescription": "Ez a módosítási kérelem nem tartalmaz fájlmódosításokat.",
     "fileList": {
       "openNavigator": "Fájlböngésző megnyitása",
-      "filesViewed": "Fájlok · {{viewed}} / {{total}} megtekintve",
       "listed": "(felsorolva)",
       "layout": "Elrendezés",
       "unified": "Egyesített",

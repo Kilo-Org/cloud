@@ -331,7 +331,6 @@
     "noFilesChangedDescription": "در این درخواست ادغام هیچ فایلی تغییر نکرده است.",
     "fileList": {
       "openNavigator": "باز کردن فهرست فایل‌ها",
-      "filesViewed": "فایل‌ها · {{viewed}} از {{total}} مشاهده‌شده",
       "listed": "(فهرست‌شده)",
       "layout": "چیدمان",
       "unified": "یکپارچه",

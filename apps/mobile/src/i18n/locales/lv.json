@@ -331,7 +331,6 @@
     "noFilesChangedDescription": "Šajā izmaiņu pieprasījumā nav failu izmaiņu.",
     "fileList": {
       "openNavigator": "Atvērt failu navigatoru",
-      "filesViewed": "Faili · apskatīti {{viewed}} no {{total}}",
       "listed": "(uzskaitīti)",
       "layout": "Izkārtojums",
       "unified": "Vienots",

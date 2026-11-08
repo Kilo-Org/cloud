@@ -331,7 +331,6 @@
     "noFilesChangedDescription": "यो पुल रिक्वेस्टमा कुनै पनि फाइल परिवर्तन भएको छैन।",
     "fileList": {
       "openNavigator": "फाइल नेभिगेसन खोल्नुहोस्",
-      "filesViewed": "फाइलहरू · {{total}} मध्ये {{viewed}} हेरियो",
       "listed": "(सूचीबद्ध)",
       "layout": "लेआउट",
       "unified": "एकीकृत",

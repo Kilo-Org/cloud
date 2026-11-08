@@ -2971,7 +2971,6 @@
     },
     "fileList": {
       "filesList": "Список файлов",
-      "filesViewed": "Файлы · просмотрено {{viewed}} из {{total}}",
       "layout": "Вид",
       "listed": "(в списке)",
       "loadingFiles": "Загрузка файлов",

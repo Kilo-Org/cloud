@@ -2891,7 +2891,6 @@
     },
     "fileList": {
       "filesList": "Bestandenlijst",
-      "filesViewed": "Bestanden · {{viewed}} van {{total}} bekeken",
       "layout": "Indeling",
       "listed": "(in de lijst)",
       "loadingFiles": "Bestanden laden",

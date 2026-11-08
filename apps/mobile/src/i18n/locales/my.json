@@ -331,7 +331,6 @@
     "noFilesChangedDescription": "ဒီ PR တွင် ဖိုင်ပြောင်းလဲမှု မရှိပါ။",
     "fileList": {
       "openNavigator": "ဖိုင်လမ်းညွှန်ကို ဖွင့်ပါ",
-      "filesViewed": "ဖိုင်များ · {{total}} ခုအနက် {{viewed}} ခု ကြည့်ပြီး",
       "listed": "(စာရင်းပါဖိုင်များ)",
       "layout": "အပြင်အဆင်",
       "unified": "တစ်စုတည်း",

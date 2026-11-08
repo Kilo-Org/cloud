@@ -331,7 +331,6 @@
     "noFilesChangedDescription": "ይህ የማዋሃድ ጥያቄ ምንም የፋይል ለውጥ አልያዘም።",
     "fileList": {
       "openNavigator": "የፋይል መዳሰሻውን ክፈት",
-      "filesViewed": "ፋይሎች · ከ{{total}} ውስጥ {{viewed}} ታይተዋል",
       "listed": "(የተዘረዘሩ)",
       "layout": "አቀማመጥ",
       "unified": "የተዋሃደ",

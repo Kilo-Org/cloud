@@ -425,13 +425,36 @@ export function tapTargetReachDp(boxDp: number, slopDp: number): number {
 }
 
 /**
+ * The frame the composer's `lg` voice toggle renders on its own pressable
+ * node, in dp. The control-size audit reads that node's view rect, and
+ * `hitSlop` widens the touch region without moving the rect, so the minimum
+ * the row's rule states (44pt on iOS, 48dp on Android) has to be the frame
+ * itself. 48 clears both minimums on one node with no `Platform` branch — the
+ * same convention as {@link ICON_TARGET_DP} — so the row's visuals, identical
+ * on both platforms, leave nothing for a per-platform frame to change.
+ * `hitSlop` stays a no-op there: the frame already carries the target
+ * (`VOICE_INPUT_LG_HIT_SLOP_DP` only documents what the earlier 35dp
+ * `h-10 w-10` + 4dp geometry reached).
+ */
+export const VOICE_INPUT_LG_FRAME_DP = 48;
+
+/**
+ * The visible circle inside the voice toggle's {@link VOICE_INPUT_LG_FRAME_DP}
+ * frame, in dp, unchanged from what the `lg` toggle shipped with: `h-10 w-10`
+ * is 35dp at NativeWind's 14pt rem. The larger frame only centres this circle,
+ * so the row's look does not change.
+ */
+export const VOICE_INPUT_LG_VISUAL_DP = 35;
+
+/**
  * Hit slop per side of the composer's `lg` voice toggle, in dp, unchanged from
- * the value the toggle already shipped with. `lg` is `h-10 w-10`, i.e. 35dp at
- * NativeWind's 14pt rem, so the slop is what widens its tap area past the
- * {@link MIN_TAP_TARGET_DP} audited frame floor. The composer input row keeps
+ * the value the toggle already shipped with. The composer input row keeps
  * the toggle's leading neighbour one `COMPOSER_CONTROL_GAP_DP` away, which has
  * to exceed this slop plus the row's own or the two tap areas overlap
- * (`chat-composer-input-row.tsx`).
+ * (`chat-composer-input-row.tsx`); the toggle's own frame
+ * ({@link VOICE_INPUT_LG_FRAME_DP}) already carries the platform minimum, so
+ * this slop only documents the shipped reach, and the row zeroes the facing
+ * side through {@link composerFacingHitSlop}.
  */
 export const VOICE_INPUT_LG_HIT_SLOP_DP = 4;
 

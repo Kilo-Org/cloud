@@ -404,6 +404,8 @@ export async function listActiveSessions({
     if (!includeCloudAgentSessions) {
       return { sessions: [] as ActiveSession[] };
     }
+    // An unconfigured source cannot have live CLI rows at all, so the empty
+    // heartbeat part is complete; the cloud merge below still runs.
   } else {
     const token = generateBoundedInternalServiceToken(userId, {
       audience: SESSION_INGEST_AUDIENCE,
@@ -433,6 +435,12 @@ export async function listActiveSessions({
         if (!includeCloudAgentSessions) {
           return { sessions: [] as ActiveSession[] };
         }
+        // The tray read must not present a failed worker as an empty list: the
+        // app would report that nothing runs while every CLI session is live.
+        throw new TRPCError({
+          code: 'BAD_GATEWAY',
+          message: `Session ingest failed to list active sessions (status ${response.status})`,
+        });
       } else {
         const raw = await response.json();
         parsed = activeSessionsResponseSchema.parse(raw);
@@ -446,9 +454,19 @@ export async function listActiveSessions({
         });
       }
       console.warn('[active-sessions] error:', error);
+      if (error instanceof TRPCError) {
+        throw error;
+      }
       if (!includeCloudAgentSessions) {
         return { sessions: [] as ActiveSession[] };
       }
+      // Same reason as the non-OK branch above: an unreachable worker is not
+      // evidence that nothing runs.
+      throw new TRPCError({
+        code: 'SERVICE_UNAVAILABLE',
+        message: 'Session ingest is unavailable',
+        cause: error,
+      });
     }
   }
 

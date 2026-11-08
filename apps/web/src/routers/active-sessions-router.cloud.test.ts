@@ -698,7 +698,10 @@ describe('active-sessions-router.list cloud merge', () => {
     expect(result.sessions[0]?.status).toBe('question');
   });
 
-  it('worker fetch failure + flag on → cloud rows still returned', async () => {
+  it('worker fetch failure + flag on → a retryable failure, not an empty list', async () => {
+    // A tray read merges cloud rows, so an unreadable worker must not answer
+    // with an empty list: the app cannot tell that from "nothing runs" and
+    // would report a live session as gone.
     const sessionId = nextId('worker-fail');
     const casId = nextId('cas');
     await seedCloudSession({
@@ -711,9 +714,19 @@ describe('active-sessions-router.list cloud merge', () => {
 
     fetchSpy = mockWorkerFailure();
     const caller = await createCallerForUser(regularUser.id);
-    const result = await caller.activeSessions.list({ includeCloudAgentSessions: true });
 
-    expect(result.sessions.map(s => s.id)).toEqual([sessionId]);
+    // BAD_GATEWAY is not a terminal code, so the app surfaces its load failure
+    // with Retry rather than an accepted empty list.
+    await expect(
+      caller.activeSessions.list({ includeCloudAgentSessions: true })
+    ).rejects.toMatchObject({ code: 'BAD_GATEWAY' });
+  });
+
+  it('worker fetch failure without the cloud flag keeps the legacy empty answer', async () => {
+    fetchSpy = mockWorkerFailure();
+    const caller = await createCallerForUser(regularUser.id);
+
+    await expect(caller.activeSessions.list({})).resolves.toEqual({ sessions: [] });
   });
 
   it('flag on + no heartbeat ids → cloud-only response (no empty inArray)', async () => {

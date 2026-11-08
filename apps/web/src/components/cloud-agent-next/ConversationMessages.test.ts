@@ -1483,15 +1483,24 @@ describe('ConversationMessages memoization', () => {
       collapseTools: true,
       isStreaming: true,
       staticMessages: [
-        assistantMessage('assistant-1', [
-          toolPart('hidden', 'todoread'),
-          textPart('empty', ''),
-          reasoningPart('reasoning-1'),
-          toolPart('bash-1'),
-        ]),
+        assistantMessage(
+          'assistant-1',
+          [
+            toolPart('hidden', 'todoread'),
+            textPart('empty', ''),
+            reasoningPart('reasoning-1'),
+            toolPart('bash-1', 'bash', {
+              status: 'running',
+              input: { command: 'pnpm test -- bash-1' },
+              time: { start: 1 },
+            }),
+          ],
+          { time: { created: 1 } }
+        ),
       ],
     });
     renderConversationMessages(props);
+    expect(container.textContent).toContain('Working');
     expect(container.textContent).toContain('1 tool call');
     expect(container.textContent).not.toContain('pnpm test');
     const group = container.querySelector<HTMLButtonElement>('button[aria-expanded="false"]');
@@ -1503,15 +1512,84 @@ describe('ConversationMessages memoization', () => {
 
     renderConversationMessages({
       ...props,
-      dynamicMessages: [assistantMessage('assistant-2', [toolPart('bash-2')])],
+      dynamicMessages: [
+        assistantMessage(
+          'assistant-2',
+          [
+            toolPart('bash-2', 'bash', {
+              status: 'running',
+              input: { command: 'pnpm test -- bash-2' },
+              time: { start: 3 },
+            }),
+          ],
+          { time: { created: 3 } }
+        ),
+      ],
     });
+    expect(container.textContent).toContain('Working');
     expect(container.textContent).toContain('2 tool calls');
     expect(container.textContent).toContain('pnpm test -- bash-2');
+    expect(group?.getAttribute('aria-expanded')).toBe('true');
 
     renderConversationMessages({ ...props, collapseTools: false });
     expect(container.textContent).not.toContain('1 tool call');
     expect(container.textContent).toContain('pnpm test -- bash-1');
   });
+
+  it.each(['reasoning', 'todowrite'] as const)(
+    'preserves group and tool expansion when leading %s becomes visible while streaming',
+    type => {
+      const hidden =
+        type === 'reasoning'
+          ? reasoningPart('leading', { text: '', time: { start: 1 } })
+          : toolPart('leading', 'todowrite', {
+              status: 'running',
+              input: { todos: [] },
+              time: { start: 1 },
+            });
+      const visible =
+        type === 'reasoning'
+          ? reasoningPart('leading', { time: { start: 1 } })
+          : toolPart('leading', 'todowrite', {
+              status: 'completed',
+              input: { todos: [] },
+              output: '',
+              title: 'Todos',
+              metadata: {},
+              time: { start: 1, end: 2 },
+            });
+      const parts = [textPart('intro', 'Inspecting the code'), hidden, toolPart('bash-1')];
+      const props = baseProps({
+        collapseTools: true,
+        isStreaming: true,
+        dynamicMessages: [assistantMessage('assistant-1', parts, { time: { created: 1 } })],
+      });
+      renderConversationMessages(props);
+      const group = container.querySelector<HTMLButtonElement>('button[aria-expanded="false"]');
+      expect(group).not.toBeNull();
+      act(() => group?.click());
+      const tool = container.querySelector<HTMLButtonElement>('[data-tool-card] button');
+      expect(tool).not.toBeNull();
+      act(() => tool?.click());
+      expect(container.textContent).toContain('Output for bash-1');
+
+      renderConversationMessages({
+        ...props,
+        dynamicMessages: [
+          assistantMessage('assistant-1', [parts[0], visible, parts[2]], {
+            time: { created: 1 },
+          }),
+        ],
+      });
+      expect(container.contains(group)).toBe(true);
+      expect(group?.getAttribute('aria-expanded')).toBe('true');
+      expect(container.contains(tool)).toBe(true);
+      expect(tool?.getAttribute('aria-expanded')).toBe('true');
+      expect(container.textContent).toContain('Output for bash-1');
+      expect(container.textContent).toContain(type === 'reasoning' ? 'Thinking' : 'Todos');
+      expect(container.textContent).toContain(type === 'reasoning' ? 'Working' : '2 tool calls');
+    }
+  );
 
   it('does not re-render the active list when only getChildMessages changes', () => {
     const message = assistantMessage('assistant-1', [textPart('text-1', 'Answer one')]);

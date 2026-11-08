@@ -104,13 +104,14 @@ export function CloudMessageParts({ collapseTools = false }: { collapseTools?: b
 
   const parts = getVisibleAssistantParts(presentation.parts.map(part => part.source));
   const indices = new Map(parts.map((part, index) => [part, index]));
-  return groupAssistantParts(parts, 'live').map(segment => {
+  return groupAssistantParts(parts, 'live').map((segment, segmentIndex, segments) => {
     const content = segment.parts.map(part => {
       const index = indices.get(part);
       return index === undefined ? null : <CloudMessagePartByIndex key={part.id} index={index} />;
     });
-    const key = segment.parts[0]?.id;
-    if (segment.type === 'chat') return <React.Fragment key={key}>{content}</React.Fragment>;
+    if (segment.type === 'chat')
+      return <React.Fragment key={segment.parts[0]?.id}>{content}</React.Fragment>;
+    const key = `agent-work:${segments[segmentIndex - 1]?.parts.at(-1)?.id ?? 'start'}`;
     const working = presentation.isStreaming && segment.parts.some(isPartStreaming);
     return (
       <div key={key} className="py-1">

@@ -1902,6 +1902,14 @@ describe('GitLab encrypted credential persistence', () => {
     expect(keptBeforeReconnect).toHaveLength(1);
 
     mockRevokeProjectAccessToken.mockClear();
+    const statusWhileSettling: Array<string | null> = [];
+    mockRevokeProjectAccessToken.mockImplementation(async () => {
+      const [row] = await db
+        .select({ status: platform_integrations.integration_status })
+        .from(platform_integrations)
+        .where(eq(platform_integrations.id, connected.integration.id));
+      statusWhileSettling.push(row.status);
+    });
 
     await connectWithPAT(
       { type: 'user', id: user.id },
@@ -1927,6 +1935,7 @@ describe('GitLab encrypted credential persistence', () => {
       777,
       'https://gitlab.com'
     );
+    expect(statusWhileSettling).toEqual(['suspended']);
     expect(credentials).toEqual([
       expect.objectContaining({
         provider_credential_type: 'personal_access_token',

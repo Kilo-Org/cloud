@@ -1438,9 +1438,29 @@ export async function connectWithPAT(
     let existingMetadata: Record<string, unknown> = {};
     let isInstanceChange = false;
     let isAccountChange = false;
-    let reconnectedAfterDisconnect = false;
     const existingAccountId = readGitLabAccountId(existingIntegration);
     const connectedAccountId = String(validatedUser.id);
+    if (
+      existingIntegration.integration_status === INTEGRATION_STATUS.SUSPENDED &&
+      !instanceUrlChanged(
+        readOptionalMetadataString(
+          requireMetadataRecord(existingIntegration.metadata),
+          'gitlab_instance_url'
+        ),
+        normalizedInstanceUrl
+      ) &&
+      (existingAccountId === null || existingAccountId === connectedAccountId)
+    ) {
+      const settlement = await settleStoredProjectTokens(
+        existingIntegration,
+        gitLabCredentialActor(owner, authorizedByUserId),
+        token
+      );
+      logExceptInTest('[connectWithPAT] Reconnect settled retained project tokens', {
+        integrationId: existingIntegration.id,
+        settledProjectTokens: settlement === null ? null : settlement,
+      });
+    }
 
     await db.transaction(async tx => {
       existingMetadata = await readGitLabMetadataInTransaction(tx, existingIntegration.id);
@@ -1450,10 +1470,6 @@ export async function connectWithPAT(
       );
       isAccountChange =
         !isInstanceChange && existingAccountId !== null && existingAccountId !== connectedAccountId;
-      reconnectedAfterDisconnect =
-        existingIntegration.integration_status === INTEGRATION_STATUS.SUSPENDED &&
-        !isInstanceChange &&
-        !isAccountChange;
       const [existingPrimaryCredential] = await tx
         .select()
         .from(platform_access_token_credentials)
@@ -1590,24 +1606,6 @@ export async function connectWithPAT(
         integrationId: existingIntegration.id,
         retired: retirement.retired,
         retained: retirement.retained,
-      });
-    }
-
-    // A disconnect that could not settle a project token kept its handles and
-    // dropped the credential that could revoke it. This reconnect presents the
-    // only credential that can finish the job, so it settles them before a new
-    // project token is minted for the same project. An instance or account
-    // change is not this case: those retire their own stored credentials below
-    // and, for an instance change, would send this instance's token elsewhere.
-    if (reconnectedAfterDisconnect) {
-      const settlement = await settleStoredProjectTokens(
-        existingIntegration,
-        gitLabCredentialActor(owner, authorizedByUserId),
-        token
-      );
-      logExceptInTest('[connectWithPAT] Reconnect settled retained project tokens', {
-        integrationId: existingIntegration.id,
-        settledProjectTokens: settlement === null ? null : settlement,
       });
     }
 

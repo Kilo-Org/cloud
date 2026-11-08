@@ -21,11 +21,7 @@ struct KiloSessionEntity: AppEntity {
   static var defaultQuery = KiloSessionEntityQuery()
 
   let id: String
-
-  /// The title is the one value the system may keep beside the identifier, so
-  /// it is declared as a property rather than left to the instance: a shortcut
-  /// that stores this session has to rebuild the same entity in a later run.
-  @Property var title: String
+  let title: String
 
   init(entry: KiloSessionCatalogEntry) {
     self.id = entry.id

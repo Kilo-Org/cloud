@@ -293,7 +293,10 @@ try {
     repeated.map(frame => frame.seq),
     [event.seq]
   );
-  check(repeated.map(frame => frame.body), [{ seq: event.seq, cursor: event.seq }]);
+  check(
+    repeated.map(frame => frame.body),
+    [{ seq: event.seq, cursor: event.seq }]
+  );
   runner.send({
     channel: 'events',
     type: 'text.delta',

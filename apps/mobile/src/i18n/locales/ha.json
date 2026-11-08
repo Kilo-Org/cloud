@@ -248,6 +248,7 @@
     "confirmDeletion": "Tabbatar da sharewa",
     "credits": "Kuɗin amfani",
     "failedToLoadBalance": "An kasa loda ragowar kuɗi. Danna don sake gwadawa.",
+    "balanceLoadFailed": "An kasa loda ragowar kuɗi",
     "hideBalance": "Ɓoye ragowar kuɗi",
     "showBalance": "Nuna ragowar kuɗi",
     "balanceHidden": "An ɓoye ragowar kuɗi",
@@ -331,7 +332,6 @@
     "noFilesChangedDescription": "Babu canje-canje ga fayiloli a wannan buƙatar haɗawa.",
     "fileList": {
       "openNavigator": "Buɗe jerin fayiloli",
-      "filesViewed": "Fayiloli · An duba {{viewed}} cikin {{total}}",
       "listed": "(da aka jera)",
       "layout": "Tsari",
       "unified": "Haɗe",
@@ -2293,6 +2293,7 @@
       "emptyDescription": "Aika saƙo a ƙasa domin farawa.",
       "scrollToBottom": "Gungura zuwa ƙasa",
       "emptyTitle": "Babu saƙonni har yanzu",
+      "emptyReadOnlyTitle": "Babu saƙonni a wannan zaman",
       "renameAccessibility": "Canza sunan zaman: {{title}}",
       "cloningSession": "Ana yin kwafin zaman",
       "couldNotLoadThisSession": "An kasa loda wannan zaman.",
@@ -2991,7 +2992,6 @@
   },
   "addCredits": {
     "cta": "Ƙara kuɗin amfani",
-    "description": "Ƙara kuɗin amfani don ci gaba da aiki.",
     "billingPage": "shafin biyan kuɗi"
   },
   "deviceSessions": {

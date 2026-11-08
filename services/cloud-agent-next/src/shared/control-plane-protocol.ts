@@ -118,6 +118,7 @@ export const CONTROL_PLANE_FAILURE_REASON_VALUES = [
   'container_limit_reached',
   'account_blocked',
   'invalid_configuration',
+  'sandbox_create_failed',
   'runtime_artifact_unauthorized',
   'runtime_artifact_invalid',
   'runtime_cli_probe_failed',

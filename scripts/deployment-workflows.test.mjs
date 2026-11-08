@@ -375,17 +375,44 @@ test('production EU preparation, rollback and historical source use the selected
   }
 });
 
-test('production and staging schedule independently on main every 20 minutes', () => {
+test('both deploys start from a successful main CI run and keep an hourly catch-up poll', () => {
   for (const [name, deployment] of [
     ['production', production],
     ['staging', staging],
   ]) {
     assert.equal(deployment.on.push, undefined, `${name} must not deploy on every merge`);
-    assert.deepEqual(deployment.on.schedule, [{ cron: '7,27,47 * * * *' }]);
+    assert.deepEqual(deployment.on.workflow_run, {
+      workflows: [ci.name],
+      types: ['completed'],
+      branches: ['main'],
+    });
+    assert.deepEqual(deployment.on.schedule, [{ cron: '7 * * * *' }]);
     assert.ok(Object.hasOwn(deployment.on, 'workflow_dispatch'));
     assert.equal(deployment.concurrency['cancel-in-progress'], false);
     assert.equal(deployment.jobs['check-changes'].with.workflow_file, `deploy-${name}.yml`);
-    assert.equal(deployment.jobs['check-changes'].needs, undefined);
+    assert.equal(deployment.jobs['check-changes'].needs, 'admit');
+    const admitted = (eventName, conclusion) =>
+      runInNewContext(deployment.jobs.admit.if, {
+        github: { event_name: eventName, event: { workflow_run: { conclusion } } },
+      });
+    assert.equal(admitted('workflow_run', 'success'), true);
+    for (const conclusion of ['failure', 'cancelled', 'skipped', 'neutral', 'timed_out', null]) {
+      assert.equal(admitted('workflow_run', conclusion), false, `${name} must skip ${conclusion}`);
+    }
+    assert.equal(admitted('schedule', null), true);
+    assert.equal(admitted('workflow_dispatch', null), true);
+    assert.deepEqual(
+      Object.entries(deployment.jobs)
+        .filter(([, job]) => job.needs === undefined)
+        .map(([id]) => id),
+      ['admit'],
+      `${name} must admit the trigger before any candidate lookup`
+    );
+    assert.doesNotMatch(
+      JSON.stringify(deployment.jobs),
+      /workflow_run\.head_sha/,
+      `${name} must not deploy a SHA taken from the event payload`
+    );
   }
   assert.notEqual(production.concurrency.group, staging.concurrency.group);
 });
@@ -431,6 +458,48 @@ test('successful main CI selects the tested deployment SHA', () => {
   for (const job of ['db-gate', 'deploy-app', 'deploy-workers']) {
     assert.match(staging.jobs[job].if, /should_deploy == 'true'/);
     assert.ok([staging.jobs[job].needs].flat().includes('check-changes'));
+  }
+});
+
+test('web promotion waits for a completed or deliberately skipped gateway rollout', () => {
+  const job = production.jobs['promote-app'];
+  const condition = (job.if ?? 'success()')
+    .replace(/^\$\{\{|\}\}$/g, '')
+    .replace(/needs\.([\w-]+)\.result/g, 'needs["$1"].result');
+  const expression = /\b(always|cancelled|failure|success)\(/.test(condition)
+    ? condition
+    : `success() && (${condition})`;
+  for (const [stage, promotion, app, database, cancelled, expected] of [
+    ['success', 'success', 'success', 'success', false, true],
+    ['skipped', 'skipped', 'success', 'success', false, true],
+    ['success', 'failure', 'success', 'success', false, false],
+    ['failure', 'skipped', 'success', 'success', false, false],
+    ['cancelled', 'skipped', 'success', 'success', false, false],
+    ['success', 'cancelled', 'success', 'success', false, false],
+    ['success', 'skipped', 'success', 'success', false, false],
+    ['skipped', 'success', 'success', 'success', false, false],
+    ['skipped', 'skipped', 'failure', 'success', false, false],
+    ['success', 'success', 'success', 'failure', false, false],
+    ['skipped', 'skipped', 'success', 'skipped', false, false],
+    ['success', 'success', 'success', 'success', true, false],
+  ]) {
+    const results = {
+      'stage-app': app,
+      'db-gate': database,
+      'stage-ai-gateway': stage,
+      'promote-ai-gateway': promotion,
+    };
+    const needs = Object.fromEntries(job.needs.map(name => [name, { result: results[name] }]));
+    assert.equal(
+      runInNewContext(expression, {
+        needs,
+        github: { repository: 'Kilo-Org/cloud' },
+        cancelled: () => cancelled,
+        success: () => Object.values(needs).every(dependency => dependency.result === 'success'),
+      }),
+      expected,
+      JSON.stringify({ stage, promotion, app, database, cancelled })
+    );
   }
 });
 
@@ -903,7 +972,7 @@ test('production deploys cloud-agent-next after the session-ingest job', () => {
   assert.equal(ingest.needs, 'detect-changes');
   assert.equal(
     ingest.if,
-    "needs.detect-changes.outputs.deploy-cloud-agent-after-session-ingest == 'true'"
+    "github.repository == 'Kilo-Org/cloud' && needs.detect-changes.outputs.deploy-cloud-agent-after-session-ingest == 'true'"
   );
   assert.equal(ingest.environment, '${{ inputs.target_environment }}');
   assert.equal(ingest['timeout-minutes'], 25);

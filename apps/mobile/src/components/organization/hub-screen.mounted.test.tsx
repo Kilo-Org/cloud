@@ -10,7 +10,7 @@
 import { readFileSync } from 'node:fs';
 
 import { ORGANIZATION_NAME_MAX_LENGTH } from '@kilocode/app-shared/organizations';
-import { createElement } from 'react';
+import { createElement, isValidElement } from 'react';
 import { act, type TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -18,6 +18,7 @@ import { renderWithProviders } from '@/test/render-with-providers';
 import { compiledDimensions, compiledLengthDp } from '@/test/native-dimensions';
 
 import { i18n } from '@/i18n';
+import { AddCreditsRow } from '@/components/add-credits-row';
 import { type OrgKiloPassRowState, type OrgKiloPassSummary } from './org-kilo-pass-row-state';
 import { OrganizationHubScreen } from './hub-screen';
 
@@ -34,6 +35,7 @@ const boundary = vi.hoisted(() => ({
   parentOrganizationId: null as string | null | undefined,
   requireSeats: false,
   seatCount: { used: 1, total: 1 },
+  balance: 5_000_000,
 }));
 const routerPush = vi.hoisted(() => vi.fn());
 const kiloPassQuery = vi.hoisted(() => ({ enabled: [] as boolean[] }));
@@ -64,7 +66,7 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
       organizationId: 'org-1',
       organizationName: boundary.name,
       parentOrganizationId: boundary.parentOrganizationId,
-      balance: 5_000_000,
+      balance: boundary.balance,
       requireSeats: boundary.requireSeats,
       seatCount: boundary.seatCount,
     },
@@ -111,11 +113,6 @@ vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
 vi.mock('@/lib/format', () => ({
   formatMoney: (amount: number) => `$${amount}`,
   formatNumber: String,
-}));
-
-vi.mock('@/lib/agent-color', () => ({
-  agentColor: () => ({}),
-  toneColor: () => ({}),
 }));
 
 vi.mock('@/lib/utils', () => ({
@@ -260,6 +257,7 @@ beforeEach(() => {
   boundary.parentOrganizationId = null;
   boundary.requireSeats = false;
   boundary.seatCount = { used: 1, total: 1 };
+  boundary.balance = 5_000_000;
   hideBalancePref.hideBalance = false;
   hideBalancePref.hasLoaded = true;
   kiloPassRowState.current = null;
@@ -295,6 +293,32 @@ describe('Organization hub card', () => {
     // Left-to-right isolate (U+2066) and pop-directional-isolate (U+2069): the
     // pair reads 1 of 5 in either interface direction.
     expect(seats?.props.value).toBe('\u20661 / 5\u2069');
+    unmount();
+  });
+
+  it('offers the top-up on the balance line of an empty balance', async () => {
+    boundary.balance = 0;
+
+    const { renderer, unmount } = await renderHub();
+
+    const balance = renderer.root
+      .findAllByType('KvRow')
+      .find(node => node.props.label === i18n.t('organization.hub.balance'));
+    // The control shares the amount's row: a row of its own held nothing but
+    // the button once the copy beside it left.
+    const trailing: object | null | undefined = balance?.props.trailing;
+    expect(isValidElement(trailing) && trailing.type === AddCreditsRow).toBe(true);
+    unmount();
+  });
+
+  it('keeps a funded organization on its balance line alone', async () => {
+    const { renderer, unmount } = await renderHub();
+
+    const balance = renderer.root
+      .findAllByType('KvRow')
+      .find(node => node.props.label === i18n.t('organization.hub.balance'));
+    expect(balance?.props.value).toBe('$5');
+    expect(balance?.props.trailing).toBeUndefined();
     unmount();
   });
 });
@@ -735,6 +759,59 @@ describe('Organization hub billing card while its data loads', () => {
     });
     expect(membersQuery.refetch).toHaveBeenCalledOnce();
     expect(kiloPassQuery.enabled.at(-1)).toBe(false);
+    unmount();
+  });
+});
+
+describe('Organization hub Kilo Pass icon tile', () => {
+  /** The tile's own classes: the View that holds the Kilo Pass glyph. */
+  function tileClass(root: TestRenderer.ReactTestInstance): string {
+    const icon = root.findAllByType('KiloPassIcon')[0];
+    if (icon === undefined) {
+      throw new Error('Kilo Pass icon missing');
+    }
+    const tile = icon.parent;
+    if (tile === null) {
+      throw new Error('Kilo Pass tile missing');
+    }
+    return String(tile.props.className);
+  }
+
+  // The row stands beside ConfigureRows that carry no tone, so it takes the
+  // shared neutral tile; a hue hashed from its title would put one accent in a
+  // settings list. Attention is the only state that earns a tone.
+  it('takes the neutral tile when the row needs no attention, never a hashed hue', async () => {
+    kiloPassRowState.current = {
+      subtitle: 'Not subscribed',
+      attention: false,
+      action: 'setup',
+      actionLabel: 'Set up',
+      accessibilityHint: 'Opens Kilo Pass setup on web.',
+      loading: false,
+    };
+    const { renderer, unmount } = await renderHub();
+
+    const tokens = tileClass(renderer.root).split(/\s+/).filter(Boolean);
+    expect(tokens).toContain('bg-hair-soft');
+    expect(tokens).toContain('border-border');
+    expect(tokens.filter(token => token.startsWith('bg-agent-'))).toEqual([]);
+    unmount();
+  });
+
+  it('keeps the warn tile for the attention state', async () => {
+    kiloPassRowState.current = {
+      subtitle: 'Could not load status',
+      attention: true,
+      action: 'retry',
+      actionLabel: 'Retry',
+      accessibilityHint: 'Retries loading Kilo Pass status.',
+      loading: false,
+    };
+    const { renderer, unmount } = await renderHub();
+
+    const tokens = tileClass(renderer.root).split(/\s+/).filter(Boolean);
+    expect(tokens).toContain('bg-warn-tile-bg');
+    expect(tokens).toContain('border-warn-tile-border');
     unmount();
   });
 });

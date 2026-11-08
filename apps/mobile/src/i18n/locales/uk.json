@@ -248,6 +248,7 @@
     "confirmDeletion": "Підтвердити видалення",
     "credits": "Кредити",
     "failedToLoadBalance": "Не вдалося завантажити баланс. Торкніться, щоб повторити.",
+    "balanceLoadFailed": "Не вдалося завантажити баланс",
     "hideBalance": "Приховати баланс",
     "showBalance": "Показати баланс",
     "balanceHidden": "Баланс приховано",
@@ -1796,6 +1797,7 @@
       "emptyDescription": "Надішліть повідомлення нижче, щоб почати.",
       "scrollToBottom": "Прокрутити вниз",
       "emptyTitle": "Повідомлень ще немає",
+      "emptyReadOnlyTitle": "У цьому сеансі немає повідомлень",
       "renameAccessibility": "Перейменувати сеанс: {{title}}",
       "cloningSession": "Клонування сеансу",
       "couldNotLoadThisSession": "Не вдалося завантажити цей сеанс.",
@@ -2516,7 +2518,6 @@
   },
   "addCredits": {
     "cta": "Поповнити баланс",
-    "description": "Поповніть баланс, щоб продовжити роботу.",
     "billingPage": "сторінка оплати"
   },
   "deviceSessions": {
@@ -2971,7 +2972,6 @@
     },
     "fileList": {
       "filesList": "Список файлів",
-      "filesViewed": "Файли · переглянуто {{viewed}} з {{total}}",
       "layout": "Вигляд",
       "listed": "(у списку)",
       "loadingFiles": "Завантаження файлів",

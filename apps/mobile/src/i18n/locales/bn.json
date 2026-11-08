@@ -248,6 +248,7 @@
     "confirmDeletion": "মুছে ফেলা নিশ্চিত করুন",
     "credits": "ক্রেডিট",
     "failedToLoadBalance": "ব্যালেন্স লোড করা যায়নি। আবার চেষ্টা করতে ট্যাপ করুন।",
+    "balanceLoadFailed": "ব্যালেন্স লোড করা যায়নি",
     "hideBalance": "ব্যালেন্স লুকান",
     "showBalance": "ব্যালেন্স দেখান",
     "balanceHidden": "ব্যালেন্স লুকানো আছে",
@@ -331,7 +332,6 @@
     "noFilesChangedDescription": "এই পুল রিকোয়েস্টে কোনো ফাইলে পরিবর্তন করা হয়নি।",
     "fileList": {
       "openNavigator": "ফাইল নেভিগেটর খুলুন",
-      "filesViewed": "ফাইল · {{total}}টির মধ্যে {{viewed}}টি দেখা হয়েছে",
       "listed": "(তালিকাভুক্ত)",
       "layout": "বিন্যাস",
       "unified": "একত্রে",
@@ -2299,6 +2299,7 @@
       "emptyDescription": "শুরু করতে নিচে একটি বার্তা পাঠান।",
       "scrollToBottom": "একেবারে নিচে স্ক্রল করুন",
       "emptyTitle": "এখনো কোনো বার্তা নেই",
+      "emptyReadOnlyTitle": "এই সেশনে কোনো বার্তা নেই",
       "renameAccessibility": "সেশনের নাম পরিবর্তন করুন: {{title}}",
       "cloningSession": "সেশন ক্লোন হচ্ছে",
       "couldNotLoadThisSession": "এই সেশনটি লোড করা যায়নি।",
@@ -2997,7 +2998,6 @@
   },
   "addCredits": {
     "cta": "ক্রেডিট যোগ করুন",
-    "description": "ব্যবহার চালিয়ে যেতে ক্রেডিট যোগ করুন।",
     "billingPage": "বিলিং পৃষ্ঠা"
   },
   "deviceSessions": {

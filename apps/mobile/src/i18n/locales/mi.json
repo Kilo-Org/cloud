@@ -248,6 +248,7 @@
     "confirmDeletion": "Whakaūngia te mukunga",
     "credits": "Ngā moni tōmua",
     "failedToLoadBalance": "Kāore i taea te uta i te toenga. Pāwhiria hei whakamātau anō.",
+    "balanceLoadFailed": "Kāore i taea te uta i te toenga",
     "hideBalance": "Hunaia te toenga",
     "showBalance": "Whakaaturia te toenga",
     "balanceHidden": "Kua huna te toenga",
@@ -331,7 +332,6 @@
     "noFilesChangedDescription": "Kāore he huringa kōnae i tēnei tono kume.",
     "fileList": {
       "openNavigator": "Whakatuwheratia te pūwhakatere kōnae",
-      "filesViewed": "Ngā kōnae · {{viewed}} o te {{total}} kua tirohia",
       "listed": "(kua rārangihia)",
       "layout": "Tahora",
       "unified": "Kotahi",
@@ -2293,6 +2293,7 @@
       "emptyDescription": "Tukuna he karere ki raro nei hei tīmata.",
       "scrollToBottom": "Panuku ki raro rawa",
       "emptyTitle": "Kāore anō he karere",
+      "emptyReadOnlyTitle": "Kāore he karere i tēnei wātū",
       "renameAccessibility": "Whakaingoatia anō te wātū: {{title}}",
       "cloningSession": "Kei te tārua i te wātū",
       "couldNotLoadThisSession": "Kāore i taea te uta i tēnei wātū.",
@@ -2991,7 +2992,6 @@
   },
   "addCredits": {
     "cta": "Tāpirihia he moni tōmua",
-    "description": "Tāpirihia he moni tōmua kia haere tonu ai te whakamahinga.",
     "billingPage": "te whārangi utunga"
   },
   "deviceSessions": {

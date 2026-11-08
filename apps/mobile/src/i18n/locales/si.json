@@ -248,6 +248,7 @@
     "confirmDeletion": "මැකීම තහවුරු කරන්න",
     "credits": "ක්‍රෙඩිට්",
     "failedToLoadBalance": "ශේෂය පූරණය කළ නොහැකි විය. නැවත උත්සාහ කිරීමට තට්ටු කරන්න.",
+    "balanceLoadFailed": "ශේෂය පූරණය කළ නොහැකි විය",
     "hideBalance": "ශේෂය සඟවන්න",
     "showBalance": "ශේෂය පෙන්වන්න",
     "balanceHidden": "ශේෂය සඟවා ඇත",
@@ -331,7 +332,6 @@
     "noFilesChangedDescription": "මෙම පුල් ඉල්ලීමේ ගොනු වෙනස්කම් නොමැත.",
     "fileList": {
       "openNavigator": "ගොනු සංචාලකය විවෘත කරන්න",
-      "filesViewed": "ගොනු · {{total}} න් {{viewed}} ක් බලා ඇත",
       "listed": "(ලැයිස්තුගත)",
       "layout": "පිරිසැලසුම",
       "unified": "ඒකාබද්ධ",
@@ -2299,6 +2299,7 @@
       "emptyDescription": "ආරම්භ කිරීමට පහත කොටුවෙන් පණිවිඩයක් යවන්න.",
       "scrollToBottom": "අවසානය දක්වා පහළට අනුචලනය කරන්න",
       "emptyTitle": "තවම පණිවිඩ නැත",
+      "emptyReadOnlyTitle": "මෙම සැසියේ පණිවිඩ නැත",
       "renameAccessibility": "{{title}} සැසියේ නම වෙනස් කරන්න",
       "cloningSession": "සැසියේ පිටපතක් සාදමින්",
       "couldNotLoadThisSession": "මෙම සැසිය පූරණය කළ නොහැකි විය.",
@@ -2997,7 +2998,6 @@
   },
   "addCredits": {
     "cta": "ක්‍රෙඩිට් එක් කරන්න",
-    "description": "දිගටම භාවිත කිරීමට ක්‍රෙඩිට් එක් කරන්න.",
     "billingPage": "බිල්පත් පිටුව"
   },
   "deviceSessions": {

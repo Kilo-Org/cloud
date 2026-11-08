@@ -72,10 +72,19 @@ function admits(workflow, event, base, files) {
   );
 }
 
+// The job runs exactly when a path its suites read changed. A run that changes
+// no workflow, action, script or manifest cannot change what this check decides,
+// and the required `test` fan-in passes a skipped job, so the gate itself must be
+// exact: a wider skip, or a different output, would drop the admission silently.
+const wiringGate = { needs: 'changes', if: "needs.changes.outputs.wiring == 'true'" };
+
 function validateCheck(workflow, jobName) {
   const job = workflow.jobs[jobName];
-  assert.equal(job.if, undefined, `${jobName}: check job must be unconditional`);
-  assert.equal(job.needs, undefined, `${jobName}: check job must not depend on filtering`);
+  assert.deepEqual(
+    { needs: job.needs, if: job.if },
+    wiringGate,
+    `${jobName}: the check must run exactly when the changes job reports a wiring change`
+  );
   assert.equal(job['continue-on-error'], undefined, `${jobName}: check failure must fail the job`);
   const steps = job.steps;
   const checks = steps.filter(step => step.run === command);
@@ -184,6 +193,7 @@ for (const [index, jobName] of [[0, 'ci-wiring']]) {
     'missing',
     'conditional-step',
     'conditional-job',
+    'ungated',
     'ignored',
     'directory',
     'before-install',
@@ -197,6 +207,10 @@ for (const [index, jobName] of [[0, 'ci-wiring']]) {
       if (defect === 'missing') job.steps.splice(checkIndex, 1);
       if (defect === 'conditional-step') check.if = 'false';
       if (defect === 'conditional-job') job.if = 'false';
+      if (defect === 'ungated') {
+        delete job.if;
+        delete job.needs;
+      }
       if (defect === 'ignored') check['continue-on-error'] = true;
       if (defect === 'directory') job.defaults = { run: { 'working-directory': 'apps/mobile' } };
       if (defect === 'before-install') job.steps.unshift(...job.steps.splice(checkIndex, 1));

@@ -8,6 +8,7 @@ import { handleHomeFixturePath } from '@/lib/home-fixture';
 import { instancePickerFixtureRoute } from '@/lib/instance-picker-fixture';
 import { handleLockedKeychainFixturePath } from '@/lib/locked-keychain-fixture';
 import { modelPickerFixtureRoute } from '@/lib/model-picker-fixture';
+import { handleOrganizationInviteMemberFixturePath } from '@/lib/organization-invite-member-fixture';
 import { handlePrReviewCopyFixturePath } from '@/lib/pr-review/pr-review-copy-fixture-route';
 import { handlePrReviewInstanceFixturePath } from '@/lib/pr-review/pr-review-instance-fixture';
 import { profilePickerFixtureRoute } from '@/lib/profile-picker-fixture';
@@ -98,6 +99,10 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
     if (/(?:^|\/)dev\/transcript-style-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/(auth)/transcript-style-fixture';
     }
+    const partDetailFixture = /(?:^|\/)dev\/part-detail-transition-fixture\/?(\?.*)?$/.exec(path);
+    if (partDetailFixture) {
+      return `/(auth)/part-detail-transition-fixture${partDetailFixture[1] ?? ''}`;
+    }
     if (/(?:^|\/)dev\/attachment-chip-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/(app)/attachment-chip-fixture';
     }
@@ -146,6 +151,10 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
     }
     if (/(?:^|\/)dev\/organization-invoices-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/(app)/(tabs)/(3_profile)/organization/invoices-fixture';
+    }
+    // Dev-only invite sheet: it navigates itself, so this returns falsy.
+    if (handleOrganizationInviteMemberFixturePath(path)) {
+      return null;
     }
     // Dev-only profile picker sheet, reached through the development fixture path.
     const profilePickerRoute = profilePickerFixtureRoute(path);

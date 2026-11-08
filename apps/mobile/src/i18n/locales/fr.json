@@ -248,6 +248,7 @@
     "confirmDeletion": "Confirmer la suppression",
     "credits": "Crédits",
     "failedToLoadBalance": "Échec du chargement du solde. Touchez pour réessayer.",
+    "balanceLoadFailed": "Échec du chargement du solde",
     "hideBalance": "Masquer le solde",
     "showBalance": "Afficher le solde",
     "balanceHidden": "Solde masqué",
@@ -1680,6 +1681,7 @@
       "emptyDescription": "Envoyez un message ci-dessous pour commencer.",
       "scrollToBottom": "Aller en bas de la conversation",
       "emptyTitle": "Aucun message pour l'instant",
+      "emptyReadOnlyTitle": "Aucun message dans cette session",
       "renameAccessibility": "Renommer la session : {{title}}",
       "cloningSession": "Clonage de la session…",
       "couldNotLoadThisSession": "Impossible de charger cette session.",
@@ -2422,7 +2424,6 @@
   },
   "addCredits": {
     "cta": "Ajouter des crédits",
-    "description": "Ajoutez des crédits pour continuer à utiliser le service.",
     "billingPage": "page de facturation"
   },
   "deviceSessions": {
@@ -2937,7 +2938,6 @@
     },
     "fileList": {
       "filesList": "Liste des fichiers",
-      "filesViewed": "Fichiers · {{viewed}} sur {{total}} consultés",
       "layout": "Disposition",
       "listed": "(affichés)",
       "loadingFiles": "Chargement des fichiers",

@@ -248,6 +248,7 @@
     "confirmDeletion": "Bekræft sletning",
     "credits": "Kreditter",
     "failedToLoadBalance": "Kunne ikke indlæse saldoen. Tryk for at prøve igen.",
+    "balanceLoadFailed": "Kunne ikke indlæse saldoen",
     "hideBalance": "Skjul saldo",
     "showBalance": "Vis saldo",
     "balanceHidden": "Saldo skjult",
@@ -331,7 +332,6 @@
     "noFilesChangedDescription": "Der er ingen filændringer i denne pull request.",
     "fileList": {
       "openNavigator": "Åbn filoversigten",
-      "filesViewed": "Filer · {{viewed}} af {{total}} gennemset",
       "listed": "(på listen)",
       "layout": "Visning",
       "unified": "Samlet",
@@ -2293,6 +2293,7 @@
       "emptyDescription": "Send en besked nedenfor for at komme i gang.",
       "scrollToBottom": "Rul til bunden",
       "emptyTitle": "Ingen beskeder endnu",
+      "emptyReadOnlyTitle": "Ingen beskeder i denne session",
       "renameAccessibility": "Omdøb session: {{title}}",
       "cloningSession": "Kloner session",
       "couldNotLoadThisSession": "Kunne ikke indlæse denne session.",
@@ -2991,7 +2992,6 @@
   },
   "addCredits": {
     "cta": "Tilføj kreditter",
-    "description": "Tilføj kreditter for at fortsætte med at bruge tjenesten.",
     "billingPage": "faktureringsside"
   },
   "deviceSessions": {

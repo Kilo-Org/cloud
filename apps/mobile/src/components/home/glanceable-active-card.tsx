@@ -31,7 +31,7 @@ import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
 
 /** Shared minimum frame; text determines the loaded card's height. */
 const CARD_CLASS = 'overflow-hidden rounded-2xl border border-border bg-card';
-const COUNTS_CLASS = 'gap-2 px-4 py-3';
+const COUNTS_CLASS = 'px-4 py-3';
 const COUNT_ROW_CLASS = `${ROW_TARGET_CLASS} flex-row items-center gap-2`;
 const DIVIDER_CLASS = 'h-px bg-border';
 const NEWEST_BLOCK_CLASS = 'min-h-[68px] justify-center gap-1 px-4 py-3';

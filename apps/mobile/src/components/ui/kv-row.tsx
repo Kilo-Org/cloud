@@ -1,4 +1,5 @@
 import { type LucideIcon } from '@/components/ui/icons';
+import { type ReactNode } from 'react';
 import { View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
@@ -47,6 +48,12 @@ type KvRowProps = {
    * `< 6.13.0` paints as `6.13.0 >`, which inverts its meaning.
    */
   valueDirection?: 'ltr';
+  /**
+   * A control that belongs to this row, painted after the value at the row's
+   * trailing edge — an action for the amount beside it. The row keeps its own
+   * height, so the control shares the line instead of opening a block below.
+   */
+  trailing?: ReactNode;
 };
 
 const VALUE_TONE = {
@@ -78,6 +85,7 @@ export function KvRow({
   valueClassName,
   valueAccessibilityLabel,
   valueDirection,
+  trailing,
 }: Readonly<KvRowProps>) {
   const colors = useThemeColors();
   // Android's `selectable` routes the value through ReactTextView, which
@@ -87,6 +95,24 @@ export function KvRow({
   // row). Clamp the values that can hold it; a selectable value wraps inside
   // the row and the row grows to fit it, so no glyph is cut off.
   const valueLineLimit = selectable ? undefined : 1;
+  const valueText = (
+    <Text
+      variant={valueFace === 'mono' ? 'mono' : 'default'}
+      selectable={selectable}
+      accessibilityLabel={valueAccessibilityLabel}
+      numberOfLines={valueLineLimit}
+      ellipsizeMode={valueLineLimit ? 'middle' : undefined}
+      style={valueDirection === 'ltr' ? LTR_TEXT_DIRECTION : undefined}
+      className={cn(
+        'min-w-0 shrink text-right text-[13px]',
+        valueFace === 'numeric' && 'tabular-nums',
+        VALUE_TONE[valueTone],
+        valueClassName
+      )}
+    >
+      {value}
+    </Text>
+  );
   return (
     <View
       className={cn(
@@ -102,22 +128,16 @@ export function KvRow({
           {label}
         </Text>
       </View>
-      <Text
-        variant={valueFace === 'mono' ? 'mono' : 'default'}
-        selectable={selectable}
-        accessibilityLabel={valueAccessibilityLabel}
-        numberOfLines={valueLineLimit}
-        ellipsizeMode={valueLineLimit ? 'middle' : undefined}
-        style={valueDirection === 'ltr' ? LTR_TEXT_DIRECTION : undefined}
-        className={cn(
-          'min-w-0 shrink text-right text-[13px]',
-          valueFace === 'numeric' && 'tabular-nums',
-          VALUE_TONE[valueTone],
-          valueClassName
-        )}
-      >
-        {value}
-      </Text>
+      {trailing === undefined ? (
+        valueText
+      ) : (
+        // The value keeps its right edge beside the control, so the pair reads
+        // as one trailing group on the row the control belongs to.
+        <View className="min-w-0 shrink flex-row items-center justify-end gap-3">
+          {valueText}
+          {trailing}
+        </View>
+      )}
     </View>
   );
 }

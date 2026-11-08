@@ -248,6 +248,7 @@
     "confirmDeletion": "Silməni təsdiqlə",
     "credits": "Kreditlər",
     "failedToLoadBalance": "Balansı yükləmək mümkün olmadı. Yenidən cəhd etmək üçün toxun.",
+    "balanceLoadFailed": "Balansı yükləmək mümkün olmadı",
     "hideBalance": "Balansı gizlət",
     "showBalance": "Balansı göstər",
     "balanceHidden": "Balans gizlidir",
@@ -331,7 +332,6 @@
     "noFilesChangedDescription": "Bu birləşdirmə sorğusunda fayl dəyişikliyi yoxdur.",
     "fileList": {
       "openNavigator": "Fayl siyahısını aç",
-      "filesViewed": "Fayllar · baxılıb: {{viewed}} / {{total}}",
       "listed": "(siyahıda)",
       "layout": "Görünüş",
       "unified": "Vahid",
@@ -2293,6 +2293,7 @@
       "emptyDescription": "Başlamaq üçün aşağıdakı sahədən mesaj göndər.",
       "scrollToBottom": "Ən aşağıya sürüşdür",
       "emptyTitle": "Hələ mesaj yoxdur",
+      "emptyReadOnlyTitle": "Bu sessiyada mesaj yoxdur",
       "renameAccessibility": "Sessiyanın adını dəyiş: {{title}}",
       "cloningSession": "Sessiya klonlanır",
       "couldNotLoadThisSession": "Bu sessiyanı yükləmək mümkün olmadı.",
@@ -2991,7 +2992,6 @@
   },
   "addCredits": {
     "cta": "Kredit əlavə et",
-    "description": "İstifadəyə davam etmək üçün kredit əlavə et.",
     "billingPage": "ödəniş səhifəsi"
   },
   "deviceSessions": {

@@ -5,6 +5,7 @@ import { randomUUID } from 'crypto';
 import { eq } from 'drizzle-orm';
 import { agent_briefing_snapshots, api_request_log, type User } from '@kilocode/db/schema';
 import { BRIEFING_SETTLEMENT_HEADER } from '@kilocode/web-shared/lib/agent-briefing-usage';
+import { REPLACED_ANSWER_HEADER } from '@kilocode/web-shared/lib/ai-gateway/replaced-answer-header';
 import type { UsageAccountingResult } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import jwt from 'jsonwebtoken';
@@ -5093,11 +5094,27 @@ describe('Enkrypt output guardrail', () => {
       );
     } else {
       expect(response.headers.get('retry-after')).toBe('1');
+      // The decline replaced an answer the gateway billed, so a caller must not
+      // repeat it, whatever its own retry advice says.
+      expect(response.headers.get(REPLACED_ANSWER_HEADER)).toBe('true');
       expect(JSON.parse(text)).toEqual(
         expectedErrorBody('chat_completions', message, 'guardrail_unavailable')
       );
     }
     expect(mockedRewriteModelResponse).not.toHaveBeenCalled();
+  });
+
+  it('marks no decline that an upstream error itself answers with', async () => {
+    mockedUpstreamRequest.mockResolvedValue({
+      type: 'success',
+      response: new Response('upstream unavailable', { status: 502 }),
+    });
+    setOrganization(outputGuardrailSettings('block'));
+
+    const response = await sendRequest('chat_completions', false);
+
+    expect(response.status).toBe(502);
+    expect(response.headers.get(REPLACED_ANSWER_HEADER)).toBeNull();
   });
 
   it.each([

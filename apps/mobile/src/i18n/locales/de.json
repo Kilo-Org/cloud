@@ -248,6 +248,7 @@
     "confirmDeletion": "Löschung bestätigen",
     "credits": "Guthaben",
     "failedToLoadBalance": "Dein Guthaben konnte nicht geladen werden. Tippe, um es erneut zu versuchen.",
+    "balanceLoadFailed": "Guthaben nicht geladen",
     "hideBalance": "Guthaben ausblenden",
     "showBalance": "Guthaben anzeigen",
     "balanceHidden": "Guthaben ausgeblendet",
@@ -1754,6 +1755,7 @@
       "emptyDescription": "Sende unten eine Nachricht, um zu beginnen.",
       "scrollToBottom": "Nach unten scrollen",
       "emptyTitle": "Noch keine Nachrichten",
+      "emptyReadOnlyTitle": "Keine Nachrichten in dieser Sitzung",
       "renameAccessibility": "Sitzung umbenennen: {{title}}",
       "cloningSession": "Sitzung wird geklont",
       "couldNotLoadThisSession": "Diese Sitzung konnte nicht geladen werden.",
@@ -2452,7 +2454,6 @@
   },
   "addCredits": {
     "cta": "Guthaben aufladen",
-    "description": "Lade Guthaben auf, um Kilo weiter zu nutzen.",
     "billingPage": "abrechnungsseite"
   },
   "deviceSessions": {
@@ -2891,7 +2892,6 @@
     },
     "fileList": {
       "filesList": "Dateiliste",
-      "filesViewed": "Dateien · {{viewed}} von {{total}} angesehen",
       "layout": "Darstellung",
       "listed": "(aufgelistet)",
       "loadingFiles": "Dateien werden geladen",

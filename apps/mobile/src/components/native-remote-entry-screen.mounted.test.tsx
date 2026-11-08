@@ -7,6 +7,8 @@ const mocks = vi.hoisted(() => ({
   token: 'native-token' as string | undefined,
   authEpoch: 1,
   isSigningOut: false,
+  organizationId: null as string | null,
+  isLoaded: true,
   url: 'http://localhost:8817' as string | undefined,
   client: vi.fn(function NativeClient() {
     return {};
@@ -19,6 +21,8 @@ vi.mock('@kilocode/cloud-agent-sdk', () => ({ NativeSyncClient: mocks.client }))
 vi.mock('expo-router', () => ({ Redirect: mocks.redirect }));
 vi.mock('@/components/native-remote/native-remote-demo', () => ({ NativeRemoteDemo: mocks.demo }));
 vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => mocks }));
+vi.mock('@/lib/organization-context', () => ({ useOrganization: () => mocks }));
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: () => null }));
 vi.mock('@/lib/config', () => ({
   get SESSION_SYNC_URL() {
     return mocks.url;
@@ -32,6 +36,8 @@ beforeEach(() => {
   mocks.token = 'native-token';
   mocks.authEpoch = 1;
   mocks.isSigningOut = false;
+  mocks.organizationId = null;
+  mocks.isLoaded = true;
   mocks.url = 'http://localhost:8817';
 });
 afterEach(() => {
@@ -73,6 +79,33 @@ describe('native remote entry', () => {
     expect(mocks.client).not.toHaveBeenCalled();
     expect(mocks.demo).not.toHaveBeenCalled();
     expect(mocks.redirect).toHaveBeenCalled();
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('waits for restored scope and forwards the selected organization without replacing credentials', () => {
+    mocks.isLoaded = false;
+    const renderer = mount();
+    expect(mocks.client).not.toHaveBeenCalled();
+    mocks.isLoaded = true;
+    mocks.organizationId = 'org-owned';
+    act(() => {
+      renderer.update(createElement(NativeRemoteEntryScreen));
+    });
+    expect(mocks.demo).toHaveBeenLastCalledWith(
+      expect.objectContaining({ organizationID: 'org-owned' }),
+      undefined
+    );
+    mocks.organizationId = null;
+    act(() => {
+      renderer.update(createElement(NativeRemoteEntryScreen));
+    });
+    expect(mocks.demo).toHaveBeenLastCalledWith(
+      expect.objectContaining({ organizationID: undefined }),
+      undefined
+    );
+    expect(mocks.client).toHaveBeenCalledTimes(1);
     act(() => {
       renderer.unmount();
     });

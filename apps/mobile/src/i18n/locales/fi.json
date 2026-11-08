@@ -248,6 +248,7 @@
     "confirmDeletion": "Vahvista poisto",
     "credits": "Krediitit",
     "failedToLoadBalance": "Saldoa ei voitu ladata. Yritä uudelleen napauttamalla.",
+    "balanceLoadFailed": "Saldoa ei voitu ladata",
     "hideBalance": "Piilota saldo",
     "showBalance": "Näytä saldo",
     "balanceHidden": "Saldo piilotettu",
@@ -331,7 +332,6 @@
     "noFilesChangedDescription": "Tässä muutospyynnössä ei ole tiedostomuutoksia.",
     "fileList": {
       "openNavigator": "Avaa tiedostoselain",
-      "filesViewed": "Tiedostot · {{viewed}}/{{total}} katsottu",
       "listed": "(luettelossa)",
       "layout": "Asettelu",
       "unified": "Yhdistetty",
@@ -2293,6 +2293,7 @@
       "emptyDescription": "Aloita lähettämällä viesti alla olevasta kentästä.",
       "scrollToBottom": "Vieritä alareunaan",
       "emptyTitle": "Ei vielä viestejä",
+      "emptyReadOnlyTitle": "Tässä istunnossa ei ole viestejä",
       "renameAccessibility": "Nimeä istunto uudelleen: {{title}}",
       "cloningSession": "Kloonataan istuntoa",
       "couldNotLoadThisSession": "Tätä istuntoa ei voitu ladata",
@@ -2991,7 +2992,6 @@
   },
   "addCredits": {
     "cta": "Lisää krediittejä",
-    "description": "Lisää krediittejä, jotta voit jatkaa käyttöä.",
     "billingPage": "laskutussivu"
   },
   "deviceSessions": {

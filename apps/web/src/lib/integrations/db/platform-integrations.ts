@@ -713,12 +713,24 @@ export async function deleteGitHubInstallationRecords(
 
 /**
  * Gets all platform integrations for an organization (supports multiple)
+ *
+ * A GitHub workflow listing uses the shared organization workflow connection
+ * definition, exactly as the status and operational lookups do, so the
+ * installation an organization's connection surfaces report as connected is
+ * the one whose repositories this listing returns. The listing is also ordered
+ * by the same preference rule those lookups use, so an association that stores
+ * the workflow role comes before a roleless one that resolves to the same
+ * connection.
+ *
+ * The agent purpose keeps its stored-role scope: roleless associations are not
+ * agent connections until a policy decision says they are.
  */
 export async function getIntegrationsByOrganization(
   organizationId: string,
   platform: string,
   purpose: 'workflow' | 'agent' | 'management' = 'workflow'
 ) {
+  const isGithubWorkflow = platform === PLATFORM.GITHUB && purpose === 'workflow';
   return await db
     .select()
     .from(platform_integrations)
@@ -726,8 +738,8 @@ export async function getIntegrationsByOrganization(
       and(
         eq(platform_integrations.owned_by_organization_id, organizationId),
         eq(platform_integrations.platform, platform),
-        platform === PLATFORM.GITHUB && purpose === 'workflow'
-          ? eq(platform_integrations.github_connection_role, 'workflow')
+        isGithubWorkflow
+          ? organizationWorkflowGitHubConnectionSql()
           : platform === PLATFORM.GITHUB && purpose === 'agent'
             ? or(
                 eq(platform_integrations.github_connection_role, 'workflow'),
@@ -736,7 +748,11 @@ export async function getIntegrationsByOrganization(
             : undefined
       )
     )
-    .orderBy(asc(platform_integrations.created_at), asc(platform_integrations.id));
+    .orderBy(
+      ...(isGithubWorkflow ? [desc(organizationWorkflowGitHubPreferenceSql())] : []),
+      asc(platform_integrations.created_at),
+      asc(platform_integrations.id)
+    );
 }
 
 /**
@@ -1523,23 +1539,6 @@ export async function findGitLabIntegrationByWebhookToken(
     .limit(1);
 
   return integration ?? null;
-}
-
-/**
- * Updates the metadata for a platform integration
- * Used for storing webhook configuration, tokens, etc.
- */
-export async function updateIntegrationMetadata(
-  integrationId: string,
-  metadata: Record<string, unknown>
-) {
-  await db
-    .update(platform_integrations)
-    .set({
-      metadata,
-      updated_at: new Date().toISOString(),
-    })
-    .where(eq(platform_integrations.id, integrationId));
 }
 
 /**

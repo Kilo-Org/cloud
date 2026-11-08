@@ -248,6 +248,7 @@
     "confirmDeletion": "Bekreft sletting",
     "credits": "Kreditter",
     "failedToLoadBalance": "Kunne ikke laste inn saldoen. Trykk for å prøve igjen.",
+    "balanceLoadFailed": "Kunne ikke laste inn saldoen",
     "hideBalance": "Skjul saldo",
     "showBalance": "Vis saldo",
     "balanceHidden": "Saldo skjult",
@@ -331,7 +332,6 @@
     "noFilesChangedDescription": "Denne PR-en inneholder ingen filendringer.",
     "fileList": {
       "openNavigator": "Åpne filoversikten",
-      "filesViewed": "Filer · {{viewed}} av {{total}} gjennomgått",
       "listed": "(i listen)",
       "layout": "Oppsett",
       "unified": "Samlet",
@@ -2293,6 +2293,7 @@
       "emptyDescription": "Send en melding nedenfor for å komme i gang.",
       "scrollToBottom": "Rull til bunnen",
       "emptyTitle": "Ingen meldinger ennå",
+      "emptyReadOnlyTitle": "Ingen meldinger i denne økten",
       "renameAccessibility": "Gi økten nytt navn: {{title}}",
       "cloningSession": "Kloner økten",
       "couldNotLoadThisSession": "Kunne ikke laste inn denne økten.",
@@ -2991,7 +2992,6 @@
   },
   "addCredits": {
     "cta": "Fyll på kreditter",
-    "description": "Fyll på kreditter for å fortsette å bruke tjenesten.",
     "billingPage": "faktureringsside"
   },
   "deviceSessions": {

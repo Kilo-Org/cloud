@@ -50,13 +50,16 @@ export function isUnknownOrigin(platform: string | null | undefined): boolean {
 }
 
 /**
- * Which state word a live row's eyebrow carries for an origin: 'live' for an
- * unrecorded one, null for a real origin. The one predicate behind the live
- * label and its tint, so a translated word can never drift to another token
- * while an origin name keeps its own deterministic hash. Lives here because
- * the platform string is this file's input; `remoteAgentLabel` renders the
- * row copy from it.
+ * Which tint key a live row's eyebrow carries for an origin: `live` when the
+ * live label stands for an unrecorded origin, `platform` when the row names
+ * the kind of agent it ran on. The one predicate behind the live label and
+ * its tint, so a translated word can never drift to another token. Lives here
+ * because the platform string is this file's input; `remoteAgentLabel`
+ * renders the row copy from it.
+ *
+ * A repository name never reaches this predicate: the caller names the
+ * repository instead of the origin.
  */
-export function remoteAgentState(platform: string | null | undefined): 'live' | null {
-  return isUnknownOrigin(platform) ? 'live' : null;
+export function remoteAgentState(platform: string | null | undefined): 'live' | 'platform' {
+  return isUnknownOrigin(platform) ? 'live' : 'platform';
 }

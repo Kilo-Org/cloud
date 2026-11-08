@@ -248,6 +248,7 @@
     "confirmDeletion": "پشتڕاستکردنەوەی سڕینەوە",
     "credits": "کرێدیت",
     "failedToLoadBalance": "نەتوانرا باڵانسەکە بار بکرێت. بۆ دووبارە هەوڵدانەوە، لێی بدە.",
+    "balanceLoadFailed": "نەتوانرا باڵانسەکە بار بکرێت",
     "hideBalance": "شاردنەوەی باڵانس",
     "showBalance": "پیشاندانی باڵانس",
     "balanceHidden": "باڵانس شاردراوەتەوە",
@@ -331,7 +332,6 @@
     "noFilesChangedDescription": "لە ئەم داواکارییەی ڕاکێشاندا هیچ فایلێک نەگۆڕاوە.",
     "fileList": {
       "openNavigator": "گەڕۆکی فایلەکان بکەرەوە",
-      "filesViewed": "فایلەکان · {{viewed}} لە {{total}} بینراوە",
       "listed": "(لە لیستدا)",
       "layout": "ڕێکخستن",
       "unified": "یەکگرتوو",
@@ -2293,6 +2293,7 @@
       "emptyDescription": "بۆ دەستپێکردن، لە خوارەوە پەیامێک بنێرە.",
       "scrollToBottom": "چوون بۆ کۆتایی",
       "emptyTitle": "هێشتا هیچ پەیامێک نییە",
+      "emptyReadOnlyTitle": "هیچ پەیامێک لەم سێشنەدا نییە",
       "renameAccessibility": "گۆڕینی ناوی سێشن: {{title}}",
       "cloningSession": "سێشنەکە کۆپی دەکرێت",
       "couldNotLoadThisSession": "نەتوانرا ئەم سێشنە بار بکرێت.",
@@ -2991,7 +2992,6 @@
   },
   "addCredits": {
     "cta": "زیادکردنی کرێدیت",
-    "description": "بۆ بەردەوامبوون لە بەکارهێنان، کرێدیت زیاد بکە.",
     "billingPage": "پەڕەی پارەدان"
   },
   "deviceSessions": {

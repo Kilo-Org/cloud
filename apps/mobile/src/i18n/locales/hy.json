@@ -248,6 +248,7 @@
     "confirmDeletion": "Հաստատել ջնջումը",
     "credits": "Կրեդիտներ",
     "failedToLoadBalance": "Չհաջողվեց բեռնել մնացորդը։ Հպեք՝ կրկին փորձելու համար։",
+    "balanceLoadFailed": "Չհաջողվեց բեռնել մնացորդը",
     "hideBalance": "Թաքցնել մնացորդը",
     "showBalance": "Ցուցադրել մնացորդը",
     "balanceHidden": "Մնացորդը թաքցված է",
@@ -331,7 +332,6 @@
     "noFilesChangedDescription": "Այս pull request-ում ֆայլերի փոփոխություններ չկան։",
     "fileList": {
       "openNavigator": "Բացել ֆայլերի նավարկիչը",
-      "filesViewed": "Ֆայլեր · դիտված է {{total}}-ից {{viewed}}-ը",
       "listed": "(ցուցակված)",
       "layout": "Տեսք",
       "unified": "Միավորված",
@@ -2293,6 +2293,7 @@
       "emptyDescription": "Սկսելու համար ներքևում հաղորդագրություն ուղարկեք։",
       "scrollToBottom": "Ոլորել մինչև վերջ",
       "emptyTitle": "Դեռևս հաղորդագրություններ չկան",
+      "emptyReadOnlyTitle": "Այս նստաշրջանում հաղորդագրություններ չկան",
       "renameAccessibility": "Վերանվանել նստաշրջանը՝ {{title}}",
       "cloningSession": "Նստաշրջանը կլոնավորվում է",
       "couldNotLoadThisSession": "Չհաջողվեց բեռնել այս նստաշրջանը։",
@@ -2991,7 +2992,6 @@
   },
   "addCredits": {
     "cta": "Ավելացնել կրեդիտներ",
-    "description": "Ավելացրեք կրեդիտներ՝ աշխատանքը շարունակելու համար։",
     "billingPage": "վճարումների էջ"
   },
   "deviceSessions": {

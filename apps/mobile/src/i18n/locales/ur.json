@@ -248,6 +248,7 @@
     "confirmDeletion": "حذف کرنے کی تصدیق کریں",
     "credits": "کریڈٹس",
     "failedToLoadBalance": "بیلنس لوڈ نہیں ہو سکا۔ دوبارہ کوشش کرنے کے لیے ٹیپ کریں۔",
+    "balanceLoadFailed": "بیلنس لوڈ نہیں ہو سکا",
     "hideBalance": "بیلنس چھپائیں",
     "showBalance": "بیلنس دکھائیں",
     "balanceHidden": "بیلنس چھپا ہوا ہے",
@@ -331,7 +332,6 @@
     "noFilesChangedDescription": "اس پل ریکویسٹ میں کسی فائل میں تبدیلی نہیں کی گئی۔",
     "fileList": {
       "openNavigator": "فائل نیویگیٹر کھولیں",
-      "filesViewed": "فائلیں · {{total}} میں سے {{viewed}} دیکھی گئیں",
       "listed": "(فہرست میں)",
       "layout": "ترتیب",
       "unified": "یکجا",
@@ -2293,6 +2293,7 @@
       "emptyDescription": "شروع کرنے کے لیے نیچے پیغام بھیجیں۔",
       "scrollToBottom": "آخر تک اسکرول کریں",
       "emptyTitle": "ابھی کوئی پیغام نہیں",
+      "emptyReadOnlyTitle": "اس سیشن میں کوئی پیغام نہیں",
       "renameAccessibility": "سیشن کا نام تبدیل کریں: {{title}}",
       "cloningSession": "سیشن کی نقل بن رہی ہے",
       "couldNotLoadThisSession": "یہ سیشن لوڈ نہیں ہو سکا۔",
@@ -2991,7 +2992,6 @@
   },
   "addCredits": {
     "cta": "کریڈٹس شامل کریں",
-    "description": "استعمال جاری رکھنے کے لیے کریڈٹس شامل کریں۔",
     "billingPage": "بلنگ کا صفحہ"
   },
   "deviceSessions": {

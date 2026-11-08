@@ -678,4 +678,188 @@ describe('GitLab OAuth integration writer', () => {
         .where(eq(platform_oauth_credentials.platform_integration_id, integration.id))
     ).resolves.toEqual([]);
   });
+
+  it('settles a kept project token before a same-account reconnect becomes active', async () => {
+    const user = await insertTestUser();
+    const providerBaseUrl = 'https://gitlab.example.com/root';
+    const [integration] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_user_id: user.id,
+        platform: 'gitlab',
+        integration_type: 'oauth',
+        platform_account_id: '101',
+        platform_account_login: 'old-login',
+        integration_status: 'suspended',
+        metadata: {
+          gitlab_instance_url: providerBaseUrl,
+          webhook_secret: 'preserved-webhook-secret',
+          auth_type: 'oauth',
+        },
+      })
+      .returning();
+    if (!integration) throw new Error('Expected existing integration');
+    await db.insert(platform_access_token_credentials).values({
+      platform_integration_id: integration.id,
+      token_encrypted: 'project-envelope',
+      provider_credential_type: 'project_access_token',
+      provider_resource_id: '42',
+      provider_base_url: providerBaseUrl,
+      authorized_by_user_id: null,
+      provider_metadata: {
+        providerCredentialId: '99',
+        expiresOn: '2030-01-01',
+        authorizedAccountId: '101',
+      },
+    });
+    const statusWhileSettling: Array<string | null> = [];
+    mockRevokeProjectAccessTokenBehavior = async () => {
+      const [row] = await db
+        .select({ status: platform_integrations.integration_status })
+        .from(platform_integrations)
+        .where(eq(platform_integrations.id, integration.id));
+      statusWhileSettling.push(row.status);
+    };
+
+    await storeGitLabOAuthIntegration({
+      owner: { type: 'user', id: user.id },
+      authorizedByUserId: user.id,
+      providerBaseUrl,
+      providerUser: { id: '101', login: 'old-login' },
+      accessToken: 'new-access-secret',
+      refreshToken: 'new-refresh-secret',
+      accessTokenExpiresAt: '2031-01-01T00:00:00.000Z',
+      oauthClientId: null,
+      oauthClientSecret: null,
+      scopes: ['api', 'read_user'],
+      repositories: null,
+    });
+
+    expect(mockRevokeProjectAccessTokenCalls).toHaveLength(1);
+    expect(mockRevokeProjectAccessTokenCalls[0]?.slice(0, 4)).toEqual([
+      'new-access-secret',
+      '42',
+      99,
+      providerBaseUrl,
+    ]);
+    expect(statusWhileSettling).toEqual(['suspended']);
+    await expect(
+      db
+        .select()
+        .from(platform_access_token_credentials)
+        .where(eq(platform_access_token_credentials.platform_integration_id, integration.id))
+    ).resolves.toEqual([]);
+    const [reconnected] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, integration.id));
+    expect(reconnected.integration_status).toBe('active');
+  });
+
+  it('keeps a kept project token when the reconnect grants no api scope', async () => {
+    const user = await insertTestUser();
+    const providerBaseUrl = 'https://gitlab.example.com/root';
+    const [integration] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_user_id: user.id,
+        platform: 'gitlab',
+        integration_type: 'oauth',
+        platform_account_id: '101',
+        platform_account_login: 'old-login',
+        integration_status: 'suspended',
+        metadata: {
+          gitlab_instance_url: providerBaseUrl,
+          webhook_secret: 'preserved-webhook-secret',
+          auth_type: 'oauth',
+        },
+      })
+      .returning();
+    if (!integration) throw new Error('Expected existing integration');
+    await db.insert(platform_access_token_credentials).values({
+      platform_integration_id: integration.id,
+      token_encrypted: 'project-envelope',
+      provider_credential_type: 'project_access_token',
+      provider_resource_id: '42',
+      provider_base_url: providerBaseUrl,
+      authorized_by_user_id: null,
+      provider_metadata: {
+        providerCredentialId: '99',
+        expiresOn: '2030-01-01',
+        authorizedAccountId: '101',
+      },
+    });
+
+    await storeGitLabOAuthIntegration({
+      owner: { type: 'user', id: user.id },
+      authorizedByUserId: user.id,
+      providerBaseUrl,
+      providerUser: { id: '101', login: 'old-login' },
+      accessToken: 'new-access-secret',
+      refreshToken: 'new-refresh-secret',
+      accessTokenExpiresAt: '2031-01-01T00:00:00.000Z',
+      oauthClientId: null,
+      oauthClientSecret: null,
+      scopes: ['read_user'],
+      repositories: null,
+    });
+
+    expect(mockRevokeProjectAccessTokenCalls).toEqual([]);
+    await expect(
+      db
+        .select()
+        .from(platform_access_token_credentials)
+        .where(eq(platform_access_token_credentials.platform_integration_id, integration.id))
+    ).resolves.toHaveLength(1);
+  });
+
+  it('does not settle kept project tokens when the reconnect changes the instance', async () => {
+    const user = await insertTestUser();
+    const [integration] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_user_id: user.id,
+        platform: 'gitlab',
+        integration_type: 'oauth',
+        platform_account_id: '101',
+        platform_account_login: 'old-login',
+        integration_status: 'suspended',
+        metadata: {
+          gitlab_instance_url: 'https://gitlab.example.com/root',
+          webhook_secret: 'preserved-webhook-secret',
+          auth_type: 'oauth',
+        },
+      })
+      .returning();
+    if (!integration) throw new Error('Expected existing integration');
+    await db.insert(platform_access_token_credentials).values({
+      platform_integration_id: integration.id,
+      token_encrypted: 'project-envelope',
+      provider_credential_type: 'project_access_token',
+      provider_resource_id: '42',
+      provider_base_url: 'https://gitlab.example.com/root',
+      authorized_by_user_id: null,
+      provider_metadata: {
+        providerCredentialId: '99',
+        expiresOn: '2030-01-01',
+        authorizedAccountId: '101',
+      },
+    });
+
+    await storeGitLabOAuthIntegration({
+      owner: { type: 'user', id: user.id },
+      authorizedByUserId: user.id,
+      providerBaseUrl: 'https://gitlab.example.com/other',
+      providerUser: { id: '101', login: 'old-login' },
+      accessToken: 'new-access-secret',
+      refreshToken: 'new-refresh-secret',
+      accessTokenExpiresAt: '2031-01-01T00:00:00.000Z',
+      oauthClientId: null,
+      oauthClientSecret: null,
+      scopes: ['api'],
+      repositories: null,
+    });
+
+    expect(mockRevokeProjectAccessTokenCalls).toEqual([]);
+  });
 });

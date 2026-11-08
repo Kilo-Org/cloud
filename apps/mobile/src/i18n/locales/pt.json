@@ -248,6 +248,7 @@
     "confirmDeletion": "Confirmar eliminação",
     "credits": "Créditos",
     "failedToLoadBalance": "Não foi possível carregar o saldo. Toque para tentar novamente.",
+    "balanceLoadFailed": "Não foi possível carregar o saldo",
     "hideBalance": "Ocultar saldo",
     "showBalance": "Mostrar saldo",
     "balanceHidden": "Saldo oculto",
@@ -331,7 +332,6 @@
     "noFilesChangedDescription": "Este PR não tem alterações nos ficheiros.",
     "fileList": {
       "openNavigator": "Abrir a lista de ficheiros",
-      "filesViewed": "Ficheiros · {{viewed}} de {{total}} vistos",
       "listed": "(listados)",
       "layout": "Disposição",
       "unified": "Unificado",
@@ -2341,6 +2341,7 @@
       "emptyDescription": "Envie uma mensagem abaixo para começar.",
       "scrollToBottom": "Ir para o fim da conversa",
       "emptyTitle": "Ainda sem mensagens",
+      "emptyReadOnlyTitle": "Não há mensagens nesta sessão",
       "renameAccessibility": "Renomear sessão: {{title}}",
       "cloningSession": "A clonar a sessão",
       "couldNotLoadThisSession": "Não foi possível carregar esta sessão.",
@@ -3050,7 +3051,6 @@
   },
   "addCredits": {
     "cta": "Adicionar créditos",
-    "description": "Adicione créditos para continuar a usar o serviço.",
     "billingPage": "página de faturação"
   },
   "deviceSessions": {

@@ -248,6 +248,7 @@
     "confirmDeletion": "Bevestig skrapping",
     "credits": "Krediete",
     "failedToLoadBalance": "Die saldo kon nie gelaai word nie. Tik om weer te probeer.",
+    "balanceLoadFailed": "Kon nie saldo laai nie",
     "hideBalance": "Versteek saldo",
     "showBalance": "Wys saldo",
     "balanceHidden": "Saldo versteek",
@@ -331,7 +332,6 @@
     "noFilesChangedDescription": "Hierdie trekversoek het geen lêerveranderings nie.",
     "fileList": {
       "openNavigator": "Maak lêernavigeerder oop",
-      "filesViewed": "Lêers · {{viewed}} van {{total}} bekyk",
       "listed": "(gelys)",
       "layout": "Uitleg",
       "unified": "Gekombineer",
@@ -2293,6 +2293,7 @@
       "emptyDescription": "Stuur 'n boodskap hieronder om te begin.",
       "scrollToBottom": "Rolleer na onder",
       "emptyTitle": "Nog geen boodskappe nie",
+      "emptyReadOnlyTitle": "Geen boodskappe in hierdie sessie nie",
       "renameAccessibility": "Hernoem sessie: {{title}}",
       "cloningSession": "Sessie word gekloon",
       "couldNotLoadThisSession": "Hierdie sessie kon nie gelaai word nie.",
@@ -2991,7 +2992,6 @@
   },
   "addCredits": {
     "cta": "Voeg krediete by",
-    "description": "Voeg krediete by om die diens te bly gebruik.",
     "billingPage": "faktureringsbladsy"
   },
   "deviceSessions": {

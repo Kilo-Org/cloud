@@ -248,6 +248,7 @@
     "confirmDeletion": "తొలగింపును నిర్ధారించండి",
     "credits": "క్రెడిట్లు",
     "failedToLoadBalance": "బ్యాలెన్స్‌ను లోడ్ చేయలేకపోయాము. మళ్లీ ప్రయత్నించడానికి నొక్కండి.",
+    "balanceLoadFailed": "బ్యాలెన్స్‌ను లోడ్ చేయలేకపోయాము",
     "hideBalance": "బ్యాలెన్స్ దాచు",
     "showBalance": "బ్యాలెన్స్ చూపించు",
     "balanceHidden": "బ్యాలెన్స్ దాచబడింది",
@@ -331,7 +332,6 @@
     "noFilesChangedDescription": "ఈ పుల్ రిక్వెస్ట్‌లో ఏ ఫైల్‌లోనూ మార్పులు లేవు.",
     "fileList": {
       "openNavigator": "ఫైల్ నావిగేటర్‌ను తెరవండి",
-      "filesViewed": "ఫైళ్లు · {{total}}లో {{viewed}} చూశారు",
       "listed": "(జాబితాలో ఉన్నవి)",
       "layout": "లేఅవుట్",
       "unified": "ఏకీకృతం",
@@ -2293,6 +2293,7 @@
       "emptyDescription": "ప్రారంభించడానికి కింద సందేశం పంపండి.",
       "scrollToBottom": "చివరి వరకు స్క్రోల్ చేయండి",
       "emptyTitle": "ఇంకా సందేశాలు లేవు",
+      "emptyReadOnlyTitle": "ఈ సెషన్‌లో సందేశాలు లేవు",
       "renameAccessibility": "{{title}} సెషన్ పేరు మార్చండి",
       "cloningSession": "సెషన్‌ను క్లోన్ చేస్తోంది",
       "couldNotLoadThisSession": "ఈ సెషన్‌ను లోడ్ చేయలేకపోయాము.",
@@ -2991,7 +2992,6 @@
   },
   "addCredits": {
     "cta": "క్రెడిట్లను జోడించండి",
-    "description": "వినియోగం కొనసాగడానికి క్రెడిట్లను జోడించండి.",
     "billingPage": "బిల్లింగ్ పేజీ"
   },
   "deviceSessions": {

@@ -7,7 +7,7 @@ import {
 } from '@kilocode/cloud-agent-sdk';
 import { createElement, type ReactElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useOpenPartDetail } from './open-part-detail-context';
 import { PartDetailSheetHost } from './part-detail-sheet-host';
@@ -18,13 +18,47 @@ import { MonoScrollBlock } from './mono-scroll-block';
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ background: '#000' }),
 }));
+const keyboardState = vi.hoisted(() => ({ visible: false, listeners: new Set<() => void>() }));
+const keyboardDismiss = vi.hoisted(() => vi.fn());
 vi.mock('react-native', () => ({
   ScrollView: 'ScrollView',
   Pressable: 'Pressable',
   View: 'View',
   Platform: { OS: 'ios' },
   useWindowDimensions: () => ({ width: 390, height: 844 }),
+  Keyboard: { dismiss: keyboardDismiss },
 }));
+vi.mock('react-native-keyboard-controller', async () => {
+  const { useSyncExternalStore } = await import('react');
+  const subscribe = (listener: () => void) => {
+    keyboardState.listeners.add(listener);
+    return () => {
+      keyboardState.listeners.delete(listener);
+    };
+  };
+  type KeyboardStateSnapshot = {
+    height: number;
+    isVisible: boolean;
+    progress: number;
+    duration: number;
+  };
+  return {
+    KeyboardProvider: 'KeyboardProvider',
+    KeyboardAvoidingView: 'KeyboardAvoidingView',
+    KeyboardChatScrollView: 'KeyboardChatScrollView',
+    useWindowDimensions: () => ({ width: 400, height: 800 }),
+    useKeyboardState: (selector?: (state: KeyboardStateSnapshot) => unknown) => {
+      const isVisible = useSyncExternalStore(subscribe, () => keyboardState.visible);
+      const snapshot: KeyboardStateSnapshot = {
+        height: isVisible ? 300 : 0,
+        isVisible,
+        progress: isVisible ? 1 : 0,
+        duration: 0,
+      };
+      return selector ? selector(snapshot) : snapshot;
+    },
+  };
+});
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ bottom: 0 }),
 }));
@@ -188,6 +222,21 @@ function sheetTitle(renderer: TestRenderer.ReactTestRenderer): unknown {
   return propOf(findByType(renderer.root, 'SheetHeader')[0], 'title');
 }
 
+function reportSheetDismissed(renderer: TestRenderer.ReactTestRenderer): void {
+  (propOf(findByType(renderer.root, 'BottomSheet')[0], 'onDismiss') as () => void)();
+}
+
+function reportSheetSelfDismissal(renderer: TestRenderer.ReactTestRenderer): void {
+  (propOf(findByType(renderer.root, 'BottomSheet')[0], 'onClose') as () => void)();
+}
+
+function setKeyboardVisible(visible: boolean): void {
+  keyboardState.visible = visible;
+  for (const listener of keyboardState.listeners) {
+    listener();
+  }
+}
+
 async function mountHost(messages: StoredMessage[]): Promise<TestRenderer.ReactTestRenderer> {
   const rendererRef: { current: TestRenderer.ReactTestRenderer | undefined } = {
     current: undefined,
@@ -202,6 +251,12 @@ async function mountHost(messages: StoredMessage[]): Promise<TestRenderer.ReactT
   }
   return renderer;
 }
+
+beforeEach(() => {
+  keyboardState.visible = false;
+  keyboardState.listeners.clear();
+  keyboardDismiss.mockClear();
+});
 
 describe('PartDetailSheetHost mounted', () => {
   it('opens a tool part and updates content live without close/reopen', async () => {
@@ -315,7 +370,7 @@ describe('PartDetailSheetHost mounted', () => {
     expect(reasoningTexts).toHaveLength(1);
   });
 
-  it('resets the text mode to wrap when the sheet closes through the host', async () => {
+  it('keeps the title, body and text mode until the native dismissal reports, then reopens fresh', async () => {
     const renderer = await mountHost([
       makeMessage('m1', [makeBashPart('bash-1', 'echo one', true)]),
     ]);
@@ -349,22 +404,215 @@ describe('PartDetailSheetHost mounted', () => {
     });
 
     // Close through the real host boundary: the SheetHeader Done button's
-    // onDone is the host's `close`, which flips visible -> false.
+    // onDone is the host's `close`, which flips visible -> false and starts
+    // the native leave animation.
     await act(async () => {
       await Promise.resolve();
       (propOf(findByType(renderer.root, 'SheetHeader')[0], 'onDone') as () => void)();
     });
     expect(propOf(findByType(renderer.root, 'BottomSheet')[0], 'index')).toBe(-1);
 
-    // Reopen the same part: the sheet resets to Wrap.
+    // The leaving sheet still shows this presentation: the original title
+    // and body, the live part behind them, and the Scroll mode. A stream
+    // tick during the leave still resolves against the same part.
+    expect(sheetTitle(renderer)).toBe('bash: echo one');
+    const leavingPart = propOf(findByType(renderer.root, 'ToolPartDetailBody')[0], 'part');
+    expect((leavingPart as ToolPart).id).toBe('bash-1');
+    expect(propOf(radio(renderer.root, 'Scroll'), 'accessibilityState')).toEqual({
+      selected: true,
+      disabled: false,
+      busy: false,
+    });
+    await act(async () => {
+      await Promise.resolve();
+      renderer.update(hostElement([makeMessage('m1', [makeBashPart('bash-1', 'echo two', true)])]));
+    });
+    expect(sheetTitle(renderer)).toBe('bash: echo two');
+
+    // The native dismissal report ends the presentation: the sheet unmounts.
+    await act(async () => {
+      await Promise.resolve();
+      reportSheetDismissed(renderer);
+    });
+    expect(findByType(renderer.root, 'BottomSheet')).toHaveLength(0);
+
+    // Reopen the same part: a fresh presentation resets to Wrap.
     await act(async () => {
       await Promise.resolve();
       capturedOpener?.('bash-1');
     });
+    expect(propOf(findByType(renderer.root, 'BottomSheet')[0], 'index')).toBe(0);
+    expect(sheetTitle(renderer)).toBe('bash: echo two');
     expect(propOf(radio(renderer.root, 'Wrap'), 'accessibilityState')).toEqual({
       selected: true,
       disabled: false,
       busy: false,
     });
+  });
+
+  it('keeps the part through a native self-dismissal and clears it on the dismissal report', async () => {
+    const renderer = await mountHost([
+      makeMessage('m1', [makeBashPart('bash-1', 'echo one', true)]),
+    ]);
+
+    await act(async () => {
+      await Promise.resolve();
+      capturedOpener?.('bash-1');
+    });
+    expect(sheetTitle(renderer)).toBe('bash: echo one');
+
+    // The drag/backdrop path: the native sheet reports its own close before
+    // it reports the finished dismissal.
+    await act(async () => {
+      await Promise.resolve();
+      reportSheetSelfDismissal(renderer);
+    });
+    expect(propOf(findByType(renderer.root, 'BottomSheet')[0], 'index')).toBe(-1);
+    expect(sheetTitle(renderer)).toBe('bash: echo one');
+
+    await act(async () => {
+      await Promise.resolve();
+      reportSheetDismissed(renderer);
+    });
+    expect(findByType(renderer.root, 'BottomSheet')).toHaveLength(0);
+
+    await act(async () => {
+      await Promise.resolve();
+      capturedOpener?.('bash-1');
+    });
+    expect(propOf(findByType(renderer.root, 'BottomSheet')[0], 'index')).toBe(0);
+    expect(sheetTitle(renderer)).toBe('bash: echo one');
+  });
+
+  it.each(['bash-1', 'bash-2'])(
+    'keeps the leaving presentation and reopens %s with fresh text mode',
+    async partId => {
+      const renderer = await mountHost([
+        makeMessage('m1', [
+          makeBashPart('bash-1', 'echo one', true),
+          makeBashPart('bash-2', 'echo two', true),
+        ]),
+      ]);
+      await act(() => {
+        capturedOpener?.('bash-1');
+      });
+      await act(() => {
+        pressRadio(renderer.root, 'Scroll');
+      });
+      await act(() => {
+        (propOf(findByType(renderer.root, 'SheetHeader')[0], 'onDone') as () => void)();
+      });
+      await act(() => {
+        capturedOpener?.(partId);
+      });
+      expect(sheetTitle(renderer)).toBe('bash: echo one');
+      expect(propOf(findByType(renderer.root, 'BottomSheet')[0], 'index')).toBe(-1);
+      expect(propOf(radio(renderer.root, 'Scroll'), 'accessibilityState')).toMatchObject({
+        selected: true,
+      });
+      await act(() => {
+        reportSheetSelfDismissal(renderer);
+        reportSheetDismissed(renderer);
+      });
+      expect(propOf(findByType(renderer.root, 'BottomSheet')[0], 'index')).toBe(0);
+      expect(sheetTitle(renderer)).toBe(partId === 'bash-1' ? 'bash: echo one' : 'bash: echo two');
+      expect(propOf(radio(renderer.root, 'Wrap'), 'accessibilityState')).toMatchObject({
+        selected: true,
+      });
+      act(() => {
+        renderer.unmount();
+      });
+    }
+  );
+
+  it('dismisses the keyboard first and presents only once it reports hidden', async () => {
+    keyboardState.visible = true;
+    const renderer = await mountHost([
+      makeMessage('m1', [makeBashPart('bash-1', 'echo one', true)]),
+    ]);
+
+    await act(async () => {
+      await Promise.resolve();
+      capturedOpener?.('bash-1');
+    });
+    expect(keyboardDismiss).toHaveBeenCalledTimes(1);
+    expect(findByType(renderer.root, 'BottomSheet')).toHaveLength(0);
+
+    await act(async () => {
+      await Promise.resolve();
+      setKeyboardVisible(false);
+    });
+    expect(propOf(findByType(renderer.root, 'BottomSheet')[0], 'index')).toBe(0);
+    expect(sheetTitle(renderer)).toBe('bash: echo one');
+
+    await act(async () => {
+      await Promise.resolve();
+      (propOf(findByType(renderer.root, 'SheetHeader')[0], 'onDone') as () => void)();
+    });
+    await act(async () => {
+      await Promise.resolve();
+      reportSheetDismissed(renderer);
+    });
+    expect(findByType(renderer.root, 'BottomSheet')).toHaveLength(0);
+    expect(keyboardDismiss).toHaveBeenCalledTimes(1);
+  });
+
+  it('presents at once when the keyboard is already hidden', async () => {
+    const renderer = await mountHost([
+      makeMessage('m1', [makeBashPart('bash-1', 'echo one', true)]),
+    ]);
+
+    await act(async () => {
+      await Promise.resolve();
+      capturedOpener?.('bash-1');
+    });
+    expect(propOf(findByType(renderer.root, 'BottomSheet')[0], 'index')).toBe(0);
+  });
+
+  it('opens only the latest part when the keyboard handoff is superseded', async () => {
+    keyboardState.visible = true;
+    const renderer = await mountHost([
+      makeMessage('m1', [
+        makeBashPart('bash-1', 'echo one', true),
+        makeReasoningPart('r1', 'working through it', true),
+      ]),
+    ]);
+
+    await act(async () => {
+      await Promise.resolve();
+      capturedOpener?.('bash-1');
+      capturedOpener?.('r1');
+    });
+    expect(findByType(renderer.root, 'BottomSheet')).toHaveLength(0);
+
+    await act(async () => {
+      await Promise.resolve();
+      setKeyboardVisible(false);
+    });
+    expect(sheetTitle(renderer)).toBe('Thought');
+    expect(findByType(renderer.root, 'ToolPartDetailBody')).toHaveLength(0);
+  });
+
+  it('opens after a missing keyboard-hide completion', async () => {
+    vi.useFakeTimers();
+    let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
+    try {
+      keyboardState.visible = true;
+      renderer = await mountHost([makeMessage('m1', [makeBashPart('bash-1', 'echo one', true)])]);
+      await act(() => {
+        capturedOpener?.('bash-1');
+      });
+      expect(findByType(renderer.root, 'BottomSheet')).toHaveLength(0);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1000);
+      });
+      expect(propOf(findByType(renderer.root, 'BottomSheet')[0], 'index')).toBe(0);
+      expect(sheetTitle(renderer)).toBe('bash: echo one');
+    } finally {
+      act(() => {
+        renderer?.unmount();
+      });
+      vi.useRealTimers();
+    }
   });
 });

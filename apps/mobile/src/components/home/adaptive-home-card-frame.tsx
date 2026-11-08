@@ -102,7 +102,7 @@ export function AdaptiveHomeCardFrame({
         accessibilityElementsHidden
         importantForAccessibility="no-hide-descendants"
       >
-        <View className="gap-2 px-4 py-3">
+        <View className="px-4 py-3">
           {[0, 1, 2, 3].map(row => (
             <View key={row} className={`${ROW_TARGET_CLASS} justify-center`}>
               <Text className="text-sm">{'\u200B'}</Text>

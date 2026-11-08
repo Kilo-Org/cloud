@@ -248,6 +248,7 @@
     "confirmDeletion": "ยืนยันการลบ",
     "credits": "เครดิต",
     "failedToLoadBalance": "โหลดยอดคงเหลือไม่สำเร็จ แตะเพื่อลองอีกครั้ง",
+    "balanceLoadFailed": "โหลดยอดคงเหลือไม่สำเร็จ",
     "hideBalance": "ซ่อนยอดคงเหลือ",
     "showBalance": "แสดงยอดคงเหลือ",
     "balanceHidden": "ยอดคงเหลือถูกซ่อน",
@@ -331,7 +332,6 @@
     "noFilesChangedDescription": "PR นี้ไม่มีการเปลี่ยนแปลงไฟล์",
     "fileList": {
       "openNavigator": "เปิดแถบนำทางไฟล์",
-      "filesViewed": "ไฟล์ · ดูแล้ว {{viewed}} จาก {{total}} ไฟล์",
       "listed": "(ในรายการ)",
       "layout": "เค้าโครง",
       "unified": "แบบรวม",
@@ -2293,6 +2293,7 @@
       "emptyDescription": "ส่งข้อความด้านล่างเพื่อเริ่มต้น",
       "scrollToBottom": "เลื่อนไปด้านล่าง",
       "emptyTitle": "ยังไม่มีข้อความ",
+      "emptyReadOnlyTitle": "ไม่มีข้อความในเซสชันนี้",
       "renameAccessibility": "เปลี่ยนชื่อเซสชัน: {{title}}",
       "cloningSession": "กำลังคัดลอกเซสชัน",
       "couldNotLoadThisSession": "ไม่สามารถโหลดเซสชันนี้ได้",
@@ -2991,7 +2992,6 @@
   },
   "addCredits": {
     "cta": "เติมเครดิต",
-    "description": "เติมเครดิตเพื่อใช้งานต่อ",
     "billingPage": "หน้าการเรียกเก็บเงิน"
   },
   "deviceSessions": {

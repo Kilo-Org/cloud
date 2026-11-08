@@ -25,6 +25,10 @@ concurrency:
 
 jobs:
   call-valtown:
+    # Guard: this workflow forwards merged PR metadata to an external webhook
+    # and only makes sense for the canonical repo. A fork with Actions enabled
+    # would otherwise attempt the same job and fail on missing repo secrets.
+    if: github.repository == 'Kilo-Org/cloud'
     runs-on: ubuntu-latest
     timeout-minutes: 5
 

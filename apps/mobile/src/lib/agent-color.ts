@@ -129,11 +129,13 @@ export const NEUTRAL_TINT = {
 } as const satisfies Tint;
 
 /**
- * The tint a row renders when the value it names is not there: a muted ink on
- * a neutral strip, never an accent. A placeholder must not compete with real
- * data — an accent would make "unknown" read like a named agent, repository or
- * platform beside it — so it takes the theme's muted ink (`text-muted-foreground`
- * over `bg-muted-soft`) instead of a ramp hue.
+ * The tint a row renders for a label that names the row's context rather than
+ * the session: a muted ink on a neutral strip, never an accent. The session
+ * title is the row's primary content, so the origin, the agent type and the
+ * repository beside it must not compete with it — a saturated label and strip
+ * would make such a row look more important than the one above it. It takes
+ * the theme's muted ink (`text-muted-foreground` over `bg-muted-soft`) instead
+ * of a ramp hue.
  */
 export const PLACEHOLDER_TINT = {
   hueClass: 'bg-muted-soft',
@@ -145,23 +147,25 @@ export const PLACEHOLDER_TINT = {
 } as const satisfies Tint;
 
 /**
- * Fixed tint for eyebrow labels that name a state, not an agent: the unknown
- * origin, idle, and live, in every language their catalog renders. A state's
- * colour must not drift with its translation, so each is pinned instead of
- * hashed, and stays put while every real-agent hash still walks the ramp. Rows
- * derive the key from what the eyebrow names (the live row's origin predicate
- * and the stored row's unknown label), never from comparing the rendered
- * string.
+ * Fixed tint for eyebrow labels that name a state, a type or the row's
+ * context, not the session: the unknown origin, the platform the row ran on,
+ * the repository it ran in, idle, and live, in every language their catalog
+ * renders. A label's colour must not drift with its translation, so each is
+ * pinned instead of hashed, and stays put while every real-agent hash still
+ * walks the ramp. Rows derive the key from what the eyebrow names (the live
+ * row's origin predicate and the stored row's unknown label), never from
+ * comparing the rendered string.
  *
- * The unknown origin is the row's placeholder, not a state to draw: it takes
- * {@link PLACEHOLDER_TINT}. Idle and live are states on a real session, so
- * each keeps the ramp entry the English word already hashed to
- * (`agentColor('IDLE')`/`agentColor('LIVE')` → agent-sky).
+ * The unknown origin, `platform` and `repository` name the row's context
+ * rather than the session, so each takes {@link PLACEHOLDER_TINT} and the
+ * title leads. Idle and live are states on a real session, so each keeps the ramp
+ * entry the English word already hashed to (`agentColor('IDLE')` /
+ * `agentColor('LIVE')` → agent-sky).
  */
 
-/** Tint for a row whose eyebrow names a state, not an agent. */
-export function stateTint(state: 'unknown' | 'idle' | 'live'): Tint {
-  if (state === 'unknown') {
+/** Tint for a row whose eyebrow names a state, a type or its context, not an agent. */
+export function stateTint(state: 'unknown' | 'platform' | 'repository' | 'idle' | 'live'): Tint {
+  if (state === 'unknown' || state === 'platform' || state === 'repository') {
     return PLACEHOLDER_TINT;
   }
   // Literal index into the `as const` ramp resolves non-null (same rule as

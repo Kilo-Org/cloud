@@ -59,6 +59,7 @@ const CAUSES = new Set([
   'prompt_exhausted',
   'credential_containment_unavailable',
   'demand',
+  'sandbox_create_failed',
   'terminal',
   'failed',
   'recovered',

@@ -1,5 +1,7 @@
 /* eslint-disable max-lines -- cohesive mounted suite: all FilePart tap/preview/share states share one harness */
-import { type FilePart } from '@kilocode/cloud-agent-sdk';
+import { type FilePart, type NativeSessionState } from '@kilocode/cloud-agent-sdk';
+import { readNativeConversation } from '@kilocode/cloud-agent-sdk/native-conversation-source';
+import { kilo2AssetKey } from '@kilocode/cloud-agent-sdk/kilo2-source-messages';
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -2060,4 +2062,88 @@ describe('FilePartRenderer preview sheet surface', () => {
 
     await unmount(renderer);
   });
+});
+
+it('mounts projected native image/PDF results in the real file renderer and opens existing viewers', async () => {
+  const imageURI = `media:${'a'.repeat(64)}`;
+  const pdfURI = `media:${'b'.repeat(64)}`;
+  const imageURL =
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jDXsAAAAASUVORK5CYII=';
+  const pdfURL = 'data:application/pdf;base64,JVBERi0xLjcK';
+  const state: NativeSessionState = {
+    connection: 'connected',
+    runnerConnected: true,
+    session: {
+      id: 'ses_native',
+      origin: { directory: '/owned' },
+      time: { created: 1, updated: 2 },
+    },
+    snapshot: { position: 2, revision: 2 },
+    pending: { permissions: [], questions: [] },
+    events: [],
+    commands: {},
+    assetURLs: {
+      [kilo2AssetKey('msg_native_files_000000_file_0', imageURI, 'image/png')]: imageURL,
+      [kilo2AssetKey('msg_native_files_000000_file_1', pdfURI, 'application/pdf')]: pdfURL,
+    },
+    messages: [
+      {
+        seq: 1,
+        message: {
+          id: 'msg_native_files',
+          type: 'assistant',
+          time: { created: 1, completed: 2 },
+          content: [
+            {
+              type: 'tool',
+              id: 'read-files',
+              name: 'read',
+              time: { created: 1, completed: 2 },
+              state: {
+                status: 'completed',
+                input: { path: '/owned' },
+                content: [
+                  { type: 'file', uri: imageURI, mime: 'image/png', name: 'snapshot.png' },
+                  { type: 'file', uri: pdfURI, mime: 'application/pdf', name: 'report.pdf' },
+                ],
+              },
+            },
+          ],
+        },
+      },
+    ],
+  };
+  const files = readNativeConversation(state)
+    .messages.flatMap(message => message.parts)
+    .filter(part => part.type === 'file');
+  expect(files).toHaveLength(2);
+  const image = files.find(part => part.mime === 'image/png');
+  const pdf = files.find(part => part.mime === 'application/pdf');
+  if (!image || !pdf) {
+    throw new Error('Native file results were not projected');
+  }
+  const imageRenderer = await mount(image);
+  expect(first(findByType(imageRenderer.root, 'Image')).props.source).toEqual({ uri: imageURL });
+  await press(first(pressableByLabel(imageRenderer.root, 'Open snapshot.png full screen')));
+  expect(first(findByType(imageRenderer.root, 'ImageViewer')).props).toMatchObject({
+    visible: true,
+    uri: imageURL,
+  });
+  await unmount(imageRenderer);
+  const pdfRenderer = await mount(pdf);
+  await press(first(pressableByLabel(pdfRenderer.root, 'Open report.pdf')));
+  await selectActionSheetOption('Preview report.pdf');
+  await flushAsync();
+  const written = fileInstances.find(instance => instance.filename?.endsWith('-report.pdf'));
+  expect(written?.write).toHaveBeenCalledWith('JVBERi0xLjcK', { encoding: 'base64' });
+  const previewed = fileInstances.find(instance => instance.canPreview.mock.calls.length > 0);
+  expect(previewed?.canPreview).toHaveBeenCalledWith({ mimeType: 'application/pdf' });
+  expect(previewed?.preview).toHaveBeenCalledWith({
+    mimeType: 'application/pdf',
+    title: 'report.pdf',
+  });
+  expect(getAttachmentDownloadUrlMutate).not.toHaveBeenCalled();
+  expect(shareRemoteFileMock.downloadRemoteFile).not.toHaveBeenCalled();
+  expect(toastMock.error).not.toHaveBeenCalled();
+  await unmount(pdfRenderer);
 });

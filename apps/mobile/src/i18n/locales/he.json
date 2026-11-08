@@ -248,6 +248,7 @@
     "confirmDeletion": "אישור המחיקה",
     "credits": "קרדיטים",
     "failedToLoadBalance": "לא ניתן לטעון את היתרה. הקש כדי לנסות שוב.",
+    "balanceLoadFailed": "לא ניתן לטעון את היתרה",
     "hideBalance": "הסתר יתרה",
     "showBalance": "הצג יתרה",
     "balanceHidden": "היתרה מוסתרת",
@@ -1775,6 +1776,7 @@
       "emptyDescription": "שלח הודעה למטה כדי להתחיל.",
       "scrollToBottom": "גלילה לתחתית",
       "emptyTitle": "אין עדיין הודעות",
+      "emptyReadOnlyTitle": "אין הודעות בסשן הזה",
       "renameAccessibility": "שינוי שם הסשן: {{title}}",
       "cloningSession": "משכפל סשן…",
       "couldNotLoadThisSession": "לא ניתן היה לטעון את הסשן הזה.",
@@ -2484,7 +2486,6 @@
   },
   "addCredits": {
     "cta": "הוספת קרדיטים",
-    "description": "הוסף קרדיטים כדי להמשיך להשתמש בשירות.",
     "billingPage": "דף החיוב"
   },
   "deviceSessions": {
@@ -2931,7 +2932,6 @@
     },
     "fileList": {
       "filesList": "רשימת קבצים",
-      "filesViewed": "קבצים · נצפו {{viewed}} מתוך {{total}}",
       "layout": "פריסה",
       "listed": "(ברשימה)",
       "loadingFiles": "הקבצים נטענים",

@@ -315,6 +315,7 @@
     "confirmDeletion": "Confirm deletion",
     "credits": "Credits",
     "failedToLoadBalance": "Failed to load balance. Tap to retry.",
+    "balanceLoadFailed": "Couldn't load balance",
     "hideBalance": "Hide balance",
     "showBalance": "Show balance",
     "balanceHidden": "Balance hidden",
@@ -398,7 +399,6 @@
     "noFilesChangedDescription": "This pull request has no file changes.",
     "fileList": {
       "openNavigator": "Open file navigator",
-      "filesViewed": "Files · {{viewed}} of {{total}} viewed",
       "listed": "(listed)",
       "layout": "Layout",
       "unified": "Unified",
@@ -2360,6 +2360,7 @@
       "emptyDescription": "Send a message below to get started.",
       "scrollToBottom": "Scroll to bottom",
       "emptyTitle": "No messages yet",
+      "emptyReadOnlyTitle": "No messages in this session",
       "renameAccessibility": "Rename session: {{title}}",
       "cloningSession": "Cloning session",
       "couldNotLoadThisSession": "Couldn't load this session",
@@ -3058,7 +3059,6 @@
   },
   "addCredits": {
     "cta": "Add credits",
-    "description": "Add credits to keep usage running.",
     "billingPage": "billing page"
   },
   "deviceSessions": {

@@ -248,6 +248,7 @@
     "confirmDeletion": "Deimhnigh scriosadh",
     "credits": "Creidmheasanna",
     "failedToLoadBalance": "Níorbh fhéidir an t-iarmhéid a lódáil. Tapáil chun triail eile a bhaint as.",
+    "balanceLoadFailed": "Níorbh fhéidir an t-iarmhéid a lódáil",
     "hideBalance": "Folaigh an t-iarmhéid",
     "showBalance": "Taispeáin an t-iarmhéid",
     "balanceHidden": "Tá an t-iarmhéid folaithe",
@@ -331,7 +332,6 @@
     "noFilesChangedDescription": "Níl aon athrú ar chomhaid san iarratas tarraingthe seo.",
     "fileList": {
       "openNavigator": "Oscail an loingseoir comhad",
-      "filesViewed": "Comhaid · {{viewed}} de {{total}} feicthe",
       "listed": "(liostaithe)",
       "layout": "Leagan amach",
       "unified": "Aontaithe",
@@ -2419,6 +2419,7 @@
       "emptyDescription": "Seol teachtaireacht thíos chun tosú.",
       "scrollToBottom": "Scrollaigh go dtí an bun",
       "emptyTitle": "Níl aon teachtaireacht ann fós",
+      "emptyReadOnlyTitle": "Níl aon teachtaireacht sa seisiún seo",
       "renameAccessibility": "Athainmnigh seisiún: {{title}}",
       "cloningSession": "Ag clónáil an tseisiúin",
       "couldNotLoadThisSession": "Níorbh fhéidir an seisiún seo a lódáil.",
@@ -3150,7 +3151,6 @@
   },
   "addCredits": {
     "cta": "Cuir creidmheasanna leis",
-    "description": "Cuir creidmheasanna leis chun leanúint ar aghaidh.",
     "billingPage": "leathanach billeála"
   },
   "deviceSessions": {

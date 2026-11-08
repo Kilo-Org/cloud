@@ -248,6 +248,7 @@
     "confirmDeletion": "Επιβεβαίωση διαγραφής",
     "credits": "Πιστώσεις",
     "failedToLoadBalance": "Δεν ήταν δυνατή η φόρτωση του υπολοίπου. Πάτησε για να δοκιμάσεις ξανά.",
+    "balanceLoadFailed": "Αδυναμία φόρτωσης υπολοίπου",
     "hideBalance": "Απόκρυψη υπολοίπου",
     "showBalance": "Εμφάνιση υπολοίπου",
     "balanceHidden": "Το υπόλοιπο είναι κρυφό",
@@ -331,7 +332,6 @@
     "noFilesChangedDescription": "Αυτό το αίτημα ενσωμάτωσης δεν περιέχει αλλαγές σε αρχεία.",
     "fileList": {
       "openNavigator": "Άνοιγμα περιήγησης αρχείων",
-      "filesViewed": "Αρχεία · {{viewed}} από {{total}} προβλήθηκαν",
       "listed": "(στη λίστα)",
       "layout": "Διάταξη",
       "unified": "Ενοποιημένη",
@@ -2293,6 +2293,7 @@
       "emptyDescription": "Στείλε ένα μήνυμα παρακάτω για να ξεκινήσεις.",
       "scrollToBottom": "Μετάβαση στο κάτω μέρος",
       "emptyTitle": "Δεν υπάρχουν ακόμα μηνύματα",
+      "emptyReadOnlyTitle": "Δεν υπάρχουν μηνύματα σε αυτή τη συνεδρία",
       "renameAccessibility": "Μετονομασία συνεδρίας: {{title}}",
       "cloningSession": "Κλωνοποίηση συνεδρίας…",
       "couldNotLoadThisSession": "Δεν ήταν δυνατή η φόρτωση αυτής της συνεδρίας.",
@@ -2991,7 +2992,6 @@
   },
   "addCredits": {
     "cta": "Προσθήκη πιστώσεων",
-    "description": "Πρόσθεσε πιστώσεις για να συνεχίσεις τη χρήση.",
     "billingPage": "σελίδα χρέωσης"
   },
   "deviceSessions": {

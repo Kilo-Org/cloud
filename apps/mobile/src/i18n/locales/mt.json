@@ -248,6 +248,7 @@
     "confirmDeletion": "Ikkonferma t-tħassir",
     "credits": "Krediti",
     "failedToLoadBalance": "Ma setax jitgħabba l-bilanċ. Tektek biex terġa' tipprova.",
+    "balanceLoadFailed": "Ma setax jitgħabba l-bilanċ",
     "hideBalance": "Aħbi l-bilanċ",
     "showBalance": "Uri l-bilanċ",
     "balanceHidden": "Il-bilanċ huwa moħbi",
@@ -331,7 +332,6 @@
     "noFilesChangedDescription": "Din it-talba għall-għaqda ma fiha l-ebda bidla fil-fajls.",
     "fileList": {
       "openNavigator": "Iftaħ in-navigatur tal-fajls",
-      "filesViewed": "Fajls · rajt {{viewed}} minn {{total}}",
       "listed": "(imniżżla)",
       "layout": "Tqassim",
       "unified": "Magħqud",
@@ -2419,6 +2419,7 @@
       "emptyDescription": "Ibgħat messaġġ hawn taħt biex tibda.",
       "scrollToBottom": "Skrollja sal-qiegħ",
       "emptyTitle": "L-ebda messaġġ s'issa",
+      "emptyReadOnlyTitle": "L-ebda messaġġ f'din is-sessjoni",
       "renameAccessibility": "Ibdel l-isem tas-sessjoni: {{title}}",
       "cloningSession": "Qed tiġi kklonjata s-sessjoni",
       "couldNotLoadThisSession": "Ma setgħetx titgħabba din is-sessjoni.",
@@ -3150,7 +3151,6 @@
   },
   "addCredits": {
     "cta": "Żid krediti",
-    "description": "Żid krediti biex tkun tista' tkompli tuża s-servizz.",
     "billingPage": "paġna tal-ħlasijiet"
   },
   "deviceSessions": {

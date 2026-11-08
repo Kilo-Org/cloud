@@ -248,6 +248,7 @@
     "confirmDeletion": "Kinnita kustutamine",
     "credits": "Krediit",
     "failedToLoadBalance": "Saldo laadimine ebaõnnestus. Uuesti proovimiseks puuduta.",
+    "balanceLoadFailed": "Saldo laadimine ebaõnnestus",
     "hideBalance": "Peida saldo",
     "showBalance": "Näita saldot",
     "balanceHidden": "Saldo on peidetud",
@@ -331,7 +332,6 @@
     "noFilesChangedDescription": "See tõmbetaotlus ei sisalda failimuudatusi.",
     "fileList": {
       "openNavigator": "Ava failinavigaator",
-      "filesViewed": "Failid · {{viewed}}/{{total}} vaadatud",
       "listed": "(loetletud)",
       "layout": "Paigutus",
       "unified": "Ühisvaade",
@@ -2293,6 +2293,7 @@
       "emptyDescription": "Alustamiseks kirjuta allolevale väljale sõnum ja saada see.",
       "scrollToBottom": "Keri lõppu",
       "emptyTitle": "Sõnumeid pole veel",
+      "emptyReadOnlyTitle": "Selles seansis pole sõnumeid",
       "renameAccessibility": "Nimeta seanss ümber: {{title}}",
       "cloningSession": "Seanssi kloonitakse",
       "couldNotLoadThisSession": "Seda seanssi ei õnnestunud laadida.",
@@ -2991,7 +2992,6 @@
   },
   "addCredits": {
     "cta": "Lisa krediiti",
-    "description": "Kasutamise jätkamiseks lisa krediiti.",
     "billingPage": "arveldusleht"
   },
   "deviceSessions": {

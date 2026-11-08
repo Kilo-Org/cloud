@@ -248,6 +248,7 @@
     "confirmDeletion": "Потвърди изтриването",
     "credits": "Кредити",
     "failedToLoadBalance": "Не успяхме да заредим наличността. Докосни, за да опиташ отново.",
+    "balanceLoadFailed": "Не успяхме да заредим наличността",
     "hideBalance": "Скрий наличността",
     "showBalance": "Покажи наличността",
     "balanceHidden": "Наличността е скрита",
@@ -331,7 +332,6 @@
     "noFilesChangedDescription": "В тази заявка за обединяване няма промени по файловете.",
     "fileList": {
       "openNavigator": "Отвори навигатора за файлове",
-      "filesViewed": "Файлове · прегледани {{viewed}} от {{total}}",
       "listed": "(в списъка)",
       "layout": "Оформление",
       "unified": "Обединено",
@@ -2293,6 +2293,7 @@
       "emptyDescription": "Изпрати съобщение по-долу, за да започнеш.",
       "scrollToBottom": "Превърти до края",
       "emptyTitle": "Все още няма съобщения",
+      "emptyReadOnlyTitle": "В тази сесия няма съобщения",
       "renameAccessibility": "Преименувай сесията: {{title}}",
       "cloningSession": "Клониране на сесия",
       "couldNotLoadThisSession": "Не успяхме да заредим тази сесия.",
@@ -2991,7 +2992,6 @@
   },
   "addCredits": {
     "cta": "Добави кредити",
-    "description": "Добави кредити, за да продължиш да използваш услугата.",
     "billingPage": "страницата за плащания"
   },
   "deviceSessions": {

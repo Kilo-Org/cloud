@@ -248,6 +248,7 @@
     "confirmDeletion": "ຢືນຢັນການລຶບ",
     "credits": "ເຄຣດິດ",
     "failedToLoadBalance": "ບໍ່ສາມາດໂຫຼດຍອດເງິນຄົງເຫຼືອໄດ້. ແຕະເພື່ອລອງອີກຄັ້ງ.",
+    "balanceLoadFailed": "ໂຫຼດຍອດເງິນຄົງເຫຼືອບໍ່ໄດ້",
     "hideBalance": "ເຊື່ອງຍອດເງິນຄົງເຫຼືອ",
     "showBalance": "ສະແດງຍອດເງິນຄົງເຫຼືອ",
     "balanceHidden": "ເຊື່ອງຍອດເງິນຄົງເຫຼືອແລ້ວ",
@@ -331,7 +332,6 @@
     "noFilesChangedDescription": "ຄຳຂໍລວມໂຄດນີ້ບໍ່ມີການປ່ຽນແປງໄຟລ໌.",
     "fileList": {
       "openNavigator": "ເປີດແຖບນຳທາງໄຟລ໌",
-      "filesViewed": "ໄຟລ໌ · ເບິ່ງແລ້ວ {{viewed}} ຈາກ {{total}}",
       "listed": "(ທີ່ຢູ່ໃນລາຍການ)",
       "layout": "ຮູບແບບການຈັດວາງ",
       "unified": "ແບບລວມ",
@@ -2293,6 +2293,7 @@
       "emptyDescription": "ສົ່ງຂໍ້ຄວາມຂ້າງລຸ່ມເພື່ອເລີ່ມຕົ້ນ.",
       "scrollToBottom": "ເລື່ອນໄປລຸ່ມສຸດ",
       "emptyTitle": "ຍັງບໍ່ມີຂໍ້ຄວາມ",
+      "emptyReadOnlyTitle": "ບໍ່ມີຂໍ້ຄວາມໃນເຊດຊັນນີ້",
       "renameAccessibility": "ປ່ຽນຊື່ເຊດຊັນ: {{title}}",
       "cloningSession": "ກຳລັງສ້າງສຳເນົາເຊດຊັນ",
       "couldNotLoadThisSession": "ບໍ່ສາມາດໂຫຼດເຊດຊັນນີ້ໄດ້.",
@@ -2991,7 +2992,6 @@
   },
   "addCredits": {
     "cta": "ເຕີມເຄຣດິດ",
-    "description": "ເຕີມເຄຣດິດເພື່ອໃຊ້ງານຕໍ່ໄດ້.",
     "billingPage": "ໜ້າການຮຽກເກັບເງິນ"
   },
   "deviceSessions": {

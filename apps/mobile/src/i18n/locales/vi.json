@@ -248,6 +248,7 @@
     "confirmDeletion": "Xác nhận xóa",
     "credits": "Số dư",
     "failedToLoadBalance": "Không thể tải số dư. Chạm để thử lại.",
+    "balanceLoadFailed": "Không thể tải số dư",
     "hideBalance": "Ẩn số dư",
     "showBalance": "Hiện số dư",
     "balanceHidden": "Số dư đã ẩn",
@@ -1754,6 +1755,7 @@
       "emptyDescription": "Gửi tin nhắn bên dưới để bắt đầu.",
       "scrollToBottom": "Cuộn xuống dưới cùng",
       "emptyTitle": "Chưa có tin nhắn",
+      "emptyReadOnlyTitle": "Phiên này không có tin nhắn",
       "renameAccessibility": "Đổi tên phiên: {{title}}",
       "cloningSession": "Đang sao chép phiên",
       "couldNotLoadThisSession": "Không thể tải phiên này.",
@@ -2452,7 +2454,6 @@
   },
   "addCredits": {
     "cta": "Nạp tiền",
-    "description": "Nạp tiền để tiếp tục sử dụng.",
     "billingPage": "trang thanh toán"
   },
   "deviceSessions": {
@@ -2891,7 +2892,6 @@
     },
     "fileList": {
       "filesList": "Danh sách tệp",
-      "filesViewed": "Tệp · Đã xem {{viewed}}/{{total}}",
       "layout": "Bố cục",
       "listed": "(đã liệt kê)",
       "loadingFiles": "Đang tải tệp",

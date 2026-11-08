@@ -29,8 +29,8 @@ public final class KiloAppActionsModule: Module {
   /// Publishes the session the app is showing, or clears it. `nil` means no
   /// session is visible.
   @JS
-  func setVisibleSession(sessionId: String?) async {
-    await KiloVisibleSession.publish(sessionId)
+  func setVisibleSession(sessionId: String?) async throws {
+    try await KiloVisibleSessionBridge.publish(sessionId)
   }
 }
 

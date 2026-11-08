@@ -1,4 +1,5 @@
 import AppIntents
+internal import KiloAppActions
 
 /// One session, in the shape Siri and Shortcuts resolve parameters with.
 ///

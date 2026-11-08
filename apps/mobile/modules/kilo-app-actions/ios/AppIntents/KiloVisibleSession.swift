@@ -5,7 +5,7 @@ import UIKit
 /// resolve "this session" to the one on screen.
 ///
 /// On-screen association requires iOS 18.2. Earlier versions skip it.
-/// The framework-backed entity catalog is available from iOS 17.
+/// The app-target entity catalog is available from iOS 17.
 ///
 /// The activity is attached to the key window's root view controller, which is
 /// the UIKit form of the association (`UIResponder.userActivity`); the app has

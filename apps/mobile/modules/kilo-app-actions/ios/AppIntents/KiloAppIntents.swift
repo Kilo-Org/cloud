@@ -1,4 +1,5 @@
 import AppIntents
+internal import KiloAppActions
 import UIKit
 
 // The English copy the App Intents carry.

@@ -7,9 +7,14 @@ import Foundation
 /// body, no credential and no path is stored — Siri and Shortcuts only ever
 /// need to name a session, and the app resolves everything else from live data
 /// when the run opens it.
-struct KiloSessionCatalogEntry: Codable, Equatable {
-  let id: String
-  let title: String
+public struct KiloSessionCatalogEntry: Codable, Equatable {
+  public let id: String
+  public let title: String
+
+  public init(id: String, title: String) {
+    self.id = id
+    self.title = title
+  }
 }
 
 /// The on-device store behind the session entity catalog.
@@ -21,7 +26,7 @@ struct KiloSessionCatalogEntry: Codable, Equatable {
 ///
 /// Every mutation runs on one serial queue, so a replace and a clear can never
 /// interleave and a clear always wins when it is last.
-enum KiloSessionCatalogStore {
+public enum KiloSessionCatalogStore {
   /// The one defaults key. Account scoping is not a namespace here: the
   /// JavaScript owner writes the current account's titles and clears the store
   /// at every account boundary, and the entity query only ever reads what the
@@ -41,7 +46,7 @@ enum KiloSessionCatalogStore {
   private static let queue = DispatchQueue(label: "kilo-app-actions-session-catalog")
 
   /// The stored entries, oldest write first, capped and clean.
-  static func entries() -> [KiloSessionCatalogEntry] {
+  public static func entries() -> [KiloSessionCatalogEntry] {
     queue.sync {
       read()
     }

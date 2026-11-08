@@ -4,11 +4,12 @@ import type { NextRequestWithAuth } from 'next-auth/middleware';
 import { withAuth } from 'next-auth/middleware';
 
 /**
- * Each path below belongs to a handler that verifies admin access itself with
- * `getUserFromAuth({ adminOnly: true })`, so the middleware lets the request
- * through. `[id]` matches one dynamic segment. A new handler must add its exact
- * path here together with that verification, or leave the path out and let the
- * middleware apply its own admin check.
+ * Each path below belongs to a handler that verifies admin access itself: it
+ * either calls `getUserFromAuth({ adminOnly: true })` or reaches an
+ * `adminProcedure`, so the middleware lets the request through. `[id]` matches
+ * one dynamic segment. A new handler must add its exact path here together with
+ * that verification, or leave the path out and let the middleware apply its own
+ * admin check.
  */
 const ADMIN_API_ROUTES_WITH_OWN_ADMIN_CHECK = [
   '/admin/api/enrichment-data/upsert',

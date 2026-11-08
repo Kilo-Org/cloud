@@ -362,11 +362,7 @@ test('the benchmark row restores the Python wheel cache it installs from', () =>
     step => step.run === 'pnpm --filter ${{ matrix.workspace.name }} test'
   );
   assert.ok(cacheIndex < runIndex, 'the cache restores before the row runs');
-  assert.equal(
-    steps[runIndex].env?.PIP_CACHE_DIR,
-    pipCacheDir,
-    'pip reads the restored directory'
-  );
+  assert.equal(steps[runIndex].env?.PIP_CACHE_DIR, pipCacheDir, 'pip reads the restored directory');
 });
 
 const harnessBuildGuards = [

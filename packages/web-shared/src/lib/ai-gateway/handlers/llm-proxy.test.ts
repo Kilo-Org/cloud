@@ -555,6 +555,31 @@ describe('POST /api/v1/chat/completions bearer audiences', () => {
     });
   });
 
+  it('returns the authorization response for a refused account', async () => {
+    const authFailedResponse = NextResponse.json(
+      { success: false as const, error: 'Access denied (R1)' },
+      { status: 403 }
+    );
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: null,
+      authFailedResponse,
+      authorizationRefused: true,
+      organizationId: undefined,
+    } as AuthResult);
+
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+    const response = await handleLlmProxyRequest(
+      makeRequest(makeBody('test/free-model:free'), {
+        authorization: `Bearer ${signedToken(KILO_GATEWAY_AUDIENCE)}`,
+      }) as never
+    );
+
+    expect(response).toBe(authFailedResponse);
+    expect(response.status).toBe(403);
+    expect(mockedGetProvider).not.toHaveBeenCalled();
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
   it('rejects an API-only token sent to the gateway endpoint', async () => {
     setSignedTokenAuth(signedToken(KILO_API_AUDIENCE), {
       user: {

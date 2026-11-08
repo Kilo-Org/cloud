@@ -72,6 +72,7 @@ export function resolveGatewayCaller(
     return { kind: 'rejected', response: auth.authFailedResponse };
   }
   if (auth.credentialsRejected) return { kind: 'rejected', response: invalidTokenResponse() };
+  if (auth.authorizationRefused) return { kind: 'rejected', response: auth.authFailedResponse };
   if (opts.passThroughAuthFailure) return { kind: 'rejected', response: auth.authFailedResponse };
   if (opts.allowAnonymous && opts.ipAddress) {
     return { kind: 'anonymous', user: createAnonymousContext(opts.ipAddress) };

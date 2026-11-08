@@ -109,6 +109,7 @@ describe('classifyOrganizationEntitlement', () => {
 
   it.each([
     'ended',
+    'pending_cancel',
     'incomplete',
     'incomplete_expired',
     'canceled',

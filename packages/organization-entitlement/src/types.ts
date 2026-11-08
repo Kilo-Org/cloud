@@ -26,18 +26,16 @@ export type OrganizationEntitlementClassification = {
 };
 
 /**
- * The seat-purchase statuses that pay for the organization's subscription.
- * A payment the provider is still retrying keeps paying (`past_due`), and
- * `pending_cancel` keeps paying while the paid period runs. A status outside
- * this list is a checkout or subscription that never completed payment, an
- * ended subscription, or a value this package does not know, so it does not
- * pay.
+ * The seat-purchase statuses that must be treated as paying for the
+ * organization's subscription. A payment the provider is still retrying stays
+ * in this list. Any other stored value requires trial enforcement to stay in
+ * force, so membership is kept to the named set and extended only when the
+ * provider adds a paying state.
  */
 export const PAID_ORGANIZATION_SEAT_SUBSCRIPTION_STATUSES = [
   'active',
   'trialing',
   'past_due',
-  'pending_cancel',
 ] as const;
 
 export type PaidOrganizationSeatSubscriptionStatus =
@@ -53,8 +51,8 @@ export function isPaidOrganizationSeatSubscriptionStatus(
   return paidSeatSubscriptionStatuses.has(status);
 }
 
-// The seat-purchase column stores the subscription status the provider reports,
-// which is an open set, plus the local 'pending_cancel' and 'ended' markers.
+// Keep this type in step with the provider's subscription status registry and
+// the stored value the seat-purchase writer records.
 export type OrganizationSeatPurchaseSubscriptionStatus =
   | PaidOrganizationSeatSubscriptionStatus
   | 'ended'

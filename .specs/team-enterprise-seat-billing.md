@@ -64,15 +64,14 @@ supports only USD for seat billing.
   past-due or incomplete.
 - **Active subscription purchase**: A purchase record whose
   `subscription_status` represents a live paid subscription:
-  `active`, `trialing`, `past_due` (the payment processor is still
-  retrying payment), or `pending_cancel` (cancellation is scheduled
-  and the paid period is still running). Used for access checks and
-  trial enforcement — an organization with at least one active
+  `active`, `trialing`, or `past_due` (the payment processor is
+  still retrying payment). Used for access checks and trial
+  enforcement — an organization with at least one active
   subscription purchase is considered subscribed. Every other
-  stored status, including `ended`, `incomplete`,
-  `incomplete_expired`, `canceled`, `unpaid`, `paused`, and any
-  status the system does not recognize, is not an active
-  subscription purchase.
+  stored status, including `ended`, `pending_cancel`,
+  `incomplete`, `incomplete_expired`, `canceled`, `unpaid`,
+  `paused`, and any status the system does not recognize, is not an
+  active subscription purchase.
 - **Known paid seat prices**: The set of payment processor price
   identifiers corresponding to the four seat pricing tiers (Teams
   monthly, Teams annual, Enterprise monthly, Enterprise annual).
@@ -625,13 +624,9 @@ in the current codebase:
 
 - Redefined "active subscription purchase" to the stored statuses
   that represent a live paid subscription: `active`, `trialing`,
-  `past_due` (payment is being retried), and `pending_cancel`
-  (the paid period is still running). Before this change it was
-  every status other than `ended`.
-- Clarified that `ended`, `incomplete`, `incomplete_expired`,
-  `canceled`, `unpaid`, `paused`, and any unrecognized status are
-  not an active subscription purchase, so a checkout that never
-  completed payment cannot clear hard-expired trial enforcement.
+  and `past_due` (payment is being retried). Read every other stored
+  status as not an active subscription purchase, so trial
+  enforcement stays in force.
 - Updated the Require-Seats and Free Trial rules that reference the
   term, and the suppressed-trial-messaging definition, to the same
   wording.

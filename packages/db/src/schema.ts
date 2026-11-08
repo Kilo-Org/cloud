@@ -4260,11 +4260,10 @@ export const organization_user_usage = pgTable(
 
 export type OrganizationUserDailyUsage = typeof organization_user_usage.$inferSelect;
 
-// The column stores the subscription status the provider reports, which is an
-// open set, plus the local 'pending_cancel' and 'ended' markers.
+// Keep this type in step with the provider's subscription status registry and
+// the stored value the seat-purchase writer records.
 type SubscriptionStatus =
   | 'active'
-  | 'pending_cancel'
   | 'ended'
   | 'incomplete'
   | 'incomplete_expired'

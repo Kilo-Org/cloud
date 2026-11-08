@@ -18,7 +18,10 @@ import {
 } from './metadata-mutation';
 import { retireProjectCredentialsForReplacedAccount } from './project-credential-lifecycle';
 import { isDefaultGitLabInstanceUrl, normalizeGitLabInstanceUrl } from './instance-url';
-import { settleStoredProjectTokens } from '@/lib/integrations/gitlab-service';
+import {
+  gitLabCredentialActor,
+  settleStoredProjectTokens,
+} from '@/lib/integrations/gitlab-service';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 export type StoreGitLabOAuthIntegrationInput = {
@@ -138,7 +141,7 @@ export async function storeGitLabOAuthIntegration(
     ) {
       const settlement = await settleStoredProjectTokens(
         existing,
-        { userId: input.authorizedByUserId },
+        gitLabCredentialActor(input.owner, input.authorizedByUserId),
         input.accessToken
       );
       logExceptInTest('[storeGitLabOAuthIntegration] Reconnect settled retained project tokens', {

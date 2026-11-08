@@ -2034,6 +2034,64 @@ describe('GitLab encrypted credential persistence', () => {
     expect(credentials[0].provider_resource_id).toBe('42');
   });
 
+  it('runs the credential-free entry cleanup when no credential is available', async () => {
+    const user = await insertTestUser();
+    const connected = await connectWithPAT(
+      { type: 'user', id: user.id },
+      'glpat-primary-token',
+      'https://gitlab.com',
+      user.id
+    );
+    const [integration] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, connected.integration.id));
+    await getOrCreateProjectAccessToken(integration, 42, { userId: user.id });
+    await db
+      .update(platform_integrations)
+      .set({
+        metadata: {
+          ...(integration.metadata as Record<string, unknown>),
+          project_tokens: {
+            '43': {
+              token: 'glpat-legacy-project-token',
+              expires_at: '2027-07-13',
+              created_at: '2026-07-13T00:00:00.000Z',
+              name: 'Kilo Code Review Bot',
+            },
+          },
+        },
+      })
+      .where(eq(platform_integrations.id, integration.id));
+    const [withLegacy] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, integration.id));
+    mockFetchGitLabCredential.mockClear();
+
+    await expect(
+      settleStoredProjectTokens(withLegacy, { userId: user.id }, undefined)
+    ).resolves.toEqual({ revoked: 0, scrubbed: 1, retained: 1, unattempted: 1 });
+
+    expect(mockRevokeProjectAccessToken).not.toHaveBeenCalled();
+    expect(mockFetchGitLabCredential).not.toHaveBeenCalled();
+    const [updated] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, integration.id));
+    expect(updated.metadata).toEqual(expect.objectContaining({ project_tokens: {} }));
+    const credentials = await db
+      .select()
+      .from(platform_access_token_credentials)
+      .where(
+        and(
+          eq(platform_access_token_credentials.platform_integration_id, connected.integration.id),
+          eq(platform_access_token_credentials.provider_credential_type, 'project_access_token')
+        )
+      );
+    expect(credentials).toHaveLength(1);
+  });
+
   it('settles the project token a disconnect kept when the integration is reconnected', async () => {
     const user = await insertTestUser();
     const connected = await connectWithPAT(

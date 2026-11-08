@@ -410,7 +410,7 @@ export async function listGitLabBranches(
  * organization integration resolves only for a member of that organization,
  * so the acting user must travel with the owner.
  */
-function gitLabCredentialActor(owner: Owner, actingUserId: string): GitLabCredentialActor {
+export function gitLabCredentialActor(owner: Owner, actingUserId: string): GitLabCredentialActor {
   return {
     userId: actingUserId,
     ...(owner.type === 'org' ? { organizationId: owner.id } : {}),
@@ -523,11 +523,26 @@ export async function settleStoredProjectTokens(
   }
 
   if (userToken === undefined) {
+    // The cleanup that needs no provider call runs before the credential check,
+    // so one request settles those entries too.
+    const noCredentialOutstanding = new Set(projectIds);
+    let noCredentialScrubbed = 0;
+    for (const projectId of projectIds) {
+      const dropped = await getStoredProjectCredential(integration.id, projectId)
+        .then(storedCredential =>
+          dropUnrevokableProjectTokenEntry(integration, projectId, storedCredential)
+        )
+        .catch(() => false);
+      if (dropped) {
+        noCredentialOutstanding.delete(projectId);
+        noCredentialScrubbed += 1;
+      }
+    }
     return {
       revoked: 0,
-      scrubbed: 0,
-      retained: projectIds.length,
-      unattempted: projectIds.length,
+      scrubbed: noCredentialScrubbed,
+      retained: noCredentialOutstanding.size,
+      unattempted: noCredentialOutstanding.size,
     };
   }
 
@@ -818,6 +833,25 @@ function hasLegacyProjectTokenEntry(metadata: unknown, projectId: string): boole
   const parsedMetadata = GitLabProjectTokenMetadataSchema.safeParse(metadata);
   if (!parsedMetadata.success) return false;
   return parsedMetadata.data.project_tokens?.[projectId] !== undefined;
+}
+
+/**
+ * Drops one stored project token entry that a provider call cannot settle.
+ * Returns true when it dropped one. Needs no provider credential.
+ */
+async function dropUnrevokableProjectTokenEntry(
+  integration: Pick<PlatformIntegration, 'id' | 'metadata'>,
+  projectId: string,
+  storedCredential: StoredProjectCredential | null
+): Promise<boolean> {
+  if (storedCredential !== null) return false;
+  if (readLegacyProjectTokenId(integration.metadata, projectId) !== null) return false;
+  if (!hasLegacyProjectTokenEntry(integration.metadata, projectId)) return false;
+  await deleteStoredProjectTokenMetadataEntry({ integrationId: integration.id, projectId });
+  logExceptInTest('[removeStoredProjectAccessToken] Dropped entry with no revocable token id', {
+    projectId,
+  });
+  return true;
 }
 
 async function getStoredProjectCredential(integrationId: string, projectId: string) {
@@ -1270,17 +1304,12 @@ export async function removeStoredProjectAccessToken(
     ),
   ];
   if (tokenIds.length === 0) {
-    if (!hasLegacyProjectTokenEntry(integration.metadata, projectIdStr)) {
-      return { outcome: 'absent' };
-    }
-    await deleteStoredProjectTokenMetadataEntry({
-      integrationId: integration.id,
-      projectId: projectIdStr,
-    });
-    logExceptInTest('[removeStoredProjectAccessToken] Dropped entry with no revocable token id', {
-      projectId,
-    });
-    return { outcome: 'scrubbed' };
+    const dropped = await dropUnrevokableProjectTokenEntry(
+      integration,
+      projectIdStr,
+      storedCredential
+    );
+    return { outcome: dropped ? 'scrubbed' : 'absent' };
   }
   const instanceUrl = normalizeInstanceUrl(metadata?.gitlab_instance_url);
 

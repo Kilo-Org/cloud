@@ -67,6 +67,10 @@ export function SupportAccessContent() {
   const queryClient = useQueryClient();
   const { data: session } = useSession();
   const currentUserId = session?.kiloUserId;
+  // Until the session resolves, the viewer identity is unknown; every
+  // actionable row fails closed so a requester's own pending grant can never
+  // look actionable to its requester.
+  const viewerIdentityKnown = currentUserId !== undefined;
   const [revokeReasons, setRevokeReasons] = useState<Record<string, string>>({});
   const [organization, setOrganization] = useState<SelectedSupportOrganization | null>(null);
   const organizationId = organization?.id ?? '';
@@ -405,7 +409,11 @@ export function SupportAccessContent() {
                       <div className="flex gap-2">
                         <Button
                           size="sm"
-                          disabled={approve.isPending || grant.actorKiloUserId === currentUserId}
+                          disabled={
+                            approve.isPending ||
+                            !viewerIdentityKnown ||
+                            grant.actorKiloUserId === currentUserId
+                          }
                           onClick={() => approve.mutate({ grantId: grant.id })}
                         >
                           Approve
@@ -413,7 +421,11 @@ export function SupportAccessContent() {
                         <Button
                           size="sm"
                           variant="outline"
-                          disabled={deny.isPending || grant.actorKiloUserId === currentUserId}
+                          disabled={
+                            deny.isPending ||
+                            !viewerIdentityKnown ||
+                            grant.actorKiloUserId === currentUserId
+                          }
                           onClick={() => deny.mutate({ grantId: grant.id })}
                         >
                           Deny
@@ -545,7 +557,11 @@ export function SupportAccessContent() {
                       <Button
                         size="sm"
                         variant="outline"
-                        disabled={review.isPending || grant.actorKiloUserId === currentUserId}
+                        disabled={
+                          review.isPending ||
+                          !viewerIdentityKnown ||
+                          grant.actorKiloUserId === currentUserId
+                        }
                         onClick={() => review.mutate({ grantId: grant.id })}
                       >
                         Mark reviewed

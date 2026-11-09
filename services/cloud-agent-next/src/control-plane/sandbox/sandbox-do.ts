@@ -273,6 +273,13 @@ import {
 import { withDORetry } from '../../utils/do-retry.js';
 import { agentSandboxProviderSchema, type AgentSandboxProvider, type Env } from '../../types.js';
 import { sandboxSessionPeerNamespace } from '../peer-bindings.js';
+import {
+  ORGANIZATION_MEMBERSHIP_READ_TIMEOUT_MS,
+  OrganizationAccessRevokedError,
+  OrganizationMembershipUnavailableError,
+  workerOrganizationMembershipReader,
+  type OrganizationMembershipReader,
+} from './organization-membership.js';
 import migrations from './drizzle/migrations';
 import {
   connectionMatches,
@@ -914,6 +921,14 @@ export class SandboxControlV2 extends DurableObject<Env> {
     ownerId,
     sessionId
   ) => this.resolveSessionPeer(ownerId, sessionId);
+  /**
+   * Current organization membership for an organization-attributed grant. The
+   * default reads the Worker's database through Hyperdrive; tests inject a fake
+   * because the fake-provider suite has no Postgres binding.
+   */
+  organizationMembershipFor: OrganizationMembershipReader = workerOrganizationMembershipReader(
+    this.env
+  );
 
   private readonly notifications = createSandboxNotificationDispatcher({
     budgetMs: () => CONTROL_PLANE_TIMERS.sandbox.sessionNotifyDeadlineMs,
@@ -2837,6 +2852,29 @@ export class SandboxControlV2 extends DurableObject<Env> {
     return this.sandboxTimers().scopeBackingTokenMs;
   }
 
+  /**
+   * Refuses an organization-attributed grant once the session owner is no longer
+   * a current member of that organization. Personal sources are not gated. A
+   * read that does not answer is not evidence of membership, so it denies too;
+   * `issueRouteGrant` throws and each caller decides whether to fail the attempt
+   * or keep the route and retry.
+   */
+  private async requireOrganizationMembership(source: ControlPlaneCredentialSource): Promise<void> {
+    const organizationId = source.orgId;
+    if (organizationId === undefined) return;
+    let member: boolean;
+    try {
+      member = await withTimeout(
+        this.organizationMembershipFor(source.userId, organizationId),
+        ORGANIZATION_MEMBERSHIP_READ_TIMEOUT_MS,
+        'Organization membership read timed out'
+      );
+    } catch {
+      throw new OrganizationMembershipUnavailableError();
+    }
+    if (!member) throw new OrganizationAccessRevokedError();
+  }
+
   /** Route transitions need storage, the bound socket and the bounded notify. */
   private routeContext(state: AllocationState): RouteContext {
     return {
@@ -3027,6 +3065,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
     environment: SessionEnvironmentReference | null,
     diagnostic?: GrantDiagnostic
   ): Promise<RouteGrantIssue> {
+    // Every issuance of an organization-attributed grant re-checks that the
+    // session owner still belongs to that organization: preparation, a wrapper
+    // rebind after a restart and a warm renewal all pass through here.
+    await this.requireOrganizationMembership(source);
     const provider = this.currentProvider();
     const allocation = await this.readAllocation();
     diagnostic?.fact({
@@ -3453,8 +3495,12 @@ export class SandboxControlV2 extends DurableObject<Env> {
         this.grantIssueTimeoutMs(),
         'Credential grant re-issue timed out'
       );
-    } catch {
-      return 'failed';
+    } catch (error) {
+      // A proven loss of organization membership is the existing policy
+      // failure: nothing is issued and the route stays until its grant expires.
+      // An unreadable membership (or any other failure) keeps the retry
+      // schedule, because it is not evidence that the grant is still allowed.
+      return error instanceof OrganizationAccessRevokedError ? 'policy_failed' : 'failed';
     }
     const cloudAgentMcp = await this.tryIssueCloudAgentMcpGrant(route);
     if (!(await this.applyCandidateGrantPolicy(issued.grant))) return 'policy_failed';

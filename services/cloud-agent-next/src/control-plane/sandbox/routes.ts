@@ -36,6 +36,7 @@ import type { SyncAcceptedHandleStorage } from './accepted-handles.js';
 import { lastSentHandleKey } from './scope-handle-delivery.js';
 import { readScopeGrant, removeScopeMember, scopeGrantId } from './scope-grants.js';
 import { admissionFailureStage } from './scope-handle-adoption.js';
+import { OrganizationAccessRevokedError } from './organization-membership.js';
 import { VercelScmContainmentError } from '../../scm-broker/vercel-identity.js';
 
 export type RouteDatabase = ReturnType<typeof drizzle>;
@@ -374,6 +375,11 @@ export function grantIssueFailure(
   error: unknown,
   fallbackStage: string
 ): { reason: ControlPlaneFailureReason; stage: string } {
+  if (error instanceof OrganizationAccessRevokedError) {
+    // The owner left the organization the session belongs to: the route cannot
+    // run on organization authority, and no retry of the same attempt mints it.
+    return { reason: 'workspace_setup_failed', stage: 'organization_access_revoked' };
+  }
   if (error instanceof SessionCredentialUpgradeRequiredError) {
     return { reason: 'credential_upgrade_required', stage: 'credential_upgrade_required' };
   }

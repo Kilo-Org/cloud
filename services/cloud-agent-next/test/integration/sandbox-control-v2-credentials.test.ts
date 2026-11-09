@@ -53,7 +53,7 @@ import {
 import {
   createFakeCredentialBroker,
   fakeOutboundContainerId,
-  installFakeCredentialEnv,
+  installFakeSandboxEnv,
   type FakeCredentialBroker,
 } from './helpers/fake-credentials.js';
 import { createRuntimeProxyMintingPeer } from './helpers/fake-session-peer.js';
@@ -334,7 +334,7 @@ async function setup(
   }));
   await runInDurableObject(stub, async instance => {
     await instance.getAllocationState();
-    installFakeCredentialEnv(instance.env, broker, {
+    installFakeSandboxEnv(instance, broker, {
       WORKER_URL: VERCEL_TARGET,
       KILOCODE_BACKEND_BASE_URL: 'https://api.kilo.ai',
       KILO_OPENROUTER_BASE: 'https://api.kilo.ai',
@@ -496,6 +496,9 @@ async function reconstructPreB(
     Object.assign(reconstructed, {
       createProviderAdapter: () => provider.adapter,
       provider: provider.adapter,
+      // A reconstructed instance loses fixture injection; the membership gate
+      // must still see a current member, as the fake env provides.
+      organizationMembershipFor: async () => true,
       sessionPeerFor: (_ownerId: string, sessionId: string) => ({
         onRoute: async (update: ControlPlaneRouteUpdate) => {
           updates.push({ sessionId, update });
@@ -1043,6 +1046,7 @@ describe('SandboxControlV2 credentials (B3)', () => {
       Object.assign(reconstructed, {
         createProviderAdapter: () => provider.adapter,
         provider: provider.adapter,
+        organizationMembershipFor: async () => true,
         sessionPeerFor: () => ({
           onRoute: async () => {},
           onEvents: async () => {},

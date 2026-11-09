@@ -843,7 +843,20 @@ app.post('/internal/streams/close', async (c: Context<HonoContext>) => {
   for (const row of rows) {
     const sessionId = row.cloudAgentSessionId;
     if (!sessionId || !isControlSession(sessionId)) continue;
-    await getSandboxSessionStub(c.env, userId, sessionId).closeOrgStreams(organizationId);
+    try {
+      await getSandboxSessionStub(c.env, userId, sessionId).closeOrgStreams(organizationId);
+    } catch (error) {
+      // One session's failed close (an unreachable Durable Object, or a release
+      // that could not finish) must not stop the others. The membership gate on
+      // grant issuance still refuses that session's next grant.
+      logger
+        .withFields({
+          cloudAgentSessionId: sessionId,
+          userId,
+          error: error instanceof Error ? error.message : String(error),
+        })
+        .error('/internal/streams/close: session close failed');
+    }
   }
 
   return c.body(null, 204);

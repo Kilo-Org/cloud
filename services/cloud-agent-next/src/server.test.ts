@@ -1940,6 +1940,46 @@ describe('server /internal/streams/close', () => {
     expect(closeOrgStreams).toHaveBeenCalledWith('org_1');
   });
 
+  it('keeps closing other sessions when one close fails', async () => {
+    const env = createEnv();
+    const closeOrgStreams = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('Durable Object unavailable'))
+      .mockResolvedValueOnce(1);
+    env.SANDBOX_SESSION.idFromName.mockReturnValue('do-id');
+    env.SANDBOX_SESSION.get.mockReturnValue({ closeOrgStreams });
+    const firstSessionId = 'workspace_cccccccc-cccc-cccc-cccc-cccccccccccc';
+    const secondSessionId = 'workspace_dddddddd-dddd-dddd-dddd-dddddddddddd';
+
+    getPgDbMock.mockReturnValue({
+      select: vi.fn(() => ({
+        from: vi.fn(() => ({
+          where: vi.fn(async () => [
+            { cloudAgentSessionId: firstSessionId },
+            { cloudAgentSessionId: secondSessionId },
+          ]),
+        })),
+      })),
+    });
+
+    const response = await fetchWorker(
+      new Request('http://worker.test/internal/streams/close', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-internal-api-key': 'test-internal-secret',
+        },
+        body: JSON.stringify({ userId: 'usr_removed', organizationId: 'org_1' }),
+      }),
+      env
+    );
+
+    // The removal itself already succeeded; a failed close for one session must
+    // not skip the remaining sessions of the same member.
+    expect(response.status).toBe(204);
+    expect(closeOrgStreams).toHaveBeenCalledTimes(2);
+  });
+
   it('skips rows that do not name a control session', async () => {
     const env = createEnv();
     const closeOrgStreams = vi.fn().mockResolvedValue(0);

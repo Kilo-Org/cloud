@@ -28,7 +28,7 @@ import {
 import {
   createFakeCredentialBroker,
   FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN,
-  installFakeCredentialEnv,
+  installFakeSandboxEnv,
 } from './helpers/fake-credentials.js';
 import { installFakeRuntimeProxyPeer } from './helpers/fake-session-peer.js';
 import { FakeWrapper } from './helpers/fake-wrapper.js';
@@ -124,7 +124,7 @@ async function setup(
   };
   await runInDurableObject(sandbox, async instance => {
     await instance.getAllocationState();
-    installFakeCredentialEnv(instance['env'], createFakeCredentialBroker(), {
+    installFakeSandboxEnv(instance, createFakeCredentialBroker(), {
       WORKSPACE_SNAPSHOT_USER_IDS: options.enabled === false ? '' : USER,
       WORKSPACE_SNAPSHOT_ORG_IDS: '',
       RUNTIME_STARTUP_MODE: 'preinstalled',

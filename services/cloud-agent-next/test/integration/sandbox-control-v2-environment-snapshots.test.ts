@@ -21,7 +21,7 @@ import {
   createFakeCredentialBroker,
   FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN,
   FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
-  installFakeCredentialEnv,
+  installFakeSandboxEnv,
 } from './helpers/fake-credentials.js';
 import {
   FakeSessionPeer,
@@ -226,7 +226,7 @@ async function setup(
   const stub = sandboxNamespace.getByName(sandboxId);
   await runInDurableObject(stub, async instance => {
     await instance.getAllocationState();
-    installFakeCredentialEnv(instance.env, createFakeCredentialBroker(), {
+    installFakeSandboxEnv(instance, createFakeCredentialBroker(), {
       NEXTAUTH_SECRET: WORKER_SECRET,
       // Credential grants require the runtime proxy facade, independent of local settings.
       WORKER_URL: 'https://worker.example.com',

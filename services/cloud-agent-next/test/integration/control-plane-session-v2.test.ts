@@ -54,7 +54,7 @@ import { sessionDoName } from '../../src/session-identity.js';
 import { SESSION_CREDENTIAL_UPGRADE_REQUIRED_MESSAGE } from '../../src/sandbox-control/session-credentials.js';
 import {
   createFakeCredentialBroker,
-  installFakeCredentialEnv,
+  installFakeSandboxEnv,
 } from './helpers/fake-credentials.js';
 import { FakeSandboxPeer } from './helpers/fake-sandbox-peer.js';
 import { installFakeRuntimeProxyPeer } from './helpers/fake-session-peer.js';
@@ -1967,7 +1967,7 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
       const sandboxStub = sandboxes.getByName(sandboxId);
       await runInDurableObject(sandboxStub, async instance => {
         await instance.getAllocationState();
-        installFakeCredentialEnv(instance['env'], createFakeCredentialBroker());
+        installFakeSandboxEnv(instance, createFakeCredentialBroker());
         installFakeRuntimeProxyPeer(instance, async (ownerId, id) => {
           const kiloId = registeredKiloSessions.get(id);
           return kiloId ? { userId: ownerId, kiloSessionId: kiloId } : null;
@@ -2093,7 +2093,7 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
     const sandboxStub = sandboxes.getByName(sandboxId);
     await runInDurableObject(sandboxStub, async instance => {
       await instance.getAllocationState();
-      installFakeCredentialEnv(instance['env'], createFakeCredentialBroker());
+      installFakeSandboxEnv(instance, createFakeCredentialBroker());
       installFakeRuntimeProxyPeer(instance, async (ownerId, id) => {
         const kiloId = registeredKiloSessions.get(id);
         return kiloId ? { userId: ownerId, kiloSessionId: kiloId } : null;
@@ -2171,7 +2171,7 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
       const sandboxStub = sandboxes.getByName(sandboxId);
       await runInDurableObject(sandboxStub, async instance => {
         await instance.getAllocationState();
-        installFakeCredentialEnv(instance.env, createFakeCredentialBroker());
+        installFakeSandboxEnv(instance, createFakeCredentialBroker());
         installFakeRuntimeProxyPeer(instance, async (ownerId, sessionId) => {
           const stored = await sessions.getByName(sessionDoName(ownerId, sessionId)).getMetadata();
           const kiloId = stored?.auth.kiloSessionId ?? registeredKiloSessions.get(sessionId);
@@ -2288,6 +2288,7 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
           Object.assign(reconstructed, {
             createProviderAdapter: () => provider.adapter,
             provider: provider.adapter,
+            organizationMembershipFor: async () => true,
             sessionPeerFor: (ownerId: string, id: string) => {
               const peer = originalPeerFor(ownerId, id);
               if (peer === null) throw new Error('Missing real Session peer');
@@ -2456,7 +2457,7 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
       const sandboxStub = sandboxes.getByName(sandboxId);
       await runInDurableObject(sandboxStub, async instance => {
         await instance.getAllocationState();
-        installFakeCredentialEnv(instance.env, createFakeCredentialBroker());
+        installFakeSandboxEnv(instance, createFakeCredentialBroker());
         installFakeRuntimeProxyPeer(instance, async (ownerId, sessionId) => {
           const stored = await sessions.getByName(sessionDoName(ownerId, sessionId)).getMetadata();
           const kiloId = stored?.auth.kiloSessionId ?? registeredKiloSessions.get(sessionId);
@@ -2672,7 +2673,7 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
       const sandboxStub = sandboxes.getByName(sandboxId);
       await runInDurableObject(sandboxStub, async instance => {
         await instance.getAllocationState();
-        installFakeCredentialEnv(instance.env, createFakeCredentialBroker());
+        installFakeSandboxEnv(instance, createFakeCredentialBroker());
         installFakeRuntimeProxyPeer(instance, async (ownerId, sessionId) => {
           const stored = await sessions.getByName(sessionDoName(ownerId, sessionId)).getMetadata();
           const kiloId = stored?.auth.kiloSessionId ?? registeredKiloSessions.get(sessionId);
@@ -2811,7 +2812,7 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
     const sandboxStub = sandboxes.getByName(sandboxId);
     await runInDurableObject(sandboxStub, async instance => {
       await instance.getAllocationState();
-      installFakeCredentialEnv(instance.env, createFakeCredentialBroker());
+      installFakeSandboxEnv(instance, createFakeCredentialBroker());
       installFakeRuntimeProxyPeer(instance, async (ownerId, sessionId) => {
         const stored = await sessions.getByName(sessionDoName(ownerId, sessionId)).getMetadata();
         const kiloId = stored?.auth.kiloSessionId ?? registeredKiloSessions.get(sessionId);
@@ -2882,7 +2883,7 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
     const sandboxStub = sandboxes.getByName(sandboxId);
     await runInDurableObject(sandboxStub, async instance => {
       await instance.getAllocationState();
-      installFakeCredentialEnv(instance.env, createFakeCredentialBroker());
+      installFakeSandboxEnv(instance, createFakeCredentialBroker());
       installFakeRuntimeProxyPeer(instance, async (ownerId, sessionId) => {
         const stored = await sessions.getByName(sessionDoName(ownerId, sessionId)).getMetadata();
         const kiloId = stored?.auth.kiloSessionId ?? registeredKiloSessions.get(sessionId);
@@ -2986,7 +2987,7 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
     const sandboxStub = sandboxes.getByName(sandboxId);
     await runInDurableObject(sandboxStub, async instance => {
       await instance.getAllocationState();
-      installFakeCredentialEnv(instance.env, broker);
+      installFakeSandboxEnv(instance, broker);
       installFakeRuntimeProxyPeer(instance, async (ownerId, sessionId) => {
         const stored = await sessions.getByName(sessionDoName(ownerId, sessionId)).getMetadata();
         const kiloId = stored?.auth.kiloSessionId ?? registeredKiloSessions.get(sessionId);
@@ -3057,7 +3058,7 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
       const sandboxStub = sandboxes.getByName(sandboxId);
       await runInDurableObject(sandboxStub, async instance => {
         await instance.getAllocationState();
-        installFakeCredentialEnv(instance.env, createFakeCredentialBroker());
+        installFakeSandboxEnv(instance, createFakeCredentialBroker());
         installFakeRuntimeProxyPeer(instance, async (ownerId, sessionId) => {
           const stored = await sessions.getByName(sessionDoName(ownerId, sessionId)).getMetadata();
           return stored?.auth.kiloSessionId
@@ -3148,7 +3149,7 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
     const sandboxStub = sandboxes.getByName(sandboxId);
     await runInDurableObject(sandboxStub, async instance => {
       await instance.getAllocationState();
-      installFakeCredentialEnv(instance.env, broker);
+      installFakeSandboxEnv(instance, broker);
       installFakeRuntimeProxyPeer(instance, async (ownerId, sessionId) => {
         const stored = await sessions.getByName(sessionDoName(ownerId, sessionId)).getMetadata();
         const kiloId = stored?.auth.kiloSessionId ?? registeredKiloSessions.get(sessionId);
@@ -3214,7 +3215,7 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
     let policyOk = true;
     await runInDurableObject(sandboxStub, async instance => {
       await instance.getAllocationState();
-      installFakeCredentialEnv(instance.env, broker);
+      installFakeSandboxEnv(instance, broker);
       installFakeRuntimeProxyPeer(instance, async (ownerId, sessionId) => {
         const stored = await sessions.getByName(sessionDoName(ownerId, sessionId)).getMetadata();
         const kiloId = stored?.auth.kiloSessionId ?? registeredKiloSessions.get(sessionId);
@@ -3289,7 +3290,7 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
     let policyOk = true;
     await runInDurableObject(sandboxStub, async instance => {
       await instance.getAllocationState();
-      installFakeCredentialEnv(instance.env, broker);
+      installFakeSandboxEnv(instance, broker);
       installFakeRuntimeProxyPeer(instance, async (ownerId, sessionId) => {
         const stored = await sessions.getByName(sessionDoName(ownerId, sessionId)).getMetadata();
         const kiloId = stored?.auth.kiloSessionId ?? registeredKiloSessions.get(sessionId);
@@ -3342,7 +3343,7 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
     const sandboxStub = sandboxes.getByName(sandboxId);
     await runInDurableObject(sandboxStub, async instance => {
       await instance.getAllocationState();
-      installFakeCredentialEnv(instance.env, broker);
+      installFakeSandboxEnv(instance, broker);
       installFakeRuntimeProxyPeer(instance, async (ownerId, sessionId) => {
         const stored = await sessions.getByName(sessionDoName(ownerId, sessionId)).getMetadata();
         const kiloId = stored?.auth.kiloSessionId ?? registeredKiloSessions.get(sessionId);

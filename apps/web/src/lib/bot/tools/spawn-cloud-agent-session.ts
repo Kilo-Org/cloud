@@ -24,7 +24,10 @@ import {
   validateGitLabRepoAccessForOrganization,
   validateGitLabRepoAccessForUser,
 } from '@/lib/cloud-agent/gitlab-integration-helpers';
-import { normalizeGitLabInstanceUrl } from '@/lib/integrations/platforms/gitlab/instance-url';
+import {
+  GitLabInstanceUrlError,
+  normalizeGitLabInstanceUrl,
+} from '@/lib/integrations/platforms/gitlab/instance-url';
 import type { CloudAgentAttachments } from '@/lib/cloud-agent/constants';
 import { linkUploadedAttachments, releaseRefusedAttachments } from '@/lib/bot/attachments';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
@@ -228,6 +231,15 @@ export default async function spawnCloudAgentSession(
         projectResolved = await validateGitLabRepoAccessForUser(owner.id, args.gitlabProject);
       }
     } catch (error) {
+      // A stored instance URL that fails policy normalization cannot start
+      // working on retry, so it gets its own non-retryable answer instead of
+      // the retry message meant for provider and transport failures.
+      if (error instanceof GitLabInstanceUrlError) {
+        return {
+          response:
+            'Error: The GitLab connection for this integration has an invalid instance URL. Update the GitLab connection in your Kilo Code settings.',
+        };
+      }
       captureException(error, {
         tags: { component: 'kilo-bot', op: 'spawn-cloud-agent-session-gitlab-project' },
         extra: { botRequestId, ownerType: owner.type },

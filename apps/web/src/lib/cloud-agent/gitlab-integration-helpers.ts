@@ -1,4 +1,5 @@
 import { TRPCError } from '@trpc/server';
+import type { PlatformIntegration } from '@kilocode/db/schema';
 import {
   getIntegrationForOrganization,
   getIntegrationForOwner,
@@ -9,6 +10,7 @@ import {
   fetchGitLabProjects,
   getGitLabProject as readGitLabProject,
 } from '@/lib/integrations/platforms/gitlab/adapter';
+import type { GitLabCredentialActor } from '@/lib/integrations/platforms/gitlab/credential-broker-client';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { isPlatformIntegrationSuspended } from '@/lib/integrations/core/health';
 import {
@@ -23,16 +25,27 @@ const DEFAULT_GITLAB_URL = 'https://gitlab.com';
  * An HTTP refusal from the GitLab single-project read. The status is the only
  * provider detail a caller can act on; the response body is never included,
  * so a message built from this error cannot leak a token or a project path.
+ * A status of 0 means the read did not produce a provider HTTP status; the
+ * original failure stays attached as the cause.
  */
 export class GitLabProjectLookupError extends Error {
   constructor(
     readonly status: number,
-    message: string
+    message: string,
+    options?: { cause?: unknown }
   ) {
-    super(message);
+    super(message, options);
     this.name = 'GitLabProjectLookupError';
   }
 }
+
+/**
+ * The adapter reports an HTTP refusal from the single-project read only
+ * through this exact message. Matching the whole message keeps a transport
+ * failure or any other message that happens to end in digits from being read
+ * as a refusal.
+ */
+const GITLAB_PROJECT_FETCH_FAILURE = /^GitLab project fetch failed: (\d{3})$/;
 
 /**
  * Read one GitLab project by path with explicit credentials, converting the
@@ -46,13 +59,32 @@ async function getGitLabProjectForCredentials(
   try {
     await readGitLabProject(accessToken, projectPath, instanceUrl);
   } catch (error) {
-    const statusPattern = /(\d{3})$/;
     const message = error instanceof Error ? error.message : '';
-    const match = statusPattern.exec(message);
+    const match = GITLAB_PROJECT_FETCH_FAILURE.exec(message);
     throw new GitLabProjectLookupError(
       match ? Number(match[1]) : 0,
-      'GitLab project lookup failed'
+      'GitLab project lookup failed',
+      { cause: error }
     );
+  }
+}
+
+const gitLabInstanceUrlFromIntegration = (integration: { metadata: unknown }): string => {
+  const metadata = integration.metadata as GitLabMetadata | null;
+  return metadata?.gitlab_instance_url || DEFAULT_GITLAB_URL;
+};
+
+async function resolveGitLabToken(
+  integration: Pick<PlatformIntegration, 'id' | 'metadata'>,
+  actor: GitLabCredentialActor
+): Promise<string> {
+  try {
+    return await getValidGitLabToken(integration, actor);
+  } catch {
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'Failed to authenticate with GitLab integration',
+    });
   }
 }
 
@@ -110,18 +142,10 @@ export async function getGitLabTokenForOrganization(
     return undefined;
   }
 
-  try {
-    const token = await getValidGitLabToken(integration, {
-      userId: actorUserId,
-      organizationId,
-    });
-    return token;
-  } catch (_error) {
-    throw new TRPCError({
-      code: 'INTERNAL_SERVER_ERROR',
-      message: 'Failed to authenticate with GitLab integration',
-    });
-  }
+  return resolveGitLabToken(integration, {
+    userId: actorUserId,
+    organizationId,
+  });
 }
 
 /**
@@ -135,15 +159,7 @@ export async function getGitLabTokenForUser(userId: string): Promise<string | un
     return undefined;
   }
 
-  try {
-    const token = await getValidGitLabToken(integration, { userId });
-    return token;
-  } catch (_error) {
-    throw new TRPCError({
-      code: 'INTERNAL_SERVER_ERROR',
-      message: 'Failed to authenticate with GitLab integration',
-    });
-  }
+  return resolveGitLabToken(integration, { userId });
 }
 
 /**
@@ -302,11 +318,12 @@ export type GitLabRequesterAccess = { outcome: 'allowed' } | { outcome: 'refused
 /**
  * What a Kilo account's own GitLab connection can see live.
  *
- * `refused`: the account holds no GitLab connection of its own, or its
- * credential's instance answered that the account cannot read the project
- * (404, or a 401/403 the account's own credential cannot clear). All three
- * are verdicts about this requester, so the caller answers with the
- * refusal line and starts no session.
+ * `refused`: the account holds no GitLab connection of its own, its
+ * connection is suspended, or its credential's instance answered that the
+ * account cannot read the project (404, or a 401/403 the account's own
+ * credential cannot clear). All of these are verdicts about this requester,
+ * so the caller answers with the refusal line and starts no session. A
+ * suspended connection is refused before any credential or project read.
  *
  * Everything else (a 5xx, a rate limit, a transport failure, a credential
  * resolution outage) propagates: the caller's failure path answers with the
@@ -318,12 +335,18 @@ export async function getGitLabProjectAccessForRequester(
   userId: string,
   projectPath: string
 ): Promise<GitLabRequesterAccess> {
-  const instanceUrl = await getGitLabInstanceUrlForUser(userId);
-  const token = await getGitLabTokenForUser(userId);
-  if (!token) return { outcome: 'refused' };
+  const integration = await getGitLabIntegration({ type: 'user', id: userId });
+  if (!integration || isPlatformIntegrationSuspended(integration)) {
+    return { outcome: 'refused' };
+  }
 
+  const token = await resolveGitLabToken(integration, { userId });
   try {
-    await getGitLabProjectForCredentials(token, projectPath, instanceUrl);
+    await getGitLabProjectForCredentials(
+      token,
+      projectPath,
+      gitLabInstanceUrlFromIntegration(integration)
+    );
   } catch (error) {
     if (
       error instanceof GitLabProjectLookupError &&
@@ -393,8 +416,7 @@ export async function getGitLabInstanceUrlForUser(userId: string): Promise<strin
     return DEFAULT_GITLAB_URL;
   }
 
-  const metadata = integration.metadata as GitLabMetadata | null;
-  return metadata?.gitlab_instance_url || DEFAULT_GITLAB_URL;
+  return gitLabInstanceUrlFromIntegration(integration);
 }
 
 /**
@@ -409,6 +431,5 @@ export async function getGitLabInstanceUrlForOrganization(organizationId: string
     return DEFAULT_GITLAB_URL;
   }
 
-  const metadata = integration.metadata as GitLabMetadata | null;
-  return metadata?.gitlab_instance_url || DEFAULT_GITLAB_URL;
+  return gitLabInstanceUrlFromIntegration(integration);
 }

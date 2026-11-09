@@ -1,6 +1,7 @@
 import { describe, expect, it, jest, beforeEach } from '@jest/globals';
 import type { PlatformIntegration } from '@kilocode/db/schema';
 import type { Owner } from '@/lib/integrations/core/types';
+import { INTEGRATION_STATUS } from '@/lib/integrations/core/constants';
 import { buildGitLabCloneUrl } from './gitlab-integration-helpers';
 
 // Define mock functions at module level with proper typing
@@ -324,6 +325,23 @@ describe('gitlab-integration-helpers', () => {
       await expect(getGitLabProjectAccessForRequester('user-1', 'group/repo')).resolves.toEqual({
         outcome: 'refused',
       });
+      expect(mockGetValidGitLabToken).not.toHaveBeenCalled();
+      expect(mockGetGitLabProject).not.toHaveBeenCalled();
+    });
+
+    it('refuses a suspended requester connection before any credential or project read', async () => {
+      mockGetGitLabIntegration.mockResolvedValue({
+        id: 'integration-1',
+        metadata: {},
+        integration_status: INTEGRATION_STATUS.SUSPENDED,
+        suspended_at: '2024-01-01T00:00:00.000Z',
+      } as PlatformIntegration);
+
+      const { getGitLabProjectAccessForRequester } = await import('./gitlab-integration-helpers');
+      await expect(getGitLabProjectAccessForRequester('user-1', 'group/repo')).resolves.toEqual({
+        outcome: 'refused',
+      });
+      expect(mockGetValidGitLabToken).not.toHaveBeenCalled();
       expect(mockGetGitLabProject).not.toHaveBeenCalled();
     });
 
@@ -334,6 +352,38 @@ describe('gitlab-integration-helpers', () => {
       } as PlatformIntegration);
       mockGetValidGitLabToken.mockResolvedValue('requester-token');
       mockGetGitLabProject.mockRejectedValue(new Error('GitLab project fetch failed: 503'));
+
+      const { getGitLabProjectAccessForRequester } = await import('./gitlab-integration-helpers');
+      await expect(getGitLabProjectAccessForRequester('user-1', 'group/repo')).rejects.toThrow(
+        'GitLab project lookup failed'
+      );
+    });
+
+    it('keeps the provider failure as the cause of the lookup error', async () => {
+      const failure = new Error('GitLab project fetch failed: 503');
+      mockGetGitLabIntegration.mockResolvedValue({
+        id: 'integration-1',
+        metadata: {},
+      } as PlatformIntegration);
+      mockGetValidGitLabToken.mockResolvedValue('requester-token');
+      mockGetGitLabProject.mockRejectedValue(failure);
+
+      const { getGitLabProjectAccessForRequester } = await import('./gitlab-integration-helpers');
+      await expect(
+        getGitLabProjectAccessForRequester('user-1', 'group/repo')
+      ).rejects.toMatchObject({
+        status: 503,
+        cause: failure,
+      });
+    });
+
+    it('does not read an unrelated failure that merely ends in digits as a refusal', async () => {
+      mockGetGitLabIntegration.mockResolvedValue({
+        id: 'integration-1',
+        metadata: {},
+      } as PlatformIntegration);
+      mockGetValidGitLabToken.mockResolvedValue('requester-token');
+      mockGetGitLabProject.mockRejectedValue(new Error('connect ETIMEDOUT after 404'));
 
       const { getGitLabProjectAccessForRequester } = await import('./gitlab-integration-helpers');
       await expect(getGitLabProjectAccessForRequester('user-1', 'group/repo')).rejects.toThrow(

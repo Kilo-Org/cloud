@@ -569,6 +569,29 @@ describe('spawnCloudAgentSession delegation', () => {
     expect(mockPrepareSession).not.toHaveBeenCalled();
   });
 
+  it('returns a non-retryable reason when the stored GitLab instance URL is invalid', async () => {
+    mockGetGitLabInstanceUrlForUser.mockResolvedValue('http://gitlab.example.com');
+
+    const result = await spawnCloudAgentSession(
+      { gitlabProject: 'group/repo', prompt: 'Use the files', mode: 'code' },
+      'model',
+      organizationIntegration,
+      'auth-token',
+      'request-gitlab-invalid-instance',
+      undefined,
+      { requesterUserId: 'user-9' }
+    );
+
+    expect(result).toEqual(
+      expect.objectContaining({ response: expect.stringContaining('invalid instance URL') })
+    );
+    expect(result.response).not.toContain('Please try again');
+    expect(mockGetGitLabProjectAccessForRequester).not.toHaveBeenCalled();
+    expect(mockValidateGitLabRepoAccessForOrganization).not.toHaveBeenCalled();
+    expect(mockPrepareSession).not.toHaveBeenCalled();
+    expect(mockGetGitLabTokenForOrganization).not.toHaveBeenCalled();
+  });
+
   it('refuses an organization GitLab project for a run with no requesting account', async () => {
     await expect(
       spawnCloudAgentSession(

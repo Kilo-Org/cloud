@@ -4098,6 +4098,7 @@
     },
     "repoBindings": {
       "title": "Perfiles predeterminados para repositorios",
+      "entryLabel": "Perfiles predeterminados",
       "add": "Agregar valor predeterminado",
       "empty": "No hay valores predeterminados configurados",
       "emptyDescription": "Agregue un valor predeterminado para aplicar automáticamente un perfil al iniciar sesiones para un repositorio.",

@@ -4036,6 +4036,7 @@
     },
     "repoBindings": {
       "title": "Kōtaha taunoa mō Repos",
+      "entryLabel": "Kōtaha taunoa",
       "add": "Tāpiri taunoa",
       "empty": "Karekau he taunoa i whirihora",
       "emptyDescription": "Tāpirihia he taunoa ki te tono aunoa i tetahi kōtaha i te wa e tiimata ana nga huihuinga mo te repo.",

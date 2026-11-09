@@ -4036,6 +4036,7 @@
     },
     "repoBindings": {
       "title": "Profil lalai untuk Repos",
+      "entryLabel": "Profil lalai",
       "add": "Tambah lalai",
       "empty": "Tiada lalai dikonfigurasikan",
       "emptyDescription": "Tambahkan lalai untuk menggunakan profil secara automatik apabila memulakan sesi untuk repo.",

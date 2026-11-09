@@ -4104,6 +4104,7 @@
     },
     "repoBindings": {
       "title": "Profils par défaut pour les dépôts",
+      "entryLabel": "Profils par défaut",
       "add": "Ajouter une valeur par défaut",
       "empty": "Aucune valeur par défaut configurée",
       "emptyDescription": "Ajoutez une valeur par défaut pour appliquer automatiquement un profil lors du démarrage des sessions pour un dépôt.",

@@ -4036,6 +4036,7 @@
     },
     "repoBindings": {
       "title": "Repos uchun standart profillar",
+      "entryLabel": "Standart profillar",
       "add": "Standart qo‘shish",
       "empty": "Hech qanday standart sozlanmagan",
       "emptyDescription": "Repo uchun seanslarni boshlashda profilni avtomatik ravishda qo'llash uchun standartni qo'shing.",

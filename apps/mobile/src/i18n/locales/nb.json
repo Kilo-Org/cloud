@@ -4036,6 +4036,7 @@
     },
     "repoBindings": {
       "title": "Standardprofiler for Repos",
+      "entryLabel": "Standardprofiler",
       "add": "Legg til standard",
       "empty": "Ingen standardinnstillinger er konfigurert",
       "emptyDescription": "Legg til en standard for automatisk å bruke en profil når du starter økter for en repo.",

@@ -4222,6 +4222,7 @@
     },
     "repoBindings": {
       "title": "Próifílí réamhshocraithe le haghaidh Repos",
+      "entryLabel": "Próifílí réamhshocraithe",
       "add": "Cuir réamhshocraithe leis",
       "empty": "Níl aon réamhshocruithe cumraithe",
       "emptyDescription": "Cuir réamhshocrú leis chun próifíl a chur i bhfeidhm go huathoibríoch agus seisiúin á gcur ar bun le haghaidh repo.",

@@ -4036,6 +4036,7 @@
     },
     "repoBindings": {
       "title": "Profaili chaguomsingi za Repos",
+      "entryLabel": "Profaili chaguomsingi",
       "add": "Ongeza chaguomsingi",
       "empty": "Hakuna chaguo-msingi zilizosanidiwa",
       "emptyDescription": "Ongeza chaguomsingi ili kutumia wasifu kiotomatiki unapoanzisha vipindi vya repo.",

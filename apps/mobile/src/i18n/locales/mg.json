@@ -4042,6 +4042,7 @@
     },
     "repoBindings": {
       "title": "Profiles default ho an'ny Repos",
+      "entryLabel": "Profil default",
       "add": "Ampio ny default",
       "empty": "Tsy misy default voarindra",
       "emptyDescription": "Manampia default hampihatra ho azy ny mombamomba rehefa manomboka fivoriana ho an'ny repo.",

@@ -4036,6 +4036,7 @@
     },
     "repoBindings": {
       "title": "Default profiles pou Repos",
+      "entryLabel": "Pwofil default",
       "add": "Ajoute default",
       "empty": "Pa gen par défaut configuré",
       "emptyDescription": "Ajoute yon default pou aplike otomatikman yon pwofil lè w kòmanse sesyon yo pou yon repo.",

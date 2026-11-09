@@ -4036,6 +4036,7 @@
     },
     "repoBindings": {
       "title": "Repos-en profil lehenetsiak",
+      "entryLabel": "Profil lehenetsiak",
       "add": "Gehitu lehenetsia",
       "empty": "Ez dago lehenetsirik konfiguratuta",
       "emptyDescription": "Gehitu lehenetsitako profil bat automatikoki aplikatzeko repositegi baterako saioak hastean.",

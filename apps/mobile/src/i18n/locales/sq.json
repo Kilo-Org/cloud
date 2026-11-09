@@ -4036,6 +4036,7 @@
     },
     "repoBindings": {
       "title": "Profilet e parazgjedhura për repos",
+      "entryLabel": "Profilet e paravendosura",
       "add": "Shto parazgjedhje",
       "empty": "Asnjë parazgjedhje nuk është konfiguruar",
       "emptyDescription": "Shto një parazgjedhje për të aplikuar automatikisht një profil kur nis seancat për një depo.",

@@ -4042,6 +4042,7 @@
     },
     "repoBindings": {
       "title": "Amaphrofayili azenzakalelayo we-Repos",
+      "entryLabel": "Amaphrofayili azenzakalelayo",
       "add": "Engeza okuzenzakalelayo",
       "empty": "Akukho okumisiwe okumisiwe",
       "emptyDescription": "Engeza okuzenzakalelayo ukuze usebenzise ngokuzenzakalelayo iphrofayela lapho uqala izikhathi ze-repo.",

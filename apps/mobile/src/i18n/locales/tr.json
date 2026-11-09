@@ -4036,6 +4036,7 @@
     },
     "repoBindings": {
       "title": "Depolar için varsayılan profiller",
+      "entryLabel": "Varsayılan profiller",
       "add": "Varsayılan ekle",
       "empty": "Varsayılan ayar yapılandırılmadı",
       "emptyDescription": "Bir depo için oturum başlatırken bir profili otomatik olarak uygulamak için bir varsayılan ekleyin.",

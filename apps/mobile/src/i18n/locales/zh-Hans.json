@@ -4036,6 +4036,7 @@
     },
     "repoBindings": {
       "title": "仓库的默认配置文件",
+      "entryLabel": "默认配置",
       "add": "添加默认值",
       "empty": "没有配置默认值",
       "emptyDescription": "添加默认值以在启动仓库会话时自动应用配置文件。",

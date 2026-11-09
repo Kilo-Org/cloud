@@ -4036,6 +4036,7 @@
     },
     "repoBindings": {
       "title": "Standaardprofielen voor repo's",
+      "entryLabel": "Standaardprofielen",
       "add": "Standaard toevoegen",
       "empty": "Geen standaardinstellingen geconfigureerd",
       "emptyDescription": "Voeg een standaard toe om automatisch een profiel toe te passen bij het starten van sessies voor een opslagplaats.",

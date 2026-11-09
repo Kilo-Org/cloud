@@ -4160,6 +4160,7 @@
     },
     "repoBindings": {
       "title": "Numatytieji saugyklų profiliai",
+      "entryLabel": "Numatytieji profiliai",
       "add": "Pridėti numatytąjį",
       "empty": "Jokių numatytųjų sukonfigūruotų",
       "emptyDescription": "Pridėkite numatytąjį nustatymą, kad profilis būtų automatiškai taikomas pradedant atpirkimo seansus.",

@@ -4036,6 +4036,7 @@
     },
     "repoBindings": {
       "title": "倉庫的預設設定檔",
+      "entryLabel": "預設設定檔",
       "add": "新增預設值",
       "empty": "沒有配置預設值",
       "emptyDescription": "新增預設值以在啟動儲存庫會話時自動套用設定檔。",

@@ -4036,6 +4036,7 @@
     },
     "repoBindings": {
       "title": "Profil default untuk Repo",
+      "entryLabel": "Profil bawaan",
       "add": "Tambahkan bawaan",
       "empty": "Tidak ada konfigurasi default",
       "emptyDescription": "Tambahkan default untuk menerapkan profil secara otomatis saat memulai sesi untuk repo.",

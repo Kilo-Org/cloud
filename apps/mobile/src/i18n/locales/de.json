@@ -4036,6 +4036,7 @@
     },
     "repoBindings": {
       "title": "Standardprofile für Repos",
+      "entryLabel": "Standardprofile",
       "add": "Standard hinzufügen",
       "empty": "Keine Standardeinstellungen konfiguriert",
       "emptyDescription": "Füge einen Standard hinzu, um beim Starten von Sitzungen für ein Repo automatisch ein Profil anzuwenden.",

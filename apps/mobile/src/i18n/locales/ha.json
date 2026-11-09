@@ -4036,6 +4036,7 @@
     },
     "repoBindings": {
       "title": "Tsoffin bayanan martaba don Repos",
+      "entryLabel": "Default profiles",
       "add": "Ƙara tsoho",
       "empty": "Ba a saita abubuwan da suka dace ba",
       "emptyDescription": "Ƙara tsoho don amfani da bayanin martaba ta atomatik lokacin fara zama don repo.",

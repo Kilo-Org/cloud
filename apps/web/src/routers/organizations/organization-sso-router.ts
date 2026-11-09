@@ -152,10 +152,16 @@ export const organizationSsoRouter = createTRPCRouter({
     // Check if organization has SSO connections
     const hasConnection = await hasWorkOsConnections(result.id);
 
+    // The summary names the domain its verification state describes: the verified
+    // one when the organization holds one, otherwise the first configured domain.
+    const primaryDomain =
+      result.domains?.find(domain => domain.state === OrganizationDomainState.Verified) ??
+      result.domains?.[0];
+
     const status: OrganizationSsoStatusView = {
       isDomainVerified,
       hasConnection,
-      domain: result.domains?.[0]?.domain ?? null,
+      domain: primaryDomain?.domain ?? null,
     };
 
     // Every member reads the status above. The provider organization, its

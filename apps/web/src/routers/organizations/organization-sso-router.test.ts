@@ -26,6 +26,7 @@ import {
   organization_audit_logs,
   organization_memberships,
   organizations,
+  support_access_grants,
   type Organization,
   type User,
 } from '@kilocode/db/schema';
@@ -300,6 +301,88 @@ describe('organization SSO router', () => {
         caller.organizations.sso.getConfig({ organizationId: organization.id })
       ).resolves.toBe(false);
       expect(listConnections).not.toHaveBeenCalled();
+    });
+
+    test('returns the status summary to an active support read', async () => {
+      const staff = await insertTestUser({
+        google_user_email: `sso-read-support-${crypto.randomUUID()}@example.com`,
+        is_admin: true,
+      });
+      callers.push(staff);
+      const now = new Date();
+      const grant = await db
+        .insert(support_access_grants)
+        .values({
+          actor_kilo_user_id: staff.id,
+          organization_id: organization.id,
+          action_class: 'support_read',
+          status: 'active',
+          reason: 'investigating a customer report',
+          requested_duration_seconds: 1800,
+          issued_at: now.toISOString(),
+          expires_at: new Date(now.getTime() + 30 * 60 * 1000).toISOString(),
+        })
+        .returning({ id: support_access_grants.id });
+      process.env.SUPPORT_ACCESS_ENABLED = 'true';
+      try {
+        const caller = await createCallerForUser(staff.id);
+
+        const result = await caller.organizations.sso.getConfig({
+          organizationId: organization.id,
+        });
+
+        expect(result).toEqual({
+          kind: 'status',
+          isDomainVerified: true,
+          hasConnection: true,
+          domain: 'read-sso.test',
+        });
+      } finally {
+        process.env.SUPPORT_ACCESS_ENABLED = 'false';
+        await db.delete(support_access_grants).where(eq(support_access_grants.id, grant[0].id));
+      }
+    });
+
+    test('names the verified domain in the summary when several are configured', async () => {
+      const caller = await createCallerWithRole('member');
+      const verifiedDomain = {
+        object: 'organization_domain',
+        id: 'workos_org_domain_read',
+        domain: 'read-sso.test',
+        organizationId: 'workos_org_read',
+        state: 'verified',
+        verificationStrategy: 'dns',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      };
+      getOrganizationByExternalId.mockResolvedValue({
+        object: 'organization',
+        id: 'workos_org_read',
+        name: 'Read SSO Organization',
+        allowProfilesOutsideOrganization: false,
+        domains: [
+          {
+            ...verifiedDomain,
+            id: 'workos_org_domain_pending',
+            domain: 'pending-sso.test',
+            state: 'pending',
+          },
+          verifiedDomain,
+        ],
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+        externalId: organization.id,
+        metadata: {},
+      });
+
+      await expect(
+        caller.organizations.sso.getConfig({ organizationId: organization.id })
+      ).resolves.toEqual({
+        kind: 'status',
+        isDomainVerified: true,
+        hasConnection: true,
+        domain: 'read-sso.test',
+      });
     });
   });
 

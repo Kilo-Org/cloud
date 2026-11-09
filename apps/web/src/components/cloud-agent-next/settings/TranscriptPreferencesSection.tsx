@@ -1,41 +1,39 @@
 'use client';
 
 import { useId } from 'react';
+import { Monitor } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { useCollapseToolsPreference } from '../collapse-tools-preference';
+import { SettingHint } from './SettingHint';
 
 export function TranscriptPreferencesSection() {
   const headingId = useId();
   const collapseToolsId = useId();
-  const collapseToolsDescriptionId = useId();
   const { collapseTools, setCollapseTools } = useCollapseToolsPreference();
 
   return (
-    <section aria-labelledby={headingId} className="flex flex-col gap-3">
-      <div className="flex flex-col gap-1">
+    <section aria-labelledby={headingId} className="flex flex-col gap-2">
+      <div className="flex items-center gap-2">
         <h4 id={headingId} className="text-sm font-medium">
-          Transcript display
+          Display
         </h4>
-        <p className="text-muted-foreground text-xs">
-          Display preferences are saved in this browser.
-        </p>
+        <Badge variant="outline" className="text-muted-foreground">
+          <Monitor aria-hidden />
+          This browser
+        </Badge>
       </div>
-      <div className="flex items-start justify-between gap-4 rounded-lg border px-3 py-2.5">
-        <div className="flex min-w-0 flex-col gap-1">
+      <div className="flex min-h-13 items-center justify-between gap-4 rounded-lg border px-3 py-2.5">
+        <div className="flex min-w-0 items-center gap-1">
           <Label htmlFor={collapseToolsId} className="pointer-coarse:min-h-11">
-            Collapse tools
+            Collapse tool calls
           </Label>
-          <p id={collapseToolsDescriptionId} className="text-muted-foreground text-xs">
-            Group tool calls and reasoning between messages into one expandable row.
-          </p>
+          <SettingHint label="Collapse tool calls">
+            Groups tool calls and reasoning between messages into one row you can expand.
+          </SettingHint>
         </div>
-        <Switch
-          id={collapseToolsId}
-          checked={collapseTools}
-          onCheckedChange={setCollapseTools}
-          aria-describedby={collapseToolsDescriptionId}
-        />
+        <Switch id={collapseToolsId} checked={collapseTools} onCheckedChange={setCollapseTools} />
       </div>
     </section>
   );

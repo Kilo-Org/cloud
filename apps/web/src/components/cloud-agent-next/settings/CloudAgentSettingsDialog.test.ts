@@ -106,7 +106,17 @@ jest.mock('@/components/ui/tabs', () => ({
       children
     ),
   TabsContent: ({ value, children }: { value: string; children?: React.ReactNode }) =>
-    value === 'general' ? createElement('div', null, children) : null,
+    value === 'general' || value === 'preferences'
+      ? createElement('div', { 'data-tab': value }, children)
+      : null,
+}));
+
+jest.mock('@/components/ui/tooltip', () => ({
+  Tooltip: ({ children }: { children?: React.ReactNode }) =>
+    createElement(React.Fragment, null, children),
+  TooltipTrigger: ({ children }: { children?: React.ReactNode }) =>
+    createElement(React.Fragment, null, children),
+  TooltipContent: () => null,
 }));
 
 jest.mock('@/components/ui/switch', () => ({
@@ -237,11 +247,16 @@ describe('CloudAgentSettingsDialog scope grouping', () => {
     });
   }
 
-  it('groups organization defaults before one personal preferences block', () => {
+  it('separates organization settings from personal preferences', () => {
     mockUseCloudAgentSettings.mockReturnValue(queryResult({ data: settings(true) }));
     renderDialog('org-1');
 
-    expect(badgeTexts()).toEqual(['Organization workspace', 'All members', 'Only you']);
+    expect(badgeTexts()).toEqual([
+      'Organization workspace',
+      'All members',
+      'Only you',
+      'This browser',
+    ]);
 
     const headings = Array.from(domDocument.querySelectorAll('h3')).map(heading =>
       heading.getAttribute('id')
@@ -251,18 +266,29 @@ describe('CloudAgentSettingsDialog scope grouping', () => {
     const organizationSection = section('session-defaults-heading');
     expect(organizationSection.textContent).toContain('Default sandbox');
     expect(organizationSection.textContent).toContain('Repository overrides');
-    expect(organizationSection.textContent).not.toContain('Transcript display');
-    expect(organizationSection.textContent).not.toContain('Agent preferences');
+    expect(organizationSection.textContent).not.toContain('Collapse tool calls');
+    expect(organizationSection.textContent).not.toContain('Background models');
+    expect(organizationSection.closest('[data-tab]')?.getAttribute('data-tab')).toBe('general');
 
     const personalSection = section('personal-preferences-heading');
     const personalText = personalSection.textContent ?? '';
-    expect(personalSection.textContent).toContain('Transcript display');
-    expect(personalSection.textContent).toContain('Agent preferences');
-    expect(personalSection.textContent).not.toContain('Default sandbox');
-    expect(personalSection.textContent).not.toContain('Repository overrides');
-    expect(personalText.indexOf('Transcript display')).toBeLessThan(
-      personalText.indexOf('Agent preferences')
+    expect(personalSection.closest('[data-tab]')?.getAttribute('data-tab')).toBe('preferences');
+    expect(personalText).toContain('Collapse tool calls');
+    expect(personalText).toContain('Modes');
+    expect(personalText).toContain('Background models');
+    expect(personalText).not.toContain('Default sandbox');
+    expect(personalText).not.toContain('Repository overrides');
+    expect(personalText.indexOf('Display')).toBeLessThan(personalText.indexOf('Modes'));
+  });
+
+  it('labels sidebar groups by who the settings apply to', () => {
+    mockUseCloudAgentSettings.mockReturnValue(queryResult({ data: settings(true) }));
+    renderDialog('org-1');
+
+    const navText = Array.from(domDocument.querySelectorAll('[role="presentation"]')).map(label =>
+      (label.textContent ?? '').trim()
     );
+    expect(navText).toEqual(['Organization', 'You']);
   });
 
   it('keeps personal preferences editable when organization settings are view only', () => {
@@ -288,15 +314,21 @@ describe('CloudAgentSettingsDialog scope grouping', () => {
     mockUseCloudAgentSettings.mockReturnValue(queryResult({ data: settings(true) }));
     renderDialog();
 
-    expect(badgeTexts()).toEqual(['Personal workspace', 'Only you']);
+    expect(badgeTexts()).toEqual([
+      'Personal workspace',
+      'New sessions',
+      'Only you',
+      'This browser',
+    ]);
 
     const organizationSection = section('session-defaults-heading');
     expect(organizationSection.textContent).toContain('Session defaults');
-    expect(organizationSection.textContent).toContain(
-      'Applies to new sessions in your personal workspace.'
-    );
-    expect(organizationSection.textContent).not.toContain('Only owners and admins');
     expect(organizationSection.textContent).not.toContain('All members');
+
+    const navText = Array.from(domDocument.querySelectorAll('[role="presentation"]')).map(label =>
+      (label.textContent ?? '').trim()
+    );
+    expect(navText).toEqual(['Workspace', 'You']);
   });
 
   it('keeps the personal preference control available while settings load', () => {
@@ -306,7 +338,7 @@ describe('CloudAgentSettingsDialog scope grouping', () => {
     expect(domDocument.querySelector('[role="status"]')?.textContent).toContain(
       'Loading settings...'
     );
-    expect(section('personal-preferences-heading').textContent).toContain('Transcript display');
+    expect(section('personal-preferences-heading').textContent).toContain('Collapse tool calls');
 
     const toggle = personalSwitch();
     expect(toggle.disabled).toBe(false);
@@ -320,7 +352,7 @@ describe('CloudAgentSettingsDialog scope grouping', () => {
     expect(domDocument.querySelector('[role="alert"]')?.textContent).toContain(
       'Could not load Cloud Agent settings.'
     );
-    expect(section('personal-preferences-heading').textContent).toContain('Transcript display');
+    expect(section('personal-preferences-heading').textContent).toContain('Collapse tool calls');
 
     const toggle = personalSwitch();
     expect(toggle.disabled).toBe(false);
@@ -351,5 +383,14 @@ describe('CloudAgentSettingsDialog scope grouping', () => {
     act(() => environments.click());
 
     expect(onSectionChange).toHaveBeenCalledWith('environments');
+
+    const preferences = Array.from(domDocument.querySelectorAll('button')).find(
+      button => button.textContent?.trim() === 'Preferences'
+    );
+    if (!preferences) throw new Error('Missing Preferences tab');
+
+    act(() => preferences.click());
+
+    expect(onSectionChange).toHaveBeenCalledWith('preferences');
   });
 });

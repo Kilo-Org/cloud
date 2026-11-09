@@ -31,6 +31,19 @@ jest.mock('@kilocode/web-shared/lib/stripe-client', () => ({
   deleteStripeCustomer: jest.fn().mockResolvedValue(undefined),
 }));
 
+// WorkOS is unreachable in tests, and the domain gate asks it which domains
+// the organization verified through DNS. The recorded directory verified none
+// — its only domain is the Okta tenant hostname, verified by hand — so an
+// empty set is what the real run saw, and the user binds are refused for the
+// same reason there.
+jest.mock('@/lib/scim/directory-verified-domains', () => {
+  class VerifiedDomainLookupError extends Error {}
+  return {
+    VerifiedDomainLookupError,
+    listDnsVerifiedDomains: jest.fn().mockResolvedValue([]),
+  };
+});
+
 import { PUT as putMembership, DELETE as deleteMembership } from './memberships/route';
 import {
   PUT as putOrganization,

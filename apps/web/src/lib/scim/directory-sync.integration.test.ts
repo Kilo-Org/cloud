@@ -30,6 +30,23 @@ jest.mock('@kilocode/web-shared/lib/stripe-client', () => ({
   deleteStripeCustomer: jest.fn().mockResolvedValue(undefined),
 }));
 
+// WorkOS is not reachable in tests either (`.env.test` carries an invalid
+// key), and the domain gate now asks it which domains the organization
+// verified through DNS. Default to none, so the existing cases still exercise
+// the refusal path, and let a case opt into a verified set.
+jest.mock('@/lib/scim/directory-verified-domains', () => {
+  class VerifiedDomainLookupError extends Error {}
+  return {
+    VerifiedDomainLookupError,
+    listDnsVerifiedDomains: jest.fn().mockResolvedValue([]),
+  };
+});
+
+const verifiedDomains = jest.requireMock<{
+  listDnsVerifiedDomains: jest.Mock;
+  VerifiedDomainLookupError: new (message: string) => Error;
+}>('@/lib/scim/directory-verified-domains');
+
 const organizationBilling = jest.requireMock<{
   getOrCreateStripeCustomerIdForOrganization: jest.Mock;
 }>('@/lib/organizations/organization-billing');
@@ -470,6 +487,67 @@ describe('upsertDirectoryUser', () => {
     expect(row.stripe_customer_id).toBeTruthy();
   });
 
+  test('creates a user at a second domain the organization verified through DNS', async () => {
+    // The enterprise runs several mail domains through one directory, and only
+    // one of them can be the SSO authority (Policy Resolution rules 4 and 6).
+    // A DNS-verified domain is the organization proving it owns the others.
+    await seedOrganizationWithDomain(`primary-${suffix}.test`);
+    verifiedDomains.listDnsVerifiedDomains.mockResolvedValueOnce(['example.test']);
+
+    const userId = await seedUser();
+
+    const [row] = await db.select().from(kilocode_users).where(eq(kilocode_users.id, userId));
+    expect(row.external_id).toBe(externalId);
+    expect(row.google_user_email).toBe(email);
+    expect(verifiedDomains.listDnsVerifiedDomains).toHaveBeenCalledWith(workOSOrganizationId);
+  });
+
+  test('refuses a domain WorkOS verified by hand rather than through DNS', async () => {
+    await seedOrganizationWithDomain(`primary-${suffix}.test`);
+    // `listDnsVerifiedDomains` filters on `verificationStrategy === 'dns'`, so
+    // a `manual` domain never reaches the gate: WorkOS reaches `verified` by a
+    // dashboard tick as well, which is an assertion rather than evidence of
+    // control, and this authorizes taking over an existing account.
+    verifiedDomains.listDnsVerifiedDomains.mockResolvedValueOnce([]);
+
+    const failure = await upsertDirectoryUser(externalId, {
+      directoryId,
+      email,
+      firstName: 'Bob',
+      lastName: 'Bobert',
+    }).catch((error: unknown) => error);
+
+    expect(failure).toBeInstanceOf(DirectorySyncConflictError);
+    expect((failure as DirectorySyncConflictError).code).toBe('domain_not_captured');
+    expect(failure instanceof Error ? failure.message : '').toContain('no DNS-verified domain');
+    // Nothing was provisioned.
+    const rows = await db
+      .select({ id: kilocode_users.id })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.external_id, externalId));
+    expect(rows).toEqual([]);
+  });
+
+  test('holds rather than refuses when WorkOS cannot be reached', async () => {
+    await seedOrganizationWithDomain(`primary-${suffix}.test`);
+    verifiedDomains.listDnsVerifiedDomains.mockRejectedValueOnce(
+      new verifiedDomains.VerifiedDomainLookupError('WorkOS unavailable')
+    );
+
+    const failure = await upsertDirectoryUser(externalId, {
+      directoryId,
+      email,
+      firstName: 'Bob',
+      lastName: 'Bobert',
+    }).catch((error: unknown) => error);
+
+    // Deliberately *not* a conflict: a conflict is terminal for this code and
+    // would park the event, discarding a bind that may well be valid. An
+    // unreachable WorkOS has to answer 500 so the Worker holds its cursor.
+    expect(failure).not.toBeInstanceOf(DirectorySyncConflictError);
+    expect(failure).toBeInstanceOf(Error);
+  });
+
   test('refuses to create a user at a domain the organization never captured', async () => {
     await seedOrganizationWithDomain(`captured-${suffix}.test`);
 
@@ -523,7 +601,8 @@ describe('upsertDirectoryUser', () => {
       lastName: 'Comer',
     }).catch((error: unknown) => error);
     expect(retryError).toBeInstanceOf(DirectorySyncConflictError);
-    expect(retryError instanceof Error ? retryError.message : '').toContain('captured domain');
+    // Names the domain and why it was refused, never the address.
+    expect(retryError instanceof Error ? retryError.message : '').toContain('DNS-verified');
   });
 
   test('is idempotent: a replayed event returns the same user', async () => {

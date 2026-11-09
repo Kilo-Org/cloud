@@ -440,12 +440,36 @@ than a race: only the capture clears it. The app logs it as
 domain, and the 409 body names the domain too — neither carries the address. See
 `.specs/organization-sso.md`, Directory Sync rules 13 and 15.
 
+Two domains satisfy the gate. The organization's own `sso_domain`, checked
+first because it needs no network call, and any domain the WorkOS organization
+reports as verified **through DNS** — an enterprise routinely routes several
+mail domains through one directory, and only one of them can be the SSO
+authority under Policy Resolution rules 4 and 6.
+
+DNS is the bar rather than a verified *state*: WorkOS also reaches that state
+by a `manual` tick in the dashboard, and `POST /organizations` accepts
+`state: 'verified'` outright, so the weaker signal is an assertion by whoever
+held access rather than evidence of control — and this authorizes seizing an
+account someone else holds. The check lives in
+`apps/web/src/lib/scim/directory-verified-domains.ts`, which reads
+`GET /organizations/{id}` and keeps only
+`state === 'verified' && verificationStrategy === 'dns'`.
+
+It is read from that API rather than the event, because `dsync.activated`'s
+domain objects are `{object, id, domain}` only — no `state`, no
+`verificationStrategy` — so the payload cannot tell a DNS-verified domain from
+one still pending.
+
 Clearing the refusal is an administrative action on the organization, never a
-directory-side one: capture the domain in the organization's SSO settings, or
-replay `dsync.activated` carrying `domains` for an organization that has none
-(rule 14). Until one of those happens every address the directory provisions is
-refused, and each refusal is recorded and skipped rather than held, so later
-events keep applying while the organization has no captured domain.
+directory-side one: verify the domain through DNS in WorkOS, capture it in the
+organization's SSO settings, or replay `dsync.activated` carrying `domains` for
+an organization that has none (rule 14). Until one of those happens every
+address the directory provisions is refused, and each refusal is recorded and
+skipped rather than held, so later events keep applying.
+
+A lookup that *fails* is not a refusal. An unreachable WorkOS answers 500, not
+409, so the loop holds its cursor and retries rather than parking a bind that
+may well be valid.
 
 `domain_not_captured` is the code for that refusal, and it is terminal: the loop
 parks it rather than retrying something no event will satisfy.

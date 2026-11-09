@@ -27,6 +27,10 @@ import {
 } from '@/lib/organizations/organization-member-removal';
 import { extractEmailDomain } from '@/lib/email-domain';
 import { createOrUpdateUser, findUserByNormalizedEmail } from '@/lib/user';
+import {
+  listDnsVerifiedDomains,
+  VerifiedDomainLookupError,
+} from '@/lib/scim/directory-verified-domains';
 
 import type {
   DirectoryMembership,
@@ -539,11 +543,24 @@ async function applyDirectoryUserChanges(
 }
 
 /**
- * Refuses unless the directory's organization has captured the address's
- * domain. Domain capture is what authorizes binding the address at all: the
- * gate runs whether the address matches a pre-existing account or would create
- * a new one, so a directory can neither take over nor mint an account at a
- * domain it does not own. The refusal names that domain, never the address.
+ * Refuses unless the directory's organization has proven it owns the
+ * address's domain. Ownership is what authorizes binding the address at all:
+ * the gate runs whether the address matches a pre-existing account or would
+ * create a new one, so a directory can neither take over nor mint an account
+ * at a domain it does not own. The refusal names that domain, never the
+ * address.
+ *
+ * Two domains satisfy it. The organization's own `sso_domain`, which is the
+ * Effective SSO policy domain and is checked first because it needs no
+ * network call. Failing that, any domain the WorkOS organization has verified
+ * **through DNS** — an enterprise commonly runs several mail domains through
+ * one directory, and only one of them can be the SSO authority under Policy
+ * Resolution rules 4 and 6, so the single column cannot express the set.
+ *
+ * DNS is the bar rather than `state === 'verified'`: WorkOS also reaches that
+ * state by a `manual` tick in the dashboard, which is an assertion by whoever
+ * had access rather than evidence of control. See
+ * `directory-verified-domains.ts`.
  *
  * The policy is read from the directory's organization rather than the
  * address: resolving an authority from the domain alone would let any
@@ -552,22 +569,24 @@ async function applyDirectoryUserChanges(
  * domain, or a child carrying its own — fails closed, under Policy Resolution
  * rule 7.
  *
- * Two of the three refusals are terminal, but the first is not, and the
- * difference decides whether the event is parked or retried. A directory with
- * no live organization has simply not been activated yet, which is the same
- * arrival-order gap `directory_not_found` names everywhere else: since this
- * gate now runs on every bind rather than only a takeover, reporting it as
- * `domain_not_captured` would park every `dsync.user.created` that overtook
- * its `dsync.activated` and never provision that user. An uncaptured or
- * misconfigured domain is a real refusal that only an administrator clears.
+ * Not every refusal is terminal, and the difference decides whether the event
+ * is parked or retried. A directory with no live organization has simply not
+ * been activated yet, which is the arrival-order gap `directory_not_found`
+ * names everywhere else: since this gate runs on every bind rather than only
+ * a takeover, reporting it as `domain_not_captured` would park every
+ * `dsync.user.created` that overtook its `dsync.activated`. An unverified
+ * domain is a real refusal only an administrator clears. An unreachable
+ * WorkOS is neither, and holds the cursor instead.
  */
 async function assertDirectoryOwnsEmailDomain(directoryId: string, email: string): Promise<void> {
+  const emailDomain = getLowerDomainFromEmail(email);
+
   const refuse = (code: DirectorySyncConflictCode, reason: string): never => {
     // The refused bind is the auditable event: it names a directory pushing an
     // address its organization never proved it owns.
     console.warn('[scim] Refused a directory address bind', {
       directoryId,
-      emailDomain: getLowerDomainFromEmail(email),
+      emailDomain,
       code,
       reason,
     });
@@ -576,12 +595,20 @@ async function assertDirectoryOwnsEmailDomain(directoryId: string, email: string
     // the reason are what an operator acts on.
     throw new DirectorySyncConflictError(
       code,
-      `Directory ${directoryId} has not captured the domain ${getLowerDomainFromEmail(email)}: ${reason}`
+      `Directory ${directoryId} has not verified the domain ${emailDomain}: ${reason}`
     );
   };
 
+  // `getLowerDomainFromEmail` answers null for an address carrying no `@`.
+  // The request schema's `.email()` rejects those before this runs, so
+  // reaching here means the two disagree — refuse rather than compare a null
+  // against the verified set and admit the bind by accident.
+  if (emailDomain === null) {
+    return refuse('domain_not_captured', 'the address carries no domain');
+  }
+
   const ownerRows = await db
-    .select({ id: organizations.id })
+    .select({ id: organizations.id, externalOrgId: organizations.external_org_id })
     .from(organizations)
     .where(directoryOwner(directoryId))
     .limit(1);
@@ -596,19 +623,49 @@ async function assertDirectoryOwnsEmailDomain(directoryId: string, email: string
   }
 
   const policy = await resolveEffectiveOrganizationSsoPolicy(owner.id);
-  if (policy.status !== 'required') {
+  if (policy.status === 'misconfigured') {
+    // Fails closed even though a DNS-verified domain might match: an ambiguous
+    // or nested policy means we cannot say which authority owns the address.
     return refuse(
       'domain_not_captured',
-      policy.status === 'misconfigured'
-        ? `the organization's SSO policy is misconfigured (${policy.reason})`
-        : 'the organization has no SSO domain, so it has captured nothing'
+      `the organization's SSO policy is misconfigured (${policy.reason})`
     );
   }
 
-  const emailDomain = getLowerDomainFromEmail(email);
-  if (emailDomain !== policy.domain) {
-    return refuse('domain_not_captured', `the organization's captured domain is ${policy.domain}`);
+  // The SSO domain, when there is one, needs no network call.
+  if (policy.status === 'required' && emailDomain === policy.domain) return;
+
+  // Otherwise the address is allowed only by a DNS-verified organization
+  // domain. Without `external_org_id` there is nothing to ask WorkOS about;
+  // the binding is written when the directory is activated, so its absence is
+  // the same not-yet-activated case as a missing organization.
+  if (owner.externalOrgId === null) {
+    return refuse(
+      'directory_not_found',
+      `organization ${owner.id} carries no WorkOS organization id yet`
+    );
   }
+
+  let verified: string[];
+  try {
+    verified = await listDnsVerifiedDomains(owner.externalOrgId);
+  } catch (error) {
+    // Not a refusal: WorkOS could not be asked, so whether this address is
+    // allowed is still unknown. Rethrown so the route answers 500 and the
+    // caller holds its cursor, rather than parking a bind that may be valid.
+    throw error instanceof VerifiedDomainLookupError
+      ? error
+      : new VerifiedDomainLookupError(String(error));
+  }
+
+  if (verified.includes(emailDomain)) return;
+
+  return refuse(
+    'domain_not_captured',
+    verified.length === 0
+      ? 'the organization has no DNS-verified domain, and a domain verified only by hand does not authorize a bind'
+      : `the organization's DNS-verified domains are ${verified.join(', ')}`
+  );
 }
 
 /**

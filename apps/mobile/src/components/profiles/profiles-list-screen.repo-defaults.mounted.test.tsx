@@ -123,21 +123,23 @@ describe('ProfilesListScreen repo defaults entry', () => {
     unmount();
   });
 
-  it('heads the profile rows with its own group like the settings group', async () => {
+  it('follows the profile rows as its own group without repeating the screen title', async () => {
     const { renderer, unmount } = await mount();
 
-    // The profiles group is one gap-3 container like the settings group: its
-    // heading sits 12 dp above the rows it labels, and the two groups space
-    // through the scroll's group gap, so neither heading floats free.
+    // The rows and the entry are separate blocks, spaced by the scroll's own
+    // gap; the rows carry no heading, because the screen's title already names
+    // them.
     const scroll = findOne(renderer.root, 'ScrollView');
     expect(groupChildren(scroll)).toHaveLength(2);
-    // The profiles label wraps the owner sections two Views out: the owner
-    // group, then the sections wrapper that keeps their own 24 dp gap.
-    const personalGroup = rowGroup(renderer.root, rowByTitle(renderer.root, 'Personal profile'));
-    const profilesGroup = rowGroup(renderer.root, rowGroup(renderer.root, personalGroup));
-    expect(groupTexts(profilesGroup)[0]?.props.children).toBe('Profiles');
+    // Nothing repeats the screen title above the rows; only the owner section
+    // and the settings group name themselves.
+    expect(groupTexts(renderer.root).map(node => node.props.children)).toEqual([
+      'Personal',
+      REPO_DEFAULTS_HEADING,
+    ]);
     const settingsGroup = rowGroup(renderer.root, repoDefaultsRow(renderer.root));
-    expect(profilesGroup.props.className).toBe(settingsGroup.props.className);
+    // The entry is the second block, directly under the rows.
+    expect(groupChildren(scroll)[1]).toBe(settingsGroup);
 
     unmount();
   });

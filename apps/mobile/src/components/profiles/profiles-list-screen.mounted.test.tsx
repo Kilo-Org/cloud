@@ -232,7 +232,9 @@ describe('ProfilesListScreen', () => {
 
     const { renderer, unmount } = await mount();
 
-    expect(textChildren(renderer.root)).toContain('Profiles');
+    // The rows sit under the screen's own title, which the header renders, so
+    // the body does not repeat it as a section heading.
+    expect(textChildren(renderer.root)).not.toContain('Profiles');
     expect(textChildren(renderer.root)).toContain('Organization');
     expect(textChildren(renderer.root)).toContain('Personal');
     expect(rowTitles(renderer.root)).toEqual([
@@ -304,12 +306,11 @@ describe('ProfilesListScreen', () => {
     const { renderer, unmount } = await mount();
 
     expect(rowTitles(renderer.root)).toEqual(['Personal profile', 'Default profiles']);
-    // No owner groups means no owner heading; the profiles heading and the
-    // settings group's own heading stay, so the list reads as one profiles
-    // group plus one settings group.
-    expect(textChildren(renderer.root)).toEqual(['Profiles', 'Repositories']);
-    // The scroll holds the labeled profiles group and the labeled settings
-    // group, and no third orphan row.
+    // No owner groups means no owner heading, and the rows repeat no heading
+    // above them; only the settings group names itself.
+    expect(textChildren(renderer.root)).toEqual(['Repositories']);
+    // The scroll holds the profile rows and the labeled settings group, and no
+    // third orphan row.
     expect(groupChildren(findOne(renderer.root, 'ScrollView'))).toHaveLength(2);
     // `agentProfiles.list` does not tag owner, so every row is personal.
     expect(findOne(renderer.root, 'ConfigureRow').props.icon).toBe('User');

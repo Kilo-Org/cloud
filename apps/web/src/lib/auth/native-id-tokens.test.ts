@@ -451,6 +451,126 @@ describe('verifyNativeAppleIdToken', () => {
       Object.assign(process.env, { NODE_ENV: previousNodeEnv });
     }
   });
+
+  // Single-use identity token record
+  const identityTokenDigest = (idToken: string) =>
+    createHash('sha256').update(idToken).digest('hex');
+
+  it('records the identity token once when a transition request is accepted', async () => {
+    process.env.NATIVE_APPLE_NONCE_REQUIRED_SINCE = new Date(Date.now() + 60_000).toISOString();
+    mockVerifyAppleJwtWithJwks.mockResolvedValue(
+      applePayload({
+        sub: 'apple-sub-1',
+        email: 'user@example.com',
+        email_verified: true,
+        exp: Math.floor(Date.now() / 1000) + 3600,
+      })
+    );
+
+    const result = await verifyNativeAppleIdToken('a-token');
+
+    expect(result).toEqual({ sub: 'apple-sub-1', email: 'user@example.com' });
+    expect(redisClient.set).toHaveBeenCalledTimes(1);
+    expect(redisClient.set).toHaveBeenCalledWith(
+      `auth:apple-signin-token:${identityTokenDigest('a-token')}`,
+      '1',
+      { nx: true, ex: 600 }
+    );
+  });
+
+  it('derives the identity token record expiry from the token expiry', async () => {
+    process.env.NATIVE_APPLE_NONCE_REQUIRED_SINCE = new Date(Date.now() + 60_000).toISOString();
+    mockVerifyAppleJwtWithJwks.mockResolvedValue(
+      applePayload({
+        sub: 'apple-sub-1',
+        email: 'user@example.com',
+        email_verified: true,
+        exp: Math.floor(Date.now() / 1000) + 300,
+      })
+    );
+
+    await verifyNativeAppleIdToken('a-token');
+    const options = jest.mocked(redisClient.set).mock.calls[0][2] as { nx: boolean; ex: number };
+    expect(options.nx).toBe(true);
+    expect(options.ex).toBeLessThanOrEqual(300);
+    expect(options.ex).toBeGreaterThan(290);
+  });
+
+  it('refuses a second acceptance of the same identity token', async () => {
+    process.env.NATIVE_APPLE_NONCE_REQUIRED_SINCE = new Date(Date.now() + 60_000).toISOString();
+    mockVerifyAppleJwtWithJwks.mockResolvedValue(
+      applePayload({
+        sub: 'apple-sub-1',
+        email: 'user@example.com',
+        email_verified: true,
+        exp: Math.floor(Date.now() / 1000) + 300,
+      })
+    );
+    // First exchange stores the record; the repeat finds it already present.
+    jest.mocked(redisClient.set).mockResolvedValueOnce('OK').mockResolvedValueOnce(null);
+
+    await verifyNativeAppleIdToken('a-token');
+
+    await expect(verifyNativeAppleIdToken('a-token')).rejects.toThrow(
+      'Apple ID token already used'
+    );
+  });
+
+  it('refuses the sign-in when the identity token record cannot be written', async () => {
+    process.env.NATIVE_APPLE_NONCE_REQUIRED_SINCE = new Date(Date.now() + 60_000).toISOString();
+    mockVerifyAppleJwtWithJwks.mockResolvedValue(
+      applePayload({ sub: 'apple-sub-1', email: 'user@example.com', email_verified: true })
+    );
+    jest.mocked(redisClient.set).mockRejectedValue(new Error('upstash unreachable'));
+
+    await expect(verifyNativeAppleIdToken('a-token')).rejects.toThrow(NonceStoreUnavailableError);
+  });
+
+  it('records the identity token on the nonce path as well', async () => {
+    const rawNonce = 'both-records-raw-nonce';
+    mockVerifyAppleJwtWithJwks.mockResolvedValue(
+      applePayload({
+        sub: 'apple-sub-1',
+        email: 'user@example.com',
+        email_verified: true,
+        nonce: createHash('sha256').update(rawNonce).digest('hex'),
+      })
+    );
+
+    await verifyNativeAppleIdToken('a-token', rawNonce);
+
+    const keys = jest.mocked(redisClient.set).mock.calls.map(call => call[0]);
+    expect(keys).toEqual([
+      `auth:apple-signin-nonce:${createHash('sha256').update(rawNonce).digest('hex')}`,
+      `auth:apple-signin-token:${identityTokenDigest('a-token')}`,
+    ]);
+  });
+
+  it('refuses an identity token the nonce path already accepted when it arrives without a nonce', async () => {
+    const rawNonce = 'cross-path-raw-nonce';
+    mockVerifyAppleJwtWithJwks.mockResolvedValue(
+      applePayload({
+        sub: 'apple-sub-1',
+        email: 'user@example.com',
+        email_verified: true,
+        nonce: createHash('sha256').update(rawNonce).digest('hex'),
+        exp: Math.floor(Date.now() / 1000) + 300,
+      })
+    );
+    // Nonce record, then token record, then the repeat finds the token present.
+    jest
+      .mocked(redisClient.set)
+      .mockResolvedValueOnce('OK')
+      .mockResolvedValueOnce('OK')
+      .mockResolvedValueOnce(null);
+
+    await verifyNativeAppleIdToken('a-token', rawNonce);
+
+    process.env.NATIVE_APPLE_NONCE_REQUIRED_SINCE = new Date(Date.now() + 60_000).toISOString();
+    await expect(verifyNativeAppleIdToken('a-token')).rejects.toThrow(
+      'Apple ID token already used'
+    );
+  });
 });
 
 describe('verifyNativeGoogleIdToken', () => {

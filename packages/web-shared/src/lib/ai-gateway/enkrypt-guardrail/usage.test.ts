@@ -385,4 +385,18 @@ describe('recordEnkryptUsage', () => {
       microdollarsBalance: 10_000_000 - 7 * MICRODOLLARS_PER_ENKRYPT_CREDIT,
     });
   });
+
+  it('stores no detectors for a write with an empty detector list', async () => {
+    const { user, organization } = await organizationWithMember();
+
+    await recordEnkryptUsageLocally({
+      ...usageRecord(organization.id, user.id),
+      guardrail: 'input',
+      detectorsFired: [],
+      id: randomUUID(),
+      occurredAt: new Date().toISOString(),
+    });
+
+    expect(await firedDetectors(organization.id)).toEqual([null]);
+  });
 });

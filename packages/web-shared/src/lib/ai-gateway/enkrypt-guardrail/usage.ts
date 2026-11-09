@@ -186,7 +186,7 @@ export async function recordEnkryptUsageLocally(
           .onConflictDoNothing({ target: enkrypt_usage_guardrail.guardrail })
           .returning({ id: enkrypt_usage_guardrail.guardrail_id })
     );
-    const firedDetectorIds = usageWrite.detectorsFired
+    const firedDetectorIds = usageWrite.detectorsFired?.length
       ? await detectorIds(tx, usageWrite.detectorsFired)
       : null;
 

@@ -68,6 +68,8 @@ import {
   baseCreatePreviewNextOutputSchema,
   basePreviewOptionsNextOutputSchema,
   basePreviewOptionsNextSchema,
+  baseListPreviewServicesNextOutputSchema,
+  baseListPreviewServicesNextSchema,
   cloudAgentGetAttachmentUploadUrlSchema,
   cloudAgentGetAttachmentDownloadUrlSchema,
   cloudAgentReleasePendingUploadsSchema,
@@ -549,6 +551,22 @@ export const cloudAgentNextRouter = createTRPCRouter({
       return { enabled: true, urlTemplate: buildPreviewUrlTemplate(options.hostTemplate) };
     }),
 
+  /**
+   * List the live services a preview can open for an owned session. Unlike the
+   * cached availability gate above, this read is on demand and its failures
+   * propagate: a failed scan must not look like "no services".
+   */
+  listPreviewServices: baseProcedure
+    .input(baseListPreviewServicesNextSchema)
+    .output(baseListPreviewServicesNextOutputSchema)
+    .query(async ({ ctx, input }) => {
+      await assertUserOwnsSession(ctx.user.id, input.cloudAgentSessionId);
+      const authToken = await createCloudAgentControlToken(ctx.user, ctx.headersList);
+      return await createCloudAgentNextClient(authToken).listPreviewServices({
+        cloudAgentSessionId: input.cloudAgentSessionId,
+      });
+    }),
+
   refreshTerminalTicket: baseProcedure
     .input(baseRefreshTerminalTicketNextSchema)
     .output(baseRefreshTerminalTicketNextOutputSchema)
@@ -654,6 +672,40 @@ export const cloudAgentNextRouter = createTRPCRouter({
       const client = createCloudAgentNextClient(authToken);
 
       return await client.interruptSession(input.sessionId);
+    }),
+
+  /**
+   * The capture time of the session's workspace snapshot, or null when the
+   * workspace has none. A non-null value is what makes "Start fresh" available
+   * on the failure state of a workspace snapshot start.
+   */
+  getWorkspaceSnapshotRecovery: baseProcedure
+    .input(z.object({ sessionId: z.string().min(1) }).strict())
+    .output(
+      z.union([z.object({ capturedAt: z.number().int().nonnegative().nullable() }), z.null()])
+    )
+    .query(async ({ ctx, input }) => {
+      await assertUserOwnsSession(ctx.user.id, input.sessionId);
+      const client = createCloudAgentNextClient(
+        await createCloudAgentControlToken(ctx.user, ctx.headersList)
+      );
+      return await client.getWorkspaceSnapshotRecovery(input.sessionId);
+    }),
+
+  /**
+   * Remove the session's workspace snapshot so its next start uses the
+   * environment snapshot or the base image. Only an explicit user action may
+   * discard the workspace changes made since the snapshot was captured.
+   */
+  removeWorkspaceSnapshot: baseProcedure
+    .input(z.object({ sessionId: z.string().min(1) }).strict())
+    .output(z.object({ success: z.literal(true) }))
+    .mutation(async ({ ctx, input }) => {
+      await assertUserOwnsSession(ctx.user.id, input.sessionId);
+      const client = createCloudAgentNextClient(
+        await createCloudAgentControlToken(ctx.user, ctx.headersList)
+      );
+      return await client.removeWorkspaceSnapshot(input.sessionId);
     }),
 
   /**

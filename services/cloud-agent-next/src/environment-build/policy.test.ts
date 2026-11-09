@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
   SNAPSHOT_ELIGIBLE_LIFETIME_MS,
+  SNAPSHOT_PREVIOUS_IMAGE_COMPATIBILITY_MS,
   SNAPSHOT_STALE_AFTER_MS,
   automaticAdmission,
   cleanupRetryDelay,
   replacementNeeded,
   snapshotEligibility,
+  snapshotImageCompatibility,
   type PublishedSnapshot,
 } from './policy.js';
 import type { SessionEnvironmentReference } from './reference.js';
@@ -213,16 +215,35 @@ describe('snapshotEligibility', () => {
     });
   });
 
-  it('treats another base image or runtime ABI as incompatible and asks for a replacement', () => {
+  it('uses the previous image inside the rollout window and asks for a replacement', () => {
     const otherImage = { ...CURRENT, baseImage: 'registry.example/app:2' };
     expect(snapshotEligibility(published(), REFERENCE, NOW, otherImage)).toEqual({
+      eligible: true,
+      stale: true,
+      staleReason: 'image',
+    });
+    expect(replacementNeeded(published(), 2, NOW, otherImage)).toBe(true);
+    expect(snapshotImageCompatibility(published(), otherImage, NOW)).toBe('previous');
+  });
+
+  it('rejects a previous-image snapshot after the rollout window', () => {
+    const otherImage = { ...CURRENT, baseImage: 'registry.example/app:2' };
+    const previous = published({
+      capturedAt: NOW - SNAPSHOT_PREVIOUS_IMAGE_COMPATIBILITY_MS - 1,
+    });
+    expect(snapshotEligibility(previous, REFERENCE, NOW, otherImage)).toEqual({
       eligible: false,
       reason: 'incompatible',
     });
-    expect(replacementNeeded(published(), 2, NOW, otherImage)).toBe(true);
+    expect(replacementNeeded(previous, 2, NOW, otherImage)).toBe(true);
+    expect(snapshotImageCompatibility(previous, otherImage, NOW)).toBe('incompatible');
+  });
+
+  it('treats another runtime ABI as incompatible and asks for a replacement', () => {
     expect(
       snapshotEligibility(published(), REFERENCE, NOW, { ...CURRENT, runtimeAbi: 'abi-2' })
     ).toEqual({ eligible: false, reason: 'incompatible' });
+    expect(replacementNeeded(published(), 2, NOW, { ...CURRENT, runtimeAbi: 'abi-2' })).toBe(true);
   });
 
   it('leaves the image check to the container when the current image is unknown', () => {

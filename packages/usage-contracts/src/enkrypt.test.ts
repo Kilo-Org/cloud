@@ -161,6 +161,24 @@ describe('EnkryptUsageWriteSchema', () => {
     expect(EnkryptUsageWriteSchema.safeParse(writeWith({ decision })).success).toBe(false);
   });
 
+  test('accepts the detectors that fired', () => {
+    const write = writeWith({ decision: 'allowed', detectorsFired: ['pii', 'toxicity'] });
+    expect(EnkryptUsageWriteSchema.parse(write)).toStrictEqual(write);
+  });
+
+  test('leaves omitted detectors absent', () => {
+    expect(EnkryptUsageWriteSchema.parse(validWrite())).not.toHaveProperty('detectorsFired');
+  });
+
+  test.each([
+    ['an empty list', []],
+    ['an unknown detector', ['system_prompt_similarity']],
+    ['null', null],
+    ['a single detector string', 'pii'],
+  ])('rejects %s as detectorsFired', (_label, detectorsFired) => {
+    expect(EnkryptUsageWriteSchema.safeParse(writeWith({ detectorsFired })).success).toBe(false);
+  });
+
   test.each(['both', 'Input', null])('rejects the guardrail %j', guardrail => {
     expect(EnkryptUsageWriteSchema.safeParse(writeWith({ guardrail })).success).toBe(false);
   });

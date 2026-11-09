@@ -92,6 +92,23 @@ export function validateCloudAgentAuthorityClaims(claims: unknown): CloudAgentAu
   return scopedTokenClaimsSchema.parse(claims).cloudAgentAuthority;
 }
 
+const requestedEnvironmentSchema = z
+  .object({
+    id: z.uuid(),
+    repositories: z
+      .array(
+        z
+          .object({
+            repoFullName: z.string().min(1).max(500),
+            branch: z.string().min(1).max(255).optional(),
+          })
+          .strict()
+      )
+      .max(100)
+      .optional(),
+  })
+  .strict();
+
 const scopedPrepareSessionSchema = z
   .object({
     githubRepo: z.string().regex(/^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/),
@@ -108,6 +125,7 @@ const scopedPrepareSessionSchema = z
     autoInitiate: z.literal(true),
     operationKey: z.uuid().optional(),
     callbackTarget: ParentCallbackTargetSchema.optional(),
+    requestedEnvironment: requestedEnvironmentSchema.optional(),
     organizationId: z.string().min(1).optional(),
   })
   .strict();
@@ -118,6 +136,15 @@ const childMessageIdSchema = z.string().regex(/^msg_[0-9a-f]{12}[0-9A-Za-z]{14}$
 // shared input stays empty so it cannot carry one.
 const MODELS_LIST_PROCEDURE = 'models.list';
 const modelsListInputSchema = z.object({}).strict();
+// The environment catalog route is shared by personal and organization scope
+// (there is no organizations.* mirror), so authority binding is enforced here.
+const CLOUD_ENVIRONMENTS_LIST_PROCEDURE = 'cloudEnvironments.list';
+const cloudEnvironmentRepositorySchema = z
+  .object({ platform: z.literal('github'), fullName: z.string().min(1).max(500) })
+  .strict();
+const cloudEnvironmentsListInputSchema = z
+  .object({ repository: cloudEnvironmentRepositorySchema })
+  .strict();
 const scopedChildOperations = {
   prepareSession: { kind: 'mutation', schema: scopedPrepareSessionSchema },
   listChildSessions: {
@@ -200,18 +227,25 @@ function isModelsListProcedure(procedure: string): boolean {
   return procedure === MODELS_LIST_PROCEDURE;
 }
 
+function isCloudEnvironmentsListProcedure(procedure: string): boolean {
+  return procedure === CLOUD_ENVIRONMENTS_LIST_PROCEDURE;
+}
+
 export function cloudAgentAuthorityProcedures(authority: CloudAgentAuthority): string[] {
   const prefix =
     authority.organizationId === null ? 'cloudAgentNext' : 'organizations.cloudAgentNext';
   return [
     ...Object.keys(scopedChildOperations).map(name => `${prefix}.${name}`),
     MODELS_LIST_PROCEDURE,
+    CLOUD_ENVIRONMENTS_LIST_PROCEDURE,
     ...Object.keys(scopedFolderOperations),
   ];
 }
 
 export function cloudAgentAuthorityProcedureKind(procedure: string): 'query' | 'mutation' {
-  if (isModelsListProcedure(procedure)) return 'query';
+  if (isModelsListProcedure(procedure) || isCloudEnvironmentsListProcedure(procedure)) {
+    return 'query';
+  }
   return scopedOperation(procedure).kind;
 }
 
@@ -224,6 +258,17 @@ export function cloudAgentAuthorityInputSchema(
   }
   if (isModelsListProcedure(procedure)) {
     return z.toJSONSchema(modelsListInputSchema, { io: 'input' });
+  }
+  if (isCloudEnvironmentsListProcedure(procedure)) {
+    return z.toJSONSchema(
+      cloudEnvironmentsListInputSchema.extend({
+        organizationId:
+          authority.organizationId === null
+            ? z.never().optional()
+            : z.literal(authority.organizationId),
+      }),
+      { io: 'input' }
+    );
   }
   return z.toJSONSchema(
     scopedOperation(procedure).schema.extend({
@@ -255,6 +300,18 @@ export function validateCloudAgentAuthorityRequest(
   }
   if (isModelsListProcedure(procedure)) {
     return modelsListInputSchema.optional().parse(input);
+  }
+  if (isCloudEnvironmentsListProcedure(procedure)) {
+    const request = cloudEnvironmentsListInputSchema
+      .extend({
+        organizationId:
+          scope.organizationId === null ? z.never().optional() : z.string().min(1).optional(),
+      })
+      .parse(input);
+    if ((request.organizationId ?? null) !== scope.organizationId) {
+      throw new Error('Cloud Agent launch exceeds its authority');
+    }
+    return request;
   }
   const operation = scopedOperation(procedure);
   const folderProcedure = procedure.startsWith('workspaceFolders.');

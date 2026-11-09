@@ -70,24 +70,226 @@ describe('Kilo v2 harness MCP refresh', () => {
       messageId: `msg_${'b'.repeat(26)}`,
     });
     expect(requests.map(request => [request.pathname, request.body])).toEqual([
+      [
+        `/api/experimental/session/${sessionId}/instructions/entries/cloud-agent-context`,
+        { value: '' },
+      ],
       [`/api/session/${sessionId}/command`, { command: 'review', text: 'src/app.ts' }],
     ]);
   });
 
-  it('leads the native prompt text with server context', async () => {
+  it('stores server context as a session instruction without changing user messages', async () => {
     const { url, requests } = startStub(() => new Response(null, { status: 204 }));
     const sessionId = `ses_${'a'.repeat(26)}`;
-    await createHarness(url).submit({
+    const harness = createHarness(url);
+    const context = '<cloud-agent-context session-id="workspace_1" />';
+    await harness.submit({
       sessionId,
       directory,
       messageId: `msg_${'b'.repeat(26)}`,
       prompt: 'Summarize the change',
-      context: '<cloud-agent-context session-id="workspace_1" />',
+      context,
     });
-    expect(requests.at(-1)?.body).toMatchObject({
-      text: '<cloud-agent-context session-id="workspace_1" />\n\nSummarize the change',
+    await harness.submit({
+      sessionId,
+      directory,
+      messageId: `msg_${'c'.repeat(26)}`,
+      parts: [
+        { type: 'text', text: 'Explain this image' },
+        {
+          type: 'file',
+          url: 'https://example.com/image.png',
+          mime: 'image/png',
+          filename: 'image.png',
+        },
+        { type: 'text', text: 'Keep it brief' },
+      ],
+      context,
     });
+    expect(requests.map(request => [request.method, request.pathname, request.body])).toEqual([
+      [
+        'PUT',
+        `/api/experimental/session/${sessionId}/instructions/entries/cloud-agent-context`,
+        { value: context },
+      ],
+      [
+        'POST',
+        `/api/session/${sessionId}/prompt`,
+        {
+          id: `msg_${'b'.repeat(26)}`,
+          text: 'Summarize the change',
+          delivery: 'steer',
+        },
+      ],
+      [
+        'PUT',
+        `/api/experimental/session/${sessionId}/instructions/entries/cloud-agent-context`,
+        { value: context },
+      ],
+      [
+        'POST',
+        `/api/session/${sessionId}/prompt`,
+        {
+          id: `msg_${'c'.repeat(26)}`,
+          text: 'Explain this image\nKeep it brief',
+          files: [{ uri: 'https://example.com/image.png', name: 'image.png' }],
+          delivery: 'steer',
+        },
+      ],
+    ]);
   });
+
+  it('clears the instruction before submitting a prompt without server context', async () => {
+    const { url, requests } = startStub(() => new Response(null, { status: 204 }));
+    await createHarness(url).submit({
+      sessionId: 'ses_no_context',
+      directory,
+      messageId: 'msg_no_context',
+      prompt: 'Hello',
+    });
+    expect(requests.map(request => [request.method, request.pathname, request.body])).toEqual([
+      [
+        'PUT',
+        '/api/experimental/session/ses_no_context/instructions/entries/cloud-agent-context',
+        { value: '' },
+      ],
+      [
+        'POST',
+        '/api/session/ses_no_context/prompt',
+        { id: 'msg_no_context', text: 'Hello', delivery: 'steer' },
+      ],
+    ]);
+  });
+
+  it.each([undefined, '', '<cloud-agent-context session-id="workspace_1" />'])(
+    'replaces a one-shot startup-failure note with the next context %p after harness recreation',
+    async context => {
+      const { url, requests } = startStub(() => new Response(null, { status: 204 }));
+      const sessionId = 'ses_context_replacement';
+      const initialContext =
+        'Some startup commands failed during session preparation. The session started anyway.\n\n' +
+        '<cloud-agent-context session-id="workspace_1" />';
+      await createHarness(url).submit({
+        sessionId,
+        directory,
+        messageId: 'msg_initial_context',
+        prompt: 'First prompt',
+        context: initialContext,
+      });
+      await createHarness(url).submit({
+        sessionId,
+        directory,
+        messageId: 'msg_next_context',
+        prompt: 'Next prompt',
+        context,
+      });
+      expect(requests.map(request => [request.method, request.pathname, request.body])).toEqual([
+        [
+          'PUT',
+          `/api/experimental/session/${sessionId}/instructions/entries/cloud-agent-context`,
+          { value: initialContext },
+        ],
+        [
+          'POST',
+          `/api/session/${sessionId}/prompt`,
+          { id: 'msg_initial_context', text: 'First prompt', delivery: 'steer' },
+        ],
+        [
+          'PUT',
+          `/api/experimental/session/${sessionId}/instructions/entries/cloud-agent-context`,
+          { value: context ?? '' },
+        ],
+        [
+          'POST',
+          `/api/session/${sessionId}/prompt`,
+          { id: 'msg_next_context', text: 'Next prompt', delivery: 'steer' },
+        ],
+      ]);
+    }
+  );
+
+  it.each(['Callback routing context', undefined])(
+    'does not submit a prompt if server context %p could not be replaced',
+    async context => {
+      const { url, requests } = startStub(() => new Response(null, { status: 503 }));
+      const error: unknown = await createHarness(url)
+        .submit({
+          sessionId: 'ses_context_failure',
+          directory,
+          messageId: 'msg_context_failure',
+          prompt: 'Hello',
+          context,
+        })
+        .catch(cause => cause);
+      expect(error).toBeInstanceOf(Error);
+      expect(String(error)).toContain('HTTP 503');
+      expect(requests).toHaveLength(1);
+      expect(requests[0]?.method).toBe('PUT');
+    }
+  );
+
+  it.each(['command', 'compact', 'condense'] as const)(
+    'clears a prior prompt context before %s after harness recreation',
+    async operation => {
+      const sessionId = 'ses_non_prompt_context';
+      const instructionPath = `/api/experimental/session/${sessionId}/instructions/entries/cloud-agent-context`;
+      const { url, requests } = startStub((_request, url) =>
+        url.pathname.includes('/message/')
+          ? Response.json({ data: { type: 'compaction', status: 'completed' } })
+          : new Response(null, { status: 204 })
+      );
+      await createHarness(url).submit({
+        sessionId,
+        directory,
+        messageId: 'msg_startup_failure',
+        prompt: 'First prompt',
+        context: 'Some startup commands failed during session preparation.',
+      });
+      const harness = createHarness(url);
+      const input = { sessionId, directory, model: 'test-model' };
+      if (operation === 'command') await harness.command({ ...input, command: 'review' });
+      else if (operation === 'compact') expect(await harness.compact(input)).toBe(true);
+      else expect(await harness.condense(input)).toEqual({ success: true, wasAborted: false });
+
+      const subsequentRequests = requests.slice(2);
+      const clearIndex = subsequentRequests.findIndex(
+        request => request.pathname === instructionPath
+      );
+      expect(clearIndex).toBeGreaterThanOrEqual(0);
+      expect(subsequentRequests[clearIndex]).toMatchObject({ method: 'PUT', body: { value: '' } });
+      const nativePath = `/api/session/${sessionId}/${operation === 'command' ? 'command' : 'compact'}`;
+      expect(
+        subsequentRequests.findIndex(request => request.pathname === nativePath)
+      ).toBeGreaterThan(clearIndex);
+    }
+  );
+
+  it.each(['command', 'compact', 'condense'] as const)(
+    'does not run %s if the prior prompt context cannot be cleared',
+    async operation => {
+      const { url, requests } = startStub(
+        (_request, url) =>
+          new Response(null, { status: url.pathname.includes('/instructions/') ? 503 : 204 })
+      );
+      const harness = createHarness(url);
+      const input = { sessionId: 'ses_clear_failure', directory, model: 'test-model' };
+      if (operation === 'condense') {
+        const result = await harness.condense(input);
+        expect(result.success).toBe(false);
+        expect(result.error).toContain('HTTP 503');
+      } else {
+        const result =
+          operation === 'command'
+            ? harness.command({ ...input, command: 'review' })
+            : harness.compact(input);
+        const error: unknown = await result.catch(cause => cause);
+        expect(error).toBeInstanceOf(Error);
+        expect(String(error)).toContain('HTTP 503');
+      }
+      expect(requests.at(-1)?.pathname).toContain('/instructions/entries/cloud-agent-context');
+      expect(requests.some(request => /\/(command|compact)$/.test(request.pathname))).toBe(false);
+    }
+  );
 
   it('replaces the running CLI MCP connection through the native runtime route', async () => {
     const stub = startStub((request, url) =>

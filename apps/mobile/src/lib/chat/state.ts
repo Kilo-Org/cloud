@@ -17,10 +17,38 @@ import { type ChatRecord, NO_RECORD } from './store';
 export type Question = {
   readonly text: string;
   readonly images: readonly LocalImage[];
+  /**
+   * The kept question this asks again, when it is a retry of one: its record is
+   * the one the ask drops once the slot holds the question, so two attempts that
+   * say the same words never take each other's place.
+   */
+  readonly from?: string | null;
 };
 
 /** Where a question goes: the model, and the effort it is asked with. Null is the model's default. */
 export type ChatTarget = { readonly model: string; readonly effort: Effort | null };
+
+/**
+ * A question that was asked and never answered, and one asked later took its
+ * place in the one slot a chat keeps.
+ *
+ * It stays in the transcript where it was said rather than going with the slot:
+ * the words may be all that is left of what the person pasted, so they keep
+ * their bubble, their Retry and their Copy to composer.
+ */
+export type Displaced = Question &
+  ChatTarget & {
+    /** Names its bubble, so its Retry finds it after another failure moved the list. */
+    readonly id: string;
+    /**
+     * How many stored turns came before it. The store appends a turn per
+     * answered question, so this places the bubble among the turns that were
+     * said after it and keeps the conversation in the order it happened.
+     */
+    readonly afterTurns: number;
+    /** Why it has no answer: the answer failed, or the person stopped it. */
+    readonly outcome: 'failed' | 'stopped';
+  };
 
 /** What a chat screen draws. */
 export type ChatState = {
@@ -41,6 +69,19 @@ export type ChatState = {
   readonly asked: string | null;
   /** The images that question carries. Empty when it carries none. */
   readonly askedImages: readonly LocalImage[];
+  /**
+   * The kept question the slot is asking again, when it is a retry of one.
+   *
+   * That question is already in the transcript, so the slot does not draw a
+   * second bubble for it: the bubble where it was said is the current attempt,
+   * and everything said after it stays after it.
+   */
+  readonly askedFrom: string | null;
+  /**
+   * The questions asked before that one and never answered, oldest first. A
+   * later send takes the one slot, and what it took the place of is kept here.
+   */
+  readonly displaced: readonly Displaced[];
   /** The target that question was asked of, even if moving onto it failed. */
   readonly askedModel: string | null;
   /** The effort that question was asked with. */
@@ -135,6 +176,8 @@ export const NOTHING = {
   answering: [] as readonly Part[],
   asked: null,
   askedImages: [] as readonly LocalImage[],
+  askedFrom: null,
+  displaced: [] as readonly Displaced[],
   askedModel: null,
   askedEffort: null,
   waiting: [] as readonly Question[],

@@ -115,6 +115,7 @@ import {
   EnkryptBenchmarkSchema,
 } from './schema-types';
 import type {
+  EnkryptDetectorId,
   EnkryptGuardrailDecision,
   EnkryptGuardrailDirection,
   WatchPrPolicy,
@@ -4260,11 +4261,10 @@ export const organization_user_usage = pgTable(
 
 export type OrganizationUserDailyUsage = typeof organization_user_usage.$inferSelect;
 
-// The column stores the subscription status the provider reports, which is an
-// open set, plus the local 'pending_cancel' and 'ended' markers.
+// Keep this type in step with the provider's subscription status registry and
+// the stored value the seat-purchase writer records.
 type SubscriptionStatus =
   | 'active'
-  | 'pending_cancel'
   | 'ended'
   | 'incomplete'
   | 'incomplete_expired'
@@ -5981,6 +5981,10 @@ export const ai_gateway_config = pgTable(
   table => [check('ai_gateway_config_singleton', sql`${table.id} = 1`)]
 );
 
+export const blacklisted_domains = pgTable('blacklisted_domains', {
+  domain: text().primaryKey(),
+});
+
 export const ai_gateway_sync_providers_state = pgTable(
   'ai_gateway_sync_providers_state',
   {
@@ -5989,9 +5993,16 @@ export const ai_gateway_sync_providers_state = pgTable(
     stale_alert_last_posted_at: timestamp({ withTimezone: true, mode: 'string' }),
     direct_byok_last_completed_at: timestamp({ withTimezone: true, mode: 'string' }),
     direct_byok_stale_alert_last_posted_at: timestamp({ withTimezone: true, mode: 'string' }),
+    metadata_cache_stale_alert_last_posted_at: timestamp({ withTimezone: true, mode: 'string' }),
   },
   table => [check('ai_gateway_sync_providers_state_singleton', sql`${table.id} = 1`)]
 );
+
+export const ai_gateway_metadata_cache = pgTable('ai_gateway_metadata_cache', {
+  url: text().primaryKey(),
+  updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  data: jsonb().$type<unknown>().notNull(),
+});
 
 export const ai_gateway_request_logging_opt_ins = pgTable(
   'ai_gateway_request_logging_opt_ins',
@@ -10911,6 +10922,15 @@ export const enkrypt_usage_guardrail = pgTable(
   table => [uniqueIndex('UQ_enkrypt_usage_guardrail').on(table.guardrail)]
 );
 
+export const enkrypt_usage_detector = pgTable(
+  'enkrypt_usage_detector',
+  {
+    detector_id: serial().notNull().primaryKey(),
+    detector: text().notNull().$type<EnkryptDetectorId>(),
+  },
+  table => [uniqueIndex('UQ_enkrypt_usage_detector').on(table.detector)]
+);
+
 // Monthly created_at partitioning is defined in the migration; Drizzle cannot express it.
 export const enkrypt_usage = pgTable(
   'enkrypt_usage',
@@ -10939,6 +10959,11 @@ export const enkrypt_usage = pgTable(
     added_latency_ms: integer(),
     // Null on rows recorded before the output guardrail existed, which are all input guardrail calls.
     guardrail_id: integer().references(() => enkrypt_usage_guardrail.guardrail_id),
+    // `enkrypt_usage_detector` ids of the detectors that fired on this call, blocking or log-only;
+    // null when none fired, the call failed, or the row predates the column. A log-only detection
+    // is an `allowed` row with detectors here. PostgreSQL cannot enforce foreign keys on array
+    // elements, so the writer resolves every id through the lookup table.
+    fired_detector_ids: integer().array(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },
   table => [

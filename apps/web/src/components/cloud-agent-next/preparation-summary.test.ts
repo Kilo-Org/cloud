@@ -2,9 +2,11 @@ import type { PreparationAttempt, PreparationStepSnapshot } from '@kilocode/clou
 import {
   extractTickerLines,
   findRunningSetupCommand,
+  phaseDisplayText,
   preparationSummaryLine,
   summarizePreparationAttempt,
 } from './preparation-summary';
+import { formatSnapshotTime } from './snapshot-display';
 
 function step(overrides: Partial<PreparationStepSnapshot>): PreparationStepSnapshot {
   return {
@@ -32,6 +34,34 @@ function attempt(overrides: Partial<PreparationAttempt>): PreparationAttempt {
 }
 
 describe('summarizePreparationAttempt', () => {
+  it.each([
+    ['environment_snapshot', 'Using environment snapshot'],
+    ['workspace_restore', 'Using workspace snapshot'],
+  ] as const)('shows the compact local capture time for %s', (key, latestDetail) => {
+    const capturedAt = Date.parse('2026-10-24T21:32:19Z');
+    const snapshotStep = step({ key, latestDetail, snapshotCapturedAt: capturedAt });
+    const text = `${latestDetail} · ${formatSnapshotTime(capturedAt)}`;
+    expect(phaseDisplayText(snapshotStep)).toBe(text);
+    expect(summarizePreparationAttempt(attempt({ steps: [snapshotStep] }))).toEqual({
+      kind: 'phase',
+      text,
+    });
+    expect(phaseDisplayText({ ...snapshotStep, status: 'completed' })).toBe(text);
+    expect(phaseDisplayText(step({ key, latestDetail }))).toBe(latestDetail);
+  });
+
+  it('preserves environment snapshot warnings alongside the local capture time', () => {
+    const capturedAt = Date.parse('2026-10-24T21:32:19Z');
+    const latestDetail = 'Using environment snapshot; environment settings have changed';
+    expect(
+      phaseDisplayText(
+        step({ key: 'environment_snapshot', latestDetail, snapshotCapturedAt: capturedAt })
+      )
+    ).toBe(
+      `Using environment snapshot · ${formatSnapshotTime(capturedAt)}; environment settings have changed`
+    );
+  });
+
   it('reports starting while no step is running yet', () => {
     expect(summarizePreparationAttempt(attempt({}))).toEqual({ kind: 'starting' });
     const completedOnly = attempt({ steps: [step({ status: 'completed' })] });

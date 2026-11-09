@@ -49,6 +49,11 @@ function isPreparationEvent(data: unknown): data is PreparingEventDataV2 {
     typeof data.timestamp === 'number' &&
     typeof data.step === 'string' &&
     typeof data.message === 'string' &&
+    (data.snapshotCapturedAt === undefined ||
+      (typeof data.snapshotCapturedAt === 'number' &&
+        Number.isInteger(data.snapshotCapturedAt) &&
+        data.snapshotCapturedAt >= 0 &&
+        data.snapshotCapturedAt <= 8_640_000_000_000_000)) &&
     typeof data.action === 'string'
   );
 }
@@ -267,7 +272,14 @@ export function materializePreparationEvent(
   } else {
     if (!step || data.revision <= step.revision || isTerminal(step.status)) return false;
     if (data.action === 'step_progress') {
-      step = { ...step, latestDetail: data.detail, revision: data.revision };
+      step = {
+        ...step,
+        latestDetail: data.detail,
+        ...(data.snapshotCapturedAt === undefined
+          ? {}
+          : { snapshotCapturedAt: data.snapshotCapturedAt }),
+        revision: data.revision,
+      };
     } else if (data.action === 'step_output') {
       const tail = utf8Tail(`${step.outputTail ?? ''}${data.output}`, OUTPUT_TAIL_MAX_BYTES);
       step = {

@@ -3,6 +3,7 @@ import 'server-only';
 import type { MessageMetadata } from '@vercel/queue';
 import { UsageRecordRequestSchema } from '@kilocode/usage-contracts';
 import { recordUsage } from '@kilocode/worker-utils/usage-writer-client';
+import { getVercelExecutionRegion } from '@kilocode/worker-utils/vercel-execution-region';
 import { verifyUsageMessage, VERCEL_USAGE_TOPIC } from './message';
 const getEnvVariable = (key: string) => process.env[key] || '';
 
@@ -10,14 +11,12 @@ export async function consumeVercelUsage(
   message: unknown,
   metadata: MessageMetadata
 ): Promise<void> {
-  const executionRegion = getEnvVariable('VERCEL_REGION');
   const context = {
     transport: 'vercel',
     messageId: metadata.messageId,
     delivery_attempt: metadata.deliveryCount,
     queue_region: metadata.region,
-    execution_region:
-      executionRegion === 'fra1' || executionRegion === 'sfo1' ? executionRegion : 'unknown',
+    execution_region: getVercelExecutionRegion(),
     queue_age_ms: Math.max(0, Date.now() - metadata.createdAt.getTime()),
   };
   // Independent of the publishing flag so previous staging deployments can drain.

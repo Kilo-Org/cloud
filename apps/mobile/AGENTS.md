@@ -126,6 +126,13 @@ Android searchable `formSheet` routes use only the existing safe-area-capped ful
 Model, repository, app-language, auth-language and voice-language searches must keep results above the software keyboard.
 iOS keeps native detent expansion when the search field gains focus.
 
+A searchable picker in a window shorter than 600pt also presents at the full detent, on either platform.
+The half detent sizes the sheet to its title row and search field, so a short window leaves the list under
+one row and the first result is clipped at the sheet edge (measured in a 501pt-tall iPad window).
+`searchPickerHeaderInList` (`@/lib/form-sheet-detents`) owns that threshold, and the language picker moves
+its search field into the scrolling list there so the title row, its actions, the field and a row stay
+together.
+
 An imperative `Sheet` with `snapPoints` hands its React content the window height on Android, not the
 detent's height, so a body that takes its slack is laid out past the sheet frame and whatever sits at its
 bottom — a dismiss row, a submit row — cannot be reached. Size such a sheet to its content instead, keep

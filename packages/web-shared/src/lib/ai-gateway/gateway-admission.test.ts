@@ -20,15 +20,37 @@ jest.mock('@kilocode/web-shared/lib/organizations/organization-usage', () => ({
 
 const user = { id: 'user-1', google_user_email: 'user@example.com', microdollars_used: 5 } as User;
 
-function authFailure(status: number, credentialsRejected: boolean) {
+type AuthFailureOptions = {
+  credentialsRejected?: boolean;
+  authorizationRefused?: boolean;
+  error?: string;
+};
+
+type TestAuthFailure = {
+  user: null;
+  authFailedResponse: NextResponse<{ success: false; error: string }>;
+  credentialsRejected: boolean;
+  authorizationRefused: boolean;
+};
+
+function authFailure(status: number, options: AuthFailureOptions = {}): TestAuthFailure {
   return {
     user: null,
     authFailedResponse: NextResponse.json(
-      { success: false as const, error: 'Auth failed' },
+      { success: false as const, error: options.error ?? 'Auth failed' },
       { status }
     ),
-    credentialsRejected,
+    credentialsRejected: options.credentialsRejected ?? false,
+    authorizationRefused: options.authorizationRefused ?? false,
   };
+}
+
+function resolveOnAnonymousCapableRoute(auth: TestAuthFailure) {
+  return resolveGatewayCaller(auth, { allowAnonymous: true, ipAddress: '192.0.2.1' });
+}
+
+function resolveOnSignedInOnlyRoute(auth: TestAuthFailure) {
+  return resolveGatewayCaller(auth, { allowAnonymous: false, passThroughAuthFailure: true });
 }
 
 describe('resolveGatewayCaller', () => {
@@ -47,33 +69,56 @@ describe('resolveGatewayCaller', () => {
   });
 
   it.each([
-    {
-      route: 'free-capable',
-      resolve: (auth: ReturnType<typeof authFailure>) =>
-        resolveGatewayCaller(auth, { allowAnonymous: true, ipAddress: '192.0.2.1' }),
-    },
-    {
-      route: 'pass-through',
-      resolve: (auth: ReturnType<typeof authFailure>) =>
-        resolveGatewayCaller(auth, { allowAnonymous: false, passThroughAuthFailure: true }),
-    },
-  ])('answers a rejected credential with INVALID_TOKEN on a $route route', async ({ resolve }) => {
-    const caller = resolve(authFailure(401, true));
+    { route: 'anonymous-capable', resolve: resolveOnAnonymousCapableRoute },
+    { route: 'signed-in-only', resolve: resolveOnSignedInOnlyRoute },
+  ])(
+    'answers a rejected credential with INVALID_TOKEN on the $route route',
+    async ({ resolve }) => {
+      const caller = resolve(authFailure(401, { credentialsRejected: true }));
 
-    expect(caller.kind).toBe('rejected');
-    if (caller.kind !== 'rejected') return;
-    expect(caller.response.status).toBe(401);
-    expect(caller.response.headers.get('WWW-Authenticate')).toBe('Bearer error="invalid_token"');
-    await expect(caller.response.json()).resolves.toMatchObject({
-      error: { code: INVALID_TOKEN_CODE },
-    });
-  });
+      expect(caller.kind).toBe('rejected');
+      if (caller.kind !== 'rejected') return;
+      expect(caller.response.status).toBe(401);
+      expect(caller.response.headers.get('WWW-Authenticate')).toBe('Bearer error="invalid_token"');
+      await expect(caller.response.json()).resolves.toMatchObject({
+        error: { code: INVALID_TOKEN_CODE },
+      });
+    }
+  );
+
+  const authorizationRefusals = [
+    { scenario: 'a refused account', error: 'Access denied (R1)' },
+    { scenario: 'a refused email domain', error: 'Access denied (R0)' },
+    {
+      scenario: 'an unavailable organization context',
+      error: 'Access denied (not a member of the organization)',
+    },
+    { scenario: 'an admin-only route', error: 'Access denied (nonadmin)' },
+  ];
+  const authorizationRefusalCases = authorizationRefusals.flatMap(refusal =>
+    [
+      { route: 'anonymous-capable', resolve: resolveOnAnonymousCapableRoute },
+      { route: 'signed-in-only', resolve: resolveOnSignedInOnlyRoute },
+    ].map(routeShape => ({ ...refusal, ...routeShape }))
+  );
+
+  it.each(authorizationRefusalCases)(
+    'returns the authorization response for $scenario on the $route route',
+    async ({ resolve, error }) => {
+      const auth = authFailure(403, { authorizationRefused: true, error });
+
+      const caller = resolve(auth);
+
+      expect(caller.kind).toBe('rejected');
+      if (caller.kind !== 'rejected') return;
+      expect(caller.response).toBe(auth.authFailedResponse);
+      expect(caller.response.status).toBe(403);
+      await expect(caller.response.json()).resolves.toEqual({ success: false, error });
+    }
+  );
 
   it('resolves a missing credential as anonymous when allowed and the IP is known', () => {
-    const caller = resolveGatewayCaller(authFailure(401, false), {
-      allowAnonymous: true,
-      ipAddress: '192.0.2.1',
-    });
+    const caller = resolveOnAnonymousCapableRoute(authFailure(401));
 
     expect(caller).toMatchObject({
       kind: 'anonymous',
@@ -85,7 +130,7 @@ describe('resolveGatewayCaller', () => {
     { allowAnonymous: true, ipAddress: undefined },
     { allowAnonymous: false, ipAddress: '192.0.2.1' },
   ])('asks a caller without a credential to sign in: %j', async opts => {
-    const caller = resolveGatewayCaller(authFailure(403, false), opts);
+    const caller = resolveGatewayCaller(authFailure(403), opts);
 
     expect(caller.kind).toBe('rejected');
     if (caller.kind !== 'rejected') return;
@@ -97,12 +142,9 @@ describe('resolveGatewayCaller', () => {
   });
 
   it('passes an auth failure without a rejected credential through when asked', () => {
-    const auth = authFailure(403, false);
+    const auth = authFailure(403);
 
-    const caller = resolveGatewayCaller(auth, {
-      allowAnonymous: false,
-      passThroughAuthFailure: true,
-    });
+    const caller = resolveOnSignedInOnlyRoute(auth);
 
     expect(caller).toEqual({ kind: 'rejected', response: auth.authFailedResponse });
   });

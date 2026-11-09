@@ -11,6 +11,7 @@ import {
   agent_environment_profile_agents,
   agent_environment_profile_repo_bindings,
   cloud_agent_webhook_triggers,
+  cli_sessions_v2,
 } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import {
@@ -78,6 +79,7 @@ describe('Agent Profiles Router', () => {
       .from(agent_environment_profiles);
 
     for (const profile of profiles) {
+      await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.profile_id, profile.id));
       await db
         .delete(agent_environment_profile_vars)
         .where(eq(agent_environment_profile_vars.profile_id, profile.id));
@@ -251,6 +253,7 @@ describe('Agent Profiles Router', () => {
         expect(result.id).toBe(profileId);
         expect(result.name).toBe('Full Profile');
         expect(result.description).toBe('A complete profile');
+        expect(result.lastUsedAt).toBeNull();
         expect(result.vars).toHaveLength(2);
         expect(result.commands).toHaveLength(1);
 
@@ -263,6 +266,69 @@ describe('Agent Profiles Router', () => {
         const debugVar = result.vars.find(v => v.key === 'DEBUG');
         expect(debugVar?.value).toBe('true');
         expect(debugVar?.isSecret).toBe(false);
+      });
+
+      test.each(['personal', 'organization'] as const)(
+        'should return the latest session activity for a %s profile',
+        async ownerType => {
+          const caller = await createCallerForUser(ownerUser.id);
+          const organizationId = ownerType === 'organization' ? organizationA.id : undefined;
+          const { id: profileId } = await caller.agentProfiles.create({
+            name: 'Used Profile',
+            organizationId,
+          });
+          const { id: otherProfileId } = await caller.agentProfiles.create({
+            name: 'Other Profile',
+            organizationId,
+          });
+          await db.insert(cli_sessions_v2).values([
+            {
+              session_id: `${profileId}-older`,
+              kilo_user_id: ownerUser.id,
+              profile_id: profileId,
+              organization_id: organizationId,
+              created_at: '2026-04-28 01:16:12.945+00',
+              last_activity_at: '2026-04-29 01:16:12.945+00',
+              updated_at: '2026-05-02 01:16:12.945+00',
+            },
+            {
+              session_id: `${profileId}-latest`,
+              kilo_user_id: ownerType === 'organization' ? memberUser.id : ownerUser.id,
+              profile_id: profileId,
+              organization_id: organizationId,
+              created_at: '2026-04-29 00:00:00+00',
+              last_activity_at: '2026-04-30 01:16:12.945+00',
+            },
+            {
+              session_id: `${otherProfileId}-unrelated`,
+              kilo_user_id: ownerUser.id,
+              profile_id: otherProfileId,
+              created_at: '2026-05-01 01:16:12.945+00',
+            },
+          ]);
+
+          const result = await caller.agentProfiles.get({ profileId, organizationId });
+
+          expect(result.lastUsedAt).toBe('2026-04-30T01:16:12.945Z');
+        }
+      );
+
+      test('should use session creation when activity has not been recorded', async () => {
+        const caller = await createCallerForUser(ownerUser.id);
+        const { id: profileId } = await caller.agentProfiles.create({
+          name: 'New Session Profile',
+        });
+        await db.insert(cli_sessions_v2).values({
+          session_id: `${profileId}-new`,
+          kilo_user_id: ownerUser.id,
+          profile_id: profileId,
+          created_at: '2026-04-29 01:16:12.945+00',
+          updated_at: '2026-05-01 01:16:12.945+00',
+        });
+
+        const result = await caller.agentProfiles.get({ profileId });
+
+        expect(result.lastUsedAt).toBe('2026-04-29T01:16:12.945Z');
       });
 
       test('should throw NOT_FOUND for non-existent profile', async () => {

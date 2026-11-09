@@ -132,8 +132,8 @@ not append audit noise.
 
 Note that an Okta directory's domain is often the IdP tenant hostname
 (`integrator-6483000.okta.com`) rather than the customer's email domain. That is
-what WorkOS reports and what gets captured; a takeover is then authorized only
-for addresses actually on that domain.
+what WorkOS reports and what gets captured; an address is then bindable, by
+takeover or a new account, only on that domain.
 
 ### Disconnect
 
@@ -172,7 +172,7 @@ having been seen first. The two upserts are no-ops in the normal case.
 The user upsert's `directoryId` comes from `data.directoryId` on a membership
 event and from `data.directoryId` on the `DirectoryUser` itself for
 `dsync.user.created` and `dsync.user.updated`. It is required, because the
-domain gate on account takeover resolves the organization from it.
+domain gate resolves the organization from it on every bind.
 
 The directory is deliberately **not** provisioned this way. Nothing in a
 `dsync.group.*` payload distinguishes a directory Kilo never activated from one
@@ -220,25 +220,38 @@ matches by address and replaces it.
 
 ### Response classes
 
-Three classes, and they decide cursor movement:
+Three statuses, four outcomes, and they decide cursor movement:
 
 | Status | Meaning | Cursor |
 |---|---|---|
 | 2xx | Applied, already applied, or nothing to do | Advance |
-| 409 | A dependency is missing — an unactivated directory, or a group whose directory resolves to a sub-organization | Hold and retry; the body names the dependency |
+| 409 | A dependency is missing — an unactivated directory, or a group whose sub-organization is not bound yet | Hold and retry; the body names the dependency |
+| 409 | The write is refused — the address is outside the organization's captured domain, an account is bound to another directory user, another account holds the address, or a group would nest under a sub-organization | Bounded retry, then advance and record the refusal |
 | 400 / 401 / 5xx | Contract mismatch, missing secret, or an unexpected failure | Hold; 5xx bodies are fixed strings, detail is in the app's log |
 
 A 409 is not always recoverable by waiting. A group under a sub-organization is
-structural, and a refused account takeover is a claim the directory cannot
-substantiate — no arrival order fixes either.
+structural, and a refused address bind is a claim the directory cannot
+substantiate — no arrival order fixes either. Holding the cursor behind a
+refusal would also stop every later event in the stream, including the
+membership removals that take a departing person's access away: one directory
+that captured no domain would stall events it does not touch. A refusal is
+therefore bounded: the loop retries it up to its retry bound, records the
+refusal and the event id it skips, and advances. That id is the replay point for
+an administrator who clears the refusal afterwards.
+
+Rule 7 forbids advancing past an event the loop could not apply, and a refusal
+is a decided answer rather than a missing dependency: the app evaluated the
+event and recorded why it is denied. A loop that applies events must state that
+distinction in rule 7 before it skips the first event.
 
 `PUT .../users/{external_id}` carries `directoryId` so it can resolve that
-claim. A pre-existing Kilo account holding the address is taken over only when
-the address's domain equals the Effective SSO policy domain of the directory's
-organization: domain capture is what establishes the enterprise's claim to it.
-The account is then converted to the SSO authority's WorkOS identity, its other
-authentication providers are dropped and its browser sessions are invalidated,
-so the prior holder keeps neither a login that bypasses SSO nor a live session.
+claim. The address is accepted only when its domain equals the Effective SSO
+policy domain of the directory's organization — domain capture is what
+establishes the enterprise's claim to it — and a pre-existing Kilo account
+holding the address is then taken over. The account is converted to the SSO
+authority's WorkOS identity, its other authentication providers are dropped and
+its browser sessions are invalidated, so the prior holder keeps neither a login
+that bypasses SSO nor a live session.
 
 The match is the mailbox, not one spelling of it. The account is resolved
 case-insensitively and with `+` aliases and Gmail dots ignored, and that same
@@ -253,15 +266,27 @@ then resolve to no account — which the removal routes report as converged, so 
 would fail silently.
 
 Any other address is refused, including when the organization has captured no
-domain or its policy is misconfigured. Every SCIM account is expected to be
-domain-captured, so a refusal is a real misconfiguration rather than a race, and
-retrying will not clear it. The app logs it as
-`[scim] Refused a directory account takeover` with the directory and the email
+domain or its policy is misconfigured. The gate runs whether the address matches
+a pre-existing account or would create a new one, so a directory can neither
+take over nor mint an account at a domain it does not own. Every SCIM account is
+expected to be domain-captured, so a refusal is a real misconfiguration rather
+than a race: only the capture clears it. The app logs it as
+`[scim] Refused a directory address bind` with the directory and the email
 domain, and the 409 body names the domain too — neither carries the address. See
 `.specs/organization-sso.md`, Directory Sync rules 13 and 15.
 
-Separating genuinely terminal failures from the retryable ones is still open,
-and is why the loop needs a retry bound rather than indefinite retry.
+Clearing the refusal is an administrative action on the organization, never a
+directory-side one: capture the domain in the organization's SSO settings, or
+replay `dsync.activated` carrying `domains` for an organization that has none
+(rule 14). Until one of those happens every address the directory provisions is
+refused, and each refusal is recorded and skipped rather than held, so later
+events keep applying while the organization has no captured domain.
+
+The two 409 outcomes are told apart by what the body names, not by the status:
+it carries `{ error }`, a message naming either the missing dependency or the
+refused domain. A stable code in that body is what lets an applying loop move
+the cursor without matching prose, and that is still open. Until it lands this
+Worker logs events and applies none, and its configured cursor never moves.
 
 ## Logging
 

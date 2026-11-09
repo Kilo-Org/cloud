@@ -44,9 +44,17 @@ const mockManager = {
 };
 const mockQueryClient = { invalidateQueries: jest.fn() };
 const mockUploadEndpoint = { mutationOptions: () => ({}) };
+const mockWorkspaceSnapshotRecovery = {
+  queryOptions: (input: unknown) => ({ queryKey: [['getWorkspaceSnapshotRecovery'], input] }),
+  pathFilter: () => ({ queryKey: [['getWorkspaceSnapshotRecovery']] }),
+};
+const mockCloudAgentNext = {
+  getAttachmentUploadUrl: mockUploadEndpoint,
+  getWorkspaceSnapshotRecovery: mockWorkspaceSnapshotRecovery,
+};
 const mockTrpc = {
-  cloudAgentNext: { getAttachmentUploadUrl: mockUploadEndpoint },
-  organizations: { cloudAgentNext: { getAttachmentUploadUrl: mockUploadEndpoint } },
+  cloudAgentNext: mockCloudAgentNext,
+  organizations: { cloudAgentNext: mockCloudAgentNext },
   cliSessionsV2: {
     worktreeParent: {
       queryOptions: (input: unknown) => ({ queryKey: [['worktreeParent'], input] }),

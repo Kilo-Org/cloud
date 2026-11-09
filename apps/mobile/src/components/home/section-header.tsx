@@ -2,8 +2,20 @@ import { type ReactNode } from 'react';
 import { I18nManager, Pressable, View } from 'react-native';
 
 import { EYEBROW_LATIN_DISPLAY, Text } from '@/components/ui/text';
-import { textActionTargetClass } from '@/lib/a11y/tap-target';
+import {
+  SECTION_ACTION_BOX_CLASS,
+  SECTION_ACTION_HIT_SLOP,
+  SECTION_HEADER_ROW_PADDING_CLASS,
+  textActionTargetClass,
+} from '@/lib/a11y/tap-target';
 import { cn } from '@/lib/utils';
+
+/**
+ * The box a Home section label sits at the bottom of. It is as tall as the
+ * compact action box, so every Home section header has one height and keeps
+ * one gap to the block above it.
+ */
+const LABEL_AIR_CLASS = 'min-h-[28px]';
 
 type SectionHeaderProps = {
   label: string;
@@ -29,16 +41,12 @@ type SectionHeaderProps = {
    */
   notice?: ReactNode;
   /**
-   * Reserves the action frame's height above the label line, so the label keeps
-   * the same leading air whether or not the row carries an action.
-   *
-   * A row with an action is as tall as the action's touch frame, and its label
-   * sits on the row's content bottom edge, so that frame already holds the label
-   * its whole height below the row's top edge. A row without an action is one
-   * label line tall, which puts its label much closer to the block above it and
-   * reads as a second rhythm on one screen (home-header-section-gap). Home passes
-   * this for its sections, whose rows sit both directly under the brand row and
-   * under the sections column's `gap-2`.
+   * Puts the label at the bottom of {@link LABEL_AIR_CLASS} and renders the
+   * action on the compact {@link SECTION_ACTION_BOX_CLASS} box, with
+   * {@link SECTION_HEADER_ROW_PADDING_CLASS} on the row to hold the action's hit
+   * slop. A row with an action and a row without one then have the same height,
+   * so every Home section keeps the same gap to the block above it
+   * (home-header-section-gap). Home passes this for its sections.
    */
   reserveLabelAir?: boolean;
 };
@@ -69,20 +77,19 @@ export function SectionHeader({
     // sits above the line instead of between the label and its content, which
     // is the header's own `pb-2` everywhere.
     //
-    // With `reserveLabelAir` the label reserves that same frame height on its
-    // own, so a row without an action holds its label as far below the row's top
-    // edge as a row with one, and neither form needs leading padding on the row
-    // (home-header-section-gap).
+    // With `reserveLabelAir` the label and the action share one compact box
+    // height, and the row's padding holds the action's hit slop inside the row,
+    // so every Home section header has one height (home-header-section-gap).
     <View
       className={cn(
-        'flex-row flex-wrap items-end justify-end gap-2 px-4 pb-2',
-        reserveLabelAir ? 'pt-0' : 'pt-2'
+        'flex-row flex-wrap items-end justify-end gap-2 px-4',
+        reserveLabelAir ? SECTION_HEADER_ROW_PADDING_CLASS : 'py-2'
       )}
     >
       {/* With a notice the label keeps its own width, so the notice takes all
           the free space on the line instead of an equal share of it. */}
       {reserveLabelAir ? (
-        <View className={cn('flex-col justify-end', !notice && 'grow', textActionTargetClass())}>
+        <View className={cn('flex-col justify-end', !notice && 'grow', LABEL_AIR_CLASS)}>
           {labelText}
         </View>
       ) : (
@@ -119,14 +126,17 @@ export function SectionHeader({
           // reads the node's own rect and `hitSlop` never widens it. The row
           // grows to hold the frame — RN stops delivering touches outside the
           // parent, so a shrunk layout box would leave part of the target dead
-          // (`textActionTargetClass`, `comment-row.tsx`). The hidden action keeps
-          // the same box, so hiding it still cannot resize the header.
+          // (`textActionTargetClass`, `comment-row.tsx`). With `reserveLabelAir`
+          // the box is the compact one, and its hit slop stays inside the row's
+          // own padding. The hidden action keeps the same box, so hiding it
+          // still cannot resize the header.
           // Its copy sits on the box's bottom edge (`items-end`, the row's own
           // cross-axis rule), so the action and the section label share one
           // baseline instead of the action holding the label half a box away
           // from the content it names.
+          hitSlop={reserveLabelAir ? SECTION_ACTION_HIT_SLOP : undefined}
           className={cn(
-            textActionTargetClass(),
+            reserveLabelAir ? SECTION_ACTION_BOX_CLASS : textActionTargetClass(),
             'max-w-full shrink-0 flex-row items-end justify-center active:opacity-70',
             actionHidden && 'opacity-0'
           )}

@@ -24,6 +24,7 @@ import type {
   GatewayRequest,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import { getFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
+import { limitHeaderValue } from '@kilocode/web-shared/lib/ai-gateway/header-limits';
 import { normalizeProjectId } from '@kilocode/web-shared/lib/normalizeProjectId';
 import { getXKiloCodeVersionNumber } from '@kilocode/web-shared/lib/userAgent';
 import { getEffectiveProviderPrivacy } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
@@ -849,7 +850,7 @@ export function getOrganizationProviderPrivacy(
 }
 
 export function extractHeaderAndLimitLength(request: NextRequest, name: string) {
-  return request.headers.get(name)?.slice(0, 500)?.trim() || null;
+  return limitHeaderValue(request.headers.get(name));
 }
 
 export function extractFraudAndProjectHeaders(request: NextRequest) {

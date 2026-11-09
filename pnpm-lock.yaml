@@ -206,6 +206,7 @@ patchedDependencies:
   expo-notifications@58.1.4: 4bdcdf64d693d0d0ea97c121e481fececc083e86c227b019cbbf8fa1c7f8d1f5
   expo-router@58.0.19: b02d51c91eb65aad388c7558622a89e10160d0ff948f765790a665a68d93d5dd
   expo-server-sdk@6.1.0: 7850520582b5b394397b35d1ea195192fe78589d8a6a748fe15177b818c4ed0b
+  expo-speech-recognition@57.1.1: a2fc2568603b981e0b9bf1133deef50012a0b2d18b52f445a9868b1770005b99
   expo-task-manager@58.0.12: 80e53527a8706bd46fc218e83ba690f30b2c8fa84891ea3ca241531aaae0bf3a
   expo-widgets@58.0.17: 460b9294721505a0314d95a86cbf0063074e50259180af2d686cad950ef6ab42
   llama.rn@0.12.9: 62dce8190ea1c3bfe58fe2ab460927672af84bea3a32dcf566e92015ad13bd67
@@ -578,7 +579,7 @@ importers:
         version: 1.5.2(@types/react@19.3.0)(react-native@0.88.0(patch_hash=526f7b32450b11fc183bc7384b39076dd9e0d15055b61e372e7a0b73cd930921)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
       '@sentry/react-native':
         specifier: ~8.31.0
-        version: 8.31.0(@babel/core@7.29.7)(@expo/config-types@58.0.3)(@expo/config@58.0.6(typescript@7.0.2))(@expo/env@2.5.2)(bufferutil@4.1.0)(dotenv@18.0.8)(expo-router@58.0.19)(expo@58.0.10)(metro-config@0.87.1)(metro-resolver@0.87.1)(open@11.0.0)(promise@8.3.0)(react-native@0.88.0(patch_hash=526f7b32450b11fc183bc7384b39076dd9e0d15055b61e372e7a0b73cd930921)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)(rollup@4.64.7)(typescript@7.0.2)(utf-8-validate@6.0.6)(webpack@5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23))(esbuild@0.28.2))
+        version: 8.31.0(@babel/core@7.29.7)(@expo/config-types@58.0.3)(@expo/config@58.0.6(typescript@7.0.2))(@expo/env@2.5.2)(bufferutil@4.1.0)(dotenv@18.0.8)(expo-router@58.0.19)(expo@58.0.10)(metro-config@0.87.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))(metro-resolver@0.87.1)(open@11.0.0)(promise@8.3.0)(react-native@0.88.0(patch_hash=526f7b32450b11fc183bc7384b39076dd9e0d15055b61e372e7a0b73cd930921)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)(rollup@4.64.7)(typescript@7.0.2)(utf-8-validate@6.0.6)(webpack@5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23))(esbuild@0.28.2))
       '@shopify/flash-list':
         specifier: 2.3.3
         version: 2.3.3(@babel/runtime@7.29.7)(react-native@0.88.0(patch_hash=526f7b32450b11fc183bc7384b39076dd9e0d15055b61e372e7a0b73cd930921)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
@@ -719,7 +720,7 @@ importers:
         version: 58.0.18(expo@58.0.10)(react-native@0.88.0(patch_hash=526f7b32450b11fc183bc7384b39076dd9e0d15055b61e372e7a0b73cd930921)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)(typescript@7.0.2)
       expo-speech-recognition:
         specifier: 57.1.1
-        version: 57.1.1(expo@58.0.10)(react-native@0.88.0(patch_hash=526f7b32450b11fc183bc7384b39076dd9e0d15055b61e372e7a0b73cd930921)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
+        version: 57.1.1(patch_hash=a2fc2568603b981e0b9bf1133deef50012a0b2d18b52f445a9868b1770005b99)(expo@58.0.10)(react-native@0.88.0(patch_hash=526f7b32450b11fc183bc7384b39076dd9e0d15055b61e372e7a0b73cd930921)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
       expo-splash-screen:
         specifier: ~58.0.9
         version: 58.0.9(expo@58.0.10)(typescript@7.0.2)
@@ -31391,7 +31392,7 @@ snapshots:
       '@sentry/conventions': 0.27.0
       '@sentry/core': 11.7.0
 
-  '@sentry/react-native@8.31.0(@babel/core@7.29.7)(@expo/config-types@58.0.3)(@expo/config@58.0.6(typescript@7.0.2))(@expo/env@2.5.2)(bufferutil@4.1.0)(dotenv@18.0.8)(expo-router@58.0.19)(expo@58.0.10)(metro-config@0.87.1)(metro-resolver@0.87.1)(open@11.0.0)(promise@8.3.0)(react-native@0.88.0(patch_hash=526f7b32450b11fc183bc7384b39076dd9e0d15055b61e372e7a0b73cd930921)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)(rollup@4.64.7)(typescript@7.0.2)(utf-8-validate@6.0.6)(webpack@5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23))(esbuild@0.28.2))':
+  '@sentry/react-native@8.31.0(@babel/core@7.29.7)(@expo/config-types@58.0.3)(@expo/config@58.0.6(typescript@7.0.2))(@expo/env@2.5.2)(bufferutil@4.1.0)(dotenv@18.0.8)(expo-router@58.0.19)(expo@58.0.10)(metro-config@0.87.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))(metro-resolver@0.87.1)(open@11.0.0)(promise@8.3.0)(react-native@0.88.0(patch_hash=526f7b32450b11fc183bc7384b39076dd9e0d15055b61e372e7a0b73cd930921)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)(rollup@4.64.7)(typescript@7.0.2)(utf-8-validate@6.0.6)(webpack@5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23))(esbuild@0.28.2))':
     dependencies:
       '@expo/config-plugins': 58.0.9(typescript@7.0.2)
       '@sentry/browser': 10.76.2
@@ -37285,7 +37286,7 @@ snapshots:
       - supports-color
       - typescript
 
-  expo-speech-recognition@57.1.1(expo@58.0.10)(react-native@0.88.0(patch_hash=526f7b32450b11fc183bc7384b39076dd9e0d15055b61e372e7a0b73cd930921)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0):
+  expo-speech-recognition@57.1.1(patch_hash=a2fc2568603b981e0b9bf1133deef50012a0b2d18b52f445a9868b1770005b99)(expo@58.0.10)(react-native@0.88.0(patch_hash=526f7b32450b11fc183bc7384b39076dd9e0d15055b61e372e7a0b73cd930921)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0):
     dependencies:
       expo: 58.0.10(@babel/core@7.29.7)(@expo/metro-runtime@58.0.14)(bufferutil@4.1.0)(expo-router@58.0.19)(expo-widgets@58.0.17)(react-dom@19.2.6(react@19.3.0))(react-native-webview@14.0.1(react-native@0.88.0(patch_hash=526f7b32450b11fc183bc7384b39076dd9e0d15055b61e372e7a0b73cd930921)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0))(react-native-worklets@0.13.0(@babel/core@7.29.7)(react-native@0.88.0(patch_hash=526f7b32450b11fc183bc7384b39076dd9e0d15055b61e372e7a0b73cd930921)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0))(react-native@0.88.0(patch_hash=526f7b32450b11fc183bc7384b39076dd9e0d15055b61e372e7a0b73cd930921)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)(typescript@7.0.2)(utf-8-validate@6.0.6)
       react: 19.3.0

@@ -14,11 +14,12 @@ jest.mock('@kilocode/web-shared/lib/redis', () => ({
 }));
 
 import { describe, expect, it, beforeEach } from '@jest/globals';
+import { createHash } from 'node:crypto';
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
-import { kilocode_users } from '@kilocode/db';
+import { blacklisted_domains, kilocode_users } from '@kilocode/db';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { redisClient } from '@kilocode/web-shared/lib/redis';
-import { eq, inArray } from 'drizzle-orm';
+import { count, eq, inArray, sql } from 'drizzle-orm';
 import { createCallerForUser } from '@/routers/test-utils';
 import { computeBlacklistStats } from '@/lib/abuse/blacklist-domain-stats';
 import { isDomainOnBlacklist } from './blacklist-domains-router';
@@ -42,15 +43,30 @@ const actualBackfillModule = jest.requireActual<{
 const mockedBackfill = jest.mocked(backfillBlockBlacklistedDomainsBatch);
 const mockedRedisGet = jest.mocked(redisClient.get);
 const mockedRedisMset = jest.mocked(redisClient.mset);
+const redisValues = new Map<string, string>();
+
+const saveFailureMessage =
+  'Redis may already be updated. Reload and retry to synchronize Postgres, then run the account backfill.';
+const conflictMessage = 'Blacklist changed. Reload the complete list before saving.';
+
+function configVersion(raw = redisValues.get(BLACKLIST_DOMAINS_REDIS_KEY) ?? '') {
+  return createHash('sha256').update(raw).digest('hex');
+}
 
 let admin: User;
 
 beforeEach(async () => {
   await cleanupDbForTest();
+  redisValues.clear();
   mockedRedisGet.mockReset();
-  mockedRedisGet.mockResolvedValue(null);
+  mockedRedisGet.mockImplementation(async <T>(key: string) => {
+    return (redisValues.get(key) ?? null) as T | null;
+  });
   mockedRedisMset.mockReset();
-  mockedRedisMset.mockResolvedValue('OK');
+  mockedRedisMset.mockImplementation(async values => {
+    for (const [key, value] of Object.entries(values)) redisValues.set(key, String(value));
+    return 'OK';
+  });
   mockedBackfill.mockReset();
   mockedBackfill.mockImplementation(actualBackfillModule.backfillBlockBlacklistedDomainsBatch);
   admin = await insertTestUser({
@@ -431,15 +447,25 @@ describe('admin.blacklistDomains.set', () => {
     });
 
     const caller = await createCallerForUser(admin.id);
-    const result = await caller.admin.blacklistDomains.set({ domains: ['mailinator.com'] });
+    const result = await caller.admin.blacklistDomains.set({
+      domains: ['mailinator.com'],
+      expected_version: configVersion(),
+    });
 
     expect(result.domains).toEqual(['mailinator.com']);
     expect(result.backfill).toEqual({ blocked: 1, remaining: false, failed: false });
     expect(mockedRedisMset).toHaveBeenCalledWith({
-      [BLACKLIST_DOMAINS_REDIS_KEY]: expect.stringContaining('mailinator.com'),
+      [BLACKLIST_DOMAINS_REDIS_KEY]: JSON.stringify({
+        domains: ['mailinator.com'],
+        blocked_signup_tlds: result.blocked_signup_tlds,
+        updated_at: result.updated_at,
+        updated_by: admin.id,
+        updated_by_email: admin.google_user_email,
+      }),
       [BLACKLIST_DOMAINS_UPDATED_AT_REDIS_KEY]: result.updated_at,
     });
     expect(result.updated_at).toEqual(expect.any(String));
+    expect(await db.select().from(blacklisted_domains)).toEqual([{ domain: 'mailinator.com' }]);
 
     const rows = await db
       .select({
@@ -462,10 +488,14 @@ describe('admin.blacklistDomains.set', () => {
     expect(untouched?.api_token_pepper).toBe('safe-pepper');
   });
 
-  it('only backfills domains that were not already on the list', async () => {
-    mockedRedisGet.mockResolvedValue(
+  it('replaces the full normalized snapshot but only backfills newly added domains', async () => {
+    await db
+      .insert(blacklisted_domains)
+      .values([{ domain: 'mailinator.com' }, { domain: 'removed.example' }]);
+    redisValues.set(
+      BLACKLIST_DOMAINS_REDIS_KEY,
       JSON.stringify({
-        domains: ['mailinator.com'],
+        domains: [' MAILINATOR.COM ', 'removed.example'],
         updated_at: null,
         updated_by: null,
         updated_by_email: null,
@@ -478,10 +508,20 @@ describe('admin.blacklistDomains.set', () => {
 
     const caller = await createCallerForUser(admin.id);
     const result = await caller.admin.blacklistDomains.set({
-      domains: ['mailinator.com', 'spam.org'],
+      domains: [' MAILINATOR.COM ', 'Spam.ORG', 'spam.org', '   '],
+      expected_version: configVersion(),
     });
 
+    expect(result.domains).toEqual(['mailinator.com', 'spam.org']);
+    expect(await db.select().from(blacklisted_domains).orderBy(blacklisted_domains.domain)).toEqual(
+      [{ domain: 'mailinator.com' }, { domain: 'spam.org' }]
+    );
+    expect(JSON.parse(redisValues.get(BLACKLIST_DOMAINS_REDIS_KEY) ?? 'null').domains).toEqual([
+      'mailinator.com',
+      'spam.org',
+    ]);
     expect(result.backfill).toEqual({ blocked: 0, remaining: false, failed: false });
+    expect(mockedBackfill).toHaveBeenCalledTimes(1);
     expect(mockedBackfill).toHaveBeenCalledWith({ actorId: admin.id, domains: ['spam.org'] });
 
     const [row] = await db
@@ -491,28 +531,400 @@ describe('admin.blacklistDomains.set', () => {
     expect(row.blocked_reason).toBeNull();
   });
 
+  it.each([{ domains: ['mailinator.com'] }, { domains: [] }])(
+    'removes domains from both stores without backfilling: $domains',
+    async ({ domains: remainingDomains }) => {
+      const previous = {
+        domains: ['mailinator.com', 'removed.example'],
+        blocked_signup_tlds: ['asia'],
+        updated_at: null,
+        updated_by: null,
+        updated_by_email: null,
+      };
+      redisValues.set(BLACKLIST_DOMAINS_REDIS_KEY, JSON.stringify(previous));
+      await db.insert(blacklisted_domains).values(previous.domains.map(domain => ({ domain })));
+      const caller = await createCallerForUser(admin.id);
+
+      const result = await caller.admin.blacklistDomains.set({
+        domains: remainingDomains,
+        expected_version: configVersion(),
+      });
+
+      expect(result.domains).toEqual(remainingDomains);
+      expect(await db.select().from(blacklisted_domains)).toEqual(
+        remainingDomains.map(domain => ({ domain }))
+      );
+      expect(JSON.parse(redisValues.get(BLACKLIST_DOMAINS_REDIS_KEY) ?? 'null')).toEqual({
+        domains: remainingDomains,
+        blocked_signup_tlds: ['asia'],
+        updated_at: result.updated_at,
+        updated_by: admin.id,
+        updated_by_email: admin.google_user_email,
+      });
+      expect(redisValues.get(BLACKLIST_DOMAINS_UPDATED_AT_REDIS_KEY)).toBe(result.updated_at);
+      expect(mockedBackfill).not.toHaveBeenCalled();
+    }
+  );
+
+  it('commits the snapshot before starting the existing-account backfill', async () => {
+    let committedDomains: { domain: string }[] | undefined;
+    mockedBackfill.mockImplementationOnce(async () => {
+      committedDomains = await db.transaction(async tx => {
+        await tx.execute(sql`LOCK TABLE ${blacklisted_domains} IN EXCLUSIVE MODE NOWAIT`);
+        return tx.select().from(blacklisted_domains);
+      });
+      return { processed: 0, remaining: false };
+    });
+    const caller = await createCallerForUser(admin.id);
+
+    const result = await caller.admin.blacklistDomains.set({
+      domains: ['mailinator.com'],
+      expected_version: configVersion(),
+    });
+
+    expect(result.backfill).toEqual({ blocked: 0, remaining: false, failed: false });
+    expect(committedDomains).toEqual([{ domain: 'mailinator.com' }]);
+  });
+
   it('keeps the saved list when the automatic block fails', async () => {
     mockedBackfill.mockRejectedValue(new Error('database unavailable'));
 
     const caller = await createCallerForUser(admin.id);
-    const result = await caller.admin.blacklistDomains.set({ domains: ['mailinator.com'] });
+    const result = await caller.admin.blacklistDomains.set({
+      domains: ['mailinator.com'],
+      expected_version: configVersion(),
+    });
 
     expect(result.domains).toEqual(['mailinator.com']);
     expect(result.backfill).toEqual({ blocked: 0, remaining: false, failed: true });
     expect(mockedRedisMset).toHaveBeenCalled();
+    expect(await db.select().from(blacklisted_domains)).toEqual([{ domain: 'mailinator.com' }]);
   });
 
-  it('does not backfill the whole list when the previous config cannot be read', async () => {
+  it('fails without changing either store when the previous config cannot be read', async () => {
+    await db.insert(blacklisted_domains).values({ domain: 'previous.example' });
     mockedRedisGet.mockRejectedValue(new Error('redis unavailable'));
 
     const caller = await createCallerForUser(admin.id);
-    const result = await caller.admin.blacklistDomains.set({ domains: ['mailinator.com'] });
 
-    expect(result.domains).toEqual(['mailinator.com']);
-    expect(result.backfill).toEqual({ blocked: 0, remaining: false, failed: true });
+    await expect(
+      caller.admin.blacklistDomains.set({
+        domains: ['mailinator.com'],
+        expected_version: configVersion(),
+      })
+    ).rejects.toMatchObject({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: expect.stringContaining(saveFailureMessage),
+    });
+
+    expect(await db.select().from(blacklisted_domains)).toEqual([{ domain: 'previous.example' }]);
     expect(mockedBackfill).not.toHaveBeenCalled();
-    expect(mockedRedisMset).toHaveBeenCalled();
+    expect(mockedRedisMset).not.toHaveBeenCalled();
   });
+
+  it('rejects a stale complete snapshot before changing either store', async () => {
+    const previous = {
+      domains: ['first.example', 'second.example'],
+      blocked_signup_tlds: ['asia'],
+      updated_at: null,
+      updated_by: null,
+      updated_by_email: null,
+    };
+    redisValues.set(BLACKLIST_DOMAINS_REDIS_KEY, JSON.stringify(previous));
+    const caller = await createCallerForUser(admin.id);
+    const loaded = await caller.admin.blacklistDomains.get();
+    const currentDomains = [...previous.domains, 'third.example'];
+    const current = JSON.stringify({ ...previous, domains: currentDomains });
+    redisValues.set(BLACKLIST_DOMAINS_REDIS_KEY, current);
+    await db.insert(blacklisted_domains).values(currentDomains.map(domain => ({ domain })));
+
+    await expect(
+      caller.admin.blacklistDomains.set({
+        domains: loaded.domains,
+        blocked_tlds: ['shop'],
+        expected_version: loaded.version,
+      })
+    ).rejects.toMatchObject({ code: 'CONFLICT', message: conflictMessage });
+
+    expect(redisValues.get(BLACKLIST_DOMAINS_REDIS_KEY)).toBe(current);
+    expect(await db.select().from(blacklisted_domains).orderBy(blacklisted_domains.domain)).toEqual(
+      currentDomains.map(domain => ({ domain }))
+    );
+    expect(mockedRedisMset).not.toHaveBeenCalled();
+    expect(mockedBackfill).not.toHaveBeenCalled();
+  });
+
+  it('rejects a predeploy editor capped prefix without a version before reading or writing Redis', async () => {
+    const domains = Array.from({ length: MAX_BLACKLIST_DOMAINS + 5 }, (_, i) => `bulk${i}.example`);
+    const raw = JSON.stringify({
+      domains,
+      blocked_signup_tlds: ['asia'],
+      updated_at: null,
+      updated_by: null,
+      updated_by_email: null,
+    });
+    redisValues.set(BLACKLIST_DOMAINS_REDIS_KEY, raw);
+    const tailDomain = domains[MAX_BLACKLIST_DOMAINS];
+    await db.insert(blacklisted_domains).values({ domain: tailDomain });
+    const caller = await createCallerForUser(admin.id);
+    const oldInput = { domains: domains.slice(0, MAX_BLACKLIST_DOMAINS), blocked_tlds: ['shop'] };
+
+    await expect(
+      caller.admin.blacklistDomains.set(
+        oldInput as Parameters<typeof caller.admin.blacklistDomains.set>[0]
+      )
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+
+    expect(await db.select().from(blacklisted_domains)).toEqual([{ domain: tailDomain }]);
+    expect(redisValues.get(BLACKLIST_DOMAINS_REDIS_KEY)).toBe(raw);
+    expect(mockedRedisGet).not.toHaveBeenCalled();
+    expect(mockedRedisMset).not.toHaveBeenCalled();
+    expect(mockedBackfill).not.toHaveBeenCalled();
+  });
+
+  it('preserves the table and skips backfill when the Redis write fails', async () => {
+    await db.insert(blacklisted_domains).values({ domain: 'previous.example' });
+    mockedRedisMset.mockRejectedValue(new Error('redis write failed'));
+    const caller = await createCallerForUser(admin.id);
+
+    await expect(
+      caller.admin.blacklistDomains.set({
+        domains: ['mailinator.com'],
+        expected_version: configVersion(),
+      })
+    ).rejects.toMatchObject({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: expect.stringContaining(saveFailureMessage),
+    });
+
+    expect(await db.select().from(blacklisted_domains)).toEqual([{ domain: 'previous.example' }]);
+    expect(mockedRedisMset).toHaveBeenCalledTimes(1);
+    expect(mockedBackfill).not.toHaveBeenCalled();
+  });
+
+  it('retains an ambiguously applied Redis write and repairs Postgres after reloading its version', async () => {
+    await db.insert(blacklisted_domains).values({ domain: 'previous.example' });
+    redisValues.set(
+      BLACKLIST_DOMAINS_REDIS_KEY,
+      JSON.stringify({
+        domains: ['previous.example'],
+        blocked_signup_tlds: ['asia'],
+        updated_at: '2026-01-01T00:00:00.000Z',
+        updated_by: null,
+        updated_by_email: null,
+      })
+    );
+    redisValues.set(BLACKLIST_DOMAINS_UPDATED_AT_REDIS_KEY, '2026-01-01T00:00:00.000Z');
+    mockedRedisMset.mockImplementationOnce(async values => {
+      for (const [key, value] of Object.entries(values)) redisValues.set(key, String(value));
+      throw new Error('Redis applied MSET but its response was lost');
+    });
+    const caller = await createCallerForUser(admin.id);
+    const domains = ['new.example', 'previous.example'];
+    const input = { domains, expected_version: configVersion() };
+
+    await expect(caller.admin.blacklistDomains.set(input)).rejects.toMatchObject({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: expect.stringContaining(saveFailureMessage),
+    });
+
+    expect(await db.select().from(blacklisted_domains)).toEqual([{ domain: 'previous.example' }]);
+    const liveConfig = JSON.parse(redisValues.get(BLACKLIST_DOMAINS_REDIS_KEY) ?? 'null');
+    expect(liveConfig).toEqual({
+      domains,
+      blocked_signup_tlds: ['asia'],
+      updated_at: expect.any(String),
+      updated_by: admin.id,
+      updated_by_email: admin.google_user_email,
+    });
+    expect(redisValues.get(BLACKLIST_DOMAINS_UPDATED_AT_REDIS_KEY)).toBe(liveConfig.updated_at);
+
+    await expect(caller.admin.blacklistDomains.set(input)).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: conflictMessage,
+    });
+    expect(mockedRedisMset).toHaveBeenCalledTimes(1);
+
+    const loaded = await caller.admin.blacklistDomains.get();
+    expect(loaded.version).toBe(configVersion());
+    expect(loaded.version).not.toBe(input.expected_version);
+    const result = await caller.admin.blacklistDomains.set({
+      domains: loaded.domains,
+      expected_version: loaded.version,
+    });
+
+    expect(await db.select().from(blacklisted_domains).orderBy(blacklisted_domains.domain)).toEqual(
+      domains.map(domain => ({ domain }))
+    );
+    expect(result.backfill).toEqual({ blocked: 0, remaining: false, failed: false });
+    expect(mockedRedisMset).toHaveBeenCalledTimes(2);
+    expect(mockedBackfill).not.toHaveBeenCalled();
+  });
+
+  it('leaves both stores intact on a second-batch failure and backfills new domains on retry', async () => {
+    await db.insert(blacklisted_domains).values({ domain: 'previous.example' });
+    const previous = JSON.stringify({
+      domains: ['previous.example'],
+      blocked_signup_tlds: ['asia'],
+      updated_at: '2026-01-01T00:00:00.000Z',
+      updated_by: 'previous-admin',
+      updated_by_email: 'previous-admin@example.com',
+    });
+    redisValues.set(BLACKLIST_DOMAINS_REDIS_KEY, previous);
+    redisValues.set(BLACKLIST_DOMAINS_UPDATED_AT_REDIS_KEY, '2026-01-01T00:00:00.000Z');
+    const addedDomains = Array.from({ length: 1001 }, (_, i) => `batch${i}.example`);
+    const domains = ['previous.example', ...addedDomains];
+    const existing = await insertTestUser({
+      google_user_email: 'existing@previous.example',
+      email_domain: 'previous.example',
+    });
+    const target = await insertTestUser({
+      google_user_email: 'target@batch1000.example',
+      email_domain: 'batch1000.example',
+    });
+    const input = { domains, expected_version: configVersion() };
+    const caller = await createCallerForUser(admin.id);
+    await db.execute(sql`
+      CREATE FUNCTION public.fail_blacklist_second_batch() RETURNS trigger AS $$
+      BEGIN
+        IF (SELECT count(*) FROM public.blacklisted_domains) = 1000 THEN
+          RAISE EXCEPTION 'forced second blacklist batch failure';
+        END IF;
+        RETURN NULL;
+      END;
+      $$ LANGUAGE plpgsql;
+      CREATE TRIGGER fail_blacklist_second_batch
+        BEFORE INSERT ON public.blacklisted_domains
+        FOR EACH STATEMENT EXECUTE FUNCTION public.fail_blacklist_second_batch();
+    `);
+    try {
+      await expect(caller.admin.blacklistDomains.set(input)).rejects.toMatchObject({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: expect.stringContaining(saveFailureMessage),
+        cause: { cause: { message: 'forced second blacklist batch failure' } },
+      });
+
+      expect(await db.select().from(blacklisted_domains)).toEqual([{ domain: 'previous.example' }]);
+      expect(redisValues.get(BLACKLIST_DOMAINS_REDIS_KEY)).toBe(previous);
+      expect(redisValues.get(BLACKLIST_DOMAINS_UPDATED_AT_REDIS_KEY)).toBe(
+        '2026-01-01T00:00:00.000Z'
+      );
+      expect(mockedRedisMset).not.toHaveBeenCalled();
+      expect(mockedBackfill).not.toHaveBeenCalled();
+    } finally {
+      await db.execute(sql`
+        DROP TRIGGER fail_blacklist_second_batch ON public.blacklisted_domains;
+        DROP FUNCTION public.fail_blacklist_second_batch();
+      `);
+    }
+    const result = await caller.admin.blacklistDomains.set(input);
+
+    expect(result.backfill).toEqual({ blocked: 1, remaining: false, failed: false });
+    expect(mockedRedisMset).toHaveBeenCalledTimes(1);
+    expect(mockedBackfill).toHaveBeenCalledTimes(1);
+    expect(mockedBackfill).toHaveBeenCalledWith({ actorId: admin.id, domains: addedDomains });
+    expect(await db.select({ count: count() }).from(blacklisted_domains)).toEqual([
+      { count: domains.length },
+    ]);
+    const rows = await db
+      .select({ id: kilocode_users.id, blocked_reason: kilocode_users.blocked_reason })
+      .from(kilocode_users)
+      .where(inArray(kilocode_users.id, [existing.id, target.id]));
+    expect(rows).toEqual(
+      expect.arrayContaining([
+        { id: existing.id, blocked_reason: null },
+        { id: target.id, blocked_reason: 'domainblocked' },
+      ])
+    );
+  });
+
+  it('serializes saves before the Redis read and rejects the stale concurrent version', async () => {
+    redisValues.set(
+      BLACKLIST_DOMAINS_REDIS_KEY,
+      JSON.stringify({
+        domains: [],
+        blocked_signup_tlds: ['shop'],
+        updated_at: null,
+        updated_by: null,
+        updated_by_email: null,
+      })
+    );
+    const writingFirst = Promise.withResolvers<void>();
+    const releaseFirst = Promise.withResolvers<void>();
+    mockedRedisMset.mockImplementationOnce(async values => {
+      writingFirst.resolve();
+      await releaseFirst.promise;
+      for (const [key, value] of Object.entries(values)) redisValues.set(key, String(value));
+      return 'OK';
+    });
+    mockedBackfill.mockResolvedValue({ processed: 0, remaining: false });
+    const caller = await createCallerForUser(admin.id);
+    const expectedVersion = configVersion();
+    const first = caller.admin.blacklistDomains.set({
+      domains: ['first.example'],
+      blocked_tlds: ['asia'],
+      expected_version: expectedVersion,
+    });
+    const saves = [first];
+    try {
+      await Promise.race([
+        writingFirst.promise,
+        first.then(() => {
+          throw new Error('Save finished without reaching Redis');
+        }),
+      ]);
+      const second = caller.admin.blacklistDomains.set({
+        domains: ['first.example', 'second.example'],
+        expected_version: expectedVersion,
+      });
+      saves.push(second);
+      const secondFailure = expect(second).rejects.toMatchObject({
+        code: 'CONFLICT',
+        message: conflictMessage,
+      });
+      const deadline = Date.now() + 5000;
+      let waiting = false;
+      while (Date.now() < deadline) {
+        const { rows } = await db.execute<{ granted: boolean }>(sql`
+          SELECT granted FROM pg_locks
+          WHERE relation = 'public.blacklisted_domains'::regclass
+            AND database = (SELECT oid FROM pg_database WHERE datname = current_database())
+            AND mode = 'ExclusiveLock'
+        `);
+        if (rows.some(row => row.granted) && rows.some(row => !row.granted)) {
+          waiting = true;
+          break;
+        }
+      }
+      expect(waiting).toBe(true);
+      expect(mockedRedisGet).toHaveBeenCalledTimes(1);
+      expect(mockedRedisMset).toHaveBeenCalledTimes(1);
+      expect(await db.select().from(blacklisted_domains)).toEqual([]);
+      releaseFirst.resolve();
+      const firstResult = await first;
+      await secondFailure;
+
+      expect(firstResult.blocked_signup_tlds).toEqual(['asia']);
+      expect(mockedRedisGet).toHaveBeenCalledTimes(2);
+      expect(mockedRedisMset).toHaveBeenCalledTimes(1);
+      expect(mockedBackfill).toHaveBeenCalledTimes(1);
+      expect(mockedBackfill).toHaveBeenCalledWith({
+        actorId: admin.id,
+        domains: ['first.example'],
+      });
+      expect(await db.select().from(blacklisted_domains)).toEqual([{ domain: 'first.example' }]);
+      expect(JSON.parse(redisValues.get(BLACKLIST_DOMAINS_REDIS_KEY) ?? 'null')).toEqual({
+        domains: firstResult.domains,
+        blocked_signup_tlds: ['asia'],
+        updated_at: firstResult.updated_at,
+        updated_by: admin.id,
+        updated_by_email: admin.google_user_email,
+      });
+    } finally {
+      releaseFirst.resolve();
+      await Promise.allSettled(saves);
+    }
+  }, 15000);
 
   it('stores normalized signup TLDs and never backfills on a TLD change', async () => {
     const onDomain = await insertTestUser({
@@ -524,6 +936,7 @@ describe('admin.blacklistDomains.set', () => {
     const result = await caller.admin.blacklistDomains.set({
       domains: [],
       blocked_tlds: ['  .ASIA  ', 'shop', 'asia'],
+      expected_version: configVersion(),
     });
 
     expect(result.blocked_signup_tlds).toEqual(['asia', 'shop']);
@@ -542,28 +955,36 @@ describe('admin.blacklistDomains.set', () => {
     expect(row.blocked_reason).toBeNull();
   });
 
-  it('keeps the stored signup TLDs when the field is omitted', async () => {
-    mockedRedisGet.mockResolvedValue(
-      JSON.stringify({
-        domains: ['mailinator.com'],
-        blocked_signup_tlds: ['asia'],
-        updated_at: null,
-        updated_by: null,
-        updated_by_email: null,
-      })
-    );
-
+  it('keeps signup TLDs from the prior completed save when the field is omitted', async () => {
     const caller = await createCallerForUser(admin.id);
-    const result = await caller.admin.blacklistDomains.set({ domains: ['mailinator.com'] });
+    await caller.admin.blacklistDomains.set({
+      domains: ['mailinator.com'],
+      blocked_tlds: ['asia'],
+      expected_version: configVersion(),
+    });
+    const loaded = await caller.admin.blacklistDomains.get();
+    mockedBackfill.mockClear();
+    const result = await caller.admin.blacklistDomains.set({
+      domains: ['mailinator.com', 'spam.org'],
+      expected_version: loaded.version,
+    });
 
     expect(result.blocked_signup_tlds).toEqual(['asia']);
+    expect(
+      JSON.parse(redisValues.get(BLACKLIST_DOMAINS_REDIS_KEY) ?? 'null').blocked_signup_tlds
+    ).toEqual(['asia']);
+    expect(mockedBackfill).toHaveBeenCalledTimes(1);
+    expect(mockedBackfill).toHaveBeenCalledWith({ actorId: admin.id, domains: ['spam.org'] });
   });
 
   it('keeps the effective TLD fallback when no config is stored yet', async () => {
     mockedRedisGet.mockResolvedValue(null);
 
     const caller = await createCallerForUser(admin.id);
-    const result = await caller.admin.blacklistDomains.set({ domains: ['mailinator.com'] });
+    const result = await caller.admin.blacklistDomains.set({
+      domains: ['mailinator.com'],
+      expected_version: configVersion(),
+    });
 
     // The stored config is written with the effective list auth enforces, not
     // an empty field that would silently re-allow every TLD.
@@ -579,16 +1000,22 @@ describe('admin.blacklistDomains.get', () => {
     const config = await caller.admin.blacklistDomains.get();
 
     expect(config.blocked_signup_tlds).toEqual(['shop', 'top']);
+    expect(config.version).toBe(configVersion(''));
   });
 
-  it('reports zero dropped entries for a stored list', async () => {
-    mockedRedisGet.mockResolvedValue(
-      JSON.stringify({
-        domains: ['mailinator.com', 'spam.org'],
-        updated_at: null,
-        updated_by: null,
-        updated_by_email: null,
-      })
+  it('reports zero dropped entries and hashes the exact stored JSON including whitespace', async () => {
+    redisValues.set(
+      BLACKLIST_DOMAINS_REDIS_KEY,
+      JSON.stringify(
+        {
+          domains: ['mailinator.com', 'spam.org'],
+          updated_at: null,
+          updated_by: null,
+          updated_by_email: null,
+        },
+        null,
+        2
+      )
     );
 
     const caller = await createCallerForUser(admin.id);
@@ -596,18 +1023,102 @@ describe('admin.blacklistDomains.get', () => {
 
     expect(config.domains).toEqual(['mailinator.com', 'spam.org']);
     expect(config.dropped_domains).toBe(0);
+    expect(config.version).toBe(configVersion());
   });
 
-  it('returns the capped prefix and its dropped-entry count', async () => {
+  it.each(['', 'not-json'])(
+    'rejects malformed stored config %j on get and save without writes',
+    async raw => {
+      redisValues.set(BLACKLIST_DOMAINS_REDIS_KEY, raw);
+      await db.insert(blacklisted_domains).values({ domain: 'previous.example' });
+      const caller = await createCallerForUser(admin.id);
+
+      await expect(caller.admin.blacklistDomains.get()).rejects.toThrow();
+      await expect(
+        caller.admin.blacklistDomains.set({
+          domains: ['mailinator.com'],
+          expected_version: configVersion(raw),
+        })
+      ).rejects.toMatchObject({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: expect.stringContaining(saveFailureMessage),
+      });
+
+      expect(await db.select().from(blacklisted_domains)).toEqual([{ domain: 'previous.example' }]);
+      expect(redisValues.get(BLACKLIST_DOMAINS_REDIS_KEY)).toBe(raw);
+      expect(mockedRedisMset).not.toHaveBeenCalled();
+      expect(mockedBackfill).not.toHaveBeenCalled();
+    }
+  );
+
+  it('round-trips an over-cap editor snapshot and TLD-only save without backfilling the tail', async () => {
     const domains = Array.from({ length: MAX_BLACKLIST_DOMAINS + 5 }, (_, i) => `bulk${i}.example`);
-    mockedRedisGet.mockResolvedValue(
-      JSON.stringify({ domains, updated_at: null, updated_by: null, updated_by_email: null })
-    );
+    const previous = {
+      domains,
+      blocked_signup_tlds: ['shop'],
+      updated_at: '2026-01-01T00:00:00.000Z',
+      updated_by: 'previous-admin',
+      updated_by_email: 'previous-admin@example.com',
+    };
+    redisValues.set(BLACKLIST_DOMAINS_REDIS_KEY, JSON.stringify(previous));
+    await db.insert(blacklisted_domains).values({ domain: 'stale.example' });
+    const tail = domains.slice(MAX_BLACKLIST_DOMAINS);
+    const user = await insertTestUser({
+      google_user_email: `existing@${tail[0]}`,
+      email_domain: tail[0],
+    });
 
     const caller = await createCallerForUser(admin.id);
     const config = await caller.admin.blacklistDomains.get();
 
-    expect(config.domains).toHaveLength(MAX_BLACKLIST_DOMAINS);
-    expect(config.dropped_domains).toBe(5);
-  });
+    expect(config).toEqual({ ...previous, version: configVersion(), dropped_domains: 5 });
+    const result = await caller.admin.blacklistDomains.set({
+      domains: config.domains,
+      blocked_tlds: [' .ASIA ', 'asia'],
+      expected_version: config.version,
+    });
+
+    expect(result.domains).toEqual(domains);
+    expect(result.blocked_signup_tlds).toEqual(['asia']);
+    expect(result.backfill).toEqual({ blocked: 0, remaining: false, failed: false });
+    expect(mockedBackfill).not.toHaveBeenCalled();
+    expect(await db.select({ count: count() }).from(blacklisted_domains)).toEqual([
+      { count: domains.length },
+    ]);
+    expect(
+      await db
+        .select()
+        .from(blacklisted_domains)
+        .where(inArray(blacklisted_domains.domain, tail))
+        .orderBy(blacklisted_domains.domain)
+    ).toEqual(tail.map(domain => ({ domain })));
+    expect(
+      await db
+        .select()
+        .from(blacklisted_domains)
+        .where(eq(blacklisted_domains.domain, 'stale.example'))
+    ).toEqual([]);
+    const savedConfig = {
+      domains,
+      blocked_signup_tlds: ['asia'],
+      updated_at: result.updated_at,
+      updated_by: admin.id,
+      updated_by_email: admin.google_user_email,
+    };
+    expect(mockedRedisMset).toHaveBeenCalledTimes(1);
+    expect(mockedRedisMset).toHaveBeenCalledWith({
+      [BLACKLIST_DOMAINS_REDIS_KEY]: JSON.stringify(savedConfig),
+      [BLACKLIST_DOMAINS_UPDATED_AT_REDIS_KEY]: result.updated_at,
+    });
+    expect(await caller.admin.blacklistDomains.get()).toEqual({
+      ...savedConfig,
+      version: configVersion(JSON.stringify(savedConfig)),
+      dropped_domains: 5,
+    });
+    const [row] = await db
+      .select({ blocked_reason: kilocode_users.blocked_reason })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, user.id));
+    expect(row.blocked_reason).toBeNull();
+  }, 30000);
 });

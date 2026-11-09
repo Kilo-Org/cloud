@@ -147,8 +147,8 @@ export function fromDraft(draft: EnkryptGuardrailsDraft): EnkryptGuardrailsConfi
 }
 
 /**
- * Applies Kilo Default's detector selection and turns on Policy violation with Kilo's default
- * policy text, keeping keywords, topics, and structured rules.
+ * Applies Kilo Default's detector selection and actions and sets Policy violation to block with
+ * Kilo's default policy text, keeping keywords, topics, and structured rules.
  */
 export function applyKiloDefaultPreset(
   detectors: EnkryptInputDetectorsDraft
@@ -161,6 +161,7 @@ export function applyKiloDefaultPreset(
     policy_violation: {
       ...detectors.policy_violation,
       enabled: true,
+      action: preset.policy_violation.action,
       format: 'policy_text',
       policy_text: KILO_DEFAULT_POLICY_TEXT,
     },
@@ -191,15 +192,15 @@ function addSchemaIssues(issues: Map<string, string>, result: z.ZodSafeParseResu
 }
 
 /**
- * The response guardrail's issues, keyed like `getEnkryptGuardrailsIssues` but relative to the
- * response guardrail.
+ * The output guardrail's issues, keyed like `getEnkryptGuardrailsIssues` but relative to the
+ * output guardrail.
  */
 export function getEnkryptOutputGuardrailIssues(
   output: EnkryptOutputGuardrailDraft
 ): EnkryptGuardrailsIssues {
   const issues = new Map<string, string>();
   if (output.enabled && !ENKRYPT_OUTPUT_DETECTOR_IDS.some(id => output.detectors[id].enabled)) {
-    issues.set('detectors', 'Turn on at least one response detector.');
+    issues.set('detectors', 'Turn on at least one output detector.');
   }
   addSchemaIssues(
     issues,
@@ -210,23 +211,28 @@ export function getEnkryptOutputGuardrailIssues(
 
 /**
  * Issues keyed by the dotted path of the field that caused them; `''` is the whole configuration.
- * Response guardrail paths start with `output.`. Detector settings are validated even while
- * guardrails are off because they are saved either way.
+ * Output guardrail paths start with `output.`. Detector settings are validated even while
+ * guardrails are off because they are saved either way, unless output is excluded from the save.
  */
-export function getEnkryptGuardrailsIssues(draft: EnkryptGuardrailsDraft): EnkryptGuardrailsIssues {
+export function getEnkryptGuardrailsIssues(
+  draft: EnkryptGuardrailsDraft,
+  includeOutput = true
+): EnkryptGuardrailsIssues {
   const issues = new Map<string, string>();
   if (
     draft.enabled &&
     !ENKRYPT_CONFIGURABLE_INPUT_DETECTOR_IDS.some(id => draft.detectors[id].enabled)
   ) {
-    issues.set('detectors', 'Turn on at least one detector.');
+    issues.set('detectors', 'Turn on at least one input detector.');
   }
   addSchemaIssues(
     issues,
     EnkryptInputDetectorsUpdateSchema.safeParse(fromDraftDetectors(draft.detectors))
   );
-  for (const [path, message] of getEnkryptOutputGuardrailIssues(draft.output)) {
-    issues.set(path ? `output.${path}` : 'output', message);
+  if (includeOutput) {
+    for (const [path, message] of getEnkryptOutputGuardrailIssues(draft.output)) {
+      issues.set(path ? `output.${path}` : 'output', message);
+    }
   }
   return issues;
 }
@@ -251,10 +257,16 @@ function sortKeys(value: unknown): unknown {
 }
 
 /** Identifies a configuration by content; PostgreSQL `jsonb` does not preserve key order. */
-export function configKey(config: EnkryptGuardrailsConfig): string {
-  return JSON.stringify(sortKeys(config));
+export function configKey(config: EnkryptGuardrailsConfig, includeOutput = true): string {
+  return JSON.stringify(
+    sortKeys(includeOutput ? config : { enabled: config.enabled, detectors: config.detectors })
+  );
 }
 
-export function draftsEqual(a: EnkryptGuardrailsDraft, b: EnkryptGuardrailsDraft): boolean {
-  return configKey(fromDraft(a)) === configKey(fromDraft(b));
+export function draftsEqual(
+  a: EnkryptGuardrailsDraft,
+  b: EnkryptGuardrailsDraft,
+  includeOutput = true
+): boolean {
+  return configKey(fromDraft(a), includeOutput) === configKey(fromDraft(b), includeOutput);
 }

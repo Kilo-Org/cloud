@@ -10,6 +10,22 @@ export const MAX_ENKRYPT_CREDITS_PER_CALL = 1_000;
 export const ENKRYPT_USAGE_WRITE_PATH = '/api/internal/enkrypt-usage/record';
 
 /**
+ * `ENKRYPT_DETECTOR_IDS` from `@kilocode/db/schema-types`, which this package cannot import;
+ * `usage-record-contract-alignment.ts` checks that they match.
+ */
+const ENKRYPT_DETECTOR_IDS = [
+  'injection_attack',
+  'pii',
+  'keyword_detector',
+  'topic_detector',
+  'policy_violation',
+  'toxicity',
+  'nsfw',
+  'bias',
+  'sponge_attack',
+] as const;
+
+/**
  * Wire contract for `POST /api/internal/enkrypt-usage/record`.
  *
  * `id` and `occurredAt` are fixed once per Enkrypt call and are the writer's idempotency key, so
@@ -29,6 +45,11 @@ export const EnkryptUsageWriteSchema = z.strictObject({
   addedLatencyMs: z.number().int().nonnegative().nullable(),
   /** Optional so input calls stay compatible with a gateway or web app deployed before it. */
   guardrail: z.enum(['input', 'output']).default('input'),
+  /**
+   * The detectors that fired on this call, blocking or log-only. Omitted when none fired, so a
+   * call without a detection stays compatible with a web app deployed before the field.
+   */
+  detectorsFired: z.array(z.enum(ENKRYPT_DETECTOR_IDS)).nonempty().optional(),
 });
 
 export type EnkryptUsageWrite = z.infer<typeof EnkryptUsageWriteSchema>;

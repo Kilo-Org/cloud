@@ -1,3 +1,5 @@
+import { z } from 'zod';
+import { ReasoningEffortSchema } from '@kilocode/db/schema-types';
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import { isGptOssModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openai';
 import { resolveOpenRouterModelAlias } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
@@ -11,7 +13,7 @@ import {
   type OpenAiChatGptStoredConnection,
 } from './store';
 import { isOpenAiModelServed } from './served-models';
-import { OPENAI_CHATGPT_API_URL } from './upstream';
+import { OPENAI_CHATGPT_API_KEY_ENV, OPENAI_CHATGPT_API_URL } from './upstream';
 
 /**
  * Routing for the delegated "Sign in with ChatGPT" connection. When a person
@@ -22,13 +24,7 @@ import { OPENAI_CHATGPT_API_URL } from './upstream';
 /** The delegated upstream URL, shared with the served-model lookup. */
 export { OPENAI_CHATGPT_API_URL };
 
-/**
- * The delegated route must carry a key from the project that owns the OAuth
- * client. `OPENAI_API_KEY` is a different project's key: it is handed to the
- * Vercel AI Gateway as an OpenAI BYOK credential. Keep the two apart so neither
- * path inherits the other's project, quota, or billing.
- */
-export const OPENAI_CHATGPT_API_KEY_ENV = 'OPENAI_CHATGPT_API_KEY';
+export { OPENAI_CHATGPT_API_KEY_ENV };
 
 /**
  * The delegated access token travels in its own upstream header. `extraHeaders`
@@ -61,6 +57,12 @@ const MIN_MAX_OUTPUT_TOKENS = 16;
  * OpenAI's deprecated name for `summary`, which the gateway always sets.
  */
 const UNSUPPORTED_REASONING_FIELDS = ['enabled', 'exclude', 'max_tokens', 'generate_summary'];
+
+const reasoningEffortUpdateSchema = z.strictObject({
+  type: z.literal('configuration_update'),
+  id: z.string().optional(),
+  reasoning: z.strictObject({ effort: ReasoningEffortSchema }),
+});
 
 /**
  * Adds the required traceability keys to the request metadata, keeping any
@@ -338,6 +340,15 @@ export function buildOpenAiChatGptProvider(
         body.max_output_tokens < MIN_MAX_OUTPUT_TOKENS
       ) {
         body.max_output_tokens = MIN_MAX_OUTPUT_TOKENS;
+      }
+      // Subscription sharing rejects inline updates; changing request-level effort can break cache reuse.
+      if (Array.isArray(body.input)) {
+        body.input = body.input.filter(item => {
+          const update = reasoningEffortUpdateSchema.safeParse(item);
+          if (!update.success) return true;
+          body.reasoning = { ...body.reasoning, effort: update.data.reasoning.effort };
+          return false;
+        });
       }
       if (body.reasoning) {
         for (const field of UNSUPPORTED_REASONING_FIELDS) {

@@ -59,6 +59,7 @@ vi.mock('@/lib/persist/encrypted-kv', () => ({
 import {
   type LogoutCleanupRecord,
   readLogoutCleanupRecords,
+  readLogoutCleanupStore,
   runLogoutCleanup,
   unregisterActivityTokensAndTombstone,
 } from '@/lib/auth/logout-cleanup';
@@ -127,6 +128,62 @@ function pushOutcome(kind: 'token' | 'none' | 'lookup-failed', token?: string): 
 // The store reports are claimed per process, so every case starts unclaimed.
 beforeEach(() => {
   forgetUnreadableStoreReports();
+});
+
+describe('readLogoutCleanupStore', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    store.clear();
+    forgetUnreadableStoreReports();
+  });
+
+  it('reads nothing stored as an empty record list', async () => {
+    await expect(readLogoutCleanupStore()).resolves.toEqual({ status: 'records', records: [] });
+  });
+
+  it('reads a failed keychain read as unreadable', async () => {
+    const { getItemAsync } = await import('expo-secure-store');
+    seedRecords([makeRecord({ needsActivityUnregister: true, activityTokens: ['activity-1'] })]);
+    vi.mocked(getItemAsync).mockRejectedValueOnce(new Error('keychain unavailable'));
+
+    // The read failed, so this build knows nothing about what the store holds.
+    await expect(readLogoutCleanupStore()).resolves.toEqual({ status: 'unreadable' });
+  });
+
+  it('files no store-state report for a failed read', async () => {
+    const { captureException } = await import('@sentry/react-native');
+    const { getItemAsync } = await import('expo-secure-store');
+    vi.mocked(getItemAsync).mockRejectedValueOnce(new Error('keychain unavailable'));
+
+    await readLogoutCleanupStore();
+
+    // The secure-store read path reports the failure at warning level, and a
+    // locked device is not filed at all.
+    expect(captureException).not.toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        tags: expect.objectContaining({ 'error.operation': 'read_logout_cleanup_store' }),
+      })
+    );
+  });
+
+  it('reads a payload of an unknown version as unsupported', async () => {
+    store.set(LOGOUT_CLEANUP_TOMBSTONE_KEY, JSON.stringify({ version: 3, records: [] }));
+
+    await expect(readLogoutCleanupStore()).resolves.toEqual({ status: 'unsupported' });
+  });
+
+  it('reads valid JSON of neither known shape as unsupported', async () => {
+    store.set(LOGOUT_CLEANUP_TOMBSTONE_KEY, JSON.stringify({ pending: [] }));
+
+    await expect(readLogoutCleanupStore()).resolves.toEqual({ status: 'unsupported' });
+  });
+
+  it('reads invalid JSON as corrupt', async () => {
+    store.set(LOGOUT_CLEANUP_TOMBSTONE_KEY, 'not-json');
+
+    await expect(readLogoutCleanupStore()).resolves.toEqual({ status: 'corrupt' });
+  });
 });
 
 describe('runLogoutCleanup', () => {
@@ -636,7 +693,7 @@ describe('runLogoutCleanup', () => {
       tags: {
         'error.subsystem': 'auth',
         'error.operation': 'read_logout_cleanup_store',
-        'logout.cleanup.store': 'unreadable',
+        'logout.cleanup.store': 'unsupported',
       },
     });
   });

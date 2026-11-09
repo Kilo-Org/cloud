@@ -26,29 +26,17 @@ env:
   VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
 
 jobs:
-  # Only a successful CI run may start an automatic deploy. The poll and
-  # dispatch are admitted unchanged. Every later job depends on this one, and
-  # the deployed SHA is still chosen by check-deployment-changes.yml.
-  admit:
-    if: >-
-      github.event_name != 'workflow_run' ||
-      github.event.workflow_run.conclusion == 'success'
-    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
-    timeout-minutes: 2
-    steps:
-      - name: Record admitted trigger
-        env:
-          TRIGGERING_RUN: ${{ github.event.workflow_run.html_url }}
-        run: |
-          echo "Admitted \`$GITHUB_EVENT_NAME\` trigger." >> "$GITHUB_STEP_SUMMARY"
-          if [ -n "$TRIGGERING_RUN" ]; then
-            echo "Triggering CI run: $TRIGGERING_RUN" >> "$GITHUB_STEP_SUMMARY"
-          fi
-
+  # Only a successful CI run may start an automatic deploy; the poll and the
+  # dispatch pass the same guard unchanged. Every later job depends on this one,
+  # so a CI completion that must not deploy skips the whole run. The deployed
+  # SHA is still chosen by check-deployment-changes.yml, which also verifies
+  # main and records the admitted trigger.
   check-changes:
-    needs: admit
     # Guard: privileged workflow — only the canonical repo may run it.
-    if: github.repository == 'Kilo-Org/cloud'
+    if: >-
+      github.repository == 'Kilo-Org/cloud' &&
+      (github.event_name != 'workflow_run' ||
+      github.event.workflow_run.conclusion == 'success')
     uses: ./.github/workflows/check-deployment-changes.yml
     with:
       workflow_file: deploy-production.yml

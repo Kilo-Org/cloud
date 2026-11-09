@@ -264,6 +264,68 @@ try {
   const resume = await socket('viewer');
   resume.send({ type: 'subscribe', afterSeq: event.seq - 1 });
   check((await resume.next('text.delta')).seq, event.seq);
+  const repeated = [];
+  const repeatedDone = new Promise((resolve, reject) => {
+    const timeout = setTimeout(
+      () => reject(new Error(`Repeat subscribe did not finish: ${JSON.stringify(repeated)}`)),
+      10_000
+    );
+    viewer.ws.addEventListener('message', function listener(message) {
+      const frame = JSON.parse(String(message.data));
+      repeated.push(frame);
+      if (frame.type !== 'subscribed') return;
+      clearTimeout(timeout);
+      viewer.ws.removeEventListener('message', listener);
+      resolve();
+    });
+    viewer.send({ type: 'subscribe', afterSeq: event.seq - 1 });
+  });
+  await repeatedDone;
+  check(
+    repeated.map(frame => frame.channel),
+    ['control']
+  );
+  check(
+    repeated.map(frame => frame.type),
+    ['subscribed']
+  );
+  check(
+    repeated.map(frame => frame.seq),
+    [event.seq]
+  );
+  check(
+    repeated.map(frame => frame.body),
+    [{ seq: event.seq, cursor: event.seq }]
+  );
+  runner.send({
+    channel: 'events',
+    type: 'text.delta',
+    body: { text: 'second synthetic delta', syncPosition: 1 },
+  });
+  const second = await viewer.next('text.delta', frame => frame.body.syncPosition === 1);
+  check(second.seq, event.seq + 1);
+  const catchingUp = await socket('viewer');
+  const replayed = [];
+  const caughtUp = new Promise((resolve, reject) => {
+    const timeout = setTimeout(
+      () => reject(new Error(`Catch-up subscribe did not finish: ${JSON.stringify(replayed)}`)),
+      10_000
+    );
+    catchingUp.ws.addEventListener('message', function listener(message) {
+      const frame = JSON.parse(String(message.data));
+      if (frame.channel === 'events') replayed.push(frame);
+      if (frame.type !== 'subscribed') return;
+      clearTimeout(timeout);
+      catchingUp.ws.removeEventListener('message', listener);
+      resolve();
+    });
+    catchingUp.send({ type: 'subscribe', afterSeq: event.seq });
+  });
+  await caughtUp;
+  check(
+    replayed.map(frame => frame.seq),
+    [event.seq + 1]
+  );
   const httpID = crypto.randomUUID();
   const submitted = await request(`/sessions/${sessionID}/commands`, 'POST', {
     channel: 'commands',
@@ -290,6 +352,7 @@ try {
   check(listing.items.find(item => item.sessionID === sessionID)?.live, true);
   viewer.ws.close();
   resume.ws.close();
+  catchingUp.ws.close();
   controller.ws.close();
   check((await presenceRunner.next('watch', frame => !frame.body.watching)).body.watching, false);
   console.log(

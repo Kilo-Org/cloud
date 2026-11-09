@@ -57,6 +57,29 @@ function metadata(overrides: Record<string, unknown> = {}) {
 
 const selection = { provider: 'cloudflare' as const };
 
+describe('trusted runtime origin', () => {
+  it.each(['cloud-agent-web', 'cloud-agent', 'code-review', 'agent-manager', undefined])(
+    'preserves the worker origin %s separately from a client web claim',
+    billingOrigin => {
+      const input = metadata({
+        identity: {
+          sessionId: 'workspace_12345678-1234-1234-1234-123456789abc',
+          userId: 'usr_1',
+          createdOnPlatform: 'cloud-agent-web',
+          billingOrigin,
+        },
+      });
+      const registration = buildControlPlaneSessionRegistration(input, selection);
+      const parsed = controlPlanePrepareInputSchema.parse({
+        spec: registration.spec,
+        credentials: registration.credentials,
+      });
+      expect(parsed.credentials).toMatchObject({ createdOnPlatform: 'cloud-agent-web' });
+      expect(parsed.credentials.billingOrigin).toBe(billingOrigin);
+    }
+  );
+});
+
 describe('workspace tail snapshot authority', () => {
   it('carries a registered workspace from metadata, without inferring one for standalone sessions', () => {
     const workspaceId = 'worktree_00000000-0000-4000-8000-000000000001';
@@ -379,6 +402,8 @@ describe('migrated origin permissions', () => {
               'gh pr create': 'deny',
               'gh api repos/*/issues/*/comments --input*': 'allow',
               'gh api repos/*/issues/comments/* -X PATCH*': 'allow',
+              'find *-exec*': 'deny',
+              'sort *--compress-program*': 'deny',
             }
       );
       expect(spec.env).toMatchObject({

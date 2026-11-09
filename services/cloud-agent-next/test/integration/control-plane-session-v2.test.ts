@@ -451,6 +451,10 @@ type PreparingRowData = {
   step?: string;
   stepId?: string;
   parentStepId?: string;
+  label?: string;
+  command?: string;
+  commandIndex?: number;
+  commandCount?: number;
   safeError?: string;
   attempt?: { id?: string; status?: string; triggerMessageId?: string };
   stepSnapshot?: { id?: string; key?: string; status?: string };
@@ -1031,30 +1035,50 @@ describe('SandboxSessionV2 message flow (fake sandbox peer)', () => {
     stream.close();
   });
 
-  it('keeps the environment snapshot detail after the sandbox starts', async () => {
-    const { sessionId, stub, peer } = await setup();
-    peer.prepareView = peer.view('preparing');
-    await stub.send(promptPayload('m1'));
-    const detail = 'Starting from the environment snapshot (revision 2)';
-    await stub.onRoute({ state: 'preparing', step: 'sandbox_create', attemptId: peer.attemptId });
-    await stub.onRoute({
-      state: 'preparing',
+  it.each([
+    {
       step: 'environment_snapshot',
-      detail,
-      attemptId: peer.attemptId,
-    });
-    await stub.onRoute({ state: 'preparing', step: 'sandbox_start', attemptId: peer.attemptId });
+      key: 'environment_snapshot',
+      detail: 'Using environment snapshot',
+    },
+    { step: 'restore', key: 'workspace_restore', detail: 'Using workspace snapshot' },
+  ] as const)(
+    'keeps $key capture time in live progress and replay after sandbox startup',
+    async ({ step, key, detail }) => {
+      const { sessionId, stub, peer } = await setup();
+      peer.prepareView = peer.view('preparing');
+      await stub.send(promptPayload('m1'));
+      const snapshotCapturedAt = Date.parse('2026-10-24T21:32:19Z');
+      const live = await connectStream(sessionId);
+      await waitForStreamEvent(live, 'connected');
+      await drainStream(live);
+      await stub.onRoute({ state: 'preparing', step: 'sandbox_create', attemptId: peer.attemptId });
+      await stub.onRoute({
+        state: 'preparing',
+        step,
+        detail,
+        snapshotCapturedAt,
+        attemptId: peer.attemptId,
+      });
+      await stub.onRoute({ state: 'preparing', step: 'sandbox_start', attemptId: peer.attemptId });
+      expect(preparingRows(await drainStream(live))).toContainEqual(
+        expect.objectContaining({ action: 'step_progress', detail, snapshotCapturedAt })
+      );
+      live.close();
 
-    const stream = await connectStream(sessionId);
-    await waitForStreamEvent(stream, 'connected');
-    const replayed = preparingRows(await drainStream(stream));
-    expect(
-      replayed.find(
-        row => row.action === 'step_snapshot' && row.stepSnapshot?.key === 'environment_snapshot'
-      )?.stepSnapshot
-    ).toMatchObject({ status: 'completed', latestDetail: detail });
-    stream.close();
-  });
+      const stream = await connectStream(sessionId);
+      await waitForStreamEvent(stream, 'connected');
+      const replayed = preparingRows(await drainStream(stream));
+      expect(
+        replayed.find(row => row.action === 'step_snapshot' && row.stepSnapshot?.key === key)
+          ?.stepSnapshot
+      ).toMatchObject({ status: 'completed', latestDetail: detail, snapshotCapturedAt });
+      expect(
+        replayed.find(row => row.stepSnapshot?.key === 'sandbox_boot')?.stepSnapshot
+      ).not.toHaveProperty('snapshotCapturedAt');
+      stream.close();
+    }
+  );
 
   it('preserves ordered phase occurrences and original starts across retries in one attempt', async () => {
     const { sessionId, stub, peer } = await setup();
@@ -1368,6 +1392,180 @@ describe('SandboxSessionV2 message flow (fake sandbox peer)', () => {
     expect(commandRows[1]).toMatchObject({ step: 'setup_commands', output: 'npm install\n' });
     // The rendered preparing rows replace the raw wrapper events.
     expect(messages.some(message => message.streamEventType === 'kilocode')).toBe(false);
+    stream.close();
+  });
+
+  it('renders session setup and start phases with their kind and command text', async () => {
+    const { sessionId, stub, peer } = await setup();
+    const stream = await connectStream(sessionId);
+    peer.prepareView = peer.view('preparing');
+    await stub.send(promptPayload('m1'));
+    await stub.onRoute({ state: 'preparing', step: 'setup', attemptId: peer.attemptId });
+    await stub.onEvents({
+      events: [
+        {
+          type: 'session.setup.started',
+          properties: {
+            command: 1,
+            commandCount: 1,
+            kind: 'session_setup',
+            commandText: 'pnpm install',
+          },
+        },
+        {
+          type: 'session.setup.finished',
+          properties: { command: 1, kind: 'session_setup', exitCode: 0 },
+        },
+        {
+          type: 'session.setup.started',
+          properties: {
+            command: 1,
+            commandCount: 2,
+            kind: 'start',
+            commandText: 'pnpm dev:start',
+          },
+        },
+        {
+          type: 'session.setup.finished',
+          properties: {
+            command: 1,
+            kind: 'start',
+            exitCode: 1,
+            safeError: 'Start command 1 failed',
+          },
+        },
+      ],
+    });
+
+    const messages = await drainStream(stream);
+    const rows = preparingRows(messages);
+    const setupStart = rows.find(
+      row =>
+        row.action === 'step_started' &&
+        row.step === 'session_setup_commands' &&
+        row.stepId?.endsWith('setup_command:0')
+    );
+    expect(setupStart).toMatchObject({
+      step: 'session_setup_commands',
+      stepId: 'phase:session_setup_commands:setup_command:0',
+      label: 'Session setup command 1 · `pnpm install`',
+      command: 'pnpm install',
+      commandIndex: 0,
+      commandCount: 1,
+    });
+    const startPhase = rows.find(
+      row =>
+        row.action === 'step_started' &&
+        row.step === 'start_commands' &&
+        row.stepId?.startsWith('phase:start_commands')
+    );
+    expect(startPhase).toMatchObject({ step: 'start_commands' });
+    const startCommand = rows.find(
+      row => row.step === 'start_commands' && row.stepId?.endsWith('setup_command:0')
+    );
+    expect(startCommand).toMatchObject({
+      action: 'step_started',
+      label: 'Start command 1 · `pnpm dev:start`',
+      command: 'pnpm dev:start',
+    });
+    expect(startCommand?.parentStepId).toMatch(/^phase:start_commands/);
+
+    const failed = rows.filter(row => row.action === 'step_failed');
+    expect(failed).toEqual([
+      expect.objectContaining({
+        step: 'start_commands',
+        stepId: 'phase:start_commands:setup_command:0',
+      }),
+    ]);
+    expect(messages.some(message => message.streamEventType === 'cloud.command.failed')).toBe(
+      false
+    );
+    stream.close();
+  });
+
+  it('records a timed-out start command once when the failure is redelivered', async () => {
+    const { sessionId, stub, peer } = await setup();
+    const stream = await connectStream(sessionId);
+    peer.prepareView = peer.view('preparing');
+    await stub.send(promptPayload('m1'));
+    await stub.onRoute({ state: 'preparing', step: 'setup', attemptId: peer.attemptId });
+    const failureEvent = {
+      type: 'session.setup.finished',
+      properties: {
+        command: 2,
+        commandCount: 2,
+        kind: 'start',
+        exitCode: 124,
+        terminationReason: 'hard_timeout',
+        safeError: 'Start command 2 timed out',
+      },
+    };
+    await stub.onEvents({
+      events: [
+        {
+          type: 'session.setup.started',
+          properties: {
+            command: 2,
+            commandCount: 2,
+            kind: 'start',
+            commandText: 'pnpm dev:start',
+          },
+        },
+        failureEvent,
+        failureEvent,
+      ],
+    });
+
+    const messages = await drainStream(stream);
+    const failed = preparingRows(messages).filter(row => row.action === 'step_failed');
+    expect(failed).toHaveLength(1);
+    expect(failed[0]).toMatchObject({
+      step: 'start_commands',
+      safeError: 'Start command 2 timed out',
+    });
+    expect(
+      preparingRows(messages).find(row => row.action === 'step_started' && row.commandIndex === 1)
+    ).toMatchObject({ label: 'Start command 2 · `pnpm dev:start`', command: 'pnpm dev:start' });
+    expect(messages.some(message => message.streamEventType === 'cloud.command.failed')).toBe(
+      false
+    );
+    stream.close();
+  });
+
+  it.each([
+    { kind: 'build', phase: 'setup_commands' },
+    { kind: undefined, phase: 'setup_commands' },
+  ] as const)('records a $kind command under the $phase phase', async ({ kind, phase }) => {
+    const { sessionId, stub, peer } = await setup();
+    const stream = await connectStream(sessionId);
+    peer.prepareView = peer.view('preparing');
+    await stub.send(promptPayload('m1'));
+    await stub.onRoute({ state: 'preparing', step: 'setup', attemptId: peer.attemptId });
+    await stub.onEvents({
+      events: [
+        {
+          type: 'session.setup.started',
+          properties: {
+            command: 1,
+            commandCount: 1,
+            ...(kind === undefined ? {} : { kind }),
+          },
+        },
+        {
+          type: 'session.setup.finished',
+          properties: {
+            command: 1,
+            exitCode: 1,
+            ...(kind === undefined ? {} : { kind }),
+          },
+        },
+      ],
+    });
+    const messages = await drainStream(stream);
+    // The legacy path keeps the old phase key so old wrappers are unchanged.
+    expect(
+      preparingRows(messages).some(row => row.step === phase && row.action === 'step_started')
+    ).toBe(true);
     stream.close();
   });
 

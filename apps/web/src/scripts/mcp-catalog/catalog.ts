@@ -75,6 +75,9 @@ const NATIVE_ONLY_PATHS: Record<string, true> = {
   'agentBriefing.updateContextPreferences': true,
   // Stores a raw GitHub credential as the user's personal identity.
   'githubApps.provideUserToken': true,
+  // "Start fresh" irreversibly discards a workspace's changes behind an in-app confirmation.
+  'cloudAgentNext.removeWorkspaceSnapshot': true,
+  'organizations.cloudAgentNext.removeWorkspaceSnapshot': true,
 };
 
 /**

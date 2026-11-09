@@ -50,7 +50,6 @@ import { VariantCombobox } from '@/components/shared/VariantCombobox';
 import { thinkingEffortLabel } from '@/lib/code-reviews/core/model-variants';
 import { InsufficientBalanceBanner } from '@/components/shared/InsufficientBalanceBanner';
 import { ProfilePickerPopover } from '@/components/cloud-agent/ProfilePickerPopover';
-import { EnvironmentProfileSetupNotice } from '@/components/cloud-agent-next/EnvironmentProfileSetupNotice';
 import { RepositoryEnvironmentChip } from '@/components/cloud-agent-next/RepositoryEnvironmentChip';
 import { environmentBlocksStart } from '@/components/cloud-agent-next/environment-selection';
 import { useSessionEnvironment } from '@/hooks/useSessionEnvironment';
@@ -1817,14 +1816,6 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
           </div>
 
           <div className="flex w-full shrink-0 items-center gap-1 sm:w-auto">
-            {repositoryEnvironment && environmentRepository && (
-              <EnvironmentProfileSetupNotice
-                organizationId={organizationId}
-                repository={environmentRepository}
-                environment={repositoryEnvironment}
-                selectedProfileId={selectedProfileId}
-              />
-            )}
             <ProfilePickerPopover
               organizationId={organizationId}
               selectedOverrideProfileId={selectedProfileId}

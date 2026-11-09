@@ -210,13 +210,17 @@ suite('real Kilo v2 harness', () => {
           })
           .catch(error => String(error))
       ).toContain('another directory');
-      async function prompt(text: string) {
+      const callbackContext = '<cloud-agent-context session-id="workspace_callback-marker" />';
+      const startupFailureNote =
+        'Some startup commands failed during session preparation. The session started anyway.';
+      async function prompt(text: string, context?: string) {
         const start = events.length;
         await harness.submit({
           sessionId,
           directory,
           messageId: createMessageId(),
           prompt: text,
+          context,
           model: 'fake-deterministic',
           signal,
         });
@@ -232,7 +236,14 @@ suite('real Kilo v2 harness', () => {
         );
         expect(runtime.sessionState(sessionId)).toBeUndefined();
       }
-      await prompt('remember amber-history-marker');
+      await prompt('remember amber-history-marker', `${startupFailureNote}\n\n${callbackContext}`);
+      expect(requests.at(-1)).toContain('workspace_callback-marker');
+      expect(requests.at(-1)).toContain(startupFailureNote);
+      expect(
+        (await nativeMessages())
+          .filter(message => message.type === 'user')
+          .map(message => message.text)
+      ).toEqual(['remember amber-history-marker']);
       expect(activity.some(event => event.activity.type === 'delta')).toBe(true);
       expect(events.some(event => event.type.startsWith('message.'))).toBe(false);
       expect(await fs.stat(path.join(root, 'data/kilo2'))).toBeDefined();
@@ -247,8 +258,10 @@ suite('real Kilo v2 harness', () => {
         restoreFiles: false,
         onRestore() {},
       });
-      await prompt('recall the earlier marker');
+      await prompt('recall the earlier marker', callbackContext);
       expect(requests.at(-1)).toContain('amber-history-marker');
+      expect(requests.at(-1)).toContain('workspace_callback-marker');
+      expect(requests.at(-1)).not.toContain(startupFailureNote);
       const history = await nativeMessages();
       expect(history.filter(message => message.type === 'user')).toHaveLength(2);
       expect(
@@ -277,8 +290,9 @@ suite('real Kilo v2 harness', () => {
       });
       expect(restored).toBe(true);
       expect(historyReads).toEqual([undefined, undefined]);
-      await prompt('recall the marker after native database replacement');
+      await prompt('recall the marker after native database replacement', callbackContext);
       expect(requests.at(-1)).toContain('amber-history-marker');
+      expect(requests.at(-1)).toContain('workspace_callback-marker');
       mode = 'tool';
       toolSent = false;
       const toolTurn = prompt('run the native tool');
@@ -303,6 +317,7 @@ suite('real Kilo v2 harness', () => {
         })
       ).toBe(true);
       await toolTurn;
+      expect(requests.at(-1)).not.toContain('workspace_callback-marker');
       expect(
         (await nativeMessages()).some(message =>
           (message.content ?? []).some(

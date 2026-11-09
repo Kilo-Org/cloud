@@ -1,6 +1,7 @@
 import { normalize, normalizeCliEvent, isChatEvent } from './normalizer';
 import { PREPARATION_OUTPUT_MAX_LENGTH, PREPARATION_OUTPUT_TAIL_MAX_BYTES } from './limits';
 import {
+  preparingDataSchema,
   REMOTE_COMMAND_MAX_COMMANDS,
   REMOTE_COMMAND_MAX_HINTS,
   SESSION_QUEUE_MAX_IDS,
@@ -1596,37 +1597,76 @@ describe('normalize', () => {
       });
     });
 
-    it.each([{ startedRevision: 2, parentStepId: 'phase:setup_commands:2' }, {}])(
-      'preserves optional preparation snapshot metadata %j',
-      metadata => {
-        const stepSnapshot = {
-          id: 'command:install',
-          key: 'setup_commands',
-          kind: 'setup_command',
-          label: 'Install dependencies',
-          status: 'completed',
-          startedAt: 1000,
-          completedAt: 2000,
+    it.each([
+      { startedRevision: 2, parentStepId: 'phase:setup_commands:2' },
+      { snapshotCapturedAt: 1_790_000_000_000 },
+      {},
+    ])('preserves optional preparation snapshot metadata %j', metadata => {
+      const stepSnapshot = {
+        id: 'command:install',
+        key: 'setup_commands',
+        kind: 'setup_command',
+        label: 'Install dependencies',
+        status: 'completed',
+        startedAt: 1000,
+        completedAt: 2000,
+        revision: 5,
+        ...metadata,
+      };
+      const result = normalize(
+        createRaw('preparing', {
+          step: 'setup_commands',
+          message: 'Preparation snapshot',
+          version: 2,
+          attemptId: 'attempt-1',
+          triggerMessageId: 'msg-1',
           revision: 5,
-          ...metadata,
-        };
+          timestamp: 2000,
+          action: 'step_snapshot',
+          stepId: stepSnapshot.id,
+          stepSnapshot,
+        })
+      );
+      expect(result).toMatchObject({ type: 'preparing', action: 'step_snapshot', stepSnapshot });
+      if (result?.type !== 'preparing') throw new Error('Expected preparing event');
+      expect(result.stepSnapshot).toEqual(stepSnapshot);
+    });
+
+    it.each([0, 1_790_000_000_000, undefined])(
+      'preserves optional live snapshot capture time %j',
+      snapshotCapturedAt => {
         const result = normalize(
           createRaw('preparing', {
-            step: 'setup_commands',
-            message: 'Preparation snapshot',
+            step: 'environment_snapshot',
+            message: 'Using environment snapshot',
             version: 2,
             attemptId: 'attempt-1',
             triggerMessageId: 'msg-1',
-            revision: 5,
+            revision: 3,
             timestamp: 2000,
-            action: 'step_snapshot',
-            stepId: stepSnapshot.id,
-            stepSnapshot,
+            action: 'step_progress',
+            stepId: 'phase:environment_snapshot',
+            detail: 'Using environment snapshot',
+            ...(snapshotCapturedAt === undefined ? {} : { snapshotCapturedAt }),
           })
         );
-        expect(result).toMatchObject({ type: 'preparing', action: 'step_snapshot', stepSnapshot });
-        if (result?.type !== 'preparing') throw new Error('Expected preparing event');
-        expect(result.stepSnapshot).toEqual(stepSnapshot);
+        expect(result).toMatchObject({ type: 'preparing', action: 'step_progress' });
+        if (snapshotCapturedAt === undefined)
+          expect(result).not.toHaveProperty('snapshotCapturedAt');
+        else expect(result).toHaveProperty('snapshotCapturedAt', snapshotCapturedAt);
+      }
+    );
+
+    it.each([-1, 0.5, Infinity, NaN, 8_640_000_000_000_001, '2026-10-24'])(
+      'rejects invalid capture time %j',
+      snapshotCapturedAt => {
+        expect(
+          preparingDataSchema.safeParse({
+            step: 'environment_snapshot',
+            message: 'Snapshot',
+            snapshotCapturedAt,
+          }).success
+        ).toBe(false);
       }
     );
 

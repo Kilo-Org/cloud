@@ -1390,6 +1390,103 @@ export async function fetchPullRequestByNumber(params: {
   }
 }
 
+/** One open pull request a recovery sweep may reconsider. */
+export type OpenPullRequest = {
+  number: number;
+  title: string;
+  body: string | null;
+  draft: boolean;
+  htmlUrl: string;
+  createdAt: string;
+  updatedAt: string;
+  authorId: number;
+  authorLogin: string;
+  authorAvatarUrl: string;
+  authorType: string;
+  labels: string[];
+  headSha: string;
+  headRef: string;
+  headRepoFullName: string | null;
+  headRepoCloneUrl: string | null;
+  headRepoHtmlUrl: string | null;
+  baseSha: string;
+  baseRef: string;
+  baseRepoId: number;
+  baseRepoName: string;
+  baseRepoFullName: string;
+};
+
+/**
+ * Lists the most recently updated open pull requests of one repository, newest
+ * first. A recovery sweep reads this to reach a pull request whose review never
+ * started, which no webhook delivery will report again.
+ *
+ * @throws {GitHubRateLimitError} on 403 secondary rate limit.
+ */
+export async function fetchOpenPullRequests(params: {
+  installationId: string;
+  owner: string;
+  repo: string;
+  limit: number;
+  appType?: GitHubAppType;
+  signal?: AbortSignal;
+}): Promise<OpenPullRequest[]> {
+  const { installationId, owner, repo, limit, appType = 'standard', signal } = params;
+
+  const requestOptions = signal ? { request: { signal } } : {};
+  const tokenData = await generateGitHubInstallationToken(
+    installationId,
+    appType,
+    undefined,
+    'workflow',
+    signal
+  ).catch((error: unknown) => {
+    throw toGitHubRateLimitError(error) ?? error;
+  });
+  const octokit = new Octokit({ auth: tokenData.token });
+
+  try {
+    const { data } = await octokit.pulls.list({
+      owner,
+      repo,
+      state: 'open',
+      sort: 'updated',
+      direction: 'desc',
+      per_page: limit,
+      ...requestOptions,
+    });
+
+    return data.map(pull => ({
+      number: pull.number,
+      title: pull.title,
+      body: pull.body ?? null,
+      draft: pull.draft === true,
+      htmlUrl: pull.html_url,
+      createdAt: pull.created_at,
+      updatedAt: pull.updated_at,
+      authorId: pull.user?.id ?? 0,
+      authorLogin: pull.user?.login ?? '',
+      authorAvatarUrl: pull.user?.avatar_url ?? '',
+      authorType: pull.user?.type ?? 'User',
+      labels: pull.labels
+        .map(label => (typeof label === 'string' ? label : (label.name ?? '')))
+        .filter(name => name !== ''),
+      headSha: pull.head.sha,
+      headRef: pull.head.ref,
+      headRepoFullName: pull.head.repo?.full_name ?? null,
+      headRepoCloneUrl: pull.head.repo?.clone_url ?? null,
+      headRepoHtmlUrl: pull.head.repo?.html_url ?? null,
+      baseSha: pull.base.sha,
+      baseRef: pull.base.ref,
+      baseRepoId: pull.base.repo.id,
+      baseRepoName: pull.base.repo.name,
+      baseRepoFullName: pull.base.repo.full_name,
+    }));
+  } catch (error) {
+    throw toGitHubRateLimitError(error) ?? error;
+  }
+}
+
 export type ReviewDecision = 'approved' | 'changes_requested' | 'review_required';
 
 export type BatchedPrInput = {
@@ -1817,7 +1914,7 @@ export async function createCheckRun(
   const { data } = await octokit.checks.create({
     owner,
     repo,
-    name: 'Kilo Code Review',
+    name: CHECK_RUN_NAME,
     head_sha: headSha,
     status: completed ? 'completed' : 'queued',
     ...(options.conclusion ? { conclusion: options.conclusion } : {}),
@@ -1835,6 +1932,42 @@ export async function createCheckRun(
   });
 
   return data.id;
+}
+
+/** The check run name the Kilo Code Review creates on a pull request head. */
+const CHECK_RUN_NAME = 'Kilo Code Review';
+
+/**
+ * The id of the latest Kilo Code Review run that already exists on a commit, or
+ * undefined when the commit carries none. A read failure also answers
+ * undefined after it is logged, so the caller cannot tell it from "no run"; the
+ * caller's fallback is a re-gate, and a decided duplicate run answers 422,
+ * which the create path logs and leaves in place.
+ */
+export async function findLatestCheckRunId(
+  installationId: string,
+  owner: string,
+  repo: string,
+  headSha: string,
+  appType: GitHubAppType = 'standard'
+): Promise<number | undefined> {
+  try {
+    const tokenData = await generateGitHubInstallationToken(installationId, appType);
+    const octokit = new Octokit({ auth: tokenData.token });
+    const { data } = await octokit.checks.listForRef({
+      owner,
+      repo,
+      ref: headSha,
+      check_name: CHECK_RUN_NAME,
+      filter: 'latest',
+      per_page: 1,
+    });
+    const [latest] = data.check_runs;
+    return latest?.id;
+  } catch (error) {
+    logExceptInTest('[findLatestCheckRunId] Failed to list check runs:', error);
+    return undefined;
+  }
 }
 
 /**

@@ -530,6 +530,32 @@ describe('response classes', () => {
     expect((await readState(target)).parked).toEqual(['evt_1', 'evt_2']);
   });
 
+  it('parks directory data the app would reject, instead of holding the stream', async () => {
+    const target = stub('invalid-directory-data');
+    // A real IdP can deliver an address the app's `.email()` check refuses.
+    // Before the body was validated here, that produced a 400 on every
+    // retry — classified `unavailable`, which never parks — so one tenant's
+    // bad attribute stalled the single namespace for every tenant.
+    const io = harness({
+      pages: [
+        [
+          userEvent('evt_1', 'dsync.user.created', { email: 'not-an-address' }),
+          userEvent('evt_2', 'dsync.user.created'),
+        ],
+      ],
+    });
+
+    const result = await runInDurableObject(target, instance => instance.poll());
+
+    // No request spent on a body that cannot be accepted.
+    expect(io.calls.map(call => call.path)).toEqual(['/api/internal/scim/users/dir_usr_01']);
+    expect(result.eventsParked).toBe(1);
+    expect(result.eventsApplied).toBe(1);
+    // The stream kept moving: the valid event behind the bad one applied.
+    expect(result.cursor).toBe('evt_2');
+    expect((await readState(target)).parked).toEqual(['evt_1']);
+  });
+
   it('stops an event at its first failed call, so later calls do not run', async () => {
     const target = stub('partial-event');
     const io = harness({

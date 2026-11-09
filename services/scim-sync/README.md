@@ -315,7 +315,7 @@ the cursor and whether the event survives:
 |---|---|---|
 | `applied` | 2xx | Continue to this event's next call, then commit the cursor |
 | `conflict` | 409 whose `code` is retryable, or an unrecognized code; an unexpected throw inside the dispatcher | Hold the cursor and retry, bounded by one hour from the first failure, then park |
-| `terminal` | a 409 with a terminal `code`, or a payload that cannot be mapped at all | Park immediately |
+| `terminal` | a 409 with a terminal `code`; a body this Worker's own copy of the request schema rejects; a payload that cannot be mapped at all | Park immediately |
 | `unavailable` | 400, 401, 403, 408, 429, any 3xx, any 5xx, a 2xx whose body does not match the contract, a network error, a timeout | Hold the cursor and retry indefinitely with capped backoff; never park |
 
 The 409 body carries a machine-readable `code`, which is what separates the two
@@ -338,22 +338,38 @@ types nullable and the endpoint requires, and a `dsync.activated` carrying no
 wrong `INTERNAL_API_SECRET`. That is an operator problem rather than a bad
 event, and parking the stream over one would step past every event behind it.
 
-**A 400 is `unavailable`, not terminal**, which is not the obvious reading of
-the status. The app's request schemas are `z.strictObject`, so this Worker
-deployed ahead of the app — sending a field the app does not yet accept — is
-rejected with exactly the status a malformed path or a genuinely bad body
-produces, and the loop cannot tell them apart. Deploy skew clears on its own
-the minute the app rolls out, and nothing replays `parked_events`, so parking
-it would discard events over a condition that resolves itself in minutes. A
-bounded `conflict` is wrong for the same reason in a slower form: the skew
-window is operational rather than per-event, so the hour could expire
+**The body is validated here before the request is spent.** Each call carries
+the same request schema the app parses it with, and a body that fails it is
+`terminal` with no HTTP call: the event parks with the offending field named,
+and the stream continues.
+
+That split is load-bearing, because the bodies carry directory data as well as
+this Worker's own construction. `email` must satisfy `.email().max(320)`,
+`name` and the two name fields `.max(255)`, `capturedDomains` at most 50
+entries. An identity provider delivering an address that fails that check, or a
+300-character display name, is not a transient condition — it would be rejected
+identically on every retry.
+
+**A 400 that still comes back is `unavailable`, not terminal**, which is not
+the obvious reading of the status. The app's request schemas are
+`z.strictObject`, so this Worker deployed ahead of the app — sending a field
+the app does not yet accept — is rejected with exactly the status a malformed
+path produces, and the loop cannot tell them apart. Deploy skew clears on its
+own the minute the app rolls out, and nothing replays `parked_events`, so
+parking it would discard events over a condition that resolves itself in
+minutes. A bounded `conflict` is wrong for the same reason in a slower form:
+the skew window is operational rather than per-event, so the hour could expire
 mid-rollout, and a 400 indicts the *request*, which is identical for every
 event of that type — so the bounded path would park every event of that shape
-in sequence. The cost is that a body no deploy will ever fix holds the stream
-indefinitely instead of being stepped over; that is the right side to fail on,
-because every body is built from the shared typed contract module with no user
-input in it, so a permanently rejected one is a bug in this Worker, which is an
-operator problem exactly like a wrong secret. `/status` reports the held
+in sequence.
+
+The cost is that a body no deploy will ever fix holds the stream indefinitely
+instead of being stepped over. The validation above is what makes that
+acceptable: the cause this Worker can see for itself — directory data outside
+the contract — parks, so a surviving 400 is the deploy-skew case or a bug in
+this Worker's own body construction, both operator problems like a wrong
+secret. Without that check, one tenant's malformed attribute would stall every
+tenant, since the namespace holds a single instance. `/status` reports the held
 failure with the status and the reason, which is how it gets noticed.
 
 **Redirects are refused, never followed.** `x-internal-api-key` is a custom

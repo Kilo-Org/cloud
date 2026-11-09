@@ -1404,7 +1404,7 @@ describe('revokeAllDirectoryMemberships', () => {
     expect(tombstones).toEqual([]);
   });
 
-  test('a user in many groups is fully revoked in one call', async () => {
+  test('a user in many groups is revoked in one transaction', async () => {
     const parentId = await seedOrganization();
     const firstChildId = await seedSubOrganization();
     const userId = await seedUser();
@@ -1427,6 +1427,20 @@ describe('revokeAllDirectoryMemberships', () => {
       await addDirectoryMembership({ directoryGroupId: groupKey, externalId });
     }
 
+    // The row counts alone do not distinguish this from the per-group
+    // implementation that preceded it — the same memberships end up deleted
+    // either way. What changed is *how*: one transaction for every deletion,
+    // with the outbound session-invalidation calls outside it. That is what
+    // keeps a user in many groups inside the Worker's 15s budget, so it is
+    // what this asserts.
+    //
+    // `invalidateMemberSessionAccess` is not spied on: it is an ES module
+    // export, so `jest.spyOn` cannot redefine it. The transaction count is
+    // the observable that separates the two implementations — the previous
+    // one opened one per group, and each of those also awaited its own
+    // invalidation inside `removeUserFromOrganization`.
+    const transactionSpy = jest.spyOn(db, 'transaction');
+
     const result = await revokeAllDirectoryMemberships(externalId, { directoryId });
 
     expect(result.revokedOrganizationIds.toSorted()).toEqual([parentId, ...groupIds].toSorted());
@@ -1436,6 +1450,14 @@ describe('revokeAllDirectoryMemberships', () => {
       .from(organization_memberships)
       .where(eq(organization_memberships.kilo_user_id, userId));
     expect(remaining).toEqual([]);
+
+    // One transaction for all 13 revocations, not one apiece. The per-group
+    // implementation opened 13, each awaiting its own session-invalidation
+    // round trip inside `removeUserFromOrganization`, which is what could
+    // exceed the Worker's request budget.
+    expect(transactionSpy).toHaveBeenCalledTimes(1);
+
+    transactionSpy.mockRestore();
   });
 });
 

@@ -5,8 +5,13 @@ import {
   DirectoryMembershipRemovalResultSchema,
   DirectoryMembershipResultSchema,
   DirectoryMembershipRevokeAllResultSchema,
+  DirectoryMembershipSchema,
+  DirectoryOrganizationUpsertSchema,
+  DirectorySubOrganizationUpsertSchema,
   DirectorySyncDeleteResultSchema,
   DirectorySyncUpsertResultSchema,
+  DirectoryUserRevokeAllSchema,
+  DirectoryUserUpsertSchema,
   type DirectoryMembership,
   type DirectoryOrganizationUpsert,
   type DirectorySubOrganizationUpsert,
@@ -88,6 +93,7 @@ async function dispatch(ctx: AppCallContext, event: Event): Promise<AttemptOutco
         method: 'PUT',
         path: `/api/internal/scim/organizations/${encodeURIComponent(event.data.id)}`,
         body,
+        requestSchema: DirectoryOrganizationUpsertSchema,
         responseSchema: DirectorySyncUpsertResultSchema,
       });
     }
@@ -145,6 +151,7 @@ async function dispatch(ctx: AppCallContext, event: Event): Promise<AttemptOutco
         method: 'PUT',
         path: '/api/internal/scim/memberships',
         body,
+        requestSchema: DirectoryMembershipSchema,
         responseSchema: DirectoryMembershipResultSchema,
       });
     }
@@ -162,6 +169,7 @@ async function dispatch(ctx: AppCallContext, event: Event): Promise<AttemptOutco
         method: 'DELETE',
         path: '/api/internal/scim/memberships',
         body,
+        requestSchema: DirectoryMembershipSchema,
         responseSchema: DirectoryMembershipRemovalResultSchema,
       });
     }
@@ -185,6 +193,7 @@ function upsertGroup(ctx: AppCallContext, group: DirectoryGroup): Promise<Attemp
     method: 'PUT',
     path: `/api/internal/scim/sub-organizations/${encodeURIComponent(group.id)}`,
     body,
+    requestSchema: DirectorySubOrganizationUpsertSchema,
     responseSchema: DirectorySyncUpsertResultSchema,
   });
 }
@@ -210,6 +219,7 @@ function upsertUser(ctx: AppCallContext, user: DirectoryUser): Promise<AttemptOu
     method: 'PUT',
     path: `/api/internal/scim/users/${encodeURIComponent(user.id)}`,
     body,
+    requestSchema: DirectoryUserUpsertSchema,
     responseSchema: DirectorySyncUpsertResultSchema,
   });
 }
@@ -226,6 +236,7 @@ function revokeAllMemberships(ctx: AppCallContext, user: DirectoryUser): Promise
     method: 'DELETE',
     path: `/api/internal/scim/users/${encodeURIComponent(user.id)}/memberships`,
     body,
+    requestSchema: DirectoryUserRevokeAllSchema,
     responseSchema: DirectoryMembershipRevokeAllResultSchema,
   });
 }

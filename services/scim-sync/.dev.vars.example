@@ -1,9 +1,16 @@
-# Local overrides for `wrangler dev --env staging`. Run `pnpm dev:env` to
-# generate `.dev.vars` from this file; it is gitignored, this template is not.
+# Local overrides for `wrangler dev --env staging`. Run
+# `pnpm dev:env -y cloudflare-scim-sync` to generate `.dev.vars` from this
+# file; it is gitignored, this template is not.
 #
-# `.dev.vars` shadows `wrangler.jsonc`'s `vars` *and* its Secrets Store
-# bindings, which is what makes a local run safe: without the override below
-# the staging environment's `BACKEND_API_URL` points at `staging-app.kilo.ai`,
+# `.dev.vars` overrides `wrangler.jsonc`'s `vars`. It does **not** shadow a
+# `secrets_store_secrets` binding, so the three secrets this Worker binds
+# (`WORKOS_API_KEY`, `WORKOS_CLIENT_ID`, `INTERNAL_API_SECRET`) still resolve
+# from the local Secrets Store and have to be seeded there — see README.md
+# "Secrets". They are listed below anyway because `wrangler.test.jsonc`
+# declares them as plain vars, so the values carry into a test run.
+#
+# What this file does decide is `BACKEND_API_URL`, and that one matters:
+# without the override below, `--env staging` points at `staging-app.kilo.ai`,
 # so a local poll with a working WorkOS key would apply directory state to
 # staging's database rather than yours.
 

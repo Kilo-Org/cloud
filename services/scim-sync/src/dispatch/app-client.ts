@@ -55,6 +55,12 @@ type CallInit = {
   path: string;
   /** Omitted for the two routes keyed entirely on their path. */
   body?: unknown;
+  /**
+   * The request schema the app will parse this body with, when there is a
+   * body. Checked here first, so directory data the app would reject is a
+   * parked event rather than a stalled stream — see `callApp`.
+   */
+  requestSchema?: z.ZodType;
   /** The 2xx body this route promises. */
   responseSchema: z.ZodType;
 };
@@ -65,6 +71,41 @@ type CallInit = {
  * failure and consume the drain budget.
  */
 export async function callApp(ctx: AppCallContext, init: CallInit): Promise<AttemptOutcome> {
+  // Validate the body against the same schema the app parses it with, before
+  // spending a request on it.
+  //
+  // A 400 is classified `unavailable` and never parks, which is right for the
+  // cause that motivated it — this Worker deployed ahead of the app, rejected
+  // for a field the app does not yet accept, clearing by itself on the app's
+  // deploy. But the bodies also carry directory data: `email` must satisfy
+  // `.email().max(320)`, `name` and the two name fields `.max(255)`. An IdP
+  // delivering an address that fails that check, or a 300-character display
+  // name, produces the *same* 400 on every retry and would hold the cursor
+  // forever — and this namespace holds one instance, so one tenant's bad data
+  // stalls every tenant behind it. That is exactly what Directory Sync rule 7
+  // was amended to forbid.
+  //
+  // Checking here separates the two: a body this Worker can see is invalid is
+  // `terminal`, so the event parks with the field named and the stream
+  // continues. A 400 that still comes back from the app is then genuinely the
+  // deploy-skew case, and holding for it stays correct.
+  if (init.body !== undefined && init.requestSchema !== undefined) {
+    const valid = init.requestSchema.safeParse(init.body);
+    if (!valid.success) {
+      // Issues, not the body: the body carries the directory user's address
+      // and name, and an event's `data` must never reach Workers Logs.
+      const issues = valid.error.issues
+        .map(issue => `${issue.path.join('.') || '(root)'}: ${issue.code}`)
+        .join('; ');
+      return {
+        class: 'terminal',
+        status: null,
+        code: null,
+        reason: `${init.method} ${init.path} body rejected by the request contract — ${issues}`,
+      };
+    }
+  }
+
   const url = `${ctx.origin}${init.path}`;
 
   let response: Response;

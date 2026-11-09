@@ -3802,7 +3802,7 @@
     "reasoningEffort": {
       "modelFlag": "此模型支援思考程度"
     },
-    "creditsRequired": "點數不足，無法傳送此訊息。請加值點數後再試一次。"
+    "creditsRequired": "點數不足，無法傳送此訊息。"
   },
   "settingsTools": {
     "confirmTitle": "確認此變更？"

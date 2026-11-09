@@ -3802,7 +3802,7 @@
     "reasoningEffort": {
       "modelFlag": "See mudel toetab mõtlemise põhjalikkust"
     },
-    "creditsRequired": "Krediiti ei piisa selle sõnumi saatmiseks. Lisa krediiti ja proovi uuesti."
+    "creditsRequired": "Krediiti ei piisa selle sõnumi saatmiseks."
   },
   "settingsTools": {
     "confirmTitle": "Kas kinnitada see muudatus?"

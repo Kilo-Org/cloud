@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import { getMessageDetailsContent } from '@/components/agents/message-details-content';
 
-import { askedMessageId, asMessages } from './turns';
+import { askedMessageId, asMessages, displacedMessageId } from './turns';
 import { answerParts } from './answer-parts';
 
 const turn = (id: string, role: Turn['role'], parts: Turn['parts']): Turn => ({
@@ -80,6 +80,34 @@ describe('asMessages', () => {
       { role: 'user', said: 'first' },
       { role: 'user', said: 'second' },
       { role: 'assistant', said: 'well' },
+    ]);
+  });
+
+  it('draws a question waiting to be asked again once, on its kept bubble', () => {
+    const kept = {
+      id: 'k1',
+      text: 'the question it asks again',
+      images: [],
+      model: 'kilo/one',
+      effort: null,
+      afterTurns: 0,
+      outcome: 'failed' as const,
+    };
+    const input = {
+      sessionId: 's1',
+      turns: [],
+      answering: [],
+      asked: 'third',
+      askedImages: [],
+      displaced: [kept],
+      waiting: [{ text: kept.text, images: [], from: 'k1' }],
+    } satisfies Parameters<typeof asMessages>[0];
+
+    // One bubble for the question, at the place it was said, and one for the
+    // question in the slot: the queued copy is the attempt on that bubble.
+    expect(asMessages(input).map(message => message.info.id)).toEqual([
+      displacedMessageId('s1', 'k1'),
+      askedMessageId('s1'),
     ]);
   });
 
@@ -161,6 +189,38 @@ describe('asMessages', () => {
     expect(messages.map(message => message.info.id)).toEqual([
       askedMessageId('s1'),
       's1:waiting:0',
+    ]);
+  });
+
+  it('draws a kept question among the turns it was said between, and one past the end last', () => {
+    const question = (id: string, afterTurns: number) => ({
+      id,
+      text: `question ${id}`,
+      images: [],
+      model: 'kilo/one',
+      effort: null,
+      afterTurns,
+      outcome: 'failed' as const,
+    });
+    const messages = asMessages({
+      sessionId: 's1',
+      turns: [
+        turn('t1', 'user', [text('p1', 'first')]),
+        turn('t2', 'assistant', [text('p2', 'an answer')]),
+      ],
+      answering: [],
+      asked: null,
+      askedImages: [],
+      // The second was displaced after more turns than the store now holds.
+      displaced: [question('a', 0), question('b', 7)],
+      waiting: [],
+    });
+
+    expect(messages.map(message => message.info.id)).toEqual([
+      displacedMessageId('s1', 'a'),
+      't1',
+      't2',
+      displacedMessageId('s1', 'b'),
     ]);
   });
 

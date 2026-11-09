@@ -3864,7 +3864,7 @@
     "reasoningEffort": {
       "modelFlag": "Este modelo aceita esforço de raciocínio"
     },
-    "creditsRequired": "Créditos insuficientes para enviar esta mensagem. Adicione créditos e tente novamente."
+    "creditsRequired": "Créditos insuficientes para enviar esta mensagem."
   },
   "settingsTools": {
     "confirmTitle": "Confirmar esta alteração?"

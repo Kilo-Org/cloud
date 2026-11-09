@@ -1,6 +1,5 @@
 import { captureRequestError } from '@sentry/nextjs';
 
-// Temporary marker while this run measures the shard install.
 export async function register() {
   if (process.env.NEXT_RUNTIME === 'nodejs') {
     const { registerNodeInstrumentation } =

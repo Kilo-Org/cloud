@@ -8,8 +8,8 @@ import {
   normalizeSignupTlds,
 } from '@kilocode/web-shared/lib/blacklist-domains-config';
 import {
-  parseBlacklistDomainsConfig,
-  type ParsedBlacklistDomainsConfig,
+  BlacklistDomainsConfigSchema,
+  MAX_BLACKLIST_DOMAINS,
 } from '@kilocode/worker-utils/account-access';
 import {
   BLACKLIST_DOMAINS_REDIS_KEY,
@@ -18,9 +18,11 @@ import {
 import type { BlacklistDomainsConfig } from '@kilocode/web-shared/lib/blacklist-domains-config';
 import { captureException } from '@sentry/nextjs';
 import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
-import { kilocode_users } from '@kilocode/db/schema';
+import { blacklisted_domains, kilocode_users } from '@kilocode/db/schema';
+import { TRPCError } from '@trpc/server';
 import { sql, count, isNotNull, desc, min, max } from 'drizzle-orm';
 import * as z from 'zod';
+import { createHash } from 'node:crypto';
 import { backfillBlockBlacklistedDomainsBatch } from '@/lib/abuse/block-blacklisted-domains';
 import {
   BLACKLIST_STATS_ROW_LIMIT,
@@ -34,85 +36,109 @@ const SuspiciousDomainsInputSchema = z
   })
   .optional();
 
-async function readConfigOrThrow(): Promise<ParsedBlacklistDomainsConfig> {
-  const raw = await redisClient.get<string>(BLACKLIST_DOMAINS_REDIS_KEY);
-  if (!raw) return { config: DEFAULT_BLACKLIST_DOMAINS_CONFIG, droppedDomains: 0 };
-  return parseBlacklistDomainsConfig(JSON.parse(raw));
-}
+// Admin saves must round-trip the entire snapshot, not the access readers' capped prefix.
+const AdminBlacklistDomainsConfigSchema = BlacklistDomainsConfigSchema.extend({
+  domains: z.array(z.string()),
+});
+const AdminBlacklistDomainsInputSchema = BlacklistDomainsInputSchema.extend({
+  domains: z.array(z.string().min(1).trim()),
+  expected_version: z.string().length(64),
+});
 
-async function readConfig(): Promise<ParsedBlacklistDomainsConfig> {
-  try {
-    return await readConfigOrThrow();
-  } catch {
-    return { config: DEFAULT_BLACKLIST_DOMAINS_CONFIG, droppedDomains: 0 };
-  }
+async function readConfigOrThrow() {
+  const raw = await redisClient.get<string>(BLACKLIST_DOMAINS_REDIS_KEY);
+  return {
+    config:
+      raw === null
+        ? DEFAULT_BLACKLIST_DOMAINS_CONFIG
+        : AdminBlacklistDomainsConfigSchema.parse(JSON.parse(raw)),
+    version: createHash('sha256')
+      .update(raw ?? '')
+      .digest('hex'),
+  };
 }
 
 export const adminBlacklistDomainsRouter = createTRPCRouter({
   get: adminProcedure.query(async () => {
-    const { config, droppedDomains } = await readConfig();
+    const { config, version } = await readConfigOrThrow();
     return {
       ...config,
+      version,
       // The editor always shows an editable list: the stored one, or the
       // effective fallback (env or built-in) when the stored config predates
       // the field.
       blocked_signup_tlds: config.blocked_signup_tlds ?? (await getBlockedSignupTlds()),
-      // Entries the stored list held beyond MAX_BLACKLIST_DOMAINS. Nonzero means
-      // the editor shows a prefix of the stored list.
-      dropped_domains: droppedDomains,
+      dropped_domains: Math.max(0, config.domains.length - MAX_BLACKLIST_DOMAINS),
     };
   }),
 
-  set: adminProcedure.input(BlacklistDomainsInputSchema).mutation(async ({ input, ctx }) => {
-    // Deduplicate and normalize domains
+  set: adminProcedure.input(AdminBlacklistDomainsInputSchema).mutation(async ({ input, ctx }) => {
     const normalizedDomains = [
       ...new Set(input.domains.map(d => d.toLowerCase().trim()).filter(Boolean)),
     ];
 
-    // Diff against the list the admin started from so only newly added domains
-    // trigger a backfill. A failed read must not look like an empty list: that
-    // would turn a one-domain save into a backfill of every listed domain. Skip
-    // the automatic run in that case and let the manual backfill handle it.
-    let previous: BlacklistDomainsConfig | null = null;
+    let saved;
     try {
-      previous = (await readConfigOrThrow()).config;
+      saved = await db.transaction(async tx => {
+        // Serialize both stores, including the previous-config read, across admin saves.
+        await tx.execute(sql`SET LOCAL lock_timeout = '10s'`);
+        await tx.execute(sql`SET LOCAL statement_timeout = '30s'`);
+        await tx.execute(sql`LOCK TABLE ${blacklisted_domains} IN EXCLUSIVE MODE`);
+        const { config: previous, version } = await readConfigOrThrow();
+        if (version !== input.expected_version) {
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: 'Blacklist changed. Reload the complete list before saving.',
+          });
+        }
+        const previousDomains = new Set(previous.domains.map(d => d.toLowerCase().trim()));
+        const addedDomains = normalizedDomains.filter(domain => !previousDomains.has(domain));
+        const blockedSignupTlds =
+          input.blocked_tlds === undefined
+            ? (previous.blocked_signup_tlds ?? (await getBlockedSignupTlds()))
+            : normalizeSignupTlds(input.blocked_tlds);
+
+        const updatedAt = new Date().toISOString();
+        const config: BlacklistDomainsConfig = {
+          domains: normalizedDomains,
+          blocked_signup_tlds: blockedSignupTlds,
+          updated_at: updatedAt,
+          updated_by: ctx.user.id,
+          updated_by_email: ctx.user.google_user_email,
+        };
+        const deadline = Date.now() + 120_000;
+        await tx.delete(blacklisted_domains);
+        for (let offset = 0; offset < normalizedDomains.length; offset += 1000) {
+          if (Date.now() > deadline) throw new Error('Blacklist synchronization timed out');
+          await tx
+            .insert(blacklisted_domains)
+            .values(normalizedDomains.slice(offset, offset + 1000).map(domain => ({ domain })));
+        }
+        // Stage SQL first so failed batches leave Redis protection and the additions diff intact.
+        // Redis and the commit cannot be atomic; never roll back Redis after an ambiguous failure.
+        await redisClient.mset({
+          [BLACKLIST_DOMAINS_REDIS_KEY]: JSON.stringify(config),
+          [BLACKLIST_DOMAINS_UPDATED_AT_REDIS_KEY]: updatedAt,
+        });
+        return { config, addedDomains };
+      });
     } catch (error) {
-      captureException(error, { tags: { source: 'blacklist_domains_previous_config_read' } });
+      if (error instanceof TRPCError && error.code === 'CONFLICT') throw error;
+      captureException(error, { tags: { source: 'blacklist_domains_dual_write' } });
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message:
+          'Blacklist save failed. Redis may already be updated. Reload and retry to synchronize Postgres, then run the account backfill.',
+        cause: error,
+      });
     }
-    const previousDomains = new Set((previous?.domains ?? []).map(d => d.toLowerCase().trim()));
-    const addedDomains = previous
-      ? normalizedDomains.filter(domain => !previousDomains.has(domain))
-      : null;
-
-    // An omitted field keeps the stored list so a stale admin tab cannot
-    // silently disable TLD blocking. A failed previous read falls back to the
-    // cached effective list rather than overwriting with the built-in default.
-    // A TLD never triggers a backfill: it only gates new signups.
-    const blockedSignupTlds =
-      input.blocked_tlds === undefined
-        ? (previous?.blocked_signup_tlds ?? (await getBlockedSignupTlds()))
-        : normalizeSignupTlds(input.blocked_tlds);
-
-    const updatedAt = new Date().toISOString();
-    const config: BlacklistDomainsConfig = {
-      domains: normalizedDomains,
-      blocked_signup_tlds: blockedSignupTlds,
-      updated_at: updatedAt,
-      updated_by: ctx.user.id,
-      updated_by_email: ctx.user.google_user_email,
-    };
-    // Readers download the list only when the updated_at key changes, so both
-    // keys must change together.
-    await redisClient.mset({
-      [BLACKLIST_DOMAINS_REDIS_KEY]: JSON.stringify(config),
-      [BLACKLIST_DOMAINS_UPDATED_AT_REDIS_KEY]: updatedAt,
-    });
+    const { config, addedDomains } = saved;
 
     // The list is already live for auth checks at this point, so a backfill
     // failure must not fail the save. Report it and point the admin at the
     // manual backfill instead.
-    const backfill = { blocked: 0, remaining: false, failed: addedDomains === null };
-    if (addedDomains && addedDomains.length > 0) {
+    const backfill = { blocked: 0, remaining: false, failed: false };
+    if (addedDomains.length > 0) {
       try {
         const result = await backfillBlockBlacklistedDomainsBatch({
           actorId: ctx.user.id,

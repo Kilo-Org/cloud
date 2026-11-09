@@ -2183,7 +2183,11 @@ describe('processGooglePlayKiloPassNotification', () => {
         });
       const now = new Date(start);
       dateNowSpy.mockReturnValue(now.valueOf());
-      const end = new Date(now.valueOf() + 31 * 86400000).toISOString();
+      // The subscription state read compares the purchase expiry against the wall
+      // clock, which this suite's `Date.now` override does not control, so anchor the
+      // expiry to the wall clock. `start` keeps driving the mocked notification path
+      // and the welcome-promo boundary cases below.
+      const end = new Date(Date.now() + 400 * 86400000).toISOString();
       const token = crypto.randomUUID();
       const orderId = crypto.randomUUID();
       const live = apiDataForUser(obfsAccountId, orderId, {

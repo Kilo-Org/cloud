@@ -1,5 +1,8 @@
 import { modelsByProvider } from '@kilocode/db/schema';
-import type { StoredModel } from '@kilocode/db/schema-types';
+import type {
+  GatewayModelMap,
+  GatewayModelWithEndpoints,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import {
   getSnapshotModelVariantId,
@@ -8,7 +11,6 @@ import {
 import {
   getOpenRouterModelsMetadataFromDatabase,
   getVercelModelsMetadataFromDatabase,
-  type StoredModelMap,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import {
   normalizeInferenceProviderId,
@@ -32,8 +34,8 @@ export type FetchModelsByProviderSnapshot = () => Promise<NormalizedOpenRouterRe
 
 type ProviderIndexLoaderOptions = {
   fetchSnapshot: FetchModelsByProviderSnapshot;
-  fetchOpenRouterModels: () => Promise<StoredModelMap>;
-  fetchVercelModels: () => Promise<StoredModelMap>;
+  fetchOpenRouterModels: () => Promise<GatewayModelMap>;
+  fetchVercelModels: () => Promise<GatewayModelMap>;
   ttlMs: number;
   nowMs: () => number;
 };
@@ -44,7 +46,7 @@ type ProviderIndexLoaderOptions = {
  * `<provider-slug>[/<quantization>]`, so their prefix lives in the same slug
  * namespace as provider allow lists and `provider.only` routing.
  */
-export function getEndpointProviderSlugs(model: StoredModel): Set<string> {
+export function getEndpointProviderSlugs(model: GatewayModelWithEndpoints): Set<string> {
   return new Set(
     model.endpoints.flatMap(endpoint =>
       endpoint.tag ? [normalizeInferenceProviderId(endpoint.tag)] : []
@@ -63,7 +65,7 @@ export function getEndpointProviderSlugs(model: StoredModel): Set<string> {
  */
 export function narrowProviderSlugsToVariant(
   snapshotProviderSlugs: ReadonlySet<string>,
-  variantModel: StoredModel | undefined
+  variantModel: GatewayModelWithEndpoints | undefined
 ): ReadonlySet<string> {
   if (!variantModel) return snapshotProviderSlugs;
   const variantProviderSlugs = getEndpointProviderSlugs(variantModel);

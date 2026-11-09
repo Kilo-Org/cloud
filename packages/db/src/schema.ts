@@ -183,7 +183,6 @@ import type {
   NormalizedOpenRouterResponse,
   OpenRouterModel,
   StripeSubscriptionStatus,
-  StoredModel,
   ContributorChampionTier,
 } from './schema-types';
 import type { AbuseClassification, GatewayApiKind } from '@kilocode/usage-contracts';
@@ -5962,8 +5961,10 @@ export type ContributorChampionSyncState = typeof contributor_champion_sync_stat
 export const modelsByProvider = pgTable('models_by_provider', {
   id: serial().notNull().primaryKey(),
   data: jsonb('data').$type<NormalizedOpenRouterResponse>().notNull(),
-  openrouter: jsonb('openrouter').$type<Record<string, StoredModel>>(),
-  vercel: jsonb('vercel').$type<Record<string, StoredModel>>(),
+  // Obsolete: no longer written or read. Gateway models and their endpoints are read from
+  // ai_gateway_metadata_cache. Kept until a follow-up migration drops both columns.
+  openrouter: jsonb('openrouter'),
+  vercel: jsonb('vercel'),
 });
 
 export const ai_gateway_config = pgTable(

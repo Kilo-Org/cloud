@@ -1,6 +1,6 @@
-import { byok_api_keys, modelsByProvider } from '@kilocode/db/schema';
-import { StoredModelSchema } from '@kilocode/db/schema-types';
-import { and, desc, eq, sql } from 'drizzle-orm';
+import { ai_gateway_metadata_cache, byok_api_keys } from '@kilocode/db/schema';
+import { EndpointsSchema, ModelsSchema } from '@kilocode/db/schema-types';
+import { and, eq, like, sql } from 'drizzle-orm';
 import { z } from 'zod';
 
 import { encryptCredential, requireEncryptionKey } from '../lib/byok';
@@ -13,12 +13,22 @@ export const usage = '<email> <provider> <model-id>';
 const ALLOWED_PROVIDERS = ['minimax', 'moonshotai'];
 const KEY_PREFIX = 'dev-seed:byok-e2e';
 const MARKER_TAG = 'dev-seed:byok-e2e';
+const VERCEL_MODELS_URL = 'https://ai-gateway.vercel.sh/v1/models';
+
+const StoredModelListSchema = z.object({ data: z.array(z.record(z.string(), z.unknown())) });
+
+function vercelModelEndpointsUrl(modelId: string) {
+  return `${VERCEL_MODELS_URL}/${modelId}/endpoints`;
+}
 
 function printUsage(): void {
   console.log(`Usage: pnpm dev:seed app:byok-e2e-fixture ${usage}`);
   console.log('');
-  console.log('Seeds a personal BYOK key and one Vercel metadata snapshot entry so the');
-  console.log('catalog flags exactly the given model id for the user.');
+  console.log('Seeds a personal BYOK key and one stored Vercel model with endpoints so the');
+  console.log('catalog flags exactly the given model id for the user. Needs the stored');
+  console.log('Vercel model list from the refresh-ai-gateway-metadata-cache cron. The gateway');
+  console.log('caches stored models for up to 5 minutes, and the next refresh replaces the');
+  console.log('stored Vercel rows with the upstream ones.');
   console.log('');
   console.log(`Allowed providers: ${ALLOWED_PROVIDERS.join(', ')}`);
   console.log('The key is a placeholder the upstream provider rejects on purpose; the');
@@ -66,9 +76,9 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   const db = getSeedDb();
 
   // Reset and replace this topic's own data in one transaction: key deletion, key
-  // insertion, marker cleanup, metadata validation, and snapshot insertion commit
-  // together, so a validation or insert failure rolls back and never leaves the user
-  // without the previous key or a half-cleaned snapshot.
+  // insertion, marker cleanup, metadata validation, and metadata writes commit together,
+  // so a validation or write failure rolls back and never leaves the user without the
+  // previous key or half-cleaned metadata.
   const byokKeyId = await db.transaction(async tx => {
     // Reset only this topic's key data: the dedicated test account's personal key for
     // this provider. Re-running with the same user+provider is idempotent.
@@ -92,62 +102,67 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       throw new Error('Failed to create the fixture BYOK key');
     }
 
-    // Remove every models_by_provider row this topic ever wrote, across all models.
-    // The marker tag never occurs in real snapshots, so a synced row is never deleted.
-    await tx.delete(modelsByProvider).where(
-      sql`EXISTS (
-          SELECT 1 FROM jsonb_each(${modelsByProvider.vercel}) AS e(k, v)
-          WHERE e.v -> 'endpoints' @> ${JSON.stringify([{ tag: MARKER_TAG }])}::jsonb
-        )`
-    );
+    // Remove every endpoints row and list entry this topic ever wrote, across all models.
+    // The marker never occurs in upstream bodies, so refreshed metadata is never removed.
+    await tx
+      .delete(ai_gateway_metadata_cache)
+      .where(
+        and(
+          like(ai_gateway_metadata_cache.url, vercelModelEndpointsUrl('%')),
+          sql`${ai_gateway_metadata_cache.data} -> 'data' -> 'endpoints' @> ${JSON.stringify([{ tag: MARKER_TAG }])}::jsonb`
+        )
+      );
 
-    // Merge the fixture entry into a copy of the newest remaining snapshot so a real
-    // synced snapshot keeps its other models (same-provider models then stay flagged).
-    const [latest] = await tx
-      .select({
-        data: modelsByProvider.data,
-        openrouter: modelsByProvider.openrouter,
-        vercel: modelsByProvider.vercel,
-      })
-      .from(modelsByProvider)
-      .orderBy(desc(modelsByProvider.id))
-      .limit(1);
-
-    const mergedVercel = {
-      ...(latest?.vercel ?? {}),
-      [modelId]: {
-        id: modelId,
-        name: modelId,
-        type: 'language',
-        endpoints: [{ provider_name: provider, tag: MARKER_TAG }],
-      },
-    };
-
-    // Prove the merged map parses the way the catalog endpoint later reads it.
-    const parsed = z.record(z.string(), StoredModelSchema).safeParse(mergedVercel);
-    if (!parsed.success) {
+    // Keep the other stored models, so same-provider models stay flagged. The gateway
+    // rejects a list of fewer than 100 models as truncated, so a real list is required.
+    const [storedList] = await tx
+      .select({ data: ai_gateway_metadata_cache.data })
+      .from(ai_gateway_metadata_cache)
+      .where(eq(ai_gateway_metadata_cache.url, VERCEL_MODELS_URL));
+    if (!storedList) {
       throw new Error(
-        `Merged vercel map failed StoredModelSchema validation: ${parsed.error.message}`
+        'No stored Vercel model list. Run the refresh-ai-gateway-metadata-cache cron first.'
       );
     }
+    const listedModels = StoredModelListSchema.parse(storedList.data).data.filter(
+      model => model.dev_seed !== MARKER_TAG
+    );
+    const list = {
+      data: listedModels.some(model => model.id === modelId)
+        ? listedModels
+        : [...listedModels, { id: modelId, name: modelId, type: 'language', dev_seed: MARKER_TAG }],
+    };
+    const endpoints = { data: { endpoints: [{ provider_name: provider, tag: MARKER_TAG }] } };
 
-    await tx.insert(modelsByProvider).values({
-      data: latest?.data ?? {
-        providers: [],
-        total_providers: 0,
-        total_models: 0,
-        generated_at: new Date().toISOString(),
-      },
-      openrouter: latest?.openrouter ?? null,
-      vercel: parsed.data,
-    } satisfies typeof modelsByProvider.$inferInsert);
+    // Prove both rows parse the way the gateway later reads them.
+    const parsedList = ModelsSchema.safeParse(list);
+    if (!parsedList.success) {
+      throw new Error(`Stored Vercel model list failed validation: ${parsedList.error.message}`);
+    }
+    const parsedEndpoints = EndpointsSchema.safeParse(endpoints);
+    if (!parsedEndpoints.success) {
+      throw new Error(`Fixture endpoints failed validation: ${parsedEndpoints.error.message}`);
+    }
+
+    for (const row of [
+      { url: VERCEL_MODELS_URL, data: list },
+      { url: vercelModelEndpointsUrl(modelId), data: endpoints },
+    ]) {
+      await tx
+        .insert(ai_gateway_metadata_cache)
+        .values(row satisfies typeof ai_gateway_metadata_cache.$inferInsert)
+        .onConflictDoUpdate({
+          target: ai_gateway_metadata_cache.url,
+          set: { data: row.data, updated_at: sql`now()` },
+        });
+    }
 
     return insertedKey.id;
   });
 
   console.log('');
   console.log('This fixture represents a user who holds a personal BYOK key for the');
-  console.log('provider and a catalog snapshot flagging exactly the given model id.');
+  console.log('provider and stored Vercel metadata flagging exactly the given model id.');
   console.log('The placeholder key is rejected upstream; the usage row still records');
   console.log('is_user_byok = true for the turn.');
 

@@ -1,4 +1,5 @@
-import type { StoredModel, User } from '@kilocode/db';
+import type { User } from '@kilocode/db';
+import type { GatewayModelWithEndpoints } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
 import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import type * as GatewayModelsCache from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
@@ -19,7 +20,11 @@ import { GET } from './route';
 const mockGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockGetOpenRouterModels = jest.mocked(getOpenRouterModelsMetadataFromDatabase);
 
-function storedModel(id: string, name: string, outputModalities: string[]): StoredModel {
+function storedModel(
+  id: string,
+  name: string,
+  outputModalities: string[]
+): GatewayModelWithEndpoints {
   return {
     id,
     name,

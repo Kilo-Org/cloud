@@ -18,12 +18,52 @@ export const ClaudeBillingOwnerSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('shared_services'), organizationId: z.uuid() }),
 ]) satisfies z.ZodType<ClaudeBillingOwner>;
 
+/**
+ * The owner on the internal payer-state wire between the gateway and the web
+ * app. The gateway deploys first, so each side must read the other's previous
+ * release: `organization` alone names the shared-services connection, which is
+ * the organization connection that release knew, and `organization` with a
+ * person names that member's own connection.
+ */
+export const ClaudeBillingPayerOwnerSchema = z
+  .discriminatedUnion('kind', [
+    z.object({ kind: z.literal('personal'), kiloUserId: z.string().min(1) }),
+    z.object({
+      kind: z.literal('organization'),
+      organizationId: z.uuid(),
+      kiloUserId: z.string().min(1).optional(),
+    }),
+  ])
+  .transform((wire): ClaudeBillingOwner => {
+    if (wire.kind === 'personal') return wire;
+    return wire.kiloUserId
+      ? { kind: 'member', kiloUserId: wire.kiloUserId, organizationId: wire.organizationId }
+      : { kind: 'shared_services', organizationId: wire.organizationId };
+  });
+
+function payerOwnerWire(owner: ClaudeBillingOwner): z.input<typeof ClaudeBillingPayerOwnerSchema> {
+  switch (owner.kind) {
+    case 'personal':
+      return owner;
+    case 'member':
+      return {
+        kind: 'organization',
+        organizationId: owner.organizationId,
+        kiloUserId: owner.kiloUserId,
+      };
+    case 'shared_services':
+      return { kind: 'organization', organizationId: owner.organizationId };
+  }
+}
+
 export const ClaudeBillingPayerStateSchema = z.object({
   status: z.enum(ClaudeBillingConnectionStatus),
   user_profile_id: z.string().min(1),
   connected_at: z.iso.datetime().nullable(),
-  /** The person who connected it; a shared-services connection is released to them. */
-  created_by: z.string().min(1),
+  /** The person the row belongs to; absent from the previous web app release. */
+  kilo_user_id: z.string().nullable().optional(),
+  /** The person who linked it last; absent from the previous web app release. */
+  created_by: z.string().min(1).optional(),
 });
 export type ClaudeBillingPayerState = z.infer<typeof ClaudeBillingPayerStateSchema>;
 const responseSchema = z.object({ connection: ClaudeBillingPayerStateSchema.nullable() });
@@ -36,6 +76,7 @@ export function claudeBillingPayerState(
         status: row.status,
         user_profile_id: row.user_profile_id,
         connected_at: row.connected_at ? new Date(row.connected_at).toISOString() : null,
+        kilo_user_id: row.kilo_user_id,
         created_by: row.created_by,
       }
     : null;
@@ -53,12 +94,16 @@ export async function getAuthoritativeClaudeBillingState(
     async () => ({
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-internal-api-key': INTERNAL_API_SECRET },
-      body: JSON.stringify(owner),
+      body: JSON.stringify(payerOwnerWire(owner)),
       cache: 'no-store',
     }),
     status => status === 429 || status >= 500,
     AbortSignal.timeout(15_000)
   );
   if (!response.ok) throw new Error(`Claude payer-state read failed with HTTP ${response.status}`);
-  return responseSchema.parse(await response.json()).connection;
+  const { connection } = responseSchema.parse(await response.json());
+  // A member connection is that person's row. The previous web app release
+  // answers a member query with the organization's row, which is never it.
+  if (owner.kind === 'member' && connection?.kilo_user_id !== owner.kiloUserId) return null;
+  return connection;
 }

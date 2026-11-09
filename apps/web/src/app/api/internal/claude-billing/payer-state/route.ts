@@ -3,7 +3,7 @@ import { authorizeInternalApiRequest } from '@/lib/internal-api-auth';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { getClaudeBillingConnection } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
 import {
-  ClaudeBillingOwnerSchema,
+  ClaudeBillingPayerOwnerSchema,
   claudeBillingPayerState,
 } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/payer-state';
 
@@ -11,7 +11,7 @@ import {
 export async function POST(request: Request) {
   const unauthorized = authorizeInternalApiRequest(request);
   if (unauthorized) return unauthorized;
-  const owner = ClaudeBillingOwnerSchema.safeParse(await request.json().catch(() => null));
+  const owner = ClaudeBillingPayerOwnerSchema.safeParse(await request.json().catch(() => null));
   if (!owner.success) return NextResponse.json({ error: 'Invalid owner' }, { status: 400 });
   const row = await getClaudeBillingConnection(owner.data, db);
   return NextResponse.json(

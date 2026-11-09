@@ -10,6 +10,7 @@ import {
   organization_user_limits,
   cli_sessions_v2,
   external_side_effect_outbox,
+  claude_billing_connections,
 } from '@kilocode/db/schema';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
@@ -71,6 +72,51 @@ describe('removeUserFromOrganization', () => {
     await db.delete(organization_seats_purchases);
     // eslint-disable-next-line drizzle/enforce-delete-with-where
     await db.delete(organizations);
+  });
+
+  test("ends the member's own Claude billing link and keeps the shared-services one", async () => {
+    const owner = await insertTestUser();
+    const member = await insertTestUser();
+    const organization = await createOrganization('Claude member removal', owner.id);
+    await addUserToOrganization(organization.id, member.id, 'member');
+    await db.insert(claude_billing_connections).values([
+      {
+        kilo_user_id: member.id,
+        organization_id: organization.id,
+        user_profile_id: `uprof_member_${member.id}`,
+        connection_id: 'ocon_member',
+        status: 'connected',
+        connected_at: new Date().toISOString(),
+        created_by: member.id,
+      },
+      {
+        organization_id: organization.id,
+        user_profile_id: `uprof_shared_${member.id}`,
+        connection_id: 'ocon_shared',
+        status: 'connected',
+        connected_at: new Date().toISOString(),
+        created_by: member.id,
+      },
+    ]);
+
+    await removeUserFromOrganization(organization.id, member.id, owner.id);
+
+    const rows = await db
+      .select()
+      .from(claude_billing_connections)
+      .where(eq(claude_billing_connections.organization_id, organization.id));
+    expect(
+      rows
+        .map(row => ({
+          member: row.kilo_user_id === member.id,
+          status: row.status,
+          id: row.connection_id,
+        }))
+        .sort((a, b) => Number(a.member) - Number(b.member))
+    ).toEqual([
+      { member: false, status: 'connected', id: 'ocon_shared' },
+      { member: true, status: 'removed', id: null },
+    ]);
   });
 
   test('should remove user from organization', async () => {

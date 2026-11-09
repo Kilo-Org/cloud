@@ -190,7 +190,7 @@ describe('Claude customer-billed routing', () => {
       botId: 'reviewer',
     });
     expect(result?.kind).toBe('provider');
-    expect(findUserById).toHaveBeenCalledWith('connector');
+    expect(findUserById).toHaveBeenCalledWith('connector', expect.anything());
     expect(isClaudePlatformOAuthEnabled).toHaveBeenCalledWith('connector@kilocode.ai');
   });
 

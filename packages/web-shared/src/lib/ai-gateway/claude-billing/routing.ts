@@ -14,6 +14,7 @@ import {
 import { isClaudePlatformOAuthEnabled } from '@kilocode/web-shared/lib/auth/claude/feature-flag.server';
 import { ClaudeBillingConnectionStatus } from '@kilocode/db/schema-types';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import type { ClaudeBillingOwner } from './store';
 import { getAuthoritativeClaudeBillingState, type ClaudeBillingPayerState } from './payer-state';
 import { getClaudeOperatorToken, isClaudeOperatorConfigured } from './operator';
@@ -74,16 +75,17 @@ function ownerCandidates(input: ClaudeBillingRoutingInput): ClaudeBillingOwner[]
 /**
  * The email the release flag is checked against. A person's own connection is
  * gated on the person making the request. A shared-services connection is
- * gated on the person who connected it, because a service run's caller is
- * often a bot that no release flag covers.
+ * gated on the person who linked it last, because a service run's caller is a
+ * bot that no release flag covers. The previous web app release does not report
+ * that person, so the requester stands in, as it did there.
  */
 async function gateEmail(
   input: ClaudeBillingRoutingInput,
   owner: ClaudeBillingOwner,
   connection: ClaudeBillingPayerState
 ): Promise<string | null> {
-  if (owner.kind !== 'shared_services') return input.requesterEmail;
-  return (await findUserById(connection.created_by))?.google_user_email ?? null;
+  if (owner.kind !== 'shared_services' || !connection.created_by) return input.requesterEmail;
+  return (await findUserById(connection.created_by, readDb))?.google_user_email ?? null;
 }
 
 /** Billing connections serve the Messages API and Anthropic's OpenAI-compatible endpoint. */

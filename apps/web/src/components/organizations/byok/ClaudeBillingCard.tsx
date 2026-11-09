@@ -50,16 +50,21 @@ const SCOPE_COPY: Record<
   },
 };
 
-function outcomeMessage(outcome: string) {
+function outcomeMessage(outcome: string, scope: ClaudeBillingScope) {
   switch (outcome) {
     case 'connected':
-      return 'Your Claude organization is linked. Any stored Anthropic API key was removed from Kilo. Revoke that key in Claude Console if nothing else uses it.';
+      // Only a personal link replaces the person's stored Anthropic API key.
+      return scope === 'personal'
+        ? 'Your Claude organization is linked. Any stored Anthropic API key was removed from Kilo. Revoke that key in Claude Console if nothing else uses it.'
+        : 'Your Claude organization is linked.';
     case 'declined':
       return 'Linking did not complete. An owner, admin, or billing admin of your Claude organization must approve it.';
     case 'already_linked':
       return 'This Claude organization is already linked in Kilo, for another person, organization, or account. Remove that link first.';
     case 'forbidden':
-      return 'Only a Kilo organization owner or admin with access to this feature can link it.';
+      return scope === 'shared_services'
+        ? 'Only a Kilo organization owner or admin with access to this feature can link it.'
+        : 'You need access to this feature, and to this Kilo organization, to link it.';
     default:
       return 'We could not link your Claude organization. Try again.';
   }
@@ -127,7 +132,7 @@ export function ClaudeBillingCardView({
       <CardContent className="flex min-h-[8rem] flex-col gap-3">
         {outcome && (outcome !== 'connected' || connected) ? (
           <Alert variant={outcome === 'connected' ? 'default' : 'destructive'}>
-            <AlertDescription>{outcomeMessage(outcome)}</AlertDescription>
+            <AlertDescription>{outcomeMessage(outcome, scope)}</AlertDescription>
           </Alert>
         ) : null}
         {error ? (

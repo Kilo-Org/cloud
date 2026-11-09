@@ -115,9 +115,38 @@ jobs:
           cache: 'pnpm'
 
       # The dump shells out to `kilo run` to generate missing summaries.
+      # A cold install downloads large platform packages, so it legitimately
+      # takes minutes, and its postinstall can run a nested npm install. One
+      # stalled registry request would hold the runner until the job timeout, so
+      # the step bounds the whole install with a budget instead of bounding each
+      # attempt: a slow but moving download gets to finish, an early failure is
+      # retried, and a stall fails this step by name instead of cancelling the job.
       - name: Install Kilo CLI
         if: steps.catalog_changes.outputs.catalog == 'true'
-        run: npm install -g @kilocode/cli
+        timeout-minutes: 14
+        env:
+          # Fail an attempt fast and retry here instead, so a bad connection
+          # cannot spend a separate retry budget. Inherited by the postinstall's
+          # nested npm install as well.
+          npm_config_fetch_retries: '0'
+        run: |
+          set -euo pipefail
+          deadline=$((SECONDS + 720))
+          for attempt in 1 2 3; do
+            remaining=$((deadline - SECONDS))
+            if [ "$remaining" -le 0 ]; then
+              break
+            fi
+            if timeout --signal=TERM --kill-after=20 "$remaining" npm install -g @kilocode/cli; then
+              exit 0
+            fi
+            if [ "$attempt" -lt 3 ] && [ $((deadline - SECONDS)) -gt $((attempt * 5)) ]; then
+              echo "::warning::Kilo CLI install attempt ${attempt} did not finish; retrying"
+              sleep $((attempt * 5))
+            fi
+          done
+          echo "::error::Kilo CLI install did not finish"
+          exit 1
 
       - name: Install root dependencies
         if: steps.catalog_changes.outputs.catalog == 'true'
@@ -378,9 +407,34 @@ jobs:
           cache: 'pnpm'
 
       # The dump shells out to `kilo run` to fill any straggler summaries.
+      # Same budget as the PR job: a slow download gets to finish, and a stalled
+      # registry request costs minutes instead of the job timeout.
       - name: Install Kilo CLI
         if: steps.merge_changes.outputs.catalog == 'true'
-        run: npm install -g @kilocode/cli
+        timeout-minutes: 14
+        env:
+          # Fail an attempt fast and retry here instead, so a bad connection
+          # cannot spend a separate retry budget. Inherited by the postinstall's
+          # nested npm install as well.
+          npm_config_fetch_retries: '0'
+        run: |
+          set -euo pipefail
+          deadline=$((SECONDS + 720))
+          for attempt in 1 2 3; do
+            remaining=$((deadline - SECONDS))
+            if [ "$remaining" -le 0 ]; then
+              break
+            fi
+            if timeout --signal=TERM --kill-after=20 "$remaining" npm install -g @kilocode/cli; then
+              exit 0
+            fi
+            if [ "$attempt" -lt 3 ] && [ $((deadline - SECONDS)) -gt $((attempt * 5)) ]; then
+              echo "::warning::Kilo CLI install attempt ${attempt} did not finish; retrying"
+              sleep $((attempt * 5))
+            fi
+          done
+          echo "::error::Kilo CLI install did not finish"
+          exit 1
 
       # Same install scope as the PR job: the dump statically imports schemas
       # from `cloud-agent-next`, so that project must be installed for its

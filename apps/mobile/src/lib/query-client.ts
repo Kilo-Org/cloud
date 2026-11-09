@@ -24,7 +24,7 @@ const acceptedActiveSessionsDataSchema = z.object({
  * the metadata without provenance (surfaces resolve empty) instead of
  * crashing every observer of the query cache.
  */
-export function acceptedActiveSessionsRowIds(data: unknown): readonly string[] {
+function acceptedActiveSessionsRowIds(data: unknown): readonly string[] {
   const parsed = acceptedActiveSessionsDataSchema.safeParse(data);
   if (parsed.success) {
     return parsed.data.sessions.map(row => row.id);

@@ -231,7 +231,6 @@ async function claimStoreEventForProcessing(params: {
   return existingEvent?.processed_at ? 'already_processed' : 'in_flight';
 }
 
-
 /** Apple `price` is in milliunits of `currency`: ten milliunits make one cent. */
 function getAppStoreUsdAmountCents(transaction: AppleStoreDecodedTransaction): number | undefined {
   if (transaction.currency !== 'USD' || transaction.price === undefined) return undefined;

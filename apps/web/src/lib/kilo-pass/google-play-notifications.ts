@@ -188,7 +188,6 @@ async function markGooglePlayStoreEventProcessed(
     );
 }
 
-
 /** Play `eventTimeMillis` is milliseconds since the epoch, as a string or a number. */
 function googlePlayEventTime(eventTimeMillis: string | number | null): Date | undefined {
   if (eventTimeMillis === null) return undefined;

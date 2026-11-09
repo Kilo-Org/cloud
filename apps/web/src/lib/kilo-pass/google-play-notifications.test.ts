@@ -637,7 +637,6 @@ describe('processGooglePlayKiloPassNotification', () => {
     });
     expect(after!.total_microdollars_acquired).toBe(user.total_microdollars_acquired);
   });
-
 });
 
 describe('Google Play bouncer store events', () => {

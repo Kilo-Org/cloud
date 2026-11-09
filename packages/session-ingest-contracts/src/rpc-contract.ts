@@ -11,6 +11,20 @@ export { cloudAgentSessionIdSchema, cloudAgentWorktreeIdSchema, type CloudAgentW
 
 export const sessionIdSchema = z.string().startsWith('ses_').length(30);
 
+export const publishCloudAgentSessionStatusSchema = z
+  .object({
+    sessionId: sessionIdSchema,
+    kiloUserId: z.string().min(1),
+    cloudAgentSessionId: cloudAgentSessionIdSchema,
+    status: z.enum(['busy', 'retry', 'question', 'permission', 'idle', 'failed']),
+    occurredAt: z.iso.datetime(),
+    transitionId: z.string().regex(/^[0-7][0-9A-HJKMNP-TV-Z]{25}$/),
+  })
+  .strict();
+export type PublishCloudAgentSessionStatusParams = z.infer<
+  typeof publishCloudAgentSessionStatusSchema
+>;
+
 export const cloudAgentWorktreeLocationSchema = z
   .object({
     sandboxId: z.string().regex(/^[A-Za-z0-9._:-]{1,256}$/),
@@ -1353,6 +1367,7 @@ export type AuthorizedSessionMessages = {
 export type GetSessionMessagesResult = AuthorizedSessionMessages | null;
 
 export type SessionIngestRpcMethods = {
+  publishCloudAgentSessionStatus: (params: PublishCloudAgentSessionStatusParams) => Promise<void>;
   beginCloudAgentWorktreeDeletion: (
     params: CloudAgentWorktreeDeletionParams
   ) => Promise<CloudAgentWorktreeDeletionState>;

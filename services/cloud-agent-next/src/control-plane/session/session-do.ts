@@ -28,6 +28,7 @@ import {
   type CloudAgentAuthority,
 } from '@kilocode/worker-utils/cloud-agent-authority';
 import { sessionCallbackContext } from './callback-context.js';
+import { createSessionListStatusOutbox, deriveSessionListStatus } from './list-status.js';
 import {
   cloudAgentWorktreeIdSchema,
   cloudAgentWorktreeLocationSchema,
@@ -749,6 +750,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   private readonly historyHydrations = new Map<string, Promise<void>>();
   /** Report obligations for terminal messages (plan B5); repair is best effort. */
   private readonly reportOutbox: ReportOutbox;
+  private readonly listStatusOutbox: ReturnType<typeof createSessionListStatusOutbox>;
   /** Terminal callback outbox (plan B5); one job per drained batch. */
   private readonly messageCallbacks: MessageCallbacks;
   /** Worktree-changes projection from the shared event log (plan B10). */
@@ -793,6 +795,10 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     this.reportOutbox = createReportOutbox({
       storage: ctx.storage,
       getQueue: () => this.env.CLOUD_AGENT_REPORT_QUEUE,
+    });
+    this.listStatusOutbox = createSessionListStatusOutbox({
+      storage: ctx.storage,
+      publish: update => this.env.SESSION_INGEST.publishCloudAgentSessionStatus(update),
     });
     this.messageCallbacks = createMessageCallbacks({
       storage: ctx.storage,
@@ -2479,6 +2485,25 @@ export class SandboxSessionV2 extends DurableObject<Env> {
    * Outbox due times retry failed reporting even once no message is open.
    */
   private async armAlarm(): Promise<void> {
+    if (
+      this.metadata !== null &&
+      this.registration !== null &&
+      this.env.SESSION_INGEST !== undefined
+    ) {
+      this.listStatusOutbox.record(
+        {
+          sessionId: this.registration.spec.kiloSessionId,
+          kiloUserId: this.metadata.identity.userId,
+          cloudAgentSessionId: this.sessionId,
+        },
+        deriveSessionListStatus({
+          messages: this.messages,
+          nativeStatus: this.deriveSessionStatus()?.type,
+          pendingInteractions: this.pendingInteractions,
+          routeState: this.route.state,
+        })
+      );
+    }
     if (!this.messages.some(message => message.state === 'queued')) {
       await this.clearTransportRecovery();
     }
@@ -2487,12 +2512,18 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       nextBackstopAt(this.messages, this.sessionTimers()),
       this.reportOutbox.nextDueAt() ?? null,
       this.messageCallbacks.nextCallbackDueAt() ?? null,
+      this.listStatusOutbox.nextDueAt(),
     ].filter((value): value is number => value !== null);
     if (candidates.length === 0) {
       await this.ctx.storage.deleteAlarm();
       return;
     }
     await this.ctx.storage.setAlarm(Math.min(...candidates));
+    const statusDueAt = this.listStatusOutbox.nextDueAt();
+    if (statusDueAt !== null && statusDueAt <= Date.now()) {
+      // Metadata publication never holds up preparation, answers, or outcomes.
+      this.ctx.waitUntil(this.listStatusOutbox.repair().then(() => this.armAlarm()));
+    }
   }
 
   async getSession(): Promise<ControlPlaneSessionSnapshot> {
@@ -4255,7 +4286,14 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   }
 
   private enqueue<T>(task: () => Promise<T>): Promise<T> {
-    const run = this.operations.tail.then(task, task);
+    const withStatus = async () => {
+      try {
+        return await task();
+      } finally {
+        await this.armAlarm();
+      }
+    };
+    const run = this.operations.tail.then(withStatus, withStatus);
     this.operations.tail = run.then(
       () => undefined,
       () => undefined

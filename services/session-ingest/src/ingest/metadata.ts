@@ -174,7 +174,8 @@ export async function applyMetadataChanges(
   kiloUserId: string,
   sessionId: string,
   mergedChanges: Map<string, string | null>,
-  ctx?: { waitUntil(promise: Promise<unknown>): void }
+  ctx?: { waitUntil(promise: Promise<unknown>): void },
+  expectedCloudAgentSessionId?: string
 ): Promise<void> {
   if (mergedChanges.size === 0) return;
 
@@ -255,6 +256,8 @@ export async function applyMetadataChanges(
     const [currentRow] = await selectCurrentRow().for('update');
     if (
       !currentRow ||
+      (expectedCloudAgentSessionId !== undefined &&
+        currentRow.cloudAgentSessionId !== expectedCloudAgentSessionId) ||
       (currentRow.worktreeId && (await isWorktreeDeleting(tx, currentRow.worktreeId)))
     )
       return null;

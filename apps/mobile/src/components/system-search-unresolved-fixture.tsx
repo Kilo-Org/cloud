@@ -6,9 +6,6 @@ import { ScreenHeader } from '@/components/screen-header';
 import { Text } from '@/components/ui/text';
 import { showSystemSearchUnresolvedFeedback } from '@/lib/system-search-route';
 
-/** The fixture screen's root, and the design-gate target's ready node. */
-export const SYSTEM_SEARCH_UNRESOLVED_FIXTURE_TEST_ID = 'system-search-unresolved-fixture';
-
 /**
  * Raises the toast again for the fixture's retry. It stands in for the real
  * retry — which consumes the module's slot — because the fixture has no slot and
@@ -19,8 +16,8 @@ function showFixtureToast(): void {
 }
 
 /**
- * The screen behind `/(auth)/system-search-unresolved-fixture`, reachable only
- * through the dev fixture link in `src/lib/system-search-unresolved-fixture-route.ts`.
+ * The screen behind `/(app)/system-search-unresolved-fixture`, reachable only
+ * through the dev fixture link in `src/app/+native-intent.tsx`.
  *
  * It raises the toast the search-tap consume shows when the phone's index could
  * not resolve the picked result, through the production function and the
@@ -39,7 +36,7 @@ export function SystemSearchUnresolvedFixture() {
   }, []);
 
   return (
-    <View className="flex-1 bg-background" testID={SYSTEM_SEARCH_UNRESOLVED_FIXTURE_TEST_ID}>
+    <View className="flex-1 bg-background" testID="system-search-unresolved-fixture">
       <ScreenHeader title="System search toast fixture" />
       <View className="gap-2 px-4 pt-4">
         <Text className="text-sm text-muted-foreground">Toast under test</Text>

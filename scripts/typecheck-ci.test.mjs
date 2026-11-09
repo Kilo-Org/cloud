@@ -1195,6 +1195,28 @@ test('the web-test shards install the closure their Jest suite reads', () => {
   assert.equal(run.run, 'pnpm --filter web test --shard=${{ matrix.shard }}/4');
 });
 
+// The wiring job reads the root project and executes Wrangler's real config
+// parser from the usage-ingest closure, so one frozen install selects both. A
+// second install step would resolve and link the same lockfile again on the
+// same runner.
+const wiringInstall =
+  'pnpm install --frozen-lockfile --ignore-scripts --filter cloudflare-usage-ingest --filter kilocode-monorepo';
+
+test('the ci-wiring job installs its closure in one pass', () => {
+  const steps = ciJobs['ci-wiring'].steps;
+  const installs = steps.filter(step => /^pnpm\b.*\binstall\b/.test(step.run ?? ''));
+  assert.deepEqual(
+    installs.map(step => step.run),
+    [wiringInstall],
+    'one install links the root project and the usage-ingest closure'
+  );
+  const installIndex = steps.indexOf(installs[0]);
+  const relay = steps.findIndex(step =>
+    /scripts\/deployment-workflows\.test\.mjs/.test(step.run ?? '')
+  );
+  assert.ok(relay > installIndex, 'the relay regression runs after the install that links Wrangler');
+});
+
 // The measured per-job install share of wall time keeps a narrowing above one
 // tenth of the job it saves: the mobile-test shards, `lint` and `check-unused`
 // clear that bar, and `typecheck`'s sample run does not, so it keeps the whole

@@ -14,6 +14,13 @@ const prJobName = 'catalog-pr';
 const mergeJobName = 'catalog-merge';
 const dumpCommand = 'pnpm --filter web script src/scripts/mcp-catalog/dump.ts';
 const skillCommand = 'pnpm --filter web script src/scripts/mcp-catalog/skill.ts';
+const wiringCommand = 'node --test scripts/kilo-mcp-catalog.test.mjs';
+// One install pass serves both the wiring check and the dump: the root project
+// the check reads, the web closure the dump parses, and `cloud-agent-next`,
+// whose schemas the dump imports by relative path. A second pass would resolve
+// and link the same lockfile again over the same store.
+const installCommand =
+  "pnpm install --frozen-lockfile --filter 'web...' --filter cloud-agent-next --filter kilocode-monorepo";
 const skillPath = '.kilo/skills/kilo-mcp/SKILL.md';
 const embedCommand = 'node services/kilo-mcp/scripts/embed-catalog.ts upsert';
 // A cold install downloads large platform packages, so each job resolves the
@@ -410,6 +417,31 @@ function validate(workflow) {
     'PR dump must not use the personal CLI credential'
   );
   assertKiloCliSteps(pr, changeGate, 'PR job');
+
+  // One install pass covers the wiring check and the dump. Splitting it back
+  // into a root-only pass and a wider pass resolves and links the same
+  // lockfile twice in one job.
+  const prInstalls = pr.steps.filter(step => /^pnpm\b.*\binstall\b/.test(step.run ?? ''));
+  assert.equal(
+    prInstalls.length,
+    1,
+    `${prJobName}: one lockfile install pass, not ${prInstalls.length}`
+  );
+  assert.equal(
+    prInstalls[0].run,
+    installCommand,
+    `${prJobName}: the install selects the root project, the web closure and cloud-agent-next in one pass`
+  );
+  assert.equal(prInstalls[0].if, changeGate, `${prJobName}: the install is gated on catalog changes`);
+  const prWiring = findStep(pr, step => step.run === wiringCommand, 'catalog wiring check step');
+  assert.ok(
+    pr.steps.indexOf(prInstalls[0]) < pr.steps.indexOf(prWiring),
+    `${prJobName}: the install must come before the wiring check it serves`
+  );
+  assert.ok(
+    pr.steps.indexOf(prInstalls[0]) < pr.steps.indexOf(prDump),
+    `${prJobName}: the install must come before the dump it serves`
+  );
 
   // The PR job regenerates the skill from the catalog.json the dump just
   // wrote, on the same change gate and with no credentials (s1's generator
@@ -969,6 +1001,22 @@ for (const [name, defect] of [
       const dumpIndex = steps.findIndex(step => step.run === dumpCommand);
       steps.splice(steps.indexOf(skill), 1);
       steps.splice(dumpIndex, 0, skill);
+    },
+  ],
+  [
+    'second lockfile install pass added',
+    workflow =>
+      addStep(workflow, prJobName, {
+        name: 'Install root dependencies',
+        if: changeGate,
+        run: 'pnpm --filter kilocode-monorepo install --frozen-lockfile --ignore-scripts',
+      }),
+  ],
+  [
+    'install narrowed to the root project',
+    workflow => {
+      const step = workflow.jobs[prJobName].steps.find(item => item.run === installCommand);
+      step.run = 'pnpm --filter kilocode-monorepo install --frozen-lockfile';
     },
   ],
 ]) {

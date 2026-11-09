@@ -5,6 +5,7 @@ import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { user_github_app_tokens, type PlatformIntegration } from '@kilocode/db/schema';
+import { isExpiredProvidedToken } from '@kilocode/db/github-identity';
 import {
   generateGitHubInstallationToken,
   type CollaboratorPermission,
@@ -315,15 +316,39 @@ async function readAllThreadComments(
   return comments;
 }
 
+/**
+ * The GitHub account bound to the Kilo user who started the run.
+ *
+ * `githubUserId` is the account id recorded with the binding. It is null when
+ * the caller only has a credential resolved at request time.
+ */
+export type FixReviewInitiatorIdentity = {
+  login: string;
+  githubUserId: string | null;
+};
+
+/**
+ * A comment is the initiator's when GitHub reports the account id recorded with
+ * the binding. Logins are compared only when one side carries no account id.
+ */
+function isInitiatorAuthor(
+  comment: FixReviewComment,
+  initiator: FixReviewInitiatorIdentity | null
+): boolean {
+  if (initiator === null) return false;
+  if (initiator.githubUserId !== null && comment.authorId !== null) {
+    return String(comment.authorId) === initiator.githubUserId;
+  }
+  const loginKey = comment.authorLogin.trim().toLowerCase();
+  return loginKey.length > 0 && loginKey === initiator.login.trim().toLowerCase();
+}
+
 export async function selectFixReviewComments(input: {
   comments: readonly FixReviewComment[];
-  trustedLogins: readonly string[];
+  initiator: FixReviewInitiatorIdentity | null;
   settledCommentIds: ReadonlySet<number>;
   lookupPermission: (login: string) => Promise<CollaboratorPermission | null>;
 }): Promise<FixReviewComment[]> {
-  const trustedLogins = new Set(
-    input.trustedLogins.map(login => login.trim().toLowerCase()).filter(login => login.length > 0)
-  );
   const permissionByLogin = new Map<string, Promise<CollaboratorPermission | null>>();
 
   async function isAuthorized(comment: FixReviewComment): Promise<boolean> {
@@ -336,9 +361,10 @@ export async function selectFixReviewComments(input: {
     ) {
       return true;
     }
+    if (isInitiatorAuthor(comment, input.initiator)) return true;
+
     const loginKey = comment.authorLogin.trim().toLowerCase();
     if (loginKey.length === 0) return false;
-    if (trustedLogins.has(loginKey)) return true;
 
     let permission = permissionByLogin.get(loginKey);
     if (!permission) {
@@ -368,7 +394,7 @@ export async function selectFixReviewComments(input: {
 }
 
 export type FixReviewSelectionDeps = {
-  getInitiatorGitHubLogin: (kiloUserId: string) => Promise<string | null>;
+  getInitiatorIdentity: (kiloUserId: string) => Promise<FixReviewInitiatorIdentity | null>;
   getUserAccessToken: typeof getGitHubUserAccessToken;
   generateInstallationToken: (
     installationId: string,
@@ -378,20 +404,37 @@ export type FixReviewSelectionDeps = {
   createCommentClient: (token: string, target: FixReviewTarget) => FixReviewCommentClient;
 };
 
-const defaultDeps: FixReviewSelectionDeps = {
-  async getInitiatorGitHubLogin(kiloUserId) {
-    const [authorization] = await db
-      .select({ login: user_github_app_tokens.github_login })
-      .from(user_github_app_tokens)
-      .where(
-        and(
-          eq(user_github_app_tokens.kilo_user_id, kiloUserId),
-          eq(user_github_app_tokens.github_app_type, 'standard')
-        )
+/**
+ * The GitHub account recorded for this Kilo user's personal identity, or null
+ * when the binding is revoked or its provided token has expired. A binding that
+ * cannot produce a credential authorizes nothing.
+ */
+export async function getFixReviewInitiatorIdentity(
+  kiloUserId: string
+): Promise<FixReviewInitiatorIdentity | null> {
+  const [authorization] = await db
+    .select({
+      login: user_github_app_tokens.github_login,
+      githubUserId: user_github_app_tokens.github_user_id,
+      revokedAt: user_github_app_tokens.revoked_at,
+      credentialSource: user_github_app_tokens.credential_source,
+      expiresAt: user_github_app_tokens.access_token_expires_at,
+    })
+    .from(user_github_app_tokens)
+    .where(
+      and(
+        eq(user_github_app_tokens.kilo_user_id, kiloUserId),
+        eq(user_github_app_tokens.github_app_type, 'standard')
       )
-      .limit(1);
-    return authorization?.login ?? null;
-  },
+    )
+    .limit(1);
+  if (!authorization || authorization.revokedAt !== null) return null;
+  if (isExpiredProvidedToken(authorization.credentialSource, authorization.expiresAt)) return null;
+  return { login: authorization.login, githubUserId: authorization.githubUserId };
+}
+
+const defaultDeps: FixReviewSelectionDeps = {
+  getInitiatorIdentity: getFixReviewInitiatorIdentity,
   getUserAccessToken: getGitHubUserAccessToken,
   generateInstallationToken: generateGitHubInstallationToken,
   createCommentClient: (token, target) =>
@@ -412,11 +455,12 @@ async function resolveCommentClient(input: {
   deps: FixReviewSelectionDeps;
 }): Promise<{
   client: FixReviewCommentClient;
-  initiatorGitHubLogin: string | null;
+  initiator: FixReviewInitiatorIdentity | null;
   userCredential?: GitHubUserAccessTokenConnected;
 }> {
   const { owner, repo } = splitRepositoryFullName(input.repositoryFullName);
-  const initiatorGitHubLogin = await input.deps.getInitiatorGitHubLogin(input.initiatorKiloUserId);
+  const initiator = await input.deps.getInitiatorIdentity(input.initiatorKiloUserId);
+
   const target = { owner, repo, pullNumber: input.pullNumber };
   const integration = input.integration;
 
@@ -429,7 +473,7 @@ async function resolveCommentClient(input: {
     );
     return {
       client: input.deps.createCommentClient(token, target),
-      initiatorGitHubLogin,
+      initiator,
     };
   }
 
@@ -442,7 +486,7 @@ async function resolveCommentClient(input: {
   return {
     client: input.deps.createCommentClient(credential.credential.token, target),
     userCredential: credential.credential,
-    initiatorGitHubLogin: initiatorGitHubLogin ?? credential.credential.githubLogin,
+    initiator: initiator ?? { login: credential.credential.githubLogin, githubUserId: null },
   };
 }
 
@@ -471,7 +515,7 @@ export async function selectFixReviewCommentsForReview(input: {
   deps?: Partial<FixReviewSelectionDeps>;
 }): Promise<FixReviewSelection> {
   const deps: FixReviewSelectionDeps = { ...defaultDeps, ...input.deps };
-  const { client, initiatorGitHubLogin, userCredential } = await resolveCommentClient({
+  const { client, initiator, userCredential } = await resolveCommentClient({
     ...input,
     deps,
   });
@@ -484,7 +528,7 @@ export async function selectFixReviewCommentsForReview(input: {
 
     const selected = await selectFixReviewComments({
       comments,
-      trustedLogins: initiatorGitHubLogin ? [initiatorGitHubLogin] : [],
+      initiator,
       settledCommentIds,
       lookupPermission: login => client.lookupPermission(login),
     });

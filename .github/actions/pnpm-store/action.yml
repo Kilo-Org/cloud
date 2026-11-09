@@ -8,7 +8,9 @@ description: >-
   Each job mounts its own clone of the disk, so parallel jobs do not wait on
   each other. Keep Branch Protection for sticky disks on in the Blacksmith
   dashboard (Settings): then only default-branch runs commit the disk, and a
-  pull request job cannot change what main reads.
+  pull request job cannot change what main reads. The reset above runs on every
+  ref; the reset after the job runs only on the default branch, because a job on
+  any other ref reaches the disk through a clone that is never committed.
 
 runs:
   using: composite

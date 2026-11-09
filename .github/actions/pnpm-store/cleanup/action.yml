@@ -1,8 +1,14 @@
 name: Reset pnpm installed graph
-description: Remove pnpm's generated dependency graph before install and sticky-disk commit
+description: >-
+  Remove pnpm's generated dependency graph so an install rebuilds it. The main
+  step keeps the reset before every install, on every ref, because an install
+  must never read a graph that another install wrote. The post step repeats the
+  reset so a run that commits the sticky disk commits only the content store;
+  it runs only on the default branch, the only ref whose runs commit the disk,
+  because any other ref mounts a clone that is discarded.
 
 runs:
   using: node24
   main: cleanup.cjs
   post: cleanup.cjs
-  post-if: always()
+  post-if: github.ref == 'refs/heads/main'

@@ -83,6 +83,8 @@ test('dependency cache keeps only the content store on the mounted filesystem', 
 
   const cleanup = action.runs.steps.find(step => step.name === 'Reset pnpm installed graph');
   assert.equal(cleanup.uses, './.github/actions/pnpm-store/cleanup');
+  // Every install must start from a rebuilt graph on every ref.
+  assert.equal(cleanup.if, undefined);
   const cleanupAction = load(
     readFileSync(
       new URL('../.github/actions/pnpm-store/cleanup/action.yml', import.meta.url),
@@ -91,7 +93,9 @@ test('dependency cache keeps only the content store on the mounted filesystem', 
   );
   assert.equal(cleanupAction.runs.main, 'cleanup.cjs');
   assert.equal(cleanupAction.runs.post, 'cleanup.cjs');
-  assert.equal(cleanupAction.runs['post-if'], 'always()');
+  // Only default-branch runs commit the sticky disk, so only they pay the
+  // second full reset. A run on another ref mounts a clone that is discarded.
+  assert.equal(cleanupAction.runs['post-if'], "github.ref == 'refs/heads/main'");
 
   const result = spawnSync(process.execPath, [pnpmCleanup], {
     encoding: 'utf8',
@@ -119,8 +123,9 @@ test('dependency cache keeps only the content store on the mounted filesystem', 
   assert.equal(missingMountResult.status, 0, missingMountResult.stderr);
 });
 
-// The reset runs before install and again after the job, so it must never reach
-// anything except the checkout's own node_modules tree.
+// The reset runs before install and, on the default branch, again after the
+// job, so it must never reach anything except the checkout's own node_modules
+// tree.
 test('pnpm reset keeps every deletion inside the checkout', t => {
   const base = mkdtempSync(join(tmpdir(), 'pnpm-cache-reset-'));
   t.after(() => rmSync(base, { recursive: true, force: true }));

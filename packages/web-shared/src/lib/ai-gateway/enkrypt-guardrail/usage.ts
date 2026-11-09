@@ -1,19 +1,21 @@
 import 'server-only';
 
 import { randomUUID } from 'crypto';
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import {
   api_kind,
   enkrypt_usage,
   enkrypt_usage_decision,
+  enkrypt_usage_detector,
   enkrypt_usage_guardrail,
 } from '@kilocode/db/schema';
 import type {
+  EnkryptDetectorId,
   EnkryptGuardrailApiKind,
   EnkryptGuardrailDecision,
   EnkryptGuardrailDirection,
 } from '@kilocode/db/schema-types';
-import { db, isUSRegion } from '@kilocode/web-shared/lib/drizzle';
+import { db, isUSRegion, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { recordOrganizationConsumption } from '@kilocode/web-shared/lib/kilo-pass-org/consumption';
 import {
   scheduleOrganizationLowBalanceAlert,
@@ -42,6 +44,11 @@ export type EnkryptGuardrailCall = {
   decision: EnkryptGuardrailDecision;
   /** Enkrypt's `X-Enkrypt-Credits-Cost` header, or null when the call returned none. */
   creditsCost: number | null;
+  /**
+   * The detectors that fired on this call, blocking or log-only. A log-only detection is an
+   * `allowed` call with detectors here.
+   */
+  detectorsFired?: EnkryptDetectorId[];
 };
 
 export type EnkryptUsageRecord = EnkryptGuardrailCall & {
@@ -63,11 +70,14 @@ export function enkryptCreditsToMicrodollars(creditsCost: number | null): number
  * defer it with `after()`.
  */
 export async function recordEnkryptUsage(usageRecord: EnkryptUsageRecord): Promise<void> {
-  const { guardrail = 'input', ...call } = usageRecord;
+  const { guardrail = 'input', detectorsFired = [], ...call } = usageRecord;
+  const [firstDetector, ...otherDetectors] = detectorsFired;
   const usageWrite: EnkryptUsageWriteInput = {
     ...call,
-    // Input calls omit the field, so a web app deployed before it still accepts them.
+    // Input calls and calls without a detection omit these fields, so a web app deployed before
+    // them still accepts the write.
     ...(guardrail === 'output' ? { guardrail } : {}),
+    ...(firstDetector ? { detectorsFired: [firstDetector, ...otherDetectors] } : {}),
     id: randomUUID(),
     occurredAt: new Date().toISOString(),
   };
@@ -90,6 +100,37 @@ async function lookupId(
   const [concurrent] = await select();
   if (!concurrent) throw new Error('Enkrypt usage lookup resolution failed');
   return concurrent.id;
+}
+
+/**
+ * The lookup ids of the detectors, in their order, inserting the new ones. An insert that conflicts
+ * with a concurrent one waits for it, so reading again afterwards finds every detector. New
+ * detectors are inserted sorted, so concurrent inserts of the same detectors cannot deadlock.
+ */
+async function detectorIds(
+  tx: DrizzleTransaction,
+  detectors: readonly EnkryptDetectorId[]
+): Promise<number[]> {
+  const select = () =>
+    tx
+      .select({ id: enkrypt_usage_detector.detector_id, detector: enkrypt_usage_detector.detector })
+      .from(enkrypt_usage_detector)
+      .where(inArray(enkrypt_usage_detector.detector, [...detectors]));
+  const distinct = [...new Set(detectors)].sort();
+  let rows = await select();
+  if (rows.length < distinct.length) {
+    await tx
+      .insert(enkrypt_usage_detector)
+      .values(distinct.map(detector => ({ detector })))
+      .onConflictDoNothing({ target: enkrypt_usage_detector.detector });
+    rows = await select();
+  }
+  const ids = new Map(rows.map(row => [row.detector, row.id]));
+  return detectors.map(detector => {
+    const id = ids.get(detector);
+    if (id === undefined) throw new Error('Enkrypt usage detector lookup resolution failed');
+    return id;
+  });
 }
 
 /**
@@ -145,6 +186,9 @@ export async function recordEnkryptUsageLocally(
           .onConflictDoNothing({ target: enkrypt_usage_guardrail.guardrail })
           .returning({ id: enkrypt_usage_guardrail.guardrail_id })
     );
+    const firedDetectorIds = usageWrite.detectorsFired?.length
+      ? await detectorIds(tx, usageWrite.detectorsFired)
+      : null;
 
     const [inserted] = await tx
       .insert(enkrypt_usage)
@@ -160,6 +204,7 @@ export async function recordEnkryptUsageLocally(
         charged_microdollars: chargedMicrodollars,
         added_latency_ms: usageWrite.addedLatencyMs,
         guardrail_id: guardrailId,
+        fired_detector_ids: firedDetectorIds,
         created_at: occurredAt,
       })
       .onConflictDoNothing({ target: [enkrypt_usage.id, enkrypt_usage.created_at] })

@@ -115,18 +115,29 @@ test('ci.yml retries the changes filter after a transient GitHub API failure', (
   validate(readChangesJob());
 });
 
-for (const defect of [
-  'missing-retry',
-  'fatal-first-attempt',
-  'ignored-retry',
-  'unconditional-retry',
-  'drifted-filters',
-  'missing-fallback',
-  'retry-only-output',
-  'second-pair',
-  'unpublished-filter',
-  'stray-output',
-]) {
+// Each defect names the check it must trip. A mutation that fails an earlier
+// assertion would pass the test for the wrong reason: the keys and outputs it
+// was written to protect could break with the suite still green.
+const defects = [
+  ['missing-retry', 'retry step (id filter_retry) is missing'],
+  ['fatal-first-attempt', 'first attempt must tolerate failure'],
+  ['ignored-retry', 'a persistent filter failure must fail the job'],
+  ['unconditional-retry', 'retry must run only after a failed first attempt'],
+  ['drifted-filters', 'retry filters must be byte-identical to the first attempt'],
+  ['missing-fallback', 'output kilocode_backend must fall back to the retry attempt'],
+  [
+    'retry-only-output',
+    'every filter in the document publishes one falling-back output, and nothing else reads it',
+  ],
+  ['second-pair', 'one Detect changes pair lists the changed files, not one pair per purpose'],
+  ['unpublished-filter', 'the one document must hold every filter the job publishes'],
+  [
+    'stray-output',
+    'every filter in the document publishes one falling-back output, and nothing else reads it',
+  ],
+];
+
+for (const [defect, rejection] of defects) {
   test(`changes rejects ${defect}`, () => {
     const job = readChangesJob();
     const first = job.steps.find(item => item.id === 'filter');
@@ -143,9 +154,24 @@ for (const defect of [
       job.outputs.wiring = '${{ steps.filter_retry.outputs.wiring }}';
     if (defect === 'second-pair')
       job.steps.push({ ...first, id: 'filter_extra' }, { ...retry, id: 'filter_extra_retry' });
-    if (defect === 'unpublished-filter')
-      first.with.filters += "            extra:\n              - 'extra/**'\n";
+    if (defect === 'unpublished-filter') {
+      // Both documents gain the key, so the pair still matches byte for byte
+      // and only the missing output can fail.
+      const extra = "extra:\n  - 'extra/**'\n";
+      first.with.filters += extra;
+      retry.with.filters += extra;
+    }
     if (defect === 'stray-output') job.outputs.extra = fallbackOutput('extra');
-    assert.throws(() => validate(job), assert.AssertionError);
+    assert.throws(
+      () => validate(job),
+      error => {
+        assert.ok(error instanceof assert.AssertionError, `${defect} must fail an assertion`);
+        assert.ok(
+          error.message.includes(rejection),
+          `${defect} must trip its own check: ${error.message}`
+        );
+        return true;
+      }
+    );
   });
 }

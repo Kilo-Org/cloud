@@ -82,6 +82,10 @@ import {
   parseMessagesMicrodollarUsageFromString,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.messages';
 import { OPENROUTER_BYOK_COST_MULTIPLIER } from '@kilocode/web-shared/lib/ai-gateway/processUsage.constants';
+import {
+  boundedMetadataValue,
+  clientIpLiteral,
+} from '@kilocode/web-shared/lib/ai-gateway/header-limits';
 import { isErrorFinishReason } from '@kilocode/web-shared/lib/ai-gateway/finishReason';
 import {
   byokNonInferenceCost_mUsd,
@@ -364,6 +368,16 @@ export async function toInsertableDbUsageRecord(
       provider,
     });
   }
+
+  // The five header-derived columns below are persisted through lookup tables, so each
+  // value is kept within the shared bound: the forward chain as one public IP literal,
+  // and every other value at the shared maximum or the oversized sentinel. `fraudHeaders`
+  // itself stays as received, because bouncer, the ja4 check and the log queries read it.
+  metadata.http_x_forwarded_for = clientIpLiteral(metadata.http_x_forwarded_for);
+  metadata.http_user_agent = boundedMetadataValue(metadata.http_user_agent);
+  metadata.http_x_vercel_ip_country = boundedMetadataValue(metadata.http_x_vercel_ip_country);
+  metadata.http_x_vercel_ip_city = boundedMetadataValue(metadata.http_x_vercel_ip_city);
+  metadata.http_x_vercel_ja4_digest = boundedMetadataValue(metadata.http_x_vercel_ja4_digest);
 
   return { core, metadata };
 }

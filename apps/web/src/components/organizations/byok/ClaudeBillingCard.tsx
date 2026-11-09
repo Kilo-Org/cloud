@@ -62,9 +62,12 @@ function outcomeMessage(outcome: string, scope: ClaudeBillingScope) {
     case 'already_linked':
       return 'This Claude organization is already linked in Kilo, for another person, organization, or account. Remove that link first.';
     case 'forbidden':
-      return scope === 'shared_services'
-        ? 'Only a Kilo organization owner or admin with access to this feature can link it.'
-        : 'You need access to this feature, and to this Kilo organization, to link it.';
+      if (scope === 'shared_services') {
+        return 'Only a Kilo organization owner or admin with access to this feature can link it.';
+      }
+      return scope === 'member'
+        ? 'Only a member of this Kilo organization with access to this feature can link it.'
+        : 'Linked billing with Claude Platform is not available for your account yet.';
     default:
       return 'We could not link your Claude organization. Try again.';
   }
@@ -207,7 +210,7 @@ export function ClaudeBillingCardView({
               <p className="text-muted-foreground text-sm">
                 {scope === 'shared_services'
                   ? 'Ask a Kilo organization owner or admin to manage Claude shared services.'
-                  : 'Ask a Kilo organization owner or admin to manage Claude billing.'}
+                  : 'Join this Kilo organization as a member to link your own Claude organization here.'}
               </p>
             ) : null}
             {connected && status.canManage ? (
@@ -283,7 +286,7 @@ function ClaudeBillingCardContent({
           : needsAdmin
             ? scope === 'shared_services'
               ? 'An organization owner or admin must manage Claude shared services.'
-              : 'An organization member must manage this link.'
+              : 'Only a member of this organization can manage this link.'
             : statusQuery.isError
               ? 'We could not load your Claude link.'
               : removeMutation.isError

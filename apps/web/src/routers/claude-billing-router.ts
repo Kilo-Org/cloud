@@ -20,6 +20,7 @@ import {
 } from '@kilocode/web-shared/lib/trpc/init';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { canManageOrganization } from '@kilocode/app-shared/organizations';
+import { isClaudeBillingOrganizationMember } from '@/lib/claude-billing/access';
 
 /**
  * The caller's Claude billing connections: their personal one, their own in an
@@ -72,8 +73,8 @@ async function resolveOwner(
   }
   return {
     owner: { kind: 'member', kiloUserId: userId, organizationId },
-    // Organization access already proves the membership this connection needs.
-    canManage: true,
+    // A member connection needs a direct membership, which inherited access is not.
+    canManage: await isClaudeBillingOrganizationMember(userId, organizationId),
   };
 }
 
@@ -117,7 +118,7 @@ export const claudeBillingRouter = createTRPCRouter({
           message:
             owner.kind === 'shared_services'
               ? 'Only an organization owner or admin can remove the shared-services link.'
-              : 'Only an organization member can remove their own link.',
+              : 'Only a direct member of this organization can manage their own link.',
         });
       }
       // The profile stays: Anthropic allows one per customer organization, and a

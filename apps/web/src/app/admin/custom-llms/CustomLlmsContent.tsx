@@ -103,7 +103,7 @@ const CREDENTIAL_FORMATS: { title: string; description: ReactNode; example: stri
   "project_id": "my-project",
   "private_key_id": "...",
   "private_key": "-----BEGIN PRIVATE KEY-----\\n...",
-  "client_email": "name@my-project.iam.gserviceaccount.com",
+  "client_email": "...",
   ...
 }`,
   },

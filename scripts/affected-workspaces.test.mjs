@@ -135,7 +135,11 @@ test('a lint-only input lints every workspace and typechecks none', () => {
   // No typecheck program reads the lint config or its plugins, so such a change
   // must not start a typecheck row, while the lint rows still cover every
   // workspace through full_checks.
-  for (const file of ['.oxlintrc.json', 'oxlint-plugin-drizzle.js', 'tools/oxlint/anti-slop/index.ts']) {
+  for (const file of [
+    '.oxlintrc.json',
+    'oxlint-plugin-drizzle.js',
+    'tools/oxlint/anti-slop/index.ts',
+  ]) {
     const result = select([file]);
     assert.deepEqual(
       result,

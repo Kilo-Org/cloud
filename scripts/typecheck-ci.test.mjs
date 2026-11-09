@@ -1176,6 +1176,24 @@ test('the web-test shards install the closure their Jest suite reads', () => {
   assert.equal(run.run, 'pnpm --filter web test --shard=${{ matrix.shard }}/4');
 });
 
+// The build job runs one command, `pnpm --filter web build`, so it installs the
+// web app's closure and the root project. The app's tsconfig maps the workspace
+// packages its tests import by relative path to their sources, so the type
+// program resolves them without those workspaces' installs. The measured
+// install step holds much more than one tenth of the job's wall time, so this
+// narrowing clears the bar above. A step that starts importing another
+// workspace widens the filter; it does not restore the full install.
+const webBuildInstall =
+  "pnpm install --frozen-lockfile --filter 'web...' --filter kilocode-monorepo";
+
+test('the build job installs the closure its build reads', () => {
+  const job = ciJobs['build'];
+  const install = job.steps.find(step => step.name === 'Install dependencies');
+  assert.equal(install.run, webBuildInstall, 'the job installs the build closure');
+  const run = job.steps.find(step => step.name === 'Build application');
+  assert.equal(run.run, 'pnpm run build', 'the job still builds the workspace default');
+});
+
 // The measured per-job install share of wall time keeps a narrowing above one
 // tenth of the job it saves: the mobile-test shards, `lint` and `check-unused`
 // clear that bar, and `typecheck`'s sample run does not, so it keeps the whole

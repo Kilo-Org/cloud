@@ -4249,5 +4249,8 @@
     "noEnabledContexts": "ਨਿਰਧਾਰਿਤ ਬ੍ਰੀਫਿੰਗਾਂ ਲਈ ਕੋਈ ਸੰਦਰਭ ਚਾਲੂ ਨਹੀਂ ਹੈ",
     "sourceBlocker": "ਸੈਸ਼ਨ ਵੱਲ ਧਿਆਨ ਦੇਣ ਦੀ ਲੋੜ ਹੈ",
     "sourceMetadata": "ਕੈਪਚਰ ਕੀਤਾ ਸੈਸ਼ਨ ਮੈਟਾਡੇਟਾ"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "ਇਹ ਖੋਜ ਨਤੀਜਾ ਖੋਲ੍ਹਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ"
   }
 }

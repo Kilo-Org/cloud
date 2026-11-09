@@ -17,6 +17,7 @@ import {
   SUPPORT_READ_MAX_DURATION_SECONDS,
   SUPPORT_WRITE_MAX_DURATION_SECONDS,
   SUPPORT_WRITE_REQUEST_TTL_SECONDS,
+  isSupportAccessEnabled,
 } from '@kilocode/web-shared/lib/admin/support-access';
 import { userIsSuperadmin } from '@/lib/admin/admin-permissions';
 import { getPostgresErrorCode } from '@/lib/db-errors';
@@ -135,6 +136,10 @@ async function writeEvent(
 /**
  * Advances grants whose clock has run out. Called under the actor/org advisory
  * lock so two requests cannot both claim the same stale row.
+ *
+ * The grant deadline bounds access. These write paths record an elapsed grant on
+ * the row, and `deriveGrantStatus` applies the same deadline when a grant is
+ * presented.
  */
 async function expireStaleGrants(
   tx: DrizzleTransaction,
@@ -199,14 +204,28 @@ export type SupportGrantSummary = {
   reviewedAt: string | null;
 };
 
-export function toSupportGrantSummary(grant: SupportAccessGrant): SupportGrantSummary {
+/** Presents a grant through its own time box: the deadline decides the status. */
+function deriveGrantStatus(grant: SupportAccessGrant, nowMs: number): SupportAccessGrantStatus {
+  if (grant.status === 'active' && grant.expires_at !== null) {
+    return Date.parse(grant.expires_at) <= nowMs ? 'expired' : 'active';
+  }
+  if (grant.status === 'pending' && grant.request_expires_at !== null) {
+    return Date.parse(grant.request_expires_at) <= nowMs ? 'expired' : 'pending';
+  }
+  return grant.status;
+}
+
+export function toSupportGrantSummary(
+  grant: SupportAccessGrant,
+  nowMs: number = Date.now()
+): SupportGrantSummary {
   return {
     id: grant.id,
     actorKiloUserId: grant.actor_kilo_user_id,
     organizationId: grant.organization_id,
     actionClass: grant.action_class,
     grantKind: grant.grant_kind,
-    status: grant.status,
+    status: deriveGrantStatus(grant, nowMs),
     reason: grant.reason,
     ticketReference: grant.ticket_reference,
     requestedAt: grant.requested_at,
@@ -259,9 +278,10 @@ export async function toSupportGrantListItems(
   const people = new Map(userRows.map(row => [row.id, row]));
   const person = (id: string): SupportGrantPerson =>
     people.get(id) ?? { id, name: null, email: null };
+  const nowMs = Date.now();
 
   return grants.map(grant => ({
-    ...toSupportGrantSummary(grant),
+    ...toSupportGrantSummary(grant, nowMs),
     organizationName: organizationNames.get(grant.organization_id) ?? null,
     actor: person(grant.actor_kilo_user_id),
     approvedBy: grant.approved_by_kilo_user_id ? person(grant.approved_by_kilo_user_id) : null,
@@ -668,15 +688,40 @@ export async function listUnreviewedEmergencyGrants(): Promise<SupportAccessGran
     .orderBy(desc(support_access_grants.issued_at));
 }
 
+/**
+ * Active grants for an organization, including grants on its live direct
+ * parent when support access is on. A parent grant applies to the child, so the
+ * org banner and the View Org button must see it; the grant row still names the
+ * parent organization it was issued for.
+ */
 export async function getActiveSupportGrantsForOrganization(
   organizationId: string
 ): Promise<SupportAccessGrant[]> {
+  const organizationIds = [organizationId];
+  if (isSupportAccessEnabled()) {
+    const [target] = await db
+      .select({ parentOrganizationId: organizations.parent_organization_id })
+      .from(organizations)
+      .where(and(eq(organizations.id, organizationId), isNull(organizations.deleted_at)))
+      .limit(1);
+    if (target?.parentOrganizationId) {
+      const [liveParent] = await db
+        .select({ id: organizations.id })
+        .from(organizations)
+        .where(
+          and(eq(organizations.id, target.parentOrganizationId), isNull(organizations.deleted_at))
+        )
+        .limit(1);
+      if (liveParent) organizationIds.push(target.parentOrganizationId);
+    }
+  }
+
   return db
     .select()
     .from(support_access_grants)
     .where(
       and(
-        eq(support_access_grants.organization_id, organizationId),
+        inArray(support_access_grants.organization_id, organizationIds),
         eq(support_access_grants.status, 'active')
       )
     )

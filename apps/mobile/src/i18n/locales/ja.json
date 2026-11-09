@@ -4243,5 +4243,8 @@
     "noEnabledContexts": "スケジュールされたブリーフが有効なコンテキストはありません",
     "sourceBlocker": "セッションに対応が必要",
     "sourceMetadata": "取得したセッションのメタデータ"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "この検索結果を開けませんでした"
   }
 }

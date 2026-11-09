@@ -4243,5 +4243,8 @@
     "noEnabledContexts": "Kò sí àyíká tí a ti mú ṣiṣẹ́ fún àwọn ìròyìn tí a ṣètò",
     "sourceBlocker": "Ìgbà iṣẹ́ nílò àfiyèsí",
     "sourceMetadata": "Ìsọfúnni àpèjúwe ìgbà iṣẹ́ tí a gbà sílẹ̀"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "A kò lè ṣí àbájọ́ ìwádìí yìí"
   }
 }

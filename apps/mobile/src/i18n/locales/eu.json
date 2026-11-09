@@ -4243,5 +4243,8 @@
     "noEnabledContexts": "Ez dago testuingururik gaituta programatutako txostenetarako",
     "sourceBlocker": "Saioak arreta behar du",
     "sourceMetadata": "Jasotako saioaren metadatuak"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Ezin izan da bilaketa-emaitza hau ireki"
   }
 }

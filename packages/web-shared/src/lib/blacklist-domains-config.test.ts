@@ -3,7 +3,10 @@ import {
   BLACKLIST_DOMAINS_REDIS_KEY,
   BLACKLIST_DOMAINS_UPDATED_AT_REDIS_KEY,
 } from '@kilocode/web-shared/lib/redis-keys';
-import { MAX_BLACKLIST_DOMAINS } from '@kilocode/worker-utils/account-access';
+import {
+  MAX_BLACKLIST_DOMAINS,
+  isEmailBlacklistedByDomain,
+} from '@kilocode/worker-utils/account-access';
 
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
 jest.mock('@kilocode/web-shared/lib/redis', () => ({ redisClient: { get: jest.fn() } }));
@@ -68,6 +71,34 @@ describe('getBlacklistedDomains', () => {
 
     await expect(getBlacklistedDomains()).resolves.toEqual(['spam.example']);
     expect(captureException).not.toHaveBeenCalled();
+  });
+
+  test('enforces all 150,001 stored entries and retains them after a failed refresh', async () => {
+    const { getBlacklistedDomains, getBlockedSignupTlds, redisGet, reportDropped } =
+      await loadGetBlacklistedDomains();
+    const domains = Array.from({ length: 150_001 }, (_, index) => `Bulk-${index}.example`);
+    redisGet.mockResolvedValueOnce(
+      JSON.stringify({
+        domains,
+        blocked_signup_tlds: ['.ASIA'],
+        updated_at: 't1',
+        updated_by: null,
+        updated_by_email: null,
+      })
+    );
+
+    const loaded = await getBlacklistedDomains();
+    expect(loaded).toHaveLength(150_001);
+    expect(loaded).toEqual(domains);
+    expect(isEmailBlacklistedByDomain('user@MAIL.BULK-150000.EXAMPLE', loaded)).toBe(true);
+    expect(isEmailBlacklistedByDomain('user@notbulk-150000.example', loaded)).toBe(false);
+    await expect(getBlockedSignupTlds()).resolves.toEqual(['asia']);
+    expect(reportDropped).not.toHaveBeenCalled();
+
+    redisGet.mockRejectedValueOnce(new Error('redis read timed out'));
+    clock.mockReturnValue(TTL_MS + 1);
+    await expect(getBlacklistedDomains()).resolves.toBe(loaded);
+    await expect(getBlockedSignupTlds()).resolves.toEqual(['asia']);
   });
 
   test('rechecks only the updated_at key while the list is unchanged', async () => {
@@ -176,7 +207,14 @@ describe('over-cap stored config reporting', () => {
       JSON.stringify({ domains, updated_at: 't1', updated_by: null, updated_by_email: null })
     );
 
-    await getBlacklistedDomains();
+    const loaded = await getBlacklistedDomains();
+    expect(loaded).toEqual(domains.slice(0, MAX_BLACKLIST_DOMAINS));
+    expect(
+      isEmailBlacklistedByDomain(`user@bulk-${MAX_BLACKLIST_DOMAINS - 1}.example`, loaded)
+    ).toBe(true);
+    expect(isEmailBlacklistedByDomain(`user@bulk-${MAX_BLACKLIST_DOMAINS}.example`, loaded)).toBe(
+      false
+    );
     clock.mockReturnValue(TTL_MS + 1);
     await getBlacklistedDomains();
     clock.mockReturnValue(2 * TTL_MS + 2);
@@ -200,14 +238,14 @@ describe('BlacklistDomainsInputSchema', () => {
     };
   }
 
-  test('accepts an admin save at the cap', async () => {
+  test('accepts input at the cap', async () => {
     const { schema, max } = await loadInputSchema();
     const domains = Array.from({ length: max }, (_, index) => `bulk-${index}.example`);
 
     expect(schema.safeParse({ domains }).success).toBe(true);
   });
 
-  test('rejects an admin save one entry over the cap', async () => {
+  test('rejects input one entry over the cap', async () => {
     const { schema, max } = await loadInputSchema();
     const domains = Array.from({ length: max + 1 }, (_, index) => `bulk-${index}.example`);
 

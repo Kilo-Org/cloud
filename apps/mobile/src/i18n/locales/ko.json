@@ -4243,5 +4243,8 @@
     "noEnabledContexts": "예약된 브리핑이 활성화된 컨텍스트 없음",
     "sourceBlocker": "확인이 필요한 세션",
     "sourceMetadata": "캡처된 세션 메타데이터"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "이 검색 결과를 열지 못했습니다"
   }
 }

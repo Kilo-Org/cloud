@@ -1,15 +1,18 @@
 #!/usr/bin/env node
 // Select the workspaces whose typecheck and lint results a change can alter.
 //
-// Usage: node scripts/affected-workspaces.mjs <base-sha>
+// Usage: node scripts/affected-workspaces.mjs <base-sha> [--worktree]
 //        node scripts/affected-workspaces.mjs --groups
 // Prints JSON: { base, full, reasons, full_checks, dirs, packages,
 // test_only_dirs, test_only_packages, test_only_files }, where `base` is the
 // revision the selection was computed for. `dirs` is also the selection the test
-// matrix consumes (scripts/changed-workspaces.sh), so it already carries the
-// workspace-despite-document rule: paths no check reads select nothing. `base`
-// lets that consumer reuse this document instead of selecting a second time in
-// one CI run.
+// matrix consumes (scripts/changed-workspaces.sh), and `full`, `full_checks` and
+// `packages` are the selection scripts/typecheck-all.sh checks, so a consumer
+// reads this document instead of selecting a second time: changed-workspaces.sh
+// reuses it within one CI run, and typecheck-all.sh's incremental run and its CI
+// groups both decide from it. With `--worktree` the comparison covers the
+// working tree instead of the committed head, so a local run selects edits that
+// are not committed yet.
 // With --groups it instead prints the CI matrix groups for the selection JSON on
 // standard input.
 //
@@ -367,7 +370,7 @@ export function selectGroups({ full_checks: fullChecks = [], dirs = [], packages
   return { typecheck_groups, lint_groups };
 }
 
-function detect(base) {
+function detect(base, worktree) {
   const items = workspaces();
   const valid =
     /^[0-9a-f]{40}$/.test(base) &&
@@ -380,7 +383,9 @@ function detect(base) {
       }
     })();
   const changedFiles = valid
-    ? git('diff', '--name-only', base, 'HEAD').split('\n').filter(Boolean)
+    ? git('diff', '--name-only', ...(worktree ? [base] : [base, 'HEAD']))
+        .split('\n')
+        .filter(Boolean)
     : ['<no base revision>'];
   const dependencyDirs = changedFiles.some(file => DEPENDENCY_MANIFESTS.has(file))
     ? execFileSync('node', ['scripts/changed-dependencies.mjs', base], { encoding: 'utf8' })
@@ -403,5 +408,5 @@ function printGroups() {
 
 if (import.meta.main) {
   if (process.argv[2] === '--groups') printGroups();
-  else detect(process.argv[2] ?? '');
+  else detect(process.argv[2] ?? '', process.argv.includes('--worktree'));
 }

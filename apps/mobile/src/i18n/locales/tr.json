@@ -4243,5 +4243,8 @@
     "noEnabledContexts": "Planlanmış raporlar için etkinleştirilmiş bağlam yok",
     "sourceBlocker": "Oturumla ilgilenilmesi gerekiyor",
     "sourceMetadata": "Kaydedilen oturum meta verileri"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Bu arama sonucu açılamadı"
   }
 }

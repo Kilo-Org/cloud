@@ -4250,5 +4250,8 @@
     "noEnabledContexts": "निर्धारित ब्रीफ़िंग के लिए कोई संदर्भ चालू नहीं है",
     "sourceBlocker": "सत्र पर ध्यान देने की ज़रूरत है",
     "sourceMetadata": "कैप्चर किया गया सत्र मेटाडेटा"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "यह खोज परिणाम खोला नहीं जा सका"
   }
 }

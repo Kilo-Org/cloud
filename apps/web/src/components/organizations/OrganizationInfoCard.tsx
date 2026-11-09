@@ -49,7 +49,10 @@ import { formatDollars, formatIsoDateTime_IsoOrderNoSeconds } from '@/lib/utils'
 import { SpendingAlertsModal } from './SpendingAlertsModal';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useExpiringCredits } from './useExpiringCredits';
-import { useAdminOrganizationHierarchy } from '@/app/admin/api/organizations/hooks';
+import {
+  useAdminOrganizationDetails,
+  useAdminOrganizationHierarchy,
+} from '@/app/admin/api/organizations/hooks';
 import { OrganizationSalesDemoResetButton } from './OrganizationSalesDemoResetButton';
 
 const formatDate = (dateString: string) => {
@@ -166,9 +169,6 @@ function Inner(props: InnerProps) {
     deleted_at,
     auto_top_up_enabled,
   } = info;
-  // The member variant omits the Stripe customer id, so read it only on the
-  // admin-and-above variant. The field is rendered only in the admin dashboard.
-  const stripe_customer_id = info.callerRole === 'member' ? null : info.stripe_customer_id;
 
   const [isEditing, setIsEditing] = useState(false);
   const [editedName, setEditedName] = useState(name);
@@ -267,6 +267,8 @@ function Inner(props: InnerProps) {
   const isInAdminDashboard = isKiloAdmin && showAdminControls;
   const canManageBilling = useCanManageBilling();
   const hierarchyQuery = useAdminOrganizationHierarchy(id, isInAdminDashboard);
+  const adminDetailsQuery = useAdminOrganizationDetails(id, isInAdminDashboard);
+  const stripe_customer_id = adminDetailsQuery.data?.stripe_customer_id ?? null;
 
   const handleSeatsRequirementEdit = () => {
     setPendingSeatsValue(!info.require_seats);

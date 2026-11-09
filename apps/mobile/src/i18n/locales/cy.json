@@ -4507,5 +4507,8 @@
     "noEnabledContexts": "Dim cyd-destunau wedi'u galluogi ar gyfer briffiau a drefnwyd",
     "sourceBlocker": "Mae angen rhoi sylw i'r sesiwn",
     "sourceMetadata": "Metadata'r sesiwn a gipiwyd"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Ni lwyddwyd i agor canlyniad chwilio hwn"
   }
 }

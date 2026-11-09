@@ -4243,5 +4243,8 @@
     "noEnabledContexts": "Ma jiraan xaalado loo shiday warbixinnada la jadwalay",
     "sourceBlocker": "Fadhigu wuxuu u baahan yahay fiiro gaar ah",
     "sourceMetadata": "Xogta sharaxaysa fadhiga ee la kaydiyay"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Natiijadan raadinta lama furi karin"
   }
 }

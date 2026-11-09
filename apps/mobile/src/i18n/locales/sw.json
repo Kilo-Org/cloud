@@ -4243,5 +4243,8 @@
     "noEnabledContexts": "Hakuna miktadha iliyowezeshwa kwa ripoti zilizoratibiwa",
     "sourceBlocker": "Kipindi kinahitaji kushughulikiwa",
     "sourceMetadata": "Metadata za kipindi zilizohifadhiwa"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Imeshindikana kufungua matokeo haya ya utafutaji"
   }
 }

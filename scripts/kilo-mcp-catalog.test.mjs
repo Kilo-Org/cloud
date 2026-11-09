@@ -16,7 +16,30 @@ const dumpCommand = 'pnpm --filter web script src/scripts/mcp-catalog/dump.ts';
 const skillCommand = 'pnpm --filter web script src/scripts/mcp-catalog/skill.ts';
 const skillPath = '.kilo/skills/kilo-mcp/SKILL.md';
 const embedCommand = 'node services/kilo-mcp/scripts/embed-catalog.ts upsert';
-const kiloInstallCommand = 'npm install -g @kilocode/cli';
+// A stalled registry request must not hold the runner until the job timeout, so
+// the install bounds the whole loop with a time budget and retries an early
+// failure with whatever budget is left. A single attempt keeps whatever budget
+// remains, so a slow but moving download is not killed mid-transfer.
+const kiloInstallCommand = [
+  'set -euo pipefail',
+  'deadline=$((SECONDS + 720))',
+  'for attempt in 1 2 3; do',
+  '  remaining=$((deadline - SECONDS))',
+  '  if [ "$remaining" -le 0 ]; then',
+  '    break',
+  '  fi',
+  '  if timeout --signal=TERM --kill-after=20 "$remaining" npm install -g @kilocode/cli; then',
+  '    exit 0',
+  '  fi',
+  '  if [ "$attempt" -lt 3 ] && [ $((deadline - SECONDS)) -gt $((attempt * 5)) ]; then',
+  '    echo "::warning::Kilo CLI install attempt ${attempt} did not finish; retrying"',
+  '    sleep $((attempt * 5))',
+  '  fi',
+  'done',
+  'echo "::error::Kilo CLI install did not finish"',
+  'exit 1',
+  '',
+].join('\n');
 const mintCommand = 'api/internal/mcp-catalog/token';
 const mintSecretEnv = '${{ secrets.MCP_CATALOG_TOKEN_SECRET }}';
 const mergeGate = "github.event_name == 'push' && github.ref == 'refs/heads/main'";

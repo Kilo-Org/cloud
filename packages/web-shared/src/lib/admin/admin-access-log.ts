@@ -141,6 +141,11 @@ export type AdminAccessAttribution = {
   supportGrantId: string | null;
   supportActionId: string | null;
   inventoryId: string | null;
+  /**
+   * The parent organization whose grant admitted the target organization, when
+   * a support grant on a parent applied to a child. Null for a direct grant.
+   */
+  supportInheritedFromOrganizationId: string | null;
 };
 
 /**
@@ -235,6 +240,7 @@ export type AdminAccessEventInput = {
   supportGrantId?: string | null;
   supportActionId?: string | null;
   inventoryId?: string | null;
+  supportInheritedFromOrganizationId?: string | null;
 } & (
   | { kind: 'admin_guard'; user: AdminAccessUser }
   | {
@@ -299,6 +305,7 @@ export function emitAdminAccessEvent(params: AdminAccessEventInput): void {
     supportGrantId: params.supportGrantId ?? null,
     supportActionId: params.supportActionId ?? null,
     inventoryId: params.inventoryId ?? null,
+    supportInheritedFromOrganizationId: params.supportInheritedFromOrganizationId ?? null,
   };
   // Audit logging is a side effect that must never deny a legitimate admin
   // action: swallow (and report) any sink failure rather than propagate it.
@@ -444,6 +451,7 @@ export async function recordKiloAdminElevation(
     supportGrantId?: string | null;
     supportActionId?: string | null;
     inventoryId?: string | null;
+    supportInheritedFromOrganizationId?: string | null;
     issuanceId?: string | null;
   } & ElevationMembershipObservation
 ): Promise<void> {
@@ -469,6 +477,7 @@ export async function recordKiloAdminElevation(
       supportGrantId: params.supportGrantId,
       supportActionId: params.supportActionId,
       inventoryId: params.inventoryId,
+      supportInheritedFromOrganizationId: params.supportInheritedFromOrganizationId,
       issuanceId: params.issuanceId,
     });
     return;
@@ -499,6 +508,7 @@ export async function recordKiloAdminElevation(
     supportGrantId: params.supportGrantId,
     supportActionId: params.supportActionId,
     inventoryId: params.inventoryId,
+    supportInheritedFromOrganizationId: params.supportInheritedFromOrganizationId,
     issuanceId: params.issuanceId ?? null,
   });
   if (ctx.authViaToken) {
@@ -586,6 +596,7 @@ export async function recordKiloAdminElevationForRequest(
     supportGrantId?: string | null;
     supportActionId?: string | null;
     inventoryId?: string | null;
+    supportInheritedFromOrganizationId?: string | null;
     issuanceId?: string | null;
   } & ElevationMembershipObservation
 ): Promise<void> {
@@ -615,6 +626,7 @@ function recordKiloAdminElevationFromHeaders(
     supportGrantId?: string | null;
     supportActionId?: string | null;
     inventoryId?: string | null;
+    supportInheritedFromOrganizationId?: string | null;
     issuanceId?: string | null;
   } & ElevationMembershipObservation
 ): void {
@@ -647,6 +659,7 @@ function recordKiloAdminElevationFromHeaders(
     supportGrantId: params.supportGrantId,
     supportActionId: params.supportActionId,
     inventoryId: params.inventoryId,
+    supportInheritedFromOrganizationId: params.supportInheritedFromOrganizationId,
     issuanceId: params.issuanceId ?? null,
   });
   if (authViaToken) {

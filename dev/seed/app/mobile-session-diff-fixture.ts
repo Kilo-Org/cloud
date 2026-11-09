@@ -13,6 +13,7 @@ import {
   parseSessionIngestServiceStatus,
   type SessionIngestItem,
 } from '../lib/mobile-sheet-fixtures';
+import { seedTokenSigningParams } from '../lib/token-signing';
 
 export const usage = '<email>';
 
@@ -165,8 +166,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     userId: user.id,
     pepper: user.apiTokenPepper,
     secret,
-    expiresInSeconds: 3600,
-    env: process.env.NODE_ENV ?? 'development',
+    ...seedTokenSigningParams(3600),
     extra: user.isAdmin ? { isAdmin: true } : undefined,
   });
 

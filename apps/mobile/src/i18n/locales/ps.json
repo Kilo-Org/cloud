@@ -4243,5 +4243,8 @@
     "noEnabledContexts": "د مهالویش شوو راپورونو لپاره هېڅ چوکاټ فعال نه دی",
     "sourceBlocker": "ناسته پاملرنې ته اړتیا لري",
     "sourceMetadata": "د ناستې ثبت شوې مېټاډاټا"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "دا د لټون پایله پرانیستل نه شو"
   }
 }

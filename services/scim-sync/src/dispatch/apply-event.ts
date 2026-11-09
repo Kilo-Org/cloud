@@ -87,7 +87,11 @@ async function dispatch(ctx: AppCallContext, event: Event): Promise<AttemptOutco
       const body: DirectoryOrganizationUpsert = {
         workOSOrganizationId: organizationId,
         name: event.data.name,
-        capturedDomains: event.data.domains.map(d => d.domain),
+        // Absent and empty both mean this directory has captured no domains, so
+        // an activation for a directory with none maps to the organization
+        // upsert and applies. An empty list says nothing about domains to the
+        // route, which therefore clears nothing.
+        capturedDomains: (event.data.domains ?? []).map(d => d.domain),
       };
       return callApp(ctx, {
         method: 'PUT',

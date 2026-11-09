@@ -208,8 +208,9 @@ Four guards, all because a domain is an SSO authority rather than a label:
   that the dashboard's capture uses, so a concurrent human capture cannot
   interleave.
 - An event without `domains` says nothing rather than clearing: `dsync.deleted`
-  omits the field, and releasing an SSO domain stays a deliberate
-  administrative action.
+  omits the field, an activation for a directory with no domains arrives
+  without it and the dispatcher maps it to an empty list, and releasing an SSO
+  domain stays a deliberate administrative action.
 
 Each capture writes an `organization.sso.set_domain` audit row with a null
 actor, which is how this repo records a system-initiated organization change. A

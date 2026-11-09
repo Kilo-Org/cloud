@@ -297,10 +297,14 @@ describe('safety identifier regeneration', () => {
 
   test('preserves the original batch error when lock release also fails', async () => {
     await insertTestUser();
-    jest.spyOn(db, 'execute').mockRejectedValueOnce(new Error('synthetic database failure'));
+    const originalError = new Error('synthetic database failure');
+    jest.spyOn(db, 'execute').mockRejectedValueOnce(originalError);
     failRelease = true;
 
-    await expect(regenerate()).rejects.toThrow(SAFETY_IDENTIFIER_BACKFILL_ERROR);
+    await expect(regenerate()).rejects.toMatchObject({
+      message: SAFETY_IDENTIFIER_BACKFILL_ERROR,
+      cause: originalError,
+    });
     expect(persistedState()).toMatchObject({
       status: 'running',
       processed: 0,
@@ -328,10 +332,23 @@ describe('safety identifier regeneration', () => {
 
   test('retains the cursor on a failed SQL statement and saves only a sanitized error', async () => {
     const user = await insertTestUser();
-    jest
-      .spyOn(db, 'execute')
-      .mockRejectedValueOnce(new Error('synthetic sensitive database error'));
-    await expect(regenerate()).rejects.toThrow(SAFETY_IDENTIFIER_BACKFILL_ERROR);
+    const driverError = Object.assign(new Error('synthetic sensitive driver details'), {
+      code: '40001',
+    });
+    const originalError = new Error('synthetic sensitive database error', { cause: driverError });
+    originalError.name = 'DrizzleQueryError';
+    jest.spyOn(db, 'execute').mockRejectedValueOnce(originalError);
+    await expect(regenerate()).rejects.toMatchObject({
+      message: SAFETY_IDENTIFIER_BACKFILL_ERROR,
+      cause: originalError,
+    });
+    expect(console.error).toHaveBeenCalledWith('Safety identifier regeneration failed', {
+      exception_name: 'DrizzleQueryError',
+      database_error_code: '40001',
+    });
+    expect(JSON.stringify(jest.mocked(console.error).mock.calls)).not.toContain(
+      'synthetic sensitive'
+    );
     expect(persistedState()).toMatchObject({
       cursor: null,
       processed: 0,

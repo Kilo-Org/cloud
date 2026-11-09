@@ -1,7 +1,9 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { and, asc, count, gt, lte, max, sql } from 'drizzle-orm';
 import { z } from 'zod';
+import { sanitizedExceptionName } from '@kilocode/worker-utils/scheduled-job-observability';
 import { kilocode_users } from '@kilocode/db';
+import { getPostgresErrorCode } from '@/lib/db-errors';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import {
@@ -205,7 +207,11 @@ export async function regenerateSafetyIdentifiers({ deadlineAt }: { deadlineAt: 
       if (completed) break;
     }
     return { processed, remaining: state.status !== 'completed', skipped: false };
-  } catch {
+  } catch (error) {
+    console.error('Safety identifier regeneration failed', {
+      exception_name: sanitizedExceptionName(error),
+      database_error_code: getPostgresErrorCode(error),
+    });
     if (state) {
       try {
         await checkpoint({
@@ -218,7 +224,7 @@ export async function regenerateSafetyIdentifiers({ deadlineAt }: { deadlineAt: 
         // An unavailable Redis or a replacement owner must leave the previous checkpoint untouched.
       }
     }
-    throw new Error(SAFETY_IDENTIFIER_BACKFILL_ERROR);
+    throw new Error(SAFETY_IDENTIFIER_BACKFILL_ERROR, { cause: error });
   } finally {
     try {
       await redisClient.eval(releaseScript, [SAFETY_IDENTIFIER_BACKFILL_LOCK_KEY], [owner]);

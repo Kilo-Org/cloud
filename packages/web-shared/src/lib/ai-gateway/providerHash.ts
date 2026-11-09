@@ -44,9 +44,11 @@ export function generateOpenRouterUpstreamSafetyIdentifier(userId: string): stri
     return null;
   }
   const userHash = generateOpenRouterDownstreamSafetyIdentifier(userId);
+  // OpenRouter combines organization, user, and safety_identifier with hyphens for its identifier.
+  // applyTrackingIds sends the same downstream hash for both request fields, requiring both copies.
   return crypto
     .createHash('sha256')
-    .update(orgId + '-' + userHash + userHash)
+    .update(orgId + '-' + userHash + '-' + userHash)
     .digest('hex');
 }
 

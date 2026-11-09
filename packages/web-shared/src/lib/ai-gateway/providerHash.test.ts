@@ -178,14 +178,20 @@ describe('generateOpenRouterUpstreamSafetyIdentifier', () => {
     jest.restoreAllMocks();
   });
 
-  it('hashes the organization ID and duplicated downstream user hash with only one hyphen', () => {
+  it('hashes the organization ID and both downstream user hashes with hyphen separators', () => {
     const userHash = generateOpenRouterDownstreamSafetyIdentifier(userId);
     const expected = crypto
       .createHash('sha256')
-      .update(orgId + '-' + userHash + userHash)
+      .update(orgId + '-' + userHash + '-' + userHash)
       .digest('hex');
 
     expect(generateOpenRouterUpstreamSafetyIdentifier(userId)).toBe(expected);
+  });
+
+  it('matches the fixed synthetic organization and user vector', () => {
+    expect(generateOpenRouterUpstreamSafetyIdentifier(userId)).toBe(
+      'f6b8e246e58becc0d9c05e2bf93eea9f011ba14a6f572a12e2dc7ab6a89c13d2'
+    );
   });
 
   it.each([undefined, ''])('logs an error and returns null when OPENROUTER_ORG_ID is %p', value => {

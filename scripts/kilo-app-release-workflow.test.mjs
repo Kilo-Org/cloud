@@ -1128,7 +1128,10 @@ const mutations = {
   },
   'the suite proof reads a job that runs for every commit': workflow => {
     const suite = step(workflow, 'check-changes', 'suite');
-    suite.run = suite.run.replace('select(.name == "mobile-test (1/8)")', 'select(.name == "mobile-changes")');
+    suite.run = suite.run.replace(
+      'select(.name == "mobile-test (1/8)")',
+      'select(.name == "mobile-changes")'
+    );
   },
   'the suite proof accepts a skipped shard': workflow => {
     const suite = step(workflow, 'check-changes', 'suite');

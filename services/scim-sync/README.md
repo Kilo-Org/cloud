@@ -263,6 +263,13 @@ than a race, and retrying will not clear it. The app logs it as
 domain, and the 409 body names the domain too — neither carries the address. See
 `.specs/organization-sso.md`, Directory Sync rules 13 and 15.
 
+Clearing the refusal is an administrative action on the organization, never a
+directory-side one: capture the domain in the organization's SSO settings, or
+replay `dsync.activated` carrying `domains` for an organization that has none
+(rule 14). Until one of those happens every address the directory provisions is
+refused, and a directory that captured no domain therefore stops at its first
+user event once this loop applies events rather than logging them.
+
 Separating genuinely terminal failures from the retryable ones is still open,
 and is why the loop needs a retry bound rather than indefinite retry.
 

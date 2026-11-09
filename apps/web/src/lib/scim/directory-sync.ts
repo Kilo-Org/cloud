@@ -347,6 +347,10 @@ export async function upsertDirectoryUser(
   // let the same uncaptured address mint a new account instead. An address
   // change cannot reach this point with an unbound account — it went through
   // `applyDirectoryUserChanges` or this gate on its first bind.
+  //
+  // It runs first among the address rules, before the rebind refusal below, as
+  // it already did: the domain assertion is the requirement every address must
+  // meet, so it answers before any rule that is scoped to one address.
   await assertDirectoryOwnsEmailDomain(input.directoryId, input.email);
 
   if (existing) {

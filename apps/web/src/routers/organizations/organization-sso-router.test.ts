@@ -136,8 +136,23 @@ describe('organization SSO router', () => {
 
   describe('getConfig', () => {
     const callers: User[] = [];
+    const originalSupportAccessEnabled = process.env.SUPPORT_ACCESS_ENABLED;
 
-    async function createCallerWithRole(role: 'member' | 'owner') {
+    beforeAll(() => {
+      // Support access off is the default deployment state and the state these expectations
+      // describe, where a Kilo staff caller resolves to the legacy admin access.
+      process.env.SUPPORT_ACCESS_ENABLED = 'false';
+    });
+
+    afterAll(() => {
+      if (originalSupportAccessEnabled === undefined) {
+        delete process.env.SUPPORT_ACCESS_ENABLED;
+      } else {
+        process.env.SUPPORT_ACCESS_ENABLED = originalSupportAccessEnabled;
+      }
+    });
+
+    async function createCallerWithRole(role: 'member' | 'admin' | 'owner') {
       const user = await insertTestUser({
         google_user_email: `sso-read-${role}-${crypto.randomUUID()}@example.com`,
       });
@@ -214,6 +229,26 @@ describe('organization SSO router', () => {
 
     test('returns the provider configuration to an organization owner', async () => {
       const caller = await createCallerWithRole('owner');
+
+      const result = await caller.organizations.sso.getConfig({
+        organizationId: organization.id,
+      });
+
+      expect(result).toEqual({
+        kind: 'configuration',
+        isDomainVerified: true,
+        hasConnection: true,
+        domain: 'read-sso.test',
+        workosOrganization: {
+          id: 'workos_org_read',
+          name: 'Read SSO Organization',
+          domains: [{ domain: 'read-sso.test', state: 'verified' }],
+        },
+      });
+    });
+
+    test('returns the provider configuration to an organization admin', async () => {
+      const caller = await createCallerWithRole('admin');
 
       const result = await caller.organizations.sso.getConfig({
         organizationId: organization.id,

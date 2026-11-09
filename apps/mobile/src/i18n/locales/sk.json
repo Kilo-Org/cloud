@@ -4375,5 +4375,8 @@
     "noEnabledContexts": "Pre naplánované prehľady nie sú povolené žiadne kontexty",
     "sourceBlocker": "Relácia si vyžaduje pozornosť",
     "sourceMetadata": "Zachytené metadáta relácie"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Nepodarilo sa otvoriť tento výsledok vyhľadávania"
   }
 }

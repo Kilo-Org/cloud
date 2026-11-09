@@ -4243,5 +4243,8 @@
     "noEnabledContexts": "Ajastetut katsaukset eivät ole käytössä missään kontekstissa",
     "sourceBlocker": "Istunto vaatii huomiota",
     "sourceMetadata": "Tallennetut istunnon metatiedot"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Tämän hakutuloksen avaaminen epäonnistui"
   }
 }

@@ -4243,5 +4243,8 @@
       "title": "Save to list",
       "saved": "Saved to {{list}}"
     }
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Could not open this search result"
   }
 }

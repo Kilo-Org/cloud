@@ -4375,5 +4375,8 @@
     "noEnabledContexts": "Za načrtovana poročila ni omogočen noben kontekst",
     "sourceBlocker": "Seja zahteva pozornost",
     "sourceMetadata": "Zajeti metapodatki seje"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Ni bilo mogoče odpreti tega rezultata iskanja"
   }
 }

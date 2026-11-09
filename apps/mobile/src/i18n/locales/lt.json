@@ -4375,5 +4375,8 @@
     "noEnabledContexts": "Nė viename kontekste neįjungtos suplanuotos suvestinės",
     "sourceBlocker": "Sesijai reikia dėmesio",
     "sourceMetadata": "Užfiksuoti sesijos metaduomenys"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Nepavyko atidaryti šio paieškos rezultato"
   }
 }

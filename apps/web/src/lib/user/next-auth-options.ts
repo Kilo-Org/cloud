@@ -109,9 +109,9 @@ import {
   getUserFromSession,
   getUserFromSessionForCredentialIssuance,
   isBlockedTLD,
-  isEmailBlacklistedByDomainAsync,
   sessionAuthOptions,
 } from '@kilocode/web-shared/lib/user/server';
+import { isEmailBlacklisted } from '@kilocode/web-shared/lib/blacklist-domains-config';
 
 export type TurnstileJwtPayload = {
   /**
@@ -1180,7 +1180,7 @@ export const authOptions: NextAuthOptions = {
           return redirectUrlForCode('USER-NOT-FOUND');
         }
 
-        if (await isEmailBlacklistedByDomainAsync(accountInfo.google_user_email)) {
+        if (await isEmailBlacklisted(accountInfo.google_user_email)) {
           sentryLogger('auth', 'warning')(
             `SECURITY: Blacklisted: ${accountInfo.google_user_email}`,
             accountInfo

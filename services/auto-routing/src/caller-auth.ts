@@ -14,6 +14,7 @@ import {
 import { eq } from 'drizzle-orm';
 import {
   extractBearerToken,
+  formatError,
   getCachedSecret,
   verifyKiloTokenForResource,
   type KiloTokenPayload,
@@ -23,28 +24,31 @@ import {
   findOrganizationMemberBalanceRow,
   findOrganizationMemberRole,
   isApiTokenPepperCurrent,
-  isEmailBlacklistedByDomain,
+  isEmailDomainBlacklisted,
   organizationMemberBalance,
   requestOrganizationId,
 } from '@kilocode/worker-utils/account-access';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import * as z from 'zod';
-import { getBlacklistedDomains } from './organization-policy';
+import { domainBlacklistCache } from './organization-policy';
 
 export class CustomRouterError extends Error {
   readonly code: CustomRouterErrorCode;
   // Set when a dependency was briefly unavailable and the same request can be retried.
   readonly retryAfterSeconds: number | null;
+  readonly status: number;
 
   constructor(
     code: CustomRouterErrorCode,
     message: string,
-    retryAfterSeconds: number | null = null
+    retryAfterSeconds: number | null = null,
+    status: number = CUSTOM_ROUTER_ERROR_HTTP_STATUS[code]
   ) {
     super(message);
     this.name = 'CustomRouterError';
     this.code = code;
     this.retryAfterSeconds = retryAfterSeconds;
+    this.status = status;
   }
 }
 
@@ -54,7 +58,7 @@ export function customRouterErrorResponse(error: CustomRouterError): Response {
   return Response.json(
     { error: { code: error.code, message: error.message } } satisfies CustomRouterErrorResponse,
     {
-      status: CUSTOM_ROUTER_ERROR_HTTP_STATUS[error.code],
+      status: error.status,
       ...(error.retryAfterSeconds === null
         ? {}
         : { headers: { 'retry-after': String(error.retryAfterSeconds) } }),
@@ -100,39 +104,51 @@ async function verifyCallerToken(env: CallerEnv, token: string): Promise<KiloTok
 // Mirrors the gateway's user authentication: token, current pepper, an account outside the
 // blocked email domains and not blocked, and organization membership for the organization
 // context.
-export async function authenticateCaller(env: CallerEnv, headers: Headers): Promise<Caller> {
+export async function authenticateCaller(
+  env: CallerEnv,
+  headers: Headers,
+  context: Pick<ExecutionContext, 'waitUntil'>
+): Promise<Caller> {
   const token = extractBearerToken(headers.get('authorization'));
   if (!token) throw new CustomRouterError('unauthorized', 'Authentication required');
   const payload = await verifyCallerToken(env, token);
 
   const db = getWorkerDb(env.HYPERDRIVE.connectionString, { statement_timeout: 2_000 });
-  const [[user], blacklistedDomains] = await Promise.all([
-    db
-      .select({
-        api_token_pepper: kilocode_users.api_token_pepper,
-        blocked_reason: kilocode_users.blocked_reason,
-        google_user_email: kilocode_users.google_user_email,
-        total_microdollars_acquired: kilocode_users.total_microdollars_acquired,
-        microdollars_used: kilocode_users.microdollars_used,
-      })
-      .from(kilocode_users)
-      .where(eq(kilocode_users.id, payload.kiloUserId))
-      .limit(1),
-    getBlacklistedDomains(env),
-  ]);
+  const [user] = await db
+    .select({
+      api_token_pepper: kilocode_users.api_token_pepper,
+      blocked_reason: kilocode_users.blocked_reason,
+      google_user_email: kilocode_users.google_user_email,
+      total_microdollars_acquired: kilocode_users.total_microdollars_acquired,
+      microdollars_used: kilocode_users.microdollars_used,
+    })
+    .from(kilocode_users)
+    .where(eq(kilocode_users.id, payload.kiloUserId))
+    .limit(1);
   if (!user || !isApiTokenPepperCurrent(user.api_token_pepper, payload.apiTokenPepper)) {
     throw new CustomRouterError('unauthorized', 'Invalid token');
   }
   if (user.blocked_reason) throw new CustomRouterError('forbidden', 'Access denied');
-  // Fail closed: without a blocked-domain list this request cannot be admitted.
-  if (blacklistedDomains === null) {
+  let blocked: boolean;
+  try {
+    blocked = await isEmailDomainBlacklisted(
+      db,
+      user.google_user_email,
+      [],
+      domainBlacklistCache(env, context)
+    );
+  } catch (error) {
+    console.warn(
+      JSON.stringify({ event: 'auto_routing_domain_blacklist_read_failed', ...formatError(error) })
+    );
     throw new CustomRouterError(
       'internal_error',
       'Account checks are temporarily unavailable',
-      DEPENDENCY_RETRY_AFTER_SECONDS
+      DEPENDENCY_RETRY_AFTER_SECONDS,
+      503
     );
   }
-  if (isEmailBlacklistedByDomain(user.google_user_email, blacklistedDomains)) {
+  if (blocked) {
     throw new CustomRouterError('forbidden', 'Access denied');
   }
 

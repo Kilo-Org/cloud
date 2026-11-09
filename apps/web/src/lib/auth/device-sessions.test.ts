@@ -26,15 +26,15 @@ import {
   isDeviceSessionActive,
   resetDeviceSessionCacheForTest,
 } from '@kilocode/web-shared/lib/auth/device-session-cache';
-import {
-  isEmailBlacklistedByDomainAsync,
-  isBlockedTLD,
-} from '@kilocode/web-shared/lib/user/server';
+import { isBlockedTLD } from '@kilocode/web-shared/lib/user/server';
+import { isEmailBlacklisted } from '@kilocode/web-shared/lib/blacklist-domains-config';
 import { getWorkOSOrganization } from '@/lib/user';
 
 jest.mock('@kilocode/web-shared/lib/user/server', () => ({
-  isEmailBlacklistedByDomainAsync: jest.fn(),
   isBlockedTLD: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/blacklist-domains-config', () => ({
+  isEmailBlacklisted: jest.fn(),
 }));
 
 jest.mock('@/lib/user', () => ({
@@ -42,8 +42,8 @@ jest.mock('@/lib/user', () => ({
   getWorkOSOrganization: jest.fn(),
 }));
 
-const mockIsEmailBlacklistedByDomainAsync = jest.mocked(isEmailBlacklistedByDomainAsync);
 const mockIsBlockedTLD = jest.mocked(isBlockedTLD);
+const mockIsEmailBlacklisted = jest.mocked(isEmailBlacklisted);
 const mockGetWorkOSOrganization = jest.mocked(getWorkOSOrganization);
 
 describe('device-sessions', () => {
@@ -53,8 +53,8 @@ describe('device-sessions', () => {
   let fakeUser: User;
 
   beforeEach(async () => {
-    mockIsEmailBlacklistedByDomainAsync.mockResolvedValue(false);
     mockIsBlockedTLD.mockResolvedValue(false);
+    mockIsEmailBlacklisted.mockResolvedValue(false);
     mockGetWorkOSOrganization.mockResolvedValue(null);
 
     await db.insert(kilocode_users).values({
@@ -684,7 +684,7 @@ describe('device-sessions', () => {
       const sessionId = await createDeviceSession({ userId: testUserId });
       const { refreshToken } = await issueSessionCredentials(fakeUser, sessionId);
 
-      mockIsEmailBlacklistedByDomainAsync.mockResolvedValueOnce(true);
+      mockIsEmailBlacklisted.mockResolvedValueOnce(true);
 
       const result = await rotateRefreshToken(refreshToken);
       expect(result).toEqual({ ok: false, error: 'USER_BLOCKED' });
@@ -709,7 +709,7 @@ describe('device-sessions', () => {
       const presentedCredentials = await issueSessionCredentials(fakeUser, presentedSessionId);
       const siblingCredentials = await issueSessionCredentials(fakeUser, siblingSessionId);
 
-      mockIsEmailBlacklistedByDomainAsync.mockResolvedValueOnce(true);
+      mockIsEmailBlacklisted.mockResolvedValueOnce(true);
 
       const result = await rotateRefreshToken(presentedCredentials.refreshToken);
 
@@ -869,7 +869,7 @@ describe('device-sessions', () => {
       const sessionId = await createDeviceSession({ userId: testUserId });
       const { refreshToken } = await issueSessionCredentials(fakeUser, sessionId);
       const lookupError = new Error('Policy lookup unavailable');
-      mockIsEmailBlacklistedByDomainAsync.mockRejectedValueOnce(lookupError);
+      mockIsEmailBlacklisted.mockRejectedValueOnce(lookupError);
 
       await expect(rotateRefreshToken(refreshToken)).rejects.toBe(lookupError);
 

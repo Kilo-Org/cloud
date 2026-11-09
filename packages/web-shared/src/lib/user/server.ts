@@ -70,7 +70,7 @@ import {
 } from '@kilocode/worker-utils/kilo-token-policy';
 
 import {
-  getBlacklistedDomains,
+  isEmailBlacklisted,
   getBlockedSignupTlds,
 } from '@kilocode/web-shared/lib/blacklist-domains-config';
 
@@ -404,6 +404,7 @@ export async function getUserFromBearerForCredentialExchange(
     return authError(401, 'Unauthorized', auth.userId);
   }
 
+  // Credential exchange must observe the current primary token pepper.
   const user = await findUserById(auth.userId, db);
   if (
     auth.claims.apiTokenPepper === undefined ||
@@ -418,6 +419,7 @@ export async function getUserFromBearerForCredentialExchange(
     opts: { adminOnly: false },
     isNewUser: false,
     deviceSessionId: auth.claims.deviceSessionId,
+    fromDb: db,
   });
   if (!result.user) return result;
   if (!isKiloCredentialExchangeEligible(auth, policy)) {
@@ -673,7 +675,7 @@ async function validateUserAuthorization({
       tokenSource,
       cloudAgentAuthority,
     });
-  } else if (await isUserBlacklistedByDomain(user)) {
+  } else if (await isUserBlacklistedByDomain(user, fromDb)) {
     return authError(403, 'Access denied (R0)', kiloUserId, {
       authorizationRefused: true,
       internalApiUse,
@@ -775,15 +777,10 @@ async function readActiveDeviceSession(
 }
 
 export async function isUserBlacklistedByDomain(
-  existingUser: Pick<User, 'google_user_email'>
+  existingUser: Pick<User, 'google_user_email'>,
+  fromDb: typeof db = db
 ): Promise<boolean> {
-  const domains = await getBlacklistedDomains();
-  return isEmailBlacklistedByDomain(existingUser.google_user_email, domains);
-}
-
-export async function isEmailBlacklistedByDomainAsync(email: string): Promise<boolean> {
-  const domains = await getBlacklistedDomains();
-  return isEmailBlacklistedByDomain(email, domains);
+  return isEmailBlacklisted(existingUser.google_user_email, fromDb);
 }
 
 /**

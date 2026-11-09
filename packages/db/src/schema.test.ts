@@ -1,5 +1,6 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import { eq, inArray, sql } from 'drizzle-orm';
+import { getTableConfig } from 'drizzle-orm/pg-core';
 import * as fs from 'fs';
 import * as path from 'path';
 import { generateDrizzleJson, generateMigration } from 'drizzle-kit/api';
@@ -24,6 +25,53 @@ const schemaTestDb = createDrizzleClient({
 
 afterAll(async () => {
   await schemaTestDb.pool.end();
+});
+
+describe('domain blacklist schema', () => {
+  it('defines domain primary keys and a constrained singleton readiness state', () => {
+    const blacklist = getTableConfig(schema.blacklisted_domains);
+    expect(blacklist.name).toBe('blacklisted_domains');
+    expect(blacklist.columns).toHaveLength(1);
+    expect(blacklist.columns[0]?.name).toBe('domain');
+    expect(blacklist.columns[0]?.primary).toBe(true);
+    expect(blacklist.columns[0]?.notNull).toBe(true);
+
+    const state = getTableConfig(schema.domain_blacklist_state);
+    const columns = new Map(state.columns.map(column => [column.name, column]));
+    expect(state.name).toBe('domain_blacklist_state');
+    expect(state.checks.map(constraint => constraint.name)).toEqual([
+      'domain_blacklist_state_singleton',
+    ]);
+    expect(columns.get('id')?.primary).toBe(true);
+    expect(columns.get('id')?.notNull).toBe(true);
+    expect(columns.get('id')?.default).toBe(1);
+    expect(columns.get('revision')?.notNull).toBe(true);
+    expect(columns.get('revision')?.default).toBeDefined();
+    expect(columns.get('use_env_fallback')?.notNull).toBe(true);
+    expect(columns.get('use_env_fallback')?.default).toBeUndefined();
+    expect(columns.get('migrated_at')?.notNull).toBe(true);
+    expect(columns.get('migrated_at')?.default).toBeDefined();
+  });
+
+  it('creates the tables without inserting readiness state', () => {
+    const migrationsDir = path.join(__dirname, 'migrations');
+    const migration = fs
+      .readdirSync(migrationsDir)
+      .filter(file => file.endsWith('.sql'))
+      .map(file => fs.readFileSync(path.join(migrationsDir, file), 'utf8'))
+      .find(
+        contents =>
+          contents.includes('CREATE TABLE "blacklisted_domains"') &&
+          contents.includes('CREATE TABLE "domain_blacklist_state"')
+      );
+
+    expect(migration).toBeDefined();
+    if (!migration) throw new Error('Domain blacklist migration is missing');
+    expect(migration).toContain(
+      'CONSTRAINT "domain_blacklist_state_singleton" CHECK ("domain_blacklist_state"."id" = 1)'
+    );
+    expect(migration).not.toMatch(/INSERT\s+INTO\s+"?domain_blacklist_state"?/i);
+  });
 });
 
 it('webhook profile migration preserves saved rows and only relaxes the explicit profile requirement', async () => {

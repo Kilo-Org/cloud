@@ -1,5 +1,7 @@
 import type { WorkerDb } from '@kilocode/db/client';
 import {
+  blacklisted_domains,
+  domain_blacklist_state,
   organization_memberships,
   organization_user_limits,
   organization_user_usage,
@@ -8,7 +10,7 @@ import {
   type OrganizationUserLimitType,
 } from '@kilocode/db/schema';
 import type { OrganizationRole } from '@kilocode/db/schema-types';
-import { and, eq, isNull, not, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNull, not, sql } from 'drizzle-orm';
 import * as z from 'zod';
 
 // Account access rules shared by the Next.js gateway and Workers that authenticate Kilo users.
@@ -173,9 +175,9 @@ export function canSpendPaidUsage(balance: number): boolean {
   return balance > 0;
 }
 
-// Admins maintain the blocked email domains in Redis; an empty list falls back to the
-// deployment's BLACKLIST_DOMAINS setting.
+// Retained for the authorized backfill and rollback; access checks never read this snapshot.
 export const BLACKLISTED_DOMAINS_REDIS_KEY = 'admin:blacklisted-domains';
+export const BLACKLISTED_DOMAINS_SETTINGS_REDIS_KEY = 'admin:blacklisted-domains:settings';
 // Holds the config's updated_at. The admin save writes both keys in one MSET.
 export const BLACKLISTED_DOMAINS_UPDATED_AT_REDIS_KEY = 'admin:blacklisted-domains:updated-at';
 
@@ -235,10 +237,7 @@ export function parseBlacklistDomainsConfig(value: unknown): ParsedBlacklistDoma
 }
 
 /**
- * Re-reads the admin blocklist config, downloading it only when it may have changed. An imported
- * domain list is megabytes and every process refreshes it each minute, so an unchanged config
- * costs one read of the small updated_at key instead. Returns `previous` itself when it is still
- * current, which keeps the domain index built for its array.
+ * Refreshes the small signup/operator settings, never the legacy domain snapshot.
  */
 export async function refreshBlacklistDomainsConfig(
   redisGet: (key: string) => Promise<string | null>,
@@ -255,7 +254,7 @@ export async function refreshBlacklistDomainsConfig(
     return previous;
   }
 
-  const raw = await redisGet(BLACKLISTED_DOMAINS_REDIS_KEY);
+  const raw = await redisGet(BLACKLISTED_DOMAINS_SETTINGS_REDIS_KEY);
   if (!raw) {
     return { config: null, fullReadAt: now, droppedDomains: 0 };
   }
@@ -316,4 +315,110 @@ export function isEmailBlacklistedByDomain(
     if (index.has(labels.slice(i).join('.'))) return true;
   }
   return false;
+}
+
+export const DOMAIN_BLACKLIST_CACHE_TTL_SECONDS = 60;
+export const DOMAIN_BLACKLIST_QUERY_TIMEOUT_MS = 1000;
+export const DOMAIN_BLACKLIST_CACHE_TIMEOUT_MS = 200;
+
+async function blacklistOperation<T>(
+  operation: PromiseLike<T>,
+  timeout: number,
+  message: string
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      operation,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(message)), timeout);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export type DomainBlacklistCache = {
+  get: (key: string) => Promise<string | null>;
+  set: (key: string, value: string, ttlSeconds: number) => Promise<unknown>;
+  defer: (write: () => Promise<void>) => void;
+  onError: (error: unknown) => void;
+};
+
+export function emailDomainSuffixes(email: string): string[] {
+  const normalized = email.toLowerCase();
+  const at = normalized.lastIndexOf('@');
+  const host = at === -1 ? normalized : normalized.slice(at + 1);
+  const labels = host.split('.');
+  if (host.length > 1024 || labels.length > 128) {
+    throw new Error('Email domain exceeds blacklist lookup bounds');
+  }
+  return labels
+    .slice(at === -1 ? 1 : 0)
+    .map((_, index) => labels.slice(index + (at === -1 ? 1 : 0)).join('.'));
+}
+
+export async function isEmailDomainBlacklisted(
+  db: AccountDb,
+  email: string,
+  fallbackDomains: string[],
+  cache: DomainBlacklistCache
+): Promise<boolean> {
+  const suffixes = emailDomainSuffixes(email);
+  const [state] = await blacklistOperation(
+    db
+      .select({
+        revision: domain_blacklist_state.revision,
+        useEnvFallback: domain_blacklist_state.use_env_fallback,
+      })
+      .from(domain_blacklist_state)
+      .where(eq(domain_blacklist_state.id, 1))
+      .limit(1),
+    DOMAIN_BLACKLIST_QUERY_TIMEOUT_MS,
+    'Domain blacklist database lookup timed out'
+  );
+  if (!state) throw new Error('Domain blacklist backfill has not completed');
+  if (state.useEnvFallback) return isEmailBlacklistedByDomain(email, fallbackDomains);
+  if (suffixes.length === 0) return false;
+
+  // The revision is committed with admin edits, so even a late cache fill cannot revive an old list.
+  const key = `domain-blacklist:${state.revision}:${email.includes('@') ? 'host' : 'suffix'}:${encodeURIComponent(suffixes[0])}`;
+  try {
+    const cached = await blacklistOperation(
+      cache.get(key),
+      DOMAIN_BLACKLIST_CACHE_TIMEOUT_MS,
+      'Domain blacklist cache lookup timed out'
+    );
+    if (cached === '1' || cached === '0') return cached === '1';
+  } catch (error) {
+    cache.onError(error);
+  }
+
+  const matches = await blacklistOperation(
+    db
+      .select({ domain: blacklisted_domains.domain })
+      .from(blacklisted_domains)
+      .where(inArray(blacklisted_domains.domain, suffixes))
+      .limit(1),
+    DOMAIN_BLACKLIST_QUERY_TIMEOUT_MS,
+    'Domain blacklist database lookup timed out'
+  );
+  const blocked = matches.length > 0;
+  try {
+    cache.defer(async () => {
+      try {
+        await blacklistOperation(
+          cache.set(key, blocked ? '1' : '0', DOMAIN_BLACKLIST_CACHE_TTL_SECONDS),
+          DOMAIN_BLACKLIST_CACHE_TIMEOUT_MS,
+          'Domain blacklist cache write timed out'
+        );
+      } catch (error) {
+        cache.onError(error);
+      }
+    });
+  } catch (error) {
+    cache.onError(error);
+  }
+  return blocked;
 }

@@ -26,11 +26,12 @@ jest.mock('next/navigation', () => ({
   redirect: (url: string) => mockRedirect(url),
 }));
 
-const mockGetBlacklistedDomains = jest.fn<Promise<string[]>, []>();
+const mockIsEmailBlacklisted = jest.fn<Promise<boolean>, [email: string, fromDb?: typeof db]>();
 
 jest.mock('@kilocode/web-shared/lib/blacklist-domains-config', () => ({
   ...jest.requireActual('@kilocode/web-shared/lib/blacklist-domains-config'),
-  getBlacklistedDomains: () => mockGetBlacklistedDomains(),
+  isEmailBlacklisted: (...args: Parameters<typeof mockIsEmailBlacklisted>) =>
+    mockIsEmailBlacklisted(...args),
 }));
 
 import { afterEach, beforeEach, describe, test, expect } from '@jest/globals';
@@ -46,7 +47,7 @@ import {
   getUserFromSessionForCredentialIssuance,
   getUserFromSessionForCredentialIssuanceOrRedirect,
 } from './server';
-import { db } from '@kilocode/web-shared/lib/drizzle';
+import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import {
   setAdminAccessSinkForTest,
   type AdminAccessEvent,
@@ -80,7 +81,7 @@ beforeEach(() => {
   mockHeaders.mockReset();
   mockGetServerSession.mockReset();
   mockRedirect.mockClear();
-  mockGetBlacklistedDomains.mockReset().mockResolvedValue([]);
+  mockIsEmailBlacklisted.mockReset().mockResolvedValue(false);
   resetDeviceSessionCacheForTest();
 });
 
@@ -588,6 +589,8 @@ describe('getUserFromAuth', () => {
     expect(gatewayResult.user?.id).toBe(user.id);
     expect(apiResult.user).toBeNull();
     expect(apiResult.authFailedResponse?.status).toBe(401);
+    expect(mockIsEmailBlacklisted.mock.calls.at(-1)?.[0]).toBe(user.google_user_email);
+    expect(mockIsEmailBlacklisted.mock.calls.at(-1)?.[1] === readDb).toBe(true);
   });
 
   test('uses the signed organization instead of a conflicting request header', async () => {
@@ -678,7 +681,7 @@ describe('getUserFromAuth', () => {
       google_user_email: `blacklisted-domain-${crypto.randomUUID()}@blocked.example`,
       api_token_pepper: 'blacklisted-domain-pepper',
     });
-    mockGetBlacklistedDomains.mockResolvedValue(['blocked.example']);
+    mockIsEmailBlacklisted.mockResolvedValue(true);
     mockHeaders.mockResolvedValue(
       new Headers({ Authorization: `Bearer ${generateApiToken(user)}` })
     );
@@ -692,6 +695,8 @@ describe('getUserFromAuth', () => {
       error: 'Access denied (R0)',
     });
     expect(result.authorizationRefused).toBe(true);
+    expect(mockIsEmailBlacklisted.mock.calls.at(-1)?.[0]).toBe(user.google_user_email);
+    expect(mockIsEmailBlacklisted.mock.calls.at(-1)?.[1] === readDb).toBe(true);
   });
 
   test('rejects a token whose organization context was soft-deleted', async () => {
@@ -832,6 +837,8 @@ describe('getUserFromAuth', () => {
     expect(result.authFailedResponse).toBeNull();
     expect(result.user?.id).toBe(user.id);
     expect(result.deviceSessionId).toBeUndefined();
+    expect(mockIsEmailBlacklisted.mock.calls.at(-1)?.[0]).toBe(user.google_user_email);
+    expect(mockIsEmailBlacklisted.mock.calls.at(-1)?.[1] === readDb).toBe(true);
   });
 
   test('failure paths leave deviceSessionId undefined even when the token carried the claim', async () => {
@@ -913,6 +920,8 @@ describe('credential issuance authentication guards', () => {
 
     expect(result.user?.id).toBe(user.id);
     expect(mockGetServerSession).toHaveBeenCalledWith(sessionAuthOptions);
+    expect(mockIsEmailBlacklisted.mock.calls.at(-1)?.[0]).toBe(user.google_user_email);
+    expect(mockIsEmailBlacklisted.mock.calls.at(-1)?.[1] === db).toBe(true);
   });
 
   test('threads the server-only webSessionId and pepper from the session claim', async () => {

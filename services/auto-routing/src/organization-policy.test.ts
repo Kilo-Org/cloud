@@ -1,84 +1,85 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { clearSecretCacheForTest } from '@kilocode/worker-utils';
-import {
-  BLACKLISTED_DOMAINS_REDIS_KEY,
-  BLACKLISTED_DOMAINS_UPDATED_AT_REDIS_KEY,
-  MAX_BLACKLIST_DOMAINS,
-  isEmailBlacklistedByDomain,
-} from '@kilocode/worker-utils/account-access';
-import { clearOrganizationPolicyCache, getBlacklistedDomains } from './organization-policy';
+import { domainBlacklistCache } from './organization-policy';
 
 const env = {
   UPSTASH_REDIS_REST_URL: { get: async () => 'https://redis.example.test' },
-  UPSTASH_REDIS_REST_TOKEN: { get: async () => 'redis-read-token' },
-} as unknown as Env;
+  UPSTASH_REDIS_REST_TOKEN: { get: async () => 'redis-test-token' },
+};
 
-function storedDomains(extra: number): string[] {
-  return Array.from({ length: MAX_BLACKLIST_DOMAINS + extra }, (_, i) => `host${i}.test`);
-}
-
-function stubRedis(store: Map<string, string>): void {
-  vi.stubGlobal('fetch', async (_url: string, init?: RequestInit): Promise<Response> => {
-    const body = typeof init?.body === 'string' ? init.body : '[]';
-    const [command, key] = JSON.parse(body) as [string, string];
-    const result = command === 'GET' ? (store.get(key) ?? null) : null;
-    return { ok: true, json: async () => ({ result }) } as Response;
-  });
-}
-
-function storeFor(config: unknown, updatedAt: string): Map<string, string> {
-  return new Map([
-    [BLACKLISTED_DOMAINS_REDIS_KEY, JSON.stringify(config)],
-    [BLACKLISTED_DOMAINS_UPDATED_AT_REDIS_KEY, updatedAt],
-  ]);
-}
-
-describe('getBlacklistedDomains', () => {
+describe('domainBlacklistCache', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
-    vi.useRealTimers();
     vi.restoreAllMocks();
-    clearOrganizationPolicyCache();
     clearSecretCacheForTest();
   });
 
-  it('enforces the stored prefix and names the entries beyond it once per loaded config', async () => {
-    const domains = storedDomains(3);
-    stubRedis(
-      storeFor(
-        {
-          domains,
-          blocked_signup_tlds: [],
-          updated_at: 't1',
-          updated_by: null,
-          updated_by_email: null,
-        },
-        't1'
-      )
-    );
-    vi.useFakeTimers();
-    vi.setSystemTime(0);
+  it('reads and writes selective keys through Redis commands with a 200ms timeout', async () => {
+    const fetch = vi
+      .fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(Response.json({ result: '0' }))
+      .mockResolvedValueOnce(Response.json({ result: 'OK' }));
+    vi.stubGlobal('fetch', fetch);
+    const timeout = vi.spyOn(AbortSignal, 'timeout');
+    const cache = domainBlacklistCache(env, { waitUntil: vi.fn() });
+    const key = 'domain-blacklist:revision-1:host:example.com';
+
+    expect(await cache.get(key)).toBe('0');
+    expect(await cache.set(key, '1', 60)).toBe('OK');
+    expect(fetch.mock.calls.map(([, init]) => JSON.parse(init?.body as string))).toEqual([
+      ['GET', key],
+      ['SET', key, '1', 'EX', 60],
+    ]);
+    for (const [url, init] of fetch.mock.calls) {
+      expect(url).toBe('https://redis.example.test');
+      expect(init?.method).toBe('POST');
+      expect(new Headers(init?.headers).get('authorization')).toBe('Bearer redis-test-token');
+      expect(init?.signal).toBeInstanceOf(AbortSignal);
+    }
+    expect(timeout.mock.calls).toEqual([[200], [200]]);
+  });
+
+  it('returns null for a cache miss', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ result: null })));
+    expect(await domainBlacklistCache(env, { waitUntil: vi.fn() }).get('missing')).toBeNull();
+  });
+
+  it.each([
+    () => Response.json({ result: 0 }),
+    () => Response.json({ error: 'invalid command' }),
+    () => new Response('unavailable', { status: 503 }),
+  ])(
+    'rejects invalid or unavailable Redis reads for the shared helper to fall back',
+    async response => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response()));
+      await expect(domainBlacklistCache(env, { waitUntil: vi.fn() }).get('key')).rejects.toThrow();
+    }
+  );
+
+  it('rejects failed cache writes', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ error: 'write denied' })));
+    await expect(
+      domainBlacklistCache(env, { waitUntil: vi.fn() }).set('key', '0', 60)
+    ).rejects.toThrow();
+  });
+
+  it('schedules cache writes through the execution context without losing its receiver', async () => {
+    const write = vi.fn(async () => {});
+    const context = { waitUntil: vi.fn() };
+    domainBlacklistCache(env, context).defer(write);
+    expect(write).toHaveBeenCalledOnce();
+    expect(context.waitUntil).toHaveBeenCalledWith(write.mock.results[0]?.value);
+    expect(context.waitUntil.mock.contexts).toEqual([context]);
+    await write.mock.results[0]?.value;
+  });
+
+  it('reports cache failures without logging credentials or the domain key', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
-    const loaded = await getBlacklistedDomains(env);
-    if (loaded === null) throw new Error('Expected a loaded blacklist snapshot');
-    expect(loaded).toEqual(domains.slice(0, MAX_BLACKLIST_DOMAINS));
-    expect(isEmailBlacklistedByDomain('user@MAIL.HOST150000.TEST', loaded)).toBe(true);
-    expect(isEmailBlacklistedByDomain(`user@host${MAX_BLACKLIST_DOMAINS - 1}.test`, loaded)).toBe(
-      true
-    );
-    expect(isEmailBlacklistedByDomain(`user@host${MAX_BLACKLIST_DOMAINS}.test`, loaded)).toBe(
-      false
-    );
-    expect(warn).toHaveBeenCalledTimes(1);
-    expect(JSON.parse(String(warn.mock.calls[0][0]))).toEqual({
-      event: 'auto_routing_blacklist_domains_over_cap',
-      droppedDomains: 3,
+    domainBlacklistCache(env, { waitUntil: vi.fn() }).onError(new Error('cache unavailable'));
+    expect(warn).toHaveBeenCalledOnce();
+    expect(JSON.parse(String(warn.mock.calls[0]?.[0]))).toMatchObject({
+      event: 'auto_routing_domain_blacklist_cache_failed',
     });
-
-    // A later refresh of the same config keeps one line for that config.
-    vi.setSystemTime(11 * 60_000);
-    expect(await getBlacklistedDomains(env)).toHaveLength(MAX_BLACKLIST_DOMAINS);
-    expect(warn).toHaveBeenCalledTimes(1);
+    expect(String(warn.mock.calls[0]?.[0])).not.toContain('redis-test-token');
   });
 });

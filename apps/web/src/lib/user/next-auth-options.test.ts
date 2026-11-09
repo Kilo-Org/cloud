@@ -2,6 +2,7 @@ import type * as watchwoodModule from '@/lib/auth/watchwood';
 import type * as linkingModule from '@/lib/account-linking-session';
 import type * as userModule from '@/lib/user';
 import type * as userServerModule from '@kilocode/web-shared/lib/user/server';
+import type * as blacklistDomainsConfigModule from '@kilocode/web-shared/lib/blacklist-domains-config';
 
 jest.mock('next/headers', () => ({ cookies: jest.fn(), headers: jest.fn() }));
 jest.mock('@/lib/auth/watchwood', () => ({
@@ -18,8 +19,13 @@ jest.mock('@/lib/user', () => ({
 jest.mock('@kilocode/web-shared/lib/user/server', () => ({
   ...jest.requireActual<typeof userServerModule>('@kilocode/web-shared/lib/user/server'),
   getUserFromSession: jest.fn(),
-  isEmailBlacklistedByDomainAsync: jest.fn(),
   isBlockedTLD: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/blacklist-domains-config', () => ({
+  ...jest.requireActual<typeof blacklistDomainsConfigModule>(
+    '@kilocode/web-shared/lib/blacklist-domains-config'
+  ),
+  isEmailBlacklisted: jest.fn(),
 }));
 jest.mock('@/lib/account-linking-session', () => ({
   ...jest.requireActual<typeof linkingModule>('@/lib/account-linking-session'),
@@ -32,6 +38,7 @@ import { readWatchwoodSignupAssessment } from '@/lib/auth/watchwood';
 import { processSSOUserLogin } from '@/lib/user/sso';
 import { getAccountLinkingSession } from '@/lib/account-linking-session';
 import * as userServer from '@kilocode/web-shared/lib/user/server';
+import { isEmailBlacklisted } from '@kilocode/web-shared/lib/blacklist-domains-config';
 import * as userLib from '@/lib/user';
 import { sessionAuthOptions } from '@kilocode/web-shared/lib/user/server';
 import {
@@ -639,7 +646,7 @@ describe('WorkOS sign-in callback', () => {
     jest.mocked(readWatchwoodSignupAssessment).mockResolvedValue(watchwood);
     jest.mocked(processSSOUserLogin).mockResolvedValue(true);
     jest.mocked(userLib.findAndSyncExistingUser).mockResolvedValue(null);
-    jest.mocked(userServer.isEmailBlacklistedByDomainAsync).mockResolvedValue(false);
+    jest.mocked(isEmailBlacklisted).mockResolvedValue(false);
     jest.mocked(userServer.isBlockedTLD).mockResolvedValue(false);
   });
 
@@ -655,6 +662,7 @@ describe('WorkOS sign-in callback', () => {
   test('forwards the Watchwood assessment, tracking context and invitation token', async () => {
     await expect(authOptions.callbacks!.signIn!(signInArgs)).resolves.toBe(true);
 
+    expect(isEmailBlacklisted).toHaveBeenCalledWith('user@example.com');
     expect(processSSOUserLogin).toHaveBeenCalledTimes(1);
     expect(processSSOUserLogin).toHaveBeenCalledWith(
       expect.objectContaining({ provider: 'workos', google_user_email: 'user@example.com' }),
@@ -663,6 +671,16 @@ describe('WorkOS sign-in callback', () => {
       expect.objectContaining({ watchwood, locale: 'en-US', countryCode: 'US' }),
       'invite-token'
     );
+  });
+
+  test('refuses a blacklisted email through the per-email lookup', async () => {
+    jest.mocked(isEmailBlacklisted).mockResolvedValue(true);
+
+    const result = await authOptions.callbacks!.signIn!(signInArgs);
+
+    expect(result).toEqual(expect.stringContaining('error=BLOCKED'));
+    expect(isEmailBlacklisted).toHaveBeenCalledWith('user@example.com');
+    expect(processSSOUserLogin).not.toHaveBeenCalled();
   });
 
   test('preserves the invitation callback on an SSO error redirect', async () => {

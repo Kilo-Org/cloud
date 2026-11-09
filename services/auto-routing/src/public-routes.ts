@@ -131,7 +131,7 @@ async function requireEvalPayerPaidUsageBalance(caller: Caller): Promise<void> {
 }
 
 export const publicDecideHandler = publicHandler(async c => {
-  const caller = await authenticateCaller(c.env, c.req.raw.headers);
+  const caller = await authenticateCaller(c.env, c.req.raw.headers, c.executionCtx);
   await requireCallerPaidUsageBalance(caller);
   const { byteLength, json } = await readJson(c, MAX_DECIDE_REQUEST_BODY_BYTES);
   const request = parseBody(CustomRouterDecideRequestSchema, json);
@@ -256,7 +256,7 @@ async function loadEditableRouter(
 }
 
 export const evalPlanHandler = publicHandler(async c => {
-  const caller = await authenticateCaller(c.env, c.req.raw.headers);
+  const caller = await authenticateCaller(c.env, c.req.raw.headers, c.executionCtx);
   await requireEvalPayerPaidUsageBalance(caller);
   const request = parseBody(
     ClientEvalPlanRequestSchema,
@@ -274,7 +274,7 @@ export const evalPlanHandler = publicHandler(async c => {
 });
 
 export const evalCaseHandler = publicHandler(async c => {
-  const caller = await authenticateCaller(c.env, c.req.raw.headers);
+  const caller = await authenticateCaller(c.env, c.req.raw.headers, c.executionCtx);
   await requireEvalPayerPaidUsageBalance(caller);
   const request = parseBody(
     ClientEvalCaseRequestSchema,
@@ -289,7 +289,7 @@ export const evalCaseHandler = publicHandler(async c => {
 });
 
 export const evalResultHandler = publicHandler(async c => {
-  const caller = await authenticateCaller(c.env, c.req.raw.headers);
+  const caller = await authenticateCaller(c.env, c.req.raw.headers, c.executionCtx);
   await requireEvalPayerPaidUsageBalance(caller);
   const upload = parseBody(
     ClientEvalResultUploadSchema,

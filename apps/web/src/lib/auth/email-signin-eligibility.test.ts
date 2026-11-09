@@ -1,10 +1,8 @@
 import { checkRateLimit } from '@vercel/firewall';
 import { captureMessage } from '@sentry/nextjs';
 import type { NextRequest } from 'next/server';
-import {
-  isEmailBlacklistedByDomainAsync,
-  isBlockedTLD,
-} from '@kilocode/web-shared/lib/user/server';
+import { isBlockedTLD } from '@kilocode/web-shared/lib/user/server';
+import { isEmailBlacklisted } from '@kilocode/web-shared/lib/blacklist-domains-config';
 import { findUserByNormalizedEmail } from '@/lib/user';
 import { resolveSsoAuthorityForDomain } from '@kilocode/web-shared/lib/organizations/organization-sso-policy';
 
@@ -15,8 +13,10 @@ jest.mock('@sentry/nextjs', () => ({
   captureMessage: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/user/server', () => ({
-  isEmailBlacklistedByDomainAsync: jest.fn(),
   isBlockedTLD: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/blacklist-domains-config', () => ({
+  isEmailBlacklisted: jest.fn(),
 }));
 jest.mock('@/lib/user', () => ({
   findUserByNormalizedEmail: jest.fn(),
@@ -35,7 +35,7 @@ import { __test__ as rateLimitTest } from './firewall-rate-limit';
 
 const mockCheckRateLimit = jest.mocked(checkRateLimit);
 const mockCaptureMessage = jest.mocked(captureMessage);
-const mockIsEmailBlacklistedByDomainAsync = jest.mocked(isEmailBlacklistedByDomainAsync);
+const mockIsEmailBlacklisted = jest.mocked(isEmailBlacklisted);
 const mockIsBlockedTLD = jest.mocked(isBlockedTLD);
 const mockFindUserByNormalizedEmail = jest.mocked(findUserByNormalizedEmail);
 const mockResolveSsoAuthorityForDomain = jest.mocked(resolveSsoAuthorityForDomain);
@@ -49,7 +49,7 @@ const request = (headers: Record<string, string> = {}) =>
 describe('checkDomainSignInEligibility', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockIsEmailBlacklistedByDomainAsync.mockResolvedValue(false);
+    mockIsEmailBlacklisted.mockResolvedValue(false);
     mockIsBlockedTLD.mockResolvedValue(false);
     mockFindUserByNormalizedEmail.mockResolvedValue(undefined);
     mockResolveSsoAuthorityForDomain.mockResolvedValue({
@@ -69,6 +69,7 @@ describe('checkDomainSignInEligibility', () => {
   it('resolves SSO authority for the lowercased domain', async () => {
     await checkDomainSignInEligibility('new@Acme.Example');
 
+    expect(mockIsEmailBlacklisted).toHaveBeenCalledWith('new@Acme.Example');
     expect(mockResolveSsoAuthorityForDomain).toHaveBeenCalledWith('acme.example');
   });
 });
@@ -76,7 +77,7 @@ describe('checkDomainSignInEligibility', () => {
 describe('isNewAccountEligibleForMagicLink', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockIsEmailBlacklistedByDomainAsync.mockResolvedValue(false);
+    mockIsEmailBlacklisted.mockResolvedValue(false);
     mockIsBlockedTLD.mockResolvedValue(false);
   });
 
@@ -85,7 +86,7 @@ describe('isNewAccountEligibleForMagicLink', () => {
   });
 
   it('rejects a blacklisted domain without exposing why', async () => {
-    mockIsEmailBlacklistedByDomainAsync.mockResolvedValue(true);
+    mockIsEmailBlacklisted.mockResolvedValue(true);
 
     await expect(isNewAccountEligibleForMagicLink('new@blocked.example')).resolves.toBe(false);
     expect(mockIsBlockedTLD).not.toHaveBeenCalled();
@@ -99,7 +100,7 @@ describe('isNewAccountEligibleForMagicLink', () => {
 
   it('rejects a malformed address before any domain lookup', async () => {
     await expect(isNewAccountEligibleForMagicLink('not-an-email')).resolves.toBe(false);
-    expect(mockIsEmailBlacklistedByDomainAsync).not.toHaveBeenCalled();
+    expect(mockIsEmailBlacklisted).not.toHaveBeenCalled();
   });
 
   it.each([undefined, '', 'false', 'TRUE'])(
@@ -128,7 +129,7 @@ describe('checkEmailSignInEligibility send budgets', () => {
     jest.clearAllMocks();
     rateLimitTest.resetReportThrottle();
     mockCheckRateLimit.mockResolvedValue({ rateLimited: false });
-    mockIsEmailBlacklistedByDomainAsync.mockResolvedValue(false);
+    mockIsEmailBlacklisted.mockResolvedValue(false);
     mockIsBlockedTLD.mockResolvedValue(false);
     mockFindUserByNormalizedEmail.mockResolvedValue(undefined);
     mockResolveSsoAuthorityForDomain.mockImplementation(async domain => ({
@@ -243,7 +244,7 @@ describe('checkEmailSignInEligibility send budgets', () => {
   });
 
   it('checks caller budgets before the domain rules', async () => {
-    mockIsEmailBlacklistedByDomainAsync.mockResolvedValue(true);
+    mockIsEmailBlacklisted.mockResolvedValue(true);
 
     await checkEmailSignInEligibility('user@example.com', request());
 

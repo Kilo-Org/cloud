@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  BLACKLISTED_DOMAINS_REDIS_KEY,
+  BLACKLISTED_DOMAINS_SETTINGS_REDIS_KEY,
   BLACKLISTED_DOMAINS_UPDATED_AT_REDIS_KEY,
   BlacklistDomainsConfigSchema,
   MAX_BLACKLIST_DOMAINS,
@@ -153,7 +153,7 @@ describe('refreshBlacklistDomainsConfig', () => {
         return store[key] ?? null;
       },
       store(config: BlacklistDomainsConfig, { writeUpdatedAtKey = true } = {}) {
-        store[BLACKLISTED_DOMAINS_REDIS_KEY] = JSON.stringify(config);
+        store[BLACKLISTED_DOMAINS_SETTINGS_REDIS_KEY] = JSON.stringify(config);
         if (writeUpdatedAtKey && config.updated_at) {
           store[BLACKLISTED_DOMAINS_UPDATED_AT_REDIS_KEY] = config.updated_at;
         }

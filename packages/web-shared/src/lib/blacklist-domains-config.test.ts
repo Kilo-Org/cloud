@@ -1,254 +1,181 @@
-import { afterEach, beforeEach, describe, expect, jest, test } from '@jest/globals';
+import { beforeAll, beforeEach, afterEach, describe, expect, jest, test } from '@jest/globals';
+import { randomUUID } from 'node:crypto';
+import { blacklisted_domains, domain_blacklist_state } from '@kilocode/db/schema';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
+import type * as BlacklistConfig from '@kilocode/web-shared/lib/blacklist-domains-config';
 import {
-  BLACKLIST_DOMAINS_REDIS_KEY,
-  BLACKLIST_DOMAINS_UPDATED_AT_REDIS_KEY,
-} from '@kilocode/web-shared/lib/redis-keys';
-import {
+  BLACKLISTED_DOMAINS_SETTINGS_REDIS_KEY,
+  BLACKLISTED_DOMAINS_UPDATED_AT_REDIS_KEY,
   MAX_BLACKLIST_DOMAINS,
-  isEmailBlacklistedByDomain,
 } from '@kilocode/worker-utils/account-access';
+import { sql } from 'drizzle-orm';
 
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
-jest.mock('@kilocode/web-shared/lib/redis', () => ({ redisClient: { get: jest.fn() } }));
-jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
-  ...jest.requireActual<object>('@kilocode/web-shared/lib/utils.server'),
-  errorExceptInTest: jest.fn(),
-}));
+const redisGet = jest.fn<(key: string) => Promise<string | null>>();
+const redisSet = jest.fn<(...args: unknown[]) => Promise<unknown>>().mockResolvedValue('OK');
+const after = jest.fn<(write: () => Promise<void>) => void>();
+let config: typeof BlacklistConfig;
+let now = 0;
+let clock: jest.Spied<typeof Date.now>;
+const settings = (fields = {}) =>
+  JSON.stringify({
+    domains: [],
+    updated_at: 'version',
+    updated_by: null,
+    updated_by_email: null,
+    ...fields,
+  });
 
-type TestMocks = {
-  redisGet: jest.Mock<(key: string) => Promise<string | null>>;
-  captureException: jest.Mock<(error: unknown, ...rest: unknown[]) => void>;
-  reportDropped: jest.Mock<(message: string, extra?: unknown) => void>;
-};
+beforeAll(async () => {
+  jest.doMock('@kilocode/web-shared/lib/redis', () => ({
+    redisClient: { get: redisGet, set: redisSet },
+  }));
+  jest.doMock('next/server', () => ({ after }));
+  jest.doMock('@kilocode/web-shared/lib/drizzle', () => ({ db }));
+  await jest.isolateModulesAsync(async () => {
+    config = await import('@kilocode/web-shared/lib/blacklist-domains-config');
+  });
+});
 
-const TTL_MS = 60_000;
-const storedConfig = (domains: string[]) =>
-  JSON.stringify({ domains, updated_at: null, updated_by: null, updated_by_email: null });
+beforeEach(async () => {
+  now += 10 * 60_000 + 1;
+  clock = jest.spyOn(Date, 'now').mockImplementation(() => now);
+  jest.clearAllMocks();
+  redisSet.mockResolvedValue('OK');
+  redisGet.mockResolvedValue(null);
+  await db.delete(domain_blacklist_state).where(sql`true`);
+  await db.delete(blacklisted_domains).where(sql`true`);
+});
 
-/**
- * The module keeps its read cache for its lifetime, so every case needs a fresh instance:
- * env vars and the mocked Redis/Sentry functions are resolved again after resetModules.
- */
-async function loadGetBlacklistedDomains(): Promise<
-  TestMocks & {
-    getBlacklistedDomains: () => Promise<string[]>;
-    getBlockedSignupTlds: () => Promise<string[]>;
-  }
-> {
-  jest.resetModules();
-  const [config, redis, sentry, utils] = await Promise.all([
-    import('@kilocode/web-shared/lib/blacklist-domains-config'),
-    import('@kilocode/web-shared/lib/redis'),
-    import('@sentry/nextjs'),
-    import('@kilocode/web-shared/lib/utils.server'),
-  ]);
-  return {
-    getBlacklistedDomains: config.getBlacklistedDomains,
-    getBlockedSignupTlds: config.getBlockedSignupTlds,
-    redisGet: redis.redisClient.get as unknown as TestMocks['redisGet'],
-    captureException: sentry.captureException as unknown as TestMocks['captureException'],
-    reportDropped: utils.errorExceptInTest as unknown as TestMocks['reportDropped'],
-  };
+afterEach(() => clock.mockRestore());
+
+async function initialize() {
+  const revision = randomUUID();
+  await db.insert(domain_blacklist_state).values({ revision, use_env_fallback: false });
+  return revision;
 }
 
-let clock: jest.Spied<typeof Date.now>;
-
-beforeEach(() => {
-  delete process.env.BLACKLIST_DOMAINS;
-  clock = jest.spyOn(Date, 'now').mockReturnValue(0);
-});
-
-afterEach(() => {
-  clock.mockRestore();
-  delete process.env.BLACKLIST_DOMAINS;
-});
-
-describe('getBlacklistedDomains', () => {
-  test('returns the stored domains', async () => {
-    process.env.BLACKLIST_DOMAINS = 'env.example';
-    const { getBlacklistedDomains, redisGet, captureException } = await loadGetBlacklistedDomains();
-    redisGet.mockResolvedValue(storedConfig(['spam.example']));
-
-    await expect(getBlacklistedDomains()).resolves.toEqual(['spam.example']);
-    expect(captureException).not.toHaveBeenCalled();
-  });
-
-  test('enforces all 150,001 stored entries and retains them after a failed refresh', async () => {
-    const { getBlacklistedDomains, getBlockedSignupTlds, redisGet, reportDropped } =
-      await loadGetBlacklistedDomains();
-    const domains = Array.from({ length: 150_001 }, (_, index) => `Bulk-${index}.example`);
-    redisGet.mockResolvedValueOnce(
-      JSON.stringify({
-        domains,
-        blocked_signup_tlds: ['.ASIA'],
-        updated_at: 't1',
-        updated_by: null,
-        updated_by_email: null,
-      })
-    );
-
-    const loaded = await getBlacklistedDomains();
-    expect(loaded).toHaveLength(150_001);
-    expect(loaded).toEqual(domains);
-    expect(isEmailBlacklistedByDomain('user@MAIL.BULK-150000.EXAMPLE', loaded)).toBe(true);
-    expect(isEmailBlacklistedByDomain('user@notbulk-150000.example', loaded)).toBe(false);
-    await expect(getBlockedSignupTlds()).resolves.toEqual(['asia']);
-    expect(reportDropped).not.toHaveBeenCalled();
-
-    redisGet.mockRejectedValueOnce(new Error('redis read timed out'));
-    clock.mockReturnValue(TTL_MS + 1);
-    await expect(getBlacklistedDomains()).resolves.toBe(loaded);
-    await expect(getBlockedSignupTlds()).resolves.toEqual(['asia']);
-  });
-
-  test('rechecks only the updated_at key while the list is unchanged', async () => {
-    const { getBlacklistedDomains, redisGet } = await loadGetBlacklistedDomains();
-    const updatedAt = '2026-10-22T13:30:00.000Z';
-    redisGet.mockImplementation(async key =>
-      key === BLACKLIST_DOMAINS_UPDATED_AT_REDIS_KEY
-        ? updatedAt
-        : JSON.stringify({
-            domains: ['spam.example'],
-            updated_at: updatedAt,
-            updated_by: null,
-            updated_by_email: null,
-          })
-    );
-
-    const first = await getBlacklistedDomains();
-    clock.mockReturnValue(TTL_MS + 1);
-    const second = await getBlacklistedDomains();
-
-    expect(second).toBe(first);
-    expect(redisGet.mock.calls.map(([key]) => key)).toEqual([
-      BLACKLIST_DOMAINS_REDIS_KEY,
-      BLACKLIST_DOMAINS_UPDATED_AT_REDIS_KEY,
-    ]);
-  });
-
-  test('serves the domain and signup TLD lists from one config read', async () => {
-    const { getBlacklistedDomains, getBlockedSignupTlds, redisGet } =
-      await loadGetBlacklistedDomains();
-    redisGet.mockResolvedValue(
-      JSON.stringify({
-        domains: ['spam.example'],
-        blocked_signup_tlds: ['.ASIA'],
-        updated_at: null,
-        updated_by: null,
-        updated_by_email: null,
-      })
-    );
-
-    await expect(getBlacklistedDomains()).resolves.toEqual(['spam.example']);
-    await expect(getBlockedSignupTlds()).resolves.toEqual(['asia']);
-    expect(redisGet).toHaveBeenCalledTimes(1);
-  });
-
-  test('keeps the last domains read when a later read fails, and reports it once', async () => {
-    const { getBlacklistedDomains, redisGet, captureException } = await loadGetBlacklistedDomains();
-    redisGet.mockResolvedValueOnce(storedConfig(['spam.example']));
-
-    await expect(getBlacklistedDomains()).resolves.toEqual(['spam.example']);
-
-    const failure = new Error('redis read timed out');
-    redisGet.mockRejectedValueOnce(failure);
-    clock.mockReturnValue(TTL_MS + 1);
-
-    await expect(getBlacklistedDomains()).resolves.toEqual(['spam.example']);
-    expect(captureException).toHaveBeenCalledTimes(1);
-    expect(captureException).toHaveBeenCalledWith(
-      failure,
-      expect.objectContaining({ tags: { source: 'blacklist_domains_config' } })
-    );
-
-    // The failed refresh is reported once; callers inside the backoff window reuse it.
-    await expect(getBlacklistedDomains()).resolves.toEqual(['spam.example']);
-    expect(redisGet).toHaveBeenCalledTimes(2);
-    expect(captureException).toHaveBeenCalledTimes(1);
-  });
-
-  test('reports a failing first read and serves the BLACKLIST_DOMAINS list', async () => {
-    process.env.BLACKLIST_DOMAINS = 'env.example|other.example';
-    const { getBlacklistedDomains, redisGet, captureException } = await loadGetBlacklistedDomains();
-    const failure = new Error('connect ECONNREFUSED');
-    redisGet.mockRejectedValue(failure);
-
-    await expect(getBlacklistedDomains()).resolves.toEqual(['env.example', 'other.example']);
-    expect(captureException).toHaveBeenCalledTimes(1);
-    expect(captureException).toHaveBeenCalledWith(
-      failure,
-      expect.objectContaining({ tags: { source: 'blacklist_domains_config' } })
+describe('Postgres blacklist management', () => {
+  test('refuses an uninitialized table instead of silently allowing access', async () => {
+    await expect(config.getBlacklistedDomains()).rejects.toThrow('backfill');
+    await expect(config.isEmailBlacklisted('user@example.com')).rejects.toThrow('backfill');
+    await expect(config.saveBlacklistedDomains(['example.com'], randomUUID())).rejects.toThrow(
+      'backfill'
     );
   });
 
-  test('reports an unreadable stored payload and keeps the last domains read', async () => {
-    const { getBlacklistedDomains, redisGet, captureException } = await loadGetBlacklistedDomains();
-    redisGet.mockResolvedValueOnce(storedConfig(['spam.example']));
-
-    await expect(getBlacklistedDomains()).resolves.toEqual(['spam.example']);
-
-    redisGet.mockResolvedValueOnce('{not json');
-    clock.mockReturnValue(TTL_MS + 1);
-
-    await expect(getBlacklistedDomains()).resolves.toEqual(['spam.example']);
-    expect(captureException).toHaveBeenCalledTimes(1);
-    expect(captureException.mock.calls[0]?.[0]).toBeInstanceOf(SyntaxError);
-  });
-});
-
-describe('over-cap stored config reporting', () => {
-  test('reports a loaded over-cap config once per config, across cache refreshes', async () => {
-    const { getBlacklistedDomains, redisGet, reportDropped } = await loadGetBlacklistedDomains();
+  test('enumerates admin entries across bounded pages without truncating them', async () => {
+    await initialize();
     const domains = Array.from(
-      { length: MAX_BLACKLIST_DOMAINS + 5 },
-      (_, index) => `bulk-${index}.example`
+      { length: 1005 },
+      (_, index) => `domain-${String(index).padStart(4, '0')}.example`
     );
-    redisGet.mockResolvedValue(
-      JSON.stringify({ domains, updated_at: 't1', updated_by: null, updated_by_email: null })
-    );
+    await db.insert(blacklisted_domains).values(domains.map(domain => ({ domain })));
+    await expect(config.getBlacklistedDomains()).resolves.toEqual(domains);
+  });
 
-    const loaded = await getBlacklistedDomains();
-    expect(loaded).toEqual(domains.slice(0, MAX_BLACKLIST_DOMAINS));
+  test('saves normalized entries atomically, rotates revision, and rejects stale editors', async () => {
+    const revision = await initialize();
+    await db.insert(blacklisted_domains).values({ domain: 'existing.example' });
+    const saved = await config.saveBlacklistedDomains(
+      [' EXISTING.example ', 'New.example', 'new.example'],
+      revision
+    );
+    expect(saved.revision).not.toBe(revision);
+    expect(saved.addedDomains).toEqual(['new.example']);
+    await expect(config.getBlacklistedDomains()).resolves.toEqual([
+      'existing.example',
+      'new.example',
+    ]);
+    await expect(config.saveBlacklistedDomains([], revision)).rejects.toThrow('reload');
+    await expect(config.getBlacklistedDomains()).resolves.toEqual([
+      'existing.example',
+      'new.example',
+    ]);
+  });
+
+  test('clearing entries restores the existing deployment fallback semantics', async () => {
+    const revision = await initialize();
+    await config.saveBlacklistedDomains([], revision);
+    const expected =
+      getEnvVariable('BLACKLIST_DOMAINS')
+        ?.split('|')
+        .map(value => value.trim())
+        .filter(Boolean) ?? [];
+    await expect(config.getBlacklistedDomains()).resolves.toEqual(expected);
+    const [state] = await db.select().from(domain_blacklist_state);
+    expect(state.use_env_fallback).toBe(true);
+  });
+
+  test('defers positive and negative lookup cache writes until after the response', async () => {
+    await initialize();
+    await db.insert(blacklisted_domains).values({ domain: 'blocked.example' });
+    await expect(config.isEmailBlacklisted('user@sub.blocked.example')).resolves.toBe(true);
+    await expect(config.isEmailBlacklisted('user@allowed.example')).resolves.toBe(false);
+    expect(redisSet).not.toHaveBeenCalled();
+    for (const [write] of after.mock.calls) {
+      if (typeof write === 'function') await write();
+    }
+    expect(redisSet).toHaveBeenCalledWith(expect.any(String), '1', { ex: 60 });
+    expect(redisSet).toHaveBeenCalledWith(expect.any(String), '0', { ex: 60 });
+  });
+
+  test('accepts existing lists beyond the former snapshot cap without loss', () => {
+    const domains = Array.from(
+      { length: MAX_BLACKLIST_DOMAINS + 1 },
+      (_, index) => `${index}.example`
+    );
     expect(
-      isEmailBlacklistedByDomain(`user@bulk-${MAX_BLACKLIST_DOMAINS - 1}.example`, loaded)
-    ).toBe(true);
-    expect(isEmailBlacklistedByDomain(`user@bulk-${MAX_BLACKLIST_DOMAINS}.example`, loaded)).toBe(
-      false
-    );
-    clock.mockReturnValue(TTL_MS + 1);
-    await getBlacklistedDomains();
-    clock.mockReturnValue(2 * TTL_MS + 2);
-    await getBlacklistedDomains();
-
-    expect(reportDropped).toHaveBeenCalledTimes(1);
-    expect(reportDropped).toHaveBeenCalledWith(expect.any(String), { droppedDomains: 5 });
+      config.BlacklistDomainsInputSchema.parse({ domains, revision: randomUUID() }).domains
+    ).toHaveLength(domains.length);
   });
 });
 
-describe('BlacklistDomainsInputSchema', () => {
-  async function loadInputSchema() {
-    jest.resetModules();
-    const [config, accountAccess] = await Promise.all([
-      import('@kilocode/web-shared/lib/blacklist-domains-config'),
-      import('@kilocode/worker-utils/account-access'),
-    ]);
-    return {
-      schema: config.BlacklistDomainsInputSchema,
-      max: accountAccess.MAX_BLACKLIST_DOMAINS,
-    };
-  }
-
-  test('accepts input at the cap', async () => {
-    const { schema, max } = await loadInputSchema();
-    const domains = Array.from({ length: max }, (_, index) => `bulk-${index}.example`);
-
-    expect(schema.safeParse({ domains }).success).toBe(true);
+describe('small shared signup/operator settings', () => {
+  test('reads only the new settings key and preserves operator metadata', async () => {
+    redisGet.mockResolvedValue(
+      settings({
+        blocked_signup_tlds: [],
+        updated_by: 'operator',
+        updated_by_email: 'admin@example.com',
+      })
+    );
+    const result = await config.getBlacklistDomainsSettings();
+    expect(result.blocked_signup_tlds).toEqual([]);
+    expect(result.updated_by).toBe('operator');
+    expect(redisGet).toHaveBeenCalledWith(BLACKLISTED_DOMAINS_SETTINGS_REDIS_KEY);
   });
 
-  test('rejects input one entry over the cap', async () => {
-    const { schema, max } = await loadInputSchema();
-    const domains = Array.from({ length: max + 1 }, (_, index) => `bulk-${index}.example`);
+  test('does not give an admin an empty editable config when settings are unavailable', async () => {
+    await expect(config.getBlacklistDomainsSettings()).rejects.toThrow('backfill');
+    redisGet.mockRejectedValue(new Error('Redis unavailable'));
+    await expect(config.getBlacklistDomainsSettings()).rejects.toThrow('Redis unavailable');
+  });
 
-    expect(schema.safeParse({ domains }).success).toBe(false);
+  test('normalizes signup TLDs and retains an explicit empty override', async () => {
+    redisGet.mockResolvedValue(settings({ blocked_signup_tlds: [' .ASIA ', 'asia', '.SHOP'] }));
+    await expect(config.getBlockedSignupTlds()).resolves.toEqual(['asia', 'shop']);
+    now += 60_001;
+    redisGet.mockResolvedValue(settings({ blocked_signup_tlds: [], updated_at: 'next' }));
+    await expect(config.getBlockedSignupTlds()).resolves.toEqual([]);
+    expect(config.normalizeSignupTlds(['.TOP', 'top', '..shop'])).toEqual(['top', 'shop']);
+  });
+
+  test('uses the deployment fallback only when the signup field is absent', async () => {
+    redisGet.mockResolvedValue(settings());
+    const expected = getEnvVariable('BLOCKED_SIGNUP_TLDS')
+      ? config.normalizeSignupTlds(getEnvVariable('BLOCKED_SIGNUP_TLDS').split('|'))
+      : ['shop', 'top'];
+    await expect(config.getBlockedSignupTlds()).resolves.toEqual(expected);
+  });
+
+  test('keeps the last good signup settings when Redis refresh fails', async () => {
+    redisGet.mockResolvedValue(settings({ blocked_signup_tlds: ['asia'] }));
+    await expect(config.getBlockedSignupTlds()).resolves.toEqual(['asia']);
+    now += 60_001;
+    redisGet.mockRejectedValue(new Error('Redis timeout'));
+    await expect(config.getBlockedSignupTlds()).resolves.toEqual(['asia']);
+    expect(redisGet).toHaveBeenCalledWith(BLACKLISTED_DOMAINS_UPDATED_AT_REDIS_KEY);
   });
 });

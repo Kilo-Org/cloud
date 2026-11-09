@@ -4375,5 +4375,8 @@
     "noEnabledContexts": "Pro naplánované přehledy nejsou povoleny žádné kontexty",
     "sourceBlocker": "Relace vyžaduje pozornost",
     "sourceMetadata": "Zachycená metadata relace"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Nepodařilo se otevřít tento výsledek hledání"
   }
 }

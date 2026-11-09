@@ -370,6 +370,14 @@ Require a remote iOS build without permitting a local compilation fallback:
 KILO_REMOTE_NATIVE=required pnpm dev:mobile:ios build <udid>
 ```
 
+### iOS app actions
+
+App Intents and the session entity compile in the app target, not the static Expo pod.
+Their Swift sources live in `apps/mobile/modules/kilo-app-actions/ios/AppIntents`.
+The prebuild plugin copies those sources into the app and adds them to its existing Sources phase.
+The pod keeps the catalog and dispatcher; the app delegate installs the typed visible-session publisher before React starts.
+The podspec excludes the app-target sources, so each declaration compiles once.
+
 ### Mobile PR review entry
 
 The PR review entry screen keeps the account picker beside the title.

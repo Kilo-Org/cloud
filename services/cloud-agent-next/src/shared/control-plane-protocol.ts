@@ -21,6 +21,7 @@ import {
   sessionTerminalResizePayloadSchema,
 } from './sandbox-control-protocol.js';
 import { sessionGitSummaryPayloadSchema, worktreeRecoverySchema } from './worktree-changes-wire.js';
+import { PreviewServicesScanSchema } from './preview-services.js';
 
 const cloudAgentWorktreeIdSchema = z.templateLiteral(['worktree_', z.uuid()]);
 
@@ -821,6 +822,7 @@ const controlPlaneRoutePreparingSchema = z
     attemptId: z.string().min(1).max(128),
     step: controlPlanePreparationStepSchema.optional(),
     detail: controlPlanePreparationDetailSchema.optional(),
+    snapshotCapturedAt: z.number().int().nonnegative().max(8_640_000_000_000_000).optional(),
     container: controlPlaneRunContainerSchema.optional(),
   })
   .strict();
@@ -1487,6 +1489,37 @@ const controlPlaneKiloResultFrameSchema = z.discriminatedUnion('ok', [
 ]);
 
 /**
+ * Sandbox DO -> wrapper: list the listening services inside the sandbox. The
+ * wrapper answers with `preview.result`; the request never names a path, port or
+ * command, so discovery cannot become a sandbox tunnel.
+ */
+const controlPlanePreviewListFrameSchema = z
+  .object({
+    type: z.literal('preview.list'),
+    requestId: z.string().min(1).max(128),
+  })
+  .strict();
+
+const controlPlanePreviewResultFrameSchema = z.discriminatedUnion('ok', [
+  z
+    .object({
+      type: z.literal('preview.result'),
+      requestId: z.string().min(1).max(128),
+      ok: z.literal(true),
+      result: PreviewServicesScanSchema,
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('preview.result'),
+      requestId: z.string().min(1).max(128),
+      ok: z.literal(false),
+      error: controlPlaneRequestErrorSchema,
+    })
+    .strict(),
+]);
+
+/**
  * Wrapper -> Sandbox DO: one page of a native v2 session's Cloud history, so the
  * wrapper restores a lost native database from the Session DO over this socket.
  * The Sandbox DO answers with `history.result` on the same socket.
@@ -1553,6 +1586,8 @@ export const controlPlaneWrapperFrameSchema = z.discriminatedUnion('type', [
   controlPlaneTerminalResultFrameSchema,
   controlPlaneKiloRequestFrameSchema,
   controlPlaneKiloResultFrameSchema,
+  controlPlanePreviewListFrameSchema,
+  controlPlanePreviewResultFrameSchema,
   controlPlaneHistoryPageFrameSchema,
   controlPlaneHistoryResultFrameSchema,
 ]);
@@ -1647,6 +1682,8 @@ export type ControlPlaneNativeOperation = z.infer<typeof controlPlaneNativeOpera
 export type ControlPlaneKiloRequestInput = z.infer<typeof controlPlaneKiloRequestInputSchema>;
 export type ControlPlaneKiloRequestFrame = z.infer<typeof controlPlaneKiloRequestFrameSchema>;
 export type ControlPlaneKiloResultFrame = z.infer<typeof controlPlaneKiloResultFrameSchema>;
+export type ControlPlanePreviewListFrame = z.infer<typeof controlPlanePreviewListFrameSchema>;
+export type ControlPlanePreviewResultFrame = z.infer<typeof controlPlanePreviewResultFrameSchema>;
 export type ControlPlaneHistoryPageFrame = z.infer<typeof controlPlaneHistoryPageFrameSchema>;
 export type ControlPlaneHistoryResultFrame = z.infer<typeof controlPlaneHistoryResultFrameSchema>;
 export type ControlPlaneWrapperFrame = z.infer<typeof controlPlaneWrapperFrameSchema>;

@@ -77,6 +77,8 @@ import {
   baseCloseTerminalNextOutputSchema,
   baseCreatePreviewNextSchema,
   baseCreatePreviewNextOutputSchema,
+  baseListPreviewServicesNextSchema,
+  baseListPreviewServicesNextOutputSchema,
   cloudAgentGetAttachmentUploadUrlSchema,
   cloudAgentReleasePendingUploadsSchema,
 } from '../cloud-agent-next-schemas';
@@ -247,6 +249,10 @@ const CreateTerminalInput = baseCreateTerminalNextSchema.extend({
 });
 
 const CreatePreviewInput = baseCreatePreviewNextSchema.extend({
+  organizationId: z.uuid(),
+});
+
+const ListPreviewServicesInput = baseListPreviewServicesNextSchema.extend({
   organizationId: z.uuid(),
 });
 
@@ -780,6 +786,25 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         organizationId: input.organizationId,
       });
       return { url: buildPreviewOpenUrl(ticket, input.path), expiresAt };
+    }),
+
+  listPreviewServices: organizationMemberProcedure
+    .input(ListPreviewServicesInput)
+    .output(baseListPreviewServicesNextOutputSchema)
+    .query(async ({ ctx, input }) => {
+      await assertOrganizationOwnsSession({
+        organizationId: input.organizationId,
+        userId: ctx.user.id,
+        cloudAgentSessionId: input.cloudAgentSessionId,
+      });
+      const authToken = await createCloudAgentControlToken(
+        ctx.user,
+        ctx.headersList,
+        input.organizationId
+      );
+      return await createCloudAgentNextClient(authToken).listPreviewServices({
+        cloudAgentSessionId: input.cloudAgentSessionId,
+      });
     }),
 
   refreshTerminalTicket: organizationMemberMutationProcedure

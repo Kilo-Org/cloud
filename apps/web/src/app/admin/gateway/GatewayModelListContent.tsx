@@ -134,12 +134,6 @@ export function GatewayModelListContent({
           <CardDescription>{description}</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
-          <p className="text-muted-foreground text-sm">
-            {hasStoredConfig
-              ? 'Showing the stored list. Changes take effect within one minute on warm instances.'
-              : 'No list stored. The gateway treats this as an empty list.'}
-          </p>
-
           <Table>
             <TableHeader>
               <TableRow>

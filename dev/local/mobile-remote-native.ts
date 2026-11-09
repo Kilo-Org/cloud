@@ -320,9 +320,9 @@ const ProducerJobListingSchema = z.object({
   jobs: z.array(z.unknown()),
 });
 
-// Parse a run-jobs listing for one run. The workflow has three jobs, so a
-// listing whose count disagrees with its entries, or that carries another
-// run's jobs, is incomplete evidence and fails closed.
+// Parse a run-jobs listing for one run. A listing whose count disagrees with
+// its entries, or that carries another run's jobs, is incomplete evidence and
+// fails closed.
 export function parseNativeProducerJobs(input: unknown, runId: number): NativeProducerJob[] {
   const listing = ProducerJobListingSchema.safeParse(input);
   if (!listing.success || listing.data.total_count !== listing.data.jobs.length) {

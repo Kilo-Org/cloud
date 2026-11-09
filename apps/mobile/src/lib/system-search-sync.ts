@@ -16,7 +16,7 @@ import { type QueryClient } from '@tanstack/react-query';
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { isSignOutActive } from '@/lib/auth/sign-out-state';
 import { isSystemSearchAvailable } from '@/lib/native-system-search';
-import { type SystemSearchCollection } from '@/lib/system-search-collect';
+import { type SessionCatalogEntry, type SystemSearchCollection } from '@/lib/system-search-collect';
 import { planSystemSearchUpdate, type SystemSearchDocument } from '@/lib/system-search-entries';
 
 /** How long a burst of cache writes coalesces before one sync runs. */
@@ -41,6 +41,14 @@ export type SystemSearchSyncDeps = {
   collect: () => Promise<SystemSearchCollection>;
   fingerprints: () => Promise<Record<string, string>>;
   apply: (update: SystemSearchIndexUpdate) => Promise<void>;
+  /**
+   * Publishes the App Intents entity catalog this run collected, returning
+   * whether the device stored a different list. Optional: a binary without the
+   * catalog passes nothing and every run behaves as it did before. It rides
+   * this one sync rather than a second subscription because it is the same
+   * cache, the same collection and the same account fence.
+   */
+  applySessions?: (sessions: readonly SessionCatalogEntry[]) => Promise<boolean>;
   report: (error: unknown) => void;
   isEnabled: () => boolean;
 };
@@ -108,11 +116,12 @@ export class SystemSearchIndexSync {
   /**
    * One sync: gate, collect, diff against the indexed ledger, apply.
    *
-   * `applied` only when the native call accepted the delta; `skipped` when the
-   * sync is disabled, the plan is empty, or the run's account transitioned
-   * while it was collecting, and then the native call is never made; `failed`
-   * after a single report, with the ledger left untouched so the next trigger
-   * re-plans the same delta. Never rejects.
+   * `applied` when a native call accepted a change — the index delta or the
+   * entity catalog; `skipped` when the sync is disabled, there was nothing to
+   * change, or the run's account transitioned while it was collecting, and
+   * then no further native call is made; `failed` after a single report, with
+   * the ledger left untouched so the next trigger re-plans the same delta.
+   * Never rejects.
    */
   async syncNow(): Promise<SystemSearchSyncResult> {
     const previous = this.runQueue;
@@ -191,7 +200,12 @@ export class SystemSearchIndexSync {
         documents: documents.documents,
         observedSources: documents.observedSources,
       });
-      if (plan.add.length === 0 && plan.remove.length === 0) {
+      const applySessions = this.deps.applySessions;
+      const planIsEmpty = plan.add.length === 0 && plan.remove.length === 0;
+      // A run with no index delta still has work when the catalog may have
+      // drifted: the privacy lock clears it while it leaves the index and its
+      // ledger alone, so the next run has to re-publish an unchanged plan.
+      if (planIsEmpty && applySessions === undefined) {
         return 'skipped';
       }
       // Both fences are read again after the awaits and immediately before the
@@ -205,8 +219,25 @@ export class SystemSearchIndexSync {
       if (!isCurrentAuthEpoch(epoch) || !this.deps.isEnabled()) {
         return 'skipped';
       }
-      await this.deps.apply({ add: plan.add, remove: plan.remove });
-      return 'applied';
+      let changed = false;
+      if (!planIsEmpty) {
+        await this.deps.apply({ add: plan.add, remove: plan.remove });
+        changed = true;
+      }
+      // A null catalog means no sessions read settled in this run's cache (a
+      // cold launch, or the list entry a rename dropped while it refetches).
+      // The device keeps the titles it already stored: replacing them with the
+      // none this run saw would break every saved shortcut that names one.
+      const catalog = documents.sessions;
+      if (applySessions !== undefined && catalog !== null) {
+        // The index write awaited, so the fences are read once more for the
+        // second write: the catalog is account-scoped for the same reason.
+        if (!isCurrentAuthEpoch(epoch) || !this.deps.isEnabled()) {
+          return changed ? 'applied' : 'skipped';
+        }
+        changed = (await applySessions(catalog)) || changed;
+      }
+      return changed ? 'applied' : 'skipped';
     } catch (error) {
       // The native ledger advances only on success, so the next trigger
       // re-plans the same delta. Never log a document id or a title.

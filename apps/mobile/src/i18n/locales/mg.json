@@ -4249,5 +4249,8 @@
     "noEnabledContexts": "Tsy misy toe-javatra nandefasana tatitra voalahatra",
     "sourceBlocker": "Mila fikarakarana ny fotoam-piasana",
     "sourceMetadata": "Metadata momba ny fotoam-piasana voarakitra"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Tsy voasokatra ity valim-pikarohana ity"
   }
 }

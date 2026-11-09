@@ -4243,5 +4243,8 @@
     "noEnabledContexts": "Tiada konteks didayakan untuk laporan berjadual",
     "sourceBlocker": "Sesi memerlukan perhatian",
     "sourceMetadata": "Metadata sesi yang dirakam"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Tidak dapat membuka hasil carian ini"
   }
 }

@@ -472,6 +472,9 @@ describe('restoring a private workspace disk snapshot', () => {
     await restored.prepared.prepare(restoredSpec);
 
     expect(ready(restored.frames)).toMatchObject({ workspace: 'adopted' });
+    expect(
+      restored.frames.filter(frame => frame.type === 'session.progress' && frame.step === 'restore')
+    ).toContainEqual(expect.objectContaining({ detail: 'Using workspace snapshot' }));
     expect(git(directory, 'status', '--porcelain=v1', '--untracked-files=all')).toBe(status);
     expect(git(directory, 'show-ref', '--heads')).toBe(refs);
     expect(git(directory, 'branch', '--show-current')).toBe('local-work');

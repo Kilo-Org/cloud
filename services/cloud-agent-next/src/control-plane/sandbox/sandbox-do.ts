@@ -33,6 +33,9 @@ import {
   readWorkspaceSnapshotRaw,
   sameWorkspaceSnapshotIdentity,
   workspaceSnapshotIdentity,
+  workspaceSnapshotIdentitySchema,
+  workspaceSnapshotStatus,
+  type WorkspaceSnapshotIdentity,
   workspaceSnapshotsEnabled,
   selectWorkspaceSnapshotResult,
   snapshotRestorePending,
@@ -214,6 +217,10 @@ import {
   workspaceConfigFromSpec,
 } from '../../shared/workspace-config.js';
 import {
+  PreviewServicesScanSchema,
+  type ListPreviewServicesOutput,
+} from '../../shared/preview-services.js';
+import {
   CONTROL_PLANE_ALLOCATION_ID_ENV,
   CONTROL_PLANE_PROTOCOL_VERSION,
   CONTROL_PLANE_REQUEST_TIMEOUT_MS,
@@ -240,6 +247,7 @@ import {
   type ControlPlaneFailureReason,
   type ControlPlaneKiloRequestInput,
   type ControlPlaneOutcome,
+  type ControlPlaneRequestError,
   type ControlPlaneRouteSpec,
   type ControlPlaneRouteUpdate,
   type ControlPlaneRouteView,
@@ -305,6 +313,12 @@ import {
   type RouteRecord,
 } from './routes.js';
 import { allocation as allocationTable, routes as routesTable } from './sqlite-schema.js';
+import {
+  credentialRenewalDueAt,
+  nextCredentialRenewalAt,
+  pruneCredentialRenewalRetries,
+  type CredentialRenewalRetries,
+} from './credential-renewal.js';
 import {
   listScopeGrants,
   readScopeGrant,
@@ -751,6 +765,14 @@ function sandboxPreparationProgress(state: AllocationState): RoutePreparationPro
 /** Upper bound on concurrently outstanding wrapper control requests. */
 const MAX_PENDING_CONTROL_REQUESTS = 64;
 
+/** Wrapper scan bound plus headroom, below the generic control request budget. */
+const PREVIEW_SERVICES_CONTROL_TIMEOUT_MS = 6_000;
+
+const WRAPPER_NOT_CONNECTED = 'Wrapper is not connected';
+const WRAPPER_WRITE_FAILED = 'Wrapper socket write failed';
+const WRAPPER_REQUEST_TIMED_OUT = 'Wrapper request timed out';
+const PRE_SEND_NOT_READY_MESSAGES = new Set([WRAPPER_NOT_CONNECTED, WRAPPER_WRITE_FAILED]);
+
 /**
  * Result of the queued half of a control request: either an early failure, or
  * the wrapper-reply promise the caller awaits outside the queue.
@@ -776,11 +798,12 @@ const CORRELATED_RESULT_FRAME_TYPES = new Set<string>([
   'worktree.result',
   'terminal.result',
   'kilo.result',
+  'preview.result',
 ]);
 
 type CorrelatedResultFrame = Extract<
   ControlPlaneWrapperFrame,
-  { type: 'worktree.result' | 'terminal.result' | 'kilo.result' }
+  { type: 'worktree.result' | 'terminal.result' | 'kilo.result' | 'preview.result' }
 >;
 
 function isCorrelatedResultFrame(frame: unknown): frame is CorrelatedResultFrame {
@@ -880,6 +903,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
   controlRequestTimeoutMs = CONTROL_PLANE_REQUEST_TIMEOUT_MS;
   workspaceSnapshotIdleMs = WORKSPACE_SNAPSHOT_IDLE_MS;
   private workspaceSnapshotCapturePending = false;
+  /** Earliest retry per grant scope after a failed renewal; in memory, so eviction retries once. */
+  private readonly credentialRenewalRetryAt: CredentialRenewalRetries = new Map();
   /**
    * Notification factory for the V2 Session DO. The default resolves the
    * `ownerId:sessionId` name through the shared binding accessor; tests inject a
@@ -1018,17 +1043,33 @@ export class SandboxControlV2 extends DurableObject<Env> {
    * state into the public snapshot; it never probes the provider or the wrapper.
    * No owner means no evidence, so the snapshot is `unknown`.
    */
-  async getStatusSnapshot(): Promise<SandboxStatusSnapshot> {
+  async getStatusSnapshot(
+    identity: WorkspaceSnapshotIdentity | null = null
+  ): Promise<SandboxStatusSnapshot> {
     await this.initialized;
     return this.enqueue(async () => {
       const owner = await this.requireOwner();
       const allocation = owner === null ? null : await this.getAllocationState();
-      return projectAllocationStatusSnapshot({
-        allocation,
-        observedAt: Date.now(),
-        inactivityTimeoutMs: this.sandboxIdleTimeoutMs(allocation),
-        runtimeIdentity: readRuntimeIdentity(this.ctx.storage.kv, allocation?.allocationId ?? null),
-      });
+      const parsedIdentity = workspaceSnapshotIdentitySchema.safeParse(identity);
+      return {
+        ...projectAllocationStatusSnapshot({
+          allocation,
+          observedAt: Date.now(),
+          inactivityTimeoutMs: this.sandboxIdleTimeoutMs(allocation),
+          runtimeIdentity: readRuntimeIdentity(
+            this.ctx.storage.kv,
+            allocation?.allocationId ?? null
+          ),
+        }),
+        ...workspaceSnapshotStatus(
+          this.db,
+          parsedIdentity.success &&
+            parsedIdentity.data.sandboxId === this.sandboxId &&
+            parsedIdentity.data.userId === owner
+            ? parsedIdentity.data
+            : null
+        ),
+      };
     });
   }
 
@@ -1172,6 +1213,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
             return result;
           }),
         eligible: route => this.workspaceSnapshotRouteEligible(route),
+        stored: async () => this.broadcastStatusSnapshots(await this.readAllocation()),
         read: async () => {
           const state = await this.readAllocation();
           const socket = this.boundWrapperSocket(state);
@@ -1387,7 +1429,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
     const handoff = await this.enqueue(async () => {
       await this.initializeOwner(parsed.kiloUserId);
       const routes = await listRoutes(this.db);
-      deleteWorkspaceSnapshot(this.db, parsed.worktreeId, 'workspace_deleted');
+      if (deleteWorkspaceSnapshot(this.db, parsed.worktreeId, 'workspace_deleted'))
+        this.broadcastStatusSnapshots(await this.readAllocation());
       this.fenceWorkspaceSnapshot('workspace_deleted');
       const target = worktreeOwnedRoutes(routes, parsed);
       const state = await this.readAllocation();
@@ -1725,6 +1768,60 @@ export class SandboxControlV2 extends DurableObject<Env> {
   }
 
   /**
+   * Session DO -> Sandbox DO live preview discovery. Route/allocation state is
+   * read off the operation queue first, so a stopped sandbox returns
+   * `not_running` and a preparing one `not_ready` without any provider call or
+   * wake. Only a bound wrapper socket is asked to scan; its reply is awaited
+   * outside the queue like every other control request.
+   */
+  async previewServices(sessionId: string): Promise<ListPreviewServicesOutput> {
+    await this.initialized;
+    const target = await this.previewTarget(sessionId);
+    if (target.status === 'unsupported_provider') {
+      return { services: [], status: 'unsupported' };
+    }
+    if (target.status === 'not_ready') return { services: [], status: 'not_ready' };
+    if (target.status === 'not_running') return { services: [], status: 'not_running' };
+
+    const handoff = await this.enqueue(() => this.beginPreviewServicesRequest());
+    if ('error' in handoff) {
+      if (handoff.error.ok) throw new Error('Unexpected preview service scan result');
+      return this.previewServicesHandoffFailure(handoff.error.error);
+    }
+    const result = await handoff.promise;
+    if (!result.ok) this.previewServicesFailure(result.error);
+    const parsed = PreviewServicesScanSchema.safeParse(result.result);
+    if (!parsed.success) throw new Error('Invalid preview service scan result');
+    return { services: parsed.data.services, status: 'running' };
+  }
+
+  private async beginPreviewServicesRequest(): Promise<ControlRequestHandoff> {
+    return this.beginWrapperControlRequest(
+      {
+        type: 'preview.list',
+        requestId: crypto.randomUUID(),
+      },
+      Math.min(this.controlRequestTimeoutMs, PREVIEW_SERVICES_CONTROL_TIMEOUT_MS)
+    );
+  }
+
+  private previewServicesHandoffFailure(
+    error: ControlPlaneRequestError
+  ): ListPreviewServicesOutput {
+    if (PRE_SEND_NOT_READY_MESSAGES.has(error.message)) {
+      return { services: [], status: 'not_ready' };
+    }
+    return this.previewServicesFailure(error);
+  }
+
+  private previewServicesFailure(error: ControlPlaneRequestError): never {
+    if (error.message === WRAPPER_REQUEST_TIMED_OUT) {
+      throw new Error('Preview service discovery timed out');
+    }
+    throw new Error(`Preview service scan failed (${error.code})`);
+  }
+
+  /**
    * Binds one request frame to the connected socket under the serial queue and
    * registers it in the pending map. The wrapper's reply is resolved on the raw
    * socket path, so callers await the returned promise OUTSIDE the queue (spec
@@ -1739,7 +1836,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     const state = await this.readAllocation();
     const socket = this.boundWrapperSocket(state);
     if (socket === null) {
-      return { error: controlRequestFailure('not_ready', 'Wrapper is not connected', true) };
+      return { error: controlRequestFailure('not_ready', WRAPPER_NOT_CONNECTED, true) };
     }
     if (this.pendingControlRequests.size >= MAX_PENDING_CONTROL_REQUESTS) {
       return {
@@ -1750,9 +1847,9 @@ export class SandboxControlV2 extends DurableObject<Env> {
     if (!this.trySendFrame(socket, frame)) {
       this.settlePendingControlRequest(
         frame.requestId,
-        controlRequestFailure('not_ready', 'Wrapper socket write failed', true)
+        controlRequestFailure('not_ready', WRAPPER_WRITE_FAILED, true)
       );
-      return { error: controlRequestFailure('not_ready', 'Wrapper socket write failed', true) };
+      return { error: controlRequestFailure('not_ready', WRAPPER_WRITE_FAILED, true) };
     }
     return { promise };
   }
@@ -1765,7 +1862,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     return new Promise<ControlPlaneControlResult>(resolve => {
       const timer = setTimeout(() => {
         this.pendingControlRequests.delete(requestId);
-        resolve(controlRequestFailure('not_ready', 'Wrapper request timed out', true));
+        resolve(controlRequestFailure('not_ready', WRAPPER_REQUEST_TIMED_OUT, true));
       }, timeoutMs);
       this.pendingControlRequests.set(requestId, { socket, resolve, timer });
     });
@@ -2248,10 +2345,18 @@ export class SandboxControlV2 extends DurableObject<Env> {
         if (owner === null || owner !== url.searchParams.get('ownerId') || !sessionId)
           return new Response('Sandbox owner mismatch', { status: 403 });
         const allocation = await this.readAllocation();
+        const parsedIdentity = workspaceSnapshotIdentitySchema.safeParse({
+          sandboxId: this.sandboxId,
+          userId: owner,
+          workspaceId: url.searchParams.get('workspaceId'),
+          directory: url.searchParams.get('directory'),
+          orgId: url.searchParams.get('orgId') ?? undefined,
+        });
+        const identity = parsedIdentity.success ? parsedIdentity.data : null;
         const pair = new WebSocketPair();
         this.ctx.acceptWebSocket(pair[1], ['sandbox-status']);
-        pair[1].serializeAttachment({ kind: 'sandbox-status', sessionId });
-        this.sendStatusSnapshot(pair[1], sessionId, allocation);
+        pair[1].serializeAttachment({ kind: 'sandbox-status', sessionId, identity });
+        this.sendStatusSnapshot(pair[1], sessionId, allocation, identity);
         return new Response(null, { status: 101, webSocket: pair[0] });
       });
     }
@@ -2357,6 +2462,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       this.expireUnboundSockets(Date.now());
       let state = await this.readAllocation();
       await failExpiredRoutes(this.routeContext(state));
+      await this.renewDueRouteGrants(state);
       if (
         state.kind === 'stopped' &&
         !this.createInFlight &&
@@ -3198,26 +3304,12 @@ export class SandboxControlV2 extends DurableObject<Env> {
       adopted = maintained.adopted;
     }
 
-    if (route.grant !== null && this.grantNeedsReissue(route.grant)) {
-      // Credentials half of B3: re-issue below one hour remaining with freshly
-      // selected material and send `session.credentials` before the prompts. A
-      // failure to re-issue must not send the frame: while the previous grant is
-      // still due, deliver the prompts on it and retry the re-issue on the next
-      // send. Once that grant has expired there is no usable grant left for any
-      // re-issue outcome, so the route fails now with the real reason.
-      const outcome = await this.reissueRouteGrant(route, state);
-      if (outcome !== 'issued' && Date.now() >= route.grant.expiresAt) {
-        await onRouteFailed(
-          this.routeContext(state),
-          payload.sessionId,
-          'workspace_setup_failed',
-          undefined,
-          true
-        );
-        return 'not_ready';
-      }
-      route = (await readRoute(this.db, payload.sessionId)) ?? route;
-    }
+    // Credentials half of B3: a due grant is re-issued and `session.credentials`
+    // is sent before the prompts. A failed re-issue still delivers on the
+    // previous grant while it is valid.
+    const renewed = await this.renewRouteGrant(route, state);
+    if (renewed === null) return 'not_ready';
+    route = renewed;
 
     // One verified-expiry check immediately before the prompts, for adopted
     // handles only. A per-session scope keeps its historical behavior: the
@@ -3268,13 +3360,81 @@ export class SandboxControlV2 extends DurableObject<Env> {
   }
 
   /**
+   * Re-issues a ready route's grant once it is inside the re-issue window. Both
+   * `deliver` and the alarm use this, so a long execution without new messages
+   * renews its grant before the lease ends. A failed re-issue keeps the route
+   * while its current grant is valid and lets the alarm retry later; once that
+   * grant has expired there is no usable grant left, so the route fails now
+   * with the real reason. Returns null when the route failed.
+   */
+  private async renewRouteGrant(
+    route: RouteRecord,
+    state: AllocationState
+  ): Promise<RouteRecord | null> {
+    if (route.grant === null || !this.grantNeedsReissue(route.grant)) return route;
+    const { scopeId, expiresAt } = route.grant;
+    const outcome = await this.reissueRouteGrant(route, state);
+    if (outcome === 'issued') {
+      this.credentialRenewalRetryAt.delete(scopeId);
+    } else if (Date.now() >= expiresAt) {
+      this.credentialRenewalRetryAt.delete(scopeId);
+      await this.failUnrenewableRoute(route.sessionId, state);
+      return null;
+    } else {
+      this.credentialRenewalRetryAt.set(
+        scopeId,
+        Date.now() + this.sandboxTimers().credentialGrantRenewalRetryMs
+      );
+    }
+    return (await readRoute(this.db, route.sessionId)) ?? route;
+  }
+
+  /** The route's grant expired and could not be re-issued: fail with the real reason. */
+  private async failUnrenewableRoute(sessionId: string, state: AllocationState): Promise<void> {
+    await onRouteFailed(
+      this.routeContext(state),
+      sessionId,
+      'workspace_setup_failed',
+      undefined,
+      true
+    );
+  }
+
+  /**
+   * The alarm half of credential renewal. Runs on the serial queue like
+   * `deliver`, so it never races a sibling join or release. A shared worktree
+   * scope is attempted once for all of its members: a success renews the shared
+   * grant, a failure sets the scope's retry, and a failure at expiry fails the
+   * other members without another attempt.
+   */
+  private async renewDueRouteGrants(state: AllocationState): Promise<void> {
+    const routes = await listRoutes(this.db);
+    const retries = this.credentialRenewalRetryAt;
+    pruneCredentialRenewalRetries(retries, routes);
+    const threshold = this.sandboxTimers().credentialGrantReissueBelowMs;
+    const expiredScopes = new Set<string>();
+    for (const listed of routes) {
+      const dueAt = credentialRenewalDueAt(listed, threshold, retries);
+      if (dueAt === null || dueAt > Date.now()) continue;
+      const route = await readRoute(this.db, listed.sessionId);
+      if (route?.state !== 'ready' || route.grant === null) continue;
+      const { scopeId } = route.grant;
+      if (expiredScopes.has(scopeId) && Date.now() >= route.grant.expiresAt) {
+        await this.failUnrenewableRoute(route.sessionId, state);
+      } else if ((await this.renewRouteGrant(route, state)) === null) {
+        expiredScopes.add(scopeId);
+      }
+    }
+  }
+
+  /**
    * Re-issues a warm route's grant. The new grant is written only after the
    * provider policy that covers its aliases is applied, so a policy failure
    * leaves the previous grant in place. Any non-`issued` outcome means the
-   * caller must not send `session.credentials`; `runDeliver` keeps the route
-   * while the previous grant is still due and fails it once that grant has
-   * expired, so the Session DO starts a fresh attempt instead of waiting for
-   * the backstop.
+   * caller must not send `session.credentials`; `renewRouteGrant` keeps the
+   * route while the previous grant is still due and fails it once that grant
+   * has expired, so the Session DO starts a fresh attempt instead of waiting
+   * for the backstop.
    */
   private async reissueRouteGrant(
     route: RouteRecord,
@@ -5135,7 +5295,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
       log('selected', candidate.sessionId, candidate.owner.workspaceId);
       await notifyPreparingRoutes(this.routeContext(current), {
         step: 'restore',
-        detail: 'Restoring the workspace tail snapshot',
+        detail: 'Using workspace snapshot',
+        snapshotCapturedAt: descriptor.capturedAt,
       });
       return {
         snapshotId: descriptor.snapshotId,
@@ -5254,6 +5415,9 @@ export class SandboxControlV2 extends DurableObject<Env> {
     await notifyPreparingRoutes(this.routeContext(state), {
       step: 'environment_snapshot',
       detail: environmentStartDetail(candidate.reference, lookup),
+      ...(lookup.kind === 'resolved' && lookup.resolution.snapshot !== null
+        ? { snapshotCapturedAt: lookup.resolution.snapshot.capturedAt }
+        : {}),
     });
     return {
       options: decision.snapshot === undefined ? {} : { snapshot: decision.snapshot },
@@ -6376,6 +6540,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
       previous.unconfirmedProviderRef === state.unconfirmedProviderRef
     )
       return;
+    this.broadcastStatusSnapshots(state);
+  }
+
+  private broadcastStatusSnapshots(state: AllocationState): void {
     for (const socket of this.ctx.getWebSockets('sandbox-status')) {
       const attachment: unknown = socket.deserializeAttachment();
       if (
@@ -6383,22 +6551,39 @@ export class SandboxControlV2 extends DurableObject<Env> {
         attachment !== null &&
         'sessionId' in attachment &&
         typeof attachment.sessionId === 'string'
-      )
-        this.sendStatusSnapshot(socket, attachment.sessionId, state);
+      ) {
+        const identity = workspaceSnapshotIdentitySchema.safeParse(
+          'identity' in attachment ? attachment.identity : null
+        );
+        this.sendStatusSnapshot(
+          socket,
+          attachment.sessionId,
+          state,
+          identity.success ? identity.data : null
+        );
+      }
     }
   }
 
-  private sendStatusSnapshot(socket: WebSocket, sessionId: string, state: AllocationState): void {
-    const snapshot = projectAllocationStatusSnapshot({
-      allocation: {
-        ...state,
-        provider: this.currentProvider(),
-        configuration: this.providerPin?.configuration ?? null,
-      },
-      observedAt: Date.now(),
-      inactivityTimeoutMs: this.sandboxIdleTimeoutMs(state),
-      runtimeIdentity: readRuntimeIdentity(this.ctx.storage.kv, state.allocationId),
-    });
+  private sendStatusSnapshot(
+    socket: WebSocket,
+    sessionId: string,
+    state: AllocationState,
+    identity: WorkspaceSnapshotIdentity | null
+  ): void {
+    const snapshot = {
+      ...projectAllocationStatusSnapshot({
+        allocation: {
+          ...state,
+          provider: this.currentProvider(),
+          configuration: this.providerPin?.configuration ?? null,
+        },
+        observedAt: Date.now(),
+        inactivityTimeoutMs: this.sandboxIdleTimeoutMs(state),
+        runtimeIdentity: readRuntimeIdentity(this.ctx.storage.kv, state.allocationId),
+      }),
+      ...workspaceSnapshotStatus(this.db, identity),
+    };
     try {
       socket.send(
         JSON.stringify({
@@ -6470,6 +6655,11 @@ export class SandboxControlV2 extends DurableObject<Env> {
     // preparation attempt.
     const allocationAt = nextAllocationAlarmAt(state, this.sandboxTimers());
     const routeAt = await earliestRouteDeadlineAt(this.db);
+    const renewalAt = nextCredentialRenewalAt(
+      await listRoutes(this.db),
+      this.sandboxTimers().credentialGrantReissueBelowMs,
+      this.credentialRenewalRetryAt
+    );
     // Pending work must survive loss of the in-memory launch continuation.
     const retryAt =
       state.kind === 'stopped' &&
@@ -6524,6 +6714,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     const candidates = [
       allocationAt,
       routeAt,
+      renewalAt,
       retryAt,
       snapshotAt,
       this.earliestHelloDeadlineAt(),

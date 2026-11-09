@@ -184,9 +184,7 @@ describe('organization guardrails router', () => {
       .where(eq(organization_audit_logs.organization_id, organization.id))
       .orderBy(desc(organization_audit_logs.created_at))
       .limit(1);
-    expect(auditLog.message).toContain(
-      'detectors: injection_attack (log), pii (log, secrets), nsfw;'
-    );
+    expect(auditLog.message).toContain('detectors: injection_attack (log);');
   });
 
   it('reads input detectors saved before they had an action as blocking', async () => {
@@ -372,7 +370,7 @@ describe('organization guardrails router', () => {
       .limit(1);
     expect(auditLog.action).toBe('organization.settings.change');
     expect(auditLog.message).toBe(
-      'Updated AI guardrails: enabled; detectors: injection_attack (block), pii (log, secrets), policy_violation (block, policy text), nsfw; output guardrails: disabled; output detectors: none'
+      'Updated AI guardrails: enabled; detectors: injection_attack (block), policy_violation (block, policy text); output guardrails: disabled; output detectors: none'
     );
     expect(auditLog.message).not.toContain('Phoenix');
     expect(auditLog.message).not.toContain('customer records');

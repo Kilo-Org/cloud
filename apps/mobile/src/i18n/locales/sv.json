@@ -4243,5 +4243,8 @@
     "noEnabledContexts": "Inga kontexter är aktiverade för schemalagda rapporter",
     "sourceBlocker": "Sessionen behöver uppmärksamhet",
     "sourceMetadata": "Insamlad sessionsmetadata"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Kunde inte öppna det här sökresultatet"
   }
 }

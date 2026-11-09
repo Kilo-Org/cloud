@@ -31,6 +31,7 @@ import type { GitHubAppType } from '@/lib/integrations/platforms/github/adapter'
 import {
   addReactionToPR,
   createCheckRun,
+  findLatestCheckRunId,
   getCheckRunConclusion,
   resolveMergeHeadContent,
   updateCheckRun,
@@ -580,6 +581,26 @@ async function gateMergeHeadFromCoveringReview(args: {
     return;
   }
   try {
+    // The Kilo check on this head may already carry the covering verdict: the
+    // webhook delivered this synchronization once, a recovery sweep ran here
+    // before, or a previous pass created the run. Gate the head once; a second
+    // run with the same conclusion adds noise, not coverage. A lookup failure
+    // reads as "no run" and the create below answers 422 on the decided run.
+    const existingRunId = await findLatestCheckRunId(
+      args.installationId,
+      args.baseOwner,
+      args.baseRepoName,
+      args.headSha,
+      args.appType
+    );
+    if (existingRunId !== undefined) {
+      logExceptInTest('Merge-commit head already carries the Kilo check:', {
+        head_sha: args.headSha,
+        check_run_id: existingRunId,
+      });
+      return;
+    }
+
     await createCheckRun(
       args.installationId,
       args.baseOwner,

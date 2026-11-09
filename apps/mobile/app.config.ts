@@ -526,6 +526,9 @@ const config: ExpoConfig = {
     // exists only in the androidx compose artifacts.
     './plugins/withAndroidSheetCloseLabel',
     './plugins/withAndroidExpoModuleRepos',
+    // Compiles the App Intents in the app target (see the plugin): the static
+    // KiloAppActions pod has no bundle for the system to load intents from.
+    './plugins/withKiloAppIntents',
     // Writes the app target's single `Localizable.strings` per language: the
     // four App Intent actions and their parameters resolve their
     // `LocalizedStringResource` literals against it, and the Focus-filter copy

@@ -19,6 +19,7 @@ import {
   workspaceSnapshotOwner,
   workspaceSnapshotRoutesEligible,
   workspaceSnapshotRestoreSkip,
+  workspaceSnapshotStatus,
   writeWorkspaceSnapshotAllocation,
 } from '../../src/control-plane/sandbox/workspace-snapshot.js';
 import type { NativeCaptureResult } from '../../src/sandbox-containers/native-capture.js';
@@ -118,6 +119,7 @@ function captureInput(db: RouteDatabase) {
     read: async () => ({ state, routes, capable }),
     enqueue: async operation => operation(),
     eligible: () => true,
+    stored: async () => {},
   };
   return {
     input,
@@ -142,6 +144,29 @@ afterEach(async () => {
 });
 
 describe('workspace snapshot diagnostics with durable SQLite', () => {
+  it('projects only persisted capture time for the complete matching identity', async () =>
+    withDatabase(db => {
+      expect(workspaceSnapshotStatus(db, IDENTITY)).toEqual({});
+      saveDescriptor(db, descriptor({ capturedAt: 1 }));
+      expect(workspaceSnapshotStatus(db, IDENTITY)).toEqual({
+        workspaceSnapshot: { capturedAt: 1 },
+      });
+      expect(workspaceSnapshotStatus(db, null)).toEqual({});
+      for (const change of [
+        { sandboxId: 'other-sandbox' },
+        { workspaceId: 'worktree_00000000-0000-4000-8000-000000000002' as const },
+        { directory: '/workspace/other' },
+        { userId: 'other-user' },
+        { orgId: 'other-org' },
+      ]) {
+        expect(workspaceSnapshotStatus(db, { ...IDENTITY, ...change })).toEqual({});
+      }
+      deleteWorkspaceSnapshot(db, IDENTITY.workspaceId);
+      expect(workspaceSnapshotStatus(db, IDENTITY)).toEqual({});
+      saveDescriptor(db, { ...descriptor(), capturedAt: 'invalid' });
+      expect(workspaceSnapshotStatus(db, IDENTITY)).toEqual({});
+    }));
+
   it.each([
     { change: undefined, reason: 'missing' },
     { change: { sandboxId: IDENTITY.sandboxId }, reason: 'invalid_descriptor' },

@@ -20,6 +20,7 @@ import { BuiltinAgentsSection } from './BuiltinAgentsSection';
 import { DefaultSandboxSection } from './DefaultSandboxSection';
 import { EnvironmentsSection } from './EnvironmentsSection';
 import { RepositoryOverridesSection } from './RepositoryOverridesSection';
+import { TranscriptPreferencesSection } from './TranscriptPreferencesSection';
 import { VercelComputeSettings } from './VercelComputeSettings';
 
 type CloudAgentSettingsDialogProps = {
@@ -77,14 +78,16 @@ function CloudAgentSettings({
   return (
     <>
       <DialogHeader className="gap-0 space-y-0 border-b px-6 py-4 text-left">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 pr-6">
           <DialogTitle>Cloud Agent settings</DialogTitle>
-          <Badge variant="secondary">{organizationId ? 'Organization' : 'Personal'}</Badge>
+          <Badge variant="secondary">
+            {organizationId ? 'Organization workspace' : 'Personal workspace'}
+          </Badge>
         </div>
         {organizationId && settings && !settings.canManage ? (
           <DialogDescription className="mt-1 flex items-center gap-1.5">
             <Lock className="size-3.5 shrink-0" aria-hidden />
-            Organization settings are view only. Your personal agent preferences remain editable.
+            Organization settings are view only. Your personal preferences remain editable.
           </DialogDescription>
         ) : (
           <DialogDescription className="sr-only">
@@ -149,33 +152,53 @@ function CloudAgentSettings({
         >
           <div className="flex flex-col gap-8">
             {settings ? (
-              <>
-                <div className="flex flex-col gap-6">
-                  {organizationId && (
-                    <div className="flex flex-col gap-1">
-                      <h3 className="text-sm font-medium">Organization defaults</h3>
-                      <p className="text-muted-foreground text-xs">
-                        Applies to new sessions across this organization. Only owners and admins can
-                        change these settings.
-                      </p>
-                    </div>
-                  )}
-                  <DefaultSandboxSection organizationId={organizationId} settings={settings} />
-                  <RepositoryOverridesSection
-                    organizationId={organizationId}
-                    settings={settings}
-                    onManageProfiles={() => setSection('profiles')}
-                  />
+              <section aria-labelledby="session-defaults-heading" className="flex flex-col gap-6">
+                <div className="flex flex-col gap-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 id="session-defaults-heading" className="text-base font-medium">
+                      {organizationId ? 'Organization settings' : 'Session defaults'}
+                    </h3>
+                    {organizationId && <Badge variant="secondary">All members</Badge>}
+                  </div>
+                  <p className="text-muted-foreground text-xs">
+                    {organizationId
+                      ? 'Applies to new sessions for everyone in this organization. Only owners and admins can make changes.'
+                      : 'Applies to new sessions in your personal workspace.'}
+                  </p>
                 </div>
-                <div className="border-t pt-6">
-                  <BuiltinAgentsSection organizationId={organizationId} settings={settings} />
-                </div>
-              </>
+                <DefaultSandboxSection organizationId={organizationId} settings={settings} />
+                <RepositoryOverridesSection
+                  organizationId={organizationId}
+                  settings={settings}
+                  onManageProfiles={() => setSection('profiles')}
+                />
+              </section>
             ) : settingsQuery.isError ? (
               <LoadError onRetry={() => void settingsQuery.refetch()} />
             ) : (
               <LoadingSkeleton />
             )}
+            <section
+              aria-labelledby="personal-preferences-heading"
+              className="flex flex-col gap-6 border-t pt-6"
+            >
+              <div className="flex flex-col gap-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 id="personal-preferences-heading" className="text-base font-medium">
+                    Personal preferences
+                  </h3>
+                  <Badge variant="secondary">Only you</Badge>
+                </div>
+                <p className="text-muted-foreground text-xs">
+                  Applies to you across personal and organization chats. Does not change settings
+                  for other members.
+                </p>
+              </div>
+              <TranscriptPreferencesSection />
+              {settings && (
+                <BuiltinAgentsSection organizationId={organizationId} settings={settings} />
+              )}
+            </section>
           </div>
         </TabsContent>
         <TabsContent

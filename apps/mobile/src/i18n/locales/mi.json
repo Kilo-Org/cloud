@@ -4243,5 +4243,8 @@
     "noEnabledContexts": "Kāore he horopaki kua whakahohea mō ngā pūrongo kua hōtaka",
     "sourceBlocker": "Me aro ki te wātū",
     "sourceMetadata": "Ngā raraungameta wātū kua hopukina"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Kāore i taea te whakatuwhera i tēnei hua kimi"
   }
 }

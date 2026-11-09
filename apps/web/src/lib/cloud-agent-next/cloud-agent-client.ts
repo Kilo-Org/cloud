@@ -48,6 +48,8 @@ import {
 import type { SendMessagePayload } from './types.js';
 import {
   baseGetMessageResultNextOutputSchema,
+  baseListPreviewServicesNextOutputSchema,
+  type ListPreviewServicesOutput,
   workerPreviewOptionsSchema,
 } from '@/routers/cloud-agent-next-schemas';
 import {
@@ -690,6 +692,9 @@ type CloudAgentNextTRPCClient = {
   getPreviewOptions: {
     query: (input: { cloudAgentSessionId: string; organizationId?: string }) => Promise<unknown>;
   };
+  listPreviewServices: {
+    query: (input: { cloudAgentSessionId: string }) => Promise<unknown>;
+  };
   prepareSession: {
     mutate: (input: PrepareSessionInput) => Promise<PrepareSessionOutput>;
   };
@@ -1132,6 +1137,14 @@ export class CloudAgentNextClient {
     cloudAgentSessionId: string;
   }): Promise<z.infer<typeof workerPreviewOptionsSchema>> {
     return workerPreviewOptionsSchema.parse(await this.client.getPreviewOptions.query(input));
+  }
+
+  async listPreviewServices(input: {
+    cloudAgentSessionId: string;
+  }): Promise<ListPreviewServicesOutput> {
+    return baseListPreviewServicesNextOutputSchema.parse(
+      await this.client.listPreviewServices.query(input)
+    );
   }
 
   /**

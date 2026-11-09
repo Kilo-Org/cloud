@@ -51,10 +51,8 @@ describe('resolveEnkryptInputGuardrail', () => {
       status: 'ready',
       detectors: {
         injection_attack: { enabled: true, need_explanation: false },
-        pii: { enabled: true, entities: ['secrets'] },
-        nsfw: { enabled: true },
       },
-      blockingDetectors: ['injection_attack', 'nsfw'],
+      blockingDetectors: ['injection_attack'],
     });
   });
 
@@ -77,15 +75,13 @@ describe('resolveEnkryptInputGuardrail', () => {
       status: 'ready',
       detectors: {
         injection_attack: { enabled: true, need_explanation: false },
-        pii: { enabled: true, entities: ['secrets'] },
         policy_violation: {
           enabled: true,
           need_explanation: false,
           policy_text: 'Never share customer records.',
         },
-        nsfw: { enabled: true },
       },
-      blockingDetectors: ['injection_attack', 'policy_violation', 'nsfw'],
+      blockingDetectors: ['injection_attack', 'policy_violation'],
     });
   });
 
@@ -105,7 +101,7 @@ describe('resolveEnkryptInputGuardrail', () => {
 
     expect(resolve({ enkrypt: { input_guardrail: { enabled: true, detectors } } })).toMatchObject({
       status: 'ready',
-      blockingDetectors: ['injection_attack', 'policy_violation', 'nsfw'],
+      blockingDetectors: ['injection_attack', 'policy_violation'],
     });
   });
 
@@ -122,15 +118,14 @@ describe('resolveEnkryptInputGuardrail', () => {
     const config = resolve({ enkrypt: { input_guardrail: { enabled: true, detectors } } });
     if (config?.status !== 'ready') throw new Error('Expected a ready guardrail');
 
-    expect(config.blockingDetectors).toEqual(['nsfw']);
+    expect(config.blockingDetectors).toEqual([]);
     const { blocking, logOnly } = splitEnkryptInputGuardrail(config);
-    expect(blocking).toEqual({ ...config, detectors: { nsfw: { enabled: true } } });
+    expect(blocking).toBeNull();
     expect(logOnly).toEqual({
       ...config,
       blockingDetectors: [],
       detectors: {
         injection_attack: { enabled: true, need_explanation: false },
-        pii: { enabled: true, entities: ['secrets'] },
         policy_violation: {
           enabled: true,
           need_explanation: false,
@@ -140,20 +135,28 @@ describe('resolveEnkryptInputGuardrail', () => {
     });
   });
 
-  it('applies Kilo Default to saved detectors that are not configurable', () => {
+  it('ignores saved detectors that are not configurable', () => {
     const detectors = createKiloDefaultEnkryptInputDetectors();
-    detectors.injection_attack.enabled = false;
-    detectors.pii = { enabled: true, action: 'block', entities: ['url'] };
-    detectors.nsfw.enabled = false;
+    detectors.pii = { enabled: true, action: 'block', entities: ['secrets', 'url'] };
+    detectors.nsfw.enabled = true;
     detectors.keyword_detector = { enabled: true, action: 'block', banned_keywords: ['Phoenix'] };
     detectors.toxicity.enabled = true;
 
     expect(resolve({ enkrypt: { input_guardrail: { enabled: true, detectors } } })).toEqual({
       scanToolResults: true,
       status: 'ready',
-      detectors: { pii: { enabled: true, entities: ['secrets'] }, nsfw: { enabled: true } },
-      blockingDetectors: ['nsfw'],
+      detectors: { injection_attack: { enabled: true, need_explanation: false } },
+      blockingDetectors: ['injection_attack'],
     });
+  });
+
+  it('is off when only detectors that are not configurable were saved as enabled', () => {
+    const detectors = createKiloDefaultEnkryptInputDetectors();
+    detectors.injection_attack.enabled = false;
+    detectors.pii.enabled = true;
+    detectors.nsfw.enabled = true;
+
+    expect(resolve({ enkrypt: { input_guardrail: { enabled: true, detectors } } })).toBeNull();
   });
 
   it('reports invalid saved detectors instead of weakening the policy', () => {
@@ -318,5 +321,17 @@ describe('resolveEnkryptOutputGuardrail', () => {
         },
       })
     ).toEqual(resolveOutput({ enkrypt: { output_guardrail: outputGuardrail } }));
+  });
+
+  it.each(['block', 'log'] as const)('keeps the saved NSFW output action %s', action => {
+    const detectors = createEmptyEnkryptOutputDetectors();
+    detectors.nsfw = { enabled: true, action };
+
+    expect(resolveOutput({ enkrypt: { output_guardrail: { enabled: true, detectors } } })).toEqual({
+      scanToolResults: false,
+      status: 'ready',
+      detectors: { nsfw: { enabled: true } },
+      blockingDetectors: action === 'block' ? ['nsfw'] : [],
+    });
   });
 });

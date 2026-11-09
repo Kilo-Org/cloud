@@ -73,7 +73,7 @@ describe('admitEnkryptGuardrail', () => {
 
   it('rejects when every input detector is log-only', async () => {
     const detectors = createKiloDefaultEnkryptInputDetectors();
-    detectors.injection_attack.enabled = false;
+    detectors.injection_attack.action = 'log';
     const settings: OrganizationSettings = {
       kilo_encrypt: true,
       enkrypt: { input_guardrail: { enabled: true, detectors } },

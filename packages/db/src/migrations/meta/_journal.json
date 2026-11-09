@@ -2409,6 +2409,13 @@
       "when": 1794222552877,
       "tag": "0343_enkrypt_usage_detectors_fired",
       "breakpoints": true
+    },
+    {
+      "idx": 344,
+      "version": "7",
+      "when": 1794229727439,
+      "tag": "0344_open_jazinda",
+      "breakpoints": true
     }
   ]
 }

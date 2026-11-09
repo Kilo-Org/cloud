@@ -4243,5 +4243,8 @@
     "noEnabledContexts": "Non hai contextos activados para os informes programados",
     "sourceBlocker": "A sesión precisa atención",
     "sourceMetadata": "Metadatos da sesión capturados"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Non se puido abrir este resultado da busca"
   }
 }

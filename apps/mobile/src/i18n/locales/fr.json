@@ -4315,5 +4315,8 @@
     "noEnabledContexts": "Aucun contexte activé pour les briefings planifiés",
     "sourceBlocker": "La session nécessite votre attention",
     "sourceMetadata": "Métadonnées de session capturées"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Impossible d'ouvrir ce résultat de recherche"
   }
 }

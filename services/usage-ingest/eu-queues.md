@@ -13,7 +13,8 @@ trial; batch, fill timeout, parallelism, retries and staging are unchanged.
 Complete the production merge gate below before merge or deployment. Receipt mode at batch1/cap1 belongs
 to the preceding EU plumbing prerequisite, which must be deployed and verified first.
 **Merging this change arms an automatic production queue cutover.** The production
-workflow runs every 20 minutes and selects eligible CI-green main: it will create or
+workflow starts when a main CI run completes and has an hourly catch-up poll; it
+selects eligible CI-green main and will create or
 reuse the EU pair, detach the old consumer if present and deploy the new bindings. Do not
 assume a separate manual deployment will provide a later approval gate.
 

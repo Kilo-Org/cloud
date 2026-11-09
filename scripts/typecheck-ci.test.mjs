@@ -18,6 +18,8 @@ import { fileURLToPath } from 'node:url';
 
 import { load } from 'js-yaml';
 
+import { DEPENDENCY_MANIFESTS } from './affected-workspaces.mjs';
+
 const workflows = Object.fromEntries(
   ['ci.yml', 'kilo-app-ci.yml', 'mobile-native-build.yml', 'explorer-ios-release.yml'].map(file => [
     file,
@@ -255,6 +257,7 @@ test('every Chromium install skips apt and restores the browser cache first', ()
 
 for (const [file, name, command, condition] of [
   ['ci.yml', 'typecheck-groups', 'scripts/typecheck-all.sh --group ${{ matrix.group }}'],
+  ['ci.yml', 'typecheck-trpc', 'scripts/typecheck-all.sh --group trpc'],
   ['ci.yml', 'harness-sdk', 'pnpm --filter @kilocode/harness-sdk check:ci'],
   [
     'ci.yml',
@@ -288,7 +291,11 @@ test('one job saves the compiler plugin cache and every reader restores it', () 
     ['.github/actions/harness-sdk-build', harnessBuildAction.runs.steps],
   ];
   for (const [key, steps] of holders) {
-    const saversHere = steps.filter(step => step.uses?.startsWith('actions/cache/save@'));
+    // An action may also save another cache (the harness SDK dist is one), so
+    // pick the plugin saves by their path rather than by the action.
+    const saversHere = steps.filter(
+      step => step.uses?.startsWith('actions/cache/save@') && step.with?.path === pluginPath
+    );
     for (const save of saversHere) {
       assert.equal(save.uses, 'actions/cache/save@668228422ae6a00e4ad889ee87cd7109ec5666a7');
       assert.ok(
@@ -334,11 +341,7 @@ test('one job saves the compiler plugin cache and every reader restores it', () 
 });
 
 const harnessBuildGuards = [
-  [
-    'ci.yml',
-    'lint-groups',
-    "matrix.group == 'trpc' && contains(fromJSON(needs.changes.outputs.affected).full_checks, 'lint')",
-  ],
+  ['ci.yml', 'lint-trpc', "contains(fromJSON(needs.changes.outputs.affected).full_checks, 'lint')"],
   ...['ios', 'android'].map(name => [
     'mobile-native-build.yml',
     name,
@@ -660,35 +663,99 @@ test('kilo-app CI builds the tRPC declarations once and both checks download the
   );
 });
 
-test('the harness SDK action restores dist and builds only on a miss', () => {
+// The tRPC action gets the same guard as the harness SDK build action: a hit
+// proves the key, not the tree.
+test('the tRPC declarations action rebuilds a hit that misses an entry point', () => {
+  const action = load(
+    readFileSync(
+      new URL('../.github/actions/trpc-declarations/action.yml', import.meta.url),
+      'utf8'
+    )
+  );
+  const steps = action.runs.steps;
+  const cache = steps.find(step => step.name === 'Restore tRPC declarations');
+  const restored = steps.find(step => step.name === 'Check the restored declarations');
+  const build = steps.find(step => step.name === 'Build trpc types');
+  assert.equal(cache.uses, 'actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7');
+  assert.equal(cache.with.path, 'packages/trpc/dist');
+  assert.ok(
+    steps.indexOf(cache) < steps.indexOf(restored) &&
+      steps.indexOf(restored) < steps.indexOf(build),
+    'the check runs between the restore and the build'
+  );
+  assert.equal(restored.id, 'restored');
+  assert.equal(restored.shell, 'bash');
+  assert.equal(restored.if, undefined, 'the check runs on a miss too');
+  for (const entry of ['packages/trpc/dist/index.d.ts', 'packages/trpc/dist/mobile.d.ts']) {
+    assert.ok(restored.run.includes(entry), `the check requires ${entry}`);
+  }
+  assert.match(restored.run, /^usable='false'$/m);
+  assert.match(restored.run, /echo "usable=\$usable" >> "\$GITHUB_OUTPUT"/m);
+  const rebuild = "steps.restored.outputs.usable != 'true'";
+  assert.equal(build.if, rebuild, 'the build gates on the check, not the raw cache hit');
+  assert.doesNotMatch(build.if, /cache-hit/, 'the raw cache hit no longer gates the build');
+});
+
+test('the harness SDK action shares one dist entry across runner operating systems', () => {
   const steps = harnessBuildAction.runs.steps;
   const key = steps.find(step => step.name === 'Hash harness SDK build inputs');
   const cache = steps.find(step => step.name === 'Restore harness SDK build');
+  const restored = steps.find(step => step.name === 'Check the restored build');
   const plugins = steps.filter(step => step.uses === pluginCacheAction);
   const build = steps.find(step => step.name === 'Build harness SDK');
+  const save = steps.find(step => step.name === 'Save harness SDK build');
   assert.equal(key.run, 'node scripts/harness-sdk-build-key.mjs >> "$GITHUB_OUTPUT"');
-  assert.equal(cache.uses, 'actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7');
+  // The dist cache is split: only a completed build saves, so a failed or
+  // cancelled build cannot take the key with the tree it half wrote.
+  assert.equal(cache.uses, 'actions/cache/restore@668228422ae6a00e4ad889ee87cd7109ec5666a7');
   assert.equal(cache.with.path, 'packages/harness-sdk/dist');
-  assert.equal(cache.with.key, '${{ runner.os }}-harness-sdk-build-${{ steps.key.outputs.key }}');
+  // The dist is a TypeScript emit and actions/cache derives the same version on
+  // Linux and macOS, so an OS prefix would only split one build into a family
+  // per runner and leave the macOS jobs unable to hit an ubuntu save.
+  const distKey = 'harness-sdk-build-${{ steps.key.outputs.key }}';
+  assert.equal(cache.with.key, distKey);
   assert.equal(cache.with['restore-keys'], undefined, 'a partial restore would serve stale dist');
+  // A hit alone is not a build: a restore missing the package entry rebuilds.
+  assert.ok(
+    steps.indexOf(cache) < steps.indexOf(restored) &&
+      steps.indexOf(restored) < steps.indexOf(build),
+    'the check runs between the restore and the build'
+  );
+  assert.equal(restored.id, 'restored');
+  assert.equal(restored.shell, 'bash');
+  assert.equal(restored.if, undefined, 'the check runs on a miss too');
+  for (const entry of [
+    'packages/harness-sdk/dist/index.js',
+    'packages/harness-sdk/dist/index.d.ts',
+  ]) {
+    assert.ok(restored.run.includes(entry), `the check requires ${entry}`);
+  }
+  assert.match(restored.run, /^usable='false'$/m);
+  assert.match(restored.run, /echo "usable=\$usable" >> "\$GITHUB_OUTPUT"/m);
+  const rebuild = "steps.restored.outputs.usable != 'true'";
   assert.equal(build.run, harnessBuild);
-  assert.equal(build.if, "steps.cache.outputs.cache-hit != 'true'");
+  assert.equal(build.if, rebuild);
+  assert.equal(save.uses, 'actions/cache/save@668228422ae6a00e4ad889ee87cd7109ec5666a7');
+  assert.equal(save.if, rebuild, 'only a build that runs is saved');
+  assert.equal(save.with.path, 'packages/harness-sdk/dist');
+  assert.equal(save.with.key, distKey, 'the save writes the key the restore reads');
+  assert.ok(steps.indexOf(build) < steps.indexOf(save), 'the save follows the build');
   // The typia transform takes minutes to compile, so the build's plugin cache
   // comes from the shared action and only when a build will run.
   assert.equal(plugins.length, 1);
   assert.equal(plugins[0].uses, pluginCacheAction);
   assert.equal(plugins[0].with, undefined);
-  assert.equal(plugins[0].if, "steps.cache.outputs.cache-hit != 'true'");
+  assert.equal(plugins[0].if, rebuild);
   assert.equal(plugins[0].id, 'plugins');
   // macOS has no ci.yml writer for its platform-scoped key, so this action
   // writes the macOS key itself, after the build that compiled the plugins.
   // The save requires the build path: a skipped restore leaves its outputs
   // empty, and a save keyed on them would write nothing.
-  const macSave = steps.find(step => step.uses?.startsWith('actions/cache/save@'));
+  const macSave = steps.find(step => step.name === 'Save compiler plugins');
   assert.ok(macSave, 'the build action writes the macOS key');
   assert.equal(
     macSave.if,
-    "runner.os == 'macOS' && steps.cache.outputs.cache-hit != 'true' && steps.plugins.outputs.cache-hit != 'true'"
+    "runner.os == 'macOS' && steps.restored.outputs.usable != 'true' && steps.plugins.outputs.cache-hit != 'true'"
   );
   assert.equal(steps.indexOf(macSave), steps.length - 1);
 });
@@ -729,8 +796,9 @@ test('the compiler plugin cache action restores under one plugin-scoped key', ()
 // One job compiles the tRPC declarations per commit. The typecheck and lint
 // matrices both relied on the same cache key and started together, so a miss
 // compiled the program twice and both jobs raced to save one key. The producer
-// keeps the cache and every consumer downloads its artifact.
-test('one job builds the tRPC declarations and both matrices download them', () => {
+// keeps the cache, and only the two trpc rows download its artifact: the web
+// and packages typecheck rows and the lint-rest row must not wait for it.
+test('one job builds the tRPC declarations and only the trpc rows download them', () => {
   const trpcAction = './.github/actions/trpc-declarations';
   const ci = workflows['ci.yml'];
   const producerName = 'trpc-declarations';
@@ -759,17 +827,61 @@ test('one job builds the tRPC declarations and both matrices download them', () 
   assert.equal(upload.with['retention-days'], 1);
   assert.equal(upload.with['if-no-files-found'], 'error');
 
-  for (const [name, guard] of [
-    ['typecheck-groups', "matrix.group == 'trpc'"],
-    ['lint-groups', "matrix.group == 'trpc'"],
+  // The rows that read no declarations depend on `changes` alone.
+  for (const [name, matrix] of [
+    ['typecheck-groups', 'typecheck_groups_non_trpc'],
+    ['lint-groups', 'lint_groups_non_trpc'],
+  ]) {
+    const job = ci.jobs[name];
+    assert.equal(job.needs, 'changes', `${name} must not wait for the producer`);
+    assert.equal(
+      job.if,
+      `needs.changes.outputs.${matrix} != '[]'`,
+      `${name} runs whenever its own list is non-empty`
+    );
+    assert.equal(
+      job.strategy.matrix.group,
+      `\${{ fromJSON(needs.changes.outputs.${matrix}) }}`,
+      `${name} lists only the rows that need no declarations`
+    );
+    assert.deepEqual(
+      job.steps.filter(step => String(step.uses).startsWith('actions/download-artifact@')),
+      [],
+      `${name} never downloads the declarations`
+    );
+    assert.deepEqual(
+      job.steps.filter(step => step.uses === trpcAction),
+      [],
+      `${name} never builds the declarations itself`
+    );
+  }
+
+  // A run that selects the trpc group still fails the required check when the
+  // producer fails: the trpc rows always run and their download fails.
+  for (const [name, guard, groupOutput, checkName, command] of [
+    [
+      'typecheck-trpc',
+      "contains(fromJSON(needs.changes.outputs.typecheck_groups), 'trpc')",
+      'typecheck_groups',
+      'typecheck (trpc)',
+      'scripts/typecheck-all.sh --group trpc',
+    ],
+    [
+      'lint-trpc',
+      "contains(fromJSON(needs.changes.outputs.lint_groups), 'trpc')",
+      'lint_groups',
+      'lint (trpc)',
+      'scripts/lint-all.sh --group trpc',
+    ],
   ]) {
     const job = ci.jobs[name];
     assert.deepEqual(job.needs, ['changes', producerName], `${name} waits for the producer`);
-    assert.match(
+    assert.equal(
       job.if,
-      /^always\(\) && needs\.changes\.result == 'success' && needs\.changes\.outputs\./,
+      `always() && needs.changes.result == 'success' && ${guard}`,
       `${name} runs even when the producer is skipped or failed`
     );
+    assert.equal(job.name, checkName, `${name} keeps the check name of the row it replaced`);
     assert.deepEqual(
       job.steps.filter(step => step.uses === trpcAction),
       [],
@@ -781,27 +893,35 @@ test('one job builds the tRPC declarations and both matrices download them', () 
     const download = job.steps[downloadIndex];
     assert.equal(download.with.name, 'trpc-declarations');
     assert.equal(download.with.path, 'packages/trpc/dist');
-    assert.equal(download.if, guard);
+    assert.equal(download.if, undefined, `${name} always needs the artifact`);
     const installIndex = job.steps.findIndex(step =>
       /^pnpm install --frozen-lockfile\b/.test(step.run ?? '')
     );
     assert.ok(downloadIndex > installIndex, `${name} downloads after install`);
+    const step = job.steps.find(candidate => candidate.run === command);
+    assert.ok(step, `${name} runs ${command}`);
+    assert.equal(step.env.KILO_AFFECTED, '${{ needs.changes.outputs.affected }}');
+    assert.ok(
+      ci.jobs.changes.outputs[groupOutput],
+      `the producer and ${name} select themselves from ${groupOutput}`
+    );
   }
 
   // The trpc typecheck row consumes the declarations, so its group script
   // skips its own build there.
-  const typecheck = ci.jobs['typecheck-groups'].steps.find(step =>
+  const typecheck = ci.jobs['typecheck-trpc'].steps.find(step =>
     (step.run ?? '').startsWith('scripts/typecheck-all.sh')
   );
-  assert.equal(
-    typecheck.env.KILO_TYPECHECK_TRPC_BUILT,
-    "${{ matrix.group == 'trpc' && '1' || '' }}"
+  assert.equal(typecheck.env.KILO_TYPECHECK_TRPC_BUILT, '1');
+  const otherTypecheck = ci.jobs['typecheck-groups'].steps.find(step =>
+    (step.run ?? '').startsWith('scripts/typecheck-all.sh')
   );
+  assert.equal(otherTypecheck.env.KILO_TYPECHECK_TRPC_BUILT, undefined);
 
-  // The required aggregators keep their needs; a failed download fails the
-  // group they already wait for.
-  assert.deepEqual(ci.jobs.typecheck.needs, ['changes', 'typecheck-groups']);
-  assert.deepEqual(ci.jobs.lint.needs, ['changes', 'lint-groups']);
+  // The required aggregators wait for both halves, so a failed producer or a
+  // failed trpc row fails the check instead of vanishing as a skipped job.
+  assert.deepEqual(ci.jobs.typecheck.needs, ['changes', 'typecheck-groups', 'typecheck-trpc']);
+  assert.deepEqual(ci.jobs.lint.needs, ['changes', 'lint-groups', 'lint-trpc']);
 });
 
 // Which rows run is one decision, and the affected detector owns it: it keeps
@@ -816,6 +936,24 @@ test('the changes job takes both matrix group lists from the affected detector',
   );
   assert.match(step.run, /echo "typecheck_groups=\$\(jq -c \.typecheck_groups <<< "\$groups"\)"/);
   assert.match(step.run, /echo "lint_groups=\$\(jq -c \.lint_groups <<< "\$groups"\)"/);
+  // The trpc-only rows need the declarations, so the non-trpc matrices need a
+  // list without them. The producer's `if` only sees its own selection unless
+  // every list the rows read is derived from this one output.
+  for (const list of ['typecheck_groups', 'lint_groups']) {
+    assert.match(
+      step.run,
+      new RegExp(`echo "${list}_non_trpc=\\$\\{?${list}_non_trpc\\}?`),
+      `the non-trpc ${list} matrix comes from this job's outputs`
+    );
+    assert.match(
+      step.run,
+      new RegExp(
+        `${list}_non_trpc=\\$\\(jq -c \\x27\\[\\.` +
+          `${list}\\[\\] \\| select\\(. != \\x22trpc\\x22\\)\\]\\x27`
+      ),
+      `the non-trpc ${list} list is derived from the producer's selection`
+    );
+  }
   assert.doesNotMatch(
     step.run,
     /\.full_checks \| index\("(typecheck|lint)"\) != null\) as \$all/,
@@ -850,6 +988,111 @@ test('the matrix step decides from the document the affected step published', ()
     /matrix=\$\(scripts\/changed-workspaces\.sh "\$\{excludes\[@\]\}" "\$\{includes\[@\]\}"\)/,
     'the matrix still comes from the matrix script'
   );
+});
+
+// The gating job reads the repository, not node_modules: only
+// scripts/changed-dependencies.mjs imports a package (js-yaml), and the detector
+// calls it only for a resource manifest. The install therefore follows a filter
+// over exactly that set; a manifest the detector gained without the filter
+// would run the detector without js-yaml.
+test('the changes job installs the root project only for a resource manifest', () => {
+  const steps = ciJobs.changes.steps;
+  const filter = steps.find(step => step.id === 'filter_resources');
+  assert.ok(filter, 'changes: the resource-manifest filter is missing');
+  assert.deepEqual(
+    Object.keys(load(filter.with.filters)),
+    ['resources'],
+    'the filter publishes one output that the install reads'
+  );
+  assert.deepEqual(
+    load(filter.with.filters).resources,
+    [...DEPENDENCY_MANIFESTS],
+    'the filter matches the detector set exactly'
+  );
+  const install = steps.find(step => step.name === 'Install root dependencies');
+  assert.equal(
+    install.if,
+    "steps.filter_resources.outputs.resources == 'true' || steps.filter_resources_retry.outputs.resources == 'true' || steps.resources_base.outputs.manifests == 'true'",
+    'the install runs on the filter answer, first attempt or retry, or the detector-base diff'
+  );
+  assert.ok(
+    steps.indexOf(install) >
+      steps.indexOf(steps.find(step => step.id === 'filter_resources_retry')),
+    'the install reads an answer the filter already wrote'
+  );
+  // dorny/paths-filter answers from the pull request's merge-base diff and
+  // scripts/affected-workspaces.mjs diffs the base tip, so on a branch that is
+  // behind main their manifest answers can disagree and only the detector's
+  // diff saves the run. The check step must reuse the detector's base, read the
+  // manifest set from it (never hardcode it), and land before the install.
+  const affected = steps.find(step => step.id === 'affected');
+  const local = steps.find(step => step.id === 'resources_base');
+  assert.ok(local, 'changes: the detector-base manifest check is missing');
+  assert.equal(
+    local.env.BASE_SHA,
+    affected.env.BASE_SHA,
+    'the check diffs the base the detector diffs, or the answers can drift'
+  );
+  assert.match(local.run, /DEPENDENCY_MANIFESTS/);
+  assert.doesNotMatch(
+    local.run,
+    /pnpm-(lock|workspace)\.yaml/,
+    'the manifest set stays in scripts/affected-workspaces.mjs'
+  );
+  assert.match(local.run, /echo "manifests=\$manifests_changed"/);
+  assert.match(
+    local.run,
+    /if \[ -z "\$manifests" \]; then[\s\S]*echo "manifests=true"/,
+    'an unreadable detector list keeps the install instead of risking a detector without js-yaml'
+  );
+  assert.ok(
+    steps.indexOf(install) > steps.indexOf(local),
+    'the install reads an answer the check wrote'
+  );
+});
+
+// The extension's unit suite runs in extension-ci.yml for a pull request and a
+// main push, and that workflow has no merge_queue trigger: the ci.yml row is the
+// merge-queue gate, and it installs and tests nothing on the events the other
+// workflow covers. The row stays in the matrix either way, so the check still
+// reports and the required `test` passes while its steps are skipped.
+test('the extension matrix row defers to extension CI outside the merge queue', () => {
+  const gate = "matrix.workspace.name != 'kilo-extension' || github.event_name == 'merge_group'";
+  const steps = ciJobs['workspace-tests'].steps;
+  for (const name of ['Install dependencies', 'Run tests']) {
+    assert.equal(
+      steps.find(step => step.name === name).if,
+      gate,
+      `workspace-tests: ${name} must run for the extension only in the merge queue`
+    );
+  }
+  const matrix = ciJobs.changes.steps.find(step => step.id === 'workspaces');
+  assert.doesNotMatch(
+    matrix.run,
+    /--exclude apps\/extension/,
+    'the merge queue has no other extension gate, so the row stays in the matrix'
+  );
+
+  const extensionCi = load(
+    readFileSync(new URL('../.github/workflows/extension-ci.yml', import.meta.url), 'utf8')
+  );
+  assert.deepEqual(
+    Object.keys(extensionCi.on).sort(),
+    ['pull_request', 'push'],
+    'extension CI covers the events the ci.yml row now defers on'
+  );
+  const verify = extensionCi.jobs.verify.steps.find(
+    step => step.run === `pnpm --filter ${extension.name} verify`
+  );
+  assert.ok(verify, 'extension CI runs the extension verify script');
+  const commands = extension.scripts.verify.split('&&').map(command => command.trim());
+  assert.ok(
+    commands.includes('pnpm run test'),
+    'the retained job runs the same unit tests the skipped step did'
+  );
+  for (const command of ['pnpm run typecheck', 'pnpm run lint']) {
+    assert.ok(commands.includes(command), `the retained job keeps ${command}`);
+  }
 });
 
 function runTypecheck(

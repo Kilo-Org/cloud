@@ -396,10 +396,10 @@ rules are covered where they are implemented, in `apps/web`
 ## Deployment
 
 Deployed by `deploy-workers.yml`, which auto-discovers any `services/*` folder
-containing a `wrangler.jsonc`. The scheduled `deploy-production.yml` run
-(`7,27,47 * * * *`) deploys the base config, and `deploy-staging.yml` deploys
-`--env staging` on the same cadence ahead of it. Both pick up changes once the
-merge commit is green in CI.
+containing a `wrangler.jsonc`. The automatic `deploy-production.yml` run starts
+when a main `CI` run completes, and `deploy-staging.yml` does the same ahead of
+it; an hourly poll covers a missed completion. Both deploy the base config and
+`--env staging` from the newest CI-green merge commit.
 
 A merge therefore starts the 5-minute cron and the self-rescheduling alarm in
 both environments; there is no separate enablement switch.

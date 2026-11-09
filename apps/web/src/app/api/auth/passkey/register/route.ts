@@ -94,7 +94,7 @@ async function refuseStaleAdminEnrollment(params: {
 export async function POST(request: NextRequest) {
   // Enrollment and management are session-only: a bearer token must not be
   // able to add a sign-in factor to the account.
-  const { user, authFailedResponse, webSessionId, authenticatedAt } =
+  const { user, authFailedResponse, webSessionId, webSessionPepper, authenticatedAt } =
     await getUserFromSessionForCredentialIssuance();
   if (authFailedResponse) {
     return authFailedResponse;
@@ -144,7 +144,8 @@ export async function POST(request: NextRequest) {
     const credential = await verifyRegistration(
       user.id,
       parsed.data.challengeId,
-      parsed.data.response
+      parsed.data.response,
+      webSessionPepper
     );
 
     if (user.is_admin) {

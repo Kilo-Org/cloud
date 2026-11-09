@@ -1,8 +1,14 @@
 name: Deploy Web to Staging
 
 on:
+  # Same trigger as the production pipeline: a completed main CI run starts the
+  # lookup, the hourly poll is the catch-up path, and dispatch stays manual.
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
   schedule:
-    - cron: '7,27,47 * * * *'
+    - cron: '7 * * * *'
   workflow_dispatch:
 
 permissions:
@@ -15,7 +21,29 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Only a successful CI run may start an automatic deploy. The poll and
+  # dispatch are admitted unchanged.
+  admit:
+    if: >-
+      github.event_name != 'workflow_run' ||
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 2
+    steps:
+      - name: Record admitted trigger
+        env:
+          TRIGGERING_RUN: ${{ github.event.workflow_run.html_url }}
+        run: |
+          echo "Admitted \`$GITHUB_EVENT_NAME\` trigger." >> "$GITHUB_STEP_SUMMARY"
+          if [ -n "$TRIGGERING_RUN" ]; then
+            echo "Triggering CI run: $TRIGGERING_RUN" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
   check-changes:
+    needs: admit
+    # Guard: this workflow_dispatch is reachable from a fork. Only the
+    # canonical repo may run it.
+    if: github.repository == 'Kilo-Org/cloud'
     uses: ./.github/workflows/check-deployment-changes.yml
     with:
       workflow_file: deploy-staging.yml
@@ -25,7 +53,10 @@ jobs:
   # the same connection.
   db-gate:
     needs: check-changes
-    if: needs.check-changes.outputs.should_deploy == 'true'
+    # Guard: this workflow_dispatch is reachable from a fork, and it deploys
+    # the web app to staging using repo secrets. Only the canonical repo may
+    # run it.
+    if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     environment: staging
@@ -64,7 +95,8 @@ jobs:
 
   deploy-app:
     needs: [check-changes, db-gate]
-    if: needs.check-changes.outputs.should_deploy == 'true'
+    # Guard: privileged workflow — only the canonical repo may run it.
+    if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
     uses: ./.github/workflows/stage-vercel-deployment.yml
     with:
       target_environment: staging
@@ -75,7 +107,8 @@ jobs:
 
   deploy-ai-gateway:
     needs: [check-changes, db-gate]
-    if: needs.check-changes.outputs.should_deploy == 'true'
+    # Guard: privileged workflow — only the canonical repo may run it.
+    if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
     uses: ./.github/workflows/stage-vercel-deployment.yml
     with:
       target_environment: staging
@@ -86,7 +119,9 @@ jobs:
 
   deploy-workers:
     needs: [check-changes, db-gate, deploy-app, deploy-ai-gateway]
-    if: needs.check-changes.outputs.should_deploy == 'true'
+    # Guard: this workflow_dispatch is reachable from a fork, and the reusable
+    # workflow inherits repo secrets. Only the canonical repo may run it.
+    if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
     uses: ./.github/workflows/deploy-workers.yml
     with:
       target_environment: staging
@@ -98,6 +133,7 @@ jobs:
     needs: [check-changes, db-gate, deploy-app, deploy-ai-gateway, deploy-workers]
     if: >-
       ${{
+        github.repository == 'Kilo-Org/cloud' &&
         !cancelled() &&
         needs.check-changes.outputs.should_deploy == 'true' &&
         needs.db-gate.result == 'success' &&

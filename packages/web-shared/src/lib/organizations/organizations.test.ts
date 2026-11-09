@@ -909,6 +909,46 @@ describe('Organizations', () => {
       });
       expect(updatedMember?.personal_account_disabled).toBe(false);
     });
+
+    test('does not add a user to a child organization without a live parent membership', async () => {
+      const owner = await insertTestUser();
+      const member = await insertTestUser();
+      const parent = await createOrganization('Parent Org', owner.id);
+      const child = await createOrganization('Child Org', owner.id);
+      await db
+        .update(organizations)
+        .set({ parent_organization_id: parent.id })
+        .where(eq(organizations.id, child.id));
+
+      const added = await addSsoUserToOrganization(child.id, member.id, { isNewUser: true });
+
+      expect(added).toBe(false);
+      expect(await isOrganizationMember(db, child.id, member.id)).toBe(false);
+      const updatedMember = await db.query.kilocode_users.findFirst({
+        where: eq(kilocode_users.id, member.id),
+      });
+      expect(updatedMember?.personal_account_disabled).toBe(false);
+    });
+
+    test('adds a live parent member to a child organization', async () => {
+      const owner = await insertTestUser();
+      const member = await insertTestUser();
+      const parent = await createOrganization('Parent Org', owner.id);
+      const child = await createOrganization('Child Org', owner.id);
+      await addUserToOrganization(parent.id, member.id, 'member');
+      await db
+        .update(organizations)
+        .set({ parent_organization_id: parent.id })
+        .where(eq(organizations.id, child.id));
+
+      const added = await addSsoUserToOrganization(child.id, member.id);
+
+      expect(added).toBe(true);
+      const memberOrgs = await getUserOrganizationsWithSeats(member.id);
+      expect(memberOrgs.map(org => org.organizationId).sort()).toEqual(
+        [parent.id, child.id].sort()
+      );
+    });
   });
 
   describe('updateUserRoleInOrganization', () => {

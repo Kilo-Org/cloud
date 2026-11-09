@@ -114,6 +114,11 @@ import {
   inferRowlessAuthProviders,
 } from '@/lib/user';
 import { blockUser } from '@/lib/user/block';
+import {
+  isRetryableRecoveryError,
+  resetAccountToMagicLink,
+  type MagicLinkRecoveryResult,
+} from '@/lib/user/account-recovery';
 import { getBlobContent } from '@/lib/r2/cli-sessions';
 import { getLowerDomainFromEmail, normalizeEmail } from '@kilocode/web-shared/lib/email-address';
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
@@ -140,7 +145,10 @@ import { recomputeUserBalances } from '@/lib/user/recompute-balances';
 import { getStripeInvoices } from '@/lib/stripe';
 import { client as stripeClient } from '@kilocode/web-shared/lib/stripe-client';
 import { resolveSsoAuthorityForDomain } from '@kilocode/web-shared/lib/organizations/organization-sso-policy';
-import { cancelAndRefundKiloPassForUser } from '@/lib/kilo-pass/cancel-and-refund';
+import {
+  cancelAndRefundKiloPassForUser,
+  type CancelAndRefundKiloPassResult,
+} from '@/lib/kilo-pass/cancel-and-refund';
 import { KILOCLAW_EARLYBIRD_EXPIRY_DATE } from '@/lib/kiloclaw/constants';
 import {
   CurrentPersonalSubscriptionResolutionError,
@@ -152,6 +160,7 @@ import {
 import { createKiloClawAdminAuditLog } from '@/lib/kiloclaw/admin-audit-log';
 import {
   recordAdminAction,
+  redactEmailAddressesInAuditText,
   userActionTarget,
   type AdminActionContext,
 } from '@/lib/admin/admin-action-audit';
@@ -503,7 +512,7 @@ const GetUserInvoicesSchema = z.object({
 
 const CancelAndRefundKiloPassSchema = z.object({
   userId: z.string(),
-  reason: z.string().min(1, 'Reason is required').trim(),
+  reason: z.string().trim().min(1, 'Reason is required').max(500),
 });
 
 const GetKiloClawStateSchema = z.object({
@@ -748,16 +757,44 @@ export const adminRouter = createTRPCRouter({
           }
         }
 
-        const removedProviders = await db
-          .delete(user_auth_provider)
-          .where(eq(user_auth_provider.kilo_user_id, input.userId))
-          .returning({ provider: user_auth_provider.provider });
+        let recovery: MagicLinkRecoveryResult | null;
+        try {
+          recovery = await resetAccountToMagicLink(input.userId);
+        } catch (error) {
+          // The reset runs in one transaction, so a failed revocation also
+          // keeps the provider rows: never report a recovery that left the
+          // prior holder signed in. A transient failure is a CONFLICT, which
+          // Sentry's `beforeSend` drops as a 4xx; any other failure stays a
+          // 500 and the tRPC Sentry middleware reports it once.
+          if (isRetryableRecoveryError(error)) {
+            throw new TRPCError({
+              code: 'CONFLICT',
+              message:
+                'Account recovery did not complete and the previous sessions were not revoked. Retry the reset.',
+              cause: error,
+            });
+          }
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message:
+              'Account recovery failed and the previous sessions were not revoked. Investigate the error before retrying.',
+            cause: error,
+          });
+        }
+        if (!recovery) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'User not found' });
+        }
 
         await recordAdminAction(ctx, {
           action: 'user.login.reset_to_magic_link',
           target: userActionTarget(input.userId),
-          message: 'Reset login to magic link (removed linked auth providers)',
-          metadata: { removedProviders: removedProviders.map(row => row.provider) },
+          message:
+            'Reset login to magic link (removed linked auth providers and passkeys, revoked browser, API and device sessions)',
+          metadata: {
+            removedProviders: recovery.removedProviders,
+            removedPasskeyCount: recovery.removedPasskeyCount,
+            revokedDeviceSessionCount: recovery.revokedDeviceSessionCount,
+          },
         });
 
         return successResult();
@@ -1826,7 +1863,7 @@ export const adminRouter = createTRPCRouter({
         return { success: true };
       }),
 
-    cancelAndRefundKiloPass: adminProcedure
+    cancelAndRefundKiloPass: superadminProcedure
       .input(CancelAndRefundKiloPassSchema)
       .mutation(async ({ input, ctx }) => {
         const userExists = await db.query.kilocode_users.findFirst({
@@ -1837,13 +1874,30 @@ export const adminRouter = createTRPCRouter({
           throw new TRPCError({ code: 'NOT_FOUND', message: 'User not found' });
         }
 
-        const result = await cancelAndRefundKiloPassForUser({
-          db,
-          stripe: stripeClient,
-          userId: input.userId,
-          reason: input.reason,
-          adminKiloUserId: ctx.user.id,
-        });
+        // The helper writes the reason to the target user records (block reason,
+        // admin note and credit transaction description); the audit row repeats it.
+        const reason = redactEmailAddressesInAuditText(input.reason);
+
+        let result: CancelAndRefundKiloPassResult;
+        try {
+          result = await cancelAndRefundKiloPassForUser({
+            db,
+            stripe: stripeClient,
+            userId: input.userId,
+            reason,
+            adminKiloUserId: ctx.user.id,
+          });
+        } catch (error) {
+          // The helper creates the Stripe refund before its local transaction, so
+          // a failure here can leave a refund with no other attribution.
+          await recordAdminAction(ctx, {
+            action: 'kilo_pass.cancel_refund',
+            target: userActionTarget(input.userId),
+            message: 'Kilo Pass cancel attempted with unknown outcome',
+            metadata: { reason },
+          });
+          throw error;
+        }
 
         if (result.status === 'skipped') {
           if (result.reason.kind === 'no_subscription') {
@@ -1864,6 +1918,24 @@ export const adminRouter = createTRPCRouter({
             message: 'Kilo Pass subscription is already canceled',
           });
         }
+
+        await recordAdminAction(ctx, {
+          action: 'kilo_pass.cancel_refund',
+          target: userActionTarget(input.userId),
+          // `cancelled_and_refunded` is reported whenever a refund was requested,
+          // even when no paid invoice or payment intent existed, so the wording
+          // keys off the amount Stripe actually refunded.
+          message:
+            result.refundedAmountCents != null
+              ? 'Cancelled Kilo Pass and refunded the latest payment'
+              : 'Cancelled Kilo Pass with no refundable payment',
+          metadata: {
+            refundedAmountCents: result.refundedAmountCents,
+            balanceResetAmountUsd: result.balanceResetAmountUsd,
+            alreadyBlocked: result.alreadyBlocked,
+            reason,
+          },
+        });
 
         return {
           success: true,

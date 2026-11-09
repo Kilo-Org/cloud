@@ -23,6 +23,16 @@ const state = vi.hoisted(() => ({
   status: 'opening' as 'opening' | 'idle' | 'working',
   messages: [] as { info: { id: string; role?: string } }[],
   asked: null as string | null,
+  askedFrom: null as string | null,
+  displaced: [] as {
+    id: string;
+    text: string;
+    images: { media: string; data: string }[];
+    model: string;
+    effort: 'low' | 'medium' | 'high' | null;
+    afterTurns: number;
+    outcome: 'failed' | 'stopped';
+  }[],
   failed: null as string | null,
   failureKey: null as string | null,
   retry: vi.fn(),
@@ -102,6 +112,8 @@ vi.mock('@/lib/chat/use-chat', () => ({
       answering: [],
       status: state.status,
       asked: state.asked,
+      askedFrom: state.askedFrom,
+      displaced: state.displaced,
       waiting: [],
       failed: state.failed,
       failureKey: state.failureKey,
@@ -116,6 +128,7 @@ vi.mock('@/lib/chat/use-chat', () => ({
 vi.mock('@/lib/chat/turns', () => ({
   asMessages: () => state.messages,
   askedMessageId: (sessionId: string) => `${sessionId}:asked`,
+  displacedMessageId: (sessionId: string, id: string) => `${sessionId}:displaced:${id}`,
 }));
 vi.mock('@/lib/organization-context', () => ({
   useOrganization: () => ({ organizationId: null }),
@@ -231,6 +244,8 @@ beforeEach(() => {
   state.status = 'opening';
   state.messages = [];
   state.asked = null;
+  state.askedFrom = null;
+  state.displaced = [];
   state.failed = null;
   state.failureKey = null;
   state.retry.mockClear();
@@ -668,9 +683,7 @@ describe('a retained chat failure', () => {
 
     /* The question is still on screen, so the failure belongs to the composer
        row above it rather than replacing the transcript. */
-    expect(messagesOf(tree)).toEqual([
-      'Not enough credits to send this message. Add credits and try again.',
-    ]);
+    expect(messagesOf(tree)).toEqual(['Not enough credits to send this message.']);
     expect(count(tree, 'EmptyState')).toBe(0);
     /* The question kept in the transcript carries the only Retry; the row adds
        the one action the message cannot offer. */
@@ -839,6 +852,135 @@ describe('message actions', () => {
       failed.onLongPressDetails?.(state.messages[1]);
     });
     expect(sheetOf(tree).deliveryState).toEqual(failed.deliveryState);
+  });
+
+  it('keeps a failed question below the one that took its place, with its recovery', async () => {
+    state.status = 'idle';
+    state.asked = 'second question';
+    state.failureKey = CREDITS_FAILURE_KEY;
+    state.displaced = [
+      {
+        id: 'k1',
+        text: 'the long question that failed',
+        images: [],
+        model: 'kilo/one',
+        effort: null,
+        afterTurns: 0,
+        outcome: 'failed',
+      },
+    ];
+    // In the order the registry draws them: the failure, then the question that
+    // took its place.
+    state.messages = [
+      { info: { id: 's1:displaced:k1', role: 'user' } },
+      { info: { id: 's1:asked', role: 'user' } },
+    ];
+    const tree = await mount();
+    const kept = bubbleFor(tree, 's1:displaced:k1');
+
+    // It keeps the footer and the recovery it had in the slot.
+    expect(kept.deliveryState).toEqual({ status: 'failed', error: '', reason: 'execution' });
+    expect(bubbleFor(tree, 's1:asked').deliveryState).toEqual(kept.deliveryState);
+
+    act(() => {
+      kept.onRetryMessage?.(state.messages[0]);
+    });
+    // Its own Retry asks that question, not the one in the slot.
+    expect(state.retry).toHaveBeenCalledWith(state.displaced[0]);
+
+    act(() => {
+      kept.onLongPressDetails?.(state.messages[0]);
+    });
+    expect(sheetOf(tree).deliveryState).toEqual(kept.deliveryState);
+  });
+
+  it('reads a kept question the person stopped as interrupted', async () => {
+    state.status = 'idle';
+    state.displaced = [
+      {
+        id: 'k1',
+        text: 'stopped question',
+        images: [],
+        model: 'kilo/one',
+        effort: null,
+        afterTurns: 0,
+        outcome: 'stopped',
+      },
+    ];
+    state.messages = [{ info: { id: 's1:displaced:k1', role: 'user' } }];
+    const tree = await mount();
+
+    expect(bubbleFor(tree, 's1:displaced:k1').deliveryState).toMatchObject({
+      reason: 'interrupted',
+    });
+  });
+
+  it('draws a question it was asked again at its own bubble, with the slot recovery', async () => {
+    state.status = 'idle';
+    state.asked = 'the long question that failed';
+    state.askedFrom = 'k1';
+    state.failureKey = CREDITS_FAILURE_KEY;
+    state.displaced = [
+      {
+        id: 'k1',
+        text: 'the long question that failed',
+        images: [],
+        model: 'm1',
+        effort: null,
+        afterTurns: 0,
+        outcome: 'failed',
+      },
+    ];
+    state.messages = [{ info: { id: 's1:displaced:k1', role: 'user' } }];
+    const tree = await mount();
+    const bubble = bubbleFor(tree, 's1:displaced:k1');
+
+    // One bubble for one question: the attempt is drawn where it was said.
+    expect(bubble.deliveryState).toEqual({ status: 'failed', error: '', reason: 'execution' });
+    act(() => {
+      bubble.onRetryMessage?.(state.messages[0]);
+    });
+    // Its Retry asks the slot's question again, not a kept copy of itself.
+    expect(state.retry).toHaveBeenCalledTimes(1);
+    expect(state.retry.mock.calls[0]).toEqual([]);
+  });
+
+  it('falls back to its own bubble when the record the slot names is gone', async () => {
+    state.status = 'idle';
+    state.asked = 'a question whose kept record is no longer here';
+    state.askedFrom = 'gone';
+    state.failureKey = CREDITS_FAILURE_KEY;
+    state.displaced = [];
+    state.messages = [{ info: { id: 's1:asked', role: 'user' } }];
+    const tree = await mount();
+    const bubble = bubbleFor(tree, 's1:asked');
+
+    // The transcript drew the slot's own bubble, so the recovery is on it.
+    expect(bubble.deliveryState).toEqual({ status: 'failed', error: '', reason: 'execution' });
+    expect(bubble.onRetryMessage).toBeDefined();
+  });
+
+  it('shows no recovery under a question asked again while it is being asked', async () => {
+    state.status = 'working';
+    state.asked = 'the long question that failed';
+    state.askedFrom = 'k1';
+    state.displaced = [
+      {
+        id: 'k1',
+        text: 'the long question that failed',
+        images: [],
+        model: 'm1',
+        effort: null,
+        afterTurns: 0,
+        outcome: 'failed',
+      },
+    ];
+    state.messages = [{ info: { id: 's1:displaced:k1', role: 'user' } }];
+    const tree = await mount();
+    const bubble = bubbleFor(tree, 's1:displaced:k1');
+
+    expect(bubble.deliveryState).toBeUndefined();
+    expect(bubble.onRetryMessage).toBeUndefined();
   });
 
   it('reads a question with no failure as stopped, with no row under the transcript', async () => {

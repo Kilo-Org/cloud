@@ -286,12 +286,15 @@ test('registers user data export with worktree-aware ports and dependencies', ()
   assert.equal(service.dir, 'services/user-data-export');
   assert.equal(service.port, 8818 + portOffset);
   assert.deepEqual(service.dependsOn, ['postgres', 'nextjs']);
+  // `cloudflare-scim-sync` now resolves after `nextjs` rather than before the
+  // core workers: it applies directory events by calling the app's internal
+  // SCIM endpoints, so it declares `postgres` and `nextjs` and the topological
+  // order places it accordingly.
   assert.deepEqual(resolveTargets(['data-export']), [
     'local-kms',
     'postgres',
     'redis',
     'stripe',
-    'cloudflare-scim-sync',
     'byok-kms',
     'cloudflare-git-token-service',
     'cloudflare-session-ingest',
@@ -299,6 +302,7 @@ test('registers user data export with worktree-aware ports and dependencies', ()
     'ai-gateway',
     'nextjs',
     'user-data-export',
+    'cloudflare-scim-sync',
   ]);
 });
 

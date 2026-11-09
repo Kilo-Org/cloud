@@ -40,6 +40,7 @@ import {
   deleteDirectorySubOrganization,
   DirectorySyncConflictError,
   removeDirectoryMembership,
+  revokeAllDirectoryMemberships,
   upsertDirectoryOrganization,
   upsertDirectorySubOrganization,
   upsertDirectoryUser,
@@ -1215,6 +1216,248 @@ describe('directory membership', () => {
       .from(kilocode_users)
       .where(eq(kilocode_users.external_id, absentExternalId));
     expect(users).toEqual([]);
+  });
+});
+
+describe('revokeAllDirectoryMemberships', () => {
+  test('a user in two sibling groups loses both and the parent', async () => {
+    const parentId = await seedOrganization();
+    const childId = await seedSubOrganization();
+    const userId = await seedUser();
+
+    const siblingGroupId = `directory_group_sibling_${suffix}`;
+    const sibling = await upsertDirectorySubOrganization(siblingGroupId, {
+      directoryId,
+      directoryIdpId: `idp_group_sibling_${suffix}`,
+      name: `on-call-${suffix}`,
+    });
+    trackOrganization(sibling.id);
+
+    await addDirectoryMembership({ directoryGroupId, externalId });
+    await addDirectoryMembership({ directoryGroupId: siblingGroupId, externalId });
+
+    const result = await revokeAllDirectoryMemberships(externalId, { directoryId });
+
+    expect(result.kiloUserId).toBe(userId);
+    expect(result.revokedOrganizationIds.toSorted()).toEqual(
+      [parentId, childId, sibling.id].toSorted()
+    );
+
+    const remaining = await db
+      .select({ organizationId: organization_memberships.organization_id })
+      .from(organization_memberships)
+      .where(eq(organization_memberships.kilo_user_id, userId));
+    expect(remaining).toEqual([]);
+
+    // Every removal goes through the ordinary removal primitive, so each one
+    // leaves the tombstone that stops an SSO sign-in restoring it.
+    const tombstones = await db
+      .select({ organizationId: organization_membership_removals.organization_id })
+      .from(organization_membership_removals)
+      .where(eq(organization_membership_removals.kilo_user_id, userId));
+    expect(tombstones.map(row => row.organizationId).toSorted()).toEqual(
+      [parentId, childId, sibling.id].toSorted()
+    );
+
+    // Memberships only: the account is never deleted or anonymized.
+    const [user] = await db.select().from(kilocode_users).where(eq(kilocode_users.id, userId));
+    expect(user.external_id).toBe(externalId);
+    expect(user.google_user_email).toBe(email);
+  });
+
+  test('a user holding only the parent membership of a directory organization loses it', async () => {
+    const parentId = await seedOrganization();
+    await seedSubOrganization();
+    const userId = await seedUser();
+    await addDirectoryMembership({ directoryGroupId, externalId });
+
+    // The group went first — a disbanded group, or a `dsync.group.deleted` that
+    // arrived before the user's deletion. The user now holds no live group
+    // membership at all, only the enterprise one, so the parents of the groups
+    // being left are an empty set and the directory organization itself is the
+    // only candidate. Missing it would leave a deleted directory user inside
+    // the enterprise organization.
+    await deleteDirectorySubOrganization(directoryGroupId);
+
+    const result = await revokeAllDirectoryMemberships(externalId, { directoryId });
+
+    expect(result).toEqual({ kiloUserId: userId, revokedOrganizationIds: [parentId] });
+
+    // The soft-deleted group keeps its membership row, which is not this
+    // function's to clean up; what matters is that no live organization does.
+    const remaining = await db
+      .select({ organizationId: organization_memberships.organization_id })
+      .from(organization_memberships)
+      .innerJoin(organizations, eq(organizations.id, organization_memberships.organization_id))
+      .where(
+        and(eq(organization_memberships.kilo_user_id, userId), isNull(organizations.deleted_at))
+      );
+    expect(remaining).toEqual([]);
+  });
+
+  test('an unknown directory user converges with an empty list', async () => {
+    await seedOrganization();
+    await seedSubOrganization();
+    const absentExternalId = `directory_user_absent_${suffix}`;
+
+    // Nothing to revoke is the state the event asserts, so this must not
+    // conflict and must not provision the departing user.
+    const result = await revokeAllDirectoryMemberships(absentExternalId, { directoryId });
+
+    expect(result).toEqual({ kiloUserId: null, revokedOrganizationIds: [] });
+
+    const users = await db
+      .select({ id: kilocode_users.id })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.external_id, absentExternalId));
+    expect(users).toEqual([]);
+  });
+
+  test('a replay reports an empty list', async () => {
+    await seedOrganization();
+    await seedSubOrganization();
+    const userId = await seedUser();
+    await addDirectoryMembership({ directoryGroupId, externalId });
+
+    const first = await revokeAllDirectoryMemberships(externalId, { directoryId });
+    const replay = await revokeAllDirectoryMemberships(externalId, { directoryId });
+
+    expect(first.revokedOrganizationIds.length).toBe(2);
+    expect(replay).toEqual({ kiloUserId: userId, revokedOrganizationIds: [] });
+  });
+
+  test('a membership in a sub-organization with no directory group binding is left alone', async () => {
+    const parentId = await seedOrganization();
+    const childId = await seedSubOrganization();
+    const userId = await seedUser();
+    await addDirectoryMembership({ directoryGroupId, externalId });
+
+    // The customer created this one, so it is not the directory's to revoke.
+    const manual = await createChildOrganization(`manual-${suffix}`, parentId);
+    trackOrganization(manual.id);
+    await addUserToOrganization(manual.id, userId, 'member');
+
+    const result = await revokeAllDirectoryMemberships(externalId, { directoryId });
+
+    expect(result.revokedOrganizationIds.toSorted()).toEqual([parentId, childId].toSorted());
+
+    const remaining = await db
+      .select({ organizationId: organization_memberships.organization_id })
+      .from(organization_memberships)
+      .where(eq(organization_memberships.kilo_user_id, userId));
+    expect(remaining.map(row => row.organizationId)).toEqual([manual.id]);
+  });
+
+  test('a membership under another directory survives, tombstone-free', async () => {
+    const parentId = await seedOrganization();
+    const childId = await seedSubOrganization();
+    const userId = await seedUser();
+    await addDirectoryMembership({ directoryGroupId, externalId });
+
+    // A second enterprise, with its own directory and its own group. Nothing
+    // stops the account from holding a membership here: the administrator-add,
+    // seat-assignment, and invitation-acceptance paths all write a membership
+    // without consulting `directory_id`, so `addUserToOrganization` is how such
+    // a row really appears.
+    const otherDirectoryId = `directory_other_${suffix}`;
+    const otherParent = await upsertDirectoryOrganization(otherDirectoryId, {
+      workOSOrganizationId: `org_other_${suffix}`,
+      name: `Other Org ${suffix}`,
+    });
+    trackOrganization(otherParent.id);
+    const otherGroup = await upsertDirectorySubOrganization(`directory_group_other_${suffix}`, {
+      directoryId: otherDirectoryId,
+      directoryIdpId: `idp_group_other_${suffix}`,
+      name: `other-users-${suffix}`,
+    });
+    trackOrganization(otherGroup.id);
+    await addUserToOrganization(otherParent.id, userId, 'member');
+    await addUserToOrganization(otherGroup.id, userId, 'member');
+
+    const result = await revokeAllDirectoryMemberships(externalId, { directoryId });
+
+    // Only the emitting directory's organizations.
+    expect(result.revokedOrganizationIds.toSorted()).toEqual([parentId, childId].toSorted());
+
+    const remaining = await db
+      .select({ organizationId: organization_memberships.organization_id })
+      .from(organization_memberships)
+      .where(eq(organization_memberships.kilo_user_id, userId));
+    expect(remaining.map(row => row.organizationId).toSorted()).toEqual(
+      [otherParent.id, otherGroup.id].toSorted()
+    );
+
+    // The irrecoverable half: `removeUserFromOrganization` writes a removal
+    // tombstone, and under Membership Admission rule 4 a tombstone blocks
+    // ordinary SSO JIT provisioning from restoring the membership. A stray
+    // tombstone here would fence the user out of the other tenant, not merely
+    // delete a row an administrator could re-add.
+    const tombstones = await db
+      .select({ organizationId: organization_membership_removals.organization_id })
+      .from(organization_membership_removals)
+      .where(
+        and(
+          eq(organization_membership_removals.kilo_user_id, userId),
+          inArray(organization_membership_removals.organization_id, [otherParent.id, otherGroup.id])
+        )
+      );
+    expect(tombstones).toEqual([]);
+  });
+
+  test('a user in many groups is revoked in one transaction', async () => {
+    const parentId = await seedOrganization();
+    const firstChildId = await seedSubOrganization();
+    const userId = await seedUser();
+    await addDirectoryMembership({ directoryGroupId, externalId });
+
+    // Enough groups that a transaction and a session-invalidation round trip
+    // apiece would not fit the Worker's 15s request budget. One call must
+    // finish the revocation: a partial one that reported success would leave
+    // the departed user holding seats the next event never revisits.
+    const groupIds = [firstChildId];
+    for (let index = 0; index < 11; index += 1) {
+      const groupKey = `directory_group_${index}_${suffix}`;
+      const group = await upsertDirectorySubOrganization(groupKey, {
+        directoryId,
+        directoryIdpId: `idp_group_${index}_${suffix}`,
+        name: `team-${index}-${suffix}`,
+      });
+      trackOrganization(group.id);
+      groupIds.push(group.id);
+      await addDirectoryMembership({ directoryGroupId: groupKey, externalId });
+    }
+
+    // The row counts alone do not distinguish this from the per-group
+    // implementation that preceded it — the same memberships end up deleted
+    // either way. What changed is *how*: one transaction for every deletion,
+    // with the outbound session-invalidation calls outside it. That is what
+    // keeps a user in many groups inside the Worker's 15s budget, so it is
+    // what this asserts.
+    //
+    // `invalidateMemberSessionAccess` is not spied on: it is an ES module
+    // export, so `jest.spyOn` cannot redefine it. The transaction count is
+    // the observable that separates the two implementations — the previous
+    // one opened one per group, and each of those also awaited its own
+    // invalidation inside `removeUserFromOrganization`.
+    const transactionSpy = jest.spyOn(db, 'transaction');
+
+    const result = await revokeAllDirectoryMemberships(externalId, { directoryId });
+
+    expect(result.revokedOrganizationIds.toSorted()).toEqual([parentId, ...groupIds].toSorted());
+
+    const remaining = await db
+      .select({ organizationId: organization_memberships.organization_id })
+      .from(organization_memberships)
+      .where(eq(organization_memberships.kilo_user_id, userId));
+    expect(remaining).toEqual([]);
+
+    // One transaction for all 13 revocations, not one apiece. The per-group
+    // implementation opened 13, each awaiting its own session-invalidation
+    // round trip inside `removeUserFromOrganization`, which is what could
+    // exceed the Worker's request budget.
+    expect(transactionSpy).toHaveBeenCalledTimes(1);
+
+    transactionSpy.mockRestore();
   });
 });
 

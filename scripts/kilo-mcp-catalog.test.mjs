@@ -140,17 +140,37 @@ function assertKiloCliSteps(job, gate, jobName) {
     step => step.run === kiloVersionCommand,
     'resolves the Kilo CLI version it installs'
   );
-  assert.equal(resolve.id, 'kilo_cli_version', `${jobName}: the resolved version feeds the cache key`);
-  assert.equal(resolve.if, gate, `${jobName}: version resolution is gated on catalog-relevant changes`);
+  assert.equal(
+    resolve.id,
+    'kilo_cli_version',
+    `${jobName}: the resolved version feeds the cache key`
+  );
+  assert.equal(
+    resolve.if,
+    gate,
+    `${jobName}: version resolution is gated on catalog-relevant changes`
+  );
 
   const restore = findStep(
     job,
     step => step.uses === 'actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7',
     'restores the cached Kilo CLI tree'
   );
-  assert.equal(restore.id, 'kilo_cli_cache', `${jobName}: the restore exposes its hit to the install`);
-  assert.equal(restore.if, gate, `${jobName}: the cache restore is gated on catalog-relevant changes`);
-  assert.equal(restore['continue-on-error'], true, `${jobName}: a cache failure must never fail the job`);
+  assert.equal(
+    restore.id,
+    'kilo_cli_cache',
+    `${jobName}: the restore exposes its hit to the install`
+  );
+  assert.equal(
+    restore.if,
+    gate,
+    `${jobName}: the cache restore is gated on catalog-relevant changes`
+  );
+  assert.equal(
+    restore['continue-on-error'],
+    true,
+    `${jobName}: a cache failure must never fail the job`
+  );
   assert.equal(restore.with?.path, kiloCachePath, `${jobName}: the cache holds the install prefix`);
   assert.equal(
     restore.with?.key,
@@ -683,9 +703,7 @@ for (const [name, defect] of [
   [
     'Kilo CLI cache removed from the merge job',
     workflow =>
-      dropStep(workflow, mergeJobName, step =>
-        (step.uses ?? '').startsWith('actions/cache@')
-      ),
+      dropStep(workflow, mergeJobName, step => (step.uses ?? '').startsWith('actions/cache@')),
   ],
   [
     'Kilo CLI cache key without the resolved version',
@@ -709,9 +727,7 @@ for (const [name, defect] of [
     'Kilo CLI cache restored before the version is resolved',
     workflow => {
       const steps = workflow.jobs[prJobName].steps;
-      const restoreIndex = steps.findIndex(item =>
-        (item.uses ?? '').startsWith('actions/cache@')
-      );
+      const restoreIndex = steps.findIndex(item => (item.uses ?? '').startsWith('actions/cache@'));
       const [restore] = steps.splice(restoreIndex, 1);
       steps.unshift(restore);
     },

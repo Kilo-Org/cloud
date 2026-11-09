@@ -19,7 +19,7 @@ import {
 import type { SeedResult } from '../index';
 import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
 import { parseSessionIngestServiceStatus } from '../lib/mobile-sheet-fixtures';
-import { seedTokenSigningParams } from './api-token';
+import { seedTokenSigningParams } from '../lib/token-signing';
 
 export const usage = '<email> [seconds] [sessionIngestPort]';
 

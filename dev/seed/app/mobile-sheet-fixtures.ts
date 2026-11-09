@@ -34,7 +34,7 @@ import {
   UNSUPPORTED_SESSION_TITLE,
   type SessionIngestItem,
 } from '../lib/mobile-sheet-fixtures';
-import { seedTokenSigningParams } from './api-token';
+import { seedTokenSigningParams } from '../lib/token-signing';
 
 export const usage = '<email> [options]';
 

@@ -4,6 +4,7 @@ import { eq, or } from 'drizzle-orm';
 
 import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
 import { normalizeSeedEmail } from '../lib/email';
+import { seedTokenSigningParams } from '../lib/token-signing';
 import { isValidEmail } from '../lib/users';
 import type { SeedResult } from '../index';
 
@@ -20,21 +21,6 @@ export const usage = '<email> [options]';
 // prepareSession probe.
 export const DEFAULT_EXPIRES_DAYS = 1825;
 const SECONDS_PER_DAY = 24 * 60 * 60;
-
-const SEED_TOKEN_ENV = 'development';
-
-/**
- * Signing parameters for a dev seed token with a caller-chosen lifetime.
- */
-export function seedTokenSigningParams(expiresInSeconds: number): {
-  expiresInSeconds: number;
-  env: string;
-} {
-  return {
-    expiresInSeconds,
-    env: SEED_TOKEN_ENV,
-  };
-}
 
 /**
  * The exact signing shape `generateApiToken()` mints in production, as the

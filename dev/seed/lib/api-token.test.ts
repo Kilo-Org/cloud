@@ -9,11 +9,8 @@ import {
   verifyKiloTokenForPolicy,
 } from '@kilocode/worker-utils';
 
-import {
-  apiTokenSigningParams,
-  DEFAULT_EXPIRES_DAYS,
-  seedTokenSigningParams,
-} from '../app/api-token';
+import { apiTokenSigningParams, DEFAULT_EXPIRES_DAYS } from '../app/api-token';
+import { seedTokenSigningParams } from './token-signing';
 
 const TEST_SECRET = 'api-token-shape-test-secret';
 

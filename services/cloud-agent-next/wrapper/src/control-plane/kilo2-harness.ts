@@ -217,22 +217,21 @@ export function createKilo2Harness(options: {
     async submit(input) {
       await select(input);
       await options.lifecycle.waitForInterrupt(input.sessionId, input.signal);
+      if (input.context !== undefined)
+        await api.request(
+          `/api/experimental/session/${encodeURIComponent(input.sessionId)}/instructions/entries/cloud-agent-context`,
+          { method: 'PUT', body: { value: input.context }, signal: input.signal }
+        );
       await post(
         `${kilo2SessionPath(input.sessionId)}/prompt`,
         {
           id: input.messageId,
-          // v2 has no synthetic prompt part, so server context leads the prompt text.
-          text: [
-            input.context,
-            input.parts
-              ? input.parts
-                  .filter(part => part.type === 'text')
-                  .map(part => part.text)
-                  .join('\n')
-              : (input.prompt ?? ''),
-          ]
-            .filter(text => text !== undefined)
-            .join('\n\n'),
+          text: input.parts
+            ? input.parts
+                .filter(part => part.type === 'text')
+                .map(part => part.text)
+                .join('\n')
+            : (input.prompt ?? ''),
           files: input.parts
             ?.filter(part => part.type === 'file')
             .map(part => ({ uri: part.url, name: part.filename })),

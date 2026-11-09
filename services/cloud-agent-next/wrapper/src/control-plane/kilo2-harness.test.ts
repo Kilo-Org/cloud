@@ -74,19 +74,94 @@ describe('Kilo v2 harness MCP refresh', () => {
     ]);
   });
 
-  it('leads the native prompt text with server context', async () => {
+  it('stores server context as a session instruction without changing user messages', async () => {
     const { url, requests } = startStub(() => new Response(null, { status: 204 }));
     const sessionId = `ses_${'a'.repeat(26)}`;
-    await createHarness(url).submit({
+    const harness = createHarness(url);
+    const context = '<cloud-agent-context session-id="workspace_1" />';
+    await harness.submit({
       sessionId,
       directory,
       messageId: `msg_${'b'.repeat(26)}`,
       prompt: 'Summarize the change',
-      context: '<cloud-agent-context session-id="workspace_1" />',
+      context,
     });
-    expect(requests.at(-1)?.body).toMatchObject({
-      text: '<cloud-agent-context session-id="workspace_1" />\n\nSummarize the change',
+    await harness.submit({
+      sessionId,
+      directory,
+      messageId: `msg_${'c'.repeat(26)}`,
+      parts: [
+        { type: 'text', text: 'Explain this image' },
+        {
+          type: 'file',
+          url: 'https://example.com/image.png',
+          mime: 'image/png',
+          filename: 'image.png',
+        },
+        { type: 'text', text: 'Keep it brief' },
+      ],
+      context,
     });
+    expect(requests.map(request => [request.method, request.pathname, request.body])).toEqual([
+      [
+        'PUT',
+        `/api/experimental/session/${sessionId}/instructions/entries/cloud-agent-context`,
+        { value: context },
+      ],
+      [
+        'POST',
+        `/api/session/${sessionId}/prompt`,
+        {
+          id: `msg_${'b'.repeat(26)}`,
+          text: 'Summarize the change',
+          delivery: 'steer',
+        },
+      ],
+      [
+        'PUT',
+        `/api/experimental/session/${sessionId}/instructions/entries/cloud-agent-context`,
+        { value: context },
+      ],
+      [
+        'POST',
+        `/api/session/${sessionId}/prompt`,
+        {
+          id: `msg_${'c'.repeat(26)}`,
+          text: 'Explain this image\nKeep it brief',
+          files: [{ uri: 'https://example.com/image.png', name: 'image.png' }],
+          delivery: 'steer',
+        },
+      ],
+    ]);
+  });
+
+  it('submits prompts without server context without adding an instruction', async () => {
+    const { url, requests } = startStub(() => new Response(null, { status: 204 }));
+    await createHarness(url).submit({
+      sessionId: 'ses_no_context',
+      directory,
+      messageId: 'msg_no_context',
+      prompt: 'Hello',
+    });
+    expect(requests).toHaveLength(1);
+    expect(requests[0]?.body).toEqual({ id: 'msg_no_context', text: 'Hello', delivery: 'steer' });
+  });
+
+  it('does not submit a prompt if its server context could not be installed', async () => {
+    const { url, requests } = startStub(() => new Response(null, { status: 503 }));
+    const error: unknown = await createHarness(url)
+      .submit({
+        sessionId: 'ses_context_failure',
+        directory,
+        messageId: 'msg_context_failure',
+        prompt: 'Hello',
+        context: 'Callback routing context',
+      })
+      .catch(cause => cause);
+    expect(error).toBeInstanceOf(Error);
+    expect(String(error)).toContain('HTTP 503');
+    expect(requests).toHaveLength(1);
+    expect(requests[0]?.method).toBe('PUT');
   });
 
   it('replaces the running CLI MCP connection through the native runtime route', async () => {

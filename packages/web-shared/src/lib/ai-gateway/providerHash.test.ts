@@ -1,9 +1,11 @@
+import crypto from 'crypto';
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
 import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import {
   applyTrackingIds,
   generateOpenRouterDownstreamSafetyIdentifier,
+  generateOpenRouterUpstreamSafetyIdentifier,
   generateProviderSpecificHash,
   generateProviderSpecificSessionHash,
   generateVercelDownstreamSafetyIdentifier,
@@ -160,6 +162,40 @@ describe('downstream safety identifiers', () => {
   it('keeps OpenRouter and Vercel identifiers distinct', () => {
     expect(generateOpenRouterDownstreamSafetyIdentifier(testUserId)).not.toBe(
       generateVercelDownstreamSafetyIdentifier(testUserId)
+    );
+  });
+});
+
+describe('generateOpenRouterUpstreamSafetyIdentifier', () => {
+  const userId = 'synthetic-upstream-user';
+  const orgId = 'synthetic-upstream-org';
+
+  beforeEach(() => {
+    jest.replaceProperty(process, 'env', { ...process.env, OPENROUTER_ORG_ID: orgId });
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('hashes the organization ID and duplicated downstream user hash with only one hyphen', () => {
+    const userHash = generateOpenRouterDownstreamSafetyIdentifier(userId);
+    const expected = crypto
+      .createHash('sha256')
+      .update(orgId + '-' + userHash + userHash)
+      .digest('hex');
+
+    expect(generateOpenRouterUpstreamSafetyIdentifier(userId)).toBe(expected);
+  });
+
+  it.each([undefined, ''])('logs an error and returns null when OPENROUTER_ORG_ID is %p', value => {
+    jest.replaceProperty(process, 'env', { ...process.env, OPENROUTER_ORG_ID: value });
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    expect(generateOpenRouterUpstreamSafetyIdentifier(userId)).toBeNull();
+    expect(consoleError).toHaveBeenCalledTimes(1);
+    expect(consoleError).toHaveBeenCalledWith(
+      '[generateOpenRouterUpstreamSafetyIdentifier] OPENROUTER_ORG_ID is not set, please run vercel env pull'
     );
   });
 });

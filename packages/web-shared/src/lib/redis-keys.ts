@@ -39,6 +39,13 @@ export const codingPlanUsageRedisKey = (input: {
 /** `digest` is a hex SHA-256 over the envelope and its KMS context; see `data-key-cache.ts`. */
 export const byokDataKeyRedisKey = (digest: string) => redisKey(`byok-data-key:v1:${digest}`);
 
+export const SAFETY_IDENTIFIER_BACKFILL_STATE_KEY = redisKey(
+  'safety-identifiers:regeneration:v1:state'
+);
+export const SAFETY_IDENTIFIER_BACKFILL_LOCK_KEY = redisKey(
+  'safety-identifiers:regeneration:v1:lock'
+);
+
 export const LEADERBOARD_MODEL_PROVIDER_USAGE_REDIS_KEY = redisKey(
   'public-api:leaderboard-model-provider-usage'
 );

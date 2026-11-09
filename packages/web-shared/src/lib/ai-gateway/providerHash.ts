@@ -43,9 +43,10 @@ export function generateOpenRouterUpstreamSafetyIdentifier(userId: string): stri
     );
     return null;
   }
+  const userHash = generateOpenRouterDownstreamSafetyIdentifier(userId);
   return crypto
     .createHash('sha256')
-    .update(orgId + '-' + generateOpenRouterDownstreamSafetyIdentifier(userId))
+    .update(orgId + '-' + userHash + userHash)
     .digest('hex');
 }
 

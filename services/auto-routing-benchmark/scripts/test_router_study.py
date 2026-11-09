@@ -1080,8 +1080,11 @@ class PreAdmission(unittest.TestCase):
             self.assertIsNone(budget.claim(row, manifest, cfg))
             with sqlite3.connect(ledger) as db:
                 attempt_key = db.execute("SELECT attempt_key FROM campaign_admissions WHERE run='first'").fetchone()[0]
-            expected_fingerprint = router_study.router_fingerprint("efficient", [["x/y", "variant=low"]])
-            self.assertEqual(attempt_key, router_study.digest(["task", "efficient", "tuning", 0, expected_fingerprint]))
+            self.assertEqual(attempt_key, router_study.digest(["task", "efficient", "tuning", 0, router_study.router_fingerprint("efficient")]))
+            refrozen = {**manifest, "out_root": str(root / "two"), "approval": {**manifest["approval"], "mode_pools": {"efficient": [["z/w", "variant=high"]]}}}
+            with sqlite3.connect(ledger) as db:
+                router_study.CAMPAIGN.register(db, refrozen, [{"executableSha256": "bundle", "config": {}}])
+            self.assertEqual(budget.claim({**row, "run": "again"}, refrozen, cfg), "never_retry_content_attempt")
             self.assertIsNone(budget.claim({**row, "run": "tail", "instance_id": "tail-task"}, manifest, cfg))
             with sqlite3.connect(ledger) as db:
                 self.assertEqual(dict(db.execute("SELECT run,maximum_usd FROM campaign_admissions")), {"first": "100", "tail": "100"})

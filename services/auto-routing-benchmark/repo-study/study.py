@@ -216,11 +216,6 @@ def scope_digest(out, cfg=None):
     return digest(manifest) if manifest else None
 
 
-def next_execution_row(out, plan, cfg=None):
-    active = {candidate["label"] for candidate in active_candidates(out, cfg)}
-    return next((row for row in plan["runs"] if row["candidate"] in active and not (Path(out) / "rollouts" / f"{row['instance_id']}--{row['candidate']}--{row['repetition']}" / "result.json").exists()), None)
-
-
 def exclude_candidate(out, approval_path):
     cfg = config()
     authorization = load(approval_path)
@@ -1061,64 +1056,6 @@ def evidence_manifest(out):
     for directory in ["images", "fixtures", "image-audits", "runtime-preflight"]:
         paths.extend(sorted((out / directory).glob("*.json")))
     return {str(path.relative_to(out)): hashlib.sha256(path.read_bytes()).hexdigest() for path in paths}
-
-
-def solve(out, task_id, candidate_label, repetition, approval_path):
-    panel, _ = check_panel(out)
-    pricing = load(out / "pricing.json")
-    approval = load(approval_path)
-    plan = execution_plan(out)
-    if approval.get("authorized") is not True or approval.get("panel_sha256") != digest(panel) or approval.get("pricing_sha256") != digest(pricing) or approval.get("execution_plan_sha256") != digest(plan):
-        raise RuntimeError("Missing parent clearance for exact frozen panel, run plan and direct pricing")
-    if approval.get("code_sha256") != hashlib.sha256(Path(__file__).read_bytes()).hexdigest():
-        raise RuntimeError("Parent clearance is not bound to this exact driver source")
-    exclusion = candidate_exclusion(out, required=True)
-    if approval.get("exclusion_manifest_sha256") != digest(exclusion):
-        raise RuntimeError("Paid phase approval does not bind the authorized candidate exclusion")
-    active = {candidate["label"] for candidate in active_candidates(out)}
-    if candidate_label not in active:
-        raise RuntimeError("Candidate is prospectively excluded by the user's authorization")
-    if approval.get("evidence_sha256") != digest(evidence_manifest(out)):
-        raise RuntimeError("Parent clearance is not bound to the exact images, fixtures, audits and runtime proof")
-    if time.time() - pricing["fetched_at"] > 86400:
-        raise RuntimeError("Pricing snapshot older than one day; refresh and obtain new parent clearance")
-    require_gateway_credentials(config())
-    initialize_ledger(out / "budget.sqlite")
-    with sqlite3.connect(out / "budget.sqlite") as db:
-        if accounting_enabled(db):
-            authorization_hash = db.execute("SELECT value FROM metadata WHERE key='unknown_accounting_authorization_sha256'").fetchone()[0]
-            if approval.get("accounting_authorization_sha256") != authorization_hash:
-                raise RuntimeError("Paid phase approval does not bind the authorized unknown-hold policy")
-    task = next(row for row in panel["tasks"] if row["instance_id"] == task_id)
-    for row in panel["tasks"]:
-        if not load(out / "fixtures" / f"{row['instance_id']}.json")["eligible"]:
-            raise RuntimeError("All frozen panel fixtures must baseline-fail and gold-pass before inference")
-        audit = load(out / "image-audits" / f"{row['instance_id']}.json")
-        if audit["forbidden_hits"] or audit["image_id"] != load(out / "images" / f"{row['instance_id']}.json")["id"]:
-            raise RuntimeError("All pinned images require a clean host-only leakage audit")
-        runtime = load(out / "runtime-preflight" / f"{row['instance_id']}.json")
-        if not runtime["valid"] or runtime["image_id"] != audit["image_id"]:
-            raise RuntimeError("All sanitized solver snapshots require a working import and public test")
-    if repetition not in range(2 if task["split"] == "discovery" else 1):
-        raise RuntimeError("Repetition outside preregistered protocol")
-    if task["split"] != "discovery" and approval.get(f"release_{task['split']}") is not True:
-        raise RuntimeError("Validation/holdout require explicit staged release after discovery selection freeze")
-    if task["split"] != "discovery":
-        rule_key = "discovery_rule_sha256" if task["split"] == "validation" else "holdout_rule_sha256"
-        rule_hash = approval.get(rule_key, "")
-        if len(rule_hash) != 64 or any(char not in "0123456789abcdef" for char in rule_hash):
-            raise RuntimeError("Phase release requires a previously frozen decision-rule digest")
-        rule_file = out / ("discovery-rule.json" if task["split"] == "validation" else "holdout-rule.json")
-        if digest(load(rule_file)) != rule_hash:
-            raise RuntimeError("Phase decision-rule artifact does not match parent clearance")
-        if load(rule_file).get("exclusion_manifest_sha256") != digest(exclusion):
-            raise RuntimeError("Frozen phase rule does not match the authorized candidate scope")
-    candidate = next(row for row in pricing["models"] if row["label"] == candidate_label)
-    run = f"{task_id}--{candidate_label}--{repetition}"
-    next_row = next_execution_row(out, plan)
-    if next_row is None or (next_row["instance_id"], next_row["candidate"], next_row["repetition"]) != (task_id, candidate_label, repetition):
-        raise RuntimeError("Only the next row of the frozen phase-ordered execution plan may run")
-    return rollout(out, task, candidate, repetition, approval, run)
 
 
 def rollout(out, task, candidate, repetition, approval, run, *, cfg=None, ledger_out=None, metadata_extra=None):

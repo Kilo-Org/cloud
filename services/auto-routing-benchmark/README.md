@@ -659,8 +659,9 @@ Old version 5 manifests are audit-only.
    lower. The pilot checks execution, grading, and receipts only. It cannot
    certify either objective. No final request may run before exact successful
    pilot evidence exists. The live worker picks its classifier from live
-   config, so the pilot must also confirm the billed classifier model and
-   cost from the organization's recorded usage before final dispatch.
+   config. The code does not check the billed classifier. Before approving
+   final dispatch, the operator must confirm the billed classifier model and
+   cost from the organization's recorded usage on the read replica.
 5. **Component tariffs.** Reserve at the dearest public provider price.
    Take per-component maxima over the Kilo catalog pricing and every public
    OpenRouter endpoint price for the model, including every override tier,

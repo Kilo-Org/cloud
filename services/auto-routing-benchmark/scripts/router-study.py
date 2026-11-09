@@ -198,9 +198,9 @@ def classifier_model(snapshot):
     return DEFAULT_CLASSIFIER_MODEL
 
 
-def router_fingerprint(mode, pool):
-    """Live router arm attempt identity: gateway model plus the frozen mode pool."""
-    return digest({"arm": "router", "gateway_model": GATEWAY_MODELS[mode], "pool": [list(pair) for pair in sorted(tuple(pair) for pair in pool)]})
+def router_fingerprint(mode):
+    """Live router arm attempt identity. The live gateway model is the arm; a re-frozen pool never makes it a new attempt."""
+    return digest({"arm": "router", "gateway_model": GATEWAY_MODELS[mode]})
 
 
 def snapshot_contract(snapshot):
@@ -442,7 +442,7 @@ def freeze_inputs(panel_out, kind, directory, spec, modules):
     catalog_coverage(catalog, pairs)
     plan = make_plan(spec, tasks)
     execution = helper("router-proof").execution_identity(spec["execution_manifest"])
-    fingerprints = {mode: router_fingerprint(mode, pools[mode]) for mode in MODES}
+    fingerprints = {mode: router_fingerprint(mode) for mode in MODES}
     with CAMPAIGN.readonly(spec["campaign_ledger"]) as db:
         campaign = CAMPAIGN.metadata(db)
         authorization = CAMPAIGN.effective_authorization(db, spec["prospective_grant_id"])
@@ -977,7 +977,7 @@ class Budget:
             if db.execute("SELECT 1 FROM campaign_manifests WHERE sha256=?", (manifest_hash,)).fetchone() is None:
                 raise ValueError("Run admission requires a registered global campaign manifest")
             if row.get("arm_kind", "router") == "router":
-                fingerprint = router_fingerprint(row["router"], manifest["approval"]["mode_pools"][row["router"]])
+                fingerprint = router_fingerprint(row["router"])
             else:
                 catalog = load(Path(manifest["out_root"]) / "variant-catalog.json")
                 fingerprint = digest({"router": row["router"], "arm_kind": row["arm_kind"], "model": row["model"], "variant": row["variant"], "resolved_variant": resolve_variant(catalog, row["model"], row["variant"]), "resources": manifest["spec"]["resources"]})
@@ -1197,7 +1197,7 @@ def dispatch_provider_outage(out, run, pair):
     error = response.get("error")
     message = error.get("message", "") if isinstance(error, dict) else str(error or response.get("message") or "")
     has_content = any(bool((choice.get("message") or {}).get("content") or (choice.get("message") or {}).get("tool_calls") or choice.get("text")) for choice in response.get("choices") or [] if isinstance(choice, dict) and isinstance(choice.get("message") or {}, dict))
-    if has_content and not re.search(r"no endpoints? found|no routable endpoints?|no allowed providers|does not exist|model.{0,40}not found", str(message), re.IGNORECASE):
+    if has_content and not re.search(r"no endpoints? found|no routable endpoints?|no allowed providers", str(message), re.IGNORECASE):
         return None
     return {"model": pair[0], "effort": pair[1], "http_status": 404, "reason": f"HTTP404 gateway provider unavailable for model={pair[0]}, variant={pair[1]} before routable content: {message}"}
 
@@ -1310,7 +1310,7 @@ def run_approval(out, manifest, plan, phase, batch, runs, pricing, concurrency=1
         raise ValueError("Frozen execution identity changed before run approval")
     if financing is None:
         raise ValueError("Run approval must bind the registered whole-plan cost forecast")
-    if financing.get("manifest_sha256") != digest(manifest) or financing.get("pricing_sha256") != digest(pricing) or financing.get("classifier_allowance_usd") != manifest["spec"]["classifier_allowance_usd"]:
+    if financing.get("manifest_sha256") != digest(manifest) or financing.get("pricing_sha256") != digest(pricing) or money(financing.get("classifier_allowance_usd")) != money(manifest["spec"]["classifier_allowance_usd"]):
         raise ValueError("Cost forecast must bind this exact manifest, quote batch and classifier allowance")
     authorization = authorization if authorization is not None else manifest["approval"]["effective_authorization"]
     if financing.get("authorization") != authorization:

@@ -1280,29 +1280,8 @@ jobs:
         with:
           bun-version: 1.4.4
 
-      # Each part installs only the workspaces its own steps reach; the full
-      # workspace install links every other project once per part, four times a
-      # run. The unit part loads the web session list and the notifications
-      # delivery code, the workers part loads the git token service, and the
-      # migrate step drives drizzle-kit from @kilocode/db. Widen that part's
-      # filter when one of its steps imports a workspace outside it.
       - name: Install dependencies
-        if: matrix.part == 'unit'
-        run: pnpm install --frozen-lockfile --filter 'cloud-agent-next...' --filter 'notifications...' --filter 'web...' --filter kilocode-monorepo
-
-      - name: Install dependencies
-        if: matrix.part == 'workers'
-        run: pnpm install --frozen-lockfile --filter 'cloud-agent-next...' --filter '@kilocode/cloud-agent-wrapper...' --filter 'cloudflare-git-token-service...' --filter kilocode-monorepo
-
-      # The wrapper suite runs `bun test` inside the nested wrapper, and the
-      # shared protocol it imports resolves through the service's own links.
-      - name: Install dependencies
-        if: matrix.part == 'wrapper-process'
-        run: pnpm install --frozen-lockfile --filter 'cloud-agent-next...' --filter '@kilocode/cloud-agent-wrapper...'
-
-      - name: Install dependencies
-        if: matrix.part == 'other'
-        run: pnpm install --frozen-lockfile --filter 'cloud-agent-next...' --filter '@kilocode/cloud-agent-wrapper...' --filter '@kilocode/db...' --filter kilocode-monorepo
+        run: pnpm install --frozen-lockfile
 
       - name: Run cloud-agent-next unit tests
         if: matrix.part == 'unit'

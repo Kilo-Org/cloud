@@ -1090,63 +1090,6 @@ test('the web-test shards install the closure their Jest suite reads', () => {
   assert.equal(run.run, 'pnpm --filter web test --shard=${{ matrix.shard }}/8');
 });
 
-// The cloud-agent-next suite runs as four parts, and each part installs only the
-// workspaces its own steps reach. The unit part loads the web session list and
-// the notifications delivery code, the workers part loads the git token
-// service, the other part needs the wrapper and the database package that
-// `pnpm drizzle migrate` drives, and the wrapper-process part runs the shared
-// protocol through the service's links. A step that starts reading another workspace widens its
-// part's filter; it does not restore the full install, and the parts matrix and
-// its steps stay as they are.
-const cloudAgentNextInstalls = new Map([
-  [
-    'unit',
-    "pnpm install --frozen-lockfile --filter 'cloud-agent-next...' --filter 'notifications...' --filter 'web...' --filter kilocode-monorepo",
-  ],
-  [
-    'workers',
-    "pnpm install --frozen-lockfile --filter 'cloud-agent-next...' --filter '@kilocode/cloud-agent-wrapper...' --filter 'cloudflare-git-token-service...' --filter kilocode-monorepo",
-  ],
-  [
-    'wrapper-process',
-    "pnpm install --frozen-lockfile --filter 'cloud-agent-next...' --filter '@kilocode/cloud-agent-wrapper...'",
-  ],
-  [
-    'other',
-    "pnpm install --frozen-lockfile --filter 'cloud-agent-next...' --filter '@kilocode/cloud-agent-wrapper...' --filter '@kilocode/db...' --filter kilocode-monorepo",
-  ],
-]);
-
-test('the cloud-agent-next parts install the closure their own steps read', () => {
-  const job = ciJobs['cloud-agent-next'];
-  const installs = job.steps.filter(step => step.name === 'Install dependencies');
-  assert.deepEqual(
-    installs.map(step => step.if),
-    [...cloudAgentNextInstalls.keys()].map(part => `matrix.part == '${part}'`),
-    'each part owns one install'
-  );
-  assert.deepEqual(
-    installs.map(step => step.run),
-    [...cloudAgentNextInstalls.values()],
-    'no part links the whole workspace'
-  );
-  assert.equal(
-    job.strategy.matrix.part,
-    '${{ fromJSON(needs.changes.outputs.cloud_agent_next_parts) }}',
-    'the parts matrix and its producer are unchanged'
-  );
-  // The producer writes the part names as a literal, and a part with no install
-  // would skip every step; the failure names the part that needs one.
-  const { run } = ciJobs.changes.steps.find(step => step.id === 'affected');
-  const parts = run.match(/\[("unit"|"workers"|"wrapper-process"|"other")(, .+?)+\] as \$all/);
-  assert.ok(parts, 'the parts literal is missing from the detector');
-  assert.deepEqual(
-    JSON.parse(parts[0].replace(/ as \$all$/, '')),
-    [...cloudAgentNextInstalls.keys()],
-    'every part the detector starts has its own install'
-  );
-});
-
 // The extension's unit suite runs in extension-ci.yml for a pull request and a
 // main push, and that workflow has no merge_queue trigger: the ci.yml row is the
 // merge-queue gate, and it installs and tests nothing on the events the other

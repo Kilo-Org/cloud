@@ -235,7 +235,10 @@ export type OrganizationSsoPolicyView = {
 export type OrganizationSsoStatusView = {
   isDomainVerified: boolean;
   hasConnection: boolean;
-  /** Name of the first configured WorkOS domain, when the organization holds one. */
+  /**
+   * Name of the verified WorkOS domain when the organization holds one, otherwise the
+   * name of the first configured domain. `null` when no domain is configured.
+   */
   domain: string | null;
 };
 

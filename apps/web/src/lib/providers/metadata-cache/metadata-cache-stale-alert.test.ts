@@ -7,7 +7,9 @@ import { SYNC_PROVIDERS_STALE_ALERT_TTL_SECONDS } from '@/lib/providers/openrout
 import {
   alertIfMetadataCacheStale,
   buildMetadataCacheStaleAlertNotification,
+  buildTestMetadataCacheStaleAlertNotification,
   METADATA_CACHE_STALE_AFTER_MS,
+  postTestMetadataCacheStaleAlert,
   shouldPostMetadataCacheStaleAlert,
   type StaleMetadataEntry,
 } from './metadata-cache-stale-alert';
@@ -192,6 +194,27 @@ describe('buildMetadataCacheStaleAlertNotification', () => {
     expect(blocks).toContain('https://metadata.test/source-8`');
     expect(blocks).not.toContain('https://metadata.test/source-9`');
     expect(blocks).toContain('• and 2 more');
+  });
+});
+
+describe('postTestMetadataCacheStaleAlert', () => {
+  it('sends a labeled test notification without reading alert state', async () => {
+    const sendNotification = postedNotification();
+
+    await expect(postTestMetadataCacheStaleAlert({ now: NOW, sendNotification })).resolves.toBe(
+      'posted'
+    );
+
+    expect(sendNotification).toHaveBeenCalledWith(
+      buildTestMetadataCacheStaleAlertNotification(NOW)
+    );
+    const notification = buildTestMetadataCacheStaleAlertNotification(NOW);
+    const blocks = JSON.stringify(notification.blocks);
+    expect(notification.text).toMatch(
+      /^\[TEST\] AI gateway metadata cache refresh delay notification\. This verifies alert delivery only/
+    );
+    expect(blocks).toContain(`Test generated at ${NOW.toISOString()}`);
+    expect(blocks).toContain('/admin/gateway|Open Gateway admin');
   });
 });
 

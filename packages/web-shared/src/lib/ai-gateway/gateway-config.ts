@@ -99,7 +99,7 @@ export const ORGANIZATION_FEATURE_DESCRIPTIONS = {
   request_logs: {
     label: 'Request logs',
     description:
-      "Shows organization owners, admins, and billing managers a Request Logs page with the organization's latest gateway requests and how each was routed.",
+      "Shows organization owners, admins, and billing managers a Request Logs page with the organization's gateway requests, one hour at a time, and how each was routed.",
   },
 } as const satisfies Record<OrganizationFeature, { label: string; description: string }>;
 

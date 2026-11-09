@@ -71,9 +71,13 @@ selection_reads() {
       } catch {
         return false;
       }
-      return ["dependencies", "devDependencies", "peerDependencies"].some(field =>
-        Object.hasOwn(manifest[field] ?? {}, dependency)
-      );
+      const fields = [
+        "dependencies",
+        "devDependencies",
+        "peerDependencies",
+        "optionalDependencies",
+      ];
+      return fields.some(field => Object.hasOwn(manifest[field] ?? {}, dependency));
     });
     process.stdout.write(reads ? "true" : "false");
   ' "$1"
@@ -132,6 +136,7 @@ if [ -n "$group" ]; then
       fi
       filters=()
       while IFS= read -r name; do
+        [ -z "$name" ] && continue
         case "$name" in
           web | @kilocode/trpc | @kilocode/storybook | kilo-app | kilo-extension) ;;
           *) filters+=(--filter "$name") ;;
@@ -166,7 +171,7 @@ selection=""
 full=false
 selected_packages=""
 if $changes_only; then
-  selection=$(node scripts/affected-workspaces.mjs "$base") || {
+  selection=$(node scripts/affected-workspaces.mjs "$base" --worktree) || {
     echo "[typecheck] the affected-workspace selection failed, running full typecheck"
     changes_only=false
   }
@@ -176,10 +181,11 @@ if $changes_only; then
   fi
 fi
 
-# 1. Build trpc (skip if --changes-only and nothing checked reads it)
+# 1. Build trpc (skip if --changes-only, no checked workspace reads it, and the
+# selection is not a full check)
 if $changes_only; then
   trpc_changed=$(git diff --name-only "$base" -- 'packages/trpc/src/**' 'packages/trpc/tsconfig.json' 'packages/trpc/tsconfig.build.json' 'packages/trpc/rollup.config.mjs' 'packages/trpc/package.json' | head -1 || true)
-  if [ -n "$trpc_changed" ] || [ "$(selection_reads @kilocode/trpc <<< "$selection")" = true ]; then
+  if [ -n "$trpc_changed" ] || [ "$full" = true ] || [ "$(selection_reads @kilocode/trpc <<< "$selection")" = true ]; then
     echo "[typecheck] rebuilding trpc for the checked workspaces"
     pnpm --filter @kilocode/trpc run build
     export KILO_TYPECHECK_TRPC_BUILT=1
@@ -195,7 +201,7 @@ fi
 # as trpc)
 if $changes_only; then
   harness_changed=$(git diff --name-only "$base" -- 'packages/harness-sdk/src/**' 'packages/harness-sdk/tsconfig.json' 'packages/harness-sdk/tsconfig.build.json' 'packages/harness-sdk/package.json' | head -1 || true)
-  if [ -n "$harness_changed" ] || [ "$(selection_reads @kilocode/harness-sdk <<< "$selection")" = true ]; then
+  if [ -n "$harness_changed" ] || [ "$full" = true ] || [ "$(selection_reads @kilocode/harness-sdk <<< "$selection")" = true ]; then
     echo "[typecheck] rebuilding the harness SDK for the checked workspaces"
     pnpm --filter @kilocode/harness-sdk run build
   else

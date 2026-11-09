@@ -1311,7 +1311,7 @@ function runTypecheck(
   writeFileSync(
     join(dir, 'scripts/affected-workspaces.mjs'),
     "import { appendFileSync } from 'node:fs';\n" +
-      "appendFileSync(process.env.COMMAND_LOG, 'node scripts/affected-workspaces.mjs ' + (process.argv[2] ?? '') + '\\n');\n" +
+      "appendFileSync(process.env.COMMAND_LOG, 'node scripts/affected-workspaces.mjs ' + process.argv.slice(2).join(' ') + '\\n');\n" +
       "if (process.env.SELECTION_EXIT !== '0') process.exit(Number(process.env.SELECTION_EXIT));\n" +
       'process.stdout.write(process.env.SELECTION);\n'
   );
@@ -1398,7 +1398,7 @@ const fullWorkspaceTypecheck = `pnpm -r ${workspaceFilters} run typecheck`;
 const trpcBuild = 'pnpm --filter @kilocode/trpc run build';
 const selectedTypecheck = names =>
   `pnpm -r ${names.map(name => `--filter ${name}`).join(' ')} ${workspaceFilters} run typecheck`;
-const detectorCall = 'node scripts/affected-workspaces.mjs base';
+const detectorCall = 'node scripts/affected-workspaces.mjs base --worktree';
 const workspaceRuns = result => result.commands.filter(command => command.startsWith('pnpm -r'));
 
 test('a full run builds each prerequisite once and checks every workspace', t => {
@@ -1447,8 +1447,10 @@ test('a pnpm-workspace.yaml change runs the full typecheck without selecting', t
 });
 
 // The detector reports a full typecheck for a change to this script, because the
-// script decides what every other workspace check runs.
-test('a change to this script checks every workspace', t => {
+// script decides what every other workspace check runs. Every workspace is then
+// checked, so both prerequisite builds must run even though the document names no
+// directory.
+test('a change to this script checks every workspace and builds its prerequisites', t => {
   const result = runTypecheck(t, {
     root: true,
     changes: 'scoped',
@@ -1457,6 +1459,14 @@ test('a change to this script checks every workspace', t => {
   assert.equal(result.status, 0);
   assert.ok(result.commands.includes(detectorCall));
   assert.deepEqual(workspaceRuns(result), [fullWorkspaceTypecheck]);
+  assert.deepEqual(
+    result.commands.filter(command => command === trpcBuild),
+    [trpcBuild]
+  );
+  assert.deepEqual(
+    result.commands.filter(command => command === harnessBuild),
+    [harnessBuild]
+  );
 });
 
 // A change reaches the workspaces it reads from and the workspaces that read it.
@@ -1578,6 +1588,18 @@ test('a group typechecks the packages the selection names', t => {
   });
   assert.equal(result.status, 0);
   assert.deepEqual(workspaceRuns(result), ['pnpm -r --filter ai-gateway run typecheck']);
+});
+
+// A document that names no package leaves the group with nothing to check; an
+// empty filter name would select every workspace instead.
+test('a group with an empty selection checks nothing', t => {
+  const result = runTypecheck(t, {
+    root: true,
+    group: 'packages',
+    affected: selection({ packages: [] }),
+  });
+  assert.equal(result.status, 0);
+  assert.deepEqual(result.commands, []);
 });
 
 test('the web group checks its programs when the selection names them', t => {

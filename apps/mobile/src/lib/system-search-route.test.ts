@@ -29,8 +29,19 @@ const mocks = vi.hoisted(() => {
     addListener: vi.fn<(listener: () => void) => { remove: () => void } | null>(() => ({
       remove: vi.fn<() => void>(),
     })),
+    toastError: vi.fn<(title: string, options?: unknown) => string | number>(() => 'toast-id'),
   };
 });
+
+// The toast adapter renders `sonner-native` (and reanimated with it); the suite
+// asserts the call the routing makes, and a device proof covers the rendering.
+vi.mock('@/lib/a11y/announcing-toast', () => ({
+  announcingToast: {
+    error: mocks.toastError,
+    success: vi.fn<(title: string) => string | number>(() => 'toast-id'),
+    warning: vi.fn<(title: string) => string | number>(() => 'toast-id'),
+  },
+}));
 
 vi.mock('@sentry/react-native', () => ({ captureException: vi.fn() }));
 
@@ -245,6 +256,84 @@ describe('system-search-route', () => {
         'error.operation': 'consume-route',
       });
       expect(getPendingDeepLinkSnapshot()).toBeNull();
+      expect(mocks.toastError).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('a tap the phone index could not resolve yet', () => {
+    const unresolved = Object.assign(new Error('The system search index could not resolve this result.'), {
+      code: 'ERR_SYSTEM_SEARCH_UNRESOLVED',
+    });
+
+    it('reports it and offers the retry in the reader’s language', async () => {
+      mocks.consumePendingRoute.mockRejectedValueOnce(unresolved);
+
+      captureSystemSearchLaunch();
+
+      await vi.waitFor(() => {
+        expect(mocks.toastError).toHaveBeenCalledOnce();
+      });
+      expect(mocks.toastError).toHaveBeenCalledWith('Could not open this search result', {
+        id: expect.any(String),
+        action: { label: 'Try again', onClick: expect.any(Function) },
+      });
+      expect(getPendingDeepLinkSnapshot()).toBeNull();
+    });
+
+    it('routes the tap when the retry resolves it', async () => {
+      mocks.consumePendingRoute.mockRejectedValueOnce(unresolved);
+      captureSystemSearchLaunch();
+      await vi.waitFor(() => {
+        expect(mocks.toastError).toHaveBeenCalledOnce();
+      });
+
+      // The module kept the picked identifier, so the retry is the same read.
+      mocks.consumePendingRoute.mockResolvedValueOnce(PR_ID);
+      const options = mocks.toastError.mock.calls[0]?.[1] as
+        | { action?: { onClick?: () => void } }
+        | undefined;
+      options?.action?.onClick?.();
+
+      await vi.waitFor(() => {
+        expect(mocks.consumePendingRoute).toHaveBeenCalledTimes(2);
+      });
+      await vi.waitFor(() => {
+        expect(getPendingDeepLinkSnapshot()).toBe(PR_ID);
+      });
+      expect(mocks.toastError).toHaveBeenCalledOnce();
+    });
+
+    it('keeps one toast for repeated failures instead of stacking copies', async () => {
+      mocks.consumePendingRoute.mockRejectedValue(unresolved);
+
+      captureSystemSearchLaunch();
+      await vi.waitFor(() => {
+        expect(mocks.toastError).toHaveBeenCalledOnce();
+      });
+      captureSystemSearchLaunch();
+      await vi.waitFor(() => {
+        expect(mocks.toastError).toHaveBeenCalledTimes(2);
+      });
+
+      const firstId = (mocks.toastError.mock.calls[0]?.[1] as { id?: string } | undefined)?.id;
+      const secondId = (mocks.toastError.mock.calls[1]?.[1] as { id?: string } | undefined)?.id;
+      expect(firstId).toBeDefined();
+      expect(secondId).toBe(firstId);
+    });
+
+    it('shows nothing when the answer names no screen of this app', async () => {
+      // The identifier was resolved and refused, or the index answered nothing:
+      // there is nothing to open and nothing to retry, so the toast stays away
+      // and the failure code alone means "could not resolve yet".
+      mocks.consumePendingRoute.mockResolvedValueOnce('https://example.com/agent-chat/session-1');
+
+      captureSystemSearchLaunch();
+
+      await vi.waitFor(() => {
+        expect(mocks.consumePendingRoute).toHaveBeenCalledOnce();
+      });
+      expect(getPendingDeepLinkSnapshot()).toBeNull();
+      expect(mocks.toastError).not.toHaveBeenCalled();
     });
   });
 

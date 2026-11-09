@@ -66,6 +66,12 @@ private const val TIMEOUT_MESSAGE = "The system search index did not respond."
 // JavaScript can tell an index that did not answer from a call that failed.
 private const val TIMEOUT_CODE = "ERR_SYSTEM_SEARCH_TIMEOUT"
 
+// A picked identifier that could not be resolved because the index could not be
+// read. Its own code, not a null answer, so JavaScript can tell "the tap could
+// not be opened yet" from "nothing was tapped" and keep the tap for a retry.
+private const val UNRESOLVED_CODE = "ERR_SYSTEM_SEARCH_UNRESOLVED"
+private const val UNRESOLVED_MESSAGE = "The system search index could not resolve this result."
+
 /**
  * One indexed entity, as JavaScript hands it across.
  *
@@ -183,34 +189,50 @@ class KiloSystemSearchModule : Module() {
   }
 
   /**
-   * The route of the last search result the user opened, read and cleared in
-   * one step, or null when there is none.
+   * The route of the last search result the user opened, or null when there is
+   * none.
    *
    * Resolving the identifier reads the index, so it runs here — on the module
    * queue, because this is an `AsyncFunction` — rather than on the main thread
    * that delivers `OnNewIntent` or the JavaScript thread that consumes the
    * slot.
    *
+   * The picked identifier is consumed only once its resolution is known to have
+   * succeeded: a read that fails rejects this call and leaves the slot — and
+   * the launch Intent — untouched, so the caller can retry the same tap
+   * instead of losing it. A resolution that answers null (the index does not
+   * hold the identifier) is a finished refusal, so that tap is still consumed.
+   *
    * A tap that launched this process has no event to announce — JavaScript is
    * still booting — so the launch Intent is read here, on the first consume and
    * only once.
    */
   private fun consumePendingRoute(): String? {
-    val identifier = readAndClearPendingRoute() ?: takeLaunchIdentifier() ?: return null
-    return resolveRoute(identifier)
+    val pending = readPendingRoute()
+    val identifier = pending ?: readLaunchIdentifier() ?: return null
+    val route = resolveRoute(identifier)
+    if (pending != null) {
+      clearPendingRoute(pending)
+    } else {
+      launchIntentRead = true
+    }
+    return route
   }
 
-  /** The identifier of the launch Intent, taken once, or null when it is not ours. */
-  private fun takeLaunchIdentifier(): String? {
+  /**
+   * The identifier of the launch Intent, or null when it is not ours.
+   *
+   * The Intent is read again on every consume until it is marked read, and it
+   * is marked read only after its resolution succeeded: on a cold start
+   * `currentActivity` can still be null when JavaScript makes its first
+   * consume, and giving up then would forfeit the launch tap for the rest of
+   * the process's life.
+   */
+  private fun readLaunchIdentifier(): String? {
     if (launchIntentRead) {
       return null
     }
-    // Read it through the activity, and only mark it read once one exists: on a
-    // cold start `currentActivity` can still be null when JavaScript makes its
-    // first consume, and giving up then would forfeit the launch tap for the
-    // rest of the process's life.
     val intent = appContext.currentActivity?.intent ?: return null
-    launchIntentRead = true
     return pickedIdentifier(intent)
   }
 
@@ -269,16 +291,17 @@ class KiloSystemSearchModule : Module() {
   private fun resolveRoute(identifier: String): String? {
     val stored = try {
       backend.stored()
-    } catch (error: Exception) {
+    } catch (error: Throwable) {
       // Fail closed: the index is the only authority on which identifiers are
       // ours, and `kiloapp://` is also the scheme the app's ordinary deep links
       // use. Without the read there is no evidence this Intent came from our
       // index, so the identifier is refused rather than opened as a search tap.
       // The JavaScript allowlist only checks a route shape; it cannot prove the
-      // Intent originated here. Report the read failure so the dropped tap is
-      // not silent.
+      // Intent originated here. Every read failure is reported with one code —
+      // the store's own exceptions and its timeout alike — so the app can tell
+      // it from "nothing was tapped" and offer the tap again.
       Log.w(TAG, "Could not read the system search index to resolve a picked result.", error)
-      return null
+      throw CodedException(UNRESOLVED_CODE, UNRESOLVED_MESSAGE, error)
     }
     if (identifier.startsWith(APP_SCHEME_PREFIX)) {
       return identifier.takeIf { link -> stored.any { it.route == link } }
@@ -321,20 +344,38 @@ class KiloSystemSearchModule : Module() {
   }
 
   /**
-   * The slot's identifier, read and cleared as one step on the module queue.
+   * The slot's identifier, without clearing it.
    *
    * The write above happens on the main thread and `SharedPreferences` has no
-   * read-and-clear operation, so the get and the remove are made atomic under
-   * `pendingRouteLock`: otherwise a tap written between them is removed without
-   * ever being resolved, and that tap never navigates.
+   * read-and-clear operation, so this read shares `pendingRouteLock` with it.
+   * The slot is cleared only after the identifier resolved (see
+   * `clearPendingRoute`), because resolving it reads the index and a failure
+   * there must leave the tap for a retry.
    */
-  private fun readAndClearPendingRoute(): String? {
+  private fun readPendingRoute(): String? {
     val context = appContext.reactContext ?: return null
     val preferences = context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
     return synchronized(pendingRouteLock) {
-      val identifier = preferences.getString(PENDING_ROUTE_KEY, null) ?: return@synchronized null
+      preferences.getString(PENDING_ROUTE_KEY, null)
+    }
+  }
+
+  /**
+   * Clears the slot when it still holds the identifier that was just resolved.
+   *
+   * The check and the remove are atomic under `pendingRouteLock`: a tap written
+   * while the index read was in flight holds a newer identifier and must
+   * survive, where an unconditional remove would discard it and that tap would
+   * never navigate.
+   */
+  private fun clearPendingRoute(identifier: String) {
+    val context = appContext.reactContext ?: return
+    val preferences = context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
+    synchronized(pendingRouteLock) {
+      if (preferences.getString(PENDING_ROUTE_KEY, null) != identifier) {
+        return@synchronized
+      }
       preferences.edit().remove(PENDING_ROUTE_KEY).apply()
-      identifier
     }
   }
 }

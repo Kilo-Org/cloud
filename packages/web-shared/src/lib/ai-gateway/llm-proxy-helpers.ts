@@ -595,6 +595,17 @@ export function modelDoesNotExistOnOpenRouterResponse(model: string) {
   );
 }
 
+export function vercelOnlyModelUnavailableResponse(model: string) {
+  const error =
+    `The requested model '${model}' is only available through Vercel AI Gateway, which cannot ` +
+    `serve this request: Vercel routing is off, or the request's provider settings or cost ` +
+    `limit rule it out. Please choose a different model.`;
+  return NextResponse.json(
+    { error, error_type: ProxyErrorType.unavailable_model, message: error },
+    { status: 404 }
+  );
+}
+
 export function noFreeModelsAvailableResponse() {
   const error = `No free models are currently available for ${KILO_AUTO_FREE_MODEL.id}. Please try again later, or switch to ${KILO_AUTO_BALANCED_MODEL.id} for affordable paid inference.`;
   return NextResponse.json(

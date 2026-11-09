@@ -35,6 +35,7 @@ import { applyProviderSpecificLogic } from '@kilocode/web-shared/lib/ai-gateway/
 import type { GetProviderProviderResult } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
 import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { isValidOpenRouterModelId } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import { isVercelModel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import { getReasoningEffort } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
 import { upstreamRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
@@ -127,7 +128,9 @@ export async function sendUpstreamAttempt({
     (providerContext.provider.type === 'openrouter' ||
       providerContext.provider.type === 'vercel') &&
     !isAutoSmallFreeModel(requestedModel) &&
-    !(await isValidOpenRouterModelId(requestedModel))
+    !(await isValidOpenRouterModelId(requestedModel)) &&
+    // Models only Vercel serves are listed under ids that OpenRouter does not know.
+    !(providerContext.provider.type === 'vercel' && (await isVercelModel(requestedModel)))
   ) {
     return { type: 'invalid-openrouter-model' };
   }

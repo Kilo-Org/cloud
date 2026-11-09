@@ -44,6 +44,7 @@ import {
 import { upstreamRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
 import {
   getOpenRouterModelsFromDatabase,
+  getVercelModelsFromDatabase,
   isValidOpenRouterModelId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
@@ -342,6 +343,7 @@ const mockedGetProvider = jest.mocked(getProvider);
 const mockedUpstreamRequest = jest.mocked(upstreamRequest);
 const mockedGetOpenRouterModels = jest.mocked(getOpenRouterModelsFromDatabase);
 const mockedIsValidOpenRouterModelId = jest.mocked(isValidOpenRouterModelId);
+const mockedGetVercelModels = jest.mocked(getVercelModelsFromDatabase);
 const mockedEmitApiMetricsForResponse = jest.mocked(emitApiMetricsForResponse);
 const mockedAccountForMicrodollarUsage = jest.mocked(accountForMicrodollarUsage);
 function usageAccountingResult(
@@ -2236,6 +2238,7 @@ describe('POST /api/v1/chat/completions request handling', () => {
     'returns 404 when the %s model id is unknown',
     async providerType => {
       mockedIsValidOpenRouterModelId.mockResolvedValue(false);
+      mockedGetVercelModels.mockResolvedValue(new Set());
       mockedGetProvider.mockResolvedValue({
         kind: 'provider',
         provider: { ...provider, type: providerType },
@@ -2257,6 +2260,25 @@ describe('POST /api/v1/chat/completions request handling', () => {
       expect(mockedUpstreamRequest).not.toHaveBeenCalled();
     }
   );
+
+  it('explains that a Vercel-only model cannot take an OpenRouter route', async () => {
+    mockedIsValidOpenRouterModelId.mockResolvedValue(false);
+    mockedGetVercelModels.mockResolvedValue(new Set(['alibaba/qwen3.5-flash']));
+
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+    const response = await handleLlmProxyRequest(
+      makeRequest(makeBody('qwen/qwen3.5-flash')) as never
+    );
+
+    expect(response.status).toBe(404);
+    expect(await response.json()).toMatchObject({
+      error_type: 'unavailable_model',
+      message: expect.stringContaining(
+        "The requested model 'qwen/qwen3.5-flash' is only available through Vercel AI Gateway"
+      ),
+    });
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
 
   it.each([
     'google/gemma-4-26b-a4b-it:free',

@@ -89,13 +89,22 @@ function getOpenCodePrompt(model: string): OpenCodePrompt | undefined {
   return undefined;
 }
 
+export function getOpenCodeSettingsForReasoningOptions(
+  model: string,
+  reasoning_options: ReasoningOption[] | undefined
+): OpenCodeSettings {
+  const ai_sdk_provider = getAiSdkProvider(model, null);
+  const variants = toLegacyVariants(reasoning_options, ai_sdk_provider);
+  const prompt = getOpenCodePrompt(model);
+  return { ai_sdk_provider, variants, reasoning_options, prompt };
+}
+
 export async function getGatewayOpenCodeSettings(
   model: string,
   allowFallback: boolean
 ): Promise<OpenCodeSettings | undefined> {
-  const ai_sdk_provider = getAiSdkProvider(model, null);
-  const reasoning_options = await getModelReasoningOptions(model, allowFallback);
-  const variants = toLegacyVariants(reasoning_options, ai_sdk_provider);
-  const prompt = getOpenCodePrompt(model);
-  return { ai_sdk_provider, variants, reasoning_options, prompt };
+  return getOpenCodeSettingsForReasoningOptions(
+    model,
+    await getModelReasoningOptions(model, allowFallback)
+  );
 }

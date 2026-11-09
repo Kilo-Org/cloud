@@ -1743,6 +1743,65 @@ describe('ConversationMessages memoization', () => {
     }
   );
 
+  it('preserves group and nested tool expansion when a leading tool errors while streaming', () => {
+    const intro = textPart('intro', 'Inspecting the code');
+    const running = toolPart('bash-1', 'bash', {
+      status: 'running',
+      input: { command: 'pnpm test' },
+      time: { start: 1 },
+    });
+    const completed = toolPart('bash-2');
+    const props = baseProps({
+      collapseTools: true,
+      isStreaming: true,
+      dynamicMessages: [
+        assistantMessage('assistant-1', [intro, running, completed], { time: { created: 1 } }),
+      ],
+    });
+    renderConversationMessages(props);
+    const group = container.querySelector<HTMLButtonElement>('button[aria-expanded="false"]');
+    expect(group?.textContent).toContain('Working');
+    act(() => group?.click());
+    const tool = container.querySelectorAll<HTMLButtonElement>('[data-tool-card] button')[1];
+    expect(tool).toBeDefined();
+    act(() => tool?.click());
+    expect(container.textContent).toContain('Output for bash-2');
+
+    renderConversationMessages({
+      ...props,
+      dynamicMessages: [
+        assistantMessage(
+          'assistant-1',
+          [
+            intro,
+            {
+              ...running,
+              state: {
+                ...running.state,
+                status: 'error',
+                error: 'Command failed',
+                time: { start: 1, end: 2 },
+              },
+            },
+            completed,
+          ],
+          { time: { created: 1 } }
+        ),
+      ],
+    });
+
+    expect(container.contains(group)).toBe(true);
+    expect(group?.getAttribute('aria-expanded')).toBe('true');
+    expect(container.contains(tool)).toBe(true);
+    expect(tool?.getAttribute('aria-expanded')).toBe('true');
+    expect(container.textContent).toContain('Output for bash-2');
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain('Command failed');
+
+    act(() => group?.click());
+    expect(container.textContent).not.toContain('Output for bash-2');
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain('Command failed');
+  });
+
   it('does not re-render the active list when only getChildMessages changes', () => {
     const message = assistantMessage('assistant-1', [textPart('text-1', 'Answer one')]);
     const props = baseProps({

@@ -112,7 +112,7 @@ export function CloudMessageParts({ collapseTools = false }: { collapseTools?: b
     });
     if (segment.type === 'chat')
       return <React.Fragment key={segment.parts[0]?.id}>{content}</React.Fragment>;
-    const key = `agent-work:${segments[segmentIndex - 1]?.parts.at(-1)?.id ?? 'start'}`;
+    const key = `agent-work:${segments[segmentIndex - 1]?.parts[0]?.id ?? 'start'}`;
     const activePart = presentation.isStreaming
       ? segment.parts.findLast(isPartStreaming)
       : undefined;

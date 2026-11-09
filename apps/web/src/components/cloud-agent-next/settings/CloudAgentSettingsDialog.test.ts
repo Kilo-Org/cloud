@@ -158,7 +158,8 @@ Object.assign(globalThis, {
   IS_REACT_ACT_ENVIRONMENT: true,
 });
 
-const { CloudAgentSettingsDialog } = requireFromHere('./CloudAgentSettingsDialog') as {
+// eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
+const { CloudAgentSettingsDialog } = require('./CloudAgentSettingsDialog') as {
   CloudAgentSettingsDialog: typeof CloudAgentSettingsDialogComponent;
 };
 

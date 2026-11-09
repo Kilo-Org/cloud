@@ -1,10 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { SupportAccessRequestDialog } from '@/components/organizations/SupportAccessRequestDialog';
 import { useAdminOrganizationDetails } from '@/app/admin/api/organizations/hooks';
+import { useInvalidateAllOrganizationData } from '@/app/api/organizations/hooks';
 import { useTRPC } from '@/lib/trpc/utils';
 
 export function OrganizationAdminSupportAccessPrompt({
@@ -13,7 +14,7 @@ export function OrganizationAdminSupportAccessPrompt({
   organizationId: string;
 }) {
   const trpc = useTRPC();
-  const queryClient = useQueryClient();
+  const invalidateOrganizationData = useInvalidateAllOrganizationData();
   const [open, setOpen] = useState(false);
   const viewAccess = useQuery(trpc.admin.supportAccess.viewAccess.queryOptions({ organizationId }));
   const details = useAdminOrganizationDetails(organizationId);
@@ -23,10 +24,7 @@ export function OrganizationAdminSupportAccessPrompt({
   const organizationName = details.data?.name ?? organizationId;
 
   return (
-    <div
-      role="status"
-      className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950"
-    >
+    <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
       <div>
         <p className="font-medium">Support access needed</p>
         <p>
@@ -41,7 +39,7 @@ export function OrganizationAdminSupportAccessPrompt({
         organizationId={organizationId}
         organizationName={organizationName}
         onGranted={grant => {
-          if (grant.status === 'active') void queryClient.invalidateQueries();
+          if (grant.status === 'active') void invalidateOrganizationData();
         }}
       />
     </div>

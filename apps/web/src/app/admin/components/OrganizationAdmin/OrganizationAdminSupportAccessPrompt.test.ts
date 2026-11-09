@@ -9,12 +9,14 @@ let mockViewAccess: { grantRequired: boolean } | undefined;
 
 jest.mock('@tanstack/react-query', () => ({
   useQuery: () => ({ data: mockViewAccess }),
-  useQueryClient: () => ({ invalidateQueries: jest.fn() }),
 }));
 jest.mock('@/lib/trpc/utils', () => ({
   useTRPC: () => ({
     admin: { supportAccess: { viewAccess: { queryOptions: () => ({ queryKey: ['view'] }) } } },
   }),
+}));
+jest.mock('@/app/api/organizations/hooks', () => ({
+  useInvalidateAllOrganizationData: () => jest.fn(),
 }));
 jest.mock('@/app/admin/api/organizations/hooks', () => ({
   useAdminOrganizationDetails: () => ({ data: { name: 'Acme Child' } }),

@@ -2416,6 +2416,13 @@
       "when": 1794229727439,
       "tag": "0344_open_jazinda",
       "breakpoints": true
+    },
+    {
+      "idx": 345,
+      "version": "7",
+      "when": 1794237014031,
+      "tag": "0345_claude_billing_owner_scopes",
+      "breakpoints": true
     }
   ]
 }

@@ -7549,11 +7549,17 @@ export const openai_chatgpt_connections = pgTable(
 export type OpenAiChatGptConnectionRow = typeof openai_chatgpt_connections.$inferSelect;
 
 /**
- * A Claude billing connection: one Kilo owner (a personal account or an
- * organization) linked through its Anthropic user profile to a customer's
- * Claude organization, so the Claude requests the owner makes bill that
- * organization. No credential is stored: Kilo's operator service account sends
- * the requests, and the user profile ID names who pays.
+ * A Claude billing connection: one Kilo owner linked through its Anthropic
+ * user profile to a customer's Claude organization, so the Claude requests the
+ * owner makes bill that organization. No credential is stored: Kilo's operator
+ * service account sends the requests, and the user profile ID names who pays.
+ *
+ * The set columns name the owner:
+ * - `kilo_user_id` only: the person's personal account.
+ * - `kilo_user_id` and `organization_id`: the person's own requests in that
+ *   organization.
+ * - `organization_id` only: the organization's shared services, such as code
+ *   review. `created_by` records the person who connected it.
  *
  * Anthropic allows one user profile per customer organization for each OAuth
  * app, so `user_profile_id` is unique and kept after a removal: a reconnect
@@ -7592,9 +7598,12 @@ export const claude_billing_connections = pgTable(
     uniqueIndex('UQ_claude_billing_connections_personal')
       .on(table.kilo_user_id)
       .where(sql`${table.organization_id} IS NULL`),
-    uniqueIndex('UQ_claude_billing_connections_organization')
-      .on(table.organization_id)
+    uniqueIndex('UQ_claude_billing_connections_org_member')
+      .on(table.kilo_user_id, table.organization_id)
       .where(sql`${table.organization_id} IS NOT NULL`),
+    uniqueIndex('UQ_claude_billing_connections_shared_services')
+      .on(table.organization_id)
+      .where(sql`${table.organization_id} IS NOT NULL AND ${table.kilo_user_id} IS NULL`),
     enumCheck(
       'claude_billing_connections_status_check',
       table.status,
@@ -7602,10 +7611,7 @@ export const claude_billing_connections = pgTable(
     ),
     check(
       'claude_billing_connections_owner_check',
-      sql`(
-        (${table.kilo_user_id} IS NOT NULL AND ${table.organization_id} IS NULL) OR
-        (${table.kilo_user_id} IS NULL AND ${table.organization_id} IS NOT NULL)
-      )`
+      sql`${table.kilo_user_id} IS NOT NULL OR ${table.organization_id} IS NOT NULL`
     ),
   ]
 );

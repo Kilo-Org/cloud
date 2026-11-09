@@ -71,4 +71,18 @@ describe('ClaudeBillingCardView', () => {
   it('hides linking and removal controls from read-only members', () => {
     expect(buttons({ status: { ...status('connected'), canManage: false } })).toHaveLength(0);
   });
+
+  it.each([
+    ['personal', 'Linked billing with Claude Platform'],
+    ['member', 'Linked billing with Claude Platform'],
+    ['shared_services', 'Claude billing for shared services'],
+  ] as const)('names the %s connection it shows', (scope, title) => {
+    const html = renderToStaticMarkup(
+      React.createElement(ClaudeBillingCardView, {
+        status: status('not_connected'),
+        scope,
+      })
+    );
+    expect(html).toContain(title);
+  });
 });

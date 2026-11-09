@@ -23,12 +23,18 @@ describe('Cross-region Claude payer state', () => {
             status: 'connected',
             user_profile_id: 'uprof_owner',
             connected_at: '2026-01-01T00:00:00Z',
+            created_by: 'owner',
           },
         })
       )
       .mockResolvedValueOnce(
         Response.json({
-          connection: { status: 'removed', user_profile_id: 'uprof_owner', connected_at: null },
+          connection: {
+            status: 'removed',
+            user_profile_id: 'uprof_owner',
+            connected_at: null,
+            created_by: 'owner',
+          },
         })
       );
     expect(await getAuthoritativeClaudeBillingState(owner)).toMatchObject({ status: 'connected' });

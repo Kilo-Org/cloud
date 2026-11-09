@@ -4207,15 +4207,20 @@
           "type": "string",
           "format": "uuid",
           "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "scope": {
+          "type": "string",
+          "const": "shared_services"
         }
       }
     },
     "tags": [
       "claudebilling",
       "remove",
-      "organizationid"
+      "organizationid",
+      "scope"
     ],
-    "searchBlob": "claudeBilling.remove Disconnect Claude billing for a user or organization so it stops charging, keeping the profile for future reconnects; owner or admin only. claudebilling remove organizationid organizationId"
+    "searchBlob": "claudeBilling.remove Disconnect Claude billing for a user or organization so it stops charging, keeping the profile for future reconnects; owner or admin only. claudebilling remove organizationid scope organizationId scope"
   },
   "claudeBilling.status": {
     "path": "claudeBilling.status",
@@ -4229,15 +4234,20 @@
           "type": "string",
           "format": "uuid",
           "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "scope": {
+          "type": "string",
+          "const": "shared_services"
         }
       }
     },
     "tags": [
       "claudebilling",
       "status",
-      "organizationid"
+      "organizationid",
+      "scope"
     ],
-    "searchBlob": "claudeBilling.status Check whether Claude billing is connected for a user or organization, including connection state and whether the caller can manage it. claudebilling status organizationid organizationId"
+    "searchBlob": "claudeBilling.status Check whether Claude billing is connected for a user or organization, including connection state and whether the caller can manage it. claudebilling status organizationid scope organizationId scope"
   },
   "cliSessions.create": {
     "path": "cliSessions.create",

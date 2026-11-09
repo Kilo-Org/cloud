@@ -51,6 +51,7 @@ describe('Authoritative Claude payer state', () => {
         status: 'connected',
         user_profile_id: row.user_profile_id,
         connected_at: '2026-01-01T00:00:00.123Z',
+        created_by: user.id,
       },
     });
     await db
@@ -59,7 +60,12 @@ describe('Authoritative Claude payer state', () => {
       .where(eq(claude_billing_connections.id, row.id));
     const removed = await POST(request(owner));
     expect(await removed.json()).toEqual({
-      connection: { status: 'removed', user_profile_id: row.user_profile_id, connected_at: null },
+      connection: {
+        status: 'removed',
+        user_profile_id: row.user_profile_id,
+        connected_at: null,
+        created_by: user.id,
+      },
     });
   });
 

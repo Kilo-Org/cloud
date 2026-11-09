@@ -14,3 +14,11 @@ export async function canManageClaudeBillingOrganization(userId: string, organiz
     memberships.find(entry => entry.orgId === organization?.parent_organization_id)?.role
   );
 }
+
+/** The person's own connection in an organization is their membership there. */
+export async function isClaudeBillingOrganizationMember(
+  userId: string,
+  organizationId: string
+): Promise<boolean> {
+  return (await getUserOrgMemberships(userId)).some(entry => entry.orgId === organizationId);
+}

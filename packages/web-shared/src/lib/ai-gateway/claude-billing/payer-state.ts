@@ -10,13 +10,20 @@ import { fetchClaudeWithRetry } from '@kilocode/web-shared/lib/auth/claude/http'
 
 export const ClaudeBillingOwnerSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('personal'), kiloUserId: z.string().min(1) }),
-  z.object({ kind: z.literal('organization'), organizationId: z.uuid() }),
+  z.object({
+    kind: z.literal('member'),
+    kiloUserId: z.string().min(1),
+    organizationId: z.uuid(),
+  }),
+  z.object({ kind: z.literal('shared_services'), organizationId: z.uuid() }),
 ]) satisfies z.ZodType<ClaudeBillingOwner>;
 
 export const ClaudeBillingPayerStateSchema = z.object({
   status: z.enum(ClaudeBillingConnectionStatus),
   user_profile_id: z.string().min(1),
   connected_at: z.iso.datetime().nullable(),
+  /** The person who connected it; a shared-services connection is released to them. */
+  created_by: z.string().min(1),
 });
 export type ClaudeBillingPayerState = z.infer<typeof ClaudeBillingPayerStateSchema>;
 const responseSchema = z.object({ connection: ClaudeBillingPayerStateSchema.nullable() });
@@ -29,6 +36,7 @@ export function claudeBillingPayerState(
         status: row.status,
         user_profile_id: row.user_profile_id,
         connected_at: row.connected_at ? new Date(row.connected_at).toISOString() : null,
+        created_by: row.created_by,
       }
     : null;
 }

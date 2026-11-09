@@ -1,14 +1,16 @@
 import 'server-only';
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
-import { eq } from 'drizzle-orm';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { claude_billing_connections, type ClaudeBillingConnectionRow } from '@kilocode/db/schema';
 import {
   CLAUDE_BILLING_PROVIDER_ID,
   CLAUDE_BILLING_PROVIDER_NAME,
 } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/provider-id';
-import { getClaudeBillingConnection } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
+import {
+  claudeBillingOwnerWhere,
+  getClaudeBillingConnection,
+} from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
 import type { ClaudeBillingOwner } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
 import { ClaudeBillingConnectionStatus } from '@kilocode/db/schema-types';
 import {
@@ -20,13 +22,16 @@ import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizat
 import { canManageOrganization } from '@kilocode/app-shared/organizations';
 
 /**
- * The owner's Claude billing connection: one Kilo organization connection or
- * the person's own. Only an organization owner or admin manages the
- * organization's connection.
+ * The caller's Claude billing connections: their personal one, their own in an
+ * organization, and the organization's shared-services one. A person manages
+ * their own connections. The shared-services connection is an organization
+ * setting, so only an organization owner or admin manages it.
  */
 
 const ClaudeBillingOwnerInputSchema = z.object({
   organizationId: z.uuid().optional(),
+  /** `shared_services` reads and manages the organization's service connection. */
+  scope: z.literal('shared_services').optional(),
 });
 
 export const ClaudeBillingStatusSchema = z.object({
@@ -44,16 +49,31 @@ export type ClaudeBillingStatus = z.infer<typeof ClaudeBillingStatusSchema>;
 
 async function resolveOwner(
   ctx: TRPCContext,
-  organizationId: string | undefined
+  organizationId: string | undefined,
+  scope: 'shared_services' | undefined
 ): Promise<{ owner: ClaudeBillingOwner; canManage: boolean }> {
   if (!ctx.user) throw new TRPCError({ code: 'UNAUTHORIZED', message: 'User not authenticated' });
+  const userId = ctx.user.id;
   if (!organizationId) {
-    return { owner: { kind: 'personal', kiloUserId: ctx.user.id }, canManage: true };
+    if (scope === 'shared_services') {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'A shared-services connection needs an organization.',
+      });
+    }
+    return { owner: { kind: 'personal', kiloUserId: userId }, canManage: true };
   }
   const role = await ensureOrganizationAccess(ctx, organizationId);
+  if (scope === 'shared_services') {
+    return {
+      owner: { kind: 'shared_services', organizationId },
+      canManage: canManageOrganization(role),
+    };
+  }
   return {
-    owner: { kind: 'organization', organizationId },
-    canManage: canManageOrganization(role),
+    owner: { kind: 'member', kiloUserId: userId, organizationId },
+    // Organization access already proves the membership this connection needs.
+    canManage: true,
   };
 }
 
@@ -82,7 +102,7 @@ export const claudeBillingRouter = createTRPCRouter({
     .input(ClaudeBillingOwnerInputSchema)
     .output(ClaudeBillingStatusSchema)
     .query(async ({ ctx, input }): Promise<ClaudeBillingStatus> => {
-      const { owner, canManage } = await resolveOwner(ctx, input.organizationId);
+      const { owner, canManage } = await resolveOwner(ctx, input.organizationId, input.scope);
       return statusOf(await getClaudeBillingConnection(owner), canManage);
     }),
 
@@ -90,11 +110,14 @@ export const claudeBillingRouter = createTRPCRouter({
     .input(ClaudeBillingOwnerInputSchema)
     .output(ClaudeBillingStatusSchema)
     .mutation(async ({ ctx, input }): Promise<ClaudeBillingStatus> => {
-      const { owner, canManage } = await resolveOwner(ctx, input.organizationId);
+      const { owner, canManage } = await resolveOwner(ctx, input.organizationId, input.scope);
       if (!canManage) {
         throw new TRPCError({
           code: 'FORBIDDEN',
-          message: 'Only an organization owner or admin can remove the link.',
+          message:
+            owner.kind === 'shared_services'
+              ? 'Only an organization owner or admin can remove the shared-services link.'
+              : 'Only an organization member can remove their own link.',
         });
       }
       // The profile stays: Anthropic allows one per customer organization, and a
@@ -108,11 +131,7 @@ export const claudeBillingRouter = createTRPCRouter({
           last_refusal_code: null,
           last_refusal_at: null,
         })
-        .where(
-          owner.kind === 'organization'
-            ? eq(claude_billing_connections.organization_id, owner.organizationId)
-            : eq(claude_billing_connections.kilo_user_id, owner.kiloUserId)
-        );
+        .where(claudeBillingOwnerWhere(owner));
       return statusOf(await getClaudeBillingConnection(owner), canManage);
     }),
 });

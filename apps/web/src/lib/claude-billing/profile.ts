@@ -3,6 +3,7 @@ import { sql } from 'drizzle-orm';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { createClaudeUserProfile } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/operator';
 import {
+  claudeBillingOwnerKey,
   getClaudeBillingConnection,
   insertClaudeBillingProfile,
   type ClaudeBillingOwner,
@@ -18,8 +19,7 @@ export async function ensureClaudeBillingProfile(
   owner: ClaudeBillingOwner,
   createdBy: string
 ): Promise<string> {
-  const lockKey =
-    owner.kind === 'organization' ? `org:${owner.organizationId}` : `user:${owner.kiloUserId}`;
+  const lockKey = claudeBillingOwnerKey(owner);
 
   return await db.transaction(async tx => {
     await tx.execute(

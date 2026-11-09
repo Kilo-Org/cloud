@@ -274,7 +274,6 @@ import { withDORetry } from '../../utils/do-retry.js';
 import { agentSandboxProviderSchema, type AgentSandboxProvider, type Env } from '../../types.js';
 import { sandboxSessionPeerNamespace } from '../peer-bindings.js';
 import {
-  ORGANIZATION_MEMBERSHIP_READ_TIMEOUT_MS,
   OrganizationAccessRevokedError,
   OrganizationMembershipUnavailableError,
   workerOrganizationMembershipReader,
@@ -2866,7 +2865,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     try {
       member = await withTimeout(
         this.organizationMembershipFor(source.userId, organizationId),
-        ORGANIZATION_MEMBERSHIP_READ_TIMEOUT_MS,
+        this.sandboxTimers().organizationMembershipReadMs,
         'Organization membership read timed out'
       );
     } catch {

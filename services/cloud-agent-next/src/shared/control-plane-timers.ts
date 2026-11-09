@@ -37,6 +37,8 @@ export type ControlPlaneTimers = {
     credentialGrantRenewalRetryMs: number;
     /** Bounds one member's backing renewal during scope-handle resolution. */
     scopeBackingTokenMs: number;
+    /** Bounds the membership read that gates an organization-attributed grant. */
+    organizationMembershipReadMs: number;
     providerStopAttemptMs: number;
     providerStopLadderMs: readonly number[];
   };
@@ -108,8 +110,8 @@ const ROUTE_PREPARATION_MS =
 // max backoff). Timers that bound external work stay real: provider create and
 // container boot, the preparation attempt, the pause before a failed create is retried,
 // restore/clone/save/runtime/session bounds, SSE silence (Kilo heartbeats every
-// 10-15 s), health request, the real-SSE reconnect window, credential grants
-// and the provider stop ladder.
+// 10-15 s), health request, the real-SSE reconnect window, credential grants,
+// the organization membership read and the provider stop ladder.
 function buildControlPlaneTimers(divisor: number): ControlPlaneTimers {
   const ms = (value: number): number => Math.max(1, Math.round(value / divisor));
   const sandbox = {
@@ -133,6 +135,10 @@ function buildControlPlaneTimers(divisor: number): ControlPlaneTimers {
     // Bounds external token renewal, so it stays real and short enough for the
     // Session DO's total scope-resolution bound.
     scopeBackingTokenMs: 3_000,
+    // The membership read is one indexed row. A read that cannot answer inside
+    // the bound denies the grant instead of holding the Sandbox DO operation
+    // queue, so it stays real.
+    organizationMembershipReadMs: 3_000,
     providerStopAttemptMs: 30_000,
     providerStopLadderMs: [5_000, 10_000, 10_000, 10_000, 10_000],
   };

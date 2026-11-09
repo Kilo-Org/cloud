@@ -512,7 +512,9 @@ These keep their current owners and evidence; the rewrite ports them, it does no
   fail the attempt with `workspace_setup_failed` stage `organization_access_revoked` and do not
   retry it. An unreadable membership denies the grant on every path, because a failed read is not
   evidence that the grant is still allowed: a renewal keeps the five-minute retry, and a preparation
-  or rebind fails the attempt. Personal sources carry no organization and skip the read.
+  or rebind fails the attempt with `workspace_setup_failed` stage
+  `organization_membership_unavailable`, so the deny is distinguishable from a grant-mint fault.
+  Personal sources carry no organization and skip the read.
 - Organization access revocation (`POST /internal/streams/close`, sent when a member is removed)
   releases each of that member's matching sessions at the Sandbox DO in addition to closing their
   client sockets: the route row, its organization-attributed grant and the wrapper path go, and the

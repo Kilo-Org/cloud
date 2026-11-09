@@ -29,6 +29,7 @@ import type {
 import {
   CONTROL_PLANE_PROTOCOL_VERSION,
   type ControlPlaneRouteSpec,
+  type ControlPlaneRouteView,
 } from '../../src/shared/control-plane-protocol.js';
 import type { createSandboxNotificationDispatcher } from '../../src/control-plane/sandbox/notifications.js';
 import { CONTROL_PLANE_TIMERS } from '../../src/shared/control-plane-timers.js';
@@ -1473,8 +1474,28 @@ describe('SandboxControlV2 routes and forwarding', () => {
       instance.organizationMembershipFor = workerOrganizationMembershipReader(instance.env);
     });
 
-    const view = await stub.prepare(prepareInput(SESSION));
+    const stages: unknown[] = [];
+    const withFields = vi.spyOn(logger, 'withFields').mockImplementation(fields => {
+      const bounded = fields as unknown as Record<string, unknown>;
+      if (bounded.diagnosticEvent === 'route_failed') stages.push(bounded.stage);
+      return logger;
+    });
+    const info = vi.spyOn(logger, 'info').mockImplementation(() => {});
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    const error = vi.spyOn(logger, 'error').mockImplementation(() => {});
+    let view: ControlPlaneRouteView;
+    try {
+      view = await stub.prepare(prepareInput(SESSION));
+    } finally {
+      withFields.mockRestore();
+      info.mockRestore();
+      warn.mockRestore();
+      error.mockRestore();
+    }
+
     expect(view).toMatchObject({ state: 'failed', reason: 'workspace_setup_failed' });
+    // The deny names its own cause instead of reading as a grant-mint fault.
+    expect(stages).toEqual(['organization_membership_unavailable']);
     expect(await readRouteRow(stub, SESSION)).toMatchObject({ state: 'failed' });
     expect(provider.launchEnvs).toHaveLength(0);
   });

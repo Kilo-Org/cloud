@@ -2,13 +2,6 @@ import { hasOrganizationAccess } from '@kilocode/worker-utils';
 import { getPgDb } from '../../db/pg.js';
 import type { Env } from '../../types.js';
 
-/**
- * Bound on the membership read that gates an organization-attributed grant. The
- * read is one indexed row; a read that cannot answer inside the bound denies the
- * grant instead of holding the Sandbox DO operation queue.
- */
-export const ORGANIZATION_MEMBERSHIP_READ_TIMEOUT_MS = 3_000;
-
 /** Current membership of one user in one organization, read on every issuance. */
 export type OrganizationMembershipReader = (
   userId: string,

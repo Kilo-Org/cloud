@@ -183,7 +183,7 @@ export type SystemSearchCollection = {
   observedSources: Set<string>;
   /**
    * The named sessions this run could see, most recently updated first, for the
-   * App Intents entity catalog.
+   * App Intents entity catalog — or null when no sessions read has settled.
    *
    * The Siri and Shortcuts picker offers the same rows the index carries, but
    * keyed by session id instead of by the route the index opens, because an
@@ -191,8 +191,16 @@ export type SystemSearchCollection = {
    * The list is ordered by the row's own update time across every query, then
    * deduped and capped; `KiloSessionCatalogStore` applies the same bound on the
    * device.
+   *
+   * Null is "not loaded yet", not "no sessions": a launch collects an empty
+   * cache before the stored history answers, and a rename drops the cached list
+   * entry while the first page is refetched. Publishing either as an empty
+   * catalog would wipe the titles a saved shortcut resolves against, so a null
+   * leaves the stored catalog alone. An empty array is a settled read that
+   * returned no sessions, which is the only evidence that nothing is left to
+   * offer.
    */
-  sessions: SessionCatalogEntry[];
+  sessions: SessionCatalogEntry[] | null;
 };
 
 /** One session the App Intents entity catalog can offer, keyed by session id. */
@@ -224,6 +232,7 @@ type QueryCollectionMemo = {
   maxPages: unknown;
   documents: SystemSearchDocument[];
   sessions: SessionCatalogCandidate[];
+  sessionsSettled: boolean;
   observedSource: string | null;
 };
 
@@ -241,6 +250,7 @@ export async function collectSystemSearchDocuments(
   const documents: SystemSearchDocument[] = [];
   const sessions: SessionCatalogCandidate[] = [];
   const observedSources = new Set<string>();
+  let sessionsSettled = false;
   const collections = collectionsFor(queryClient);
   const seen = new Set<string>();
   for (const query of queryClient.getQueryCache().getAll()) {
@@ -249,6 +259,7 @@ export async function collectSystemSearchDocuments(
     const collected = collectOrReuse(collections, query, queryHash);
     documents.push(...collected.documents);
     sessions.push(...collected.sessions);
+    sessionsSettled = sessionsSettled || collected.sessionsSettled;
     // Only a successful query that fully enumerated a source scope is
     // authoritative. A query can hold the family path without enumerating it —
     // the findings capacity probe fetches `limit: 1` under `listFindings`, a
@@ -275,10 +286,18 @@ export async function collectSystemSearchDocuments(
   return {
     documents: dedupeBy(documents, document => document.id),
     observedSources,
-    sessions: dedupeBy(sortedByRecency(sessions), session => session.id)
-      .slice(0, SESSION_CATALOG_MAX_ENTRIES)
-      .map(session => ({ id: session.id, title: session.title })),
+    // A settled read is the only thing that may replace the device's catalog.
+    // Building the entries only then keeps the caller from publishing a
+    // half-loaded cache under the account's titles.
+    sessions: sessionsSettled ? catalogEntries(sessions) : null,
   };
+}
+
+/** The catalog's entries: one per session id, newest first, capped. */
+function catalogEntries(sessions: readonly SessionCatalogCandidate[]): SessionCatalogEntry[] {
+  return dedupeBy(sortedByRecency(sessions), session => session.id)
+    .slice(0, SESSION_CATALOG_MAX_ENTRIES)
+    .map(session => ({ id: session.id, title: session.title }));
 }
 
 /**
@@ -335,6 +354,7 @@ function collectOrReuse(
     maxPages: query.options.maxPages,
     documents: collected.documents,
     sessions: collected.sessions,
+    sessionsSettled: collected.sessionsSettled,
     observedSource: collected.observedSource,
   });
   return collected;
@@ -352,10 +372,22 @@ type QueryDocuments = {
   documents: SystemSearchDocument[];
   /** The named sessions this query enumerates, for the intent catalog. */
   sessions: SessionCatalogCandidate[];
+  /**
+   * Whether this query delivered a sessions list this run may speak for: one
+   * unfiltered stored-history payload with at least one page. A narrowed list
+   * (one platform or repository) and a list the app has not fetched yet are not
+   * whole answers, so neither may become the catalog.
+   */
+  sessionsSettled: boolean;
   observedSource: string | null;
 };
 
-const NOT_ENUMERATED: QueryDocuments = { documents: [], sessions: [], observedSource: null };
+const NOT_ENUMERATED: QueryDocuments = {
+  documents: [],
+  sessions: [],
+  sessionsSettled: false,
+  observedSource: null,
+};
 
 /** The keys whose presence narrows a source list to a subset of its scope. */
 const SESSION_NARROWING_KEYS = ['createdOnPlatform', 'gitUrl'] as const;
@@ -411,6 +443,13 @@ function documentsFromQuery(query: Query): QueryDocuments {
       sessions: namedSessions(
         rows.map(row => ({ id: row.session_id, title: row.title, updatedAt: row.updated_at }))
       ),
+      // A page-less payload is an infinite query the app has built and not
+      // fetched, which is the cold-launch state; a narrowed list is one
+      // platform's or repository's subset of the account's sessions. Neither is
+      // the whole answer the catalog replaces the device's list with.
+      sessionsSettled:
+        parsed.data.pages.length > 0 &&
+        !hasNarrowingFilter(queryInput(queryKey), SESSION_NARROWING_KEYS),
       observedSource: sessionObservedSource(query),
     };
   }
@@ -421,13 +460,16 @@ function documentsFromQuery(query: Query): QueryDocuments {
     }
     // The live list enumerates only currently running sessions, a subset of
     // the stored history that already carries every session, so it contributes
-    // documents but never authorises a removal.
+    // documents but never authorises a removal, and never becomes the catalog
+    // on its own: a launch that has only the live list has not read the
+    // history yet.
     const rows = decodedRows(parsed.data.sessions, activeSessionRowSchema);
     return {
       documents: rows.flatMap(row => presentOrEmpty(activeSessionSearchDocument(row))),
       sessions: namedSessions(
         rows.map(row => ({ id: row.id, title: row.title, updatedAt: row.updatedAt }))
       ),
+      sessionsSettled: false,
       observedSource: null,
     };
   }
@@ -446,6 +488,7 @@ function documentsFromQuery(query: Query): QueryDocuments {
         .flatMap(page => decodedRows(page.items, inboxItemRowSchema))
         .map(row => inboxPrSearchDocument(row, systemSearchSourceKey('pullRequests', 'github'))),
       sessions: [],
+      sessionsSettled: false,
       observedSource: isDefaultInput
         ? untrimmedSource(query, systemSearchSourceKey('pullRequests', 'github'), cursorHasMore)
         : null,
@@ -473,6 +516,7 @@ function documentsFromQuery(query: Query): QueryDocuments {
           )
         ),
       sessions: [],
+      sessionsSettled: false,
       observedSource:
         provider === null
           ? null
@@ -507,6 +551,7 @@ function findingsFromQuery(query: Query, scope: string): QueryDocuments {
       .flatMap(page => decodedRows(page.findings, findingRowSchema))
       .map(row => findingSearchDocument(row, scope)),
     sessions: [],
+    sessionsSettled: false,
     observedSource: filtered
       ? null
       : untrimmedSource(query, systemSearchSourceKey('findings', scope), findingsHasMore),

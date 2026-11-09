@@ -39,6 +39,10 @@ async function applyIndexUpdate(update: SystemSearchIndexUpdate): Promise<void> 
  * The mount's catalog dep. Only a known-unlocked app publishes: the lock
  * surface covers every other status, so a publish then would put titles back
  * behind it.
+ *
+ * The sync hands this only a settled sessions read. A launch, or the window a
+ * rename leaves while its list entry is refetched, carries no catalog at all,
+ * so the device keeps the titles a saved shortcut resolves against.
  */
 function applySessionCatalog(sessions: readonly SessionCatalogEntry[]): Promise<boolean> {
   if (!isCatalogPublishAllowed()) {

@@ -262,7 +262,7 @@ describe('collectSystemSearchDocuments', () => {
   it('collects no documents from an empty cache', async () => {
     await expect(collectSystemSearchDocuments(new QueryClient())).resolves.toEqual({
       documents: [],
-      sessions: [],
+      sessions: null,
       observedSources: new Set(RECENTS_SOURCES),
     });
   });
@@ -865,14 +865,80 @@ describe('collectSystemSearchDocuments session catalog', () => {
 
     const { sessions } = await collectSystemSearchDocuments(client);
 
+    if (sessions === null) {
+      throw new Error('expected a settled catalog');
+    }
     expect(sessions).toHaveLength(50);
     expect(sessions[0]).toEqual({ id: 'sess-0', title: 'Session 0' });
     expect(sessions.at(-1)).toEqual({ id: 'sess-49', title: 'Session 49' });
   });
 
-  it('carries no catalog for a cache that holds no session rows', async () => {
+  it('carries no catalog until a sessions read has settled', async () => {
+    // A launch before the stored history answers, and the window a rename
+    // leaves while it drops the list entry and refetches page one: the cache
+    // has documents from other sources but no sessions list. Null, not an
+    // empty list — the publish must leave the device's titles alone.
     const client = new QueryClient();
     client.setQueryData(INBOX_KEY, inbox);
+
+    const { sessions } = await collectSystemSearchDocuments(client);
+
+    expect(sessions).toBeNull();
+  });
+
+  it('carries no catalog for a sessions query that has not delivered a page', async () => {
+    // The infinite query exists but its first fetch has not answered. Its
+    // `pages` are empty, which says nothing about the account's history.
+    const client = new QueryClient();
+    client.setQueryData(SESSION_LIST_KEY, { pages: [], pageParams: [] });
+
+    const { sessions } = await collectSystemSearchDocuments(client);
+
+    expect(sessions).toBeNull();
+  });
+
+  it('carries no catalog for a narrowed sessions list', async () => {
+    // One platform's or repository's list is a subset of the account's
+    // sessions, so replacing the catalog with it would drop the rest.
+    const client = new QueryClient();
+    client.setQueryData(
+      [
+        ['cliSessionsV2', 'list'],
+        {
+          type: 'infinite',
+          input: { limit: 30, orderBy: 'updated_at', includeChildren: false, gitUrl: 'acme/api' },
+        },
+      ],
+      {
+        pages: [
+          {
+            cliSessions: [
+              {
+                session_id: 'sess-filtered',
+                title: 'Fix login bug',
+                organization_id: null,
+                git_branch: null,
+                updated_at: new Date().toISOString(),
+              },
+            ],
+            nextCursor: null,
+          },
+        ],
+      }
+    );
+
+    const { sessions } = await collectSystemSearchDocuments(client);
+
+    expect(sessions).toBeNull();
+  });
+
+  it('carries an empty catalog for a settled read that returned no sessions', async () => {
+    // The list answered and holds no rows: that is the one case where an empty
+    // catalog is the truth, and the publish has to clear the device's titles.
+    const client = new QueryClient();
+    client.setQueryData(SESSION_LIST_KEY, {
+      pages: [{ cliSessions: [], nextCursor: null }],
+    });
 
     const { sessions } = await collectSystemSearchDocuments(client);
 

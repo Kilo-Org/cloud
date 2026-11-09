@@ -224,13 +224,18 @@ export class SystemSearchIndexSync {
         await this.deps.apply({ add: plan.add, remove: plan.remove });
         changed = true;
       }
-      if (applySessions !== undefined) {
+      // A null catalog means no sessions read settled in this run's cache (a
+      // cold launch, or the list entry a rename dropped while it refetches).
+      // The device keeps the titles it already stored: replacing them with the
+      // none this run saw would break every saved shortcut that names one.
+      const catalog = documents.sessions;
+      if (applySessions !== undefined && catalog !== null) {
         // The index write awaited, so the fences are read once more for the
         // second write: the catalog is account-scoped for the same reason.
         if (!isCurrentAuthEpoch(epoch) || !this.deps.isEnabled()) {
           return changed ? 'applied' : 'skipped';
         }
-        changed = (await applySessions(documents.sessions)) || changed;
+        changed = (await applySessions(catalog)) || changed;
       }
       return changed ? 'applied' : 'skipped';
     } catch (error) {

@@ -428,7 +428,7 @@ describe('SystemSearchIndexSync', () => {
     });
     const sync = new harness.SystemSearchIndexSync({
       queryClient,
-      collect: async () => ({ documents: [], sessions: [], observedSources: new Set() }),
+      collect: async () => ({ documents: [], sessions: null, observedSources: new Set() }),
       fingerprints: bridge.indexedSystemSearchFingerprints,
       apply: async () => undefined,
       report,
@@ -538,6 +538,43 @@ describe('the App Intents session catalog a run publishes', () => {
 
     await expect(sync.syncNow()).resolves.toBe('skipped');
     expect(bridge.replaceSessions).not.toHaveBeenCalled();
+    expect(bridge.catalog).toEqual([]);
+  });
+
+  it('keeps the stored titles when no sessions read settled in the run', async () => {
+    // A cold launch collects an empty cache before the stored history answers.
+    // The run must not hand the device an empty catalog: that drops the titles
+    // every saved shortcut resolves against.
+    const bridge = createBridge();
+    const queryClient = new QueryClient();
+    queryClient.setQueryData(SESSION_LIST_KEY, storedSessions('Fix login bug'));
+    const { sync } = await syncWithCatalog(bridge, queryClient);
+    await expect(sync.syncNow()).resolves.toBe('applied');
+    expect(bridge.catalog).toEqual([{ id: 'sess-1', title: 'Fix login bug' }]);
+
+    // The next launch collects before the list has loaded again.
+    queryClient.clear();
+    bridge.replaceSessions.mockClear();
+
+    await sync.syncNow();
+
+    expect(bridge.replaceSessions).not.toHaveBeenCalled();
+    expect(bridge.catalog).toEqual([{ id: 'sess-1', title: 'Fix login bug' }]);
+  });
+
+  it('clears the stored titles when a settled read returns no sessions', async () => {
+    const bridge = createBridge();
+    const queryClient = new QueryClient();
+    queryClient.setQueryData(SESSION_LIST_KEY, storedSessions('Fix login bug'));
+    const { sync } = await syncWithCatalog(bridge, queryClient);
+    await expect(sync.syncNow()).resolves.toBe('applied');
+
+    queryClient.setQueryData(SESSION_LIST_KEY, { pages: [{ cliSessions: [], nextCursor: null }] });
+    bridge.replaceSessions.mockClear();
+
+    await sync.syncNow();
+
+    expect(bridge.replaceSessions).toHaveBeenCalledExactlyOnceWith([]);
     expect(bridge.catalog).toEqual([]);
   });
 

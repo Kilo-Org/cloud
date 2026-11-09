@@ -173,6 +173,43 @@ describe('the App Intents catalog and the privacy lock', () => {
     mounted.unmount();
   });
 
+  it('leaves the stored titles alone on a launch with no cached session rows', async () => {
+    // A cold launch runs the sync before the stored history answers, and a
+    // rename runs it again while the list entry is gone and its first page is
+    // refetching. Neither may replace the device's catalog with the nothing it
+    // saw: a saved shortcut resolves its session against what is stored.
+    const mounted = await mountSync();
+
+    expect(nativeBridge.replaceNativeSessionCatalog).not.toHaveBeenCalled();
+    expect(nativeBridge.clearNativeSessionCatalog).not.toHaveBeenCalled();
+
+    // The foreground event is the retry that runs once the list has loaded.
+    seedSession('Fix login bug');
+    await act(async () => {
+      for (const listener of appState.listeners) {
+        listener('active');
+      }
+      await Promise.resolve();
+    });
+
+    expect(nativeBridge.replaceNativeSessionCatalog).toHaveBeenCalledWith([
+      { id: 'sess-1', title: 'Fix login bug' },
+    ]);
+    mounted.unmount();
+  });
+
+  it('clears the stored titles when the settled session read is empty', async () => {
+    // The list answered and holds no rows, so an empty catalog is the truth.
+    client().setQueryData(SESSION_LIST_KEY, {
+      pages: [{ cliSessions: [], nextCursor: null }],
+    });
+
+    const mounted = await mountSync();
+
+    expect(nativeBridge.replaceNativeSessionCatalog).toHaveBeenCalledExactlyOnceWith([]);
+    mounted.unmount();
+  });
+
   it('publishes nothing while the launch is still reading the lock preference', async () => {
     seedSession('Fix login bug');
     unlock.status = 'preference-loading';

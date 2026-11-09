@@ -300,6 +300,7 @@ export default function CloudChatPage({
   const remoteModelState = useAtomValue(manager.atoms.remoteModelState);
   const observedModel = useAtomValue(manager.atoms.observedModel);
   const remoteModelOverride = useAtomValue(manager.atoms.remoteModelOverride);
+  const cloudAgentModelOverride = useAtomValue(manager.atoms.cloudAgentModelOverride);
   const hasOlderMessages = useAtomValue(manager.atoms.hasOlderMessages);
   const isLoadingOlderMessages = useAtomValue(manager.atoms.isLoadingOlderMessages);
   const olderMessagesError = useAtomValue(manager.atoms.olderMessagesError);
@@ -587,6 +588,7 @@ export default function CloudChatPage({
     remoteModelState,
     observedModel,
     remoteModelOverride,
+    cloudAgentModelOverride,
     gatewayModelId: composerSettings?.model,
     gatewayVariant: composerSettings?.variant,
     // A chat listed under this route belongs to its organization, so its models load at once.
@@ -683,8 +685,8 @@ export default function CloudChatPage({
   const newChatComposer = composerSettings
     ? {
         mode: composerSettings.mode,
-        model: composerSettings.model,
-        variant: composerSettings.variant ?? null,
+        model: sessionModels.selectedValue ?? composerSettings.model,
+        variant: sessionModels.selectedVariant ?? null,
       }
     : null;
   const handleCreateWorktreeChat = useCallback(() => {
@@ -714,8 +716,8 @@ export default function CloudChatPage({
           type: 'prompt',
           prompt,
           mode: selection.mode,
-          model: selection.model,
-          variant: selection.variant,
+          model: sessionModels.selectedValue ?? selection.model,
+          variant: sessionModels.selectedVariant,
         },
         attachments: supportsAttachments ? attachments : undefined,
       });
@@ -740,6 +742,8 @@ export default function CloudChatPage({
       manager,
       scheduleScrollToBottom,
       sessionConfig,
+      sessionModels.selectedValue,
+      sessionModels.selectedVariant,
       supportsAttachments,
       captureSendPosition,
       followAcceptedSend,
@@ -1281,9 +1285,10 @@ export default function CloudChatPage({
       const newModelVariants =
         modelOptions.find(candidate => candidate.id === model)?.variants ?? [];
       const validVariant =
-        sessionConfig.variant && newModelVariants.includes(sessionConfig.variant)
-          ? sessionConfig.variant
+        sessionModels.selectedVariant && newModelVariants.includes(sessionModels.selectedVariant)
+          ? sessionModels.selectedVariant
           : newModelVariants[0];
+      manager.setCloudAgentModelOverride({ model, variant: validVariant });
       setSessionConfig({ ...sessionConfig, model, variant: validVariant });
     },
     [
@@ -1303,7 +1308,9 @@ export default function CloudChatPage({
         manager.setRemoteModelOverride(createRemoteModelOverride(option, variant));
         return;
       }
-      if (sessionConfig) setSessionConfig({ ...sessionConfig, variant });
+      if (!sessionConfig || !sessionModels.selectedValue) return;
+      manager.setCloudAgentModelOverride({ model: sessionModels.selectedValue, variant });
+      setSessionConfig({ ...sessionConfig, model: sessionModels.selectedValue, variant });
     },
     [
       activeSessionType,
@@ -1334,11 +1341,7 @@ export default function CloudChatPage({
 
   const showChatInterface =
     Boolean(selectedWorktreeId) || Boolean(sessionConfig) || Boolean(sessionIdFromParams);
-  const currentModelOption = modelOptions.find(model =>
-    activeSessionType === 'remote'
-      ? model.id === sessionModels.selectedValue
-      : model.id === sessionConfig?.model
-  );
+  const currentModelOption = modelOptions.find(model => model.id === displayModel);
   const modelDisplayName = currentModelOption?.name
     ? formatShortModelDisplayName(currentModelOption.name)
     : undefined;
@@ -1455,7 +1458,7 @@ export default function CloudChatPage({
             : (sessionBranch ?? undefined)
       }
       gitUrl={workspaceControlSession ? undefined : fetchedSessionData?.gitUrl}
-      model={workspaceControlSession?.model ?? sessionConfig?.model}
+      model={workspaceControlSession?.model ?? displayModel}
       modelDisplayName={workspaceControlSession ? undefined : modelDisplayName}
       getSessionCostBreakdown={
         !workspaceControlSession && isCurrentSession && fetchedSessionData

@@ -39,22 +39,30 @@ const DNS_LOOKUP_TIMEOUT_MS = 2_000;
  */
 const DNS_LOOKUP_SETTLE_DEADLINE_MS = 30_000;
 /**
- * Process-wide ceiling on outstanding system lookups. `dns.lookup` runs
- * getaddrinfo on the libuv threadpool, which it shares with the process's other
- * pooled I/O, so the gateway starts a bounded number of them and reports the
- * retryable lookup failure for the rest.
+ * Process-wide ceiling on system lookups whose resolver has not settled.
+ * `dns.lookup` runs getaddrinfo on the libuv threadpool, which it shares with
+ * the process's other pooled I/O, so the gateway starts a bounded number of them
+ * and reports the retryable lookup failure for the rest.
  */
 const DNS_LOOKUPS_MAX_OUTSTANDING = 2;
 const publicHostnameExpiresAt = new Map<string, number>();
 /**
- * Resolutions in flight, keyed by normalized hostname. An entry exists only
- * while its lookup is unsettled, or until the settle deadline passes, so the
- * map holds the outstanding lookups the process-wide limit counts. A validation
- * reuses the entry for its host while that lookup is pending. Removal only
- * stops new validations from reusing the entry. Callers that already hold the
- * promise keep it, with their own signal and deadline.
+ * Resolutions in flight, keyed by normalized hostname. A validation reuses the
+ * entry for its host while that lookup is pending, or until the settle deadline
+ * stops new validations from reusing it. Removal only stops the reuse; the
+ * lookup itself keeps its capacity until it settles, which the outstanding
+ * counter tracks. Callers that already hold the promise keep it, with their own
+ * signal and deadline.
  */
 const inFlightHostnameResolutions = new Map<string, Promise<string[]>>();
+/**
+ * System lookups the process started and whose resolver has not settled yet.
+ * `dns.lookup` cannot be cancelled, so this count only falls when getaddrinfo
+ * returns. The settle deadline can drop a map entry that no validation may
+ * reuse any more, but it does not free this capacity: the lookup still holds its
+ * thread-pool slot.
+ */
+let outstandingSystemLookups = 0;
 
 const REJECTION_MESSAGES = {
   invalid_url: 'The upstream provider URL is not a valid URL.',
@@ -123,11 +131,14 @@ function forgetInFlightResolution(hostname: string, resolution: Promise<string[]
 /**
  * Returns the resolution already in flight for `hostname`, or starts one.
  * Returns null without starting a lookup when the process already has
- * `DNS_LOOKUPS_MAX_OUTSTANDING` outstanding lookups. The entry stays recorded
- * until the resolution settles or the settle deadline passes, whichever comes
- * first. Every validation of the same host that starts in that window awaits
- * that one resolution. Each caller applies its own signal and deadline to the
- * promise it receives.
+ * `DNS_LOOKUPS_MAX_OUTSTANDING` lookups whose resolver has not settled. The
+ * entry stays recorded until the resolution settles or the settle deadline
+ * passes, whichever comes first. Every validation of the same host that starts
+ * in that window awaits that one resolution. Each caller applies its own signal
+ * and deadline to the promise it receives.
+ *
+ * Capacity is separate from the entry: a lookup that outlives its entry still
+ * counts against the limit until its resolver settles.
  */
 function resolveSharedHostAddresses(
   hostname: string,
@@ -135,9 +146,10 @@ function resolveSharedHostAddresses(
 ): Promise<string[]> | null {
   const pending = inFlightHostnameResolutions.get(hostname);
   if (pending) return pending;
-  if (inFlightHostnameResolutions.size >= DNS_LOOKUPS_MAX_OUTSTANDING) return null;
+  if (outstandingSystemLookups >= DNS_LOOKUPS_MAX_OUTSTANDING) return null;
 
   const resolution = Promise.resolve().then(() => resolveHostAddresses(hostname));
+  outstandingSystemLookups += 1;
   inFlightHostnameResolutions.set(hostname, resolution);
   const forget = () => forgetInFlightResolution(hostname, resolution);
   // `dns.lookup` cannot be cancelled, so a stalled lookup can outlive every
@@ -147,6 +159,7 @@ function resolveSharedHostAddresses(
   const settleDeadline = setTimeout(forget, DNS_LOOKUP_SETTLE_DEADLINE_MS);
   settleDeadline.unref?.();
   const forgetSettled = () => {
+    outstandingSystemLookups -= 1;
     clearTimeout(settleDeadline);
     forget();
   };
@@ -215,9 +228,14 @@ async function resolveWithRetry(
   return null;
 }
 
+/**
+ * Test hook. Also resets the outstanding-lookup accounting: a lookup a test
+ * leaves stalled never settles, and nothing else releases its capacity.
+ */
 export function clearUpstreamUrlPolicyCache(): void {
   publicHostnameExpiresAt.clear();
   inFlightHostnameResolutions.clear();
+  outstandingSystemLookups = 0;
 }
 
 /**

@@ -204,6 +204,41 @@ describe('findUpstreamUrlViolation', () => {
     await expect(Promise.all(outstanding)).resolves.toEqual([null, null]);
   });
 
+  it('keeps lookup capacity when the settle deadline forgets the entry before the resolver settles', async () => {
+    jest.useFakeTimers();
+    try {
+      const first = pendingResolution();
+      const second = pendingResolution();
+      const third = neverResolves();
+
+      const pending = Promise.all([
+        check('https://a.example.com/v1', first.resolveHostAddresses),
+        check('https://b.example.com/v1', second.resolveHostAddresses),
+      ]);
+      await jest.advanceTimersByTimeAsync(10);
+      expect(first.resolveHostAddresses).toHaveBeenCalledTimes(1);
+      expect(second.resolveHostAddresses).toHaveBeenCalledTimes(1);
+
+      // The settle deadline stops further reuse of the two entries, but the
+      // resolvers hold their capacity until they settle.
+      await jest.advanceTimersByTimeAsync(30_000);
+
+      await expect(check('https://c.example.com/v1', third)).resolves.toBe('dns_lookup_failed');
+      expect(third).not.toHaveBeenCalled();
+
+      first.resolve(['104.18.2.115']);
+      second.resolve(['104.18.2.115']);
+      await expect(pending).resolves.toEqual([null, null]);
+
+      // A settled resolver releases its capacity for the next host.
+      const fourth = resolvesTo('104.18.2.115');
+      await expect(check('https://d.example.com/v1', fourth)).resolves.toBeNull();
+      expect(fourth).toHaveBeenCalledTimes(1);
+    } finally {
+      jest.useRealTimers();
+    }
+  }, 10_000);
+
   it('keeps the shared resolution when the only caller aborts', async () => {
     const { resolveHostAddresses, resolve } = pendingResolution();
     const controller = new AbortController();

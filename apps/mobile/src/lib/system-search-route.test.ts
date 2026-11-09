@@ -261,9 +261,12 @@ describe('system-search-route', () => {
   });
 
   describe('a tap the phone index could not resolve yet', () => {
-    const unresolved = Object.assign(new Error('The system search index could not resolve this result.'), {
-      code: 'ERR_SYSTEM_SEARCH_UNRESOLVED',
-    });
+    const unresolved = Object.assign(
+      new Error('The system search index could not resolve this result.'),
+      {
+        code: 'ERR_SYSTEM_SEARCH_UNRESOLVED',
+      }
+    );
 
     it('reports it and offers the retry in the reader’s language', async () => {
       mocks.consumePendingRoute.mockRejectedValueOnce(unresolved);

@@ -225,13 +225,16 @@ type GetAuthResponse =
 export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAuthResponse> {
   const headersList = opts.requestHeaders ?? (await headers());
   const result = await resolveUserFromAuth(opts, headersList);
+  // Every admin audit event of one request carries the surface it arrived on,
+  // so the same request lands in one inventory entry whichever way it resolves.
+  const surface = opts.stepUpSurface ?? 'rest';
 
   // Admin audit trail: emit exactly one identity-attributed event per authorized
   // admin request. Guarded strictly on adminOnly so the millions of
   // adminOnly:false calls never log.
   if (opts.adminOnly === true && result.user) {
     emitAdminAccessEvent({
-      surface: opts.stepUpSurface ?? 'rest',
+      surface,
       kind: 'admin_guard',
       user: result.user,
       authViaToken: authViaTokenFromHeaders(headersList),
@@ -257,7 +260,6 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
       delegatedWorkload: result.cloudAgentAuthority !== undefined,
     });
     if (isAdminStepUpEnabled() && !opts.skipStepUpGuard) {
-      const surface = opts.stepUpSurface ?? 'rest';
       const route = routeFromHeaders(headersList);
       const method = methodFromHeaders(headersList, opts.requestMethod);
       const { actionClass, inventoryId } = actionClassForRoute({
@@ -321,12 +323,12 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
     const route = routeFromHeaders(headersList);
     const method = methodFromHeaders(headersList, opts.requestMethod);
     const { actionClass, inventoryId } = actionClassForRoute({
-      surface: 'rest',
+      surface,
       route: route ?? '',
       method,
     });
     emitPrivilegedAccessEvent({
-      surface: 'rest',
+      surface,
       user: result.user ?? undefined,
       credential,
       outcome: result.user ? 'succeeded' : 'denied',

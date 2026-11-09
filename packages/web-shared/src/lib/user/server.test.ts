@@ -1617,7 +1617,7 @@ describe('step-up refusal telemetry (REST)', () => {
     evaluateStepUp.mockClear();
   });
 
-  async function bearerAdmin() {
+  async function bearerAdmin(pathname = '/admin/api/safety-identifiers') {
     const admin = await insertTestUser({
       google_user_email: `step-up-audit-bearer-${crypto.randomUUID()}@kilocode.ai`,
       hosted_domain: 'kilocode.ai',
@@ -1627,7 +1627,7 @@ describe('step-up refusal telemetry (REST)', () => {
     mockHeaders.mockResolvedValue(
       new Headers({
         Authorization: `Bearer ${generateApiToken(admin)}`,
-        'x-pathname': '/admin/api/safety-identifiers',
+        'x-pathname': pathname,
         'x-forwarded-for': '203.0.113.9, 10.0.0.1',
       })
     );
@@ -1697,6 +1697,28 @@ describe('step-up refusal telemetry (REST)', () => {
     expect(
       events.filter(event => event.kind === 'privileged_access' && event.outcome === 'denied')
     ).toHaveLength(0);
+  });
+
+  test('carries the arriving surface through both events of one request', async () => {
+    process.env.ADMIN_STEP_UP_ENABLED = 'false';
+    await bearerAdmin('/admin');
+
+    const result = await getUserFromAuth({
+      adminOnly: true,
+      requestMethod: 'GET',
+      stepUpSurface: 'server-component',
+    });
+
+    expect(result.user).not.toBeNull();
+    expect(events.map(event => event.surface)).toEqual(['server-component', 'server-component']);
+    expect(events[1]).toMatchObject({
+      kind: 'privileged_access',
+      outcome: 'succeeded',
+      actionClass: 'platform_read',
+      actionId: 'serverComponent.admin',
+      route: '/admin',
+      method: 'GET',
+    });
   });
 
   test('records a failed event when the guard cannot answer', async () => {

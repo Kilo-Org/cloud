@@ -194,6 +194,47 @@ persistence completion. This is not durable recovery: unaccepted events may be
 lost, and ambiguous failures may still be recorded later by the consumer. For
 unselected events, the existing SFO handoff-to-local fallback remains unchanged.
 
+### Publisher attempt timing
+
+The Cloudflare HTTP publisher writes one `usage_publisher_attempt` JSON line at
+`info` level for each attempt that completes. It adds no request, retry, timeout,
+budget or response change. Fields, with times in milliseconds from
+`performance.now()`:
+
+| Field | Meaning |
+|---|---|
+| `usage_id`, `execution_region` | The published usage ID and Vercel function region, as on the other publisher logs |
+| `attempt`, `max_attempts` | 1-based attempt number; `max_attempts` is 4 with retries and 1 for a single-attempt call |
+| `accepted` | The attempt received HTTP 202 |
+| `attempt_end` | `response_headers`, `timeout` (its abort signal fired) or `network_error` |
+| `http_status` | The actual status, only when `attempt_end` is `response_headers` |
+| `reason` | The existing categorical reason (`http_<status>`, `timeout`, `request_failed`) when not accepted |
+| `duration_ms` | Just before `fetch` to response headers, or to the error or abort reaching the publisher. It includes local scheduling delay and never waits for the body |
+| `timeout_ms` | The abort window this attempt used, after clipping to the remaining budget |
+| `remaining_budget_ms` | Retries only: what was left of the 40 s budget when the attempt started |
+| `start_offset_ms` | Publication start, after serialization when the budget clock starts, to this attempt's start |
+| `prior_backoff_planned_ms`, `prior_backoff_elapsed_ms` | Later attempts only: the jittered sleep chosen and the measured sleep. Elapsed above planned is timer or runtime delay |
+| `sample_rate` | `0.01` for a sampled fast acceptance, otherwise `1` |
+
+Coverage: an attempt that was not accepted, any attempt after the first, and any
+attempt that took at least 1,000 ms are always logged. A first attempt accepted in
+under 1,000 ms is logged only when a stable hash of its usage ID falls in a nominal
+1% bucket, the same method as the consumer's delivery baseline. That is at most one
+line per attempt, four per publication, and about 1% of publications plus every
+slow, failed or retried attempt. The rows are not a uniform sample: weight fast
+rows by `1 / sample_rate` and do not read either subset as population percentiles.
+An attempt cut off by a process kill writes nothing. Configuration failures and the
+Vercel queue transport make no attempt and log nothing new. If writing the line
+throws, the publisher reports a Sentry warning tagged `usage_publisher_attempt_log`
+and the publication continues with its existing outcome.
+
+To join a publication to ingress, select these lines by `usage_id` and the
+`usage_ingest_enqueue_start`, `usage_ingest_enqueue` and
+`usage_ingest_enqueue_observed` events with the same `usage_id`. Each attempt that
+reached the Worker has its own ingress start. Order them by time but do not
+subtract timestamps across hosts as exact durations. An accepted attempt is queue
+acceptance only; `usage_record_completion` is the persistence signal.
+
 `duration_ms` covers the shared persistence call and its awaited follow-up work,
 not pure SQL time. `event_age_ms` retains the original event timestamp across
 replay/redrive, while `queue_wait_ms` uses the current queue message's send time

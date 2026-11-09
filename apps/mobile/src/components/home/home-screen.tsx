@@ -112,7 +112,7 @@ export function HomeScreen() {
               />
               <UpNextSection organizationId={context.organizationId} enabled={context.isReady} />
               {context.isReady && (
-                <View className="gap-2 pt-4">
+                <View className="gap-2 pt-2">
                   <NewTaskButton organizationId={context.organizationId} />
                   <NewTaskFromPictureButton organizationId={context.organizationId} />
                 </View>

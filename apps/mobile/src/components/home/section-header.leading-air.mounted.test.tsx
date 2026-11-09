@@ -2,7 +2,6 @@ import { createElement, type ReactElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
-import { textActionTargetClass } from '@/lib/a11y/tap-target';
 import { SectionHeader } from './section-header';
 
 vi.mock('react-native', () => ({
@@ -33,17 +32,14 @@ function row(element: ReactElement) {
 }
 
 describe('SectionHeader leading air', () => {
-  // Field defect (Home): a row with an action is as tall as that action's touch
-  // frame while an action-less row is one label line tall, so one leading
-  // padding held the first section's label ~44 dp below the Home header row and
-  // every later label ~14 dp below its block. Reserving the frame's own height
-  // above the label line gives both forms the same air, on the platform's own
-  // frame size (home-header-section-gap).
-  it('reserves the action frame above a label whose row has no action', () => {
-    const frame = textActionTargetClass().split(' ');
+  // Field defect (Home): an action-less row is one label line tall, so the label
+  // sat directly under the block above it. Reserving a short fixed box above the
+  // label keeps a gap between Home sections without the full action frame's air
+  // (home-header-section-gap).
+  it('reserves a short fixed box above a label whose row has no action', () => {
     const plain = row(createElement(SectionHeader, { label: 'Explore', reserveLabelAir: true }));
     expect(plain.row).toContain('pt-0');
-    expect(plain.labelBox).toEqual(expect.arrayContaining(frame));
+    expect(plain.labelBox).toContain('min-h-[28px]');
 
     const withAction = row(
       createElement(SectionHeader, {

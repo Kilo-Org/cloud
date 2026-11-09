@@ -5,6 +5,13 @@ import { EYEBROW_LATIN_DISPLAY, Text } from '@/components/ui/text';
 import { textActionTargetClass } from '@/lib/a11y/tap-target';
 import { cn } from '@/lib/utils';
 
+/**
+ * The box a Home section label sits at the bottom of. It holds the label a
+ * short, fixed distance below the block above it, instead of the full action
+ * frame, so Home's sections stay close together.
+ */
+const LABEL_AIR_CLASS = 'min-h-[28px]';
+
 type SectionHeaderProps = {
   label: string;
   /**
@@ -29,16 +36,10 @@ type SectionHeaderProps = {
    */
   notice?: ReactNode;
   /**
-   * Reserves the action frame's height above the label line, so the label keeps
-   * the same leading air whether or not the row carries an action.
-   *
-   * A row with an action is as tall as the action's touch frame, and its label
-   * sits on the row's content bottom edge, so that frame already holds the label
-   * its whole height below the row's top edge. A row without an action is one
-   * label line tall, which puts its label much closer to the block above it and
-   * reads as a second rhythm on one screen (home-header-section-gap). Home passes
-   * this for its sections, whose rows sit both directly under the brand row and
-   * under the sections column's `gap-2`.
+   * Reserves {@link LABEL_AIR_CLASS} above the label line, so a row without an
+   * action keeps a fixed leading air instead of sitting directly under the block
+   * above it (home-header-section-gap). A row with an action is still as tall as
+   * the action's touch frame. Home passes this for its sections.
    */
   reserveLabelAir?: boolean;
 };
@@ -69,10 +70,9 @@ export function SectionHeader({
     // sits above the line instead of between the label and its content, which
     // is the header's own `pb-2` everywhere.
     //
-    // With `reserveLabelAir` the label reserves that same frame height on its
-    // own, so a row without an action holds its label as far below the row's top
-    // edge as a row with one, and neither form needs leading padding on the row
-    // (home-header-section-gap).
+    // With `reserveLabelAir` the label sits at the bottom of its own short box,
+    // so a row without an action keeps a fixed gap to the block above it and
+    // needs no leading padding on the row (home-header-section-gap).
     <View
       className={cn(
         'flex-row flex-wrap items-end justify-end gap-2 px-4 pb-2',
@@ -82,7 +82,7 @@ export function SectionHeader({
       {/* With a notice the label keeps its own width, so the notice takes all
           the free space on the line instead of an equal share of it. */}
       {reserveLabelAir ? (
-        <View className={cn('flex-col justify-end', !notice && 'grow', textActionTargetClass())}>
+        <View className={cn('flex-col justify-end', !notice && 'grow', LABEL_AIR_CLASS)}>
           {labelText}
         </View>
       ) : (

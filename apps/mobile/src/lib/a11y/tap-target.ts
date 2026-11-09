@@ -93,6 +93,9 @@ export const ROW_IDENTITY_CLASS = 'min-h-[48px] min-w-0 flex-1 justify-center';
  */
 export const DENSE_ROW_FRAME_DP = 39;
 
+/** The frame a dense row renders, as {@link DENSE_ROW_FRAME_DP}. */
+export const DENSE_ROW_FRAME_CLASS = 'min-h-[39px]';
+
 /**
  * Per-side vertical `hitSlop` of a row on {@link DENSE_ROW_FRAME_DP}:
  * `39 + 3 + 3 = 45 dp`, past `DESIGN.md:364`'s 44pt design target, so even the

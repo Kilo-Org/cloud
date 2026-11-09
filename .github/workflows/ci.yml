@@ -1393,8 +1393,11 @@ jobs:
         with:
           node-version-file: '.nvmrc'
 
+      # Only the web app's dependency closure and the root project are
+      # installed: every step below runs `pnpm --filter web`. Widen the filter
+      # when a step here imports a workspace outside the closure.
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --filter 'web...' --filter kilocode-monorepo
 
       # The version comes from the dependency graph this install just built, so
       # a bump to @playwright/test changes the key and downloads the matching

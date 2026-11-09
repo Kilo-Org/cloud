@@ -116,28 +116,100 @@ jobs:
 
       # The dump shells out to `kilo run` to generate missing summaries.
       # A cold install downloads large platform packages, so it legitimately
-      # takes minutes, and its postinstall can run a nested npm install. One
-      # stalled registry request would hold the runner until the job timeout, so
-      # the step bounds the whole install with a budget instead of bounding each
-      # attempt: a slow but moving download gets to finish, an early failure is
-      # retried, and a stall fails this step by name instead of cancelling the job.
+      # takes minutes, and its postinstall can run a nested npm install. The
+      # version is resolved first so the cache key and the pinned install name
+      # the same release; the tree is cached per version below.
+      - name: Resolve Kilo CLI version
+        id: kilo_cli_version
+        if: steps.catalog_changes.outputs.catalog == 'true'
+        timeout-minutes: 2
+        env:
+          # Fail an attempt fast and retry here instead, so a bad connection
+          # cannot spend a separate retry budget.
+          npm_config_fetch_retries: '0'
+        run: |
+          set -euo pipefail
+          deadline=$((SECONDS + 60))
+          for attempt in 1 2 3; do
+            remaining=$((deadline - SECONDS))
+            if [ "$remaining" -le 0 ]; then
+              break
+            fi
+            if version="$(timeout --signal=TERM --kill-after=10 "$remaining" npm view @kilocode/cli version)"; then
+              echo "version=$version" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            if [ "$attempt" -lt 3 ] && [ $((deadline - SECONDS)) -gt $((attempt * 5)) ]; then
+              echo "::warning::Resolving the Kilo CLI version did not finish; retrying"
+              sleep $((attempt * 5))
+            fi
+          done
+          echo "::error::Could not resolve the Kilo CLI version from the registry"
+          exit 1
+
+      # The installed tree is one release per platform and is ~200 MB
+      # compressed, so the cache only pays off when the prefix holds exactly the
+      # resolved version. A miss, or a cache failure, costs the registry install
+      # and never fails the job. An entry that fails the check in the install
+      # step is not replaced under an unchanged key, so it costs that install in
+      # every job until the release changes.
+      - name: Restore Kilo CLI
+        id: kilo_cli_cache
+        if: steps.catalog_changes.outputs.catalog == 'true'
+        continue-on-error: true
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: ${{ runner.temp }}/kilo-cli
+          # The tree holds the @kilocode/cli-<os>-<arch> platform packages, so an
+          # entry from another architecture cannot be reused.
+          key: ${{ runner.os }}-${{ runner.arch }}-kilo-cli-${{ steps.kilo_cli_version.outputs.version }}
+
+      # One stalled registry request would hold the runner until the job
+      # timeout, so the miss path bounds the whole install with a budget instead
+      # of bounding each attempt: a slow but moving download gets to finish, an
+      # early failure is retried, and a stall fails this step by name instead of
+      # cancelling the job.
       - name: Install Kilo CLI
         if: steps.catalog_changes.outputs.catalog == 'true'
         timeout-minutes: 14
         env:
+          KILO_CLI_PREFIX: ${{ runner.temp }}/kilo-cli
+          KILO_CLI_VERSION: ${{ steps.kilo_cli_version.outputs.version }}
+          CACHE_HIT: ${{ steps.kilo_cli_cache.outputs.cache-hit }}
           # Fail an attempt fast and retry here instead, so a bad connection
           # cannot spend a separate retry budget. Inherited by the postinstall's
           # nested npm install as well.
           npm_config_fetch_retries: '0'
         run: |
           set -euo pipefail
+          echo "$KILO_CLI_PREFIX/bin" >> "$GITHUB_PATH"
+
+          manifest="$KILO_CLI_PREFIX/lib/node_modules/@kilocode/cli/package.json"
+          installed=$(node -p "require('$manifest').version" 2>/dev/null || true)
+
+          # A miss, a tree of another version, or a tree the binary cannot start
+          # from takes the registry path.
+          if [ "$CACHE_HIT" = "true" ] && [ "$installed" = "$KILO_CLI_VERSION" ] \
+            && "$KILO_CLI_PREFIX/bin/kilo" --version > /dev/null 2>&1; then
+            echo "Restored @kilocode/cli@$installed from the cache"
+            "$KILO_CLI_PREFIX/bin/kilo" --version
+            exit 0
+          fi
+
+          rm -rf "$KILO_CLI_PREFIX"
           deadline=$((SECONDS + 720))
           for attempt in 1 2 3; do
             remaining=$((deadline - SECONDS))
             if [ "$remaining" -le 0 ]; then
               break
             fi
-            if timeout --signal=TERM --kill-after=20 "$remaining" npm install -g @kilocode/cli; then
+            if timeout --signal=TERM --kill-after=20 "$remaining" npm install --global --prefix "$KILO_CLI_PREFIX" "@kilocode/cli@$KILO_CLI_VERSION" --no-audit --no-fund; then
+              installed=$(node -p "require('$manifest').version")
+              if [ "$installed" != "$KILO_CLI_VERSION" ]; then
+                echo "::error::Installed @kilocode/cli@$installed but resolved version $KILO_CLI_VERSION"
+                exit 1
+              fi
+              "$KILO_CLI_PREFIX/bin/kilo" --version
               exit 0
             fi
             if [ "$attempt" -lt 3 ] && [ $((deadline - SECONDS)) -gt $((attempt * 5)) ]; then
@@ -406,26 +478,95 @@ jobs:
           node-version-file: '.nvmrc'
           cache: 'pnpm'
 
-      # The dump shells out to `kilo run` to fill any straggler summaries.
+      # The dump shells out to `kilo run` to fill any straggler summaries. Same
+      # version resolution and per-version cache as the PR job: the key and the
+      # pinned install name the same release, so a restored tree is either that
+      # release or falls back to the registry.
+      - name: Resolve Kilo CLI version
+        id: kilo_cli_version
+        if: steps.merge_changes.outputs.catalog == 'true'
+        timeout-minutes: 2
+        env:
+          # Fail an attempt fast and retry here instead, so a bad connection
+          # cannot spend a separate retry budget.
+          npm_config_fetch_retries: '0'
+        run: |
+          set -euo pipefail
+          deadline=$((SECONDS + 60))
+          for attempt in 1 2 3; do
+            remaining=$((deadline - SECONDS))
+            if [ "$remaining" -le 0 ]; then
+              break
+            fi
+            if version="$(timeout --signal=TERM --kill-after=10 "$remaining" npm view @kilocode/cli version)"; then
+              echo "version=$version" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            if [ "$attempt" -lt 3 ] && [ $((deadline - SECONDS)) -gt $((attempt * 5)) ]; then
+              echo "::warning::Resolving the Kilo CLI version did not finish; retrying"
+              sleep $((attempt * 5))
+            fi
+          done
+          echo "::error::Could not resolve the Kilo CLI version from the registry"
+          exit 1
+
+      # Same shape as the PR job's restore: the main-branch entry is what the
+      # catalog PRs restore, so this job also populates it. A miss or a cache
+      # failure costs the registry install and never fails the job.
+      - name: Restore Kilo CLI
+        id: kilo_cli_cache
+        if: steps.merge_changes.outputs.catalog == 'true'
+        continue-on-error: true
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: ${{ runner.temp }}/kilo-cli
+          # The tree holds the @kilocode/cli-<os>-<arch> platform packages, so an
+          # entry from another architecture cannot be reused.
+          key: ${{ runner.os }}-${{ runner.arch }}-kilo-cli-${{ steps.kilo_cli_version.outputs.version }}
+
       # Same budget as the PR job: a slow download gets to finish, and a stalled
       # registry request costs minutes instead of the job timeout.
       - name: Install Kilo CLI
         if: steps.merge_changes.outputs.catalog == 'true'
         timeout-minutes: 14
         env:
+          KILO_CLI_PREFIX: ${{ runner.temp }}/kilo-cli
+          KILO_CLI_VERSION: ${{ steps.kilo_cli_version.outputs.version }}
+          CACHE_HIT: ${{ steps.kilo_cli_cache.outputs.cache-hit }}
           # Fail an attempt fast and retry here instead, so a bad connection
           # cannot spend a separate retry budget. Inherited by the postinstall's
           # nested npm install as well.
           npm_config_fetch_retries: '0'
         run: |
           set -euo pipefail
+          echo "$KILO_CLI_PREFIX/bin" >> "$GITHUB_PATH"
+
+          manifest="$KILO_CLI_PREFIX/lib/node_modules/@kilocode/cli/package.json"
+          installed=$(node -p "require('$manifest').version" 2>/dev/null || true)
+
+          # A miss, a tree of another version, or a tree the binary cannot start
+          # from takes the registry path.
+          if [ "$CACHE_HIT" = "true" ] && [ "$installed" = "$KILO_CLI_VERSION" ] \
+            && "$KILO_CLI_PREFIX/bin/kilo" --version > /dev/null 2>&1; then
+            echo "Restored @kilocode/cli@$installed from the cache"
+            "$KILO_CLI_PREFIX/bin/kilo" --version
+            exit 0
+          fi
+
+          rm -rf "$KILO_CLI_PREFIX"
           deadline=$((SECONDS + 720))
           for attempt in 1 2 3; do
             remaining=$((deadline - SECONDS))
             if [ "$remaining" -le 0 ]; then
               break
             fi
-            if timeout --signal=TERM --kill-after=20 "$remaining" npm install -g @kilocode/cli; then
+            if timeout --signal=TERM --kill-after=20 "$remaining" npm install --global --prefix "$KILO_CLI_PREFIX" "@kilocode/cli@$KILO_CLI_VERSION" --no-audit --no-fund; then
+              installed=$(node -p "require('$manifest').version")
+              if [ "$installed" != "$KILO_CLI_VERSION" ]; then
+                echo "::error::Installed @kilocode/cli@$installed but resolved version $KILO_CLI_VERSION"
+                exit 1
+              fi
+              "$KILO_CLI_PREFIX/bin/kilo" --version
               exit 0
             fi
             if [ "$attempt" -lt 3 ] && [ $((deadline - SECONDS)) -gt $((attempt * 5)) ]; then

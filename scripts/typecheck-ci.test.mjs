@@ -803,6 +803,25 @@ test('the tRPC declarations action rebuilds a hit that misses an entry point', (
   assert.doesNotMatch(build.if, /cache-hit/, 'the raw cache hit no longer gates the build');
 });
 
+test('the tRPC declarations action shares one dist entry across runner operating systems', () => {
+  const action = load(
+    readFileSync(
+      new URL('../.github/actions/trpc-declarations/action.yml', import.meta.url),
+      'utf8'
+    )
+  );
+  const steps = action.runs.steps;
+  const key = steps.find(step => step.name === 'Hash tRPC declaration inputs');
+  const cache = steps.find(step => step.name === 'Restore tRPC declarations');
+  assert.equal(key.run, 'node scripts/trpc-declaration-key.mjs >> "$GITHUB_OUTPUT"');
+  assert.equal(cache.with.path, 'packages/trpc/dist');
+  // The dist is a TypeScript declaration emit and actions/cache derives the same
+  // version on Linux and macOS, so an OS prefix would only split one build into a
+  // family per runner and leave the macOS jobs unable to hit an ubuntu save.
+  assert.equal(cache.with.key, 'trpc-declarations-${{ steps.key.outputs.key }}');
+  assert.equal(cache.with['restore-keys'], undefined, 'a partial restore would serve stale dist');
+});
+
 test('the harness SDK action shares one dist entry across runner operating systems', () => {
   const steps = harnessBuildAction.runs.steps;
   const key = steps.find(step => step.name === 'Hash harness SDK build inputs');

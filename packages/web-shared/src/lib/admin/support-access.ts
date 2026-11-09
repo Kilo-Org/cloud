@@ -29,6 +29,45 @@ export type SupportDecision =
   | 'deny_never_list'
   | 'deny_actor_permission';
 
+export type SupportAccessReason =
+  | 'support_grant_required'
+  | 'support_grant_expired'
+  | 'support_grant_revoked'
+  | 'support_access_not_allowlisted'
+  | 'support_access_action_class'
+  | 'support_grant_lookup_failed';
+
+const SUPPORT_ACCESS_REASONS: readonly SupportAccessReason[] = [
+  'support_grant_required',
+  'support_grant_expired',
+  'support_grant_revoked',
+  'support_access_not_allowlisted',
+  'support_access_action_class',
+  'support_grant_lookup_failed',
+];
+
+export function isSupportAccessReason(value: unknown): value is SupportAccessReason {
+  return typeof value === 'string' && SUPPORT_ACCESS_REASONS.some(reason => reason === value);
+}
+
+export type SupportAccessDenialAction = 'request' | 'unavailable' | 'retry';
+
+/** What a denied platform admin can do next on the denied surface. */
+export function supportAccessDenialAction(
+  reason: SupportAccessReason | null
+): SupportAccessDenialAction {
+  switch (reason) {
+    case 'support_grant_required':
+    case 'support_grant_expired':
+    case 'support_grant_revoked':
+      return 'request';
+    case 'support_grant_lookup_failed':
+      return 'retry';
+    default:
+      return 'unavailable';
+  }
+}
+
 export type SupportContext = {
   kind: 'support';
   grantId: string;

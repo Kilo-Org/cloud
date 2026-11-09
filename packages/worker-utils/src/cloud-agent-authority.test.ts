@@ -452,6 +452,7 @@ describe('Cloud Agent authority contract', () => {
       'cloudAgentNext.interruptSession',
       'cloudAgentNext.sendMessage',
       'models.list',
+      'cloudEnvironments.list',
       'workspaceFolders.list',
       'workspaceFolders.moveWorktree',
     ]);
@@ -463,10 +464,12 @@ describe('Cloud Agent authority contract', () => {
       'organizations.cloudAgentNext.interruptSession',
       'organizations.cloudAgentNext.sendMessage',
       'models.list',
+      'cloudEnvironments.list',
       'workspaceFolders.list',
       'workspaceFolders.moveWorktree',
     ]);
     expect(cloudAgentAuthorityProcedureKind('models.list')).toBe('query');
+    expect(cloudAgentAuthorityProcedureKind('cloudEnvironments.list')).toBe('query');
   });
 
   it.each([
@@ -552,6 +555,187 @@ describe('Cloud Agent authority contract', () => {
         '/api/trpc/models.list,organizations.cloudAgentNext.getSession'
       )
     ).toBe(true);
+  });
+
+  it.each([
+    ['personal', scope],
+    ['organization', { ...scope, organizationId }],
+  ] as const)('permits scoped environment listing for %s authority', (_label, authority) => {
+    const repository = { platform: 'github', fullName: 'acme/repo' };
+    const input =
+      authority.organizationId === null ? { repository } : { repository, organizationId };
+    expect(validateCloudAgentAuthorityRequest(authority, 'cloudEnvironments.list', input)).toEqual(
+      input
+    );
+    expect(cloudAgentAuthorityProcedureKind('cloudEnvironments.list')).toBe('query');
+    expect(cloudAgentAuthorityInputSchema(authority, 'cloudEnvironments.list')).toMatchObject({
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        repository: { type: 'object' },
+        ...(authority.organizationId === null
+          ? {}
+          : { organizationId: { const: authority.organizationId } }),
+      },
+      required: expect.arrayContaining(['repository']),
+    });
+    expect(
+      isCloudAgentAuthorityHttpPathAllowed(authority, '/api/trpc/cloudEnvironments.list')
+    ).toBe(true);
+  });
+
+  it.each([
+    ['null', null],
+    ['array', []],
+    ['missing repository', {}],
+    ['extra field', { repository: { platform: 'github', fullName: 'acme/repo' }, extra: true }],
+    ['unknown platform', { repository: { platform: 'local', fullName: 'acme/repo' } }],
+    ['gitlab repository', { repository: { platform: 'gitlab', projectPath: 'group/project' } }],
+    [
+      'bitbucket repository',
+      {
+        repository: {
+          platform: 'bitbucket',
+          workspaceUuid: organizationId,
+          repositoryUuid: organizationId,
+        },
+      },
+    ],
+    ['empty repository', { repository: { platform: 'github', fullName: '' } }],
+    [
+      'widened repository',
+      {
+        repository: { platform: 'github', fullName: 'acme/repo', workspaceUuid: organizationId },
+      },
+    ],
+    [
+      'organizationId on personal authority',
+      { repository: { platform: 'github', fullName: 'acme/repo' }, organizationId },
+    ],
+  ] as const)('rejects widened cloudEnvironments.list input: %s', (_label, input) => {
+    expect(() =>
+      validateCloudAgentAuthorityRequest(scope, 'cloudEnvironments.list', input)
+    ).toThrow();
+  });
+
+  it.each([
+    ['missing organizationId', { repository: { platform: 'github', fullName: 'acme/repo' } }],
+    [
+      'other organizationId',
+      {
+        repository: { platform: 'github', fullName: 'acme/repo' },
+        organizationId: '33333333-3333-4333-8333-333333333333',
+      },
+    ],
+  ] as const)('binds organization environment listing: %s', (_label, input) => {
+    expect(() =>
+      validateCloudAgentAuthorityRequest(
+        { ...scope, organizationId },
+        'cloudEnvironments.list',
+        input
+      )
+    ).toThrow();
+  });
+
+  it.each([
+    'cloudEnvironments.listAll',
+    'cloudEnvironments.get',
+    'cloudEnvironments.create',
+    'cloudEnvironments.update',
+    'cloudEnvironments.delete',
+    'organizations.cloudEnvironments.list',
+  ])('does not permit adjacent environment path %s', procedure => {
+    expect(cloudAgentAuthorityProcedures(scope)).not.toContain(procedure);
+    expect(() => cloudAgentAuthorityProcedureKind(procedure)).toThrow();
+    expect(() => cloudAgentAuthorityInputSchema(scope, procedure)).toThrow();
+    expect(() =>
+      validateCloudAgentAuthorityRequest(scope, procedure, {
+        repository: { platform: 'github', fullName: 'acme/repo' },
+      })
+    ).toThrow();
+    expect(isCloudAgentAuthorityHttpPathAllowed(scope, `/api/trpc/${procedure}`)).toBe(false);
+  });
+
+  it('expires environment listing with the authority', () => {
+    expect(() =>
+      validateCloudAgentAuthorityRequest(
+        scope,
+        'cloudEnvironments.list',
+        { repository: { platform: 'github', fullName: 'acme/repo' } },
+        scope.expiresAt
+      )
+    ).toThrow();
+    expect(
+      isCloudAgentAuthorityHttpPathAllowed(
+        { ...scope, expiresAt: now - 1 },
+        '/api/trpc/cloudEnvironments.list'
+      )
+    ).toBe(false);
+  });
+
+  it('accepts the requested environment on a launch', () => {
+    const requestedEnvironment = {
+      id: organizationId,
+      repositories: [
+        { repoFullName: 'acme/other', branch: 'feature/child' },
+        { repoFullName: 'acme/third' },
+      ],
+    };
+    const request = { ...launch, requestedEnvironment };
+    expect(
+      validateCloudAgentAuthorityRequest(scope, 'cloudAgentNext.prepareSession', request)
+    ).toEqual(request);
+    expect(cloudAgentAuthorityInputSchema(scope)).toMatchObject({
+      properties: {
+        requestedEnvironment: { type: 'object' },
+      },
+    });
+    expect(
+      validateCloudAgentAuthorityRequest(scope, 'cloudAgentNext.prepareSession', {
+        ...launch,
+        requestedEnvironment: { id: organizationId },
+      })
+    ).toMatchObject({ requestedEnvironment: { id: organizationId } });
+  });
+
+  it.each([
+    { requestedEnvironment: { id: 'not-a-uuid' } },
+    { requestedEnvironment: { id: organizationId, extra: true } },
+    { requestedEnvironment: { id: organizationId, repositories: [{ repoFullName: '' }] } },
+    {
+      requestedEnvironment: {
+        id: organizationId,
+        repositories: [{ repoFullName: 'acme/other', branch: '' }],
+      },
+    },
+    {
+      requestedEnvironment: {
+        id: organizationId,
+        repositories: [{ repoFullName: 'acme/other', branch: 'b'.repeat(256) }],
+      },
+    },
+    {
+      requestedEnvironment: {
+        id: organizationId,
+        repositories: Array.from({ length: 101 }, () => ({ repoFullName: 'acme/other' })),
+      },
+    },
+    {
+      requestedEnvironment: {
+        id: organizationId,
+        repositories: [{ repoFullName: 'acme/other', extra: true }],
+      },
+    },
+    { requireEnvironmentChoice: true },
+    { requireEnvironmentChoice: false },
+    { requireEnvironmentChoice: 'true' },
+  ])('rejects widened or invalid launch environment input: %j', override => {
+    expect(() =>
+      validateCloudAgentAuthorityRequest(scope, 'cloudAgentNext.prepareSession', {
+        ...launch,
+        ...override,
+      })
+    ).toThrow();
   });
 });
 

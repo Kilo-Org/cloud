@@ -379,10 +379,12 @@ export function OrganizationWorkOSCard({ organizationId }: OrganizationWorkOSCar
                   <label className="text-muted-foreground text-sm font-medium">
                     Organization SSO Domain
                   </label>
-                  <SsoDomainEditButton
-                    organizationId={organizationId}
-                    currentDomain={organization?.sso_domain}
-                  />
+                  {ssoConfig.kind === 'configuration' && (
+                    <SsoDomainEditButton
+                      organizationId={organizationId}
+                      currentDomain={organization?.sso_domain}
+                    />
+                  )}
                 </div>
                 <p className="text-sm">
                   {organization?.sso_domain ? (
@@ -396,16 +398,18 @@ export function OrganizationWorkOSCard({ organizationId }: OrganizationWorkOSCar
 
             {/* Admin Controls */}
             <div className="space-y-4 border-t pt-4">
-              <Button
-                onClick={handleDeleteSSO}
-                disabled={deleteConfig.isPending}
-                variant="destructive"
-                size="sm"
-                className="w-full"
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                {deleteConfig.isPending ? 'Deleting...' : 'Delete SSO Configuration'}
-              </Button>
+              {ssoConfig.kind === 'configuration' && (
+                <Button
+                  onClick={handleDeleteSSO}
+                  disabled={deleteConfig.isPending}
+                  variant="destructive"
+                  size="sm"
+                  className="w-full"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  {deleteConfig.isPending ? 'Deleting...' : 'Delete SSO Configuration'}
+                </Button>
+              )}
 
               {/* Debug Info */}
               <details>

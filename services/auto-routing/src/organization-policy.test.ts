@@ -4,6 +4,7 @@ import {
   BLACKLISTED_DOMAINS_REDIS_KEY,
   BLACKLISTED_DOMAINS_UPDATED_AT_REDIS_KEY,
   MAX_BLACKLIST_DOMAINS,
+  isEmailBlacklistedByDomain,
 } from '@kilocode/worker-utils/account-access';
 import { clearOrganizationPolicyCache, getBlacklistedDomains } from './organization-policy';
 
@@ -59,7 +60,16 @@ describe('getBlacklistedDomains', () => {
     vi.setSystemTime(0);
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
-    expect(await getBlacklistedDomains(env)).toEqual(domains.slice(0, MAX_BLACKLIST_DOMAINS));
+    const loaded = await getBlacklistedDomains(env);
+    if (loaded === null) throw new Error('Expected a loaded blacklist snapshot');
+    expect(loaded).toEqual(domains.slice(0, MAX_BLACKLIST_DOMAINS));
+    expect(isEmailBlacklistedByDomain('user@MAIL.HOST150000.TEST', loaded)).toBe(true);
+    expect(isEmailBlacklistedByDomain(`user@host${MAX_BLACKLIST_DOMAINS - 1}.test`, loaded)).toBe(
+      true
+    );
+    expect(isEmailBlacklistedByDomain(`user@host${MAX_BLACKLIST_DOMAINS}.test`, loaded)).toBe(
+      false
+    );
     expect(warn).toHaveBeenCalledTimes(1);
     expect(JSON.parse(String(warn.mock.calls[0][0]))).toEqual({
       event: 'auto_routing_blacklist_domains_over_cap',

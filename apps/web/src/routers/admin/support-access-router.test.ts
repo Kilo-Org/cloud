@@ -1,7 +1,7 @@
 import { afterAll, beforeEach, describe, expect, jest, test } from '@jest/globals';
 import fs from 'node:fs';
 import path from 'node:path';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import {
   passkey_credentials,
   session_step_up_proofs,
@@ -669,5 +669,71 @@ describe('admin.supportAccess list display names', () => {
       actor: { id: admin.id, name: admin.google_user_name, email: admin.google_user_email },
       approvedBy: null,
     });
+  });
+});
+
+describe('admin.supportAccess listing status follows the grant window', () => {
+  function secondsFromNow(seconds: number): string {
+    return new Date(Date.now() + seconds * 1000).toISOString();
+  }
+
+  test('a listed grant reflects its own deadline', async () => {
+    const viewer = await insertRequester();
+    const liveHolder = await insertRequester();
+    const endedHolder = await insertRequester();
+    const lapsedRequester = await insertRequester();
+    const { organization } = await orgWithOwner();
+
+    const [live, ended, lapsed] = await db
+      .insert(support_access_grants)
+      .values([
+        {
+          actor_kilo_user_id: liveHolder.id,
+          organization_id: organization.id,
+          action_class: 'support_read',
+          reason: 'investigating a customer report',
+          requested_duration_seconds: 1800,
+          status: 'active',
+          issued_at: secondsFromNow(-60),
+          expires_at: secondsFromNow(1800),
+        },
+        {
+          actor_kilo_user_id: endedHolder.id,
+          organization_id: organization.id,
+          action_class: 'support_read',
+          reason: 'investigating a second customer report',
+          requested_duration_seconds: 1800,
+          status: 'active',
+          issued_at: secondsFromNow(-600),
+          expires_at: secondsFromNow(-60),
+        },
+        {
+          actor_kilo_user_id: lapsedRequester.id,
+          organization_id: organization.id,
+          action_class: 'support_write',
+          reason: 'fixing a broken organization setting',
+          requested_duration_seconds: 900,
+          status: 'pending',
+          request_expires_at: secondsFromNow(-60),
+        },
+      ])
+      .returning();
+
+    const caller = await stepUpCaller(viewer.id);
+
+    const active = await caller.admin.supportAccess.listActive();
+    expect(active.find(item => item.id === live.id)?.status).toBe('active');
+    expect(active.find(item => item.id === ended.id)?.status).toBe('expired');
+
+    const pending = await caller.admin.supportAccess.listPending();
+    expect(pending.find(item => item.id === lapsed.id)?.status).toBe('expired');
+
+    const stored = await db.query.support_access_grants.findMany({
+      where: inArray(support_access_grants.id, [live.id, ended.id, lapsed.id]),
+    });
+    const storedStatuses = new Map(stored.map(row => [row.id, row.status]));
+    expect(storedStatuses.get(live.id)).toBe('active');
+    expect(storedStatuses.get(ended.id)).toBe('active');
+    expect(storedStatuses.get(lapsed.id)).toBe('pending');
   });
 });

@@ -921,8 +921,13 @@ jobs:
         with:
           node-version-file: '.nvmrc'
 
+      # The shards run one Jest suite, and that suite reads four projects: web,
+      # its web-shared and db dependencies, and ai-gateway, whose src is one of
+      # its roots. Only those closures and the root project are installed, so a
+      # shard stops linking the workspaces its Jest run never reads. Widen the
+      # filter when a step here imports a workspace outside the closure.
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --filter 'web...' --filter 'ai-gateway...' --filter kilocode-monorepo
 
       - name: Run web tests
         run: pnpm --filter web test --shard=${{ matrix.shard }}/8

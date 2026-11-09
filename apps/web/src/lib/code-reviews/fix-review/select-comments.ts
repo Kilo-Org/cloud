@@ -486,7 +486,7 @@ async function resolveCommentClient(input: {
   return {
     client: input.deps.createCommentClient(credential.credential.token, target),
     userCredential: credential.credential,
-    initiator: initiator ?? { login: credential.credential.githubLogin, githubUserId: null },
+    initiator,
   };
 }
 

@@ -361,7 +361,7 @@ describe('selectFixReviewCommentsForReview', () => {
       integration: null,
       deps: depsFixture(client, {
         createCommentClient,
-        getInitiatorIdentity: async () => null,
+        getInitiatorIdentity: async () => ({ login: 'linked-user', githubUserId: null }),
         getUserAccessToken: async () => connectedCredential('linked-user'),
       }),
     });
@@ -372,6 +372,26 @@ describe('selectFixReviewCommentsForReview', () => {
       repo: 'repo',
       pullNumber: 123,
     });
+  });
+
+  it('trusts no login when the user token has no usable binding behind it', async () => {
+    const lookupPermission = jest.fn(async (_login: string) => 'read' as CollaboratorPermission);
+    const client = clientFixture({
+      listComments: async () => [comment({ id: 6, authorLogin: 'linked-user' })],
+      lookupPermission,
+    });
+
+    const selected = await selectFixReviewCommentsForReview({
+      ...baseInput,
+      integration: null,
+      deps: depsFixture(client, {
+        getInitiatorIdentity: async () => null,
+        getUserAccessToken: async () => connectedCredential('linked-user'),
+      }),
+    });
+
+    expect(selected.comments).toEqual([]);
+    expect(lookupPermission).toHaveBeenCalledWith('linked-user');
   });
 
   it('refuses to select when no GitHub credential is available', async () => {

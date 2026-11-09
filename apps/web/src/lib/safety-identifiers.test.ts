@@ -32,6 +32,7 @@ jest.mock('@kilocode/web-shared/lib/config.server', () => ({ CRON_SECRET: 'cron-
 const storage = new Map<string, string>();
 const originalOrg = process.env.OPENROUTER_ORG_ID;
 let failCheckpoint = false;
+let failRelease = false;
 let replaceOwner = false;
 let checkpointHook: (() => Promise<void>) | undefined;
 
@@ -60,11 +61,13 @@ beforeEach(async () => {
   await cleanupDbForTest();
   storage.clear();
   failCheckpoint = false;
+  failRelease = false;
   replaceOwner = false;
   checkpointHook = undefined;
   process.env.OPENROUTER_ORG_ID = 'synthetic-org';
   jest.spyOn(console, 'info').mockImplementation(() => {});
   jest.spyOn(console, 'error').mockImplementation(() => {});
+  jest.spyOn(console, 'warn').mockImplementation(() => {});
   jest.mocked(getUserFromAuth).mockResolvedValue({
     user: defineTestUser({ is_admin: true }),
     authFailedResponse: null,
@@ -98,6 +101,7 @@ beforeEach(async () => {
       return 1;
     }
     expect(script).toContain("redis.call('DEL', KEYS[1])");
+    if (failRelease) throw new Error('synthetic Redis release failure');
     if (storage.get(keys[0]) !== args[0]) return 0;
     storage.delete(keys[0]);
     return 1;
@@ -227,6 +231,86 @@ describe('safety identifier regeneration', () => {
     await expect(regenerate()).resolves.toEqual({ processed: 0, remaining: false, skipped: false });
     expect(execute).not.toHaveBeenCalled();
     expect(storage.get(SAFETY_IDENTIFIER_BACKFILL_STATE_KEY)).toBe(state);
+  });
+
+  test('starts a fresh finite pass after completed configuration rotation and overwrites all identifiers', async () => {
+    await insertUsers(2);
+    await expect(regenerate()).resolves.toEqual({ processed: 2, remaining: false, skipped: false });
+    const completed = persistedState();
+    const users = await db.select().from(kilocode_users);
+    for (const user of users) {
+      await db
+        .update(kilocode_users)
+        .set({
+          openrouter_upstream_safety_identifier: `stale-upstream-${user.id}`,
+          openrouter_downstream_safety_identifier: `stale-downstream-${user.id}`,
+          vercel_downstream_safety_identifier: `stale-vercel-${user.id}`,
+        })
+        .where(eq(kilocode_users.id, user.id));
+    }
+    const newUser = await insertTestUser({ id: 'zz-synthetic-later-user' });
+    process.env.OPENROUTER_ORG_ID = 'rotated-synthetic-org';
+
+    await expect(regenerate()).resolves.toEqual({ processed: 3, remaining: false, skipped: false });
+    expect(persistedState()).toMatchObject({
+      status: 'completed',
+      processed: 3,
+      total: 3,
+      lastBatchProcessed: 3,
+      highWaterId: newUser.id,
+      cursor: newUser.id,
+      lastError: null,
+    });
+    expect(persistedState().targetFingerprint).not.toBe(completed.targetFingerprint);
+    for (const user of [...users, newUser]) {
+      const [actual] = await db.select().from(kilocode_users).where(eq(kilocode_users.id, user.id));
+      expect(actual).toMatchObject({
+        openrouter_upstream_safety_identifier: generateOpenRouterUpstreamSafetyIdentifier(user.id),
+        openrouter_downstream_safety_identifier: generateOpenRouterDownstreamSafetyIdentifier(
+          user.id
+        ),
+        vercel_downstream_safety_identifier: generateVercelDownstreamSafetyIdentifier(user.id),
+      });
+    }
+  });
+
+  test('preserves committed success and completed progress when lock release fails', async () => {
+    const user = await insertTestUser();
+    failRelease = true;
+
+    await expect(regenerate()).resolves.toEqual({ processed: 1, remaining: false, skipped: false });
+    expect(persistedState()).toMatchObject({
+      status: 'completed',
+      processed: 1,
+      cursor: user.id,
+      lastError: null,
+    });
+    const [actual] = await db.select().from(kilocode_users).where(eq(kilocode_users.id, user.id));
+    expect(actual.openrouter_upstream_safety_identifier).toBe(
+      generateOpenRouterUpstreamSafetyIdentifier(user.id)
+    );
+    expect(storage.has(SAFETY_IDENTIFIER_BACKFILL_LOCK_KEY)).toBe(true);
+    expect(console.warn).toHaveBeenCalledWith(
+      'Safety identifier regeneration lock release failed; waiting for lock expiry.'
+    );
+  });
+
+  test('preserves the original batch error when lock release also fails', async () => {
+    await insertTestUser();
+    jest.spyOn(db, 'execute').mockRejectedValueOnce(new Error('synthetic database failure'));
+    failRelease = true;
+
+    await expect(regenerate()).rejects.toThrow(SAFETY_IDENTIFIER_BACKFILL_ERROR);
+    expect(persistedState()).toMatchObject({
+      status: 'running',
+      processed: 0,
+      cursor: null,
+      lastError: SAFETY_IDENTIFIER_BACKFILL_ERROR,
+    });
+    expect(storage.has(SAFETY_IDENTIFIER_BACKFILL_LOCK_KEY)).toBe(true);
+    expect(console.warn).toHaveBeenCalledWith(
+      'Safety identifier regeneration lock release failed; waiting for lock expiry.'
+    );
   });
 
   test('completes an empty database without issuing an update', async () => {

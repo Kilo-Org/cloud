@@ -127,7 +127,8 @@ export async function regenerateSafetyIdentifiers({ deadlineAt }: { deadlineAt: 
     const stored = await readState();
     state = stored;
     if (stored && stored.targetFingerprint !== targetFingerprint) {
-      throw new Error(SAFETY_IDENTIFIER_BACKFILL_ERROR);
+      if (stored.status !== 'completed') throw new Error(SAFETY_IDENTIFIER_BACKFILL_ERROR);
+      state = null;
     }
     if (state?.status === 'completed') {
       return { processed: 0, remaining: false, skipped: false };
@@ -219,6 +220,10 @@ export async function regenerateSafetyIdentifiers({ deadlineAt }: { deadlineAt: 
     }
     throw new Error(SAFETY_IDENTIFIER_BACKFILL_ERROR);
   } finally {
-    await redisClient.eval(releaseScript, [SAFETY_IDENTIFIER_BACKFILL_LOCK_KEY], [owner]);
+    try {
+      await redisClient.eval(releaseScript, [SAFETY_IDENTIFIER_BACKFILL_LOCK_KEY], [owner]);
+    } catch {
+      console.warn('Safety identifier regeneration lock release failed; waiting for lock expiry.');
+    }
   }
 }

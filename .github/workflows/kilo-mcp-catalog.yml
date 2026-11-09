@@ -122,15 +122,25 @@ jobs:
       - name: Resolve Kilo CLI version
         id: kilo_cli_version
         if: steps.catalog_changes.outputs.catalog == 'true'
+        timeout-minutes: 2
+        env:
+          # Fail an attempt fast and retry here instead, so a bad connection
+          # cannot spend a separate retry budget.
+          npm_config_fetch_retries: '0'
         run: |
           set -euo pipefail
+          deadline=$((SECONDS + 60))
           for attempt in 1 2 3; do
-            if version="$(npm view @kilocode/cli version)"; then
+            remaining=$((deadline - SECONDS))
+            if [ "$remaining" -le 0 ]; then
+              break
+            fi
+            if version="$(timeout --signal=TERM --kill-after=10 "$remaining" npm view @kilocode/cli version)"; then
               echo "version=$version" >> "$GITHUB_OUTPUT"
               exit 0
             fi
-            if [ "$attempt" -lt 3 ]; then
-              echo "::warning::Resolving the Kilo CLI version failed; retrying"
+            if [ "$attempt" -lt 3 ] && [ $((deadline - SECONDS)) -gt $((attempt * 5)) ]; then
+              echo "::warning::Resolving the Kilo CLI version did not finish; retrying"
               sleep $((attempt * 5))
             fi
           done
@@ -475,15 +485,25 @@ jobs:
       - name: Resolve Kilo CLI version
         id: kilo_cli_version
         if: steps.merge_changes.outputs.catalog == 'true'
+        timeout-minutes: 2
+        env:
+          # Fail an attempt fast and retry here instead, so a bad connection
+          # cannot spend a separate retry budget.
+          npm_config_fetch_retries: '0'
         run: |
           set -euo pipefail
+          deadline=$((SECONDS + 60))
           for attempt in 1 2 3; do
-            if version="$(npm view @kilocode/cli version)"; then
+            remaining=$((deadline - SECONDS))
+            if [ "$remaining" -le 0 ]; then
+              break
+            fi
+            if version="$(timeout --signal=TERM --kill-after=10 "$remaining" npm view @kilocode/cli version)"; then
               echo "version=$version" >> "$GITHUB_OUTPUT"
               exit 0
             fi
-            if [ "$attempt" -lt 3 ]; then
-              echo "::warning::Resolving the Kilo CLI version failed; retrying"
+            if [ "$attempt" -lt 3 ] && [ $((deadline - SECONDS)) -gt $((attempt * 5)) ]; then
+              echo "::warning::Resolving the Kilo CLI version did not finish; retrying"
               sleep $((attempt * 5))
             fi
           done

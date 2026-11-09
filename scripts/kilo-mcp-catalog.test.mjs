@@ -24,13 +24,18 @@ const embedCommand = 'node services/kilo-mcp/scripts/embed-catalog.ts upsert';
 // time budget and retries an early failure with whatever budget is left.
 const kiloVersionCommand = [
   'set -euo pipefail',
+  'deadline=$((SECONDS + 60))',
   'for attempt in 1 2 3; do',
-  '  if version="$(npm view @kilocode/cli version)"; then',
+  '  remaining=$((deadline - SECONDS))',
+  '  if [ "$remaining" -le 0 ]; then',
+  '    break',
+  '  fi',
+  '  if version="$(timeout --signal=TERM --kill-after=10 "$remaining" npm view @kilocode/cli version)"; then',
   '    echo "version=$version" >> "$GITHUB_OUTPUT"',
   '    exit 0',
   '  fi',
-  '  if [ "$attempt" -lt 3 ]; then',
-  '    echo "::warning::Resolving the Kilo CLI version failed; retrying"',
+  '  if [ "$attempt" -lt 3 ] && [ $((deadline - SECONDS)) -gt $((attempt * 5)) ]; then',
+  '    echo "::warning::Resolving the Kilo CLI version did not finish; retrying"',
   '    sleep $((attempt * 5))',
   '  fi',
   'done',
@@ -149,6 +154,11 @@ function assertKiloCliSteps(job, gate, jobName) {
     resolve.if,
     gate,
     `${jobName}: version resolution is gated on catalog-relevant changes`
+  );
+  assert.equal(
+    resolve['timeout-minutes'],
+    2,
+    `${jobName}: version resolution must be bounded, or a stalled registry request holds the runner`
   );
 
   const restore = findStep(
@@ -704,6 +714,13 @@ for (const [name, defect] of [
     'Kilo CLI cache removed from the merge job',
     workflow =>
       dropStep(workflow, mergeJobName, step => (step.uses ?? '').startsWith('actions/cache@')),
+  ],
+  [
+    'Kilo CLI version resolution may stall the job',
+    workflow => {
+      const step = workflow.jobs[prJobName].steps.find(item => item.id === 'kilo_cli_version');
+      delete step['timeout-minutes'];
+    },
   ],
   [
     'Kilo CLI cache key without the resolved version',

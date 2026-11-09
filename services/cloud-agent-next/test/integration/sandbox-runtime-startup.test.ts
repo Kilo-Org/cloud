@@ -206,6 +206,7 @@ async function setup(
 }
 type PrepareOptions = {
   orgId?: string;
+  billingOrigin?: string;
   createdOnPlatform?: string;
   sandboxKind?: 'isolated' | 'isolated-standard' | 'code-review' | 'shared';
 };
@@ -226,6 +227,7 @@ async function requestPrepare(h: Harness, options: PrepareOptions = {}) {
       ...(options.createdOnPlatform === undefined
         ? {}
         : { createdOnPlatform: options.createdOnPlatform }),
+      ...(options.billingOrigin === undefined ? {} : { billingOrigin: options.billingOrigin }),
       repository: { type: 'github', repo: 'acme/widgets' },
       scopeId: SESSION,
     },
@@ -483,7 +485,12 @@ describe('downloaded startup in the allocation owner', () => {
         ?.split('\n')
         .findLast(line => line.startsWith('exec '))
         ?.match(/KILO_RUNTIME_HARNESS='([a-z0-9]+)'/)?.[1];
-    const isolatedTarget = { orgId: TARGET_ORG, sandboxKind: 'isolated' } as const;
+    const isolatedTarget = {
+      orgId: TARGET_ORG,
+      billingOrigin: 'cloud-agent-web',
+      sandboxKind: 'isolated',
+      createdOnPlatform: 'cloud-agent-web',
+    } as const;
     async function recreate(h: Harness, envChange: Record<string, string>) {
       await waitFor(async () => expect((await h.stub.getAllocationState()).kind).toBe('starting'));
       await runInDurableObject(h.stub, instance => {
@@ -523,6 +530,17 @@ describe('downloaded startup in the allocation owner', () => {
         expect.objectContaining({ container })
       );
     });
+    it.each(['cloud-agent', 'code-review', 'desktop', 'agent-manager', 'slack', undefined])(
+      'starts v1 when a client claims web but the trusted origin is %s',
+      async billingOrigin => {
+        const h = await setup(KILO2_SANDBOX, {}, kilo2Env);
+        await prepare(h, { ...isolatedTarget, billingOrigin });
+        expect(harnessOf(h, 0)).toBe('kilo');
+        await runInDurableObject(h.stub, async (_instance, state) => {
+          expect(await state.storage.get('runtime_harness')).toBe('kilo');
+        });
+      }
+    );
     it('keeps an unlisted organization sandbox on v1 after the organization joins the list', async () => {
       const h = await setup(
         UNLISTED_KILO2_SANDBOX,

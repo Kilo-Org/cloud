@@ -4471,7 +4471,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
         const cohort = {
           preparingRoutes: (await listRoutes(this.db))
             .filter(route => route.state === 'preparing')
-            .map(route => ({ orgId: route.credentialSource?.orgId })),
+            .map(route => ({
+              orgId: route.credentialSource?.orgId,
+              billingOrigin: route.credentialSource?.billingOrigin,
+            })),
           sandboxKind: pin.sandboxKind,
           sandboxId: this.sandboxId,
         };

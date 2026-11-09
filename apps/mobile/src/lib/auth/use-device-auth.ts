@@ -21,7 +21,8 @@ import {
 } from '@/lib/auth/pending-external-auth';
 
 type DeviceAuthResult = DeviceAuthState & {
-  start: (mode?: 'signin' | 'sso', ssoEmail?: string) => Promise<void>;
+  /** `pendingLinkToken` ties the browser sign-in to the pending link it resolves. */
+  start: (mode?: 'signin' | 'sso', ssoEmail?: string, pendingLinkToken?: string) => Promise<void>;
   cancel: () => void;
   openBrowser: () => Promise<void>;
   clearError: () => void;
@@ -126,7 +127,7 @@ export function useDeviceAuth(): DeviceAuthResult {
   }, [cleanup]);
 
   const start = useCallback(
-    async (mode?: 'signin' | 'sso', ssoEmail?: string) => {
+    async (mode?: 'signin' | 'sso', ssoEmail?: string, pendingLinkToken?: string) => {
       flowEpochRef.current += 1;
       cleanup();
       setState(pendingDeviceAuthState(undefined, undefined));
@@ -151,6 +152,7 @@ export function useDeviceAuth(): DeviceAuthResult {
         const response = await fetch(`${API_BASE_URL}/api/device-auth/codes?app=1`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...buildClientMetadataHeaders() },
+          ...(pendingLinkToken ? { body: JSON.stringify({ pendingLinkToken }) } : {}),
           signal: startAbort.signal,
         });
         // The timeout guards ONLY the POST. This function stays suspended on

@@ -296,6 +296,20 @@
     "signInCodeField": "Sign-in code",
     "or": "or"
   },
+  "pendingLink": {
+    "description": "An account already uses {{email}}. Sign in with one of its methods to add {{provider}}.",
+    "emailCode": "Email me a sign-in code",
+    "continueInBrowser": "Continue in browser",
+    "startAgain": "Start again",
+    "expired": "This request to add {{provider}} has expired.",
+    "noMethods": "This account has no other sign-in method, so {{provider}} can't be added.",
+    "linked": "{{provider}} was added to your account.",
+    "failedExpired": "{{provider}} wasn't added because the request expired.",
+    "failedWrongAccount": "{{provider}} wasn't added because you signed in to a different account.",
+    "failedAccountAlreadyLinked": "{{provider}} wasn't added because it's already linked to another account.",
+    "failedProviderAlreadyLinked": "{{provider}} wasn't added because your account already has a different {{provider}} sign-in.",
+    "failedLinking": "{{provider}} couldn't be added to your account."
+  },
   "profile": {
     "codeReviewerSubtitle": "Automatic PR reviews",
     "securityAgentSubtitle": "Find and remediate vulnerabilities",
@@ -334,6 +348,8 @@
     "providerTestAccount": "Test Account",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "Enterprise SSO",
     "passkeysTitle": "Passkeys",
     "passkeysSubtitle": "Sign in without a password",

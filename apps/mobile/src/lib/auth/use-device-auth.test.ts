@@ -463,6 +463,36 @@ describe('useDeviceAuth hook', () => {
     expect(url.searchParams.has('ssoOrganizationId')).toBe(false);
   });
 
+  it('ties the device code to the pending link a browser sign-in resolves', async () => {
+    vi.mocked(readPendingExternalAuth).mockResolvedValue({ kind: 'none' });
+    fetchMock.mockResolvedValue(
+      Response.json({ code: 'UC', verificationUrl: 'https://app.kilo.ai/device-auth?code=UC' })
+    );
+
+    const result = requireResult(await mountSettled());
+    await act(async () => {
+      await result.start('signin', undefined, 'link-token');
+    });
+
+    const init = fetchMock.mock.calls[0]?.[1] as RequestInit | undefined;
+    expect(init?.body).toBe(JSON.stringify({ pendingLinkToken: 'link-token' }));
+  });
+
+  it('sends the device code request without a body when no link is pending', async () => {
+    vi.mocked(readPendingExternalAuth).mockResolvedValue({ kind: 'none' });
+    fetchMock.mockResolvedValue(
+      Response.json({ code: 'UC', verificationUrl: 'https://app.kilo.ai/device-auth?code=UC' })
+    );
+
+    const result = requireResult(await mountSettled());
+    await act(async () => {
+      await result.start('signin');
+    });
+
+    const init = fetchMock.mock.calls[0]?.[1] as RequestInit | undefined;
+    expect(init).not.toHaveProperty('body');
+  });
+
   it('opens a plain browser for a non-product auth host (no consent alert)', async () => {
     const url = 'http://127.0.0.1:3000/device-auth?code=UC-1';
     await startSignin(url);

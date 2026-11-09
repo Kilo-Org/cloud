@@ -24,12 +24,20 @@ import {
   buildChallengeEntry,
   parseEmailCodeResponse,
   parseTokenPair,
+  type PendingLinkOffer,
+  type PendingLinkResult,
   selectChallengeId,
 } from '@/lib/auth/native-auth-contract';
 import {
   passkeyFailureKey,
   signInWithPasskey as runPasskeySignIn,
 } from '@/lib/auth/passkey-client';
+import {
+  announcePendingLinkResult,
+  type PendingLinkFailure,
+  pendingLinkFailure,
+  pendingLinkTokenBody,
+} from '@/lib/auth/pending-link';
 import { resolveAdmission } from '@/lib/auth/resolve-admission';
 import { type SsoRecovery, useSsoRecovery } from '@/lib/auth/use-sso-recovery';
 
@@ -91,12 +99,28 @@ type NativeAuthResult = {
   ssoRecovery: SsoRecovery | null;
   clearSsoRecovery: () => void;
   handleSsoError: (email: string, ssoOrganizationId: string | undefined) => void;
+  /** The last refusal while a pending link is being resolved; that screen shows it inline. */
+  pendingLinkFailure: PendingLinkFailure | undefined;
 };
 
-export function useNativeAuth(): NativeAuthResult {
+type PendingLinkBinding = {
+  /** The pending link the screen is resolving; every sign-in request carries its token. */
+  pendingLink: PendingLinkOffer | null;
+  /** Receives the pending link a `DIFFERENT-OAUTH` refusal offers. */
+  onPendingLinkOffer: (offer: PendingLinkOffer) => void;
+};
+
+/**
+ * Without a binding the hook keeps the plain sign-in behavior: a `DIFFERENT-OAUTH` refusal is a
+ * toast even when the server offered a pending link.
+ */
+export function useNativeAuth(binding?: PendingLinkBinding): NativeAuthResult {
   const { signIn } = useAuth();
+  const pendingLink = binding?.pendingLink ?? null;
+  const onPendingLinkOffer = binding?.onPendingLinkOffer;
   const [busy, setBusy] = useState<BusyAction>(undefined);
   const [emailErrorKey, setEmailErrorKey] = useState<EmailErrorKey | undefined>(undefined);
+  const [linkFailure, setLinkFailure] = useState<PendingLinkFailure | undefined>(undefined);
   const busyRef = useRef<BusyAction>(undefined);
   const challengeRef = useRef<{ email: string; challengeId: string } | null>(null);
   const { ssoRecovery, clearSsoRecovery, handleSsoError } = useSsoRecovery();
@@ -114,6 +138,7 @@ export function useNativeAuth(): NativeAuthResult {
       setBusy(action);
       clearEmailError();
       clearSsoRecovery();
+      setLinkFailure(undefined);
       return true;
     },
     [clearEmailError, clearSsoRecovery]
@@ -128,6 +153,39 @@ export function useNativeAuth(): NativeAuthResult {
 
   const googleConfigured =
     Boolean(GOOGLE_WEB_CLIENT_ID) && (Platform.OS !== 'ios' || Boolean(GOOGLE_IOS_CLIENT_ID));
+
+  // The landing toasts a refusal; the pending-link screen keeps it inline beside its options.
+  const reportFailure = useCallback(
+    (message: string, errorCode?: string) => {
+      if (pendingLink) {
+        setLinkFailure(pendingLinkFailure(message, errorCode));
+        return;
+      }
+      toast.error(message);
+    },
+    [pendingLink]
+  );
+
+  const takePendingLinkOffer = useCallback(
+    (result: PostAuthFailure) => {
+      if (result.errorCode !== 'DIFFERENT-OAUTH' || !result.pendingLink || !onPendingLinkOffer) {
+        return false;
+      }
+      onPendingLinkOffer(result.pendingLink);
+      return true;
+    },
+    [onPendingLinkOffer]
+  );
+
+  const announceSignedIn = useCallback(
+    (outcome: { created?: boolean; pendingLink?: PendingLinkResult }) => {
+      if (outcome.created === true) {
+        announcingToast.success(i18n.t('login.accountCreated'));
+      }
+      announcePendingLinkResult(outcome.pendingLink, pendingLink);
+    },
+    [pendingLink]
+  );
 
   const signInWithApple = useCallback(async () => {
     if (!startAction('apple')) {
@@ -151,7 +209,7 @@ export function useNativeAuth(): NativeAuthResult {
       });
 
       if (!credential.identityToken) {
-        toast.error(defaultErrorMessage());
+        reportFailure(defaultErrorMessage());
         return;
       }
 
@@ -174,12 +232,13 @@ export function useNativeAuth(): NativeAuthResult {
         nonce: rawNonce,
         supportsRefresh: true,
         ...(fullName ? { fullName } : {}),
+        ...pendingLinkTokenBody(pendingLink),
       });
 
       if (result.ok) {
         const parsed = parseTokenPair(result.data);
         if (!parsed) {
-          toast.error(defaultErrorMessage());
+          reportFailure(defaultErrorMessage());
           return;
         }
         await signIn(
@@ -187,23 +246,30 @@ export function useNativeAuth(): NativeAuthResult {
           'refreshToken' in parsed ? parsed.refreshToken : undefined,
           'expiresIn' in parsed ? parsed.expiresIn : undefined
         );
-        if (parsed.created === true) {
-          announcingToast.success(i18n.t('login.accountCreated'));
-        }
+        announceSignedIn(parsed);
       } else if (result.errorCode === 'SSO_ERROR') {
         handleSsoError(credential.email ?? '', result.ssoOrganizationId);
-      } else {
-        toast.error(mapError(result.errorCode));
+      } else if (!takePendingLinkOffer(result)) {
+        reportFailure(mapError(result.errorCode), result.errorCode);
       }
     } catch (error) {
       if (hasStringCode(error) && error.code === 'ERR_REQUEST_CANCELED') {
         return;
       }
-      toast.error(defaultErrorMessage());
+      reportFailure(defaultErrorMessage());
     } finally {
       finishAction('apple');
     }
-  }, [finishAction, handleSsoError, signIn, startAction]);
+  }, [
+    announceSignedIn,
+    finishAction,
+    handleSsoError,
+    pendingLink,
+    reportFailure,
+    signIn,
+    startAction,
+    takePendingLinkOffer,
+  ]);
 
   const signInWithGoogle = useCallback(async () => {
     if (!startAction('google')) {
@@ -223,7 +289,7 @@ export function useNativeAuth(): NativeAuthResult {
       const idToken = response.data.idToken;
 
       if (!serverAuthCode && !idToken) {
-        toast.error(defaultErrorMessage());
+        reportFailure(defaultErrorMessage());
         return;
       }
 
@@ -241,12 +307,13 @@ export function useNativeAuth(): NativeAuthResult {
           ? { serverAuthCode, googleClientId: GOOGLE_WEB_CLIENT_ID }
           : { idToken }),
         ...admissionBody,
+        ...pendingLinkTokenBody(pendingLink),
       });
 
       if (result.ok) {
         const parsed = parseTokenPair(result.data);
         if (!parsed) {
-          toast.error(defaultErrorMessage());
+          reportFailure(defaultErrorMessage());
           return;
         }
         await signIn(
@@ -254,32 +321,38 @@ export function useNativeAuth(): NativeAuthResult {
           'refreshToken' in parsed ? parsed.refreshToken : undefined,
           'expiresIn' in parsed ? parsed.expiresIn : undefined
         );
-        if (parsed.created === true) {
-          announcingToast.success(i18n.t('login.accountCreated'));
-        }
+        announceSignedIn(parsed);
       } else if (result.errorCode === 'SSO_ERROR') {
         handleSsoError(response.data.user.email, result.ssoOrganizationId);
-      } else {
-        toast.error(await tokenRefusalMessage(result, googleConfigured));
+      } else if (!takePendingLinkOffer(result)) {
+        reportFailure(await tokenRefusalMessage(result, googleConfigured), result.errorCode);
       }
     } catch {
-      toast.error(defaultErrorMessage());
+      reportFailure(defaultErrorMessage());
     } finally {
       finishAction('google');
     }
-  }, [finishAction, googleConfigured, handleSsoError, signIn, startAction]);
+  }, [
+    announceSignedIn,
+    finishAction,
+    googleConfigured,
+    handleSsoError,
+    pendingLink,
+    reportFailure,
+    signIn,
+    startAction,
+    takePendingLinkOffer,
+  ]);
 
   const signInWithPasskey = useCallback(async () => {
     if (!startAction('passkey')) {
       return;
     }
     try {
-      const result = await runPasskeySignIn();
+      const result = await runPasskeySignIn(undefined, pendingLink?.token);
       if (result.status === 'ok') {
         await signIn(result.token, result.refreshToken, result.expiresIn);
-        if (result.created === true) {
-          announcingToast.success(i18n.t('login.accountCreated'));
-        }
+        announceSignedIn(result);
         return;
       }
       if (result.reported) {
@@ -295,17 +368,26 @@ export function useNativeAuth(): NativeAuthResult {
         handleSsoError('', result.ssoOrganizationId);
         return;
       }
-      toast.error(
-        result.errorCode ? mapError(result.errorCode) : i18n.t(passkeyFailureKey(result.failure))
+      reportFailure(
+        result.errorCode ? mapError(result.errorCode) : i18n.t(passkeyFailureKey(result.failure)),
+        result.errorCode
       );
     } catch (error) {
       // eslint-disable-next-line no-console -- surface swallowed auth errors to Sentry
       console.error('[native-auth] signInWithPasskey failed:', error);
-      toast.error(defaultErrorMessage());
+      reportFailure(defaultErrorMessage());
     } finally {
       finishAction('passkey');
     }
-  }, [finishAction, handleSsoError, signIn, startAction]);
+  }, [
+    announceSignedIn,
+    finishAction,
+    handleSsoError,
+    pendingLink,
+    reportFailure,
+    signIn,
+    startAction,
+  ]);
 
   const requestEmailCode = useCallback(
     async (rawEmail: string) => {
@@ -336,13 +418,13 @@ export function useNativeAuth(): NativeAuthResult {
           ) {
             setEmailErrorKey(mapErrorKey(result.errorCode));
           } else {
-            toast.error(mapError(result.errorCode));
+            reportFailure(mapError(result.errorCode), result.errorCode);
           }
           return false;
         }
         const parsed = parseEmailCodeResponse(result.data);
         if (!parsed) {
-          toast.error(defaultErrorMessage());
+          reportFailure(defaultErrorMessage());
           return false;
         }
         // Hold the challenge for the current email so verifyEmailCode can
@@ -355,7 +437,7 @@ export function useNativeAuth(): NativeAuthResult {
         finishAction('otp-send');
       }
     },
-    [finishAction, handleSsoError, startAction]
+    [finishAction, handleSsoError, reportFailure, startAction]
   );
 
   const verifyEmailCode = useCallback(
@@ -383,11 +465,14 @@ export function useNativeAuth(): NativeAuthResult {
           code,
           supportsRefresh: true,
           ...(challengeId ? { challengeId } : {}),
+          ...pendingLinkTokenBody(pendingLink),
         });
         if (!result.ok) {
           if (result.errorCode === 'SSO_ERROR') {
             handleSsoError(email, result.ssoOrganizationId);
           }
+          // An offered pending link replaces the code step with its own screen.
+          takePendingLinkOffer(result);
           // Every other refusal surfaces inline on the code step: the form owns
           // the message slot, so a wrong, spent, or contested code reads in the
           // active language right where the input is. A toast here was the
@@ -404,9 +489,7 @@ export function useNativeAuth(): NativeAuthResult {
           'refreshToken' in parsed ? parsed.refreshToken : undefined,
           'expiresIn' in parsed ? parsed.expiresIn : undefined
         );
-        if (parsed.created === true) {
-          announcingToast.success(i18n.t('login.accountCreated'));
-        }
+        announceSignedIn(parsed);
         return { ok: true };
       } catch (error) {
         // eslint-disable-next-line no-console -- surface swallowed auth errors to Sentry
@@ -416,7 +499,16 @@ export function useNativeAuth(): NativeAuthResult {
         finishAction('otp-verify');
       }
     },
-    [finishAction, googleConfigured, handleSsoError, signIn, startAction]
+    [
+      announceSignedIn,
+      finishAction,
+      googleConfigured,
+      handleSsoError,
+      pendingLink,
+      signIn,
+      startAction,
+      takePendingLinkOffer,
+    ]
   );
 
   return {
@@ -432,5 +524,6 @@ export function useNativeAuth(): NativeAuthResult {
     ssoRecovery,
     clearSsoRecovery,
     handleSsoError,
+    pendingLinkFailure: linkFailure,
   };
 }

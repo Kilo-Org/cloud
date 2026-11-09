@@ -26,7 +26,8 @@ import {
 import { PRIVACY_URL, TERMS_URL } from '@/lib/config';
 import { i18n } from '@/i18n';
 
-import { IdleAuth, PROVIDER_GLYPH_SLOT_CLASS } from '../idle-auth';
+import { IdleAuth } from '../idle-auth';
+import { PROVIDER_GLYPH_SLOT_CLASS } from '../provider-buttons';
 
 type StartFn = (mode: 'signin' | 'sso', ssoEmail?: string) => Promise<void>;
 
@@ -586,7 +587,8 @@ describe('IdleAuth SSO recovery', () => {
       (btn.props.onPress as () => void)();
     });
 
-    expect(start).toHaveBeenCalledWith('sso', 'user@example.com');
+    // Without a pending link the browser start carries no link token.
+    expect(start).toHaveBeenCalledWith('sso', 'user@example.com', undefined);
   });
 
   it('moves the SSO busy spinner inside its primary Button', async () => {

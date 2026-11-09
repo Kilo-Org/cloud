@@ -1466,9 +1466,9 @@ export const EnkryptOutputDetectorsUpdateSchema =
 
 /**
  * Enkrypt AI input scan of each gateway chat request. Requests flagged by a blocking detector are
- * blocked, and so is every request while Enkrypt is unavailable. Without `detectors` the gateway applies Kilo
- * Default. The gateway checks every input, including tool results; `scan_tool_results` is no
- * longer read and is always written as true.
+ * blocked. Blocking scans fail closed while Enkrypt is unavailable; log-only scans do not gate
+ * requests. Without `detectors` the gateway applies Kilo Default. The gateway checks every input,
+ * including tool results; `scan_tool_results` is no longer read and is always written as true.
  *
  * `detectors` is validated with `EnkryptInputDetectorsSchema` where it is written and read, not
  * here: organization settings are parsed on every settings write and on some reads, and a stored

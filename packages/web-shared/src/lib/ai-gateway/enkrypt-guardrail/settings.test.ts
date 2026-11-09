@@ -54,7 +54,7 @@ describe('resolveEnkryptInputGuardrail', () => {
         pii: { enabled: true, entities: ['secrets'] },
         nsfw: { enabled: true },
       },
-      blockingDetectors: ['injection_attack', 'nsfw'],
+      blockingDetectors: ['injection_attack'],
     });
   });
 
@@ -85,7 +85,7 @@ describe('resolveEnkryptInputGuardrail', () => {
         },
         nsfw: { enabled: true },
       },
-      blockingDetectors: ['injection_attack', 'policy_violation', 'nsfw'],
+      blockingDetectors: ['injection_attack', 'policy_violation'],
     });
   });
 
@@ -105,7 +105,7 @@ describe('resolveEnkryptInputGuardrail', () => {
 
     expect(resolve({ enkrypt: { input_guardrail: { enabled: true, detectors } } })).toMatchObject({
       status: 'ready',
-      blockingDetectors: ['injection_attack', 'policy_violation', 'nsfw'],
+      blockingDetectors: ['injection_attack', 'policy_violation'],
     });
   });
 
@@ -122,9 +122,9 @@ describe('resolveEnkryptInputGuardrail', () => {
     const config = resolve({ enkrypt: { input_guardrail: { enabled: true, detectors } } });
     if (config?.status !== 'ready') throw new Error('Expected a ready guardrail');
 
-    expect(config.blockingDetectors).toEqual(['nsfw']);
+    expect(config.blockingDetectors).toEqual([]);
     const { blocking, logOnly } = splitEnkryptInputGuardrail(config);
-    expect(blocking).toEqual({ ...config, detectors: { nsfw: { enabled: true } } });
+    expect(blocking).toBeNull();
     expect(logOnly).toEqual({
       ...config,
       blockingDetectors: [],
@@ -136,6 +136,7 @@ describe('resolveEnkryptInputGuardrail', () => {
           need_explanation: false,
           policy_text: 'Never share customer records.',
         },
+        nsfw: { enabled: true },
       },
     });
   });
@@ -152,7 +153,7 @@ describe('resolveEnkryptInputGuardrail', () => {
       scanToolResults: true,
       status: 'ready',
       detectors: { pii: { enabled: true, entities: ['secrets'] }, nsfw: { enabled: true } },
-      blockingDetectors: ['nsfw'],
+      blockingDetectors: [],
     });
   });
 
@@ -318,5 +319,17 @@ describe('resolveEnkryptOutputGuardrail', () => {
         },
       })
     ).toEqual(resolveOutput({ enkrypt: { output_guardrail: outputGuardrail } }));
+  });
+
+  it.each(['block', 'log'] as const)('keeps the saved NSFW output action %s', action => {
+    const detectors = createEmptyEnkryptOutputDetectors();
+    detectors.nsfw = { enabled: true, action };
+
+    expect(resolveOutput({ enkrypt: { output_guardrail: { enabled: true, detectors } } })).toEqual({
+      scanToolResults: false,
+      status: 'ready',
+      detectors: { nsfw: { enabled: true } },
+      blockingDetectors: action === 'block' ? ['nsfw'] : [],
+    });
   });
 });

@@ -400,7 +400,7 @@ function InputGuardrailSection({
   return (
     <GuardrailSection
       title="Input guardrails"
-      description="Check every input with Enkrypt AI before it reaches a model, including tool results such as file reads and command output. Requests are blocked while Enkrypt is unavailable."
+      description="Check every input with Enkrypt AI, including tool results such as file reads and command output. Blocking detectors reject requests if Enkrypt is unavailable."
       enabled={draft.enabled}
       onEnabledChange={enabled => onChange(current => ({ ...current, enabled }))}
     >

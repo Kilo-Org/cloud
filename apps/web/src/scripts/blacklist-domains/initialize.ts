@@ -1,6 +1,6 @@
 import { Redis } from '@upstash/redis';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { backfillDomainBlacklist } from '@kilocode/web-shared/lib/blacklist-domains-migration';
+import { initializeDomainBlacklist } from '@kilocode/web-shared/lib/blacklist-domains-migration';
 import {
   BLACKLISTED_DOMAINS_REDIS_KEY,
   BLACKLISTED_DOMAINS_SETTINGS_REDIS_KEY,
@@ -15,10 +15,12 @@ export async function run(...args: string[]): Promise<void> {
     retry: false,
     signal: () => AbortSignal.timeout(30_000),
   });
-  await backfillDomainBlacklist(
+  await initializeDomainBlacklist(
     db,
     () => redis.get<string>(BLACKLISTED_DOMAINS_REDIS_KEY),
     settings => redis.set(BLACKLISTED_DOMAINS_SETTINGS_REDIS_KEY, JSON.stringify(settings))
   );
-  console.log('Domain blacklist backfill committed. The legacy Redis snapshot is unchanged.');
+  console.log(
+    'Domain blacklist initialized from PostgreSQL; legacy Redis settings were saved without domains.'
+  );
 }

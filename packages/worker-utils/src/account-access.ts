@@ -175,7 +175,7 @@ export function canSpendPaidUsage(balance: number): boolean {
   return balance > 0;
 }
 
-// Retained for the authorized backfill and rollback; access checks never read this snapshot.
+// Only explicit settings initialization and retirement touch this legacy snapshot.
 export const BLACKLISTED_DOMAINS_REDIS_KEY = 'admin:blacklisted-domains';
 export const BLACKLISTED_DOMAINS_SETTINGS_REDIS_KEY = 'admin:blacklisted-domains:settings';
 // Holds the config's updated_at. The admin save writes both keys in one MSET.
@@ -185,8 +185,7 @@ export const BLACKLISTED_DOMAINS_UPDATED_AT_REDIS_KEY = 'admin:blacklisted-domai
 // from a web deployment older than that key, can go unnoticed.
 const BLACKLISTED_DOMAINS_FULL_READ_INTERVAL_MS = 10 * 60_000;
 
-// Temporary Redis reader capacity; full-snapshot reads still incur bandwidth and timeout costs.
-// Keep the parsed list and in-process index bounded until the selective Postgres cutover.
+// Legacy parsing stays bounded; selective Postgres access checks do not use this limit.
 export const MAX_BLACKLIST_DOMAINS = 200_000;
 
 export const BlacklistDomainsConfigSchema = z.object({
@@ -379,7 +378,7 @@ export async function isEmailDomainBlacklisted(
     DOMAIN_BLACKLIST_QUERY_TIMEOUT_MS,
     'Domain blacklist database lookup timed out'
   );
-  if (!state) throw new Error('Domain blacklist backfill has not completed');
+  if (!state) throw new Error('Domain blacklist initialization has not completed');
   if (state.useEnvFallback) return isEmailBlacklistedByDomain(email, fallbackDomains);
   if (suffixes.length === 0) return false;
 

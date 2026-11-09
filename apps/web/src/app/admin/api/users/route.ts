@@ -212,7 +212,7 @@ export async function GET(
       .from(domain_blacklist_state)
       .where(eq(domain_blacklist_state.id, 1))
       .limit(1);
-    if (!blacklistState) throw new Error('Domain blacklist backfill has not completed');
+    if (!blacklistState) throw new Error('Domain blacklist initialization has not completed');
     const blacklistedDomains = blacklistState.useEnvFallback
       ? envFallbackDomains
       : candidateDomains.length === 0

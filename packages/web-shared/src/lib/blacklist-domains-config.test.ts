@@ -55,8 +55,8 @@ async function initialize() {
 
 describe('Postgres blacklist reads', () => {
   test('refuses an uninitialized table instead of silently allowing access', async () => {
-    await expect(config.getBlacklistedDomains()).rejects.toThrow('backfill');
-    await expect(config.isEmailBlacklisted('user@example.com')).rejects.toThrow('backfill');
+    await expect(config.getBlacklistedDomains()).rejects.toThrow('initialization');
+    await expect(config.isEmailBlacklisted('user@example.com')).rejects.toThrow('initialization');
   });
 
   test('enumerates admin entries across bounded pages without truncating them', async () => {

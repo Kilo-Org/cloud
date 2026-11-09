@@ -1,12 +1,9 @@
 import { beforeEach, describe, expect, jest, test } from '@jest/globals';
 import { blacklisted_domains, domain_blacklist_state } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { backfillDomainBlacklist } from '@kilocode/web-shared/lib/blacklist-domains-migration';
-import {
-  MAX_BLACKLIST_DOMAINS,
-  type BlacklistDomainsConfig,
-} from '@kilocode/worker-utils/account-access';
-import { eq, sql } from 'drizzle-orm';
+import { initializeDomainBlacklist } from '@kilocode/web-shared/lib/blacklist-domains-migration';
+import type { BlacklistDomainsConfig } from '@kilocode/worker-utils/account-access';
+import { sql } from 'drizzle-orm';
 
 beforeEach(async () => {
   await db.delete(domain_blacklist_state).where(sql`true`);
@@ -22,14 +19,10 @@ const legacy = (domains: string[], fields = {}) =>
     ...fields,
   });
 
-describe('domain blacklist operational backfill', () => {
-  test('reconciles the full legacy snapshot without retaining stale shadow rows', async () => {
-    const domains = Array.from(
-      { length: MAX_BLACKLIST_DOMAINS + 1 },
-      (_, index) => `bulk-${index}.example`
-    );
-    domains.push('UPPER.example', 'UPPER.example', ' padded.example ');
-    const raw = legacy(domains, {
+describe('domain blacklist initialization', () => {
+  test('preserves PostgreSQL domains and saves only legacy settings', async () => {
+    const postgresDomains = ['postgres.example', 'postgres-stale-extra.example'];
+    const raw = legacy(['legacy-only.example', 'legacy-stale-extra.example'], {
       blocked_signup_tlds: [],
       updated_by: 'operator',
       updated_by_email: 'admin@example.com',
@@ -38,30 +31,11 @@ describe('domain blacklist operational backfill', () => {
     const write = jest
       .fn<(settings: BlacklistDomainsConfig) => Promise<void>>()
       .mockResolvedValue(undefined);
-    await db.insert(blacklisted_domains).values({ domain: 'preexisting.example' });
-    await backfillDomainBlacklist(db, read, write);
-    const [count] = await db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(blacklisted_domains);
-    expect(count.count).toBe(MAX_BLACKLIST_DOMAINS + 3);
-    expect(
-      await db
-        .select()
-        .from(blacklisted_domains)
-        .where(eq(blacklisted_domains.domain, 'preexisting.example'))
-    ).toEqual([]);
-    expect(
-      await db
-        .select()
-        .from(blacklisted_domains)
-        .where(eq(blacklisted_domains.domain, `bulk-${MAX_BLACKLIST_DOMAINS}.example`))
-    ).toHaveLength(1);
-    expect(
-      await db
-        .select()
-        .from(blacklisted_domains)
-        .where(eq(blacklisted_domains.domain, ' padded.example '))
-    ).toHaveLength(1);
+    await db.insert(blacklisted_domains).values(postgresDomains.map(domain => ({ domain })));
+    await initializeDomainBlacklist(db, read, write);
+    expect((await db.select().from(blacklisted_domains)).map(row => row.domain).sort()).toEqual(
+      postgresDomains.sort()
+    );
     expect(write).toHaveBeenCalledWith({
       domains: [],
       blocked_signup_tlds: [],
@@ -72,12 +46,27 @@ describe('domain blacklist operational backfill', () => {
     const [state] = await db.select().from(domain_blacklist_state);
     expect(state.use_env_fallback).toBe(false);
     expect(read).toHaveBeenCalledTimes(2);
-    await expect(backfillDomainBlacklist(db, read, write)).rejects.toThrow('already initialized');
-  }, 30_000);
+    await expect(initializeDomainBlacklist(db, read, write)).rejects.toThrow('already initialized');
+    expect(read).toHaveBeenCalledTimes(2);
+  });
 
-  test('a failed Redis source read never marks an empty table ready', async () => {
+  test.each([null, legacy([]), legacy(['legacy.example'])])(
+    'an empty PostgreSQL table enables deployment fallbacks regardless of legacy domains (%s)',
+    async raw => {
+      const write = jest
+        .fn<(settings: BlacklistDomainsConfig) => Promise<void>>()
+        .mockResolvedValue(undefined);
+      await initializeDomainBlacklist(db, async () => raw, write);
+      expect(await db.select().from(blacklisted_domains)).toEqual([]);
+      const [state] = await db.select().from(domain_blacklist_state);
+      expect(state.use_env_fallback).toBe(true);
+      expect(write).toHaveBeenCalledWith(expect.objectContaining({ domains: [] }));
+    }
+  );
+
+  test('a failed Redis source read never marks the blacklist initialized', async () => {
     await expect(
-      backfillDomainBlacklist(
+      initializeDomainBlacklist(
         db,
         async () => {
           throw new Error('Redis timeout');
@@ -88,32 +77,31 @@ describe('domain blacklist operational backfill', () => {
     expect(await db.select().from(domain_blacklist_state)).toEqual([]);
   });
 
-  test('malformed legacy data and concurrent legacy edits abort without dropping entries', async () => {
-    await db.insert(blacklisted_domains).values({ domain: 'preexisting.example' });
-    await expect(
-      backfillDomainBlacklist(
-        db,
-        async () => '{bad json',
-        async () => {}
-      )
-    ).rejects.toThrow();
-    const read = jest
-      .fn<() => Promise<string | null>>()
-      .mockResolvedValueOnce(legacy(['first.example']))
-      .mockResolvedValueOnce(legacy(['first.example', 'second.example']));
-    await expect(backfillDomainBlacklist(db, read, async () => {})).rejects.toThrow('changed');
-    expect(await db.select().from(blacklisted_domains)).toEqual([
-      { domain: 'preexisting.example' },
-    ]);
-    expect(await db.select().from(domain_blacklist_state)).toEqual([]);
-  });
+  test.each(['{bad json', '', legacy(['legacy.example'], { updated_by: 42 })])(
+    'invalid legacy payload %j leaves PostgreSQL unchanged',
+    async raw => {
+      const postgresDomains = ['postgres.example', 'postgres-extra.example'];
+      await db.insert(blacklisted_domains).values(postgresDomains.map(domain => ({ domain })));
+      await expect(
+        initializeDomainBlacklist(
+          db,
+          async () => raw,
+          async () => {}
+        )
+      ).rejects.toThrow();
+      expect((await db.select().from(blacklisted_domains)).map(row => row.domain).sort()).toEqual(
+        postgresDomains.sort()
+      );
+      expect(await db.select().from(domain_blacklist_state)).toEqual([]);
+    }
+  );
 
-  test('settings write failure rolls back the import and leaves readiness unset', async () => {
+  test('a settings write failure leaves PostgreSQL domains and readiness unchanged', async () => {
     await db.insert(blacklisted_domains).values({ domain: 'preexisting.example' });
     await expect(
-      backfillDomainBlacklist(
+      initializeDomainBlacklist(
         db,
-        async () => legacy(['blocked.example']),
+        async () => legacy(['legacy.example']),
         async () => {
           throw new Error('Redis write failed');
         }
@@ -125,52 +113,51 @@ describe('domain blacklist operational backfill', () => {
     expect(await db.select().from(domain_blacklist_state)).toEqual([]);
   });
 
-  test.each([null, legacy([])])(
-    'a successful absent or empty legacy config keeps deployment fallbacks (%s)',
-    async raw => {
-      const write = jest
-        .fn<(settings: BlacklistDomainsConfig) => Promise<void>>()
-        .mockResolvedValue(undefined);
-      await db.insert(blacklisted_domains).values({ domain: 'stale.example' });
-      await backfillDomainBlacklist(db, async () => raw, write);
-      expect(await db.select().from(blacklisted_domains)).toEqual([]);
-      const [state] = await db.select().from(domain_blacklist_state);
-      expect(state.use_env_fallback).toBe(true);
-      const [settings] = write.mock.calls[0];
-      expect(settings).not.toHaveProperty('blocked_signup_tlds');
-    }
-  );
-
-  test('an empty-string payload is malformed, not an absent legacy config', async () => {
+  test('an existing readiness state refuses initialization before reading legacy data', async () => {
+    const read = jest.fn<() => Promise<string | null>>().mockResolvedValue(legacy([]));
     await db.insert(blacklisted_domains).values({ domain: 'preexisting.example' });
-    await expect(
-      backfillDomainBlacklist(
-        db,
-        async () => '',
-        async () => {}
-      )
-    ).rejects.toThrow();
+    await db.insert(domain_blacklist_state).values({ use_env_fallback: false });
+    await expect(initializeDomainBlacklist(db, read, async () => {})).rejects.toThrow(
+      'already initialized'
+    );
+    expect(read).not.toHaveBeenCalled();
     expect(await db.select().from(blacklisted_domains)).toEqual([
       { domain: 'preexisting.example' },
     ]);
+  });
+
+  test('concurrent legacy edits abort without changing PostgreSQL domains or readiness', async () => {
+    const postgresDomains = ['preexisting.example', 'keep-extra.example'];
+    await db.insert(blacklisted_domains).values(postgresDomains.map(domain => ({ domain })));
+    const read = jest
+      .fn<() => Promise<string | null>>()
+      .mockResolvedValueOnce(legacy(['first.example']))
+      .mockResolvedValueOnce(legacy(['first.example', 'second.example']));
+    const write = jest.fn<(settings: BlacklistDomainsConfig) => Promise<void>>();
+    await expect(initializeDomainBlacklist(db, read, write)).rejects.toThrow('changed');
+    expect((await db.select().from(blacklisted_domains)).map(row => row.domain).sort()).toEqual(
+      postgresDomains.sort()
+    );
     expect(await db.select().from(domain_blacklist_state)).toEqual([]);
+    expect(write).not.toHaveBeenCalled();
   });
 
   test('reads its source after acquiring the same lock used by prep writers', async () => {
     let raw = legacy(['before.example']);
     const read = jest.fn<() => Promise<string | null>>().mockImplementation(async () => raw);
+    await db.insert(blacklisted_domains).values({ domain: 'postgres.example' });
     let migration = Promise.resolve();
     try {
       await db.transaction(async tx => {
         await tx.execute(sql`LOCK TABLE ${blacklisted_domains} IN EXCLUSIVE MODE`);
-        migration = backfillDomainBlacklist(db, read, async () => {});
+        migration = initializeDomainBlacklist(db, read, async () => {});
         expect(read).not.toHaveBeenCalled();
         raw = legacy(['after.example']);
       });
     } finally {
       await migration;
     }
-    expect(await db.select().from(blacklisted_domains)).toEqual([{ domain: 'after.example' }]);
+    expect(await db.select().from(blacklisted_domains)).toEqual([{ domain: 'postgres.example' }]);
     const [state] = await db.select().from(domain_blacklist_state);
     expect(state.use_env_fallback).toBe(false);
   });

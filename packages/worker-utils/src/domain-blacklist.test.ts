@@ -295,7 +295,7 @@ describe('isEmailDomainBlacklisted', () => {
 
     await expect(
       isEmailDomainBlacklisted(captured.db as never, email, [], cache.cache)
-    ).rejects.toThrow('Domain blacklist backfill has not completed');
+    ).rejects.toThrow('Domain blacklist initialization has not completed');
 
     expect(captured.queries).toHaveLength(1);
     expect(cache.reads).toEqual([]);

@@ -62,18 +62,19 @@ function EditTab() {
           blocked === 1 ? 'account' : 'accounts'
         }`;
 
-        if (failed) {
-          toast.warning(
-            'Saved, but blocking existing accounts failed. Run the backfill to finish.'
-          );
-        } else if (remaining) {
-          toast.warning(
-            `Saved. Blocked ${accountLabel}; more remain. Run the backfill to finish the rest.`
-          );
-        } else if (blocked > 0) {
-          toast.success(`Saved. Blocked ${accountLabel}.`);
+        const message =
+          blocked > 0 ? `Saved. Blocked ${accountLabel}.` : 'Blacklisted domains updated.';
+        const warnings = [
+          failed && 'Blocking existing accounts failed. Run the backfill to finish.',
+          remaining && 'More accounts remain. Run the backfill to finish the rest.',
+          result.legacy_cleanup_failed && 'Legacy Redis cleanup failed. Sync again to retry.',
+        ]
+          .filter(Boolean)
+          .join(' ');
+        if (warnings) {
+          toast.warning(`${message} ${warnings}`);
         } else {
-          toast.success('Blacklisted domains updated');
+          toast.success(message);
         }
       },
       onError: error => {
@@ -139,14 +140,6 @@ function EditTab() {
         </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
-        {data && data.dropped_domains > 0 && (
-          <p className="text-destructive flex items-center gap-2 text-xs">
-            <AlertTriangle className="h-4 w-4 shrink-0" />
-            Postgres checks use all {domainCount.toLocaleString()} entries. Legacy Redis readers
-            during rollout or rollback only enforce the first{' '}
-            {(domainCount - data.dropped_domains).toLocaleString()} entries.
-          </p>
-        )}
         <Textarea
           placeholder={'example.com\nspam.org\nmalicious.net'}
           value={inputValue}
@@ -205,7 +198,8 @@ function EditTab() {
         <div className="text-muted-foreground text-xs">
           <p>
             Access checks use Postgres with 60-second per-domain caching and replica propagation
-            delay. Each save or Sync updates both Postgres and Redis. Empty domain lists use
+            delay. Saves keep domains in Postgres and only small settings in Redis. The next save
+            deletes the legacy Redis blob unless it already has a TTL. Empty domain lists use
             BLACKLIST_DOMAINS; unset signup TLDs use BLOCKED_SIGNUP_TLDS or the built-in defaults.
           </p>
         </div>

@@ -69,7 +69,7 @@ function getEnvFallbackSignupTlds(): string[] {
 
 // Resolved once so an unchanged fallback keeps the domain index built for its array.
 export const envFallbackDomains = getEnvFallbackDomains();
-const envFallbackSignupTlds = getEnvFallbackSignupTlds();
+export const envFallbackSignupTlds = getEnvFallbackSignupTlds();
 
 let snapshot: BlacklistDomainsConfigSnapshot | null = null;
 
@@ -111,7 +111,7 @@ export function isEmailBlacklisted(email: string, fromDb: Pick<typeof db, 'selec
 
 const DOMAIN_BATCH_SIZE = 1000;
 
-async function listStoredDomains(fromDb: Pick<typeof db, 'select'>): Promise<string[]> {
+export async function listStoredDomains(fromDb: Pick<typeof db, 'select'>): Promise<string[]> {
   const domains: string[] = [];
   let cursor: string | null = null;
   for (;;) {
@@ -136,7 +136,7 @@ export async function getBlacklistedDomains(
     .from(domain_blacklist_state)
     .where(eq(domain_blacklist_state.id, 1))
     .limit(1);
-  if (!state) throw new Error('Domain blacklist backfill has not completed');
+  if (!state) throw new Error('Domain blacklist initialization has not completed');
   return state.useEnvFallback ? envFallbackDomains : listStoredDomains(fromDb);
 }
 

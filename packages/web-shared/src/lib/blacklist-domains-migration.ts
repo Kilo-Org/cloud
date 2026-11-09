@@ -5,12 +5,10 @@ import {
   type BlacklistDomainsConfig,
 } from '@kilocode/worker-utils/account-access';
 import { eq, sql } from 'drizzle-orm';
-import * as z from 'zod';
 
-const LegacyConfigSchema = BlacklistDomainsConfigSchema.extend({ domains: z.array(z.string()) });
-const BATCH_SIZE = 1000;
+const LegacySettingsSchema = BlacklistDomainsConfigSchema.omit({ domains: true });
 
-export async function backfillDomainBlacklist(
+export async function initializeDomainBlacklist(
   db: DrizzleClient['db'],
   readLegacy: () => Promise<string | null>,
   writeSettings: (settings: BlacklistDomainsConfig) => Promise<unknown>
@@ -27,23 +25,20 @@ export async function backfillDomainBlacklist(
     if (state) throw new Error('Domain blacklist is already initialized; refusing to overwrite it');
 
     const raw = await readLegacy();
-    const config =
+    const config: BlacklistDomainsConfig =
       raw === null
         ? { domains: [], updated_at: null, updated_by: null, updated_by_email: null }
-        : LegacyConfigSchema.parse(JSON.parse(raw));
-    const domains = [...new Set(config.domains.map(domain => domain.toLowerCase()))];
-    const deadline = Date.now() + 120_000;
-    await tx.delete(blacklisted_domains).where(sql`true`);
-    for (let offset = 0; offset < domains.length; offset += BATCH_SIZE) {
-      if (Date.now() > deadline) throw new Error('Blacklist synchronization timed out');
-      await tx
-        .insert(blacklisted_domains)
-        .values(domains.slice(offset, offset + BATCH_SIZE).map(domain => ({ domain })));
-    }
+        : { ...LegacySettingsSchema.parse(JSON.parse(raw)), domains: [] };
     if ((await readLegacy()) !== raw) {
-      throw new Error('Legacy blacklist changed during backfill; freeze admin edits and retry');
+      throw new Error(
+        'Legacy blacklist changed during initialization; freeze admin edits and retry'
+      );
     }
-    await writeSettings({ ...config, domains: [] });
+    const domains = await tx
+      .select({ domain: blacklisted_domains.domain })
+      .from(blacklisted_domains)
+      .limit(1);
+    await writeSettings(config);
     await tx
       .insert(domain_blacklist_state)
       .values({ id: 1, use_env_fallback: domains.length === 0 });

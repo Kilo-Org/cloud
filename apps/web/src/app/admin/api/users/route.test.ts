@@ -212,7 +212,7 @@ describe('GET /admin/api/users blacklist annotations', () => {
     expect(response.status).toBe(500);
     expect(await response.json()).toEqual({ error: 'Failed to fetch users' });
     expect(captureException).toHaveBeenCalledWith(
-      new Error('Domain blacklist backfill has not completed'),
+      new Error('Domain blacklist initialization has not completed'),
       expect.any(Object)
     );
     expect(domainWhere).not.toHaveBeenCalled();

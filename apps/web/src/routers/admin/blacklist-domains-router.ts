@@ -2,15 +2,14 @@ import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/
 import { redisClient } from '@kilocode/web-shared/lib/redis';
 import {
   BlacklistDomainsInputSchema,
-  DEFAULT_BLACKLIST_DOMAINS_CONFIG,
+  envFallbackSignupTlds,
   getBlacklistedDomains,
-  getBlockedSignupTlds,
+  listStoredDomains,
   normalizeSignupTlds,
 } from '@kilocode/web-shared/lib/blacklist-domains-config';
 import {
   BlacklistDomainsConfigSchema,
   BLACKLISTED_DOMAINS_SETTINGS_REDIS_KEY,
-  MAX_BLACKLIST_DOMAINS,
 } from '@kilocode/worker-utils/account-access';
 import {
   BLACKLIST_DOMAINS_REDIS_KEY,
@@ -37,40 +36,56 @@ const SuspiciousDomainsInputSchema = z
   })
   .optional();
 
-// Admin saves must round-trip the entire snapshot, not the access readers' capped prefix.
-const AdminBlacklistDomainsConfigSchema = BlacklistDomainsConfigSchema.extend({
-  domains: z.array(z.string()),
+const BlacklistSettingsSchema = BlacklistDomainsConfigSchema.extend({
+  domains: z.array(z.string()).length(0),
 });
 const AdminBlacklistDomainsInputSchema = BlacklistDomainsInputSchema.extend({
   domains: z.array(z.string().min(1).trim()),
   expected_version: z.string().length(64),
 });
 
-async function readConfigOrThrow() {
-  const raw = await redisClient.get<string>(BLACKLIST_DOMAINS_REDIS_KEY);
+async function readConfigOrThrow(fromDb: Pick<typeof db, 'select'>) {
+  const [state] = await fromDb
+    .select({ revision: domain_blacklist_state.revision })
+    .from(domain_blacklist_state)
+    .where(eq(domain_blacklist_state.id, 1))
+    .limit(1)
+    .for('share');
+  if (!state) {
+    throw new TRPCError({
+      code: 'PRECONDITION_FAILED',
+      message: 'Domain blacklist initialization has not completed.',
+    });
+  }
+  const raw = await redisClient.get<string>(BLACKLISTED_DOMAINS_SETTINGS_REDIS_KEY);
+  if (raw === null) {
+    throw new TRPCError({
+      code: 'PRECONDITION_FAILED',
+      message: 'Blacklist settings initialization has not completed.',
+    });
+  }
+  const settings = BlacklistSettingsSchema.parse(JSON.parse(raw));
   return {
-    config:
-      raw === null
-        ? DEFAULT_BLACKLIST_DOMAINS_CONFIG
-        : AdminBlacklistDomainsConfigSchema.parse(JSON.parse(raw)),
-    version: createHash('sha256')
-      .update(raw ?? '')
-      .digest('hex'),
+    config: { ...settings, domains: await listStoredDomains(fromDb) },
+    version: createHash('sha256').update(`postgres:${state.revision}`).digest('hex'),
   };
 }
 
 export const adminBlacklistDomainsRouter = createTRPCRouter({
   get: adminProcedure.query(async () => {
-    const { config, version } = await readConfigOrThrow();
-    return {
-      ...config,
-      version,
-      // The editor always shows an editable list: the stored one, or the
-      // effective fallback (env or built-in) when the stored config predates
-      // the field.
-      blocked_signup_tlds: config.blocked_signup_tlds ?? (await getBlockedSignupTlds()),
-      dropped_domains: Math.max(0, config.domains.length - MAX_BLACKLIST_DOMAINS),
-    };
+    return db.transaction(async tx => {
+      await tx.execute(sql`SET LOCAL lock_timeout = '10s'`);
+      await tx.execute(sql`SET LOCAL statement_timeout = '30s'`);
+      const { config, version } = await readConfigOrThrow(tx);
+      return {
+        ...config,
+        version,
+        blocked_signup_tlds: normalizeSignupTlds(
+          config.blocked_signup_tlds ?? envFallbackSignupTlds
+        ),
+        dropped_domains: 0,
+      };
+    });
   }),
 
   set: adminProcedure.input(AdminBlacklistDomainsInputSchema).mutation(async ({ input, ctx }) => {
@@ -81,11 +96,10 @@ export const adminBlacklistDomainsRouter = createTRPCRouter({
     let saved;
     try {
       saved = await db.transaction(async tx => {
-        // Serialize both stores, including the previous-config read, across admin saves.
         await tx.execute(sql`SET LOCAL lock_timeout = '10s'`);
         await tx.execute(sql`SET LOCAL statement_timeout = '30s'`);
         await tx.execute(sql`LOCK TABLE ${blacklisted_domains} IN EXCLUSIVE MODE`);
-        const { config: previous, version } = await readConfigOrThrow();
+        const { config: previous, version } = await readConfigOrThrow(tx);
         if (version !== input.expected_version) {
           throw new TRPCError({
             code: 'CONFLICT',
@@ -94,10 +108,9 @@ export const adminBlacklistDomainsRouter = createTRPCRouter({
         }
         const previousDomains = new Set(previous.domains.map(d => d.toLowerCase().trim()));
         const addedDomains = normalizedDomains.filter(domain => !previousDomains.has(domain));
-        const blockedSignupTlds =
-          input.blocked_tlds === undefined
-            ? (previous.blocked_signup_tlds ?? (await getBlockedSignupTlds()))
-            : normalizeSignupTlds(input.blocked_tlds);
+        const blockedSignupTlds = normalizeSignupTlds(
+          input.blocked_tlds ?? previous.blocked_signup_tlds ?? envFallbackSignupTlds
+        );
 
         const updatedAt = new Date().toISOString();
         const config: BlacklistDomainsConfig = {
@@ -119,26 +132,38 @@ export const adminBlacklistDomainsRouter = createTRPCRouter({
           .update(domain_blacklist_state)
           .set({ revision: randomUUID(), use_env_fallback: normalizedDomains.length === 0 })
           .where(eq(domain_blacklist_state.id, 1));
-        // Stage SQL first so failed batches leave Redis protection and the additions diff intact.
-        // Redis and the commit cannot be atomic; never roll back Redis after an ambiguous failure.
         await redisClient.mset({
-          [BLACKLIST_DOMAINS_REDIS_KEY]: JSON.stringify(config),
           [BLACKLISTED_DOMAINS_SETTINGS_REDIS_KEY]: JSON.stringify({ ...config, domains: [] }),
           [BLACKLIST_DOMAINS_UPDATED_AT_REDIS_KEY]: updatedAt,
         });
         return { config, addedDomains };
       });
     } catch (error) {
-      if (error instanceof TRPCError && error.code === 'CONFLICT') throw error;
-      captureException(error, { tags: { source: 'blacklist_domains_dual_write' } });
+      if (error instanceof TRPCError) throw error;
+      captureException(error, { tags: { source: 'blacklist_domains_save' } });
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',
         message:
-          'Blacklist save failed. Redis may already be updated. Reload and retry to synchronize Postgres, then run the account backfill.',
+          'Blacklist save failed. Settings or the database commit may already have applied. Reload the Postgres list before retrying, then run the account backfill.',
         cause: error,
       });
     }
     const { config, addedDomains } = saved;
+
+    let legacyCleanupFailed = false;
+    try {
+      await redisClient.eval(
+        `if redis.call('TTL', KEYS[1]) == -1 then
+          return redis.call('DEL', KEYS[1])
+        end
+        return 0`,
+        [BLACKLIST_DOMAINS_REDIS_KEY],
+        []
+      );
+    } catch (error) {
+      captureException(error, { tags: { source: 'blacklist_domains_legacy_cleanup' } });
+      legacyCleanupFailed = true;
+    }
 
     // The list is already live for auth checks at this point, so a backfill
     // failure must not fail the save. Report it and point the admin at the
@@ -158,7 +183,7 @@ export const adminBlacklistDomainsRouter = createTRPCRouter({
       }
     }
 
-    return { ...config, backfill };
+    return { ...config, backfill, legacy_cleanup_failed: legacyCleanupFailed };
   }),
 
   stats: adminProcedure.query(async () => {

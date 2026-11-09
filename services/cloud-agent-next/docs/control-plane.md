@@ -1530,6 +1530,22 @@ per-port hostname. It handles ordinary HTTP and WebSocket upgrades.
   chat: an assistant link to a loopback address with a port in range (`localhost`, `127.0.0.1`,
   `0.0.0.0`, `[::1]`, `[::]`) shows the real preview URL with its path, and a click mints a ticket
   for that port and path. A copied preview URL opened without the cookie gets the 401 below.
+- **Live service discovery.** The web app can ask `listPreviewServices({ cloudAgentSessionId })` for
+  the services listening inside the session's live sandbox. The Worker runs the current-session
+  access check, the Session DO owns eligibility and the sandbox lookup, and the Sandbox DO returns
+  `{ services: Array<{ port, name, description? }>, status: 'running' | 'not_running' | 'not_ready'
+  | 'unsupported' }`. `running` with an empty list is a real scan result; a stopped sandbox is
+  `not_running` and a preparing or disconnected one is `not_ready`. Discovery never starts, resumes
+  or wakes an allocation: it reads route/allocation state off the operation queue and asks only an
+  already-bound wrapper. A scanner or transport failure is an error, not an empty list. The wrapper
+  derives each port from `/proc/net/tcp` and `/proc/net/tcp6` listening sockets, attributes the
+  socket inode through `/proc/<pid>/fd`, and offers only sockets owned by a sandbox process. Unowned
+  listeners (proxy, sidecar, provider control) and Kilo serve/control plus provider-reserved ports
+  are skipped; the manual port field remains the fallback when ownership is inaccessible. Results
+  are deduped and sorted across 1024-65535 and bounded. Names come only from an allowlist of
+  framework/executable labels plus an optional safe directory basename, with `HTTP server` for an
+  attributed process outside that allowlist; raw argv, environment values, secrets and full paths
+  never cross the socket. The web app calls this on demand and does not poll it automatically.
 - **Entry exchange.** The web app mints a 60-second HS256 entry ticket (audience
   `cloud-agent-preview`, purpose `preview`, claims `userId`, `cloudAgentSessionId`, optional
   `organizationId`, `port`) and opens `<worker>/preview/open?ticket=<jwt>[&path=<path>]` on the

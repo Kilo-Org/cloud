@@ -23,6 +23,7 @@ import { createSessionEgressAuditHandlers } from './router/handlers/session-egre
 import { listChildSessions } from './router/handlers/list-child-sessions.js';
 import { getSandboxSelectionOptions } from './router/handlers/sandbox-selection.js';
 import { getPreviewOptions } from './router/handlers/preview-options.js';
+import { listPreviewServices } from './router/handlers/preview-services.js';
 import { listHostedSessions } from './router/handlers/hosted-session-list.js';
 import {
   getHostedWorkspace,
@@ -43,6 +44,7 @@ export const appRouter = router({
   deleteWorktree,
   getSandboxSelectionOptions,
   getPreviewOptions,
+  listPreviewServices,
   listHostedSessions,
   listChildSessions,
   listHostedWorkspaces,

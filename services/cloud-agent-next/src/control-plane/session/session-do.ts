@@ -76,7 +76,7 @@ import type {
 } from '../../session/message-result.js';
 import { createSessionEventQueries, type SessionEventQueries } from './event-queries.js';
 import { createPreparationProgressRecorder } from '../../session/preparation-progress.js';
-import { sessionIdFromDoName } from '../../session-identity.js';
+import { isControlSession, sessionIdFromDoName } from '../../session-identity.js';
 import {
   finalizePreparationAttempt,
   getPreparationSnapshots,
@@ -175,6 +175,8 @@ import {
 import { createControlPlaneTerminals, type ControlPlaneTerminals } from './terminals.js';
 import { createControlPlanePreview, type ControlPlanePreview } from './preview.js';
 import type { PreviewTargetResult, ResolvedPreviewTarget } from '../sandbox/preview-target.js';
+import { isTerminalSessionEligible } from '../../terminal/access.js';
+import type { ListPreviewServicesOutput } from '../../shared/preview-services.js';
 import { readWorktreeChildSessions } from './worktree-child-sessions.js';
 import {
   buildControlPlaneMessageReport,
@@ -510,6 +512,8 @@ export type ControlPlaneSandboxPeer = SharedWorktreeChangesPeer & {
   kiloRequest(input: ControlPlaneKiloRequestInput): Promise<ControlPlaneControlResult>;
   /** Resolves the preview provider coordinates for this sandbox (off the op queue). */
   previewTarget(sessionId: string): Promise<PreviewTargetResult>;
+  /** Lists live listening services through the bound wrapper (never wakes an allocation). */
+  previewServices(sessionId: string): Promise<ListPreviewServicesOutput>;
   /** B10: the wrapper identity bound to the connected allocation. */
   getWrapperId(): Promise<string | null>;
   /** B10: the public sandbox status snapshot projected from the allocation. */
@@ -2850,6 +2854,32 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   async resolvePreviewTarget(): Promise<ResolvedPreviewTarget> {
     await this.initialized;
     return this.preview.resolve();
+  }
+
+  /**
+   * Worker-facing live preview discovery. Eligibility and the sandbox owner are
+   * decided here; the Sandbox DO checks route/allocation state and relays the
+   * scan to the bound wrapper. A stopped or idle sandbox is reported as
+   * `not_running`/`not_ready` and is never started or woken.
+   */
+  async listPreviewServices(): Promise<ListPreviewServicesOutput> {
+    await this.initialized;
+    const metadata = this.metadata;
+    if (metadata === null) return { services: [], status: 'not_ready' };
+    if (!isControlSession(metadata.identity.sessionId) || !isTerminalSessionEligible(metadata)) {
+      return { services: [], status: 'unsupported' };
+    }
+    const sandboxId = metadata.workspace?.sandboxId;
+    if (sandboxId === undefined || sandboxId.length === 0) {
+      return { services: [], status: 'not_ready' };
+    }
+    const peer = this.sandboxPeerFor(sandboxId);
+    if (peer === null) return { services: [], status: 'not_running' };
+    return withDORetry(
+      () => this.sandboxPeerFor(sandboxId) ?? peer,
+      stub => stub.previewServices(this.sessionId),
+      'previewServices'
+    );
   }
 
   async fetch(request: Request): Promise<Response> {

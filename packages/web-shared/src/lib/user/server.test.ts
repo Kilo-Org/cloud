@@ -10,8 +10,7 @@ jest.mock('@kilocode/web-shared/lib/admin/step-up-store', () => {
   return { ...actual, evaluateStepUp: jest.fn(actual.evaluateStepUp) };
 });
 
-// The guard converts an evaluation error into its own verdict, so the fault
-// path needs this seam.
+// The defensive unexpected-throw case needs this seam.
 jest.mock('@kilocode/web-shared/lib/admin/step-up-guard', () => {
   const actual = jest.requireActual('@kilocode/web-shared/lib/admin/step-up-guard');
   return { ...actual, runStepUpGuard: jest.fn(actual.runStepUpGuard) };
@@ -1721,10 +1720,10 @@ describe('step-up refusal telemetry (REST)', () => {
     });
   });
 
-  test('records a failed event when the guard cannot answer', async () => {
+  test('records a failed event for an unexpected guard throw', async () => {
     process.env.ADMIN_STEP_UP_ENABLED = 'true';
     await bearerAdmin();
-    runStepUpGuard.mockRejectedValueOnce(new Error('step-up store unavailable'));
+    runStepUpGuard.mockRejectedValueOnce(new Error('unexpected guard failure'));
 
     const result = await getUserFromAuth({ adminOnly: true, requestMethod: 'GET' });
 

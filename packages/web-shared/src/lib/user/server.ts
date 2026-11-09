@@ -279,9 +279,9 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
           surface,
         });
       } catch (error) {
-        // One measurement per guarded non-session request: `denied` for a
-        // step-up verdict and `failed` for a fault, matching the tRPC admin
-        // guard. Session traffic stays on `admin_guard`.
+        // One privileged-access outcome per guarded non-session request:
+        // `denied` for a policy verdict, `failed` for an unexpected throw.
+        // Session traffic stays on `admin_guard`.
         const emitOutcome = (outcome: 'denied' | 'failed') => {
           if (credential === 'session') return;
           emitPrivilegedAccessEvent({

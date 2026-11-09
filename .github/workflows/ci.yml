@@ -793,8 +793,11 @@ jobs:
             exit 1
           fi
 
+  # Required check on its own: the repo-wide formatter gate runs on every pull
+  # request, merge-queue entry and main push (extension-ci.yml and
+  # kilo-app-ci.yml add no formatter job of their own). It reads no output of
+  # `changes`, so it starts with the run and reports an independent result.
   format-check:
-    needs: changes
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     steps:

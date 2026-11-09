@@ -231,6 +231,31 @@ export type OrganizationSsoPolicyView = {
   configurationError: boolean;
 };
 
+/** SSO status an organization member may read: the card's states and its domain label. */
+export type OrganizationSsoStatusView = {
+  isDomainVerified: boolean;
+  hasConnection: boolean;
+  /** Name of the first configured WorkOS domain, when the organization holds one. */
+  domain: string | null;
+};
+
+/**
+ * SSO configuration read by a caller who may manage it: the status above plus the
+ * provider organization and each domain with its verification state. Domain
+ * `state` stays a plain string so a client component can compare it without
+ * pulling the provider SDK into the browser bundle.
+ */
+export type OrganizationSsoConfigView =
+  | ({ kind: 'status' } & OrganizationSsoStatusView)
+  | ({
+      kind: 'configuration';
+      workosOrganization: {
+        id: string;
+        name: string;
+        domains: { domain: string; state: string }[];
+      };
+    } & OrganizationSsoStatusView);
+
 export type OrganizationWithMembers = z.infer<typeof OrganizationSchema> & {
   callerRole: Exclude<OrganizationRole, 'member'>;
   members: OrganizationMember[];

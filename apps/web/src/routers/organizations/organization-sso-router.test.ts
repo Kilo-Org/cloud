@@ -24,6 +24,7 @@ import {
   admin_action_audit_logs,
   kilocode_users,
   organization_audit_logs,
+  organization_memberships,
   organizations,
   type Organization,
   type User,
@@ -40,11 +41,15 @@ const { mockWorkOSInstance } = jest.requireMock('@workos-inc/node') as {
       getOrganizationByExternalId: jest.Mock;
       deleteOrganization: jest.Mock;
     };
+    sso: {
+      listConnections: jest.Mock;
+    };
   };
 };
 
 const getOrganizationByExternalId = mockWorkOSInstance.organizations.getOrganizationByExternalId;
 const deleteOrganization = mockWorkOSInstance.organizations.deleteOrganization;
+const listConnections = mockWorkOSInstance.sso.listConnections;
 
 describe('organization SSO router', () => {
   let admin: User;
@@ -127,6 +132,140 @@ describe('organization SSO router', () => {
 
     expect(updatedUser?.api_token_pepper).toBe('old-api-pepper');
     expect(updatedUser?.web_session_pepper).toBe('old-web-pepper');
+  });
+
+  describe('getConfig', () => {
+    const callers: User[] = [];
+
+    async function createCallerWithRole(role: 'member' | 'owner') {
+      const user = await insertTestUser({
+        google_user_email: `sso-read-${role}-${crypto.randomUUID()}@example.com`,
+      });
+      callers.push(user);
+      await db.insert(organization_memberships).values({
+        organization_id: organization.id,
+        kilo_user_id: user.id,
+        role,
+      });
+      return createCallerForUser(user.id);
+    }
+
+    afterAll(async () => {
+      for (const user of callers) {
+        await db
+          .delete(organization_memberships)
+          .where(eq(organization_memberships.kilo_user_id, user.id));
+        await db.delete(kilocode_users).where(eq(kilocode_users.id, user.id));
+      }
+    });
+
+    beforeEach(() => {
+      getOrganizationByExternalId.mockReset();
+      listConnections.mockReset();
+      listConnections.mockResolvedValue({ data: [{ id: 'connection_read' }] });
+      getOrganizationByExternalId.mockResolvedValue({
+        object: 'organization',
+        id: 'workos_org_read',
+        name: 'Read SSO Organization',
+        allowProfilesOutsideOrganization: false,
+        domains: [
+          {
+            object: 'organization_domain',
+            id: 'workos_org_domain_read',
+            domain: 'read-sso.test',
+            organizationId: 'workos_org_read',
+            state: 'verified',
+            verificationToken: 'domain-verification-token',
+            verificationStrategy: 'dns',
+            verificationPrefix: 'workos-verify',
+            createdAt: '2026-01-01T00:00:00.000Z',
+            updatedAt: '2026-01-01T00:00:00.000Z',
+          },
+        ],
+        stripeCustomerId: 'cus_read_sso',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+        externalId: organization.id,
+        metadata: {
+          createdById: 'sso-config-creator',
+          createdByEmail: 'sso-config-creator@example.com',
+        },
+      });
+    });
+
+    test('returns the status summary to an organization member', async () => {
+      const caller = await createCallerWithRole('member');
+
+      const result = await caller.organizations.sso.getConfig({
+        organizationId: organization.id,
+      });
+
+      expect(result).toEqual({
+        kind: 'status',
+        isDomainVerified: true,
+        hasConnection: true,
+        domain: 'read-sso.test',
+      });
+      expect(JSON.stringify(result)).not.toContain('workos_org_read');
+      expect(JSON.stringify(result)).not.toContain('cus_read_sso');
+      expect(JSON.stringify(result)).not.toContain('domain-verification-token');
+      expect(JSON.stringify(result)).not.toContain('sso-config-creator');
+    });
+
+    test('returns the provider configuration to an organization owner', async () => {
+      const caller = await createCallerWithRole('owner');
+
+      const result = await caller.organizations.sso.getConfig({
+        organizationId: organization.id,
+      });
+
+      expect(result).toEqual({
+        kind: 'configuration',
+        isDomainVerified: true,
+        hasConnection: true,
+        domain: 'read-sso.test',
+        workosOrganization: {
+          id: 'workos_org_read',
+          name: 'Read SSO Organization',
+          domains: [{ domain: 'read-sso.test', state: 'verified' }],
+        },
+      });
+    });
+
+    test('returns the provider configuration to a Kilo admin outside the organization', async () => {
+      const kiloAdmin = await insertTestUser({
+        google_user_email: `sso-read-kilo-admin-${crypto.randomUUID()}@example.com`,
+        is_admin: true,
+      });
+      callers.push(kiloAdmin);
+      const caller = await createCallerForUser(kiloAdmin.id);
+
+      const result = await caller.organizations.sso.getConfig({
+        organizationId: organization.id,
+      });
+
+      expect(result).toEqual({
+        kind: 'configuration',
+        isDomainVerified: true,
+        hasConnection: true,
+        domain: 'read-sso.test',
+        workosOrganization: {
+          id: 'workos_org_read',
+          name: 'Read SSO Organization',
+          domains: [{ domain: 'read-sso.test', state: 'verified' }],
+        },
+      });
+    });
+
+    test('returns false when the organization has no WorkOS configuration', async () => {
+      const caller = await createCallerWithRole('member');
+      getOrganizationByExternalId.mockResolvedValue(null);
+
+      await expect(
+        caller.organizations.sso.getConfig({ organizationId: organization.id })
+      ).resolves.toBe(false);
+      expect(listConnections).not.toHaveBeenCalled();
+    });
   });
 
   describe('deleteConfig', () => {

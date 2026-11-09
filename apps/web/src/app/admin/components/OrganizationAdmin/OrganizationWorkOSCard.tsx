@@ -29,11 +29,6 @@ type OrganizationWorkOSCardProps = {
   organizationId: string;
 };
 
-type WorkOSDomain = {
-  domain: string;
-  state: string;
-};
-
 function useOrganizationSSOConfig(organizationId: string) {
   const trpc = useTRPC();
   return useQuery(trpc.organizations.sso.getConfig.queryOptions({ organizationId }));
@@ -312,19 +307,23 @@ export function OrganizationWorkOSCard({ organizationId }: OrganizationWorkOSCar
             </div>
 
             <div className="space-y-2">
-              <div>
-                <label className="text-muted-foreground text-sm font-medium">
-                  WorkOS Organization ID
-                </label>
-                <p className="font-mono text-sm">{ssoConfig.id}</p>
-              </div>
+              {ssoConfig.kind === 'configuration' && (
+                <>
+                  <div>
+                    <label className="text-muted-foreground text-sm font-medium">
+                      WorkOS Organization ID
+                    </label>
+                    <p className="font-mono text-sm">{ssoConfig.workosOrganization.id}</p>
+                  </div>
 
-              <div>
-                <label className="text-muted-foreground text-sm font-medium">
-                  Organization Name
-                </label>
-                <p className="text-sm">{ssoConfig.name}</p>
-              </div>
+                  <div>
+                    <label className="text-muted-foreground text-sm font-medium">
+                      Organization Name
+                    </label>
+                    <p className="text-sm">{ssoConfig.workosOrganization.name}</p>
+                  </div>
+                </>
+              )}
 
               <div>
                 <label className="text-muted-foreground text-sm font-medium">Domain Verified</label>
@@ -348,31 +347,32 @@ export function OrganizationWorkOSCard({ organizationId }: OrganizationWorkOSCar
                 </p>
               </div>
 
-              {ssoConfig.domains && ssoConfig.domains.length > 0 && (
-                <div>
-                  <label className="text-muted-foreground text-sm font-medium">
-                    Configured Domains
-                  </label>
-                  <ul className="space-y-1 text-sm">
-                    {ssoConfig.domains.map((domain: WorkOSDomain) => (
-                      <li key={domain.domain} className="flex items-center gap-2">
-                        <span>{domain.domain}</span>
-                        <span
-                          className={`rounded px-2 py-1 text-xs ${
-                            domain.state === 'verified'
-                              ? 'bg-green-100 text-green-800'
-                              : domain.state === 'pending'
-                                ? 'bg-yellow-100 text-yellow-800'
-                                : 'bg-gray-100 text-gray-800'
-                          }`}
-                        >
-                          {domain.state}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+              {ssoConfig.kind === 'configuration' &&
+                ssoConfig.workosOrganization.domains.length > 0 && (
+                  <div>
+                    <label className="text-muted-foreground text-sm font-medium">
+                      Configured Domains
+                    </label>
+                    <ul className="space-y-1 text-sm">
+                      {ssoConfig.workosOrganization.domains.map(domain => (
+                        <li key={domain.domain} className="flex items-center gap-2">
+                          <span>{domain.domain}</span>
+                          <span
+                            className={`rounded px-2 py-1 text-xs ${
+                              domain.state === 'verified'
+                                ? 'bg-green-100 text-green-800'
+                                : domain.state === 'pending'
+                                  ? 'bg-yellow-100 text-yellow-800'
+                                  : 'bg-gray-100 text-gray-800'
+                            }`}
+                          >
+                            {domain.state}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
 
               <div>
                 <div className="flex items-center gap-2">

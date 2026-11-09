@@ -135,7 +135,7 @@ describe('Kilo v2 harness MCP refresh', () => {
     ]);
   });
 
-  it('submits prompts without server context without adding an instruction', async () => {
+  it('clears the instruction before submitting a prompt without server context', async () => {
     const { url, requests } = startStub(() => new Response(null, { status: 204 }));
     await createHarness(url).submit({
       sessionId: 'ses_no_context',
@@ -143,26 +143,86 @@ describe('Kilo v2 harness MCP refresh', () => {
       messageId: 'msg_no_context',
       prompt: 'Hello',
     });
-    expect(requests).toHaveLength(1);
-    expect(requests[0]?.body).toEqual({ id: 'msg_no_context', text: 'Hello', delivery: 'steer' });
+    expect(requests.map(request => [request.method, request.pathname, request.body])).toEqual([
+      [
+        'PUT',
+        '/api/experimental/session/ses_no_context/instructions/entries/cloud-agent-context',
+        { value: '' },
+      ],
+      [
+        'POST',
+        '/api/session/ses_no_context/prompt',
+        { id: 'msg_no_context', text: 'Hello', delivery: 'steer' },
+      ],
+    ]);
   });
 
-  it('does not submit a prompt if its server context could not be installed', async () => {
-    const { url, requests } = startStub(() => new Response(null, { status: 503 }));
-    const error: unknown = await createHarness(url)
-      .submit({
-        sessionId: 'ses_context_failure',
+  it.each([undefined, '', '<cloud-agent-context session-id="workspace_1" />'])(
+    'replaces a one-shot startup-failure note with the next context %p after harness recreation',
+    async context => {
+      const { url, requests } = startStub(() => new Response(null, { status: 204 }));
+      const sessionId = 'ses_context_replacement';
+      const initialContext =
+        'Some startup commands failed during session preparation. The session started anyway.\n\n' +
+        '<cloud-agent-context session-id="workspace_1" />';
+      await createHarness(url).submit({
+        sessionId,
         directory,
-        messageId: 'msg_context_failure',
-        prompt: 'Hello',
-        context: 'Callback routing context',
-      })
-      .catch(cause => cause);
-    expect(error).toBeInstanceOf(Error);
-    expect(String(error)).toContain('HTTP 503');
-    expect(requests).toHaveLength(1);
-    expect(requests[0]?.method).toBe('PUT');
-  });
+        messageId: 'msg_initial_context',
+        prompt: 'First prompt',
+        context: initialContext,
+      });
+      await createHarness(url).submit({
+        sessionId,
+        directory,
+        messageId: 'msg_next_context',
+        prompt: 'Next prompt',
+        context,
+      });
+      expect(requests.map(request => [request.method, request.pathname, request.body])).toEqual([
+        [
+          'PUT',
+          `/api/experimental/session/${sessionId}/instructions/entries/cloud-agent-context`,
+          { value: initialContext },
+        ],
+        [
+          'POST',
+          `/api/session/${sessionId}/prompt`,
+          { id: 'msg_initial_context', text: 'First prompt', delivery: 'steer' },
+        ],
+        [
+          'PUT',
+          `/api/experimental/session/${sessionId}/instructions/entries/cloud-agent-context`,
+          { value: context ?? '' },
+        ],
+        [
+          'POST',
+          `/api/session/${sessionId}/prompt`,
+          { id: 'msg_next_context', text: 'Next prompt', delivery: 'steer' },
+        ],
+      ]);
+    }
+  );
+
+  it.each(['Callback routing context', undefined])(
+    'does not submit a prompt if server context %p could not be replaced',
+    async context => {
+      const { url, requests } = startStub(() => new Response(null, { status: 503 }));
+      const error: unknown = await createHarness(url)
+        .submit({
+          sessionId: 'ses_context_failure',
+          directory,
+          messageId: 'msg_context_failure',
+          prompt: 'Hello',
+          context,
+        })
+        .catch(cause => cause);
+      expect(error).toBeInstanceOf(Error);
+      expect(String(error)).toContain('HTTP 503');
+      expect(requests).toHaveLength(1);
+      expect(requests[0]?.method).toBe('PUT');
+    }
+  );
 
   it('replaces the running CLI MCP connection through the native runtime route', async () => {
     const stub = startStub((request, url) =>

@@ -211,6 +211,8 @@ suite('real Kilo v2 harness', () => {
           .catch(error => String(error))
       ).toContain('another directory');
       const callbackContext = '<cloud-agent-context session-id="workspace_callback-marker" />';
+      const startupFailureNote =
+        'Some startup commands failed during session preparation. The session started anyway.';
       async function prompt(text: string, context?: string) {
         const start = events.length;
         await harness.submit({
@@ -234,8 +236,9 @@ suite('real Kilo v2 harness', () => {
         );
         expect(runtime.sessionState(sessionId)).toBeUndefined();
       }
-      await prompt('remember amber-history-marker', callbackContext);
+      await prompt('remember amber-history-marker', `${startupFailureNote}\n\n${callbackContext}`);
       expect(requests.at(-1)).toContain('workspace_callback-marker');
+      expect(requests.at(-1)).toContain(startupFailureNote);
       expect(
         (await nativeMessages())
           .filter(message => message.type === 'user')
@@ -255,9 +258,10 @@ suite('real Kilo v2 harness', () => {
         restoreFiles: false,
         onRestore() {},
       });
-      await prompt('recall the earlier marker');
+      await prompt('recall the earlier marker', callbackContext);
       expect(requests.at(-1)).toContain('amber-history-marker');
       expect(requests.at(-1)).toContain('workspace_callback-marker');
+      expect(requests.at(-1)).not.toContain(startupFailureNote);
       const history = await nativeMessages();
       expect(history.filter(message => message.type === 'user')).toHaveLength(2);
       expect(
@@ -313,6 +317,7 @@ suite('real Kilo v2 harness', () => {
         })
       ).toBe(true);
       await toolTurn;
+      expect(requests.at(-1)).not.toContain('workspace_callback-marker');
       expect(
         (await nativeMessages()).some(message =>
           (message.content ?? []).some(

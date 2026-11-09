@@ -217,11 +217,11 @@ export function createKilo2Harness(options: {
     async submit(input) {
       await select(input);
       await options.lifecycle.waitForInterrupt(input.sessionId, input.signal);
-      if (input.context !== undefined)
-        await api.request(
-          `/api/experimental/session/${encodeURIComponent(input.sessionId)}/instructions/entries/cloud-agent-context`,
-          { method: 'PUT', body: { value: input.context }, signal: input.signal }
-        );
+      // Context can contain a one-shot startup-failure note, so replace it on every prompt.
+      await api.request(
+        `/api/experimental/session/${encodeURIComponent(input.sessionId)}/instructions/entries/cloud-agent-context`,
+        { method: 'PUT', body: { value: input.context ?? '' }, signal: input.signal }
+      );
       await post(
         `${kilo2SessionPath(input.sessionId)}/prompt`,
         {

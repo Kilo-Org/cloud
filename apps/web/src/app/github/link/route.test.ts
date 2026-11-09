@@ -13,7 +13,10 @@ jest.mock('@/lib/bot/github-link-state');
 jest.mock('@/lib/bot/github-link-token');
 jest.mock('@/lib/integrations/platforms/github/app-selector');
 jest.mock('@/lib/bot/platform-helpers');
-jest.mock('@kilocode/worker-utils/account-access');
+jest.mock('@kilocode/worker-utils/account-access', () => ({
+  ...jest.requireActual('@kilocode/worker-utils/account-access'),
+  isOrganizationMember: jest.fn(),
+}));
 
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockedCreateGitHubBotLinkState = jest.mocked(createGitHubBotLinkState);

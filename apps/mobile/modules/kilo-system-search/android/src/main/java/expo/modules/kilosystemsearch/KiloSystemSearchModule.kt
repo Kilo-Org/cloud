@@ -15,6 +15,7 @@ import android.app.appsearch.SearchSpec
 import android.app.appsearch.SetSchemaRequest
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Process
@@ -45,6 +46,7 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 import java.security.MessageDigest
 import java.util.function.Consumer
+import kotlin.math.abs
 
 private const val NAMESPACE = "kilo"
 private const val TAG = "KiloSystemSearch"
@@ -53,6 +55,12 @@ private const val DATABASE_NAME = "kilo-system-search"
 private const val PREFERENCES_NAME = "kilo-system-search"
 private const val PENDING_ROUTE_KEY = "kilo-system-search-pending-route"
 private const val PENDING_ROUTE_WRITTEN_AT_KEY = "kilo-system-search-pending-route-written-at"
+private const val PENDING_ROUTE_WRITTEN_WALL_KEY = "kilo-system-search-pending-route-written-wall"
+private const val PENDING_ROUTE_BOOT_AT_KEY = "kilo-system-search-pending-route-boot-at"
+
+// Two instants that name the same boot agree exactly; this tolerance only
+// absorbs the milliseconds a wall-clock correction moves one of them by.
+private const val BOOT_INSTANT_MATCH_MS = 1_000L
 
 // How long a picked tap may wait for its resolution. The slot outlives the
 // process, and a tap that could not be resolved is kept for a retry, so without
@@ -116,8 +124,11 @@ private data class StoredDocument(
   val route: String
 )
 
-/** The single-shot slot's contents: the picked identifier and when it arrived. */
-private data class PendingRoute(val identifier: String, val writtenAt: Long)
+/**
+ * The single-shot slot's contents: the picked identifier, and whether an
+ * earlier process wrote it.
+ */
+private data class PendingRoute(val identifier: String, val fromEarlierProcess: Boolean)
 
 /**
  * The subset of an AppSearch session this module uses, so the platform store
@@ -234,7 +245,7 @@ class KiloSystemSearchModule : Module() {
   private fun consumePendingRoute(): String? {
     val pending = readPendingRoute()
     val launchIdentifier = readLaunchIdentifier()
-    val leftover = pending?.takeIf { launchIdentifier != null && it.writtenAt < processStartedAt }
+    val leftover = pending?.takeIf { launchIdentifier != null && it.fromEarlierProcess }
     leftover?.let { clearPendingRoute(it.identifier) }
     val slot = if (leftover == null) pending else null
     val identifier = slot?.identifier ?: launchIdentifier ?: return null
@@ -356,19 +367,24 @@ class KiloSystemSearchModule : Module() {
   /**
    * Writes the single-shot slot; false when there is no context to write it in.
    * The slot carries the identifier exactly as the platform handed it back,
-   * with the moment it arrived, so a tap that outlives its welcome can be
-   * dropped instead of opening a screen long after the reader tapped it.
+   * with the clocks the age check below needs, so a tap that outlives its
+   * welcome can be dropped instead of opening a screen long after the reader
+   * tapped it.
    *
    * Runs on the main thread that delivers `OnNewIntent`, which is why it shares
    * `pendingRouteLock` with the read and the clear below.
    */
   private fun writePendingRoute(identifier: String): Boolean {
     val context = appContext.reactContext ?: return false
+    val uptime = SystemClock.elapsedRealtime()
+    val wall = System.currentTimeMillis()
     synchronized(pendingRouteLock) {
       context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
         .edit()
         .putString(PENDING_ROUTE_KEY, identifier)
-        .putLong(PENDING_ROUTE_WRITTEN_AT_KEY, SystemClock.elapsedRealtime())
+        .putLong(PENDING_ROUTE_WRITTEN_AT_KEY, uptime)
+        .putLong(PENDING_ROUTE_WRITTEN_WALL_KEY, wall)
+        .putLong(PENDING_ROUTE_BOOT_AT_KEY, wall - uptime)
         .apply()
     }
     return true
@@ -384,25 +400,32 @@ class KiloSystemSearchModule : Module() {
    * `clearPendingRoute`), because resolving it reads the index and a failure
    * there must leave the tap for a retry.
    *
-   * The write and this read use the same boot-relative clock. That clock
-   * restarts at zero on a reboot while the slot survives it, so a tap written
-   * before the reboot reads as newer than the current time. Its age cannot be
-   * measured at all then, and the window it was kept for has passed, so a
-   * backwards clock counts as expired.
+   * The age is measured on the boot-relative clock, which is monotonic but
+   * restarts at zero on a reboot while the slot survives it. Only a write from
+   * the same boot can be compared with it, and the boot instant recorded with
+   * the slot is what decides that. Across a reboot the wall clock is the only
+   * reference that spans both, so it measures the age then; a slot whose
+   * wall-clock age is negative or too large, and one written before this
+   * version recorded a boot instant, counts as expired.
    */
   private fun readPendingRoute(): PendingRoute? {
     val context = appContext.reactContext ?: return null
     val preferences = context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
     return synchronized(pendingRouteLock) {
       val identifier = preferences.getString(PENDING_ROUTE_KEY, null) ?: return@synchronized null
-      val writtenAt = preferences.getLong(PENDING_ROUTE_WRITTEN_AT_KEY, 0L)
-      val now = SystemClock.elapsedRealtime()
-      if (now < writtenAt || now - writtenAt > PENDING_ROUTE_MAX_AGE_MS) {
-        preferences.edit().remove(PENDING_ROUTE_KEY).remove(PENDING_ROUTE_WRITTEN_AT_KEY).apply()
+      val writtenUptime = preferences.getLong(PENDING_ROUTE_WRITTEN_AT_KEY, 0L)
+      val writtenWall = preferences.getLong(PENDING_ROUTE_WRITTEN_WALL_KEY, 0L)
+      val writtenBootAt = preferences.getLong(PENDING_ROUTE_BOOT_AT_KEY, 0L)
+      val uptime = SystemClock.elapsedRealtime()
+      val wall = System.currentTimeMillis()
+      val sameBoot = abs(wall - uptime - writtenBootAt) <= BOOT_INSTANT_MATCH_MS
+      val age = if (sameBoot) uptime - writtenUptime else wall - writtenWall
+      if (age < 0 || age > PENDING_ROUTE_MAX_AGE_MS) {
+        preferences.edit().removePendingRoute().apply()
         Log.w(TAG, "Dropped a picked result the index could not resolve in time.")
         return@synchronized null
       }
-      PendingRoute(identifier, writtenAt)
+      PendingRoute(identifier, fromEarlierProcess = !sameBoot || writtenUptime < processStartedAt)
     }
   }
 
@@ -421,10 +444,17 @@ class KiloSystemSearchModule : Module() {
       if (preferences.getString(PENDING_ROUTE_KEY, null) != identifier) {
         return@synchronized
       }
-      preferences.edit().remove(PENDING_ROUTE_KEY).remove(PENDING_ROUTE_WRITTEN_AT_KEY).apply()
+      preferences.edit().removePendingRoute().apply()
     }
   }
 }
+
+/** Removes every field the slot is written with, as one edit. */
+private fun SharedPreferences.Editor.removePendingRoute() = this
+  .remove(PENDING_ROUTE_KEY)
+  .remove(PENDING_ROUTE_WRITTEN_AT_KEY)
+  .remove(PENDING_ROUTE_WRITTEN_WALL_KEY)
+  .remove(PENDING_ROUTE_BOOT_AT_KEY)
 
 private fun toIndexedDocument(record: SystemSearchRecord) = IndexedDocument(
   id = record.id,

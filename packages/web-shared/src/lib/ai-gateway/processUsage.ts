@@ -4,11 +4,7 @@ import { randomUUID } from 'crypto';
 import { db, isUSRegion } from '../drizzle';
 import { recordUsageInPrimaryRegion } from './usage-record-client';
 import { after } from 'next/server';
-import {
-  enqueueUsage,
-  getUsagePublisherExecutionRegion,
-  type UsageEnqueueOutcome,
-} from './usage-publisher';
+import { enqueueUsage, type UsageEnqueueOutcome } from './usage-publisher';
 import {
   describeDatabaseError,
   isUsageRowConflict,
@@ -18,6 +14,7 @@ import {
 } from './usage-record-diagnostics';
 import type { MicrodollarUsage } from '@kilocode/db/schema';
 import { microdollar_usage } from '@kilocode/db/schema';
+import { getVercelExecutionRegion } from '@kilocode/worker-utils/vercel-execution-region';
 import { createTimer } from '@kilocode/web-shared/lib/timer';
 import type { OpenAI } from 'openai';
 import type { EventSourceMessage } from 'eventsource-parser';
@@ -457,7 +454,7 @@ async function logMicrodollarUsageWithTransport(
     if (outcome.kind === 'accepted') {
       console.info('usage accounting queued', {
         usageId: core.id,
-        execution_region: getUsagePublisherExecutionRegion(),
+        execution_region: getVercelExecutionRegion(),
       });
       return { status: 'queued', usageId: core.id, createdAt: core.created_at };
     }
@@ -466,7 +463,7 @@ async function logMicrodollarUsageWithTransport(
       reportPublisherNotConfigured(core.id);
       console.warn('usage accounting queue publisher not configured', {
         usageId: core.id,
-        execution_region: getUsagePublisherExecutionRegion(),
+        execution_region: getVercelExecutionRegion(),
         fallback: 'direct',
       });
       return recordUsageDirectly(core, metadata, usageContext, bouncerUsageEvent);
@@ -476,7 +473,7 @@ async function logMicrodollarUsageWithTransport(
       // Nothing was published, so the direct write cannot duplicate it.
       console.warn('usage accounting queue unavailable without a request lifetime', {
         usageId: core.id,
-        execution_region: getUsagePublisherExecutionRegion(),
+        execution_region: getVercelExecutionRegion(),
         reason: outcome.reason,
         fallback: 'direct',
       });
@@ -484,7 +481,7 @@ async function logMicrodollarUsageWithTransport(
     }
     console.error('usage accounting publication failed', {
       usageId: core.id,
-      execution_region: getUsagePublisherExecutionRegion(),
+      execution_region: getVercelExecutionRegion(),
       reason: outcome.reason,
     });
     return null;

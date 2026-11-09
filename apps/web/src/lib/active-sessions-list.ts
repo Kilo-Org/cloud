@@ -680,16 +680,9 @@ export async function listActiveSessions({
   }
 
   // The merged list is built now, so an empty answer is only authoritative
-  // when the worker read succeeded. A failed read stays a failure for the
-  // caller that merges cloud rows (the tray); the unconfigured-source case
-  // above cannot mask live rows, because no live row can exist without the
-  // worker.
-  if (upstreamReadFailed && requireCompleteSnapshot) {
-    throw new TRPCError({
-      code: 'INTERNAL_SERVER_ERROR',
-      message: 'Failed to fetch active sessions',
-    });
-  }
+  // when the worker read succeeded. Snapshot callers already threw on the
+  // failed read above, so this decides the remaining best-effort callers: an
+  // empty merged list is not proof that nothing runs.
   if (upstreamReadFailed && sessions.length === 0) {
     throw new TRPCError({
       code: 'SERVICE_UNAVAILABLE',

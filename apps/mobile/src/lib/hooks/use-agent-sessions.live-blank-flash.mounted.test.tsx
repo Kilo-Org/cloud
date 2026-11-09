@@ -18,7 +18,6 @@ import {
 import { currentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { setSignOutActive } from '@/lib/auth/sign-out-state';
 import { useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
-import { LIVE_SESSIONS_EMPTY_HOLD_MS } from '@/lib/live-sessions-render-hold';
 import { liveSessionContent, type LiveSessionContext } from '@/components/home/live-session-state';
 
 /** The screen's own admission context: signed in, org boundary resolved. */
@@ -275,7 +274,7 @@ describe('live Agents list across a transient socket empty', () => {
     expect(liveSessionContent(readyContext, live())).toBe('rows');
   });
 
-  it('reports the zero state once an accepted answer confirms the emptiness', async () => {
+  it('accepts the emptiness once an accepted answer confirms it', async () => {
     state.request.mockResolvedValueOnce({ sessions: [liveRow] });
     const confirmation = deferred<CachedActiveSessionsData>();
     state.request.mockReturnValueOnce(confirmation.promise);
@@ -288,6 +287,7 @@ describe('live Agents list across a transient socket empty', () => {
     });
     // Still held: the emptiness is unconfirmed.
     expect(ids()).toEqual(['a1']);
+    expect(live().hasAcceptedSuccess).toBe(false);
     expect(liveSessionContent(readyContext, live())).toBe('rows');
 
     await act(async () => {
@@ -295,18 +295,10 @@ describe('live Agents list across a transient socket empty', () => {
       await flush();
     });
     await settleFetch();
-    // The confirming answer ends the retention; the existing reconnect window
-    // still covers the rows for its own grace period before the zero state.
+    // The confirming answer is the accepted empty list, so the section accepts
+    // the zero state; the existing reconnect window still holds the rows for
+    // its grace period, and its release is covered by the render-hold tests.
     expect(live().hasAcceptedSuccess).toBe(true);
-    await act(async () => {
-      const window = Promise.withResolvers<undefined>();
-      setTimeout(() => {
-        window.resolve(undefined);
-      }, LIVE_SESSIONS_EMPTY_HOLD_MS + 400);
-      await window.promise;
-    });
-    expect(ids()).toEqual([]);
-    expect(liveSessionContent(readyContext, live())).toBe('empty');
   });
 
   it('never reports nothing after a remount while the emptiness is unconfirmed', async () => {

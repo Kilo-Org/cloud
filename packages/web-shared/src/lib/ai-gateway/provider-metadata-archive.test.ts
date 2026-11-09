@@ -20,7 +20,6 @@ jest.mock('next/server', () => ({
 }));
 jest.mock('./usage-publisher', () => ({
   enqueueUsage: jest.fn(async () => ({ kind: 'accepted' })),
-  getUsagePublisherExecutionRegion: () => 'fra1',
 }));
 jest.mock('./providers/upstream-request', () => ({ fetchGeneration: jest.fn() }));
 jest.mock('./custom-pricing-config', () => ({

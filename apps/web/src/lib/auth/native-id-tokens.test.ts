@@ -38,7 +38,7 @@ jest.mock('@sentry/nextjs', () => ({
   captureMessage: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/redis', () => ({
-  redisClient: { set: jest.fn() },
+  redisClient: { set: jest.fn(), multi: jest.fn() },
 }));
 jest.mock('@kilocode/web-shared/lib/posthog-feature-flags', () => ({
   isReleaseToggleEnabled: jest.fn(async () => true),
@@ -58,6 +58,30 @@ import { captureMessage } from '@sentry/nextjs';
 
 const mockIsReleaseToggleEnabled = jest.mocked(isReleaseToggleEnabled);
 const mockCaptureMessage = jest.mocked(captureMessage);
+const mockRedisMulti = jest.mocked(redisClient.multi);
+
+type RedisSetCommand = [key: string, value: string, options: { nx: boolean; ex: number }];
+
+const identityTokenDigest = (idToken: string) => createHash('sha256').update(idToken).digest('hex');
+
+/**
+ * Install a transaction mock that records every command it stages and answers
+ * `exec` with the supplied results.
+ */
+function mockAcceptanceTransaction(
+  exec: () => Promise<[string | null, string | null]>
+): RedisSetCommand[] {
+  const commands: RedisSetCommand[] = [];
+  const chain = {
+    set: (key: string, value: string, options: { nx: boolean; ex: number }) => {
+      commands.push([key, value, options]);
+      return chain;
+    },
+    exec: () => exec(),
+  };
+  mockRedisMulti.mockReturnValue(chain as never);
+  return commands;
+}
 
 const mockVerifyAppleJwtWithJwks = jest.mocked(verifyAppleJwtWithJwks);
 const mockGetFederatedSignonCertsAsync = jest.fn();
@@ -77,6 +101,7 @@ describe('verifyNativeAppleIdToken', () => {
     jest.clearAllMocks();
     mockConfig.APPLE_APP_BUNDLE_ID = 'com.kilocode.kiloapp';
     jest.mocked(redisClient.set).mockResolvedValue('OK');
+    mockAcceptanceTransaction(async () => ['OK', 'OK']);
     mockIsReleaseToggleEnabled.mockResolvedValue(true);
     delete process.env.NATIVE_APPLE_NONCE_REQUIRED_SINCE;
   });
@@ -165,13 +190,14 @@ describe('verifyNativeAppleIdToken', () => {
         nonce: expectedDigest,
       })
     );
+    const commands = mockAcceptanceTransaction(async () => ['OK', 'OK']);
 
     const result = await verifyNativeAppleIdToken('a-token', rawNonce);
     expect(result).toEqual({ sub: 'apple-sub-1', email: 'user@example.com' });
-    expect(redisClient.set).toHaveBeenCalledWith(`auth:apple-signin-nonce:${expectedDigest}`, '1', {
-      nx: true,
-      ex: 600,
-    });
+    expect(commands).toEqual([
+      [`auth:apple-signin-nonce:${expectedDigest}`, '1', { nx: true, ex: 600 }],
+      [`auth:apple-signin-token:${identityTokenDigest('a-token')}`, '1', { nx: true, ex: 600 }],
+    ]);
   });
 
   it('throws NativeIdTokenError when the nonce does not match', async () => {
@@ -204,13 +230,31 @@ describe('verifyNativeAppleIdToken', () => {
         nonce: expectedDigest,
       })
     );
-    jest.mocked(redisClient.set).mockResolvedValue(null);
+    mockAcceptanceTransaction(async () => [null, 'OK']);
     await expect(verifyNativeAppleIdToken('a-token', rawNonce)).rejects.toThrow(
       'Apple nonce already used'
     );
   });
 
-  it('refuses the sign-in when the nonce record cannot be written', async () => {
+  it('refuses a token whose identity record is already present', async () => {
+    const rawNonce = 'spent-token-raw-nonce';
+    const expectedDigest = createHash('sha256').update(rawNonce).digest('hex');
+    mockVerifyAppleJwtWithJwks.mockResolvedValue(
+      applePayload({
+        sub: 'apple-sub-1',
+        email: 'user@example.com',
+        email_verified: true,
+        nonce: expectedDigest,
+      })
+    );
+    mockAcceptanceTransaction(async () => ['OK', null]);
+
+    await expect(verifyNativeAppleIdToken('a-token', rawNonce)).rejects.toThrow(
+      'Apple ID token already used'
+    );
+  });
+
+  it('refuses the sign-in when the acceptance records cannot be written', async () => {
     const rawNonce = 'store-unavailable-nonce';
     const expectedDigest = createHash('sha256').update(rawNonce).digest('hex');
     mockVerifyAppleJwtWithJwks.mockResolvedValue(
@@ -222,7 +266,9 @@ describe('verifyNativeAppleIdToken', () => {
         exp: Math.floor(Date.now() / 1000) + 600,
       })
     );
-    jest.mocked(redisClient.set).mockRejectedValue(new Error('upstash unreachable'));
+    mockAcceptanceTransaction(async () => {
+      throw new Error('upstash unreachable');
+    });
 
     await expect(verifyNativeAppleIdToken('a-token', rawNonce)).rejects.toThrow(
       NonceStoreUnavailableError
@@ -242,12 +288,13 @@ describe('verifyNativeAppleIdToken', () => {
       })
     );
 
+    const commands = mockAcceptanceTransaction(async () => ['OK', 'OK']);
     await verifyNativeAppleIdToken('a-token', rawNonce);
-    const call = jest.mocked(redisClient.set).mock.calls[0];
-    const options = call[2] as { nx: boolean; ex: number };
+    const options = commands[0][2];
     expect(options.nx).toBe(true);
     expect(options.ex).toBeLessThanOrEqual(300);
     expect(options.ex).toBeGreaterThan(290);
+    expect(commands[1][2].ex).toBe(options.ex);
   });
 
   it('caps the record TTL at ten minutes for a long-lived token', async () => {
@@ -263,10 +310,10 @@ describe('verifyNativeAppleIdToken', () => {
       })
     );
 
+    const commands = mockAcceptanceTransaction(async () => ['OK', 'OK']);
     await verifyNativeAppleIdToken('a-token', rawNonce);
-    const options = jest.mocked(redisClient.set).mock.calls[0][2] as { nx: boolean; ex: number };
-    expect(options.nx).toBe(true);
-    expect(options.ex).toBe(600);
+    expect(commands[0][2]).toEqual({ nx: true, ex: 600 });
+    expect(commands[1][2]).toEqual({ nx: true, ex: 600 });
   });
 
   it('uses the ten-minute cap when the token carries no exp claim', async () => {
@@ -281,10 +328,10 @@ describe('verifyNativeAppleIdToken', () => {
       })
     );
 
+    const commands = mockAcceptanceTransaction(async () => ['OK', 'OK']);
     await verifyNativeAppleIdToken('a-token', rawNonce);
-    const options = jest.mocked(redisClient.set).mock.calls[0][2] as { nx: boolean; ex: number };
-    expect(options.nx).toBe(true);
-    expect(options.ex).toBe(600);
+    expect(commands[0][2]).toEqual({ nx: true, ex: 600 });
+    expect(commands[1][2]).toEqual({ nx: true, ex: 600 });
   });
 
   it('requires the nonce field after the transition closes', async () => {
@@ -453,9 +500,6 @@ describe('verifyNativeAppleIdToken', () => {
   });
 
   // Single-use identity token record
-  const identityTokenDigest = (idToken: string) =>
-    createHash('sha256').update(idToken).digest('hex');
-
   it('records the identity token once when a transition request is accepted', async () => {
     process.env.NATIVE_APPLE_NONCE_REQUIRED_SINCE = new Date(Date.now() + 60_000).toISOString();
     mockVerifyAppleJwtWithJwks.mockResolvedValue(
@@ -470,6 +514,7 @@ describe('verifyNativeAppleIdToken', () => {
     const result = await verifyNativeAppleIdToken('a-token');
 
     expect(result).toEqual({ sub: 'apple-sub-1', email: 'user@example.com' });
+    expect(mockRedisMulti).not.toHaveBeenCalled();
     expect(redisClient.set).toHaveBeenCalledTimes(1);
     expect(redisClient.set).toHaveBeenCalledWith(
       `auth:apple-signin-token:${identityTokenDigest('a-token')}`,
@@ -526,26 +571,6 @@ describe('verifyNativeAppleIdToken', () => {
     await expect(verifyNativeAppleIdToken('a-token')).rejects.toThrow(NonceStoreUnavailableError);
   });
 
-  it('records the identity token on the nonce path as well', async () => {
-    const rawNonce = 'both-records-raw-nonce';
-    mockVerifyAppleJwtWithJwks.mockResolvedValue(
-      applePayload({
-        sub: 'apple-sub-1',
-        email: 'user@example.com',
-        email_verified: true,
-        nonce: createHash('sha256').update(rawNonce).digest('hex'),
-      })
-    );
-
-    await verifyNativeAppleIdToken('a-token', rawNonce);
-
-    const keys = jest.mocked(redisClient.set).mock.calls.map(call => call[0]);
-    expect(keys).toEqual([
-      `auth:apple-signin-nonce:${createHash('sha256').update(rawNonce).digest('hex')}`,
-      `auth:apple-signin-token:${identityTokenDigest('a-token')}`,
-    ]);
-  });
-
   it('refuses an identity token the nonce path already accepted when it arrives without a nonce', async () => {
     const rawNonce = 'cross-path-raw-nonce';
     mockVerifyAppleJwtWithJwks.mockResolvedValue(
@@ -557,12 +582,9 @@ describe('verifyNativeAppleIdToken', () => {
         exp: Math.floor(Date.now() / 1000) + 300,
       })
     );
-    // Nonce record, then token record, then the repeat finds the token present.
-    jest
-      .mocked(redisClient.set)
-      .mockResolvedValueOnce('OK')
-      .mockResolvedValueOnce('OK')
-      .mockResolvedValueOnce(null);
+    // The nonce acceptance commits, then the repeat finds the token record present.
+    mockAcceptanceTransaction(async () => ['OK', 'OK']);
+    jest.mocked(redisClient.set).mockResolvedValue(null);
 
     await verifyNativeAppleIdToken('a-token', rawNonce);
 

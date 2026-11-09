@@ -100,17 +100,21 @@ function appleIdentityFromPayload(payload: jwt.JwtPayload): VerifiedAppleIdToken
   return { sub: payload.sub, email: payload.email };
 }
 
+/** Key of the single-use record for one identity token. */
+function appleTokenRecordKey(idToken: string): string {
+  return `auth:apple-signin-token:${createHash('sha256').update(idToken).digest('hex')}`;
+}
+
 /**
- * Consume a verified Apple identity token so it signs in exactly once, whichever
- * path accepted it. The record lives as long as the token it binds, and a store
- * write that cannot complete refuses the sign-in with the retryable error, so
- * the acceptance rule never depends on the store being reachable.
+ * Consume a verified Apple identity token so it signs in exactly once. The
+ * record lives as long as the token it binds, and a store write that cannot
+ * complete refuses the sign-in with the retryable error, so the acceptance rule
+ * never depends on the store being reachable.
  */
 async function recordSingleUseAppleToken(idToken: string, exp: number | undefined): Promise<void> {
-  const digest = createHash('sha256').update(idToken).digest('hex');
   let recorded: string | null = null;
   try {
-    recorded = await redisClient.set(`auth:apple-signin-token:${digest}`, '1', {
+    recorded = await redisClient.set(appleTokenRecordKey(idToken), '1', {
       nx: true,
       ex: recordTtlSeconds(exp),
     });
@@ -118,6 +122,36 @@ async function recordSingleUseAppleToken(idToken: string, exp: number | undefine
     throw new NonceStoreUnavailableError('Apple token record unavailable');
   }
   if (recorded !== 'OK') {
+    throw new NativeIdTokenError('Apple ID token already used');
+  }
+}
+
+/**
+ * Consume both acceptance records of one nonce-bound sign-in in a single
+ * transaction, so a store fault commits neither of them: the caller can retry
+ * the same request instead of finding one record already spent. Each record
+ * keeps its own key, value and lifetime.
+ */
+async function recordSingleUseAppleNonceAcceptance(
+  nonceDigest: string,
+  idToken: string,
+  exp: number | undefined
+): Promise<void> {
+  const ex = recordTtlSeconds(exp);
+  let results: [string | null, string | null] = [null, null];
+  try {
+    results = (await redisClient
+      .multi()
+      .set(`auth:apple-signin-nonce:${nonceDigest}`, '1', { nx: true, ex })
+      .set(appleTokenRecordKey(idToken), '1', { nx: true, ex })
+      .exec<[string | null, string | null]>()) ?? [null, null];
+  } catch {
+    throw new NonceStoreUnavailableError('Apple sign-in records unavailable');
+  }
+  if (results[0] !== 'OK') {
+    throw new NativeIdTokenError('Apple nonce already used');
+  }
+  if (results[1] !== 'OK') {
     throw new NativeIdTokenError('Apple ID token already used');
   }
 }
@@ -162,25 +196,13 @@ export async function verifyNativeAppleIdToken(
   if (payload.nonce !== expectedNonce) {
     throw new NativeIdTokenError('Apple nonce mismatch');
   }
-  // A store write that cannot complete refuses the sign-in, keeping the
-  // acceptance rule uniform.
-  let recorded: string | null = null;
-  try {
-    recorded = await redisClient.set(`auth:apple-signin-nonce:${expectedNonce}`, '1', {
-      nx: true,
-      ex: recordTtlSeconds(payload.exp),
-    });
-  } catch {
-    throw new NonceStoreUnavailableError('Apple nonce check unavailable');
-  }
-  if (recorded !== 'OK') {
-    throw new NativeIdTokenError('Apple nonce already used');
-  }
 
   const identity = appleIdentityFromPayload(payload);
-  // Both paths record the identity token itself, so one token signs in once
-  // whichever path accepted it first.
-  await recordSingleUseAppleToken(idToken, payload.exp);
+  // Both acceptance records commit together, so a store fault leaves neither
+  // of them spent and the caller can retry the same request. The identity
+  // token record is shared with the path that accepts a token without a nonce,
+  // so one token signs in once whichever path accepted it first.
+  await recordSingleUseAppleNonceAcceptance(expectedNonce, idToken, payload.exp);
   return identity;
 }
 

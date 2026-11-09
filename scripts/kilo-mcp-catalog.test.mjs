@@ -16,7 +16,8 @@ const dumpCommand = 'pnpm --filter web script src/scripts/mcp-catalog/dump.ts';
 const skillCommand = 'pnpm --filter web script src/scripts/mcp-catalog/skill.ts';
 const skillPath = '.kilo/skills/kilo-mcp/SKILL.md';
 const embedCommand = 'node services/kilo-mcp/scripts/embed-catalog.ts upsert';
-const kiloInstallCommand = 'npm install -g @kilocode/cli';
+const kiloInstallCommand =
+  'npm install -g --prefix ~/.kilo-cli --omit=optional --no-audit --no-fund "@kilocode/cli@${KILO_CLI_VERSION}" "@kilocode/cli-linux-x64@${KILO_CLI_VERSION}"';
 const mintCommand = 'api/internal/mcp-catalog/token';
 const mintSecretEnv = '${{ secrets.MCP_CATALOG_TOKEN_SECRET }}';
 const mergeGate = "github.event_name == 'push' && github.ref == 'refs/heads/main'";

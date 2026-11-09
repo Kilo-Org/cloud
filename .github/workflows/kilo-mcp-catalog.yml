@@ -52,6 +52,9 @@ on:
 
 # New commits to the same PR supersede in-progress runs; a main push must not
 # be cancelled mid-Vectorize-upsert.
+env:
+  KILO_CLI_VERSION: 7.8.27
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -115,9 +118,25 @@ jobs:
           cache: 'pnpm'
 
       # The dump shells out to `kilo run` to generate missing summaries.
-      - name: Install Kilo CLI
+      # Pinned, cached, and limited to the linux-x64 binary: the package's
+      # optional dependencies otherwise pull every matching ~330 MB platform
+      # build, which can stall long enough to hit the job timeout.
+      - name: Restore Kilo CLI
         if: steps.catalog_changes.outputs.catalog == 'true'
-        run: npm install -g @kilocode/cli
+        id: kilo_cli_cache
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: ~/.kilo-cli
+          key: kilo-cli-${{ runner.os }}-${{ runner.arch }}-${{ env.KILO_CLI_VERSION }}
+
+      - name: Install Kilo CLI
+        if: steps.catalog_changes.outputs.catalog == 'true' && steps.kilo_cli_cache.outputs.cache-hit != 'true'
+        timeout-minutes: 8
+        run: npm install -g --prefix ~/.kilo-cli --omit=optional --no-audit --no-fund "@kilocode/cli@${KILO_CLI_VERSION}" "@kilocode/cli-linux-x64@${KILO_CLI_VERSION}"
+
+      - name: Add Kilo CLI to PATH
+        if: steps.catalog_changes.outputs.catalog == 'true'
+        run: echo "$HOME/.kilo-cli/bin" >> "$GITHUB_PATH"
 
       - name: Install root dependencies
         if: steps.catalog_changes.outputs.catalog == 'true'
@@ -378,9 +397,25 @@ jobs:
           cache: 'pnpm'
 
       # The dump shells out to `kilo run` to fill any straggler summaries.
-      - name: Install Kilo CLI
+      # Pinned, cached, and limited to the linux-x64 binary: the package's
+      # optional dependencies otherwise pull every matching ~330 MB platform
+      # build, which can stall long enough to hit the job timeout.
+      - name: Restore Kilo CLI
         if: steps.merge_changes.outputs.catalog == 'true'
-        run: npm install -g @kilocode/cli
+        id: kilo_cli_cache
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: ~/.kilo-cli
+          key: kilo-cli-${{ runner.os }}-${{ runner.arch }}-${{ env.KILO_CLI_VERSION }}
+
+      - name: Install Kilo CLI
+        if: steps.merge_changes.outputs.catalog == 'true' && steps.kilo_cli_cache.outputs.cache-hit != 'true'
+        timeout-minutes: 8
+        run: npm install -g --prefix ~/.kilo-cli --omit=optional --no-audit --no-fund "@kilocode/cli@${KILO_CLI_VERSION}" "@kilocode/cli-linux-x64@${KILO_CLI_VERSION}"
+
+      - name: Add Kilo CLI to PATH
+        if: steps.merge_changes.outputs.catalog == 'true'
+        run: echo "$HOME/.kilo-cli/bin" >> "$GITHUB_PATH"
 
       # Same install scope as the PR job: the dump statically imports schemas
       # from `cloud-agent-next`, so that project must be installed for its

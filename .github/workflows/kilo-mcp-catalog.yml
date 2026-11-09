@@ -115,27 +115,37 @@ jobs:
           cache: 'pnpm'
 
       # The dump shells out to `kilo run` to generate missing summaries.
-      # The install pulls a large platform package, and its postinstall can run a
-      # nested npm install, so one stalled registry request holds the runner until
-      # the job timeout. Bound each attempt and retry it, so a bad connection costs
-      # minutes instead of the whole job.
+      # A cold install downloads large platform packages, so it legitimately
+      # takes minutes, and its postinstall can run a nested npm install. One
+      # stalled registry request would hold the runner until the job timeout, so
+      # the step bounds the whole install with a budget instead of bounding each
+      # attempt: a slow but moving download gets to finish, an early failure is
+      # retried, and a stall fails this step by name instead of cancelling the job.
       - name: Install Kilo CLI
         if: steps.catalog_changes.outputs.catalog == 'true'
-        timeout-minutes: 10
+        timeout-minutes: 14
         env:
-          # Inherited by the postinstall's nested npm install as well.
+          # Fail an attempt fast and retry here instead, so a bad connection
+          # cannot spend a separate retry budget. Inherited by the postinstall's
+          # nested npm install as well.
           npm_config_fetch_retries: '0'
-          npm_config_fetch_retry_maxtimeout: '10000'
         run: |
           set -euo pipefail
+          deadline=$((SECONDS + 720))
           for attempt in 1 2 3; do
-            if timeout --signal=TERM --kill-after=20 180 npm install -g @kilocode/cli; then
+            remaining=$((deadline - SECONDS))
+            if [ "$remaining" -le 0 ]; then
+              break
+            fi
+            if timeout --signal=TERM --kill-after=20 "$remaining" npm install -g @kilocode/cli; then
               exit 0
             fi
-            echo "::warning::Kilo CLI install attempt ${attempt} did not finish; retrying"
-            sleep $((attempt * 5))
+            if [ "$attempt" -lt 3 ]; then
+              echo "::warning::Kilo CLI install attempt ${attempt} did not finish; retrying"
+              sleep $((attempt * 5))
+            fi
           done
-          echo "::error::Kilo CLI install failed after 3 attempts"
+          echo "::error::Kilo CLI install did not finish"
           exit 1
 
       - name: Install root dependencies
@@ -397,25 +407,33 @@ jobs:
           cache: 'pnpm'
 
       # The dump shells out to `kilo run` to fill any straggler summaries.
-      # Same bound as the PR job: a stalled registry request must cost minutes,
-      # not the job timeout.
+      # Same budget as the PR job: a slow download gets to finish, and a stalled
+      # registry request costs minutes instead of the job timeout.
       - name: Install Kilo CLI
         if: steps.merge_changes.outputs.catalog == 'true'
-        timeout-minutes: 10
+        timeout-minutes: 14
         env:
-          # Inherited by the postinstall's nested npm install as well.
+          # Fail an attempt fast and retry here instead, so a bad connection
+          # cannot spend a separate retry budget. Inherited by the postinstall's
+          # nested npm install as well.
           npm_config_fetch_retries: '0'
-          npm_config_fetch_retry_maxtimeout: '10000'
         run: |
           set -euo pipefail
+          deadline=$((SECONDS + 720))
           for attempt in 1 2 3; do
-            if timeout --signal=TERM --kill-after=20 180 npm install -g @kilocode/cli; then
+            remaining=$((deadline - SECONDS))
+            if [ "$remaining" -le 0 ]; then
+              break
+            fi
+            if timeout --signal=TERM --kill-after=20 "$remaining" npm install -g @kilocode/cli; then
               exit 0
             fi
-            echo "::warning::Kilo CLI install attempt ${attempt} did not finish; retrying"
-            sleep $((attempt * 5))
+            if [ "$attempt" -lt 3 ]; then
+              echo "::warning::Kilo CLI install attempt ${attempt} did not finish; retrying"
+              sleep $((attempt * 5))
+            fi
           done
-          echo "::error::Kilo CLI install failed after 3 attempts"
+          echo "::error::Kilo CLI install did not finish"
           exit 1
 
       # Same install scope as the PR job: the dump statically imports schemas

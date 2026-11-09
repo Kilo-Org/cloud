@@ -17,17 +17,26 @@ const skillCommand = 'pnpm --filter web script src/scripts/mcp-catalog/skill.ts'
 const skillPath = '.kilo/skills/kilo-mcp/SKILL.md';
 const embedCommand = 'node services/kilo-mcp/scripts/embed-catalog.ts upsert';
 // A stalled registry request must not hold the runner until the job timeout, so
-// the install bounds each attempt and retries it.
+// the install bounds the whole loop with a time budget and retries an early
+// failure with whatever budget is left. A single attempt keeps whatever budget
+// remains, so a slow but moving download is not killed mid-transfer.
 const kiloInstallCommand = [
   'set -euo pipefail',
+  'deadline=$((SECONDS + 720))',
   'for attempt in 1 2 3; do',
-  '  if timeout --signal=TERM --kill-after=20 180 npm install -g @kilocode/cli; then',
+  '  remaining=$((deadline - SECONDS))',
+  '  if [ "$remaining" -le 0 ]; then',
+  '    break',
+  '  fi',
+  '  if timeout --signal=TERM --kill-after=20 "$remaining" npm install -g @kilocode/cli; then',
   '    exit 0',
   '  fi',
-  '  echo "::warning::Kilo CLI install attempt ${attempt} did not finish; retrying"',
-  '  sleep $((attempt * 5))',
+  '  if [ "$attempt" -lt 3 ]; then',
+  '    echo "::warning::Kilo CLI install attempt ${attempt} did not finish; retrying"',
+  '    sleep $((attempt * 5))',
+  '  fi',
   'done',
-  'echo "::error::Kilo CLI install failed after 3 attempts"',
+  'echo "::error::Kilo CLI install did not finish"',
   'exit 1',
   '',
 ].join('\n');

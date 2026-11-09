@@ -507,11 +507,18 @@ describe('upsertDirectoryUser', () => {
     expect(stripeClient.createStripeCustomer).not.toHaveBeenCalled();
     expect(stripeClient.deleteStripeCustomer).not.toHaveBeenCalled();
 
-    // The refusal is not a missing dependency: the directory is bound and an
-    // address at its captured domain still binds, so a retry of *this* event
-    // fails identically rather than resolving after a delay.
-    const bound = await seedUser();
-    expect(bound).toBeTruthy();
+    // A retry of this same event fails identically: the directory is bound and
+    // its captured domain is resolved, so the refusal is a policy answer rather
+    // than the missing dependency a later event would satisfy. The reason names
+    // the domain mismatch, not an absent organization.
+    const retryError = await upsertDirectoryUser(externalId, {
+      directoryId,
+      email: foreignEmail,
+      firstName: 'New',
+      lastName: 'Comer',
+    }).catch((error: unknown) => error);
+    expect(retryError).toBeInstanceOf(DirectorySyncConflictError);
+    expect(retryError instanceof Error ? retryError.message : '').toContain('captured domain');
   });
 
   test('is idempotent: a replayed event returns the same user', async () => {

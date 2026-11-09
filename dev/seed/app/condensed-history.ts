@@ -5,7 +5,7 @@ import { signKiloToken } from '@kilocode/worker-utils';
 import { and, eq, or } from 'drizzle-orm';
 
 import type { SeedResult } from '../index';
-import { getSeedDb } from '../lib/db';
+import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
 import { normalizeSeedEmail } from '../lib/email';
 import { isValidEmail } from '../lib/users';
 import {
@@ -345,6 +345,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     );
   }
 
+  assertLocalSeedDatabase('app:condensed-history');
   const normalizedEmail = normalizeSeedEmail(email);
   const db = getSeedDb();
   const matches = await db

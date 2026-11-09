@@ -4,7 +4,7 @@ import { cli_sessions_v2, kilocode_users } from '@kilocode/db/schema';
 import { signKiloToken } from '@kilocode/worker-utils';
 import { and, eq, inArray, or } from 'drizzle-orm';
 
-import { getSeedDb } from '../lib/db';
+import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
 import { normalizeSeedEmail } from '../lib/email';
 import { isValidEmail } from '../lib/users';
 import {
@@ -184,6 +184,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   }
 
   const normalizedEmail = normalizeSeedEmail(email);
+  assertLocalSeedDatabase('app:mobile-sheet-fixtures');
   const db = getSeedDb();
   const matches = await db
     .select({

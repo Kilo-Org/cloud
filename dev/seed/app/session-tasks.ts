@@ -6,7 +6,7 @@ import { signKiloToken } from '@kilocode/worker-utils';
 import { and, eq, sql } from 'drizzle-orm';
 
 import type { SeedResult } from '../index';
-import { getSeedDb } from '../lib/db';
+import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
 import {
   buildAssistantMessageItem,
   buildSessionItem,
@@ -254,6 +254,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     throw new Error('NEXTAUTH_SECRET is not set for this worktree.');
   }
 
+  assertLocalSeedDatabase('app:session-tasks');
   const db = getSeedDb();
   const [user] = await db
     .select({

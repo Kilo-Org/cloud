@@ -2,7 +2,7 @@ import { kilocode_users } from '@kilocode/db/schema';
 import { signKiloToken } from '@kilocode/worker-utils';
 import { eq, or } from 'drizzle-orm';
 
-import { getSeedDb } from '../lib/db';
+import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
 import { normalizeSeedEmail } from '../lib/email';
 import { isValidEmail } from '../lib/users';
 import type { SeedResult } from '../index';
@@ -143,6 +143,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     );
   }
 
+  assertLocalSeedDatabase('app:api-token');
   const normalizedEmail = normalizeSeedEmail(options.email);
   const db = getSeedDb();
   const matches = await db

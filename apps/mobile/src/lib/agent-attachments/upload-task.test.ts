@@ -18,14 +18,19 @@ vi.mock('@/lib/trpc', () => ({
   },
 }));
 
-const createUploadTaskMock = vi.fn((..._args: unknown[]) => ({
+/** The progress shape the native task really emits: iOS sends `bigint` counts. */
+type NativeUploadProgress = { bytesSent: number | bigint; totalBytes: number | bigint };
+type UploadTaskOptions = { onProgress?: (progress: NativeUploadProgress) => void };
+
+const createUploadTaskMock = vi.fn((_url: string, _options: UploadTaskOptions) => ({
   uploadAsync: vi.fn().mockResolvedValue({ status: 200, body: '', headers: {} }),
   cancel: vi.fn(),
 }));
 vi.mock('expo-file-system', () => ({
   UploadType: { BINARY_CONTENT: 'binary-content', MULTIPART: 'multipart' },
   File: class {
-    createUploadTask = (...args: unknown[]): unknown => createUploadTaskMock(...args);
+    createUploadTask = (url: string, options: UploadTaskOptions): unknown =>
+      createUploadTaskMock(url, options);
   },
 }));
 
@@ -110,5 +115,27 @@ describe('uploadOne', () => {
     ).rejects.toThrow('Upload cancelled');
 
     expect(createUploadTaskMock).not.toHaveBeenCalled();
+  });
+
+  it('reports a numeric fraction when iOS sends the byte counts as bigint', async () => {
+    const reported: (number | null)[] = [];
+    await uploadOne({
+      attachmentId: 'att-4',
+      path: 'path-4',
+      extension: 'jpg',
+      contentType: 'image/jpeg',
+      contentLength: 1024,
+      localUri: 'file:///cache/photo.jpg',
+      onProgress: progress => {
+        reported.push(progress);
+      },
+    });
+
+    const emit = createUploadTaskMock.mock.calls[0]?.[1].onProgress;
+    emit?.({ bytesSent: 256n, totalBytes: 1024n });
+    emit?.({ bytesSent: 1024n, totalBytes: 1024n });
+    emit?.({ bytesSent: 10n, totalBytes: 0n });
+
+    expect(reported).toEqual([0.25, 1, null]);
   });
 });

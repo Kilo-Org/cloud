@@ -485,6 +485,31 @@ describe('organizations.requestLogs trpc router', () => {
       }
     });
 
+    describe.each(['openai-chatgpt', 'claude-billing'])('%s legacy requests', provider => {
+      it.each([false, true])('returns BYOK when metadata exists=%s', async hasMetadata => {
+        await enableRequestLogs([organization.id]);
+        const usage = usageRow({ organization_id: organization.id, provider });
+        await db.insert(microdollar_usage).values(usage);
+        if (hasMetadata) {
+          await db
+            .insert(microdollar_usage_metadata)
+            .values(metadataRow(usage.id, { is_user_byok: false }));
+        }
+
+        const caller = await createCallerForUser(owner.id);
+        const [row] = await caller.organizations.requestLogs.list({
+          organizationId: organization.id,
+        });
+
+        expect(row.is_user_byok).toBe(true);
+        const storedMetadata = await db
+          .select({ is_user_byok: microdollar_usage_metadata.is_user_byok })
+          .from(microdollar_usage_metadata)
+          .where(eq(microdollar_usage_metadata.id, usage.id));
+        expect(storedMetadata).toEqual(hasMetadata ? [{ is_user_byok: false }] : []);
+      });
+    });
+
     it('returns null user details for a user that no longer exists', async () => {
       await enableRequestLogs([organization.id]);
       const deletedUserId = `deleted-user-${randomUUID()}`;

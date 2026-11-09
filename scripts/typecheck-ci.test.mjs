@@ -1257,9 +1257,33 @@ test('the extension matrix row defers to extension CI outside the merge queue', 
   }
 });
 
+// A selection document from scripts/affected-workspaces.mjs, as the root script
+// reads it.
+const selection = (overrides = {}) => ({
+  base: 'base',
+  full: false,
+  reasons: [],
+  full_checks: [],
+  dirs: [],
+  packages: [],
+  test_only_dirs: [],
+  test_only_packages: [],
+  test_only_files: [],
+  ...overrides,
+});
+
 function runTypecheck(
   t,
-  { root = false, changes = '', buildExit = 0, checkExit = 0, built = '', selected = '' } = {}
+  {
+    root = false,
+    changes = '',
+    group = '',
+    buildExit = 0,
+    checkExit = 0,
+    built = '',
+    affected = selection(),
+    selectionExit = 0,
+  } = {}
 ) {
   const dir = mkdtempSync(join(tmpdir(), 'typecheck-ci-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
@@ -1267,10 +1291,29 @@ function runTypecheck(
   mkdirSync(bin, { recursive: true });
   mkdirSync(join(dir, 'apps/extension'), { recursive: true });
   writeFileSync(join(dir, 'apps/extension/package.json'), JSON.stringify(extension));
+  mkdirSync(join(dir, 'apps/mobile'), { recursive: true });
+  writeFileSync(
+    join(dir, 'apps/mobile/package.json'),
+    JSON.stringify({
+      name: 'kilo-app',
+      dependencies: { '@kilocode/harness-sdk': 'workspace:*', '@kilocode/trpc': 'workspace:*' },
+    })
+  );
   mkdirSync(join(dir, 'services/cloud-agent-next'), { recursive: true });
   writeFileSync(
     join(dir, 'services/cloud-agent-next/package.json'),
     JSON.stringify({ name: 'cloud-agent-next', private: true })
+  );
+  // The detector decides the selection, and its own suite covers that decision.
+  // Here it answers with the document the test supplies and records the base it
+  // was asked for.
+  mkdirSync(join(dir, 'scripts'), { recursive: true });
+  writeFileSync(
+    join(dir, 'scripts/affected-workspaces.mjs'),
+    "import { appendFileSync } from 'node:fs';\n" +
+      "appendFileSync(process.env.COMMAND_LOG, 'node scripts/affected-workspaces.mjs ' + (process.argv[2] ?? '') + '\\n');\n" +
+      "if (process.env.SELECTION_EXIT !== '0') process.exit(Number(process.env.SELECTION_EXIT));\n" +
+      'process.stdout.write(process.env.SELECTION);\n'
   );
   const cli = `#!/usr/bin/env node
 const { appendFileSync } = require('node:fs');
@@ -1284,12 +1327,6 @@ if (name === 'git') {
   else if (args.includes('packages/trpc/src/**') && changes.includes('trpc')) console.log('packages/trpc/src/index.ts');
   else if (args.includes('packages/harness-sdk/tsconfig.build.json') && changes.includes('harness-build')) console.log('packages/harness-sdk/tsconfig.build.json');
   else if (args.includes('pnpm-workspace.yaml') && changes.includes('workspace')) console.log('pnpm-workspace.yaml');
-  else if (args.includes('*.ts') && changes.includes('cloud-agent-next')) console.log('services/cloud-agent-next/src/shared/protocol.ts');
-  else if (args.includes('*.ts')) console.log('apps/extension/package.json');
-} else if (name === 'pnpm' && args[0] === 'ls') {
-  appendFileSync(process.env.COMMAND_LOG, name + ' ' + args.join(' ') + '\\n');
-  const selected = process.env.SELECTED.split(',').filter(Boolean);
-  console.log(JSON.stringify(selected.map(entry => ({ name: entry }))));
 } else if (name === 'pnpm' && args[0] === '-r') {
   appendFileSync(process.env.COMMAND_LOG, name + ' ' + args.join(' ') + '\\n');
   const result = spawnSync('sh', ['-c', process.env.EXTENSION_TYPECHECK], { stdio: 'inherit' });
@@ -1308,7 +1345,7 @@ if (name === 'git') {
   const result = spawnSync(
     root ? 'bash' : 'sh',
     root
-      ? [rootScript, ...(changes ? ['--changes-only'] : [])]
+      ? [rootScript, ...(group ? ['--group', group] : changes ? ['--changes-only'] : [])]
       : ['-c', extension.scripts.typecheck],
     {
       cwd: dir,
@@ -1319,14 +1356,19 @@ if (name === 'git') {
         KILO_TYPECHECK_TRPC_BUILT: built,
         EXTENSION_TYPECHECK: extension.scripts.typecheck,
         CHANGES: changes,
-        SELECTED: selected,
+        KILO_AFFECTED: JSON.stringify(affected),
+        SELECTION: JSON.stringify(affected),
+        SELECTION_EXIT: String(selectionExit),
         BUILD_EXIT: String(buildExit),
         CHECK_EXIT: String(checkExit),
         COMMAND_LOG: log,
       },
     }
   );
-  return { status: result.status, commands: readFileSync(log, 'utf8').trim().split('\n') };
+  return {
+    status: result.status,
+    commands: readFileSync(log, 'utf8').trim().split('\n').filter(Boolean),
+  };
 }
 
 test('standalone extension checks build tRPC before compiling', t => {
@@ -1353,34 +1395,147 @@ test('extension compiler errors still fail when tRPC is already built', t => {
 
 const workspaceFilters = '--filter !kilocode-monorepo --filter !web --filter !@kilocode/trpc';
 const fullWorkspaceTypecheck = `pnpm -r ${workspaceFilters} run typecheck`;
-const extensionTypecheck = `pnpm -r --filter ${extension.name}... ${workspaceFilters} run typecheck`;
+const trpcBuild = 'pnpm --filter @kilocode/trpc run build';
+const selectedTypecheck = names =>
+  `pnpm -r ${names.map(name => `--filter ${name}`).join(' ')} ${workspaceFilters} run typecheck`;
+const detectorCall = 'node scripts/affected-workspaces.mjs base';
+const workspaceRuns = result => result.commands.filter(command => command.startsWith('pnpm -r'));
 
-for (const [changes, harnessBuilds, workspaceTypecheck] of [
-  ['', 1, fullWorkspaceTypecheck],
-  ['trpc', 0, extensionTypecheck],
-  ['extension', 0, extensionTypecheck],
-  ['workspace', 1, fullWorkspaceTypecheck],
-  ['trpc,workspace', 1, fullWorkspaceTypecheck],
-]) {
-  test(`root ${changes || 'full'} typecheck builds each prerequisite once and checks the extension`, t => {
-    const result = runTypecheck(t, { root: true, changes });
-    const count = name =>
-      result.commands.filter(command => command.startsWith(`pnpm --filter ${name} `)).length;
-    assert.equal(result.status, 0);
-    assert.equal(count('@kilocode/trpc'), 1);
-    assert.equal(count('@kilocode/harness-sdk'), harnessBuilds);
-    assert.deepEqual(
-      result.commands.filter(command => command.startsWith('pnpm -r')),
-      [workspaceTypecheck]
-    );
-    assert.equal(result.commands.at(-1), 'tsc --noEmit');
-  });
-}
+test('a full run builds each prerequisite once and checks every workspace', t => {
+  const result = runTypecheck(t, { root: true });
+  const count = name =>
+    result.commands.filter(command => command.startsWith(`pnpm --filter ${name} `)).length;
+  assert.equal(result.status, 0);
+  assert.equal(count('@kilocode/trpc'), 1);
+  assert.equal(count('@kilocode/harness-sdk'), 1);
+  assert.deepEqual(workspaceRuns(result), [fullWorkspaceTypecheck]);
+  assert.equal(result.commands.at(-1), 'tsc --noEmit');
+});
 
 test('a failed root tRPC build stops the typecheck', t => {
   const result = runTypecheck(t, { root: true, buildExit: 7 });
   assert.equal(result.status, 7);
-  assert.deepEqual(result.commands, ['pnpm --filter @kilocode/trpc run build']);
+  assert.deepEqual(result.commands, [trpcBuild]);
+});
+
+// The detector owns the selection, and a run that cannot get one must not check
+// less than a full run.
+test('a failed selection runs the full typecheck', t => {
+  const result = runTypecheck(t, { root: true, changes: 'scoped', selectionExit: 1 });
+  assert.equal(result.status, 0);
+  assert.deepEqual(workspaceRuns(result), [fullWorkspaceTypecheck]);
+  assert.deepEqual(
+    result.commands.filter(command => command === trpcBuild),
+    [trpcBuild]
+  );
+});
+
+// A change to the workspace membership list can alter the type surface across
+// packages, and the detector does not attribute it.
+test('a pnpm-workspace.yaml change runs the full typecheck without selecting', t => {
+  const result = runTypecheck(t, {
+    root: true,
+    changes: 'workspace',
+    affected: selection({ packages: ['ai-gateway'] }),
+  });
+  assert.equal(result.status, 0);
+  assert.deepEqual(workspaceRuns(result), [fullWorkspaceTypecheck]);
+  assert.deepEqual(
+    result.commands.filter(command => command.startsWith('node scripts/')),
+    []
+  );
+});
+
+// The detector reports a full typecheck for a change to this script, because the
+// script decides what every other workspace check runs.
+test('a change to this script checks every workspace', t => {
+  const result = runTypecheck(t, {
+    root: true,
+    changes: 'scoped',
+    affected: selection({ full_checks: ['typecheck'] }),
+  });
+  assert.equal(result.status, 0);
+  assert.ok(result.commands.includes(detectorCall));
+  assert.deepEqual(workspaceRuns(result), [fullWorkspaceTypecheck]);
+});
+
+// A change reaches the workspaces it reads from and the workspaces that read it.
+// The document names both, and one filter per name keeps the run on that set.
+test('a changes-only run checks the packages the detector selects, readers included', t => {
+  const result = runTypecheck(t, {
+    root: true,
+    changes: 'scoped',
+    affected: selection({
+      dirs: ['apps/ai-gateway', 'apps/web', 'packages/usage-queue', 'packages/web-shared'],
+      packages: ['@kilocode/usage-queue', '@kilocode/web-shared', 'ai-gateway', 'web'],
+    }),
+  });
+  assert.equal(result.status, 0);
+  assert.ok(result.commands.includes(detectorCall));
+  assert.deepEqual(workspaceRuns(result), [
+    selectedTypecheck(['@kilocode/usage-queue', '@kilocode/web-shared', 'ai-gateway']),
+  ]);
+});
+
+// apps/web and scripts/web-env are root programs, and step 1 builds trpc: a
+// selection that names only those adds no workspace run.
+test('a changes-only run skips the workspace check when the root programs cover it', t => {
+  const result = runTypecheck(t, {
+    root: true,
+    changes: 'scoped',
+    affected: selection({
+      dirs: ['apps/web', 'packages/trpc'],
+      packages: ['@kilocode/trpc', 'web'],
+    }),
+  });
+  assert.equal(result.status, 0);
+  assert.deepEqual(workspaceRuns(result), []);
+});
+
+// apps/extension and kilo-app compile against the tRPC declarations, and kilo-app
+// against the harness SDK dist: those builds must run when the selection checks a
+// reader, even when the package's own sources did not change.
+test('a changes-only run builds the declarations a checked workspace reads', t => {
+  const result = runTypecheck(t, {
+    root: true,
+    changes: 'scoped',
+    affected: selection({ dirs: ['apps/mobile'], packages: ['kilo-app'] }),
+  });
+  assert.equal(result.status, 0);
+  assert.deepEqual(
+    result.commands.filter(command => command === trpcBuild),
+    [trpcBuild]
+  );
+  assert.deepEqual(
+    result.commands.filter(command => command === harnessBuild),
+    [harnessBuild]
+  );
+  assert.deepEqual(workspaceRuns(result), [selectedTypecheck(['kilo-app'])]);
+});
+
+test('a changes-only run skips both builds when no checked workspace reads them', t => {
+  const result = runTypecheck(t, {
+    root: true,
+    changes: 'scoped',
+    affected: selection({ dirs: ['apps/ai-gateway'], packages: ['ai-gateway'] }),
+  });
+  assert.equal(result.status, 0);
+  assert.equal(result.commands.includes(trpcBuild), false);
+  assert.equal(result.commands.includes(harnessBuild), false);
+});
+
+test('a changes-only run rebuilds trpc when its source changed', t => {
+  const result = runTypecheck(t, {
+    root: true,
+    changes: 'trpc',
+    affected: selection({ dirs: ['apps/extension'], packages: ['kilo-extension'] }),
+  });
+  assert.equal(result.status, 0);
+  assert.deepEqual(
+    result.commands.filter(command => command === trpcBuild),
+    [trpcBuild]
+  );
+  assert.deepEqual(workspaceRuns(result), [selectedTypecheck(['kilo-extension'])]);
 });
 
 // The build the predicate guards is `ttsc -p tsconfig.build.json`, so a change
@@ -1388,7 +1543,11 @@ test('a failed root tRPC build stops the typecheck', t => {
 // does not hold the program the new one describes, and apps/mobile typechecks
 // against it.
 test('a changes-only run rebuilds the harness SDK when its build config changed', t => {
-  const result = runTypecheck(t, { root: true, changes: 'harness-build' });
+  const result = runTypecheck(t, {
+    root: true,
+    changes: 'harness-build',
+    affected: selection({ packages: ['ai-gateway'] }),
+  });
   assert.equal(result.status, 0);
   assert.deepEqual(
     result.commands.filter(command => command === harnessBuild),
@@ -1397,37 +1556,53 @@ test('a changes-only run rebuilds the harness SDK when its build config changed'
   );
 });
 
-// The wrapper compiles the service's own shared sources (its tsconfig includes
-// ../src/shared), which a package filter does not follow. A changes-only run
-// selects the wrapper whenever the service lands in the selection, once.
-test('a changes-only run selects the wrapper when the service is selected', t => {
+// The groups read the same document: `full` decides a check of every workspace,
+// and a package name decides which packages a group checks.
+test('a group checks every workspace when the selection is a full check', t => {
   const result = runTypecheck(t, {
     root: true,
-    changes: 'cloud-agent-next',
-    selected: 'cloud-agent-next',
+    group: 'packages',
+    affected: selection({ full: true }),
   });
   assert.equal(result.status, 0);
-  assert.deepEqual(
-    result.commands.filter(command => command.startsWith('pnpm -r')),
-    [
-      `pnpm -r --filter cloud-agent-next... --filter @kilocode/cloud-agent-wrapper ${workspaceFilters} run typecheck`,
-    ]
-  );
+  assert.deepEqual(workspaceRuns(result), [
+    `pnpm -r ${workspaceFilters} --filter !@kilocode/storybook --filter !kilo-app --filter !kilo-extension run typecheck`,
+  ]);
 });
 
-test('a changes-only run leaves the wrapper out when the service is not selected', t => {
+test('a group typechecks the packages the selection names', t => {
   const result = runTypecheck(t, {
     root: true,
-    changes: 'cloud-agent-next',
-    selected: '@kilocode/worker-utils',
+    group: 'packages',
+    affected: selection({ packages: ['ai-gateway', 'web', '@kilocode/storybook'] }),
   });
   assert.equal(result.status, 0);
-  assert.deepEqual(
-    result.commands.filter(command => command.startsWith('pnpm -r')),
-    [`pnpm -r --filter cloud-agent-next... ${workspaceFilters} run typecheck`]
-  );
+  assert.deepEqual(workspaceRuns(result), ['pnpm -r --filter ai-gateway run typecheck']);
 });
 
+test('the web group checks its programs when the selection names them', t => {
+  const result = runTypecheck(t, {
+    root: true,
+    group: 'web',
+    affected: selection({ packages: ['@kilocode/storybook', 'web'] }),
+  });
+  assert.equal(result.status, 0);
+  assert.deepEqual(result.commands, [
+    'tsgo --noEmit -p apps/web/tsconfig.json --incremental false',
+    'tsgo --noEmit -p scripts/web-env/tsconfig.json',
+    'pnpm --filter @kilocode/storybook run typecheck',
+  ]);
+});
+
+test('the web group stays out of a selection that names neither program', t => {
+  const result = runTypecheck(t, {
+    root: true,
+    group: 'web',
+    affected: selection({ packages: ['ai-gateway'] }),
+  });
+  assert.equal(result.status, 0);
+  assert.deepEqual(result.commands, []);
+});
 // `pnpm-workspace.yaml` lists workspaces that sit inside another workspace
 // (services/cloud-agent-next/wrapper is one). Both the full and the affected
 // group runs select members with `pnpm -r ... run typecheck`, which starts

@@ -77,6 +77,33 @@ describe('retained prepared admission on the control plane', () => {
     expect(send).not.toHaveBeenCalled();
   });
 
+  it('replays a queued and a completed initial turn without claiming it was sent', async () => {
+    for (const status of ['queued', 'completed'] as const) {
+      getMessageResult.mockResolvedValue({
+        type: 'found',
+        result: { status, messageId: 'msg_prepared_1' },
+      });
+      const ack = await replayPreparedInitialMessageIfAlreadyAdmitted(input, ctx);
+      expect(ack?.messageId).toBe('msg_prepared_1');
+      expect(ack?.delivery).toBe('queued');
+    }
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it.each(['failed', 'interrupted'] as const)(
+    'surfaces the typed non-retryable failure for a %s initial turn',
+    async status => {
+      getMessageResult.mockResolvedValue({
+        type: 'found',
+        result: { status, messageId: 'msg_prepared_1' },
+      });
+      await expect(replayPreparedInitialMessageIfAlreadyAdmitted(input, ctx)).rejects.toMatchObject(
+        { code: 'BAD_REQUEST', message: 'session_creation_failed' }
+      );
+      expect(send).not.toHaveBeenCalled();
+    }
+  );
+
   it('does not replay an initial turn that was never admitted', async () => {
     getMessageResult.mockResolvedValue({ type: 'message-not-found' });
     await expect(replayPreparedInitialMessageIfAlreadyAdmitted(input, ctx)).resolves.toBe(

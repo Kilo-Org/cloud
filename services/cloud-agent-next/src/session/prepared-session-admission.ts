@@ -8,6 +8,7 @@ import {
   ControlPlaneMessageInputError,
 } from './control-plane-session-input.js';
 import { fetchSessionMetadata } from './metadata.js';
+import { classifyStoredInitialTurn, initialTurnTerminalFailure } from './initial-turn-outcome.js';
 import type {
   ControlPlaneSendResult,
   SandboxSessionV2,
@@ -37,10 +38,14 @@ export async function replayPreparedInitialMessageIfAlreadyAdmitted(
     'getMessageResult'
   );
   if (result.type !== 'found') return undefined;
+  const outcome = classifyStoredInitialTurn(result.result);
+  if (outcome.type === 'terminal-failure') {
+    throw initialTurnTerminalFailure();
+  }
   return projectAdmissionToPublicAck(sessionId, {
     success: true,
     outcome: 'queued',
-    compatibilityDelivery: result.result.status === 'running' ? 'sent' : 'queued',
+    compatibilityDelivery: outcome.delivery,
     messageId,
   });
 }

@@ -965,6 +965,7 @@ export const AdminActionAuditAction = z.enum([
   'support_access.review',
   'service_fee.rollback_refund',
   'service_fee.rollback_reconcile',
+  'kilo_pass.cancel_refund',
 ]);
 
 export type AdminActionAuditAction = z.infer<typeof AdminActionAuditAction>;

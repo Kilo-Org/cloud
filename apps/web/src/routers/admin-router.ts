@@ -145,7 +145,10 @@ import { recomputeUserBalances } from '@/lib/user/recompute-balances';
 import { getStripeInvoices } from '@/lib/stripe';
 import { client as stripeClient } from '@kilocode/web-shared/lib/stripe-client';
 import { resolveSsoAuthorityForDomain } from '@kilocode/web-shared/lib/organizations/organization-sso-policy';
-import { cancelAndRefundKiloPassForUser } from '@/lib/kilo-pass/cancel-and-refund';
+import {
+  cancelAndRefundKiloPassForUser,
+  type CancelAndRefundKiloPassResult,
+} from '@/lib/kilo-pass/cancel-and-refund';
 import { KILOCLAW_EARLYBIRD_EXPIRY_DATE } from '@/lib/kiloclaw/constants';
 import {
   CurrentPersonalSubscriptionResolutionError,
@@ -157,6 +160,7 @@ import {
 import { createKiloClawAdminAuditLog } from '@/lib/kiloclaw/admin-audit-log';
 import {
   recordAdminAction,
+  redactEmailAddressesInAuditText,
   userActionTarget,
   type AdminActionContext,
 } from '@/lib/admin/admin-action-audit';
@@ -508,7 +512,7 @@ const GetUserInvoicesSchema = z.object({
 
 const CancelAndRefundKiloPassSchema = z.object({
   userId: z.string(),
-  reason: z.string().min(1, 'Reason is required').trim(),
+  reason: z.string().trim().min(1, 'Reason is required').max(500),
 });
 
 const GetKiloClawStateSchema = z.object({
@@ -1859,7 +1863,7 @@ export const adminRouter = createTRPCRouter({
         return { success: true };
       }),
 
-    cancelAndRefundKiloPass: adminProcedure
+    cancelAndRefundKiloPass: superadminProcedure
       .input(CancelAndRefundKiloPassSchema)
       .mutation(async ({ input, ctx }) => {
         const userExists = await db.query.kilocode_users.findFirst({
@@ -1870,13 +1874,30 @@ export const adminRouter = createTRPCRouter({
           throw new TRPCError({ code: 'NOT_FOUND', message: 'User not found' });
         }
 
-        const result = await cancelAndRefundKiloPassForUser({
-          db,
-          stripe: stripeClient,
-          userId: input.userId,
-          reason: input.reason,
-          adminKiloUserId: ctx.user.id,
-        });
+        // The helper writes the reason to the target user records (block reason,
+        // admin note and credit transaction description); the audit row repeats it.
+        const reason = redactEmailAddressesInAuditText(input.reason);
+
+        let result: CancelAndRefundKiloPassResult;
+        try {
+          result = await cancelAndRefundKiloPassForUser({
+            db,
+            stripe: stripeClient,
+            userId: input.userId,
+            reason,
+            adminKiloUserId: ctx.user.id,
+          });
+        } catch (error) {
+          // The helper creates the Stripe refund before its local transaction, so
+          // a failure here can leave a refund with no other attribution.
+          await recordAdminAction(ctx, {
+            action: 'kilo_pass.cancel_refund',
+            target: userActionTarget(input.userId),
+            message: 'Kilo Pass cancel attempted with unknown outcome',
+            metadata: { reason },
+          });
+          throw error;
+        }
 
         if (result.status === 'skipped') {
           if (result.reason.kind === 'no_subscription') {
@@ -1897,6 +1918,24 @@ export const adminRouter = createTRPCRouter({
             message: 'Kilo Pass subscription is already canceled',
           });
         }
+
+        await recordAdminAction(ctx, {
+          action: 'kilo_pass.cancel_refund',
+          target: userActionTarget(input.userId),
+          // `cancelled_and_refunded` is reported whenever a refund was requested,
+          // even when no paid invoice or payment intent existed, so the wording
+          // keys off the amount Stripe actually refunded.
+          message:
+            result.refundedAmountCents != null
+              ? 'Cancelled Kilo Pass and refunded the latest payment'
+              : 'Cancelled Kilo Pass with no refundable payment',
+          metadata: {
+            refundedAmountCents: result.refundedAmountCents,
+            balanceResetAmountUsd: result.balanceResetAmountUsd,
+            alreadyBlocked: result.alreadyBlocked,
+            reason,
+          },
+        });
 
         return {
           success: true,

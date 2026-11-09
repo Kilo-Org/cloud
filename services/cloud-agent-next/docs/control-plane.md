@@ -130,7 +130,7 @@ lost notifications; the Sandbox DO and the wrapper settle every normal case earl
 are derived from the owners' timers so the backstop does not end work within its owner's bound:
 queued = reconnect window (90 s) + one preparation attempt (the sum of its step bounds, below) + 3 min, which covers the
 longest normal wait (a message sent while the socket is down, then a fresh attempt on a new
-sandbox); accepted = turn hard cap (120 min) + 5 min. The hard cap bounds one native execution, not
+sandbox); accepted = turn hard cap (12 h) + 5 min. The hard cap bounds one native execution, not
 an accepted message, so a batch whose follow-up waits behind a serialized command spans several
 executions and can outlive the accepted backstop (see "Prompts and turn outcome" in section 7).
 After every message change the Session DO sets the alarm to the earliest backstop,
@@ -465,9 +465,14 @@ These keep their current owners and evidence; the rewrite ports them, it does no
   runtime proxy authorization and Vercel network policy as today. Grants last 4 hours. When less than
   1 hour remains, `deliver` re-issues the grant with freshly selected Git and legacy Kilo material and
   sends them in a `session.credentials` frame before the prompts; the wrapper installs them into the
-  running route and Kilo runtime. Modern runtime-authorized sessions use one runtime proxy handle per
-  worktree scope, shared by every member of the scope, on Cloudflare Sandbox, Cloudflare Containers
-  and Vercel instead of a Kilo capability wrapping the registration token. The Session DO owns the
+  running route and Kilo runtime. The Sandbox DO alarm renews a ready route's grant in the same
+  window without a message, so a long execution does not outlive its grant. Renewal keeps the
+  sandbox-visible handle and aliases, so Kilo does not restart, and it is not activity. A failed
+  renewal keeps the route while its grant is valid and retries after 5 minutes, once for all members
+  of a shared worktree scope; at expiry the routes fail `workspace_setup_failed`. Modern
+  runtime-authorized sessions use one runtime proxy handle per worktree scope, shared by every
+  member of the scope, on Cloudflare Sandbox, Cloudflare Containers and Vercel instead of a Kilo
+  capability wrapping the registration token. The Session DO owns the
   current delegated token and its renewal; registration credentials are route configuration, not
   authority to reuse a create-time delegated token. Grant renewal does not renew delegation.
 - Repeated preparation, new preparation attempts and warm renewal reuse the canonical grant's
@@ -855,7 +860,7 @@ the legacy profile restrictions.
   dispatched command/summary Kilo has already observed and still supervises does not consume its
   2-minute prompt-delivery budget; that budget stays current while the wait holds, so it does not
   expire the instant the response clears. The native 20-minute no-progress bound applies while
-  executing; its clock pauses during user waits, and the 120-minute wall-clock cap still bounds
+  executing; its clock pauses during user waits, and the 12-hour wall-clock cap still bounds
   the wait, not the batch: the follower starts a new native execution once the response clears, so a
   batch spanning several executions can outlive the accepted backstop and fail `no_outcome`. A command
   that is not currently observed, or a plain prompt, still expires as a stuck intake.
@@ -875,7 +880,7 @@ the legacy profile restrictions.
     and no later prompt remains unfinished. `session.idle` and a `superseded` turn-close are not
     completion signals. The wrapper does not keep a copy of Kilo's native prompt queue.
   - `failed`: Kilo reports a final error; native execution exceeds 20 minutes without real
-    progress or the separate 120-minute wall-clock cap; Kilo restarts after real progress or
+    progress or the separate 12-hour wall-clock cap; Kilo restarts after real progress or
     a second time; prompt delivery fails. The native supervisor chooses `no_progress` or
     `execution_limit` once, settles accepted messages with that reason, then performs a
     bounded tree abort. A `no_progress` stall in Kilo's model retry loop (a `retry` status
@@ -888,7 +893,7 @@ the legacy profile restrictions.
     event cannot overwrite the outcome or settle a newly queued message.
     A `superseded` turn-close is Kilo handing off to a queued follow-up, so the native
     execution and both of its clocks continue into the next turn. Follow-ups therefore cannot
-    extend a run past 120 minutes from its start; if no turn follows, the next idle snapshot
+    extend a run past 12 hours from its start; if no turn follows, the next idle snapshot
     finishes the execution.
     Assistant text/reasoning changes and actual tool output/state changes are progress.
     User input, repeated parts, metadata, busy/retry status and transport heartbeats are not.
@@ -1043,7 +1048,7 @@ them through one development-only override.
 | Owner | Timer | Value | On expiry |
 |---|---|---|---|
 | Session DO | Queued backstop | From send: reconnect window + one preparation attempt + 3 min | `failed` (`preparation_timeout`) |
-| Session DO | Accepted backstop | 125 min from accept | `failed` (`no_outcome`) |
+| Session DO | Accepted backstop | 12 h 5 min from accept | `failed` (`no_outcome`) |
 | Session DO | Sandbox transport pass / best-effort abort | 2 s including RPC retries, not scaled | Retain queued intent / return from abort |
 | Session DO | Queued transport recovery | 15 s after exhaustion; development-only scaling | Consume once; passive status then bounded prepare/deliver, no self-rearm |
 | Sandbox DO | Provider create call | 2 min | Retry after the pause below while a route deadline remains |
@@ -1056,7 +1061,7 @@ them through one development-only override.
 | Sandbox DO | Session notification | 2 s from enqueue including queue wait and RPC retries, not scaled | Drop expired queued work before RPC; bounded best-effort loss, existing Session backstop |
 | Sandbox DO | Idle | 10 min without activity | Stop the sandbox |
 | Sandbox DO | Provider lease | Existing lease length, renewed while active | Provider may stop an inactive sandbox |
-| Sandbox DO | Credential grant | 4 h; re-issued on `deliver` below 1 h | — |
+| Sandbox DO | Credential grant | 4 h; re-issued below 1 h by `deliver` or the Sandbox alarm, which retries a failed renewal every 5 min, once per grant scope | Route `failed` (`workspace_setup_failed`) when the grant expired and re-issue failed |
 | Sandbox DO | Artifact grant | `createDeadlineAt` plus first connect | Downloads are rejected |
 | Bootstrap | Install | Until the first-connect deadline, rendered by the Worker | Report `deadline_exceeded` and exit |
 | Sandbox DO | Provider stop | Existing ladder | Log unconfirmed stop; routing state `stopped` |
@@ -1069,7 +1074,7 @@ them through one development-only override.
 | Wrapper | SSE reconnects | 6 in 2 min | Restart Kilo |
 | Wrapper | Kilo restart budget | 3 in 10 min | Routes `failed` (`agent_unavailable`) |
 | Wrapper | Native execution without real progress, including silent tools | 20 min excluding user waits | Bounded tree abort; `no_progress` outcome or routed error, or the retried assistant failure when Kilo is retrying the model request |
-| Wrapper | Native execution hard cap | 120 min including user waits | Bounded tree abort; `execution_limit` outcome or routed error |
+| Wrapper | Native execution hard cap | 12 h including user waits | Bounded tree abort; `execution_limit` outcome or routed error |
 | Wrapper | Reconnect backoff | 1 s to 30 s, forever | — |
 | Wrapper | Connect attempt (upgrade, `hello`, `welcome`, outbox flush) | 30 s from socket creation | Detach the socket and use the reconnect backoff; Kilo keeps running |
 | Supervisor | Wrapper restarts | 5 in 10 min | Stop restarting |
@@ -1099,7 +1104,7 @@ them through one development-only override.
 | Kilo restart budget used up | Wrapper | None until the next message | Queued and accepted fail (`agent_unavailable`) |
 | Kilo final error | Wrapper | None (Kilo already retried) | Accepted fail with Kilo's reason |
 | No real progress for 20 min, including silent tools | Native session supervisor | Bounded tree abort; runtime recovery if unconfirmed | Accepted fail (`no_progress`, or the retried assistant failure during a Kilo model retry), or routed error without a current turn |
-| Native execution over 120 min | Native session supervisor | Bounded tree abort | Accepted fail (`execution_limit`), or routed error without a current turn |
+| Native execution over 12 h | Native session supervisor | Bounded tree abort | Accepted fail (`execution_limit`), or routed error without a current turn |
 | Idle 10 min, question pending | Sandbox DO | Stop the sandbox | Accepted fail (`sandbox_stopped`); a later answer is a new message |
 | Sandbox gone | Provider via Sandbox DO | New allocation on next `prepare` | Accepted fail (`sandbox_lost`); queued re-prepare |
 | Notification lost | Session DO backstop | — | Fail at the queued or accepted backstop |
@@ -1753,7 +1758,7 @@ counts.
     fails (`sandbox_stopped`); the answer or a new message continues the chat on a new sandbox.
 16. **No progress.** Every native execution, including autonomous work without a Cloud turn,
     is interrupted after 20 minutes without real progress (`no_progress`). A silent running
-    tool gets the same bound. User waits pause no-progress time; the separate 120-minute
+    tool gets the same bound. User waits pause no-progress time; the separate 12-hour
     wall-clock cap (`execution_limit`) remains in force. A stall while Kilo retries the model
     request fails as the retried assistant failure, for example `rate_limited`, so a provider
     condition is not counted as a platform failure. After confirmed interruption, an
@@ -1826,8 +1831,8 @@ provider stop reliability, billing or hosted timing; those are checked on a depl
 - The cause of the Kilo hang is inside Kilo and is not fixed here; the restart only recovers it.
 - A legitimate operation that remains completely silent for 20 minutes is interrupted,
   including long-running tools. This is a resource policy, not proof the operation was broken.
-  The separate native execution cap is 120 minutes and the lost-outcome Session backstop
-  remains 125 minutes. Observation gaps use bounded runtime recovery instead of claiming
+  The separate native execution cap is 12 hours and the lost-outcome Session backstop
+  is 12 hours 5 minutes. Observation gaps use bounded runtime recovery instead of claiming
   the session made no progress.
 - A prompt frame lost when the socket breaks stays `accepted` until the next outcome or the backstop.
 - Notifications are best effort; the Session DO backstop bounds a lost one.

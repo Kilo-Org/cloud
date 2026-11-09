@@ -340,7 +340,7 @@ repository.
    A healthy runtime that still cannot be observed at that bound, or no longer
    has recent real progress, MUST use bounded restart recovery without claiming
    that Kilo was unresponsive. The existing memory hold MUST retain precedence.
-   The separate 120-minute execution cap MUST include user waits. Native
+   The separate 12-hour execution cap MUST include user waits. Native
    cancellation MUST be bounded and confirmed; unconfirmed cancellation MUST
    use bounded runtime recovery. Accepted Cloud messages MUST settle once;
    autonomous routed failures MUST remain visible without inventing new message
@@ -358,7 +358,7 @@ repository.
    five minutes, the environment MUST stop and every accepted message on it
    MUST fail with a specific connection reason; queued messages MUST wait for a
    new environment in the same chat. Each affected composer MUST become usable;
-   already-terminal messages MUST stay unchanged. Do not wait for the 120-minute
+   already-terminal messages MUST stay unchanged. Do not wait for the 12-hour
    execution cap or physical stop confirmation, and do not claim that Kilo
    stalled or returned an error.
 

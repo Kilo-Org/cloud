@@ -126,23 +126,18 @@ describe('ProfilesListScreen repo defaults entry', () => {
   it('heads the profile rows with its own group like the settings group', async () => {
     const { renderer, unmount } = await mount();
 
-    // The profiles heading is a direct scroll child, exactly like the settings
-    // group's heading: the two groups space evenly and one heading cannot end
-    // up nested inside the other group's gap.
+    // The profiles group is one gap-3 container like the settings group: its
+    // heading sits 12 dp above the rows it labels, and the two groups space
+    // through the scroll's group gap, so neither heading floats free.
     const scroll = findOne(renderer.root, 'ScrollView');
-    const scrollChildren = groupChildren(scroll);
-    const profilesHeading = scrollChildren.find(
-      node => typeof node.props.children === 'string' && node.props.children === 'Profiles'
-    );
-    // The list labels the rows it already shows, so the unheaded profile
-    // section cannot read as a stray row beside the labeled settings group.
-    expect(profilesHeading?.props.children).toBe('Profiles');
+    expect(groupChildren(scroll)).toHaveLength(2);
+    // The profiles label wraps the owner sections two Views out: the owner
+    // group, then the sections wrapper that keeps their own 24 dp gap.
+    const personalGroup = rowGroup(renderer.root, rowByTitle(renderer.root, 'Personal profile'));
+    const profilesGroup = rowGroup(renderer.root, rowGroup(renderer.root, personalGroup));
+    expect(groupTexts(profilesGroup)[0]?.props.children).toBe('Profiles');
     const settingsGroup = rowGroup(renderer.root, repoDefaultsRow(renderer.root));
-    // The heading is the settings group's sibling on the scroll, not a child
-    // inside it, so the gap above REPOSITORIES stays the scroll's group gap.
-    expect(settingsGroup.props.className).toBe(
-      rowGroup(renderer.root, rowByTitle(renderer.root, 'Personal profile')).props.className
-    );
+    expect(profilesGroup.props.className).toBe(settingsGroup.props.className);
 
     unmount();
   });

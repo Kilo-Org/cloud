@@ -308,11 +308,9 @@ describe('ProfilesListScreen', () => {
     // settings group's own heading stay, so the list reads as one profiles
     // group plus one settings group.
     expect(textChildren(renderer.root)).toEqual(['Profiles', 'Repositories']);
-    // The profiles heading is the scroll's own first child, the same position
-    // the section heading keeps under its group; neither nests in the other.
-    const scroll = findOne(renderer.root, 'ScrollView');
-    const scrollChildren = groupChildren(scroll);
-    expect(scrollChildren[0]?.props.children).toBe('Profiles');
+    // The scroll holds the labeled profiles group and the labeled settings
+    // group, and no third orphan row.
+    expect(groupChildren(findOne(renderer.root, 'ScrollView'))).toHaveLength(2);
     // `agentProfiles.list` does not tag owner, so every row is personal.
     expect(findOne(renderer.root, 'ConfigureRow').props.icon).toBe('User');
 

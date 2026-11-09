@@ -1,6 +1,6 @@
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import type { User } from '@kilocode/db/schema';
-import { kilocode_users, user_auth_provider } from '@kilocode/db/schema';
+import { domain_blacklist_state, kilocode_users, user_auth_provider } from '@kilocode/db/schema';
 import { hosted_domain_specials } from '@kilocode/web-shared/lib/auth/constants';
 
 export function defineTestUser(userData: Partial<User> = {}): User {
@@ -57,6 +57,7 @@ export function defineTestUser(userData: Partial<User> = {}): User {
 }
 
 export async function insertTestUser(userData: Partial<User> = {}): Promise<User> {
+  await db.insert(domain_blacklist_state).values({ use_env_fallback: true }).onConflictDoNothing();
   const result = await db.insert(kilocode_users).values(defineTestUser(userData)).returning();
   return result[0];
 }

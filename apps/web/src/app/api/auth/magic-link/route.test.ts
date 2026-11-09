@@ -17,6 +17,10 @@ jest.mock('@kilocode/web-shared/lib/auth/magic-link-tokens');
 jest.mock('@kilocode/web-shared/lib/email');
 jest.mock('@/lib/user');
 jest.mock('@kilocode/web-shared/lib/organizations/organization-sso-policy');
+jest.mock('@kilocode/web-shared/lib/blacklist-domains-config', () => ({
+  ...jest.requireActual('@kilocode/web-shared/lib/blacklist-domains-config'),
+  isEmailBlacklisted: jest.fn(async () => false),
+}));
 
 import { POST } from './route';
 

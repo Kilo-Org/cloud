@@ -15,6 +15,10 @@ jest.mock('@kilocode/web-shared/lib/constants', () => ({
   ...(jest.requireActual('@kilocode/web-shared/lib/constants') as object),
   allow_fake_login: true,
 }));
+jest.mock('@kilocode/web-shared/lib/blacklist-domains-config', () => ({
+  ...jest.requireActual('@kilocode/web-shared/lib/blacklist-domains-config'),
+  isEmailBlacklisted: jest.fn(async () => false),
+}));
 jest.mock('@/lib/user', () => ({
   ...(jest.requireActual('@/lib/user') as object),
   createOrUpdateUser: jest.fn(),

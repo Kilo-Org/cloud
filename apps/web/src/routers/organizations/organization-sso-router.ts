@@ -7,7 +7,10 @@ import {
   organizationAccessRole,
   organizationMemberProcedure,
 } from '@kilocode/web-shared/routers/organizations/utils';
-import { ORGANIZATION_MANAGE_ROLES, canManageOrganization } from '@kilocode/app-shared/organizations';
+import {
+  ORGANIZATION_MANAGE_ROLES,
+  canManageOrganization,
+} from '@kilocode/app-shared/organizations';
 import { TRPCError } from '@trpc/server';
 import { GenerateLinkIntent, WorkOS, OrganizationDomainState } from '@workos-inc/node';
 import * as z from 'zod';

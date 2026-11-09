@@ -70,6 +70,10 @@ describe('Kilo v2 harness MCP refresh', () => {
       messageId: `msg_${'b'.repeat(26)}`,
     });
     expect(requests.map(request => [request.pathname, request.body])).toEqual([
+      [
+        `/api/experimental/session/${sessionId}/instructions/entries/cloud-agent-context`,
+        { value: '' },
+      ],
       [`/api/session/${sessionId}/command`, { command: 'review', text: 'src/app.ts' }],
     ]);
   });
@@ -221,6 +225,69 @@ describe('Kilo v2 harness MCP refresh', () => {
       expect(String(error)).toContain('HTTP 503');
       expect(requests).toHaveLength(1);
       expect(requests[0]?.method).toBe('PUT');
+    }
+  );
+
+  it.each(['command', 'compact', 'condense'] as const)(
+    'clears a prior prompt context before %s after harness recreation',
+    async operation => {
+      const sessionId = 'ses_non_prompt_context';
+      const instructionPath = `/api/experimental/session/${sessionId}/instructions/entries/cloud-agent-context`;
+      const { url, requests } = startStub((_request, url) =>
+        url.pathname.includes('/message/')
+          ? Response.json({ data: { type: 'compaction', status: 'completed' } })
+          : new Response(null, { status: 204 })
+      );
+      await createHarness(url).submit({
+        sessionId,
+        directory,
+        messageId: 'msg_startup_failure',
+        prompt: 'First prompt',
+        context: 'Some startup commands failed during session preparation.',
+      });
+      const harness = createHarness(url);
+      const input = { sessionId, directory, model: 'test-model' };
+      if (operation === 'command') await harness.command({ ...input, command: 'review' });
+      else if (operation === 'compact') expect(await harness.compact(input)).toBe(true);
+      else expect(await harness.condense(input)).toEqual({ success: true, wasAborted: false });
+
+      const subsequentRequests = requests.slice(2);
+      const clearIndex = subsequentRequests.findIndex(
+        request => request.pathname === instructionPath
+      );
+      expect(clearIndex).toBeGreaterThanOrEqual(0);
+      expect(subsequentRequests[clearIndex]).toMatchObject({ method: 'PUT', body: { value: '' } });
+      const nativePath = `/api/session/${sessionId}/${operation === 'command' ? 'command' : 'compact'}`;
+      expect(
+        subsequentRequests.findIndex(request => request.pathname === nativePath)
+      ).toBeGreaterThan(clearIndex);
+    }
+  );
+
+  it.each(['command', 'compact', 'condense'] as const)(
+    'does not run %s if the prior prompt context cannot be cleared',
+    async operation => {
+      const { url, requests } = startStub(
+        (_request, url) =>
+          new Response(null, { status: url.pathname.includes('/instructions/') ? 503 : 204 })
+      );
+      const harness = createHarness(url);
+      const input = { sessionId: 'ses_clear_failure', directory, model: 'test-model' };
+      if (operation === 'condense') {
+        const result = await harness.condense(input);
+        expect(result.success).toBe(false);
+        expect(result.error).toContain('HTTP 503');
+      } else {
+        const result =
+          operation === 'command'
+            ? harness.command({ ...input, command: 'review' })
+            : harness.compact(input);
+        const error: unknown = await result.catch(cause => cause);
+        expect(error).toBeInstanceOf(Error);
+        expect(String(error)).toContain('HTTP 503');
+      }
+      expect(requests.at(-1)?.pathname).toContain('/instructions/entries/cloud-agent-context');
+      expect(requests.some(request => /\/(command|compact)$/.test(request.pathname))).toBe(false);
     }
   );
 

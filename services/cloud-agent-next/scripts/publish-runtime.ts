@@ -397,6 +397,20 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
       kilo: await publishRuntimeRelease(store, packaged),
       ...(kilo2 ? { kilo2: await publishRuntimeRelease(store, kilo2) } : {}),
     };
+    if (local) {
+      await fs.mkdir(path.join(packageRoot, '.wrangler'), { recursive: true });
+      await fs.writeFile(
+        path.join(packageRoot, '.wrangler/runtime-local-vars.json'),
+        JSON.stringify({
+          RUNTIME_STARTUP_MODE: 'downloaded',
+          NATIVE_RUNTIME_IMAGE: 'runtime-free',
+          RUNTIME_RELEASE_DESCRIPTOR: published.kilo.descriptor.sha256,
+          ...(published.kilo2
+            ? { RUNTIME_RELEASE_DESCRIPTOR_KILO2: published.kilo2.descriptor.sha256 }
+            : {}),
+        })
+      );
+    }
     const descriptorOut = argValue(argv, '--descriptor-out');
     if (descriptorOut)
       await fs.writeFile(descriptorOut, serializeRuntimeRelease(packaged.descriptor));

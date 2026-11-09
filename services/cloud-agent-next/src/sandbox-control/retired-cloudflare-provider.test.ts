@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { preinstalledStartup } from './preinstalled-startup.js';
+import { supervisorStartup } from '../../test/fixtures/supervisor-startup.js';
 import {
   createRetiredCloudflareProviderAdapter,
   RetiredSandboxProviderError,
@@ -17,7 +17,7 @@ describe('retired Cloudflare provider adapter', () => {
     [
       'launch',
       (adapter: ReturnType<typeof createRetiredCloudflareProviderAdapter>) =>
-        adapter.launch('ses-abcdef', { command: preinstalledStartup(), env: {} }),
+        adapter.launch('ses-abcdef', { command: supervisorStartup(), env: {} }),
     ],
     [
       'admission',

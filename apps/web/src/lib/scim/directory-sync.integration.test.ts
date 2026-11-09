@@ -130,10 +130,14 @@ async function seedUser(): Promise<string> {
 
 async function seedOrganizationWithDomain(domain: string): Promise<string> {
   const organizationId = await seedOrganization();
+  // Fills only an absent domain, the same rule the capture path applies
+  // (`.specs/organization-sso.md`, rule 14). A suite that captured a domain
+  // before seeding a user keeps it, so a later helper cannot silently move the
+  // authority its assertions were written against.
   await db
     .update(organizations)
     .set({ sso_domain: domain })
-    .where(eq(organizations.id, organizationId));
+    .where(and(eq(organizations.id, organizationId), isNull(organizations.sso_domain)));
   return organizationId;
 }
 

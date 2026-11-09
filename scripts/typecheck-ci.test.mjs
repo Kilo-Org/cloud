@@ -46,6 +46,7 @@ const jobRun = new Map([
   ['.github/actions/harness-sdk-build', harnessBuild],
 ]);
 const ciJobs = workflows['ci.yml'].jobs;
+const kiloAppJobs = workflows['kilo-app-ci.yml'].jobs;
 const pnpmCleanup = fileURLToPath(
   new URL('../.github/actions/pnpm-store/cleanup/cleanup.cjs', import.meta.url)
 );
@@ -1173,6 +1174,43 @@ test('the web-test shards install the closure their Jest suite reads', () => {
   assert.deepEqual(job.strategy.matrix.shard, [1, 2, 3, 4], 'four shards still run');
   const run = job.steps.find(step => step.name === 'Run web tests');
   assert.equal(run.run, 'pnpm --filter web test --shard=${{ matrix.shard }}/4');
+});
+
+// The measured per-job install share of wall time keeps a narrowing above one
+// tenth of the job it saves: the mobile-test shards, `lint` and `check-unused`
+// clear that bar, and `typecheck`'s sample run does not, so it keeps the whole
+// workspace for now. When a measurement moves a job over the bar, name it here;
+// a step that starts importing another workspace widens its job's filter, and
+// no job restores the full install to hide an undeclared import. Dependency
+// postinstalls stay enabled across these jobs.
+const appClosureInstall =
+  "pnpm install --frozen-lockfile --filter 'kilo-app...' --filter kilocode-monorepo";
+
+test('the kilo-app CI consumers install the app closure', () => {
+  // The producer jobs keep their own wider (or whole-workspace) closures, and
+  // `typecheck` keeps the whole workspace until its measured saving clears the
+  // bar; every other install in this workflow is the app's.
+  const consumerJobs = Object.entries(kiloAppJobs)
+    .filter(
+      ([name, job]) =>
+        !name.startsWith('prepare') &&
+        name !== 'typecheck' &&
+        (job.steps ?? []).some(step => /^pnpm install --frozen-lockfile\b/.test(step.run ?? ''))
+    )
+    .map(([name]) => name);
+  for (const name of consumerJobs) {
+    const install = kiloAppJobs[name].steps.find(step => step.name === 'Install dependencies');
+    assert.equal(
+      install.run,
+      appClosureInstall,
+      `${name} installs the app closure, not the whole workspace`
+    );
+  }
+  assert.deepEqual(
+    consumerJobs,
+    ['lint', 'check-unused', 'mobile-test'],
+    'the app closure covers the measured consumer installs and leaves the others alone'
+  );
 });
 
 // The extension's unit suite runs in extension-ci.yml for a pull request and a

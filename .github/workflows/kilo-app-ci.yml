@@ -211,11 +211,8 @@ jobs:
         with:
           node-version-file: '.nvmrc'
 
-      # Only the workspaces the app depends on and the root one are installed:
-      # the step runs the app's own scripts against the downloaded builds.
-      # Widen the filter when a step here imports a workspace outside the closure.
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile --filter 'kilo-app...' --filter kilocode-monorepo
+        run: pnpm install --frozen-lockfile
 
       - name: Download the tRPC declarations
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8

@@ -1091,21 +1091,25 @@ test('the web-test shards install the closure their Jest suite reads', () => {
   assert.equal(run.run, 'pnpm --filter web test --shard=${{ matrix.shard }}/4');
 });
 
-// The app's checks and suite read the app's workspace closure and the builds
-// the producers upload, so a recursive workspace install links every other
-// project for a step that reads none of them. A step that starts importing
-// another workspace widens its job's filter here; it does not restore the full
-// install. Dependency postinstalls stay enabled across these jobs.
+// The measured per-job install share of wall time keeps a narrowing above one
+// tenth of the job it saves: the mobile-test shards, `lint` and `check-unused`
+// clear that bar, and `typecheck`'s sample run does not, so it keeps the whole
+// workspace for now. When a measurement moves a job over the bar, name it here;
+// a step that starts importing another workspace widens its job's filter, and
+// no job restores the full install to hide an undeclared import. Dependency
+// postinstalls stay enabled across these jobs.
 const appClosureInstall =
   "pnpm install --frozen-lockfile --filter 'kilo-app...' --filter kilocode-monorepo";
 
 test('the kilo-app CI consumers install the app closure', () => {
-  // The two producer jobs keep their own wider (or whole-workspace) closures;
-  // every other install in this workflow is the app's.
+  // The producer jobs keep their own wider (or whole-workspace) closures, and
+  // `typecheck` keeps the whole workspace until its measured saving clears the
+  // bar; every other install in this workflow is the app's.
   const consumerJobs = Object.entries(kiloAppJobs)
     .filter(
       ([name, job]) =>
         !name.startsWith('prepare') &&
+        name !== 'typecheck' &&
         (job.steps ?? []).some(step => /^pnpm install --frozen-lockfile\b/.test(step.run ?? ''))
     )
     .map(([name]) => name);
@@ -1119,8 +1123,8 @@ test('the kilo-app CI consumers install the app closure', () => {
   }
   assert.deepEqual(
     consumerJobs,
-    ['typecheck', 'lint', 'check-unused', 'mobile-test'],
-    'the app closure covers every consumer install and leaves the producers alone'
+    ['lint', 'check-unused', 'mobile-test'],
+    'the app closure covers the measured consumer installs and leaves the others alone'
   );
 });
 

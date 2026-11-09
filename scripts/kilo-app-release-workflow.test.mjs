@@ -218,6 +218,24 @@ function validate(workflow) {
     /\[ "\$STATUS" != "completed" \] && \[ "\$REUSE_RUNNING" = "false" \][\s\S]*?exit 0/,
     'a schedule or a manual run of main reuses only a suite run that concluded'
   );
+  // A skipped suite still reports success, and the tip of main need not be a
+  // commit that touched an app path, so the shard job is the proof that the run
+  // this path reuses executed the suite.
+  assert.match(
+    suite.run,
+    /actions\/runs\/\$ID\/jobs\?per_page=100&filter=latest/,
+    'a schedule or a manual run of main must read the jobs of the run it reuses'
+  );
+  assert.match(
+    suite.run,
+    /select\(\.name == "mobile-test \(1\/8\)"\)/,
+    'the proof must read a shard job that runs only when the suite runs'
+  );
+  assert.match(
+    suite.run,
+    /\[ "\$SHARD" != "success" \][\s\S]*?exit 0/,
+    'a run that did not execute the suite leaves the suite to this workflow'
+  );
   assert.match(
     suite.run,
     /actions\/workflows\/kilo-app-ci\.yml\/runs\?head_sha=\$GITHUB_SHA&event=push/,
@@ -660,21 +678,33 @@ test('the suite lookup reuses a passed run and otherwise runs the suite here', (
   mkdirSync(stubDir, { recursive: true });
   // `gh` answers with the newest run of the workflow and event the lookup asks
   // for, in gojq's shape: an empty match prints the two empty fields it would
-  // emit for a null run. A failure case answers like an API error. `sleep` is
-  // stubbed out so the bounded wait for the runs list does not slow the test.
+  // emit for a null run. A jobs read answers with the shard conclusion the case
+  // gives it, which is the proof that the suite ran. A failure case answers
+  // like an API error. `sleep` is stubbed out so the bounded wait for the runs
+  // list does not slow the test.
   writeFileSync(
     join(stubDir, 'gh'),
     `#!/usr/bin/env node
 const fs = require('node:fs');
 const calls = process.env.GH_STUB_CALLS;
-const seen = fs.existsSync(calls)
-  ? fs.readFileSync(calls, 'utf8').trim().split('\\n').filter(Boolean).length
-  : 0;
-fs.appendFileSync(calls, process.argv.slice(2).join(' ') + '\\n');
+const prior = fs.existsSync(calls)
+  ? fs.readFileSync(calls, 'utf8').trim().split('\\n').filter(Boolean)
+  : [];
+const args = process.argv.slice(2);
+fs.appendFileSync(calls, args.join(' ') + '\\n');
+if (args.some(arg => arg.includes('/jobs?'))) {
+  if (process.env.GH_STUB_JOBS_ERROR === '1') {
+    process.stderr.write('HTTP 500: internal server error\\n');
+    process.exit(1);
+  }
+  process.stdout.write((process.env.GH_STUB_SHARD ?? 'success') + '\\n');
+  process.exit(0);
+}
 if (process.env.GH_STUB_ERROR === '1') {
   process.stderr.write('HTTP 503: service unavailable\\n');
   process.exit(1);
 }
+const seen = prior.filter(line => !line.includes('/jobs?')).length;
 const script = JSON.parse(fs.readFileSync(process.env.GH_STUB_RUNS, 'utf8'));
 const run = (script[Math.min(seen, script.length - 1)] ?? [])[0];
 process.stdout.write(run ? [run.id, run.status, run.conclusion ?? ''].join('\\t') + '\\n' : '\\t\\t\\n');
@@ -686,7 +716,15 @@ process.stdout.write(run ? [run.id, run.status, run.conclusion ?? ''].join('\\t'
   const suite = step(readWorkflow(), 'check-changes', 'suite');
   const sha = '0123456789abcdef0123456789abcdef01234567';
   // `runs` is one entry per lookup: the last entry answers every later call.
-  const lookup = ({ event, ref = 'refs/heads/main', runs, error }) => {
+  // `shard` is the conclusion of the shard job in the jobs read.
+  const lookup = ({
+    event,
+    ref = 'refs/heads/main',
+    runs,
+    error,
+    shard = 'success',
+    jobsError = false,
+  }) => {
     writeFileSync(runsPath, JSON.stringify(runs));
     writeFileSync(callsPath, '');
     writeFileSync(output, '');
@@ -703,6 +741,8 @@ process.stdout.write(run ? [run.id, run.status, run.conclusion ?? ''].join('\\t'
         GH_STUB_RUNS: runsPath,
         GH_STUB_CALLS: callsPath,
         GH_STUB_ERROR: error ? '1' : '0',
+        GH_STUB_SHARD: shard,
+        GH_STUB_JOBS_ERROR: jobsError ? '1' : '0',
       },
     });
     const outputs = Object.fromEntries(
@@ -775,6 +815,12 @@ process.stdout.write(run ? [run.id, run.status, run.conclusion ?? ''].join('\\t'
       ),
       'the schedule must read the push run of its own commit'
     );
+    assert.match(
+      scheduled.calls[1],
+      /^api repos\/Kilo-Org\/cloud\/actions\/runs\/46\/jobs\?/,
+      'the schedule must prove the suite ran in the run it reuses'
+    );
+    assert.equal(scheduled.calls.length, 2, 'one run read and one jobs read');
 
     // It never waits on a suite it did not start, and it reuses nothing that
     // is not already a pass.
@@ -791,6 +837,25 @@ process.stdout.write(run ? [run.id, run.status, run.conclusion ?? ''].join('\\t'
     });
     assert.deepEqual(scheduledFailed.outputs, { reuse: 'false' });
 
+    // A run whose suite jobs were skipped for a commit that touched no app path
+    // still reports success, and that is no validation for the app change this
+    // release submits.
+    const skipped = lookup({
+      event: 'schedule',
+      runs: [[{ id: 53, status: 'completed', conclusion: 'success' }]],
+      shard: 'skipped',
+    });
+    assert.deepEqual(skipped.outputs, { reuse: 'false' });
+    assert.equal(skipped.calls.length, 2, 'the suite proof must read the jobs');
+
+    // A jobs read that fails proves nothing either.
+    const jobsErrored = lookup({
+      event: 'schedule',
+      runs: [[{ id: 54, status: 'completed', conclusion: 'success' }]],
+      jobsError: true,
+    });
+    assert.deepEqual(jobsErrored.outputs, { reuse: 'false' });
+
     // A manual run of main follows the same rule.
     const dispatched = lookup({
       event: 'workflow_dispatch',
@@ -798,6 +863,14 @@ process.stdout.write(run ? [run.id, run.status, run.conclusion ?? ''].join('\\t'
       runs: [[{ id: 49, status: 'completed', conclusion: 'success' }]],
     });
     assert.deepEqual(dispatched.outputs, { reuse: 'true', suite_run: '49' });
+
+    const dispatchedSkipped = lookup({
+      event: 'workflow_dispatch',
+      ref: 'refs/heads/main',
+      runs: [[{ id: 55, status: 'completed', conclusion: 'success' }]],
+      shard: 'skipped',
+    });
+    assert.deepEqual(dispatchedSkipped.outputs, { reuse: 'false' });
 
     const dispatchedRunning = lookup({
       event: 'workflow_dispatch',
@@ -1052,6 +1125,14 @@ const mutations = {
   'the schedule reuses a suite run still in flight': workflow => {
     const suite = step(workflow, 'check-changes', 'suite');
     suite.run = suite.run.replace('schedule) REUSE_RUNNING=false', 'schedule) REUSE_RUNNING=true');
+  },
+  'the suite proof reads a job that runs for every commit': workflow => {
+    const suite = step(workflow, 'check-changes', 'suite');
+    suite.run = suite.run.replace('select(.name == "mobile-test (1/8)")', 'select(.name == "mobile-changes")');
+  },
+  'the suite proof accepts a skipped shard': workflow => {
+    const suite = step(workflow, 'check-changes', 'suite');
+    suite.run = suite.run.replace('[ "$SHARD" != "success" ]', '[ "$SHARD" = "stale" ]');
   },
   'the suite lookup reuses a run that did not pass': workflow => {
     const suite = step(workflow, 'check-changes', 'suite');

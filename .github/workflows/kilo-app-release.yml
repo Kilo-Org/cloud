@@ -166,13 +166,14 @@ jobs:
       # conclusion instead of the suite running a second time. The hourly
       # schedule and a manual run of main stand on the tip of main, which the
       # push that put it there already validated, so they reuse that same run
-      # as well — and only once it has concluded successfully, because neither
-      # of them started a suite it could wait for. Every other case keeps the
-      # in-workflow suite: a manual run of another ref has no push run for its
-      # commit, a lookup that fails proves nothing, and a run that already
-      # concluded unsuccessfully is not a validation for this commit. The
-      # default `reuse=false` is therefore the fail-closed value, and only a
-      # lookup that succeeded can turn it true.
+      # as well — but only once it has concluded successfully and proven that
+      # it executed the suite, because kilo-app CI skips every suite job for a
+      # commit that touched no app path while the run still reports success.
+      # Every other case keeps the in-workflow suite: a manual run of another
+      # ref has no push run for its commit, a lookup that fails proves nothing,
+      # and a run that already concluded unsuccessfully is not a validation for
+      # this commit. The default `reuse=false` is therefore the fail-closed
+      # value, and only a lookup that succeeded can turn it true.
       - name: Look for the suite run of this commit
         id: suite
         if: steps.check.outputs.should_build == 'true' && steps.cap.outputs.allowed == 'true'
@@ -244,6 +245,23 @@ jobs:
           if [ "$STATUS" != "completed" ] && [ "$REUSE_RUNNING" = "false" ]; then
             echo "The suite run for this commit is still $STATUS — the suite runs in this workflow instead."
             exit 0
+          fi
+
+          # A run's success does not prove that the suite ran for this commit:
+          # kilo-app CI skips every suite job when the pushed range touched no
+          # app path, and a skipped job still reports success. The tip of main
+          # can be such a commit while the app change being released is older,
+          # so the shard job is the proof that this run executed the suite.
+          if [ "$REUSE_RUNNING" = "false" ]; then
+            if ! SHARD=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$ID/jobs?per_page=100&filter=latest" \
+                --jq '[.jobs[] | select(.name == "mobile-test (1/8)") | .conclusion // ""] | .[0] // ""'); then
+              echo "::warning::could not read the jobs of kilo-app CI run $ID — the suite runs in this workflow"
+              exit 0
+            fi
+            if [ "$SHARD" != "success" ]; then
+              echo "kilo-app CI run $ID did not execute the mobile suite for this commit (mobile-test 1/8: ${SHARD:-absent}) — the suite runs in this workflow instead."
+              exit 0
+            fi
           fi
 
           echo "reuse=true" >> "$GITHUB_OUTPUT"

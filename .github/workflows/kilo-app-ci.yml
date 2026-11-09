@@ -4,14 +4,15 @@ name: kilo-app CI
 # every PR and every main push (no path filters) and the `mobile-changes` job
 # gates the suite work. An unrelated PR or push still reports the suite checks
 # as skipped (a skipped job satisfies a required check) instead of leaving them
-# "Expected". A release for a main commit consumes this run's conclusion for
-# that commit — the release the same push started, and the hourly schedule or a
-# manual run of main, which stand on the tip of main — because every release
-# path is inside the detection below, so the run always executes the suite.
-# The release calls the suite through `workflow_call` only for a reuse it cannot
-# prove: no run for the commit, a run that ended without a pass (including one
-# the cancel-in-progress group above cancels when a later push lands on main),
-# or a schedule or manual run that found its commit's run still in flight.
+# "Expected". A push that starts a release is inside the detection below, so its
+# run always executes the suite, and that release consumes this run's conclusion
+# for the commit. The hourly schedule and a manual run of main stand on the tip
+# of main and reuse that commit's push run as well, but only a run that passed
+# and whose shard job proves the suite executed. The release calls the suite
+# through `workflow_call` for any reuse it cannot prove: no run for the commit, a
+# run that ended without a pass (including one the cancel-in-progress group above
+# cancels when a later push lands on main), a run still in flight, and a run for
+# a commit that touched no app path and so skipped the suite.
 #
 # The app's formatting is gated by the repo-wide `format-check` job in ci.yml:
 # `oxfmt --list-different .` covers apps/mobile on every PR, merge-queue entry

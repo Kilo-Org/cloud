@@ -88,7 +88,7 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
       return '/(auth)/session-row-fixture';
     }
     if (/(?:^|\/)dev\/system-search-unresolved-fixture\/?(?:[?#].*)?$/.test(path)) {
-      return '/(auth)/system-search-unresolved-fixture';
+      return '/(app)/system-search-unresolved-fixture';
     }
     if (/(?:^|\/)dev\/save-profile-sheet-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/(app)/save-profile-sheet-fixture';

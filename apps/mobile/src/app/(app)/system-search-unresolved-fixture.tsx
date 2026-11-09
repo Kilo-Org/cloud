@@ -6,13 +6,16 @@ import { SystemSearchUnresolvedFixture } from '@/components/system-search-unreso
  * Development-only route for the unresolved-search-tap toast fixture: a screen
  * that raises the toast the search-tap consume shows when the phone's index
  * could not resolve the picked result. The fixture link in
- * `src/lib/system-search-unresolved-fixture-route.ts` maps to it through
- * `src/app/+native-intent.tsx`, and a release build refuses the path outright so
- * the fixture is never reachable.
+ * `src/app/+native-intent.tsx` maps to it, and a release build refuses the path
+ * outright so the fixture is never reachable.
+ *
+ * It sits in the signed-in group because that is where the toast appears: a
+ * system-search tap is resolved while the reader is using the app, so the copy
+ * and its retry are measured over an authenticated screen.
  */
 export default function SystemSearchUnresolvedFixtureRoute() {
   if (!__DEV__) {
-    return <Redirect href="/(auth)/login" />;
+    return <Redirect href="/" />;
   }
   return <SystemSearchUnresolvedFixture />;
 }

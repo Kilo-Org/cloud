@@ -317,10 +317,19 @@ test('claim and header names cannot forge the internal rejection discriminator',
     undefined,
     true,
     true,
-    { rejectionReason: 'empty_organization_context', credentialsRejected: false },
-    { rejectionReason: 'empty_organization_context', credentialsRejected: 'false' }
+    {
+      rejectionReason: 'empty_organization_context',
+      credentialsRejected: false,
+      authorizationRefused: false,
+    },
+    {
+      rejectionReason: 'empty_organization_context',
+      credentialsRejected: 'false',
+      authorizationRefused: 'false',
+    }
   );
   expect(result.auth).not.toHaveProperty('rejectionReason');
+  expect(result.auth).not.toHaveProperty('authorizationRefused');
   expect(result.caller.kind).toBe('signed-in');
   expect(result.publication).toEqual({ kind: 'accepted' });
 });

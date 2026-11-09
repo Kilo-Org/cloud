@@ -1,6 +1,11 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { getUserFromAuth, isUserBlacklistedByDomain } from '@kilocode/web-shared/lib/user/server';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { envFallbackDomains } from '@kilocode/web-shared/lib/blacklist-domains-config';
+import {
+  emailDomainSuffixes,
+  isEmailBlacklistedByDomain,
+} from '@kilocode/worker-utils/account-access';
 import type { UsersApiResponse, SortableField, UserTableProps } from '@/types/admin';
 import { sortableFields } from '@/types/admin';
 import {
@@ -14,6 +19,8 @@ import {
   user_admin_notes,
   referral_codes,
   organization_memberships,
+  blacklisted_domains,
+  domain_blacklist_state,
 } from '@kilocode/db/schema';
 import {
   ilike,
@@ -38,7 +45,8 @@ export async function GET(
 ): Promise<NextResponse<{ error: string } | UsersApiResponse>> {
   const { searchParams } = new URL(request.url);
   const page = Math.max(1, parseInt(searchParams.get('page') || '1'));
-  const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '25')));
+  const requestedLimit = parseInt(searchParams.get('limit') || '25');
+  const limit = Number.isFinite(requestedLimit) ? Math.min(100, Math.max(1, requestedLimit)) : 25;
   const sortBy = (searchParams.get('sortBy') || 'created_at') as SortableField;
   const sortOrder = searchParams.get('sortOrder') === 'asc' ? 'asc' : 'desc';
   const searchTerm = searchParams.get('search')?.trim() || '';
@@ -197,20 +205,38 @@ export async function GET(
 
     const totalPages = Math.ceil(totalUserCount / limit);
 
-    const usersWithPaymentStatus: UserTableProps[] = await Promise.all(
-      users.map(async user => ({
-        ...user,
-        paymentMethodStatus: describePaymentMethods(
-          paymentMethodsByUserId[user.id] || [],
-          user,
-          usersWithValidationCredits.has(user.id)
-        ),
-        admin_notes: notesByUserId.get(user.id)?.map(o => ({ ...o, admin_kilo_user: null })) || [],
-        is_blacklisted_by_domain: await isUserBlacklistedByDomain({
-          google_user_email: user.google_user_email,
-        }),
-      }))
-    );
+    const userDomainSuffixes = users.map(user => emailDomainSuffixes(user.google_user_email));
+    const candidateDomains = [...new Set(userDomainSuffixes.flatMap(suffixes => suffixes ?? []))];
+    const [blacklistState] = await db
+      .select({ useEnvFallback: domain_blacklist_state.use_env_fallback })
+      .from(domain_blacklist_state)
+      .where(eq(domain_blacklist_state.id, 1))
+      .limit(1);
+    if (!blacklistState) throw new Error('Domain blacklist backfill has not completed');
+    const blacklistedDomains = blacklistState.useEnvFallback
+      ? envFallbackDomains
+      : candidateDomains.length === 0
+        ? []
+        : (
+            await db
+              .select({ domain: blacklisted_domains.domain })
+              .from(blacklisted_domains)
+              .where(inArray(blacklisted_domains.domain, candidateDomains))
+              .limit(candidateDomains.length)
+          ).map(row => row.domain);
+
+    const usersWithPaymentStatus: UserTableProps[] = users.map((user, index) => ({
+      ...user,
+      paymentMethodStatus: describePaymentMethods(
+        paymentMethodsByUserId[user.id] || [],
+        user,
+        usersWithValidationCredits.has(user.id)
+      ),
+      admin_notes: notesByUserId.get(user.id)?.map(o => ({ ...o, admin_kilo_user: null })) || [],
+      is_blacklisted_by_domain:
+        userDomainSuffixes[index] === null ||
+        isEmailBlacklistedByDomain(user.google_user_email, blacklistedDomains),
+    }));
 
     const response: UsersApiResponse = {
       users: usersWithPaymentStatus,

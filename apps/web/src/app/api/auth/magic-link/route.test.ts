@@ -10,6 +10,8 @@ import { checkRateLimit } from '@vercel/firewall';
 import { NextResponse } from 'next/server';
 import { NextRequest } from 'next/server';
 import { resolveSsoAuthorityForDomain } from '@kilocode/web-shared/lib/organizations/organization-sso-policy';
+import { isEmailBlacklisted } from '@kilocode/web-shared/lib/blacklist-domains-config';
+import type * as BlacklistConfig from '@kilocode/web-shared/lib/blacklist-domains-config';
 
 jest.mock('@vercel/firewall');
 jest.mock('@/lib/auth/verify-turnstile-jwt');
@@ -100,6 +102,23 @@ describe('POST /api/auth/magic-link', () => {
     expect(mockCreateMagicLinkToken).toHaveBeenCalledWith('user@example.com');
     expect(mockSendMagicLinkEmail).toHaveBeenCalledWith(mockMagicLinkToken, undefined);
   });
+
+  it.each([`user@${'a'.repeat(1025)}.com`, `user@${Array(129).fill('a').join('.')}.com`])(
+    'rejects an over-bound domain without a server error (%#)',
+    async email => {
+      const actual = jest.requireActual<typeof BlacklistConfig>(
+        '@kilocode/web-shared/lib/blacklist-domains-config'
+      );
+      jest.mocked(isEmailBlacklisted).mockImplementationOnce(actual.isEmailBlacklisted);
+
+      const response = await POST(createRequest({ email }));
+
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toEqual({ success: false, error: 'BLOCKED' });
+      expect(mockCreateMagicLinkToken).not.toHaveBeenCalled();
+      expect(mockSendMagicLinkEmail).not.toHaveBeenCalled();
+    }
+  );
 
   describe('while email signups are disabled', () => {
     beforeEach(() => {

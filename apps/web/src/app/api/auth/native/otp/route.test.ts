@@ -4,11 +4,15 @@ import {
 } from '@kilocode/web-shared/lib/auth/magic-link-tokens';
 import { sendSignInCodeEmail } from '@kilocode/web-shared/lib/email';
 import { checkEmailSignInEligibility } from '@/lib/auth/email-signin-eligibility';
+import type * as EmailEligibility from '@/lib/auth/email-signin-eligibility';
 import { NextRequest } from 'next/server';
 
 jest.mock('@kilocode/web-shared/lib/auth/magic-link-tokens');
 jest.mock('@kilocode/web-shared/lib/email');
 jest.mock('@/lib/auth/email-signin-eligibility');
+jest.mock('@/lib/auth/firewall-rate-limit', () => ({
+  checkFirewallRateLimit: jest.fn(async () => 'allowed'),
+}));
 
 import { POST } from './route';
 
@@ -141,6 +145,25 @@ describe('POST /api/auth/native/otp', () => {
     expect(mockCreateSignInCode).not.toHaveBeenCalled();
     expect(mockSendSignInCodeEmail).not.toHaveBeenCalled();
   });
+
+  it.each([`user@${'a'.repeat(1025)}.com`, `user@${Array(129).fill('a').join('.')}.com`])(
+    'keeps over-bound domains opaque without issuing a code (%#)',
+    async email => {
+      const actual = jest.requireActual<typeof EmailEligibility>(
+        '@/lib/auth/email-signin-eligibility'
+      );
+      mockCheckEmailSignInEligibility.mockImplementationOnce(actual.checkEmailSignInEligibility);
+
+      const response = await POST(createRequest({ email }));
+
+      expect(response.status).toBe(200);
+      const data = await response.json();
+      expect(data.success).toBe(true);
+      expect(data.challengeId).toMatch(UUID_REGEX);
+      expect(mockCreateSignInCode).not.toHaveBeenCalled();
+      expect(mockSendSignInCodeEmail).not.toHaveBeenCalled();
+    }
+  );
 
   it('returns identical body shape for blocked domain and eligible email', async () => {
     // Eligible response

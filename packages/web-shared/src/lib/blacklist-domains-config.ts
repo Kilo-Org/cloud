@@ -72,7 +72,7 @@ function getEnvFallbackSignupTlds(): string[] {
 }
 
 // Resolved once so an unchanged fallback keeps the domain index built for its array.
-const envFallbackDomains = getEnvFallbackDomains();
+export const envFallbackDomains = getEnvFallbackDomains();
 const envFallbackSignupTlds = getEnvFallbackSignupTlds();
 
 let snapshot: BlacklistDomainsConfigSnapshot | null = null;

@@ -125,7 +125,7 @@ async function flushDeferred(cache: ReturnType<typeof createCache>): Promise<voi
 }
 
 function cacheKey(email: string, revision = 'revision-1'): string {
-  const suffix = emailDomainSuffixes(email)[0];
+  const suffix = emailDomainSuffixes(email)?.[0];
   if (!suffix) throw new Error('Expected a cacheable domain suffix');
   return `domain-blacklist:${revision}:${email.includes('@') ? 'host' : 'suffix'}:${encodeURIComponent(suffix)}`;
 }
@@ -320,13 +320,14 @@ describe('isEmailDomainBlacklisted', () => {
   it.each([
     { name: 'overlong domain', email: `user@${'a'.repeat(1025)}` },
     { name: 'too many labels', email: `user@${Array.from({ length: 129 }, () => 'a').join('.')}` },
-  ])('rejects a $name before querying the database', async ({ email }) => {
+  ])('blocks a $name before querying the database', async ({ email }) => {
     const captured = createDb();
     const cache = createCache();
 
+    expect(emailDomainSuffixes(email)).toBeNull();
     await expect(
       isEmailDomainBlacklisted(captured.db as never, email, [], cache.cache)
-    ).rejects.toThrow('Email domain exceeds blacklist lookup bounds');
+    ).resolves.toBe(true);
 
     expect(captured.queries).toEqual([]);
     expect(cache.reads).toEqual([]);

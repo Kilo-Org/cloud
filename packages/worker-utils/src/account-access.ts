@@ -346,13 +346,13 @@ export type DomainBlacklistCache = {
   onError: (error: unknown) => void;
 };
 
-export function emailDomainSuffixes(email: string): string[] {
+export function emailDomainSuffixes(email: string): string[] | null {
   const normalized = email.toLowerCase();
   const at = normalized.lastIndexOf('@');
   const host = at === -1 ? normalized : normalized.slice(at + 1);
   const labels = host.split('.');
   if (host.length > 1024 || labels.length > 128) {
-    throw new Error('Email domain exceeds blacklist lookup bounds');
+    return null;
   }
   return labels
     .slice(at === -1 ? 1 : 0)
@@ -366,6 +366,7 @@ export async function isEmailDomainBlacklisted(
   cache: DomainBlacklistCache
 ): Promise<boolean> {
   const suffixes = emailDomainSuffixes(email);
+  if (suffixes === null) return true;
   const [state] = await blacklistOperation(
     db
       .select({

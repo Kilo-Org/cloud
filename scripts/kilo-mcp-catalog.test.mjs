@@ -31,7 +31,7 @@ const kiloInstallCommand = [
   '  if timeout --signal=TERM --kill-after=20 "$remaining" npm install -g @kilocode/cli; then',
   '    exit 0',
   '  fi',
-  '  if [ "$attempt" -lt 3 ]; then',
+  '  if [ "$attempt" -lt 3 ] && [ $((deadline - SECONDS)) -gt 5 ]; then',
   '    echo "::warning::Kilo CLI install attempt ${attempt} did not finish; retrying"',
   '    sleep $((attempt * 5))',
   '  fi',

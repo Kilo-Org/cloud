@@ -5,7 +5,7 @@
  * cloud-agent/ProfileSelector.tsx:84-102,173-222`) to the mobile selector
  * sheet: the no-override row, an Organization Profiles group and a Personal
  * Profiles group (owner icons, effective-default star), then the
- * `Manage profiles...` and `Default profiles for repos` entries. The
+ * `Manage profiles...` and `Default profiles` entries. The
  * no-override row drops the override and the effective default still applies,
  * so it is labeled `Default profile` whenever the context has one and only
  * says `No profile` when nothing applies at all.
@@ -24,7 +24,7 @@ export const PROFILE_SELECTOR_KEYS = {
   /** The no-override row when no profile would apply: nothing is selected. */
   noProfile: 'agentChat.newSession.noProfile',
   manageProfiles: 'agentChat.newSession.manageProfiles',
-  repoDefaults: 'profiles.repoBindings.title',
+  repoDefaults: 'profiles.repoBindings.entryLabel',
   organizationProfiles: 'agentChat.newSession.organizationProfiles',
   personalProfiles: 'agentChat.newSession.personalProfiles',
   yourProfiles: 'agentChat.newSession.yourProfiles',
@@ -86,7 +86,7 @@ export type BuildProfileSelectorStateInput = Readonly<{
   /** The profile the form currently holds as an override, or null for none. */
   selectedProfileId: string | null;
   /**
-   * Whether to offer the `Default profiles for repos...` entry. The caller
+   * Whether to offer the `Default profiles...` entry. The caller
    * omits it until the repo-bindings surface exists, so no dead entry shows.
    */
   includeRepoDefaults?: boolean;

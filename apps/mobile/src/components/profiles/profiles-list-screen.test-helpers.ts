@@ -7,7 +7,7 @@
 import { type ReactTestInstance } from '@/test/renderer';
 
 /** The catalog title of the repo-defaults entry the list hosts. */
-const REPO_DEFAULTS_TITLE = 'Default profiles for repos';
+const REPO_DEFAULTS_TITLE = 'Default profiles';
 
 /** The catalog word over the settings group that hosts the entry. */
 export const REPO_DEFAULTS_HEADING = 'Repositories';

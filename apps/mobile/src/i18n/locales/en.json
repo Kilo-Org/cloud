@@ -4103,6 +4103,7 @@
     },
     "repoBindings": {
       "title": "Default profiles for repos",
+      "entryLabel": "Default profiles",
       "add": "Add default",
       "empty": "No defaults configured",
       "emptyDescription": "Add a default to automatically apply a profile when starting sessions for a repo.",

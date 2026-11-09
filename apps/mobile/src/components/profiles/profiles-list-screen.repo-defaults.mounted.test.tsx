@@ -122,6 +122,19 @@ describe('ProfilesListScreen repo defaults entry', () => {
     unmount();
   });
 
+  it('heads the profile rows with its own PROFILES group like the settings group', async () => {
+    const { renderer, unmount } = await mount();
+
+    const profileRow = rowByTitle(renderer.root, 'Personal profile');
+    const profilesGroup = rowGroup(renderer.root, profileRow);
+    const profilesHeading = groupTexts(profilesGroup)[0];
+    // The list labels the rows it already shows, so the unheaded profile
+    // section cannot read as a stray row beside the labeled settings group.
+    expect(profilesHeading?.props.children).toBe('Profiles');
+
+    unmount();
+  });
+
   it('heads the entry with a group of its own, styled and spaced like a profile group', async () => {
     const { renderer, unmount } = await mount();
 

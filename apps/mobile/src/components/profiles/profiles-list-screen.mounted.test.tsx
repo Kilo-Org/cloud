@@ -231,12 +231,13 @@ describe('ProfilesListScreen', () => {
 
     const { renderer, unmount } = await mount();
 
+    expect(textChildren(renderer.root)).toContain('Profiles');
     expect(textChildren(renderer.root)).toContain('Organization');
     expect(textChildren(renderer.root)).toContain('Personal');
     expect(rowTitles(renderer.root)).toEqual([
       'Org profile',
       'Personal profile',
-      'Default profiles for repos',
+      'Default profiles',
     ]);
 
     const personalRow = findAll(renderer.root, 'ConfigureRow').find(
@@ -301,10 +302,11 @@ describe('ProfilesListScreen', () => {
 
     const { renderer, unmount } = await mount();
 
-    expect(rowTitles(renderer.root)).toEqual(['Personal profile', 'Default profiles for repos']);
-    // No owner groups means no owner heading; the settings group keeps its own,
-    // so the list reads as rows plus one settings group.
-    expect(textChildren(renderer.root)).toEqual(['Repositories']);
+    expect(rowTitles(renderer.root)).toEqual(['Personal profile', 'Default profiles']);
+    // No owner groups means no owner heading; the profiles heading and the
+    // settings group's own heading stay, so the list reads as one profiles
+    // group plus one settings group.
+    expect(textChildren(renderer.root)).toEqual(['Profiles', 'Repositories']);
     // `agentProfiles.list` does not tag owner, so every row is personal.
     expect(findOne(renderer.root, 'ConfigureRow').props.icon).toBe('User');
 
@@ -320,7 +322,7 @@ describe('ProfilesListScreen', () => {
 
     expect(findOne(renderer.root, 'QueryError').props.variant).toBe('offline');
     // The cached rows stay usable under the banner.
-    expect(rowTitles(renderer.root)).toEqual(['Personal profile', 'Default profiles for repos']);
+    expect(rowTitles(renderer.root)).toEqual(['Personal profile', 'Default profiles']);
 
     unmount();
   });

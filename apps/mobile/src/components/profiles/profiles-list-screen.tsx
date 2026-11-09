@@ -247,6 +247,9 @@ export function ProfilesListScreen({
             <ConfigureRow
               icon={GitBranch}
               title={t('profiles.repoBindings.entryLabel')}
+              // The visible label is shortened under the section header, so
+              // the row's own name carries the full destination instead.
+              accessibilityLabel={t('profiles.repoBindings.title')}
               className="rounded-lg bg-secondary px-3"
               last
               onPress={openRepoBindings}

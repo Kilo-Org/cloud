@@ -125,12 +125,29 @@ describe('ProfilesListScreen repo defaults entry', () => {
   it('heads the profile rows with its own PROFILES group like the settings group', async () => {
     const { renderer, unmount } = await mount();
 
+    // The heading wraps every owner section in one labeled group, in the same
+    // element the settings group uses for its heading over its row.
     const profileRow = rowByTitle(renderer.root, 'Personal profile');
-    const profilesGroup = rowGroup(renderer.root, profileRow);
-    const profilesHeading = groupTexts(profilesGroup)[0];
+    const ownerGroup = rowGroup(renderer.root, profileRow);
+    const profilesGroup = rowGroup(renderer.root, ownerGroup);
     // The list labels the rows it already shows, so the unheaded profile
     // section cannot read as a stray row beside the labeled settings group.
-    expect(profilesHeading?.props.children).toBe('Profiles');
+    expect(groupTexts(profilesGroup)[0]?.props.children).toBe('Profiles');
+    // The owner groups are the reference, so the two cannot drift apart.
+    const settingsGroup = rowGroup(renderer.root, repoDefaultsRow(renderer.root));
+    expect(profilesGroup.props.className).toBe(settingsGroup.props.className);
+
+    unmount();
+  });
+
+  it('announces the full destination from the shortened visible row', async () => {
+    const { renderer, unmount } = await mount();
+
+    // The visible label drops the repos context the section header supplies,
+    // so the row's own name keeps naming the destinations it opens.
+    expect(repoDefaultsRow(renderer.root).props.accessibilityLabel).toBe(
+      'Default profiles for repos'
+    );
 
     unmount();
   });
@@ -145,11 +162,13 @@ describe('ProfilesListScreen repo defaults entry', () => {
     const settingsGroup = rowGroup(renderer.root, repoDefaultsRow(renderer.root));
     expect(groupChildren(settingsGroup)).toHaveLength(2);
 
-    // The owner groups are the reference, so the two cannot drift apart.
+    // The owner sections are the reference, so the two cannot drift apart.
     const ownerGroup = rowGroup(renderer.root, rowByTitle(renderer.root, 'Personal profile'));
     const ownerHeading = groupTexts(ownerGroup)[0];
     expect(ownerHeading?.props.children).toBe('Personal');
     expect(heading.props.className).toBe(ownerHeading?.props.className);
+    // The headings share one element, so the spacing around both groups is
+    // the container gap the screen sets, not per-group markup.
     expect(settingsGroup.props.className).toBe(ownerGroup.props.className);
 
     unmount();

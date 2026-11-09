@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterAll } from '@jest/globals';
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import type { User } from '@kilocode/db/schema';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
@@ -159,6 +159,28 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
     } finally {
       await deleteCustomLlmForTest('stealth/embedding-custom-model');
     }
+  });
+
+  it('returns the authorization response for a refused account', async () => {
+    const authFailedResponse = NextResponse.json(
+      { success: false as const, error: 'Access denied (R1)' },
+      { status: 403 }
+    );
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: null,
+      authFailedResponse,
+      authorizationRefused: true,
+      organizationId: undefined,
+    });
+
+    const { handleEmbeddingsRequest } = await import('./embeddings');
+    const response = await handleEmbeddingsRequest(
+      makeRequest({ model: 'acme/embedding-free:free' })
+    );
+
+    expect(response).toBe(authFailedResponse);
+    expect(response.status).toBe(403);
+    expect(mockedFetch).not.toHaveBeenCalled();
   });
 
   it('forwards personal request privacy with other provider fields', async () => {

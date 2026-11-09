@@ -188,6 +188,11 @@ type GetAuthResponse =
        * false.
        */
       credentialsRejected?: boolean;
+      /**
+       * True when authorization refused a request that presented a credential.
+       * The authentication response is the answer for such a request.
+       */
+      authorizationRefused?: boolean;
       rejectionReason?: 'empty_organization_context';
       isNewUser?: undefined;
       organizationId?: Organization['id'];
@@ -205,6 +210,7 @@ type GetAuthResponse =
       user: User;
       authFailedResponse: null;
       credentialsRejected?: undefined;
+      authorizationRefused?: undefined;
       rejectionReason?: undefined;
       isNewUser?: boolean;
       organizationId?: Organization['id'];
@@ -612,6 +618,7 @@ function authError(
   kiloUserId: string,
   options?: {
     credentialsRejected?: boolean;
+    authorizationRefused?: boolean;
     rejectionReason?: 'empty_organization_context';
     internalApiUse?: boolean;
     tokenSource?: string;
@@ -623,6 +630,7 @@ function authError(
     user: null,
     authFailedResponse: NextResponse.json(failureResult(error), { status }),
     credentialsRejected: options?.credentialsRejected ?? false,
+    authorizationRefused: options?.authorizationRefused ?? false,
     internalApiUse: options?.internalApiUse,
     tokenSource: options?.tokenSource,
     cloudAgentAuthority: options?.cloudAgentAuthority,
@@ -667,18 +675,21 @@ async function validateUserAuthorization({
     });
   } else if (await isUserBlacklistedByDomain(user)) {
     return authError(403, 'Access denied (R0)', kiloUserId, {
+      authorizationRefused: true,
       internalApiUse,
       tokenSource,
       cloudAgentAuthority,
     });
   } else if (!opts.DANGEROUS_allowBlockedUsers && user.blocked_reason) {
     return authError(403, 'Access denied (R1)', kiloUserId, {
+      authorizationRefused: true,
       internalApiUse,
       tokenSource,
       cloudAgentAuthority,
     });
   } else if (opts.adminOnly && !user.is_admin) {
     return authError(403, 'Access denied (nonadmin)', kiloUserId, {
+      authorizationRefused: true,
       internalApiUse,
       tokenSource,
       cloudAgentAuthority,
@@ -721,6 +732,7 @@ async function validateUserAuthorization({
     const isMember = await isOrganizationMember(fromDb, organizationId, kiloUserId);
     if (!isMember) {
       return authError(403, 'Access denied (not a member of the organization)', kiloUserId, {
+        authorizationRefused: true,
         internalApiUse,
         tokenSource,
         cloudAgentAuthority,

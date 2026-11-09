@@ -26,6 +26,13 @@ jest.mock('next/navigation', () => ({
   redirect: (url: string) => mockRedirect(url),
 }));
 
+const mockGetBlacklistedDomains = jest.fn<Promise<string[]>, []>();
+
+jest.mock('@kilocode/web-shared/lib/blacklist-domains-config', () => ({
+  ...jest.requireActual('@kilocode/web-shared/lib/blacklist-domains-config'),
+  getBlacklistedDomains: () => mockGetBlacklistedDomains(),
+}));
+
 import { afterEach, beforeEach, describe, test, expect } from '@jest/globals';
 import { isEmailBlacklistedByDomain } from '@kilocode/worker-utils/account-access';
 import {
@@ -73,6 +80,7 @@ beforeEach(() => {
   mockHeaders.mockReset();
   mockGetServerSession.mockReset();
   mockRedirect.mockClear();
+  mockGetBlacklistedDomains.mockReset().mockResolvedValue([]);
   resetDeviceSessionCacheForTest();
 });
 
@@ -489,6 +497,7 @@ describe('getUserFromAuth', () => {
 
     expect(result.user).toBeNull();
     expect(result.credentialsRejected).toBe(false);
+    expect(result.authorizationRefused).toBe(false);
   });
 
   test('returns 401 when the session read throws on malformed cookies', async () => {
@@ -664,6 +673,27 @@ describe('getUserFromAuth', () => {
     expect(result.organizationId).toBe(organization.id);
   });
 
+  test('returns the authorization response for a refused email domain', async () => {
+    const user = await insertTestUser({
+      google_user_email: `blacklisted-domain-${crypto.randomUUID()}@blocked.example`,
+      api_token_pepper: 'blacklisted-domain-pepper',
+    });
+    mockGetBlacklistedDomains.mockResolvedValue(['blocked.example']);
+    mockHeaders.mockResolvedValue(
+      new Headers({ Authorization: `Bearer ${generateApiToken(user)}` })
+    );
+
+    const result = await getUserFromAuth({ adminOnly: false });
+
+    expect(result.user).toBeNull();
+    expect(result.authFailedResponse?.status).toBe(403);
+    await expect(result.authFailedResponse?.json()).resolves.toEqual({
+      success: false,
+      error: 'Access denied (R0)',
+    });
+    expect(result.authorizationRefused).toBe(true);
+  });
+
   test('rejects a token whose organization context was soft-deleted', async () => {
     const user = await insertTestUser({ api_token_pepper: 'deleted-organization-pepper' });
     const organization = await createTestOrganization(
@@ -684,6 +714,7 @@ describe('getUserFromAuth', () => {
 
     expect(result.user).toBeNull();
     expect(result.authFailedResponse?.status).toBe(403);
+    expect(result.authorizationRefused).toBe(true);
   });
 
   test('allows API-token authentication for users from SSO-protected domains', async () => {
@@ -945,6 +976,7 @@ describe('credential issuance authentication guards', () => {
 
     expect(result.user).toBeNull();
     expect(result.authFailedResponse?.status).toBe(403);
+    expect(result.authorizationRefused).toBe(true);
   });
 
   test('leaves generic bearer authentication available', async () => {
@@ -1679,6 +1711,7 @@ describe('getUserFromAuth admin_access telemetry (REST)', () => {
     const result = await getUserFromAuth({ adminOnly: true });
 
     expect(result.authFailedResponse).not.toBeNull();
+    expect(result.authorizationRefused).toBe(true);
     expect(events).toHaveLength(1);
     expect(events[0]).toMatchObject({
       kind: 'privileged_access',

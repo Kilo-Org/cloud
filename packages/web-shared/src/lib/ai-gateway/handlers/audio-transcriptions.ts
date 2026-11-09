@@ -185,7 +185,7 @@ export async function handleAudioTranscriptionsRequest(
   const authSpan = startInactiveSpan({ name: 'auth-check' });
   const caller = resolveGatewayCaller(
     await getUserFromAuth({ adminOnly: false, expectedAudience: KILO_GATEWAY_AUDIENCE }),
-    { allowAnonymous: false }
+    { allowAnonymous: false, passThroughAuthFailure: true }
   );
   authSpan.end();
   if (caller.kind === 'rejected') return caller.response;

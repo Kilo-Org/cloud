@@ -7,10 +7,12 @@ import { getCachedSecret } from '@kilocode/worker-utils';
  * isolate's lifetime by `getCachedSecret` — these values are read on every
  * poll, so re-fetching them each time would add three round trips per alarm.
  *
- * A plain string is accepted because a binding is not available in every
- * config a Worker runs under: the Secrets Store has no local seeding path, so
- * `wrangler.test.jsonc` and a `.dev.vars` supply the value as a var instead.
- * The same union is how `gastown` and `webhook-agent-ingest` handle it.
+ * A plain string is accepted because `wrangler.test.jsonc` declares these as
+ * plain `vars`, which keeps the test suite from depending on local Secrets
+ * Store state. `wrangler dev` is different: `.dev.vars` overrides `vars` but
+ * does *not* shadow a Secrets Store binding, so a local run needs the secrets
+ * seeded into the store itself — see README.md "Secrets". The same union is how
+ * `gastown` and `webhook-agent-ingest` handle it.
  */
 export function resolveSecret(binding: SecretsStoreSecret | string, name: string): Promise<string> {
   return typeof binding === 'string' ? Promise.resolve(binding) : getCachedSecret(binding, name);

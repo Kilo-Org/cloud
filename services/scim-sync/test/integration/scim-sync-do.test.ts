@@ -8,6 +8,7 @@ import {
   PAGE_LIMIT,
   SEED_CURSOR_KEY,
 } from '../../src/util/constants';
+import { resolveSecret } from '../../src/util/secret';
 import {
   activationWithoutDomains,
   directoryEvent,
@@ -188,7 +189,12 @@ describe('event mapping', () => {
       externalId: 'dir_usr_01',
     });
     // Every call carries the internal secret; the endpoints refuse without it.
-    expect(io.calls.every(c => c.apiKey === 'internal-test-secret')).toBe(true);
+    // Compared against the binding rather than a literal: `.dev.vars` overrides
+    // `wrangler.test.jsonc`'s vars, so a developer who has run `pnpm dev:env`
+    // supplies their real secret here and a hardcoded expectation would fail
+    // for them and pass in CI.
+    const configured = await resolveSecret(env.INTERNAL_API_SECRET, 'INTERNAL_API_SECRET');
+    expect(io.calls.every(c => c.apiKey === configured)).toBe(true);
   });
 
   it('revokes every membership for a deletion and for an inactive update', async () => {

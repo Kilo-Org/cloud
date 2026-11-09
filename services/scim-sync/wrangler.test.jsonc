@@ -25,8 +25,11 @@
     },
   ],
 
-  // The Secrets Store has no local seeding path, so the three secrets are
-  // plain vars here. `resolveSecret` takes either.
+  // The three secrets are plain vars here rather than Secrets Store bindings,
+  // so the suite never depends on what a developer has seeded locally.
+  // `resolveSecret` takes either. Note a generated `services/scim-sync/.dev.vars`
+  // overrides these, so assertions must compare against the binding rather
+  // than a hardcoded literal.
   //
   // `BACKEND_API_URL` and the WorkOS hostname are both stubbed at the `fetch`
   // boundary rather than served, so these origins are never dialed.

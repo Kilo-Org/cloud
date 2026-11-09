@@ -10,8 +10,9 @@
     "noEmit": true,
     "isolatedModules": true,
     "noImplicitReturns": true,
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
+    "resolveJsonModule": true
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "fixtures/**/*.json"],
   "exclude": ["node_modules"]
 }

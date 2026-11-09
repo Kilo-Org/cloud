@@ -13,15 +13,11 @@ export type SettingsDeepLink = {
  * Resolves the `settings` query into an open state and initial tab. An empty
  * value (`?settings`) is treated as the General tab.
  */
-export function resolveSettingsDeepLink(
-  settings: string | null,
-  organizationId?: string
-): SettingsDeepLink {
+export function resolveSettingsDeepLink(settings: string | null): SettingsDeepLink {
   if (settings === '' || settings === 'general') return { open: true, initialSection: 'general' };
   if (settings === 'environments') return { open: true, initialSection: 'environments' };
   if (settings === 'profiles') return { open: true, initialSection: 'profiles' };
-  if (settings === 'compute' && organizationId !== undefined)
-    return { open: true, initialSection: 'compute' };
+  if (settings === 'compute') return { open: true, initialSection: 'compute' };
   return { open: false, initialSection: 'general' };
 }
 
@@ -30,14 +26,11 @@ export function resolveSettingsDeepLink(
  * point into the dialog uses this so opening, switching tabs, and closing all
  * produce the same shareable URL.
  */
-export function useCloudAgentSettingsDeepLink(organizationId?: string) {
+export function useCloudAgentSettingsDeepLink() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const { open, initialSection } = resolveSettingsDeepLink(
-    searchParams.get('settings'),
-    organizationId
-  );
+  const { open, initialSection } = resolveSettingsDeepLink(searchParams.get('settings'));
 
   const setSection = useCallback(
     (section: SettingsSection) => {

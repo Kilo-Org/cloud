@@ -27,6 +27,19 @@ describe('PersonalCloudPage sign-in callback', () => {
     );
   });
 
+  it('preserves the bare settings query across sign-in', async () => {
+    mockGetUserFromAuthOrRedirect.mockRejectedValue(new Error('NEXT_REDIRECT'));
+    const { default: PersonalCloudPage } = await import('./page');
+
+    await expect(
+      PersonalCloudPage({ searchParams: Promise.resolve({ settings: '' }) })
+    ).rejects.toThrow('NEXT_REDIRECT');
+
+    expect(mockGetUserFromAuthOrRedirect).toHaveBeenCalledWith(
+      '/users/sign_in?callbackPath=%2Fcloud%3Fsettings%3D'
+    );
+  });
+
   it('keeps the plain cloud callback without a settings query', async () => {
     mockGetUserFromAuthOrRedirect.mockRejectedValue(new Error('NEXT_REDIRECT'));
     const { default: PersonalCloudPage } = await import('./page');

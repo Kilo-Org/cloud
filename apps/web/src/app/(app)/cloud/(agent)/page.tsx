@@ -7,7 +7,8 @@ type PageProps = {
 
 export default async function PersonalCloudPage({ searchParams }: PageProps) {
   const { settings } = await searchParams;
-  const callbackPath = settings ? `/cloud?settings=${encodeURIComponent(settings)}` : '/cloud';
+  const callbackPath =
+    settings === undefined ? '/cloud' : `/cloud?settings=${encodeURIComponent(settings)}`;
   await getUserFromAuthOrRedirect(
     `/users/sign_in?callbackPath=${encodeURIComponent(callbackPath)}`
   );

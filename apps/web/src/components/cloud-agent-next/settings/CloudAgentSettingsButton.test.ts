@@ -104,13 +104,13 @@ describe('CloudAgentSettingsButton deep links', () => {
     expect(props.initialSection).toBe('compute');
   });
 
-  it('does not open compute in personal scope', () => {
+  it('opens compute in personal scope', () => {
     setSearchParams('?settings=compute');
 
     const props = renderButton();
 
-    expect(props.open).toBe(false);
-    expect(props.initialSection).toBe('general');
+    expect(props.open).toBe(true);
+    expect(props.initialSection).toBe('compute');
   });
 
   it('stays closed without a settings query', () => {

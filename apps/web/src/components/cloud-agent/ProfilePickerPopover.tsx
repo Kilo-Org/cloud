@@ -44,7 +44,7 @@ export function ProfilePickerPopover({
   const [showManageProfiles, setShowManageProfiles] = useState(false);
   const [openToNewProfile, setOpenToNewProfile] = useState(false);
   const [editProfileId, setEditProfileId] = useState<string | null>(null);
-  const { setSection, clearSection } = useCloudAgentSettingsDeepLink(organizationId);
+  const { setSection, clearSection } = useCloudAgentSettingsDeepLink();
 
   // Reset override-picker mode whenever the popover closes.
   useEffect(() => {

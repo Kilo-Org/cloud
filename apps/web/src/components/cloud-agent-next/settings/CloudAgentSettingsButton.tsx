@@ -26,7 +26,7 @@ export function CloudAgentSettingsButton({ organizationId }: { organizationId?: 
     initialSection,
     setSection,
     clearSection,
-  } = useCloudAgentSettingsDeepLink(organizationId);
+  } = useCloudAgentSettingsDeepLink();
   const [open, setOpen] = useState(initialOpen);
 
   const handleOpenChange = useCallback(

@@ -5,6 +5,8 @@ import process from 'node:process';
 
 import { computeDatabaseUrl, createDrizzleClient } from '@kilocode/db';
 
+const QUERY_TIMEOUT_MS = 30_000;
+
 function loadEnvFile(path: string): void {
   if (!existsSync(path)) return;
   process.loadEnvFile(path);
@@ -19,6 +21,10 @@ async function main(): Promise<void> {
     poolConfig: {
       max: 1,
       connectionTimeoutMillis: 10_000,
+      // statement_timeout bounds the server's work; query_timeout bounds a peer that accepts the
+      // session and then stops responding, where only a client-side timer can fire.
+      statement_timeout: QUERY_TIMEOUT_MS,
+      query_timeout: QUERY_TIMEOUT_MS,
     },
   });
 

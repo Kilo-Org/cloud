@@ -532,6 +532,128 @@ describe('checkOpenAiChatGptByok', () => {
     expect('reasoning' in body).toBe(false);
   });
 
+  it('promotes a replayed effort update without changing conversation items', async () => {
+    const provider = await buildProviderForTest();
+    const history = [
+      { type: 'message', role: 'user', content: 'Inspect the code.' },
+      { type: 'reasoning', summary: [], encrypted_content: 'opaque-reasoning' },
+      { type: 'function_call', call_id: 'call-1', name: 'read', arguments: '{}' },
+      {
+        type: 'function_call_output',
+        call_id: 'call-1',
+        output: [
+          { type: 'input_text', text: 'Tool output' },
+          { type: 'input_text', text: 'Exit code: 0' },
+        ],
+      },
+    ];
+    const followUp = { type: 'message', role: 'user', content: 'Review the changes.' };
+    const body = {
+      model: 'openai/gpt-6.1-sol',
+      input: [
+        ...history,
+        { type: 'configuration_update', reasoning: { effort: 'high' } },
+        followUp,
+      ],
+      reasoning: { effort: 'medium', summary: 'auto' },
+    } as GatewayResponsesRequest;
+
+    await transformResponsesRequest(provider, body);
+
+    expect(body.reasoning).toEqual({ effort: 'high', summary: 'auto' });
+    expect(body.input).toEqual([...history, followUp]);
+    expect(body.input?.[0]).toBe(history[0]);
+  });
+
+  it.each(['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'] as const)(
+    'uses the latest effort update %s when reasoning was absent',
+    async effort => {
+      const provider = await buildProviderForTest();
+      const body = {
+        model: 'openai/gpt-6.1-sol',
+        input: [
+          { type: 'configuration_update', reasoning: { effort: 'high' } },
+          { role: 'user', content: 'First turn.' },
+          { type: 'configuration_update', id: 'update-2', reasoning: { effort } },
+          { role: 'user', content: 'Next turn.' },
+        ],
+      } as GatewayResponsesRequest;
+
+      await transformResponsesRequest(provider, body);
+
+      expect(body.reasoning).toEqual({ effort });
+      expect(body.input).toEqual([
+        { role: 'user', content: 'First turn.' },
+        { role: 'user', content: 'Next turn.' },
+      ]);
+    }
+  );
+
+  it.each([
+    { type: 'configuration_update', reasoning: { effort: 'unsupported' } },
+    { type: 'configuration_update', reasoning: { effort: null } },
+    { type: 'configuration_update', reasoning: {} },
+    { type: 'configuration_update', reasoning: { effort: 'high', summary: 'detailed' } },
+    { type: 'configuration_update', reasoning: { effort: 'high', future_option: true } },
+    { type: 'configuration_update', reasoning: { effort: 'high' }, future_option: true },
+    {
+      type: 'configuration_update',
+      reasoning: { effort: 'high' },
+      text: { format: { type: 'text' } },
+    },
+    { type: 'configuration_update', text: { format: { type: 'text' } } },
+  ])('preserves an update that cannot be translated safely: %j', async update => {
+    const provider = await buildProviderForTest();
+    const body = {
+      model: 'openai/gpt-6.1-sol',
+      input: [update, { role: 'user', content: 'Continue.' }],
+      reasoning: { effort: 'medium', summary: 'auto' },
+    } as GatewayResponsesRequest;
+
+    await transformResponsesRequest(provider, body);
+
+    expect(body.input).toEqual([update, { role: 'user', content: 'Continue.' }]);
+    expect(body.reasoning).toEqual({ effort: 'medium', summary: 'auto' });
+  });
+
+  it('preserves untranslatable updates interleaved with recognized effort updates', async () => {
+    const provider = await buildProviderForTest();
+    const reset = { type: 'configuration_update', reasoning: { effort: null } };
+    const unknown = { type: 'configuration_update', text: { format: { type: 'text' } } };
+    const message = { role: 'user', content: 'Continue.' };
+    const body = {
+      model: 'openai/gpt-6.1-sol',
+      input: [
+        { type: 'configuration_update', reasoning: { effort: 'high' } },
+        reset,
+        message,
+        unknown,
+        { type: 'configuration_update', reasoning: { effort: 'low' } },
+      ],
+      reasoning: { effort: 'medium', summary: 'auto' },
+    } as GatewayResponsesRequest;
+
+    await transformResponsesRequest(provider, body);
+
+    expect(body.input).toEqual([reset, message, unknown]);
+    expect(body.reasoning).toEqual({ effort: 'low', summary: 'auto' });
+  });
+
+  it('does not rewrite an input history without effort updates', async () => {
+    const provider = await buildProviderForTest();
+    const input = [{ role: 'user' as const, content: 'Continue.' }];
+    const body: GatewayResponsesRequest = {
+      model: 'openai/gpt-6.1-sol',
+      input,
+      reasoning: { effort: 'low', summary: 'auto' },
+    };
+
+    await transformResponsesRequest(provider, body);
+
+    expect(body.input).toEqual(input);
+    expect(body.reasoning).toEqual({ effort: 'low', summary: 'auto' });
+  });
+
   it.each([
     [1, 16],
     [15, 16],

@@ -34,17 +34,22 @@ import { posix } from 'node:path';
 
 // Root paths that change how every workspace is checked.
 const GLOBAL = [
-  /^(package\.json|\.npmrc|\.pnpmfile\.cjs|\.nvmrc|\.oxlintrc\.json|\.oxfmtrc\.json|oxlint-plugin-drizzle\.js|tsconfig[^/]*\.json)$/,
-  /^(patches|tools\/oxlint)\//,
+  /^(package\.json|\.npmrc|\.pnpmfile\.cjs|\.nvmrc|tsconfig[^/]*\.json)$/,
+  /^patches\//,
   /^\.github\/workflows\/(ci|kilo-app-ci)\.yml$/,
   /^\.github\/actions\//,
   /^scripts\/(affected-workspaces\.mjs|changed-dependencies\.mjs|build-key-inputs\.mjs|trpc-declaration-key\.mjs|harness-sdk-build-key\.mjs|ttsc-plugin-key\.mjs)$/,
 ];
 
-// Root scripts that change one check for every workspace, and nothing else.
-const CHECK_SCRIPTS = [
+// Root paths that change one check for every workspace, and nothing else: the
+// scripts that run a check, and the inputs only one check reads. A lint config
+// or an oxlint plugin cannot change a type program, so it selects the lint rows
+// alone; every workspace is still linted.
+const CHECK_INPUTS = [
   [/^scripts\/typecheck-all\.sh$/, 'typecheck'],
   [/^scripts\/lint-all\.sh$/, 'lint'],
+  [/^(\.oxlintrc\.json|oxlint-plugin-drizzle\.js)$/, 'lint'],
+  [/^tools\/oxlint\//, 'lint'],
 ];
 
 // Root paths whose effect belongs to one workspace.
@@ -61,11 +66,13 @@ const EXTRA_INPUTS = [
   [/^apps\/web\/\.env(\.test)?$/, 'apps/ai-gateway'],
 ];
 
-// Root paths that no typecheck or lint reads.
+// Root paths that no typecheck or lint reads. The formatter config belongs here:
+// the ci.yml format-check job runs on every run, so a change to it needs no
+// workspace selection.
 const NEUTRAL = [
   /\.md$/,
   /^(\.specs|\.plans|docs|dev|\.kilo|\.agents|\.vscode|\.husky|\.cursor|script|\.github|scripts)\//,
-  /^(LICENSE|skills-lock\.json|kilo\.json|flake\.nix|flake\.lock|\.syft\.yaml|\.gitignore|\.gitattributes|\.envrc|\.kilocodeignore|\.prettierignore|\.env\.local\.example)$/,
+  /^(LICENSE|skills-lock\.json|kilo\.json|flake\.nix|flake\.lock|\.syft\.yaml|\.gitignore|\.gitattributes|\.envrc|\.kilocodeignore|\.prettierignore|\.oxfmtrc\.json|\.env\.local\.example)$/,
 ];
 
 // Paths that no check reads on its own: documents, and the root locations above
@@ -268,9 +275,9 @@ export function selectAffected({ items, changedFiles, dependencyDirs, references
       reasons.push(`${file} changes how every workspace is checked`);
       continue;
     }
-    const script = CHECK_SCRIPTS.find(([pattern]) => pattern.test(file));
-    if (script) {
-      fullChecks.add(script[1]);
+    const input = CHECK_INPUTS.find(([pattern]) => pattern.test(file));
+    if (input) {
+      fullChecks.add(input[1]);
       continue;
     }
     if (DEPENDENCY_MANIFESTS.has(file)) {

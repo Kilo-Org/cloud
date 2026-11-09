@@ -467,8 +467,15 @@ describe('environment snapshot launch', () => {
     expect(lookups.lookups).toEqual([{ reference: REFERENCE, actorUserId: 'user_123' }]);
     expect(frame.spec.capture).toBeUndefined();
     expect(frame.spec).not.toHaveProperty('environment');
-    expect(environmentSnapshotDetails(peer)).toContain(
-      'Using snapshot · 01 Jan 1970, 00:00:00 UTC; environment settings have changed; cached files may retain earlier values; a replacement build was started'
+    await waitFor(() =>
+      expect(peer.routeUpdatesFor(SESSION)).toContainEqual({
+        state: 'preparing',
+        attemptId: expect.any(String),
+        step: 'environment_snapshot',
+        detail:
+          'Using environment snapshot; environment settings have changed; cached files may retain earlier values; a replacement build was started',
+        snapshotCapturedAt: 1,
+      })
     );
   });
 

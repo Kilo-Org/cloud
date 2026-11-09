@@ -219,7 +219,7 @@ describe('environment snapshot lookup', () => {
     ).resolves.toEqual({ kind: 'unavailable' });
   });
 
-  it('uses the same snapshot name when configuration revisions match', () => {
+  it('uses the short snapshot label when configuration revisions match', () => {
     expect(
       environmentStartDetail(
         { ...REFERENCE, configurationRevision: 1 },
@@ -228,12 +228,12 @@ describe('environment snapshot lookup', () => {
           resolution: { ...RESOLVED, admission: { status: 'not_needed' } },
         }
       )
-    ).toBe('Using snapshot · 24 Oct 2026, 21:32:19 UTC');
+    ).toBe('Using environment snapshot');
   });
 
-  it('names the snapshot by capture time and explains changed settings', () => {
+  it('keeps changed settings and replacement build warnings without formatting dates', () => {
     expect(environmentStartDetail(REFERENCE, { kind: 'resolved', resolution: RESOLVED })).toBe(
-      'Using snapshot · 24 Oct 2026, 21:32:19 UTC; environment settings have changed; cached files may retain earlier values; a replacement build was started'
+      'Using environment snapshot; environment settings have changed; cached files may retain earlier values; a replacement build was started'
     );
     expect(
       environmentStartDetail(REFERENCE, {
@@ -279,7 +279,7 @@ describe('environmentSnapshotDecision', () => {
     ).toEqual({
       kind: 'start',
       snapshot: { snapshotId: 'snap-1', baseImage: 'registry.example/app:1' },
-      detail: expect.stringContaining('Using snapshot'),
+      detail: expect.stringContaining('Using environment snapshot'),
     });
   });
 

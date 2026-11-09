@@ -740,7 +740,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       );
       if (sessionInspection === 'same' || sessionStamp?.allocationId === deps.allocationId)
         return { outcome: 'same', deferredStamps: null, commandFailures: [] };
-      emitProgress(spec.sessionId, 'restore', 'Restoring workspace tail snapshot');
+      emitProgress(spec.sessionId, 'restore', 'Using workspace snapshot');
       await withinStep('restore', timers.restoreMs, async signal => {
         for (const root of roots) {
           if (!root.spec.git) continue;

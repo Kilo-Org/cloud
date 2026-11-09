@@ -1,5 +1,11 @@
 import type { SessionEnvironmentReference } from '../../src/environment-build/reference.js';
-import { env, evictAllDurableObjects, reset, runInDurableObject } from 'cloudflare:test';
+import {
+  abortAllDurableObjects,
+  env,
+  evictAllDurableObjects,
+  reset,
+  runInDurableObject,
+} from 'cloudflare:test';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { logger } from '../../src/logger.js';
 import type { SandboxControlV2 } from '../../src/control-plane/sandbox/sandbox-do.js';
@@ -30,6 +36,11 @@ import { readRoute, writeRoute } from '../../src/control-plane/sandbox/routes.js
 import { workspaceDiskSnapshots } from '../../src/control-plane/sandbox/sqlite-schema.js';
 import { DEADLINE_MS } from '../../src/sandbox-control/deadlines.js';
 import { waitFor } from './wait-for.js';
+import { parseSessionMetadata } from '../../src/persistence/session-metadata.js';
+import {
+  SandboxStatusSnapshotSchema,
+  type SandboxStatusSnapshot,
+} from '../../src/shared/sandbox-status.js';
 
 const sandboxes = (env as unknown as { SANDBOX_CONTROL: DurableObjectNamespace<SandboxControlV2> })
   .SANDBOX_CONTROL;
@@ -279,6 +290,42 @@ async function setup(
     });
     return { ...sibling, frame };
   }
+  async function statusStream(target = session, id = sessionId) {
+    await runInDurableObject(target, instance => {
+      instance['metadata'] = parseSessionMetadata({
+        metadataSchemaVersion: 2,
+        identity: { sessionId: id, userId: USER, orgId: registration.credentials.orgId },
+        auth: { kiloSessionId: KILO, kilocodeToken: FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN },
+        agent: { mode: 'code', model: 'test/model' },
+        workspace: { sandboxId, sandboxKind: 'isolated-standard' },
+        lifecycle: { version: 1, timestamp: 1 },
+      });
+    });
+    const response = await target.fetch(
+      new Request('https://session.internal/stream?sandboxStatus=true', {
+        headers: { Upgrade: 'websocket' },
+      })
+    );
+    expect(response.status).toBe(101);
+    const socket = response.webSocket;
+    if (socket === null) throw new Error('Missing status socket');
+    const snapshots: SandboxStatusSnapshot[] = [];
+    socket.addEventListener('message', event => {
+      const envelope = JSON.parse(String(event.data));
+      expect(envelope.streamEventType).toBe('cloud.sandbox.status');
+      snapshots.push(SandboxStatusSnapshotSchema.parse(envelope.data));
+    });
+    socket.accept();
+    await waitFor(() => expect(snapshots.length).toBeGreaterThan(0));
+    return {
+      snapshots,
+      close: () =>
+        new Promise<void>(resolve => {
+          socket.addEventListener('close', () => resolve(), { once: true });
+          socket.close();
+        }),
+    };
+  }
   return {
     sandbox,
     workspaceId,
@@ -300,6 +347,7 @@ async function setup(
     attachSibling,
     messageState,
     alarm,
+    statusStream,
   };
 }
 
@@ -310,6 +358,73 @@ afterEach(async () => {
 });
 
 describe('idle workspace disk checkpoint', () => {
+  it('publishes accepted capture time and retains it during workspace activity without chat events', async () => {
+    const test = await setup();
+    const wrapper = await test.start();
+    const sibling = await test.attachSibling(wrapper);
+    const first = await test.statusStream();
+    const second = await test.statusStream(sibling.session, sibling.id);
+    const unrelated = await test.registerSibling();
+    await unrelated.session.registerSession({
+      ...unrelated.registration,
+      credentials: { ...unrelated.registration.credentials, orgId: 'other-org' },
+    });
+    const isolated = await test.statusStream(unrelated.session, unrelated.id);
+    expect(first.snapshots.at(-1)?.workspaceSnapshot).toBeUndefined();
+    const capturedAt = Date.parse('2026-10-24T21:32:19Z');
+    test.controls.capture = async () => ({ ...stored(), capturedAt });
+    const before = await test.session.getSession();
+    const firstBeforeIdle = first.snapshots.length;
+    const secondBeforeIdle = second.snapshots.length;
+    const isolatedBeforeIdle = isolated.snapshots.length;
+    await test.idle(wrapper);
+    await waitFor(() => {
+      expect(first.snapshots.length).toBe(firstBeforeIdle + 1);
+      expect(second.snapshots.length).toBe(secondBeforeIdle + 1);
+      expect(isolated.snapshots.length).toBe(isolatedBeforeIdle + 1);
+    });
+    const isolatedBeforeAlarm = isolated.snapshots.length;
+    await test.alarm();
+    await waitFor(() => {
+      expect(first.snapshots.at(-1)?.workspaceSnapshot).toEqual({ capturedAt });
+      expect(second.snapshots.at(-1)?.workspaceSnapshot).toEqual({ capturedAt });
+      expect(isolated.snapshots.length).toBe(isolatedBeforeAlarm + 1);
+    });
+    expect(isolated.snapshots.slice(isolatedBeforeAlarm)).toHaveLength(1);
+    expect(
+      isolated.snapshots
+        .slice(isolatedBeforeAlarm)
+        .every(snapshot => snapshot.workspaceSnapshot === undefined)
+    ).toBe(true);
+    expect((await test.session.getSandboxStatus()).workspaceSnapshot).toEqual({ capturedAt });
+    const after = await test.session.getSession();
+    expect(after.type === 'found' && after.latestEventId).toBe(
+      before.type === 'found' && before.latestEventId
+    );
+    const lateSibling = await test.registerSibling();
+    const initial = await test.statusStream(lateSibling.session, lateSibling.id);
+    expect(initial.snapshots[0].workspaceSnapshot).toEqual({ capturedAt });
+    expect(await test.snapshot()).toMatchObject({ capturedAt });
+    expect(test.captures).toHaveLength(1);
+    const activityBeforeMutation = (await test.sandbox.getAllocationState()).lastActivityAt;
+    wrapper.send({ type: 'heartbeat', active: false, workspaceBusy: true, degraded: false });
+    await waitFor(async () => {
+      const disk = await runInDurableObject(test.sandbox, instance =>
+        readWorkspaceSnapshotAllocation(instance['db'])
+      );
+      expect(disk?.idleConnectionId).toBeUndefined();
+    });
+    expect(first.snapshots.at(-1)?.workspaceSnapshot).toEqual({ capturedAt });
+    expect(second.snapshots.at(-1)?.workspaceSnapshot).toEqual({ capturedAt });
+    expect(initial.snapshots.at(-1)?.workspaceSnapshot).toEqual({ capturedAt });
+    expect(await test.snapshot()).toMatchObject({ capturedAt });
+    expect((await test.sandbox.getAllocationState()).lastActivityAt).toBe(activityBeforeMutation);
+    expect(test.captures).toHaveLength(1);
+    await Promise.all([first, second, isolated, initial].map(stream => stream.close()));
+    test.wrappers.forEach(wrapper => wrapper.close());
+    await abortAllDurableObjects();
+  });
+
   it.each([
     {
       options: { enabled: false },
@@ -607,6 +722,10 @@ describe('idle workspace disk checkpoint', () => {
 
   it('lets a new sibling restore the workspace and attaches later siblings with provenance', async () => {
     const test = await setup();
+    test.controls.capture = async () => ({
+      ...stored(),
+      capturedAt: Date.parse('2026-10-24T21:32:19Z'),
+    });
     await test.checkpoint();
     const sourceAllocationId = (await test.sandbox.getAllocationState()).allocationId;
     await test.cold();
@@ -614,6 +733,15 @@ describe('idle workspace disk checkpoint', () => {
     await sibling.session.send(prompt('new-chat'));
     const { wrapper, frame } = await test.connect(1);
     expect(test.launchOptions[1]?.snapshot?.snapshotId).toBe('session-snapshot');
+    await waitFor(async () => {
+      const attempts = await sibling.session.getPreparationAttempts();
+      expect(attempts.flatMap(attempt => attempt.steps)).toContainEqual(
+        expect.objectContaining({
+          latestDetail: 'Using workspace snapshot',
+          snapshotCapturedAt: Date.parse('2026-10-24T21:32:19Z'),
+        })
+      );
+    });
     expect(frame && 'spec' in frame && frame.spec.workspaceSnapshot).toMatchObject({
       workspaceId: test.workspaceId,
       sourceAllocationId,

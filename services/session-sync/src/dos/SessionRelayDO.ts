@@ -55,8 +55,6 @@ const attachmentSchema = z.strictObject({
     iat: z.number(),
   }),
   subscribed: z.boolean(),
-  // Highest event sequence already handed to this socket, by replay or by live fanout.
-  highWater: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).default(0),
   reauthNotified: z.boolean(),
   closed: z.boolean(),
 });
@@ -96,6 +94,9 @@ export class SessionRelayDO extends DurableObject<Env> {
   private watchQueueDepth = 0;
   private runnerRates = new Map<string, { window: number; count: number }>();
   private attachments = new Map<WebSocket, Attachment>();
+  // Highest event sequence handed to each socket. Memory only: after reconstruction the replay floor
+  // already starts at the stored sequence ceiling, so a persisted value could never change replay.
+  private delivered = new WeakMap<WebSocket, number>();
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -140,13 +141,7 @@ export class SessionRelayDO extends DurableObject<Env> {
     const pair = new WebSocketPair();
     const client = pair[0];
     const server = pair[1];
-    const state: Attachment = {
-      ticket,
-      subscribed: false,
-      highWater: 0,
-      reauthNotified: false,
-      closed: false,
-    };
+    const state: Attachment = { ticket, subscribed: false, reauthNotified: false, closed: false };
     this.ctx.acceptWebSocket(server);
     this.saveAttachment(server, state);
     this.control(server, 'hello', {
@@ -600,14 +595,14 @@ export class SessionRelayDO extends DurableObject<Env> {
       this.control(ws, 'reset_required', { seq: this.seq });
       return wasSubscribed;
     }
-    const cursor = Math.max(afterSeq, state.highWater);
+    const cursor = Math.max(afterSeq, this.delivered.get(ws) ?? 0);
     let replayed = false;
     for (const entry of this.ring) {
       if (entry.seq <= cursor) continue;
       if (!this.sendEncoded(ws, state, entry.encoded)) return false;
       replayed = true;
     }
-    state.highWater = this.seq;
+    this.delivered.set(ws, this.seq);
     this.control(ws, 'subscribed', { seq: this.seq, cursor });
     return !wasSubscribed || replayed;
   }
@@ -656,7 +651,7 @@ export class SessionRelayDO extends DurableObject<Env> {
     for (const [viewer, state] of this.sockets()) {
       if (state.ticket.role !== 'runner' && state.subscribed) {
         if (!this.sendEncoded(viewer, state, encoded)) continue;
-        state.highWater = seq;
+        this.delivered.set(viewer, seq);
         fanout++;
       }
     }

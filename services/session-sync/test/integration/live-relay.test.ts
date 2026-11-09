@@ -107,7 +107,6 @@ const socketAttachmentSchema = z
   .object({
     ticket: z.object({ role: z.string() }).passthrough(),
     subscribed: z.boolean(),
-    highWater: z.number().default(0),
   })
   .passthrough();
 type SocketAttachment = z.infer<typeof socketAttachmentSchema>;
@@ -377,11 +376,14 @@ it('coalesces a repeated subscribe to the entries a socket has not received', as
       await instance.webSocketMessage(server, JSON.stringify({ type: 'subscribe', afterSeq: 0 }));
       const sent = frames.map(frame => envelopeSchema.parse(JSON.parse(frame)));
       // Private relay state holds the delivered position this test needs to check.
-      const relay = instance as unknown as { attachments: Map<WebSocket, SocketAttachment> };
+      const relay = instance as unknown as { delivered: WeakMap<WebSocket, number> };
       return {
         frames: sent.map(envelope => envelope.type),
         body: sent.at(-1)?.body,
-        highWater: relay.attachments.get(server)?.highWater,
+        delivered: relay.delivered.get(server),
+        attachmentKeys: Object.keys(
+          z.record(z.string(), z.unknown()).parse(server.deserializeAttachment())
+        ).sort(),
       };
     } finally {
       vi.mocked(server.send).mockRestore();
@@ -390,7 +392,9 @@ it('coalesces a repeated subscribe to the entries a socket has not received', as
   expect(afterLive).toEqual({
     frames: ['subscribed'],
     body: { seq: 5, cursor: 5 },
-    highWater: 5,
+    delivered: 5,
+    // The persisted attachment keeps the previous release's shape, so a rollback can still parse it.
+    attachmentKeys: ['closed', 'reauthNotified', 'subscribed', 'ticket'],
   });
   await fixture.connect('viewer');
   const catchUp = await runInDurableObject(fixture.stub, async (instance, state) => {
@@ -405,6 +409,74 @@ it('coalesces a repeated subscribe to the entries a socket has not received', as
     }
   });
   expect(catchUp).toEqual(['four', 'five', 'subscribed']);
+});
+
+it('resumes a reconstructed subscribed socket from its valid cursor without a persisted position', async () => {
+  const fixture = await setup();
+  const runner = await fixture.connect('runner');
+  const viewer = await fixture.connect('viewer');
+  await subscribe(viewer);
+  for (const type of ['one', 'two', 'three']) {
+    runner.ws.send(JSON.stringify({ channel: 'events', type, body: type }));
+    await viewer.next(type);
+  }
+  const resumed = await runInDurableObject(fixture.stub, async (_instance, state) => {
+    const initialize = vi.spyOn(state, 'blockConcurrencyWhile');
+    try {
+      const restored = new SessionRelayDO(state, testEnv);
+      const initialization = initialize.mock.results.at(-1);
+      if (initialization?.type !== 'return')
+        throw new Error('Relay initialization was not captured');
+      await initialization.value;
+      // Reconstruction starts the replay floor at the stored sequence ceiling.
+      const floor =
+        drizzle(state.storage, { logger: false })
+          .select()
+          .from(relayState)
+          .where(eq(relayState.id, 1))
+          .get()?.seq ?? 0;
+      const viewerServer = relaySocket(state, saved => saved.ticket.role === 'viewer');
+      const runnerServer = relaySocket(state, saved => saved.ticket.role === 'runner');
+      const frames: string[] = [];
+      captureRelaySend(viewerServer, frames);
+      const sent = () => frames.splice(0).map(frame => envelopeSchema.parse(JSON.parse(frame)));
+      try {
+        await restored.webSocketMessage(
+          viewerServer,
+          JSON.stringify({ type: 'subscribe', afterSeq: floor })
+        );
+        const atFloor = sent().map(envelope => ({ type: envelope.type, body: envelope.body }));
+        await restored.webSocketMessage(
+          runnerServer,
+          JSON.stringify({ channel: 'events', type: 'four', body: 4 })
+        );
+        await restored.webSocketMessage(
+          runnerServer,
+          JSON.stringify({ channel: 'events', type: 'five', body: 5 })
+        );
+        const live = sent().map(envelope => ({ type: envelope.type, seq: envelope.seq }));
+        await restored.webSocketMessage(
+          viewerServer,
+          JSON.stringify({ type: 'subscribe', afterSeq: 3 })
+        );
+        const belowFloor = sent().map(envelope => envelope.type);
+        return { floor, atFloor, live, belowFloor };
+      } finally {
+        vi.mocked(viewerServer.send).mockRestore();
+      }
+    } finally {
+      initialize.mockRestore();
+    }
+  });
+  expect(resumed.floor).toBeGreaterThan(3);
+  expect(resumed.atFloor).toEqual([
+    { type: 'subscribed', body: { seq: resumed.floor, cursor: resumed.floor } },
+  ]);
+  expect(resumed.live).toEqual([
+    { type: 'four', seq: resumed.floor + 1 },
+    { type: 'five', seq: resumed.floor + 2 },
+  ]);
+  expect(resumed.belowFloor).toEqual(['reset_required']);
 });
 
 it('queues HTTP and socket commands together, delivers in order, dedupes, and removes payloads on ack', async () => {

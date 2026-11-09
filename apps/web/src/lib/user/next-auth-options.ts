@@ -151,9 +151,14 @@ function generateAppleClientSecret(): string {
   );
 }
 
-const claudeVerifiedEmailSchema = z.object({
+/**
+ * Anthropic's ID token carries `sub`, `email` and `name`; it does not carry
+ * `email_verified`. The subject binds the account, and a claim-less profile
+ * never auto-links to an existing Kilo account, so the email alone cannot take
+ * one over.
+ */
+const claudeEmailClaimSchema = z.object({
   email: z.email(),
-  email_verified: z.literal(true),
 });
 
 const anacondaProfileSchema = z.object({
@@ -1129,13 +1134,12 @@ export const authOptions: NextAuthOptions = {
           }
         }
         if (account.provider === 'claude' && !isAccountLinking) {
-          const claims = claudeVerifiedEmailSchema.safeParse(profile);
+          const claims = claudeEmailClaimSchema.safeParse(profile);
           if (!claims.success) {
             console.warn('[claude-auth] authorization refused', {
               reason: 'invalid_profile_claims',
               claimNames: Object.keys(profile ?? {}).filter(
-                key =>
-                  key === 'sub' || key === 'email' || key === 'email_verified' || key === 'name'
+                key => key === 'sub' || key === 'email' || key === 'name'
               ),
               rejectedClaims: claims.error.issues.map(issue => issue.path.map(String).join('.')),
             });

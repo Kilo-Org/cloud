@@ -12,7 +12,10 @@ const MAXIMUM_ERROR_RATE = 0.5;
 
 const LEADERBOARD_MODEL_PROVIDER_USAGE_QUERY = `
 select
-     mu.requested_model as "model"
+     case
+        when mu.requested_model like '~%' then coalesce(mu.model, mu.requested_model)
+        else mu.requested_model
+      end as "model"
     , mu.inference_provider as "provider"
     , sum(mu.total_cost_microdollars) as "sum_cost"
     , sum(mu.total_input_tokens) + sum(mu.total_output_tokens) as "sum_tokens"

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { ai_gateway_metadata_cache } from '@kilocode/db/schema';
-import { db, sql } from '@kilocode/web-shared/lib/drizzle';
+import { db, readDb, sql } from '@kilocode/web-shared/lib/drizzle';
 import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import {
   fetchGatewayModels,
@@ -29,14 +29,14 @@ function endpointsUrl(modelId: string) {
   return gatewayModelEndpointsSource(gateway, modelId).url;
 }
 
-function mockGateway(endpointsStatus: (modelId: string) => number) {
+function mockGateway(endpointsStatus: (modelId: string) => number | Promise<number>) {
   return jest.spyOn(global, 'fetch').mockImplementation(async input => {
     const url = String(input);
     if (url === `${gateway.apiUrl}/models`) {
       return Response.json({ data: listedModelIds.map(id => ({ id, name: id })) });
     }
     const modelId = url.slice(`${gateway.apiUrl}/models/`.length, -'/endpoints'.length);
-    const status = endpointsStatus(modelId);
+    const status = await endpointsStatus(modelId);
     if (status !== 200) return new Response(null, { status });
     return Response.json({ data: { endpoints: [{ provider_name: 'test' }] } });
   });
@@ -77,14 +77,33 @@ describe('fetchGatewayModels', () => {
     expect(models['test/model-0']?.endpoints).toEqual([{ provider_name: 'test' }]);
   });
 
-  it('fails on other live endpoint errors without fetching the queued models', async () => {
-    const fetchSpy = mockGateway(modelId => (modelId === 'test/model-7' ? 500 : 200));
+  it('fails on other live endpoint errors without starting the queued models', async () => {
+    const selectSpy = jest.spyOn(readDb, 'select');
+    const otherFetchesStarted = Promise.withResolvers<void>();
+    const releaseOtherFetches = Promise.withResolvers<void>();
+    let otherFetchCount = 0;
+    const fetchSpy = mockGateway(async modelId => {
+      if (modelId === 'test/model-7') return 500;
+      otherFetchCount += 1;
+      if (otherFetchCount === 7) otherFetchesStarted.resolve();
+      await releaseOtherFetches.promise;
+      return 200;
+    });
 
     await expect(
       fetchGatewayModels(gateway, gatewayModelsSource(gateway, '/models'))
     ).rejects.toThrow('Fetching https://gateway.test/v1/models/test/model-7/endpoints failed: 500');
-    await new Promise(resolve => setTimeout(resolve, 200));
-    expect(fetchedEndpointsUrls(fetchSpy).length).toBeLessThan(20);
+    await otherFetchesStarted.promise;
+    releaseOtherFetches.resolve();
+
+    // One read for the model list, then one per started model: the eight that fill the limiter.
+    expect(selectSpy).toHaveBeenCalledTimes(9);
+    expect(fetchedEndpointsUrls(fetchSpy).sort()).toEqual(
+      listedModelIds
+        .slice(0, 8)
+        .map(id => endpointsUrl(id))
+        .sort()
+    );
   });
 
   it('uses stored endpoints, including a stored missing resource, without fetching them', async () => {

@@ -4243,5 +4243,8 @@
     "noEnabledContexts": "Geen contexten ingeschakeld voor geplande briefings",
     "sourceBlocker": "Sessie heeft aandacht nodig",
     "sourceMetadata": "Vastgelegde sessiemetadata"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Dit zoekresultaat kon niet worden geopend"
   }
 }

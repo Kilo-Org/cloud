@@ -4243,5 +4243,8 @@
     "noEnabledContexts": "Egyetlen környezetben sincsenek engedélyezve az ütemezett jelentések",
     "sourceBlocker": "A munkamenet figyelmet igényel",
     "sourceMetadata": "A munkamenet rögzített metaadatai"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Nem sikerült megnyitni ezt a keresési találatot"
   }
 }

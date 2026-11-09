@@ -4243,5 +4243,8 @@
     "noEnabledContexts": "Ingen kontekster er aktiveret for planlagte briefinger",
     "sourceBlocker": "Sessionen kræver opmærksomhed",
     "sourceMetadata": "Gemte sessionsmetadata"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Kunne ikke åbne dette søgeresultat"
   }
 }

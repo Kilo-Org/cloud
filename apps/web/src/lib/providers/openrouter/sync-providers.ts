@@ -145,7 +145,14 @@ export async function fetchGatewayModels(gateway: Provider, source: MetadataSour
   await Promise.all(
     models.data.map(model =>
       limit(async () => {
-        const endpoints = await getMetadata(gatewayModelEndpointsSource(gateway, model.id), readDb);
+        // Clearing here, before this task settles, stops the limiter from starting a queued model.
+        const endpoints = await getMetadata(
+          gatewayModelEndpointsSource(gateway, model.id),
+          readDb
+        ).catch((error: unknown) => {
+          limit.clearQueue();
+          throw error;
+        });
         if (endpoints === NO_ENDPOINTS_RESOURCE) {
           modelsWithoutEndpoints.push(model.id);
           return;
@@ -165,10 +172,7 @@ export async function fetchGatewayModels(gateway: Provider, source: MetadataSour
         };
       })
     )
-  ).catch((error: unknown) => {
-    limit.clearQueue();
-    throw error;
-  });
+  );
 
   if (modelsWithoutEndpoints.length > 0) {
     console.warn(

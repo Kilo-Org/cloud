@@ -51,8 +51,6 @@ describe('resolveEnkryptInputGuardrail', () => {
       status: 'ready',
       detectors: {
         injection_attack: { enabled: true, need_explanation: false },
-        pii: { enabled: true, entities: ['secrets'] },
-        nsfw: { enabled: true },
       },
       blockingDetectors: ['injection_attack'],
     });
@@ -77,13 +75,11 @@ describe('resolveEnkryptInputGuardrail', () => {
       status: 'ready',
       detectors: {
         injection_attack: { enabled: true, need_explanation: false },
-        pii: { enabled: true, entities: ['secrets'] },
         policy_violation: {
           enabled: true,
           need_explanation: false,
           policy_text: 'Never share customer records.',
         },
-        nsfw: { enabled: true },
       },
       blockingDetectors: ['injection_attack', 'policy_violation'],
     });
@@ -130,31 +126,37 @@ describe('resolveEnkryptInputGuardrail', () => {
       blockingDetectors: [],
       detectors: {
         injection_attack: { enabled: true, need_explanation: false },
-        pii: { enabled: true, entities: ['secrets'] },
         policy_violation: {
           enabled: true,
           need_explanation: false,
           policy_text: 'Never share customer records.',
         },
-        nsfw: { enabled: true },
       },
     });
   });
 
-  it('applies Kilo Default to saved detectors that are not configurable', () => {
+  it('ignores saved detectors that are not configurable', () => {
     const detectors = createKiloDefaultEnkryptInputDetectors();
-    detectors.injection_attack.enabled = false;
-    detectors.pii = { enabled: true, action: 'block', entities: ['url'] };
-    detectors.nsfw.enabled = false;
+    detectors.pii = { enabled: true, action: 'block', entities: ['secrets', 'url'] };
+    detectors.nsfw.enabled = true;
     detectors.keyword_detector = { enabled: true, action: 'block', banned_keywords: ['Phoenix'] };
     detectors.toxicity.enabled = true;
 
     expect(resolve({ enkrypt: { input_guardrail: { enabled: true, detectors } } })).toEqual({
       scanToolResults: true,
       status: 'ready',
-      detectors: { pii: { enabled: true, entities: ['secrets'] }, nsfw: { enabled: true } },
-      blockingDetectors: [],
+      detectors: { injection_attack: { enabled: true, need_explanation: false } },
+      blockingDetectors: ['injection_attack'],
     });
+  });
+
+  it('is off when only detectors that are not configurable were saved as enabled', () => {
+    const detectors = createKiloDefaultEnkryptInputDetectors();
+    detectors.injection_attack.enabled = false;
+    detectors.pii.enabled = true;
+    detectors.nsfw.enabled = true;
+
+    expect(resolve({ enkrypt: { input_guardrail: { enabled: true, detectors } } })).toBeNull();
   });
 
   it('reports invalid saved detectors instead of weakening the policy', () => {

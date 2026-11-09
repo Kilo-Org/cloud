@@ -234,7 +234,7 @@ describe('OrganizationGuardrailsPage output availability', () => {
     expect(switchControl('Input guardrails').getAttribute('aria-checked')).toBe('true');
     expect(checkedChoice('Prompt injection')).toBe('Block');
     expect(checkedChoice('Policy violation')).toBe('Off');
-    expect(container.textContent).toContain('NSFW and secrets detections are log-only.');
+    expect(container.textContent).not.toContain('NSFW');
     expect(container.textContent).toContain(
       'Blocking detectors reject requests if Enkrypt is unavailable.'
     );

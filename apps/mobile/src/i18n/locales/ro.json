@@ -4309,5 +4309,8 @@
     "noEnabledContexts": "Niciun context activat pentru rapoarte programate",
     "sourceBlocker": "Sesiunea necesită atenție",
     "sourceMetadata": "Metadate capturate ale sesiunii"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Nu s-a putut deschide acest rezultat de căutare"
   }
 }

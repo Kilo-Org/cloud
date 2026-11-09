@@ -17,6 +17,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.SystemClock
 import android.util.Log
 import androidx.annotation.RequiresApi
 import androidx.appsearch.app.AppSearchBatchResult as JetpackBatchResult
@@ -50,6 +51,14 @@ private const val SCHEMA_TYPE = "KiloSystemSearchEntity"
 private const val DATABASE_NAME = "kilo-system-search"
 private const val PREFERENCES_NAME = "kilo-system-search"
 private const val PENDING_ROUTE_KEY = "kilo-system-search-pending-route"
+private const val PENDING_ROUTE_WRITTEN_AT_KEY = "kilo-system-search-pending-route-written-at"
+
+// How long a picked tap may wait for its resolution. The slot outlives the
+// process, and a tap that could not be resolved is kept for a retry, so without
+// a bound an identifier could stay here across restarts and open a screen long
+// after the reader tapped it. A retry within minutes is the case the retention
+// exists for; anything older is treated as no tap at all.
+private const val PENDING_ROUTE_MAX_AGE_MS = 5 * 60 * 1000L
 private const val PROPERTY_ID = "id"
 private const val PROPERTY_TITLE = "title"
 private const val PROPERTY_DESCRIPTION = "description"
@@ -327,10 +336,12 @@ class KiloSystemSearchModule : Module() {
 
   /**
    * Writes the single-shot slot; false when there is no context to write it in.
-   * The slot carries the identifier exactly as the platform handed it back.
+   * The slot carries the identifier exactly as the platform handed it back,
+   * with the moment it arrived, so a tap that outlives its welcome can be
+   * dropped instead of opening a screen long after the reader tapped it.
    *
    * Runs on the main thread that delivers `OnNewIntent`, which is why it shares
-   * `pendingRouteLock` with the read-and-clear below.
+   * `pendingRouteLock` with the read and the clear below.
    */
   private fun writePendingRoute(identifier: String): Boolean {
     val context = appContext.reactContext ?: return false
@@ -338,25 +349,35 @@ class KiloSystemSearchModule : Module() {
       context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
         .edit()
         .putString(PENDING_ROUTE_KEY, identifier)
+        .putLong(PENDING_ROUTE_WRITTEN_AT_KEY, SystemClock.elapsedRealtime())
         .apply()
     }
     return true
   }
 
   /**
-   * The slot's identifier, without clearing it.
+   * The slot's identifier, without clearing it, or null when the slot is empty
+   * or its tap has waited past `PENDING_ROUTE_MAX_AGE_MS`.
    *
    * The write above happens on the main thread and `SharedPreferences` has no
    * read-and-clear operation, so this read shares `pendingRouteLock` with it.
    * The slot is cleared only after the identifier resolved (see
    * `clearPendingRoute`), because resolving it reads the index and a failure
-   * there must leave the tap for a retry.
+   * there must leave the tap for a retry. The age is read off the boot-relative
+   * clock, so a restart cannot make an old tap look fresh.
    */
   private fun readPendingRoute(): String? {
     val context = appContext.reactContext ?: return null
     val preferences = context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
     return synchronized(pendingRouteLock) {
-      preferences.getString(PENDING_ROUTE_KEY, null)
+      val identifier = preferences.getString(PENDING_ROUTE_KEY, null) ?: return@synchronized null
+      val writtenAt = preferences.getLong(PENDING_ROUTE_WRITTEN_AT_KEY, 0L)
+      if (SystemClock.elapsedRealtime() - writtenAt > PENDING_ROUTE_MAX_AGE_MS) {
+        preferences.edit().remove(PENDING_ROUTE_KEY).remove(PENDING_ROUTE_WRITTEN_AT_KEY).apply()
+        Log.w(TAG, "Dropped a picked result the index could not resolve in time.")
+        return@synchronized null
+      }
+      identifier
     }
   }
 
@@ -375,7 +396,7 @@ class KiloSystemSearchModule : Module() {
       if (preferences.getString(PENDING_ROUTE_KEY, null) != identifier) {
         return@synchronized
       }
-      preferences.edit().remove(PENDING_ROUTE_KEY).apply()
+      preferences.edit().remove(PENDING_ROUTE_KEY).remove(PENDING_ROUTE_WRITTEN_AT_KEY).apply()
     }
   }
 }

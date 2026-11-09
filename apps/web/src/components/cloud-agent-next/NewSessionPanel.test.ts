@@ -128,7 +128,9 @@ jest.mock('@/lib/trpc/utils', () => ({
 }));
 
 jest.mock('next/navigation', () => ({
-  useRouter: () => ({ push: mockRouterPush }),
+  useRouter: () => ({ push: mockRouterPush, replace: jest.fn() }),
+  usePathname: () => '/cloud',
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 jest.mock('jotai', () => ({

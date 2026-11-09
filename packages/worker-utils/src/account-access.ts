@@ -183,10 +183,9 @@ export const BLACKLISTED_DOMAINS_UPDATED_AT_REDIS_KEY = 'admin:blacklisted-domai
 // from a web deployment older than that key, can go unnoticed.
 const BLACKLISTED_DOMAINS_FULL_READ_INTERVAL_MS = 10 * 60_000;
 
-// Every process parses the stored list and builds a lookup index from it, and the admin
-// editor round-trips the whole list through one save. 100k entries covers multi-megabyte
-// imported lists while keeping the payload and the in-process index bounded.
-export const MAX_BLACKLIST_DOMAINS = 100_000;
+// Temporary Redis reader capacity; full-snapshot reads still incur bandwidth and timeout costs.
+// Keep the parsed list and in-process index bounded until the selective Postgres cutover.
+export const MAX_BLACKLIST_DOMAINS = 200_000;
 
 export const BlacklistDomainsConfigSchema = z.object({
   domains: z.array(z.string()).max(MAX_BLACKLIST_DOMAINS),

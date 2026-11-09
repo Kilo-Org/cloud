@@ -32,6 +32,7 @@ import {
   organizations,
   modelsByProvider,
   ai_gateway_sync_providers_state,
+  ai_gateway_metadata_cache,
   api_request_log,
 } from '@kilocode/db/schema';
 import { isGoneOrDeletingBlockedReason } from '@kilocode/db/user-soft-delete';
@@ -39,6 +40,7 @@ import { isNewSession } from '@/lib/cloud-agent/session-type';
 import { fetchSessionSnapshot } from '@/lib/session-ingest-client';
 import { sortSessionMessagesForDisplay } from '@/lib/cloud-agent-next/message-ordering';
 import { postTestStaleSyncAlert } from '@/lib/providers/openrouter/sync-providers-stale-alert';
+import { postTestMetadataCacheStaleAlert } from '@/lib/providers/metadata-cache/metadata-cache-stale-alert';
 import { syncAndStoreProviders } from '@/lib/providers/openrouter/sync-providers';
 import { syncAndStoreDirectByokProviders } from '@/lib/providers/direct-byok/sync-direct-byok';
 import { refreshMetadataCache } from '@/lib/providers/metadata-cache/refresh-metadata-cache';
@@ -106,6 +108,7 @@ import {
   inArray,
   count,
   min,
+  max,
 } from 'drizzle-orm';
 import type { InferColumnsDataTypes } from 'drizzle-orm';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
@@ -2537,15 +2540,18 @@ export const adminRouter = createTRPCRouter({
       return refreshMetadataCache();
     }),
     postTestStaleAlert: adminProcedure
-      .input(z.object({ job: z.enum(['providers', 'direct_byok']) }))
+      .input(z.object({ job: z.enum(['metadata_cache', 'providers', 'direct_byok']) }))
       .mutation(async ({ input }) => {
-        const delivery = await postTestStaleSyncAlert(input.job);
+        const delivery =
+          input.job === 'metadata_cache'
+            ? await postTestMetadataCacheStaleAlert()
+            : await postTestStaleSyncAlert(input.job);
         return { delivery };
       }),
     getLastSync: adminProcedure.query(async () => {
-      const [[latest], [syncState]] = await Promise.all([
+      const [[latest], [syncState], [metadataCache]] = await Promise.all([
         db
-          .select({ id: modelsByProvider.id, data: modelsByProvider.data })
+          .select({ data: modelsByProvider.data })
           .from(modelsByProvider)
           .orderBy(desc(modelsByProvider.id))
           .limit(1),
@@ -2558,19 +2564,22 @@ export const adminRouter = createTRPCRouter({
           .from(ai_gateway_sync_providers_state)
           .where(eq(ai_gateway_sync_providers_state.id, 1))
           .limit(1),
+        db
+          .select({
+            newestUpdatedAt: max(ai_gateway_metadata_cache.updated_at),
+            oldestUpdatedAt: min(ai_gateway_metadata_cache.updated_at),
+          })
+          .from(ai_gateway_metadata_cache),
       ]);
-      const lastCompletedAt = syncState?.lastCompletedAt ?? null;
-      const directByokLastCompletedAt = syncState?.directByokLastCompletedAt ?? null;
-      if (!latest && !lastCompletedAt && !directByokLastCompletedAt) return null;
+      const toIso = (value: string | null | undefined) =>
+        value ? new Date(value).toISOString() : null;
       return {
-        id: latest?.id ?? null,
-        generated_at: latest?.data.generated_at ?? null,
-        completed_at: lastCompletedAt ? new Date(lastCompletedAt).toISOString() : null,
-        direct_byok_completed_at: directByokLastCompletedAt
-          ? new Date(directByokLastCompletedAt).toISOString()
-          : null,
-        total_providers: latest?.data.total_providers ?? 0,
-        total_models: latest?.data.total_models ?? 0,
+        completed_at: toIso(syncState?.lastCompletedAt),
+        direct_byok_completed_at: toIso(syncState?.directByokLastCompletedAt),
+        metadata_cache_newest_updated_at: toIso(metadataCache?.newestUpdatedAt),
+        metadata_cache_oldest_updated_at: toIso(metadataCache?.oldestUpdatedAt),
+        total_providers: latest?.data.total_providers ?? null,
+        total_models: latest?.data.total_models ?? null,
       };
     }),
   }),

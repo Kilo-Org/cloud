@@ -5,10 +5,12 @@ import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import type { AdminSlackNotification } from '@kilocode/web-shared/lib/slack/admin-notifications';
 import {
   SYNC_PROVIDERS_STALE_ALERT_TTL_SECONDS,
+  TEST_COPY,
   URGENCY_COPY,
   parseIsoTimestamp,
   readSyncStateColumn,
   sendStaleSyncAlertNotification,
+  sendTestStaleSyncAlertNotification,
   writeLatestSyncStateTimestamp,
   type StaleAlertDelivery,
 } from '@/lib/providers/openrouter/sync-providers-stale-alert';
@@ -23,6 +25,8 @@ const IMPACT =
   'Consumers keep using the last stored metadata, so new or changed models and providers may not appear.';
 const INVESTIGATION =
   'Check Vercel logs for `[refresh-metadata-cache]` errors naming the listed sources.';
+const TEST_STATUS =
+  'A real alert lists the upstream metadata sources that failed to refresh and are more than a day out of date.';
 
 export type StaleMetadataEntry = {
   url: string;
@@ -72,6 +76,48 @@ function listEntries(staleEntries: ReadonlyArray<StaleMetadataEntry>) {
   return [...entriesByKey].map(([key, entries]) => describeEntries(key, entries));
 }
 
+function buildNotification(input: {
+  headline: string;
+  details: string[];
+  textDetails: string[];
+  context: string;
+}): AdminSlackNotification {
+  return {
+    text: [`${input.headline}.`, ...input.textDetails, IMPACT, URGENCY_COPY, INVESTIGATION].join(
+      ' '
+    ),
+    blocks: [
+      {
+        type: 'section',
+        text: { type: 'mrkdwn', text: `:large_yellow_circle: *${input.headline}*` },
+      },
+      {
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: [
+            ...input.details,
+            `*Impact:* ${IMPACT}`,
+            `*Urgency:* ${URGENCY_COPY}`,
+            `*Follow-up:* ${INVESTIGATION}`,
+          ].join('\n'),
+        },
+      },
+      {
+        type: 'context',
+        elements: [
+          {
+            type: 'mrkdwn',
+            text: `${input.context} · <${APP_URL}/admin/gateway|Open Gateway admin>`,
+          },
+        ],
+      },
+    ],
+    unfurl_links: false,
+    unfurl_media: false,
+  };
+}
+
 export function buildMetadataCacheStaleAlertNotification(input: {
   staleEntries: ReadonlyArray<StaleMetadataEntry>;
   now: Date;
@@ -85,40 +131,31 @@ export function buildMetadataCacheStaleAlertNotification(input: {
     staleEntries.length === 1 ? 'source' : 'sources'
   } failed to refresh and ${staleEntries.length === 1 ? 'is' : 'are'} more than a day out of date.`;
 
-  return {
-    text: [`${TITLE} is delayed.`, status, IMPACT, URGENCY_COPY, INVESTIGATION].join(' '),
-    blocks: [
-      {
-        type: 'section',
-        text: { type: 'mrkdwn', text: `:large_yellow_circle: *${TITLE} is delayed*` },
-      },
-      {
-        type: 'section',
-        text: {
-          type: 'mrkdwn',
-          text: [
-            `*Status:* ${status}`,
-            `*Sources:*`,
-            ...sources.map(source => `• ${source}`),
-            `*Impact:* ${IMPACT}`,
-            `*Urgency:* ${URGENCY_COPY}`,
-            `*Follow-up:* ${INVESTIGATION}`,
-          ].join('\n'),
-        },
-      },
-      {
-        type: 'context',
-        elements: [
-          {
-            type: 'mrkdwn',
-            text: `Checked at ${now.toISOString()} · <${APP_URL}/admin/gateway|Open Gateway admin>`,
-          },
-        ],
-      },
-    ],
-    unfurl_links: false,
-    unfurl_media: false,
-  };
+  return buildNotification({
+    headline: `${TITLE} is delayed`,
+    details: [`*Status:* ${status}`, `*Sources:*`, ...sources.map(source => `• ${source}`)],
+    textDetails: [status],
+    context: `Checked at ${now.toISOString()}`,
+  });
+}
+
+export function buildTestMetadataCacheStaleAlertNotification(now: Date): AdminSlackNotification {
+  return buildNotification({
+    headline: `[TEST] ${TITLE} delay notification`,
+    details: [`*Test only:* ${TEST_COPY}`, `*Status:* ${TEST_STATUS}`],
+    textDetails: [TEST_COPY, TEST_STATUS],
+    context: `Test generated at ${now.toISOString()}`,
+  });
+}
+
+export function postTestMetadataCacheStaleAlert({
+  now = new Date(),
+  sendNotification = sendTestStaleSyncAlertNotification,
+}: {
+  now?: Date;
+  sendNotification?: (notification: AdminSlackNotification) => Promise<StaleAlertDelivery>;
+} = {}): Promise<StaleAlertDelivery> {
+  return sendNotification(buildTestMetadataCacheStaleAlertNotification(now));
 }
 
 type MetadataCacheStaleAlertDependencies = {

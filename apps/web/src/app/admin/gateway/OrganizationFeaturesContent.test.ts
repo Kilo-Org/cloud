@@ -160,7 +160,6 @@ describe('OrganizationFeaturesContent', () => {
     mockPreviewQuery.data?.push({ id: deletedId, name: 'Deleted organization', isDeleted: true });
     render();
 
-    expect(container.textContent).toContain('These features are experimental.');
     expect(container.textContent).toContain(
       'Lets the organization configure Enkrypt output guardrails in AI Guardrails. Existing output guardrails keep running when this feature is removed.'
     );

@@ -115,9 +115,28 @@ jobs:
           cache: 'pnpm'
 
       # The dump shells out to `kilo run` to generate missing summaries.
+      # The install pulls a large platform package, and its postinstall can run a
+      # nested npm install, so one stalled registry request holds the runner until
+      # the job timeout. Bound each attempt and retry it, so a bad connection costs
+      # minutes instead of the whole job.
       - name: Install Kilo CLI
         if: steps.catalog_changes.outputs.catalog == 'true'
-        run: npm install -g @kilocode/cli
+        timeout-minutes: 10
+        env:
+          # Inherited by the postinstall's nested npm install as well.
+          npm_config_fetch_retries: '0'
+          npm_config_fetch_retry_maxtimeout: '10000'
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            if timeout --signal=TERM --kill-after=20 180 npm install -g @kilocode/cli; then
+              exit 0
+            fi
+            echo "::warning::Kilo CLI install attempt ${attempt} did not finish; retrying"
+            sleep $((attempt * 5))
+          done
+          echo "::error::Kilo CLI install failed after 3 attempts"
+          exit 1
 
       - name: Install root dependencies
         if: steps.catalog_changes.outputs.catalog == 'true'
@@ -378,9 +397,26 @@ jobs:
           cache: 'pnpm'
 
       # The dump shells out to `kilo run` to fill any straggler summaries.
+      # Same bound as the PR job: a stalled registry request must cost minutes,
+      # not the job timeout.
       - name: Install Kilo CLI
         if: steps.merge_changes.outputs.catalog == 'true'
-        run: npm install -g @kilocode/cli
+        timeout-minutes: 10
+        env:
+          # Inherited by the postinstall's nested npm install as well.
+          npm_config_fetch_retries: '0'
+          npm_config_fetch_retry_maxtimeout: '10000'
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            if timeout --signal=TERM --kill-after=20 180 npm install -g @kilocode/cli; then
+              exit 0
+            fi
+            echo "::warning::Kilo CLI install attempt ${attempt} did not finish; retrying"
+            sleep $((attempt * 5))
+          done
+          echo "::error::Kilo CLI install failed after 3 attempts"
+          exit 1
 
       # Same install scope as the PR job: the dump statically imports schemas
       # from `cloud-agent-next`, so that project must be installed for its

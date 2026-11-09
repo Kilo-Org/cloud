@@ -32,59 +32,110 @@ type GrantLookup = {
   id: string;
   actionClass: SupportAccessActionClass;
   expiresAt: string;
+  grantOrganizationId: string;
+  grantOrganizationName: string | null;
 };
 
+/**
+ * An active grant on the target organization, or on its live direct parent,
+ * admits the target. Both organizations must be live. The order prefers an
+ * exact action-class match, then a grant on the organization itself over an
+ * inherited one, then the longest remaining lifetime.
+ */
 async function findUsableGrant(params: {
   actorKiloUserId: string;
   organizationId: string;
   requiredActionClass: SupportAccessActionClass;
 }): Promise<GrantLookup | null> {
+  const [target] = await db
+    .select({
+      id: organizations.id,
+      name: organizations.name,
+      parentOrganizationId: organizations.parent_organization_id,
+    })
+    .from(organizations)
+    .where(and(eq(organizations.id, params.organizationId), isNull(organizations.deleted_at)))
+    .limit(1);
+  if (!target) return null;
+
+  const organizationIds = [target.id];
+  const organizationNames = new Map([[target.id, target.name]]);
+  if (target.parentOrganizationId) {
+    const [parent] = await db
+      .select({ id: organizations.id, name: organizations.name })
+      .from(organizations)
+      .where(
+        and(eq(organizations.id, target.parentOrganizationId), isNull(organizations.deleted_at))
+      )
+      .limit(1);
+    if (parent) {
+      organizationIds.push(parent.id);
+      organizationNames.set(parent.id, parent.name);
+    }
+  }
+
   const [row] = await db
     .select({
       id: support_access_grants.id,
       actionClass: support_access_grants.action_class,
       expiresAt: support_access_grants.expires_at,
+      grantOrganizationId: support_access_grants.organization_id,
     })
     .from(support_access_grants)
     .innerJoin(kilocode_users, eq(kilocode_users.id, support_access_grants.actor_kilo_user_id))
-    .innerJoin(organizations, eq(organizations.id, support_access_grants.organization_id))
     .where(
       and(
         eq(support_access_grants.actor_kilo_user_id, params.actorKiloUserId),
-        eq(support_access_grants.organization_id, params.organizationId),
         eq(support_access_grants.status, 'active'),
         sql`${support_access_grants.expires_at} > now()`,
         eq(kilocode_users.is_admin, true),
         isNull(kilocode_users.blocked_reason),
-        isNull(organizations.deleted_at)
+        inArray(support_access_grants.organization_id, organizationIds)
       )
     )
     .orderBy(
       sql`${support_access_grants.action_class} = ${params.requiredActionClass} DESC`,
+      sql`(${support_access_grants.organization_id} = ${params.organizationId}) DESC`,
       desc(support_access_grants.expires_at)
     )
     .limit(1);
 
   return row && row.expiresAt !== null
-    ? { id: row.id, actionClass: row.actionClass, expiresAt: row.expiresAt }
+    ? {
+        id: row.id,
+        actionClass: row.actionClass,
+        expiresAt: row.expiresAt,
+        grantOrganizationId: row.grantOrganizationId,
+        grantOrganizationName: organizationNames.get(row.grantOrganizationId) ?? null,
+      }
     : null;
 }
 
 /**
  * Distinguishes an expired or revoked grant from "never requested" so the
- * caller can return a specific cause code, per the Failure UX rule.
+ * caller can return a specific cause code, per the Failure UX rule. A grant on
+ * the target's direct parent counts, so a lapsed inherited grant reports the
+ * same reason as a lapsed direct one.
  */
 export async function latestSupportGrantStatus(params: {
   actorKiloUserId: string;
   organizationId: string;
 }): Promise<'expired' | 'revoked' | null> {
+  const [target] = await db
+    .select({ parentOrganizationId: organizations.parent_organization_id })
+    .from(organizations)
+    .where(eq(organizations.id, params.organizationId))
+    .limit(1);
+  const organizationIds = [params.organizationId];
+  if (target?.parentOrganizationId) organizationIds.push(target.parentOrganizationId);
+
   const [row] = await db
     .select({ status: support_access_grants.status })
     .from(support_access_grants)
     .where(
       and(
         eq(support_access_grants.actor_kilo_user_id, params.actorKiloUserId),
-        eq(support_access_grants.organization_id, params.organizationId),
+        inArray(support_access_grants.organization_id, organizationIds),
         inArray(support_access_grants.status, ['expired', 'revoked'])
       )
     )
@@ -144,6 +195,8 @@ export async function evaluateSupportAccess(params: {
     access: params.requiredActionClass === 'support_write' ? 'write' : 'read',
   });
 
+  const inheritedFromOrganizationId =
+    grant.grantOrganizationId === params.organizationId ? null : grant.grantOrganizationId;
   return {
     access: {
       kind: 'support',
@@ -153,6 +206,9 @@ export async function evaluateSupportAccess(params: {
       expiresAt: grant.expiresAt,
       supportActionId: params.supportActionId ?? params.key,
       inventoryId: inventory?.id ?? null,
+      inheritedFromOrganizationId,
+      inheritedFromOrganizationName:
+        inheritedFromOrganizationId === null ? null : grant.grantOrganizationName,
     },
     decision: 'support_grant',
     grantId: grant.id,
@@ -185,6 +241,7 @@ export async function recordSupportWriteUse(params: {
   actorKiloUserId: string;
   organizationId: string;
   supportActionId: string;
+  inheritedFromOrganizationId?: string | null;
 }): Promise<void> {
   try {
     await db.insert(support_access_grant_events).values({
@@ -193,7 +250,12 @@ export async function recordSupportWriteUse(params: {
       performed_by_kilo_user_id: params.actorKiloUserId,
       organization_id: params.organizationId,
       action_class: 'support_write',
-      metadata: { supportActionId: params.supportActionId },
+      metadata: {
+        supportActionId: params.supportActionId,
+        ...(params.inheritedFromOrganizationId
+          ? { inheritedFromOrganizationId: params.inheritedFromOrganizationId }
+          : {}),
+      },
     });
   } catch {
     warnWriteEvidenceFailure('Support write evidence could not be recorded; continuing');

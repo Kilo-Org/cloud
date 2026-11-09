@@ -27,7 +27,7 @@ import {
   type User,
 } from '@kilocode/db/schema';
 import { hashWebSessionId } from '@kilocode/web-shared/lib/admin/step-up-store';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 
 /**
  * `is_admin` on these helpers is the escape hatch that lets a Kilo employee read
@@ -465,6 +465,33 @@ describe('binary support organization access', () => {
     );
     const admin = await insertTestUser({ is_admin: true });
     return { organization, admin };
+  }
+
+  async function parentAndChild() {
+    const parentOwner = await insertTestUser({ is_admin: false });
+    const childOwner = await insertTestUser({ is_admin: false });
+    const parent = await createTestOrganization(
+      `support-parent-${crypto.randomUUID()}`,
+      parentOwner.id,
+      0
+    );
+    const child = await createTestOrganization(
+      `support-child-${crypto.randomUUID()}`,
+      childOwner.id,
+      0
+    );
+    await db
+      .update(organizations)
+      .set({ parent_organization_id: parent.id })
+      .where(eq(organizations.id, child.id));
+    return { parent, child };
+  }
+
+  async function attachToParent(childId: string, parentId: string | null) {
+    await db
+      .update(organizations)
+      .set({ parent_organization_id: parentId })
+      .where(eq(organizations.id, childId));
   }
 
   async function insertGrant(params: {
@@ -1097,6 +1124,291 @@ describe('binary support organization access', () => {
       code: 'FORBIDDEN',
       cause: expect.objectContaining({ supportAccessReason: 'support_access_action_class' }),
     });
+  });
+
+  test('ON admits an allowlisted read on a child through a grant on its parent', async () => {
+    setSupportEnabled(true);
+    const admin = await insertTestUser({ is_admin: true });
+    const { parent, child } = await parentAndChild();
+    const grant = await insertGrant({
+      actorKiloUserId: admin.id,
+      organizationId: parent.id,
+      actionClass: 'support_read',
+    });
+
+    const access = await resolveOrganizationAccess(readCtx(admin), child.id);
+
+    expect(access).toMatchObject({
+      kind: 'support',
+      organizationId: child.id,
+      grantId: grant.id,
+      inheritedFromOrganizationId: parent.id,
+      inheritedFromOrganizationName: parent.name,
+    });
+    const event = events.find(event => event.kind === 'kilo_admin_elevation');
+    expect(event).toMatchObject({
+      reason: 'organization_access',
+      target: `organization:${child.id}`,
+      supportDecision: 'support_grant',
+      supportGrantId: grant.id,
+      supportInheritedFromOrganizationId: parent.id,
+    });
+  });
+
+  test('ON denies a write on a child with only a read grant on its parent', async () => {
+    setSupportEnabled(true);
+    const admin = await insertTestUser({ is_admin: true });
+    const { parent, child } = await parentAndChild();
+    await insertGrant({
+      actorKiloUserId: admin.id,
+      organizationId: parent.id,
+      actionClass: 'support_read',
+    });
+
+    await expect(
+      ensureOrganizationAccess(
+        {
+          user: admin,
+          trpcPath: 'organizations.settings.updateDefaultModel',
+          trpcType: 'mutation',
+        },
+        child.id
+      )
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      cause: expect.objectContaining({ supportAccessReason: 'support_access_action_class' }),
+    });
+  });
+
+  test('ON admits a write on a child through a fresh step-up and a write grant on its parent', async () => {
+    setSupportEnabled(true);
+    const admin = await insertTestUser({ is_admin: true });
+    const approver = await insertTestUser({ is_admin: true });
+    const { parent, child } = await parentAndChild();
+    const grant = await insertGrant({
+      actorKiloUserId: admin.id,
+      organizationId: parent.id,
+      actionClass: 'support_write',
+      approverKiloUserId: approver.id,
+    });
+
+    await expect(ensureOrganizationAccess(await writeCtxWithStepUp(admin), child.id)).resolves.toBe(
+      'admin'
+    );
+
+    const evidence = await db
+      .select()
+      .from(support_access_grant_events)
+      .where(
+        and(
+          eq(support_access_grant_events.grant_id, grant.id),
+          eq(support_access_grant_events.event_type, 'used_write')
+        )
+      );
+    expect(evidence).toHaveLength(1);
+    expect(evidence[0]).toMatchObject({
+      organization_id: child.id,
+      metadata: { inheritedFromOrganizationId: parent.id },
+    });
+  });
+
+  test('ON inherited write on a child still rejects a bearer credential', async () => {
+    setSupportEnabled(true);
+    const admin = await insertTestUser({ is_admin: true });
+    const approver = await insertTestUser({ is_admin: true });
+    const { parent, child } = await parentAndChild();
+    await insertGrant({
+      actorKiloUserId: admin.id,
+      organizationId: parent.id,
+      actionClass: 'support_write',
+      approverKiloUserId: approver.id,
+    });
+
+    await expect(
+      ensureOrganizationAccess(
+        {
+          user: admin,
+          credential: 'human_bearer',
+          trpcPath: 'organizations.settings.updateDefaultModel',
+          trpcType: 'mutation',
+        },
+        child.id
+      )
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      cause: expect.objectContaining({ code: 'BEARER_NOT_ALLOWED' }),
+    });
+  });
+
+  test('ON inherited write on a child still requires a fresh proof', async () => {
+    setSupportEnabled(true);
+    const admin = await insertTestUser({ is_admin: true });
+    const approver = await insertTestUser({ is_admin: true });
+    const { parent, child } = await parentAndChild();
+    await insertGrant({
+      actorKiloUserId: admin.id,
+      organizationId: parent.id,
+      actionClass: 'support_write',
+      approverKiloUserId: approver.id,
+    });
+    await enroll(admin.id);
+
+    await expect(
+      ensureOrganizationAccess(
+        {
+          user: admin,
+          credential: 'session',
+          webSessionId: writeSessionId,
+          trpcPath: 'organizations.settings.updateDefaultModel',
+          trpcType: 'mutation',
+        },
+        child.id
+      )
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      cause: expect.objectContaining({ code: 'MFA_REQUIRED' }),
+    });
+  });
+
+  test('a grant on a child does not cover its parent or sibling', async () => {
+    setSupportEnabled(true);
+    const admin = await insertTestUser({ is_admin: true });
+    const { parent, child } = await parentAndChild();
+    const sibling = await createTestOrganization(
+      `support-sibling-${crypto.randomUUID()}`,
+      (await insertTestUser({ is_admin: false })).id,
+      0
+    );
+    await attachToParent(sibling.id, parent.id);
+    await insertGrant({
+      actorKiloUserId: admin.id,
+      organizationId: child.id,
+      actionClass: 'support_read',
+    });
+
+    for (const organizationId of [parent.id, sibling.id]) {
+      await expect(ensureOrganizationAccess(readCtx(admin), organizationId)).rejects.toMatchObject({
+        code: 'FORBIDDEN',
+        cause: expect.objectContaining({ supportAccessReason: 'support_grant_required' }),
+      });
+    }
+  });
+
+  test('a parent grant does not cover a detached or deleted child', async () => {
+    setSupportEnabled(true);
+    const admin = await insertTestUser({ is_admin: true });
+    const { parent, child } = await parentAndChild();
+    await insertGrant({
+      actorKiloUserId: admin.id,
+      organizationId: parent.id,
+      actionClass: 'support_read',
+    });
+
+    await attachToParent(child.id, null);
+    await expect(ensureOrganizationAccess(readCtx(admin), child.id)).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      cause: expect.objectContaining({ supportAccessReason: 'support_grant_required' }),
+    });
+
+    await attachToParent(child.id, parent.id);
+    await db
+      .update(organizations)
+      .set({ deleted_at: new Date().toISOString() })
+      .where(eq(organizations.id, child.id));
+    await expect(ensureOrganizationAccess(readCtx(admin), child.id)).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+    });
+  });
+
+  test('a parent grant does not cover a child once the parent is deleted', async () => {
+    setSupportEnabled(true);
+    const admin = await insertTestUser({ is_admin: true });
+    const { parent, child } = await parentAndChild();
+    await insertGrant({
+      actorKiloUserId: admin.id,
+      organizationId: parent.id,
+      actionClass: 'support_read',
+    });
+    await db
+      .update(organizations)
+      .set({ deleted_at: new Date().toISOString() })
+      .where(eq(organizations.id, parent.id));
+
+    await expect(ensureOrganizationAccess(readCtx(admin), child.id)).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      cause: expect.objectContaining({ supportAccessReason: 'support_grant_required' }),
+    });
+  });
+
+  test('ON reports expired and revoked parent grants for a child', async () => {
+    setSupportEnabled(true);
+    const expiredAdmin = await insertTestUser({ is_admin: true });
+    const expiredOrgs = await parentAndChild();
+    await insertGrant({
+      actorKiloUserId: expiredAdmin.id,
+      organizationId: expiredOrgs.parent.id,
+      actionClass: 'support_read',
+      status: 'expired',
+    });
+    await expect(
+      ensureOrganizationAccess(readCtx(expiredAdmin), expiredOrgs.child.id)
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      cause: expect.objectContaining({ supportAccessReason: 'support_grant_expired' }),
+    });
+
+    const revokedAdmin = await insertTestUser({ is_admin: true });
+    const revokedOrgs = await parentAndChild();
+    await insertGrant({
+      actorKiloUserId: revokedAdmin.id,
+      organizationId: revokedOrgs.parent.id,
+      actionClass: 'support_read',
+      status: 'revoked',
+    });
+    await expect(
+      ensureOrganizationAccess(readCtx(revokedAdmin), revokedOrgs.child.id)
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      cause: expect.objectContaining({ supportAccessReason: 'support_grant_revoked' }),
+    });
+  });
+
+  test('ON denies a never-list surface on a child even with a parent write grant', async () => {
+    setSupportEnabled(true);
+    const admin = await insertTestUser({ is_admin: true });
+    const approver = await insertTestUser({ is_admin: true });
+    const { parent, child } = await parentAndChild();
+    await insertGrant({
+      actorKiloUserId: admin.id,
+      organizationId: parent.id,
+      actionClass: 'support_write',
+      approverKiloUserId: approver.id,
+    });
+
+    await expect(
+      resolveOrganizationAccess({ user: admin, trpcType: 'POST' }, child.id, {
+        surface: 'rest',
+        supportKey: '/api/organizations/[id]/user-tokens',
+        requiredActionClass: 'support_write',
+      })
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      cause: expect.objectContaining({ supportAccessReason: 'support_access_not_allowlisted' }),
+    });
+  });
+
+  test('OFF keeps the legacy owner shortcut on a child with a parent grant', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const { parent, child } = await parentAndChild();
+    await insertGrant({
+      actorKiloUserId: admin.id,
+      organizationId: parent.id,
+      actionClass: 'support_read',
+    });
+
+    await expect(ensureOrganizationAccess(readCtx(admin), child.id)).resolves.toBe('owner');
+    const event = events.find(event => event.kind === 'kilo_admin_elevation');
+    expect(event).toMatchObject({ supportDecision: null });
   });
 
   test('ON fails closed when the membership read fails for an admin', async () => {

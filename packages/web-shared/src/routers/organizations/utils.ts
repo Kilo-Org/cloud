@@ -484,6 +484,7 @@ export async function resolveOrganizationAccess(
         actorKiloUserId: ctx.user.id,
         organizationId,
         supportActionId: evaluation.access.supportActionId,
+        inheritedFromOrganizationId: evaluation.access.inheritedFromOrganizationId,
       });
     }
     await recordKiloAdminElevation(ctx, {
@@ -495,6 +496,7 @@ export async function resolveOrganizationAccess(
       supportGrantId: evaluation.grantId,
       supportActionId,
       inventoryId: evaluation.access.inventoryId,
+      supportInheritedFromOrganizationId: evaluation.access.inheritedFromOrganizationId,
     });
     return evaluation.access;
   }

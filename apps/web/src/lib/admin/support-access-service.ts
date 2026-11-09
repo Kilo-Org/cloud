@@ -17,6 +17,7 @@ import {
   SUPPORT_READ_MAX_DURATION_SECONDS,
   SUPPORT_WRITE_MAX_DURATION_SECONDS,
   SUPPORT_WRITE_REQUEST_TTL_SECONDS,
+  isSupportAccessEnabled,
 } from '@kilocode/web-shared/lib/admin/support-access';
 import { userIsSuperadmin } from '@/lib/admin/admin-permissions';
 import { getPostgresErrorCode } from '@/lib/db-errors';
@@ -668,15 +669,40 @@ export async function listUnreviewedEmergencyGrants(): Promise<SupportAccessGran
     .orderBy(desc(support_access_grants.issued_at));
 }
 
+/**
+ * Active grants for an organization, including grants on its live direct
+ * parent when support access is on. A parent grant applies to the child, so the
+ * org banner and the View Org button must see it; the grant row still names the
+ * parent organization it was issued for.
+ */
 export async function getActiveSupportGrantsForOrganization(
   organizationId: string
 ): Promise<SupportAccessGrant[]> {
+  const organizationIds = [organizationId];
+  if (isSupportAccessEnabled()) {
+    const [target] = await db
+      .select({ parentOrganizationId: organizations.parent_organization_id })
+      .from(organizations)
+      .where(and(eq(organizations.id, organizationId), isNull(organizations.deleted_at)))
+      .limit(1);
+    if (target?.parentOrganizationId) {
+      const [liveParent] = await db
+        .select({ id: organizations.id })
+        .from(organizations)
+        .where(
+          and(eq(organizations.id, target.parentOrganizationId), isNull(organizations.deleted_at))
+        )
+        .limit(1);
+      if (liveParent) organizationIds.push(target.parentOrganizationId);
+    }
+  }
+
   return db
     .select()
     .from(support_access_grants)
     .where(
       and(
-        eq(support_access_grants.organization_id, organizationId),
+        inArray(support_access_grants.organization_id, organizationIds),
         eq(support_access_grants.status, 'active')
       )
     )

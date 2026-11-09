@@ -109,6 +109,8 @@ describe('OrganizationByPageLayout', () => {
       expiresAt: '2030-01-01T00:00:00.000Z',
       supportActionId: 'action-1',
       inventoryId: null,
+      inheritedFromOrganizationId: null,
+      inheritedFromOrganizationName: null,
     };
     mockSupportAuth.mockResolvedValue({
       success: true,

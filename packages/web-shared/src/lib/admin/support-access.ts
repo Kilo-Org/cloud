@@ -37,6 +37,12 @@ export type SupportContext = {
   expiresAt: string;
   supportActionId: string;
   inventoryId: string | null;
+  /**
+   * The parent organization whose grant admitted this child organization
+   * access, or null when the grant is on the target organization itself.
+   */
+  inheritedFromOrganizationId: string | null;
+  inheritedFromOrganizationName: string | null;
 };
 
 export type MemberAccess = {

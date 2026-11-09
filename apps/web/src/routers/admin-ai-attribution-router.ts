@@ -53,7 +53,6 @@ export const adminAIAttributionRouter = createTRPCRouter({
       whereConditions.push(ilike(code_indexing_manifest.project_id, `%${search}%`));
     }
 
-    // Get distinct projects with their most recent created_at
     const results = await db
       .select({
         project_id: code_indexing_manifest.project_id,
@@ -80,7 +79,6 @@ export const adminAIAttributionRouter = createTRPCRouter({
       whereConditions.push(ilike(code_indexing_manifest.file_path, `%${search}%`));
     }
 
-    // Get distinct file paths with their most recent created_at
     const results = await db
       .select({
         file_path: code_indexing_manifest.file_path,
@@ -107,7 +105,6 @@ export const adminAIAttributionRouter = createTRPCRouter({
       whereConditions.push(ilike(code_indexing_manifest.git_branch, `%${search}%`));
     }
 
-    // Get distinct branches with their most recent created_at
     const results = await db
       .select({
         git_branch: code_indexing_manifest.git_branch,

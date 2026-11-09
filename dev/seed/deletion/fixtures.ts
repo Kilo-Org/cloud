@@ -21,7 +21,7 @@ import {
 import { and, eq, inArray, isNotNull, like, sql } from 'drizzle-orm';
 
 import type { SeedResult } from '../index';
-import { getSeedDb } from '../lib/db';
+import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
 
 const EMAILS = [
   'ok@local.test',
@@ -73,6 +73,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     throw new Error(`Unexpected extra arguments: ${args.join(' ')}`);
   }
 
+  assertLocalSeedDatabase('deletion:fixtures');
   const db = getSeedDb();
   const users = await db
     .select({

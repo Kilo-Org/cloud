@@ -3,7 +3,7 @@ import { normalizeGitUrl } from '@kilocode/worker-utils';
 import { and, eq, inArray, or } from 'drizzle-orm';
 
 import type { SeedResult } from '../index';
-import { getSeedDb } from '../lib/db';
+import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
 import { normalizeSeedEmail } from '../lib/email';
 import { isValidEmail } from '../lib/users';
 
@@ -92,6 +92,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     throw new Error(`Not an email address: ${email}`);
   }
 
+  assertLocalSeedDatabase('app:encoded-repository-names');
   const db = getSeedDb();
   const matches = await db
     .select({ userId: kilocode_users.id, email: kilocode_users.google_user_email })

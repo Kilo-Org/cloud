@@ -8,7 +8,6 @@ import type {
   RecordCloudAgentWorktreeCleanupParams,
 } from '@kilocode/session-ingest-contracts';
 import type { TRPCContext } from '../../types';
-import { getWorktreeWorkspacePath } from '../../workspace';
 import { router } from '../auth';
 import { deleteWorktree } from './worktree-deletion';
 
@@ -79,6 +78,19 @@ function fixture(rootCount = 1, childCount = 0) {
   const begin = vi.fn(async (_params: CloudAgentWorktreeDeletionParams) => structuredClone(state));
   const record = vi.fn(async (input: RecordCloudAgentWorktreeCleanupParams) => {
     state.runtimeLocations = input.runtimeLocations ?? state.runtimeLocations;
+    if (
+      input.completedRuntimeLocation &&
+      !state.manifest.completedRuntimeLocations?.some(
+        item =>
+          item.sandboxId === input.completedRuntimeLocation?.sandboxId &&
+          item.provider === input.completedRuntimeLocation.provider
+      )
+    ) {
+      state.manifest.completedRuntimeLocations = [
+        ...(state.manifest.completedRuntimeLocations ?? []),
+        input.completedRuntimeLocation,
+      ];
+    }
     for (const sessionId of [
       ...(input.sessionIds ?? []),
       ...(input.childSessions ?? []).map(child => child.sessionId),
@@ -89,10 +101,14 @@ function fixture(rootCount = 1, childCount = 0) {
     }
     return structuredClone(state);
   });
+  const deleteContent = vi.fn(async (_params: CloudAgentWorktreeDeletionParams) => ({
+    success: true as const,
+    deletedSessionIds: state.manifest.sessions.map(session => session.sessionId),
+  }));
   const complete = vi.fn(async () => {
     state = { ...state, completed: true };
     return {
-      success: true,
+      success: true as const,
       deletedSessionIds: state.manifest.sessions.map(session => session.sessionId),
     };
   });
@@ -122,6 +138,7 @@ function fixture(rootCount = 1, childCount = 0) {
       SESSION_INGEST: {
         beginCloudAgentWorktreeDeletion: begin,
         recordCloudAgentWorktreeCleanup: record,
+        deleteCloudAgentWorktreeContent: deleteContent,
         completeCloudAgentWorktreeDeletion: complete,
       },
     } as never,
@@ -131,6 +148,7 @@ function fixture(rootCount = 1, childCount = 0) {
     ctx,
     begin,
     record,
+    deleteContent,
     complete,
     cleanup,
     beginSession,
@@ -148,41 +166,47 @@ function fixture(rootCount = 1, childCount = 0) {
 beforeEach(() => vi.resetAllMocks());
 
 describe('deleteWorktree authorization and completion', () => {
-  it.each([false, true])('reports aggregate phase timings when cleanup fails=%s', async fail => {
-    const f = fixture(2);
-    let now = 1000;
-    const clock = vi.spyOn(Date, 'now').mockImplementation(() => now);
-    f.begin.mockImplementation(async () => {
-      now += 10;
-      return structuredClone(f.getState());
-    });
-    f.cleanup.mockImplementation(async input => {
-      now += 25;
-      if (fail) throw new Error('cleanup unavailable');
-      return { deleted: true, sessionIds: input.sessionIds };
-    });
-    try {
-      const pending = f.caller.deleteWorktree({ worktreeId });
-      if (fail) await expect(pending).rejects.toThrow('Worktree deletion is incomplete');
-      else await pending;
-      const summaries = mocks.diagnostic.mock.calls.filter(
-        ([event, fields]) => event === 'worktree_deletion' && fields.phase === 'finished'
-      );
-      expect(summaries).toHaveLength(1);
-      expect(summaries[0][1]).toMatchObject({
-        worktreeId,
-        beginDeletionMs: 10,
-        collectSessionsMs: 0,
-        runtimeCleanupMs: 25,
-        durationMs: 35,
-        result: fail ? 'pending' : 'completed',
+  it.each([false, true])(
+    'reports aggregate phase timings and pending cleanup when runtime cleanup fails=%s',
+    async fail => {
+      const f = fixture(2);
+      let now = 1000;
+      const clock = vi.spyOn(Date, 'now').mockImplementation(() => now);
+      f.begin.mockImplementation(async () => {
+        now += 10;
+        return structuredClone(f.getState());
       });
-      if (fail) expect(summaries[0][1]).not.toHaveProperty('completeDeletionMs');
-      else expect(summaries[0][1]).toHaveProperty('completeDeletionMs', 0);
-    } finally {
-      clock.mockRestore();
+      f.cleanup.mockImplementation(async input => {
+        now += 25;
+        if (fail) throw new Error('cleanup unavailable');
+        return { deleted: true, sessionIds: input.sessionIds };
+      });
+      try {
+        const result = await f.caller.deleteWorktree({ worktreeId });
+        expect(result).toMatchObject({
+          success: true,
+          cleanup: fail ? 'pending' : 'complete',
+        });
+        expect(f.complete).toHaveBeenCalledTimes(fail ? 0 : 1);
+        const summaries = mocks.diagnostic.mock.calls.filter(
+          ([event, fields]) => event === 'worktree_deletion' && fields.phase === 'finished'
+        );
+        expect(summaries).toHaveLength(1);
+        expect(summaries[0][1]).toMatchObject({
+          worktreeId,
+          beginDeletionMs: 10,
+          collectSessionsMs: 0,
+          runtimeCleanupMs: 25,
+          durationMs: 35,
+          result: fail ? 'pending' : 'completed',
+        });
+        if (fail) expect(summaries[0][1]).not.toHaveProperty('completeDeletionMs');
+        else expect(summaries[0][1]).toHaveProperty('completeDeletionMs', 0);
+      } finally {
+        clock.mockRestore();
+      }
     }
-  });
+  );
 
   it.each(['begin', 'finish'] as const)(
     'bounds concurrent %s operations and waits before advancing phases',
@@ -219,17 +243,18 @@ describe('deleteWorktree authorization and completion', () => {
         } else {
           expect(f.record).toHaveBeenCalledTimes(2);
           expect(f.cleanup).toHaveBeenCalledTimes(1);
+          expect(f.deleteContent).toHaveBeenCalledTimes(1);
         }
         for (const gate of gates.slice(start, end)) gate.resolve();
       }
-      await expect(pending).resolves.toMatchObject({ success: true });
+      await expect(pending).resolves.toMatchObject({ success: true, cleanup: 'complete' });
       expect(peak).toBe(8);
       expect(active).toBe(0);
     }
   );
 
   it.each(['begin', 'finish'] as const)(
-    'drains started %s siblings on failure without starting another batch',
+    'drains started %s siblings on a hard failure without starting another batch',
     async phase => {
       const f = fixture(17);
       const failed = Promise.withResolvers<void>();
@@ -252,7 +277,7 @@ describe('deleteWorktree authorization and completion', () => {
       });
       const calls = phase === 'begin' ? f.beginSession : f.finishSession;
       await vi.waitFor(() => expect(calls).toHaveBeenCalledTimes(8));
-      failed.reject(new Error('deletion failed'));
+      failed.reject(new Error('worktree_child_lineage_conflict'));
       await failed.promise.catch(() => undefined);
       await new Promise(resolve => setTimeout(resolve, 0));
       expect(settled).toBe(false);
@@ -260,11 +285,13 @@ describe('deleteWorktree authorization and completion', () => {
       if (phase === 'begin') {
         expect(f.record).not.toHaveBeenCalled();
         expect(f.cleanup).not.toHaveBeenCalled();
+        expect(f.deleteContent).not.toHaveBeenCalled();
         expect(f.finishSession).not.toHaveBeenCalled();
       }
       siblings.resolve();
       await expect(pending).resolves.toMatchObject({
-        cause: { error: 'WORKTREE_DELETION_PENDING', retryable: true },
+        code: 'PRECONDITION_FAILED',
+        cause: { error: 'WORKTREE_CHILD_LINEAGE_CONFLICT', retryable: false },
       });
       expect(calls).toHaveBeenCalledTimes(8);
       expect(f.complete).not.toHaveBeenCalled();
@@ -283,7 +310,7 @@ describe('deleteWorktree authorization and completion', () => {
     }));
     const record = f.record.getMockImplementation();
     if (!record) throw new Error('Missing record fixture');
-    const gates = Array.from({ length: 4 }, () => Promise.withResolvers<void>());
+    const gates = Array.from({ length: 2 }, () => Promise.withResolvers<void>());
     let active = 0;
     let peak = 0;
     let index = 0;
@@ -302,60 +329,228 @@ describe('deleteWorktree authorization and completion', () => {
       expect(active).toBe(1);
       expect(f.finishSession).not.toHaveBeenCalled();
       expect(f.complete).not.toHaveBeenCalled();
-      expect(f.cleanup).toHaveBeenCalledTimes(index < 2 ? 0 : 1);
+      expect(f.cleanup).toHaveBeenCalledTimes(index === 0 ? 0 : 1);
       gates[index].resolve();
     }
     await expect(pending).resolves.toMatchObject({
       deletedSessionIds: [kiloId(0), kiloId(1), kiloId(2)],
+      cleanup: 'complete',
     });
     expect(peak).toBe(1);
     expect(f.cleanup.mock.calls[0][0].sessionIds).toContain(kiloId(2));
+    expect(f.record.mock.invocationCallOrder[0]).toBeLessThan(
+      f.deleteContent.mock.invocationCallOrder[0]
+    );
   });
 
-  it('journals retained child lineage before cold runtime cleanup and keeps it on retry', async () => {
+  it('journals retained child lineage before content deletion and keeps it on retry', async () => {
     const f = fixture();
     f.readChildren.mockResolvedValue([{ sessionId: kiloId(1), parentSessionId: kiloId(0) }]);
     f.cleanup.mockRejectedValueOnce(new Error('provider unavailable'));
-    await expect(f.caller.deleteWorktree({ worktreeId })).rejects.toMatchObject({
-      cause: { error: 'WORKTREE_DELETION_PENDING' },
+    await expect(f.caller.deleteWorktree({ worktreeId })).resolves.toEqual({
+      success: true,
+      deletedSessionIds: [kiloId(0), kiloId(1)],
+      cleanup: 'pending',
     });
     expect(f.record.mock.calls[0][0].childSessions).toEqual([
       { sessionId: kiloId(1), parentSessionId: kiloId(0), cloudAgentSessionId: workspaceId(0) },
     ]);
+    expect(f.record.mock.invocationCallOrder[0]).toBeLessThan(
+      f.deleteContent.mock.invocationCallOrder[0]
+    );
     expect(f.getState().manifest.sessions.map(session => session.sessionId)).toEqual([
       kiloId(0),
       kiloId(1),
     ]);
+    expect(f.getState().completed).toBe(false);
     f.readChildren.mockResolvedValue([]);
     await expect(f.caller.deleteWorktree({ worktreeId })).resolves.toEqual({
       success: true,
       deletedSessionIds: [kiloId(0), kiloId(1)],
+      cleanup: 'complete',
     });
+    expect(f.deleteContent).toHaveBeenCalledTimes(2);
   });
 
-  it('deletes and retries an ownership-only root using the canonical allocation returned by ingest', async () => {
+  it('deletes and retries an unopened root using its registered runtime location', async () => {
     const f = fixture();
     f.getState().runtimeLocations = [location];
     f.beginSession.mockResolvedValue(null);
     f.cleanup.mockRejectedValueOnce(new Error('provider temporarily unavailable'));
-    await expect(f.caller.deleteWorktree({ worktreeId })).rejects.toMatchObject({
-      cause: { error: 'WORKTREE_DELETION_PENDING', retryable: true },
+    await expect(f.caller.deleteWorktree({ worktreeId })).resolves.toEqual({
+      success: true,
+      deletedSessionIds: [kiloId(0)],
+      cleanup: 'pending',
     });
     expect(f.complete).not.toHaveBeenCalled();
     expect(f.getState().runtimeLocations).toEqual([location]);
     await expect(f.caller.deleteWorktree({ worktreeId })).resolves.toEqual({
       success: true,
       deletedSessionIds: [kiloId(0)],
+      cleanup: 'complete',
     });
-    expect(mocks.getControl).toHaveBeenCalledWith(f.ctx.env, location.sandboxId);
+    expect(mocks.getControl).toHaveBeenCalledTimes(2);
   });
 
-  it('isolates unavailable allocation history instead of repeatedly waiting for registration that is fenced', async () => {
+  it('accepts a missing session DO when the journal already confirmed runtime cleanup', async () => {
+    const f = fixture();
+    f.getState().runtimeLocations = [location];
+    f.getState().manifest.completedRuntimeLocations = [location];
+    f.beginSession.mockResolvedValue(null);
+
+    await expect(f.caller.deleteWorktree({ worktreeId })).resolves.toEqual({
+      success: true,
+      deletedSessionIds: [kiloId(0)],
+      cleanup: 'complete',
+    });
+    expect(f.cleanup).not.toHaveBeenCalled();
+    expect(f.finishSession).toHaveBeenCalledTimes(1);
+  });
+
+  it('skips runtime locations whose successful cleanup is already journaled', async () => {
+    const f = fixture();
+    f.getState().runtimeLocations = [location];
+    f.getState().manifest.completedRuntimeLocations = [location];
+
+    await expect(f.caller.deleteWorktree({ worktreeId })).resolves.toEqual({
+      success: true,
+      deletedSessionIds: [kiloId(0)],
+      cleanup: 'complete',
+    });
+    expect(f.cleanup).not.toHaveBeenCalled();
+  });
+
+  it('removes content but reports pending cleanup when runtime history was never recorded', async () => {
     const f = fixture();
     f.beginSession.mockResolvedValue(null);
+    await expect(f.caller.deleteWorktree({ worktreeId })).resolves.toEqual({
+      success: true,
+      deletedSessionIds: [kiloId(0)],
+      cleanup: 'pending',
+    });
+    expect(f.deleteContent).toHaveBeenCalledTimes(1);
+    expect(f.cleanup).not.toHaveBeenCalled();
+    expect(f.finishSession).not.toHaveBeenCalled();
+    expect(f.complete).not.toHaveBeenCalled();
+    expect(f.getState().manifest.sessions).toHaveLength(1);
+    expect(f.getState().completed).toBe(false);
+    await expect(f.caller.deleteWorktree({ worktreeId })).resolves.toEqual({
+      success: true,
+      deletedSessionIds: [kiloId(0)],
+      cleanup: 'pending',
+    });
+    expect(f.deleteContent).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps content deletion authoritative when the runtime is unavailable', async () => {
+    const f = fixture(2, 1);
+    for (const session of f.getState().manifest.sessions) {
+      if (session.cloudAgentSessionId) f.beginSession.mockRejectedValueOnce(new Error('DO down'));
+    }
+    await expect(f.caller.deleteWorktree({ worktreeId })).resolves.toEqual({
+      success: true,
+      deletedSessionIds: [kiloId(0), kiloId(1), kiloId(2)],
+      cleanup: 'pending',
+    });
+    expect(f.deleteContent).toHaveBeenCalledTimes(1);
+    expect(f.cleanup).not.toHaveBeenCalled();
+    expect(f.complete).not.toHaveBeenCalled();
+  });
+
+  it('continues cleanup for other runtime locations and reports pending once', async () => {
+    const f = fixture();
+    const otherLocation = { sandboxId: 'usr-second-route', provider: 'vercel' as const };
+    f.getState().runtimeLocations = [location, otherLocation];
+    f.cleanup.mockRejectedValueOnce(new Error('provider unavailable'));
+
+    await expect(f.caller.deleteWorktree({ worktreeId })).resolves.toEqual({
+      success: true,
+      deletedSessionIds: [kiloId(0)],
+      cleanup: 'pending',
+    });
+    expect(f.cleanup).toHaveBeenCalledTimes(2);
+    expect(f.record.mock.calls.slice(1).map(([input]) => input.completedRuntimeLocation)).toEqual([
+      otherLocation,
+    ]);
+    expect(f.finishSession).not.toHaveBeenCalled();
+    expect(f.complete).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [
+      'begin',
+      'worktree_unregistered_child_sessions',
+      'WORKTREE_UNREGISTERED_CHILD_SESSIONS',
+      'PRECONDITION_FAILED',
+    ],
+    [
+      'record',
+      'worktree_unregistered_child_sessions',
+      'WORKTREE_UNREGISTERED_CHILD_SESSIONS',
+      'PRECONDITION_FAILED',
+    ],
+    [
+      'record',
+      'worktree_child_lineage_conflict',
+      'WORKTREE_CHILD_LINEAGE_CONFLICT',
+      'PRECONDITION_FAILED',
+    ],
+    [
+      'discovery',
+      'worktree_child_lineage_conflict',
+      'WORKTREE_CHILD_LINEAGE_CONFLICT',
+      'PRECONDITION_FAILED',
+    ],
+    ['begin', 'worktree_membership_changed', 'WORKTREE_MEMBERSHIP_CHANGED', 'CONFLICT'],
+    [
+      'discovery',
+      'Worktree identity conflict',
+      'WORKTREE_IDENTITY_CONFLICT',
+      'PRECONDITION_FAILED',
+    ],
+  ] as const)(
+    'reports a non-retryable %s failure for %s before content deletion',
+    async (phase, reason, errorCode, code) => {
+      const f = fixture();
+      const operation =
+        phase === 'begin' ? f.begin : phase === 'record' ? f.record : f.beginSession;
+      operation.mockRejectedValue(new Error(`remote exception: ${reason}`));
+
+      await expect(f.caller.deleteWorktree({ worktreeId })).rejects.toMatchObject({
+        code,
+        cause: { error: errorCode, retryable: false },
+      });
+      expect(f.deleteContent).not.toHaveBeenCalled();
+      expect(f.cleanup).not.toHaveBeenCalled();
+      expect(f.finishSession).not.toHaveBeenCalled();
+      expect(f.complete).not.toHaveBeenCalled();
+      expect(mocks.diagnostic).toHaveBeenCalledWith(
+        'worktree_deletion',
+        expect.objectContaining({ result: 'rejected', errorCode, retryable: false }),
+        'info'
+      );
+    }
+  );
+
+  it('does not treat a forbidden runtime cleanup as pending success', async () => {
+    const f = fixture();
+    f.cleanup.mockRejectedValue(new Error('worktree_access_denied'));
+
+    await expect(f.caller.deleteWorktree({ worktreeId })).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
+    expect(f.deleteContent).toHaveBeenCalledTimes(1);
+    expect(f.finishSession).not.toHaveBeenCalled();
+    expect(f.complete).not.toHaveBeenCalled();
+  });
+
+  it('keeps a content deletion failure retryable and does not claim cleanup', async () => {
+    const f = fixture();
+    f.deleteContent.mockRejectedValueOnce(new Error('ingest unavailable'));
+
     await expect(f.caller.deleteWorktree({ worktreeId })).rejects.toMatchObject({
       code: 'INTERNAL_SERVER_ERROR',
-      cause: { error: 'WORKTREE_RUNTIME_HISTORY_UNAVAILABLE', retryable: false },
+      cause: { error: 'WORKTREE_DELETION_PENDING', retryable: true },
     });
     expect(f.cleanup).not.toHaveBeenCalled();
     expect(f.complete).not.toHaveBeenCalled();
@@ -367,9 +562,26 @@ describe('deleteWorktree authorization and completion', () => {
     await expect(f.caller.deleteWorktree({ worktreeId })).resolves.toEqual({
       success: true,
       deletedSessionIds: [kiloId(0)],
+      cleanup: 'complete',
     });
     expect(f.begin).toHaveBeenCalledWith({ worktreeId, kiloUserId: userId });
     expect(mocks.getDb).not.toHaveBeenCalled();
+  });
+
+  it('forwards the sole-session precondition to the ingest begin call', async () => {
+    const f = fixture();
+    await expect(
+      f.caller.deleteWorktree({ worktreeId, onlyIfSoleSessionId: kiloId(0) })
+    ).resolves.toEqual({
+      success: true,
+      deletedSessionIds: [kiloId(0)],
+      cleanup: 'complete',
+    });
+    expect(f.begin).toHaveBeenCalledWith({
+      worktreeId,
+      kiloUserId: userId,
+      onlyIfSoleSessionId: kiloId(0),
+    });
   });
 
   it('rejects an unauthenticated request and a client-supplied owner', async () => {
@@ -392,6 +604,7 @@ describe('deleteWorktree authorization and completion', () => {
     });
     expect(f.cleanup).not.toHaveBeenCalled();
     expect(f.beginSession).not.toHaveBeenCalled();
+    expect(f.deleteContent).not.toHaveBeenCalled();
   });
 
   it('requires current non-deleted organization membership even when balance checks are skipped', async () => {
@@ -410,20 +623,22 @@ describe('deleteWorktree authorization and completion', () => {
     const result = await f.caller.deleteWorktree({ worktreeId });
     expect(result.deletedSessionIds).toHaveLength(220);
     expect(new Set(result.deletedSessionIds).size).toBe(220);
+    expect(result.cleanup).toBe('complete');
     expect(f.beginSession).toHaveBeenCalledTimes(205);
     expect(f.finishSession).toHaveBeenCalledTimes(205);
     expect(f.cleanup.mock.calls[0][0].sessionIds).toHaveLength(220);
+    expect(f.deleteContent.mock.calls[0][0]).toEqual({ worktreeId, kiloUserId: userId });
     expect(f.complete.mock.invocationCallOrder[0]).toBeGreaterThan(
       f.finishSession.mock.invocationCallOrder.at(-1) ?? 0
     );
   });
 
-  it('keeps discovery and reports a retryable error after partial runtime failure', async () => {
+  it('keeps discovery and retries after a partial runtime failure', async () => {
     const f = fixture(2, 2);
     f.cleanup.mockRejectedValueOnce(new Error('wrapper disconnected'));
-    await expect(f.caller.deleteWorktree({ worktreeId })).rejects.toMatchObject({
-      code: 'INTERNAL_SERVER_ERROR',
-      cause: { retryable: true, error: 'WORKTREE_DELETION_PENDING' },
+    await expect(f.caller.deleteWorktree({ worktreeId })).resolves.toMatchObject({
+      success: true,
+      cleanup: 'pending',
     });
     expect(f.finishSession).not.toHaveBeenCalled();
     expect(f.complete).not.toHaveBeenCalled();
@@ -431,20 +646,105 @@ describe('deleteWorktree authorization and completion', () => {
     await expect(f.caller.deleteWorktree({ worktreeId })).resolves.toMatchObject({
       success: true,
       deletedSessionIds: [kiloId(0), kiloId(1), kiloId(2), kiloId(3)],
+      cleanup: 'complete',
     });
   });
 
-  it('can retry ingest cleanup after session metadata has already been erased', async () => {
+  it('keeps completion retryable as pending after session metadata has already been erased', async () => {
     const f = fixture(1, 1);
-    f.complete.mockRejectedValueOnce(new Error('R2 unavailable'));
-    await expect(f.caller.deleteWorktree({ worktreeId })).rejects.toMatchObject({
-      cause: { retryable: true },
-    });
+    f.complete.mockRejectedValueOnce(new Error('R2 unavailable token=do-not-log'));
     await expect(f.caller.deleteWorktree({ worktreeId })).resolves.toEqual({
       success: true,
       deletedSessionIds: [kiloId(0), kiloId(1)],
+      cleanup: 'pending',
+    });
+    expect(f.getState().completed).toBe(false);
+    const completeDiagnostic = mocks.diagnostic.mock.calls.find(
+      ([event, fields]) => event === 'worktree_deletion' && fields.phase === 'complete_pending'
+    );
+    expect(completeDiagnostic?.[1]).toMatchObject({ errorClass: 'Error' });
+    expect(JSON.stringify(completeDiagnostic?.[1])).not.toContain('do-not-log');
+    await expect(f.caller.deleteWorktree({ worktreeId })).resolves.toEqual({
+      success: true,
+      deletedSessionIds: [kiloId(0), kiloId(1)],
+      cleanup: 'complete',
     });
     expect(f.getState().completed).toBe(true);
+  });
+
+  it('returns pending when cleanup recording fails after content deletion', async () => {
+    const f = fixture();
+    const record = f.record.getMockImplementation();
+    if (!record) throw new Error('Missing record fixture');
+    let calls = 0;
+    f.record.mockImplementation(async input => {
+      calls += 1;
+      if (calls === 2) throw new Error('worktree_cleanup_manifest_changed token=do-not-log');
+      return record(input);
+    });
+
+    await expect(f.caller.deleteWorktree({ worktreeId })).resolves.toEqual({
+      success: true,
+      deletedSessionIds: [kiloId(0)],
+      cleanup: 'pending',
+    });
+    expect(f.deleteContent).toHaveBeenCalledTimes(1);
+    expect(f.finishSession).not.toHaveBeenCalled();
+    expect(f.complete).not.toHaveBeenCalled();
+    expect(f.getState().completed).toBe(false);
+    const recordDiagnostic = mocks.diagnostic.mock.calls.find(
+      ([event, fields]) =>
+        event === 'worktree_deletion' && fields.phase === 'record_cleanup_pending'
+    );
+    expect(recordDiagnostic?.[1]).toMatchObject({
+      errorClass: 'Error',
+      errorCode: 'worktree_cleanup_manifest_changed',
+    });
+    expect(JSON.stringify(recordDiagnostic?.[1])).not.toContain('do-not-log');
+  });
+
+  it('returns pending with a sanitized cause when a session finish fails', async () => {
+    const f = fixture();
+    f.finishSession.mockRejectedValueOnce(new Error('finish failed token=do-not-log'));
+
+    await expect(f.caller.deleteWorktree({ worktreeId })).resolves.toEqual({
+      success: true,
+      deletedSessionIds: [kiloId(0)],
+      cleanup: 'pending',
+    });
+    expect(f.complete).not.toHaveBeenCalled();
+    const finishDiagnostic = mocks.diagnostic.mock.calls.find(
+      ([event, fields]) => event === 'worktree_deletion' && fields.phase === 'finish_pending'
+    );
+    expect(finishDiagnostic?.[1]).toMatchObject({ errorClass: 'Error' });
+    expect(JSON.stringify(finishDiagnostic?.[1])).not.toContain('do-not-log');
+  });
+
+  it('reports sanitized causes for discovery and runtime cleanup failures', async () => {
+    const f = fixture(2);
+    f.beginSession.mockImplementation(async id =>
+      id === workspaceId(0)
+        ? Promise.reject(new Error('discovery failed token=do-not-log'))
+        : location
+    );
+    f.cleanup.mockRejectedValueOnce(new Error('provider failed token=do-not-log'));
+
+    await expect(f.caller.deleteWorktree({ worktreeId })).resolves.toEqual({
+      success: true,
+      deletedSessionIds: [kiloId(0), kiloId(1)],
+      cleanup: 'pending',
+    });
+    const discoveryDiagnostic = mocks.diagnostic.mock.calls.find(
+      ([event, fields]) => event === 'worktree_deletion' && fields.phase === 'discovery_unavailable'
+    );
+    const cleanupDiagnostic = mocks.diagnostic.mock.calls.find(
+      ([event, fields]) => event === 'worktree_cleanup_location' && fields.result === 'pending'
+    );
+    expect(discoveryDiagnostic?.[1]).toMatchObject({ errorClass: 'Error' });
+    expect(cleanupDiagnostic?.[1]).toMatchObject({ errorClass: 'Error' });
+    expect(JSON.stringify([discoveryDiagnostic?.[1], cleanupDiagnostic?.[1]])).not.toContain(
+      'do-not-log'
+    );
   });
 
   it('authorizes completed tombstones on retry without requiring surviving session rows', async () => {
@@ -453,7 +753,7 @@ describe('deleteWorktree authorization and completion', () => {
     const cleanupCalls = f.cleanup.mock.calls.length;
     await expect(
       f.caller.deleteWorktree({ worktreeId, kilocodeOrganizationId: organizationId })
-    ).resolves.toMatchObject({ success: true });
+    ).resolves.toMatchObject({ success: true, cleanup: 'complete' });
     expect(f.cleanup).toHaveBeenCalledTimes(cleanupCalls);
     f.membership.mockResolvedValue([]);
     await expect(
@@ -461,16 +761,15 @@ describe('deleteWorktree authorization and completion', () => {
     ).rejects.toMatchObject({ code: 'FORBIDDEN' });
   });
 
-  it('records the stored checkout directory returned by the session DO', async () => {
-    const f = fixture();
-    const identity = getWorktreeWorkspacePath(organizationId, userId, worktreeId);
+  it('records one manifest per phase regardless of the number of checkout directories', async () => {
+    const f = fixture(17);
     mocks.getSession.mockImplementation((_env, ownerId: string, id: string) => {
       expect(ownerId).toBe(userId);
       return {
         beginWorktreeDeletion: async () => ({
           location: await f.beginSession(id),
           children: [],
-          directory: '/workspace/app',
+          directory: `/workspace/${id}`,
         }),
         finishWorktreeDeletion: () => f.finishSession(id),
       };
@@ -478,62 +777,37 @@ describe('deleteWorktree authorization and completion', () => {
 
     await expect(f.caller.deleteWorktree({ worktreeId })).resolves.toMatchObject({
       success: true,
+      cleanup: 'complete',
     });
-    expect(f.record.mock.calls.length).toBeGreaterThan(0);
-    for (const call of f.record.mock.calls) {
-      expect(call[0].directory).toBe('/workspace/app');
-      expect(call[0].directory).not.toBe(identity);
-    }
+    expect(f.record).toHaveBeenCalledTimes(2);
+    expect(f.record.mock.calls[0][0]).toEqual({
+      worktreeId,
+      kiloUserId: userId,
+      runtimeLocations: [location],
+    });
+    expect(f.record.mock.calls[1][0]).toEqual({
+      worktreeId,
+      kiloUserId: userId,
+      sessionIds: Array.from({ length: 17 }, (_, index) => kiloId(index)),
+      completedRuntimeLocation: location,
+    });
   });
 
-  it('records every distinct stored checkout directory across sessions', async () => {
-    const f = fixture(2);
-    const identity = getWorktreeWorkspacePath(organizationId, userId, worktreeId);
-    const directories = new Map<string, string>([
-      [workspaceId(0), '/workspace/app'],
-      [workspaceId(1), identity],
+  it('records cleanup exactly once for each runtime location', async () => {
+    const f = fixture();
+    const otherLocation = { sandboxId: 'usr-second-route', provider: 'vercel' as const };
+    f.getState().runtimeLocations = [location, otherLocation];
+
+    await expect(f.caller.deleteWorktree({ worktreeId })).resolves.toMatchObject({
+      success: true,
+      cleanup: 'complete',
+    });
+    expect(f.cleanup).toHaveBeenCalledTimes(2);
+    expect(f.record).toHaveBeenCalledTimes(3);
+    expect(f.record.mock.calls.slice(1).map(([input]) => input.completedRuntimeLocation)).toEqual([
+      location,
+      otherLocation,
     ]);
-    mocks.getSession.mockImplementation((_env, ownerId: string, id: string) => {
-      expect(ownerId).toBe(userId);
-      return {
-        beginWorktreeDeletion: async () => ({
-          location: await f.beginSession(id),
-          children: [],
-          directory: directories.get(id) ?? null,
-        }),
-        finishWorktreeDeletion: () => f.finishSession(id),
-      };
-    });
-
-    await expect(f.caller.deleteWorktree({ worktreeId })).resolves.toMatchObject({
-      success: true,
-    });
-    // Both call sites (record_manifest carrying runtimeLocations and
-    // record_cleanup carrying sessionIds) must cover both directories.
-    const manifestDirectories = new Set(
-      f.record.mock.calls
-        .filter(call => call[0].runtimeLocations !== undefined)
-        .map(call => call[0].directory)
-    );
-    const cleanupDirectories = new Set(
-      f.record.mock.calls
-        .filter(call => call[0].sessionIds !== undefined)
-        .map(call => call[0].directory)
-    );
-    expect(manifestDirectories).toEqual(new Set(['/workspace/app', identity]));
-    expect(cleanupDirectories).toEqual(new Set(['/workspace/app', identity]));
-  });
-
-  it('falls back to the identity workspace path when no session returns a directory', async () => {
-    const f = fixture();
-    const identity = getWorktreeWorkspacePath(undefined, userId, worktreeId);
-
-    await expect(f.caller.deleteWorktree({ worktreeId })).resolves.toMatchObject({
-      success: true,
-    });
-    expect(f.record.mock.calls.length).toBeGreaterThan(0);
-    for (const call of f.record.mock.calls) {
-      expect(call[0].directory).toBe(identity);
-    }
+    expect(f.record.mock.calls.every(([input]) => !('directory' in input))).toBe(true);
   });
 });

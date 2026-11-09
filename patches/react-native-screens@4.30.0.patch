@@ -1,0 +1,123 @@
+diff --git a/android/src/main/java/com/swmansion/rnscreens/bottomsheet/SheetDelegate.kt b/android/src/main/java/com/swmansion/rnscreens/bottomsheet/SheetDelegate.kt
+index 800407998ed12d559a6fde732dde1a6ae8b3f172..4bb4e2d1c40f0678e913f606c4be8de382559483 100644
+--- a/android/src/main/java/com/swmansion/rnscreens/bottomsheet/SheetDelegate.kt
++++ b/android/src/main/java/com/swmansion/rnscreens/bottomsheet/SheetDelegate.kt
+@@ -3,6 +3,7 @@ package com.swmansion.rnscreens.bottomsheet
+ import android.animation.Animator
+ import android.content.Context
+ import android.os.Build
++import android.util.Log
+ import android.view.View
+ import android.view.WindowManager
+ import android.view.inputmethod.InputMethodManager
+@@ -50,9 +51,13 @@ class SheetDelegate(
+     private val stackFragment: ScreenStackFragment
+         get() = screen.fragment as ScreenStackFragment
+ 
+-    private fun requireDecorView(): View =
+-        checkNotNull(screen.reactContext.currentActivity) { "[RNScreens] Attempt to access activity on detached context" }
+-            .window.decorView
++    private val decorViewOrNull: View?
++        get() =
++            screen.reactContext.currentActivity
++                ?.window
++                ?.decorView
++
++    private var isInsetsObserverRegistrationPending = false
+ 
+     private var viewToRestoreFocus: View? = null
+ 
+@@ -87,13 +92,41 @@ class SheetDelegate(
+     }
+ 
+     private fun handleHostFragmentOnStart() {
+-        InsetsObserverProxy.registerOnView(requireDecorView())
++        registerInsetsObserver()
+     }
+ 
+     private fun handleHostFragmentOnResume() {
++        if (isInsetsObserverRegistrationPending) {
++            registerInsetsObserver()
++        }
+         InsetsObserverProxy.addOnApplyWindowInsetsListener(this)
+     }
+ 
++    /**
++     * Registers the insets observer on the current activity's decor view, deferring to ON_RESUME
++     * when there is no current activity yet.
++     *
++     * The host fragment can reach ON_START while React holds no current activity: the sheet is
++     * open, the activity hosting it is stopped, another ReactActivity is destroyed as the current
++     * one, and the user then returns to the app. Fragment ON_START is dispatched before
++     * ReactActivity.onResume calls onHostResume, so at that moment currentActivity is still null.
++     * ON_RESUME runs after onHostResume has restored it, which is why the retry lands there.
++     *
++     * Requiring an activity here turned that return into a fatal IllegalStateException. Nothing
++     * about the sheet needs the decor view this early, and preserveBackgroundFocus below already
++     * treats a missing current activity as an ordinary condition.
++     */
++    private fun registerInsetsObserver() {
++        val decorView = decorViewOrNull
++        if (decorView == null) {
++            Log.w(TAG, "[RNScreens] No current activity while registering the sheet insets observer, deferring to ON_RESUME")
++            isInsetsObserverRegistrationPending = true
++            return
++        }
++        InsetsObserverProxy.registerOnView(decorView)
++        isInsetsObserverRegistrationPending = false
++    }
++
+     private fun handleHostFragmentOnPause() {
+         InsetsObserverProxy.removeOnApplyWindowInsetsListener(this)
+     }
+diff --git a/ios/RNSScreenStack.mm b/ios/RNSScreenStack.mm
+index 5da11964f5932cb44e1131c44a2480803c0a62b5..e6fe3dee90800cc4be730638006fe5251835a198 100644
+--- a/ios/RNSScreenStack.mm
++++ b/ios/RNSScreenStack.mm
+@@ -1,4 +1,5 @@
+ #import "RNSScreenStack.h"
++#import <math.h>
+ #import <React/RCTConversions.h>
+ #import <React/RCTFabricComponentsPlugins.h>
+ #import <React/RCTFabricSurface.h>
+@@ -870,6 +871,40 @@ RNS_IGNORE_SUPER_CALL_END
+ }
+ 
+ - (BOOL)gestureRecognizerShouldBegin:(UIGestureRecognizer *)gestureRecognizer
++{
++  RNSScreenView *topScreen = _reactSubviews.lastObject;
++#if !TARGET_OS_TV && !TARGET_OS_VISION
++  if (topScreen.preventNativeDismiss && [gestureRecognizer isKindOfClass:[RNSPanGestureRecognizer class]]) {
++    CGPoint velocity = [(UIPanGestureRecognizer *)gestureRecognizer velocityInView:gestureRecognizer.view];
++    BOOL isVertical = topScreen.swipeDirection == RNSScreenSwipeDirectionVertical;
++    CGFloat along = isVertical ? velocity.y : velocity.x;
++    CGFloat across = isVertical ? velocity.x : velocity.y;
++    BOOL isRTL = _controller.view.semanticContentAttribute == UISemanticContentAttributeForceRightToLeft;
++    if (!isVertical && isRTL) {
++      along = -along;
++    }
++    if (topScreen.stackAnimation == RNSScreenStackAnimationSlideFromLeft) {
++      along = -along;
++    }
++    if (along <= 0 || fabs(along) <= fabs(across)) {
++      return NO;
++    }
++  }
++#endif
++  if (![self dismissGestureShouldBegin:gestureRecognizer]) {
++    return NO;
++  }
++  if (!topScreen.preventNativeDismiss) {
++    return YES;
++  }
++  // A screen that prevents its removal answers the swipe in JS (usePreventRemove)
++  // instead of letting UIKit pop it and push it back after the gesture ends.
++  _isFullWidthSwipingWithPanGesture = NO;
++  [topScreen notifyDismissCancelledWithDismissCount:1];
++  return NO;
++}
++
++- (BOOL)dismissGestureShouldBegin:(UIGestureRecognizer *)gestureRecognizer
+ {
+   if (_disableSwipeBack) {
+     return NO;

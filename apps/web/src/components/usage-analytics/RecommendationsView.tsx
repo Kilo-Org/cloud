@@ -40,7 +40,6 @@ const FEATURE_LABELS: Record<Recommendation['feature'], string> = {
   'security-agent': 'Security Agent',
   'team-integration': 'Team integrations',
   'cloud-agent-used': 'Cloud Agent',
-  'project-deployed': 'Deploy',
 };
 
 function FeatureIcon({ recommendation }: { recommendation: Recommendation }) {

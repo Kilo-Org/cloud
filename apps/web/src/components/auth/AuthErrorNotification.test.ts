@@ -45,6 +45,18 @@ describe('AuthErrorNotification', () => {
     expect(html).toContain(message);
   });
 
+  it('points new email signups at the other sign-in options', () => {
+    const html = renderToStaticMarkup(
+      createElement(AuthErrorNotification, { error: 'EMAIL-SIGNUP-DISABLED' })
+    );
+
+    expect(html).toContain('role="alert"');
+    expect(html).toContain('Email Sign-up Is Paused');
+    expect(html).toContain('be created with email right now');
+    expect(html).toContain('choose one of the other');
+    expect(html).toContain('You can still sign in with email.');
+  });
+
   it('uses the generic fallback for an unknown callback error', () => {
     const html = renderToStaticMarkup(
       createElement(AuthErrorNotification, { error: 'untrusted-query-error' })

@@ -9,14 +9,18 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useSessionListAutoScroll } from '@/components/agents/use-session-list-auto-scroll';
 import { useSessionListAnchorReport } from '@/components/agents/use-session-list-anchor-report';
+import { useSessionListOpenSettle } from '@/components/agents/use-session-list-open-settle';
 import { useSessionListResumeScroll } from '@/components/agents/use-session-list-resume-scroll';
 import { SessionPaginationHeader } from '@/components/agents/session-pagination-header';
+import { SessionTranscriptOpenGate } from '@/components/agents/session-transcript-open-gate';
 import { shouldTriggerOlderMessagesLoad } from '@/components/agents/session-message-list-state';
 import {
   getSessionTranscriptItemMessageId,
   type SessionTranscriptItem,
 } from '@/components/agents/session-transcript';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
+import { cn } from '@/lib/utils';
 import {
   getOlderMessagesArrivedAnnouncement,
   shouldAnnounceOlderMessagesArrival,
@@ -85,6 +89,16 @@ type SessionMessageListProps<T> = {
    * history exactly when the user returns to the live tail.
    */
   onReachedBottom?: () => void;
+  /**
+   * Optional callback that publishes the open gate's verdict, keyed by the
+   * session it belongs to: the rows are still measuring and the skeleton is
+   * what the body paints. A host that owns chrome around the transcript — the
+   * composer slot, the read-only footer, the header pill — must hold that
+   * chrome in its loading shape until this reports settled, or the screen
+   * shows finished controls beside a loading body. Absent keeps every other
+   * caller byte-identical.
+   */
+  onOpenSettledChange?: (sessionId: string, settled: boolean) => void;
 };
 
 export function SessionMessageList<T>({
@@ -102,13 +116,12 @@ export function SessionMessageList<T>({
   contentBottomInset,
   onReachedBottom,
   onAnchorChange,
+  onOpenSettledChange,
   resumeAt,
   followTailNonce,
 }: Readonly<SessionMessageListProps<T>>) {
   // Rows are already present when the list mounts (the resume never mounts a
-  // blank list), so the resume decision is derivable at render: every row's
-  // anchor id via `getSessionTranscriptItemMessageId`, and whether the anchor
-  // is one of them.
+  // blank list), so the resume decision is derivable at render.
   const anchorIds = useMemo(
     () => items.map(item => getSessionTranscriptItemMessageId(item as SessionTranscriptItem)),
     [items]
@@ -157,6 +170,24 @@ export function SessionMessageList<T>({
     initialAutoScroll: followTailAtMount,
     resumeKey: resumeAnchor,
   });
+  // The transcript stays behind the loading skeleton until its rows stop
+  // measuring, so the position it is first seen in is the position it keeps.
+  const {
+    openSettled,
+    handleContentSizeChange: handleContentSizeChangeForOpen,
+    handleListLayout: handleListLayoutForOpen,
+  } = useSessionListOpenSettle({
+    sessionId,
+    followTailAtMount,
+    onContentSizeChange: handleContentSizeChange,
+    onLayout: handleListLayout,
+  });
+  // The host holds the chrome around this list — the bottom slot and the header
+  // pill — in its loading shape while the gate hides the rows, so it needs the
+  // gate's verdict, keyed by the session it describes.
+  useEffect(() => {
+    onOpenSettledChange?.(sessionId, openSettled);
+  }, [onOpenSettledChange, openSettled, sessionId]);
   const colors = useThemeColors();
   const { t } = useTranslation();
   const { left, right } = useSafeAreaInsets();
@@ -245,11 +276,10 @@ export function SessionMessageList<T>({
 
   // The newest message is kept visible when the viewport shrinks by the follow
   // itself: `handleListLayout` re-pins the tail on a viewport resize, and
-  // FlashList's `startRenderingFromBottom` holds the bottom while the layout
-  // changes. A keyboard listener here added a second, independent correction —
-  // the message stack jumped on its own timetable while the composer was still
-  // moving (video V1 ~19.0s), and no surface beside the provider may read the
-  // keyboard.
+  // `startRenderingFromBottom` holds the bottom while the layout changes. A
+  // keyboard listener here added a second, independent correction — the stack
+  // jumped as the composer moved (video V1 ~19.0s), and no surface beside the
+  // provider may read the keyboard.
 
   // Fire `onReachedBottom` only on the false→true transition of
   // `isAtBottom`. The previous-value ref prevents a fire on mount (the list
@@ -350,76 +380,85 @@ export function SessionMessageList<T>({
   );
 
   return (
-    <View className="flex-1">
-      <FlashList<T>
-        ref={listRef}
-        style={listStyle}
-        contentContainerStyle={resolvedContentContainerStyle}
-        data={items}
-        keyExtractor={keyExtractor}
-        getItemType={getItemType}
-        renderItem={renderItem}
-        // Transcript rows are tall and parse markdown on mount. The 250 dp
-        // default draws under half a screen ahead, so a fast fling shows blank
-        // space until the rows mount. A 2000 dp lookahead hides that.
-        drawDistance={DRAW_DISTANCE}
-        // Android Fabric can race clipped-view reattachment with rapid transcript updates.
-        // Kept explicit: flash-list ≥ 2.3.2 defaults this to false (PR #2202); the pin
-        // is asserted in src/lib/flash-list-contract.test.ts.
-        removeClippedSubviews={false}
-        onScroll={handleScroll}
-        onScrollBeginDrag={handleScrollBeginDrag}
-        onScrollEndDrag={handleScrollEndDrag}
-        onMomentumScrollBegin={handleMomentumScrollBegin}
-        onMomentumScrollEnd={handleMomentumScrollEnd}
-        onContentSizeChange={handleContentSizeChange}
-        onLayout={handleListLayout}
-        scrollEventThrottle={16}
-        onStartReached={hasOlderMessages ? handleStartReached : undefined}
-        onStartReachedThreshold={ON_START_REACHED_THRESHOLD}
-        // Viewability is only wired when a host asked for the position, so
-        // every other caller's list stays byte-identical.
-        {...anchorReport}
-        maintainVisibleContentPosition={{
-          // Start rendering from the bottom so the newest message is visible
-          // on first render. `autoscrollToTopThreshold` is left at its default
-          // so the viewport only repositions when the user is far enough away
-          // from the top — preserving the existing auto-follow behavior on
-          // streaming insertions at the bottom.
-          startRenderingFromBottom: true,
-        }}
-        ListHeaderComponent={listHeaderComponent}
-        ListFooterComponent={ListFooterComponent}
-        keyboardDismissMode="interactive"
-        keyboardShouldPersistTaps="handled"
-      />
-      {/* Floating "scroll to bottom" affordance. Rendered only when the
+    <SessionTranscriptOpenGate settled={openSettled} sessionId={sessionId}>
+      <View className="flex-1">
+        <FlashList<T>
+          ref={listRef}
+          style={listStyle}
+          contentContainerStyle={resolvedContentContainerStyle}
+          data={items}
+          keyExtractor={keyExtractor}
+          getItemType={getItemType}
+          renderItem={renderItem}
+          // Transcript rows are tall and parse markdown on mount. The 250 dp
+          // default draws under half a screen ahead, so a fast fling shows blank
+          // space until the rows mount. A 2000 dp lookahead hides that.
+          drawDistance={DRAW_DISTANCE}
+          // Android Fabric can race clipped-view reattachment with rapid transcript updates.
+          // Kept explicit: flash-list ≥ 2.3.2 defaults this to false (PR #2202); the pin
+          // is asserted in src/lib/flash-list-contract.test.ts.
+          removeClippedSubviews={false}
+          onScroll={handleScroll}
+          onScrollBeginDrag={handleScrollBeginDrag}
+          onScrollEndDrag={handleScrollEndDrag}
+          onMomentumScrollBegin={handleMomentumScrollBegin}
+          onMomentumScrollEnd={handleMomentumScrollEnd}
+          onContentSizeChange={handleContentSizeChangeForOpen}
+          onLayout={handleListLayoutForOpen}
+          scrollEventThrottle={16}
+          onStartReached={hasOlderMessages ? handleStartReached : undefined}
+          onStartReachedThreshold={ON_START_REACHED_THRESHOLD}
+          // Viewability is only wired when a host asked for the position, so
+          // every other caller's list stays byte-identical.
+          {...anchorReport}
+          maintainVisibleContentPosition={{
+            // Start rendering from the bottom so the newest message is visible
+            // on first render. `autoscrollToTopThreshold` is left at its default
+            // so the viewport only repositions when the user is far enough away
+            // from the top — preserving the existing auto-follow behavior on
+            // streaming insertions at the bottom.
+            startRenderingFromBottom: true,
+          }}
+          ListHeaderComponent={listHeaderComponent}
+          ListFooterComponent={ListFooterComponent}
+          keyboardDismissMode="interactive"
+          keyboardShouldPersistTaps="handled"
+        />
+        {/* Floating "scroll to bottom" affordance. Rendered only when the
           user has scrolled past the 100px bottom threshold; the fade
           animations match the chat-composer convention. `pointerEvents`
           is set on the wrapper so empty space around the button keeps
           scrolling the list, while the Pressable itself catches taps. */}
-      {!isAtBottom ? (
-        <Animated.View
-          entering={FadeIn.duration(200)}
-          exiting={FadeOut.duration(150)}
-          pointerEvents="box-none"
-          className="absolute bottom-4 right-4"
-          // The fixed 16pt (right-4) offset gains the landscape right inset so
-          // the control clears the sensor area; portrait insets are 0, keeping
-          // the geometry unchanged (16 == right-4).
-          style={{ right: 16 + right }}
-        >
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t('agentChat.session.scrollToBottom')}
-            onPress={scrollToLatestAnimated}
-            hitSlop={2}
-            className="h-10 w-10 items-center justify-center rounded-full border border-border bg-card shadow-lg shadow-[#00000040] active:opacity-70"
+        {!isAtBottom ? (
+          <Animated.View
+            entering={FadeIn.duration(200)}
+            exiting={FadeOut.duration(150)}
+            pointerEvents="box-none"
+            className="absolute bottom-4 right-4"
+            // The fixed 16pt (right-4) offset gains the landscape right inset so
+            // the control clears the sensor area; portrait insets are 0, keeping
+            // the geometry unchanged (16 == right-4).
+            style={{ right: 16 + right }}
           >
-            <ChevronDown size={20} color={colors.foreground} />
-          </Pressable>
-        </Animated.View>
-      ) : null}
-    </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('agentChat.session.scrollToBottom')}
+              onPress={scrollToLatestAnimated}
+              // The pressable is the touch target a control-size audit
+              // measures, and `hitSlop` never moves that rect: the 48pt floor
+              // has to be this node's own box.
+              className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
+            >
+              {/* The visible circle stays compact (explicit px, because
+                  NativeWind's 14pt rem renders `h-10` at 35pt): DESIGN.md keeps
+                  the target, not the visual, at 44pt. */}
+              <View className="h-[35px] w-[35px] items-center justify-center rounded-full border border-border bg-card shadow-lg shadow-[#00000040]">
+                <ChevronDown size={20} color={colors.foreground} />
+              </View>
+            </Pressable>
+          </Animated.View>
+        ) : null}
+      </View>
+    </SessionTranscriptOpenGate>
   );
 }

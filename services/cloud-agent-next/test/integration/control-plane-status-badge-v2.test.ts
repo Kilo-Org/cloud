@@ -1,4 +1,5 @@
-import { env, reset, runInDurableObject } from 'cloudflare:test';
+import { installFakeRuntimeProxyPeer } from './helpers/fake-session-peer.js';
+import { env, evictAllDurableObjects, reset, runInDurableObject } from 'cloudflare:test';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -6,7 +7,7 @@ import type { SandboxControlV2 } from '../../src/control-plane/sandbox/sandbox-d
 import { allocation as allocationTable } from '../../src/control-plane/sandbox/sqlite-schema.js';
 import type { SandboxSessionV2 } from '../../src/control-plane/session/session-do.js';
 import { generateSandboxId } from '../../src/sandbox-id.js';
-import { sessionDoName } from '../../src/session-plane.js';
+import { sessionDoName } from '../../src/session-identity.js';
 import { parseSessionMetadata } from '../../src/persistence/session-metadata.js';
 import { CONTROL_PLANE_TIMERS } from '../../src/shared/control-plane-timers.js';
 import { SandboxStatusSnapshotSchema } from '../../src/shared/sandbox-status.js';
@@ -20,8 +21,9 @@ import {
   type ControlPlanePromptPayload,
 } from '../../src/shared/control-plane-protocol.js';
 import {
+  FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN,
   createFakeCredentialBroker,
-  FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
+  FAKE_SANDBOX_CONTAINERS_NAMESPACE,
   installFakeCredentialEnv,
 } from './helpers/fake-credentials.js';
 import { FakeSandboxPeer } from './helpers/fake-sandbox-peer.js';
@@ -60,13 +62,13 @@ function metadata(input: { sessionId: string; kiloSessionId: string; sandboxId: 
       orgId: ORG_ID,
       createdOnPlatform: 'cloud-agent-web',
     },
-    auth: { kiloSessionId: input.kiloSessionId, kilocodeToken: 'native-token' },
+    auth: { kiloSessionId: input.kiloSessionId, kilocodeToken: FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN },
     agent: { mode: 'code', model: 'test/model' },
     repository: { type: 'github', repo: 'acme/widgets', upstreamBranch: 'main' },
     workspace: {
       branchName: 'kilo/b10',
       sandboxId: input.sandboxId,
-      sandboxProvider: 'cloudflare',
+      sandboxProvider: 'cloudflare-containers',
     },
     lifecycle: { version: 1, timestamp: 1 },
   });
@@ -87,7 +89,7 @@ function createFakeProvider(): { adapter: ProviderAdapter; launchEnvs: Record<st
     async create(intent: ProviderCreateIntent) {
       return { providerRef: `mem_${intent.intentId}` };
     },
-    async launch(_ref, launchEnv) {
+    async launch(_ref, { env: launchEnv }) {
       provider.launchEnvs.push({ ...launchEnv });
       return { startSource: 'image' as const };
     },
@@ -114,12 +116,13 @@ async function injectProvider(
   await runInDurableObject(stub, async instance => {
     await instance.getAllocationState();
     installFakeCredentialEnv(instance.env, broker, {
-      SandboxSmallContainment: FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
+      SANDBOX_CONTAINERS: FAKE_SANDBOX_CONTAINERS_NAMESPACE,
       WORKER_URL: 'https://control.test',
       KILOCODE_BACKEND_BASE_URL: 'https://control.test',
       KILO_OPENROUTER_BASE: 'https://control.test',
       KILO_SESSION_INGEST_URL: 'https://control.test',
     });
+    installFakeRuntimeProxyPeer(instance);
     Object.assign(instance, {
       createProviderAdapter: () => provider.adapter,
       provider: provider.adapter,
@@ -150,18 +153,17 @@ async function patchAllocation(
 }
 
 /** Creates an owned sandbox with a provider pin but no wrapper connection. */
-async function startOwnedSandbox(): Promise<{
+async function startOwnedSandbox(provider = createFakeProvider()): Promise<{
   sandboxId: string;
   sandbox: DurableObjectStub<SandboxControlV2>;
 }> {
-  const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, newSessionId());
-  const provider = createFakeProvider();
+  const sandboxId = await generateSandboxId(newSessionId());
   const sandbox = await injectProvider(sandboxId, provider);
   const sessionId = newSessionId();
   await sessions.getByName(sessionDoName(USER_ID, sessionId)).createSessionWithInitialAdmission({
     metadata: metadata({ sessionId, kiloSessionId: kiloSessionId(), sandboxId }),
     message: promptPayload(messageId()),
-    sandboxSelection: { provider: 'cloudflare' },
+    sandboxSelection: { provider: 'cloudflare-containers' },
   });
   await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
   return { sandboxId, sandbox };
@@ -173,7 +175,7 @@ afterEach(async () => {
 
 describe('sandbox status badge projection (B10)', () => {
   it('reports unknown when the sandbox has no owner', async () => {
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, newSessionId());
+    const sandboxId = await generateSandboxId(newSessionId());
     const sandbox = sandboxes.getByName(sandboxId);
 
     const snapshot = SandboxStatusSnapshotSchema.parse(await sandbox.getStatusSnapshot());
@@ -187,7 +189,7 @@ describe('sandbox status badge projection (B10)', () => {
   });
 
   it('reports active while connected and sleeping after the provider is gone', async () => {
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, newSessionId());
+    const sandboxId = await generateSandboxId(newSessionId());
     const provider = createFakeProvider();
     const sandbox = await injectProvider(sandboxId, provider);
     const sessionId = newSessionId();
@@ -196,7 +198,7 @@ describe('sandbox status badge projection (B10)', () => {
     await session.createSessionWithInitialAdmission({
       metadata: metadata({ sessionId, kiloSessionId: kilo, sandboxId }),
       message: promptPayload(messageId()),
-      sandboxSelection: { provider: 'cloudflare' },
+      sandboxSelection: { provider: 'cloudflare-containers' },
     });
     await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
     const launchEnv = provider.launchEnvs[0]!;
@@ -219,7 +221,7 @@ describe('sandbox status badge projection (B10)', () => {
     expect(active).toMatchObject({
       status: 'active',
       detailCode: 'sandbox_ready',
-      provider: 'Cloudflare',
+      provider: 'Cloudflare Containers',
       inactivityTimeoutMs: CONTROL_PLANE_TIMERS.sandbox.idleMs,
     });
 
@@ -228,11 +230,159 @@ describe('sandbox status badge projection (B10)', () => {
     expect(stopped).toMatchObject({
       status: 'sleeping',
       detailCode: 'sandbox_stopped',
-      provider: 'Cloudflare',
+      provider: 'Cloudflare Containers',
     });
     await waitFor(async () =>
       expect(await session.getSession()).toMatchObject({ route: { state: 'unknown' } })
     );
+    wrapper.close();
+  });
+
+  it.each(['7.4.20', '0.0.0-v2-25'])(
+    'reports CLI version %s and keeps it across eviction',
+    async kiloCliVersion => {
+      const provider = createFakeProvider();
+      const { sandboxId, sandbox } = await startOwnedSandbox(provider);
+      const response = await sandbox.fetch(
+        new Request(
+          `https://sandbox.internal/status-stream?ownerId=${USER_ID}&sessionId=workspace_status`,
+          { headers: { Upgrade: 'websocket' } }
+        )
+      );
+      const socket = response.webSocket!;
+      const snapshots: unknown[] = [];
+      socket.addEventListener('message', event => {
+        snapshots.push(JSON.parse(String(event.data)).data);
+      });
+      socket.accept();
+      await waitFor(() => expect(snapshots).toHaveLength(1));
+      expect(SandboxStatusSnapshotSchema.parse(snapshots[0]).runtime?.kiloCliVersion).toBeNull();
+      const launchEnv = provider.launchEnvs[0]!;
+      const wrapper = await FakeWrapper.connect({
+        sandboxId,
+        credential: launchEnv.SANDBOX_CONTROL_CREDENTIAL!,
+        kiloCliVersion,
+        wrapperVersion: '2.4.0',
+      });
+      expect(
+        await wrapper.hello({
+          wrapperId: WRAPPER_ID,
+          allocationId: launchEnv.CONTROL_PLANE_ALLOCATION_ID!,
+        })
+      ).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
+      await waitFor(async () => (await sandbox.getAllocationState()).kind === 'connected');
+
+      const runtime = {
+        sandboxType: 'containers-standard-3',
+        kiloCliVersion,
+        wrapperVersion: '2.4.0',
+        startedAt: null,
+        stoppedAt: null,
+      };
+      expect(SandboxStatusSnapshotSchema.parse(await sandbox.getStatusSnapshot()).runtime).toEqual(
+        runtime
+      );
+      await waitFor(() => {
+        expect(SandboxStatusSnapshotSchema.parse(snapshots.at(-1)).runtime).toEqual(runtime);
+      });
+
+      await evictAllDurableObjects();
+      expect(SandboxStatusSnapshotSchema.parse(await sandbox.getStatusSnapshot()).runtime).toEqual(
+        runtime
+      );
+      wrapper.close();
+      socket.close();
+    }
+  );
+
+  it('resets observed versions for a new allocation and tolerates a wrapper without headers', async () => {
+    const provider = createFakeProvider();
+    const { sandboxId, sandbox } = await startOwnedSandbox(provider);
+    const first = provider.launchEnvs[0]!;
+    const wrapper = await FakeWrapper.connect({
+      sandboxId,
+      credential: first.SANDBOX_CONTROL_CREDENTIAL!,
+      kiloCliVersion: '7.4.20',
+      wrapperVersion: '2.4.0',
+    });
+    await wrapper.hello({
+      wrapperId: WRAPPER_ID,
+      allocationId: first.CONTROL_PLANE_ALLOCATION_ID!,
+    });
+    await waitFor(async () => (await sandbox.getAllocationState()).kind === 'connected');
+    expect((await sandbox.getStatusSnapshot()).runtime).toMatchObject({
+      kiloCliVersion: '7.4.20',
+      wrapperVersion: '2.4.0',
+    });
+
+    await sandbox.reportProviderGone();
+    await waitFor(async () => (await sandbox.getAllocationState()).kind === 'stopped');
+    expect((await sandbox.getStatusSnapshot()).runtime).toMatchObject({
+      kiloCliVersion: null,
+      wrapperVersion: null,
+    });
+
+    await sandbox.ensureAllocation();
+    await waitFor(() => expect(provider.launchEnvs).toHaveLength(2));
+    const second = provider.launchEnvs[1]!;
+    expect(second.CONTROL_PLANE_ALLOCATION_ID).not.toBe(first.CONTROL_PLANE_ALLOCATION_ID);
+    expect((await sandbox.getStatusSnapshot()).runtime).toMatchObject({
+      kiloCliVersion: null,
+      wrapperVersion: null,
+    });
+
+    const legacy = await FakeWrapper.connect({
+      sandboxId,
+      credential: second.SANDBOX_CONTROL_CREDENTIAL!,
+    });
+    expect(
+      await legacy.hello({
+        wrapperId: 'wr_legacy',
+        allocationId: second.CONTROL_PLANE_ALLOCATION_ID!,
+      })
+    ).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
+    await waitFor(async () => (await sandbox.getAllocationState()).kind === 'connected');
+    expect((await sandbox.getStatusSnapshot()).runtime).toMatchObject({
+      sandboxType: 'containers-standard-3',
+      kiloCliVersion: null,
+      wrapperVersion: null,
+    });
+
+    wrapper.close();
+    legacy.close();
+  });
+
+  it('does not let a rejected stale hello overwrite observed versions', async () => {
+    const provider = createFakeProvider();
+    const { sandboxId, sandbox } = await startOwnedSandbox(provider);
+    const launchEnv = provider.launchEnvs[0]!;
+    const wrapper = await FakeWrapper.connect({
+      sandboxId,
+      credential: launchEnv.SANDBOX_CONTROL_CREDENTIAL!,
+      kiloCliVersion: '7.4.20',
+      wrapperVersion: '2.4.0',
+    });
+    await wrapper.hello({
+      wrapperId: WRAPPER_ID,
+      allocationId: launchEnv.CONTROL_PLANE_ALLOCATION_ID!,
+    });
+    await waitFor(async () => (await sandbox.getAllocationState()).kind === 'connected');
+
+    const stale = await FakeWrapper.connect({
+      sandboxId,
+      credential: launchEnv.SANDBOX_CONTROL_CREDENTIAL!,
+      kiloCliVersion: '9.9.9',
+      wrapperVersion: '9.9.9',
+    });
+    expect(await stale.hello({ wrapperId: 'wr_stale', allocationId: 'stale-allocation' })).toEqual({
+      type: 'shutdown',
+      reason: 'hello_rejected',
+    });
+    expect(await stale.waitForClose()).toBe(1008);
+
+    expect(
+      SandboxStatusSnapshotSchema.parse(await sandbox.getStatusSnapshot()).runtime
+    ).toMatchObject({ kiloCliVersion: '7.4.20', wrapperVersion: '2.4.0' });
     wrapper.close();
   });
 
@@ -265,9 +415,44 @@ describe('sandbox status badge projection (B10)', () => {
     expect(active.estimatedSleepAt as number).toBeGreaterThan(Date.now());
   });
 
+  it('projects stored billing without admitting or starting another allocation', async () => {
+    const provider = createFakeProvider();
+    let projectionCalls = 0;
+    provider.adapter.getBillingProjection = async () => {
+      projectionCalls += 1;
+      return {
+        sandboxClassName: 'SandboxContainersStandard3' as const,
+        blocked: true,
+        context: {
+          service: 'cloud-agent',
+          instanceId: 'instance',
+          sku: 'cloud-agent-containers-standard-3-2026-09',
+          subject: { type: 'user' as const, id: USER_ID },
+          actor: { type: 'user' as const, id: USER_ID },
+          startEpochMs: 17,
+        },
+      };
+    };
+    const { sandbox } = await startOwnedSandbox(provider);
+    const launches = provider.launchEnvs.length;
+
+    await expect(sandbox.getWorkspaceBillingProjection()).resolves.toEqual({
+      payer: { type: 'user', id: USER_ID },
+      actor: { type: 'user', id: USER_ID },
+      onBehalfOf: null,
+      sku: 'cloud-agent-containers-standard-3-2026-09',
+      blocked: true,
+      enforcementRequested: false,
+      intervalStartedAt: 17,
+      meterInstanceId: null,
+    });
+    expect(projectionCalls).toBe(1);
+    expect(provider.launchEnvs).toHaveLength(launches);
+  });
+
   it('returns the Sandbox DO snapshot through the Session DO RPC', async () => {
     const sessionId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, newSessionId());
+    const sandboxId = await generateSandboxId(newSessionId());
     const stub = sessions.getByName(sessionId);
     const peer = new FakeSandboxPeer();
     const expected = {
@@ -277,6 +462,13 @@ describe('sandbox status badge projection (B10)', () => {
       detailCode: 'sandbox_ready' as const,
       inactivityTimeoutMs: 600_000,
       estimatedSleepAt: 900,
+      runtime: {
+        sandboxType: 'unknown' as const,
+        kiloCliVersion: '7.4.20',
+        wrapperVersion: '2.4.0',
+        startedAt: null,
+        stoppedAt: null,
+      },
     };
     peer.statusSnapshot = expected;
     await stub.registerSession({
@@ -290,7 +482,7 @@ describe('sandbox status badge projection (B10)', () => {
       credentials: {
         userId: USER_ID,
         kiloSessionId: kiloSessionId(),
-        kiloToken: 'native-token',
+        kiloToken: FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN,
         orgId: ORG_ID,
         repository: { type: 'github', repo: 'acme/widgets' },
         scopeId: sessionId,
@@ -310,12 +502,63 @@ describe('sandbox status badge projection (B10)', () => {
       inactivityTimeoutMs: null,
     });
   });
+
+  it('composes the passive workspace runtime status without preparing a route', async () => {
+    const sessionId = newSessionId();
+    const sandboxId = await generateSandboxId(newSessionId());
+    const stub = sessions.getByName(sessionId);
+    const peer = new FakeSandboxPeer();
+    const expected = {
+      status: 'sleeping' as const,
+      provider: 'Cloudflare Containers' as const,
+      observedAt: 42,
+      detailCode: 'sandbox_stopped' as const,
+      inactivityTimeoutMs: 600_000,
+      estimatedSleepAt: null,
+    };
+    peer.statusSnapshot = expected;
+    peer.billingProjection = {
+      payer: { type: 'user', id: USER_ID },
+      actor: { type: 'user', id: USER_ID },
+      onBehalfOf: null,
+      sku: 'cloud-agent-standard-2026-07',
+      blocked: false,
+      enforcementRequested: true,
+      intervalStartedAt: null,
+      meterInstanceId: 'sbx-meter',
+    };
+    await stub.registerSession({
+      sandboxId,
+      spec: {
+        sessionId,
+        kiloSessionId: kiloSessionId(),
+        directory: `/workspace/${sessionId}`,
+        attemptId: `${sessionId}-requested`,
+      },
+      credentials: {
+        userId: USER_ID,
+        kiloSessionId: kiloSessionId(),
+        kiloToken: FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN,
+        orgId: ORG_ID,
+        repository: { type: 'github', repo: 'acme/widgets' },
+        scopeId: sessionId,
+      },
+    });
+    await installPeer(stub, peer);
+
+    await expect(stub.getWorkspaceRuntimeStatus()).resolves.toEqual({
+      sandbox: expected,
+      billing: peer.billingProjection,
+    });
+    expect(peer.prepareCalls).toEqual([]);
+    expect(peer.deliverCalls).toEqual([]);
+  });
 });
 
 describe('compute billing status metadata read (B10)', () => {
   it('exposes the metadata the billing handler reads from the session DO', async () => {
     const sessionId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, newSessionId());
+    const sandboxId = await generateSandboxId(newSessionId());
     const kindaSession = kiloSessionId();
     const stub = sessions.getByName(sessionId);
     const peer = new FakeSandboxPeer();
@@ -324,7 +567,7 @@ describe('compute billing status metadata read (B10)', () => {
     await stub.createSessionWithInitialAdmission({
       metadata: metadata({ sessionId, kiloSessionId: kindaSession, sandboxId }),
       message: promptPayload(messageId()),
-      sandboxSelection: { provider: 'cloudflare' },
+      sandboxSelection: { provider: 'cloudflare-containers' },
     });
 
     const stored = await stub.getMetadata();
@@ -332,6 +575,6 @@ describe('compute billing status metadata read (B10)', () => {
     expect(stored?.identity.userId).toBe(USER_ID);
     expect(stored?.identity.orgId).toBe(ORG_ID);
     expect(stored?.workspace?.sandboxId).toBe(sandboxId);
-    expect(stored?.workspace?.sandboxProvider).toBe('cloudflare');
+    expect(stored?.workspace?.sandboxProvider).toBe('cloudflare-containers');
   });
 });

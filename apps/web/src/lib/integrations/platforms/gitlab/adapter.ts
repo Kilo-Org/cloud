@@ -1,4 +1,5 @@
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
+import { MAX_INLINE_COMMENT_BODY_CHARS } from '@/lib/code-reviews/core/constants';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import type { PlatformRepository } from '@/lib/integrations/core/types';
 import { getPlatformOAuthCallbackUrl } from '@/lib/integrations/oauth/urls';
@@ -22,11 +23,111 @@ const GITLAB_REDIRECT_URI = getPlatformOAuthCallbackUrl(PLATFORM.GITLAB);
 
 const DEFAULT_GITLAB_URL = DEFAULT_GITLAB_INSTANCE_URL;
 const MAX_GITLAB_REDIRECTS = 5;
-const MAX_GITLAB_RESPONSE_BYTES = 10 * 1024 * 1024;
-const GITLAB_REQUEST_TIMEOUT_MS = 30_000;
+export const MAX_GITLAB_RESPONSE_BYTES = 10 * 1024 * 1024;
+export const GITLAB_REQUEST_TIMEOUT_MS = 30_000;
+const MAX_PROVIDER_ERROR_EXCERPT_CHARS = 200;
 
-async function fetchGitLab(url: string, init?: RequestInit, redirectCount = 0): Promise<Response> {
-  const response = await fetchGitLabOnce(url, init);
+/** Collapses a provider error body to one bounded line for the log. */
+function providerErrorExcerpt(body: string): string {
+  const singleLine = body.replace(/\s+/g, ' ').trim();
+  if (singleLine.length <= MAX_PROVIDER_ERROR_EXCERPT_CHARS) {
+    return singleLine;
+  }
+  return `${singleLine.slice(0, MAX_PROVIDER_ERROR_EXCERPT_CHARS - 1)}…`;
+}
+const MAX_GITLAB_PAGINATION_PAGES = 100;
+const MAX_GITLAB_PAGINATION_ITEMS = 10_000;
+
+/**
+ * Cumulative response bytes one paginated read keeps across its pages. A real page of 100
+ * projects is about 90 KiB and a page of 100 branches about 100 KiB on gitlab.com, so
+ * MAX_GITLAB_PAGINATION_PAGES full pages come to roughly 10 MiB; 16 MiB leaves headroom for
+ * payloads larger than that.
+ */
+export const MAX_GITLAB_LISTING_BYTES = 16 * 1024 * 1024;
+
+/**
+ * Total duration of one paginated read, shared by every page request. A real page answers in
+ * well under a second, so the page cap is reached in seconds and this limit applies only to a
+ * read far slower than a listing.
+ */
+export const GITLAB_LISTING_TIMEOUT_MS = 60_000;
+
+/**
+ * One paginated read's budget: the response bytes it keeps across pages and the single
+ * total-duration signal every page request of that read shares. A read that exceeds either
+ * limit fails with an error naming the read.
+ */
+class GitLabListingBudget {
+  readonly signal: AbortSignal;
+  private readonly controller = new AbortController();
+  private readonly context: string;
+  private readonly timer: NodeJS.Timeout;
+  private retainedBytes = 0;
+
+  constructor(context: string) {
+    this.context = context;
+    this.timer = setTimeout(() => {
+      this.controller.abort(
+        new Error(
+          `GitLab pagination limit exceeded: ${context} did not finish within ${GITLAB_LISTING_TIMEOUT_MS / 1000} s`
+        )
+      );
+    }, GITLAB_LISTING_TIMEOUT_MS);
+    this.timer.unref?.();
+    this.signal = this.controller.signal;
+  }
+
+  retain(bytes: number): void {
+    this.retainedBytes += bytes;
+    if (this.retainedBytes > MAX_GITLAB_LISTING_BYTES) {
+      throw new Error(
+        `GitLab pagination limit exceeded: ${this.context} returned more than ${MAX_GITLAB_LISTING_BYTES / (1024 * 1024)} MiB`
+      );
+    }
+  }
+
+  dispose(): void {
+    clearTimeout(this.timer);
+  }
+}
+
+/**
+ * Upper bound on the merge-request note text one read keeps, matching the GitHub
+ * adapter's stored review-comment budget. Pagination stops once a read reaches it,
+ * so the result is a partial review state rather than a full provider history.
+ */
+export const MAX_MR_NOTE_BODY_BYTES = 512 * 1024;
+
+/**
+ * Enforces the server-side pagination bounds for every paginating helper in this
+ * adapter: pagination continues only within MAX_GITLAB_PAGINATION_PAGES pages and
+ * MAX_GITLAB_PAGINATION_ITEMS items, and exceeding either bound fails with an error.
+ */
+function checkGitLabPaginationBounds(page: number, itemCount: number, context: string): void {
+  if (page > MAX_GITLAB_PAGINATION_PAGES) {
+    throw new Error(
+      `GitLab pagination limit exceeded: ${context} returned more than ${MAX_GITLAB_PAGINATION_PAGES} pages`
+    );
+  }
+  if (itemCount > MAX_GITLAB_PAGINATION_ITEMS) {
+    throw new Error(
+      `GitLab pagination limit exceeded: ${context} returned more than ${MAX_GITLAB_PAGINATION_ITEMS} items`
+    );
+  }
+}
+
+async function fetchGitLab(
+  url: string,
+  init?: RequestInit,
+  budget?: GitLabListingBudget,
+  redirectCount = 0
+): Promise<Response> {
+  const response = await fetchGitLabOnce(
+    url,
+    budget ? { ...init, signal: budget.signal } : init,
+    budget
+  );
   if (!isGitLabRedirect(response.status)) {
     return response;
   }
@@ -44,17 +145,103 @@ async function fetchGitLab(url: string, init?: RequestInit, redirectCount = 0): 
   return fetchGitLab(
     redirectUrl,
     buildRedirectRequestInit(init, response.status, url, redirectUrl),
+    budget,
     redirectCount + 1
   );
 }
 
-async function fetchGitLabOnce(url: string, init?: RequestInit): Promise<Response> {
-  const resolvedUrl = await resolveGitLabUrlSafely(url);
-  if (!resolvedUrl.address) {
-    return fetch(url, { ...init, redirect: 'manual' });
+/**
+ * Awaits a step that cannot observe the listing signal itself, such as a DNS lookup, so the
+ * read still ends at its deadline.
+ */
+async function withDeadline<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
+  if (signal.aborted) {
+    throw signal.reason;
   }
 
-  return fetchGitLabBoundToAddress({ ...resolvedUrl, address: resolvedUrl.address }, init);
+  const { promise, reject } = Promise.withResolvers<never>();
+  const onAbort = (): void => reject(signal.reason);
+  signal.addEventListener('abort', onAbort, { once: true });
+  try {
+    return await Promise.race([work, promise]);
+  } finally {
+    signal.removeEventListener('abort', onAbort);
+  }
+}
+
+async function fetchGitLabOnce(
+  url: string,
+  init?: RequestInit,
+  budget?: GitLabListingBudget
+): Promise<Response> {
+  const resolvedUrl = budget
+    ? await withDeadline(resolveGitLabUrlSafely(url), budget.signal)
+    : await resolveGitLabUrlSafely(url);
+  if (!resolvedUrl.address) {
+    return fetchBounded(url, init, budget);
+  }
+
+  return fetchGitLabBoundToAddress(
+    { ...resolvedUrl, address: resolvedUrl.address },
+    init,
+    MAX_GITLAB_RESPONSE_BYTES,
+    budget
+  );
+}
+
+async function fetchBounded(
+  url: string,
+  init?: RequestInit,
+  budget?: GitLabListingBudget
+): Promise<Response> {
+  const requestTimeout = AbortSignal.timeout(GITLAB_REQUEST_TIMEOUT_MS);
+  // A caller signal (a listing's total deadline) bounds the whole read; the per-request
+  // inactivity bound still applies to the single request.
+  const signal = init?.signal ? AbortSignal.any([init.signal, requestTimeout]) : requestTimeout;
+  const response = await fetch(url, {
+    ...init,
+    signal,
+    redirect: 'manual',
+  });
+
+  const rawHeaders = response.headers;
+  const contentLength =
+    rawHeaders && typeof rawHeaders.get === 'function' ? rawHeaders.get('content-length') : null;
+  if (contentLength && Number(contentLength) > MAX_GITLAB_RESPONSE_BYTES) {
+    const error = new Error('GitLab response exceeded size limit');
+    await response.body?.cancel();
+    throw error;
+  }
+
+  if (!response.body || typeof response.body.getReader !== 'function') {
+    return response;
+  }
+
+  const chunks: Buffer[] = [];
+  let responseBytes = 0;
+  const reader = response.body.getReader();
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) {
+      break;
+    }
+    const buffer = Buffer.isBuffer(value) ? value : Buffer.from(value);
+    responseBytes += buffer.byteLength;
+    if (responseBytes > MAX_GITLAB_RESPONSE_BYTES) {
+      const error = new Error('GitLab response exceeded size limit');
+      await reader.cancel(error);
+      throw error;
+    }
+    chunks.push(buffer);
+  }
+
+  const body = responseStatusForbidsBody(response.status) ? null : Buffer.concat(chunks);
+  budget?.retain(responseBytes);
+  return new Response(body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers,
+  });
 }
 
 function isGitLabRedirect(status: number): boolean {
@@ -100,9 +287,11 @@ function buildRedirectRequestInit(
   return { ...init, headers };
 }
 
-function fetchGitLabBoundToAddress(
+export function fetchGitLabBoundToAddress(
   { url, address, family }: GitLabResolvedUrl & { address: string },
-  init?: RequestInit
+  init?: RequestInit,
+  maxResponseBytes = MAX_GITLAB_RESPONSE_BYTES,
+  budget?: GitLabListingBudget
 ): Promise<Response> {
   const request = url.protocol === 'https:' ? https.request : http.request;
   const headers = headersInitToRecord(init?.headers);
@@ -112,82 +301,91 @@ function fetchGitLabBoundToAddress(
     headers['content-length'] = String(Buffer.byteLength(body));
   }
 
-  return new Promise((resolve, reject) => {
-    const req = request(
-      {
-        protocol: url.protocol,
-        hostname: url.hostname,
-        port: url.port,
-        path: `${url.pathname}${url.search}`,
-        method: init?.method ?? 'GET',
-        headers,
-        family,
-        lookup: (_hostname, _options, callback) => callback(null, address, family ?? 0),
-        ...(url.protocol === 'https:' ? { servername: url.hostname } : {}),
-      },
-      response => {
-        const chunks: Buffer[] = [];
-        let responseBytes = 0;
-        response.on('data', chunk => {
-          const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-          responseBytes += buffer.byteLength;
-          if (responseBytes > MAX_GITLAB_RESPONSE_BYTES) {
-            const error = new Error('GitLab response exceeded size limit');
-            response.destroy(error);
-            req.destroy(error);
-            reject(error);
-            return;
-          }
+  const { promise, resolve, reject } = Promise.withResolvers<Response>();
+  const signal = init?.signal;
+  const onAbort = (): void => {
+    req.destroy(signal?.reason);
+    fail(signal?.reason);
+  };
+  /** Settles the request and drops its deadline listener, so one read keeps one listener. */
+  const settle = (value: Response): void => {
+    signal?.removeEventListener('abort', onAbort);
+    resolve(value);
+  };
+  const fail = (error: unknown): void => {
+    signal?.removeEventListener('abort', onAbort);
+    reject(error);
+  };
 
-          chunks.push(buffer);
-        });
-        response.on('error', reject);
-        response.on('end', () => {
-          try {
-            const status = response.statusCode ?? 500;
-            const body = responseStatusForbidsBody(status) ? null : Buffer.concat(chunks);
-            resolve(
-              new Response(body, {
-                status,
-                statusText: response.statusMessage,
-                headers: responseHeadersToHeaders(response.headers),
-              })
-            );
-          } catch (error) {
-            reject(error);
-          }
-        });
-      }
-    );
+  const req = request(
+    {
+      protocol: url.protocol,
+      hostname: url.hostname,
+      port: url.port,
+      path: `${url.pathname}${url.search}`,
+      method: init?.method ?? 'GET',
+      headers,
+      family,
+      lookup: (_hostname, _options, callback) => callback(null, address, family ?? 0),
+      ...(url.protocol === 'https:' ? { servername: url.hostname } : {}),
+    },
+    response => {
+      const chunks: Buffer[] = [];
+      let responseBytes = 0;
+      response.on('data', chunk => {
+        const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+        responseBytes += buffer.byteLength;
+        if (responseBytes > maxResponseBytes) {
+          const error = new Error('GitLab response exceeded size limit');
+          response.destroy(error);
+          req.destroy(error);
+          fail(error);
+          return;
+        }
 
-    req.on('error', reject);
-    req.setTimeout(GITLAB_REQUEST_TIMEOUT_MS, () => {
-      req.destroy(new Error('GitLab request timed out'));
-    });
-
-    const signal = init?.signal;
-    if (signal) {
-      if (signal.aborted) {
-        req.destroy(signal.reason);
-        reject(signal.reason);
-        return;
-      }
-
-      signal.addEventListener(
-        'abort',
-        () => {
-          req.destroy(signal.reason);
-          reject(signal.reason);
-        },
-        { once: true }
-      );
+        chunks.push(buffer);
+      });
+      response.on('error', fail);
+      response.on('end', () => {
+        try {
+          const status = response.statusCode ?? 500;
+          const body = responseStatusForbidsBody(status) ? null : Buffer.concat(chunks);
+          budget?.retain(responseBytes);
+          settle(
+            new Response(body, {
+              status,
+              statusText: response.statusMessage,
+              headers: responseHeadersToHeaders(response.headers),
+            })
+          );
+        } catch (error) {
+          fail(error);
+        }
+      });
     }
+  );
 
-    if (body) {
-      req.write(body);
-    }
-    req.end();
+  req.on('error', fail);
+  req.setTimeout(GITLAB_REQUEST_TIMEOUT_MS, () => {
+    req.destroy(new Error('GitLab request timed out'));
   });
+
+  if (signal) {
+    if (signal.aborted) {
+      req.destroy(signal.reason);
+      fail(signal.reason);
+      return promise;
+    }
+
+    signal.addEventListener('abort', onAbort, { once: true });
+  }
+
+  if (body) {
+    req.write(body);
+  }
+  req.end();
+
+  return promise;
 }
 
 function headersInitToRecord(headers: HeadersInit | undefined): Record<string, string> {
@@ -249,7 +447,7 @@ export const GITLAB_OAUTH_SCOPES = [
   'api', // Full API access (needed for MR comments, reactions)
   'read_user', // Read user info
   'read_repository', // Read repository contents
-  'write_repository', // Push branches (for auto-fix)
+  'write_repository', // Push branches
 ] as const;
 
 export type GitLabUser = {
@@ -271,6 +469,12 @@ export type GitLabProject = {
   archived: boolean;
   marked_for_deletion_on?: string | null;
   marked_for_deletion_at?: string | null;
+  /**
+   * Access the requesting credential holds on the project, as reported by the
+   * instance. The value is provider input with no shape guarantee, so a caller
+   * that reads it validates it before use.
+   */
+  permissions?: unknown;
 };
 
 function isActiveGitLabProject(project: GitLabProject): boolean {
@@ -356,8 +560,11 @@ export async function exchangeGitLabOAuthCode(
   });
 
   if (!response.ok) {
-    const error = await response.text();
-    logExceptInTest('GitLab OAuth token exchange failed:', { status: response.status, error });
+    const bodyExcerpt = providerErrorExcerpt(await response.text());
+    logExceptInTest('GitLab OAuth token exchange failed:', {
+      status: response.status,
+      bodyExcerpt,
+    });
     throw new Error(`GitLab OAuth token exchange failed: ${response.status}`);
   }
 
@@ -384,8 +591,8 @@ export async function fetchGitLabUser(
   });
 
   if (!response.ok) {
-    const error = await response.text();
-    logExceptInTest('GitLab user fetch failed:', { status: response.status, error });
+    const bodyExcerpt = providerErrorExcerpt(await response.text());
+    logExceptInTest('GitLab user fetch failed:', { status: response.status, bodyExcerpt });
     throw new Error(`GitLab user fetch failed: ${response.status}`);
   }
 
@@ -396,55 +603,65 @@ export async function fetchGitLabProjects(
   accessToken: string,
   instanceUrl: string = DEFAULT_GITLAB_URL
 ): Promise<PlatformRepository[]> {
-  const projects: PlatformRepository[] = [];
-  let page = 1;
-  const perPage = 100;
+  const budget = new GitLabListingBudget('project listing');
+  try {
+    const projects: PlatformRepository[] = [];
+    let page = 1;
+    const perPage = 100;
 
-  while (true) {
-    const response = await fetchGitLab(
-      buildGitLabUrl(instanceUrl, '/api/v4/projects', {
-        membership: true,
-        per_page: perPage,
-        page,
-        archived: false,
-      }),
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
+    while (true) {
+      const response = await fetchGitLab(
+        buildGitLabUrl(instanceUrl, '/api/v4/projects', {
+          membership: true,
+          per_page: perPage,
+          page,
+          archived: false,
+        }),
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
         },
+        budget
+      );
+
+      if (!response.ok) {
+        const bodyExcerpt = providerErrorExcerpt(await response.text());
+        logExceptInTest('GitLab projects fetch failed:', {
+          status: response.status,
+          bodyExcerpt,
+        });
+        throw new Error(`GitLab projects fetch failed: ${response.status}`);
       }
-    );
 
-    if (!response.ok) {
-      const error = await response.text();
-      logExceptInTest('GitLab projects fetch failed:', { status: response.status, error });
-      throw new Error(`GitLab projects fetch failed: ${response.status}`);
+      const data = (await response.json()) as GitLabProject[];
+
+      projects.push(
+        ...data.filter(isActiveGitLabProject).map(project => ({
+          id: project.id,
+          name: project.name,
+          full_name: project.path_with_namespace,
+          private: project.visibility === 'private',
+        }))
+      );
+
+      const nextPage = Number.parseInt(response.headers.get('x-next-page') || '', 10);
+      if (Number.isInteger(nextPage) && nextPage > page) {
+        checkGitLabPaginationBounds(nextPage, projects.length, 'project listing');
+        page = nextPage;
+        continue;
+      }
+
+      checkGitLabPaginationBounds(page, projects.length, 'project listing');
+      break;
     }
 
-    const data = (await response.json()) as GitLabProject[];
+    logExceptInTest('GitLab projects fetched', { count: projects.length });
 
-    projects.push(
-      ...data.filter(isActiveGitLabProject).map(project => ({
-        id: project.id,
-        name: project.name,
-        full_name: project.path_with_namespace,
-        private: project.visibility === 'private',
-      }))
-    );
-
-    const nextPage = Number.parseInt(response.headers.get('x-next-page') || '', 10);
-    if (Number.isInteger(nextPage) && nextPage > page) {
-      page = nextPage;
-      continue;
-    }
-
-    if (data.length < perPage) break;
-    page++;
+    return projects;
+  } finally {
+    budget.dispose();
   }
-
-  logExceptInTest('GitLab projects fetched', { count: projects.length });
-
-  return projects;
 }
 
 /**
@@ -469,43 +686,51 @@ export async function fetchGitLabBranches(
 ): Promise<GitLabBranch[]> {
   const encodedProjectId =
     typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
-  const branches: GitLabBranch[] = [];
-  let page = 1;
-  const perPage = 100;
+  const budget = new GitLabListingBudget('branch listing');
+  try {
+    const branches: GitLabBranch[] = [];
+    let page = 1;
+    const perPage = 100;
 
-  while (true) {
-    const response = await fetchGitLab(
-      buildGitLabUrl(instanceUrl, `/api/v4/projects/${encodedProjectId}/repository/branches`, {
-        per_page: perPage,
-        page,
-      }),
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
+    while (true) {
+      const response = await fetchGitLab(
+        buildGitLabUrl(instanceUrl, `/api/v4/projects/${encodedProjectId}/repository/branches`, {
+          per_page: perPage,
+          page,
+        }),
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
         },
-      }
-    );
-
-    if (!response.ok) {
-      const error = await response.text();
-      logExceptInTest('GitLab branches fetch failed:', { status: response.status, error });
-      throw new GitLabBranchesFetchError(
-        response.status,
-        `GitLab branches fetch failed: ${response.status}`
+        budget
       );
+
+      if (!response.ok) {
+        const bodyExcerpt = providerErrorExcerpt(await response.text());
+        logExceptInTest('GitLab branches fetch failed:', { status: response.status, bodyExcerpt });
+        throw new GitLabBranchesFetchError(
+          response.status,
+          `GitLab branches fetch failed: ${response.status}`
+        );
+      }
+
+      const data = (await response.json()) as GitLabBranch[];
+      branches.push(...data);
+
+      const parsedTotalPages = parseInt(response.headers.get('x-total-pages') || '1', 10);
+      const totalPages = Number.isFinite(parsedTotalPages) ? parsedTotalPages : 1;
+      checkGitLabPaginationBounds(totalPages, branches.length, 'branch listing');
+      if (page >= totalPages) break;
+      page++;
     }
 
-    const data = (await response.json()) as GitLabBranch[];
-    branches.push(...data);
+    logExceptInTest('GitLab branches fetched', { projectId, count: branches.length });
 
-    const totalPages = parseInt(response.headers.get('x-total-pages') || '1', 10);
-    if (page >= totalPages) break;
-    page++;
+    return branches;
+  } finally {
+    budget.dispose();
   }
-
-  logExceptInTest('GitLab branches fetched', { projectId, count: branches.length });
-
-  return branches;
 }
 
 /**
@@ -574,6 +799,22 @@ export function verifyGitLabWebhookToken(token: string, expectedToken?: string):
 }
 
 /**
+ * GitLab rejected the credential itself (HTTP 401), before any role or
+ * permission check. Callers must send the user to reconnect the integration;
+ * role guidance cannot fix it.
+ */
+export class GitLabAuthenticationError extends Error {
+  constructor(
+    public projectId: string | number,
+    readonly statusCode: number,
+    message: string
+  ) {
+    super(message);
+    this.name = 'GitLabAuthenticationError';
+  }
+}
+
+/**
  * Custom error class for webhook permission issues
  * Thrown when user doesn't have Maintainer+ role on a project
  */
@@ -612,12 +853,39 @@ export type GitLabWebhook = {
 };
 
 /**
+ * The event configuration Kilo needs on a project hook. Create and update send
+ * the same properties so a project is configured identically either way.
+ */
+function buildProjectWebhookPayload(webhookUrl: string, webhookSecret: string) {
+  return {
+    name: 'Kilo Code Reviews',
+    description: 'Auto-configured webhook for Kilo AI code reviews',
+    url: webhookUrl,
+    token: webhookSecret,
+    merge_requests_events: true,
+    push_events: false,
+    issues_events: false,
+    confidential_issues_events: false,
+    tag_push_events: false,
+    note_events: false,
+    confidential_note_events: false,
+    job_events: false,
+    pipeline_events: false,
+    wiki_page_events: false,
+    deployment_events: false,
+    releases_events: false,
+    enable_ssl_verification: true,
+  };
+}
+
+/**
  * Lists all webhooks for a GitLab project
  *
  * @param accessToken - OAuth access token
  * @param projectId - GitLab project ID or path (URL-encoded)
  * @param instanceUrl - GitLab instance URL (defaults to gitlab.com)
- * @throws {GitLabWebhookPermissionError} When user doesn't have Maintainer+ role on the project
+ * @throws {GitLabAuthenticationError} When GitLab rejects the credential (HTTP 401)
+ * @throws {GitLabWebhookPermissionError} When user doesn't have Maintainer+ role on the project (HTTP 403)
  */
 export async function listProjectWebhooks(
   accessToken: string,
@@ -637,14 +905,22 @@ export async function listProjectWebhooks(
   );
 
   if (!response.ok) {
-    const error = await response.text();
+    const bodyExcerpt = providerErrorExcerpt(await response.text());
     logExceptInTest('GitLab list webhooks failed:', {
       status: response.status,
-      error,
+      bodyExcerpt,
       projectId,
     });
 
-    if (response.status === 401 || response.status === 403) {
+    if (response.status === 401) {
+      throw new GitLabAuthenticationError(
+        projectId,
+        401,
+        `GitLab rejected the credential while listing webhooks for project ${projectId} (HTTP 401). Reconnect the GitLab integration and try again.`
+      );
+    }
+
+    if (response.status === 403) {
       throw new GitLabWebhookPermissionError(
         projectId,
         response.status,
@@ -666,7 +942,8 @@ export async function listProjectWebhooks(
  * @param webhookUrl - URL to receive webhook events
  * @param webhookSecret - Secret token for webhook verification
  * @param instanceUrl - GitLab instance URL (defaults to gitlab.com)
- * @throws {GitLabWebhookPermissionError} When user doesn't have Maintainer+ role on the project
+ * @throws {GitLabAuthenticationError} When GitLab rejects the credential (HTTP 401)
+ * @throws {GitLabWebhookPermissionError} When user doesn't have Maintainer+ role on the project (HTTP 403)
  */
 export async function createProjectWebhook(
   accessToken: string,
@@ -686,37 +963,27 @@ export async function createProjectWebhook(
         Authorization: `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        name: 'Kilo Code Reviews',
-        description: 'Auto-configured webhook for Kilo AI code reviews',
-        url: webhookUrl,
-        token: webhookSecret,
-        merge_requests_events: true,
-        push_events: false,
-        issues_events: false,
-        confidential_issues_events: false,
-        tag_push_events: false,
-        note_events: false,
-        confidential_note_events: false,
-        job_events: false,
-        pipeline_events: false,
-        wiki_page_events: false,
-        deployment_events: false,
-        releases_events: false,
-        enable_ssl_verification: true,
-      }),
+      body: JSON.stringify(buildProjectWebhookPayload(webhookUrl, webhookSecret)),
     }
   );
 
   if (!response.ok) {
-    const error = await response.text();
+    const bodyExcerpt = providerErrorExcerpt(await response.text());
     logExceptInTest('GitLab create webhook failed:', {
       status: response.status,
-      error,
+      bodyExcerpt,
       projectId,
     });
 
-    if (response.status === 401 || response.status === 403) {
+    if (response.status === 401) {
+      throw new GitLabAuthenticationError(
+        projectId,
+        401,
+        `GitLab rejected the credential while creating a webhook for project ${projectId} (HTTP 401). Reconnect the GitLab integration and try again.`
+      );
+    }
+
+    if (response.status === 403) {
       throw new GitLabWebhookPermissionError(
         projectId,
         response.status,
@@ -724,7 +991,7 @@ export async function createProjectWebhook(
       );
     }
 
-    throw new Error(`GitLab create webhook failed: ${response.status} - ${error}`);
+    throw new Error(`GitLab create webhook failed: ${response.status}`);
   }
 
   const webhook = (await response.json()) as GitLabWebhook;
@@ -747,7 +1014,8 @@ export async function createProjectWebhook(
  * @param webhookUrl - URL to receive webhook events
  * @param webhookSecret - Secret token for webhook verification
  * @param instanceUrl - GitLab instance URL (defaults to gitlab.com)
- * @throws {GitLabWebhookPermissionError} When user doesn't have Maintainer+ role on the project
+ * @throws {GitLabAuthenticationError} When GitLab rejects the credential (HTTP 401)
+ * @throws {GitLabWebhookPermissionError} When user doesn't have Maintainer+ role on the project (HTTP 403)
  */
 export async function updateProjectWebhook(
   accessToken: string,
@@ -768,38 +1036,28 @@ export async function updateProjectWebhook(
         Authorization: `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        name: 'Kilo Code Reviews',
-        description: 'Auto-configured webhook for Kilo AI code reviews',
-        url: webhookUrl,
-        token: webhookSecret,
-        merge_requests_events: true,
-        push_events: false,
-        issues_events: false,
-        confidential_issues_events: false,
-        tag_push_events: false,
-        note_events: false,
-        confidential_note_events: false,
-        job_events: false,
-        pipeline_events: false,
-        wiki_page_events: false,
-        deployment_events: false,
-        releases_events: false,
-        enable_ssl_verification: true,
-      }),
+      body: JSON.stringify(buildProjectWebhookPayload(webhookUrl, webhookSecret)),
     }
   );
 
   if (!response.ok) {
-    const error = await response.text();
+    const bodyExcerpt = providerErrorExcerpt(await response.text());
     logExceptInTest('GitLab update webhook failed:', {
       status: response.status,
-      error,
+      bodyExcerpt,
       projectId,
       hookId,
     });
 
-    if (response.status === 401 || response.status === 403) {
+    if (response.status === 401) {
+      throw new GitLabAuthenticationError(
+        projectId,
+        401,
+        `GitLab rejected the credential while updating a webhook for project ${projectId} (HTTP 401). Reconnect the GitLab integration and try again.`
+      );
+    }
+
+    if (response.status === 403) {
       throw new GitLabWebhookPermissionError(
         projectId,
         response.status,
@@ -807,7 +1065,7 @@ export async function updateProjectWebhook(
       );
     }
 
-    throw new Error(`GitLab update webhook failed: ${response.status} - ${error}`);
+    throw new Error(`GitLab update webhook failed: ${response.status}`);
   }
 
   const webhook = (await response.json()) as GitLabWebhook;
@@ -850,14 +1108,14 @@ export async function deleteProjectWebhook(
 
   // 404 means webhook already deleted, which is fine
   if (!response.ok && response.status !== 404) {
-    const error = await response.text();
+    const bodyExcerpt = providerErrorExcerpt(await response.text());
     logExceptInTest('GitLab delete webhook failed:', {
       status: response.status,
-      error,
+      bodyExcerpt,
       projectId,
       hookId,
     });
-    throw new Error(`GitLab delete webhook failed: ${response.status} - ${error}`);
+    throw new Error(`GitLab delete webhook failed: ${response.status}`);
   }
 
   logExceptInTest('[deleteProjectWebhook] Deleted webhook', {
@@ -1025,12 +1283,28 @@ export type GitLabMergeRequest = {
   };
 };
 
+export type GitLabMergeRequestDetail = Omit<GitLabMergeRequest, 'diff_refs'> & {
+  created_at?: string;
+  updated_at?: string;
+  project_id?: number;
+  has_conflicts?: boolean;
+  merge_status?: string;
+  merge_when_pipeline_succeeds?: boolean;
+  force_remove_source_branch?: boolean;
+  head_pipeline?: { id: number; sha: string; ref: string; status: string; web_url: string } | null;
+  references?: { full?: string };
+  // Empty while computing; capped totals have a trailing `+` (for example `1000+`).
+  changes_count?: string | null;
+  // GitLab can omit or null these when the merge request has no diff.
+  diff_refs?: GitLabMergeRequest['diff_refs'] | null;
+};
+
 export async function fetchGitLabMergeRequest(params: {
   accessToken: string;
   projectId: string | number;
   mrIid: number;
   instanceUrl?: string;
-}): Promise<GitLabMergeRequest> {
+}): Promise<GitLabMergeRequestDetail> {
   const encodedProjectId =
     typeof params.projectId === 'string' ? encodeURIComponent(params.projectId) : params.projectId;
   const instanceUrl = params.instanceUrl ?? DEFAULT_GITLAB_URL;
@@ -1048,16 +1322,27 @@ export async function fetchGitLabMergeRequest(params: {
   );
 
   if (!response.ok) {
-    const error = await response.text();
-    logExceptInTest('GitLab MR fetch failed:', { status: response.status, error });
+    const bodyExcerpt = providerErrorExcerpt(await response.text());
+    logExceptInTest('GitLab MR fetch failed:', { status: response.status, bodyExcerpt });
     throw new Error(`GitLab MR fetch failed: ${response.status}`);
   }
 
-  return (await response.json()) as GitLabMergeRequest;
+  return (await response.json()) as GitLabMergeRequestDetail;
 }
 
 /**
  * Looks for the <!-- kilo-review --> marker in MR notes.
+ *
+ * Only notes authored by the GitLab account that owns the access token are
+ * candidates, so the note Kilo reuses is always one it can attribute to its
+ * own posting identity. The identity follows the credential in use: when a
+ * project token is replaced, the next lookup matches notes from the new
+ * identity and the pipeline composes a fresh summary note; later lookups
+ * update that note as usual.
+ *
+ * The read keeps only the candidate notes and stops paging at
+ * MAX_MR_NOTE_BODY_BYTES, so a note history cannot make one lookup hold more
+ * than that budget. A note found before the stop is still returned.
  */
 export async function findKiloReviewNote(
   accessToken: string,
@@ -1065,51 +1350,80 @@ export async function findKiloReviewNote(
   mrIid: number,
   instanceUrl: string = DEFAULT_GITLAB_URL
 ): Promise<{ noteId: number; body: string } | null> {
+  const tokenUser = await fetchGitLabUser(accessToken, instanceUrl);
   const encodedProjectId =
     typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
 
-  const notes: GitLabNote[] = [];
+  // Only candidate notes are kept: the provider's other note text is never retained, and the
+  // retained bytes are bounded by MAX_MR_NOTE_BODY_BYTES across pages.
+  const candidateNotes: Array<{ id: number; body: string; updated_at: string }> = [];
+  let retainedNoteBytes = 0;
+  let notesRead = 0;
+  let reachedByteLimit = false;
   let page = 1;
   const perPage = 100;
+  const budget = new GitLabListingBudget('MR note listing');
 
-  while (true) {
-    const response = await fetchGitLab(
-      buildGitLabUrl(
-        instanceUrl,
-        `/api/v4/projects/${encodedProjectId}/merge_requests/${mrIid}/notes`,
-        { per_page: perPage, page }
-      ),
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
+  try {
+    while (true) {
+      const response = await fetchGitLab(
+        buildGitLabUrl(
+          instanceUrl,
+          `/api/v4/projects/${encodedProjectId}/merge_requests/${mrIid}/notes`,
+          { per_page: perPage, page }
+        ),
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
         },
+        budget
+      );
+
+      if (!response.ok) {
+        const bodyExcerpt = providerErrorExcerpt(await response.text());
+        logExceptInTest('GitLab MR notes fetch failed:', { status: response.status, bodyExcerpt });
+        throw new Error(`GitLab MR notes fetch failed: ${response.status}`);
       }
-    );
 
-    if (!response.ok) {
-      const error = await response.text();
-      logExceptInTest('GitLab MR notes fetch failed:', { status: response.status, error });
-      throw new Error(`GitLab MR notes fetch failed: ${response.status}`);
+      const data = (await response.json()) as GitLabNote[];
+      notesRead += data.length;
+
+      for (const note of data) {
+        if (note.system || note.author.id !== tokenUser.id) continue;
+        if (!note.body?.includes('<!-- kilo-review -->')) continue;
+
+        // The body is written back to this note when Kilo updates the summary, so it stays
+        // whole; only its size counts against the read budget.
+        retainedNoteBytes += Buffer.byteLength(note.body);
+        candidateNotes.push({ id: note.id, body: note.body, updated_at: note.updated_at });
+        if (retainedNoteBytes >= MAX_MR_NOTE_BODY_BYTES) {
+          reachedByteLimit = true;
+          break;
+        }
+      }
+
+      const parsedTotalPages = parseInt(response.headers.get('x-total-pages') || '1', 10);
+      const totalPages = Number.isFinite(parsedTotalPages) ? parsedTotalPages : 1;
+      checkGitLabPaginationBounds(totalPages, notesRead, 'MR note listing');
+      if (reachedByteLimit) break;
+      if (page >= totalPages) break;
+      page++;
     }
-
-    const data = (await response.json()) as GitLabNote[];
-    notes.push(...data);
-
-    const totalPages = parseInt(response.headers.get('x-total-pages') || '1', 10);
-    if (page >= totalPages) break;
-    page++;
+  } finally {
+    budget.dispose();
   }
 
   logExceptInTest('[findKiloReviewNote] Fetched notes', {
     projectId,
     mrIid,
-    totalNotes: notes.length,
+    totalNotes: notesRead,
+    candidateNotes: candidateNotes.length,
+    reachedByteLimit,
   });
 
-  const markedNotes = notes.filter(n => n.body?.includes('<!-- kilo-review -->') && !n.system);
-
-  if (markedNotes.length > 0) {
-    const latestNote = markedNotes.sort((a, b) => {
+  if (candidateNotes.length > 0) {
+    const latestNote = candidateNotes.sort((a, b) => {
       return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
     })[0];
 
@@ -1117,7 +1431,7 @@ export async function findKiloReviewNote(
       projectId,
       mrIid,
       noteId: latestNote.id,
-      markedNotesCount: markedNotes.length,
+      markedNotesCount: candidateNotes.length,
     });
 
     return { noteId: latestNote.id, body: latestNote.body };
@@ -1126,7 +1440,7 @@ export async function findKiloReviewNote(
   logExceptInTest('[findKiloReviewNote] No existing Kilo review note found', {
     projectId,
     mrIid,
-    totalNotes: notes.length,
+    totalNotes: notesRead,
   });
 
   return null;
@@ -1159,8 +1473,15 @@ export async function updateKiloReviewNote(
   );
 
   if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`GitLab MR note update failed: ${response.status} ${error}`);
+    const bodyExcerpt = providerErrorExcerpt(await response.text());
+    logExceptInTest('GitLab MR note update failed:', {
+      status: response.status,
+      bodyExcerpt,
+      projectId,
+      mrIid,
+      noteId,
+    });
+    throw new Error(`GitLab MR note update failed: ${response.status}`);
   }
 
   logExceptInTest('[updateKiloReviewNote] Updated note', {
@@ -1196,8 +1517,14 @@ export async function createMRNote(
   );
 
   if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`GitLab MR note creation failed: ${response.status} ${error}`);
+    const bodyExcerpt = providerErrorExcerpt(await response.text());
+    logExceptInTest('GitLab MR note creation failed:', {
+      status: response.status,
+      bodyExcerpt,
+      projectId,
+      mrIid,
+    });
+    throw new Error(`GitLab MR note creation failed: ${response.status}`);
   }
 
   logExceptInTest('[createMRNote] Created note', { projectId, mrIid });
@@ -1205,6 +1532,7 @@ export async function createMRNote(
 
 /**
  * Checks whether a note containing the given marker already exists on a GitLab MR.
+ * Only notes authored by the GitLab account that owns the access token count.
  * Paginates through all notes (consistent with findKiloReviewNote).
  */
 export async function hasMRNoteWithMarker(
@@ -1214,39 +1542,55 @@ export async function hasMRNoteWithMarker(
   marker: string,
   instanceUrl: string = DEFAULT_GITLAB_URL
 ): Promise<boolean> {
+  const tokenUser = await fetchGitLabUser(accessToken, instanceUrl);
   const encodedProjectId =
     typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
 
   let page = 1;
   const perPage = 100;
+  const budget = new GitLabListingBudget('MR note marker search');
 
-  while (true) {
-    const response = await fetchGitLab(
-      buildGitLabUrl(
-        instanceUrl,
-        `/api/v4/projects/${encodedProjectId}/merge_requests/${mrIid}/notes`,
-        { per_page: perPage, page }
-      ),
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
+  try {
+    while (true) {
+      const response = await fetchGitLab(
+        buildGitLabUrl(
+          instanceUrl,
+          `/api/v4/projects/${encodedProjectId}/merge_requests/${mrIid}/notes`,
+          { per_page: perPage, page }
+        ),
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
         },
+        budget
+      );
+
+      if (!response.ok) {
+        const bodyExcerpt = providerErrorExcerpt(await response.text());
+        logExceptInTest('GitLab MR notes fetch failed:', {
+          status: response.status,
+          bodyExcerpt,
+          projectId,
+          mrIid,
+          page,
+        });
+        throw new Error(`GitLab MR notes fetch failed: ${response.status}`);
       }
-    );
 
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`GitLab MR notes fetch failed: ${response.status} ${error}`);
+      const notes = (await response.json()) as Array<{ body: string; author: { id: number } }>;
+      if (notes.some(n => n.body?.includes(marker) && n.author.id === tokenUser.id)) {
+        return true;
+      }
+
+      const parsedTotalPages = parseInt(response.headers.get('x-total-pages') || '1', 10);
+      const totalPages = Number.isFinite(parsedTotalPages) ? parsedTotalPages : 1;
+      checkGitLabPaginationBounds(totalPages, page * perPage, 'MR note marker search');
+      if (page >= totalPages) break;
+      page++;
     }
-
-    const notes = (await response.json()) as Array<{ body: string }>;
-    if (notes.some(n => n.body?.includes(marker))) {
-      return true;
-    }
-
-    const totalPages = parseInt(response.headers.get('x-total-pages') || '1', 10);
-    if (page >= totalPages) break;
-    page++;
+  } finally {
+    budget.dispose();
   }
 
   return false;
@@ -1254,6 +1598,14 @@ export async function hasMRNoteWithMarker(
 
 /**
  * Used to detect duplicates and track outdated inline comments.
+ *
+ * `authoredByKilo` reports whether the user behind the access token that reads the MR wrote
+ * the note (the Project Access Token bot user).
+ *
+ * Each retained body is sliced to the rendered length and counted against
+ * MAX_MR_NOTE_BODY_BYTES; paging stops when that budget is reached, so the
+ * result is the newest comments within the budget rather than the full history,
+ * ordered newest first like the GitHub adapter.
  */
 export async function fetchMRInlineComments(
   accessToken: string,
@@ -1268,17 +1620,33 @@ export async function fetchMRInlineComments(
     line: number | null;
     body: string;
     isOutdated: boolean;
+    authoredByKilo: boolean;
     user: { username: string };
   }>
 > {
   const encodedProjectId =
     typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
 
-  const discussions: GitLabDiscussion[] = [];
-  let page = 1;
+  // Positioned notes are retained as each page arrives, with each body sliced to the rendered
+  // length, and paging stops once the retained bytes reach MAX_MR_NOTE_BODY_BYTES.
+  const positionedNotes: Array<{
+    id: number;
+    discussionId: string;
+    path: string;
+    line: number | null;
+    body: string;
+    isOutdated: boolean;
+    authorId: number;
+    authorUsername: string;
+  }> = [];
+  let retainedNoteBytes = 0;
+  let discussionsRead = 0;
+  let reachedByteLimit = false;
+  let totalPages = 1;
   const perPage = 100;
+  const budget = new GitLabListingBudget('MR discussion listing');
 
-  while (true) {
+  async function readDiscussionPage(page: number): Promise<GitLabDiscussion[]> {
     const response = await fetchGitLab(
       buildGitLabUrl(
         instanceUrl,
@@ -1289,57 +1657,106 @@ export async function fetchMRInlineComments(
         headers: {
           Authorization: `Bearer ${accessToken}`,
         },
-      }
+      },
+      budget
     );
 
     if (!response.ok) {
-      const error = await response.text();
-      logExceptInTest('GitLab MR discussions fetch failed:', { status: response.status, error });
+      const bodyExcerpt = providerErrorExcerpt(await response.text());
+      logExceptInTest('GitLab MR discussions fetch failed:', {
+        status: response.status,
+        bodyExcerpt,
+      });
       throw new Error(`GitLab MR discussions fetch failed: ${response.status}`);
     }
 
     const data = (await response.json()) as GitLabDiscussion[];
-    discussions.push(...data);
-
-    const totalPages = parseInt(response.headers.get('x-total-pages') || '1', 10);
-    if (page >= totalPages) break;
-    page++;
+    const parsedTotalPages = parseInt(response.headers.get('x-total-pages') || '1', 10);
+    totalPages = Number.isFinite(parsedTotalPages) ? parsedTotalPages : 1;
+    return data;
   }
 
-  const inlineComments: Array<{
-    id: number;
-    discussionId: string;
-    path: string;
-    line: number | null;
-    body: string;
-    isOutdated: boolean;
-    user: { username: string };
-  }> = [];
+  function retainDiscussions(data: GitLabDiscussion[]): void {
+    discussionsRead += data.length;
+    checkGitLabPaginationBounds(totalPages, discussionsRead, 'MR discussion listing');
 
-  for (const discussion of discussions) {
-    if (discussion.individual_note) continue;
+    for (const discussion of data) {
+      if (discussion.individual_note) continue;
 
-    for (const note of discussion.notes) {
-      if (note.position) {
-        inlineComments.push({
+      for (const note of discussion.notes) {
+        if (!note.position) continue;
+
+        const body = note.body.slice(0, MAX_INLINE_COMMENT_BODY_CHARS);
+        retainedNoteBytes += Buffer.byteLength(body);
+        positionedNotes.push({
           id: note.id,
           discussionId: discussion.id,
           path: note.position.new_path || note.position.old_path,
           line: note.position.new_line ?? note.position.old_line,
-          body: note.body,
+          body,
           // In GitLab, resolved discussions are considered "outdated" for our purposes
           isOutdated: note.resolved === true,
-          user: { username: note.author.username },
+          authorId: note.author.id,
+          authorUsername: note.author.username,
         });
+
+        if (retainedNoteBytes >= MAX_MR_NOTE_BODY_BYTES) {
+          reachedByteLimit = true;
+          break;
+        }
       }
+
+      if (reachedByteLimit) break;
     }
   }
+
+  // GitLab lists merge-request discussions oldest first and accepts no ordering parameter, so the
+  // read starts at the last page and walks back, consuming each page newest first. That keeps the
+  // newest comments when the budget ends the read, as the GitHub adapter does with its
+  // newest-first request, and the returned comments are ordered newest first.
+  try {
+    const oldestPage = await readDiscussionPage(1);
+    checkGitLabPaginationBounds(totalPages, oldestPage.length, 'MR discussion listing');
+    for (let page = totalPages; page >= 2 && !reachedByteLimit; page--) {
+      const data = await readDiscussionPage(page);
+      retainDiscussions([...data].reverse());
+    }
+    if (!reachedByteLimit) {
+      retainDiscussions([...oldestPage].reverse());
+    }
+  } finally {
+    budget.dispose();
+  }
+
+  // Attribution is best-effort: a failed lookup leaves the comments unattributed for this
+  // run so the surrounding review state (summary, incremental mode, diff refs) is preserved.
+  let kiloUserId: number | null = null;
+  if (positionedNotes.length > 0) {
+    try {
+      kiloUserId = (await fetchGitLabUser(accessToken, instanceUrl)).id;
+    } catch (error) {
+      logExceptInTest(
+        '[fetchMRInlineComments] Token user lookup failed; comments stay unattributed',
+        {
+          projectId,
+          mrIid,
+          error: error instanceof Error ? error.message : String(error),
+        }
+      );
+    }
+  }
+  const inlineComments = positionedNotes.map(({ authorId, authorUsername, ...comment }) => ({
+    ...comment,
+    authoredByKilo: kiloUserId !== null && authorId === kiloUserId,
+    user: { username: authorUsername },
+  }));
 
   logExceptInTest('[fetchMRInlineComments] Fetched inline comments', {
     projectId,
     mrIid,
-    totalDiscussions: discussions.length,
+    totalDiscussions: discussionsRead,
     inlineComments: inlineComments.length,
+    reachedByteLimit,
   });
 
   return inlineComments;
@@ -1351,25 +1768,7 @@ export async function getMRHeadCommit(
   mrIid: number,
   instanceUrl: string = DEFAULT_GITLAB_URL
 ): Promise<string> {
-  const encodedProjectId =
-    typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
-
-  const response = await fetchGitLab(
-    buildGitLabUrl(instanceUrl, `/api/v4/projects/${encodedProjectId}/merge_requests/${mrIid}`),
-    {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    }
-  );
-
-  if (!response.ok) {
-    const error = await response.text();
-    logExceptInTest('GitLab MR fetch failed:', { status: response.status, error });
-    throw new Error(`GitLab MR fetch failed: ${response.status}`);
-  }
-
-  const mr = (await response.json()) as GitLabMergeRequest;
+  const mr = await fetchGitLabMergeRequest({ accessToken, projectId, mrIid, instanceUrl });
 
   logExceptInTest('[getMRHeadCommit] Got HEAD commit', {
     projectId,
@@ -1389,25 +1788,10 @@ export async function getMRDiffRefs(
   mrIid: number,
   instanceUrl: string = DEFAULT_GITLAB_URL
 ): Promise<{ baseSha: string; headSha: string; startSha: string }> {
-  const encodedProjectId =
-    typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
-
-  const response = await fetchGitLab(
-    buildGitLabUrl(instanceUrl, `/api/v4/projects/${encodedProjectId}/merge_requests/${mrIid}`),
-    {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    }
-  );
-
-  if (!response.ok) {
-    const error = await response.text();
-    logExceptInTest('GitLab MR fetch failed:', { status: response.status, error });
-    throw new Error(`GitLab MR fetch failed: ${response.status}`);
+  const mr = await fetchGitLabMergeRequest({ accessToken, projectId, mrIid, instanceUrl });
+  if (!mr.diff_refs?.base_sha || !mr.diff_refs.head_sha || !mr.diff_refs.start_sha) {
+    throw new Error('GitLab merge request has no diff refs');
   }
-
-  const mr = (await response.json()) as GitLabMergeRequest;
 
   logExceptInTest('[getMRDiffRefs] Got diff refs', {
     projectId,
@@ -1463,8 +1847,8 @@ export async function addReactionToMR(
       return;
     }
 
-    const error = await response.text();
-    logExceptInTest('GitLab add reaction failed:', { status: response.status, error });
+    const bodyExcerpt = providerErrorExcerpt(await response.text());
+    logExceptInTest('GitLab add reaction failed:', { status: response.status, bodyExcerpt });
     throw new Error(`GitLab add reaction failed: ${response.status}`);
   }
 
@@ -1473,6 +1857,19 @@ export async function addReactionToMR(
     mrIid,
     emoji,
   });
+}
+
+/**
+ * A non-ok HTTP response from the GitLab single-project read. The status is the
+ * only provider detail a caller can act on; the response body is never
+ * included, so a message built from this error cannot leak a token or a
+ * project path.
+ */
+export class GitLabProjectFetchError extends Error {
+  constructor(readonly status: number) {
+    super(`GitLab project fetch failed: ${status}`);
+    this.name = 'GitLabProjectFetchError';
+  }
 }
 
 export async function getGitLabProject(
@@ -1492,9 +1889,9 @@ export async function getGitLabProject(
   );
 
   if (!response.ok) {
-    const error = await response.text();
-    logExceptInTest('GitLab project fetch failed:', { status: response.status, error });
-    throw new Error(`GitLab project fetch failed: ${response.status}`);
+    const bodyExcerpt = providerErrorExcerpt(await response.text());
+    logExceptInTest('GitLab project fetch failed:', { status: response.status, bodyExcerpt });
+    throw new GitLabProjectFetchError(response.status);
   }
 
   return (await response.json()) as GitLabProject;
@@ -1517,10 +1914,10 @@ export async function fetchGitLabRepositorySize(
   );
 
   if (!response.ok) {
-    const error = await response.text();
+    const bodyExcerpt = providerErrorExcerpt(await response.text());
     logExceptInTest('GitLab project repository size fetch failed:', {
       status: response.status,
-      error,
+      bodyExcerpt,
     });
     throw new Error(`GitLab project repository size fetch failed: ${response.status}`);
   }
@@ -1723,6 +2120,21 @@ export class GitLabProjectAccessTokenPermissionError extends Error {
 }
 
 /**
+ * Thrown when GitLab does not confirm a Project Access Token revocation.
+ * Carries the response status so callers can record it and choose when to retry.
+ */
+export class GitLabProjectAccessTokenRevocationError extends Error {
+  constructor(
+    public projectId: string | number,
+    public status: number,
+    message: string
+  ) {
+    super(message);
+    this.name = 'GitLabProjectAccessTokenRevocationError';
+  }
+}
+
+/**
  * Creates a Project Access Token for a GitLab project
  *
  * Project Access Tokens allow bot-like access to a project without using a user's credentials.
@@ -1740,7 +2152,8 @@ export class GitLabProjectAccessTokenPermissionError extends Error {
  * @param scopes - Token scopes (default: ['api', 'self_rotate'])
  * @param accessLevel - Access level for the token (default: DEVELOPER = 30)
  * @param instanceUrl - GitLab instance URL (defaults to gitlab.com)
- * @throws {GitLabProjectAccessTokenPermissionError} When user doesn't have Maintainer+ role
+ * @throws {GitLabAuthenticationError} When GitLab rejects the credential (HTTP 401)
+ * @throws {GitLabProjectAccessTokenPermissionError} When user doesn't have Maintainer+ role (HTTP 403)
  *
  * @see https://docs.gitlab.com/ee/api/project_access_tokens.html#create-a-project-access-token
  */
@@ -1774,14 +2187,22 @@ export async function createProjectAccessToken(
   );
 
   if (!response.ok) {
-    const error = await response.text();
+    const bodyExcerpt = providerErrorExcerpt(await response.text());
     logExceptInTest('[createProjectAccessToken] Failed:', {
       status: response.status,
-      error,
+      bodyExcerpt,
       projectId,
     });
 
-    if (response.status === 401 || response.status === 403) {
+    if (response.status === 401) {
+      throw new GitLabAuthenticationError(
+        projectId,
+        401,
+        `GitLab rejected the credential while creating a Project Access Token for project ${projectId} (HTTP 401). Reconnect the GitLab integration and try again.`
+      );
+    }
+
+    if (response.status === 403) {
       throw new GitLabProjectAccessTokenPermissionError(
         projectId,
         response.status,
@@ -1796,7 +2217,7 @@ export async function createProjectAccessToken(
       );
     }
 
-    throw new Error(`GitLab create Project Access Token failed: ${response.status} - ${error}`);
+    throw new Error(`GitLab create Project Access Token failed: ${response.status}`);
   }
 
   const token = (await response.json()) as GitLabProjectAccessToken;
@@ -1819,7 +2240,8 @@ export async function createProjectAccessToken(
  * @param accessToken - OAuth access token (requires Maintainer+ role)
  * @param projectId - GitLab project ID or path (URL-encoded)
  * @param instanceUrl - GitLab instance URL (defaults to gitlab.com)
- * @throws {GitLabProjectAccessTokenPermissionError} When user doesn't have Maintainer+ role
+ * @throws {GitLabAuthenticationError} When GitLab rejects the credential (HTTP 401)
+ * @throws {GitLabProjectAccessTokenPermissionError} When user doesn't have Maintainer+ role (HTTP 403)
  *
  * @see https://docs.gitlab.com/ee/api/project_access_tokens.html#list-project-access-tokens
  */
@@ -1841,14 +2263,22 @@ export async function listProjectAccessTokens(
   );
 
   if (!response.ok) {
-    const error = await response.text();
+    const bodyExcerpt = providerErrorExcerpt(await response.text());
     logExceptInTest('[listProjectAccessTokens] Failed:', {
       status: response.status,
-      error,
+      bodyExcerpt,
       projectId,
     });
 
-    if (response.status === 401 || response.status === 403) {
+    if (response.status === 401) {
+      throw new GitLabAuthenticationError(
+        projectId,
+        401,
+        `GitLab rejected the credential while listing Project Access Tokens for project ${projectId} (HTTP 401). Reconnect the GitLab integration and try again.`
+      );
+    }
+
+    if (response.status === 403) {
       throw new GitLabProjectAccessTokenPermissionError(
         projectId,
         response.status,
@@ -1906,10 +2336,10 @@ export async function getProjectAccessToken(
       return null;
     }
 
-    const error = await response.text();
+    const bodyExcerpt = providerErrorExcerpt(await response.text());
     logExceptInTest('[getProjectAccessToken] Failed:', {
       status: response.status,
-      error,
+      bodyExcerpt,
       projectId,
       tokenId,
     });
@@ -1931,6 +2361,8 @@ export async function getProjectAccessToken(
  * @param tokenId - ID of the Project Access Token to rotate
  * @param expiresAt - New expiration date in YYYY-MM-DD format (max 1 year from now)
  * @param instanceUrl - GitLab instance URL (defaults to gitlab.com)
+ * @throws {GitLabAuthenticationError} When GitLab rejects the credential (HTTP 401)
+ * @throws {GitLabProjectAccessTokenPermissionError} When user doesn't have Maintainer+ role (HTTP 403)
  *
  * @see https://docs.gitlab.com/ee/api/project_access_tokens.html#rotate-a-project-access-token
  */
@@ -1962,15 +2394,23 @@ export async function rotateProjectAccessToken(
   );
 
   if (!response.ok) {
-    const error = await response.text();
+    const bodyExcerpt = providerErrorExcerpt(await response.text());
     logExceptInTest('[rotateProjectAccessToken] Failed:', {
       status: response.status,
-      error,
+      bodyExcerpt,
       projectId,
       tokenId,
     });
 
-    if (response.status === 401 || response.status === 403) {
+    if (response.status === 401) {
+      throw new GitLabAuthenticationError(
+        projectId,
+        401,
+        `GitLab rejected the credential while rotating a Project Access Token for project ${projectId} (HTTP 401). Reconnect the GitLab integration and try again.`
+      );
+    }
+
+    if (response.status === 403) {
       throw new GitLabProjectAccessTokenPermissionError(
         projectId,
         response.status,
@@ -1982,7 +2422,7 @@ export async function rotateProjectAccessToken(
       throw new Error(`Project Access Token ${tokenId} not found in project ${projectId}.`);
     }
 
-    throw new Error(`GitLab rotate Project Access Token failed: ${response.status} - ${error}`);
+    throw new Error(`GitLab rotate Project Access Token failed: ${response.status}`);
   }
 
   const token = (await response.json()) as GitLabProjectAccessToken;
@@ -2005,6 +2445,11 @@ export async function rotateProjectAccessToken(
  * @param projectId - GitLab project ID or path (URL-encoded)
  * @param tokenId - ID of the Project Access Token to revoke
  * @param instanceUrl - GitLab instance URL (defaults to gitlab.com)
+ * @throws {GitLabAuthenticationError} When GitLab rejects the credential (HTTP 401)
+ * @throws {GitLabProjectAccessTokenPermissionError} When user doesn't have Maintainer+ role (HTTP 403)
+ *
+ * `signal` carries a caller's deadline, so a settlement that has spent its
+ * budget does not keep one revocation open for the per-request timeout.
  *
  * @see https://docs.gitlab.com/ee/api/project_access_tokens.html#revoke-a-project-access-token
  */
@@ -2012,7 +2457,8 @@ export async function revokeProjectAccessToken(
   accessToken: string,
   projectId: string | number,
   tokenId: number,
-  instanceUrl: string = DEFAULT_GITLAB_URL
+  instanceUrl: string = DEFAULT_GITLAB_URL,
+  signal?: AbortSignal
 ): Promise<void> {
   const encodedProjectId =
     typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
@@ -2024,20 +2470,29 @@ export async function revokeProjectAccessToken(
       headers: {
         Authorization: `Bearer ${accessToken}`,
       },
+      ...(signal === undefined ? {} : { signal }),
     }
   );
 
   // 404 means token already deleted, which is fine
   if (!response.ok && response.status !== 404) {
-    const error = await response.text();
+    const bodyExcerpt = providerErrorExcerpt(await response.text());
     logExceptInTest('[revokeProjectAccessToken] Failed:', {
       status: response.status,
-      error,
+      bodyExcerpt,
       projectId,
       tokenId,
     });
 
-    if (response.status === 401 || response.status === 403) {
+    if (response.status === 401) {
+      throw new GitLabAuthenticationError(
+        projectId,
+        401,
+        `GitLab rejected the credential while revoking a Project Access Token for project ${projectId} (HTTP 401). Reconnect the GitLab integration and try again.`
+      );
+    }
+
+    if (response.status === 403) {
       throw new GitLabProjectAccessTokenPermissionError(
         projectId,
         response.status,
@@ -2045,7 +2500,11 @@ export async function revokeProjectAccessToken(
       );
     }
 
-    throw new Error(`GitLab revoke Project Access Token failed: ${response.status} - ${error}`);
+    throw new GitLabProjectAccessTokenRevocationError(
+      projectId,
+      response.status,
+      `GitLab revoke Project Access Token failed: ${response.status}`
+    );
   }
 
   logExceptInTest('[revokeProjectAccessToken] Revoked token', {
@@ -2115,50 +2574,73 @@ export function isProjectAccessTokenExpiringSoon(
   return daysUntilExpiry <= withinDays;
 }
 
+export type GitLabProjectAccessTokenValidation =
+  | { status: 'valid' }
+  | { status: 'invalid'; reason: 'unauthorized' | 'forbidden'; httpStatus: number }
+  | {
+      status: 'unverified';
+      reason: 'instance-url' | 'transport' | 'http-error';
+      httpStatus?: number;
+    };
+
 /**
  * Checks whether a stored token is still valid on GitLab
  * (e.g., it might have been manually revoked by the user).
+ *
+ * Reports the authenticated probe outcome for the caller's credential policy.
  */
 export async function validateProjectAccessToken(
   token: string,
   instanceUrl: string = DEFAULT_GITLAB_URL
-): Promise<boolean> {
+): Promise<GitLabProjectAccessTokenValidation> {
+  let userUrl: string;
   try {
-    const response = await fetchGitLab(buildGitLabUrl(instanceUrl, '/api/v4/user'), {
+    userUrl = buildGitLabUrl(instanceUrl, '/api/v4/user');
+  } catch (error) {
+    logExceptInTest('[validateProjectAccessToken] Invalid GitLab instance URL', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return { status: 'unverified', reason: 'instance-url' };
+  }
+
+  let response: Response;
+  try {
+    response = await fetchGitLab(userUrl, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
     });
-
-    if (response.ok) {
-      logExceptInTest('[validateProjectAccessToken] Token is valid');
-      return true;
-    }
-
-    if (response.status === 401) {
-      logExceptInTest('[validateProjectAccessToken] Token is invalid (401)');
-      return false;
-    }
-
-    // Other errors - log but assume token might still be valid
-    logExceptInTest('[validateProjectAccessToken] Unexpected response', {
-      status: response.status,
-    });
-    return true;
   } catch (error) {
-    if (error instanceof GitLabInstanceUrlError) {
-      logExceptInTest('[validateProjectAccessToken] Invalid GitLab instance URL', {
-        error: error.message,
-      });
-      return false;
-    }
-
-    // Network errors - assume token might still be valid
-    logExceptInTest('[validateProjectAccessToken] Error validating token', {
+    logExceptInTest('[validateProjectAccessToken] Token validation request failed', {
       error: error instanceof Error ? error.message : String(error),
     });
-    return true;
+    // A rejected URL is stored configuration and stays rejected; temporary name
+    // resolution failures and transport errors can clear on their own.
+    if (error instanceof GitLabInstanceUrlError && !error.transient) {
+      return { status: 'unverified', reason: 'instance-url' };
+    }
+    return { status: 'unverified', reason: 'transport' };
   }
+
+  if (response.ok) {
+    logExceptInTest('[validateProjectAccessToken] Token is valid');
+    return { status: 'valid' };
+  }
+
+  if (response.status === 401) {
+    logExceptInTest('[validateProjectAccessToken] Token is invalid (401)');
+    return { status: 'invalid', reason: 'unauthorized', httpStatus: 401 };
+  }
+
+  if (response.status === 403) {
+    logExceptInTest('[validateProjectAccessToken] Token is denied (403)');
+    return { status: 'invalid', reason: 'forbidden', httpStatus: 403 };
+  }
+
+  logExceptInTest('[validateProjectAccessToken] Token health is unconfirmed', {
+    status: response.status,
+  });
+  return { status: 'unverified', reason: 'http-error', httpStatus: response.status };
 }
 
 /**
@@ -2260,10 +2742,10 @@ export async function validatePersonalAccessToken(
       };
     }
 
-    const errorText = await tokenInfoResponse.text();
+    const bodyExcerpt = providerErrorExcerpt(await tokenInfoResponse.text());
     logExceptInTest('[validatePersonalAccessToken] Token info fetch failed', {
       status: tokenInfoResponse.status,
-      error: errorText,
+      bodyExcerpt,
     });
     return {
       valid: false,
@@ -2344,10 +2826,10 @@ export async function validatePersonalAccessToken(
   }
 
   if (!userResponse.ok) {
-    const errorText = await userResponse.text();
+    const bodyExcerpt = providerErrorExcerpt(await userResponse.text());
     logExceptInTest('[validatePersonalAccessToken] User fetch failed', {
       status: userResponse.status,
-      error: errorText,
+      bodyExcerpt,
     });
     return {
       valid: false,
@@ -2428,15 +2910,15 @@ export async function setCommitStatus(
   );
 
   if (!response.ok) {
-    const error = await response.text();
+    const bodyExcerpt = providerErrorExcerpt(await response.text());
     logExceptInTest('[setCommitStatus] Failed to set commit status', {
       status: response.status,
-      error,
+      bodyExcerpt,
       projectId,
       sha: sha.substring(0, 8),
       state,
     });
-    throw new Error(`GitLab set commit status failed: ${response.status} - ${error}`);
+    throw new Error(`GitLab set commit status failed: ${response.status}`);
   }
 
   logExceptInTest('[setCommitStatus] Set commit status', {

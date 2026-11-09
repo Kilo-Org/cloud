@@ -8,6 +8,7 @@ import {
   upsertCliSessionPullRequestsFromWebhook,
   type WebhookInstallationOwner,
 } from './upsert-cli-session-pull-requests';
+import { createEmptyPrObservations, getPrObservationSummary } from '../pr-observations';
 
 const REPO = 'acme/widgets';
 // Matches what the webhook handler will store after normalizing clone_url.
@@ -33,6 +34,7 @@ function makePayload(overrides: {
   headSha: string;
   title?: string;
   cloneUrl?: string;
+  createdAt?: string;
   htmlUrl?: string;
   /** Base repository full name. */
   repo?: string;
@@ -50,6 +52,7 @@ function makePayload(overrides: {
       merged: overrides.merged,
       draft: overrides.draft,
       html_url: overrides.prUrl ?? `https://github.com/${repo}/pull/${overrides.prNumber}`,
+      created_at: overrides.createdAt,
       user: { id: 1, login: 'octocat', avatar_url: 'https://example.com/a.png', type: 'User' },
       head: {
         sha: overrides.headSha,
@@ -173,6 +176,65 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
         .where(inArray(github_branch_pull_requests.owned_by_organization_id, orgIdsToCleanup));
       await db.delete(organizations).where(inArray(organizations.id, orgIdsToCleanup));
     }
+  });
+  it('updates mergeability from PR webhooks without erasing cached check inventory', async () => {
+    const branch = 'feature/cached-status';
+    const headSha = 'a'.repeat(40);
+    await seedSession({ branch, owner: testOwner, prNumber: 999 });
+    const payload = makePayload({ action: 'opened', prNumber: 999, headRef: branch, headSha });
+    payload.pull_request.base.sha = 'b'.repeat(40);
+    payload.pull_request.mergeable = false;
+    payload.pull_request.mergeable_state = 'dirty';
+    await upsertCliSessionPullRequestsFromWebhook(payload, testOwner);
+
+    const [initial] = await readUserRow({ userId: testUserId, prNumber: 999 });
+    expect(getPrObservationSummary(initial.pr_observations, headSha)?.mergeability).toMatchObject({
+      mergeable: false,
+      state: 'dirty',
+      baseSha: 'b'.repeat(40),
+    });
+
+    await db
+      .update(github_branch_pull_requests)
+      .set({
+        pr_observations: {
+          ...createEmptyPrObservations(),
+          headSha,
+          checks: [
+            {
+              key: 'status:test',
+              id: '123',
+              attempt: 1,
+              at: null,
+              phase: 2,
+              failed: false,
+              outcome: 'passed',
+            },
+          ],
+          checksObserved: true,
+          checksComplete: true,
+        },
+      })
+      .where(
+        and(
+          eq(github_branch_pull_requests.owned_by_user_id, testUserId),
+          eq(github_branch_pull_requests.pr_number, 999)
+        )
+      );
+
+    payload.action = 'edited';
+    payload.pull_request.base.sha = 'c'.repeat(40);
+    payload.pull_request.mergeable = true;
+    payload.pull_request.mergeable_state = 'clean';
+    await upsertCliSessionPullRequestsFromWebhook(payload, testOwner);
+    const [updated] = await readUserRow({ userId: testUserId, prNumber: 999 });
+    const summary = getPrObservationSummary(updated.pr_observations, headSha);
+    expect(summary?.checks).toMatchObject({ total: 1, passed: 1, failed: 0, complete: true });
+    expect(summary?.mergeability).toMatchObject({
+      mergeable: true,
+      state: 'clean',
+      baseSha: 'c'.repeat(40),
+    });
   });
 
   it('inserts a cache row on opened and marks the linking session verified', async () => {
@@ -1199,37 +1261,83 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
       await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, sessionId));
     });
 
-    it.each([
-      ['stored head ref', { pr_head_ref: 'feature/other-branch' }],
-      ['session branch', { git_branch: 'feature/other-branch' }],
-    ])(
-      'does not verify a matching head SHA when the %s names another branch',
-      async (_label, contradiction) => {
-        const branch = 'feature/contradicting-ref';
-        const headSha = 'sha-711';
-        // The head SHA matches, but refresh would reject this link because a
-        // stored ref names another branch, so the webhook must not verify it.
-        const sessionId = await seedSession({
-          branch,
-          owner: testOwner,
-          prNumber: 711,
-          prHeadSha: headSha,
-        });
-        await db
-          .update(cli_sessions_v2)
-          .set(contradiction)
-          .where(eq(cli_sessions_v2.session_id, sessionId));
+    it('does not verify a matching head SHA when the stored head ref names another branch', async () => {
+      const branch = 'feature/contradicting-ref';
+      const headSha = 'sha-711';
+      // The head SHA matches, but the head ref the session reported names
+      // another branch, so refresh would reject this link and the webhook must
+      // not verify it either.
+      const sessionId = await seedSession({
+        branch,
+        owner: testOwner,
+        prNumber: 711,
+        prHeadSha: headSha,
+      });
+      await db
+        .update(cli_sessions_v2)
+        .set({ pr_head_ref: 'feature/other-branch' })
+        .where(eq(cli_sessions_v2.session_id, sessionId));
 
-        const written = await upsertCliSessionPullRequestsFromWebhook(
-          makePayload({ action: 'opened', prNumber: 711, state: 'open', headRef: branch, headSha }),
-          testOwner
-        );
+      const written = await upsertCliSessionPullRequestsFromWebhook(
+        makePayload({ action: 'opened', prNumber: 711, state: 'open', headRef: branch, headSha }),
+        testOwner
+      );
 
-        expect(written).toBe(0);
-        expect(await sessionVerifiedAt(sessionId)).toBeNull();
-        await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, sessionId));
-      }
-    );
+      expect(written).toBe(0);
+      expect(await sessionVerifiedAt(sessionId)).toBeNull();
+      await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, sessionId));
+    });
+
+    it('verifies when the reported head ref names the payload head ref and the stored branch differs', async () => {
+      // The session recorded another branch but pushed the PR from the payload
+      // head ref, which is exactly what refresh accepts.
+      const branch = 'feature/reported-ref';
+      const headSha = 'sha-reported-ref';
+      const sessionId = await seedSession({
+        branch: 'feature/recorded-branch',
+        owner: testOwner,
+        prNumber: 712,
+        prHeadSha: headSha,
+        prHeadRef: branch,
+      });
+
+      const written = await upsertCliSessionPullRequestsFromWebhook(
+        makePayload({ action: 'opened', prNumber: 712, state: 'open', headRef: branch, headSha }),
+        testOwner
+      );
+
+      expect(written).toBe(1);
+      expect(await sessionVerifiedAt(sessionId)).not.toBeNull();
+      await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, sessionId));
+    });
+
+    it('does not verify a link without a reported head ref when the stored branch differs', async () => {
+      // With no stored head ref, the branch evidence is the stored branch, and
+      // a matching head SHA does not excuse it, exactly as refresh decides.
+      const headSha = 'sha-713';
+      const sessionId = await seedSession({
+        branch: 'feature/other-branch',
+        owner: testOwner,
+        prNumber: 713,
+        prHeadRef: null,
+        prHeadSha: headSha,
+      });
+
+      const written = await upsertCliSessionPullRequestsFromWebhook(
+        makePayload({
+          action: 'opened',
+          prNumber: 713,
+          state: 'open',
+          headRef: 'feature/payload',
+          headSha,
+        }),
+        testOwner
+      );
+
+      expect(written).toBe(0);
+      expect(await sessionVerifiedAt(sessionId)).toBeNull();
+      await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, sessionId));
+    });
 
     it('verifies a session on a platform outside the old review-decision set', async () => {
       const branch = 'feature/platform-agnostic-gate';

@@ -25,8 +25,9 @@ import {
   type OutcomeRole,
   type OutcomeWindow,
   type ProductOrigin,
+  type RuntimeHarnessBucket,
 } from '../../src/telemetry/outcome-aggregate.js';
-import { sessionPlaneFromId } from '../../src/session-plane.js';
+import { isControlSession } from '../../src/session-identity.js';
 
 const { getPgDbMock } = vi.hoisted(() => ({ getPgDbMock: vi.fn() }));
 
@@ -177,10 +178,12 @@ async function insertRun(values: {
   failureCode?: string;
   failureResponsibility?: string;
   failureReason?: string;
+  container?: Record<string, unknown>;
 }): Promise<void> {
   await writer.db.insert(cloud_agent_session_runs).values({
     cloud_agent_session_id: values.cloudAgentSessionId,
     message_id: values.messageId,
+    container: (values.container ?? null) as never,
     status: values.status,
     queued_at: values.terminalAt,
     terminal_at: values.terminalAt,
@@ -202,10 +205,15 @@ function headline(
   result: OutcomeAggregate,
   generation: OutcomeGeneration,
   role: OutcomeRole,
-  productOrigin: ProductOrigin
+  productOrigin: ProductOrigin,
+  runtimeHarness: RuntimeHarnessBucket = 'unknown'
 ): AgentExecutionHeadline {
   const found = assembleExecutionHeadlines(result.runCounts).find(
-    row => row.generation === generation && row.role === role && row.productOrigin === productOrigin
+    row =>
+      row.generation === generation &&
+      row.role === role &&
+      row.productOrigin === productOrigin &&
+      row.runtimeHarness === runtimeHarness
   );
   if (!found) throw new Error('missing headline');
   return found;
@@ -363,14 +371,14 @@ afterAll(async () => {
 describe('cloud agent outcome aggregate against PostgreSQL', () => {
   it('counts a run whose terminal_at equals the window start and excludes the window end', async () => {
     const window = nextWindow();
-    const startSession = uniqueSessionId('agent');
+    const startSession = uniqueSessionId('workspace');
     await saveReport(
       startSession,
       completedRun(await createSession(startSession, window.start), window.start),
       window.end
     );
 
-    const endSession = uniqueSessionId('agent');
+    const endSession = uniqueSessionId('workspace');
     await saveReport(
       endSession,
       completedRun(await createSession(endSession, window.start), window.end),
@@ -378,12 +386,12 @@ describe('cloud agent outcome aggregate against PostgreSQL', () => {
     );
 
     const result = await aggregate(window);
-    expect(headline(result, 'legacy', 'initial', 'unknown').completed).toBe(1);
+    expect(headline(result, 'control', 'initial', 'unknown').completed).toBe(1);
   });
 
   it('merges duplicate and out-of-order snapshots into one terminal turn', async () => {
     const window = nextWindow();
-    const sessionId = uniqueSessionId('agent');
+    const sessionId = uniqueSessionId('workspace');
     const initial = await createSession(sessionId, window.start);
 
     await saveReport(
@@ -406,25 +414,25 @@ describe('cloud agent outcome aggregate against PostgreSQL', () => {
     expect(rows).toHaveLength(1);
 
     const result = await aggregate(window);
-    expect(headline(result, 'legacy', 'initial', 'unknown').platformFailed).toBe(1);
+    expect(headline(result, 'control', 'initial', 'unknown').platformFailed).toBe(1);
     expect(assembleFailureRows(result.runCounts)).toHaveLength(1);
   });
 
   it('counts a run with null responsibility as unknown', async () => {
     const window = nextWindow();
-    const sessionId = uniqueSessionId('agent');
+    const sessionId = uniqueSessionId('workspace');
     const initial = await createSession(sessionId, window.start);
     await saveReport(sessionId, unclassifiedFailedRun(initial, window.start), window.end);
 
     const result = await aggregate(window);
-    expect(headline(result, 'legacy', 'initial', 'unknown').unknownFailed).toBe(1);
-    expect(headline(result, 'legacy', 'initial', 'unknown').platformFailed).toBe(0);
+    expect(headline(result, 'control', 'initial', 'unknown').unknownFailed).toBe(1);
+    expect(headline(result, 'control', 'initial', 'unknown').platformFailed).toBe(0);
     expect(assembleFailureRows(result.runCounts)[0]?.responsibility).toBe('unknown');
   });
 
   it('emits the unclassified sentinels for a failed run with no classification', async () => {
     const window = nextWindow();
-    const sessionId = uniqueSessionId('agent');
+    const sessionId = uniqueSessionId('workspace');
     const initial = await createSession(sessionId, window.start);
     await saveReport(
       sessionId,
@@ -433,18 +441,67 @@ describe('cloud agent outcome aggregate against PostgreSQL', () => {
     );
 
     const result = await aggregate(window);
-    expect(headline(result, 'legacy', 'initial', 'unknown').unknownFailed).toBe(1);
+    expect(headline(result, 'control', 'initial', 'unknown').unknownFailed).toBe(1);
     expect(assembleFailureRows(result.runCounts)).toEqual([
       {
-        generation: 'legacy',
+        generation: 'control',
         role: 'initial',
         productOrigin: 'unknown',
+        runtimeHarness: 'unknown',
         responsibility: 'unknown',
         stage: 'unknown',
         code: 'unclassified',
         reason: 'unclassified',
         count: 1,
       },
+    ]);
+  });
+
+  it('splits runs by the reported runtime harness and buckets the rest as unknown', async () => {
+    const window = nextWindow();
+    const container = (runtimeHarness?: 'kilo' | 'kilo2') => ({
+      provider: 'cloudflare-containers' as const,
+      sandboxId: `sandbox_${randomUUID()}`,
+      ...(runtimeHarness === undefined ? {} : { runtimeHarness }),
+    });
+    const v1Session = uniqueSessionId('workspace');
+    const v1Initial = await createSession(v1Session, window.start);
+    await saveReport(
+      v1Session,
+      { ...completedRun(v1Initial, window.start), container: container('kilo') },
+      window.end
+    );
+    const v2Session = uniqueSessionId('workspace');
+    const v2Initial = await createSession(v2Session, window.start);
+    await saveReport(
+      v2Session,
+      { ...platformFailedRun(v2Initial, window.start), container: container('kilo2') },
+      window.end
+    );
+    const unreportedSession = uniqueSessionId('workspace');
+    const unreportedInitial = await createSession(unreportedSession, window.start);
+    await saveReport(
+      unreportedSession,
+      { ...completedRun(unreportedInitial, window.start), container: container() },
+      window.end
+    );
+    const foreignSession = uniqueSessionId('workspace');
+    const foreignInitial = await insertSession(foreignSession, window.start);
+    await insertRun({
+      cloudAgentSessionId: foreignSession,
+      messageId: foreignInitial,
+      status: 'completed',
+      terminalAt: window.start,
+      container: { ...container(), runtimeHarness: 'kilo3' },
+    });
+
+    const result = await aggregate(window);
+    expect(headline(result, 'control', 'initial', 'unknown', 'kilo').completed).toBe(1);
+    expect(headline(result, 'control', 'initial', 'unknown', 'kilo2').platformFailed).toBe(1);
+    expect(headline(result, 'control', 'initial', 'unknown', 'kilo2').completed).toBe(0);
+    expect(headline(result, 'control', 'initial', 'unknown', 'unknown').completed).toBe(2);
+    expect(assembleFailureRows(result.runCounts)).toEqual([
+      expect.objectContaining({ runtimeHarness: 'kilo2', responsibility: 'platform', count: 1 }),
     ]);
   });
 
@@ -471,12 +528,12 @@ describe('cloud agent outcome aggregate against PostgreSQL', () => {
 
   it('labels the run whose message_id matches initial_message_id as initial and others as follow-up', async () => {
     const window = nextWindow();
-    const sessionId = uniqueSessionId('agent');
+    const sessionId = uniqueSessionId('workspace');
     const initial = await createSession(sessionId, window.start);
     await saveReport(sessionId, platformFailedRun(initial, window.start), window.end);
     await saveReport(sessionId, platformFailedRun(uniqueMessageId(), window.start), window.end);
 
-    const missingInitialSession = uniqueSessionId('agent');
+    const missingInitialSession = uniqueSessionId('workspace');
     await createSession(missingInitialSession, window.start);
     await saveReport(
       missingInitialSession,
@@ -485,8 +542,8 @@ describe('cloud agent outcome aggregate against PostgreSQL', () => {
     );
 
     const result = await aggregate(window);
-    expect(headline(result, 'legacy', 'initial', 'unknown').platformFailed).toBe(1);
-    expect(headline(result, 'legacy', 'follow_up', 'unknown').platformFailed).toBe(2);
+    expect(headline(result, 'control', 'initial', 'unknown').platformFailed).toBe(1);
+    expect(headline(result, 'control', 'follow_up', 'unknown').platformFailed).toBe(2);
   });
 
   it('classifies the first admitted run of an anchor-created control-plane parent as initial', async () => {
@@ -505,7 +562,7 @@ describe('cloud agent outcome aggregate against PostgreSQL', () => {
 
   it('keeps an interrupted turn out of the failure rows even when it carries a responsibility', async () => {
     const window = nextWindow();
-    const sessionId = uniqueSessionId('agent');
+    const sessionId = uniqueSessionId('workspace');
     const initial = await createSession(sessionId, window.start);
     await saveReport(
       sessionId,
@@ -524,9 +581,9 @@ describe('cloud agent outcome aggregate against PostgreSQL', () => {
     await saveReport(sessionId, completedRun(uniqueMessageId(), window.start), window.end);
 
     const result = await aggregate(window);
-    expect(headline(result, 'legacy', 'initial', 'unknown').interrupted).toBe(1);
-    expect(headline(result, 'legacy', 'initial', 'unknown').userFailed).toBe(0);
-    expect(headline(result, 'legacy', 'follow_up', 'unknown').completed).toBe(1);
+    expect(headline(result, 'control', 'initial', 'unknown').interrupted).toBe(1);
+    expect(headline(result, 'control', 'initial', 'unknown').userFailed).toBe(0);
+    expect(headline(result, 'control', 'follow_up', 'unknown').completed).toBe(1);
     expect(assembleFailureRows(result.runCounts)).toEqual([]);
   });
 
@@ -553,7 +610,7 @@ describe('cloud agent outcome aggregate against PostgreSQL', () => {
     expect(headline(result, 'legacy', 'follow_up', 'unknown').completed).toBe(1);
   });
 
-  it('splits generations by the workspace_ prefix in agreement with sessionPlaneFromId', async () => {
+  it('splits generations by the workspace_ prefix in agreement with isControlSession', async () => {
     const window = nextWindow();
     const sessionIds = [
       uniqueSessionId('workspace'),
@@ -575,8 +632,8 @@ describe('cloud agent outcome aggregate against PostgreSQL', () => {
     }
 
     const result = await aggregate(window);
-    const expectedLegacy = sessionIds.filter(id => sessionPlaneFromId(id) === 'legacy').length;
-    const expectedControl = sessionIds.filter(id => sessionPlaneFromId(id) === 'control').length;
+    const expectedLegacy = sessionIds.filter(id => !isControlSession(id)).length;
+    const expectedControl = sessionIds.filter(id => isControlSession(id)).length;
     expect(expectedControl).toBe(1);
     expect(headline(result, 'legacy', 'initial', 'unknown').completed).toBe(expectedLegacy);
     expect(headline(result, 'control', 'initial', 'unknown').completed).toBe(expectedControl);
@@ -587,20 +644,20 @@ describe('cloud agent outcome aggregate against PostgreSQL', () => {
     const result = await aggregate(window);
 
     const headlines = assembleExecutionHeadlines(result.runCounts);
-    expect(headlines).toHaveLength(12);
+    expect(headlines).toHaveLength(36);
     expect(headlines.every(row => row.completed === 0 && row.interrupted === 0)).toBe(true);
   });
 
   it('reports a session setup failure grouped by its origin and never with a role', async () => {
     const window = nextWindow();
-    const reviewSession = uniqueSessionId('agent');
+    const reviewSession = uniqueSessionId('workspace');
     await createSession(reviewSession, window.start, uniqueMessageId(), 'code-review');
     await store.recordSessionFailure({
       cloudAgentSessionId: reviewSession,
       occurredAt: window.start,
       failure: { stage: 'registration', code: 'do_registration_rejected' },
     });
-    const unknownSession = uniqueSessionId('agent');
+    const unknownSession = uniqueSessionId('workspace');
     await createSession(unknownSession, window.start);
     await store.recordSessionFailure({
       cloudAgentSessionId: unknownSession,
@@ -609,18 +666,18 @@ describe('cloud agent outcome aggregate against PostgreSQL', () => {
     });
 
     const result = await aggregate(window);
-    expect(headline(result, 'legacy', 'initial', 'unknown').completed).toBe(0);
+    expect(headline(result, 'control', 'initial', 'unknown').completed).toBe(0);
     const rows = assembleSetupFailureRows(result.sessionSetupFailures);
     expect(rows).toEqual([
       {
-        generation: 'legacy',
+        generation: 'control',
         productOrigin: 'code-review',
         stage: 'registration',
         code: 'do_registration_rejected',
         count: 1,
       },
       {
-        generation: 'legacy',
+        generation: 'control',
         productOrigin: 'unknown',
         stage: 'transport',
         code: 'do_rpc_outcome_unknown',
@@ -632,12 +689,12 @@ describe('cloud agent outcome aggregate against PostgreSQL', () => {
 
   it('counts a pre-dispatch platform failure without a dispatch acceptance fact', async () => {
     const window = nextWindow();
-    const sessionId = uniqueSessionId('agent');
+    const sessionId = uniqueSessionId('workspace');
     const initial = await createSession(sessionId, window.start);
     await saveReport(sessionId, platformFailedRun(initial, window.start), window.end);
 
     const result = await aggregate(window);
-    expect(headline(result, 'legacy', 'initial', 'unknown').platformFailed).toBe(1);
+    expect(headline(result, 'control', 'initial', 'unknown').platformFailed).toBe(1);
   });
 
   it('excludes queued and failed rows with no terminal_at', async () => {
@@ -669,9 +726,9 @@ describe('cloud agent outcome aggregate against PostgreSQL', () => {
 
   it('labels created_on_platform code-review as code-review, other platforms as other, and missing as unknown', async () => {
     const window = nextWindow();
-    const reviewSession = uniqueSessionId('agent');
-    const otherSession = uniqueSessionId('agent');
-    const unknownSession = uniqueSessionId('agent');
+    const reviewSession = uniqueSessionId('workspace');
+    const otherSession = uniqueSessionId('workspace');
+    const unknownSession = uniqueSessionId('workspace');
     const reviewInitial = await createSession(
       reviewSession,
       window.start,
@@ -690,26 +747,26 @@ describe('cloud agent outcome aggregate against PostgreSQL', () => {
     await saveReport(unknownSession, completedRun(unknownInitial, window.start), window.end);
 
     const result = await aggregate(window);
-    expect(headline(result, 'legacy', 'initial', 'code-review').completed).toBe(1);
-    expect(headline(result, 'legacy', 'initial', 'other').completed).toBe(1);
-    expect(headline(result, 'legacy', 'initial', 'unknown').completed).toBe(1);
+    expect(headline(result, 'control', 'initial', 'code-review').completed).toBe(1);
+    expect(headline(result, 'control', 'initial', 'other').completed).toBe(1);
+    expect(headline(result, 'control', 'initial', 'unknown').completed).toBe(1);
   });
 
   it('serializes real query results to JSON without a BigInt error', async () => {
     const window = nextWindow();
-    const sessionId = uniqueSessionId('agent');
+    const sessionId = uniqueSessionId('workspace');
     const initial = await createSession(sessionId, window.start);
     await saveReport(sessionId, platformFailedRun(initial, window.start), window.end);
 
     const result = await aggregate(window);
-    expect(typeof headline(result, 'legacy', 'initial', 'unknown').platformFailed).toBe('number');
+    expect(typeof headline(result, 'control', 'initial', 'unknown').platformFailed).toBe('number');
     expect(() => JSON.stringify(result)).not.toThrow();
     expect(JSON.parse(JSON.stringify(result)).runCounts[0].runCount).toBe(1);
   });
 
   it('excludes a run failure and a setup failure committed after the first query in one snapshot', async () => {
     const window = nextWindow();
-    const sessionId = uniqueSessionId('agent');
+    const sessionId = uniqueSessionId('workspace');
     const initial = await createSession(sessionId, window.start);
 
     const barrier = createBarrier();
@@ -749,10 +806,10 @@ describe('cloud agent outcome aggregate against PostgreSQL', () => {
     }
 
     const after = await aggregate(window);
-    expect(headline(after, 'legacy', 'initial', 'unknown').platformFailed).toBe(1);
+    expect(headline(after, 'control', 'initial', 'unknown').platformFailed).toBe(1);
     expect(assembleSetupFailureRows(after.sessionSetupFailures)).toEqual([
       {
-        generation: 'legacy',
+        generation: 'control',
         productOrigin: 'unknown',
         stage: 'registration',
         code: 'do_registration_rejected',

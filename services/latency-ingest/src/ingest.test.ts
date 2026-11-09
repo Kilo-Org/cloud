@@ -8,6 +8,7 @@ import {
   handleLatencyIngest,
   MAX_BATCH_SAMPLES,
   MAX_PAYLOAD_BYTES,
+  MAX_VERSION_LENGTH,
   type LatencyIngestDeps,
 } from './ingest.js';
 import worker from './index.js';
@@ -367,8 +368,6 @@ describe('handleLatencyIngest accepted batches', () => {
     expect(lines[0]).toMatchObject({
       type: 'client_latency',
       client: 'mobile',
-      platform: 'ios',
-      version: '1.0.12',
       requestId: 'req-1',
       procedures: ['user.getMe'],
       batchSize: 2,
@@ -379,7 +378,14 @@ describe('handleLatencyIngest accepted batches', () => {
     });
     expect(lines[1]).toMatchObject({ requestId: 'req-2', batchSize: 2 });
     expect(durationLines(lines)).toMatchObject([
-      { route: '/v1/latency', method: 'POST', status: 204, outcome: 'ok' },
+      {
+        route: '/v1/latency',
+        method: 'POST',
+        status: 204,
+        outcome: 'ok',
+        platform: 'ios',
+        version: '1.0.12',
+      },
     ]);
   });
 
@@ -404,13 +410,17 @@ describe('handleLatencyIngest accepted batches', () => {
     expect(JSON.stringify(duration)).not.toContain('?');
     expect(JSON.stringify(duration)).not.toContain('requestId=leak');
     expect(JSON.stringify(duration)).not.toContain('super-secret');
-    // The allow-list is exhaustive: no caller-supplied or extra field rides along.
+    // The key set is exhaustive: the only request-derived fields are the
+    // sanitized platform and the validated version, and nothing else rides
+    // along.
     expect(Object.keys(duration).sort()).toEqual([
       'durationMs',
       'method',
       'outcome',
+      'platform',
       'route',
       'status',
+      'version',
     ]);
   });
 
@@ -436,6 +446,100 @@ describe('handleLatencyIngest accepted batches', () => {
     expect(durationLines(lines)).toMatchObject([
       { route: '/v1/latency', method: 'POST', status: 204, outcome: 'ok' },
     ]);
+  });
+});
+
+describe('handleLatencyIngest client dimensions', () => {
+  it('logs a known platform once per request', async () => {
+    const { deps, lines } = makeDeps();
+
+    const response = await handleLatencyIngest(
+      post(
+        { samples: [sample(), sample({ requestId: 'req-2' })] },
+        {
+          'x-kilo-app-platform': 'android',
+        }
+      ),
+      deps
+    );
+
+    expect(response.status).toBe(204);
+    expect(durationLines(lines)).toMatchObject([{ platform: 'android', version: '1.0.12' }]);
+    for (const line of sampleLines(lines)) {
+      expect(line).not.toHaveProperty('platform');
+      expect(line).not.toHaveProperty('version');
+    }
+  });
+
+  it('records an unrecognized platform as unknown and still ingests', async () => {
+    const { deps, lines } = makeDeps();
+
+    const response = await handleLatencyIngest(
+      post({ samples: [sample()] }, { 'x-kilo-app-platform': 'watchOS' }),
+      deps
+    );
+
+    expect(response.status).toBe(204);
+    expect(durationLines(lines)).toMatchObject([{ status: 204, platform: 'unknown' }]);
+  });
+
+  it('records a missing platform header as unknown', async () => {
+    const { deps, lines } = makeDeps();
+    const request = new Request(ENDPOINT, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${BEARER}`, 'x-kilo-app-version': '1.0.12' },
+      body: JSON.stringify({ samples: [sample()] }),
+    });
+
+    const response = await handleLatencyIngest(request, deps);
+
+    expect(response.status).toBe(204);
+    expect(durationLines(lines)).toMatchObject([{ platform: 'unknown' }]);
+  });
+
+  it('does not copy an unrecognized platform value into the line', async () => {
+    const { deps, lines } = makeDeps();
+    const overlong = 'x'.repeat(4096);
+
+    const response = await handleLatencyIngest(
+      post({ samples: [sample()] }, { 'x-kilo-app-platform': overlong }),
+      deps
+    );
+
+    expect(response.status).toBe(204);
+    expect(durationLines(lines)).toMatchObject([{ platform: 'unknown' }]);
+    expect(JSON.stringify(lines)).not.toContain(overlong);
+  });
+
+  it('rejects a version longer than the cap and logs nothing caller-supplied', async () => {
+    const { deps, lines } = makeDeps();
+    const overlong = `1.0.${'1'.repeat(MAX_VERSION_LENGTH)}`;
+
+    const response = await handleLatencyIngest(
+      post({ samples: [sample()] }, { 'x-kilo-app-version': overlong }),
+      deps
+    );
+
+    expect(response.status).toBe(403);
+    expect(sampleLines(lines)).toHaveLength(0);
+    expect(durationLines(lines)).toMatchObject([
+      { status: 403, outcome: 'version_rejected', platform: null, version: null },
+    ]);
+    expect(JSON.stringify(lines)).not.toContain(overlong);
+  });
+
+  it('accepts a version of exactly the cap length', async () => {
+    const { deps, lines } = makeDeps();
+    const atCap = `1.0.${'1'.repeat(MAX_VERSION_LENGTH - 4)}`;
+
+    expect(atCap).toHaveLength(MAX_VERSION_LENGTH);
+    const response = await handleLatencyIngest(
+      post({ samples: [sample()] }, { 'x-kilo-app-version': atCap }),
+      deps
+    );
+
+    expect(response.status).toBe(204);
+    expect(durationLines(lines)).toMatchObject([{ version: atCap }]);
   });
 });
 

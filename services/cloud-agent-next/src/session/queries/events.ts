@@ -18,10 +18,16 @@ import { alias } from 'drizzle-orm/sqlite-core';
 import * as z from 'zod';
 import type { StoredEvent } from '../../websocket/types.js';
 import type { EventId } from '../../types/ids.js';
-import type { AssistantMessagePart, LatestAssistantMessage } from '../types.js';
-import { events } from '../../db/sqlite-schema.js';
+import type { AssistantMessagePart } from '../types.js';
+import { events } from '../../control-plane/session/sqlite-schema.js';
 import type { SQL } from 'drizzle-orm';
 import { CALLBACK_ACTIVITY_MESSAGE_LIMIT } from '../../callbacks/recent-activity.js';
+import {
+  readKilo2Answer,
+  readV1Answer,
+  type AssistantAnswer,
+} from '../../callbacks/assistant-answer.js';
+import { kilo2ConversationMessageSchema } from '../../shared/kilo2-conversation.js';
 
 type SqlStorage = DurableObjectState['storage']['sql'];
 
@@ -32,6 +38,19 @@ const storedEventRowSchema = z.object({
   stream_event_type: z.string(),
   payload: z.string(),
   timestamp: z.number(),
+});
+
+// v1 rows store `message.updated` with `info`; native v2 rows store
+// `conversation.message.updated` with the native `message` and row-level identity.
+const assistantRowSql = (payload = 'payload') =>
+  `json_extract(${payload}, '$.event') IN ('message.updated', 'conversation.message.updated')
+  AND COALESCE(json_extract(${payload}, '$.properties.info.role'), json_extract(${payload}, '$.properties.message.type')) = 'assistant'`;
+const messageFieldSql = (v1: string, v2: string, payload = 'payload') =>
+  `COALESCE(json_extract(${payload}, '$.properties.info.${v1}'), json_extract(${payload}, '$.properties.${v2}'))`;
+
+const conversationMessagePayloadSchema = z.object({
+  event: z.literal('conversation.message.updated'),
+  properties: kilo2ConversationMessageSchema,
 });
 
 const assistantMessageInfoSchema = z
@@ -97,6 +116,9 @@ export type UpsertEventParams = InsertEventParams & {
 export type EventQueryFilters = {
   /** Exclusive: id > fromId */
   fromId?: EventId;
+  toId?: EventId;
+  afterCursor?: number;
+  throughCursor?: number;
   /** Only return events for these execution IDs */
   executionIds?: string[];
   /** Only return events of these types */
@@ -116,6 +138,7 @@ function buildConditions(filters: Omit<EventQueryFilters, 'limit'>): SQL[] {
   if (filters.fromId !== undefined) {
     conditions.push(gt(events.id, filters.fromId));
   }
+  if (filters.toId !== undefined) conditions.push(lte(events.id, filters.toId));
   if (filters.executionIds?.length) {
     conditions.push(inArray(events.execution_id, filters.executionIds));
   }
@@ -158,11 +181,24 @@ function parseStoredEventRow(row: unknown): StoredEvent | null {
   return parsed.success ? parsed.data : null;
 }
 
-function buildLatestAssistantMessage(
+/** Reads a callback answer from the native message, without a display projection. */
+function readAssistantAnswer(
   sessionId: string,
   rawSql: SqlStorage,
   messageRow: StoredEvent
-): LatestAssistantMessage | null {
+): AssistantAnswer | null {
+  const conversation = parseJsonPayload(messageRow.payload, conversationMessagePayloadSchema);
+  if (conversation) return readKilo2Answer(conversation.properties.message);
+  const parts = readV1AssistantParts(sessionId, rawSql, messageRow);
+  return parts ? readV1Answer(parts) : null;
+}
+
+/** The current parts of a v1 assistant message row, in part id order. */
+function readV1AssistantParts(
+  sessionId: string,
+  rawSql: SqlStorage,
+  messageRow: StoredEvent
+): AssistantMessagePart[] | null {
   const messagePayload = parseJsonPayload(messageRow.payload, assistantMessageUpdatedPayloadSchema);
   if (!messagePayload) return null;
 
@@ -216,14 +252,7 @@ function buildLatestAssistantMessage(
     }
   }
 
-  const parts = [...partsById.values()].sort((a, b) => a.id.localeCompare(b.id));
-
-  return {
-    eventId: messageRow.id,
-    timestamp: messageRow.timestamp,
-    info: messagePayload.properties.info,
-    parts,
-  } satisfies LatestAssistantMessage;
+  return [...partsById.values()].sort((a, b) => a.id.localeCompare(b.id));
 }
 
 /**
@@ -375,10 +404,11 @@ export function createEventQueries(db: DrizzleSqliteDODatabase, rawSql: SqlStora
         .all() satisfies StoredEvent[];
     },
 
-    getLatestAssistantMessage(
+    getAssistantAnswerForUserMessage(
       sessionId: string,
-      kiloSessionId: string
-    ): LatestAssistantMessage | null {
+      kiloSessionId: string,
+      parentMessageId: string
+    ): AssistantAnswer | null {
       const messageRow = parseStoredEventRow(
         rawSql
           .exec(
@@ -389,76 +419,9 @@ export function createEventQueries(db: DrizzleSqliteDODatabase, rawSql: SqlStora
               AND stream_event_type = 'kilocode'
               AND entity_id IS NOT NULL
               AND substr(entity_id, 1, 8) = 'message/'
-              AND json_extract(payload, '$.event') = 'message.updated'
-              AND json_extract(payload, '$.properties.info.role') = 'assistant'
-              AND json_extract(payload, '$.properties.info.sessionID') = ?
-            ORDER BY entity_id DESC
-            LIMIT 1
-            `,
-            sessionId,
-            kiloSessionId
-          )
-          .toArray()[0]
-      );
-      if (!messageRow) return null;
-
-      return buildLatestAssistantMessage(sessionId, rawSql, messageRow);
-    },
-
-    getAssistantMessageById(
-      sessionId: string,
-      kiloSessionId: string,
-      assistantMessageId: string,
-      parentMessageId: string
-    ): LatestAssistantMessage | null {
-      const messageRow = parseStoredEventRow(
-        rawSql
-          .exec(
-            `
-            SELECT id, execution_id, session_id, stream_event_type, payload, timestamp
-            FROM events
-            WHERE session_id = ?
-              AND stream_event_type = 'kilocode'
-              AND entity_id = ?
-              AND json_extract(payload, '$.event') = 'message.updated'
-              AND json_extract(payload, '$.properties.info.id') = ?
-              AND json_extract(payload, '$.properties.info.role') = 'assistant'
-              AND json_extract(payload, '$.properties.info.sessionID') = ?
-              AND json_extract(payload, '$.properties.info.parentID') = ?
-            LIMIT 1
-            `,
-            sessionId,
-            `message/${assistantMessageId}`,
-            assistantMessageId,
-            kiloSessionId,
-            parentMessageId
-          )
-          .toArray()[0]
-      );
-      if (!messageRow) return null;
-
-      return buildLatestAssistantMessage(sessionId, rawSql, messageRow);
-    },
-
-    getAssistantMessageForUserMessage(
-      sessionId: string,
-      kiloSessionId: string,
-      parentMessageId: string
-    ): LatestAssistantMessage | null {
-      const messageRow = parseStoredEventRow(
-        rawSql
-          .exec(
-            `
-            SELECT id, execution_id, session_id, stream_event_type, payload, timestamp
-            FROM events
-            WHERE session_id = ?
-              AND stream_event_type = 'kilocode'
-              AND entity_id IS NOT NULL
-              AND substr(entity_id, 1, 8) = 'message/'
-              AND json_extract(payload, '$.event') = 'message.updated'
-              AND json_extract(payload, '$.properties.info.role') = 'assistant'
-              AND json_extract(payload, '$.properties.info.sessionID') = ?
-              AND json_extract(payload, '$.properties.info.parentID') = ?
+              AND ${assistantRowSql()}
+              AND ${messageFieldSql('sessionID', 'sessionID')} = ?
+              AND ${messageFieldSql('parentID', 'parentID')} = ?
             ORDER BY id DESC
             LIMIT 1
             `,
@@ -470,14 +433,14 @@ export function createEventQueries(db: DrizzleSqliteDODatabase, rawSql: SqlStora
       );
       if (!messageRow) return null;
 
-      return buildLatestAssistantMessage(sessionId, rawSql, messageRow);
+      return readAssistantAnswer(sessionId, rawSql, messageRow);
     },
 
-    getRecentAssistantMessagesForUserMessage(
+    getRecentAssistantAnswersForUserMessage(
       sessionId: string,
       kiloSessionId: string,
       parentMessageId: string
-    ): LatestAssistantMessage[] {
+    ): AssistantAnswer[] {
       const removals = alias(events, 'message_removals');
       const rows = db
         .select()
@@ -488,14 +451,13 @@ export function createEventQueries(db: DrizzleSqliteDODatabase, rawSql: SqlStora
             eq(events.stream_event_type, 'kilocode'),
             gte(events.entity_id, 'message/'),
             lt(events.entity_id, 'message0'),
-            eq(sql<string>`json_extract(${events.payload}, '$.event')`, 'message.updated'),
-            eq(sql<string>`json_extract(${events.payload}, '$.properties.info.role')`, 'assistant'),
+            sql.raw(assistantRowSql('"events"."payload"')),
             eq(
-              sql<string>`json_extract(${events.payload}, '$.properties.info.sessionID')`,
+              sql.raw(messageFieldSql('sessionID', 'sessionID', '"events"."payload"')),
               kiloSessionId
             ),
             eq(
-              sql<string>`json_extract(${events.payload}, '$.properties.info.parentID')`,
+              sql.raw(messageFieldSql('parentID', 'parentID', '"events"."payload"')),
               parentMessageId
             ),
             notExists(
@@ -529,8 +491,8 @@ export function createEventQueries(db: DrizzleSqliteDODatabase, rawSql: SqlStora
         .limit(CALLBACK_ACTIVITY_MESSAGE_LIMIT)
         .all();
       return rows.reverse().flatMap(row => {
-        const message = buildLatestAssistantMessage(sessionId, rawSql, row);
-        return message ? [message] : [];
+        const answer = readAssistantAnswer(sessionId, rawSql, row);
+        return answer ? [answer] : [];
       });
     },
 

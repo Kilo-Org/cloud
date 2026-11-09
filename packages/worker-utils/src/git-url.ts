@@ -157,3 +157,63 @@ export function repoFullNameFromGitUrl(
   if (!coords) return undefined;
   return `${coords.owner}/${coords.repo}`;
 }
+
+/** The raw HTTP path, with backslash separators normalized before checking dot segments. */
+function rawUrlPath(url: string): string | null {
+  const schemeEnd = url.indexOf('://');
+  if (schemeEnd < 0) return null;
+
+  const afterAuthority = url.slice(schemeEnd + 3).replaceAll('\\', '/');
+  const pathStart = afterAuthority.search(/[/?#]/);
+  if (pathStart < 0 || afterAuthority[pathStart] !== '/') return '';
+
+  const rest = afterAuthority.slice(pathStart);
+  const pathEnd = rest.search(/[?#]/);
+  return pathEnd < 0 ? rest : rest.slice(0, pathEnd);
+}
+
+/**
+ * Canonicalize a credential-free GitLab clone URL into the single string
+ * repository environments are compared and stored by.
+ *
+ * Keeps a non-default port and any GitLab base path; drops a default port and
+ * userinfo, query, and fragment. The host is lowercased, trailing slashes are
+ * stripped, `.git` is appended when missing, and the path is rejected when
+ * empty or when it contains a `.` or `..` segment. Returns `null` for an
+ * unparseable or non-http(s) URL.
+ */
+export function canonicalGitLabCloneUrl(url: string): string | null {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return null;
+  }
+
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null;
+
+  // `new URL` resolves dot segments away, so reject them against the raw path.
+  const rawPath = rawUrlPath(url);
+  if (rawPath === null) return null;
+  for (const segment of rawPath.split('/')) {
+    if (segment === '') continue;
+    let decoded: string;
+    try {
+      decoded = decodeURIComponent(segment);
+    } catch {
+      return null;
+    }
+    if (decoded === '.' || decoded === '..') return null;
+  }
+
+  parsed.username = '';
+  parsed.password = '';
+  parsed.search = '';
+  parsed.hash = '';
+
+  const pathname = parsed.pathname.replace(/\/+$/, '');
+  if (pathname === '') return null;
+
+  const path = pathname.endsWith('.git') ? pathname : `${pathname}.git`;
+  return `${parsed.protocol}//${parsed.host.toLowerCase()}${path}`;
+}

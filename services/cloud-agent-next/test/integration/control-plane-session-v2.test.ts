@@ -16,6 +16,7 @@ import type { CloudAgentQueueReport } from '@kilocode/worker-utils/cloud-agent-q
 import type { CallbackJob } from '../../src/callbacks/types.js';
 import {
   parseSessionMetadata,
+  CLOUDFLARE_RUNTIME_RETIRED_MESSAGE,
   DEVCONTAINER_RETIRED_MESSAGE,
 } from '../../src/persistence/session-metadata.js';
 import { ProviderCreationError } from '../../src/sandbox-control/provider.js';
@@ -27,7 +28,7 @@ import {
   settleAcceptedUpTo,
   settleMessages,
 } from '../../src/control-plane/session/messages.js';
-import { controlPlaneMessages } from '../../src/control-plane/session/sqlite-schema.js';
+import { controlPlaneMessages, events } from '../../src/control-plane/session/sqlite-schema.js';
 import type {
   ProviderAdapter,
   ProviderCreateIntent,
@@ -39,23 +40,30 @@ import {
   type ControlPlaneRouteSpec,
   type ControlPlaneRouteUpdate,
 } from '../../src/shared/control-plane-protocol.js';
-import { CONTROL_PLANE_TIMERS } from '../../src/shared/control-plane-timers.js';
+import {
+  CONTROL_PLANE_TIMERS,
+  resolveControlPlaneTimers,
+} from '../../src/shared/control-plane-timers.js';
 import type { MessageResultRPCResponse } from '../../src/session/message-result.js';
 import {
   readPreparationAttempt,
   readPreparationSteps,
 } from '../../src/session/preparation-history.js';
 import { createPreparationProgressRecorder } from '../../src/session/preparation-progress.js';
-import { sessionDoName } from '../../src/session-plane.js';
+import { sessionDoName } from '../../src/session-identity.js';
+import { SESSION_CREDENTIAL_UPGRADE_REQUIRED_MESSAGE } from '../../src/sandbox-control/session-credentials.js';
 import {
   createFakeCredentialBroker,
   installFakeCredentialEnv,
 } from './helpers/fake-credentials.js';
 import { FakeSandboxPeer } from './helpers/fake-sandbox-peer.js';
+import { installFakeRuntimeProxyPeer } from './helpers/fake-session-peer.js';
 import { FakeWrapper } from './helpers/fake-wrapper.js';
 import { waitFor } from './wait-for.js';
 
-const NATIVE_KILO_TOKEN = 'native-kilo-token-user';
+const NATIVE_KILO_TOKEN =
+  'eyJhbGciOiJub25lIn0.eyJydW50aW1lQXV0aG9yaXphdGlvbiI6eyJpZCI6InJhXzEifX0.c2ln';
+const registeredKiloSessions = new Map<string, string>();
 /** The session owner; the Session DO name is `ownerId:sessionId` (spec §3). */
 const SESSION_OWNER_ID = 'user_123';
 const QUEUED_BACKSTOP_MS = CONTROL_PLANE_TIMERS.session.queuedBackstopMs;
@@ -97,6 +105,126 @@ describe('retired control-plane runtime recovery', () => {
       expect((await stub.getMetadata())?.workspace?.devcontainerRequested).toBe(true);
     }
   );
+
+  it('fails stored Cloudflare runtime work before prepare or delivery and keeps Stop accessible', async () => {
+    const sessionId = newSessionId();
+    const sandboxId = isolatedSandboxId();
+    const stub = sessions.getByName(sessionDoName(SESSION_OWNER_ID, sessionId));
+    const peer = new FakeSandboxPeer();
+    await stub.registerSession(registration(sandboxId, sessionId));
+    await installPeer(stub, peer);
+    await runInDurableObject(stub, async (instance, state) => {
+      const metadata = parseSessionMetadata({
+        metadataSchemaVersion: 2,
+        identity: { userId: SESSION_OWNER_ID, sessionId },
+        auth: { kilocodeToken: NATIVE_KILO_TOKEN },
+        workspace: { sandboxId, sandboxProvider: 'cloudflare' },
+        lifecycle: { version: 1, timestamp: 1 },
+      });
+      Object.assign(instance, { metadata });
+      await state.storage.put('session_metadata', metadata);
+    });
+    const messageId = 'msg_018f1e2d3c4bAbCdEfGhIjKlMn';
+    await expect(stub.send(promptPayload(messageId))).resolves.toEqual({ type: 'ok' });
+    expect(await messageStatus(stub, messageId)).toBe('failed');
+    expect(await readMessageReason(stub, messageId)).toBe(CLOUDFLARE_RUNTIME_RETIRED_MESSAGE);
+    expect(peer.prepareCalls).toEqual([]);
+    expect(peer.deliverCalls).toEqual([]);
+    await stub.stop();
+    expect(peer.abortCalls).toEqual([sessionId]);
+  });
+
+  it.each(['prepare', 'deliver', 'recover', 'accepted-only'] as const)(
+    'settles persisted accepted Cloudflare runtime work through %s without changing terminal messages',
+    async path => {
+      const sessionId = newSessionId();
+      const sandboxId = isolatedSandboxId();
+      const stub = sessions.getByName(sessionDoName(SESSION_OWNER_ID, sessionId));
+      const peer = new FakeSandboxPeer();
+      await stub.registerSession(registration(sandboxId, sessionId));
+      const now = Date.now();
+      const rows = (['accepted', 'completed', 'failed', 'cancelled'] as const).map(state => ({
+        message_id: state,
+        intent: JSON.stringify(promptPayload(state)),
+        state,
+        created_at: now,
+        accepted_at: now,
+        settled_at: state === 'accepted' ? null : now,
+        reason:
+          state === 'failed' ? 'original failure' : state === 'cancelled' ? 'interrupted' : null,
+      }));
+      await runInDurableObject(stub, async (_instance, state) => {
+        await state.storage.put(
+          'session_metadata',
+          parseSessionMetadata({
+            metadataSchemaVersion: 2,
+            identity: { userId: SESSION_OWNER_ID, sessionId },
+            auth: { kilocodeToken: NATIVE_KILO_TOKEN },
+            workspace: { sandboxId, sandboxProvider: 'cloudflare' },
+            lifecycle: { version: 1, timestamp: 1 },
+          })
+        );
+        await state.storage.put(
+          'control_plane_route',
+          path === 'prepare' ? { state: 'unknown' } : peer.view('ready')
+        );
+        const db = drizzle(state.storage);
+        db.insert(controlPlaneMessages).values(rows).run();
+        if (path !== 'accepted-only') {
+          db.insert(controlPlaneMessages)
+            .values({
+              message_id: 'queued',
+              intent: JSON.stringify(promptPayload('queued')),
+              state: 'queued',
+              created_at: now,
+            })
+            .run();
+        }
+        if (path === 'recover' || path === 'accepted-only') {
+          await state.storage.put('control_plane_transport_recovery_at', now - 1);
+        }
+      });
+      await evictAllDurableObjects();
+      await installPeer(stub, peer);
+      expect(await messageStatus(stub, 'accepted')).toBe('running');
+      if (path === 'recover' || path === 'accepted-only') {
+        await runSessionAlarm(stub);
+      } else {
+        await stub.send(promptPayload('queued'));
+      }
+
+      expect(await messageStatus(stub, 'accepted')).toBe('failed');
+      expect(await readMessageReason(stub, 'accepted')).toBe(CLOUDFLARE_RUNTIME_RETIRED_MESSAGE);
+      const settled = await runInDurableObject(stub, (_instance, state) =>
+        drizzle(state.storage).select().from(controlPlaneMessages).all()
+      );
+      expect(settled.find(row => row.message_id === 'accepted')).toMatchObject({
+        state: 'failed',
+        accepted_at: now,
+        settled_at: expect.any(Number),
+        reason: CLOUDFLARE_RUNTIME_RETIRED_MESSAGE,
+      });
+      for (const row of rows.filter(row => row.state !== 'accepted')) {
+        expect(settled.find(stored => stored.message_id === row.message_id)).toMatchObject(row);
+      }
+      if (path !== 'accepted-only') {
+        expect(await messageStatus(stub, 'queued')).toBe('failed');
+        expect(await readMessageReason(stub, 'queued')).toBe(CLOUDFLARE_RUNTIME_RETIRED_MESSAGE);
+      }
+      expect(await readAlarm(stub)).toBeNull();
+      expect(peer.prepareCalls).toEqual([]);
+      expect(peer.deliverCalls).toEqual([]);
+      expect(peer.statusCalls).toEqual([]);
+      await expect(stub.stop()).resolves.toEqual({ interrupted: false });
+      expect(peer.abortCalls).toEqual([sessionId]);
+      await runSessionAlarm(stub);
+      await expect(
+        runInDurableObject(stub, (_instance, state) =>
+          drizzle(state.storage).select().from(controlPlaneMessages).all()
+        )
+      ).resolves.toEqual(settled);
+    }
+  );
 });
 
 type SandboxControlNamespace = DurableObjectNamespace<SandboxControlV2>;
@@ -108,6 +236,11 @@ let sequence = 0;
 function unique(prefix: string): string {
   sequence += 1;
   return `${prefix}_${sequence}`;
+}
+function isolatedSandboxId(): string {
+  return `ses-${unique('a')
+    .replace(/[^0-9a-f]/g, '0')
+    .padEnd(48, '0')}`;
 }
 function newSessionId(): string {
   return `workspace_${crypto.randomUUID()}`;
@@ -129,6 +262,7 @@ function routeSpec(sessionId: string): ControlPlaneRouteSpec {
 
 function registration(sandboxId: string, sessionId: string) {
   const kiloId = kiloSessionId();
+  registeredKiloSessions.set(sessionId, kiloId);
   return {
     sandboxId,
     spec: { ...routeSpec(sessionId), kiloSessionId: kiloId },
@@ -317,6 +451,10 @@ type PreparingRowData = {
   step?: string;
   stepId?: string;
   parentStepId?: string;
+  label?: string;
+  command?: string;
+  commandIndex?: number;
+  commandCount?: number;
   safeError?: string;
   attempt?: { id?: string; status?: string; triggerMessageId?: string };
   stepSnapshot?: { id?: string; key?: string; status?: string };
@@ -357,7 +495,7 @@ function createFakeProvider(): FakeProvider {
       provider.refs.push(ref);
       return { providerRef: ref };
     },
-    async launch(_ref, launchEnv) {
+    async launch(_ref, { env: launchEnv }) {
       provider.launchEnvs.push({ ...launchEnv });
       return { startSource: 'image' as const };
     },
@@ -784,6 +922,42 @@ describe('SandboxSessionV2 message flow (fake sandbox peer)', () => {
     stream.close();
   });
 
+  it('settles a credential upgrade failure with recoverable guidance', async () => {
+    const { sessionId, stub, peer } = await setup();
+    peer.prepareView = peer.view('preparing');
+    await stub.send(promptPayload('m1'));
+    await stub.onRoute({ state: 'preparing', step: 'clone', attemptId: peer.attemptId });
+
+    peer.prepareView = {
+      state: 'failed',
+      attemptId: peer.attemptId,
+      reason: 'credential_upgrade_required',
+    };
+    await stub.onRoute({
+      state: 'failed',
+      attemptId: peer.attemptId,
+      reason: 'credential_upgrade_required',
+    });
+
+    await waitFor(async () => expect(await messageStatus(stub, 'm1')).toBe('failed'));
+    expect(await readMessageReason(stub, 'm1')).toBe('credential_upgrade_required');
+    const stream = await connectStream(sessionId);
+    const replayed = await drainStream(stream);
+    expect(
+      replayed.find(message => message.streamEventType === 'cloud.message.failed')?.data
+    ).toMatchObject({
+      messageId: 'm1',
+      status: 'failed',
+      reason: 'credential_upgrade_required',
+      error: SESSION_CREDENTIAL_UPGRADE_REQUIRED_MESSAGE,
+    });
+    await expect(stub.getSession()).resolves.toMatchObject({
+      type: 'found',
+      route: { state: 'failed', reason: 'credential_upgrade_required' },
+    });
+    stream.close();
+  });
+
   it('replaces the preparing row when the route attempt changes', async () => {
     const { sessionId, stub, peer } = await setup();
     const stream = await connectStream(sessionId);
@@ -860,6 +1034,51 @@ describe('SandboxSessionV2 message flow (fake sandbox peer)', () => {
     }
     stream.close();
   });
+
+  it.each([
+    {
+      step: 'environment_snapshot',
+      key: 'environment_snapshot',
+      detail: 'Using environment snapshot',
+    },
+    { step: 'restore', key: 'workspace_restore', detail: 'Using workspace snapshot' },
+  ] as const)(
+    'keeps $key capture time in live progress and replay after sandbox startup',
+    async ({ step, key, detail }) => {
+      const { sessionId, stub, peer } = await setup();
+      peer.prepareView = peer.view('preparing');
+      await stub.send(promptPayload('m1'));
+      const snapshotCapturedAt = Date.parse('2026-10-24T21:32:19Z');
+      const live = await connectStream(sessionId);
+      await waitForStreamEvent(live, 'connected');
+      await drainStream(live);
+      await stub.onRoute({ state: 'preparing', step: 'sandbox_create', attemptId: peer.attemptId });
+      await stub.onRoute({
+        state: 'preparing',
+        step,
+        detail,
+        snapshotCapturedAt,
+        attemptId: peer.attemptId,
+      });
+      await stub.onRoute({ state: 'preparing', step: 'sandbox_start', attemptId: peer.attemptId });
+      expect(preparingRows(await drainStream(live))).toContainEqual(
+        expect.objectContaining({ action: 'step_progress', detail, snapshotCapturedAt })
+      );
+      live.close();
+
+      const stream = await connectStream(sessionId);
+      await waitForStreamEvent(stream, 'connected');
+      const replayed = preparingRows(await drainStream(stream));
+      expect(
+        replayed.find(row => row.action === 'step_snapshot' && row.stepSnapshot?.key === key)
+          ?.stepSnapshot
+      ).toMatchObject({ status: 'completed', latestDetail: detail, snapshotCapturedAt });
+      expect(
+        replayed.find(row => row.stepSnapshot?.key === 'sandbox_boot')?.stepSnapshot
+      ).not.toHaveProperty('snapshotCapturedAt');
+      stream.close();
+    }
+  );
 
   it('preserves ordered phase occurrences and original starts across retries in one attempt', async () => {
     const { sessionId, stub, peer } = await setup();
@@ -1176,6 +1395,180 @@ describe('SandboxSessionV2 message flow (fake sandbox peer)', () => {
     stream.close();
   });
 
+  it('renders session setup and start phases with their kind and command text', async () => {
+    const { sessionId, stub, peer } = await setup();
+    const stream = await connectStream(sessionId);
+    peer.prepareView = peer.view('preparing');
+    await stub.send(promptPayload('m1'));
+    await stub.onRoute({ state: 'preparing', step: 'setup', attemptId: peer.attemptId });
+    await stub.onEvents({
+      events: [
+        {
+          type: 'session.setup.started',
+          properties: {
+            command: 1,
+            commandCount: 1,
+            kind: 'session_setup',
+            commandText: 'pnpm install',
+          },
+        },
+        {
+          type: 'session.setup.finished',
+          properties: { command: 1, kind: 'session_setup', exitCode: 0 },
+        },
+        {
+          type: 'session.setup.started',
+          properties: {
+            command: 1,
+            commandCount: 2,
+            kind: 'start',
+            commandText: 'pnpm dev:start',
+          },
+        },
+        {
+          type: 'session.setup.finished',
+          properties: {
+            command: 1,
+            kind: 'start',
+            exitCode: 1,
+            safeError: 'Start command 1 failed',
+          },
+        },
+      ],
+    });
+
+    const messages = await drainStream(stream);
+    const rows = preparingRows(messages);
+    const setupStart = rows.find(
+      row =>
+        row.action === 'step_started' &&
+        row.step === 'session_setup_commands' &&
+        row.stepId?.endsWith('setup_command:0')
+    );
+    expect(setupStart).toMatchObject({
+      step: 'session_setup_commands',
+      stepId: 'phase:session_setup_commands:setup_command:0',
+      label: 'Session setup command 1 · `pnpm install`',
+      command: 'pnpm install',
+      commandIndex: 0,
+      commandCount: 1,
+    });
+    const startPhase = rows.find(
+      row =>
+        row.action === 'step_started' &&
+        row.step === 'start_commands' &&
+        row.stepId?.startsWith('phase:start_commands')
+    );
+    expect(startPhase).toMatchObject({ step: 'start_commands' });
+    const startCommand = rows.find(
+      row => row.step === 'start_commands' && row.stepId?.endsWith('setup_command:0')
+    );
+    expect(startCommand).toMatchObject({
+      action: 'step_started',
+      label: 'Start command 1 · `pnpm dev:start`',
+      command: 'pnpm dev:start',
+    });
+    expect(startCommand?.parentStepId).toMatch(/^phase:start_commands/);
+
+    const failed = rows.filter(row => row.action === 'step_failed');
+    expect(failed).toEqual([
+      expect.objectContaining({
+        step: 'start_commands',
+        stepId: 'phase:start_commands:setup_command:0',
+      }),
+    ]);
+    expect(messages.some(message => message.streamEventType === 'cloud.command.failed')).toBe(
+      false
+    );
+    stream.close();
+  });
+
+  it('records a timed-out start command once when the failure is redelivered', async () => {
+    const { sessionId, stub, peer } = await setup();
+    const stream = await connectStream(sessionId);
+    peer.prepareView = peer.view('preparing');
+    await stub.send(promptPayload('m1'));
+    await stub.onRoute({ state: 'preparing', step: 'setup', attemptId: peer.attemptId });
+    const failureEvent = {
+      type: 'session.setup.finished',
+      properties: {
+        command: 2,
+        commandCount: 2,
+        kind: 'start',
+        exitCode: 124,
+        terminationReason: 'hard_timeout',
+        safeError: 'Start command 2 timed out',
+      },
+    };
+    await stub.onEvents({
+      events: [
+        {
+          type: 'session.setup.started',
+          properties: {
+            command: 2,
+            commandCount: 2,
+            kind: 'start',
+            commandText: 'pnpm dev:start',
+          },
+        },
+        failureEvent,
+        failureEvent,
+      ],
+    });
+
+    const messages = await drainStream(stream);
+    const failed = preparingRows(messages).filter(row => row.action === 'step_failed');
+    expect(failed).toHaveLength(1);
+    expect(failed[0]).toMatchObject({
+      step: 'start_commands',
+      safeError: 'Start command 2 timed out',
+    });
+    expect(
+      preparingRows(messages).find(row => row.action === 'step_started' && row.commandIndex === 1)
+    ).toMatchObject({ label: 'Start command 2 · `pnpm dev:start`', command: 'pnpm dev:start' });
+    expect(messages.some(message => message.streamEventType === 'cloud.command.failed')).toBe(
+      false
+    );
+    stream.close();
+  });
+
+  it.each([
+    { kind: 'build', phase: 'setup_commands' },
+    { kind: undefined, phase: 'setup_commands' },
+  ] as const)('records a $kind command under the $phase phase', async ({ kind, phase }) => {
+    const { sessionId, stub, peer } = await setup();
+    const stream = await connectStream(sessionId);
+    peer.prepareView = peer.view('preparing');
+    await stub.send(promptPayload('m1'));
+    await stub.onRoute({ state: 'preparing', step: 'setup', attemptId: peer.attemptId });
+    await stub.onEvents({
+      events: [
+        {
+          type: 'session.setup.started',
+          properties: {
+            command: 1,
+            commandCount: 1,
+            ...(kind === undefined ? {} : { kind }),
+          },
+        },
+        {
+          type: 'session.setup.finished',
+          properties: {
+            command: 1,
+            exitCode: 1,
+            ...(kind === undefined ? {} : { kind }),
+          },
+        },
+      ],
+    });
+    const messages = await drainStream(stream);
+    // The legacy path keeps the old phase key so old wrappers are unchanged.
+    expect(
+      preparingRows(messages).some(row => row.step === phase && row.action === 'step_started')
+    ).toBe(true);
+    stream.close();
+  });
+
   it.each([
     { exitCode: 0, secondSetupNotification: true },
     { exitCode: 1, secondSetupNotification: true },
@@ -1481,7 +1874,7 @@ describe('SandboxSessionV2 message flow (fake sandbox peer)', () => {
 
     const running = await connectStream(sessionId);
     const runningConnected = await waitForStreamEvent(running, 'connected');
-    expect(runningConnected.data).not.toHaveProperty('sessionStatus');
+    expect(runningConnected.data).toMatchObject({ sessionStatus: { type: 'busy' } });
     running.close();
 
     await stub.onOutcome({
@@ -1507,7 +1900,7 @@ describe('SandboxSessionV2 message flow (fake sandbox peer)', () => {
     await stub.onEvents({ events: [busy] });
     const native = await connectStream(sessionId);
     const nativeConnected = await waitForStreamEvent(native, 'connected');
-    expect(nativeConnected.data).not.toHaveProperty('sessionStatus');
+    expect(nativeConnected.data).toMatchObject({ sessionStatus: { type: 'busy' } });
     native.close();
   });
 
@@ -1554,16 +1947,236 @@ describe('SandboxSessionV2 message flow (fake sandbox peer)', () => {
 });
 
 describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', () => {
+  it.each(['events', 'heartbeat', 'unavailable'] as const)(
+    'applies live allocation policy to %s',
+    async frame => {
+      const sessionId = newSessionId();
+      const sandboxId = unique('sbx__live_policy');
+      const provider = createFakeProvider();
+      let blocked = false;
+      let leaseCalls = 0;
+      let billingReads = 0;
+      provider.adapter.ensureLeaseAtLeast = async () => {
+        leaseCalls++;
+      };
+      provider.adapter.isBillingBlocked = async () => {
+        billingReads++;
+        if (blocked && frame === 'unavailable') throw new Error('State unavailable');
+        return blocked;
+      };
+      const sandboxStub = sandboxes.getByName(sandboxId);
+      await runInDurableObject(sandboxStub, async instance => {
+        await instance.getAllocationState();
+        installFakeCredentialEnv(instance['env'], createFakeCredentialBroker());
+        installFakeRuntimeProxyPeer(instance, async (ownerId, id) => {
+          const kiloId = registeredKiloSessions.get(id);
+          return kiloId ? { userId: ownerId, kiloSessionId: kiloId } : null;
+        });
+        Object.assign(instance, {
+          createProviderAdapter: () => provider.adapter,
+          provider: provider.adapter,
+          env: {
+            ...instance['env'],
+            SANDBOX_CONTAINERS: {
+              idFromName: (name: string) => ({ toString: () => `oc_${name}` }),
+            },
+          },
+        });
+      });
+      const sessionStub = sessions.getByName(sessionDoName(SESSION_OWNER_ID, sessionId));
+      await sessionStub.registerSession({
+        ...registration(sandboxId, sessionId),
+        sandboxSelection: { provider: 'cloudflare-containers' },
+      });
+      await sessionStub.send(promptPayload('m1'));
+      await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
+      const launch = provider.launchEnvs[0];
+      const wrapper = await FakeWrapper.connect({
+        sandboxId,
+        credential: launch.SANDBOX_CONTROL_CREDENTIAL,
+      });
+      try {
+        await wrapper.hello({
+          wrapperId: 'wr_live_policy',
+          allocationId: launch.CONTROL_PLANE_ALLOCATION_ID,
+        });
+        expect(await wrapper.next()).toMatchObject({ type: 'session.prepare' });
+        wrapper.send({ type: 'session.ready', sessionId });
+        await waitFor(async () => expect(await messageStatus(sessionStub, 'm1')).toBe('running'));
+        const persisted = () =>
+          runInDurableObject(sessionStub, (_instance, state) =>
+            drizzle(state.storage)
+              .select({ payload: events.payload })
+              .from(events)
+              .where(eq(events.stream_event_type, 'kilocode'))
+              .all()
+              .map(row => JSON.parse(row.payload))
+          );
+        const nativeSessionId = registeredKiloSessions.get(sessionId);
+        wrapper.sendSessionEvents(sessionId, [
+          {
+            type: 'message.removed',
+            properties: { sessionID: nativeSessionId, messageID: 'initial' },
+          },
+        ]);
+        wrapper.heartbeat(true);
+        await waitFor(async () => {
+          expect(await persisted()).toContainEqual(
+            expect.objectContaining({
+              properties: { sessionID: nativeSessionId, messageID: 'initial' },
+            })
+          );
+          expect(leaseCalls).toBeGreaterThan(0);
+        });
+        leaseCalls = 0;
+        await runInDurableObject(sandboxStub, (_instance, state) => {
+          blocked = true;
+          for (const socket of state.getWebSockets()) {
+            socket.serializeAttachment({ ...socket.deserializeAttachment(), billingCheckedAt: 0 });
+          }
+        });
+        if (frame === 'heartbeat') wrapper.heartbeat(true);
+        wrapper.sendSessionEvents(sessionId, [
+          {
+            type: 'message.removed',
+            properties: { sessionID: nativeSessionId, messageID: 'later' },
+          },
+        ]);
+        if (frame === 'unavailable') {
+          wrapper.heartbeat(true);
+          await waitFor(async () => {
+            expect(await persisted()).toContainEqual(
+              expect.objectContaining({
+                properties: { sessionID: nativeSessionId, messageID: 'later' },
+              })
+            );
+            expect(leaseCalls).toBeGreaterThan(0);
+          });
+          expect(provider.stopCalls).toEqual([]);
+          expect((await sandboxStub.getAllocationState()).kind).toBe('connected');
+          expect(billingReads).toBe(2);
+          return;
+        }
+        expect(await wrapper.waitForClose()).toBe(4402);
+        await waitFor(() => expect(provider.stopCalls).toEqual(provider.refs));
+        expect((await sandboxStub.getAllocationState()).kind).toBe('stopped');
+        expect(leaseCalls).toBe(0);
+        expect(billingReads).toBe(2);
+        expect(await persisted()).not.toContainEqual(
+          expect.objectContaining({
+            properties: { sessionID: nativeSessionId, messageID: 'later' },
+          })
+        );
+        await waitFor(async () => expect(await messageStatus(sessionStub, 'm1')).toBe('failed'));
+        expect(await readMessageReason(sessionStub, 'm1')).toBe('billing_blocked');
+      } finally {
+        wrapper.close();
+      }
+    }
+  );
+
+  it('acknowledges a heartbeat while a policy read hangs', async () => {
+    const sessionId = newSessionId();
+    const sandboxId = unique('sbx__billing_ack');
+    const provider = createFakeProvider();
+    let hangPolicyRead = false;
+    let policyReadStarted = false;
+    let billingReads = 0;
+    const policyRead = Promise.withResolvers<boolean>();
+    provider.adapter.isBillingBlocked = async () => {
+      billingReads++;
+      if (!hangPolicyRead) return false;
+      policyReadStarted = true;
+      return policyRead.promise;
+    };
+    const timers = resolveControlPlaneTimers({ CONTROL_PLANE_TIMER_DIVISOR: '10' });
+    const sandboxStub = sandboxes.getByName(sandboxId);
+    await runInDurableObject(sandboxStub, async instance => {
+      await instance.getAllocationState();
+      installFakeCredentialEnv(instance['env'], createFakeCredentialBroker());
+      installFakeRuntimeProxyPeer(instance, async (ownerId, id) => {
+        const kiloId = registeredKiloSessions.get(id);
+        return kiloId ? { userId: ownerId, kiloSessionId: kiloId } : null;
+      });
+      Object.assign(instance, {
+        createProviderAdapter: () => provider.adapter,
+        provider: provider.adapter,
+        env: {
+          ...instance['env'],
+          CONTROL_PLANE_TIMER_DIVISOR: '10',
+          SANDBOX_CONTAINERS: {
+            idFromName: (name: string) => ({ toString: () => `oc_${name}` }),
+          },
+        },
+      });
+    });
+    const sessionStub = sessions.getByName(sessionDoName(SESSION_OWNER_ID, sessionId));
+    await sessionStub.registerSession({
+      ...registration(sandboxId, sessionId),
+      sandboxSelection: { provider: 'cloudflare-containers' },
+    });
+    await sessionStub.send(promptPayload('m1'));
+    await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
+    const launch = provider.launchEnvs[0];
+    const wrapper = await FakeWrapper.connect({
+      sandboxId,
+      credential: launch.SANDBOX_CONTROL_CREDENTIAL,
+    });
+    try {
+      wrapper.send({
+        type: 'hello',
+        wrapperId: 'wr_billing_ack',
+        allocationId: launch.CONTROL_PLANE_ALLOCATION_ID,
+        protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
+        heartbeatAck: true,
+      });
+      expect(await wrapper.next()).toEqual({
+        type: 'welcome',
+        protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
+        heartbeatAck: true,
+      });
+      expect(await wrapper.next()).toMatchObject({ type: 'session.prepare' });
+      wrapper.send({ type: 'session.ready', sessionId });
+      await waitFor(async () => expect(await messageStatus(sessionStub, 'm1')).toBe('running'));
+      hangPolicyRead = true;
+      await runInDurableObject(sandboxStub, (_instance, state) => {
+        for (const socket of state.getWebSockets()) {
+          socket.serializeAttachment({ ...socket.deserializeAttachment(), billingCheckedAt: 0 });
+        }
+      });
+      const startedAt = Date.now();
+      wrapper.heartbeat(true);
+      const ack = await wrapper.nextSkipping(
+        ['workspace.captured', 'session.prompt'],
+        timers.wrapper.heartbeatAckTimeoutMs
+      );
+      expect(ack).toEqual({ type: 'heartbeat_ack' });
+      expect(Date.now() - startedAt).toBeLessThan(timers.wrapper.heartbeatAckTimeoutMs);
+      expect(policyReadStarted).toBe(true);
+      expect(billingReads).toBeGreaterThan(0);
+      expect((await sandboxStub.getAllocationState()).kind).toBe('connected');
+      expect(provider.stopCalls).toEqual([]);
+    } finally {
+      policyRead.resolve(false);
+      wrapper.close();
+    }
+  });
+
   it.each(['ready', 'preparing'] as const)(
     'preserves message ownership when pre-B %s retirement arrives after a fresh send',
     async oldState => {
       const sessionId = newSessionId();
-      const sandboxId = unique('sbx__retirement_order');
+      const sandboxId = isolatedSandboxId();
       const provider = createFakeProvider();
       const sandboxStub = sandboxes.getByName(sandboxId);
       await runInDurableObject(sandboxStub, async instance => {
         await instance.getAllocationState();
         installFakeCredentialEnv(instance.env, createFakeCredentialBroker());
+        installFakeRuntimeProxyPeer(instance, async (ownerId, sessionId) => {
+          const stored = await sessions.getByName(sessionDoName(ownerId, sessionId)).getMetadata();
+          const kiloId = stored?.auth.kiloSessionId ?? registeredKiloSessions.get(sessionId);
+          return kiloId ? { userId: ownerId, kiloSessionId: kiloId } : null;
+        });
         Object.assign(instance, {
           createProviderAdapter: () => provider.adapter,
           provider: provider.adapter,
@@ -1578,11 +2191,11 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
             auth: { kiloSessionId: kiloSessionId(), kilocodeToken: NATIVE_KILO_TOKEN },
             agent: { mode: 'code', model: 'test/model' },
             repository: { type: 'github', repo: 'acme/widgets', upstreamBranch: 'main' },
-            workspace: { sandboxId, sandboxProvider: 'cloudflare' },
+            workspace: { sandboxId, sandboxProvider: 'cloudflare-containers' },
             callback: { target: { url: 'https://callback.test/hook' } },
             lifecycle: { version: 1, timestamp: 1 },
           }),
-          sandboxSelection: { provider: 'cloudflare' },
+          sandboxSelection: { provider: 'cloudflare-containers' },
         })
       ).toEqual({ success: true });
       const reports: CloudAgentQueueReport[] = [];
@@ -1649,7 +2262,18 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
         });
         for (const [key, value] of retained) await state.storage.put(key, value);
         expect(await state.storage.get('control_plane_generation')).toBe(2);
-        db.insert(allocationTable).values(allocation).run();
+        // Raw SQL: the pre-B allocation table predates `create_attempt`.
+        db.run(
+          sql`INSERT INTO allocation (id, state, allocation_id, connection_id, provider_ref, wrapper_id,
+                  last_frame_at, last_activity_at, create_deadline_at, first_connect_deadline_at,
+                  stop_attempt, stop_pending, stop_at, unconfirmed_provider_ref, provider_pin)
+              VALUES (${allocation.id}, ${allocation.state}, ${allocation.allocation_id},
+                  ${allocation.connection_id}, ${allocation.provider_ref}, ${allocation.wrapper_id},
+                  ${allocation.last_frame_at}, ${allocation.last_activity_at},
+                  ${allocation.create_deadline_at}, ${allocation.first_connect_deadline_at},
+                  ${allocation.stop_attempt}, ${allocation.stop_pending}, ${allocation.stop_at},
+                  ${allocation.unconfirmed_provider_ref}, ${allocation.provider_pin})`
+        );
         // Raw SQL: the pre-B routes table predates `repo_key`, which the schema now carries.
         db.run(
           sql`INSERT INTO routes (session_id, spec, grant, credential_source, state, attempt_id, attempt_deadline_at, reason, updated_at)
@@ -1827,12 +2451,17 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
     'preserves new-attempt %s notification facts when the real passive view omits them',
     async notification => {
       const sessionId = newSessionId();
-      const sandboxId = unique('sbx__notification_facts');
+      const sandboxId = isolatedSandboxId();
       const provider = createFakeProvider();
       const sandboxStub = sandboxes.getByName(sandboxId);
       await runInDurableObject(sandboxStub, async instance => {
         await instance.getAllocationState();
         installFakeCredentialEnv(instance.env, createFakeCredentialBroker());
+        installFakeRuntimeProxyPeer(instance, async (ownerId, sessionId) => {
+          const stored = await sessions.getByName(sessionDoName(ownerId, sessionId)).getMetadata();
+          const kiloId = stored?.auth.kiloSessionId ?? registeredKiloSessions.get(sessionId);
+          return kiloId ? { userId: ownerId, kiloSessionId: kiloId } : null;
+        });
         Object.assign(instance, {
           createProviderAdapter: () => provider.adapter,
           provider: provider.adapter,
@@ -1847,11 +2476,11 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
           auth: { kiloSessionId: kiloSessionId(), kilocodeToken: NATIVE_KILO_TOKEN },
           agent: { mode: 'code', model: 'test/model' },
           repository: { type: 'github', repo: 'acme/widgets', upstreamBranch: 'main' },
-          workspace: { sandboxId, sandboxProvider: 'cloudflare' },
+          workspace: { sandboxId, sandboxProvider: 'cloudflare-containers' },
           callback: { target: { url: 'https://callback.test/hook' } },
           lifecycle: { version: 1, timestamp: 1 },
         }),
-        sandboxSelection: { provider: 'cloudflare' },
+        sandboxSelection: { provider: 'cloudflare-containers' },
       });
       expect(registered).toEqual({ success: true });
       const reports: CloudAgentQueueReport[] = [];
@@ -2037,13 +2666,18 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
     'settles known permanent %s promptly and recovers the next message',
     async (cause, reason, code, error) => {
       const sessionId = newSessionId();
-      const sandboxId = unique('sbx__permanent');
+      const sandboxId = isolatedSandboxId();
       const provider = createFakeProvider();
       provider.failure = new ProviderCreationError(cause);
       const sandboxStub = sandboxes.getByName(sandboxId);
       await runInDurableObject(sandboxStub, async instance => {
         await instance.getAllocationState();
         installFakeCredentialEnv(instance.env, createFakeCredentialBroker());
+        installFakeRuntimeProxyPeer(instance, async (ownerId, sessionId) => {
+          const stored = await sessions.getByName(sessionDoName(ownerId, sessionId)).getMetadata();
+          const kiloId = stored?.auth.kiloSessionId ?? registeredKiloSessions.get(sessionId);
+          return kiloId ? { userId: ownerId, kiloSessionId: kiloId } : null;
+        });
         Object.assign(instance, {
           createProviderAdapter: () => provider.adapter,
           provider: provider.adapter,
@@ -2058,11 +2692,11 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
           auth: { kiloSessionId: kiloSessionId(), kilocodeToken: NATIVE_KILO_TOKEN },
           agent: { mode: 'code', model: 'test/model' },
           repository: { type: 'github', repo: 'acme/widgets', upstreamBranch: 'main' },
-          workspace: { sandboxId, sandboxProvider: 'cloudflare' },
+          workspace: { sandboxId, sandboxProvider: 'cloudflare-containers' },
           callback: { target: { url: 'https://callback.test/hook' } },
           lifecycle: { version: 1, timestamp: 1 },
         }),
-        sandboxSelection: { provider: 'cloudflare' },
+        sandboxSelection: { provider: 'cloudflare-containers' },
       });
       const reports: CloudAgentQueueReport[] = [];
       const callbacks: CallbackJob[] = [];
@@ -2178,6 +2812,11 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
     await runInDurableObject(sandboxStub, async instance => {
       await instance.getAllocationState();
       installFakeCredentialEnv(instance.env, createFakeCredentialBroker());
+      installFakeRuntimeProxyPeer(instance, async (ownerId, sessionId) => {
+        const stored = await sessions.getByName(sessionDoName(ownerId, sessionId)).getMetadata();
+        const kiloId = stored?.auth.kiloSessionId ?? registeredKiloSessions.get(sessionId);
+        return kiloId ? { userId: ownerId, kiloSessionId: kiloId } : null;
+      });
       Object.assign(instance, {
         createProviderAdapter: () => provider.adapter,
         provider: provider.adapter,
@@ -2235,6 +2874,110 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
     wrapper.close();
   });
 
+  it('fails the queued message when the create attempt budget is spent', async () => {
+    const sessionId = newSessionId();
+    const sandboxId = isolatedSandboxId();
+    const provider = createFakeProvider();
+    provider.failure = new Error('provider unavailable');
+    const sandboxStub = sandboxes.getByName(sandboxId);
+    await runInDurableObject(sandboxStub, async instance => {
+      await instance.getAllocationState();
+      installFakeCredentialEnv(instance.env, createFakeCredentialBroker());
+      installFakeRuntimeProxyPeer(instance, async (ownerId, sessionId) => {
+        const stored = await sessions.getByName(sessionDoName(ownerId, sessionId)).getMetadata();
+        const kiloId = stored?.auth.kiloSessionId ?? registeredKiloSessions.get(sessionId);
+        return kiloId ? { userId: ownerId, kiloSessionId: kiloId } : null;
+      });
+      Object.assign(instance, {
+        createProviderAdapter: () => provider.adapter,
+        provider: provider.adapter,
+      });
+    });
+    const sessionName = sessionDoName(SESSION_OWNER_ID, sessionId);
+    const sessionStub = sessions.getByName(sessionName);
+    await sessionStub.registerSession(registration(sandboxId, sessionId));
+    const reports: CloudAgentQueueReport[] = [];
+    const callbacks: CallbackJob[] = [];
+    await runInDurableObject(sessionStub, instance => {
+      instance.env.CLOUD_AGENT_REPORT_QUEUE = {
+        send: async (report: CloudAgentQueueReport) => {
+          reports.push(report);
+        },
+      } as never;
+      instance.env.CALLBACK_QUEUE = {
+        send: async (job: CallbackJob) => {
+          callbacks.push(job);
+        },
+      } as never;
+    });
+    const stream = await connectStream(sessionName);
+    const startedAt = Date.now();
+    await sessionStub.send(promptPayload('m1'));
+
+    // The retry runs and fails: two attempts, and the budget is spent long
+    // before the attempt deadline could expire.
+    await waitFor(async () => {
+      const allocation = await sandboxStub.getAllocationState();
+      expect(provider.createCalls).toBe(1);
+      expect(allocation.kind).toBe('creating');
+      // The pause the first failure persisted, not the first create deadline.
+      expect(allocation.createDeadlineAt).toBeLessThanOrEqual(
+        Date.now() + CONTROL_PLANE_TIMERS.sandbox.providerCreateRetryMs
+      );
+    });
+    await waitFor(async () => {
+      await runInDurableObject(sandboxStub, async (instance, state) => {
+        drizzle(state.storage)
+          .update(allocationTable)
+          .set({ create_deadline_at: Date.now() - 1 })
+          .where(eq(allocationTable.id, 'current'))
+          .run();
+        await instance.alarm();
+      });
+      expect(provider.createCalls).toBe(2);
+    });
+    await waitFor(async () => expect(await messageStatus(sessionStub, 'm1')).toBe('failed'));
+    expect(Date.now() - startedAt).toBeLessThan(
+      CONTROL_PLANE_TIMERS.sandbox.providerCreateRetryMs * 3
+    );
+    expect(await readMessageReason(sessionStub, 'm1')).toBe('sandbox_create_failed');
+    expect((await sandboxStub.status({ sessionId })).view).toMatchObject({
+      state: 'failed',
+      reason: 'sandbox_create_failed',
+    });
+    const failed = await waitForStreamEvent(stream, 'cloud.message.failed');
+    expect(failed.data).toMatchObject({
+      messageId: 'm1',
+      status: 'failed',
+      reason: 'sandbox_create_failed',
+      error: 'The sandbox could not be created',
+      accepted: false,
+    });
+    await runSessionAlarm(sessionStub);
+    expect(reports).toHaveLength(1);
+    expect(reports[0]?.run).toMatchObject({
+      status: 'failed',
+      failureStage: 'pre_dispatch',
+      failureCode: 'sandbox_connect_failed',
+    });
+    expect(reports[0]?.run.diagnostic).toMatchObject({
+      errorMessageRedacted: 'Sandbox connection failed',
+    });
+    await waitFor(async () =>
+      expect((await sandboxStub.getAllocationState()).kind).toBe('stopped')
+    );
+    expect(provider.createCalls).toBe(2);
+    stream.close();
+    // A fresh client opens into the same error status rather than a retrying
+    // preparation: the failure survives the session's own reconnect.
+    const reopened = await connectStream(sessionName);
+    const connected = await waitForStreamEvent(reopened, 'connected');
+    expect(connected.data).toMatchObject({
+      cloudStatus: { type: 'error', message: 'sandbox_create_failed' },
+    });
+    reopened.close();
+  }, 20_000);
+
   it('completes a cold message and streams queued, sent, and completed', async () => {
     const sessionId = newSessionId();
     const sandboxId = unique('sbx__session_v2');
@@ -2244,6 +2987,11 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
     await runInDurableObject(sandboxStub, async instance => {
       await instance.getAllocationState();
       installFakeCredentialEnv(instance.env, broker);
+      installFakeRuntimeProxyPeer(instance, async (ownerId, sessionId) => {
+        const stored = await sessions.getByName(sessionDoName(ownerId, sessionId)).getMetadata();
+        const kiloId = stored?.auth.kiloSessionId ?? registeredKiloSessions.get(sessionId);
+        return kiloId ? { userId: ownerId, kiloSessionId: kiloId } : null;
+      });
       Object.assign(instance, {
         createProviderAdapter: () => provider.adapter,
         provider: provider.adapter,
@@ -2300,6 +3048,161 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
     reconnected.close();
   });
 
+  it.each(['fail', 'pass', undefined] as const)(
+    'forwards a completed wrapper outcome through the Sandbox DO to the callback with gateResult %s',
+    async gateResult => {
+      const sessionId = newSessionId();
+      const sandboxId = isolatedSandboxId();
+      const provider = createFakeProvider();
+      const sandboxStub = sandboxes.getByName(sandboxId);
+      await runInDurableObject(sandboxStub, async instance => {
+        await instance.getAllocationState();
+        installFakeCredentialEnv(instance.env, createFakeCredentialBroker());
+        installFakeRuntimeProxyPeer(instance, async (ownerId, sessionId) => {
+          const stored = await sessions.getByName(sessionDoName(ownerId, sessionId)).getMetadata();
+          return stored?.auth.kiloSessionId
+            ? { userId: ownerId, kiloSessionId: stored.auth.kiloSessionId }
+            : null;
+        });
+        Object.assign(instance, {
+          createProviderAdapter: () => provider.adapter,
+          provider: provider.adapter,
+        });
+      });
+      const sessionStub = sessions.getByName(sessionDoName(SESSION_OWNER_ID, sessionId));
+      await sessionStub.registerSessionFromMetadata({
+        metadata: parseSessionMetadata({
+          metadataSchemaVersion: 2,
+          identity: { sessionId, userId: SESSION_OWNER_ID, orgId: 'org_123' },
+          auth: { kiloSessionId: kiloSessionId(), kilocodeToken: NATIVE_KILO_TOKEN },
+          agent: { mode: 'code', model: 'test/model' },
+          repository: { type: 'github', repo: 'acme/widgets', upstreamBranch: 'main' },
+          workspace: { sandboxId, sandboxProvider: 'cloudflare-containers' },
+          callback: { target: { url: 'https://callback.test/hook' } },
+          lifecycle: { version: 1, timestamp: 1 },
+        }),
+        sandboxSelection: { provider: 'cloudflare-containers' },
+      });
+      const callbacks: CallbackJob[] = [];
+      await runInDurableObject(sessionStub, instance => {
+        instance.env.CLOUD_AGENT_REPORT_QUEUE = { send: async () => {} } as never;
+        instance.env.CALLBACK_QUEUE = {
+          send: async (job: CallbackJob) => {
+            callbacks.push(job);
+          },
+        } as never;
+      });
+      await sessionStub.send(promptPayload('m1'));
+      await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
+      const launch = provider.launchEnvs[0];
+      const wrapper = await FakeWrapper.connect({
+        sandboxId,
+        credential: launch.SANDBOX_CONTROL_CREDENTIAL,
+      });
+      try {
+        expect(
+          await wrapper.hello({
+            wrapperId: 'wr_gate_result',
+            allocationId: launch.CONTROL_PLANE_ALLOCATION_ID,
+          })
+        ).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
+        expect(await wrapper.next()).toMatchObject({
+          type: 'session.prepare',
+          spec: { sessionId },
+        });
+        wrapper.send({ type: 'session.ready', sessionId });
+        expect(await wrapper.next()).toMatchObject({
+          type: 'session.prompt',
+          sessionId,
+          payload: { messageId: 'm1' },
+        });
+        await waitFor(async () => expect(await messageStatus(sessionStub, 'm1')).toBe('running'));
+        wrapper.send({
+          type: 'session.outcome',
+          sessionId,
+          status: 'completed',
+          lastMessageId: 'm1',
+          ...(gateResult === undefined ? {} : { gateResult }),
+        });
+        await waitFor(async () => expect(await messageStatus(sessionStub, 'm1')).toBe('completed'));
+        await runSessionAlarm(sessionStub);
+        expect(callbacks).toHaveLength(1);
+        expect(callbacks[0]?.payload).toMatchObject({
+          sessionId,
+          cloudAgentSessionId: sessionId,
+          messageId: 'm1',
+          status: 'completed',
+        });
+        expect(callbacks[0]?.payload.gateResult).toBe(gateResult);
+      } finally {
+        wrapper.close();
+      }
+    }
+  );
+
+  it('carries the roots of a V2 registration through the Session DO to the wrapper frame', async () => {
+    const sessionId = newSessionId();
+    const sandboxId = unique('sbx__session_v2');
+    const provider = createFakeProvider();
+    const broker = createFakeCredentialBroker();
+    const sandboxStub = sandboxes.getByName(sandboxId);
+    await runInDurableObject(sandboxStub, async instance => {
+      await instance.getAllocationState();
+      installFakeCredentialEnv(instance.env, broker);
+      installFakeRuntimeProxyPeer(instance, async (ownerId, sessionId) => {
+        const stored = await sessions.getByName(sessionDoName(ownerId, sessionId)).getMetadata();
+        const kiloId = stored?.auth.kiloSessionId ?? registeredKiloSessions.get(sessionId);
+        return kiloId ? { userId: ownerId, kiloSessionId: kiloId } : null;
+      });
+      Object.assign(instance, {
+        createProviderAdapter: () => provider.adapter,
+        provider: provider.adapter,
+      });
+    });
+    const roots = ['widgets', 'gadgets'].map(leaf => ({
+      directory: `/workspace/${leaf}`,
+      repoFullName: `acme/${leaf}`,
+      git: { url: `https://github.com/acme/${leaf}.git`, platform: 'github' as const },
+      branch: 'kilo/session',
+      branchMode: 'working' as const,
+    }));
+    const base = registration(sandboxId, sessionId);
+    const sessionStub = sessions.getByName(sessionDoName(SESSION_OWNER_ID, sessionId));
+    await sessionStub.registerSession({
+      ...base,
+      spec: { ...base.spec, directory: '/workspace', roots },
+      environment: {
+        environmentId: '33333333-3333-4333-8333-333333333333',
+        owner: { type: 'user', id: SESSION_OWNER_ID },
+        configurationRevision: 1,
+        repositories: roots.map(root => ({
+          identity: { platform: 'github', repoFullName: root.repoFullName },
+          repoFullName: root.repoFullName,
+          leaf: root.directory.slice('/workspace/'.length),
+          branch: root.branch,
+        })),
+      },
+    });
+    await sessionStub.send(promptPayload('m1'));
+
+    await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
+    const launchEnv = provider.launchEnvs[0];
+    if (!launchEnv) throw new Error('provider.launch was not called');
+    const wrapper = await FakeWrapper.connect({
+      sandboxId,
+      credential: launchEnv.SANDBOX_CONTROL_CREDENTIAL ?? '',
+    });
+    await wrapper.hello({
+      wrapperId: 'wr_1',
+      allocationId: launchEnv.CONTROL_PLANE_ALLOCATION_ID ?? '',
+    });
+    const prepareFrame = await wrapper.next();
+    if (prepareFrame?.type !== 'session.prepare') throw new Error('expected session.prepare');
+    expect(prepareFrame.spec.directory).toBe('/workspace');
+    expect(prepareFrame.spec.roots).toEqual(roots);
+    wrapper.close();
+  });
+
   it('delivers on the old grant and retries the re-issue on the next send when deliver cannot re-issue credentials', async () => {
     const sessionId = newSessionId();
     const sandboxId = unique('sbx__session_v2');
@@ -2312,6 +3215,11 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
     await runInDurableObject(sandboxStub, async instance => {
       await instance.getAllocationState();
       installFakeCredentialEnv(instance.env, broker);
+      installFakeRuntimeProxyPeer(instance, async (ownerId, sessionId) => {
+        const stored = await sessions.getByName(sessionDoName(ownerId, sessionId)).getMetadata();
+        const kiloId = stored?.auth.kiloSessionId ?? registeredKiloSessions.get(sessionId);
+        return kiloId ? { userId: ownerId, kiloSessionId: kiloId } : null;
+      });
       Object.assign(instance, {
         createProviderAdapter: () => provider.adapter,
         provider: provider.adapter,
@@ -2382,6 +3290,11 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
     await runInDurableObject(sandboxStub, async instance => {
       await instance.getAllocationState();
       installFakeCredentialEnv(instance.env, broker);
+      installFakeRuntimeProxyPeer(instance, async (ownerId, sessionId) => {
+        const stored = await sessions.getByName(sessionDoName(ownerId, sessionId)).getMetadata();
+        const kiloId = stored?.auth.kiloSessionId ?? registeredKiloSessions.get(sessionId);
+        return kiloId ? { userId: ownerId, kiloSessionId: kiloId } : null;
+      });
       Object.assign(instance, {
         createProviderAdapter: () => provider.adapter,
         provider: provider.adapter,
@@ -2430,6 +3343,11 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
     await runInDurableObject(sandboxStub, async instance => {
       await instance.getAllocationState();
       installFakeCredentialEnv(instance.env, broker);
+      installFakeRuntimeProxyPeer(instance, async (ownerId, sessionId) => {
+        const stored = await sessions.getByName(sessionDoName(ownerId, sessionId)).getMetadata();
+        const kiloId = stored?.auth.kiloSessionId ?? registeredKiloSessions.get(sessionId);
+        return kiloId ? { userId: ownerId, kiloSessionId: kiloId } : null;
+      });
       Object.assign(instance, {
         createProviderAdapter: () => provider.adapter,
         provider: provider.adapter,

@@ -43,8 +43,10 @@ export async function fetchWithBackoff(
           });
         }
 
+        const target =
+          typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
         console.warn(
-          `Fetch failed after ${performance.now() - startedAt}ms: ${input.toString()}\n${status} ${statusText}`
+          `Fetch failed after ${performance.now() - startedAt}ms: ${target}\n${status} ${statusText}`
         );
         return response;
       }

@@ -11,7 +11,9 @@
  *   - the PR's base repository is that same repository, and
  *   - the PR's head repository is that same repository (a fork or another
  *     repo that happens to share the branch name never matches), and
- *   - the PR's head ref is the session's branch, and
+ *   - the PR's head ref is the branch the session reported pushing (its
+ *     `pr_head_ref`), or — for a link that carries no head ref — the session's
+ *     stored branch, and
  *   - when the session reported a head SHA, GitHub reports that SHA as the PR
  *     head or as one of the PR's commits.
  *
@@ -300,18 +302,13 @@ export function verifySessionPullRequestLink(args: {
     return reject('head_repo_mismatch');
   }
 
-  // PR head ref must equal the session's branch, and the branch the session
-  // reported pushing when it differs from the stored branch.
-  const expectedRefs = new Set<string>();
-  if (sessionRepo.gitBranch) expectedRefs.add(sessionRepo.gitBranch);
-  if (link.headRef) expectedRefs.add(link.headRef);
-  if (expectedRefs.size === 0 || !pullRequest.headRef) {
+  // The PR head ref must be the branch the session reported pushing. The
+  // stored session branch is only the fallback for a link that carries no
+  // head ref (pre-headRef CLI): a session can push its PR from a branch other
+  // than the one recorded as its `git_branch`.
+  const expectedRef = link.headRef || sessionRepo.gitBranch;
+  if (!expectedRef || !pullRequest.headRef || pullRequest.headRef !== expectedRef) {
     return reject('head_ref_mismatch');
-  }
-  for (const expectedRef of expectedRefs) {
-    if (pullRequest.headRef !== expectedRef) {
-      return reject('head_ref_mismatch');
-    }
   }
 
   const sessionHeadSha = normalizeSha(link.headSha);

@@ -12,13 +12,14 @@
   },
   "dependencies": {
     "@kilocode/app-shared": "workspace:*",
+    "@kilocode/worker-utils": "workspace:*",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",
     "@typescript/native-preview": "catalog:",
     "typescript": "catalog:",
-    "vitest": "catalog:",
+    "vitest": "catalog:vitest5",
     "wrangler": "catalog:"
   }
 }

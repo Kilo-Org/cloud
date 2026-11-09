@@ -46,6 +46,20 @@ describe('generateMessageSignature', () => {
     expect(JSON.stringify(signature)).toBe('{"a":"number","b":"number"}');
   });
 
+  it('treats every key as an ordinary key (object value)', () => {
+    const input: Record<string, unknown> = JSON.parse('{"__proto__":{"a":1},"b":2}');
+
+    expect(JSON.stringify(generateMessageSignature(input))).toBe(
+      '{"__proto__":{"a":"number"},"b":"number"}'
+    );
+  });
+
+  it('treats every key as an ordinary key (primitive value)', () => {
+    const input: Record<string, unknown> = JSON.parse('{"__proto__":"x"}');
+
+    expect(JSON.stringify(generateMessageSignature(input))).toBe('{"__proto__":"string"}');
+  });
+
   it('does not mutate the input', () => {
     const input = {
       a: '{"b": 1}',

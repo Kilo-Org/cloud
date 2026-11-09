@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { resolve } from 'node:path';
 
+import { shellQuote } from '../src/kilo/utils.js';
 import {
   CONTROL_PLANE_SUPERVISOR,
   GIT_CREDENTIAL_HELPER,
@@ -10,12 +11,12 @@ import {
   runtimeInstallPath,
   wrapperBundle,
 } from '../src/shared/runtime-distribution.js';
+import { toolchainVerificationScript } from '../src/shared/runtime-toolchain.js';
 
 export const SNAPSHOT_RUNTIME = 'node24';
 export const PINNED_BUN_VERSION = RUNTIME_DISTRIBUTION.bun;
 export const SNAPSHOT_MANIFEST_PATH = '/usr/local/share/kilo/runtime-manifest.json';
 
-export const SNAPSHOT_WRAPPER_PATH = runtimeInstallPath(wrapperBundle('src/main.ts').installName);
 export const SNAPSHOT_CONTROL_PLANE_WRAPPER_PATH = runtimeInstallPath(
   wrapperBundle('src/control-plane/main.ts').installName
 );
@@ -37,7 +38,6 @@ export type RuntimeManifest = {
   wrapperVersion: string;
   runtime: typeof SNAPSHOT_RUNTIME;
   bunVersion: string;
-  wrapperSha256: string;
   controlPlaneWrapperSha256: string;
   controlPlaneSupervisorSha256: string;
   artifacts: RuntimeManifestArtifact[];
@@ -58,13 +58,11 @@ const MANIFEST_SCALAR_KEYS = [
   'wrapperVersion',
   'runtime',
   'bunVersion',
-  'wrapperSha256',
   'controlPlaneWrapperSha256',
   'controlPlaneSupervisorSha256',
 ] as const satisfies readonly (keyof RuntimeManifest)[];
 
 const MANIFEST_REQUIRED_ARTIFACTS = [
-  'kilocode-wrapper.js',
   'kilocode-control-plane-wrapper.js',
   'kilocode-control-plane-supervisor.sh',
 ] as const;
@@ -102,7 +100,6 @@ export function sha256Hex(bytes: Uint8Array): string {
 export function createRuntimeManifest(input: {
   runtimeBuildId: string;
   wrapperVersion: string;
-  wrapperBytes: Uint8Array;
   controlPlaneWrapperBytes: Uint8Array;
   controlPlaneSupervisorBytes: Uint8Array;
   artifacts: readonly RuntimeManifestArtifact[];
@@ -127,7 +124,6 @@ export function createRuntimeManifest(input: {
     wrapperVersion: input.wrapperVersion,
     runtime: SNAPSHOT_RUNTIME,
     bunVersion: input.bunVersion ?? PINNED_BUN_VERSION,
-    wrapperSha256: sha256Hex(input.wrapperBytes),
     controlPlaneWrapperSha256: sha256Hex(input.controlPlaneWrapperBytes),
     controlPlaneSupervisorSha256: sha256Hex(input.controlPlaneSupervisorBytes),
     artifacts: [...input.artifacts],
@@ -175,24 +171,9 @@ export function runtimeManifestArtifacts(
   return artifacts.map(({ installName, sha256 }) => ({ installName, sha256 }));
 }
 
-export function shellQuote(value: string): string {
-  return `'${value.replaceAll("'", `'"'"'`)}'`;
-}
-
-function exactVersionCommand(binary: string): string {
-  return `${binary} --version | head -n1 | grep -oE '[0-9]+\\.[0-9]+\\.[0-9]+' | head -n1`;
-}
-
-export function exactVersionCheck(binary: string, version: string): string {
-  return `test "$(${exactVersionCommand(binary)})" = ${shellQuote(version)}`;
-}
-
 export function runtimeVerificationScript(artifacts: readonly RuntimeArtifact[]): string {
   const pins = [
-    `test "$(bun --version)" = ${shellQuote(RUNTIME_DISTRIBUTION.bun)}`,
-    `test "$(pnpm --version)" = ${shellQuote(RUNTIME_DISTRIBUTION.pnpm)}`,
-    exactVersionCheck('glab', RUNTIME_DISTRIBUTION.glab),
-    exactVersionCheck('gh', RUNTIME_DISTRIBUTION.gh),
+    toolchainVerificationScript(['bun', 'pnpm', 'gh', 'glab', 'rg', 'kilo']),
     `case "$(node --version)" in v${RUNTIME_DISTRIBUTION.nodeMajor}.*) ;; *) echo "unexpected node" >&2; exit 1 ;; esac`,
   ];
   const presence = RUNTIME_REQUIRED_BINARIES.map(binary => `command -v ${binary} >/dev/null`);
@@ -204,5 +185,6 @@ export function runtimeVerificationScript(artifacts: readonly RuntimeArtifact[])
     if (artifact.linkPath) checks.push(`test -L ${shellQuote(artifact.linkPath)}`);
     return checks.join(' && ');
   });
-  return [...pins, ...presence, ...files].join(' && ');
+  // One check per line, so the first failure ends the script.
+  return ['set -euo pipefail', ...pins, ...presence, ...files].join('\n');
 }

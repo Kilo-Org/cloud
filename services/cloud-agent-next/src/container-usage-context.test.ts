@@ -1,21 +1,17 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { VercelSandboxResources } from '@kilocode/worker-utils/sandbox-allocation';
-import type { SandboxId, SandboxInstance } from './types.js';
+import type { SandboxId } from './types.js';
 import type { SessionMetadata } from './persistence/session-metadata.js';
 import {
   assertSandboxBillingAllocation,
   billingCapacityForSandboxClass,
   buildSandboxBillingInput,
-  configureSandboxBillingInput,
   parseSandboxBillingInput,
   CONTAINERS_BILLING_CAPACITIES,
   containersBillingIdentity,
-  forceDestroyControlPlaneSandbox,
-  getSandboxBillingRuntimeStatus,
   isContainersBillingClassName,
   isVercelBillingClassName,
   SANDBOX_CAPACITIES,
-  SANDBOX_USAGE_SKUS,
   VERCEL_BILLING_CAPACITIES,
   vercelBillingIdentity,
   type SandboxClassName,
@@ -32,114 +28,16 @@ function metadata(identity: SessionMetadata['identity']): SessionMetadata {
 }
 
 describe('container usage context', () => {
-  it('invokes billing status as a binding method for RPC proxies', async () => {
-    const status = {
-      sandboxClassName: 'SandboxSmall' as const,
-      running: true,
-      blocked: false,
-    };
-    const getBillingRuntimeStatus = new Proxy(
-      vi.fn(async () => status),
-      {
-        get: (target, property, receiver) => {
-          if (property === 'call')
-            throw new Error('RPC method proxies do not support Function.call');
-          return Reflect.get(target, property, receiver);
-        },
-      }
-    );
-
-    await expect(
-      getSandboxBillingRuntimeStatus({ getBillingRuntimeStatus } as unknown as SandboxInstance)
-    ).resolves.toEqual(status);
-  });
-
-  it('invokes native control-plane destruction as a binding method without SDK fallback', async () => {
-    const forceDestroyForControlPlane = new Proxy(
-      vi.fn(async function (this: { running: boolean }) {
-        this.running = false;
-      }),
-      {
-        get: (target, property, receiver) => {
-          if (property === 'call' || property === 'apply') {
-            throw new Error('RPC method proxies do not support Function.call or Function.apply');
-          }
-          return Reflect.get(target, property, receiver);
-        },
-      }
-    );
-    const sandbox = {
-      running: true,
-      forceDestroyForControlPlane,
-      destroy: vi.fn(),
-    };
-
-    await expect(forceDestroyControlPlaneSandbox(sandbox)).resolves.toBeUndefined();
-
-    expect(sandbox.running).toBe(false);
-    expect(forceDestroyForControlPlane).toHaveBeenCalledOnce();
-    expect(sandbox.destroy).not.toHaveBeenCalled();
-  });
-
-  it.each([undefined, null, 42, {}, { forceDestroyForControlPlane: true }])(
-    'fails closed when native control-plane destruction is unavailable: %j',
-    async sandbox => {
-      await expect(forceDestroyControlPlaneSandbox(sandbox)).rejects.toThrow(
-        'Cloudflare control-plane native destruction is unavailable'
-      );
-    }
-  );
-
-  it('does not substitute SDK destruction for a missing native capability', async () => {
-    const sandbox = { destroy: vi.fn(async () => undefined) };
-
-    await expect(forceDestroyControlPlaneSandbox(sandbox)).rejects.toThrow(
-      'Cloudflare control-plane native destruction is unavailable'
-    );
-    expect(sandbox.destroy).not.toHaveBeenCalled();
-  });
-
-  it('propagates native control-plane destruction failures', async () => {
-    const error = new Error('Native destroy acknowledgement lost');
-    const sandbox = {
-      forceDestroyForControlPlane: vi.fn().mockRejectedValue(error),
-      destroy: vi.fn(),
-    };
-
-    await expect(forceDestroyControlPlaneSandbox(sandbox)).rejects.toBe(error);
-    expect(sandbox.destroy).not.toHaveBeenCalled();
-  });
-
-  it('maps every concrete sandbox class to its immutable SKU', () => {
-    expect(SANDBOX_USAGE_SKUS).toEqual({
-      Sandbox: 'cloud-agent-standard-2026-07',
-      SandboxContainment: 'cloud-agent-standard-2026-07',
-      SandboxSmall: 'cloud-agent-small-2026-07',
-      SandboxSmallContainment: 'cloud-agent-small-2026-07',
-      SandboxDIND: 'cloud-agent-dind-2026-07',
-      SandboxCodeReview: 'cloud-agent-code-review-2026-07',
-      SandboxCodeReviewContainment: 'cloud-agent-code-review-2026-07',
-      SandboxContainersStandard3: 'cloud-agent-containers-standard-3-2026-09',
-      SandboxContainersStandard4: 'cloud-agent-containers-standard-4-2026-09',
-      SandboxVercelSmall: 'cloud-agent-vercel-small-2026-09',
-      SandboxVercelLarge: 'cloud-agent-vercel-large-2026-09',
+  it('bills the code-review containers instance at the code-review capacity', () => {
+    expect(containersBillingIdentity('code-review')).toEqual({
+      className: 'SandboxContainersCodeReview',
+      service: 'cloud-agent-next-sandbox-containers-code-review',
+      sku: 'cloud-agent-code-review-2026-07',
+      capacity: { vcpu: 1, memoryMiB: 4_096, diskMB: 8_000 },
     });
   });
 
-  it('resolves a containers identity per instance size', () => {
-    expect(containersBillingIdentity('standard-3')).toEqual({
-      className: 'SandboxContainersStandard3',
-      service: 'cloud-agent-next-sandbox-containers-standard3',
-      sku: 'cloud-agent-containers-standard-3-2026-09',
-      capacity: { vcpu: 2, memoryMiB: 8_192, diskMB: 16_000 },
-    });
-    expect(containersBillingIdentity('standard-4')).toEqual({
-      className: 'SandboxContainersStandard4',
-      service: 'cloud-agent-next-sandbox-containers-standard4',
-      sku: 'cloud-agent-containers-standard-4-2026-09',
-      capacity: { vcpu: 4, memoryMiB: 12_288, diskMB: 20_000 },
-    });
-
+  it('rejects unsupported containers instance sizes', () => {
     expect(() => containersBillingIdentity('lite')).toThrow(
       'Containers billing is unsupported for instance size: lite'
     );
@@ -168,13 +66,8 @@ describe('container usage context', () => {
       expect(isVercelBillingClassName(className)).toBe(true);
     }
     for (const className of [
-      'Sandbox',
       'SandboxContainment',
-      'SandboxSmall',
       'SandboxSmallContainment',
-      'SandboxDIND',
-      'SandboxCodeReview',
-      'SandboxCodeReviewContainment',
       'SandboxContainersStandard3',
       'SandboxContainersStandard4',
     ] as const) {
@@ -183,35 +76,6 @@ describe('container usage context', () => {
     for (const className of ['toString', 'constructor', 'valueOf', '__proto__'] as const) {
       expect(isVercelBillingClassName(className as SandboxClassName)).toBe(false);
     }
-  });
-
-  it('snapshots the Vercel capacities without a disk field', () => {
-    expect(VERCEL_BILLING_CAPACITIES).toEqual({
-      SandboxVercelSmall: { vcpu: 2, memoryMiB: 4_096 },
-      SandboxVercelLarge: { vcpu: 4, memoryMiB: 8_192 },
-    });
-    for (const capacity of Object.values(VERCEL_BILLING_CAPACITIES)) {
-      expect(capacity).not.toHaveProperty('diskMB');
-      expect(capacity).not.toHaveProperty('disk_mb');
-    }
-  });
-
-  it('resolves a Vercel identity for both accepted presets', () => {
-    const small: VercelSandboxResources = { vcpus: 2, memory: 4096 };
-    const large: VercelSandboxResources = { vcpus: 4, memory: 8192 };
-
-    expect(vercelBillingIdentity(small)).toEqual({
-      className: 'SandboxVercelSmall',
-      service: 'cloud-agent-next-sandbox-vercel-small',
-      sku: 'cloud-agent-vercel-small-2026-09',
-      capacity: { vcpu: 2, memoryMiB: 4_096 },
-    });
-    expect(vercelBillingIdentity(large)).toEqual({
-      className: 'SandboxVercelLarge',
-      service: 'cloud-agent-next-sandbox-vercel-large',
-      sku: 'cloud-agent-vercel-large-2026-09',
-      capacity: { vcpu: 4, memoryMiB: 8_192 },
-    });
   });
 
   it('throws instead of guessing a SKU for unsupported Vercel resources', () => {
@@ -228,18 +92,18 @@ describe('container usage context', () => {
   });
 
   it('routes the capacity lookup to Vercel, containers, and legacy records', () => {
-    expect(billingCapacityForSandboxClass('SandboxVercelSmall')).toEqual({
-      vcpu: 2,
-      memoryMiB: 4_096,
-    });
-    expect(billingCapacityForSandboxClass('SandboxVercelLarge')).toEqual({
-      vcpu: 4,
-      memoryMiB: 8_192,
-    });
+    expect(billingCapacityForSandboxClass('SandboxVercelSmall')).toEqual(
+      VERCEL_BILLING_CAPACITIES.SandboxVercelSmall
+    );
+    expect(billingCapacityForSandboxClass('SandboxVercelLarge')).toEqual(
+      VERCEL_BILLING_CAPACITIES.SandboxVercelLarge
+    );
     expect(billingCapacityForSandboxClass('SandboxContainersStandard3')).toEqual(
       CONTAINERS_BILLING_CAPACITIES.SandboxContainersStandard3
     );
-    expect(billingCapacityForSandboxClass('SandboxSmall')).toEqual(SANDBOX_CAPACITIES.SandboxSmall);
+    expect(billingCapacityForSandboxClass('SandboxSmallContainment')).toEqual(
+      SANDBOX_CAPACITIES.SandboxSmallContainment
+    );
   });
 
   it('accepts both Vercel classes against an isolated `ses` billing ID and rejects others', () => {
@@ -271,15 +135,7 @@ describe('container usage context', () => {
     for (const className of ['SandboxContainersStandard3', 'SandboxContainersStandard4'] as const) {
       expect(isContainersBillingClassName(className)).toBe(true);
     }
-    for (const className of [
-      'Sandbox',
-      'SandboxContainment',
-      'SandboxSmall',
-      'SandboxSmallContainment',
-      'SandboxDIND',
-      'SandboxCodeReview',
-      'SandboxCodeReviewContainment',
-    ] as const) {
+    for (const className of ['SandboxContainment', 'SandboxSmallContainment'] as const) {
       expect(isContainersBillingClassName(className)).toBe(false);
     }
   });
@@ -323,25 +179,6 @@ describe('container usage context', () => {
         ).toThrow(`${sandboxClassName} billing received an incompatible sandbox ID`);
       }
     }
-  });
-
-  it('snapshots the configured capacity for every legacy sandbox class', () => {
-    expect(SANDBOX_CAPACITIES).toEqual({
-      Sandbox: { vcpu: 4, memoryMiB: 12_288, diskMB: 20_000 },
-      SandboxContainment: { vcpu: 4, memoryMiB: 12_288, diskMB: 20_000 },
-      SandboxSmall: { vcpu: 2, memoryMiB: 6_144, diskMB: 10_000 },
-      SandboxSmallContainment: { vcpu: 2, memoryMiB: 6_144, diskMB: 10_000 },
-      SandboxDIND: { vcpu: 2, memoryMiB: 6_144, diskMB: 10_000 },
-      SandboxCodeReview: { vcpu: 1, memoryMiB: 4_096, diskMB: 8_000 },
-      SandboxCodeReviewContainment: { vcpu: 1, memoryMiB: 4_096, diskMB: 8_000 },
-    });
-  });
-
-  it('keeps the containers billing capacities unchanged', () => {
-    expect(CONTAINERS_BILLING_CAPACITIES).toEqual({
-      SandboxContainersStandard3: { vcpu: 2, memoryMiB: 8_192, diskMB: 16_000 },
-      SandboxContainersStandard4: { vcpu: 4, memoryMiB: 12_288, diskMB: 20_000 },
-    });
   });
 
   it.each([
@@ -456,6 +293,18 @@ describe('container usage context', () => {
     });
   });
 
+  it('attributes Agent Manager sessions to agent-manager', () => {
+    const input = buildSandboxBillingInput(
+      metadata({
+        sessionId: 'agent_manager',
+        userId: 'user_manager',
+        billingOrigin: 'agent-manager',
+      }),
+      'dind-abcdef'
+    );
+    expect(input.metadata?.origin).toBe('agent-manager');
+  });
+
   it('maps unknown caller-provided origins to other', () => {
     const input = buildSandboxBillingInput(
       metadata({
@@ -482,7 +331,7 @@ describe('container usage context', () => {
 
   it.each([
     ['isolated', 'SandboxSmallContainment', true],
-    ['code-review', 'SandboxCodeReviewContainment', true],
+    ['code-review', 'SandboxContainersCodeReview', true],
     ['shared', 'SandboxContainment', false],
   ] as const)(
     'attributes a placed %s sandbox from its kind, not its neutral key',
@@ -544,7 +393,7 @@ describe('container usage context', () => {
 
   it('rejects session attribution and extra metadata for shared sandboxes', () => {
     expect(() =>
-      assertSandboxBillingAllocation('Sandbox', {
+      assertSandboxBillingAllocation('SandboxContainment', {
         sandboxId: 'org-abcdef',
         subject: { type: 'user', id: 'user_shared' },
         actor: { type: 'user', id: 'user_shared' },
@@ -556,7 +405,7 @@ describe('container usage context', () => {
 
   it('rejects isolated-prefixed legacy IDs for shared sandbox classes', () => {
     expect(() =>
-      assertSandboxBillingAllocation('Sandbox', {
+      assertSandboxBillingAllocation('SandboxContainment', {
         sandboxId: 'ses-abcdef__legacy',
         subject: { type: 'user', id: 'user_shared' },
         actor: { type: 'user', id: 'user_shared' },
@@ -566,7 +415,7 @@ describe('container usage context', () => {
 
   it('requires bounded isolated attribution for non-shared sandbox classes', () => {
     expect(() =>
-      assertSandboxBillingAllocation('SandboxSmall', {
+      assertSandboxBillingAllocation('SandboxSmallContainment', {
         sandboxId: 'ses-abcdef',
         subject: { type: 'user', id: 'user_isolated' },
         actor: { type: 'user', id: 'user_isolated' },
@@ -575,7 +424,7 @@ describe('container usage context', () => {
     ).toThrow('Isolated sandbox billing requires session attribution');
   });
 
-  it.each(['Sandbox', 'SandboxContainment'] as const)(
+  it.each(['SandboxContainment'] as const)(
     'accepts isolated Standard attribution for %s',
     sandboxClassName => {
       expect(() =>
@@ -592,7 +441,7 @@ describe('container usage context', () => {
 
   it('requires session attribution for isolated Standard sandboxes', () => {
     expect(() =>
-      assertSandboxBillingAllocation('Sandbox', {
+      assertSandboxBillingAllocation('SandboxContainment', {
         sandboxId: 'istd-abcdef',
         subject: { type: 'org', id: 'org_standard' },
         actor: { type: 'user', id: 'user_standard' },
@@ -603,7 +452,7 @@ describe('container usage context', () => {
 
   it('rejects unsupported isolated origins at the sandbox RPC boundary', () => {
     expect(() =>
-      assertSandboxBillingAllocation('SandboxSmall', {
+      assertSandboxBillingAllocation('SandboxSmallContainment', {
         sandboxId: 'ses-abcdef',
         subject: { type: 'user', id: 'user_isolated' },
         actor: { type: 'user', id: 'user_isolated' },
@@ -615,51 +464,25 @@ describe('container usage context', () => {
 
   it('rejects a sandbox ID that does not match the concrete container class', () => {
     expect(() =>
-      assertSandboxBillingAllocation('SandboxDIND', {
+      assertSandboxBillingAllocation('SandboxContainment', {
         sandboxId: 'ses-abcdef',
         subject: { type: 'user', id: 'user_1' },
         actor: { type: 'user', id: 'user_1' },
         sessionId: 'agent_1',
         metadata: { origin: 'cloud-agent' },
       })
-    ).toThrow('SandboxDIND billing received an incompatible sandbox ID');
+    ).toThrow('SandboxContainment billing received an incompatible sandbox ID');
   });
 
   it('rejects isolated Standard IDs for Small container classes', () => {
     expect(() =>
-      assertSandboxBillingAllocation('SandboxSmall', {
+      assertSandboxBillingAllocation('SandboxSmallContainment', {
         sandboxId: 'istd-abcdef',
         subject: { type: 'user', id: 'user_1' },
         actor: { type: 'user', id: 'user_1' },
         sessionId: 'agent_1',
         metadata: { origin: 'cloud-agent' },
       })
-    ).toThrow('SandboxSmall billing received an incompatible sandbox ID');
-  });
-
-  it('skips shadow configuration when a sandbox does not expose the metering RPC', async () => {
-    await expect(
-      configureSandboxBillingInput({} as SandboxInstance, {
-        sandboxId: 'ses-abcdef',
-        subject: { type: 'user', id: 'user_1' },
-        actor: { type: 'user', id: 'user_1' },
-        sessionId: 'agent_1',
-        metadata: { origin: 'cloud-agent' },
-      })
-    ).resolves.toBeUndefined();
-  });
-
-  it('propagates attribution configuration failures before sandbox startup', async () => {
-    const configureBilling = vi.fn().mockRejectedValue(new Error('meter unavailable'));
-    await expect(
-      configureSandboxBillingInput({ configureBilling } as unknown as SandboxInstance, {
-        sandboxId: 'ses-abcdef',
-        subject: { type: 'user', id: 'user_1' },
-        actor: { type: 'user', id: 'user_1' },
-        sessionId: 'agent_1',
-        metadata: { origin: 'cloud-agent' },
-      })
-    ).rejects.toThrow('meter unavailable');
-    expect(configureBilling).toHaveBeenCalledOnce();
+    ).toThrow('SandboxSmallContainment billing received an incompatible sandbox ID');
   });
 });

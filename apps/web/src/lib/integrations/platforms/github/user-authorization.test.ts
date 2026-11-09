@@ -1,4 +1,5 @@
 /* eslint-disable drizzle/enforce-delete-with-where */
+import { GitHubIdentityConflictError } from '@kilocode/db/github-identity';
 import { captureException } from '@sentry/nextjs';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
@@ -7,8 +8,11 @@ import { eq } from 'drizzle-orm';
 import {
   disconnectGitHubUserAuthorization,
   exchangeAndStoreGitHubUserAuthorization,
+  getGitHubUserAuthorizationStatus,
+  revokeStoredGitHubUserAuthorization,
 } from './user-authorization';
 import { disconnectStoredGitHubUserAuthorization } from './user-authorization-client';
+import { evictGitHubUserAccessTokenCache } from './user-token-client';
 
 const mockGetAuthenticated = jest.fn();
 const mockEncryptKeyedEnvelope = jest.fn(
@@ -17,6 +21,7 @@ const mockEncryptKeyedEnvelope = jest.fn(
 const mockDisconnectStoredGitHubUserAuthorization = jest.mocked(
   disconnectStoredGitHubUserAuthorization
 );
+const mockEvictGitHubUserAccessTokenCache = jest.mocked(evictGitHubUserAccessTokenCache);
 const mockTokenEncryptionConfig = {
   keyId: 'github-token-key-v1',
   publicKey: Buffer.from('test-public-key').toString('base64'),
@@ -57,6 +62,10 @@ jest.mock('./user-authorization-client', () => ({
   disconnectStoredGitHubUserAuthorization: jest.fn(),
 }));
 
+jest.mock('./user-token-client', () => ({
+  evictGitHubUserAccessTokenCache: jest.fn(),
+}));
+
 function exchangeResponse() {
   return Response.json({
     access_token: 'new-access-token',
@@ -90,8 +99,11 @@ describe('GitHub user authorization', () => {
         kiloUserId: user.id,
         code: 'authorization-code',
         codeVerifier: 'code-verifier',
+        expected: await getGitHubUserAuthorizationStatus(user.id),
       })
-    ).resolves.toEqual({ status: 'connected', githubLogin: 'octocat' });
+    ).resolves.toMatchObject({ status: 'connected', githubLogin: 'octocat' });
+
+    expect(mockEvictGitHubUserAccessTokenCache).toHaveBeenCalledWith(user.id);
 
     const accessAad = `github-user-authorization:v1:${user.id}:standard:101:access`;
     const refreshAad = `github-user-authorization:v1:${user.id}:standard:101:refresh`;
@@ -128,6 +140,7 @@ describe('GitHub user authorization', () => {
         kiloUserId: user.id,
         code: 'authorization-code',
         codeVerifier: 'code-verifier',
+        expected: await getGitHubUserAuthorizationStatus(user.id),
       })
     ).rejects.toThrow('GitHub user token envelope encryption is not configured');
 
@@ -152,6 +165,7 @@ describe('GitHub user authorization', () => {
         kiloUserId: user.id,
         code: 'authorization-code',
         codeVerifier: 'code-verifier',
+        expected: await getGitHubUserAuthorizationStatus(user.id),
       })
     ).rejects.toThrow('GitHub grant revoked');
 
@@ -161,7 +175,6 @@ describe('GitHub user authorization', () => {
         .from(user_github_app_tokens)
         .where(eq(user_github_app_tokens.kilo_user_id, user.id))
     ).resolves.toHaveLength(0);
-    expect(mockEncryptKeyedEnvelope).not.toHaveBeenCalled();
   });
 
   it('delegates persisted authorization disconnect without reading stored tokens', async () => {
@@ -178,9 +191,16 @@ describe('GitHub user authorization', () => {
     });
     const fetchMock = jest.spyOn(global, 'fetch');
 
-    await disconnectGitHubUserAuthorization(user.id);
+    await disconnectGitHubUserAuthorization(
+      user.id,
+      await getGitHubUserAuthorizationStatus(user.id)
+    );
 
-    expect(mockDisconnectStoredGitHubUserAuthorization).toHaveBeenCalledWith(user.id);
+    expect(mockDisconnectStoredGitHubUserAuthorization).toHaveBeenCalledWith(
+      user.id,
+      expect.objectContaining({ credentialVersion: 1 })
+    );
+    expect(mockEvictGitHubUserAccessTokenCache).toHaveBeenCalledWith(user.id);
     expect(fetchMock).not.toHaveBeenCalled();
     await expect(
       db
@@ -195,11 +215,65 @@ describe('GitHub user authorization', () => {
     const serviceError = new Error('GitHub authorization disconnect failed (503)');
     mockDisconnectStoredGitHubUserAuthorization.mockRejectedValueOnce(serviceError);
 
-    await expect(disconnectGitHubUserAuthorization(user.id)).rejects.toThrow(serviceError);
+    await expect(
+      disconnectGitHubUserAuthorization(user.id, await getGitHubUserAuthorizationStatus(user.id))
+    ).rejects.toThrow(serviceError);
 
+    expect(mockEvictGitHubUserAccessTokenCache).toHaveBeenCalledWith(user.id);
     expect(captureException).toHaveBeenCalledWith(serviceError, {
       tags: { source: 'github_user_authorization_disconnect' },
     });
+  });
+
+  it('does not report a stale disconnect precondition as a failure', async () => {
+    const user = await insertTestUser();
+    mockDisconnectStoredGitHubUserAuthorization.mockRejectedValueOnce(
+      new GitHubIdentityConflictError()
+    );
+
+    await expect(
+      disconnectGitHubUserAuthorization(user.id, await getGitHubUserAuthorizationStatus(user.id))
+    ).rejects.toBeInstanceOf(GitHubIdentityConflictError);
+
+    expect(mockEvictGitHubUserAccessTokenCache).toHaveBeenCalledWith(user.id);
+    expect(captureException).not.toHaveBeenCalled();
+  });
+
+  it('revokes the stored authorization and evicts the cached credential for its Kilo user', async () => {
+    const user = await insertTestUser();
+    await db.insert(user_github_app_tokens).values({
+      kilo_user_id: user.id,
+      github_app_type: 'standard',
+      github_user_id: '101',
+      github_login: 'octocat',
+      access_token_encrypted: 'opaque-access-envelope',
+      access_token_expires_at: '2030-01-01T00:00:00.000Z',
+      refresh_token_encrypted: 'opaque-refresh-envelope',
+      refresh_token_expires_at: '2030-01-01T00:00:00.000Z',
+    });
+
+    await expect(
+      revokeStoredGitHubUserAuthorization('101', 'standard', 'github_app_authorization')
+    ).resolves.toEqual({ kiloUserId: user.id });
+
+    expect(mockEvictGitHubUserAccessTokenCache).toHaveBeenCalledWith(user.id);
+    const [authorization] = await db
+      .select()
+      .from(user_github_app_tokens)
+      .where(eq(user_github_app_tokens.kilo_user_id, user.id));
+    expect(authorization?.revoked_at).not.toBeNull();
+    expect(authorization?.revocation_reason).toBe('github_app_authorization');
+  });
+
+  it('does not evict when the revocation matches no standard authorization', async () => {
+    await expect(
+      revokeStoredGitHubUserAuthorization('101', 'standard', 'github_app_authorization')
+    ).resolves.toBeNull();
+    await expect(
+      revokeStoredGitHubUserAuthorization('101', 'lite', 'github_app_authorization')
+    ).resolves.toBeNull();
+
+    expect(mockEvictGitHubUserAccessTokenCache).not.toHaveBeenCalled();
   });
 
   it('revokes the transient callback grant when replacing an existing identity', async () => {
@@ -225,6 +299,7 @@ describe('GitHub user authorization', () => {
         kiloUserId: user.id,
         code: 'authorization-code',
         codeVerifier: 'code-verifier',
+        expected: await getGitHubUserAuthorizationStatus(user.id),
       })
     ).resolves.toEqual({ status: 'disconnect_existing_identity_first' });
 
@@ -266,10 +341,40 @@ describe('GitHub user authorization', () => {
         kiloUserId: connectingUser.id,
         code: 'authorization-code',
         codeVerifier: 'code-verifier',
+        expected: await getGitHubUserAuthorizationStatus(connectingUser.id),
       })
     ).resolves.toEqual({ status: 'already_connected_to_another_account' });
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(mockEncryptKeyedEnvelope).not.toHaveBeenCalled();
+  });
+  it('rejects an App callback authenticated before account deletion', async () => {
+    const user = await insertTestUser();
+    const expected = await getGitHubUserAuthorizationStatus(user.id);
+    let resume = (_response: Response) => {};
+    jest.spyOn(global, 'fetch').mockImplementationOnce(
+      () =>
+        new Promise<Response>(resolve => {
+          resume = resolve;
+        })
+    );
+    mockGetAuthenticated.mockResolvedValue({ data: { id: 101, login: 'octocat' } });
+    const pending = exchangeAndStoreGitHubUserAuthorization({
+      kiloUserId: user.id,
+      code: 'old-code',
+      codeVerifier: 'verifier',
+      expected,
+    });
+    await db
+      .update(kilocode_users)
+      .set({ blocked_reason: 'soft-deleted at 2026-11-05T00:00:00.000Z' })
+      .where(eq(kilocode_users.id, user.id));
+    resume(exchangeResponse());
+    await expect(pending).rejects.toThrow('github_identity_conflict');
+    expect(
+      await db
+        .select()
+        .from(user_github_app_tokens)
+        .where(eq(user_github_app_tokens.kilo_user_id, user.id))
+    ).toHaveLength(0);
   });
 });

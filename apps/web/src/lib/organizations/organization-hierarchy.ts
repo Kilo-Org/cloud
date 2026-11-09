@@ -1,6 +1,7 @@
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { getOrCreateStripeCustomerIdForOrganization } from '@/lib/organizations/organization-billing';
 import { organizations } from '@kilocode/db/schema';
+import { enforceOrganizationCreationLimit } from '@kilocode/web-shared/lib/organizations/organization-creation-limit';
 import { TRPCError } from '@trpc/server';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 
@@ -98,14 +99,50 @@ export async function validateParentOrganizationChange(
   }
 }
 
-export async function createChildOrganization(name: string, parentOrganizationId: string) {
+/**
+ * Directory-sync bindings, written in the same statement as the row.
+ *
+ * They have to land inside this function's transaction. Stripe provisioning
+ * runs after it commits and can fail, so a binding written afterwards leaves a
+ * live sub-organization carrying none of these columns — invisible to the
+ * lookups keyed on them, and duplicated by every retry.
+ */
+export type DirectoryOrganizationBinding = {
+  directory_id: string;
+  directory_group_id: string;
+  directory_idp_id: string;
+};
+
+export async function createChildOrganization(
+  name: string,
+  parentOrganizationId: string,
+  userId?: string,
+  directoryBinding?: DirectoryOrganizationBinding
+) {
   const organization = await db.transaction(async tx => {
     await tx.execute(sql`SELECT pg_advisory_xact_lock(20260624, 1)`);
+    if (userId) {
+      await enforceOrganizationCreationLimit(tx, userId);
+    }
+
+    const [parentOrganization] = await tx
+      .select({ plan: organizations.plan })
+      .from(organizations)
+      .where(and(eq(organizations.id, parentOrganizationId), isNull(organizations.deleted_at)))
+      .limit(1);
+
+    if (!parentOrganization) {
+      throw new TRPCError({
+        code: 'NOT_FOUND',
+        message: 'Parent organization not found',
+      });
+    }
 
     const [createdOrganization] = await tx
       .insert(organizations)
       .values({
         name,
+        plan: parentOrganization.plan,
         require_seats: false,
         free_trial_end_at: null,
         parent_organization_id: parentOrganizationId,
@@ -114,6 +151,7 @@ export async function createChildOrganization(name: string, parentOrganizationId
           code_indexing_enabled: true,
           ...childOrganizationSettings,
         },
+        ...directoryBinding,
       })
       .returning();
 

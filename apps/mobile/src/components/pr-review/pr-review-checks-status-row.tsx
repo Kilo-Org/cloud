@@ -14,8 +14,10 @@ import {
 import { SpinningIcon } from '@/components/ui/spinning-icon';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { formatNumber } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { cn } from '@/lib/utils';
 
 /** The four rollup statuses the checks card summarises, in summary order. */
 export type PrReviewChecksStatus = 'success' | 'failure' | 'pending' | 'skipped';
@@ -81,7 +83,7 @@ export function PrReviewChecksStatusRow({
   return (
     <View>
       <Pressable
-        className="min-h-11 flex-row items-center gap-3 px-4 py-3 active:opacity-70"
+        className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-3 px-4 py-3 active:opacity-70')}
         onPress={() => {
           setExpanded(current => !current);
         }}

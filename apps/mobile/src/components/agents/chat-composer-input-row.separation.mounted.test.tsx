@@ -84,7 +84,6 @@ describe('ChatComposerInputRow mounted — control separation', () => {
     const renderer = await renderRow({
       inputEditable: true,
       returnSendsMessage: true,
-      voiceInputAvailable: true,
     });
 
     const [mic] = findAllByType(renderer.root, 'VoiceInputButton');
@@ -120,7 +119,7 @@ describe('ChatComposerInputRow mounted — control separation', () => {
     async ({ isRTL, micFacing, sendFacing }) => {
       layoutDirection.isRTL = isRTL;
       try {
-        const renderer = await renderRow({ inputEditable: true, voiceInputAvailable: true });
+        const renderer = await renderRow({ inputEditable: true });
 
         const [mic] = findAllByType(renderer.root, 'VoiceInputButton');
         const send = findByAccessibilityLabel(renderer.root, 'Send message');
@@ -137,23 +136,12 @@ describe('ChatComposerInputRow mounted — control separation', () => {
     }
   );
 
-  it('keeps the row gap and full slop on send when no mic sits before it', async () => {
-    const renderer = await renderRow({ inputEditable: true, voiceInputAvailable: false });
-
-    const send = findByAccessibilityLabel(renderer.root, 'Send message');
-    expect(hasGapWrapper(send)).toBe(true);
-    expect(send?.props.hitSlop).toBeGreaterThan(0);
-
-    renderer.unmount();
-  });
-
   it('wraps the stop control in the voice/send gap while streaming', async () => {
     const renderer = await renderRow({
       inputEditable: true,
       isStreaming: true,
       canSend: false,
       hasSendableContent: false,
-      voiceInputAvailable: true,
     });
 
     const [mic] = findAllByType(renderer.root, 'VoiceInputButton');

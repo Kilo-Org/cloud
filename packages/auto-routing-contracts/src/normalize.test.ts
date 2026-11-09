@@ -24,6 +24,156 @@ describe('classifier input normalization', () => {
     });
   });
 
+  it('keeps prefixes stable and cheap on very long prompt text', () => {
+    // Extraction walks message content with forward-only cursors, so the cost
+    // tracks the length of the text. The budget leaves room for a loaded CI
+    // runner while still failing far below the cost of an unbounded scan.
+    const budgetMs = 1000;
+    const cases: Array<{ content: string; prefix: string }> = [
+      { content: `<task>${' '.repeat(500_000)}`, prefix: '<task>' },
+      { content: `<task>open${' '.repeat(500_000)}`, prefix: '<task>open' },
+      { content: '<thinking>'.repeat(50_000), prefix: '<thinking>'.repeat(100) },
+    ];
+
+    const started = performance.now();
+    for (const { content, prefix } of cases) {
+      expect(
+        normalizeClassifierInput('chat_completions', {
+          model: 'anthropic/claude-sonnet-4',
+          messages: [{ role: 'user', content }],
+        })
+      ).toMatchObject({ userPromptPrefix: prefix });
+    }
+    const elapsed = performance.now() - started;
+
+    expect(elapsed).toBeLessThan(budgetMs);
+  });
+
+  it('normalizes a content value nested far deeper than any client needs', () => {
+    // Content is accepted as `z.unknown()`, so its nesting is whatever the
+    // caller sent. Every walk over it stays inside its budget, so a deeply
+    // nested value answers with the documented empty result.
+    const budgetMs = 2000;
+    const nested = (levels: number): unknown => {
+      let value: unknown = 'nested prompt text';
+      for (let level = 0; level < levels; level++) {
+        value = { content: [value] };
+      }
+      return value;
+    };
+
+    const started = performance.now();
+
+    expect(
+      normalizeClassifierInput('chat_completions', {
+        model: 'anthropic/claude-sonnet-4',
+        messages: [{ role: 'user', content: nested(20_000) }],
+      })
+    ).toMatchObject({ userPromptPrefix: null });
+    expect(
+      normalizeClassifierInput('responses', {
+        model: 'openai/gpt-5-mini',
+        input: [{ role: 'user', content: nested(20_000) }],
+      })
+    ).toMatchObject({ userPromptPrefix: null });
+    expect(
+      normalizeClassifierInput('messages', {
+        model: 'anthropic/claude-sonnet-4',
+        messages: [{ role: 'user', content: nested(20_000) }],
+      })
+    ).toMatchObject({ userPromptPrefix: null });
+
+    // The same body reaches the modality and token-estimate walks.
+    const deep = { model: 'm', messages: [{ role: 'user', content: nested(20_000) }] };
+    expect(detectRequiredInputModalities(deep)).toEqual([]);
+    expect(estimateRoutingTokens(deep)).toBe(0);
+
+    // Nesting a plausible shape well inside the budget is unaffected.
+    expect(
+      normalizeClassifierInput('chat_completions', {
+        model: 'anthropic/claude-sonnet-4',
+        messages: [{ role: 'user', content: nested(20) }],
+      })
+    ).toMatchObject({ userPromptPrefix: 'nested prompt text' });
+
+    expect(performance.now() - started).toBeLessThan(budgetMs);
+  });
+
+  it('keeps the user text ahead of a stripped block near the window size', () => {
+    // The gathering window has to clear a whole agent block, because the strip
+    // passes see a block's closer only when it falls inside the gathered text.
+    // This block is close to a mebibyte with its closer inside the window, so a
+    // window of a few tens of kilobytes fails here.
+    const budgetMs = 2000;
+    const userText = 'Refactor the billing retry path and add a regression test.';
+    const content = `${userText}\n<environment_details>\n${'src/app/page.tsx\n'.repeat(58_000)}</environment_details>`;
+    expect(content.length).toBeGreaterThan(900_000);
+
+    const started = performance.now();
+    const chat = normalizeClassifierInput('chat_completions', {
+      model: 'anthropic/claude-sonnet-4',
+      messages: [{ role: 'user', content }],
+    });
+    const responses = normalizeClassifierInput('responses', {
+      model: 'openai/gpt-5-mini',
+      input: [{ role: 'user', content }],
+    });
+    const messages = normalizeClassifierInput('messages', {
+      model: 'anthropic/claude-sonnet-4',
+      messages: [{ role: 'user', content }],
+    });
+    const elapsed = performance.now() - started;
+
+    expect(chat?.userPromptPrefix).toBe(userText);
+    expect(responses?.userPromptPrefix).toBe(userText);
+    expect(messages?.userPromptPrefix).toBe(userText);
+    expect(elapsed).toBeLessThan(budgetMs);
+  });
+
+  it('keeps the leading prefix of a message larger than the gathering window', () => {
+    const budgetMs = 2000;
+    const huge =
+      'Add a regression test for the timeout path. ' +
+      'lorem ipsum dolor sit amet '.repeat(200_000);
+
+    const started = performance.now();
+    const result = normalizeClassifierInput('chat_completions', {
+      model: 'anthropic/claude-sonnet-4',
+      messages: [{ role: 'user', content: huge }],
+    });
+    const elapsed = performance.now() - started;
+
+    expect(result?.userPromptPrefix).toBe(huge.slice(0, 1000));
+    expect(elapsed).toBeLessThan(budgetMs);
+  });
+
+  it('keeps a late image and the full text count in a long conversation', () => {
+    // The body-wide walks are linear in the parsed body and bounded by depth,
+    // so a multi-hundred-turn history still reports the modality and text of
+    // its newest turns instead of stopping partway through the array.
+    const history = Array.from({ length: 300 }, (_, index) => ({
+      role: index % 2 === 0 ? 'user' : 'assistant',
+      content: 'x'.repeat(1000),
+    }));
+    const body = {
+      model: 'anthropic/claude-sonnet-4',
+      messages: [
+        ...history,
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: 'What is in this screenshot?' },
+            { type: 'image_url', image_url: { url: 'https://example.com/diagram.png' } },
+          ],
+        },
+      ],
+    };
+
+    expect(detectRequiredInputModalities(body)).toEqual(['image']);
+    // 300 history messages x 1000 chars, plus the 28-char text part, over chars/4.
+    expect(estimateRoutingTokens(body)).toBe(Math.floor((300_000 + 28) / 4));
+  });
+
   it('strips redundant tool result content from prompt prefixes', () => {
     expect(
       normalizeClassifierInput('chat_completions', {
@@ -120,6 +270,103 @@ describe('classifier input normalization', () => {
     });
   });
 
+  it.each([
+    'key',
+    'private_key',
+    'privateKey',
+    'access_key',
+    'accessKeyId',
+    'client_key',
+    'clientKey',
+    'signing_key',
+    'signingKey',
+    'encryption_key',
+    'encryptionKey',
+    'x-functions-key',
+    'apiKey',
+    'secret',
+    'password',
+    'authorization',
+    'passwordhash',
+    'secretvalue',
+    'tokenvalue',
+    'cookievalue',
+    'authorizationheader',
+    'keyid',
+    'mysql_pwd',
+    'db_pass',
+    'dbpass',
+    'redis_passphrase',
+    'passkey',
+    'pgpass',
+    'mongopass',
+    'oraclepass',
+    'pwd',
+    'passphrase',
+  ])('redacts the credential-bearing provider hint key %s', key => {
+    const hints = redactProviderHints({
+      provider: { order: ['openai'], [key]: 'provider-secret' },
+      providerOptions: { openrouter: { sort: 'price', [key]: 'option-secret' } },
+    });
+
+    expect(hints).toEqual({
+      provider: { order: ['openai'], [key]: '[REDACTED]' },
+      providerOptions: { openrouter: { sort: 'price', [key]: '[REDACTED]' } },
+    });
+  });
+
+  it('redacts credential keys beside a long property name', () => {
+    // Every property name is scanned within the same fixed window, so a very
+    // long one still leaves its neighbours' redaction intact.
+    const budgetMs = 2000;
+    const repeated = 'a' + 'key'.repeat(200_000);
+    const provider = { order: ['openai'], api_key: 'sk-secret', [repeated]: 'value' };
+
+    const started = performance.now();
+    const hints = redactProviderHints({ provider, providerOptions: undefined });
+    const elapsed = performance.now() - started;
+
+    expect(hints.provider).toMatchObject({ api_key: '[REDACTED]' });
+    expect((hints.provider as Record<string, unknown>)[repeated]).toBe('value');
+    expect(elapsed).toBeLessThan(budgetMs);
+  });
+
+  it('redacts credential-bearing keys nested in provider option arrays', () => {
+    expect(
+      redactProviderHints({
+        provider: undefined,
+        providerOptions: { chain: [{ sort: 'price', privateKey: 'nested-secret' }] },
+      })
+    ).toEqual({
+      provider: null,
+      providerOptions: { chain: [{ sort: 'price', privateKey: '[REDACTED]' }] },
+    });
+  });
+
+  it('keeps provider routing hints that name no credential', () => {
+    const provider = {
+      order: ['openai'],
+      only: ['openai'],
+      ignore: ['azure'],
+      sort: 'latency',
+      data_collection: 'deny',
+      zdr: true,
+      allow_fallbacks: false,
+      quantizations: ['int8'],
+      monkey: 'banana',
+      compass: 'north',
+      trespasses: 'none',
+      overpass: 'closed',
+      passage: 'open',
+      passthrough: 'none',
+    };
+
+    expect(redactProviderHints({ provider, providerOptions: undefined })).toEqual({
+      provider,
+      providerOptions: null,
+    });
+  });
+
   it('stops walking pathologically large arrays once the budget is exhausted', () => {
     const huge = Array.from({ length: 10_000 }, (_, index) => `entry-${index}`);
 
@@ -133,14 +380,14 @@ describe('classifier input normalization', () => {
 
   it('stops walking pathologically key-dense objects once the budget is exhausted', () => {
     const huge = Object.fromEntries(
-      Array.from({ length: 10_000 }, (_, index) => [`key-${index}`, index])
+      Array.from({ length: 10_000 }, (_, index) => [`field-${index}`, index])
     );
 
     const hints = redactProviderHints({ provider: huge, providerOptions: undefined });
     const provider = hints.provider as Record<string, unknown>;
 
     expect(Object.keys(provider).length).toBeLessThan(600);
-    expect(provider['key-0']).toBe(0);
+    expect(provider['field-0']).toBe(0);
     expect(provider['[truncated]']).toBe('[TRUNCATED]');
   });
 

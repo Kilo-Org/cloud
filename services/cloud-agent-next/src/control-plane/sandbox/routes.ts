@@ -1,3 +1,7 @@
+import {
+  environmentReferenceSchema,
+  type SessionEnvironmentReference,
+} from '../../environment-build/reference.js';
 import { eq } from 'drizzle-orm';
 import type { drizzle } from 'drizzle-orm/durable-sqlite';
 import {
@@ -12,13 +16,27 @@ import {
   type ControlPlaneRouteView,
   type ControlPlaneWorkspaceFailureSubtype,
 } from '../../shared/control-plane-protocol.js';
-import type { SessionCredentialGrant } from '../../sandbox-control/session-credentials.js';
+import {
+  SessionCredentialUpgradeRequiredError,
+  type SessionCredentialGrant,
+} from '../../sandbox-control/session-credentials.js';
 import { logControlDiagnostic } from '../../sandbox-control/diagnostics.js';
+import {
+  EnvironmentMemberCredentialError,
+  memberCredentialFailureStage,
+} from '../../sandbox-control/session-credential-members.js';
+import {
+  createGrantDiagnostic,
+  pickGrantDiagnosticFields,
+  type GrantDiagnostic,
+  type GrantDiagnosticSnapshot,
+} from '../../sandbox-control/grant-diagnostic.js';
 import { routes as routesTable } from './sqlite-schema.js';
 import type { SyncAcceptedHandleStorage } from './accepted-handles.js';
 import { lastSentHandleKey } from './scope-handle-delivery.js';
 import { readScopeGrant, removeScopeMember, scopeGrantId } from './scope-grants.js';
 import { admissionFailureStage } from './scope-handle-adoption.js';
+import { VercelScmContainmentError } from '../../scm-broker/vercel-identity.js';
 
 export type RouteDatabase = ReturnType<typeof drizzle>;
 
@@ -40,11 +58,10 @@ export type RouteRecord = {
   grant: RouteGrant | null;
   credentialSource: ControlPlaneCredentialSource | null;
   /**
-   * Names the repository snapshot this route may start from and capture. Computed
-   * from the input spec when the route is first prepared and kept across
-   * attempts, because the stored spec no longer has the input env.
+   * The repository environment the session admitted, for environment snapshot
+   * selection. DO-private like the credential source; kept across attempts.
    */
-  repoKey: string | null;
+  environment: SessionEnvironmentReference | null;
   state: RouteState;
   attemptId: string;
   attemptDeadlineAt: number;
@@ -55,6 +72,7 @@ export type RouteRecord = {
 export type RoutePreparationProgress = {
   step: ControlPlanePreparationStep;
   detail?: string;
+  snapshotCapturedAt?: number;
 };
 
 /** The grant outcome for a route attempt: a re-projected spec plus the grant. */
@@ -85,7 +103,9 @@ export type RouteContext = {
    */
   issueGrant: (
     spec: ControlPlaneRouteSpec,
-    source: ControlPlaneCredentialSource
+    source: ControlPlaneCredentialSource,
+    environment: SessionEnvironmentReference | null,
+    diagnostic?: GrantDiagnostic
   ) => Promise<RouteGrantIssue>;
   /**
    * Applies the provider credential policy for the current grants. Resolves
@@ -113,7 +133,10 @@ export function routeFromRow(db: RouteDatabase, row: RouteRow): RouteRecord {
       row.credential_source === null || row.credential_source === undefined
         ? null
         : controlPlaneCredentialSourceSchema.parse(JSON.parse(row.credential_source)),
-    repoKey: row.repo_key ?? null,
+    environment:
+      row.environment === null || row.environment === undefined
+        ? null
+        : environmentReferenceSchema.parse(JSON.parse(row.environment)),
     state: parseRouteState(row.state),
     attemptId: row.attempt_id,
     attemptDeadlineAt: row.attempt_deadline_at ?? 0,
@@ -128,7 +151,7 @@ function routeToRow(route: RouteRecord): typeof routesTable.$inferInsert {
     grant: route.grant === null ? null : scopeGrantId(route.grant),
     credential_source:
       route.credentialSource === null ? null : JSON.stringify(route.credentialSource),
-    repo_key: route.repoKey,
+    environment: route.environment === null ? null : JSON.stringify(route.environment),
     state: route.state,
     attempt_id: route.attemptId,
     attempt_deadline_at: route.attemptDeadlineAt,
@@ -143,14 +166,14 @@ export function newPreparingRoute(
   attemptDeadlineAt: number,
   grant: RouteGrant | null,
   credentialSource: ControlPlaneCredentialSource | null,
-  repoKey: string | null
+  environment: SessionEnvironmentReference | null
 ): RouteRecord {
   return {
     sessionId: spec.sessionId,
     spec,
     grant,
     credentialSource,
-    repoKey,
+    environment,
     state: 'preparing',
     attemptId,
     attemptDeadlineAt,
@@ -256,6 +279,10 @@ function redactRouteSpec(spec: ControlPlaneRouteSpec): ControlPlaneRouteSpec {
     ...(spec.branch === undefined ? {} : { branch: spec.branch }),
     ...(spec.branchMode === undefined ? {} : { branchMode: spec.branchMode }),
     ...(spec.setupCommands === undefined ? {} : { setupCommands: spec.setupCommands }),
+    ...(spec.startCommands === undefined ? {} : { startCommands: spec.startCommands }),
+    ...(spec.environmentSetupCommandCount === undefined
+      ? {}
+      : { environmentSetupCommandCount: spec.environmentSetupCommandCount }),
     attemptId: spec.attemptId,
   };
 }
@@ -265,7 +292,9 @@ export async function failRoute(
   spec: ControlPlaneRouteSpec,
   attemptId: string,
   reason: ControlPlaneFailureReason,
-  stage = 'route'
+  stage = 'route',
+  diagnostic?: GrantDiagnosticSnapshot,
+  subtype?: ControlPlaneWorkspaceFailureSubtype
 ): Promise<RouteRecord> {
   const existing = await readRoute(ctx.db, spec.sessionId);
   const route: RouteRecord = {
@@ -273,7 +302,7 @@ export async function failRoute(
     spec: redactRouteSpec(spec),
     grant: existing?.grant ?? null,
     credentialSource: existing?.credentialSource ?? null,
-    repoKey: null,
+    environment: existing?.environment ?? null,
     state: 'failed',
     attemptId,
     attemptDeadlineAt: 0,
@@ -285,8 +314,15 @@ export async function failRoute(
     attemptId,
     reason,
     stage,
+    subtype,
+    ...(diagnostic === undefined ? {} : pickGrantDiagnosticFields(diagnostic)),
   });
-  await ctx.notify(spec.sessionId, { state: 'failed', attemptId, reason });
+  await ctx.notify(spec.sessionId, {
+    state: 'failed',
+    attemptId,
+    reason,
+    ...(subtype === undefined ? {} : { subtype }),
+  });
   return route;
 }
 
@@ -311,11 +347,12 @@ export async function failCurrentAttempt(
   sessionId: string,
   attemptId: string,
   reason: ControlPlaneFailureReason,
-  stage = 'attempt'
+  stage = 'attempt',
+  subtype?: ControlPlaneWorkspaceFailureSubtype
 ): Promise<void> {
   const route = await readRoute(ctx.db, sessionId);
   if (!isCurrentPreparingAttempt(route, attemptId)) return;
-  await failRoute(ctx, route.spec, attemptId, reason, stage);
+  await failRoute(ctx, route.spec, attemptId, reason, stage, undefined, subtype);
 }
 
 /**
@@ -326,6 +363,28 @@ export async function failCurrentAttempt(
  * issuer must fail fast rather than hold the queue.
  */
 const ATTEMPT_POLICY_ATTEMPTS = 2;
+
+/**
+ * The failure reason and diagnostic stage for an error that grant issuance
+ * threw. A repository of the environment that cannot be accessed has its own
+ * reason, and its stage names the repository; the other errors keep the generic
+ * workspace failure with the caller's stage.
+ */
+export function grantIssueFailure(
+  error: unknown,
+  fallbackStage: string
+): { reason: ControlPlaneFailureReason; stage: string } {
+  if (error instanceof SessionCredentialUpgradeRequiredError) {
+    return { reason: 'credential_upgrade_required', stage: 'credential_upgrade_required' };
+  }
+  if (error instanceof EnvironmentMemberCredentialError) {
+    return { reason: 'repository_access_failed', stage: memberCredentialFailureStage(error) };
+  }
+  if (error instanceof VercelScmContainmentError) {
+    return { reason: error.reason, stage: admissionFailureStage(error, fallbackStage) };
+  }
+  return { reason: 'workspace_setup_failed', stage: admissionFailureStage(error, fallbackStage) };
+}
 
 /**
  * Starts and persists a new preparation attempt: the one place an attempt is
@@ -340,7 +399,7 @@ export async function startAttempt(
   ctx: RouteContext,
   spec: ControlPlaneRouteSpec,
   source: ControlPlaneCredentialSource | null,
-  repoKey: string | null
+  environment: SessionEnvironmentReference | null
 ): Promise<RouteRecord> {
   const attemptId = crypto.randomUUID();
   const attemptSpec: ControlPlaneRouteSpec = { ...spec, attemptId };
@@ -358,16 +417,19 @@ export async function startAttempt(
       'credential_source_missing'
     );
   }
+  const diagnostic = createGrantDiagnostic();
   let issued: RouteGrantIssue;
   try {
-    issued = await ctx.issueGrant(attemptSpec, source);
+    issued = await ctx.issueGrant(attemptSpec, source, environment, diagnostic);
   } catch (error) {
+    const failure = grantIssueFailure(error, 'credential_grant_failed');
     return failRoute(
       ctx,
       attemptSpec,
       attemptId,
-      'workspace_setup_failed',
-      admissionFailureStage(error, 'credential_grant_failed')
+      failure.reason,
+      failure.stage,
+      diagnostic.snapshot()
     );
   }
   const route = newPreparingRoute(
@@ -376,7 +438,7 @@ export async function startAttempt(
     ctx.now() + ctx.routePreparationMs,
     issued.grant,
     source,
-    repoKey
+    environment
   );
   for (let attempt = 1; attempt <= ATTEMPT_POLICY_ATTEMPTS; attempt += 1) {
     if (await ctx.applyPolicy(issued.grant)) {
@@ -403,13 +465,13 @@ export async function ensureRoute(
   ctx: RouteContext,
   spec: ControlPlaneRouteSpec,
   source: ControlPlaneCredentialSource | null,
-  repoKey: string | null
+  environment: SessionEnvironmentReference | null
 ): Promise<{ route: RouteRecord; started: boolean }> {
   const existing = await readRoute(ctx.db, spec.sessionId);
   if (existing !== null && existing.state !== 'failed') {
     return { route: existing, started: false };
   }
-  return { route: await startAttempt(ctx, spec, source, repoKey), started: true };
+  return { route: await startAttempt(ctx, spec, source, environment), started: true };
 }
 
 /** Ready routes after `hello`: a restart starts a new attempt, else re-notify. */
@@ -422,7 +484,7 @@ export async function onWrapperConnected(ctx: RouteContext, restarted: boolean):
         attemptId: route.attemptId,
         reason: 'agent_restarted',
       });
-      await startAttempt(ctx, route.spec, route.credentialSource, route.repoKey);
+      await startAttempt(ctx, route.spec, route.credentialSource, route.environment);
       continue;
     }
     if (route.state === 'ready') {
@@ -483,7 +545,7 @@ export async function failReadyRoutesForScope(
   }
 }
 
-/** Fail preparing routes whose 12-minute attempt deadline has passed. */
+/** Fail preparing routes whose preparation attempt deadline has passed. */
 export async function failExpiredRoutes(ctx: RouteContext): Promise<void> {
   const now = ctx.now();
   for (const route of await listRoutes(ctx.db)) {

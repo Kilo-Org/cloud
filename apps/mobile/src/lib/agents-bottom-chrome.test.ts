@@ -56,21 +56,21 @@ describe('getAgentsListBottomInset', () => {
 describe('getEmptyStateFullHeight', () => {
   it('builds the state from the app’s 14pt rem, not a 16pt one', () => {
     // bubble h-14 (49) + gap-4 (14) + text-lg line (24.5) + gap-1 (3.5) + a
-    // text-sm description line (17.5) + gap-4 (14) + the 44px action.
-    expect(getEmptyStateFullHeight({ descriptionLines: 1 })).toBe(167);
+    // text-sm description line (17.5) + gap-4 (14) + the 48px action.
+    expect(getEmptyStateFullHeight({ descriptionLines: 1 })).toBe(171);
   });
 
   it('reserves the two-line description the live empty state actually renders', () => {
     // `agents.sessionList.noSessionsYetDescription` is longer than one phone
     // line, so the state on screen is one text line taller.
-    expect(getEmptyStateFullHeight()).toBe(184);
+    expect(getEmptyStateFullHeight()).toBe(188);
     expect(getEmptyStateFullHeight({ descriptionLines: 2 })).toBeGreaterThan(
       getEmptyStateFullHeight({ descriptionLines: 1 })
     );
   });
 
   it('counts a title line as well as the description lines', () => {
-    expect(getEmptyStateFullHeight({ titleLines: 2 })).toBe(209);
+    expect(getEmptyStateFullHeight({ titleLines: 2 })).toBe(213);
     expect(getEmptyStateFullHeight({ titleLines: 2 })).toBeGreaterThan(
       getEmptyStateFullHeight({ titleLines: 1 })
     );
@@ -88,11 +88,20 @@ describe('getEmptyStateFullHeight', () => {
   });
 
   it('counts the live empty state’s stacked history link under the primary action', () => {
-    // The accepted-empty body renders the See-all history link under the New
-    // session button: a gap-3 block gap (10.5) plus one eyebrow line (17.5 at
-    // scale 1). A band that holds the single-action no-match state is then too
-    // short for the live one, and the estimate must say so.
-    expect(getEmptyStateFullHeight({ secondaryAction: true })).toBe(212);
+    // The accepted-empty body renders the history link under the New session
+    // button: a gap-3 block gap (10.5) plus the link's own box, which carries
+    // the platform touch target (44pt iOS, 48dp Android) as a px literal rather
+    // than a line of text. Modelling it as one 17.5 line under-counted the
+    // rendered control by 30dp and could keep the full form in a band that
+    // cannot hold it, leaving the link's target under the tab bar. A band that
+    // holds the single-action no-match state is then too short for the live
+    // one, and the estimate must say so.
+    expect(getEmptyStateFullHeight({ secondaryAction: true })).toBe(247);
+    // The gap plus the platform's target box, not one text line: the estimate
+    // has to carry the control's own frame.
+    expect(
+      getEmptyStateFullHeight({ secondaryAction: true }) - getEmptyStateFullHeight()
+    ).toBeGreaterThanOrEqual(58);
     expect(getEmptyStateFullHeight({ secondaryAction: true })).toBeGreaterThan(
       getEmptyStateFullHeight()
     );

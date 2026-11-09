@@ -6,7 +6,8 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./schemas": "./src/schemas.ts"
   },
   "scripts": {
     "typecheck": "tsgo --noEmit",
@@ -16,12 +17,12 @@
   "dependencies": {
     "@kilocode/app-shared": "workspace:*",
     "@kilocode/session-ingest-contracts": "workspace:*",
-    "i18next": "^26.3.6",
+    "i18next": "^26.4.7",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@typescript/native-preview": "catalog:",
     "typescript": "catalog:",
-    "vitest": "catalog:"
+    "vitest": "catalog:vitest5"
   }
 }

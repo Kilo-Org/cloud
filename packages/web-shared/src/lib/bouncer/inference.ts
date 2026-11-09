@@ -6,7 +6,7 @@ import { after, NextResponse, type NextRequest } from 'next/server';
 
 import { isCloudflareIP } from '@kilocode/web-shared/lib/cloudflare-ip';
 import {
-  isUserRateLimitedFeature,
+  isServerSideProductFeature,
   type FeatureValue,
 } from '@kilocode/web-shared/lib/feature-detection';
 import {
@@ -60,7 +60,7 @@ export function bareIpLiteral(value: string | undefined): string | undefined {
  * The signed-in IP to record where bouncer keys a payer (the usage ledger).
  * Shared Kilo infrastructure is dropped here.
  *
- * The server-side Kilo products (cloud-agent, code-review, app-builder, gastown)
+ * The server-side Kilo products (cloud-agent, code-review, gastown)
  * reach the gateway from Cloudflare Workers, so the first forwarded hop is a
  * Cloudflare address shared by many unrelated requests. Recording it for payer
  * sharing would let one account's traffic trip another payer's IP signal. No
@@ -73,7 +73,7 @@ export function payerSharingIp(
   ip: string | undefined,
   feature: FeatureValue | null
 ): string | undefined {
-  if (ip !== undefined && isUserRateLimitedFeature(feature) && isCloudflareIP(ip)) {
+  if (ip !== undefined && isServerSideProductFeature(feature) && isCloudflareIP(ip)) {
     return undefined;
   }
   return ip;

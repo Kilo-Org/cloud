@@ -47,16 +47,19 @@ const blank: Answer = { said: '', usage: undefined, first: 0, whole: 0 };
 const ask = (session: SessionHandle, text: string) =>
   Effect.suspend(() => {
     const started = performance.now();
-    return Stream.runFold(session.ask(text), blank, (held, event) =>
-      event.kind === 'delta'
-        ? {
-            ...held,
-            said: held.said + event.text,
-            first: held.first === 0 ? performance.now() - started : held.first,
-          }
-        : event.kind === 'done'
-          ? { ...held, usage: event.usage, whole: performance.now() - started }
-          : held
+    return Stream.runFold(
+      session.ask(text),
+      () => blank,
+      (held, event) =>
+        event.kind === 'delta'
+          ? {
+              ...held,
+              said: held.said + event.text,
+              first: held.first === 0 ? performance.now() - started : held.first,
+            }
+          : event.kind === 'done'
+            ? { ...held, usage: event.usage, whole: performance.now() - started }
+            : held
     );
   });
 
@@ -89,10 +92,10 @@ const preferred: readonly ApiKind[] = (process.env['KILO_KINDS']?.split(',') as
 const run = (model: string) =>
   converse(model, preferred).pipe(
     Effect.map(result => ({ model, kind: preferred[0] ?? 'messages', result })),
-    Effect.catchAll(first =>
+    Effect.catch(first =>
       converse(model, ['chat_completions']).pipe(
         Effect.map(result => ({ model, kind: 'chat_completions' as ApiKind, result })),
-        Effect.catchAll(second =>
+        Effect.catch(second =>
           Effect.succeed({ model, kind: 'failed' as const, errors: [first, second] })
         )
       )

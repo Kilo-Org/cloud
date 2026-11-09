@@ -2,12 +2,14 @@ import {
   GLANCEABLE_SNAPSHOT_EXPIRY_MS,
   GLANCEABLE_SNAPSHOT_SCHEMA_VERSION,
   type GlanceableAgentsSnapshot,
+  NO_GLANCEABLE_WORK,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
 import { clearHomeWidgetData } from './home-widget-data';
-import { getLastGlanceableSnapshot } from './persist';
+import { getGlanceableSnapshotForSignedInScope, getLastGlanceableSnapshot } from './persist';
 import { withStatus } from './publisher';
 import { forEachSink, getGlanceableDelivery, guardSink } from './sink-registry';
+import { recordWaitingAsk } from './waiting-ask';
 
 // Monotonic epoch bumped on every terminal blank (signed-out or privacy). The
 // publisher captures it at construction and refuses to emit once it advances,
@@ -84,12 +86,7 @@ function buildTerminalSnapshot(status: 'signed_out' | 'privacy'): GlanceableAgen
     scopeKey: `terminal:${status}`,
     organizationBound: false,
     status,
-    running: 0,
-    needsInput: 0,
-    idle: 0,
-    scheduled: 0,
-    needsInputSince: null,
-    scheduledAt: null,
+    ...NO_GLANCEABLE_WORK,
     // A terminal scope asserts nothing about work, so the newest-result fact is
     // blank with the counts.
     newestResultKind: null,
@@ -116,6 +113,11 @@ function writeTerminalAndEnd(status: 'signed_out' | 'privacy'): void {
   // Arm the publisher gate before any sink writes, so a cache success that
   // lands during this window can never emit for the torn-down session.
   terminalBlankEpoch += 1;
+  // The ask names a session and an organization of the scope that is ending.
+  // End it with that scope, in memory and in the mirror: the surfaces read the
+  // record at draw time, so a record left behind would keep naming the previous
+  // scope's session to whoever picks up the device next.
+  recordWaitingAsk(null);
   clearHomeWidgetData();
   // The scope cleanup also deletes the followed session card tokens.
   getGlanceableDelivery().cleanupTokens('scope');
@@ -159,7 +161,9 @@ export function confirmGlanceableOrgMembership(): void {
  * by the org fence when the org list errors: stale, not lost-org.
  */
 export function republishLastSnapshotStale(): void {
-  const previous = getLastGlanceableSnapshot();
+  // A restored record is drawn only for the scope signed in now: the surfaces
+  // never take another context's frame.
+  const previous = getGlanceableSnapshotForSignedInScope();
   if (previous === null) {
     return;
   }

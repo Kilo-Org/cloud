@@ -8,7 +8,7 @@ import { catalogSaying, emptyCatalog, options, run } from './session-fixture.js'
 
 it('raises the token ceiling for one question only', async () => {
   const { calls } = await run([{ deltas: ['x'] }], session =>
-    Effect.zipRight(
+    Effect.andThen(
       Stream.runDrain(session.ask('a', { maxTokens: 4096 })),
       Stream.runDrain(session.ask('b'))
     )
@@ -37,7 +37,7 @@ it('lets the session and then the question beat the catalog', async () => {
     Effect.provide(
       Effect.scoped(
         Effect.flatMap(openSession({ ...options, maxTokens: 512 }), session =>
-          Effect.zipRight(
+          Effect.andThen(
             Stream.runDrain(session.ask('a')),
             Stream.runDrain(session.ask('b', { maxTokens: 99 }))
           )

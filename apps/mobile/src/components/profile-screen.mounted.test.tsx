@@ -114,6 +114,7 @@ vi.mock('@/components/ui/icons', () => ({
   SlidersHorizontal: 'SlidersHorizontal',
   Smartphone: 'Smartphone',
   Trash2: 'Trash2',
+  Users: 'Users',
 }));
 vi.mock('@/components/profile-action-tile', () => ({ ActionTile: 'ActionTile' }));
 vi.mock('@/components/profile-credits-card', () => ({ CreditsCard: 'CreditsCard' }));

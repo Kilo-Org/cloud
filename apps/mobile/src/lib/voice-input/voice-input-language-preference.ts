@@ -21,7 +21,7 @@ const languageStore = createSecureStorePreference<string | null>({
 languageStore.preload();
 
 export function readVoiceInputLanguage(): string | null {
-  return languageStore.get();
+  return languageStore.getRequested();
 }
 
 export function writeVoiceInputLanguage(tag: string | null): void {

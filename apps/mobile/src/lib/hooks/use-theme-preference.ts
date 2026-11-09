@@ -34,7 +34,7 @@ export function applyThemePreference(pref: ThemePreference): void {
 
 /** The stored theme preference for callers with no React tree (the settings registry). */
 export function getThemePreference(): ThemePreference {
-  return store.get();
+  return store.getRequested();
 }
 
 export function setThemePreference(pref: ThemePreference): void {

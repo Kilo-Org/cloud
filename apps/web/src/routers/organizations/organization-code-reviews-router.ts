@@ -9,9 +9,14 @@ import {
   ensureOrganizationAccess,
 } from '@kilocode/web-shared/routers/organizations/utils';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
+import { isOrganizationMember } from '@kilocode/worker-utils/account-access';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
+import type { TRPCContext } from '@kilocode/web-shared/lib/trpc/init';
+import { recordElevatedOrganizationAdminAction } from '@/lib/admin/admin-action-audit';
 import {
+  getGitHubConnectionStatusForOwner,
   getIntegrationForOrganization,
-  updateIntegrationMetadata,
 } from '@/lib/integrations/db/platform-integrations';
 import {
   getAgentConfig,
@@ -28,6 +33,7 @@ import { fetchAllGitHubRepositoriesForOrganization } from '@/lib/cloud-agent/git
 import { fetchGitLabRepositoriesForOrganization } from '@/lib/cloud-agent/gitlab-integration-helpers';
 import { PRIMARY_DEFAULT_MODEL } from '@kilocode/web-shared/lib/ai-gateway/models';
 import { createDefaultCodeReviewConfig } from '@/lib/code-reviews/core/default-config';
+import { repositoryModeForPlatform } from '@/lib/code-reviews/core/repository-mode';
 import { isCouncilEntitledForOrganization } from '@/lib/code-reviews/core/council-entitlement';
 import {
   CodeReviewCouncilConfigSchema,
@@ -40,7 +46,11 @@ import {
   syncWebhooksForRepositories,
   type ConfiguredWebhook,
 } from '@/lib/integrations/platforms/gitlab/webhook-sync';
-import { getValidGitLabToken } from '@/lib/integrations/gitlab-service';
+import { mutateGitLabMetadata } from '@/lib/integrations/platforms/gitlab/metadata-mutation';
+import {
+  getValidGitLabToken,
+  isGitLabCredentialConnected,
+} from '@/lib/integrations/gitlab-service';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import {
   clearCodeReviewActionRequiredState,
@@ -57,6 +67,7 @@ import { getBitbucketCodeReviewerReadiness } from '@/lib/integrations/platforms/
 import {
   BitbucketCodeReviewWebhookConfigurationError,
   ensureBitbucketCodeReviewWorkspaceWebhook,
+  type BitbucketCodeReviewWebhookWorkspace,
 } from '@/lib/integrations/platforms/bitbucket/code-review-webhooks';
 import { cleanupBitbucketCodeReviewerForIntegration } from '@/lib/integrations/platforms/bitbucket/code-review-cleanup';
 import {
@@ -222,7 +233,9 @@ function requireRepositoryIdsForPlatform(
   return numericRepositoryIds.data;
 }
 
-function requireBitbucketWorkspace(readiness: BitbucketCodeReviewerReadiness) {
+function requireBitbucketWorkspace(
+  readiness: BitbucketCodeReviewerReadiness
+): BitbucketCodeReviewWebhookWorkspace {
   if (!readiness.connected || !readiness.integrationId || !readiness.workspace) {
     throw new TRPCError({
       code: 'PRECONDITION_FAILED',
@@ -336,8 +349,7 @@ function manualBitbucketCodeReviewErrorCode(error: ManualBitbucketCodeReviewTrig
 
 async function ensureBitbucketWorkspaceWebhook(input: {
   organizationId: string;
-  currentManagerId: string;
-  workspace: ReturnType<typeof requireBitbucketWorkspace>;
+  workspace: BitbucketCodeReviewWebhookWorkspace;
 }): Promise<void> {
   let result;
   try {
@@ -362,6 +374,17 @@ async function ensureBitbucketWorkspaceWebhook(input: {
   }
 }
 
+// The rotated secret is returned to the caller, so an elevated admin rotation
+// is recorded durably. The secret itself is never logged.
+async function recordGitLabSecretRotation(ctx: TRPCContext, organizationId: string) {
+  await recordElevatedOrganizationAdminAction(ctx, {
+    organizationId,
+    requiredRoles: ORGANIZATION_BILLING_ROLES,
+    action: 'organization.gitlab_webhook_secret.rotate',
+    message: 'Rotated GitLab webhook secret (new secret returned to the caller)',
+  });
+}
+
 export const organizationReviewAgentRouter = createTRPCRouter({
   createManualReviewJob: organizationMemberMutationProcedure
     .input(CreateManualReviewJobInputSchema)
@@ -377,6 +400,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
           thinkingEffort: input.thinkingEffort,
           instructions: input.instructions,
           council: input.council,
+          operationKey: input.operationKey,
         },
       });
     }),
@@ -441,27 +465,12 @@ export const organizationReviewAgentRouter = createTRPCRouter({
 
   /**
    * Gets the GitHub App installation status
-   * (Replaces getGitHubStatus - now checks for GitHub App instead of OAuth)
    */
   getGitHubStatus: organizationMemberProcedure.query(async ({ input }) => {
-    const integration = await getIntegrationForOrganization(input.organizationId, 'github');
-
-    if (!isPlatformIntegrationHealthy(integration)) {
-      return {
-        connected: false,
-        integration: null,
-      };
-    }
-
-    return {
-      connected: true,
-      integration: {
-        accountLogin: integration.platform_account_login,
-        repositorySelection: integration.repository_access,
-        installedAt: integration.installed_at,
-        isValid: true,
-      },
-    };
+    return await getGitHubConnectionStatusForOwner({
+      type: 'org',
+      id: input.organizationId,
+    });
   }),
 
   /**
@@ -483,12 +492,51 @@ export const organizationReviewAgentRouter = createTRPCRouter({
   /**
    * Gets the GitLab OAuth integration status for organization
    */
-  getGitLabStatus: organizationMemberProcedure.query(async ({ input }) => {
+  getGitLabStatus: organizationMemberProcedure.query(async ({ input, ctx }) => {
     const integration = await getIntegrationForOrganization(input.organizationId, PLATFORM.GITLAB);
+
+    // An existing row that cannot serve a review is a different state from
+    // "never connected": the organization already authorized this integration,
+    // so the connect gate must explain that the connection has to be
+    // re-authorized instead of asking for a first-time connect that was
+    // already completed. Mirrors the personal read.
+    if (!integration) {
+      return {
+        connected: false,
+        reconnectRequired: false,
+        integration: null,
+      };
+    }
 
     if (!isPlatformIntegrationHealthy(integration)) {
       return {
         connected: false,
+        reconnectRequired: true,
+        integration: null,
+      };
+    }
+
+    // The row being healthy says nothing about the stored credential. Ask the
+    // token service to resolve it, exactly as a review read would, so an
+    // expired or revoked credential reports as not connected instead of
+    // sending the settings surface into review-only content.
+    //
+    // The broker authorizes only a direct member of the integration's
+    // organization, so this consult runs for direct members only. Kilo admins
+    // and parent-organization role holders (no membership row) keep the
+    // row-based answer — the broker would refuse them as not_connected and
+    // fake a broken connection for a healthy organization.
+    const isDirectMember = await isOrganizationMember(db, input.organizationId, ctx.user.id);
+    if (
+      isDirectMember &&
+      !(await isGitLabCredentialConnected(integration, {
+        userId: ctx.user.id,
+        organizationId: input.organizationId,
+      }))
+    ) {
+      return {
+        connected: false,
+        reconnectRequired: true,
         integration: null,
       };
     }
@@ -502,11 +550,11 @@ export const organizationReviewAgentRouter = createTRPCRouter({
 
     return {
       connected: true,
+      reconnectRequired: false,
       integration: {
         accountLogin: integration.platform_account_login,
         repositorySelection: integration.repository_access,
         installedAt: integration.installed_at,
-        isValid: true,
         instanceUrl: (metadata?.gitlab_instance_url as string) || 'https://gitlab.com',
       },
     };
@@ -537,6 +585,11 @@ export const organizationReviewAgentRouter = createTRPCRouter({
     .query(async ({ input }) => {
       const platform = input.platform ?? 'github';
       const config = await getAgentConfig(input.organizationId, 'code_review', platform);
+      // GitLab has no 'all' repository mode either: the webhook handler reviews
+      // only selected or manually added projects, so neither the stored value
+      // nor the default may report 'all' for it.
+      const isBitbucket = platform === PLATFORM.BITBUCKET;
+      const isGitLab = platform === PLATFORM.GITLAB;
 
       if (!config) {
         // Return default configuration
@@ -549,7 +602,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
           thinkingEffort: null satisfies string | null,
           gateThreshold: 'off' as const,
           repositorySelectionMode:
-            platform === 'bitbucket' ? ('selected' as const) : ('all' as const),
+            isBitbucket || isGitLab ? ('selected' as const) : ('all' as const),
           selectedRepositoryIds: [],
           manuallyAddedRepositories: [],
           repositoryModelOverrides: [],
@@ -563,7 +616,6 @@ export const organizationReviewAgentRouter = createTRPCRouter({
       }
 
       const cfg = config.config as CodeReviewAgentConfig;
-      const isBitbucket = platform === PLATFORM.BITBUCKET;
       const selectedRepositoryIds = isBitbucket
         ? (cfg.selected_repository_ids ?? []).filter(
             (repositoryId): repositoryId is string => typeof repositoryId === 'string'
@@ -579,9 +631,8 @@ export const organizationReviewAgentRouter = createTRPCRouter({
         modelSlug: cfg.model_slug || PRIMARY_DEFAULT_MODEL,
         thinkingEffort: cfg.thinking_effort ?? null,
         gateThreshold: isBitbucket ? ('off' as const) : (cfg.gate_threshold ?? 'off'),
-        repositorySelectionMode: isBitbucket
-          ? ('selected' as const)
-          : cfg.repository_selection_mode || 'all',
+        repositorySelectionMode:
+          isBitbucket || isGitLab ? ('selected' as const) : cfg.repository_selection_mode || 'all',
         selectedRepositoryIds,
         manuallyAddedRepositories: isBitbucket ? [] : cfg.manually_added_repositories || [],
         repositoryModelOverrides: (cfg.repository_model_overrides ?? [])
@@ -616,6 +667,13 @@ export const organizationReviewAgentRouter = createTRPCRouter({
         const platform = input.platform ?? 'github';
         const isBitbucket = platform === PLATFORM.BITBUCKET;
 
+        // GitLab code review has no 'all' repository mode: the webhook handler
+        // reviews only selected or manually added projects. The same rule settles
+        // the stored mode and the GitLab hook-sync decision below.
+        const repositorySelectionMode = isBitbucket
+          ? 'selected'
+          : repositoryModeForPlatform(platform, input.repositorySelectionMode);
+
         const previousConfig = await getAgentConfig(input.organizationId, 'code_review', platform);
         const previousRepoIds =
           (previousConfig?.config as CodeReviewAgentConfig | undefined)?.selected_repository_ids ||
@@ -632,7 +690,6 @@ export const organizationReviewAgentRouter = createTRPCRouter({
           if (previousConfig?.is_enabled) {
             await ensureBitbucketWorkspaceWebhook({
               organizationId: input.organizationId,
-              currentManagerId: ctx.user.id,
               workspace,
             });
           }
@@ -682,9 +739,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
             model_slug: input.modelSlug,
             thinking_effort: input.thinkingEffort ?? null,
             gate_threshold: isBitbucket ? 'off' : (input.gateThreshold ?? 'off'),
-            repository_selection_mode: isBitbucket
-              ? 'selected'
-              : input.repositorySelectionMode || 'all',
+            repository_selection_mode: repositorySelectionMode,
             selected_repository_ids: selectedRepositoryIds,
             manually_added_repositories: isBitbucket ? [] : input.manuallyAddedRepositories || [],
             repository_model_overrides: repositoryModelOverrides,
@@ -705,7 +760,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
         if (
           platform === PLATFORM.GITLAB &&
           input.autoConfigureWebhooks !== false &&
-          input.repositorySelectionMode === 'selected'
+          repositorySelectionMode === 'selected'
         ) {
           const integration = await getIntegrationForOrganization(
             input.organizationId,
@@ -742,11 +797,10 @@ export const organizationReviewAgentRouter = createTRPCRouter({
                   instanceUrl
                 );
 
-                // Update integration metadata with new webhook configuration
-                const existingMetadata = (integration.metadata as Record<string, unknown>) || {};
-                await updateIntegrationMetadata(integration.id, {
-                  ...existingMetadata,
-                  configured_webhooks: updatedWebhooks,
+                // Merge the new webhook configuration, so a writer that changed
+                // another metadata key meanwhile keeps its value.
+                await mutateGitLabMetadata(integration.id, {
+                  set: { configured_webhooks: updatedWebhooks },
                 });
 
                 webhookSyncResult = {
@@ -1094,10 +1148,8 @@ export const organizationReviewAgentRouter = createTRPCRouter({
                   instanceUrl
                 );
 
-                const existingMetadata = (integration.metadata as Record<string, unknown>) || {};
-                await updateIntegrationMetadata(integration.id, {
-                  ...existingMetadata,
-                  configured_webhooks: updatedWebhooks,
+                await mutateGitLabMetadata(integration.id, {
+                  set: { configured_webhooks: updatedWebhooks },
                 });
 
                 webhookSyncResult = {
@@ -1211,7 +1263,6 @@ export const organizationReviewAgentRouter = createTRPCRouter({
           }
           await ensureBitbucketWorkspaceWebhook({
             organizationId: input.organizationId,
-            currentManagerId: ctx.user.id,
             workspace,
           });
 
@@ -1255,7 +1306,6 @@ export const organizationReviewAgentRouter = createTRPCRouter({
           if (readiness.integrationId) {
             await cleanupBitbucketCodeReviewerForIntegration({
               organizationId: input.organizationId,
-              currentManagerId: ctx.user.id,
               integrationId: readiness.integrationId,
               workspace: readiness.workspace,
             });
@@ -1352,9 +1402,8 @@ export const organizationReviewAgentRouter = createTRPCRouter({
       // If no Kilo-managed webhooks are configured, skip the network
       // round-trip entirely and just persist + return the new secret.
       if (Object.keys(configuredWebhooks).length === 0) {
-        await updateIntegrationMetadata(integration.id, {
-          ...existingMetadata,
-          webhook_secret: newSecret,
+        await mutateGitLabMetadata(integration.id, {
+          set: { webhook_secret: newSecret },
         });
         await createAuditLog({
           organization_id: organizationId,
@@ -1364,6 +1413,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
           actor_name: ctx.user.google_user_name,
           message: 'Rotated GitLab webhook secret (no Kilo-managed webhooks to re-sync)',
         });
+        await recordGitLabSecretRotation(ctx, organizationId);
         return {
           webhookSecret: newSecret,
           webhookSync: {
@@ -1437,10 +1487,8 @@ export const organizationReviewAgentRouter = createTRPCRouter({
         };
       }
 
-      await updateIntegrationMetadata(integration.id, {
-        ...existingMetadata,
-        webhook_secret: newSecret,
-        configured_webhooks: updatedWebhooks,
+      await mutateGitLabMetadata(integration.id, {
+        set: { webhook_secret: newSecret, configured_webhooks: updatedWebhooks },
       });
 
       await createAuditLog({
@@ -1452,6 +1500,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
         message: `Rotated GitLab webhook secret (webhooks: ${webhookSyncResult.updated} updated, ${webhookSyncResult.errors.length} errors)`,
       });
 
+      await recordGitLabSecretRotation(ctx, organizationId);
       return {
         webhookSecret: newSecret,
         webhookSync: webhookSyncResult,

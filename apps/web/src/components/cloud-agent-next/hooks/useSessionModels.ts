@@ -4,6 +4,7 @@ import {
   isRemoteModelRecommended,
   modelRefsEqual,
   sortRemoteModelCatalogProviders,
+  type CloudAgentModelOverride,
   type FetchedSessionData,
   type ModelRef,
   type ModelSelection,
@@ -16,7 +17,9 @@ import {
   buildContextLengthByProviderAndModel,
   type ContextLengthByProviderAndModel,
 } from '../model-context-lengths';
+import { toKnownModel, withKnownModel, type KnownModel } from '../known-models';
 import { useOrganizationModels } from './useOrganizationModels';
+import { useRememberKnownModel } from './useRememberKnownModel';
 
 type ActiveSessionType = ResolvedSession['type'];
 
@@ -42,6 +45,7 @@ type BuildSessionModelsInput = {
   remoteModelState: RemoteModelState;
   observedModel: ModelSelection | null;
   remoteModelOverride: RemoteModelOverride | null;
+  cloudAgentModelOverride?: CloudAgentModelOverride | null;
   gatewayModels: ModelOption[];
   gatewayModelsLoading: boolean;
   gatewayModelId?: string;
@@ -56,6 +60,8 @@ type UseSessionModelsInput = Omit<
   fetchedSessionData: Pick<FetchedSessionData, 'organizationId'> | null;
   routeOrganizationId?: string;
   sessionIdFromParams: string | null;
+  knownModels: readonly KnownModel[];
+  currentUserId?: string;
 };
 
 type SessionModels = {
@@ -100,12 +106,14 @@ export function useSessionModels(input: UseSessionModelsInput): UseSessionModels
     remoteModelState,
     observedModel,
     remoteModelOverride,
-    gatewayModelId,
-    gatewayVariant,
+    cloudAgentModelOverride,
     fetchedSessionData,
     routeOrganizationId,
     sessionIdFromParams,
+    knownModels,
+    currentUserId,
   } = input;
+  const { model: gatewayModelId, variant: gatewayVariant } = cloudAgentSelection(input);
   const gatewayOrganization = resolveGatewayOrganization(
     fetchedSessionData,
     routeOrganizationId,
@@ -116,6 +124,49 @@ export function useSessionModels(input: UseSessionModelsInput): UseSessionModels
     gatewayOrganization.organizationId,
     usesGateway && gatewayOrganization.resolved
   );
+  const catalogLoaded = gatewayOrganization.resolved && !gatewayModels.isLoadingModels;
+  // A remote session's model comes from its CLI, not from the composer settings.
+  const usesComposerModel = activeSessionType !== 'remote';
+  const catalog = useMemo(
+    () =>
+      withKnownModel(
+        {
+          modelOptions: gatewayOrganization.resolved ? gatewayModels.modelOptions : [],
+          isLoadingModels: !catalogLoaded,
+          contextLengthByModelId: gatewayModels.contextLengthByModelId,
+        },
+        usesComposerModel ? knownModels : [],
+        gatewayModelId
+      ),
+    [
+      catalogLoaded,
+      gatewayModelId,
+      gatewayModels.contextLengthByModelId,
+      gatewayModels.modelOptions,
+      gatewayOrganization.resolved,
+      knownModels,
+      usesComposerModel,
+    ]
+  );
+  const selectedCatalogModel = useMemo(() => {
+    const option =
+      catalogLoaded && usesComposerModel
+        ? gatewayModels.modelOptions.find(model => model.id === gatewayModelId)
+        : undefined;
+    return option
+      ? toKnownModel(option, gatewayModels.contextLengthByModelId.get(option.id))
+      : null;
+  }, [
+    catalogLoaded,
+    gatewayModelId,
+    gatewayModels.contextLengthByModelId,
+    gatewayModels.modelOptions,
+    usesComposerModel,
+  ]);
+  useRememberKnownModel(knownModels, selectedCatalogModel, {
+    userId: currentUserId,
+    organizationId: routeOrganizationId,
+  });
   const models = useMemo(
     () =>
       buildSessionModels({
@@ -123,19 +174,19 @@ export function useSessionModels(input: UseSessionModelsInput): UseSessionModels
         remoteModelState,
         observedModel,
         remoteModelOverride,
-        gatewayModels: gatewayOrganization.resolved ? gatewayModels.modelOptions : [],
-        gatewayModelsLoading: gatewayModels.isLoadingModels || !gatewayOrganization.resolved,
+        cloudAgentModelOverride,
+        gatewayModels: catalog.modelOptions,
+        gatewayModelsLoading: catalog.isLoadingModels,
         gatewayModelId,
         gatewayVariant,
         gatewayOrganizationId: gatewayOrganization.organizationId,
       }),
     [
       activeSessionType,
+      catalog,
+      cloudAgentModelOverride,
       gatewayModelId,
-      gatewayModels.isLoadingModels,
-      gatewayModels.modelOptions,
       gatewayOrganization.organizationId,
-      gatewayOrganization.resolved,
       gatewayVariant,
       observedModel,
       remoteModelOverride,
@@ -152,7 +203,7 @@ export function useSessionModels(input: UseSessionModelsInput): UseSessionModels
 
   return {
     ...models,
-    gatewayContextLengthByModelId: gatewayModels.contextLengthByModelId,
+    gatewayContextLengthByModelId: catalog.contextLengthByModelId,
     remoteContextLengthByProviderAndModel,
   };
 }
@@ -168,18 +219,44 @@ export function buildSessionModels(input: BuildSessionModelsInput): SessionModel
     return buildUnavailableRemoteModels(input);
   }
 
-  const selectedOption = input.gatewayModels.find(model => model.id === input.gatewayModelId);
+  const selection = cloudAgentSelection(input);
+  const selectedOption = input.gatewayModels.find(model => model.id === selection.model);
 
   return {
     source: 'cloud-agent-gateway',
     modelOptions: input.gatewayModels,
-    selectedValue: input.gatewayModelId,
-    selectedVariant: input.gatewayVariant ?? undefined,
+    selectedValue: selection.model,
+    selectedVariant:
+      selection.variant && selectedOption?.variants?.includes(selection.variant)
+        ? selection.variant
+        : undefined,
     availableVariants: selectedOption?.variants ?? [],
     modelPickerDisabled: false,
     isLoadingModels: input.gatewayModelsLoading,
     gatewayOrganizationId: input.gatewayOrganizationId,
   };
+}
+
+function cloudAgentSelection(
+  input: Pick<
+    BuildSessionModelsInput,
+    | 'activeSessionType'
+    | 'cloudAgentModelOverride'
+    | 'observedModel'
+    | 'gatewayModelId'
+    | 'gatewayVariant'
+  >
+) {
+  if (input.activeSessionType !== 'remote') {
+    if (input.cloudAgentModelOverride) return input.cloudAgentModelOverride;
+    if (input.observedModel?.model.providerID === 'kilo') {
+      return {
+        model: input.observedModel.model.modelID,
+        variant: input.observedModel.variant,
+      };
+    }
+  }
+  return { model: input.gatewayModelId, variant: input.gatewayVariant };
 }
 
 function buildUnavailableRemoteModels(input: BuildSessionModelsInput): SessionModels {

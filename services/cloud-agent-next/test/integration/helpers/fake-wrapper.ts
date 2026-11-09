@@ -1,6 +1,13 @@
 import {
+  RUNTIME_HARNESS_HEADER,
+  WORKSPACE_CONFIGURATION_HEADER,
+  WORKSPACE_CONFIGURATION_VERSION,
   WORKTREE_RUNTIME_HEADER,
   WORKTREE_RUNTIME_VERSION,
+} from '../../../src/shared/control-plane-runtime-contract.js';
+import {
+  KILO_CLI_VERSION_HEADER,
+  WRAPPER_VERSION_HEADER,
 } from '../../../src/shared/control-plane-runtime-contract.js';
 import { SELF } from 'cloudflare:test';
 import {
@@ -14,6 +21,11 @@ export type FakeWrapperConnectInput = {
   credential: string;
   path?: string;
   runtimeContract?: 'legacy' | 'worktree';
+  workspaceConfiguration?: boolean;
+  /** Raw `x-kilo-runtime-harness` value, so a test can also send an unknown one. */
+  runtimeHarness?: string;
+  kiloCliVersion?: string;
+  wrapperVersion?: string;
 };
 
 export type FakeWrapperHelloInput = {
@@ -21,6 +33,17 @@ export type FakeWrapperHelloInput = {
   allocationId: string;
   protocolVersion?: number;
   redactsNamedSecrets?: boolean;
+  installsSkillsSh?: boolean;
+  workspaceSnapshots?: boolean;
+  /** The retired capability sent by wrappers built before workspace snapshots. */
+  sessionSnapshots?: boolean;
+  startCommands?: boolean;
+};
+
+export type FakeNativeEvent = {
+  type: string;
+  properties: Record<string, unknown>;
+  timestamp?: string;
 };
 
 /**
@@ -32,6 +55,8 @@ export class FakeWrapper {
   private readonly messages: ControlPlaneWrapperFrame[] = [];
   private readonly frameWaiters: Array<(frame: ControlPlaneWrapperFrame | null) => void> = [];
   private readonly closeWaiters: Array<(code: number) => void> = [];
+  private readonly listeners = new Set<(frame: ControlPlaneWrapperFrame) => void>();
+  private readonly unparsed: string[] = [];
   private closeCode: number | null = null;
   private received = 0;
 
@@ -42,9 +67,13 @@ export class FakeWrapper {
       try {
         frame = controlPlaneWrapperFrameSchema.parse(JSON.parse(text));
       } catch {
+        // A frame the Worker produced outside the protocol would otherwise
+        // vanish. Keep it so a test can assert the Worker never did that.
+        this.unparsed.push(text);
         return;
       }
       this.received += 1;
+      for (const listener of this.listeners) listener(frame);
       const waiter = this.frameWaiters.shift();
       if (waiter) waiter(frame);
       else this.messages.push(frame);
@@ -67,6 +96,18 @@ export class FakeWrapper {
         ...(input.runtimeContract === 'legacy'
           ? {}
           : { [WORKTREE_RUNTIME_HEADER]: WORKTREE_RUNTIME_VERSION }),
+        ...(input.workspaceConfiguration
+          ? { [WORKSPACE_CONFIGURATION_HEADER]: WORKSPACE_CONFIGURATION_VERSION }
+          : {}),
+        ...(input.runtimeHarness === undefined
+          ? {}
+          : { [RUNTIME_HARNESS_HEADER]: input.runtimeHarness }),
+        ...(input.kiloCliVersion === undefined
+          ? {}
+          : { [KILO_CLI_VERSION_HEADER]: input.kiloCliVersion }),
+        ...(input.wrapperVersion === undefined
+          ? {}
+          : { [WRAPPER_VERSION_HEADER]: input.wrapperVersion }),
       },
     });
     if (response.status !== 101 || !response.webSocket) {
@@ -83,6 +124,24 @@ export class FakeWrapper {
   /** How many frames this wrapper has received, consumed or queued. */
   receivedFrames(): number {
     return this.received;
+  }
+
+  /** Raw frames the Worker sent that did not match the protocol schema. */
+  unparsedFrames(): readonly string[] {
+    return [...this.unparsed];
+  }
+
+  /** Observe every parsed inbound frame without consuming the queue. */
+  onFrame(listener: (frame: ControlPlaneWrapperFrame) => void): () => void {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
+  /** Pushes one native event batch for a session, as the real wrapper does. */
+  sendSessionEvents(sessionId: string, events: readonly FakeNativeEvent[]): void {
+    this.send({ type: 'session.events', sessionId, events });
   }
 
   sendRaw(data: string): void {
@@ -131,6 +190,10 @@ export class FakeWrapper {
       allocationId: input.allocationId,
       protocolVersion: input.protocolVersion ?? CONTROL_PLANE_PROTOCOL_VERSION,
       ...(input.redactsNamedSecrets ? { redactsNamedSecrets: true } : {}),
+      ...(input.installsSkillsSh ? { installsSkillsSh: true } : {}),
+      ...(input.workspaceSnapshots ? { workspaceSnapshots: true } : {}),
+      ...(input.sessionSnapshots ? { sessionSnapshots: true } : {}),
+      ...(input.startCommands ? { startCommands: true } : {}),
     });
     return this.next();
   }

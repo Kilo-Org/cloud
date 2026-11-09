@@ -1,9 +1,11 @@
 import * as SecureStore from '@/lib/auth/secure-store';
 
 import { API_BASE_URL } from '@/lib/config';
+import { clearAttestKeyOnRefusal, getAdmission } from '@/lib/auth/admission';
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { persistSignInCredentialsAtEpoch } from '@/lib/auth/credentials';
-import { parseTokenPair } from '@/lib/auth/native-auth-contract';
+import { parseAuthError, parseTokenPair } from '@/lib/auth/native-auth-contract';
+import { buildClientMetadataHeaders } from '@/lib/client-metadata';
 import { AUTH_TOKEN_KEY, LEGACY_EXCHANGE_DONE_KEY } from '@/lib/storage-keys';
 
 export async function exchangeLegacyToken(): Promise<{
@@ -37,15 +39,41 @@ export async function exchangeLegacyToken(): Promise<{
       return null;
     }
 
+    // The exchange issues device credentials, so it needs the same attestation
+    // the sign-in exchange does. Fetch the proof after the epoch check so a
+    // superseded sign-in never spends a challenge.
+    const admission = await getAdmission().catch(() => null);
+    if (!admission) {
+      // This device cannot attest, so the exchange cannot succeed. It costs
+      // nothing to retry next launch — no challenge is requested for a device
+      // without capability — so do not write a permanent marker that would
+      // outlive a build-configuration fix.
+      return null;
+    }
+
+    if (!isCurrentAuthEpoch(epoch)) {
+      return null;
+    }
+
     const response = await fetch(`${API_BASE_URL}/api/auth/native/exchange`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
+        // The exchange route stores the request user agent on the new device
+        // session row; without this the row records the HTTP client default.
+        ...buildClientMetadataHeaders(),
       },
+      body: JSON.stringify({ admission }),
     });
 
     if (!response.ok) {
+      // A refusal can name a key the server does not know, for example when a
+      // first exchange verified but its response was lost. Drop the stored key
+      // id so the next launch attests again instead of replaying an assertion
+      // the server can never accept.
+      const refused: unknown = await response.json().catch(() => undefined);
+      await clearAttestKeyOnRefusal(parseAuthError(refused)?.code);
       // One-time exchange failure: retain old token, do not set the done
       // marker. Retry on the next app launch.
       return null;

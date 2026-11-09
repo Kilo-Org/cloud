@@ -1,16 +1,16 @@
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { getSecurityAgentRepositorySyncState } from '@kilocode/db';
 import { security_findings, agent_configs } from '@kilocode/db/schema';
-import { eq, and, desc, count, sql, max, or, type SQL } from 'drizzle-orm';
+import { eq, and, desc, count, sql, max, or, inArray, type SQL } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
-import type { SecurityFinding, NewSecurityFinding } from '@kilocode/db/schema';
+import type { SecurityFinding } from '@kilocode/db/schema';
 import {
   SecurityAuditLogAction,
   SecurityFindingAuditSourceContext,
 } from '@kilocode/db/schema-types';
 import {
   deriveSecurityFindingAuditEventKey,
-  insertSecurityFindingAuditEvent,
+  insertSecurityFindingAuditEvents,
   type SecurityFindingAuditHumanActor,
   type SecurityFindingAuditOwner,
 } from '@kilocode/worker-utils/security-finding-audit';
@@ -730,41 +730,6 @@ export async function getSecurityFindingsSummary(params: {
   }
 }
 
-export async function updateSecurityFindingStatus(
-  findingId: string,
-  status: SecurityFindingStatus,
-  updates: {
-    ignoredReason?: string;
-    ignoredBy?: string;
-    fixedAt?: Date;
-  } = {}
-): Promise<void> {
-  try {
-    const updateData: Partial<NewSecurityFinding> = {
-      status,
-      updated_at: new Date().toISOString(),
-    };
-
-    if (updates.ignoredReason !== undefined) {
-      updateData.ignored_reason = updates.ignoredReason;
-    }
-    if (updates.ignoredBy !== undefined) {
-      updateData.ignored_by = updates.ignoredBy;
-    }
-    if (updates.fixedAt !== undefined) {
-      updateData.fixed_at = updates.fixedAt.toISOString();
-    }
-
-    await db.update(security_findings).set(updateData).where(eq(security_findings.id, findingId));
-  } catch (error) {
-    captureException(error, {
-      tags: { operation: 'updateSecurityFindingStatus' },
-      extra: { findingId, status, updates },
-    });
-    throw error;
-  }
-}
-
 export async function getRepositoriesWithFindings(owner: SecurityReviewOwner): Promise<string[]> {
   try {
     const ownerConverted = toOwner(owner);
@@ -784,34 +749,6 @@ export async function getRepositoriesWithFindings(owner: SecurityReviewOwner): P
     captureException(error, {
       tags: { operation: 'getRepositoriesWithFindings' },
       extra: { owner },
-    });
-    throw error;
-  }
-}
-
-export async function findSecurityFindingBySource(
-  repoFullName: string,
-  source: string,
-  sourceId: string
-): Promise<SecurityFinding | null> {
-  try {
-    const [finding] = await db
-      .select()
-      .from(security_findings)
-      .where(
-        and(
-          eq(security_findings.repo_full_name, repoFullName),
-          eq(security_findings.source, source),
-          eq(security_findings.source_id, sourceId)
-        )
-      )
-      .limit(1);
-
-    return finding || null;
-  } catch (error) {
-    captureException(error, {
-      tags: { operation: 'findSecurityFindingBySource' },
-      extra: { repoFullName, source, sourceId },
     });
     throw error;
   }
@@ -924,6 +861,10 @@ export async function getOrphanedRepositoriesWithFindingCounts(params: {
   }
 }
 
+/** Findings selected, audited, and deleted per round trip. Keeps memory bounded and
+ * keeps each audit insert inside PostgreSQL's bind-parameter limit. */
+export const DELETE_FINDINGS_CHUNK_SIZE = 500;
+
 export async function deleteFindingsByRepository(params: {
   owner: SecurityReviewOwner;
   repoFullName: string;
@@ -946,38 +887,62 @@ export async function deleteFindingsByRepository(params: {
     const ownerForAudit = toSecurityFindingAuditOwner(ownerConverted);
     const ownerKeyPart = ownerAuditKeyPart(ownerConverted);
 
+    // One transaction for the whole delete: either every finding of the repository
+    // is removed with its audit event, or none is. Findings are processed in chunks
+    // so memory stays bounded and the audit trail costs one insert per chunk instead
+    // of one awaited insert per finding.
     const deletedCount = await db.transaction(async tx => {
-      const findings = await tx
-        .select()
-        .from(security_findings)
-        .where(and(...conditions));
       const occurredAt = new Date().toISOString();
+      let deleted = 0;
 
-      for (const finding of findings) {
-        await insertSecurityFindingAuditEvent(tx, {
-          owner: ownerForAudit,
-          finding,
-          actor: params.actor,
-          action: SecurityAuditLogAction.FindingDeleted,
-          occurredAt,
-          eventKey: deriveSecurityFindingAuditEventKey([
-            ownerKeyPart,
-            finding.id,
-            SecurityAuditLogAction.FindingDeleted,
-          ]),
-          sourceContext: SecurityFindingAuditSourceContext.Web,
-          beforeState: { status: finding.status },
-          afterState: { deleted: true },
-          metadata: { repo_full_name: repoFullName },
-        });
+      for (;;) {
+        const findings = await tx
+          .select()
+          .from(security_findings)
+          .where(and(...conditions))
+          .limit(DELETE_FINDINGS_CHUNK_SIZE);
+
+        if (findings.length === 0) break;
+
+        await insertSecurityFindingAuditEvents(
+          tx,
+          findings.map(finding => ({
+            owner: ownerForAudit,
+            finding,
+            actor: params.actor,
+            action: SecurityAuditLogAction.FindingDeleted,
+            occurredAt,
+            eventKey: deriveSecurityFindingAuditEventKey([
+              ownerKeyPart,
+              finding.id,
+              SecurityAuditLogAction.FindingDeleted,
+            ]),
+            sourceContext: SecurityFindingAuditSourceContext.Web,
+            beforeState: { status: finding.status },
+            afterState: { deleted: true },
+            metadata: { repo_full_name: repoFullName },
+          }))
+        );
+
+        const deletedRows = await tx
+          .delete(security_findings)
+          .where(
+            and(
+              ...conditions,
+              inArray(
+                security_findings.id,
+                findings.map(finding => finding.id)
+              )
+            )
+          )
+          .returning({ id: security_findings.id });
+
+        deleted += deletedRows.length;
+
+        if (findings.length < DELETE_FINDINGS_CHUNK_SIZE) break;
       }
 
-      const deleted = await tx
-        .delete(security_findings)
-        .where(and(...conditions))
-        .returning({ id: security_findings.id });
-
-      return deleted.length;
+      return deleted;
     });
 
     return { deletedCount };

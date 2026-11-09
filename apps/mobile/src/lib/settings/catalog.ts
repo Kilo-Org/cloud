@@ -94,7 +94,8 @@ const BOOLEAN_TOGGLES: readonly BooleanToggle[] = [
   },
   {
     name: 'autoExpandThinking',
-    description: 'Expand thinking rows by default in new messages.',
+    description:
+      'Expand thinking rows by default in new messages. No effect while hideThinking is on.',
     read: getAutoExpandThinking,
     write: setAutoExpandThinking,
   },
@@ -130,7 +131,7 @@ const BOOLEAN_TOGGLES: readonly BooleanToggle[] = [
   },
   {
     name: 'hideBalance',
-    description: 'Hide the account balance on the profile screen.',
+    description: 'Hide credit balances on the profile screens and the organization hub.',
     read: getHideBalance,
     write: setHideBalance,
   },

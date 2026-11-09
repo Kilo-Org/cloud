@@ -75,11 +75,32 @@ function createBridge(options: { available?: boolean; failFirstApply?: boolean }
   indexedFingerprints.mockImplementation(async () =>
     Object.fromEntries([...index].map(([id, document]) => [id, document.fingerprint]))
   );
+  // The App Intents catalog, faked the way the device store behaves: a whole
+  // list replaces the previous one, and the call reports whether the bytes
+  // changed.
+  let catalog: { id: string; title: string }[] = [];
+  const replaceSessions =
+    vi.fn<(entries: readonly { id: string; title: string }[]) => Promise<boolean>>();
+  replaceSessions.mockImplementation(async entries => {
+    const next = entries.map(entry => ({ id: entry.id, title: entry.title }));
+    const changed = JSON.stringify(next) !== JSON.stringify(catalog);
+    catalog = next;
+    return changed;
+  });
   return {
     available: options.available ?? true,
     index,
     applyUpdate,
     indexedFingerprints,
+    /** The catalog as the device would hold it. */
+    get catalog() {
+      return catalog;
+    },
+    /** The device-side clear the privacy lock and an account boundary fire. */
+    clearCatalog() {
+      catalog = [];
+    },
+    replaceSessions,
     // The bridge surface, facing the sync through the same module the mount
     // uses — only the platform module behind it is faked.
     applySystemSearchUpdate: async (update: SystemSearchUpdate) => {
@@ -127,6 +148,7 @@ function createSync(harness: Harness, bridge: Bridge, queryClient: QueryClient) 
     apply: async update => {
       await bridge.applySystemSearchUpdate({ add: update.add, removeIds: update.remove });
     },
+    applySessions: bridge.replaceSessions,
     report,
     isEnabled: harness.isSystemSearchSyncEnabled,
   });
@@ -406,7 +428,7 @@ describe('SystemSearchIndexSync', () => {
     });
     const sync = new harness.SystemSearchIndexSync({
       queryClient,
-      collect: async () => ({ documents: [], observedSources: new Set() }),
+      collect: async () => ({ documents: [], sessions: null, observedSources: new Set() }),
       fingerprints: bridge.indexedSystemSearchFingerprints,
       apply: async () => undefined,
       report,
@@ -420,5 +442,153 @@ describe('SystemSearchIndexSync', () => {
     await expect(sync.syncNow()).resolves.toBe('failed');
     expect(report).toHaveBeenCalledOnce();
     expect(bridge.applyUpdate).not.toHaveBeenCalled();
+  });
+});
+
+describe('the App Intents session catalog a run publishes', () => {
+  /** A sync whose collect step runs `duringCollect` before it answers. */
+  async function syncWithCatalog(
+    bridge: Bridge,
+    queryClient: QueryClient,
+    duringCollect: () => void | Promise<void> = () => undefined
+  ) {
+    const harness = await loadHarness(bridge);
+    const report = vi.fn<(error: unknown) => void>();
+    const sync = new harness.SystemSearchIndexSync({
+      queryClient,
+      collect: async () => {
+        await duringCollect();
+        return harness.collectSystemSearchDocuments(queryClient);
+      },
+      fingerprints: bridge.indexedSystemSearchFingerprints,
+      apply: async update => {
+        await bridge.applySystemSearchUpdate({ add: update.add, removeIds: update.remove });
+      },
+      applySessions: bridge.replaceSessions,
+      report,
+      isEnabled: harness.isSystemSearchSyncEnabled,
+    });
+    return { sync, report };
+  }
+
+  it('publishes the run’s titles beside the index write', async () => {
+    const bridge = createBridge();
+    const queryClient = new QueryClient();
+    queryClient.setQueryData(SESSION_LIST_KEY, storedSessions('Fix login bug'));
+    const { sync } = await syncWithCatalog(bridge, queryClient);
+
+    await expect(sync.syncNow()).resolves.toBe('applied');
+
+    expect(bridge.replaceSessions).toHaveBeenCalledExactlyOnceWith([
+      { id: 'sess-1', title: 'Fix login bug' },
+    ]);
+    expect(bridge.catalog).toEqual([{ id: 'sess-1', title: 'Fix login bug' }]);
+  });
+
+  it('republishes the titles when only the catalog was cleared', async () => {
+    // The privacy lock wipes the catalog and leaves the index ledger alone, so
+    // the next run has an empty plan and still has to restore the picker.
+    const bridge = createBridge();
+    const queryClient = new QueryClient();
+    queryClient.setQueryData(SESSION_LIST_KEY, storedSessions('Fix login bug'));
+    const { sync } = await syncWithCatalog(bridge, queryClient);
+    await expect(sync.syncNow()).resolves.toBe('applied');
+    expect(bridge.catalog).toEqual([{ id: 'sess-1', title: 'Fix login bug' }]);
+
+    bridge.clearCatalog();
+    bridge.replaceSessions.mockClear();
+    bridge.applyUpdate.mockClear();
+
+    await expect(sync.syncNow()).resolves.toBe('applied');
+
+    expect(bridge.applyUpdate).not.toHaveBeenCalled();
+    expect(bridge.catalog).toEqual([{ id: 'sess-1', title: 'Fix login bug' }]);
+  });
+
+  it('keeps the titles out of a run whose collect spanned a sign-out', async () => {
+    const bridge = createBridge();
+    const queryClient = new QueryClient();
+    queryClient.setQueryData(SESSION_LIST_KEY, storedSessions('Fix login bug'));
+    const { sync } = await syncWithCatalog(bridge, queryClient, async () => {
+      // Imported inside the collect, after the harness reset the module
+      // registry: a static import would bind the pre-reset sign-out flag and
+      // the fence would never move.
+      const signOut = await import('@/lib/auth/sign-out-state');
+      signOut.setSignOutActive(true);
+    });
+
+    try {
+      await expect(sync.syncNow()).resolves.toBe('skipped');
+      expect(bridge.replaceSessions).not.toHaveBeenCalled();
+      expect(bridge.catalog).toEqual([]);
+    } finally {
+      const signOut = await import('@/lib/auth/sign-out-state');
+      signOut.setSignOutActive(false);
+    }
+  });
+
+  it('keeps the titles out of a run whose collect spanned an account switch', async () => {
+    const bridge = createBridge();
+    const queryClient = new QueryClient();
+    queryClient.setQueryData(SESSION_LIST_KEY, storedSessions('Fix login bug'));
+    const { sync } = await syncWithCatalog(bridge, queryClient, async () => {
+      const authEpoch = await import('@/lib/auth/auth-epoch');
+      authEpoch.bumpAuthEpoch();
+    });
+
+    await expect(sync.syncNow()).resolves.toBe('skipped');
+    expect(bridge.replaceSessions).not.toHaveBeenCalled();
+    expect(bridge.catalog).toEqual([]);
+  });
+
+  it('keeps the stored titles when no sessions read settled in the run', async () => {
+    // A cold launch collects an empty cache before the stored history answers.
+    // The run must not hand the device an empty catalog: that drops the titles
+    // every saved shortcut resolves against.
+    const bridge = createBridge();
+    const queryClient = new QueryClient();
+    queryClient.setQueryData(SESSION_LIST_KEY, storedSessions('Fix login bug'));
+    const { sync } = await syncWithCatalog(bridge, queryClient);
+    await expect(sync.syncNow()).resolves.toBe('applied');
+    expect(bridge.catalog).toEqual([{ id: 'sess-1', title: 'Fix login bug' }]);
+
+    // The next launch collects before the list has loaded again.
+    queryClient.clear();
+    bridge.replaceSessions.mockClear();
+
+    await sync.syncNow();
+
+    expect(bridge.replaceSessions).not.toHaveBeenCalled();
+    expect(bridge.catalog).toEqual([{ id: 'sess-1', title: 'Fix login bug' }]);
+  });
+
+  it('clears the stored titles when a settled read returns no sessions', async () => {
+    const bridge = createBridge();
+    const queryClient = new QueryClient();
+    queryClient.setQueryData(SESSION_LIST_KEY, storedSessions('Fix login bug'));
+    const { sync } = await syncWithCatalog(bridge, queryClient);
+    await expect(sync.syncNow()).resolves.toBe('applied');
+
+    queryClient.setQueryData(SESSION_LIST_KEY, { pages: [{ cliSessions: [], nextCursor: null }] });
+    bridge.replaceSessions.mockClear();
+
+    await sync.syncNow();
+
+    expect(bridge.replaceSessions).toHaveBeenCalledExactlyOnceWith([]);
+    expect(bridge.catalog).toEqual([]);
+  });
+
+  it('still writes the index when the catalog write fails, and reports once', async () => {
+    const bridge = createBridge();
+    const queryClient = new QueryClient();
+    queryClient.setQueryData(SESSION_LIST_KEY, storedSessions('Fix login bug'));
+    const { sync, report } = await syncWithCatalog(bridge, queryClient);
+    bridge.replaceSessions.mockRejectedValueOnce(new Error('the catalog store refused'));
+
+    await expect(sync.syncNow()).resolves.toBe('failed');
+
+    expect(bridge.applyUpdate).toHaveBeenCalledOnce();
+    expect(report).toHaveBeenCalledOnce();
+    expect(bridge.catalog).toEqual([]);
   });
 });

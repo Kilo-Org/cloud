@@ -11,5 +11,5 @@ export {
   ExpandSeparatorRow,
   HunkHeaderRow,
   PaginationRow,
-  TabStateMessage,
 } from '@/components/pr-review/diff/pr-diff-hunk-rows';
+export { TabStateMessage } from '@/components/pr-review/diff/pr-diff-tab-state-message';

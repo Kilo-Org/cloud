@@ -1,5 +1,5 @@
 import { i18n } from '@/i18n';
-import { parseLocalizedNumber } from '@/lib/format';
+import { formatCurrency, formatNumber, normalizeLocalizedNumber } from '@/lib/format';
 
 /**
  * Bounds the save payload's schema enforces, mirrored here so the form shows an
@@ -35,37 +35,57 @@ export const DEFAULT_MULTIPLIER = 2;
 export const DISABLED_THRESHOLD_USD = 1;
 export const DISABLED_MULTIPLIER = 1;
 
+/** The inclusive bounds a field's value must sit inside to be submittable. */
+type Bounds = Readonly<{ minimum: number; maximum: number }>;
+
+const THRESHOLD_BOUNDS: Bounds = { minimum: MIN_THRESHOLD_USD, maximum: MAX_THRESHOLD_USD };
+const MULTIPLIER_BOUNDS: Bounds = { minimum: 1, maximum: MAX_MULTIPLIER };
+
 /**
- * Parse a USD limit: an empty, unparsable, zero, negative, sub-microdollar, or
- * above-cap value is `null` (no limit), never a clamped number.
+ * Read a localized amount against inclusive bounds. The magnitude is compared on
+ * the normalized literal, because a pasted number too large for a JS number
+ * still has a magnitude — it reads as `Infinity`, which is above any cap — while
+ * the text itself is exactly the kind of input the field must report as too big.
  */
-export function parseThreshold(value: string): number | null {
-  const trimmed = value.trim();
-  const parsed = parseLocalizedNumber(trimmed, i18n.language);
-  if (
-    trimmed === '' ||
-    parsed === null ||
-    parsed < MIN_THRESHOLD_USD ||
-    parsed > MAX_THRESHOLD_USD
-  ) {
-    return null;
+function readAmount(value: string, bounds: Bounds) {
+  const normalized = normalizeLocalizedNumber(value, i18n.language);
+  if (normalized === null) {
+    return {
+      amount: null,
+      problem: value.trim() === '' ? ('empty' as const) : ('unparsable' as const),
+    };
   }
-  return parsed;
+  const amount = Number(normalized);
+  if (amount > bounds.maximum) {
+    return { amount: null, problem: 'aboveMaximum' as const };
+  }
+  if (amount < bounds.minimum) {
+    return { amount: null, problem: 'belowMinimum' as const };
+  }
+  return { amount, problem: null };
+}
+
+/** Parse a USD limit: out-of-range values are `null` (no limit), never clamped. */
+export function parseThreshold(value: string): number | null {
+  return readAmount(value, THRESHOLD_BOUNDS).amount;
 }
 
 /** Parse the anomaly multiplier: at least 1x, at most the wire's 50x cap. */
 export function parseMultiplier(value: string): number | null {
-  const trimmed = value.trim();
-  const parsed = parseLocalizedNumber(trimmed, i18n.language);
-  if (trimmed === '' || parsed === null || parsed < 1 || parsed > MAX_MULTIPLIER) {
-    return null;
-  }
-  return parsed;
+  return readAmount(value, MULTIPLIER_BOUNDS).amount;
 }
 
 /** The wire stores the multiplier in basis points, where 100 is 1x. */
 export function multiplierBasisPoints(multiplier: number): number {
   return Math.round(multiplier * 100);
+}
+
+/**
+ * The empty limit field's sample amount, written with the same separators the
+ * field reads, so the sample can be typed back as shown.
+ */
+export function thresholdPlaceholder(): string {
+  return formatNumber(25, i18n.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 /** A window read back from the wire, narrowed to the three the wire accepts. */
@@ -78,14 +98,31 @@ export function toWindowHours(value: number | null | undefined): SpendAlertWindo
 
 /** Inline error for the limit field, or `null` while the value is valid. */
 export function thresholdError(value: string): string | null {
-  // Reuses the billing alert's copy: the same sentence, so the two fields can
-  // never drift apart in a translation.
-  return parseThreshold(value) == null
-    ? i18n.t('organization.lowBalanceAlert.thresholdError')
-    : null;
+  const { problem } = readAmount(value, THRESHOLD_BOUNDS);
+  if (problem === null) {
+    return null;
+  }
+  if (problem === 'aboveMaximum') {
+    return i18n.t('spendAlerts.thresholdMaxError', {
+      max: formatCurrency(MAX_THRESHOLD_USD, i18n.language, 0),
+    });
+  }
+  // Empty, unparsable, and below the smallest storable amount share the billing
+  // alert's copy: the same sentence, so the two fields can never drift apart in
+  // a translation.
+  return i18n.t('organization.lowBalanceAlert.thresholdError');
 }
 
 /** Inline error for the multiplier field, or `null` while the value is valid. */
 export function multiplierError(value: string): string | null {
-  return parseMultiplier(value) == null ? i18n.t('spendAlerts.multiplierError') : null;
+  const { problem } = readAmount(value, MULTIPLIER_BOUNDS);
+  if (problem === null) {
+    return null;
+  }
+  if (problem === 'aboveMaximum') {
+    return i18n.t('spendAlerts.multiplierMaxError', {
+      max: formatNumber(MAX_MULTIPLIER, i18n.language),
+    });
+  }
+  return i18n.t('spendAlerts.multiplierError');
 }

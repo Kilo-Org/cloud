@@ -193,7 +193,7 @@ void i18n.init({
  * fall back to English; a token with no locale is treated as English.
  */
 export function resolvePushLocale(locale: string | null | undefined): string {
-  if (locale != null && locale in resources) return locale;
+  if (locale != null && Object.hasOwn(resources, locale)) return locale;
   return 'en';
 }
 

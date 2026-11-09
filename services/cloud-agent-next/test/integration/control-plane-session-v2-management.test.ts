@@ -7,8 +7,9 @@ import type { CallbackJob } from '../../src/callbacks/types.js';
 import type { SandboxSessionV2 } from '../../src/control-plane/session/session-do.js';
 import type { SandboxControlV2 } from '../../src/control-plane/sandbox/sandbox-do.js';
 import { controlPlaneMessages } from '../../src/control-plane/session/sqlite-schema.js';
-import { events } from '../../src/db/sqlite-schema.js';
+import { events } from '../../src/control-plane/session/sqlite-schema.js';
 import { parseSessionMetadata } from '../../src/persistence/session-metadata.js';
+import { appRouter } from '../../src/router.js';
 import { sessionRuntimeLocator } from '../../src/sandbox-control/worktree-ownership.js';
 import { generateSandboxId } from '../../src/sandbox-id.js';
 import type { ControlPlanePromptPayload } from '../../src/shared/control-plane-protocol.js';
@@ -90,7 +91,7 @@ function metadata(input: {
     },
     auth: {
       kiloSessionId: input.kiloSessionId,
-      kilocodeToken: input.kiloToken ?? NATIVE_KILO_TOKEN,
+      kilocodeToken: input.kiloToken ?? runtimeAuthorizedKiloToken(),
     },
     agent: { mode: 'code', model: 'test/model' },
     repository: { type: 'github', repo: 'acme/widgets', upstreamBranch: 'main' },
@@ -98,7 +99,7 @@ function metadata(input: {
     workspace: {
       branchName: 'kilo/test-branch',
       sandboxId: input.sandboxId,
-      sandboxProvider: 'cloudflare',
+      sandboxProvider: 'cloudflare-containers',
       ...(input.worktreeId ? { worktreeId: input.worktreeId } : {}),
       ...(input.workspacePath ? { workspacePath: input.workspacePath } : {}),
     },
@@ -157,7 +158,7 @@ async function registerSession(input: {
   await installPeer(stub, peer);
   await stub.registerSessionFromMetadata({
     metadata: metadata(input),
-    sandboxSelection: { provider: 'cloudflare' },
+    sandboxSelection: { provider: 'cloudflare-containers' },
   });
   return stub;
 }
@@ -167,9 +168,94 @@ afterEach(async () => {
 });
 
 describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
+  it('exposes interrupt and send without explicit hosted lifecycle operations', () => {
+    const procedures = appRouter._def.procedures;
+    expect(procedures).not.toHaveProperty('getHostedSessionLifecycle');
+    expect(procedures).not.toHaveProperty('stopHostedSession');
+    expect(procedures).not.toHaveProperty('resumeHostedSession');
+    expect(procedures.interruptSession._def.type).toBe('mutation');
+    expect(procedures.send._def.type).toBe('mutation');
+    expect(procedures.listChildSessions._def.type).toBe('query');
+  });
+
+  it('exposes workspace snapshot recovery procedures', () => {
+    const procedures = appRouter._def.procedures;
+    expect(procedures.getWorkspaceSnapshotRecovery._def.type).toBe('query');
+    expect(procedures.removeWorkspaceSnapshot._def.type).toBe('mutation');
+  });
+
+  it('forwards workspace snapshot metadata and removal to the sandbox peer', async () => {
+    const sessionId = newSessionId();
+    const sandboxId = await generateSandboxId(sessionId);
+    const stub = await registerSession({ sessionId, sandboxId, kiloSessionId: kiloSessionId() });
+    const peer = new FakeSandboxPeer();
+    peer.workspaceSnapshotRecovery = { capturedAt: 1_763_000_000_000 };
+    await installPeer(stub, peer);
+
+    await expect(stub.getWorkspaceSnapshotRecovery()).resolves.toEqual({
+      capturedAt: 1_763_000_000_000,
+    });
+    await expect(stub.removeWorkspaceSnapshot()).resolves.toEqual({ success: true });
+    expect(peer.removeWorkspaceSnapshotCalls).toEqual([sessionId]);
+    await expect(stub.getWorkspaceSnapshotRecovery()).resolves.toBeNull();
+  });
+
+  it('reports nothing to discard without a registered sandbox', async () => {
+    const stub = sessions.getByName(newSessionId());
+    await expect(stub.getWorkspaceSnapshotRecovery()).resolves.toBeNull();
+    await expect(stub.removeWorkspaceSnapshot()).resolves.toEqual({ success: true });
+  });
+
+  it('interrupts a turn without releasing its route and accepts the next message', async () => {
+    const sessionId = newSessionId();
+    const nativeSessionId = kiloSessionId();
+    const sandboxId = await generateSandboxId(sessionId);
+    const stub = sessions.getByName(sessionId);
+    const peer = new FakeSandboxPeer();
+    peer.prepareView = peer.view('ready');
+    let releaseCalls = 0;
+    peer.release = async () => {
+      releaseCalls += 1;
+    };
+    await installPeer(stub, peer);
+    await installCapturedQueues(stub);
+    const initialMessageId = messageId();
+    const nextMessageId = messageId();
+    await stub.createSessionWithInitialAdmission({
+      metadata: metadata({ sessionId, kiloSessionId: nativeSessionId, sandboxId }),
+      message: promptPayload(initialMessageId),
+      sandboxSelection: { provider: 'cloudflare-containers' },
+    });
+    await expect(stub.getSession()).resolves.toMatchObject({
+      messages: [{ messageId: initialMessageId, state: 'accepted' }],
+    });
+
+    await stub.stop();
+    await expect(stub.send(promptPayload(nextMessageId))).resolves.toEqual({ type: 'ok' });
+
+    expect(peer.abortCalls).toEqual([sessionId]);
+    expect(releaseCalls).toBe(0);
+    expect(peer.prepareCalls).toHaveLength(1);
+    expect(
+      peer.deliverCalls.flatMap(payload => payload.messages.map(message => message.messageId))
+    ).toEqual([initialMessageId, nextMessageId]);
+    await expect(stub.getSession()).resolves.toMatchObject({
+      type: 'found',
+      route: { state: 'ready' },
+      messages: [
+        { messageId: initialMessageId, state: 'cancelled' },
+        { messageId: nextMessageId, state: 'accepted' },
+      ],
+    });
+    await expect(stub.getMetadata()).resolves.toMatchObject({
+      identity: { sessionId },
+      auth: { kiloSessionId: nativeSessionId },
+    });
+  });
+
   it('forwards a real status websocket through the Session DO to the Sandbox DO', async () => {
     const sessionId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const stub = await registerSession({ sessionId, sandboxId, kiloSessionId: kiloSessionId() });
     const sandboxes = (
       env as unknown as { SANDBOX_CONTROL: DurableObjectNamespace<SandboxControlV2> }
@@ -206,7 +292,7 @@ describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
 
   it('routes status subscriptions only to the registered sandbox and stored owner', async () => {
     const sessionId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const stub = await registerSession({ sessionId, sandboxId, kiloSessionId: kiloSessionId() });
     const peer = new FakeSandboxPeer();
     const routed: string[] = [];
@@ -258,7 +344,7 @@ describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
 
   it('retries a transient sandbox status upgrade on a fresh peer', async () => {
     const sessionId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const stub = await registerSession({ sessionId, sandboxId, kiloSessionId: kiloSessionId() });
     const peer = new FakeSandboxPeer();
     let attempts = 0;
@@ -283,7 +369,7 @@ describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
 
   it('reads the stored runtime location and returns null when unregistered', async () => {
     const sessionId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const stub = await registerSession({
       sessionId,
       sandboxId,
@@ -296,7 +382,7 @@ describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
       cloudAgentSessionId: sessionId,
       kiloUserId: USER_ID,
       organizationId: ORG_ID,
-      location: { sandboxId, provider: 'cloudflare' },
+      location: { sandboxId, provider: 'cloudflare-containers' },
     });
 
     await expect(sessions.getByName(newSessionId()).getMetadata()).resolves.toBeNull();
@@ -304,7 +390,7 @@ describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
 
   it('reports message work from the session snapshot', async () => {
     const sessionId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const stub = sessions.getByName(sessionId);
     const peer = new FakeSandboxPeer();
     await installPeer(stub, peer);
@@ -312,7 +398,7 @@ describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
     await stub.createSessionWithInitialAdmission({
       metadata: metadata({ sessionId, kiloSessionId: kiloSessionId(), sandboxId }),
       message: promptPayload(first),
-      sandboxSelection: { provider: 'cloudflare' },
+      sandboxSelection: { provider: 'cloudflare-containers' },
     });
 
     // The route is preparing, so the admitted message stays queued.
@@ -332,7 +418,7 @@ describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
 
   it('returns the latest stored event id on the session snapshot', async () => {
     const sessionId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const stub = await registerSession({
       sessionId,
       sandboxId,
@@ -366,8 +452,15 @@ describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
     const legacySession = newSessionId();
     const legacyStub = await registerSession({
       sessionId: legacySession,
-      sandboxId: await generateSandboxId('*', ORG_ID, USER_ID, legacySession),
+      sandboxId: await generateSandboxId(legacySession),
       kiloSessionId: kiloSessionId(),
+    });
+    await runInDurableObject(legacyStub, async (instance, state) => {
+      const stored = await instance.getMetadata();
+      if (!stored) throw new Error('Missing registered metadata');
+      const legacy = { ...stored, auth: { ...stored.auth, kilocodeToken: NATIVE_KILO_TOKEN } };
+      await state.storage.put('session_metadata', legacy);
+      Object.assign(instance, { metadata: legacy });
     });
     await expect(legacyStub.getRuntimeAuthorizationStatus()).resolves.toMatchObject({
       state: 'legacy',
@@ -381,10 +474,10 @@ describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
       metadata: metadata({
         sessionId: revokedSession,
         kiloSessionId: kiloSessionId(),
-        sandboxId: await generateSandboxId('*', ORG_ID, USER_ID, revokedSession),
+        sandboxId: await generateSandboxId(revokedSession),
         kiloToken: runtimeAuthorizedKiloToken(),
       }),
-      sandboxSelection: { provider: 'cloudflare' },
+      sandboxSelection: { provider: 'cloudflare-containers' },
     });
     expect(registration).toEqual({ success: true });
     await expect(revokedStub.getRuntimeAuthorizationStatus()).resolves.toMatchObject({
@@ -396,7 +489,7 @@ describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
 
     // A stored active authorization is active; an expired one is revoked.
     const activeSession = newSessionId();
-    const activeSandbox = await generateSandboxId('*', ORG_ID, USER_ID, activeSession);
+    const activeSandbox = await generateSandboxId(activeSession);
     const activeSeal = await sealFor(activeSession, secret);
     const activeStub = sessions.getByName(activeSession);
     await runInDurableObject(activeStub, instance => {
@@ -412,7 +505,7 @@ describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
         kiloToken: runtimeAuthorizedKiloToken(),
       }),
       message: promptPayload(messageId()),
-      sandboxSelection: { provider: 'cloudflare' },
+      sandboxSelection: { provider: 'cloudflare-containers' },
       runtimeAuthorizationSeal: activeSeal,
     });
     expect(admission.success).toBe(true);
@@ -438,7 +531,7 @@ describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
 
   it('rejects invalid modern proxy configuration without installing session or authorization state', async () => {
     const sessionId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const stub = sessions.getByName(sessionId);
     await installPeer(stub, new FakeSandboxPeer());
     await runInDurableObject(stub, instance => {
@@ -451,7 +544,7 @@ describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
         kiloSessionId: kiloSessionId(),
         kiloToken: runtimeAuthorizedKiloToken(),
       }),
-      sandboxSelection: { provider: 'cloudflare' },
+      sandboxSelection: { provider: 'cloudflare-containers' },
     });
     expect(result).toMatchObject({
       success: false,
@@ -469,7 +562,7 @@ describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
 
   it('deletes the session, releases its route and wipes its storage idempotently', async () => {
     const sessionId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const stub = sessions.getByName(sessionId);
     const peer = new FakeSandboxPeer();
     const releaseCalls: string[] = [];
@@ -480,7 +573,7 @@ describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
     await stub.createSessionWithInitialAdmission({
       metadata: metadata({ sessionId, kiloSessionId: kiloSessionId(), sandboxId }),
       message: promptPayload(messageId()),
-      sandboxSelection: { provider: 'cloudflare' },
+      sandboxSelection: { provider: 'cloudflare-containers' },
     });
 
     await expect(stub.getSession()).resolves.toMatchObject({ type: 'found' });
@@ -501,7 +594,7 @@ describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
 
   it('returns the worktree runtime location and rejects a foreign worktree', async () => {
     const sessionId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const worktree = worktreeId();
     const kilo = kiloSessionId();
     const workspacePath = `/workspace/worktrees/${worktree}`;
@@ -521,7 +614,7 @@ describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
         organizationId: ORG_ID,
       })
     ).resolves.toEqual({
-      location: { sandboxId, provider: 'cloudflare' },
+      location: { sandboxId, provider: 'cloudflare-containers' },
       children: [],
       directory: '/workspace/app',
     });
@@ -548,7 +641,7 @@ describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
 
   it('reads child Kilo sessions from the stored event log', async () => {
     const sessionId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const worktree = worktreeId();
     const ownKilo = kiloSessionId();
     const firstChild = kiloSessionId();
@@ -617,7 +710,7 @@ describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
 
   it('finishes worktree deletion by wiping the session storage', async () => {
     const sessionId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const worktree = worktreeId();
     const stub = await registerSession({
       sessionId,
@@ -638,7 +731,7 @@ describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
 
   it('purges on finish regardless of the informational worktree id and is idempotent', async () => {
     const sessionId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const worktree = worktreeId();
     const stub = await registerSession({
       sessionId,
@@ -658,7 +751,7 @@ describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
 
   it('settles open messages as interrupted and reports them before deleting', async () => {
     const sessionId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const stub = sessions.getByName(sessionId);
     const peer = new FakeSandboxPeer();
     peer.prepareView = peer.view('ready');
@@ -669,7 +762,7 @@ describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
     await stub.createSessionWithInitialAdmission({
       metadata: metadata({ sessionId, kiloSessionId: kiloSessionId(), sandboxId }),
       message: promptPayload(accepted),
-      sandboxSelection: { provider: 'cloudflare' },
+      sandboxSelection: { provider: 'cloudflare-containers' },
     });
     // A second message whose delivery is not ready stays queued beside it.
     peer.deliverResult = 'not_ready';
@@ -700,7 +793,7 @@ describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
 
   it('leaves the session intact when release fails, then completes on retry', async () => {
     const sessionId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const stub = sessions.getByName(sessionId);
     const peer = new FakeSandboxPeer();
     let releaseCalls = 0;
@@ -711,7 +804,7 @@ describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
     await installPeer(stub, peer);
     await stub.registerSessionFromMetadata({
       metadata: metadata({ sessionId, kiloSessionId: kiloSessionId(), sandboxId }),
-      sandboxSelection: { provider: 'cloudflare' },
+      sandboxSelection: { provider: 'cloudflare-containers' },
     });
 
     // A permanent release failure aborts before the wipe, so deletion retries.
@@ -727,12 +820,12 @@ describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
 
   it('does not persist a send that is queued behind a delete', async () => {
     const sessionId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const stub = sessions.getByName(sessionId);
     await installPeer(stub, new FakeSandboxPeer());
     await stub.registerSessionFromMetadata({
       metadata: metadata({ sessionId, kiloSessionId: kiloSessionId(), sandboxId }),
-      sandboxSelection: { provider: 'cloudflare' },
+      sandboxSelection: { provider: 'cloudflare-containers' },
     });
 
     const racing = messageId();
@@ -753,7 +846,7 @@ describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
 
   it('suppresses worktree capture while deleting', async () => {
     const sessionId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const stub = await registerSession({ sessionId, sandboxId, kiloSessionId: kiloSessionId() });
 
     let suppressCalls = 0;

@@ -3,6 +3,27 @@ import { z } from 'zod';
 
 export { ABUSE_CLASSIFICATION, GatewayApiKindSchema } from './schema-types';
 export type { AbuseClassification, GatewayApiKind } from './schema-types';
+export {
+  EXA_ALLOWED_PATHS,
+  EXA_USAGE_FEATURE_ID_MAX_LENGTH,
+  EXA_USAGE_TYPE_MAX_LENGTH,
+  EXA_USAGE_WRITE_PATH,
+  ExaUsageRecordSchema,
+  ExaUsageWriteResponseSchema,
+  isExaAllowedPath,
+} from './exa';
+export type { ExaAllowedPath, ExaUsageRecord, ExaUsageWriteResponse } from './exa';
+export {
+  ENKRYPT_USAGE_WRITE_PATH,
+  EnkryptUsageWriteResponseSchema,
+  EnkryptUsageWriteSchema,
+  MAX_ENKRYPT_CREDITS_PER_CALL,
+} from './enkrypt';
+export type {
+  EnkryptUsageWrite,
+  EnkryptUsageWriteInput,
+  EnkryptUsageWriteResponse,
+} from './enkrypt';
 
 /**
  * Wire contract for `POST /api/internal/usage/record`.
@@ -12,8 +33,18 @@ export type { AbuseClassification, GatewayApiKind } from './schema-types';
  * write holds row locks on `kilocode_users` / `organizations` /
  * `organization_user_usage` across several sequential statements, so from SFO
  * the lock hold is dominated by transatlantic round trips rather than database
- * work. This contract lets an SFO instance hand the whole write to a
- * Frankfurt-local endpoint so those round trips become local.
+ * work.
+ *
+ * Selected usage normally goes through the configured queue transport; the
+ * production Cloudflare consumer calls the Frankfurt-local endpoint, which
+ * persists idempotently by usage ID, so redelivery does not create a second
+ * debit. SFO instances call that endpoint directly through
+ * `recordUsageInPrimaryRegion` for unselected accounting; Frankfurt instances
+ * write unselected accounting locally. Selected usage falls back to a direct
+ * write only in the two pre-publication cases where nothing was sent: missing
+ * or unparseable publisher configuration and failed lifetime registration. A
+ * timeout or other ambiguous publication failure is not a direct-write
+ * fallback, because the message may already be queued.
  *
  * Invariants this schema deliberately encodes:
  *
@@ -97,7 +128,11 @@ const UsageMetadataSchema = z.object({
   // Like bouncer_usage_event, older gateway senders omit this additive field.
   // Default it to null so parsed metadata still satisfies UsageMetaData.
   reasoning_setting: z.string().nullable().default(null),
+  // Additive like reasoning_setting: older senders omit it.
+  inference_region: z.string().nullable().default(null),
   market_cost: z.number().nullable(),
+  // Additive like reasoning_setting: older senders omit it.
+  non_inference_cost: bigintAsNumber.nullable().default(null),
   is_free: z.boolean().nullable(),
   abuse_delay: z.number().nullable(),
   abuse_downgraded_from: z.string().nullable(),

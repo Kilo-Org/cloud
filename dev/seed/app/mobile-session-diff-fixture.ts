@@ -5,7 +5,7 @@ import { signKiloToken } from '@kilocode/worker-utils';
 import { and, eq } from 'drizzle-orm';
 
 import type { SeedResult } from '../index';
-import { getSeedDb } from '../lib/db';
+import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
 import {
   buildAssistantMessageItem,
   buildSessionItem,
@@ -126,6 +126,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     throw new Error('NEXTAUTH_SECRET is not set for this worktree.');
   }
 
+  assertLocalSeedDatabase('app:mobile-session-diff-fixture');
   const db = getSeedDb();
   const [user] = await db
     .select({
@@ -197,5 +198,9 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   console.log(
     'Suggested next step: open the session on a signed-in dev build, then tap View changes.'
   );
-  return { userId: user.id, sessionId: SESSION_ID, deepLink: `kiloapp://agent-chat/${SESSION_ID}` };
+  return {
+    userId: user.id,
+    sessionId: SESSION_ID,
+    deepLink: `kiloapp:///(app)/agent-chat/${SESSION_ID}`,
+  };
 }

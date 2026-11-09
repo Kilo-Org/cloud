@@ -1,8 +1,9 @@
 import { useLayoutEffect, useRef, useState } from 'react';
-import { type TextInput, type TextInputProps, View } from 'react-native';
+import { type LayoutChangeEvent, type TextInput, type TextInputProps, View } from 'react-native';
 
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { formFieldA11y } from '@/components/ui/form-field-a11y';
+import { FormFieldLabel } from '@/components/ui/form-field-label';
 import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
 import { cn } from '@/lib/utils';
@@ -11,6 +12,13 @@ type FormFieldProps = Omit<TextInputProps, 'value'> &
   React.RefAttributes<TextInput> & {
     label: string;
     error?: string;
+    /**
+     * Controls that belong to the field's own row, rendered at the end of the
+     * label line: the reorder and delete controls of a list a field sits in.
+     * The label keeps the line's remaining width and the row is as tall as the
+     * accessory, so the controls take no separate band under the input.
+     */
+    labelAccessory?: React.ReactNode;
     /** Reserve the tallest localized message, including wrapping and font scaling. */
     reserveErrorMessages?: readonly string[];
     disabled?: boolean;
@@ -21,9 +29,17 @@ type FormFieldProps = Omit<TextInputProps, 'value'> &
      */
     required?: boolean;
     /**
+     * Layout of the field's whole block: its label, input and message. A form
+     * that scrolls a refused Save to the field at fault records this offset;
+     * the input's own `onLayout` stays with the native text view.
+     */
+    containerOnLayout?: (event: LayoutChangeEvent) => void;
+    /**
      * Owns blur-validation: runs on blur, and re-runs live once an error is
      * showing so it clears the moment the value becomes valid again. When
-     * set, this replaces `error` as the source of the displayed message.
+     * set, its message replaces `error` while it reports one; an `error`
+     * passed alongside shows whenever the field's own rule has nothing to say,
+     * which is how a rejected submit is reported without a blur.
      */
     validate?: (value: string) => string | null;
   };
@@ -38,10 +54,12 @@ type FormFieldProps = Omit<TextInputProps, 'value'> &
  */
 function FormField({
   label,
+  labelAccessory,
   error,
   reserveErrorMessages,
   disabled,
   required,
+  containerOnLayout,
   className,
   ref,
   validate,
@@ -54,7 +72,10 @@ function FormField({
   const [validationError, setValidationError] = useState<string | null>(null);
   const valueRef = useRef(defaultValue ?? '');
   const nativeInput = useRef<TextInput>(null);
-  const displayedError = validate ? validationError : error;
+  // `validate` owns what this field's own rule reports; `error` carries an
+  // error known from elsewhere (a rejected submit). Either one marks the field
+  // invalid; the field's own rule wins while it has something to say.
+  const displayedError = (validate ? validationError : null) ?? error;
 
   // Write the default only on attach; later prop changes must not move the caret
   // while the person edits an uncontrolled field.
@@ -67,8 +88,8 @@ function FormField({
   }, []);
 
   return (
-    <View className="gap-1.5">
-      <Text className="text-sm font-medium text-foreground">{label}</Text>
+    <View className="gap-1.5" onLayout={containerOnLayout}>
+      <FormFieldLabel label={label} labelAccessory={labelAccessory} />
       <Input
         ref={instance => {
           nativeInput.current = instance;
@@ -111,6 +132,12 @@ function FormField({
           // insets the already-centered text rect by it, drawing the value and
           // the placeholder below the middle (apps/mobile/AGENTS.md).
           'rounded-md border border-input bg-background text-sm text-foreground',
+          // DESIGN.md's input recipe fills the field with `border.inputBg` (4 %
+          // white) over the canvas. `bg-background` is the canvas itself, so in
+          // dark the field had no surface of its own and only the border color
+          // separated it from the page. Light keeps the canvas fill, where the
+          // 45 % ink `--input` border already carries the field.
+          'dark:bg-[#FFFFFF0A]',
           'focus:border-ring',
           displayedError && 'border-destructive',
           disabled && 'opacity-50',

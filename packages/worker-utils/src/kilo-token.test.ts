@@ -37,7 +37,6 @@ describe('signKiloToken', () => {
       extra: {
         botId: 'bot-1',
         internalApiUse: true,
-        gastownAccess: true,
       },
     });
 
@@ -50,7 +49,6 @@ describe('signKiloToken', () => {
       env: 'development',
       botId: 'bot-1',
       internalApiUse: true,
-      gastownAccess: true,
     });
   });
 

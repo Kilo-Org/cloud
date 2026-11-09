@@ -72,11 +72,11 @@ const runShape = async (model: string, kind: ApiKind): Promise<void> => {
     return yield* said(session.ask(asked));
   });
   const answer = await Effect.runPromise(
-    Effect.either(Effect.scoped(Effect.provide(program, withTools(kind))))
+    Effect.result(Effect.scoped(Effect.provide(program, withTools(kind))))
   );
 
-  if (answer._tag === 'Left') {
-    console.log(`${kind.padEnd(18)}FAILED  ${JSON.stringify(answer.left)}`);
+  if (answer._tag === 'Failure') {
+    console.log(`${kind.padEnd(18)}FAILED  ${JSON.stringify(answer.failure)}`);
     fail(`${kind}: the round failed, so the shape would not carry the list`);
     return;
   }
@@ -84,7 +84,7 @@ const runShape = async (model: string, kind: ApiKind): Promise<void> => {
   const last = versions.at(-1) ?? [];
   console.log(
     `${kind.padEnd(18)}${String(versions.length).padEnd(8)}${String(last.length).padEnd(7)}` +
-      `${marks(last).padEnd(8)}${JSON.stringify(answer.right.slice(0, 60))}`
+      `${marks(last).padEnd(8)}${JSON.stringify(answer.success.slice(0, 60))}`
   );
 
   if (versions.length < 2) {
@@ -103,8 +103,10 @@ const runShape = async (model: string, kind: ApiKind): Promise<void> => {
   if (!last.some(todo => todo.state === 'done')) {
     fail(`${kind}: nothing was marked done, though a step was finished`);
   }
-  if (!answer.right.toLowerCase().includes('checks')) {
-    fail(`${kind}: the model was asked what it is on and answered ${JSON.stringify(answer.right)}`);
+  if (!answer.success.toLowerCase().includes('checks')) {
+    fail(
+      `${kind}: the model was asked what it is on and answered ${JSON.stringify(answer.success)}`
+    );
   }
 };
 

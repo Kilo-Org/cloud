@@ -74,12 +74,23 @@ export function narrowProviderSlugsToVariant(
   return narrowed.size > 0 ? narrowed : snapshotProviderSlugs;
 }
 
+/**
+ * The snapshot providers Kilo's own routes can use. BYOK-only providers serve only an
+ * organization's own catalog-mode keys, which are decided per key provider instead (see
+ * `isModelAllowedForProviderKey`).
+ */
+export function getKiloRouteProviders(
+  snapshot: NormalizedOpenRouterResponse
+): NormalizedOpenRouterResponse['providers'] {
+  return snapshot.providers.filter(provider => !provider.byokOnly);
+}
+
 export function buildModelIdToProviderSlugsIndex(
   snapshot: NormalizedOpenRouterResponse
 ): Map<string, Set<string>> {
   const index = new Map<string, Set<string>>();
 
-  for (const provider of snapshot.providers) {
+  for (const provider of getKiloRouteProviders(snapshot)) {
     for (const model of provider.models) {
       const normalizedModelId = normalizeModelId(model.slug);
       const existing = index.get(normalizedModelId);
@@ -104,7 +115,7 @@ export function buildDataCollectionRequiredModelIds(
   snapshot: NormalizedOpenRouterResponse
 ): Set<string> {
   const trainsOnEveryProvider = new Map<string, boolean>();
-  for (const provider of snapshot.providers) {
+  for (const provider of getKiloRouteProviders(snapshot)) {
     for (const model of provider.models) {
       const modelId = getSnapshotModelVariantId(model);
       trainsOnEveryProvider.set(

@@ -6,7 +6,7 @@ import Foundation
 /// The App Intents turn these into what Shortcuts shows: `errorDescription` is
 /// the caller-facing line, and the JS `message` is preferred over every
 /// built-in one whenever the pipeline sent it.
-enum KiloAppActionError: Error, LocalizedError {
+public enum KiloAppActionError: Error, LocalizedError {
   /// No JS dispatcher registered inside the bounded wait: the app is still
   /// starting, or its JS runtime never came up.
   case dispatcherUnavailable(seconds: Int)
@@ -19,7 +19,7 @@ enum KiloAppActionError: Error, LocalizedError {
   /// The system declined to open the action's link into the app.
   case linkRefused
 
-  var errorDescription: String? {
+  public var errorDescription: String? {
     switch self {
     case .dispatcherUnavailable(let seconds):
       return "Kilo did not finish starting within \(seconds) seconds, so the action did not run. "
@@ -42,8 +42,8 @@ enum KiloAppActionError: Error, LocalizedError {
 /// for the whole runtime. The bridge owns no action logic — it hands the
 /// payload over and reports the `AppActionResult` back, so the in-app control
 /// and the OS entry points run the exact same code path.
-final class KiloAppActionBridge: @unchecked Sendable {
-  static let shared = KiloAppActionBridge()
+public final class KiloAppActionBridge: @unchecked Sendable {
+  public static let shared = KiloAppActionBridge()
 
   /// How long a run waits for `registerAppActionDispatcher` before it reports a
   /// failure. A background App Intent is killed by the system long before this,
@@ -67,13 +67,13 @@ final class KiloAppActionBridge: @unchecked Sendable {
   /// waiting. A late registration resumes its callers directly instead of them
   /// re-checking on a timer.
   ///
-  /// Runs on the JS thread of `runtime` (the module's synchronous `Function`),
+  /// Runs on the JS thread of `runtime` (the module's synchronous `@JS` method),
   /// because it adds the registration to `runtime.longLivedObjects` and can
   /// release a replaced dispatcher of the same runtime. A replaced registration
   /// of an earlier runtime is not released here: that runtime's teardown sweep
   /// owns it, and on reload it already ran, before this runtime started.
   @JavaScriptActor
-  func register(dispatcher: JavaScriptValue, runtime: JavaScriptRuntime) {
+  func register(dispatcher: consuming JavaScriptValue, runtime: JavaScriptRuntime) {
     let next = DispatcherRegistration(dispatcher: dispatcher, runtime: runtime)
     runtime.longLivedObjects.add(next)
     lock.lock()
@@ -181,7 +181,7 @@ final class KiloAppActionBridge: @unchecked Sendable {
   /// `AppActionResult` for that request — a successful `StartAgent` reports the
   /// session id it created, and a refused one throws with the pipeline's own
   /// message, so Shortcuts shows a real result instead of a silent success.
-  func perform(payload: [String: String]) async throws -> String {
+  public func perform(payload: [String: String]) async throws -> String {
     let registration = try await waitUntilRegistered()
     do {
       // All JSI access happens on the JS thread; the answer crosses back as a
@@ -204,12 +204,16 @@ final class KiloAppActionBridge: @unchecked Sendable {
     let sessionId: String?
     let message: String?
     let retryable: Bool?
+    let code: String?
   }
+
+  /// The result code a declined confirmation reports.
+  private static let cancelledCode = "start-cancelled"
 
   /// The dispatcher may answer with the result or with a promise of it; both
   /// are accepted, and a rejected promise propagates its JS error.
   @JavaScriptActor
-  private static func resolved(_ answer: JavaScriptValue) async throws -> JavaScriptValue {
+  private static func resolved(_ answer: consuming JavaScriptValue) async throws -> JavaScriptValue {
     do {
       return try await answer.asPromise().await()
     } catch is JavaScriptValue.TypeError {
@@ -218,9 +222,11 @@ final class KiloAppActionBridge: @unchecked Sendable {
     }
   }
 
-  /// The caller-facing result: the session id a `StartAgent` run created.
-  /// A refusal throws with the pipeline's message.
-  private static func result(from answer: JavaScriptValue) throws -> String {
+  /// The caller-facing result: the session id a `StartAgent` run created. A
+  /// declined confirmation reports its message as a normal value; any other
+  /// refusal throws with the pipeline's message.
+  @JavaScriptActor
+  private static func result(from answer: borrowing JavaScriptValue) throws -> String {
     let decoded = try decode(answer)
     guard let ok = decoded.ok else {
       throw KiloAppActionError.malformedResult
@@ -234,6 +240,9 @@ final class KiloAppActionBridge: @unchecked Sendable {
       }
       return message
     }
+    if decoded.code == cancelledCode, let message = nonBlank(decoded.message) {
+      return message
+    }
     throw KiloAppActionError.refused(
       message: nonBlank(decoded.message),
       retryable: decoded.retryable ?? false
@@ -242,7 +251,8 @@ final class KiloAppActionBridge: @unchecked Sendable {
 
   /// Reads the answer as the `AppActionResult` object, or as its JSON text —
   /// the two forms the contract accepts.
-  private static func decode(_ answer: JavaScriptValue) throws -> Answer {
+  @JavaScriptActor
+  private static func decode(_ answer: borrowing JavaScriptValue) throws -> Answer {
     if answer.isString() {
       guard let data = answer.getString().data(using: .utf8) else {
         throw KiloAppActionError.malformedResult
@@ -261,11 +271,13 @@ final class KiloAppActionBridge: @unchecked Sendable {
     let sessionId = object.getProperty("sessionId")
     let message = object.getProperty("message")
     let retryable = object.getProperty("retryable")
+    let code = object.getProperty("code")
     return Answer(
       ok: ok.isBool() ? ok.getBool() : nil,
       sessionId: sessionId.isString() ? sessionId.getString() : nil,
       message: message.isString() ? message.getString() : nil,
-      retryable: retryable.isBool() ? retryable.getBool() : nil
+      retryable: retryable.isBool() ? retryable.getBool() : nil,
+      code: code.isString() ? code.getString() : nil
     )
   }
 
@@ -291,10 +303,10 @@ final class KiloAppActionBridge: @unchecked Sendable {
 @JavaScriptActor
 private final class DispatcherRegistration: LongLivedObject {
   nonisolated let runtime: JavaScriptRuntime
-  private var dispatcher: JavaScriptValue?
+  private let dispatcher: JavaScriptValue.Ref
 
-  init(dispatcher: JavaScriptValue, runtime: JavaScriptRuntime) {
-    self.dispatcher = dispatcher
+  init(dispatcher: consuming JavaScriptValue, runtime: JavaScriptRuntime) {
+    self.dispatcher = dispatcher.ref()
     self.runtime = runtime
   }
 
@@ -302,18 +314,18 @@ private final class DispatcherRegistration: LongLivedObject {
   /// kept past this call, so a teardown while the answer is pending still
   /// releases the dispatcher on time.
   func call(payload: [String: String]) throws -> JavaScriptValue {
-    guard let dispatcher else {
+    guard let answer = try dispatcher.withUnwrappedValue({ (dispatcher: borrowing JavaScriptValue) in
+      try dispatcher.getFunction().call(arguments: payload)
+    }) else {
       throw KiloAppActionError.dispatcherUnavailable(
         seconds: Int(KiloAppActionBridge.registrationTimeout)
       )
     }
-    // `JavaScriptValue` only holds the reference; the callable form is its
-    // function view. Same idiom as ExpoModulesJSI's own promise resolvers.
-    return try dispatcher.getFunction().call(arguments: payload)
+    return answer
   }
 
   func allowRelease() {
-    dispatcher = nil
+    dispatcher.release()
     KiloAppActionBridge.shared.unregister(self)
   }
 }

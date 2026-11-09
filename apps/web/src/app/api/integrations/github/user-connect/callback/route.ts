@@ -1,11 +1,12 @@
 import type { NextRequest } from 'next/server';
-import { createHash } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
+import { GitHubIdentityConflictError } from '@kilocode/db/github-identity';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { consumeGitHubUserAuthorizationState } from '@/lib/integrations/platforms/github/user-authorization-state';
 import { exchangeAndStoreGitHubUserAuthorization } from '@/lib/integrations/platforms/github/user-authorization';
+import { oauthStateHash, validOAuthCode } from '@/lib/integrations/oauth/callback-safety';
 
 function redirectWithStatus(key: 'success' | 'error', value: string): NextResponse {
   const target = new URL('/integrations/github', APP_URL);
@@ -19,14 +20,9 @@ function safeCallbackContext(searchParams: URLSearchParams) {
   return {
     hasCode: Boolean(searchParams.get('code')),
     hasState: Boolean(state),
-    stateHash: state ? createHash('sha256').update(state).digest('hex').slice(0, 8) : null,
+    stateHash: oauthStateHash(state),
     hasProviderError: Boolean(searchParams.get('error')),
   };
-}
-
-function validOAuthCode(code: string | null): string | null {
-  if (!code || code.length > 2048 || !/^[A-Za-z0-9._~+/-]+$/.test(code)) return null;
-  return code;
 }
 
 type CallbackStage = 'authenticate_user' | 'consume_state' | 'exchange_and_store_authorization';
@@ -76,13 +72,18 @@ export async function GET(request: NextRequest) {
       kiloUserId: user.id,
       code,
       codeVerifier: state.codeVerifier,
+      expected: state.expected,
     });
     if (result.status !== 'connected') {
       return redirectWithStatus('error', result.status);
     }
 
     return redirectWithStatus('success', 'user_connected');
-  } catch {
+  } catch (error) {
+    // The identity changed during the round trip. The user starts a new connection.
+    if (error instanceof GitHubIdentityConflictError) {
+      return redirectWithStatus('error', 'connection_conflict');
+    }
     captureException(new Error('GitHub user authorization callback failed'), {
       tags: { endpoint: 'github/user-connect/callback', stage, reason: 'operation_failed' },
       extra: safeCallbackContext(request.nextUrl.searchParams),

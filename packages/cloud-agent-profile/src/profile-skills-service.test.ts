@@ -1,5 +1,20 @@
 import { describe, expect, test } from 'vitest';
-import { parseSkillFrontmatter } from './profile-skills-service';
+import {
+  parseSkillFrontmatter,
+  MAX_PROFILE_SKILLS,
+  createCustomSkill,
+  createSkillsShSkill,
+  skillsShInputSchema,
+  type SkillCustomInput,
+} from './profile-skills-service';
+import { createLimitTestDb, TEST_PROFILE_ID } from './profile-limit-test-db';
+import type { ProfileOwner } from './types';
+
+const OWNER: ProfileOwner = { type: 'user', id: 'user_test' };
+
+function skillInput(name: string): SkillCustomInput {
+  return { name, rawMarkdown: `# ${name}` };
+}
 
 describe('parseSkillFrontmatter', () => {
   test('extracts name and description from YAML frontmatter', () => {
@@ -32,5 +47,51 @@ describe('parseSkillFrontmatter', () => {
       name: null,
       description: null,
     });
+  });
+});
+
+describe.each(['custom', 'skills-sh'] as const)('%s skill cap enforcement', sourceType => {
+  const createSkill: typeof createCustomSkill =
+    sourceType === 'custom'
+      ? createCustomSkill
+      : (db, profileId, input, owner) =>
+          createSkillsShSkill(
+            db,
+            profileId,
+            skillsShInputSchema.parse({ source: `owner/repo@${input.name}` }),
+            owner
+          );
+
+  test('stores a skill while the profile is below the cap', async () => {
+    const { db, state } = createLimitTestDb(MAX_PROFILE_SKILLS - 1);
+
+    await expect(createSkill(db, TEST_PROFILE_ID, skillInput('deploy'), OWNER)).resolves.toEqual({
+      id: expect.any(String),
+    });
+    expect(state.rowCount).toBe(MAX_PROFILE_SKILLS);
+    expect(state.lockCalls).toBe(1);
+  });
+
+  test('rejects a create at the cap without inserting', async () => {
+    const { db, state } = createLimitTestDb(MAX_PROFILE_SKILLS);
+
+    await expect(
+      createSkill(db, TEST_PROFILE_ID, skillInput('deploy'), OWNER)
+    ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
+    expect(state.rowCount).toBe(MAX_PROFILE_SKILLS);
+    expect(state.lockCalls).toBe(1);
+  });
+
+  test('keeps concurrent creates within the per-profile cap', async () => {
+    const { db, state } = createLimitTestDb(MAX_PROFILE_SKILLS - 1);
+
+    const results = await Promise.allSettled([
+      createSkill(db, TEST_PROFILE_ID, skillInput('first'), OWNER),
+      createSkill(db, TEST_PROFILE_ID, skillInput('second'), OWNER),
+    ]);
+
+    expect(results.map(result => result.status)).toEqual(['fulfilled', 'rejected']);
+    expect(state.rowCount).toBe(MAX_PROFILE_SKILLS);
+    expect(state.lockCalls).toBe(2);
   });
 });

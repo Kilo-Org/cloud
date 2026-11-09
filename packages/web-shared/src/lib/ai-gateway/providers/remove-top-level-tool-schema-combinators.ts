@@ -37,7 +37,7 @@ function addRequired(schema: Record<string, unknown>, names: string[]) {
   if (names.length === 0) {
     return;
   }
-  const required = Array.isArray(schema.required) ? schema.required : [];
+  const required: unknown[] = Array.isArray(schema.required) ? (schema.required as unknown[]) : [];
   schema.required = [...new Set([...required, ...names])];
 }
 

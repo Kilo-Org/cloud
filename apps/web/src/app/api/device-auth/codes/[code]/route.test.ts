@@ -24,6 +24,8 @@ const mockCheckRateLimit = jest.mocked(checkRateLimit);
 const fakeUser = { id: 'user-1' } as never;
 
 describe('GET /api/device-auth/codes/[code] (legacy poll)', () => {
+  const pollSecret = 'poll-secret-value-for-the-requesting-client';
+
   beforeEach(() => {
     jest.clearAllMocks();
   });
@@ -32,10 +34,11 @@ describe('GET /api/device-auth/codes/[code] (legacy poll)', () => {
     mockPoll.mockResolvedValue({ status: 'pending' });
 
     const response = await GET(new NextRequest('http://localhost:3000'), {
-      params: Promise.resolve({ code: 'ABCD-EFGH' }),
+      params: Promise.resolve({ code: pollSecret }),
     });
     expect(response.status).toBe(202);
     expect(await response.json()).toEqual({ status: 'pending' });
+    expect(mockPoll).toHaveBeenCalledWith(pollSecret);
     expect(Sentry.captureMessage).not.toHaveBeenCalled();
     expect(Sentry.captureException).not.toHaveBeenCalled();
   });
@@ -49,7 +52,7 @@ describe('GET /api/device-auth/codes/[code] (legacy poll)', () => {
     });
 
     const response = await GET(new NextRequest('http://localhost:3000'), {
-      params: Promise.resolve({ code: 'ABCD-EFGH' }),
+      params: Promise.resolve({ code: pollSecret }),
     });
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({
@@ -57,6 +60,37 @@ describe('GET /api/device-auth/codes/[code] (legacy poll)', () => {
       token: 'jwt',
       userId: 'user-1',
       userEmail: 'user@example.com',
+      requestingClient: null,
+      clientConfirmed: false,
+    });
+  });
+
+  test('returns the confirmed client with an approved pairing', async () => {
+    mockPoll.mockResolvedValue({
+      status: 'approved',
+      token: 'jwt',
+      userId: 'user-1',
+      userEmail: 'user@example.com',
+      requestingClient: {
+        clientId: 'client-abc',
+        clientName: 'Claude Desktop',
+        redirectOrigin: 'https://client.test',
+      },
+      clientConfirmed: true,
+    });
+
+    const response = await GET(new NextRequest('http://localhost:3000'), {
+      params: Promise.resolve({ code: 'ABCD-EFGH' }),
+    });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      status: 'approved',
+      requestingClient: {
+        clientId: 'client-abc',
+        clientName: 'Claude Desktop',
+        redirectOrigin: 'https://client.test',
+      },
+      clientConfirmed: true,
     });
   });
 
@@ -64,7 +98,7 @@ describe('GET /api/device-auth/codes/[code] (legacy poll)', () => {
     mockPoll.mockResolvedValue({ status: 'denied' });
 
     const response = await GET(new NextRequest('http://localhost:3000'), {
-      params: Promise.resolve({ code: 'ABCD-EFGH' }),
+      params: Promise.resolve({ code: pollSecret }),
     });
     expect(response.status).toBe(403);
   });
@@ -73,7 +107,7 @@ describe('GET /api/device-auth/codes/[code] (legacy poll)', () => {
     mockPoll.mockResolvedValue({ status: 'expired' });
 
     const response = await GET(new NextRequest('http://localhost:3000'), {
-      params: Promise.resolve({ code: 'ABCD-EFGH' }),
+      params: Promise.resolve({ code: pollSecret }),
     });
     expect(response.status).toBe(410);
   });

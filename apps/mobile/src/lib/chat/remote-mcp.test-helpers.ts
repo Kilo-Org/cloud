@@ -1,6 +1,6 @@
 import { Effect } from 'effect';
 
-import { type Tool } from '@kilocode/harness-sdk';
+import { type RemoteMcpOfferedTool } from '@kilocode/harness-sdk/plugins/remote-mcp';
 
 import { type RemoteMcpServerState } from './remote-mcp-state';
 import { type StoredRemoteMcpServer } from './remote-mcp-store';
@@ -28,16 +28,29 @@ export function server(
   };
 }
 
-/** A tool as the harness names one, already carrying its server's id. */
-export function tool(name: string): Tool {
+/**
+ * A tool as the harness offers one: the name the model calls it by, the name
+ * the server calls it by, and the view it carries when a test gives it one.
+ */
+export function tool(
+  name: string,
+  fields: { readonly serverToolName?: string; readonly uiResourceUri?: string } = {}
+): RemoteMcpOfferedTool {
   return {
     definition: {
       name,
       description: 'A tool the server offers.',
       parameters: { type: 'object', properties: {} },
     },
+    serverToolName: fields.serverToolName ?? name.split('_').slice(2).join('_'),
+    ...(fields.uiResourceUri === undefined ? {} : { uiResourceUri: fields.uiResourceUri }),
     run: () => Effect.succeed(''),
   };
+}
+
+/** The same, carrying the MCP Apps view the server attached to it. */
+export function viewTool(name: string, serverToolName: string, uri: string): RemoteMcpOfferedTool {
+  return tool(name, { serverToolName, uiResourceUri: uri });
 }
 
 /** The state a server is expected to be drawn in. */

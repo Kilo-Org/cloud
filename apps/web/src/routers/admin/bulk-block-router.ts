@@ -2,6 +2,7 @@ import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users } from '@kilocode/db/schema';
 import { unblockBulkBlockedUsers } from '@/lib/abuse/bulkBlock';
+import { recordAdminActions, userActionTarget } from '@/lib/admin/admin-action-audit';
 import { sql, count, isNotNull, desc, eq } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import * as z from 'zod';
@@ -46,7 +47,30 @@ export const adminBulkBlockRouter = createTRPCRouter({
     }));
   }),
 
-  unblockRecentBlock: adminProcedure.input(BulkBlockRowSchema).mutation(async ({ input }) => {
-    return unblockBulkBlockedUsers(input.blocked_reason, input.date, input.blocked_by_kilo_user_id);
+  unblockRecentBlock: adminProcedure.input(BulkBlockRowSchema).mutation(async ({ input, ctx }) => {
+    const { updatedCount, unblockedUserIds } = await unblockBulkBlockedUsers(
+      input.blocked_reason,
+      input.date,
+      input.blocked_by_kilo_user_id
+    );
+
+    // Unblocking clears the block attribution columns, so record one audit row
+    // per user with the block group that was lifted.
+    await recordAdminActions(
+      ctx,
+      unblockedUserIds.map(userId => ({
+        action: 'user.unblock' as const,
+        target: userActionTarget(userId),
+        message: 'Unblocked user via bulk unblock',
+        metadata: {
+          bulk: true,
+          previousBlockedReason: input.blocked_reason,
+          previousBlockedDate: input.date,
+          previousBlockedByKiloUserId: input.blocked_by_kilo_user_id,
+        },
+      }))
+    );
+
+    return { updatedCount };
   }),
 });

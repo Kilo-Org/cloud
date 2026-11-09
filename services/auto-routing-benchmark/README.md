@@ -24,8 +24,8 @@ design, invariants, and rollout/rollback.
   frontier uses only `FRONTIER_CASES`, including its harder long-context tasks, tagged `frontier`.
   Results land in the decider registry (`benchmark_profiles`), keyed by
   `(router, model, variant, engine identity, repetitions)`. Engine identity includes the router
-  and a hash of all selected dataset inputs. Efficient platform and owner pools share their
-  measurements; frontier measurements never satisfy efficient profiles.
+  and a hash of all selected dataset inputs. Each router's platform list and owner requests share
+  that router's measurements; frontier measurements never satisfy efficient profiles.
 - Normalized results live in D1 (`BENCH_DB`); published artifacts are cached in
   the shared `AUTO_ROUTING_CONFIG` KV namespace (publish = delete the keys so the
   next read repopulates from D1).
@@ -43,6 +43,21 @@ objects include the router, so an otherwise identical call on another router can
 deduplicated as a retry of the first call.
 Capability lookups derive candidate IDs from the selected router's table; the capability
 cache remains a shared model-ID union because modalities and context limits belong to models.
+
+Both routers are custom-router bases (ADR 0005): owner profile admission, the owner queue,
+custom router tables, and client evals accept `efficient` and `frontier`.
+Owner work for a base uses that base's configuration, dataset, engine identity, and quota.
+
+Client and direct-BYOK custom-router entries can explicitly link `measuredAs` to a globally
+measured platform model. Same-name variants reuse the base router's live platform measurement;
+other variants remain client-measured. Linked variants neither enter client eval plans nor accept
+client uploads, and status reads do not admit additional platform work for them. Custom tables
+preserve the entry's candidate identity and reprice the linked measurement at its owner's prices:
+token means give exact costs, while older summaries use the blended input/output price ratio.
+Missing client pricing means zero cost; an unpriceable linked summary is excluded from ranking.
+Ready history remains available as stale when its identity changes or its model leaves the catalog.
+`GET /admin/platform-measurements?router=efficient|frontier` lists models and variants with ready
+global history for link selection, including owner-requested platform-key measurements.
 
 ## System-optimal policy settings
 
@@ -72,10 +87,16 @@ falls back to the system value. Publishing reads effective values only.
   measurement-effort knobs have no measured basis for a daily recomputation. The Policy tab
   shows their value and the reason they are read-only.
 
-Frontier initially has no saved configuration or published table. No default model pool or
-efficient table is fabricated for it. Before enabling frontier serving, administrators must
-save a frontier configuration with its own decider models, benchmark those entries, and
-publish a complete frontier table.
+An omitted Frontier pool uses its router-specific alias preset.
+The worker benchmarks that pool before it publishes a complete Frontier table.
+It does not fabricate measurements or reuse the Efficient table.
+
+Frontier serves all authenticated callers through the benchmark router.
+It has no per-user rollout toggle or mode-based legacy model selection.
+Publish a complete Frontier table before deploying the gateway cutover.
+Missing or invalid Frontier decisions return service unavailable without invoking a legacy or organization fallback model.
+Authentication, organization access, privacy restrictions, and classification billing retain their existing checks.
+Catalog annotations and pre-classification denial hints use visible Frontier table candidates, independently of Efficient custom pools.
 
 Decider execution uses a global pool of reusable container slots, not run reservations.
 An atomic D1 claim selects an eligible unfinished chunk from any running run whenever a
@@ -90,13 +111,14 @@ and CLI-reported latency remain unchanged.
 `BENCHMARK_SCHEDULER_CONFIG` is a JSON object. Defaults are `slots: 250`,
 `modelConcurrency: 12`, `providerConcurrency: 16`, and `unknownProviderConcurrency: 2`.
 Optional `modelLimits` and `providerLimits` objects override those defaults by exact identity.
-`shares` defaults to `{"efficient/platform":2,"frontier/platform":2,"efficient/user":1}`.
+`shares` defaults to
+`{"efficient/platform":2,"frontier/platform":2,"efficient/user":1,"frontier/user":1}`.
 The least-occupied weighted share receives the next eligible claim; unused shares are
 borrowed without reservations or preempting active work. Model caps span variants and runs.
 Provider identities come from the catalog's optional `inference_provider_ids`, which uses
 the existing gateway provider index. Every possible provider is conservatively counted;
 missing metadata shares a small unknown-provider bucket. Model-name prefixes are never
-treated as serving providers. Frontier has no owner queue.
+treated as serving providers. Each router has an owner queue with its own share.
 
 Admins can override `slots`, `modelConcurrency`, `providerConcurrency`, and
 `unknownProviderConcurrency` at runtime, without a deploy, from the Scheduler card on the
@@ -126,7 +148,12 @@ reuses recoverable output, and never begins a ledgered paid case again. A queued
 limit, and a resume keeps the running lease. The one-minute tick recovers abandoned claims;
 completion refills slots immediately without waiting for a tick. Recovery and
 infrastructure/grader waits are bounded to six claims, with 15–300 second backoff. Capacity
-and unbilled provider-throttle waits do not create model-failure rows.
+and unbilled provider-throttle waits do not create model-failure rows. A provider throttle
+refunds its claim and counts against a separate budget of 16 throttle deferrals (about an
+hour of backoff), so a briefly rate-limited model is paced instead of losing its lanes; after
+that budget, the chunk falls back to the six-claim limit, so a persistent throttle still fails
+its lane. The gateway exempts only the default benchmark user (`bot-internal-benchmark`)
+from its free-model account limit; a `benchmarkUserId` override is limited like other accounts.
 
 A dispatch pass reads current occupancy and the next pending chunk of every lane — one
 `(run, model, variant, repetition)` chunk chain — and claims as many of those lanes as fit.
@@ -153,6 +180,10 @@ materializes, and a second lease row keeps concurrent dispatchers from initializ
 same time; a pass that completes a run's initialization claims again so its chunks start at
 once.
 
+Initialization failures stay isolated to their run, so healthy runs can still dispatch.
+A run without its saved execution identity fails and releases its claimed profiles.
+Transient catalog failures leave the run eligible for another initialization attempt.
+
 Run completion accounting reads every case result of the run, so it does not run per
 completed chunk. A completion first asks whether the run still has scheduled work — an
 index probe for a chunk that is pending, queued or active in a lane that has not
@@ -167,9 +198,19 @@ per-run scheduler markers instead of scanning the chunk, execution or run tables
 Completed cases are skipped, and all final CLI outputs are persisted before grading.
 A separate paid-execution ledger records when each paid case started and prevents automatic
 repetition if a worker disappears after inference may have started but before an output was
-saved. The container finishes a case whose caller is gone, posts the output back to the
-worker, and refuses the cases it had not started, so an interrupted lane resumes from
-recoverable output or repeats a case that provably made no paid call.
+saved. The container posts every completed case to the worker before returning its HTTP
+response, then posts `not_started` for accepted cases that provably did not spawn the CLI.
+Each callback carries the paid attempt's start time, so a stale callback cannot replace a
+newer empty-output retry.
+
+Output that arrives after its lane failed or its run became terminal is graded later by a
+single-case recovery message. Recovery never starts inference. A per-case grading lease
+prevents the live and recovery paths from grading the same output twice.
+Unbilled throttle, provider-outage (5xx or "temporarily unavailable") and catalog-load
+failures are cleared and deferred instead of measured, including one that ends a multi-step
+run after partial text but before any billed answer. A CLI process killed by a signal before
+its first event gets the same single retry as an empty completion; a timeout, a kill after
+events, or an invalid-request rejection stays a measured failure.
 
 A chunk that finds a ledgered case without output waits for it instead of failing its lane.
 It keeps its slot and provider lease, so the wait cannot oversubscribe providers, and its
@@ -185,14 +226,33 @@ and pending successful outputs are still reused.
 Terminal scheduler rows are pruned in bounded batches after 24 hours. Benchmark history,
 completed case results, and pending outputs remain available for compatible reuse.
 
-Rollout first exposes catalog provider metadata, then applies the additive D1 migration while
-the queue is paused. Wait for old consumers to quiesce and stop old run-scoped containers
-before enabling the new worker. Legacy queued chunk bodies are wakeups only: it materializes the run's
-entire remaining workload from its snapshot and schedules it under the same global caps.
-Old chunk/shard metadata cannot grant ownership. Do not run old and new consumers together
-or roll back while scheduler claims are active. Pause and quiesce first; complete or requeue
-affected runs before returning to an older worker. This change does not deploy or resume work.
+Production benchmark deploys use `pnpm run deploy`. The wrapper holds the scheduler dispatch
+lease, waits until no queued or active chunks remain, applies D1 migrations, deploys, then
+releases the lease. It renews the lease throughout and fails closed when draining exceeds
+its limit. It never pauses or resumes operator-controlled queues.
 
+An operator pauses dispatch by holding `scheduler_dispatch_lock` row 1 with a token that starts
+with `operator-pause-` and an unexpired lease. The wrapper treats that row as the dispatch hold:
+it never acquires, renews, releases or modifies it, still waits for queued and active chunks to
+drain, and verifies the same token with an unexpired lease before migrations, before the deploy,
+throughout the deploy and after it. It fails closed if the pause disappears, changes or expires,
+and logs `operator_pause_retained` without the token. Any other unexpired owner is contention.
+Resume dispatch after the deploy with:
+
+```sql
+UPDATE scheduler_dispatch_lock SET token=NULL, lease_until=0 WHERE id=1 AND token LIKE 'operator-pause-%'
+```
+
+Diagnostic events contain run, model, variant, repetition, case, chunk, slot, outcome and
+safe error categories. They never contain claim tokens, prompts, model output or raw stderr:
+
+| Event | Use |
+|---|---|
+| `benchmark_case_execution_started` / `benchmark_case_execution_retry_started` | Paid attempt start and output deadline |
+| `benchmark_scheduler_wait` | Retry, wait or lane-failure reason and `errorCategory` |
+| `benchmark_container_result_*` | Callback delivery and worker persistence |
+| `benchmark_output_recovery_*` / `benchmark_late_output_graded` | Late output handling |
+| `benchmark_decider_run_completed` | Expected, measured, missing, failed-lane and error coverage |
 
 Efficient publications invalidate `routing_table_v1`; frontier publications invalidate
 `routing_table_frontier_v1`. Router, engine/dataset identity, ranking settings, and contributing
@@ -202,17 +262,80 @@ measurements are included in routing-table version hashes.
 ## Platform model selection
 
 - Select a model, not one effort, in the platform configuration.
-- The worker resolves `~` model aliases through the catalog's `alias_target` when the concrete target is present, then expands every reasoning variant from that target's current `/api/openrouter/models` entry. An alias whose target is absent stays alias-keyed.
-- Exact resolved `(model, variant)` pairs are deduplicated: an alias and its target, or multiple aliases for one target, share a measurement. Retargeting an alias requests the new concrete pair instead of reusing the old target's result.
+- An omitted Efficient pool defaults to `~deepseek/deepseek-flash-latest`; an omitted Frontier pool defaults to `~openai/gpt-sol-latest`.
+- New admin forms use these presets. Explicit saved pools remain unchanged, and an explicit empty pool is invalid.
+- Admission uses the authenticated catalog for the benchmark identity, including its organization context.
+- Resumed runs preserve their saved user and organization scope. Configuration defaults do not replace a saved personal execution scope.
+- The worker applies the CLI's tool-support rule and validates exact reasoning variants before scheduling.
+- The drain also requires at least 20,000 input tokens after the completion budget the CLI reserves: catalog `context_length` minus `min(top_provider.max_completion_tokens || max_completion_tokens || 20% of the window, 32,000)`. The CLI harness prompt alone is about 16.6k tokens. A smaller pair is registered, then its profile fails with a context-window reason before any paid call. An absent context length is admitted.
+- Platform and owner pools share measurements for identical concrete model, variant, engine, and repetition settings.
 - Variants must contain explicit `reasoning.enabled` or `reasoning.effort` controls. Unrelated presets do not create benchmark entries.
 - A model without reasoning controls creates one `(model, null)` entry.
-- If the catalog fails or omits a selected model, reconciliation fails. It does not infer a default effort.
-- Catalog requests have a 10-second deadline, including body reads, so a stalled response cannot block both queues indefinitely.
+- An unavailable model fails its profile without blocking unrelated entries. Catalog request failures leave the existing snapshots intact.
+- Catalog requests have a bounded deadline, including body reads.
 - Manual and automatic selections use the same expansion. Existing saved effort selections no longer restrict platform measurements.
-- Owner pools use the same alias resolution and all-efforts expansion, sharing concrete measurements with the platform. Status responses preserve the requested model ids; custom routing tables use concrete ids.
-- Before the owner queue claims a batch, each pending owner-requested alias row whose target resolves hands its owner request to the concrete pair (creating it pending when absent) and drops its own. This converts owner rows registered before alias resolution, and stops an alias and its target from being measured twice. A variant the target no longer offers only loses the request; the next status lookup re-admits the target's current pairs. Running, failed, and ready alias rows are untouched.
-- Custom tables are already scoped to the requested resolved pairs by the benchmark worker. The serving worker accepts those concrete candidates and loads capabilities by their ids rather than re-filtering against saved alias ids.
-- Deploy the serving worker before the benchmark worker when introducing alias resolution; older serving workers filter concrete custom-table candidates against the original pool aliases.
+- Status responses preserve requested alias IDs. Routing tables contain measured concrete IDs.
+
+### Daily alias snapshots
+
+- New subscriptions resolve once when admitted. Existing subscriptions check for target changes daily at 05:00 UTC.
+- Queue dispatch, publication, policy edits, and status reads use persisted targets. They do not silently retarget an existing alias.
+- An unchanged target with current measurements needs no benchmark.
+- A changed target reuses current cached measurements or enters the normal benchmark queue.
+- The previous serving target remains active until every replacement variant is ready.
+- Resolution failures, unavailable replacements, and failed measurements retain the previous serving target.
+- Removing an alias stops its subscription from following later updates.
+- Daily target changes do not consume the owner's request quota.
+- An unchanged concrete ID has no automatic measurement expiry. Use targeted refresh after a confirmed provider change.
+
+Existing benchmark subscriptions retain their persisted alias targets. Backfill known owners
+with the full model list before relying on daily coverage for historical pools.
+Send the existing full pool to `POST /admin/profiles/subscriptions`:
+
+```json
+{
+  "ownerType": "user",
+  "ownerId": "owner-id",
+  "entries": [{ "model": "~vendor/latest" }]
+}
+```
+
+This authenticated endpoint replaces the owner's tracked benchmark models without editing
+its custom router. Send `entries: null` to remove its subscriptions.
+Use `restorePrevious: true` only to compensate a failed router save.
+Ordinary removal and re-addition resolve a new subscription instead of restoring its previous target.
+Apply the additive D1 migration and deploy the benchmark worker before resuming paused benchmark queues.
+
+
+
+### Unavailable models and targeted refresh
+
+A confirmed lookup failure for the requested model is not a quality score.
+It fails that exact profile and stops its remaining queued work.
+Already executing cases retain their slots and paid-execution records until they settle.
+Ordinary incorrect answers and genuine model failures retain their existing scoring.
+
+Use `POST /admin/registry/refresh` with explicit concrete model/variant pairs:
+
+```json
+{
+  "router": "efficient",
+  "mode": "repair_unavailable",
+  "entries": [{ "model": "vendor/model", "variant": null }]
+}
+```
+
+- `repair_unavailable` resets only selected profiles with recorded model-lookup failures.
+- `refresh` explicitly invalidates selected current measurements, including otherwise valid ready profiles.
+- Executable pairs become pending. Unavailable pairs remain failed instead of entering another doomed run.
+- The response lists `refreshed`, `unavailable`, and `skipped` pairs.
+- A selection containing an in-flight measurement returns conflict without partial changes.
+- Historical results remain available for inspection. The invalidation cutoff prevents their reuse by refreshed pairs.
+- Other profiles and ordinary retry reuse remain unchanged. No global engine-version bump occurs.
+
+The refresh endpoint handles affected `ready` rows directly. The failed-only requeue endpoint cannot repair them.
+Container callbacks are bounded by three attempts. Exhausted delivery logs contain categories,
+not credentials or result contents.
 
 Each pair uses its own CLI variant, results, cost, latency, and registry provenance.
 The worker admits bounded oldest-first registry batches independently of available execution slots.
@@ -229,30 +352,40 @@ Expand a route to inspect every ranked model/effort pair.
 - `rankCandidates` (`@kilocode/auto-routing-contracts`) orders every route's candidates.
 - A candidate competes within the router's `accuracyNoiseBand` of its effective `minAccuracy` (default noise band 0.05).
 - Frontier's effective threshold is `min(1, minAccuracy + frontierMinAccuracyDelta)`. The delta is fixed at 0, so the frontier router uses its own system-computed `minAccuracy`.
-- Both routers use the same best-value formula, selecting models and efforts from their own measured pools.
-- Daily re-evaluation: `minAccuracy`/`accuracyNoiseBand` come from a held-out grid over the
-  registry's measurements, `productionTokenProfile`/`switchHorizonTurns` from production auto
-  usage (mean uncached/cached input tokens per request, median requests per session), and the
-  rest are fixed constants. Admin overrides win over the computed values.
+- Both routers share candidate ranking, with separate validation objectives over their own measured pools.
+- Efficient minimizes estimated request cost without reducing the current policy's validation accuracy.
+- Frontier maximizes validation accuracy without increasing the current policy's estimated request cost.
+- Daily re-evaluation includes the current effective thresholds in its validation grid.
+  Incomplete, unmatched, or duplicate case coverage leaves the current settings unchanged.
+  Equivalent outcomes keep the current thresholds.
+- These request-level validation objectives are proxies, not verified full-task success or total task cost.
+  The grid selects settings; it does not provide independent evidence of improvement.
+  Freeze the policy before evaluating untouched full tasks and their complete costs.
+- `productionTokenProfile` and `switchHorizonTurns` still use production usage estimates.
+  Admin overrides retain precedence over computed settings.
 - Competing candidates are ordered by `estimatedRequestCostUsd × effectiveLatency^1.5 / wilson^15`, lowest first. With known TTFT, `effectiveLatency = p50TtftMs + LATENCY_TOTAL_WEIGHT × p50LatencyMs`, where the exported `LATENCY_TOTAL_WEIGHT` is 0.15 (tuned on a fully streamed offline sweep); without TTFT, total `p50LatencyMs` alone preserves legacy ordering.
-- `estimatedRequestCostUsd` adds the configured `productionTokenProfile` prompt cost at catalog prices to `avgCostUsd`. Without a profile or pricing, it equals `avgCostUsd`.
+- Published `estimatedRequestCostUsd` adds the configured input profile to the observed per-pair benchmark cost.
+  Fresh selection uses known request tokens at the prompt price, without assuming cache hits.
+  Unpriced candidates retain their published estimates.
+  The observed benchmark cost remains a limited base estimate, not a prediction of full-task output or remaining turns.
+  Tables without stored noise-band metadata retain their published ordering until republished.
 - `wilson` is the Wilson lower bound (z = 1) of accuracy over the candidate's measured `cases`. A well-measured candidate beats a thinly measured one at equal accuracy. Without `cases`, raw accuracy is used.
+- A candidate whose `estimatedRequestCostUsd` is exactly 0 outranks every paid candidate inside the accuracy band and takes no cost term (ADR 0005): $0 candidates are ordered by `effectiveLatency^1.5 / wilson^15` alone, so a free-but-slow or thinly measured one still loses to a free candidate with latency and coverage. Paid ordering is unchanged. Client models in a custom router are the usual source of $0.
 - The other candidates follow by accuracy, then cost.
 - When `lowConfidenceThreshold` is set and the classifier's route confidence is below it, the worker picks the most accurate eligible candidate of the route instead of the first-ranked one.
 - `meetsThreshold` stays strict (`accuracy >= minAccuracy`) for sticky routing.
 - The ranking policy version is part of every registry table version, so a policy change republishes.
 
-Production CLI benchmarks currently record total latency only, so published D1
-tables use the total-latency fallback. Offline sweep and candidate-screen
-summaries carry measured TTFT and use the TTFT-aware formula; missing TTFT is
-never fabricated.
+Published tables retain measured total latency, time to first token, and the policy noise band through D1 storage.
+If every final candidate lacks total latency, request-time repricing compares cost and Wilson-adjusted accuracy without a latency factor.
+Unknown measurements remain unknown; a candidate missing latency remains conservative when another candidate has measured latency.
 
-The optional `effortByComplexity` table mapping selects a variant after the model
-has been picked, using the production classifier's `low`, `medium`, or `high`
-reasoning-complexity bucket. It never changes models or restores a candidate
-excluded by the decision filters. Same-model effort changes retain the prompt
-cache and do not trigger cost-switch logic; sticky-immediate turns retain the
-incumbent variant until a classification is available.
+The optional `effortByComplexity` mapping filters each model to its measured variant before fresh model selection.
+The filter preserves published relative ordering and cannot restore an ineligible pair.
+Known request pricing then re-ranks those final pairs within the stored quality band.
+Cheapest mode skips the complexity mapping.
+Sticky decisions keep their existing exact-pair identity and cache-switch economics.
+Sticky-immediate turns retain the incumbent variant until classification is available.
 
 Platform and custom-table builds read `case_results` for each ready pair's exact
 provenance run and join the committed `src/datasets/case-complexity.json` labels.
@@ -260,6 +393,11 @@ Missing labels are ignored. Each route/model/bucket ranks its measured variants
 with the same value policy, falling back to the route-level variant when fewer
 than six distinct graded cases are available. Mappings are persisted with the
 table and included in its version identity.
+
+Apply the additive routing-evidence migration before deploying readers that select its columns.
+Deploy the benchmark writer and republish from ready measurements to populate the new evidence.
+Do not backfill old policy bands or latency from current configuration or unrelated profiles.
+
 
 Regenerate the labels with the production classifier and gateway normalization:
 
@@ -348,18 +486,35 @@ cases only. Held-out accuracy, cost, latency, and TTFT then aggregate the raw
 per-case results of the mapped variant for each bucket, not the route-level
 variant's overall summary. Without labels, the existing route-level evaluation
 is unchanged.
-Direct TTFT is time to the first nonempty content or reasoning delta; final streaming
-usage supplies cost. Container TTFT uses the first text event timestamp (or text
+Direct TTFT is time to the first nonempty content or reasoning delta. Streaming
+usage frames are cumulative receipts: a later billing frame supersedes an earlier
+one and is never added to it. Without BYOK, `usage.cost` is the total charge.
+With BYOK, `usage.cost` is only the router fee, so the row cost is that fee plus
+`cost_details.upstream_inference_cost`; either value alone leaves the total
+unknown (`costUsd: null`). Container TTFT uses the first text event timestamp (or text
 `time.start`) relative to request start, and is null when timestamps are unavailable.
 Legacy sweeps without TTFT remain readable and do not substitute total latency.
 Missing picks are excluded; `quality.heldOut.routes` reports coverage.
-`--max-usd` includes model and grader spend (in-flight requests can overshoot).
+`--max-usd` compares known model and grader spend only. In-flight requests can
+overshoot it; this stop is not a financed bound on total charges.
+An unknown model cost stops new model and paid-judge requests across workers.
+Mechanical checks continue. Already dispatched work finishes and retains its receipts.
+Resume preserves this stop when any stored row has unknown cost. A request blocked
+before dispatch creates no result row and remains unattempted for a later resume.
+Direct and container requests send one attempt. HTTP and transport failures do not
+trigger automatic redispatch because the earlier attempt can have an unknown charge.
+The row retains an unknown cost; this does not create a funded reservation.
+An HTTP status alone does not supply a complete billing receipt, including BYOK
+provider charges and auxiliary service fees. Do not infer a zero total charge.
+Legacy null-cost rows remain blocked without independent billing evidence;
+an old error string is not proof that no earlier request reached a provider.
 Atomic checkpoints every 200 cases retain each pair's raw `results`;
 `--resume sweep.json` requires the same suite and pairs, skips completed
 pair/case/repetitions, and retains accumulated spend.
 Infrastructure/grader failures are excluded from graded `cases` and counted in summary
-`errors`; empty answers score zero. Missing usage still permits grading but makes
-`costUsd` null and excludes that row only from the cost mean. Graded training candidates
+`errors`; empty answers score zero. Missing usage still permits mechanical grading.
+New paid judging stays blocked; judged rows without a grade record `grader_failed`.
+An unknown `costUsd` excludes that row from the cost mean. Graded training candidates
 with unknown cost still compete at the route's maximum known request-cost estimate
 (or benchmark cost zero if the entire route lacks costs), without imputing held-out cost.
 Recompute old summaries without
@@ -419,6 +574,207 @@ route mix, table, and pricing snapshot for base and head; use saved table and pr
 files if the live inputs may change between builds. `benchmarkPerTaskUsdWeighted`
 remains the benchmark-only cost and can move differently from this production-input
 estimate.
+
+### Prospective full-task experiment protocol (not admitted)
+
+This section states requirements for a future full-task experiment. It does not
+describe an admitted runner, a passed gate, or a measured result. No quality or
+cost gain is claimed under this protocol.
+
+The scoreboard, sweep, and policy grid above optimize and check single requests.
+That request-validation proxy can select a candidate policy. It cannot prove
+full-task success, full-task cost, or a routing improvement. Only frozen,
+untouched full tasks with complete charges can supply that evidence.
+
+The production worker and sweep keep their own paid-execution ledger. The
+bundled `repo-study` driver and `router-*` scripts implement the separate
+full-task research protocol below. Historical scripts and evidence remain
+audit-only; they cannot authorize new dispatch. Use the bundled runner rather
+than introducing another execution framework.
+
+**Frozen design.** Freeze the spec before any paid request, and bind it by hash.
+
+- Tasks: the frozen 18 tuning tasks and 32 final tasks, disjoint and unchanged.
+- Every final arm runs every final task with exactly 2 repetitions. A repetition
+  is a repeat measurement, not a new independent task. Include any paid tuning
+  in the frozen plan and allowance; this protocol does not add a tuning campaign.
+- Per-run limits: 60 steps, 1800 s wall time, 180 s per action, 16384 requested
+  output tokens, and the approved $60 per-run ceiling. The other pinned
+  resource limits stay unchanged. Prove a finite hidden-output ceiling.
+- Tune only on tuning tasks. Keep final tasks untouched until final selection.
+- Do not add tuning tasks, repetitions, arms, or limits silently. Any change is
+  a prospective amendment with a new freeze, quote, and admission decision.
+
+**Objectives.** Judge Efficient and Frontier separately, with the floor, bound,
+and interval rule frozen before outcomes exist.
+
+- Efficient: minimize total full-task cost subject to meeting the frozen
+  full-task success floor.
+- Frontier: maximize verified full-task success subject to the frozen
+  total-cost bound.
+- A rule that requires both strictly higher success and strictly lower cost for
+  both routers is a strict diagnostic only. It replaces neither objective.
+
+**Mandatory comparisons.** The denominator is every arm × task × repetition.
+
+- Arms: the unchanged router, the candidate router, a cost-matched
+  content-blind control, and every fixed pool model. Give each fixed model its
+  frozen variant policy.
+- The content-blind control selects without task content and matches the
+  candidate cost budget. It separates routing signal from spend alone.
+- Share one physical observation between arms only under an immutable,
+  hash-bound identical-intervention mapping. The mapping must prove the same
+  executable, task revision, model, variant, payload, limits, and grader.
+  Any other observation is a separate run.
+- Do not shrink the denominator after dispatch. Missing, failed, and invalid
+  rows stay visible with their reason and charges.
+
+**Financial admission gates.** Version 5 is capped exploration. It has no
+full-plan funding guarantee. A budget stop leaves the plan inconclusive.
+
+1. **Continuity.** Retain all historical settled charges, unknown holds at
+   their full bound, router fees, and upstream BYOK charges. Do not reset the
+   ledger, attempt history, or candidate history. Cumulative new allowance
+   across all amendments stays at or below the authorized $100. An amendment
+   never rebases the allowance, and a tranche inside it is not new allowance.
+   A larger legacy ledger cap is not spending permission.
+2. **Whole-plan cost forecast.** Register one hash-bound forecast for the whole
+   plan: every arm, task, and repetition. Price every `(model, variant)` pair
+   reachable from the baseline and candidate tables, not only first picks. A
+   missing or unpriced mandatory pair blocks registration. The forecast total
+   can exceed $100. The forecast is evidence, not funding.
+3. **Nested caps at dispatch.** Reserve each request in full before dispatch.
+   Settled plus held plus the next bound must fit three nested caps: the $100
+   cumulative new allowance, the $60 pilot ceiling for pilot work, and the $60
+   per-run ceiling. The frozen per-run resource limit can bind first. Count
+   incurred commitments only. Do not count unattempted rows. Do not count the
+   unused part of an active run cap. A claim records its per-run cap. The claim
+   reserves no money. Known settlement replaces a hold with the actual charge.
+   The unused part then stops counting. An unknown or breached charge stays at
+   its full bound and stops dispatch.
+4. **Pilot ceiling.** A baseline-only protocol pilot has an independent $60
+   ceiling inside the same cumulative allowance. A frozen pilot cap can be
+   lower. The pilot checks execution, grading, and receipts only. It cannot
+   certify either objective. No final request may run before exact successful
+   pilot evidence exists.
+5. **Component tariffs.** Keep immutable raw price evidence with units and
+   quantities for every component: input, cached read, cache write and storage
+   with its time-to-live bound, output, hidden reasoning, and per-request fees.
+   Prove whether hidden-reasoning and completion rates are additive or alternative.
+   If both quantities have finite bounds, sum their rates conservatively or reject
+   the quote; never assume a component is free. BYOK totals are
+   the router fee plus the upstream charge; either part alone is unknown.
+6. **Provider closure.** Prove the exact provider, descendant-model, and
+   service-tier set that the frozen request constraints admit. Price the worst
+   reachable member of that closure, not the cheapest endpoint. Keep privacy,
+   parameter, and no-fallback constraints in the frozen request.
+7. **Payload guard.** After all variant mutation, validate the final serialized
+   payload. Admit string text only. Reject media, files, native tools, search
+   plugins, cache controls, automatic continuation, budget escalation, and any
+   passthrough field that can add billable work. Reject; do not silently strip.
+   Bind the guard, its hash, and negative proofs to the executable identity.
+8. **Identity.** Bind the complete executable and input identity before
+   dispatch: source and bundle hashes, runtime argv, parser and grader
+   revisions, task split, arm snapshots, variant catalog, run order seed,
+   resource limits, classifier identity, and quote evidence. Dispatch only
+   inside the quote validity window; an expired quote needs a fresh quote.
+   Any identity mismatch blocks dispatch.
+
+**Tariff incompatibility is a no-go, not an outage.** If a tariff cannot be
+bounded under this contract, record an accounting failure. Do not mark the
+endpoint unavailable, invent an outage, strip tariff fields, drop a pair, or
+reduce the denominator to escape it.
+
+**Outcome interpretation.** Never retry an attempt that may have been paid.
+
+- Happy path: the run completes, the deterministic grade is valid, and every
+  charge settles. Record resolved or not, with settled total cost.
+- Empty: a dispatched attempt returns no answer or no submission, with settled
+  charges. Score it as a failure, retain its charges, and do not retry it.
+- Retryable: only an attempt proven not dispatched, with no paid call started.
+  It stays undispatched and missing, never a failure, and may run later under
+  the same frozen identity.
+- Nonretryable: any attempt that may have reached a provider. Never dispatch it
+  again. Hold an unknown charge at its full bound, stop further dispatch until
+  the stop is cleared under the frozen policy, and give ambiguous quality the
+  full interval instead of an invented score.
+- A provider outage with a valid outage record is an arm failure.
+  Infrastructure and grader failures block completeness instead. They are not
+  model-quality failures.
+- Budget stop: a cap stops a later request. The plan is partial and
+  inconclusive. A favorable prefix cannot establish a pass, superiority over a
+  fixed model, or control cost matching.
+
+**No-go states.** Paid dispatch stays blocked while an applicable gate fails:
+unaccounted unknown charges; unresolved historical candidate uncertainty;
+incomplete or expired tariff coverage; an unbounded tariff component; unresolved
+provider closure; a missing payload guard; an executable identity mismatch;
+or a changed denominator. A forecast above the caps is not a no-go. The next
+unaffordable request is the stop.
+Final dispatch also requires exact successful pilot evidence. The pilot cannot
+prove its own admission retroactively. Report blocked while any applicable gate fails.
+
+The version 5 prospective protocol is implemented by the bundled `repo-study`
+driver and the `router-*` coordinator scripts. Old manifests and old financing
+manifests are audit-only. Paid execution requires, in order:
+
+1. A capped-exploration authorization whose cumulative new allowance is within
+   the $100 programme ceiling and whose origin snapshot is immutable.
+2. A frozen version 5 spec with the complete router, content-blind control and
+   fixed-model arms for each mode, the unchanged task split and resources, and
+   frozen account-plugin evidence supplied as an absolute `account_policy` path.
+   Its bytes are bound into the freeze approval.
+3. A fresh complete tariff quote for every mandatory pair. An unsupported tariff
+   is an accounting failure, not an endpoint outage.
+4. A registered whole-plan cost forecast covering every mandatory row.
+   The `finance` command registers that forecast. It does not fund the plan.
+   Audit executability requires current authorization and frozen plan
+   validation. Each forecast keeps its own total.
+
+The coordinator validates the final text-only payload after variant resolution,
+posts exactly the approved bytes, and consumes each reservation once. It reports
+no pass or savings claim unless every arm has settled charges, determinate grades
+and the frozen coverage. An incomplete analysis is `inconclusive`.
+
+Variant validation accepts the shared gateway catalog's complete verbosity
+vocabulary, including `xhigh`, without dropping its frozen reasoning controls.
+
+These are pre-dispatch reservation checks, not a guaranteed ceiling on final
+provider charges. An over-bound charge is detected after billing and stops
+further dispatch. A provider dashboard budget is not a hard cap either:
+already-dispatched requests can finish after that budget is reached. Real
+dispatch requires independent evidence that all billed exposure stays inside
+the authorization; a quote or dashboard limit alone does not prove that.
+
+Recovery releases a coordinator reservation at zero cost only when neither its
+dispatch admission nor its receipt indicates dispatch. Historical and admitted
+requests retain their full holds. Receipt or observer failures cannot overwrite
+a settled charge. Admission denials finalize their receipt and budget-limit
+evidence even when admission already settled the unused reservation.
+
+Classifier settlement uses the solver's billing-evidence rules. Missing billing
+mode or upstream-cost evidence retains the full hold and stops further dispatch.
+Known charge floors remain held even when they exceed the original reservation.
+
+The isolated runtime uses the installed Miniflare configuration API. Closing a
+run attempts every instance, reports disposal failures, and retains failed
+instances for another cleanup attempt. Package type checks include this runtime.
+
+Run the offline checks with:
+
+```sh
+python3 -m pip install -r repo-study/requirements.txt
+(cd repo-study && python3 -m unittest test_text_tariffs)
+(cd scripts && python3 -m unittest test_router_ledger test_router_study test_router_proof test_router_replay.ReplayInvariants)
+```
+
+Do not authorize paid work without real account-policy evidence, a finite quote
+for every mandatory pair, and independent evidence of total billed exposure.
+A forecast above the remaining authorization can register for offline checks.
+The code checks quoted reservations; it does not certify a provider-invoice
+ceiling. Local admission stops before an unaffordable reservation. This protocol
+does not authorize a live run by itself. Do not shrink the plan or raise a cap
+implicitly.
 
 ### Shadow routing policy
 
@@ -488,8 +844,9 @@ explicitly listed in `excludedRoutes`, never simulated by direct completions.
 A shared worker pool pulls requests in round-robin order, alternating each model's
 variants within its case sequence. `--concurrency <n>` defaults to 24. Dispatch
 order spreads partial-run coverage across models; completions may arrive out of order.
-Direct requests, streaming TTFT, retries, long-context materialization, and grading
-reuse the offline sweep path. Set `OPENROUTER_API_KEY`; no container is required.
+Direct requests, streaming TTFT, long-context materialization, and grading reuse
+the offline sweep path. Direct model requests are not automatically retried.
+Set `OPENROUTER_API_KEY`; no container is required.
 
 The report contains model-wide and per-variant accuracy, Wilson lower bounds,
 benchmark and estimated production request cost, p50 TTFT and total latency, raw
@@ -543,8 +900,9 @@ All under `/admin`, gated by `Authorization: Bearer <INTERNAL_API_SECRET_PROD>`
 (the gateway's admin panel proxies these with the internal secret):
 
 GET endpoints accept `?router=efficient|frontier`; mutations accept `router` in their body
-or query. Omission selects efficient. Owner profile registration/status and custom-table
-endpoints reject frontier. The classifier-winner endpoint returns the shared winner.
+or query. Omission selects efficient. Owner profile and custom router endpoints accept both
+routers. The classifier-winner endpoint returns the shared winner.
+The client eval routes (`/v1/eval/*`, below) use the same bearer secret.
 
 
 | Endpoint | Purpose |
@@ -555,38 +913,41 @@ endpoints reject frontier. The classifier-winner endpoint returns the shared win
 | `POST /admin/runs` | Classifier: start a run (`{kind: 'classifier', force}`). Decider: reconcile + drain the registry queues (`{kind: 'decider', queue: 'platform' \| 'user' \| 'both'}`) |
 | `GET /admin/registry` | Queue counts and exact platform entry statuses under the current engine identity and repetitions |
 | `POST /admin/registry/requeue` | Put failed registry rows back to `pending` (`{scope}`); charges no owner quota |
+| `POST /admin/registry/remeasure-prompt-transport` | Dry-run, queue or cancel re-measures of prompt-transport-affected cases (`{router?, action}`) |
 | `GET /admin/routing-table` | Latest published **platform** routing table |
 | `GET /admin/classifier-winner` | Current classifier winner |
 | `POST /admin/debug-cli` | Run one ad-hoc prompt through the kilo CLI container (diagnostic) |
-| `POST /admin/profiles/register` | Admit missing/stale/retried profiles for every current catalog effort of the pool models (quota 10 models/24h) |
-| `POST /admin/profiles/status` | Read current per-effort coverage; free re-admission for engine-stale pairs |
-| `POST /admin/custom-routing-table` | Rank ready/current exact pairs for the selected models (`table: null` → balanced fallback) |
+| `POST /admin/profiles/register` | Admit missing/stale/retried profiles for every current catalog effort of a custom router's gateway models (quota 20 models per base router per 24h) |
+| `POST /admin/custom-router-table` | Custom router table from platform and owner client measurements (`CustomRouterBenchmarkContextSchema`) |
+| `POST /admin/custom-router-status` | Per-variant status of every custom router entry (`CustomRouterStatusResponseSchema`) |
 
-## Owner pools and Benchmark profiles
+## Owner Benchmark profiles
 
-Owners (personal users or organizations) can constrain `kilo-auto/efficient` to
-1–10 **pool models**. The pool lives in the auto-routing Durable Object, whose
-read path collapses and deduplicates legacy exact-pair pools. Each selected model
+Custom routers (ADR 0005) name gateway models of either base router. When an owner saves a
+router whose entries or base router changed, the web app registers the gateway entries the
+platform key can serve with `POST /admin/profiles/register`. Each selected model
 expands through the live catalog into every supported reasoning effort, or one
 default pair when there are no reasoning controls. This worker measures exact
 model-effort pairs globally under the current engine identity and repetitions.
-Custom tables rank every measured pair; the router, not the owner, chooses effort.
+Custom router tables rank every measured pair; the router, not the owner, chooses effort.
+ADR 0003 owner pools, which constrained efficient itself, were converted to custom routers
+with slug `efficient` at the ADR 0005 cutover.
 
 ### The two registry queues
 
 A registry row records who wants the measurement: `platform_requested` (the
-saved decider list) and `user_requested` (owner pools). Both can be set — the
+saved decider list) and `user_requested` (custom router gateway entries). Both can be set — the
 row is global, so the pair is benchmarked once and serves both.
 
 | | Platform queue | User queue |
 |---|---|---|
-| Filled by | `syncPlatformRegistry` expands the saved models from the current catalog on config save, daily sync, and platform drain | `POST /admin/profiles/register` from owner pools (quota-charged) |
+| Filled by | `syncPlatformRegistry` expands the saved models from the current catalog on config save, daily sync, and platform drain | `POST /admin/profiles/register` from the web custom routers API (quota-charged) |
 | Trigger | Admin `POST /admin/runs`, daily cron, any decider terminal state | Admin `POST /admin/runs`, one-minute cron, any decider terminal state |
 | `benchmark_runs.purpose` | `platform` | `user` |
-| Execution share | Efficient and frontier each have default weight 2 | Efficient has default weight 1 |
-| Run lifecycle | One active run per router/queue | One active efficient owner run |
+| Execution share | Efficient and frontier each have default weight 2 | Efficient and frontier each have default weight 1 |
+| Run lifecycle | One active run per router/queue | One active owner run per router |
 
-All three shares use the same bounded chunk scheduler and borrow unused capacity.
+All four shares use the same bounded chunk scheduler and borrow unused capacity.
 `benchmark_runs.max_concurrency` is retained for storage compatibility but new decider
 runs write zero: it is not an execution reservation. Registry admission is still atomic
 per exact pair, and the per-router/queue run lifecycle gate remains independent of slots.
@@ -596,8 +957,8 @@ If a desired pair remains pending or running, the previous table stays live.
 Failed pairs do not contribute scores.
 If any taxonomy route has no measured candidate, the worker skips publication and keeps the previous table.
 
-Rollback: turning off owner pools (or clearing a pool) leaves the platform table
-untouched — it only ever draws on rows the platform list asks for.
+Rollback: removing a model from a custom router (or deleting the router) leaves the platform
+table untouched — it only ever draws on rows the platform list asks for.
 
 ### Request ledger and admission
 
@@ -606,13 +967,15 @@ Already ready/current or pending/running pairs are reused by every owner.
 
 `POST /admin/profiles/register` admits missing, stale, or retried pairs and records
 one quota request event per newly requested model in the same D1 batch. The rolling
-quota counts models, not efforts. Engine-stale remeasurement is quota-free.
+quota allows 20 new models per base router per owner in 24 hours; it counts models,
+not efforts, and ready or pending models are reused without a charge. Engine-stale
+remeasurement is quota-free.
 Concurrent requests share one global pair; the first admission wins and the
 others report its status.
 
-Admission returns before the caller's Durable Object settings write. If that
-write fails, the previous pool remains, but admitted measurements still run.
-Retrying reuses the same global profiles without charging quota twice.
+Admission returns before the web app's router write. If that write fails, the previous
+router remains, but admitted measurements still run. Retrying reuses the same global
+profiles without charging quota twice.
 
 ### Status transitions and drain
 
@@ -630,8 +993,9 @@ pending → running → ready
   transition — a newer pending/ready row is never clobbered.
 
 Currency: a profile is current only when `engine_identity`, `repetitions`, and
-exact variant match the live decider engine. Stale rows are never returned as
-Ready or assembled into custom tables.
+exact variant match the live decider engine. The platform table never uses a stale row.
+Custom router tables serve a stale row, flagged `stale`, until the current one is ready (see
+below).
 
 **Per-queue drain** (after any decider terminal state, on the admin's manual
 trigger, and on the one-minute cron):
@@ -654,19 +1018,107 @@ first flips it to `running`, so it is still measured exactly once.
 
 Long waits stay `Benchmarking` in the UI; there is no second timeout state in v1.
 
-### Sparse custom routing tables
+### Prompt transport re-measure
 
-`POST /admin/custom-routing-table` with 1–10 entries returns
-`CustomRoutingTableResponse`:
+Every result row carries `prompt_revision` (`PROMPT_TRANSPORT_REVISION` in
+`src/prompt-transport.ts`). Revision 1 passed the prompt as a `kilo run` argument, which
+quoted prompts containing a space and escaped their inner `"`, and omitted long-context
+snapshots. Revision 2 materializes the snapshot and writes the prompt verbatim to stdin.
+`argvAffectedCases(router)` lists the cases revision 1 measured unreliably: every
+long-context case, and efficient cases whose prompt has an inner `"` and whose check is
+`exact`, `contains_all` or `regex` (frontier inner-quote cases join when
+`REMEASURE_FRONTIER_INNER_QUOTE_CASES` is set). The engine identity does not change.
 
-- Candidates come only from **ready + current** profiles' provenance
-  `model_summaries` for that entry's exact pair **and** measuring `run_id`
-  (no cross-run leakage), ranked with the saved policy knobs via
-  `rankCandidates`.
-- Candidates carry exact `variant` (never `reasoningEffort`).
-- Route keys with no graded candidates are **omitted** (not empty arrays).
-- If no requested entry is ready/current → `{ table: null }` so the gateway
-  falls back to balanced. Never fabricate candidates.
+A re-measure claims the pair in `profile_remeasures`, not on the profile: the profile stays
+`ready` on its previous run, so the platform table, owner tables and status keep serving.
+The re-measure run copies the previous run's results except the affected revision-1 rows,
+so only those cases are scheduled, under the normal scheduler caps. When the run completes,
+the profile's `run_id` moves to it, the claim is removed, and the platform table republishes
+as after any decider run. A failed run, a dead lane or an orphaned claim drops the claim and
+keeps the previous measurement; an unwritten run returns the claim to the queue. Prior-case
+reuse never copies an affected revision-1 row into a new run. A container result recovered
+after its caller died is stamped with the revision the paid call was opened under
+(`scheduler_executions.prompt_revision`, defaulting to 1 for calls opened before this
+change), so output a previous deploy produced stays re-measurable instead of being trusted.
+
+Runbook, after the whole stack is merged and deployed (the migration applies on deploy):
+
+1. Dry run (writes nothing): `POST /admin/registry/remeasure-prompt-transport` with
+   `{"action":"dry-run"}`, or `{"router":"efficient","action":"dry-run"}` for one router.
+   Each router reports its affected pairs, affected results, and projected spend: the
+   measured cost of each affected result plus, for long-context cases, the snapshot's
+   prompt tokens at the catalog prompt price. `unknownCostResults` counts results this
+   estimate cannot price.
+2. Queue: the same call with `"action":"request"`. The next drain (at most one minute)
+   starts the runs.
+3. Verify: the dry run reports `pairs: 0` per router, `profile_remeasures` is empty, and
+   `GET /admin/routing-table` shows a new version.
+4. Stop: `"action":"cancel"` deletes queued claims. A claimed pair finishes or drops with
+   its run.
+## Custom routers and client measurements
+
+ADR 0005 custom routers rank a pool of gateway and client entries against one base
+router. The serving worker and the web app resolve the router from PostgreSQL and send
+its context (`CustomRouterBenchmarkContextSchema`: owner, base router, entries, and the
+entry keys the owner's CLI measures); this worker has no PostgreSQL access.
+
+- **Client profiles** (`client_profiles`) are keyed by owner, base router, entry kind,
+  provider, model, variant, engine identity, and repetitions. They hold a rollup of the
+  owner's uploads: accuracy, errors, timeouts, mean cost, p50/p95 latency, and per-route
+  summaries. `client_case_results` keeps each uploaded output with its cost, duration,
+  exit code, timeout flag, score, and grader cost. Each upload takes the next value of the
+  profile's `upload_seq` as its `revision`, so revisions never repeat, even after a case is
+  deleted and uploaded again: the rollup is written only if every stored upload still
+  carries the revision the view was computed from, so a stale view never overwrites a
+  newer one. A failed grader charge deletes only the upload with its own revision. Client rows never
+  feed the platform table and are never copied into `benchmark_profiles`.
+- A client profile is `ready` once one uploaded case ran without error, `failed` once every
+  planned case repetition was uploaded and none did, and `pending` otherwise. Latency comes
+  from the uploader's machine.
+- **Tables** (`POST /admin/custom-router-table`): each pair serves its current ready
+  measurement, otherwise its newest ready measurement from an older engine identity with
+  `stale: true`. Gateway entries the platform measures use `benchmark_profiles`; client
+  entries become `client:<provider>/<model>` candidates priced from the entry (absent
+  pricing is $0). Thresholds and ranking knobs are the base router's effective policy.
+  The version includes the base router, engine identity, and each client profile's upload
+  count.
+- **Status** (`POST /admin/custom-router-status`): `ready`, `stale`, `pending`, `running`,
+  `failed`, or `missing` per variant. A platform pair with only older-engine rows is
+  re-admitted for free.
+
+### Client eval API
+
+The auto-routing worker forwards the CLI's public calls to these routes with the owner
+context; schemas live in `@kilocode/auto-routing-contracts`. Errors use
+`CustomRouterErrorResponseSchema` with `CUSTOM_ROUTER_ERROR_HTTP_STATUS`.
+
+| Route | Request | Behavior |
+|---|---|---|
+| `POST /v1/eval/plan` | `InternalClientEvalPlanRequestSchema` | Every (entry, variant, case, repetition) without a successful current-engine upload, plus `staleEntries` that still serve an older-engine measurement |
+| `POST /v1/eval/case` | `InternalClientEvalCaseRequestSchema` | `prompt`: the exact `kilo run` prompt the platform container sends (`deciderCliPrompt`, so client and platform rows share byte-identical prompts), and the 180-second timeout; checks and golden answers stay here |
+| `POST /v1/eval/result` | `InternalClientEvalResultRequestSchema` | Grade with the platform graders, store, roll up the profile, return the score |
+
+- An upload for another engine identity returns `stale_engine_identity` (409); the CLI
+  requests a new plan. Unknown cases, variants outside the entry, and repetitions beyond
+  the base router's `deciderRepetitions` return `invalid_request`.
+- Grading matches the platform: a nonzero exit, a timeout, or empty output scores 0;
+  otherwise the case's mechanical check or the System One judge grades it.
+- Judged grading cost is billed to `billing.userId` and `billing.organizationId` as usage
+  model `auto-routing/grader` through `/api/internal/usage/record`, before the result is
+  stored. The usage id derives from the graded case, so a retried upload records it once.
+  If usage cannot be recorded the upload fails with `internal_error` and nothing is stored.
+  The serving worker checks the paying owner's balance before forwarding.
+- A case repetition reuses its stored score only after exit code 0, no timeout, and nonempty
+  output. Nonzero exits, timeouts, and empty output remain in the plan; a new upload replaces
+  the failed attempt.
+- A judged upload grades under a per-case claim (`client_case_grading_claims`, one row per
+  profile, case and repetition). The claim holder runs the judge; a parallel upload of the
+  same case returns the stored score once the holder finishes, and otherwise fails with
+  `internal_error` instead of starting a second grading. The claim is released when its
+  grading ends, and a lease lets the next upload take over one left by a vanished request.
+
+Rollout: apply the additive D1 migration (new tables and the `profile_request_events.router`
+column, defaulting existing rows to `efficient`) with the deploy; no queue pause is needed.
 
 ## Local development
 
@@ -678,7 +1130,8 @@ pnpm dev:start auto-routing
 
 This brings up the auto-routing worker (:8810), this worker (:8814), and the
 Next.js gateway (:3000). Logs land in `dev/logs/*.log`; the tmux session is
-`kilo-dev-<worktree>`.
+`kilo-dev-<worktree>`. The `predev` script applies this worker's D1 migrations to
+the local database before `wrangler dev` starts, so a fresh stack has every table.
 
 ### Required env / secrets
 
@@ -688,7 +1141,9 @@ Next.js gateway (:3000). Logs land in `dev/logs/*.log`; the tmux session is
   `localhost`).
 - **Secrets store** (seeded via `pnpm dev:env -y auto-routing-benchmark`, not
   `.dev.vars`): `INTERNAL_API_SECRET_PROD` (same value as the gateway's
-  `INTERNAL_API_SECRET`) and `OPENROUTER_API_KEY`.
+  `INTERNAL_API_SECRET`), `BOT_TOKEN_MINT_SECRET` (same value as the gateway's
+  `BOT_TOKEN_MINT_SECRET`; it authenticates only the decider CLI token mint)
+  and `OPENROUTER_API_KEY`.
 
 ### Hitting it locally
 
@@ -697,10 +1152,28 @@ SECRET=$(grep '^INTERNAL_API_SECRET=' ../../.env.local | cut -d= -f2- | tr -d '"
 curl -s http://localhost:8814/admin/config -H "Authorization: Bearer $SECRET"
 ```
 
-Decider runs use the worker's default benchmark user and org unless
-`benchmarkUserId` / `benchmarkOrgId` overrides are saved in config. Any
-effective benchmark user must exist locally with credits and belong to the
-effective org. The dev seed provides `auto-routing-cli-local`.
+A fresh local database has no benchmark configuration, and none is fabricated
+(ADR 0002): profile admission, custom routers, and client evals
+answer 400 `benchmark config not set` until one is saved. Save one per base router
+you use, with models from your local catalog, through the admin panel's Benchmarks
+tab or this call (repeat with `?router=frontier` for frontier):
+
+```bash
+curl -s -X PUT 'http://localhost:8814/admin/config?router=efficient' \
+  -H "Authorization: Bearer $SECRET" -H 'content-type: application/json' \
+  -H 'x-updated-by: you@kilocode.ai' \
+  -d '{"classifierModels":["<system-one-model>"],"deciderModels":[{"id":"<catalog-model>"}],
+       "minAccuracy":0.7,"switchCostFactor":3,"benchmarkUserId":null,
+       "updatedAt":null,"updatedBy":null}'
+```
+
+Decider runs use the worker's default benchmark user (`bot-internal-benchmark`)
+and org unless `benchmarkUserId` / `benchmarkOrgId` overrides are saved in
+config. Each queue message mints a one-hour CLI token from
+`POST /api/internal/bot-token`, which only issues for internal bot users
+(`bot-internal-*`) that belong to the org, so a non-bot override fails the run
+start with a clear error. Create the user locally from the admin
+**Internal Bot Users** page; it also needs credits.
 
 > Local KV/D1 writes from a *second* `wrangler` process are not seen by the
 > running dev process (miniflare holds its own view). After writing state out of
@@ -716,8 +1189,9 @@ pnpm db:generate     # drizzle-kit generate
 pnpm typecheck && pnpm test
 ```
 
-Migrations apply on deploy via the `predeploy` hook
-(`wrangler d1 migrations apply auto-routing-benchmark --remote`).
+Production migrations apply inside the guarded `pnpm run deploy` flow. The local database
+uses the `predev` hook (`--local`; `CI=1` skips wrangler's confirmation prompt, which would
+otherwise block the dev runner's tmux pane).
 
 Inspect local D1 by copying the sqlite out (direct reads often hit miniflare
 locks):
@@ -733,17 +1207,19 @@ sqlite3 /tmp/<file>.sqlite 'select id, kind, status from benchmark_runs;'
   The D1 live-slot uniqueness constraint and claim tokens protect container ownership.
   CLI runs remain serialized because they share SQLite state.
 - `/warmup` initializes the local CLI database once per container without making an inference request.
+- The case prompt reaches `kilo run` on stdin, never as an argument. Long-context cases are
+  materialized with their workspace snapshot (up to about 640 KB for 160k-token targets),
+  which exceeds Linux's 128 KiB limit on one argument, and `kilo run` re-quotes argument
+  messages that contain spaces. With no positional message the CLI reads stdin to EOF and
+  sends it verbatim as the user message.
 - The server handles SIGTERM and drains the CLI case it already accepted, then exits.
   A case still queued when SIGTERM arrives is refused with `503` instead of starting a new
-  paid call, so a rollout is never charged for work it interrupts. Idle containers therefore
-  release capacity instead of ignoring the inactivity stop.
-- A drained case whose caller disappeared is posted to the worker's `/container/case-result`
-  route, which stores it as pending output. A Durable Object request keeps running after its
-  caller is canceled, so `BenchRunnerContainer` relays the caller's `request.signal` (enabled
-  by the `enable_request_signal` compatibility flag) to the container request; without that,
-  the container would answer the Durable Object and never post. The route is authenticated
-  by the paid-execution claim token instead of the backend secret, which a container never
-  holds, and it only records outcomes for a claim token that actually opened the execution.
+  paid call, after its callback records `not_started`.
+- Every completed case is posted to the worker's `/container/case-result` route before the
+  HTTP response. A Durable Object request keeps running after its caller is canceled, so
+  `BenchRunnerContainer` relays the caller's `request.signal` (enabled by the
+  `enable_request_signal` compatibility flag) to the container request. The route accepts
+  only the exact paid-execution generation that opened the case.
 - Completed or failed runs reject queued work before starting another CLI case.
 - Smaller chunks leave time for an empty-output retry within the queue invocation limit.
 - `case_results` rows carry diagnostics: CLI exit code, output prefix, and an
@@ -768,6 +1244,9 @@ Classifier dead-letter handling remains fail-fast.
 
 `run_lane_failures` preserves lane-aware finalization: a run settles once each
 (model, variant, repetition) lane has all its cases or a recorded infrastructure failure.
+
+The periodic dispatch sweep ignores pending chunks in failed lanes when checking run completion.
+It retries finalization after a canceled completion handler without starting duplicate inference.
 
 - **Decider runs of either queue** complete per-entry: entries whose lanes all
   finished go `ready`; entries with a dead lane go `failed` ("Benchmark lane did

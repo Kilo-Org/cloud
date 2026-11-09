@@ -1,6 +1,5 @@
 import { describe, expect, it } from '@jest/globals';
 import {
-  CHATGPT_USAGE_SETTINGS_URL,
   USAGE_LIMIT_UNKNOWN_RESET_WINDOW_MS,
   isChatGptUsageLimitCurrent,
   readChatGptUsageLimit,
@@ -23,7 +22,7 @@ describe('readChatGptUsageLimit', () => {
       NOW
     );
 
-    expect(limit).toEqual({ resetsAt: NOW + 3_600_000 });
+    expect(limit).toEqual({ code: 'usage_limit_reached', resetsAt: NOW + 3_600_000 });
   });
 
   it('reads the API shape and keeps a missing reset delay empty', () => {
@@ -33,7 +32,7 @@ describe('readChatGptUsageLimit', () => {
       NOW
     );
 
-    expect(limit).toEqual({ resetsAt: null });
+    expect(limit).toEqual({ code: 'insufficient_quota', resetsAt: null });
   });
 
   it('reads the documented sharing code of a delegated request', () => {
@@ -50,7 +49,7 @@ describe('readChatGptUsageLimit', () => {
 
     // OpenAI reports no reset time for this code, and the notice must not claim
     // one: the recorded window only bounds how long the message stays up.
-    expect(limit).toEqual({ resetsAt: null });
+    expect(limit).toEqual({ code: 'subscription_sharing_usage_limit_exceeded', resetsAt: null });
   });
 
   it('reads the sharing code when the body carries a reset delay', () => {
@@ -65,7 +64,20 @@ describe('readChatGptUsageLimit', () => {
       NOW
     );
 
-    expect(limit).toEqual({ resetsAt: NOW + 3_600_000 });
+    expect(limit).toEqual({
+      code: 'subscription_sharing_usage_limit_exceeded',
+      resetsAt: NOW + 3_600_000,
+    });
+  });
+
+  it.each([
+    { error: { code: 'subscription_sharing_workplace_individual_usage_limit_exceeded' } },
+    { detail: { type: 'subscription_sharing_workplace_individual_usage_limit_exceeded' } },
+  ])('identifies a workspace limit separately from a consumer limit', body => {
+    expect(readChatGptUsageLimit(429, body, NOW)).toEqual({
+      code: 'subscription_sharing_workplace_individual_usage_limit_exceeded',
+      resetsAt: null,
+    });
   });
 
   it('ignores a per-minute rate limit', () => {
@@ -82,15 +94,6 @@ describe('readChatGptUsageLimit', () => {
     expect(readChatGptUsageLimit(429, { detail: { type: 'server_error' } }, NOW)).toBeNull();
     expect(readChatGptUsageLimit(429, 'not json', NOW)).toBeNull();
     expect(readChatGptUsageLimit(429, null, NOW)).toBeNull();
-  });
-});
-
-describe('CHATGPT_USAGE_SETTINGS_URL', () => {
-  it('opens the page that lists the app-specific limit too', () => {
-    // The guideline's notice must open the usage settings page: an app-specific
-    // weekly limit can be exhausted while the plan still has allowance, and
-    // only that page names it.
-    expect(CHATGPT_USAGE_SETTINGS_URL).toBe('https://chatgpt.com/settings/usage');
   });
 });
 

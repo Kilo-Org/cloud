@@ -8,6 +8,7 @@ import { SelectableText } from '@/components/ui/selectable-text';
 import { FixedPartRow } from '../fixed-part-row';
 import { useOpenPartDetail } from '../open-part-detail-context';
 import { getToolDisplay, toolPartHasDetails } from '../tool-card-display';
+import { toolStatusLabel } from '../tool-status-label';
 import { buildResultRowsModel } from '../tool-list-model';
 import { ToolResultRows } from '../tool-result-rows';
 
@@ -51,7 +52,7 @@ export function GlobToolCard({ part }: Readonly<{ part: ToolPart }>) {
       status={part.state.status}
       accessibilityLabel={t('agentChat.toolCard.accessibilityLabel', {
         name: display.subtitle ?? display.title,
-        status: part.state.status,
+        status: toolStatusLabel(t, part.state.status),
       })}
       onPress={
         hasDetails && openPartDetail

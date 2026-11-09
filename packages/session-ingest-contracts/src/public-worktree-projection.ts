@@ -1,3 +1,15 @@
+export function projectKnownCloudAgentPath(
+  path: string,
+  publicDirectory: string
+): string | undefined {
+  const root =
+    /^\/workspace\/(?:(?:[^/]+\/){1,2}(?:sessions|worktrees)\/(?:ses_|sess_|agent_|workspace_|worktree_)[^/]+|app)(?=\/|$)/.exec(
+      path
+    )?.[0];
+  if (!root || path.split('/').includes('..')) return undefined;
+  return publicDirectory + path.slice(root.length);
+}
+
 export function projectPrivateWorktreePaths<T extends object>(
   value: T,
   metadata: readonly unknown[],
@@ -36,7 +48,10 @@ export function projectPrivateWorktreePaths<T extends object>(
       if (typeof current === 'string') {
         let projected = current;
         for (const directory of privateDirectories) {
-          projected = projected.replaceAll(directory, publicDirectory);
+          projected = projected.replace(
+            new RegExp(directory.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'),
+            () => publicDirectory
+          );
         }
         Reflect.set(target, key, projected);
       } else if (typeof current === 'object' && current !== null) {

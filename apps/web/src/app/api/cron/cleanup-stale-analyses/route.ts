@@ -6,7 +6,10 @@ import {
   createScheduledJobRun,
   emitScheduledJobEvent,
 } from '@kilocode/worker-utils/scheduled-job-observability';
-import { cleanupStaleAnalyses } from '@/lib/security-agent/db/security-analysis';
+import {
+  cleanupStaleAnalyses,
+  cleanupStaleStartReservations,
+} from '@/lib/security-agent/db/security-analysis';
 import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import { CRON_SECRET } from '@kilocode/web-shared/lib/config.server';
 
@@ -55,9 +58,14 @@ export async function GET(request: Request) {
   try {
     // Execute cleanup - mark analyses running for more than 30 minutes as failed
     const cleanedCount = await cleanupStaleAnalyses(30);
+    // Reap start reservations left pending with no queue row (stale admissions)
+    const reapedReservations = await cleanupStaleStartReservations(10);
 
     if (cleanedCount > 0) {
       log(`Cleaned up ${cleanedCount} stale security analyses`);
+    }
+    if (reapedReservations > 0) {
+      log(`Reaped ${reapedReservations} abandoned start reservations`);
     }
 
     // Alert if abnormally high number of stale analyses indicates a systemic issue
@@ -71,6 +79,7 @@ export async function GET(request: Request) {
     emitScheduledJobEvent(
       buildScheduledJobSuccessEvent(run, {
         cleaned_count: cleanedCount,
+        reaped_reservations: reapedReservations,
         anomaly_threshold: STALE_ANOMALY_THRESHOLD,
         anomaly_detected: cleanedCount > STALE_ANOMALY_THRESHOLD,
       })
@@ -79,6 +88,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       success: true,
       cleanedCount,
+      reapedReservations,
       timestamp: new Date().toISOString(),
     });
   } catch (error) {

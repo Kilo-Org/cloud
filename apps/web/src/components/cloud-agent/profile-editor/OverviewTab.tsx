@@ -24,9 +24,18 @@ type AutoSaveFieldProps = {
   initialValue: string;
   /** Returns the canonical value that was actually persisted (e.g. trimmed). */
   onSave: (value: string) => Promise<string>;
+  disabled?: boolean;
 };
 
-function AutoSaveField({ kind, id, label, placeholder, initialValue, onSave }: AutoSaveFieldProps) {
+function AutoSaveField({
+  kind,
+  id,
+  label,
+  placeholder,
+  initialValue,
+  onSave,
+  disabled = false,
+}: AutoSaveFieldProps) {
   const [value, setValue] = useState(initialValue);
   const [savedValue, setSavedValue] = useState(initialValue);
   const [status, setStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
@@ -63,9 +72,9 @@ function AutoSaveField({ kind, id, label, placeholder, initialValue, onSave }: A
     onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
       setValue(e.target.value),
     onBlur: () => {
-      void commit();
+      if (!disabled) void commit();
     },
-    disabled: status === 'saving',
+    disabled: disabled || status === 'saving',
   };
 
   return (
@@ -109,6 +118,7 @@ type OverviewTabProps = {
     | ReturnType<typeof useCombinedProfileMutations>;
   onDelete: () => void;
   isDeleting: boolean;
+  readOnly?: boolean;
 };
 
 export function OverviewTab({
@@ -119,6 +129,7 @@ export function OverviewTab({
   mutations,
   onDelete,
   isDeleting,
+  readOnly = false,
 }: OverviewTabProps) {
   const [togglingDefault, setTogglingDefault] = useState(false);
 
@@ -149,6 +160,7 @@ export function OverviewTab({
         label="Name"
         placeholder="Profile name"
         initialValue={profile.name}
+        disabled={readOnly}
         onSave={async value => {
           const trimmed = value.trim();
           if (!trimmed) {
@@ -174,6 +186,7 @@ export function OverviewTab({
         label="Description"
         placeholder="Optional description"
         initialValue={profile.description ?? ''}
+        disabled={readOnly}
         onSave={async value => {
           const trimmed = value.trim();
           // Only send the changed field — sending stale `name` here
@@ -208,28 +221,30 @@ export function OverviewTab({
           }
           checked={profile.isDefault}
           onCheckedChange={handleToggleDefault}
-          disabled={togglingDefault}
+          disabled={readOnly || togglingDefault}
         />
       </div>
 
       {/* Delete profile */}
-      <div className="flex items-center justify-between rounded-lg border p-3">
-        <div>
-          <div className="flex items-center gap-2 text-sm font-medium">
-            <Trash2 className="text-destructive h-4 w-4" />
-            Delete profile
+      {!readOnly && (
+        <div className="flex items-center justify-between rounded-lg border p-3">
+          <div>
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <Trash2 className="text-destructive h-4 w-4" />
+              Delete profile
+            </div>
+            <p className="text-muted-foreground mt-0.5 text-xs">
+              Permanently removes this profile and its settings. This cannot be undone.
+            </p>
           </div>
-          <p className="text-muted-foreground mt-0.5 text-xs">
-            Permanently removes this profile and its settings. This cannot be undone.
-          </p>
+          <InlineDeleteConfirmation
+            onDelete={onDelete}
+            isLoading={isDeleting}
+            showAsButton
+            buttonText="Delete"
+          />
         </div>
-        <InlineDeleteConfirmation
-          onDelete={onDelete}
-          isLoading={isDeleting}
-          showAsButton
-          buttonText="Delete"
-        />
-      </div>
+      )}
     </div>
   );
 }

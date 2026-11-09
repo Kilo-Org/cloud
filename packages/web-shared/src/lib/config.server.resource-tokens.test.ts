@@ -9,12 +9,10 @@ import {
 
 const families = {
   'cloud-agent-next': 'CLOUD_AGENT_RESOURCE_TOKENS_ENABLED',
-  gastown: 'GASTOWN_RESOURCE_TOKENS_ENABLED',
-  wasteland: 'WASTELAND_RESOURCE_TOKENS_ENABLED',
   chat: 'CHAT_RESOURCE_TOKENS_ENABLED',
   'delegated-resource': 'DELEGATED_RESOURCE_TOKENS_ENABLED',
   'workflow-gateway': 'WORKFLOW_GATEWAY_RESOURCE_TOKENS_ENABLED',
-  benchmark: 'BENCHMARK_RESOURCE_TOKENS_ENABLED',
+  'internal-bot': 'INTERNAL_BOT_RESOURCE_TOKENS_ENABLED',
 } satisfies Record<ResourceTokenFamily, string>;
 const entries = Object.entries(families) as [ResourceTokenFamily, string][];
 const master = 'SHARED_RESOURCE_TOKENS_ENABLED';

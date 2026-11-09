@@ -10,13 +10,24 @@ import { Eyebrow } from '@/components/ui/eyebrow';
 import { selectSessionRowEyebrowRight } from '@/components/ui/session-row-eyebrow-right';
 import { SessionStatusIcon } from '@/components/ui/session-status-icon';
 import { Text } from '@/components/ui/text';
-import { agentColor } from '@/lib/agent-color';
+import { agentColor, stateTint } from '@/lib/agent-color';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
 type SessionRowProps = {
-  /** Uppercase label shown in the eyebrow (and hashed for the row hue). */
+  /** Uppercase label shown in the eyebrow, and hashed when no `agentState` is passed. */
   agentLabel: string;
+  /**
+   * The row tint to paint for the label: the word's colour must not drift with
+   * its translation, so the key pins instead of hashing. `unknown` is a
+   * placeholder for a value the row cannot name, `platform` names the kind of
+   * agent the row ran on, and `repository` names the repository it ran in; all
+   * three label the row's context rather than the session, so they take the
+   * muted pair and the title leads. `idle`/`live` keep the ramp entry the
+   * English word already hashed to (sky blue). Omit it for a label that is the
+   * session's own name, such as a chat's model, which hashes.
+   */
+  agentState?: 'unknown' | 'platform' | 'repository' | 'idle' | 'live' | null;
   title: string;
   /** Small line shown below the title (e.g. git branch, a message preview). */
   subtitle?: string | null;
@@ -81,11 +92,13 @@ type SessionRowProps = {
 
 /**
  * Used by Home and Agents list. Composes agent hue strip + eyebrow +
- * ellipsized title + mono meta + chevron. Hue is deterministically hashed
- * from `agentLabel` so the strip, eyebrow and tile always match.
+ * ellipsized title + mono meta + chevron. The strip, eyebrow and tile always
+ * share one tint: the pinned `agentState`, else the hue hashed from
+ * `agentLabel`.
  */
 export function SessionRow({
   agentLabel,
+  agentState = null,
   title,
   subtitle,
   meta,
@@ -103,7 +116,7 @@ export function SessionRow({
 }: Readonly<SessionRowProps>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
-  const color = agentColor(agentLabel);
+  const color = agentState ? stateTint(agentState) : agentColor(agentLabel);
   const dimStrip = !live && !needsInput;
   const liveKind: GlanceableStatusKind = statusKind === 'idle' ? 'idle' : 'running';
 
@@ -174,7 +187,6 @@ export function SessionRow({
 
   let eyebrowRight: React.ReactNode = null;
   if (eyebrowDecision.kind === 'needs-input') {
-    // Icon suppressed — render exactly as today.
     eyebrowRight = branchContent;
   } else if (eyebrowDecision.showPlatformIcon && platformIcon != null) {
     // `none` kind: icon alone, no extra wrapper. Otherwise wrap icon + branch.
@@ -191,10 +203,16 @@ export function SessionRow({
     eyebrowRight = branchContent;
   }
 
+  const titleNode = (
+    <Text className="font-medium text-sm tracking-tight text-foreground" numberOfLines={2}>
+      {title}
+    </Text>
+  );
+
   const row = (
     <View
       className={cn(
-        'relative flex-row items-start gap-3 py-[13px] pl-[18px] pr-3',
+        'relative flex-row items-center gap-3 py-[13px] pl-[18px] pr-3',
         !last && 'border-b-[0.5px] border-hair-soft',
         className
       )}
@@ -202,6 +220,7 @@ export function SessionRow({
       {stripMode === 'edge' ? (
         <AgentBadge
           agent={agentLabel}
+          tint={color}
           variant="strip"
           className={dimStrip ? 'opacity-30' : undefined}
         />
@@ -216,14 +235,6 @@ export function SessionRow({
       )}
       <View className="min-w-0 flex-1">
         <View className="mb-[3px] flex-row items-center justify-between">
-          {/* flex-1 basis 0: the right cluster is sized first at its full
-              natural width, so a long agent label truncates instead of
-              crowding the status glyph and relative time out of the row.
-              The label is the repo identifier, so it ellipsizes in the middle
-              rather than at the tail: a tail ellipsis hides the distinguishing
-              suffix ("TAX-REPORT-GENERA…"), while middle keeps both ends legible
-              (the long-identifier convention in `KvRow` and `SheetHeader`). The
-              one-line clamp still bounds the eyebrow. */}
           <Eyebrow
             className={cn('min-w-0 flex-1', color.hueTextClass)}
             numberOfLines={1}
@@ -233,9 +244,7 @@ export function SessionRow({
           </Eyebrow>
           {eyebrowRight}
         </View>
-        <Text className="text-sm font-medium tracking-tight text-foreground" numberOfLines={2}>
-          {title}
-        </Text>
+        {titleNode}
         {subtitle ? (
           <Text
             variant={subtitleVariant}
@@ -250,7 +259,11 @@ export function SessionRow({
           </Text>
         ) : null}
       </View>
-      <DirectionalChevronRight size={14} color={colors.mutedSoft} />
+      {/* The row is top-aligned so a multi-line title keeps its first line in
+          line with the eyebrow; the disclosure mark centers on the row. */}
+      <View className="self-center">
+        <DirectionalChevronRight size={14} color={colors.mutedSoft} />
+      </View>
     </View>
   );
   if (onPress) {

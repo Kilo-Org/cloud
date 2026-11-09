@@ -1,7 +1,6 @@
-const fs = require('fs');
-const path = require('path');
-
 const { withDangerousMod, withStringsXml } = require('expo/config-plugins');
+
+const { writeLocaleStrings } = require('./android-strings-helpers.js');
 
 // Localizes the Android widget-picker entry.
 //
@@ -21,38 +20,6 @@ const { withDangerousMod, withStringsXml } = require('expo/config-plugins');
 
 /** The library derives both resource names from the widget name, lowercased. */
 const stringName = (widgetName, suffix) => `widget_${widgetName.toLowerCase()}_${suffix}`;
-
-/**
- * Android resource qualifier for a BCP 47 tag.
- *
- * The `b+` form is the only one that carries a script (`zh-Hans`), and it has
- * been supported since API 24 — below the app's minimum. The legacy `-r` form
- * cannot express a script at all, so everything uses `b+` for one rule.
- */
-const localeQualifier = tag => `b+${tag.replace(/-/g, '+')}`;
-
-/**
- * Escape one string resource value.
- *
- * `&` and `<` are XML; the apostrophe, the quote and the backslash are Android's
- * own string escapes; a leading `@` or `?` would otherwise read as a resource
- * reference.
- */
-const escapeValue = value =>
-  value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/([\\'"])/g, '\\$1')
-    .replace(/^([@?])/, '\\$1');
-
-const stringsXml = entries =>
-  [
-    '<?xml version="1.0" encoding="utf-8"?>',
-    '<resources>',
-    ...entries.map(([name, value]) => `  <string name="${name}">${escapeValue(value)}</string>`),
-    '</resources>',
-    '',
-  ].join('\n');
 
 module.exports = function withAndroidWidgetLocalizations(config, options) {
   const languages = options?.languages ?? [];
@@ -96,26 +63,20 @@ module.exports = function withAndroidWidgetLocalizations(config, options) {
   return withDangerousMod(withDefaults, [
     'android',
     async cfg => {
-      const resPath = path.join(cfg.modRequest.platformProjectRoot, 'app', 'src', 'main', 'res');
-      if (!fs.existsSync(resPath)) {
-        throw new Error(`withAndroidWidgetLocalizations: no res directory at ${resPath}`);
-      }
-      for (const tag of languages) {
-        const translated = copy[tag];
-        if (tag === 'en' || !translated) {
-          continue;
-        }
-        const folder = path.join(resPath, `values-${localeQualifier(tag)}`);
-        fs.mkdirSync(folder, { recursive: true });
-        fs.writeFileSync(
-          path.join(folder, 'kilo_widget_strings.xml'),
-          stringsXml([
-            [labelName, translated.displayName],
-            [descriptionName, translated.description],
-          ]),
-          'utf8'
-        );
-      }
+      writeLocaleStrings({
+        config: cfg,
+        copy: Object.fromEntries(
+          Object.entries(copy).map(([tag, entry]) => [
+            tag,
+            { displayName: entry?.displayName, description: entry?.description },
+          ])
+        ),
+        pick: entry => [
+          [labelName, entry.displayName],
+          [descriptionName, entry.description],
+        ],
+        stringsFile: 'kilo_widget_strings.xml',
+      });
       return cfg;
     },
   ]);

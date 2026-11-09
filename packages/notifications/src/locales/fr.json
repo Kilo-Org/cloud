@@ -9,6 +9,7 @@
       "lowBalance": "Votre solde nécessite une attention",
       "spendAlert": "Vos dépenses nécessitent une attention",
       "securityFinding": "Un résultat de sécurité nécessite une attention",
+      "securityUpdate": "Une vérification de sécurité a une mise à jour",
       "activeAgentsGlanceable": "Les agents actifs ont une mise à jour"
     }
   },
@@ -61,7 +62,7 @@
     },
     "securityLifecycle": {
       "title": "Kilo",
-      "body": "Un résultat de sécurité nécessite une attention"
+      "body": "Une vérification de sécurité a une mise à jour"
     }
   },
   "instanceLifecycle": {

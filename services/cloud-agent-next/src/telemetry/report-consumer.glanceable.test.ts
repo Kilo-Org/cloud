@@ -9,7 +9,7 @@ import {
   cloud_agent_sessions,
   github_branch_pull_requests,
 } from '@kilocode/db/schema';
-import type { RefreshGlanceableSessionsParams } from '@kilocode/notifications';
+import type { RefreshGlanceableSessionsParams } from '@kilocode/notifications/schemas';
 import type { CloudAgentQueueReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
 import {
   buildGlanceableSnapshot,
@@ -95,7 +95,7 @@ function setup(options: { beforeCommit?: () => Promise<void>; refreshError?: Err
       query
         .replace(/\$\d+/g, '?')
         .replace(/\bdefault\b/gi, 'null')
-        .replace(
+        .replaceAll(
           "now() - interval '15 minutes'",
           `'${new Date(Date.now() - 15 * 60_000).toISOString()}'`
         )

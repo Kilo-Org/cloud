@@ -9,7 +9,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { CommentRow } from './comment-row';
 import { CommentModerationProvider } from './comment-moderation';
-import { MIN_TAP_TARGET_DP } from '@/lib/a11y/tap-target';
+import { ICON_TARGET_BOX_CLASS, ICON_TARGET_DP } from '@/lib/a11y/tap-target';
 import {
   COMMENT_ACTIONS_FRAME_DP,
   COMMENT_ACTIONS_HIT_SLOP,
@@ -64,6 +64,7 @@ vi.mock('@/lib/trpc', () => ({
   }),
 }));
 vi.mock('@/lib/utils', () => ({
+  cn: (...parts: unknown[]) => parts.filter(Boolean).join(' '),
   parseTimestamp: () => new Date('2024-01-01T00:00:00Z'),
   timeAgo: () => '2d ago',
 }));
@@ -105,7 +106,7 @@ async function render(): Promise<TestRenderer.ReactTestRenderer> {
 }
 
 describe('CommentRow overflow touch target', () => {
-  it('measures the frame, not the 16pt glyph, and reaches 44pt with its slop', async () => {
+  it('measures the frame, not the 16pt glyph, and the frame alone is the 48dp target', async () => {
     const renderer = await render();
 
     const overflow = renderer.root.find(
@@ -117,14 +118,9 @@ describe('CommentRow overflow touch target', () => {
 
     // h-7 measured 24.5dp on device (NativeWind's 14pt rem) and was reported as
     // too small to tap; the frame is what a size audit measures.
-    expect(overflow.props.className).toContain('h-11 w-11');
-    expect(overflow.props.className).toContain('items-center');
-    expect(overflow.props.className).toContain('justify-center');
+    expect(overflow.props.className).toContain(ICON_TARGET_BOX_CLASS);
     expect(overflow.props.hitSlop).toEqual(COMMENT_ACTIONS_HIT_SLOP);
-    expect(COMMENT_ACTIONS_FRAME_DP).toBeGreaterThanOrEqual(MIN_TAP_TARGET_DP);
-    expect(
-      COMMENT_ACTIONS_FRAME_DP + COMMENT_ACTIONS_HIT_SLOP.top + COMMENT_ACTIONS_HIT_SLOP.bottom
-    ).toBeGreaterThanOrEqual(44);
+    expect(COMMENT_ACTIONS_FRAME_DP).toBeGreaterThanOrEqual(ICON_TARGET_DP);
 
     // The visible circle keeps its compact size inside the frame.
     const circleClass = `h-[${COMMENT_ACTIONS_VISUAL_DP}px] w-[${COMMENT_ACTIONS_VISUAL_DP}px]`;

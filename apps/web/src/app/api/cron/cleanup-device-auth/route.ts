@@ -7,11 +7,13 @@ import {
 } from '@kilocode/worker-utils/scheduled-job-observability';
 import { cleanupExpiredDeviceAuthRequests } from '@/lib/device-auth/device-auth';
 import { cleanupExpiredAdmissionChallenges } from '@/lib/auth/native-admission';
+import { cleanupExpiredDeviceRefreshTokens } from '@/lib/auth/device-sessions';
 import {
   cleanupExpiredPasskeyChallenges,
   cleanupExpiredPasskeySignInTickets,
 } from '@/lib/auth/passkey';
 import { cleanupExpiredAccessCodes } from '@/lib/kiloclaw/access-codes';
+import { cleanupExpiredSessionStepUpRows } from '@kilocode/web-shared/lib/admin/step-up-store';
 import { cleanupExpiredInstallStates } from '@/lib/integrations/github/install-state';
 import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 
@@ -47,6 +49,9 @@ export async function GET(request: Request) {
     const deletedCount = await cleanupExpiredDeviceAuthRequests();
     sentryLogger('cron', 'info')(`Cleaned up ${deletedCount} expired device auth requests`);
 
+    const refreshTokensDeleted = await cleanupExpiredDeviceRefreshTokens();
+    sentryLogger('cron', 'info')(`Cleaned up ${refreshTokensDeleted} expired refresh tokens`);
+
     const challengesDeleted = await cleanupExpiredAdmissionChallenges();
     sentryLogger('cron', 'info')(`Cleaned up ${challengesDeleted} expired admission challenges`);
 
@@ -68,25 +73,39 @@ export async function GET(request: Request) {
     const installStatesDeleted = await cleanupExpiredInstallStates();
     sentryLogger('cron', 'info')(`Cleaned up ${installStatesDeleted} expired install states`);
 
+    const stepUpDeleted = await cleanupExpiredSessionStepUpRows();
+    sentryLogger(
+      'cron',
+      'info'
+    )(
+      `Cleaned up ${stepUpDeleted.challenges} expired step-up challenges and ${stepUpDeleted.proofs} proofs`
+    );
+
     emitScheduledJobEvent(
       buildScheduledJobSuccessEvent(run, {
         deleted_device_auth_request_count: deletedCount,
+        deleted_refresh_token_count: refreshTokensDeleted,
         deleted_admission_challenge_count: challengesDeleted,
         deleted_passkey_challenge_count: passkeyChallengesDeleted,
         deleted_passkey_sign_in_ticket_count: passkeySignInTicketsDeleted,
         deleted_access_code_count: accessCodesDeleted,
         deleted_install_state_count: installStatesDeleted,
+        deleted_step_up_challenge_count: stepUpDeleted.challenges,
+        deleted_step_up_proof_count: stepUpDeleted.proofs,
       })
     );
 
     return NextResponse.json({
       success: true,
       deletedCount,
+      refreshTokensDeleted,
       challengesDeleted,
       passkeyChallengesDeleted,
       passkeySignInTicketsDeleted,
       accessCodesDeleted,
       installStatesDeleted,
+      stepUpChallengesDeleted: stepUpDeleted.challenges,
+      stepUpProofsDeleted: stepUpDeleted.proofs,
       timestamp: new Date().toISOString(),
     });
   } catch (error) {

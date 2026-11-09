@@ -1384,7 +1384,6 @@ export function PinsTab() {
   const [removingInstanceId, setRemovingInstanceId] = useState<string | null>(null);
   const limit = 25;
 
-  // Add pin form state
   const [userSearch, setUserSearch] = useState('');
   const [userComboboxOpen, setUserComboboxOpen] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);

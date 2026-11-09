@@ -1,4 +1,5 @@
 import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import { TRPCError } from '@trpc/server';
 import { code_indexing_manifest, organizations, kilocode_users } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { getTableName, sql } from 'drizzle-orm';
@@ -9,6 +10,21 @@ import {
   QDRANT_CLUSTER_RAM_GB,
 } from '@kilocode/web-shared/lib/config.server';
 import { chunkCountToSizeKbSql } from '@/lib/code-indexing/util';
+import {
+  CODE_INDEXING_GONE_MESSAGE,
+  isCodeIndexingEnabled,
+} from '@/lib/code-indexing/availability.server';
+
+const codeIndexingAdminProcedure = adminProcedure.use(async ({ next }) => {
+  if (!isCodeIndexingEnabled()) {
+    throw new TRPCError({
+      code: 'NOT_FOUND',
+      message: CODE_INDEXING_GONE_MESSAGE,
+    });
+  }
+
+  return next();
+});
 
 const PaginationInputSchema = z.object({
   page: z.number().int().min(1).default(1),
@@ -112,7 +128,7 @@ const ClusterStatusSchema = z.object({
 });
 
 export const codeIndexingAdminRouter = createTRPCRouter({
-  getSummaryStats: adminProcedure
+  getSummaryStats: codeIndexingAdminProcedure
     .input(PaginationInputSchema)
     .output(IndexOperationalInfoSchema)
     .query(async ({ input }) => {
@@ -196,7 +212,7 @@ export const codeIndexingAdminRouter = createTRPCRouter({
       });
     }),
 
-  getUserSummaryStats: adminProcedure
+  getUserSummaryStats: codeIndexingAdminProcedure
     .input(UserPaginationInputSchema)
     .output(UserIndexOperationalInfoSchema)
     .query(async ({ input }) => {
@@ -279,7 +295,7 @@ export const codeIndexingAdminRouter = createTRPCRouter({
       });
     }),
 
-  getClusterStatus: adminProcedure.output(ClusterStatusSchema).query(async () => {
+  getClusterStatus: codeIndexingAdminProcedure.output(ClusterStatusSchema).query(async () => {
     const telemetryUrl = `https://${QDRANT_HOST}/telemetry?details_level=1`;
     const telemetryResponse = await fetch(telemetryUrl, {
       method: 'GET',

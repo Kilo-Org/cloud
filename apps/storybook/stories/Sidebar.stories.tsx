@@ -11,23 +11,17 @@ import {
   Cloud,
   Coins,
   CreditCard,
-  Database,
   Download,
-  Factory,
   Key,
   List,
-  ListChecks,
   MessageSquare,
-  Plus,
   Receipt,
-  Rocket,
   Settings,
   Shield,
   Sparkles,
   User,
   UserCog,
   Webhook,
-  Wrench,
 } from 'lucide-react';
 import HeaderLogo from '@/components/HeaderLogo';
 import {
@@ -144,11 +138,6 @@ const kiloClawItems: SidebarStoryItem[] = [
 
 const cloudItems: SidebarStoryItem[] = [
   {
-    title: 'App Builder',
-    icon: Plus,
-    url: '/app-builder',
-  },
-  {
     title: 'Cloud Agent',
     icon: Cloud,
     url: '/cloud',
@@ -172,36 +161,6 @@ const cloudItems: SidebarStoryItem[] = [
     title: 'Security Agent',
     icon: Shield,
     url: '/security-agent',
-  },
-  {
-    title: 'Auto Triage',
-    icon: ListChecks,
-    url: '/auto-triage',
-  },
-  {
-    title: 'Auto Fix',
-    icon: Wrench,
-    url: '/auto-fix',
-  },
-  {
-    title: 'Deploy',
-    icon: Rocket,
-    url: '/deploy',
-  },
-  {
-    title: 'Gas Town',
-    icon: Factory,
-    url: '/gastown',
-  },
-  {
-    title: 'Managed Indexing',
-    icon: Database,
-    url: '/code-indexing',
-  },
-  {
-    title: 'MCP Gateway',
-    icon: Cable,
-    url: '/cloud/mcp-gateway',
   },
 ];
 

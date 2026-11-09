@@ -14,6 +14,8 @@ export type AuthErrorType =
   | 'SIGNUP-STEP-UP'
   | 'SIGNUP-UNAVAILABLE'
   | 'EMAIL-ALREADY-USED'
+  | 'EMAIL-SIGNUP-DISABLED'
+  | 'ADMISSION_REQUIRED'
   | 'SSO_ERROR';
 
 /**
@@ -38,6 +40,7 @@ export const hosted_domain_specials = {
   linkedin: '@@linkedin@@',
   discord: '@@discord@@',
   openai: '@@openai@@',
+  claude: '@@claude@@',
   email: '@@email@@',
   fake_devonly: '@@fake@@',
   kilocode_admin: 'kilocode.ai',

@@ -28,7 +28,7 @@ export async function PrefetchedOrganizations({ children }: { children: ReactNod
     // Same user `GET /api/user` returns; `useUser()` fetches that route on the client.
     user = ctx.user;
     const trpc = createTRPCOptionsProxy({ router: rootRouter, ctx, queryClient });
-    await queryClient.prefetchQuery(trpc.organizations.list.queryOptions());
+    await queryClient.query(trpc.organizations.list.queryOptions()).catch(() => undefined);
   } catch (error) {
     // Prefetch failures are non-fatal — the client-side query will handle fetching.
     // Still report to Sentry so real server failures don't go unnoticed.

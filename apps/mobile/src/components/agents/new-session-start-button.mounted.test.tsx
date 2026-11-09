@@ -11,6 +11,7 @@ import { NewSessionStartButton } from './new-session-start-button';
 // call-to-action keeps a visible label while starting (button.tsx draws the
 // inline spinner, so an empty child renders as a bare brand-coloured bar).
 vi.mock('react-native', () => ({
+  Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   View: 'View',
 }));
@@ -53,6 +54,8 @@ async function mountButton(props: {
   isStartDisabled?: boolean;
   isStarting?: boolean;
   startBlockedReason?: string | null;
+  startBlockedAction?: { label: string; onPress: () => void; isBusy?: boolean } | null;
+  blockedByPlan?: boolean;
 }): Promise<TestRenderer.ReactTestRenderer> {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   await act(async () => {
@@ -63,6 +66,8 @@ async function mountButton(props: {
         isStartDisabled: props.isStartDisabled ?? false,
         isStarting: props.isStarting ?? false,
         startBlockedReason: props.startBlockedReason ?? null,
+        startBlockedAction: props.startBlockedAction ?? null,
+        blockedByPlan: props.blockedByPlan ?? false,
         onStartSession: vi.fn<() => void>(),
       })
     );
@@ -164,5 +169,103 @@ describe('NewSessionStartButton', () => {
     expect(statuses[0]?.props.message).toBe('Connect a provider to start.');
 
     renderer.unmount();
+  });
+
+  it('renders the recovery action between the reason and Start and fires onPress once', async () => {
+    const onPress = vi.fn<() => void>();
+    const renderer = await mountButton({
+      isStartDisabled: true,
+      startBlockedReason: 'Connect a provider to start.',
+      startBlockedAction: { label: 'Connect a provider', onPress },
+    });
+
+    // Outline recovery button sits between the announced reason and Start.
+    const order = renderer.root
+      .findAll(node => {
+        if (typeof node.type !== 'string') {
+          return false;
+        }
+        const type = node.type as string;
+        return type === 'AccessibleStatus' || type === 'Pressable';
+      })
+      .map(node => node.type as string);
+    expect(order).toEqual(['AccessibleStatus', 'Pressable', 'Pressable']);
+
+    const buttons = hostByType(renderer.root, 'Pressable');
+    const actionButton = buttons[0];
+    if (!actionButton) {
+      throw new Error('recovery action button was not rendered');
+    }
+    expect(actionButton.props.accessibilityLabel).toBe('Connect a provider');
+    expect(hasTextLabel(renderer.root, 'Connect a provider')).toBe(true);
+    await act(async () => {
+      (actionButton.props.onPress as () => void)();
+      await Promise.resolve();
+    });
+    expect(onPress).toHaveBeenCalledTimes(1);
+
+    renderer.unmount();
+  });
+
+  it('renders no action while the reason is present but no action is supplied', async () => {
+    const renderer = await mountButton({
+      isStartDisabled: true,
+      startBlockedReason: 'Select a repository to start.',
+    });
+
+    expect(hostByType(renderer.root, 'Pressable')).toHaveLength(1);
+    expect(hasTextLabel(renderer.root, 'Connect a provider')).toBe(false);
+
+    renderer.unmount();
+  });
+
+  it('disables the recovery action and shows the spinner while its work is in flight', async () => {
+    const onPress = vi.fn<() => void>();
+    const renderer = await mountButton({
+      isStartDisabled: true,
+      startBlockedReason: 'No repositories found',
+      startBlockedAction: { label: 'Refresh repositories', onPress, isBusy: true },
+    });
+
+    const button = hostByType(renderer.root, 'Pressable')[0];
+    expect(button?.props.accessibilityState).toEqual({ disabled: true, busy: true });
+    expect(hostByType(renderer.root, 'ActivityIndicator')).toHaveLength(1);
+
+    renderer.unmount();
+  });
+
+  it('renders no action without a reason even when one is supplied', async () => {
+    const renderer = await mountButton({
+      startBlockedAction: { label: 'Connect a provider', onPress: vi.fn<() => void>() },
+    });
+
+    expect(hostByType(renderer.root, 'AccessibleStatus')).toHaveLength(0);
+    expect(hostByType(renderer.root, 'Pressable')).toHaveLength(1);
+
+    renderer.unmount();
+  });
+
+  // The plan explanation keeps Start disabled. On a dark screen the disabled
+  // primary fill is a light neutral that reads as an enabled plate, so this
+  // state takes the inactive control fill and an ink that still contrasts on
+  // it; a Start disabled for any other reason keeps the disabled primary pair.
+  it('draws a plan-blocked Start in the inactive fill on a dark screen', async () => {
+    const blocked = await mountButton({ blockedByPlan: true, isStartDisabled: true });
+    const blockedButton = hostByType(blocked.root, 'Pressable')[0];
+    const blockedClasses = String(blockedButton?.props.className).split(' ');
+    expect(blockedClasses).toContain('bg-primary-disabled');
+    expect(blockedClasses).toContain('dark:bg-control-idle');
+    const blockedLabel = hostByType(blocked.root, 'Text')[0];
+    expect(blockedLabel?.props.className).toContain('dark:text-ink2');
+    blocked.unmount();
+
+    const ordinary = await mountButton({ isStartDisabled: true });
+    const ordinaryButton = hostByType(ordinary.root, 'Pressable')[0];
+    const ordinaryClasses = String(ordinaryButton?.props.className).split(' ');
+    expect(ordinaryClasses).toContain('bg-primary-disabled');
+    expect(ordinaryClasses).not.toContain('dark:bg-control-idle');
+    const ordinaryLabel = hostByType(ordinary.root, 'Text')[0];
+    expect(ordinaryLabel?.props.className).toBeUndefined();
+    ordinary.unmount();
   });
 });

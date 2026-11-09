@@ -3,6 +3,8 @@ import { getEnvVariable, requireEnv } from '@kilocode/web-shared/lib/dotenvx';
 import 'server-only';
 
 export const IS_IN_AUTOMATED_TEST = !!getEnvVariable('IS_IN_AUTOMATED_TEST');
+export const PAID_CREDIT_EXPIRATION_EFFECTIVE_AT =
+  getEnvVariable('PAID_CREDIT_EXPIRATION_EFFECTIVE_AT') || null;
 export const NEXTAUTH_URL = APP_URL;
 export const MAILGUN_API_KEY = getEnvVariable('MAILGUN_API_KEY');
 export const MAILGUN_DOMAIN = getEnvVariable('MAILGUN_DOMAIN');
@@ -61,14 +63,22 @@ export const MISTRAL_API_KEY = getEnvVariable('MISTRAL_API_KEY');
 export const INCEPTION_API_KEY = getEnvVariable('INCEPTION_API_KEY');
 export const EXA_API_KEY = getEnvVariable('EXA_API_KEY');
 export const INTERNAL_API_SECRET = getEnvVariable('INTERNAL_API_SECRET');
+export const CODE_REVIEW_HEALTH_SECRET = getEnvVariable('CODE_REVIEW_HEALTH_SECRET');
+export const UPTIME_PROBE_SECRET = getEnvVariable('UPTIME_PROBE_SECRET');
+export const CLOUD_AGENT_DISPATCH_HEALTH_SECRET = getEnvVariable(
+  'CLOUD_AGENT_DISPATCH_HEALTH_SECRET'
+);
 export const USAGE_INGEST_URL = getEnvVariable('USAGE_INGEST_URL');
 export const USAGE_INGEST_PUBLISH_SECRET = getEnvVariable('USAGE_INGEST_PUBLISH_SECRET');
-export const USAGE_SHADOW_PUBLISH_ENABLED =
-  getEnvVariable('USAGE_SHADOW_PUBLISH_ENABLED') === 'true';
+
 // Shared secret with the MCP catalog CI job
 // (.github/workflows/kilo-mcp-catalog.yml). It authenticates only the mint in
 // app/api/internal/mcp-catalog/token; it is never accepted as a Kilo credential.
 export const MCP_CATALOG_TOKEN_SECRET = getEnvVariable('MCP_CATALOG_TOKEN_SECRET');
+// Shared secret with internal-bot workloads (bouncer watch, auto-routing
+// benchmark). It authenticates only the mint in app/api/internal/bot-token;
+// it is never accepted as a Kilo credential.
+export const BOT_TOKEN_MINT_SECRET = getEnvVariable('BOT_TOKEN_MINT_SECRET');
 export function isBoundedInternalServiceTokenIssuanceEnabled(): boolean {
   return getEnvVariable('BOUNDED_INTERNAL_SERVICE_TOKENS_ENABLED') === 'true';
 }
@@ -83,12 +93,10 @@ export function isSharedResourceTokenIssuanceEnabled(): boolean {
 }
 const resourceTokenFamilyFlags = {
   'cloud-agent-next': 'CLOUD_AGENT_RESOURCE_TOKENS_ENABLED',
-  gastown: 'GASTOWN_RESOURCE_TOKENS_ENABLED',
-  wasteland: 'WASTELAND_RESOURCE_TOKENS_ENABLED',
   chat: 'CHAT_RESOURCE_TOKENS_ENABLED',
   'delegated-resource': 'DELEGATED_RESOURCE_TOKENS_ENABLED',
   'workflow-gateway': 'WORKFLOW_GATEWAY_RESOURCE_TOKENS_ENABLED',
-  benchmark: 'BENCHMARK_RESOURCE_TOKENS_ENABLED',
+  'internal-bot': 'INTERNAL_BOT_RESOURCE_TOKENS_ENABLED',
 } as const;
 
 export type ResourceTokenFamily = keyof typeof resourceTokenFamilyFlags;
@@ -161,24 +169,6 @@ export const STRIPE_ENTERPRISE_ANNUAL_PRICE_ID = getEnvVariable(
   'STRIPE_ENTERPRISE_ANNUAL_PRICE_ID'
 );
 
-export const USER_DEPLOYMENTS_API_BASE_URL =
-  getEnvVariable('USER_DEPLOYMENTS_API_BASE_URL') ||
-  'https://kilo-test-builder-do.engineering-e11.workers.dev';
-export const USER_DEPLOYMENTS_API_AUTH_KEY = getEnvVariable('USER_DEPLOYMENTS_API_AUTH_KEY') || '';
-
-// Dispatcher API for password protection
-export const USER_DEPLOYMENTS_DISPATCHER_URL =
-  getEnvVariable('USER_DEPLOYMENTS_DISPATCHER_URL') || '';
-export const USER_DEPLOYMENTS_DISPATCHER_AUTH_KEY =
-  getEnvVariable('USER_DEPLOYMENTS_DISPATCHER_AUTH_KEY') || '';
-
-/**
- * RSA public key used for encrypting deployment environment variables.
- * Must be in PEM format, one line base64 encoded
- */
-export const USER_DEPLOYMENTS_ENV_VARS_PUBLIC_KEY =
-  getEnvVariable('USER_DEPLOYMENTS_ENV_VARS_PUBLIC_KEY') || '';
-
 /**
  * AES-256 encryption key for BYOK API keys.
  * Must be a base64-encoded 32-byte (256-bit) key.
@@ -209,13 +199,8 @@ export const QDRANT_CLUSTER_RAM_GB = Number(getEnvVariable('QDRANT_CLUSTER_RAM_G
 export const MILVUS_ADDRESS = getEnvVariable('MILVUS_ADDRESS');
 export const MILVUS_TOKEN = getEnvVariable('MILVUS_TOKEN');
 
-// App Builder
-export const APP_BUILDER_URL = getEnvVariable('APP_BUILDER_URL');
-export const APP_BUILDER_AUTH_TOKEN = getEnvVariable('APP_BUILDER_AUTH_TOKEN');
-
-// App Builder DB Proxy
-export const APP_BUILDER_DB_PROXY_URL = getEnvVariable('APP_BUILDER_DB_PROXY_URL');
-export const APP_BUILDER_DB_PROXY_AUTH_TOKEN = getEnvVariable('APP_BUILDER_DB_PROXY_AUTH_TOKEN');
+// Cloud managed code indexing. Disabled unless explicitly enabled.
+export const CODE_INDEXING_ENABLED = getEnvVariable('CODE_INDEXING_ENABLED') === 'true';
 
 // Slack
 export const SLACK_CLIENT_ID = getEnvVariable('SLACK_CLIENT_ID');
@@ -292,9 +277,6 @@ export const GOOGLE_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY = getEnvVariable(
 // Posts user feedback into a fixed Slack channel in the Kilo workspace.
 // Expected to be a Slack Incoming Webhook URL.
 export const SLACK_USER_FEEDBACK_WEBHOOK_URL = getEnvVariable('SLACK_USER_FEEDBACK_WEBHOOK_URL');
-// Posts deploy threat alerts to a dedicated Slack channel.
-// Expected to be a Slack Incoming Webhook URL.
-export const SLACK_DEPLOY_THREAT_WEBHOOK_URL = getEnvVariable('SLACK_DEPLOY_THREAT_WEBHOOK_URL');
 
 // AI Attribution Service
 export const AI_ATTRIBUTION_ADMIN_SECRET = getEnvVariable('AI_ATTRIBUTION_ADMIN_SECRET');
@@ -311,20 +293,7 @@ export const BOUNCER_URL =
  */
 export const AGENT_ENV_VARS_PUBLIC_KEY = getEnvVariable('AGENT_ENV_VARS_PUBLIC_KEY') || '';
 
-// Gastown Service
-export const GASTOWN_SERVICE_URL =
-  getEnvVariable('GASTOWN_SERVICE_URL') ||
-  (process.env.NODE_ENV === 'production' ? 'https://gastown.kiloapps.io' : null);
-export const GASTOWN_BILLING_ANNOUNCEMENT_ENABLED =
-  process.env.NODE_ENV === 'development' ||
-  getEnvVariable('GASTOWN_BILLING_ANNOUNCEMENT_ENABLED') === 'true';
-
-// Cloudflare dashboard link construction (admin town inspector)
 export const CLOUDFLARE_ACCOUNT_ID = getEnvVariable('CLOUDFLARE_ACCOUNT_ID');
-export const CLOUDFLARE_TOWN_DO_NAMESPACE_ID = getEnvVariable('CLOUDFLARE_TOWN_DO_NAMESPACE_ID');
-export const CLOUDFLARE_CONTAINER_DO_NAMESPACE_ID = getEnvVariable(
-  'CLOUDFLARE_CONTAINER_DO_NAMESPACE_ID'
-);
 // Cloudflare Containers GraphQL Analytics (admin reconciliation). Point-of-use only; do not throw at module load.
 export const CLOUDFLARE_ANALYTICS_API_TOKEN = getEnvVariable('CLOUDFLARE_ANALYTICS_API_TOKEN');
 
@@ -449,6 +418,7 @@ export const NOTIFICATIONS_WORKER_URL = getEnvVariable('NOTIFICATIONS_WORKER_URL
 
 // Auto routing worker
 export const AUTO_ROUTING_WORKER_URL = getEnvVariable('AUTO_ROUTING_WORKER_URL') || '';
+export const AUTO_ROUTING_DECISION_SECRET = getEnvVariable('AUTO_ROUTING_DECISION_SECRET') || '';
 
 // Auto routing benchmark worker
 export const AUTO_ROUTING_BENCHMARK_WORKER_URL =
@@ -478,4 +448,15 @@ export const O11Y_KILO_GATEWAY_CLIENT_SECRET = getEnvVariable('O11Y_KILO_GATEWAY
 // the user's email so the widget can verify the end user's identity.
 export const PYLON_IDENTITY_SECRET = getEnvVariable('PYLON_IDENTITY_SECRET') || '';
 
-export const SUPPORT_API_SECRET = getEnvVariable('SUPPORT_API_SECRET') || '';
+/**
+ * Binary session-bound MFA step-up switch.
+ *
+ * `'true'` enforces step-up on the admin surfaces; anything else, including
+ * unset, leaves the application exactly as it was before step-up. This is an
+ * environment variable rather than a release toggle so security posture does
+ * not depend on PostHog.
+ */
+export function isAdminStepUpEnabled(): boolean {
+  // Exact match: no trimming or casing variants, so a typo stays off.
+  return getEnvVariable('ADMIN_STEP_UP_ENABLED') === 'true';
+}

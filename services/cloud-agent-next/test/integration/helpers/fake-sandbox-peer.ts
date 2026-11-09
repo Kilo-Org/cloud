@@ -2,6 +2,7 @@ import type { ControlPlaneSandboxPeer } from '../../../src/control-plane/session
 import type { ControlRuntimeCredentialProxyFence } from '../../../src/control-plane/sandbox/sandbox-do.js';
 import type { PreviewTargetResult } from '../../../src/control-plane/sandbox/preview-target.js';
 import type { SandboxStatusSnapshot } from '../../../src/shared/sandbox-status.js';
+import type { WorkspaceBillingProjection } from '../../../src/shared/workspace-runtime-status.js';
 import type {
   ControlPlaneAnswerPayload,
   ControlPlaneDeliverPayload,
@@ -16,6 +17,18 @@ import type {
  * `prepare`/`deliver` results deterministically.
  */
 export class FakeSandboxPeer implements ControlPlaneSandboxPeer {
+  async getWorktreeChanges() {
+    return { snapshot: null };
+  }
+  async getWorktreeFile() {
+    return { status: 'not_captured' as const };
+  }
+  async refreshWorktreeChanges() {
+    return { status: 'offline' as const, snapshot: null };
+  }
+  async getWorktreeRecovery() {
+    return undefined;
+  }
   readonly fetchCalls: Request[] = [];
   async fetch(request: Request): Promise<Response> {
     this.fetchCalls.push(request);
@@ -36,7 +49,7 @@ export class FakeSandboxPeer implements ControlPlaneSandboxPeer {
   /** The snapshot returned by `getStatusSnapshot` (B10 badge tests). */
   statusSnapshot: SandboxStatusSnapshot = {
     status: 'sleeping',
-    provider: 'Cloudflare',
+    provider: 'Cloudflare Containers',
     observedAt: 1,
     detailCode: 'sandbox_stopped',
     inactivityTimeoutMs: 600_000,
@@ -105,12 +118,33 @@ export class FakeSandboxPeer implements ControlPlaneSandboxPeer {
     return this.statusSnapshot;
   }
 
+  /** The stored billing projection returned by `getWorkspaceBillingProjection`. */
+  billingProjection: WorkspaceBillingProjection | null = null;
+
+  async getWorkspaceBillingProjection(): Promise<WorkspaceBillingProjection | null> {
+    return this.billingProjection;
+  }
+
+  /** The workspace snapshot descriptor's capture time, or null when absent. */
+  workspaceSnapshotRecovery: { capturedAt: number | null } | null = null;
+  readonly removeWorkspaceSnapshotCalls: string[] = [];
+
+  async removeWorkspaceSnapshot(payload: { sessionId: string }): Promise<{ success: true }> {
+    this.removeWorkspaceSnapshotCalls.push(payload.sessionId);
+    this.workspaceSnapshotRecovery = null;
+    return { success: true };
+  }
+
+  async getWorkspaceSnapshotRecovery(): Promise<{ capturedAt: number | null } | null> {
+    return this.workspaceSnapshotRecovery;
+  }
+
   previewTargetResult: PreviewTargetResult = {
     status: 'ok',
     coordinates: {
-      provider: 'cloudflare',
-      allocationName: 'sbx',
-      containment: false,
+      provider: 'cloudflare-containers',
+      logicalSandboxId: 'sbx',
+      allocationRef: 'sbx',
     },
   };
   readonly previewTargetCalls: string[] = [];

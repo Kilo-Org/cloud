@@ -1,7 +1,6 @@
 import type { Env } from '../types.js';
-import type { SessionMetadata } from '../persistence/session-metadata.js';
 import { getPgDb } from '../db/pg.js';
-import { CLOUD_AGENT_REPORT_RETENTION_DAYS, createCloudAgentReportStore } from './report-store.js';
+import { createCloudAgentReportStore } from './report-store.js';
 import type { CloudAgentAdmissionFailureCode } from '@kilocode/worker-utils/cloud-agent-failure';
 
 export type CloudAgentSessionFailure =
@@ -31,37 +30,6 @@ export async function createCloudAgentSessionReport(
     initialMessageId: params.initialMessageId,
     occurredAt: params.occurredAt ?? new Date().toISOString(),
   });
-}
-
-export async function ensureCloneSessionReport(
-  metadata: SessionMetadata | null,
-  env: ReportingEnv
-): Promise<void> {
-  const occurredAt = metadata?.clone?.reportingCreatedAt;
-  const kiloSessionId = metadata?.auth.kiloSessionId;
-  const initialMessageId = metadata?.initialMessage?.id;
-  if (
-    !metadata?.identity.sessionId.startsWith('agent_') ||
-    !occurredAt ||
-    !kiloSessionId ||
-    !initialMessageId ||
-    Date.parse(occurredAt) <= Date.now() - CLOUD_AGENT_REPORT_RETENTION_DAYS * 24 * 60 * 60 * 1000
-  ) {
-    return;
-  }
-
-  const cloudAgentSessionId = metadata.identity.sessionId;
-  await createCloudAgentSessionReport(
-    {
-      cloudAgentSessionId,
-      kiloSessionId,
-      initialMessageId,
-      occurredAt,
-    },
-    env
-  );
-  const sandboxId = metadata.workspace?.sandboxId;
-  if (sandboxId) await recordCloudAgentSandboxIdentity({ cloudAgentSessionId, sandboxId }, env);
 }
 
 export async function recordCloudAgentSandboxIdentity(

@@ -17,6 +17,8 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ background: '#000' }),
 }));
 vi.mock('react-native', () => ({
+  // Sheet registers the app-level Android Back listener while it is visible.
+  BackHandler: { addEventListener: vi.fn(() => ({ remove: () => undefined })) },
   View: 'View',
   Platform: reactNativeMock.Platform,
 }));
@@ -29,19 +31,33 @@ vi.mock('@/components/sheet-header', () => ({
 }));
 
 function sheetElement(
-  props: { onClose?: () => void; onDismiss?: () => void; children?: ReactElement | null } = {}
+  props: {
+    onClose?: () => void;
+    onDismiss?: () => void;
+    onRequestDismiss?: () => boolean;
+    dismissible?: boolean;
+    children?: ReactElement | null;
+  } = {}
 ): ReactElement {
   return createElement(SessionPageSheet, {
     visible: true,
     onClose: props.onClose ?? vi.fn<() => void>(),
     onDismiss: props.onDismiss,
+    onRequestDismiss: props.onRequestDismiss,
+    dismissible: props.dismissible,
     // eslint-disable-next-line react/no-children-prop -- tsgo requires `children` in the props object, not the third argument.
     children: props.children ?? null,
   });
 }
 
 async function mountSheet(
-  props: { onClose?: () => void; onDismiss?: () => void; children?: ReactElement | null } = {}
+  props: {
+    onClose?: () => void;
+    onDismiss?: () => void;
+    onRequestDismiss?: () => boolean;
+    dismissible?: boolean;
+    children?: ReactElement | null;
+  } = {}
 ): Promise<TestRenderer.ReactTestRenderer> {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   await act(async () => {
@@ -53,6 +69,22 @@ async function mountSheet(
     throw new Error('renderer was not created');
   }
   return renderer;
+}
+
+/** The sheet's dismissal request answers whether it may close. */
+function booleanHandler(value: unknown): () => boolean {
+  if (typeof value !== 'function') {
+    throw new TypeError('expected a handler prop');
+  }
+  return value as () => boolean;
+}
+
+/** A host stub keeps the component's own props untyped; these suites call one handler each. */
+function voidHandler(value: unknown): () => void {
+  if (typeof value !== 'function') {
+    throw new TypeError('expected a handler prop');
+  }
+  return value as () => void;
 }
 
 function findByType(
@@ -78,11 +110,10 @@ function sheet(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInst
 }
 
 function press(instance: TestRenderer.ReactTestInstance, key: string): void {
-  const handler = instance.props[key] as (() => void) | undefined;
-  if (typeof handler !== 'function') {
-    throw new TypeError(`target has no ${key}`);
-  }
-  handler();
+  const handler = voidHandler(instance.props[key]);
+  act(() => {
+    handler();
+  });
 }
 
 beforeEach(() => {
@@ -160,6 +191,56 @@ describe('SessionPageSheet mounted', () => {
     const surface = findByTestID(renderer.root, 'session-page-sheet-surface')[0];
     // The padding keeps the content below the system status bar.
     expect(surface?.props.style).toEqual({ paddingTop: 24 });
+    // The surface clears the status bar, so the sheet must not reserve that inset
+    // too: Android reads a dialog window's insets only after the sheet measured
+    // itself, and the sheet then shrank by the status bar and moved its whole
+    // content — header included — after it had already appeared.
+    expect(sheet(renderer.root).props.contentOwnsTopInset).toBe(true);
+
+    renderer.unmount();
+  });
+
+  it('never lets a drag dismiss the sheet, and forwards the requested dismissal', async () => {
+    const onRequestDismiss = vi.fn(() => false);
+    const renderer = await mountSheet({ onRequestDismiss });
+
+    const sheetNode = sheet(renderer.root);
+    // A full-window sheet owns a form's scroll view: on iOS the native sheet
+    // claims every downward drag that starts over it, so the gesture is off.
+    expect(sheetNode.props.dismissGestures).toBe(false);
+    // Back (and the Android scrim) stay, so the sheet is never a dead end.
+    expect(sheetNode.props.enablePanDownToClose).toBe(true);
+    // The form decides whether that requested dismissal really closes it.
+    const requestDismiss = booleanHandler(sheetNode.props.onRequestDismiss);
+    expect(requestDismiss()).toBe(false);
+    expect(onRequestDismiss).toHaveBeenCalledTimes(1);
+
+    renderer.unmount();
+  });
+
+  it('lets a read-only surface dismiss on a drag', async () => {
+    const renderer = await mountSheet({ dismissible: true });
+
+    const sheetNode = sheet(renderer.root);
+    expect(sheetNode.props.dismissGestures).toBe(true);
+    expect(sheetNode.props.enablePanDownToClose).toBe(true);
+
+    renderer.unmount();
+  });
+
+  it('keeps the drag off a sheet that asks before closing', async () => {
+    // A drag has already taken the native sheet down when the question is asked,
+    // so a refused request could only answer Keep editing into an empty window.
+    const onRequestDismiss = vi.fn(() => false);
+    const renderer = await mountSheet({ dismissible: true, onRequestDismiss });
+
+    const sheetNode = sheet(renderer.root);
+    expect(sheetNode.props.dismissGestures).toBe(false);
+    // The dismissal paths that ask first stay reachable, and the caller still
+    // decides the answer.
+    expect(sheetNode.props.enablePanDownToClose).toBe(true);
+    expect(booleanHandler(sheetNode.props.onRequestDismiss)()).toBe(false);
+    expect(onRequestDismiss).toHaveBeenCalledTimes(1);
 
     renderer.unmount();
   });

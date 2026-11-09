@@ -9,9 +9,11 @@ import {
   type RepositoryGroup,
 } from '@/components/agents/new-session-repository-state';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { remoteSpawnInstanceDisconnectedNote } from '@/lib/remote-submit-outcome';
 
-import { NewSessionProfileRow } from './new-session-configure-form';
+import { NewSessionPlanRefusal } from '@/components/agents/new-session-plan-refusal';
+import { NewSessionProfileRow } from './new-session-environment-row';
 
 import '@/i18n';
 import type * as ReactI18next from 'react-i18next';
@@ -414,6 +416,35 @@ describe('NewSessionConfigureForm', () => {
     expect(findElement(remote, 'NewSessionCloudCreateError')).toBeNull();
   });
 
+  it('shows the plan refusal in the scroll body under the composer, not the footer', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: INSTANCE,
+      showRunOnSelector: true,
+      planRefusal: 'The organization trial has ended.',
+    }) as Node;
+
+    // A three-line explanation in the pinned footer shrinks the scroll frame
+    // and cuts the launch folder on a compact screen, so the body carries it.
+    const scrollBody = findElement(element, 'ScrollView');
+    expect(findElementByComponent(scrollBody, NewSessionPlanRefusal)).toMatchObject({
+      message: 'The organization trial has ended.',
+    });
+    // The footer keeps only the start-blocked reason (its own component): the
+    // refusal must not take height from the form a second time. The pinned
+    // footer is the KeyboardAvoidingView's second child, after the scroll body,
+    // and it must be found for the negative assertion to mean anything.
+    const lift = findElementByType(element, 'KeyboardAvoidingView');
+    const footer = (lift?.children as Node[] | undefined)?.[1] as Node | undefined;
+    expect(lift).not.toBeNull();
+    expect(footer).toBeDefined();
+    expect(findElementByType(footer, 'NewSessionStartButton')).not.toBeNull();
+    expect(findElementByComponent(footer, NewSessionPlanRefusal)).toBeNull();
+  });
+
   // ── Case 1: Cloud, selector shown ──
   it('renders prompt, repo, and the run-target block when cloud target with selector shown', async () => {
     const { NewSessionConfigureForm } = await import('./new-session-configure-form');
@@ -430,6 +461,64 @@ describe('NewSessionConfigureForm', () => {
     expect(findElementByType(element, 'NewSessionRunTarget')).toMatchObject({
       showRunOnSelector: true,
     });
+  });
+
+  it('keeps the run-target block while every provider asks to be connected', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    // The first-run form with no Git provider connected: the repository section
+    // renders its connect cards, and the run target must stay next to them so a
+    // Cloud Agent pick can still be switched back to a connected computer.
+    const connectGroups: RepositoryGroup[] = [
+      { key: 'github', status: 'connect', repositories: [] },
+      { key: 'gitlab', status: 'connect', repositories: [] },
+    ];
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: null,
+      showRunOnSelector: true,
+      groups: connectGroups,
+    }) as Node;
+
+    expect(findElementByType(element, 'NewSessionRepositorySection')).toMatchObject({
+      groups: connectGroups,
+    });
+    expect(findElementByType(element, 'NewSessionRunTarget')).toMatchObject({
+      showRunOnSelector: true,
+      disabled: false,
+    });
+  });
+
+  it('renders the account section above the run-target block', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: null,
+      showRunOnSelector: true,
+      accountSection: 'Account section',
+    }) as Node;
+
+    // The labeled section renders inside the same scroll body as the other
+    // form sections (the run-target block itself is a string-host mock here).
+    const scrollBody = findElement(element, 'ScrollView');
+    expect(scrollBody).not.toBeNull();
+    expect(findTextContent(scrollBody as Node, text => text === 'Account section')).toBe(true);
+  });
+
+  it('hides the account section when the caller omits it', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: null,
+      showRunOnSelector: true,
+    }) as Node;
+
+    expect(findTextContent(element, text => text === 'Account section')).toBe(false);
   });
 
   // ── Case 1b: ordered repository array passes through unchanged ──
@@ -492,6 +581,12 @@ describe('NewSessionConfigureForm', () => {
     expect(findElementByType(element, 'NewSessionRepositorySection')).not.toBeNull();
     expect(findTextContent(element, t => t === 'Run on')).toBe(false);
     expect(findTextContent(element, t => t === 'Run on: ')).toBe(false);
+    expect(
+      findTextContent(
+        element,
+        t => t === 'To run on your computer, start Kilo there and leave it running.'
+      )
+    ).toBe(false);
   });
 
   // ── Case 3: Remote, selector shown ──
@@ -511,6 +606,12 @@ describe('NewSessionConfigureForm', () => {
       showRunOnSelector: true,
       runOnInstance: INSTANCE,
     });
+    expect(
+      findTextContent(
+        element,
+        t => t === 'To run on your computer, start Kilo there and leave it running.'
+      )
+    ).toBe(true);
   });
 
   // ── Case 4: Remote, selector hidden ──
@@ -707,9 +808,12 @@ describe('NewSessionConfigureForm', () => {
     const element = renderRow({ profile: PROFILE });
 
     expect(findTextContent(element, t => t === 'Production')).toBe(true);
-    expect(findTextContent(element, t => t === '3 commands · 1 MCP · 2 skills · 4 agents')).toBe(
-      true
-    );
+    expect(
+      findTextContent(
+        element,
+        t => t === '2 vars · 1 MCP · 2 skills · 4 cmds · 3 setup cmds · 4 agents'
+      )
+    ).toBe(true);
   });
 
   it('renders "Default environment" when no profile resolves', () => {
@@ -743,6 +847,48 @@ describe('NewSessionConfigureForm', () => {
     expect(findElementByType(element, 'Skeleton')).not.toBeNull();
     expect(findTextContent(element, t => t === 'Default environment')).toBe(false);
     expect(findTextContent(element, t => t === 'Production')).toBe(false);
+  });
+
+  it('keeps the summary slot when a resolved profile has nothing configured', () => {
+    const element = renderRow({
+      profile: {
+        ...PROFILE,
+        varCount: 0,
+        mcpServerCount: 0,
+        skillCount: 0,
+        kiloCommandCount: 0,
+        commandCount: 0,
+        agentCount: 0,
+      },
+    });
+
+    // The empty count list keeps the two-line placeholder, so the card holds the
+    // height the loading state reserves instead of collapsing.
+    expect(findTextContent(element, t => t === '\u00A0\n\u00A0')).toBe(true);
+    const slots = collectElementsByType(element, 'View').filter(
+      view => view.importantForAccessibility === 'no-hide-descendants'
+    );
+    expect(slots).toHaveLength(1);
+    expect(slots[0]?.accessibilityElementsHidden).toBe(true);
+  });
+
+  it('renders every Environment row state inside the same card', () => {
+    const chrome = `${ROW_TARGET_CLASS} flex-row items-center gap-3 rounded-lg border border-border bg-card`;
+
+    for (const row of [
+      renderRow({ isProfileLoading: true }),
+      renderRow({ isProfileError: true }),
+      renderRow({ profile: PROFILE }),
+      renderRow(),
+    ]) {
+      const cards = [
+        ...collectElementsByType(row, 'View'),
+        ...collectElementsByType(row, 'Pressable'),
+      ]
+        .map(element => element.className)
+        .filter(className => typeof className === 'string' && className.includes(chrome));
+      expect(cards).toEqual([expect.stringContaining(chrome)]);
+    }
   });
 
   it('opens the profile picker when the row is pressed', () => {
@@ -823,11 +969,13 @@ describe('NewSessionConfigureForm', () => {
 
     // The panel is controlled by the session, so it gets the same override the
     // Environment row shows and reports picks back through the same callback.
+    // `onRequestReveal` is how the panel scrolls the composer to its expansion.
     expect(findElementByType(element, 'AdvancedConfigPanel')).toMatchObject({
       organizationId: 'org-1',
       selectedProfileId: 'profile-1',
       onSelectProfile,
       disabled: false,
+      onRequestReveal: expect.any(Function),
     });
   });
 
@@ -897,8 +1045,8 @@ describe('NewSessionConfigureForm', () => {
     expect(findTextContent(element, t => t === 'Changes')).toBe(false);
   });
 
-  // ── Case 12: the Run on helper sentence stays in plain language ──
-  it('renders the plain help sentence, without CLI jargon, for cloud and remote targets', async () => {
+  // ── Case 12: the Run on helper sentence stays in plain language, on a remote target only ──
+  it('renders the plain help sentence for a remote target and never for the cloud target', async () => {
     const { NewSessionConfigureForm } = await import('./new-session-configure-form');
 
     const helpSentence = 'To run on your computer, start Kilo there and leave it running.';
@@ -910,15 +1058,13 @@ describe('NewSessionConfigureForm', () => {
       runOnInstance: null,
       showRunOnSelector: true,
     }) as Node;
-    expect(findTextContent(cloud, t => t === helpSentence)).toBe(true);
+    expect(findTextContent(cloud, t => t === helpSentence)).toBe(false);
     for (const term of cliTerms) {
       expect(
         findTextContent(cloud, t => t.includes(term)),
         term
       ).toBe(false);
     }
-    // The help draws the sentence as prose: the authoring markers must not
-    // reach the screen.
     expect(findTextContent(cloud, t => t.includes('`'))).toBe(false);
 
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
@@ -979,18 +1125,5 @@ describe('NewSessionConfigureForm', () => {
       cloudCreateError,
     }) as Node;
     expect(findElementByType(remote, 'NewSessionCloudCreateError')).toBeNull();
-  });
-
-  // ── Case 15: the scroll frame is measured and handed to the prompt ──
-  it('measures the scroll frame and threads it to NewSessionPrompt', async () => {
-    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
-
-    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
-    const element = NewSessionConfigureForm(defaultProps()) as Node;
-
-    // The ScrollView reports its height so the prompt can yield its floor to it.
-    expect(findElementByType(element, 'ScrollView')?.onLayout).toEqual(expect.any(Function));
-    // The mocked useState holds the initial measurement (0) and never setStates.
-    expect(findElementByType(element, 'NewSessionPrompt')?.frameHeight).toBe(0);
   });
 });

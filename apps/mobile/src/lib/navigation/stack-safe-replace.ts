@@ -28,29 +28,44 @@ export type StackSafeReplaceRouter = {
  * form of this pushed and then reset the stack one frame later, which landed the
  * second commit while the push was still animating and crashed the same way.
  *
- * The removal is keyed on the route focused when the navigation started, so a
+ * The removal is keyed on the routes focused when the navigations started, so a
  * duplicate route name elsewhere in the stack is never dropped by mistake.
+ * A second `replace` before the first transition ends only adds its source to
+ * the pending set: the first source stays tracked, and one cleanup then
+ * retires every replaced screen at once, so back skips all of them.
  */
 export function useStackSafeReplace(): StackSafeReplaceRouter {
   const router = useRouter();
   const navigation = useNavigation<NativeStackNavigationProp<Record<string, undefined>>>();
-  const pendingRouteKeyRef = useRef<string | null>(null);
+  const pendingRouteKeysRef = useRef<Set<string>>(new Set());
 
   useEffect(
     () =>
       navigation.addListener('transitionEnd', () => {
-        const routeKey = pendingRouteKeyRef.current;
-        if (routeKey === null) {
+        const pendingKeys = pendingRouteKeysRef.current;
+        if (pendingKeys.size === 0) {
           return;
         }
-        pendingRouteKeyRef.current = null;
         const state = navigation.getState();
-        const routes = state.routes.filter(route => route.key !== routeKey);
-        // The route is already gone (the user left another way), or it is the
-        // only one left: leave the stack alone rather than commit a bad reset.
+        const focusedKey = state.routes[state.index]?.key;
+        // Keep a key pending only while it can still be retired later; a
+        // source that left the stack some other way, or that some other
+        // navigation made the focused screen, is no longer ours to remove.
+        for (const key of pendingKeys) {
+          if (key === focusedKey || !state.routes.some(route => route.key === key)) {
+            pendingKeys.delete(key);
+          }
+        }
+        if (pendingKeys.size === 0) {
+          return;
+        }
+        const routes = state.routes.filter(route => !pendingKeys.has(route.key));
+        // Nothing left to remove, or the reset would empty the navigator:
+        // leave the stack alone rather than commit a bad reset.
         if (routes.length === state.routes.length || routes.length === 0) {
           return;
         }
+        pendingRouteKeysRef.current = new Set();
         navigation.reset({ ...state, routes, index: routes.length - 1 });
       }),
     [navigation]
@@ -59,7 +74,10 @@ export function useStackSafeReplace(): StackSafeReplaceRouter {
   const replace = useCallback(
     (href: Href) => {
       const state = navigation.getState();
-      pendingRouteKeyRef.current = state.routes[state.index]?.key ?? null;
+      const sourceKey = state.routes[state.index]?.key ?? null;
+      if (sourceKey !== null) {
+        pendingRouteKeysRef.current.add(sourceKey);
+      }
       router.push(href);
     },
     [navigation, router]

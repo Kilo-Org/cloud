@@ -1,3 +1,6 @@
+import { type InstancePickerInstance } from '@/lib/picker-bridge';
+import { resolveLiveInstance } from '@/lib/resolve-live-instance';
+
 /**
  * Transient new-session route-param value that asks the form to open on the
  * Cloud Agent target regardless of the stored preference. The first-sign-in
@@ -5,6 +8,15 @@
  * session without wiping the person's saved run-on destination.
  */
 export const PRESELECT_CLOUD_RUN_ON = 'cloud';
+
+/**
+ * Transient new-session route-param value that asks the form to open on the
+ * computer target: the first-sign-in tour's computer path passes it, the form
+ * binds the first connected computer once the live instance list arrives, and
+ * none connected leaves the target selected but unbound (Start disabled with
+ * the setup hint) instead of falling back to the Cloud Agent.
+ */
+export const PRESELECT_COMPUTER_RUN_ON = 'computer';
 
 export function parseStoredRunOnDestination(raw: string | null): string | null {
   if (!raw) {
@@ -55,4 +67,21 @@ export function resolvePersistedRunOn<T extends { connectionId: string }>(
     return null;
   }
   return instances.find(instance => instance.connectionId === storedConnectionId) ?? null;
+}
+
+/**
+ * The target the form should hold after a refetch. A host that reboots
+ * reconnects its CLI with the same name and project under a new
+ * connectionId, so the selection follows the live row
+ * (`resolveLiveInstance`); a live list that no longer represents it leaves the
+ * selection unchanged, because the spawn path reports that case to the user.
+ */
+export function followLiveRunOn(
+  selected: InstancePickerInstance | null,
+  instances: readonly InstancePickerInstance[]
+): InstancePickerInstance | null {
+  if (selected === null) {
+    return null;
+  }
+  return resolveLiveInstance(selected, [...instances]) ?? selected;
 }

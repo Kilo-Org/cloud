@@ -17,7 +17,7 @@ import { buildActiveSessionsTrayInput } from '@/lib/active-sessions-live';
 import { useAuth } from '@/lib/auth/auth-context';
 import { isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { isSignOutActive } from '@/lib/auth/sign-out-state';
-import { type UseAgentSessionsOptions } from '@/lib/hooks/use-agent-sessions';
+import { type UseAgentSessionsOptions } from '@/lib/agent-session-queries';
 import { useOrganization } from '@/lib/organization-context';
 import { captureActiveSessionsQueryRefresh, fenceActiveSessionsQuery } from '@/lib/query-client';
 import { useTRPC } from '@/lib/trpc';

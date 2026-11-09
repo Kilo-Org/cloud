@@ -1,3 +1,4 @@
+import { installFakeRuntimeProxyPeer } from './helpers/fake-session-peer.js';
 import { env, reset, runInDurableObject } from 'cloudflare:test';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
@@ -12,8 +13,8 @@ import {
   WORKTREE_DELETION_PREFIX,
   WorktreeDeletionIncompleteError,
 } from '../../src/control-plane/sandbox/worktree-deletion.js';
-import { generateSandboxId } from '../../src/sandbox-id.js';
-import { sessionDoName } from '../../src/session-plane.js';
+import { generateSandboxId, hashToSandboxId } from '../../src/sandbox-id.js';
+import { sessionDoName } from '../../src/session-identity.js';
 import { getWorktreeWorkspacePath } from '../../src/workspace.js';
 import { parseSessionMetadata } from '../../src/persistence/session-metadata.js';
 import type {
@@ -27,8 +28,9 @@ import {
   type ControlPlaneWrapperFrame,
 } from '../../src/shared/control-plane-protocol.js';
 import {
+  FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN,
   createFakeCredentialBroker,
-  FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
+  FAKE_SANDBOX_CONTAINERS_NAMESPACE,
   installFakeCredentialEnv,
 } from './helpers/fake-credentials.js';
 import { FakeWrapper } from './helpers/fake-wrapper.js';
@@ -72,6 +74,7 @@ function metadata(input: {
   kiloSessionId: string;
   sandboxId: string;
   worktreeId: string;
+  sandboxKind?: 'code-review';
 }) {
   return parseSessionMetadata({
     metadataSchemaVersion: 2,
@@ -81,14 +84,16 @@ function metadata(input: {
       orgId: ORG_ID,
       createdOnPlatform: 'cloud-agent-web',
     },
-    auth: { kiloSessionId: input.kiloSessionId, kilocodeToken: 'native-token' },
+    auth: { kiloSessionId: input.kiloSessionId, kilocodeToken: FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN },
     agent: { mode: 'code', model: 'test/model' },
     repository: { type: 'github', repo: 'acme/widgets', upstreamBranch: 'main' },
     workspace: {
       branchName: 'kilo/b10',
       sandboxId: input.sandboxId,
-      sandboxProvider: 'cloudflare',
+      sandboxProvider: 'cloudflare-containers',
       worktreeId: input.worktreeId,
+      workspacePath: worktreePath(input.worktreeId),
+      ...(input.sandboxKind === undefined ? {} : { sandboxKind: input.sandboxKind }),
     },
     lifecycle: { version: 1, timestamp: 1 },
   });
@@ -123,7 +128,7 @@ function createFakeProvider(): FakeProvider {
     async create(intent: ProviderCreateIntent) {
       return { providerRef: `mem_${intent.intentId}` };
     },
-    async launch(_ref, launchEnv) {
+    async launch(_ref, { env: launchEnv }) {
       provider.launchEnvs.push({ ...launchEnv });
       return { startSource: 'image' as const };
     },
@@ -151,12 +156,13 @@ async function injectProvider(
   await runInDurableObject(stub, async instance => {
     await instance.getAllocationState();
     installFakeCredentialEnv(instance.env, broker, {
-      SandboxSmallContainment: FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
+      SANDBOX_CONTAINERS: FAKE_SANDBOX_CONTAINERS_NAMESPACE,
       WORKER_URL: 'https://control.test',
       KILOCODE_BACKEND_BASE_URL: 'https://control.test',
       KILO_OPENROUTER_BASE: 'https://control.test',
       KILO_SESSION_INGEST_URL: 'https://control.test',
     });
+    installFakeRuntimeProxyPeer(instance);
     Object.assign(instance, {
       createProviderAdapter: () => provider.adapter,
       provider: provider.adapter,
@@ -200,14 +206,27 @@ async function createWorktreeSession(input: {
   sandboxId: string;
   worktreeId: string;
   kiloSessionId: string;
+  sandboxKind?: 'code-review';
 }): Promise<DurableObjectStub<SandboxSessionV2>> {
   const stub = sessions.getByName(sessionDoName(USER_ID, input.sessionId));
   await stub.createSessionWithInitialAdmission({
     metadata: metadata(input),
     message: promptPayload(messageId()),
-    sandboxSelection: { provider: 'cloudflare' },
+    sandboxSelection: {
+      provider: 'cloudflare-containers',
+      ...(input.sandboxKind === undefined ? {} : { sandboxKind: input.sandboxKind }),
+    },
   });
   return stub;
+}
+
+/**
+ * A multi-worktree sandbox uses the code-review kind: native isolated sandboxes
+ * are single-session and force every route into /workspace/app, which would make
+ * a second worktree's grant collide with the first.
+ */
+function multiWorktreeSandboxId(sessionId: string): Promise<string> {
+  return hashToSandboxId(`control-isolated-v1:${sessionId}`, 'sbx');
 }
 
 async function startConnectedSandbox(): Promise<{
@@ -219,7 +238,7 @@ async function startConnectedSandbox(): Promise<{
   kiloSessionId: string;
   worktreeId: string;
 }> {
-  const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, newSessionId());
+  const sandboxId = await generateSandboxId(newSessionId());
   const provider = createFakeProvider();
   const sandbox = await injectProvider(sandboxId, provider);
   const sessionId = newSessionId();
@@ -244,7 +263,7 @@ async function startConnectedSandbox(): Promise<{
   };
 }
 
-/** Two worktrees on one connected sandbox: a shared sandbox with a live wrapper. */
+/** Two worktrees on one connected native sandbox with a live wrapper. */
 async function startSharedConnectedSandbox(): Promise<{
   sandboxId: string;
   sandbox: DurableObjectStub<SandboxControlV2>;
@@ -257,14 +276,12 @@ async function startSharedConnectedSandbox(): Promise<{
   kiloA: string;
   kiloB: string;
 }> {
-  const sandboxId = await generateSandboxId(undefined, ORG_ID, USER_ID, newSessionId(), undefined, {
-    sandboxAllocation: 'cloudflare-shared',
-  });
+  const sessionA = newSessionId();
+  const sandboxId = await multiWorktreeSandboxId(sessionA);
   const provider = createFakeProvider();
   const sandbox = await injectProvider(sandboxId, provider);
   const worktreeA = worktreeId();
   const worktreeB = worktreeId();
-  const sessionA = newSessionId();
   const sessionB = newSessionId();
   const kiloA = kiloSessionId();
   const kiloB = kiloSessionId();
@@ -273,6 +290,7 @@ async function startSharedConnectedSandbox(): Promise<{
     sandboxId,
     worktreeId: worktreeA,
     kiloSessionId: kiloA,
+    sandboxKind: 'code-review',
   });
   await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
   const wrapper = await connectAndHello(provider, sandboxId);
@@ -281,6 +299,7 @@ async function startSharedConnectedSandbox(): Promise<{
     sandboxId,
     worktreeId: worktreeB,
     kiloSessionId: kiloB,
+    sandboxKind: 'code-review',
   });
   return {
     sandboxId,
@@ -300,7 +319,7 @@ function deletionInput(input: { sandboxId: string; worktreeId: string; sessionId
   return {
     worktreeId: input.worktreeId,
     kiloUserId: USER_ID,
-    location: { sandboxId: input.sandboxId, provider: 'cloudflare' as const },
+    location: { sandboxId: input.sandboxId, provider: 'cloudflare-containers' as const },
     sessionIds: input.sessionIds,
   };
 }
@@ -351,6 +370,16 @@ describe('worktree deletion on the V2 Sandbox DO (B10)', () => {
       kiloSessionId: kilo,
     } = await startConnectedSandbox();
 
+    await runInDurableObject(sandbox, (_instance, state) => {
+      state.storage.kv.put(`worktree_changes/${worktree}/worktree_changes`, { sentinel: true });
+      state.storage.kv.put(`worktree_changes/${worktree}/worktree_file:changed.txt`, {
+        sentinel: true,
+      });
+      state.storage.kv.put('worktree_changes/another-worktree/worktree_changes', {
+        sentinel: true,
+      });
+    });
+
     const result = await sandbox.deleteWorktreeResources(
       deletionInput({ sandboxId, worktreeId: worktree, sessionIds: [kilo] })
     );
@@ -358,6 +387,14 @@ describe('worktree deletion on the V2 Sandbox DO (B10)', () => {
     expect(result).toEqual({ deleted: true, sessionIds: [kilo] });
     expect(provider.stopCalls).toHaveLength(1);
     expect((await sandbox.getAllocationState()).kind).toBe('stopped');
+    await runInDurableObject(sandbox, (_instance, state) => {
+      expect(
+        Array.from(state.storage.kv.list({ prefix: `worktree_changes/${worktree}/` }))
+      ).toEqual([]);
+      expect(state.storage.kv.get('worktree_changes/another-worktree/worktree_changes')).toEqual({
+        sentinel: true,
+      });
+    });
     await expect(sandbox.status({ sessionId })).resolves.toMatchObject({
       view: { state: 'unknown' },
     });
@@ -395,7 +432,7 @@ describe('worktree deletion on the V2 Sandbox DO (B10)', () => {
   });
 
   it('shortcuts only a stopped allocation with no unconfirmed provider ref', async () => {
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, newSessionId());
+    const sandboxId = await generateSandboxId(newSessionId());
     const provider = createFakeProvider();
     const sandbox = await injectProvider(sandboxId, provider);
     const worktree = worktreeId();
@@ -564,7 +601,7 @@ describe('worktree deletion on the V2 Sandbox DO (B10)', () => {
   });
 
   it('cleans a connected shared sandbox when the deleted worktree has no route', async () => {
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, newSessionId());
+    const sandboxId = await generateSandboxId(newSessionId());
     const provider = createFakeProvider();
     const sandbox = await injectProvider(sandboxId, provider);
     const worktreeA = worktreeId();
@@ -690,15 +727,15 @@ describe('worktree deletion on the V2 Sandbox DO (B10)', () => {
     wrapper.close();
   });
 
-  it('keeps a shared sandbox alive and removes only the deleted worktree route when the provider is terminal', async () => {
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, newSessionId());
+  it('keeps a multi-worktree sandbox alive and removes only the deleted worktree route when the provider is terminal', async () => {
+    const sessionA = newSessionId();
+    const sandboxId = await multiWorktreeSandboxId(sessionA);
     const provider = createFakeProvider();
     provider.observeStatus = 'terminal';
     const sandbox = await injectProvider(sandboxId, provider);
 
     const worktreeA = worktreeId();
     const worktreeB = worktreeId();
-    const sessionA = newSessionId();
     const sessionB = newSessionId();
     const kiloA = kiloSessionId();
     const kiloB = kiloSessionId();
@@ -707,12 +744,14 @@ describe('worktree deletion on the V2 Sandbox DO (B10)', () => {
       sandboxId,
       worktreeId: worktreeA,
       kiloSessionId: kiloA,
+      sandboxKind: 'code-review',
     });
     await createWorktreeSession({
       sessionId: sessionB,
       sandboxId,
       worktreeId: worktreeB,
       kiloSessionId: kiloB,
+      sandboxKind: 'code-review',
     });
 
     const result = await sandbox.deleteWorktreeResources(
@@ -731,7 +770,7 @@ describe('worktree deletion on the V2 Sandbox DO (B10)', () => {
   });
 
   it('rejects a foreign sandbox location', async () => {
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, newSessionId());
+    const sandboxId = await generateSandboxId(newSessionId());
     const provider = createFakeProvider();
     const sandbox = await injectProvider(sandboxId, provider);
 
@@ -740,7 +779,7 @@ describe('worktree deletion on the V2 Sandbox DO (B10)', () => {
         instance.deleteWorktreeResources({
           worktreeId: worktreeId(),
           kiloUserId: USER_ID,
-          location: { sandboxId: 'usr-foreign', provider: 'cloudflare' },
+          location: { sandboxId: 'usr-foreign', provider: 'cloudflare-containers' },
           sessionIds: [kiloSessionId()],
         })
       )
@@ -760,7 +799,7 @@ describe('worktree deletion on the V2 Sandbox DO (B10)', () => {
         instance.deleteWorktreeResources({
           worktreeId: worktree,
           kiloUserId: OTHER_USER_ID,
-          location: { sandboxId, provider: 'cloudflare' },
+          location: { sandboxId, provider: 'cloudflare-containers' },
           sessionIds: [kilo],
         })
       )

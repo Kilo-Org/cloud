@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- The mounted Home matrix covers live provenance, admission, and independent recovery actions. */
-import { createElement, type ReactNode } from 'react';
+import { createElement, type ReactNode, useEffect } from 'react';
 import * as ReactQuery from '@tanstack/react-query';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -47,7 +47,11 @@ const queryClient = new ReactQuery.QueryClient();
 vi.mock('@tanstack/react-query', async importOriginal => ({
   ...(await importOriginal<typeof ReactQuery>()),
   useQueryClient: () => queryClient,
-  useQuery: () => ({ data: state.memberships }),
+  // The account control on the header reads its memberships through useQuery:
+  // a disabled query (signed out) stays pending, exactly as the live one does.
+  useQuery: (options: { enabled?: boolean }) => ({
+    data: options.enabled === false ? undefined : state.memberships,
+  }),
 }));
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({ organizations: { list: { queryOptions: () => ({}) } } }),
@@ -86,6 +90,12 @@ vi.mock('@/lib/a11y/motion', () => ({
   selectReducedMotionEntrance: (_reduced: boolean, crossfade: unknown) => crossfade,
 }));
 vi.mock('expo-router', () => ({
+  useNavigationContainerRef: () => ({ addListener: () => () => undefined }),
+  // The account picker closes itself on the owning screen's focus loss; this
+  // suite keeps Home focused, so the effect lives as long as the tree.
+  useFocusEffect: (effect: Parameters<typeof useEffect>[0]) => {
+    useEffect(effect, [effect]);
+  },
   useRouter: () => ({
     canGoBack: () => false,
     push: (path: string) => {
@@ -97,6 +107,12 @@ vi.mock('expo-router', () => ({
   }),
 }));
 vi.mock('@/components/home/new-task-button', () => ({ NewTaskButton: 'NewTaskButton' }));
+// The briefing card renders the paid-summary surfaces and reaches the native
+// SQLCipher store; Home's layout assertions do not exercise it.
+vi.mock('@/components/agent-briefing/briefing-card', () => ({
+  BriefingCard: 'BriefingCard',
+  useHomeBriefing: () => ({ briefing: undefined, frameReport: undefined }),
+}));
 vi.mock('@/components/todos/up-next-section', () => ({ UpNextSection: 'UpNextSection' }));
 vi.mock('@/components/home/new-task-from-picture-button', () => ({
   NewTaskFromPictureButton: 'NewTaskFromPictureButton',
@@ -121,6 +137,7 @@ vi.mock('@/components/ui/text', async () => {
 });
 vi.mock('@/components/ui/icons', () => ({
   AlertCircle: 'AlertCircle',
+  Bot: 'Bot',
   ChevronDown: 'ChevronDown',
   GitMerge: 'GitMerge',
   GitPullRequest: 'GitPullRequest',
@@ -165,11 +182,14 @@ vi.mock('@/lib/a11y/announce', () => ({
   },
 }));
 vi.mock('@/lib/hooks/use-agent-sessions', async () => {
-  const { useEffect } = await import('react');
+  // `vi.mock` factories are hoisted above the file's imports, so React has to
+  // be loaded here; binding it to a name keeps the file's own `useEffect` import
+  // from being shadowed.
+  const react = await import('react');
   return {
     useLiveAgentSessions: (options: Parameters<typeof useLiveAgentSessions>[0]) => {
       state.liveQuery(options);
-      useEffect(() => {
+      react.useEffect(() => {
         state.owners += 1;
         return () => {
           state.owners -= 1;
@@ -219,7 +239,10 @@ function press(label: string) {
   (action(label).props.onPress as () => void)();
 }
 /** The one glanceable card's frame; absent while no card is shown. */
-const CARD_FRAME = 'overflow-hidden rounded-2xl border border-border bg-card';
+// The Home card now renders through the shared adaptive frame that holds the
+// live card, the briefing and the pending placeholder.
+const CARD_FRAME =
+  'flex-row items-stretch overflow-hidden rounded-2xl border border-border bg-card';
 function cardFrame() {
   return nodes('View').find(node => node.props.className === CARD_FRAME);
 }
@@ -299,18 +322,18 @@ describe('HomeScreen composition', () => {
   });
 
   it.each([null, 'org-1'])(
-    'keeps the selected query scope without a context control for %s',
+    'shows the switchable account control for %s and keeps the live query scope',
     async organizationId => {
       state.organization.organizationId = organizationId;
-      state.boundary.orgs = [{ organizationId: 'org-1', organizationName: 'Home organization' }];
+      state.memberships = [{ organizationId: 'org-1', organizationName: 'Home organization' }];
+      state.boundary.orgs = state.memberships;
       state.boundary.org = state.boundary.orgs[0];
       state.live.activeSessions = [row];
       await renderHome();
       expect(
         nodes('Pressable').filter(node => node.props.accessibilityHint === 'Select account')
-      ).toHaveLength(0);
-      expect(text()).not.toContain('Home organization');
-      expect(text()).not.toContain('Personal');
+      ).toHaveLength(1);
+      expect(text()).toContain(organizationId === null ? 'Personal' : 'Home organization');
       expect(state.liveQuery).toHaveBeenLastCalledWith({ organizationId, enabled: true });
       expect(text()).toContain('Live task');
       expect(nodes('NewTaskButton')[0]?.props.organizationId).toBe(organizationId);
@@ -365,7 +388,9 @@ describe('HomeScreen composition', () => {
     expect(state.liveQuery).toHaveBeenLastCalledWith({ organizationId: 'org-1', enabled: loaded });
     expect(hasLoadedCard()).toBe(loaded);
     expect(nodes('NewTaskButton')).toHaveLength(loaded ? 1 : 0);
-    expect(nodes('Skeleton')).toHaveLength(loaded ? 0 : 15);
+    // The header account control adds one skeleton while the organization
+    // selection is unresolved.
+    expect(nodes('Skeleton')).toHaveLength(loaded ? 0 : 16);
   });
 
   it.each([false, true])(
@@ -474,6 +499,18 @@ describe('Home live presentation', () => {
       expect(text().includes('Connection lost')).toBe(mode === 'exhausted');
       expect(text().includes('Reconnecting…')).toBe(mode === 'reconnecting' || mode === 'unknown');
       expect(text()).not.toContain('Internet connection restored');
+      if (mode === 'exhausted') {
+        // Device defect (Android portrait, pt-BR): the notice beside `Retry`
+        // and the header action ellipsized "Connection lost" to "Connection
+        // …". The message must keep no `numberOfLines` cap, so it wraps to a
+        // second line instead of clipping.
+        const message = nodes('Text').find(node => node.children.includes('Connection lost'));
+        expect(message).toBeDefined();
+        expect(message?.props.numberOfLines).toBeUndefined();
+        expect(String(message?.props.className).split(' ')).toEqual(
+          expect.arrayContaining(['min-w-0', 'shrink'])
+        );
+      }
     }
   );
 
@@ -814,10 +851,16 @@ describe('Home admission', () => {
       expect(nodes('NewTaskButton')).toHaveLength(0);
       expect(text()).not.toContain('Code Reviewer');
       expect(text()).not.toContain('Security Agent');
-      expect(text()).not.toContain('Engineering');
+      // The header account control still names the account on purpose (it owns
+      // its own error and pending presentation); the protected rows must not,
+      // so the name may appear at most once on the whole screen.
+      expect(text().split('Engineering').length - 1).toBeLessThanOrEqual(1);
     }
     if (mode === 'membership paused') {
+      // The sessions body pauses on skeleton, but the shared membership list
+      // the header control reads is settled, so it renders the name itself.
       expect(nodes('Skeleton')).toHaveLength(15);
+      expect(text()).toContain('Engineering');
       expect(text()).not.toContain('Organization unavailable');
     }
     if (

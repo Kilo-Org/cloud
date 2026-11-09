@@ -6,6 +6,7 @@ import { readFileSync } from 'node:fs';
 import { readFile, writeFile } from 'node:fs/promises';
 import { basename, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { shellQuote } from '../src/kilo/utils.js';
 import { RUNTIME_DISTRIBUTION } from '../src/shared/runtime-distribution.js';
 import {
   CONTROL_PLANE_SUPERVISOR,
@@ -16,17 +17,20 @@ import { CONTROL_PLANE_PROTOCOL_VERSION } from '../src/shared/control-plane-prot
 import { WRAPPER_VERSION } from '../src/shared/wrapper-version.js';
 import { KILO_CLI_VERSION } from '../src/shared/kilo-cli-version.js';
 import {
+  RUNTIME_TOOLCHAIN,
+  installPinnedArchiveScript,
+  installPinnedNpmPackageScript,
+  toolchainVerificationScript,
+} from '../src/shared/runtime-toolchain.js';
+import {
   SNAPSHOT_CONTROL_PLANE_SUPERVISOR_PATH,
   SNAPSHOT_MANIFEST_PATH,
   SNAPSHOT_RUNTIME,
-  SNAPSHOT_WRAPPER_PATH,
   createRuntimeManifest,
-  exactVersionCheck,
   hashRuntimeArtifacts,
   runtimeDistributionSourceFiles,
   runtimeManifestArtifacts,
   runtimeVerificationScript,
-  shellQuote,
   validateRuntimeManifest,
   type RuntimeArtifact,
   type RuntimeManifest,
@@ -38,12 +42,10 @@ export {
   SNAPSHOT_CONTROL_PLANE_WRAPPER_PATH,
   SNAPSHOT_MANIFEST_PATH,
   SNAPSHOT_RUNTIME,
-  SNAPSHOT_WRAPPER_PATH,
   createRuntimeManifest,
   hashRuntimeArtifacts,
   runtimeDistributionSourceFiles,
   runtimeVerificationScript,
-  shellQuote,
   validateRuntimeManifest,
 } from './runtime-manifest.js';
 export type { RuntimeArtifact, RuntimeManifest } from './runtime-manifest.js';
@@ -205,7 +207,7 @@ export function defaultRuntimeBuildId(now = new Date()): string {
 }
 
 export function resolveSnapshotInputs(args: Args): {
-  wrapperPath: string;
+  buildRoot: string;
   controlPlaneWrapperPath: string;
   controlPlaneSupervisorPath: string;
   artifactPaths: Record<string, string>;
@@ -230,7 +232,6 @@ export function resolveSnapshotInputs(args: Args): {
     wrapperRoot,
     CONTROL_PLANE_SUPERVISOR.wrapperPath
   );
-  const wrapperPath = resolve(explicitWrapper ?? artifactPaths['kilocode-wrapper.js']);
   const controlPlaneWrapperPath = resolve(
     optionalArg(args, 'control-plane-wrapper') ?? artifactPaths['kilocode-control-plane-wrapper.js']
   );
@@ -239,12 +240,11 @@ export function resolveSnapshotInputs(args: Args): {
       artifactPaths['kilocode-control-plane-supervisor.sh']
   );
   return {
-    wrapperPath,
+    buildRoot: wrapperRoot,
     controlPlaneWrapperPath,
     controlPlaneSupervisorPath,
     artifactPaths: {
       ...artifactPaths,
-      'kilocode-wrapper.js': wrapperPath,
       'kilocode-control-plane-wrapper.js': controlPlaneWrapperPath,
       'kilocode-control-plane-supervisor.sh': controlPlaneSupervisorPath,
     },
@@ -845,108 +845,65 @@ async function scanRemote(config: ProviderConfig, sessionId: string): Promise<vo
   }
 }
 
-async function installBuilder(config: ProviderConfig, sessionId: string): Promise<void> {
+/**
+ * The builder steps that produce the base toolchain. Every third-party tool comes
+ * from a pinned distribution checked against `RUNTIME_TOOLCHAIN`, and the last
+ * step re-checks the installed toolchain by version and digest.
+ */
+export function builderInstallSteps(): Array<{ label: string; script: string }> {
   const versions = RUNTIME_DISTRIBUTION;
-  const steps: Array<{ label: string; script: string }> = [
+  return [
     {
       label: 'install packages (dnf)',
-      script: 'sudo dnf install -y git git-lfs jq tar gzip',
+      // `unzip` unpacks the pinned bun archive.
+      script: 'sudo dnf install -y git git-lfs jq tar gzip unzip',
     },
     {
-      // AL2023 core dnf does not ship ripgrep; it is SPAL-only.
-      label: 'install ripgrep',
-      script: [
-        'RG_VERSION=15.2.0',
-        'curl -fsSL "https://github.com/BurntSushi/ripgrep/releases/download/${RG_VERSION}/ripgrep-${RG_VERSION}-x86_64-unknown-linux-musl.tar.gz" -o /tmp/rg.tar.gz',
-        'tar -xzf /tmp/rg.tar.gz -C /tmp',
-        'sudo install -m 0755 /tmp/ripgrep-${RG_VERSION}-x86_64-unknown-linux-musl/rg /usr/local/bin/rg',
-        'rm -rf /tmp/rg.tar.gz /tmp/ripgrep-${RG_VERSION}-x86_64-unknown-linux-musl',
-      ].join('\n'),
+      label: `install ripgrep ${RUNTIME_TOOLCHAIN.rg.version}`,
+      script: installPinnedArchiveScript('rg'),
     },
     {
       label: `install bun ${versions.bun}`,
-      script: `curl -fsSL https://bun.sh/install | bash -s ${shellQuote(`bun-v${versions.bun}`)} && sudo install -m 0755 "$HOME/.bun/bin/bun" /usr/local/bin/bun`,
+      script: installPinnedArchiveScript('bun'),
     },
     {
       label: `install glab ${versions.glab}`,
-      script: [
-        `GLAB_VERSION=${shellQuote(versions.glab)}`,
-        'curl -fsSL "https://gitlab.com/gitlab-org/cli/-/releases/v${GLAB_VERSION}/downloads/glab_${GLAB_VERSION}_linux_amd64.tar.gz" -o /tmp/glab.tar.gz',
-        'mkdir -p /tmp/glab-extract',
-        'tar -xzf /tmp/glab.tar.gz -C /tmp/glab-extract',
-        'sudo install -m 0755 /tmp/glab-extract/bin/glab /usr/local/bin/glab',
-        'rm -rf /tmp/glab.tar.gz /tmp/glab-extract',
-      ].join('\n'),
+      script: installPinnedArchiveScript('glab'),
     },
     {
       label: `install gh ${versions.gh}`,
-      script: [
-        `GH_VERSION=${shellQuote(versions.gh)}`,
-        'curl -fsSL "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_amd64.tar.gz" -o /tmp/gh.tar.gz',
-        'tar -xzf /tmp/gh.tar.gz -C /tmp',
-        'sudo install -m 0755 "/tmp/gh_${GH_VERSION}_linux_amd64/bin/gh" /usr/local/bin/gh',
-        'rm -rf /tmp/gh.tar.gz "/tmp/gh_${GH_VERSION}_linux_amd64"',
-      ].join('\n'),
+      script: installPinnedArchiveScript('gh'),
     },
     {
       label: `install pnpm ${versions.pnpm}`,
-      script: `sudo npm install -g ${shellQuote(`pnpm@${versions.pnpm}`)}`,
+      script: installPinnedNpmPackageScript('pnpm'),
     },
     {
       label: `install kilo ${KILO_CLI_VERSION}`,
-      script: `sudo npm install -g ${shellQuote(`@kilocode/cli@${KILO_CLI_VERSION}`)}`,
+      script: installPinnedNpmPackageScript('kilo'),
     },
     {
       label: 'verify runtime pins',
       script: [
         'sudo mkdir -p /usr/local/share/kilo /opt/git/etc',
         'sudo git lfs install --system --skip-repo',
-        `test "$(bun --version)" = ${shellQuote(versions.bun)}`,
-        `test "$(pnpm --version)" = ${shellQuote(versions.pnpm)}`,
+        toolchainVerificationScript(['bun', 'pnpm', 'gh', 'glab', 'rg', 'kilo']),
         `case "$(node --version)" in v${versions.nodeMajor}.*) ;; *) echo "unexpected node $(node --version)" >&2; exit 1 ;; esac`,
         'curl --version >/dev/null',
         'git --version >/dev/null',
-        exactVersionCheck('gh', versions.gh),
-        exactVersionCheck('glab', versions.glab),
-        'command -v rg >/dev/null',
         'git-lfs version >/dev/null',
-        'kilo --version >/dev/null',
       ].join('\n'),
     },
   ];
-  for (const step of steps) {
+}
+
+async function installBuilder(config: ProviderConfig, sessionId: string): Promise<void> {
+  for (const step of builderInstallSteps()) {
     await execute(config, sessionId, 'bash', ['-lc', `set -euo pipefail\n${step.script}`], {
       timeoutMs: DEFAULT_TIMEOUT_MS,
       label: step.label,
     });
   }
-}
-
-async function smokeWrapper(config: ProviderConfig, sessionId: string, manifest: RuntimeManifest) {
-  const smokeSessionId = `agent_${randomUUID()}`;
-  const script = `set -euo pipefail
-rm -f /tmp/kilo-snapshot-smoke.log /tmp/kilo-snapshot-smoke.err /tmp/kilo-snapshot-health.json
-mkdir -p /tmp/kilo-snapshot-home
-dump_wrapper() {
-  echo "wrapper smoke failed" >&2
-  [ -s /tmp/kilo-snapshot-smoke.err ] && { echo "wrapper stderr:" >&2; cat /tmp/kilo-snapshot-smoke.err >&2; }
-  [ -s /tmp/kilo-snapshot-smoke.log ] && { echo "wrapper log:" >&2; cat /tmp/kilo-snapshot-smoke.log >&2; }
-}
-cleanup() { kill "$pid" 2>/dev/null || true; wait "$pid" 2>/dev/null || true; rm -rf /tmp/kilo-snapshot-home /tmp/kilo-snapshot-smoke.log /tmp/kilo-snapshot-smoke.err /tmp/kilo-snapshot-health.json; }
-HOME=/tmp/kilo-snapshot-home WRAPPER_PORT=5099 WRAPPER_LOG_PATH=/tmp/kilo-snapshot-smoke.log bun ${SNAPSHOT_WRAPPER_PATH} --agent-session ${shellQuote(smokeSessionId)} --user-id snapshot-operator >/tmp/kilo-snapshot-smoke.err 2>&1 &
-pid=$!
-trap cleanup EXIT
-for attempt in $(seq 1 60); do
-  if curl -fsS http://127.0.0.1:5099/health > /tmp/kilo-snapshot-health.json; then break; fi
-  if ! kill -0 "$pid" 2>/dev/null; then dump_wrapper; exit 1; fi
-  sleep 1
-done
-if [ ! -s /tmp/kilo-snapshot-health.json ]; then dump_wrapper; exit 1; fi
-jq -e --arg version ${shellQuote(manifest.wrapperVersion)} '.version == $version' /tmp/kilo-snapshot-health.json >/dev/null`;
-  await execute(config, sessionId, 'bash', ['-lc', script], {
-    timeoutMs: 90_000,
-    label: 'smoke wrapper',
-  });
 }
 
 async function smokeControlPlane(config: ProviderConfig, sessionId: string): Promise<void> {
@@ -1024,7 +981,6 @@ async function readExpectedRuntime(
     manifest: createRuntimeManifest({
       runtimeBuildId: input.runtimeBuildId,
       wrapperVersion: input.wrapperVersion,
-      wrapperBytes: runtimeBytes(bytes, 'kilocode-wrapper.js'),
       controlPlaneWrapperBytes: runtimeBytes(bytes, 'kilocode-control-plane-wrapper.js'),
       controlPlaneSupervisorBytes: runtimeBytes(bytes, 'kilocode-control-plane-supervisor.sh'),
       artifacts: runtimeManifestArtifacts(artifacts),
@@ -1123,7 +1079,6 @@ async function validateChild(
     const errors = validateRuntimeManifest(manifest, expected);
     if (errors.length) throw new Error(`runtime manifest validation failed: ${errors.join(', ')}`);
     await execute(config, target.sessionId, 'bash', ['-lc', runtimeVerificationScript(artifacts)]);
-    await smokeWrapper(config, target.sessionId, expected);
     await smokeControlPlane(config, target.sessionId);
     await scanRemote(config, target.sessionId);
   } finally {
@@ -1136,10 +1091,10 @@ async function validateChild(
 
 async function buildSnapshot(args: Args): Promise<void> {
   const config = providerConfig(args);
-  const { wrapperPath } = resolveSnapshotInputs(args);
+  const input = resolveSnapshotInputs(args);
   if (args['skip-wrapper-build'] !== true) {
     log('building wrapper bundle');
-    await runLocal('bun', ['run', 'build'], dirname(dirname(wrapperPath)));
+    await runLocal('bun', ['run', 'build'], input.buildRoot);
   }
   const { manifest, artifacts } = await readExpectedRuntime(args);
   const timeoutMs = optionalNumber(args, 'timeout-ms', DEFAULT_TIMEOUT_MS);
@@ -1149,8 +1104,6 @@ async function buildSnapshot(args: Args): Promise<void> {
     log('uploading runtime artifacts and manifest');
     await uploadRuntimeArtifacts(config, builder.sessionId, artifacts);
     await uploadRuntimeManifest(config, builder.sessionId, manifest);
-    log('smoking wrapper');
-    await smokeWrapper(config, builder.sessionId, manifest);
     log('smoking control-plane supervisor');
     await smokeControlPlane(config, builder.sessionId);
     log('scanning builder for leftover credentials/state');
@@ -1266,7 +1219,7 @@ These may come from the environment, services/cloud-agent-next/.dev.vars, or:
 Build/validate/acceptance arguments:
   --snapshot-id <id>       Required except for build
   --build-id <id>          Defaults to local-YYYYMMDD-HHMMSS
-  --wrapper <path>         Defaults to wrapper/dist/wrapper.js
+  --wrapper <path>         A built bundle file; all bundles are read from its directory
   --wrapper-version <semver> Defaults to the current WRAPPER_VERSION
   --timeout-ms <ms>        Optional bounded sandbox timeout (default ${DEFAULT_TIMEOUT_MS})
   --skip-wrapper-build     Build only: use the existing wrapper bundle
@@ -1275,7 +1228,7 @@ Build/validate/acceptance arguments:
   --sandbox-name <name>    Stop only: exact sandbox name used to create it
 
 Activation and rollback:
-  1. Deploy code with VERCEL_SANDBOX_ORG_IDS empty.
+  1. Deploy code with BYOC_VERCEL_IDS empty.
   2. Verify no deployed version-1 Vercel tombstones exist.
   3. Build and accept the snapshot.
   4. Configure accepted runtime values and one allowlisted organization.

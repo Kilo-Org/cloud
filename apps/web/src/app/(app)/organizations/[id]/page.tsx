@@ -2,6 +2,7 @@ import { OrganizationDashboard } from '@/components/organizations/OrganizationDa
 import { OrganizationByPageLayout } from '@/components/organizations/OrganizationByPageLayout';
 import { TOPUP_AMOUNT_QUERY_STRING_KEY } from '@kilocode/web-shared/lib/organizations/constants';
 import { isOrgAutoTopUpFeatureEnabled } from '@/lib/organizations/organization-auto-top-up';
+import { isKiloEncryptEnabled } from '@/lib/organizations/kilo-encrypt';
 
 export default async function OrganizationByIdPage({
   params,
@@ -18,12 +19,14 @@ export default async function OrganizationByIdPage({
   return (
     <OrganizationByPageLayout
       params={params}
+      supportRead
       render={({ role, organization }) => (
         <OrganizationDashboard
           organizationId={organization.id}
           role={role}
           topupAmount={topupAmount}
           isAutoTopUpEnabled={isAutoTopUpEnabled}
+          isGuardrailsEnabled={isKiloEncryptEnabled(organization.settings)}
         />
       )}
     />

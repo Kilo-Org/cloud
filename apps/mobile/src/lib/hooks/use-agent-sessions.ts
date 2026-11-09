@@ -1,10 +1,5 @@
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
-import {
-  keepPreviousData,
-  useInfiniteQuery,
-  useQuery,
-  useQueryClient,
-} from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 
 import { useActiveSessions } from '@/lib/active-sessions-query';
@@ -21,15 +16,13 @@ import {
   filterActiveSessionsByOrganization,
   selectActiveExclusionIds,
 } from '@/lib/active-sessions-live';
-import {
-  buildAgentSessionListInput,
-  buildAgentSessionSearchInput,
-} from '@/lib/agent-session-input';
 import { collectSearchPages, collectUnfilteredPages } from '@/lib/agent-session-pages';
 import {
-  resolveStoredSessionsHold,
-  type StoredSessionsHold,
-} from '@/lib/agent-session-render-hold';
+  buildAgentSessionSearchQueryOptions,
+  buildStoredSessionsQueryOptions,
+  type UseAgentSessionSearchOptions,
+  type UseAgentSessionsOptions,
+} from '@/lib/agent-session-queries';
 import { groupAgentSessionsByDate } from '@/lib/agent-session-groups';
 import {
   type AgentSessionSortBy,
@@ -38,7 +31,7 @@ import {
 } from '@/lib/agent-session-sort';
 import { useAppLifecycle } from '@/lib/hooks/use-app-lifecycle';
 import { useLiveSessionsHold } from '@/lib/hooks/use-live-sessions-hold';
-import { reconcileFirstPage, withInfiniteRetention } from '@/lib/query/infinite-retention';
+import { reconcileFirstPage } from '@/lib/query/infinite-retention';
 import { scheduleCacheMaintenance } from '@/lib/query/schedule-cache-maintenance';
 import { useTRPC } from '@/lib/trpc';
 
@@ -49,33 +42,6 @@ type RouterOutputs = inferRouterOutputs<MobileRouter>;
 export type StoredSession = RouterOutputs['cliSessionsV2']['list']['cliSessions'][number];
 
 export type ActiveSession = RouterOutputs['activeSessions']['list']['sessions'][number];
-
-export type UseAgentSessionsOptions = {
-  createdOnPlatform?: string | string[];
-  gitUrl?: string | string[];
-  organizationId?: string | null;
-  enabled?: boolean;
-  /**
-   * Field to order by. Defaults to `updated_at` so callers that don't
-   * care (e.g. Home's session surface) keep the legacy behavior bit-for-bit.
-   */
-  sortBy?: AgentSessionSortBy;
-  /**
-   * Foreground reconcile ownership for the stored-sessions query.
-   *
-   * The hook owns the OS app-foreground refresh: on the shared
-   * `useAppLifecycle` false -> true edge it reconciles page one (resets the
-   * cached pages and refetches from `initialPageParam`) instead of letting
-   * React Query's native window-focus refetch fan out over every retained
-   * page. That edge is registered unless the caller passes `false`; the native
-   * query option stays off by default for the same reason.
-   *
-   * The Agents list passes `false`: its screen drives app-foreground refresh
-   * through its own AppState callback that runs the wrapped `refetch`, so the
-   * hook must not reconcile a second time.
-   */
-  refetchOnWindowFocus?: boolean;
-};
 
 type UseRecentAgentRepositoriesOptions = {
   organizationId?: string | null;
@@ -113,53 +79,6 @@ function getUpdatedSince(days: number): string {
 
 // ── Queries ──────────────────────────────────────────────────────────
 
-/**
- * Retention bound for the session-history infinite queries.
- *
- * The history browser pages the stored-sessions query forward and the user
- * scrolls back over everything already loaded. The shared
- * `INFINITE_QUERY_MAX_PAGES` (5) trims the oldest page from the front on every
- * forward fetch (`addToEnd(..., max)` slices index 0), so past five pages the
- * top of the history is evicted and the list can never scroll back to it: the
- * oldest date header becomes the top of the list. This bound holds the
- * e2e history (8 pages of 30 sessions) with headroom while still stopping a
- * server that keeps handing out cursors from growing the cache without bound.
- *
- * `maxPages` also bounds a single refetch: React Query re-requests every page
- * retained in the cache on `refetch()`. The foreground and refresh paths
- * reconcile page one instead (see `storedReconcile`), but the bound still caps
- * the fan-out of any full refetch and the memory the history holds. Staying
- * near the browsable requirement (instead of a 100-page bound) keeps that
- * fan-out small, matching `INBOX_MAX_PAGES`.
- */
-const SESSION_HISTORY_MAX_PAGES = 20;
-
-/**
- * Build the stored-sessions infinite-query options shared by every stored
- * refetch path on the Agents screen (focus return, pull-to-refresh, retry,
- * departure trigger, backfill). Kept as a pure builder so the query options
- * are executable-tested without mounting the hook.
- */
-export function buildStoredSessionsQueryOptions(
-  trpc: ReturnType<typeof useTRPC>,
-  options?: UseAgentSessionsOptions
-) {
-  const base = trpc.cliSessionsV2.list.infiniteQueryOptions(
-    buildAgentSessionListInput(options ?? {}),
-    {
-      staleTime: 30_000,
-      enabled: options?.enabled,
-      getNextPageParam: lastPage => lastPage.nextCursor,
-      // The hook owns the OS-foreground refresh through its `useAppLifecycle`
-      // edge (see `storedReconcile`), so the native window-focus refetch stays
-      // off by default: React Query's native path re-requests every retained
-      // page, which is exactly the burst the page-one reconcile replaces.
-      refetchOnWindowFocus: options?.refetchOnWindowFocus ?? false,
-    }
-  );
-  return withInfiniteRetention(base, SESSION_HISTORY_MAX_PAGES);
-}
-
 function useStoredSessions(options?: UseAgentSessionsOptions) {
   const trpc = useTRPC();
 
@@ -182,30 +101,6 @@ export function useRecentAgentRepositories(options?: UseRecentAgentRepositoriesO
 }
 
 // ── Search ───────────────────────────────────────────────────────────
-
-type UseAgentSessionSearchOptions = UseAgentSessionsOptions & {
-  searchQuery: string;
-};
-
-/**
- * Build the server-side session-search infinite-query options. Extracted as a
- * pure builder (mirroring `buildStoredSessionsQueryOptions`) so the options
- * are executable-tested without mounting the hook.
- */
-export function buildAgentSessionSearchQueryOptions(
-  trpc: ReturnType<typeof useTRPC>,
-  options: UseAgentSessionSearchOptions
-) {
-  return withInfiniteRetention(
-    trpc.cliSessionsV2.search.infiniteQueryOptions(buildAgentSessionSearchInput(options), {
-      staleTime: 30_000,
-      enabled: (options.enabled ?? true) && options.searchQuery.length > 0,
-      placeholderData: keepPreviousData,
-      getNextPageParam: lastPage => lastPage.nextCursor,
-    }),
-    SESSION_HISTORY_MAX_PAGES
-  );
-}
 
 /**
  * Server-side session search, now cursor-paginated for consistent
@@ -231,12 +126,16 @@ export function useAgentSessionSearch(options: UseAgentSessionSearchOptions) {
     refetch: query.refetch,
     hasNextPage: query.hasNextPage,
     isFetchingNextPage: query.isFetchingNextPage,
+    isFetchNextPageError: query.isFetchNextPageError,
     isPlaceholderData: query.isPlaceholderData,
     fetchNextPage: query.fetchNextPage,
   };
 }
 
 // ── Main hook ────────────────────────────────────────────────────────
+
+/** Nothing retained for this scope, shared so the empty case allocates nothing. */
+const NO_CONFIRMED_ROWS: ActiveSession[] = [];
 
 export function useAgentSessions(options?: UseAgentSessionsOptions) {
   const sortBy = resolveSortBy(options?.sortBy);
@@ -250,16 +149,15 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
   const { isActive } = useAppLifecycle();
 
   // Rows delivered since this hook mounted, as opposed to rows restored from
-  // the query cache (in-memory or the encrypted read cache). `dataUpdatedAt`
-  // advances when the stored query successfully delivers data, but
-  // `reconcileFirstPage` (the foreground edge, pull-to-refresh, retry and
-  // departure reconciles) is also a cache write: it empties `pages` and
-  // advances `dataUpdatedAt` without a delivery, so requiring at least one
-  // delivered page tells a delivery apart from that reset. The flag latches
-  // once true, because a later reconcile empties `pages` again and must not
-  // make rows already delivered this mount read as stale. A fresh screen mount
-  // that cannot reach the API therefore has no fresh rows even when a previous
-  // mount left rows cached. The Agents history screen uses this to show its
+  // the query cache (in-memory or the encrypted read cache). Only a delivery
+  // advances `dataUpdatedAt`, which is what a refresh has to respect:
+  // `reconcileFirstPage` keeps the retained pages, replaces them when page one
+  // arrives (a delivery), and re-anchors a trimmed start cursor through
+  // `setState`, which writes no data and leaves the stamp alone. A failed or
+  // paused refresh writes nothing either. The flag latches once true, so a
+  // later refresh cannot make rows already delivered this mount read as stale.
+  // A fresh screen mount that cannot reach the API therefore has no fresh rows
+  // even when a previous mount left rows cached. The Agents history screen uses this to show its
   // retryable full-screen error on a failed fresh open instead of presenting
   // stale rows as loaded, while a failure after rows were actually delivered
   // this mount keeps them with the inline error.
@@ -284,24 +182,14 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
   // callbacks every render (the backfill effect depends on their stability).
   const enqueueStoredOperation = useMemo(() => createOperationCoordinator(), []);
   const storedFetchNextPage = stored.fetchNextPage;
-  // Foreground/refresh reconcile. `reconcileFirstPage` resets the cached pages
-  // and invalidates the prefix, so page one refetches from `initialPageParam`
-  // instead of React Query re-requesting every retained page (up to
-  // `SESSION_HISTORY_MAX_PAGES`). `cancelRefetch: false` is required: after the
-  // reset `query.state.data` is still defined, so a default `cancelRefetch:
-  // true` would cancel the page-one fetch the invalidate just started and issue
-  // a second request.
+  // Foreground/refresh reconcile. `reconcileFirstPage` refetches page one only
+  // and keeps the retained pages on screen until that page arrives, so a
+  // refresh that is paused by lost connectivity or fails never blanks the list
+  // into its empty or full-screen error state.
   const storedReconcile = useCallback(async () => {
-    await enqueueStoredOperation(async () => {
-      reconcileFirstPage(queryClient, trpc.cliSessionsV2.list.pathFilter().queryKey);
-      // `cancelRefetch` is a `refetchQueries` option (second argument), not a
-      // query filter: `false` makes it await the page-one fetch the invalidate
-      // just started instead of cancelling it and issuing a second request.
-      await queryClient.refetchQueries(
-        { queryKey: trpc.cliSessionsV2.list.pathFilter().queryKey, type: 'active' },
-        { cancelRefetch: false }
-      );
-    });
+    await enqueueStoredOperation(() =>
+      reconcileFirstPage(queryClient, trpc.cliSessionsV2.list.pathFilter().queryKey)
+    );
   }, [enqueueStoredOperation, queryClient, trpc]);
   const fetchNextPage = useCallback(async () => {
     await enqueueStoredOperation(storedFetchNextPage);
@@ -311,35 +199,6 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
   // load (the cursor follows the selected sort field). Dedupe by session_id
   // using the shared collection helper.
   const storedSessions = useMemo(() => collectUnfilteredPages(stored.data?.pages), [stored.data]);
-
-  // Render hold: `reconcileFirstPage` (foreground edge and refresh below,
-  // departure effect, mutation settle via `invalidateAgentSessionQueries`)
-  // empties the cached pages before refetching page one. Keep rendering the
-  // last non-empty rows for the same query key until the refetch delivers, so
-  // the SectionList never unmounts and scroll survives. A key change
-  // (filter/sort) or a settled empty result releases the hold.
-  //
-  // The hold gate spans the whole unresolved refetch, not just the in-flight
-  // one: after the reset `isFetching` is false while the page-one fetch is
-  // paused (offline) and after it fails (`isError`), and in both cases the
-  // cache holds zero rows while the user's rows exist only in the hold.
-  // Releasing there would blank the list into its empty or full-screen error
-  // state. `resolveStoredSessionsHold` only gates on a caller-supplied boolean,
-  // so the composite is computed here.
-  const storedQueryKeyJson = JSON.stringify(
-    trpc.cliSessionsV2.list.infiniteQueryKey(buildAgentSessionListInput(options ?? {}))
-  );
-  const storedHoldRef = useRef<StoredSessionsHold<StoredSession> | null>(null);
-  const resolvedStored = resolveStoredSessionsHold({
-    current: storedSessions,
-    isFetching: stored.isFetching || stored.isPaused || stored.isError,
-    queryKeyJson: storedQueryKeyJson,
-    previousHold: storedHoldRef.current,
-  });
-  useEffect(() => {
-    storedHoldRef.current = resolvedStored.hold;
-  }, [resolvedStored.hold]);
-  const renderedStoredSessions = resolvedStored.sessions;
 
   // The server already filters by context; this covers the window where a WS
   // heartbeat has introduced a row the client has not enriched yet (see
@@ -372,23 +231,23 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
   );
 
   const dateGroups = useMemo(
-    () => groupAgentSessionsByDate(renderedStoredSessions, sortBy),
-    [renderedStoredSessions, sortBy]
+    () => groupAgentSessionsByDate(storedSessions, sortBy),
+    [storedSessions, sortBy]
   );
 
   // Departure-triggered stored reset. Only the active poll has a refetch
   // interval (10s); the stored/history list does not. When a session id
   // leaves the active set, the just-terminated session has not yet shown up
   // in history, so resetting the stored list to page one and refetching makes
-  // it reappear. `reconcileFirstPage` empties the cached pages and invalidates
-  // the prefix, so the refetch starts from `initialPageParam` (page one). A
-  // plain `refetch()` would only refresh pages still in cache, and after
-  // `maxPages` evicts page one the newest session never reappears.
+  // it reappear. `reconcileFirstPage` refetches page one only and replaces the
+  // pages when it arrives, so the newest session returns even when `maxPages`
+  // evicted its page. A plain `refetch()` would re-request every retained page
+  // from the cursor they start at, and would not bring back an evicted page.
   //
   // The guard is strictly "id present before, absent now": the empty→populated
   // transition (first poll) is ignored, and the initial mount with a non-empty
-  // set is ignored (no "before" to compare against). The render hold above
-  // keeps the last rows visible while this reset refetches page one.
+  // set is ignored (no "before" to compare against). The reconcile keeps the
+  // rows on screen while it refetches page one.
   const previousActiveIdsRef = useRef<{ ids: Set<string>; epoch: number } | null>(null);
   useEffect(() => {
     const epoch = currentAuthEpoch();
@@ -407,7 +266,7 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
     if (departedId) {
       scheduleCacheMaintenance(() => {
         if (isCurrentAuthEpoch(epoch) && !isSignOutActive()) {
-          reconcileFirstPage(queryClient, trpc.cliSessionsV2.list.pathFilter().queryKey);
+          void reconcileFirstPage(queryClient, trpc.cliSessionsV2.list.pathFilter().queryKey);
         }
       });
     }
@@ -430,7 +289,7 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
   }, [isActive, ownsForegroundReconcile, storedReconcile]);
 
   return {
-    storedSessions: renderedStoredSessions,
+    storedSessions,
     activeSessions,
     activeSessionIds,
     activeExclusionIds,
@@ -451,6 +310,10 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
     // unresolved rather than as a settled page, so they can offer a retry
     // instead of a skeleton that never settles.
     storedIsPaused: stored.isPaused,
+    // The stored query's failure code, when it has one. Callers that act on a
+    // denial (the Share Gate resolving a new-session organization) must not
+    // read any stored failure — a network blip is not a membership answer.
+    storedErrorCode: stored.error?.data?.code,
     storedFetchedSinceMount,
     // React Query v5's `isLoading` is `isPending && isFetching`, so it is false
     // on the first render (the observer has not started the fetch yet) and
@@ -476,6 +339,11 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
     activeIsPaused: active.isPaused,
     hasNextPage: stored.hasNextPage,
     isFetchingNextPage: stored.isFetchingNextPage,
+    // The last next-page attempt failed. The loaded rows stay, so the footer
+    // owns a Retry that calls `fetchNextPage`, and the end-reach gate must stop
+    // re-firing until a page lands: the other paginated lists read the same
+    // flag for the same reason.
+    isFetchNextPageError: stored.isFetchNextPageError,
     fetchNextPage,
     // Pull-to-refresh, retry and the Share Gate's refresh reconcile page one
     // as well: after `maxPages` evicts page one, a plain stored `refetch()`
@@ -504,7 +372,7 @@ export function useLiveAgentSessions(options?: UseAgentSessionsOptions) {
   );
   const getSnapshot = useCallback(() => getActiveSessionsQueryMetadata(query), [query]);
   const metadata = useSyncExternalStore(subscribe, getSnapshot);
-  const activeSessions = useMemo(
+  const cacheSessions = useMemo(
     () =>
       sortActiveSessionsByCreatedAt(
         filterActiveSessionsByOrganization(
@@ -515,6 +383,54 @@ export function useLiveAgentSessions(options?: UseAgentSessionsOptions) {
     [active.canRead, active.data, options?.organizationId]
   );
 
+  // The last accepted server answer listed sessions while the cache reads
+  // empty: that emptiness came from a write no server answer confirmed (a
+  // socket write, or the floor poll's own `setQueryData`), so it is not proof
+  // that nothing runs. The surface keeps the rows this hook instance last
+  // rendered, and a fresh instance (a remount, such as the route reset this
+  // finding reports) paints its loading card until the confirmation answer
+  // lands. Only an accepted answer that lists no sessions resolves the zero
+  // state.
+  const confirmedRowsRef = useRef<{ scopeKey: string; rows: ActiveSession[] }>({
+    scopeKey: '',
+    rows: NO_CONFIRMED_ROWS,
+  });
+  const scopeKey = JSON.stringify(active.queryKey);
+  useEffect(() => {
+    if (cacheSessions.length > 0) {
+      confirmedRowsRef.current = { scopeKey, rows: cacheSessions };
+    } else if (confirmedRowsRef.current.scopeKey !== scopeKey) {
+      // A context change must never show the previous context's rows (the same
+      // rule the render hold's scope key keeps).
+      confirmedRowsRef.current = { scopeKey, rows: NO_CONFIRMED_ROWS };
+    }
+  }, [cacheSessions, scopeKey]);
+  const retained = confirmedRowsRef.current;
+  const confirmedRows = retained.scopeKey === scopeKey ? retained.rows : NO_CONFIRMED_ROWS;
+  const unconfirmedEmpty = cacheSessions.length === 0 && metadata.acceptedSessionIds.size > 0;
+  const activeSessions = unconfirmedEmpty ? confirmedRows : cacheSessions;
+  // One confirmation per emptiness episode: the answer either lists the rows
+  // again or confirms the emptiness, and a repeated empty (rows back, then
+  // gone again) re-arms it. Without the latch a failing answer would loop. The
+  // fetch is also what a remount needs: the cached empty list can be fresh
+  // enough that mounting the query fetches nothing.
+  const confirmationRequestedRef = useRef(false);
+  // Aliased so the confirmation effect lists stable values (the query object
+  // itself is rebuilt every render).
+  const activeCanRead = active.canRead;
+  const activeRefetch = active.refetch;
+  useEffect(() => {
+    if (!unconfirmedEmpty) {
+      confirmationRequestedRef.current = false;
+      return;
+    }
+    if (!activeCanRead || confirmationRequestedRef.current) {
+      return;
+    }
+    confirmationRequestedRef.current = true;
+    void activeRefetch();
+  }, [unconfirmedEmpty, activeCanRead, activeRefetch]);
+
   // The socket writers (`sessions.list`, `sessions.heartbeat`,
   // `cli.disconnected`) empty the live set the moment a CLI socket blips, and
   // the reconnect restores the rows a moment later. Hold the last rows through
@@ -522,7 +438,7 @@ export function useLiveAgentSessions(options?: UseAgentSessionsOptions) {
   // the hold is scoped to the query key so a context change still loads.
   const renderedActiveSessions = useLiveSessionsHold({
     current: activeSessions,
-    scopeKey: JSON.stringify(active.queryKey),
+    scopeKey,
     canHold: active.canRead,
   });
 
@@ -532,7 +448,10 @@ export function useLiveAgentSessions(options?: UseAgentSessionsOptions) {
     // to distinguish unconfirmed empty data from accepted empty success.
     isLoading: active.isLoading,
     isError: active.isError,
-    hasAcceptedSuccess: metadata.acceptedRevision > 0,
+    // Empty success needs the accepted answer to be the empty list. While an
+    // earlier answer still lists rows, the surface stays unresolved instead of
+    // presenting those rows as gone.
+    hasAcceptedSuccess: metadata.acceptedRevision > 0 && !unconfirmedEmpty,
     terminalError: metadata.terminalError,
     isFetching: active.canRead && active.isFetching,
     isPaused: active.canRead && active.isPaused,

@@ -12,11 +12,12 @@ import type * as ProfilePickerPopoverModule from './ProfilePickerPopover';
 
 let mockCombined: unknown;
 let mockPersonal: unknown;
+let mockRepoBindings: { repoFullName: string; platform: 'github'; profileId: string }[] = [];
 
 jest.mock('@/hooks/useCloudAgentProfiles', () => ({
   useCombinedProfiles: () => mockCombined,
   useProfiles: () => mockPersonal,
-  useRepoBindings: () => ({ data: [] }),
+  useRepoBindings: () => ({ data: mockRepoBindings }),
 }));
 
 jest.mock('@/components/ui/popover', () => {
@@ -44,20 +45,164 @@ const PROFILE = {
   name: 'Production',
   ownerType: 'organization',
   varCount: 2,
-  mcpServerCount: 1,
-  skillCount: 0,
-  kiloCommandCount: 0,
+  mcpServerCount: 2,
+  skillCount: 6,
+  kiloCommandCount: 3,
 };
 
-function renderPicker(): string {
+const SECOND_PROFILE = { ...PROFILE, id: 'profile-2', name: 'Development' };
+
+type RenderOptions = {
+  selectedOverrideProfileId?: string | null;
+  repoFullName?: string;
+  environment?: { repositories?: unknown } | null;
+  organizationId?: string;
+};
+
+function renderPicker(options: RenderOptions = {}): string {
   return renderToStaticMarkup(
     createElement(ProfilePickerPopover, {
-      organizationId: 'org-1',
-      selectedOverrideProfileId: null,
+      organizationId: 'organizationId' in options ? options.organizationId : 'org-1',
+      selectedOverrideProfileId: options.selectedOverrideProfileId ?? null,
+      repoFullName: options.repoFullName,
+      environment: options.environment,
       onOverrideProfileSelect: jest.fn(),
     })
   );
 }
+
+function triggerText(markup: string): string {
+  return markup.split('</button>')[0].replace(/<[^>]*>/g, '');
+}
+
+describe('ProfilePickerPopover trigger', () => {
+  beforeEach(() => {
+    mockCombined = {
+      data: {
+        allProfiles: [PROFILE, { ...PROFILE, id: 'profile-2', name: 'Development' }],
+        effectiveDefaultId: PROFILE.id,
+      },
+      isLoading: false,
+      error: undefined,
+      refetch: jest.fn(),
+    };
+    mockPersonal = { data: [], isLoading: false, error: undefined, refetch: jest.fn() };
+    mockRepoBindings = [{ repoFullName: 'acme/repo', platform: 'github', profileId: PROFILE.id }];
+  });
+
+  it.each([
+    { selectedOverrideProfileId: null, repoFullName: undefined, name: 'Production' },
+    { selectedOverrideProfileId: 'profile-2', repoFullName: undefined, name: 'Development' },
+    { selectedOverrideProfileId: 'profile-2', repoFullName: 'acme/repo', name: 'Development' },
+  ])('shows only $name for override $selectedOverrideProfileId and repo $repoFullName', props => {
+    const markup = renderPicker({
+      selectedOverrideProfileId: props.selectedOverrideProfileId,
+      repoFullName: props.repoFullName,
+    });
+
+    expect(triggerText(markup)).toBe(props.name);
+    expect(markup).toContain('2 vars · 2 MCP · 6 skills · 3 cmds');
+  });
+
+  it('keeps the no-profile label when no profile is selected', () => {
+    mockCombined = {
+      data: { allProfiles: [], effectiveDefaultId: null },
+      isLoading: false,
+      error: undefined,
+      refetch: jest.fn(),
+    };
+
+    expect(triggerText(renderPicker())).toBe('No profile');
+  });
+});
+
+describe('ProfilePickerPopover environment profiles', () => {
+  const v2WithOneRepository = { repositories: [{}] };
+  const v2WithSeveralRepositories = { repositories: [{}, {}] };
+
+  beforeEach(() => {
+    // The repo binding points at a different profile than the default, so a
+    // leaked binding would surface as a second active layer.
+    mockCombined = {
+      data: { allProfiles: [PROFILE, SECOND_PROFILE], effectiveDefaultId: SECOND_PROFILE.id },
+      isLoading: false,
+      error: undefined,
+      refetch: jest.fn(),
+    };
+    mockPersonal = { data: [], isLoading: false, error: undefined, refetch: jest.fn() };
+    mockRepoBindings = [{ repoFullName: 'acme/repo', platform: 'github', profileId: PROFILE.id }];
+  });
+
+  it.each([
+    { repositories: 'one repository', environment: v2WithOneRepository },
+    { repositories: 'several repositories', environment: v2WithSeveralRepositories },
+  ])(
+    'shows the default and no repository binding for a V2 environment with $repositories',
+    ({ environment }) => {
+      const markup = renderPicker({ environment, repoFullName: 'acme/repo' });
+
+      expect(triggerText(markup)).toBe('Development');
+      expect(markup).toContain('Active profile');
+      expect(markup).not.toContain('Production');
+      expect(markup).not.toContain('on top of');
+    }
+  );
+
+  it('lets an explicit profile replace the default', () => {
+    const markup = renderPicker({
+      environment: v2WithOneRepository,
+      repoFullName: 'acme/repo',
+      selectedOverrideProfileId: PROFILE.id,
+    });
+
+    expect(triggerText(markup)).toBe('Production');
+    expect(markup).not.toContain('Development');
+    expect(markup).not.toContain('on top of');
+  });
+
+  it('restores the default when the explicit profile is cleared', () => {
+    const markup = renderPicker({
+      environment: v2WithOneRepository,
+      repoFullName: 'acme/repo',
+      selectedOverrideProfileId: null,
+    });
+
+    expect(triggerText(markup)).toBe('Development');
+  });
+
+  it('shows no profile when there is no default and no explicit selection', () => {
+    mockCombined = {
+      data: { allProfiles: [PROFILE], effectiveDefaultId: null },
+      isLoading: false,
+      error: undefined,
+      refetch: jest.fn(),
+    };
+
+    const markup = renderPicker({ environment: v2WithOneRepository, repoFullName: 'acme/repo' });
+
+    expect(triggerText(markup)).toBe('No profile');
+    expect(markup).toContain('Pick a profile');
+    expect(markup).not.toContain('Active profile');
+  });
+
+  it('applies the personal default for a V2 environment', () => {
+    mockPersonal = {
+      data: [{ ...PROFILE, isDefault: true }],
+      isLoading: false,
+      error: undefined,
+      refetch: jest.fn(),
+    };
+
+    const markup = renderPicker({
+      environment: v2WithOneRepository,
+      repoFullName: 'acme/repo',
+      organizationId: undefined,
+    });
+
+    expect(triggerText(markup)).toBe('Production');
+    expect(markup).not.toContain('on top of');
+  });
+});
 
 describe('ProfilePickerPopover profiles error state', () => {
   it('keeps the picker when a refetch fails but cached profiles remain', () => {

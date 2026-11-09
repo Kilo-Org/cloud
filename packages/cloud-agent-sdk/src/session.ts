@@ -6,11 +6,9 @@
  * CLI live, or CLI historical transport.
  */
 import type { QuestionInfo } from '@kilocode/app-shared/opencode';
-import type { CloudAgentAttachments } from '@kilocode/app-shared/cloud-agent';
-import type { Images } from '@kilocode/app-shared/images-schema';
 import type { NormalizedEvent, ServiceEvent } from './normalizer';
 import type { SuggestionAction } from './types';
-import type { RemoteModelOverride, RemoteModelState } from './remote-model-catalog';
+import type { RemoteModelState } from './remote-model-catalog';
 import type { RemoteCommandState } from './remote-command-catalog';
 import { createChatProcessor } from './chat-processor';
 import { heartbeatDataSchema, sessionsListDataSchema } from './schemas';
@@ -25,10 +23,9 @@ import type {
   CloudAgentApi,
   CloudAgentStreamTicketResult,
   CreateRemoteSessionInput,
-  RemoteAttachmentPart,
   TransportFactory,
   TransportSink,
-  TransportSendPayload,
+  TransportSendInput,
   Transport,
 } from './transport';
 import { createMemoryStorage } from './storage/memory';
@@ -119,21 +116,8 @@ type CloudAgentSessionConfig = {
     | undefined;
 };
 
-type CloudAgentSessionSendInput = {
-  payload: TransportSendPayload;
-  messageId?: string | undefined;
-  attachments?: CloudAgentAttachments | undefined;
-  images?: Images | undefined;
-  remoteModelOverride?: RemoteModelOverride | undefined;
-  /**
-   * Ready file parts to forward to a remote CLI session. The session-manager
-   * gate already enforces that this is only non-empty for a `remote` session
-   * the CLI has not reported as incapable (unknown capabilities are
-   * optimistic); transports that don't support the path (cloud-agent,
-   * read-only, a CLI that reported `attachments: false`) simply ignore it.
-   */
-  attachmentParts?: RemoteAttachmentPart[] | undefined;
-};
+/** The session sends straight through, so its input is the transport contract. */
+type CloudAgentSessionSendInput = TransportSendInput;
 
 type CloudAgentSessionAnswerInput = {
   requestId: string;
@@ -183,6 +167,12 @@ type CloudAgentSessionTransport = {
         options: { cursor?: string }
       ) => Promise<SessionSnapshotPageOutcome | null>)
     | undefined;
+  fetchCloudSnapshotPage?:
+    | ((
+        sessionId: CloudAgentSessionId,
+        options: { cursor?: string; limit?: number; kiloSessionId?: string }
+      ) => Promise<unknown>)
+    | undefined;
   /** Called by the transport after a successful initial bounded page read. */
   onInitialPageLoaded?: ((page: SessionSnapshotPage) => void) | undefined;
   lifecycleHooks?: ConnectionLifecycleHooks | undefined;
@@ -209,6 +199,7 @@ type CloudAgentSession = {
   ) => unknown | Promise<unknown>;
   retryRemoteModels: () => void;
   retryRemoteCommands: () => void;
+  observeProjected: (messages: SessionSnapshot['messages']) => void;
   createRemoteSession: (input?: CreateRemoteSessionInput) => Promise<KiloSessionId>;
   exitRemoteSession: () => Promise<void>;
 
@@ -298,10 +289,25 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
     void resolveAndConnect(connectGeneration);
   }
 
+  function emitEventToListener(event: NormalizedEvent): void {
+    try {
+      config.onEvent?.(event);
+    } catch (error) {
+      console.error(`[Session] Event listener threw on ${event.type}:`, error);
+    }
+  }
+
   const sink: TransportSink = {
     onChatEvent(event) {
-      chatProcessor.process(event);
-      config.onEvent?.(event);
+      // Keep one event's failure from taking the events after it: report and
+      // carry on rather than surfacing a session error for a single chat
+      // event, so the transcript keeps streaming.
+      try {
+        if (!chatProcessor.process(event)) return;
+      } catch (error) {
+        console.error(`[Session] Failed to process ${event.type}:`, error);
+      }
+      emitEventToListener(event);
     },
     onServiceEvent(event) {
       serviceState.process(event);
@@ -325,7 +331,7 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
         storage.deleteMessage(event.messageId);
       }
       if (event.type === 'cloud.message.completed') replayedQueuedMessages.delete(event.messageId);
-      config.onEvent?.(event);
+      emitEventToListener(event);
     },
     onReplayStarted: () => {
       replaying = true;
@@ -386,7 +392,10 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
             'CloudAgentSession transport.getTicket is required for Cloud Agent sessions'
           );
         }
-        if (!config.transport.fetchSnapshot) {
+        if (
+          !config.transport.fetchSnapshot &&
+          !resolved.cloudAgentSessionId.startsWith('workspace_')
+        ) {
           throw new Error(
             'CloudAgentSession transport.fetchSnapshot is required for Cloud Agent sessions'
           );
@@ -405,6 +414,7 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
           api: config.transport.api,
           getTicket: config.transport.getTicket,
           fetchSnapshot: config.transport.fetchSnapshot,
+          fetchCloudSnapshotPage: config.transport.fetchCloudSnapshotPage,
           ...(config.transport.fetchSnapshotPage
             ? { fetchSnapshotPage: config.transport.fetchSnapshotPage }
             : {}),
@@ -577,6 +587,9 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
     },
     retryRemoteCommands() {
       transport?.retryRemoteCommands?.();
+    },
+    observeProjected(messages) {
+      transport?.observeProjected?.(messages);
     },
     createRemoteSession: async (input?: CreateRemoteSessionInput) => {
       if (!transport?.createSession) {

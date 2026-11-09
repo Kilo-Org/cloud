@@ -1,5 +1,7 @@
 'use client';
 
+import { adminFetch } from '@/lib/admin/admin-fetch';
+
 import {
   BENCHMARK_CONTAINER_BUDGET,
   DEFAULT_AUTO_ROUTER,
@@ -10,6 +12,7 @@ import {
   BenchmarkRunsResponseSchema,
   DEFAULT_BENCHMARK_ORG_ID,
   DEFAULT_BENCHMARK_USER_ID,
+  DEFAULT_BENCHMARK_DECIDER_MODEL_IDS,
   getReasoningVariantKeys,
   RequeueBenchmarkRegistryResponseSchema,
   StartBenchmarkRunResponseSchema,
@@ -33,7 +36,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { ChevronDown, ChevronRight, Play, Plus, RotateCcw, Save, Trash2 } from 'lucide-react';
 import { useModelSelectorList } from '@/lib/hooks/use-openrouter-models';
-import { toEligibleModelOptions } from '@/components/auto-routing/AutoRoutingModeCard';
+import { toEligibleModelOptions } from './eligible-model-options';
 import { PoolModalityWarning } from '@/components/auto-routing/PoolModalityWarning';
 import {
   computePoolModalityCoverage,
@@ -68,10 +71,6 @@ import {
 import { parseAdminResponse } from './admin-fetch';
 import { SchedulerConfigCard } from './SchedulerConfigCard';
 import { useSystemOneModelOptions } from './system-one-models';
-
-// ---------------------------------------------------------------------------
-// Pure helpers (exported for unit tests)
-// ---------------------------------------------------------------------------
 
 export function formatAccuracy(n: number): string {
   return `${(n * 100).toFixed(1)}%`;
@@ -217,20 +216,41 @@ export function policyOverridesFromForm(
   return Object.keys(overrides).length > 0 ? overrides : null;
 }
 
-// ---------------------------------------------------------------------------
-// Model picker helpers (exported for unit tests)
-// ---------------------------------------------------------------------------
-
 /** Pins a saved model id that is absent from the eligible catalog so it stays selectable. */
 export function pinnedModelFor(id: string): ModelOption {
   return { id, name: id };
 }
 
+/** The registry measures an alias under its concrete target, so coverage reads the target's entries. */
+export type BenchmarkModelOption = ModelOption & { measuredModelId?: string };
+
+type BenchmarkCatalogModel = Parameters<typeof toEligibleModelOptions>[0][number] & {
+  alias_target?: string;
+  opencode?: { variants?: Parameters<typeof getReasoningVariantKeys>[0] } | null;
+};
+
+/** Mirrors `platformRegistryEntries`: an alias counts only through a concrete catalog target. */
+export function toBenchmarkModelOptions(models: BenchmarkCatalogModel[]): BenchmarkModelOption[] {
+  const byId = new Map(models.map(model => [model.id, model]));
+  return toEligibleModelOptions(models).map(option => {
+    const measured = option.id.startsWith('~')
+      ? byId.get(byId.get(option.id)?.alias_target ?? '')
+      : byId.get(option.id);
+    if (measured === undefined || measured.id.startsWith('~')) return option;
+    return {
+      ...option,
+      measuredModelId: measured.id,
+      reasoningVariants: getReasoningVariantKeys(measured.opencode?.variants),
+    };
+  });
+}
+
 export function effortCoverageForModel(
-  model: ModelOption | undefined,
+  model: BenchmarkModelOption | undefined,
   entries?: BenchmarkRegistryResponse['platformEntries']
 ): string {
   if (model?.reasoningVariants === undefined) return 'Effort coverage unavailable';
+  const measuredModelId = model.measuredModelId ?? model.id;
   const efforts: (string | null)[] =
     model.reasoningVariants.length > 0 ? model.reasoningVariants : [null];
   const supported =
@@ -240,7 +260,8 @@ export function effortCoverageForModel(
   if (entries === undefined) return `${supported} · Measurement status unavailable`;
   const statuses = efforts.map(variant => ({
     variant,
-    status: entries.find(entry => entry.model === model.id && entry.variant === variant)?.status,
+    status: entries.find(entry => entry.model === measuredModelId && entry.variant === variant)
+      ?.status,
   }));
   const measured = statuses.filter(entry => entry.status === 'ready').length;
   const outstanding = statuses
@@ -249,17 +270,13 @@ export function effortCoverageForModel(
   return `${supported} · ${measured} of ${efforts.length} measured${outstanding.length > 0 ? ` · ${outstanding.join(', ')}` : ''}`;
 }
 
-// ---------------------------------------------------------------------------
-// Fetch helpers
-// ---------------------------------------------------------------------------
-
 async function fetchBenchmarkConfig(router: AutoRouter) {
-  const response = await fetch(`/admin/api/auto-routing/benchmark-config?router=${router}`);
+  const response = await adminFetch(`/admin/api/auto-routing/benchmark-config?router=${router}`);
   return parseAdminResponse(response, BenchmarkConfigResponseSchema);
 }
 
 async function saveBenchmarkConfig(config: BenchmarkConfig) {
-  const response = await fetch('/admin/api/auto-routing/benchmark-config', {
+  const response = await adminFetch('/admin/api/auto-routing/benchmark-config', {
     method: 'PUT',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(config),
@@ -293,7 +310,7 @@ export function runTypeLabel(run: Pick<BenchmarkRun, 'kind' | 'purpose'>): strin
 async function fetchBenchmarkRuns(filter: RunFilter, router: AutoRouter) {
   const query = new URLSearchParams(runFilterQuery(filter).replace(/^\?/, ''));
   query.set('router', router);
-  const response = await fetch(`/admin/api/auto-routing/benchmark-runs?${query}`);
+  const response = await adminFetch(`/admin/api/auto-routing/benchmark-runs?${query}`);
   return parseAdminResponse(response, BenchmarkRunsResponseSchema);
 }
 
@@ -308,7 +325,7 @@ async function startBenchmarkRun({
   queue: BenchmarkQueueSelector;
   router: AutoRouter;
 }) {
-  const response = await fetch('/admin/api/auto-routing/benchmark-runs', {
+  const response = await adminFetch('/admin/api/auto-routing/benchmark-runs', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ kind, force, queue, router }),
@@ -317,12 +334,12 @@ async function startBenchmarkRun({
 }
 
 async function fetchBenchmarkRegistry(router: AutoRouter) {
-  const response = await fetch(`/admin/api/auto-routing/benchmark-registry?router=${router}`);
+  const response = await adminFetch(`/admin/api/auto-routing/benchmark-registry?router=${router}`);
   return parseAdminResponse(response, BenchmarkRegistryResponseSchema);
 }
 
 async function requeueBenchmarkRegistry(scope: BenchmarkQueueSelector, router: AutoRouter) {
-  const response = await fetch('/admin/api/auto-routing/benchmark-registry', {
+  const response = await adminFetch('/admin/api/auto-routing/benchmark-registry', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ scope, router }),
@@ -331,16 +348,14 @@ async function requeueBenchmarkRegistry(scope: BenchmarkQueueSelector, router: A
 }
 
 async function fetchBenchmarkRoutingTable(router: AutoRouter) {
-  const response = await fetch(`/admin/api/auto-routing/benchmark-routing-table?router=${router}`);
+  const response = await adminFetch(
+    `/admin/api/auto-routing/benchmark-routing-table?router=${router}`
+  );
   return parseAdminResponse<BenchmarkRoutingTableResponse>(
     response,
     BenchmarkRoutingTableResponseSchema
   );
 }
-
-// ---------------------------------------------------------------------------
-// Local form state type for decider model rows
-// ---------------------------------------------------------------------------
 
 type DeciderModelRow = BenchmarkPlatformModel;
 
@@ -389,13 +404,16 @@ export type BenchmarkConfigFormState = {
   policyOverrides: PolicyOverrideForm;
 };
 
-export function configToFormState(config: BenchmarkConfig | null): BenchmarkConfigFormState {
+export function configToFormState(
+  config: BenchmarkConfig | null,
+  router: AutoRouter = config?.router ?? DEFAULT_AUTO_ROUTER
+): BenchmarkConfigFormState {
   if (config === null) {
     // No config saved yet: identity fields are overrides, so blank means the
     // worker uses its default benchmark user and org at run time.
     return {
       classifierModels: [],
-      deciderModels: [],
+      deciderModels: [{ id: DEFAULT_BENCHMARK_DECIDER_MODEL_IDS[router] }],
       minAccuracy: 0.7,
       accuracyNoiseBand: 0.05,
       frontierMinAccuracyDelta: 0,
@@ -469,10 +487,6 @@ export function formStateToConfig(
     updatedBy: base?.updatedBy ?? null,
   };
 }
-
-// ---------------------------------------------------------------------------
-// Config editor sub-component
-// ---------------------------------------------------------------------------
 
 function ConfigSectionHeading({ title, description }: { title: string; description: string }) {
   return (
@@ -590,7 +604,7 @@ function BenchmarkConfigEditor({
   config: BenchmarkConfig | null;
   router: AutoRouter;
   onSaved: (next: { config: BenchmarkConfig | null }) => void;
-  modelOptions: ModelOption[];
+  modelOptions: BenchmarkModelOption[];
   modelsLoading: boolean;
   modelsError?: string;
   classifierModelOptions: ModelOption[];
@@ -599,7 +613,7 @@ function BenchmarkConfigEditor({
   registryEntries?: BenchmarkRegistryResponse['platformEntries'];
   catalogModalities: readonly ModalityCatalogModel[] | null;
 }) {
-  const [form, setForm] = useState(() => configToFormState(config));
+  const [form, setForm] = useState(() => configToFormState(config, router));
   // Tracks unsaved local edits. A background config refetch (the runs list
   // polls; the query also refetches on focus) must not silently overwrite
   // in-progress edits, so the sync effect only resets the form while pristine.
@@ -619,22 +633,22 @@ function BenchmarkConfigEditor({
   // Sync from server config only on initial load / after a save — never while
   // the admin has unsaved edits (that would discard their work).
   useEffect(() => {
-    if (!dirty) setForm(configToFormState(config));
-  }, [config, dirty]);
+    if (!dirty) setForm(configToFormState(config, router));
+  }, [config, dirty, router]);
 
   // Discard local edits and reload the latest server config (explicit conflict
   // recovery when a remote update arrived while editing).
   const handleReload = useCallback(() => {
-    setForm(configToFormState(config));
+    setForm(configToFormState(config, router));
     setDirty(false);
-  }, [config]);
+  }, [config, router]);
 
   const saveMutation = useMutation({
     mutationFn: (next: BenchmarkConfig) => saveBenchmarkConfig({ ...next, router }),
     onSuccess: data => {
       // The save is now the source of truth: clear dirty and re-sync so the
       // next background refetch is free to update the form again.
-      setForm(configToFormState(data.config));
+      setForm(configToFormState(data.config, router));
       setDirty(false);
       onSaved(data);
       toast.success('Benchmark config saved');
@@ -1135,10 +1149,6 @@ function BenchmarkConfigEditor({
   );
 }
 
-// ---------------------------------------------------------------------------
-// Run summaries expandable table
-// ---------------------------------------------------------------------------
-
 function RunSummariesTable({ run, id }: { run: BenchmarkRun; id: string }) {
   const isDecider = run.kind === 'decider';
 
@@ -1221,10 +1231,6 @@ function RunSummariesTable({ run, id }: { run: BenchmarkRun; id: string }) {
     </TableRow>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Runs table
-// ---------------------------------------------------------------------------
 
 function statusBadgeVariant(
   status: BenchmarkRun['status']
@@ -1338,10 +1344,6 @@ function BenchmarkRunsTable({ runs }: { runs: BenchmarkRun[] }) {
     </>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Routing table view
-// ---------------------------------------------------------------------------
 
 function RoutingTableSummary({ table }: { table: BenchmarkRoutingTableResponse['table'] }) {
   if (!table) return null;
@@ -1465,10 +1467,6 @@ export function RoutingTableView({ data }: { data: BenchmarkRoutingTableResponse
   );
 }
 
-// ---------------------------------------------------------------------------
-// Registry summary
-// ---------------------------------------------------------------------------
-
 const REGISTRY_STATUSES = ['pending', 'running', 'ready', 'failed'] as const;
 
 function RegistrySummary({
@@ -1525,26 +1523,16 @@ function RegistrySummary({
   );
 }
 
-// ---------------------------------------------------------------------------
-// Main exported section component
-// ---------------------------------------------------------------------------
-
 export function RouterBenchmarksSection({ router }: { router: AutoRouter }) {
   const queryClient = useQueryClient();
   const [forceRerun, setForceRerun] = useState(false);
   const [runFilter, setRunFilter] = useState<RunFilter>('all');
 
   const modelsQuery = useModelSelectorList(undefined);
-  const modelOptions = useMemo(() => {
-    const models = modelsQuery.data?.data ?? [];
-    const coverage = new Map(
-      models.map(model => [model.id, getReasoningVariantKeys(model.opencode?.variants)])
-    );
-    return toEligibleModelOptions(models, []).map(model => ({
-      ...model,
-      reasoningVariants: coverage.get(model.id),
-    }));
-  }, [modelsQuery.data?.data]);
+  const modelOptions = useMemo(
+    () => toBenchmarkModelOptions(modelsQuery.data?.data ?? []),
+    [modelsQuery.data?.data]
+  );
   const modelsError = modelsQuery.error instanceof Error ? modelsQuery.error.message : undefined;
   const catalogModels = modelsQuery.error ? undefined : modelsQuery.data?.data;
   const catalogModalities = useMemo(
@@ -1588,7 +1576,6 @@ export function RouterBenchmarksSection({ router }: { router: AutoRouter }) {
     queryFn: () => fetchBenchmarkRuns('all', router),
   });
 
-  // Poll runs every 30s while any run is 'running'
   const hasRunningRun = allRunsQuery.data?.runs.some(r => r.status === 'running') ?? false;
   const refetchRuns = runsQuery.refetch;
   const refetchAllRuns = allRunsQuery.refetch;
@@ -1736,7 +1723,7 @@ export function RouterBenchmarksSection({ router }: { router: AutoRouter }) {
           <CardContent className="flex flex-col gap-3 p-4 pt-0">
             <p className="text-muted-foreground text-xs">
               Measurements and published tables are isolated for the selected router. Classifier
-              measurements are shared. Custom owner pools use the efficient router only.
+              measurements are shared.
             </p>
             {registryQuery.isLoading ? (
               <Skeleton className="h-20 w-full" />

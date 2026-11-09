@@ -6,7 +6,7 @@ import {
   organization_memberships,
   organizations,
 } from '@kilocode/db/schema';
-import { eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   createOrganization,
@@ -74,6 +74,54 @@ describe('organizations trpc router', () => {
   });
 
   describe('get procedure', () => {
+    it.each(['owner', 'member'] as const)(
+      'returns consistent expired balance fields for an organization %s',
+      async role => {
+        const org = await createOrganization('Expiration response', regularUser.id);
+        try {
+          await addUserToOrganization(org.id, memberUser.id, 'member');
+          await db
+            .update(organizations)
+            .set({
+              microdollars_used: 3_000_000,
+              total_microdollars_acquired: 10_000_000,
+              microdollars_balance: 7_000_000,
+              next_credit_expiration_at: '2024-01-10T00:00:00Z',
+            })
+            .where(eq(organizations.id, org.id));
+          await db.insert(credit_transactions).values({
+            kilo_user_id: regularUser.id,
+            organization_id: org.id,
+            amount_microdollars: 10_000_000,
+            is_free: true,
+            expiry_date: '2024-01-10T00:00:00Z',
+            expiration_baseline_microdollars_used: 0,
+            original_baseline_microdollars_used: 0,
+          });
+          const caller = await createCallerForUser(
+            role === 'owner' ? regularUser.id : memberUser.id
+          );
+          const result = await caller.organizations.withMembers({ organizationId: org.id });
+          const persisted = await db.query.organizations.findFirst({
+            where: eq(organizations.id, org.id),
+          });
+          expect(result).toMatchObject({
+            microdollars_used: 3_000_000,
+            total_microdollars_acquired: 3_000_000,
+            microdollars_balance: 0,
+            next_credit_expiration_at: null,
+          });
+          expect(result).toHaveProperty('microdollars_balance', persisted?.microdollars_balance);
+          expect(result.updated_at).toBe(persisted?.updated_at);
+        } finally {
+          await db
+            .delete(credit_transactions)
+            .where(eq(credit_transactions.organization_id, org.id));
+          await db.delete(organizations).where(eq(organizations.id, org.id));
+        }
+      }
+    );
+
     it('should return organization with members for organization owner', async () => {
       const caller = await createCallerForUser(regularUser.id);
       const result = await caller.organizations.withMembers({
@@ -211,6 +259,54 @@ describe('organizations trpc router', () => {
         await db.delete(organizations).where(eq(organizations.id, parentOrganization.id));
       }
     });
+
+    it.each(['owner', 'admin', 'billing_manager'] as const)(
+      'returns the inherited %s role without a direct child membership',
+      async role => {
+        const parentUser = await insertTestUser({ is_admin: false });
+        const childOwner = await insertTestUser({ is_admin: false });
+        const parentOrganization = await createOrganization(
+          'Parent Role Organization',
+          parentUser.id
+        );
+        const childOrganization = await createOrganization(
+          'Child Role Organization',
+          childOwner.id
+        );
+        await db
+          .update(organization_memberships)
+          .set({ role })
+          .where(
+            and(
+              eq(organization_memberships.organization_id, parentOrganization.id),
+              eq(organization_memberships.kilo_user_id, parentUser.id)
+            )
+          );
+        await db
+          .update(organizations)
+          .set({ parent_organization_id: parentOrganization.id })
+          .where(eq(organizations.id, childOrganization.id));
+
+        try {
+          const caller = await createCallerForUser(parentUser.id);
+          const result = await caller.organizations.withMembers({
+            organizationId: childOrganization.id,
+          });
+
+          expect(result.callerRole).toBe(role);
+          expect(
+            result.members.some(member => member.status === 'active' && member.id === parentUser.id)
+          ).toBe(false);
+        } finally {
+          await db
+            .update(organizations)
+            .set({ parent_organization_id: null })
+            .where(eq(organizations.id, childOrganization.id));
+          await db.delete(organizations).where(eq(organizations.id, childOrganization.id));
+          await db.delete(organizations).where(eq(organizations.id, parentOrganization.id));
+        }
+      }
+    );
 
     it('should include child organization memberships for parent organization members', async () => {
       const parentOwner = await insertTestUser({
@@ -419,6 +515,10 @@ describe('organizations trpc router', () => {
             'plan',
             'free_trial_end_at',
             'company_domain',
+            'directory_id',
+            'directory_group_id',
+            'directory_idp_id',
+            'external_org_id',
             'callerRole',
             'members',
             'childOrganizations',
@@ -487,6 +587,10 @@ describe('organizations trpc router', () => {
             'plan',
             'free_trial_end_at',
             'company_domain',
+            'directory_id',
+            'directory_group_id',
+            'directory_idp_id',
+            'external_org_id',
             'callerRole',
             'members',
             'childOrganizations',
@@ -915,7 +1019,7 @@ describe('organizations trpc router', () => {
           organizationId: testOrganization.id,
           name: longName,
         })
-      ).rejects.toThrow('Organization name must be less than 100 characters');
+      ).rejects.toThrow('Organization name must be 100 characters or fewer');
     });
 
     it('should trim whitespace from organization name', async () => {

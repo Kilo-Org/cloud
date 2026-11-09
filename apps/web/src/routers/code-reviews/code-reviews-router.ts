@@ -67,6 +67,7 @@ import { v2SnapshotToLogEntries, v1BlobToLogEntries } from '@/lib/code-reviews/s
 import { codeReviewAnalyticsRouter } from './code-review-analytics-router';
 import {
   getManualCodeReviewConfig,
+  getManualCodeReviewConfigForDetail,
   isLocalKiloCodeReview,
   shouldPublishCodeReviewToProvider,
 } from '@/lib/code-reviews/manual-config';
@@ -205,6 +206,38 @@ async function cancelPRGateCheck(review: CloudAgentCodeReview, actor: GitLabCred
       `[cancel] Set commit status 'canceled' on ${review.repo_full_name}!${review.pr_number}`
     );
   }
+}
+
+/**
+ * Cancels a review locally, then settles its ledger row and finalizes its PR
+ * gate check — but only when the guarded cancel actually changed a row.
+ *
+ * A review that reached a terminal state between the caller's status read and
+ * this write is left untouched, and then there is nothing to settle: the row's
+ * own terminal transition already settled the ledger. Reporting `false` keeps
+ * the caller from answering with a success it did not achieve.
+ */
+async function cancelReviewLocally(
+  review: CloudAgentCodeReview,
+  credentialActor: GitLabCredentialActor
+): Promise<boolean> {
+  const cancelled = await cancelCodeReview(review.id);
+  if (!cancelled) return false;
+
+  await settleCodeReviewLedgerRow({
+    reviewId: review.id,
+    status: 'cancelled',
+    terminalReason: 'user_cancelled',
+    triggerSource: review.trigger_source,
+  });
+
+  try {
+    await cancelPRGateCheck(review, credentialActor);
+  } catch (gateError) {
+    logExceptInTest('[cancel] Failed to finalize PR gate check:', gateError);
+  }
+
+  return true;
 }
 
 export const codeReviewRouter = createTRPCRouter({
@@ -408,7 +441,10 @@ export const codeReviewRouter = createTRPCRouter({
         selectedModel = selectedModelFromReviewSources({
           persistedModel: null,
           repoFullName: review.repo_full_name,
-          config: getManualCodeReviewConfig(review)?.agentConfig ?? null,
+          // Detail-read tolerance: a legacy row whose stored manual_config
+          // fails the strict schema must not fail the whole load; read it as
+          // "no manual config" and fall through to the owner agent config.
+          config: getManualCodeReviewConfigForDetail(review)?.agentConfig ?? null,
         });
         if (!selectedModel) {
           const owner = review.owned_by_organization_id
@@ -462,6 +498,15 @@ export const codeReviewRouter = createTRPCRouter({
       if (error instanceof TRPCError) {
         throw error;
       }
+      // A non-TRPC failure here resolves to the client as a generic, retryable
+      // `success: false`. Without this line the real cause is invisible in
+      // production: the resolved failure never reaches Sentry and the request
+      // logs show only a 200/207. reviewId identifies the row; the line
+      // carries no user data.
+      logExceptInTest('[codeReviews.get] Failed to load review', {
+        reviewId: input.reviewId,
+        error: error instanceof Error ? error.message : String(error),
+      });
       return failureResult(error instanceof Error ? error.message : 'Failed to get code review');
     }
   }),
@@ -535,17 +580,8 @@ export const codeReviewRouter = createTRPCRouter({
                 status: review.status,
               }
             );
-            await cancelCodeReview(input.reviewId);
-            await settleCodeReviewLedgerRow({
-              reviewId: input.reviewId,
-              status: 'cancelled',
-              terminalReason: review.terminal_reason,
-              triggerSource: review.trigger_source,
-            });
-            try {
-              await cancelPRGateCheck(review, credentialActor);
-            } catch (gateError) {
-              logExceptInTest('[cancel] Failed to finalize PR gate check:', gateError);
+            if (!(await cancelReviewLocally(review, credentialActor))) {
+              return failureResult('Code review is no longer running');
             }
             return successResult({ message: 'Code review cancelled successfully' });
           }
@@ -557,17 +593,8 @@ export const codeReviewRouter = createTRPCRouter({
         } catch (workerError) {
           if (review.status === 'queued' && !review.session_id) {
             console.error('Worker cancel failed, updating DB directly:', workerError);
-            await cancelCodeReview(input.reviewId);
-            await settleCodeReviewLedgerRow({
-              reviewId: input.reviewId,
-              status: 'cancelled',
-              terminalReason: review.terminal_reason,
-              triggerSource: review.trigger_source,
-            });
-            try {
-              await cancelPRGateCheck(review, credentialActor);
-            } catch (gateError) {
-              logExceptInTest('[cancel] Failed to finalize PR gate check:', gateError);
+            if (!(await cancelReviewLocally(review, credentialActor))) {
+              return failureResult('Code review is no longer running');
             }
             return successResult({ message: 'Code review cancelled (worker unreachable)' });
           }
@@ -577,17 +604,8 @@ export const codeReviewRouter = createTRPCRouter({
       }
 
       // For pending reviews (not yet dispatched to worker), update DB and finalize gate
-      await cancelCodeReview(input.reviewId);
-      await settleCodeReviewLedgerRow({
-        reviewId: input.reviewId,
-        status: 'cancelled',
-        terminalReason: review.terminal_reason,
-        triggerSource: review.trigger_source,
-      });
-      try {
-        await cancelPRGateCheck(review, credentialActor);
-      } catch (gateError) {
-        logExceptInTest('[cancel] Failed to finalize PR gate check:', gateError);
+      if (!(await cancelReviewLocally(review, credentialActor))) {
+        return failureResult('Code review is no longer running');
       }
 
       return successResult({ message: 'Code review cancelled successfully' });
@@ -720,6 +738,16 @@ export const codeReviewRouter = createTRPCRouter({
 
         // Try to dispatch the review
         await tryDispatchPendingReviews(owner);
+
+        // Dispatch owns the retry from here: a worker that refuses the job marks
+        // the review failed again. Returning success would report a retry that
+        // never started, and the caller would show the queued state for it.
+        const retriedReview = await getCodeReviewById(input.reviewId);
+        if (retriedReview?.status === 'failed') {
+          return failureResult(
+            retriedReview.error_message ?? 'The code review retry did not start'
+          );
+        }
 
         return successResult({ message: 'Code review retriggered successfully' });
       } catch (error) {

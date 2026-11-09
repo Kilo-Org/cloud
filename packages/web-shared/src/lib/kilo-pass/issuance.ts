@@ -19,10 +19,12 @@ import { KiloPassAuditLogResult } from './enums';
 import { KiloPassAuditLogAction } from './enums';
 import { KiloPassCadence } from './enums';
 import { KiloPassIssuanceItemKind } from './enums';
-import { type KiloPassIssuanceSource } from './enums';
+import { KiloPassIssuanceSource } from './enums';
 
 import type { db as defaultDb } from '@kilocode/web-shared/lib/drizzle';
 import { processTopUp } from '@kilocode/web-shared/lib/credits';
+import type { PaidCreditGrant } from '@kilocode/web-shared/lib/paidCreditPolicy';
+import { KiloPassPaymentProvider } from './enums';
 import {
   grantCreditForCategory,
   type GrantCreditOptions,
@@ -335,6 +337,8 @@ export async function issueBaseCreditsForIssuance(
     stripeInvoiceId?: string | null;
     providerPaymentId?: string | null;
     description: string;
+    paidCredit?: PaidCreditGrant;
+    issuedAt?: Date | string;
   }
 ): Promise<IssueCreditResult> {
   const {
@@ -383,6 +387,42 @@ export async function issueBaseCreditsForIssuance(
   const originalBaselineMicrodollarsUsed = user.microdollars_used;
   const amountCents = roundUsdToCents(amountUsd);
   const amountMicrodollars = toMicrodollars(centsToUsd(amountCents));
+  const subscription = await tx.query.kilo_pass_subscriptions.findFirst({
+    where: eq(kilo_pass_subscriptions.id, subscriptionId),
+  });
+  const issuance = await tx.query.kilo_pass_issuances.findFirst({
+    where: eq(kilo_pass_issuances.id, issuanceId),
+  });
+  if (!subscription || !issuance) throw new Error('Pass issuance context is missing');
+  const [termCredit] = params.paidCredit
+    ? []
+    : await tx
+        .select({ policy: credit_transactions.paid_credit_policy })
+        .from(kilo_pass_issuances)
+        .innerJoin(
+          kilo_pass_issuance_items,
+          eq(kilo_pass_issuance_items.kilo_pass_issuance_id, kilo_pass_issuances.id)
+        )
+        .innerJoin(
+          credit_transactions,
+          eq(credit_transactions.id, kilo_pass_issuance_items.credit_transaction_id)
+        )
+        .where(
+          and(
+            eq(kilo_pass_issuances.kilo_pass_subscription_id, subscriptionId),
+            eq(kilo_pass_issuances.source, KiloPassIssuanceSource.StripeInvoice),
+            lte(kilo_pass_issuances.issue_month, issuance.issue_month),
+            eq(kilo_pass_issuance_items.kind, KiloPassIssuanceItemKind.Base)
+          )
+        )
+        .orderBy(sql`${kilo_pass_issuances.issue_month} DESC`)
+        .limit(1);
+  const paidCredit: PaidCreditGrant = params.paidCredit ?? {
+    source: subscription.payment_provider === KiloPassPaymentProvider.AppStore ? 'apple' : 'pass',
+    purchasedAt: subscription.started_at ?? issuance.created_at,
+    issuedAt: params.issuedAt ?? issuance.created_at,
+    terms: termCredit?.policy === 'one_year' ? 'one_year' : 'legacy',
+  };
 
   // Use processTopUp() as the canonical way to create paid credits, while keeping
   // Kilo Pass issuance atomic by executing on the same transaction.
@@ -399,6 +439,7 @@ export async function issueBaseCreditsForIssuance(
       creditTransactionId: attemptedCreditTransactionId,
       creditDescription: description,
       skipPostTopUpFreeStuff: true,
+      paidCredit,
     }
   );
 

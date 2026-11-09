@@ -9,6 +9,7 @@
       "lowBalance": "Bakiyeniz dikkat gerektiriyor",
       "spendAlert": "Harcamanız dikkat gerektiriyor",
       "securityFinding": "Bir güvenlik bulgusu dikkat gerektiriyor",
+      "securityUpdate": "Bir güvenlik kontrolünde güncelleme var",
       "activeAgentsGlanceable": "Etkin ajanlarda bir güncelleme var"
     }
   },
@@ -61,7 +62,7 @@
     },
     "securityLifecycle": {
       "title": "Kilo",
-      "body": "Bir güvenlik bulgusu dikkat gerektiriyor"
+      "body": "Bir güvenlik kontrolünde güncelleme var"
     }
   },
   "instanceLifecycle": {

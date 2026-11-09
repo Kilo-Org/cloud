@@ -91,6 +91,14 @@ function addServer(): void {
   });
 }
 
+// A preference becomes visible (and refreshes the snapshots built from it) once
+// its write lands, so the tests let the queued write settle before asserting.
+async function settlePreferences(): Promise<void> {
+  await new Promise<void>(resolve => {
+    setImmediate(resolve);
+  });
+}
+
 beforeEach(() => {
   forgetChatPlaces();
   storedQuestions.clear();
@@ -163,6 +171,7 @@ describe('remembered question targets', () => {
       model: 'kilo/one',
       effort: null,
       images: [],
+      failureKey: null,
     });
   });
 
@@ -181,6 +190,7 @@ describe('remembered question targets', () => {
       model: 'backend:private:1:model',
       effort: null,
       images: [],
+      failureKey: null,
     });
   });
 });
@@ -189,6 +199,7 @@ describe('the remote MCP connection and its stored servers', () => {
   it('are dropped when the account signs out', async () => {
     addServer();
     setSettingsToolsEnabled(false);
+    await settlePreferences();
     expect(listRemoteMcpServers()).toHaveLength(1);
     expect(remoteMcpState()).toHaveLength(1);
     expect(isSettingsToolsEnabled()).toBe(false);
@@ -205,6 +216,7 @@ describe('the remote MCP connection and its stored servers', () => {
   it('are dropped when another account signs in', async () => {
     addServer();
     setSettingsToolsEnabled(false);
+    await settlePreferences();
     expect(listRemoteMcpServers()).toHaveLength(1);
     expect(remoteMcpState()).toHaveLength(1);
 

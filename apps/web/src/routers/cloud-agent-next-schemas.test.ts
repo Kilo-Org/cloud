@@ -278,6 +278,44 @@ describe('baseGetSessionNextOutputSchema', () => {
     expect(response).not.toHaveProperty('parentSessionId');
     expect(response).not.toHaveProperty('cloudAgentSessionScopeId');
   });
+
+  it('preserves runtime agent visibility metadata for the chat picker', () => {
+    const runtimeAgents = [
+      { slug: 'primary', name: 'Primary', mode: 'primary', hidden: false, disable: false },
+      { slug: 'subagent', name: 'Subagent', mode: 'subagent' },
+      { slug: 'hidden', name: 'Hidden', mode: 'all', hidden: true },
+      { slug: 'disabled', name: 'Disabled', disable: true },
+      { slug: 'legacy', name: 'Legacy' },
+    ];
+
+    expect(
+      baseGetSessionNextOutputSchema.parse({ ...baseSession, runtimeAgents }).runtimeAgents
+    ).toEqual(runtimeAgents);
+  });
+
+  it('preserves safe DO-native metadata fields used by session detail UIs', () => {
+    const metadata = {
+      title: 'DO title',
+      associatedPr: {
+        url: 'https://github.com/Kilo-Org/cloud/pull/42',
+        number: 42,
+        state: 'open',
+        title: 'Preserve metadata',
+        headSha: 'a'.repeat(40),
+        lastSyncedAt: '2026-10-19T21:00:00.000Z',
+        platform: 'github',
+        reviewDecision: 'approved',
+        reviewDecisionPending: false,
+      },
+      totalCostMicrodollars: 350_000,
+      createdOnPlatform: 'extension',
+      profileId: 'profile-1',
+    };
+    expect(baseGetSessionNextOutputSchema.parse({ ...baseSession, ...metadata })).toEqual({
+      ...baseSession,
+      ...metadata,
+    });
+  });
 });
 
 describe('baseWorktreeChangesNextSchema', () => {
@@ -318,8 +356,14 @@ describe('baseWorktreeFileNextSchema', () => {
     expect(baseWorktreeFileNextSchema.parse(input)).toEqual(input);
   });
 
+  it.each(['uncommitted', 'against-base-branch'])('preserves optional %s file scope', scope => {
+    expect(baseWorktreeFileNextSchema.parse({ ...input, scope })).toEqual({ ...input, scope });
+  });
+
   it.each([
     { path: '' },
+    { scope: 'committed' },
+    { scope: null },
     { path: '/absolute' },
     { path: '../outside' },
     { path: 'src/../outside' },
@@ -638,6 +682,18 @@ describe('basePrepareSessionNextSchema cloneFromKiloSessionId union', () => {
     expect(result.success).toBe(true);
   });
 
+  it('drops a client environmentId: the server resolves the environment from the repository', () => {
+    const result = personalPrepareSessionNextSchema.parse({
+      githubRepo: 'acme/repo',
+      prompt: 'Use environment',
+      mode: 'code',
+      model: 'kilo/test-model',
+      environmentId: '123e4567-e89b-12d3-a456-426614174099',
+    });
+
+    expect(result).not.toHaveProperty('environmentId');
+  });
+
   it('does not accept client provenance from public session preparation input', () => {
     const result = basePrepareSessionNextSchema.parse({
       githubRepo: 'acme/repo',
@@ -660,6 +716,7 @@ describe('send-time attachment filenames', () => {
   };
   const sendInput = {
     cloudAgentSessionId: 'agent_12345678-1234-4234-9234-123456789abc',
+    messageId: 'msg_123456789abc123456789ABCDE',
     payload: { type: 'prompt', prompt: '', mode: 'code', model: 'kilo/test-model' },
   };
   const attachmentsWith = (extension: string) => ({
@@ -757,6 +814,23 @@ describe('prepare session sandbox selection', () => {
     model: 'kilo/test-model',
   };
   const organizationInput = { ...baseInput, organizationId: MESSAGE_UUID };
+  it.each([
+    { egressAudit: false },
+    { egressAudit: true },
+    { egressMode: 'unrestricted', egressAudit: false },
+    { egressMode: 'unrestricted', egressAudit: true },
+    { egressMode: 'allowlist', egressAudit: false },
+    { egressMode: 'allowlist', egressAudit: true },
+  ])('preserves personal and organization audit opt-ins: %j', policy => {
+    for (const parsed of [
+      personalPrepareSessionNextSchema.parse({ ...baseInput, ...policy }),
+      organizationPrepareSessionNextSchema.parse({ ...organizationInput, ...policy }),
+    ]) {
+      expect(parsed.egressAudit).toBe(policy.egressAudit);
+      expect(parsed.egressMode).toBe('egressMode' in policy ? policy.egressMode : undefined);
+      expect(parsed.egressAllowlist).toBeUndefined();
+    }
+  });
   it.each([[], ['Z.Example.COM.', 'example.com']].map(egressAllowlist => ({ egressAllowlist })))(
     'preserves canonical API-only policy %j',
     ({ egressAllowlist }) => {
@@ -798,6 +872,8 @@ describe('prepare session sandbox selection', () => {
     { egressMode: 'unrestricted', egressAllowlist: ['example.com'] },
     { egressMode: 'deny-all' },
     { egressMode: null },
+    { egressMode: 'allowlist', egressAudit: null },
+    { egressMode: 'allowlist', egressAudit: 'true' },
   ])('rejects ambiguous or unsupported egress policies: %j', policy => {
     expect(personalPrepareSessionNextSchema.safeParse({ ...baseInput, ...policy }).success).toBe(
       false
@@ -877,8 +953,8 @@ describe('prepare session sandbox selection', () => {
     { vcpus: 4 },
     { provider: { id: 'cloudflare', account: 'byoc' }, instanceType: 'single' },
     { provider: { id: 'cloudflare', account: 'kilo' }, instanceType: 'small' },
-    { provider: { id: 'vercel', account: 'kilo' }, instanceType: 'single' },
-    { provider: { id: 'vercel', account: 'kilo' }, instanceType: 'default' },
+    { provider: { id: 'vercel', account: 'byoc' }, instanceType: 'single' },
+    { provider: { id: 'vercel', account: 'byoc' }, instanceType: 'default' },
     { provider: { id: 'cloudflare', account: 'kilo' }, instanceType: 'devcontainer' },
   ])('rejects an invalid sandbox allocation: %j', sandboxAllocation => {
     expect(
@@ -948,10 +1024,10 @@ describe('prepare session sandbox selection', () => {
       cloneFromKiloSessionId: KILO_SESSION_ID,
       autoInitiate: true,
       operationKey: MESSAGE_UUID,
-      sandboxAllocation: 'cloudflare-single',
+      sandboxAllocation: 'cloudflare-containers-standard-3',
     };
     expect(personalPrepareSessionNextSchema.parse(personalClone).sandboxAllocation).toEqual(
-      getSandboxAllocationRequest('cloudflare-single')
+      getSandboxAllocationRequest('cloudflare-containers-standard-3')
     );
     expect(
       personalPrepareSessionNextSchema.safeParse({ ...personalClone, prompt: 'Not allowed' })
@@ -964,10 +1040,10 @@ describe('prepare session sandbox selection', () => {
       cloneFromKiloSessionId: KILO_SESSION_ID,
       autoInitiate: true,
       operationKey: MESSAGE_UUID,
-      sandboxAllocation: 'cloudflare-single',
+      sandboxAllocation: 'cloudflare-containers-standard-3',
     };
     expect(organizationPrepareSessionNextSchema.parse(cloneInput).sandboxAllocation).toEqual(
-      getSandboxAllocationRequest('cloudflare-single')
+      getSandboxAllocationRequest('cloudflare-containers-standard-3')
     );
     expect(
       organizationPrepareSessionNextSchema.safeParse({ ...cloneInput, prompt: 'Not allowed' })

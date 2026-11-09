@@ -13,7 +13,7 @@ import { createTestQueryClient } from '@/test/render-with-providers';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import InstancePickerScreen from './instance-picker';
-import '@/i18n';
+import { i18n } from '@/i18n';
 
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
 
@@ -23,6 +23,7 @@ const fetchInstances = vi.hoisted(() =>
 const queryOptionsCalls = vi.hoisted(() => [] as Record<string, unknown>[]);
 const bridge = vi.hoisted(() => ({
   currentValue: null as InstancePickerInstance | null,
+  pendingComputer: false,
   onSelect: vi.fn(),
 }));
 const insets = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
@@ -50,19 +51,24 @@ const flashListMock = vi.hoisted(
         )
       );
       const empty = props.data.length === 0 ? props.ListEmptyComponent : null;
-      return createElement('FlashList', null, props.ListHeaderComponent, ...rows, empty);
+      return createElement('FlashList', props, props.ListHeaderComponent, ...rows, empty);
     }
 );
 
 vi.mock('react-native', () => ({
   FlatList: 'FlatList',
+  Platform: { OS: 'android' },
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   View: 'View',
+  BackHandler: {
+    addEventListener: vi.fn(() => ({ remove: vi.fn() })),
+  },
 }));
 vi.mock('@shopify/flash-list', () => ({ FlashList: flashListMock }));
 vi.mock('expo-router', () => ({
   useRouter: () => router,
+  useNavigation: () => ({ isFocused: () => true }),
   useFocusEffect: (effect: EffectCallback) => {
     // The route focus effect runs on mount and clears the bridge on unmount.
     useEffect(effect, [effect]);
@@ -150,6 +156,22 @@ function radios(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestIns
   );
 }
 
+/** The one radio row whose accessible name contains `text`, or undefined. */
+function radioFor(
+  root: TestRenderer.ReactTestInstance,
+  text: string
+): TestRenderer.ReactTestInstance | undefined {
+  return radios(root).find(node => {
+    const props: unknown = node.props;
+    return (
+      props !== null &&
+      typeof props === 'object' &&
+      'accessibilityLabel' in props &&
+      String(props.accessibilityLabel).includes(text)
+    );
+  });
+}
+
 /**
  * React Query notifies its observers through its scheduler, so a single
  * microtask flush does not settle a fetch. Yield to the macrotask queue a few
@@ -190,12 +212,24 @@ async function mount(): Promise<TestRenderer.ReactTestRenderer> {
   return ref.current;
 }
 
+/** The FlashList the success state renders, so a test can inspect its list props. */
+function flashListOf(root: TestRenderer.ReactTestInstance): {
+  props: { contentContainerStyle?: { paddingBottom?: number } };
+} {
+  const list = findByType(root, 'FlashList')[0];
+  if (!list) {
+    throw new Error('FlashList not found');
+  }
+  return list as { props: { contentContainerStyle?: { paddingBottom?: number } } };
+}
+
 describe('InstancePickerScreen list', () => {
   beforeEach(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     fetchInstances.mockReset().mockResolvedValue({ instances: [CLI_INSTANCE, REMOTE_INSTANCE] });
     queryOptionsCalls.length = 0;
     bridge.currentValue = CLI_INSTANCE;
+    bridge.pendingComputer = false;
     bridge.onSelect.mockClear();
     router.back.mockClear();
     insets.bottom = 0;
@@ -242,6 +276,88 @@ describe('InstancePickerScreen list', () => {
     // through FlashList when the instance data is an empty array.
     expect(findByType(renderer.root, 'EmptyState')).toHaveLength(1);
     expect(radios(renderer.root)).toHaveLength(1);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('clears the gesture bar with the detail-screen floor, not the raw inset', async () => {
+    // A zero reported bottom inset: the floor still keeps the sheet's bottom
+    // action above the Android gesture navigation bar.
+    insets.bottom = 0;
+    const renderer = await mount();
+
+    const style = flashListOf(renderer.root).props.contentContainerStyle;
+    expect(style?.paddingBottom).toBe(32);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('keeps a reported bottom inset larger than the floor', async () => {
+    insets.bottom = 34;
+    const renderer = await mount();
+
+    const style = flashListOf(renderer.root).props.contentContainerStyle;
+    expect(style?.paddingBottom).toBe(50);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('marks no row checked while the pending computer target owns the form', async () => {
+    bridge.currentValue = null;
+    bridge.pendingComputer = true;
+    const renderer = await mount();
+
+    // Every radio renders unchecked: the Cloud Agent default is not the
+    // current target, and no instance row is bound either.
+    for (const radio of radios(renderer.root)) {
+      expect(radio.props.accessibilityState).toMatchObject({ checked: false });
+    }
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('checks the row for the same computer after its connection id changes', async () => {
+    // The form's target is the row it held when it opened: a host that
+    // rebooted reconnects its CLI under a new connectionId with the same name
+    // and project, so an identifier-only match would mark no row at all.
+    bridge.currentValue = { ...CLI_INSTANCE, connectionId: 'cli-before-reboot' };
+    const renderer = await mount();
+
+    const laptop = radioFor(renderer.root, CLI_INSTANCE.name);
+    expect(laptop).toBeDefined();
+    expect(laptop?.props.accessibilityState).toMatchObject({ checked: true });
+    // The Cloud Agent row is not the target the form shows.
+    expect(
+      radioFor(renderer.root, i18n.t('agentChat.instancePicker.runOnCloudAgent'))
+    ).toBeDefined();
+    expect(
+      radioFor(renderer.root, i18n.t('agentChat.instancePicker.runOnCloudAgent'))?.props
+        .accessibilityState
+    ).toMatchObject({ checked: false });
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('checks no row when the form target left the live list', async () => {
+    // The chosen computer is gone: its row cannot be marked, and the Cloud
+    // Agent is not what the form runs on either.
+    bridge.currentValue = CLI_INSTANCE;
+    fetchInstances.mockResolvedValue({ instances: [REMOTE_INSTANCE] });
+    const renderer = await mount();
+
+    for (const radio of radios(renderer.root)) {
+      expect(radio.props.accessibilityState).toMatchObject({ checked: false });
+    }
 
     act(() => {
       renderer.unmount();

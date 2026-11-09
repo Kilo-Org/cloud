@@ -16,6 +16,9 @@ export function BackendHeadersField({
   const colors = useThemeColors();
   const [revealed, setRevealed] = useState(false);
   const value = useRef(defaultValue);
+  // The control names the action it performs now, so the same button reads
+  // "Hide value" once the headers are on screen.
+  const revealLabel = revealed ? t('profiles.secrets.hide') : t('profiles.secrets.reveal');
 
   return (
     <>
@@ -24,7 +27,7 @@ export function BackendHeadersField({
           label={t('profiles.mcp.headers')}
           defaultValue={value.current}
           multiline
-          className="min-h-28 leading-5"
+          className="min-h-28 leading-[1.25rem]"
           autoCapitalize="none"
           autoCorrect={false}
           disabled={busy}
@@ -47,8 +50,8 @@ export function BackendHeadersField({
       <Pressable
         className="min-h-11 flex-row items-center gap-2 self-start px-1 active:opacity-70"
         accessibilityRole="button"
-        accessibilityLabel={t('profiles.secrets.reveal')}
-        accessibilityState={{ selected: revealed, disabled: busy }}
+        accessibilityLabel={revealLabel}
+        accessibilityState={{ disabled: busy }}
         disabled={busy}
         onPress={() => {
           setRevealed(current => !current);
@@ -59,7 +62,7 @@ export function BackendHeadersField({
         ) : (
           <Eye size={18} color={colors.mutedForeground} />
         )}
-        <Text className="text-sm text-muted-foreground">{t('profiles.secrets.reveal')}</Text>
+        <Text className="text-sm text-muted-foreground">{revealLabel}</Text>
       </Pressable>
     </>
   );

@@ -1,7 +1,7 @@
 import type { CloudAgentChildSessionLineage } from '@kilocode/session-ingest-contracts';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import type { DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
-import { events } from '../../db/sqlite-schema.js';
+import { events } from './sqlite-schema.js';
 import { childSessionLineage } from '../../sandbox-session/control-plane-ingest.js';
 
 /**

@@ -146,6 +146,8 @@ type ApplyMetadataDbOptions = {
   parentCloudAgentScopeId?: string;
   parentWorktreeId?: string;
   initialStatus?: string | null;
+  initialStatusUpdatedAt?: string | null;
+  initialStatusTransitionId?: string | null;
   rowMissing?: boolean;
   cloudAgentSessionScopeId?: string | null;
   cloudAgentSessionId?: string | null;
@@ -191,10 +193,13 @@ function createApplyMetadataDb(options: ApplyMetadataDbOptions = {}) {
     return {
       title: options.initialTitle ?? null,
       status: options.initialStatus ?? 'idle',
+      statusUpdatedAt: options.initialStatusUpdatedAt ?? null,
+      statusTransitionId: options.initialStatusTransitionId ?? null,
       parentSessionId: options.parentSessionId ?? null,
       cloudAgentSessionScopeId: options.cloudAgentSessionScopeId ?? null,
       cloudAgentSessionId: options.cloudAgentSessionId ?? null,
       gitUrl: options.initialGitUrl ?? null,
+      organizationId: options.initialOrganizationId ?? null,
     };
   }
 
@@ -611,6 +616,298 @@ describe('applyMetadataChanges', () => {
       remove: cacheRemove,
     } as never);
     vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+  });
+  it('projects blocker clearing at source time without inventing history from the projection', async () => {
+    const db = createApplyMetadataDb({ initialStatus: 'question' });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    await applyMetadataChanges(
+      env,
+      'usr_1',
+      'ses_1',
+      new Map([
+        ['status', 'busy'],
+        ['statusOccurredAt', '2026-07-24T23:00:00.000Z'],
+      ])
+    );
+    expect(db.updateSets[0]).toMatchObject({
+      status: 'busy',
+      status_updated_at: '2026-07-24T23:00:00.000Z',
+    });
+  });
+  it('preserves a pre-cutoff originating status even when projection happens after cutoff', async () => {
+    const db = createApplyMetadataDb({ initialStatus: 'busy' });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    const occurredAt = '2026-07-24T07:59:00.000Z';
+    await applyMetadataChanges(
+      env,
+      'usr_1',
+      'ses_1',
+      new Map([
+        ['status', 'question'],
+        ['statusOccurredAt', occurredAt],
+      ])
+    );
+    expect(db.updateSets[0]).toMatchObject({ status_updated_at: occurredAt });
+  });
+
+  it('does not invent historical blocker onset for an untimestamped legacy status', async () => {
+    const db = createApplyMetadataDb({ initialStatus: 'busy' });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    await applyMetadataChanges(env, 'usr_1', 'ses_1', new Map([['status', 'question']]));
+    expect(db.updateSets[0]).toMatchObject({ status: 'question' });
+  });
+  it('does not regress newer SQL status for a delayed historical transition', async () => {
+    const db = createApplyMetadataDb({
+      initialStatus: 'idle',
+      initialStatusUpdatedAt: '2026-07-24T08:05:00.000Z',
+    });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    await applyMetadataChanges(
+      env,
+      'usr_1',
+      'ses_1',
+      new Map([
+        ['status', 'question'],
+        ['statusOccurredAt', '2026-07-24T07:59:00.000Z'],
+      ])
+    );
+    expect(db.updateSets).toEqual([]);
+    expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+  });
+  it('does not rewrite a same-state snapshot from an older source timestamp', async () => {
+    const db = createApplyMetadataDb({
+      initialStatus: 'question',
+      initialStatusUpdatedAt: '2026-07-24T08:01:00.000Z',
+    });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    const occurredAt = '2026-07-24T07:59:00.000Z';
+    await applyMetadataChanges(
+      env,
+      'usr_1',
+      'ses_1',
+      new Map([
+        ['status', 'question'],
+        ['statusOccurredAt', occurredAt],
+      ])
+    );
+    expect(db.updateSets).toEqual([]);
+    expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+  });
+  it('does not reverse SQL projection for a delayed equal-millisecond older transition id', async () => {
+    const occurredAt = '2026-07-24T07:59:00.000Z';
+    const db = createApplyMetadataDb({
+      initialStatus: 'busy',
+      initialStatusUpdatedAt: occurredAt,
+      initialStatusTransitionId: '01ARZ3NDEKTSV4RRFFQ69G5FAW',
+    });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    await applyMetadataChanges(
+      env,
+      'usr_1',
+      'ses_1',
+      new Map([
+        ['status', 'question'],
+        ['statusOccurredAt', occurredAt],
+        ['statusTransitionId', '01ARZ3NDEKTSV4RRFFQ69G5FAV'],
+      ])
+    );
+    expect(db.updateSets).toEqual([]);
+    expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+  });
+
+  it('persists newer same-millisecond transition identity and clears it on legacy writes', async () => {
+    const occurredAt = '2026-07-24T07:59:00.000Z';
+    const db = createApplyMetadataDb({
+      initialStatus: 'question',
+      initialStatusUpdatedAt: occurredAt,
+      initialStatusTransitionId: '01ARZ3NDEKTSV4RRFFQ69G5FAV',
+    });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    await applyMetadataChanges(
+      env,
+      'usr_1',
+      'ses_1',
+      new Map([
+        ['status', 'busy'],
+        ['statusOccurredAt', occurredAt],
+        ['statusTransitionId', '01ARZ3NDEKTSV4RRFFQ69G5FAW'],
+      ])
+    );
+    expect(db.updateSets[0]).toMatchObject({
+      status: 'busy',
+      status_updated_at: occurredAt,
+      status_transition_id: '01ARZ3NDEKTSV4RRFFQ69G5FAW',
+    });
+    expect(computeSessionMetadataUpdates(new Map([['status', 'idle']]))).toMatchObject({
+      status_transition_id: null,
+    });
+  });
+  describe('producer ordering across a CLI-disconnect reset', () => {
+    const questionAt = '2026-07-24T08:00:00.000Z';
+    const delayedAt = '2026-07-24T08:05:00.000Z';
+    const resetAt = '2026-07-24T08:10:00.000Z';
+    const questionId = '01ARZ3NDEKTSV4RRFFQ69G5FAV';
+
+    async function resetProducerQuestion() {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date(resetAt));
+      try {
+        const resetDb = createTransactionDb({
+          initialStatus: 'question',
+          initialStatusUpdatedAt: questionAt,
+        });
+        vi.mocked(getWorkerDb).mockReturnValue(resetDb as never);
+        await resetAttentionStatusOnCliDisconnect(env, 'usr_1', 'ses_1');
+        expect(resetDb.updateSet).toHaveBeenCalledWith({
+          status: CLI_DISCONNECT_ATTENTION_RESET_STATUS,
+          status_updated_at: resetAt,
+        });
+      } finally {
+        vi.useRealTimers();
+      }
+      vi.mocked(notifyUserSessionEvent).mockReset();
+      const db = createApplyMetadataDb({
+        initialStatus: CLI_DISCONNECT_ATTENTION_RESET_STATUS,
+        initialStatusUpdatedAt: resetAt,
+        initialStatusTransitionId: questionId,
+      });
+      vi.mocked(getWorkerDb).mockReturnValue(db as never);
+      return db;
+    }
+
+    it('applies a delayed newer producer transition whose source time precedes the reset', async () => {
+      const db = await resetProducerQuestion();
+      await applyMetadataChanges(
+        env,
+        'usr_1',
+        'ses_1',
+        new Map([
+          ['status', 'idle'],
+          ['statusOccurredAt', delayedAt],
+          ['statusTransitionId', '01ARZ3NDEKTSV4RRFFQ69G5FAW'],
+        ])
+      );
+      expect(db.updateSets[0]).toMatchObject({
+        status: 'idle',
+        status_updated_at: delayedAt,
+        status_transition_id: '01ARZ3NDEKTSV4RRFFQ69G5FAW',
+      });
+      expect(notifyUserSessionEvent).toHaveBeenCalledWith(
+        env,
+        'usr_1',
+        expect.objectContaining({
+          type: 'session.status.updated',
+          data: expect.objectContaining({
+            previousStatus: CLI_DISCONNECT_ATTENTION_RESET_STATUS,
+            status: 'idle',
+          }),
+        }),
+        undefined
+      );
+    });
+
+    it.each([
+      ['an older producer transition', '01ARZ3NDEKTSV4RRFFQ69G5FAT'],
+      ['a replay of the reset producer transition', questionId],
+    ])('still rejects %s after the reset', async (_label, transitionId) => {
+      const db = await resetProducerQuestion();
+      await applyMetadataChanges(
+        env,
+        'usr_1',
+        'ses_1',
+        new Map([
+          ['status', 'question'],
+          ['statusOccurredAt', '2026-07-24T08:20:00.000Z'],
+          ['statusTransitionId', transitionId],
+        ])
+      );
+      expect(db.updateSets).toEqual([]);
+      expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+    });
+
+    it('keeps source-time ordering for a cursorless legacy projection', async () => {
+      const stale = createApplyMetadataDb({
+        initialStatus: CLI_DISCONNECT_ATTENTION_RESET_STATUS,
+        initialStatusUpdatedAt: resetAt,
+      });
+      vi.mocked(getWorkerDb).mockReturnValue(stale as never);
+      await applyMetadataChanges(
+        env,
+        'usr_1',
+        'ses_1',
+        new Map([
+          ['status', 'idle'],
+          ['statusOccurredAt', delayedAt],
+          ['statusTransitionId', '01ARZ3NDEKTSV4RRFFQ69G5FAW'],
+        ])
+      );
+      expect(stale.updateSets).toEqual([]);
+
+      const fresh = createApplyMetadataDb({
+        initialStatus: CLI_DISCONNECT_ATTENTION_RESET_STATUS,
+        initialStatusUpdatedAt: resetAt,
+      });
+      vi.mocked(getWorkerDb).mockReturnValue(fresh as never);
+      await applyMetadataChanges(
+        env,
+        'usr_1',
+        'ses_1',
+        new Map([
+          ['status', 'idle'],
+          ['statusOccurredAt', '2026-07-24T08:15:00.000Z'],
+          ['statusTransitionId', '01ARZ3NDEKTSV4RRFFQ69G5FAW'],
+        ])
+      );
+      expect(fresh.updateSets[0]).toMatchObject({
+        status: 'idle',
+        status_updated_at: '2026-07-24T08:15:00.000Z',
+        status_transition_id: '01ARZ3NDEKTSV4RRFFQ69G5FAW',
+      });
+    });
+  });
+
+  it('clears the old-context excerpt atomically when moving into an authorized organization', async () => {
+    const db = createApplyMetadataDb({ membershipRows: 1 });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    const before = Date.now();
+    await applyMetadataChanges(env, 'usr_1', 'ses_1', new Map([['orgId', 'org_owned']]));
+    expect(db.updateSets).toEqual([
+      expect.objectContaining({
+        organization_id: 'org_owned',
+        briefing_excerpt: null,
+        briefing_excerpt_scope_changed_at: expect.any(String),
+      }),
+    ]);
+    const update = db.updateSets[0] as { briefing_excerpt_scope_changed_at: string };
+    expect(Date.parse(update.briefing_excerpt_scope_changed_at)).toBeGreaterThanOrEqual(before);
+    expect(db.transaction).toHaveBeenCalledTimes(1);
+  });
+
+  it('clears the organization excerpt before moving the session into personal scope', async () => {
+    const db = createApplyMetadataDb({ initialOrganizationId: 'org_owned' });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    await applyMetadataChanges(env, 'usr_1', 'ses_1', new Map([['orgId', null]]));
+    expect(db.updateSets).toEqual([
+      expect.objectContaining({
+        organization_id: null,
+        briefing_excerpt: null,
+        briefing_excerpt_scope_changed_at: expect.any(String),
+      }),
+    ]);
+  });
+
+  it('retains the excerpt when an organization claim is refused', async () => {
+    const db = createApplyMetadataDb({ membershipRows: 0 });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    await applyMetadataChanges(env, 'usr_1', 'ses_1', new Map([['orgId', 'org_foreign']]));
+    expect(db.updateSets).toEqual([]);
+  });
+
+  it('does not reset excerpt ordering for an unchanged organization', async () => {
+    const db = createApplyMetadataDb({ membershipRows: 1, initialOrganizationId: 'org_owned' });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    await applyMetadataChanges(env, 'usr_1', 'ses_1', new Map([['orgId', 'org_owned']]));
+    expect(db.updateSets).toEqual([{ organization_id: 'org_owned' }]);
   });
 
   it.each([
@@ -1142,6 +1439,7 @@ describe('applyMetadataChanges', () => {
         git_branch: 'feature/provenance',
         status: 'busy',
         status_updated_at: expect.any(String),
+        status_transition_id: null,
       },
     ]);
     expect(notifyUserSessionEvent).toHaveBeenCalledWith(

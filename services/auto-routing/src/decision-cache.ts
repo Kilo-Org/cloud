@@ -189,21 +189,28 @@ export class AutoRoutingDecisionCacheDO extends DurableObject<Env> {
 
 type DecisionCacheEnv = Pick<Env, 'AUTO_ROUTING_DECISION_CACHE'>;
 
-function cacheStub(env: DecisionCacheEnv, conversationKey: string, router: AutoRouter) {
-  const namespace = env.AUTO_ROUTING_DECISION_CACHE;
-  return namespace.get(namespace.idFromName(`${router}:${conversationKey}`));
+// A platform router name, or the custom router scope from customRouterDecisionScope.
+export type DecisionScope = AutoRouter | `custom:${string}`;
+
+export function customRouterDecisionScope(routerId: string): DecisionScope {
+  return `custom:${routerId}`;
 }
 
-function entryKey(contentHash: string, classifierModel: string, router: AutoRouter): string {
-  return `${router}:${classifierModel}:${contentHash}`;
+function cacheStub(env: DecisionCacheEnv, conversationKey: string, scope: DecisionScope) {
+  const namespace = env.AUTO_ROUTING_DECISION_CACHE;
+  return namespace.get(namespace.idFromName(`${scope}:${conversationKey}`));
+}
+
+function entryKey(contentHash: string, classifierModel: string, scope: DecisionScope): string {
+  return `${scope}:${classifierModel}:${contentHash}`;
 }
 
 export function getHotCachedClassification(
   exactHash: string,
   classifierModel: string,
-  router: AutoRouter = DEFAULT_AUTO_ROUTER
+  scope: DecisionScope = DEFAULT_AUTO_ROUTER
 ): ClassifierOutput | null {
-  const key = entryKey(exactHash, classifierModel, router);
+  const key = entryKey(exactHash, classifierModel, scope);
   const entry = classificationHotCache.get(key);
   if (!entry) return null;
   if (Date.now() - entry.storedAt > ENTRY_TTL_MS) {
@@ -233,12 +240,12 @@ export async function readConversationState(
   conversationKey: string,
   exactHash: string,
   classifierModel: string,
-  router: AutoRouter = DEFAULT_AUTO_ROUTER
+  scope: DecisionScope = DEFAULT_AUTO_ROUTER
 ): Promise<ConversationState> {
   try {
-    const key = entryKey(exactHash, classifierModel, router);
-    const state = await cacheStub(env, conversationKey, router).readConversationState(key);
-    let classification = getHotCachedClassification(exactHash, classifierModel, router);
+    const key = entryKey(exactHash, classifierModel, scope);
+    const state = await cacheStub(env, conversationKey, scope).readConversationState(key);
+    let classification = getHotCachedClassification(exactHash, classifierModel, scope);
     if (!classification) {
       const parsed = ClassifierOutputSchema.safeParse(state.classification?.value);
       if (parsed.success && state.classification) {
@@ -263,10 +270,10 @@ export async function putStickyDecision(
   variant: string | null,
   routeKey: string,
   generation: number,
-  router: AutoRouter = DEFAULT_AUTO_ROUTER
+  scope: DecisionScope = DEFAULT_AUTO_ROUTER
 ): Promise<void> {
   try {
-    await cacheStub(env, conversationKey, router).putStickyDecision(
+    await cacheStub(env, conversationKey, scope).putStickyDecision(
       { model, variant, routeKey } satisfies StickyDecision,
       generation
     );
@@ -281,12 +288,12 @@ export async function putCachedClassification(
   contentHash: string,
   classifierModel: string,
   classification: ClassifierOutput,
-  router: AutoRouter = DEFAULT_AUTO_ROUTER
+  scope: DecisionScope = DEFAULT_AUTO_ROUTER
 ): Promise<void> {
   try {
-    const key = entryKey(contentHash, classifierModel, router);
+    const key = entryKey(contentHash, classifierModel, scope);
     const storedAt = Date.now();
-    await cacheStub(env, conversationKey, router).putEntry(key, classification);
+    await cacheStub(env, conversationKey, scope).putEntry(key, classification);
     cacheClassification(key, classification, storedAt);
   } catch {
     // Cache writes are best effort and must not fail the decision.

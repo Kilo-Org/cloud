@@ -6,8 +6,10 @@ import {
   cli_sessions_v2,
   cloud_agent_session_runs,
   cloud_agent_sessions,
+  organization_memberships,
+  organizations,
 } from '@kilocode/db/schema';
-import { eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import type { User } from '@kilocode/db/schema';
 import { CLOUD_AGENT_CONNECTION_ID, resolveActiveSessionStatus } from './active-sessions-router';
 import { resolveCloudCandidateStatus } from '@/lib/active-sessions-list';
@@ -273,6 +275,83 @@ describe('active-sessions-router.list cloud merge', () => {
     expect(result.sessions).toEqual([]);
   });
 
+  it('flag on + busy turn with no run row + fresh activity → included', async () => {
+    // A session between message turns — or one whose current turn wrote no run
+    // row — keeps a non-idle status with no open run, so neither the open-run
+    // nor the warm-idle proof applies while the agent is demonstrably working.
+    // Recorded session activity is the only proof of life; without it the tray
+    // dropped the row until the session went idle, which made it appear only
+    // "temporarily when finished".
+    const sessionId = nextId('busy-activity');
+    const casId = nextId('cas');
+    await seedCloudSession({
+      sessionId,
+      cloudAgentSessionId: casId,
+      kiloUserId: regularUser.id,
+      status: 'busy',
+      statusUpdatedAt: minutesAgoIso(30),
+      lastActivityAt: minutesAgoIso(1),
+      title: 'Working without a run row',
+      run: null,
+    });
+
+    fetchSpy = mockWorkerSessions([]);
+    const caller = await createCallerForUser(regularUser.id);
+    const result = await caller.activeSessions.list({ includeCloudAgentSessions: true });
+
+    expect(result.sessions.map(s => s.id)).toEqual([sessionId]);
+    expect(result.sessions[0]).toMatchObject({
+      status: 'busy',
+      connectionId: CLOUD_AGENT_CONNECTION_ID,
+      title: 'Working without a run row',
+    });
+  });
+
+  it('flag on + attention status with no run row + fresh activity → included as attention', async () => {
+    // A session waiting on the user is the one case the tray must never hide:
+    // the fleet badge and the needs-input notification read this set.
+    const sessionId = nextId('question-activity');
+    const casId = nextId('cas');
+    await seedCloudSession({
+      sessionId,
+      cloudAgentSessionId: casId,
+      kiloUserId: regularUser.id,
+      status: 'question',
+      statusUpdatedAt: minutesAgoIso(20),
+      lastActivityAt: minutesAgoIso(2),
+      run: null,
+    });
+
+    fetchSpy = mockWorkerSessions([]);
+    const caller = await createCallerForUser(regularUser.id);
+    const result = await caller.activeSessions.list({ includeCloudAgentSessions: true });
+
+    expect(result.sessions.map(s => s.id)).toEqual([sessionId]);
+    expect(result.sessions[0]?.status).toBe('question');
+  });
+
+  it('flag on + busy status with no run row + stale activity → excluded', async () => {
+    // The recency window keeps abandoned `busy` rows (a runner that died
+    // without writing a terminal run) out of the tray.
+    const sessionId = nextId('stale-busy');
+    const casId = nextId('cas');
+    await seedCloudSession({
+      sessionId,
+      cloudAgentSessionId: casId,
+      kiloUserId: regularUser.id,
+      status: 'busy',
+      statusUpdatedAt: minutesAgoIso(40),
+      lastActivityAt: minutesAgoIso(30),
+      run: null,
+    });
+
+    fetchSpy = mockWorkerSessions([]);
+    const caller = await createCallerForUser(regularUser.id);
+    const result = await caller.activeSessions.list({ includeCloudAgentSessions: true });
+
+    expect(result.sessions).toEqual([]);
+  });
+
   it('excludes child cloud rows (parent_session_id set)', async () => {
     const parentId = nextId('parent');
     const parentCas = nextId('cas-p');
@@ -383,6 +462,73 @@ describe('active-sessions-router.list cloud merge', () => {
 
     const unfiltered = await caller.activeSessions.list({ includeCloudAgentSessions: true });
     expect(unfiltered.sessions.map(s => s.id).sort()).toEqual([personalId, orgId].sort());
+  });
+
+  it('unfiltered list keeps only cloud rows of organizations the caller can still access', async () => {
+    const kept = await createTestOrganization(`Cloud Access Kept ${PREFIX}`, regularUser.id, 0);
+    const removed = await createTestOrganization(
+      `Cloud Access Removed ${PREFIX}`,
+      regularUser.id,
+      0
+    );
+    const deleted = await createTestOrganization(
+      `Cloud Access Deleted ${PREFIX}`,
+      regularUser.id,
+      0
+    );
+
+    await db
+      .delete(organization_memberships)
+      .where(
+        and(
+          eq(organization_memberships.organization_id, removed.id),
+          eq(organization_memberships.kilo_user_id, regularUser.id)
+        )
+      );
+    await db
+      .update(organizations)
+      .set({ deleted_at: new Date().toISOString() })
+      .where(eq(organizations.id, deleted.id));
+
+    const keptId = nextId('access-kept');
+    const removedId = nextId('access-removed');
+    const deletedId = nextId('access-deleted');
+    for (const [sessionId, organizationId] of [
+      [keptId, kept.id],
+      [removedId, removed.id],
+      [deletedId, deleted.id],
+    ] as const) {
+      await seedCloudSession({
+        sessionId,
+        cloudAgentSessionId: nextId('cas'),
+        kiloUserId: regularUser.id,
+        organizationId,
+        status: 'busy',
+        createdAt: minutesAgoIso(3),
+        run: { terminalAt: null },
+      });
+    }
+
+    try {
+      fetchSpy = mockWorkerSessions([]);
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.activeSessions.list({ includeCloudAgentSessions: true });
+
+      expect(result.sessions.map(session => session.id)).toEqual([keptId]);
+    } finally {
+      await db
+        .update(organizations)
+        .set({ deleted_at: null })
+        .where(eq(organizations.id, deleted.id));
+      await db
+        .delete(organization_memberships)
+        .where(
+          inArray(organization_memberships.organization_id, [kept.id, removed.id, deleted.id])
+        );
+      await db
+        .delete(organizations)
+        .where(inArray(organizations.id, [kept.id, removed.id, deleted.id]));
+    }
   });
 
   it('NULL-org cloud row always emits organizationId: null', async () => {
@@ -552,7 +698,9 @@ describe('active-sessions-router.list cloud merge', () => {
     expect(result.sessions[0]?.status).toBe('question');
   });
 
-  it('worker fetch failure + flag on → cloud rows still returned', async () => {
+  it('worker fetch failure + flag on → a user with live rows still gets them', async () => {
+    // The merged answer is what decides: with a live cloud row the read is
+    // complete enough to return, so the tray keeps the row the DB can prove.
     const sessionId = nextId('worker-fail');
     const casId = nextId('cas');
     await seedCloudSession({
@@ -565,9 +713,28 @@ describe('active-sessions-router.list cloud merge', () => {
 
     fetchSpy = mockWorkerFailure();
     const caller = await createCallerForUser(regularUser.id);
-    const result = await caller.activeSessions.list({ includeCloudAgentSessions: true });
 
+    const result = await caller.activeSessions.list({ includeCloudAgentSessions: true });
     expect(result.sessions.map(s => s.id)).toEqual([sessionId]);
+  });
+
+  it('worker fetch failure + flag on → nothing provable reads as a retryable failure', async () => {
+    // An unreadable worker answers "no live rows", which the wire cannot tell
+    // from a user with nothing running and the app would report a live CLI
+    // session as gone across a worker restart. Fail the answer instead.
+    fetchSpy = mockWorkerFailure();
+    const caller = await createCallerForUser(regularUser.id);
+
+    await expect(
+      caller.activeSessions.list({ includeCloudAgentSessions: true })
+    ).rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE' });
+  });
+
+  it('worker fetch failure without the cloud flag keeps the legacy empty answer', async () => {
+    fetchSpy = mockWorkerFailure();
+    const caller = await createCallerForUser(regularUser.id);
+
+    await expect(caller.activeSessions.list({})).resolves.toEqual({ sessions: [] });
   });
 
   it('flag on + no heartbeat ids → cloud-only response (no empty inArray)', async () => {

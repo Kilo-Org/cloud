@@ -1,6 +1,5 @@
 import type { EventQueries } from '../session/queries/index.js';
 import { materializePreparationEvent } from '../session/preparation-history.js';
-import type { EventId } from '../types/ids.js';
 import type { StoredEvent } from '../websocket/types.js';
 
 export function applyControlPlanePreparingEvent(params: {
@@ -15,7 +14,7 @@ export function applyControlPlanePreparingEvent(params: {
       ? record.timestamp
       : Date.now();
   const stored: StoredEvent = {
-    id: 0 as EventId,
+    id: 0,
     execution_id: '',
     session_id: params.sessionId,
     stream_event_type: 'preparing',

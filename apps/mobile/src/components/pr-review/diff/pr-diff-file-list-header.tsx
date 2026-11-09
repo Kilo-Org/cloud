@@ -1,7 +1,8 @@
 // Compact header row for the PR Files tab. Shown above the FlashList
 // with two responsibilities:
-//   1. Navigator entry: "Files · n of m viewed" pressable that opens
-//      the file-navigator sheet route. Always visible.
+//   1. Navigator entry: "n of m viewed" pressable that opens the
+//      file-navigator sheet route. Always visible. The count carries no
+//      "Files" prefix because the Files label sits directly above it.
 //   2. Tablet layout toggle: unified vs side-by-side. Only on tablets
 //      (the `useIsTablet` hook gates it). The selection is local
 //      component state — not persisted across mounts.
@@ -85,12 +86,13 @@ export function PrDiffFileListHeader({
           onPress={handleOpenNavigator}
           accessibilityRole="button"
           accessibilityLabel={t('prReview.fileList.openNavigator')}
+          testID="pr-files-summary"
           className="min-h-9 flex-row items-center gap-1.5 rounded-md px-2 active:opacity-70"
           hitSlop={6}
         >
           <Rows3 size={14} color={colors.mutedForeground} />
           <Text className="text-xs font-medium text-foreground">
-            {t('prReview.fileList.filesViewed', {
+            {t('prReview.fileNavigator.viewedCount', {
               viewed: formatNumber(viewedCount, i18n.language),
               total: formatNumber(totalListed, i18n.language),
             })}

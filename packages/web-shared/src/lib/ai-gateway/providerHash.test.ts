@@ -79,6 +79,30 @@ describe('session tracking identifiers', () => {
     expect(trackedSession).toBeUndefined();
   });
 
+  it.each(requests)('uses the shared session hash for Vercel $kind tracking', request => {
+    const trackedRequest = structuredClone(request);
+    applyTrackingIds(trackedRequest, VERCEL_AI_GATEWAY, userId, sessionId);
+
+    const trackedSession =
+      trackedRequest.kind === 'messages'
+        ? trackedRequest.body.session_id
+        : trackedRequest.body.prompt_cache_key;
+    expect(trackedSession).toBe(
+      generateProviderSpecificSessionHash(userId, sessionId, VERCEL_AI_GATEWAY)
+    );
+  });
+
+  it('sets the Vercel user hash on Vercel messages requests', () => {
+    const request: GatewayRequest = {
+      kind: 'messages',
+      body: { model: 'test-model', messages: [], max_tokens: 100 },
+    };
+    applyTrackingIds(request, VERCEL_AI_GATEWAY, userId, null);
+
+    expect(request.body).toHaveProperty('user', generateVercelDownstreamSafetyIdentifier(userId));
+    expect(request.body).not.toHaveProperty('session_id');
+  });
+
   const promptCacheKeyRequests = (promptCacheKey: string): GatewayRequest[] => [
     {
       kind: 'chat_completions',

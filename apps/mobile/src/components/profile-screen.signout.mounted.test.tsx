@@ -1,6 +1,6 @@
-import { createElement } from 'react';
+import { createElement, useEffect } from 'react';
 import { act, type TestRenderer } from '@/test/renderer';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
 import { ProfileScreen } from '@/components/profile-screen';
@@ -14,6 +14,8 @@ const platform = vi.hoisted(() => ({ os: 'android' as 'android' | 'ios' }));
 const insets = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
 
 vi.mock('react-native', () => ({
+  // Sheet registers the app-level Android Back listener while it is visible.
+  BackHandler: { addEventListener: vi.fn(() => ({ remove: () => undefined })) },
   Alert: { alert: alertFn },
   Modal: 'Modal',
   Platform: {
@@ -47,11 +49,19 @@ vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => insets,
 }));
 
-vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn() }) }));
+vi.mock('expo-router', () => ({
+  useRouter: () => ({ push: vi.fn() }),
+  // The account picker closes itself on the owning screen's focus loss; this
+  // suite keeps the screen focused, so the effect lives as long as the tree.
+  useFocusEffect: (effect: Parameters<typeof useEffect>[0]) => {
+    useEffect(effect, [effect]);
+  },
+}));
 vi.mock('expo-application', () => ({
   nativeApplicationVersion: '1.0.0',
   nativeBuildVersion: '1',
 }));
+vi.mock('@/lib/config', () => ({ SESSION_SYNC_URL: undefined }));
 
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
@@ -90,6 +100,12 @@ vi.mock('@/lib/hooks/use-current-user-id', () => ({
   useCurrentUserId: () => ({ userId: 'user-1' }),
 }));
 
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  getCommittedConnectivityStatus: () => 'online',
+  useCommittedConnectivityStatus: () => 'online',
+  useOfflineBannerState: () => false,
+}));
+
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ destructive: '#B0483A', mutedForeground: '#000000' }),
 }));
@@ -103,9 +119,7 @@ vi.mock('@/lib/auth/push-registration-reconciliation', () => ({
   attemptPushRegistrationReconciliation: vi.fn(),
 }));
 
-// The queries the actions section does not depend on stay deferred, so the
-// sign-out tile is exercised without their interaction-manager flush.
-vi.mock('@/lib/hooks/use-after-interactions', () => ({ useAfterInteractions: () => false }));
+vi.mock('@/lib/hooks/use-after-idle', () => ({ useAfterIdle: () => false }));
 
 vi.mock('@/lib/profile-agent-navigation', () => ({
   getCodeReviewerProfilePath: () => '/code-reviewer',
@@ -137,9 +151,11 @@ vi.mock('@/components/ui/icons', () => ({
   Sparkles: 'Sparkles',
   Smartphone: 'Smartphone',
   Trash2: 'Trash2',
+  Users: 'Users',
 }));
 
 vi.mock('@/components/profile-action-tile', () => ({ ActionTile: 'ActionTile' }));
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/profile-credits-card', () => ({ CreditsCard: 'CreditsCard' }));
 vi.mock('@/components/language-picker-sheet', () => ({
   LanguagePickerSheet: 'LanguagePickerSheet',
@@ -161,9 +177,11 @@ function isType(node: TestRenderer.ReactTestInstance, type: string): boolean {
 
 describe('ProfileScreen sign-out confirmation', () => {
   beforeEach(() => {
+    vi.stubGlobal('__DEV__', false);
     signOutFn.mockReset();
     alertFn.mockReset();
   });
+  afterEach(() => vi.unstubAllGlobals());
 
   /**
    * Calls one of a mounted element's own props inside `act`. The test renderer

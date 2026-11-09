@@ -3,9 +3,13 @@ import * as React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, TestRenderer } from '@/test/renderer';
 
+import { getAdmission } from '@/lib/auth/admission';
+import type * as AdmissionTypes from '@/lib/auth/admission';
 import type * as AuthFetchTypes from '@/lib/auth/auth-fetch';
 
 import '@/i18n';
+
+const authMock = vi.hoisted(() => ({ signIn: vi.fn() }));
 
 // Mock @/lib/config to avoid pulling in react-native at module import time.
 vi.mock('@/lib/config', () => ({
@@ -73,7 +77,7 @@ vi.mock('expo-crypto', () => ({
 }));
 
 vi.mock('@/lib/auth/auth-context', () => ({
-  useAuth: vi.fn(() => ({ signIn: vi.fn() })),
+  useAuth: () => ({ signIn: authMock.signIn }),
 }));
 
 vi.mock('@sentry/react-native', () => ({ addBreadcrumb: vi.fn() }));
@@ -81,6 +85,11 @@ vi.mock('@sentry/react-native', () => ({ addBreadcrumb: vi.fn() }));
 vi.mock('@/lib/auth/auth-fetch', async importOriginal => {
   const mod = await importOriginal<typeof AuthFetchTypes>();
   return { ...mod, postAuth: vi.fn() };
+});
+
+vi.mock('@/lib/auth/admission', async importOriginal => {
+  const mod = await importOriginal<typeof AdmissionTypes>();
+  return { ...mod, getAdmission: vi.fn() };
 });
 
 vi.mock('@/lib/login-draft', () => ({
@@ -111,6 +120,7 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 const { IdleAuth } = await import('@/components/login/idle-auth');
 const { postAuth } = await import('@/lib/auth/auth-fetch');
 const mockPostAuth = vi.mocked(postAuth);
+const mockGetAdmission = vi.mocked(getAdmission);
 
 type R = TestRenderer.ReactTestRenderer;
 type I = TestRenderer.ReactTestInstance;
@@ -146,6 +156,12 @@ async function mountIdleAuth(): Promise<R> {
 describe('IdleAuth email sign-in flow (real useNativeAuth)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockGetAdmission.mockResolvedValue({
+      platform: 'ios',
+      kind: 'attestation',
+      challenge: 'server-challenge',
+      payload: 'device-proof',
+    });
   });
 
   afterEach(() => {
@@ -318,6 +334,217 @@ describe('IdleAuth email sign-in flow (real useNativeAuth)', () => {
     });
 
     expect(findAll(renderer.root, 'EmailOtpForm')).toHaveLength(1);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('drops a refusal that settles after the user edited the code', async () => {
+    mockPostAuth.mockResolvedValue({
+      ok: true,
+      data: { success: true, challengeId: 'c0000000-0000-4000-8000-000000000001' },
+    });
+
+    const renderer = await mountIdleAuth();
+
+    const field = findAll(renderer.root, 'FormField')[0];
+    if (!field) {
+      throw new Error('FormField not found');
+    }
+    act(() => {
+      (field.props.onChangeText as (value: string) => void)('late@example.com');
+    });
+
+    await act(async () => {
+      (continueButton(renderer.root).props.onPress as () => void)();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const otpForm = findAll(renderer.root, 'EmailOtpForm')[0];
+    if (!otpForm) {
+      throw new Error('EmailOtpForm not found');
+    }
+
+    // The refusal resolves only after the user has edited the code.
+    const verifyGate = Promise.withResolvers<unknown>();
+    mockPostAuth.mockReturnValue(verifyGate.promise as never);
+
+    await act(async () => {
+      (otpForm.props.onVerify as (code: string) => void)('000000');
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // The user edits the code while the attempt is in flight.
+    act(() => {
+      (otpForm.props.onCodeChange as () => void)();
+    });
+
+    await act(async () => {
+      verifyGate.resolve({
+        ok: false,
+        errorCode: 'INVALID_CODE',
+        ssoOrganizationId: undefined,
+      });
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(findAll(renderer.root, 'EmailOtpForm')[0]?.props.error).toBeUndefined();
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('renders a wrong-code refusal inline on the code step and clears it on edit', async () => {
+    mockPostAuth.mockResolvedValue({
+      ok: true,
+      data: { success: true, challengeId: 'c0000000-0000-4000-8000-000000000001' },
+    });
+
+    const renderer = await mountIdleAuth();
+
+    const field = findAll(renderer.root, 'FormField')[0];
+    if (!field) {
+      throw new Error('FormField not found');
+    }
+    act(() => {
+      (field.props.onChangeText as (value: string) => void)('wrong@example.com');
+    });
+
+    await act(async () => {
+      (continueButton(renderer.root).props.onPress as () => void)();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const otpForm = findAll(renderer.root, 'EmailOtpForm')[0];
+    if (!otpForm) {
+      throw new Error('EmailOtpForm not found');
+    }
+    expect(otpForm.props.error).toBeUndefined();
+
+    mockPostAuth.mockResolvedValue({
+      ok: false,
+      errorCode: 'INVALID_CODE',
+      ssoOrganizationId: undefined,
+    });
+    await act(async () => {
+      (otpForm.props.onVerify as (code: string) => void)('000000');
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(findAll(renderer.root, 'EmailOtpForm')[0]?.props.error).toBe(
+      'That code is incorrect. Please try again.'
+    );
+
+    // Editing the code retires the refusal message.
+    act(() => {
+      (otpForm.props.onCodeChange as () => void)();
+    });
+    expect(findAll(renderer.root, 'EmailOtpForm')[0]?.props.error).toBeUndefined();
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('signs in when the correct code verifies and stays silent on success', async () => {
+    mockPostAuth.mockResolvedValue({
+      ok: true,
+      data: { success: true, challengeId: 'c0000000-0000-4000-8000-000000000001' },
+    });
+
+    const renderer = await mountIdleAuth();
+
+    const field = findAll(renderer.root, 'FormField')[0];
+    if (!field) {
+      throw new Error('FormField not found');
+    }
+    act(() => {
+      (field.props.onChangeText as (value: string) => void)('correct@example.com');
+    });
+
+    await act(async () => {
+      (continueButton(renderer.root).props.onPress as () => void)();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const otpForm = findAll(renderer.root, 'EmailOtpForm')[0];
+    if (!otpForm) {
+      throw new Error('EmailOtpForm not found');
+    }
+
+    mockPostAuth.mockResolvedValue({
+      ok: true,
+      data: { token: 'at', refreshToken: 'rt', expiresIn: 3600 },
+    });
+    await act(async () => {
+      (otpForm.props.onVerify as (code: string) => void)('123456');
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(findAll(renderer.root, 'EmailOtpForm')[0]?.props.error).toBeUndefined();
+    expect(authMock.signIn).toHaveBeenCalledExactlyOnceWith('at', 'rt', 3600);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('keeps admission failures inline on the code step and allows verification to retry', async () => {
+    mockPostAuth.mockResolvedValue({
+      ok: true,
+      data: { success: true, challengeId: 'c0000000-0000-4000-8000-000000000001' },
+    });
+    const renderer = await mountIdleAuth();
+    const field = findAll(renderer.root, 'FormField')[0];
+    if (!field) {
+      throw new Error('FormField not found');
+    }
+    act(() => {
+      (field.props.onChangeText as (value: string) => void)('admission@example.com');
+    });
+    await act(() => {
+      (continueButton(renderer.root).props.onPress as () => void)();
+    });
+    const otpForm = findAll(renderer.root, 'EmailOtpForm')[0];
+    if (!otpForm) {
+      throw new Error('EmailOtpForm not found');
+    }
+
+    mockGetAdmission.mockRejectedValueOnce(new Error('Device proof unavailable'));
+    mockPostAuth.mockClear();
+    await act(() => {
+      (otpForm.props.onVerify as (code: string) => void)('123456');
+    });
+
+    expect(findAll(renderer.root, 'EmailOtpForm')[0]?.props.error).toBe(
+      'We could not verify this device. Check your connection and try again.'
+    );
+    expect(mockPostAuth).not.toHaveBeenCalled();
+    expect(authMock.signIn).not.toHaveBeenCalled();
+
+    mockPostAuth.mockResolvedValue({
+      ok: true,
+      data: { token: 'at', refreshToken: 'rt', expiresIn: 3600 },
+    });
+    await act(() => {
+      (otpForm.props.onVerify as (code: string) => void)('123456');
+    });
+    expect(authMock.signIn).toHaveBeenCalledExactlyOnceWith('at', 'rt', 3600);
 
     act(() => {
       renderer.unmount();

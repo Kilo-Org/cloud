@@ -23,6 +23,10 @@ import {
   OWNED_BY_USER_DELETE_TABLES,
   type OwnedByUserDeleteTable,
 } from '@/lib/user/owned-by-user-batch-delete';
+import {
+  ClaudeProfileDeletionError,
+  deletePersonalClaudeProfile,
+} from '@/lib/claude-billing/delete';
 
 type DrainResult =
   | { kind: 'drained'; progress: UserDeletionTaskProgress | undefined }
@@ -86,6 +90,17 @@ export const handleAnonymize: DeletionHandler = async ({ request, step, context 
 
   const stop = continueIfLowTime(context);
   if (stop) return stop;
+  try {
+    await deletePersonalClaudeProfile(userId);
+  } catch (error) {
+    return {
+      kind:
+        error instanceof ClaudeProfileDeletionError && !error.retryable
+          ? 'needs_attention'
+          : 'retry',
+      errorCode: 'claude_profile_cleanup_failed',
+    };
+  }
 
   let progress = step.progress_json;
   for (const table of OWNED_BY_USER_DELETE_TABLES) {

@@ -40,6 +40,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: deploy-workers-${{ inputs.target_environment }}
@@ -47,9 +48,13 @@ concurrency:
 
 jobs:
   deploy-manual:
-    if: inputs.worker != ''
+    # Guard: this workflow_dispatch is reachable from a fork, and it deploys
+    # Cloudflare Workers using repo secrets. Only the canonical repo may run
+    # it. (Also called as a reusable workflow from deploy-staging.yml, whose
+    # caller job is itself guarded.)
+    if: inputs.worker != '' && github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
-    timeout-minutes: 25
+    timeout-minutes: ${{ inputs.worker == 'services/cloud-agent-next' && 75 || inputs.worker == 'services/auto-routing-benchmark' && inputs.target_environment == 'production' && 60 || 25 }}
     name: Deploy ${{ inputs.worker }}
     environment: ${{ inputs.target_environment }}
     steps:
@@ -67,11 +72,89 @@ jobs:
           node-version-file: '.nvmrc'
           cache: 'pnpm'
 
+      - name: Setup Bun
+        if: inputs.worker == 'services/cloud-agent-next'
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: 1.4.4
+
       - name: Install dependencies
         working-directory: ${{ inputs.worker }}
-        run: pnpm install --frozen-lockfile
+        # Only the Worker's own dependency closure plus the root project: a
+        # recursive workspace install links every unrelated package and runs its
+        # lifecycle scripts in each deploy job. A Worker whose predeploy builds a
+        # nested workspace package (the cloud-agent wrapper) needs that package's
+        # closure as well.
+        run: |
+          filters=(--filter '{.}...' --filter kilocode-monorepo)
+          if [ -f wrapper/package.json ]; then
+            filters+=(--filter '@kilocode/cloud-agent-wrapper...')
+          fi
+          pnpm install --frozen-lockfile "${filters[@]}"
+
+      - name: Prepare downloaded Cloud Agent runtime
+        if: inputs.worker == 'services/cloud-agent-next'
+        id: runtime
+        working-directory: services/cloud-agent-next
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha || github.sha }}
+          TARGET_ENVIRONMENT: ${{ inputs.target_environment }}
+          RUNTIME_R2_ACCOUNT_ID: ${{ vars.CLOUD_AGENT_RUNTIME_ACCOUNT_ID }}
+          RUNTIME_R2_BUCKET: ${{ vars.CLOUD_AGENT_RUNTIME_BUCKET }}
+          RUNTIME_R2_ACCESS_KEY_ID: ${{ secrets.CLOUD_AGENT_RUNTIME_R2_ACCESS_KEY_ID }}
+          RUNTIME_R2_SECRET_ACCESS_KEY: ${{ secrets.CLOUD_AGENT_RUNTIME_R2_SECRET_ACCESS_KEY }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUD_AGENT_RUNTIME_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          # Read-only: lets preparation stop waiting once the SHA's publication has failed.
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          if [ -f scripts/prepare-runtime-deploy.ts ] || [ -f runtime-targets.json ]; then
+            pnpm exec tsx scripts/prepare-runtime-deploy.ts "$TARGET_ENVIRONMENT" "$SOURCE_SHA"
+          fi
+
+      - name: Drain and deploy benchmark
+        if: inputs.worker == 'services/auto-routing-benchmark' && inputs.target_environment == 'production'
+        working-directory: ${{ inputs.worker }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: pnpm run deploy
+
+      - name: Check selected usage queues
+        id: usage_queues
+        if: inputs.worker == 'services/usage-ingest' && (inputs.target_environment == 'staging' || inputs.target_environment == 'production')
+        working-directory: services/usage-ingest
+        env:
+          TARGET_ENVIRONMENT: ${{ inputs.target_environment }}
+        run: |
+          node --input-type=commonjs <<'NODE'
+          const { appendFileSync, existsSync } = require('node:fs');
+          const { unstable_readConfig } = require('wrangler');
+          const environment = process.env.TARGET_ENVIRONMENT;
+          const config = unstable_readConfig({ config: 'wrangler.jsonc', env: environment === 'staging' ? 'staging' : undefined });
+          if (config.services.some(service => service.binding === 'USAGE_WRITER_RELAY')) {
+            throw new Error('Selected usage source requires the retired usage writer relay; use a direct-writer revision or its historical deployment workflow');
+          }
+          const queuesRequired = config.queues.producers.some(p => p.queue?.endsWith('-eu'));
+          appendFileSync(process.env.GITHUB_OUTPUT, `queues_required=${queuesRequired}\n`);
+          const helper = 'scripts/provision-queues.mjs';
+          const supported = existsSync(helper) && (environment === 'staging' || require(`./${helper}`).supportedEnvironments?.includes('production') === true);
+          appendFileSync(process.env.GITHUB_OUTPUT, `prepare_required=${queuesRequired || supported}\n`);
+          NODE
+
+      - name: Prepare usage queues
+        if: steps.usage_queues.outputs.prepare_required == 'true'
+        working-directory: services/usage-ingest
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          TARGET_ENVIRONMENT: ${{ inputs.target_environment }}
+        run: node scripts/provision-queues.mjs "$TARGET_ENVIRONMENT"
 
       - name: Deploy to Cloudflare Workers
+        id: deploy
+        if: inputs.worker != 'services/auto-routing-benchmark' || inputs.target_environment != 'production'
+        # One bounded retry for Cloudflare's flaky upload validation; the matrix
+        # job below carries the evidence. A real failure fails both attempts.
+        continue-on-error: true
         uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65 # v3.14.1
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -80,20 +163,50 @@ jobs:
           # right before deploy; all other workers are unaffected.
           preCommands: |
             if [ "$(jq -r '.scripts.predeploy // empty' package.json)" != "" ]; then pnpm run predeploy; fi
-          command: ${{ inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment) }}
+          command: ${{ steps.runtime.outputs.command || (inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment)) }} ${{ steps.usage_queues.outputs.queues_required == 'true' && '--experimental-provision=false' || '' }}
+
+      - name: Deploy to Cloudflare Workers (retry)
+        if: steps.deploy.outcome == 'failure'
+        uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65 # v3.14.1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          workingDirectory: ${{ inputs.worker }}
+          preCommands: |
+            if [ "$(jq -r '.scripts.predeploy // empty' package.json)" != "" ]; then pnpm run predeploy; fi
+          command: ${{ steps.runtime.outputs.command || (inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment)) }} ${{ steps.usage_queues.outputs.queues_required == 'true' && '--experimental-provision=false' || '' }}
 
   detect-changes:
-    if: inputs.worker == '' && inputs.base_sha != ''
+    # Manual dispatch has no `base_sha` (it is a `workflow_call` input only), so
+    # change detection is reachable only through `workflow_call`.
+    # Guard: privileged workflow. Only the canonical repo may run it.
+    if: inputs.worker == '' && inputs.base_sha != '' && github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 5
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
+      deploy-cloud-agent-after-session-ingest: ${{ steps.set-matrix.outputs.deploy-cloud-agent-after-session-ingest }}
     steps:
       - name: Checkout code
         uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
         with:
           fetch-depth: 0
           ref: ${{ inputs.source_sha || github.sha }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      # scripts/changed-dependencies.mjs parses pnpm-lock.yaml with js-yaml,
+      # so detection needs the root dependencies.
+      - name: Mount pnpm store
+        uses: ./.github/actions/pnpm-store
+
+      - name: Setup Node.js
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Install root dependencies
+        run: pnpm --filter kilocode-monorepo install --frozen-lockfile --ignore-scripts
 
       - name: Find changed workers
         id: set-matrix
@@ -165,13 +278,8 @@ jobs:
 
           # Workers excluded from automatic deployment:
           EXCLUDED=(
-            services/app-builder
-            services/deploy-infra/builder
-            services/deploy-infra/dispatcher
             services/kiloclaw  # Docker-based deploy in deploy-kiloclaw.yml (manual-only)
-            services/gastown   # Deployed separately
-            services/wasteland # Deployed separately
-            services/deploy-infra/builder-docker-container/container-files  # Build artifact template, not a deployable worker
+            services/user-data-export # Automatic deploy suspended
           )
 
           # Discover all workers with a wrangler.jsonc
@@ -196,14 +304,57 @@ jobs:
             fi
           done
 
+          # A worker redeploys when its own files change, or when a workspace
+          # it depends on changes (scripts/affected-workspaces.mjs). A change to
+          # an unrelated shared package must not restart the worker: a rollout
+          # kills in-flight containers. If detection fails, selects everything,
+          # or the worker is not a workspace, use the broad rule.
+          AFFECTED_DIRS=""
+          NARROW=false
+          if affected=$(node scripts/affected-workspaces.mjs "$BASE_SHA") \
+            && [ "$(jq -r '.full' <<< "$affected")" = false ] \
+            && AFFECTED_DIRS=$(jq -r '.dirs[]' <<< "$affected") \
+            && WORKSPACE_DIRS=$(set -o pipefail; pnpm ls -r --depth -1 --json | jq -r --arg root "$(pwd -P)/" '.[].path | ltrimstr($root)'); then
+            NARROW=true
+          else
+            echo "Workspace detection unavailable or selected everything; using the broad rule"
+          fi
+
           CHANGED=()
           for dir in "${DEPLOYABLE[@]}"; do
             if [ "$TARGET_ENVIRONMENT" != "production" ] && ! has_named_environment "$dir/wrangler.jsonc"; then
               echo "Skipping $dir: wrangler.jsonc does not define env.$TARGET_ENVIRONMENT"
-            elif ! git diff --quiet "$BASE_SHA" HEAD -- "$dir/" packages pnpm-lock.yaml pnpm-workspace.yaml patches; then
+            elif ! git diff --quiet "$BASE_SHA" HEAD -- "$dir/"; then
+              CHANGED+=("$dir")
+            elif [ "$NARROW" = true ] && grep -Fxq "$dir" <<< "$WORKSPACE_DIRS"; then
+              if grep -Fxq "$dir" <<< "$AFFECTED_DIRS"; then
+                CHANGED+=("$dir")
+              fi
+            elif ! git diff --quiet "$BASE_SHA" HEAD -- packages pnpm-lock.yaml pnpm-workspace.yaml patches; then
               CHANGED+=("$dir")
             fi
           done
+
+          DEPLOY_CLOUD_AGENT_AFTER_SESSION_INGEST=false
+          if [ "$TARGET_ENVIRONMENT" = production ] && [ "$NARROW" = true ] \
+            && grep -Fxq services/session-ingest <<< "$AFFECTED_DIRS" \
+            && grep -Fxq services/cloud-agent-next <<< "$AFFECTED_DIRS"; then
+            DEPLOY_CLOUD_AGENT_AFTER_SESSION_INGEST=true
+          fi
+          echo "deploy-cloud-agent-after-session-ingest=$DEPLOY_CLOUD_AGENT_AFTER_SESSION_INGEST" >> "$GITHUB_OUTPUT"
+
+          # The ordered deployment path owns both workers: session-ingest runs as its
+          # own job and cloud-agent-next needs that job, so neither may also sit in
+          # the parallel matrix.
+          FILTERED=()
+          for dir in "${CHANGED[@]}"; do
+            if [ "$DEPLOY_CLOUD_AGENT_AFTER_SESSION_INGEST" = true ] \
+              && { [ "$dir" = services/session-ingest ] || [ "$dir" = services/cloud-agent-next ]; }; then
+              continue
+            fi
+            FILTERED+=("$dir")
+          done
+          CHANGED=("${FILTERED[@]}")
 
           if [ ${#CHANGED[@]} -eq 0 ]; then
             echo "matrix=[]" >> "$GITHUB_OUTPUT"
@@ -214,9 +365,9 @@ jobs:
 
   deploy-changed:
     needs: detect-changes
-    if: needs.detect-changes.outputs.matrix != '[]' && needs.detect-changes.outputs.matrix != ''
+    if: needs.detect-changes.outputs.matrix != '[]' && needs.detect-changes.outputs.matrix != '' && github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
-    timeout-minutes: 25
+    timeout-minutes: ${{ matrix.worker == 'services/cloud-agent-next' && 75 || matrix.worker == 'services/auto-routing-benchmark' && inputs.target_environment == 'production' && 60 || 25 }}
     environment: ${{ inputs.target_environment }}
     strategy:
       fail-fast: false
@@ -238,11 +389,93 @@ jobs:
           node-version-file: '.nvmrc'
           cache: 'pnpm'
 
+      - name: Setup Bun
+        if: matrix.worker == 'services/cloud-agent-next'
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: 1.4.4
+
       - name: Install dependencies
         working-directory: ${{ matrix.worker }}
-        run: pnpm install --frozen-lockfile
+        # Only the Worker's own dependency closure plus the root project: a
+        # recursive workspace install links every unrelated package and runs its
+        # lifecycle scripts in each matrix job. A Worker whose predeploy builds a
+        # nested workspace package (the cloud-agent wrapper) needs that package's
+        # closure as well.
+        run: |
+          filters=(--filter '{.}...' --filter kilocode-monorepo)
+          if [ -f wrapper/package.json ]; then
+            filters+=(--filter '@kilocode/cloud-agent-wrapper...')
+          fi
+          pnpm install --frozen-lockfile "${filters[@]}"
+
+      - name: Prepare downloaded Cloud Agent runtime
+        if: matrix.worker == 'services/cloud-agent-next'
+        id: runtime
+        working-directory: services/cloud-agent-next
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha || github.sha }}
+          TARGET_ENVIRONMENT: ${{ inputs.target_environment }}
+          RUNTIME_R2_ACCOUNT_ID: ${{ vars.CLOUD_AGENT_RUNTIME_ACCOUNT_ID }}
+          RUNTIME_R2_BUCKET: ${{ vars.CLOUD_AGENT_RUNTIME_BUCKET }}
+          RUNTIME_R2_ACCESS_KEY_ID: ${{ secrets.CLOUD_AGENT_RUNTIME_R2_ACCESS_KEY_ID }}
+          RUNTIME_R2_SECRET_ACCESS_KEY: ${{ secrets.CLOUD_AGENT_RUNTIME_R2_SECRET_ACCESS_KEY }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUD_AGENT_RUNTIME_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          # Read-only: lets preparation stop waiting once the SHA's publication has failed.
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          if [ -f scripts/prepare-runtime-deploy.ts ] || [ -f runtime-targets.json ]; then
+            pnpm exec tsx scripts/prepare-runtime-deploy.ts "$TARGET_ENVIRONMENT" "$SOURCE_SHA"
+          fi
+
+      - name: Drain and deploy benchmark
+        if: matrix.worker == 'services/auto-routing-benchmark' && inputs.target_environment == 'production'
+        working-directory: ${{ matrix.worker }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: pnpm run deploy
+
+      - name: Check selected usage queues
+        id: usage_queues
+        if: matrix.worker == 'services/usage-ingest' && (inputs.target_environment == 'staging' || inputs.target_environment == 'production')
+        working-directory: services/usage-ingest
+        env:
+          TARGET_ENVIRONMENT: ${{ inputs.target_environment }}
+        run: |
+          node --input-type=commonjs <<'NODE'
+          const { appendFileSync, existsSync } = require('node:fs');
+          const { unstable_readConfig } = require('wrangler');
+          const environment = process.env.TARGET_ENVIRONMENT;
+          const config = unstable_readConfig({ config: 'wrangler.jsonc', env: environment === 'staging' ? 'staging' : undefined });
+          if (config.services.some(service => service.binding === 'USAGE_WRITER_RELAY')) {
+            throw new Error('Selected usage source requires the retired usage writer relay; use a direct-writer revision or its historical deployment workflow');
+          }
+          const queuesRequired = config.queues.producers.some(p => p.queue?.endsWith('-eu'));
+          appendFileSync(process.env.GITHUB_OUTPUT, `queues_required=${queuesRequired}\n`);
+          const helper = 'scripts/provision-queues.mjs';
+          const supported = existsSync(helper) && (environment === 'staging' || require(`./${helper}`).supportedEnvironments?.includes('production') === true);
+          appendFileSync(process.env.GITHUB_OUTPUT, `prepare_required=${queuesRequired || supported}\n`);
+          NODE
+
+      - name: Prepare usage queues
+        if: steps.usage_queues.outputs.prepare_required == 'true'
+        working-directory: services/usage-ingest
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          TARGET_ENVIRONMENT: ${{ inputs.target_environment }}
+        run: node scripts/provision-queues.mjs "$TARGET_ENVIRONMENT"
 
       - name: Deploy to Cloudflare Workers
+        id: deploy
+        if: matrix.worker != 'services/auto-routing-benchmark' || inputs.target_environment != 'production'
+        # Cloudflare's upload validation is flaky for a script that sits close to
+        # its startup budget: a byte-identical cloud-agent-next bundle reported
+        # widely different startup times, and a rejection with "Script startup
+        # exceeded CPU time limit" or "Pipeline binding error" cleared on the next
+        # attempt. The retry below absorbs that noise. A real failure fails both
+        # attempts, so the job still fails.
+        continue-on-error: true
         uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65 # v3.14.1
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -251,4 +484,153 @@ jobs:
           # right before deploy; all other workers are unaffected.
           preCommands: |
             if [ "$(jq -r '.scripts.predeploy // empty' package.json)" != "" ]; then pnpm run predeploy; fi
+          command: ${{ steps.runtime.outputs.command || (inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment)) }} ${{ steps.usage_queues.outputs.queues_required == 'true' && '--experimental-provision=false' || '' }}
+
+      - name: Deploy to Cloudflare Workers (retry)
+        if: steps.deploy.outcome == 'failure'
+        uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65 # v3.14.1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          workingDirectory: ${{ matrix.worker }}
+          preCommands: |
+            if [ "$(jq -r '.scripts.predeploy // empty' package.json)" != "" ]; then pnpm run predeploy; fi
+          command: ${{ steps.runtime.outputs.command || (inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment)) }} ${{ steps.usage_queues.outputs.queues_required == 'true' && '--experimental-provision=false' || '' }}
+
+  deploy-session-ingest:
+    needs: detect-changes
+    # Guard: this reusable workflow can be invoked from a fork, and the job
+    # deploys to the target environment with inherited repo secrets. Only the
+    # canonical repo may run it.
+    if: github.repository == 'Kilo-Org/cloud' && needs.detect-changes.outputs.deploy-cloud-agent-after-session-ingest == 'true'
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 25
+    environment: ${{ inputs.target_environment }}
+    name: Deploy session-ingest before cloud-agent-next
+    steps:
+      - name: Checkout code
+        uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        working-directory: services/session-ingest
+        # Only the Worker's dependency closure plus the root project; a recursive
+        # workspace install links every unrelated package as well.
+        run: |
+          filters=(--filter '{.}...' --filter kilocode-monorepo)
+          if [ -f wrapper/package.json ]; then
+            filters+=(--filter '@kilocode/cloud-agent-wrapper...')
+          fi
+          pnpm install --frozen-lockfile "${filters[@]}"
+
+      - name: Deploy to Cloudflare Workers
+        id: deploy
+        continue-on-error: true
+        uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65 # v3.14.1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          workingDirectory: services/session-ingest
+          preCommands: |
+            if [ "$(jq -r '.scripts.predeploy // empty' package.json)" != "" ]; then pnpm run predeploy; fi
           command: ${{ inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment) }}
+
+      - name: Deploy to Cloudflare Workers (retry)
+        if: steps.deploy.outcome == 'failure'
+        uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65 # v3.14.1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          workingDirectory: services/session-ingest
+          preCommands: |
+            if [ "$(jq -r '.scripts.predeploy // empty' package.json)" != "" ]; then pnpm run predeploy; fi
+          command: ${{ inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment) }}
+
+  deploy-cloud-agent-after-session-ingest:
+    needs: [detect-changes, deploy-session-ingest]
+    # GitHub skips a dependent job when a needed job fails: cloud-agent-next never
+    # deploys after an unsuccessful session-ingest deployment.
+    if: >-
+      github.repository == 'Kilo-Org/cloud' &&
+      needs.detect-changes.outputs.deploy-cloud-agent-after-session-ingest == 'true' &&
+      needs.deploy-session-ingest.result == 'success'
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 75
+    environment: ${{ inputs.target_environment }}
+    name: Deploy cloud-agent-next after session-ingest
+    steps:
+      - name: Checkout code
+        uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: 1.4.4
+
+      - name: Install cloud-agent-next dependencies
+        working-directory: services/cloud-agent-next
+        # The service's closure plus the wrapper package that its predeploy
+        # builds; a recursive workspace install would link every unrelated
+        # package too.
+        run: |
+          filters=(--filter '{.}...' --filter kilocode-monorepo)
+          if [ -f wrapper/package.json ]; then
+            filters+=(--filter '@kilocode/cloud-agent-wrapper...')
+          fi
+          pnpm install --frozen-lockfile "${filters[@]}"
+
+      - name: Prepare downloaded Cloud Agent runtime
+        id: runtime
+        working-directory: services/cloud-agent-next
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha || github.sha }}
+          TARGET_ENVIRONMENT: ${{ inputs.target_environment }}
+          RUNTIME_R2_ACCOUNT_ID: ${{ vars.CLOUD_AGENT_RUNTIME_ACCOUNT_ID }}
+          RUNTIME_R2_BUCKET: ${{ vars.CLOUD_AGENT_RUNTIME_BUCKET }}
+          RUNTIME_R2_ACCESS_KEY_ID: ${{ secrets.CLOUD_AGENT_RUNTIME_R2_ACCESS_KEY_ID }}
+          RUNTIME_R2_SECRET_ACCESS_KEY: ${{ secrets.CLOUD_AGENT_RUNTIME_R2_SECRET_ACCESS_KEY }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUD_AGENT_RUNTIME_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          # Read-only: lets preparation stop waiting once the SHA's publication has failed.
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          if [ -f scripts/prepare-runtime-deploy.ts ] || [ -f runtime-targets.json ]; then
+            pnpm exec tsx scripts/prepare-runtime-deploy.ts "$TARGET_ENVIRONMENT" "$SOURCE_SHA"
+          fi
+
+      - name: Deploy cloud-agent-next
+        id: deploy-cloud-agent
+        continue-on-error: true
+        uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65 # v3.14.1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          workingDirectory: services/cloud-agent-next
+          preCommands: pnpm run predeploy
+          command: ${{ steps.runtime.outputs.command || (inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment)) }}
+
+      - name: Deploy cloud-agent-next (retry)
+        if: steps.deploy-cloud-agent.outcome == 'failure'
+        uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65 # v3.14.1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          workingDirectory: services/cloud-agent-next
+          preCommands: pnpm run predeploy
+          command: ${{ steps.runtime.outputs.command || (inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment)) }}

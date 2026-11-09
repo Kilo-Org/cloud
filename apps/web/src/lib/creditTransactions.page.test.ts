@@ -148,4 +148,59 @@ describe('getCreditTransactionsForOrganizationPage', () => {
     expect(second.entries.some(entry => firstIds.has(entry.id))).toBe(false);
     expect(second.entries).toHaveLength(5);
   });
+
+  test('a cursor without a usable timestamp reads as no cursor', async () => {
+    const user = await insertTestUser();
+    const org = await createTestOrganization('timestamp cursor org', user.id, 0);
+
+    await db.insert(credit_transactions).values(
+      Array.from({ length: 30 }, (_, index) => ({
+        kilo_user_id: user.id,
+        organization_id: org.id,
+        is_free: false,
+        amount_microdollars: 1_000_000,
+        description: `purchase ${index}`,
+      }))
+    );
+
+    const first = await getCreditTransactionsForOrganizationPage(org.id);
+    const firstIds = first.entries.map(entry => entry.id);
+    expect(first.hasMore).toBe(true);
+
+    for (const cursor of [
+      'not-a-timestamp|00000000-0000-4000-8000-000000000000',
+      '2026-02-30 00:00:00+00|00000000-0000-4000-8000-000000000000',
+    ]) {
+      const page = await getCreditTransactionsForOrganizationPage(org.id, cursor);
+
+      expect(page.entries.map(entry => entry.id)).toEqual(firstIds);
+      expect(page.hasMore).toBe(true);
+    }
+  });
+
+  test('a cursor without a usable id reads as no cursor', async () => {
+    const user = await insertTestUser();
+    const org = await createTestOrganization('id cursor org', user.id, 0);
+
+    await db.insert(credit_transactions).values(
+      Array.from({ length: 30 }, (_, index) => ({
+        kilo_user_id: user.id,
+        organization_id: org.id,
+        is_free: false,
+        amount_microdollars: 1_000_000,
+        description: `purchase ${index}`,
+      }))
+    );
+
+    const first = await getCreditTransactionsForOrganizationPage(org.id);
+    expect(first.hasMore).toBe(true);
+    const validCursor = first.nextCursor!;
+    const createdAt = validCursor.slice(0, validCursor.indexOf('|'));
+
+    // The timestamp segment is the one a valid cursor carries; only the id is malformed.
+    const page = await getCreditTransactionsForOrganizationPage(org.id, `${createdAt}|not-a-uuid`);
+
+    expect(page.entries.map(entry => entry.id)).toEqual(first.entries.map(entry => entry.id));
+    expect(page.hasMore).toBe(true);
+  });
 });

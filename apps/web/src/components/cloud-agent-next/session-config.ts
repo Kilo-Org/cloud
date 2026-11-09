@@ -4,6 +4,7 @@
  * Centralized logic for building, validating, and deriving SessionConfig.
  */
 
+import type { SessionConfig as CloudAgentSessionConfig } from '@kilocode/cloud-agent-sdk';
 import type { SessionConfig, ResumeConfig, AgentMode } from './types';
 
 // Re-export AgentMode for backwards compatibility
@@ -191,6 +192,47 @@ export function ensureSelectedCustomOption(
   return [...custom, { value: selected, label: selected, description: '' }];
 }
 
+export type SendSelection = {
+  mode: string;
+  model: string;
+  variant: string | undefined;
+};
+
+/**
+ * Resolve the mode/model/variant a send carries. A runtime agent's model pin
+ * wins because the worker materializes that agent with its own model. Its
+ * variant only applies when it also pins a model, since variants are
+ * model-specific; otherwise the user's session variant applies.
+ */
+export function resolveSendSelection(
+  config:
+    | Pick<CloudAgentSessionConfig, 'mode' | 'model' | 'variant' | 'runtimeAgents'>
+    | null
+    | undefined
+): SendSelection {
+  const selectedAgent = config?.runtimeAgents?.find(agent => agent.slug === config?.mode);
+  const agentModel = selectedAgent?.model?.trim() || undefined;
+  const agentVariant = agentModel ? selectedAgent?.variant?.trim() || undefined : undefined;
+
+  return {
+    mode: normalizeAlias(config?.mode) || 'code',
+    model: agentModel ?? config?.model ?? '',
+    variant: agentModel ? agentVariant : (config?.variant ?? undefined),
+  };
+}
+
+export function filterSessionCustomModeOptions(
+  options: CustomModeOption[],
+  runtimeAgents: CloudAgentSessionConfig['runtimeAgents']
+): CustomModeOption[] {
+  const excludedSlugs = new Set(
+    (runtimeAgents ?? [])
+      .filter(agent => agent.disable || agent.hidden || agent.mode === 'subagent')
+      .map(agent => agent.slug)
+  );
+  return options.filter(option => !excludedSlugs.has(option.value));
+}
+
 /**
  * Get mode and model from various sources with debug info.
  *
@@ -211,7 +253,6 @@ export function getModeModelWithSource(options: {
   let modeSource = 'default';
   let modelSource = 'default';
 
-  // Check dbSession first (lower priority)
   if (dbSession?.last_mode) {
     mode = dbSession.last_mode;
     modeSource = 'dbSession';
@@ -221,7 +262,6 @@ export function getModeModelWithSource(options: {
     modelSource = 'dbSession';
   }
 
-  // Then resumeConfig (higher priority - overwrites)
   if (resumeConfig?.mode) {
     mode = resumeConfig.mode;
     modeSource = 'resumeConfig';

@@ -4,7 +4,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type DestructiveConfirmDialogProps } from '@/components/destructive-confirm-dialog';
 
-import { type SettingsBackGuardResult, useSettingsBackGuard } from './use-settings-back-guard';
+import {
+  type SettingsBackGuardResult,
+  type SettingsBackGuardSaveOutcome,
+  useSettingsBackGuard,
+} from './use-settings-back-guard';
 
 const dispatchMock = vi.hoisted(() => vi.fn());
 const goBackMock = vi.hoisted(() => vi.fn());
@@ -13,14 +17,21 @@ type Action = { type: string };
 
 const usePreventRemoveHolder = vi.hoisted(() => ({
   preventRemove: undefined as boolean | undefined,
-  callback: undefined as ((options: { data: { action: Action } }) => void) | undefined,
+  callback: undefined as
+    | ((options: { data: { action: Action }; repeat: () => void }) => void)
+    | undefined,
 }));
 
 const usePreventRemoveMock = vi.hoisted(() =>
-  vi.fn((preventRemove: boolean, handler: (options: { data: { action: Action } }) => void) => {
-    usePreventRemoveHolder.preventRemove = preventRemove;
-    usePreventRemoveHolder.callback = handler;
-  })
+  vi.fn(
+    (
+      preventRemove: boolean,
+      handler: (options: { data: { action: Action }; repeat: () => void }) => void
+    ) => {
+      usePreventRemoveHolder.preventRemove = preventRemove;
+      usePreventRemoveHolder.callback = handler;
+    }
+  )
 );
 
 // The guard builds its confirmation through the real `useConfirmDialog`, so the
@@ -46,32 +57,21 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('expo-router', () => ({
   useNavigation: () => ({ dispatch: dispatchMock, goBack: goBackMock }),
   useRouter: () => ({}),
-}));
-
-vi.mock('@/lib/navigation/prevent-remove', () => ({
   usePreventRemove: usePreventRemoveMock,
 }));
 
 let latest: SettingsBackGuardResult | undefined = undefined;
 
-function GuardHarness({
-  dirty,
-  valid,
-  onSave,
-}: {
-  dirty: boolean;
-  valid: boolean;
-  onSave: () => Promise<void>;
-}) {
+type Save = () => Promise<SettingsBackGuardSaveOutcome>;
+
+function GuardHarness({ dirty, valid, onSave }: { dirty: boolean; valid: boolean; onSave: Save }) {
   latest = useSettingsBackGuard({ dirty, valid, onSave });
   return null;
 }
 
-async function noOpSave(): Promise<void> {
-  await Promise.resolve();
-}
+const noOpSave: Save = () => Promise.resolve('saved');
 
-function mountGuard(dirty: boolean, valid: boolean, onSave: () => Promise<void>) {
+function mountGuard(dirty: boolean, valid: boolean, onSave: Save) {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   act(() => {
     ref.current = TestRenderer.create(createElement(GuardHarness, { dirty, valid, onSave }));
@@ -85,7 +85,12 @@ function mountGuard(dirty: boolean, valid: boolean, onSave: () => Promise<void>)
 function triggerPreventRemove(): Action {
   const action = { type: 'GO_BACK' };
   act(() => {
-    usePreventRemoveHolder.callback?.({ data: { action } });
+    usePreventRemoveHolder.callback?.({
+      data: { action },
+      repeat: () => {
+        dispatchMock(action);
+      },
+    });
   });
   return action;
 }
@@ -116,7 +121,7 @@ describe('useSettingsBackGuard', () => {
     latest = undefined;
   });
 
-  it('passes `dirty` alone as the preventRemove boolean', () => {
+  it('arms removal prevention only for a dirty screen', () => {
     const clean = mountGuard(false, true, noOpSave);
     expect(usePreventRemoveMock).toHaveBeenCalledTimes(1);
     expect(usePreventRemoveMock.mock.calls[0]?.[0]).toBe(false);
@@ -141,8 +146,60 @@ describe('useSettingsBackGuard', () => {
     expect(dispatchMock).toHaveBeenCalledTimes(1);
     expect(dispatchMock).toHaveBeenCalledWith(action);
     expect(currentDialog()).toBeUndefined();
+    expect(usePreventRemoveHolder.preventRemove).toBe(false);
     // The bypass is one-shot: consumed on the removal it armed.
     expect(result.skipNextGuardRef.current).toBe(false);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('replays the captured action only after the guard has unregistered', () => {
+    const { renderer, result } = mountGuard(true, true, noOpSave);
+    result.skipNextGuardRef.current = true;
+
+    // The navigator drops a re-dispatched action while the route still counts
+    // as prevented, so the replay must observe the guard already switched off.
+    const preventedDuringReplay: (boolean | undefined)[] = [];
+    const action = { type: 'GO_BACK' };
+    act(() => {
+      usePreventRemoveHolder.callback?.({
+        data: { action },
+        repeat: () => {
+          preventedDuringReplay.push(usePreventRemoveHolder.preventRemove);
+          dispatchMock(action);
+        },
+      });
+    });
+
+    expect(preventedDuringReplay).toEqual([false]);
+    expect(dispatchMock).toHaveBeenCalledTimes(1);
+    expect(dispatchMock).toHaveBeenCalledWith(action);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('replays a second confirmed leave after the guard is already open', () => {
+    const { renderer } = mountGuard(true, true, noOpSave);
+    triggerPreventRemove();
+
+    const dialog = currentDialog();
+    expect(dialog?.onConfirm).toBeDefined();
+
+    act(() => {
+      dialog?.onConfirm();
+    });
+    expect(dispatchMock).toHaveBeenCalledTimes(1);
+
+    // A leave that lands after the first replay must not be swallowed while
+    // the screen is still mounted.
+    act(() => {
+      dialog?.onConfirm();
+    });
+    expect(dispatchMock).toHaveBeenCalledTimes(2);
 
     act(() => {
       renderer.unmount();
@@ -173,6 +230,10 @@ describe('useSettingsBackGuard', () => {
 
     triggerPreventRemove();
     const dialog = currentDialog();
+    expect(dialog?.title).toBe('Unsaved changes');
+    expect(dialog?.message).toBe(
+      "These changes can't be saved yet. Fix them to save, or discard them to leave."
+    );
     // Nothing valid to persist, so there is no Save action to offer.
     expect(dialog?.extraAction).toBeUndefined();
     expect(dialog?.cancelLabel).toBe('Keep editing');
@@ -188,9 +249,10 @@ describe('useSettingsBackGuard', () => {
     dispatchMock.mockImplementation(() => {
       order.push('dispatch');
     });
-    const onSave = vi.fn(async () => {
+    const onSave = vi.fn(async (): Promise<SettingsBackGuardSaveOutcome> => {
       await Promise.resolve();
       order.push('save');
+      return 'saved';
     });
     const { renderer } = mountGuard(true, true, onSave);
     triggerPreventRemove();
@@ -207,6 +269,7 @@ describe('useSettingsBackGuard', () => {
     expect(dispatchMock).toHaveBeenCalledTimes(1);
     // onSave must run before navigation (dispatch).
     expect(order).toEqual(['save', 'dispatch']);
+    expect(usePreventRemoveHolder.preventRemove).toBe(false);
 
     act(() => {
       renderer.unmount();
@@ -214,8 +277,9 @@ describe('useSettingsBackGuard', () => {
   });
 
   it('stays on the screen when the save fails', async () => {
-    const onSave = vi.fn(async () => {
+    const onSave = vi.fn(async (): Promise<SettingsBackGuardSaveOutcome> => {
       await Promise.reject(new Error('save failure'));
+      return 'saved';
     });
     const { renderer } = mountGuard(true, true, onSave);
     triggerPreventRemove();
@@ -231,6 +295,31 @@ describe('useSettingsBackGuard', () => {
     expect(onSave).toHaveBeenCalledTimes(1);
     // The failed save must not navigate: the screen stays for a retry or discard.
     expect(dispatchMock).not.toHaveBeenCalled();
+    expect(usePreventRemoveHolder.preventRemove).toBe(true);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('stays on the screen when the caller declines the save', async () => {
+    // A screen that asks its own destructive question answers `false` when the
+    // reader backs out of it: the draft stays unsaved and the leave is dropped.
+    const onSave = vi.fn(() => Promise.resolve<SettingsBackGuardSaveOutcome>('declined'));
+    const { renderer } = mountGuard(true, true, onSave);
+    triggerPreventRemove();
+
+    const save = currentDialog()?.extraAction;
+    expect(save).toBeDefined();
+
+    act(() => {
+      save?.onPress();
+    });
+    await flushMicrotasks();
+
+    expect(onSave).toHaveBeenCalledTimes(1);
+    expect(dispatchMock).not.toHaveBeenCalled();
+    expect(usePreventRemoveHolder.preventRemove).toBe(true);
 
     act(() => {
       renderer.unmount();
@@ -249,6 +338,7 @@ describe('useSettingsBackGuard', () => {
     });
     expect(dispatchMock).toHaveBeenCalledTimes(1);
     expect(dispatchMock).toHaveBeenCalledWith({ type: 'GO_BACK' });
+    expect(usePreventRemoveHolder.preventRemove).toBe(false);
 
     act(() => {
       renderer.unmount();
@@ -256,8 +346,9 @@ describe('useSettingsBackGuard', () => {
   });
 
   it('Keep editing dismisses the confirm without saving or leaving', () => {
-    const onSave = vi.fn(async () => {
+    const onSave = vi.fn(async (): Promise<SettingsBackGuardSaveOutcome> => {
       await Promise.resolve();
+      return 'saved';
     });
     const { renderer } = mountGuard(true, true, onSave);
     triggerPreventRemove();
@@ -274,6 +365,7 @@ describe('useSettingsBackGuard', () => {
     expect(currentDialog()).toBeUndefined();
     expect(onSave).not.toHaveBeenCalled();
     expect(dispatchMock).not.toHaveBeenCalled();
+    expect(usePreventRemoveHolder.preventRemove).toBe(true);
 
     act(() => {
       renderer.unmount();

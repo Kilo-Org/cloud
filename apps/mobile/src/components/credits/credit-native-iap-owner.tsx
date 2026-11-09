@@ -24,6 +24,7 @@ import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import {
   type StoreCreditProduct,
   type StoreCreditProductListing,
+  type StoreProductFetchOptions,
 } from '@/lib/credits/store-products';
 import { getCreditStorefront } from '@/lib/credits/storefront';
 import { fetchPendingStorePurchases } from '@/lib/iap/pending-store-purchases';
@@ -67,7 +68,10 @@ async function fetchCreditStoreProducts(
 
 export type CreditNativeIapContextValue = {
   connected: boolean;
-  fetchStoreProducts: (productSkus: string[]) => Promise<readonly StoreCreditProductListing[]>;
+  fetchStoreProducts: (
+    productSkus: string[],
+    options?: StoreProductFetchOptions
+  ) => Promise<readonly StoreCreditProductListing[]>;
   /**
    * Restores the store connection after a failed initialization. expo-iap
    * removes its purchase-update listeners on that failure, and only the hook's
@@ -154,14 +158,19 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
 
   // Server-backed catalog: its account token is the one the store purchase must
   // carry, and its product ids drive recovery even when the store fetch failed.
-  const serverProductsQuery = useQuery(trpc.credits.getMobileStoreProducts.queryOptions());
+  const serverProductsQuery = useQuery(
+    trpc.credits.getMobileStoreProducts.queryOptions({ supportsCreditExpiry: true })
+  );
   const appAccountToken = serverProductsQuery.data?.appAccountToken ?? '';
   const creditPackAppleProductIds = useMemo(
     () => serverProductsQuery.data?.products.map(product => product.appleProductId) ?? [],
     [serverProductsQuery.data]
   );
   const creditPackGoogleProductIds = useMemo(
-    () => serverProductsQuery.data?.products.map(product => product.googleProductId) ?? [],
+    () =>
+      serverProductsQuery.data?.recoveryGoogleProductIds ??
+      serverProductsQuery.data?.products.map(product => product.googleProductId) ??
+      [],
     [serverProductsQuery.data]
   );
 
@@ -565,12 +574,27 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
   // once more, so one dropped connection is not reported as a store outage. A
   // reconnect that fails, or a second failure, reaches the loader, which shows
   // the store-unavailable copy.
+  //
+  // The ask once more is skipped once the caller's deadline has settled this
+  // call: the store SDK has no cancellation, so the first call can surface a
+  // stale failure long after the screen gave up, and a store that stayed
+  // silent for the whole deadline stays silent for a retry too. Checked before
+  // and after the reconnect, which is itself a store call.
   const fetchStoreProducts = useCallback(
-    async (productSkus: string[]): Promise<StoreCreditProductListing[]> => {
+    async (
+      productSkus: string[],
+      options?: StoreProductFetchOptions
+    ): Promise<StoreCreditProductListing[]> => {
+      const signal = options?.signal;
       try {
         return await fetchCreditStoreProducts(productSkus);
       } catch (error) {
-        if (!isStoreNotReadyError(error) || !(await reconnectStore())) {
+        if (
+          signal?.aborted ||
+          !isStoreNotReadyError(error) ||
+          !(await reconnectStore()) ||
+          signal?.aborted
+        ) {
           throw error;
         }
         return fetchCreditStoreProducts(productSkus);

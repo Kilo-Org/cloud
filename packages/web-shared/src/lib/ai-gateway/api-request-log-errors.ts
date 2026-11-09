@@ -125,7 +125,7 @@ function detectChatCompletionSseErrors(
   // Accumulate tool call arguments by index across chunks (choice 0 only)
   const byIndex = new Map<number, ToolAccumulator>();
   for (const line of lines) {
-    const chunk: OpenAI.Chat.Completions.ChatCompletionChunk = JSON.parse(line);
+    const chunk = JSON.parse(line) as OpenAI.Chat.Completions.ChatCompletionChunk;
     const choice = chunk.choices.find(c => c.index === 0);
     for (const toolCall of choice?.delta.tool_calls ?? []) {
       const acc = byIndex.get(toolCall.index) ?? { id: '', name: '', arguments: '' };
@@ -170,7 +170,7 @@ function detectResponsesSseErrors(
   // response.output_item.done carries the fully assembled function_call item
   const errors: ToolCallError[] = [];
   for (const line of lines) {
-    const event = JSON.parse(line);
+    const event = JSON.parse(line) as OpenAI.Responses.ResponseStreamEvent;
     if (event.type !== 'response.output_item.done' || event.item?.type !== 'function_call')
       continue;
     const callId: string = event.item.call_id;
@@ -202,7 +202,7 @@ function detectMessagesSseErrors(
   // Accumulate partial_json fragments by content block index
   const byIndex = new Map<number, ToolAccumulator>();
   for (const line of lines) {
-    const event = JSON.parse(line);
+    const event = JSON.parse(line) as Anthropic.RawMessageStreamEvent;
     if (event.type === 'content_block_start' && event.content_block?.type === 'tool_use') {
       const id: string = event.content_block.id;
       const name: string = event.content_block.name;

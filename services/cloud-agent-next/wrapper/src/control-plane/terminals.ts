@@ -1,13 +1,13 @@
 import {
   ControlTerminalRuntimeError,
   createControlTerminalRuntime,
+  type TerminalRuntimePort,
 } from '../control/terminal-runtime.js';
 import {
   forgetAttachedRoot,
   rememberAttachedRoot,
   rootForSession,
 } from '../control/session-directories.js';
-import type { WorktreeKiloRuntime } from '../control/worktree-runtime.js';
 import type { SessionRequestIdentity } from '../../../src/shared/sandbox-control-protocol.js';
 import type {
   ControlPlaneTerminalRequestFrame,
@@ -25,22 +25,14 @@ export type ControlPlaneTerminalRuntime = {
   forgetSession(sessionId: string): Promise<void>;
   /** Detaches every attached session for a directory, for worktree deletion (R2). */
   detachDirectory(directory: string): Promise<void>;
-  /**
-   * True only while an attached session received browser→PTY input inside the
-   * activity window (spec §6). A live-but-idle PTY reports false, so an
-   * abandoned terminal does not pin the sandbox awake.
-   */
-  hasRecentInput(): boolean;
-  /** Attached sessions with input inside that same window, for the status line. */
+  /** Attached sessions with input in the last 30 seconds, for diagnostics only. */
   recentInputCount(): number;
+  hasActivePty(): boolean;
   handle(frame: ControlPlaneTerminalRequestFrame): Promise<ControlPlaneWrapperFrame>;
   shutdown(): void;
 };
 
-// Mirrors the legacy bridge's `TERMINAL_ACTIVITY_INTERVAL_MS` (terminal-bridge.ts):
-// activity is reported at most once per window, and only while input arrives.
 const TERMINAL_INPUT_WINDOW_MS = 30_000;
-const terminalSignal = new AbortController().signal;
 
 type AttachedTerminal = {
   identity: SessionRequestIdentity;
@@ -58,16 +50,12 @@ function adaptRuntime(
   runtime: KiloRuntime,
   identity: SessionRequestIdentity,
   isolation: 'per-session' | 'directory-shared'
-): WorktreeKiloRuntime {
+): TerminalRuntimePort {
   return {
     identity,
     isolation,
-    scopeId: identity.kiloSessionId,
-    runtimeId: identity.sessionId,
-    directory: runtime.directory,
     env: runtime.env,
-    kiloClient: runtime.client,
-    signal: terminalSignal,
+    kiloClient: runtime.client.terminals,
   };
 }
 
@@ -159,10 +147,6 @@ export function createControlPlaneTerminals(options: {
     return count;
   }
 
-  function hasRecentInput(): boolean {
-    return recentInputCount() > 0;
-  }
-
   async function handle(
     frame: ControlPlaneTerminalRequestFrame
   ): Promise<ControlPlaneWrapperFrame> {
@@ -211,8 +195,9 @@ export function createControlPlaneTerminals(options: {
     rememberAttachedSession,
     forgetSession,
     detachDirectory,
-    hasRecentInput,
     recentInputCount,
+    hasActivePty: () =>
+      [...attached.values()].some(session => runtime.hasActivePty(session.identity)),
     handle,
     shutdown: () => runtime.shutdown(),
   };

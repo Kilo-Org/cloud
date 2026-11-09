@@ -15,10 +15,8 @@ expand(dotenvConfig({ path: resolve(webRoot, '.env') }));
 
 const storybookPublicEnvDefaults = {
   NEXT_PUBLIC_EVENT_SERVICE_URL: 'https://event-service.storybook.invalid',
-  NEXT_PUBLIC_GASTOWN_URL: 'https://gastown.storybook.invalid',
   NEXT_PUBLIC_KILO_CHAT_URL: 'https://kilo-chat.storybook.invalid',
   NEXT_PUBLIC_TURNSTILE_SITE_KEY: '1x00000000000000000000AA',
-  NEXT_PUBLIC_WASTELAND_URL: 'https://wasteland.storybook.invalid',
 } satisfies Record<string, string>;
 
 const config: StorybookConfig = {
@@ -65,11 +63,9 @@ const config: StorybookConfig = {
     return config;
   },
   typescript: {
-    reactDocgen: 'react-docgen-typescript',
-    reactDocgenTypescriptOptions: {
-      shouldExtractLiteralValuesFromEnum: true,
-      propFilter: prop => (prop.parent ? !/node_modules/.test(prop.parent.fileName) : true),
-    },
+    // The TypeScript docgen engine loads the compiler API, which the workspace's
+    // native TypeScript 7 no longer ships. The Babel engine builds the tables.
+    reactDocgen: 'react-docgen',
   },
 };
 

@@ -1,9 +1,10 @@
 import { z } from 'zod';
 import { getAlertConfigDO } from './AlertConfigDO';
 import type { AlertConfigDO } from './AlertConfigDO';
+import { ModelIdSchema } from './query';
 
 const ttfbAlertingConfigInputSchema = z.object({
-  model: z.string().trim().min(1),
+  model: ModelIdSchema,
   enabled: z.boolean(),
   ttfbThresholdMs: z.number().int().positive(),
   ttfbSlo: z.number().gt(0).lt(1),

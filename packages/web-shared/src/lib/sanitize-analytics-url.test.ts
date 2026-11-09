@@ -1,4 +1,7 @@
 import {
+  isSharedSessionPath,
+  sanitizeAnalyticsPathname,
+  sanitizeAnalyticsText,
   sanitizeAnalyticsUrl,
   sanitizeAnalyticsUrlValue,
 } from '@kilocode/web-shared/lib/sanitize-analytics-url';
@@ -61,12 +64,56 @@ describe('sanitizeAnalyticsUrl', () => {
     );
   });
 
-  it('leaves neighboring /s paths unchanged', () => {
+  it('redacts legacy /share/* pathnames', () => {
+    expect(sanitizeAnalyticsUrl('https://app.kilo.ai', '/share/abc', '')).toBe(
+      'https://app.kilo.ai/share/:share_id'
+    );
+    expect(sanitizeAnalyticsUrlValue('https://app.kilo.ai/share/abc?tab=preview')).toBe(
+      'https://app.kilo.ai/share/:share_id?tab=preview'
+    );
+  });
+
+  it('redacts share capabilities embedded in editor URLs', () => {
+    expect(
+      sanitizeAnalyticsUrlValue(
+        'vscode://kilocode.kilo-code/kilocode/s/eyJhbGciOiJIUzI1NiJ9.share.token'
+      )
+    ).toBe('vscode://kilocode.kilo-code/kilocode/s/:share_token');
+    expect(
+      sanitizeAnalyticsUrlValue(
+        'cursor://kilocode.kilo-code/kilocode/share/9a5f0c84-1b04-4f6e-9e4f-37ed356a9f42'
+      )
+    ).toBe('cursor://kilocode.kilo-code/kilocode/share/:share_id');
+  });
+
+  it('redacts share capabilities in arbitrary analytics text', () => {
+    expect(
+      sanitizeAnalyticsText(
+        'a:attr__href="vscode://kilocode.kilo-code/kilocode/s/eyJhbGciOiJIUzI1NiJ9.share.token"'
+      )
+    ).toBe('a:attr__href="vscode://kilocode.kilo-code/kilocode/s/:share_token"');
+  });
+
+  it('leaves neighboring paths unchanged', () => {
     expect(sanitizeAnalyticsUrl('https://app.kilo.ai', '/sessions/abc', '')).toBe(
       'https://app.kilo.ai/sessions/abc'
     );
-    expect(sanitizeAnalyticsUrl('https://app.kilo.ai', '/share/abc', '')).toBe(
-      'https://app.kilo.ai/share/abc'
+    expect(sanitizeAnalyticsUrl('https://app.kilo.ai', '/shares/abc', '')).toBe(
+      'https://app.kilo.ai/shares/abc'
     );
+  });
+
+  it('identifies both current and legacy share paths', () => {
+    expect(isSharedSessionPath('/s/token')).toBe(true);
+    expect(isSharedSessionPath('/s')).toBe(true);
+    expect(isSharedSessionPath('/share/abc')).toBe(true);
+    expect(isSharedSessionPath('/share')).toBe(true);
+    expect(isSharedSessionPath('/sessions/abc')).toBe(false);
+  });
+
+  it('redacts share pathnames without changing unrelated pathnames', () => {
+    expect(sanitizeAnalyticsPathname('/s/token')).toBe('/s/:share_token');
+    expect(sanitizeAnalyticsPathname('/share/abc')).toBe('/share/:share_id');
+    expect(sanitizeAnalyticsPathname('/cloud/sessions')).toBe('/cloud/sessions');
   });
 });

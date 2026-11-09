@@ -11,6 +11,7 @@ import {
   formStateToConfig,
   formatRunProgress,
   RoutingTableView,
+  toBenchmarkModelOptions,
 } from './BenchmarksSection';
 
 const baseConfig: BenchmarkConfig = {
@@ -148,6 +149,34 @@ describe('platform model selection', () => {
     ).toContain('1 of 1 measured');
     expect(effortCoverageForModel(model, [])).toContain('default: not measured');
     expect(effortCoverageForModel(model, [])).not.toContain('pending');
+  });
+
+  it('reports an alias with the measured efforts of its resolved target', () => {
+    const reasoning = (effort: 'low' | 'high') => ({ reasoning: { effort } });
+    const options = toBenchmarkModelOptions([
+      { id: 'vendor/model-2', name: 'Model 2', opencode: { variants: { low: reasoning('low') } } },
+      {
+        id: 'vendor/model-1',
+        name: 'Model 1',
+        opencode: { variants: { low: reasoning('low'), high: reasoning('high') } },
+      },
+      {
+        id: '~vendor/model-latest',
+        name: 'Model Latest',
+        alias_target: 'vendor/model-2',
+        opencode: { variants: { low: reasoning('low'), high: reasoning('high') } },
+      },
+      { id: '~vendor/dangling-latest', name: 'Dangling', alias_target: 'vendor/missing' },
+    ]);
+    const entries = [{ model: 'vendor/model-2', variant: 'low', status: 'ready' as const }];
+    const coverage = (id: string) =>
+      effortCoverageForModel(
+        options.find(option => option.id === id),
+        entries
+      );
+    expect(coverage('~vendor/model-latest')).toBe('All 1 efforts: low · 1 of 1 measured');
+    expect(coverage('vendor/model-1')).toContain('0 of 2 measured');
+    expect(coverage('~vendor/dangling-latest')).toBe('Effort coverage unavailable');
   });
 });
 

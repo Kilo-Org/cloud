@@ -10,5 +10,6 @@ export function getEffectiveModelRestrictions(organization: Organization): Model
     requireModelInCurrentSnapshot: true,
     providerAllowList: organization.settings?.provider_allow_list,
     modelDenyList: organization.settings?.model_deny_list ?? [],
+    customLlmGrantee: { organizationId: organization.id, groupIds: [] },
   };
 }

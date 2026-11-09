@@ -11,6 +11,7 @@ import {
   type LayoutChangeEvent,
   PixelRatio,
   ScrollView,
+  type ScrollViewInstance,
   type ScrollViewProps,
   useWindowDimensions,
   View,
@@ -28,7 +29,16 @@ import { cn } from '@/lib/utils';
 
 type CenteredStateProps = {
   children: ReactNode;
+  /** Classes for the scroller itself: background, width. */
   className?: string;
+  /**
+   * Classes for the content box that holds the caller's children. A horizontal
+   * inset belongs here: the scroller's own padding does not narrow the scroll
+   * content, so an inset set through `className` leaves the end side flush in a
+   * right-to-left layout, and the scroller's content container style already
+   * carries the centering layout, so a class applied there is replaced by it.
+   */
+  contentContainerClassName?: string;
   testID?: string;
   refreshControl?: ScrollViewProps['refreshControl'];
 };
@@ -45,6 +55,7 @@ export const STATE_SURFACE_FALLBACK_MS = 400;
 export function CenteredState({
   children,
   className,
+  contentContainerClassName,
   testID = 'centered-state',
   refreshControl,
 }: CenteredStateProps) {
@@ -52,7 +63,7 @@ export function CenteredState({
   const frame = surface?.frame;
   const windowSize = useWindowDimensions();
   const shortBand = isShortViewport(windowSize.width, windowSize.height);
-  const scrollRef = useRef<ScrollView | null>(null);
+  const scrollRef = useRef<ScrollViewInstance | null>(null);
   const requestRef = useRef(0);
   const [viewport, setViewport] = useState<MeasuredViewport | null>(null);
   const [contentHeight, setContentHeight] = useState<number | null>(null);
@@ -64,8 +75,24 @@ export function CenteredState({
     requestRef.current += 1;
     const request = requestRef.current;
     const node = scrollRef.current?.getNativeScrollRef();
-    if (!frame || !node) {
+    if (!frame) {
       setViewport(null);
+      return;
+    }
+    if (!node) {
+      // The scroller's native node is briefly absent while a screen that owned
+      // this surface comes back and re-attaches its host view. The geometry it
+      // had is the geometry it still has, so the placement it already carries
+      // stays: dropping it here is what made a returning state re-center and
+      // then jump back to its measured position. The measurement publishes a
+      // fresh object each run, so compare the band, not the identity.
+      setViewport(previous =>
+        previous !== null &&
+        previous.surface.top === frame.top &&
+        previous.surface.bottom === frame.bottom
+          ? previous
+          : null
+      );
       return;
     }
     node.measureInWindow((...bounds) => {
@@ -79,17 +106,19 @@ export function CenteredState({
         return;
       }
       setViewport(previous =>
-        previous?.surface === frame &&
+        previous !== null &&
+        previous.surface.top === frame.top &&
+        previous.surface.bottom === frame.bottom &&
         previous.frame.top === top &&
         previous.frame.bottom === bottom
           ? previous
-          : { surface: frame, frame: { top, bottom } }
+          : { surface: { top: frame.top, bottom: frame.bottom }, frame: { top, bottom } }
       );
     });
   }, [frame]);
 
   const capture = useCallback(
-    (node: ScrollView | null) => {
+    (node: ScrollViewInstance | null) => {
       scrollRef.current = node;
       measure();
     },
@@ -106,22 +135,33 @@ export function CenteredState({
   const measureContent = useCallback((event: LayoutChangeEvent) => {
     setContentHeight(PixelRatio.roundToNearestPixel(event.nativeEvent.layout.height));
   }, []);
-  const layout = useMemo(
-    () =>
-      surface?.frame && viewport?.surface === surface.frame && contentHeight !== null
-        ? getCenteredStateLayout({
-            surface: surface.frame,
-            viewport: viewport.frame,
-            contentHeight,
-            topInset: surface.topInset,
-            bottomInset: surface.bottomInset,
-            nativeViewportFillsSurface: surface.nativeViewportFillsSurface,
-            nativeViewportBottom: surface.bounds?.bottom,
-            roundToPixel: value => PixelRatio.roundToNearestPixel(value),
-          })
-        : undefined,
-    [surface, viewport, contentHeight]
-  );
+  const layout = useMemo(() => {
+    // The stored viewport carries the band it was measured against, and the
+    // surface publishes a fresh frame object on every measurement, so compare
+    // the band itself: a state whose surface has not moved keeps its placement
+    // instead of dropping back to the pending one and jumping when it returns.
+    const measured = viewport;
+    if (
+      !frame ||
+      !measured ||
+      measured.surface.top !== frame.top ||
+      measured.surface.bottom !== frame.bottom ||
+      contentHeight === null
+    ) {
+      return undefined;
+    }
+    const measuredFrame = measured.frame;
+    return getCenteredStateLayout({
+      surface: frame,
+      viewport: measuredFrame,
+      contentHeight,
+      topInset: surface.topInset,
+      bottomInset: surface.bottomInset,
+      nativeViewportFillsSurface: surface.nativeViewportFillsSurface,
+      nativeViewportBottom: surface.bounds?.bottom,
+      roundToPixel: value => PixelRatio.roundToNearestPixel(value),
+    });
+  }, [surface, frame, viewport, contentHeight]);
   const ready = layout !== undefined;
   // While the measured layout is pending, the fallback must still keep the band
   // the surface reserved (the fixed tab bar) free: without it the body centers
@@ -143,19 +183,37 @@ export function CenteredState({
     [bottomReservation, layout, ready]
   );
   const [fallbackElapsed, setFallbackElapsed] = useState(false);
+  // The hidden-until-measured gate keeps a data state from flashing at the wrong
+  // spot on its first frame. It must only ever gate that first frame: once the
+  // state has been painted, a measurement that lands, detaches and lands again
+  // — a restored route, the tab bar's own layout pass, a rotation — must not
+  // hide it again. Re-arming this window on every `ready` transition did
+  // exactly that, and a run of them kept an empty history body invisible for
+  // seconds after a relaunch. The timer starts once at mount, and the reveal is
+  // latched for the life of the mount.
   useEffect(() => {
-    if (ready) {
-      setFallbackElapsed(false);
-      return undefined;
-    }
     const timer = setTimeout(() => {
       setFallbackElapsed(true);
     }, STATE_SURFACE_FALLBACK_MS);
     return () => {
       clearTimeout(timer);
     };
-  }, [ready]);
-  const visible = ready || fallbackElapsed;
+  }, []);
+  // The latch is a layout effect, and it is declared after the measuring layout
+  // effect above: layout effects flush before the frame is painted, so the
+  // reveal lands in the same commit that placed the state, and a later detach —
+  // which clears the placement in that earlier layout effect — already reads the
+  // latch. An ordinary effect would run after paint and let one hidden frame
+  // through, which is the blank body a returning screen showed; a render-phase
+  // update is not an option either, because it updates a component React has
+  // not mounted yet and surfaces as a development-time state-update warning.
+  const [revealed, setRevealed] = useState(false);
+  const visible = ready || fallbackElapsed || revealed;
+  useLayoutEffect(() => {
+    if (visible && !revealed) {
+      setRevealed(true);
+    }
+  }, [revealed, visible]);
 
   if (!surface) {
     throw new Error('CenteredState requires a StateSurface');
@@ -175,7 +233,7 @@ export function CenteredState({
         keyboardShouldPersistTaps="handled"
       >
         <View
-          className={cn('w-full', !visible && 'opacity-0')}
+          className={cn('w-full', contentContainerClassName, !visible && 'opacity-0')}
           testID={testID ? `${testID}-content` : undefined}
           onLayout={measureContent}
           accessibilityElementsHidden={!visible}

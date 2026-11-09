@@ -111,12 +111,31 @@ describe('downloading a vision model', () => {
     expect(h.store.model('eyes')?.vision).toBe(true);
   });
 
-  it('refuses a projector whose bytes do not match the published size', async () => {
+  it('downloads a projector that stopped short again instead of calling the model unusable', async () => {
     const h = harness();
     h.store.start(VISION_CATALOG);
     await finish(taskAt(h.tasks, 0), 1000);
     await finish(taskAt(h.tasks, 1), 150);
-    expect(h.store.snapshot().failure).toEqual({ fileId: 'eyes', problem: 'invalidFile' });
+
+    expect(h.tasks).toHaveLength(3);
+    expect(taskAt(h.tasks, 2).name).toBe(ggufProjectorPartialName('eyes'));
+    expect(h.store.snapshot().failure).toBeNull();
+
+    await finish(taskAt(h.tasks, 2), 200);
+    expect(h.store.model('eyes')).toMatchObject({ sizeBytes: 1200, vision: true });
+  });
+
+  it('reports a network problem when a projector stops short twice, and keeps nothing', async () => {
+    const h = harness();
+    h.store.start(VISION_CATALOG);
+    await finish(taskAt(h.tasks, 0), 1000);
+    await finish(taskAt(h.tasks, 1), 150);
+    await finish(taskAt(h.tasks, 2), 150);
+
+    expect(h.store.snapshot()).toMatchObject({
+      download: null,
+      failure: { fileId: 'eyes', problem: 'network' },
+    });
     expect(h.files.size).toBe(0);
   });
 
@@ -146,6 +165,20 @@ describe('downloading a vision model', () => {
     expect(h.store.snapshot().failure).toEqual({ fileId: 'eyes', problem: 'invalidFile' });
     expect(h.files.size).toBe(0);
     expect(h.store.model('eyes')).toBeUndefined();
+  });
+
+  it('keeps a model whose first move placed the model file and failed on the projector', async () => {
+    const h = harness({ failMoveOnce: ggufProjectorName('eyes') });
+    h.store.start(VISION_CATALOG);
+    await finish(taskAt(h.tasks, 0), 1000);
+    await finish(taskAt(h.tasks, 1), 200);
+
+    expect(h.store.snapshot().failure).toBeNull();
+    expect(h.store.model('eyes')).toMatchObject({ sizeBytes: 1200, vision: true });
+    expect([...h.files.keys()].toSorted()).toEqual([
+      ggufModelName('eyes'),
+      ggufProjectorName('eyes'),
+    ]);
   });
 
   it('keeps no model file when its projector cannot be moved into place', async () => {

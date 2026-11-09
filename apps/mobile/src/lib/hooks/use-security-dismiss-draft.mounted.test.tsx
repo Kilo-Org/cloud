@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the persist/refresh/failure-listing suites share one KV harness */
 /* eslint-disable require-await, @typescript-eslint/require-await -- the fake KV factories settle without await because they resolve immediately */
 
 // Dismiss-draft persistence contract: the hook writes the draft on persist,
@@ -8,9 +9,11 @@ import { createElement, useEffect } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { i18n } from '@/i18n';
 import {
   isSecurityDismissDraft,
   listSecurityDismissFailures,
+  securityDismissFailureCopy,
   useSecurityDismissDraft,
   useSecurityDismissFailures,
 } from './use-security-dismiss-draft';
@@ -123,7 +126,7 @@ describe('listSecurityDismissFailures', () => {
     );
 
     await expect(listSecurityDismissFailures('u1', 'personal')).resolves.toEqual([
-      { findingId: 'f1', lastError: 'boom', retryable: true },
+      { findingId: 'f1', lastError: 'boom', lastErrorKey: null, retryable: true },
     ]);
   });
 });
@@ -188,7 +191,13 @@ describe('useSecurityDismissDraft remount', () => {
 
     // Simulate onError: persist the failure, then force the debounced write.
     act(() => {
-      latest?.persist({ reason: 'not_used', comment: '', lastError: 'boom', retryable: true });
+      latest?.persist({
+        reason: 'not_used',
+        comment: '',
+        lastError: 'boom',
+        lastErrorKey: null,
+        retryable: true,
+      });
     });
     await flushDraft('u1', 'security-dismiss:personal:f1');
 
@@ -207,6 +216,7 @@ describe('useSecurityDismissDraft remount', () => {
       reason: 'not_used',
       comment: '',
       lastError: 'boom',
+      lastErrorKey: null,
       retryable: true,
     });
   });
@@ -221,7 +231,13 @@ describe('useSecurityDismissDraft remount', () => {
     await waitForHydrated();
 
     act(() => {
-      latest?.persist({ reason: 'not_used', comment: '', lastError: null, retryable: null });
+      latest?.persist({
+        reason: 'not_used',
+        comment: '',
+        lastError: null,
+        lastErrorKey: null,
+        retryable: null,
+      });
     });
     await flushDraft('u1', 'security-dismiss:personal:f1');
 
@@ -268,12 +284,14 @@ describe('useSecurityDismissDraft refresh and flush', () => {
     });
     await waitFor(() => latest?.draft?.lastError === 'boom');
 
+    // A legacy draft recorded before `lastErrorKey` existed has no field.
     expect(latest?.draft).toEqual({
       reason: 'not_used',
       comment: '',
       lastError: 'boom',
       retryable: true,
     });
+    expect('lastErrorKey' in (latest?.draft ?? {})).toBe(false);
   });
 
   it('flushes the pending write on unmount so a kill inside the window does not drop it', async () => {
@@ -286,7 +304,13 @@ describe('useSecurityDismissDraft refresh and flush', () => {
     await waitForHydrated();
 
     act(() => {
-      latest?.persist({ reason: 'not_used', comment: '', lastError: 'boom', retryable: true });
+      latest?.persist({
+        reason: 'not_used',
+        comment: '',
+        lastError: 'boom',
+        lastErrorKey: null,
+        retryable: true,
+      });
     });
     // No manual flush: unmount must flush the pending debounced write.
     act(() => {
@@ -308,6 +332,7 @@ describe('useSecurityDismissDraft refresh and flush', () => {
       reason: 'not_used',
       comment: '',
       lastError: 'boom',
+      lastErrorKey: null,
       retryable: true,
     });
   });
@@ -327,7 +352,7 @@ describe('useSecurityDismissFailures refresh', () => {
     });
     await waitFor(() => latestFailures?.failures.length === 1);
     expect(latestFailures?.failures).toEqual([
-      { findingId: 'f1', lastError: 'boom', retryable: true },
+      { findingId: 'f1', lastError: 'boom', lastErrorKey: null, retryable: true },
     ]);
 
     // A second failure lands in the store after mount; refresh must surface it.
@@ -343,8 +368,37 @@ describe('useSecurityDismissFailures refresh', () => {
     await waitFor(() => latestFailures?.failures.length === 2);
 
     expect(latestFailures?.failures).toEqual([
-      { findingId: 'f1', lastError: 'boom', retryable: true },
-      { findingId: 'f2', lastError: 'other', retryable: false },
+      { findingId: 'f1', lastError: 'boom', lastErrorKey: null, retryable: true },
+      { findingId: 'f2', lastError: 'other', lastErrorKey: null, retryable: false },
     ]);
+  });
+
+  it('re-translates a stored failure through its recorded catalog key', async () => {
+    seedStoredValue(
+      'draft:u1',
+      'security-dismiss:personal:f1',
+      JSON.stringify({
+        reason: 'not_used',
+        comment: '',
+        lastError: 'A security sync is already in progress. Please try again.',
+        lastErrorKey: 'securityAgent.mutations.syncInProgress',
+        retryable: true,
+      })
+    );
+
+    const holder: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
+    act(() => {
+      holder.current = TestRenderer.create(createElement(ProbeFailures, { scope: 'personal' }));
+    });
+    await waitFor(() => latestFailures?.failures.length === 1);
+
+    const failure = latestFailures?.failures[0];
+    expect(failure?.lastErrorKey).toBe('securityAgent.mutations.syncInProgress');
+    if (!failure) {
+      throw new Error('expected one stored failure');
+    }
+    expect(securityDismissFailureCopy(failure)).toBe(
+      i18n.t('securityAgent.mutations.syncInProgress')
+    );
   });
 });

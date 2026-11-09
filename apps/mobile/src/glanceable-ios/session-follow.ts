@@ -2,7 +2,7 @@ import {
   buildSessionLiveActivityContentState,
   type SessionLiveActivityContentState,
   type SessionLiveActivityRow,
-} from '@kilocode/notifications';
+} from '@kilocode/notifications/schemas';
 import { after } from 'expo-widgets';
 
 import {
@@ -18,11 +18,11 @@ import {
   observedSessionActivityIds,
   registerSessionActivityToken,
   releaseSessionActivity,
-  retrySessionActivityTokens,
 } from '@/lib/glanceable/session-activity-tokens';
 import { getGlanceableDelivery } from '@/lib/glanceable/sink-registry';
 import { launcherSessionUrl } from '@/lib/launcher-surfaces';
 
+import * as cardScopes from './session-card-scope';
 import {
   clearSessionCardPress,
   readSessionCards,
@@ -31,7 +31,7 @@ import {
   sessionCardRelevance,
   settleCardWork,
 } from './session-card-press';
-import { SessionLiveActivity, type SessionLiveActivityProps } from './session-live-activity';
+import { getSessionLiveActivity, type SessionLiveActivityProps } from './session-live-activity';
 import { drawsSame, isOlderThanCard, sessionCardStaleAfterSeconds } from './session-card-facts';
 import { liveActivitiesAllowedBySystem } from './system-switch';
 
@@ -49,6 +49,14 @@ import { liveActivitiesAllowedBySystem } from './system-switch';
  * card's sink reads `ActiveAgentsLiveActivity` instances only, and expo-widgets
  * filters each factory's instances by name, so neither cleanup can end the
  * other's cards.
+ *
+ * A card belongs to the account and organization that followed it, and no
+ * field of its content state says which: the server rebuilds that state on
+ * every push. The device keeps the scope per session in
+ * `session-card-scope.ts`, writes it on Follow, and the launch/foreground
+ * restore ends any card it cannot place in the current scope. No stored account
+ * puts every card outside the scope, so a card left live by a process that did
+ * not finish its sign-out ends there too.
  */
 
 export type SessionFollowContext = { userId: string; organizationId: string | null };
@@ -62,6 +70,12 @@ export const SESSION_FINISHED_DISMISS_MS = 15 * 60 * 1000;
 const cards = new Map<string, SessionActivity>();
 const listeners = new Set<() => void>();
 let revision = 0;
+/**
+ * True when the last `discoverSessionCards` read ActivityKit itself. While it
+ * is false the returned cards are only the ones this process already knew, so a
+ * restore must not treat the result as the whole live set.
+ */
+let discoveryReadable = true;
 
 function emit(): void {
   revision += 1;
@@ -107,7 +121,7 @@ async function readToken(
  * End one card and release its push token on the server. The token read starts
  * before the end, because ActivityKit drops the token with the card.
  */
-function endCard(
+export function endCard(
   activity: SessionActivity,
   dismissal: 'immediate' | { after: Date },
   props?: SessionLiveActivityProps
@@ -116,6 +130,18 @@ function endCard(
   getGlanceableDelivery().cleanupTokens('session', token);
   const relevance = props === undefined ? undefined : sessionCardRelevance(props);
   void settleCardWork(activity.end(dismissal, props, new Date(), relevance));
+}
+
+/**
+ * Stop following one session in this process: its card, its press state, and
+ * the scope record it was followed under.
+ */
+export function forgetFollow(sessionId: string): void {
+  clearSessionCardPress(sessionId);
+  cardScopes.forgetSessionCardScopes([sessionId]);
+  if (cards.delete(sessionId)) {
+    emit();
+  }
 }
 
 /**
@@ -128,8 +154,10 @@ function endCard(
 export function discoverSessionCards(): SessionActivity[] {
   const instances = readSessionCards(false);
   if (instances === null) {
+    discoveryReadable = false;
     return [...cards.values()];
   }
+  discoveryReadable = true;
   const liveIds = new Set(instances.map(activity => activity.getId()));
   const known = new Set([
     ...[...cards.values()].map(activity => activity.getId()),
@@ -171,38 +199,15 @@ export function discoverSessionCards(): SessionActivity[] {
   return [...next.values()];
 }
 
-/**
- * Launch and foreground: rebuild the map, then register every card's token
- * again. A registration that failed earlier retries here (spec "Error
- * Handling" rule 4). Without a known account the cards stay as they are: a
- * locked keychain is not a sign-out, and sign-out ends the cards itself.
- */
-export function restoreFollowedSessionCards(ctx: SessionFollowContext | null): void {
-  if (!getLiveActivityEnabled()) {
-    // The in-app switch turned off while no process ran: no card may stay.
-    // Retire the token scope first, so it reads each card's token before the
-    // end drops it.
-    getGlanceableDelivery().cleanupTokens('scope');
-    endAllSessionCards();
-    return;
-  }
-  const live = discoverSessionCards();
-  if (ctx === null) {
-    return;
-  }
-  for (const activity of live) {
-    const sessionId = activity.getProps()?.sessionId;
-    if (sessionId !== undefined) {
-      registerSessionActivityToken(activity.getId(), activity, { sessionId, ...ctx });
-    }
-  }
-  retrySessionActivityTokens();
+/** True when the last `discoverSessionCards` read ActivityKit itself. */
+export function isSessionCardDiscoveryReadable(): boolean {
+  return discoveryReadable;
 }
 
 /** Start the card collapsed and silent, or null when iOS refuses it. */
 function startCard(content: SessionLiveActivityContentState): SessionActivity | null {
   try {
-    return SessionLiveActivity.start(
+    return getSessionLiveActivity().start(
       content,
       launcherSessionUrl(content.sessionId),
       sessionCardStaleAfterSeconds(content),
@@ -249,6 +254,7 @@ export function followSession(
     return 'refused';
   }
   cards.set(row.id, activity);
+  cardScopes.rememberSessionCardScope(row.id, ctx);
   registerSessionActivityToken(activity.getId(), activity, { sessionId: row.id, ...ctx });
   emit();
   return 'started';
@@ -260,10 +266,8 @@ export function unfollowSession(sessionId: string): void {
   if (activity === undefined) {
     return;
   }
-  cards.delete(sessionId);
-  clearSessionCardPress(sessionId);
+  forgetFollow(sessionId);
   endCard(activity, 'immediate');
-  emit();
 }
 
 /**
@@ -275,10 +279,8 @@ export function dismissFinishedSessionCard(sessionId: string): void {
     const props = activity.getProps();
     if (props?.sessionId === sessionId && (!isLive(activity) || props.statusKind === 'idle')) {
       if (cards.get(sessionId)?.getId() === activity.getId()) {
-        cards.delete(sessionId);
-        emit();
+        forgetFollow(sessionId);
       }
-      clearSessionCardPress(sessionId);
       endCard(activity, 'immediate');
     }
   }
@@ -297,6 +299,7 @@ export function endAllSessionCards(): void {
     void settleCardWork(activity.end('immediate'));
   }
   clearSessionCardPress();
+  cardScopes.clearSessionCardScopes();
   if (cards.size > 0) {
     cards.clear();
     emit();
@@ -317,7 +320,6 @@ export function syncFollowedSessionCards(
     return;
   }
   const updatedAt = new Date(checkedAt > 0 ? checkedAt : Date.now()).toISOString();
-  let ended = false;
   for (const [sessionId, activity] of cards) {
     const row = rows.find(candidate => candidate.id === sessionId);
     const current = activity.getProps();
@@ -333,9 +335,7 @@ export function syncFollowedSessionCards(
       });
       // A failed run ends like a finished one, with its stop reason.
       if (content.statusKind === 'idle' || content.statusKind === 'failed') {
-        cards.delete(sessionId);
-        clearSessionCardPress(sessionId);
-        ended = true;
+        forgetFollow(sessionId);
         endCard(activity, after(new Date(Date.now() + SESSION_FINISHED_DISMISS_MS)), content);
       } else if (!drawsSame(current, content)) {
         void settleCardWork(
@@ -347,9 +347,6 @@ export function syncFollowedSessionCards(
         );
       }
     }
-  }
-  if (ended) {
-    emit();
   }
 }
 

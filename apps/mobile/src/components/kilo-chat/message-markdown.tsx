@@ -27,8 +27,8 @@ export function MessageMarkdown({ text, isFromMe }: Readonly<MessageMarkdownProp
         selectable={isMessageTextSelectionEnabled()}
         className={
           isFromMe
-            ? 'text-sm leading-5 text-primary-foreground'
-            : 'text-sm leading-5 text-foreground'
+            ? 'text-sm leading-[1.25rem] text-primary-foreground'
+            : 'text-sm leading-[1.25rem] text-foreground'
         }
       >
         {text}

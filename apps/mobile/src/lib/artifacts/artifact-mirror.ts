@@ -124,7 +124,7 @@ function writeManifest(root: Directory, manifest: ArtifactMirrorManifest): void 
   }
 
   const part = new File(root, MANIFEST_PART_FILE_NAME);
-  part.write(bytes);
+  part.writeSync(bytes);
   part.moveSync(target, { overwrite: true });
 }
 

@@ -1,0 +1,1 @@
+CREATE INDEX `idx_oauth_pending_authorizations_expires_at` ON `oauth_pending_authorizations` (`expires_at`);

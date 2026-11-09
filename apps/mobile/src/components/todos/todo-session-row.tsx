@@ -6,6 +6,7 @@ import { namedSessionTitle } from '@/components/agents/session-detail-rename-sta
 import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-navigator';
 import { TodoStatusChip } from '@/components/todos/todo-status-chip';
 import { useConfirmDialog } from '@/components/ui/dialog';
+import { IconButton } from '@/components/ui/icon-button';
 import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { MoreHorizontal } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
@@ -91,16 +92,13 @@ export function TodoSessionRow({ todo, session, now, onUnlink }: Readonly<TodoSe
         </View>
         <DirectionalChevronRight size={20} color={colors.mutedForeground} />
       </Pressable>
-      <Pressable
+      <IconButton
         onPress={openSessionActions}
-        hitSlop={8}
-        accessibilityRole="button"
         accessibilityLabel={t('agents.sessionRow.actions')}
         accessibilityHint={title}
-        className="size-11 items-center justify-center active:opacity-70"
       >
         <MoreHorizontal size={20} color={colors.mutedForeground} />
-      </Pressable>
+      </IconButton>
       {dialog}
     </View>
   );

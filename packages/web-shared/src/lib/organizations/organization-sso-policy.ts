@@ -42,7 +42,50 @@ export type SsoDomainAuthority =
 
 type DbOrTransaction = typeof db | DrizzleTransaction;
 
+type SsoAuthorityRow = {
+  id: string;
+  ssoDomain: string | null;
+  parentOrganizationId: string | null;
+};
+
 const parentOrganizations = alias(organizations, 'sso_policy_parent_organizations');
+
+type DomainAuthorityMatch =
+  | { status: 'unmatched' }
+  | { status: 'ambiguous' }
+  | { status: 'conflicting_child_policy' }
+  | { status: 'authoritative'; sourceOrganizationId: string };
+
+/**
+ * The domain-authority rule, decided from the live organizations whose
+ * `sso_domain` normalizes to the domain. A domain that several organizations
+ * claim, or that belongs to a child organization, is a misconfiguration; the
+ * remaining match is authoritative only for the organization it was read from,
+ * when the caller names one.
+ */
+function decideDomainAuthority(
+  matches: readonly Pick<SsoAuthorityRow, 'id' | 'parentOrganizationId'>[],
+  expectedSourceOrganizationId?: string
+): DomainAuthorityMatch {
+  if (matches.length > 1) {
+    return { status: 'ambiguous' };
+  }
+
+  const [match] = matches;
+  if (!match) {
+    return { status: 'unmatched' };
+  }
+
+  if (match.parentOrganizationId) {
+    return { status: 'conflicting_child_policy' };
+  }
+
+  if (expectedSourceOrganizationId && match.id !== expectedSourceOrganizationId) {
+    return { status: 'ambiguous' };
+  }
+
+  return { status: 'authoritative', sourceOrganizationId: match.id };
+}
 
 function normalizeSsoDomain(domain: string): string | null {
   const normalized = domain.trim().toLowerCase();
@@ -64,23 +107,18 @@ async function resolveAuthorityForNormalizedDomain(
     )
     .limit(2);
 
-  if (matchingOrganizations.length === 0) {
-    return { status: 'not_required', domain };
-  }
+  const match = decideDomainAuthority(matchingOrganizations);
 
-  if (matchingOrganizations.length > 1) {
-    return { status: 'misconfigured', domain, reason: 'ambiguous_domain' };
+  switch (match.status) {
+    case 'unmatched':
+      return { status: 'not_required', domain };
+    case 'ambiguous':
+      return { status: 'misconfigured', domain, reason: 'ambiguous_domain' };
+    case 'conflicting_child_policy':
+      return { status: 'misconfigured', domain, reason: 'conflicting_child_policy' };
+    case 'authoritative':
+      return { status: 'required', domain, sourceOrganizationId: match.sourceOrganizationId };
   }
-
-  if (matchingOrganizations[0].parentOrganizationId) {
-    return { status: 'misconfigured', domain, reason: 'conflicting_child_policy' };
-  }
-
-  return {
-    status: 'required',
-    domain,
-    sourceOrganizationId: matchingOrganizations[0].id,
-  };
 }
 
 export async function resolveSsoAuthorityForDomain(
@@ -148,21 +186,26 @@ export async function resolveEffectiveOrganizationSsoPolicies(
     }
   }
 
-  const authorityRows = await dbOrTx
-    .select({
-      id: organizations.id,
-      ssoDomain: organizations.sso_domain,
-      parentOrganizationId: organizations.parent_organization_id,
-    })
-    .from(organizations)
-    .where(
-      and(
-        inArray(sql`lower(${organizations.sso_domain})`, [...normalizedDomains]),
-        isNull(organizations.deleted_at)
-      )
-    );
+  // The authority map is only consulted for organizations that carry a domain, so an empty set
+  // needs no lookup.
+  const authorityRows: SsoAuthorityRow[] =
+    normalizedDomains.size === 0
+      ? []
+      : await dbOrTx
+          .select({
+            id: organizations.id,
+            ssoDomain: organizations.sso_domain,
+            parentOrganizationId: organizations.parent_organization_id,
+          })
+          .from(organizations)
+          .where(
+            and(
+              inArray(sql`lower(${organizations.sso_domain})`, [...normalizedDomains]),
+              isNull(organizations.deleted_at)
+            )
+          );
 
-  const authoritiesByDomain = new Map<string, typeof authorityRows>();
+  const authoritiesByDomain = new Map<string, SsoAuthorityRow[]>();
   for (const authority of authorityRows) {
     if (!authority.ssoDomain) continue;
     const domain = authority.ssoDomain.toLowerCase();
@@ -182,26 +225,26 @@ export async function resolveEffectiveOrganizationSsoPolicies(
       return { status: 'misconfigured', organizationId, reason: 'invalid_domain' };
     }
 
-    const matchingAuthorities = authoritiesByDomain.get(domain) ?? [];
-    if (matchingAuthorities.length > 1) {
-      return { status: 'misconfigured', organizationId, reason: 'ambiguous_domain' };
-    }
+    const match = decideDomainAuthority(
+      authoritiesByDomain.get(domain) ?? [],
+      sourceOrganizationId
+    );
 
-    const authority = matchingAuthorities[0];
-    if (authority?.parentOrganizationId) {
-      return { status: 'misconfigured', organizationId, reason: 'conflicting_child_policy' };
+    switch (match.status) {
+      case 'conflicting_child_policy':
+        return { status: 'misconfigured', organizationId, reason: 'conflicting_child_policy' };
+      case 'unmatched':
+      case 'ambiguous':
+        return { status: 'misconfigured', organizationId, reason: 'ambiguous_domain' };
+      case 'authoritative':
+        return {
+          status: 'required',
+          organizationId,
+          source,
+          sourceOrganizationId,
+          domain,
+        };
     }
-    if (!authority || authority.id !== sourceOrganizationId) {
-      return { status: 'misconfigured', organizationId, reason: 'ambiguous_domain' };
-    }
-
-    return {
-      status: 'required',
-      organizationId,
-      source,
-      sourceOrganizationId,
-      domain,
-    };
   }
 
   const organizationsById = new Map(

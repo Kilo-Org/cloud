@@ -22,6 +22,14 @@ const auth = vi.hoisted(() => ({ token: 'token-a' as string | undefined }));
 const storage = vi.hoisted(() => ({ read: vi.fn(), write: vi.fn(), remove: vi.fn() }));
 const list = vi.hoisted(() => vi.fn());
 
+// The provider now announces the lost-membership recovery through the
+// toast adapter, whose module graph reaches react-native's Flow source
+// the mounted transform cannot parse. Suites mock the adapter (not the
+// sonner package) so the mock sits at the edge that imports it.
+vi.mock('@/lib/a11y/announcing-toast', () => ({
+  announcingToast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() },
+}));
+
 vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => auth }));
 vi.mock('@/lib/auth/logout-cleanup', () => ({ unregisterActivityTokensAndTombstone: vi.fn() }));
 vi.mock('expo-secure-store', () => ({
@@ -116,7 +124,10 @@ beforeEach(() => {
     savedMetadata.delete(key);
     await Promise.resolve();
   });
-  list.mockReset().mockResolvedValue([]);
+  // The default list holds both fixture organizations: a stored selection
+  // missing from the fetched list now recovers to the first membership, so
+  // the fencing tests below stage their own list payloads explicitly.
+  list.mockReset().mockResolvedValue([orgA, orgB]);
   onlineManager.setOnline(true);
 });
 
@@ -135,7 +146,7 @@ describe('OrganizationProvider default organization', () => {
     await mount();
     expect(scope()).toMatchObject({ organizationId: 'org-b', isLoaded: true, error: null });
     await act(() => {
-      names.resolve([orgA]);
+      names.resolve([orgA, orgB]);
     });
     expect(scope().organizationId).toBe('org-b');
   });
@@ -307,7 +318,8 @@ describe('OrganizationProvider restoration fencing', () => {
       }
       return savedMetadata.get(key) ?? null;
     });
-    list.mockResolvedValue([orgA]);
+    // The fetched list holds the saved organization, so the selection survives.
+    list.mockResolvedValue([orgA, orgB]);
 
     await mount();
     await waitFor(() => scope().isLoaded);

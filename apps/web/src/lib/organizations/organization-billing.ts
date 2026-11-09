@@ -21,6 +21,12 @@ import { captureException, captureMessage } from '@sentry/nextjs';
 import { sendCreditsTopUpEmail } from '@kilocode/web-shared/lib/email';
 import { IS_IN_AUTOMATED_TEST } from '@kilocode/web-shared/lib/config.server';
 import { after } from 'next/server';
+import {
+  resolvePaidCreditPolicy,
+  type PaidCreditGrant,
+} from '@kilocode/web-shared/lib/paidCreditPolicy';
+import { reconcileCreditExpirationsInTransaction } from '@kilocode/db/credit-expiration';
+import { recordRefundDebtRepayment } from '@kilocode/db/credit-refund-repayments';
 
 export async function getOrCreateStripeCustomerIdForOrganization(
   organizationId: Organization['id'],
@@ -82,6 +88,7 @@ export async function getOrCreateStripeCustomerIdForOrganization(
 
 type Config = StripeConfig;
 type ProcessTopupForOrganizationOptions = {
+  paidCredit?: PaidCreditGrant;
   isAutoTopUp?: boolean;
   serviceFeeCents?: number;
   grossPaidCents?: number;
@@ -229,6 +236,16 @@ export async function maybeSendOrganizationTopUpConfirmationEmail(params: {
   // accepted/delivered the message before the exception surfaced, so these
   // must NOT be treated as safe to retry.
   let ambiguousFailures = 0;
+  const [creditTransaction] = await db
+    .select({ expiryDate: credit_transactions.expiry_date })
+    .from(credit_transactions)
+    .where(
+      and(
+        eq(credit_transactions.organization_id, organization.id),
+        eq(credit_transactions.stripe_payment_id, stripeChargeOrInvoiceId)
+      )
+    )
+    .limit(1);
 
   for (const [recipientIndex, recipient] of recipients.entries()) {
     try {
@@ -240,6 +257,9 @@ export async function maybeSendOrganizationTopUpConfirmationEmail(params: {
         grossPaidCents,
         creditsCents,
         purchaseDate: purchaseDate ?? new Date(),
+        creditExpiryDate: creditTransaction?.expiryDate
+          ? new Date(creditTransaction.expiryDate)
+          : null,
         receiptUrl,
         organizationId: organization.id,
         organizationName: organization.name,
@@ -378,8 +398,17 @@ export async function processTopupForOrganization(
 
   const creditDescription = `Organization top-up via ${config.type}`;
   const creditAmountInMicrodollars = toMicrodollars(amountInCents / 100);
+  const policy = resolvePaidCreditPolicy(
+    options.paidCredit ?? { source: 'stripe', purchasedAt: new Date(), terms: 'legacy' }
+  );
+  const creditTransactionId = crypto.randomUUID();
 
   const didInsertCreditTransaction = await db.transaction(async (tx: DrizzleTransaction) => {
+    const current = await reconcileCreditExpirationsInTransaction(
+      { type: 'organization', id: organization.id },
+      tx
+    );
+    const baseline = Math.min(current.microdollars_used, current.total_microdollars_acquired);
     logExceptInTest(
       `processing topup for ${organization.id} - ${amountInCents} in transaction with payment id ${config.stripe_payment_id}`
     );
@@ -387,13 +416,16 @@ export async function processTopupForOrganization(
     const result = await tx
       .insert(credit_transactions)
       .values({
+        id: creditTransactionId,
         kilo_user_id: kiloUserId,
         organization_id: organization.id,
         is_free: false,
         amount_microdollars: creditAmountInMicrodollars,
         description: creditDescription,
         stripe_payment_id: config.stripe_payment_id,
-        original_baseline_microdollars_used: organization.microdollars_used,
+        original_baseline_microdollars_used: current.microdollars_used,
+        expiration_baseline_microdollars_used: baseline,
+        ...policy,
       })
       .onConflictDoNothing();
 
@@ -403,12 +435,22 @@ export async function processTopupForOrganization(
       );
       return false;
     }
+    await recordRefundDebtRepayment(tx, {
+      owner: { type: 'organization', id: organization.id },
+      transactionId: creditTransactionId,
+      priorAcquired: current.total_microdollars_acquired,
+      priorUsed: current.microdollars_used,
+      amountMicrodollars: creditAmountInMicrodollars,
+    });
 
     await tx
       .update(organizations)
       .set({
         total_microdollars_acquired: sql`${organizations.total_microdollars_acquired} + ${Math.round(creditAmountInMicrodollars)}`,
         microdollars_balance: sql`${organizations.microdollars_balance} + ${Math.round(creditAmountInMicrodollars)}`,
+        ...(policy.expiry_date && {
+          next_credit_expiration_at: sql`LEAST(${organizations.next_credit_expiration_at}, ${policy.expiry_date}::timestamptz)`,
+        }),
       })
       .where(eq(organizations.id, organization.id));
 

@@ -50,6 +50,16 @@ export function useOfflineBannerState(): boolean {
   return useSyncExternalStore(getStore().subscribe, getStore().isOffline);
 }
 
+/**
+ * Non-hook observation of committed connectivity changes, for app-lifetime
+ * wiring that must react without mounting a component. The listener fires on
+ * every committed state change (`online` / `offline` / `unknown`), reading the
+ * current value with `getCommittedConnectivityStatus`.
+ */
+export function subscribeCommittedConnectivityStatus(listener: () => void): () => void {
+  return getStore().subscribe(listener);
+}
+
 export function useCommittedConnectivityStatus(): BannerState {
   return useSyncExternalStore(getStore().subscribe, getStore().state);
 }

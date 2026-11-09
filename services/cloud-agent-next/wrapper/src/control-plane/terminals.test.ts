@@ -1,5 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it, setSystemTime } from 'bun:test';
-import type { WrapperKiloClient, WrapperPty, WrapperPtySize } from '../kilo-api.js';
+import type { WrapperPty, WrapperPtySize } from '../kilo-api.js';
+import type { Harness } from './harness.js';
+import { createKiloHarness } from './kilo-harness.js';
 import type { KiloRuntime, KiloRuntimes } from './kilo-runtime.js';
 import { createControlPlaneTerminals } from './terminals.js';
 import { forgetAttachedRoot, rootForSession } from '../control/session-directories.js';
@@ -21,37 +23,43 @@ async function waitFor(assertion: () => boolean): Promise<void> {
   throw new Error('condition was not met');
 }
 
-function fakeClient(serverUrl: string): WrapperKiloClient {
-  return {
-    serverUrl,
+function fakeClient(serverUrl: string): Harness {
+  const harness = createKiloHarness({
     server: { url: serverUrl, authorization: KILO_AUTHORIZATION },
-    createPty: async (input: { cwd: string }): Promise<WrapperPty> => ({
-      id: ptyId,
-      title: 'Terminal',
-      command: '/bin/sh',
-      args: [],
-      cwd: input.cwd,
-      status: 'running',
-      pid: 73,
-    }),
-    resizePty: async (
-      id: string,
-      _size: WrapperPtySize,
-      directory?: string
-    ): Promise<WrapperPty> => ({
-      id,
-      title: 'Terminal',
-      command: '/bin/sh',
-      args: [],
-      cwd: directory ?? session.directory,
-      status: 'running',
-      pid: 73,
-    }),
-    deletePty: async () => true,
-  } as unknown as WrapperKiloClient;
+    directory: session.directory,
+  });
+  return {
+    ...harness,
+    terminals: {
+      ...harness.terminals,
+      createPty: async (input: { cwd: string }): Promise<WrapperPty> => ({
+        id: ptyId,
+        title: 'Terminal',
+        command: '/bin/sh',
+        args: [],
+        cwd: input.cwd,
+        status: 'running',
+        pid: 73,
+      }),
+      resizePty: async (
+        id: string,
+        _size: WrapperPtySize,
+        directory?: string
+      ): Promise<WrapperPty> => ({
+        id,
+        title: 'Terminal',
+        command: '/bin/sh',
+        args: [],
+        cwd: directory ?? session.directory,
+        status: 'running',
+        pid: 73,
+      }),
+      deletePty: async () => true,
+    },
+  };
 }
 
-function fakeRuntime(client: WrapperKiloClient): KiloRuntime {
+function fakeRuntime(client: Harness): KiloRuntime {
   return {
     directory: session.directory,
     env: { TERMINAL: '1' },
@@ -123,7 +131,7 @@ afterAll(async () => {
   await server.stop(true);
 });
 
-function attachedTerminals(client: WrapperKiloClient) {
+function attachedTerminals(client: Harness) {
   const terminals = createControlPlaneTerminals({
     controlUrl: serverUrl,
     wrapperId: 'wrapper_test',
@@ -294,10 +302,9 @@ describe('control-plane terminal adapter (B10)', () => {
     terminals.shutdown();
   });
 
-  it('reports heartbeat activity only for recent browser→PTY input', async () => {
+  it('tracks recent browser-to-PTY input for diagnostics', async () => {
     sockets.reverse = undefined;
     const terminals = attachedTerminals(fakeClient(serverUrl));
-    expect(terminals.hasRecentInput()).toBe(false);
     expect(terminals.recentInputCount()).toBe(0);
 
     await terminals.handle({
@@ -320,17 +327,14 @@ describe('control-plane terminal adapter (B10)', () => {
     await waitFor(() => sockets.reverse !== undefined);
     await connected;
 
-    // An open, idle PTY is not activity.
-    expect(terminals.hasRecentInput()).toBe(false);
     expect(terminals.recentInputCount()).toBe(0);
     const reverse = sockets.reverse as Bun.ServerWebSocket<{ path: string }> | undefined;
     if (!reverse) throw new Error('reverse socket was not opened');
     reverse.send('keystroke');
-    await waitFor(() => terminals.hasRecentInput());
+    await waitFor(() => terminals.recentInputCount() === 1);
     expect(terminals.recentInputCount()).toBe(1);
 
     await terminals.forgetSession(session.sessionId);
-    expect(terminals.hasRecentInput()).toBe(false);
     expect(terminals.recentInputCount()).toBe(0);
     terminals.shutdown();
   });
@@ -361,12 +365,10 @@ describe('control-plane terminal adapter (B10)', () => {
     if (!reverse) throw new Error('reverse socket was not opened');
     reverse.send('keystroke');
     await waitFor(() => terminals.recentInputCount() === 1);
-    expect(terminals.hasRecentInput()).toBe(true);
 
     try {
       setSystemTime(new Date(Date.now() + 31_000));
       expect(terminals.recentInputCount()).toBe(0);
-      expect(terminals.hasRecentInput()).toBe(false);
     } finally {
       setSystemTime();
     }

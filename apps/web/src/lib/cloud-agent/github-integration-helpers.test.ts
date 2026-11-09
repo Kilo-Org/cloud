@@ -206,7 +206,7 @@ describe('github-integration-helpers', () => {
     });
   });
 
-  describe('fetchGitHubRepositoriesForOrganization', () => {
+  describe('fetchAllGitHubRepositoriesForOrganization', () => {
     it('returns cached repositories for an active integration', async () => {
       mockGetIntegrationsByOrganization.mockResolvedValue([buildIntegration()]);
 
@@ -389,6 +389,148 @@ describe('github-integration-helpers', () => {
       const result = await fetchAllGitHubRepositoriesForOrganization('org-123');
 
       expect(result.integrationInstalled).toBe(true);
+      expect(result.partial).toBe(true);
+      expect(result.repositories).toEqual([
+        expect.objectContaining({
+          fullName: 'acme-core/api',
+          platformIntegrationId: 'integration-1',
+        }),
+      ]);
+    });
+
+    it('reports the suspended reason when a suspended installation is the only one', async () => {
+      mockGetIntegrationsByOrganization.mockResolvedValue([
+        buildIntegration({
+          integration_status: 'suspended',
+          suspended_at: '2026-06-25 18:00:00+00',
+          suspended_by: 'github_deleted',
+        }),
+      ]);
+
+      const { fetchAllGitHubRepositoriesForOrganization } =
+        await import('./github-integration-helpers');
+      const result = await fetchAllGitHubRepositoriesForOrganization('org-123');
+
+      expect(result).toEqual({
+        integrationInstalled: false,
+        repositories: [],
+        syncedAt: null,
+        errorMessage: 'GitHub integration is suspended',
+        unavailableReason: 'suspended',
+      });
+      expect(mockFetchGitHubRepositories).not.toHaveBeenCalled();
+    });
+
+    it('reports the reauthorization reason when every installation is auth-invalid', async () => {
+      mockGetIntegrationsByOrganization.mockResolvedValue([
+        buildIntegration({ auth_invalid_at: '2026-06-25 18:00:00+00' }),
+        buildIntegration({
+          id: 'integration-2',
+          platform_installation_id: 'installation-2',
+          auth_invalid_at: '2026-06-25 18:00:00+00',
+        }),
+      ]);
+
+      const { fetchAllGitHubRepositoriesForOrganization } =
+        await import('./github-integration-helpers');
+      const result = await fetchAllGitHubRepositoriesForOrganization('org-123');
+
+      expect(result).toMatchObject({
+        integrationInstalled: false,
+        errorMessage: 'GitHub integration requires reauthorization',
+        unavailableReason: 'reauth_required',
+      });
+      expect(mockFetchGitHubRepositories).not.toHaveBeenCalled();
+    });
+
+    it('reports only the reachable repositories and flags the list as partial when an installation is suspended', async () => {
+      mockGetIntegrationsByOrganization.mockResolvedValue([
+        buildIntegration({
+          id: 'integration-1',
+          repositories: [{ id: 1, name: 'api', full_name: 'acme-core/api', private: true }],
+        }),
+        buildIntegration({
+          id: 'integration-2',
+          platform_installation_id: 'installation-2',
+          integration_status: 'suspended',
+          suspended_at: '2026-06-25 18:00:00+00',
+        }),
+      ]);
+
+      const { fetchAllGitHubRepositoriesForOrganization } =
+        await import('./github-integration-helpers');
+      const result = await fetchAllGitHubRepositoriesForOrganization('org-123');
+
+      expect(result.integrationInstalled).toBe(true);
+      expect(result.partial).toBe(true);
+      expect(result.unavailableReason).toBeUndefined();
+      expect(result.repositories).toEqual([
+        expect.objectContaining({
+          fullName: 'acme-core/api',
+          platformIntegrationId: 'integration-1',
+        }),
+      ]);
+      expect(mockFetchGitHubRepositories).not.toHaveBeenCalled();
+    });
+
+    it('keeps the retry affordance when a rejected read sits beside an unusable installation', async () => {
+      mockGetIntegrationsByOrganization.mockResolvedValue([
+        buildIntegration({
+          integration_status: 'suspended',
+          suspended_at: '2026-06-25 18:00:00+00',
+        }),
+        buildIntegration({
+          id: 'integration-2',
+          platform_installation_id: 'installation-2',
+          repositories: null,
+        }),
+      ]);
+      mockFetchGitHubRepositories.mockRejectedValue(new Error('GitHub unavailable'));
+
+      const { fetchAllGitHubRepositoriesForOrganization } =
+        await import('./github-integration-helpers');
+      const result = await fetchAllGitHubRepositoriesForOrganization('org-123');
+
+      expect(result.integrationInstalled).toBe(false);
+      expect(result.unavailableReason).toBe('suspended');
+      // The sibling's read can clear on retry, so the list is not settled.
+      expect(result.partial).toBe(true);
+    });
+
+    it('treats an installation without a platform installation id as unavailable', async () => {
+      mockGetIntegrationsByOrganization.mockResolvedValue([
+        buildIntegration({ platform_installation_id: null }),
+      ]);
+
+      const { fetchAllGitHubRepositoriesForOrganization } =
+        await import('./github-integration-helpers');
+      const result = await fetchAllGitHubRepositoriesForOrganization('org-123');
+
+      expect(result).toEqual({
+        integrationInstalled: false,
+        repositories: [],
+        syncedAt: null,
+        errorMessage: 'GitHub integration is not properly configured',
+        unavailableReason: 'not_configured',
+      });
+      expect(mockFetchGitHubRepositories).not.toHaveBeenCalled();
+    });
+
+    it('reports configured repositories from one installation while another lacks an installation id', async () => {
+      mockGetIntegrationsByOrganization.mockResolvedValue([
+        buildIntegration({
+          id: 'integration-1',
+          repositories: [{ id: 1, name: 'api', full_name: 'acme-core/api', private: true }],
+        }),
+        buildIntegration({ id: 'integration-2', platform_installation_id: null }),
+      ]);
+
+      const { fetchAllGitHubRepositoriesForOrganization } =
+        await import('./github-integration-helpers');
+      const result = await fetchAllGitHubRepositoriesForOrganization('org-123');
+
+      expect(result.integrationInstalled).toBe(true);
+      expect(result.partial).toBe(true);
       expect(result.repositories).toEqual([
         expect.objectContaining({
           fullName: 'acme-core/api',
@@ -414,68 +556,6 @@ describe('github-integration-helpers', () => {
       await expect(fetchAllGitHubRepositoriesForOrganization('org-123')).rejects.toThrow(
         'Failed to fetch GitHub repositories'
       );
-    });
-
-    it('returns integrationInstalled false when no integration exists', async () => {
-      mockGetPrimaryGitHubIntegrationForOrganization.mockResolvedValue(null);
-      mockGetIntegrationForOrganization.mockResolvedValue(null);
-
-      const { fetchGitHubRepositoriesForOrganization } =
-        await import('./github-integration-helpers');
-      const result = await fetchGitHubRepositoriesForOrganization('org-123');
-
-      expect(result.integrationInstalled).toBe(false);
-      expect(result.repositories).toEqual([]);
-    });
-
-    it('returns no repositories when the integration is suspended', async () => {
-      mockGetPrimaryGitHubIntegrationForOrganization.mockResolvedValue(null);
-      mockGetIntegrationForOrganization.mockResolvedValue(
-        buildIntegration({
-          integration_status: 'suspended',
-          suspended_at: '2026-06-25 18:00:00+00',
-          suspended_by: 'someone',
-        })
-      );
-
-      const { fetchGitHubRepositoriesForOrganization } =
-        await import('./github-integration-helpers');
-      const result = await fetchGitHubRepositoriesForOrganization('org-123');
-
-      expect(result.integrationInstalled).toBe(false);
-      expect(result.repositories).toEqual([]);
-      expect(result.errorMessage).toBe('GitHub integration is suspended');
-      expect(mockFetchGitHubRepositories).not.toHaveBeenCalled();
-    });
-
-    it('returns no repositories when the integration requires reauthorization', async () => {
-      mockGetPrimaryGitHubIntegrationForOrganization.mockResolvedValue(null);
-      mockGetIntegrationForOrganization.mockResolvedValue(
-        buildIntegration({ auth_invalid_at: '2026-06-25 18:00:00+00' })
-      );
-
-      const { fetchGitHubRepositoriesForOrganization } =
-        await import('./github-integration-helpers');
-      const result = await fetchGitHubRepositoriesForOrganization('org-123');
-
-      expect(result.integrationInstalled).toBe(false);
-      expect(result.errorMessage).toBe('GitHub integration requires reauthorization');
-      expect(mockFetchGitHubRepositories).not.toHaveBeenCalled();
-    });
-
-    it('does not refresh repositories for a suspended integration even with forceRefresh', async () => {
-      mockGetPrimaryGitHubIntegrationForOrganization.mockResolvedValue(null);
-      mockGetIntegrationForOrganization.mockResolvedValue(
-        buildIntegration({ integration_status: 'suspended' })
-      );
-
-      const { fetchGitHubRepositoriesForOrganization } =
-        await import('./github-integration-helpers');
-      const result = await fetchGitHubRepositoriesForOrganization('org-123', true);
-
-      expect(result.integrationInstalled).toBe(false);
-      expect(mockFetchGitHubRepositories).not.toHaveBeenCalled();
-      expect(mockUpdateRepositoriesForIntegration).not.toHaveBeenCalled();
     });
   });
 });

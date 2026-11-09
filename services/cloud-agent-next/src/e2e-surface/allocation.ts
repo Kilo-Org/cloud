@@ -15,7 +15,7 @@
 import type { Context } from 'hono';
 import { projectSessionAccessHttpError, requireCurrentSessionAccess } from '../session-access.js';
 import { getSandboxControlStub } from '../sandbox-control/stub.js';
-import { resolveSessionStub, type SessionStub } from '../sandbox-session/session-stub.js';
+import { getSandboxSessionStub, type SessionStub } from '../sandbox-session/session-stub.js';
 import type { CloudAgentSessionState } from '../persistence/types.js';
 import type { HonoContext } from '../hono-context.js';
 import type { AllocationView } from '../control-plane/sandbox/allocation.js';
@@ -90,7 +90,7 @@ export async function handleAllocationInspect(c: Context<HonoContext>): Promise<
     return projectSessionAccessHttpError(error);
   }
 
-  const getStub = () => resolveSessionStub(env, userId, sessionId);
+  const getStub = () => getSandboxSessionStub(env, userId, sessionId);
   const metadata = await withDORetry<SessionStub, CloudAgentSessionState | null>(
     getStub,
     stub => stub.getMetadata(),

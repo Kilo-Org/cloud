@@ -114,6 +114,76 @@ describe('SideBySideRow code direction', () => {
   });
 });
 
+describe('SideBySideRow code end inset', () => {
+  // Same edge as the unified DiffLine: the row mirrors under an RTL interface,
+  // so a physical-only gutter inset leaves each LTR code Text flush against
+  // the column's mirrored end. Every column's code container names a logical
+  // end inset instead, and the empty column keeps the same shape.
+  function codeContainers(renderer: TestRenderer.ReactTestRenderer) {
+    const columns = renderer.root.findAll(
+      node =>
+        node.type === ('View' as never) &&
+        typeof node.props.className === 'string' &&
+        node.props.className.includes('flex-1 flex-row items-stretch')
+    );
+    expect(columns).toHaveLength(2);
+    return columns.map(column => {
+      const children = column.props.children as TestRenderer.ReactTestInstance[];
+      const code = children[1];
+      if (code === undefined) {
+        throw new Error('the column rendered without a code container');
+      }
+      return code;
+    });
+  }
+
+  function expectEndInset(code: TestRenderer.ReactTestInstance) {
+    const style = code.props.style as {
+      paddingEnd?: number;
+      paddingLeft?: number;
+      paddingRight?: number;
+    };
+    expect(style.paddingEnd).toBe(2);
+    expect(style.paddingLeft).toBeUndefined();
+    expect(style.paddingRight).toBeUndefined();
+  }
+
+  it('names a logical end inset on both column code containers', () => {
+    for (const code of codeContainers(mountRow(row()))) {
+      expectEndInset(code);
+    }
+  });
+
+  it('names the same inset on the code container of an empty column', () => {
+    const renderer = mountRow({ left: { line: line() }, right: null });
+    for (const code of codeContainers(renderer)) {
+      expectEndInset(code);
+    }
+  });
+});
+
+describe('SideBySideRow column numbers', () => {
+  // Each column carries its own file's numbering — the left column the old
+  // number, the right column the new one — and the row's spoken label names
+  // the line text only, so no column draws a number the label contradicts.
+  // This pins that split so a single-gutter refactor cannot reintroduce it.
+  it('shows the old number on the left and the new number on the right', () => {
+    const contextLine = line({ type: 'context', oldLine: 4, newLine: 6 });
+    const renderer = mountRow({ left: { line: contextLine }, right: { line: contextLine } });
+
+    const gutterTexts = renderer.root
+      .findAll(
+        node =>
+          node.type === ('RNText' as never) &&
+          typeof node.props.children === 'string' &&
+          /^\d+$/.test(node.props.children)
+      )
+      .map(node => node.props.children as string);
+
+    expect(gutterTexts).toEqual(['4', '6']);
+  });
+});
+
 describe('SideBySideRow gutter alignment', () => {
   // Same defect class as the unified DiffLine gutter: a wrapped code line
   // makes the column several visual lines tall, and a centered number would

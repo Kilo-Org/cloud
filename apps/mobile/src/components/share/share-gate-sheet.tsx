@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- Share gate owns commit, destination admission, and CLI-spawn orchestration in one formSheet body. */
 import { useQuery } from '@tanstack/react-query';
-import * as Haptics from 'expo-haptics';
+import { selectionHaptic } from '@/lib/haptics';
 import { useRouter } from 'expo-router';
 import { GitPullRequest, Plus, X } from '@/components/ui/icons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -18,12 +18,14 @@ import { DestinationOptionRow } from '@/components/destination-option-row';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { useAgentSessions } from '@/lib/hooks/use-agent-sessions';
+import { useOrganizationsList } from '@/lib/hooks/use-organizations-list';
 import { useRemoteInstanceSpawn } from '@/lib/hooks/use-remote-instance-spawn';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
 import { useHoistedOperationKey } from '@/lib/operation-key';
 import { providerPrRoutePath } from '@/lib/pr-review/provider-pr-ref';
 import { resolveRemoteSubmitOutcome } from '@/lib/remote-submit-outcome';
+import { resolveRemoteStartPlan } from '@/lib/remote-spawn-admission';
 import { appendShareParams, setPendingShareNavigation } from '@/lib/share-navigation';
 import {
   clearPendingShareIdDraft,
@@ -47,6 +49,7 @@ import {
 import { selectShareDestinations, type ShareDestinationRow } from './share-destinations';
 import { ShareDestinationList } from './share-destination-list';
 import { isShareCommitEnabled, selectShareGateState } from './share-gate-state';
+import { resolveShareNewSessionOrganization } from './share-new-session-org';
 import { SharePayloadPreview } from './share-payload-preview';
 import { type SharePayloadValidation, validateSharePayload } from './share-payload-validation';
 import { selectShareReviewPr, selectShareReviewPrSubtitle } from './share-review-pr';
@@ -61,6 +64,15 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
   const trpc = useTRPC();
   const { t } = useTranslation();
   const { organizationId, isLoaded: orgLoaded } = useOrganization();
+  // The account's memberships: the gate commits a new session only into an
+  // organization this list holds (see `resolveShareNewSessionOrganization`).
+  const {
+    data: memberships,
+    isFetched: membershipsFetched,
+    isFetching: membershipsFetching,
+    isError: membershipsFailed,
+    isRefetchError: membershipsRefetchFailed,
+  } = useOrganizationsList();
   // Org-scoped stored page (cloud-agent + cli) narrowed to live sessions:
   // a session that is not live cannot receive the share, so it is never
   // offered. The active list supplies the liveness filter and the
@@ -223,7 +235,7 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
     if (!reviewPr) {
       return;
     }
-    void Haptics.selectionAsync();
+    selectionHaptic();
     setPendingShareNavigation({
       href: providerPrRoutePath(reviewPr) as string,
       shareId: null,
@@ -247,7 +259,7 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
       if (!shareId) {
         return;
       }
-      void Haptics.selectionAsync();
+      selectionHaptic();
       committedShareIdRef.current = shareId;
       setPendingShareNavigation({ href, shareId });
       // Clear only this id's durable pending hint (value-scoped). A kill after
@@ -263,9 +275,33 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
     if (!shareId || isSpawning) {
       return;
     }
-    const base = getNewAgentSessionPath(organizationId);
+    const selectedOrganizationId = resolveShareNewSessionOrganization({
+      organizationId,
+      membershipIds: memberships?.map(membership => membership.organizationId),
+      // An earlier success is not proof the list is current: a refetch in
+      // flight or a failed background refresh (cached data keeps `isError`
+      // false) is only the previous answer, so it cannot name a target.
+      membershipsSettled: membershipsFetched && !membershipsFetching,
+      membershipsFailed: membershipsFailed || membershipsRefetchFailed,
+      // The selected organization's own org-scoped read is the only proof it is
+      // unusable: the org list can be a stale, earlier-successful page.
+      selectedOrganizationAccessDenied:
+        sessions.storedErrorCode === 'UNAUTHORIZED' || sessions.storedErrorCode === 'FORBIDDEN',
+    });
+    const base = getNewAgentSessionPath(selectedOrganizationId);
     commit(appendShareParams(base, shareId));
-  }, [commit, isSpawning, organizationId, shareId]);
+  }, [
+    commit,
+    isSpawning,
+    memberships,
+    membershipsFailed,
+    membershipsFetching,
+    membershipsFetched,
+    membershipsRefetchFailed,
+    organizationId,
+    sessions.storedErrorCode,
+    shareId,
+  ]);
 
   const commitEnabled = isShareCommitEnabled({ orgLoaded, validation });
   const instanceRowsDisabled = !commitEnabled || isSpawning;
@@ -287,7 +323,10 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
       if (!admission.ok) {
         // Keep the gate open and the payload staged so the user can pick
         // another destination.
-        Alert.alert(admission.title, admission.message);
+        Alert.alert(admission.title, admission.message, undefined, {
+          // Android back dismisses; the gate stays open for another choice.
+          cancelable: true,
+        });
         return;
       }
       const org = row.organization_id ?? undefined;
@@ -303,6 +342,19 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
         return;
       }
 
+      // The remote start is a relay command, so the organization subscription
+      // gate never runs for it and the session would be created before the
+      // model request was refused. Refuse here, before the spawn, in the same
+      // words the cloud start path uses for the same organization state.
+      const plan = resolveRemoteStartPlan({
+        organizationId: organizationId ?? null,
+        organizations: memberships,
+      });
+      if (!plan.allowed) {
+        toast.error(plan.toast);
+        return;
+      }
+
       const admission = resolveShareDestinationAdmission({
         createdOnPlatform: 'cli',
         live: true,
@@ -311,7 +363,10 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
         hasFiles: resolveShareHasFiles(validation, payload?.files.length ?? 0),
       });
       if (!admission.ok) {
-        Alert.alert(admission.title, admission.message);
+        Alert.alert(admission.title, admission.message, undefined, {
+          // Android back dismisses; the gate stays open for another choice.
+          cancelable: true,
+        });
         return;
       }
 
@@ -375,6 +430,8 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
       commitEnabled,
       getKey,
       isSpawning,
+      memberships,
+      organizationId,
       payload,
       refetchInstances,
       rotateKey,
@@ -393,7 +450,7 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
 
   const header = (
     <View className="border-b border-border bg-background pt-4">
-      <View className="min-h-11 flex-row items-center justify-center px-4">
+      <View className="min-h-[48px] flex-row items-center justify-center px-4">
         <Text
           className="min-w-0 flex-1 px-12 text-center text-lg font-semibold text-foreground"
           accessibilityRole="header"
@@ -452,6 +509,7 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
       destinations={destinations}
       onSelect={handleSelectDestination}
       onRetry={handleRetry}
+      onDismiss={dismiss}
       instances={instanceRows}
       spawningConnectionId={spawningConnectionId}
       instanceRowsDisabled={instanceRowsDisabled}

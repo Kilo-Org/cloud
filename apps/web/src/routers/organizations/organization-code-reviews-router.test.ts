@@ -1,5 +1,6 @@
 const mockSyncWebhooksForRepositories = jest.fn();
 const mockGetValidGitLabToken = jest.fn();
+const mockIsGitLabCredentialConnected = jest.fn();
 const mockGetBitbucketCodeReviewerReadiness = jest.fn();
 
 jest.mock('@/lib/integrations/platforms/gitlab/webhook-sync', () => ({
@@ -8,6 +9,7 @@ jest.mock('@/lib/integrations/platforms/gitlab/webhook-sync', () => ({
 
 jest.mock('@/lib/integrations/gitlab-service', () => ({
   getValidGitLabToken: (...args: unknown[]) => mockGetValidGitLabToken(...args),
+  isGitLabCredentialConnected: (...args: unknown[]) => mockIsGitLabCredentialConnected(...args),
 }));
 
 jest.mock('@/lib/integrations/platforms/bitbucket/workspace-access-token-repository-cache', () => ({
@@ -127,6 +129,40 @@ describe('organization review agent router: toggleReviewAgent', () => {
     expect(result).toEqual({ success: true, isEnabled: true });
     const logs = await settingsChangeAuditLogs(organization.id);
     expect(logs).toEqual([{ message: 'Enabled AI Code Review Agent for github' }]);
+  });
+
+  it('stores the selected repository mode when a GitLab agent is enabled for the first time', async () => {
+    const { owner, organization } = await createFixtureOrganization();
+    const caller = await createCallerForUser(owner.id);
+
+    await caller.organizations.reviewAgent.toggleReviewAgent({
+      organizationId: organization.id,
+      platform: 'gitlab',
+      isEnabled: true,
+    });
+
+    const stored = await getAgentConfig(organization.id, 'code_review', 'gitlab');
+    expect(stored?.is_enabled).toBe(true);
+    expect(stored?.config).toEqual(
+      expect.objectContaining({
+        repository_selection_mode: 'selected',
+        selected_repository_ids: [],
+      })
+    );
+  });
+
+  it('keeps the all repository mode when a GitHub agent is enabled for the first time', async () => {
+    const { owner, organization } = await createFixtureOrganization();
+    const caller = await createCallerForUser(owner.id);
+
+    await caller.organizations.reviewAgent.toggleReviewAgent({
+      organizationId: organization.id,
+      platform: 'github',
+      isEnabled: true,
+    });
+
+    const stored = await getAgentConfig(organization.id, 'code_review', 'github');
+    expect(stored?.config).toEqual(expect.objectContaining({ repository_selection_mode: 'all' }));
   });
 });
 
@@ -894,5 +930,248 @@ describe('organization review agent router: skip bot pull requests', () => {
       platform: 'github',
     });
     expect(cfg.skipBotPullRequests).toBe(false);
+  });
+});
+
+describe('organization review agent router: getGitHubStatus connection rule', () => {
+  afterAll(async () => {
+    for (const organizationId of createdOrganizationIds) {
+      await db
+        .delete(organization_audit_logs)
+        .where(eq(organization_audit_logs.organization_id, organizationId));
+      await db
+        .delete(agent_configs)
+        .where(eq(agent_configs.owned_by_organization_id, organizationId));
+      await db.delete(organizations).where(eq(organizations.id, organizationId));
+    }
+  });
+
+  async function seedOrgGitHubIntegration(
+    organizationId: string,
+    overrides: Partial<typeof platform_integrations.$inferInsert> = {}
+  ) {
+    const [row] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_organization_id: organizationId,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: `inst-${crypto.randomUUID()}`,
+        github_app_type: 'standard',
+        github_connection_role: 'workflow',
+        integration_status: 'active',
+        repository_access: 'all',
+        platform_account_login: 'octo-org',
+        installed_at: '2026-01-01T00:00:00Z',
+        ...overrides,
+      })
+      .returning();
+    return row;
+  }
+
+  it('reports the healthy active workflow installation as connected', async () => {
+    const { owner, organization } = await createFixtureOrganization();
+    await seedOrgGitHubIntegration(organization.id);
+
+    const caller = await createCallerForUser(owner.id);
+    const status = await caller.organizations.reviewAgent.getGitHubStatus({
+      organizationId: organization.id,
+    });
+
+    expect(status).toEqual({
+      connected: true,
+      integration: {
+        accountLogin: 'octo-org',
+        repositorySelection: 'all',
+        installedAt: '2026-01-01 00:00:00+00',
+      },
+    });
+  });
+
+  it('reports a suspended installation as not connected', async () => {
+    const { owner, organization } = await createFixtureOrganization();
+    await seedOrgGitHubIntegration(organization.id, {
+      integration_status: 'suspended',
+      suspended_at: '2026-02-01T00:00:00Z',
+    });
+
+    const caller = await createCallerForUser(owner.id);
+    const status = await caller.organizations.reviewAgent.getGitHubStatus({
+      organizationId: organization.id,
+    });
+
+    expect(status).toEqual({ connected: false, integration: null });
+  });
+
+  it('reports a locally disconnected installation as not connected', async () => {
+    const { owner, organization } = await createFixtureOrganization();
+    await seedOrgGitHubIntegration(organization.id, {
+      github_disconnected_at: '2026-02-01T00:00:00Z',
+    });
+
+    const caller = await createCallerForUser(owner.id);
+    const status = await caller.organizations.reviewAgent.getGitHubStatus({
+      organizationId: organization.id,
+    });
+
+    expect(status).toEqual({ connected: false, integration: null });
+  });
+});
+
+describe('organization review agent router: repository_selection_mode', () => {
+  afterAll(async () => {
+    for (const organizationId of createdOrganizationIds) {
+      await db
+        .delete(organization_audit_logs)
+        .where(eq(organization_audit_logs.organization_id, organizationId));
+      await db
+        .delete(agent_configs)
+        .where(eq(agent_configs.owned_by_organization_id, organizationId));
+      await db.delete(organizations).where(eq(organizations.id, organizationId));
+    }
+  });
+
+  it('forces GitLab repository_selection_mode to selected on a full save with the mode "all"', async () => {
+    const { owner, organization } = await createFixtureOrganization();
+    const caller = await createCallerForUser(owner.id);
+
+    await caller.organizations.reviewAgent.saveReviewConfig({
+      organizationId: organization.id,
+      platform: 'gitlab',
+      reviewStyle: 'balanced',
+      focusAreas: [],
+      modelSlug: 'test-model',
+      repositorySelectionMode: 'all',
+      selectedRepositoryIds: [303],
+      autoConfigureWebhooks: false,
+    });
+
+    const stored = await db.query.agent_configs.findFirst({
+      where: and(
+        eq(agent_configs.agent_type, 'code_review'),
+        eq(agent_configs.platform, 'gitlab'),
+        eq(agent_configs.owned_by_organization_id, organization.id)
+      ),
+    });
+    expect(stored?.config).toEqual(
+      expect.objectContaining({
+        repository_selection_mode: 'selected',
+        selected_repository_ids: [303],
+      })
+    );
+  });
+
+  it('forces GitLab repository_selection_mode to selected on a full save with the mode omitted', async () => {
+    const { owner, organization } = await createFixtureOrganization();
+    const caller = await createCallerForUser(owner.id);
+
+    await caller.organizations.reviewAgent.saveReviewConfig({
+      organizationId: organization.id,
+      platform: 'gitlab',
+      reviewStyle: 'balanced',
+      focusAreas: [],
+      modelSlug: 'test-model',
+      selectedRepositoryIds: [404],
+      autoConfigureWebhooks: false,
+    });
+
+    const stored = await db.query.agent_configs.findFirst({
+      where: and(
+        eq(agent_configs.agent_type, 'code_review'),
+        eq(agent_configs.platform, 'gitlab'),
+        eq(agent_configs.owned_by_organization_id, organization.id)
+      ),
+    });
+    expect(stored?.config).toEqual(
+      expect.objectContaining({
+        repository_selection_mode: 'selected',
+        selected_repository_ids: [404],
+      })
+    );
+  });
+
+  it('runs the GitLab hook sync for the resolved selected mode when the save sends "all"', async () => {
+    const { owner, organization } = await createFixtureOrganization();
+    await db.insert(platform_integrations).values({
+      owned_by_organization_id: organization.id,
+      platform: 'gitlab',
+      integration_type: 'oauth',
+      integration_status: 'active',
+      metadata: {
+        webhook_secret: 'webhook-secret',
+        gitlab_instance_url: 'https://gitlab.example.com',
+        configured_webhooks: {},
+      },
+    });
+    mockGetValidGitLabToken.mockResolvedValue('gitlab-token');
+    mockSyncWebhooksForRepositories.mockResolvedValue({
+      result: { created: [], updated: [], deleted: [], errors: [] },
+      updatedWebhooks: {},
+    });
+    const caller = await createCallerForUser(owner.id);
+
+    await caller.organizations.reviewAgent.saveReviewConfig({
+      organizationId: organization.id,
+      platform: 'gitlab',
+      reviewStyle: 'balanced',
+      focusAreas: [],
+      modelSlug: 'test-model',
+      repositorySelectionMode: 'all',
+      selectedRepositoryIds: [303],
+    });
+
+    // The resolved mode is 'selected', so the stored selection gets its hooks
+    // even though the client asked for 'all'.
+    expect(mockSyncWebhooksForRepositories).toHaveBeenCalledWith(
+      'gitlab-token',
+      'webhook-secret',
+      [303],
+      [],
+      {},
+      'https://gitlab.example.com'
+    );
+  });
+
+  it('reports selected for the organization GitLab default config and keeps GitHub unchanged', async () => {
+    const { owner, organization } = await createFixtureOrganization();
+    const caller = await createCallerForUser(owner.id);
+
+    const gitlab = await caller.organizations.reviewAgent.getReviewConfig({
+      organizationId: organization.id,
+      platform: 'gitlab',
+    });
+    expect(gitlab.repositorySelectionMode).toBe('selected');
+
+    const github = await caller.organizations.reviewAgent.getReviewConfig({
+      organizationId: organization.id,
+      platform: 'github',
+    });
+    expect(github.repositorySelectionMode).toBe('all');
+  });
+
+  it('reports selected for a stored organization GitLab config with the mode "all"', async () => {
+    const { owner, organization } = await createFixtureOrganization();
+    await db.insert(agent_configs).values({
+      owned_by_organization_id: organization.id,
+      agent_type: 'code_review',
+      platform: 'gitlab',
+      config: {
+        review_style: 'balanced',
+        focus_areas: [],
+        model_slug: 'test-model',
+        repository_selection_mode: 'all',
+        selected_repository_ids: [303],
+      },
+      is_enabled: true,
+      created_by: owner.id,
+    });
+    const caller = await createCallerForUser(owner.id);
+
+    const returned = await caller.organizations.reviewAgent.getReviewConfig({
+      organizationId: organization.id,
+      platform: 'gitlab',
+    });
+    expect(returned.repositorySelectionMode).toBe('selected');
+    expect(returned.selectedRepositoryIds).toEqual([303]);
   });
 });

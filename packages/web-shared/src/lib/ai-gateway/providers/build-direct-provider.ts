@@ -1,41 +1,56 @@
 import { addCacheBreakpoints } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
-import type { CustomLlmApiConfig, CustomLlmSecureProxyCredentials } from '@kilocode/db';
+import type {
+  CustomLlmApiConfig,
+  CustomLlmAwsBedrockCredentials,
+  CustomLlmSecureProxyCredentials,
+} from '@kilocode/db';
 import {
   type GatewayChatApiKind,
   type Provider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { sanitizeJsonRefToolResults } from '@kilocode/web-shared/lib/ai-gateway/providers/sanitize-json-ref-tool-results';
+import { generateProviderSpecificHash } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
 
 export type DirectUpstreamAuth =
   | { type: 'api_key'; apiKey: string; apiKeyHeader: 'x-api-key' | null }
-  | { type: 'secure_proxy'; credentials: CustomLlmSecureProxyCredentials };
+  | { type: 'secure_proxy'; credentials: CustomLlmSecureProxyCredentials }
+  | { type: 'aws_bedrock'; credentials: CustomLlmAwsBedrockCredentials };
 
 function resolveRouting(
   upstream: CustomLlmApiConfig,
   auth: DirectUpstreamAuth
-): Pick<Provider, 'apiUrl' | 'apiKey' | 'apiKeyHeader' | 'secureProxy'> {
-  if (auth.type === 'api_key') {
-    return { apiUrl: upstream.base_url, apiKey: auth.apiKey, apiKeyHeader: auth.apiKeyHeader };
+): Pick<Provider, 'apiUrl' | 'apiKey' | 'apiKeyHeader' | 'secureProxy' | 'awsBedrock'> {
+  switch (auth.type) {
+    case 'api_key':
+      return { apiUrl: upstream.base_url, apiKey: auth.apiKey, apiKeyHeader: auth.apiKeyHeader };
+    case 'aws_bedrock':
+      return {
+        apiUrl: upstream.base_url,
+        apiKey: '',
+        apiKeyHeader: null,
+        awsBedrock: auth.credentials,
+      };
+    case 'secure_proxy':
+      return {
+        apiUrl: auth.credentials.config.url,
+        apiKey: auth.credentials.proxy_secret,
+        apiKeyHeader: null,
+        secureProxy: {
+          url: upstream.base_url,
+          upstreamAuthHeaders: auth.credentials.config.extra_headers ?? {},
+        },
+      };
   }
-  return {
-    apiUrl: auth.credentials.config.url,
-    apiKey: auth.credentials.proxy_secret,
-    apiKeyHeader: null,
-    secureProxy: {
-      url: upstream.base_url,
-      upstreamAuthHeaders: auth.credentials.config.extra_headers ?? {},
-    },
-  };
 }
 
 export function buildDirectProvider(
-  id: 'custom',
+  type: 'custom' | 'custom-public',
   supportedChatApis: ReadonlyArray<GatewayChatApiKind>,
   upstream: CustomLlmApiConfig,
   auth: DirectUpstreamAuth
 ): Provider {
   return {
-    id,
+    type,
     ...resolveRouting(upstream, auth),
     apiUrlOverrides: {},
     disableUrlSuffix: upstream.disable_url_suffix ?? false,
@@ -51,6 +66,15 @@ export function buildDirectProvider(
       Object.assign(body, upstream.extra_body ?? {});
       if (upstream.extra_headers) {
         Object.assign(context.extraHeaders, upstream.extra_headers);
+      }
+      if (upstream.user_hash_as_mt_user_id) {
+        for (const key of Object.keys(context.extraHeaders)) {
+          if (key.toLowerCase() === 'mt-user-id') {
+            delete context.extraHeaders[key];
+          }
+        }
+        context.extraHeaders['Mt-User-Id'] =
+          'kilo:' + generateProviderSpecificHash(context.kilo_user_id, context.provider);
       }
       if (upstream.internal_id === undefined) {
         delete body.model;

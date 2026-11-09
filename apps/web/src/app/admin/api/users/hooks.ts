@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { adminFetch } from '@/lib/admin/admin-fetch';
 
 type User = {
   id: string;
@@ -14,7 +15,7 @@ export function useSearchUsers(searchTerm: string) {
   return useQuery({
     queryKey: ['search-users', searchTerm],
     queryFn: async (): Promise<SearchUsersResponse> => {
-      const response = await fetch(
+      const response = await adminFetch(
         `/admin/api/users?search=${encodeURIComponent(searchTerm)}&limit=10`
       );
       if (!response.ok) {

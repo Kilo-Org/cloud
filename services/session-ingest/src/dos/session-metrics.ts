@@ -31,6 +31,11 @@ export type SessionMetrics = {
   terminationReason: TerminationReason;
   platform: string;
   organizationId: string | undefined;
+  /**
+   * True when the counted figures cover only the newest part of the session: the scan that
+   * produced them stopped at its read ceiling.
+   */
+  metricsBounded: boolean;
 };
 
 // -- Zod schemas for the subset of CLI types we need for metrics --
@@ -151,6 +156,20 @@ function nonNegative(value: number): number {
   return Math.max(0, value);
 }
 
+/**
+ * Maximum accepted cost contribution for one assistant message, in USD.
+ */
+export const MAX_ASSISTANT_COST_USD = 1000;
+
+/**
+ * Clamps one assistant-message cost to [0, MAX_ASSISTANT_COST_USD].
+ * Every cost consumer uses this same contribution rule.
+ */
+export function clampAssistantCostUsd(cost: number): number {
+  if (!Number.isFinite(cost) || cost <= 0) return 0;
+  return Math.min(cost, MAX_ASSISTANT_COST_USD);
+}
+
 function processKiloMeta(acc: Accumulator, raw: unknown) {
   const parsed = KiloMetaSchema.safeParse(raw);
   if (!parsed.success) return;
@@ -189,12 +208,12 @@ function processMessage(acc: Accumulator, raw: unknown) {
         acc.firstAssistantMessageCreatedAt = t;
       }
 
-      acc.totalTokens.input += msg.tokens.input;
-      acc.totalTokens.output += msg.tokens.output;
-      acc.totalTokens.reasoning += msg.tokens.reasoning;
-      acc.totalTokens.cacheRead += msg.tokens.cache.read;
-      acc.totalTokens.cacheWrite += msg.tokens.cache.write;
-      acc.totalCost += msg.cost;
+      acc.totalTokens.input += nonNegative(msg.tokens.input);
+      acc.totalTokens.output += nonNegative(msg.tokens.output);
+      acc.totalTokens.reasoning += nonNegative(msg.tokens.reasoning);
+      acc.totalTokens.cacheRead += nonNegative(msg.tokens.cache.read);
+      acc.totalTokens.cacheWrite += nonNegative(msg.tokens.cache.write);
+      acc.totalCost += clampAssistantCostUsd(msg.cost);
 
       if (msg.error) {
         acc.totalErrors++;
@@ -243,13 +262,18 @@ function processPart(acc: Accumulator, raw: unknown) {
 }
 
 /**
- * Compute aggregate session metrics from all ingested items.
+ * Compute aggregate session metrics from ingested items.
  * Each row's item_data is parsed with Zod — malformed rows are silently skipped.
+ *
+ * `bounded` marks a partial item set: the caller read only the newest part of the session, so
+ * every count covers that part and the time to first response cannot be computed at all.
  */
 export function computeSessionMetrics(
   items: Array<{ item_type: string; item_data: string }>,
-  closeReason: TerminationReason
+  closeReason: TerminationReason,
+  options: { bounded?: boolean } = {}
 ): SessionMetrics {
+  const bounded = options.bounded === true;
   const acc = freshAccumulator();
 
   for (const row of items) {
@@ -288,6 +312,7 @@ export function computeSessionMetrics(
 
   let timeToFirstResponseMs: number | undefined;
   if (
+    !bounded &&
     acc.firstUserMessageCreatedAt !== undefined &&
     acc.firstAssistantMessageCreatedAt !== undefined
   ) {
@@ -320,32 +345,105 @@ export function computeSessionMetrics(
     terminationReason: closeReason,
     platform: acc.platform,
     organizationId: acc.organizationId,
+    metricsBounded: bounded,
   };
 }
 
 /**
- * Sum assistant-message `cost` (USD) from inline message rows for live cost persist.
- * Malformed rows and non-assistant messages are skipped; R2-offloaded rows store '{}' → 0.
- * Convert to microdollars at the call site with Math.max(0, Math.round(usd * 1_000_000)).
+ * One assistant message's contribution to the session cost. Malformed values,
+ * non-assistant messages and out-of-range costs contribute the same clamp rule
+ * everywhere the session cost is summed.
  */
-export function computeRunningAssistantCostUsd(rows: Array<{ item_data: string }>): number {
+export function assistantMessageCostUsd(data: unknown): number {
+  const parsed = AssistantMessageSchema.safeParse(data);
+  return parsed.success ? clampAssistantCostUsd(parsed.data.cost) : 0;
+}
+
+/**
+ * Contribution of one stored message row. An R2-offloaded body is not read here,
+ * so it contributes nothing — the same rule the full recomputation applies.
+ */
+export function storedAssistantMessageCostUsd(
+  row: { item_data: string; item_data_r2_key: string | null } | null | undefined
+): number {
+  if (row === null || row === undefined || row.item_data_r2_key !== null) return 0;
+  let raw: unknown;
+  try {
+    raw = JSON.parse(row.item_data);
+  } catch {
+    return 0;
+  }
+  return assistantMessageCostUsd(raw);
+}
+
+/** Running session cost after one stored row replaces another. */
+export function adjustRunningAssistantCostUsd(
+  runningUsd: number,
+  previousUsd: number,
+  nextUsd: number
+): number {
+  return nonNegative(runningUsd - previousUsd + nextUsd);
+}
+
+/**
+ * Contribution of the message row a new version replaces. A row stored with its
+ * contribution contributes that value; a row that predates the column, or that was
+ * copied without one, contributes what its body says — the rule the full
+ * recomputation applies to it.
+ */
+export function storedMessageCostUsd(
+  row:
+    | {
+        cost_usd: number | null;
+        /** The body, present only for a row without a stored contribution. */
+        legacy_item_data: string | null;
+        item_data_r2_key: string | null;
+      }
+    | null
+    | undefined
+): number {
+  if (row === null || row === undefined) return 0;
+  if (typeof row.cost_usd === 'number') return row.cost_usd;
+  if (row.legacy_item_data === null) return 0;
+  return storedAssistantMessageCostUsd({
+    item_data: row.legacy_item_data,
+    item_data_r2_key: row.item_data_r2_key,
+  });
+}
+
+export function computeRunningAssistantCostUsd(
+  rows: Array<{ item_data: string; item_data_r2_key?: string | null }>
+): number {
   let total = 0;
   for (const row of rows) {
-    let raw: unknown;
-    try {
-      raw = JSON.parse(row.item_data);
-    } catch {
-      continue;
-    }
-    const parsed = AssistantMessageSchema.safeParse(raw);
-    if (!parsed.success) continue;
-    total += parsed.data.cost;
+    total += storedAssistantMessageCostUsd({
+      item_data: row.item_data,
+      item_data_r2_key: row.item_data_r2_key ?? null,
+    });
   }
   return nonNegative(total);
 }
 
 const ACTIVITY_PERSIST_THROTTLE_MS = 15_000;
 export const COST_PERSIST_THROTTLE_MS = 30_000;
+
+/**
+ * A close-path comparison of the running total against a recomputation over the
+ * stored rows tolerates one microdollar, the smallest unit the persisted column holds.
+ */
+export const COST_DIVERGENCE_TOLERANCE_USD = 1 / 1_000_000;
+
+/**
+ * `ingest_meta` key holding the session's running assistant cost in USD. It is
+ * maintained from the message items each batch stores, so the cost persist reads
+ * a stored total instead of re-reading the session's message history.
+ */
+export const RUNNING_ASSISTANT_COST_META_KEY = 'runningAssistantCostUsd';
+
+/** The stored cost column value for a running USD total. */
+export function runningAssistantCostMicrodollars(usd: number): number {
+  return Math.max(0, Math.round(usd * 1_000_000));
+}
 
 export type DecideLivePersistArgs = {
   nowMs: number;

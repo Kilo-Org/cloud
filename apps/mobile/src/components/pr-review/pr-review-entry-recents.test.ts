@@ -20,6 +20,7 @@ import {
   textValues,
 } from './pr-review-entry-screen-test-utils';
 import { recentPrKey } from '@/lib/pr-review/recent-prs';
+import { PrReviewRecentsPending } from './pr-review-recents-pending';
 import { type ConfirmDialogRequest } from '@/components/ui/dialog';
 
 const SAME_TRIPLE = { owner: 'acme', repo: 'api', number: 7, lastOpenedAt: 1_700_000_000_000 };
@@ -59,10 +60,9 @@ describe('recents identity across providers', () => {
 
   it("row presses navigate to the row's own provider route", async () => {
     const tree = await renderLoaded();
-    const rowPressables = findAll(tree, 'Pressable').filter(
-      p => p.props?.accessibilityLabel == null
-    );
-    expect(rowPressables).toHaveLength(3);
+    const rowPressables = findAll(tree, 'View')
+      .filter(row => row.props?.testID === 'recent-row')
+      .map(row => find(row, 'Pressable', () => true));
     const pushes: unknown[] = [];
     for (const row of rowPressables) {
       mocks.push.mockClear();
@@ -77,20 +77,15 @@ describe('recents identity across providers', () => {
     ]);
   });
 
-  it('remove confirms with provider-neutral copy and deletes only the targeted row', async () => {
+  it('long press confirms removal without opening the review and deletes only the targeted row', async () => {
     const tree = await renderLoaded();
-    const removeGitLab = find(
-      tree,
-      'Button',
-      p => p.accessibilityLabel === 'Remove acme/api!7 from recents'
+    const rows = findAll(tree, 'View').filter(row => row.props?.testID === 'recent-row');
+    const gitlab = find(rows[1], 'Pressable', () => true);
+    (propsOf(gitlab).onLongPress as () => void)();
+    expect(mocks.push).not.toHaveBeenCalled();
+    expect(mocks.confirm).toHaveBeenCalledWith(
+      expect.objectContaining({ message: expect.stringContaining('acme/api!7') })
     );
-    (propsOf(removeGitLab).onPress as () => void)();
-    expect(mocks.confirm).toHaveBeenCalledWith({
-      title: 'Remove from recents?',
-      message: 'This review will be removed from your recents.',
-      confirmLabel: 'Remove',
-      onConfirm: expect.any(Function),
-    });
     // The hoisted mock is untyped; the request shape is the dialog contract.
     const request = mocks.confirm.mock.calls.at(0)?.at(0) as ConfirmDialogRequest | undefined;
     request?.onConfirm();
@@ -103,7 +98,23 @@ describe('recents identity across providers', () => {
     ]);
   });
 
-  it('a failed row keeps the retry CTA and provider label', async () => {
+  it('the accessibility Remove action confirms removal without opening the review', async () => {
+    const tree = await renderLoaded();
+    const row = findAll(tree, 'View').find(candidate => candidate.props?.testID === 'recent-row');
+    const github = find(row, 'Pressable', () => true);
+    const action = propsOf(github).onAccessibilityAction as (event: {
+      nativeEvent: { actionName: string };
+    }) => void;
+    action({ nativeEvent: { actionName: 'remove' } });
+    expect(mocks.push).not.toHaveBeenCalled();
+    const request = mocks.confirm.mock.calls.at(0)?.at(0) as ConfirmDialogRequest | undefined;
+    expect(request).toBeDefined();
+    request?.onConfirm();
+    await flush();
+    expect(storedRecents().map(entry => entry.platform)).toEqual(['gitlab', 'bitbucket']);
+  });
+
+  it('a failed row names what could not be opened in its provider vocabulary', async () => {
     store.clear();
     seedRecents([
       {
@@ -113,9 +124,32 @@ describe('recents identity across providers', () => {
         instanceHint: 'https://gl.acme.dev',
         lastResult: 'failed',
       },
+      {
+        ...SAME_TRIPLE,
+        owner: 'kilo',
+        title: 'Broken PR',
+        platform: 'github',
+        lastResult: 'failed',
+      },
     ]);
     const tree = await renderLoaded();
-    expect(textValues(tree)).toContain("Couldn't load");
+    const rows = findAll(tree, 'View').filter(
+      candidate => candidate.props?.testID === 'recent-row'
+    );
+    // Each row's own copy, read inside that row: both rows stand for a review
+    // request, so a check over the whole tree would pass with the two nouns
+    // swapped. The filter keeps only the failure line, never the title or ref.
+    const failureCopy = (title: string) => {
+      const row = rows.find(candidate =>
+        findAll(candidate, 'Text').some(el => el.props?.children === title)
+      );
+      if (!row) {
+        throw new Error(`no recents row titled ${title}`);
+      }
+      return textValues(row).filter(value => value.includes('request'));
+    };
+    expect(failureCopy('Broken MR')).toEqual(['Could not open merge request']);
+    expect(failureCopy('Broken PR')).toEqual(['Could not open pull request']);
     const retry = find(tree, 'Button', p => p.accessibilityLabel === 'Retry');
     (propsOf(retry).onPress as () => void)();
     expect(mocks.push).toHaveBeenCalledWith(
@@ -132,13 +166,27 @@ describe('recents identity across providers', () => {
     expect(empty.props?.description).toBe(
       "Paste a link above to start a review — it'll show up here next time."
     );
+    // The RECENT body is the tail of the inbox scroll, so its full-size stack
+    // (a 56 dp bubble over a 64 dp pin) fell under the tab bar on a compact
+    // phone. It always shares the screen with the INBOX section above it, so it
+    // always takes the compact form.
+    expect(empty.props?.compact).toBe(true);
   });
 
-  it('the recents load renders into an indicator while pending', () => {
-    // getRecentPrs is still in flight on the first call: the body is the
-    // spinner, never a blank that would jump the layout on arrival.
+  it('the recents load renders one row-shaped card while pending', () => {
+    // getRecentPrs is still in flight on the first call: the body is a card
+    // with a recent row's own shape, never a blank or a bare spinner that
+    // would read as a clipped fragment and jump the section on arrival.
     store.set('pr-review-recents', JSON.stringify([{ ...SAME_TRIPLE, title: 'X' }]));
     const tree = render();
-    expect(findAll(tree, 'ActivityIndicator').length).toBeGreaterThan(0);
+    expect(findAll(tree, PrReviewRecentsPending)).toHaveLength(1);
+    // The loaded rows wait for the read: no row is drawn beside the card.
+    expect(findAll(tree, 'View').filter(p => p.props?.testID === 'recent-row')).toHaveLength(0);
+
+    // eslint-disable-next-line new-cap -- called as a plain function, like the screen harness
+    const card = PrReviewRecentsPending();
+    const frame = find(card, 'View', p => p.accessibilityRole === 'progressbar');
+    expect(propsOf(frame).accessibilityLabel).toBe('Loading…');
+    expect(findAll(frame, 'Skeleton')).toHaveLength(4);
   });
 });

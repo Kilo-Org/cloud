@@ -17,6 +17,7 @@ import {
   sendKiloPassDuplicateCardCanceledEmail,
   sendSpendAlertEmail,
   subjects,
+  sendCreditsTopUpEmail,
 } from '@kilocode/web-shared/lib/email';
 import { captureException } from '@sentry/nextjs';
 import { sendViaMailgun } from '@kilocode/web-shared/lib/email-mailgun';
@@ -33,6 +34,48 @@ describe('email rendering helpers', () => {
       '&lt;b&gt;https:/&#8203;/&#8203;evil.&#8203;example&lt;/&#8203;b&gt; www.&#8203;bad.&#8203;example acme.&#8203;com'
     );
   });
+});
+
+describe('credit purchase expiration email', () => {
+  it.each([
+    {
+      creditExpiryDate: new Date('2027-02-28T12:34:00.000Z'),
+      expectedDate: 'February 28, 2027',
+      expectedLabel: 'Purchased credits expire',
+    },
+    {
+      creditExpiryDate: null,
+      expectedDate: 'No expiration.',
+      expectedLabel: 'Purchased credits',
+    },
+  ])(
+    'uses the persisted deadline $creditExpiryDate',
+    async ({ creditExpiryDate, expectedDate, expectedLabel }) => {
+      jest.clearAllMocks();
+      await sendCreditsTopUpEmail({
+        to: 'purchase@example.com',
+        variant: 'manual',
+        principalCents: 2000,
+        serviceFeeCents: 0,
+        grossPaidCents: 2000,
+        creditsCents: 2000,
+        purchaseDate: new Date('2026-02-28T12:34:00.000Z'),
+        creditExpiryDate,
+      });
+
+      expect(sendViaMailgun).toHaveBeenCalledWith(
+        expect.objectContaining({
+          category: 'creditsTopUp',
+          html: expect.stringContaining(expectedDate),
+        })
+      );
+      expect(sendViaMailgun).toHaveBeenCalledWith(
+        expect.objectContaining({
+          html: expect.stringContaining(expectedLabel),
+        })
+      );
+    }
+  );
 });
 
 describe('template loading', () => {

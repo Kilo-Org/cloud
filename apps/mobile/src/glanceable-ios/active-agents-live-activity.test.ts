@@ -139,7 +139,10 @@ describe('Live Activity Lock Screen card (round 7)', () => {
     // A server-written question-only state carries no flag and no approvable count.
     expect(offered({ ...PERMISSION, needsApproval: 0, canApprove: undefined })).toBe(false);
     expect(offered({ ...PERMISSION, needsApproval: 1, canApprove: undefined })).toBe(true);
-    // The expired frame zeroes the wait but leaves the approvable count.
+    // A lapsed frame carries neither count, so it offers nothing.
+    expect(offered({ ...PERMISSION, needsInput: 0, needsApproval: 0 })).toBe(false);
+    // Either count alone is not enough: a permission row with no wait behind it
+    // offers no control either.
     expect(offered({ ...PERMISSION, needsInput: 0 })).toBe(false);
   });
 

@@ -33,14 +33,17 @@ import {
   handleCallbackIngest,
   handleCallbackMint,
   handleCallbackRead,
+  isCallbackToken,
 } from './callbacks.js';
 
 const INTERNAL_API_KEY_HEADER = 'x-internal-api-key';
-const CALLBACK_INGEST_PATH = /^\/__e2e\/callbacks\/[^/]+$/;
+const CALLBACK_PATH = /^\/__e2e\/callbacks\/([^/]+)$/;
 
 /** The one method+path exempt from the secret and JWT chain. */
 export function isCallbackIngestRequest(method: string, path: string): boolean {
-  return method === 'POST' && CALLBACK_INGEST_PATH.test(path);
+  if (method !== 'POST') return false;
+  const match = CALLBACK_PATH.exec(path);
+  return match !== null && isCallbackToken(match[1]);
 }
 
 /**
@@ -51,7 +54,15 @@ export function isCallbackIngestRequest(method: string, path: string): boolean {
  */
 export const e2eSurfaceSecretMiddleware = createMiddleware<HonoContext>(
   async (c: Context<HonoContext>, next: Next) => {
-    if (isCallbackIngestRequest(c.req.method, c.req.path)) {
+    const path = new URL(c.req.url).pathname;
+    if (
+      c.req.method === 'POST' &&
+      CALLBACK_PATH.test(path) &&
+      !isCallbackIngestRequest(c.req.method, path)
+    ) {
+      return new Response('Unknown or expired callback token', { status: 404 });
+    }
+    if (isCallbackIngestRequest(c.req.method, path)) {
       await next();
       return;
     }
@@ -67,7 +78,7 @@ export const e2eSurfaceSecretMiddleware = createMiddleware<HonoContext>(
 /** Gate two: the production JWT middleware, exempt for the callback ingest. */
 export const e2eSurfaceAuthMiddleware = createMiddleware<HonoContext>(
   async (c: Context<HonoContext>, next: Next) => {
-    if (isCallbackIngestRequest(c.req.method, c.req.path)) {
+    if (isCallbackIngestRequest(c.req.method, new URL(c.req.url).pathname)) {
       await next();
       return;
     }

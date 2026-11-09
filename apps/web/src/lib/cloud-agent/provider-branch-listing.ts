@@ -2,13 +2,13 @@
  * Provider branch listing for the new-session flow.
  *
  * One entry point per repository identity, three providers: GitHub via
- * `githubAppsService.listBranches`, GitLab via
- * `gitlabService.listGitLabBranches`, Bitbucket Cloud via the s3 review
- * layer's authorized requests (`/refs/branches` + the repository object's
- * `mainbranch`). The
- * server resolves the integration and the credentials itself — no caller
- * supplies an integration id, a token, or a host, and the repository
- * identity is re-checked against the integration's own cache on every call.
+ * `githubAppsService.listBranches`, GitLab via `authorizeProject` plus
+ * `fetchGitLabBranches`, Bitbucket Cloud via the s3 review layer's
+ * authorized requests (`/refs/branches` + the repository object's
+ * `mainbranch`). The server resolves the integration and the credentials
+ * itself — no caller supplies an integration id, a token, or a host, and the
+ * repository identity is re-checked against the integration's own cache on
+ * every call.
  *
  * Bitbucket Cloud is organization-context only: a personal call returns the
  * explicit org-only unavailable state (FORBIDDEN with the shared copy from
@@ -35,6 +35,8 @@ import {
 import {
   authorizeProject,
   GitLabReviewError,
+  gitlabReviewErrorToTrpcError,
+  gitlabReviewOwnerFor,
   type GitLabReviewOwner,
 } from '@/lib/provider-review/gitlab-authorization';
 import {
@@ -43,6 +45,7 @@ import {
   BitbucketReviewError,
   type BitbucketRepositoryAccess,
 } from '@/lib/provider-review/bitbucket-authorization';
+import { providerReviewErrorToTrpcError } from '@/lib/provider-review/error-mapping';
 import {
   fetchPage,
   repositoryPathGuard,
@@ -55,13 +58,19 @@ export type ProviderBranchListing = {
   /** The provider's default branch, or null when the provider reports none. */
   defaultBranch: string | null;
   branches: string[];
+  /**
+   * True when the provider holds more branches than `branches` includes, so a
+   * client presents the list as partial instead of as the whole repository.
+   */
+  truncated: boolean;
 };
 
-/** The router output contract: `{ defaultBranch, branches }`, nothing else. */
+/** The router output contract: `{ defaultBranch, branches, truncated }`, nothing else. */
 export const ProviderBranchListingSchema = z
   .object({
     defaultBranch: z.string().nullable(),
     branches: z.array(z.string()),
+    truncated: z.boolean(),
   })
   .strict();
 
@@ -102,32 +111,15 @@ async function requireActiveIntegration(owner: Owner, platform: string, label: s
   return integration;
 }
 
-/**
- * Map a classified Bitbucket refusal onto the router error states. The
- * message is the authorization layer's fixed copy — it never embeds a token
- * or a workspace identity.
- */
-function bitbucketErrorToTrpcError(error: BitbucketReviewError): TRPCError {
-  switch (error.kind) {
-    case 'not_found':
-      return new TRPCError({ code: 'NOT_FOUND', message: error.message });
-    case 'forbidden':
-      return new TRPCError({ code: 'FORBIDDEN', message: error.message });
-    case 'bad_request':
-      return new TRPCError({ code: 'BAD_REQUEST', message: error.message });
-    default:
-      // stale_head cannot come from a read; retryable surfaces as a
-      // retryable gateway failure, never as an empty branch list.
-      return new TRPCError({ code: 'BAD_GATEWAY', message: error.message });
-  }
-}
-
 type GitHubBranchRef = { name: string; isDefault: boolean };
 
 function toListing(branches: GitHubBranchRef[]): ProviderBranchListing {
   return {
     defaultBranch: branches.find(branch => branch.isDefault)?.name ?? null,
     branches: branches.map(branch => branch.name),
+    // Both provider walks page until the provider runs out, so nothing here is
+    // held back from the caller.
+    truncated: false,
   };
 }
 
@@ -144,6 +136,19 @@ function cachesRepository(integration: GitHubIntegrationRow, repositoryFullName:
 /** The HTTP status of a provider refusal, when the thrown error carries one. */
 function refusalStatus(error: unknown): unknown {
   return (error as { status?: unknown } | null)?.status;
+}
+
+/**
+ * A GitHub rate limit, primary or secondary, is transient: it is never a
+ * statement about an installation's access, so it may not be read as a
+ * permanent refusal.
+ */
+function githubRateLimitTrpcError(error: unknown): TRPCError {
+  return new TRPCError({
+    code: 'BAD_GATEWAY',
+    message: 'GitHub is limiting requests. Try again in a moment.',
+    cause: error,
+  });
 }
 
 /** A refusal meaning "this installation cannot see that repository" — try the next one. */
@@ -187,6 +192,7 @@ async function listOrganizationGitHubBranches(
     ...healthy.filter(integration => !cachesRepository(integration, repositoryFullName)),
   ];
   let lastError: unknown;
+  let rateLimitError: unknown;
   for (const integration of candidates) {
     try {
       const { branches } = await githubAppsService.listBranches(
@@ -197,10 +203,23 @@ async function listOrganizationGitHubBranches(
       );
       return toListing(branches);
     } catch (error) {
+      // Overloaded 403/429 answers arrive here too. Each installation has its
+      // own quota, so a rate limit says nothing about the remaining candidates
+      // and never ends the walk; it is remembered for the final refusal, which
+      // then stays retryable instead of claiming no installation can see the
+      // repository.
+      if (isGitHubRateLimitError(error)) {
+        rateLimitError ??= error;
+        continue;
+      }
       if (!isRepositoryUnreachable(error)) throw error;
       lastError = error;
     }
   }
+  // A transient refusal outranks a permission one: the caller must retry
+  // rather than show the install message for a repository a limited
+  // installation may well list once the limit clears.
+  if (rateLimitError) throw githubRateLimitTrpcError(rateLimitError);
   throw new TRPCError({
     code: 'NOT_FOUND',
     message:
@@ -227,16 +246,11 @@ async function listGitHubBranches(
   } catch (error) {
     // A blocked or missing repository is GitHub's own refusal, not a server
     // fault: surface it as 403/404 so the caller stops retrying a 500. 403 is
-    // overloaded — a rate-limited request is transient and stays retryable.
+    // overloaded — a rate-limited request is transient and stays retryable,
+    // whether GitHub answers 403 or 429.
+    if (isGitHubRateLimitError(error)) throw githubRateLimitTrpcError(error);
     const status = refusalStatus(error);
     if (status === 403) {
-      if (isGitHubRateLimitError(error)) {
-        throw new TRPCError({
-          code: 'BAD_GATEWAY',
-          message: 'GitHub is limiting requests. Try again in a moment.',
-          cause: error,
-        });
-      }
       throw new TRPCError({
         code: 'FORBIDDEN',
         message: githubRepositoryForbiddenMessage,
@@ -254,36 +268,40 @@ async function listGitHubBranches(
   }
 }
 
-/** A refusal meaning "this GitLab review call cannot proceed" — router worded. */
-function gitlabErrorToTrpcError(error: GitLabReviewError): TRPCError {
-  switch (error.kind) {
-    case 'not_found':
-      return new TRPCError({ code: 'NOT_FOUND', message: error.message });
-    case 'forbidden':
-      return new TRPCError({ code: 'FORBIDDEN', message: error.message });
-    case 'bad_request':
-      return new TRPCError({ code: 'BAD_REQUEST', message: error.message });
-    default:
-      // stale_head cannot come from a read; retryable surfaces as a
-      // retryable gateway failure, never as an empty branch list.
-      return new TRPCError({ code: 'BAD_GATEWAY', message: error.message });
-  }
-}
-
 /**
  * Map a GitLab branches HTTP refusal onto the router error states. Only the
  * status is carried over; the adapter's message stays out of the copy.
+ *
+ * The token belongs to the connection, so a refused credential (401) and, for
+ * an organization-owned connection, a 403 are the connection's: both take the
+ * reconnect state the review-layer mapper above returns for the same
+ * classes, so one call cannot answer two different things depending on which
+ * step refused. A personal connection's 403 stays a permission refusal.
  */
-function gitlabBranchesErrorToTrpcError(error: GitLabBranchesFetchError): TRPCError {
+function gitlabBranchesErrorToTrpcError(
+  error: GitLabBranchesFetchError,
+  owner: GitLabReviewOwner
+): TRPCError {
   switch (error.status) {
     case 401:
-    case 403:
       return new TRPCError({
-        code: 'FORBIDDEN',
-        message:
-          'Your GitLab connection does not allow listing branches of this project. Reconnect GitLab if the connection has expired.',
+        code: 'PRECONDITION_FAILED',
+        message: 'Your GitLab connection is no longer valid. Reconnect GitLab and try again.',
         cause: error,
       });
+    case 403:
+      return owner.type === 'organization'
+        ? new TRPCError({
+            code: 'PRECONDITION_FAILED',
+            message:
+              'Your GitLab connection does not allow listing branches of this project. Reconnect GitLab if the connection has expired.',
+            cause: error,
+          })
+        : new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'Your GitLab role does not allow listing branches of this project.',
+            cause: error,
+          });
     case 404:
       return new TRPCError({
         code: 'NOT_FOUND',
@@ -311,10 +329,7 @@ async function listGitLabBranches(
   // authorization boundary the Bitbucket path enforces through
   // authorizeRepository. Without it, any project path the connected token
   // can reach would be listable.
-  const reviewOwner: GitLabReviewOwner =
-    owner.type === 'org'
-      ? { type: 'organization', organizationId: owner.id, userId: actor.userId }
-      : { type: 'user', userId: actor.userId };
+  const reviewOwner = gitlabReviewOwnerFor(owner, actor.userId);
   try {
     const access = await authorizeProject(reviewOwner, repositoryFullName);
     const branches = await fetchGitLabBranches(
@@ -324,8 +339,9 @@ async function listGitLabBranches(
     );
     return toListing(branches.map(branch => ({ name: branch.name, isDefault: branch.default })));
   } catch (error) {
-    if (error instanceof GitLabReviewError) throw gitlabErrorToTrpcError(error);
-    if (error instanceof GitLabBranchesFetchError) throw gitlabBranchesErrorToTrpcError(error);
+    if (error instanceof GitLabReviewError) throw gitlabReviewErrorToTrpcError(error, reviewOwner);
+    if (error instanceof GitLabBranchesFetchError)
+      throw gitlabBranchesErrorToTrpcError(error, reviewOwner);
     throw error;
   }
 }
@@ -391,14 +407,14 @@ async function listBitbucketBranches(
       repoSlug
     );
   } catch (error) {
-    if (error instanceof BitbucketReviewError) throw bitbucketErrorToTrpcError(error);
+    if (error instanceof BitbucketReviewError) throw providerReviewErrorToTrpcError(error);
     throw error;
   }
 
   let defaultBranch: string | null = null;
   try {
     const metadata = BitbucketRepositoryMetadataSchema.safeParse(
-      await requestBitbucketJson<unknown>(access, repositoryApiPath(access))
+      await requestBitbucketJson(access, repositoryApiPath(access))
     );
     defaultBranch = metadata.success ? (metadata.data.mainbranch?.name ?? null) : null;
   } catch {
@@ -409,6 +425,9 @@ async function listBitbucketBranches(
   const names: string[] = [];
   const seen = new Set<string>();
   let cursor: string | undefined;
+  // Set only when the page budget ends the walk with a cursor still pointing
+  // at a next page: the provider holds branches this listing does not include.
+  let truncated = false;
   try {
     for (let page = 0; page < MAX_BRANCH_PAGES; page += 1) {
       const result = await fetchPage(
@@ -428,13 +447,20 @@ async function listBitbucketBranches(
       }
       if (!result.nextCursor || result.nextCursor === cursor) break;
       cursor = result.nextCursor;
+      if (page === MAX_BRANCH_PAGES - 1) truncated = true;
     }
   } catch (error) {
-    if (error instanceof BitbucketReviewError) throw bitbucketErrorToTrpcError(error);
+    if (error instanceof BitbucketReviewError) throw providerReviewErrorToTrpcError(error);
     throw error;
   }
 
-  return { defaultBranch, branches: names };
+  // The default branch is what the session checks out, and it is selected
+  // before the list is browsed, so a partial walk must still offer it: a
+  // default that sorts past the page budget would otherwise be unselectable.
+  const branches =
+    defaultBranch !== null && !seen.has(defaultBranch) ? [defaultBranch, ...names] : names;
+
+  return { defaultBranch, branches, truncated };
 }
 
 /**

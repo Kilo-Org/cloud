@@ -23,6 +23,7 @@ import {
   getSessionSnapshot,
   isMessageCompleted,
   openConnectedStream,
+  resolveFakeScope,
   sendMessage,
   type ApiVersion,
   type DriverConfig,
@@ -58,6 +59,7 @@ const ALLOCATION_WAIT_SLACK_MS = 1_000;
  * drops repeatedly from reconnecting without limit.
  */
 const MAX_BOOT_RECONNECTS = 5;
+const PACED_PROBE_TIMEOUT_MS = 5_000;
 
 export type ScenarioDeadline = {
   /** Absolute epoch milliseconds at which the scenario budget expires. */
@@ -547,10 +549,11 @@ export async function bootToCompletion(
       Math.max(1, Math.min(budgetMs, deadline.remaining(`${label} terminal`))),
       messageId
     );
+    const terminalType = terminal?.streamEventType ?? 'none';
     if (!isMessageCompleted(terminal, messageId)) {
       const reason = failureReasonFromEvent(terminal);
       throw new Error(
-        `${label} boot turn ${messageId} did not complete: terminal=${terminal?.streamEventType ?? 'none'}` +
+        `${label} boot turn ${messageId} did not complete: terminal=${terminalType}` +
           (reason === undefined ? '' : ` reason=${reason}`)
       );
     }
@@ -690,6 +693,10 @@ export async function startPacedHoldTurn(input: {
     const baseline = await deadline.within(`${label} baseline`, signal =>
       fetchFakeRequests(config.fakeLlmUrl, signal)
     );
+    const scope = resolveFakeScope();
+    if (scope !== undefined && baseline.scope !== scope) {
+      throw new Error(`${label}: fake request baseline scope did not match ${scope}`);
+    }
     const sent = await deadline.within(
       `${label} send`,
       signal =>
@@ -756,24 +763,95 @@ export async function waitForPacedProgress(
   label: string
 ): Promise<void> {
   const budget = Math.min(budgetMs, deadline.remaining(label));
-  const end = Date.now() + budget;
+  const startedAt = Date.now();
+  const end = startedAt + budget;
+  const scope = resolveFakeScope();
+  let probes = 0;
+  let probeFailures = 0;
+  let lastProbeMs = 0;
+  let lastProbeError = 'none';
+  let currentCount: number | undefined;
+  let firstCorrelatedMs: number | undefined;
+  const diagnostics = () =>
+    `${correlatedProgressSummary(stream.events, parentMessageId)} ` +
+    `scope=${scope ?? 'global'} baseline=${requestsBefore} current=${currentCount ?? 'unobserved'} ` +
+    `probes=${probes} probeFailures=${probeFailures} lastProbeMs=${lastProbeMs} ` +
+    `lastProbeError=${lastProbeError} firstCorrelatedMs=${firstCorrelatedMs ?? 'unobserved'} ` +
+    `streamOpen=${stream.isOpen} closeCode=${stream.closeInfo?.code ?? 'none'}`;
+  const eventTimings = () =>
+    stream.events
+      .filter(event => event.streamEventType === 'kilocode')
+      .slice(-20)
+      .map(event => {
+        const properties = event.data.properties;
+        const values =
+          properties !== null && typeof properties === 'object' ? properties : undefined;
+        const info = values && 'info' in values ? values.info : undefined;
+        const part = values && 'part' in values ? values.part : undefined;
+        const entity = info ?? part;
+        return {
+          eventType: event.data.event ?? event.data.type,
+          timestamp: event.timestamp,
+          ...(entity !== null && typeof entity === 'object'
+            ? Object.fromEntries(
+                Object.entries(entity).filter(
+                  ([key, value]) =>
+                    ['id', 'parentID', 'messageID', 'role', 'type'].includes(key) &&
+                    typeof value === 'string'
+                )
+              )
+            : {}),
+        };
+      });
   while (Date.now() < end) {
     if (hasCorrelatedStreamProgress(stream.events, parentMessageId)) {
-      const current = await deadline.within(
-        `${label} poll`,
-        signal => fetchFakeRequests(config.fakeLlmUrl, signal),
-        Math.max(1, end - Date.now())
-      );
-      if (current.chatCompletions > requestsBefore) {
-        if (Date.now() <= end) return;
-        break;
+      firstCorrelatedMs ??= Date.now() - startedAt;
+      const probeStartedAt = Date.now();
+      probes += 1;
+      let current: Awaited<ReturnType<typeof fetchFakeRequests>> | undefined;
+      let probeSignal: AbortSignal | undefined;
+      try {
+        current = await deadline.within(
+          `${label} poll`,
+          signal => {
+            probeSignal = signal;
+            return fetchFakeRequests(config.fakeLlmUrl, signal);
+          },
+          Math.max(1, Math.min(PACED_PROBE_TIMEOUT_MS, end - Date.now()))
+        );
+      } catch (error) {
+        probeFailures += 1;
+        lastProbeError = probeSignal?.aborted
+          ? 'timeout'
+          : error instanceof Error
+            ? error.name
+            : 'unknown';
+      } finally {
+        lastProbeMs = Date.now() - probeStartedAt;
+      }
+      if (current !== undefined) {
+        currentCount = current.chatCompletions;
+        if (
+          !Number.isSafeInteger(currentCount) ||
+          currentCount < 0 ||
+          (scope !== undefined && current.scope !== scope)
+        ) {
+          throw new Error(`${label}: invalid fake request counter or scope (${diagnostics()})`);
+        }
+        if (currentCount > requestsBefore) {
+          if (Date.now() <= end) {
+            console.info(`${label}: ready elapsedMs=${Date.now() - startedAt} (${diagnostics()})`);
+            return;
+          }
+          break;
+        }
       }
     }
-    await sleep(Math.min(200, Math.max(0, end - Date.now())));
+    if (Date.now() < end) await sleep(Math.min(200, end - Date.now()));
   }
   throw new Error(
     `${label}: no correlated turn progress and new model request for ${parentMessageId} ` +
-      `within ${budget}ms (${correlatedProgressSummary(stream.events, parentMessageId)})`
+      `within ${budget}ms (${diagnostics()}) eventTimings=${JSON.stringify(eventTimings())}`
   );
 }
 

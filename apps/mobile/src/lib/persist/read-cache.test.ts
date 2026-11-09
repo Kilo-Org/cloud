@@ -108,13 +108,51 @@ beforeEach(() => {
 
 describe('scope derivation', () => {
   it('derives one scope per user per schema version', () => {
-    expect(SCHEMA_VERSION).toBe(1);
-    expect(readCacheScope('u1')).toBe('cache:u1:1');
-    expect(readCacheScope('u2')).toBe('cache:u2:1');
+    expect(readCacheScope('u1')).toBe(`cache:u1:${SCHEMA_VERSION}`);
+    expect(readCacheScope('u2')).not.toBe(readCacheScope('u1'));
   });
 });
 
 describe('allowlist filter', () => {
+  it('persists bounded briefing lists and viewed details, but not paid estimates or cursor variants', () => {
+    expect(
+      isReadCacheAllowedKey([
+        ['agentBriefing', 'list'],
+        {
+          type: 'query',
+          input: { currentOnly: true, limit: 100 },
+        },
+      ])
+    ).toBe(true);
+    expect(
+      isReadCacheAllowedKey([
+        ['agentBriefing', 'get'],
+        {
+          type: 'query',
+          input: { reportId: 'report-1' },
+        },
+      ])
+    ).toBe(true);
+    expect(
+      isReadCacheAllowedKey([
+        ['agentBriefing', 'list'],
+        {
+          type: 'query',
+          input: { currentOnly: false, limit: 30, cursor: 'next-page' },
+        },
+      ])
+    ).toBe(false);
+    expect(
+      isReadCacheAllowedKey([
+        ['agentBriefing', 'estimateSummary'],
+        {
+          type: 'query',
+          input: {},
+        },
+      ])
+    ).toBe(false);
+  });
+
   it('allows the default no-input procedures', () => {
     expect(isReadCacheAllowedKey([['user', 'getMe'], { type: 'query' }])).toBe(true);
     expect(isReadCacheAllowedKey([['organizations', 'list'], { type: 'query' }])).toBe(true);
@@ -399,18 +437,18 @@ describe('publication budget', () => {
 
     expect(kv.setItem).toHaveBeenCalledTimes(1);
     const [scope, key, value] = vi.mocked(kv.setItem).mock.calls[0] ?? [];
-    expect(scope).toBe('cache:u1:1');
+    expect(scope).toBe(readCacheScope('u1'));
     expect(key).toBe('read-cache');
     expect(JSON.parse(value ?? '{}') as PersistedClient).toMatchObject({
       clientState: { queries: [{ queryKey: GET_ME_QUERY_KEY }] },
     });
-    expect(scopes.get('cache:u1:1')?.get('read-cache')).toBe(value);
+    expect(scopes.get(readCacheScope('u1'))?.get('read-cache')).toBe(value);
   });
 
   it('drops a blob over 2 MB and removes the previous blob for the scope', async () => {
     const { kv, scopes } = createFakeKv();
     const queryClient = makeAuthoritativeQueryClient('u1');
-    scopes.set('cache:u1:1', new Map([['read-cache', 'stale-blob']]));
+    scopes.set(readCacheScope('u1'), new Map([['read-cache', 'stale-blob']]));
     const persister = createReadCachePersister({
       queryClient,
       userId: 'u1',
@@ -421,16 +459,16 @@ describe('publication budget', () => {
     await persister.persistClient(oversized);
 
     // Never written partially: the previous blob for the scope is removed.
-    expect(kv.removeItem).toHaveBeenCalledWith('cache:u1:1', 'read-cache');
+    expect(kv.removeItem).toHaveBeenCalledWith(readCacheScope('u1'), 'read-cache');
     expect(kv.setItem).not.toHaveBeenCalled();
-    expect(scopes.get('cache:u1:1')?.has('read-cache')).toBe(false);
+    expect(scopes.get(readCacheScope('u1'))?.has('read-cache')).toBe(false);
   });
 
   it('restores from the scope even when the publication fence would block a write', async () => {
     const { scopes } = createFakeKv();
     const queryClient = new QueryClient();
     scopes.set(
-      'cache:u1:1',
+      readCacheScope('u1'),
       new Map([['read-cache', JSON.stringify(makePersistedClient({ id: 'u1' }))]])
     );
     const persister = createReadCachePersister({
@@ -476,7 +514,9 @@ describe('bounded serialization', () => {
       // Five query-cache changes inside one throttle window. The un-throttled
       // wrapper path must serialize none of them: only the throttled save
       // already running has serialized, exactly once for the whole burst.
-      const inFlight = burst.map(client => persister.persistClient(client));
+      const inFlight = burst
+        .map(client => persister.persistClient(client))
+        .filter((pending): pending is Promise<void> => pending !== undefined);
       expect(blobSerializations()).toBe(1);
 
       await Promise.all(inFlight);
@@ -485,7 +525,7 @@ describe('bounded serialization', () => {
       // is bounded by the throttle window, never by the number of changes.
       expect(blobSerializations()).toBeLessThanOrEqual(2);
       expect(kv.setItem).toHaveBeenCalledTimes(2);
-      expect(scopes.get('cache:u1:1')?.get('read-cache')).toBeDefined();
+      expect(scopes.get(readCacheScope('u1'))?.get('read-cache')).toBeDefined();
     } finally {
       stringify.mockRestore();
     }
@@ -544,7 +584,7 @@ describe('cold-start restore and takeover', () => {
     const { scopes } = createFakeKv();
     store.set(ACTIVE_USER_ID_KEY, 'u1');
     scopes.set(
-      'cache:u1:1',
+      readCacheScope('u1'),
       new Map([['read-cache', JSON.stringify(makePersistedClient({ id: 'u1' }))]])
     );
     const queryClient = new QueryClient();
@@ -553,7 +593,7 @@ describe('cold-start restore and takeover', () => {
 
     // The allowlisted getMe query was hydrated from the hint account's scope.
     expect(queryClient.getQueryData(GET_ME_QUERY_KEY)).toEqual({ id: 'u1' });
-    expect(takeOverColdStartRestore()).toBe('cache:u1:1');
+    expect(takeOverColdStartRestore()).toBe(readCacheScope('u1'));
     // A completed restore is reported exactly once.
     expect(takeOverColdStartRestore()).toBeNull();
   });
@@ -562,7 +602,7 @@ describe('cold-start restore and takeover', () => {
     const { scopes } = createFakeKv();
     store.set(ACTIVE_USER_ID_KEY, 'u1');
     scopes.set(
-      'cache:u1:1',
+      readCacheScope('u1'),
       new Map([['read-cache', JSON.stringify(makePersistedClient({ id: 'u1' }))]])
     );
     // The keychain read can reject transiently; the restore must retry it
@@ -573,7 +613,7 @@ describe('cold-start restore and takeover', () => {
     await restorePersistedCacheOnColdStart(queryClient);
 
     expect(queryClient.getQueryData(GET_ME_QUERY_KEY)).toEqual({ id: 'u1' });
-    expect(takeOverColdStartRestore()).toBe('cache:u1:1');
+    expect(takeOverColdStartRestore()).toBe(readCacheScope('u1'));
   });
 
   it('drops an expired blob instead of hydrating it', async () => {
@@ -581,41 +621,41 @@ describe('cold-start restore and takeover', () => {
     store.set(ACTIVE_USER_ID_KEY, 'u1');
     const expired = makePersistedClient({ id: 'u1' });
     expired.timestamp = Date.now() - READ_CACHE_MAX_AGE_MS - 1;
-    scopes.set('cache:u1:1', new Map([['read-cache', JSON.stringify(expired)]]));
+    scopes.set(readCacheScope('u1'), new Map([['read-cache', JSON.stringify(expired)]]));
     const queryClient = new QueryClient();
 
     await restorePersistedCacheOnColdStart(queryClient);
 
     expect(queryClient.getQueryData(GET_ME_QUERY_KEY)).toBeUndefined();
-    expect(kv.removeItem).toHaveBeenCalledWith('cache:u1:1', 'read-cache');
-    expect(takeOverColdStartRestore()).toBe('cache:u1:1');
+    expect(kv.removeItem).toHaveBeenCalledWith(readCacheScope('u1'), 'read-cache');
+    expect(takeOverColdStartRestore()).toBe(readCacheScope('u1'));
   });
 
   it('never restores a blob written by an older schema: it lives in another scope', async () => {
     const { kv, scopes } = createFakeKv();
     store.set(ACTIVE_USER_ID_KEY, 'u1');
-    // The previous schema version wrote into `cache:u1:0`; the current scope is
-    // `cache:u1:1`, so the old blob is never read and never hydrated.
+    // The previous schema version wrote into its own scope, so the old blob is
+    // never read and never hydrated.
     const oldSchemaBlob = JSON.stringify(makePersistedClient({ id: 'u1' }));
-    scopes.set('cache:u1:0', new Map([['read-cache', oldSchemaBlob]]));
+    scopes.set(`cache:u1:${SCHEMA_VERSION - 1}`, new Map([['read-cache', oldSchemaBlob]]));
     const queryClient = new QueryClient();
 
     await restorePersistedCacheOnColdStart(queryClient);
 
     expect(queryClient.getQueryData(GET_ME_QUERY_KEY)).toBeUndefined();
-    expect(kv.getItem).toHaveBeenCalledWith('cache:u1:1', 'read-cache');
-    expect(kv.getItem).not.toHaveBeenCalledWith('cache:u1:0', 'read-cache');
+    expect(kv.getItem).toHaveBeenCalledWith(readCacheScope('u1'), 'read-cache');
+    expect(kv.getItem).not.toHaveBeenCalledWith(`cache:u1:${SCHEMA_VERSION - 1}`, 'read-cache');
   });
 
   it('is best effort: a corrupt blob never blocks startup and is discarded', async () => {
     const { kv, scopes } = createFakeKv();
     store.set(ACTIVE_USER_ID_KEY, 'u1');
-    scopes.set('cache:u1:1', new Map([['read-cache', 'not-json']]));
+    scopes.set(readCacheScope('u1'), new Map([['read-cache', 'not-json']]));
     const queryClient = new QueryClient();
 
     await expect(restorePersistedCacheOnColdStart(queryClient)).resolves.toBeUndefined();
 
-    expect(kv.removeItem).toHaveBeenCalledWith('cache:u1:1', 'read-cache');
+    expect(kv.removeItem).toHaveBeenCalledWith(readCacheScope('u1'), 'read-cache');
     expect(takeOverColdStartRestore()).toBeNull();
   });
 
@@ -644,7 +684,7 @@ describe('cold-start restore and takeover', () => {
     const { kv, scopes } = createFakeKv();
     store.set(ACTIVE_USER_ID_KEY, 'u1');
     scopes.set(
-      'cache:u1:1',
+      readCacheScope('u1'),
       new Map([['read-cache', JSON.stringify(makePersistedClient({ id: 'u1' }))]])
     );
     const restoreRead: { resolve: ((value: string | null) => void) | null } = { resolve: null };
@@ -674,7 +714,7 @@ describe('cold-start restore and takeover', () => {
     const { kv, scopes } = createFakeKv();
     store.set(ACTIVE_USER_ID_KEY, 'u1');
     scopes.set(
-      'cache:u1:1',
+      readCacheScope('u1'),
       new Map([['read-cache', JSON.stringify(makePersistedClient({ id: 'u1' }))]])
     );
     const restoreRead: { resolve: ((value: string | null) => void) | null } = { resolve: null };
@@ -751,16 +791,16 @@ describe('sign-out cleanup', () => {
 
   it('keeps the other account cache and every draft when one user signs out', async () => {
     const { scopes } = createFakeKv();
-    scopes.set('cache:u1:0', new Map([['read-cache', 'u1-previous-schema']]));
-    scopes.set('cache:u1:1', new Map([['read-cache', 'u1-current-schema']]));
-    scopes.set('cache:u12:1', new Map([['read-cache', 'other-user']]));
+    scopes.set(`cache:u1:${SCHEMA_VERSION - 1}`, new Map([['read-cache', 'u1-previous-schema']]));
+    scopes.set(readCacheScope('u1'), new Map([['read-cache', 'u1-current-schema']]));
+    scopes.set(readCacheScope('u12'), new Map([['read-cache', 'other-user']]));
     scopes.set('draft:u1', new Map([['agent-composer:new', '"unsent text"']]));
 
     await clearCacheScopeForSignOut('u1');
 
-    expect(scopes.has('cache:u1:0')).toBe(false);
-    expect(scopes.has('cache:u1:1')).toBe(false);
-    expect(scopes.get('cache:u12:1')?.get('read-cache')).toBe('other-user');
+    expect(scopes.has(`cache:u1:${SCHEMA_VERSION - 1}`)).toBe(false);
+    expect(scopes.has(readCacheScope('u1'))).toBe(false);
+    expect(scopes.get(readCacheScope('u12'))?.get('read-cache')).toBe('other-user');
     expect(scopes.get('draft:u1')?.get('agent-composer:new')).toBe('"unsent text"');
   });
 

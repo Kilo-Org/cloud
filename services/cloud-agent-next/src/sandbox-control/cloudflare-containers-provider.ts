@@ -1,5 +1,5 @@
 import { CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE } from '@kilocode/worker-utils/sandbox-allocation';
-import { isContainerConcurrencyLimitError } from '../container-concurrency.js';
+import { getContainerCapacityFailureReason } from '../container-concurrency.js';
 import {
   containersBillingIdentity,
   parseSandboxBillingInput,
@@ -15,7 +15,7 @@ import {
   decodeCloudflareProviderRef,
   encodeCloudflareProviderRef,
   type CloudflareProviderRef,
-} from './cloudflare-provider.js';
+} from './provider-ref.js';
 import { CONTROL_WRAPPER_LOG_PATH } from './container-paths.js';
 import { DEADLINE_MS, leaseAtLeastMs } from './deadlines.js';
 import { logControlDiagnostic } from './diagnostics.js';
@@ -51,7 +51,12 @@ export function createCloudflareContainersProviderAdapter(deps: {
   allocationName: string;
   instance?: ContainerInstanceSize;
   egressAllowlist?: string[];
+  egressAudit?: boolean;
   getContainer: (logicalSandboxId: string) => DurableObjectStub<SandboxContainers>;
+  /**
+   * Trusted cold-launch inputs. Absent, and a descriptor absent within it, keep
+   * the baked supervisor selection.
+   */
 }): ProviderAdapter {
   const instance = deps.instance ?? CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE;
   const encodeIntentProviderRef = (intent: ProviderAllocationIntent): string =>
@@ -96,7 +101,7 @@ export function createCloudflareContainersProviderAdapter(deps: {
       try {
         admission = await container.ensureBillingAdmission(input, instance);
       } catch (error) {
-        if (isContainerConcurrencyLimitError(error)) throw error;
+        if (getContainerCapacityFailureReason(error)) throw error;
         admission = {
           success: false,
           code: 'meter_unavailable',
@@ -116,7 +121,23 @@ export function createCloudflareContainersProviderAdapter(deps: {
   };
 
   return {
+    environmentSnapshots: true,
+    workspaceSnapshots: {
+      currentImage: image => deps.getContainer(deps.logicalSandboxId).currentImage(image),
+      async capture(ref, captureId) {
+        if (decodeOwnedProviderRef(ref) === null)
+          throw new ProviderCreationError('invalid_configuration');
+        return deps.getContainer(deps.logicalSandboxId).captureSnapshot(ref, captureId);
+      },
+    },
     ensureBillingAdmission,
+    async isBillingBlocked(ref) {
+      if (ref === null || decodeOwnedProviderRef(ref) === null) return false;
+      return deps.getContainer(deps.logicalSandboxId).isBillingBlocked();
+    },
+    async getBillingProjection() {
+      return deps.getContainer(deps.logicalSandboxId).getBillingRuntimeStatus();
+    },
     describeRuntime(ref) {
       const parsed = decodeOwnedProviderRef(ref);
       if (parsed === null) return undefined;
@@ -132,7 +153,7 @@ export function createCloudflareContainersProviderAdapter(deps: {
       await ensureBillingAdmission(providerRef, intent.billing);
       return { providerRef };
     },
-    async launch(ref, env, options) {
+    async launch(ref, { command, env }, options) {
       const owned = decodeOwnedProviderRef(ref);
       if (owned === null) {
         throw new ProviderCreationError('invalid_configuration');
@@ -141,14 +162,19 @@ export function createCloudflareContainersProviderAdapter(deps: {
       const workloadLimitMb =
         env['CONTROL_WORKLOAD_LIMIT_MB'] ??
         String(containersBillingIdentity(instance).capacity.memoryMiB);
-      const { startSource, snapshotFailed } = await container.launchWrapper({
+      // One launch selection (amendment "cold session without a snapshot"): a
+      // trusted descriptor installs the verified runtime before the supervisor,
+      // also on a snapshot start; no descriptor runs the baked supervisor.
+      const { startSource, snapshotFailed, snapshotFailureReason } = await container.launchWrapper({
         allocationRef: ref,
+        command,
         instance,
         containment: owned.containment,
         ...(deps.egressAllowlist === undefined ? {} : { egressAllowlist: deps.egressAllowlist }),
-        ...(options?.repoKey === undefined ? {} : { repoKey: options.repoKey }),
-        ...(options?.skipRepository === true ? { skipRepository: true as const } : {}),
+        ...(options?.snapshot === undefined ? {} : { snapshot: options.snapshot }),
+        ...(deps.egressAudit === true ? { egressAudit: true } : {}),
         ...(options?.deadlineAt === undefined ? {} : { deadlineAt: options.deadlineAt }),
+        ...(options?.nativeImage === undefined ? {} : { nativeImage: options.nativeImage }),
         env: {
           ...env,
           CONTROL_WORKLOAD_LIMIT_MB: workloadLimitMb,
@@ -156,7 +182,12 @@ export function createCloudflareContainersProviderAdapter(deps: {
           WRAPPER_LOG_PATH: CONTROL_WRAPPER_LOG_PATH,
         },
       });
-      if (snapshotFailed) return { startSource, snapshotFailed };
+      if (snapshotFailed)
+        return {
+          startSource,
+          snapshotFailed,
+          ...(snapshotFailureReason === undefined ? {} : { snapshotFailureReason }),
+        };
       // Lease renewal only starts once the wrapper reports ready, which the
       // recovery admission gate can delay. Establish the initial lease here so
       // the container is not reaped by its inactivity timeout before then.
@@ -172,16 +203,6 @@ export function createCloudflareContainersProviderAdapter(deps: {
         );
       });
       return { startSource };
-    },
-    async captureRepository(ref, repoKey, commit) {
-      if (decodeOwnedProviderRef(ref) === null) return false;
-      try {
-        return await deps
-          .getContainer(deps.logicalSandboxId)
-          .captureRepository(ref, repoKey, commit);
-      } catch {
-        return false;
-      }
     },
     async observe(ref, intent) {
       const providerRef = resolveProviderRef(ref, intent);

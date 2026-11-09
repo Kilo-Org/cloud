@@ -28,7 +28,6 @@ export { createNotFoundHandler } from './not-found-handler.js';
 export type { Owner, MCPServerConfig } from './types.js';
 
 export {
-  AUTO_FIX_INSUFFICIENT_CREDITS_MESSAGE,
   CLOUD_AGENT_NEXT_BILLING_ERROR_PATTERNS,
   createCloudAgentNextFetchClient,
   isCloudAgentNextBillingErrorBody,
@@ -57,8 +56,6 @@ export { CloudAgentNextBillingError, CloudAgentNextError } from './cloud-agent-n
 export {
   KILO_API_AUDIENCE,
   KILO_GATEWAY_AUDIENCE,
-  GASTOWN_AUDIENCE,
-  WASTELAND_AUDIENCE,
   KILO_CHAT_AUDIENCE,
   EVENT_SERVICE_AUDIENCE,
   NOTIFICATIONS_AUDIENCE,
@@ -162,16 +159,6 @@ export type {
   VerifiedKiloAuthContext,
 } from './kilo-token-policy.js';
 
-export { createKiloAuthMiddleware } from './kilo-auth-middleware.js';
-export type {
-  KiloAuthEnv,
-  KiloAuthMiddlewareOptions,
-  KiloAuthOrgMembership,
-  KiloAuthVariables,
-  ResolveSecret,
-  SecretBinding,
-} from './kilo-auth-middleware.js';
-
 export { SessionMetricsParamsSchema, TerminationReasons } from './session-metrics-schema.js';
 export type { SessionMetricsParams, SessionMetricsParamsInput } from './session-metrics-schema.js';
 
@@ -179,7 +166,12 @@ export { isValidInstanceId, sandboxIdFromInstanceId } from './instance-id.js';
 
 export { redactSensitiveHeaders } from './redact-headers.js';
 
+export { getVercelExecutionRegion } from './vercel-execution-region.js';
+export type { VercelExecutionRegion } from './vercel-execution-region.js';
+
 export { normalizeGitUrl } from './normalize-git-url.js';
+
+export { chunkArray } from './chunk-array.js';
 
 export { deriveCallbackToken, verifyCallbackToken } from './callback-token.js';
 export type { CallbackTokenParams, VerifyCallbackTokenParams } from './callback-token.js';
@@ -241,10 +233,12 @@ export {
   buildSecurityFindingAuditSnapshot,
   deriveSecurityFindingAuditEventKey,
   insertSecurityFindingAuditEvent,
+  insertSecurityFindingAuditEvents,
 } from './security-finding-audit.js';
 export type {
   NewSecurityFindingAuditLogValues,
   SecurityFindingAuditActor,
+  SecurityFindingAuditBatchWriterDb,
   SecurityFindingAuditEventFinding,
   SecurityFindingAuditEventInput,
   SecurityFindingAuditHumanActor,
@@ -256,7 +250,18 @@ export type {
   SecurityFindingAuditWriterDb,
 } from './security-finding-audit.js';
 
-export { hasOrganizationAccess } from './organization-membership.js';
+export {
+  activeOrganizationAccessSql,
+  activeOrganizationJoinCondition,
+  hasOrganizationAccess,
+  organizationMembershipJoinCondition,
+  parentOrganizationJoinCondition,
+  parentOrganizationMembershipJoinCondition,
+  parentOrganizationsTable,
+  parentOrganizationMembershipsTable,
+  personalOrActiveOrganizationCondition,
+  personalOrInheritedOrganizationCondition,
+} from './organization-membership.js';
 
 export {
   MAX_AUTO_COMMIT_MESSAGE_BYTES,

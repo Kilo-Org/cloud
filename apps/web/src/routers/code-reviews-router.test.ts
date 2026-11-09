@@ -2,6 +2,7 @@ const mockCancelReview = jest.fn();
 const mockTryDispatchPendingReviews = jest.fn();
 const mockSyncWebhooksForRepositories = jest.fn();
 const mockGetValidGitLabToken = jest.fn();
+const mockIsGitLabCredentialConnected = jest.fn();
 const mockGetBlobContent = jest.fn();
 const mockFetchSessionSnapshot = jest.fn();
 const mockEnsureBitbucketCodeReviewWorkspaceWebhook = jest.fn();
@@ -61,6 +62,7 @@ jest.mock('@/lib/bot-users/bot-user-service', () => {
 
 jest.mock('@/lib/integrations/gitlab-service', () => ({
   getValidGitLabToken: (...args: unknown[]) => mockGetValidGitLabToken(...args),
+  isGitLabCredentialConnected: (...args: unknown[]) => mockIsGitLabCredentialConnected(...args),
 }));
 
 jest.mock('@/lib/r2/cli-sessions', () => ({
@@ -274,6 +276,40 @@ describe('codeReviewRouter.cancel', () => {
     expect(mockCancelReview).toHaveBeenCalledWith(review.id, 'Cancelled by user', undefined);
     expect(storedReview?.status).toBe('cancelled');
     expect(storedReview?.completed_at).toBeTruthy();
+  });
+
+  it('reports that nothing changed when the review finished before the local cancel', async () => {
+    const integration = await insertGitHubIntegration(testUser.id, 'lite');
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        reviewValues(testUser.id, 'queued', {
+          platform_integration_id: integration.id,
+          check_run_id: 777,
+        })
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+    // The status read that precedes the cancel saw a queued review; by the time
+    // the guarded cancel runs, the worker path has finished it.
+    mockCancelReview.mockImplementation(async () => {
+      await db
+        .update(cloud_agent_code_reviews)
+        .set({ status: 'completed', completed_at: new Date().toISOString() })
+        .where(eq(cloud_agent_code_reviews.id, review.id));
+      return { success: false, reviewId: review.id };
+    });
+
+    const caller = await createCallerForUser(testUser.id);
+    const result = await caller.codeReviews.cancel({ reviewId: review.id });
+
+    const storedReview = await db.query.cloud_agent_code_reviews.findFirst({
+      where: eq(cloud_agent_code_reviews.id, review.id),
+    });
+
+    expect(result).toEqual({ success: false, error: 'Code review is no longer running' });
+    expect(storedReview?.status).toBe('completed');
+    expect(storedReview?.error_message).toBeNull();
+    expect(mockUpdateCheckRun).not.toHaveBeenCalled();
   });
 
   it('cancels pending reviews locally without calling the Worker', async () => {
@@ -750,6 +786,71 @@ describe('personalReviewAgent.createManualReviewJob', () => {
       id: testUser.id,
       userId: testUser.id,
     });
+  });
+
+  it('replays the review an accepted start created when a retry carries the same operation key', async () => {
+    const caller = await createCallerForUser(testUser.id);
+    const operationKey = '0f7b7d0e-9d43-4d8f-9a11-2b0c3d4e5f60';
+
+    const first = await caller.personalReviewAgent.createManualReviewJob({
+      platform: 'github',
+      url: prUrl,
+      modelSlug: 'test-model',
+      operationKey,
+    });
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+    // The retry a stalled start sends: the first attempt was already accepted,
+    // its response lost, so the same key must resolve to the same review.
+    const retry = await caller.personalReviewAgent.createManualReviewJob({
+      platform: 'github',
+      url: prUrl,
+      modelSlug: 'test-model',
+      operationKey,
+    });
+
+    expect(retry).toEqual(first);
+    // The replay repeats no provider read and creates no second row.
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+    const rows = await db
+      .select({
+        id: cloud_agent_code_reviews.id,
+        manualOperationKey: cloud_agent_code_reviews.manual_operation_key,
+      })
+      .from(cloud_agent_code_reviews)
+      .where(eq(cloud_agent_code_reviews.repo_full_name, repo));
+
+    expect(rows).toEqual([{ id: first.reviewId, manualOperationKey: operationKey }]);
+  });
+
+  it('refuses an operation key that already produced a review for another change', async () => {
+    const caller = await createCallerForUser(testUser.id);
+    const operationKey = '4b2b6b0f-1234-4c9a-8f1d-0a1b2c3d4e5f';
+
+    await caller.personalReviewAgent.createManualReviewJob({
+      platform: 'github',
+      url: prUrl,
+      modelSlug: 'test-model',
+      operationKey,
+    });
+
+    const rejection = await caller.personalReviewAgent
+      .createManualReviewJob({
+        platform: 'github',
+        url: `https://github.com/${repo}/pull/2`,
+        modelSlug: 'test-model',
+        operationKey,
+      })
+      .then(
+        () => {
+          throw new Error('Expected createManualReviewJob to reject');
+        },
+        error => error as { code?: string; message?: string }
+      );
+
+    expect(rejection.code).toBe('CONFLICT');
+    expect(rejection.message).toBe('operation_key_reuse_mismatch');
   });
 
   // The local (DEBUG_SHOW_DEV_UI) path reads the pull request from the provider's
@@ -2153,6 +2254,192 @@ describe('review agent config REVIEW.md setting', () => {
     expect(config?.config).toEqual(expect.objectContaining({ disable_review_md: true }));
     expect(config?.config).not.toHaveProperty('max_review_time_minutes');
   });
+
+  it('forces GitLab repository_selection_mode to selected on a full save with the mode omitted', async () => {
+    const caller = await createCallerForUser(testUser.id);
+
+    await caller.personalReviewAgent.saveReviewConfig({
+      platform: 'gitlab',
+      reviewStyle: 'balanced',
+      focusAreas: [],
+      modelSlug: 'test-model',
+      selectedRepositoryIds: [101],
+      autoConfigureWebhooks: false,
+    });
+
+    const config = await db.query.agent_configs.findFirst({
+      where: and(
+        eq(agent_configs.agent_type, 'code_review'),
+        eq(agent_configs.platform, 'gitlab'),
+        eq(agent_configs.owned_by_user_id, testUser.id)
+      ),
+    });
+    expect(config?.config).toEqual(
+      expect.objectContaining({
+        repository_selection_mode: 'selected',
+        selected_repository_ids: [101],
+      })
+    );
+  });
+
+  it('forces GitLab repository_selection_mode to selected on a full save with the mode "all"', async () => {
+    await db.insert(platform_integrations).values({
+      owned_by_user_id: testUser.id,
+      platform: 'gitlab',
+      integration_type: 'oauth',
+      integration_status: 'active',
+      metadata: { webhook_secret: 'webhook-secret' },
+    });
+    const caller = await createCallerForUser(testUser.id);
+
+    const result = await caller.personalReviewAgent.saveReviewConfig({
+      platform: 'gitlab',
+      reviewStyle: 'balanced',
+      focusAreas: [],
+      modelSlug: 'test-model',
+      repositorySelectionMode: 'all',
+      selectedRepositoryIds: [202],
+    });
+
+    const config = await db.query.agent_configs.findFirst({
+      where: and(
+        eq(agent_configs.agent_type, 'code_review'),
+        eq(agent_configs.platform, 'gitlab'),
+        eq(agent_configs.owned_by_user_id, testUser.id)
+      ),
+    });
+    expect(config?.config).toEqual(
+      expect.objectContaining({
+        repository_selection_mode: 'selected',
+        selected_repository_ids: [202],
+      })
+    );
+    // The clamp resolves the saved mode to 'selected', so the GitLab webhook
+    // sync runs for the selection the client sent.
+    expect(mockSyncWebhooksForRepositories).toHaveBeenCalledWith(
+      'gitlab-token',
+      'webhook-secret',
+      [202],
+      [],
+      {},
+      'https://gitlab.com'
+    );
+    expect(result.webhookSync).toEqual({ created: 0, updated: 0, deleted: 0, errors: [] });
+  });
+});
+
+describe('review agent config repository_selection_mode reads', () => {
+  let testUser: User;
+  let organization: Organization;
+
+  beforeAll(async () => {
+    testUser = await insertTestUser();
+    organization = await createTestOrganization('Selection Mode Org', testUser.id, 0, {}, false);
+  });
+
+  afterEach(async () => {
+    await db
+      .delete(agent_configs)
+      .where(
+        or(
+          eq(agent_configs.owned_by_user_id, testUser.id),
+          eq(agent_configs.owned_by_organization_id, organization.id)
+        )
+      );
+  });
+
+  afterAll(async () => {
+    await db.delete(organizations).where(eq(organizations.id, organization.id));
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, testUser.id));
+  });
+
+  it('reports selected for a personal GitLab config stored with the mode "all"', async () => {
+    await db.insert(agent_configs).values({
+      owned_by_user_id: testUser.id,
+      agent_type: 'code_review',
+      platform: 'gitlab',
+      config: {
+        review_style: 'balanced',
+        focus_areas: [],
+        model_slug: 'test-model',
+        repository_selection_mode: 'all',
+        selected_repository_ids: [101],
+      },
+      is_enabled: true,
+      created_by: testUser.id,
+    });
+    const caller = await createCallerForUser(testUser.id);
+
+    const returned = await caller.personalReviewAgent.getReviewConfig({ platform: 'gitlab' });
+
+    expect(returned.repositorySelectionMode).toBe('selected');
+    expect(returned.selectedRepositoryIds).toEqual([101]);
+  });
+
+  it('reports selected for the personal GitLab default config', async () => {
+    const caller = await createCallerForUser(testUser.id);
+
+    const returned = await caller.personalReviewAgent.getReviewConfig({ platform: 'gitlab' });
+
+    expect(returned.repositorySelectionMode).toBe('selected');
+    expect(returned.selectedRepositoryIds).toEqual([]);
+  });
+
+  it('reports all for the personal GitHub default config', async () => {
+    const caller = await createCallerForUser(testUser.id);
+
+    const returned = await caller.personalReviewAgent.getReviewConfig({ platform: 'github' });
+
+    expect(returned.repositorySelectionMode).toBe('all');
+  });
+
+  it('reports selected for an organization GitLab config stored with the mode "all"', async () => {
+    await db.insert(agent_configs).values({
+      owned_by_organization_id: organization.id,
+      agent_type: 'code_review',
+      platform: 'gitlab',
+      config: {
+        review_style: 'balanced',
+        focus_areas: [],
+        model_slug: 'test-model',
+        repository_selection_mode: 'all',
+        selected_repository_ids: [303],
+      },
+      is_enabled: true,
+      created_by: testUser.id,
+    });
+    const caller = await createCallerForUser(testUser.id);
+
+    const returned = await caller.organizations.reviewAgent.getReviewConfig({
+      organizationId: organization.id,
+      platform: 'gitlab',
+    });
+
+    expect(returned.repositorySelectionMode).toBe('selected');
+    expect(returned.selectedRepositoryIds).toEqual([303]);
+  });
+
+  it('reports selected for the organization GitLab default config', async () => {
+    const caller = await createCallerForUser(testUser.id);
+
+    const returned = await caller.organizations.reviewAgent.getReviewConfig({
+      organizationId: organization.id,
+      platform: 'gitlab',
+    });
+
+    expect(returned.repositorySelectionMode).toBe('selected');
+  });
+
+  it('keeps the organization Bitbucket default selected', async () => {
+    const caller = await createCallerForUser(testUser.id);
+
+    const returned = await caller.organizations.reviewAgent.getReviewConfig({
+      organizationId: organization.id,
+      platform: 'bitbucket',
+    });
+
+    expect(returned.repositorySelectionMode).toBe('selected');
+  });
 });
 
 describe('codeReviewRouter attempts', () => {
@@ -2429,6 +2716,38 @@ describe('codeReviewRouter attempts', () => {
 
     expect(latestAttempt?.retry_reason).toBe('manual_retrigger');
     expect(mockTryDispatchPendingReviews).toHaveBeenCalled();
+  });
+
+  it('reports a retry whose dispatch left the review failed again', async () => {
+    await insertEnabledAgentConfig();
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        reviewValues(testUser.id, 'failed', {
+          session_id: 'agent-first',
+          cli_session_id: 'ses_first',
+          error_message: 'Container shutdown: SIGTERM',
+          terminal_reason: 'sandbox_error',
+        })
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    const dispatchError =
+      'Dispatch failed: could not reach the code review service. ' +
+      'It may be offline — retry the review once it is running.';
+    mockTryDispatchPendingReviews.mockImplementationOnce(async () => {
+      // Real dispatch marks the reservation failed when the worker refuses it.
+      await db
+        .update(cloud_agent_code_reviews)
+        .set({ status: 'failed', error_message: dispatchError })
+        .where(eq(cloud_agent_code_reviews.id, review.id));
+      return { dispatched: 0, notDispatched: 1, activeCount: 0 };
+    });
+
+    const caller = await createCallerForUser(testUser.id);
+    const result = await caller.codeReviews.retrigger({ reviewId: review.id });
+
+    expect(result).toEqual({ success: false, error: dispatchError });
   });
 
   it('parallel retriggers dispatch once and the second is a conflict', async () => {
@@ -3751,12 +4070,16 @@ describe('personalReviewAgent.patchReviewConfig', () => {
 //      webhooks kept carrying the old secret and stopped validating.
 // ============================================================================
 
-async function seedPersonalGitLabIntegration(userId: string, metadata: Record<string, unknown>) {
+async function seedPersonalGitLabIntegration(
+  userId: string,
+  metadata: Record<string, unknown>,
+  integrationStatus: 'active' | 'pending' | 'suspended' = 'active'
+) {
   await db.insert(platform_integrations).values({
     owned_by_user_id: userId,
     platform: 'gitlab',
     integration_type: 'oauth',
-    integration_status: 'active',
+    integration_status: integrationStatus,
     platform_installation_id: `inst-${crypto.randomUUID()}`,
     metadata: { ...metadata, webhook_secret: 'old-secret-do-not-leak' },
   });
@@ -3798,6 +4121,10 @@ describe('personalReviewAgent.getGitLabStatus P1-D-32 (omits webhook secret)', (
   beforeEach(() => {
     mockGetValidGitLabToken.mockReset();
     mockSyncWebhooksForRepositories.mockReset();
+    // The status read consults the credential broker; a usable credential is
+    // the default so the P1-D-32 shape assertions below stay on the healthy
+    // path.
+    mockIsGitLabCredentialConnected.mockReset().mockResolvedValue(true);
   });
 
   afterEach(async () => {
@@ -3810,6 +4137,46 @@ describe('personalReviewAgent.getGitLabStatus P1-D-32 (omits webhook secret)', (
     await db.delete(kilocode_users).where(eq(kilocode_users.id, testUser.id));
   });
 
+  it('asks for re-authorization when the stored credential is unusable despite an active row', async () => {
+    await seedPersonalGitLabIntegration(testUser.id, {
+      gitlab_instance_url: 'https://gitlab.example.com',
+    });
+    mockIsGitLabCredentialConnected.mockResolvedValue(false);
+
+    const caller = await createCallerForUser(testUser.id);
+    const status = await caller.personalReviewAgent.getGitLabStatus();
+
+    // The row exists and the account already authorized it, so the gate must
+    // offer a re-authorization, not a first-time connect.
+    expect(status).toEqual({ connected: false, reconnectRequired: true, integration: null });
+  });
+
+  it.each(['pending', 'suspended'] as const)(
+    'asks for re-authorization when the existing row is %s',
+    async integrationStatus => {
+      await seedPersonalGitLabIntegration(
+        testUser.id,
+        { gitlab_instance_url: 'https://gitlab.example.com' },
+        integrationStatus
+      );
+
+      const caller = await createCallerForUser(testUser.id);
+      const status = await caller.personalReviewAgent.getGitLabStatus();
+
+      expect(status).toEqual({ connected: false, reconnectRequired: true, integration: null });
+      // A row that cannot serve a review never reaches the credential broker.
+      expect(mockIsGitLabCredentialConnected).not.toHaveBeenCalled();
+    }
+  );
+
+  it('keeps the first-time connect state when the user has no integration', async () => {
+    const caller = await createCallerForUser(testUser.id);
+    const status = await caller.personalReviewAgent.getGitLabStatus();
+
+    expect(status).toEqual({ connected: false, reconnectRequired: false, integration: null });
+    expect(mockIsGitLabCredentialConnected).not.toHaveBeenCalled();
+  });
+
   it('returns the integration shape WITHOUT webhookSecret for the self caller', async () => {
     await seedPersonalGitLabIntegration(testUser.id, {
       gitlab_instance_url: 'https://gitlab.example.com',
@@ -3820,6 +4187,7 @@ describe('personalReviewAgent.getGitLabStatus P1-D-32 (omits webhook secret)', (
     const status = await caller.personalReviewAgent.getGitLabStatus();
 
     expect(status.connected).toBe(true);
+    expect(status.reconnectRequired).toBe(false);
     expect(status.integration).toBeDefined();
     // Regression guard: the secret must NEVER appear in the status
     // payload, even for the secret's owner. If this assertion fails,
@@ -3831,7 +4199,6 @@ describe('personalReviewAgent.getGitLabStatus P1-D-32 (omits webhook secret)', (
     // stored integration row regardless of their concrete values).
     expect(status.integration).toEqual(
       expect.objectContaining({
-        isValid: true,
         instanceUrl: 'https://gitlab.example.com',
       })
     );
@@ -4032,5 +4399,124 @@ describe('gitlab.regenerateWebhookSecret P1-D-32 (self-only, re-syncs)', () => {
     expect(result.webhookSync.errors).toHaveLength(1);
     expect(mockSyncWebhooksForRepositories).not.toHaveBeenCalled();
     expect(await readPersonalWebhookSecret(testUser.id)).toBe(result.webhookSecret);
+  });
+});
+
+describe('personalReviewAgent.getGitHubStatus connection rule', () => {
+  let testUser: User;
+
+  beforeAll(async () => {
+    testUser = await insertTestUser();
+  });
+
+  afterEach(async () => {
+    await db
+      .delete(platform_integrations)
+      .where(eq(platform_integrations.owned_by_user_id, testUser.id));
+  });
+
+  afterAll(async () => {
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, testUser.id));
+  });
+
+  async function seedGitHubIntegration(
+    overrides: Partial<typeof platform_integrations.$inferInsert> = {}
+  ) {
+    const [row] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_user_id: testUser.id,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: `inst-${crypto.randomUUID()}`,
+        github_app_type: 'standard',
+        github_connection_role: 'workflow',
+        integration_status: 'active',
+        repository_access: 'all',
+        platform_account_login: 'octocat',
+        installed_at: '2026-01-01T00:00:00Z',
+        ...overrides,
+      })
+      .returning();
+    return row;
+  }
+
+  it('reports the healthy active workflow installation as connected', async () => {
+    await seedGitHubIntegration();
+
+    const caller = await createCallerForUser(testUser.id);
+    const status = await caller.personalReviewAgent.getGitHubStatus();
+
+    expect(status).toEqual({
+      connected: true,
+      integration: {
+        accountLogin: 'octocat',
+        repositorySelection: 'all',
+        installedAt: '2026-01-01 00:00:00+00',
+      },
+    });
+  });
+
+  it('reports a locally disconnected installation as not connected', async () => {
+    // Regression: the status must use the same health rule as the repository
+    // picker and Security Agent, so a disconnected installation cannot reach
+    // reviewer screens whose every repository call then fails.
+    await seedGitHubIntegration({ github_disconnected_at: '2026-02-01T00:00:00Z' });
+
+    const caller = await createCallerForUser(testUser.id);
+    const status = await caller.personalReviewAgent.getGitHubStatus();
+
+    expect(status).toEqual({ connected: false, integration: null });
+  });
+
+  it('reports a suspended installation as not connected', async () => {
+    await seedGitHubIntegration({
+      integration_status: 'suspended',
+      suspended_at: '2026-02-01T00:00:00Z',
+    });
+
+    const caller = await createCallerForUser(testUser.id);
+    const status = await caller.personalReviewAgent.getGitHubStatus();
+
+    expect(status).toEqual({ connected: false, integration: null });
+  });
+
+  it('reports an installation awaiting reauthorization as not connected', async () => {
+    await seedGitHubIntegration({ auth_invalid_at: '2026-02-01T00:00:00Z' });
+
+    const caller = await createCallerForUser(testUser.id);
+    const status = await caller.personalReviewAgent.getGitHubStatus();
+
+    expect(status).toEqual({ connected: false, integration: null });
+  });
+
+  it('reports not connected without any installation', async () => {
+    const caller = await createCallerForUser(testUser.id);
+    const status = await caller.personalReviewAgent.getGitHubStatus();
+
+    expect(status).toEqual({ connected: false, integration: null });
+  });
+
+  it('reports connected when a healthy row coexists with a retained disconnected row', async () => {
+    // A locally disconnected row is retained, and reconnecting a different
+    // installation inserts another row. The status must resolve the healthy
+    // installation instead of an unordered first row.
+    await seedGitHubIntegration({ github_disconnected_at: '2026-02-01T00:00:00Z' });
+    await seedGitHubIntegration({
+      platform_installation_id: `inst-${crypto.randomUUID()}`,
+      platform_account_login: 'octocat-new',
+    });
+
+    const caller = await createCallerForUser(testUser.id);
+    const status = await caller.personalReviewAgent.getGitHubStatus();
+
+    expect(status).toEqual({
+      connected: true,
+      integration: {
+        accountLogin: 'octocat-new',
+        repositorySelection: 'all',
+        installedAt: '2026-01-01 00:00:00+00',
+      },
+    });
   });
 });

@@ -11,6 +11,8 @@ import {
 import { handleAppActionPath } from './action-url-handler';
 import { getPendingAppAction, takePendingAppAction } from './pending-app-action';
 
+const SESSION_ID = 'ses_0123456789abcdefghijklmnop';
+
 vi.mock('@sentry/react-native', () => ({ captureException: vi.fn() }));
 
 beforeEach(() => {
@@ -39,11 +41,11 @@ describe('handleAppActionPath', () => {
   it('stashes a session URL on the universal-link rails', () => {
     expect(
       handleAppActionPath({
-        path: 'kiloapp:///actions/open-session?sessionId=ses_1',
+        path: `kiloapp:///actions/open-session?sessionId=${SESSION_ID}`,
         initial: false,
       })
     ).toBe(true);
-    expect(getPendingDeepLink()).toBe('/(app)/agent-chat/ses_1');
+    expect(getPendingDeepLink()).toBe(`/(app)/agent-chat/${SESSION_ID}`);
     expect(getPendingAppAction()).toBeNull();
   });
 
@@ -57,11 +59,24 @@ describe('handleAppActionPath', () => {
     expect(getPendingDeepLink()).toBe('/(app)/pr-review/o/r/7');
   });
 
+  it('opens nothing for a session id the route cannot resolve', () => {
+    // Still the contract's URL, but there is no destination to open: stashing
+    // the composer fallback would replace the current screen with it.
+    expect(
+      handleAppActionPath({
+        path: 'kiloapp:///actions/open-session?sessionId=not-a-session',
+        initial: false,
+      })
+    ).toBe(true);
+    expect(getPendingDeepLink()).toBeNull();
+    expect(getPendingAppAction()).toBeNull();
+  });
+
   it('accepts the scheme-less path expo-router hands redirectSystemPath', () => {
     expect(
-      handleAppActionPath({ path: '/actions/open-session?sessionId=ses_1', initial: true })
+      handleAppActionPath({ path: `/actions/open-session?sessionId=${SESSION_ID}`, initial: true })
     ).toBe(true);
-    expect(getPendingDeepLink()).toBe('/(app)/agent-chat/ses_1');
+    expect(getPendingDeepLink()).toBe(`/(app)/agent-chat/${SESSION_ID}`);
   });
 
   it('leaves anything that is not an action URL to the caller', () => {
@@ -108,12 +123,12 @@ describe('handleAppActionPath', () => {
   });
 
   it('does not re-stash a cold action when the launch capture already stashed', () => {
-    _setGetLinkingURLForTests(() => 'https://app.kilo.ai/cloud/sessions/ses_9');
+    _setGetLinkingURLForTests(() => `https://app.kilo.ai/cloud/sessions/${SESSION_ID}`);
     captureLaunchDeepLink();
-    expect(getPendingDeepLink()).toBe('/(app)/agent-chat/ses_9');
+    expect(getPendingDeepLink()).toBe(`/(app)/agent-chat/${SESSION_ID}`);
     expect(
       handleAppActionPath({
-        path: 'kiloapp:///actions/open-session?sessionId=ses_1',
+        path: `kiloapp:///actions/open-session?sessionId=${SESSION_ID}`,
         initial: true,
       })
     ).toBe(true);
@@ -121,10 +136,10 @@ describe('handleAppActionPath', () => {
     // A warm arrival has no launch capture to guard against, so it stashes.
     expect(
       handleAppActionPath({
-        path: 'kiloapp:///actions/open-session?sessionId=ses_1',
+        path: `kiloapp:///actions/open-session?sessionId=${SESSION_ID}`,
         initial: false,
       })
     ).toBe(true);
-    expect(getPendingDeepLink()).toBe('/(app)/agent-chat/ses_1');
+    expect(getPendingDeepLink()).toBe(`/(app)/agent-chat/${SESSION_ID}`);
   });
 });

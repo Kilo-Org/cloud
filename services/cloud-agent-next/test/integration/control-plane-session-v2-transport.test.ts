@@ -1,3 +1,4 @@
+import { FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN } from './helpers/fake-credentials.js';
 import { env, evictAllDurableObjects, reset, runInDurableObject } from 'cloudflare:test';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -46,18 +47,18 @@ async function setup() {
     metadata: parseSessionMetadata({
       metadataSchemaVersion: 2,
       identity: { sessionId, userId: 'user_transport', createdOnPlatform: 'cloud-agent-web' },
-      auth: { kiloSessionId, kilocodeToken: 'test-token' },
+      auth: { kiloSessionId, kilocodeToken: FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN },
       agent: { mode: 'code', model: 'test/model' },
       repository: { type: 'github', repo: 'acme/widgets', upstreamBranch: 'main' },
       callback: { target: { url: 'https://callback.test/hook' } },
       workspace: {
-        sandboxId: await generateSandboxId('*', undefined, 'user_transport', sessionId),
-        sandboxProvider: 'cloudflare',
+        sandboxId: await generateSandboxId(sessionId),
+        sandboxProvider: 'cloudflare-containers',
         branchName: 'kilo/test',
       },
       lifecycle: { version: 1, timestamp: 1 },
     }),
-    sandboxSelection: { provider: 'cloudflare' },
+    sandboxSelection: { provider: 'cloudflare-containers' },
   });
   expect(registered).toEqual({ success: true });
   await installPeer(stub, peer);
@@ -124,7 +125,7 @@ describe('SandboxSessionV2 queued transport recovery', () => {
     const scaled = resolveControlPlaneTimers({ CONTROL_PLANE_TIMER_DIVISOR: '10' });
     expect(scaled.session.sandboxRpcDeadlineMs).toBe(2_000);
     expect(scaled.session.transportRecoveryMs).toBe(1_500);
-    expect(scaled.sandbox.routePreparationMs).toBe(12 * 60_000);
+    expect(scaled.sandbox.routePreparationMs).toBe(CONTROL_PLANE_TIMERS.sandbox.routePreparationMs);
     expect(resolveControlPlaneTimers({ CONTROL_PLANE_TIMER_DIVISOR: 'invalid' })).toBe(
       CONTROL_PLANE_TIMERS
     );

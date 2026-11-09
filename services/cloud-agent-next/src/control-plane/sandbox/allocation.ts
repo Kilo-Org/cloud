@@ -1,3 +1,7 @@
+import {
+  STARTUP_FAILURES,
+  type StartupFailureCode,
+} from '../../sandbox-control/startup-failure.js';
 import type { ControlPlaneTimers } from '../../shared/control-plane-timers.js';
 import type { ControlPlaneFailureReason } from '../../shared/control-plane-protocol.js';
 import type { AgentSandboxProvider } from '../../types.js';
@@ -37,6 +41,12 @@ export type AllocationState = {
   lastActivityAt: number | null;
   createDeadlineAt: number | null;
   firstConnectDeadlineAt: number | null;
+  /**
+   * Create attempts this preparing episode has made, 1 from `ensure`. The
+   * budget stops a provider that rejects every create, which otherwise retries
+   * every pause until the route attempt deadline.
+   */
+  createAttempt: number;
   /** Id of the current stop attempt; results for other ids are ignored (N1). */
   stopAttempt: number;
   /** True when the next attempt is scheduled but its stop call is not issued yet. */
@@ -68,6 +78,7 @@ export function initialAllocationState(): AllocationState {
     lastActivityAt: null,
     createDeadlineAt: null,
     firstConnectDeadlineAt: null,
+    createAttempt: 0,
     stopAttempt: 0,
     stopPending: false,
     stopAt: null,
@@ -83,6 +94,7 @@ export type AllocationEvent =
    * `hello` never observes a null ref.
    */
   | { type: 'provider-ref'; at: number; allocationId: string; providerRef: string }
+  | { type: 'startup-failed'; at: number; allocationId: string; code: StartupFailureCode }
   | { type: 'created'; at: number; allocationId: string; providerRef: string }
   | {
       type: 'create-failed';
@@ -137,6 +149,14 @@ export type AllocationEffect =
   | { type: 'close-socket' }
   | { type: 'lease' };
 
+/**
+ * Create attempts one preparation attempt may make: the first plus the one
+ * retry the attempt budget reserves for a transient create failure
+ * (`CONTROL_PLANE_TIMERS` test, "A transient create failure creates again
+ * inside the same attempt").
+ */
+export const CREATE_ATTEMPT_LIMIT = 2;
+
 export type AllocationReduction = {
   state: AllocationState;
   effects: AllocationEffect[];
@@ -145,6 +165,13 @@ export type AllocationReduction = {
    * the caller notifies ready routes without re-deriving the cause.
    */
   stopReason?: ControlPlaneFailureReason;
+  /**
+   * Set when the create attempt budget, not the route deadline, ends the
+   * episode: why the preparing routes failed, so the caller fails them at once
+   * instead of leaving them to wait out a deadline that no longer means
+   * progress.
+   */
+  routeFailure?: ControlPlaneFailureReason;
 };
 
 const NO_EFFECTS: AllocationEffect[] = [];
@@ -253,6 +280,7 @@ export function reduceAllocation(
           kind: 'creating',
           allocationId: event.allocationId,
           createDeadlineAt: event.at + timers.providerCreateMs,
+          createAttempt: 1,
         },
         effects: [{ type: 'create', allocationId: event.allocationId }],
       };
@@ -264,6 +292,20 @@ export function reduceAllocation(
       }
       if (state.allocationId !== event.allocationId) return { state, effects: NO_EFFECTS };
       return { state: { ...state, providerRef: event.providerRef }, effects: NO_EFFECTS };
+    }
+
+    case 'startup-failed': {
+      if (
+        (state.kind !== 'creating' && state.kind !== 'starting') ||
+        state.allocationId !== event.allocationId
+      )
+        return { state, effects: NO_EFFECTS };
+      return enterStopping(
+        state,
+        event.at,
+        timers,
+        STARTUP_FAILURES[event.code].reason ?? 'connection_lost'
+      );
     }
 
     case 'created': {
@@ -285,7 +327,7 @@ export function reduceAllocation(
       if (state.kind !== 'creating' || state.allocationId !== event.allocationId) {
         return { state, effects: NO_EFFECTS };
       }
-      if (event.retryAllowed) {
+      if (event.retryAllowed && state.createAttempt < CREATE_ATTEMPT_LIMIT) {
         // Nothing is in flight now, so the deadline is the retry pause; the tick
         // that reaches it starts the next attempt with a full create deadline.
         return {
@@ -298,7 +340,7 @@ export function reduceAllocation(
           effects: NO_EFFECTS,
         };
       }
-      return { state: initialAllocationState(), effects: NO_EFFECTS };
+      return exhaustedCreate(event.retryAllowed);
     }
 
     case 'hello-accepted': {
@@ -385,18 +427,19 @@ function reduceTick(
       if (state.createDeadlineAt === null || event.at < state.createDeadlineAt) {
         return { state, effects: NO_EFFECTS };
       }
-      if (event.retryAllowed) {
+      if (event.retryAllowed && state.createAttempt < CREATE_ATTEMPT_LIMIT) {
         return {
           state: {
             ...state,
             allocationId: event.nextAllocationId,
             providerRef: null,
             createDeadlineAt: event.at + timers.providerCreateMs,
+            createAttempt: state.createAttempt + 1,
           },
           effects: [{ type: 'create', allocationId: event.nextAllocationId }],
         };
       }
-      return { state: initialAllocationState(), effects: NO_EFFECTS };
+      return exhaustedCreate(event.retryAllowed);
     }
 
     case 'starting': {
@@ -452,6 +495,21 @@ function reduceTick(
     default:
       return { state, effects: NO_EFFECTS };
   }
+}
+
+/**
+ * The create call is done for this episode: its attempt budget is spent while
+ * the routes still had attempt time, or no route attempt time remains (whose
+ * deadline sweep owns the failure). A spent budget fails the routes now, so the
+ * reader reaches the failure state instead of waiting out the attempt deadline
+ * for a sandbox that never started.
+ */
+function exhaustedCreate(retryAllowed: boolean): AllocationReduction {
+  return {
+    state: initialAllocationState(),
+    effects: NO_EFFECTS,
+    ...(retryAllowed ? { routeFailure: 'sandbox_create_failed' as const } : {}),
+  };
 }
 
 /**

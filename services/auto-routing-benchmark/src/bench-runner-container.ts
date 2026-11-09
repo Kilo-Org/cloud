@@ -15,8 +15,6 @@ export class BenchRunnerContainer extends Container<Env> {
       await this.destroy();
       return new Response('destroyed');
     }
-    // Without this the container answers a connection nobody reads after the queue
-    // invocation is canceled, and never posts the outcome to /container/case-result.
     return super.fetch(withCallerCancellation(request));
   }
 }

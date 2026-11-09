@@ -2,11 +2,11 @@
  * Generic schema and type for image attachments.
  *
  * This file is intentionally isolated to avoid circular dependencies.
- * It can be imported from both cloud-agent and app-builder modules.
+ * It can be imported from multiple feature modules.
  *
  * R2 path structure: {bucket}/{userId}/{path}/{filename}
  * - userId is derived from the authenticated user context
- * - path is app-specific (e.g., "app-builder/msg-uuid", "cloud-agent/session123")
+ * - path is app-specific (e.g., "cloud-agent/session123")
  * - files are either specified explicitly or all files at the path are downloaded
  */
 import * as z from 'zod';
@@ -18,7 +18,7 @@ export const imagesSchema = z
   .object({
     /**
      * App-specific path within the user's namespace.
-     * Examples: "app-builder/msg-uuid-123", "cloud-agent/session-456"
+     * Examples: "cloud-agent/session-456"
      */
     path: z.string().min(1).max(500),
     /**

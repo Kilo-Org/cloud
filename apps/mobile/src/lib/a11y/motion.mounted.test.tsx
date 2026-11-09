@@ -39,8 +39,6 @@ const reanimatedMock = vi.hoisted(() => ({
   config: vi.fn((_props: { mode: unknown }) => null),
 }));
 
-const platformMock = vi.hoisted(() => ({ OS: 'android' }));
-
 vi.mock('expo-battery', async () => {
   const { useSyncExternalStore } = await import('react');
   return {
@@ -57,8 +55,6 @@ vi.mock('react-native-reanimated', () => ({
   ReduceMotion: { Always: 'always', Never: 'never', System: 'system' },
   useReducedMotion: () => reanimatedMock.systemReducedMotion,
 }));
-
-vi.mock('react-native', () => ({ Platform: platformMock }));
 
 let childMounts = 0;
 let policy: MotionPolicy | undefined = undefined;
@@ -103,7 +99,6 @@ beforeEach(() => {
   policy = undefined;
   reanimatedMock.systemReducedMotion = false;
   reanimatedMock.config.mockClear();
-  platformMock.OS = 'android';
 });
 
 describe('MotionProvider battery policy', () => {
@@ -129,19 +124,6 @@ describe('MotionProvider battery policy', () => {
 
     renderer.unmount();
   });
-
-  it.each(['android', 'ios'] as const)(
-    'enables low battery motion on $os for the same low reading',
-    os => {
-      platformMock.OS = os;
-      const renderer = mount(0.15, BatteryState.NOT_CHARGING);
-
-      expect(currentPolicy()).toEqual({ reducedMotion: true, scrollAnimated: false });
-      expect(currentGlobalMode()).toBe(ReduceMotion.Always);
-
-      renderer.unmount();
-    }
-  );
 
   it('updates the policy and global mode without remounting the application tree', () => {
     const renderer = mount(0.8, BatteryState.UNPLUGGED);

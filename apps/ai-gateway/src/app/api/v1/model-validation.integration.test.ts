@@ -1,11 +1,11 @@
 import type { RuntimeAuthorization } from '@kilocode/worker-utils/runtime-authorization-contract';
 const mockFetchSessionMetadata = jest.fn();
 const mockGetRuntimeToken = jest.fn();
-jest.mock('../../../../../../services/cloud-agent-next/src/session-service', () => ({
+jest.mock('../../../../../../services/cloud-agent-next/src/session/metadata', () => ({
   fetchSessionMetadata: (...args: unknown[]) => mockFetchSessionMetadata(...args),
 }));
 jest.mock('../../../../../../services/cloud-agent-next/src/sandbox-session/session-stub', () => ({
-  resolveSessionStub: () => ({ getRuntimeToken: () => mockGetRuntimeToken() }),
+  getSandboxSessionStub: () => ({ getRuntimeToken: () => mockGetRuntimeToken() }),
 }));
 let currentHeaders = new Headers();
 const mockHeaders = jest.fn(() => currentHeaders);
@@ -34,8 +34,11 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/openrouter', () => ({
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
   getDirectByokModelsForUser: jest.fn(),
+  getDirectByokCatalogModelIds: jest.fn(async () => new Set()),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({
+  addDirectByokCatalogAvailability: jest.requireActual('@kilocode/web-shared/lib/ai-gateway/byok')
+    .addDirectByokCatalogAvailability,
   addUserByokAvailability: jest.fn(),
   getUserByokProviderIds: jest.fn(),
 }));
@@ -50,6 +53,8 @@ import { POST as organizationValidator } from './organizations/[id]/models/valid
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { signModernKiloToken } from '@kilocode/worker-utils/kilo-token-policy';
 import { RUNTIME_PROXY_ATTESTATION_HEADER } from '@kilocode/worker-utils/runtime-proxy-attestation';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { auto_routing_custom_routers } from '@kilocode/db/schema';
 
 jest.mock('../../../../../../services/cloud-agent-next/src/logger', () => ({
   logger: { withFields: () => ({ info: jest.fn(), warn: jest.fn(), error: jest.fn() }) },
@@ -81,12 +86,13 @@ const publicCatalog = { data: [{ id: 'public/model' }] };
 // Load the real Worker implementations at runtime without adding Worker ambient
 // types and their transitive service graph to the web TypeScript project.
 type ValidationEnv = { KILOCODE_BACKEND_BASE_URL: string; NEXTAUTH_SECRET: string };
+const ISOLATED_SANDBOX_ID = `ses-${'a'.repeat(48)}`;
 type TestSessionMetadata = {
   metadataSchemaVersion: 2;
   identity: { sessionId: string; userId: string };
   auth: { kilocodeToken: string };
   agent: { model: string };
-  workspace: Record<string, never>;
+  workspace: { sandboxId: string; sandboxProvider: 'cloudflare-containers' };
   lifecycle: { version: number; timestamp: number };
 };
 const { assertKiloModelAvailable } = jest.requireActual<{
@@ -141,7 +147,7 @@ async function runtimeToken(
         runtimeAuthorization: {
           id: crypto.randomUUID(),
           resourceKind: 'cloud-agent-next',
-          resourceId: 'agent-session',
+          resourceId: 'workspace_11111111-1111-4111-8111-111111111111',
         },
       },
     })
@@ -201,6 +207,76 @@ describe('cloud-agent model validation through real web authentication', () => {
   );
 
   test.each(['runtime_authorized_session_create', 'send'])(
+    'personal custom router passes %s with a signed runtime credential',
+    async procedure => {
+      const user = await insertTestUser({ api_token_pepper: crypto.randomUUID() });
+      await db.insert(auto_routing_custom_routers).values({
+        owned_by_user_id: user.id,
+        slug: 'efficient',
+        name: 'Efficient',
+        base_router: 'efficient',
+        mode: 'best_accuracy',
+        entries: [{ kind: 'gateway', model: 'public/model' }],
+        default_entry_key: 'gateway:public/model',
+      });
+
+      await expect(
+        assertKiloModelAvailable({
+          env,
+          submittedModel: 'kilo-auto/custom/efficient',
+          originalToken: await runtimeToken(user),
+          procedure,
+        })
+      ).resolves.toBeUndefined();
+    }
+  );
+
+  test.each(['foreign', 'anonymous', 'missing'] as const)(
+    '%s caller cannot select an unavailable personal custom router',
+    async scenario => {
+      const owner = await insertTestUser({ api_token_pepper: crypto.randomUUID() });
+      const foreign = await insertTestUser({ api_token_pepper: crypto.randomUUID() });
+      await db.insert(auto_routing_custom_routers).values({
+        owned_by_user_id: owner.id,
+        slug: 'efficient',
+        name: 'Efficient',
+        base_router: 'efficient',
+        mode: 'best_accuracy',
+        entries: [{ kind: 'gateway', model: 'public/model' }],
+        default_entry_key: 'gateway:public/model',
+      });
+      currentHeaders = new Headers();
+      if (scenario !== 'anonymous') {
+        const token = jwt.sign(
+          {
+            version: JWT_TOKEN_VERSION,
+            kiloUserId: scenario === 'foreign' ? foreign.id : owner.id,
+            apiTokenPepper:
+              scenario === 'foreign' ? foreign.api_token_pepper : owner.api_token_pepper,
+            env: process.env.NODE_ENV,
+          },
+          NEXTAUTH_SECRET
+        );
+        currentHeaders.set('authorization', `Bearer ${token}`);
+      }
+
+      const response = await personalValidator(
+        new NextRequest(`${backend}/api/openrouter/models/validate`, {
+          method: 'POST',
+          headers: currentHeaders,
+          body: JSON.stringify({
+            modelId:
+              scenario === 'missing' ? 'kilo-auto/custom/missing' : 'kilo-auto/custom/efficient',
+          }),
+        })
+      );
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({ valid: false, reason: 'unavailable' });
+    }
+  );
+
+  test.each(['runtime_authorized_session_create', 'send'])(
     'organization private model passes %s with a signed runtime credential',
     async procedure => {
       const user = await insertTestUser({ api_token_pepper: crypto.randomUUID() });
@@ -217,11 +293,12 @@ describe('cloud-agent model validation through real web authentication', () => {
           procedure,
         })
       ).resolves.toBeUndefined();
-      expect(getAvailableModelsForOrganization).toHaveBeenCalledWith(org.id, {
-        type: 'member',
-        kiloUserId: user.id,
-        allowNonMember: true,
-      });
+      expect(getAvailableModelsForOrganization).toHaveBeenCalledWith(
+        org.id,
+        { type: 'member', kiloUserId: user.id, allowNonMember: true },
+        'member',
+        { countryCode: null }
+      );
     }
   );
 
@@ -235,7 +312,7 @@ describe('cloud-agent model validation through real web authentication', () => {
         runtimeAuthorization: {
           id,
           resourceKind: 'cloud-agent-next' as const,
-          resourceId: 'agent-session',
+          resourceId: 'workspace_11111111-1111-4111-8111-111111111111',
         },
       };
       const sign = (issuedAt: Date) =>
@@ -253,17 +330,17 @@ describe('cloud-agent model validation through real web authentication', () => {
         });
       let metadata: TestSessionMetadata = {
         metadataSchemaVersion: 2,
-        identity: { sessionId: 'agent-session', userId: user.id },
+        identity: { sessionId: 'workspace_11111111-1111-4111-8111-111111111111', userId: user.id },
         auth: { kilocodeToken: (await sign(new Date(now - 7200000))).token },
         agent: { model: privateModel },
-        workspace: {},
+        workspace: { sandboxId: ISOLATED_SANDBOX_ID, sandboxProvider: 'cloudflare-containers' },
         lifecycle: { version: 1, timestamp: now },
       };
       const record: RuntimeAuthorization = {
         version: 1,
         id,
         resourceKind: 'cloud-agent-next',
-        resourceId: 'agent-session',
+        resourceId: 'workspace_11111111-1111-4111-8111-111111111111',
         userId: user.id,
         authorizationUserId: user.id,
         issuedAt: new Date(now - 10800000).toISOString(),
@@ -293,7 +370,7 @@ describe('cloud-agent model validation through real web authentication', () => {
       const validation = preflightExistingPromptModel({
         env,
         userId: user.id,
-        cloudAgentSessionId: 'agent-session',
+        cloudAgentSessionId: 'workspace_11111111-1111-4111-8111-111111111111',
         procedure: 'send',
       });
       if (state === 'active') {

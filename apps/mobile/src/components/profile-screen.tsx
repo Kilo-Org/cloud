@@ -17,11 +17,13 @@ import {
   SlidersHorizontal,
   Sparkles,
   Trash2,
+  Users,
 } from '@/components/ui/icons';
-import { type LayoutChangeEvent, type ScrollView, View } from 'react-native';
+import { type LayoutChangeEvent, type ScrollViewInstance, View } from 'react-native';
 import Animated, { FadeOut } from 'react-native-reanimated';
 
 import { useConfirmDialog } from '@/components/ui/dialog';
+import { useContextPicker } from '@/components/context-control';
 import { ActionTile } from '@/components/profile-action-tile';
 import { CreditsCard } from '@/components/profile-credits-card';
 import { QueryError } from '@/components/query-error';
@@ -36,9 +38,11 @@ import { useDeleteAccount } from '@/components/use-delete-account';
 import { useFeedbackPrompt } from '@/components/use-feedback-prompt';
 import { i18n } from '@/i18n';
 import { useAuth } from '@/lib/auth/auth-context';
+import { SESSION_SYNC_URL } from '@/lib/config';
 import { openExternalUrl } from '@/lib/external-link';
-import { useAfterInteractions } from '@/lib/hooks/use-after-interactions';
+import { useAfterIdle } from '@/lib/hooks/use-after-idle';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { useOrganization } from '@/lib/organization-context';
 import {
   getCodeReviewerProfilePath,
@@ -47,6 +51,7 @@ import {
   getPrReviewEntryPath,
 } from '@/lib/profile-agent-navigation';
 import { getSecurityAgentPath } from '@/lib/security-agent';
+import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { useTRPC } from '@/lib/trpc';
 
 const PROVIDER_LABEL_KEYS = {
@@ -80,16 +85,12 @@ export function ProfileScreen() {
   const { signOut, token } = useAuth();
   const router = useRouter();
   const trpc = useTRPC();
-  const deleteScrollRef = useRef<ScrollView>(null);
+  const deleteScrollRef = useRef<ScrollViewInstance>(null);
   const [deleteKeyboardOcclusion, setDeleteKeyboardOcclusion] = useState(0);
   const [deleteScrollFrameHeight, setDeleteScrollFrameHeight] = useState(0);
   const { organizationId, isLoaded: organizationContextLoaded } = useOrganization();
   const isAuthenticated = token != null;
-  // The account queries wait for the tab transition to settle, but the hook
-  // bounds that wait: an interaction queue that never reports idle (an
-  // automated UI session holds one open) must not hide the Linked accounts row,
-  // the only place the signed-in address renders.
-  const afterInteractions = useAfterInteractions();
+  const afterIdle = useAfterIdle();
   // Both destructive confirms on this screen go through the app's dialog: it
   // carries the destructive (red) affordance on iOS and Android alike, because
   // Android's native `AlertDialog` paints every button with the theme accent.
@@ -102,7 +103,10 @@ export function ProfileScreen() {
     refetch: refetchProviders,
   } = useQuery({
     ...trpc.user.getAuthProviders.queryOptions(),
-    enabled: isAuthenticated && afterInteractions,
+    enabled: isAuthenticated && afterIdle,
+    // A paused read leaves the Linked accounts row with neither content nor an
+    // error surface.
+    ...SETTLE_WHILE_OFFLINE,
   });
   const {
     data: orgs,
@@ -111,14 +115,24 @@ export function ProfileScreen() {
     refetch: refetchOrganizations,
   } = useQuery({
     ...trpc.organizations.list.queryOptions(),
-    enabled: isAuthenticated && afterInteractions,
+    enabled: isAuthenticated && afterIdle,
+    // The Agents section resolves its scope from this list, so a paused read
+    // leaves the organization section and its rows waiting.
+    ...SETTLE_WHILE_OFFLINE,
   });
   const agentScope = organizationContextLoaded
-    ? getProfileAgentScope(organizationId, orgs, organizationsFetching || !afterInteractions)
+    ? getProfileAgentScope(organizationId, orgs)
     : undefined;
+  const { openPicker, picker } = useContextPicker(orgs);
   const selectedOrg = orgs?.find(org => org.organizationId === organizationId);
   const orgRole = selectedOrg?.role;
-  const orgName = selectedOrg?.organizationName;
+  // The Organization section stays on Profile in every credit-account context:
+  // a Personal context still offers the account picker when the account has
+  // memberships, so organization management is not gated behind the credits
+  // account control. The restore decides the context first, so the chooser never
+  // paints for a frame before the active organization's row replaces it.
+  const showOrganizationSection =
+    organizationId != null || (organizationContextLoaded && (orgs?.length ?? 0) > 0);
 
   const { userId } = useCurrentUserId({ enabled: isAuthenticated });
   // The prompt's surface is platform-specific (`feedback-prompt-platform.ts`);
@@ -126,6 +140,39 @@ export function ProfileScreen() {
   const feedbackPrompt = useFeedbackPrompt();
 
   const { t } = useTranslation();
+  // Reactive: a connectivity commit re-renders the error-variant selection, so
+  // a read that settled by failing while the device is confirmed offline says
+  // so instead of presenting itself as a server fault.
+  const committedConnectivity = useCommittedConnectivityStatus();
+
+  // Personal context has no selected organization to label, so its row opens
+  // the account picker; otherwise the row names the destination for the active
+  // organization's role.
+  const organizationRow =
+    organizationId == null ? (
+      <ConfigureRow
+        icon={Building2}
+        title={t('organization.boundary.selectOrganization')}
+        hue="lime"
+        className="rounded-lg bg-secondary px-3"
+        last
+        onPress={openPicker}
+      />
+    ) : (
+      <ConfigureRow
+        icon={Building2}
+        title={
+          orgRole === 'member' ? t('profile.viewOrganization') : t('profile.manageOrganization')
+        }
+        hue="lime"
+        className="rounded-lg bg-secondary px-3"
+        disabled={!orgRole}
+        last
+        onPress={() => {
+          router.push('/(app)/(tabs)/(3_profile)/organization' as Href);
+        }}
+      />
+    );
 
   const requestSignOut = () => {
     confirm({
@@ -242,7 +289,7 @@ export function ProfileScreen() {
             }}
           />
           <ConfigureRow
-            icon={SlidersHorizontal}
+            icon={Users}
             title={t('profiles.title')}
             subtitle={t('profiles.entrySubtitle')}
             // Agents step: the row lists the agent profiles, and its two
@@ -265,7 +312,7 @@ export function ProfileScreen() {
           <ConfigureRow
             icon={GitMerge}
             title={t('common.prReview')}
-            subtitle={t('profile.prReviewSubtitle')}
+            subtitle={t('common.prReviewSubtitle')}
             hue="gold"
             className="rounded-lg bg-secondary px-3"
             last
@@ -276,14 +323,14 @@ export function ProfileScreen() {
         </View>
 
         {/* Organization */}
-        {organizationId != null && (
+        {showOrganizationSection && (
           <View className="mt-6 gap-3">
             <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
               {t('common.organization')}
             </Text>
             {organizationsError ? (
               <QueryError
-                variant="server"
+                variant={committedConnectivity === 'offline' ? 'offline' : 'server'}
                 placement="top"
                 title={t('profile.couldNotLoadOrganization')}
                 message={t('profile.couldNotLoadOrganizationDescription')}
@@ -291,23 +338,9 @@ export function ProfileScreen() {
                 isRetrying={organizationsFetching}
               />
             ) : (
-              <ConfigureRow
-                icon={Building2}
-                title={
-                  orgRole === 'member'
-                    ? t('profile.viewOrganization')
-                    : t('profile.manageOrganization')
-                }
-                subtitle={orgName}
-                hue="lime"
-                className="rounded-lg bg-secondary px-3"
-                disabled={!orgRole}
-                last
-                onPress={() => {
-                  router.push('/(app)/(tabs)/(3_profile)/organization' as Href);
-                }}
-              />
+              organizationRow
             )}
+            {picker}
           </View>
         )}
 
@@ -316,6 +349,17 @@ export function ProfileScreen() {
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
             {t('profile.app')}
           </Text>
+          {__DEV__ && SESSION_SYNC_URL && (
+            <ConfigureRow
+              icon={SlidersHorizontal}
+              title={t('nativeRemote.title')}
+              hue="sage"
+              className="rounded-lg bg-secondary px-3"
+              onPress={() => {
+                router.push('/(app)/native-remote' as Href);
+              }}
+            />
+          )}
           <ConfigureRow
             icon={SlidersHorizontal}
             title={t('common.preferences')}
@@ -324,6 +368,16 @@ export function ProfileScreen() {
             className="rounded-lg bg-secondary px-3"
             onPress={() => {
               router.push('/(app)/(tabs)/(3_profile)/preferences' as Href);
+            }}
+          />
+          <ConfigureRow
+            icon={BookOpenCheck}
+            title={t('agentBriefing.title')}
+            subtitle={t('agentBriefing.historyHint')}
+            hue="sage"
+            className="rounded-lg bg-secondary px-3"
+            onPress={() => {
+              router.push('/(app)/agent-briefing' as Href);
             }}
           />
           {/* Permanent replay entry: opens the tour at any time, including
@@ -366,13 +420,13 @@ export function ProfileScreen() {
         {(providersError ||
           (data?.providers.length ?? 0) > 0 ||
           isLoading ||
-          (!afterInteractions && !data)) && (
+          (!afterIdle && !data)) && (
           <View className="mt-6 gap-3">
             <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
               {t('profile.linkedAccounts')}
             </Text>
 
-            {(isLoading || !afterInteractions) && !data && !providersError && (
+            {(isLoading || !afterIdle) && !data && !providersError && (
               <Animated.View exiting={FadeOut.duration(150)}>
                 {/* Content-shaped skeleton (icon tile + two text bars in the
                     row's own bg-secondary card): a plain block read as an
@@ -394,7 +448,7 @@ export function ProfileScreen() {
 
             {providersError && (
               <QueryError
-                variant="server"
+                variant={committedConnectivity === 'offline' ? 'offline' : 'server'}
                 placement="top"
                 title={t('profile.couldNotLoadAccounts')}
                 onRetry={() => void refetchProviders()}

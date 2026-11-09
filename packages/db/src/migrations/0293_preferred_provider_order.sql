@@ -1,0 +1,1 @@
+ALTER TABLE "ai_gateway_config" ADD COLUMN "preferred_provider_order" jsonb;

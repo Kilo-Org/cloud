@@ -2,6 +2,7 @@ import 'server-only';
 
 import { captureException } from '@sentry/nextjs';
 import { z } from 'zod';
+import { TRPCError } from '@trpc/server';
 import {
   INTERNAL_API_SECRET,
   SESSION_INGEST_WORKER_URL,
@@ -13,6 +14,11 @@ import type { User } from '@kilocode/db/schema';
 import {
   kiloSdkMessageHistorySchema,
   sessionDiffReadSchema,
+  sessionShareOptionsSchema,
+  WORKSPACE_REQUIRES_ROOT_SESSION,
+  WORKSPACE_DELETING,
+  WORKSPACE_IDENTITY_CONFLICT,
+  type SessionShareOptions,
   type KiloSdkMessageHistory,
   type SessionDiffRead,
 } from '@kilocode/session-ingest-contracts';
@@ -390,17 +396,25 @@ const SharedSessionMetadataResponseSchema = z
   })
   .strict();
 
+export class SessionShareTooLargeError extends Error {
+  constructor() {
+    super('Session details are too large to share. Existing links are unchanged.');
+    this.name = 'SessionShareTooLargeError';
+  }
+}
+
 /**
  * Share a session via the session-ingest worker.
  *
- * Calls POST /session/:sessionId/share which is idempotent — if the session
- * already has an active share generation, the existing one is reused.
+ * Calls POST /session/:sessionId/share, which rotates the public capability.
+ * Each call issues a fresh share generation and invalidates the previous link.
  *
  * @returns The opaque JWT used to construct the /s/{share_token} share URL.
  */
 export async function shareSession(
   sessionId: string,
-  userId: string
+  userId: string,
+  options: Partial<SessionShareOptions> = {}
 ): Promise<{ share_token: string }> {
   if (!SESSION_INGEST_WORKER_URL) {
     throw new Error('SESSION_INGEST_WORKER_URL is not configured');
@@ -414,8 +428,13 @@ export async function shareSession(
 
   const response = await fetchSessionIngest(url, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(sessionShareOptionsSchema.parse(options)),
   });
+
+  if (response.status === 413) {
+    throw new SessionShareTooLargeError();
+  }
 
   if (response.status === 404) {
     throw new Error('Session not found');
@@ -650,6 +669,27 @@ export async function deleteSession(sessionId: string, userId: string): Promise<
   if (response.status === 404) {
     // Session already deleted or was never ingested — treat as success (idempotent delete).
     return;
+  }
+
+  if (response.status === 409) {
+    const parsed = z
+      .object({
+        error: z.enum([
+          WORKSPACE_REQUIRES_ROOT_SESSION,
+          WORKSPACE_DELETING,
+          WORKSPACE_IDENTITY_CONFLICT,
+          'worktree_deleting',
+        ]),
+      })
+      .safeParse(
+        await response
+          .clone()
+          .json()
+          .catch(() => null)
+      );
+    if (parsed.success) {
+      throw new TRPCError({ code: 'CONFLICT', message: parsed.data.error });
+    }
   }
 
   if (!response.ok) {

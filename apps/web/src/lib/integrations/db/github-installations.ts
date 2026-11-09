@@ -18,6 +18,11 @@ import {
 import { lockProviderOAuthOwnerRow } from '@/lib/integrations/provider-oauth-attempts';
 import { parsePlatformRepositoryCache } from '@/lib/integrations/core/schemas';
 import {
+  effectiveAppTypeCondition,
+  occupiesAnotherGitHubInstallationSlot,
+  ownerCondition,
+} from '@/lib/integrations/db/predicates';
+import {
   cancelActiveCodeReviewsForIntegration,
   settleCancelledReviews,
 } from '@/lib/code-reviews/db/code-reviews';
@@ -70,19 +75,20 @@ function isCanonicalInstallationId(value: string): boolean {
   return /^[1-9][0-9]*$/.test(value);
 }
 
-function ownerCondition(owner: Owner) {
-  return owner.type === 'user'
-    ? eq(platform_integrations.owned_by_user_id, owner.id)
-    : eq(platform_integrations.owned_by_organization_id, owner.id);
-}
-
-export function effectiveAppTypeCondition(appType: 'standard' | 'lite') {
-  return appType === 'standard'
-    ? or(
-        eq(platform_integrations.github_app_type, 'standard'),
-        isNull(platform_integrations.github_app_type)
-      )
-    : eq(platform_integrations.github_app_type, 'lite');
+function mergeRepositoryCache(
+  current: unknown,
+  repositoriesAdded: PlatformRepository[] | undefined,
+  repositoryIdsRemoved: number[] | undefined
+): PlatformRepository[] {
+  const removed = new Set(repositoryIdsRemoved ?? []);
+  const retained = parsePlatformRepositoryCache(current).filter(
+    repository => !removed.has(repository.id)
+  );
+  const additions = (repositoriesAdded ?? []).filter(repository => !removed.has(repository.id));
+  return [
+    ...retained.filter(repository => !additions.some(addition => addition.id === repository.id)),
+    ...additions,
+  ];
 }
 
 export async function connectVerifiedGitHubInstallation(
@@ -149,11 +155,11 @@ export async function connectVerifiedGitHubInstallation(
             isNull(platform_integrations.github_disconnected_at)
           )
         );
-      const hasAnotherInstallation = ownerIntegrations.some(
-        integration =>
-          integration.installationId !== null &&
-          (integration.installationId !== data.platformInstallationId ||
-            (integration.appType ?? 'standard') !== data.githubAppType)
+      const hasAnotherInstallation = ownerIntegrations.some(integration =>
+        occupiesAnotherGitHubInstallationSlot(integration, {
+          installationId: data.platformInstallationId,
+          appType: data.githubAppType,
+        })
       );
       if (hasAnotherInstallation) {
         return { ok: false, reason: 'multiple_installations_disabled' };
@@ -689,19 +695,11 @@ export async function updateGitHubInstallationRepositories(input: {
         )
         .for('update');
       for (const integration of legacy) {
-        const removed = new Set(input.repositoryIdsRemoved ?? []);
-        const current = parsePlatformRepositoryCache(integration.repositories).filter(
-          repository => !removed.has(repository.id)
+        const repositories = mergeRepositoryCache(
+          integration.repositories,
+          input.repositoriesAdded,
+          input.repositoryIdsRemoved
         );
-        const additions = (input.repositoriesAdded ?? []).filter(
-          repository => !removed.has(repository.id)
-        );
-        const repositories = [
-          ...current.filter(
-            repository => !additions.some(addition => addition.id === repository.id)
-          ),
-          ...additions,
-        ];
         await tx
           .update(platform_integrations)
           .set({ repositories, repositories_synced_at: now, updated_at: now })
@@ -717,15 +715,11 @@ export async function updateGitHubInstallationRepositories(input: {
       }
       return;
     }
-    const removed = new Set(input.repositoryIdsRemoved ?? []);
-    const existing = parsePlatformRepositoryCache(canonical.repositories).filter(
-      repo => !removed.has(repo.id)
+    const repositories = mergeRepositoryCache(
+      canonical.repositories,
+      input.repositoriesAdded,
+      input.repositoryIdsRemoved
     );
-    const additions = (input.repositoriesAdded ?? []).filter(repo => !removed.has(repo.id));
-    const repositories = [
-      ...existing.filter(repo => !additions.some(addition => addition.id === repo.id)),
-      ...additions,
-    ];
     await tx
       .update(github_app_installations)
       .set({

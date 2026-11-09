@@ -101,7 +101,7 @@ const partsSaid = (spoken: Spoken): readonly PartDraft[] => {
 
 /** Keeps a turn this question made, in memory and on the list to be written. */
 const collect = (wiring: Wiring, exchange: Exchange, turn: Turn): Effect.Effect<void> =>
-  Effect.zipRight(
+  Effect.andThen(
     remember(wiring, turn),
     Ref.update(exchange.written, held => [...held, turn])
   );
@@ -147,7 +147,7 @@ const commit = (wiring: Wiring, exchange: Exchange): Effect.Effect<void, StoreEr
       onStore(wiring.store, plugin =>
         plugin.append({ sessionId: wiring.id, turns: [exchange.question, ...turns], prompted })
       )
-  ).pipe(Effect.zipRight(Ref.set(exchange.answered, true)));
+  ).pipe(Effect.andThen(Ref.set(exchange.answered, true)));
 
 /**
  * Collects one thinking event into the block it belongs to.

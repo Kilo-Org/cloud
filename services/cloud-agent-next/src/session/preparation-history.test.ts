@@ -4,6 +4,7 @@ import {
   finalizeOtherRunningAttemptsForMessage,
   finalizePreparationAttempt,
   getPreparationSnapshots,
+  listPreparationAttempts,
   materializePreparationEvent,
   readPreparationAttempt,
   reconcileStalePreparationAttempts,
@@ -276,6 +277,45 @@ describe('readPreparationAttempt', () => {
     expect(readPreparationAttempt(eventQueries, 'attempt-1')).toBeNull();
     const { attemptId } = seedRunningAttempt(eventQueries);
     expect(readPreparationAttempt(eventQueries, attemptId)?.status).toBe('running');
+  });
+});
+
+describe('listPreparationAttempts', () => {
+  it('returns each attempt with its steps but no step output, ordered as a replaying client orders them', () => {
+    const eventQueries = createMemoryEventQueries();
+    seedRunningAttempt(eventQueries, { attemptId: 'attempt-late', startedAt: 9000 });
+    seedRunningAttempt(eventQueries, { attemptId: 'attempt-early', startedAt: 1000 });
+    materializePreparationEvent(eventQueries, storedEvent(7000), {
+      version: 2,
+      attemptId: 'attempt-early',
+      triggerMessageId: 'msg-1',
+      revision: 3,
+      timestamp: 7000,
+      step: 'kilo_server',
+      message: 'Starting Kilo',
+      action: 'step_output',
+      stepId: 'phase:kilo_server',
+      output: 'listening on 4096',
+    });
+    finalizePreparationAttempt(eventQueries, 'attempt-late', {
+      status: 'completed',
+      timestamp: 20_000,
+    });
+
+    const attempts = listPreparationAttempts(eventQueries);
+
+    expect(attempts.map(attempt => [attempt.id, attempt.status])).toEqual([
+      ['attempt-early', 'running'],
+      ['attempt-late', 'completed'],
+    ]);
+    const {
+      outputTail,
+      outputTruncated: _outputTruncated,
+      ...stepWithoutOutput
+    } = readStep(eventQueries, 'attempt-early', 'phase:kilo_server');
+    expect(outputTail).toBe('listening on 4096');
+    expect(attempts[0]?.steps).toEqual([stepWithoutOutput]);
+    expect(attempts[1]?.steps.map(step => step.status)).toEqual(['completed']);
   });
 });
 

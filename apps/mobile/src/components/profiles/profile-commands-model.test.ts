@@ -5,8 +5,10 @@ import {
   commandRowA11yLabel,
   MAX_SETUP_COMMANDS,
   moveCommand,
+  nonBlankCommands,
   removeCommand,
   replaceCommand,
+  sameCommands,
 } from '@/components/profiles/profile-commands-model';
 
 describe('setup command list operations', () => {
@@ -52,6 +54,18 @@ describe('setup command list operations', () => {
     const single = ['pnpm install'];
     expect(moveCommand(single, 0, -1)).toEqual(single);
     expect(moveCommand(single, 0, 1)).toEqual(single);
+  });
+});
+
+describe('command list payloads', () => {
+  it('drops the blank draft rows from what the server stores', () => {
+    expect(nonBlankCommands(['a', '  ', '', 'b '])).toEqual(['a', 'b ']);
+  });
+
+  it('compares lists by length and order', () => {
+    expect(sameCommands(['a', 'b'], ['a', 'b'])).toBe(true);
+    expect(sameCommands(['a', 'b'], ['b', 'a'])).toBe(false);
+    expect(sameCommands(['a'], ['a', 'b'])).toBe(false);
   });
 });
 

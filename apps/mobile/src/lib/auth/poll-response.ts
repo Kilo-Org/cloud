@@ -2,14 +2,18 @@
 // free of any react-native/expo imports so it can be unit tested directly.
 
 import { parseRetryAfterMs } from '@/lib/auth/auth-response-class';
-import { i18n } from '@/i18n';
+import {
+  type DeviceAuthError,
+  deviceAuthErrorKey,
+  deviceAuthErrorText,
+} from '@/lib/auth/device-auth-state';
 
 type PollOutcome =
   | { readonly status: 'approved' }
   | { readonly status: 'pending' }
-  | { readonly status: 'denied'; readonly message: string }
-  | { readonly status: 'expired'; readonly message: string }
-  | { readonly status: 'error'; readonly message: string }
+  | { readonly status: 'denied'; readonly message: DeviceAuthError }
+  | { readonly status: 'expired'; readonly message: DeviceAuthError }
+  | { readonly status: 'error'; readonly message: DeviceAuthError }
   | { readonly status: 'retry'; readonly retryAfterMs?: number };
 
 export function classifyPollResponse(
@@ -24,10 +28,10 @@ export function classifyPollResponse(
     return { status: 'pending' };
   }
   if (httpStatus === 403) {
-    return { status: 'denied', message: i18n.t('authErrors.accessDeniedByUser') };
+    return { status: 'denied', message: deviceAuthErrorKey('authErrors.accessDeniedByUser') };
   }
   if (httpStatus === 410) {
-    return { status: 'expired', message: i18n.t('authErrors.codeExpired') };
+    return { status: 'expired', message: deviceAuthErrorKey('authErrors.codeExpired') };
   }
   // 429/5xx are transient (rate limiting or a flaky server) — keep polling,
   // and honour the server's own `Retry-After` when it named one instead of
@@ -38,11 +42,17 @@ export function classifyPollResponse(
   }
   // Any other 4xx (400, 401, ...) is not something retrying will fix — and
   // 1xx/3xx are statuses this endpoint never returns, so treat them the same.
-  return { status: 'error', message: i18n.t('authErrors.invalidToken') };
+  return { status: 'error', message: deviceAuthErrorKey('authErrors.invalidToken') };
 }
 
-/** Extract the user-facing message from a device-auth start 429 JSON body. */
-export function getDeviceAuth429Message(body: { error?: string } | undefined): string {
-  const fallback = i18n.t('authErrors.tooManySignInAttempts');
-  return body?.error ?? fallback;
+/**
+ * The device-auth start 429 refusal. The server's own body text has no
+ * catalog key, so it flows through as text; the fallback translates at
+ * render from its key.
+ */
+export function getDeviceAuth429Error(body: { error?: string } | undefined): DeviceAuthError {
+  if (body?.error) {
+    return deviceAuthErrorText(body.error);
+  }
+  return deviceAuthErrorKey('authErrors.tooManySignInAttempts');
 }

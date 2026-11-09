@@ -17,7 +17,7 @@ import {
 } from './__fixtures__/helpers';
 import { kiloId, cloudAgentId, makeSnapshot } from './test-helpers';
 import type { SessionActivity, AgentStatus, SessionInfo } from './types';
-import type { CloudAgentEvent } from './event-types';
+import type { CloudAgentEvent } from './schemas';
 
 type MockWebSocket = {
   onopen: ((ev: Event) => void) | null;
@@ -464,7 +464,6 @@ describe('authoritative message failure settlement', () => {
         variant: null,
         repository: 'test/repo',
         isInitiated: true,
-        needsLegacyPrepare: false,
         isPreparingAsync: false,
         prompt: null,
         initialMessageId: null,

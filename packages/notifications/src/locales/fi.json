@@ -9,6 +9,7 @@
       "lowBalance": "Saldosi vaatii huomiota",
       "spendAlert": "Kulutuksesi vaatii huomiota",
       "securityFinding": "Tietoturvalöydös vaatii huomiota",
+      "securityUpdate": "Tietoturvatarkistuksella on päivitys",
       "activeAgentsGlanceable": "Aktiivisilla agenteilla on päivitys"
     }
   },
@@ -41,7 +42,7 @@
   "internal": {
     "lowBalance": {
       "title": "Matalan saldon hälytys",
-      "body": "{{organizationName}} saldo laski alle ${{minimumBalanceUsd}}"
+      "body": "Organisaation {{organizationName}} saldo laski alle ${{minimumBalanceUsd}}"
     },
     "spendAlert": {
       "title": "Kulutushälytys",
@@ -61,7 +62,7 @@
     },
     "securityLifecycle": {
       "title": "Kilo",
-      "body": "Tietoturvalöydös vaatii huomiota"
+      "body": "Tietoturvatarkistuksella on päivitys"
     }
   },
   "instanceLifecycle": {

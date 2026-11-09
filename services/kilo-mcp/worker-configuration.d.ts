@@ -4,6 +4,7 @@
 interface __BaseEnv_Env {
 	VECTORIZE: VectorizeIndex;
 	AI: Ai;
+	SEARCH_RATE_LIMITER: RateLimit;
 	WEB_BASE_URL: "http://localhost:3000" | "https://app.kilo.ai";
 	KILO_MCP_OAUTH_STORE: DurableObjectNamespace<import("./src/index").KiloMcpOAuthStore>;
 	NEXT_PUBLIC_POSTHOG_KEY?: "phc_GK2Pxl0HPj5ZPfwhLRjXrtdz8eD7e9MKnXiFrOqnB6z";
@@ -18,6 +19,7 @@ declare namespace Cloudflare {
 	interface DevEnv {
 		VECTORIZE: VectorizeIndex;
 		AI: Ai;
+		SEARCH_RATE_LIMITER: RateLimit;
 		WEB_BASE_URL: "http://localhost:3000";
 		KILO_MCP_OAUTH_STORE: DurableObjectNamespace<import("./src/index").KiloMcpOAuthStore>;
 		OAUTH_KV: KVNamespace;

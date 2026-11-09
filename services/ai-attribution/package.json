@@ -19,16 +19,17 @@
   "author": "Kilo Code",
   "license": "UNLICENSED",
   "devDependencies": {
+    "@swc/jest": "0.2.39",
     "@types/jest": "29.5.14",
     "@types/node": "catalog:",
     "@typescript/native-preview": "catalog:",
     "drizzle-kit": "catalog:",
     "jest": "29.7.0",
-    "ts-jest": "29.4.9",
     "typescript": "catalog:",
     "wrangler": "catalog:"
   },
   "dependencies": {
+    "@kilocode/db": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
     "drizzle-orm": "catalog:",
     "hono": "catalog:",

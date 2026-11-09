@@ -110,9 +110,9 @@ describe('NewSessionCloudCreateError', () => {
     expect(findElementByType(element, 'Button')?.disabled).toBe(true);
   });
 
-  it('reports the server reason verbatim for a terminal rejection, with no retry', async () => {
+  it('reports the localized failure detail for a terminal rejection, with no retry', async () => {
     const { NewSessionCloudCreateError } = await import('./new-session-cloud-create-error');
-    const reason = 'Insufficient credits for this session';
+    const reason = 'Check your access to this organization, then try again.';
 
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
     const element = NewSessionCloudCreateError({

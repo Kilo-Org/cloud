@@ -52,11 +52,11 @@ const modelStore = createSecureStorePreference<ToolSummaryTranslationModel>({
 });
 
 export function isToolSummaryTranslationEnabled(): boolean {
-  return enabledStore.get();
+  return enabledStore.getRequested();
 }
 
 export function readToolSummaryTranslationModel(): ToolSummaryTranslationModel {
-  return modelStore.get();
+  return modelStore.getRequested();
 }
 
 export function setToolSummaryTranslationEnabled(next: boolean): void {
@@ -88,9 +88,11 @@ function syncRuntime(): void {
   if (!hasLoadedPreferences()) {
     return;
   }
+  // The runtime follows what the disk holds, so a choice whose write failed
+  // never sends transcripts to a translation the app does not claim to have.
   setConfig({
-    enabled: isToolSummaryTranslationEnabled(),
-    model: readToolSummaryTranslationModel(),
+    enabled: enabledStore.get(),
+    model: modelStore.get(),
   });
 }
 
@@ -108,6 +110,12 @@ export type ToolSummaryTranslationPreference = {
   hasLoaded: boolean;
   setEnabled: (next: boolean) => void;
   setModel: (next: ToolSummaryTranslationModel) => void;
+  /**
+   * The switch state a press should flip: the newest chosen value while its
+   * write is still on its way to disk, otherwise the stored one. A press reads
+   * this at tap time so a burst of taps each flips what the person last chose.
+   */
+  getRequestedEnabled: () => boolean;
 };
 
 export function useToolSummaryTranslationPreference(): ToolSummaryTranslationPreference {
@@ -121,6 +129,7 @@ export function useToolSummaryTranslationPreference(): ToolSummaryTranslationPre
     hasLoaded: enabledLoaded && modelLoaded,
     setEnabled: setToolSummaryTranslationEnabled,
     setModel: writeToolSummaryTranslationModel,
+    getRequestedEnabled: enabledStore.getRequested,
   };
 }
 

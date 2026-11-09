@@ -99,8 +99,7 @@ export function SSOSignupCard({ organization, role }: SSOSignupCardProps) {
   if (ssoConfig && typeof ssoConfig === 'object') {
     const isDomainVerified = ssoConfig.isDomainVerified;
     const hasConnection = ssoConfig.hasConnection;
-    // Extract domain from the domains array
-    const domain = ssoConfig.domains?.[0]?.domain || organization.sso_domain || 'your domain';
+    const domain = ssoConfig.domain || organization.sso_domain || 'your domain';
 
     return (
       <Card>

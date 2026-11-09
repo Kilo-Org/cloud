@@ -1,6 +1,6 @@
+import type { PreferredProviderOrderConfig } from '@kilocode/db/schema-types';
 import { isPdfSupportingModel } from '@kilocode/web-shared/lib/ai-gateway/models';
 import { getPreferredModels } from '@kilocode/web-shared/lib/ai-gateway/preferred-models';
-import { kiloExclusiveModels } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import {
   getLocalFakeTranscriptionModelsUrl,
@@ -14,22 +14,21 @@ import {
 } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { captureException, captureMessage } from '@sentry/nextjs';
-import {
-  convertFromKiloExclusiveModel,
-  getInferenceProvider,
-  type KiloExclusiveModel,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
 import { getUnavailableModelIds } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
 import { getGatewayOpenCodeSettings } from '@kilocode/web-shared/lib/ai-gateway/providers/model-settings';
 import { withLegacyVariants } from '@kilocode/web-shared/lib/ai-gateway/providers/legacy-variants';
 import { AUTO_MODELS, type AutoModel } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
-import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import {
+  getOpenRouterModelsMetadataFromDatabase,
+  type StoredModelMap,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import {
   getDataCollectionRequiredModelIds,
   getProviderSlugsForModels,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
-import { getPreferredProviderOrder } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
+import { resolvePreferredProviderOrder } from '@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order';
+import { getPreferredProviderOrderConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order-config';
 import { normalizeInferenceProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import {
   getTerminalBenchSummaries,
@@ -44,8 +43,24 @@ import {
   NVIDIA_TRIAL_TOS,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/nvidia';
 import { applyCustomPricingToModel } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing';
+import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
+import {
+  getCustomLlmsById,
+  isPublicCustomLlm,
+} from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
+import { convertCustomLlmToCatalogModel } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/listAvailableCustomLlms';
+import { isCustomLlmDeniedInCountry } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/country-deny-list';
 import { addMonths } from 'date-fns';
 import { getModelDisplayPricing } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/display-pricing';
+import {
+  assertMinimumCount,
+  createCachedMetadataReader,
+  type MetadataSource,
+} from '@kilocode/web-shared/lib/ai-gateway/metadata-cache';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
+
+const OPENROUTER_MODELS_CACHE_TTL_MS = 5 * 60 * 1000;
+const OPENROUTER_MODELS_FETCH_TIMEOUT_MS = 15_000;
 
 // Re-export from shared module for backwards compatibility
 export { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
@@ -124,87 +139,124 @@ export function formatName(model: OpenRouterModel, preferredIndex: number) {
   return name;
 }
 
-export function shouldSuppressOpenRouterModel(model: KiloExclusiveModel): boolean {
-  return model.status !== 'disabled' || model.pricing === null;
+/**
+ * The price the model picker shows for a catalog entry: the preferred
+ * provider's route price when the snapshot knows one, otherwise the entry's
+ * own catalog price.
+ */
+export function pickerModelPricing(
+  model: OpenRouterModel,
+  endpointsMetadata: StoredModelMap,
+  preferredProviderOrderConfig: PreferredProviderOrderConfig
+): OpenRouterModel['pricing'] {
+  const preferredProvider = resolvePreferredProviderOrder(
+    preferredProviderOrderConfig,
+    model.id
+  ).at(0);
+  const endpoints = endpointsMetadata[model.id]?.endpoints ?? [];
+  const rawPricing = !preferredProvider
+    ? endpoints[0]?.pricing
+    : (endpoints.find(e => e.tag === preferredProvider)?.pricing ??
+      endpoints.find(
+        e => normalizeInferenceProviderId(e.tag) === normalizeInferenceProviderId(preferredProvider)
+      )?.pricing);
+  return getModelDisplayPricing(rawPricing) ?? model.pricing;
 }
 
-async function enhancedModelList(models: OpenRouterModel[]) {
+/**
+ * The catalog entry the picker adds for an id that the OpenRouter response
+ * does not carry: one of Kilo's own Auto models.
+ */
+export function pickerExtraModel(modelId: string): OpenRouterModel | undefined {
+  return buildAutoModels().find(model => model.id === modelId);
+}
+
+async function enhancedModelList(models: OpenRouterModel[], countryCode: string | null) {
   const autoModels = buildAutoModels();
-  const [endpointsMetadata, dataCollectionRequiredModelIds, preferredModels, unavailableModelIds] =
-    await Promise.all([
-      getOpenRouterModelsMetadataFromDatabase(),
-      getDataCollectionRequiredModelIds(),
-      getPreferredModels(),
-      getUnavailableModelIds(),
-    ]);
+  const [
+    endpointsMetadata,
+    dataCollectionRequiredModelIds,
+    preferredModels,
+    unavailableModelIds,
+    preferredProviderOrderConfig,
+    customLlmsById,
+    customPricingConfig,
+  ] = await Promise.all([
+    getOpenRouterModelsMetadataFromDatabase(),
+    getDataCollectionRequiredModelIds(),
+    getPreferredModels(),
+    getUnavailableModelIds(),
+    getPreferredProviderOrderConfig(),
+    getCustomLlmsById(),
+    getCustomPricingConfig(),
+  ]);
+  const publicCustomLlms = [...customLlmsById.values()].flatMap(customLlm =>
+    isPublicCustomLlm(customLlm.definition) &&
+    !unavailableModelIds.has(customLlm.public_id.toLowerCase()) &&
+    !isCustomLlmDeniedInCountry(customLlm.definition, countryCode)
+      ? [{ ...customLlm, definition: customLlm.definition }]
+      : []
+  );
+  const publicCustomLlmProviders = new Map(
+    publicCustomLlms.map(({ public_id, definition }) => [
+      public_id,
+      definition.public.inference_providers,
+    ])
+  );
+  const publicCustomLlmModels = publicCustomLlms.map(({ public_id, definition }) =>
+    convertCustomLlmToCatalogModel(public_id, definition)
+  );
   const hasEndpointsMetadata = Object.keys(endpointsMetadata).length > 0;
   const summaries = await getTerminalBenchSummaries();
   const catalogModels = models
     .filter(
       model =>
         (!hasEndpointsMetadata || endpointsMetadata[model.id] !== undefined) &&
-        !kiloExclusiveModels.some(
-          m => m.public_id === model.id && shouldSuppressOpenRouterModel(m)
-        ) &&
+        // OpenRouter may add a model after a custom LLM claimed its id, and
+        // routing serves the custom LLM.
+        !customLlmsById.has(model.id.toLowerCase()) &&
         !unavailableModelIds.has(model.id) &&
         !model.id.endsWith(':batch')
     )
     .map((model): OpenRouterModel => {
-      const preferredProvider = getPreferredProviderOrder(model.id).at(0);
-      const endpoints = endpointsMetadata[model.id]?.endpoints ?? [];
-      const rawPricing = !preferredProvider
-        ? endpoints[0]?.pricing
-        : (endpoints.find(e => e.tag === preferredProvider)?.pricing ??
-          endpoints.find(
-            e =>
-              normalizeInferenceProviderId(e.tag) ===
-              normalizeInferenceProviderId(preferredProvider)
-          )?.pricing);
-      const pricing = getModelDisplayPricing(rawPricing);
+      const pricing = pickerModelPricing(model, endpointsMetadata, preferredProviderOrderConfig);
       const terminalBench = terminalBenchFor(summaries, model.id);
       const aliasTarget = model.id.startsWith('~')
         ? endpointsMetadata[model.id]?.alias_target?.slug
         : undefined;
       return {
         ...model,
-        ...(pricing && { pricing }),
+        pricing,
         ...(terminalBench && { terminalBench }),
         alias_target: aliasTarget,
       };
     })
-    .concat(
-      kiloExclusiveModels
-        .filter(m => m.status === 'public' && !unavailableModelIds.has(m.public_id))
-        .map(model => convertFromKiloExclusiveModel(model))
-    )
     .concat(autoModels)
-    .map(applyCustomPricingToModel);
-  const exclusiveById = new Map(
-    kiloExclusiveModels
-      .filter(entry => entry.status === 'public')
-      .map(entry => [entry.public_id, entry])
-  );
-  const providerLookupId = (model: OpenRouterModel) =>
-    exclusiveById.get(model.id)?.internal_id ?? model.alias_target ?? model.id;
+    .map(model => applyCustomPricingToModel(customPricingConfig, model))
+    // Public custom LLMs are complete as defined; id-based pricing, PDF, and
+    // protocol guesses below would describe a model routing does not serve.
+    .concat(publicCustomLlmModels);
+  const providerLookupId = (model: OpenRouterModel) => model.alias_target ?? model.id;
   const indexedProviders = await getProviderSlugsForModels(catalogModels.map(providerLookupId));
   const enhancedModels = await Promise.all(
     catalogModels.map(async (model: OpenRouterModel) => {
       const preferredIndex = preferredModels.indexOf(model.id);
-      const exclusive = exclusiveById.get(model.id);
-      const exclusiveProvider = exclusive && getInferenceProvider(exclusive);
-      const providerIds = exclusiveProvider
-        ? [exclusiveProvider.slug]
-        : exclusive && exclusive.inference_provider_restriction.length > 0
-          ? exclusive.inference_provider_restriction
-          : (indexedProviders.get(providerLookupId(model)) ?? []);
+      const providerIds =
+        publicCustomLlmProviders.get(model.id) ??
+        indexedProviders.get(providerLookupId(model)) ??
+        [];
       const inferenceProviderIds = [
         ...new Set([...providerIds].map(id => normalizeInferenceProviderId(id))),
       ];
+      const isPublicCustomLlmModel = publicCustomLlmProviders.has(model.id);
       const addPdf =
-        isPdfSupportingModel(model.id) && !model.architecture.input_modalities.includes('pdf');
-      const description = isFreeNemotronModel(model.id)
-        ? model.description + '\n\n**Terms of service** ' + NVIDIA_TRIAL_TOS
-        : model.description;
+        !isPublicCustomLlmModel &&
+        isPdfSupportingModel(model.id) &&
+        !model.architecture.input_modalities.includes('pdf');
+      const description =
+        !isPublicCustomLlmModel && isFreeNemotronModel(model.id)
+          ? model.description + '\n\n**Terms of service** ' + NVIDIA_TRIAL_TOS
+          : model.description;
       const isFree = isFreeModel(model.id);
       return {
         ...model,
@@ -215,12 +267,14 @@ async function enhancedModelList(models: OpenRouterModel[]) {
         isFree: model.isFree ?? isFree,
         mayTrainOnYourPrompts:
           model.mayTrainOnYourPrompts ?? (isFree || dataCollectionRequiredModelIds.has(model.id)),
-        opencode:
-          model.opencode ??
-          (await getGatewayOpenCodeSettings(
-            model.id,
-            model.supported_parameters?.includes('reasoning') ?? false
-          )),
+        // A custom LLM's protocol comes only from its definition, as in routing.
+        opencode: isPublicCustomLlmModel
+          ? model.opencode
+          : (model.opencode ??
+            (await getGatewayOpenCodeSettings(
+              model.id,
+              model.supported_parameters?.includes('reasoning') ?? false
+            ))),
         architecture: addPdf
           ? {
               ...model.architecture,
@@ -267,30 +321,27 @@ function removeUpstreamEnkrypt(response: unknown): unknown {
 }
 
 /**
- * Fetch raw, unfiltered models from OpenRouter API
- * Use this for syncing model stats where you need complete data including :free variants
+ * Reads one OpenRouter catalogue: fetch, sanitize, validate and report.
+ * Callers own the URL, the headers and the cache policy; the metadata cache readers use this
+ * as their live fallback, and the local fake LLM transcription catalogue always fetches live.
  */
-export async function getRawOpenRouterModels(): Promise<OpenRouterModelsResponse> {
-  const response = await fetch(`${OPENROUTER.apiUrl}/models`, {
-    cache: 'force-cache',
-    method: 'GET',
-    headers: {
-      Authorization: `Bearer ${OPENROUTER.apiKey}`,
-      ...ATTRIBUTION_HEADERS,
-    },
-    next: { revalidate: 60 },
-  });
+async function fetchOpenRouterModels(
+  url: string,
+  init: Parameters<typeof fetch>[1],
+  { subject, endpoint }: { subject: 'models' | 'transcription models'; endpoint: string }
+): Promise<OpenRouterModelsResponse> {
+  const response = await fetch(url, init);
 
   if (!response.ok) {
-    const errorMessage = `Failed to fetch OpenRouter models: ${response.status} ${response.statusText}`;
+    const errorMessage = `Failed to fetch OpenRouter ${subject}: ${response.status} ${response.statusText}`;
     captureException(new Error(errorMessage), {
-      tags: { endpoint: 'openrouter/models', source: 'openrouter_api' },
+      tags: { endpoint, source: 'openrouter_api' },
       extra: {
         status: response.status,
         statusText: response.statusText,
       },
     });
-    throw new Error('Failed to fetch models from OpenRouter API');
+    throw new Error(`Failed to fetch ${subject} from OpenRouter API`);
   }
 
   const data = removeUpstreamEnkrypt(await response.json());
@@ -298,9 +349,9 @@ export async function getRawOpenRouterModels(): Promise<OpenRouterModelsResponse
   const parseResult = OpenRouterModelsResponseSchema.safeParse(data);
 
   if (!parseResult.success) {
-    errorExceptInTest('OpenRouter models response not in expected format:', parseResult.error);
+    errorExceptInTest(`OpenRouter ${subject} response not in expected format:`, parseResult.error);
 
-    captureMessage('openrouter models not in expected format!', {
+    captureMessage(`openrouter ${subject} not in expected format!`, {
       level: 'error',
       extra: {
         data,
@@ -314,11 +365,94 @@ export async function getRawOpenRouterModels(): Promise<OpenRouterModelsResponse
   return parseResult.data;
 }
 
+function openRouterModelsHeaders() {
+  return {
+    Authorization: `Bearer ${OPENROUTER.apiKey}`,
+    ...ATTRIBUTION_HEADERS,
+  };
+}
+
+function openRouterModelsSource(
+  url: string,
+  minimumCount: number
+): MetadataSource<OpenRouterModelsResponse> {
+  return {
+    url,
+    headers: openRouterModelsHeaders,
+    parse: raw => {
+      const parsed = OpenRouterModelsResponseSchema.parse(removeUpstreamEnkrypt(raw));
+      assertMinimumCount(url, parsed.data.length, minimumCount);
+      return parsed;
+    },
+  };
+}
+
+function createOpenRouterModelsReader(
+  source: MetadataSource<OpenRouterModelsResponse>,
+  { subject, endpoint }: { subject: 'models' | 'transcription models'; endpoint: string }
+) {
+  return createCachedMetadataReader(source, {
+    fromDb: readDb,
+    ttlMs: OPENROUTER_MODELS_CACHE_TTL_MS,
+    fetchFallback: () =>
+      fetchOpenRouterModels(
+        source.url,
+        {
+          method: 'GET',
+          headers: openRouterModelsHeaders(),
+          cache: 'no-store',
+          signal: AbortSignal.timeout(OPENROUTER_MODELS_FETCH_TIMEOUT_MS),
+        },
+        { subject, endpoint }
+      ),
+  });
+}
+
+export const openRouterModelsMetadataSource = openRouterModelsSource(
+  `${OPENROUTER.apiUrl}/models`,
+  100
+);
+
+export const openRouterTranscriptionModelsMetadataSource = openRouterModelsSource(
+  `${OPENROUTER.apiUrl}/models?output_modalities=transcription`,
+  1
+);
+
+const openRouterModelsReader = createOpenRouterModelsReader(openRouterModelsMetadataSource, {
+  subject: 'models',
+  endpoint: 'openrouter/models',
+});
+
+const openRouterTranscriptionModelsReader = createOpenRouterModelsReader(
+  openRouterTranscriptionModelsMetadataSource,
+  { subject: 'transcription models', endpoint: 'openrouter/transcription-models' }
+);
+
+export function resetOpenRouterModelsCaches() {
+  openRouterModelsReader.reset();
+  openRouterTranscriptionModelsReader.reset();
+}
+
+/**
+ * Raw, unfiltered OpenRouter models, read from the metadata cache table (live fetch only when
+ * the row is missing or unusable) and kept in memory for 5 minutes.
+ * Use this for syncing model stats where you need complete data including :free variants
+ */
+export async function getRawOpenRouterModels(): Promise<OpenRouterModelsResponse> {
+  return openRouterModelsReader.get();
+}
+
 /**
  * Fetch enhanced models from OpenRouter API with filtering and UI enhancements
  * Use this for user-facing model selection where you want filtered, sorted models
  */
-export async function getEnhancedOpenRouterModels(): Promise<OpenRouterModelsResponse> {
+export async function getEnhancedOpenRouterModels({
+  countryCode,
+}: {
+  /** The requester's Vercel IP country; custom LLMs denied there are left out.
+   * Null lists every custom LLM, for callers that do not serve a request. */
+  countryCode: string | null;
+}): Promise<OpenRouterModelsResponse> {
   const rawResponse = await getRawOpenRouterModels();
 
   // If data is not in expected format (e.g., validation failed), return as-is
@@ -326,61 +460,27 @@ export async function getEnhancedOpenRouterModels(): Promise<OpenRouterModelsRes
     return rawResponse;
   }
 
-  const models = await enhancedModelList(rawResponse.data);
+  const models = await enhancedModelList(rawResponse.data, countryCode);
   const snapshot = await getEnkryptBenchmarks();
   return { data: publishEnkryptModels(models, snapshot) };
 }
 /**
- * Fetch speech-to-text models from the OpenRouter API.
+ * OpenRouter speech-to-text models, read like `getRawOpenRouterModels`. The local fake LLM
+ * catalogue is always fetched live.
  */
 export async function getOpenRouterTranscriptionModels(): Promise<OpenRouterModelsResponse> {
   const localFakeModelsUrl = getLocalFakeTranscriptionModelsUrl();
-  const response = await fetch(
-    localFakeModelsUrl ?? `${OPENROUTER.apiUrl}/models?output_modalities=transcription`,
+  if (!localFakeModelsUrl) {
+    return openRouterTranscriptionModelsReader.get();
+  }
+  return fetchOpenRouterModels(
+    localFakeModelsUrl,
     {
       method: 'GET',
-      headers: {
-        Authorization: `Bearer ${localFakeModelsUrl ? LOCAL_FAKE_LLM_API_KEY : OPENROUTER.apiKey}`,
-        ...ATTRIBUTION_HEADERS,
-      },
-      // Never serve a cached catalogue: a cached answer would mask an
-      // unreachable gateway and the mobile picker would list stale models
-      // instead of showing its load-failed retry state.
+      headers: { Authorization: `Bearer ${LOCAL_FAKE_LLM_API_KEY}`, ...ATTRIBUTION_HEADERS },
       cache: 'no-store',
-    }
+      signal: AbortSignal.timeout(OPENROUTER_MODELS_FETCH_TIMEOUT_MS),
+    },
+    { subject: 'transcription models', endpoint: 'openrouter/transcription-models' }
   );
-
-  if (!response.ok) {
-    const errorMessage = `Failed to fetch OpenRouter transcription models: ${response.status} ${response.statusText}`;
-    captureException(new Error(errorMessage), {
-      tags: { endpoint: 'openrouter/transcription-models', source: 'openrouter_api' },
-      extra: {
-        status: response.status,
-        statusText: response.statusText,
-      },
-    });
-    throw new Error('Failed to fetch transcription models from OpenRouter API');
-  }
-
-  const data = removeUpstreamEnkrypt(await response.json());
-
-  const parseResult = OpenRouterModelsResponseSchema.safeParse(data);
-
-  if (!parseResult.success) {
-    errorExceptInTest(
-      'OpenRouter transcription models response not in expected format:',
-      parseResult.error
-    );
-
-    captureMessage('openrouter transcription models not in expected format!', {
-      level: 'error',
-      extra: {
-        data,
-        zodError: parseResult.error.issues,
-      },
-    });
-    return data as OpenRouterModelsResponse;
-  }
-
-  return parseResult.data;
 }

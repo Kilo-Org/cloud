@@ -18,8 +18,8 @@ import { sendAlertNotification, type AlertPayload } from './notify';
 import { listAlertingConfigs, type AlertingConfig } from './config-store';
 import { listTtfbAlertingConfigs, type TtfbAlertingConfig } from './ttfb-config-store';
 import { evaluateContainerCapacity } from './container-capacity-evaluate';
+import { evaluateContainerAllocations } from './container-allocations';
 import { evaluateQueueBacklogAlert } from './queue-backlog-evaluate';
-import { evaluateGastownHealthAlert } from './gastown-health-evaluate';
 
 /**
  * Compute the burn rate from an observed bad-event fraction and the SLO.
@@ -316,15 +316,15 @@ export async function evaluateAlerts(env: Env): Promise<void> {
   }
 
   try {
-    await evaluateQueueBacklogAlert(env);
+    await evaluateContainerAllocations(env);
   } catch (err) {
-    errors.push(new Error('queue_backlog evaluation', { cause: err }));
+    errors.push(new Error('container_allocations evaluation', { cause: err }));
   }
 
   try {
-    await evaluateGastownHealthAlert(env);
+    await evaluateQueueBacklogAlert(env);
   } catch (err) {
-    errors.push(new Error('gastown_container_health evaluation', { cause: err }));
+    errors.push(new Error('queue_backlog evaluation', { cause: err }));
   }
 
   if (errors.length > 0) {

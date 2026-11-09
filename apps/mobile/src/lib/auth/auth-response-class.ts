@@ -58,7 +58,7 @@ export type AuthResponseClass =
    * pair is dead (a 401 on the refresh route).
    */
   | { readonly kind: 'terminal'; readonly status: number; readonly clearCredential: boolean }
-  /** Retryable: a 429 carries the server's own back-off, if it named one. */
+  /** Retryable: a 408, 429 or 5xx carries the server's own back-off, if it named one. */
   | { readonly kind: 'retry'; readonly status: number; readonly retryAfterMs: number | undefined };
 
 /**
@@ -89,9 +89,10 @@ export function parseRetryAfterMs(
 
 /**
  * Classify a sign-in response. A 401 is terminal (and clears the stored
- * credential on a credential route). A 429 or 5xx is retryable and carries the
- * server's `Retry-After` when it sent one. Every other 4xx — and the 1xx/3xx a
- * sign-in route never returns — is terminal: retrying it cannot change it.
+ * credential on a credential route). A 408, 429 or 5xx is retryable and carries
+ * the server's `Retry-After` when it sent one. Every other 4xx — and the
+ * 1xx/3xx a sign-in route never returns — is terminal: retrying it cannot
+ * change it.
  */
 export function classifyAuthResponse(args: {
   path: string;
@@ -136,8 +137,15 @@ export function resetAuthTerminalReports(): void {
   reportedTerminalFailures.clear();
 }
 
-/** True when this exact terminal failure has not been reported yet. */
-export function shouldReportAuthTerminalFailure(route: string, status: number): boolean {
+/**
+ * Claim the one report this process may file for this route and status: true
+ * on the first call, false on every repeat.
+ *
+ * The call itself marks the failure as reported, so it is not a question to ask
+ * out of curiosity: a claim spends the process's single report for that
+ * failure, and a `reportAuthTerminalFailure` after it files nothing.
+ */
+export function claimAuthTerminalFailureReport(route: string, status: number): boolean {
   const key = `${route}:${status}`;
   if (reportedTerminalFailures.has(key)) {
     return false;
@@ -148,15 +156,22 @@ export function shouldReportAuthTerminalFailure(route: string, status: number): 
 
 /**
  * Report one terminal sign-in failure, at most once per process, with the
- * stable fingerprint above. Never throws; a no-op until a telemetry sink is
- * installed.
+ * stable fingerprint above. The expected expiry of the stored credential is a
+ * lifecycle event, so it is filed at warning level; every other terminal
+ * refusal names a defect and stays at error. Same tags and fingerprint either
+ * way, so one route and status keeps one issue and only its severity moves.
+ * Never throws; a no-op until a telemetry sink is installed.
  */
 export function reportAuthTerminalFailure(route: AuthTerminalRoute, status: number): void {
-  if (!shouldReportAuthTerminalFailure(route, status)) {
+  if (!claimAuthTerminalFailureReport(route, status)) {
     return;
   }
+  // The stored credential's own expiry is the expected end of a session: it
+  // was expired, revoked or already rotated, and the person signs in again.
+  // Every other terminal refusal names a defect, so only that one is a warning.
+  const expired = route === STORED_CREDENTIAL_ROUTE && status === 401;
   captureTelemetry({
-    level: 'error',
+    level: expired ? 'warning' : 'error',
     error: new Error(`Terminal sign-in failure: ${status} on ${route}`),
     tags: {
       'error.subsystem': 'auth',

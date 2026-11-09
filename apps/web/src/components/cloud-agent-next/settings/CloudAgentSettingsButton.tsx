@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -8,7 +9,9 @@ import { CloudAgentSettingsDialog } from './CloudAgentSettingsDialog';
 
 /** Topbar button that opens the Cloud Agent settings dialog. */
 export function CloudAgentSettingsButton({ organizationId }: { organizationId?: string }) {
-  const [open, setOpen] = useState(false);
+  const searchParams = useSearchParams();
+  const openCompute = organizationId !== undefined && searchParams.get('settings') === 'compute';
+  const [open, setOpen] = useState(openCompute);
 
   return (
     <>
@@ -28,6 +31,7 @@ export function CloudAgentSettingsButton({ organizationId }: { organizationId?: 
       </Tooltip>
       <CloudAgentSettingsDialog
         organizationId={organizationId}
+        initialSection={openCompute ? 'compute' : 'general'}
         open={open}
         onOpenChange={setOpen}
       />

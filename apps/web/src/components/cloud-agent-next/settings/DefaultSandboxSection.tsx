@@ -32,14 +32,14 @@ export function DefaultSandboxSection({ organizationId, settings }: DefaultSandb
     <section aria-labelledby={headingId} className="flex flex-col gap-3">
       <div className="flex flex-col gap-1">
         <div className="flex items-center gap-1.5">
-          <h3 id={headingId} className="text-sm font-medium">
+          <h4 id={headingId} className="text-sm font-medium">
             Default sandbox
-          </h3>
+          </h4>
           {canChoose && <SandboxRulesHint />}
         </div>
         <p className="text-muted-foreground text-xs">
           {canChoose
-            ? `Used for new sessions ${organizationId ? 'in this organization ' : ''}unless a repository overrides it.`
+            ? `Used for new sessions ${organizationId ? 'in this organization ' : ''}unless a repository environment or override sets a sandbox.`
             : `New sessions ${organizationId ? 'in this organization ' : ''}run on this sandbox.`}
         </p>
       </div>
@@ -77,8 +77,11 @@ function SandboxRulesHint() {
       </PopoverTrigger>
       <PopoverContent align="start" className="flex flex-col gap-2 text-xs">
         <p>
-          A sandbox chosen when a session starts always wins. Otherwise a repository override
-          applies, then this default, then the platform default.
+          The sandbox size in a repository&apos;s environment applies first. Then a repository
+          override applies, then this default, then the platform default.
+        </p>
+        <p className="text-muted-foreground">
+          A request that names a sandbox when it starts a session wins over all of them.
         </p>
         <p className="text-muted-foreground">
           If a session cannot use the selected sandbox, it runs on the next available default.

@@ -19,6 +19,7 @@ import {
   bitbucketCodeReviewerLifecycleLockKey,
   cancelActiveCodeReviewsById,
   cancelActiveCodeReviewsForIntegration,
+  cancelCodeReview,
   cancelSupersededReviewsForPR,
   createCodeReview,
   createCodeReviewIfAbsentInTransaction,
@@ -28,6 +29,7 @@ import {
   ensureCurrentCodeReviewAttemptFromReview,
   findActiveReviewsForPR,
   findExistingReview,
+  findReviewCoveringHeads,
   getCodeReviewAttemptForReview,
   getCodeReviewCouncilResult,
   getSessionUsageFromBilling,
@@ -36,6 +38,9 @@ import {
   updateCodeReviewAttemptForCallback,
   findPreviousCompletedReview,
   updateCodeReviewStatus,
+  updateCodeReviewStatusIfNonTerminal,
+  settleCodeReviewUsage,
+  backfillCodeReviewUsage,
   resetCodeReviewForRetry,
   failReservedQueuedReview,
   updatePreviousReviewSummary,
@@ -257,6 +262,125 @@ describe('review identity', () => {
     expect(result).toEqual({ reviewId: existingReviewId, created: false });
   });
 
+  it('resolves the conflict winner only within the requesting review scope', async () => {
+    const repoFullName = `${REPO}-scope-mismatch-conflict`;
+    const headSha = 'scope-mismatch-conflict-head-sha';
+    const [existingRow] = await db
+      .insert(cloud_agent_code_reviews)
+      .values({
+        owned_by_user_id: secondUser.id,
+        platform_integration_id: secondIntegrationId,
+        repo_full_name: repoFullName,
+        pr_number: 27,
+        pr_url: `https://github.com/${repoFullName}/pull/27`,
+        pr_title: 'scope mismatch conflict',
+        pr_author: 'octocat',
+        base_ref: 'main',
+        head_ref: 'feature/scope-mismatch-conflict',
+        head_sha: headSha,
+        platform: 'github',
+      })
+      .returning({ id: cloud_agent_code_reviews.id });
+    createdReviewIds.push(existingRow.id);
+
+    const scope = {
+      owner: { type: 'user' as const, id: firstUser.id, userId: firstUser.id },
+      platform: 'github' as const,
+      repoFullName,
+      prNumber: 27,
+      platformIntegrationId: secondIntegrationId,
+    };
+    const params = {
+      owner: { type: 'user' as const, id: firstUser.id, userId: firstUser.id },
+      platformIntegrationId: secondIntegrationId,
+      repoFullName,
+      prNumber: 27,
+      prUrl: `https://github.com/${repoFullName}/pull/27`,
+      prTitle: 'scope mismatch conflict',
+      prAuthor: 'octocat',
+      baseRef: 'main',
+      headRef: 'feature/scope-mismatch-conflict',
+      headSha,
+      platform: 'github' as const,
+      triggerSource: 'webhook' as const,
+    };
+
+    await expect(
+      db.transaction(tx => createCodeReviewIfAbsentInTransaction(tx, scope, params))
+    ).rejects.toThrow('Code review conflict winner not found');
+
+    await expect(
+      db.transaction(tx =>
+        createCodeReviewIfAbsentInTransaction(
+          tx,
+          { ...scope, owner: { type: 'user', id: secondUser.id, userId: secondUser.id } },
+          { ...params, owner: { type: 'user', id: secondUser.id, userId: secondUser.id } }
+        )
+      )
+    ).resolves.toEqual({ reviewId: existingRow.id, created: false });
+  });
+
+  it('reuses the same-owner manual provider review at the same head SHA', async () => {
+    const repoFullName = `${REPO}-manual-provider-conflict`;
+    const headSha = 'manual-provider-conflict-head-sha';
+    const manualConfig: ManualCodeReviewConfig = {
+      agentConfig: {
+        review_style: 'balanced',
+        focus_areas: [],
+        model_slug: 'anthropic/claude-sonnet-4.6',
+      },
+      instructions: null,
+      outputMode: 'provider',
+    };
+    const [manualRow] = await db
+      .insert(cloud_agent_code_reviews)
+      .values({
+        owned_by_user_id: firstUser.id,
+        platform_integration_id: firstIntegrationId,
+        repo_full_name: repoFullName,
+        pr_number: 28,
+        pr_url: `https://github.com/${repoFullName}/pull/28`,
+        pr_title: 'manual provider conflict',
+        pr_author: 'octocat',
+        base_ref: 'main',
+        head_ref: 'feature/manual-provider-conflict',
+        head_sha: headSha,
+        platform: 'github',
+        manual_config: manualConfig,
+      })
+      .returning({ id: cloud_agent_code_reviews.id });
+    createdReviewIds.push(manualRow.id);
+
+    const result = await db.transaction(tx =>
+      createCodeReviewIfAbsentInTransaction(
+        tx,
+        {
+          owner: { type: 'user', id: firstUser.id, userId: firstUser.id },
+          platform: 'github',
+          repoFullName,
+          prNumber: 28,
+          platformIntegrationId: firstIntegrationId,
+        },
+        {
+          owner: { type: 'user', id: firstUser.id, userId: firstUser.id },
+          platformIntegrationId: firstIntegrationId,
+          repoFullName,
+          prNumber: 28,
+          prUrl: `https://github.com/${repoFullName}/pull/28`,
+          prTitle: 'manual provider conflict',
+          prAuthor: 'octocat',
+          baseRef: 'main',
+          headRef: 'feature/manual-provider-conflict',
+          headSha,
+          platform: 'github',
+          triggerSource: 'webhook',
+        }
+      )
+    );
+
+    expect(result).toEqual({ reviewId: manualRow.id, created: false });
+  });
+
   it('rejects duplicate reviews in the same organization scope', async () => {
     const params = {
       owner: { type: 'org' as const, id: organizationId, userId: firstUser.id },
@@ -313,6 +437,53 @@ describe('review identity', () => {
     );
 
     expect(matchingReview?.id).toBe(reviewId);
+  });
+
+  it('covers heads only for reviews that finished or are in flight in the same scope', async () => {
+    const params = {
+      owner: { type: 'user' as const, id: firstUser.id, userId: firstUser.id },
+      platformIntegrationId: firstIntegrationId,
+      repoFullName: `${REPO}-covering-heads`,
+      prNumber: 25,
+      prUrl: `https://github.com/${REPO}-covering-heads/pull/25`,
+      prTitle: 'covering heads',
+      prAuthor: 'octocat',
+      baseRef: 'main',
+      headRef: 'feature/covering-heads',
+      headSha: 'covering-heads-content-sha',
+      platform: 'github' as const,
+    };
+    const reviewId = await createCodeReview(params);
+    createdReviewIds.push(reviewId);
+
+    const scope = {
+      owner: { type: 'user' as const, id: firstUser.id, userId: firstUser.id },
+      platform: 'github' as const,
+      repoFullName: params.repoFullName,
+      prNumber: params.prNumber,
+      platformIntegrationId: firstIntegrationId,
+    };
+
+    // A head it holds covers it only while the review can still stand for the content.
+    expect(
+      await findReviewCoveringHeads(scope, ['other-head-sha', 'covering-heads-content-sha'])
+    ).toEqual({
+      checkRunId: null,
+      headSha: 'covering-heads-content-sha',
+      id: reviewId,
+      status: 'pending',
+    });
+
+    await updateCodeReviewStatus(reviewId, 'cancelled');
+
+    expect(await findReviewCoveringHeads(scope, ['covering-heads-content-sha'])).toBeNull();
+    expect(
+      await findReviewCoveringHeads(
+        { ...scope, platformIntegrationId: alternateFirstUserIntegrationId },
+        ['covering-heads-content-sha']
+      )
+    ).toBeNull();
+    expect(await findReviewCoveringHeads(scope, [])).toBeNull();
   });
 
   it('scopes GitLab active review uniqueness to the integration; separate instances are independent', async () => {
@@ -518,7 +689,7 @@ describe('review identity', () => {
     expect(activeReviewIds).toEqual([runningReviewId, queuedReviewId, pendingReviewId]);
   });
 
-  it('finds previous completed review context within the exact owner and repository scope across integrations', async () => {
+  it('finds previous completed review context within the exact owner, integration and repository scope', async () => {
     const createCompletedReview = async (
       user: User,
       platformIntegrationId: string,
@@ -567,13 +738,14 @@ describe('review identity', () => {
         platform: 'github',
         repoFullName: `${REPO}-previous-scope`,
         prNumber: 21,
+        platformIntegrationId: firstIntegrationId,
       },
       'previous-scope-current-head'
     );
 
     expect(previousReview).toEqual({
-      head_sha: 'previous-scope-alternate-integration-head',
-      session_id: 'agent_alternate_integration_previous',
+      head_sha: 'previous-scope-old-head',
+      session_id: 'agent_matching_previous',
     });
   });
 
@@ -798,10 +970,22 @@ describe('review identity', () => {
     ).toEqual(['cancelled', 'cancelled', 'cancelled']);
     expect(reviews.find(review => review.id === completedReviewId)?.status).toBe('completed');
     const attempts = await db
-      .select({ status: cloud_agent_code_review_attempts.status })
+      .select({
+        id: cloud_agent_code_review_attempts.id,
+        status: cloud_agent_code_review_attempts.status,
+        terminalReason: cloud_agent_code_review_attempts.terminal_reason,
+        errorMessage: cloud_agent_code_review_attempts.error_message,
+      })
       .from(cloud_agent_code_review_attempts)
       .where(inArray(cloud_agent_code_review_attempts.id, [queuedAttempt.id, runningAttempt.id]));
-    expect(attempts.map(attempt => attempt.status)).toEqual(['cancelled', 'cancelled']);
+    expect(attempts).toHaveLength(2);
+    for (const attempt of attempts) {
+      expect(attempt).toMatchObject({
+        status: 'cancelled',
+        terminalReason: 'user_cancelled',
+        errorMessage: 'Platform integration disconnected',
+      });
+    }
   });
 
   it('clears a dangling dispatch reservation when cancelling for an integration', async () => {
@@ -1227,6 +1411,11 @@ describe('cancelSupersededReviewsForPR', () => {
     await updateCodeReviewStatus(unrelatedId, 'running', {
       sessionId: 'session-id-cancel-unrelated',
     });
+    const duplicateReservationId = crypto.randomUUID();
+    await db
+      .update(cloud_agent_code_reviews)
+      .set({ dispatch_reservation_id: duplicateReservationId })
+      .where(eq(cloud_agent_code_reviews.id, runningDuplicateId));
 
     const cancelled = await cancelActiveCodeReviewsById(
       [queuedDuplicateId, runningDuplicateId],
@@ -1254,6 +1443,7 @@ describe('cancelSupersededReviewsForPR', () => {
         status: cloud_agent_code_reviews.status,
         terminalReason: cloud_agent_code_reviews.terminal_reason,
         errorMessage: cloud_agent_code_reviews.error_message,
+        dispatchReservationId: cloud_agent_code_reviews.dispatch_reservation_id,
       })
       .from(cloud_agent_code_reviews)
       .where(
@@ -1280,6 +1470,7 @@ describe('cancelSupersededReviewsForPR', () => {
         status: 'cancelled',
         terminalReason: 'superseded',
         errorMessage: 'Superseded by duplicate merge-commit continuation',
+        dispatchReservationId: duplicateReservationId,
       })
     );
   });
@@ -1398,6 +1589,51 @@ describe('cancelSupersededReviewsForPR', () => {
       .where(eq(operation_ledgers.operation_key, `review:${reviewId}`));
     expect(ledgerRow?.status).toBe('superseded');
   });
+
+  it('keeps a dispatch reservation while superseding for a new push', async () => {
+    const reviewId = await createReview({
+      headSha: 'sha-superseded-reservation',
+      prNumber: 47,
+      platformIntegrationId: githubIntegrationId,
+    });
+    const attempt = await createCodeReviewAttempt({ codeReviewId: reviewId, status: 'queued' });
+    await updateCodeReviewStatus(reviewId, 'queued');
+    const reservationId = crypto.randomUUID();
+    await db
+      .update(cloud_agent_code_reviews)
+      .set({ dispatch_reservation_id: reservationId })
+      .where(eq(cloud_agent_code_reviews.id, reviewId));
+
+    const cancelled = await cancelSupersededReviewsForPR(
+      {
+        owner: { type: 'user', id: testUser.id, userId: testUser.id },
+        platform: 'github',
+        repoFullName: repo,
+        prNumber: 47,
+        platformIntegrationId: githubIntegrationId,
+      },
+      'sha-superseded-reservation-new'
+    );
+
+    expect(cancelled.map(row => row.id)).toEqual([reviewId]);
+    expect(cancelled[0]?.latestActiveAttemptId).toBe(attempt.id);
+
+    const [row] = await db
+      .select({
+        status: cloud_agent_code_reviews.status,
+        terminalReason: cloud_agent_code_reviews.terminal_reason,
+        errorMessage: cloud_agent_code_reviews.error_message,
+        dispatchReservationId: cloud_agent_code_reviews.dispatch_reservation_id,
+      })
+      .from(cloud_agent_code_reviews)
+      .where(eq(cloud_agent_code_reviews.id, reviewId));
+    expect(row).toEqual({
+      status: 'cancelled',
+      terminalReason: 'superseded',
+      errorMessage: 'Superseded by new push',
+      dispatchReservationId: reservationId,
+    });
+  });
 });
 
 describe('findPreviousCompletedReview', () => {
@@ -1505,12 +1741,17 @@ describe('findPreviousCompletedReview', () => {
     return id;
   }
 
-  async function createGitLabReview(headSha: string, integrationId: string, projectId: number) {
+  async function createGitLabReview(
+    headSha: string,
+    integrationId: string,
+    projectId: number,
+    repoFullName = gitLabRepo
+  ) {
     const id = await createCodeReview({
       owner: { type: 'user', id: testUser.id, userId: testUser.id },
-      repoFullName: gitLabRepo,
+      repoFullName,
       prNumber: 42,
-      prUrl: `https://gitlab.example.com/${gitLabRepo}/-/merge_requests/42`,
+      prUrl: `https://gitlab.example.com/${repoFullName}/-/merge_requests/42`,
       prTitle: 'test GitLab MR',
       prAuthor: 'gitlab-user',
       baseRef: 'main',
@@ -1530,6 +1771,7 @@ describe('findPreviousCompletedReview', () => {
       platform: 'github' as const,
       repoFullName: REPO,
       prNumber: 42,
+      platformIntegrationId: githubIntegrationId,
     };
   }
 
@@ -1604,46 +1846,65 @@ describe('findPreviousCompletedReview', () => {
     expect(result!.session_id).toBeNull();
   });
 
-  it('keeps GitLab session continuation on repo-name scope until provider-stable identity lands', async () => {
-    const olderIntegrationId = await createGitLabReview(
-      'gitlab-older-integration-sha',
+  function gitLabReviewScope(platformIntegrationId: string, repoFullName = gitLabRepo) {
+    return {
+      owner: { type: 'user' as const, id: testUser.id, userId: testUser.id },
+      platform: 'gitlab' as const,
+      repoFullName,
+      prNumber: 42,
+      platformIntegrationId,
+    };
+  }
+
+  it('returns each integration its own previous review session when repository and MR number match', async () => {
+    const integrationAReviewId = await createGitLabReview(
+      'gitlab-integration-a-sha',
       gitLabIntegrationAId,
       501
     );
-    const newerIntegrationId = await createGitLabReview(
-      'gitlab-newer-integration-sha',
+    const integrationBReviewId = await createGitLabReview(
+      'gitlab-integration-b-sha',
       gitLabIntegrationBId,
       501
     );
-    await updateCodeReviewStatus(olderIntegrationId, 'completed', {
-      sessionId: 'agent_older_integration',
+    await updateCodeReviewStatus(integrationAReviewId, 'completed', {
+      sessionId: 'agent_integration_a',
     });
-    await updateCodeReviewStatus(newerIntegrationId, 'completed', {
-      sessionId: 'agent_newer_integration',
+    await updateCodeReviewStatus(integrationBReviewId, 'completed', {
+      sessionId: 'agent_integration_b',
     });
-    const differentProjectId = await createGitLabReview(
-      'gitlab-matching-sha',
-      gitLabIntegrationAId,
-      502
+
+    await expect(
+      findPreviousCompletedReview(gitLabReviewScope(gitLabIntegrationAId), 'current-gitlab-sha')
+    ).resolves.toEqual({
+      head_sha: 'gitlab-integration-a-sha',
+      session_id: 'agent_integration_a',
+    });
+    await expect(
+      findPreviousCompletedReview(gitLabReviewScope(gitLabIntegrationBId), 'current-gitlab-sha')
+    ).resolves.toEqual({
+      head_sha: 'gitlab-integration-b-sha',
+      session_id: 'agent_integration_b',
+    });
+  });
+
+  it('returns null when the scoped integration has no completed review of the repository', async () => {
+    const repoFullName = `${gitLabRepo}-other-integration`;
+    const otherIntegrationReviewId = await createGitLabReview(
+      'gitlab-foreign-integration-sha',
+      gitLabIntegrationBId,
+      601,
+      repoFullName
     );
-    await updateCodeReviewStatus(differentProjectId, 'completed', {
-      sessionId: 'agent_other_project',
+    await updateCodeReviewStatus(otherIntegrationReviewId, 'completed', {
+      sessionId: 'agent_foreign_integration',
     });
 
     const result = await findPreviousCompletedReview(
-      {
-        owner: { type: 'user', id: testUser.id, userId: testUser.id },
-        platform: 'gitlab',
-        repoFullName: gitLabRepo,
-        prNumber: 42,
-      },
+      gitLabReviewScope(gitLabIntegrationAId, repoFullName),
       'current-gitlab-sha'
     );
-
-    expect(result).toEqual({
-      head_sha: 'gitlab-matching-sha',
-      session_id: 'agent_other_project',
-    });
+    expect(result).toBeNull();
   });
 
   it('does not return GitLab context for a GitHub review scope', async () => {
@@ -1723,6 +1984,111 @@ describe('findPreviousCompletedReview', () => {
 
     expect(updatedFirstAttempt?.status).toBe('failed');
     expect(updatedFirstAttempt?.error_message).toBe('Container shutdown: SIGTERM');
+  });
+
+  it('updates the attempt matched by session id even when a newer attempt exists', async () => {
+    const reviewId = await createReview('sha-matched-session-attempt');
+    const matchedAttempt = await createCodeReviewAttempt({
+      codeReviewId: reviewId,
+      status: 'running',
+      sessionId: 'agent_matched_session',
+    });
+    const newerAttempt = await createCodeReviewAttempt({
+      codeReviewId: reviewId,
+      retryOfAttemptId: matchedAttempt.id,
+      retryReason: 'manual_retrigger',
+      status: 'running',
+      sessionId: 'agent_newer_session',
+    });
+
+    const result = await updateCodeReviewAttemptForCallback({
+      codeReviewId: reviewId,
+      status: 'failed',
+      sessionId: 'agent_matched_session',
+      errorMessage: 'matched session callback',
+      terminalReason: 'sandbox_error',
+    });
+
+    expect(result.id).toBe(matchedAttempt.id);
+    expect(result.status).toBe('failed');
+    expect(result.error_message).toBe('matched session callback');
+
+    const unchangedNewer = await getCodeReviewAttemptForReview(reviewId, newerAttempt.id);
+    expect(unchangedNewer?.status).toBe('running');
+    expect(unchangedNewer?.error_message).toBeNull();
+  });
+
+  it('updates the attempt matched by cli session id when no session id matches', async () => {
+    const reviewId = await createReview('sha-matched-cli-attempt');
+    const matchedAttempt = await createCodeReviewAttempt({
+      codeReviewId: reviewId,
+      status: 'running',
+      sessionId: 'agent_cli_match',
+      cliSessionId: 'ses_cli_match',
+    });
+    await createCodeReviewAttempt({
+      codeReviewId: reviewId,
+      status: 'pending',
+    });
+
+    const result = await updateCodeReviewAttemptForCallback({
+      codeReviewId: reviewId,
+      status: 'failed',
+      sessionId: 'agent_unknown_session',
+      cliSessionId: 'ses_cli_match',
+      errorMessage: 'cli session callback',
+    });
+
+    expect(result.id).toBe(matchedAttempt.id);
+    expect(result.status).toBe('failed');
+    expect(result.error_message).toBe('cli session callback');
+  });
+
+  it('returns the latest attempt unchanged when the callback session differs from it', async () => {
+    const reviewId = await createReview('sha-mismatched-session-callback');
+    const latestAttempt = await createCodeReviewAttempt({
+      codeReviewId: reviewId,
+      status: 'running',
+      sessionId: 'agent_latest_session',
+    });
+
+    const result = await updateCodeReviewAttemptForCallback({
+      codeReviewId: reviewId,
+      status: 'failed',
+      sessionId: 'agent_stale_session',
+      errorMessage: 'stale callback',
+    });
+
+    expect(result.id).toBe(latestAttempt.id);
+    expect(result.status).toBe('running');
+
+    const storedAttempt = await getCodeReviewAttemptForReview(reviewId, latestAttempt.id);
+    expect(storedAttempt?.status).toBe('running');
+    expect(storedAttempt?.error_message).toBeNull();
+  });
+
+  it('creates an attempt when the callback session matches no existing attempt', async () => {
+    const reviewId = await createReview('sha-unmatched-callback-create');
+
+    const result = await updateCodeReviewAttemptForCallback({
+      codeReviewId: reviewId,
+      status: 'failed',
+      sessionId: 'agent_first_callback',
+      cliSessionId: 'ses_first_callback',
+      executionId: 'exec_first_callback',
+      errorMessage: 'container exited',
+      terminalReason: 'sandbox_error',
+    });
+
+    expect(result.status).toBe('failed');
+    expect(result.session_id).toBe('agent_first_callback');
+    expect(result.cli_session_id).toBe('ses_first_callback');
+    expect(result.execution_id).toBe('exec_first_callback');
+    expect(result.error_message).toBe('container exited');
+    expect(result.terminal_reason).toBe('sandbox_error');
+
+    const attempts = await listCodeReviewAttempts(reviewId);
+    expect(attempts.map(attempt => attempt.id)).toEqual([result.id]);
   });
 
   it('does not reopen a terminal attempt without session ids', async () => {
@@ -1969,6 +2335,132 @@ describe('getSessionUsageFromBilling', () => {
       cachedTokens: 700,
       totalCostMusd: 100,
     });
+  });
+
+  type UsageRow = {
+    model: string | null;
+    input: number;
+    output: number;
+    cacheHit: number;
+    cacheWrite: number;
+    cost: number;
+    createdAt: string;
+  };
+
+  async function insertSessionUsage(sessionId: string, rows: UsageRow[]) {
+    const ids = rows.map(() => crypto.randomUUID());
+    usageIds.push(...ids);
+
+    await db.insert(microdollar_usage).values(
+      rows.map((row, index) => ({
+        id: ids[index]!,
+        kilo_user_id: 'code-review-usage-test',
+        cost: row.cost,
+        input_tokens: row.input,
+        output_tokens: row.output,
+        cache_write_tokens: row.cacheWrite,
+        cache_hit_tokens: row.cacheHit,
+        created_at: row.createdAt,
+        model: row.model,
+      }))
+    );
+    await db.insert(microdollar_usage_metadata).values(
+      rows.map((row, index) => ({
+        id: ids[index]!,
+        message_id: `msg_${ids[index]}`,
+        session_id: sessionId,
+        created_at: row.createdAt,
+      }))
+    );
+  }
+
+  it('sums every model in the window and reports the model with the most tokens', async () => {
+    const sessionId = `ses_usage_multi_model_${crypto.randomUUID()}`;
+    await insertSessionUsage(sessionId, [
+      {
+        model: 'anthropic/claude-sonnet-4.6',
+        input: 1000,
+        output: 100,
+        cacheHit: 600,
+        cacheWrite: 100,
+        cost: 100,
+        createdAt: '2026-06-18T10:00:00.000Z',
+      },
+      {
+        model: 'openai/gpt-4o',
+        input: 2000,
+        output: 200,
+        cacheHit: 1200,
+        cacheWrite: 200,
+        cost: 200,
+        createdAt: '2026-06-18T10:30:00.000Z',
+      },
+    ]);
+
+    await expect(
+      getSessionUsageFromBilling(sessionId, '2026-06-18T09:00:00.000Z', '2026-06-18T11:00:00.000Z')
+    ).resolves.toEqual({
+      model: 'openai/gpt-4o',
+      totalTokensIn: 3000,
+      totalTokensOut: 300,
+      tokensIn: 900,
+      tokensOut: 300,
+      cachedTokens: 2100,
+      totalCostMusd: 300,
+    });
+  });
+
+  it('resolves a top-model tie to the same model every time', async () => {
+    const sessionId = `ses_usage_tie_${crypto.randomUUID()}`;
+    await insertSessionUsage(sessionId, [
+      {
+        model: 'zeta/tied-model',
+        input: 500,
+        output: 50,
+        cacheHit: 0,
+        cacheWrite: 0,
+        cost: 10,
+        createdAt: '2026-06-18T10:00:00.000Z',
+      },
+      {
+        model: 'alpha/tied-model',
+        input: 500,
+        output: 50,
+        cacheHit: 0,
+        cacheWrite: 0,
+        cost: 10,
+        createdAt: '2026-06-18T10:30:00.000Z',
+      },
+    ]);
+
+    const usage = await getSessionUsageFromBilling(
+      sessionId,
+      '2026-06-18T09:00:00.000Z',
+      '2026-06-18T11:00:00.000Z'
+    );
+
+    expect(usage?.model).toBe('alpha/tied-model');
+    expect(usage?.totalTokensIn).toBe(1000);
+    expect(usage?.totalCostMusd).toBe(20);
+  });
+
+  it('returns null when the window holds no usage', async () => {
+    const sessionId = `ses_usage_empty_${crypto.randomUUID()}`;
+    await insertSessionUsage(sessionId, [
+      {
+        model: 'anthropic/claude-sonnet-4.6',
+        input: 1000,
+        output: 100,
+        cacheHit: 600,
+        cacheWrite: 100,
+        cost: 100,
+        createdAt: '2026-06-18T12:00:00.000Z',
+      },
+    ]);
+
+    await expect(
+      getSessionUsageFromBilling(sessionId, '2026-06-18T09:00:00.000Z', '2026-06-18T11:00:00.000Z')
+    ).resolves.toBeNull();
   });
 });
 
@@ -2256,6 +2748,27 @@ describe('listCodeReviews narrows the list DTO', () => {
     expect(Object.keys(row).sort()).toEqual(Object.keys(listColumns).sort());
   });
 
+  it('lists reviews for the requested owner', async () => {
+    await createReviewWithHeavyFields();
+    const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+
+    try {
+      await listCodeReviews({
+        owner: { type: 'user', id: testUser.id, userId: testUser.id },
+        limit: 50,
+        offset: 0,
+        repoFullName: `${REPO}-narrow-list`,
+      });
+    } finally {
+      logSpy.mockRestore();
+    }
+
+    const listLogs = logSpy.mock.calls.filter(
+      ([first]) => typeof first === 'string' && first.includes('[listCodeReviews]')
+    );
+    expect(listLogs).toEqual([]);
+  });
+
   it('keeps council_result available to the detail getter', async () => {
     const reviewId = await createReviewWithHeavyFields();
 
@@ -2393,5 +2906,646 @@ describe('claimCodeReviewAttemptPublicationOutcome', () => {
       })
     ).resolves.toBe('write_failed');
     await expect(getCodeReviewAttemptPublicationStatus(attemptId)).resolves.toBeNull();
+  });
+});
+
+describe('code review status writes', () => {
+  let testUser: User;
+  const reviewIds: string[] = [];
+
+  beforeAll(async () => {
+    testUser = await insertTestUser();
+  });
+
+  afterEach(async () => {
+    if (reviewIds.length === 0) return;
+    await db
+      .delete(cloud_agent_code_reviews)
+      .where(inArray(cloud_agent_code_reviews.id, reviewIds));
+    reviewIds.length = 0;
+  });
+
+  afterAll(async () => {
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, testUser.id));
+  });
+
+  async function insertReview(overrides: Record<string, unknown> = {}) {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values({
+        owned_by_user_id: testUser.id,
+        repo_full_name: REPO,
+        pr_number: 1,
+        pr_url: `https://github.com/${REPO}/pull/1`,
+        pr_title: 'Test PR',
+        pr_author: 'octocat',
+        base_ref: 'main',
+        head_ref: 'feature/test',
+        head_sha: `sha-${crypto.randomUUID()}`,
+        ...overrides,
+      })
+      .returning({ id: cloud_agent_code_reviews.id });
+    reviewIds.push(review.id);
+    return review.id;
+  }
+
+  async function readReview(reviewId: string) {
+    const stored = await db.query.cloud_agent_code_reviews.findFirst({
+      where: eq(cloud_agent_code_reviews.id, reviewId),
+    });
+    if (!stored) throw new Error('Expected stored review');
+    return stored;
+  }
+
+  it('maps every optional field to its column and stamps started_at for a running review', async () => {
+    const reviewId = await insertReview();
+
+    await updateCodeReviewStatus(reviewId, 'running', {
+      sessionId: 'agent_status_fields',
+      cliSessionId: 'ses_status_fields',
+      errorMessage: 'still going',
+      terminalReason: 'timeout',
+      agentVersion: 'v2',
+      model: 'anthropic/claude-sonnet-4.6',
+      totalTokensIn: 1200,
+      totalTokensOut: 340,
+      totalCostMusd: 5678,
+    });
+
+    const stored = await readReview(reviewId);
+    expect(stored.status).toBe('running');
+    expect(stored.session_id).toBe('agent_status_fields');
+    expect(stored.cli_session_id).toBe('ses_status_fields');
+    expect(stored.error_message).toBe('still going');
+    expect(stored.terminal_reason).toBe('timeout');
+    expect(stored.agent_version).toBe('v2');
+    expect(stored.model).toBe('anthropic/claude-sonnet-4.6');
+    expect(stored.total_tokens_in).toBe(1200);
+    expect(stored.total_tokens_out).toBe(340);
+    expect(stored.total_cost_musd).toBe(5678);
+    expect(stored.started_at).not.toBeNull();
+    expect(stored.completed_at).toBeNull();
+  });
+
+  it('maps the same columns and stamps completed_at for a terminal review', async () => {
+    const reviewId = await insertReview();
+
+    await expect(
+      updateCodeReviewStatusIfNonTerminal(reviewId, 'failed', {
+        sessionId: 'agent_status_failed',
+        cliSessionId: 'ses_status_failed',
+        errorMessage: 'gateway refused',
+        terminalReason: 'upstream_error',
+        agentVersion: 'v2',
+        model: 'openai/gpt-5',
+        totalTokensIn: 10,
+        totalTokensOut: 20,
+        totalCostMusd: 30,
+      })
+    ).resolves.toBe(true);
+
+    const stored = await readReview(reviewId);
+    expect(stored.status).toBe('failed');
+    expect(stored.session_id).toBe('agent_status_failed');
+    expect(stored.cli_session_id).toBe('ses_status_failed');
+    expect(stored.error_message).toBe('gateway refused');
+    expect(stored.terminal_reason).toBe('upstream_error');
+    expect(stored.agent_version).toBe('v2');
+    expect(stored.model).toBe('openai/gpt-5');
+    expect(stored.total_tokens_in).toBe(10);
+    expect(stored.total_tokens_out).toBe(20);
+    expect(stored.total_cost_musd).toBe(30);
+    expect(stored.started_at).toBeNull();
+    expect(stored.completed_at).not.toBeNull();
+  });
+
+  it('keeps caller-supplied timestamps and refuses a write past a terminal status', async () => {
+    const startedAt = new Date('2026-01-02T03:04:05.000Z');
+    const completedAt = new Date('2026-01-02T04:05:06.000Z');
+    const reviewId = await insertReview();
+
+    await updateCodeReviewStatus(reviewId, 'running', { startedAt });
+    await updateCodeReviewStatus(reviewId, 'completed', { completedAt });
+
+    const completed = await readReview(reviewId);
+    expect(new Date(completed.started_at ?? '').toISOString()).toBe(startedAt.toISOString());
+    expect(new Date(completed.completed_at ?? '').toISOString()).toBe(completedAt.toISOString());
+
+    await expect(updateCodeReviewStatusIfNonTerminal(reviewId, 'running')).resolves.toBe(false);
+
+    const unchanged = await readReview(reviewId);
+    expect(unchanged.status).toBe('completed');
+  });
+});
+
+describe('code review usage writes', () => {
+  let testUser: User;
+  const reviewIds: string[] = [];
+
+  beforeAll(async () => {
+    testUser = await insertTestUser();
+  });
+
+  afterEach(async () => {
+    if (reviewIds.length === 0) return;
+    await db
+      .delete(cloud_agent_code_reviews)
+      .where(inArray(cloud_agent_code_reviews.id, reviewIds));
+    reviewIds.length = 0;
+  });
+
+  afterAll(async () => {
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, testUser.id));
+  });
+
+  async function insertReview(overrides: Record<string, unknown> = {}) {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values({
+        owned_by_user_id: testUser.id,
+        repo_full_name: REPO,
+        pr_number: 2,
+        pr_url: `https://github.com/${REPO}/pull/2`,
+        pr_title: 'Test PR',
+        pr_author: 'octocat',
+        base_ref: 'main',
+        head_ref: 'feature/usage',
+        head_sha: `sha-${crypto.randomUUID()}`,
+        ...overrides,
+      })
+      .returning({ id: cloud_agent_code_reviews.id });
+    reviewIds.push(review.id);
+    return review.id;
+  }
+
+  async function readReview(reviewId: string) {
+    const stored = await db.query.cloud_agent_code_reviews.findFirst({
+      where: eq(cloud_agent_code_reviews.id, reviewId),
+    });
+    if (!stored) throw new Error('Expected stored review');
+    return stored;
+  }
+
+  it('records usage once and leaves it unchanged when a second call arrives', async () => {
+    const reviewId = await insertReview();
+
+    await expect(
+      settleCodeReviewUsage(reviewId, {
+        model: 'anthropic/claude-sonnet-4.6',
+        totalTokensIn: 1200,
+        totalTokensOut: 340,
+        totalCostMusd: 56780,
+      })
+    ).resolves.toBe(true);
+
+    const first = await readReview(reviewId);
+    expect(first.model).toBe('anthropic/claude-sonnet-4.6');
+    expect(first.total_tokens_in).toBe(1200);
+    expect(first.total_tokens_out).toBe(340);
+    expect(first.total_cost_musd).toBe(56780);
+
+    await expect(
+      settleCodeReviewUsage(reviewId, {
+        model: 'openai/gpt-5',
+        totalTokensIn: 7,
+        totalTokensOut: 9,
+        totalCostMusd: 11,
+      })
+    ).resolves.toBe(false);
+
+    const unchanged = await readReview(reviewId);
+    expect(unchanged.model).toBe('anthropic/claude-sonnet-4.6');
+    expect(unchanged.total_tokens_in).toBe(1200);
+    expect(unchanged.total_tokens_out).toBe(340);
+    expect(unchanged.total_cost_musd).toBe(56780);
+  });
+
+  it('lets the billing back-fill replace usage that was already recorded', async () => {
+    const reviewId = await insertReview();
+
+    await settleCodeReviewUsage(reviewId, {
+      model: 'anthropic/claude-sonnet-4.6',
+      totalTokensIn: 1200,
+      totalTokensOut: 340,
+      totalCostMusd: 56780,
+    });
+    await backfillCodeReviewUsage(reviewId, {
+      totalTokensIn: 2000,
+      totalTokensOut: 400,
+      totalCostMusd: 90000,
+    });
+
+    const stored = await readReview(reviewId);
+    expect(stored.model).toBe('anthropic/claude-sonnet-4.6');
+    expect(stored.total_tokens_in).toBe(2000);
+    expect(stored.total_tokens_out).toBe(400);
+    expect(stored.total_cost_musd).toBe(90000);
+  });
+
+  it('fills a metered value that an earlier call left out without changing the recorded ones', async () => {
+    const reviewId = await insertReview();
+
+    await expect(
+      settleCodeReviewUsage(reviewId, {
+        model: 'anthropic/claude-sonnet-4.6',
+        totalTokensIn: 1200,
+        totalTokensOut: 340,
+      })
+    ).resolves.toBe(true);
+
+    const partial = await readReview(reviewId);
+    expect(partial.total_tokens_in).toBe(1200);
+    expect(partial.total_tokens_out).toBe(340);
+    expect(partial.total_cost_musd).toBeNull();
+
+    await expect(
+      settleCodeReviewUsage(reviewId, {
+        model: 'openai/gpt-5',
+        totalTokensIn: 9,
+        totalTokensOut: 9,
+        totalCostMusd: 56780,
+      })
+    ).resolves.toBe(true);
+
+    const completed = await readReview(reviewId);
+    expect(completed.model).toBe('anthropic/claude-sonnet-4.6');
+    expect(completed.total_tokens_in).toBe(1200);
+    expect(completed.total_tokens_out).toBe(340);
+    expect(completed.total_cost_musd).toBe(56780);
+
+    await expect(
+      settleCodeReviewUsage(reviewId, {
+        model: 'openai/gpt-5',
+        totalTokensIn: 9,
+        totalTokensOut: 9,
+        totalCostMusd: 1,
+      })
+    ).resolves.toBe(false);
+    const unchanged = await readReview(reviewId);
+    expect(unchanged.total_cost_musd).toBe(56780);
+  });
+
+  it('ignores a call without metered values and records usage when it arrives later', async () => {
+    const reviewId = await insertReview();
+
+    await expect(
+      settleCodeReviewUsage(reviewId, { model: 'anthropic/claude-sonnet-4.6' })
+    ).resolves.toBe(false);
+    const empty = await readReview(reviewId);
+    expect(empty.model).toBeNull();
+    expect(empty.total_tokens_in).toBeNull();
+    expect(empty.total_tokens_out).toBeNull();
+    expect(empty.total_cost_musd).toBeNull();
+
+    await expect(
+      settleCodeReviewUsage(reviewId, {
+        model: 'anthropic/claude-sonnet-4.6',
+        totalTokensIn: 5,
+        totalTokensOut: 6,
+        totalCostMusd: 7,
+      })
+    ).resolves.toBe(true);
+    const stored = await readReview(reviewId);
+    expect(stored.model).toBe('anthropic/claude-sonnet-4.6');
+    expect(stored.total_tokens_in).toBe(5);
+    expect(stored.total_tokens_out).toBe(6);
+    expect(stored.total_cost_musd).toBe(7);
+  });
+
+  it('settles again after a retry reset the review usage', async () => {
+    const reviewId = await insertReview();
+    await settleCodeReviewUsage(reviewId, {
+      model: 'anthropic/claude-sonnet-4.6',
+      totalTokensIn: 1200,
+      totalTokensOut: 340,
+      totalCostMusd: 56780,
+    });
+
+    await updateCodeReviewStatus(reviewId, 'failed');
+    await expect(resetCodeReviewForRetry(reviewId)).resolves.toBe(1);
+    await expect(
+      settleCodeReviewUsage(reviewId, {
+        model: 'openai/gpt-5',
+        totalTokensIn: 10,
+        totalTokensOut: 20,
+        totalCostMusd: 30,
+      })
+    ).resolves.toBe(true);
+
+    const stored = await readReview(reviewId);
+    expect(stored.model).toBe('openai/gpt-5');
+    expect(stored.total_tokens_in).toBe(10);
+    expect(stored.total_tokens_out).toBe(20);
+    expect(stored.total_cost_musd).toBe(30);
+  });
+});
+
+describe('ensureCurrentCodeReviewAttemptFromReview', () => {
+  let testUser: User;
+  const reviewIds: string[] = [];
+
+  beforeAll(async () => {
+    testUser = await insertTestUser();
+  });
+
+  afterEach(async () => {
+    if (reviewIds.length === 0) return;
+    await db
+      .delete(cloud_agent_code_reviews)
+      .where(inArray(cloud_agent_code_reviews.id, reviewIds));
+    reviewIds.length = 0;
+  });
+
+  afterAll(async () => {
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, testUser.id));
+  });
+
+  async function insertReview(overrides: Record<string, unknown> = {}) {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values({
+        owned_by_user_id: testUser.id,
+        repo_full_name: REPO,
+        pr_number: 1,
+        pr_url: `https://github.com/${REPO}/pull/1`,
+        pr_title: 'Test PR',
+        pr_author: 'octocat',
+        base_ref: 'main',
+        head_ref: 'feature/test',
+        head_sha: `sha-${crypto.randomUUID()}`,
+        ...overrides,
+      })
+      .returning();
+    reviewIds.push(review.id);
+    return review;
+  }
+
+  it('mirrors a running review onto a new attempt', async () => {
+    const startedAt = new Date('2026-02-03T04:05:06.000Z');
+    const review = await insertReview({
+      status: 'running',
+      session_id: 'agent_attempt_mirror',
+      cli_session_id: 'ses_attempt_mirror',
+      started_at: startedAt.toISOString(),
+    });
+
+    const attempt = await ensureCurrentCodeReviewAttemptFromReview(review);
+
+    expect(attempt.status).toBe('running');
+    expect(attempt.session_id).toBe('agent_attempt_mirror');
+    expect(attempt.cli_session_id).toBe('ses_attempt_mirror');
+    expect(new Date(attempt.started_at ?? '').toISOString()).toBe(startedAt.toISOString());
+  });
+
+  it('throws instead of copying an unexpected persisted status', async () => {
+    const review = await insertReview({ status: 'not_a_status' });
+
+    await expect(ensureCurrentCodeReviewAttemptFromReview(review)).rejects.toThrow(
+      `Code review ${review.id} has an unexpected persisted status 'not_a_status'`
+    );
+
+    await expect(listCodeReviewAttempts(review.id)).resolves.toEqual([]);
+  });
+
+  it('throws instead of copying an unexpected persisted terminal reason', async () => {
+    const review = await insertReview({
+      status: 'failed',
+      terminal_reason: 'not_a_reason',
+    });
+
+    await expect(ensureCurrentCodeReviewAttemptFromReview(review)).rejects.toThrow(
+      `Code review ${review.id} has an unexpected persisted terminal reason 'not_a_reason'`
+    );
+  });
+});
+
+describe('single review cancel', () => {
+  let testUser: User;
+  const reviewIds: string[] = [];
+
+  beforeAll(async () => {
+    testUser = await insertTestUser();
+  });
+
+  afterEach(async () => {
+    if (reviewIds.length === 0) return;
+    await db
+      .delete(cloud_agent_code_reviews)
+      .where(inArray(cloud_agent_code_reviews.id, reviewIds));
+    reviewIds.length = 0;
+  });
+
+  afterAll(async () => {
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, testUser.id));
+  });
+
+  async function insertReview(overrides: Record<string, unknown> = {}) {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values({
+        owned_by_user_id: testUser.id,
+        repo_full_name: REPO,
+        pr_number: 1,
+        pr_url: `https://github.com/${REPO}/pull/1`,
+        pr_title: 'Test PR',
+        pr_author: 'octocat',
+        base_ref: 'main',
+        head_ref: 'feature/test',
+        head_sha: `sha-${crypto.randomUUID()}`,
+        ...overrides,
+      })
+      .returning({ id: cloud_agent_code_reviews.id });
+    reviewIds.push(review.id);
+    return review.id;
+  }
+
+  async function readReview(reviewId: string) {
+    const stored = await db.query.cloud_agent_code_reviews.findFirst({
+      where: eq(cloud_agent_code_reviews.id, reviewId),
+    });
+    if (!stored) throw new Error('Expected stored review');
+    return stored;
+  }
+
+  it('cancels a queued review, its in-flight attempt and its reservation', async () => {
+    const reviewId = await insertReview({
+      status: 'queued',
+      dispatch_reservation_id: 'reservation-cancelled-locally',
+    });
+    const attempt = await createCodeReviewAttempt({ codeReviewId: reviewId, status: 'running' });
+
+    await expect(cancelCodeReview(reviewId)).resolves.toBe(true);
+
+    const stored = await readReview(reviewId);
+    expect(stored.status).toBe('cancelled');
+    expect(stored.terminal_reason).toBe('user_cancelled');
+    expect(stored.error_message).toBe('Cancelled by user');
+    expect(stored.completed_at).toBeTruthy();
+    expect(stored.dispatch_reservation_id).toBeNull();
+
+    const storedAttempt = await db.query.cloud_agent_code_review_attempts.findFirst({
+      where: eq(cloud_agent_code_review_attempts.id, attempt.id),
+    });
+    expect(storedAttempt?.status).toBe('cancelled');
+    expect(storedAttempt?.terminal_reason).toBe('user_cancelled');
+    expect(storedAttempt?.completed_at).toBeTruthy();
+
+    // Nothing left to move, so a second request reports that it changed no row.
+    await expect(cancelCodeReview(reviewId)).resolves.toBe(false);
+  });
+
+  it('leaves a review that finished first untouched and reports it did not cancel', async () => {
+    const completedAt = '2026-01-02T03:04:05.000Z';
+    const reviewId = await insertReview({
+      status: 'completed',
+      completed_at: completedAt,
+      error_message: 'review finished',
+    });
+
+    await expect(cancelCodeReview(reviewId)).resolves.toBe(false);
+
+    const stored = await readReview(reviewId);
+    expect(stored.status).toBe('completed');
+    expect(stored.error_message).toBe('review finished');
+    expect(stored.terminal_reason).toBeNull();
+    expect(new Date(stored.completed_at ?? '').toISOString()).toBe(completedAt);
+  });
+});
+
+describe('error message normalization', () => {
+  let testUser: User;
+  const reviewIds: string[] = [];
+
+  beforeAll(async () => {
+    testUser = await insertTestUser();
+  });
+
+  afterEach(async () => {
+    if (reviewIds.length === 0) return;
+    await db
+      .delete(cloud_agent_code_reviews)
+      .where(inArray(cloud_agent_code_reviews.id, reviewIds));
+    reviewIds.length = 0;
+  });
+
+  afterAll(async () => {
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, testUser.id));
+  });
+
+  async function insertReview() {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values({
+        owned_by_user_id: testUser.id,
+        repo_full_name: REPO,
+        pr_number: 1,
+        pr_url: `https://github.com/${REPO}/pull/1`,
+        pr_title: 'Test PR',
+        pr_author: 'octocat',
+        base_ref: 'main',
+        head_ref: 'feature/test',
+        head_sha: `sha-${crypto.randomUUID()}`,
+        status: 'running',
+      })
+      .returning({ id: cloud_agent_code_reviews.id });
+    reviewIds.push(review.id);
+    return review.id;
+  }
+
+  it('stores a callback status error message that held a NUL byte', async () => {
+    const reviewId = await insertReview();
+
+    await updateCodeReviewStatusIfNonTerminal(reviewId, 'failed', {
+      errorMessage: 'gateway refused\u0000 after 3 attempts',
+    });
+
+    const stored = await db.query.cloud_agent_code_reviews.findFirst({
+      where: eq(cloud_agent_code_reviews.id, reviewId),
+    });
+    expect(stored?.status).toBe('failed');
+    expect(stored?.error_message).toBe('gateway refused\ufffd after 3 attempts');
+  });
+
+  it('stores a callback attempt error message that held a NUL byte', async () => {
+    const reviewId = await insertReview();
+    const attempt = await createCodeReviewAttempt({ codeReviewId: reviewId, status: 'running' });
+
+    const updated = await updateCodeReviewAttemptForCallback({
+      codeReviewId: reviewId,
+      attemptId: attempt.id,
+      status: 'failed',
+      errorMessage: 'agent exited\u0000 with code 1',
+    });
+
+    expect(updated.error_message).toBe('agent exited\ufffd with code 1');
+  });
+
+  it('stores a NUL byte in an error message that arrives before any attempt exists', async () => {
+    const reviewId = await insertReview();
+
+    const created = await updateCodeReviewAttemptForCallback({
+      codeReviewId: reviewId,
+      status: 'failed',
+      errorMessage: 'agent never started\u0000',
+    });
+
+    expect(created.error_message).toBe('agent never started\ufffd');
+  });
+});
+
+describe('review list paging', () => {
+  let testUser: User;
+  const reviewIds: string[] = [];
+
+  beforeAll(async () => {
+    testUser = await insertTestUser();
+  });
+
+  afterEach(async () => {
+    if (reviewIds.length === 0) return;
+    await db
+      .delete(cloud_agent_code_reviews)
+      .where(inArray(cloud_agent_code_reviews.id, reviewIds));
+    reviewIds.length = 0;
+  });
+
+  afterAll(async () => {
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, testUser.id));
+  });
+
+  it('gives every row one position when reviews share a creation time', async () => {
+    const createdAt = '2026-03-04T05:06:07.000Z';
+    const inserted: string[] = [];
+    for (const prNumber of [1, 2, 3, 4]) {
+      const [review] = await db
+        .insert(cloud_agent_code_reviews)
+        .values({
+          owned_by_user_id: testUser.id,
+          repo_full_name: REPO,
+          pr_number: prNumber,
+          pr_url: `https://github.com/${REPO}/pull/${prNumber}`,
+          pr_title: 'Test PR',
+          pr_author: 'octocat',
+          base_ref: 'main',
+          head_ref: 'feature/test',
+          head_sha: `sha-${crypto.randomUUID()}`,
+          created_at: createdAt,
+        })
+        .returning({ id: cloud_agent_code_reviews.id });
+      reviewIds.push(review.id);
+      inserted.push(review.id);
+    }
+
+    // Equal creation times leave the review id as the only ordering, so the
+    // expected sequence is the ids in ascending order — the order PostgreSQL
+    // uses for the uuid type.
+    const expectedOrder = [...inserted].sort();
+
+    const owner = { type: 'user' as const, id: testUser.id, userId: testUser.id };
+    const firstPage = await listCodeReviews({ owner, limit: 2, offset: 0 });
+    const secondPage = await listCodeReviews({ owner, limit: 2, offset: 2 });
+
+    expect(firstPage.map(row => row.id)).toEqual(expectedOrder.slice(0, 2));
+    expect(secondPage.map(row => row.id)).toEqual(expectedOrder.slice(2));
   });
 });

@@ -4,12 +4,10 @@ import type { Env } from './types.js';
 import { StreamTicketNonceDO } from './persistence/StreamTicketNonceDO.js';
 
 const {
-  getRunningTerminalClientMock,
   consumeCloudAgentReportBatchMock,
   removeExpiredCloudAgentReportDataMock,
   requireCurrentSessionAccessMock,
 } = vi.hoisted(() => ({
-  getRunningTerminalClientMock: vi.fn(),
   consumeCloudAgentReportBatchMock: vi.fn().mockResolvedValue(undefined),
   removeExpiredCloudAgentReportDataMock: vi.fn().mockResolvedValue(undefined),
   requireCurrentSessionAccessMock: vi.fn(),
@@ -33,21 +31,18 @@ vi.mock('./logger.js', () => {
   };
 });
 
-vi.mock('@cloudflare/sandbox', () => ({
-  Sandbox: class Sandbox {},
-  getSandbox: vi.fn(),
-}));
-
-vi.mock('./agent-sandbox/factory.js', () => ({
-  createAgentSandbox: vi.fn(() => ({
-    getRunningTerminalClient: getRunningTerminalClientMock,
-  })),
-}));
-
 vi.mock('cloudflare:workers', () => ({
   DurableObject: class DurableObject {
     constructor(_state: unknown, _env: unknown) {}
   },
+}));
+
+vi.mock('./byoc/vercel-runtime-identity.js', () => ({
+  getVercelRuntimeIdentity: vi.fn().mockResolvedValue({
+    wrapperVersion: 'test-wrapper',
+    releasedAt: '2026-10-24',
+    digest: 'test-runtime-digest',
+  }),
 }));
 
 vi.mock('./router.js', () => ({
@@ -89,10 +84,6 @@ vi.mock('./session-access.js', () => ({
     ),
 }));
 
-vi.mock('./persistence/CloudAgentSession.js', () => ({
-  CloudAgentSession: class CloudAgentSession {},
-}));
-
 vi.mock('@kilocode/db/client', () => ({
   getWorkerDb: () => ({
     select: () => ({
@@ -111,14 +102,10 @@ const secret = 'test-secret';
 
 type MockEnv = {
   NEXTAUTH_SECRET: string;
-  Sandbox: unknown;
-  SandboxSmall: unknown;
+  SandboxContainment: unknown;
+  SandboxSmallContainment: unknown;
   WS_ALLOWED_ORIGINS?: string;
   HYPERDRIVE: { connectionString: string };
-  CLOUD_AGENT_SESSION: {
-    idFromName: ReturnType<typeof vi.fn>;
-    get: ReturnType<typeof vi.fn>;
-  };
   STREAM_TICKET_NONCE_DO: {
     idFromName: ReturnType<typeof vi.fn>;
     get: ReturnType<typeof vi.fn>;
@@ -135,13 +122,9 @@ type MockEnv = {
 function createEnv(): MockEnv {
   return {
     NEXTAUTH_SECRET: secret,
-    Sandbox: {},
-    SandboxSmall: {},
+    SandboxContainment: {},
+    SandboxSmallContainment: {},
     HYPERDRIVE: { connectionString: 'postgres://test' },
-    CLOUD_AGENT_SESSION: {
-      idFromName: vi.fn(),
-      get: vi.fn(),
-    },
     STREAM_TICKET_NONCE_DO: {
       idFromName: vi.fn(),
       get: vi.fn(),
@@ -228,7 +211,7 @@ function signStreamTicket(overrides: Record<string, unknown> = {}): string {
     {
       type: 'stream_ticket',
       userId: 'user-1',
-      cloudAgentSessionId: 'session-1',
+      cloudAgentSessionId: 'workspace_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
       nonce: 'nonce-1',
       ...overrides,
     },
@@ -239,7 +222,7 @@ function signStreamTicket(overrides: Record<string, unknown> = {}): string {
 
 function streamRequest(ticket: string): Request {
   return new Request(
-    `http://worker.test/stream?cloudAgentSessionId=session-1&ticket=${encodeURIComponent(ticket)}`,
+    `http://worker.test/stream?cloudAgentSessionId=workspace_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa&ticket=${encodeURIComponent(ticket)}`,
     { headers: { Upgrade: 'websocket' } }
   );
 }
@@ -250,7 +233,7 @@ function signTerminalTicket(overrides: Record<string, unknown> = {}): string {
       type: 'stream_ticket',
       purpose: 'terminal',
       userId: 'user-1',
-      cloudAgentSessionId: 'session-1',
+      cloudAgentSessionId: 'workspace_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
       ptyId: 'pty-1',
       nonce: 'nonce-1',
       ...overrides,
@@ -268,7 +251,6 @@ function terminalRequest(ticket: string, sessionId = 'session-1'): Request {
 }
 
 beforeEach(() => {
-  getRunningTerminalClientMock.mockReset();
   consumeCloudAgentReportBatchMock.mockClear();
   removeExpiredCloudAgentReportDataMock.mockClear();
   requireCurrentSessionAccessMock.mockReset().mockResolvedValue({
@@ -314,7 +296,6 @@ describe('server /stream ticket nonce consume', () => {
     const url = new URL(request.url);
     url.searchParams.set('sandboxStatus', 'true');
     expect((await fetchWorker(new Request(url, request), env)).status).toBe(403);
-    expect(env.CLOUD_AGENT_SESSION.get).not.toHaveBeenCalled();
     expect(env.SANDBOX_SESSION.get).not.toHaveBeenCalled();
     expect(env.STREAM_TICKET_NONCE_DO.get).not.toHaveBeenCalled();
   });
@@ -323,15 +304,17 @@ describe('server /stream ticket nonce consume', () => {
     const env = createEnv();
     installNonceStore(env);
     const doFetch = vi.fn().mockResolvedValue(new Response('ok', { status: 200 }));
-    env.CLOUD_AGENT_SESSION.idFromName.mockReturnValue('session-do-id');
-    env.CLOUD_AGENT_SESSION.get.mockReturnValue({ fetch: doFetch });
+    env.SANDBOX_SESSION.idFromName.mockReturnValue('session-do-id');
+    env.SANDBOX_SESSION.get.mockReturnValue({ fetch: doFetch });
     const ticket = signStreamTicket();
 
     const response = await fetchWorker(streamRequest(ticket), env);
 
     expect(response.status).toBe(200);
     expect(env.STREAM_TICKET_NONCE_DO.idFromName).toHaveBeenCalledWith('nonce-1');
-    expect(env.CLOUD_AGENT_SESSION.idFromName).toHaveBeenCalledWith('user-1:session-1');
+    expect(env.SANDBOX_SESSION.idFromName).toHaveBeenCalledWith(
+      'user-1:workspace_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+    );
     expect(doFetch).toHaveBeenCalledOnce();
   });
 
@@ -357,16 +340,36 @@ describe('server /stream ticket nonce consume', () => {
 
     expect(response.status).toBe(200);
     expect(env.SANDBOX_SESSION.idFromName).toHaveBeenCalledWith(`user-1:${sessionId}`);
-    expect(env.CLOUD_AGENT_SESSION.idFromName).not.toHaveBeenCalled();
     expect(doFetch).toHaveBeenCalledOnce();
+  });
+
+  it('rejects an agent_ session before resolving the control-plane Durable Object', async () => {
+    const env = createEnv();
+    installNonceStore(env);
+    const ticket = signStreamTicket({
+      cloudAgentSessionId: 'agent_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+    });
+
+    const response = await fetchWorker(
+      new Request(
+        `http://worker.test/stream?cloudAgentSessionId=agent_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa&ticket=${encodeURIComponent(ticket)}`,
+        { headers: { Upgrade: 'websocket' } }
+      ),
+      env
+    );
+
+    expect(response.status).toBe(404);
+    await expect(response.text()).resolves.toBe('Not found');
+    expect(env.SANDBOX_SESSION.idFromName).not.toHaveBeenCalled();
+    expect(env.STREAM_TICKET_NONCE_DO.get).not.toHaveBeenCalled();
   });
 
   it('rejects an immediate replay of the same nonce on the worker path', async () => {
     const env = createEnv();
     installNonceStore(env);
     const doFetch = vi.fn().mockResolvedValue(new Response('ok', { status: 200 }));
-    env.CLOUD_AGENT_SESSION.idFromName.mockReturnValue('session-do-id');
-    env.CLOUD_AGENT_SESSION.get.mockReturnValue({ fetch: doFetch });
+    env.SANDBOX_SESSION.idFromName.mockReturnValue('session-do-id');
+    env.SANDBOX_SESSION.get.mockReturnValue({ fetch: doFetch });
     const ticket = signStreamTicket();
 
     const first = await fetchWorker(streamRequest(ticket), env);
@@ -386,7 +389,7 @@ describe('server /stream ticket nonce consume', () => {
         type: 'stream_ticket',
         purpose: 'terminal',
         userId: 'user-1',
-        cloudAgentSessionId: 'session-1',
+        cloudAgentSessionId: 'workspace_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
         nonce: 'nonce-1',
       },
       secret,
@@ -397,7 +400,7 @@ describe('server /stream ticket nonce consume', () => {
 
     expect(response.status).toBe(401);
     await expect(response.text()).resolves.toBe('Invalid ticket audience');
-    expect(env.CLOUD_AGENT_SESSION.idFromName).not.toHaveBeenCalled();
+    expect(env.SANDBOX_SESSION.idFromName).not.toHaveBeenCalled();
     expect(env.STREAM_TICKET_NONCE_DO.idFromName).not.toHaveBeenCalled();
   });
 
@@ -405,8 +408,8 @@ describe('server /stream ticket nonce consume', () => {
     const env = createEnv();
     installNonceStore(env);
     const doFetch = vi.fn();
-    env.CLOUD_AGENT_SESSION.idFromName.mockReturnValue('session-do-id');
-    env.CLOUD_AGENT_SESSION.get.mockReturnValue({ fetch: doFetch });
+    env.SANDBOX_SESSION.idFromName.mockReturnValue('session-do-id');
+    env.SANDBOX_SESSION.get.mockReturnValue({ fetch: doFetch });
     const ticket = signStreamTicket({ nonce: undefined });
 
     const response = await fetchWorker(streamRequest(ticket), env);
@@ -419,44 +422,6 @@ describe('server /stream ticket nonce consume', () => {
 });
 
 describe('server /terminal ticket nonce consume', () => {
-  it('rejects an immediate replay of the same nonce on the terminal path', async () => {
-    const env = createEnv();
-    installNonceStore(env);
-
-    const connectTerminal = vi.fn().mockResolvedValue(new Response('ok', { status: 200 }));
-    getRunningTerminalClientMock.mockResolvedValue({
-      status: 'running',
-      client: { connectTerminal },
-    });
-
-    env.CLOUD_AGENT_SESSION.idFromName.mockReturnValue('session-do-id');
-    env.CLOUD_AGENT_SESSION.get.mockReturnValue({
-      isRuntimeAuthorizationRecoveryInProgress: vi.fn().mockResolvedValue(false),
-      getMetadata: vi.fn().mockResolvedValue({
-        metadataSchemaVersion: 2,
-        identity: {
-          sessionId: 'session-1',
-          userId: 'user-1',
-          createdOnPlatform: 'cloud-agent',
-        },
-        auth: {},
-        lifecycle: { version: 1, timestamp: Date.now(), preparedAt: Date.now() },
-        workspace: { workspacePath: '/workspace' },
-      }),
-    });
-
-    const ticket = signTerminalTicket();
-
-    const first = await fetchWorker(terminalRequest(ticket), env);
-    expect(first.status).toBe(200);
-    expect(connectTerminal).toHaveBeenCalledOnce();
-
-    const replay = await fetchWorker(terminalRequest(ticket), env);
-    expect(replay.status).toBe(401);
-    await expect(replay.text()).resolves.toBe('Ticket nonce already used');
-    expect(connectTerminal).toHaveBeenCalledTimes(1);
-  });
-
   it('consumes a control-plane terminal nonce exactly once before forwarding the browser upgrade', async () => {
     const sessionId = 'workspace_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
     const env = createEnv();
@@ -523,8 +488,8 @@ describe('server stream ticket nonce expiry pass-through', () => {
     env.STREAM_TICKET_NONCE_DO.idFromName.mockReturnValue('nonce-do-id');
     env.STREAM_TICKET_NONCE_DO.get.mockReturnValue({ consume });
     const doFetch = vi.fn().mockResolvedValue(new Response('ok', { status: 200 }));
-    env.CLOUD_AGENT_SESSION.idFromName.mockReturnValue('session-do-id');
-    env.CLOUD_AGENT_SESSION.get.mockReturnValue({ fetch: doFetch });
+    env.SANDBOX_SESSION.idFromName.mockReturnValue('session-do-id');
+    env.SANDBOX_SESSION.get.mockReturnValue({ fetch: doFetch });
     const ticket = signStreamTicket();
 
     const response = await fetchWorker(streamRequest(ticket), env);

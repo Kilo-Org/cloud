@@ -16,8 +16,8 @@ import {
   addUserToOrganization,
   getOrganizationMembers,
   getOrganizationById,
-  isOrganizationMember,
 } from '@kilocode/web-shared/lib/organizations/organizations';
+import { isOrganizationMember } from '@kilocode/worker-utils/account-access';
 import { resolveEffectiveOrganizationSsoPolicy } from '@kilocode/web-shared/lib/organizations/organization-sso-policy';
 import { getLowerDomainFromEmail } from '@kilocode/web-shared/lib/email-address';
 import {
@@ -36,11 +36,7 @@ import {
 } from '@kilocode/web-shared/lib/email';
 import { IS_IN_AUTOMATED_TEST } from '@kilocode/web-shared/lib/config.server';
 import type { OrganizationPlan } from '@kilocode/web-shared/lib/organizations/organization-types';
-import {
-  OrganizationPlanSchema,
-  billingCycleFromStripeInterval,
-  billingCycleToDb,
-} from '@kilocode/web-shared/lib/organizations/organization-types';
+import { OrganizationPlanSchema } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { client as stripeClient } from '@kilocode/web-shared/lib/stripe-client';
 import { isSeatLineItem } from '@kilocode/web-shared/lib/organizations/stripe-seat-line-items';
 import { bumpOrganizationGroupPolicyRevision } from '@kilocode/web-shared/lib/organizations/organization-groups';
@@ -235,8 +231,10 @@ async function handleSubscriptionEventInternal(
   const billingCycleItem = paidLineItem ?? firstSeatLineItem;
   const stripeInterval = billingCycleItem.price?.recurring?.interval;
   let billingCycleDb: 'monthly' | 'yearly';
-  if (stripeInterval === 'month' || stripeInterval === 'year') {
-    billingCycleDb = billingCycleToDb(billingCycleFromStripeInterval(stripeInterval));
+  if (stripeInterval === 'year') {
+    billingCycleDb = 'yearly';
+  } else if (stripeInterval === 'month') {
+    billingCycleDb = 'monthly';
   } else {
     billingCycleDb = 'monthly';
     sentryError(
@@ -265,7 +263,7 @@ async function handleSubscriptionEventInternal(
       logExceptInTest(
         `Skipping membership for removed user ${meta.kiloUserId} in org ${meta.organizationId} (Subscription Lifecycle 2)`
       );
-    } else if (!(await isOrganizationMember(meta.organizationId, meta.kiloUserId))) {
+    } else if (!(await isOrganizationMember(db, meta.organizationId, meta.kiloUserId))) {
       const ssoPolicy = await resolveEffectiveOrganizationSsoPolicy(meta.organizationId);
       const metadataUserDomain = getLowerDomainFromEmail(metadataUser.google_user_email);
       const protectedHuman =

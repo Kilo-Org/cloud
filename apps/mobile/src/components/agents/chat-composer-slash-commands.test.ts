@@ -390,13 +390,14 @@ describe('getSlashCommandDescription', () => {
   });
 
   it('resolves a built-in entry that reports the catalog source string', () => {
+    const sourceDescription = en.agentChat.slashCommands.goalDescription;
     expect(
       getSlashCommandDescription({
         name: 'goal',
-        description: en.agentChat.slashCommands.goalDescription,
+        description: sourceDescription,
         hints: [],
       })
-    ).toBe('Keep working toward a session goal. /goal <objective> or pause, resume, clear');
+    ).toBe(sourceDescription);
   });
 
   it('resolves every built-in command name that reports the catalog source string', () => {

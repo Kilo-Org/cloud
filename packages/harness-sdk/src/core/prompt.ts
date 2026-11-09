@@ -80,10 +80,9 @@ const textIn = (message: PromptMessage): string =>
     .map(part => part.text)
     .join('');
 
-class PromptAssembler extends Context.Tag('harness/PromptAssembler')<
-  PromptAssembler,
-  PromptAssemblerService
->() {}
+class PromptAssembler extends Context.Service<PromptAssembler, PromptAssemblerService>()(
+  'harness/PromptAssembler'
+) {}
 
 export type { Prompt, PromptAssemblerService, PromptBlock, PromptInput, PromptMessage, PromptPart };
 export { PromptAssembler, textIn };

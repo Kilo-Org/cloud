@@ -26,9 +26,32 @@ jest.mock('@/components/ui/tooltip', () => {
   const passthrough = ({ children }: { children?: ReactNode }) =>
     react.createElement(react.Fragment, null, children);
   return {
-    Tooltip: passthrough,
+    Tooltip: jest.fn(passthrough),
     TooltipTrigger: passthrough,
-    TooltipContent: passthrough,
+    TooltipContent: ({
+      children,
+      className,
+      side,
+      align,
+      sideOffset,
+    }: {
+      children?: ReactNode;
+      className?: string;
+      side?: string;
+      align?: string;
+      sideOffset?: number;
+    }) =>
+      react.createElement(
+        'div',
+        {
+          role: 'tooltip',
+          className,
+          'data-side': side,
+          'data-align': align,
+          'data-offset': sideOffset,
+        },
+        children
+      ),
     TooltipProvider: passthrough,
   };
 });
@@ -72,11 +95,13 @@ jest.mock('./SessionPrIndicator', () => ({
 
 import { ChatSidebar } from './ChatSidebar';
 import { SessionPrIndicator } from './SessionPrIndicator';
+import { Tooltip } from '@/components/ui/tooltip';
 
 type ChatSidebarProps = React.ComponentProps<typeof ChatSidebar>;
 
 const SESSION_COUNT = 200;
 const indicatorMock = jest.mocked(SessionPrIndicator);
+const tooltipMock = jest.mocked(Tooltip);
 
 jest.setTimeout(30_000);
 
@@ -174,12 +199,19 @@ function replaceSession(
   return sessions.map((session, i) => (i === index ? { ...session, ...overrides } : session));
 }
 
-function activeSession(session: StoredSession, status = 'idle') {
+function activeSession(
+  session: StoredSession,
+  status = 'idle',
+  organizationId: string | null = null
+) {
   return {
     id: session.sessionId,
     status,
     title: session.prompt,
     connectionId: 'test-connection',
+    // The router attributes every row it returns; `null` is the personal
+    // scope, and the sidebar filters live rows by it.
+    organizationId,
   };
 }
 
@@ -201,6 +233,7 @@ describe('ChatSidebar row rendering', () => {
     mockPathname = '/cloud';
     mockRouterPush.mockClear();
     indicatorMock.mockClear();
+    tooltipMock.mockClear();
     root = createRoot(dom.container);
   });
 
@@ -214,6 +247,306 @@ describe('ChatSidebar row rendering', () => {
       root.render(React.createElement(ChatSidebar, props));
     });
   }
+
+  it('does not flash an empty state while the session list loads', () => {
+    renderSidebar({ isLoading: true });
+    expect(dom.container.querySelector('[role="status"]')?.getAttribute('aria-label')).toBe(
+      'Loading sessions'
+    );
+    expect(dom.container.textContent).not.toContain('No sessions yet');
+    renderSidebar({ isLoading: false });
+    expect(dom.container.textContent).toContain('No sessions yet');
+  });
+
+  it('keeps one skeleton until sessions, names and folders are ready together', () => {
+    const session = makeSession(0, { worktreeId: 'worktree_ready' });
+    renderSidebar({ sessions: [session], isLoading: true });
+    expect(dom.container.querySelector('[aria-label="Loading sessions"]')).not.toBeNull();
+    expect(dom.container.querySelector('[data-worktree-id="worktree_ready"]')).toBeNull();
+
+    renderSidebar({ sessions: [session] });
+    expect(dom.container.querySelector('[aria-label="Loading sessions"]')).toBeNull();
+    expect(dom.container.querySelector('[data-worktree-id="worktree_ready"]')).not.toBeNull();
+  });
+
+  it('shows the full workspace title above the row, away from the sibling PR badge', () => {
+    const session = makeSession(0, {
+      worktreeId: 'worktree_tooltip',
+      associatedPr: {
+        url: 'https://github.com/kilo/repository/pull/42',
+        number: 42,
+        state: 'open',
+        title: 'Fix sidebar tooltips',
+        headSha: null,
+        lastSyncedAt: new Date().toISOString(),
+        reviewDecision: null,
+        reviewDecisionPending: false,
+        platform: 'github',
+        observations: null,
+      },
+    });
+    const title = 'Cloud Agent sidebar session titles should remain readable when truncated';
+    const onOpenSession = jest.fn();
+    renderSidebar({
+      sessions: [session],
+      onOpenSession,
+      worktreeDetails: {
+        worktree_tooltip: { name: title, defaultTitle: null, prSession: session, sessions: [] },
+      },
+    });
+
+    const row = dom.container.querySelector('[data-worktree-id="worktree_tooltip"]');
+    const tooltip = row?.querySelector('[role="tooltip"]');
+    expect(tooltipMock.mock.calls.map(([props]) => props.delayDuration)).toContain(400);
+    expect(tooltip?.textContent).toBe(title);
+    expect(tooltip?.className).toContain('max-w-xs');
+    expect(tooltip?.className).toContain('break-words');
+    expect(tooltip?.getAttribute('data-side')).toBe('top');
+    expect(tooltip?.getAttribute('data-align')).toBe('start');
+    expect(tooltip?.getAttribute('data-offset')).toBe('8');
+
+    const button = row?.querySelector<HTMLButtonElement>(
+      `button[aria-label="Open worktree ${title}"]`
+    );
+    expect(button?.querySelector('.line-clamp-1')?.textContent).toBe(title);
+    expect(row?.querySelector('[data-session-pr="ses_000"]')).not.toBeNull();
+    expect(button?.querySelector('[data-session-pr]')).toBeNull();
+    act(() => button?.click());
+    expect(onOpenSession).toHaveBeenCalledWith(session.sessionId);
+
+    renderSidebar({ sessions: [session] });
+    expect(row?.querySelector('[role="tooltip"]')?.textContent).toBe(session.repository);
+  });
+
+  it('lets the owner choose which chat a worktree opens, newest first', () => {
+    const older = makeSession(2, { worktreeId: 'worktree_choice' });
+    const newer = makeSession(1, { worktreeId: 'worktree_choice' });
+    const onOpenSession = jest.fn();
+    const onOpenWorktree = jest.fn();
+    const onMobileSheetOpenChange = jest.fn();
+    renderSidebar({
+      sessions: [older, newer],
+      onOpenSession,
+      onOpenWorktree,
+      onMobileSheetOpenChange,
+    });
+
+    act(() =>
+      dom.container
+        .querySelector<HTMLButtonElement>(
+          '[data-worktree-id="worktree_choice"] button[aria-label^="Open worktree"]'
+        )
+        ?.click()
+    );
+
+    expect(onOpenWorktree).toHaveBeenCalledWith('worktree_choice', [
+      newer.sessionId,
+      older.sessionId,
+    ]);
+    expect(onOpenSession).not.toHaveBeenCalled();
+    expect(onMobileSheetOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it('waits for the worktree name instead of flashing a repository label', () => {
+    const session = makeSession(0, { worktreeId: 'worktree_loading' });
+    renderSidebar({ sessions: [session], loadingWorktreeIds: ['worktree_loading'] });
+    const row = dom.container.querySelector('[data-worktree-id="worktree_loading"]');
+    expect(row?.querySelector('[role="tooltip"]')).toBeNull();
+    expect(row?.textContent).not.toContain(session.repository);
+    expect(
+      row?.querySelector('button[aria-label="Open worktree Loading worktree…"]')
+    ).not.toBeNull();
+    renderSidebar({
+      sessions: [session],
+      worktreeDetails: {
+        worktree_loading: {
+          name: 'Stable workspace title',
+          defaultTitle: null,
+          prSession: null,
+          sessions: [],
+        },
+      },
+    });
+    expect(
+      dom.container.querySelector('[data-worktree-id="worktree_loading"]')?.textContent
+    ).toContain('Stable workspace title');
+    // A metadata failure must leave the row usable with its repository fallback.
+    renderSidebar({ sessions: [session] });
+    expect(
+      dom.container.querySelector('[data-worktree-id="worktree_loading"]')?.textContent
+    ).toContain(session.repository);
+  });
+
+  it.each([
+    ['failed', 'Last run failed'],
+    ['system_interrupted', 'Last run stopped unexpectedly'],
+  ] as const)(
+    'renders an accessible standalone %s warning instead of its timestamp',
+    (latestRunFailureKind, label) => {
+      const session = makeSession(0, { sessionStatus: 'idle', latestRunFailureKind });
+      renderSidebar({ sessions: [session], activeSessions: [activeSession(session)] });
+
+      const row = rowElement(session.sessionId);
+      const warning = row.querySelector(`[role="img"][aria-label="${label}"]`);
+      expect(warning).not.toBeNull();
+      expect(warning?.getAttribute('title')).toBe(label);
+      expect(warning?.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true');
+      expect(row.querySelector('[data-time-ago]')).toBeNull();
+    }
+  );
+
+  it.each(['busy', 'retry', 'question', 'permission'])(
+    'renders standalone %s activity instead of the previous failure',
+    sessionStatus => {
+      const session = makeSession(0, { sessionStatus, latestRunFailureKind: 'failed' });
+      renderSidebar({ sessions: [session] });
+
+      const row = rowElement(session.sessionId);
+      expect(row.querySelector('[aria-label="Last run failed"]')).toBeNull();
+      expect(row.querySelector('[data-time-ago]')).toBeNull();
+      if (sessionStatus === 'busy' || sessionStatus === 'retry') {
+        expect(row.innerHTML).toContain(
+          sessionStatus === 'busy' ? '<title>Busy</title>' : '<title>Retrying</title>'
+        );
+      } else {
+        const label =
+          sessionStatus === 'question' ? 'Waiting for answer' : 'Waiting for permission';
+        expect(row.querySelector(`[aria-label="${label}"]`)).not.toBeNull();
+      }
+    }
+  );
+
+  it('clears the standalone warning on a new run and restores the timestamp after success', () => {
+    const session = makeSession(0, { sessionStatus: 'idle', latestRunFailureKind: 'failed' });
+    renderSidebar({ sessions: [session] });
+    expect(
+      rowElement(session.sessionId).querySelector('[aria-label="Last run failed"]')
+    ).not.toBeNull();
+
+    renderSidebar({
+      sessions: [{ ...session, sessionStatus: 'busy', latestRunFailureKind: null }],
+    });
+    expect(
+      rowElement(session.sessionId).querySelector('[aria-label="Last run failed"]')
+    ).toBeNull();
+    expect(rowElement(session.sessionId).innerHTML).toContain('<title>Busy</title>');
+
+    renderSidebar({ sessions: [{ ...session, latestRunFailureKind: null }] });
+    expect(rowElement(session.sessionId).querySelector('[role="img"]')).toBeNull();
+    expect(rowElement(session.sessionId).querySelector('[data-time-ago]')).not.toBeNull();
+  });
+
+  it.each([
+    ['failed', 'Last run failed'],
+    ['system_interrupted', 'Last run stopped unexpectedly'],
+  ] as const)(
+    'shows a %s warning during search only when the latest sibling has issues',
+    (latestRunFailureKind, label) => {
+      const visible = makeSession(0, { worktreeId: 'worktree_shared', sessionStatus: 'idle' });
+      const hidden = makeSession(1, {
+        worktreeId: 'worktree_shared',
+        sessionStatus: 'idle',
+        latestRunFailureKind,
+      });
+      const props = {
+        sessions: [visible],
+        searchQuery: visible.prompt,
+        worktreeDetails: {
+          worktree_shared: {
+            name: 'Shared worktree',
+            defaultTitle: null,
+            prSession: null,
+            sessions: [visible, hidden],
+          },
+        },
+      } satisfies Partial<ChatSidebarProps>;
+      renderSidebar(props);
+
+      const row = dom.container.querySelector('[data-worktree-id="worktree_shared"]');
+      expect(row).not.toBeNull();
+      expect(row?.querySelector(`[role="img"][aria-label="${label}"]`)).toBeNull();
+      expect(row?.querySelector('[data-time-ago]')).not.toBeNull();
+      expect(row?.textContent).not.toContain(hidden.prompt);
+      expect(dom.container.querySelector(`[data-session-pr="${hidden.sessionId}"]`)).toBeNull();
+
+      renderSidebar({ ...props, activeSessions: [activeSession(hidden)] });
+      expect(row?.querySelector(`[role="img"][aria-label="${label}"]`)).toBeNull();
+
+      const latest = {
+        ...hidden,
+        updatedAt: new Date(new Date(visible.updatedAt).getTime() + 1_000).toISOString(),
+      };
+      renderSidebar({
+        ...props,
+        worktreeDetails: {
+          worktree_shared: {
+            ...props.worktreeDetails.worktree_shared,
+            sessions: [visible, latest],
+          },
+        },
+      });
+      expect(row?.querySelector(`[role="img"][aria-label="${label}"]`)).not.toBeNull();
+      expect(row?.querySelector('[data-time-ago]')).toBeNull();
+
+      renderSidebar({
+        ...props,
+        worktreeDetails: {
+          worktree_shared: {
+            ...props.worktreeDetails.worktree_shared,
+            sessions: [visible, { ...latest, latestRunFailureKind: null }],
+          },
+        },
+      });
+      expect(dom.container.querySelector(`[aria-label="${label}"]`)).toBeNull();
+      expect(row?.querySelector('[data-time-ago]')).not.toBeNull();
+    }
+  );
+
+  it.each(['busy', 'retry', 'question', 'permission'])(
+    'renders grouped %s activity ahead of a hidden failed sibling',
+    status => {
+      const visible = makeSession(0, { worktreeId: 'worktree_shared' });
+      const hidden = makeSession(1, { sessionStatus: 'idle', latestRunFailureKind: 'failed' });
+      renderSidebar({
+        sessions: [visible],
+        foregroundSession: { sessionId: visible.sessionId, status },
+        worktreeDetails: {
+          worktree_shared: {
+            name: 'Shared worktree',
+            defaultTitle: null,
+            prSession: null,
+            sessions: [visible, hidden],
+          },
+        },
+      });
+
+      const row = dom.container.querySelector('[data-worktree-id="worktree_shared"]');
+      expect(row?.querySelector('[aria-label="Last run failed"]')).toBeNull();
+      if (status === 'busy' || status === 'retry') {
+        expect(row?.innerHTML).toContain(
+          status === 'busy' ? '<title>Busy</title>' : '<title>Retrying</title>'
+        );
+      } else {
+        const label = status === 'question' ? 'Waiting for answer' : 'Waiting for permission';
+        expect(row?.querySelector(`[aria-label="${label}"]`)).not.toBeNull();
+      }
+    }
+  );
+
+  it('does not render warnings for normal interruptions in standalone or grouped rows', () => {
+    renderSidebar({
+      sessions: [
+        makeSession(0, { sessionStatus: 'idle', latestRunFailureKind: null }),
+        makeSession(1, {
+          sessionStatus: 'idle',
+          latestRunFailureKind: null,
+          worktreeId: 'worktree_shared',
+        }),
+      ],
+    });
+    expect(dom.container.querySelector('[role="img"]')).toBeNull();
+    expect(dom.container.querySelectorAll('[data-time-ago]')).toHaveLength(2);
+  });
 
   function rowElement(sessionId: string): HTMLElement {
     let node: Element | null = dom.container.querySelector(`[data-session-pr="${sessionId}"]`);
@@ -281,6 +614,7 @@ describe('ChatSidebar row rendering', () => {
         { id: ids[0], name: 'Product', color: 'blue' as const, worktreeIds: [] as string[] },
       ],
       isLoading: false,
+      isFirstLoadPending: false,
       isError: false,
       isSaving: false,
       collapsedFolderIds: [],
@@ -289,6 +623,7 @@ describe('ChatSidebar row rendering', () => {
       setFolderColor: jest.fn(async () => true),
       deleteFolder: jest.fn(async () => true),
       moveWorktree: jest.fn(async () => false),
+      moveSession: jest.fn(async () => false),
       reorderFolders: jest.fn(async () => true),
       refresh: jest.fn(async () => undefined),
     } satisfies NonNullable<ChatSidebarProps['workspaceFolders']>;
@@ -370,8 +705,50 @@ describe('ChatSidebar row rendering', () => {
     expect(workspaceFolders.reorderFolders).not.toHaveBeenCalled();
   });
 
+  it('drags a standalone ses_ row by its cloud workspace id', () => {
+    const { sessions, workspaceFolders, dataTransfer, dragEvent } = folderDragFixture();
+    const workspaceId = 'workspace_99999999-9999-4999-8999-999999999999';
+    const standalone = makeSession(3, {
+      prompt: 'Standalone cloud chat',
+      cloudAgentSessionId: workspaceId,
+    });
+    renderSidebar({ sessions: [...sessions, standalone], workspaceFolders });
+    const row = Array.from(dom.container.querySelectorAll<HTMLElement>('[draggable="true"]')).find(
+      element => element.textContent?.includes(standalone.prompt)
+    );
+    const folder = dom.container.querySelector('[data-folder-id]');
+    if (!row || !folder) throw new Error('Drag source or target missing');
+    row.getBoundingClientRect = () => ({ left: 10, top: 20, width: 200, height: 36 }) as DOMRect;
+
+    dragEvent(row, 'dragstart');
+    expect(dataTransfer.setData).toHaveBeenCalledWith(
+      'application/x-kilo-workspace-folder',
+      JSON.stringify({ type: 'session', id: workspaceId })
+    );
+    expect(dom.container.querySelectorAll('.opacity-50')).toHaveLength(1);
+
+    dragEvent(folder, 'dragover');
+    dragEvent(folder, 'drop');
+
+    expect(workspaceFolders.moveSession).toHaveBeenCalledTimes(1);
+    expect(workspaceFolders.moveSession).toHaveBeenCalledWith(
+      workspaceId,
+      workspaceFolders.folders[0].id
+    );
+    expect(workspaceFolders.moveSession).not.toHaveBeenCalledWith(
+      standalone.sessionId,
+      expect.anything()
+    );
+    expect(dom.container.querySelectorAll('.opacity-50')).toHaveLength(0);
+  });
+
   it('keeps immutable standalone rows flat when live inputs churn with stable callbacks', () => {
-    const sessions = makeSessions(SESSION_COUNT);
+    // Every row carries a cloud id so the drag props are defined; otherwise a
+    // per-row onDragStart identity leak would go unnoticed by this test.
+    const sessions = makeSessions(SESSION_COUNT).map((session, index) => ({
+      ...session,
+      cloudAgentSessionId: `workspace_00000000-0000-4000-8000-${index.toString().padStart(12, '0')}`,
+    }));
     const onOpenSession = jest.fn();
     const onDeleteSession = jest.fn();
     const onRenameSession = jest.fn(async () => undefined);
@@ -500,6 +877,26 @@ describe('ChatSidebar row rendering', () => {
       candidate => candidate.textContent === longTitle
     );
     expect(remoteTitle?.getAttribute('title')).toBe(longTitle);
+  });
+
+  it('scopes live rows to the organization the sidebar is showing', () => {
+    const sessions = makeSessions(2);
+    const personal = activeSession(sessions[0]!);
+    const organization = activeSession(sessions[1]!, 'idle', 'org-1');
+
+    // Personal view (no organization prop) keeps the personal row and leaves
+    // the organization row to the stored list.
+    renderSidebar({ sessions: [], activeSessions: [personal, organization] });
+    expect(dom.container.textContent).toContain(sessions[0]!.prompt);
+    expect(dom.container.textContent).not.toContain(sessions[1]!.prompt);
+
+    renderSidebar({
+      sessions: [],
+      organizationId: 'org-1',
+      activeSessions: [personal, organization],
+    });
+    expect(dom.container.textContent).toContain(sessions[1]!.prompt);
+    expect(dom.container.textContent).not.toContain(sessions[0]!.prompt);
   });
 
   it('updates the visible status of a live row without touching its siblings', () => {

@@ -79,6 +79,7 @@ beforeEach(() => {
       entries,
       observedAt: Date.now(),
       generation: 0,
+      customLlmIds: new Set(['acme/stats-slug']),
     }));
 });
 afterEach(() => {
@@ -183,7 +184,7 @@ describe('GET /api/models/stats/[slug]', () => {
     { isStealth: true },
     { isActive: false },
     { isActive: null },
-    { openrouterId: 'kilo-internal/stats-slug' },
+    { openrouterId: 'acme/stats-slug' },
     { benchmarks: { ...siblings, enkrypt: { ...benchmark, ingestedAt: 'invalid' } } },
     {
       benchmarks: {

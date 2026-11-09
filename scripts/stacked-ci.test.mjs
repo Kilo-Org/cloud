@@ -8,7 +8,25 @@ import { load } from 'js-yaml';
 const rootPath = '.github/workflows/ci.yml';
 const mobilePath = '.github/workflows/kilo-app-ci.yml';
 const checkPath = 'scripts/stacked-ci.test.mjs';
-const command = `node --test ${checkPath}`;
+// ci-wiring runs the wiring suites in one `node --test` invocation. The exact
+// command is pinned here, so splitting the suite back into per-file steps, or
+// dropping or reordering a suite, fails this validation.
+const wiringSuites = [
+  checkPath,
+  'scripts/changed-dependencies.test.mjs',
+  'scripts/build-key-inputs.test.mjs',
+  'scripts/ttsc-plugin-key.test.mjs',
+  'scripts/affected-workspaces.test.mjs',
+  'scripts/changed-workspaces.test.mjs',
+  'scripts/changes-filter-retry.test.mjs',
+  'scripts/typecheck-ci.test.mjs',
+  'scripts/deployment-workflows.test.mjs',
+  'scripts/main-workflow-failure.test.mjs',
+  'scripts/production-deploy-failure.test.mjs',
+  'scripts/meta-janitor-approve.test.mjs',
+  'scripts/mobile-sbom-workflow.test.mjs',
+];
+const command = `node --test ${wiringSuites.join(' ')}`;
 // The path families the mobile change-detection grep must recognise. The PR
 // admission and the `push` trigger carry no filter, so this grep is the only
 // thing that gates the suite; a dropped or mistyped family silently reports
@@ -54,10 +72,19 @@ function admits(workflow, event, base, files) {
   );
 }
 
+// The job runs exactly when a path its suites read changed. A run that changes
+// no workflow, action, script or manifest cannot change what this check decides,
+// and the required `test` fan-in passes a skipped job, so the gate itself must be
+// exact: a wider skip, or a different output, would drop the admission silently.
+const wiringGate = { needs: 'changes', if: "needs.changes.outputs.wiring == 'true'" };
+
 function validateCheck(workflow, jobName) {
   const job = workflow.jobs[jobName];
-  assert.equal(job.if, undefined, `${jobName}: check job must be unconditional`);
-  assert.equal(job.needs, undefined, `${jobName}: check job must not depend on filtering`);
+  assert.deepEqual(
+    { needs: job.needs, if: job.if },
+    wiringGate,
+    `${jobName}: the check must run exactly when the changes job reports a wiring change`
+  );
   assert.equal(job['continue-on-error'], undefined, `${jobName}: check failure must fail the job`);
   const steps = job.steps;
   const checks = steps.filter(step => step.run === command);
@@ -80,21 +107,22 @@ function validateCheck(workflow, jobName) {
   const installIndex = steps.findIndex(item => /\bpnpm\b.*\binstall\b/.test(item.run ?? ''));
   const checkIndex = steps.indexOf(step);
   assert.ok(installIndex >= 0 && installIndex < checkIndex, `${jobName}: install before the check`);
-  if (jobName === 'changes') {
-    const filterIndex = steps.findIndex(item => item.id === 'filter');
-    assert.ok(filterIndex > checkIndex, 'changes: check before filtering');
-  }
-  if (jobName === 'mobile-changes') {
-    const detectIndex = steps.findIndex(item => item.id === 'detect');
-    assert.ok(detectIndex > checkIndex, 'mobile-changes: check before change detection');
-    const detect = steps[detectIndex];
-    for (const fragment of mobilePathFragments) {
-      assert.match(
-        detect.run ?? '',
-        fragment,
-        `mobile change-detection step must recognise ${fragment}`
-      );
-    }
+  // No job waits for the check job, so only the required `test` fan-in makes
+  // a broken admission block the merge.
+  assert.ok(
+    [workflow.jobs.test?.needs ?? []].flat().includes(jobName),
+    `${jobName}: the required test job must need the check job`
+  );
+}
+
+function validateMobileDetect(mobile) {
+  const detect = mobile.jobs['mobile-changes'].steps.find(item => item.id === 'detect');
+  for (const fragment of mobilePathFragments) {
+    assert.match(
+      detect.run ?? '',
+      fragment,
+      `mobile change-detection step must recognise ${fragment}`
+    );
   }
 }
 
@@ -124,8 +152,8 @@ function validate(root, mobile) {
     'push must not filter by path: the required suite checks must report on every main push'
   );
   assert.equal(mobile.on.push['paths-ignore'], undefined);
-  validateCheck(root, 'changes');
-  validateCheck(mobile, 'mobile-changes');
+  validateCheck(root, 'ci-wiring');
+  validateMobileDetect(mobile);
 }
 
 test('both live workflows validate triggers and unconditional check invocations', () => {
@@ -160,17 +188,16 @@ test('mobile catches an isolated root main-only regression on a stacked base', (
   assert.throws(() => validate(root, mobile), /pull_request must admit every base/);
 });
 
-for (const [index, jobName] of [
-  [0, 'changes'],
-  [1, 'mobile-changes'],
-]) {
+for (const [index, jobName] of [[0, 'ci-wiring']]) {
   for (const defect of [
     'missing',
     'conditional-step',
     'conditional-job',
+    'ungated',
     'ignored',
     'directory',
     'before-install',
+    'not-required',
   ]) {
     test(`${jobName} rejects a ${defect} check`, () => {
       const workflows = readWorkflows();
@@ -180,9 +207,17 @@ for (const [index, jobName] of [
       if (defect === 'missing') job.steps.splice(checkIndex, 1);
       if (defect === 'conditional-step') check.if = 'false';
       if (defect === 'conditional-job') job.if = 'false';
+      if (defect === 'ungated') {
+        delete job.if;
+        delete job.needs;
+      }
       if (defect === 'ignored') check['continue-on-error'] = true;
       if (defect === 'directory') job.defaults = { run: { 'working-directory': 'apps/mobile' } };
       if (defect === 'before-install') job.steps.unshift(...job.steps.splice(checkIndex, 1));
+      if (defect === 'not-required') {
+        const test = workflows[index].jobs.test;
+        test.needs = test.needs.filter(need => need !== jobName);
+      }
       assert.throws(() => validate(...workflows), assert.AssertionError);
     });
   }

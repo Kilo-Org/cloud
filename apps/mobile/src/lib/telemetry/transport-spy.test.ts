@@ -1,9 +1,8 @@
 /* oxlint-disable max-lines -- one transport-spy suite per SDK; splitting would duplicate the shared mock scaffold */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { SENTRY_NATIVE_OPTIONS } from '@/lib/sentry-dsn';
 import { type SentryInitExtras } from '@/lib/sentry-init';
-
-// ---- shared hoisted mocks ----
 
 const hoisted = vi.hoisted(() => {
   const usHost = 'https://us.i.posthog.com';
@@ -47,7 +46,7 @@ const hoisted = vi.hoisted(() => {
     stopObservingTransactions: vi.fn(),
   };
 
-  const platform = { OS: 'ios' };
+  const platform: { OS: string; Version: number | string } = { OS: 'ios', Version: 0 };
 
   const sentryHolder: { initOptions?: Record<string, unknown> } = { initOptions: undefined };
   const mobileReplayIntegration = vi.fn();
@@ -84,8 +83,6 @@ const hoisted = vi.hoisted(() => {
     storage,
   };
 });
-
-// ---- all vi.mock calls at top level ----
 
 vi.mock('posthog-react-native', () => ({
   default: vi.fn(function PostHogMock(_key: string, options: Record<string, unknown>) {
@@ -170,8 +167,6 @@ vi.mock('@sentry/react-native', () => ({
 
 vi.stubGlobal('__DEV__', false);
 
-// ---- loaders ----
-
 // Load posthog + appsflyer + the real controller from one module registry so
 // the SDK modules and the controller share a single decision/generation state.
 // oxlint-disable-next-line require-await -- async required by promise-function-async
@@ -188,8 +183,6 @@ async function loadSentryInit() {
   vi.resetModules();
   return import('@/lib/sentry-init');
 }
-
-// ---- PostHog transport ----
 
 describe('PostHog transport spy', () => {
   beforeEach(() => {
@@ -295,8 +288,6 @@ describe('PostHog transport spy', () => {
   });
 });
 
-// ---- AppsFlyer transport ----
-
 describe('AppsFlyer transport spy', () => {
   const logEventSpy =
     vi.fn<(eventName: string, eventValues: Record<string, string>) => Promise<void>>();
@@ -398,8 +389,6 @@ function profilerNames(initOptions: Record<string, unknown> | undefined): string
     .filter((name): name is string => name?.startsWith('HermesProfiling') ?? false);
 }
 
-// ---- Sentry transport ----
-
 describe('Sentry transport spy', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -428,6 +417,51 @@ describe('Sentry transport spy', () => {
     expect(resolveIntegrations(hoisted.sentryHolder.initOptions).map(i => i.name)).toContain(
       'ExtraErrorData'
     );
+  });
+
+  it('keeps the NDK crash handler only below Android 12, where no tombstone exists', async () => {
+    const { initSentry } = await loadSentryInit();
+
+    // Android 12+ has the tombstone integration, which reports the same native
+    // crashes out of process. The in-process NDK handler only duplicates it and
+    // can abort inside its own unwinder (std::bad_alloc in
+    // sentry__unwind_stack_libunwindstack), which replaces the real crash.
+    for (const [version, expected] of [
+      [36, false],
+      [31, false],
+      [30, true],
+      [24, true],
+    ] as const) {
+      hoisted.platform.OS = 'android';
+      hoisted.platform.Version = version;
+      initSentry(false);
+
+      expect(hoisted.sentryHolder.initOptions?.enableNdk, `API ${version}`).toBe(expected);
+      // The tombstone path stays on at every level: it is the only native
+      // crash source above 31 and harmless duplication below.
+      expect(hoisted.sentryHolder.initOptions?.enableTombstone).toBe(true);
+    }
+
+    // An unreadable version keeps the handler rather than losing native
+    // crash capture.
+    hoisted.platform.Version = 'unknown';
+    initSentry(false);
+    expect(hoisted.sentryHolder.initOptions?.enableNdk).toBe(true);
+
+    // iOS has no NDK option: the property must be absent, not false.
+    hoisted.platform.OS = 'ios';
+    hoisted.platform.Version = 18;
+    initSentry(false);
+    expect(hoisted.sentryHolder.initOptions).not.toHaveProperty('enableNdk');
+    expect(hoisted.sentryHolder.initOptions?.enableTombstone).toBe(true);
+  });
+
+  it('leaves the NDK handler off for the native init that runs before JS', () => {
+    // Native init runs before any JS, so this value decides whether a startup
+    // crash can be replaced by the handler's own unwinder abort. It must stay
+    // off: JS installs the handler again below Android 12.
+    expect(SENTRY_NATIVE_OPTIONS.enableNdk).toBe(false);
+    expect(SENTRY_NATIVE_OPTIONS.enableTombstone).toBe(true);
   });
 
   it('registers no replay and disables screenshots when optional consent is false', async () => {

@@ -50,11 +50,25 @@ const KILO_MCP_URL_PRODUCTION = 'https://mcp.kiloapps.io';
 export const KILO_MCP_URL: string | undefined =
   optional('kiloMcpUrl') ??
   (extra?.isProductionBuild === true ? KILO_MCP_URL_PRODUCTION : undefined);
+// The native remote preview requires a development bundle and an explicit relay.
+export const SESSION_SYNC_URL: string | undefined = __DEV__
+  ? process.env.EXPO_PUBLIC_SESSION_SYNC_URL
+  : undefined;
+if (SESSION_SYNC_URL) {
+  assertUrlScheme('sessionSyncUrl', SESSION_SYNC_URL, ['https:'], { allowInsecure: true });
+}
 export const GOOGLE_WEB_CLIENT_ID: string | undefined = optional('googleWebClientId');
 export const GOOGLE_IOS_CLIENT_ID: string | undefined = optional('googleIosClientId');
 export const PLAY_INTEGRITY_PROJECT_NUMBER: string | undefined = optional(
   'playIntegrityProjectNumber'
 );
+
+// Non-production builds send the fixed admission sentinel when the device
+// cannot attest (simulator, emulator without Play Services). The server accepts
+// it only when it also runs outside production, so a production app build with
+// this flag baked in still cannot use it.
+export const NATIVE_ADMISSION_DEV_SENTINEL: boolean =
+  optional('nativeAdmissionDevSentinel') === 'true' && extra?.isProductionBuild !== true;
 export const SENTRY_ENVIRONMENT: string | undefined = optional('sentryEnvironment');
 
 /** Client-observed latency ingest endpoint. The optional `LATENCY_INGEST_URL`

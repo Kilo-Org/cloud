@@ -658,11 +658,6 @@ const PROGRESS_GROUPS = [
     hint: 'After customer notification',
     stepKeys: [UserDeletionStepKey.PylonContact],
   },
-  {
-    label: 'CSA support DB',
-    hint: 'After the Pylon contact is deleted',
-    stepKeys: [UserDeletionStepKey.CsaSupportDb],
-  },
 ] as const;
 
 function isFinishedTask(status: string): boolean {

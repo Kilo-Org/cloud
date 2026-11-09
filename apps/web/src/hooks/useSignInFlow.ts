@@ -10,6 +10,7 @@ import { sendMagicLink } from '@/lib/auth/send-magic-link';
 import { shouldDiscardSsoHintOnError } from '@/lib/auth/sign-in-hint-recovery';
 import { SignInDiscoveryResponseSchema } from '@/lib/schemas/sso-organizations';
 import { orderNewAccountProviders, resolveSignInMethods } from '@/lib/auth/sign-in-methods';
+import { prepareWatchwoodSignup, submitWatchwoodSignup } from '@/lib/auth/watchwood.client';
 
 export type FlowState = 'landing' | 'provider-select' | 'magic-link-sent' | 'redirecting';
 export type Tier = 'returning' | 'new' | 'invite';
@@ -24,6 +25,8 @@ const callbackAuthErrors = new Set([
   'SIGNUP-STEP-UP',
   'SIGNUP-UNAVAILABLE',
   'EMAIL-ALREADY-USED',
+  'EMAIL-SIGNUP-DISABLED',
+  'EMAIL-INVALID-FORMAT',
   'EMAIL-MUST-BE-LOWERCASE',
   'EMAIL-CANNOT-CONTAIN-PLUS',
 ]);
@@ -112,6 +115,10 @@ export function useSignInFlow({
   const saveHint = realHint.saveHint;
   // For storybook, consider hints always loaded; otherwise use the real loading state
   const isHintLoaded = storybookInitialState ? true : realHint.isLoaded;
+
+  useEffect(() => {
+    if (!storybookInitialState) void prepareWatchwoodSignup();
+  }, [storybookInitialState]);
   const [isInviteCleared, setIsInviteCleared] = useState(false);
 
   // Determine tier based on hint and params
@@ -305,7 +312,16 @@ export function useSignInFlow({
         }
         setIsVerifying(false);
         setShowTurnstile(false);
-        setError('MAGIC_LINK_DELIVERY_FAILED');
+        if (result.error === 'EMAIL-SIGNUP-DISABLED') {
+          setError('EMAIL-SIGNUP-DISABLED');
+          // On sign-up, return to the provider buttons the notice points at.
+          if (isSignUp) {
+            setPendingSignIn(null);
+            setShowEmailInput(false);
+          }
+        } else {
+          setError('MAGIC_LINK_DELIVERY_FAILED');
+        }
         setFlowState('landing');
         return false;
       } catch (error) {
@@ -322,7 +338,7 @@ export function useSignInFlow({
         }
       }
     },
-    [email, isCurrentDiscoveryRequest, params, saveHint]
+    [email, isCurrentDiscoveryRequest, isSignUp, params, saveHint]
   );
 
   useEffect(
@@ -485,6 +501,7 @@ export function useSignInFlow({
         }
 
         if (checkResult.kind === 'new') {
+          if (checkResult.emailSignupDisabled) setError('EMAIL-SIGNUP-DISABLED');
           setIsNewUser(true);
           setIsVerifying(false);
           setAvailableProviders(orderNewAccountProviders(checkResult.providers));
@@ -654,6 +671,9 @@ export function useSignInFlow({
           setTurnstileError(true);
           return;
         }
+
+        await submitWatchwoodSignup();
+        if (!isCurrentDiscoveryRequest(discoveryGeneration)) return;
 
         // Handle SSO redirect (from returning user or invite)
         const pendingSSOOrgId = pendingSSOOrgIdRef.current;

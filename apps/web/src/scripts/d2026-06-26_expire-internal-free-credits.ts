@@ -31,11 +31,9 @@ import pLimit from 'p-limit';
 import { db, closeAllDrizzleConnections } from '@kilocode/web-shared/lib/drizzle';
 import { credit_transactions, kilocode_users } from '@kilocode/db/schema';
 import { and, eq, gt, isNull, sql, inArray, or } from 'drizzle-orm';
-import {
-  computeExpiration,
-  processLocalExpirations,
-  type ExpiringTransaction,
-} from '@kilocode/web-shared/lib/creditExpiration';
+import { computeExpiration, type ExpiringTransaction } from '@kilocode/db/credit-expiration';
+import { processLocalExpirations } from '@kilocode/web-shared/lib/creditExpiration';
+import { chunkArray } from '@kilocode/worker-utils/chunk-array';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -253,20 +251,12 @@ async function processUser(
     })
     .where(inArray(credit_transactions.id, [...affectedIds]));
 
-  const expirationOutcome = await processLocalExpirations(
-    {
-      id: user.id,
-      microdollars_used: user.microdollars_used,
-      next_credit_expiration_at: user.next_credit_expiration_at,
-      updated_at: user.updated_at,
-      total_microdollars_acquired: user.total_microdollars_acquired,
-    },
-    new Date(expiryDateIso)
-  );
+  const expirationOutcome = await processLocalExpirations(user.id, new Date(expiryDateIso), {
+    force: true,
+  });
 
-  const acquiredAfter =
-    expirationOutcome?.total_microdollars_acquired ?? user.total_microdollars_acquired;
-  const realBalanceAfter = acquiredAfter - user.microdollars_used;
+  const acquiredAfter = expirationOutcome.total_microdollars_acquired;
+  const realBalanceAfter = acquiredAfter - expirationOutcome.microdollars_used;
 
   if (realBalanceAfter < 0) {
     const fix = -realBalanceAfter;
@@ -277,7 +267,7 @@ async function processUser(
         is_free: true,
         credit_category: 'accounting_adjustment',
         description: 'Correction to $0 after expiring internal free credits',
-        original_baseline_microdollars_used: user.microdollars_used,
+        original_baseline_microdollars_used: expirationOutcome.microdollars_used,
       });
       await tx
         .update(kilocode_users)
@@ -303,12 +293,6 @@ async function processUser(
 }
 
 // ── Main ─────────────────────────────────────────────────────────────────────
-
-function chunk<T>(arr: T[], size: number): T[][] {
-  const out: T[][] = [];
-  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
-  return out;
-}
 
 async function main() {
   const { execute, yes, batchSize, concurrency } = parseArgs();
@@ -347,7 +331,7 @@ async function main() {
   // Identify which matched users actually hold a free, positive, personal grant.
   const usersById = new Map(users.map(u => [u.id, u]));
   const userIdsWithFree = new Set<string>();
-  for (const idChunk of chunk(
+  for (const idChunk of chunkArray(
     users.map(u => u.id),
     batchSize
   )) {

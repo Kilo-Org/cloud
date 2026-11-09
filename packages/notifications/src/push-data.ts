@@ -1,15 +1,22 @@
 import { z } from 'zod';
-import { homeWidgetDetailsSchema } from '@kilocode/app-shared/home-widget';
-
-import { instanceLifecycleEventSchema, scheduledActionEventSchema } from './notification-events';
+import { HOME_WIDGET_TITLE_LIMIT, homeWidgetDetailsSchema } from '@kilocode/app-shared/home-widget';
+import { GLANCEABLE_STATUS_KINDS } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import {
   SESSION_LIVE_COMMAND_LIMIT,
   sessionLiveChangesSchema,
   sessionLiveFailureSchema,
-  sessionLiveOutcomeSchema,
   sessionLivePlanSchema,
   sessionLiveStepSchema,
-} from './session-live-content';
+} from '@kilocode/session-ingest-contracts';
+
+import { NEEDS_INPUT_ATTENTION_KINDS } from './needs-input-actions';
+import {
+  instanceLifecycleEventSchema,
+  scheduledActionEventSchema,
+  securityLifecycleEventSchema,
+} from './notification-events';
+import { SESSION_CARD_STATUS_KINDS, sessionLiveOutcomeSchema } from './session-live-content';
+import { refineSpendAlertScope } from './spend-alert-scope';
 
 const nonEmptyStringSchema = z.string().min(1);
 
@@ -30,8 +37,8 @@ export type CloudAgentSessionCategory = z.infer<typeof cloudAgentSessionCategory
 export const sessionLiveActivityContentStateSchema = z.object({
   sessionId: nonEmptyStringSchema,
   /** Trimmed and capped display title; null for an untitled session. */
-  title: z.string().max(120).nullable(),
-  statusKind: z.enum(['needsInput', 'running', 'idle', 'scheduled', 'failed']),
+  title: z.string().max(HOME_WIDGET_TITLE_LIMIT).nullable(),
+  statusKind: z.enum(SESSION_CARD_STATUS_KINDS),
   /** ISO 8601; when the current status kind began. */
   statusSince: z.string(),
   /** ISO 8601 wake time for a scheduled session, else null. */
@@ -79,12 +86,12 @@ export const pushDataSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('instance-lifecycle'),
     event: instanceLifecycleEventSchema,
-    sandboxId: z.string().min(1),
+    sandboxId: nonEmptyStringSchema,
   }),
   z.object({
     type: z.literal('scheduled-action'),
     event: scheduledActionEventSchema,
-    sandboxId: z.string().min(1),
+    sandboxId: nonEmptyStringSchema,
   }),
   z.object({
     type: z.literal('cloud_agent_session'),
@@ -92,12 +99,16 @@ export const pushDataSchema = z.discriminatedUnion('type', [
     category: cloudAgentSessionCategorySchema.optional(),
     // Needs-input raise detail: which answer the waiting agent wants, and the
     // PR that can be opened from the notification. Absent on status pushes.
-    attentionKind: z.enum(['question', 'permission']).optional(),
-    prUrl: z.string().optional(),
+    attentionKind: z.enum(NEEDS_INPUT_ATTENTION_KINDS).optional(),
+    prUrl: nonEmptyStringSchema.optional(),
     // The session's organization, so a tap can land the app in the context
     // the session belongs to. Optional so a push from an older producer in a
     // rolling deploy still validates; absent means Personal.
     organizationId: nonEmptyStringSchema.optional(),
+  }),
+  z.object({
+    type: z.literal('agent_briefing'),
+    url: z.literal('/agent-briefing'),
   }),
   z.object({
     type: z.literal('low_balance'),
@@ -105,41 +116,29 @@ export const pushDataSchema = z.discriminatedUnion('type', [
   }),
   // Spend alert push. Carries the owner scope and its id only — never an
   // amount, an email, or the configured threshold: this blob crosses the OS
-  // lock screen, so the generic preview copy above must stay content-free.
-  z.object({
-    type: z.literal('spend_alert'),
-    scope: z.enum(['personal', 'organization']),
-    organizationId: nonEmptyStringSchema.optional(),
-  }),
+  // lock screen, so the generic preview copy in `genericPushContentForPushData`
+  // (`./push-copy.ts`) must stay content-free.
+  // The tap routes by the scope, so the scope and its id must agree: an
+  // organization alert without its id would open the personal spend view, and
+  // a personal alert naming an organization would open one that did not send.
+  z
+    .object({
+      type: z.literal('spend_alert'),
+      scope: z.enum(['personal', 'organization']),
+      organizationId: nonEmptyStringSchema.optional(),
+    })
+    .superRefine(refineSpendAlertScope),
   z.object({
     type: z.literal('security_finding'),
     findingId: nonEmptyStringSchema,
     scope: nonEmptyStringSchema,
   }),
-  // 1:1 map to SecurityAuditLogAction (packages/db/src/schema-types.ts):
-  // analysis_completed -> FindingAnalysisCompleted,
-  // analysis_failed -> FindingAnalysisFailed,
-  // remediation_queued -> RemediationQueued,
-  // remediation_pr_opened -> RemediationPrOpened,
-  // remediation_failed -> RemediationFailed,
-  // remediation_blocked -> RemediationBlocked,
-  // remediation_no_changes_needed -> RemediationNoChangesNeeded,
-  // remediation_cancelled -> RemediationCancelled.
-  // FindingCreated is intentionally unmapped: finding creation already sends
-  // the visible `security_finding` push, so a second visible push would
-  // double-notify.
+  // 1:1 map to SecurityAuditLogAction, shared with the internal dispatch
+  // request schema: see SECURITY_LIFECYCLE_EVENTS in `notification-events.ts`
+  // for the event-to-action mapping and the FindingCreated rationale.
   z.object({
     type: z.literal('security_lifecycle'),
-    event: z.enum([
-      'analysis_completed',
-      'analysis_failed',
-      'remediation_queued',
-      'remediation_pr_opened',
-      'remediation_failed',
-      'remediation_blocked',
-      'remediation_no_changes_needed',
-      'remediation_cancelled',
-    ]),
+    event: securityLifecycleEventSchema,
     findingId: nonEmptyStringSchema,
     scope: nonEmptyStringSchema,
     remediationId: nonEmptyStringSchema.optional(),
@@ -159,10 +158,10 @@ export const pushDataSchema = z.discriminatedUnion('type', [
     needsInput: z.number().int().min(0),
     /**
      * Needs-input rows waiting on a permission prompt: the ones the wrist can
-     * approve. Optional so a push from a server older than this release still
-     * parses; every mobile reader treats absent as 0.
+     * approve. Optional on input with a zero default so a push from a server
+     * older than this release still parses.
      */
-    needsApproval: z.number().int().min(0).optional(),
+    needsApproval: z.number().int().min(0).default(0),
     idle: z.number().int().min(0),
     /**
      * Sessions scheduled to wake later. Optional on input with a zero default
@@ -185,10 +184,7 @@ export const pushDataSchema = z.discriminatedUnion('type', [
     // parsed (output) type stays total — the mobile client spreads the parsed
     // fields straight into a `GlanceableAgentsSnapshot`. Remove the optional
     // and the default when every server sends both keys.
-    newestResultKind: z
-      .enum(['needsInput', 'running', 'idle', 'scheduled'])
-      .nullable()
-      .default(null),
+    newestResultKind: z.enum(GLANCEABLE_STATUS_KINDS).nullable().default(null),
     newestResultAt: z.string().nullable().default(null),
     homeWidgetDetails: homeWidgetDetailsSchema.optional(),
   }),

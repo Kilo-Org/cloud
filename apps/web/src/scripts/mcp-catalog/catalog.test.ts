@@ -132,7 +132,73 @@ describe('mcp-catalog catalog', () => {
       expect(isDenylistedPath('debug.ping')).toBe(false);
       // Native-only credential issuers are withheld by exact path.
       expect(isDenylistedPath('activeSessions.widgetCredential')).toBe(true);
+      expect(isDenylistedPath('agentBriefing.updateContextPreferences')).toBe(true);
+      expect(isDenylistedPath('githubApps.provideUserToken')).toBe(true);
+      expect(isDenylistedPath('agentBriefing.estimateSummary')).toBe(false);
+      expect(isDenylistedPath('agentBriefing.dismiss')).toBe(false);
       expect(isDenylistedPath('activeSessions.getToken')).toBe(false);
+      // Start fresh discards workspace changes behind an in-app confirmation.
+      expect(isDenylistedPath('cloudAgentNext.removeWorkspaceSnapshot')).toBe(true);
+      expect(isDenylistedPath('organizations.cloudAgentNext.removeWorkspaceSnapshot')).toBe(true);
+      expect(isDenylistedPath('cloudAgentNext.getWorkspaceSnapshotRecovery')).toBe(false);
+    });
+
+    it('withholds Vercel secrets and resource mutations while retaining status reads', () => {
+      for (const prefix of ['vercelCompute', 'organizations.vercelCompute']) {
+        for (const method of [
+          'add',
+          'discoverTeams',
+          'discoverProjects',
+          'remove',
+          'retrySetup',
+          'upgradeRuntime',
+        ]) {
+          expect(isDenylistedPath(`${prefix}.${method}`)).toBe(true);
+        }
+        expect(isDenylistedPath(`${prefix}.getStatus`)).toBe(false);
+        expect(isDenylistedPath(`${prefix}.getEnrollment`)).toBe(false);
+      }
+    });
+
+    it('withholds every MCP guardrail policy mutation', () => {
+      const mutations = collectCatalogLeaves(rootRouter).filter(
+        leaf => leaf.path.startsWith('organizations.mcpGuardrails.') && leaf.type === 'mutation'
+      );
+      expect(mutations.map(leaf => leaf.path).sort()).toEqual([
+        'organizations.mcpGuardrails.add',
+        'organizations.mcpGuardrails.approveConnection',
+        'organizations.mcpGuardrails.delete',
+        'organizations.mcpGuardrails.setEnforcement',
+        'organizations.mcpGuardrails.setStatus',
+        'organizations.mcpGuardrails.update',
+      ]);
+      for (const leaf of mutations) {
+        expect(isDenylistedPath(leaf.path)).toBe(true);
+      }
+    });
+
+    it('withholds paid scheduling consent while exposing scheduled report reads', () => {
+      const leaves = collectCatalogLeaves(rootRouter).filter(leaf =>
+        leaf.path.startsWith('agentBriefing.')
+      );
+      const { rows, missing } = buildCatalogRows(
+        leaves,
+        new Map(leaves.map(leaf => [leaf.path, 'Briefing procedure.']))
+      );
+      const paths = rows.map(row => row.path);
+      expect(missing).toEqual([]);
+      expect(paths).toEqual(
+        expect.arrayContaining([
+          'agentBriefing.estimateSummary',
+          'agentBriefing.get',
+          'agentBriefing.list',
+          'agentBriefing.dismiss',
+        ])
+      );
+      for (const path of ['agentBriefing.updateContextPreferences']) {
+        expect(leaves.some(leaf => leaf.path === path)).toBe(true);
+        expect(paths).not.toContain(path);
+      }
     });
 
     it('fails on a zero-row catalog instead of emitting an empty one', () => {
@@ -198,6 +264,22 @@ describe('mcp-catalog catalog', () => {
       expect(schema?.['required']).toEqual(
         expect.arrayContaining(['organizationId', 'name', 'color'])
       );
+    });
+
+    it('keeps searchable field tags across union and intersection branches', () => {
+      const { rows } = buildCatalogRows(
+        withMutation([
+          mutationLeaf('cloudAgentNext.prepareSession', [
+            z.intersection(
+              z.object({ egressAudit: z.boolean().optional() }),
+              z.union([z.object({ prompt: z.string() }), z.object({ cloneFrom: z.string() })])
+            ),
+          ]),
+        ]),
+        new Map([['cloudAgentNext.prepareSession', 'Prepares a session.']])
+      );
+      expect(rows[0]?.tags).toEqual(expect.arrayContaining(['egressaudit', 'prompt', 'clonefrom']));
+      expect(rows[0]?.searchBlob).toContain('egressAudit');
     });
 
     it('keeps every constraint when two chained schemas declare the same key', () => {
@@ -363,6 +445,7 @@ describe('mcp-catalog catalog', () => {
       ['creditManagerProcedure.query(async () => ({}))', true],
       ['superadminProcedure.query(async () => ({}))', true],
       ['sessionViewerProcedure.query(async () => ({}))', true],
+      ['apiRequestLogExporterProcedure.query(async () => ({}))', true],
       ['baseProcedure.query(async () => ({}))', false],
       ['protectedProcedure.query(async () => ({}))', false],
       // A guard elsewhere in the chain does not make the procedure admin-only.

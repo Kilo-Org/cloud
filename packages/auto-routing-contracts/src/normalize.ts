@@ -16,16 +16,86 @@ const TRUNCATED_KEY = '[truncated]';
 // consumed per visited node and per object property, and traversal stops
 // (with a truncation sentinel) the moment it runs out.
 const PROVIDER_HINTS_MAX_NODES = 512;
-const SENSITIVE_KEY_PATTERNS = [
-  'authorization',
-  'api_key',
+// Message content, and the Responses input, are client-supplied JSON of
+// unbounded depth: no schema below `content: z.unknown()` constrains their
+// shape. Every walk this module does over them stays inside a fixed amount of
+// work on the synchronous request path, the way the provider-hint copy does. A
+// walk that reaches its limit keeps what it gathered and answers with the
+// documented null or partial result.
+//
+// The node and length budgets cover the text walk, which runs per message and
+// stops as soon as it has the prefix. The two body-wide walks (modalities and
+// the token estimate) run over the whole body, which the request size already
+// bounds, so they are bounded by depth alone and keep reporting every message.
+const PROMPT_WALK_MAX_NODES = 1024;
+const PROMPT_WALK_MAX_DEPTH = 64;
+// Cleaning runs before the stored prefix is taken and is linear in the text it
+// receives, so text is gathered up to this window and no further. The window has
+// to be larger than any single block the cleaning passes strip, because a block
+// whose closer falls outside the gathered text is kept as ordinary text: real
+// agent prompts carry environment_details and file blocks of hundreds of
+// kilobytes, and 1 MiB covers them while still bounding one message's cleaning
+// to a few tens of milliseconds. One mebibyte is the documented limit for a
+// single block; past it the prefix is the block's own opening text.
+const PROMPT_TEXT_MAX_LENGTH = TEXT_PREFIX_MAX_LENGTH * 1024;
+// Credential keys are matched on token boundaries: key names split at
+// separators, digits, and camelCase humps into tokens, and a credential token
+// matches exactly, so ordinary words that merely contain those letters stay
+// intact. A credential word joined to a credential qualifier without any
+// boundary counts as a credential key.
+const SENSITIVE_KEY_WORDS = [
   'apikey',
+  'authorization',
   'cookie',
   'credential',
+  'key',
+  'pass',
+  'passkey',
+  'passphrase',
   'password',
+  'passwd',
+  'pwd',
   'secret',
   'token',
 ];
+// A vendor name joined directly to a short password word (`dbpass`, `pgpass`,
+// `mongopass`) is a credential key only when the vendor is listed here, because a
+// broader rule would also classify ordinary words that end in `pass`, such as
+// `compass`. The list holds the products whose clients ship such a key name.
+const SENSITIVE_KEY_QUALIFIERS = [
+  'access',
+  'account',
+  'api',
+  'app',
+  'auth',
+  'client',
+  'db',
+  'encryption',
+  'master',
+  'mongo',
+  'mssql',
+  'mysql',
+  'oracle',
+  'pg',
+  'postgres',
+  'postgresql',
+  'private',
+  'public',
+  'redis',
+  'root',
+  'secret',
+  'service',
+  'session',
+  'signing',
+  'sql',
+  'subscription',
+];
+// A qualifier only counts when it ends immediately before a credential word, so
+// the scan before each occurrence never needs more than the longest qualifier.
+const MAX_QUALIFIER_LENGTH = Math.max(...SENSITIVE_KEY_QUALIFIERS.map(q => q.length));
+// These words also begin common English words, so they count only as an exact
+// token or a qualified occurrence, not at any token start.
+const TOKEN_START_EXCLUDED_WORDS: Record<string, true> = { pass: true };
 const REDUNDANT_CONTENT_TYPES = new Set([
   'function_call_output',
   'tool_call_output',
@@ -218,6 +288,8 @@ function firstAndLatestPromptPrefix(
 }
 
 function textPrefix(value: unknown): string | null {
+  // Cleaning is linear in the text it receives, so the walk stops at the
+  // window and only that much text reaches it.
   const text = cleanPromptText(textFromValue(value));
 
   if (text.length === 0) {
@@ -227,48 +299,192 @@ function textPrefix(value: unknown): string | null {
   return text.slice(0, TEXT_PREFIX_MAX_LENGTH);
 }
 
-function cleanPromptText(text: string): string {
-  const taskText = text.match(/<task>\s*([\s\S]*?)\s*<\/task>/i)?.[1] ?? text;
+// Message content is client-supplied and this runs synchronously on the
+// gateway request path, so extraction walks the text with forward-only
+// cursors: the opener search and the closer search cover ranges no earlier
+// search covered, and the cost stays linear in the length of the text. A
+// missing closing tag leaves the remaining text untouched and ends the pass.
+type BlockPass = {
+  // Opener scan. A literal opener includes the `>`; an attribute opener stops
+  // at the tag name and is completed by the `>` search in `nextOpener`.
+  open: RegExp;
+  close: RegExp;
+  attributes: boolean;
+};
 
-  return taskText
-    .replace(/<thinking>[\s\S]*?<\/thinking>/gi, ' ')
-    .replace(/<environment_details>[\s\S]*?<\/environment_details>/gi, ' ')
-    .replace(/<file(?:\s[^>]*)?>[\s\S]*?<\/file>/gi, ' ')
-    .replace(/<file_content(?:\s[^>]*)?>[\s\S]*?<\/file_content>/gi, ' ')
-    .replace(/<read_file>[\s\S]*?<\/read_file>/gi, ' ')
-    .replace(/<search_files>[\s\S]*?<\/search_files>/gi, ' ')
+const BLOCK_PASSES: BlockPass[] = [
+  { open: /<thinking>/gi, close: /<\/thinking>/gi, attributes: false },
+  { open: /<environment_details>/gi, close: /<\/environment_details>/gi, attributes: false },
+  { open: /<file/gi, close: /<\/file>/gi, attributes: true },
+  { open: /<file_content/gi, close: /<\/file_content>/gi, attributes: true },
+  { open: /<read_file>/gi, close: /<\/read_file>/gi, attributes: false },
+  { open: /<search_files>/gi, close: /<\/search_files>/gi, attributes: false },
+];
+
+const TASK_OPEN = /<task>/i;
+const TASK_CLOSE = /<\/task>/gi;
+// Same character set as `\s`, and as the set `String.prototype.trim` strips.
+const WHITESPACE = /\s/;
+
+type OpenerMatch = { start: number; end: number };
+
+// Next opener at or after `from`, or null when none can match. An attribute
+// opener is the tag name, then `>`, or one whitespace character and the next
+// `>` anywhere after it.
+function nextOpener(pass: BlockPass, text: string, from: number): OpenerMatch | null {
+  pass.open.lastIndex = from;
+  for (;;) {
+    const open = pass.open.exec(text);
+    if (!open) return null;
+
+    const end = open.index + open[0].length;
+    if (!pass.attributes) return { start: open.index, end };
+
+    const following = text[end];
+    if (following === '>') return { start: open.index, end: end + 1 };
+    if (following !== undefined && WHITESPACE.test(following)) {
+      const bracket = text.indexOf('>', end + 1);
+      // No `>` left in the text: this opener fails, so every later one does.
+      return bracket < 0 ? null : { start: open.index, end: bracket + 1 };
+    }
+
+    pass.open.lastIndex = end;
+  }
+}
+
+// Replaces every `open ... close` block with a single space: left to right,
+// non-overlapping, nearest closer. A block whose closer is missing, and the
+// text before the first opener, are kept as they are.
+function stripBlocks(text: string, pass: BlockPass): string {
+  let stripped = '';
+  let cursor = 0;
+  for (;;) {
+    const open = nextOpener(pass, text, cursor);
+    if (!open) break;
+
+    pass.close.lastIndex = open.end;
+    const close = pass.close.exec(text);
+    if (!close) break;
+
+    stripped += text.slice(cursor, open.start) + ' ';
+    cursor = close.index + close[0].length;
+  }
+
+  return stripped + text.slice(cursor);
+}
+
+function extractTaskText(text: string): string {
+  const open = TASK_OPEN.exec(text);
+  if (!open) return text;
+
+  TASK_CLOSE.lastIndex = open.index + open[0].length;
+  const close = TASK_CLOSE.exec(text);
+  if (!close) return text;
+
+  return text.slice(open.index + open[0].length, close.index).trim();
+}
+
+function cleanPromptText(text: string): string {
+  let cleaned = extractTaskText(text);
+  for (const pass of BLOCK_PASSES) {
+    cleaned = stripBlocks(cleaned, pass);
+  }
+
+  return cleaned
     .replace(/^\[[^\]]+\]\s+Result:\s*/i, ' ')
     .replace(/\[ERROR\][\s\S]*/i, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }
 
+// Explicit-stack walk over a client-supplied content value: an array
+// contributes the non-empty text of its children joined by `\n`, an object
+// contributes `text`, then a string `content`, then the text of its own
+// `content`, and a redundant tool-result part contributes nothing. The walk
+// keeps its own stack because a content value can nest arbitrarily deep; the
+// node and depth budgets end it, and the length budget stops it at the window
+// the cleaning passes receive.
+type TextWalkFrame =
+  // `children` is how many child values were pushed, in document order.
+  { kind: 'join'; children: number } | { kind: 'value'; value: unknown; depth: number };
+
 function textFromValue(value: unknown): string {
-  if (typeof value === 'string') {
-    return value;
+  const work: TextWalkFrame[] = [{ kind: 'value', value, depth: 0 }];
+  // Text of the completed frames; a frame pops what its children pushed.
+  const results: string[] = [];
+  let remainingNodes = PROMPT_WALK_MAX_NODES;
+  let remainingChars = PROMPT_TEXT_MAX_LENGTH;
+
+  // Keeps at most the remaining window of one text value.
+  const keep = (text: string) => {
+    const kept = text.slice(0, remainingChars);
+    remainingChars -= kept.length;
+    results.push(kept);
+  };
+
+  for (let frame = work.pop(); frame; frame = work.pop()) {
+    if (frame.kind === 'join') {
+      const parts: string[] = [];
+      // Results were pushed in document order, so pop back-to-front.
+      for (let index = 0; index < frame.children; index++) {
+        parts.push(results.pop() ?? '');
+      }
+      results.push(parts.filter(Boolean).reverse().join('\n'));
+      continue;
+    }
+
+    if (remainingNodes <= 0 || frame.depth > PROMPT_WALK_MAX_DEPTH) {
+      results.push('');
+      continue;
+    }
+    remainingNodes -= 1;
+
+    const node = frame.value;
+
+    if (typeof node === 'string') {
+      keep(node);
+      continue;
+    }
+
+    if (Array.isArray(node)) {
+      // Push children back-to-front so they are visited in document order, and
+      // only as many as the node budget still allows.
+      const pushed = Math.min(node.length, remainingNodes);
+      if (pushed === 0) {
+        results.push('');
+        continue;
+      }
+      work.push({ kind: 'join', children: pushed });
+      for (let index = pushed - 1; index >= 0; index--) {
+        work.push({ kind: 'value', value: node[index], depth: frame.depth + 1 });
+      }
+      continue;
+    }
+
+    if (!isRecord(node)) {
+      results.push('');
+      continue;
+    }
+
+    if (typeof node.type === 'string' && REDUNDANT_CONTENT_TYPES.has(node.type)) {
+      results.push('');
+      continue;
+    }
+
+    if (typeof node.text === 'string') {
+      keep(node.text);
+      continue;
+    }
+
+    if (typeof node.content === 'string') {
+      keep(node.content);
+      continue;
+    }
+
+    work.push({ kind: 'value', value: node.content, depth: frame.depth + 1 });
   }
 
-  if (Array.isArray(value)) {
-    return value.map(textFromValue).filter(Boolean).join('\n');
-  }
-
-  if (!isRecord(value)) {
-    return '';
-  }
-
-  if (typeof value.type === 'string' && REDUNDANT_CONTENT_TYPES.has(value.type)) {
-    return '';
-  }
-
-  if (typeof value.text === 'string') {
-    return value.text;
-  }
-
-  if (typeof value.content === 'string') {
-    return value.content;
-  }
-
-  return textFromValue(value.content);
+  return results.pop() ?? '';
 }
 
 function hasTools(tools: unknown[] | undefined) {
@@ -326,8 +542,34 @@ function toJsonValue(value: unknown, budget: { remaining: number }): JsonValue {
 }
 
 function isSensitiveKey(key: string) {
-  const normalizedKey = key.replaceAll(/[^a-zA-Z0-9]/g, '').toLowerCase();
-  return SENSITIVE_KEY_PATTERNS.some(pattern => normalizedKey.includes(pattern));
+  return splitKeyTokens(key).some(isSensitiveToken);
+}
+
+function splitKeyTokens(key: string) {
+  return key
+    .replaceAll(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replaceAll(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
+    .toLowerCase()
+    .split(/[^a-z]+/)
+    .filter(token => token.length > 0);
+}
+
+function isSensitiveToken(token: string) {
+  const singular = token.endsWith('s') ? token.slice(0, -1) : token;
+  if (SENSITIVE_KEY_WORDS.some(word => word === token || word === singular)) return true;
+  for (const word of SENSITIVE_KEY_WORDS) {
+    for (let index = token.indexOf(word); index !== -1; index = token.indexOf(word, index + 1)) {
+      // A token that starts with a credential word is a credential key, unless
+      // the word is one that also begins ordinary words.
+      if (index === 0 && !TOKEN_START_EXCLUDED_WORDS[word]) return true;
+      // A qualifier counts only when it ends immediately before the occurrence,
+      // so the last MAX_QUALIFIER_LENGTH characters are the whole window that
+      // can match one.
+      const window = token.slice(Math.max(0, index - MAX_QUALIFIER_LENGTH), index);
+      if (SENSITIVE_KEY_QUALIFIERS.some(qualifier => window.endsWith(qualifier))) return true;
+    }
+  }
+  return false;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -345,7 +587,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 // are silently ignored; the caller treats an empty result as "text only".
 export function detectRequiredInputModalities(body: unknown): string[] {
   const found = new Set<string>();
-  collectModalities(body, found);
+  collectModalities(body, found, 0);
 
   if (found.size === 0) {
     return [];
@@ -354,12 +596,20 @@ export function detectRequiredInputModalities(body: unknown): string[] {
   return [...found].sort();
 }
 
-function collectModalities(value: unknown, out: Set<string>): void {
+// The same body reaches this walk as reaches the text walk, with the same
+// unbounded nesting. Its work is already linear in the parsed body, which the
+// request size bounds, and every level costs one node per message, so the
+// walk is bounded by depth alone: a node count would stop it inside a long
+// conversation and silently drop a modality from the newest turn. A value
+// nested past the depth limit keeps what was found before it, which is the
+// documented "malformed shapes are ignored" result.
+function collectModalities(value: unknown, out: Set<string>, depth: number): void {
   if (value === null || value === undefined) return;
+  if (depth > PROMPT_WALK_MAX_DEPTH) return;
 
   if (Array.isArray(value)) {
     for (const item of value) {
-      collectModalities(item, out);
+      collectModalities(item, out, depth + 1);
     }
     return;
   }
@@ -375,7 +625,7 @@ function collectModalities(value: unknown, out: Set<string>): void {
   // tools, metadata, and provider hints — only into the known structural
   // containers.
   for (const key of MODALITY_CONTAINER_KEYS) {
-    collectModalities(value[key], out);
+    collectModalities(value[key], out, depth + 1);
   }
 
   // Typed content parts: OpenAI Responses `input_image` / `input_file`,
@@ -421,7 +671,7 @@ const MODALITY_CONTAINER_KEYS = ['messages', 'input', 'content', 'parts', 'syste
 export function estimateRoutingTokens(body: unknown): number {
   if (!isRecord(body)) return 0;
 
-  const textChars = sumBodyTextChars(body);
+  const textChars = sumBodyTextChars(body, 0);
   const reservation = readOutputReservation(body);
   const raw = textChars / 4 + reservation;
 
@@ -433,13 +683,18 @@ export function estimateRoutingTokens(body: unknown): number {
 // Walks known container structures (messages, input, system, instructions)
 // and extracts text from content parts. Does NOT recurse into arbitrary
 // object fields — that would count `model`, `role`, tool definitions, etc.
-function sumBodyTextChars(body: Record<string, unknown>): number {
+// The nesting it follows is client-supplied, so it is bounded by depth like
+// the modality walk: a node count would stop counting partway through a long
+// conversation and under-report the context the request needs.
+function sumBodyTextChars(body: Record<string, unknown>, depth: number): number {
+  if (depth > PROMPT_WALK_MAX_DEPTH) return 0;
+
   let total = 0;
 
   // OpenAI chat completions / Anthropic messages: messages[]
   if (Array.isArray(body.messages)) {
     for (const msg of body.messages) {
-      total += sumMessageTextChars(msg);
+      total += sumMessageTextChars(msg, depth + 1);
     }
   }
 
@@ -449,7 +704,7 @@ function sumBodyTextChars(body: Record<string, unknown>): number {
     total += system.length;
   } else if (Array.isArray(system)) {
     for (const part of system) {
-      total += sumContentPartTextChars(part);
+      total += sumContentPartTextChars(part, depth + 1);
     }
   }
 
@@ -458,14 +713,15 @@ function sumBodyTextChars(body: Record<string, unknown>): number {
     total += body.instructions.length;
   }
   if ('input' in body) {
-    total += sumResponsesInputChars(body.input);
+    total += sumResponsesInputChars(body.input, depth + 1);
   }
 
   return total;
 }
 
-function sumMessageTextChars(msg: unknown): number {
+function sumMessageTextChars(msg: unknown, depth: number): number {
   if (!isRecord(msg)) return 0;
+  if (depth > PROMPT_WALK_MAX_DEPTH) return 0;
 
   let total = 0;
 
@@ -475,10 +731,10 @@ function sumMessageTextChars(msg: unknown): number {
     total += content.length;
   } else if (Array.isArray(content)) {
     for (const part of content) {
-      total += sumContentPartTextChars(part);
+      total += sumContentPartTextChars(part, depth + 1);
     }
   } else if (isRecord(content)) {
-    total += sumContentPartTextChars(content);
+    total += sumContentPartTextChars(content, depth + 1);
   }
 
   // OpenAI assistant tool_calls: count function.arguments strings
@@ -493,9 +749,10 @@ function sumMessageTextChars(msg: unknown): number {
   return total;
 }
 
-function sumContentPartTextChars(part: unknown): number {
+function sumContentPartTextChars(part: unknown, depth: number): number {
   if (typeof part === 'string') return part.length;
   if (!isRecord(part)) return 0;
+  if (depth > PROMPT_WALK_MAX_DEPTH) return 0;
 
   const type = part.type;
 
@@ -535,7 +792,10 @@ function sumContentPartTextChars(part: unknown): number {
           : part.content;
       if (typeof text === 'string') return text.length;
       if (Array.isArray(text)) {
-        return text.reduce((sum: number, p: unknown) => sum + sumContentPartTextChars(p), 0);
+        return text.reduce(
+          (sum: number, p: unknown) => sum + sumContentPartTextChars(p, depth + 1),
+          0
+        );
       }
       return 0;
     }
@@ -545,15 +805,20 @@ function sumContentPartTextChars(part: unknown): number {
   if (typeof part.text === 'string') return part.text.length;
   if (typeof part.content === 'string') return part.content.length;
   if (Array.isArray(part.content)) {
-    return part.content.reduce((sum: number, p: unknown) => sum + sumContentPartTextChars(p), 0);
+    return part.content.reduce(
+      (sum: number, p: unknown) => sum + sumContentPartTextChars(p, depth + 1),
+      0
+    );
   }
 
   return 0;
 }
 
 // Responses API input: string, array of messages/parts, or object
-function sumResponsesInputChars(input: unknown): number {
+function sumResponsesInputChars(input: unknown, depth: number): number {
   if (typeof input === 'string') return input.length;
+  if (depth > PROMPT_WALK_MAX_DEPTH) return 0;
+
   if (Array.isArray(input)) {
     let total = 0;
     for (const item of input) {
@@ -566,7 +831,7 @@ function sumResponsesInputChars(input: unknown): number {
           typeof type === 'string' &&
           (type === 'function_call_output' || type === 'tool_call_output')
         ) {
-          total += sumContentPartTextChars(item);
+          total += sumContentPartTextChars(item, depth + 1);
         } else if (typeof type === 'string' && type === 'function_call') {
           // Responses API function_call: count arguments string
           if (typeof item.arguments === 'string') {
@@ -574,7 +839,7 @@ function sumResponsesInputChars(input: unknown): number {
           }
         } else {
           // Message-like object with role and content
-          total += sumMessageTextChars(item);
+          total += sumMessageTextChars(item, depth + 1);
         }
       }
     }
@@ -582,7 +847,7 @@ function sumResponsesInputChars(input: unknown): number {
   }
   if (isRecord(input)) {
     // Single message-like object
-    return sumMessageTextChars(input);
+    return sumMessageTextChars(input, depth + 1);
   }
   return 0;
 }

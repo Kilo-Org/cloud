@@ -1,4 +1,7 @@
+import { getToolUiResourceUri } from '@modelcontextprotocol/ext-apps/app-bridge';
 import { Data } from 'effect';
+
+import type { RemoteMcpTool } from './client.js';
 
 /**
  * A remote MCP server, and what can go wrong reaching it.
@@ -93,5 +96,23 @@ const callableName = (name: string): boolean => /^[A-Za-z0-9_-]+$/u.test(name);
 /** The name the model is offered a remote tool under. */
 const mcpToolName = (server: RemoteMcpServer, tool: string): string => `mcp_${server.id}_${tool}`;
 
+/**
+ * The MCP Apps view a tool's metadata names, if it names one.
+ *
+ * The official bridge package reads the metadata (`_meta.ui.resourceUri`, with
+ * the deprecated flat `_meta['ui/resourceUri']` beside it) and throws when a
+ * value is there but is not a `ui://` uri. A tool's metadata is a fact this
+ * host reports, not a contract it enforces — a server that writes something
+ * else there has a tool with no view, not a broken server — so the throw is
+ * read as no view.
+ */
+const uiResourceUriOf = (tool: Pick<RemoteMcpTool, '_meta'>): string | undefined => {
+  try {
+    return getToolUiResourceUri(tool);
+  } catch {
+    return undefined;
+  }
+};
+
 export type { RemoteMcpAuth, RemoteMcpFailure, RemoteMcpServer };
-export { callableName, explain, mcpToolName, RemoteMcpError };
+export { callableName, explain, mcpToolName, RemoteMcpError, uiResourceUriOf };

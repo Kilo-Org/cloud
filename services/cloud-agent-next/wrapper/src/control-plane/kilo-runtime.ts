@@ -1,9 +1,9 @@
+import { runtimeHarness, kilo2RuntimeEnvironment, probeKilo2Health } from './runtime-harness.js';
 import fs from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import fsp from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { createKiloClient } from '@kilocode/sdk';
 import { createKiloClient as createKiloEventClient } from '@kilocode/sdk/v2/client';
 import type {
   ControlDiagnosticReporter,
@@ -11,7 +11,10 @@ import type {
 } from '../../../src/shared/control-diagnostics.js';
 import type { ControlPlaneTimers } from '../../../src/shared/control-plane-timers.js';
 import { RUNTIME_CREDENTIAL_PROXY_AUDIENCE } from '../../../src/shared/runtime-credential-proxy-handle.js';
-import { createWrapperKiloClient, type WrapperKiloClient } from '../kilo-api.js';
+import type { ControlPlaneSessionCredentialsPayload } from '../../../src/shared/control-plane-protocol.js';
+import { WORKSPACE_MCP_SERVER_NAME } from '../control/worktree-runtime.js';
+import type { Harness } from './harness.js';
+import type { HarnessActivityEvent } from './harness-activity.js';
 import { createOwnedProcessScope, type OwnedProcessScope } from '../control/owned-processes.js';
 import { isKiloServerProcess } from '../tool-cgroup.js';
 import {
@@ -20,7 +23,6 @@ import {
   type WorkloadSnapshot,
 } from '../control/workload-cgroup.js';
 import {
-  createKiloEventFeed,
   type KiloEventFeed,
   type KiloEventFeedSource,
   type KiloFeedEvent,
@@ -43,13 +45,11 @@ import { writeCloudAgentRulesFile } from '../cloud-agent-rules-file.js';
 import type { AgentSandboxProvider } from '../../../src/shared/sandbox-provider.js';
 import {
   createKiloServerCredential,
-  fetchKiloServer,
   kiloClientConfig,
   type KiloServer,
 } from '../kilo-server-auth.js';
 
 const PIDFILE_SUFFIX = '.pid.json';
-const KILO_STARTUP_READY_PATTERN = /^kilo server listening on (http:\/\/127\.0\.0\.1:\d+)\r?\n/m;
 const KILO_STARTUP_OUTPUT_LIMIT = 65_536;
 /** Stop a replaced runtime within this bound; the wrapper's own cleanup budget. */
 const KILO_STOP_TIMEOUT_MS = 30_000;
@@ -230,11 +230,15 @@ async function defaultSpawnKiloProcess(input: KiloProcessSpawnInput): Promise<Ki
   const placement = admitControlWorkload(input.workload);
   const processes = createOwnedProcessScope(placement);
   input.onProcessScope?.(processes);
-  const credential = createKiloServerCredential();
+  const backend = runtimeHarness();
+  const credential = createKiloServerCredential(backend.username);
   // Own process group via the owned-process scope's detached spawn.
-  const proc = processes.spawn('kilo', ['serve', '--hostname=127.0.0.1', '--port=0'], {
+  const proc = processes.spawn(backend.cli, ['serve', '--hostname=127.0.0.1', '--port=0'], {
     cwd: input.directory,
-    env: { ...input.env, ...credential.env },
+    env: {
+      ...(backend.kind === 'kilo2' ? kilo2RuntimeEnvironment(input.env) : input.env),
+      ...credential.env,
+    },
   });
   proc.stderr.resume();
   const exited = new Promise<void>(resolve => {
@@ -249,7 +253,7 @@ async function defaultSpawnKiloProcess(input: KiloProcessSpawnInput): Promise<Ki
       const onAbort = (): void => fail(new Error('Kilo server startup aborted'));
       const onData = (chunk: Buffer): void => {
         output = (output + chunk.toString()).slice(-KILO_STARTUP_OUTPUT_LIMIT);
-        const match = KILO_STARTUP_READY_PATTERN.exec(output);
+        const match = backend.ready.exec(output);
         if (match?.[1]) {
           cleanup();
           resolve(match[1]);
@@ -297,11 +301,13 @@ export type KiloRuntimeOptions = {
   log?: (message: string) => void;
   onNativeDiagnostic?: ControlDiagnosticReporter;
   onEvent?: (event: KiloFeedEvent) => void;
+  onHarnessActivity?: (event: HarnessActivityEvent) => void;
   onActivityChange?: () => void;
   onDeadline?: (
     identity: ExecutionIdentity,
     reason: ExecutionFailure,
-    retry: ExecutionRetry | undefined
+    retry: ExecutionRetry | undefined,
+    stopped: Promise<boolean>
   ) => void;
   readSnapshot?: typeof readSessionSnapshot;
   /** Fired after Kilo comes back with a fresh process; B8 hands over busy turns. */
@@ -325,7 +331,7 @@ export type KiloRuntimeOptions = {
   /** Reads the OS process start time; undefined means "cannot verify". */
   readProcessStartTime?: (pid: number) => string | undefined;
   /** True when every session is idle and no PTY is open (credential install gate). */
-  isIdle?: (client: WrapperKiloClient, directory: string, signal: AbortSignal) => Promise<boolean>;
+  isIdle?: (client: Harness, directory: string, signal: AbortSignal) => Promise<boolean>;
   /** Names the reserved port in the agent rules; unknown leaves that rule out. */
   sandboxProvider?: AgentSandboxProvider;
   /** Creates the Kilo home/auth/runtime directories before spawn (spec §7). */
@@ -338,6 +344,7 @@ export type KiloRuntimeOptions = {
 
 export type KiloFeedCallbacks = {
   onEvent: (event: KiloFeedEvent) => void;
+  onHarnessActivity: (event: HarnessActivityEvent) => void;
   onFailure: () => void;
   /** The runtime's per-attempt abort signal, passed to the feed. */
   signal: AbortSignal;
@@ -346,15 +353,18 @@ export type KiloFeedCallbacks = {
 export type KiloRuntime = {
   readonly directory: string;
   readonly env: Record<string, string>;
-  readonly client: WrapperKiloClient;
-  ensure(): Promise<WrapperKiloClient>;
+  readonly client: Harness;
+  ensure(): Promise<Harness>;
   /**
    * Stores the env immediately; the turn owner authorizes an idle restart.
    */
-  installCredentials(env: Record<string, string>): Promise<void>;
+  installCredentials(
+    env: Record<string, string>,
+    cloudAgentMcp?: ControlPlaneSessionCredentialsPayload['cloudAgentMcp']
+  ): Promise<void>;
   /** Restarts with the pending credentials when the runtime is idle. B8 calls this. */
   applyPendingCredentials(canRestart: () => boolean): Promise<boolean>;
-  isRetiredClient(client: WrapperKiloClient): boolean;
+  isRetiredClient(client: Harness): boolean;
   /** The live phase; the native status line counts these without a second reader. */
   phase(): KiloRuntimePhase;
   isSuspected(): boolean;
@@ -372,7 +382,7 @@ export type KiloRuntime = {
  * resolve through this so a release during a restart is a no-op instead of an
  * exception that escapes the frame handler.
  */
-export function liveRuntimeClient(runtime: KiloRuntime | undefined): WrapperKiloClient | undefined {
+export function liveRuntimeClient(runtime: KiloRuntime | undefined): Harness | undefined {
   if (!runtime || runtime.isRestarting() || runtime.isUnavailable()) return undefined;
   try {
     return runtime.client;
@@ -412,6 +422,7 @@ function createHealthProbe(
   timeoutMs: number,
   observe: (observation: HealthProbeObservation) => void
 ): (signal: AbortSignal) => Promise<boolean> {
+  if (runtimeHarness().kind === 'kilo2') return signal => probeKilo2Health(server, signal);
   const client = createKiloEventClient(kiloClientConfig(server, directory));
   return async (): Promise<boolean> => {
     const controller = new AbortController();
@@ -476,7 +487,7 @@ function createHealthProbe(
 
 /** PTY half of credential maintenance; native idle comes from the supervisor. */
 async function defaultIsIdle(
-  client: WrapperKiloClient,
+  client: Harness,
   directory: string,
   signal: AbortSignal
 ): Promise<boolean> {
@@ -485,22 +496,12 @@ async function defaultIsIdle(
   const controller = new AbortController();
   const probeSignal = AbortSignal.any([signal, controller.signal]);
   try {
-    return await withTimeoutAndAbort(
-      (async () => {
-        const url = new URL('/pty', client.serverUrl);
-        url.searchParams.set('directory', directory);
-        const response = await fetchKiloServer(client.server, url, { signal: probeSignal });
-        if (!response.ok) return false;
-        const ptys: unknown = await response.json();
-        return Array.isArray(ptys) && ptys.length === 0;
-      })(),
-      {
-        signal,
-        timeoutMs: KILO_CONTROL_REQUEST_TIMEOUT_MS,
-        timeoutMessage: 'Kilo request timed out',
-        abortMessage: 'Kilo request cancelled',
-      }
-    );
+    return await withTimeoutAndAbort(client.terminals.isIdle(directory, probeSignal), {
+      signal,
+      timeoutMs: KILO_CONTROL_REQUEST_TIMEOUT_MS,
+      timeoutMessage: 'Kilo request timed out',
+      abortMessage: 'Kilo request cancelled',
+    });
   } finally {
     controller.abort();
   }
@@ -526,7 +527,7 @@ export async function prepareKiloFilesystem(
   }
   const dataHome = env.XDG_DATA_HOME;
   if (dataHome !== undefined && dataHome.length > 0) {
-    const authDirectory = path.join(dataHome, 'kilo');
+    const authDirectory = path.join(dataHome, runtimeHarness().dataDirectory);
     await fsp.mkdir(authDirectory, { recursive: true, mode: 0o700 });
     await fsp.writeFile(path.join(authDirectory, 'auth.json'), env.KILO_AUTH_CONTENT ?? '', {
       mode: 0o600,
@@ -540,6 +541,7 @@ export async function prepareKiloFilesystem(
 }
 
 export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
+  const backend = runtimeHarness();
   const timers = options.timers.wrapper;
   const reconnectProofMs = Math.floor(timers.sseSilenceMs * RECONNECT_PROOF_FRACTION);
   const scheduler = options.scheduler ?? defaultScheduler;
@@ -550,10 +552,11 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
   const openFeed =
     options.openFeed ??
     ((source: KiloEventFeedSource, callbacks: KiloFeedCallbacks) =>
-      createKiloEventFeed({
+      backend.feed({
         source,
         signal: callbacks.signal,
         onEvent: callbacks.onEvent,
+        onHarnessActivity: callbacks.onHarnessActivity,
         onFailure: callbacks.onFailure,
         log,
       }));
@@ -565,14 +568,14 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
   const latestWorkloadSnapshot = (): WorkloadSnapshot | undefined =>
     latestScope?.latestSnapshot() ?? options.latestWorkloadSnapshot?.();
   let pidfilePath: string | undefined;
-  let client: WrapperKiloClient | undefined;
+  let client: Harness | undefined;
   let feed: KiloEventFeed | undefined;
   let activity: RuntimeActivity | undefined;
   let nativeRuntimeId = '';
   let feedAttempt = 0;
   let probeHealth: ((signal: AbortSignal) => Promise<boolean>) | undefined;
   let healthObservation: HealthProbeObservation | undefined;
-  let starting: Promise<WrapperKiloClient> | undefined;
+  let starting: Promise<Harness> | undefined;
   let startAbort: AbortController | undefined;
   let phase: KiloRuntimePhase = 'running';
   /** Spec §7: one health probe per silence episode, reset by any activity. */
@@ -585,7 +588,7 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
   const restarts: number[] = [];
   /** Spec §7: at most `sseReconnectLimit` stream reconnects per `sseReconnectWindowMs`. */
   const reconnects: number[] = [];
-  const retiredClients = new WeakSet<WrapperKiloClient>();
+  const retiredClients = new WeakSet<Harness>();
   const memoryHold = createKiloMemoryHold({
     directory: options.directory,
     holdMs: timers.kiloMemoryHoldMs,
@@ -695,11 +698,24 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
             if (event.type !== KILO_CONNECTED_EVENT) onActivity();
             currentActivity?.observe(event);
             options.onEvent?.(event);
+            backend.onEvent?.(event);
             if (first) {
               first = false;
               finish(true);
               currentActivity?.connected();
             }
+          },
+          onHarnessActivity: event => {
+            if (
+              controller.signal.aborted ||
+              currentPhase() === 'stopped' ||
+              processId !== nativeRuntimeId ||
+              attempt !== feedAttempt
+            )
+              return;
+            onActivity();
+            currentActivity?.observeActivity(event);
+            options.onHarnessActivity?.(event);
           },
           onFailure: () => {
             if (
@@ -895,7 +911,7 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
     }
   }
 
-  async function start(): Promise<WrapperKiloClient> {
+  async function start(): Promise<Harness> {
     // Spec §7 pre-spawn filesystem: Kilo reads auth.json from disk, and a route
     // with no git and no setup commands never created the worktree directory.
     const env = options.env;
@@ -946,11 +962,12 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
     }
     pidfilePath = file;
     const server: KiloServer = { url: spawned.url, authorization: spawned.authorization };
-    const kilo = createWrapperKiloClient(
-      createKiloClient(kiloClientConfig(server, options.directory)),
+    const kilo = backend.create({
       server,
-      options.directory
-    );
+      directory: options.directory,
+      readSnapshot: options.readSnapshot,
+      log,
+    });
     const processId = nativeRuntimeId;
     activity = createRuntimeActivity({
       nativeRuntimeId: processId,
@@ -958,8 +975,8 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
       client: kilo,
       timers,
       now: () => scheduler.now(),
-      readSnapshot: options.readSnapshot,
-      onDeadline: (identity, reason, retry) => options.onDeadline?.(identity, reason, retry),
+      onDeadline: (identity, reason, retry, stopped) =>
+        options.onDeadline?.(identity, reason, retry, stopped),
       onChange: () => options.onActivityChange?.(),
       onFault: reason => {
         if (nativeRuntimeId !== processId) return true;
@@ -1020,7 +1037,7 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
     return kilo;
   }
 
-  async function ensure(): Promise<WrapperKiloClient> {
+  async function ensure(): Promise<Harness> {
     if (phase === 'stopped') throw new Error('Kilo runtime is shutting down');
     if (phase === 'unavailable') throw new Error('Kilo runtime is unavailable');
     if (client) return client;
@@ -1222,28 +1239,37 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
     },
     ensure,
     isRetiredClient: candidate => retiredClients.has(candidate),
-    async installCredentials(env: Record<string, string>): Promise<void> {
+    async installCredentials(env, cloudAgentMcp): Promise<void> {
       const installedHandle = options.env.KILOCODE_TOKEN;
       const incomingHandle = env.KILOCODE_TOKEN;
       const installedExp = proxyHandleExpiry(installedHandle);
       const incomingExp = proxyHandleExpiry(incomingHandle);
       if (installedExp !== undefined && incomingExp !== undefined) {
-        // Both sides are proxy handles. A repeated frame must not roll the
-        // credential (and must not clear a latched rollover); a stale frame
-        // whose handle expires earlier is ignored entirely.
-        if (installedHandle === incomingHandle) {
-          options.env = env;
-          return;
-        }
-        if (incomingExp <= installedExp) return;
-        options.env = env;
+        // Stale handles cannot replace the current environment or MCP grant.
+        if (installedHandle !== incomingHandle && incomingExp <= installedExp) return;
+        if (installedHandle !== incomingHandle) pendingCredentials = true;
+      } else {
         pendingCredentials = true;
-        return;
       }
-      // Store the refreshed env immediately; the running process keeps the old
-      // grant (valid below 1 h) until an idle restart applies the new one.
+      // Repeated proxy handles can still carry a renewed MCP credential.
       options.env = env;
-      pendingCredentials = true;
+      if (client && cloudAgentMcp) {
+        try {
+          await withTimeoutAndAbort(
+            client.updateCloudAgentMcp(
+              cloudAgentMcp,
+              AbortSignal.timeout(KILO_CONTROL_REQUEST_TIMEOUT_MS)
+            ),
+            {
+              timeoutMs: KILO_CONTROL_REQUEST_TIMEOUT_MS,
+              timeoutMessage: 'Cloud Agent MCP credential refresh timed out',
+              abortMessage: 'Cloud Agent MCP credential refresh aborted',
+            }
+          );
+        } catch {
+          log('control-plane MCP credential refresh failed; retaining pending credential restart');
+        }
+      }
     },
     applyPendingCredentials,
     needsCompute: () => activity?.needsCompute() ?? false,
@@ -1285,7 +1311,8 @@ export type KiloRuntimesOptions = Omit<
     identity: ExecutionIdentity,
     reason: ExecutionFailure,
     retry: ExecutionRetry | undefined,
-    key: string
+    key: string,
+    stopped: Promise<boolean>
   ) => void;
   onActivityChange?: (key: string) => void;
   onMemoryHold?: (info: { directory: string; held: boolean; key: string }) => void;
@@ -1297,7 +1324,7 @@ export type KiloRuntimes = {
     directory: string;
     env: Record<string, string>;
     workload?: ControlWorkload;
-  }): Promise<WrapperKiloClient>;
+  }): Promise<Harness>;
   get(key: string): KiloRuntime | undefined;
   remove(key: string): void;
   needsCompute(): boolean;
@@ -1385,9 +1412,11 @@ export function proxyHandleExpiry(token: string | undefined): number | undefined
 }
 
 /**
- * The MCP portion of the runtime configuration. Credential refreshes rotate the
- * Kilo alias inside `KILO_CONFIG_CONTENT`, so comparing the whole config would
- * false-positive; only `mcp` identifies the runtime's server set.
+ * The workspace-profile MCP portion of the runtime configuration. Credential
+ * refreshes rotate the Kilo alias inside `KILO_CONFIG_CONTENT`, and the
+ * workspace-owned built-in server carries a rotating workspace credential, so
+ * comparing the whole config or the raw server set would false-positive; only
+ * the workspace-profile servers identify the shared runtime's configuration.
  */
 function mcpConfigurationSignature(env: Record<string, string>): string {
   const raw = env.KILO_CONFIG_CONTENT;
@@ -1395,7 +1424,16 @@ function mcpConfigurationSignature(env: Record<string, string>): string {
   try {
     const parsed: unknown = JSON.parse(raw);
     if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return raw;
-    return JSON.stringify((parsed as { mcp?: unknown }).mcp ?? {});
+    const mcp = (parsed as { mcp?: unknown }).mcp;
+    if (typeof mcp !== 'object' || mcp === null || Array.isArray(mcp)) {
+      return JSON.stringify(mcp ?? {});
+    }
+    const profileServers = Object.fromEntries(
+      Object.entries(mcp as Record<string, unknown>).filter(
+        ([name]) => name !== WORKSPACE_MCP_SERVER_NAME
+      )
+    );
+    return JSON.stringify(profileServers);
   } catch {
     return raw;
   }
@@ -1448,9 +1486,11 @@ export function createKiloRuntimes(options: KiloRuntimesOptions): KiloRuntimes {
         pidfileDirectory,
         ...(input.workload ? { workload: input.workload } : {}),
         onEvent: event => options.onEvent?.({ ...event, runtimeKey: input.key }),
+        onHarnessActivity: event =>
+          options.onHarnessActivity?.({ ...event, runtimeKey: input.key }),
         onRestart: info => options.onRestart?.({ ...info, key: input.key }),
-        onDeadline: (identity, reason, retry) =>
-          options.onDeadline?.(identity, reason, retry, input.key),
+        onDeadline: (identity, reason, retry, stopped) =>
+          options.onDeadline?.(identity, reason, retry, input.key, stopped),
         onActivityChange: () => options.onActivityChange?.(input.key),
         onUnavailable: directory => options.onUnavailable?.(directory, input.key),
         onMemoryHold: info => options.onMemoryHold?.({ ...info, key: input.key }),

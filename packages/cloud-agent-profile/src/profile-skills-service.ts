@@ -1,6 +1,7 @@
 import type { WorkerDb } from '@kilocode/db';
 import {
   agent_environment_profile_skills,
+  agent_environment_profiles,
   type AgentEnvironmentProfileSkill,
 } from '@kilocode/db/schema';
 import { and, eq, count } from 'drizzle-orm';
@@ -24,6 +25,7 @@ import {
   type SkillCustomInput,
   type SkillUpdateInput,
 } from './contracts/skills';
+import { skillsShInputSchema, parseSkillsShSourceUrl, type SkillsShInput } from './skills-sh';
 
 export {
   MAX_PROFILE_SKILLS,
@@ -39,8 +41,11 @@ export {
   skillCustomInputSchema,
   skillUpdateInputSchema,
   parseSkillFrontmatter,
+  skillsShInputSchema,
 };
-export type { SkillCustomInput, SkillUpdateInput };
+export type { SkillCustomInput, SkillUpdateInput, SkillsShInput };
+
+type SkillWriteTransaction = Parameters<Parameters<WorkerDb['transaction']>[0]>[0];
 
 function toResponse(skill: AgentEnvironmentProfileSkill): ProfileSkillResponse {
   return {
@@ -57,8 +62,8 @@ function toResponse(skill: AgentEnvironmentProfileSkill): ProfileSkillResponse {
   };
 }
 
-async function assertSkillLimit(db: WorkerDb, profileId: string): Promise<void> {
-  const [row] = await db
+async function assertSkillLimit(tx: SkillWriteTransaction, profileId: string): Promise<void> {
+  const [row] = await tx
     .select({ n: count() })
     .from(agent_environment_profile_skills)
     .where(eq(agent_environment_profile_skills.profile_id, profileId));
@@ -107,6 +112,20 @@ export async function listSkillsForProfile(
   return skills.map(toResponse);
 }
 
+/**
+ * A profile's skills for a caller who holds the profile, ownership checked.
+ * The profile editor's Skills screen renders these and nothing else the
+ * profile carries.
+ */
+export async function getProfileSkills(
+  db: WorkerDb,
+  profileId: string,
+  owner: ProfileOwner
+): Promise<ProfileSkillResponse[]> {
+  await verifyProfileOwnership(db, profileId, owner);
+  return listSkillsForProfile(db, profileId);
+}
+
 export async function createCustomSkill(
   db: WorkerDb,
   profileId: string,
@@ -114,23 +133,69 @@ export async function createCustomSkill(
   owner: ProfileOwner
 ): Promise<{ id: string }> {
   await verifyProfileOwnership(db, profileId, owner);
-  await assertSkillLimit(db, profileId);
 
-  const [row] = await db
-    .insert(agent_environment_profile_skills)
-    .values({
-      profile_id: profileId,
-      name: input.name,
-      description: input.description ?? null,
-      source_type: 'custom',
-      source_url: null,
-      raw_markdown: input.rawMarkdown,
-      files: input.files ?? {},
-      enabled: input.enabled ?? true,
-    })
-    .returning({ id: agent_environment_profile_skills.id });
+  return await db.transaction(async tx => {
+    // Lock the owning profile row so the cap count and the insert are one
+    // serialized unit, keeping concurrent creates within the per-profile cap.
+    await tx
+      .select({ id: agent_environment_profiles.id })
+      .from(agent_environment_profiles)
+      .where(eq(agent_environment_profiles.id, profileId))
+      .for('update');
 
-  return { id: row.id };
+    await assertSkillLimit(tx, profileId);
+
+    const [row] = await tx
+      .insert(agent_environment_profile_skills)
+      .values({
+        profile_id: profileId,
+        name: input.name,
+        description: input.description ?? null,
+        source_type: 'custom',
+        source_url: null,
+        raw_markdown: input.rawMarkdown,
+        files: input.files ?? {},
+        enabled: input.enabled ?? true,
+      })
+      .returning({ id: agent_environment_profile_skills.id });
+
+    return { id: row.id };
+  });
+}
+
+export async function createSkillsShSkill(
+  db: WorkerDb,
+  profileId: string,
+  input: SkillsShInput,
+  owner: ProfileOwner
+): Promise<{ id: string }> {
+  await verifyProfileOwnership(db, profileId, owner);
+
+  return await db.transaction(async tx => {
+    await tx
+      .select({ id: agent_environment_profiles.id })
+      .from(agent_environment_profiles)
+      .where(eq(agent_environment_profiles.id, profileId))
+      .for('update');
+
+    await assertSkillLimit(tx, profileId);
+
+    const [row] = await tx
+      .insert(agent_environment_profile_skills)
+      .values({
+        profile_id: profileId,
+        name: input.source.skill,
+        description: null,
+        source_type: 'skills-sh',
+        source_url: input.source.sourceUrl,
+        raw_markdown: '',
+        files: {},
+        enabled: input.enabled ?? true,
+      })
+      .returning({ id: agent_environment_profile_skills.id });
+
+    return { id: row.id };
+  });
 }
 
 export async function updateSkill(
@@ -141,7 +206,17 @@ export async function updateSkill(
   owner: ProfileOwner
 ): Promise<void> {
   await verifyProfileOwnership(db, profileId, owner);
-  await fetchSkill(db, skillId, profileId);
+  const existing = await fetchSkill(db, skillId, profileId);
+
+  if (
+    existing.source_type === 'skills-sh' &&
+    (input.name !== undefined || input.rawMarkdown !== undefined || input.files !== undefined)
+  ) {
+    throw new TRPCError({
+      code: 'PRECONDITION_FAILED',
+      message: 'Skills.sh references cannot be modified; delete and re-add the skill instead',
+    });
+  }
 
   const updates: Partial<AgentEnvironmentProfileSkill> = {};
   if (input.name !== undefined) updates.name = input.name;
@@ -190,13 +265,20 @@ export async function setSkillEnabled(
 
 /**
  * Shape used for session materialization. Only enabled skills are returned.
+ * Custom and marketplace skills carry their bundle; skills.sh references carry
+ * only the validated `owner/repo` source and are installed during setup.
  * Internal: no ownership check.
  */
-export type SkillForSession = {
-  name: string;
-  rawMarkdown: string;
-  files: Record<string, string>;
-};
+export type SkillForSession =
+  | {
+      name: string;
+      rawMarkdown: string;
+      files: Record<string, string>;
+    }
+  | {
+      name: string;
+      source: string;
+    };
 
 export async function getSkillsForSession(
   db: WorkerDb,
@@ -205,6 +287,8 @@ export async function getSkillsForSession(
   const skills = await db
     .select({
       name: agent_environment_profile_skills.name,
+      sourceType: agent_environment_profile_skills.source_type,
+      sourceUrl: agent_environment_profile_skills.source_url,
       rawMarkdown: agent_environment_profile_skills.raw_markdown,
       files: agent_environment_profile_skills.files,
     })
@@ -216,5 +300,19 @@ export async function getSkillsForSession(
       )
     )
     .orderBy(agent_environment_profile_skills.name);
-  return skills.map(s => ({ ...s, files: s.files ?? {} }));
+
+  return skills.map(skill => {
+    if (skill.sourceType === 'skills-sh') {
+      const parsed = skill.sourceUrl ? parseSkillsShSourceUrl(skill.sourceUrl) : null;
+      if (!parsed || parsed.skill !== skill.name) {
+        throw new Error(`Skill '${skill.name}' does not match its skills.sh source URL`);
+      }
+      return { name: skill.name, source: parsed.ownerRepo };
+    }
+    return {
+      name: skill.name,
+      rawMarkdown: skill.rawMarkdown,
+      files: skill.files ?? {},
+    };
+  });
 }

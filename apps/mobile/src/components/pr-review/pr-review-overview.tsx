@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { type Href, useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { CheckCheck, GitPullRequest } from '@/components/ui/icons';
@@ -13,7 +13,10 @@ import { QueryError } from '@/components/query-error';
 import { MarkdownText } from '@/components/agents/markdown-text';
 import { PrOverviewMeta } from '@/components/pr-review/pr-review-meta-parts';
 import { PrReviewChecksSection } from '@/components/pr-review/pr-review-checks-section';
+import { PrReviewOverviewSkeleton } from '@/components/pr-review/pr-review-overview-skeleton';
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
+import { PrReviewSectionLabel } from '@/components/pr-review/pr-review-section-label';
+import { PrReviewUnavailableActions } from '@/components/pr-review/pr-review-unavailable-actions';
 import { PrMergeSection } from '@/components/pr-review/merge/pr-merge-section';
 import { PrMergeSectionProvider } from '@/components/pr-review/merge/pr-merge-section-provider';
 import {
@@ -26,6 +29,7 @@ import {
 } from '@/components/pr-review/pr-review-overview-parts';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { getGitHubIntegrationUrl } from '@/lib/agent-github-integration';
 import { WEB_BASE_URL } from '@/lib/config';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -33,6 +37,7 @@ import { classifyPrReviewQueryState } from '@/lib/pr-review/classify-pr-review-q
 import { useProviderPrQueries } from '@/lib/pr-review/provider-pr-queries';
 import { useCheckGitHubConnection } from '@/lib/pr-review/use-check-github-connection';
 import { trpcClient } from '@/lib/trpc';
+import { cn } from '@/lib/utils';
 
 const REVIEW_SUBMIT_PATH = '/(app)/pr-review/[owner]/[repo]/[number]/review-submit' as const;
 
@@ -49,28 +54,6 @@ type PrReviewOverviewProps = {
   readonly isActive: boolean;
   readonly refreshControl?: ScrollViewProps['refreshControl'];
 };
-
-function OverviewSkeleton() {
-  return (
-    <View className="gap-6">
-      <View className="gap-2">
-        <View className="h-5 w-20 rounded-full bg-muted" />
-        <View className="h-7 w-3/4 rounded bg-muted" />
-        <View className="h-5 w-1/2 rounded bg-muted" />
-      </View>
-      <View className="gap-2">
-        <View className="h-3 w-32 rounded bg-muted" />
-        <View className="h-3 w-48 rounded bg-muted" />
-        <View className="h-3 w-40 rounded bg-muted" />
-      </View>
-      <View className="gap-2">
-        <View className="h-3 w-full rounded bg-muted" />
-        <View className="h-3 w-5/6 rounded bg-muted" />
-        <View className="h-3 w-2/3 rounded bg-muted" />
-      </View>
-    </View>
-  );
-}
 
 export function PrReviewOverview({
   owner,
@@ -92,6 +75,32 @@ export function PrReviewOverview({
   const isMergeRequest = queries.platform === 'gitlab';
 
   const pr = useQuery(queries.overviewOptions());
+
+  // The checks card below the description grows downward from whatever frame
+  // it first paints: a head with no runs renders one copy line (plus the
+  // view-on-provider button when the screen published a URL), a head with runs
+  // renders a count header plus one row per status group. The Review button and
+  // PrMergeSection sit below it, so a card that painted a placeholder first and
+  // its body later pushed them down by the difference (30.9 dp on
+  // dev/pr-review-copy-fixture/overview, design gate at b3b389e1), and a
+  // placeholder that reserved the tallest shape pulled them ~100 dp upward
+  // whenever the head had no checks (`pr-review-acme-widgets-1`). No single
+  // placeholder height holds in all three states, so the body paints only once
+  // this read has settled: the card's first frame is its final one and the two
+  // actions never move. The read is enabled by the overview's own answer (it
+  // needs the head SHA), and a failed read settles here too, so the error arm
+  // and the empty/terminal states paint at once.
+  //
+  // The key carries the head SHA, so a refresh that returns a new commit starts
+  // a new read. `keepPreviousData` keeps the card that is already on screen
+  // until that read answers: without it the settled body would fall back to the
+  // skeleton on every head change, and the card's own answer would arrive into
+  // an empty page.
+  const headSha = pr.data?.headSha;
+  const checks = useQuery({
+    ...queries.checksOptions(headSha ?? '', headSha !== undefined),
+    placeholderData: keepPreviousData,
+  });
 
   const handleOpenReviewSubmit = useCallback(() => {
     const href: Href = {
@@ -115,7 +124,12 @@ export function PrReviewOverview({
   }, [t]);
 
   const state = pr.isError ? classifyPrReviewQueryState(pr.error) : null;
-  if (state && (!pr.data || state.kind !== 'retryable')) {
+  // A retryable gateway-class failure (retryable or service-unavailable)
+  // with cached data keeps it on screen: a failed background refetch of a
+  // previously loaded PR must not blank the overview. Every other state, or
+  // a first load with no data, renders the error states below.
+  const keepCachedData = state?.kind === 'retryable' || state?.kind === 'service-unavailable';
+  if (state && (!pr.data || !keepCachedData)) {
     if (state.kind === 'not-found') {
       return (
         <EmptyState
@@ -133,10 +147,19 @@ export function PrReviewOverview({
           }
           action={
             isGitHub ? (
-              <Button className="mt-3 w-full" onPress={handleInstallApp}>
+              <Button className={cn('mt-3 w-full', STATE_ACTION_CLASS)} onPress={handleInstallApp}>
                 <Text>{t('prReview.installKiloGitHubApp')}</Text>
               </Button>
-            ) : null
+            ) : (
+              // GitLab folds its connection failures (no integration, inactive
+              // integration) into the same NOT_FOUND a deleted merge request
+              // produces, so this state cannot be terminal: retry the read and
+              // offer the provider connection check alongside it.
+              <PrReviewUnavailableActions
+                onRetry={() => void pr.refetch()}
+                isRetrying={pr.isFetching}
+              />
+            )
           }
         />
       );
@@ -166,7 +189,8 @@ export function PrReviewOverview({
         return (
           <DetailScreenScrollView
             className="flex-1"
-            contentContainerClassName="p-4"
+            contentContainerClassName="px-4 pb-4 pt-3"
+            overlayRefreshProgress
             refreshControl={refreshControl}
           >
             <PrReviewReconnectNotice />
@@ -181,7 +205,7 @@ export function PrReviewOverview({
           description={t('prReview.reconnectNotice.message')}
           action={
             <Button
-              className="mt-3 w-full"
+              className={cn('mt-3 w-full', STATE_ACTION_CLASS)}
               onPress={() => {
                 connection.mutate();
               }}
@@ -193,15 +217,28 @@ export function PrReviewOverview({
         />
       );
     }
-    // retryable
+    // retryable / service-unavailable: the review read path could not serve
+    // the request. A BAD_GATEWAY (service-unavailable) — the authorization
+    // layer in front of GitHub, a GitHub 5xx, or a provider transport
+    // failure — names its own cause, while every other failure keeps the
+    // generic server-error copy. Both offer Retry. This arm runs only on a
+    // first load; a failed background refetch with cached data keeps the
+    // loaded overview (see the guard above).
+    let errorTitle = t('prReview.couldNotLoadPullRequest');
+    if (state.kind === 'service-unavailable') {
+      errorTitle = t('prReview.reviewServiceUnavailable');
+    } else if (isMergeRequest) {
+      errorTitle = t('prReview.terms.couldNotLoadMergeRequest');
+    }
     return (
       <QueryError
         refreshControl={refreshControl}
         variant="server"
-        title={
-          isMergeRequest
-            ? t('prReview.terms.couldNotLoadMergeRequest')
-            : t('prReview.couldNotLoadPullRequest')
+        title={errorTitle}
+        message={
+          state.kind === 'service-unavailable'
+            ? t('prReview.reviewServiceUnavailableDescription')
+            : undefined
         }
         onRetry={() => {
           void pr.refetch();
@@ -212,14 +249,15 @@ export function PrReviewOverview({
   }
 
   const data = pr.data;
-  if (!data) {
+  if (!data || checks.isLoading) {
     return (
       <DetailScreenScrollView
         className="flex-1"
-        contentContainerClassName="px-4"
+        contentContainerClassName="px-4 pt-3"
+        overlayRefreshProgress
         refreshControl={refreshControl}
       >
-        <OverviewSkeleton />
+        <PrReviewOverviewSkeleton />
       </DetailScreenScrollView>
     );
   }
@@ -232,13 +270,17 @@ export function PrReviewOverview({
   return (
     <DetailScreenScrollView
       className="flex-1"
-      contentContainerClassName="gap-5 px-4"
+      contentContainerClassName="gap-5 px-4 pt-3"
       keyboardShouldPersistTaps="handled"
+      overlayRefreshProgress
       refreshControl={refreshControl}
     >
       <View className="gap-3">
         <PrStateChip descriptor={chip} />
-        <Text className="text-[22px] font-semibold leading-7 text-foreground" numberOfLines={3}>
+        <Text
+          className="text-[22px] font-semibold leading-[1.75rem] text-foreground"
+          numberOfLines={3}
+        >
           {data.title}
         </Text>
         <PrAuthorRow author={data.author} />
@@ -254,9 +296,7 @@ export function PrReviewOverview({
       <PrOverviewMeta overview={data} />
 
       <View className="gap-2">
-        <Text variant="eyebrow" className="uppercase tracking-wide text-muted-foreground">
-          {t('prReview.description')}
-        </Text>
+        <PrReviewSectionLabel label={t('prReview.description')} />
         {data.bodyMarkdown && data.bodyMarkdown.trim().length > 0 ? (
           <View className="rounded-lg bg-card p-4">
             <MarkdownText value={data.bodyMarkdown} variant="assistant" />
@@ -268,28 +308,24 @@ export function PrReviewOverview({
         )}
       </View>
 
-      <PrReviewChecksSection owner={owner} repo={repo} number={number} headSha={data.headSha} />
+      <PrReviewChecksSection owner={owner} repo={repo} number={number} checks={checks} />
 
-      {isGitHub ? (
-        <View className="gap-2">
-          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            {t('prReview.review')}
-          </Text>
-          {/* The ScreenHeader already carries the primary Submit-review CTA
-              (same route). This section is its secondary re-entry, so it must
-              not be a second olive primary: the merge section below owns the
-              overview body's single primary action. */}
-          <Button
-            variant="outline"
-            onPress={handleOpenReviewSubmit}
-            accessibilityLabel={t('prReview.reviewPullRequest')}
-          >
-            <View className="flex-row items-center gap-2">
-              <CheckCheck size={14} color={colors.foreground} />
-              <Text>{t('prReview.review')}</Text>
-            </View>
-          </Button>
-        </View>
+      {isGitHub && data.state === 'open' ? (
+        // The ScreenHeader already carries the primary Submit-review CTA
+        // (same route). This section is its secondary re-entry, so it must
+        // not be a second olive primary: the merge section below owns the
+        // overview body's single primary action. A merged or closed review
+        // takes no review, so its body offers none.
+        <Button
+          variant="outline"
+          onPress={handleOpenReviewSubmit}
+          accessibilityLabel={t('prReview.reviewPullRequest')}
+        >
+          <View className="flex-row items-center gap-2">
+            <CheckCheck size={14} color={colors.foreground} />
+            <Text>{t('prReview.review')}</Text>
+          </View>
+        </Button>
       ) : null}
 
       {isGitHub ? (

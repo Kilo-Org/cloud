@@ -1,8 +1,16 @@
 import { StatusSpinner } from './StatusSpinner';
+import { TriangleAlert } from 'lucide-react';
 
-const VISIBLE_STATUSES = new Set(['busy', 'question', 'permission', 'retry']);
+const VISIBLE_STATUSES = new Set([
+  'busy',
+  'question',
+  'permission',
+  'retry',
+  'failed',
+  'system_interrupted',
+]);
 
-export type SessionActivityIndicatorKind = 'working' | 'attention';
+export type SessionActivityIndicatorKind = 'working' | 'attention' | 'failure';
 
 export function shouldShowSessionStatus(status: string | null, _statusUpdatedAt: string | null) {
   if (!status || !VISIBLE_STATUSES.has(status)) return false;
@@ -17,6 +25,7 @@ export function getSessionActivityIndicatorKind(
 
   if (status === 'busy' || status === 'retry') return 'working';
   if (status === 'question' || status === 'permission') return 'attention';
+  if (status === 'failed' || status === 'system_interrupted') return 'failure';
 
   return null;
 }
@@ -41,6 +50,15 @@ export function SessionStatusIndicator({
       );
     case 'attention':
       return <NeedsAttentionIndicator title={getNeedsAttentionTitle(status)} />;
+    case 'failure': {
+      const title =
+        status === 'system_interrupted' ? 'Last run stopped unexpectedly' : 'Last run failed';
+      return (
+        <span title={title} aria-label={title} role="img" className="flex shrink-0">
+          <TriangleAlert className="text-destructive h-4 w-4" aria-hidden="true" />
+        </span>
+      );
+    }
   }
 }
 

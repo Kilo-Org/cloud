@@ -29,12 +29,13 @@ export const NOTIFICATION_PREFERENCES_QUERY_KEY = [
 export function readNotificationPreferences(): Effect.Effect<NotificationPreferences, ToolFailure> {
   return Effect.tryPromise({
     try: async () => {
-      const preferences = await queryClient.ensureQueryData({
+      const preferences = await queryClient.query({
         queryKey: NOTIFICATION_PREFERENCES_QUERY_KEY,
         queryFn: async () => {
           const result = await trpcClient.user.getNotificationPreferences.query();
           return result;
         },
+        staleTime: 'static',
       });
       return preferences;
     },

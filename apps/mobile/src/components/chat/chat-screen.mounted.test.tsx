@@ -3,12 +3,12 @@
 import { createElement, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 import { ChatScreen } from '@/components/chat/chat-screen';
 import { act, type ReactTestRenderer } from '@/test/renderer';
-import { renderWithProviders } from '@/test/render-with-providers';
+import { renderWithProviders, type RenderWithProvidersResult } from '@/test/render-with-providers';
 import { type StoredChatBackend } from '@/lib/chat/backend-store';
-import { backendTargetId } from '@/lib/chat/backend-target';
+import { backendTargetId, CREDITS_FAILURE_KEY, localTargetId } from '@/lib/chat/backend-target';
 
 /**
  * What the chat screen draws while it is opening.
@@ -23,6 +23,16 @@ const state = vi.hoisted(() => ({
   status: 'opening' as 'opening' | 'idle' | 'working',
   messages: [] as { info: { id: string; role?: string } }[],
   asked: null as string | null,
+  askedFrom: null as string | null,
+  displaced: [] as {
+    id: string;
+    text: string;
+    images: { media: string; data: string }[];
+    model: string;
+    effort: 'low' | 'medium' | 'high' | null;
+    afterTurns: number;
+    outcome: 'failed' | 'stopped';
+  }[],
   failed: null as string | null,
   failureKey: null as string | null,
   retry: vi.fn(),
@@ -40,6 +50,11 @@ const state = vi.hoisted(() => ({
 }));
 
 type AlertAction = { onPress?: () => void };
+const router = vi.hoisted(() => ({
+  push: vi.fn<(href: string) => void>(),
+  dismissTo: vi.fn<(href: string) => void>(),
+}));
+vi.mock('expo-router', () => ({ useRouter: () => router }));
 const backendUi = vi.hoisted(() => ({
   profiles: [] as StoredChatBackend[],
   loaded: true,
@@ -97,6 +112,8 @@ vi.mock('@/lib/chat/use-chat', () => ({
       answering: [],
       status: state.status,
       asked: state.asked,
+      askedFrom: state.askedFrom,
+      displaced: state.displaced,
       waiting: [],
       failed: state.failed,
       failureKey: state.failureKey,
@@ -111,6 +128,7 @@ vi.mock('@/lib/chat/use-chat', () => ({
 vi.mock('@/lib/chat/turns', () => ({
   asMessages: () => state.messages,
   askedMessageId: (sessionId: string) => `${sessionId}:asked`,
+  displacedMessageId: (sessionId: string, id: string) => `${sessionId}:displaced:${id}`,
 }));
 vi.mock('@/lib/organization-context', () => ({
   useOrganization: () => ({ organizationId: null }),
@@ -155,11 +173,17 @@ vi.mock('@/components/agents/session-message-list', () => ({
   SessionMessageList: 'SessionMessageList',
 }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/centered-state-surface', () => ({ StateSurface: 'StateSurface' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/ui/icons', () => ({
+  AlertCircle: 'AlertCircle',
+  Lock: 'Lock',
   MessageCircle: 'MessageCircle',
-  Wrench: 'Wrench',
+  SearchX: 'SearchX',
   Server: 'Server',
+  ServerCrash: 'ServerCrash',
+  WifiOff: 'WifiOff',
+  Wrench: 'Wrench',
 }));
 vi.mock('@/components/ui/status-dot', () => ({ StatusDot: 'StatusDot' }));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
@@ -220,9 +244,13 @@ beforeEach(() => {
   state.status = 'opening';
   state.messages = [];
   state.asked = null;
+  state.askedFrom = null;
+  state.displaced = [];
   state.failed = null;
   state.failureKey = null;
   state.retry.mockClear();
+  router.push.mockClear();
+  router.dismissTo.mockClear();
   backendUi.profiles = [];
   backendUi.alert.mockClear();
   backendUi.loaded = true;
@@ -249,6 +277,52 @@ function isHandler(value: unknown): value is (...args: unknown[]) => unknown {
   return typeof value === 'function';
 }
 
+/** The props each state surface on screen was drawn with. */
+type StateProps = { title?: unknown; description?: unknown; action?: unknown };
+
+const emptyStatesOf = (tree: ReactTestRenderer): StateProps[] =>
+  tree.root.findAll(node => (node.type as string) === 'EmptyState').map(node => node.props);
+
+/** The copy the state's description node was given. */
+const descriptionMessageOf = (surface: StateProps): unknown =>
+  (surface.description as ReactElement<{ message: unknown }>).props.message;
+
+/** Mounts the state's action row, which the harness's stubbed `EmptyState` does not draw. */
+function mountAction(tree: ReactTestRenderer): Promise<RenderWithProvidersResult> {
+  const [surface] = emptyStatesOf(tree);
+  if (surface === undefined || surface.action === undefined) {
+    throw new TypeError('The state has no action');
+  }
+  return renderWithProviders(surface.action as ReactElement);
+}
+
+/** The copy the screen's status nodes carry, in tree order. */
+const messagesOf = (tree: ReactTestRenderer): unknown[] =>
+  tree.root
+    .findAll(node => (node.type as string) === 'AccessibleStatus')
+    .map(node => node.props.message);
+
+const buttonLabels = (tree: ReactTestRenderer): unknown[] =>
+  tree.root
+    .findAll(node => (node.type as string) === 'Button')
+    .map(button => button.find(node => (node.type as string) === 'Text').props.children);
+
+function press(tree: ReactTestRenderer, label: unknown): void {
+  const button = tree.root
+    .findAll(node => (node.type as string) === 'Button')
+    .find(node => node.find(child => (child.type as string) === 'Text').props.children === label);
+  if (button === undefined) {
+    throw new TypeError(`No button ${String(label)}`);
+  }
+  const { onPress } = button.props;
+  if (!isHandler(onPress)) {
+    throw new TypeError(`The ${String(label)} button has no press handler`);
+  }
+  act(() => {
+    onPress();
+  });
+}
+
 describe('the chat transcript while it opens', () => {
   it('shows a loading transcript instead of the empty state', async () => {
     const tree = await mount();
@@ -262,8 +336,16 @@ describe('the chat transcript while it opens', () => {
     state.status = 'idle';
     const tree = await mount();
 
-    expect(count(tree, 'EmptyState')).toBe(1);
+    /* A chat that finished opening with nothing in it and nothing wrong is the
+       one case that keeps the invitation to start one, with no failure beside
+       it. */
+    expect(emptyStatesOf(tree).map(surface => surface.title)).toEqual([
+      i18n.t('modelChat.empty.title'),
+    ]);
     expect(count(tree, 'SessionSkeletonMessages')).toBe(0);
+    expect(messagesOf(tree)).toEqual([]);
+    /* Nothing failed, so the chat takes a first message. */
+    expect(count(tree, 'ChatComposer')).toBe(1);
   });
 
   it.each([
@@ -342,6 +424,24 @@ function metricOf(tree: ReactTestRenderer): Metric {
   return metric;
 }
 
+describe('the chat header', () => {
+  it('spaces its three controls so they never sit flush', async () => {
+    state.status = 'idle';
+    const tree = await mount();
+    const header = tree.root.find(node => (node.type as string) === 'ScreenHeader');
+    const cluster = header.props.headerRight as ReactElement<{
+      className: string;
+      children: readonly ReactElement[];
+    }>;
+    // Three controls share this row: the context pill, the backend button and
+    // the tools button. Without a gap they touch, which reads as one broken
+    // control rather than three. Every other multi-control header cluster in
+    // the app carries the same spacing.
+    expect(cluster.props.className).toContain('gap-2');
+    expect(cluster.props.children).toHaveLength(3);
+  });
+});
+
 function details(tree: ReactTestRenderer) {
   return tree.root.find(node => (node.type as string) === 'ChatDetailsSheet').props as {
     readonly visible: boolean;
@@ -374,6 +474,43 @@ describe('the chat details', () => {
 });
 
 describe('backend context-transfer approval', () => {
+  it.each([
+    localTargetId('apple'),
+    localTargetId('android'),
+    localTargetId('gguf', 'qwen-test.gguf'),
+  ])('describes local processing and waits for approval before selecting %s', async target => {
+    state.status = 'idle';
+    const tree = await mount();
+    const composer = () =>
+      tree.root.find(node => (node.type as string) === 'ChatComposer').props as {
+        model: string;
+        onModelSelect: (model: string, variant: string) => void;
+      };
+
+    act(() => {
+      composer().onModelSelect(target, '');
+    });
+    expect(composer().model).toBe('m1');
+    const [title, message, actions] = backendUi.alert.mock.calls.at(-1) ?? [];
+    expect(title).toBe(i18n.t('modelChat.localModels.switchTitle'));
+    expect(message).toBe(i18n.t('modelChat.localModels.switchMessage', { name: target }));
+    expect(actions?.find(action => action.onPress)).toMatchObject({
+      text: i18n.t('modelChat.localModels.switchConfirm'),
+    });
+    act(() => {
+      actions?.find(action => action.onPress)?.onPress?.();
+    });
+    expect(composer().model).toBe(target);
+    act(() => {
+      composer().onModelSelect('m1', '');
+    });
+    expect(backendUi.alert.mock.calls.at(-1)?.slice(0, 2)).toEqual([
+      i18n.t('modelChat.backends.switchTitle'),
+      i18n.t('modelChat.backends.switchMessage', { name: 'm1' }),
+    ]);
+    expect(composer().model).toBe(target);
+  });
+
   it('requires approval when returning from a picked custom backend before its queued move finishes', async () => {
     state.status = 'working';
     const backend: StoredChatBackend = {
@@ -537,13 +674,78 @@ describe('the thinking effort of a chat', () => {
 });
 
 describe('a retained chat failure', () => {
-  it('shows only fixed copy and retries the retained work', async () => {
+  it('says the balance blocked the send and opens where the credit is bought', async () => {
+    state.status = 'idle';
+    state.asked = 'what is a monad';
+    state.failureKey = CREDITS_FAILURE_KEY;
+    state.messages = [{ info: { id: 's1:asked', role: 'user' } }];
+    const tree = await mount();
+
+    /* The question is still on screen, so the failure belongs to the composer
+       row above it rather than replacing the transcript. */
+    expect(messagesOf(tree)).toEqual(['Not enough credits to send this message.']);
+    expect(count(tree, 'EmptyState')).toBe(0);
+    /* The question kept in the transcript carries the only Retry; the row adds
+       the one action the message cannot offer. */
+    expect(buttonLabels(tree)).toEqual([i18n.t('addCredits.cta')]);
+    press(tree, i18n.t('addCredits.cta'));
+    expect(router.push).toHaveBeenCalledWith('/(app)/credits');
+    expect(state.retry).not.toHaveBeenCalled();
+  });
+});
+
+describe('a chat that settled without a transcript', () => {
+  it('draws the not-found copy once, with a way back and no empty state', async () => {
+    state.status = 'idle';
+    state.failureKey = 'queryError.notFoundDescription';
+    const tree = await mount();
+
+    /* One state, not two: the area says what is true — in the empty state's
+       place — and the composer is not drawn at all below it. */
+    expect(count(tree, 'EmptyState')).toBe(1);
+    expect(count(tree, 'ChatComposer')).toBe(0);
+    const [failure] = emptyStatesOf(tree);
+    expect(failure?.title).toBe(i18n.t('common.notFound'));
+    expect(descriptionMessageOf(failure ?? {})).toBe(i18n.t('queryError.notFoundDescription'));
+    expect(messagesOf(tree)).toEqual([]);
+    /* Entering it again settles the same state, so no Retry is offered. */
+    const action = await mountAction(tree);
+    expect(buttonLabels(action.renderer)).toEqual([i18n.t('common.back')]);
+    press(action.renderer, i18n.t('common.back'));
+    action.unmount();
+    expect(router.dismissTo).toHaveBeenCalledWith('/(app)/(tabs)/(4_chat)');
+  });
+
+  it('offers Retry and Back for a failure that could settle differently', async () => {
+    state.status = 'idle';
+    state.failureKey = 'common.somethingWentWrong';
+    const tree = await mount();
+
+    /* No transcript means nothing to send into, whichever failure it was. */
+    expect(count(tree, 'ChatComposer')).toBe(0);
+    const [failure] = emptyStatesOf(tree);
+    expect(failure?.title).toBe(i18n.t('common.somethingWentWrong'));
+    /* The title already says it, so the state does not repeat the sentence;
+       the neutral description carries the retry invitation instead. */
+    expect(descriptionMessageOf(failure ?? {})).toBe(i18n.t('queryError.neutralDescription'));
+    /* A balance caused nothing here, so no Add credits joins the two ways out. */
+    const action = await mountAction(tree);
+    expect(buttonLabels(action.renderer)).toEqual([i18n.t('common.retry'), i18n.t('common.back')]);
+    press(action.renderer, i18n.t('common.retry'));
+    action.unmount();
+    expect(state.retry).toHaveBeenCalledOnce();
+    expect(router.push).not.toHaveBeenCalled();
+  });
+
+  it('shows only fixed copy for a failure a provider body caused', async () => {
     state.status = 'idle';
     state.failed = 'Bearer provider-secret from a raw provider body';
     state.failureKey = 'modelChat.backends.deletedBackend';
     const tree = await mount();
-    const status = tree.root.find(node => (node.type as string) === 'AccessibleStatus');
-    expect(status.props.message).toBe(
+
+    expect(count(tree, 'ChatComposer')).toBe(0);
+    const [failure] = emptyStatesOf(tree);
+    expect(descriptionMessageOf(failure ?? {})).toBe(
       'This chat backend was deleted. Choose another backend to continue.'
     );
     expect(
@@ -553,13 +755,9 @@ describe('a retained chat failure', () => {
         )
       )
     ).toHaveLength(0);
-    const { onPress } = tree.root.find(node => (node.type as string) === 'Button').props;
-    if (!isHandler(onPress)) {
-      throw new TypeError('Retry button has no press handler');
-    }
-    act(() => {
-      onPress();
-    });
+    const action = await mountAction(tree);
+    press(action.renderer, i18n.t('common.retry'));
+    action.unmount();
     expect(state.retry).toHaveBeenCalledOnce();
   });
 });
@@ -654,6 +852,135 @@ describe('message actions', () => {
       failed.onLongPressDetails?.(state.messages[1]);
     });
     expect(sheetOf(tree).deliveryState).toEqual(failed.deliveryState);
+  });
+
+  it('keeps a failed question below the one that took its place, with its recovery', async () => {
+    state.status = 'idle';
+    state.asked = 'second question';
+    state.failureKey = CREDITS_FAILURE_KEY;
+    state.displaced = [
+      {
+        id: 'k1',
+        text: 'the long question that failed',
+        images: [],
+        model: 'kilo/one',
+        effort: null,
+        afterTurns: 0,
+        outcome: 'failed',
+      },
+    ];
+    // In the order the registry draws them: the failure, then the question that
+    // took its place.
+    state.messages = [
+      { info: { id: 's1:displaced:k1', role: 'user' } },
+      { info: { id: 's1:asked', role: 'user' } },
+    ];
+    const tree = await mount();
+    const kept = bubbleFor(tree, 's1:displaced:k1');
+
+    // It keeps the footer and the recovery it had in the slot.
+    expect(kept.deliveryState).toEqual({ status: 'failed', error: '', reason: 'execution' });
+    expect(bubbleFor(tree, 's1:asked').deliveryState).toEqual(kept.deliveryState);
+
+    act(() => {
+      kept.onRetryMessage?.(state.messages[0]);
+    });
+    // Its own Retry asks that question, not the one in the slot.
+    expect(state.retry).toHaveBeenCalledWith(state.displaced[0]);
+
+    act(() => {
+      kept.onLongPressDetails?.(state.messages[0]);
+    });
+    expect(sheetOf(tree).deliveryState).toEqual(kept.deliveryState);
+  });
+
+  it('reads a kept question the person stopped as interrupted', async () => {
+    state.status = 'idle';
+    state.displaced = [
+      {
+        id: 'k1',
+        text: 'stopped question',
+        images: [],
+        model: 'kilo/one',
+        effort: null,
+        afterTurns: 0,
+        outcome: 'stopped',
+      },
+    ];
+    state.messages = [{ info: { id: 's1:displaced:k1', role: 'user' } }];
+    const tree = await mount();
+
+    expect(bubbleFor(tree, 's1:displaced:k1').deliveryState).toMatchObject({
+      reason: 'interrupted',
+    });
+  });
+
+  it('draws a question it was asked again at its own bubble, with the slot recovery', async () => {
+    state.status = 'idle';
+    state.asked = 'the long question that failed';
+    state.askedFrom = 'k1';
+    state.failureKey = CREDITS_FAILURE_KEY;
+    state.displaced = [
+      {
+        id: 'k1',
+        text: 'the long question that failed',
+        images: [],
+        model: 'm1',
+        effort: null,
+        afterTurns: 0,
+        outcome: 'failed',
+      },
+    ];
+    state.messages = [{ info: { id: 's1:displaced:k1', role: 'user' } }];
+    const tree = await mount();
+    const bubble = bubbleFor(tree, 's1:displaced:k1');
+
+    // One bubble for one question: the attempt is drawn where it was said.
+    expect(bubble.deliveryState).toEqual({ status: 'failed', error: '', reason: 'execution' });
+    act(() => {
+      bubble.onRetryMessage?.(state.messages[0]);
+    });
+    // Its Retry asks the slot's question again, not a kept copy of itself.
+    expect(state.retry).toHaveBeenCalledTimes(1);
+    expect(state.retry.mock.calls[0]).toEqual([]);
+  });
+
+  it('falls back to its own bubble when the record the slot names is gone', async () => {
+    state.status = 'idle';
+    state.asked = 'a question whose kept record is no longer here';
+    state.askedFrom = 'gone';
+    state.failureKey = CREDITS_FAILURE_KEY;
+    state.displaced = [];
+    state.messages = [{ info: { id: 's1:asked', role: 'user' } }];
+    const tree = await mount();
+    const bubble = bubbleFor(tree, 's1:asked');
+
+    // The transcript drew the slot's own bubble, so the recovery is on it.
+    expect(bubble.deliveryState).toEqual({ status: 'failed', error: '', reason: 'execution' });
+    expect(bubble.onRetryMessage).toBeDefined();
+  });
+
+  it('shows no recovery under a question asked again while it is being asked', async () => {
+    state.status = 'working';
+    state.asked = 'the long question that failed';
+    state.askedFrom = 'k1';
+    state.displaced = [
+      {
+        id: 'k1',
+        text: 'the long question that failed',
+        images: [],
+        model: 'm1',
+        effort: null,
+        afterTurns: 0,
+        outcome: 'failed',
+      },
+    ];
+    state.messages = [{ info: { id: 's1:displaced:k1', role: 'user' } }];
+    const tree = await mount();
+    const bubble = bubbleFor(tree, 's1:displaced:k1');
+
+    expect(bubble.deliveryState).toBeUndefined();
+    expect(bubble.onRetryMessage).toBeUndefined();
   });
 
   it('reads a question with no failure as stopped, with no row under the transcript', async () => {

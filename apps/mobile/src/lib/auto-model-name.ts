@@ -33,3 +33,18 @@ export function autoModelLabel(id: string, fallbackName: string): string {
     lookup(AUTO_MODEL_NAME_KEYS, id) ?? lookup(AUTO_MODEL_NAME_KEYS, stripModelPrefix(id));
   return key ? i18n.t(key) : fallbackName;
 }
+
+/**
+ * The label for a stored model id from the live catalogue: the localized Auto
+ * name when the id is one of Kilo's, else the catalogue's own name, else
+ * `fallbackName` (the persisted name or the bare id) for a model the catalogue
+ * no longer carries. Settings rows resolve names through this so a row and the
+ * picker that writes it never name the same model differently.
+ */
+export function modelLabelFromCatalogue(
+  models: readonly { id: string; name: string }[],
+  id: string,
+  fallbackName: string = id
+): string {
+  return autoModelLabel(id, models.find(model => model.id === id)?.name ?? fallbackName);
+}

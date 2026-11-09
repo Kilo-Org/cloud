@@ -2,29 +2,31 @@ import * as Clipboard from 'expo-clipboard';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Clipboard as ClipboardIcon, SearchX, X } from '@/components/ui/icons';
 import { DirectionalChevronRight } from '@/components/ui/directional-icons';
-import { type ReactNode, useCallback, useRef, useState } from 'react';
+import { type ReactNode, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, type TextInput, View } from 'react-native';
-import { ActivityIndicator } from '@/components/ui/activity-indicator';
+import { Pressable, View } from 'react-native';
 
+import { ContextControl } from '@/components/context-control';
 import { EmptyState } from '@/components/empty-state';
 import { PrLinkPlaceholder } from '@/components/pr-review/pr-link-placeholder';
 import { PrReviewInboxList } from '@/components/pr-review/pr-review-inbox-list';
+import { PrReviewRecentsPending } from '@/components/pr-review/pr-review-recents-pending';
+import { providerPrNounKey } from '@/components/pr-review/pr-review-provider-noun';
 import { selectRecentPrRowState } from '@/lib/pr-review/recent-pr-row-state';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
+import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { providerPrRefLabel, providerPrRoutePath } from '@/lib/pr-review/provider-pr-ref';
-import { consumePrLinkInputEcho, pushPrLinkInputEcho } from '@/lib/pr-review/pr-link-input-echo';
 import {
-  decidePrLinkOpen,
-  decidePrLinkPaste,
   prLinkToastClipboardEmptyCopy,
-  prLinkToastInvalidCopy,
+  prLinkToastPasteDeniedCopy,
+  readPrLinkPasteClipboard,
   selectPrLinkClearButtonVisible,
 } from '@/lib/pr-review/pr-link-paste';
 import {
@@ -34,28 +36,33 @@ import {
   recentPrKey,
   removeRecentPr,
 } from '@/lib/pr-review/recent-prs';
+import { usePrLinkField } from '@/lib/pr-review/use-pr-link-field';
 
 export function PrReviewEntryScreen() {
   const router = useRouter();
   const colors = useThemeColors();
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
-  // Uncontrolled iOS input — keep the raw text in a ref so the submit
-  // handler reads the latest value without re-rendering on every
-  // keystroke. State is only for derived UI (whether there's any text).
-  // The TextInput component ref is for focus() and setNativeProps on
-  // programmatic paste.
-  const inputRef = useRef<TextInput>(null);
-  const inputValueRef = useRef<string>('');
-  // FIFO of values written via setNativeProps. Matching onChangeText values
-  // are treated as programmatic echoes (do not clobber ref).
-  // Order-agnostic membership so double-taps and delayed native echoes work.
-  const pendingProgrammaticTextsRef = useRef<string[]>([]);
-  const [hasInput, setHasInput] = useState(false);
+  // Seeded from the module draft: a review push unmounts this screen, and
+  // Back must bring the link and an enabled Open back without a re-paste.
+  const {
+    inputRef,
+    initialText,
+    hasInput,
+    linkState,
+    writeField,
+    handleFieldChange,
+    clearField,
+    restoreDraft,
+    submitDecision,
+  } = usePrLinkField();
   const [recent, setRecent] = useState<RecentPr[] | null>(null);
 
   useFocusEffect(
     useCallback(() => {
+      // A review push unmounts this screen; the module draft brings the link
+      // back when Back remounts it, so a cancelled open needs no re-paste.
+      restoreDraft();
       const state = { cancelled: false };
       void (async () => {
         const list = await getRecentPrs();
@@ -66,23 +73,12 @@ export function PrReviewEntryScreen() {
       return () => {
         state.cancelled = true;
       };
-    }, [])
+    }, [restoreDraft])
   );
 
-  const applyFieldText = (text: string) => {
-    pendingProgrammaticTextsRef.current = pushPrLinkInputEcho(
-      pendingProgrammaticTextsRef.current,
-      text
-    );
-    inputValueRef.current = text;
-    inputRef.current?.setNativeProps({ text });
-    setHasInput(text.length > 0);
-  };
-
   const handleSubmit = () => {
-    const decision = decidePrLinkOpen(inputValueRef.current);
+    const decision = submitDecision();
     if (decision.kind === 'invalid') {
-      announcingToast.error(prLinkToastInvalidCopy());
       return;
     }
     // Navigate straight to the ref's own provider route. Recents are written
@@ -95,16 +91,22 @@ export function PrReviewEntryScreen() {
   };
 
   const handlePaste = async () => {
-    const clipboard = await Clipboard.getStringAsync();
-    const decision = decidePrLinkPaste(clipboard);
-    if (decision.kind === 'empty') {
-      announcingToast.error(prLinkToastClipboardEmptyCopy());
+    // Every tap ends in a visible result: the field is replaced, or a toast
+    // names why nothing could be pasted. The reader never rejects, so a
+    // refused or broken clipboard read cannot vanish into the press handler.
+    const outcome = await readPrLinkPasteClipboard(Clipboard);
+    if (outcome.kind === 'empty') {
+      // iOS answers a denied prompt with an empty read, so the reader asks the
+      // prompt-free probe whether the clipboard still holds text before calling
+      // it empty; a read that failed outright reports the same denial.
+      announcingToast.error(
+        outcome.reason === 'denied' ? prLinkToastPasteDeniedCopy() : prLinkToastClipboardEmptyCopy()
+      );
       return;
     }
-    // Replace entire field (never append-at-cursor): native field + ref + hasInput.
-    applyFieldText(decision.text);
-    if (decision.kind === 'non-url-text') {
-      announcingToast.error(prLinkToastInvalidCopy());
+    // Replace the native field, ref and derived UI together, never append at the cursor.
+    writeField(outcome.text);
+    if (outcome.kind === 'non-url-text') {
       return;
     }
     handleSubmit();
@@ -121,7 +123,7 @@ export function PrReviewEntryScreen() {
   const handleRemoveRecent = (entry: RecentPr) => {
     confirm({
       title: t('prReview.entry.removeFromRecentsTitle'),
-      message: t('prReview.entry.removeFromRecentsMessage'),
+      message: `${providerPrRefLabel(providerRefFromRecentPr(entry))}\n${t('prReview.entry.removeFromRecentsMessage')}`,
       confirmLabel: t('common.remove'),
       onConfirm: () => {
         void (async () => {
@@ -138,21 +140,26 @@ export function PrReviewEntryScreen() {
 
   let recentsBody: ReactNode = null;
   if (recent === null) {
-    recentsBody = <ActivityIndicator size="small" color={colors.mutedForeground} />;
+    recentsBody = <PrReviewRecentsPending />;
   } else if (recent.length === 0) {
+    // The recents state is the last body of the inbox scroll, so it shares the
+    // screen with the INBOX section above it and never owns a clear region
+    // either: the full-size stack is what fell under the tab bar on a compact
+    // phone, and the footer's own gap already separates it from the RECENT
+    // eyebrow.
     recentsBody = (
       <EmptyState
         icon={SearchX}
         title={t('prReview.entry.noRecentPrs')}
         description={t('prReview.entry.noRecentPrsDescription')}
         placement="top"
+        compact
       />
     );
   } else {
     recentsBody = (
-      <View className="rounded-lg bg-secondary">
-        {recent.map((entry, index) => {
-          const isLast = index === recent.length - 1;
+      <View className="gap-3">
+        {recent.map(entry => {
           const rowState = selectRecentPrRowState(entry);
           const removeLabel = t('prReview.entry.removeRecentAccessibility', {
             repo: providerPrRefLabel(providerRefFromRecentPr(entry)),
@@ -161,65 +168,81 @@ export function PrReviewEntryScreen() {
             <View
               key={recentPrKey(entry)}
               testID="recent-row"
-              className={isLast ? '' : 'border-b-[0.5px] border-hair-soft'}
+              className="rounded-xl border border-border bg-card"
             >
               <Pressable
                 onPress={() => {
                   handleRecentPress(entry);
                 }}
-                className="flex-row items-center gap-3 px-3 py-3 active:opacity-70"
+                onLongPress={() => {
+                  handleRemoveRecent(entry);
+                }}
+                accessibilityRole="button"
+                accessibilityActions={[{ name: 'remove', label: removeLabel }]}
+                onAccessibilityAction={event => {
+                  if (event.nativeEvent.actionName === 'remove') {
+                    handleRemoveRecent(entry);
+                  }
+                }}
+                className="flex-row items-center gap-3 p-3 active:opacity-70"
               >
-                <View className="flex-1 gap-1">
+                <View className="min-w-0 flex-1 gap-1">
                   <Text
                     variant="small"
                     className="text-[10px] uppercase tracking-wide text-muted-foreground"
                   >
                     {rowState.provider}
                   </Text>
-                  <Text className="text-sm font-medium" numberOfLines={1}>
+                  <Text className="text-sm font-medium" numberOfLines={2}>
                     {rowState.primary}
                   </Text>
                   {rowState.secondary ? (
-                    <Text variant="muted" className="text-xs">
+                    <Text
+                      variant="muted"
+                      className="text-xs"
+                      numberOfLines={1}
+                      ellipsizeMode="middle"
+                    >
                       {rowState.secondary}
                     </Text>
                   ) : null}
                 </View>
                 <DirectionalChevronRight size={16} color={colors.mutedForeground} />
               </Pressable>
-              <View className="flex-row items-center justify-between gap-2 px-3 pb-3">
-                {rowState.failed ? (
-                  <Text variant="muted" className="text-xs">
-                    {t('prReview.entry.couldNotLoad')}
+              {rowState.failed ? (
+                // The footer names the item that failed, not just "couldn't
+                // load": the row stands for one pull/merge request, so the
+                // provider's own noun says what to retry. The retry keeps the
+                // link treatment — a bordered control beside the card's plain
+                // lines read as a piece of another surface — while its own node
+                // still carries the state-action box, because `hitSlop` widens
+                // the touch region without enlarging the rect an audit reads.
+                <View className="flex-row items-center justify-between gap-3 border-t border-hair-soft px-3 py-1">
+                  <Text variant="muted" className="min-w-0 flex-1 text-xs">
+                    {t('common.couldNotOpen', {
+                      label: t(providerPrNounKey(entry.platform ?? 'github')),
+                    })}
                   </Text>
-                ) : (
-                  <View />
-                )}
-                <View className="flex-row items-center gap-2">
-                  {rowState.failed ? (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onPress={() => {
-                        handleRecentPress(entry);
-                      }}
-                      accessibilityLabel={t('common.retry')}
-                    >
-                      <Text>{t('common.retry')}</Text>
-                    </Button>
-                  ) : null}
                   <Button
-                    size="sm"
-                    variant="outline"
+                    size="action"
+                    variant="link"
+                    className="px-0"
+                    hitSlop={{ top: 4, bottom: 4, left: 8, right: 8 }}
                     onPress={() => {
-                      handleRemoveRecent(entry);
+                      handleRecentPress(entry);
                     }}
-                    accessibilityLabel={removeLabel}
+                    accessibilityLabel={t('common.retry')}
                   >
-                    <Text>{t('common.remove')}</Text>
+                    {/* The card's own ink, not the link accent: this retry sits
+                        in a footer under a row's plain lines, and the accent is
+                        the loudest colour the dark card can carry, so it read
+                        as a second primary action over the screen's own Open
+                        button. The link affordance (the press underline) and
+                        the action box stay. */}
+                    <Text className="text-foreground">{t('common.retry')}</Text>
                   </Button>
                 </View>
-              </View>
+              ) : null}
             </View>
           );
         })}
@@ -228,101 +251,112 @@ export function PrReviewEntryScreen() {
   }
 
   const pasteBlock = (
-    <View className="gap-3">
-      <View className="flex-row items-center gap-2">
-        <View
-          className="min-h-14 min-w-0 flex-1 flex-row items-center rounded-md border border-border bg-card"
-          testID="pr-link-input-row"
-          collapsable={false}
-        >
-          <Input
-            ref={inputRef}
-            defaultValue=""
-            placeholder={urlPlaceholder}
-            // The native hint is not reliably one line: Android lays it out
-            // on a second line the one-line field clips. Both platforms draw
-            // the visible placeholder with the one-line PrLinkPlaceholder
-            // overlay instead; the hint stays set for the digest and
-            // accessibility text but is invisible.
-            placeholderTextColor="transparent"
-            autoCapitalize="none"
-            autoCorrect={false}
-            keyboardType="url"
-            numberOfLines={1}
-            onChangeText={value => {
-              // Don't setState on every keystroke; track only whether the
-              // input has any text. The raw value lives in the ref so
-              // handleSubmit reads the latest text without re-rendering.
-              const decision = consumePrLinkInputEcho(pendingProgrammaticTextsRef.current, value);
-              pendingProgrammaticTextsRef.current = [...decision.pending];
-              if (decision.kind === 'echo') {
-                // Echo of setNativeProps: inputValueRef already holds the
-                // intentional value from applyFieldText — do not clobber it
-                // with a delayed/stale echo.
-                return;
-              }
-              inputValueRef.current = value;
-              setHasInput(value.length > 0);
+    <View>
+      <View className="gap-4">
+        <View className="flex-row items-center gap-2">
+          <View
+            className="min-h-14 min-w-0 flex-1 flex-row items-center rounded-md border border-border bg-card"
+            testID="pr-link-input-row"
+            collapsable={false}
+          >
+            <Input
+              ref={inputRef}
+              defaultValue={initialText}
+              placeholder={urlPlaceholder}
+              // The native hint is not reliably one line: Android lays it out
+              // on a second line the one-line field clips. Both platforms draw
+              // the visible placeholder with the one-line PrLinkPlaceholder
+              // overlay instead; the hint stays set for the digest and
+              // accessibility text but is invisible.
+              placeholderTextColor="transparent"
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="url"
+              numberOfLines={1}
+              onChangeText={handleFieldChange}
+              // The shared single-line box (`@/components/ui/input`) supplies the
+              // height floor, the one line box for the placeholder and the value,
+              // and the RTL content alignment, so this field keeps only its own
+              // chrome and text size.
+              className="min-w-0 flex-1 bg-transparent pl-3 pr-1 text-base text-foreground"
+              accessibilityLabel={t('prReview.entry.urlAccessibility')}
+              returnKeyType="go"
+              onSubmitEditing={handleSubmit}
+            />
+            {!hasInput ? <PrLinkPlaceholder label={urlPlaceholder} /> : null}
+            {showClearButton ? (
+              // The clear control is icon-only like the paste control beside it,
+              // so it carries the same shared 48dp target; the 45pt box it used
+              // to render (`h-13`, which is 45pt at this app's 14pt rem) sits
+              // under Android's minimum.
+              <Pressable
+                onPress={clearField}
+                accessibilityRole="button"
+                accessibilityLabel={t('prReview.entry.clearLink')}
+                className={`${ICON_TARGET_BOX_CLASS} active:opacity-70`}
+              >
+                <X size={16} color={colors.mutedForeground} />
+              </Pressable>
+            ) : null}
+          </View>
+          <Pressable
+            onPress={() => {
+              void handlePaste();
             }}
-            // The shared single-line box (`@/components/ui/input`) supplies the
-            // height floor, the one line box for the placeholder and the value,
-            // and the RTL content alignment, so this field keeps only its own
-            // chrome and text size.
-            className="min-w-0 flex-1 bg-transparent pl-3 pr-1 text-base text-foreground"
-            accessibilityLabel={t('prReview.entry.urlAccessibility')}
-            returnKeyType="go"
-            onSubmitEditing={handleSubmit}
-          />
-          {!hasInput ? <PrLinkPlaceholder label={urlPlaceholder} /> : null}
-          {showClearButton ? (
-            // h-13 w-13 measures 45×45pt on device; h-12 is 42pt and h-11 is
-            // 38pt in this app — do not "simplify" back to h-11/w-11.
-            <Pressable
-              onPress={() => {
-                // clear() is the iOS-safe native empty after real typing.
-                // setNativeProps({ text: '' }) loses the most-recent-event-count
-                // race and leaves the typed text visible while React state
-                // thinks the field is empty. Do not route through
-                // applyFieldText('') (paste-only path) and do not push an
-                // echo for '' — a non-arriving echo would stale the FIFO.
-                inputValueRef.current = '';
-                setHasInput(false);
-                inputRef.current?.clear();
-                inputRef.current?.focus();
-              }}
-              accessibilityRole="button"
-              accessibilityLabel={t('prReview.entry.clearLink')}
-              className="h-13 w-13 items-center justify-center active:opacity-70"
-            >
-              <X size={16} color={colors.mutedForeground} />
-            </Pressable>
-          ) : null}
+            accessibilityRole="button"
+            accessibilityLabel={t('prReview.entry.pasteLink')}
+            className={`${ICON_TARGET_BOX_CLASS} rounded-md border border-border bg-card active:opacity-70`}
+          >
+            <ClipboardIcon size={18} color={colors.mutedForeground} />
+          </Pressable>
         </View>
-        <Pressable
-          onPress={() => {
-            void handlePaste();
-          }}
-          accessibilityRole="button"
-          accessibilityLabel={t('prReview.entry.pasteLink')}
-          hitSlop={4}
-          className="h-11 w-11 items-center justify-center rounded-md border border-border bg-card active:opacity-70"
+        <Button
+          disabled={linkState !== 'valid'}
+          onPress={handleSubmit}
+          accessibilityLabel={t('prReview.entry.openAccessibility')}
         >
-          <ClipboardIcon size={18} color={colors.mutedForeground} />
-        </Pressable>
+          <Text>{t('prReview.entry.open')}</Text>
+        </Button>
       </View>
-      <Button
-        disabled={!hasInput}
-        onPress={handleSubmit}
-        accessibilityLabel={t('prReview.entry.openAccessibility')}
-      >
-        <Text>{t('prReview.entry.open')}</Text>
-      </Button>
+      {/* The invalid-link notice is the field's own error and sits under the
+          field's action, not between the field and Open: a line there pushed
+          Open 38.5 dp away from the field and the two stopped reading as one
+          group. It keeps a one-line slot of its own, held apart from Open by
+          the form's small gap; the INBOX header then takes the section break
+          from the inbox list, the same token the RECENT header gets, so the
+          error reads as the form's last line and never as the first item of
+          the inbox.
+          The invisible copy holds the line's real box in BOTH states — a
+          wrapped sentence in a long locale or a larger text scale grows the
+          slot by the same amount with or without the error, so a pasted
+          non-PR link never moves the INBOX or RECENT headers, and the visible
+          line (drawn over the same slot) never spills into the INBOX header. */}
+      <View className="relative mt-2">
+        <Text
+          className="text-sm opacity-0"
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+        >
+          {t('prReview.linkPasteNotAPullRequest')}
+        </Text>
+        <View className="absolute inset-0">
+          <AccessibleStatus
+            className="text-sm"
+            message={linkState === 'invalid' ? t('prReview.linkPasteNotAPullRequest') : null}
+          />
+        </View>
+      </View>
     </View>
   );
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('common.prReview')} />
+      <ScreenHeader
+        title={t('common.prReview')}
+        headerRight={<ContextControl />}
+        headerRightShrinks
+        allowHeaderRightStacking={false}
+      />
       <PrReviewInboxList header={pasteBlock} recents={recentsBody} />
       {dialog}
     </View>

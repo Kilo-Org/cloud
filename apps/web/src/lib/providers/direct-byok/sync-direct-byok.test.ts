@@ -1,11 +1,13 @@
 import { DirectUserByokInferenceProviderIdSchema } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { direct_byok_model_lists } from '@kilocode/db/schema';
+import { ai_gateway_sync_providers_state, direct_byok_model_lists } from '@kilocode/db/schema';
 import { eq, inArray } from 'drizzle-orm';
 import type { DirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
 import {
+  indexCatalogModelIdsByCanonicalId,
   parseModelsDevProviderModels,
   parseOpenAICompatibleProviderModels,
+  syncAndStoreDirectByokProviders,
   syncDirectByokModels,
 } from './sync-direct-byok';
 
@@ -340,6 +342,43 @@ describe('parseModelsDevProviderModels', () => {
   });
 });
 
+describe('indexCatalogModelIdsByCanonicalId', () => {
+  test('maps canonical IDs to OpenRouter IDs, preferring the canonical ID and then the shortest', () => {
+    const index = indexCatalogModelIdsByCanonicalId({
+      openrouter: {
+        models: {
+          'deepseek/deepseek-v4.1-flash-1017': {
+            id: 'deepseek/deepseek-v4.1-flash-1017',
+            canonical_model_id: 'deepseek/deepseek-v4.1-flash',
+          },
+          'deepseek/deepseek-v4.1-flash': {
+            id: 'deepseek/deepseek-v4.1-flash',
+            canonical_model_id: 'deepseek/deepseek-v4.1-flash',
+          },
+          'z-ai/glm-5.2-0901': { id: 'z-ai/glm-5.2-0901', canonical_model_id: 'zhipuai/glm-5.2' },
+          'z-ai/glm-5.2': { id: 'z-ai/glm-5.2', canonical_model_id: 'zhipuai/glm-5.2' },
+          'minimax/minimax-m3.1-flash:free': {
+            id: 'minimax/minimax-m3.1-flash:free',
+            canonical_model_id: 'minimax/MiniMax-M3.1-Flash',
+          },
+          'openrouter/auto': { id: 'openrouter/auto' },
+        },
+      },
+    });
+
+    expect(Object.fromEntries(index)).toEqual({
+      'deepseek/deepseek-v4.1-flash': 'deepseek/deepseek-v4.1-flash',
+      'zhipuai/glm-5.2': 'z-ai/glm-5.2',
+    });
+  });
+
+  test('returns an empty index when models.dev lacks the openrouter provider', () => {
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(indexCatalogModelIdsByCanonicalId({}).size).toBe(0);
+    jest.restoreAllMocks();
+  });
+});
+
 describe('syncDirectByokModels database snapshots', () => {
   const providerId = 'nvidia-byok';
   const oldSyncedAt = '2020-01-02T03:04:05.000Z';
@@ -374,6 +413,9 @@ describe('syncDirectByokModels database snapshots', () => {
   ];
   let providerModels: Record<string, { id: string } & Record<string, unknown>>;
   let openCodeGoModels: Record<string, { id: string } & Record<string, unknown>>;
+  let openRouterModels: Record<string, { id: string } & Record<string, unknown>>;
+  let chutesModelsDevModels: Record<string, { id: string } & Record<string, unknown>>;
+  let chutesModels: Array<{ id: string }>;
   let fetchAvailableModels: () => Promise<Response>;
 
   beforeEach(async () => {
@@ -386,12 +428,17 @@ describe('syncDirectByokModels database snapshots', () => {
         )
       );
     providerModels = downloadedModels;
-    openCodeGoModels = {};
+    openCodeGoModels = { placeholder: { id: 'placeholder/model' } };
+    openRouterModels = {};
+    chutesModelsDevModels = {};
+    chutesModels = [{ id: 'placeholder/model' }];
     fetchAvailableModels = async () =>
       Response.json({ data: Object.values(providerModels).map(({ id }) => ({ id })) });
     jest.spyOn(globalThis, 'fetch').mockImplementation(async input => {
       if (input === 'https://models.dev/api.json') {
         return Response.json({
+          openrouter: { models: openRouterModels },
+          chutes: { models: chutesModelsDevModels },
           nvidia: { models: providerModels },
           'alibaba-token-plan': { models: {} },
           edenai: { models: {} },
@@ -400,6 +447,8 @@ describe('syncDirectByokModels database snapshots', () => {
           'opencode-go': { models: openCodeGoModels },
           'xiaomi-token-plan-ams': { models: {} },
           'xiaomi-token-plan-sgp': { models: {} },
+          'amazon-bedrock': { models: {} },
+          'google-vertex': { models: {} },
         });
       }
       if (input === 'https://integrate.api.nvidia.com/v1/models') {
@@ -408,7 +457,10 @@ describe('syncDirectByokModels database snapshots', () => {
       if (input === 'https://opencode.ai/zen/go/v1/models') {
         return Response.json({ data: Object.values(openCodeGoModels).map(({ id }) => ({ id })) });
       }
-      return Response.json({ data: [] });
+      if (input === 'https://llm.chutes.ai/v1/models') {
+        return Response.json({ data: chutesModels });
+      }
+      return Response.json({ data: [{ id: 'placeholder/model' }] });
     });
   });
 
@@ -441,16 +493,50 @@ describe('syncDirectByokModels database snapshots', () => {
     expect(Date.parse(snapshot.synced_at)).toBeGreaterThanOrEqual(startedAt);
     expect(Date.parse(snapshot.synced_at)).toBeLessThanOrEqual(Date.now());
     expect(counts[providerId]).toBe(normalizedModels.length);
-    expect(Object.values(counts).reduce((sum, count) => sum + count, 0)).toBe(
-      normalizedModels.length
-    );
     const snapshots = await db.select().from(direct_byok_model_lists);
     expect(snapshots.map(row => row.provider_id).sort()).toEqual(Object.keys(counts).sort());
-    expect(snapshots.filter(row => row.provider_id !== providerId).map(row => row.models)).toEqual(
-      Object.keys(counts)
-        .filter(id => id !== providerId)
-        .map(() => [])
-    );
+  });
+
+  test('persists the OpenRouter catalog model ID that models.dev identifies', async () => {
+    openRouterModels = {
+      'nvidia/reasoner-catalog': {
+        id: 'nvidia/reasoner-catalog',
+        canonical_model_id: 'nvidia/reasoner-canonical',
+      },
+      'moonshotai/kimi-k2.6': {
+        id: 'moonshotai/kimi-k2.6',
+        canonical_model_id: 'moonshotai/kimi-k2.6',
+      },
+    };
+    providerModels = {
+      reasoner: { id: 'nvidia/reasoner', canonical_model_id: 'nvidia/reasoner-canonical' },
+      unknown: { id: 'nvidia/unknown', canonical_model_id: 'nvidia/not-on-openrouter' },
+    };
+    chutesModelsDevModels = {
+      'moonshotai/Kimi-K2.6-TEE': {
+        id: 'moonshotai/Kimi-K2.6-TEE',
+        canonical_model_id: 'moonshotai/kimi-k2.6',
+      },
+    };
+    chutesModels = [{ id: 'moonshotai/Kimi-K2.6-TEE' }, { id: 'chutes-only-model' }];
+
+    await syncDirectByokModels();
+
+    const catalogModelIds = async (providerId: 'nvidia-byok' | 'chutes-byok') => {
+      const [row] = await db
+        .select()
+        .from(direct_byok_model_lists)
+        .where(eq(direct_byok_model_lists.provider_id, providerId));
+      return Object.fromEntries(row.models.map(model => [model.id, model.catalog_model_id]));
+    };
+    expect(await catalogModelIds('nvidia-byok')).toEqual({
+      'nvidia/reasoner': 'nvidia/reasoner-catalog',
+      'nvidia/unknown': undefined,
+    });
+    expect(await catalogModelIds('chutes-byok')).toEqual({
+      'moonshotai/Kimi-K2.6-TEE': 'moonshotai/kimi-k2.6',
+      'chutes-only-model': undefined,
+    });
   });
 
   test('re-sync replaces models and metadata, removes stale models, and refreshes synced_at', async () => {
@@ -483,16 +569,17 @@ describe('syncDirectByokModels database snapshots', () => {
     expect(counts[providerId]).toBe(1);
   });
 
-  test('persists a successful empty list over the previous snapshot', async () => {
+  test('rejects an empty upstream list without replacing the last successful snapshot', async () => {
     await syncDirectByokModels();
     await backdateSnapshot();
+    const previousSnapshot = await readSnapshot();
     fetchAvailableModels = async () => Response.json({ data: [] });
-    const counts = await syncDirectByokModels();
-    const snapshot = await readSnapshot();
 
-    expect(snapshot.models).toStrictEqual([]);
-    expect(new Date(snapshot.synced_at).toISOString()).not.toBe(oldSyncedAt);
-    expect(counts[providerId]).toBe(0);
+    await expect(syncDirectByokModels()).rejects.toThrow(
+      'Suspicious: https://integrate.api.nvidia.com/v1/models returned 0 entries, fewer than 1'
+    );
+
+    expect(await readSnapshot()).toStrictEqual(previousSnapshot);
   });
 
   test('re-sync removes previously synced OpenCode Go models served only over the Gemini API', async () => {
@@ -538,9 +625,56 @@ describe('syncDirectByokModels database snapshots', () => {
     };
 
     await expect(syncDirectByokModels()).rejects.toThrow(
-      'Failed to fetch nvidia-byok available models: 503 Service Unavailable'
+      'Fetching https://integrate.api.nvidia.com/v1/models failed: 503 Service Unavailable'
     );
 
     expect(await readSnapshot()).toStrictEqual(previousSnapshot);
+  });
+
+  describe('syncAndStoreDirectByokProviders', () => {
+    const providersCompletedAt = '2020-01-01T00:00:00.000Z';
+
+    beforeEach(async () => {
+      await db
+        .delete(ai_gateway_sync_providers_state)
+        .where(eq(ai_gateway_sync_providers_state.id, 1));
+      await db
+        .insert(ai_gateway_sync_providers_state)
+        .values({ id: 1, last_completed_at: providersCompletedAt });
+    });
+
+    async function readSyncState() {
+      const [row] = await db.select().from(ai_gateway_sync_providers_state);
+      return row;
+    }
+
+    test('records direct BYOK completion separately from the full provider sync', async () => {
+      const startedAt = Date.now();
+      const summary = await syncAndStoreDirectByokProviders();
+      const state = await readSyncState();
+
+      expect(summary.direct_byok_model_counts[providerId]).toBe(normalizedModels.length);
+      expect(summary.total_providers).toBe(Object.keys(summary.direct_byok_model_counts).length);
+      expect(summary.total_models).toBe(
+        Object.values(summary.direct_byok_model_counts).reduce((sum, count) => sum + count, 0)
+      );
+      expect(state.direct_byok_last_completed_at).not.toBeNull();
+      expect(new Date(state.direct_byok_last_completed_at ?? '').toISOString()).toBe(
+        summary.completed_at
+      );
+      expect(Date.parse(summary.completed_at)).toBeGreaterThanOrEqual(startedAt);
+      expect(new Date(state.last_completed_at ?? '').toISOString()).toBe(providersCompletedAt);
+    });
+
+    test('does not record completion when a provider fetch fails', async () => {
+      fetchAvailableModels = async () =>
+        new Response(null, { status: 503, statusText: 'Service Unavailable' });
+
+      await expect(syncAndStoreDirectByokProviders()).rejects.toThrow(
+        'Fetching https://integrate.api.nvidia.com/v1/models failed: 503 Service Unavailable'
+      );
+
+      expect((await readSyncState()).direct_byok_last_completed_at).toBeNull();
+    });
   });
 });

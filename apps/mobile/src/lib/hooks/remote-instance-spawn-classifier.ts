@@ -98,11 +98,9 @@ export const FORK_CUT_NOT_SYNCED_KEY = 'agentChat.newSession.forkCutNotSynced';
 
 /**
  * Map a delivered clone/import error string to the i18n key shown inline under
- * "Run on". `cloud session not found` → notFound; unauthorized/denied →
- * accessDenied; every other delivered string (including `cloud session import
- * failed`) → importFailed. Returns null only for the retryable
- * owner-vanished literal, which the classifier has already routed to
- * `retryable` before this helper runs.
+ * "Run on". `cloud session not found` → notFound; `cloud session cut not
+ * found` → forkCutNotSynced; unauthorized/denied → accessDenied; every other
+ * delivered string (including `cloud session import failed`) → importFailed.
  */
 export function resolveCloneImportFailureKey(message: string): string {
   if (message === CLOUD_SESSION_NOT_FOUND_LITERAL) {

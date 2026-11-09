@@ -441,7 +441,7 @@ export async function githubReviewPublishMain(
           publish: createGitHubReviewPublisher({
             target,
             token,
-            fetchImpl: fetch as FetchLike,
+            fetchImpl: fetch,
             apiBaseUrl: resolveApiBaseUrl(env),
             sleep: (ms, signal) =>
               new Promise<void>((resolve, reject) => {

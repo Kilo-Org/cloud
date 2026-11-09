@@ -71,6 +71,9 @@ vi.mock('@/lib/hooks/use-keep-screen-on-preference', () => ({
 vi.mock('@/lib/hooks/use-live-activity-preference', () => ({
   clearLiveActivityPreference: vi.fn(),
 }));
+vi.mock('@/lib/hooks/use-tracking-permission-prompt', () => ({
+  clearTrackingPromptDismissed: vi.fn(),
+}));
 vi.mock('@/lib/hooks/use-pr-review-footer-preference', () => ({
   clearPrReviewFooterPreference: vi.fn(),
 }));
@@ -132,6 +135,23 @@ vi.mock('react-native', () => ({
 // suites do, or Node's parser hits react-native's Flow-only `import typeof`.
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 
+// The auth graph imports `exchange-legacy-token`, which now builds the app
+// `User-Agent` through `client-metadata` -> `expo-application`; that module's
+// expo root needs `__DEV__` and cannot load in the node test environment.
+vi.mock('expo-application', () => ({ nativeApplicationVersion: '1.0.0' }));
+
+// The same graph builds an admission proof for the legacy exchange, which
+// reaches `@expo/app-integrity`; that module's expo root needs `__DEV__` too.
+vi.mock('@/lib/auth/admission', () => ({
+  getAdmission: vi.fn().mockResolvedValue({
+    platform: 'android',
+    kind: 'assertion',
+    challenge: 'challenge',
+    payload: 'proof',
+  }),
+  clearAttestKeyOnRefusal: vi.fn(),
+}));
+
 // These imported session-clear modules pull in native bindings that crash the
 // node test environment: use-trusted-hosts -> secure-store-preference ->
 // sonner-native -> react-native (Flow `import typeof`), and the cache/file
@@ -189,6 +209,12 @@ vi.mock('@/lib/artifacts/artifact-provider-native', () => ({
 // environment. The clear is a no-op here.
 vi.mock('@/lib/native-system-search', () => ({
   clearSystemSearchIndex: vi.fn().mockResolvedValue(undefined),
+}));
+
+// The App Intents catalog clear reaches the same entry through the app-action
+// bridge, so it is a no-op here too.
+vi.mock('@/lib/app-actions/session-catalog', () => ({
+  clearSessionCatalogBestEffort: vi.fn(),
 }));
 
 import * as SecureStore from 'expo-secure-store';

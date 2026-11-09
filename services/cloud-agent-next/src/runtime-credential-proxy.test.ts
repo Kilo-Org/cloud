@@ -388,6 +388,14 @@ describe('runtime credential proxy', () => {
     ['api prefix', 'https://worker.example.test/runtime/api', null],
     ['non-default port', 'https://worker.example.test:8443/runtime', null],
     ['HTTP', 'http://worker.example.test/runtime', null],
+    [
+      'local docker host with port',
+      'http://host.docker.internal:11694',
+      'http://host.docker.internal:11694',
+    ],
+    ['local loopback with port', 'http://localhost:8794', 'http://localhost:8794'],
+    ['local loopback https with port', 'https://127.0.0.1:8794', 'https://127.0.0.1:8794'],
+    ['local credentials', 'http://user@localhost:8794', null],
     ['credentials', 'https://user@worker.example.test/runtime', null],
     ['query', 'https://worker.example.test/runtime?next=x', null],
     ['fragment', 'https://worker.example.test/runtime#next', null],
@@ -465,15 +473,10 @@ describe('runtime credential proxy', () => {
     const base = 'https://worker.example.test/runtime';
     const handle = 'opaque-handle';
     const policy = buildVercelCredentialNetworkPolicy({
-      kilo: {
-        token: 'raw-secret',
-        placeholder: 'placeholder',
-        targets,
-        rootSessionIds: [root],
-        runtimeProxy: {
-          targets: { backendBaseUrl: base, providerBaseUrl: base, sessionIngestBaseUrl: base },
-          members: [{ sessionId: 'agent_proxy', kiloSessionId: root, handle }],
-        },
+      rootSessionIds: [root],
+      runtimeProxy: {
+        targets: { backendBaseUrl: base, providerBaseUrl: base, sessionIngestBaseUrl: base },
+        members: [{ sessionId: 'agent_proxy', kiloSessionId: root, handle }],
       },
     });
     const rules = policy.injectionRules ?? [];
@@ -499,7 +502,6 @@ describe('runtime credential proxy', () => {
         })
       ).toBeUndefined();
     }
-    expect(JSON.stringify(rules)).not.toContain('raw-secret');
   });
 
   it('requires exact identity and strict JSON for session creation', () => {
@@ -567,6 +569,18 @@ describe('runtime credential proxy', () => {
         kiloSessionId: 'kilo_1',
       })?.toString()
     ).toBe('https://provider.example.test/api/openrouter/chat/completions');
+    for (const base of ['https://backend.example.test/api', 'http://127.0.0.1:4300/api/']) {
+      expect(
+        resolveRuntimeCredentialProxyRoute({
+          targets: { ...targets, providerBaseUrl: base },
+          route: 'provider',
+          method: 'POST',
+          pathname: '/api/openrouter/chat/completions',
+          search: '?stream=true',
+          kiloSessionId: 'kilo_1',
+        })?.toString()
+      ).toBe(`${base.replace(/\/$/, '')}/openrouter/chat/completions?stream=true`);
+    }
     expect(
       resolveRuntimeCredentialProxyRoute({
         targets: { ...targets, providerBaseUrl: 'https://api.kilo.ai' },

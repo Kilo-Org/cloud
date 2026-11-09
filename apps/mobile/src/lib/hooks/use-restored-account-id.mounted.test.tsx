@@ -1,4 +1,5 @@
 import { createElement } from 'react';
+import type * as ReactQueryModule from '@tanstack/react-query';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 
@@ -7,7 +8,10 @@ import { useRestoredAccountId } from './use-restored-account-id';
 const getMe = vi.hoisted(() => ({ data: undefined as { id?: string } | undefined }));
 const getItemAsync = vi.hoisted(() => vi.fn<(key: string) => Promise<string | null>>());
 
-vi.mock('@tanstack/react-query', () => ({ useQuery: () => getMe }));
+vi.mock('@tanstack/react-query', async importOriginal => ({
+  ...(await importOriginal<typeof ReactQueryModule>()),
+  useQuery: () => getMe,
+}));
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({ user: { getMe: { queryOptions: () => ({}) } } }),
 }));

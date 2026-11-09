@@ -2,11 +2,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   authTerminalFingerprint,
+  claimAuthTerminalFailureReport,
   classifyAuthResponse,
   parseRetryAfterMs,
   reportAuthTerminalFailure,
   resetAuthTerminalReports,
-  shouldReportAuthTerminalFailure,
 } from '@/lib/auth/auth-response-class';
 import { setTelemetrySink, type TelemetryEvent } from '@/lib/telemetry/error-sink';
 
@@ -72,6 +72,17 @@ describe('classifyAuthResponse', () => {
     });
   });
 
+  it('classifies a 408 as retryable and carries Retry-After', () => {
+    expect(
+      classifyAuthResponse({ path: '/api/auth/native/token', status: 408, retryAfterHeader: '12' })
+    ).toEqual({ kind: 'retry', status: 408, retryAfterMs: 12_000 });
+    expect(classifyAuthResponse({ path: '/api/auth/native/token', status: 408 })).toEqual({
+      kind: 'retry',
+      status: 408,
+      retryAfterMs: undefined,
+    });
+  });
+
   it('classifies a 429 as retryable and carries Retry-After', () => {
     expect(
       classifyAuthResponse({ path: '/api/auth/native/otp', status: 429, retryAfterHeader: '12' })
@@ -110,9 +121,11 @@ describe('terminal failure reporting', () => {
   });
 
   it('uses one stable fingerprint for every repeat of the same failure', () => {
-    expect(authTerminalFingerprint('/api/auth/native/token', 401)).toEqual(
-      authTerminalFingerprint('/api/auth/native/token', 401)
-    );
+    expect(authTerminalFingerprint('/api/auth/native/token', 401)).toEqual([
+      'auth-terminal',
+      '/api/auth/native/token',
+      '401',
+    ]);
     expect(authTerminalFingerprint('/api/auth/native/token', 401)).not.toEqual(
       authTerminalFingerprint('/api/auth/native/refresh', 401)
     );
@@ -145,15 +158,55 @@ describe('terminal failure reporting', () => {
     expect(events).toHaveLength(2);
   });
 
+  it('files the stored credential expiry as a warning and every other terminal refusal as an error', () => {
+    const events: TelemetryEvent[] = [];
+    setTelemetrySink(event => {
+      events.push(event);
+    });
+
+    reportAuthTerminalFailure('/api/auth/native/refresh', 401);
+    reportAuthTerminalFailure('/api/auth/native/refresh', 400);
+    reportAuthTerminalFailure('/api/auth/native/token', 401);
+
+    // The expiry is the expected end of a session; the other two name defects.
+    expect(events.map(event => event.level)).toEqual(['warning', 'error', 'error']);
+    // Same event identity either way: one route and status keeps one issue.
+    expect(events[0]?.tags).toEqual({
+      'error.subsystem': 'auth',
+      'auth.outcome': 'terminal',
+      'auth.route': '/api/auth/native/refresh',
+      'http.status': 401,
+    });
+    expect(events.map(event => event.fingerprint)).toEqual([
+      ['auth-terminal', '/api/auth/native/refresh', '401'],
+      ['auth-terminal', '/api/auth/native/refresh', '400'],
+      ['auth-terminal', '/api/auth/native/token', '401'],
+    ]);
+  });
+
   it('reports nothing when no sink is installed', () => {
     expect(() => {
       reportAuthTerminalFailure('/api/auth/native/token', 401);
     }).not.toThrow();
   });
 
-  it('marks the first terminal failure as reportable and later repeats as not', () => {
+  it('claims the first report of a route and status and refuses every repeat', () => {
     resetAuthTerminalReports();
-    expect(shouldReportAuthTerminalFailure('/api/auth/native/refresh', 401)).toBe(true);
-    expect(shouldReportAuthTerminalFailure('/api/auth/native/refresh', 401)).toBe(false);
+    expect(claimAuthTerminalFailureReport('/api/auth/native/refresh', 401)).toBe(true);
+    expect(claimAuthTerminalFailureReport('/api/auth/native/refresh', 401)).toBe(false);
+    expect(claimAuthTerminalFailureReport('/api/auth/native/token', 401)).toBe(true);
+  });
+
+  it('lets a claim spend the report, so a later report of it files nothing', () => {
+    const events: TelemetryEvent[] = [];
+    setTelemetrySink(event => {
+      events.push(event);
+    });
+    resetAuthTerminalReports();
+
+    expect(claimAuthTerminalFailureReport('/api/auth/native/refresh', 401)).toBe(true);
+    reportAuthTerminalFailure('/api/auth/native/refresh', 401);
+
+    expect(events).toHaveLength(0);
   });
 });

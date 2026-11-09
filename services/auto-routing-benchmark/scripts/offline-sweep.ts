@@ -1,6 +1,5 @@
 import { createHash } from 'node:crypto';
 import { readFile, rename, writeFile } from 'node:fs/promises';
-import { setTimeout as delay } from 'node:timers/promises';
 import { parseArgs } from 'node:util';
 import * as z from 'zod';
 import { BenchmarkPairSchema, benchmarkPairKey } from '@kilocode/auto-routing-contracts';
@@ -185,8 +184,10 @@ async function main() {
       }
     }
   }
+  let unknownCost = sweep.pairs.some(pair => pair.results.some(result => result.costUsd === null));
+  if (unknownCost) sweep.truncated = true;
   const budgetAvailable = () => {
-    if (sweep.costUsd + sweep.graderCostUsd < maxUsd) return true;
+    if (!unknownCost && sweep.costUsd + sweep.graderCostUsd < maxUsd) return true;
     sweep.truncated = true;
     return false;
   };
@@ -261,51 +262,53 @@ async function main() {
           output = null;
         }
       }
-      for (let attempt = 0; agentic && attempt < 3; attempt++) {
+      if (agentic) {
         if (!budgetAvailable()) {
           error = 'Sweep budget exhausted before request';
-          break;
-        }
-        let retry = false;
-        try {
-          if (!containerUrl) throw new Error('Agentic cases require a container URL');
-          const response = await fetch(new URL('/run', containerUrl), {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body,
-            signal: AbortSignal.timeout(195_000 * agenticConcurrency),
-          });
-          if (!response.ok) {
-            await response.body?.cancel();
-            error = `Container returned HTTP ${response.status}`;
-            retry = response.status === 429 || response.status >= 500;
-          } else {
-            const result = containerResponseSchema.parse(await response.json());
-            const parsed = parseKiloRunEvents(result.stdoutLines);
-            modelCostUsd = parsed.costUsd;
-            ttftMs = containerTtftMs(result.stdoutLines, startedWall);
-            if (modelCostUsd !== null) sweep.costUsd += modelCostUsd;
-            if (result.timedOut || result.exitCode !== 0) {
-              error = result.timedOut
-                ? 'Container CLI timed out'
-                : `Container CLI exited ${result.exitCode}`;
-              break;
+        } else {
+          try {
+            if (!containerUrl) throw new Error('Agentic cases require a container URL');
+            const response = await fetch(new URL('/run', containerUrl), {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body,
+              signal: AbortSignal.timeout(195_000 * agenticConcurrency),
+            });
+            if (!response.ok) {
+              await response.body?.cancel();
+              error = `Container returned HTTP ${response.status}`;
+            } else {
+              const result = containerResponseSchema.parse(await response.json());
+              const parsed = parseKiloRunEvents(result.stdoutLines);
+              modelCostUsd = parsed.costUsd;
+              ttftMs = containerTtftMs(result.stdoutLines, startedWall);
+              if (modelCostUsd !== null) sweep.costUsd += modelCostUsd;
+              if (result.timedOut || result.exitCode !== 0) {
+                error = result.timedOut
+                  ? 'Container CLI timed out'
+                  : `Container CLI exited ${result.exitCode}`;
+              } else {
+                output = parsed.text;
+                error = modelCostUsd === null ? 'usage_missing' : null;
+                if (output.length === 0) {
+                  score = 0;
+                  error = 'Container response is missing answer content';
+                  output = null;
+                }
+              }
             }
-            output = parsed.text;
-            error = modelCostUsd === null ? 'usage_missing' : null;
-            if (output.length === 0) {
-              score = 0;
-              error = 'Container response is missing answer content';
-              output = null;
-            }
-            break;
+          } catch {
+            error = 'Container transport or body read failed';
           }
-        } catch {
-          error = 'Container transport or body read failed';
-          retry = true;
         }
-        if (!retry || attempt === 2) break;
-        await delay(1_000 * 2 ** attempt);
+      }
+      if (error === 'Sweep budget exhausted before request') {
+        sweep.truncated = true;
+        return;
+      }
+      if (modelCostUsd === null) {
+        unknownCost = true;
+        sweep.truncated = true;
       }
       const latencyMs = directLatencyMs ?? performance.now() - started;
       if (output !== null) {

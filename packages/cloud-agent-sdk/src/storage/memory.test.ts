@@ -210,6 +210,46 @@ describe('createMemoryStorage', () => {
     });
   });
 
+  describe('deleteMessage', () => {
+    test('removes parts a delta created before the message row', () => {
+      s.applyPartDelta('msg-1', 'p-1', 'text', 'hello');
+      const partsCb = jest.fn();
+      const messageCb = jest.fn();
+      const idsCb = jest.fn();
+      s.subscribe('parts:msg-1', partsCb);
+      s.subscribe('message:msg-1', messageCb);
+      s.subscribe('messageIds', idsCb);
+
+      s.deleteMessage('msg-1');
+
+      expect(s.getParts('msg-1')).toEqual([]);
+      expect(s.getMessageIds()).toEqual([]);
+      expect(partsCb).toHaveBeenCalledTimes(1);
+      expect(messageCb).not.toHaveBeenCalled();
+      expect(idsCb).not.toHaveBeenCalled();
+    });
+
+    test('removes parts that arrived before a later message row', () => {
+      s.applyPartDelta('msg-1', 'p-1', 'text', 'hello');
+      s.upsertMessage(makeMsg('msg-1'));
+
+      s.deleteMessage('msg-1');
+
+      expect(s.getParts('msg-1')).toEqual([]);
+      expect(s.getMessageIds()).toEqual([]);
+      expect(s.getMessageInfo('msg-1')).toBeUndefined();
+    });
+
+    test('keeps the parts of another id', () => {
+      s.applyPartDelta('msg-1', 'p-1', 'text', 'hello');
+      s.applyPartDelta('msg-2', 'p-2', 'text', 'kept');
+
+      s.deleteMessage('msg-1');
+
+      expect(s.getParts('msg-2').map(p => p.id)).toEqual(['p-2']);
+    });
+  });
+
   describe('getParts', () => {
     test('returns empty array for unknown messageId', () => {
       expect(s.getParts('unknown')).toEqual([]);

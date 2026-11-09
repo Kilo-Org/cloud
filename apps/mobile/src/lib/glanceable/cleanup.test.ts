@@ -1,6 +1,11 @@
+/* eslint-disable max-lines -- one cohesive suite: the terminal blanks, the org fence, and the republish fences they share */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { type GlanceableAgentsSnapshot } from '@kilocode/app-shared/glanceable-agents-snapshot';
+import {
+  buildOpaqueScopeKey,
+  type GlanceableAgentsSnapshot,
+} from '@kilocode/app-shared/glanceable-agents-snapshot';
+import { ACTIVE_USER_ID_KEY } from '@/lib/storage-keys';
 
 import {
   confirmGlanceableOrgMembership,
@@ -16,13 +21,23 @@ import { GlanceablePublisher } from './publisher';
 import {
   _resetGlanceablePersistForTests,
   _setLastGlanceableSnapshotForTests,
+  _setSecureStoreForTests,
   getLastGlanceableSnapshot,
+  persistGlanceableSink,
+  restorePersistedGlanceable,
 } from './persist';
 import {
   type GlanceableSink,
   registerGlanceableSink,
   unregisterGlanceableSink,
 } from './sink-registry';
+import {
+  _flushWaitingAskMirrorForTests,
+  _resetWaitingAskForTests,
+  _setSecureStoreForTests as _setAskSecureStoreForTests,
+  getWaitingAsk,
+  recordWaitingAsk,
+} from './waiting-ask';
 
 type SinkCall =
   | { type: 'publish'; snapshot: GlanceableAgentsSnapshot }
@@ -48,6 +63,28 @@ function makeSink() {
 
 const PUB_CTX = { userId: 'u1', organizationId: 'revoked-org' };
 
+/** A happy frame of one account, as that account's own publish built it. */
+function snapshotForScope(userId: string): GlanceableAgentsSnapshot {
+  return {
+    schemaVersion: 1,
+    revision: 1,
+    updatedAt: '2026-08-27T00:00:00.000Z',
+    expiresAt: '2026-08-27T08:00:00.000Z',
+    scopeKey: buildOpaqueScopeKey({ userId, organizationId: null }),
+    organizationBound: false,
+    status: 'happy',
+    running: 2,
+    needsInput: 1,
+    needsApproval: 1,
+    idle: 0,
+    scheduled: 0,
+    needsInputSince: '2026-08-26T23:00:00.000Z',
+    scheduledAt: null,
+    newestResultKind: 'running',
+    newestResultAt: '2026-08-26T23:30:00.000Z',
+  };
+}
+
 function lastSnapshot(calls: SinkCall[]): GlanceableAgentsSnapshot {
   const found = [...calls].toReversed().find(call => call.type === 'publish');
   if (found === undefined) {
@@ -58,6 +95,7 @@ function lastSnapshot(calls: SinkCall[]): GlanceableAgentsSnapshot {
 
 afterEach(() => {
   _resetGlanceablePersistForTests();
+  _resetWaitingAskForTests();
   // The lost-org latch is module state: release it so it cannot leak forward.
   confirmGlanceableOrgMembership();
   vi.useRealTimers();
@@ -76,6 +114,41 @@ describe('cleanup', () => {
     } finally {
       unregisterGlanceableSink(sink);
     }
+  });
+
+  it('ends the recorded ask with the account it named', async () => {
+    const askStore = new Map<string, string>();
+    _setAskSecureStoreForTests({
+      setItemAsync: (key, value) => {
+        askStore.set(key, value);
+        return Promise.resolve();
+      },
+      getItemAsync: key => Promise.resolve(askStore.get(key) ?? null),
+      deleteItemAsync: key => {
+        askStore.delete(key);
+        return Promise.resolve();
+      },
+    });
+    recordWaitingAsk({
+      kiloSessionId: 'ses_signing_out',
+      status: 'permission',
+      isCloudAgent: true,
+      scopeKey: buildOpaqueScopeKey(PUB_CTX),
+      organizationId: PUB_CTX.organizationId,
+      userId: PUB_CTX.userId,
+      recordedAt: Date.now(),
+      boundPermissionId: 'perm_signing_out',
+    });
+    await _flushWaitingAskMirrorForTests();
+    expect(askStore.size).toBe(1);
+
+    writeSignedOutSnapshotAndEnd();
+
+    // The ask names a session and an organization of the scope that just
+    // ended, so the blank ends it in memory and on disk alike.
+    expect(getWaitingAsk()).toBeNull();
+    await _flushWaitingAskMirrorForTests();
+    expect(askStore.size).toBe(0);
   });
 
   it('blanks every other sink when one sink throws', () => {
@@ -181,30 +254,17 @@ describe('cleanup', () => {
   });
 
   it('blanks to privacy only after a successful list misses the selection', () => {
-    expect(
-      planOrgFenceAction({
-        organizationId: 'missing-org',
-        orgs: [{ organizationId: 'kept-org' }],
-        isLoading: false,
-        isError: false,
-      })
-    ).toBe('privacy');
-    expect(
-      planOrgFenceAction({
-        organizationId: 'missing-org',
-        orgs: [{ organizationId: 'kept-org' }],
-        isLoading: true,
-        isError: false,
-      })
-    ).toBe('none');
-    expect(
-      planOrgFenceAction({
-        organizationId: 'kept-org',
-        orgs: [{ organizationId: 'kept-org' }],
-        isLoading: false,
-        isError: false,
-      })
-    ).toBe('confirmed');
+    const fence = {
+      organizationId: 'missing-org',
+      orgs: [{ organizationId: 'kept-org' }],
+      isLoading: false,
+      isError: false,
+    };
+    expect(planOrgFenceAction(fence)).toBe('privacy');
+    expect(planOrgFenceAction({ ...fence, isLoading: true })).toBe('none');
+    expect(planOrgFenceAction({ ...fence, organizationId: 'kept-org', orgs: fence.orgs })).toBe(
+      'confirmed'
+    );
     expect(
       planOrgFenceAction({ organizationId: null, orgs: [], isLoading: false, isError: false })
     ).toBe('confirmed');
@@ -241,6 +301,7 @@ describe('cleanup', () => {
       status: 'happy',
       running: 2,
       needsInput: 1,
+      needsApproval: 1,
       idle: 1,
       scheduled: 0,
       needsInputSince: '2026-08-26T23:00:00.000Z',
@@ -253,18 +314,14 @@ describe('cleanup', () => {
     const { sink, calls } = makeSink();
     registerGlanceableSink(sink);
     try {
-      for (const [index, now] of [
-        '2026-08-27T01:00:00.000Z',
-        '2026-08-27T07:59:59.999Z',
-      ].entries()) {
+      const staleAt = ['2026-08-27T01:00:00.000Z', '2026-08-27T07:59:59.999Z'];
+      const expiredAt = ['2026-08-27T08:00:00.000Z', '2026-08-27T09:00:00.000Z'];
+      for (const [index, now] of staleAt.entries()) {
         vi.setSystemTime(new Date(now));
         republishLastSnapshotStale();
         expect(lastSnapshot(calls)).toEqual({ ...seeded, revision: index + 4, status: 'stale' });
       }
-      for (const [index, now] of [
-        '2026-08-27T08:00:00.000Z',
-        '2026-08-27T09:00:00.000Z',
-      ].entries()) {
+      for (const [index, now] of expiredAt.entries()) {
         vi.setSystemTime(new Date(now));
         republishLastSnapshotStale();
         expect(lastSnapshot(calls)).toEqual({
@@ -273,10 +330,49 @@ describe('cleanup', () => {
           status: 'expired',
           running: 0,
           needsInput: 0,
+          needsApproval: 0,
           idle: 0,
           needsInputSince: null,
         });
       }
+    } finally {
+      unregisterGlanceableSink(sink);
+    }
+  });
+
+  it('republishes a restored record only for the signed-in scope', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-27T01:00:00.000Z'));
+    const store = new Map<string, string>();
+    const secureStore = {
+      setItemAsync: async (key: string, value: string) => {
+        store.set(key, value);
+        await Promise.resolve();
+      },
+      getItemAsync: async (key: string) => {
+        await Promise.resolve();
+        return store.get(key) ?? null;
+      },
+    };
+    _setSecureStoreForTests(secureStore);
+    const record = {
+      ...snapshotForScope('u1'),
+      revision: 6,
+      updatedAt: '2026-08-27T00:30:00.000Z',
+      expiresAt: '2026-08-27T08:00:00.000Z',
+    } satisfies GlanceableAgentsSnapshot;
+    persistGlanceableSink.publish(record);
+    // A restart: the identity on this device derives another scope.
+    _resetGlanceablePersistForTests();
+    _setSecureStoreForTests(secureStore);
+    store.set(ACTIVE_USER_ID_KEY, 'u2');
+    await restorePersistedGlanceable();
+
+    const { sink, calls } = makeSink();
+    registerGlanceableSink(sink);
+    try {
+      republishLastSnapshotStale();
+      expect(calls).toEqual([]);
     } finally {
       unregisterGlanceableSink(sink);
     }
@@ -296,6 +392,7 @@ describe('cleanup', () => {
         status,
         running: 0,
         needsInput: 0,
+        needsApproval: 0,
         idle: 0,
         scheduled: 0,
         needsInputSince: null,
@@ -315,9 +412,9 @@ describe('cleanup', () => {
             status,
             scopeKey: terminal.scopeKey,
             updatedAt: terminal.updatedAt,
-            expiresAt: terminal.expiresAt,
             running: 0,
             needsInput: 0,
+            needsApproval: 0,
             idle: 0,
             needsInputSince: null,
           });

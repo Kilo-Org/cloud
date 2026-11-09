@@ -28,6 +28,15 @@ import {
   getPlatformOAuthConnectPath,
 } from '@/lib/integrations/oauth/paths';
 import { useConfirm } from '@/components/ui/confirm';
+import { resolveConnectionErrorMessage } from '@/components/integrations/connection-error-message';
+
+const gitlabConnectionErrorMessages: Record<string, string> = {
+  missing_code: 'Authorization code missing from GitLab',
+  connection_failed: 'Failed to connect to GitLab',
+  oauth_init_failed: 'Failed to initiate GitLab OAuth',
+  permission_required: 'You need a billing role to replace this GitLab integration',
+  organization_access_required: 'You do not have access to this organization',
+};
 
 type GitLabIntegrationDetailsProps = {
   organizationId?: string;
@@ -157,14 +166,18 @@ export function GitLabIntegrationDetails({
   // Connect with PAT mutation
   const { mutate: connectWithPATMutate, isPending: isConnectingWithPAT } = useMutation(
     trpc.gitlab.connectWithPAT.mutationOptions({
-      onSuccess: () => {
-        toast.success('GitLab connected successfully!');
+      onSuccess: result => {
+        const warning = result.warnings?.join(' ');
+        toast.success('GitLab connected successfully!', warning ? { description: warning } : {});
         // Reset PAT form
         setPatToken('');
         setPATValidation({ status: 'idle' });
         setConnectionMethod('oauth');
-        // Reload the page to refresh the installation data
-        window.location.reload();
+        // Refresh the installation in place. A reload here would replace the
+        // document and discard the toast before it can be read.
+        void queryClient.invalidateQueries({
+          queryKey: trpc.gitlab.getInstallation.queryKey(input),
+        });
       },
       onError: err => {
         toast.error('Failed to connect', { description: err.message });
@@ -272,14 +285,13 @@ export function GitLabIntegrationDetails({
       toast.success('GitLab connected successfully!');
     }
     if (error) {
-      const errorMessages: Record<string, string> = {
-        missing_code: 'Authorization code missing from GitLab',
-        connection_failed: 'Failed to connect to GitLab',
-        oauth_init_failed: 'Failed to initiate GitLab OAuth',
-        permission_required: 'You need a billing role to replace this GitLab integration',
-        organization_access_required: 'You do not have access to this organization',
-      };
-      toast.error(errorMessages[error] || `Connection failed: ${error}`);
+      toast.error(
+        resolveConnectionErrorMessage(
+          gitlabConnectionErrorMessages,
+          error,
+          `Connection failed: ${error}`
+        )
+      );
     }
   }, [success, error]);
 

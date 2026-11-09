@@ -1,18 +1,21 @@
+/* eslint-disable max-lines -- the transcript element-tree suite asserts this component's unrendered tree, so splitting the failure footer behind a component boundary would hide every assertion's target */
 import { memo, useCallback, useMemo } from 'react';
 import {
   type MessageDeliveryState,
   type Part,
   type StoredMessage,
 } from '@kilocode/cloud-agent-sdk';
-import { Clock } from '@/components/ui/icons';
+import { AlertCircle, Clock } from '@/components/ui/icons';
 import { type AccessibilityActionEvent, Platform, Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { Bubble } from '@/components/ui/bubble';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
+import { cn } from '@/lib/utils';
 
 import { InMessageBubbleContext } from './bubble-text-selection-context';
 import { ChatMarkdownText } from './chat-markdown-text';
@@ -22,10 +25,10 @@ import { FilePartRenderer } from './file-part-renderer';
 import { buildAgentMessageBubbleAccessibilityProps } from './message-bubble-a11y';
 import { MessageErrorBoundary } from './message-error-boundary';
 import { MessageLongPressProvider } from './message-long-press-context';
-import { selectMessageFailure } from './message-failure-state';
+import { messageFailureLabel, selectMessageFailure } from './message-failure-state';
 import { partRendersContent } from './message-visibility';
 import { PartRenderer } from './part-renderer';
-import { firstHumanText, isFilePart, isTextPart } from './part-types';
+import { firstHumanText, humanTextParts, isFilePart } from './part-types';
 import { groupMessageParts } from './session-tool-run';
 import { CondensedToolRunRow } from './tool-run-rows';
 import { useMessageCopy } from './use-message-copy';
@@ -60,6 +63,19 @@ type MessageBubbleProps = {
   holdQueuedSlot?: boolean;
   /** Retries a failed message. The failure footer renders only when supplied. */
   onRetryMessage?: (message: StoredMessage) => void;
+  /**
+   * Opens the credit purchase screen, for a failed turn the account's own
+   * balance caused. Adding credits never needs the session to accept a
+   * re-send, so this action renders even where `retryAvailable` is false.
+   */
+  onAddCredits?: () => void;
+  /**
+   * Whether this row's session can accept a re-send now. When false the failure
+   * footer keeps its statement and drops the Retry, so a read-only transcript or
+   * a session without a live transport still says why the turn failed. Defaults
+   * to true.
+   */
+  retryAvailable?: boolean;
   /** Copies a failed user message's text back into the composer. */
   onCopyToComposer?: (text: string) => void;
   /** Restores a canceled queued message's prompt back into the composer. */
@@ -85,6 +101,8 @@ function MessageBubbleImpl({
   onLongPressDetails,
   holdQueuedSlot,
   onRetryMessage,
+  onAddCredits,
+  retryAvailable,
   onCopyToComposer,
   onRestoreQueued,
   condenseToolCalls,
@@ -114,8 +132,7 @@ function MessageBubbleImpl({
   const userTextContent = useMemo(
     () =>
       isUser
-        ? parts
-            .filter(part => isTextPart(part))
+        ? humanTextParts(parts)
             .map(p => p.text)
             .join('\n\n')
         : '',
@@ -146,35 +163,75 @@ function MessageBubbleImpl({
     );
   }
 
-  // Failed-row footer. Renders only when the relevant handler is wired
+  // Failed-row footer. Renders when the relevant handler is wired
   // (mobile-w2b wires onRetryMessage/onCopyToComposer); a delivery row needs
-  // Retry or Copy, an assistant row needs Retry only.
-  const failure = selectMessageFailure({ deliveryState, info: message.info });
+  // Retry or Copy, an assistant row needs Retry or, when the account's balance
+  // caused the failure, Add credits. A caller that already knows the session
+  // cannot accept a re-send passes `retryAvailable: false`: the footer then
+  // still states the failure, with no action that could not act.
+  const failure = selectMessageFailure({ deliveryState, info: message.info, retryAvailable });
   const relevantHandlerWired =
-    failure?.kind === 'delivery'
-      ? onRetryMessage !== undefined || onCopyToComposer !== undefined
-      : onRetryMessage !== undefined;
+    retryAvailable === false ||
+    (failure !== null &&
+      (failure.kind === 'delivery'
+        ? onRetryMessage !== undefined || onCopyToComposer !== undefined
+        : onRetryMessage !== undefined || (failure.canAddCredits && onAddCredits !== undefined)));
+  // The footer is the failed turn's status, so it sits in the column that turn
+  // occupies rather than the row that carries it: a message that never reached
+  // the agent is the user's own row, and its title, detail and action row stay
+  // under that bubble, which is end-aligned; a failed response — the
+  // assistant's own error, and an execution failure carried by the question —
+  // takes the assistant's leading edge like every other block of that turn.
+  // `items-end` is logical, so the user's column mirrors with the interface.
+  // `text-right` is how a line end-aligns here: NativeWind drops
+  // `text-align: end`, and RN resolves `right` against the interface direction,
+  // so the copy still ends on the trailing side in an RTL interface. The
+  // assistant's column names no alignment: its title and detail keep the
+  // interface's own start edge, as the assistant rows around them do.
+  const trailingFailure = failure?.side === 'user';
   const failureFooter =
     failure !== null && relevantHandlerWired ? (
-      <View className="gap-1 px-4 py-1">
-        <Text
-          className="text-sm text-destructive"
-          accessibilityLabel={
-            failure.canRetry
-              ? t('agentChat.messageBubble.failureRetryAvailable', { title: failure.title })
-              : t('agentChat.messageBubble.failure', { title: failure.title })
-          }
-        >
-          {failure.title}
-        </Text>
+      /* The actions close the turn rather than opening the next one: the space
+         under them is the gap between turns, so a Retry is never read as part of
+         the message that follows it. 24 dp is more than twice the gap between a
+         bubble and its own status line, which is what keeps a turn's status and
+         actions in its own group. `items-end` is logical, so the status stays
+         with the end-aligned bubble in either direction. */
+      <View className={cn('gap-2 px-4 pt-1 pb-[24px]', trailingFailure && 'items-end')}>
+        <View className={cn('flex-row items-center gap-1.5', trailingFailure && 'justify-end')}>
+          {failure.error ? (
+            // Every failure that reports an error carries the same marker; a
+            // message the person stopped reports a neutral status and carries
+            // none. The marker is the state, not copy: the title beside it says
+            // what happened, so it carries no text of its own for a screen
+            // reader.
+            <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+              <AlertCircle size={14} color={colors.destructive} />
+            </View>
+          ) : null}
+          <Text
+            className={cn('text-sm text-destructive', trailingFailure && 'text-right')}
+            accessibilityLabel={messageFailureLabel(failure)}
+          >
+            {failure.title}
+          </Text>
+        </View>
         {failure.detail !== null ? (
-          <Text className="text-xs text-muted-foreground">{failure.detail}</Text>
+          <Text
+            className={cn(
+              'text-sm leading-[1.25rem] text-muted-foreground',
+              trailingFailure && 'text-right'
+            )}
+          >
+            {failure.detail}
+          </Text>
         ) : null}
         <View className="flex-row gap-2">
           {failure.canRetry && onRetryMessage ? (
             <Button
               variant="outline"
               size="sm"
+              className={STATE_ACTION_CLASS}
               onPress={() => {
                 onRetryMessage(message);
               }}
@@ -182,6 +239,24 @@ function MessageBubbleImpl({
               accessibilityLabel={t('common.retry')}
             >
               <Text>{t('common.retry')}</Text>
+            </Button>
+          ) : null}
+          {failure.canAddCredits && onAddCredits ? (
+            // The failure's one recovery action, so it takes the accent surface
+            // the person's own bubble and the enabled send control fill with,
+            // in both schemes; the theme's `--primary` is olive in light, which
+            // would read as one more secondary action here. The label uses that
+            // surface's own ink, because the primary label ink is white in the
+            // light scheme.
+            <Button
+              variant="default"
+              size="sm"
+              className={cn(STATE_ACTION_CLASS, 'bg-accent-soft')}
+              onPress={onAddCredits}
+              accessibilityRole="button"
+              accessibilityLabel={t('addCredits.cta')}
+            >
+              <Text className="text-accent-soft-foreground">{t('addCredits.cta')}</Text>
             </Button>
           ) : null}
           {failure.canCopy && onCopyToComposer && copyText !== '' ? (
@@ -305,37 +380,39 @@ function MessageBubbleImpl({
 
   return (
     <View>
-      <Pressable className="px-4 py-1" onLongPress={handleLongPress} accessible={a11y.accessible}>
-        <InMessageBubbleContext.Provider value>
-          <MessageLongPressProvider message={message} onLongPressDetails={onLongPressDetails}>
-            <View className="gap-2">
-              {condenseToolCalls
-                ? groupMessageParts(parts, { condense: true }).map(group =>
-                    group.kind === 'tool-run' ? (
-                      <MessageErrorBoundary key={group.parts[0]?.id}>
-                        <CondensedToolRunRow parts={group.parts} />
-                      </MessageErrorBoundary>
-                    ) : (
-                      group.parts.map(renderPart)
+      {parts.some(part => partRendersContent(part)) ? (
+        <Pressable className="px-4 py-1" onLongPress={handleLongPress} accessible={a11y.accessible}>
+          <InMessageBubbleContext.Provider value>
+            <MessageLongPressProvider message={message} onLongPressDetails={onLongPressDetails}>
+              <View className="gap-2">
+                {condenseToolCalls
+                  ? groupMessageParts(parts, { condense: true }).map(group =>
+                      group.kind === 'tool-run' ? (
+                        <MessageErrorBoundary key={group.parts[0]?.id}>
+                          <CondensedToolRunRow parts={group.parts} />
+                        </MessageErrorBoundary>
+                      ) : (
+                        group.parts.map(renderPart)
+                      )
                     )
-                  )
-                : parts.map(part => renderPart(part))}
-            </View>
-          </MessageLongPressProvider>
-        </InMessageBubbleContext.Provider>
-        {a11y.accessibilityActions.length > 0 ? (
-          <View
-            accessible
-            accessibilityRole={a11y.accessibilityRole}
-            accessibilityLabel={a11y.accessibilityLabel}
-            accessibilityHint={a11y.accessibilityHint}
-            accessibilityActions={a11y.accessibilityActions}
-            onAccessibilityAction={handleAccessibilityAction}
-            className="absolute inset-0 opacity-0"
-            pointerEvents="none"
-          />
-        ) : null}
-      </Pressable>
+                  : parts.map(part => renderPart(part))}
+              </View>
+            </MessageLongPressProvider>
+          </InMessageBubbleContext.Provider>
+          {a11y.accessibilityActions.length > 0 ? (
+            <View
+              accessible
+              accessibilityRole={a11y.accessibilityRole}
+              accessibilityLabel={a11y.accessibilityLabel}
+              accessibilityHint={a11y.accessibilityHint}
+              accessibilityActions={a11y.accessibilityActions}
+              onAccessibilityAction={handleAccessibilityAction}
+              className="absolute inset-0 opacity-0"
+              pointerEvents="none"
+            />
+          ) : null}
+        </Pressable>
+      ) : null}
       {failureFooter}
     </View>
   );

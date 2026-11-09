@@ -3,7 +3,12 @@ import { createRoot, type Root } from 'react-dom/client';
 import { createRequire } from 'node:module';
 import {
   addTerminalTab,
+  CHAT_TAB_ID,
   createWorkspaceTabsState,
+  getWorkspaceTabScope,
+  openFileTab,
+  selectWorkspaceTab,
+  setFileTabMode,
   type WorkspaceTabsState,
 } from '../workspace-tabs';
 import type { usePersistedWorkspaceTabs } from './usePersistedWorkspaceTabs';
@@ -154,6 +159,24 @@ describe('usePersistedWorkspaceTabs', () => {
     expect(probe?.tabs.terminals).toHaveLength(1);
   });
 
+  it('preserves file tabs and modes across sibling chats but isolates other worktrees', () => {
+    render(STORAGE_KEY, getWorkspaceTabScope('wt-a', 'chat-a'));
+    act(() =>
+      probe?.setTabs(state =>
+        setFileTabMode(openFileTab(state, 'src/file.ts'), 'src/file.ts', 'preview')
+      )
+    );
+    render(STORAGE_KEY, getWorkspaceTabScope('wt-a', 'chat-b'));
+    act(() => probe?.setTabs(state => selectWorkspaceTab(state, CHAT_TAB_ID)));
+    expect(probe?.tabs.files).toEqual([{ path: 'src/file.ts', mode: 'preview' }]);
+    expect(stored()?.files).toEqual(probe?.tabs.files);
+
+    render(STORAGE_KEY, getWorkspaceTabScope('wt-b', 'chat-c'));
+    expect(probe?.tabs.files).toEqual([]);
+    render(STORAGE_KEY, getWorkspaceTabScope('wt-a', 'chat-b'));
+    expect(probe?.tabs.files).toEqual([{ path: 'src/file.ts', mode: 'preview' }]);
+  });
+
   it('drops the stored entry when the scope returns to the default state', () => {
     render(STORAGE_KEY, SCOPE_A);
     act(() => probe?.setTabs(state => addTerminalTab(state, 'tty-1', 'ses-1')));
@@ -282,6 +305,26 @@ describe('usePersistedWorkspaceTabs', () => {
       dom.storage.clear();
       dispatchStorage(null);
       expect(chatProbe?.closedSessionIds).toEqual([]);
+    });
+
+    it('resyncs a page restored from the back-forward cache', () => {
+      renderChats();
+      dom.storage.set(
+        STORAGE_KEY,
+        JSON.stringify({ closedSessionIds: ['ses-external'], sessionOrderByWorktree: {} })
+      );
+      const dispatchPageShow = (persisted: boolean) => {
+        const event = new window.Event('pageshow');
+        Object.assign(event, { persisted });
+        act(() => {
+          window.dispatchEvent(event);
+        });
+      };
+
+      dispatchPageShow(false);
+      expect(chatProbe?.closedSessionIds).toEqual([]);
+      dispatchPageShow(true);
+      expect(chatProbe?.closedSessionIds).toEqual(['ses-external']);
     });
 
     it.each(['getItem', 'setItem'] as const)('keeps updates in memory when %s throws', method => {

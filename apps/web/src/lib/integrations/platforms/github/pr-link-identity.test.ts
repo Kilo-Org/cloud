@@ -217,6 +217,37 @@ describe('verifySessionPullRequestLink - accepts', () => {
       verify(sessionRepo(), sessionLink({ headSha: 'deadbeef' }), pullRequest({ headSha: 'cafe' }))
     ).toEqual({ verified: false, reason: 'head_sha_mismatch' });
   });
+
+  it('accepts the reported head ref when it differs from the stored session branch', () => {
+    // The session recorded `feature/z` as its branch but pushed the PR from
+    // another branch, so the reported head ref is the branch evidence.
+    const repo = sessionRepo({ gitBranch: 'feature/z' });
+    const link = sessionLink({ headRef: 'feature/reported' });
+    expect(verify(repo, link, pullRequest({ headRef: 'feature/reported' }))).toEqual({
+      verified: true,
+      evidence: 'head_sha',
+    });
+    expect(
+      verify(
+        repo,
+        sessionLink({ headRef: 'feature/reported', headSha: null }),
+        pullRequest({ headRef: 'feature/reported' })
+      )
+    ).toEqual({ verified: true, evidence: 'head_ref' });
+  });
+
+  it('falls back to the stored session branch only when the link carries no head ref', () => {
+    expect(
+      verify(sessionRepo(), sessionLink({ headRef: null, headSha: null }), pullRequest())
+    ).toEqual({ verified: true, evidence: 'head_ref' });
+    expect(
+      verify(
+        sessionRepo(),
+        sessionLink({ headRef: null, headSha: null }),
+        pullRequest({ headRef: 'feature/other' })
+      )
+    ).toEqual({ verified: false, reason: 'head_ref_mismatch' });
+  });
 });
 
 describe('verifySessionPullRequestLink - rejects', () => {
@@ -293,10 +324,14 @@ describe('verifySessionPullRequestLink - rejects', () => {
     });
   });
 
-  it('rejects when the session branch and the reported head ref disagree', () => {
-    expect(verify(sessionRepo(), sessionLink({ headRef: 'feature/other' }), pullRequest())).toEqual(
-      { verified: false, reason: 'head_ref_mismatch' }
-    );
+  it('rejects when the PR head ref matches neither the reported head ref nor the stored branch', () => {
+    expect(
+      verify(
+        sessionRepo(),
+        sessionLink({ headRef: 'feature/reported', headSha: null }),
+        pullRequest({ headRef: 'feature/other' })
+      )
+    ).toEqual({ verified: false, reason: 'head_ref_mismatch' });
   });
 
   it('rejects when the PR has no base repository evidence', () => {

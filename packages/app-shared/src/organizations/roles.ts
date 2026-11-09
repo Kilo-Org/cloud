@@ -21,6 +21,13 @@ export const ORGANIZATION_BILLING_ROLES = [
   'billing_manager',
 ] satisfies OrganizationRole[];
 
+// Parent access is separate from billing scope so billing changes cannot widen child inheritance.
+export const ORGANIZATION_PARENT_ACCESS_ROLES = [
+  'owner',
+  'admin',
+  'billing_manager',
+] satisfies OrganizationRole[];
+
 /**
  * Membership roles that receive an organization-scope spend alert: the
  * organization's owners and its billing managers. This is deliberately

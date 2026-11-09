@@ -24,6 +24,7 @@ export const OpenAiChatGptStatusSchema = z.object({
       reachedAt: z.string(),
       /** ISO timestamp of the reported reset, or null when OpenAI gave none. */
       resetsAt: z.string().nullable(),
+      code: z.string().nullable(),
     })
     .optional(),
   errorMessage: z.string().optional(),

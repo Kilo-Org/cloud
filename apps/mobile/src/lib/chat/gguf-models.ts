@@ -63,7 +63,7 @@ const storage: GgufStorage = {
     return file.exists ? file.textSync() : null;
   },
   writeIndex: text => {
-    fileIn(INDEX).write(text);
+    fileIn(INDEX).writeSync(text);
   },
   createDownload: (url, name, onProgress) =>
     File.createDownloadTask(url, fileIn(name), { onProgress }),

@@ -5,7 +5,7 @@ import {
   buildGlanceableSnapshot,
   type GlanceableAgentsSnapshot,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
-import { type GlanceableLiveActivityContentState } from '@kilocode/notifications';
+import { type GlanceableLiveActivityContentState } from '@kilocode/notifications/schemas';
 
 import { _resetIosSinkForTests, getActivityKitDenied, iosSink } from '@/glanceable-ios/ios-sink';
 import { bumpAuthEpoch } from '@/lib/auth/auth-epoch';
@@ -48,9 +48,14 @@ vi.mock('expo-secure-store', () => ({
   getItemAsync: mocks.getItemAsync,
 }));
 
+vi.mock('expo-widgets', () => ({
+  after: (date: Date) => ({ after: date }),
+  areLiveActivitiesEnabled: () => true,
+}));
+
 vi.mock('@/glanceable-ios/active-agents-live-activity', () => ({
   OPEN_AGENTS_URL: 'kiloapp:///cloud/sessions',
-  ActiveAgentsLiveActivity: {
+  getActiveAgentsLiveActivity: () => ({
     getInstances() {
       if (mocks.instancesError !== null) {
         throw mocks.instancesError;
@@ -70,7 +75,7 @@ vi.mock('@/glanceable-ios/active-agents-live-activity', () => ({
         },
       };
     },
-  },
+  }),
 }));
 
 vi.mock('@/glanceable-ios/active-agents-widget', () => ({

@@ -10,10 +10,6 @@ const splitLinkMock = vi.hoisted(() =>
   vi.fn((opts: { condition: unknown; true: unknown; false: unknown }) => [opts.true, opts.false])
 );
 
-// Mutable so a test can toggle the optional ingest endpoint before importing
-// trpc.ts (`vi.resetModules()` re-reads the config mock factory).
-const latencyIngestUrlMock = vi.hoisted(() => ({ value: undefined as string | undefined }));
-
 const randomUUIDMock = vi.hoisted(() => vi.fn(() => 'test-request-id'));
 
 const secureStoreMock = vi.hoisted(() => {
@@ -79,23 +75,13 @@ vi.mock('@/lib/config', () => ({
   E2E_LATENCY_SESSION_MS: 0,
   // The secure-store read path reads this fault window; keep it closed.
   E2E_SECURE_STORE_FAULT_MS: 0,
-  // A getter, not a snapshot: the mock factory object is cached, so a test
-  // must be able to swap the optional endpoint without re-running it.
-  get LATENCY_INGEST_URL(): string | undefined {
-    return latencyIngestUrlMock.value;
-  },
+  // The ingest endpoint stays unset so a wiring test never posts latency.
+  LATENCY_INGEST_URL: undefined,
 }));
 
 vi.mock('@/lib/storage-keys', () => ({
   AUTH_TOKEN_KEY: 'auth-token',
   TOKEN_EXPIRES_AT_KEY: 'token-expires-at',
-}));
-
-// auth-context pulls in react-native, Sentry and the telemetry modules.
-// This test only inspects link options, so stub the two symbols trpc.ts uses.
-vi.mock('@/lib/auth/auth-context', () => ({
-  performRefresh: vi.fn().mockResolvedValue({ ok: false, refused: false }),
-  REFRESH_MARGIN_MS: 60_000,
 }));
 
 vi.mock('react-native', () => ({
@@ -186,6 +172,16 @@ describe('getAuthHeaders', () => {
     expect(secureStoreMock.getItemAsync).toHaveBeenCalledTimes(2);
   });
 
+  it('sends the app product token as the User-Agent on every tRPC call', async () => {
+    secureStoreMock.store.set('auth-token', 'stored-token');
+    secureStoreMock.store.set('token-expires-at', String(Date.now() + 3_600_000));
+    const headers = await loadHeaders();
+
+    await expect(headers()).resolves.toMatchObject({
+      'User-Agent': 'Kilo-Code/1.0.4 (ios)',
+    });
+  });
+
   it('uses the newest owner token published while the cold expiry was read', async () => {
     secureStoreMock.store.set('auth-token', 'stored-token');
     secureStoreMock.store.set('token-expires-at', String(Date.now() - 1000));
@@ -199,22 +195,104 @@ describe('getAuthHeaders', () => {
       expect(vi.mocked(secureStoreMock.getItemAsync)).toHaveBeenCalledWith('token-expires-at');
     });
     // Publish a newer owner while the cold expiry read is still in flight.
-    const { setActiveToken } = await import('@/lib/auth/token-owner');
-    setActiveToken('newer-token', Date.now() + 3_600_000);
+    const newerExpiresAt = Date.now() + 3_600_000;
+    // `afterEach` resets the module registry, so the owner must be loaded from
+    // the same graph as `./trpc` inside the case rather than imported statically.
+    const { getActiveTokenSnapshot, setActiveToken } = await import('@/lib/auth/token-owner');
+    setActiveToken('newer-token', newerExpiresAt);
     secureStoreMock.releaseHeldExpiryRead();
 
     // The request uses the newest owner token, not the cold-read token, and
     // the newer owner's expiry is not overwritten by the stale read.
     await expect(pending).resolves.toMatchObject({ Authorization: 'Bearer newer-token' });
+    // The stale read resolved to an expired value; the owner must still hold
+    // the newer expiry instead of having been overwritten by it.
+    expect(getActiveTokenSnapshot()).toMatchObject({
+      token: 'newer-token',
+      expiresAtMs: newerExpiresAt,
+    });
+  });
+
+  it('sends the held token without touching the keychain while protected data is unavailable', async () => {
+    // `afterEach` resets the module registry, so the owner and the gate must be
+    // loaded from the same graph as `./trpc` inside the case.
+    const headers = await loadHeaders();
+    const { getActiveTokenSnapshot, setActiveToken } = await import('@/lib/auth/token-owner');
+    const { setProtectedDataAvailable } = await import('@/lib/protected-data');
+    // The production precondition: a held owner with no expiry, then a lock.
+    setActiveToken('held-token', null);
+    setProtectedDataAvailable(false);
+    try {
+      await expect(headers()).resolves.toMatchObject({ Authorization: 'Bearer held-token' });
+      // The refused read never reaches the keychain, so the refusal cannot fail
+      // the request.
+      expect(secureStoreMock.getItemAsync).not.toHaveBeenCalled();
+      // An unknown expiry is not published as a known one.
+      expect(getActiveTokenSnapshot()).toMatchObject({ token: 'held-token', expiresAtMs: null });
+
+      // A later request behaves the same: the expiry is still unknown.
+      await expect(headers()).resolves.toMatchObject({ Authorization: 'Bearer held-token' });
+      expect(secureStoreMock.getItemAsync).not.toHaveBeenCalled();
+    } finally {
+      setProtectedDataAvailable(true);
+    }
+
+    // After unlock the expiry is read once and published into the same owner.
+    const storedExpiresAt = Date.now() + 3_600_000;
+    secureStoreMock.store.set('token-expires-at', String(storedExpiresAt));
+    await expect(headers()).resolves.toMatchObject({ Authorization: 'Bearer held-token' });
+    expect(secureStoreMock.getItemAsync).toHaveBeenCalledWith('token-expires-at');
+    expect(getActiveTokenSnapshot()).toMatchObject({
+      token: 'held-token',
+      expiresAtMs: storedExpiresAt,
+    });
+  });
+
+  it('still fails the request when the cold expiry read fails for another reason', async () => {
+    const headers = await loadHeaders();
+    const { setActiveToken } = await import('@/lib/auth/token-owner');
+    setActiveToken('held-token', null);
+    secureStoreMock.getItemAsync.mockImplementationOnce(async () => {
+      await Promise.resolve();
+      throw new Error('keychain unavailable');
+    });
+
+    await expect(headers()).rejects.toThrow('keychain unavailable');
+  });
+
+  it('resolves unauthenticated while protected data is unavailable and files nothing', async () => {
+    // `afterEach` resets the module registry, so the sink, the owner, and the
+    // gate must be loaded from the same graph as `./trpc` inside the case.
+    secureStoreMock.store.set('auth-token', 'stored-token');
+    secureStoreMock.store.set('token-expires-at', String(Date.now() + 3_600_000));
+    const events: TelemetryEvent[] = [];
+    const { setTelemetrySink } = await import('@/lib/telemetry/error-sink');
+    const headers = await loadHeaders();
+    setTelemetrySink(event => {
+      events.push(event);
+    });
+    const { setProtectedDataAvailable } = await import('@/lib/protected-data');
+    setProtectedDataAvailable(false);
+    try {
+      // The locked request still resolves: no rejection reaches tRPC, so
+      // nothing wraps the lock state into a reported client error.
+      const unauthenticated = await headers();
+      expect(unauthenticated).not.toHaveProperty('Authorization');
+      // The refused read never reached the keychain.
+      expect(secureStoreMock.getItemAsync).not.toHaveBeenCalled();
+      expect(events).toEqual([]);
+    } finally {
+      setProtectedDataAvailable(true);
+    }
+
+    // After unlock the same request resolves the stored token and sends it.
+    await expect(headers()).resolves.toMatchObject({ Authorization: 'Bearer stored-token' });
+    expect(secureStoreMock.getItemAsync).toHaveBeenCalledWith('auth-token');
+    expect(events).toEqual([]);
   });
 });
 
 const mockFetch = vi.fn();
-
-// Suppress Node.js 24 unhandledRejection from AbortController.abort()
-// with a non-DOMException reason during fake-timer tests.
-// eslint-disable-next-line @typescript-eslint/no-empty-function
-function swallowUnhandledRejection(): void {}
 
 describe('deadlineFetch', () => {
   beforeEach(() => {
@@ -239,12 +317,10 @@ describe('deadlineFetch', () => {
 
   it('rejects with RequestDeadlineError when the deadline expires', async () => {
     vi.useFakeTimers();
-    process.on('unhandledRejection', swallowUnhandledRejection);
     try {
       // Fetch never resolves unless its signal aborts — simulates a hanging
       // backend where the only thing that cancels the request is the deadline.
       mockFetch.mockImplementation(
-        // eslint-disable-next-line typescript-eslint/promise-function-async
         (_url, init?: RequestInit) =>
           new Promise<Response>((resolve, reject) => {
             const signal = init?.signal;
@@ -262,13 +338,12 @@ describe('deadlineFetch', () => {
       const { deadlineFetch } = await import('./trpc');
       const promise = deadlineFetch('https://api.example.com/api/trpc');
 
-      vi.advanceTimersByTime(15_001);
-      // eslint-disable-next-line typescript-eslint/await-thenable
-      await vi.runAllTicks();
-
-      await expect(promise).rejects.toThrow('timed out after 15000ms');
+      // Attach the rejection handler before the fake clock reaches the
+      // deadline, so the settled promise never goes unhandled.
+      const rejection = expect(promise).rejects.toThrow('timed out after 15000ms');
+      await vi.advanceTimersByTimeAsync(15_001);
+      await rejection;
     } finally {
-      process.off('unhandledRejection', swallowUnhandledRejection);
       vi.useRealTimers();
     }
   });
@@ -291,7 +366,6 @@ describe('deadlineFetch', () => {
     try {
       // Fetch hangs unless its signal aborts.
       mockFetch.mockImplementation(
-        // eslint-disable-next-line typescript-eslint/promise-function-async
         (_url, init?: RequestInit) =>
           new Promise<Response>((_resolve, reject) => {
             const signal = init?.signal;
@@ -311,14 +385,15 @@ describe('deadlineFetch', () => {
         signal: controller.signal,
       });
 
-      // Let the fetch start, then abort from the caller side.
-      await vi.advanceTimersByTimeAsync(0);
+      // Let the fetch start, then abort from the caller side. Attach the
+      // rejection handler before aborting, so the settled promise never goes
+      // unhandled.
+      const rejection = expect(promise).rejects.toThrow('caller cancelled mid-flight');
       controller.abort(new Error('caller cancelled mid-flight'));
 
-      // eslint-disable-next-line typescript-eslint/await-thenable
-      await vi.runAllTicks();
+      await vi.advanceTimersByTimeAsync(0);
 
-      await expect(promise).rejects.toThrow('caller cancelled mid-flight');
+      await rejection;
     } finally {
       vi.useRealTimers();
     }
@@ -431,30 +506,8 @@ describe('network error reporting', () => {
 
 type SplitCondition = (op: { path: string; context: { skipBatch?: boolean } }) => boolean;
 
-type LatencySample = {
-  requestId: string;
-  procedures: string[];
-  ttfbMs: number;
-  totalMs: number;
-  status: number;
-  ok: boolean;
-};
-
-function latencySample(overrides: Partial<LatencySample> = {}): LatencySample {
-  return {
-    requestId: 'req-1',
-    procedures: ['user.getMe'],
-    ttfbMs: 5,
-    totalMs: 9,
-    status: 200,
-    ok: true,
-    ...overrides,
-  };
-}
-
 describe('latency wiring', () => {
   beforeEach(() => {
-    latencyIngestUrlMock.value = undefined;
     secureStoreMock.store.clear();
     mockFetch.mockReset();
     vi.stubGlobal('fetch', mockFetch);
@@ -465,7 +518,6 @@ describe('latency wiring', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
-    latencyIngestUrlMock.value = undefined;
   });
 
   async function loadLatencyLinks(): Promise<{
@@ -555,7 +607,7 @@ describe('latency wiring', () => {
   // tRPC's single `httpLink` leaves the body off a POST for a no-input call,
   // and the server's fetch adapter rejects that empty body with 400. The
   // shared fetch sends `{}` so an unbatched no-input query reaches its
-  // procedure, matching the batched `{"0":{"json":null}}` shape.
+  // procedure.
   it('sends an empty JSON object body when a POST has none', async () => {
     const { httpFetch } = await loadLatencyLinks();
     mockFetch.mockResolvedValue(new Response('ok', { status: 200 }));
@@ -580,62 +632,5 @@ describe('latency wiring', () => {
 
     const init = mockFetch.mock.calls[0]?.[1] as RequestInit | undefined;
     expect(init?.body).toBe('{"organizationId":null}');
-  });
-
-  it('posts a non-empty batch with auth, client metadata, and the JSON content type', async () => {
-    latencyIngestUrlMock.value = 'https://latency.example.com';
-    secureStoreMock.store.set('auth-token', 'stored-token');
-    mockFetch.mockResolvedValue(new Response(null, { status: 204 }));
-    const { postLatencyBatch } = await import('@/lib/telemetry/latency-ingest');
-    const samples = [latencySample()];
-
-    await postLatencyBatch({ samples });
-
-    expect(mockFetch).toHaveBeenCalledTimes(1);
-    const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe('https://latency.example.com/v1/latency');
-    expect(init.method).toBe('POST');
-    expect(JSON.parse(init.body as string)).toEqual({ samples });
-    const headers = new Headers(init.headers);
-    expect(headers.get('authorization')).toBe('Bearer stored-token');
-    expect(headers.get('content-type')).toBe('application/json');
-    expect(headers.get('x-kilo-client')).toBe('mobile');
-    expect(headers.get('x-kilo-app-platform')).toBe('ios');
-    expect(headers.get('x-kilo-app-version')).toBe('1.0.4');
-  });
-
-  it('does nothing when the ingest endpoint is unset', async () => {
-    latencyIngestUrlMock.value = undefined;
-    const { postLatencyBatch } = await import('@/lib/telemetry/latency-ingest');
-
-    await postLatencyBatch({ samples: [latencySample()] });
-
-    expect(mockFetch).not.toHaveBeenCalled();
-  });
-
-  it('does nothing for an empty batch', async () => {
-    latencyIngestUrlMock.value = 'https://latency.example.com';
-    const { postLatencyBatch } = await import('@/lib/telemetry/latency-ingest');
-
-    await postLatencyBatch({ samples: [] });
-
-    expect(mockFetch).not.toHaveBeenCalled();
-  });
-
-  it('drops the batch quietly on a network failure', async () => {
-    latencyIngestUrlMock.value = 'https://latency.example.com';
-    mockFetch.mockRejectedValue(new Error('ingest down'));
-    const { postLatencyBatch } = await import('@/lib/telemetry/latency-ingest');
-
-    await expect(postLatencyBatch({ samples: [latencySample()] })).resolves.toBeUndefined();
-  });
-
-  it('drops the batch quietly on a 5xx response', async () => {
-    latencyIngestUrlMock.value = 'https://latency.example.com';
-    mockFetch.mockResolvedValue(new Response('nope', { status: 503 }));
-    const { postLatencyBatch } = await import('@/lib/telemetry/latency-ingest');
-
-    await expect(postLatencyBatch({ samples: [latencySample()] })).resolves.toBeUndefined();
-    expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 });

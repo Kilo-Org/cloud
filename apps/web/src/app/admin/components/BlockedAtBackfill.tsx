@@ -1,5 +1,7 @@
 'use client';
 
+import { adminFetch } from '@/lib/admin/admin-fetch';
+
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -22,7 +24,7 @@ export function BlockedAtBackfill() {
   const { data: counts, isLoading } = useQuery<BlockedAtCountsResponse>({
     queryKey: ['blocked-at-counts'],
     queryFn: async () => {
-      const res = await fetch('/admin/api/backfills/blocked-at');
+      const res = await adminFetch('/admin/api/backfills/blocked-at');
       return res.json() as Promise<BlockedAtCountsResponse>;
     },
     refetchInterval: false,
@@ -30,7 +32,7 @@ export function BlockedAtBackfill() {
 
   const mutation = useMutation<BlockedAtBackfillResponse, Error>({
     mutationFn: async () => {
-      const res = await fetch('/admin/api/backfills/blocked-at', { method: 'POST' });
+      const res = await adminFetch('/admin/api/backfills/blocked-at', { method: 'POST' });
       if (!res.ok) {
         const body = (await res.json()) as { error?: string };
         throw new Error(body.error ?? `HTTP ${res.status}`);

@@ -19,11 +19,11 @@ export type TestSkill = {
   rawMarkdown: string;
 };
 
-/** The profile detail the mocked `useAgentProfile` returns. */
-export type TestProfileDetail = { id: string; skills: TestSkill[] };
+/** The skill list the mocked `useAgentProfileSkills` returns. */
+export type TestSkills = TestSkill[];
 
-export function testProfile(skills: TestSkill[] = []): TestProfileDetail {
-  return { id: 'profile-1', skills };
+export function testSkills(skills: TestSkill[] = []): TestSkills {
+  return skills;
 }
 
 export function testSkill(overrides: Partial<TestSkill> = {}): TestSkill {
@@ -84,6 +84,14 @@ export function pressEmptyAction(renderer: ReactTestRenderer): void {
   });
 }
 
+/** Press the add CTA a loaded, non-empty list renders as its last row. */
+export function pressAddButton(root: ReactTestInstance): void {
+  const button = findOne(root, 'Button');
+  act(() => {
+    (button.props as { onPress: () => void }).onPress();
+  });
+}
+
 export function changeText(root: ReactTestInstance, label: string, value: string): void {
   act(() => {
     (findField(root, label).props as { onChangeText: (v: string) => void }).onChangeText(value);
@@ -94,6 +102,13 @@ export function changeText(root: ReactTestInstance, label: string, value: string
 export function pressSheetDone(root: ReactTestInstance): void {
   act(() => {
     (findOne(root, 'SheetHeader').props as { onDone: () => void }).onDone();
+  });
+}
+
+/** Press the sheet's Cancel control. */
+export function pressSheetCancel(root: ReactTestInstance): void {
+  act(() => {
+    (findOne(root, 'SheetHeader').props as { onCancel: () => void }).onCancel();
   });
 }
 

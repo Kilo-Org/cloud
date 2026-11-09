@@ -4,7 +4,8 @@ import { createRequire } from 'node:module';
 import type { CloudChatPage as CloudChatPageComponent } from './CloudChatPage';
 import type { ChatHeader } from './ChatHeader';
 import type { CloudAgentWorkspaceTabs } from './CloudAgentWorkspaceTabs';
-import type { ConversationMessages } from './ConversationMessages';
+import type { StoredMessage } from './types';
+let mockRuntimeMessages: StoredMessage[] = [];
 import type { ResumeAnchor, ResumeAttemptStep } from './resume-anchor';
 import type { SessionStatusIndicator as SessionStatusIndicatorType } from '@kilocode/cloud-agent-sdk';
 
@@ -18,6 +19,7 @@ let mockChatHeader: ComponentProps<typeof ChatHeader> | null = null;
 let mockWorkspaceTabs: ComponentProps<typeof CloudAgentWorkspaceTabs> | null = null;
 let mockAtomValues: Record<string, unknown>;
 const mockSetAtom = jest.fn();
+const mockUseCloudAgentEnvironment = jest.fn();
 const mockRequestOlderMessages = jest.fn();
 const mockPlanResumeAttempt = jest.fn((): ResumeAttemptStep => 'wait');
 const mockResumeAnchorForTranscript = jest.fn((): ResumeAnchor | null => null);
@@ -42,10 +44,24 @@ const mockManager = {
 };
 const mockQueryClient = { invalidateQueries: jest.fn() };
 const mockUploadEndpoint = { mutationOptions: () => ({}) };
-const mockTrpc = {
-  cloudAgentNext: { getAttachmentUploadUrl: mockUploadEndpoint },
-  organizations: { cloudAgentNext: { getAttachmentUploadUrl: mockUploadEndpoint } },
+const mockWorkspaceSnapshotRecovery = {
+  queryOptions: (input: unknown) => ({ queryKey: [['getWorkspaceSnapshotRecovery'], input] }),
+  pathFilter: () => ({ queryKey: [['getWorkspaceSnapshotRecovery']] }),
 };
+const mockCloudAgentNext = {
+  getAttachmentUploadUrl: mockUploadEndpoint,
+  getWorkspaceSnapshotRecovery: mockWorkspaceSnapshotRecovery,
+};
+const mockTrpc = {
+  cloudAgentNext: mockCloudAgentNext,
+  organizations: { cloudAgentNext: mockCloudAgentNext },
+  cliSessionsV2: {
+    worktreeParent: {
+      queryOptions: (input: unknown) => ({ queryKey: [['worktreeParent'], input] }),
+    },
+  },
+};
+const mockTrpcClient = { cliSessionsV2: { worktreeParent: { query: jest.fn() } } };
 
 class MockResizeObserver {
   constructor(callback: ResizeObserverCallback) {
@@ -59,8 +75,21 @@ class MockResizeObserver {
   unobserve = jest.fn();
 }
 
+// The SDK derives the cached page's owner; the mocks own the cached rows directly.
+function mockCachedTranscriptSessionId(): unknown {
+  if (!mockAtomValues.isRefreshingCachedTranscript) return null;
+  const rows = [
+    ...((mockAtomValues.staticMessages as { info: { sessionID: string } }[] | undefined) ?? []),
+    ...((mockAtomValues.dynamicMessages as { info: { sessionID: string } }[] | undefined) ?? []),
+  ];
+  return rows[0]?.info.sessionID ?? null;
+}
+
 jest.mock('jotai', () => ({
-  useAtomValue: (key: string) => mockAtomValues[key] ?? null,
+  useAtomValue: (key: string) =>
+    key === 'cachedTranscriptSessionId'
+      ? mockCachedTranscriptSessionId()
+      : (mockAtomValues[key] ?? null),
   useSetAtom: () => mockSetAtom,
 }));
 jest.mock('next/navigation', () => ({
@@ -71,10 +100,20 @@ jest.mock('next/navigation', () => ({
     }),
 }));
 jest.mock('@tanstack/react-query', () => ({
+  skipToken: Symbol('skip'),
+  queryOptions: (options: unknown) => options,
   useMutation: () => ({ mutateAsync: jest.fn() }),
+  useQuery: () => ({ data: undefined }),
   useQueryClient: () => mockQueryClient,
 }));
-jest.mock('@/lib/trpc/utils', () => ({ useTRPC: () => mockTrpc }));
+jest.mock('@/lib/trpc/utils', () => ({
+  useTRPC: () => mockTrpc,
+  useRawTRPCClient: () => mockTrpcClient,
+}));
+jest.mock('./useSavedWorktreeChanges', () => ({
+  useSavedWorktreeChanges: () => ({ saved: { data: undefined }, queryKey: [] }),
+}));
+jest.mock('./use-cached-transcript-page', () => ({ useCachedTranscriptPage: () => null }));
 jest.mock('./use-preview', () => ({
   ...jest.requireActual('./use-preview'),
   usePreviewUrlTemplate: () => null,
@@ -120,6 +159,9 @@ jest.mock('@/hooks/useCloudAgentProfiles', () => ({
   useProfiles: () => ({}),
   useProfile: () => ({}),
 }));
+jest.mock('@/hooks/useCloudAgentEnvironments', () => ({
+  useCloudAgentEnvironment: (...args: unknown[]) => mockUseCloudAgentEnvironment(...args),
+}));
 jest.mock('@/hooks/useSlashCommandSets', () => ({
   useSlashCommandSets: () => ({ availableCommands: [] }),
 }));
@@ -151,21 +193,30 @@ jest.mock('./ChatHeader', () => ({
 }));
 jest.mock('./WorktreeChanges', () => ({ WorktreeChangesView: () => null }));
 jest.mock('./WorktreeFilePane', () => ({ WorktreeFilePane: () => null }));
-jest.mock('./ChatInput', () => ({
-  ChatInput: (props: Record<string, unknown>) => {
+jest.mock('./assistant-ui/CloudComposer', () => ({
+  CloudComposer: (props: Record<string, unknown>) => {
     mockChatInput = props;
     return createElement('input', { 'data-composer': true });
   },
 }));
-jest.mock('./ConversationMessages', () => ({
-  ConversationMessages: ({
-    staticMessages,
-    dynamicMessages,
-  }: ComponentProps<typeof ConversationMessages>) =>
+jest.mock('./assistant-ui/CloudChatRuntimeProvider', () => ({
+  CloudChatRuntimeProvider: ({
+    projection,
+    children,
+  }: {
+    projection: { messages: StoredMessage[] };
+    children: ReactNode;
+  }) => {
+    mockRuntimeMessages = projection.messages;
+    return children;
+  },
+}));
+jest.mock('./assistant-ui/CloudThread', () => ({
+  CloudThread: () =>
     createElement(
       'section',
       { 'data-conversation': true },
-      ...[...staticMessages, ...dynamicMessages].map(message =>
+      ...mockRuntimeMessages.map(message =>
         createElement(
           'div',
           { key: message.info.id, 'data-message-id': message.info.id },
@@ -317,6 +368,7 @@ describe('CloudChatPage route-aware transcript phase', () => {
     mockResumeAnchorForTranscript.mockReset().mockReturnValue(null);
     mockRequestOlderMessages.mockClear();
     mockSetAtom.mockClear();
+    mockUseCloudAgentEnvironment.mockReset().mockReturnValue({ data: undefined });
     mockAtomValues = {
       sessionId: null,
       fetchedSessionData: null,
@@ -327,6 +379,7 @@ describe('CloudChatPage route-aware transcript phase', () => {
       pendingMessages: new Map(),
       preparationAttempts: [],
       commits: [],
+      unreadablePermissions: [],
       chatUI: { shouldAutoScroll: true },
       isLoading: true,
     };
@@ -377,7 +430,11 @@ describe('CloudChatPage route-aware transcript phase', () => {
     expect(status?.textContent).toContain('Loading session…');
     expect(alert()).toBeNull();
     expect(dom.container.querySelector('[data-conversation]')).toBeNull();
-    expect(mockChatInput?.placeholder).toBe('Loading session…');
+    expect(mockChatInput).toMatchObject({
+      textareaDisabled: false,
+      disabled: true,
+      sendUnavailableReason: 'Loading session…',
+    });
   });
 
   it.each([null, { type: 'preparing' }, { type: 'error', message: 'Preparation failed' }])(
@@ -403,6 +460,57 @@ describe('CloudChatPage route-aware transcript phase', () => {
       });
     }
   );
+
+  it('shows the starting environment beside the repository and branch', () => {
+    mockAtomValues.fetchedSessionData = {
+      kiloSessionId: 'ses_b',
+      organizationId: null,
+      gitBranch: 'kilo/workspace',
+      environmentId: '11111111-1111-4111-8111-111111111111',
+    };
+    mockAtomValues.sessionConfig = { repository: 'Kilo-Org/cloud' };
+    mockUseCloudAgentEnvironment.mockReturnValue({ data: { name: 'Cloud development' } });
+    mockAtomValues.isLoading = false;
+
+    render();
+
+    const footer = dom.container.querySelector('[data-composer]')?.nextElementSibling;
+    expect(footer?.textContent).toBe('Kilo-Org/cloud·kilo/workspace·Cloud development');
+    expect(mockUseCloudAgentEnvironment).toHaveBeenLastCalledWith(
+      '11111111-1111-4111-8111-111111111111',
+      { organizationId: undefined }
+    );
+  });
+
+  it('keeps the repository and branch when the environment cannot be loaded', () => {
+    mockAtomValues.fetchedSessionData = {
+      kiloSessionId: 'ses_b',
+      organizationId: null,
+      gitBranch: 'kilo/workspace',
+      environmentId: '11111111-1111-4111-8111-111111111111',
+    };
+    mockAtomValues.sessionConfig = { repository: 'Kilo-Org/cloud' };
+    mockAtomValues.isLoading = false;
+
+    render();
+
+    const footer = dom.container.querySelector('[data-composer]')?.nextElementSibling;
+    expect(footer?.textContent).toBe('Kilo-Org/cloud·kilo/workspace');
+  });
+
+  it('does not query a previous chat environment while switching sessions', () => {
+    mockAtomValues.fetchedSessionData = {
+      kiloSessionId: 'ses_a',
+      organizationId: null,
+      environmentId: '11111111-1111-4111-8111-111111111111',
+    };
+
+    render();
+
+    expect(mockUseCloudAgentEnvironment).toHaveBeenLastCalledWith(null, {
+      organizationId: undefined,
+    });
+  });
 
   it.each([
     { isPreparingAsync: true, cloudStatus: { type: 'ready' } },
@@ -433,7 +541,7 @@ describe('CloudChatPage route-aware transcript phase', () => {
     expect(mockChatHeader?.branch).toBe('kilo/prepared-branch');
   });
 
-  it('does not render a placeholder when branch metadata is missing', () => {
+  it('reserves the branch row without placeholder text when branch metadata is missing', () => {
     mockAtomValues.fetchedSessionData = {
       kiloSessionId: 'ses_b',
       organizationId: null,
@@ -446,7 +554,9 @@ describe('CloudChatPage route-aware transcript phase', () => {
 
     const composer = dom.container.querySelector('[data-composer]');
     expect(composer).not.toBeNull();
-    expect(composer?.nextElementSibling).toBeNull();
+    // The row holds its height so the composer does not move when metadata lands.
+    expect(composer?.nextElementSibling?.className).toContain('min-h-11');
+    expect(composer?.nextElementSibling?.textContent).toBe('');
   });
 
   it('shows cached rows before metadata without allowing submission or resuming an anchor', () => {

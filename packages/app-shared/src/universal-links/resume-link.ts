@@ -41,7 +41,6 @@ export type IncomingResume = {
 
 /**
  * Build the universal link another device opens to resume this session.
- * The anchor is appended only when it is a non-empty string.
  */
 export function sessionResumeUrl({ sessionId, anchorMessageId }: SessionResumeTarget): string {
   const base = `${WEB_ORIGIN}${SESSION_PATH_PREFIX}${encodeURIComponent(sessionId)}`;

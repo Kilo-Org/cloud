@@ -1,3 +1,5 @@
+import { TRPCError } from '@trpc/server';
+import { CLOUD_AGENT_PARENT_AUTHORITY_DENIED } from '../cloud-agent-authority.js';
 import type { CallbackTarget, ExecutionCallbackPayload } from './types.js';
 import { logger } from '../logger.js';
 
@@ -16,6 +18,28 @@ export type DeliveryResult =
   | { type: 'success' }
   | { type: 'retry'; delaySeconds: number }
   | { type: 'failed'; error: string };
+
+/** Access and input errors cannot recover through redelivery. */
+export function classifyCallbackError(
+  error: unknown,
+  payload: ExecutionCallbackPayload,
+  attempts: number,
+  message: string,
+  forcePermanent = false
+): DeliveryResult {
+  const permanent =
+    forcePermanent ||
+    (error instanceof TRPCError &&
+      ['BAD_REQUEST', 'FORBIDDEN', 'UNAUTHORIZED', 'NOT_FOUND', 'PAYMENT_REQUIRED'].includes(
+        error.code
+      )) ||
+    (error instanceof Error && error.message.includes(CLOUD_AGENT_PARENT_AUTHORITY_DENIED));
+  return classifyCallbackDelivery(
+    { ok: false, status: permanent ? 403 : 503, error: message },
+    payload,
+    attempts
+  );
+}
 
 async function deliverToTarget(
   target: CallbackTarget,
@@ -68,6 +92,14 @@ export async function deliverCallbackJob(
 ): Promise<DeliveryResult> {
   const result = await deliverToTarget(target, payload);
 
+  return classifyCallbackDelivery(result, payload, attempts);
+}
+
+export function classifyCallbackDelivery(
+  result: { ok: boolean; status?: number; error?: string },
+  payload: ExecutionCallbackPayload,
+  attempts: number
+): DeliveryResult {
   if (result.ok) {
     return { type: 'success' };
   }

@@ -33,6 +33,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import type { StoredSession } from './types';
 import {
   getRunningSessionSortTime,
+  getSidebarSessionStatus,
   getSidebarWorktreeActivity,
   getSidebarWorktreeLabel,
   getSidebarWorktreePrSession,
@@ -62,7 +63,9 @@ import type { WorkspaceFolder } from '@/lib/cloud-agent/workspace-folders';
 import type { WorkspaceFolderController } from './hooks/useWorkspaceFolders';
 import { WorkspaceFolderSection } from './WorkspaceFolderSection';
 import { WorkspaceFolderDialog } from './WorkspaceFolderDialog';
+import { SidebarListSkeleton } from './SidebarListSkeleton';
 import {
+  controlPlaneSessionIdSchema,
   getWorkspaceFolderColor,
   getWorkspaceFolderDropAction,
   getWorkspaceFolderId,
@@ -71,15 +74,8 @@ import {
   type WorkspaceFolderDragItem,
   type WorkspaceFolderDropTarget,
 } from './workspace-folders';
-
-type ActiveSession = {
-  id: string;
-  status: string;
-  title: string;
-  connectionId: string;
-  gitUrl?: string;
-  gitBranch?: string;
-};
+import { filterLiveSidebarSessions } from './live-sidebar-sessions';
+import type { ActiveSession } from './hooks/useActiveSessions';
 
 type ChatSidebarProps = {
   sessions: StoredSession[];
@@ -87,15 +83,19 @@ type ChatSidebarProps = {
   selectedWorktreeId?: string | null;
   organizationId?: string;
   onOpenSession?: (sessionId: string) => void;
+  /** Opens a worktree; its chats are listed most recently updated first. */
+  onOpenWorktree?: (worktreeId: string, sessionIdsByRecency: readonly string[]) => void;
   onDeleteSession?: (sessionId: string) => void;
   deletingSessionIds?: string[];
   onRenameSession?: (sessionId: string, title: string) => Promise<void>;
-  onCreateWorktreeChat?: (sourceKiloSessionId: string) => Promise<boolean>;
-  creatingWorktreeSourceSessionId?: string | null;
+  onCreateWorktreeChat?: (sourceKiloSessionId: string) => void;
+  isLoading?: boolean;
   worktreeDetails?: Record<string, SidebarWorktreeDetails>;
+  loadingWorktreeIds?: readonly string[];
   onRenameWorktree?: (worktreeId: string, name: string) => Promise<void>;
   onDeleteWorktree?: (worktreeId: string) => void;
   deletingWorktreeIds?: readonly string[];
+  isDeletionInProgress?: boolean;
   isInSheet?: boolean;
   activeSessions?: ActiveSession[];
   foregroundSession?: SidebarForegroundSessionStatus | null;
@@ -126,6 +126,7 @@ const SessionRow = memo(function SessionRow({
   isLive,
   onDeleteSession,
   isDeleting,
+  isDeletionInProgress,
   onStartRename,
   isEditing,
   editTitle,
@@ -133,12 +134,17 @@ const SessionRow = memo(function SessionRow({
   onSaveRename,
   onCancelRename,
   onClick,
+  draggable,
+  onDragStart,
+  onDragEnd,
+  isDragging,
 }: {
   session: StoredSession;
   isActive: boolean;
   isLive: boolean;
   onDeleteSession?: (sessionId: string) => void;
   isDeleting: boolean;
+  isDeletionInProgress: boolean;
   onStartRename?: (session: StoredSession) => void;
   isEditing: boolean;
   editTitle: string;
@@ -146,6 +152,10 @@ const SessionRow = memo(function SessionRow({
   onSaveRename?: () => void;
   onCancelRename: () => void;
   onClick: (sessionId: string) => void;
+  draggable?: boolean;
+  onDragStart?: (event: DragEvent<HTMLDivElement>, session: StoredSession) => void;
+  onDragEnd?: () => void;
+  isDragging?: boolean;
 }) {
   const [hovered, setHovered] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -173,8 +183,9 @@ const SessionRow = memo(function SessionRow({
   };
 
   const isV2 = session.sessionId.startsWith('ses_');
+  const sidebarStatus = getSidebarSessionStatus(session);
   const sessionActivityIndicatorKind = getSessionActivityIndicatorKind(
-    session.sessionStatus ?? null,
+    sidebarStatus,
     session.sessionStatusUpdatedAt ?? null
   );
   const shouldReplaceTime = isLive || sessionActivityIndicatorKind !== null;
@@ -182,11 +193,15 @@ const SessionRow = memo(function SessionRow({
   return (
     <div
       onClick={isEditing || isDeleting ? undefined : () => onClick(session.sessionId)}
+      draggable={draggable}
+      onDragStart={onDragStart ? event => onDragStart(event, session) : undefined}
+      onDragEnd={onDragEnd}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       className={cn(
         'hover:bg-accent cursor-pointer rounded-lg text-sm transition-colors',
         isDeleting && 'cursor-wait opacity-60',
+        isDragging && 'opacity-50',
         isActive && 'bg-accent font-medium'
       )}
     >
@@ -221,7 +236,7 @@ const SessionRow = memo(function SessionRow({
                 >
                   {sessionActivityIndicatorKind ? (
                     <SessionStatusIndicator
-                      status={session.sessionStatus ?? null}
+                      status={sidebarStatus}
                       statusUpdatedAt={session.sessionStatusUpdatedAt ?? null}
                     />
                   ) : null}
@@ -269,6 +284,7 @@ const SessionRow = memo(function SessionRow({
                       {onDeleteSession && (
                         <DropdownMenuItem
                           variant="destructive"
+                          disabled={isDeletionInProgress}
                           onClick={e => {
                             e.stopPropagation();
                             onDeleteSession(session.sessionId);
@@ -294,12 +310,13 @@ function WorktreeGroupRow({
   group,
   currentSessionId,
   selectedWorktreeId,
-  onOpenSession,
+  onOpenWorktree,
   onCreateWorktreeChat,
-  creatingWorktreeSourceSessionId,
   onRenameWorktree,
   onDeleteWorktree,
   isDeleting,
+  isDeletionInProgress,
+  isLoadingDetails,
   activeSessionStatuses,
   foregroundSession,
   folderControls,
@@ -307,12 +324,13 @@ function WorktreeGroupRow({
   group: SidebarWorktreeGroup;
   currentSessionId?: string;
   selectedWorktreeId?: string | null;
-  onOpenSession: (sessionId: string) => void;
-  onCreateWorktreeChat?: (sourceKiloSessionId: string) => Promise<boolean>;
-  creatingWorktreeSourceSessionId?: string | null;
+  onOpenWorktree: (group: SidebarWorktreeGroup) => void;
+  onCreateWorktreeChat?: (sourceKiloSessionId: string) => void;
   onRenameWorktree?: (worktreeId: string, name: string) => Promise<void>;
   onDeleteWorktree?: (worktreeId: string) => void;
   isDeleting: boolean;
+  isDeletionInProgress: boolean;
+  isLoadingDetails: boolean;
   activeSessionStatuses: ReadonlyMap<string, string>;
   foregroundSession?: SidebarForegroundSessionStatus | null;
   folderControls?: WorktreeFolderControls;
@@ -329,7 +347,8 @@ function WorktreeGroupRow({
   const savingRenameRef = useRef(false);
   const restoreFocusRef = useRef(false);
   const renameErrorId = useId();
-  const label = getSidebarWorktreeLabel(group);
+  const worktreeLabel = getSidebarWorktreeLabel(group);
+  const label = isLoadingDetails ? 'Loading worktree…' : worktreeLabel;
   const prSession = getSidebarWorktreePrSession(group);
   const activity = getSidebarWorktreeActivity(
     group.sessions,
@@ -344,11 +363,7 @@ function WorktreeGroupRow({
   const isActive =
     selectedWorktreeId === group.worktreeId ||
     group.sessions.some(session => session.sessionId === currentSessionId);
-  const isCreatingThisGroup = group.sessions.some(
-    session => session.sessionId === creatingWorktreeSourceSessionId
-  );
-  const isCreationPending = creatingWorktreeSourceSessionId != null;
-  const showActions = hasActions && (hovered || menuOpen || isCreatingThisGroup);
+  const showActions = hasActions && (hovered || menuOpen);
 
   useEffect(() => {
     if (isEditing) {
@@ -374,7 +389,7 @@ function WorktreeGroupRow({
   const saveRename = async () => {
     if (!editingRef.current || !onRenameWorktree || savingRenameRef.current || isDeleting) return;
     const name = editName.trim();
-    if (!name || name === label) {
+    if (isLoadingDetails || !name || name === worktreeLabel) {
       finishRename();
       return;
     }
@@ -401,7 +416,7 @@ function WorktreeGroupRow({
       onDragEnd={folderControls?.onDragEnd}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      aria-busy={isDeleting || isSavingRename || isCreatingThisGroup || undefined}
+      aria-busy={isDeleting || isSavingRename || undefined}
       className={cn(
         'hover:bg-accent rounded-lg text-sm transition-colors',
         isDeleting && 'cursor-wait opacity-60',
@@ -446,17 +461,40 @@ function WorktreeGroupRow({
           </>
         ) : (
           <>
-            <button
-              ref={openButtonRef}
-              type="button"
-              disabled={isDeleting}
-              onClick={() => onOpenSession(group.latestSession.sessionId)}
-              aria-label={`Open worktree ${label}`}
-              aria-current={isActive ? 'page' : undefined}
-              className="focus-visible:ring-ring -my-2 -ml-3 flex min-w-0 flex-1 items-center rounded-md py-2 pl-3 text-left focus-visible:ring-2 focus-visible:outline-none disabled:cursor-wait"
-            >
-              <span className="line-clamp-1 min-w-0 leading-snug">{label}</span>
-            </button>
+            <Tooltip delayDuration={400}>
+              <TooltipTrigger asChild>
+                <button
+                  ref={openButtonRef}
+                  type="button"
+                  disabled={isDeleting}
+                  onClick={() => onOpenWorktree(group)}
+                  aria-label={`Open worktree ${label}`}
+                  aria-current={isActive ? 'page' : undefined}
+                  className="focus-visible:ring-ring -my-2 -ml-3 flex min-w-0 flex-1 items-center rounded-md py-2 pl-3 text-left focus-visible:ring-2 focus-visible:outline-none disabled:cursor-wait"
+                >
+                  {isLoadingDetails ? (
+                    <span
+                      className="bg-muted line-clamp-1 w-32 min-w-0 max-w-full rounded leading-snug text-transparent"
+                      aria-hidden="true"
+                    >
+                      Loading worktree…
+                    </span>
+                  ) : (
+                    <span className="line-clamp-1 min-w-0 leading-snug">{label}</span>
+                  )}
+                </button>
+              </TooltipTrigger>
+              {!isLoadingDetails && (
+                <TooltipContent
+                  side="top"
+                  align="start"
+                  sideOffset={8}
+                  className="max-w-xs break-words"
+                >
+                  {label}
+                </TooltipContent>
+              )}
+            </Tooltip>
             {prSession && <SessionPrIndicator session={prSession} />}
             <span className="group/session-actions relative flex w-6 shrink-0 justify-end [@media(any-pointer:coarse)]:w-auto [@media(hover:none)]:w-auto">
               {isDeleting ? (
@@ -503,14 +541,7 @@ function WorktreeGroupRow({
                         onClick={event => event.stopPropagation()}
                         className="hover:bg-muted focus-visible:ring-ring relative rounded-md p-0.5 before:absolute before:-inset-3 focus-visible:ring-2 focus-visible:outline-none"
                       >
-                        {isCreatingThisGroup ? (
-                          <LoaderCircle
-                            className="text-muted-foreground h-4 w-4 animate-spin"
-                            aria-label="Creating chat"
-                          />
-                        ) : (
-                          <MoreHorizontal className="text-muted-foreground h-4 w-4" />
-                        )}
+                        <MoreHorizontal className="text-muted-foreground h-4 w-4" />
                       </button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent
@@ -521,10 +552,7 @@ function WorktreeGroupRow({
                     >
                       {onCreateWorktreeChat && (
                         <DropdownMenuItem
-                          disabled={isCreationPending}
-                          onSelect={() => {
-                            void onCreateWorktreeChat(group.latestSession.sessionId);
-                          }}
+                          onSelect={() => onCreateWorktreeChat(group.latestSession.sessionId)}
                         >
                           <Plus className="h-4 w-4" />
                           New chat
@@ -532,9 +560,10 @@ function WorktreeGroupRow({
                       )}
                       {onRenameWorktree && (
                         <DropdownMenuItem
+                          disabled={isLoadingDetails}
                           onSelect={() => {
                             editingRef.current = true;
-                            setEditName(label);
+                            setEditName(worktreeLabel);
                             setRenameError(null);
                             setIsEditing(true);
                             setMenuOpen(false);
@@ -582,7 +611,7 @@ function WorktreeGroupRow({
                       {onDeleteWorktree && (
                         <DropdownMenuItem
                           variant="destructive"
-                          disabled={isCreatingThisGroup}
+                          disabled={isDeletionInProgress}
                           onSelect={() => onDeleteWorktree(group.worktreeId)}
                         >
                           <Trash2 className="h-4 w-4" />
@@ -646,15 +675,18 @@ export function ChatSidebar({
   selectedWorktreeId,
   organizationId,
   onOpenSession,
+  onOpenWorktree,
   onDeleteSession,
   deletingSessionIds,
   onRenameSession,
   onCreateWorktreeChat,
-  creatingWorktreeSourceSessionId,
+  isLoading = false,
   worktreeDetails = {},
+  loadingWorktreeIds = [],
   onRenameWorktree,
   onDeleteWorktree,
   deletingWorktreeIds = [],
+  isDeletionInProgress = false,
   isInSheet = false,
   activeSessions = [],
   foregroundSession,
@@ -747,6 +779,21 @@ export function ChatSidebar({
     [chatPath, pathname, router, onOpenSession, onMobileSheetOpenChange]
   );
 
+  const handleWorktreeClick = useCallback(
+    (group: SidebarWorktreeGroup) => {
+      if (!onOpenWorktree) {
+        handleSessionClick(group.latestSession.sessionId);
+        return;
+      }
+      onOpenWorktree(
+        group.worktreeId,
+        group.sessions.map(session => session.sessionId)
+      );
+      onMobileSheetOpenChange?.(false);
+    },
+    [handleSessionClick, onMobileSheetOpenChange, onOpenWorktree]
+  );
+
   const toggleSearch = useCallback(() => {
     setShowSearch(prev => {
       if (prev) {
@@ -765,21 +812,32 @@ export function ChatSidebar({
     [activeSessions]
   );
 
-  // Heartbeats reorder activeSessions per connection, so the Remote section
-  // needs its own stable order: attention first, then working, id last.
+  // Live sessions the stored list does not carry. The live rows bypass the
+  // server-side filter the stored list gets, so they have to honor the same
+  // selections here or the sidebar shows rows the filters exclude.
   const liveOnlySessions = useMemo(() => {
+    // The merge order is per-connection and changes on every heartbeat, so the
+    // rendered order is decided here: attention first, then working, id last.
     const remotePriority = (status: string) =>
       status === 'question' || status === 'permission'
         ? 2
         : status === 'busy' || status === 'retry'
           ? 1
           : 0;
-    return activeSessions
-      .filter(activeS => !sessions.some(s => s.sessionId === activeS.id))
-      .sort(
-        (a, b) => remotePriority(b.status) - remotePriority(a.status) || a.id.localeCompare(b.id)
-      );
-  }, [activeSessions, sessions]);
+    return filterLiveSidebarSessions(
+      activeSessions.filter(activeS => !sessions.some(s => s.sessionId === activeS.id)),
+      {
+        platformFilter: platformFilter ?? [],
+        projectFilter: projectFilter ?? [],
+        searchQuery,
+        // The stored list is queried with `organizationId ?? null`, where
+        // `null` means personal. Match it, or the personal view keeps org rows.
+        organizationId: organizationId ?? null,
+      }
+    ).sort(
+      (a, b) => remotePriority(b.status) - remotePriority(a.status) || a.id.localeCompare(b.id)
+    );
+  }, [activeSessions, sessions, platformFilter, projectFilter, searchQuery, organizationId]);
 
   const hasActiveFilter = (platformFilter?.length ?? 0) > 0 || (projectFilter?.length ?? 0) > 0;
 
@@ -789,12 +847,10 @@ export function ChatSidebar({
     const pins = new Map<string, number>();
     for (const session of sessions) {
       const liveStatus = activeSessionStatuses.get(session.sessionId) ?? null;
-      const isRunning =
-        getSessionActivityIndicatorKind(liveStatus, null) !== null ||
-        getSessionActivityIndicatorKind(
-          session.sessionStatus ?? null,
-          session.sessionStatusUpdatedAt ?? null
-        ) !== null;
+      const isRunning = [liveStatus, getSidebarSessionStatus(session)].some(status => {
+        const kind = getSessionActivityIndicatorKind(status, null);
+        return kind === 'working' || kind === 'attention';
+      });
       if (isRunning) pins.set(session.sessionId, getRunningSessionSortTime(session, true));
     }
     return pins;
@@ -820,28 +876,39 @@ export function ChatSidebar({
     [dateGroups]
   );
 
-  const clearDrag = () => {
+  const clearDrag = useCallback(() => {
     setDragItem(null);
     setDropTarget(null);
-  };
+  }, []);
 
-  const startDrag = (event: DragEvent<HTMLDivElement>, item: WorkspaceFolderDragItem) => {
-    if (!canEditFolders) {
-      event.preventDefault();
-      return;
-    }
-    event.stopPropagation();
-    event.dataTransfer.effectAllowed = 'move';
-    event.dataTransfer.setData('application/x-kilo-workspace-folder', JSON.stringify(item));
-    const bounds = event.currentTarget.getBoundingClientRect();
-    event.dataTransfer.setDragImage(
-      event.currentTarget,
-      event.clientX - bounds.left,
-      event.clientY - bounds.top
-    );
-    setDragItem(item);
-    setDropTarget(null);
-  };
+  const startDrag = useCallback(
+    (event: DragEvent<HTMLDivElement>, item: WorkspaceFolderDragItem) => {
+      if (!canEditFolders) {
+        event.preventDefault();
+        return;
+      }
+      event.stopPropagation();
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData('application/x-kilo-workspace-folder', JSON.stringify(item));
+      const bounds = event.currentTarget.getBoundingClientRect();
+      event.dataTransfer.setDragImage(
+        event.currentTarget,
+        event.clientX - bounds.left,
+        event.clientY - bounds.top
+      );
+      setDragItem(item);
+      setDropTarget(null);
+    },
+    [canEditFolders]
+  );
+
+  const startSessionDrag = useCallback(
+    (event: DragEvent<HTMLDivElement>, session: StoredSession) => {
+      const parsed = controlPlaneSessionIdSchema.safeParse(session.cloudAgentSessionId);
+      if (parsed.success) startDrag(event, { type: 'session', id: parsed.data });
+    },
+    [startDrag]
+  );
 
   const folderTarget = (
     event: DragEvent<HTMLElement>,
@@ -910,6 +977,8 @@ export function ChatSidebar({
     event.stopPropagation();
     if (action.type === 'move-worktree') {
       void moveWorktree(action.worktreeId, action.folderId);
+    } else if (action.type === 'move-session') {
+      void workspaceFolders.moveSession(action.sessionId, action.folderId);
     } else {
       void workspaceFolders.reorderFolders(action.folderIds);
     }
@@ -933,14 +1002,15 @@ export function ChatSidebar({
     <WorktreeGroupRow
       key={group.worktreeId}
       group={group}
+      isLoadingDetails={loadingWorktreeIds.includes(group.worktreeId)}
       currentSessionId={currentSessionId}
       selectedWorktreeId={selectedWorktreeId}
-      onOpenSession={handleSessionClick}
+      onOpenWorktree={handleWorktreeClick}
       onCreateWorktreeChat={onCreateWorktreeChat}
-      creatingWorktreeSourceSessionId={creatingWorktreeSourceSessionId}
       onRenameWorktree={onRenameWorktree}
       onDeleteWorktree={onDeleteWorktree}
       isDeleting={deletingWorktreeIds.includes(group.worktreeId)}
+      isDeletionInProgress={isDeletionInProgress}
       activeSessionStatuses={activeSessionStatuses}
       foregroundSession={foregroundSession}
       folderControls={
@@ -959,36 +1029,63 @@ export function ChatSidebar({
     />
   );
 
+  const onStartRenameSession = useCallback(
+    (session: StoredSession) => handleStartRename(session),
+    [handleStartRename]
+  );
+
   const renderSession = useCallback(
-    (session: StoredSession) => (
-      <SessionRow
-        key={session.sessionId}
-        session={session}
-        isActive={session.sessionId === currentSessionId}
-        isLive={activeSessionIds.has(session.sessionId)}
-        onDeleteSession={onDeleteSession}
-        onStartRename={onRenameSession ? handleStartRename : undefined}
-        isDeleting={deletingSessionIds?.includes(session.sessionId) ?? false}
-        isEditing={editingSessionId === session.sessionId}
-        editTitle={editingSessionId === session.sessionId ? editTitle : ''}
-        onEditTitleChange={setEditTitle}
-        onSaveRename={editingSessionId === session.sessionId ? handleSaveRename : undefined}
-        onCancelRename={handleCancelRename}
-        onClick={handleSessionClick}
-      />
-    ),
+    (session: StoredSession) => {
+      const parsedSessionId = controlPlaneSessionIdSchema.safeParse(session.cloudAgentSessionId);
+      const sessionId = parsedSessionId.success ? parsedSessionId.data : null;
+      const isDeleting = deletingSessionIds?.includes(session.sessionId) ?? false;
+      return (
+        <SessionRow
+          key={session.sessionId}
+          session={session}
+          isActive={session.sessionId === currentSessionId}
+          isLive={activeSessionIds.has(session.sessionId)}
+          onDeleteSession={onDeleteSession}
+          onStartRename={onRenameSession ? onStartRenameSession : undefined}
+          isDeleting={isDeleting}
+          isDeletionInProgress={isDeletionInProgress}
+          isEditing={editingSessionId === session.sessionId}
+          editTitle={editingSessionId === session.sessionId ? editTitle : ''}
+          onEditTitleChange={setEditTitle}
+          onSaveRename={editingSessionId === session.sessionId ? handleSaveRename : undefined}
+          onCancelRename={handleCancelRename}
+          onClick={handleSessionClick}
+          draggable={
+            sessionId !== null &&
+            canEditFolders &&
+            editingSessionId !== session.sessionId &&
+            !isDeleting
+          }
+          onDragStart={sessionId ? startSessionDrag : undefined}
+          onDragEnd={sessionId ? clearDrag : undefined}
+          isDragging={
+            sessionId !== null && dragItem?.type === 'session' && dragItem.id === sessionId
+          }
+        />
+      );
+    },
     [
       activeSessionIds,
+      canEditFolders,
+      clearDrag,
       currentSessionId,
       deletingSessionIds,
+      dragItem,
       editingSessionId,
       editTitle,
       handleCancelRename,
       handleSaveRename,
       handleSessionClick,
-      handleStartRename,
+      isDeletionInProgress,
       onDeleteSession,
       onRenameSession,
+      onStartRenameSession,
+      startSessionDrag,
     ]
   );
 
@@ -1160,11 +1257,6 @@ export function ChatSidebar({
         className="flex-1 space-y-px overflow-y-auto p-2 select-none"
         aria-busy={workspaceFolders?.isSaving || undefined}
       >
-        {workspaceFolders?.isLoading && (
-          <p role="status" className="text-muted-foreground px-2 py-2 text-xs">
-            Loading folders...
-          </p>
-        )}
         {workspaceFolders?.isError && (
           <div
             role="alert"
@@ -1180,8 +1272,10 @@ export function ChatSidebar({
             </button>
           </div>
         )}
-        {sessions.length === 0 && liveOnlySessions.length === 0 && folderGroups.length === 0 ? (
-          <div className="py-8 text-center text-sm text-gray-500">No sessions yet</div>
+        {isLoading || workspaceFolders?.isFirstLoadPending ? (
+          <SidebarListSkeleton />
+        ) : sessions.length === 0 && liveOnlySessions.length === 0 && folderGroups.length === 0 ? (
+          <div className="text-muted-foreground py-8 text-center text-sm">No sessions yet</div>
         ) : (
           <>
             {workspaceFolders &&

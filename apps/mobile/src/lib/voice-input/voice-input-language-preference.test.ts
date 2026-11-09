@@ -26,17 +26,6 @@ vi.mock('sonner-native', () => ({ toast: { error: toastError } }));
 
 const LANGUAGE_KEY = 'voice-input-language';
 
-// eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
-function flushPreferences(): Promise<void> {
-  // The module-scope preload reads SecureStore in the background; two
-  // macrotask rounds let the read, parse and emit settle before assertions.
-  return new Promise(resolve => {
-    setImmediate(() => {
-      setImmediate(resolve);
-    });
-  });
-}
-
 /**
  * Fresh module instance per import: the store is module-scoped and preload()
  * runs at import time, so the disk contents must be arranged before the
@@ -57,43 +46,47 @@ beforeEach(() => {
 describe('voice input language preference', () => {
   it('reads null by default when nothing is persisted', async () => {
     const mod = await importPreferenceModule();
-    await flushPreferences();
+    await mod.whenVoiceInputLanguageLoaded();
 
     expect(mod.readVoiceInputLanguage()).toBeNull();
   });
 
   it('round-trips a chosen language through SecureStore across a module reload', async () => {
     const mod = await importPreferenceModule();
-    await flushPreferences();
+    await mod.whenVoiceInputLanguageLoaded();
 
     mod.writeVoiceInputLanguage('nl-NL');
     expect(mod.readVoiceInputLanguage()).toBe('nl-NL');
-    await flushPreferences();
-    expect(store.get(LANGUAGE_KEY)).toBe('nl-NL');
+    await vi.waitFor(() => {
+      expect(store.get(LANGUAGE_KEY)).toBe('nl-NL');
+    });
 
     // A fresh module (next launch) reads the persisted choice.
     vi.resetModules();
     const reloaded = await importPreferenceModule();
-    await flushPreferences();
+    await reloaded.whenVoiceInputLanguageLoaded();
     expect(reloaded.readVoiceInputLanguage()).toBe('nl-NL');
   });
 
   it('persists null as an empty string and parses that empty string back to null', async () => {
     const mod = await importPreferenceModule();
-    await flushPreferences();
+    await mod.whenVoiceInputLanguageLoaded();
 
     mod.writeVoiceInputLanguage('nl-NL');
-    await flushPreferences();
+    await vi.waitFor(() => {
+      expect(store.get(LANGUAGE_KEY)).toBe('nl-NL');
+    });
     mod.writeVoiceInputLanguage(null);
-    await flushPreferences();
+    await vi.waitFor(() => {
+      expect(store.get(LANGUAGE_KEY)).toBe('');
+    });
 
     expect(mod.readVoiceInputLanguage()).toBeNull();
-    expect(store.get(LANGUAGE_KEY)).toBe('');
 
     // A stored empty string is the serialized form of "auto", not a language.
     vi.resetModules();
     const reloaded = await importPreferenceModule();
-    await flushPreferences();
+    await reloaded.whenVoiceInputLanguageLoaded();
     expect(reloaded.readVoiceInputLanguage()).toBeNull();
   });
 });

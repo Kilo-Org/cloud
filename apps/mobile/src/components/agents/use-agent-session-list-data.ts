@@ -45,6 +45,7 @@ export function useAgentSessionListData(options: {
     storedFetchedSinceMount,
     hasNextPage,
     isFetchingNextPage,
+    isFetchNextPageError,
     fetchNextPage,
     refetch,
   } = useAgentSessions({
@@ -73,18 +74,16 @@ export function useAgentSessionListData(options: {
     enabled: ready,
   });
   const contentIsError = isSearching ? search.isError : storedIsError;
-  const handleRetry = useCallback(() => {
+  const handleRetry = useCallback(async () => {
     if (!isSearching) {
-      void refetch();
+      await refetch();
       return;
     }
     if (activeIsError) {
-      void (async () => {
-        await Promise.all([search.refetch(), refetch()]);
-      })();
+      await Promise.all([search.refetch(), refetch()]);
       return;
     }
-    void search.refetch();
+    await search.refetch();
   }, [activeIsError, isSearching, refetch, search]);
   const handleRefetch = useCallback(async () => {
     if (isSearching) {
@@ -105,12 +104,14 @@ export function useAgentSessionListData(options: {
         ? {
             hasNextPage: search.hasNextPage,
             isFetchingNextPage: search.isFetchingNextPage,
+            isFetchNextPageError: search.isFetchNextPageError,
             isPlaceholderData: search.isPlaceholderData,
             fetchNextPage: search.fetchNextPage,
           }
         : {
             hasNextPage,
             isFetchingNextPage,
+            isFetchNextPageError,
             isPlaceholderData: false,
             fetchNextPage,
           },
@@ -118,9 +119,11 @@ export function useAgentSessionListData(options: {
       effectiveSearchQuery,
       hasNextPage,
       isFetchingNextPage,
+      isFetchNextPageError,
       fetchNextPage,
       search.hasNextPage,
       search.isFetchingNextPage,
+      search.isFetchNextPageError,
       search.isPlaceholderData,
       search.fetchNextPage,
     ]

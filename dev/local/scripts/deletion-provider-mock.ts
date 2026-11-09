@@ -186,7 +186,7 @@ function helpText(host: string, port: number): string {
     'Deletion provider mock (PostHog + Pylon + Substack + Customer.io)',
     '',
     `Listening on http://${host}:${port}`,
-    'Point POSTHOG_HOST, PYLON_HOST, SUBSTACK_PUBLICATION_URL, CUSTOMERIO_TRACK_BASE, and CSA_APP_BASE_URL at this origin.',
+    'Point POSTHOG_HOST, PYLON_HOST, SUBSTACK_PUBLICATION_URL, and CUSTOMERIO_TRACK_BASE at this origin.',
     '',
     'Email local-part scenarios:',
     '  ok@local.test                 happy path for all mocked providers',
@@ -775,22 +775,6 @@ function createDeletionProviderMockState(): {
         return;
       }
       json(res, 200, { ok: true });
-      return;
-    }
-
-    if (method === 'POST' && path === '/api/internal/cloud/users/gdpr-scrub') {
-      const body = await readBody(req);
-      const email =
-        isRecord(body) && typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
-      if (!email) {
-        json(res, 400, { status: 'error' });
-        return;
-      }
-      if (email.endsWith('@service.usepylon.com') || email.endsWith('@app.kilocode.ai')) {
-        json(res, 400, { status: 'blocked' });
-        return;
-      }
-      json(res, 200, { status: email.includes('missing') ? 'not_found' : 'updated' });
       return;
     }
 

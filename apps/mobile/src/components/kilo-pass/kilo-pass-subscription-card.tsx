@@ -1,5 +1,5 @@
 import { type Href, useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
+import { selectionHaptic } from '@/lib/haptics';
 import { type ReactNode } from 'react';
 import { Linking, Platform, Pressable, useWindowDimensions, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
@@ -8,6 +8,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Text } from '@/components/ui/text';
 import { KiloPassIcon } from '@/components/kilo-pass/kilo-pass-icon';
 import { Skeleton } from '@/components/ui/skeleton';
+import { rowTint } from '@/lib/agent-color';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { isNarrowLayout } from '@/lib/narrow-layout';
 import { useTRPC } from '@/lib/trpc';
@@ -61,7 +62,7 @@ export function KiloPassSubscriptionCard({
 
     const cardState = contentState.state;
 
-    void Haptics.selectionAsync();
+    selectionHaptic();
     if (cardState.action === 'open-web') {
       const webUrl = presentationQuery.data?.webUrl;
       if (webUrl) {
@@ -72,17 +73,15 @@ export function KiloPassSubscriptionCard({
     router.push('/(app)/kilo-pass' as Href);
   };
   const handleRetryPress = () => {
-    void Haptics.selectionAsync();
+    selectionHaptic();
     void presentationQuery.refetch();
   };
-
-  const isUnavailable = presentationQuery.data?.kind === 'unavailable';
 
   // The card body's one row: icon tile + text block + an optional trailing
   // label, stacked when a narrow window cannot fit the fixed siblings.
   const iconTile = (
     <View className="h-10 w-10 shrink-0 items-center justify-center rounded-md bg-secondary">
-      <KiloPassIcon size={19} color={colors.primary} />
+      <KiloPassIcon size={19} color={colors[rowTint('honey').hueThemeKey]} />
     </View>
   );
   const cardBody = (text: ReactNode, trailing?: ReactNode, tile: ReactNode = iconTile) =>
@@ -106,10 +105,16 @@ export function KiloPassSubscriptionCard({
     <View className="gap-2">
       {contentState.kind === 'loading' && hideLoadingSkeleton ? (
         // The height the loading card below renders at, so revealing it never
-        // moves layout: p-3 (24) + the h-10 icon row (40) + the 1px borders
-        // (2), plus the stacked copy row (gap-2 8 + the two skeleton bars
-        // 12 + 16 + 12) when narrow.
-        <View className={narrow ? 'h-[114px]' : 'h-[66px]'} />
+        // moves layout. The card's rem is 14 pt, not 16, so the wide row
+        // measures p-3 (21) + the h-10 icon row (35) + the 1px borders (2):
+        // 58 dp, which the design gate measured as 58.67 dp loaded on Profile
+        // (2026-11-05). The earlier 66 assumed a 16 pt rem and left every
+        // section below the card moving 8 dp when the card arrived.
+        //
+        // The stacked reserve keeps its old value: the standard matrix has no
+        // window narrow enough to reach it, so there is no measurement behind
+        // a change to it.
+        <View className={narrow ? 'h-[114px]' : 'h-[58px]'} />
       ) : null}
 
       {contentState.kind === 'loading' && !hideLoadingSkeleton ? (
@@ -166,7 +171,6 @@ export function KiloPassSubscriptionCard({
           accessibilityRole="button"
           className="rounded-lg border border-border bg-card p-3 active:opacity-80"
           onPress={handlePress}
-          testID={isUnavailable ? 'kilo-pass-unavailable-card' : undefined}
         >
           {cardBody(
             <>

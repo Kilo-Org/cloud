@@ -2,6 +2,7 @@ import { createTRPCRouter, baseProcedure } from '@kilocode/web-shared/lib/trpc/i
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import {
+  getGitHubConnectionStatusForOwner,
   getIntegrationForOwner,
   updateIntegrationMetadataForOwner,
 } from '@/lib/integrations/db/platform-integrations';
@@ -19,7 +20,10 @@ import {
   syncWebhooksForRepositories,
   type ConfiguredWebhook,
 } from '@/lib/integrations/platforms/gitlab/webhook-sync';
-import { getValidGitLabToken } from '@/lib/integrations/gitlab-service';
+import {
+  getValidGitLabToken,
+  isGitLabCredentialConnected,
+} from '@/lib/integrations/gitlab-service';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import {
   clearCodeReviewActionRequiredState,
@@ -35,6 +39,7 @@ import {
   type CodeReviewFieldMergePatch,
   type CodeReviewStoredConfig,
 } from '@kilocode/app-shared/code-review';
+import { repositoryModeForPlatform } from '@/lib/code-reviews/core/repository-mode';
 
 const PlatformSchema = z.enum(['github', 'gitlab']).default('github');
 
@@ -168,24 +173,7 @@ export const personalReviewAgentRouter = createTRPCRouter({
    */
   getGitHubStatus: baseProcedure.query(async ({ ctx }) => {
     const owner = { type: 'user' as const, id: ctx.user.id, userId: ctx.user.id };
-    const integration = await getIntegrationForOwner(owner, 'github');
-
-    if (!integration || integration.integration_status !== 'active') {
-      return {
-        connected: false,
-        integration: null,
-      };
-    }
-
-    return {
-      connected: true,
-      integration: {
-        accountLogin: integration.platform_account_login,
-        repositorySelection: integration.repository_access,
-        installedAt: integration.installed_at,
-        isValid: !integration.suspended_at,
-      },
-    };
+    return await getGitHubConnectionStatusForOwner(owner);
   }),
 
   /**
@@ -204,9 +192,39 @@ export const personalReviewAgentRouter = createTRPCRouter({
     const owner = { type: 'user' as const, id: ctx.user.id, userId: ctx.user.id };
     const integration = await getIntegrationForOwner(owner, PLATFORM.GITLAB);
 
-    if (!integration || integration.integration_status !== 'active') {
+    // An existing row that cannot serve a review is a different state from
+    // "never connected": the account already authorized this integration, so
+    // the connect gate must explain that the connection has to be
+    // re-authorized instead of asking for a first-time connect that the user
+    // already completed.
+    if (!integration) {
       return {
         connected: false,
+        reconnectRequired: false,
+        integration: null,
+      };
+    }
+
+    if (integration.integration_status !== 'active') {
+      return {
+        connected: false,
+        reconnectRequired: true,
+        integration: null,
+      };
+    }
+
+    // The row being active says nothing about the stored credential. Ask the
+    // token service to resolve it, exactly as a review read would, so an
+    // expired or revoked credential reports as not connected instead of
+    // sending the settings surface into review-only content.
+    if (
+      !(await isGitLabCredentialConnected(integration, {
+        userId: ctx.user.id,
+      }))
+    ) {
+      return {
+        connected: false,
+        reconnectRequired: true,
         integration: null,
       };
     }
@@ -220,11 +238,11 @@ export const personalReviewAgentRouter = createTRPCRouter({
 
     return {
       connected: true,
+      reconnectRequired: false,
       integration: {
         accountLogin: integration.platform_account_login,
         repositorySelection: integration.repository_access,
         installedAt: integration.installed_at,
-        isValid: true, // GitLab OAuth doesn't have suspension concept
         instanceUrl: (metadata?.gitlab_instance_url as string) || 'https://gitlab.com',
       },
     };
@@ -248,6 +266,10 @@ export const personalReviewAgentRouter = createTRPCRouter({
       const owner = { type: 'user' as const, id: ctx.user.id, userId: ctx.user.id };
       const platform = input?.platform ?? 'github';
       const config = await getAgentConfigForOwner(owner, 'code_review', platform);
+      // GitLab code review has no 'all' repository mode: the webhook handler
+      // reviews only selected or manually added projects, so the reported mode
+      // must not promise 'all' for a stored row or for the default config.
+      const isGitLab = platform === PLATFORM.GITLAB;
 
       if (!config) {
         // Return default configuration
@@ -259,7 +281,7 @@ export const personalReviewAgentRouter = createTRPCRouter({
           modelSlug: PRIMARY_DEFAULT_MODEL,
           thinkingEffort: null satisfies string | null,
           gateThreshold: 'off' as const,
-          repositorySelectionMode: 'all' as const,
+          repositorySelectionMode: isGitLab ? ('selected' as const) : ('all' as const),
           selectedRepositoryIds: [],
           manuallyAddedRepositories: [],
           repositoryModelOverrides: [],
@@ -281,7 +303,9 @@ export const personalReviewAgentRouter = createTRPCRouter({
         modelSlug: cfg.model_slug || PRIMARY_DEFAULT_MODEL,
         thinkingEffort: cfg.thinking_effort ?? null,
         gateThreshold: cfg.gate_threshold ?? 'off',
-        repositorySelectionMode: cfg.repository_selection_mode || 'all',
+        repositorySelectionMode: isGitLab
+          ? ('selected' as const)
+          : cfg.repository_selection_mode || 'all',
         selectedRepositoryIds: (cfg.selected_repository_ids ?? []).filter(
           (repositoryId): repositoryId is number => typeof repositoryId === 'number'
         ),
@@ -319,6 +343,14 @@ export const personalReviewAgentRouter = createTRPCRouter({
         const owner = { type: 'user' as const, id: ctx.user.id, userId: ctx.user.id };
         const platform = input.platform ?? 'github';
 
+        // GitLab code review has no 'all' repository mode: the webhook handler
+        // reviews only selected or manually added projects. The same rule settles
+        // the stored mode and the GitLab hook-sync decision below.
+        const repositorySelectionMode = repositoryModeForPlatform(
+          platform,
+          input.repositorySelectionMode
+        );
+
         // Get previous config to determine which repos were previously selected
         const previousConfig = await getAgentConfigForOwner(owner, 'code_review', platform);
         const previousRepoIds =
@@ -349,7 +381,7 @@ export const personalReviewAgentRouter = createTRPCRouter({
             model_slug: input.modelSlug,
             thinking_effort: input.thinkingEffort ?? null,
             gate_threshold: input.gateThreshold ?? 'off',
-            repository_selection_mode: input.repositorySelectionMode || 'all',
+            repository_selection_mode: repositorySelectionMode,
             selected_repository_ids: input.selectedRepositoryIds || [],
             manually_added_repositories: input.manuallyAddedRepositories || [],
             repository_model_overrides: repositoryModelOverrides,
@@ -367,7 +399,7 @@ export const personalReviewAgentRouter = createTRPCRouter({
         if (
           platform === PLATFORM.GITLAB &&
           input.autoConfigureWebhooks !== false &&
-          input.repositorySelectionMode === 'selected'
+          repositorySelectionMode === 'selected'
         ) {
           const integration = await getIntegrationForOwner(owner, PLATFORM.GITLAB);
           if (integration) {

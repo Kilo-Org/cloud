@@ -2,6 +2,7 @@ import { FolderOpen } from 'lucide-react';
 import { getDirectoryName } from './toolCardUtils';
 import { ToolCardShell } from './ToolCardShell';
 import { ToolCodeBlock, ToolMarkdown } from './ToolOutput';
+import { cloudAgentFileLabel } from '@kilocode/app-shared/cloud-agent';
 import type { ToolPart } from './types';
 
 type ListToolCardProps = {
@@ -10,7 +11,7 @@ type ListToolCardProps = {
 
 export function ListToolCard({ toolPart }: ListToolCardProps) {
   const state = toolPart.state;
-  const path = typeof state.input.path === 'string' ? state.input.path : '';
+  const path = typeof state.input.path === 'string' ? cloudAgentFileLabel(state.input.path) : '';
   const dirName = getDirectoryName(path);
   const output = state.status === 'completed' ? state.output : undefined;
   const error = state.status === 'error' ? state.error : undefined;

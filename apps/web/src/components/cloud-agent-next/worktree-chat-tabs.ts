@@ -17,6 +17,67 @@ export function getWorkspaceControlSession(
   );
 }
 
+/** The chats of a worktree share its branch, so any chat that stored it names it. */
+export function getWorktreeBranch(
+  worktreeId: string | null,
+  chats: readonly StoredSession[]
+): string | null {
+  if (worktreeId === null) return null;
+  return chats.find(chat => chat.worktreeId === worktreeId && chat.branch)?.branch ?? null;
+}
+
+/**
+ * The requested chat's stored row, which drives the worktree controls while its
+ * session loads, so the controls stay in place across chat switches.
+ */
+export function getLoadingChatControlSession(
+  sessionId: string,
+  chats: readonly StoredSession[],
+  deletingSessionIds: readonly string[]
+): StoredSession | null {
+  return (
+    chats.find(
+      chat =>
+        chat.sessionId === sessionId &&
+        Boolean(chat.cloudAgentSessionId) &&
+        !deletingSessionIds.includes(chat.sessionId)
+    ) ?? null
+  );
+}
+
+/**
+ * The chat whose cloud session drives the worktree controls. A loaded chat
+ * drives them itself (null). While the requested chat loads, its stored row
+ * does. A chat created here has no cloud session yet, so its source chat, or
+ * else the worktree's control chat, stands in until it loads.
+ */
+export function resolveWorkspaceControlSession({
+  requestedSessionId,
+  requestedSessionLoaded,
+  local,
+  worktreeId,
+  chats,
+  deletingSessionIds,
+}: {
+  requestedSessionId: string | null;
+  requestedSessionLoaded: boolean;
+  /** Set when the requested chat was created here. */
+  local: { sourceSessionId: string | null } | null;
+  worktreeId: string | null;
+  chats: readonly StoredSession[];
+  deletingSessionIds: readonly string[];
+}): StoredSession | null {
+  if (!requestedSessionId) return getWorkspaceControlSession(worktreeId, chats, deletingSessionIds);
+  if (requestedSessionLoaded) return null;
+  const stored = getLoadingChatControlSession(requestedSessionId, chats, deletingSessionIds);
+  if (stored || !local) return stored;
+  return (
+    (local.sourceSessionId &&
+      getLoadingChatControlSession(local.sourceSessionId, chats, deletingSessionIds)) ||
+    getWorkspaceControlSession(worktreeId, chats, deletingSessionIds)
+  );
+}
+
 const CLOSED_WORKTREE_CHAT_TABS_STORAGE_KEY_PREFIX = 'cloud-agent:closed-worktree-chat-tabs';
 
 const sessionIdsSchema = z.array(z.string()).transform(sessionIds => [...new Set(sessionIds)]);
@@ -150,6 +211,69 @@ export function getClosedWorktreeChatSessionIds(
 ): string[] {
   const knownIds = new Set(sessionIds);
   return closedSessionIds.toReversed().filter(sessionId => knownIds.has(sessionId));
+}
+
+export function getLatestOpenChatSessionId(
+  sessionIdsByRecency: readonly string[],
+  closedSessionIds: readonly string[]
+): string | null {
+  const closedIds = new Set(closedSessionIds);
+  return sessionIdsByRecency.find(sessionId => !closedIds.has(sessionId)) ?? null;
+}
+
+/**
+ * A reloaded, history-restored, or discarded-then-revived document shows the
+ * address it had, not one the user just asked to open, so its chat must not be
+ * reopened.
+ */
+export function isRestoredDocumentNavigation(
+  navigation: { name: string; type: string } | undefined,
+  currentUrl: string,
+  wasDiscarded: boolean
+): boolean {
+  if (!navigation || navigation.name !== currentUrl) return false;
+  return wasDiscarded || navigation.type === 'reload' || navigation.type === 'back_forward';
+}
+
+/**
+ * Chat addresses this window asked for that the router has not shown yet. The
+ * router applies them in a transition, so the shown chat lags the request.
+ * Null `target` is the worktree view.
+ */
+export type PendingChatNavigation = {
+  target: string | null;
+  requested: readonly (string | null)[];
+} | null;
+
+export function requestChatNavigation(
+  pending: PendingChatNavigation,
+  target: string | null
+): PendingChatNavigation {
+  return { target, requested: [...(pending?.requested ?? []), target] };
+}
+
+/**
+ * Settles the pending navigation once the window shows `sessionId`. A chat this
+ * window requested had its tab opened by that request, so arriving at it must
+ * not reopen a tab the user closed in the meantime.
+ */
+export function arriveAtChatAddress(
+  pending: PendingChatNavigation,
+  sessionId: string | null
+): { pending: PendingChatNavigation; requestedHere: boolean } {
+  const requestedHere = pending?.requested.includes(sessionId) ?? false;
+  return {
+    pending: pending && requestedHere && pending.target !== sessionId ? pending : null,
+    requestedHere,
+  };
+}
+
+/** The chat the window is showing or about to show. */
+export function getActiveChatSessionId(
+  pending: PendingChatNavigation,
+  currentSessionId: string | null
+): string | null {
+  return pending ? pending.target : currentSessionId;
 }
 
 export function getNextOpenChatSessionId(

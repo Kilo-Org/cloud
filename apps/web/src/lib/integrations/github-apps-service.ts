@@ -4,32 +4,36 @@ import type { PlatformIntegration } from '@kilocode/db/schema';
 import { platform_integrations } from '@kilocode/db/schema';
 import { eq, and, asc, desc, isNull } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
-import { requireNumericPlatformRepositories, type Owner } from '@/lib/integrations/core/types';
+import {
+  requireNumericPlatformRepositories,
+  shouldSyncProviderRepositories,
+  type Owner,
+} from '@/lib/integrations/core/types';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
 import { platformIntegrationHealthSql } from '@/lib/integrations/core/health';
 import {
   findPendingInstallationByKiloUserId,
   getGitHubIntegrationById,
+  personalGitHubIntegrationOrder,
   updateIntegrationMetadataForOwner,
   updateRepositoriesForIntegration,
 } from '@/lib/integrations/db/platform-integrations';
 import { uninstallExclusiveGitHubInstallation } from '@/lib/integrations/db/github-installations';
+import { ownerCondition } from '@/lib/integrations/db/predicates';
 import {
   deleteGitHubInstallation,
   fetchGitHubBranches,
   fetchGitHubRepositories,
 } from '@/lib/integrations/platforms/github/adapter';
-import { isOrganizationModelUpdateAllowed } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+import { isOrganizationModelUpdateAllowed } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
+import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 /**
  * List all integrations for an owner
  * Only returns GitHub integrations to prevent errors with non-GitHub platforms
  */
 export async function listIntegrations(owner: Owner) {
-  const ownershipCondition =
-    owner.type === 'user'
-      ? eq(platform_integrations.owned_by_user_id, owner.id)
-      : eq(platform_integrations.owned_by_organization_id, owner.id);
+  const ownershipCondition = ownerCondition(owner);
 
   const integrations = await db
     .select()
@@ -44,21 +48,20 @@ export async function listIntegrations(owner: Owner) {
  * Get GitHub App installation status for an owner
  */
 export async function getInstallation(owner: Owner): Promise<PlatformIntegration | null> {
-  const ownershipCondition =
-    owner.type === 'user'
-      ? eq(platform_integrations.owned_by_user_id, owner.id)
-      : eq(platform_integrations.owned_by_organization_id, owner.id);
+  const ownershipCondition = ownerCondition(owner);
 
   const [integration] = await db
     .select()
     .from(platform_integrations)
     .where(and(ownershipCondition, eq(platform_integrations.platform, 'github')))
     .orderBy(
-      desc(platformIntegrationHealthSql()),
-      owner.type === 'org'
-        ? asc(platform_integrations.created_at)
-        : desc(platform_integrations.updated_at),
-      asc(platform_integrations.id)
+      ...(owner.type === 'org'
+        ? [
+            desc(platformIntegrationHealthSql()),
+            asc(platform_integrations.created_at),
+            asc(platform_integrations.id),
+          ]
+        : personalGitHubIntegrationOrder())
     )
     .limit(1);
 
@@ -138,9 +141,10 @@ export async function uninstallApp(
         message: 'Disconnect this Kilo connection instead of uninstalling the shared GitHub App',
       });
     }
+    errorExceptInTest('Failed to delete GitHub installation', { error });
     throw new TRPCError({
       code: 'INTERNAL_SERVER_ERROR',
-      message: `Failed to delete GitHub installation: ${error instanceof Error ? error.message : String(error)}`,
+      message: 'Failed to delete GitHub installation',
     });
   }
 
@@ -149,17 +153,16 @@ export async function uninstallApp(
 
 /**
  * List repositories accessible by an integration
- * Returns cached repositories by default, fetches fresh from GitHub when forceRefresh is true
+ * Returns the cached snapshot by default, including an empty one that has
+ * already synced; reads the provider when the row has no snapshot yet or when
+ * forceRefresh is true
  */
 export async function listRepositories(
   owner: Owner,
   integrationId: string,
   forceRefresh: boolean = false
 ) {
-  const ownershipCondition =
-    owner.type === 'user'
-      ? eq(platform_integrations.owned_by_user_id, owner.id)
-      : eq(platform_integrations.owned_by_organization_id, owner.id);
+  const ownershipCondition = ownerCondition(owner);
 
   const [integration] = await db
     .select()
@@ -188,8 +191,16 @@ export async function listRepositories(
   }
 
   const cachedRepositories = requireNumericPlatformRepositories(integration.repositories);
-  // If forceRefresh, no cached repos, or never synced before, fetch from GitHub and update cache
-  if (forceRefresh || !cachedRepositories?.length || !integration.repositories_synced_at) {
+  // Answer from the cached snapshot unless the caller forces a sync or the
+  // integration has never synced: a synced empty snapshot is the
+  // connected-empty state, not a reason to re-query GitHub on every read.
+  if (
+    shouldSyncProviderRepositories({
+      forceRefresh,
+      cachedRepositories,
+      repositoriesSyncedAt: integration.repositories_synced_at,
+    })
+  ) {
     const appType = integration.github_app_type || 'standard';
     const repos = await fetchGitHubRepositories(
       integration.platform_installation_id,
@@ -204,30 +215,29 @@ export async function listRepositories(
     };
   }
 
-  // Return cached repos
   return {
-    repositories: cachedRepositories,
+    repositories: cachedRepositories ?? [],
     syncedAt: integration.repositories_synced_at,
   };
 }
 
 /**
- * Cancel a pending installation
+ * Cancel one pending installation request.
+ *
+ * The id is required: a user can hold several pending requests, so the caller
+ * must name the row it displayed. An id that is not a pending request for this
+ * owner is refused rather than replaced by another matching row.
  */
-export async function cancelPendingInstallation(owner: Owner, integrationId?: string) {
-  const ownershipCondition =
-    owner.type === 'user'
-      ? eq(platform_integrations.owned_by_user_id, owner.id)
-      : eq(platform_integrations.owned_by_organization_id, owner.id);
+export async function cancelPendingInstallation(owner: Owner, integrationId: string) {
+  const ownershipCondition = ownerCondition(owner);
 
-  // Find the pending installation
   const [integration] = await db
     .select()
     .from(platform_integrations)
     .where(
       and(
         ownershipCondition,
-        ...(integrationId ? [eq(platform_integrations.id, integrationId)] : []),
+        eq(platform_integrations.id, integrationId),
         eq(platform_integrations.platform, 'github'),
         eq(platform_integrations.integration_status, INTEGRATION_STATUS.PENDING),
         isNull(platform_integrations.platform_installation_id)
@@ -260,10 +270,7 @@ export async function listBranches(
   repositoryFullName: string,
   purpose: 'workflow' | 'agent' = 'workflow'
 ) {
-  const ownershipCondition =
-    owner.type === 'user'
-      ? eq(platform_integrations.owned_by_user_id, owner.id)
-      : eq(platform_integrations.owned_by_organization_id, owner.id);
+  const ownershipCondition = ownerCondition(owner);
 
   const [integration] = await db
     .select()

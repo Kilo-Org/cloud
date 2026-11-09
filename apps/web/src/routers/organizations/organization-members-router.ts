@@ -1,3 +1,4 @@
+import { isSupportAccessEnabled } from '@kilocode/web-shared/lib/admin/support-access';
 import { removeUserFromOrganization } from '@/lib/organizations/organization-member-removal';
 import {
   updateUserRoleInOrganization,
@@ -6,7 +7,10 @@ import {
   getOrganizationMembers,
   inviteUserToOrganization,
   getAcceptInviteUrl,
+  lockOrganizationMembershipMutation,
+  CHILD_ORGANIZATION_INVITE_REQUIRES_PARENT_MEMBER,
 } from '@kilocode/web-shared/lib/organizations/organizations';
+import { lockOrganizationGroupPolicy } from '@kilocode/web-shared/lib/organizations/organization-groups';
 import { updateOrganizationUserLimit } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import {
   organization_memberships,
@@ -24,7 +28,15 @@ import {
   organizationBillingMutationProcedure,
   organizationMemberProcedure,
 } from '@kilocode/web-shared/routers/organizations/utils';
-import { ORGANIZATION_MANAGE_ROLES } from '@kilocode/app-shared/organizations';
+import {
+  ORGANIZATION_BILLING_ROLES,
+  ORGANIZATION_MANAGE_ROLES,
+} from '@kilocode/app-shared/organizations';
+import { getLowerDomainFromEmail, normalizeEmail } from '@kilocode/web-shared/lib/email-address';
+import {
+  getOrganizationMembershipRoles,
+  recordElevatedOrganizationAdminAction,
+} from '@/lib/admin/admin-action-audit';
 import {
   enqueueInviteEmail,
   resetInviteEmailForResend,
@@ -37,7 +49,6 @@ import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import { successResult } from '@kilocode/web-shared/lib/maybe-result';
 import { destroyOrgInstancesForUser } from '@/lib/kiloclaw/instance-registry';
 import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client';
-import { revokeGatewayStateForOrganizationMember } from '@/lib/mcp-gateway/lifecycle-service';
 import { invalidateOrganizationSessionAccess } from '@/lib/session-ingest-client';
 import {
   OrganizationRoleSchema,
@@ -57,8 +68,10 @@ const RemoveMemberSchema = OrganizationIdInputSchema.extend({
   memberId: z.string(),
 });
 
+// 254 is the address maximum a mail system delivers (RFC 5321 path limit), so a
+// longer address can never receive the invitation this procedure creates.
 const InviteMemberSchema = OrganizationIdInputSchema.extend({
-  email: z.email('Invalid email address'),
+  email: z.email('Invalid email address').max(254, 'Email address must be 254 characters or fewer'),
   role: OrganizationRoleSchema,
 });
 
@@ -277,6 +290,16 @@ export const organizationsMembersRouter = createTRPCRouter({
         await updateOrganizationUserLimit(organizationId, memberId, dailyUsageLimitUsd);
       }
 
+      await recordElevatedOrganizationAdminAction(ctx, {
+        organizationId,
+        // Changing an owner or granting owner needs owner authority.
+        requiredRoles:
+          targetMember.role === 'owner' || role === 'owner' ? ['owner'] : ORGANIZATION_MANAGE_ROLES,
+        action: 'organization.member.role.update',
+        message: `Changed member role from ${targetMember.role} to ${role}`,
+        metadata: { memberKiloUserId: memberId, previousRole: targetMember.role, role },
+      });
+
       return successResult({ updated: 'role and limit' });
     }),
   setChildMemberships: organizationBillingMutationProcedure
@@ -286,10 +309,11 @@ export const organizationsMembersRouter = createTRPCRouter({
       const { organizationId, memberId } = input;
       const childOrganizationIds = Array.from(new Set(input.childOrganizationIds));
 
-      const directRole = user.is_admin
-        ? 'owner'
-        : await getDirectOrganizationRole(organizationId, user.id);
-      if (directRole !== 'owner' && directRole !== 'billing_manager') {
+      const directRole =
+        user.is_admin && !isSupportAccessEnabled()
+          ? 'owner'
+          : await getDirectOrganizationRole(organizationId, user.id);
+      if (!ORGANIZATION_BILLING_ROLES.some(role => role === directRole)) {
         throw new TRPCError({
           code: 'UNAUTHORIZED',
           message: 'You do not have the required organizational role to access this feature',
@@ -342,87 +366,120 @@ export const organizationsMembersRouter = createTRPCRouter({
         });
       }
 
-      const childIds = childOrganizations.map(child => child.id);
-      const existingMemberships =
-        childIds.length > 0
-          ? await db
-              .select({
-                organizationId: organization_memberships.organization_id,
-                role: organization_memberships.role,
-              })
-              .from(organization_memberships)
-              .where(
-                and(
-                  eq(organization_memberships.kilo_user_id, memberId),
-                  inArray(organization_memberships.organization_id, childIds)
-                )
-              )
-          : [];
-      const existingMembershipsByOrganizationId = new Map(
-        existingMemberships.map(membership => [membership.organizationId, membership])
-      );
+      const childIds = childOrganizations.map(child => child.id).sort();
       const selectedChildOrganizationIds = new Set(childOrganizationIds);
-
-      const added: string[] = [];
-      const removed: string[] = [];
-
-      for (const childOrganizationId of childOrganizationIds) {
-        if (existingMembershipsByOrganizationId.has(childOrganizationId)) continue;
-
-        const wasAdded = await db.transaction(async tx => {
-          const addedNow = await addUserToOrganization(childOrganizationId, memberId, 'member', tx);
-          if (!addedNow) return false;
-          await createAuditLog({
-            action: 'organization.member.admin_add',
-            actor_email: user.google_user_email,
-            actor_id: user.id,
-            actor_name: user.google_user_name,
-            message: `Added parent organization member ${parentMember.email} as a member from parent organization ${organizationId}`,
-            organization_id: childOrganizationId,
-            tx,
-          });
-          return true;
-        });
-
-        if (wasAdded) {
-          added.push(childOrganizationId);
+      const { added, removed } = await db.transaction(async tx => {
+        for (const childId of childIds) {
+          await lockOrganizationMembershipMutation(tx, childId, memberId);
         }
-      }
 
-      for (const membership of existingMemberships) {
-        if (selectedChildOrganizationIds.has(membership.organizationId)) continue;
+        const existingMemberships =
+          childIds.length > 0
+            ? await tx
+                .select({ organizationId: organization_memberships.organization_id })
+                .from(organization_memberships)
+                .where(
+                  and(
+                    eq(organization_memberships.kilo_user_id, memberId),
+                    inArray(organization_memberships.organization_id, childIds)
+                  )
+                )
+                .orderBy(organization_memberships.organization_id)
+            : [];
+        const existingMembershipsByOrganizationId = new Map(
+          existingMemberships.map(membership => [membership.organizationId, membership])
+        );
 
-        const wasRemoved = await db.transaction(async tx => {
+        const added = new Set<string>();
+        const removed: string[] = [];
+
+        for (const childOrganizationId of childIds) {
+          const existingMembership = existingMembershipsByOrganizationId.get(childOrganizationId);
+          if (selectedChildOrganizationIds.has(childOrganizationId)) {
+            if (existingMembership) continue;
+
+            const wasAdded = await addUserToOrganization(
+              childOrganizationId,
+              memberId,
+              'member',
+              tx
+            );
+            if (!wasAdded) continue;
+            await createAuditLog({
+              action: 'organization.member.admin_add',
+              actor_email: user.google_user_email,
+              actor_id: user.id,
+              actor_name: user.google_user_name,
+              message: `Added parent organization member ${parentMember.email} as a member from parent organization ${organizationId}`,
+              organization_id: childOrganizationId,
+              tx,
+            });
+            added.add(childOrganizationId);
+            continue;
+          }
+          if (!existingMembership) continue;
+
+          await lockOrganizationGroupPolicy(tx, childOrganizationId);
+          const [lockedMembership] = await tx
+            .select({ role: organization_memberships.role })
+            .from(organization_memberships)
+            .where(
+              and(
+                eq(organization_memberships.organization_id, childOrganizationId),
+                eq(organization_memberships.kilo_user_id, memberId)
+              )
+            )
+            .for('update');
+          if (lockedMembership && lockedMembership.role !== 'member') {
+            throw new TRPCError({
+              code: 'FORBIDDEN',
+              message: 'Elevated child team memberships must be managed in the child team',
+            });
+          }
+          if (!lockedMembership) continue;
+
           const result = await removeUserFromOrganization(
-            membership.organizationId,
+            childOrganizationId,
             memberId,
             user.id,
             tx
           );
-          if ((result.rowCount ?? 0) === 0) return false;
-          await revokeGatewayStateForOrganizationMember(tx, membership.organizationId, memberId);
+          if ((result.rowCount ?? 0) === 0) continue;
           await createAuditLog({
             action: 'organization.member.remove',
             actor_email: user.google_user_email,
             actor_id: user.id,
             actor_name: user.google_user_name,
             message: `Removed parent organization member ${parentMember.email} from child organization via parent organization ${organizationId}`,
-            organization_id: membership.organizationId,
+            organization_id: childOrganizationId,
             tx,
           });
-          return true;
-        });
-
-        if (wasRemoved) {
-          removed.push(membership.organizationId);
-          // Best-effort session access invalidation after the transaction commits.
-          try {
-            await invalidateOrganizationSessionAccess(memberId, membership.organizationId);
-          } catch {
-            // A removed member loses cached access within the cache TTL even
-            // when this call fails.
-          }
+          removed.push(childOrganizationId);
         }
+
+        return { added: childOrganizationIds.filter(id => added.has(id)), removed };
+      });
+
+      for (const childOrganizationId of removed) {
+        await invalidateOrganizationSessionAccess(memberId, childOrganizationId).catch(
+          () => undefined
+        );
+      }
+
+      if (added.length > 0 || removed.length > 0) {
+        await recordElevatedOrganizationAdminAction(ctx, {
+          organizationId,
+          // Mirrors the direct-membership check above.
+          requiredRoles: ORGANIZATION_BILLING_ROLES,
+          membershipScope: 'direct',
+          action: 'organization.child_memberships.set',
+          message: 'Changed child organization memberships',
+          metadata: {
+            memberKiloUserId: memberId,
+            addedOrganizationIds: added,
+            removedOrganizationIds: removed,
+          },
+        });
       }
 
       return successResult({ added, removed });
@@ -434,7 +491,7 @@ export const organizationsMembersRouter = createTRPCRouter({
       const { organizationId, memberId } = input;
 
       // Prevent users from removing themselves (unless they are kilo admin users)
-      if (user.id === memberId && !user.is_admin) {
+      if (user.id === memberId && (!user.is_admin || isSupportAccessEnabled())) {
         throw new TRPCError({
           code: 'FORBIDDEN',
           message: 'You cannot remove yourself from the organization',
@@ -466,6 +523,13 @@ export const organizationsMembersRouter = createTRPCRouter({
       );
       assertOwnerAuthority(actorRole, { currentRole: targetMember.role });
 
+      // Self-removal deletes the actor's own membership, so read their real
+      // roles first for the audit row.
+      const actorHeldRolesBeforeRemoval =
+        user.is_admin && memberId === user.id
+          ? await getOrganizationMembershipRoles(user.id, organizationId, 'direct_or_inherited')
+          : undefined;
+
       const result = await removeUserFromOrganization(organizationId, memberId, user.id);
       if (result.rowCount === 0) {
         throw new TRPCError({
@@ -484,8 +548,23 @@ export const organizationsMembersRouter = createTRPCRouter({
         organization_id: organizationId,
       });
 
-      await revokeGatewayStateForOrganizationMember(db, organizationId, memberId);
       await cleanupRemovedMemberInstances(memberId, organizationId);
+
+      await recordElevatedOrganizationAdminAction(ctx, {
+        organizationId,
+        // Only Kilo admins may remove themselves, so self-removal is always a
+        // bypass regardless of the roles they held.
+        requiredRoles:
+          memberId === user.id
+            ? []
+            : targetMember.role === 'owner'
+              ? ['owner']
+              : ORGANIZATION_MANAGE_ROLES,
+        heldRoles: actorHeldRolesBeforeRemoval,
+        action: 'organization.member.remove',
+        message: memberId === user.id ? 'Removed self from organization' : 'Removed member',
+        metadata: { memberKiloUserId: memberId, previousRole: targetMember.role },
+      });
 
       return successResult({ updated: memberId });
     }),
@@ -552,6 +631,26 @@ export const organizationsMembersRouter = createTRPCRouter({
           return { acceptInviteUrl, invitationId: invitation.id };
         });
 
+        // The invitee's address stays out of the audit log; inviting oneself
+        // (turning elevation into lasting membership) is flagged explicitly.
+        await recordElevatedOrganizationAdminAction(ctx, {
+          organizationId,
+          requiredRoles:
+            role === 'owner'
+              ? ['owner']
+              : role === 'member'
+                ? ORGANIZATION_BILLING_ROLES
+                : ORGANIZATION_MANAGE_ROLES,
+          action: 'organization.member.invite',
+          message: `Invited a user as ${role}`,
+          metadata: {
+            invitationId: result.invitationId,
+            role,
+            invitedEmailDomain: getLowerDomainFromEmail(email),
+            invitedSelf: normalizeEmail(email) === normalizeEmail(user.google_user_email),
+          },
+        });
+
         return { ...result, emailStatus: 'pending' as const };
       } catch (error) {
         if (error instanceof Error) {
@@ -567,10 +666,10 @@ export const organizationsMembersRouter = createTRPCRouter({
               message: 'This user is already a member of this organization',
             });
           }
-          if (error.message === 'Child organizations cannot invite members') {
+          if (error.message === CHILD_ORGANIZATION_INVITE_REQUIRES_PARENT_MEMBER) {
             throw new TRPCError({
               code: 'PRECONDITION_FAILED',
-              message: 'Child organizations manage membership through their parent organization.',
+              message: CHILD_ORGANIZATION_INVITE_REQUIRES_PARENT_MEMBER,
             });
           }
           if (error.message === 'User must join this organization through SSO') {

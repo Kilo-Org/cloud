@@ -2,6 +2,7 @@ export type {
   Part,
   TextPart,
   ToolPart,
+  ToolState,
   FilePart,
   ReasoningPart,
   StepStartPart,
@@ -23,6 +24,8 @@ export type {
 } from '@kilocode/app-shared/opencode';
 
 import type { UserMessage, AssistantMessage, Part } from '@kilocode/app-shared/opencode';
+import type * as z from 'zod';
+import type { cloudSessionMetadataSchema } from './schemas';
 
 export type {
   KiloSdkMessageHistory,
@@ -46,6 +49,9 @@ export type SendMessagePayload =
       type: 'command';
       command: string;
       arguments: string;
+      mode?: string;
+      model?: string;
+      variant?: string;
     };
 
 // Branded session ID types — prevent accidental mixing of kilo vs cloud agent IDs
@@ -76,6 +82,7 @@ export type SessionGoal = {
 export type SessionInfo = {
   id: string;
   parentID?: string | undefined;
+  title?: string | undefined;
   model?:
     | {
         providerID: string;
@@ -165,6 +172,15 @@ export type PermissionState = {
   always: string[];
 };
 
+/**
+ * A permission request that is still pending for the CLI while this app cannot
+ * read its scope. No consent card can be offered for it, so the surfaces show a
+ * notice that names the request and points the user at the CLI.
+ */
+export type UnreadablePermissionState = {
+  requestId: string;
+};
+
 export type SuggestionAction = {
   label: string;
   description?: string | undefined;
@@ -219,6 +235,7 @@ export type MessageDeliveryState =
     };
 
 export type SessionCommit = {
+  repository?: string | undefined;
   commitHash: string;
   commitMessage: string;
   messageId: string;
@@ -245,6 +262,8 @@ export type PreparationStepSnapshot = {
   completedAt?: number | undefined;
   revision: number;
   latestDetail?: string | undefined;
+  /** Capture time of the selected snapshot, in Unix epoch milliseconds. */
+  snapshotCapturedAt?: number | undefined;
   safeError?: string | undefined;
   command?: string | undefined;
   commandIndex?: number | undefined;
@@ -277,6 +296,8 @@ export type ServiceStateSnapshot = {
   sessionInfo: SessionInfo | null;
   question: QuestionState | null;
   permission: PermissionState | null;
+  /** Pending permission requests this app could not read, oldest first. */
+  unreadablePermissions: readonly UnreadablePermissionState[];
   suggestion: SuggestionState | null;
   pendingMessages: ReadonlyMap<string, MessageDeliveryState>;
 };
@@ -321,11 +342,54 @@ export type SessionSnapshot = {
  * existing `replay=false` behaviour.
  */
 export type SessionSnapshotPage = {
+  sourceVersion?: 'v1' | 'v2';
   info: SessionInfo;
   messages: SessionSnapshot['messages'];
   nextCursor: string | null;
   omittedItemCount: number;
   watermarkEventId?: number | null;
+  updateCursor?: number;
+  totalCostMicrodollars?: number | null | undefined;
+  /** The preparation rows the stream replays first, so the first page can show them. */
+  preparationAttempts?: readonly PreparationAttempt[];
+};
+
+export type CloudSessionMetadata = z.infer<typeof cloudSessionMetadataSchema>;
+
+export type CloudSessionSnapshotPage = SessionSnapshotPage & {
+  kind: 'success';
+  updateCursor: number;
+};
+
+export type SessionConfig = {
+  sessionId: CloudAgentSessionId | KiloSessionId;
+  repository: string;
+  mode: string;
+  model: string;
+  providerID?: string | null | undefined;
+  variant?: string | null | undefined;
+  /** Installed custom agents, including picker visibility and model overrides. */
+  runtimeAgents?:
+    | Array<{
+        slug: string;
+        name: string;
+        mode?: 'primary' | 'subagent' | 'all' | undefined;
+        hidden?: boolean | undefined;
+        disable?: boolean | undefined;
+        model?: string | undefined;
+        variant?: string | undefined;
+      }>
+    | undefined;
+};
+
+/**
+ * A caller-cached transcript page plus the rows the transcript draws from
+ * service state, so a cached repaint matches the live transcript's layout.
+ */
+export type CachedSessionSnapshotPage = SessionSnapshotPage & {
+  commits?: readonly SessionCommit[];
+  /** A Cloud Agent session's last settings, shown on reopen until its metadata loads. */
+  sessionConfig?: SessionConfig;
 };
 
 /**

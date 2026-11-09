@@ -220,6 +220,28 @@ test('runs the AI gateway app with the core services', () => {
   assert.ok(resolveGroups(getAlwaysOnGroupIds()).includes('ai-gateway'));
 });
 
+test('starts the BYOK KMS service on its own port before the web app', () => {
+  const kms = getService('local-kms');
+  const service = getService('byok-kms');
+
+  assert.equal(kms.type, 'infra');
+  assert.equal(kms.port, 8900 + portOffset);
+  assert.equal(service.group, 'core');
+  assert.equal(service.type, 'process');
+  assert.equal(service.port, 8901 + portOffset);
+  assert.deepEqual(service.dependsOn, ['local-kms']);
+  assert.deepEqual(service.command, [
+    'env',
+    `BYOK_KMS_SERVICE_PORT=${8901 + portOffset}`,
+    `BYOK_KMS_ENDPOINT=http://127.0.0.1:${8900 + portOffset}`,
+    'pnpm',
+    'exec',
+    'tsx',
+    'dev/byok-kms/server.ts',
+  ]);
+  assert.ok(getService('nextjs').dependsOn.includes('byok-kms'));
+});
+
 test('starts the AI gateway app before the web app that rewrites to it', () => {
   const web = getService('nextjs');
   const gateway = getService('ai-gateway');
@@ -265,11 +287,15 @@ test('registers user data export with worktree-aware ports and dependencies', ()
   assert.equal(service.port, 8818 + portOffset);
   assert.deepEqual(service.dependsOn, ['postgres', 'nextjs']);
   assert.deepEqual(resolveTargets(['data-export']), [
-    'redis',
+    'local-kms',
     'postgres',
+    'redis',
     'stripe',
-    'redis-http',
+    'cloudflare-scim-sync',
+    'byok-kms',
+    'cloudflare-git-token-service',
     'cloudflare-session-ingest',
+    'redis-http',
     'ai-gateway',
     'nextjs',
     'user-data-export',
@@ -293,6 +319,41 @@ test('starts the session-ingest worker whenever the web app starts', () => {
   assert.equal(worker.type, 'worker');
   assert.equal(worker.dir, 'services/session-ingest');
   assert.equal(worker.port, 8800 + portOffset);
+});
+
+test('starts the git-token worker whenever the web app starts', () => {
+  // Every code-review read and write resolves the caller's provider credential
+  // through git-token-service, so starting the web stack must pull the worker in
+  // transitively — otherwise the fetch hits a dead GIT_TOKEN_SERVICE_API_URL and
+  // a connected provider renders as a service outage with no rows.
+  const appTargets = resolveTargets(['app']);
+
+  assert.ok(
+    appTargets.includes('cloudflare-git-token-service'),
+    `expected cloudflare-git-token-service in app start targets, got: ${appTargets.join(', ')}`
+  );
+  assert.ok(
+    appTargets.indexOf('cloudflare-git-token-service') < appTargets.indexOf('nextjs'),
+    `expected cloudflare-git-token-service before nextjs, got: ${appTargets.join(', ')}`
+  );
+
+  const worker = getService('cloudflare-git-token-service');
+  assert.equal(worker.type, 'worker');
+  assert.equal(worker.dir, 'services/git-token-service');
+  assert.equal(worker.port, 8802 + portOffset);
+});
+
+test('runs kilo-mcp with the cloud-agent group on its wrangler port', () => {
+  const targets = resolveTargets(['cloud-agent']);
+  assert.ok(
+    targets.includes('kilo-mcp'),
+    `expected kilo-mcp in cloud-agent start targets, got: ${targets.join(', ')}`
+  );
+
+  const worker = getService('kilo-mcp');
+  assert.equal(worker.type, 'worker');
+  assert.equal(worker.dir, 'services/kilo-mcp');
+  assert.equal(worker.port, 8815 + portOffset);
 });
 
 test('points both user data export Hyperdrive bindings at the offset database', () => {
@@ -327,14 +388,14 @@ test('keeps auto routing package dev script compatible with local launcher flags
   assert.equal(launcherFlags.filter(part => part === '--ip').length, 1);
 });
 
-test('starts the container usage meter whenever Gastown starts', () => {
-  // Gastown's TownContainerDO binds container-usage-meter via a service binding,
-  // which only connects when the meter is registered in the same local Wrangler
-  // dev registry. Starting Gastown must therefore always launch the meter.
-  const gastownTargets = resolveTargets(['gastown']);
+test('starts the container usage meter whenever the cloud-agent group starts', () => {
+  // Cloud Agent binds container-usage-meter via a service binding, which only
+  // connects when the meter is registered in the same local Wrangler dev
+  // registry. Starting the cloud-agent group must therefore always launch it.
+  const cloudAgentTargets = resolveTargets(['cloud-agent']);
   assert.ok(
-    gastownTargets.includes('container-usage-meter'),
-    `expected container-usage-meter in gastown start targets, got: ${gastownTargets.join(', ')}`
+    cloudAgentTargets.includes('container-usage-meter'),
+    `expected container-usage-meter in cloud-agent start targets, got: ${cloudAgentTargets.join(', ')}`
   );
 
   const meter = getService('container-usage-meter');
@@ -344,8 +405,7 @@ test('starts the container usage meter whenever Gastown starts', () => {
 });
 
 test('binds the container usage meter under its unsuffixed Wrangler name', () => {
-  // Gastown binds CONTAINER_USAGE to service "container-usage-meter" with no
-  // "-dev" suffix. The meter's dev script must not pass --env (which would
+  // Producers bind to service "container-usage-meter" with no "-dev" suffix. The meter's dev script must not pass --env (which would
   // register it as a different name) and must accept the launcher's flags.
   const meter = getService('container-usage-meter');
   const packageJson = JSON.parse(fs.readFileSync(`${meter.dir}/package.json`, 'utf-8')) as {
@@ -428,7 +488,6 @@ test('injects deletion-mock host overrides only when the service is selected', (
     PYLON_HOST: 'http://127.0.0.1:5210',
     SUBSTACK_PUBLICATION_URL: 'http://127.0.0.1:5210',
     CUSTOMERIO_TRACK_BASE: 'http://127.0.0.1:5210',
-    CSA_APP_BASE_URL: 'http://127.0.0.1:5210',
     PYLON_API_KEY: 'deletion-mock',
     POSTHOG_PERSONAL_API_KEY: 'deletion-mock',
     POSTHOG_ENVIRONMENT_ID: 'deletion-mock',

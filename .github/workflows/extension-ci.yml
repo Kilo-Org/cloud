@@ -27,6 +27,9 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320
 
+      - name: Mount pnpm store
+        uses: ./.github/actions/pnpm-store
+
       - name: Setup Node
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f
         with:
@@ -44,6 +47,7 @@ jobs:
               - 'apps/extension/**'
               - '.github/workflows/extension-ci.yml'
               - 'scripts/changed-workspaces.sh'
+              - 'scripts/affected-workspaces.mjs'
               - 'scripts/changed-dependencies.mjs'
               - 'scripts/changed-dependencies.test.mjs'
               - 'package.json'
@@ -62,8 +66,12 @@ jobs:
           matrix=$(scripts/changed-workspaces.sh)
           echo "extension=$(jq -r 'any(.[]; .dir == "apps/extension")' <<< "$matrix")" >> "$GITHUB_OUTPUT"
 
-  # Compiler, linter, formatting and unit tests, via the extension's own `verify`
-  # script so the extension's stricter (type-aware) oxlint config is what runs.
+  # Compiler, linter and unit tests, via the extension's own `verify` script so
+  # the extension's stricter (type-aware) oxlint config is what runs.
+  #
+  # The extension's formatting is gated by the repo-wide `format-check` job in
+  # ci.yml: `oxfmt --list-different .` covers apps/extension on every PR,
+  # merge-queue entry and main push, so `verify` does not format-check it again.
   verify:
     needs: changes
     if: needs.changes.outputs.extension == 'true'
@@ -86,7 +94,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Verify (typecheck, lint, format, unit tests)
+      - name: Restore or build tRPC declarations
+        uses: ./.github/actions/trpc-declarations
+
+      - name: Verify (typecheck, lint, unit tests)
+        env:
+          KILO_TYPECHECK_TRPC_BUILT: '1'
         run: pnpm --filter kilo-extension verify
 
   # Prove the Firefox MV3 target still builds (the Chrome build runs inside e2e).
@@ -141,6 +154,20 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      # The version comes from the dependency graph this install just built, so
+      # a bump to @playwright/test changes the key and downloads the matching
+      # build. No restore-keys: an older browser tree never satisfies the
+      # install and would only grow the cached entry.
+      - name: Resolve Playwright version
+        id: playwright
+        run: echo "version=$(pnpm --filter kilo-extension exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-${{ runner.arch }}-playwright-${{ steps.playwright.outputs.version }}
 
       - name: Install Playwright Chromium
         # No --with-deps: the runner image already ships the Chromium system libraries, and the apt-get behind --with-deps hangs until the job timeout whenever the runner fleet's apt egress degrades (measured: four 20-minute hangs on 2026-08-12). A missing library would fail the browser launch with an explicit list instead.

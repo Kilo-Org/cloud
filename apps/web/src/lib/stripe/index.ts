@@ -1,7 +1,11 @@
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import 'server-only'; // This file imports the database and can therefore only be used on the server side.
 import Stripe from 'stripe';
-import { client } from '@kilocode/web-shared/lib/stripe-client';
+import { client, invalidateStripePaymentMethodCache } from '@kilocode/web-shared/lib/stripe-client';
+import {
+  getStripeChargeInvoice,
+  getStripeInvoiceChargeId,
+} from '@kilocode/web-shared/lib/stripe-invoice-payments';
 import { captureException } from '@sentry/nextjs';
 import { db, auto_deleted_at } from '@kilocode/web-shared/lib/drizzle';
 import type { User, PaymentMethod, Organization } from '@kilocode/db/schema';
@@ -34,7 +38,14 @@ import {
 } from '@kilocode/web-shared/lib/autoTopUpConstants';
 import { findUserByStripeCustomerId } from '@/lib/user';
 import { findOrganizationByStripeCustomerId } from '@kilocode/web-shared/lib/organizations/organizations';
-import type { CreditEvent, StoreCreditEvent } from '@kilocode/web-shared/lib/bouncer/client';
+import {
+  bouncerAccountId,
+  bouncerWireEventId,
+  type CreditEvent,
+  type StoreCreditEvent,
+} from '@kilocode/web-shared/lib/bouncer/client';
+import { chargeStanding } from '@kilocode/web-shared/lib/bouncer/charge-gate';
+import { deliverBouncerCreditEventNow } from '@/lib/bouncer/dispatch-credit-event-outbox';
 import {
   enqueueCreditEvent,
   reportChargeAttempted,
@@ -43,7 +54,10 @@ import {
 import type { UnifiedInvoice } from '@/types/billing';
 import type { StripeConfig } from '@kilocode/web-shared/lib/credits';
 import { processTopUp } from '@kilocode/web-shared/lib/credits';
+import type { PaidCreditGrant } from '@kilocode/web-shared/lib/paidCreditPolicy';
+import { getPaidCreditTerms } from '@kilocode/web-shared/lib/paidCreditPolicy.server';
 import { processTopupForOrganization } from '@/lib/organizations/organization-billing';
+import { sanitizeErrorForTelemetry } from '@/lib/sanitize-error-for-telemetry';
 import {
   STRIPE_SUB_QUERY_STRING_KEY,
   TOPUP_CANCELED_QUERY_STRING_KEY,
@@ -131,6 +145,7 @@ import { createServiceFeeStores } from '@kilocode/web-shared/lib/service-fees/dr
 import { handleKiloPassInvoiceCreated } from '@/lib/service-fees/invoice-created';
 import { getEffectiveOrganizationServiceFeeExemption } from '@kilocode/web-shared/lib/service-fees/organization-exemptions';
 import {
+  isServiceFeeOnlyRefundedCharge,
   observeServiceFeeChargeRefunded,
   observeServiceFeeCreditNote,
 } from '@/lib/service-fees/refunds';
@@ -169,12 +184,11 @@ function getAffiliateDisputeSaleKind(invoice: Stripe.Invoice): AffiliateDisputeS
 
 async function getAffiliateDisputeChargeContext(
   chargeId: string,
-  preFetchedCharge?: Stripe.Charge & { invoice?: string | Stripe.Invoice | null }
+  preFetchedCharge?: Stripe.Charge
 ): Promise<AffiliateDisputeChargeContext | null> {
-  const charge: Stripe.Charge & { invoice?: string | Stripe.Invoice | null } =
-    preFetchedCharge ?? (await client.charges.retrieve(chargeId, { expand: ['invoice'] }));
-  const invoice = charge.invoice;
-  if (!invoice || typeof invoice === 'string') {
+  const charge = preFetchedCharge ?? (await client.charges.retrieve(chargeId));
+  const invoice = await getStripeChargeInvoice(client, charge);
+  if (!invoice) {
     return null;
   }
 
@@ -192,16 +206,10 @@ async function getAffiliateDisputeChargeContext(
 
 async function suspendOrganizationKiloPassForAdverseCharge(
   chargeId: string,
-  preFetchedCharge?: Stripe.Charge & { invoice?: string | Stripe.Invoice | null }
+  preFetchedCharge?: Stripe.Charge
 ) {
-  const charge: Stripe.Charge & { invoice?: string | Stripe.Invoice | null } = preFetchedCharge
-    ? preFetchedCharge
-    : await client.charges.retrieve(chargeId, { expand: ['invoice'] });
-  const invoiceReference = charge.invoice;
-  const invoice =
-    typeof invoiceReference === 'string'
-      ? await client.invoices.retrieve(invoiceReference)
-      : invoiceReference;
+  const charge = preFetchedCharge ?? (await client.charges.retrieve(chargeId));
+  const invoice = await getStripeChargeInvoice(client, charge);
   if (invoice && invoiceLooksLikeOrganizationKiloPass(invoice)) {
     await handleOrganizationKiloPassPaymentAdverseForInvoice(invoice);
   }
@@ -277,7 +285,7 @@ async function reportWebhookCreditEvent(
   owner: Parameters<typeof resolveBouncerCreditOwner>[0],
   event: WebhookCreditEvent,
   fingerprintChargeId?: string | null
-): Promise<void> {
+): Promise<{ payer: BouncerCreditOwner; wireEventId: string } | null> {
   const payer = await resolveBouncerCreditOwner(owner).catch(error => {
     captureException(error, { tags: { source: 'bouncer_webhook_credit_event' } });
     throw error;
@@ -287,7 +295,7 @@ async function reportWebhookCreditEvent(
       eventType: event.type,
       eventId: event.eventId,
     });
-    return;
+    return null;
   }
   const cardFingerprint =
     event.cardFingerprint ??
@@ -301,6 +309,7 @@ async function reportWebhookCreditEvent(
       orgId: payer.orgId,
     })
   );
+  return { payer, wireEventId: bouncerWireEventId(event.eventId) };
 }
 
 /** The card fingerprint of a charge, or null when the charge cannot be read. */
@@ -311,6 +320,204 @@ async function bouncerCardFingerprintForChargeId(chargeId: string): Promise<stri
   } catch {
     return null;
   }
+}
+
+/** The card fingerprint of a payment method, or null when it cannot be read. */
+async function bouncerCardFingerprintForPaymentMethodId(
+  paymentMethodId: string
+): Promise<string | null> {
+  try {
+    const paymentMethod = await client.paymentMethods.retrieve(paymentMethodId);
+    return paymentMethod.card?.fingerprint ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Decline codes that mean the customer did not finish authentication. A retried 3DS challenge is
+ * not a declined card, and counting it would reach bouncer's `card_testing` threshold of three
+ * failures per payer in an hour and block a paying customer once that reason is enforced.
+ * `authentication_failed` is a charge outcome reason; the others are payment intent error codes.
+ */
+const AUTHENTICATION_FAILURE_CODES: Record<string, true> = {
+  authentication_failed: true,
+  authentication_required: true,
+  payment_intent_authentication_failure: true,
+};
+
+function isAuthenticationFailureCode(code: string | null | undefined): boolean {
+  return code != null && AUTHENTICATION_FAILURE_CODES[code] === true;
+}
+
+/** True when a failed payment intent records an authentication failure rather than a decline. */
+function isAuthenticationFailure(paymentIntent: Stripe.PaymentIntent): boolean {
+  const error = paymentIntent.last_payment_error;
+  return (
+    isAuthenticationFailureCode(error?.code) || isAuthenticationFailureCode(error?.decline_code)
+  );
+}
+
+/** True when a failed charge records an authentication failure rather than a declined card. */
+function isAuthenticationFailureCharge(charge: Stripe.Charge): boolean {
+  return (
+    isAuthenticationFailureCode(charge.failure_code) ||
+    isAuthenticationFailureCode(charge.outcome?.reason)
+  );
+}
+
+/** Bounds each Stripe call the failure gate makes from a webhook. */
+const CHARGE_GATE_STRIPE_TIMEOUT_MS = 5_000;
+
+/** At most this many open sessions one declined charge expires. */
+const CHARGE_GATE_MAX_EXPIRED_SESSIONS = 10;
+
+/**
+ * Expires the open checkout sessions behind a declined charge, so a card tester cannot keep cycling
+ * cards inside one session. Stripe populates `payment_intent` only on payment-mode sessions, while
+ * a subscription checkout (Kilo Pass, KiloClaw, seats, organization Kilo Pass) is found by its
+ * customer instead; every checkout session this app creates sets `customer`, so the customer
+ * lookup covers both modes. The payment-intent lookup stays as the fallback for a session created
+ * without a customer. Best-effort: the caller logs and continues.
+ */
+async function expireOpenCheckoutSessionsForDeclinedCharge(params: {
+  customerId: string | null;
+  paymentIntentId: string | null;
+}): Promise<void> {
+  if (params.customerId) {
+    const listed = await client.checkout.sessions.list(
+      {
+        customer: params.customerId,
+        status: 'open',
+        limit: CHARGE_GATE_MAX_EXPIRED_SESSIONS,
+      },
+      { timeout: CHARGE_GATE_STRIPE_TIMEOUT_MS }
+    );
+    // In parallel and settled one by one: a session that closed meanwhile or a slow call cannot
+    // keep the other sessions open, and the batch is bounded by one call's timeout.
+    const expired = await Promise.allSettled(
+      listed.data
+        .filter(session => session.status === 'open')
+        .map(session =>
+          client.checkout.sessions.expire(session.id, { timeout: CHARGE_GATE_STRIPE_TIMEOUT_MS })
+        )
+    );
+    const failed = expired.filter(result => result.status === 'rejected').length;
+    if (failed > 0) {
+      warnExceptInTest('Bouncer decline gate could not expire some open checkout sessions', {
+        failed,
+        listed: expired.length,
+      });
+    }
+    return;
+  }
+  if (!params.paymentIntentId) return;
+  const listed = await client.checkout.sessions.list(
+    { payment_intent: params.paymentIntentId, limit: 1 },
+    { timeout: CHARGE_GATE_STRIPE_TIMEOUT_MS }
+  );
+  const session = listed.data[0];
+  if (session?.status !== 'open') return;
+  await client.checkout.sessions.expire(session.id, { timeout: CHARGE_GATE_STRIPE_TIMEOUT_MS });
+}
+
+/**
+ * After a decline is durably enqueued, sends it to bouncer now and asks for the failure-stage
+ * verdict. A refusal expires the payer's open checkout sessions. Every step is best-effort and
+ * bounded: an error is logged and the webhook still succeeds, so Stripe never retries because of
+ * this gate.
+ */
+async function enforceDeclinedChargeStanding(params: {
+  payer: BouncerCreditOwner;
+  wireEventId: string;
+  requestId: string;
+  customerId: string | null;
+  paymentIntentId: string | null;
+}): Promise<void> {
+  try {
+    // The credit-event POST applies the payer standing before it answers, so the verdict below
+    // sees this failure.
+    if (!(await deliverBouncerCreditEventNow(params.wireEventId))) return;
+    const verdict = await chargeStanding({
+      stage: 'failure',
+      requestId: params.requestId,
+      accountId: bouncerAccountId(params.payer.userId, params.payer.orgId),
+      userId: params.payer.userId,
+    });
+    if (!verdict?.enforced) return;
+    await expireOpenCheckoutSessionsForDeclinedCharge({
+      customerId: params.customerId,
+      paymentIntentId: params.paymentIntentId,
+    });
+  } catch (error) {
+    warnExceptInTest('Bouncer decline gate could not expire the open checkout session', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
+/**
+ * Reports one declined charge attempt to bouncer as `charge.failed`.
+ *
+ * Stripe describes one attempt with up to two events: `charge.failed`, and
+ * `payment_intent.payment_failed` for the payment intent behind it. Both carry the same charge id,
+ * so the event id is derived from that charge and a second event for the same attempt counts once.
+ * An attempt with no charge keeps its payment intent id. An attempt with neither id is skipped
+ * with a visible log, so an enqueue is never keyed on an empty string.
+ *
+ * `cardFingerprint` is what the event itself carries. `fingerprintSource` names where to read a
+ * fingerprint the event lacks; a `charge.failed` payload is the charge, so a second read of it
+ * returns the same answer and it passes none. Without a fingerprint bouncer cannot count the card
+ * ledger and files a `missing_card` review instead.
+ *
+ * After the durable enqueue, the attempt is delivered to bouncer immediately and the failure-stage
+ * verdict is applied, so an enforced standing expires the open checkout sessions of the charge's
+ * customer, whether the session is payment- or subscription-mode. A redelivered second event for
+ * the same attempt finds the row already delivered and leaves the sessions alone.
+ */
+async function reportDeclinedCharge(params: {
+  owner: Parameters<typeof resolveBouncerCreditOwner>[0];
+  chargeId: string | null | undefined;
+  paymentIntentId: string | null | undefined;
+  occurredAt: Date;
+  cardFingerprint: string | null;
+  fingerprintSource?: {
+    chargeId: string | null | undefined;
+    paymentMethodId: string | null | undefined;
+  };
+}): Promise<void> {
+  const chargeId = params.chargeId ?? null;
+  const eventId = chargeId
+    ? `charge:${chargeId}`
+    : params.paymentIntentId
+      ? `payment_intent:${params.paymentIntentId}`
+      : null;
+  if (!eventId) {
+    warnExceptInTest('Bouncer declined charge has no charge or payment intent id; skipping');
+    return;
+  }
+  const lookupChargeId = params.fingerprintSource?.chargeId ?? null;
+  const cardFingerprint =
+    params.cardFingerprint ??
+    (lookupChargeId ? await bouncerCardFingerprintForChargeId(lookupChargeId) : null) ??
+    (params.fingerprintSource?.paymentMethodId
+      ? await bouncerCardFingerprintForPaymentMethodId(params.fingerprintSource.paymentMethodId)
+      : null);
+  const reported = await reportWebhookCreditEvent(params.owner, {
+    type: 'charge.failed',
+    eventId,
+    occurredAt: params.occurredAt,
+    cardFingerprint,
+  });
+  if (!reported) return;
+  const paymentIntentId = params.paymentIntentId ?? null;
+  await enforceDeclinedChargeStanding({
+    payer: reported.payer,
+    wireEventId: reported.wireEventId,
+    requestId: chargeId ?? paymentIntentId ?? eventId,
+    customerId: stripeReferenceId(params.owner.customer) ?? null,
+    paymentIntentId,
+  });
 }
 
 /**
@@ -376,6 +583,7 @@ export type StripeTopupMetadata = {
   kiloUserId?: User['id'];
   organizationId?: Organization['id'] | null;
   amountCents?: string;
+  paid_credit_policy?: string;
   serviceFeeAssessmentKey?: string;
   serviceFeeVersion?: string;
   serviceFeeFlow?: string;
@@ -479,6 +687,9 @@ export async function detachAllPaymentMethods(user: User) {
       await client.paymentMethods.detach(paymentMethod.id);
     })
   );
+  // Cards changed for this customer; the next payment-method read must ask
+  // Stripe again instead of serving the answer cached before the removal.
+  invalidateStripePaymentMethodCache(user.stripe_customer_id);
 
   // Also clear auto-top-up settings
   await db
@@ -563,11 +774,17 @@ export async function ensurePaymentMethodStored(
   } catch (error) {
     const context = {
       tags: { source: 'stripe_payment_method_storage' },
-      extra: { kiloUserId, paymentMethod, organizationId },
+      extra: {
+        kiloUserId,
+        paymentMethodId: paymentMethod.id,
+        paymentMethodType: paymentMethod.type,
+        organizationId,
+      },
     };
-    captureException(error, context);
+    const safeError = sanitizeErrorForTelemetry(error);
+    captureException(safeError, context);
     if (process.env.NODE_ENV !== 'test')
-      console.error('Error saving payment method for user ' + kiloUserId, error, context);
+      console.error('Error saving payment method for user ' + kiloUserId, safeError, context);
     return null;
   }
 }
@@ -623,7 +840,11 @@ async function handleAutoTopUpSetup(
   paymentIntent: Stripe.PaymentIntent,
   creditAmountInCents: number,
   config: StripeConfig,
-  emailAmounts: { serviceFeeCents?: number; grossPaidCents?: number } = {}
+  emailAmounts: {
+    serviceFeeCents?: number;
+    grossPaidCents?: number;
+    paidCredit?: PaidCreditGrant;
+  } = {}
 ) {
   logExceptInTest(
     `Processing auto-topup-setup for user ${user.id} from payment intent ${paymentIntent.id}`
@@ -640,7 +861,7 @@ async function handleAutoTopUpSetup(
       'Missing auto top-up payment method despite setup_future_usage: "off_session"',
       {
         kilo_user_id: user.id,
-        paymentIntent,
+        payment_intent_id: paymentIntent.id,
         ...config,
       }
     );
@@ -683,6 +904,7 @@ async function handleAutoTopUpSetup(
   const setupTopUpOk = await processTopUp(user, creditAmountInCents, config, {
     serviceFeeCents: emailAmounts.serviceFeeCents,
     grossPaidCents: emailAmounts.grossPaidCents,
+    paidCredit: emailAmounts.paidCredit,
   });
   if (!setupTopUpOk) {
     sentryLogger('stripe', 'info')('Auto-topup-setup already registered or failed to insert', {
@@ -712,7 +934,7 @@ async function handleOrgAutoTopUpSetup(
       'Missing org auto top-up payment method despite setup_future_usage: "off_session"',
       {
         organizationId,
-        paymentIntent,
+        payment_intent_id: paymentIntent.id,
         ...config,
       }
     );
@@ -758,6 +980,15 @@ async function handleOrgAutoTopUpSetup(
     .where(eq(organizations.id, organizationId));
 }
 
+function getSafeStripeChargeLogContext(charge: Stripe.Charge, paymentIntent: Stripe.PaymentIntent) {
+  return {
+    chargeId: charge.id,
+    paymentIntentId: paymentIntent.id,
+    customerId: stripeReferenceId(charge.customer) ?? null,
+    paymentIntentType: paymentIntent.metadata.type ?? null,
+  };
+}
+
 async function handleSuccessfulCharge(
   event: Stripe.ChargeSucceededEvent
 ): Promise<Stripe.PaymentIntent> {
@@ -789,7 +1020,7 @@ export async function handleSuccessfulChargeWithPayment(
       sentryLogger('stripe', 'warning')('Org top-up missing kiloUserId in PaymentIntent metadata', {
         payment_intent_id: paymentIntent.id,
         charge_id: charge.id,
-        metadata: paymentIntent.metadata,
+        organization_id: organizationId,
       });
       return;
     }
@@ -820,6 +1051,7 @@ export async function handleSuccessfulChargeWithPayment(
         isAutoTopUp: paymentIntent.metadata.type === 'org-auto-topup-setup',
         serviceFeeCents: settlement.chargedFeeMinor,
         grossPaidCents: settlement.grossPaidMinor,
+        paidCredit: settlement.paidCredit,
       }
     );
 
@@ -846,9 +1078,8 @@ export async function handleSuccessfulChargeWithPayment(
   const user = await findUserByStripeCustomerId(charge.customer as string);
   if (!user) {
     warnExceptInTest(
-      `No user found for charge ${charge.id} with customer ID ${charge.customer as string}. Skipping processing.`,
-      paymentIntent,
-      charge
+      'No user found for Stripe charge; skipping processing.',
+      getSafeStripeChargeLogContext(charge, paymentIntent)
     );
     return;
   }
@@ -888,6 +1119,7 @@ export async function handleSuccessfulChargeWithPayment(
       await handleAutoTopUpSetup(user, paymentIntent, settlement.principalMinor, config, {
         serviceFeeCents: settlement.chargedFeeMinor,
         grossPaidCents: settlement.grossPaidMinor,
+        paidCredit: settlement.paidCredit,
       });
     } else if (isKiloclawEarlybird) {
       await recordKiloclawEarlybirdPurchase(user, charge);
@@ -895,9 +1127,7 @@ export async function handleSuccessfulChargeWithPayment(
       // Unknown charge type - log warning but don't process
       warnExceptInTest(
         'Unknown charge type (not stripe-checkout-topup, not auto-topup-setup). Ignoring.',
-        charge.customer,
-        charge,
-        paymentIntent
+        getSafeStripeChargeLogContext(charge, paymentIntent)
       );
     }
     return;
@@ -916,6 +1146,7 @@ export async function handleSuccessfulChargeWithPayment(
   const topUpOk = await processTopUp(user, settlement.principalMinor, config, {
     serviceFeeCents: settlement.chargedFeeMinor,
     grossPaidCents: settlement.grossPaidMinor,
+    paidCredit: settlement.paidCredit,
   });
   if (!topUpOk) {
     sentryLogger('stripe', 'warning')('Ignoring already registered top-up', {
@@ -1047,24 +1278,21 @@ async function handlePaymentMethodEvent(
     | Stripe.PaymentMethodUpdatedEvent
 ) {
   const paymentMethod = event.data.object;
-  const user = await findUserByStripeCustomer(paymentMethod.customer);
-  if (process.env.NODE_ENV !== 'test') console.log(event.type, user?.id, paymentMethod);
-
-  if (!user) return;
-
   if (event.type === 'payment_method.detached') {
-    // Soft delete using Drizzle - set deleted_at timestamp
     await db
       .update(payment_methods)
       .set({ ...auto_deleted_at })
-      .where(
-        and(eq(payment_methods.stripe_id, paymentMethod.id), eq(payment_methods.user_id, user.id))
-      );
-  } else if (event.type === 'payment_method.attached') {
-    await ensurePaymentMethodStored(user.id, paymentMethod);
-  } else {
-    await ensurePaymentMethodStored(user.id, paymentMethod);
+      .where(eq(payment_methods.stripe_id, paymentMethod.id));
+    const stripeCustomerId = stripeReferenceId(paymentMethod.customer);
+    if (stripeCustomerId) invalidateStripePaymentMethodCache(stripeCustomerId);
+    return;
   }
+
+  const user = await findUserByStripeCustomer(paymentMethod.customer);
+  if (!user) return;
+  await ensurePaymentMethodStored(user.id, paymentMethod);
+  // Attaching or updating a card changes the answer for this customer.
+  invalidateStripePaymentMethodCache(user.stripe_customer_id);
 }
 
 type AutoTopUpOwner = { type: 'user'; id: string } | { type: 'organization'; id: string };
@@ -1118,7 +1346,7 @@ async function syncStripeDisputeCaseFromWebhook(params: {
 
   let disputeCharge: DisputeChargeWithInvoice;
   try {
-    disputeCharge = await client.charges.retrieve(chargeId, { expand: ['invoice'] });
+    disputeCharge = await client.charges.retrieve(chargeId);
   } catch (error) {
     await observeStripeDisputeCreated({
       eventId: params.eventId,
@@ -1152,9 +1380,8 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
       // One payment is reported once: a charge tied to an invoice is reported by the
       // `invoice.paid` case below, and a standalone charge (the top-up and auto-top-up setup
       // charges this handler credits) is reported here.
-      const chargeInvoiceId =
-        'invoice' in charge && typeof charge.invoice === 'string' ? charge.invoice : null;
-      if (!chargeInvoiceId) {
+      const chargeInvoice = await getStripeChargeInvoice(client, charge);
+      if (!chargeInvoice) {
         await reportWebhookCreditEvent(
           {
             kiloUserId: paymentIntent.metadata.kiloUserId,
@@ -1231,8 +1458,7 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
         invoice.metadata?.type === 'auto-topup' || invoice.metadata?.type === 'org-auto-topup';
       if (invoice.amount_paid > 0 && (isSubscriptionInvoice || isAutoTopUpInvoice)) {
         const subscriptionMetadata = invoice.parent?.subscription_details?.metadata;
-        const invoiceChargeId =
-          'charge' in invoice && typeof invoice.charge === 'string' ? invoice.charge : null;
+        const invoiceChargeId = await getStripeInvoiceChargeId(client, invoice);
         await reportWebhookCreditEvent(
           {
             kiloUserId: invoice.metadata?.kiloUserId ?? subscriptionMetadata?.kiloUserId,
@@ -1278,9 +1504,10 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
       const isOrgAutoTopup = invoice.metadata?.type === 'org-auto-topup';
 
       if (isUserAutoTopup || isOrgAutoTopup) {
-        const chargeId =
-          'charge' in invoice && typeof invoice.charge === 'string' ? invoice.charge : null;
-        if (!chargeId) break;
+        const chargeId = await getStripeInvoiceChargeId(client, invoice);
+        if (!chargeId) {
+          throw new Error(`Paid auto-top-up invoice ${invoice.id} has no settled charge`);
+        }
 
         const config: StripeConfig = { type: 'stripe', stripe_payment_id: chargeId };
 
@@ -1319,6 +1546,7 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
               isAutoTopUp: true,
               serviceFeeCents: settlement.chargedFeeMinor,
               grossPaidCents: settlement.grossPaidMinor,
+              paidCredit: settlement.paidCredit,
             });
 
             if (!autoTopUpOk) {
@@ -1395,6 +1623,7 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
                 isAutoTopUp: true,
                 serviceFeeCents: settlement.chargedFeeMinor,
                 grossPaidCents: settlement.grossPaidMinor,
+                paidCredit: settlement.paidCredit,
               }
             );
 
@@ -1534,11 +1763,22 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
         break;
       }
 
-      await observeServiceFeeChargeRefunded({
+      const invoice = await getStripeChargeInvoice(client, charge);
+      const feeRefund = await observeServiceFeeChargeRefunded({
         store: createServiceFeeStores().assessments,
-        charge,
+        charge: { ...charge, invoice: invoice?.id ?? null },
         stripe: client,
       });
+      if (
+        feeRefund.assessment &&
+        (await isServiceFeeOnlyRefundedCharge({
+          charge,
+          chargedFeeMinor: feeRefund.assessment.chargedFeeMinor,
+          stripe: client,
+        }))
+      ) {
+        break;
+      }
       await suspendOrganizationKiloPassForAdverseCharge(charge.id);
       const referralAdverseCharge = await getAffiliateDisputeChargeContext(charge.id);
       if (!referralAdverseCharge) {
@@ -1841,19 +2081,45 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
 
     case 'charge.failed': {
       const charge = event.data.object;
-      await reportWebhookCreditEvent(
-        {
+      if (isAuthenticationFailureCharge(charge)) {
+        break;
+      }
+      await reportDeclinedCharge({
+        owner: {
           kiloUserId: charge.metadata?.kiloUserId,
           organizationId: charge.metadata?.organizationId,
           customer: charge.customer,
         },
-        {
-          type: 'charge.failed',
-          eventId: event.id,
-          occurredAt: new Date(event.created * 1000),
-          cardFingerprint: charge.payment_method_details?.card?.fingerprint ?? null,
-        }
-      );
+        chargeId: charge.id,
+        paymentIntentId: stripeReferenceId(charge.payment_intent),
+        occurredAt: new Date(event.created * 1000),
+        cardFingerprint: charge.payment_method_details?.card?.fingerprint ?? null,
+      });
+      break;
+    }
+
+    // A declined card reaches the webhook as this event, not as `charge.failed`. Reporting it keeps
+    // bouncer's `card_testing` rule fed; without it the rule never sees a failure.
+    case 'payment_intent.payment_failed': {
+      const paymentIntent = event.data.object;
+      if (isAuthenticationFailure(paymentIntent)) {
+        break;
+      }
+      await reportDeclinedCharge({
+        owner: {
+          kiloUserId: paymentIntent.metadata?.kiloUserId,
+          organizationId: paymentIntent.metadata?.organizationId,
+          customer: paymentIntent.customer,
+        },
+        chargeId: stripeReferenceId(paymentIntent.latest_charge),
+        paymentIntentId: paymentIntent.id,
+        occurredAt: new Date(event.created * 1000),
+        cardFingerprint: null,
+        fingerprintSource: {
+          chargeId: stripeReferenceId(paymentIntent.latest_charge),
+          paymentMethodId: stripeReferenceId(paymentIntent.payment_method),
+        },
+      });
       break;
     }
 
@@ -1881,6 +2147,7 @@ export async function createAutoTopUpSetupCheckoutSession(
   amountCents: number = 5000
 ): Promise<string | null> {
   const amountDollars = amountCents / 100;
+  const paidCreditTerms = getPaidCreditTerms('stripe');
   const feeDeps = createStripeTopUpFeeDeps();
   const prepared = await prepareTopUpCheckoutFee({
     flow: 'personal_auto_top_up_setup',
@@ -1895,6 +2162,14 @@ export async function createAutoTopUpSetupCheckoutSession(
     prepared,
     buildSessionParams: feeLine => ({
       mode: 'payment',
+      ...(paidCreditTerms === 'one_year' && {
+        custom_text: {
+          submit: {
+            message:
+              'Purchased credits expire one year after purchase. Existing credits keep their current terms. Promotional and bonus credits may expire sooner.',
+          },
+        },
+      }),
       customer: stripeCustomerId,
       billing_address_collection: 'required',
       line_items: [
@@ -1925,7 +2200,7 @@ export async function createAutoTopUpSetupCheckoutSession(
       success_url: `${APP_URL}/payments/auto-topup/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${APP_URL}/profile?auto_topup_setup=cancelled`,
       metadata: mergeServiceFeeCommercialMetadata(
-        { type: 'auto-topup-setup', kiloUserId },
+        { type: 'auto-topup-setup', kiloUserId, paid_credit_policy: paidCreditTerms },
         prepared.commercialMetadata
       ),
       payment_intent_data: {
@@ -1934,6 +2209,7 @@ export async function createAutoTopUpSetupCheckoutSession(
             type: 'auto-topup-setup',
             kiloUserId,
             amountCents: String(amountCents),
+            paid_credit_policy: paidCreditTerms,
           },
           prepared.commercialMetadata
         ),
@@ -1961,6 +2237,7 @@ export async function getStripeTopUpCheckoutUrl(
   attempt?: ChargeAttemptContext
 ): Promise<string | null> {
   const feeDeps = createStripeTopUpFeeDeps();
+  const paidCreditTerms = getPaidCreditTerms('stripe');
   const defaultPriceId = amount ? null : getEnvVariable('STRIPE_TOP_UP_PRICE_ID');
   const principalMinor = amount
     ? Math.round(amount * 100)
@@ -2024,6 +2301,14 @@ export async function getStripeTopUpCheckoutUrl(
     prepared,
     buildSessionParams: feeLine => ({
       mode: 'payment',
+      ...(paidCreditTerms === 'one_year' && {
+        custom_text: {
+          submit: {
+            message:
+              'Purchased credits expire one year after purchase. Existing credits keep their current terms. Promotional and bonus credits may expire sooner.',
+          },
+        },
+      }),
       customer: stripeCustomerId,
       billing_address_collection: 'required',
       line_items: feeLine ? [principalLine, feeLine] : [principalLine],
@@ -2044,6 +2329,7 @@ export async function getStripeTopUpCheckoutUrl(
         {
           type: 'stripe-checkout-topup',
           kiloUserId,
+          paid_credit_policy: paidCreditTerms,
           ...(organizationId ? { organizationId } : {}),
         },
         prepared.commercialMetadata
@@ -2055,6 +2341,7 @@ export async function getStripeTopUpCheckoutUrl(
             kiloUserId,
             organizationId: organizationId ?? null,
             amountCents: String(principalMinor),
+            paid_credit_policy: paidCreditTerms,
           } satisfies StripeTopupMetadata,
           prepared.commercialMetadata
         ),

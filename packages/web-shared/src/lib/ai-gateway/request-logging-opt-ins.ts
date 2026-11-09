@@ -1,7 +1,8 @@
 import * as z from 'zod';
 import { ai_gateway_request_logging_opt_ins } from '@kilocode/db/schema';
 import { createCachedFetch } from '@kilocode/web-shared/lib/cached-fetch';
-import { db } from '@kilocode/web-shared/lib/drizzle';
+import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
+import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { eq } from 'drizzle-orm';
 
 export const RequestLoggingOptInSchema = z.object({
@@ -11,27 +12,45 @@ export const RequestLoggingOptInSchema = z.object({
   reason: z.string().trim().min(1).max(1000),
   added_by_email: z.string().email(),
   added_at: z.string().datetime(),
+  errors_only: z.boolean().default(false),
+  expires_at: z.string().datetime().optional(),
 });
 
+// Keep existing persisted lists readable so admins can remove rules above the new limit.
 export const RequestLoggingOptInsSchema = z.array(RequestLoggingOptInSchema).max(500);
+export const MAX_REQUEST_LOGGING_OPT_INS = 10;
 
 export type RequestLoggingOptIn = z.infer<typeof RequestLoggingOptInSchema>;
 
+export type RequestLoggingMode = 'all' | 'errors_only';
+
 const REQUEST_LOGGING_OPT_INS_CACHE_TTL_MS = process.env.NODE_ENV === 'test' ? 0 : 10_000;
 
-export function hasMatchingRequestLoggingOptIn(
-  optIns: RequestLoggingOptIn[],
-  params: { accountId: string | null; organizationId: string | null }
-): boolean {
-  return optIns.some(
-    entry =>
-      (entry.target_type === 'account' && entry.target_id === params.accountId) ||
-      (entry.target_type === 'organization' && entry.target_id === params.organizationId)
-  );
+export function exceedsRequestLoggingOptInLimit(optIns: RequestLoggingOptIn[]): boolean {
+  return optIns.length > MAX_REQUEST_LOGGING_OPT_INS;
 }
 
-export async function getRequestLoggingOptIns(): Promise<RequestLoggingOptIn[]> {
-  const [row] = await db
+/** A matching opt-in that logs all requests takes precedence over an errors-only one. */
+export function resolveRequestLoggingMode(
+  optIns: RequestLoggingOptIn[],
+  params: { accountId: string | null; organizationId: string | null }
+): RequestLoggingMode | null {
+  if (exceedsRequestLoggingOptInLimit(optIns)) return null;
+  const now = Date.now();
+  const matching = optIns.filter(
+    entry =>
+      (entry.expires_at === undefined || Date.parse(entry.expires_at) > now) &&
+      ((entry.target_type === 'account' && entry.target_id === params.accountId) ||
+        (entry.target_type === 'organization' && entry.target_id === params.organizationId))
+  );
+  if (matching.length === 0) return null;
+  return matching.every(entry => entry.errors_only) ? 'errors_only' : 'all';
+}
+
+export async function getRequestLoggingOptIns(
+  fromDb: typeof db = db
+): Promise<RequestLoggingOptIn[]> {
+  const [row] = await fromDb
     .select({ optIns: ai_gateway_request_logging_opt_ins.opt_ins })
     .from(ai_gateway_request_logging_opt_ins)
     .where(eq(ai_gateway_request_logging_opt_ins.id, 1))
@@ -40,9 +59,10 @@ export async function getRequestLoggingOptIns(): Promise<RequestLoggingOptIn[]> 
 }
 
 const getCachedRequestLoggingOptIns = createCachedFetch<RequestLoggingOptIn[]>(
-  getRequestLoggingOptIns,
+  () => getRequestLoggingOptIns(readDb),
   REQUEST_LOGGING_OPT_INS_CACHE_TTL_MS,
-  []
+  [],
+  { name: 'requestLoggingOptIns' }
 );
 
 export async function createRequestLoggingOptIn(
@@ -61,7 +81,10 @@ export async function createRequestLoggingOptIn(
       .for('update');
     if (!row) throw new Error('Request logging opt-in state row is missing');
 
-    const optIns = RequestLoggingOptInsSchema.parse(row.optIns);
+    const now = Date.now();
+    const optIns = RequestLoggingOptInsSchema.parse(row.optIns).filter(
+      optIn => optIn.expires_at === undefined || Date.parse(optIn.expires_at) > now
+    );
     if (
       optIns.some(
         optIn =>
@@ -70,7 +93,7 @@ export async function createRequestLoggingOptIn(
     ) {
       return 'duplicate' as const;
     }
-    if (optIns.length >= 500) return 'full' as const;
+    if (optIns.length >= MAX_REQUEST_LOGGING_OPT_INS) return 'full' as const;
 
     const updatedOptIns = [...optIns, validated];
     await tx
@@ -81,35 +104,67 @@ export async function createRequestLoggingOptIn(
   });
 }
 
-export async function deleteRequestLoggingOptIn(id: string): Promise<boolean> {
+export async function deleteRequestLoggingOptIn(id: string): Promise<RequestLoggingOptIn | null> {
   return db.transaction(async tx => {
     const [row] = await tx
       .select({ optIns: ai_gateway_request_logging_opt_ins.opt_ins })
       .from(ai_gateway_request_logging_opt_ins)
       .where(eq(ai_gateway_request_logging_opt_ins.id, 1))
       .for('update');
-    if (!row) return false;
+    if (!row) return null;
 
     const optIns = RequestLoggingOptInsSchema.parse(row.optIns);
+    const deleted = optIns.find(entry => entry.id === id);
+    if (!deleted) return null;
     const remaining = optIns.filter(entry => entry.id !== id);
-    if (remaining.length === optIns.length) return false;
 
     await tx
       .update(ai_gateway_request_logging_opt_ins)
       .set({ opt_ins: remaining })
       .where(eq(ai_gateway_request_logging_opt_ins.id, 1));
-    return true;
+    return deleted;
   });
 }
 
-export async function isDynamicallyOptedIntoRequestLogging(params: {
+export async function deleteExpiredRequestLoggingOptIns(): Promise<number> {
+  return db.transaction(async tx => {
+    const [row] = await tx
+      .select({ optIns: ai_gateway_request_logging_opt_ins.opt_ins })
+      .from(ai_gateway_request_logging_opt_ins)
+      .where(eq(ai_gateway_request_logging_opt_ins.id, 1))
+      .for('update');
+    if (!row) return 0;
+
+    const now = Date.now();
+    const optIns = RequestLoggingOptInsSchema.parse(row.optIns);
+    const remaining = optIns.filter(
+      entry => entry.expires_at === undefined || Date.parse(entry.expires_at) > now
+    );
+    const deletedCount = optIns.length - remaining.length;
+    if (deletedCount > 0) {
+      await tx
+        .update(ai_gateway_request_logging_opt_ins)
+        .set({ opt_ins: remaining })
+        .where(eq(ai_gateway_request_logging_opt_ins.id, 1));
+    }
+    return deletedCount;
+  });
+}
+
+export async function getDynamicRequestLoggingMode(params: {
   accountId: string | null;
   organizationId: string | null;
-}): Promise<boolean> {
+}): Promise<RequestLoggingMode | null> {
   try {
     const optIns = await getCachedRequestLoggingOptIns();
-    return hasMatchingRequestLoggingOptIn(optIns, params);
+    if (exceedsRequestLoggingOptInLimit(optIns)) {
+      warnExceptInTest(
+        `[request-logging-opt-ins] skipped request logging because ${optIns.length} opt-ins are stored, above the limit of ${MAX_REQUEST_LOGGING_OPT_INS}`
+      );
+      return null;
+    }
+    return resolveRequestLoggingMode(optIns, params);
   } catch {
-    return false;
+    return null;
   }
 }

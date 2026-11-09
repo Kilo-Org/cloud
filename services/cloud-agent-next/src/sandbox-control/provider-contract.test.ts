@@ -1,6 +1,7 @@
+import { preinstalledStartup } from './preinstalled-startup.js';
 import { describe, expect, it } from 'vitest';
+import { execFileSync } from 'node:child_process';
 import type { AgentSandboxProvider } from '../types.js';
-import type { SandboxInstance } from '../types.js';
 import {
   parseSandboxBillingInput,
   type SandboxBillingAdmissionResult,
@@ -19,10 +20,7 @@ import {
   type VercelSandboxSession,
 } from '../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
 import type { VercelSandboxRuntimeConfig } from '../agent-sandbox/vercel/vercel-runtime-config.js';
-import {
-  createCloudflareProviderAdapter,
-  encodeCloudflareProviderRef,
-} from './cloudflare-provider.js';
+import { encodeCloudflareProviderRef } from './provider-ref.js';
 import { createCloudflareContainersProviderAdapter } from './cloudflare-containers-provider.js';
 import {
   createVercelProviderAdapter,
@@ -40,14 +38,14 @@ import { CONTROL_SUPERVISOR_PATH, CONTROL_WRAPPER_LOG_PATH } from './container-p
 import { leaseAtLeastMs } from './deadlines.js';
 
 /**
- * The shared provider-adapter contract, exercised against the three real
- * control-plane adapters (cloudflare, cloudflare-containers, vercel) over
- * hand-written fake backends. Nothing here adapts a provider for the test: the
- * production `createCloudflareProviderAdapter` and friends are the code under
- * test, and the fakes stand in only for the Cloudflare Sandbox binding, the
- * `SandboxContainers` Durable Object and the Vercel REST client. That means each
- * assertion drives the adapter's real ref encoding, ownership check, status
- * mapping and backend call shape, which no mock-call-only test does.
+ * The shared provider-adapter contract, exercised against the two real
+ * control-plane adapters (cloudflare-containers, vercel) over hand-written fake
+ * backends. Nothing here adapts a provider for the test: the production
+ * `createCloudflareContainersProviderAdapter` and friends are the code under
+ * test, and the fakes stand in only for the `SandboxContainers` Durable Object
+ * and the Vercel REST client. That means each assertion drives the adapter's
+ * real ref encoding, ownership check, status mapping and backend call shape,
+ * which no mock-call-only test does.
  *
  * The fake backends carry real observable state (running/idle/stopped, admission
  * results, stop outcomes, recorded lease and capture calls) rather than flags,
@@ -103,89 +101,30 @@ type ContractHarness = {
   launchedEnv(): Record<string, string> | undefined;
   /** The supervisor invocation the adapter issued, where it names one explicitly. */
   launchSupervisor(): string | undefined;
+  launchInvocation(): string | readonly string[] | undefined;
   /** Lease attempts the backend received for an owned ref. */
   leaseCalls(): number;
   /** Lease durations the backend received where it has one (Cloudflare has none). */
   leaseMs(): number[];
-  /** Containers-only repository capture; absent on the other two adapters. */
-  captureRepository?(ref: string, repoKey: string, commit?: string): Promise<boolean>;
-  /** Containers-only observable capture call. */
-  capturedRepository?(): { ref: string; repoKey: string; commit?: string } | undefined;
+  /** Containers-only: the launch inputs the container DO received. */
+  launchInputs?(): ContainersLaunchInput[];
   /** Containers-only: set the outcome the backend reports from `stop`. */
   setStopOutcome?(outcome: 'terminal' | 'retryable'): void;
   /** Vercel-only: authoritative contained-grant reads observed by the adapter. */
   grantReads?(): number;
   /** Vercel-only: policy bodies the adapter sent to the backend. */
   appliedPolicies?(): unknown[];
+  /** Container providers: set the backend's stored billing block. */
+  billingBlock?(blocked: boolean): void;
+  /** Container providers: how many backend billing reads the adapter made. */
+  billingReads?(): number;
+  launchSudo?(): boolean | undefined;
 };
 
 async function requireRef(adapter: ProviderAdapter): Promise<string> {
   const created = await adapter.create(intent);
   if (!('providerRef' in created)) throw new Error('create did not resolve a provider ref');
   return created.providerRef;
-}
-
-function cloudflareHarness(): ContractHarness {
-  const state = {
-    running: true,
-    observeThrows: false,
-    destroyThrows: false,
-    admission: async (): Promise<SandboxBillingAdmissionResult> => ({ success: true }),
-    startEnvs: [] as Record<string, string>[],
-    startPaths: [] as string[],
-    leaseCalls: 0,
-  };
-  const sandbox = {
-    isContainerRunning: async () => {
-      if (state.observeThrows) throw new Error('cloudflare inspect failed');
-      return state.running;
-    },
-    isBillingBlocked: async () => false,
-    ensureBillingAdmission: () => state.admission(),
-    configureBilling: async () => {},
-    setOutboundHandler: async () => {},
-    startProcess: async (path: string, options?: { env?: Record<string, string> }) => {
-      state.startPaths.push(path);
-      state.startEnvs.push(options?.env ?? {});
-    },
-    renewActivityTimeout: async () => {
-      state.leaseCalls += 1;
-    },
-  } as unknown as SandboxInstance;
-  const adapter = createCloudflareProviderAdapter({
-    sandboxId: SANDBOX,
-    getSandbox: () => sandbox,
-    destroy: async () => {
-      if (state.destroyThrows) throw new Error('cloudflare destroy failed');
-    },
-  });
-  return {
-    name: 'cloudflare',
-    adapter,
-    create: () => requireRef(adapter),
-    foreignRef: () =>
-      encodeCloudflareProviderRef({ sandboxId: FOREIGN, containment: false, instanceId: 'x' }),
-    setRunning: running => {
-      state.running = running;
-    },
-    failObserve: () => {
-      state.observeThrows = true;
-    },
-    failStop: () => {
-      state.destroyThrows = true;
-    },
-    failCreate: () => {
-      state.admission = async () => ({
-        success: false,
-        code: 'stopping',
-        message: 'Sandbox is stopping',
-      });
-    },
-    launchedEnv: () => state.startEnvs.at(-1),
-    launchSupervisor: () => state.startPaths.at(-1),
-    leaseCalls: () => state.leaseCalls,
-    leaseMs: () => [],
-  };
 }
 
 function containersHarness(
@@ -203,10 +142,30 @@ function containersHarness(
     admission: async (): Promise<SandboxBillingAdmissionResult> => ({ success: true }),
     launchInputs: [] as ContainersLaunchInput[],
     leaseMs: [] as number[],
-    captures: [] as { ref: string; repoKey: string; commit?: string }[],
+    billingBlocked: false,
+    billingReads: 0,
   };
   const container = {
-    isBillingBlocked: async () => false,
+    isBillingBlocked: async () => {
+      state.billingReads += 1;
+      return state.billingBlocked;
+    },
+    getBillingRuntimeStatus: async () => {
+      state.billingReads += 1;
+      return {
+        sandboxClassName: 'SandboxContainersStandard3',
+        running: state.observation.running,
+        blocked: state.billingBlocked,
+        context: {
+          service: 'cloud-agent',
+          instanceId: SANDBOX,
+          sku: 'cloud-agent-containers-standard-3-2026-09',
+          subject: { type: 'user', id: 'user-1' },
+          actor: { type: 'user', id: 'user-1' },
+          startEpochMs: 1,
+        },
+      };
+    },
     ensureBillingAdmission: () => state.admission(),
     configureBilling: async () => {},
     launchWrapper: async (input: ContainersLaunchInput) => {
@@ -217,10 +176,6 @@ function containersHarness(
     ensureLeaseAtLeast: async (_ref: string, ms: number) => {
       state.leaseMs.push(ms);
       if (options.failLaunchLease) throw new Error('containers lease failed');
-    },
-    captureRepository: async (ref: string, repoKey: string, commit?: string) => {
-      state.captures.push({ ref, repoKey, ...(commit === undefined ? {} : { commit }) });
-      return true;
     },
     observe: async () => {
       if (state.observeThrows) throw new Error('containers observe failed');
@@ -270,13 +225,17 @@ function containersHarness(
     launchedEnv: () => state.launchInputs.at(-1)?.env,
     // Containers start the supervisor as the image entrypoint; no path is passed.
     launchSupervisor: () => undefined,
+    launchInvocation: () => state.launchInputs.at(-1)?.command.argv,
     leaseCalls: () => state.leaseMs.length,
     leaseMs: () => [...state.leaseMs],
-    captureRepository: (ref, repoKey, commit) => adapter.captureRepository!(ref, repoKey, commit),
-    capturedRepository: () => state.captures.at(-1),
+    launchInputs: () => [...state.launchInputs],
     setStopOutcome: outcome => {
       state.stopResult = outcome;
     },
+    billingBlock: blocked => {
+      state.billingBlocked = blocked;
+    },
+    billingReads: () => state.billingReads,
   };
 }
 function vercelHarness(): ContractHarness {
@@ -377,14 +336,19 @@ function vercelHarness(): ContractHarness {
     },
     launchedEnv: () => state.commands.at(-1)?.env,
     launchSupervisor: () => state.commands.at(-1)?.args.at(-1),
+    launchInvocation: () => {
+      const input = state.commands.at(-1);
+      return input ? [input.command, ...input.args] : undefined;
+    },
     leaseCalls: () => state.extendedMs.length,
     leaseMs: () => [...state.extendedMs],
     grantReads: () => state.grantReads,
     appliedPolicies: () => [...state.policies],
+    launchSudo: () => state.commands.at(-1)?.sudo,
   };
 }
 
-const harnessFactories = [cloudflareHarness, containersHarness, vercelHarness];
+const harnessFactories = [containersHarness, vercelHarness];
 
 describe.each(harnessFactories.map(factory => [factory().name, factory] as const))(
   'provider adapter contract: %s',
@@ -407,9 +371,7 @@ describe.each(harnessFactories.map(factory => [factory().name, factory] as const
               runtimeBuildId: 'build',
               startSource: 'snapshot',
             }
-          : harness.name === 'cloudflare'
-            ? { startSource: 'image' }
-            : { instanceType: 'standard-3' }),
+          : { instanceType: 'standard-3' }),
       });
       expect(harness.adapter.describeRuntime?.(harness.foreignRef())).toBeUndefined();
       expect(harness.adapter.describeRuntime?.('invalid')).toBeUndefined();
@@ -419,7 +381,10 @@ describe.each(harnessFactories.map(factory => [factory().name, factory] as const
       const harness = factory();
       const ref = await harness.create();
 
-      const launched = await harness.adapter.launch(ref, { CALLER: 'value' });
+      const launched = await harness.adapter.launch(ref, {
+        command: preinstalledStartup(),
+        env: { CALLER: 'value' },
+      });
 
       expect(launched).toEqual({ startSource: 'image' });
       expect(harness.launchedEnv()).toMatchObject({
@@ -428,6 +393,22 @@ describe.each(harnessFactories.map(factory => [factory().name, factory] as const
         WRAPPER_LOG_PATH: CONTROL_WRAPPER_LOG_PATH,
       });
       expect(harness.launchedEnv()?.WRAPPER_LOG_PATH).toBe('/tmp/kilocode-control-wrapper.log');
+    });
+
+    it('runs exactly the supplied argv, preserving shell metacharacters and empty arguments', async () => {
+      const harness = factory();
+      const ref = await harness.create();
+      const args = ['', 'two words', "one'quote", '"double"', '$HOME', '$(exit 79)', 'line\nbreak'];
+      const command = { argv: ['/bin/sh', '-c', 'printf "%s\\n" "$@"', 'startup', ...args] };
+      await harness.adapter.launch(ref, { command, env: {} });
+      const invocation = harness.launchInvocation();
+      if (invocation === undefined) throw new Error('No physical startup command');
+      const [executable, ...argv] =
+        typeof invocation === 'string' ? ['/bin/sh', '-c', invocation] : invocation;
+      if (!executable) throw new Error('No executable');
+      const output = execFileSync(executable, argv, { encoding: 'utf8' });
+      expect(output).toBe(`${args.join('\n')}\n`);
+      if (typeof invocation !== 'string') expect(invocation).toEqual(command.argv);
     });
 
     it('observes an owned ref active, then terminal once the backend reports it gone', async () => {
@@ -473,9 +454,9 @@ describe.each(harnessFactories.map(factory => [factory().name, factory] as const
     it('refuses a foreign ref for launch, observe and stop', async () => {
       const harness = factory();
 
-      await expect(harness.adapter.launch(harness.foreignRef(), {})).rejects.toBeInstanceOf(
-        ProviderCreationError
-      );
+      await expect(
+        harness.adapter.launch(harness.foreignRef(), { command: preinstalledStartup(), env: {} })
+      ).rejects.toBeInstanceOf(ProviderCreationError);
       await expect(harness.adapter.observe(harness.foreignRef(), intent)).resolves.toMatchObject({
         status: 'unknown',
       });
@@ -511,41 +492,26 @@ describe('provider-specific contract differences', () => {
   it('reports the actual snapshot launch source even if its initial lease renewal fails', async () => {
     const harness = containersHarness({ startSource: 'repository', failLaunchLease: true });
     const ref = await harness.create();
-    await expect(harness.adapter.launch(ref, {})).resolves.toEqual({ startSource: 'repository' });
+    await expect(
+      harness.adapter.launch(ref, { command: preinstalledStartup(), env: {} })
+    ).resolves.toEqual({ startSource: 'repository' });
     expect(harness.leaseCalls()).toBe(1);
   });
 
-  it('keeps Cloudflare logs as an opaque descriptor and ignores the lease duration', async () => {
-    const harness = cloudflareHarness();
-    const ref = await harness.create();
-
-    await harness.adapter.launch(ref, {});
-    expect(harness.launchSupervisor()).toBe(CONTROL_SUPERVISOR_PATH);
-    expect(await harness.adapter.logs(ref)).toBe(`cloudflare ${ref}`);
-    await harness.adapter.ensureLeaseAtLeast(ref, OWNED_LEASE_MS);
-    // Cloudflare renews its activity timeout with no duration argument.
-    expect(harness.leaseMs()).toEqual([]);
-    const owned = harness.leaseCalls();
-    await harness.adapter.ensureLeaseAtLeast(harness.foreignRef(), OWNED_LEASE_MS);
-    expect(harness.leaseCalls()).toBe(owned);
-    expect('captureRepository' in harness.adapter).toBe(false);
-    expect('applyContainedCredentials' in harness.adapter).toBe(false);
-  });
-
-  it('maps Containers repository capture and reports a backend stop outcome verbatim', async () => {
+  it('forwards an environment snapshot start and reports a backend stop outcome verbatim', async () => {
     const harness = containersHarness();
     const ref = await harness.create();
 
-    expect(await harness.captureRepository!(ref, 'repo-key', 'commit-1')).toBe(true);
-    expect(harness.capturedRepository!()).toEqual({
-      ref,
-      repoKey: 'repo-key',
-      commit: 'commit-1',
-    });
-    expect(await harness.captureRepository!(harness.foreignRef(), 'repo-key')).toBe(false);
+    expect(harness.adapter.environmentSnapshots).toBe(true);
+    const snapshot = { snapshotId: 'snap-env', baseImage: 'registry.example/app:1' };
+    await harness.adapter.launch(ref, { command: preinstalledStartup(), env: {} }, { snapshot });
+    expect(harness.launchInputs!().at(-1)?.snapshot).toEqual(snapshot);
+    await harness.adapter.launch(ref, { command: preinstalledStartup(), env: {} });
+    expect(harness.launchInputs!().at(-1)).not.toHaveProperty('snapshot');
 
+    const launchLeases = harness.leaseMs().length;
     await harness.adapter.ensureLeaseAtLeast(ref, OWNED_LEASE_MS);
-    expect(harness.leaseMs()).toEqual([OWNED_LEASE_MS]);
+    expect(harness.leaseMs().slice(launchLeases)).toEqual([OWNED_LEASE_MS]);
     expect(await harness.adapter.logs(ref)).toBe('container-log-body');
     // The DO reports an unconfirmed stop outcome, and the adapter returns it verbatim.
     harness.setStopOutcome!('retryable');
@@ -562,7 +528,7 @@ describe('provider-specific contract differences', () => {
     const harness = containersHarness();
     const ref = await harness.create();
 
-    await harness.adapter.launch(ref, { CALLER: 'value' });
+    await harness.adapter.launch(ref, { command: preinstalledStartup(), env: { CALLER: 'value' } });
 
     expect(harness.launchedEnv()).toMatchObject({
       CALLER: 'value',
@@ -575,20 +541,86 @@ describe('provider-specific contract differences', () => {
     expect(harness.launchSupervisor()).toBeUndefined();
   });
 
+  it('reads the stored billing block for an owned ref only', async () => {
+    const harness = containersHarness();
+    const ref = await harness.create();
+    const initialReads = harness.billingReads?.();
+
+    await expect(harness.adapter.isBillingBlocked?.(ref)).resolves.toBe(false);
+    harness.billingBlock?.(true);
+    await expect(harness.adapter.isBillingBlocked?.(ref)).resolves.toBe(true);
+    expect(harness.billingReads?.()).toBe((initialReads ?? 0) + 2);
+
+    const reads = harness.billingReads?.();
+    await expect(harness.adapter.isBillingBlocked?.(harness.foreignRef())).resolves.toBe(false);
+    await expect(harness.adapter.isBillingBlocked?.(null)).resolves.toBe(false);
+    expect(harness.billingReads?.()).toBe(reads);
+  });
+
+  it('projects stored billing state without admitting or starting compute', async () => {
+    const harness = containersHarness();
+    const sku = 'cloud-agent-containers-standard-3-2026-09';
+    await harness.create();
+    const reads = harness.billingReads?.() ?? 0;
+    const leases = harness.leaseCalls();
+    const launches = harness.launchInputs?.().length ?? 0;
+
+    await expect(harness.adapter.getBillingProjection?.()).resolves.toMatchObject({
+      blocked: false,
+      sandboxClassName: expect.any(String),
+      context: {
+        sku,
+        subject: { type: 'user', id: 'user-1' },
+        actor: { type: 'user', id: 'user-1' },
+        startEpochMs: 1,
+      },
+    });
+    harness.billingBlock?.(true);
+    await expect(harness.adapter.getBillingProjection?.()).resolves.toMatchObject({
+      blocked: true,
+    });
+    expect(harness.billingReads?.()).toBe(reads + 2);
+    expect(harness.leaseCalls()).toBe(leases);
+    expect(harness.launchInputs?.().length ?? 0).toBe(launches);
+  });
+
+  it('reads the stored billing projection after compute stops', async () => {
+    const harness = containersHarness();
+    const ref = await harness.create();
+    await harness.adapter.stop(ref);
+    harness.setRunning(false);
+    harness.billingBlock?.(true);
+
+    await expect(harness.adapter.getBillingProjection?.()).resolves.toMatchObject({
+      blocked: true,
+    });
+  });
+
+  it('runs the trusted downloaded installer as root on Vercel', async () => {
+    const harness = vercelHarness();
+    const ref = await harness.create();
+    await harness.adapter.launch(ref, {
+      command: { argv: ['/bin/sh', '-c', 'installer'], user: 'root' },
+      env: {},
+    });
+    expect(harness.launchSudo?.()).toBe(true);
+  });
+
   it('reads Vercel grants on every create and applies a contained-credential policy', async () => {
     const harness = vercelHarness();
     const ref = await harness.create();
     // Creation reads the authoritative grants exactly once, even when empty.
     expect(harness.grantReads!()).toBe(1);
 
-    await harness.adapter.launch(ref, {});
-    expect(harness.launchSupervisor()).toContain(`exec ${CONTROL_SUPERVISOR_PATH}`);
+    await harness.adapter.launch(ref, { command: preinstalledStartup(), env: {} });
+    expect(harness.launchSupervisor()).toBe(CONTROL_SUPERVISOR_PATH);
+    expect(harness.launchSudo?.()).toBe(false);
     expect('applyContainedCredentials' in harness.adapter).toBe(true);
     // A foreign ref is refused before any Vercel request.
     const leases = harness.leaseMs().length;
     await harness.adapter.ensureLeaseAtLeast(harness.foreignRef(), OWNED_LEASE_MS);
     expect(harness.leaseMs()).toHaveLength(leases);
-    expect('captureRepository' in harness.adapter).toBe(false);
+    expect('environmentSnapshots' in harness.adapter).toBe(false);
 
     await expect(
       harness.adapter.applyContainedCredentials!(ref, [] as readonly SessionCredentialGrant[])

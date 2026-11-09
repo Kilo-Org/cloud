@@ -35,11 +35,24 @@ export function SettingsSaveButton({
   const router = useRouter();
   const colors = useThemeColors();
   const { t } = useTranslation();
+  // A settings header holds this one action, and a filled primary is the
+  // loudest thing on the screen. It should not outshout the content's own way
+  // out (the repository picker's "Manage GitHub App access" is exactly that
+  // case) while there is nothing to save, so the fill only appears with a
+  // pending change. Before that the action is a quiet text control: still
+  // present and still disabled, so its place in the header never moves.
+  const actionable = dirty && valid;
+  // The spinner has to follow the surface it sits in. The filled variant's ink
+  // is `primaryForeground`, the quiet variant's is the body foreground; a
+  // hard-coded primary ink vanished when the draft turned invalid while a save
+  // was in flight and the header fell back to the quiet style.
+  const spinnerColor = actionable ? colors.primaryForeground : colors.foreground;
 
   return (
     <Button
       size="sm"
-      disabled={!dirty || !valid || pending}
+      variant={actionable ? 'default' : 'ghost'}
+      disabled={!actionable || pending}
       onPress={() => {
         void (async () => {
           try {
@@ -63,7 +76,7 @@ export function SettingsSaveButton({
       // shrinks and wraps in place instead of clipping.
       className="min-w-0 max-w-[140px] shrink"
     >
-      {pending ? <ActivityIndicator size="small" color={colors.primaryForeground} /> : null}
+      {pending ? <ActivityIndicator size="small" color={spinnerColor} /> : null}
       <Text className="shrink text-center">{t('securityAgent.settingsSave.saveChanges')}</Text>
     </Button>
   );

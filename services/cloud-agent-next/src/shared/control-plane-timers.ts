@@ -33,6 +33,8 @@ export type ControlPlaneTimers = {
     providerLeaseMs: number;
     credentialGrantMs: number;
     credentialGrantReissueBelowMs: number;
+    /** Wait before the alarm retries a failed renewal while the grant is still valid. */
+    credentialGrantRenewalRetryMs: number;
     /** Bounds one member's backing renewal during scope-handle resolution. */
     scopeBackingTokenMs: number;
     providerStopAttemptMs: number;
@@ -72,30 +74,62 @@ export type ControlPlaneTimers = {
   };
 };
 
+// External-work bounds for one preparation attempt. They stay real (never
+// scaled) because they bound provider and container work.
+const PROVIDER_CREATE_MS = 2 * MINUTE_MS;
+const PROVIDER_CREATE_RETRY_MS = 10_000;
+// Environment snapshot starts use `DEADLINE_MS.repositoryStartup`; this module
+// also ships in the wrapper without the worker sources.
+const PREPARATION_CREATE_MS = 5 * MINUTE_MS;
+const WRAPPER_FIRST_CONNECT_MS = 5 * MINUTE_MS;
+const WRAPPER_HELLO_MS = 30_000;
+const RESTORE_MS = 2 * MINUTE_MS;
+const CLONE_MS = 6 * MINUTE_MS;
+const CAPTURE_MS = 5 * MINUTE_MS + 10_000;
+const KILO_RUNTIME_START_MS = 2 * MINUTE_MS;
+const KILO_SESSION_MS = 2 * MINUTE_MS;
+
+// Fixed preparation work includes one create retry and one retry each for
+// runtime start and session import. Setup retains its per-command bounds;
+// the attempt deadline is its aggregate stop.
+const ROUTE_PREPARATION_MS =
+  PREPARATION_CREATE_MS +
+  PROVIDER_CREATE_RETRY_MS +
+  PREPARATION_CREATE_MS +
+  WRAPPER_FIRST_CONNECT_MS +
+  WRAPPER_HELLO_MS +
+  RESTORE_MS +
+  CLONE_MS +
+  2 * KILO_RUNTIME_START_MS +
+  2 * KILO_SESSION_MS;
+
 // The divisor shortens only internal deadlines whose partner also scales, so
 // their orderings hold (the 90-s reconnect window stays longer than the 30-s
 // max backoff). Timers that bound external work stay real: provider create and
-// container boot, the 12-min prep attempt that must outlast clone+runtime+
-// session, the pause before a failed create is retried, clone/runtime/session
-// bounds, SSE silence (Kilo heartbeats every 10-15 s), health request, the
-// real-SSE reconnect window, credential grants and the provider stop ladder.
+// container boot, the preparation attempt, the pause before a failed create is retried,
+// restore/clone/save/runtime/session bounds, SSE silence (Kilo heartbeats every
+// 10-15 s), health request, the real-SSE reconnect window, credential grants
+// and the provider stop ladder.
 function buildControlPlaneTimers(divisor: number): ControlPlaneTimers {
   const ms = (value: number): number => Math.max(1, Math.round(value / divisor));
   const sandbox = {
-    providerCreateMs: 2 * MINUTE_MS,
-    providerCreateRetryMs: 10_000,
-    wrapperFirstConnectMs: 5 * MINUTE_MS,
-    wrapperHelloMs: 30_000,
+    providerCreateMs: PROVIDER_CREATE_MS,
+    providerCreateRetryMs: PROVIDER_CREATE_RETRY_MS,
+    wrapperFirstConnectMs: WRAPPER_FIRST_CONNECT_MS,
+    wrapperHelloMs: WRAPPER_HELLO_MS,
     heartbeatMs: ms(45_000),
     reconnectMs: ms(90_000),
-    routePreparationMs: 12 * MINUTE_MS,
+    routePreparationMs: ROUTE_PREPARATION_MS,
     idleMs: ms(10 * MINUTE_MS),
     unattendedIdleMs: ms(MINUTE_MS),
     // Bounds one Sandbox -> Session notification; real (not scaled) like the
     // other bounds on external work.
     sessionNotifyDeadlineMs: 2_000,
+    // Grants are renewed from the alarm and on `deliver` below the threshold, so
+    // their lease does not bound how long one native execution may run.
     credentialGrantMs: 4 * HOUR_MS,
     credentialGrantReissueBelowMs: HOUR_MS,
+    credentialGrantRenewalRetryMs: 5 * MINUTE_MS,
     // Bounds external token renewal, so it stays real and short enough for the
     // Session DO's total scope-resolution bound.
     scopeBackingTokenMs: 3_000,
@@ -108,11 +142,11 @@ function buildControlPlaneTimers(divisor: number): ControlPlaneTimers {
     heartbeatNegotiationMs: ms(1_000),
     // Scales with the reconnect window it must stay inside.
     handshakeMs: ms(30_000),
-    cloneMs: 6 * MINUTE_MS,
-    restoreMs: 2 * MINUTE_MS,
-    captureMs: 5 * MINUTE_MS + 10_000,
-    kiloRuntimeStartMs: 2 * MINUTE_MS,
-    kiloSessionMs: 2 * MINUTE_MS,
+    cloneMs: CLONE_MS,
+    restoreMs: RESTORE_MS,
+    captureMs: CAPTURE_MS,
+    kiloRuntimeStartMs: KILO_RUNTIME_START_MS,
+    kiloSessionMs: KILO_SESSION_MS,
     sseSilenceMs: 30_000,
     healthRequestMs: 5_000,
     sseReconnectLimit: 6,
@@ -122,7 +156,7 @@ function buildControlPlaneTimers(divisor: number): ControlPlaneTimers {
     // Allow transient reclaim to clear while bounding a sustained memory stall.
     kiloMemoryHoldMs: ms(2 * MINUTE_MS),
     noProgressMs: ms(20 * MINUTE_MS),
-    turnHardCapMs: ms(120 * MINUTE_MS),
+    turnHardCapMs: ms(12 * HOUR_MS),
     reconnectBackoffMinMs: ms(1_000),
     reconnectBackoffMaxMs: ms(30_000),
   };
@@ -167,7 +201,12 @@ export type SandboxIdlePolicy = 'interactive' | 'unattended';
  * prepare could reuse.
  */
 export function sandboxIdlePolicyForOrigins(origins: readonly unknown[]): SandboxIdlePolicy {
-  return origins.length === 0 || origins.includes('cloud-agent-web') ? 'interactive' : 'unattended';
+  return origins.length === 0 ||
+    origins.some(
+      origin => origin === 'cloud-agent-web' || origin === 'desktop' || origin === 'agent-manager'
+    )
+    ? 'interactive'
+    : 'unattended';
 }
 
 // Positive integer divisor that shortens internal deadline timers for local E2E. Pass `env` on the Worker/DO side or `process.env` in the wrapper. Development-only by absence from production config; do not add it to wrangler.jsonc.

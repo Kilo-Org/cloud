@@ -1,4 +1,5 @@
 import { TRPCError } from '@trpc/server';
+
 import jwt from 'jsonwebtoken';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -10,14 +11,9 @@ vi.mock('../sandbox-session/session-stub.js', () => ({
     getRuntimeAuthorizationStatus,
     recoverExpiredRuntimeAuthorization,
   }),
-  resolveLegacySessionStub: () => ({
-    getRuntimeAuthorizationRecoveryState: getRuntimeAuthorizationStatus,
-    recoverExpiredRuntimeAuthorization,
-  }),
-  resolveSessionStub: () => ({}),
 }));
 
-vi.mock('../session-service.js', () => ({
+vi.mock('./metadata.js', () => ({
   fetchSessionMetadata: vi.fn(async () => ({
     identity: { sessionId: 'workspace_12345678-1234-1234-1234-123456789abc', userId: 'usr_1' },
   })),
@@ -44,6 +40,20 @@ import { preflightRuntimeAuthorizationRecovery } from './queue-message.js';
 
 // A decodable token so the preflight treats the request as a delegated grant.
 const delegatedToken = jwt.sign({ tokenPurpose: 'cloud-agent' }, 'test-secret');
+const scopedToken = jwt.sign(
+  {
+    tokenPurpose: 'delegated-workload',
+    cloudAgentAuthority: {
+      version: 1,
+      ownerId: 'usr_1',
+      parentSessionId: 'workspace_parent',
+      organizationId: null,
+      authorizationId: 'authorization-1',
+      expiresAt: Math.floor(Date.now() / 1000) + 60,
+    },
+  },
+  'test-secret'
+);
 
 const ctx = {
   env: { HYPERDRIVE: { connectionString: 'postgres://test' } } as never,
@@ -64,11 +74,28 @@ describe('preflightRuntimeAuthorizationRecovery', () => {
     expect(recoverExpiredRuntimeAuthorization).not.toHaveBeenCalled();
   });
 
+  it('does nothing for the legacy credential-compatibility status', async () => {
+    getRuntimeAuthorizationStatus.mockResolvedValue({ state: 'legacy' });
+    await preflightRuntimeAuthorizationRecovery('workspace_a', ctx);
+    expect(recoverExpiredRuntimeAuthorization).not.toHaveBeenCalled();
+  });
+
   it('rejects a revoked authorization with FORBIDDEN', async () => {
     getRuntimeAuthorizationStatus.mockResolvedValue({ state: 'revoked' });
     await expect(preflightRuntimeAuthorizationRecovery('workspace_a', ctx)).rejects.toMatchObject({
       code: 'FORBIDDEN',
     });
+  });
+
+  it('does not extend a scoped delegation on expiry recovery', async () => {
+    getRuntimeAuthorizationStatus.mockResolvedValue({
+      state: 'expired',
+      id: 'authorization-1',
+    });
+    await expect(
+      preflightRuntimeAuthorizationRecovery('workspace_a', { ...ctx, authToken: scopedToken })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(recoverExpiredRuntimeAuthorization).not.toHaveBeenCalled();
   });
 
   it('mints and commits a fresh authorization when the delegation expired', async () => {

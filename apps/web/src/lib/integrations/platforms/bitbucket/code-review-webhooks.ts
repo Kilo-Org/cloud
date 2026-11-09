@@ -6,6 +6,7 @@ import {
   BITBUCKET_CODE_REVIEW_WEBHOOK_SIGNING_KEYS,
 } from '@kilocode/web-shared/lib/config.server';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
+import { ensureBotUserForOrg } from '@/lib/bot-users/bot-user-service';
 import {
   deleteBitbucketWorkspaceWebhooksFromTokenService,
   ensureBitbucketWorkspaceWebhookFromTokenService,
@@ -21,7 +22,6 @@ export type BitbucketCodeReviewWebhookWorkspace = BitbucketCodeReviewWorkspaceId
 
 type BitbucketCodeReviewWorkspaceWebhookInput = {
   organizationId: string;
-  currentManagerId: string;
   workspace: BitbucketCodeReviewWebhookWorkspace;
 };
 
@@ -76,7 +76,7 @@ function activeSigningKey(): Uint8Array {
   }
 }
 
-export function ensureBitbucketCodeReviewWorkspaceWebhook(
+export async function ensureBitbucketCodeReviewWorkspaceWebhook(
   input: BitbucketCodeReviewWorkspaceWebhookInput
 ): Promise<BitbucketEnsureWebhookResult> {
   const callbackUrl = buildBitbucketCodeReviewWebhookUrl(input.workspace.integrationId);
@@ -84,8 +84,9 @@ export function ensureBitbucketCodeReviewWorkspaceWebhook(
     integrationId: input.workspace.integrationId,
     workspaceUuid: input.workspace.workspaceUuid,
   });
+  const bot = await ensureBotUserForOrg(input.organizationId, 'code-review');
   return ensureBitbucketWorkspaceWebhookFromTokenService({
-    managerUserId: input.currentManagerId,
+    managerUserId: bot.id,
     organizationId: input.organizationId,
     workspace: input.workspace,
     callbackUrl,
@@ -97,8 +98,9 @@ export async function deleteBitbucketCodeReviewWorkspaceWebhooksBestEffort(
   input: BitbucketCodeReviewWorkspaceWebhookInput
 ): Promise<void> {
   try {
+    const bot = await ensureBotUserForOrg(input.organizationId, 'code-review');
     await deleteBitbucketWorkspaceWebhooksFromTokenService({
-      managerUserId: input.currentManagerId,
+      managerUserId: bot.id,
       organizationId: input.organizationId,
       workspace: input.workspace,
       callbackUrl: buildBitbucketCodeReviewWebhookUrl(input.workspace.integrationId),

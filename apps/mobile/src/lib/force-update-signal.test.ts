@@ -31,6 +31,17 @@ describe('force-update-signal', () => {
     expect(listener).not.toHaveBeenCalled();
   });
 
+  it('reportTrpcError ignores a retryable app-version read failure', () => {
+    const { listener } = makeListener();
+    // The server answers a failed minimum-version read with this retryable code
+    // and no `app_update_required` cause; it must not force the update screen.
+    reportTrpcError({
+      data: { code: 'SERVICE_UNAVAILABLE', httpStatus: 503 },
+      message: 'App version check temporarily unavailable',
+    });
+    expect(listener).not.toHaveBeenCalled();
+  });
+
   it('falls through to shape.data when data is not an object', () => {
     const { listener } = makeListener();
     reportTrpcError({ data: 'nope', shape: { data: { upstreamCode: 'app_update_required' } } });

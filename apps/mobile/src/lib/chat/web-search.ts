@@ -1,4 +1,4 @@
-import { Effect, FiberRef } from 'effect';
+import { Effect } from 'effect';
 import { type HttpResponse, type Tool, type ToolCall, ToolFailure } from '@kilocode/harness-sdk';
 import { onlineManager } from '@tanstack/react-query';
 import { z } from 'zod';
@@ -195,18 +195,19 @@ export function webSearchTool(organizationId?: string): Tool {
       },
     },
     run: (call: ToolCall) =>
-      Effect.flatMap(FiberRef.get(questionSearches), spent =>
-        Effect.tryPromise({
-          try: async signal => {
-            const outcome = await search(call.arguments, { organizationId, signal, spent });
-            return outcome;
-          },
-          catch: cause => new ToolFailure({ cause: `Web search failed: ${String(cause)}` }),
-        })
-      ).pipe(
-        Effect.timeoutFail({
+      questionSearches.pipe(
+        Effect.flatMap(spent =>
+          Effect.tryPromise({
+            try: async signal => {
+              const outcome = await search(call.arguments, { organizationId, signal, spent });
+              return outcome;
+            },
+            catch: cause => new ToolFailure({ cause: `Web search failed: ${String(cause)}` }),
+          })
+        ),
+        Effect.timeoutOrElse({
           duration: SEARCH_TIMEOUT,
-          onTimeout: () => new ToolFailure({ cause: TIMED_OUT }),
+          orElse: () => Effect.fail(new ToolFailure({ cause: TIMED_OUT })),
         }),
         Effect.flatMap(outcome =>
           outcome.ok

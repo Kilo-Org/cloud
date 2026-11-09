@@ -38,8 +38,9 @@ if [ -n "$group" ]; then
   case "$group" in
     web)
       if affects web; then
-        # apps/web/tsconfig.json sets incremental; CI caches this file.
-        tsgo --noEmit -p apps/web/tsconfig.json --tsBuildInfoFile apps/web/.tsbuildinfo/ci-web.tsbuildinfo
+        # A full check: from main's build info, an edit to a shared module
+        # rechecks more than a full check costs.
+        tsgo --noEmit -p apps/web/tsconfig.json --incremental false
         tsgo --noEmit -p scripts/web-env/tsconfig.json
       fi
       if affects @kilocode/storybook; then
@@ -47,9 +48,13 @@ if [ -n "$group" ]; then
       fi
       ;;
     trpc)
-      # kilo-app typechecks in kilo-app CI, which runs whenever kilo-app is
-      # affected. The extension has no other job that typechecks it outside its
-      # own workflow, which skips unrelated PRs.
+      # The rows run on every full typecheck, which `selectAffected` reports
+      # whenever a change has no base, hits a GLOBAL path or this script,
+      # moves root or unscoped dependencies, or holds a file it cannot
+      # attribute to any workspace. The merge queue is one of those runs and
+      # has no extension trigger, so the rows keep the extension's gate there.
+      # The extension's own workflow typechecks it for the same selection on
+      # every other pull request, and kilo-app typechecks in kilo-app CI.
       # CI restores or builds the declarations first and sets
       # KILO_TYPECHECK_TRPC_BUILT=1.
       if [ "${KILO_TYPECHECK_TRPC_BUILT:-}" != 1 ]; then
@@ -105,7 +110,7 @@ fi
 
 # 1. Build trpc (skip if --changes-only and source unchanged)
 if $changes_only; then
-  trpc_changed=$(git diff --name-only "$base" -- 'packages/trpc/src/**' 'packages/trpc/tsconfig.json' 'packages/trpc/rollup.config.mjs' 'packages/trpc/package.json' | head -1 || true)
+  trpc_changed=$(git diff --name-only "$base" -- 'packages/trpc/src/**' 'packages/trpc/tsconfig.json' 'packages/trpc/tsconfig.build.json' 'packages/trpc/rollup.config.mjs' 'packages/trpc/package.json' | head -1 || true)
   if [ -n "$trpc_changed" ]; then
     echo "[typecheck] trpc source changed, rebuilding"
     pnpm --filter @kilocode/trpc run build
@@ -120,7 +125,7 @@ fi
 
 # 1b. Build the harness SDK, which apps/mobile typechecks against (same rule as trpc)
 if $changes_only; then
-  harness_changed=$(git diff --name-only "$base" -- 'packages/harness-sdk/src/**' 'packages/harness-sdk/tsconfig.json' 'packages/harness-sdk/package.json' | head -1 || true)
+  harness_changed=$(git diff --name-only "$base" -- 'packages/harness-sdk/src/**' 'packages/harness-sdk/tsconfig.json' 'packages/harness-sdk/tsconfig.build.json' 'packages/harness-sdk/package.json' | head -1 || true)
   if [ -n "$harness_changed" ]; then
     echo "[typecheck] harness-sdk source changed, rebuilding"
     pnpm --filter @kilocode/harness-sdk run build
@@ -168,6 +173,16 @@ done <<< "$changed_dirs"
 if [ ${#pnpm_filters[@]} -eq 0 ]; then
   echo "[typecheck] no matching workspace packages, skipping workspace typecheck"
   exit 0
+fi
+
+# The wrapper workspace compiles this service's shared sources (its tsconfig
+# includes ../src/shared), and the package filters above follow package.json
+# dependencies only, in either direction from another workspace. CI's affected
+# run selects the wrapper through that include; select it here too whenever the
+# service lands in the selection.
+if pnpm ls -r --depth -1 "${pnpm_filters[@]}" --json 2>/dev/null |
+  node -e 'process.exit(JSON.parse(require("node:fs").readFileSync(0, "utf8")).some(p => p.name === "cloud-agent-next") ? 0 : 1)'; then
+  pnpm_filters+=(--filter '@kilocode/cloud-agent-wrapper')
 fi
 
 echo "[typecheck] checking affected packages: ${pnpm_filters[*]}"

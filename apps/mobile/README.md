@@ -11,9 +11,248 @@ Humans: follow instructions below or talk to [@iscekic](https://github.com/iscek
 - PostHog feature flag infrastructure and the version-aware registry remain available for future flags.
 - KiloClaw tab visibility still depends on instance ownership.
 
+## Profile credits
+
+The bonus-credit subtitle includes only grants with an expiry strictly after the
+current render time. Elapsed grants and non-expiring credits do not contribute to
+its amount or earliest expiry, for both personal and organization accounts.
+The balance continues to come from the balance query.
+
+## Session restoration
+
+The first auth-provider mount uses the credentials preloaded when JavaScript
+starts. Later mounts read secure storage again: Android can recreate the activity
+without restarting JavaScript, so the initial snapshot may predate sign-in.
+Back-exit and force-stop preserve the stored session; explicit sign-out clears it.
+The existing bootstrap loading and retryable-error surfaces cover restoration.
+
+## Runtime recovery
+
+Retry on the runtime-error screen restores the last focused route for the
+current account. Route recording pauses while the root layout remounts, so its
+temporary Home route cannot replace the recovery destination. Credential
+preloads are used only for the first auth-provider mount; recovery reads the
+current stored credentials through the normal bounded retry path.
+
+## Voice-input terminal ownership
+
+Stop, cancel, and a queued next start wait for a terminal event with a 60-second
+silence bound. Completed gateway segments and final transcripts extend that
+window; interim text does not. A timed-out stop reports the retryable stopped
+message, while cancel stays silent.
+
+The OS adapter assigns each start a numeric `kiloSessionId` and consumes only
+the patched recognizer's `kiloEvent` channel. Native callbacks retain their
+originating run identity, and old teardown owns only that run's resources.
+Foreign-run events are dropped before controller delivery and iOS transcript
+deduplication. A genuine failed-start error and end remain valid without start.
+
+The versioned `expo-speech-recognition@57.1.1` patch, its workspace registration,
+and its lockfile hash form one native compatibility change. Rebuild both native
+clients; reloading JavaScript onto an older recognizer binary is not supported.
+
+## New-session model choice
+
+Model resolution waits for stored preferences to load. An explicit model and
+effort pick updates the current account scope's preference cache before its
+server save finishes, so reopening the form does not restore an older cached
+choice. Older in-flight preference reads are cancelled before that update.
+The existing server, local, and default-model fallback order is unchanged.
+
+## New-session keyboard and Back
+
+Back keeps a dirty editor mounted while the keyboard closes, then opens the
+discard confirmation. Keep editing restores input focus only after the sheet
+closes. Discard and Save as to-do leave the keyboard closed.
+
+The prompt interpolates whole-line heights from the app-root keyboard motion
+provider. Screens do not register keyboard listeners. Native progress is bounded
+before interpolation because keyboard height changes can exceed its normal range.
+The iOS swipe guard requires a native build with the `react-native-screens` patch.
+
+For local computer, folder, model, and effort picker verification, run
+`pnpm dev:seed app:connected-computer kilo-<name>@example.com`.
+The fixture requires an existing fake account, a localhost database,
+`NEXTAUTH_SECRET`, and a running local `cloudflare-session-ingest` service.
+The optional `sessionIngestPort` argument selects an explicit local port.
+The fixture serves read-only picker commands and rejects execution commands.
+
+## Organization credit-activity links
+
+Credit activity treats a scalar `org` or the first value of a repeated `org`
+parameter as its explicit scope. An empty first value means no explicit scope;
+later values are not fallbacks. The route guard and screen share this rule.
+Explicit links remain on their named organization after an account switch, while
+plain account-scoped routes leave. Membership validation still gates the data
+query: a foreign or malformed explicit organization never falls back to the
+selected organization's transactions.
+
+## Organization hub connectivity
+
+Usage tiles retain labels and show cached totals or em dash placeholders.
+Unavailable usage and low-balance settings expose Retry. The low-balance row
+retries its settings read until data is available, then opens configuration.
+Cached settings remain visible during offline pauses and refresh failures.
+
+## Sheet list gestures and actions
+
+Vertical scroll containers inside native route sheets and `Sheet` surfaces enable
+`nestedScrollEnabled` so Android scrolls the list before handing a downward drag
+to the sheet at the top. Keep self-scrolling picker lists outside the shell's
+`ScrollView`.
+
+Shared `SheetHeader` actions use explicit 48px minimum width and height, not
+rem-based sizes: native rem is 14dp. Labels retain their intrinsic size as text
+scales; the title takes the remaining space.
+
+## Selectable row accessibility
+
+Use `selectableRowA11y` from `@/lib/a11y/selectable-row` for custom checkbox and
+radio rows. It exposes button/selected traits on iOS and checkbox or radio roles
+with checked state on Android. `ChoiceRow` and `radioItemA11y` use this mapping.
+Verify both the native role and state transitions in device accessibility trees;
+a rendered checkmark alone does not verify accessibility.
+
+## Review memory proposals
+
+Code Reviewer review-memory rows show the proposal status and open full proposal
+details. Personal owners and organization owners, admins, and billing managers can
+edit or dismiss open, edited, and failed proposals, or open a REVIEW.md pull request.
+Save edits before opening the pull request. Other members can inspect the same
+details without mutation controls.
+Dismissal asks for confirmation before removing a proposal from the active list.
+
+For local device verification, run
+`pnpm dev:seed app:mobile-review-memory kilo-<name>-<timestamp>@example.com`.
+The fixture requires a localhost database and `SKIP_STRIPE_API=true`, returns mobile
+deep links, and creates no provider integration. It covers editable, opened, failed,
+and member-only proposals; successful provider pull-request creation requires a
+separate integration fixture.
+
+## PR merge sheet
+
+The merge sheet composes the form and provider-specific bodies. `usePrMergeDraft`
+owns identity-scoped loading, seeding, saving, background flushing, and clearing;
+`usePrMergeSubmit` owns confirmation, mutation inputs, errors, and success effects.
+Header back retains the draft. Footer Cancel and a successful submission clear it.
+
+The mounted suites keep React, form sections, and draft persistence real, with
+native controls, encrypted storage, identity, and mutations replaced at their boundaries:
+
+```bash
+pnpm --filter kilo-app exec vitest run src/components/pr-review/merge
+```
+
+## Remote session recovery
+
+A response that fails before producing any content still shows its failure and
+Retry action, including after reopening the session. Retry resends the original
+user prompt as a new turn in the same session; the original prompt remains in
+the transcript.
+
+## Email sign-in
+
+The email form validates syntax and a 254-character maximum after trimming and
+lowercasing. Invalid addresses stay on the email step with localized inline
+feedback. The code-step destination abbreviates addresses longer than 48
+characters with a middle ellipsis; delivery and verification use the full address.
+The code input and Verify action remain available below the destination prompt.
+
+## Transcript action targets
+
+Standalone transcript continuation and recovery buttons use the shared
+`Button size="action"`: a 48dp minimum height that can grow with the label.
+Compact, default, and large button sizes remain unchanged for other controls.
+Verify Android targets using the clickable accessibility node bounds, not
+hitSlop alone; keep the translated label fully visible.
+
+## Loading buttons
+
+The shared `Button` uses the native iOS spinner without an additional ring.
+Android keeps its circular track while the native indicator animates.
+Both platforms preserve the button dimensions, accessible busy name, and disabled state during loading.
+
+## Mounted query tests
+
+A mutation promise can settle before React Query publishes its observer state.
+Use `waitFor` from `@/test/render-with-providers` before asserting a rendered mutation result.
+Awaiting `mutateAsync` inside `act` does not replace that wait.
+
+## Remote native verification
+
+Keep `KILO_REMOTE_NATIVE=required` when a local iOS build is prohibited.
+Compatible producers are joined before another workflow is dispatched.
+Unknown producer evidence stops the request without dispatching another build.
+Dispatch rechecks the requested local and remote head after a producer wait.
+
+The cache records the simulator SDK from the executable's load commands.
+Old cache identities refresh through the remote artifact path.
+A failed producer or unsupported simulator runtime never supplies an installable artifact.
+
+## Design proof comparisons
+
+Prepare exact base and head revisions before comparing a changed screen:
+
+```sh
+pnpm dev:mobile:design-gate prepare --base <base-sha> --head <head-sha> --targets <manifest.json> --out <new-directory>
+```
+
+The manifest names each target's link, route, focused screen, and readiness test ID.
+An optional diagnostic wrapper imports each revision's own component with identical declared props.
+Preparation never copies head product code into the base.
+
+Start an isolated development stack in each prepared worktree.
+Run the tool from that worktree with its preparation receipt:
+
+```sh
+pnpm exec tsx <tool-checkout>/dev/local/design-gate/cli.ts run --preparation <preparation.json> --revision base --targets <manifest.json> --platform android --device <serial> --metro <url> --out <base-run>
+pnpm exec tsx <tool-checkout>/dev/local/design-gate/cli.ts run --preparation <preparation.json> --revision head --targets <manifest.json> --platform android --device <serial> --metro <url> --out <head-run>
+pnpm dev:mobile:design-gate compare --preparation <preparation.json> --base-run <base-run> --head-run <head-run> --out <comparison>
+```
+
+Login, splash, unopened, or mismatched targets make the comparison inconclusive.
+They do not establish an introduced defect.
+The runtime marker binds the loaded source to the preparation receipt.
+
+Captures retain the original screenshot and a `.capture.json` alignment record.
+Matching probe states bracket the screenshot but do not certify native paint.
+Uncertain alignment skips pixel-to-tree rules; unsettled state skips single-frame geometry rules.
+Timeline shifts still use their own resting-state checks.
+Possible blank frames remain visible as observations, not confirmed defects.
+
 ## Getting started
 
 Generally speaking, you only need a new dev build if making dependency/native changes.
+
+The app uses Expo SDK 58, React Native 0.88 and React 19.3. Align SDK-managed
+dependencies with the selected release's `bundledNativeModules.json`, and retain
+the workspace release-age policy when resolving upgrades. Existing development-tool
+exemptions remain separate from the SDK's release eligibility.
+
+Native compatibility requirements:
+
+- Keep versioned dependency patches and their lockfile hashes together. Regenerate
+  them against pristine package sources, and rebuild both development clients.
+- Android builds the patched background-task, notifications and task-manager modules
+  from source, together with task-manager's app loader.
+- `android.uniquePackageNames=false` retains compatibility with AppsFlyer's SDK and
+  purchase connector, which share a namespace. AGP 9 otherwise rejects that vendor pair.
+- The supported Gesture Handler builder API remains explicitly allowed by the
+  deprecation lint rule; other deprecated APIs remain checked.
+- `expo-share-intent` 9.x targets SDK 58. Keep its Expo, linking and constants
+  peers aligned with the app; rebuild the development clients after upgrading it.
+- `react-native-css` forwards React Native's native component registry through its
+  CommonJS facade for Router's native screen host, so the styling facade needs no
+  patch of its own.
+- The `llama.rn` iOS patch installs JSI bindings through React Native's TurboModule
+  runtime hook and conforms to the generated native spec.
+- The iOS App Actions bridge uses `@JS` for Expo's noncopyable JavaScript values.
+  Its runtime-owned reference releases the dispatcher on the JavaScript thread.
+- Root React types stay aligned with the root/web runtime; mobile declares its own
+  SDK-matched types. Keep both explicit so cached dependency hoisting cannot mix
+  the web and native JSX type identities.
+- Deferred cache maintenance keeps a 500 ms timer fallback alongside idle work.
+  The first delivery cancels the other so invalidation runs once during sustained JS work.
 
 Native permission translations live in `plugins/permission-prompt-copy.json` for all 87 supported languages.
 The camera and photo library prompts explain AI agent attachments and include specific examples.
@@ -23,8 +262,13 @@ Every build localizes the local-network prompt, because Chat can connect to a lo
 Changes require a new iOS build; an over-the-air update cannot change the native permission prompt.
 
 1. obtain Expo access
-2. `pnpx eas-cli login -b`
+2. `pnpm exec eas login -b`
 3. obtain Apple access (developer)
+
+Run these commands from `apps/mobile` after `pnpm install --frozen-lockfile`.
+When updating EAS CLI, keep the `eas-cli` development dependency and `eas.json`'s
+`cli.version` aligned, regenerate the workspace dependency graph, and verify with
+`pnpm exec eas --version`.
 
 ### Android
 
@@ -32,9 +276,13 @@ Changes require a new iOS build; an over-the-air update cannot change the native
 2. `pnpm start`
 3. open installed app on your phone
 
+Production Android builds use the EAS `large` resource class to give Gradle and
+JavaScript bundling more memory. Development, preview, and iOS builds retain
+their default resource classes. The production builder requires a paid EAS plan.
+
 ### iOS
 
-1. add your device to the list of internal devices using `pnpx eas-cli device:create`
+1. add your device to the list of internal devices using `pnpm exec eas device:create`
 2. install the provisioning profile from step 1 on your device (it may involve a 1hr wait)
 3. create a new dev build using `pnpm build:ios`
 4. `pnpm start`
@@ -43,21 +291,22 @@ Changes require a new iOS build; an over-the-air update cannot change the native
 #### iPhone Duo and iOS 27
 
 - Use Xcode 27.1 or later to test native iPhone Duo layouts.
-- Keep `expo-build-properties.ios.enableSceneSupport` enabled in `app.config.ts` while the app uses Expo SDK 57.
+- Expo SDK 58 includes scene lifecycle support in its template; no scene-support opt-in is needed.
 - Expo's scene delegate creates the window and forwards lifecycle events and links to the app delegate.
 - After a native config change, regenerate the iOS project and rebuild the app.
 - Do not edit the generated `ios/` files.
 - Sign local simulator builds with an Apple Development identity and its correct team ID.
 - Unsigned builds cannot restore the local account from the keychain on this simulator.
 - Check both displays, all three fold poses, and each orientation after the rebuild.
-- When the app moves to Expo SDK 58, remove the scene support option; its template includes scene support.
+- `ios.requireFullScreen` is false, so an iOS 27 window resizes continuously.
+- Expo's config plugin then writes the four `UISupportedInterfaceOrientations~ipad` values for App Store validation.
 
 #### Widget layout checks
 
 - Home widgets keep a 16pt band on all four sides, including the updating placeholder.
 - Check the medium placeholder on a 164pt-tall card: its header, bars and footer must fit within 132pt or SwiftUI centres the overflow into the padding.
 - Arabic Live Activity direction comes from `homeWidgetLocale` in the shared app group, not the simulator language.
-- The Live Activity direction override is native code in `patches/expo-widgets@57.0.22.patch`. Rebuild the iOS extension after changing the patch; restarting Metro alone leaves the installed extension unchanged.
+- The Live Activity direction override is native code in `patches/expo-widgets@58.0.17.patch`. Rebuild the iOS extension after changing the patch; restarting Metro alone leaves the installed extension unchanged.
 - After switching the app language, reopen the development client on Metro before applying a fixture and capturing widgets.
 
 #### Responsive layout checks
@@ -72,6 +321,56 @@ Changes require a new iOS build; an over-the-air update cannot change the native
 - Use `--display=1` for the outer display and `--display=3` for the inner display.
 - An inactive display produces a black screenshot.
 - Type a draft, change the appearance in both directions, and verify the draft stays readable.
+- Resize the window to a narrow size and to a wide size; keep headers, tab labels, lists and transcript controls inside the horizontal safe areas.
+- Resize with an open sheet and the keyboard shown; keep every field and action visible and tappable.
+- Type a draft, resize the window, then background and foreground the app; keep the draft, the route and the transcript position.
+
+## Diagram host checks
+
+Mermaid uses a packaged renderer and a shared HTML host document.
+Run `pnpm --filter web exec playwright install chromium`, then
+`pnpm --filter web run test:mobile-mermaid` for its browser regression suite.
+CI runs the same command when the host document, its renderer asset, or the
+suite changes.
+The suite needs no backend or signed-in account and includes flowcharts and
+data-image diagrams.
+
+## Agent brief localization
+
+Scheduled report dates use the app language and preserve the report's calendar
+day across device timezones. Period windows retain the report's own timezone.
+Generation estimates and charges use USD currency precision and locale separators.
+Positive amounts below half a cent display as less than one cent.
+
+A brief is a saved snapshot of recent agent activity captured on a schedule.
+Its AI summary is a section of the report, not the complete report.
+
+- Use a consistent artifact noun in each locale's title, history, settings, and progress messages.
+- Keep natural inflections and established loanwords. Do not force identical substrings.
+- Keep the selected session evidence and AI summary distinct from the complete report.
+- Treat a window as a time period. Treat an agent as software, not a human representative.
+- Describe redaction as concealment of sensitive information, not editing or censorship.
+- Preserve separate balances, per-context opt-in, explicit paid consent, and offline restrictions.
+- After finding a meaning error, check that concept across every supported locale.
+
+Catalog checks verify structure, not translation meaning. Verify corrected copy on its native screen.
+
+## Scheduled agent briefs
+
+- Enable Personal and organization contexts separately in Agent brief settings.
+- Review the model, cost estimate, and generation limits before enabling a context.
+- Keep notification consent separate from paid summary consent.
+- Configure the saved timezone and overnight window.
+- Read the capture time and partial-coverage notice with each report.
+- Treat counts as selected-session counts, not complete historical totals.
+- Open a session or verified pull request for details.
+- Read the structured snapshot while its AI summary runs or fails.
+- Find retained reports in History.
+
+The server captures each scheduled occurrence once from current session metadata and bounded completed-response excerpts.
+Report reads never start generation or recollect evidence.
+Manual creation, preparation drafts, custom historical periods, and manual generation retries are not available.
+The server checks current context and source-session access before returning saved content.
 
 ## Quick Chat backends
 
@@ -158,6 +457,21 @@ Storage is checked before download and again when the server supplies a length.
 Credit packs retain their native App Store and Google Play purchase flow.
 They require a development or production build with in-app purchases enabled;
 Expo Go is not supported.
+
+The app uses `expo-iap` v6 through a single `CreditNativeIapOwner`. Purchase
+completion comes from its `onPurchaseSuccess` callback, not the resolved value of
+`requestPurchase`. The backend verifies and grants the credits before the app calls
+`finishTransaction` with `isConsumable: true`. A failed store finish leaves the
+transaction available for a later recovery pass.
+
+Recovery reads unfinished StoreKit transactions with `getPendingTransactionsIOS`
+and Play purchases with `getAvailablePurchases`; these are not interchangeable
+for consumable credit packs.
+
+The Expo plugin disables Horizon and Fire OS through `modules.horizon` and
+`modules.amazon.fireOS`. The Amazon peer packages are optional for Apple/Play
+builds. Rebuild the native development client after changing `expo-iap`; a Metro
+reload alone does not update its native billing implementation.
 
 Kilo Pass has no native purchase, restore, or store-management flow in the app.
 The Profile card and `/kilo-pass` route render the backend

@@ -58,7 +58,7 @@ export function setConnectCtaCollapsed(platform: RepoPlatform, collapsed: boolea
   // Start the disk read if it has not run, so the write merges with the
   // persisted list instead of replacing it with the empty default.
   store.preload();
-  const current = store.get();
+  const current = store.getRequested();
   const isCollapsed = current.includes(platform);
   // No membership change: skip the write, so useSyncExternalStore never loops
   // on a store notification that carries the same value.

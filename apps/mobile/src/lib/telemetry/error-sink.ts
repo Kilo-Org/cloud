@@ -30,6 +30,13 @@ export type TelemetryDescription = {
   fingerprint: readonly string[];
   /** Defaults to `error`. An expected, recoverable outcome declares `warning`. */
   level?: TelemetryLevel;
+  /**
+   * `none` keeps the query and mutation reporters quiet: the network layer
+   * already recorded this answer (an error-status response, or a transport
+   * failure it keeps as a breadcrumb), so a second record here would duplicate
+   * it. Defaults to `event`.
+   */
+  report?: 'event' | 'none';
   tags?: Record<string, string | number | boolean>;
   contexts?: Record<string, Record<string, unknown>>;
   extra?: Record<string, unknown>;

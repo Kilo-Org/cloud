@@ -25,14 +25,8 @@ import {
   type DriverConfig,
 } from './client.js';
 import { createMessageId } from '../../src/session/message-id.js';
-import {
-  killSandboxFamily,
-  listSandboxesForAgentSession,
-  sandboxFamilyKey,
-  waitForSandboxFamilyGone,
-  waitForSandboxForAgentSession,
-  type SandboxContainer,
-} from './sandbox-control.js';
+import { currentOwnedSandbox, stopOwnedSandboxFamily, waitForOwnedSandbox } from './lifecycle.js';
+import { sandboxFamilyKey, type SandboxContainer } from './sandbox-control.js';
 
 const SERVICE_PACKAGE_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const READ_TIMEOUT_MS = 30_000;
@@ -217,26 +211,22 @@ function trackSandboxFamily(
 
 async function discoverOwnedSandboxFamilies(
   cloudAgentSessionID: string,
+  kiloSessionID: string,
   ownedSandboxFamilies: Map<string, SandboxContainer>
 ): Promise<void> {
-  const sandboxes = await listSandboxesForAgentSession(cloudAgentSessionID);
-  for (const sandbox of sandboxes) trackSandboxFamily(ownedSandboxFamilies, sandbox);
+  const sandbox = await currentOwnedSandbox(cloudAgentSessionID, kiloSessionID);
+  if (sandbox) trackSandboxFamily(ownedSandboxFamilies, sandbox);
 }
 
 async function stopOwnedSandboxFamilies(
   cloudAgentSessionID: string | undefined,
+  kiloSessionID: string | undefined,
   ownedSandboxFamilies: Map<string, SandboxContainer>
 ): Promise<void> {
-  if (cloudAgentSessionID) {
-    await discoverOwnedSandboxFamilies(cloudAgentSessionID, ownedSandboxFamilies);
-  }
+  if (!cloudAgentSessionID || !kiloSessionID) return;
+  await discoverOwnedSandboxFamilies(cloudAgentSessionID, kiloSessionID, ownedSandboxFamilies);
   for (const [key, sandbox] of ownedSandboxFamilies) {
-    await killSandboxFamily(sandbox);
-    assert.equal(
-      await waitForSandboxFamilyGone(sandbox, READ_TIMEOUT_MS),
-      true,
-      `sandbox family ${key} did not stop`
-    );
+    await stopOwnedSandboxFamily(sandbox, cloudAgentSessionID, kiloSessionID);
     ownedSandboxFamilies.delete(key);
   }
 }
@@ -250,6 +240,7 @@ async function main(): Promise<void> {
     ...DEFAULT_CONFIG,
     user,
     nextAuthSecret: devVars.NEXTAUTH_SECRET ?? '',
+    internalApiSecret: devVars.INTERNAL_API_SECRET,
     workerUrl: process.env.WORKER_URL ?? DEFAULT_CONFIG.workerUrl,
     gitUrl: process.env.E2E_GIT_URL ?? DEFAULT_CONFIG.gitUrl,
     model: process.env.E2E_MODEL ?? DEFAULT_CONFIG.model,
@@ -282,8 +273,10 @@ async function main(): Promise<void> {
       return created;
     })();
     const root = await lifecycleStreamPromise;
-    const initialSandbox = await waitForSandboxForAgentSession(
+    const initialSandbox = await waitForOwnedSandbox(
       root.cloudAgentSessionId,
+      root.kiloSessionId,
+      new Set(),
       TURN_TIMEOUT_MS
     );
     assert.notEqual(initialSandbox, null, 'lifecycle setup did not start an owned sandbox');
@@ -301,9 +294,21 @@ async function main(): Promise<void> {
     }, 'materialized root session list row');
     assertProjectedSession(listedRoot, rootSessionID, 'session.list()');
 
-    const warmSession = requireData(
-      await client.session.get({ sessionID: rootSessionID }),
-      'warm session.get()'
+    const warmSession = await pollFor(
+      async () => {
+        const response = await client.session.get({ sessionID: rootSessionID });
+        if (
+          typeof response.error === 'object' &&
+          response.error !== null &&
+          'error' in response.error &&
+          response.error.error === 'KILO_SESSION_SNAPSHOT_PENDING'
+        ) {
+          return undefined;
+        }
+        return requireData(response, 'warm session.get()');
+      },
+      'warm session snapshot',
+      READ_TIMEOUT_MS
     );
     assertProjectedSession(warmSession, rootSessionID, 'warm session.get()');
 
@@ -320,7 +325,7 @@ async function main(): Promise<void> {
       assertProjectedAssistant(warmBootstrapAssistant, rootDirectory, 'warm session.messages()');
     }
 
-    await stopOwnedSandboxFamilies(root.cloudAgentSessionId, ownedSandboxFamilies);
+    await stopOwnedSandboxFamilies(root.cloudAgentSessionId, rootSessionID, ownedSandboxFamilies);
 
     const coldSession = requireData(
       await client.session.get({ sessionID: rootSessionID }),
@@ -456,7 +461,7 @@ async function main(): Promise<void> {
     );
     const warmPageIDs = [...warmFirstPage, ...warmSecondPage].map(entry => entry.info.id);
 
-    await stopOwnedSandboxFamilies(root.cloudAgentSessionId, ownedSandboxFamilies);
+    await stopOwnedSandboxFamilies(root.cloudAgentSessionId, rootSessionID, ownedSandboxFamilies);
     const coldFirstPageResult = await client.session.messages({
       sessionID: rootSessionID,
       limit: 2,
@@ -564,9 +569,11 @@ async function main(): Promise<void> {
     if (sessionID && directory) {
       await client.session.abort({ sessionID, directory }).catch(() => undefined);
     }
-    await stopOwnedSandboxFamilies(cloudAgentSessionID, ownedSandboxFamilies).catch(error => {
-      console.warn(`sdk-basic-chat: sandbox cleanup failed: ${String(error)}`);
-    });
+    await stopOwnedSandboxFamilies(cloudAgentSessionID, sessionID, ownedSandboxFamilies).catch(
+      error => {
+        console.warn(`sdk-basic-chat: sandbox cleanup failed: ${String(error)}`);
+      }
+    );
   }
 }
 

@@ -56,6 +56,13 @@ describe('POST /api/auth/native/otp', () => {
     expect(mockSendSignInCodeEmail).toHaveBeenCalledWith('user@example.com', '123456');
   });
 
+  it('issues and delivers the code to the same lowercased address, keeping the plus suffix', async () => {
+    await POST(createRequest({ email: 'Alias+News@Example.com' }));
+
+    expect(mockCreateSignInCode).toHaveBeenCalledWith('alias+news@example.com');
+    expect(mockSendSignInCodeEmail).toHaveBeenCalledWith('alias+news@example.com', '123456');
+  });
+
   it('checks eligibility before issuing a code', async () => {
     await POST(createRequest({ email: 'user@example.com' }));
 
@@ -97,6 +104,24 @@ describe('POST /api/auth/native/otp', () => {
     expect(data.success).toBe(true);
     expect(data.challengeId).toMatch(UUID_REGEX);
     expect(mockCreateSignInCode).not.toHaveBeenCalled();
+  });
+
+  it('delivers a real code to a new address while email signups are disabled', async () => {
+    mockCheckEmailSignInEligibility.mockResolvedValue({
+      ok: false,
+      status: 403,
+      errorCode: 'EMAIL-SIGNUP-DISABLED',
+      body: { success: false, error: 'EMAIL-SIGNUP-DISABLED' },
+    });
+
+    const response = await POST(createRequest({ email: 'new@example.com' }));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      success: true,
+      challengeId: 'c0000000-0000-0000-0000-000000000001',
+    });
+    expect(mockSendSignInCodeEmail).toHaveBeenCalledWith('new@example.com', '123456');
   });
 
   it('returns opaque 200 with a challengeId for a blocked domain', async () => {

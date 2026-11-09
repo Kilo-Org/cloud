@@ -13,10 +13,10 @@ import {
 } from '@kilocode/worker-utils/cloud-agent-failure';
 import { CloudAgentRunFailureClassifications } from '@kilocode/worker-utils/cloud-agent-queue-report';
 import {
-  CLOUD_AGENT_ASSISTANT_FAILURE_REASON_VALUES,
-  CLOUD_AGENT_PROVIDER_OWNERSHIP_VALUES,
-  CLOUD_AGENT_WORKSPACE_FAILURE_SUBTYPE_VALUES,
-} from '../shared/sandbox-control-protocol.js';
+  CONTROL_PLANE_ASSISTANT_FAILURE_REASONS,
+  CONTROL_PLANE_PROVIDER_OWNERSHIP_VALUES,
+  CONTROL_PLANE_WORKSPACE_FAILURE_SUBTYPES,
+} from '../shared/control-plane-protocol.js';
 import { resolveAssistantProviderOwnership } from '../shared/assistant-failure.js';
 import {
   classifyControlPlaneRunFailure,
@@ -208,6 +208,19 @@ const cases: readonly FenceCase[] = [
     stage: 'agent_activity',
     code: 'assistant_error',
     responsibility: 'platform',
+    failureReason: 'assistant_invalid_request',
+  },
+  {
+    name: 'missing agent configuration is a user failure',
+    reason: 'Agent "foreman" was not found in the repository or profile',
+    dispatchState: 'accepted',
+    status: 'failed',
+    assistantReason: 'invalid_request',
+    providerOwnership: 'unknown',
+    admittedModel: 'kilo/example',
+    stage: 'agent_activity',
+    code: 'assistant_error',
+    responsibility: 'user',
     failureReason: 'assistant_invalid_request',
   },
   {
@@ -490,11 +503,9 @@ describe('classifyControlPlaneRunFailure', () => {
   });
 
   it('keeps the local protocol enums in sync with worker-utils', () => {
-    expect(CLOUD_AGENT_ASSISTANT_FAILURE_REASON_VALUES).toEqual(
-      CLOUD_AGENT_ASSISTANT_FAILURE_REASONS
-    );
-    expect(CLOUD_AGENT_PROVIDER_OWNERSHIP_VALUES).toEqual(CLOUD_AGENT_PROVIDER_OWNERSHIPS);
-    expect(CLOUD_AGENT_WORKSPACE_FAILURE_SUBTYPE_VALUES).toEqual(WORKSPACE_FAILURE_SUBTYPES);
+    expect(CONTROL_PLANE_ASSISTANT_FAILURE_REASONS).toEqual(CLOUD_AGENT_ASSISTANT_FAILURE_REASONS);
+    expect(CONTROL_PLANE_PROVIDER_OWNERSHIP_VALUES).toEqual(CLOUD_AGENT_PROVIDER_OWNERSHIPS);
+    expect(CONTROL_PLANE_WORKSPACE_FAILURE_SUBTYPES).toEqual(WORKSPACE_FAILURE_SUBTYPES);
   });
 });
 

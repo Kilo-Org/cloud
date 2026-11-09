@@ -14,6 +14,8 @@ import { SecurityAuditLogAction } from '../core/enums';
 import type { SecurityReviewOwner } from '../core/types';
 import { captureException } from '@sentry/nextjs';
 import { REPORTABLE_SECURITY_FINDING_AUDIT_ACTIONS } from '@kilocode/worker-utils/security-finding-audit';
+import { currentUserHasPermission } from '@/lib/admin/admin-permissions';
+import { platformAdminDomains } from '@/lib/admin/platform-admin';
 
 export { SecurityAuditLogAction };
 
@@ -127,13 +129,31 @@ export async function logSecurityAuditAndWait(
   }
 }
 
-/** Replace internal Kilo admin actor details with a generic placeholder for non-admin requestors. */
+/**
+ * Whether the caller may read staff actor details. The platform admin
+ * permission decides. The check reads the primary row, so a granted or revoked
+ * permission applies to a session that is already signed in.
+ */
+export function canCallerReadStaffAuditActors(callerUserId: string): Promise<boolean> {
+  return currentUserHasPermission(callerUserId, user => user.is_admin);
+}
+
+const platformAdminEmailSuffixes = platformAdminDomains.map(domain => `@${domain}`);
+
+/** Whether the mailbox belongs to an eligible platform-admin domain. */
+function isPlatformAdminActorEmail(actorEmail: string | null): boolean {
+  return (
+    actorEmail !== null && platformAdminEmailSuffixes.some(suffix => actorEmail.endsWith(suffix))
+  );
+}
+
+/** Audit actor fields are generic unless the caller has the platform admin permission. */
 export function maskKiloAdminActors<
   T extends { actor_id: string | null; actor_email: string | null; actor_name: string | null },
 >(logs: T[], isRequestingUserKiloAdmin: boolean): T[] {
   if (isRequestingUserKiloAdmin) return logs;
   return logs.map(log => {
-    if (log.actor_email && log.actor_email.endsWith('@kilocode.ai')) {
+    if (isPlatformAdminActorEmail(log.actor_email)) {
       return {
         ...log,
         actor_id: '00000000-0000-0000-0000-000000000000',

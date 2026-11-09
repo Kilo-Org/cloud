@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -21,13 +22,14 @@ import {
   lookupCache,
   mobileRoot,
   parseCliArgs,
+  parseExecutableSdkVersion,
   pruneCache,
   publishCacheEntry,
   resolveCacheRoot,
-  resolveMobileRoot,
   runBuild,
   runFingerprint,
   runPrune,
+  SimulatorSdkVersionSchema,
   validateSimulatorClaim,
   validateXcodeWorkspace,
   withFingerprintLock,
@@ -37,7 +39,6 @@ import {
   type CompatibilityDimensions,
   type LockRecord,
   type Manifest,
-  type PruneResult,
 } from './mobile-ios-build';
 
 function makeTempDir(label: string): string {
@@ -95,8 +96,6 @@ function sharedResult<T>(initialValue: T): { set: (value: T) => void; read: () =
     read: async () => value,
   };
 }
-
-// ── Fingerprint options ──────────────────────────────────────────────
 
 test('fingerprint options include iOS platform and only skip the Expo extra section beyond defaults', () => {
   const options = buildFingerprintOptions();
@@ -181,8 +180,6 @@ test('fingerprint changes for iOS module and extension sources and ignores unrel
   }
 });
 
-// ── Compatibility key ────────────────────────────────────────────────
-
 test('buildCompatibilityKey is stable for identical dimensions and changes on each dimension', () => {
   const dimensions = fixedDimensions();
   const keyA = buildCompatibilityKey(dimensions);
@@ -200,8 +197,6 @@ test('buildCompatibilityKey is stable for identical dimensions and changes on ea
   }
 });
 
-// ── Cache root resolution ────────────────────────────────────────────
-
 test('resolveCacheRoot prefers macOS Library/Caches/Kilo with XDG fallback chain', () => {
   assert.equal(
     resolveCacheRoot({ home: '/Users/test', platform: 'darwin', env: {} }),
@@ -216,8 +211,6 @@ test('resolveCacheRoot prefers macOS Library/Caches/Kilo with XDG fallback chain
     '/home/test/.cache/Kilo/mobile-ios-builds'
   );
 });
-
-// ── Artifact checksum ────────────────────────────────────────────────
 
 test('computeArtifactChecksum is deterministic and content-sensitive', async () => {
   const dir = makeTempDir('checksum');
@@ -234,8 +227,6 @@ test('computeArtifactChecksum is deterministic and content-sensitive', async () 
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
-
-// ── Concurrency: withFingerprintLock ─────────────────────────────────
 
 test('withFingerprintLock runs producer once for matching concurrent callers', async () => {
   const cacheRoot = makeTempDir('lock-once');
@@ -361,8 +352,6 @@ test('withFingerprintLock bounds wait when an active lock holds the producer', a
   }
 });
 
-// ── Cache lookup ─────────────────────────────────────────────────────
-
 test('cache hit returns the published manifest and avoids the producer', async () => {
   const cacheRoot = makeTempDir('hit');
   const key = 'k-hit';
@@ -479,8 +468,6 @@ test('cache miss when the entry is missing the app bundle directory', async () =
   fs.rmSync(cacheRoot, { recursive: true, force: true });
 });
 
-// ── Simulator claim validation ───────────────────────────────────────
-
 test('validateSimulatorClaim accepts the current worktree and rejects foreign worktrees', () => {
   const claimRoot = makeTempDir('claims');
   const worktree = makeTempDir('wt');
@@ -506,8 +493,6 @@ test('validateSimulatorClaim accepts the current worktree and rejects foreign wo
   }
 });
 
-// ── Install command ──────────────────────────────────────────────────
-
 test('buildInstallCommand uses xcrun simctl install with the cached bundle', () => {
   const command = buildInstallCommand('UDID-1234', '/cache/key/Kilo.app');
   assert.deepEqual(command, {
@@ -515,8 +500,6 @@ test('buildInstallCommand uses xcrun simctl install with the cached bundle', () 
     args: ['simctl', 'install', 'UDID-1234', '/cache/key/Kilo.app'],
   });
 });
-
-// ── Pruning ──────────────────────────────────────────────────────────
 
 test('pruneCache removes entries older than the threshold and protects active locks', async () => {
   const cacheRoot = makeTempDir('prune');
@@ -568,8 +551,6 @@ test('pruneCache removes entries older than the threshold and protects active lo
   fs.rmSync(cacheRoot, { recursive: true, force: true });
 });
 
-// ── CLI parsing ──────────────────────────────────────────────────────
-
 test('parseCliArgs supports fingerprint, build, and prune subcommands', () => {
   assert.deepEqual(parseCliArgs(['fingerprint']), { command: 'fingerprint' });
   assert.deepEqual(parseCliArgs(['build', 'UDID-1']), { command: 'build', udid: 'UDID-1' });
@@ -578,8 +559,6 @@ test('parseCliArgs supports fingerprint, build, and prune subcommands', () => {
   assert.throws(() => parseCliArgs(['build']), /Usage/);
   assert.throws(() => parseCliArgs(['unknown']), /Usage/);
 });
-
-// ── Publication boundary ─────────────────────────────────────────────
 
 test('withFingerprintLock does not publish a usable entry when the producer throws', async () => {
   const cacheRoot = makeTempDir('lock-publish-fail');
@@ -680,8 +659,6 @@ test('withFingerprintLock publishes atomically via a temp directory rename', asy
   assert.equal(fs.existsSync(entriesDir), true);
   fs.rmSync(cacheRoot, { recursive: true, force: true });
 });
-
-// ── xcodebuild command ──────────────────────────────────────────────
 
 test('validateXcodeWorkspace accepts the generated workspace and rejects missing', () => {
   const mobileRoot = makeTempDir('ws-ok');
@@ -787,7 +764,114 @@ test('locateProducedApp throws when the canonical .app is missing', () => {
   }
 });
 
-// ── runBuild orchestration ──────────────────────────────────────────
+const VTOOL_SIMULATOR_SDK_26_5 = `Load command 9
+      cmd LC_BUILD_VERSION
+  cmdsize 32
+ platform IOSSIMULATOR
+    minos 15.1
+      sdk 26.5
+   ntools 1
+     tool LD
+  version 1230.1
+`;
+
+// The `vtool -show-build` shape of a real CI-produced Kilo executable
+// (two slices, producer path generalized away).
+const VTOOL_REAL_KILO = `Kilo (architecture x86_64):
+Load command 11
+      cmd LC_BUILD_VERSION
+  cmdsize 32
+ platform IOSSIMULATOR
+    minos 16.4
+      sdk 26.5
+   ntools 1
+     tool LD
+  version 1267.0
+Kilo (architecture arm64):
+Load command 11
+      cmd LC_BUILD_VERSION
+  cmdsize 32
+ platform IOSSIMULATOR
+    minos 16.4
+      sdk 26.5
+   ntools 1
+     tool LD
+  version 1267.0
+`;
+
+test('parseExecutableSdkVersion reads the SDK stamped into the executable', () => {
+  assert.equal(parseExecutableSdkVersion(VTOOL_SIMULATOR_SDK_26_5), '26.5');
+  assert.equal(parseExecutableSdkVersion(VTOOL_REAL_KILO), '26.5');
+  // A fat binary whose slices agree (modulo a trailing zero component)
+  // yields the single normalized producer SDK.
+  const fat = `${VTOOL_SIMULATOR_SDK_26_5}Load command 9
+      cmd LC_BUILD_VERSION
+  cmdsize 32
+ platform IOSSIMULATOR
+    minos 15.1
+      sdk 26.5.0
+   ntools 0
+`;
+  assert.equal(parseExecutableSdkVersion(fat), '26.5');
+  // SDK lines outside an LC_BUILD_VERSION block are not evidence.
+  const dylib = `Load command 12
+          cmd LC_LOAD_DYLIB
+      cmdsize 56
+         name /usr/lib/libSystem.B.dylib (offset 24)
+      sdk 99.9
+${VTOOL_SIMULATOR_SDK_26_5}`;
+  assert.equal(parseExecutableSdkVersion(dylib), '26.5');
+});
+
+test('parseExecutableSdkVersion rejects unsupported or unreadable SDK stamps', () => {
+  for (const output of [
+    '',
+    'not vtool output',
+    // A device build is a mismatched binary for a simulator artifact.
+    VTOOL_SIMULATOR_SDK_26_5.replace('IOSSIMULATOR', 'IOS'),
+    // The legacy version command carries no simulator platform proof.
+    `Load command 9
+      cmd LC_VERSION_MIN_IPHONEOS
+  cmdsize 16
+    version 15.1
+      sdk 26.5
+`,
+    // Slices that disagree have no single producer SDK.
+    `${VTOOL_SIMULATOR_SDK_26_5}Load command 9
+      cmd LC_BUILD_VERSION
+  cmdsize 32
+ platform IOSSIMULATOR
+    minos 15.1
+      sdk 17.5
+   ntools 0
+`,
+    // A device slice mixed into a fat binary refuses the whole artifact,
+    // even though the other slice is a valid simulator build.
+    VTOOL_REAL_KILO.replace(
+      'Kilo (architecture arm64):\nLoad command 11\n      cmd LC_BUILD_VERSION\n  cmdsize 32\n platform IOSSIMULATOR',
+      'Kilo (architecture arm64):\nLoad command 11\n      cmd LC_BUILD_VERSION\n  cmdsize 32\n platform IOS'
+    ),
+    // A legacy-stamped slice mixed with a simulator slice is unreadable
+    // evidence, not a slice to silently ignore.
+    `${VTOOL_SIMULATOR_SDK_26_5}Load command 10
+      cmd LC_VERSION_MIN_IPHONEOS
+  cmdsize 16
+    version 15.1
+      sdk 26.5
+`,
+    // An architecture section with no stamp at all.
+    `${VTOOL_REAL_KILO}Kilo (architecture arm64e):
+`,
+    VTOOL_SIMULATOR_SDK_26_5.replace('sdk 26.5', 'sdk 0.0'),
+    VTOOL_SIMULATOR_SDK_26_5.replace('sdk 26.5', 'sdk beta'),
+    VTOOL_SIMULATOR_SDK_26_5.replace('sdk 26.5', 'sdk 26.5-beta1'),
+  ]) {
+    assert.throws(
+      () => parseExecutableSdkVersion(output),
+      /IOSSIMULATOR SDK|Invalid simulator SDK|missing a build version stamp|unreadable build version stamp/
+    );
+  }
+});
 
 function makeBuildDeps(overrides: Partial<BuildDeps> = {}): BuildDeps {
   return {
@@ -798,6 +882,7 @@ function makeBuildDeps(overrides: Partial<BuildDeps> = {}): BuildDeps {
     fingerprint: async () => 'native-hash',
     build: async () => undefined,
     readInfoPlist: () => 'com.kilocode.kiloapp',
+    readExecutableSdkVersion: () => SimulatorSdkVersionSchema.parse('17.5'),
     install: () => undefined,
     copyDir: (src, dest) => {
       fs.cpSync(src, dest, { recursive: true });
@@ -1055,6 +1140,201 @@ test('runBuild on miss publishes a remote-fetched app without the local builder 
     fs.rmSync(cacheRoot, { recursive: true, force: true });
     fs.rmSync(claimRoot, { recursive: true, force: true });
     fs.rmSync(worktree, { recursive: true, force: true });
+  }
+});
+
+test('runBuild records the fetched binary producer SDK, not the host ambient SDK', async () => {
+  const cacheRoot = makeTempDir('build-remote-sdk');
+  const claimRoot = makeTempDir('claims');
+  const worktree = makeTempDir('wt');
+  const udid = 'UDID-remote-sdk';
+  fs.writeFileSync(
+    path.join(claimRoot, `${udid}.json`),
+    JSON.stringify({
+      worktreeRoot: worktree,
+      claimId: 'c',
+      status: 'ready',
+      claimedAt: new Date().toISOString(),
+      deviceId: udid,
+    })
+  );
+  const installs: string[] = [];
+  const deps: BuildDeps = makeBuildDeps({
+    // The receiving host's ambient SDK is 17.5; the fetched binary was
+    // produced against 26.5 and the packaged manifest must say so.
+    env: fixedEnv({ cacheRoot }),
+    worktreeRoot: worktree,
+    claimRoot,
+    fetchRemote: async ({ productsDir }) => {
+      const app = path.join(productsDir, 'Kilo.app');
+      fs.mkdirSync(app, { recursive: true });
+      fs.writeFileSync(path.join(app, 'Info.plist'), '<plist/>');
+      fs.writeFileSync(path.join(app, 'Kilo'), 'fake-macho');
+      return true;
+    },
+    readExecutableSdkVersion: appPath => {
+      assert.equal(path.basename(appPath), 'Kilo.app');
+      assert.equal(fs.existsSync(path.join(appPath, 'Kilo')), true);
+      return parseExecutableSdkVersion(VTOOL_REAL_KILO);
+    },
+    install: (_udid, app) => {
+      installs.push(app);
+    },
+  });
+  try {
+    await runBuild(udid, deps);
+    assert.equal(installs.length, 1);
+    const manifest: Manifest = JSON.parse(
+      fs.readFileSync(path.join(path.dirname(installs[0]), 'manifest.json'), 'utf8')
+    );
+    assert.equal(manifest.simulatorSdkVersion, '26.5');
+  } finally {
+    fs.rmSync(cacheRoot, { recursive: true, force: true });
+    fs.rmSync(claimRoot, { recursive: true, force: true });
+    fs.rmSync(worktree, { recursive: true, force: true });
+  }
+});
+
+test('runBuild never installs a legacy warm entry stamped with the host ambient SDK', async () => {
+  const cacheRoot = makeTempDir('build-legacy-cache');
+  const claimRoot = makeTempDir('claims');
+  const worktree = makeTempDir('wt');
+  const udid = 'UDID-legacy-cache';
+  fs.writeFileSync(
+    path.join(claimRoot, `${udid}.json`),
+    JSON.stringify({
+      worktreeRoot: worktree,
+      claimId: 'c',
+      status: 'ready',
+      claimedAt: new Date().toISOString(),
+      deviceId: udid,
+    })
+  );
+  // Seed a checksum-valid format 1 entry: keyed by the pre-cutover hash
+  // (dimensions only, no cache format version) and stamped with the
+  // receiving host's ambient 17.5 around a binary produced against 26.5.
+  const dimensions = {
+    nativeHash: 'native-hash',
+    xcodeBuildVersion: '16A0000',
+    simulatorSdkVersion: '17.5',
+    hostArch: 'arm64',
+    buildMode: 'debug-dev-client',
+  } as const;
+  const legacyKey = createHash('sha256')
+    .update(
+      JSON.stringify({
+        buildMode: dimensions.buildMode,
+        hostArch: dimensions.hostArch,
+        nativeHash: dimensions.nativeHash,
+        simulatorSdkVersion: dimensions.simulatorSdkVersion,
+        xcodeBuildVersion: dimensions.xcodeBuildVersion,
+      })
+    )
+    .digest('hex');
+  const legacyDir = path.join(cacheRoot, 'entries', legacyKey);
+  const legacyApp = path.join(legacyDir, 'Kilo.app');
+  fs.mkdirSync(legacyApp, { recursive: true });
+  fs.writeFileSync(path.join(legacyApp, 'Info.plist'), '<plist/>');
+  fs.writeFileSync(path.join(legacyApp, 'Kilo'), 'legacy-macho');
+  fs.writeFileSync(
+    path.join(legacyDir, 'manifest.json'),
+    JSON.stringify(
+      fakeManifest({
+        key: legacyKey,
+        artifactChecksum: await computeArtifactChecksum(legacyApp),
+      })
+    )
+  );
+  let fetches = 0;
+  let sdkReads = 0;
+  const installs: string[] = [];
+  const deps: BuildDeps = makeBuildDeps({
+    env: fixedEnv({ cacheRoot }),
+    worktreeRoot: worktree,
+    claimRoot,
+    fetchRemote: async ({ productsDir }) => {
+      fetches += 1;
+      const app = path.join(productsDir, 'Kilo.app');
+      fs.mkdirSync(app, { recursive: true });
+      fs.writeFileSync(path.join(app, 'Info.plist'), '<plist/>');
+      fs.writeFileSync(path.join(app, 'Kilo'), 'fake-macho');
+      return true;
+    },
+    readExecutableSdkVersion: () => {
+      sdkReads += 1;
+      return parseExecutableSdkVersion(VTOOL_REAL_KILO);
+    },
+    install: (_udid, app) => {
+      installs.push(app);
+    },
+  });
+  try {
+    const newKey = buildCompatibilityKey(dimensions);
+    assert.notEqual(newKey, legacyKey);
+    await runBuild(udid, deps);
+    assert.equal(fetches, 1, 'the legacy warm entry must miss and reach the producer');
+    assert.equal(installs.length, 1);
+    assert.equal(installs[0], path.join(cacheRoot, 'entries', newKey, 'Kilo.app'));
+    const manifest: Manifest = JSON.parse(
+      fs.readFileSync(path.join(cacheRoot, 'entries', newKey, 'manifest.json'), 'utf8')
+    );
+    assert.equal(manifest.simulatorSdkVersion, '26.5');
+    // The truthful new entry is then a plain cache hit: no producer and
+    // no binary re-read on the second run.
+    await runBuild(udid, deps);
+    assert.equal(fetches, 1);
+    assert.equal(sdkReads, 1);
+    assert.equal(installs.length, 2);
+    assert.equal(installs[1], installs[0]);
+  } finally {
+    fs.rmSync(cacheRoot, { recursive: true, force: true });
+    fs.rmSync(claimRoot, { recursive: true, force: true });
+    fs.rmSync(worktree, { recursive: true, force: true });
+  }
+});
+
+test('publishCacheEntry rejects a produced app whose executable SDK is unreadable', async () => {
+  const cacheRoot = makeTempDir('publish-bad-sdk');
+  const key = 'b'.repeat(64);
+  const deps: BuildDeps = makeBuildDeps({
+    env: fixedEnv({ cacheRoot }),
+    // The provider fails at its own external boundary: the executable's
+    // tool output carries no readable SDK stamp.
+    readExecutableSdkVersion: () => parseExecutableSdkVersion('not vtool output'),
+    build: async ({ derivedDataPath }) => {
+      const app = path.join(
+        derivedDataPath,
+        'Build',
+        'Products',
+        'Debug-iphonesimulator',
+        'Kilo.app'
+      );
+      fs.mkdirSync(app, { recursive: true });
+      fs.writeFileSync(path.join(app, 'Info.plist'), '<plist/>');
+      fs.writeFileSync(path.join(app, 'Kilo'), 'fake-macho');
+    },
+  });
+  try {
+    await assert.rejects(
+      publishCacheEntry({
+        env: fixedEnv({ cacheRoot }),
+        key,
+        compatibility: {
+          nativeHash: 'native-hash',
+          xcodeBuildVersion: '16A0000',
+          simulatorSdkVersion: '17.5',
+          hostArch: 'arm64',
+          buildMode: 'debug-dev-client',
+        },
+        worktreeRoot: '/wt',
+        udid: 'UDID-test',
+        deps,
+      }),
+      /missing a build version stamp/
+    );
+    assert.equal(fs.existsSync(path.join(cacheRoot, 'entries', key)), false);
+  } finally {
+    fs.rmSync(cacheRoot, { recursive: true, force: true });
   }
 });
 
@@ -1383,8 +1663,6 @@ test('runBuild installs via the exact xcrun simctl install command shape', async
   }
 });
 
-// ── runFingerprint orchestration ────────────────────────────────────
-
 test('runFingerprint prints sanitized compatibility dimensions and key only', async () => {
   const outputs: string[] = [];
   const write = (chunk: string): void => {
@@ -1426,8 +1704,6 @@ test('runFingerprint prints sanitized compatibility dimensions and key only', as
   );
 });
 
-// ── runPrune orchestration ──────────────────────────────────────────
-
 test('runPrune reports the removed count and keeps the rest', async () => {
   const cacheRoot = makeTempDir('prune-run');
   const entriesRoot = path.join(cacheRoot, 'entries');
@@ -1462,8 +1738,6 @@ test('runPrune reports the removed count and keeps the rest', async () => {
     fs.rmSync(cacheRoot, { recursive: true, force: true });
   }
 });
-
-// ── Spec-review findings ────────────────────────────────────────────
 
 test('atomic lock takeover: two simultaneous adopters produce exactly once', async () => {
   const cacheRoot = makeTempDir('lock-atomic-takeover');
@@ -1778,14 +2052,11 @@ test('computeArtifactChecksum rejects symlinks outside root', async () => {
   }
 });
 
-// ── Review findings ────────────────────────────────────────────────
-
 test('tryAdoptLock does not steal a lock that has been replaced by a fresh active record', async () => {
   const cacheRoot = makeTempDir('lock-steal-toctou');
   const lockRoot = path.join(cacheRoot, 'locks');
   const lockDir = path.join(lockRoot, 'test.lock');
   const lockFile = path.join(lockDir, 'lock.json');
-  const resultFile = path.join(lockDir, 'result.json');
   fs.mkdirSync(lockDir, { recursive: true });
   const staleRecord: LockRecord = {
     key: 'test',

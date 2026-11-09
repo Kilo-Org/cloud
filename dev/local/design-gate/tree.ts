@@ -1,0 +1,539 @@
+import { z } from 'zod';
+
+import type { ElementRef, Rect } from './findings';
+
+export type { Rect } from './findings';
+
+const RectSchema = z.tuple([z.number(), z.number(), z.number(), z.number()]).readonly();
+const InsetsSchema = z.object({
+  top: z.number(),
+  right: z.number(),
+  bottom: z.number(),
+  left: z.number(),
+});
+
+const ProbeNodeSchema = z.object({
+  parent: z.number().int().min(-1),
+  tag: z.string(),
+  rect: RectSchema,
+  layoutRect: RectSchema.optional(),
+  owners: z.array(z.string()).optional(),
+  text: z.string().optional(),
+  testID: z.string().optional(),
+  label: z.string().optional(),
+  role: z.string().optional(),
+  pressable: z.literal(true).optional(),
+  hitSlop: InsetsSchema.optional(),
+  lines: z.number().optional(),
+  screenState: z.number().optional(),
+  scrollAxes: z.object({ x: z.boolean(), y: z.boolean() }).optional(),
+  style: z.record(z.string(), z.union([z.string(), z.number()])).optional(),
+});
+
+const ProbeEnvSchema = z.object({
+  platform: z.string(),
+  osVersion: z.string(),
+  route: z.string(),
+  /** The focused route with its groups; a URL drops them, so tabs share `/`. */
+  screen: z.string().optional(),
+  window: z.object({ width: z.number(), height: z.number() }),
+  pixelRatio: z.number().positive(),
+  fontScale: z.number(),
+  colorScheme: z.string(),
+  isRTL: z.boolean(),
+  language: z.string(),
+  languagePreference: z.string(),
+  safeArea: InsetsSchema,
+  safeAreaKnown: z.boolean().optional(),
+  tapTarget: z.object({ min: z.number(), touch: z.number() }),
+  source: z.enum(['probe', 'uiautomator', 'agent-device']).optional(),
+});
+
+export const ProbeDumpSchema = z
+  .object({
+    version: z.literal(1),
+    env: ProbeEnvSchema,
+    nodes: z.array(ProbeNodeSchema).min(1),
+  })
+  .superRefine((dump, ctx) => {
+    dump.nodes.forEach((node, index) => {
+      if (index === 0 ? node.parent !== -1 : node.parent < 0 || node.parent >= index) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['nodes', index, 'parent'],
+          message: 'parent must precede the node in DFS pre-order; only nodes[0] is the root',
+        });
+      }
+    });
+  });
+
+export type Insets = z.infer<typeof InsetsSchema>;
+export type ProbeNode = z.infer<typeof ProbeNodeSchema>;
+export type ProbeEnv = z.infer<typeof ProbeEnvSchema>;
+export type ProbeDump = z.infer<typeof ProbeDumpSchema>;
+
+export function parseDump(input: unknown): ProbeDump {
+  return ProbeDumpSchema.parse(typeof input === 'string' ? JSON.parse(input) : input);
+}
+
+const TEXT_TAGS = new Set(['Paragraph', 'Text', 'RCTText']);
+const TEXT_INPUT_TAGS = new Set([
+  'TextInput',
+  'AndroidTextInput',
+  'RCTSinglelineTextInputView',
+  'RCTMultilineTextInputView',
+]);
+const SCREEN_TAGS = new Set(['RNSScreen']);
+const STACK_TAGS = new Set(['RNSScreenStack']);
+/**
+ * `@expo/ui` renders its Android `ModalBottomSheet` in a dialog window of its
+ * own: the compose host is the app-tree node that carries the sheet, and the RN
+ * children hang off an `RNHostView` whose origin is the sheet content's top.
+ * Their frames are therefore in the sheet's space, and only a placement puts
+ * them back into window space (see `presentedSheets`).
+ */
+const SHEET_HOST_TAG = 'ViewManagerAdapter_ExpoUI_HostView';
+const SHEET_CONTENT_TAG = 'ViewManagerAdapter_ExpoUI_RNHostView';
+const IGNORED_TAGS = new Set(['DebuggingOverlay', 'RNSScreenStackHeaderConfig']);
+const LIST_OWNERS = new Set(['FlashList', 'RecyclerView']);
+const CONTROL_ROLES = new Set(['button', 'link', 'tab', 'switch', 'menuitem']);
+const GENERIC_OWNERS = new Set([
+  'View',
+  'Text',
+  'TextInput',
+  'Image',
+  'ScrollView',
+  'Pressable',
+  'TouchableOpacity',
+  'TouchableHighlight',
+  'TouchableWithoutFeedback',
+  'AnimatedComponent',
+  'InternalTextInput',
+  'Svg',
+  'G',
+  'Path',
+  'Circle',
+  'Rect',
+  'Suspender',
+  'Freeze',
+  'DelayedFreeze',
+  'ScreenContentWrapper',
+  'DebugContainer',
+]);
+
+export const tags = {
+  isText: (tag: string) => TEXT_TAGS.has(tag),
+  isTextInput: (tag: string) => TEXT_INPUT_TAGS.has(tag),
+  isScroll: (tag: string) => tag.endsWith('ScrollView'),
+  isHorizontalScroll: (tag: string) => tag.endsWith('ScrollView') && tag.includes('Horizontal'),
+  isScreen: (tag: string) => SCREEN_TAGS.has(tag),
+  isStack: (tag: string) => STACK_TAGS.has(tag),
+  isIgnored: (tag: string) => IGNORED_TAGS.has(tag),
+  isListOwner: (owner: string) => LIST_OWNERS.has(owner),
+  isControlRole: (role: string | undefined) => role !== undefined && CONTROL_ROLES.has(role),
+  isGenericOwner: (owner: string) => GENERIC_OWNERS.has(owner) || owner.startsWith('Animated'),
+  isGraphic: (tag: string) => tag.includes('Image') || tag.startsWith('RNSVGSvgView'),
+};
+
+const TRANSPARENT_COLORS = /^(transparent|#0000|#00000000|rgba\(.*,\s*0(\.0+)?\))$/i;
+
+/**
+ * Owners whose content a native dialog or sheet hosts.
+ *
+ * The platform presents that surface in its own window and positions it there,
+ * so `getBoundingClientRect` reports every frame of its content from the
+ * surface's own origin: a bottom sheet whose top sits 307 dp down the app window
+ * measures its heading at y 0. The window's insets therefore do not describe
+ * those frames, and the surface owns them itself — `SessionPageSheet` pads the
+ * top inset on Android and sits below the status bar on iOS, as its own
+ * definition documents. No frame the probe can read distinguishes a surface that
+ * coincides with the window from one that does not, so a rule about the window's
+ * insets skips all of them rather than guessing from a height.
+ */
+const PRESENTED_SURFACE_OWNERS: Record<string, true> = { PresentedContent: true };
+
+/** True when one of a probe node's owners is a presented surface. */
+export function hasPresentedOwner(probe: ProbeNode): boolean {
+  return (probe.owners ?? []).some(owner => PRESENTED_SURFACE_OWNERS[owner] === true);
+}
+
+/**
+ * True when a native dialog or sheet hosts the node's content, so its frame is
+ * measured from that surface's origin rather than the window's.
+ */
+export function insidePresentedSurface(node: LayoutNode): boolean {
+  return [node, ...ancestors(node)].some(candidate => hasPresentedOwner(candidate.probe));
+}
+
+function visibleContainer(style: ProbeNode['style']): boolean {
+  const background = style?.backgroundColor;
+  const filled =
+    typeof background === 'number'
+      ? background >>> 24 !== 0
+      : typeof background === 'string' && !TRANSPARENT_COLORS.test(background.trim());
+  const border = style?.borderWidth;
+  return filled || (typeof border === 'number' && border > 0);
+}
+
+export type LayoutNode = {
+  index: number;
+  tag: string;
+  rect: Rect;
+  visibleRect: Rect;
+  probe: ProbeNode;
+  parent?: LayoutNode;
+  children: LayoutNode[];
+  absolute: boolean;
+  clips: boolean;
+  scroll: { x: boolean; y: boolean };
+  isText: boolean;
+  isTextInput: boolean;
+  isControl: boolean;
+  pressable: boolean;
+  hasContainer: boolean;
+  paints: boolean;
+  hasText: boolean;
+  path: string;
+  structuralPath: string;
+  key?: string;
+  ref: ElementRef;
+  /**
+   * Set for a node inside a sheet the platform presents in its own window, which
+   * places `rect` and `layoutRect` in window space. `space` identifies that
+   * window, so two nodes of different spaces never compete for one tap.
+   */
+  presented?: Readonly<{ space: number; dy: number }>;
+};
+
+export type LayoutTree = { env: ProbeEnv; nodes: LayoutNode[]; roots: LayoutNode[] };
+
+export function right(rect: Rect): number {
+  return rect[0] + rect[2];
+}
+
+export function bottom(rect: Rect): number {
+  return rect[1] + rect[3];
+}
+
+export function intersection(a: Rect, b: Rect): Rect {
+  const x = Math.max(a[0], b[0]);
+  const y = Math.max(a[1], b[1]);
+  return [
+    x,
+    y,
+    Math.max(0, Math.min(right(a), right(b)) - x),
+    Math.max(0, Math.min(bottom(a), bottom(b)) - y),
+  ];
+}
+
+export function contains(outer: Rect, inner: Rect, tolerance: number): boolean {
+  return (
+    inner[0] >= outer[0] - tolerance &&
+    inner[1] >= outer[1] - tolerance &&
+    right(inner) <= right(outer) + tolerance &&
+    bottom(inner) <= bottom(outer) + tolerance
+  );
+}
+
+export function ancestors(node: LayoutNode): LayoutNode[] {
+  const result: LayoutNode[] = [];
+  for (let current = node.parent; current; current = current.parent) result.push(current);
+  return result;
+}
+
+/**
+ * A node's frame with every transform removed. A transform moves a node's
+ * descendants and not its own frame, so a parent's `rect` and a child's `rect`
+ * describe different spaces as soon as anything between them is transformed —
+ * a natively presented formSheet translates its whole screen. Comparing boxes
+ * only means something in this space.
+ */
+export function layoutRect(node: LayoutNode): Rect {
+  const box = node.probe.layoutRect;
+  if (!box) return node.rect;
+  if (!node.presented) return box;
+  return [box[0], box[1] + node.presented.dy, box[2], box[3]];
+}
+
+function numeric(style: ProbeNode['style'], ...keys: string[]): number {
+  for (const key of keys) {
+    const value = style?.[key];
+    if (typeof value === 'number') return value;
+  }
+  return 0;
+}
+
+export function contentBox(node: LayoutNode, isRTL: boolean, box: Rect = node.rect): Rect {
+  const style = node.probe.style;
+  const border = numeric(style, 'borderWidth');
+  const top =
+    border +
+    numeric(style, 'paddingTop', 'paddingBlockStart', 'paddingBlock', 'paddingVertical', 'padding');
+  const bottomInset =
+    border +
+    numeric(
+      style,
+      'paddingBottom',
+      'paddingBlockEnd',
+      'paddingBlock',
+      'paddingVertical',
+      'padding'
+    );
+  const leftEdge = isRTL ? 'End' : 'Start';
+  const rightEdge = isRTL ? 'Start' : 'End';
+  const left =
+    border +
+    numeric(
+      style,
+      `paddingInline${leftEdge}`,
+      `padding${leftEdge}`,
+      'paddingLeft',
+      'paddingInline',
+      'paddingHorizontal',
+      'padding'
+    );
+  const rightInset =
+    border +
+    numeric(
+      style,
+      `paddingInline${rightEdge}`,
+      `padding${rightEdge}`,
+      'paddingRight',
+      'paddingInline',
+      'paddingHorizontal',
+      'padding'
+    );
+  const [x, y, width, height] = box;
+  return [
+    x + left,
+    y + top,
+    Math.max(0, width - left - rightInset),
+    Math.max(0, height - top - bottomInset),
+  ];
+}
+
+function hidden(node: ProbeNode): boolean {
+  return (
+    tags.isIgnored(node.tag) ||
+    node.style?.display === 'none' ||
+    node.style?.opacity === 0 ||
+    (tags.isScreen(node.tag) && node.screenState === 0)
+  );
+}
+
+// A native stack keeps every pushed screen mounted and active; only its last screen is on top.
+function coveredScreens(nodes: readonly ProbeNode[]): Set<number> {
+  const lastScreen = new Map<number, number>();
+  const covered = new Set<number>();
+  nodes.forEach((node, index) => {
+    if (!tags.isScreen(node.tag) || node.parent < 0) return;
+    const stack = nodes[node.parent];
+    if (!stack || !tags.isStack(stack.tag)) return;
+    const previous = lastScreen.get(node.parent);
+    if (previous !== undefined) covered.add(previous);
+    lastScreen.set(node.parent, index);
+  });
+  return covered;
+}
+
+function ownerName(node: ProbeNode): string | undefined {
+  return node.owners?.find(owner => !tags.isGenericOwner(owner));
+}
+
+function siblingLabel(node: LayoutNode): string {
+  const siblings = node.parent?.children.filter(child => child.tag === node.tag) ?? [node];
+  return siblings.length > 1 ? `${node.tag}[${siblings.indexOf(node)}]` : node.tag;
+}
+
+function ownerPath(node: LayoutNode): string {
+  const owner = ownerName(node.probe);
+  const chain = [node];
+  if (owner) {
+    for (
+      let current = node.parent;
+      current?.probe.owners?.includes(owner);
+      current = current.parent
+    ) {
+      chain.unshift(current);
+    }
+  }
+  const labels = chain.map(siblingLabel);
+  return owner ? [owner, ...labels].join(' > ') : labels.join(' > ');
+}
+
+function scrollAxes(node: ProbeNode, children: readonly ProbeNode[]): { x: boolean; y: boolean } {
+  if (node.scrollAxes) return node.scrollAxes;
+  const scrolls = tags.isScroll(node.tag) || (node.owners ?? []).slice(0, 1).some(tags.isListOwner);
+  if (!scrolls) return { x: false, y: false };
+  const horizontal =
+    tags.isHorizontalScroll(node.tag) ||
+    children.some(
+      child => child.style?.flexDirection === 'row' || child.style?.flexDirection === 'row-reverse'
+    );
+  return { x: horizontal, y: !horizontal };
+}
+
+/**
+ * Where each sheet the platform presents in its own window really sits, keyed by
+ * probe index.
+ *
+ * On Android `@expo/ui` renders `ModalBottomSheet` as a Material3 dialog, so the
+ * RN children of its `RNHostView` report frames inside that dialog: the sheet
+ * content's top is their origin. The platform anchors the dialog above the
+ * navigation inset, so every frame in the subtree moves down by the difference
+ * between the window and the sheet's own height. A content-sized sheet and a
+ * partial detent both land where the platform paints them, and a full detent,
+ * whose box already spans that area, stays where it is — its content then still
+ * reaches under the status bar, which is exactly what the app pads for.
+ */
+function presentedSheets(
+  nodes: readonly ProbeNode[],
+  env: ProbeEnv
+): Map<number, Readonly<{ space: number; dy: number }>> {
+  const placements = new Map<number, Readonly<{ space: number; dy: number }>>();
+  if (env.platform !== 'android') return placements;
+
+  // Each node's nearest sheet host, itself included, so one pass finds the
+  // subtree a presented sheet owns.
+  const hostOf: number[] = [];
+  nodes.forEach((node, index) => {
+    if (node.tag === SHEET_HOST_TAG) hostOf.push(index);
+    else hostOf.push(node.parent >= 0 ? (hostOf[node.parent] ?? -1) : -1);
+  });
+  const sheets = new Set<number>();
+  nodes.forEach((node, index) => {
+    const host = hostOf[index];
+    if (host >= 0 && node.tag === SHEET_CONTENT_TAG) sheets.add(host);
+  });
+  const anchoredBottom = env.window.height - env.safeArea.bottom;
+  for (const host of sheets) {
+    const dy = Math.max(0, anchoredBottom - nodes[host].rect[3]);
+    placements.set(host, { space: host, dy });
+  }
+  nodes.forEach((_, index) => {
+    const host = hostOf[index];
+    if (host < 0 || host === index) return;
+    const placement = placements.get(host);
+    if (placement) placements.set(index, placement);
+  });
+  return placements;
+}
+
+export function normalize(dump: ProbeDump): LayoutTree {
+  const { env } = dump;
+  const windowRect: Rect = [0, 0, env.window.width, env.window.height];
+  const childrenOf = new Map<number, ProbeNode[]>();
+  dump.nodes.forEach(node => {
+    if (node.parent >= 0)
+      childrenOf.set(node.parent, [...(childrenOf.get(node.parent) ?? []), node]);
+  });
+
+  const placed: (LayoutNode | undefined)[] = [];
+  const dropped = new Set<number>();
+  const effectiveParent: (LayoutNode | undefined)[] = [];
+  const clipOf: Rect[] = [];
+  const nodes: LayoutNode[] = [];
+  const roots: LayoutNode[] = [];
+
+  const covered = coveredScreens(dump.nodes);
+  const presented = presentedSheets(dump.nodes, env);
+  dump.nodes.forEach((probe, index) => {
+    if ((probe.parent >= 0 && dropped.has(probe.parent)) || covered.has(index)) {
+      dropped.add(index);
+      return;
+    }
+    const placement = presented.get(index);
+    const rect: Rect = placement
+      ? [probe.rect[0], probe.rect[1] + placement.dy, probe.rect[2], probe.rect[3]]
+      : probe.rect;
+    const parent =
+      probe.parent >= 0 ? (placed[probe.parent] ?? effectiveParent[probe.parent]) : undefined;
+    const inheritedClip = probe.parent >= 0 ? clipOf[probe.parent] : windowRect;
+    const visibleRect = intersection(rect, inheritedClip);
+    const overflow = probe.style?.overflow;
+    const scroll = scrollAxes(probe, childrenOf.get(index) ?? []);
+    const clips = overflow === 'hidden' || overflow === 'scroll' || scroll.x || scroll.y;
+    const zeroArea = rect[2] <= 0 || rect[3] <= 0;
+    if (hidden(probe) || (zeroArea && clips)) {
+      dropped.add(index);
+      return;
+    }
+    if (zeroArea) {
+      effectiveParent[index] = parent;
+      clipOf[index] = inheritedClip;
+      return;
+    }
+    if (visibleRect[2] <= 0 || visibleRect[3] <= 0) {
+      dropped.add(index);
+      return;
+    }
+    clipOf[index] = clips ? intersection(inheritedClip, rect) : inheritedClip;
+    const isText = tags.isText(probe.tag);
+    const isTextInput = tags.isTextInput(probe.tag);
+    const pressable = probe.pressable === true;
+    const node: LayoutNode = {
+      index,
+      tag: probe.tag,
+      rect,
+      visibleRect,
+      probe,
+      parent,
+      children: [],
+      absolute: probe.style?.position === 'absolute',
+      clips,
+      scroll,
+      isText,
+      isTextInput,
+      isControl: pressable || tags.isControlRole(probe.role),
+      pressable,
+      hasContainer: visibleContainer(probe.style),
+      paints: isText || isTextInput || tags.isGraphic(probe.tag) || visibleContainer(probe.style),
+      hasText: isText || isTextInput,
+      path: '',
+      structuralPath: '',
+      ...(placement ? { presented: placement } : {}),
+      ref: { index, path: '', tag: probe.tag, rect },
+    };
+    placed[index] = node;
+    if (parent) parent.children.push(node);
+    else roots.push(node);
+    nodes.push(node);
+  });
+
+  for (const node of [...nodes].reverse()) {
+    if (node.hasText && node.parent) node.parent.hasText = true;
+  }
+
+  const keyCounts = new Map<string, number>();
+  for (const node of nodes) {
+    node.path = ownerPath(node);
+    node.structuralPath = node.parent
+      ? `${node.parent.structuralPath}/${siblingLabel(node)}`
+      : siblingLabel(node);
+    const { probe } = node;
+    node.ref = {
+      index: node.index,
+      path: node.path,
+      tag: node.tag,
+      ...(probe.owners ? { owners: [...probe.owners] } : {}),
+      ...(probe.text !== undefined ? { text: probe.text } : {}),
+      ...(probe.testID !== undefined ? { testID: probe.testID } : {}),
+      ...(probe.label !== undefined ? { label: probe.label } : {}),
+      rect: node.rect,
+    };
+    const base = probe.testID
+      ? `testID:${probe.testID}`
+      : probe.label
+        ? `label:${probe.label}`
+        : probe.text
+          ? `text:${node.tag}|${ownerName(probe) ?? ''}|${probe.text}`
+          : undefined;
+    if (base) {
+      const seen = keyCounts.get(base) ?? 0;
+      keyCounts.set(base, seen + 1);
+      node.key = seen === 0 ? base : `${base}#${seen}`;
+    }
+  }
+
+  return { env, nodes, roots };
+}

@@ -1,39 +1,36 @@
 import { z } from 'zod';
-import type { Sandbox } from '@cloudflare/sandbox';
 import {
   getSandboxAllocationProvider,
+  normalizeSandboxAllocation,
   type SandboxAllocation,
 } from '@kilocode/worker-utils/sandbox-allocation';
 import {
   classifySandboxId,
-  getSandboxNamespace,
   hashToSandboxId,
   isPlacedSandboxKey,
+  RETIRED_SHARED_SANDBOX_MESSAGE,
   selectDefaultSandboxProvider,
-  sharedSandboxOwnerKey,
   type SandboxIdClass,
   type SandboxSelectionEnv,
 } from './sandbox-id.js';
-import type { AgentSandboxProvider, Env, SandboxId } from './types.js';
+import type { AgentSandboxProvider, SandboxId } from './types.js';
 
 /**
  * What a control-plane sandbox with a neutral `sbx-` key is. The key carries no
  * routing meaning, so session metadata stores the kind and every routing rule
  * reads it from there. Legacy prefixed keys store no kind and keep routing by
  * prefix.
+ *
+ * Every sandbox serves one workspace. `shared` is legacy decode only: stored
+ * metadata of a retired owner-scoped sandbox can still carry it, but no new
+ * session is placed on one ({@link PlacedSandboxKind}).
  */
 export const sandboxKindSchema = z.enum(['isolated', 'isolated-standard', 'code-review', 'shared']);
 
 export type SandboxKind = z.infer<typeof sandboxKindSchema>;
 
-type SandboxNamespaceEnv = Pick<
-  Env,
-  | 'Sandbox'
-  | 'SandboxContainment'
-  | 'SandboxSmallContainment'
-  | 'SandboxCodeReviewContainment'
-  | 'SandboxDIND'
->;
+/** The kinds a new session can be placed on. */
+export type PlacedSandboxKind = Exclude<SandboxKind, 'shared'>;
 
 /**
  * The legacy key class each kind stands in for, so class-based rules (billing
@@ -46,18 +43,10 @@ const KIND_SANDBOX_ID_CLASS: Record<SandboxKind, SandboxIdClass> = {
   shared: 'shared',
 };
 
-/** The contained pool per kind; the same mapping the legacy prefixes encode. */
-const CONTAINED_NAMESPACE = {
-  isolated: 'SandboxSmallContainment',
-  'isolated-standard': 'SandboxContainment',
-  'code-review': 'SandboxCodeReviewContainment',
-  shared: 'SandboxContainment',
-} as const satisfies Record<SandboxKind, keyof SandboxNamespaceEnv>;
-
 export type ControlPlaneSandboxDecision = {
   sandboxId: SandboxId;
   provider: AgentSandboxProvider;
-  sandboxKind: SandboxKind;
+  sandboxKind: PlacedSandboxKind;
 };
 
 /** The one sandbox decision for a new control-plane session: kind, provider and neutral key. */
@@ -66,52 +55,55 @@ export async function selectControlPlaneSandbox(input: {
   sessionId: string;
   userId: string;
   orgId?: string;
-  botId?: string;
   codeReview: boolean;
   sandboxAllocation?: SandboxAllocation;
+  /** The caller's normalized choice; the resolved default never changes the kind. */
+  requestedAllocation?: SandboxAllocation;
 }): Promise<ControlPlaneSandboxDecision> {
-  const sandboxKind = controlPlaneSandboxKind(input);
+  const requestedAllocation =
+    input.requestedAllocation !== undefined
+      ? normalizeSandboxAllocation(input.requestedAllocation)
+      : input.codeReview
+        ? undefined
+        : input.sandboxAllocation;
+  const sandboxKind = controlPlaneSandboxKind({
+    codeReview: input.codeReview,
+    ...(requestedAllocation !== undefined ? { sandboxAllocation: requestedAllocation } : {}),
+  });
   const provider =
-    input.sandboxAllocation === undefined
-      ? selectDefaultSandboxProvider({
-          env: input.env,
-          orgId: input.orgId,
-          userId: input.userId,
-          plane: 'control',
-          isolated: sandboxKind === 'isolated',
-        })
-      : getSandboxAllocationProvider(input.sandboxAllocation);
-  return { sandboxId: await placedSandboxKey(sandboxKind, input), provider, sandboxKind };
+    input.sandboxAllocation !== undefined
+      ? getSandboxAllocationProvider(input.sandboxAllocation)
+      : input.codeReview
+        ? 'cloudflare-containers'
+        : selectDefaultSandboxProvider({
+            env: input.env,
+            orgId: input.orgId,
+            userId: input.userId,
+            isolated: sandboxKind === 'isolated',
+          });
+  return {
+    sandboxId: await hashToSandboxId(`control-isolated-v1:${input.sessionId}`, 'sbx'),
+    provider,
+    sandboxKind,
+  };
 }
 
-/** Sessions are isolated by default; only an explicit shared allocation shares a sandbox. */
+/** One sandbox serves one workspace, so every new session gets its own sandbox. */
 function controlPlaneSandboxKind(input: {
   codeReview: boolean;
   sandboxAllocation?: SandboxAllocation;
-}): SandboxKind {
+}): PlacedSandboxKind {
   const allocation = input.sandboxAllocation;
   if (allocation !== undefined) {
     if (input.codeReview) {
       throw new Error('Sandbox allocations cannot be combined with specialized sandbox routing');
     }
-    if (allocation === 'isolated-standard') {
-      return 'isolated-standard';
+    if (allocation === 'cloudflare-shared') {
+      throw new Error(RETIRED_SHARED_SANDBOX_MESSAGE);
     }
-    return allocation === 'cloudflare-shared' ? 'shared' : 'isolated';
+    return allocation === 'isolated-standard' ? 'isolated-standard' : 'isolated';
   }
   return input.codeReview ? 'code-review' : 'isolated';
-}
-
-function placedSandboxKey(
-  sandboxKind: SandboxKind,
-  input: { sessionId: string; userId: string; orgId?: string; botId?: string }
-): Promise<SandboxId> {
-  return sandboxKind === 'shared'
-    ? hashToSandboxId(
-        `control-shared-v2:${sharedSandboxOwnerKey(input.orgId, input.userId, input.botId)}`,
-        'sbx'
-      )
-    : hashToSandboxId(`control-isolated-v1:${input.sessionId}`, 'sbx');
 }
 
 /** A placed key requires a stored kind; a legacy key has none. */
@@ -133,19 +125,4 @@ export function resolveSandboxIdClass(input: {
   return input.sandboxKind === undefined
     ? classifySandboxId(input.sandboxId)
     : KIND_SANDBOX_ID_CLASS[input.sandboxKind];
-}
-
-/**
- * The Cloudflare Sandbox namespace from the stored kind, or from a legacy key's
- * prefix. A placed key without its kind is rejected by the prefix table.
- */
-export function resolveSandboxNamespace(
-  env: SandboxNamespaceEnv,
-  input: { sandboxId: string; sandboxKind?: SandboxKind; contained: boolean }
-): DurableObjectNamespace<Sandbox> {
-  if (input.sandboxKind === undefined) {
-    return getSandboxNamespace(env, input.sandboxId, { managedScmContainment: input.contained });
-  }
-  // Every non-contained sandbox runs in the standard pool, as for legacy keys.
-  return input.contained ? env[CONTAINED_NAMESPACE[input.sandboxKind]] : env.Sandbox;
 }

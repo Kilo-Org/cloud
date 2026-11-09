@@ -18,6 +18,12 @@ vi.mock('@/components/organization/member-limit-sheet', () => ({
   MemberLimitSheet: 'MemberLimitSheet',
 }));
 
+// The account guard needs the organization provider and the navigation it
+// dismisses; this suite proves the route's param validation only.
+vi.mock('@/lib/hooks/use-leave-stale-organization-scope', () => ({
+  useLeaveStaleOrganizationScope: () => false,
+}));
+
 function findByType(
   root: TestRenderer.ReactTestInstance,
   type: string

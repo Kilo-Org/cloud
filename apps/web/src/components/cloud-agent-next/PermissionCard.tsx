@@ -6,9 +6,7 @@ import { Shield, Loader2 } from 'lucide-react';
 import { useRawTRPCClient } from '@/lib/trpc/utils';
 import { Button } from '@/components/ui/button';
 
-// ---------------------------------------------------------------------------
 // PermissionContext — mirrors QuestionContext pattern
-// ---------------------------------------------------------------------------
 
 type PermissionContextValue = {
   cloudAgentSessionId: string | null;
@@ -45,10 +43,6 @@ export function PermissionContextProvider({
   );
   return <PermissionContext.Provider value={value}>{children}</PermissionContext.Provider>;
 }
-
-// ---------------------------------------------------------------------------
-// PermissionCard
-// ---------------------------------------------------------------------------
 
 type PermissionCardProps = {
   requestId: string;
@@ -111,7 +105,6 @@ export function PermissionCard({
 
   const isAlreadyAllowed = always.includes(permission);
 
-  // Extract command from metadata if present
   const command = typeof metadata.command === 'string' ? metadata.command : null;
 
   return (

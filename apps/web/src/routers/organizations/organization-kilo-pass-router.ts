@@ -20,6 +20,7 @@ import {
   ipCountryFromHeaders,
   ja4FromHeaders,
 } from '@kilocode/web-shared/lib/bouncer/credit-events';
+import { assertChargeAllowed } from '@kilocode/web-shared/lib/bouncer/charge-gate';
 import {
   billingHistoryResponseSchema,
   mapStripeInvoiceToBillingHistoryEntry,
@@ -239,6 +240,13 @@ export const organizationKiloPassRouter = createTRPCRouter({
     .output(CheckoutOutputSchema)
     .mutation(async ({ input, ctx }) => {
       const organization = await getOrganizationById(input.organizationId);
+      await assertChargeAllowed({
+        userId: ctx.user.id,
+        organizationId: input.organizationId,
+        flow: 'kilo_pass',
+        ip: ctx.ip,
+        ja4: ja4FromHeaders(ctx.headersList),
+      });
       try {
         return await organizationKiloPassService.createCheckout(
           { ...input, actorUserId: ctx.user.id },

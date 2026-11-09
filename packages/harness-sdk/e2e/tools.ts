@@ -34,7 +34,7 @@
  *
  * The same line is drawn in `e2e/time.ts`, for the same reason.
  */
-import { Duration, Effect, Layer, Stream } from 'effect';
+import { Duration, Effect, Fiber, Layer, Stream } from 'effect';
 import type { ApiKind } from '../src/core/catalog.js';
 import { said } from '../src/core/model.js';
 import { openSession } from '../src/core/run.js';
@@ -60,7 +60,7 @@ const cityIn = (args: string): string => {
   return found ?? 'Oslo';
 };
 
-const weather = (takes: Duration.DurationInput): Tool => ({
+const weather = (takes: Duration.Input): Tool => ({
   definition: {
     name: 'weather',
     description: 'The weather in one city. Call it once per city.',
@@ -120,14 +120,16 @@ const runShape = async (model: string, kind: ApiKind): Promise<boolean | undefin
     return yield* said(session.ask('What is the weather in Oslo?'));
   });
   const answer = await Effect.runPromise(
-    Effect.either(Effect.scoped(Effect.provide(program, withTools(kind, [weather(0)]))))
+    Effect.result(Effect.scoped(Effect.provide(program, withTools(kind, [weather(0)]))))
   );
 
-  if (answer._tag === 'Left') {
-    console.log(`${kind.padEnd(18)}FAILED    ${JSON.stringify(answer.left)}`);
+  if (answer._tag === 'Failure') {
+    console.log(`${kind.padEnd(18)}FAILED    ${JSON.stringify(answer.failure)}`);
     return undefined;
   }
-  console.log(`${kind.padEnd(18)}${String(ran.length).padEnd(10)}${JSON.stringify(answer.right)}`);
+  console.log(
+    `${kind.padEnd(18)}${String(ran.length).padEnd(10)}${JSON.stringify(answer.success)}`
+  );
   if (ran.length === 0) {
     return false;
   }
@@ -135,7 +137,7 @@ const runShape = async (model: string, kind: ApiKind): Promise<boolean | undefin
      once for one question, and what it wrote is what the model answered with. */
   wrongIf(ran.length !== 1, `${kind}: the tool ran ${String(ran.length)} times for one question`);
   wrongIf(
-    !answer.right.includes('kestrel'),
+    !answer.success.includes('kestrel'),
     `${kind}: the tool ran and the answer did not carry what it said`
   );
   return true;
@@ -154,12 +156,12 @@ const runTogether = async (model: string): Promise<boolean | undefined> => {
     return yield* said(session.ask('What is the weather in Oslo and in Lisbon?'));
   });
   const got = await Effect.runPromise(
-    Effect.either(
+    Effect.result(
       Effect.scoped(Effect.provide(program, withTools('messages', [weather('600 millis')])))
     )
   );
-  if (got._tag === 'Left') {
-    console.log(`\ntwo calls in one turn FAILED ${JSON.stringify(got.left)}`);
+  if (got._tag === 'Failure') {
+    console.log(`\ntwo calls in one turn FAILED ${JSON.stringify(got.failure)}`);
     return undefined;
   }
 
@@ -200,13 +202,13 @@ const runBackgrounded = async (model: string): Promise<boolean | undefined> => {
     });
     /* Watch first: the round the session starts on its own happens whether or
        not anybody is listening, and a late subscriber hears none of it. */
-    const watching = yield* Effect.fork(
+    const watching = yield* Effect.forkChild(
       Effect.timeout(
         Stream.runFold(
           /* One round and no more. The stream itself never ends: it carries
              every round the session ever starts on its own. */
           Stream.takeUntil(session.continued, one => 'failed' in one || one.event.kind === 'done'),
-          '',
+          () => '',
           (held: string, one) =>
             !('failed' in one) && one.event.kind === 'delta' ? held + one.event.text : held
         ),
@@ -218,19 +220,19 @@ const runBackgrounded = async (model: string): Promise<boolean | undefined> => {
         'Ask me for my favourite colour with the question tool, then tell me what I said.'
       )
     );
-    return { first, later: yield* watching.await };
+    return { first, later: yield* Fiber.await(watching) };
   });
 
   const got = await Effect.runPromise(
-    Effect.either(Effect.scoped(Effect.provide(program, withTools('messages', [tool]))))
+    Effect.result(Effect.scoped(Effect.provide(program, withTools('messages', [tool]))))
   );
 
-  if (got._tag === 'Left') {
-    console.log(`\nbackgrounded      FAILED    ${JSON.stringify(got.left)}`);
+  if (got._tag === 'Failure') {
+    console.log(`\nbackgrounded      FAILED    ${JSON.stringify(got.failure)}`);
     return undefined;
   }
 
-  const { first, later } = got.right;
+  const { first, later } = got.success;
   const told = later._tag === 'Success' ? later.value : '';
   console.log(`\nasked, not waited: ${JSON.stringify(first)}`);
   console.log(`told later:        ${JSON.stringify(told)}`);
@@ -267,11 +269,11 @@ const runWanted = async (model: string): Promise<boolean | undefined> => {
       maxTokens: room,
       tools: ['weather'],
     });
-    const watching = yield* Effect.fork(
+    const watching = yield* Effect.forkChild(
       Effect.timeout(
         Stream.runFold(
           Stream.takeUntil(session.continued, one => 'failed' in one || one.event.kind === 'done'),
-          '',
+          () => '',
           (held: string, one) =>
             !('failed' in one) && one.event.kind === 'delta' ? held + one.event.text : held
         ),
@@ -283,21 +285,21 @@ const runWanted = async (model: string): Promise<boolean | undefined> => {
         'What is the weather in Oslo? Do not wait for the tool — tell me you have asked, and I will hear the rest when it answers.'
       )
     );
-    return { first, later: yield* watching.await };
+    return { first, later: yield* Fiber.await(watching) };
   });
 
   const got = await Effect.runPromise(
-    Effect.either(
+    Effect.result(
       Effect.scoped(Effect.provide(program, withTools('messages', [weather('3 seconds')])))
     )
   );
 
-  if (got._tag === 'Left') {
-    console.log(`\nwait: false       FAILED    ${JSON.stringify(got.left)}`);
+  if (got._tag === 'Failure') {
+    console.log(`\nwait: false       FAILED    ${JSON.stringify(got.failure)}`);
     return undefined;
   }
 
-  const { first, later } = got.right;
+  const { first, later } = got.success;
   const told = later._tag === 'Success' ? later.value : '';
   console.log(`\ndid not wait:      ${JSON.stringify(first)}`);
   console.log(`told later:        ${JSON.stringify(told)}`);

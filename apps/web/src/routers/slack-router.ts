@@ -9,6 +9,7 @@ import {
   optionalOrgInput,
 } from '@/lib/integrations/resolve-owner';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import { ORGANIZATION_MANAGE_ROLES } from '@kilocode/app-shared/organizations';
 import { requireActiveSubscriptionOrTrial } from '@kilocode/web-shared/lib/organizations/trial-middleware';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
 import { unlinkTeamKiloUsers } from '@/lib/bot-identity';
@@ -70,7 +71,11 @@ export const slackRouter = createTRPCRouter({
       await ensureOrganizationAccess(ctx, input.organizationId);
       await requireActiveSubscriptionOrTrial(input.organizationId);
     }
-    const owner = await resolveAuthorizedOwner(ctx, input?.organizationId);
+    const owner = await resolveAuthorizedOwner(
+      ctx,
+      input?.organizationId,
+      ORGANIZATION_MANAGE_ROLES
+    );
     const result = await slackService.uninstallApp(owner, {
       deleteChatSdkInstallation: deleteChatSdkSlackInstallation,
       deleteChatSdkIdentityCache: deleteChatSdkSlackIdentityCache,
@@ -113,7 +118,11 @@ export const slackRouter = createTRPCRouter({
         await ensureOrganizationAccess(ctx, input.organizationId);
         await requireActiveSubscriptionOrTrial(input.organizationId);
       }
-      const owner = await resolveAuthorizedOwner(ctx, input.organizationId);
+      const owner = await resolveAuthorizedOwner(
+        ctx,
+        input.organizationId,
+        ORGANIZATION_MANAGE_ROLES
+      );
       const result = await slackService.updateModel(owner, input.modelSlug);
 
       if (input.organizationId) {

@@ -54,6 +54,13 @@ export function buildControlWrapperLaunchEnv(
   }
   return {
     ...diagnosticEnv,
+    // The Vercel node24 snapshot installs Bun and global CLIs in /usr/local/bin.
+    // Supply the runtime path directly instead of reading a snapshot's login profile.
+    ...(input.provider === 'vercel'
+      ? {
+          PATH: '/usr/local/bin:/vercel/runtimes/node24/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin',
+        }
+      : {}),
     ...(input.workloadCgroup ? { CONTROL_WORKLOAD_CGROUP: input.workloadCgroup } : {}),
     SANDBOX_CONTROL_URL: sandboxControlWebSocketUrl(workerUrl, input.sandboxId),
     SANDBOX_CONTROL_CREDENTIAL: input.credential,

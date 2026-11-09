@@ -1,8 +1,11 @@
+import { preinstalledStartup } from './preinstalled-startup.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ContainerConcurrencyLimitError } from '../container-concurrency.js';
+import {
+  ContainerCapacityUnavailableError,
+  ContainerConcurrencyLimitError,
+} from '../container-concurrency.js';
 import {
   parseSandboxBillingInput,
-  type MeteredSandboxInstance,
   type SandboxBillingAdmissionResult,
 } from '../container-usage-context.js';
 import type { SandboxContainers } from '../sandbox-containers/SandboxContainers.js';
@@ -11,7 +14,6 @@ import {
   VercelSandboxRestError,
   type VercelSandboxCreateEnvelope,
 } from '../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
-import { createCloudflareProviderAdapter } from './cloudflare-provider.js';
 import { createCloudflareContainersProviderAdapter } from './cloudflare-containers-provider.js';
 import { createControlPlaneCredential } from './managed-credential.js';
 import { buildControlNetworkPolicy, type SessionCredentialGrant } from './session-credentials.js';
@@ -48,21 +50,7 @@ const config: VercelSandboxRuntimeConfig = {
   extendDurationMs: 60_000,
 };
 
-function cloudflareProvider(
-  kind: 'cloudflare' | 'cloudflare-containers',
-  admit: () => Promise<SandboxBillingAdmissionResult>
-): ProviderAdapter {
-  if (kind === 'cloudflare') {
-    const sandbox: Partial<MeteredSandboxInstance> = {
-      isBillingBlocked: async () => false,
-      ensureBillingAdmission: admit,
-    } satisfies Pick<MeteredSandboxInstance, 'isBillingBlocked' | 'ensureBillingAdmission'>;
-    return createCloudflareProviderAdapter({
-      sandboxId: SANDBOX_ID,
-      getSandbox: () => sandbox as MeteredSandboxInstance,
-      destroy: async () => {},
-    });
-  }
+function cloudflareProvider(admit: () => Promise<SandboxBillingAdmissionResult>): ProviderAdapter {
   const container: object = {
     isBillingBlocked: async () => false,
     ensureBillingAdmission: admit,
@@ -79,11 +67,13 @@ afterEach(() => vi.unstubAllGlobals());
 describe('native egress policy forwarding', () => {
   it.each([
     { egressAllowlist: undefined },
+    { egressAllowlist: undefined, egressAudit: true },
     { egressAllowlist: [] },
     { egressAllowlist: ['agent.example.com', 'github.com'] },
+    { egressAllowlist: ['agent.example.com'], egressAudit: true },
   ])(
     'preserves policy across initial and fallback launch: $egressAllowlist',
-    async ({ egressAllowlist }) => {
+    async ({ egressAllowlist, egressAudit }) => {
       const launchWrapper = vi.fn().mockResolvedValue({ started: true, startSource: 'image' });
       const container = {
         launchWrapper,
@@ -93,23 +83,75 @@ describe('native egress policy forwarding', () => {
         logicalSandboxId: SANDBOX_ID,
         allocationName: SANDBOX_ID,
         egressAllowlist,
+        egressAudit,
         getContainer: () => container as unknown as DurableObjectStub<SandboxContainers>,
       });
       const created = await provider.create({ intentId: 'egress-attempt', createdAt: 0 });
       if ('unresolved' in created) throw new Error('Expected provider reference');
       await provider.launch(created.providerRef, {
-        SANDBOX_CONTROL_URL: 'wss://agent.example.com',
+        command: preinstalledStartup(),
+        env: {
+          SANDBOX_CONTROL_URL: 'wss://agent.example.com',
+        },
       });
-      await provider.launch(created.providerRef, {}, { skipRepository: true });
+      await provider.launch(created.providerRef, { command: preinstalledStartup(), env: {} });
       for (const [input] of launchWrapper.mock.calls) {
         if (egressAllowlist === undefined) expect(input).not.toHaveProperty('egressAllowlist');
         else expect(input.egressAllowlist).toEqual(egressAllowlist);
+        expect(input.egressAudit).toBe(egressAudit);
       }
     }
   );
 });
 
-describe.each(['cloudflare', 'cloudflare-containers'] as const)('%s creation causes', kind => {
+describe('native image forwarding', () => {
+  it.each(['all-in-one', 'runtime-free'] as const)(
+    'forwards the %s image selection to the container start',
+    async nativeImage => {
+      const launchWrapper = vi.fn().mockResolvedValue({ started: true, startSource: 'image' });
+      const container = {
+        launchWrapper,
+        ensureLeaseAtLeast: vi.fn().mockResolvedValue(undefined),
+      };
+      const provider = createCloudflareContainersProviderAdapter({
+        logicalSandboxId: SANDBOX_ID,
+        allocationName: SANDBOX_ID,
+        getContainer: () => container as unknown as DurableObjectStub<SandboxContainers>,
+      });
+      const created = await provider.create({ intentId: 'image-attempt', createdAt: 0 });
+      if ('unresolved' in created) throw new Error('Expected provider reference');
+
+      await provider.launch(
+        created.providerRef,
+        { command: preinstalledStartup(), env: {} },
+        { nativeImage }
+      );
+
+      expect(launchWrapper).toHaveBeenCalledWith(expect.objectContaining({ nativeImage }));
+    }
+  );
+
+  it('omits the image selection when none is supplied', async () => {
+    const launchWrapper = vi.fn().mockResolvedValue({ started: true, startSource: 'image' });
+    const container = {
+      launchWrapper,
+      ensureLeaseAtLeast: vi.fn().mockResolvedValue(undefined),
+    };
+    const provider = createCloudflareContainersProviderAdapter({
+      logicalSandboxId: SANDBOX_ID,
+      allocationName: SANDBOX_ID,
+      getContainer: () => container as unknown as DurableObjectStub<SandboxContainers>,
+    });
+    const created = await provider.create({ intentId: 'image-attempt', createdAt: 0 });
+    if ('unresolved' in created) throw new Error('Expected provider reference');
+
+    await provider.launch(created.providerRef, { command: preinstalledStartup(), env: {} });
+
+    expect(launchWrapper.mock.calls[0]?.[0]).not.toHaveProperty('nativeImage');
+  });
+});
+
+describe('cloudflare-containers creation causes', () => {
   it('retries shadow billing configuration with a fresh handle and unchanged attribution', async () => {
     const error = Object.assign(new Error('Durable Object reset'), { retryable: true });
     const failed = {
@@ -122,18 +164,11 @@ describe.each(['cloudflare', 'cloudflare-containers'] as const)('%s creation cau
       .mockReturnValueOnce(failed)
       .mockReturnValueOnce(failed)
       .mockReturnValue(recovered);
-    const provider =
-      kind === 'cloudflare'
-        ? createCloudflareProviderAdapter({
-            sandboxId: SANDBOX_ID,
-            getSandbox: resolveHandle,
-            destroy: async () => {},
-          })
-        : createCloudflareContainersProviderAdapter({
-            logicalSandboxId: SANDBOX_ID,
-            allocationName: SANDBOX_ID,
-            getContainer: resolveHandle,
-          });
+    const provider = createCloudflareContainersProviderAdapter({
+      logicalSandboxId: SANDBOX_ID,
+      allocationName: SANDBOX_ID,
+      getContainer: resolveHandle,
+    });
 
     await expect(
       provider.create({ ...intent, billing: { ...billing, enforcementRequested: false } })
@@ -158,19 +193,11 @@ describe.each(['cloudflare', 'cloudflare-containers'] as const)('%s creation cau
         isBillingBlocked: async () => false,
         configureBilling,
       }));
-      const provider =
-        kind === 'cloudflare'
-          ? createCloudflareProviderAdapter({
-              sandboxId: SANDBOX_ID,
-              getSandbox: () => resolveHandle() as unknown as MeteredSandboxInstance,
-              destroy: async () => {},
-            })
-          : createCloudflareContainersProviderAdapter({
-              logicalSandboxId: SANDBOX_ID,
-              allocationName: SANDBOX_ID,
-              getContainer: () =>
-                resolveHandle() as unknown as DurableObjectStub<SandboxContainers>,
-            });
+      const provider = createCloudflareContainersProviderAdapter({
+        logicalSandboxId: SANDBOX_ID,
+        allocationName: SANDBOX_ID,
+        getContainer: () => resolveHandle() as unknown as DurableObjectStub<SandboxContainers>,
+      });
 
       await expect(
         provider.create({ ...intent, billing: { ...billing, enforcementRequested: false } })
@@ -181,11 +208,12 @@ describe.each(['cloudflare', 'cloudflare-containers'] as const)('%s creation cau
     }
   );
 
-  it('preserves RPC-wrapped quota denial instead of converting it to a meter outage', async () => {
-    const denial = new Error(
-      `remote RPC: ${new ContainerConcurrencyLimitError('personal', 20).message}`
-    );
-    const provider = cloudflareProvider(kind, async () => {
+  it.each([
+    new ContainerConcurrencyLimitError('personal', 20),
+    new ContainerCapacityUnavailableError(),
+  ])('preserves RPC-wrapped capacity failure: %s', async failure => {
+    const denial = new Error(`remote RPC: ${failure.message}`);
+    const provider = cloudflareProvider(async () => {
       throw denial;
     });
     await expect(provider.create(intent)).rejects.toBe(denial);
@@ -193,7 +221,7 @@ describe.each(['cloudflare', 'cloudflare-containers'] as const)('%s creation cau
   it.each(['insufficient_credits', 'stopping', 'meter_unavailable'] as const)(
     'preserves %s independently of unsafe provider text',
     async code => {
-      const provider = cloudflareProvider(kind, async () => ({
+      const provider = cloudflareProvider(async () => ({
         success: false,
         code,
         message: 'raw-sensitive-provider-detail',
@@ -209,7 +237,7 @@ describe.each(['cloudflare', 'cloudflare-containers'] as const)('%s creation cau
   );
 
   it('does not promote a transport exception containing billing text to insufficient credits', async () => {
-    const provider = cloudflareProvider(kind, async () => {
+    const provider = cloudflareProvider(async () => {
       throw new Error('insufficient credits 402');
     });
     await expect(provider.create(intent)).rejects.toMatchObject({
@@ -224,7 +252,7 @@ describe.each(['cloudflare', 'cloudflare-containers'] as const)('%s creation cau
       code: 'stopping',
       message: 'stopping',
     };
-    const provider = cloudflareProvider(kind, async () => result);
+    const provider = cloudflareProvider(async () => result);
     await expect(provider.create(intent)).rejects.toMatchObject({ code: 'stopping' });
     result = { success: true };
     await expect(provider.create(intent)).resolves.toMatchObject({
@@ -234,7 +262,7 @@ describe.each(['cloudflare', 'cloudflare-containers'] as const)('%s creation cau
 
   it('classifies a locally invalid billing configuration without admitting work', async () => {
     const admit = vi.fn<() => Promise<SandboxBillingAdmissionResult>>();
-    const provider = cloudflareProvider(kind, admit);
+    const provider = cloudflareProvider(admit);
     await expect(
       provider.create({ ...intent, billing: { ...billing, subject: { type: 'user', id: '' } } })
     ).rejects.toMatchObject({
@@ -368,12 +396,10 @@ describe('Vercel runtime metadata', () => {
         readFile: vi.fn<VercelControlRestClient['readFile']>(),
         updateNetworkPolicy: vi.fn<VercelControlRestClient['updateNetworkPolicy']>(),
       };
-      const billingLifetimeSink = vi.fn();
       const provider = createVercelProviderAdapter({
         sandboxName: SANDBOX_ID,
         config,
         restClient,
-        billingLifetimeSink,
         readContainedGrants: async () => [],
       });
       const result =
@@ -413,23 +439,20 @@ describe('Vercel runtime metadata', () => {
       expect(restClient.getSession).not.toHaveBeenCalled();
       if (operation === 'create') {
         expect(restClient.createSandbox).toHaveBeenCalledWith(
-          expect.objectContaining({ snapshotId: config.snapshotId })
+          expect.objectContaining({ source: { type: 'snapshot', snapshotId: config.snapshotId } })
         );
       } else {
         expect(restClient.inspectByName).toHaveBeenCalledWith(
           expect.objectContaining({ snapshotId: config.snapshotId })
         );
       }
-      expect(await provider.launch(providerRef, {})).toEqual({ startSource: 'image' });
+      expect(
+        await provider.launch(providerRef, { command: preinstalledStartup(), env: {} })
+      ).toEqual({ startSource: 'image' });
       expect(restClient.executeCommand).toHaveBeenCalledOnce();
       expect(await provider.observe(providerRef, intent)).toEqual({ status: 'active' });
       expect(await provider.stop(providerRef, intent)).toBe('terminal');
       expect(restClient.stopSession).toHaveBeenCalledOnce();
-      expect(billingLifetimeSink.mock.calls.map(([evidence]) => evidence.providerRef)).toEqual([
-        providerRef,
-        providerRef,
-        providerRef,
-      ]);
       expect(provider.describeRuntime?.(providerRef)?.region).toBe(
         validMetadata ? region : undefined
       );
@@ -517,11 +540,10 @@ describe('Vercel contained-credential policy wiring', () => {
 
   it('creates with unrestricted egress and no credential injections for an empty grant set', async () => {
     const body = (await createBodyFor([])) as {
-      networkPolicy: { allowedDomains: string[]; injectionRules: unknown[] };
+      networkPolicy: unknown;
     };
     expect(body.networkPolicy).toEqual(buildControlNetworkPolicy([]));
-    expect(body.networkPolicy.allowedDomains).toEqual(['*']);
-    expect(body.networkPolicy.injectionRules).toEqual([]);
+    expect(body.networkPolicy).toEqual({ allow: { '*': [] } });
   });
 
   it('never calls the provider when the grants reader fails', async () => {

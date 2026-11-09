@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useId, useRef, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { skipToken, useQuery, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
 import {
   Box,
@@ -18,11 +18,11 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { useTRPC } from '@/lib/trpc/utils';
 import { CLOUD_AGENT_NEXT_WS_URL } from '@kilocode/web-shared/lib/constants';
 import { subscribeSandboxStatus } from './sandbox-status-stream';
 import { cn } from '@/lib/utils';
 import { sandboxStatusPresentation, type SandboxStatusPresentation } from './sandbox-status';
+import { formatSnapshotTime } from './snapshot-display';
 
 const statusBadgeIcons = {
   active: Circle,
@@ -63,6 +63,23 @@ function SandboxStatusDetails({ view }: { view: SandboxStatusPresentation }) {
           )}
         </dl>
       </section>
+      {view.snapshotCapturedAt !== null && (
+        <section className="space-y-2 border-t pt-3">
+          <div className="flex items-baseline justify-between gap-4">
+            <h3 className="text-foreground font-medium">Workspace snapshot</h3>
+            <span className="text-muted-foreground">Local time</span>
+          </div>
+          <dl className="grid grid-cols-[auto_minmax(0,1fr)] items-baseline gap-x-4 gap-y-1.5">
+            <dt className="text-muted-foreground">Captured</dt>
+            <dd className="text-right tabular-nums">
+              <time dateTime={new Date(view.snapshotCapturedAt).toISOString()}>
+                {formatSnapshotTime(view.snapshotCapturedAt)}
+              </time>
+            </dd>
+          </dl>
+          <p className="text-muted-foreground">Shared by all chats in this workspace.</p>
+        </section>
+      )}
       {hasTiming && (
         <section className="space-y-2 border-t pt-3">
           <div className="flex items-baseline justify-between gap-4">
@@ -114,16 +131,21 @@ function SandboxStatusDetails({ view }: { view: SandboxStatusPresentation }) {
 }
 
 export function SandboxStatusIndicator({
+  scopeId,
   cloudAgentSessionId,
   organizationId,
   sessionActive,
 }: {
+  /** Chats of one worktree share its sandbox, so one observation serves all of them. */
+  scopeId: string;
   cloudAgentSessionId: string;
   organizationId?: string;
   sessionActive: boolean;
 }) {
-  const trpc = useTRPC();
   const queryClient = useQueryClient();
+  // Read when a subscription starts: a chat switch in the same sandbox keeps it.
+  const cloudAgentSessionIdRef = useRef(cloudAgentSessionId);
+  cloudAgentSessionIdRef.current = cloudAgentSessionId;
   const [streamHealthy, setStreamHealthy] = useState(false);
   const [observation, setObservation] = useState({
     enabled: false,
@@ -194,15 +216,11 @@ export function SandboxStatusIndicator({
     };
   }, []);
 
-  const queryKey = organizationId
-    ? trpc.organizations.cloudAgentNext.getSandboxStatus.queryKey({
-        organizationId,
-        cloudAgentSessionId,
-      })
-    : trpc.cloudAgentNext.getSandboxStatus.queryKey({ cloudAgentSessionId });
+  const observationKey = ['cloud-agent-sandbox-observation', organizationId ?? null, scopeId];
+  // Filled only by the status stream below, never fetched.
   const query = useQuery<{ snapshot: unknown; requestedAt: number; receivedAt: number }>({
-    queryKey: [...queryKey, 'observation'],
-    enabled: false,
+    queryKey: observationKey,
+    queryFn: skipToken,
     gcTime: 0,
   });
 
@@ -210,15 +228,11 @@ export function SandboxStatusIndicator({
     setStreamHealthy(false);
     if (!observation.enabled) return;
     const controller = new AbortController();
-    const key = organizationId
-      ? trpc.organizations.cloudAgentNext.getSandboxStatus.queryKey({
-          organizationId,
-          cloudAgentSessionId,
-        })
-      : trpc.cloudAgentNext.getSandboxStatus.queryKey({ cloudAgentSessionId });
+    const cloudAgentSessionId = cloudAgentSessionIdRef.current;
+    const key = ['cloud-agent-sandbox-observation', organizationId ?? null, scopeId];
     const getTicket = () =>
-      queryClient.fetchQuery({
-        queryKey: [...key, 'stream-ticket', observation.freshAfter],
+      queryClient.query({
+        queryKey: [...key, cloudAgentSessionId, 'stream-ticket', observation.freshAfter],
         staleTime: 0,
         gcTime: 0,
         retry: 2,
@@ -243,7 +257,7 @@ export function SandboxStatusIndicator({
       onDisconnected: () => setStreamHealthy(false),
       onSnapshot: snapshot => {
         const receivedAt = Date.now();
-        queryClient.setQueryData([...key, 'observation'], {
+        queryClient.setQueryData(key, {
           snapshot,
           requestedAt: receivedAt,
           receivedAt,
@@ -255,14 +269,7 @@ export function SandboxStatusIndicator({
       unsubscribe();
       controller.abort();
     };
-  }, [
-    cloudAgentSessionId,
-    organizationId,
-    observation.enabled,
-    observation.freshAfter,
-    queryClient,
-    trpc,
-  ]);
+  }, [scopeId, organizationId, observation.enabled, observation.freshAfter, queryClient]);
 
   const now = Math.max(clock, Date.now());
   const view = sandboxStatusPresentation({

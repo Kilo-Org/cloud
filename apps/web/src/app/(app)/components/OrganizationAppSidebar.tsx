@@ -11,17 +11,12 @@ import {
   Sliders,
   Sparkles,
   Cable,
-  Rocket,
-  Database,
   Users,
   CreditCard,
   Cloud,
   Key,
   List,
   Shield,
-  Plus,
-  ListChecks,
-  Wrench,
   Webhook,
   Settings,
   MessageSquare,
@@ -29,6 +24,7 @@ import {
   ChevronRight,
   UsersRound,
   Network,
+  ScrollText,
 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
@@ -42,6 +38,7 @@ import SidebarUserFooter from './SidebarUserFooter';
 import { useFeatureFlagEnabled } from 'posthog-js/react';
 import { canManageOrganizationBilling } from '@kilocode/app-shared/organizations';
 import { CHATGPT_ACCESS_FLAG } from '@/lib/auth/openai/access';
+import { useRequestLogsAvailable } from '@/hooks/useRequestLogsAvailable';
 
 type OrganizationAppSidebarProps = React.ComponentProps<typeof Sidebar> & {
   organizationId: string;
@@ -59,11 +56,7 @@ export default function OrganizationAppSidebar({
   const kiloClawNavStateQuery = useOrgKiloClawNavState(organizationId);
 
   // Feature flags
-  const isAutoTriageFeatureEnabled = useFeatureFlagEnabled('auto-triage-feature');
-  const isAppBuilderEnabled = useFeatureFlagEnabled('app-builder-feature');
-  const isDeployEnabled = useFeatureFlagEnabled('deploy-feature');
   const isChatGptSignInEnabled = useFeatureFlagEnabled(CHATGPT_ACCESS_FLAG);
-  const isDevelopment = process.env.NODE_ENV === 'development';
 
   // Get current organization role and data
   const currentOrg = organizationData;
@@ -103,6 +96,8 @@ export default function OrganizationAppSidebar({
 
   const hasOwnerLevelAccess = canManageOrganizationBilling(currentRole);
 
+  const showRequestLogs = useRequestLogsAvailable(organizationId, hasOwnerLevelAccess);
+
   // Dashboard group
   const dashboardItems: Array<{
     title: string;
@@ -129,6 +124,15 @@ export default function OrganizationAppSidebar({
       icon: ChartColumnIncreasing,
       url: `/organizations/${organizationId}/usage-details?view=ai-usage`,
     },
+    ...(showRequestLogs
+      ? [
+          {
+            title: 'Request Logs',
+            icon: ScrollText,
+            url: `/organizations/${organizationId}/request-logs`,
+          },
+        ]
+      : []),
     ...(hasOwnerLevelAccess && currentOrg?.parent_organization_id === null
       ? [
           {
@@ -181,15 +185,6 @@ export default function OrganizationAppSidebar({
     url: string;
     className?: string;
   }> = [
-    ...(isAppBuilderEnabled || isDevelopment
-      ? [
-          {
-            title: 'App Builder',
-            icon: Plus,
-            url: `/organizations/${organizationId}/app-builder`,
-          },
-        ]
-      : []),
     {
       title: 'Cloud Agent',
       icon: Cloud,
@@ -205,16 +200,6 @@ export default function OrganizationAppSidebar({
       icon: Webhook,
       url: `/organizations/${organizationId}/cloud/triggers`,
     },
-    // Gastown requires non-billing_manager role; hide for billing-only users
-    ...(currentRole !== 'billing_manager'
-      ? [
-          {
-            title: 'Gas Town',
-            icon: Bot,
-            url: `/organizations/${organizationId}/gastown`,
-          },
-        ]
-      : []),
     {
       title: 'Code Reviewer',
       icon: Bot,
@@ -225,43 +210,6 @@ export default function OrganizationAppSidebar({
       icon: Shield,
       url: `/organizations/${organizationId}/security-agent`,
     },
-    ...(isAutoTriageFeatureEnabled || isDevelopment
-      ? [
-          {
-            title: 'Auto Triage',
-            icon: ListChecks,
-            url: `/organizations/${organizationId}/auto-triage`,
-          },
-          { title: 'Auto Fix', icon: Wrench, url: `/organizations/${organizationId}/auto-fix` },
-        ]
-      : []),
-    ...(isDeployEnabled || isDevelopment
-      ? [
-          {
-            title: 'Deploy',
-            icon: Rocket,
-            url: `/organizations/${organizationId}/deploy`,
-          },
-        ]
-      : []),
-    ...(organizationData?.settings?.code_indexing_enabled
-      ? [
-          {
-            title: 'Managed Indexing',
-            icon: Database,
-            url: `/organizations/${organizationId}/code-indexing`,
-          },
-        ]
-      : []),
-    ...(user?.is_admin
-      ? [
-          {
-            title: 'MCP Gateway',
-            icon: Cable,
-            url: `/organizations/${organizationId}/cloud/mcp-gateway`,
-          },
-        ]
-      : []),
   ];
 
   // Account group

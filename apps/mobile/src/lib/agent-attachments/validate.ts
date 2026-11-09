@@ -83,7 +83,6 @@ export function mimeForExtension(extension: string): AgentAttachmentMime {
  *   or a bare traversal token (`.` or `..`).
  */
 export function sanitizeAttachmentFilename(raw: string): string {
-  // Strip to basename only — drop any directory prefix
   let sanitized = raw.replace(/^.*[/\\]/, '');
 
   // Strip control characters
@@ -99,7 +98,6 @@ export function sanitizeAttachmentFilename(raw: string): string {
     sanitized = out;
   }
 
-  // Strip any remaining path separators
   sanitized = sanitized.replaceAll('/', '').replaceAll('\\', '');
 
   // Truncate to the byte budget, preserving the extension when
@@ -126,12 +124,10 @@ export function sanitizeAttachmentFilename(raw: string): string {
         sanitized = truncateUtf8(sanitized, AGENT_ATTACHMENT_SAFE_FILENAME_MAX_LENGTH);
       }
     } else {
-      // No parsable extension — truncate the whole string.
       sanitized = truncateUtf8(sanitized, AGENT_ATTACHMENT_SAFE_FILENAME_MAX_LENGTH);
     }
   }
 
-  // If empty, use the safe fallback
   if (sanitized.length === 0) {
     return `file.${AGENT_ATTACHMENT_FALLBACK_EXTENSION}`;
   }

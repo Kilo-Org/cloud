@@ -1,38 +1,69 @@
 import ExpoModulesCore
 
-/// The Expo module the JS side names `KiloAppActions`.
-///
-/// It exists for one handshake: the JS action pipeline registers the dispatcher
-/// that performs the four actions, and the native entry points (the App Intents
-/// on this platform) reach it through `KiloAppActionBridge`. No action logic
-/// lives here, and the bridge is a singleton rather than module state because
-/// an App Intent can run before, or without, a module instance.
+@ExpoModule("KiloAppActions")
 public final class KiloAppActionsModule: Module {
-  public func definition() -> ModuleDefinition {
-    Name("KiloAppActions")
-
-    /// Registers the JS handler that runs an action payload and answers with
-    /// the `AppActionResult`. The return value is the payloads that arrived
-    /// before this call, so the pipeline can run them; on iOS it is always
-    /// empty, because a native run waits for registration instead of parking.
-    ///
-    /// A synchronous `Function`, like Android's, so it runs on the JS thread:
-    /// the bridge hands the dispatcher to the runtime's long-lived objects,
-    /// and the runtime's teardown releases it there. An `AsyncFunction` runs
-    /// on a background queue, where replacing the previous dispatcher
-    /// destroyed a JSI value of a runtime that a reload had already freed.
-    Function("registerAppActionDispatcher") { (dispatcher: JavaScriptValue) throws -> [[String: String]] in
-      // `AppContext.runtime` is a throwing property: it raises `RuntimeLost`
-      // until the runtime exists, which is the same condition as the module
-      // having no app context at all.
-      guard let appContext = self.appContext, let runtime = try? appContext.runtime else {
-        throw ActionDispatcherNotReadyException()
-      }
-      JavaScriptActor.assumeIsolated {
-        KiloAppActionBridge.shared.register(dispatcher: dispatcher, runtime: runtime)
-      }
-      return KiloAppActionBridge.shared.drainParkedPayloads()
+  @JS
+  @JavaScriptActor
+  func registerAppActionDispatcher(dispatcher: consuming JavaScriptValue) throws -> [[String: String]] {
+    guard let appContext, let runtime = try? appContext.runtime else {
+      throw ActionDispatcherNotReadyException()
     }
+    KiloAppActionBridge.shared.register(dispatcher: dispatcher, runtime: runtime)
+    return KiloAppActionBridge.shared.drainParkedPayloads()
+  }
+
+  /// Replaces the session entity catalog. True means the stored bytes changed,
+  /// so the caller can tell a real update from a run that re-published the same
+  /// titles.
+  @JS
+  func replaceSessionCatalog(entries: [KiloSessionCatalogRecord]) -> Bool {
+    KiloSessionCatalogStore.replace(entries.map(\.entry))
+  }
+
+  /// Wipes the session entity catalog. True means there was something to wipe.
+  @JS
+  func clearSessionCatalog() -> Bool {
+    KiloSessionCatalogStore.clear()
+  }
+
+  /// Takes the app lock's terms, so the entity queries stop answering while the
+  /// app sits in the background past the interval the lock allows.
+  ///
+  /// The interval comes from the lock's own owner, so the store cannot drift
+  /// from the interval the app applies to its surface. JavaScript counts in
+  /// milliseconds; the store keeps seconds.
+  @JS
+  func setSessionCatalogLock(enabled: Bool, intervalMs: Double) {
+    KiloSessionCatalogStore.setLock(enabled: enabled, interval: intervalMs / 1000)
+  }
+
+  /// Tells the catalog whether this launch is showing unlocked content.
+  ///
+  /// The store starts closed on every launch, so a launch the system starts to
+  /// answer an App Intent cannot answer with titles the lock keeps from the
+  /// person holding the device, and a saved shortcut still resolves the session
+  /// it names once the app says it is unlocked.
+  @JS
+  func setSessionCatalogVisible(visible: Bool) {
+    KiloSessionCatalogStore.setVisible(visible)
+  }
+
+  /// Publishes the session the app is showing, or clears it. `nil` means no
+  /// session is visible.
+  @JS
+  func setVisibleSession(sessionId: String?) async throws {
+    try await KiloVisibleSessionBridge.publish(sessionId)
+  }
+}
+
+/// One catalog entry, in the shape `src/lib/app-actions/native-bridge.ts`
+/// sends. Mirrors `KiloSessionCatalogEntry`, which owns the stored shape.
+struct KiloSessionCatalogRecord: Record {
+  @Field var id: String = ""
+  @Field var title: String = ""
+
+  var entry: KiloSessionCatalogEntry {
+    KiloSessionCatalogEntry(id: id, title: title)
   }
 }
 

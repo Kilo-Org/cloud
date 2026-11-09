@@ -28,7 +28,7 @@ export function setHideThinking(value: boolean) {
 
 /** The stored hide-thinking value for callers with no React tree (the settings registry). */
 export function getHideThinking(): boolean {
-  return store.get();
+  return store.getRequested();
 }
 
 export function useHideThinkingPreference() {

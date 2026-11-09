@@ -8,6 +8,7 @@ import { SheetHeader } from '@/components/sheet-header';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { Text } from '@/components/ui/text';
+import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
 import { Server } from '@/components/ui/icons';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
@@ -24,6 +25,8 @@ import {
   useChatBackends,
 } from '@/lib/chat/backend-store';
 import { backendTargetId } from '@/lib/chat/backend-target';
+import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
+import { cn } from '@/lib/utils';
 
 import { BackendForm } from './backend-form';
 import {
@@ -41,41 +44,65 @@ export function BackendSettingsControl(selection: ProviderSelection) {
   const { t } = useTranslation();
   const colors = useThemeColors();
   const [visible, setVisible] = useState(false);
+  // The sheet stays mounted until its native dismissal reports, so it never
+  // loses its content mid-animation and paints an empty card.
+  const [mounted, setMounted] = useState(false);
+  // A navigation waits for that report: pushing while the sheet is still on
+  // its way down presents the new screen under an empty, closing sheet.
+  const afterDismiss = useRef<(() => void) | null>(null);
   const close = useCallback(() => {
     setVisible(false);
+  }, []);
+  const closeThen = useCallback((action: () => void) => {
+    afterDismiss.current = action;
+    setVisible(false);
+  }, []);
+  const dismissed = useCallback(() => {
+    setMounted(false);
+    const action = afterDismiss.current;
+    afterDismiss.current = null;
+    action?.();
   }, []);
   return (
     <>
       <Pressable
         onPress={() => {
+          afterDismiss.current = null;
+          setMounted(true);
           setVisible(true);
         }}
         accessibilityRole="button"
         accessibilityLabel={t('modelChat.backends.manage')}
-        className="h-11 w-11 items-center justify-center active:opacity-70"
+        className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
       >
         <Server size={22} color={colors.foreground} />
       </Pressable>
-      <BackendSettingsSheet visible={visible} onClose={close} {...selection} />
+      {mounted ? (
+        <BackendSettingsContent
+          visible={visible}
+          onClose={close}
+          onCloseThen={closeThen}
+          onDismiss={dismissed}
+          {...selection}
+        />
+      ) : null}
     </>
   );
 }
 
-function BackendSettingsSheet({
+function BackendSettingsContent({
   visible,
   onClose,
+  onCloseThen,
+  onDismiss,
   ...selection
-}: Readonly<{ visible: boolean; onClose: () => void }> & ProviderSelection) {
-  if (!visible) {
-    return null;
-  }
-  return <BackendSettingsContent onClose={onClose} {...selection} />;
-}
-
-function BackendSettingsContent({
-  onClose,
-  ...selection
-}: Readonly<{ onClose: () => void }> & ProviderSelection) {
+}: Readonly<{
+  visible: boolean;
+  onClose: () => void;
+  onCloseThen: (action: () => void) => void;
+  onDismiss: () => void;
+}> &
+  ProviderSelection) {
   const { confirm, dialog } = useConfirmDialog();
   const { t } = useTranslation();
   const backends = useChatBackends();
@@ -87,6 +114,18 @@ function BackendSettingsContent({
   );
   const [target, setTarget] = useState<FormTarget | null>(null);
   const [formError, setError] = useState<string | null>(null);
+  const backendDirtyRef = useRef(false);
+  const {
+    requestClose,
+    requestDismiss,
+    dialog: discardDialog,
+  } = useSheetDismissGuard({
+    isDirty: () => backendDirtyRef.current,
+    onDiscard: () => {
+      backendDirtyRef.current = false;
+      setTarget(null);
+    },
+  });
   const epoch = useRef(currentAuthEpoch());
   useEffect(() => {
     if (!isCurrentAuthEpoch(epoch.current)) {
@@ -108,6 +147,7 @@ function BackendSettingsContent({
         addChatBackend(draft);
       }
       setError(null);
+      backendDirtyRef.current = false;
       setTarget(null);
     } catch (error) {
       setError(
@@ -140,7 +180,7 @@ function BackendSettingsContent({
         };
   const providerSelection = { selectedModel: selection.selectedModel, onSelectModel: chooseModel };
   return (
-    <SessionPageSheet visible onClose={onClose}>
+    <SessionPageSheet visible={visible} onClose={onClose} onDismiss={onDismiss}>
       <SheetHeader
         title={t('modelChat.backends.providersTitle')}
         onDone={onClose}
@@ -164,8 +204,9 @@ function BackendSettingsContent({
           <GgufModelSection
             {...providerSelection}
             onBrowse={() => {
-              onClose();
-              router.push('/model-catalog');
+              onCloseThen(() => {
+                router.push('/model-catalog');
+              });
             }}
           />
         </View>
@@ -193,6 +234,7 @@ function BackendSettingsContent({
                     variant="outline"
                     onPress={() => {
                       setError(null);
+                      backendDirtyRef.current = false;
                       setTarget({ kind: 'edit', backend });
                     }}
                   >
@@ -215,6 +257,7 @@ function BackendSettingsContent({
               variant="outline"
               onPress={() => {
                 setError(null);
+                backendDirtyRef.current = false;
                 setTarget({ kind: 'add' });
               }}
             >
@@ -227,14 +270,14 @@ function BackendSettingsContent({
         <SessionPageSheet
           visible
           onClose={() => {
+            backendDirtyRef.current = false;
             setTarget(null);
           }}
+          onRequestDismiss={requestDismiss}
         >
           <SheetHeader
             title={t(target.kind === 'add' ? 'modelChat.backends.add' : 'modelChat.backends.edit')}
-            onDone={() => {
-              setTarget(null);
-            }}
+            onDone={requestClose}
             doneLabel={t('common.close')}
             topInset="ios-page-sheet"
           />
@@ -250,9 +293,13 @@ function BackendSettingsContent({
               }
               backend={target.kind === 'edit' ? target.backend : undefined}
               onSave={save}
+              onDirtyChange={dirty => {
+                backendDirtyRef.current = dirty;
+              }}
             />
             {formError !== null && <Text accessibilityRole="alert">{t(formError)}</Text>}
           </ScrollView>
+          {discardDialog}
         </SessionPageSheet>
       )}
       {dialog}

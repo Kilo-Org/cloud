@@ -125,16 +125,6 @@ const START_OPTIONS = {
   requiresOnDeviceRecognition: false,
 } as const;
 
-/** Let every queued microtask/timer continuation of the engine run. */
-async function flush(): Promise<void> {
-  for (let i = 0; i < 4; i += 1) {
-    // eslint-disable-next-line no-await-in-loop -- each macrotask turn lets the engine's chained continuations settle
-    await new Promise<void>(resolve => {
-      setTimeout(resolve, 0);
-    });
-  }
-}
-
 function deferred(): { promise: Promise<void>; resolve: () => void } {
   let storedResolve: (() => void) | undefined = undefined;
   const promise = new Promise<void>(resolve => {
@@ -168,7 +158,9 @@ describe('gatewayVoiceInputNative recorder construction', () => {
     // false — and false is the native default. Without the pair the gateway
     // recorder never starts on iOS, so every gateway session dies at start.
     gatewayVoiceInputNative.start(START_OPTIONS);
-    await flush();
+    await vi.waitFor(() => {
+      expect(vi.mocked(setAudioModeAsync)).toHaveBeenCalled();
+    });
 
     expect(vi.mocked(setAudioModeAsync)).toHaveBeenCalledWith({
       allowsRecording: true,
@@ -179,11 +171,15 @@ describe('gatewayVoiceInputNative recorder construction', () => {
   it('constructs the recorder with the same shared options on iOS and Android', async () => {
     platformMock.OS = 'ios';
     gatewayVoiceInputNative.start(START_OPTIONS);
-    await flush();
+    await vi.waitFor(() => {
+      expect(recorderBox.calls).toHaveLength(1);
+    });
 
     platformMock.OS = 'android';
     gatewayVoiceInputNative.start(START_OPTIONS);
-    await flush();
+    await vi.waitFor(() => {
+      expect(recorderBox.calls).toHaveLength(2);
+    });
 
     expect(recorderBox.calls).toHaveLength(2);
     // One implementation for both platforms: the construction options are
@@ -213,9 +209,11 @@ describe('gatewayVoiceInputNative recorder construction', () => {
       platformMock.OS = os;
 
       gatewayVoiceInputNative.start(START_OPTIONS);
-      await flush();
+      await vi.waitFor(() => {
+        expect(recorderBox.instances).toHaveLength(1);
+        expect(recorderBox.instances[0]?.preparedWith).toBe(HIGH_QUALITY);
+      });
 
-      expect(recorderBox.instances).toHaveLength(1);
       // Identity: the binding passes the shared preset object through to the
       // shimmed prototype method, which applies the platform record on both.
       expect(recorderBox.instances[0]?.preparedWith).toBe(HIGH_QUALITY);

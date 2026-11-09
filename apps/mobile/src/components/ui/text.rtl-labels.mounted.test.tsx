@@ -1,9 +1,13 @@
-import { createElement, type ReactElement } from 'react';
-import { act, TestRenderer } from '@/test/renderer';
+import { createElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { Text } from '@/components/ui/text';
+import {
+  hostText,
+  mountTextTree,
+  unmountTextTree,
+} from '@/components/ui/text.mounted.test-helpers';
 
 const i18nManager = vi.hoisted(() => ({ isRTL: false }));
 vi.mock('react-native', () => ({
@@ -11,21 +15,6 @@ vi.mock('react-native', () => ({
   Text: 'Text',
 }));
 vi.mock('@rn-primitives/slot', () => ({ Text: 'Slot.Text' }));
-
-let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
-function mount(element: ReactElement) {
-  act(() => {
-    renderer = TestRenderer.create(element);
-  });
-  if (!renderer) {
-    throw new Error('Missing text renderer');
-  }
-  return renderer.root;
-}
-
-function hostText(root: TestRenderer.ReactTestInstance) {
-  return root.find(node => Object.is(node.type, 'Text'));
-}
 
 const ARABIC = 'الجلسات الجارية الآن';
 // U+0870–U+089F, Arabic Extended-B: Arabic-script characters outside the
@@ -42,14 +31,13 @@ beforeEach(() => {
   i18nManager.isRTL = false;
 });
 afterEach(() => {
-  act(() => renderer?.unmount());
-  renderer = undefined;
+  unmountTextTree();
 });
 
 describe('Text eyebrow in an RTL interface', () => {
   it('drops the mono family and letter spacing from an Arabic label', () => {
     i18nManager.isRTL = true;
-    const label = hostText(mount(createElement(Text, { variant: 'eyebrow' }, ARABIC)));
+    const label = hostText(mountTextTree(createElement(Text, { variant: 'eyebrow' }, ARABIC)));
     const classes = (label.props.className as string).split(' ');
 
     expect(classes.some(token => token.startsWith('font-mono'))).toBe(false);
@@ -61,7 +49,9 @@ describe('Text eyebrow in an RTL interface', () => {
 
   it('drops the mono family and letter spacing from an Extended-B-only label', () => {
     i18nManager.isRTL = true;
-    const label = hostText(mount(createElement(Text, { variant: 'eyebrow' }, ARABIC_EXTENDED_B)));
+    const label = hostText(
+      mountTextTree(createElement(Text, { variant: 'eyebrow' }, ARABIC_EXTENDED_B))
+    );
     const classes = (label.props.className as string).split(' ');
 
     expect(classes.some(token => token.startsWith('font-mono'))).toBe(false);
@@ -71,7 +61,7 @@ describe('Text eyebrow in an RTL interface', () => {
 
   it('drops the mono family and letter spacing from a Hebrew label', () => {
     i18nManager.isRTL = true;
-    const label = hostText(mount(createElement(Text, { variant: 'eyebrow' }, HEBREW)));
+    const label = hostText(mountTextTree(createElement(Text, { variant: 'eyebrow' }, HEBREW)));
     const classes = (label.props.className as string).split(' ');
 
     expect(classes.some(token => token.startsWith('font-mono'))).toBe(false);
@@ -83,17 +73,19 @@ describe('Text eyebrow in an RTL interface', () => {
 
   it('keeps the tracked mono design for a Latin label', () => {
     i18nManager.isRTL = true;
-    const label = hostText(mount(createElement(Text, { variant: 'eyebrow' }, LATIN)));
+    const label = hostText(mountTextTree(createElement(Text, { variant: 'eyebrow' }, LATIN)));
     const classes = (label.props.className as string).split(' ');
 
     expect(classes).toContain('font-mono-medium');
     expect(classes).toContain('tracking-[1.5px]');
-    expect(label.props.style).toEqual([{ writingDirection: 'rtl' }, undefined, undefined]);
+    const style = label.props.style as ({ letterSpacing?: number } | undefined)[];
+    expect(style).toContainEqual({ writingDirection: 'rtl' });
+    expect(style.filter(entry => entry?.letterSpacing)).toEqual([]);
   });
 
   it('drops the mono family and adds the reset for Arabic in an LTR interface', () => {
     i18nManager.isRTL = false;
-    const label = hostText(mount(createElement(Text, { variant: 'eyebrow' }, ARABIC)));
+    const label = hostText(mountTextTree(createElement(Text, { variant: 'eyebrow' }, ARABIC)));
     const classes = (label.props.className as string).split(' ');
 
     // Neither rule is the interface's: the script cannot take the tracking and
@@ -104,7 +96,7 @@ describe('Text eyebrow in an RTL interface', () => {
 
   it('applies the same rule to the Eyebrow wrapper', () => {
     i18nManager.isRTL = true;
-    const label = hostText(mount(createElement(Eyebrow, null, ARABIC)));
+    const label = hostText(mountTextTree(createElement(Eyebrow, null, ARABIC)));
     const classes = (label.props.className as string).split(' ');
 
     expect(classes.some(token => token.startsWith('font-mono'))).toBe(false);

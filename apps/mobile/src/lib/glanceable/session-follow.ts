@@ -5,7 +5,7 @@ import {
   type SessionLiveActivityContentState,
   sessionLiveActivityRelevance,
   type SessionLiveActivityRow,
-} from '@kilocode/notifications';
+} from '@kilocode/notifications/schemas';
 
 import type * as AndroidFollow from '@/glanceable-android/session-follow';
 import type * as IosFollow from '@/glanceable-ios/session-follow';
@@ -208,7 +208,7 @@ export const restoreFollowedSessionsFromStorage = async (): Promise<boolean> => 
   return known;
 };
 
-/** Android only: a dismissed notification is an Unfollow (spec "Android: actions" 3). */
+/** Android only: a dismissed notification is an Unfollow (spec "Android: actions" 4). */
 export const unfollowDismissedSession = async (sessionId: string): Promise<void> => {
   if (Platform.OS === 'android') {
     await android().unfollowDismissedSession(sessionId);

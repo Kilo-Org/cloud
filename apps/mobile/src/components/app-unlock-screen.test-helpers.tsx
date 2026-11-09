@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- Use the repository's DOM-free mounted renderer; one shared harness mocks every native module the five layouts reach. */
-import { createElement, type ElementType, type ReactElement, useState } from 'react';
+import { createElement, type ElementType, type ReactElement, useEffect, useState } from 'react';
 import { type AppStateStatus } from 'react-native';
 import { act, type ReactTestInstance } from '@/test/renderer';
 import { expect, vi } from 'vitest';
@@ -136,6 +136,10 @@ vi.mock('react-native', () => ({
   Switch: 'Switch',
   ActivityIndicator: 'ActivityIndicator',
   Platform: platform,
+  useColorScheme: () => 'light',
+  BackHandler: {
+    addEventListener: vi.fn(() => ({ remove: vi.fn() })),
+  },
   useWindowDimensions: () => ({ fontScale: 1, width: 390, height: 844, scale: 3 }),
   StatusBar: { currentHeight: 0 },
   I18nManager: { isRTL: false },
@@ -168,6 +172,13 @@ vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }
 vi.mock('@/components/centered-state-surface', () => ({
   NativeStateSurface: ({ children }: { children: ReactElement }) => children,
   StateSurface: 'StateSurface',
+}));
+// The (app) layout's screenLayout is the covered-screen gate; the fake Scene
+// the Stack mock below mounts passes the scene straight through, so the unlock
+// wrapper stays the only hidden/visible surface under test.
+vi.mock('@/components/app-screen-layout', () => ({
+  // Same call shape as production: the layout receives the scene props object.
+  appScreenLayout: (props: { children: ReactElement }) => unlockScene(props.children),
 }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/icons', () => ({
@@ -203,9 +214,15 @@ vi.mock('expo-router', () => ({
     { Screen: 'StackScreen' }
   ),
   useRouter: () => ({ push: vi.fn() }),
+  useNavigation: () => ({ isFocused: () => true, addListener: () => () => undefined }),
   usePathname: () => route.pathname,
   useLocalSearchParams: () => ({ owner: 'owner', repo: 'repo', number: '1', scope: 'personal' }),
   useSegments: () => route.segments,
+  // The General settings screen retires its attempt feedback on blur; the
+  // announcement suites keep it focused, so the cleanup never runs here.
+  useFocusEffect: (effect: Parameters<typeof useEffect>[0]) => {
+    useEffect(effect, [effect]);
+  },
 }));
 vi.mock('@expo/react-native-action-sheet', () => ({ ActionSheetProvider: 'ActionSheetProvider' }));
 vi.mock('@rn-primitives/portal', () => ({ PortalHost: 'PortalHost' }));
@@ -232,6 +249,12 @@ vi.mock('@/lib/glanceable/mount', () => ({ GlanceablePublisherMount: () => null 
 // like the glanceable mount — and the stub keeps its `expo` root import (which
 // needs `__DEV__` and a native binding) out of this DOM-free harness.
 vi.mock('@/components/launcher-surfaces-mount', () => ({ LauncherSurfacesMount: () => null }));
+// The briefing mount reads tRPC and the native SQLCipher dismissal journal
+// (expo-crypto needs `__DEV__` and a native binding), so it is a null mount in
+// this DOM-free harness.
+vi.mock('@/components/agent-briefing/briefing-sync-mount', () => ({
+  BriefingSyncMount: () => null,
+}));
 vi.mock('@/lib/organization-context', () => ({ OrganizationProvider: 'OrganizationProvider' }));
 vi.mock('@/components/offline-banner', () => ({ OfflineBanner: 'OfflineBanner' }));
 vi.mock('@/lib/query-client-lifecycle', () => ({
@@ -272,6 +295,7 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 vi.mock('@/lib/hooks/use-current-user-id', () => ({ useCurrentUserId: () => ({ userId: null }) }));
 vi.mock('@/lib/form-sheet', () => ({
   useFormSheetDetents: () => ({ fullSheetDetent: 1 }),
+  useSheetHeaderTopClearance: () => 0,
   useFormSheetScreenOptions: () => ({
     presentation: 'formSheet',
     sheetAllowedDetents: [0.5, 1],
@@ -280,7 +304,10 @@ vi.mock('@/lib/form-sheet', () => ({
     sheetShouldOverflowTopInset: true,
   }),
 }));
-vi.mock('@/lib/hooks/use-route-foreground-refresh', () => ({ useRouteForegroundRefresh: vi.fn() }));
+vi.mock('@/lib/hooks/use-route-foreground-refresh', () => ({
+  useRouteForegroundRefresh: vi.fn(),
+  useAppWideForegroundRefresh: vi.fn(),
+}));
 vi.mock('@/lib/hooks/use-security-lifecycle-invalidation', () => ({
   useSecurityLifecycleInvalidation: vi.fn(),
 }));
@@ -333,6 +360,11 @@ vi.mock('@/components/security-agent/security-agent-command-observer', () => ({
   SecurityAgentCommandObserver: 'SecurityAgentCommandObserver',
 }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
+// `(app)/_layout` names this boundary in `unstable_settings`; the harness only
+// needs the module to load, not the fallback's own providers.
+vi.mock('@/components/screen-error-boundary', () => ({
+  ScreenErrorBoundary: 'ScreenErrorBoundary',
+}));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
 vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: 'ConfigureRow' }));
 vi.mock('@/components/ui/segmented-control', () => ({ SegmentedControl: 'SegmentedControl' }));
@@ -439,9 +471,23 @@ export function expectFeedback(root: ReactTestInstance, message: string, copies:
   );
 }
 
+/**
+ * The scene navigation the layouts' `screenLayout` receives. The unlock
+ * surfaces under test read focus and state events; a layout that repairs the
+ * Stack it belongs to (the Security Agent group's dashboard) reads a Stack
+ * that already has its parent, so its repair no-ops here.
+ */
+const SCENE_NAVIGATION = {
+  isFocused: () => true,
+  addListener: () => () => undefined,
+  getState: () => ({ index: 0, routes: [{ key: 'index', name: 'index' }] }),
+  reset: () => undefined,
+};
+
 export function unlockScene(children: ReactElement, layout = appUnlockScreenLayout) {
-  const props = { children };
-  return layout(props as Parameters<typeof appUnlockScreenLayout>[0]);
+  const props = { children, navigation: SCENE_NAVIGATION };
+  // The harness supplies the props these layouts read, not the whole scene.
+  return layout(props as unknown as Parameters<typeof appUnlockScreenLayout>[0]);
 }
 
 export function nestedUnlockScenes(children: ReactElement) {

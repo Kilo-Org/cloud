@@ -2,12 +2,14 @@ import {
   fitCallbackJobToQueueLimit,
   type CallbackJobQueueFitResult,
 } from '../../callbacks/queue-payload.js';
+import { isWorkspaceCallbackTargetUrl } from '@kilocode/worker-utils/cloud-agent-authority';
+import { createMessageId, isCanonicalMessageId } from '../../session/message-id.js';
 import type { CallbackJob, CallbackTarget } from '../../callbacks/types.js';
 import { renderRecentActivity } from '../../callbacks/recent-activity.js';
 import { logger } from '../../logger.js';
 import type { SessionMetadata } from '../../persistence/session-metadata.js';
 import { projectTerminalClientError } from '../../session/terminal-error-projector.js';
-import type { LatestAssistantMessage } from '../../session/types.js';
+import type { AssistantAnswer } from '../../callbacks/assistant-answer.js';
 import { messageFailureText } from './failure-messages.js';
 import type { SessionMessage } from './messages.js';
 import { projectSettledMessageFailure, type ControlPlaneReportFacts } from './reports.js';
@@ -26,25 +28,23 @@ export type PendingCallbackJob = {
 };
 
 /**
- * Terminal callback outbox for the new plane (plan B5). Adapted from the legacy
- * `message-callbacks.ts`: it reads the new `SessionMessage` row and never
- * imports the legacy message model. One job per drained batch, keyed by the
- * representative terminal message id.
+ * Terminal callback outbox. One job per drained batch, keyed by the
+ * representative terminal message ID.
  */
 export type MessageCallbacksDependencies = {
   storage: CallbackStorage;
   getMetadata: () => SessionMetadata | null;
   getCallbackQueue: () => CallbackQueue | undefined;
-  getAssistantMessageForUserMessage: (
+  getAssistantAnswerForUserMessage: (
     sessionId: string,
     kiloSessionId: string,
     parentMessageId: string
-  ) => LatestAssistantMessage | null;
-  getRecentAssistantMessagesForUserMessage: (
+  ) => AssistantAnswer | null;
+  getRecentAssistantAnswersForUserMessage: (
     sessionId: string,
     kiloSessionId: string,
     parentMessageId: string
-  ) => LatestAssistantMessage[];
+  ) => AssistantAnswer[];
 };
 
 export type MessageCallbacks = {
@@ -89,6 +89,12 @@ function isCallbackJob(value: unknown): value is CallbackJob {
   }
   const payload = value.payload;
   return (
+    (!isWorkspaceCallbackTargetUrl(value.target.url) ||
+      (isRecord(value.parentSession) &&
+        typeof value.parentSession.userId === 'string' &&
+        value.parentSession.userId.length > 0 &&
+        typeof value.parentSession.messageId === 'string' &&
+        isCanonicalMessageId(value.parentSession.messageId))) &&
     typeof payload.sessionId === 'string' &&
     typeof payload.cloudAgentSessionId === 'string' &&
     (payload.executionId === undefined || typeof payload.executionId === 'string') &&
@@ -125,16 +131,6 @@ function callbackKey(messageId: string): string {
   return `${CALLBACK_OUTBOX_PREFIX}${messageId}`;
 }
 
-function extractAssistantText(message: LatestAssistantMessage): string | undefined {
-  const pieces: string[] = [];
-  for (const part of message.parts) {
-    if (part.type !== 'text' || typeof part.text !== 'string' || part.text.length === 0) continue;
-    pieces.push(part.text);
-  }
-  const text = pieces.join('').trim();
-  return text || undefined;
-}
-
 function callbackStatus(message: SessionMessage): CallbackJob['payload']['status'] | undefined {
   if (message.state === 'completed') return 'completed';
   if (message.state === 'failed') return 'failed';
@@ -165,8 +161,8 @@ export function createMessageCallbacks(
     storage,
     getMetadata,
     getCallbackQueue,
-    getAssistantMessageForUserMessage,
-    getRecentAssistantMessagesForUserMessage,
+    getAssistantAnswerForUserMessage,
+    getRecentAssistantAnswersForUserMessage,
   } = dependencies;
   let repairInFlight: Promise<void> | undefined;
 
@@ -185,14 +181,12 @@ export function createMessageCallbacks(
     let recentActivity: string | undefined;
     if (status === 'completed' && kiloSessionId) {
       try {
-        const assistantMessage = getAssistantMessageForUserMessage(
+        const answer = getAssistantAnswerForUserMessage(
           sessionId,
           kiloSessionId,
           message.messageId
         );
-        lastAssistantMessageText = assistantMessage
-          ? extractAssistantText(assistantMessage)
-          : undefined;
+        lastAssistantMessageText = answer?.text.trim() || undefined;
       } catch {
         lastAssistantMessageText = undefined;
         logger
@@ -201,7 +195,7 @@ export function createMessageCallbacks(
       }
       try {
         recentActivity = renderRecentActivity(
-          getRecentAssistantMessagesForUserMessage(sessionId, kiloSessionId, message.messageId)
+          getRecentAssistantAnswersForUserMessage(sessionId, kiloSessionId, message.messageId)
         );
       } catch {
         logger
@@ -212,7 +206,7 @@ export function createMessageCallbacks(
     // The classification is derived from the message alone; settlement facts
     // only enrich it (workspace subtype, assistant reason, provider ownership).
     // Every terminal callback carries the structured failure, matching the
-    // legacy plane's `projectSafeFailure(state)`.
+    // shared safe-failure projection.
     const failure = projectSettledMessageFailure(message, facts ?? {});
     // A workspace subtype carries a specific cause ("Repository clone timed
     // out"); the generic control reason would hide it from receivers that match
@@ -224,6 +218,9 @@ export function createMessageCallbacks(
 
     return {
       target: structuredClone(target),
+      ...(isWorkspaceCallbackTargetUrl(target.url)
+        ? { parentSession: { userId: metadata.identity.userId, messageId: createMessageId() } }
+        : {}),
       payload: {
         sessionId,
         cloudAgentSessionId: sessionId,

@@ -1,8 +1,6 @@
-import { createAgentSandbox } from '../agent-sandbox/factory.js';
-import { AgentSandboxUnavailableError, type AgentSandbox } from '../agent-sandbox/protocol.js';
-import type { WrapperHealthResponse, WrapperPty } from '../kilo/wrapper-client.js';
-import type { CloudAgentSessionState, OperationResult } from '../persistence/types.js';
-import type { Env } from '../types.js';
+import type { SessionMetadata } from '../persistence/session-metadata.js';
+import { isControlSession } from '../session-identity.js';
+import { isInteractiveSessionOrigin } from '../shared/control-plane-permission.js';
 
 const TERMINAL_SESSION_PLATFORMS = new Set(['cloud-agent', 'cloud-agent-web', 'slack']);
 
@@ -10,90 +8,14 @@ export function isTerminalSessionPlatform(platform: string | undefined): boolean
   return platform !== undefined && TERMINAL_SESSION_PLATFORMS.has(platform);
 }
 
-export function validateTerminalMetadata(
-  metadata: CloudAgentSessionState | null,
-  sessionId: string
-): OperationResult<{ metadata: CloudAgentSessionState }> {
-  if (!metadata) {
-    return { success: false, error: 'Session not found' };
-  }
-
-  if (metadata.identity.sessionId !== sessionId) {
-    return { success: false, error: 'Invalid terminal session' };
-  }
-
-  if (!metadata.lifecycle.preparedAt || !metadata.workspace?.workspacePath) {
-    return {
-      success: false,
-      error: 'Terminal is only available after the workspace is prepared',
-    };
-  }
-
-  if (!isTerminalSessionPlatform(metadata.identity.createdOnPlatform)) {
-    return {
-      success: false,
-      error: 'Terminal is only available for interactive Cloud Agent sessions',
-    };
-  }
-
-  return { success: true, data: { metadata } };
-}
-
-export type TerminalWrapperClient = {
-  health(): Promise<WrapperHealthResponse>;
-  listTerminals(): Promise<WrapperPty[]>;
-  createTerminal(size?: { cols: number; rows: number }): Promise<WrapperPty>;
-  resizeTerminal(ptyId: string, size: { cols: number; rows: number }): Promise<WrapperPty>;
-  closeTerminal(ptyId: string): Promise<{ success: boolean }>;
-  connectTerminal(ptyId: string, request: Request): Promise<Response>;
-};
-
-type ResolveTerminalWrapperDeps = {
-  createSandbox(env: Env, metadata: CloudAgentSessionState): AgentSandbox;
-};
-
-const defaultDeps: ResolveTerminalWrapperDeps = {
-  createSandbox: createAgentSandbox,
-};
-
-export async function resolveTerminalWrapperClient(
-  params: {
-    env: Env;
-    metadata: CloudAgentSessionState | null;
-    sessionId: string;
-  },
-  deps: ResolveTerminalWrapperDeps = defaultDeps
-): Promise<OperationResult<{ client: TerminalWrapperClient }>> {
-  const metadataResult = validateTerminalMetadata(params.metadata, params.sessionId);
-  if (!metadataResult.success || !metadataResult.data) {
-    return { success: false, error: metadataResult.error };
-  }
-
-  let terminal: Awaited<ReturnType<AgentSandbox['getRunningTerminalClient']>>;
-  try {
-    terminal = await deps
-      .createSandbox(params.env, metadataResult.data.metadata)
-      .getRunningTerminalClient();
-  } catch (error) {
-    if (error instanceof AgentSandboxUnavailableError) {
-      return { success: false, error: error.message };
-    }
-    throw error;
-  }
-  if (terminal.status === 'capability-unavailable') {
-    return { success: false, error: terminal.message };
-  }
-  if (terminal.status === 'not-running') {
-    return {
-      success: false,
-      error: 'Terminal is unavailable because the session wrapper is not running',
-    };
-  }
-  if (terminal.status === 'unhealthy') {
-    return {
-      success: false,
-      error: 'Terminal is unavailable because the session wrapper is not healthy',
-    };
-  }
-  return { success: true, data: { client: terminal.client } };
+export function isTerminalSessionEligible(metadata: SessionMetadata): boolean {
+  const platform = metadata.identity.createdOnPlatform;
+  return (
+    isTerminalSessionPlatform(platform) ||
+    (isInteractiveSessionOrigin(platform) &&
+      isControlSession(metadata.identity.sessionId) &&
+      metadata.workspace?.worktreeId !== undefined &&
+      metadata.workspace.sandboxId !== undefined &&
+      metadata.workspace.sandboxProvider !== undefined)
+  );
 }

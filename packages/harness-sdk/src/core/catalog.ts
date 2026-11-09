@@ -41,10 +41,9 @@ interface ModelCatalogService {
   readonly facts: (model: string) => Effect.Effect<ModelFacts, CatalogError>;
 }
 
-class ModelCatalog extends Context.Tag('harness/ModelCatalog')<
-  ModelCatalog,
-  ModelCatalogService
->() {}
+class ModelCatalog extends Context.Service<ModelCatalog, ModelCatalogService>()(
+  'harness/ModelCatalog'
+) {}
 
 export type { ApiKind, ModelCatalogService, ModelFacts };
 export { CatalogError, ModelCatalog };

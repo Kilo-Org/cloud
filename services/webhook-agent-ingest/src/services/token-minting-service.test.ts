@@ -3,17 +3,21 @@ import { verifyKiloBearerAgainstCurrentPepper } from '@kilocode/worker-utils/kil
 import { createRuntimeAuthorization } from '@kilocode/worker-utils/runtime-authorization';
 import { TokenMintingService } from './token-minting-service.js';
 
-const { findUserForToken, organizationExists, ensureBotUserForOrg } = vi.hoisted(() => ({
-  findUserForToken: vi.fn(),
-  organizationExists: vi.fn(),
-  ensureBotUserForOrg: vi.fn(),
-}));
+const { findUserForToken, organizationExists, ensureBotUserForOrg, isDirectOrgMember } = vi.hoisted(
+  () => ({
+    findUserForToken: vi.fn(),
+    organizationExists: vi.fn(),
+    ensureBotUserForOrg: vi.fn(),
+    isDirectOrgMember: vi.fn(),
+  })
+);
 
 vi.mock('../db/queries.js', () => ({
   getWorkerDb: vi.fn(() => ({})),
   findUserForToken,
   organizationExists,
   ensureBotUserForOrg,
+  isDirectOrgMember,
 }));
 
 const secret = 'test-secret-at-least-thirty-two-characters';
@@ -38,6 +42,8 @@ describe('webhook token minting', () => {
     findUserForToken.mockReset();
     organizationExists.mockReset();
     ensureBotUserForOrg.mockReset();
+    isDirectOrgMember.mockReset();
+    isDirectOrgMember.mockResolvedValue(true);
     findUserForToken.mockResolvedValue({
       id: 'user-1',
       api_token_pepper: 'current-pepper',
@@ -105,6 +111,91 @@ describe('webhook token minting', () => {
 
     expect(claims).not.toHaveProperty('aud');
     expect(claims).not.toHaveProperty('organizationId');
+  });
+
+  it.each([undefined, false, true])(
+    'always mints modern creator assertions with org billing and no bot for flag %s',
+    async enabled => {
+      const organizationId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+      findUserForToken.mockResolvedValue({
+        id: 'oauth/creator',
+        api_token_pepper: 'creator-pepper',
+        blocked_at: null,
+        blocked_reason: null,
+      });
+      const result = await service(enabled).mintToken({
+        orgId: organizationId,
+        executionUserId: 'oauth/creator',
+        triggerId: 'trigger-1',
+      });
+
+      expect(result).toMatchObject({ userId: 'oauth/creator', isBot: false });
+      expect(decodeJwt(result.token)).toMatchObject({
+        kiloUserId: 'oauth/creator',
+        organizationId,
+        apiTokenPepper: 'creator-pepper',
+        aud: 'cloud-agent-next',
+        runtimeAdmission: {
+          source: 'automation',
+          authorizationUserId: 'oauth/creator',
+          authorizationPepper: 'creator-pepper',
+        },
+      });
+      expect(decodeJwt(result.token)).not.toHaveProperty('botId');
+      expect(isDirectOrgMember).toHaveBeenCalledWith(
+        expect.anything(),
+        organizationId,
+        'oauth/creator'
+      );
+      expect(ensureBotUserForOrg).not.toHaveBeenCalled();
+    }
+  );
+
+  it('revalidates direct membership before every creator token mint without bot fallback', async () => {
+    const mintingService = service(true);
+    const input = {
+      orgId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      executionUserId: 'user-1',
+      triggerId: 'trigger-1',
+    };
+    await mintingService.mintToken(input);
+    isDirectOrgMember.mockResolvedValue(false);
+
+    await expect(mintingService.mintToken(input)).rejects.toThrow(
+      'no longer a direct organization member'
+    );
+    expect(isDirectOrgMember).toHaveBeenCalledTimes(2);
+    expect(organizationExists).toHaveBeenCalledTimes(2);
+    expect(findUserForToken).toHaveBeenCalledTimes(2);
+    expect(ensureBotUserForOrg).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { blocked_at: '2026-10-21T00:00:00Z', blocked_reason: null },
+    { blocked_at: null, blocked_reason: 'account deleted' },
+  ])('rejects blocked or soft-deleted creators', async disabled => {
+    findUserForToken.mockResolvedValue({ id: 'user-1', api_token_pepper: 'pepper', ...disabled });
+    await expect(
+      service(true).mintToken({ orgId: 'org-1', executionUserId: 'user-1', triggerId: 'trigger-1' })
+    ).rejects.toThrow('blocked or deleted');
+    expect(ensureBotUserForOrg).not.toHaveBeenCalled();
+  });
+
+  it('rejects a missing creator or inactive organization without bot fallback', async () => {
+    const input = { orgId: 'org-1', executionUserId: 'user-1', triggerId: 'trigger-1' };
+    findUserForToken.mockResolvedValue(null);
+    await expect(service().mintToken(input)).rejects.toThrow('user not found');
+    organizationExists.mockResolvedValue(false);
+    await expect(service().mintToken(input)).rejects.toThrow('organization not found or deleted');
+    expect(ensureBotUserForOrg).not.toHaveBeenCalled();
+  });
+
+  it('rejects creator identity on a personal trigger', async () => {
+    await expect(
+      service().mintToken({ userId: 'user-1', executionUserId: 'user-1', triggerId: 'trigger-1' })
+    ).rejects.toThrow('requires an organization trigger');
+    expect(findUserForToken).not.toHaveBeenCalled();
+    expect(ensureBotUserForOrg).not.toHaveBeenCalled();
   });
 
   it.each([

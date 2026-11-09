@@ -1,15 +1,23 @@
+/* eslint-disable max-lines -- one cohesive mirror suite: read fencing, write ordering, and the scope gate the mirror feeds */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   buildGlanceableSnapshot,
+  buildOpaqueScopeKey,
   type GlanceableAgentsSnapshot,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
+import { EMPTY_HOME_WIDGET_DETAILS } from '@kilocode/app-shared/home-widget';
 
+import { ACTIVE_USER_ID_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
+
+import { getLastHomeWidgetData } from './home-widget-data';
 import {
+  _flushGlanceableMirrorForTests,
   _resetGlanceablePersistForTests,
   _setGlanceableRestoreUnavailableForTests,
   _setLastGlanceableSnapshotForTests,
   _setSecureStoreForTests,
+  getGlanceableSnapshotForSignedInScope,
   getLastGlanceableSnapshot,
   getLocalScopeKey,
   isGlanceableRestoreSettled,
@@ -22,20 +30,28 @@ import {
 const NOW = 1_750_000_000_000;
 const SNAPSHOT_KEY = 'glanceable-snapshot';
 const SCOPE_KEY = 'glanceable-scope-key';
+const HOME_WIDGET_DATA_KEY = 'home-widget-data';
+const details = EMPTY_HOME_WIDGET_DETAILS;
 
 const store = new Map<string, string>();
 
 // Fake SecureStore surface backed by an in-memory Map, injected through the
 // test-only setter so the durable mirror never loads the real native module.
+// The defaults are re-installed per case: a case that holds a write open must
+// not leak its implementation into the next one.
+const defaultSetItem = async (key: string, value: string) => {
+  store.set(key, value);
+  await Promise.resolve();
+};
+
+const defaultGetItem = async (key: string): Promise<string | null> => {
+  await Promise.resolve();
+  return store.get(key) ?? null;
+};
+
 const secureStoreMock = {
-  setItemAsync: vi.fn(async (key: string, value: string) => {
-    store.set(key, value);
-    await Promise.resolve();
-  }),
-  getItemAsync: vi.fn(async (key: string) => {
-    await Promise.resolve();
-    return store.get(key) ?? null;
-  }),
+  setItemAsync: vi.fn(defaultSetItem),
+  getItemAsync: vi.fn(defaultGetItem),
 };
 
 function snapshotFor(sessions: { status: string }[]): GlanceableAgentsSnapshot {
@@ -60,14 +76,31 @@ function deferred(): { promise: Promise<void>; resolve: () => void } {
   };
 }
 
+/**
+ * A JS restart: a fresh module instance with no in-memory state reads the
+ * SecureStore the previous process wrote. The dynamic import is the point:
+ * a static import would keep the instance the test already published through,
+ * so only a re-import after `resetModules` starts from an empty module state.
+ */
+async function restartPersistModule() {
+  vi.resetModules();
+  const fresh = await import('./persist');
+  fresh._setSecureStoreForTests(secureStoreMock);
+  return fresh;
+}
+
 beforeEach(() => {
   _resetGlanceablePersistForTests();
   _setSecureStoreForTests(secureStoreMock);
   store.clear();
   vi.clearAllMocks();
+  secureStoreMock.setItemAsync.mockImplementation(defaultSetItem);
+  secureStoreMock.getItemAsync.mockImplementation(defaultGetItem);
 });
 
-afterEach(() => {
+afterEach(async () => {
+  // Let a queued mirror write land before the next case clears the map.
+  await _flushGlanceableMirrorForTests();
   _resetGlanceablePersistForTests();
   store.clear();
 });
@@ -136,12 +169,38 @@ describe('restorePersistedGlanceable', () => {
     const stored = snapshotFor([{ status: 'busy' }]);
     store.set(SNAPSHOT_KEY, JSON.stringify(stored));
     store.set(SCOPE_KEY, stored.scopeKey);
+    store.set(ACTIVE_USER_ID_KEY, 'u1');
 
     await restorePersistedGlanceable();
 
     expect(getLastGlanceableSnapshot()).toEqual(stored);
     expect(getLocalScopeKey()).toBe(stored.scopeKey);
     expect(isGlanceableRestoreUnavailable()).toBe(false);
+  });
+
+  it('leaves the scope unconfirmed for a record of another account', async () => {
+    const stored = snapshotFor([{ status: 'busy' }]);
+    store.set(SNAPSHOT_KEY, JSON.stringify(stored));
+    store.set(SCOPE_KEY, stored.scopeKey);
+    store.set(ACTIVE_USER_ID_KEY, 'u2');
+
+    await restorePersistedGlanceable();
+
+    // The record still seeds the revision the next publisher must outrank, but
+    // it never becomes this process's scope: the drawn frame and the
+    // waiting-ask fence both key off that one value.
+    expect(getLastGlanceableSnapshot()).toEqual(stored);
+    expect(getLocalScopeKey()).toBeNull();
+  });
+
+  it('leaves the scope unconfirmed when no account is signed in', async () => {
+    const stored = snapshotFor([{ status: 'busy' }]);
+    store.set(SNAPSHOT_KEY, JSON.stringify(stored));
+
+    await restorePersistedGlanceable();
+
+    expect(getLastGlanceableSnapshot()).toEqual(stored);
+    expect(getLocalScopeKey()).toBeNull();
   });
 
   it('flags an unreadable mirror so a caller can tell it from an absent record', async () => {
@@ -266,6 +325,7 @@ describe('restorePersistedGlanceable', () => {
     const { newestResultKind: _kind, newestResultAt: _at, ...previousRelease } = stored;
     store.set(SNAPSHOT_KEY, JSON.stringify(previousRelease));
     store.set(SCOPE_KEY, stored.scopeKey);
+    store.set(ACTIVE_USER_ID_KEY, 'u1');
 
     await restorePersistedGlanceable();
 
@@ -275,5 +335,211 @@ describe('restorePersistedGlanceable', () => {
       newestResultAt: null,
     });
     expect(getLocalScopeKey()).toBe(stored.scopeKey);
+  });
+
+  it('does not clobber a publish that lands during the legacy scope-key read', async () => {
+    const scopeKey = buildOpaqueScopeKey({ userId: 'u1', organizationId: null });
+    const otherScope = buildOpaqueScopeKey({ userId: 'u2', organizationId: null });
+    store.set(SCOPE_KEY, scopeKey);
+    store.set(ACTIVE_USER_ID_KEY, 'u1');
+    secureStoreMock.getItemAsync.mockImplementation((key: string) => {
+      const value = store.get(key) ?? null;
+      if (key === SCOPE_KEY) {
+        // The live publish lands after the identity read and while the legacy
+        // entry is being read.
+        persistGlanceableSink.publish({ ...snapshotFor([]), scopeKey: otherScope });
+      }
+      return Promise.resolve(value);
+    });
+
+    await restorePersistedGlanceable();
+
+    // The publish owns the scope, the same as one that lands during either
+    // earlier read of the restore.
+    expect(getLocalScopeKey()).toBe(otherScope);
+  });
+
+  // The previous release stored the snapshot and the scope key as two records.
+  // An install that upgrades with that pair on disk must still restore, and the
+  // record's own scope key is what a restart uses from then on.
+  it('restores a record the previous release wrote as two keys', async () => {
+    const stored = snapshotFor([{ status: 'busy' }]);
+    store.set(SNAPSHOT_KEY, JSON.stringify(stored));
+    store.set(SCOPE_KEY, stored.scopeKey);
+    store.set(ACTIVE_USER_ID_KEY, 'u1');
+
+    const restarted = await restartPersistModule();
+    await restarted.restorePersistedGlanceable();
+
+    expect(restarted.getLastGlanceableSnapshot()).toEqual(stored);
+    expect(restarted.getLocalScopeKey()).toBe(stored.scopeKey);
+  });
+
+  it('fills the scope from a legacy key the signed-in account confirms', async () => {
+    const scopeKey = buildOpaqueScopeKey({ userId: 'u1', organizationId: null });
+    store.set(SCOPE_KEY, scopeKey);
+    store.set(ACTIVE_USER_ID_KEY, 'u1');
+
+    const restarted = await restartPersistModule();
+    await restarted.restorePersistedGlanceable();
+
+    expect(restarted.getLastGlanceableSnapshot()).toBeNull();
+    expect(restarted.getLocalScopeKey()).toBe(scopeKey);
+  });
+
+  // The entry names the scope the previous release published for, not the one
+  // holding the device now: an account that does not match leaves this process
+  // without a scope, which is what every reader of it fails closed on.
+  it('does not fill the scope from a legacy key the account does not confirm', async () => {
+    store.set(SCOPE_KEY, 'legacy-scope');
+    store.set(ACTIVE_USER_ID_KEY, 'u1');
+
+    const restarted = await restartPersistModule();
+    await restarted.restorePersistedGlanceable();
+
+    expect(restarted.getLastGlanceableSnapshot()).toBeNull();
+    expect(restarted.getLocalScopeKey()).toBeNull();
+  });
+
+  it('restores the Home-widget record on the signed-in scope', async () => {
+    const stored = snapshotFor([{ status: 'busy' }]);
+    store.set(SNAPSHOT_KEY, JSON.stringify(stored));
+    store.set(SCOPE_KEY, stored.scopeKey);
+    store.set(HOME_WIDGET_DATA_KEY, JSON.stringify({ snapshot: stored, details: details }));
+    store.set(ACTIVE_USER_ID_KEY, 'u1');
+
+    await restorePersistedGlanceable();
+
+    // The record is adopted only when its scope is the signed-in one.
+    expect(getLastHomeWidgetData()).toMatchObject({ snapshot: { scopeKey: stored.scopeKey } });
+  });
+
+  it('leaves a Home-widget record of another scope unadopted', async () => {
+    const stored = snapshotFor([{ status: 'busy' }]);
+    store.set(SNAPSHOT_KEY, JSON.stringify(stored));
+    store.set(SCOPE_KEY, stored.scopeKey);
+    store.set(HOME_WIDGET_DATA_KEY, JSON.stringify({ snapshot: stored, details: details }));
+    store.set(ACTIVE_USER_ID_KEY, 'u2');
+
+    await restorePersistedGlanceable();
+
+    // The glanceable record still restores: its revision and scope feed the
+    // fences the signed-in context verifies before it writes anything.
+    expect(getLastGlanceableSnapshot()).toEqual(stored);
+    expect(getLastHomeWidgetData()).toBeNull();
+  });
+
+  it('draws a record on the signed-in scope and only on the signed-in scope', async () => {
+    const stored = snapshotFor([{ status: 'busy' }]);
+    store.set(SNAPSHOT_KEY, JSON.stringify(stored));
+
+    store.set(ACTIVE_USER_ID_KEY, 'u1');
+    await restorePersistedGlanceable();
+    expect(getGlanceableSnapshotForSignedInScope()).toEqual(stored);
+
+    _resetGlanceablePersistForTests();
+    _setSecureStoreForTests(secureStoreMock);
+    store.set(ACTIVE_USER_ID_KEY, 'u2');
+    await restorePersistedGlanceable();
+    // The revision still seeds the next publisher, but no surface draws it.
+    expect(getLastGlanceableSnapshot()).toEqual(stored);
+    expect(getGlanceableSnapshotForSignedInScope()).toBeNull();
+  });
+
+  it('leaves the Home-widget record unadopted when the identity is unreadable', async () => {
+    const stored = snapshotFor([{ status: 'busy' }]);
+    store.set(SNAPSHOT_KEY, JSON.stringify(stored));
+    store.set(SCOPE_KEY, stored.scopeKey);
+    store.set(HOME_WIDGET_DATA_KEY, JSON.stringify({ snapshot: stored, details: details }));
+    secureStoreMock.getItemAsync.mockImplementation(key =>
+      key === ACTIVE_USER_ID_KEY
+        ? Promise.reject(new Error('keychain locked'))
+        : Promise.resolve(store.get(key) ?? null)
+    );
+
+    await restorePersistedGlanceable();
+
+    // An unreadable identity is "unknown", never a match; the mirror itself
+    // still read, so it is not reported as unavailable.
+    expect(getLastHomeWidgetData()).toBeNull();
+    expect(isGlanceableRestoreUnavailable()).toBe(false);
+  });
+});
+
+describe('mirror writes', () => {
+  // A publish is fire-and-forget, so without a chain the slow happy frame can
+  // reach SecureStore after the terminal blank that replaced it, and the next
+  // JS restart brings back a state the user already left.
+  it('leaves the later blank on disk when an earlier publish is still writing', async () => {
+    const gate = deferred();
+    let writes = 0;
+    secureStoreMock.setItemAsync.mockImplementation(async (key: string, value: string) => {
+      writes += 1;
+      if (writes === 1) {
+        // The happy frame's write is slow: it settles only after the terminal
+        // blank has been published.
+        await gate.promise;
+      }
+      store.set(key, value);
+    });
+
+    const happy = snapshotFor([{ status: 'busy' }]);
+    const blank = buildGlanceableSnapshot({
+      sessions: [],
+      userId: 'u1',
+      organizationId: null,
+      now: NOW + 1,
+      status: 'signed_out',
+    });
+
+    persistGlanceableSink.publish(happy);
+    persistGlanceableSink.publish(blank);
+    gate.resolve();
+    await _flushGlanceableMirrorForTests();
+
+    expect(JSON.parse(store.get(SNAPSHOT_KEY) ?? 'null')).toMatchObject({
+      status: 'signed_out',
+    });
+
+    const restarted = await restartPersistModule();
+    await restarted.restorePersistedGlanceable();
+
+    expect(restarted.getLastGlanceableSnapshot()).toEqual(blank);
+    // A terminal key never equals a signed-in scope's, so the record names no
+    // scope this process may act for: the surfaces draw its blank copy only
+    // while it is the frame this process published.
+    expect(restarted.getLocalScopeKey()).toBeNull();
+  });
+
+  // One record per publish carries both facts, so a restart can never pair one
+  // publish's snapshot with another publish's scope key.
+  it('restores the snapshot and the scope key of the same publish', async () => {
+    const first = buildGlanceableSnapshot({
+      sessions: [{ status: 'busy' }],
+      userId: 'u1',
+      organizationId: 'org-1',
+      now: NOW,
+    });
+    const second = buildGlanceableSnapshot({
+      sessions: [{ status: 'busy' }],
+      userId: 'u1',
+      organizationId: 'org-2',
+      now: NOW + 1,
+    });
+    expect(second.scopeKey).not.toBe(first.scopeKey);
+
+    persistGlanceableSink.publish(first);
+    persistGlanceableSink.publish(second);
+    await _flushGlanceableMirrorForTests();
+
+    // The device holds the org the last publish wrote.
+    store.set(ACTIVE_USER_ID_KEY, 'u1');
+    store.set(ORGANIZATION_STORAGE_KEY, 'org-2');
+
+    const restarted = await restartPersistModule();
+    await restarted.restorePersistedGlanceable();
+
+    expect(restarted.getLastGlanceableSnapshot()).toEqual(second);
+    expect(restarted.getLocalScopeKey()).toBe(second.scopeKey);
   });
 });

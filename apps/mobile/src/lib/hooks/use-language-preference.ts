@@ -27,13 +27,13 @@ const store = createSecureStorePreference<LanguagePreference>({
 
 /** The active language: the stored override, or the resolved device language. */
 export function getResolvedLanguage(): SupportedLanguage {
-  const preference = store.get();
+  const preference = store.getRequested();
   return preference === 'device' ? resolveDeviceLanguage() : preference;
 }
 
 /** The raw stored preference (device or a supported tag). */
 export function getLanguagePreference(): LanguagePreference {
-  return store.get();
+  return store.getRequested();
 }
 
 /** Apply and persist a preference; returns false when the disk write failed. */

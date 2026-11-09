@@ -143,7 +143,7 @@ describe('deletion intake', () => {
     expect(parsePylonTicket('')).toBeNull();
   });
 
-  it('refuses CSA blocked relay emails and allows staff domains', () => {
+  it('refuses support relay emails and allows staff domains', () => {
     const result = previewDeletionTargets([
       { email: 'hi@app.kilocode.ai' },
       { email: 'user@service.usepylon.com' },

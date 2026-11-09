@@ -1,15 +1,20 @@
+import type { CloudSessionMessagesWirePage } from '@kilocode/cloud-agent-sdk/schemas';
 import {
   type KiloSdkMessageHistory,
   type KiloSdkMessageHistoryPage,
   type KiloSessionId,
+  type CloudAgentSessionId,
+  type PreparationAttempt,
   type SessionSnapshotPage,
   type SessionSnapshotPageOutcome,
 } from '@kilocode/cloud-agent-sdk';
+import { cloudSessionMessagesPageWireSchema } from '@kilocode/cloud-agent-sdk/schemas';
 
 type SessionMessagesPageResult = {
   kiloSessionId: string;
   history: KiloSdkMessageHistory | null;
   watermarkEventId?: number | null;
+  preparationAttempts?: PreparationAttempt[];
 };
 
 export type SessionPageTrpcClient = {
@@ -19,6 +24,42 @@ export type SessionPageTrpcClient = {
     };
   };
 };
+
+type CloudSessionPageInput = {
+  sessionId: string;
+  kiloSessionId?: string;
+  cursor?: string;
+  limit?: number;
+};
+
+export type CloudSessionPageTrpcClient = {
+  cloudAgentNext: {
+    getSessionMessagesPage: { query: (input: CloudSessionPageInput) => Promise<unknown> };
+  };
+  organizations: {
+    cloudAgentNext: {
+      getSessionMessagesPage: {
+        query: (input: CloudSessionPageInput & { organizationId: string }) => Promise<unknown>;
+      };
+    };
+  };
+};
+
+export async function fetchWebCloudSessionSnapshotPage(
+  trpcClient: CloudSessionPageTrpcClient,
+  sessionId: CloudAgentSessionId,
+  options: { organizationId?: string; kiloSessionId?: string; cursor?: string; limit?: number }
+): Promise<CloudSessionMessagesWirePage> {
+  const { organizationId, ...pageOptions } = options;
+  const input = { sessionId, ...pageOptions };
+  const result = organizationId
+    ? await trpcClient.organizations.cloudAgentNext.getSessionMessagesPage.query({
+        ...input,
+        organizationId,
+      })
+    : await trpcClient.cloudAgentNext.getSessionMessagesPage.query(input);
+  return cloudSessionMessagesPageWireSchema.parse(result);
+}
 
 function isHistoryPage(history: KiloSdkMessageHistory): history is KiloSdkMessageHistoryPage {
   return 'messages' in history && Array.isArray(history.messages);
@@ -35,6 +76,12 @@ export async function fetchWebSessionSnapshotPage(
   });
 
   const history = result.history;
+  const pageState = {
+    ...(result.watermarkEventId != null ? { watermarkEventId: result.watermarkEventId } : {}),
+    ...(result.preparationAttempts?.length
+      ? { preparationAttempts: result.preparationAttempts }
+      : {}),
+  };
   if (history === null) {
     return {
       kind: 'success',
@@ -42,7 +89,7 @@ export async function fetchWebSessionSnapshotPage(
       messages: [],
       nextCursor: null,
       omittedItemCount: 0,
-      ...(result.watermarkEventId != null ? { watermarkEventId: result.watermarkEventId } : {}),
+      ...pageState,
     };
   }
 
@@ -53,7 +100,7 @@ export async function fetchWebSessionSnapshotPage(
       messages: history.messages as SessionSnapshotPage['messages'],
       nextCursor: history.nextCursor,
       omittedItemCount: history.omittedItemCount,
-      ...(result.watermarkEventId != null ? { watermarkEventId: result.watermarkEventId } : {}),
+      ...pageState,
     };
   }
 

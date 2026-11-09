@@ -1,6 +1,6 @@
 ---
 name: kilo-mcp
-description: Use when working with the Kilo MCP server, the kilo_search and kilo_call tools, or when deciding which Kilo API area covers a task. Covers the search-then-call sequence, the query/mutation kind split and the mutation safety rule, the retry rule after an ambiguous transport error, and every area of services/kilo-mcp/catalog.json with its query and mutation counts. Generated from that catalog — read the catalog for current detail.
+description: Use when working with the Kilo MCP server, its general kilo_search and kilo_call tools, or its parent-scoped child-session tools. Covers model ID discovery, child workspace launches and callbacks, API discovery, query/mutation safety.
 ---
 
 <!--
@@ -13,12 +13,14 @@ Then regenerate:
 
 # Kilo MCP
 
-The Kilo MCP server exposes the Kilo API through two tools, `kilo_search` and
-`kilo_call`.
+General account connections expose the Kilo API through two tools, `kilo_search`
+and `kilo_call`. Parent-scoped Cloud Agent connections instead expose the dedicated
+child-session tools described below. Use the tool names published by your client;
+it may prefix them with the MCP server name.
 
 The changes are recorded in `services/kilo-mcp/CHANGELOG.md`.
 
-## How to use it
+## General API connections
 
 1. **Search first.** `kilo_search` finds catalog endpoints. Never call a path from memory, and never guess one from this skill.
 2. **Call one path.** `kilo_call` takes a `path` from the catalog and an `input` that satisfies that row's `inputSchema`. A path outside the catalog and an input that violates the schema are rejected before any request is made.
@@ -32,9 +34,59 @@ an admin guard carries `admin: true`; an opted-in admin connection also gets
 and `submit_otp`, which runs it once the user approves with their authenticator
 code. A row whose top segment is `debug` carries `debug: true`.
 
-The catalog is `services/kilo-mcp/catalog.json`. This skill is generated from
-it, and the catalog wins when the two disagree — read the catalog, not this
-file, for current detail.
+The catalog at `services/kilo-mcp/catalog.json` is authoritative.
+Read it for current endpoint details.
+
+## Parent-scoped child sessions
+
+These connections publish `search_models`, `generate_message_id`, `spawn_session`,
+`list_child_sessions`, `get_session`, `get_message_result`, `send_message`, `interrupt_session`,
+`list_environments`, `list_folders`, and `assign_workspace_to_folder`.
+They do not expose API `search` or `call`.
+
+1. Launch only when the user explicitly requests a Cloud Agent session. Children have independent sandboxes/worktrees; use local tools for this worktree.
+2. Resolve the requested model or established user preference with `search_models`; copy its exact `id`. Otherwise browse with `{}` and ask the user to choose. No implicit default: `isPreferred` is a recommendation. Omit `variant` unless requested; pass only a supported variant separately. Never guess or substitute IDs. `alias_target` names a floating alias's target; discovery does not prove policy approval.
+3. Call `spawn_session` with repository, self-contained task prompt, mode, exact model ID, and fresh UUID `operationKey`. Include constraints, verification, and Git/PR instructions. It starts immediately with multi-chat support. Organization and `createdOnPlatform` are inherited, not caller inputs.
+4. Set `callbackTarget` to `{"url":"workspace:new-chat"}` (parent workspace) or `{"url":"workspace:<session-id>"}` (this chat); omit for none. Prefer callbacks.
+5. `list_child_sessions` recovers IDs and `initialMessageId` when recorded; `get_session` checks status; `get_message_result` reads outcomes. Before a new authorized follow-up, call `generate_message_id({})` and copy its `messageId` into `send_message`. This generates no work. Retain it for retries; never replace it after an uncertain send. Initial tasks use `initialMessageId`; report if absent, never invent it. Admission, queued/running, and missing results are not completion. `interrupt_session` is for authorized Stop.
+6. `list_folders` discovers existing folder IDs, not workspace membership. Use `assign_workspace_to_folder` with `folderId` and the child's `cloudAgentSessionId`/`worktreeId` from listing or status. It files the whole worktree, including sibling chats; `folderId: null` unfiles it. Only this parent's child workspaces are movable. Folder creation, editing, deletion, and reordering are unavailable.
+7. After an ambiguous mutation failure, reconcile state before retrying. Keep the same `operationKey` or follow-up `messageId` for that same submission.
+8. Omitted `autoCommit` requests no automatic commit/push; follow-ups do not inherit it. Set `true` per authorized message. If publication is forbidden, set `false` and prohibit it in the prompt: `false` cannot restrict agent Git tools or cancel another prompt's request. Request PR creation in the prompt.
+9. Use `list_environments({repository:{platform:"github",fullName:"owner/repo"}})` for scoped summaries. Pass a returned `id` as `spawn_session.requestedEnvironment.id`; never guess IDs.
+
+Callbacks return to the canonical parent workspace. Manage only direct children,
+never the parent. No grandchildren.
+
+### Examples
+
+Pseudocode; `modelId` comes from `search_models`; `launchUuid` is a fresh retained UUID.
+
+```js
+const child = await spawn_session({
+  githubRepo: 'owner/repo', model: modelId, mode: 'code',
+  prompt: 'Fix the bug, run focused tests, and report. Do not commit, push, or create a PR.',
+  operationKey: launchUuid, autoCommit: false,
+  callbackTarget: { url: 'workspace:new-chat' },
+});
+```
+
+After the callback, retrieve `initialMessageId` via `list_child_sessions` and pass
+it with `child.cloudAgentSessionId` to `get_message_result`. Authorized follow-up:
+
+```js
+const { messageId } = await generate_message_id({});
+await send_message({
+  cloudAgentSessionId: child.cloudAgentSessionId, messageId,
+  payload: { type: 'prompt', prompt: followUpTask, mode: 'code', model: modelId },
+  autoCommit: false,
+});
+```
+
+After the callback, or as one bounded check:
+
+```js
+await get_message_result({ cloudAgentSessionId: child.cloudAgentSessionId, messageId });
+```
 
 ## Reporting feedback and bugs
 
@@ -49,73 +101,58 @@ to send platform feedback and bug reports rather than a support channel.
 ## Areas
 
 The first path segment names an area. Search to learn an area's vocabulary:
-each row's `summary` and `tags` are what the search matches.
+each row's `summary` and `tags` are what the search matches. Some areas also
+exist as an org-scoped mirror under `organizations`, for example
+`organizations.kiloclaw`.
 
-**890 procedures** — **379 queries**, **511 mutations** — under **54 prefixes**.
-
-| Prefix | Procedures | Queries | Mutations |
-|---|---:|---:|---:|
-| `organizations` | 303 | 131 | 172 |
-| `kiloclaw` | 96 | 35 | 61 |
-| `user` | 40 | 15 | 25 |
-| `agentProfiles` | 36 | 4 | 32 |
-| `cloudAgentNext` | 33 | 13 | 20 |
-| `securityAgent` | 26 | 15 | 11 |
-| `githubPrReview` | 20 | 6 | 14 |
-| `githubApps` | 19 | 9 | 10 |
-| `cliSessionsV2` | 18 | 10 | 8 |
-| `kiloPass` | 18 | 10 | 8 |
-| `appBuilder` | 16 | 6 | 10 |
-| `cliSessions` | 16 | 7 | 9 |
-| `mcpGateway` | 16 | 4 | 12 |
-| `providerReview` | 16 | 8 | 8 |
-| `todos` | 16 | 6 | 10 |
-| `deployments` | 14 | 6 | 8 |
-| `moderation` | 11 | 3 | 8 |
-| `codeReviews` | 9 | 6 | 3 |
-| `gitlab` | 9 | 3 | 6 |
-| `personalReviewAgent` | 9 | 5 | 4 |
-| `webhookTriggers` | 9 | 5 | 4 |
-| `autoFix` | 8 | 4 | 4 |
-| `codingPlans` | 8 | 5 | 3 |
-| `personalAutoTriage` | 8 | 4 | 4 |
-| `reviewMemory` | 8 | 3 | 5 |
-| `byok` | 7 | 2 | 5 |
-| `codeIndexing` | 7 | 5 | 2 |
-| `personalAutoFix` | 7 | 3 | 4 |
-| `userExports` | 7 | 3 | 4 |
-| `autoTriage` | 6 | 4 | 2 |
-| `dolthub` | 6 | 4 | 2 |
-| `modelPreferences` | 6 | 1 | 5 |
-| `usageAnalytics` | 6 | 6 | 0 |
-| `workspaceFolders` | 6 | 1 | 5 |
-| `activeSessions` | 5 | 4 | 1 |
-| `cloudAgentSettings` | 5 | 2 | 3 |
-| `debug` | 4 | 4 | 0 |
-| `discord` | 4 | 1 | 3 |
-| `securityAuditLog` | 4 | 3 | 1 |
-| `slack` | 4 | 1 | 3 |
-| `credits` | 3 | 1 | 2 |
-| `linear` | 3 | 1 | 2 |
-| `unifiedSessions` | 3 | 3 | 0 |
-| `mcpGatewayAuthorizations` | 2 | 1 | 1 |
-| `models` | 2 | 2 | 0 |
-| `openAiChatGpt` | 2 | 1 | 1 |
-| `spendAlerts` | 2 | 1 | 1 |
-| `appBuilderFeedback` | 1 | 0 | 1 |
-| `appReportedMessages` | 1 | 0 | 1 |
-| `cloudAgentNextFeedback` | 1 | 0 | 1 |
-| `feedback` | 1 | 0 | 1 |
-| `kiloChat` | 1 | 1 | 0 |
-| `platformIntegrations` | 1 | 1 | 0 |
-| `userFeedback` | 1 | 0 | 1 |
-
-### Sub-areas
-
-The second path segment of each area that splits, with procedure counts:
-
-- `organizations.*` — 303: `kiloclaw` 66, `cloudAgentNext` 32, `securityAgent` 26, `(direct)` 19, `appBuilder` 17, `deployments` 17, `groups` 14, `reviewAgent` 13, `subscription` 12, `kiloPass` 11, `settings` 11, `autoTriage` 8, `autoFix` 7, `members` 7, `autoTopUp` 6, `bitbucket` 6, `sso` 6, `modes` 5, `subOrganizations` 5, `usageDetails` 5, `securityAuditLog` 4, `auditLogs` 3, `funds` 2, `salesDemo` 1
-
-- `todos.*` — 16: `items` 11, `lists` 5
-
-- `codeReviews.*` — 9: `(direct)` 7, `analytics` 2
+- `activeSessions`
+- `agentBriefing`
+- `agentProfiles`
+- `appReportedMessages`
+- `byok`
+- `claudeBilling`
+- `cliSessions`
+- `cliSessionsV2`
+- `cloudAgentNext`
+- `cloudAgentNextFailures`
+- `cloudAgentNextFeedback`
+- `cloudAgentSettings`
+- `cloudEnvironments`
+- `codeIndexing`
+- `codeReviews`
+- `codingPlans`
+- `credits`
+- `debug`
+- `discord`
+- `dolthub`
+- `feedback`
+- `githubApps`
+- `githubPrReview`
+- `gitlab`
+- `kiloChat`
+- `kiloPass`
+- `kiloclaw`
+- `linear`
+- `modelPreferences`
+- `models`
+- `moderation`
+- `openAiChatGpt`
+- `organizations`
+- `personalReviewAgent`
+- `platformIntegrations`
+- `providerReview`
+- `reviewMemory`
+- `securityAgent`
+- `securityAuditLog`
+- `slack`
+- `spendAlerts`
+- `stepUp`
+- `todos`
+- `unifiedSessions`
+- `usageAnalytics`
+- `user`
+- `userExports`
+- `userFeedback`
+- `vercelCompute`
+- `webhookTriggers`
+- `workspaceFolders`

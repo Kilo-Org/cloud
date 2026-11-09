@@ -26,6 +26,10 @@ type ComposerPasteButtonProps = {
  * text). Pressing reads the clipboard through the shared `useClipboardPaste`
  * path, which attaches a readable image, pastes clipboard text at the caret,
  * and toasts only when the clipboard holds neither.
+ *
+ * The hit slop lifts each size's frame to Android's 48dp minimum
+ * (WCAG 2.5.8 AA) without growing the visual: h-8 (28pt) carries 10pt per
+ * side, h-9 (31.5pt) carries 8.25pt.
  */
 export function ComposerPasteButton({
   onPress,
@@ -39,7 +43,11 @@ export function ComposerPasteButton({
     <Pressable
       onPress={onPress}
       disabled={disabled}
-      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      hitSlop={
+        size === 'md'
+          ? { top: 8.25, bottom: 8.25, left: 8.25, right: 8.25 }
+          : { top: 10, bottom: 10, left: 10, right: 10 }
+      }
       className={cn(
         SIZE_CLASSES[size],
         'items-center justify-center rounded-full active:opacity-70',

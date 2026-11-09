@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { INJECTED_FAULT_ERROR_NAME } from '@/lib/telemetry/e2e-fault';
-import { setTelemetrySink, type TelemetryEvent } from '@/lib/telemetry/error-sink';
+import { type TelemetryEvent } from '@/lib/telemetry/error-sink';
 
 const getItemAsync = vi.hoisted(() =>
   vi.fn<(key: string, options?: unknown) => Promise<string | null>>()
@@ -11,11 +11,6 @@ vi.mock('expo-secure-store', () => ({
   getItemAsync,
   WHEN_UNLOCKED_THIS_DEVICE_ONLY: 'WHEN_UNLOCKED_THIS_DEVICE_ONLY',
 }));
-
-// The fault window is off for every case except the one that proves it: the
-// constant is read from the bundle-time config, so that case reloads the
-// module with its own mock.
-vi.mock('@/lib/config', () => ({ E2E_SECURE_STORE_FAULT_MS: 0 }));
 
 /** A read that rejects, built without `Promise.reject` so the promise rule
  *  stays satisfied. */
@@ -31,6 +26,22 @@ async function resolvedNullRead(): Promise<string | null> {
   return null;
 }
 
+/** Replaces the config module before every dynamic import of the helper: the
+ *  real module needs the app build's baked `extra` and cannot load under
+ *  Vitest. Called in each suite's `beforeEach`, so no suite depends on the
+ *  order it runs in. */
+function mockConfig(faultMs: number): void {
+  vi.resetModules();
+  vi.doMock('@/lib/config', () => ({ E2E_SECURE_STORE_FAULT_MS: faultMs }));
+}
+
+/** Restores the plain registry after a suite, so a later suite's `doMock`
+ *  never inherits this one's registration. */
+function restoreConfig(): void {
+  vi.doUnmock('@/lib/config');
+  vi.resetModules();
+}
+
 async function loadHelper() {
   const mod = await import('./secure-store-read');
   return mod.readStoredValueWithRetry;
@@ -41,17 +52,19 @@ async function loadNullRetryHelper() {
   return mod.readStoredValueRetryingNull;
 }
 
-// Runs before `readStoredValueWithRetry`: the fault-window cases in that suite
-// unmock `@/lib/config` and reset the module registry, so this suite must see
-// the file-scope config mock above.
 describe('readStoredValueRetryingNull', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    mockConfig(0);
+    // `mockReset` instead of `clearAllMocks`: one-time implementations queued
+    // by a previous test (`mockRejectedValueOnce`) must not leak into this
+    // suite's defaults.
+    getItemAsync.mockReset();
     vi.useFakeTimers();
   });
 
   afterEach(() => {
     vi.useRealTimers();
+    restoreConfig();
   });
 
   it('returns the value on a healthy first read without waiting', async () => {
@@ -126,18 +139,26 @@ describe('readStoredValueRetryingNull', () => {
 describe('readStoredValueWithRetry', () => {
   let events: TelemetryEvent[] = [];
 
-  beforeEach(() => {
-    vi.clearAllMocks();
+  beforeEach(async () => {
+    mockConfig(0);
+    // `mockReset` instead of `clearAllMocks`: one-time implementations queued
+    // by a previous test (`mockRejectedValueOnce`) must not leak into this
+    // suite's defaults.
+    getItemAsync.mockReset();
     vi.useFakeTimers();
     events = [];
-    setTelemetrySink(event => {
+    // `resetModules` gives the helper imported by every test its own fresh
+    // error-sink registry, so the sink is installed on that fresh module —
+    // the same import hands back the instance the helper will read.
+    const { setTelemetrySink: setFreshTelemetrySink } = await import('@/lib/telemetry/error-sink');
+    setFreshTelemetrySink(event => {
       events.push(event);
     });
   });
 
   afterEach(() => {
     vi.useRealTimers();
-    setTelemetrySink(null);
+    restoreConfig();
   });
 
   it('returns the value on a healthy first read without waiting', async () => {
@@ -306,11 +327,10 @@ describe('readStoredValueWithRetry', () => {
   });
 
   it('rejects every read while the E2E fault window is open', async () => {
-    vi.resetModules();
-    vi.doMock('@/lib/config', () => ({ E2E_SECURE_STORE_FAULT_MS: 60_000 }));
+    mockConfig(60_000);
     getItemAsync.mockResolvedValue('stored-token');
-    // `resetModules` gives the reloaded helper its own error-sink registry, so
-    // the sink is re-installed on the fresh module before the read runs.
+    // The fresh registry has no sink yet: re-install it on the reloaded
+    // error-sink module before the read runs.
     const { setTelemetrySink: setFreshTelemetrySink } = await import('@/lib/telemetry/error-sink');
     setFreshTelemetrySink(event => {
       events.push(event);
@@ -332,14 +352,10 @@ describe('readStoredValueWithRetry', () => {
     expect(events[0]?.level).toBe('warning');
     expect(events[0]?.fingerprint).toEqual(['secure-store-failure', 'read']);
     expect(JSON.stringify(events[0])).not.toContain('auth-token');
-
-    vi.doUnmock('@/lib/config');
-    vi.resetModules();
   });
 
   it('reads normally once the E2E fault window has elapsed', async () => {
-    vi.resetModules();
-    vi.doMock('@/lib/config', () => ({ E2E_SECURE_STORE_FAULT_MS: 1000 }));
+    mockConfig(1000);
     getItemAsync.mockResolvedValue('stored-token');
     const readStoredValueWithRetry = await loadHelper();
 
@@ -349,8 +365,5 @@ describe('readStoredValueWithRetry', () => {
     await vi.advanceTimersByTimeAsync(2000);
 
     await expect(read).resolves.toBe('stored-token');
-
-    vi.doUnmock('@/lib/config');
-    vi.resetModules();
   });
 });

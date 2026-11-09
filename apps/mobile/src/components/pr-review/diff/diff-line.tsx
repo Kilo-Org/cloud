@@ -1,5 +1,5 @@
 // A single line of a diff, rendered in JetBrains Mono with syntax
-// highlighting, a gutter for old/new line numbers, and a tinted
+// highlighting, a gutter for the line number, and a tinted
 // background that signals add / del / context.
 //
 // Row height scales with the system font scale (bounded — see
@@ -51,6 +51,7 @@ import { hitSlopForRow } from '@/lib/pr-review/diff/diff-target';
 import {
   buildDiffLineAccessibilityLabel,
   diffLineMarker,
+  diffLineNumber,
   type ParsedDiffLine,
 } from '@/lib/pr-review/diff/parse-patch';
 import { MUTED_COLOR } from '@/lib/pr-review/diff/syntax-colors';
@@ -64,6 +65,13 @@ import { highlightRunChildren } from '@/components/pr-review/diff/highlight-runs
 
 const GUTTER_WIDTH = 56;
 const VERTICAL_PADDING = 2;
+// The row's only horizontal inset is the gutter's trailing `pr-2`. The row
+// mirrors under an RTL interface, so a physical right inset alone leaves the
+// LTR code Text flush against the physical left edge there. A logical end
+// inset keeps both ends of the mirrored row clear of the edge; 8 dp is this
+// row's chosen inset, while the gutter's `pr-2` utility resolves to 7 dp at
+// this app's rem.
+const CODE_END_PADDING = 8;
 
 type DiffLineProps = {
   line: ParsedDiffLine;
@@ -75,14 +83,13 @@ type DiffLineProps = {
   isSelected?: boolean;
 };
 
+// The gutter shows the same number the row's accessibility label speaks
+// (`diffLineNumber`): new-file numbering, so a context line reads the same
+// when drawn and when announced, matching the add rows and the RIGHT-side
+// comment anchor. A single 56pt gutter has no room for both numbers at the
+// bounded font scale.
 function gutterTextFor(line: ParsedDiffLine): string {
-  if (line.type === 'add') {
-    return `${line.newLine ?? ''}`;
-  }
-  if (line.type === 'del') {
-    return `${line.oldLine ?? ''}`;
-  }
-  return `${line.oldLine ?? line.newLine ?? ''}`;
+  return `${diffLineNumber(line) ?? ''}`;
 }
 
 function rowBackgroundFor(type: ParsedDiffLine['type']): string {
@@ -142,7 +149,10 @@ function DiffLineImpl({ line, language, onTap, isSelected }: Readonly<DiffLinePr
     // line instead of lining up with the row's start.
     paddingTop: VERTICAL_PADDING,
   };
-  const codeContainerStyle: ViewStyle = { paddingVertical: VERTICAL_PADDING };
+  const codeContainerStyle: ViewStyle = {
+    paddingVertical: VERTICAL_PADDING,
+    paddingEnd: CODE_END_PADDING,
+  };
   const codeBaseStyle: TextStyle = {
     ...LTR_TEXT_DIRECTION,
     fontFamily: 'JetBrainsMono_500Medium',

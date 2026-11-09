@@ -3,7 +3,7 @@ import { ReasoningEffortSchema } from './reasoning';
 import { TaxonomyRouteKeySchema } from './taxonomy';
 import { DEFAULT_AUTO_ROUTER, type AutoRouter } from './router';
 
-/** Maximum Pool entries in an owner-configured Efficient model pool. */
+/** Maximum models in one benchmark profile registration request. */
 export const MAX_POOL_ENTRIES = 10;
 
 export const PoolEntrySchema = z.object({
@@ -39,7 +39,7 @@ function addDuplicatePoolEntryIssues(entries: PoolEntry[], ctx: z.RefinementCtx)
   });
 }
 
-/** Owner-configured pool of unique models; null inherits the platform pool. */
+/** The unique models of one benchmark profile registration request. */
 export const EfficientModelPoolSchema = z
   .array(PoolEntrySchema)
   .min(1)
@@ -48,11 +48,6 @@ export const EfficientModelPoolSchema = z
     addDuplicatePoolEntryIssues(entries, ctx);
   });
 export type EfficientModelPool = z.infer<typeof EfficientModelPoolSchema>;
-
-export const PersistedEfficientModelPoolSchema = z
-  .array(PoolEntrySchema)
-  .transform(entries => [...new Map(entries.map(entry => [entry.model, entry])).values()])
-  .pipe(EfficientModelPoolSchema);
 
 export const CandidatePricingSchema = z.object({
   promptUsdPerToken: z.number().nonnegative(),
@@ -79,6 +74,57 @@ export function estimateRequestCostUsd(
       (candidate.pricing.cacheReadUsdPerToken ?? candidate.pricing.promptUsdPerToken)
   );
 }
+
+// Industry-standard blended price weighting (3 input : 1 output) for summaries without tokens.
+const BLENDED_INPUT_WEIGHT = 3;
+const BLENDED_OUTPUT_WEIGHT = 1;
+
+function blendedUsdPerToken(pricing: CandidatePricing): number {
+  return (
+    (BLENDED_INPUT_WEIGHT * pricing.promptUsdPerToken +
+      BLENDED_OUTPUT_WEIGHT * pricing.completionUsdPerToken) /
+    (BLENDED_INPUT_WEIGHT + BLENDED_OUTPUT_WEIGHT)
+  );
+}
+
+export type LinkedCostSummary = {
+  avgCostUsd: number | null;
+  avgInputTokens?: number | null;
+  avgCachedInputTokens?: number | null;
+  avgOutputTokens?: number | null;
+  avgReasoningTokens?: number | null;
+};
+
+/**
+ * Mean cost per case of a platform measurement at the owner's prices (ADR 0005 linked entries).
+ * Null owner pricing is $0. Summaries with token means are repriced exactly; older summaries
+ * scale the measured cost by the blended price ratio. Null when the cost cannot be derived, which
+ * keeps the pair out of ranking rather than ranking it at a guessed price.
+ */
+export function linkedAvgCostUsd(
+  summary: LinkedCostSummary,
+  ownerPricing: CandidatePricing | null,
+  platformPricing: CandidatePricing | null
+): number | null {
+  if (ownerPricing === null) return 0;
+  const { avgInputTokens, avgCachedInputTokens, avgOutputTokens, avgReasoningTokens } = summary;
+  if (
+    avgInputTokens != null &&
+    avgCachedInputTokens != null &&
+    avgOutputTokens != null &&
+    avgReasoningTokens != null
+  ) {
+    return (
+      avgInputTokens * ownerPricing.promptUsdPerToken +
+      avgCachedInputTokens * (ownerPricing.cacheReadUsdPerToken ?? ownerPricing.promptUsdPerToken) +
+      (avgOutputTokens + avgReasoningTokens) * ownerPricing.completionUsdPerToken
+    );
+  }
+  if (summary.avgCostUsd === null || platformPricing === null) return null;
+  const platformBlended = blendedUsdPerToken(platformPricing);
+  if (platformBlended <= 0) return null;
+  return summary.avgCostUsd * (blendedUsdPerToken(ownerPricing) / platformBlended);
+}
 /**
  * Reader precedence for candidate variant identity: prefer `variant`; when
  * absent, a valid legacy `reasoningEffort` string may be interpreted as the
@@ -104,6 +150,9 @@ export const RankedCandidateSchema = z
     // Legacy effort the model was benchmarked with; retained for rolling
     // deploy reads of old published tables. Prefer `variant` when present.
     reasoningEffort: ReasoningEffortSchema.nullable().optional(),
+    // True when the measurement behind this candidate is from an older engine
+    // identity than the table's. Custom routers only (ADR 0005).
+    stale: z.boolean().optional(),
   })
   .superRefine((candidate, ctx) => {
     if (candidate.variant != null && candidate.reasoningEffort != null) {
@@ -139,6 +188,7 @@ const routingTableFields = {
   version: z.string().min(1),
   generatedAt: z.string().min(1),
   minAccuracy: z.number().min(0).max(1),
+  accuracyNoiseBand: z.number().min(0).max(1).optional(),
   // Keep a session's incumbent model unless the fresh pick is cheaper by
   // more than this factor (see BenchmarkConfigSchema.switchCostFactor).
   switchCostFactor: z.number().min(1),
@@ -164,13 +214,26 @@ function refineTaxonomyRouteKeys(routes: Record<string, unknown>, ctx: z.Refinem
   }
 }
 
-/** Platform default routing table: every published route has ≥1 candidate. */
-export const RoutingTableSchema = z.object({
-  ...routingTableFields,
-  routes: z.record(z.string(), z.array(RankedCandidateSchema).min(1)).superRefine((routes, ctx) => {
+const routingTableRoutesSchema = z
+  .record(z.string(), z.array(RankedCandidateSchema).min(1))
+  .superRefine((routes, ctx) => {
     refineTaxonomyRouteKeys(routes, ctx);
-  }),
-});
+  });
+
+const routingTableShape = {
+  ...routingTableFields,
+  routes: routingTableRoutesSchema,
+};
+
+/**
+ * Platform default routing table. Its producer builds an entry for every
+ * taxonomy route and refuses to publish one whose candidate list is empty, so a
+ * published platform table covers the route set of the taxonomy it was built
+ * from. The schema does not require that coverage: a table published before a
+ * taxonomy route was added still validates, and a route a table omits falls back
+ * to balanced, same as for a custom table.
+ */
+export const RoutingTableSchema = z.object(routingTableShape);
 export type RoutingTable = z.infer<typeof RoutingTableSchema>;
 
 /**
@@ -178,13 +241,12 @@ export type RoutingTable = z.infer<typeof RoutingTableSchema>;
  * Route keys with no graded candidates are omitted (not empty arrays).
  * Consumers must return no decision for an omitted route (balanced fallback);
  * existing `computeDecision` already does this.
+ *
+ * Validates the same documents as {@link RoutingTableSchema}: the platform and
+ * custom difference is which routes each producer writes, not what one schema
+ * accepts over the other.
  */
-export const CustomRoutingTableSchema = z.object({
-  ...routingTableFields,
-  routes: z.record(z.string(), z.array(RankedCandidateSchema).min(1)).superRefine((routes, ctx) => {
-    refineTaxonomyRouteKeys(routes, ctx);
-  }),
-});
+export const CustomRoutingTableSchema = z.object(routingTableShape);
 export type CustomRoutingTable = z.infer<typeof CustomRoutingTableSchema>;
 
 export const ROUTING_TABLE_KV_KEY = 'routing_table_v1';
@@ -196,13 +258,12 @@ export function routingTableKvKey(router: AutoRouter = DEFAULT_AUTO_ROUTER): str
 
 // Candidates within this raw-accuracy margin of minAccuracy compete on value.
 const ACCURACY_NOISE_BAND = 0.05;
-// Value uses the Wilson lower bound when the measured case count is known.
 const LATENCY_WEIGHT = 1.5;
 export const LATENCY_TOTAL_WEIGHT = 0.15;
 const ACCURACY_WEIGHT = 15;
 // Part of every registry table version: a policy change must republish tables
 // built from unchanged measurements.
-export const RANKING_POLICY_VERSION = 'value-ttft-prodcost-wilson-v4';
+export const RANKING_POLICY_VERSION = 'value-ttft-prodcost-request-pairs-v6';
 
 type RankInput = Omit<RankedCandidate, 'meetsThreshold'> & {
   meetsThreshold?: boolean;
@@ -219,18 +280,42 @@ export function wilsonLowerBound(accuracy: number, n: number, z = 1.0): number {
   return Math.max(0, (center - margin) / denominator);
 }
 
+export function effectiveLatencyMs(c: {
+  p50LatencyMs: number | null;
+  p50TtftMs?: number | null;
+}): number | null {
+  if (c.p50LatencyMs === null) return null;
+  return c.p50TtftMs == null ? c.p50LatencyMs : c.p50TtftMs + LATENCY_TOTAL_WEIGHT * c.p50LatencyMs;
+}
+
 export function rankValue(c: {
   avgCostUsd: number;
   accuracy: number;
   cases?: number | null;
   p50LatencyMs: number | null;
   p50TtftMs?: number | null;
+  ignoreLatency?: boolean;
 }) {
   const accuracy = c.cases == null ? c.accuracy : wilsonLowerBound(c.accuracy, c.cases);
-  if (c.p50LatencyMs === null || accuracy <= 0) return Number.POSITIVE_INFINITY;
-  const effectiveLatency =
-    c.p50TtftMs == null ? c.p50LatencyMs : c.p50TtftMs + LATENCY_TOTAL_WEIGHT * c.p50LatencyMs;
+  const effectiveLatency = c.ignoreLatency ? 1 : effectiveLatencyMs(c);
+  if (effectiveLatency === null || accuracy <= 0) return Number.POSITIVE_INFINITY;
   return (c.avgCostUsd * effectiveLatency ** LATENCY_WEIGHT) / accuracy ** ACCURACY_WEIGHT;
+}
+
+// ADR 0005: within the accuracy band a $0 candidate beats every paid one and takes no cost
+// term. `estimatedRequestCostUsd === 0` is the only source, so observed paid cost keeps the
+// value formula.
+export function rankFreeValue(c: {
+  accuracy: number;
+  cases?: number | null;
+  p50LatencyMs: number | null;
+  p50TtftMs?: number | null;
+  ignoreLatency?: boolean;
+}) {
+  const accuracy = c.cases == null ? c.accuracy : wilsonLowerBound(c.accuracy, c.cases);
+  const effectiveLatency = c.ignoreLatency ? 1 : effectiveLatencyMs(c);
+  if (effectiveLatency === null || accuracy <= 0) return Number.POSITIVE_INFINITY;
+  return effectiveLatency ** LATENCY_WEIGHT / accuracy ** ACCURACY_WEIGHT;
 }
 
 // Candidates within ACCURACY_NOISE_BAND of the threshold come first, best
@@ -240,12 +325,28 @@ export function rankValue(c: {
 export function rankCandidates(
   candidates: ReadonlyArray<RankInput>,
   minAccuracy: number,
-  options?: { profile?: ProductionTokenProfile | null; accuracyNoiseBand?: number }
+  options?: {
+    profile?: ProductionTokenProfile | null;
+    accuracyNoiseBand?: number;
+    // Actual prompt size of one request. Priced candidates are charged cold
+    // input (cache state is unmeasured); unpriced candidates retain their
+    // published estimate. Takes precedence over `profile`.
+    requestTokens?: number | null;
+    ignoreLatency?: boolean;
+  }
 ): RankedCandidate[] {
   const floor = minAccuracy - (options?.accuracyNoiseBand ?? ACCURACY_NOISE_BAND);
+  const requestTokens = options?.requestTokens ?? null;
   return candidates
     .map(({ p50LatencyMs, ...c }) => {
-      const estimatedRequestCostUsd = estimateRequestCostUsd(c, options?.profile ?? null);
+      const estimatedRequestCostUsd =
+        requestTokens !== null && c.pricing != null
+          ? c.avgCostUsd + requestTokens * c.pricing.promptUsdPerToken
+          : requestTokens !== null && c.estimatedRequestCostUsd != null
+            ? c.estimatedRequestCostUsd
+            : estimateRequestCostUsd(c, options?.profile ?? null);
+      const competes = c.accuracy > 0 && c.accuracy >= floor;
+      const free = estimatedRequestCostUsd === 0;
       return {
         candidate: {
           ...c,
@@ -253,19 +354,35 @@ export function rankCandidates(
           estimatedRequestCostUsd,
           meetsThreshold: c.accuracy >= minAccuracy,
         },
-        competes: c.accuracy > 0 && c.accuracy >= floor,
-        value: rankValue({
-          avgCostUsd: estimatedRequestCostUsd,
-          accuracy: c.accuracy,
-          cases: c.cases,
-          p50LatencyMs,
-          p50TtftMs: c.p50TtftMs,
-        }),
+        competes,
+        free,
+        value: free
+          ? rankFreeValue({
+              accuracy: c.accuracy,
+              cases: c.cases,
+              p50LatencyMs,
+              p50TtftMs: c.p50TtftMs,
+              ignoreLatency: options?.ignoreLatency,
+            })
+          : rankValue({
+              avgCostUsd: estimatedRequestCostUsd,
+              accuracy: c.accuracy,
+              cases: c.cases,
+              p50LatencyMs,
+              p50TtftMs: c.p50TtftMs,
+              ignoreLatency: options?.ignoreLatency,
+            }),
       };
     })
     .toSorted((a, b) => {
       if (a.competes !== b.competes) return a.competes ? -1 : 1;
-      if (a.competes && a.value !== b.value) return a.value < b.value ? -1 : 1;
+      if (!a.competes) {
+        const x = a.candidate;
+        const y = b.candidate;
+        return y.accuracy - x.accuracy || x.avgCostUsd - y.avgCostUsd;
+      }
+      if (a.free !== b.free) return a.free ? -1 : 1;
+      if (a.value !== b.value) return a.value < b.value ? -1 : 1;
       const x = a.candidate;
       const y = b.candidate;
       return y.accuracy - x.accuracy || x.avgCostUsd - y.avgCostUsd;

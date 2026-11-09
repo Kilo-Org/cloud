@@ -63,21 +63,31 @@ const RuntimeSkillFilesSchema = z
     }
   });
 
-/**
- * Runtime skill schema. Each entry is materialized to
- * `${SESSION_HOME}/.kilocode/skills/<name>/` at preparation time — `rawMarkdown`
- * is written to `SKILL.md`, and each `files[path]` is written under the same
- * directory.
- */
-export const RuntimeSkillSchema = z.object({
-  name: z
-    .string()
-    .min(1)
-    .max(RuntimeProfileLimits.MAX_RUNTIME_SKILL_NAME_LENGTH)
-    .regex(/^[a-z0-9][a-z0-9-]*$/, 'Skill name must be a slug'),
-  rawMarkdown: z.string().min(1).max(RuntimeProfileLimits.MAX_RUNTIME_SKILL_MARKDOWN),
-  files: RuntimeSkillFilesSchema.optional(),
-});
+const RuntimeSkillNameSchema = z
+  .string()
+  .min(1)
+  .max(RuntimeProfileLimits.MAX_RUNTIME_SKILL_NAME_LENGTH)
+  .regex(/^[a-z0-9][a-z0-9-]*$/, 'Skill name must be a slug');
+
+export const RuntimeSkillSchema = z.union([
+  z.object({
+    name: RuntimeSkillNameSchema,
+    rawMarkdown: z.string().min(1).max(RuntimeProfileLimits.MAX_RUNTIME_SKILL_MARKDOWN),
+    files: RuntimeSkillFilesSchema.optional(),
+    source: z.never().optional(),
+  }),
+  z.strictObject({
+    name: RuntimeSkillNameSchema,
+    source: z
+      .string()
+      .max(140)
+      .regex(
+        /^[a-z0-9](?:[a-z0-9]|-(?=[a-z0-9])){0,38}\/[a-z0-9._][a-z0-9._-]{0,99}$/,
+        'Skill source must be a GitHub owner/repo'
+      )
+      .refine(source => !source.includes('..') && !source.endsWith('/.')),
+  }),
+]);
 
 export const RuntimeSkillsSchema = z
   .array(RuntimeSkillSchema)
@@ -151,6 +161,72 @@ export const RuntimeAgentsSchema = z
   );
 
 export type RuntimeAgentInput = z.infer<typeof RuntimeAgentSchema>;
+
+/**
+ * Built-in CLI agents whose model or visibility a Cloud Agent user may tune.
+ * Keep this list in sync with `CLOUD_AGENT_BUILTIN_AGENTS` in
+ * `@kilocode/cloud-agent-profile`; a parity test asserts they match.
+ */
+export const RUNTIME_BUILTIN_AGENT_SLUGS = [
+  'code',
+  'plan',
+  'debug',
+  'orchestrator',
+  'ask',
+  'explore',
+  'compaction',
+] as const;
+
+/** Agents whose visibility the user may turn off. `code` is the session default. */
+export const RUNTIME_DISABLEABLE_BUILTIN_AGENT_SLUGS = [
+  'plan',
+  'debug',
+  'orchestrator',
+  'ask',
+] as const;
+
+const RuntimeBuiltinAgentOverrideSchema = z
+  .strictObject({
+    model: z
+      .string()
+      .trim()
+      .min(1)
+      .max(RuntimeProfileLimits.MAX_RUNTIME_AGENT_MODEL_LENGTH)
+      .nullable()
+      .optional(),
+    variant: z.string().trim().min(1).max(50).optional(),
+    disable: z.boolean().optional(),
+  })
+  .refine(override => !override.variant || typeof override.model === 'string', {
+    message: 'variant requires a model — variants are model-specific',
+    path: ['variant'],
+  });
+
+/**
+ * User-scoped overrides for CLI built-in agents. Unlike `runtimeAgents`, these
+ * entries target existing agents and may be disabled rather than replacing
+ * their prompt. Materialized into `KILO_CONFIG_CONTENT.agent.<slug>` beside
+ * custom runtime agents.
+ */
+export const RuntimeBuiltinAgentsSchema = z
+  .partialRecord(z.enum(RUNTIME_BUILTIN_AGENT_SLUGS), RuntimeBuiltinAgentOverrideSchema)
+  .superRefine((agents, ctx) => {
+    for (const [slug, override] of Object.entries(agents)) {
+      if (
+        override.disable === true &&
+        !RUNTIME_DISABLEABLE_BUILTIN_AGENT_SLUGS.includes(
+          slug as (typeof RUNTIME_DISABLEABLE_BUILTIN_AGENT_SLUGS)[number]
+        )
+      ) {
+        ctx.addIssue({
+          code: 'custom',
+          path: [slug, 'disable'],
+          message: 'This built-in agent cannot be disabled',
+        });
+      }
+    }
+  });
+export type RuntimeBuiltinAgents = z.infer<typeof RuntimeBuiltinAgentsSchema>;
 
 export const RuntimeKiloCommandSchema = z.object({
   name: z

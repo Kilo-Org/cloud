@@ -2,28 +2,34 @@
 
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { TRPCQueryKey } from '@trpc/tanstack-react-query';
 import { cloudAgentWorktreeIdSchema } from '@kilocode/session-ingest-contracts';
 import { toast } from 'sonner';
 import { useTRPC } from '@/lib/trpc/utils';
-import { useLocalStorage } from '@/hooks/useLocalStorage';
 import type { WorkspaceFolderColor } from '@/lib/cloud-agent/workspace-folders';
-import {
-  getCollapsedWorkspaceFoldersStorageKey,
-  parseCollapsedWorkspaceFolders,
-} from '../workspace-folders';
+import { controlPlaneSessionIdSchema } from '../workspace-folders';
+import { workspaceFoldersQueryKey } from './sidebar-queries';
+import type { useSidebarPreferences } from './useSidebarPreferences';
 
-export function useWorkspaceFolders(currentUserId: string, organizationId?: string) {
+type CollapsedFolders = Pick<
+  ReturnType<typeof useSidebarPreferences>,
+  'collapsedFolderIds' | 'setCollapsedFolderIds'
+>;
+
+export function useWorkspaceFolders(
+  currentUserId: string,
+  organizationId: string | undefined,
+  { collapsedFolderIds, setCollapsedFolderIds }: CollapsedFolders
+) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const queryOptions = useMemo(
     () => trpc.workspaceFolders.list.queryOptions({ organizationId: organizationId ?? null }),
     [organizationId, trpc]
   );
-  const queryKey = useMemo<TRPCQueryKey>(() => {
-    const options = { ...queryOptions.queryKey[1], userId: currentUserId };
-    return [queryOptions.queryKey[0], options];
-  }, [currentUserId, queryOptions.queryKey]);
+  const queryKey = useMemo(
+    () => workspaceFoldersQueryKey(queryOptions.queryKey, currentUserId),
+    [currentUserId, queryOptions.queryKey]
+  );
   const foldersQuery = useQuery({ ...queryOptions, queryKey, staleTime: 15_000 });
   const { mutateAsync: createFolder } = useMutation(trpc.workspaceFolders.create.mutationOptions());
   const { mutateAsync: updateFolder } = useMutation(trpc.workspaceFolders.update.mutationOptions());
@@ -31,14 +37,12 @@ export function useWorkspaceFolders(currentUserId: string, organizationId?: stri
   const { mutateAsync: assignWorktree } = useMutation(
     trpc.workspaceFolders.moveWorktree.mutationOptions()
   );
+  const { mutateAsync: assignSession } = useMutation(
+    trpc.workspaceFolders.moveSession.mutationOptions()
+  );
   const { mutateAsync: reorder } = useMutation(trpc.workspaceFolders.reorder.mutationOptions());
   const [isSaving, setIsSaving] = useState(false);
   const savingRef = useRef(false);
-  const [collapsedFolderIds, setCollapsedFolderIds] = useLocalStorage<string[]>(
-    getCollapsedWorkspaceFoldersStorageKey(currentUserId, organizationId),
-    [],
-    { initializeWithValue: false, deserializer: parseCollapsedWorkspaceFolders }
-  );
 
   const refresh = useCallback(
     () => queryClient.invalidateQueries({ queryKey }),
@@ -114,6 +118,30 @@ export function useWorkspaceFolders(currentUserId: string, organizationId?: stri
     [assignWorktree, organizationId, run, setCollapsedFolderIds]
   );
 
+  const moveSession = useCallback(
+    async (sessionId: string, folderId: string | null) => {
+      const moved = await run(
+        () =>
+          assignSession({
+            sessionId: controlPlaneSessionIdSchema.parse(sessionId),
+            folderId,
+            organizationId: organizationId ?? null,
+          }),
+        folderId ? 'Session moved to folder' : 'Session moved to Ungrouped'
+      );
+      if (moved) {
+        // The destination folder changes how the sidebar groups the session,
+        // so the sessions and worktree-details queries must refetch too.
+        void queryClient.invalidateQueries(trpc.cliSessionsV2.list.pathFilter());
+        void queryClient.invalidateQueries(trpc.cliSessionsV2.search.pathFilter());
+        void queryClient.invalidateQueries(trpc.cliSessionsV2.worktreeDetails.pathFilter());
+        if (folderId) setCollapsedFolderIds(ids => ids.filter(id => id !== folderId));
+      }
+      return moved;
+    },
+    [assignSession, organizationId, queryClient, run, setCollapsedFolderIds, trpc]
+  );
+
   const reorderFolders = useCallback(
     (folderIds: string[]) =>
       run(
@@ -134,6 +162,8 @@ export function useWorkspaceFolders(currentUserId: string, organizationId?: stri
   return {
     folders: foldersQuery.data?.folders ?? [],
     isLoading: foldersQuery.isPending,
+    /** Only the first request; a retry after a failure must not keep the list hidden. */
+    isFirstLoadPending: foldersQuery.isPending && foldersQuery.failureCount === 0,
     isError: foldersQuery.isError,
     isSaving,
     collapsedFolderIds,
@@ -142,6 +172,7 @@ export function useWorkspaceFolders(currentUserId: string, organizationId?: stri
     setFolderColor,
     deleteFolder,
     moveWorktree,
+    moveSession,
     reorderFolders,
     refresh,
   };

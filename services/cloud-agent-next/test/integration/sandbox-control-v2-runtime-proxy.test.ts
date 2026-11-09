@@ -13,10 +13,13 @@ import type {
 import type { SandboxSessionV2 } from '../../src/control-plane/session/session-do.js';
 import { parseSessionMetadata } from '../../src/persistence/session-metadata.js';
 import {
+  createRuntimeProxyGrant,
+  issueRuntimeCredentialProxyHandle,
   runtimeCredentialProxyFacadeBaseUrl,
   runtimeProxyHandleGrantId,
+  RUNTIME_PROXY_GRANT_KEY,
 } from '../../src/runtime-credential-proxy.js';
-import { RUNTIME_PROXY_GRANT_KEY } from '../../src/runtime-credential-proxy.js';
+import { markHistoryHydrated } from '../../src/control-plane/session/history-hydration.js';
 import {
   RUNTIME_AUTHORIZATION_KEY,
   renewStoredRuntimeAuthorization,
@@ -26,7 +29,7 @@ import { logger } from '../../src/logger.js';
 import type { AgentSandboxProvider, Env } from '../../src/types.js';
 import type { ProviderAdapter, StopResult } from '../../src/sandbox-control/provider.js';
 import { generateSandboxId } from '../../src/sandbox-id.js';
-import { sessionDoName } from '../../src/session-plane.js';
+import { sessionDoName } from '../../src/session-identity.js';
 import {
   CONTROL_PLANE_PROTOCOL_VERSION,
   type ControlPlanePromptPayload,
@@ -34,7 +37,7 @@ import {
 import {
   createFakeCredentialBroker,
   fakeOutboundContainerId,
-  FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
+  FAKE_SANDBOX_CONTAINERS_NAMESPACE,
   installFakeCredentialEnv,
 } from './helpers/fake-credentials.js';
 import { FakeWrapper } from './helpers/fake-wrapper.js';
@@ -50,7 +53,7 @@ const sandboxes = (env as unknown as { SANDBOX_CONTROL: SandboxControlNamespace 
 const sessions = (env as unknown as { SANDBOX_SESSION: SessionNamespace }).SANDBOX_SESSION;
 
 const USER_ID = 'user_123';
-const ORG_ID = 'org_123';
+const ORG_ID = '11111111-1111-4111-8111-111111111111';
 const WORKER_URL = 'https://control.test';
 const SECRET = env.NEXTAUTH_SECRET as string;
 const FACADE_BASE = runtimeCredentialProxyFacadeBaseUrl(WORKER_URL);
@@ -186,7 +189,7 @@ function createProvider(): FakeProvider {
     async create(intent) {
       return { providerRef: `mem_${intent.intentId}` };
     },
-    async launch(_ref, launchEnv) {
+    async launch(_ref, { env: launchEnv }) {
       provider.launchEnvs.push({ ...launchEnv });
       return { startSource: 'image' as const };
     },
@@ -215,8 +218,7 @@ async function installSandbox(
   await runInDurableObject(sandboxStub, async instance => {
     await instance.getAllocationState();
     installFakeCredentialEnv(instance.env, broker, {
-      SandboxSmallContainment: FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
-      SANDBOX_CONTAINERS: FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
+      SANDBOX_CONTAINERS: FAKE_SANDBOX_CONTAINERS_NAMESPACE,
       WORKER_URL,
       KILOCODE_BACKEND_BASE_URL: WORKER_URL,
       KILO_OPENROUTER_BASE: WORKER_URL,
@@ -259,6 +261,14 @@ async function createVercelSession(input: {
     message: promptPayload(messageId()),
     sandboxSelection: {
       provider: input.provider ?? 'vercel',
+      ...((input.provider ?? 'vercel') === 'vercel'
+        ? {
+            byoc: {
+              organizationId: ORG_ID,
+              credentialId: '22222222-2222-4222-8222-222222222222',
+            },
+          }
+        : {}),
       ...(input.contained === undefined
         ? {}
         : {
@@ -292,7 +302,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
   it('keeps a shared modern sibling authorized after releasing the creator and denies its deleted handle', async () => {
     const creatorId = newSessionId();
     const siblingId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, creatorId);
+    const sandboxId = await generateSandboxId(creatorId);
     const worktreeId = `worktree_${crypto.randomUUID()}`;
     const provider = createProvider();
     const sandbox = await installSandbox(sandboxId, provider);
@@ -366,10 +376,8 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
   });
 
   it.each([
-    ['cloudflare', true],
     ['cloudflare-containers', true],
     ['vercel', true],
-    ['cloudflare', false],
     ['cloudflare-containers', false],
   ] as const)(
     '%s contained=%s forwards renewed authorization after JWT expiry and allocation replacement',
@@ -377,7 +385,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
       const startedAt = Date.now();
       const sessionId = newSessionId();
       const kiloId = kiloSessionId();
-      const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+      const sandboxId = await generateSandboxId(sessionId);
       const provider = createProvider();
       const broker = createFakeCredentialBroker();
       const sandboxStub = await installSandbox(sandboxId, provider, broker);
@@ -401,7 +409,6 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
       expect(handle).toEqual(expect.any(String));
       if (!handle) throw new Error('missing runtime proxy handle');
       expect(JSON.stringify(frame).includes(token)).toBe(false);
-      expect(broker.kiloIssued()).toBe(0);
       expect(frame.spec.runtimeIsolation).toBeUndefined();
       expect(
         await sandboxStub.resolveCredential({
@@ -413,7 +420,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
       ).toBeNull();
       await runInDurableObject(sessionStub, async instance => {
         expect(await instance.ctx.storage.get(RUNTIME_PROXY_GRANT_KEY)).toMatchObject({
-          mode: contained ? 'contained' : 'direct',
+          mode: 'contained',
         });
       });
       wrapper.send({ type: 'session.ready', sessionId });
@@ -537,7 +544,6 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
       expect(await sessionStub.resolveRuntimeCredentialProxyGrant(handle)).toBeNull();
       await forward(nextHandle);
       expect(destinations).toHaveLength(6);
-      expect(broker.kiloIssued()).toBe(0);
       const siblingKiloSessionId = kiloSessionId();
       const siblingDenied = await worker.fetch(
         new Request(`${WORKER_URL}/api/session/${siblingKiloSessionId}/ingest`, {
@@ -602,7 +608,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
 
   it('rejects unsupported direct Vercel admission before storing or queuing the session', async () => {
     const sessionId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const stub = sessions.getByName(sessionDoName(USER_ID, sessionId));
     const result = await stub.createSessionWithInitialAdmission({
       metadata: metadata({
@@ -620,7 +626,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
 
   it('mints a handle on the connected prepare, projects it into the credentials, and resolves it', async () => {
     const sessionId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const provider = createProvider();
     await installSandbox(sandboxId, provider);
     const { seal, token } = await sealedRuntimeAuthorization(sessionId);
@@ -651,11 +657,153 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
     expect(await sessionStub.resolveRuntimeCredentialProxyGrant(handle ?? '')).not.toBeNull();
   });
 
+  it('delivers a private scoped MCP grant separately from model aliases and never in launch env or persisted route specs', async () => {
+    const sessionId = newSessionId();
+    const sandboxId = await generateSandboxId(sessionId);
+    const provider = createProvider();
+    const sandbox = await installSandbox(sandboxId, provider);
+    const { seal, token } = await sealedRuntimeAuthorization(sessionId);
+    const mcpGrant = {
+      url: 'https://mcp.kiloapps.io/mcp',
+      token: 'private-scoped-mcp-fixture',
+      expiresAt: Math.floor(Date.now() / 1000) + 24 * 3600,
+    };
+    const sessionStub = sessions.getByName(sessionDoName(USER_ID, sessionId));
+    await runInDurableObject(sandbox, instance => {
+      const peerFor = instance.sessionPeerFor.bind(instance);
+      instance.sessionPeerFor = (ownerId, id) => {
+        const peer = peerFor(ownerId, id);
+        if (!peer) return null;
+        return {
+          onRoute: update => peer.onRoute(update),
+          onEvents: notification => peer.onEvents(notification),
+          onOutcome: outcome => peer.onOutcome(outcome),
+          issueRuntimeCredentialProxyGrant: fence => peer.issueRuntimeCredentialProxyGrant(fence),
+          issueCloudAgentMcpGrant: async () => mcpGrant,
+        };
+      };
+    });
+    await createVercelSession({
+      sessionId,
+      kiloId: kiloSessionId(),
+      sandboxId,
+      kiloToken: token,
+      seal,
+    });
+    await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
+    const { credential, allocationId } = launchIdentity(provider);
+    const wrapper = await FakeWrapper.connect({ sandboxId, credential });
+    await wrapper.hello({ wrapperId: 'wr_scoped', allocationId });
+    const frame = await wrapper.next();
+    if (frame?.type !== 'session.prepare') throw new Error('expected session.prepare');
+    expect(frame.credentials.cloudAgentMcp).toEqual(mcpGrant);
+    expect(frame.credentials.proxy?.handle).toEqual(expect.any(String));
+    expect(frame.credentials.kilo.token).not.toBe(mcpGrant.token);
+    expect(JSON.stringify(frame.spec)).not.toContain(mcpGrant.token);
+    expect(JSON.stringify(provider.launchEnvs)).not.toContain(mcpGrant.token);
+    await runInDurableObject(sandbox, instance => {
+      const db = drizzle(instance.ctx.storage);
+      expect(JSON.stringify(db.select().from(routesTable).all())).not.toContain(mcpGrant.token);
+    });
+    expect(JSON.stringify(await sessionStub.getMetadata())).not.toContain(mcpGrant.token);
+    wrapper.close();
+    await waitFor(async () =>
+      expect((await sandbox.getAllocationState()).kind).toBe('disconnected')
+    );
+    mcpGrant.token = 'recovered-scoped-mcp-fixture';
+    mcpGrant.expiresAt += 24 * 3600;
+    const reconnected = await FakeWrapper.connect({ sandboxId, credential });
+    await reconnected.hello({ wrapperId: 'wr_scoped', allocationId });
+    const recovered = await reconnected.next();
+    if (recovered?.type !== 'session.prepare')
+      throw new Error('expected reconnected session.prepare');
+    expect(recovered.credentials.cloudAgentMcp).toEqual(mcpGrant);
+    expect(JSON.stringify(recovered.spec)).not.toContain(mcpGrant.token);
+  });
+
+  it.each(['rejection', 'timeout'] as const)(
+    'prepares without optional MCP credentials after issuance %s and retries on reconnect',
+    async failure => {
+      const sessionId = newSessionId();
+      const sandboxId = await generateSandboxId(sessionId);
+      const provider = createProvider();
+      const sandbox = await installSandbox(sandboxId, provider);
+      const { seal, token } = await sealedRuntimeAuthorization(sessionId);
+      const mcpGrant = {
+        url: 'https://mcp.kiloapps.io/mcp',
+        token: 'recovered-optional-prepare-mcp-grant',
+        expiresAt: Math.floor(Date.now() / 1000) + 24 * 3600,
+      };
+      let failIssuance = true;
+      const issueMcpGrant = vi.fn(async () => {
+        if (!failIssuance) return mcpGrant;
+        if (failure === 'rejection') throw new Error(`MCP failure containing ${mcpGrant.token}`);
+        return new Promise<typeof mcpGrant>(() => {});
+      });
+      const fields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+      const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+      await runInDurableObject(sandbox, instance => {
+        const peerFor = instance.sessionPeerFor.bind(instance);
+        instance.sessionPeerFor = (ownerId, id) => {
+          const peer = peerFor(ownerId, id);
+          if (!peer) return null;
+          return {
+            onRoute: update => peer.onRoute(update),
+            onEvents: notification => peer.onEvents(notification),
+            onOutcome: outcome => peer.onOutcome(outcome),
+            issueRuntimeCredentialProxyGrant: fence => peer.issueRuntimeCredentialProxyGrant(fence),
+            issueCloudAgentMcpGrant: issueMcpGrant,
+          };
+        };
+        Object.assign(instance, { grantIssueTimeoutMs: () => 100 });
+      });
+      const session = await createVercelSession({
+        sessionId,
+        kiloId: kiloSessionId(),
+        sandboxId,
+        kiloToken: token,
+        seal,
+      });
+      await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
+      const { credential, allocationId } = launchIdentity(provider);
+      const wrapper = await FakeWrapper.connect({ sandboxId, credential });
+      await wrapper.hello({ wrapperId: 'wr_optional_mcp', allocationId });
+      const frame = await wrapper.next();
+      if (frame?.type !== 'session.prepare' || frame.credentials === undefined)
+        throw new Error('expected session.prepare credentials');
+      expect(frame.credentials.cloudAgentMcp).toBeUndefined();
+      expect(frame.credentials.kilo.token).toEqual(expect.any(String));
+      expect(
+        await session.resolveRuntimeCredentialProxyGrant(frame.credentials.proxy?.handle ?? '')
+      ).not.toBeNull();
+      expect(await sandbox.status({ sessionId })).toMatchObject({ view: { state: 'preparing' } });
+      expect(issueMcpGrant).toHaveBeenCalledTimes(1);
+      expect(fields).toHaveBeenCalledWith({ sandboxId, sessionId, anchorSessionId: sessionId });
+      expect(warn).toHaveBeenCalledWith(
+        'Optional Cloud Agent MCP grant unavailable; continuing without it'
+      );
+      expect(JSON.stringify([fields.mock.calls, warn.mock.calls])).not.toContain(mcpGrant.token);
+
+      wrapper.close();
+      await waitFor(async () =>
+        expect((await sandbox.getAllocationState()).kind).toBe('disconnected')
+      );
+      failIssuance = false;
+      const reconnected = await FakeWrapper.connect({ sandboxId, credential });
+      await reconnected.hello({ wrapperId: 'wr_optional_mcp', allocationId });
+      const recovered = await reconnected.next();
+      if (recovered?.type !== 'session.prepare' || recovered.credentials === undefined)
+        throw new Error('expected recovered session.prepare credentials');
+      expect(recovered.credentials.cloudAgentMcp).toEqual(mcpGrant);
+      expect(issueMcpGrant).toHaveBeenCalledTimes(2);
+    }
+  );
+
   it.each(['before request', 'during token resolution'] as const)(
     'authorizes the model facade while disconnected %s and completes after same-wrapper reconnect',
     async disconnectAt => {
       const sessionId = newSessionId();
-      const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+      const sandboxId = await generateSandboxId(sessionId);
       const provider = createProvider();
       const sandboxStub = await installSandbox(sandboxId, provider);
       const { seal, token } = await sealedRuntimeAuthorization(sessionId);
@@ -763,7 +911,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
 
   it('re-prepares and mints a new handle after a wrapper restart, invalidating the old one', async () => {
     const sessionId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const provider = createProvider();
     const sandboxStub = await installSandbox(sandboxId, provider);
     const { seal, token } = await sealedRuntimeAuthorization(sessionId);
@@ -809,7 +957,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
 
   it('re-mints on a still-preparing route when a wrapper restart supersedes the handle', async () => {
     const sessionId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const provider = createProvider();
     const sandboxStub = await installSandbox(sandboxId, provider);
     const { seal, token } = await sealedRuntimeAuthorization(sessionId);
@@ -853,7 +1001,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
 
   it('resends the identical handle on a plain reconnect without re-binding', async () => {
     const sessionId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const provider = createProvider();
     const sandboxStub = await installSandbox(sandboxId, provider);
     const { seal, token } = await sealedRuntimeAuthorization(sessionId);
@@ -903,7 +1051,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
 
   it('does not send a stale handle when the fence changes between bind and send', async () => {
     const sessionId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const provider = createProvider();
     const sandboxStub = await installSandbox(sandboxId, provider);
     const { seal, token } = await sealedRuntimeAuthorization(sessionId);
@@ -963,7 +1111,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
 
   it('fails the route as workspace_setup_failed when the handle cannot be minted', async () => {
     const sessionId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const provider = createProvider();
     const sandboxStub = await installSandbox(sandboxId, provider);
     // A session peer that cannot mint stands in for a mint failure (no active
@@ -1042,7 +1190,7 @@ describe('SandboxControlV2 runtime proxy prepare frame secrets', () => {
     const { publicKey, privateKey } = generateSecretsKeyPair();
     const envelope = encryptWithPublicKey(SECRET_VALUE, publicKey);
     const sessionId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const provider = createProvider();
     const sandboxStub = await installSandbox(
       sandboxId,
@@ -1087,7 +1235,7 @@ describe('SandboxControlV2 runtime proxy prepare frame secrets', () => {
     const { publicKey, privateKey } = generateSecretsKeyPair();
     const envelope = encryptWithPublicKey(SECRET_VALUE, publicKey);
     const sessionId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const provider = createProvider();
     const sandboxStub = await installSandbox(
       sandboxId,
@@ -1143,7 +1291,7 @@ describe('SandboxControlV2 runtime proxy prepare frame secrets', () => {
     const { publicKey } = generateSecretsKeyPair();
     const envelope = encryptWithPublicKey(SECRET_VALUE, publicKey);
     const sessionId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const provider = createProvider();
     // No AGENT_ENV_VARS_PRIVATE_KEY binding: decryption fails at send time.
     const sandboxStub = await installSandbox(sandboxId, provider);
@@ -1190,5 +1338,120 @@ describe('SandboxControlV2 runtime proxy prepare frame secrets', () => {
     );
     expect(await wrapper.next(100)).toBeNull();
     expect(JSON.stringify(await readRouteRow(sandboxStub, sessionId))).not.toContain(SECRET_VALUE);
+  });
+});
+
+describe('wrapper history pages', () => {
+  async function setupHistory() {
+    const sessionId = newSessionId();
+    const kiloId = kiloSessionId();
+    const sandboxId = await generateSandboxId(sessionId);
+    const provider = createProvider();
+    await installSandbox(sandboxId, provider);
+    const { seal, token } = await sealedRuntimeAuthorization(sessionId);
+    const sessionStub = await createVercelSession({
+      sessionId,
+      kiloId,
+      sandboxId,
+      kiloToken: token,
+      seal,
+    });
+    await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
+    const { credential, allocationId } = launchIdentity(provider);
+    const wrapper = await FakeWrapper.connect({ sandboxId, credential });
+    await wrapper.hello({ wrapperId: 'wr_history', allocationId });
+    const frame = await wrapper.next();
+    if (frame?.type !== 'session.prepare') throw new Error('expected session.prepare');
+    await runInDurableObject(sessionStub, (_instance, state) => {
+      markHistoryHydrated(state.storage);
+    });
+    async function readPage(input: {
+      sessionId?: string;
+      kiloSessionId?: string;
+      cursor?: string;
+    }) {
+      const requestId = crypto.randomUUID();
+      wrapper.send({
+        type: 'history.page',
+        requestId,
+        sessionId: input.sessionId ?? sessionId,
+        kiloSessionId: input.kiloSessionId ?? kiloId,
+        ...(input.cursor === undefined ? {} : { cursor: input.cursor }),
+      });
+      for (;;) {
+        const result = await wrapper.next(5_000);
+        if (result === null) throw new Error('expected history.result');
+        if (result.type === 'history.result' && result.requestId === requestId) return result;
+      }
+    }
+    return { sessionId, kiloId, sessionStub, readPage };
+  }
+
+  it('serves a cold page, then every page of seeded native history', async () => {
+    const { sessionId, kiloId, sessionStub, readPage } = await setupHistory();
+    expect(await readPage({})).toMatchObject({
+      ok: true,
+      page: { kind: 'success', info: { id: kiloId }, messages: [], nextCursor: null },
+    });
+
+    const source = {
+      version: 'v2',
+      session: {
+        id: kiloId,
+        location: { directory: `/workspace/${sessionId}` },
+        time: { created: 1, updated: 2 },
+      },
+    };
+    const ids = Array.from({ length: 101 }, () => messageId());
+    await sessionStub.onEvents({
+      events: [
+        { type: 'conversation.source', properties: { sessionID: kiloId, source } },
+        ...ids.map((id, index) => ({
+          type: 'conversation.message.updated',
+          properties: {
+            sessionID: kiloId,
+            source,
+            message: { id, type: 'user', time: { created: index + 1 }, text: `prompt ${index}` },
+          },
+        })),
+      ],
+    });
+
+    const read: string[] = [];
+    let cursor: string | undefined;
+    do {
+      const result = await readPage({ cursor });
+      if (!result.ok) throw new Error(result.error.code);
+      const page = result.page as {
+        source: { version: string };
+        messages: Array<{ message: { id: string } }>;
+        nextCursor: string | null;
+      };
+      expect(page.source.version).toBe('v2');
+      read.push(...page.messages.map(item => item.message.id));
+      cursor = page.nextCursor ?? undefined;
+    } while (cursor);
+    expect(read.toSorted()).toEqual(ids.toSorted());
+  });
+
+  it('rejects sessions this sandbox does not host and cursors of another session', async () => {
+    const { readPage } = await setupHistory();
+    const other = await setupHistory();
+    expect(await readPage({ sessionId: newSessionId() })).toMatchObject({
+      ok: false,
+      error: { code: 'not_found', retryable: false },
+    });
+    expect(await readPage({ kiloSessionId: kiloSessionId() })).toMatchObject({
+      ok: false,
+      error: { code: 'not_found', retryable: false },
+    });
+    // The other sandbox's route is not hosted here, even with its own identity.
+    expect(
+      await readPage({ sessionId: other.sessionId, kiloSessionId: other.kiloId })
+    ).toMatchObject({ ok: false, error: { code: 'not_found' } });
+    expect(await readPage({ cursor: 'not-a-cursor' })).toMatchObject({
+      ok: false,
+      error: { code: 'unavailable' },
+    });
   });
 });

@@ -1,8 +1,40 @@
-export { isStreamError, isValidCloudAgentEvent } from './event-types';
-export type { CloudAgentEvent, StreamError, StreamErrorCode } from './event-types';
+export { NativeSyncClient, NativeSyncError } from './native-sync';
+export type {
+  NativeSyncOptions,
+  NativeEvent,
+  NativeSessionSummary,
+  NativePresenceState,
+  NativeSessionState,
+  NativePresenceConnection,
+  NativeSessionConnection,
+  NativeInstanceReply,
+  NativeSocket,
+  NativeSocketConstructor,
+} from './native-sync';
+export { listNativeModels } from './native-sync-discovery';
+export type { NativeDiscoveredModel } from './native-sync-discovery';
+export { projectNativeSnapshot } from './native-sync-snapshot';
+export type {
+  NativeEntity,
+  NativeAssetReader,
+  NativeSnapshot,
+  NativeSnapshotMessage,
+  NativeSnapshotProjection,
+  NativeSnapshotSession,
+} from './native-sync-snapshot';
+export { readNativeConversation } from './native-conversation-source';
+export type {
+  NativeConversation,
+  NativePendingRequests,
+  NativePendingQuestion,
+} from './native-conversation-source';
+
+export { isStreamError, isValidCloudAgentEvent } from './schemas';
+export type { CloudAgentEvent, StreamError, StreamErrorCode } from './schemas';
 
 export { formatError as formatSessionError } from './session-manager';
 export { createSessionManager } from './session-manager';
+export { sessionConfigFromFetchedSession } from './session-config';
 export { customerBillingFailureSchema, parseCustomerBillingFailure } from './schemas';
 export type { CustomerBillingFailure } from './schemas';
 export { CLI_MODEL_ID, cliModelLabel } from './cli-model';
@@ -40,7 +72,7 @@ export type {
 } from './session';
 
 export { normalize, normalizeCliEvent, isChatEvent, projectSessionGoal } from './normalizer';
-export type { NormalizedEvent, ChatEvent, ServiceEvent } from './normalizer';
+export type { NormalizedEvent, ChatEvent, ChatEventVersion, ServiceEvent } from './normalizer';
 
 export { reduce } from './reducer';
 
@@ -157,6 +189,7 @@ export type {
   CloudStatus,
   QuestionState,
   PermissionState,
+  UnreadablePermissionState,
   SlashCommandInfo,
   SlashCommandCatalogStatus,
   SuggestionAction,
@@ -174,9 +207,12 @@ export type {
   SessionGoalStatus,
   KiloSessionId,
   CloudAgentSessionId,
+  CloudSessionMetadata,
+  CloudSessionSnapshotPage,
   ResolvedSession,
   SessionSnapshot,
   SessionSnapshotPage,
+  CachedSessionSnapshotPage,
   SessionSnapshotPageOutcome,
   OlderMessagesError,
   Part,
@@ -202,3 +238,7 @@ export type {
 // `New session - <ISO>` placeholder that no display surface should show as
 // the session's title.
 export { isDefaultSessionTitle } from '@kilocode/session-ingest-contracts';
+
+export { createConversationSourceReader } from './conversation-source';
+export type { ConversationSource } from './conversation-source';
+export type { CloudSessionMessagesWirePage } from './schemas';

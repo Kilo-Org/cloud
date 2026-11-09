@@ -1,5 +1,7 @@
 'use client';
 
+import { adminFetch } from '@/lib/admin/admin-fetch';
+
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatMicrodollars, formatRelativeTime } from '@/lib/admin-utils';
@@ -75,7 +77,6 @@ export function UserAdminUsageBilling({
         if (variables.dryRun) {
           setBalanceResult(data);
         } else {
-          // Fix was applied - reset to unvalidated state and show toast
           setBalanceResult(null);
           void queryClient.invalidateQueries({ queryKey: ['admin-user', id] });
           void queryClient.invalidateQueries({ queryKey: ['admin-user-credit-transactions', id] });
@@ -116,7 +117,7 @@ export function UserAdminUsageBilling({
 
   const recomputeExpirationsMutation = useMutation<void, Error>({
     mutationFn: async () => {
-      const response = await fetch(
+      const response = await adminFetch(
         `/admin/api/users/${encodeURIComponent(id)}/kill-balance-cache`,
         {
           method: 'POST',
@@ -143,7 +144,7 @@ export function UserAdminUsageBilling({
         throw new Error('Enter a valid dollar amount > 0');
       }
 
-      const response = await fetch(
+      const response = await adminFetch(
         `/admin/api/users/${encodeURIComponent(id)}/dev/insert-usage-record`,
         {
           method: 'POST',

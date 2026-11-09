@@ -9,14 +9,24 @@ import {
   useRef,
   useState,
 } from 'react';
-import { AppState, type AppStateStatus } from 'react-native';
+import { AppState } from 'react-native';
 import { z } from 'zod';
 
 import { readStoredValueWithRetry } from '@/lib/auth/secure-store-read';
 
 // Device-local, not account metadata. The only stored values are enabled/disabled.
 const STORAGE_KEY = 'app-unlock-enabled';
-const BACKGROUND_LOCK_MS = 300_000;
+
+/**
+ * How long the app may stay in the background before the lock engages.
+ *
+ * Exported because it is not only the surface's business: the App Intents
+ * entity catalog answers from a background launch, so the same interval reaches
+ * the native catalog store (`system-search-index-mount.tsx`), which withholds
+ * the stored titles once it has passed. The two readings have to be one number.
+ */
+export const BACKGROUND_LOCK_MS = 300_000;
+
 const nativeResultSchema = z.discriminatedUnion('success', [
   // iOS includes nullable error and warning fields even after success.
   z.strictObject({
@@ -45,6 +55,7 @@ type AppUnlockContextValue = UnlockState & {
   busy: boolean;
   retry: () => void;
   setEnabled: (enabled: boolean) => void;
+  clearSettingOutcome: () => void;
 };
 const AppUnlockContext = createContext<AppUnlockContextValue | undefined>(undefined);
 
@@ -278,7 +289,7 @@ export function AppUnlockProvider({
 
   useEffect(() => {
     mounted.current = true;
-    const onChange = (next: AppStateStatus) => {
+    const onChange = (next: typeof AppState.currentState) => {
       appState.current = next;
       if (next === 'background' && !background.current) {
         intervalGeneration.current += 1;
@@ -323,6 +334,14 @@ export function AppUnlockProvider({
       void authenticate();
     }
   }, [authenticate]);
+  // Per-attempt feedback: the setting outcome belongs to the screen that
+  // started it, so leaving that screen retires it. Scoped to the setting
+  // purpose so a locked-scene outcome is never dropped.
+  const clearSettingOutcome = useCallback(() => {
+    if (current.current.purpose === 'setting') {
+      publish({ purpose: null, outcome: null });
+    }
+  }, [publish]);
   const setEnabled = useCallback(
     (enabled: boolean) => {
       void authenticate(enabled);
@@ -336,8 +355,9 @@ export function AppUnlockProvider({
         promptMessage === null || state.status === 'preference-loading' || state.phase !== 'idle',
       retry,
       setEnabled,
+      clearSettingOutcome,
     }),
-    [promptMessage, state, retry, setEnabled]
+    [promptMessage, state, retry, setEnabled, clearSettingOutcome]
   );
   return <AppUnlockContext value={value}>{children}</AppUnlockContext>;
 }

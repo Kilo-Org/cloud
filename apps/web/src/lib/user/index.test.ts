@@ -23,12 +23,15 @@ import {
   organization_groups,
   organization_group_memberships,
   organization_group_policy_settings,
+  organization_guardrails,
+  byoc_connections,
   organization_invitations,
   organization_recommendation_dismissals,
   security_audit_log,
   organizations,
   user_feedback,
   cloud_agent_feedback,
+  cloud_agent_webhook_triggers,
   user_admin_notes,
   magic_link_tokens,
   device_sessions,
@@ -44,6 +47,8 @@ import {
   kiloclaw_image_catalog,
   security_findings,
   security_finding_notifications,
+  support_access_grants,
+  support_access_grant_events,
   security_remediation_attempts,
   security_remediations,
   security_analysis_queue,
@@ -58,12 +63,18 @@ import {
   bot_requests,
   bot_request_cloud_agent_sessions,
   kiloclaw_admin_audit_logs,
+  admin_action_audit_logs,
   kiloclaw_scheduled_actions,
   kiloclaw_scheduled_action_stages,
   kiloclaw_scheduled_action_targets,
   user_push_tokens,
   user_activity_tokens,
   user_notification_preferences,
+  user_notification_history,
+  agent_briefing_snapshots,
+  agent_briefing_context_preferences,
+  agent_briefing_preferences,
+  cli_sessions_v2,
   spend_alert_settings,
   spend_alert_rules,
   spend_alert_rule_state,
@@ -71,11 +82,15 @@ import {
   spend_alert_deliveries,
   user_data_export_object_deletions,
   security_advisor_scans,
+  enkrypt_usage,
+  enkrypt_usage_decision,
+  api_kind,
   credit_campaigns,
   agent_environment_profiles,
   agent_environment_profile_mcp_servers,
   agent_environment_profile_skills,
   cloud_agent_sandbox_allocation_settings,
+  cloud_agent_environments,
   deleted_user_email_tombstones,
   impact_attribution_touches,
   impact_advocate_participants,
@@ -88,6 +103,7 @@ import {
   impact_advocate_reward_redemptions,
   impact_conversion_reports,
   github_branch_pull_requests,
+  auto_routing_custom_routers,
   github_install_states,
   code_review_feedback_events,
   code_review_memory_proposals,
@@ -109,17 +125,7 @@ import {
   coding_plan_subscriptions,
   byok_api_keys,
   openai_chatgpt_connections,
-  mcp_gateway_configs,
-  mcp_gateway_authorization_codes,
-  mcp_gateway_authorization_requests,
-  mcp_gateway_config_secrets,
-  mcp_gateway_connect_resources,
-  mcp_gateway_connection_instances,
-  mcp_gateway_provider_grants,
-  mcp_gateway_pending_provider_authorizations,
-  mcp_gateway_oauth_clients,
-  mcp_gateway_oauth_grants,
-  deployments_ephemeral,
+  claude_billing_connections,
   operation_ledgers,
   analytics_event_outbox,
   bouncer_credit_event_outbox,
@@ -137,14 +143,20 @@ import {
   cloud_agent_pending_uploads,
   cloud_agent_workspace_folders,
   cloud_agent_worktrees,
+  cloud_agent_pr_watches,
+  cloud_agent_pr_watch_activity,
   todo_items,
   todo_lists,
   passkey_credentials,
   passkey_challenges,
   passkey_sign_in_tickets,
+  session_step_up_challenges,
+  session_step_up_proofs,
 } from '@kilocode/db/schema';
+import { hashWebSessionId } from '@kilocode/web-shared/lib/admin/step-up-store';
 
 import { eq, count, inArray, and, isNull, sql } from 'drizzle-orm';
+import { lockGitHubIdentity } from '@kilocode/db/github-identity';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import {
   softDeleteUser,
@@ -186,10 +198,14 @@ import {
   SecurityFindingNotificationStatus,
   UserDeletionCloudSubjectResolution,
   UserDeletionRequestStatus,
+  type AuthProviderId,
+  type VercelComputeCredentialEnvelope,
 } from '@kilocode/db/schema-types';
 
 import type * as StripeClient from '@kilocode/web-shared/lib/stripe-client';
+import type * as PostHogModule from '@kilocode/web-shared/lib/posthog';
 import type * as BouncerClient from '@kilocode/web-shared/lib/bouncer/client';
+import type { WatchwoodSignupAssessment } from '@/lib/auth/watchwood';
 
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   ...jest.requireActual('@kilocode/web-shared/lib/config.server'),
@@ -219,6 +235,27 @@ const { createStripeCustomer, deleteStripeCustomer } = jest.requireMock<typeof S
   '@kilocode/web-shared/lib/stripe-client'
 );
 
+jest.mock<typeof PostHogModule>('@kilocode/web-shared/lib/posthog', () => {
+  const mockCapture = jest.fn();
+  return {
+    __esModule: true,
+    default: jest.fn(() => ({
+      capture: mockCapture,
+      alias: jest.fn(),
+      debug: jest.fn(),
+      isFeatureEnabled: jest.fn(),
+      getFeatureFlag: jest.fn(),
+    })),
+    flushPostHog: jest.fn(async () => {}),
+    shutdownPosthog: jest.fn(async () => {}),
+    mockCapture,
+  };
+});
+
+const { mockCapture } = jest.requireMock('@kilocode/web-shared/lib/posthog') as {
+  mockCapture: jest.Mock;
+};
+
 jest.mock('@/lib/impact/affiliate-events', () => ({
   recordAffiliateAttributionAndQueueParentEvent: jest.fn(async () => null),
 }));
@@ -240,13 +277,17 @@ const mockRecordAffiliateAttributionAndQueueParentEvent = jest.mocked(
 
 describe('User', () => {
   // Shared cleanup for all tests in this suite to prevent data pollution
+  beforeEach(() => {
+    mockCapture.mockReset();
+  });
+
   afterEach(async () => {
+    await db.delete(cloud_agent_pr_watches);
     await db.delete(cloud_agent_worktrees);
     await db.delete(cloud_agent_workspace_folders);
     await db.delete(todo_lists);
     await db.delete(user_deletion_steps);
     await db.delete(user_deletion_requests);
-    await db.delete(deployments_ephemeral);
     await db.delete(operation_ledgers);
     await db.delete(analytics_event_outbox);
     await db.delete(user_data_export_parts);
@@ -284,6 +325,7 @@ describe('User', () => {
     await db.delete(organization_recommendation_dismissals);
     await db.delete(security_audit_log);
     await db.delete(kiloclaw_admin_audit_logs);
+    await db.delete(admin_action_audit_logs);
     await db.delete(model_eval_ingestions);
     await db.delete(kiloclaw_scheduled_action_targets);
     await db.delete(kiloclaw_scheduled_action_stages);
@@ -327,16 +369,9 @@ describe('User', () => {
     await db.delete(kiloclaw_instances);
     await db.delete(agent_environment_profile_skills);
     await db.delete(agent_environment_profile_mcp_servers);
+    await db.delete(cloud_agent_webhook_triggers);
+    await db.delete(cloud_agent_environments);
     await db.delete(agent_environment_profiles);
-    await db.delete(mcp_gateway_pending_provider_authorizations);
-    await db.delete(mcp_gateway_authorization_codes);
-    await db.delete(mcp_gateway_authorization_requests);
-    await db.delete(mcp_gateway_oauth_grants);
-    await db.delete(mcp_gateway_oauth_clients);
-    await db.delete(mcp_gateway_provider_grants);
-    await db.delete(mcp_gateway_connection_instances);
-    await db.delete(mcp_gateway_connect_resources);
-    await db.delete(mcp_gateway_configs);
     await db.delete(github_branch_pull_requests);
     await db.delete(code_review_memory_proposals);
     await db.delete(code_review_feedback_events);
@@ -345,7 +380,12 @@ describe('User', () => {
     await db.delete(platform_access_token_credentials);
     await db.delete(platform_integrations);
     await db.delete(github_app_installations);
+    await db.delete(byoc_connections);
+    await db.delete(enkrypt_usage);
+    await db.delete(support_access_grant_events);
+    await db.delete(support_access_grants);
     await db.delete(organizations);
+    await db.delete(cli_sessions_v2);
     await db.delete(kilocode_users);
   });
 
@@ -869,6 +909,269 @@ describe('User', () => {
       jest.restoreAllMocks();
     });
 
+    it.each<WatchwoodSignupAssessment>([
+      {
+        status: 'assessed',
+        riskScore: 1,
+        safetyIdentifier: '4829b420-d43c-4f31-893d-f5042cf274cf',
+        latencyMs: 10,
+        assessedAt: 1,
+      },
+      { status: 'unavailable', latencyMs: 1000, assessedAt: 1 },
+      { status: 'missing', latencyMs: 0, assessedAt: 1 },
+    ])('creates an account with a $status shadow assessment', async watchwood => {
+      const email = `watchwood-${watchwood.status}@example.com`;
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: email,
+          google_user_name: 'Shadow Signup',
+          google_user_image_url: '',
+          hosted_domain: null,
+          provider: 'google',
+          provider_account_id: `watchwood-${watchwood.status}`,
+        },
+        undefined,
+        false,
+        new Headers({ 'x-forwarded-for': '203.0.113.70' }),
+        null,
+        { watchwood }
+      );
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.isNew).toBe(true);
+      expect(await findUserById(result.user.id)).toMatchObject({ google_user_email: email });
+      expect(await getUserAuthProviders(result.user.id)).toMatchObject([
+        { provider: 'google', provider_account_id: `watchwood-${watchwood.status}` },
+      ]);
+    });
+
+    it('refuses a native signup without verified admission before creating a Stripe customer or user', async () => {
+      const email = 'native-admission-refused@example.com';
+      const verifyAdmission = jest.fn().mockResolvedValue(false);
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: email,
+          google_user_name: 'Unverified',
+          google_user_image_url: '',
+          hosted_domain: null,
+          provider: 'email',
+          provider_account_id: email,
+        },
+        undefined,
+        true,
+        new Headers({ 'x-forwarded-for': '203.0.113.68' }),
+        undefined,
+        undefined,
+        true,
+        verifyAdmission
+      );
+
+      expect(result).toEqual({ success: false, error: 'ADMISSION_REQUIRED' });
+      expect(verifyAdmission).toHaveBeenCalledTimes(1);
+      expect(createStripeCustomer).not.toHaveBeenCalled();
+      expect(
+        await db.query.kilocode_users.findFirst({
+          where: eq(kilocode_users.google_user_email, email),
+        })
+      ).toBeUndefined();
+      expect(
+        await db.query.user_auth_provider.findFirst({
+          where: eq(user_auth_provider.provider_account_id, email),
+        })
+      ).toBeUndefined();
+    });
+
+    it('refuses missing native admission before calling the signup bouncer', async () => {
+      const email = 'native-admission-before-bouncer@example.com';
+      mockSignupDecide.mockResolvedValue(null);
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: email,
+          google_user_name: 'Unverified',
+          google_user_image_url: '',
+          hosted_domain: null,
+          provider: 'email',
+          provider_account_id: email,
+        },
+        undefined,
+        true,
+        new Headers({ 'x-forwarded-for': '203.0.113.70' }),
+        undefined,
+        undefined,
+        true,
+        async () => false
+      );
+
+      expect(result).toEqual({ success: false, error: 'ADMISSION_REQUIRED' });
+      expect(mockSignupDecide).not.toHaveBeenCalled();
+      expect(createStripeCustomer).not.toHaveBeenCalled();
+    });
+
+    it('does not require native signup admission for an existing account', async () => {
+      const email = 'native-admission-existing@example.com';
+      const args = {
+        google_user_email: email,
+        google_user_name: 'Existing',
+        google_user_image_url: '',
+        hosted_domain: null,
+        provider: 'email' as const,
+        provider_account_id: email,
+      };
+      const headers = new Headers({ 'x-forwarded-for': '203.0.113.69' });
+      const created = await createOrUpdateUser(args, undefined, true, headers);
+      expect(created.success).toBe(true);
+      const verifyAdmission = jest.fn().mockResolvedValue(false);
+
+      const signedIn = await createOrUpdateUser(
+        args,
+        undefined,
+        true,
+        headers,
+        undefined,
+        undefined,
+        true,
+        verifyAdmission
+      );
+
+      expect(signedIn.success).toBe(true);
+      if (!signedIn.success) return;
+      expect(signedIn.isNew).toBe(false);
+      expect(verifyAdmission).not.toHaveBeenCalled();
+    });
+
+    describe('while email signups are disabled', () => {
+      const emailArgs = (email: string) => ({
+        google_user_email: email,
+        google_user_name: 'Email User',
+        google_user_image_url: '',
+        hosted_domain: null,
+        provider: 'email' as const,
+        provider_account_id: email,
+      });
+      const headers = () => new Headers({ 'x-forwarded-for': '203.0.113.90' });
+
+      afterEach(() => {
+        process.env.EMAIL_SIGNUPS_ENABLED = 'true';
+      });
+
+      it('refuses a new email account before Bouncer, Stripe, or user creation', async () => {
+        const email = 'email-signup-disabled-new@example.com';
+        process.env.EMAIL_SIGNUPS_ENABLED = 'false';
+
+        const result = await createOrUpdateUser(emailArgs(email), undefined, true, headers());
+
+        expect(result).toEqual({ success: false, error: 'EMAIL-SIGNUP-DISABLED' });
+        expect(mockSignupDecide).not.toHaveBeenCalled();
+        expect(createStripeCustomer).not.toHaveBeenCalled();
+        expect(
+          await db.query.kilocode_users.findFirst({
+            where: eq(kilocode_users.google_user_email, email),
+          })
+        ).toBeUndefined();
+      });
+
+      it('signs in an existing email user', async () => {
+        const email = 'email-signup-disabled-existing@example.com';
+        const created = await createOrUpdateUser(emailArgs(email), undefined, true, headers());
+        expect(created.success).toBe(true);
+        process.env.EMAIL_SIGNUPS_ENABLED = 'false';
+
+        const signedIn = await createOrUpdateUser(emailArgs(email), undefined, true, headers());
+
+        expect(signedIn.success).toBe(true);
+        if (!signedIn.success) return;
+        expect(signedIn.isNew).toBe(false);
+      });
+
+      it('links email to an existing OAuth user on their first magic link', async () => {
+        const email = 'email-signup-disabled-oauth@example.com';
+        const created = await createOrUpdateUser(
+          {
+            ...emailArgs(email),
+            provider: 'google',
+            provider_account_id: 'google-email-signup-disabled',
+          },
+          undefined,
+          false,
+          headers()
+        );
+        expect(created.success).toBe(true);
+        if (!created.success) return;
+        process.env.EMAIL_SIGNUPS_ENABLED = 'false';
+
+        const signedIn = await createOrUpdateUser(emailArgs(email), undefined, true, headers());
+
+        expect(signedIn.success).toBe(true);
+        if (!signedIn.success) return;
+        expect(signedIn.user.id).toBe(created.user.id);
+        expect(signedIn.isNew).toBe(false);
+      });
+
+      it('keeps EMAIL-ALREADY-USED for a normalized match of an existing account', async () => {
+        const created = await createOrUpdateUser(
+          emailArgs('emailsignupdisabledalias@gmail.com'),
+          undefined,
+          true,
+          headers()
+        );
+        expect(created.success).toBe(true);
+        process.env.EMAIL_SIGNUPS_ENABLED = 'false';
+
+        const result = await createOrUpdateUser(
+          emailArgs('email.signup.disabled.alias@gmail.com'),
+          undefined,
+          true,
+          headers()
+        );
+
+        expect(result).toEqual({ success: false, error: 'EMAIL-ALREADY-USED' });
+      });
+
+      it('refuses a case variant of a legacy account without a normalized email', async () => {
+        await insertTestUser({
+          id: 'email-signup-disabled-legacy',
+          google_user_email: 'Legacy.Case@Example.com',
+          normalized_email: null,
+        });
+        process.env.EMAIL_SIGNUPS_ENABLED = 'false';
+
+        const result = await createOrUpdateUser(
+          emailArgs('legacy.case@example.com'),
+          undefined,
+          true,
+          headers()
+        );
+
+        expect(result).toEqual({ success: false, error: 'EMAIL-ALREADY-USED' });
+        expect(createStripeCustomer).not.toHaveBeenCalled();
+        expect(
+          await db.query.kilocode_users.findFirst({
+            where: eq(kilocode_users.google_user_email, 'legacy.case@example.com'),
+          })
+        ).toBeUndefined();
+      });
+
+      it('still creates a new OAuth account', async () => {
+        process.env.EMAIL_SIGNUPS_ENABLED = 'false';
+
+        const result = await createOrUpdateUser(
+          {
+            ...emailArgs('email-signup-disabled-google-new@example.com'),
+            provider: 'google',
+            provider_account_id: 'google-email-signup-disabled-new',
+          },
+          undefined,
+          false,
+          headers()
+        );
+
+        expect(result.success).toBe(true);
+        if (!result.success) return;
+        expect(result.isNew).toBe(true);
+      });
+    });
+
     it.each([
       { name: 'IP rejection', flags: [{ name: 'signup:burst', source: 'ip' }] },
       { name: 'JA4 rejection', flags: [{ name: 'signup:ja4', source: 'ja4' }] },
@@ -1060,6 +1363,62 @@ describe('User', () => {
       expect(
         await db.query.kilocode_users.findFirst({ where: eq(kilocode_users.id, retry.user.id) })
       ).toBeDefined();
+    });
+
+    it('creates the account without an IP when a trusted path skips admission', async () => {
+      // SCIM directory-sync provisioning has no end user and no forwarded IP.
+      // Without the skip this fails closed with SIGNUP-UNAVAILABLE, which would
+      // block every directory-provisioned account in production.
+      const email = 'skip-admission@example.com';
+      const args = {
+        google_user_email: email,
+        google_user_name: 'Skip Admission',
+        google_user_image_url: '',
+        hosted_domain: null,
+        provider: 'workos' as const,
+        provider_account_id: 'workos-skip-admission',
+      };
+
+      const result = await createOrUpdateUser(
+        args,
+        undefined,
+        true,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        { skipSignupAdmission: true }
+      );
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.isNew).toBe(true);
+      // Admission is the only gate skipped: the account is still fully provisioned.
+      expect(createStripeCustomer).toHaveBeenCalledTimes(1);
+      expect(mockSignupDecide).not.toHaveBeenCalled();
+      expect(
+        await db.query.kilocode_users.findFirst({ where: eq(kilocode_users.id, result.user.id) })
+      ).toBeDefined();
+    });
+
+    it('still rejects a request with no IP when admission is not skipped', async () => {
+      // The guard against the skip becoming the default.
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: 'no-ip-no-skip@example.com',
+          google_user_name: 'No IP No Skip',
+          google_user_image_url: '',
+          hosted_domain: null,
+          provider: 'google' as const,
+          provider_account_id: 'google-no-ip-no-skip',
+        },
+        undefined,
+        false
+      );
+
+      expect(result).toEqual({ success: false, error: 'SIGNUP-UNAVAILABLE' });
+      expect(createStripeCustomer).not.toHaveBeenCalled();
     });
 
     it.each([undefined, '', 'not-a-digest', 'has space', 'a'.repeat(129)])(
@@ -1778,11 +2137,281 @@ describe('User', () => {
       expect(providerRows).toHaveLength(2);
       expect(providerRows.some(row => row.provider === 'github')).toBe(true);
     });
+
+    async function insertUserWithProviders(
+      primaryEmail: string,
+      providers: Array<{ provider: AuthProviderId; email: string }>
+    ) {
+      const user = await insertTestUser({
+        google_user_email: primaryEmail,
+        google_user_name: 'Existing Account',
+      });
+      if (providers.length > 0) {
+        await db.insert(user_auth_provider).values(
+          providers.map(({ provider, email }) => ({
+            kilo_user_id: user.id,
+            provider,
+            provider_account_id: `${provider}-${email}`,
+            email,
+            avatar_url: '',
+            display_name: null,
+            hosted_domain: 'example.com',
+          }))
+        );
+      }
+      return user;
+    }
+
+    async function providerTypesFor(userId: string) {
+      const rows = await db
+        .select({ provider: user_auth_provider.provider })
+        .from(user_auth_provider)
+        .where(eq(user_auth_provider.kilo_user_id, userId));
+      return rows.map(row => row.provider).sort();
+    }
+
+    function magicLinkSignIn(email: string) {
+      return createOrUpdateUser(
+        {
+          google_user_email: email,
+          google_user_name: 'Magic Link',
+          google_user_image_url: '',
+          hosted_domain: 'example.com',
+          provider: 'email',
+          provider_account_id: email,
+        },
+        undefined,
+        true
+      );
+    }
+
+    it('auto-links when a verified method holds the primary address', async () => {
+      const existing = await insertUserWithProviders('primary-match@example.com', [
+        { provider: 'google', email: 'primary-match@example.com' },
+      ]);
+
+      const result = await magicLinkSignIn('primary-match@example.com');
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.user.id).toBe(existing.id);
+      await expect(providerTypesFor(existing.id)).resolves.toEqual(['email', 'google']);
+    });
+
+    it('refuses auto-link when the verified method holds a different address', async () => {
+      const existing = await insertUserWithProviders('primary-a@example.com', [
+        { provider: 'github', email: 'primary-a@example.com' },
+        { provider: 'google', email: 'linked-b@example.com' },
+      ]);
+      mockCapture.mockClear();
+
+      const result = await magicLinkSignIn('primary-a@example.com');
+
+      expect(result.success).toBe(false);
+      if (result.success) return;
+      expect(result.error).toBe('DIFFERENT-OAUTH');
+      expect(mockCapture).toHaveBeenCalledWith(
+        expect.objectContaining({
+          distinctId: 'primary-a@example.com',
+          event: 'auto_link_skipped_unverified_primary_address',
+          properties: {
+            existing_provider_count: 2,
+            existing_providers: expect.arrayContaining(['github', 'google']),
+            new_provider: 'email',
+          },
+        })
+      );
+      await expect(providerTypesFor(existing.id)).resolves.toEqual(['github', 'google']);
+    });
+
+    it('refuses auto-link when the account holds no verified method', async () => {
+      const existing = await insertUserWithProviders('github-only@example.com', [
+        { provider: 'github', email: 'github-only@example.com' },
+      ]);
+
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: 'github-only@example.com',
+          google_user_name: 'Google Later',
+          google_user_image_url: 'https://example.com/avatar.png',
+          hosted_domain: 'example.com',
+          provider: 'google',
+          provider_account_id: 'google-new',
+        },
+        undefined,
+        true
+      );
+
+      expect(result.success).toBe(false);
+      if (result.success) return;
+      expect(result.error).toBe('DIFFERENT-OAUTH');
+      await expect(providerTypesFor(existing.id)).resolves.toEqual(['github']);
+    });
+
+    it('matches the primary address regardless of case', async () => {
+      const existing = await insertUserWithProviders('case.match@example.com', [
+        { provider: 'anaconda', email: 'Case.Match@Example.COM' },
+      ]);
+
+      const result = await magicLinkSignIn('case.match@example.com');
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.user.id).toBe(existing.id);
+    });
+
+    it.each([
+      ['a plus alias of the primary address', 'alias+tag@example.com', 'alias@example.com'],
+      [
+        'a Gmail dot variant of the primary address',
+        'dot.variant@gmail.com',
+        'dotvariant@gmail.com',
+      ],
+    ])(
+      'refuses auto-link when the verified method holds %s',
+      async (_label, rowEmail, primaryEmail) => {
+        const existing = await insertUserWithProviders(primaryEmail, [
+          { provider: 'google', email: rowEmail },
+        ]);
+
+        const result = await magicLinkSignIn(primaryEmail);
+
+        expect(result.success).toBe(false);
+        if (result.success) return;
+        expect(result.error).toBe('DIFFERENT-OAUTH');
+        await expect(providerTypesFor(existing.id)).resolves.toEqual(['google']);
+      }
+    );
+
+    it.each(['apple', 'workos'] as const)(
+      'does not count a %s method at the primary address as verified',
+      async provider => {
+        const primaryEmail = `${provider}-primary@example.com`;
+        const existing = await insertUserWithProviders(primaryEmail, [
+          { provider, email: primaryEmail },
+        ]);
+
+        const result = await magicLinkSignIn(primaryEmail);
+
+        expect(result.success).toBe(false);
+        if (result.success) return;
+        expect(result.error).toBe('DIFFERENT-OAUTH');
+        await expect(providerTypesFor(existing.id)).resolves.toEqual([provider]);
+      }
+    );
+
+    it('keeps auto-link for an account with no provider rows', async () => {
+      const existing = await insertUserWithProviders('rowless-primary@example.com', []);
+
+      const result = await magicLinkSignIn('rowless-primary@example.com');
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.user.id).toBe(existing.id);
+      await expect(providerTypesFor(existing.id)).resolves.toEqual(['email']);
+    });
+
+    it('does not attribute a same-provider refusal to the primary-address requirement', async () => {
+      await insertUserWithProviders('same-provider-event@example.com', [
+        { provider: 'github', email: 'same-provider-event@example.com' },
+      ]);
+      mockCapture.mockClear();
+
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: 'same-provider-event@example.com',
+          google_user_name: 'Same Provider Event',
+          google_user_image_url: 'https://example.com/avatar.png',
+          hosted_domain: hosted_domain_specials.github,
+          provider: 'github',
+          provider_account_id: 'github-same-provider-new',
+        },
+        undefined,
+        true
+      );
+
+      expect(result.success).toBe(false);
+      if (result.success) return;
+      expect(result.error).toBe('DIFFERENT-OAUTH');
+      expect(mockCapture).not.toHaveBeenCalledWith(
+        expect.objectContaining({ event: 'auto_link_skipped_unverified_primary_address' })
+      );
+    });
+
+    it('keeps WorkOS SSO settlement unchanged', async () => {
+      const existing = await insertTestUser({
+        google_user_email: 'workos-other-method@example.com',
+        google_user_name: 'WorkOS Other Method',
+      });
+      await db.insert(user_auth_provider).values({
+        kilo_user_id: existing.id,
+        provider: 'github',
+        provider_account_id: 'github-workos-other-method',
+        email: 'workos-other-method@example.com',
+        avatar_url: '',
+        display_name: null,
+        hosted_domain: hosted_domain_specials.github,
+      });
+
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: 'workos-other-method@example.com',
+          google_user_name: 'WorkOS Later',
+          google_user_image_url: 'https://example.com/avatar.png',
+          hosted_domain: 'example.com',
+          provider: 'workos',
+          provider_account_id: 'workos-other-method',
+        },
+        undefined,
+        true
+      );
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.user.id).toBe(existing.id);
+
+      const providerRows = await db
+        .select()
+        .from(user_auth_provider)
+        .where(eq(user_auth_provider.kilo_user_id, existing.id));
+      expect(providerRows).toHaveLength(1);
+      expect(providerRows[0]?.provider).toBe('workos');
+      expect(providerRows[0]?.provider_account_id).toBe('workos-other-method');
+    });
   });
 
   describe('anonymizeCloudUserData', () => {
     const userId = 'oauth/google/Legacy.User';
     const deletedEmail = `deleted+${userId}@deleted.invalid`;
+
+    it('waits for an in-flight GitHub identity writer before it locks the user', async () => {
+      const user = await insertTestUser();
+      let release: () => void = () => {};
+      const held = new Promise<void>(resolve => {
+        release = resolve;
+      });
+      let acquired: () => void = () => {};
+      const locked = new Promise<void>(resolve => {
+        acquired = resolve;
+      });
+      const writer = db.transaction(async tx => {
+        await lockGitHubIdentity(tx, user.id, { authorizationId: null, credentialVersion: null });
+        acquired();
+        await held;
+      });
+      await locked;
+      try {
+        await expect(
+          db.transaction(async tx => {
+            await tx.execute(sql`SET LOCAL lock_timeout = '200ms'`);
+            await anonymizeCloudUserData(tx, user.id);
+          })
+        ).rejects.toMatchObject({ cause: expect.objectContaining({ code: '55P03' }) });
+      } finally {
+        release();
+        await writer;
+      }
+    });
 
     it.each([null, deletedEmail, 'deleted@deleted.invalid'])(
       'preserves deletion history and scrubs new PII on replay with normalized_email %p',
@@ -1841,6 +2470,31 @@ describe('User', () => {
           kilo_user_id: user.id,
           expires_at: new Date().toISOString(),
         });
+        const [stepUpCredential] = await db
+          .insert(passkey_credentials)
+          .values({
+            kilo_user_id: user.id,
+            credential_id: `step-up-credential-${randomUUID()}`,
+            public_key: 'public-key',
+          })
+          .returning();
+        await db.insert(session_step_up_challenges).values({
+          id: randomUUID(),
+          challenge: `challenge-${randomUUID()}`,
+          kilo_user_id: user.id,
+          session_id_hash: hashWebSessionId('deleted-session'),
+          purpose: 'session',
+          expires_at: new Date(Date.now() + 60_000).toISOString(),
+        });
+        await db.insert(session_step_up_proofs).values({
+          kilo_user_id: user.id,
+          session_id_hash: hashWebSessionId('deleted-session'),
+          method: 'webauthn_uv',
+          passkey_credential_id: stepUpCredential!.id,
+          purpose: 'session',
+          verified_at: new Date().toISOString(),
+          expires_at: new Date(Date.now() + 60_000).toISOString(),
+        });
 
         await db.transaction(tx => anonymizeCloudUserData(tx, user.id));
 
@@ -1884,6 +2538,18 @@ describe('User', () => {
             .select()
             .from(passkey_credentials)
             .where(eq(passkey_credentials.kilo_user_id, user.id))
+        ).toHaveLength(0);
+        expect(
+          await db
+            .select()
+            .from(session_step_up_challenges)
+            .where(eq(session_step_up_challenges.kilo_user_id, user.id))
+        ).toHaveLength(0);
+        expect(
+          await db
+            .select()
+            .from(session_step_up_proofs)
+            .where(eq(session_step_up_proofs.kilo_user_id, user.id))
         ).toHaveLength(0);
         expect(
           await db
@@ -1943,6 +2609,40 @@ describe('User', () => {
       ).toHaveLength(0);
     });
 
+    it("removes the deleted user's personal Claude billing connection and keeps the organization's", async () => {
+      const user = await insertTestUser({
+        google_user_email: `claude-billing-cleanup-${randomUUID()}@example.com`,
+      });
+      const organization = await createTestOrganization(
+        `Claude billing cleanup ${randomUUID()}`,
+        user.id,
+        0
+      );
+      await db.insert(claude_billing_connections).values([
+        { kilo_user_id: user.id, user_profile_id: `uprof_${randomUUID()}`, created_by: user.id },
+        {
+          organization_id: organization.id,
+          user_profile_id: `uprof_${randomUUID()}`,
+          created_by: user.id,
+        },
+      ]);
+
+      await db.transaction(tx => anonymizeCloudUserData(tx, user.id));
+
+      expect(
+        await db
+          .select()
+          .from(claude_billing_connections)
+          .where(eq(claude_billing_connections.kilo_user_id, user.id))
+      ).toHaveLength(0);
+      expect(
+        await db
+          .select()
+          .from(claude_billing_connections)
+          .where(eq(claude_billing_connections.organization_id, organization.id))
+      ).toHaveLength(1);
+    });
+
     it("keeps the organization's shared-services row when the connector is deleted", async () => {
       const connector = await insertTestUser({
         google_user_email: `chatgpt-shared-cleanup-${randomUUID()}@example.com`,
@@ -1979,6 +2679,96 @@ describe('User', () => {
       expect(rows).toHaveLength(1);
       expect(rows[0].kilo_user_id).toBeNull();
       expect(rows[0].created_by).toBe(connector.id);
+    });
+
+    it('detaches deleted personal profiles while retaining organization webhooks and unrelated profile references', async () => {
+      const user = await insertTestUser({
+        google_user_email: `webhook-profile-delete-${randomUUID()}@example.com`,
+      });
+      const owner = await insertTestUser({
+        google_user_email: `webhook-profile-owner-${randomUUID()}@example.com`,
+      });
+      const organization = await createTestOrganization(
+        `Webhook profile cleanup ${randomUUID()}`,
+        owner.id,
+        0
+      );
+      await db
+        .insert(organization_memberships)
+        .values({ organization_id: organization.id, kilo_user_id: user.id, role: 'member' });
+      const [deletedProfile, otherProfile, organizationProfile] = await db
+        .insert(agent_environment_profiles)
+        .values([
+          { owned_by_user_id: user.id, name: 'Deleted personal profile' },
+          { owned_by_user_id: owner.id, name: 'Other personal profile' },
+          { owned_by_organization_id: organization.id, name: 'Organization profile' },
+        ])
+        .returning();
+      const [creatorTrigger, otherCreatorTrigger, botTrigger, personalTrigger] = await db
+        .insert(cloud_agent_webhook_triggers)
+        .values([
+          {
+            trigger_id: 'deleted-creator-profile',
+            organization_id: organization.id,
+            github_repo: 'owner/repo',
+            profile_id: deletedProfile.id,
+          },
+          {
+            trigger_id: 'other-creator-profile',
+            organization_id: organization.id,
+            github_repo: 'owner/repo',
+            profile_id: otherProfile.id,
+          },
+          {
+            trigger_id: 'organization-profile',
+            organization_id: organization.id,
+            github_repo: 'owner/repo',
+            profile_id: organizationProfile.id,
+          },
+          {
+            trigger_id: 'deleted-personal-trigger',
+            user_id: user.id,
+            github_repo: 'owner/repo',
+            profile_id: deletedProfile.id,
+          },
+        ])
+        .returning();
+
+      await db.transaction(tx => anonymizeCloudUserData(tx, user.id));
+
+      expect(
+        await db
+          .select({
+            id: cloud_agent_webhook_triggers.id,
+            profileId: cloud_agent_webhook_triggers.profile_id,
+          })
+          .from(cloud_agent_webhook_triggers)
+          .where(eq(cloud_agent_webhook_triggers.organization_id, organization.id))
+      ).toEqual(
+        expect.arrayContaining([
+          { id: creatorTrigger.id, profileId: null },
+          { id: otherCreatorTrigger.id, profileId: otherProfile.id },
+          { id: botTrigger.id, profileId: organizationProfile.id },
+        ])
+      );
+      expect(
+        await db
+          .select()
+          .from(cloud_agent_webhook_triggers)
+          .where(eq(cloud_agent_webhook_triggers.id, personalTrigger.id))
+      ).toEqual([]);
+      expect(
+        await db
+          .select()
+          .from(agent_environment_profiles)
+          .where(eq(agent_environment_profiles.id, deletedProfile.id))
+      ).toEqual([]);
+      expect(
+        await db
+          .select({ id: agent_environment_profiles.id })
+          .from(agent_environment_profiles)
+          .where(inArray(agent_environment_profiles.id, [otherProfile.id, organizationProfile.id]))
+      ).toEqual(expect.arrayContaining([{ id: otherProfile.id }, { id: organizationProfile.id }]));
     });
 
     it('removes personal sandbox allocation settings while keeping the organization rows', async () => {
@@ -2023,9 +2813,275 @@ describe('User', () => {
           )
       ).toHaveLength(1);
     });
+
+    it('deletes all personal BYOC connections while preserving organization connections', async () => {
+      const user = await insertTestUser({ id: 'oauth/google/vercel-credential-owner' });
+      const organizationOwner = await insertTestUser();
+      const organization = await createTestOrganization(
+        'Vercel Credential Cleanup Org',
+        organizationOwner.id,
+        0
+      );
+      await db.insert(organization_memberships).values({
+        organization_id: organization.id,
+        kilo_user_id: user.id,
+        role: 'member',
+      });
+
+      const tokenEncrypted = {
+        scheme: 'byoc-vercel-credential-rsa-aes-256-gcm',
+        version: 1,
+        keyId: 'test-key',
+        ciphertext: {
+          encryptedData: 'encrypted-data',
+          encryptedDEK: 'encrypted-dek',
+          algorithm: 'rsa-aes-256-gcm',
+          version: 1,
+        },
+      } satisfies VercelComputeCredentialEnvelope;
+      const personalCredentialId = randomUUID();
+      const organizationCredentialId = randomUUID();
+      const otherPersonalId = randomUUID();
+      await db.insert(byoc_connections).values([
+        {
+          id: personalCredentialId,
+          organization_id: null,
+          user_id: user.id,
+          provider: 'vercel',
+          credentials_encrypted: tokenEncrypted,
+          config: { token_scope: 'team', team_id: 'team_personal', project_id: 'prj_personal' },
+        },
+        {
+          id: organizationCredentialId,
+          organization_id: organization.id,
+          user_id: null,
+          provider: 'vercel',
+          credentials_encrypted: tokenEncrypted,
+          config: {
+            token_scope: 'team',
+            team_id: 'team_organization',
+            project_id: 'prj_organization',
+          },
+        },
+        {
+          id: otherPersonalId,
+          user_id: user.id,
+          provider: 'another-provider',
+          credentials_encrypted: tokenEncrypted,
+          config: { region: 'test-region' },
+        },
+      ]);
+
+      await db.transaction(tx => anonymizeCloudUserData(tx, user.id));
+
+      expect(
+        await db
+          .select()
+          .from(byoc_connections)
+          .where(eq(byoc_connections.id, personalCredentialId))
+      ).toHaveLength(0);
+      expect(
+        await db.query.byoc_connections.findFirst({
+          where: eq(byoc_connections.id, otherPersonalId),
+        })
+      ).toBeUndefined();
+      expect(
+        await db
+          .select()
+          .from(byoc_connections)
+          .where(eq(byoc_connections.id, organizationCredentialId))
+      ).toEqual([
+        expect.objectContaining({
+          id: organizationCredentialId,
+          organization_id: organization.id,
+          user_id: null,
+          provider: 'vercel',
+          credentials_encrypted: tokenEncrypted,
+        }),
+      ]);
+    });
   });
 
   describe('softDeleteUser', () => {
+    it('revokes the actor open support access grants and records events', async () => {
+      const admin = await insertTestUser({
+        is_admin: true,
+      });
+      const owner = await insertTestUser({ is_admin: false });
+      const organization = await createTestOrganization(
+        `soft-delete-support-${crypto.randomUUID()}`,
+        owner.id,
+        0
+      );
+      const now = new Date();
+      const [grant] = await db
+        .insert(support_access_grants)
+        .values({
+          actor_kilo_user_id: admin.id,
+          organization_id: organization.id,
+          action_class: 'support_read',
+          status: 'active',
+          reason: 'investigating a customer report',
+          requested_duration_seconds: 1800,
+          issued_at: now.toISOString(),
+          expires_at: new Date(now.getTime() + 30 * 60 * 1000).toISOString(),
+        })
+        .returning();
+
+      await softDeleteUser(admin.id);
+
+      const [revoked] = await db
+        .select()
+        .from(support_access_grants)
+        .where(eq(support_access_grants.id, grant.id));
+      expect(revoked).toMatchObject({
+        status: 'revoked',
+        revoke_reason: 'actor account soft-deleted',
+      });
+      const events = await db
+        .select()
+        .from(support_access_grant_events)
+        .where(eq(support_access_grant_events.grant_id, grant.id));
+      expect(events).toEqual([expect.objectContaining({ event_type: 'revoked' })]);
+    });
+
+    it('removes session step-up rows', async () => {
+      const user = await insertTestUser();
+      const [credential] = await db
+        .insert(passkey_credentials)
+        .values({
+          kilo_user_id: user.id,
+          credential_id: `soft-delete-step-up-${randomUUID()}`,
+          public_key: 'public-key',
+        })
+        .returning();
+      await db.insert(session_step_up_challenges).values({
+        id: randomUUID(),
+        challenge: `challenge-${randomUUID()}`,
+        kilo_user_id: user.id,
+        session_id_hash: hashWebSessionId('soft-delete-session'),
+        purpose: 'session',
+        expires_at: new Date(Date.now() + 60_000).toISOString(),
+      });
+      await db.insert(session_step_up_proofs).values({
+        kilo_user_id: user.id,
+        session_id_hash: hashWebSessionId('soft-delete-session'),
+        method: 'webauthn_uv',
+        passkey_credential_id: credential!.id,
+        purpose: 'session',
+        verified_at: new Date().toISOString(),
+        expires_at: new Date(Date.now() + 60_000).toISOString(),
+      });
+
+      await softDeleteUser(user.id);
+
+      expect(
+        await db
+          .select()
+          .from(session_step_up_challenges)
+          .where(eq(session_step_up_challenges.kilo_user_id, user.id))
+      ).toHaveLength(0);
+      expect(
+        await db
+          .select()
+          .from(session_step_up_proofs)
+          .where(eq(session_step_up_proofs.kilo_user_id, user.id))
+      ).toHaveLength(0);
+    });
+
+    it('deletes OAuth-owned PR watch policy and activity without touching another owner', async () => {
+      const user = await insertTestUser({ id: `oauth/github|watch-privacy-${randomUUID()}` });
+      const otherUser = await insertTestUser();
+      const [integration] = await db
+        .insert(platform_integrations)
+        .values({
+          owned_by_user_id: otherUser.id,
+          platform: 'github',
+          integration_type: 'app',
+        })
+        .returning();
+      if (!integration) throw new Error('Missing integration fixture');
+      const policy = {
+        version: 1 as const,
+        model: 'anthropic/claude-sonnet-4.6',
+        profileId: null,
+        categories: { reviews: true, failedChecks: true, baseUpdates: false },
+        branchStrategy: 'merge' as const,
+        historyRewriteConsent: false,
+        maxAttemptsPerProblem: 2,
+        maxTotalAttempts: 10,
+        observationOnlyConsent: true as const,
+        futureEventsOnlyConsent: true as const,
+        noHardSpendCapConsent: true as const,
+      };
+      const watches = await db
+        .insert(cloud_agent_pr_watches)
+        .values(
+          [user, otherUser].map((owner, index) => ({
+            kilo_user_id: owner.id,
+            integration_id: integration.id,
+            installation_id: '123',
+            github_app_type: 'standard' as const,
+            repository_id: '123',
+            repo_url: 'https://github.com/kilo/watch-privacy',
+            pr_number: index + 1,
+            source_session_id: `ses_${randomUUID()}`,
+            source_cloud_agent_session_id: `workspace_${randomUUID()}`,
+            worktree_id: `worktree_${randomUUID()}`,
+            head_ref: 'fix',
+            base_ref: 'main',
+            head_sha: 'a'.repeat(40),
+            base_sha: 'b'.repeat(40),
+            policy,
+            projection: { privateFeedback: 'Customer-sensitive feedback' },
+            expires_at: new Date(Date.now() + 3600000).toISOString(),
+          }))
+        )
+        .returning();
+      const ownedWatch = watches.find(watch => watch.kilo_user_id === user.id);
+      const otherWatch = watches.find(watch => watch.kilo_user_id === otherUser.id);
+      if (!ownedWatch || !otherWatch) throw new Error('Missing watch fixtures');
+      await db.insert(cloud_agent_pr_watch_activity).values([
+        {
+          watch_id: ownedWatch.id,
+          generation: 1,
+          kind: 'feedback',
+          data: { body: 'Private feedback' },
+        },
+        {
+          watch_id: otherWatch.id,
+          generation: 1,
+          kind: 'feedback',
+          data: { body: 'Keep this feedback' },
+        },
+      ]);
+      await softDeleteUser(user.id);
+      expect(
+        await db
+          .select()
+          .from(cloud_agent_pr_watches)
+          .where(eq(cloud_agent_pr_watches.kilo_user_id, user.id))
+      ).toEqual([]);
+      expect(
+        await db
+          .select()
+          .from(cloud_agent_pr_watch_activity)
+          .where(eq(cloud_agent_pr_watch_activity.watch_id, ownedWatch.id))
+      ).toEqual([]);
+      expect(
+        await db
+          .select()
+          .from(cloud_agent_pr_watches)
+          .where(eq(cloud_agent_pr_watches.id, otherWatch.id))
+      ).toHaveLength(1);
+      expect(
+        await db
+          .select()
+          .from(cloud_agent_pr_watch_activity)
+          .where(eq(cloud_agent_pr_watch_activity.watch_id, otherWatch.id))
+      ).toHaveLength(1);
+    });
+
     it('scrubs worktree names without removing deletion fences or another owner’s names', async () => {
       const user = await insertTestUser();
       const otherUser = await insertTestUser();
@@ -2382,6 +3438,46 @@ describe('User', () => {
           .from(cloud_agent_pending_uploads)
           .where(eq(cloud_agent_pending_uploads.id, otherPending.id))
       ).toHaveLength(1);
+    });
+
+    it('preserves attachment cleanup work until completion', async () => {
+      const user = await insertTestUser();
+      const id = crypto.randomUUID();
+      await db.insert(cloud_agent_pending_uploads).values({
+        id,
+        kilo_user_id: user.id,
+        object_key: `${user.id}/cloud-agent/${crypto.randomUUID()}.bin`,
+        message_uuid: crypto.randomUUID(),
+        attachment_id: crypto.randomUUID(),
+        byte_size: 42,
+        status: 'linked',
+        expires_at: new Date(Date.now() + 60_000).toISOString(),
+      });
+      mockR2Send.mockRejectedValue(new Error('R2 unavailable'));
+      try {
+        await expect(softDeleteUser(user.id)).rejects.toThrow(
+          'Cloud Agent attachment cleanup incomplete'
+        );
+        expect(
+          await db
+            .select({
+              id: cloud_agent_pending_uploads.id,
+              status: cloud_agent_pending_uploads.status,
+            })
+            .from(cloud_agent_pending_uploads)
+            .where(eq(cloud_agent_pending_uploads.id, id))
+        ).toEqual([{ id, status: 'pending' }]);
+      } finally {
+        mockR2Send.mockResolvedValue({});
+      }
+
+      await softDeleteUser(user.id);
+      expect(
+        await db
+          .select({ id: cloud_agent_pending_uploads.id })
+          .from(cloud_agent_pending_uploads)
+          .where(eq(cloud_agent_pending_uploads.id, id))
+      ).toEqual([]);
     });
 
     it('deletes user data export state and dependent multipart and outbox rows', async () => {
@@ -2941,178 +4037,6 @@ describe('User', () => {
       expect(findingRows[0]?.owned_by_organization_id).toBe(organization.id);
     });
 
-    it('deletes gateway provider grants and pending provider state', async () => {
-      const user = await insertTestUser();
-      const [config] = await db
-        .insert(mcp_gateway_configs)
-        .values({
-          owner_scope: 'personal',
-          owner_id: user.id,
-          name: 'Gateway config',
-          remote_url: 'https://example.com/mcp',
-          auth_mode: 'oauth_static',
-          sharing_mode: 'single_user',
-        })
-        .returning();
-      await db.insert(mcp_gateway_config_secrets).values({
-        config_id: config.config_id,
-        secret_kind: 'static_headers',
-        encrypted_secret: 'encrypted-config-secret',
-      });
-      const [route] = await db
-        .insert(mcp_gateway_connect_resources)
-        .values({
-          config_id: config.config_id,
-          owner_scope: 'personal',
-          owner_id: user.id,
-          route_key: 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_',
-          canonical_url: 'https://mcp.kilosessions.ai/mcp-connect/user/test/config/key',
-          route_status: 'active',
-        })
-        .returning();
-      const [instance] = await db
-        .insert(mcp_gateway_connection_instances)
-        .values({
-          config_id: config.config_id,
-          owner_scope: 'personal',
-          owner_id: user.id,
-          kilo_user_id: user.id,
-          instance_status: 'active',
-        })
-        .returning();
-      await db.insert(mcp_gateway_provider_grants).values({
-        instance_id: instance.instance_id,
-        encrypted_grant: 'encrypted-provider-token',
-        provider_subject: 'provider-user',
-        grant_status: 'active',
-      });
-      const [oauthClient] = await db
-        .insert(mcp_gateway_oauth_clients)
-        .values({
-          client_id: 'mcp:test-client',
-          registration_token_hash: 'registration-token-hash',
-          token_endpoint_auth_method: 'none',
-          redirect_uris: ['https://client.example/callback'],
-          grant_types: ['authorization_code'],
-          response_types: ['code'],
-          declared_scopes: ['mcp:access'],
-        })
-        .returning();
-      const [oauthGrant] = await db
-        .insert(mcp_gateway_oauth_grants)
-        .values({
-          oauth_client_id: oauthClient.oauth_client_id,
-          kilo_user_id: user.id,
-          owner_scope: 'personal',
-          owner_id: user.id,
-          config_id: config.config_id,
-          connect_resource_id: route.connect_resource_id,
-          instance_id: instance.instance_id,
-          redirect_uri: 'https://client.example/callback',
-          granted_scopes: ['mcp:access'],
-          execution_context: { type: 'personal' },
-          config_version: 1,
-        })
-        .returning();
-      const [authorizationRequest] = await db
-        .insert(mcp_gateway_authorization_requests)
-        .values({
-          request_state_hash: 'request-state-hash',
-          oauth_client_id: oauthClient.oauth_client_id,
-          oauth_grant_id: oauthGrant.oauth_grant_id,
-          client_id: 'mcp:test-client',
-          owner_scope: 'personal',
-          owner_id: user.id,
-          config_id: config.config_id,
-          route_key: route.route_key,
-          canonical_resource_url: route.canonical_url,
-          redirect_uri: 'https://client.example/callback',
-          requested_scopes: ['mcp:access'],
-          granted_scopes: ['mcp:access'],
-          code_challenge: 'challenge',
-          code_challenge_method: 'S256',
-          execution_context: { type: 'personal' },
-          kilo_user_id: user.id,
-          instance_id: instance.instance_id,
-          request_status: 'pending',
-          expires_at: new Date(Date.now() + 60_000).toISOString(),
-        })
-        .returning();
-      await db.insert(mcp_gateway_authorization_codes).values({
-        code_hash: 'authorization-code-hash',
-        authorization_request_id: authorizationRequest.authorization_request_id,
-        oauth_client_id: authorizationRequest.oauth_client_id,
-        oauth_grant_id: oauthGrant.oauth_grant_id,
-        client_id: authorizationRequest.client_id,
-        owner_scope: 'personal',
-        owner_id: user.id,
-        config_id: config.config_id,
-        route_key: route.route_key,
-        canonical_resource_url: route.canonical_url,
-        redirect_uri: authorizationRequest.redirect_uri,
-        granted_scopes: ['mcp:access'],
-        code_challenge: 'challenge',
-        code_challenge_method: 'S256',
-        execution_context: { type: 'personal' },
-        kilo_user_id: user.id,
-        instance_id: instance.instance_id,
-        expires_at: new Date(Date.now() + 60_000).toISOString(),
-      });
-      await db.insert(mcp_gateway_pending_provider_authorizations).values({
-        state_hash: 'pending-state-hash',
-        oauth_grant_id: oauthGrant.oauth_grant_id,
-        config_id: config.config_id,
-        instance_id: instance.instance_id,
-        owner_scope: 'personal',
-        owner_id: user.id,
-        kilo_user_id: user.id,
-        route_key: route.route_key,
-        canonical_resource_url: route.canonical_url,
-        remote_url: config.remote_url,
-        auth_mode: 'oauth_static',
-        provider_authorization_endpoint: 'https://example.com/authorize',
-        provider_token_endpoint: 'https://example.com/token',
-        encrypted_state: 'encrypted-provider-state',
-        execution_context: { type: 'personal' },
-        config_version: 1,
-        pending_status: 'pending',
-        expires_at: new Date(Date.now() + 60_000).toISOString(),
-      });
-
-      await softDeleteUser(user.id);
-
-      const grants = await db
-        .select()
-        .from(mcp_gateway_provider_grants)
-        .where(eq(mcp_gateway_provider_grants.instance_id, instance.instance_id));
-      const configSecrets = await db
-        .select()
-        .from(mcp_gateway_config_secrets)
-        .where(eq(mcp_gateway_config_secrets.config_id, config.config_id));
-      const pending = await db
-        .select()
-        .from(mcp_gateway_pending_provider_authorizations)
-        .where(eq(mcp_gateway_pending_provider_authorizations.kilo_user_id, user.id));
-      const authorizationCodes = await db
-        .select()
-        .from(mcp_gateway_authorization_codes)
-        .where(eq(mcp_gateway_authorization_codes.kilo_user_id, user.id));
-      const authorizationRequests = await db
-        .select()
-        .from(mcp_gateway_authorization_requests)
-        .where(eq(mcp_gateway_authorization_requests.kilo_user_id, user.id));
-      const oauthGrants = await db
-        .select()
-        .from(mcp_gateway_oauth_grants)
-        .where(eq(mcp_gateway_oauth_grants.kilo_user_id, user.id));
-      expect(grants).toHaveLength(0);
-      expect(configSecrets).toHaveLength(0);
-      expect(pending).toHaveLength(0);
-      expect(authorizationCodes).toHaveLength(0);
-      expect(authorizationRequests).toHaveLength(0);
-      expect(oauthGrants).toHaveLength(0);
-    });
-
     it('should anonymize the user row and preserve it', async () => {
       const user = await insertTestUser({
         google_user_email: 'real-email@example.com',
@@ -3127,6 +4051,7 @@ describe('User', () => {
         vercel_downstream_safety_identifier: 'vercel_downstream_safety_identifier',
         customer_source: 'A YouTube video',
         signup_ip: '203.0.113.10',
+        external_id: 'ext-abc-123',
         api_token_pepper: 'api-token-pepper',
         web_session_pepper: 'web-session-pepper',
         blocked_reason: 'manual block',
@@ -3136,6 +4061,7 @@ describe('User', () => {
         is_super_admin: true,
         can_view_sessions: true,
         can_manage_credits: true,
+        can_export_api_request_logs: true,
       });
 
       await softDeleteUser(user.id);
@@ -3162,6 +4088,7 @@ describe('User', () => {
       );
       expect(softDeleted!.customer_source).toBeNull();
       expect(softDeleted!.signup_ip).toBeNull();
+      expect(softDeleted!.external_id).toBeNull();
       expect(softDeleted!.api_token_pepper).toEqual(expect.any(String));
       expect(softDeleted!.api_token_pepper).not.toBe('api-token-pepper');
       expect(softDeleted!.web_session_pepper).toEqual(expect.any(String));
@@ -3176,6 +4103,7 @@ describe('User', () => {
       expect(softDeleted!.is_super_admin).toBe(false);
       expect(softDeleted!.can_view_sessions).toBe(false);
       expect(softDeleted!.can_manage_credits).toBe(false);
+      expect(softDeleted!.can_export_api_request_logs).toBe(false);
       // Stripe customer ID should be preserved
       expect(softDeleted!.stripe_customer_id).toBe(user.stripe_customer_id);
     });
@@ -3240,87 +4168,6 @@ describe('User', () => {
       expect(userFeedbackCount?.value).toBe(0);
       expect(userProposalCount?.value).toBe(0);
       expect(orgProposalCount?.value).toBe(1);
-    });
-
-    it('should scrub ephemeral deployment ownership and schedule immediate cleanup', async () => {
-      const user = await insertTestUser({
-        google_user_email: 'ephemeral-deployment-delete@example.com',
-      });
-      const otherUser = await insertTestUser({
-        google_user_email: 'ephemeral-deployment-delete-other@example.com',
-      });
-      const cleanupClaimToken = randomUUID();
-      const claimedUntil = '2026-06-03T18:00:00.000Z';
-      const originalCleanupAt = '2026-06-04T18:00:00.000Z';
-      const originalUpdatedAt = '2026-06-02T18:00:00.000Z';
-
-      await db.insert(deployments_ephemeral).values([
-        {
-          owned_by_user_id: user.id,
-          source_type: 'html',
-          internal_worker_name: `qdpl-${randomUUID()}`,
-          deployment_slug: 'soft-delete-ephemeral',
-          status: 'active',
-          expires_at: originalCleanupAt,
-          next_cleanup_at: originalCleanupAt,
-          cleanup_claim_token: cleanupClaimToken,
-          cleanup_claimed_until: claimedUntil,
-          updated_at: originalUpdatedAt,
-        },
-        {
-          owned_by_user_id: otherUser.id,
-          source_type: 'html',
-          internal_worker_name: `qdpl-${randomUUID()}`,
-          deployment_slug: 'soft-delete-ephemeral-other',
-          status: 'active',
-          expires_at: originalCleanupAt,
-          next_cleanup_at: originalCleanupAt,
-          cleanup_claim_token: cleanupClaimToken,
-          cleanup_claimed_until: claimedUntil,
-          updated_at: originalUpdatedAt,
-        },
-      ]);
-
-      await softDeleteUser(user.id);
-      const afterSoftDelete = Date.now();
-
-      const rows = await db
-        .select()
-        .from(deployments_ephemeral)
-        .orderBy(deployments_ephemeral.deployment_slug);
-      const otherDeployment = rows.find(row => row.owned_by_user_id === otherUser.id);
-      const scrubbedDeployment = rows.find(row => row.deployment_slug === 'soft-delete-ephemeral');
-
-      expect(scrubbedDeployment).toEqual(
-        expect.objectContaining({
-          owned_by_user_id: null,
-          status: 'cleanup_retry',
-          cleanup_claim_token: null,
-          cleanup_claimed_until: null,
-        })
-      );
-      if (!scrubbedDeployment) throw new Error('Expected scrubbed ephemeral deployment');
-      const nextCleanupAt = new Date(scrubbedDeployment.next_cleanup_at).getTime();
-      expect(nextCleanupAt).toBeGreaterThan(afterSoftDelete - 5_000);
-      expect(nextCleanupAt).toBeLessThanOrEqual(afterSoftDelete);
-      expect(new Date(scrubbedDeployment.updated_at).getTime()).toBe(nextCleanupAt);
-      expect(otherDeployment).toEqual(
-        expect.objectContaining({
-          owned_by_user_id: otherUser.id,
-          status: 'active',
-          cleanup_claim_token: cleanupClaimToken,
-        })
-      );
-      if (!otherDeployment) throw new Error('Expected untouched ephemeral deployment');
-      expect(new Date(otherDeployment.next_cleanup_at).getTime()).toBe(
-        new Date(originalCleanupAt).getTime()
-      );
-      expect(new Date(otherDeployment.cleanup_claimed_until ?? '').getTime()).toBe(
-        new Date(claimedUntil).getTime()
-      );
-      expect(new Date(otherDeployment.updated_at).getTime()).toBe(
-        new Date(originalUpdatedAt).getTime()
-      );
     });
 
     it('should rotate and scrub App Store account-linked Kilo Pass data', async () => {
@@ -4423,6 +5270,41 @@ describe('User', () => {
       expect(storedSettings.updated_by_kilo_user_id).toBeNull();
     });
 
+    it('should clear the creator of organization guardrails but keep the policy', async () => {
+      const actor = await insertTestUser();
+      const [organization] = await db
+        .insert(organizations)
+        .values({ name: 'Guardrail attribution org', plan: 'enterprise' })
+        .returning();
+      const [guardrail] = await db
+        .insert(organization_guardrails)
+        .values({
+          organization_id: organization.id,
+          type: 'mcp',
+          identity_key: 'npm:example-server',
+          name: 'Example server',
+          config: {
+            kind: 'package',
+            ecosystem: 'npm',
+            identifier: 'example-server',
+            min_version: null,
+          },
+          source: { registry: 'custom', id: null },
+          created_by_kilo_user_id: actor.id,
+        })
+        .returning();
+
+      await softDeleteUser(actor.id);
+
+      const [stored] = await db
+        .select()
+        .from(organization_guardrails)
+        .where(eq(organization_guardrails.id, guardrail.id));
+      expect(stored.created_by_kilo_user_id).toBeNull();
+      expect(stored.identity_key).toBe('npm:example-server');
+      expect(stored.name).toBe('Example server');
+    });
+
     it('should anonymize security audit logs where user is actor', async () => {
       const user = await insertTestUser();
       const orgId = randomUUID();
@@ -4647,6 +5529,70 @@ describe('User', () => {
       expect(logs).toHaveLength(1);
       expect(logs[0].target_user_id).toBe('deleted-user');
       expect(logs[0].actor_email).toBe(adminUser.google_user_email); // admin not anonymized
+    });
+
+    it('should anonymize admin action audit logs where user is actor', async () => {
+      const adminUser = await insertTestUser();
+
+      await db.insert(admin_action_audit_logs).values({
+        action: 'user.api_key.reset',
+        actor_id: adminUser.id,
+        actor_email: adminUser.google_user_email,
+        actor_name: adminUser.google_user_name,
+        target_type: 'user',
+        target_id: 'some-other-user',
+        message: 'API key reset',
+      });
+
+      await softDeleteUser(adminUser.id);
+
+      const logs = await db
+        .select()
+        .from(admin_action_audit_logs)
+        .where(eq(admin_action_audit_logs.actor_id, adminUser.id));
+      expect(logs).toHaveLength(1);
+      expect(logs[0].actor_email).toBeNull();
+      expect(logs[0].actor_name).toBeNull();
+      expect(logs[0].target_id).toBe('some-other-user');
+    });
+
+    it('should anonymize admin action audit logs where user is the target', async () => {
+      const targetUser = await insertTestUser();
+      const adminUser = await insertTestUser();
+
+      await db.insert(admin_action_audit_logs).values([
+        {
+          action: 'user.api_key.reset',
+          actor_id: adminUser.id,
+          actor_email: adminUser.google_user_email,
+          actor_name: adminUser.google_user_name,
+          target_type: 'user',
+          target_id: targetUser.id,
+          message: 'API key reset',
+        },
+        {
+          action: 'organization.create',
+          actor_id: adminUser.id,
+          actor_email: adminUser.google_user_email,
+          actor_name: adminUser.google_user_name,
+          target_type: 'organization',
+          target_id: targetUser.id,
+          message: 'Organization created',
+        },
+      ]);
+
+      await softDeleteUser(targetUser.id);
+
+      const logs = await db
+        .select()
+        .from(admin_action_audit_logs)
+        .where(eq(admin_action_audit_logs.actor_id, adminUser.id));
+      expect(logs).toHaveLength(2);
+      const userTargeted = logs.find(log => log.target_type === 'user');
+      const orgTargeted = logs.find(log => log.target_type === 'organization');
+      expect(userTargeted?.target_id).toBe('deleted-user');
+      expect(userTargeted?.actor_email).toBe(adminUser.google_user_email);
+      expect(orgTargeted?.target_id).toBe(targetUser.id);
     });
 
     it('should retain kiloclaw_scheduled_action_targets after soft-delete (anonymized FK)', async () => {
@@ -5343,6 +6289,40 @@ describe('User', () => {
       expect(skills).toHaveLength(0);
     });
 
+    it('deletes user-owned repository environments without touching another owner', async () => {
+      const user = await insertTestUser();
+      const otherUser = await insertTestUser();
+
+      await db.insert(cloud_agent_environments).values([
+        {
+          owned_by_user_id: user.id,
+          name: 'mine',
+          platform: 'github',
+          repo_full_name: 'acme/widgets',
+        },
+        {
+          owned_by_user_id: otherUser.id,
+          name: 'theirs',
+          platform: 'github',
+          repo_full_name: 'acme/widgets',
+        },
+      ]);
+
+      await softDeleteUser(user.id);
+
+      const environments = await db
+        .select()
+        .from(cloud_agent_environments)
+        .where(eq(cloud_agent_environments.owned_by_user_id, otherUser.id));
+      expect(environments.map(environment => environment.name)).toEqual(['theirs']);
+
+      const deletedUserEnvironments = await db
+        .select()
+        .from(cloud_agent_environments)
+        .where(eq(cloud_agent_environments.owned_by_user_id, user.id));
+      expect(deletedUserEnvironments).toHaveLength(0);
+    });
+
     it('should nullify user_feedback FK', async () => {
       const user = await insertTestUser();
       await db.insert(user_feedback).values({
@@ -5553,6 +6533,30 @@ describe('User', () => {
       expect(tokens).toHaveLength(0);
     });
 
+    it('should delete user_notification_history rows', async () => {
+      const user = await insertTestUser();
+      const other = await insertTestUser();
+      const historyRow = {
+        category: 'chatMessages',
+        push_type: 'chat.message',
+        payload: { type: 'chat.message' },
+        i18n_key: 'chat.message',
+        i18n_params: { conversationTitle: 'Hello' },
+        fallback_title: 'Kilo',
+        fallback_body: 'New message',
+        dedupe_bucket: Math.floor(Date.now() / 3_600_000),
+      };
+      await db.insert(user_notification_history).values([
+        { ...historyRow, user_id: user.id, idempotency_key: 'history-user' },
+        { ...historyRow, user_id: other.id, idempotency_key: 'history-other' },
+      ]);
+
+      await softDeleteUser(user.id);
+
+      const remaining = await db.select().from(user_notification_history);
+      expect(remaining.map(row => row.idempotency_key)).toEqual(['history-other']);
+    });
+
     it('should delete user_notification_preferences', async () => {
       const user = await insertTestUser();
       await db.insert(user_notification_preferences).values({
@@ -5567,6 +6571,75 @@ describe('User', () => {
         .from(user_notification_preferences)
         .where(eq(user_notification_preferences.user_id, user.id));
       expect(rows).toHaveLength(0);
+    });
+
+    it('removes owned briefing reports, excerpts, consent and schedule without touching another user', async () => {
+      const user = await insertTestUser();
+      const otherUser = await insertTestUser();
+      const now = new Date().toISOString();
+      for (const account of [user, otherUser]) {
+        const sessionId = `ses_briefing_delete_${crypto.randomUUID()}`;
+        await db.insert(cli_sessions_v2).values({
+          session_id: sessionId,
+          kilo_user_id: account.id,
+          created_on_platform: 'cli',
+          briefing_excerpt: {
+            messageId: 'final',
+            completedAt: now,
+            text: 'Private selected outcome',
+          },
+        });
+        await db
+          .insert(agent_briefing_preferences)
+          .values({ kilo_user_id: account.id, timezone: 'UTC', next_run_at: now });
+        await db.insert(agent_briefing_context_preferences).values({
+          kilo_user_id: account.id,
+          context_key: 'personal',
+          model: 'test/model',
+          enabled: true,
+        });
+        await db.insert(agent_briefing_snapshots).values({
+          kilo_user_id: account.id,
+          context_key: 'personal',
+          local_date: now.slice(0, 10),
+          timezone: 'UTC',
+          language: 'en',
+          captured_at: now,
+          expires_at: new Date(Date.now() + 86_400_000).toISOString(),
+          night_start_at: now,
+          cutoff_at: now,
+          morning_end_at: now,
+          facts: { sessionTitle: 'Private work' },
+          summary: { text: 'Private briefing' },
+        });
+      }
+      await softDeleteUser(user.id);
+      const excerpts = await db
+        .select({ userId: cli_sessions_v2.kilo_user_id, excerpt: cli_sessions_v2.briefing_excerpt })
+        .from(cli_sessions_v2)
+        .where(inArray(cli_sessions_v2.kilo_user_id, [user.id, otherUser.id]));
+      expect(excerpts.find(row => row.userId === user.id)?.excerpt).toBeNull();
+      expect(excerpts.find(row => row.userId === otherUser.id)?.excerpt?.text).toBe(
+        'Private selected outcome'
+      );
+      for (const table of [
+        agent_briefing_snapshots,
+        agent_briefing_context_preferences,
+        agent_briefing_preferences,
+      ]) {
+        expect(
+          await db
+            .select({ userId: table.kilo_user_id })
+            .from(table)
+            .where(eq(table.kilo_user_id, user.id))
+        ).toHaveLength(0);
+        expect(
+          await db
+            .select({ userId: table.kilo_user_id })
+            .from(table)
+            .where(eq(table.kilo_user_id, otherUser.id))
+        ).toHaveLength(1);
+      }
     });
 
     it('should delete personal spend alert settings, rules, counters, and deliveries', async () => {
@@ -5669,6 +6742,38 @@ describe('User', () => {
       expect(intents).toHaveLength(0);
     });
 
+    it('should delete user-owned custom auto routers and keep another owner’s', async () => {
+      const user = await insertTestUser();
+      const otherUser = await insertTestUser();
+      const router = (ownerId: string, slug: string) => ({
+        owned_by_user_id: ownerId,
+        slug,
+        name: slug,
+        base_router: 'efficient' as const,
+        mode: 'cost_per_accuracy' as const,
+        entries: [{ kind: 'gateway' as const, model: 'anthropic/claude-sonnet-4' }],
+        default_entry_key: 'gateway:anthropic/claude-sonnet-4',
+      });
+      await db
+        .insert(auto_routing_custom_routers)
+        .values([router(user.id, 'mine'), router(otherUser.id, 'theirs')]);
+
+      await softDeleteUser(user.id);
+
+      expect(
+        await db
+          .select()
+          .from(auto_routing_custom_routers)
+          .where(eq(auto_routing_custom_routers.owned_by_user_id, user.id))
+      ).toHaveLength(0);
+      expect(
+        await db
+          .select()
+          .from(auto_routing_custom_routers)
+          .where(eq(auto_routing_custom_routers.owned_by_user_id, otherUser.id))
+      ).toHaveLength(1);
+    });
+
     it('should delete github_branch_pull_requests owned by user', async () => {
       const user = await insertTestUser();
       await db.insert(github_branch_pull_requests).values({
@@ -5687,47 +6792,53 @@ describe('User', () => {
       expect(rows).toHaveLength(0);
     });
 
-    it('should delete stored GitHub user authorization credentials', async () => {
-      const user = await insertTestUser();
-      const otherUser = await insertTestUser();
+    it.each(['github_app', 'provided_token'] as const)(
+      'deletes %s identity credentials and advances the retained revision',
+      async credentialSource => {
+        const user = await insertTestUser();
+        const otherUser = await insertTestUser();
 
-      await db.insert(user_github_app_tokens).values([
-        {
-          kilo_user_id: user.id,
-          github_app_type: 'standard',
-          github_user_id: '101',
-          github_login: 'deleted-user',
-          access_token_encrypted: 'encrypted-access-deleted',
-          access_token_expires_at: '2026-06-01T00:00:00.000Z',
-          refresh_token_encrypted: 'encrypted-refresh-deleted',
-          refresh_token_expires_at: '2026-11-01T00:00:00.000Z',
-        },
-        {
-          kilo_user_id: otherUser.id,
-          github_app_type: 'standard',
-          github_user_id: '102',
-          github_login: 'retained-user',
-          access_token_encrypted: 'encrypted-access-retained',
-          access_token_expires_at: '2026-06-01T00:00:00.000Z',
-          refresh_token_encrypted: 'encrypted-refresh-retained',
-          refresh_token_expires_at: '2026-11-01T00:00:00.000Z',
-        },
-      ]);
+        await db.insert(user_github_app_tokens).values([
+          {
+            kilo_user_id: user.id,
+            credential_source: credentialSource,
+            github_app_type: 'standard',
+            github_user_id: '101',
+            github_login: 'deleted-user',
+            access_token_encrypted: 'encrypted-access-deleted',
+            access_token_expires_at: '2026-06-01T00:00:00.000Z',
+            refresh_token_encrypted:
+              credentialSource === 'github_app' ? 'encrypted-refresh-deleted' : null,
+            refresh_token_expires_at:
+              credentialSource === 'github_app' ? '2026-11-01T00:00:00.000Z' : null,
+          },
+          {
+            kilo_user_id: otherUser.id,
+            github_app_type: 'standard',
+            github_user_id: '102',
+            github_login: 'retained-user',
+            access_token_encrypted: 'encrypted-access-retained',
+            access_token_expires_at: '2026-06-01T00:00:00.000Z',
+            refresh_token_encrypted: 'encrypted-refresh-retained',
+            refresh_token_expires_at: '2026-11-01T00:00:00.000Z',
+          },
+        ]);
 
-      await softDeleteUser(user.id);
+        await softDeleteUser(user.id);
 
-      const deletedCredentials = await db
-        .select()
-        .from(user_github_app_tokens)
-        .where(eq(user_github_app_tokens.kilo_user_id, user.id));
-      const retainedCredentials = await db
-        .select()
-        .from(user_github_app_tokens)
-        .where(eq(user_github_app_tokens.kilo_user_id, otherUser.id));
+        const deletedCredentials = await db
+          .select()
+          .from(user_github_app_tokens)
+          .where(eq(user_github_app_tokens.kilo_user_id, user.id));
+        const retainedCredentials = await db
+          .select()
+          .from(user_github_app_tokens)
+          .where(eq(user_github_app_tokens.kilo_user_id, otherUser.id));
 
-      expect(deletedCredentials).toHaveLength(0);
-      expect(retainedCredentials).toHaveLength(1);
-    });
+        expect(deletedCredentials).toHaveLength(0);
+        expect(retainedCredentials).toHaveLength(1);
+      }
+    );
 
     it('deletes an unshared personal canonical GitHub installation', async () => {
       const user = await insertTestUser();
@@ -5876,6 +6987,66 @@ describe('User', () => {
       // Analytics fields preserved
       expect(scans[0].source_platform).toBe('openclaw');
       expect(scans[0].findings_critical).toBe(1);
+    });
+
+    it('should retain enkrypt_usage billing rows and attribution when the user is soft-deleted', async () => {
+      const user = await insertTestUser({ id: `oauth/${randomUUID()}` });
+      const otherUser = await insertTestUser();
+      const organization = await createTestOrganization('Enkrypt usage retention', otherUser.id, 0);
+      const [apiKind] = await db
+        .insert(api_kind)
+        .values({ api_kind: 'chat_completions' })
+        .onConflictDoUpdate({ target: api_kind.api_kind, set: { api_kind: 'chat_completions' } })
+        .returning();
+      const [decision] = await db
+        .insert(enkrypt_usage_decision)
+        .values({ decision: 'allowed' })
+        .onConflictDoUpdate({
+          target: enkrypt_usage_decision.decision,
+          set: { decision: 'allowed' },
+        })
+        .returning();
+      if (!apiKind || !decision) throw new Error('Failed to create Enkrypt usage dimensions');
+
+      const usageFields = {
+        organization_id: organization.id,
+        api_kind_id: apiKind.api_kind_id,
+        decision_id: decision.decision_id,
+        enkrypt_credits_cost: 1.5,
+        charged_microdollars: 15_000,
+        added_latency_ms: 42,
+      };
+      const originalRows = await db
+        .insert(enkrypt_usage)
+        .values([
+          { ...usageFields, kilo_user_id: user.id, session_id: 'deleted-user-session' },
+          {
+            ...usageFields,
+            kilo_user_id: user.id,
+            session_id: null,
+            enkrypt_credits_cost: null,
+            charged_microdollars: 0,
+            added_latency_ms: null,
+          },
+          { ...usageFields, kilo_user_id: otherUser.id, session_id: 'retained-user-session' },
+        ])
+        .returning();
+
+      await softDeleteUser(user.id);
+
+      const retainedRows = await db
+        .select()
+        .from(enkrypt_usage)
+        .where(
+          inArray(
+            enkrypt_usage.id,
+            originalRows.map(row => row.id)
+          )
+        );
+      expect(retainedRows).toHaveLength(originalRows.length);
+      for (const originalRow of originalRows) {
+        expect(retainedRows.find(row => row.id === originalRow.id)).toEqual(originalRow);
+      }
     });
 
     it('should preserve credit transactions and creator attribution', async () => {

@@ -1,0 +1,2 @@
+ALTER TABLE "auto_routing_custom_routers" ADD COLUMN "legacy_pool" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+ALTER TABLE "auto_routing_custom_routers" ADD COLUMN "legacy_mode_inherited" boolean DEFAULT false NOT NULL;

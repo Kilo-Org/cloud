@@ -1,4 +1,7 @@
-import { afterEach, describe, expect, it, jest } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { ai_gateway_sync_providers_state } from '@kilocode/db/schema';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { eq } from 'drizzle-orm';
 
 jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),
@@ -10,10 +13,12 @@ jest.mock('@kilocode/web-shared/lib/constants', () => ({
 
 import type { AdminSlackNotification } from '@kilocode/web-shared/lib/slack/admin-notifications';
 import {
-  alertIfSyncProvidersStale,
+  alertIfSyncStale,
   buildStaleSyncAlertNotification,
+  getSyncLastCompletedAt,
   parseIsoTimestamp,
   postTestStaleSyncAlert,
+  recordSyncCompleted,
   sendStaleSyncAlertNotification,
   sendTestStaleSyncAlertNotification,
   shouldPostStaleSyncAlert,
@@ -127,6 +132,7 @@ describe('shouldPostStaleSyncAlert', () => {
 describe('buildStaleSyncAlertNotification', () => {
   it('frames the delay as important but not urgent and includes follow-up guidance', () => {
     const notification = buildStaleSyncAlertNotification({
+      jobId: 'providers',
       lastCompletedAt: STALE_SYNC,
       now: NOW,
     });
@@ -148,6 +154,7 @@ describe('buildStaleSyncAlertNotification', () => {
 
   it('makes clear that test alerts verify delivery and do not indicate an active issue', () => {
     const notification = buildStaleSyncAlertNotification({
+      jobId: 'providers',
       lastCompletedAt: STALE_SYNC,
       now: NOW,
       kind: 'test',
@@ -163,11 +170,27 @@ describe('buildStaleSyncAlertNotification', () => {
 
   it('says never recorded when no full sync timestamp exists', () => {
     const notification = buildStaleSyncAlertNotification({
+      jobId: 'providers',
       lastCompletedAt: null,
       now: NOW,
     });
 
     expect(notification.text).toContain('never recorded');
+  });
+
+  it('describes the direct BYOK sync with its own job and log names', () => {
+    const notification = buildStaleSyncAlertNotification({
+      jobId: 'direct_byok',
+      lastCompletedAt: STALE_SYNC,
+      now: NOW,
+    });
+
+    expect(notification.text).toContain('Direct BYOK model list sync is delayed');
+    expect(notification.text).toContain('within the past hour');
+    expect(notification.text).toContain('existing direct BYOK model lists remain available');
+    expect(notification.text).toContain('`web.sync_direct_byok_providers`');
+    expect(notification.text).toContain('`[sync-direct-byok-providers]`');
+    expect(notification.text).not.toContain('Provider/model catalog sync');
   });
 });
 
@@ -229,14 +252,14 @@ describe('sendTestStaleSyncAlertNotification', () => {
   });
 });
 
-describe('alertIfSyncProvidersStale', () => {
+describe('alertIfSyncStale', () => {
   it('posts once and stores the alert timestamp with a three-day TTL', async () => {
     const sendNotification = jest.fn(
       async (_notification: AdminSlackNotification) => 'posted' as const
     );
     const setLastAlertAt = jest.fn(async (_iso: string) => 'OK');
 
-    await alertIfSyncProvidersStale({
+    await alertIfSyncStale('providers', {
       now: () => NOW,
       getLastCompletedAt: async () => STALE_SYNC.toISOString(),
       getLastAlertAt: async () => null,
@@ -246,7 +269,7 @@ describe('alertIfSyncProvidersStale', () => {
 
     expect(sendNotification).toHaveBeenCalledTimes(1);
     expect(sendNotification).toHaveBeenCalledWith(
-      buildStaleSyncAlertNotification({ lastCompletedAt: STALE_SYNC, now: NOW })
+      buildStaleSyncAlertNotification({ jobId: 'providers', lastCompletedAt: STALE_SYNC, now: NOW })
     );
     expect(setLastAlertAt).toHaveBeenCalledWith(NOW.toISOString());
     expect(SYNC_PROVIDERS_STALE_ALERT_TTL_SECONDS).toBe(3 * 24 * 60 * 60);
@@ -259,7 +282,7 @@ describe('alertIfSyncProvidersStale', () => {
     );
     const setLastAlertAt = jest.fn(async (_iso: string) => 'OK');
 
-    await alertIfSyncProvidersStale({
+    await alertIfSyncStale('providers', {
       now: () => NOW,
       getLastCompletedAt: async () => STALE_SYNC.toISOString(),
       getLastAlertAt: async () => NEWER_ALERT.toISOString(),
@@ -278,7 +301,7 @@ describe('alertIfSyncProvidersStale', () => {
     );
 
     await expect(
-      alertIfSyncProvidersStale({
+      alertIfSyncStale('providers', {
         now: () => NOW,
         getLastCompletedAt: async () => {
           throw new Error('database down');
@@ -295,7 +318,7 @@ describe('alertIfSyncProvidersStale', () => {
     const setLastAlertAt = jest.fn(async (_iso: string) => 'OK');
 
     await expect(
-      alertIfSyncProvidersStale({
+      alertIfSyncStale('providers', {
         now: () => NOW,
         getLastCompletedAt: async () => STALE_SYNC.toISOString(),
         getLastAlertAt: async () => null,
@@ -314,7 +337,7 @@ describe('alertIfSyncProvidersStale', () => {
       async (_notification: AdminSlackNotification) => 'simulated' as const
     );
 
-    await alertIfSyncProvidersStale({
+    await alertIfSyncStale('providers', {
       now: () => NOW,
       getLastCompletedAt: async () => STALE_SYNC.toISOString(),
       getLastAlertAt: async () => null,
@@ -325,6 +348,74 @@ describe('alertIfSyncProvidersStale', () => {
     expect(sendNotification).toHaveBeenCalledTimes(1);
     expect(setLastAlertAt).not.toHaveBeenCalled();
   });
+
+  it('posts the direct BYOK notification for the direct BYOK job', async () => {
+    const sendNotification = jest.fn(
+      async (_notification: AdminSlackNotification) => 'posted' as const
+    );
+    const setLastAlertAt = jest.fn(async (_iso: string) => 'OK');
+
+    await alertIfSyncStale('direct_byok', {
+      now: () => NOW,
+      getLastCompletedAt: async () => null,
+      getLastAlertAt: async () => null,
+      setLastAlertAt,
+      sendNotification,
+    });
+
+    expect(sendNotification).toHaveBeenCalledWith(
+      buildStaleSyncAlertNotification({ jobId: 'direct_byok', lastCompletedAt: null, now: NOW })
+    );
+    expect(setLastAlertAt).toHaveBeenCalledWith(NOW.toISOString());
+  });
+});
+
+describe('sync state persistence', () => {
+  beforeEach(async () => {
+    await db
+      .delete(ai_gateway_sync_providers_state)
+      .where(eq(ai_gateway_sync_providers_state.id, 1));
+  });
+
+  async function readSyncState() {
+    const [row] = await db.select().from(ai_gateway_sync_providers_state);
+    return row;
+  }
+
+  it('records completion per job without touching the other job', async () => {
+    const providersCompletedAt = await recordSyncCompleted('providers');
+    const before = await readSyncState();
+    expect(new Date(before.last_completed_at ?? '').toISOString()).toBe(providersCompletedAt);
+    expect(before.direct_byok_last_completed_at).toBeNull();
+
+    const directByokCompletedAt = await recordSyncCompleted('direct_byok');
+    const after = await readSyncState();
+    expect(new Date(after.direct_byok_last_completed_at ?? '').toISOString()).toBe(
+      directByokCompletedAt
+    );
+    expect(new Date(after.last_completed_at ?? '').toISOString()).toBe(providersCompletedAt);
+    await expect(getSyncLastCompletedAt('direct_byok')).resolves.not.toBeNull();
+  });
+
+  it('stores and reads the direct BYOK alert timestamp separately', async () => {
+    const sendNotification = jest.fn(
+      async (_notification: AdminSlackNotification) => 'posted' as const
+    );
+    await db
+      .insert(ai_gateway_sync_providers_state)
+      .values({ id: 1, last_completed_at: NOW.toISOString() });
+
+    await alertIfSyncStale('direct_byok', { now: () => NOW, sendNotification });
+    await alertIfSyncStale('direct_byok', { now: () => NOW, sendNotification });
+    await alertIfSyncStale('providers', { now: () => NOW, sendNotification });
+
+    expect(sendNotification).toHaveBeenCalledTimes(1);
+    const state = await readSyncState();
+    expect(new Date(state.direct_byok_stale_alert_last_posted_at ?? '').toISOString()).toBe(
+      NOW.toISOString()
+    );
+    expect(state.stale_alert_last_posted_at).toBeNull();
+  });
 });
 
 describe('postTestStaleSyncAlert', () => {
@@ -334,7 +425,7 @@ describe('postTestStaleSyncAlert', () => {
     );
 
     await expect(
-      postTestStaleSyncAlert({
+      postTestStaleSyncAlert('providers', {
         now: () => NOW,
         getLastCompletedAt: async () => STALE_SYNC.toISOString(),
         sendNotification,
@@ -343,7 +434,12 @@ describe('postTestStaleSyncAlert', () => {
 
     expect(sendNotification).toHaveBeenCalledTimes(1);
     expect(sendNotification).toHaveBeenCalledWith(
-      buildStaleSyncAlertNotification({ lastCompletedAt: STALE_SYNC, now: NOW, kind: 'test' })
+      buildStaleSyncAlertNotification({
+        jobId: 'providers',
+        lastCompletedAt: STALE_SYNC,
+        now: NOW,
+        kind: 'test',
+      })
     );
   });
 });

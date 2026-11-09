@@ -19,6 +19,7 @@ import {
 import type { SeedResult } from '../index';
 import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
 import { parseSessionIngestServiceStatus } from '../lib/mobile-sheet-fixtures';
+import { seedTokenSigningParams } from './api-token';
 
 export const usage = '<email> [seconds] [sessionIngestPort]';
 
@@ -194,8 +195,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     userId: user.id,
     pepper: user.apiTokenPepper,
     secret,
-    expiresInSeconds: seconds + 60,
-    env: 'development',
+    ...seedTokenSigningParams(seconds + 60),
   });
   const startedAt = new Date().toISOString();
   // Node's WebSocket accepts authenticated handshake options without putting the token in the URL.

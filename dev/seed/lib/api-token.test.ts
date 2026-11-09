@@ -9,7 +9,11 @@ import {
   verifyKiloTokenForPolicy,
 } from '@kilocode/worker-utils';
 
-import { apiTokenSigningParams, DEFAULT_EXPIRES_DAYS } from '../app/api-token';
+import {
+  apiTokenSigningParams,
+  DEFAULT_EXPIRES_DAYS,
+  seedTokenSigningParams,
+} from '../app/api-token';
 
 const TEST_SECRET = 'api-token-shape-test-secret';
 
@@ -67,4 +71,34 @@ test('a short-lived dev token is exchange-ineligible (the broken pre-fix shape)'
     mode: 'allow-legacy',
   });
   assert.equal(isKiloCredentialExchangeEligible(auth, { legacy: 'five-year-api' }), false);
+});
+
+test('seed signing params supply the local development env', async () => {
+  const previousNodeEnv = process.env.NODE_ENV;
+  process.env.NODE_ENV = 'production';
+  try {
+    const params = seedTokenSigningParams(3600);
+    assert.equal(params.expiresInSeconds, 3600);
+    assert.equal(params.env, 'development');
+    assert.equal(apiTokenSigningParams(DEFAULT_EXPIRES_DAYS).env, 'development');
+
+    const { token } = await signKiloToken({
+      userId: '00000000-0000-0000-0000-000000000001',
+      pepper: 'pepper',
+      secret: TEST_SECRET,
+      ...params,
+    });
+    const auth = await verifyKiloTokenForPolicy(token, TEST_SECRET, {
+      audience: KILO_API_AUDIENCE,
+      mode: 'allow-legacy',
+    });
+
+    assert.equal(auth.claims.env, 'development');
+  } finally {
+    if (previousNodeEnv === undefined) {
+      Reflect.deleteProperty(process.env, 'NODE_ENV');
+    } else {
+      process.env.NODE_ENV = previousNodeEnv;
+    }
+  }
 });

@@ -506,11 +506,13 @@ These keep their current owners and evidence; the rewrite ports them, it does no
   without resetting attempt deadlines or starting a sandbox merely to obtain credentials.
 - Organization membership gates every organization-attributed grant. Preparation, the wrapper
   rebind after a restart and a warm renewal all issue through the same path, which reads the session
-  owner's current membership of the grant's organization first. A proven non-member is the existing
-  policy failure: no grant and no `session.credentials` frame, and the route keeps its current grant
-  until that grant expires. An unreadable membership denies the grant and keeps the five-minute
-  retry, because a failed read is not evidence that the grant is still allowed. Personal sources
-  carry no organization and skip the read.
+  owner's current membership of the grant's organization first. None of the three paths sends a
+  grant or a `session.credentials` frame to a non-member. A warm renewal returns the existing policy
+  failure, so the route keeps its current grant until that grant expires; preparation and the rebind
+  fail the attempt with `workspace_setup_failed` stage `organization_access_revoked` and do not
+  retry it. An unreadable membership denies the grant on every path, because a failed read is not
+  evidence that the grant is still allowed: a renewal keeps the five-minute retry, and a preparation
+  or rebind fails the attempt. Personal sources carry no organization and skip the read.
 - Organization access revocation (`POST /internal/streams/close`, sent when a member is removed)
   releases each of that member's matching sessions at the Sandbox DO in addition to closing their
   client sockets: the route row, its organization-attributed grant and the wrapper path go, and the

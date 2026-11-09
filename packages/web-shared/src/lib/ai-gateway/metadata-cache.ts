@@ -11,6 +11,11 @@ export type MetadataSource<T> = {
   parse: (raw: unknown) => T;
   headers?: () => Record<string, string>;
   timeoutMs?: number;
+  /**
+   * When set, a 404 means the resource does not exist rather than that the fetch failed: this value
+   * stands in for the body, so the absence is parsed and stored like any other response.
+   */
+  rawWhenNotFound?: unknown;
 };
 
 export type MetadataDb = typeof db | typeof readDb;
@@ -26,6 +31,9 @@ export async function fetchMetadata<T>(
     cache: 'no-store',
     signal: options.signal ? AbortSignal.any([timeout, options.signal]) : timeout,
   });
+  if (response.status === 404 && source.rawWhenNotFound !== undefined) {
+    return { raw: source.rawWhenNotFound, data: source.parse(source.rawWhenNotFound) };
+  }
   if (!response.ok) {
     throw new Error(`Fetching ${source.url} failed: ${response.status} ${response.statusText}`);
   }

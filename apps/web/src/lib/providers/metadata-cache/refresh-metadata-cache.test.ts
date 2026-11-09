@@ -8,6 +8,8 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
 import { openAiServedModelsMetadataSource } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/served-models';
 import { mockOpenRouterModels } from '@kilocode/web-shared/tests/helpers/openrouter-models.helper';
+import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
+import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
 import type * as StaleAlert from '@/lib/providers/metadata-cache/metadata-cache-stale-alert';
 
 jest.mock('@/lib/providers/metadata-cache/metadata-cache-stale-alert', () => ({
@@ -19,6 +21,7 @@ jest.mock('@/lib/providers/metadata-cache/metadata-cache-stale-alert', () => ({
 
 import { alertIfMetadataCacheStale } from '@/lib/providers/metadata-cache/metadata-cache-stale-alert';
 import {
+  gatewayModelEndpointsSource,
   openRouterGatewayModelsSource,
   openRouterProvidersSource,
   vercelGatewayModelsSource,
@@ -28,6 +31,8 @@ import { modelsDevCatalogSource } from '@/lib/providers/direct-byok/models-dev';
 import { refreshMetadataCache } from './refresh-metadata-cache';
 
 const PROVIDER_MODELS_URL_PREFIX = 'https://openrouter.ai/api/frontend/v1/models/find?';
+const MODEL_ENDPOINTS_URL_PATTERN = /\/models\/.+\/endpoints$/;
+const REFRESH_BUDGET_MS = 180_000;
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
 
@@ -60,13 +65,22 @@ function catalogModels() {
   };
 }
 
-function gatewayModels() {
+function gatewayModelIds(prefix = 'vendor') {
+  return Array.from({ length: 100 }, (_, index) => `${prefix}/model-${index}`);
+}
+
+function gatewayModels(prefix = 'vendor') {
   return {
-    data: Array.from({ length: 100 }, (_, index) => ({
-      id: `vendor/model-${index}`,
-      name: `Model ${index}`,
-    })),
+    data: gatewayModelIds(prefix).map((id, index) => ({ id, name: `Model ${index}` })),
   };
+}
+
+function openRouterEndpointsUrl(modelId: string) {
+  return gatewayModelEndpointsSource(OPENROUTER, modelId).url;
+}
+
+function vercelEndpointsUrl(modelId: string) {
+  return gatewayModelEndpointsSource(VERCEL_AI_GATEWAY, modelId).url;
 }
 
 function modelsDevCatalog() {
@@ -95,6 +109,12 @@ function fetchedUrls() {
   return fetchSpy.mock.calls.map(([input]) => String(input));
 }
 
+function fetchedEndpointsUrls(gatewayApiUrl: string) {
+  return fetchedUrls().filter(
+    url => url.startsWith(`${gatewayApiUrl}/models/`) && MODEL_ENDPOINTS_URL_PATTERN.test(url)
+  );
+}
+
 beforeEach(async () => {
   await db.delete(ai_gateway_metadata_cache).where(sql`true`);
   responses = new Map([
@@ -115,6 +135,9 @@ beforeEach(async () => {
     if (response) return response();
     if (url.startsWith(PROVIDER_MODELS_URL_PREFIX)) {
       return Response.json({ data: { models: [] } });
+    }
+    if (MODEL_ENDPOINTS_URL_PATTERN.test(url)) {
+      return Response.json({ data: { endpoints: [] } });
     }
     return Response.json({ data: [{ id: 'vendor/model' }] });
   });
@@ -235,7 +258,9 @@ describe('refreshMetadataCache', () => {
 
     await refreshMetadataCache();
 
-    const urls = fetchedUrls().filter(url => !url.startsWith(PROVIDER_MODELS_URL_PREFIX));
+    const urls = fetchedUrls().filter(
+      url => !url.startsWith(PROVIDER_MODELS_URL_PREFIX) && !MODEL_ENDPOINTS_URL_PATTERN.test(url)
+    );
     expect(urls.at(-1)).toBe(modelsDevCatalogSource.url);
     expect(urls.at(-2)).toBe(openRouterModelsMetadataSource.url);
   });
@@ -264,5 +289,112 @@ describe('refreshMetadataCache', () => {
         { url: modelsDevCatalogSource.url, updatedAt: null },
       ])
     );
+  });
+
+  it('refreshes the endpoints of every model in both stored gateway lists, oldest first', async () => {
+    await storeRow(
+      openRouterEndpointsUrl('vendor/model-3'),
+      { data: { endpoints: [] } },
+      hoursAgo(1)
+    );
+    await storeRow(
+      openRouterEndpointsUrl('vendor/model-5'),
+      { data: { endpoints: [] } },
+      hoursAgo(48)
+    );
+    respond(vercelEndpointsUrl('vendor/model-0'), () =>
+      Response.json({ data: { endpoints: [{ provider_name: 'test' }] } })
+    );
+
+    const summary = await refreshMetadataCache();
+
+    const openRouterUrls = fetchedEndpointsUrls(OPENROUTER.apiUrl);
+    expect(openRouterUrls.toSorted()).toEqual(gatewayModelIds().map(openRouterEndpointsUrl).sort());
+    expect(openRouterUrls.at(-1)).toBe(openRouterEndpointsUrl('vendor/model-3'));
+    expect(openRouterUrls.at(-2)).toBe(openRouterEndpointsUrl('vendor/model-5'));
+    expect(fetchedEndpointsUrls(VERCEL_AI_GATEWAY.apiUrl).toSorted()).toEqual(
+      gatewayModelIds().map(vercelEndpointsUrl).sort()
+    );
+    expect((await readRow(vercelEndpointsUrl('vendor/model-0'))).data).toEqual({
+      data: { endpoints: [{ provider_name: 'test' }] },
+    });
+    expect(summary).toEqual({
+      source_count: fetchedUrls().length,
+      failed_count: 0,
+      stale_count: 0,
+    });
+  });
+
+  it('stores a missing endpoints resource without counting it as failed', async () => {
+    respond(openRouterEndpointsUrl('vendor/model-4'), () => new Response(null, { status: 404 }));
+
+    const summary = await refreshMetadataCache();
+
+    expect((await readRow(openRouterEndpointsUrl('vendor/model-4'))).data).toEqual({
+      status: 404,
+    });
+    expect(summary).toMatchObject({ failed_count: 0, stale_count: 0 });
+    expect(alertIfMetadataCacheStale).toHaveBeenCalledWith([]);
+  });
+
+  it('alerts only for failed endpoints sources stored over a day ago, grouped per gateway', async () => {
+    const staleUrl = openRouterEndpointsUrl('vendor/model-1');
+    const neverStoredUrl = openRouterEndpointsUrl('vendor/model-2');
+    const staleUpdatedAt = new Date(Date.now() - 2 * DAY_MS).toISOString();
+    await storeRow(
+      staleUrl,
+      { data: { endpoints: [{ provider_name: 'stored' }] } },
+      staleUpdatedAt
+    );
+    const before = await readRow(staleUrl);
+    for (const url of [staleUrl, neverStoredUrl]) {
+      respond(url, () => new Response(null, { status: 503 }));
+    }
+
+    const summary = await refreshMetadataCache();
+
+    expect(await readRow(staleUrl)).toEqual(before);
+    expect(await readRow(neverStoredUrl)).toBeUndefined();
+    expect(summary).toMatchObject({ failed_count: 2, stale_count: 1 });
+    expect(alertIfMetadataCacheStale).toHaveBeenCalledWith([
+      {
+        url: staleUrl,
+        updatedAt: new Date(staleUpdatedAt),
+        group: 'https://openrouter.ai/api/v1/models/{id}/endpoints',
+      },
+    ]);
+  });
+
+  it('refreshes model endpoints from the stored gateway list when the live list fails', async () => {
+    await storeRow(vercelGatewayModelsSource.url, gatewayModels('stored'), hoursAgo(1));
+    respond(vercelGatewayModelsSource.url, () => new Response(null, { status: 503 }));
+
+    const summary = await refreshMetadataCache();
+
+    expect(fetchedEndpointsUrls(VERCEL_AI_GATEWAY.apiUrl).toSorted()).toEqual(
+      gatewayModelIds('stored').map(vercelEndpointsUrl).sort()
+    );
+    expect(summary).toMatchObject({ failed_count: 1, stale_count: 0 });
+  });
+
+  it('stops refreshing model endpoints once the run budget is spent', async () => {
+    const budget = new AbortController();
+    const timeout = AbortSignal.timeout.bind(AbortSignal);
+    jest
+      .spyOn(AbortSignal, 'timeout')
+      .mockImplementation(ms => (ms === REFRESH_BUDGET_MS ? budget.signal : timeout(ms)));
+    const fetchResponse = fetchSpy.getMockImplementation();
+    fetchSpy.mockImplementation(async (input, init) => {
+      if (MODEL_ENDPOINTS_URL_PATTERN.test(String(input))) budget.abort();
+      if (!fetchResponse) throw new Error('fetch mock is missing');
+      return fetchResponse(input, init);
+    });
+
+    const summary = await refreshMetadataCache();
+
+    const endpointsUrls = fetchedUrls().filter(url => MODEL_ENDPOINTS_URL_PATTERN.test(url));
+    expect(endpointsUrls).toHaveLength(1);
+    expect(summary).toMatchObject({ failed_count: 199, stale_count: 0 });
+    expect(alertIfMetadataCacheStale).toHaveBeenCalledWith([]);
   });
 });

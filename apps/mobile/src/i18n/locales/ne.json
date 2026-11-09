@@ -4243,5 +4243,8 @@
     "noEnabledContexts": "निर्धारित ब्रिफिङहरूका लागि कुनै सन्दर्भ सक्षम गरिएको छैन",
     "sourceBlocker": "सत्रमा ध्यान दिन आवश्यक छ",
     "sourceMetadata": "सङ्कलित सत्र मेटाडाटा"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "यो खोज परिणाम खोल्न सकिएन"
   }
 }

@@ -4249,5 +4249,8 @@
     "noEnabledContexts": "هیچ بخشی برای گزارش‌های زمان‌بندی‌شده فعال نیست",
     "sourceBlocker": "جلسه به توجه نیاز دارد",
     "sourceMetadata": "فراداده‌های ثبت‌شدهٔ جلسه"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "باز کردن این نتیجه جست‌وجو ممکن نشد"
   }
 }

@@ -4243,5 +4243,8 @@
     "noEnabledContexts": "Ajastatud ülevaated pole üheski kontekstis lubatud",
     "sourceBlocker": "Seanss vajab tähelepanu",
     "sourceMetadata": "Salvestatud seansi metaandmed"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Otsingutulemust ei õnnestunud avada"
   }
 }

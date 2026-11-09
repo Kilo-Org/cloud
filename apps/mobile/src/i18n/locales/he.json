@@ -4309,5 +4309,8 @@
     "noEnabledContexts": "אין הקשרים שבהם מופעלים דוחות מתוזמנים",
     "sourceBlocker": "הסשן דורש תשומת לב",
     "sourceMetadata": "מטא־נתונים של הסשן שנלכדו"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "לא ניתן היה לפתוח את תוצאת החיפוש הזו"
   }
 }

@@ -4243,5 +4243,8 @@
     "noEnabledContexts": "Planlaşdırılmış hesabatlar üçün heç bir kontekst aktiv deyil",
     "sourceBlocker": "Sessiyaya diqqət yetirilməlidir",
     "sourceMetadata": "Qeydə alınmış sessiya metaməlumatları"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Bu axtarış nəticəsi açılmadı"
   }
 }

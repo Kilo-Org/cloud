@@ -4243,5 +4243,8 @@
     "noEnabledContexts": "未为定时简报启用任何上下文",
     "sourceBlocker": "会话需要关注",
     "sourceMetadata": "已采集的会话元数据"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "无法打开此搜索结果"
   }
 }

@@ -4243,5 +4243,8 @@
     "noEnabledContexts": "ଅନୁସୂଚିତ ରିପୋର୍ଟ ପାଇଁ କୌଣସି ପ୍ରସଙ୍ଗ ସକ୍ଷମ ହୋଇନାହିଁ",
     "sourceBlocker": "ସେସନ୍ ପ୍ରତି ଧ୍ୟାନ ଦେବା ଆବଶ୍ୟକ",
     "sourceMetadata": "ସଂରକ୍ଷିତ ସେସନ୍ ମେଟାଡାଟା"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "ଏହି ଖୋଜା ଫଳାଫଳ ଖୋଲିହେଲା ନାହିଁ"
   }
 }

@@ -4243,5 +4243,8 @@
     "noEnabledContexts": "Pa gen kontèks ki aktive pou rapò pwograme yo",
     "sourceBlocker": "Sesyon an bezwen atansyon",
     "sourceMetadata": "Metadone sesyon an ki anrejistre"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Pa t ka louvri rezilta rechèch sa a"
   }
 }

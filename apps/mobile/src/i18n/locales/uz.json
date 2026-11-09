@@ -4243,5 +4243,8 @@
     "noEnabledContexts": "Rejalashtirilgan brifinglar uchun hech bir kontekst yoqilmagan",
     "sourceBlocker": "Seans e’tibor talab qiladi",
     "sourceMetadata": "Qayd etilgan seans metama’lumotlari"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Bu qidiruv natijasini ochib bo'lmadi"
   }
 }

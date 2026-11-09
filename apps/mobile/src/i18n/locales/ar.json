@@ -4507,5 +4507,8 @@
     "noEnabledContexts": "لا توجد سياقات مفعّلة للتقارير المجدولة",
     "sourceBlocker": "الجلسة تحتاج إلى اهتمام",
     "sourceMetadata": "البيانات الوصفية الملتقطة للجلسة"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "تعذّر فتح نتيجة البحث هذه"
   }
 }

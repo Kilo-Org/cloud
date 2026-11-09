@@ -4249,5 +4249,8 @@
     "noEnabledContexts": "নির্ধারিত ব্রিফিংয়ের জন্য কোনো কনটেক্সট চালু নেই",
     "sourceBlocker": "সেশনে মনোযোগ দেওয়া প্রয়োজন",
     "sourceMetadata": "সংরক্ষিত সেশন মেটাডেটা"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "এই অনুসন্ধানের ফলাফল খোলা যায়নি"
   }
 }

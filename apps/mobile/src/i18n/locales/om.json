@@ -4243,5 +4243,8 @@
     "noEnabledContexts": "Gabaasota saganteeffamaniif haalawwan dandeessifaman hin jiran",
     "sourceBlocker": "Taa'umsi xiyyeeffannoo barbaada",
     "sourceMetadata": "Meetadaataa taa'umsaa galmaa'e"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Bu'aa barbaachuu kana banuun hin danda'amne"
   }
 }

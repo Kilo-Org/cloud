@@ -4243,5 +4243,8 @@
     "noEnabledContexts": "Asnjë kontekst i aktivizuar për raportet e planifikuara",
     "sourceBlocker": "Seanca kërkon vëmendje",
     "sourceMetadata": "Metatëdhënat e regjistruara të seancës"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Nuk u hap dot ky rezultat kërkimi"
   }
 }

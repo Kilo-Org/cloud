@@ -4243,5 +4243,8 @@
     "noEnabledContexts": "ไม่มีบริบทที่เปิดใช้รายงานตามกำหนดการ",
     "sourceBlocker": "เซสชันต้องได้รับการดูแล",
     "sourceMetadata": "เมทาดาทาของเซสชันที่บันทึกไว้"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "ไม่สามารถเปิดผลการค้นหานี้ได้"
   }
 }

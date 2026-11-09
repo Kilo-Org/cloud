@@ -31,6 +31,17 @@ jobs:
       should_deploy: ${{ steps.changes.outputs.should_deploy }}
       deploy_kiloclaw: ${{ steps.changes.outputs.deploy_kiloclaw }}
     steps:
+      # The caller admits the trigger. The `github` context belongs to the
+      # caller workflow, so the trigger is available here for the run summary.
+      - name: Record admitted trigger
+        env:
+          TRIGGERING_RUN: ${{ github.event.workflow_run.html_url }}
+        run: |
+          echo "Admitted \`$GITHUB_EVENT_NAME\` trigger." >> "$GITHUB_STEP_SUMMARY"
+          if [ -n "$TRIGGERING_RUN" ]; then
+            echo "Triggering CI run: $TRIGGERING_RUN" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
       - name: Verify main branch
         run: test "$GITHUB_REF" = refs/heads/main
 

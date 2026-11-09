@@ -390,10 +390,21 @@ test('both deploys start from a successful main CI run and keep an hourly catch-
     assert.ok(Object.hasOwn(deployment.on, 'workflow_dispatch'));
     assert.equal(deployment.concurrency['cancel-in-progress'], false);
     assert.equal(deployment.jobs['check-changes'].with.workflow_file, `deploy-${name}.yml`);
-    assert.equal(deployment.jobs['check-changes'].needs, 'admit');
-    const admitted = (eventName, conclusion) =>
-      runInNewContext(deployment.jobs.admit.if, {
-        github: { event_name: eventName, event: { workflow_run: { conclusion } } },
+    // One runner reservation per run: the admission guard lives on the job that
+    // does the candidate lookup, so no guard-only job reserves a runner first.
+    assert.equal(deployment.jobs['check-changes'].needs, undefined);
+    assert.equal(
+      Object.hasOwn(deployment.jobs, 'admit'),
+      false,
+      `${name} must not reserve a runner to evaluate the guard`
+    );
+    const admitted = (eventName, conclusion, repository = 'Kilo-Org/cloud') =>
+      runInNewContext(deployment.jobs['check-changes'].if, {
+        github: {
+          repository,
+          event_name: eventName,
+          event: { workflow_run: { conclusion } },
+        },
       });
     assert.equal(admitted('workflow_run', 'success'), true);
     for (const conclusion of ['failure', 'cancelled', 'skipped', 'neutral', 'timed_out', null]) {
@@ -401,13 +412,38 @@ test('both deploys start from a successful main CI run and keep an hourly catch-
     }
     assert.equal(admitted('schedule', null), true);
     assert.equal(admitted('workflow_dispatch', null), true);
+    for (const eventName of ['workflow_run', 'schedule', 'workflow_dispatch']) {
+      assert.equal(
+        admitted(eventName, 'success', 'fork/cloud'),
+        false,
+        `${name} must skip a fork's ${eventName}`
+      );
+    }
+    // Every deploy job reaches the guarded job through `needs`, so a skipped
+    // admission skips the whole chain exactly as the separate job did.
+    const reachesCheckChanges = id => {
+      const seen = new Set([id]);
+      const pending = [deployment.jobs[id]];
+      while (pending.length > 0) {
+        for (const dependency of [pending.pop().needs ?? []].flat()) {
+          if (dependency === 'check-changes') return true;
+          if (seen.has(dependency)) continue;
+          seen.add(dependency);
+          pending.push(deployment.jobs[dependency]);
+        }
+      }
+      return false;
+    };
     assert.deepEqual(
       Object.entries(deployment.jobs)
         .filter(([, job]) => job.needs === undefined)
         .map(([id]) => id),
-      ['admit'],
-      `${name} must admit the trigger before any candidate lookup`
+      ['check-changes'],
+      `${name} must admit the trigger in the job that starts the candidate lookup`
     );
+    for (const id of Object.keys(deployment.jobs).filter(id => id !== 'check-changes')) {
+      assert.ok(reachesCheckChanges(id), `${id} must run only after the guarded lookup`);
+    }
     assert.doesNotMatch(
       JSON.stringify(deployment.jobs),
       /workflow_run\.head_sha/,

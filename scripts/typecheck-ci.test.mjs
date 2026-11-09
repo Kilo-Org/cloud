@@ -1107,7 +1107,10 @@ const cloudAgentNextInstalls = new Map([
     'workers',
     "pnpm install --frozen-lockfile --filter 'cloud-agent-next...' --filter '@kilocode/cloud-agent-wrapper...' --filter 'cloudflare-git-token-service...' --filter kilocode-monorepo",
   ],
-  ['wrapper-process', "pnpm install --frozen-lockfile --filter 'cloud-agent-next...' --filter '@kilocode/cloud-agent-wrapper...'"],
+  [
+    'wrapper-process',
+    "pnpm install --frozen-lockfile --filter 'cloud-agent-next...' --filter '@kilocode/cloud-agent-wrapper...'",
+  ],
   [
     'other',
     "pnpm install --frozen-lockfile --filter 'cloud-agent-next...' --filter '@kilocode/cloud-agent-wrapper...' --filter '@kilocode/db...' --filter kilocode-monorepo",

@@ -4243,5 +4243,8 @@
     "noEnabledContexts": "Babu mahallin da aka kunna rahotannin da aka tsara a cikinsa",
     "sourceBlocker": "Zaman aiki yana buƙatar kulawa",
     "sourceMetadata": "Bayanan metadata na zaman aiki da aka adana"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Ba a iya buɗe wannan sakamakon binciken ba"
   }
 }

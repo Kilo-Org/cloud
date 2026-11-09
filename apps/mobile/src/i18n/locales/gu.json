@@ -4249,5 +4249,8 @@
     "noEnabledContexts": "શેડ્યૂલ કરેલા રિપોર્ટ માટે કોઈ સંદર્ભ ચાલુ નથી",
     "sourceBlocker": "સત્ર પર ધ્યાન આપવાની જરૂર છે",
     "sourceMetadata": "સાચવેલ સત્ર મેટાડેટા"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "આ શોધ પરિણામ ખોલી શકાયું નહીં"
   }
 }

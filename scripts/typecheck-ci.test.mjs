@@ -46,6 +46,7 @@ const jobRun = new Map([
   ['.github/actions/harness-sdk-build', harnessBuild],
 ]);
 const ciJobs = workflows['ci.yml'].jobs;
+const kiloAppJobs = workflows['kilo-app-ci.yml'].jobs;
 const pnpmCleanup = fileURLToPath(
   new URL('../.github/actions/pnpm-store/cleanup/cleanup.cjs', import.meta.url)
 );
@@ -340,13 +341,10 @@ test('one job saves the compiler plugin cache and every reader restores it', () 
   );
 });
 
+// mobile-native-build runs the action once, in `prepare-harness-sdk`, and both
+// platform jobs download its artifact instead; the test below pins that split.
 const harnessBuildGuards = [
   ['ci.yml', 'lint-trpc', "contains(fromJSON(needs.changes.outputs.affected).full_checks, 'lint')"],
-  ...['ios', 'android'].map(name => [
-    'mobile-native-build.yml',
-    name,
-    "steps.published.outputs.published != 'true'",
-  ]),
   [
     'explorer-ios-release.yml',
     'build',
@@ -573,6 +571,94 @@ test('kilo-app CI builds the harness SDK once and every suite downloads it', () 
     assert.ok(
       [jobs.test.needs].flat().includes(requiredProducer),
       `the required test job fails with a failed ${requiredProducer}`
+    );
+  }
+});
+
+// mobile-native-build needs the same single producer for a different reason:
+// both platform jobs start together after the gate, so running the action in
+// each made a dist cache miss pay the typia compile twice and raced both to
+// save the one key. `prepare-harness-sdk` builds it once, and the macOS job
+// downloads the Linux tree just as it restores the Linux cache entry today.
+test('mobile-native-build builds the harness SDK once and both platform jobs download it', () => {
+  const jobs = workflows['mobile-native-build.yml'].jobs;
+  const actionUsers = Object.entries(jobs)
+    .filter(([, job]) =>
+      (job.steps ?? []).some(step => step.uses === './.github/actions/harness-sdk-build')
+    )
+    .map(([name]) => name);
+  assert.deepEqual(actionUsers, [harnessProducer], 'only the producer builds the harness SDK');
+
+  const producer = jobs[harnessProducer];
+  assert.equal(producer.needs, 'gate', 'the producer waits for the gate it is skipped by');
+  assert.equal(
+    producer.if,
+    "needs.gate.outputs.need_ios == 'true' || needs.gate.outputs.need_android == 'true'",
+    'a run with every platform published must not pay a build for nobody'
+  );
+  const producerSteps = producer.steps;
+  const producerInstall = producerSteps.findIndex(step =>
+    /^pnpm install --frozen-lockfile\b/.test(step.run ?? '')
+  );
+  const producerAction = producerSteps.findIndex(
+    step => step.uses === './.github/actions/harness-sdk-build'
+  );
+  assert.ok(
+    producerInstall >= 0 && producerAction > producerInstall,
+    'the producer builds after the workspace install'
+  );
+  const sdkUploads = producerSteps
+    .map((step, index) => ({ step, index }))
+    .filter(
+      ({ step }) =>
+        step.uses?.startsWith('actions/upload-artifact@') && step.with?.name === sdkArtifact
+    );
+  assert.equal(sdkUploads.length, 1, 'the producer uploads its build exactly once');
+  assert.ok(sdkUploads[0].index > producerAction, 'the producer uploads what it built');
+  const upload = sdkUploads[0].step;
+  assert.match(upload.uses, /^actions\/upload-artifact@[0-9a-f]{40}$/, 'immutable upload pin');
+  assert.equal(upload.with.path, sdkDist, 'the artifact root is the dist directory');
+  assert.equal(upload.with['retention-days'], 1);
+  assert.equal(upload.with['if-no-files-found'], 'error', 'an empty build must fail');
+
+  for (const name of ['ios', 'android']) {
+    const job = jobs[name];
+    assert.ok(
+      [job.needs ?? []].flat().includes(harnessProducer),
+      `${name} waits for the build it downloads`
+    );
+    const steps = job.steps;
+    const installIndex = steps.findIndex(step =>
+      /^pnpm install --frozen-lockfile\b/.test(step.run ?? '')
+    );
+    assert.deepEqual(
+      steps.filter(step => step.run === harnessBuild).map(step => step.name),
+      [],
+      `${name} never builds the harness SDK by hand`
+    );
+    const sdkDownloads = steps
+      .map((step, index) => ({ step, index }))
+      .filter(
+        ({ step }) =>
+          step.uses?.startsWith('actions/download-artifact@') && step.with?.name === sdkArtifact
+      );
+    assert.equal(sdkDownloads.length, 1, `${name} downloads the harness SDK build once`);
+    const downloadIndex = sdkDownloads[0].index;
+    assert.ok(
+      installIndex >= 0 && downloadIndex > installIndex,
+      `${name} downloads the build after install`
+    );
+    const download = sdkDownloads[0].step;
+    assert.match(
+      download.uses,
+      /^actions\/download-artifact@[0-9a-f]{40}$/,
+      'immutable download pin'
+    );
+    assert.equal(download.with.path, sdkDist, `${name} restores it where the build writes`);
+    assert.equal(
+      download.if,
+      "steps.published.outputs.published != 'true'",
+      `${name} still skips its whole build when another run published`
     );
   }
 });
@@ -1088,6 +1174,43 @@ test('the web-test shards install the closure their Jest suite reads', () => {
   assert.deepEqual(job.strategy.matrix.shard, [1, 2, 3, 4], 'four shards still run');
   const run = job.steps.find(step => step.name === 'Run web tests');
   assert.equal(run.run, 'pnpm --filter web test --shard=${{ matrix.shard }}/4');
+});
+
+// The measured per-job install share of wall time keeps a narrowing above one
+// tenth of the job it saves: the mobile-test shards, `lint` and `check-unused`
+// clear that bar, and `typecheck`'s sample run does not, so it keeps the whole
+// workspace for now. When a measurement moves a job over the bar, name it here;
+// a step that starts importing another workspace widens its job's filter, and
+// no job restores the full install to hide an undeclared import. Dependency
+// postinstalls stay enabled across these jobs.
+const appClosureInstall =
+  "pnpm install --frozen-lockfile --filter 'kilo-app...' --filter kilocode-monorepo";
+
+test('the kilo-app CI consumers install the app closure', () => {
+  // The producer jobs keep their own wider (or whole-workspace) closures, and
+  // `typecheck` keeps the whole workspace until its measured saving clears the
+  // bar; every other install in this workflow is the app's.
+  const consumerJobs = Object.entries(kiloAppJobs)
+    .filter(
+      ([name, job]) =>
+        !name.startsWith('prepare') &&
+        name !== 'typecheck' &&
+        (job.steps ?? []).some(step => /^pnpm install --frozen-lockfile\b/.test(step.run ?? ''))
+    )
+    .map(([name]) => name);
+  for (const name of consumerJobs) {
+    const install = kiloAppJobs[name].steps.find(step => step.name === 'Install dependencies');
+    assert.equal(
+      install.run,
+      appClosureInstall,
+      `${name} installs the app closure, not the whole workspace`
+    );
+  }
+  assert.deepEqual(
+    consumerJobs,
+    ['lint', 'check-unused', 'mobile-test'],
+    'the app closure covers the measured consumer installs and leaves the others alone'
+  );
 });
 
 // The extension's unit suite runs in extension-ci.yml for a pull request and a

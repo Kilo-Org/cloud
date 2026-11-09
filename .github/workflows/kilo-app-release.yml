@@ -254,12 +254,12 @@ jobs:
           # so the shard job is the proof that this run executed the suite.
           if [ "$REUSE_RUNNING" = "false" ]; then
             if ! SHARD=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$ID/jobs?per_page=100&filter=latest" \
-                --jq '[.jobs[] | select(.name == "mobile-test (1/8)") | .conclusion // ""] | .[0] // ""'); then
+                --jq '[.jobs[] | select(.name == "mobile-test (1/4)") | .conclusion // ""] | .[0] // ""'); then
               echo "::warning::could not read the jobs of kilo-app CI run $ID — the suite runs in this workflow"
               exit 0
             fi
             if [ "$SHARD" != "success" ]; then
-              echo "kilo-app CI run $ID did not execute the mobile suite for this commit (mobile-test 1/8: ${SHARD:-absent}) — the suite runs in this workflow instead."
+              echo "kilo-app CI run $ID did not execute the mobile suite for this commit (mobile-test 1/4: ${SHARD:-absent}) — the suite runs in this workflow instead."
               exit 0
             fi
           fi

@@ -609,11 +609,9 @@ describe('database schema', () => {
 
         await expect(
           tx.transaction(nested =>
-            nested.execute(
-              sql`INSERT INTO ${schema.blacklisted_domains} (${schema.blacklisted_domains.domain}) VALUES (NULL)`
-            )
+            nested.execute(sql`INSERT INTO ${schema.blacklisted_domains} (domain) VALUES (NULL)`)
           )
-        ).rejects.toThrow();
+        ).rejects.toMatchObject({ cause: { code: '23502', column: 'domain' } });
 
         throw rollback;
       })

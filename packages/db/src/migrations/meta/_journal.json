@@ -2402,6 +2402,13 @@
       "when": 1794216638064,
       "tag": "0342_ai_gateway_metadata_cache",
       "breakpoints": true
+    },
+    {
+      "idx": 343,
+      "version": "7",
+      "when": 1794222552877,
+      "tag": "0343_enkrypt_usage_detectors_fired",
+      "breakpoints": true
     }
   ]
 }

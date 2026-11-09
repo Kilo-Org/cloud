@@ -1,11 +1,12 @@
 import 'server-only';
 
 import { randomUUID } from 'crypto';
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import {
   api_kind,
   enkrypt_usage,
   enkrypt_usage_decision,
+  enkrypt_usage_detector,
   enkrypt_usage_guardrail,
 } from '@kilocode/db/schema';
 import type {
@@ -14,7 +15,7 @@ import type {
   EnkryptGuardrailDecision,
   EnkryptGuardrailDirection,
 } from '@kilocode/db/schema-types';
-import { db, isUSRegion } from '@kilocode/web-shared/lib/drizzle';
+import { db, isUSRegion, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { recordOrganizationConsumption } from '@kilocode/web-shared/lib/kilo-pass-org/consumption';
 import {
   scheduleOrganizationLowBalanceAlert,
@@ -102,6 +103,37 @@ async function lookupId(
 }
 
 /**
+ * The lookup ids of the detectors, in their order, inserting the new ones. An insert that conflicts
+ * with a concurrent one waits for it, so reading again afterwards finds every detector. New
+ * detectors are inserted sorted, so concurrent inserts of the same detectors cannot deadlock.
+ */
+async function detectorIds(
+  tx: DrizzleTransaction,
+  detectors: readonly EnkryptDetectorId[]
+): Promise<number[]> {
+  const select = () =>
+    tx
+      .select({ id: enkrypt_usage_detector.detector_id, detector: enkrypt_usage_detector.detector })
+      .from(enkrypt_usage_detector)
+      .where(inArray(enkrypt_usage_detector.detector, [...detectors]));
+  const distinct = [...new Set(detectors)].sort();
+  let rows = await select();
+  if (rows.length < distinct.length) {
+    await tx
+      .insert(enkrypt_usage_detector)
+      .values(distinct.map(detector => ({ detector })))
+      .onConflictDoNothing({ target: enkrypt_usage_detector.detector });
+    rows = await select();
+  }
+  const ids = new Map(rows.map(row => [row.detector, row.id]));
+  return detectors.map(detector => {
+    const id = ids.get(detector);
+    if (id === undefined) throw new Error('Enkrypt usage detector lookup resolution failed');
+    return id;
+  });
+}
+
+/**
  * Writes the ledger row and debits the organization in one transaction, apart from inference
  * usage accounting. The debit is an atomic increment, so concurrent debits cannot lose updates,
  * and the ledger row's id is the consumption source id that makes a Kilo Pass debit idempotent.
@@ -154,6 +186,9 @@ export async function recordEnkryptUsageLocally(
           .onConflictDoNothing({ target: enkrypt_usage_guardrail.guardrail })
           .returning({ id: enkrypt_usage_guardrail.guardrail_id })
     );
+    const firedDetectorIds = usageWrite.detectorsFired
+      ? await detectorIds(tx, usageWrite.detectorsFired)
+      : null;
 
     const [inserted] = await tx
       .insert(enkrypt_usage)
@@ -169,7 +204,7 @@ export async function recordEnkryptUsageLocally(
         charged_microdollars: chargedMicrodollars,
         added_latency_ms: usageWrite.addedLatencyMs,
         guardrail_id: guardrailId,
-        detectors_fired: usageWrite.detectorsFired ?? null,
+        fired_detector_ids: firedDetectorIds,
         created_at: occurredAt,
       })
       .onConflictDoNothing({ target: [enkrypt_usage.id, enkrypt_usage.created_at] })

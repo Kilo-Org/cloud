@@ -9,7 +9,12 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage-primary-r
 import { beforeEach, describe, expect, test } from '@jest/globals';
 import { randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
-import { enkrypt_usage, enkrypt_usage_guardrail, organizations } from '@kilocode/db/schema';
+import {
+  enkrypt_usage,
+  enkrypt_usage_detector,
+  enkrypt_usage_guardrail,
+  organizations,
+} from '@kilocode/db/schema';
 import {
   EnkryptUsageWriteSchema,
   type EnkryptUsageWrite,
@@ -77,6 +82,8 @@ async function ledgerRows(organizationId: string) {
       eq(enkrypt_usage_guardrail.guardrail_id, enkrypt_usage.guardrail_id)
     )
     .where(eq(enkrypt_usage.organization_id, organizationId));
+  const detectors = await db.select().from(enkrypt_usage_detector);
+  const detectorById = new Map(detectors.map(each => [each.detector_id, each.detector]));
   return rows.map(({ row, guardrail }) => ({
     id: row.id,
     occurredAt: new Date(row.created_at).toISOString(),
@@ -87,7 +94,7 @@ async function ledgerRows(organizationId: string) {
     chargedMicrodollars: row.charged_microdollars,
     addedLatencyMs: row.added_latency_ms,
     guardrail,
-    detectorsFired: row.detectors_fired,
+    detectorsFired: row.fired_detector_ids?.map(id => detectorById.get(id)) ?? null,
   }));
 }
 

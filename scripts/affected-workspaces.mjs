@@ -44,9 +44,9 @@ const GLOBAL = [
 // Root paths that change one check for every workspace, and nothing else: the
 // scripts that run a check, and the inputs only one check reads. A lint config
 // or an oxlint plugin cannot change a type program, so it selects the lint rows
-// alone; every workspace is still linted. A workspace whose own files read the
-// path (an oxlint config that loads a plugin) is still selected, so its own
-// check keeps running.
+// alone; every workspace is still linted. A workspace that runs its own lint
+// with these inputs keeps that check: kilo-app CI names tools/oxlint in its own
+// change detection, because the app's oxlint configs load those plugins.
 const CHECK_INPUTS = [
   [/^scripts\/typecheck-all\.sh$/, 'typecheck'],
   [/^scripts\/lint-all\.sh$/, 'lint'],
@@ -278,7 +278,10 @@ export function selectAffected({ items, changedFiles, dependencyDirs, references
       continue;
     }
     const input = CHECK_INPUTS.find(([pattern]) => pattern.test(file));
-    if (input) fullChecks.add(input[1]);
+    if (input) {
+      fullChecks.add(input[1]);
+      continue;
+    }
     if (DEPENDENCY_MANIFESTS.has(file)) {
       if (dependencyDirs.includes('*') || dependencyDirs.includes('.')) {
         reasons.push(`${file} changes root or unscoped dependencies`);
@@ -297,7 +300,7 @@ export function selectAffected({ items, changedFiles, dependencyDirs, references
     }
     const owned = OWNED.find(([pattern]) => pattern.test(file));
     if (owned) changed.add(owned[1]);
-    if (input || owned || rootReaders.length || isNeutral(file)) continue;
+    if (owned || rootReaders.length || isNeutral(file)) continue;
     reasons.push(`${file} is outside every workspace`);
   }
 

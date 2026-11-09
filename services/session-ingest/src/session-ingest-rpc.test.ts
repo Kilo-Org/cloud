@@ -390,6 +390,7 @@ function makeRootWriteDb(params: {
     }),
     innerJoin: vi.fn(() => select),
     where: vi.fn(() => select),
+    orderBy: vi.fn(() => select),
     limit: vi.fn(() => select),
     for: vi.fn(async () =>
       selectedTable === cloud_agent_worktrees

@@ -221,6 +221,105 @@ export async function markSessionsVerifyingPullRequest(
   return { kind: 'session' };
 }
 
+const MAX_LINKED_WORKTREES = 50;
+
+/**
+ * Cloud Agent worktree link: a PR belongs to the worktree whose branch it was
+ * opened from, not to whichever chat happened to report it.
+ *
+ * Every chat in a Cloud Agent worktree shares one checkout, one repository and
+ * one branch. When an open PR names that repository and branch, every session
+ * in the matching worktree in the same tenant gets the PR written as its own
+ * verified link, so all existing read paths (sidebar, chat header, Watch PR,
+ * refresh) show it without the agent having to report it.
+ *
+ * This is the one place a branch name, scoped to repository and tenant, is
+ * enough evidence. It is limited to Cloud Agent worktrees (whose branches are
+ * generated per workspace or chosen by the user for it), and to open or draft
+ * PRs, so a closed PR on a reused branch name never links. Local CLI sessions
+ * still need their own reported link.
+ *
+ * The stored link carries the head ref but no head SHA, so later `synchronize`
+ * deliveries keep matching it through `markSessionsVerifyingPullRequest`. A
+ * session already linked to a different PR that is still open keeps that link.
+ */
+export async function linkCloudAgentWorktreesToPullRequest(
+  pr: { gitUrl: string; prNumber: number; prUrl: string; headRef: string; state: PrState },
+  owner: WebhookInstallationOwner
+): Promise<number> {
+  if (pr.state !== 'open' && pr.state !== 'draft') return 0;
+
+  const worktrees = await db
+    .selectDistinct({
+      kiloUserId: cli_sessions_v2.kilo_user_id,
+      worktreeId: cli_sessions_v2.cloud_agent_worktree_id,
+    })
+    .from(cli_sessions_v2)
+    .where(
+      and(
+        eq(cli_sessions_v2.git_url, pr.gitUrl),
+        eq(cli_sessions_v2.git_branch, pr.headRef),
+        isNotNull(cli_sessions_v2.cloud_agent_worktree_id),
+        tenantPredicateForOwner(owner)
+      )
+    )
+    .limit(MAX_LINKED_WORKTREES);
+  const worktreeMatches = worktrees.flatMap(({ kiloUserId, worktreeId }) =>
+    worktreeId === null
+      ? []
+      : [
+          and(
+            eq(cli_sessions_v2.kilo_user_id, kiloUserId),
+            eq(cli_sessions_v2.cloud_agent_worktree_id, worktreeId)
+          ),
+        ]
+  );
+  if (worktreeMatches.length === 0) return 0;
+
+  const cacheOwnerMatches =
+    owner.kind === 'organization'
+      ? sql`${github_branch_pull_requests.owned_by_organization_id} = ${owner.organizationId}`
+      : sql`${github_branch_pull_requests.owned_by_user_id} = ${owner.userId}`;
+
+  const linked = await db
+    .update(cli_sessions_v2)
+    .set({
+      platform: 'github',
+      pr_url: pr.prUrl,
+      pr_number: pr.prNumber,
+      pr_head_ref: pr.headRef,
+      pr_head_sha: null,
+      pr_link_verified_at: sql`now()`,
+    })
+    .where(
+      and(
+        or(...worktreeMatches),
+        eq(cli_sessions_v2.git_url, pr.gitUrl),
+        tenantPredicateForOwner(owner),
+        // Already linked to this PR: nothing to change.
+        sql`NOT (
+          ${cli_sessions_v2.pr_number} IS NOT DISTINCT FROM ${pr.prNumber}
+          AND ${cli_sessions_v2.pr_url} IS NOT DISTINCT FROM ${pr.prUrl}
+          AND ${cli_sessions_v2.pr_link_verified_at} IS NOT NULL
+        )`,
+        // Linked to another PR that is still open: keep it.
+        sql`NOT (
+          ${cli_sessions_v2.pr_link_verified_at} IS NOT NULL
+          AND ${cli_sessions_v2.pr_number} IS DISTINCT FROM ${pr.prNumber}
+          AND EXISTS (
+            SELECT 1 FROM ${github_branch_pull_requests}
+            WHERE ${github_branch_pull_requests.git_url} = ${cli_sessions_v2.git_url}
+              AND ${github_branch_pull_requests.pr_number} = ${cli_sessions_v2.pr_number}
+              AND ${cacheOwnerMatches}
+              AND ${github_branch_pull_requests.pr_state} IN ('open', 'draft')
+          )
+        )`
+      )
+    )
+    .returning({ session_id: cli_sessions_v2.session_id });
+  return linked.length;
+}
+
 /**
  * Side-effect: when a pull_request webhook arrives for one of the tracked
  * actions, a session that verifiably links the PR is marked verified and the
@@ -230,7 +329,9 @@ export async function markSessionsVerifyingPullRequest(
  * The cache is never the source of the link: it only carries the state and
  * review decision for a PR a session already verifiably links. A branch name
  * is not identity — a reused branch name opened by someone else must never
- * populate or overwrite the row.
+ * populate or overwrite the row. The one exception is an open PR on a Cloud
+ * Agent worktree's branch, which `linkCloudAgentWorktreesToPullRequest` links
+ * to that worktree's sessions first.
  *
  * The review decision is NOT fetched here. Instead `review_decision_pending` is
  * flipped to `true` for actions that can affect it (opened, reopened,
@@ -278,8 +379,13 @@ export async function upsertCliSessionPullRequestsFromWebhook(
   if (!prUrl) return 0;
 
   const gitUrl = baseRepoRef.url;
+  const state = derivePrState(pull_request, action);
 
   try {
+    await linkCloudAgentWorktreesToPullRequest(
+      { gitUrl, prNumber: pull_request.number, prUrl, headRef: branch, state },
+      owner
+    );
     const gateResult = await markSessionsVerifyingPullRequest(
       {
         gitUrl,
@@ -300,7 +406,6 @@ export async function upsertCliSessionPullRequestsFromWebhook(
       return 0;
     }
 
-    const state = derivePrState(pull_request, action);
     const mergeability = prMergeabilitySchema.safeParse({
       headSha: pull_request.head.sha,
       baseSha: pull_request.base.sha,

@@ -1976,4 +1976,176 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
       expect(rows[0].review_decision_pending).toBe(true);
     });
   });
+
+  describe('Cloud Agent worktree linking', () => {
+    function newWorktreeId() {
+      return `worktree_${crypto.randomUUID()}`;
+    }
+
+    async function seedWorktreeSession(args: {
+      worktreeId: string | null;
+      branch: string;
+      owner?: WebhookInstallationOwner;
+    }) {
+      const owner = args.owner ?? testOwner;
+      const sessionId = `ses_test_worktree_pr_${Date.now()}_${sessionCounter++}`;
+      await db.insert(cli_sessions_v2).values({
+        session_id: sessionId,
+        kilo_user_id: owner.kind === 'user' ? owner.userId : testUserId,
+        organization_id: owner.kind === 'organization' ? owner.organizationId : null,
+        cloud_agent_worktree_id: args.worktreeId,
+        git_url: NORMALIZED_GIT_URL,
+        git_branch: args.branch,
+        created_on_platform: args.worktreeId === null ? 'cli' : 'cloud-agent-web',
+      });
+      sessionIdsToCleanup.push(sessionId);
+      return sessionId;
+    }
+
+    async function readLink(sessionId: string) {
+      const [row] = await db
+        .select({
+          platform: cli_sessions_v2.platform,
+          pr_url: cli_sessions_v2.pr_url,
+          pr_number: cli_sessions_v2.pr_number,
+          pr_head_ref: cli_sessions_v2.pr_head_ref,
+          pr_head_sha: cli_sessions_v2.pr_head_sha,
+          verified: cli_sessions_v2.pr_link_verified_at,
+        })
+        .from(cli_sessions_v2)
+        .where(eq(cli_sessions_v2.session_id, sessionId));
+      return row;
+    }
+
+    it('links an open PR to every chat in the worktree on that branch', async () => {
+      const branch = 'kilo/worktree-link-open';
+      const worktreeId = newWorktreeId();
+      const first = await seedWorktreeSession({ worktreeId, branch });
+      const second = await seedWorktreeSession({ worktreeId, branch });
+      const otherWorktree = await seedWorktreeSession({
+        worktreeId: newWorktreeId(),
+        branch: 'kilo/other-branch',
+      });
+      const localCli = await seedWorktreeSession({ worktreeId: null, branch });
+
+      const written = await upsertCliSessionPullRequestsFromWebhook(
+        makePayload({ action: 'opened', prNumber: 901, headRef: branch, headSha: 'sha-901' }),
+        testOwner
+      );
+
+      expect(written).toBe(1);
+      for (const sessionId of [first, second]) {
+        expect(await readLink(sessionId)).toMatchObject({
+          platform: 'github',
+          pr_url: `https://github.com/${REPO}/pull/901`,
+          pr_number: 901,
+          pr_head_ref: branch,
+          pr_head_sha: null,
+          verified: expect.any(String),
+        });
+      }
+      expect((await readLink(otherWorktree)).pr_url).toBeNull();
+      expect((await readLink(localCli)).pr_url).toBeNull();
+      const [row] = await readUserRow({ userId: testUserId, prNumber: 901 });
+      expect(row).toMatchObject({ pr_state: 'open', pr_head_sha: 'sha-901' });
+    });
+
+    it('keeps the link verified and the cache current across new pushes', async () => {
+      const branch = 'kilo/worktree-link-sync';
+      const sessionId = await seedWorktreeSession({ worktreeId: newWorktreeId(), branch });
+      await upsertCliSessionPullRequestsFromWebhook(
+        makePayload({ action: 'opened', prNumber: 902, headRef: branch, headSha: 'sha-a' }),
+        testOwner
+      );
+
+      const written = await upsertCliSessionPullRequestsFromWebhook(
+        makePayload({ action: 'synchronize', prNumber: 902, headRef: branch, headSha: 'sha-b' }),
+        testOwner
+      );
+
+      expect(written).toBe(1);
+      expect(await readLink(sessionId)).toMatchObject({
+        pr_number: 902,
+        verified: expect.any(String),
+      });
+      const [row] = await readUserRow({ userId: testUserId, prNumber: 902 });
+      expect(row.pr_head_sha).toBe('sha-b');
+    });
+
+    it('does not link a closed PR', async () => {
+      const branch = 'kilo/worktree-link-closed';
+      const sessionId = await seedWorktreeSession({ worktreeId: newWorktreeId(), branch });
+
+      const written = await upsertCliSessionPullRequestsFromWebhook(
+        makePayload({
+          action: 'closed',
+          prNumber: 903,
+          state: 'closed',
+          merged: true,
+          headRef: branch,
+          headSha: 'sha-903',
+        }),
+        testOwner
+      );
+
+      expect(written).toBe(0);
+      expect((await readLink(sessionId)).pr_url).toBeNull();
+      expect(await readUserRow({ userId: testUserId, prNumber: 903 })).toHaveLength(0);
+    });
+
+    it('does not link a worktree in another tenant', async () => {
+      const branch = 'kilo/worktree-link-tenant';
+      const otherUser = await insertTestUser();
+      userIdsToCleanup.push(otherUser.id);
+      const sessionId = await seedWorktreeSession({
+        worktreeId: newWorktreeId(),
+        branch,
+        owner: { kind: 'user', userId: otherUser.id },
+      });
+
+      await upsertCliSessionPullRequestsFromWebhook(
+        makePayload({ action: 'opened', prNumber: 904, headRef: branch, headSha: 'sha-904' }),
+        testOwner
+      );
+
+      expect((await readLink(sessionId)).pr_url).toBeNull();
+    });
+
+    it('keeps a link to another open PR, and replaces it once that PR is merged', async () => {
+      const branch = 'kilo/worktree-link-replace';
+      const sessionId = await seedWorktreeSession({ worktreeId: newWorktreeId(), branch });
+      await upsertCliSessionPullRequestsFromWebhook(
+        makePayload({ action: 'opened', prNumber: 905, headRef: branch, headSha: 'sha-905' }),
+        testOwner
+      );
+
+      await upsertCliSessionPullRequestsFromWebhook(
+        makePayload({ action: 'opened', prNumber: 906, headRef: branch, headSha: 'sha-906' }),
+        testOwner
+      );
+      expect((await readLink(sessionId)).pr_number).toBe(905);
+
+      await upsertCliSessionPullRequestsFromWebhook(
+        makePayload({
+          action: 'closed',
+          prNumber: 905,
+          state: 'closed',
+          merged: true,
+          headRef: branch,
+          headSha: 'sha-905',
+        }),
+        testOwner
+      );
+      expect((await readLink(sessionId)).pr_number).toBe(905);
+
+      await upsertCliSessionPullRequestsFromWebhook(
+        makePayload({ action: 'synchronize', prNumber: 906, headRef: branch, headSha: 'sha-906b' }),
+        testOwner
+      );
+      expect(await readLink(sessionId)).toMatchObject({
+        pr_number: 906,
+        verified: expect.any(String),
+      });
+    });
+  });
 });

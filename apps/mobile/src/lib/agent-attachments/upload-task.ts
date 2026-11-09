@@ -1,5 +1,4 @@
 import { File, UploadType } from 'expo-file-system';
-import * as z from 'zod';
 
 import { i18n } from '@/i18n';
 import { trpcClient } from '@/lib/trpc';
@@ -7,12 +6,7 @@ import {
   type AgentAttachmentExtension,
   type AgentAttachmentMime,
 } from '@/lib/agent-attachments/constants';
-
-// expo-file-system types upload progress counts as `number`, but iOS sends the
-// native Int64 values as `bigint`. BigInt division truncates to 0n or 1n, and
-// the chip's percentage math then throws, so the event is parsed, not trusted.
-const ByteCount = z.union([z.number(), z.bigint().transform(Number)]);
-const NativeUploadProgress = z.object({ bytesSent: ByteCount, totalBytes: ByteCount });
+import { NativeUploadProgress } from '@/lib/native-transfer-progress';
 
 export function normalizeFilename(name: string, extension: AgentAttachmentExtension): string {
   // If the original filename had no usable extension we append the

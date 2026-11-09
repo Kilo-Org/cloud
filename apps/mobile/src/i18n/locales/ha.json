@@ -229,6 +229,20 @@
     "signInCodeField": "Lambar shiga",
     "or": "ko"
   },
+  "pendingLink": {
+    "description": "Wani asusu yana amfani da {{email}} tuni. Shiga da ɗaya daga cikin hanyoyinsa domin ƙara {{provider}}.",
+    "emailCode": "Aiko mini lambar shiga ta imel",
+    "continueInBrowser": "Ci gaba a burauza",
+    "startAgain": "Sake farawa",
+    "expired": "Wannan buƙatar ƙara {{provider}} ta ƙare.",
+    "noMethods": "Wannan asusun ba shi da wata hanyar shiga, don haka ba za a iya ƙara {{provider}} ba.",
+    "linked": "An ƙara {{provider}} zuwa asusunka.",
+    "failedExpired": "Ba a ƙara {{provider}} ba saboda buƙatar ta ƙare.",
+    "failedWrongAccount": "Ba a ƙara {{provider}} ba saboda ka shiga wani asusu daban.",
+    "failedAccountAlreadyLinked": "Ba a ƙara {{provider}} ba saboda an riga an haɗa shi da wani asusu.",
+    "failedProviderAlreadyLinked": "Ba a ƙara {{provider}} ba saboda asusunka yana da wata shigar {{provider}} daban tuni.",
+    "failedLinking": "An kasa ƙara {{provider}} zuwa asusunka."
+  },
   "profile": {
     "codeReviewerSubtitle": "Bitar PR ta atomatik",
     "securityAgentSubtitle": "Nemo raunin tsaro ka gyara su",
@@ -267,6 +281,8 @@
     "providerTestAccount": "Asusun gwaji",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO na kamfani",
     "passkeysTitle": "Maɓallan shiga",
     "passkeysSubtitle": "Shiga ba tare da kalmar sirri ba",

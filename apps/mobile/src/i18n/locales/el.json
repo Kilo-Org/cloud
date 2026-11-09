@@ -229,6 +229,20 @@
     "signInCodeField": "Κωδικός σύνδεσης",
     "or": "ή"
   },
+  "pendingLink": {
+    "description": "Ένας λογαριασμός χρησιμοποιεί ήδη το {{email}}. Συνδέσου με μία από τις μεθόδους του για να προσθέσεις το {{provider}}.",
+    "emailCode": "Στείλε μου κωδικό σύνδεσης με email",
+    "continueInBrowser": "Συνέχεια στο πρόγραμμα περιήγησης",
+    "startAgain": "Έναρξη από την αρχή",
+    "expired": "Αυτό το αίτημα προσθήκης του {{provider}} έληξε.",
+    "noMethods": "Αυτός ο λογαριασμός δεν έχει άλλη μέθοδο σύνδεσης, οπότε το {{provider}} δεν μπορεί να προστεθεί.",
+    "linked": "Το {{provider}} προστέθηκε στον λογαριασμό σου.",
+    "failedExpired": "Το {{provider}} δεν προστέθηκε επειδή το αίτημα έληξε.",
+    "failedWrongAccount": "Το {{provider}} δεν προστέθηκε επειδή συνδέθηκες σε διαφορετικό λογαριασμό.",
+    "failedAccountAlreadyLinked": "Το {{provider}} δεν προστέθηκε επειδή είναι ήδη συνδεδεμένο με άλλον λογαριασμό.",
+    "failedProviderAlreadyLinked": "Το {{provider}} δεν προστέθηκε επειδή ο λογαριασμός σου έχει ήδη διαφορετική σύνδεση {{provider}}.",
+    "failedLinking": "Δεν ήταν δυνατή η προσθήκη του {{provider}} στον λογαριασμό σου."
+  },
   "profile": {
     "codeReviewerSubtitle": "Αυτόματοι έλεγχοι PR",
     "securityAgentSubtitle": "Εντοπισμός και αποκατάσταση ευπαθειών",
@@ -267,6 +281,8 @@
     "providerTestAccount": "Δοκιμαστικός λογαριασμός",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "Εταιρική ενιαία σύνδεση (SSO)",
     "passkeysTitle": "Κλειδιά πρόσβασης",
     "passkeysSubtitle": "Συνδεθείτε χωρίς κωδικό πρόσβασης",

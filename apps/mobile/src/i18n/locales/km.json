@@ -229,6 +229,20 @@
     "signInCodeField": "លេខកូដចូល",
     "or": "ឬ"
   },
+  "pendingLink": {
+    "description": "មានគណនីមួយកំពុងប្រើ {{email}} រួចហើយ។ សូមចូលដោយប្រើវិធីមួយរបស់គណនីនោះ ដើម្បីបន្ថែម {{provider}}។",
+    "emailCode": "ផ្ញើលេខកូដចូលមកអ៊ីមែលខ្ញុំ",
+    "continueInBrowser": "បន្តនៅក្នុងកម្មវិធីរុករក",
+    "startAgain": "ចាប់ផ្តើមម្តងទៀត",
+    "expired": "សំណើបន្ថែម {{provider}} នេះបានផុតកំណត់ហើយ។",
+    "noMethods": "គណនីនេះគ្មានវិធីចូលផ្សេងទៀតទេ ដូច្នេះមិនអាចបន្ថែម {{provider}} បានទេ។",
+    "linked": "{{provider}} ត្រូវបានបន្ថែមទៅគណនីរបស់អ្នក។",
+    "failedExpired": "{{provider}} មិនត្រូវបានបន្ថែមទេ ព្រោះសំណើបានផុតកំណត់។",
+    "failedWrongAccount": "{{provider}} មិនត្រូវបានបន្ថែមទេ ព្រោះអ្នកបានចូលគណនីផ្សេង។",
+    "failedAccountAlreadyLinked": "{{provider}} មិនត្រូវបានបន្ថែមទេ ព្រោះវាបានភ្ជាប់ទៅគណនីផ្សេងរួចហើយ។",
+    "failedProviderAlreadyLinked": "{{provider}} មិនត្រូវបានបន្ថែមទេ ព្រោះគណនីរបស់អ្នកមានការចូល {{provider}} ផ្សេងរួចហើយ។",
+    "failedLinking": "មិនអាចបន្ថែម {{provider}} ទៅគណនីរបស់អ្នកបានទេ។"
+  },
   "profile": {
     "codeReviewerSubtitle": "ការពិនិត្យ PR ដោយស្វ័យប្រវត្តិ",
     "securityAgentSubtitle": "ស្វែងរក និងដោះស្រាយចំណុចខ្សោយផ្នែកសុវត្ថិភាព",
@@ -267,6 +281,8 @@
     "providerTestAccount": "គណនីសាកល្បង",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO សម្រាប់សហគ្រាស",
     "passkeysTitle": "កូនសោចូល",
     "passkeysSubtitle": "ចូលដោយគ្មានពាក្យសម្ងាត់",

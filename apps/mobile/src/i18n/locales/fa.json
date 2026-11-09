@@ -229,6 +229,20 @@
     "signInCodeField": "کد ورود",
     "or": "یا"
   },
+  "pendingLink": {
+    "description": "حسابی از قبل از {{email}} استفاده می‌کند. برای افزودن {{provider}} با یکی از روش‌های ورود آن وارد شوید.",
+    "emailCode": "کد ورود را برایم ایمیل کنید",
+    "continueInBrowser": "ادامه در مرورگر",
+    "startAgain": "شروع دوباره",
+    "expired": "مهلت این درخواست برای افزودن {{provider}} تمام شده است.",
+    "noMethods": "این حساب روش ورود دیگری ندارد، بنابراین {{provider}} را نمی‌توان افزود.",
+    "linked": "{{provider}} به حساب شما افزوده شد.",
+    "failedExpired": "{{provider}} افزوده نشد، چون مهلت درخواست تمام شده بود.",
+    "failedWrongAccount": "{{provider}} افزوده نشد، چون به حساب دیگری وارد شدید.",
+    "failedAccountAlreadyLinked": "{{provider}} افزوده نشد، چون از قبل به حساب دیگری پیوند داده شده است.",
+    "failedProviderAlreadyLinked": "{{provider}} افزوده نشد، چون حساب شما از قبل ورود دیگری با {{provider}} دارد.",
+    "failedLinking": "افزودن {{provider}} به حساب شما ممکن نشد."
+  },
   "profile": {
     "codeReviewerSubtitle": "بازبینی خودکار PR",
     "securityAgentSubtitle": "یافتن و رفع آسیب‌پذیری‌ها",
@@ -267,6 +281,8 @@
     "providerTestAccount": "حساب آزمایشی",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO سازمانی",
     "passkeysTitle": "کلیدهای عبور",
     "passkeysSubtitle": "بدون گذرواژه وارد شوید",

@@ -229,6 +229,20 @@
     "pleaseEnterEmail": "Lütfen e-posta adresini gir.",
     "or": "veya"
   },
+  "pendingLink": {
+    "description": "{{email}} adresini zaten bir hesap kullanıyor. {{provider}} eklemek için bu hesabın yöntemlerinden biriyle oturum aç.",
+    "emailCode": "Bana e-postayla oturum açma kodu gönder",
+    "continueInBrowser": "Tarayıcıda devam et",
+    "startAgain": "Baştan başla",
+    "expired": "{{provider}} ekleme isteğinin süresi doldu.",
+    "noMethods": "Bu hesabın başka bir oturum açma yöntemi olmadığından {{provider}} eklenemiyor.",
+    "linked": "{{provider}} hesabına eklendi.",
+    "failedExpired": "İsteğin süresi dolduğu için {{provider}} eklenmedi.",
+    "failedWrongAccount": "Farklı bir hesapta oturum açtığın için {{provider}} eklenmedi.",
+    "failedAccountAlreadyLinked": "{{provider}} zaten başka bir hesaba bağlı olduğu için eklenmedi.",
+    "failedProviderAlreadyLinked": "Hesabında zaten farklı bir {{provider}} oturum açma yöntemi olduğu için {{provider}} eklenmedi.",
+    "failedLinking": "{{provider}} hesabına eklenemedi."
+  },
   "profile": {
     "codeReviewerSubtitle": "Otomatik PR incelemeleri",
     "securityAgentSubtitle": "Güvenlik açıklarını bul ve gider",
@@ -267,6 +281,8 @@
     "providerTestAccount": "Test hesabı",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "Kurumsal SSO",
     "passkeysTitle": "Geçiş anahtarları",
     "passkeysSubtitle": "Parolasız oturum açın",

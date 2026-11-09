@@ -229,6 +229,20 @@
     "pleaseEnterEmail": "Introduce tu correo electrónico.",
     "or": "o"
   },
+  "pendingLink": {
+    "description": "Ya hay una cuenta que usa {{email}}. Inicia sesión con uno de sus métodos para añadir {{provider}}.",
+    "emailCode": "Enviarme un código de inicio de sesión por correo",
+    "continueInBrowser": "Continuar en el navegador",
+    "startAgain": "Empezar de nuevo",
+    "expired": "Esta solicitud para añadir {{provider}} ha caducado.",
+    "noMethods": "Esta cuenta no tiene otro método de inicio de sesión, así que no se puede añadir {{provider}}.",
+    "linked": "{{provider}} se añadió a tu cuenta.",
+    "failedExpired": "No se añadió {{provider}} porque la solicitud caducó.",
+    "failedWrongAccount": "No se añadió {{provider}} porque iniciaste sesión en otra cuenta.",
+    "failedAccountAlreadyLinked": "No se añadió {{provider}} porque ya está vinculado a otra cuenta.",
+    "failedProviderAlreadyLinked": "No se añadió {{provider}} porque tu cuenta ya tiene otro inicio de sesión de {{provider}}.",
+    "failedLinking": "No se pudo añadir {{provider}} a tu cuenta."
+  },
   "profile": {
     "codeReviewerSubtitle": "Revisiones automáticas de PR",
     "securityAgentSubtitle": "Encontrar y corregir vulnerabilidades",
@@ -267,6 +281,8 @@
     "providerTestAccount": "Cuenta de prueba",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO empresarial",
     "passkeysTitle": "Claves de acceso",
     "passkeysSubtitle": "Inicia sesión sin contraseña",

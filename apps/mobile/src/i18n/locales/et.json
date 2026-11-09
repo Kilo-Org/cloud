@@ -229,6 +229,20 @@
     "signInCodeField": "Sisselogimiskood",
     "or": "või"
   },
+  "pendingLink": {
+    "description": "Aadressi {{email}} kasutab juba üks konto. {{provider}} lisamiseks logi sisse mõne selle konto meetodiga.",
+    "emailCode": "Saada mulle sisselogimiskood e-postiga",
+    "continueInBrowser": "Jätka brauseris",
+    "startAgain": "Alusta uuesti",
+    "expired": "See {{provider}} lisamise taotlus on aegunud.",
+    "noMethods": "Sellel kontol pole muud sisselogimismeetodit, seega ei saa {{provider}} lisada.",
+    "linked": "{{provider}} lisati sinu kontole.",
+    "failedExpired": "{{provider}} jäi lisamata, sest taotlus aegus.",
+    "failedWrongAccount": "{{provider}} jäi lisamata, sest logisid sisse teise kontoga.",
+    "failedAccountAlreadyLinked": "{{provider}} jäi lisamata, sest see on juba seotud teise kontoga.",
+    "failedProviderAlreadyLinked": "{{provider}} jäi lisamata, sest sinu kontol on juba teine {{provider}} sisselogimine.",
+    "failedLinking": "{{provider}} ei õnnestunud sinu kontole lisada."
+  },
   "profile": {
     "codeReviewerSubtitle": "Automaatsed PR-ülevaatused",
     "securityAgentSubtitle": "Leia ja kõrvalda turvanõrkused",
@@ -267,6 +281,8 @@
     "providerTestAccount": "Testikonto",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "Ettevõtte SSO",
     "passkeysTitle": "Pääsuvõtmed",
     "passkeysSubtitle": "Logi sisse ilma paroolita",

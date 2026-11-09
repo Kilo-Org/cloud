@@ -229,6 +229,20 @@
     "signInCodeField": "შესვლის კოდი",
     "or": "ან"
   },
+  "pendingLink": {
+    "description": "{{email}} უკვე გამოიყენება ანგარიშის მიერ. {{provider}}-ის დასამატებლად შედი მისი ერთ-ერთი მეთოდით.",
+    "emailCode": "შესვლის კოდის გამოგზავნა ელფოსტით",
+    "continueInBrowser": "ბრაუზერში გაგრძელება",
+    "startAgain": "თავიდან დაწყება",
+    "expired": "{{provider}}-ის დამატების ეს მოთხოვნა ვადაგასულია.",
+    "noMethods": "ამ ანგარიშს შესვლის სხვა მეთოდი არ აქვს, ამიტომ {{provider}}-ის დამატება შეუძლებელია.",
+    "linked": "{{provider}} დაემატა შენს ანგარიშს.",
+    "failedExpired": "{{provider}} არ დაემატა, რადგან მოთხოვნას ვადა გაუვიდა.",
+    "failedWrongAccount": "{{provider}} არ დაემატა, რადგან სხვა ანგარიშში შეხვედი.",
+    "failedAccountAlreadyLinked": "{{provider}} არ დაემატა, რადგან ის უკვე დაკავშირებულია სხვა ანგარიშთან.",
+    "failedProviderAlreadyLinked": "{{provider}} არ დაემატა, რადგან შენს ანგარიშს უკვე აქვს სხვა {{provider}}-ით შესვლა.",
+    "failedLinking": "{{provider}}-ის დამატება შენს ანგარიშზე ვერ მოხერხდა."
+  },
   "profile": {
     "codeReviewerSubtitle": "PR-ების ავტომატური შემოწმება",
     "securityAgentSubtitle": "მოწყვლადობების პოვნა და აღმოფხვრა",
@@ -267,6 +281,8 @@
     "providerTestAccount": "სატესტო ანგარიში",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "კორპორაციული SSO",
     "passkeysTitle": "წვდომის გასაღებები",
     "passkeysSubtitle": "შესვლა პაროლის გარეშე",

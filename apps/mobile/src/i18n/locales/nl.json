@@ -229,6 +229,20 @@
     "pleaseEnterEmail": "Voer je e-mailadres in.",
     "or": "of"
   },
+  "pendingLink": {
+    "description": "Er is al een account dat {{email}} gebruikt. Meld je aan met een van de methoden van dat account om {{provider}} toe te voegen.",
+    "emailCode": "Aanmeldcode naar mijn e-mail sturen",
+    "continueInBrowser": "Doorgaan in de browser",
+    "startAgain": "Opnieuw beginnen",
+    "expired": "Dit verzoek om {{provider}} toe te voegen is verlopen.",
+    "noMethods": "Dit account heeft geen andere aanmeldmethode, dus {{provider}} kan niet worden toegevoegd.",
+    "linked": "{{provider}} is toegevoegd aan je account.",
+    "failedExpired": "{{provider}} is niet toegevoegd omdat het verzoek is verlopen.",
+    "failedWrongAccount": "{{provider}} is niet toegevoegd omdat je bij een ander account bent aangemeld.",
+    "failedAccountAlreadyLinked": "{{provider}} is niet toegevoegd omdat het al aan een ander account is gekoppeld.",
+    "failedProviderAlreadyLinked": "{{provider}} is niet toegevoegd omdat je account al een andere {{provider}}-aanmelding heeft.",
+    "failedLinking": "{{provider}} kon niet aan je account worden toegevoegd."
+  },
   "profile": {
     "codeReviewerSubtitle": "Automatische PR-beoordelingen",
     "securityAgentSubtitle": "Kwetsbaarheden vinden en verhelpen",
@@ -267,6 +281,8 @@
     "providerTestAccount": "Testaccount",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO voor bedrijven",
     "passkeysTitle": "Passkeys",
     "passkeysSubtitle": "Aanmelden zonder wachtwoord",

@@ -229,6 +229,20 @@
     "signInCodeField": "Kaody fidirana",
     "or": "na"
   },
+  "pendingLink": {
+    "description": "Misy kaonty efa mampiasa {{email}}. Midira amin'ny iray amin'ireo fomba fidirany mba hanampiana {{provider}}.",
+    "emailCode": "Alefaso amin'ny mailaka ho ahy ny kaody fidirana",
+    "continueInBrowser": "Tohizo ao amin'ny mpitety tranonkala",
+    "startAgain": "Avereno atomboka",
+    "expired": "Lany daty ity fangatahana hanampy {{provider}} ity.",
+    "noMethods": "Tsy manana fomba fidirana hafa ity kaonty ity, ka tsy azo ampiana {{provider}}.",
+    "linked": "Nampiana tao amin'ny kaontinao {{provider}}.",
+    "failedExpired": "Tsy nampiana {{provider}} satria lany daty ny fangatahana.",
+    "failedWrongAccount": "Tsy nampiana {{provider}} satria niditra tamin'ny kaonty hafa ianao.",
+    "failedAccountAlreadyLinked": "Tsy nampiana {{provider}} satria efa mifandray amin'ny kaonty hafa izy.",
+    "failedProviderAlreadyLinked": "Tsy nampiana {{provider}} satria efa manana fidirana {{provider}} hafa ny kaontinao.",
+    "failedLinking": "Tsy afaka nampiana tao amin'ny kaontinao {{provider}}."
+  },
   "profile": {
     "codeReviewerSubtitle": "Fandinihana PR mandeha ho azy",
     "securityAgentSubtitle": "Tadiavo sy ahitsio ny fahalemena ara-piarovana",
@@ -267,6 +281,8 @@
     "providerTestAccount": "Kaonty fitsapana",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO an'orinasa",
     "passkeysTitle": "Fanalahidin'ny fidirana",
     "passkeysSubtitle": "Midira tsy misy tenimiafina",

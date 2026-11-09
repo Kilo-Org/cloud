@@ -229,6 +229,20 @@
     "signInCodeField": "Kodiċi tad-dħul",
     "or": "jew"
   },
+  "pendingLink": {
+    "description": "Diġà hemm kont li juża {{email}}. Idħol b'wieħed mill-metodi tiegħu biex iżżid {{provider}}.",
+    "emailCode": "Ibagħtli kodiċi tad-dħul bl-email",
+    "continueInBrowser": "Kompli fil-browser",
+    "startAgain": "Erġa' ibda",
+    "expired": "Din it-talba biex jiżdied {{provider}} skadiet.",
+    "noMethods": "Dan il-kont m'għandux metodu ieħor tad-dħul, għalhekk {{provider}} ma jistax jiżdied.",
+    "linked": "{{provider}} żdied mal-kont tiegħek.",
+    "failedExpired": "{{provider}} ma żdiedx għax it-talba skadiet.",
+    "failedWrongAccount": "{{provider}} ma żdiedx għax dħalt f'kont differenti.",
+    "failedAccountAlreadyLinked": "{{provider}} ma żdiedx għax diġà marbut ma' kont ieħor.",
+    "failedProviderAlreadyLinked": "{{provider}} ma żdiedx għax il-kont tiegħek diġà għandu dħul ieħor b'{{provider}}.",
+    "failedLinking": "{{provider}} ma setax jiżdied mal-kont tiegħek."
+  },
   "profile": {
     "codeReviewerSubtitle": "Reviżjonijiet awtomatiċi tal-PR",
     "securityAgentSubtitle": "Sib u rrimedja l-vulnerabbiltajiet",
@@ -267,6 +281,8 @@
     "providerTestAccount": "Kont tat-test",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO tal-intrapriża",
     "passkeysTitle": "Ċwievet tal-aċċess",
     "passkeysSubtitle": "Idħol mingħajr password",

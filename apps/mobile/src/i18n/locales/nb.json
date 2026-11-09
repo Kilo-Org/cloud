@@ -229,6 +229,20 @@
     "signInCodeField": "Innloggingskode",
     "or": "eller"
   },
+  "pendingLink": {
+    "description": "En konto bruker allerede {{email}}. Logg inn med en av metodene for kontoen for å legge til {{provider}}.",
+    "emailCode": "Send meg en innloggingskode på e-post",
+    "continueInBrowser": "Fortsett i nettleseren",
+    "startAgain": "Start på nytt",
+    "expired": "Denne forespørselen om å legge til {{provider}} er utløpt.",
+    "noMethods": "Denne kontoen har ingen annen innloggingsmetode, så {{provider}} kan ikke legges til.",
+    "linked": "{{provider}} ble lagt til i kontoen din.",
+    "failedExpired": "{{provider}} ble ikke lagt til fordi forespørselen utløp.",
+    "failedWrongAccount": "{{provider}} ble ikke lagt til fordi du logget inn på en annen konto.",
+    "failedAccountAlreadyLinked": "{{provider}} ble ikke lagt til fordi den allerede er koblet til en annen konto.",
+    "failedProviderAlreadyLinked": "{{provider}} ble ikke lagt til fordi kontoen din allerede har en annen {{provider}}-innlogging.",
+    "failedLinking": "{{provider}} kunne ikke legges til i kontoen din."
+  },
   "profile": {
     "codeReviewerSubtitle": "Automatiske PR-gjennomganger",
     "securityAgentSubtitle": "Finn og utbedre sårbarheter",
@@ -267,6 +281,8 @@
     "providerTestAccount": "Testkonto",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO for bedrifter",
     "passkeysTitle": "Passnøkler",
     "passkeysSubtitle": "Logg inn uten passord",

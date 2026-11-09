@@ -229,6 +229,20 @@
     "signInCodeField": "የመግቢያ ኮድ",
     "or": "ወይም"
   },
+  "pendingLink": {
+    "description": "{{email}} ቀድሞውኑ በአንድ መለያ ጥቅም ላይ ውሏል። {{provider}}ን ለማከል ከመለያው የመግቢያ ዘዴዎች በአንዱ ይግቡ።",
+    "emailCode": "የመግቢያ ኮድ በኢሜይል ይላኩልኝ",
+    "continueInBrowser": "በአሳሽ ውስጥ ይቀጥሉ",
+    "startAgain": "እንደገና ይጀምሩ",
+    "expired": "{{provider}}ን የማከል ይህ ጥያቄ ጊዜው አልፎበታል።",
+    "noMethods": "ይህ መለያ ሌላ የመግቢያ ዘዴ ስለሌለው {{provider}}ን ማከል አይቻልም።",
+    "linked": "{{provider}} ወደ መለያዎ ታክሏል።",
+    "failedExpired": "ጥያቄው ጊዜው ስላለፈበት {{provider}} አልታከለም።",
+    "failedWrongAccount": "ወደ ሌላ መለያ ስለገቡ {{provider}} አልታከለም።",
+    "failedAccountAlreadyLinked": "{{provider}} አስቀድሞ ከሌላ መለያ ጋር ስለተገናኘ አልታከለም።",
+    "failedProviderAlreadyLinked": "መለያዎ አስቀድሞ ሌላ የ{{provider}} መግቢያ ስላለው {{provider}} አልታከለም።",
+    "failedLinking": "{{provider}}ን ወደ መለያዎ ማከል አልተቻለም።"
+  },
   "profile": {
     "codeReviewerSubtitle": "በራስ ሰር የሚደረጉ የPR ግምገማዎች",
     "securityAgentSubtitle": "ተጋላጭነቶችን ፈልገው ያስተካክሉ",
@@ -267,6 +281,8 @@
     "providerTestAccount": "የሙከራ መለያ",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "የድርጅት SSO",
     "passkeysTitle": "ፓስኪዎች",
     "passkeysSubtitle": "ያለ የይለፍ ቃል ይግቡ",

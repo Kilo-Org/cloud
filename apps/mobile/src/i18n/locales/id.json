@@ -229,6 +229,20 @@
     "pleaseEnterEmail": "Masukkan alamat emailmu.",
     "or": "atau"
   },
+  "pendingLink": {
+    "description": "Sudah ada akun yang menggunakan {{email}}. Masuk dengan salah satu metodenya untuk menambahkan {{provider}}.",
+    "emailCode": "Kirimi saya kode masuk lewat email",
+    "continueInBrowser": "Lanjutkan di peramban",
+    "startAgain": "Mulai lagi",
+    "expired": "Permintaan untuk menambahkan {{provider}} ini sudah kedaluwarsa.",
+    "noMethods": "Akun ini tidak punya metode masuk lain, jadi {{provider}} tidak dapat ditambahkan.",
+    "linked": "{{provider}} telah ditambahkan ke akunmu.",
+    "failedExpired": "{{provider}} tidak ditambahkan karena permintaannya sudah kedaluwarsa.",
+    "failedWrongAccount": "{{provider}} tidak ditambahkan karena kamu masuk ke akun lain.",
+    "failedAccountAlreadyLinked": "{{provider}} tidak ditambahkan karena sudah ditautkan ke akun lain.",
+    "failedProviderAlreadyLinked": "{{provider}} tidak ditambahkan karena akunmu sudah memiliki metode masuk {{provider}} yang berbeda.",
+    "failedLinking": "{{provider}} tidak dapat ditambahkan ke akunmu."
+  },
   "profile": {
     "codeReviewerSubtitle": "Tinjauan PR otomatis",
     "securityAgentSubtitle": "Temukan dan perbaiki kerentanan",
@@ -267,6 +281,8 @@
     "providerTestAccount": "Akun uji",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO perusahaan",
     "passkeysTitle": "Kunci sandi",
     "passkeysSubtitle": "Masuk tanpa kata sandi",

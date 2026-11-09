@@ -229,6 +229,20 @@
     "signInCodeField": "Кіру коды",
     "or": "немесе"
   },
+  "pendingLink": {
+    "description": "{{email}} мекенжайын басқа аккаунт пайдаланып жатыр. {{provider}} қосу үшін оның кіру әдістерінің бірімен кіріңіз.",
+    "emailCode": "Кіру кодын электрондық поштаға жіберу",
+    "continueInBrowser": "Браузерде жалғастыру",
+    "startAgain": "Қайта бастау",
+    "expired": "{{provider}} қосу сұрауының мерзімі өтіп кетті.",
+    "noMethods": "Бұл аккаунтта басқа кіру әдісі жоқ, сондықтан {{provider}} қосу мүмкін емес.",
+    "linked": "{{provider}} аккаунтыңызға қосылды.",
+    "failedExpired": "Сұраудың мерзімі өткендіктен, {{provider}} қосылмады.",
+    "failedWrongAccount": "Басқа аккаунтқа кіргендіктен, {{provider}} қосылмады.",
+    "failedAccountAlreadyLinked": "{{provider}} басқа аккаунтқа әлдеқашан байланыстырылғандықтан, қосылмады.",
+    "failedProviderAlreadyLinked": "Аккаунтыңызда басқа {{provider}} кіру әдісі бар болғандықтан, {{provider}} қосылмады.",
+    "failedLinking": "{{provider}} аккаунтыңызға қосылмады."
+  },
   "profile": {
     "codeReviewerSubtitle": "PR сұрауларын автоматты тексеру",
     "securityAgentSubtitle": "Осалдықтарды табу және жою",
@@ -267,6 +281,8 @@
     "providerTestAccount": "Сынақ тіркелгісі",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "Корпоративтік SSO",
     "passkeysTitle": "Кіру кілттері",
     "passkeysSubtitle": "Құпия сөзсіз кіру",

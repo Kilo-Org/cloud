@@ -229,6 +229,20 @@
     "signInCodeField": "Kod za prijavu",
     "or": "ili"
   },
+  "pendingLink": {
+    "description": "Nalog već koristi {{email}}. Prijavi se jednim od njegovih načina da dodaš {{provider}}.",
+    "emailCode": "Pošalji mi kod za prijavu e-poštom",
+    "continueInBrowser": "Nastavi u pregledaču",
+    "startAgain": "Počni ponovo",
+    "expired": "Ovaj zahtev za dodavanje {{provider}} je istekao.",
+    "noMethods": "Ovaj nalog nema drugi način prijave, pa {{provider}} ne može da se doda.",
+    "linked": "{{provider}} je dodat na tvoj nalog.",
+    "failedExpired": "{{provider}} nije dodat jer je zahtev istekao.",
+    "failedWrongAccount": "{{provider}} nije dodat jer si se prijavio na drugi nalog.",
+    "failedAccountAlreadyLinked": "{{provider}} nije dodat jer je već povezan sa drugim nalogom.",
+    "failedProviderAlreadyLinked": "{{provider}} nije dodat jer tvoj nalog već ima drugu {{provider}} prijavu.",
+    "failedLinking": "{{provider}} nije moguće dodati na tvoj nalog."
+  },
   "profile": {
     "codeReviewerSubtitle": "Automatski pregledi PR-ova",
     "securityAgentSubtitle": "Pronađi i otkloni ranjivosti",
@@ -267,6 +281,8 @@
     "providerTestAccount": "Probni nalog",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "Poslovni SSO",
     "passkeysTitle": "Pristupni ključevi",
     "passkeysSubtitle": "Prijavi se bez lozinke",

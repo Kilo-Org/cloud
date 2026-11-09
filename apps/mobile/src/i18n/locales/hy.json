@@ -229,6 +229,20 @@
     "signInCodeField": "Մուտքի կոդ",
     "or": "կամ"
   },
+  "pendingLink": {
+    "description": "{{email}} հասցեն արդեն օգտագործվում է հաշվի կողմից։ Մուտք գործիր դրա եղանակներից մեկով՝ {{provider}}-ն ավելացնելու համար։",
+    "emailCode": "Ուղարկել ինձ մուտքի կոդ էլ. փոստով",
+    "continueInBrowser": "Շարունակել դիտարկիչում",
+    "startAgain": "Սկսել նորից",
+    "expired": "{{provider}}-ն ավելացնելու այս հարցման ժամկետն անցել է։",
+    "noMethods": "Այս հաշիվը մուտքի այլ եղանակ չունի, ուստի {{provider}}-ն հնարավոր չէ ավելացնել։",
+    "linked": "{{provider}}-ն ավելացվեց քո հաշվին։",
+    "failedExpired": "{{provider}}-ն չավելացվեց, քանի որ հարցման ժամկետն անցել է։",
+    "failedWrongAccount": "{{provider}}-ն չավելացվեց, քանի որ մուտք ես գործել այլ հաշիվ։",
+    "failedAccountAlreadyLinked": "{{provider}}-ն չավելացվեց, քանի որ այն արդեն կապված է այլ հաշվի։",
+    "failedProviderAlreadyLinked": "{{provider}}-ն չավելացվեց, քանի որ քո հաշիվն արդեն ունի այլ {{provider}} մուտք։",
+    "failedLinking": "Չհաջողվեց {{provider}}-ն ավելացնել քո հաշվին։"
+  },
   "profile": {
     "codeReviewerSubtitle": "PR-ների ավտոմատ ստուգումներ",
     "securityAgentSubtitle": "Գտնել և վերացնել խոցելիությունները",
@@ -267,6 +281,8 @@
     "providerTestAccount": "Թեստային հաշիվ",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "Կորպորատիվ SSO",
     "passkeysTitle": "Մուտքի բանալիներ",
     "passkeysSubtitle": "Մուտք գործել առանց գաղտնաբառի",

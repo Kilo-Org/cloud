@@ -229,6 +229,20 @@
     "signInCodeField": "Inloggningskod",
     "or": "eller"
   },
+  "pendingLink": {
+    "description": "Det finns redan ett konto som använder {{email}}. Logga in med någon av dess metoder för att lägga till {{provider}}.",
+    "emailCode": "Mejla mig en inloggningskod",
+    "continueInBrowser": "Fortsätt i webbläsaren",
+    "startAgain": "Börja om",
+    "expired": "Den här begäran om att lägga till {{provider}} har upphört att gälla.",
+    "noMethods": "Det här kontot har ingen annan inloggningsmetod, så {{provider}} kan inte läggas till.",
+    "linked": "{{provider}} har lagts till i ditt konto.",
+    "failedExpired": "{{provider}} lades inte till eftersom begäran hade upphört att gälla.",
+    "failedWrongAccount": "{{provider}} lades inte till eftersom du loggade in på ett annat konto.",
+    "failedAccountAlreadyLinked": "{{provider}} lades inte till eftersom det redan är kopplat till ett annat konto.",
+    "failedProviderAlreadyLinked": "{{provider}} lades inte till eftersom ditt konto redan har en annan {{provider}}-inloggning.",
+    "failedLinking": "{{provider}} kunde inte läggas till i ditt konto."
+  },
   "profile": {
     "codeReviewerSubtitle": "Automatiska PR-granskningar",
     "securityAgentSubtitle": "Hitta och åtgärda sårbarheter",
@@ -267,6 +281,8 @@
     "providerTestAccount": "Testkonto",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO för företag",
     "passkeysTitle": "Passnycklar",
     "passkeysSubtitle": "Logga in utan lösenord",

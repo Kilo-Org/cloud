@@ -229,6 +229,20 @@
     "signInCodeField": "Prijavna koda",
     "or": "ali"
   },
+  "pendingLink": {
+    "description": "Račun z naslovom {{email}} že obstaja. Prijavi se z enim od njegovih načinov, da dodaš {{provider}}.",
+    "emailCode": "Pošlji mi prijavno kodo po e-pošti",
+    "continueInBrowser": "Nadaljuj v brskalniku",
+    "startAgain": "Začni znova",
+    "expired": "Ta zahteva za dodajanje storitve {{provider}} je potekla.",
+    "noMethods": "Ta račun nima drugega načina prijave, zato storitve {{provider}} ni mogoče dodati.",
+    "linked": "Storitev {{provider}} je bila dodana tvojemu računu.",
+    "failedExpired": "Storitev {{provider}} ni bila dodana, ker je zahteva potekla.",
+    "failedWrongAccount": "Storitev {{provider}} ni bila dodana, ker si se prijavil v drug račun.",
+    "failedAccountAlreadyLinked": "Storitev {{provider}} ni bila dodana, ker je že povezana z drugim računom.",
+    "failedProviderAlreadyLinked": "Storitev {{provider}} ni bila dodana, ker ima tvoj račun že drugo prijavo s storitvijo {{provider}}.",
+    "failedLinking": "Storitve {{provider}} ni bilo mogoče dodati tvojemu računu."
+  },
   "profile": {
     "codeReviewerSubtitle": "Samodejni pregledi PR",
     "securityAgentSubtitle": "Poišči in odpravi ranljivosti",
@@ -267,6 +281,8 @@
     "providerTestAccount": "Testni račun",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO za podjetja",
     "passkeysTitle": "Ključi za dostop",
     "passkeysSubtitle": "Prijavi se brez gesla",

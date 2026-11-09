@@ -229,6 +229,20 @@
     "signInCodeField": "Kirjautumiskoodi",
     "or": "tai"
   },
+  "pendingLink": {
+    "description": "Sähköpostiosoite {{email}} on jo käytössä toisella tilillä. Lisää {{provider}} kirjautumalla jollakin sen kirjautumistavoista.",
+    "emailCode": "Lähetä minulle kirjautumiskoodi sähköpostiin",
+    "continueInBrowser": "Jatka selaimessa",
+    "startAgain": "Aloita alusta",
+    "expired": "Tämä pyyntö lisätä {{provider}} on vanhentunut.",
+    "noMethods": "Tällä tilillä ei ole muuta kirjautumistapaa, joten {{provider}}-palvelua ei voi lisätä.",
+    "linked": "{{provider}} lisättiin tiliisi.",
+    "failedExpired": "{{provider}}-palvelua ei lisätty, koska pyyntö vanheni.",
+    "failedWrongAccount": "{{provider}}-palvelua ei lisätty, koska kirjauduit eri tilille.",
+    "failedAccountAlreadyLinked": "{{provider}}-palvelua ei lisätty, koska se on jo yhdistetty toiseen tiliin.",
+    "failedProviderAlreadyLinked": "{{provider}}-palvelua ei lisätty, koska tililläsi on jo toinen {{provider}}-kirjautuminen.",
+    "failedLinking": "{{provider}}-palvelua ei voitu lisätä tiliisi."
+  },
   "profile": {
     "codeReviewerSubtitle": "Automaattiset PR-katselmoinnit",
     "securityAgentSubtitle": "Etsi ja korjaa haavoittuvuuksia",
@@ -267,6 +281,8 @@
     "providerTestAccount": "Testitili",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "Yrityksen SSO",
     "passkeysTitle": "Pääsyavaimet",
     "passkeysSubtitle": "Kirjaudu ilman salasanaa",

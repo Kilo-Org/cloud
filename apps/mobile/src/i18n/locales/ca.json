@@ -229,6 +229,20 @@
     "signInCodeField": "Codi d'inici de sessió",
     "or": "o"
   },
+  "pendingLink": {
+    "description": "Ja hi ha un compte que utilitza {{email}}. Inicia la sessió amb un dels seus mètodes per afegir {{provider}}.",
+    "emailCode": "Envia'm un codi d'inici de sessió per correu",
+    "continueInBrowser": "Continua al navegador",
+    "startAgain": "Torna a començar",
+    "expired": "Aquesta sol·licitud per afegir {{provider}} ha caducat.",
+    "noMethods": "Aquest compte no té cap altre mètode d'inici de sessió, així que no es pot afegir {{provider}}.",
+    "linked": "S'ha afegit {{provider}} al teu compte.",
+    "failedExpired": "No s'ha afegit {{provider}} perquè la sol·licitud ha caducat.",
+    "failedWrongAccount": "No s'ha afegit {{provider}} perquè has iniciat la sessió en un altre compte.",
+    "failedAccountAlreadyLinked": "No s'ha afegit {{provider}} perquè ja està vinculat a un altre compte.",
+    "failedProviderAlreadyLinked": "No s'ha afegit {{provider}} perquè el teu compte ja té un altre inici de sessió amb {{provider}}.",
+    "failedLinking": "No s'ha pogut afegir {{provider}} al teu compte."
+  },
   "profile": {
     "codeReviewerSubtitle": "Revisions automàtiques de PR",
     "securityAgentSubtitle": "Troba i corregeix vulnerabilitats",
@@ -267,6 +281,8 @@
     "providerTestAccount": "Compte de prova",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO d'empresa",
     "passkeysTitle": "Claus d'accés",
     "passkeysSubtitle": "Inicia la sessió sense contrasenya",

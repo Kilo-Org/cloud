@@ -229,6 +229,20 @@
     "pleaseEnterEmail": "הזן את כתובת הדוא״ל שלך.",
     "or": "או"
   },
+  "pendingLink": {
+    "description": "כבר קיים חשבון שמשתמש בכתובת {{email}}. כדי להוסיף את {{provider}}, יש להיכנס באחת משיטות הכניסה שלו.",
+    "emailCode": "שליחת קוד כניסה בדוא״ל",
+    "continueInBrowser": "המשך בדפדפן",
+    "startAgain": "התחלה מחדש",
+    "expired": "תוקף הבקשה להוספת {{provider}} פג.",
+    "noMethods": "לחשבון הזה אין שיטת כניסה אחרת, ולכן אי אפשר להוסיף את {{provider}}.",
+    "linked": "{{provider}} נוסף לחשבון שלך.",
+    "failedExpired": "{{provider}} לא נוסף כי תוקף הבקשה פג.",
+    "failedWrongAccount": "{{provider}} לא נוסף כי נכנסת לחשבון אחר.",
+    "failedAccountAlreadyLinked": "{{provider}} לא נוסף כי הוא כבר מקושר לחשבון אחר.",
+    "failedProviderAlreadyLinked": "{{provider}} לא נוסף כי בחשבון שלך כבר יש כניסה אחרת באמצעות {{provider}}.",
+    "failedLinking": "לא ניתן היה להוסיף את {{provider}} לחשבון שלך."
+  },
   "profile": {
     "codeReviewerSubtitle": "סקירות PR אוטומטיות",
     "securityAgentSubtitle": "איתור ותיקון של חולשות אבטחה",
@@ -267,6 +281,8 @@
     "providerTestAccount": "חשבון בדיקה",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO ארגוני",
     "passkeysTitle": "מפתחות גישה",
     "passkeysSubtitle": "היכנסו בלי סיסמה",

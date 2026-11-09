@@ -229,6 +229,20 @@
     "pleaseEnterEmail": "Введите адрес электронной почты.",
     "or": "или"
   },
+  "pendingLink": {
+    "description": "Адрес {{email}} уже используется другим аккаунтом. Войдите одним из его способов входа, чтобы добавить {{provider}}.",
+    "emailCode": "Отправить код входа на почту",
+    "continueInBrowser": "Продолжить в браузере",
+    "startAgain": "Начать заново",
+    "expired": "Срок действия запроса на добавление {{provider}} истёк.",
+    "noMethods": "У этого аккаунта нет других способов входа, поэтому добавить {{provider}} нельзя.",
+    "linked": "{{provider}} добавлен в ваш аккаунт.",
+    "failedExpired": "{{provider}} не добавлен: срок действия запроса истёк.",
+    "failedWrongAccount": "{{provider}} не добавлен: вы вошли в другой аккаунт.",
+    "failedAccountAlreadyLinked": "{{provider}} не добавлен: он уже привязан к другому аккаунту.",
+    "failedProviderAlreadyLinked": "{{provider}} не добавлен: в вашем аккаунте уже есть другой вход через {{provider}}.",
+    "failedLinking": "Не удалось добавить {{provider}} в ваш аккаунт."
+  },
   "profile": {
     "codeReviewerSubtitle": "Автоматические проверки PR",
     "securityAgentSubtitle": "Поиск и устранение уязвимостей",
@@ -267,6 +281,8 @@
     "providerTestAccount": "Тестовый аккаунт",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "Корпоративный SSO",
     "passkeysTitle": "Ключи доступа",
     "passkeysSubtitle": "Войти без пароля",

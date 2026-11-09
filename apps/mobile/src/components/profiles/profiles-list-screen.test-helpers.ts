@@ -108,17 +108,3 @@ export function repoDefaultsHeading(root: ReactTestInstance): ReactTestInstance 
   }
   return heading;
 }
-
-/**
- * A group's own parent, e.g. the Scroll child list that holds the settings
- * group next to the profiles heading. `rowGroup` only walks Views, so this
- * repeats its walk on the found group.
- */
-export function parentGroup(root: ReactTestInstance, group: ReactTestInstance): ReactTestInstance {
-  for (const view of findAll(root, 'View')) {
-    if (view.children.includes(group)) {
-      return view;
-    }
-  }
-  throw new Error('group parent missing');
-}

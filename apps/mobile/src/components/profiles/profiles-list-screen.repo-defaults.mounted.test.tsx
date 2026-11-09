@@ -5,9 +5,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import '@/i18n';
 import { ProfilesListScreen } from '@/components/profiles/profiles-list-screen';
 import {
+  findOne,
   groupChildren,
   groupTexts,
-  parentGroup,
   profile,
   type ProfileSummary,
   REPO_DEFAULTS_HEADING,
@@ -129,21 +129,20 @@ describe('ProfilesListScreen repo defaults entry', () => {
     // The profiles heading is a direct scroll child, exactly like the settings
     // group's heading: the two groups space evenly and one heading cannot end
     // up nested inside the other group's gap.
-    const settingsGroup = rowGroup(renderer.root, repoDefaultsRow(renderer.root));
-    // Text nodes and strings do not own Views, so the sibling check reads the
-    // heading's Text element position directly against the settings group's.
-    const heading = renderer.root.findAll(
-      node => node.type === 'Text' && node.props.children === 'Profiles'
-    )[0];
-    if (!heading) {
-      throw new Error('profiles heading missing');
-    }
-    const headingParent = heading.parent;
-    expect(headingParent?.children).toContain(settingsGroup);
-
+    const scroll = findOne(renderer.root, 'ScrollView');
+    const scrollChildren = groupChildren(scroll);
+    const profilesHeading = scrollChildren.find(
+      node => typeof node.props.children === 'string' && node.props.children === 'Profiles'
+    );
     // The list labels the rows it already shows, so the unheaded profile
     // section cannot read as a stray row beside the labeled settings group.
-    expect(heading.props.children).not.toBe(REPO_DEFAULTS_HEADING);
+    expect(profilesHeading?.props.children).toBe('Profiles');
+    const settingsGroup = rowGroup(renderer.root, repoDefaultsRow(renderer.root));
+    // The heading is the settings group's sibling on the scroll, not a child
+    // inside it, so the gap above REPOSITORIES stays the scroll's group gap.
+    expect(settingsGroup.props.className).toBe(
+      rowGroup(renderer.root, rowByTitle(renderer.root, 'Personal profile')).props.className
+    );
 
     unmount();
   });

@@ -24,6 +24,8 @@ const references = [
   ['packages/trpc/src/index.ts', 'apps/web/src/routers/root-router'],
   ['apps/web/src/lib/preview.ts', 'services/agent/src/shared/preview'],
   ['services/leaf/vitest.config.ts', 'tools/shared'],
+  // The app's oxlint configs load the plugins from tools/oxlint.
+  ['apps/mobile/.oxlintrc.json', 'tools/oxlint'],
 ];
 const select = (changedFiles, dependencyDirs = []) =>
   selectAffected({ items, changedFiles, dependencyDirs, references });
@@ -135,11 +137,7 @@ test('a lint-only input lints every workspace and typechecks none', () => {
   // No typecheck program reads the lint config or its plugins, so such a change
   // must not start a typecheck row, while the lint rows still cover every
   // workspace through full_checks.
-  for (const file of [
-    '.oxlintrc.json',
-    'oxlint-plugin-drizzle.js',
-    'tools/oxlint/anti-slop/index.ts',
-  ]) {
+  for (const file of ['.oxlintrc.json', 'oxlint-plugin-drizzle.js']) {
     const result = select([file]);
     assert.deepEqual(
       result,
@@ -159,6 +157,25 @@ test('a lint-only input lints every workspace and typechecks none', () => {
       file
     );
   }
+});
+
+test('a lint plugin change still selects the workspace whose config loads it', () => {
+  // The app's oxlint configs point at tools/oxlint, and its own CI runs the
+  // lint and i18n checks with them, so the app stays selected. Its typecheck is
+  // owned by that CI, so the selection still starts no typecheck row.
+  const result = select(['tools/oxlint/anti-slop/index.ts']);
+  assert.deepEqual(result, {
+    full: false,
+    reasons: [],
+    full_checks: ['lint'],
+    dirs: ['apps/mobile'],
+    packages: ['kilo-app'],
+    ...noTests,
+  });
+  assert.deepEqual(selectGroups(result), {
+    typecheck_groups: [],
+    lint_groups: ['trpc', 'rest'],
+  });
 });
 
 test('a formatter config change selects no check', () => {

@@ -1,7 +1,8 @@
 import AppIntents
+internal import KiloAppActions
 import UIKit
 
-// The English copy the four App Intents carry.
+// The English copy the App Intents carry.
 //
 // An App Intent's `title`, its parameter names and a shortcut's title are
 // `LocalizedStringResource`s that iOS resolves against `Localizable.strings`
@@ -133,6 +134,36 @@ struct OpenSessionIntent: AppIntent {
     try await KiloAppActionTarget.open(
       KiloAppActionTarget.openSession,
       query: ["sessionId": session]
+    )
+    return .result()
+  }
+}
+
+/// Opens one session the person picks by its title, or the session on screen.
+///
+/// This is the discovery surface beside `OpenSessionIntent`, which keeps its
+/// text parameter so a shortcut saved with a session id still runs. Here the
+/// parameter is an entity, so Shortcuts draws the app's own sessions as a
+/// picker and Siri matches a spoken title before the run starts. The run opens
+/// the same `open-session` target as the id-based action, through the same
+/// `KiloAppActionTarget.open`: the app's pipeline still resolves the
+/// destination, and no second dispatcher exists.
+///
+/// The action is not added to `KiloAppShortcuts`. An intent is listed in the
+/// Shortcuts app from the metadata Xcode extracts, so a phrase buys nothing,
+/// and the provider's four existing phrases stay exactly as they are.
+@available(iOS 17.0, *)
+struct OpenNamedSessionIntent: AppIntent {
+  static var title: LocalizedStringResource = "Open session by name"
+  static var openAppWhenRun: Bool = true
+
+  @Parameter(title: "Session")
+  var session: KiloSessionEntity
+
+  func perform() async throws -> some IntentResult {
+    try await KiloAppActionTarget.open(
+      KiloAppActionTarget.openSession,
+      query: ["sessionId": session.id]
     )
     return .result()
   }

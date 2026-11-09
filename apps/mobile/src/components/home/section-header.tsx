@@ -2,13 +2,18 @@ import { type ReactNode } from 'react';
 import { I18nManager, Pressable, View } from 'react-native';
 
 import { EYEBROW_LATIN_DISPLAY, Text } from '@/components/ui/text';
-import { textActionTargetClass } from '@/lib/a11y/tap-target';
+import {
+  SECTION_ACTION_BOX_CLASS,
+  SECTION_ACTION_HIT_SLOP,
+  SECTION_HEADER_ROW_PADDING_CLASS,
+  textActionTargetClass,
+} from '@/lib/a11y/tap-target';
 import { cn } from '@/lib/utils';
 
 /**
- * The box a Home section label sits at the bottom of. It holds the label a
- * short, fixed distance below the block above it, instead of the full action
- * frame, so Home's sections stay close together.
+ * The box a Home section label sits at the bottom of. It is as tall as the
+ * compact action box, so every Home section header has one height and keeps
+ * one gap to the block above it.
  */
 const LABEL_AIR_CLASS = 'min-h-[28px]';
 
@@ -36,10 +41,12 @@ type SectionHeaderProps = {
    */
   notice?: ReactNode;
   /**
-   * Reserves {@link LABEL_AIR_CLASS} above the label line, so a row without an
-   * action keeps a fixed leading air instead of sitting directly under the block
-   * above it (home-header-section-gap). A row with an action is still as tall as
-   * the action's touch frame. Home passes this for its sections.
+   * Puts the label at the bottom of {@link LABEL_AIR_CLASS} and renders the
+   * action on the compact {@link SECTION_ACTION_BOX_CLASS} box, with
+   * {@link SECTION_HEADER_ROW_PADDING_CLASS} on the row to hold the action's hit
+   * slop. A row with an action and a row without one then have the same height,
+   * so every Home section keeps the same gap to the block above it
+   * (home-header-section-gap). Home passes this for its sections.
    */
   reserveLabelAir?: boolean;
 };
@@ -70,13 +77,13 @@ export function SectionHeader({
     // sits above the line instead of between the label and its content, which
     // is the header's own `pb-2` everywhere.
     //
-    // With `reserveLabelAir` the label sits at the bottom of its own short box,
-    // so a row without an action keeps a fixed gap to the block above it and
-    // needs no leading padding on the row (home-header-section-gap).
+    // With `reserveLabelAir` the label and the action share one compact box
+    // height, and the row's padding holds the action's hit slop inside the row,
+    // so every Home section header has one height (home-header-section-gap).
     <View
       className={cn(
-        'flex-row flex-wrap items-end justify-end gap-2 px-4 pb-2',
-        reserveLabelAir ? 'pt-0' : 'pt-2'
+        'flex-row flex-wrap items-end justify-end gap-2 px-4',
+        reserveLabelAir ? SECTION_HEADER_ROW_PADDING_CLASS : 'py-2'
       )}
     >
       {/* With a notice the label keeps its own width, so the notice takes all
@@ -119,14 +126,17 @@ export function SectionHeader({
           // reads the node's own rect and `hitSlop` never widens it. The row
           // grows to hold the frame — RN stops delivering touches outside the
           // parent, so a shrunk layout box would leave part of the target dead
-          // (`textActionTargetClass`, `comment-row.tsx`). The hidden action keeps
-          // the same box, so hiding it still cannot resize the header.
+          // (`textActionTargetClass`, `comment-row.tsx`). With `reserveLabelAir`
+          // the box is the compact one, and its hit slop stays inside the row's
+          // own padding. The hidden action keeps the same box, so hiding it
+          // still cannot resize the header.
           // Its copy sits on the box's bottom edge (`items-end`, the row's own
           // cross-axis rule), so the action and the section label share one
           // baseline instead of the action holding the label half a box away
           // from the content it names.
+          hitSlop={reserveLabelAir ? SECTION_ACTION_HIT_SLOP : undefined}
           className={cn(
-            textActionTargetClass(),
+            reserveLabelAir ? SECTION_ACTION_BOX_CLASS : textActionTargetClass(),
             'max-w-full shrink-0 flex-row items-end justify-center active:opacity-70',
             actionHidden && 'opacity-0'
           )}

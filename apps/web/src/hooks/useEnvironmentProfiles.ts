@@ -14,19 +14,21 @@ export function useEnvironmentProfiles({
   repository,
   selectedProfileId,
   environment,
+  enabled = true,
 }: {
   organizationId?: string;
   repository?: { platform: string; fullName: string };
   selectedProfileId?: string | null;
   /** The environment being edited or used. A V2 environment skips the repo binding; the effective default still applies. */
   environment?: { repositories?: unknown } | null;
+  enabled?: boolean;
 }) {
-  const personal = useProfiles({ enabled: !organizationId });
+  const personal = useProfiles({ enabled: enabled && !organizationId });
   const combined = useCombinedProfiles({
     organizationId: organizationId ?? '',
-    enabled: !!organizationId,
+    enabled: enabled && !!organizationId,
   });
-  const bindings = useRepoBindings({ organizationId });
+  const bindings = useRepoBindings({ organizationId, enabled });
   const summaries = organizationId ? combined.data?.allProfiles : personal.data;
   const binds = appliesRepoBindings(environment);
   const binding =
@@ -51,11 +53,11 @@ export function useEnvironmentProfiles({
       : undefined;
   const base = useProfile(layers.base?.profileId ?? '', {
     organizationId: ownerFor(layers.base?.profileId),
-    enabled: !!summaries,
+    enabled: enabled && !!summaries,
   });
   const top = useProfile(layers.top?.profileId ?? '', {
     organizationId: ownerFor(layers.top?.profileId),
-    enabled: !!summaries,
+    enabled: enabled && !!summaries,
   });
   const queries = [
     organizationId ? combined : personal,

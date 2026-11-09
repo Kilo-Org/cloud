@@ -94,9 +94,17 @@ function isAllowedBackendRoute(
   );
 }
 
-function isAllowedProviderRoute(method: string, path: string): boolean {
+function isAllowedProviderRoute(
+  method: string,
+  path: string,
+  organizationId: string | undefined
+): boolean {
   if (path === '/models') return method === 'GET';
   if (path === '/models/validate') return method === 'POST';
+  if (method === 'GET') {
+    const match = /^\/organizations\/([A-Za-z0-9._-]+)\/models$/.exec(path);
+    return match !== null && organizationId !== undefined && match[1] === organizationId;
+  }
   return (
     method === 'POST' &&
     [
@@ -110,14 +118,17 @@ function isAllowedProviderRoute(method: string, path: string): boolean {
   );
 }
 
-function logicalProviderPath(pathname: string): string | null {
+function logicalProviderPath(pathname: string, organizationId: string | undefined): string | null {
   const prefix = ['/api/openrouter', '/api/gateway'].find(value =>
     pathname.startsWith(`${value}/`)
   );
   if (!prefix) return null;
   const path = pathname.slice(prefix.length);
   if (path.startsWith('/v1/') && prefix !== '/api/gateway') return null;
-  return isAllowedProviderRoute('GET', path) || isAllowedProviderRoute('POST', path) ? path : null;
+  return isAllowedProviderRoute('GET', path, organizationId) ||
+    isAllowedProviderRoute('POST', path, organizationId)
+    ? path
+    : null;
 }
 
 export const EXA_PROXY_PATHS = [
@@ -400,8 +411,8 @@ export function resolveRuntimeCredentialProxyRoute(
     return targetUrl(input.targets.backendBaseUrl, path, input.search);
   }
   if (input.route === 'provider') {
-    const logicalPath = logicalProviderPath(path);
-    if (logicalPath && isAllowedProviderRoute(input.method, logicalPath)) {
+    const logicalPath = logicalProviderPath(path, input.organizationId);
+    if (logicalPath && isAllowedProviderRoute(input.method, logicalPath, input.organizationId)) {
       return providerTargetUrl(input.targets.providerBaseUrl, logicalPath, input.search);
     }
   }

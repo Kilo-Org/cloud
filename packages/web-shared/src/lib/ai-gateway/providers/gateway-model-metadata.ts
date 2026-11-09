@@ -19,7 +19,6 @@ import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/provide
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
 import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
 import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
-import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 export type GatewayModelWithEndpoints = GatewayModel & { endpoints: Endpoint[] };
 
@@ -124,15 +123,10 @@ function jsonbArrayOrEmpty(value: SQL) {
   return sql`CASE WHEN jsonb_typeof(${value}) = 'array' THEN ${value} ELSE '[]'::jsonb END`;
 }
 
-const storedGatewayModelsRowSchema = z.object({
-  models: z.unknown(),
-  endpoints: z.record(z.string(), z.unknown()),
-});
-
-export type StoredGatewayModels = {
-  models: GatewayModel[];
-  /** Models whose endpoints row is missing or does not parse have no entry. */
-  endpoints: ReadonlyMap<string, GatewayModelEndpoints>;
+/** `endpoints` is undefined when the model's endpoints row is missing or unusable. */
+export type ListedGatewayModel = {
+  model: GatewayModel;
+  endpoints: GatewayModelEndpoints | undefined;
 };
 
 export function formatModelIds(modelIds: readonly string[]) {
@@ -142,26 +136,38 @@ export function formatModelIds(modelIds: readonly string[]) {
     : listed;
 }
 
+function parseStoredGatewayModelEndpoints(raw: unknown): GatewayModelEndpoints | undefined {
+  if (raw === null) return undefined;
+  try {
+    return parseGatewayModelEndpoints(raw);
+  } catch {
+    return undefined;
+  }
+}
+
 /**
- * Reads a stored gateway model list and the stored endpoints of every listed model in one query.
- * Returns null when the list is not stored. Throws when the query fails or the list fails
- * `source.parse`, including its truncation check, so a cached caller keeps its last good value.
+ * Reads a stored gateway model list and the stored endpoints of every listed model in one query,
+ * in list order. Returns null when the list is not stored. Throws when the query fails or the list
+ * fails `source.parse`, including its truncation check, so a cached caller keeps its last good
+ * value.
  */
 export async function readStoredGatewayModels(
   gateway: Provider,
   source: MetadataSource<GatewayModelList>,
   fromDb: MetadataDb
-): Promise<StoredGatewayModels | null> {
+): Promise<ListedGatewayModel[] | null> {
   const item = sql`items.item`;
   const endpointsData = sql`endpoints_row.data`;
   const endpointsList = sql`${endpointsData}->'data'->'endpoints'`;
-  const result = await fromDb.execute(sql`
+  // Both aggregates run over the same rows in the same order, so `endpoints[i]` belongs to the
+  // `i`th listed model, and JSON null stands for a missing endpoints row.
+  const result = await fromDb.execute<{ models: unknown; endpoints: unknown[] }>(sql`
     SELECT
       CASE WHEN jsonb_typeof(list.data->'data') = 'array'
         THEN jsonb_build_object('data', coalesce(projected.models, '[]'::jsonb))
         ELSE list.data
       END AS models,
-      coalesce(projected.endpoints, '{}'::jsonb) AS endpoints
+      coalesce(projected.endpoints, '[]'::jsonb) AS endpoints
     FROM ai_gateway_metadata_cache AS list
     CROSS JOIN LATERAL (
       SELECT
@@ -171,8 +177,7 @@ export async function readStoredGatewayModels(
           })}
           ORDER BY items.ordinality
         ) AS models,
-        jsonb_object_agg(
-          ${item}->>'id',
+        jsonb_agg(
           CASE WHEN jsonb_typeof(${endpointsList}) = 'array'
             THEN jsonb_build_object('data', jsonb_build_object('endpoints', (
               SELECT coalesce(jsonb_agg(
@@ -183,10 +188,10 @@ export async function readStoredGatewayModels(
               ), '[]'::jsonb)
               FROM jsonb_array_elements(${endpointsList}) WITH ORDINALITY AS endpoints(endpoint, ordinality)
             )))
-            ELSE ${endpointsData}
+            ELSE coalesce(${endpointsData}, 'null'::jsonb)
           END
-        ) FILTER (WHERE jsonb_typeof(${item}->'id') = 'string' AND ${endpointsData} IS NOT NULL)
-          AS endpoints
+          ORDER BY items.ordinality
+        ) AS endpoints
       FROM jsonb_array_elements(${jsonbArrayOrEmpty(sql`list.data->'data'`)})
         WITH ORDINALITY AS items(item, ordinality)
       LEFT JOIN ai_gateway_metadata_cache AS endpoints_row
@@ -196,24 +201,10 @@ export async function readStoredGatewayModels(
   `);
   const [row] = result.rows;
   if (!row) return null;
-  const stored = storedGatewayModelsRowSchema.parse(row);
-  const models = source.parse(stored.models).data;
-
-  const endpoints = new Map<string, GatewayModelEndpoints>();
-  const unparseable: string[] = [];
-  for (const [modelId, raw] of Object.entries(stored.endpoints)) {
-    try {
-      endpoints.set(modelId, parseGatewayModelEndpoints(raw));
-    } catch {
-      unparseable.push(modelId);
-    }
-  }
-  if (unparseable.length > 0) {
-    warnExceptInTest(
-      `[readStoredGatewayModels] stored ${gateway.type} endpoints are unusable for ${unparseable.length} models: ${formatModelIds(unparseable.sort())}`
-    );
-  }
-  return { models, endpoints };
+  return source.parse(row.models).data.map((model, index) => ({
+    model,
+    endpoints: parseStoredGatewayModelEndpoints(row.endpoints[index]),
+  }));
 }
 
 export type JoinedGatewayModels = {
@@ -228,14 +219,12 @@ export type JoinedGatewayModels = {
  */
 export function joinGatewayModelEndpoints(
   gateway: Provider,
-  models: readonly GatewayModel[],
-  endpointsByModelId: ReadonlyMap<string, GatewayModelEndpoints>
+  listedModels: readonly ListedGatewayModel[]
 ): JoinedGatewayModels {
   const joined: GatewayModelMap = {};
   const withoutEndpointsResource: string[] = [];
   const withoutStoredEndpoints: string[] = [];
-  for (const model of models) {
-    const endpoints = endpointsByModelId.get(model.id);
+  for (const { model, endpoints } of listedModels) {
     if (endpoints === undefined) {
       withoutStoredEndpoints.push(model.id);
     } else if (endpoints === NO_ENDPOINTS_RESOURCE) {

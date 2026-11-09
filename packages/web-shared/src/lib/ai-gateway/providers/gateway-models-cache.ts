@@ -36,14 +36,10 @@ function createGatewayModelsFetcher(
         console.debug(`[getGatewayModels] no ${name} models found in the database`);
         return {};
       }
-      const { models, withoutStoredEndpoints } = joinGatewayModelEndpoints(
-        gateway,
-        stored.models,
-        stored.endpoints
-      );
+      const { models, withoutStoredEndpoints } = joinGatewayModelEndpoints(gateway, stored);
       if (withoutStoredEndpoints.length > 0) {
         warnExceptInTest(
-          `[getGatewayModels] left out ${withoutStoredEndpoints.length} ${name} models without stored endpoints: ${formatModelIds(withoutStoredEndpoints)}`
+          `[getGatewayModels] left out ${withoutStoredEndpoints.length} ${name} models without usable stored endpoints: ${formatModelIds(withoutStoredEndpoints)}`
         );
       }
       return models;

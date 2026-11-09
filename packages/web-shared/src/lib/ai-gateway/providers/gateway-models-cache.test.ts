@@ -302,7 +302,7 @@ describe('gateway model metadata readers', () => {
       })
     );
     expect(mockWarnExceptInTest).toHaveBeenCalledWith(
-      '[getGatewayModels] left out 2 Vercel models without stored endpoints: vendor/not-stored, vendor/unparseable'
+      '[getGatewayModels] left out 2 Vercel models without usable stored endpoints: vendor/not-stored, vendor/unparseable'
     );
   });
 

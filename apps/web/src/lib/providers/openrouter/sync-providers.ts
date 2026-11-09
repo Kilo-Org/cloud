@@ -9,14 +9,15 @@ import {
   type MetadataSource,
 } from '@kilocode/web-shared/lib/ai-gateway/metadata-cache';
 import {
+  formatModelIds,
   gatewayModelEndpointsSource,
   joinGatewayModelEndpoints,
   openRouterGatewayModelsSource,
   readStoredGatewayModels,
   vercelGatewayModelsSource,
-  type GatewayModelEndpoints,
   type GatewayModelList,
   type GatewayModelMap,
+  type ListedGatewayModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
 import type {
   NormalizedOpenRouterResponse,
@@ -85,18 +86,6 @@ export const openRouterProvidersSource: MetadataSource<OpenRouterProvider[]> = {
   },
 };
 
-async function readStoredGatewayModelsOrNull(
-  gateway: Provider,
-  source: MetadataSource<GatewayModelList>
-) {
-  try {
-    return await readStoredGatewayModels(gateway, source, readDb);
-  } catch (error) {
-    console.warn(`[fetchGatewayModels] stored ${gateway.type} models are unusable`, error);
-    return null;
-  }
-}
-
 /**
  * Reads the stored list and every stored endpoints row in one query. A missing or unusable list or
  * endpoints row falls back to `getMetadata`, which fetches it upstream, so an upstream outage does
@@ -106,33 +95,37 @@ export async function fetchGatewayModels(
   gateway: Provider,
   source: MetadataSource<GatewayModelList>
 ): Promise<GatewayModelMap> {
-  const stored = await readStoredGatewayModelsOrNull(gateway, source);
-  const models = stored?.models ?? (await getMetadata(source, readDb)).data;
-  const endpoints = new Map<string, GatewayModelEndpoints>(stored?.endpoints);
+  const stored = await readStoredGatewayModels(gateway, source, readDb).catch((error: unknown) => {
+    console.warn(`[fetchGatewayModels] stored ${gateway.type} models are unusable`, error);
+    return null;
+  });
+  const listedModels: ListedGatewayModel[] =
+    stored ??
+    (await getMetadata(source, readDb)).data.map(model => ({ model, endpoints: undefined }));
 
   const limit = pLimit(8);
-  await Promise.all(
-    models
-      .filter(model => !endpoints.has(model.id))
-      .map(model =>
-        limit(async () => {
-          // Clearing here, before this task settles, stops the limiter from starting a queued model.
-          const modelEndpoints = await getMetadata(
-            gatewayModelEndpointsSource(gateway, model.id),
-            readDb
-          ).catch((error: unknown) => {
-            limit.clearQueue();
-            throw error;
-          });
-          endpoints.set(model.id, modelEndpoints);
-        })
-      )
+  const withEndpoints = await Promise.all(
+    listedModels.map(listed =>
+      listed.endpoints !== undefined
+        ? listed
+        : limit(async () => ({
+            model: listed.model,
+            // Clearing here, before this task settles, stops the limiter from starting a queued model.
+            endpoints: await getMetadata(
+              gatewayModelEndpointsSource(gateway, listed.model.id),
+              readDb
+            ).catch((error: unknown) => {
+              limit.clearQueue();
+              throw error;
+            }),
+          }))
+    )
   );
 
-  const joined = joinGatewayModelEndpoints(gateway, models, endpoints);
+  const joined = joinGatewayModelEndpoints(gateway, withEndpoints);
   if (joined.withoutEndpointsResource.length > 0) {
     console.warn(
-      `[fetchGatewayModels] skipped ${joined.withoutEndpointsResource.length} ${gateway.type} models without endpoints: ${joined.withoutEndpointsResource.join(', ')}`
+      `[fetchGatewayModels] skipped ${joined.withoutEndpointsResource.length} ${gateway.type} models without endpoints: ${formatModelIds(joined.withoutEndpointsResource)}`
     );
   }
   console.debug(

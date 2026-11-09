@@ -10,7 +10,7 @@ import {
   gatewayModelsSource,
   joinGatewayModelEndpoints,
   readStoredGatewayModels,
-  type GatewayModelEndpoints,
+  type ListedGatewayModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
 
 const gateway = {
@@ -52,6 +52,18 @@ function endpointsBody(endpoints: unknown) {
 
 function read() {
   return readStoredGatewayModels(gateway, modelsSource, db);
+}
+
+function modelsOf(listed: ListedGatewayModel[] | null) {
+  return listed?.map(({ model }) => model);
+}
+
+function storedEndpointsOf(listed: ListedGatewayModel[] | null) {
+  return new Map(
+    listed?.flatMap(({ model, endpoints }) =>
+      endpoints === undefined ? [] : [[model.id, endpoints] as const]
+    )
+  );
 }
 
 const upstreamModel = {
@@ -106,7 +118,7 @@ describe('readStoredGatewayModels', () => {
     await expect(read()).resolves.toBeNull();
   });
 
-  it('returns the listed models in order and the endpoints of each by model id', async () => {
+  it('returns the listed models in order, each with its endpoints', async () => {
     await storeList([{ id: 'vendor/b', name: 'B' }, upstreamModel, { id: 'vendor/a', name: 'A' }]);
     await storeRows([
       endpointsRow('vendor/a', endpointsBody([{ provider_name: 'a' }])),
@@ -116,7 +128,7 @@ describe('readStoredGatewayModels', () => {
 
     const stored = await read();
 
-    expect(stored?.models).toEqual([
+    expect(modelsOf(stored)).toEqual([
       { id: 'vendor/b', name: 'B' },
       {
         id: 'vendor/full',
@@ -129,7 +141,7 @@ describe('readStoredGatewayModels', () => {
       { id: 'vendor/a', name: 'A' },
       ...fillerModels,
     ]);
-    expect(stored?.endpoints).toEqual(
+    expect(storedEndpointsOf(stored)).toEqual(
       new Map([
         ['vendor/b', []],
         [
@@ -180,8 +192,8 @@ describe('readStoredGatewayModels', () => {
             ...fillerModels,
           ],
         },
-        endpoints: {
-          'vendor/full': {
+        endpoints: [
+          {
             data: {
               endpoints: [
                 {
@@ -201,7 +213,8 @@ describe('readStoredGatewayModels', () => {
               ],
             },
           },
-        },
+          ...fillerModels.map(() => null),
+        ],
       },
     ]);
   });
@@ -212,7 +225,7 @@ describe('readStoredGatewayModels', () => {
 
     const stored = await read();
 
-    expect(stored?.endpoints).toEqual(new Map([['vendor/a-batch', NO_ENDPOINTS_RESOURCE]]));
+    expect(storedEndpointsOf(stored)).toEqual(new Map([['vendor/a-batch', NO_ENDPOINTS_RESOURCE]]));
   });
 
   it('leaves out models whose endpoints row is missing or does not parse', async () => {
@@ -232,14 +245,18 @@ describe('readStoredGatewayModels', () => {
 
     const stored = await read();
 
-    expect(stored?.models.slice(0, 5).map(model => model.id)).toEqual([
+    expect(
+      modelsOf(stored)
+        ?.slice(0, 5)
+        .map(model => model.id)
+    ).toEqual([
       'vendor/ok',
       'vendor/missing',
       'vendor/not-a-list',
       'vendor/not-an-object',
       'vendor/no-data',
     ]);
-    expect(stored?.endpoints).toEqual(new Map([['vendor/ok', [{ provider_name: 'ok' }]]]));
+    expect(storedEndpointsOf(stored)).toEqual(new Map([['vendor/ok', [{ provider_name: 'ok' }]]]));
   });
 
   it.each([
@@ -291,15 +308,15 @@ describe('readStoredGatewayModels', () => {
 
     const stored = await read();
 
-    expect(stored?.models[0]).toEqual(ModelSchema.parse(modelWithNulls));
-    expect(stored?.models[0]).toEqual({ id: 'vendor/nulls', name: 'Nulls' });
+    expect(stored?.[0]?.model).toEqual(ModelSchema.parse(modelWithNulls));
+    expect(stored?.[0]?.model).toEqual({ id: 'vendor/nulls', name: 'Nulls' });
     for (const [id, body] of Object.entries(endpointsBodies)) {
-      expect([id, stored?.endpoints.has(id)]).toEqual([
+      expect([id, storedEndpointsOf(stored).has(id)]).toEqual([
         id,
         EndpointsSchema.safeParse(body).success,
       ]);
     }
-    expect(stored?.endpoints).toEqual(
+    expect(storedEndpointsOf(stored)).toEqual(
       new Map([['vendor/null-flags', [{ provider_name: 'flags' }]]])
     );
   });
@@ -317,7 +334,7 @@ describe('readStoredGatewayModels', () => {
 
     const stored = await read();
 
-    expect(stored?.endpoints).toEqual(new Map([['vendor/a', [{ provider_name: 'own' }]]]));
+    expect(storedEndpointsOf(stored)).toEqual(new Map([['vendor/a', [{ provider_name: 'own' }]]]));
   });
 
   it('matches model ids that contain alias and variant characters', async () => {
@@ -327,7 +344,7 @@ describe('readStoredGatewayModels', () => {
 
     const stored = await read();
 
-    expect(stored?.endpoints).toEqual(
+    expect(storedEndpointsOf(stored)).toEqual(
       new Map([
         ['~vendor/model-latest', [{ provider_name: '~vendor/model-latest' }]],
         ['vendor/model:free', [{ provider_name: 'vendor/model:free' }]],
@@ -337,32 +354,20 @@ describe('readStoredGatewayModels', () => {
 });
 
 describe('joinGatewayModelEndpoints', () => {
-  const fillerEndpoints = fillerModels.map((model): [string, GatewayModelEndpoints] => [
-    model.id,
-    [{ provider_name: 'filler' }],
-  ]);
+  const listedFillers = fillerModels.map((model): ListedGatewayModel => ({
+    model,
+    endpoints: [{ provider_name: 'filler' }],
+  }));
 
   it('attaches endpoints and reports models without endpoints or an endpoints resource', () => {
-    const models = [
-      { id: 'vendor/c', name: 'C' },
-      { id: 'vendor/b-batch', name: 'B batch' },
-      { id: 'vendor/a', name: 'A' },
-      { id: 'vendor/a-batch', name: 'A batch' },
-      { id: 'vendor/b', name: 'B' },
-      ...fillerModels,
-    ];
-
-    const joined = joinGatewayModelEndpoints(
-      gateway,
-      models,
-      new Map<string, GatewayModelEndpoints>([
-        ['vendor/a', [{ provider_name: 'a' }]],
-        ['vendor/a-batch', NO_ENDPOINTS_RESOURCE],
-        ['vendor/b-batch', NO_ENDPOINTS_RESOURCE],
-        ['vendor/unlisted', [{ provider_name: 'unlisted' }]],
-        ...fillerEndpoints,
-      ])
-    );
+    const joined = joinGatewayModelEndpoints(gateway, [
+      { model: { id: 'vendor/c', name: 'C' }, endpoints: undefined },
+      { model: { id: 'vendor/b-batch', name: 'B batch' }, endpoints: NO_ENDPOINTS_RESOURCE },
+      { model: { id: 'vendor/a', name: 'A' }, endpoints: [{ provider_name: 'a' }] },
+      { model: { id: 'vendor/a-batch', name: 'A batch' }, endpoints: NO_ENDPOINTS_RESOURCE },
+      { model: { id: 'vendor/b', name: 'B' }, endpoints: undefined },
+      ...listedFillers,
+    ]);
 
     expect(Object.keys(joined.models)).toEqual([
       'vendor/a',
@@ -379,14 +384,10 @@ describe('joinGatewayModelEndpoints', () => {
 
   it('throws when fewer than 100 models have endpoints', () => {
     expect(() =>
-      joinGatewayModelEndpoints(
-        gateway,
-        [{ id: 'vendor/a-batch', name: 'A batch' }, ...fillerModels],
-        new Map<string, GatewayModelEndpoints>([
-          ['vendor/a-batch', NO_ENDPOINTS_RESOURCE],
-          ...fillerEndpoints.slice(1),
-        ])
-      )
+      joinGatewayModelEndpoints(gateway, [
+        { model: { id: 'vendor/a-batch', name: 'A batch' }, endpoints: NO_ENDPOINTS_RESOURCE },
+        ...listedFillers.slice(1),
+      ])
     ).toThrow('Suspicious: total number of vercel models is 99 < 100');
   });
 });

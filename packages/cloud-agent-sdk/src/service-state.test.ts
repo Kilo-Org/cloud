@@ -909,6 +909,26 @@ describe('createServiceState', () => {
       ]);
     });
 
+    it('accumulates session setup and start command messages into setupLog', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({
+        type: 'preparing',
+        step: 'session_setup_commands',
+        message: 'Running session setup command 1 of 1: npm install',
+      });
+      state.process({
+        type: 'preparing',
+        step: 'start_commands',
+        message: 'Running start command 1 of 1: npm run dev',
+      });
+
+      expect(state.getSetupLog()).toEqual([
+        'Running session setup command 1 of 1: npm install',
+        'Running start command 1 of 1: npm run dev',
+      ]);
+    });
+
     it('clears setupLog on ready', () => {
       const state = createServiceState(makeConfig());
 

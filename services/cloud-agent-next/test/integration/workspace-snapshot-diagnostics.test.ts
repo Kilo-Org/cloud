@@ -11,9 +11,11 @@ import { workspaceDiskSnapshots } from '../../src/control-plane/sandbox/sqlite-s
 import {
   captureIdleWorkspaceSnapshot,
   deleteWorkspaceSnapshot,
+  fenceWorkspaceSnapshot,
   readWorkspaceSnapshot,
   readWorkspaceSnapshotAllocation,
   selectWorkspaceSnapshot,
+  WORKSPACE_SNAPSHOT_TTL_MS,
   workspaceSnapshotOwner,
   workspaceSnapshotRoutesEligible,
   workspaceSnapshotRestoreSkip,
@@ -35,7 +37,7 @@ const descriptor = (overrides: Record<string, unknown> = {}) => ({
   snapshotId: 'private-handle',
   baseImage: 'image:1',
   runtimeIdentity: RUNTIME,
-  capturedAt: 1,
+  capturedAt: Date.now(),
   ...overrides,
 });
 const disk = () => ({
@@ -145,6 +147,10 @@ describe('workspace snapshot diagnostics with durable SQLite', () => {
     { change: { sandboxId: IDENTITY.sandboxId }, reason: 'invalid_descriptor' },
     { change: descriptor({ directory: '/workspace/another' }), reason: 'ownership_mismatch' },
     { change: descriptor({ runtimeIdentity: OTHER_RUNTIME }), reason: 'runtime_mismatch' },
+    {
+      change: descriptor({ capturedAt: Date.now() - WORKSPACE_SNAPSHOT_TTL_MS - 1 }),
+      reason: 'expired',
+    },
     { change: descriptor({ baseImage: 'old-image' }), reason: 'image_mismatch' },
     { change: descriptor(), reason: 'selected' },
   ])('reports $reason without changing the descriptor', async ({ change, reason }) =>
@@ -180,6 +186,28 @@ describe('workspace snapshot diagnostics with durable SQLite', () => {
       expect(JSON.stringify(fields.mock.calls)).not.toContain('private-handle');
     })
   );
+
+  it('fences a generation without deleting the descriptor or its payload', () =>
+    withDatabase(db => {
+      writeWorkspaceSnapshotAllocation(db, disk());
+      saveDescriptor(db, descriptor());
+      const before = readWorkspaceSnapshot(db, IDENTITY.workspaceId);
+      const fields = vi.spyOn(logger, 'withFields');
+      fenceWorkspaceSnapshot(db, 'prompt', 'workspace-1');
+      expect(readWorkspaceSnapshot(db, IDENTITY.workspaceId)).toEqual(before);
+      const fenced = readWorkspaceSnapshotAllocation(db);
+      expect(fenced?.invalidationGeneration).toBe(1);
+      expect(fenced?.idleConnectionId).toBeUndefined();
+      expect(fields.mock.calls.map(([value]) => value)).toContainEqual(
+        expect.objectContaining({
+          diagnosticEvent: 'workspace_snapshot_fenced',
+          reason: 'prompt',
+          previousGeneration: 0,
+          generation: 1,
+        })
+      );
+      expect(JSON.stringify(fields.mock.calls)).not.toContain('private-handle');
+    }));
 
   it.each([
     'not_connected',

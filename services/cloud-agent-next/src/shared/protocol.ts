@@ -140,6 +140,8 @@ export type PreparingStep =
   | 'branch'
   | 'devcontainer_setup'
   | 'setup_commands'
+  | 'session_setup_commands'
+  | 'start_commands'
   | 'workspace_restore'
   | 'workspace_backup'
   | 'sandbox_provision'

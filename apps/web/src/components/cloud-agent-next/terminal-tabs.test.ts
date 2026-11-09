@@ -78,10 +78,18 @@ const mockManager = {
 };
 const mockQueryClient = { invalidateQueries: jest.fn(), query: jest.fn() };
 const mockUploadEndpoint = { mutationOptions: () => ({}) };
+const mockWorkspaceSnapshotRecovery = {
+  queryOptions: (input: unknown) => ({ queryKey: [['getWorkspaceSnapshotRecovery'], input] }),
+  pathFilter: () => ({ queryKey: [['getWorkspaceSnapshotRecovery']] }),
+};
+const mockCloudAgentNext = {
+  getAttachmentUploadUrl: mockUploadEndpoint,
+  getWorkspaceSnapshotRecovery: mockWorkspaceSnapshotRecovery,
+};
 const mockGetWithRuntimeState = { queryOptions: (input: unknown) => input };
 const mockTrpc = {
-  cloudAgentNext: { getAttachmentUploadUrl: mockUploadEndpoint },
-  organizations: { cloudAgentNext: { getAttachmentUploadUrl: mockUploadEndpoint } },
+  cloudAgentNext: mockCloudAgentNext,
+  organizations: { cloudAgentNext: mockCloudAgentNext },
   cliSessionsV2: {
     getWithRuntimeState: mockGetWithRuntimeState,
     worktreeParent: { queryOptions: mockParentQueryOptions },
@@ -108,6 +116,9 @@ jest.mock('@tanstack/react-query', () => ({
   queryOptions: (options: unknown) => options,
   useMutation: () => ({ mutateAsync: jest.fn() }),
   useQuery: (options: { queryKey: unknown[] }) => {
+    if ((options.queryKey[0] as unknown[] | undefined)?.[0] === 'getWorkspaceSnapshotRecovery') {
+      return { data: undefined };
+    }
     mockParentQuery(options);
     return { data: options.queryKey[1] === mockSkipToken ? undefined : mockParentSession };
   },

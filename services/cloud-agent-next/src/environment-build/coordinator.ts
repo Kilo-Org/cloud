@@ -42,9 +42,9 @@ import {
   SNAPSHOT_ELIGIBLE_LIFETIME_MS,
   automaticAdmission,
   cleanupRetryDelay,
-  compatibleWith,
   replacementNeeded,
   snapshotEligibility,
+  snapshotImageCompatibility,
   type SnapshotCompatibility,
   type PublishedSnapshot,
 } from './policy.js';
@@ -151,6 +151,13 @@ export type SnapshotAdmission =
     }
   | { status: 'not_needed' };
 
+export type SnapshotBuildSummary = {
+  buildId: string;
+  state: BuildState;
+  outcome: BuildOutcome | null;
+  failureReason: string | null;
+};
+
 export type SnapshotResolution = {
   snapshot: {
     snapshotId: string;
@@ -158,7 +165,7 @@ export type SnapshotResolution = {
     revision: number;
     capturedAt: number;
     buildId: string;
-    stale: 'revision' | 'age' | null;
+    stale: 'revision' | 'age' | 'image' | null;
   } | null;
   /** Why no snapshot was selected, when none was. */
   reason:
@@ -171,6 +178,10 @@ export type SnapshotResolution = {
     | 'deleted'
     | 'unsupported';
   admission: SnapshotAdmission;
+  /** The image a session would start with now, or null when it could not be read. */
+  currentBaseImage?: string | null;
+  /** The active build, or the most recent terminal one, for a blocked startup. */
+  build?: SnapshotBuildSummary | null;
 };
 
 const ACTIVE_RUNNER_STATES: readonly BuildState[] = ['preparing'];
@@ -375,7 +386,22 @@ export class EnvironmentBuildCoordinator {
     )
       ? await this.admitAutomatic(request.reference, request.actorUserId)
       : ({ status: 'not_needed' } as const);
-    return { snapshot, reason, admission };
+    const buildRow = store.activeBuild() ?? store.latestTerminal();
+    return {
+      snapshot,
+      reason,
+      admission,
+      currentBaseImage: current.baseImage,
+      build:
+        buildRow === null
+          ? null
+          : {
+              buildId: buildRow.id,
+              state: buildRow.state,
+              outcome: buildRow.outcome ?? null,
+              failureReason: buildRow.failure_reason,
+            },
+    };
   }
 
   private async admitAutomatic(
@@ -1299,13 +1325,14 @@ function summarizeSnapshot(
   now: number,
   current: SnapshotCompatibility
 ) {
-  const stale = !compatibleWith(published, current)
-    ? ('image' as const)
-    : published.revision < currentRevision
-      ? ('revision' as const)
-      : replacementNeeded(published, published.revision, now, current)
-        ? ('age' as const)
-        : null;
+  const stale =
+    snapshotImageCompatibility(published, current, now) !== 'current'
+      ? ('image' as const)
+      : published.revision < currentRevision
+        ? ('revision' as const)
+        : replacementNeeded(published, published.revision, now, current)
+          ? ('age' as const)
+          : null;
   return {
     buildId: published.buildId,
     revision: published.revision,

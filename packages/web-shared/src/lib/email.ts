@@ -25,6 +25,8 @@ export const subjects = {
   orgInvitation: 'Kilo: Teams Invitation',
   magicLink: 'Sign in to Kilo Code',
   signInCode: 'Your Kilo Code sign-in code',
+  accountLinkCode: 'Kilo: Confirm adding a sign-in method',
+  newSignInMethod: 'Kilo: A new sign-in method was added to your account',
   balanceAlert: 'Kilo: Low Balance Alert',
   spendAlert: 'Kilo: Spend alert',
   autoTopUpFailed: 'Kilo: Auto Top-Up Failed',
@@ -295,6 +297,38 @@ export async function sendSignInCodeEmail(email: string, code: string): Promise<
       code,
       email,
       expires_in: '10 minutes',
+    },
+  });
+}
+
+export async function sendAccountLinkCodeEmail(
+  email: string,
+  code: string,
+  providerName: string
+): Promise<SendResult> {
+  return send({
+    to: email,
+    templateName: 'accountLinkCode',
+    templateVars: {
+      code,
+      email,
+      provider_name: providerName,
+      expires_in: '10 minutes',
+    },
+  });
+}
+
+export async function sendNewSignInMethodEmail(
+  email: string,
+  providerName: string
+): Promise<SendResult> {
+  return send({
+    to: email,
+    templateName: 'newSignInMethod',
+    templateVars: {
+      email,
+      provider_name: providerName,
+      connected_accounts_url: `${NEXTAUTH_URL}/connected-accounts`,
     },
   });
 }

@@ -133,6 +133,60 @@ describe('authOptions.callbacks.signIn auto-link wiring', () => {
     expect(mockCreateOrUpdateUser.mock.calls[0]?.[2]).toBe(false);
   });
 
+  it('passes autoLink=true for a Discord profile with verified true', async () => {
+    setValidTurnstileCookie();
+
+    const result = await signIn({
+      user: { id: 'x', email: 'cb-discord@example.com', name: 'CB Discord', image: '' },
+      account: { provider: 'discord', providerAccountId: 'cb-discord-id', type: 'oauth' },
+      profile: { verified: true },
+    } as never);
+
+    expect(result).toBe(true);
+    expect(mockCreateOrUpdateUser.mock.calls[0]?.[2]).toBe(true);
+  });
+
+  it('redirects to the pending link page on an eligible DIFFERENT-OAUTH', async () => {
+    setValidTurnstileCookie();
+    const owner = await insertTestUser({ google_user_email: 'cb-pending@example.com' });
+    mockCreateOrUpdateUser.mockResolvedValueOnce({
+      success: false,
+      error: 'DIFFERENT-OAUTH',
+      targetUserId: owner.id,
+      accountHasVerifiedPrimaryAddress: true,
+      providerAlreadyPresent: false,
+    });
+
+    const result = await signIn({
+      user: { id: 'x', email: 'cb-pending@example.com', name: 'CB Pending', image: '' },
+      account: { provider: 'github', providerAccountId: 'cb-pending-github', type: 'oauth' },
+      profile: { login: 'cbpending' },
+    } as never);
+
+    expect(result).toBe('/users/pending-link');
+    expect(cookieStore.get('pending-auth-link')?.value).toBeTruthy();
+  });
+
+  it('bounces an Apple account link without a session to pending completion', async () => {
+    const owner = await insertTestUser({ google_user_email: 'cb-apple-link@example.com' });
+    mockGetAccountLinkingSession.mockResolvedValueOnce({
+      existingUserId: owner.id,
+      targetProvider: 'apple',
+      createdAt: Date.now(),
+    });
+
+    const result = await signIn({
+      user: { id: 'x', email: 'cb-apple-link@example.com', name: 'CB Apple', image: '' },
+      account: { provider: 'apple', providerAccountId: 'cb-apple-link-sub', type: 'oauth' },
+      profile: { email_verified: 'true', email: 'cb-apple-link@example.com' },
+    } as never);
+
+    expect(result).toBe('/api/auth/pending-link/complete');
+    expect(cookieStore.get('pending-auth-link')?.value).toBeTruthy();
+    expect(mockLinkAccountToExistingUser).not.toHaveBeenCalled();
+    expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+  });
+
   it('passes autoLink=true for an email (magic link) sign-in', async () => {
     const result = await signIn({
       user: {
@@ -688,7 +742,13 @@ describe('Claude explicit linking persistence', () => {
         );
       // Settlement finds the existing account that owns this email and another
       // provider's subject.
-      mockCreateOrUpdateUser.mockResolvedValue({ success: false, error: 'DIFFERENT-OAUTH' });
+      mockCreateOrUpdateUser.mockResolvedValue({
+        success: false,
+        error: 'DIFFERENT-OAUTH',
+        targetUserId: link.owner.id,
+        accountHasVerifiedPrimaryAddress: false,
+        providerAlreadyPresent: true,
+      });
       const result = await signIn({
         user: { id: link.subject, email, name: 'External' },
         account: { provider: 'claude', providerAccountId: link.subject, type: 'oauth' },

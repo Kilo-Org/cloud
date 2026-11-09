@@ -2065,6 +2065,11 @@ describe('User', () => {
       expect(result.success).toBe(false);
       if (result.success) return;
       expect(result.error).toBe('DIFFERENT-OAUTH');
+      expect(result).toMatchObject({
+        targetUserId: existing.id,
+        accountHasVerifiedPrimaryAddress: true,
+        providerAlreadyPresent: false,
+      });
 
       const providerRows = await db
         .select()
@@ -2096,6 +2101,7 @@ describe('User', () => {
       expect(result.success).toBe(false);
       if (result.success) return;
       expect(result.error).toBe('DIFFERENT-OAUTH');
+      expect(result).toMatchObject({ providerAlreadyPresent: true });
     });
 
     it('keeps the dev-only upgrade path: any provider links to a user whose only provider is fake-login', async () => {

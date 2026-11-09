@@ -20,7 +20,8 @@ export function AuthErrorNotification({
     return (
       <div data-error-notification role="alert" aria-live="assertive" aria-atomic="true">
         <ErrorNotificationBox title="Error">
-          An account already exists with this email. Did you use a different login method?
+          An account already exists with this email, and it already has this type of sign-in method
+          linked. Sign in with the original account for that method.
         </ErrorNotificationBox>
       </div>
     );

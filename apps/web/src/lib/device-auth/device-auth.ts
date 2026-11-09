@@ -6,6 +6,23 @@ import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
 import { randomInt, createHash, randomBytes } from 'node:crypto';
 import { createDeviceSession, issueSessionCredentials } from '@/lib/auth/device-sessions';
 import { requestingClientOfRow, type RequestingClient } from './requesting-client';
+import {
+  completePendingLinkByHash,
+  hashPendingLinkSecret,
+  type PendingLinkResult,
+} from '@/lib/auth/pending-link';
+
+async function completeStoredPendingLink(
+  secretHash: string | null,
+  userId: string
+): Promise<PendingLinkResult | undefined> {
+  if (!secretHash) return undefined;
+  try {
+    return await completePendingLinkByHash(secretHash, userId);
+  } catch {
+    return { status: 'failed', reason: 'LINKING-FAILED' };
+  }
+}
 
 export type { RequestingClient } from './requesting-client';
 
@@ -100,6 +117,7 @@ export async function createDeviceAuthRequest(params: {
   userAgent?: string;
   ipAddress?: string;
   requestingClient?: RequestingClient;
+  pendingLinkToken?: string;
 }): Promise<{
   code: string;
   userCode: string;
@@ -161,6 +179,9 @@ export async function createDeviceAuthRequest(params: {
             expires_at: expiresAt.toISOString(),
             user_agent: userAgent,
             ip_address: ipAddress,
+            pending_link_secret_hash: params.pendingLinkToken
+              ? hashPendingLinkSecret(params.pendingLinkToken)
+              : null,
             ...requestingClientColumns(requestingClient),
           })
           .onConflictDoNothing({
@@ -361,6 +382,7 @@ export async function consumeDeviceAuthByDeviceCode(
   expiresIn?: number;
   userId?: string;
   userEmail?: string;
+  pendingLink?: PendingLinkResult;
 }> {
   const deviceCodeHash = hashDeviceSecret(deviceCode);
   const now = new Date().toISOString();
@@ -424,6 +446,8 @@ export async function consumeDeviceAuthByDeviceCode(
       return { status: 'denied' };
     }
 
+    const pendingLink = await completeStoredPendingLink(consumed.pending_link_secret_hash, user.id);
+
     const token = options?.supportsRefresh
       ? undefined
       : generateApiToken(user, { deviceAuthRequestCode: consumed.code });
@@ -442,6 +466,7 @@ export async function consumeDeviceAuthByDeviceCode(
         expiresIn: pair.expiresIn,
         userId: user.id,
         userEmail: user.google_user_email,
+        ...(pendingLink ? { pendingLink } : {}),
       };
     }
 
@@ -450,6 +475,7 @@ export async function consumeDeviceAuthByDeviceCode(
       token,
       userId: user.id,
       userEmail: user.google_user_email,
+      ...(pendingLink ? { pendingLink } : {}),
     };
   } catch (err) {
     // If a device session was created, delete it to avoid orphans.
@@ -484,6 +510,7 @@ export async function pollDeviceAuthRequest(code: string): Promise<{
   requestingClient?: RequestingClient | null;
   /** Whether the approval confirmed that exact client. */
   clientConfirmed?: boolean;
+  pendingLink?: PendingLinkResult;
 }> {
   const now = new Date().toISOString();
 
@@ -528,6 +555,10 @@ export async function pollDeviceAuthRequest(code: string): Promise<{
         return { status: 'denied' };
       }
 
+      const pendingLink = await completeStoredPendingLink(
+        consumed.pending_link_secret_hash,
+        user.id
+      );
       const token = generateApiToken(user, {
         deviceAuthRequestCode: consumed.code,
       });
@@ -539,6 +570,7 @@ export async function pollDeviceAuthRequest(code: string): Promise<{
         userEmail: user.google_user_email,
         requestingClient: requestingClientOfRow(consumed),
         clientConfirmed: consumed.client_confirmed_at !== null,
+        ...(pendingLink ? { pendingLink } : {}),
       };
     } catch (err) {
       // Restore the row so the request remains redeemable.

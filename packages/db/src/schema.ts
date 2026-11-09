@@ -2651,6 +2651,45 @@ export const user_auth_provider = pgTable(
   ]
 );
 
+export const pending_auth_links = pgTable(
+  'pending_auth_links',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    secret_hash: text().notNull(),
+    kilo_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    kind: text().notNull().$type<'existing_account' | 'explicit_link'>(),
+    provider: text().notNull().$type<AuthProviderId>(),
+    provider_account_id: text().notNull(),
+    email: text().notNull(),
+    avatar_url: text().notNull(),
+    display_name: text(),
+    hosted_domain: text(),
+    email_code_allowed: boolean().notNull(),
+    email_code_challenge_id: uuid(),
+    callback_path: text(),
+    expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    consumed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    uniqueIndex('UQ_pending_auth_links_secret_hash').on(table.secret_hash),
+    index('IDX_pending_auth_links_kilo_user_id').on(table.kilo_user_id),
+    index('IDX_pending_auth_links_expires_at').on(table.expires_at),
+    check(
+      'check_pending_auth_links_kind',
+      sql`${table.kind} IN ('existing_account', 'explicit_link')`
+    ),
+  ]
+);
+
+export type PendingAuthLink = typeof pending_auth_links.$inferSelect;
+export type NewPendingAuthLink = typeof pending_auth_links.$inferInsert;
+
 export type PaymentMethod = typeof payment_methods.$inferSelect;
 
 export const payment_methods = pgTable(
@@ -7341,6 +7380,8 @@ export const device_auth_requests = pgTable(
     requesting_redirect_origin: text(),
     /** When the approver confirmed that exact client; null until then. */
     client_confirmed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    /** SHA-256 hash of the pending account link secret to complete on approval. */
+    pending_link_secret_hash: text(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()

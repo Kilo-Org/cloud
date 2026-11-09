@@ -9,7 +9,7 @@ import { getDeliveredEmailAddress } from '@kilocode/web-shared/lib/email-address
 import { captureMessage } from '@sentry/nextjs';
 
 const SIGN_IN_CODE_EXPIRY_MINUTES = 10;
-const SIGN_IN_CODE_MAX_ATTEMPTS = 5;
+export const SIGN_IN_CODE_MAX_ATTEMPTS = 5;
 // Reservations expire on their own after two minutes — no cleanup job is needed.
 const SIGN_IN_CODE_RESERVATION_MINUTES = 2;
 

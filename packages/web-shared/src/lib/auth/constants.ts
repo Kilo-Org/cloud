@@ -1,3 +1,21 @@
+import type { AuthProviderId } from '@kilocode/db/schema-types';
+
+export const AUTH_PROVIDER_DISPLAY_NAMES: Record<AuthProviderId, string> = {
+  anaconda: 'Anaconda',
+  email: 'Email',
+  apple: 'Apple',
+  google: 'Google',
+  github: 'GitHub',
+  gitlab: 'GitLab',
+  linkedin: 'LinkedIn',
+  discord: 'Discord',
+  openai: 'ChatGPT',
+  claude: 'Claude',
+  'fake-login': 'Test Account',
+  workos: 'Enterprise SSO',
+  passkey: 'Passkey',
+};
+
 export type AuthErrorType =
   | 'BLOCKED'
   | 'DIFFERENT-OAUTH'

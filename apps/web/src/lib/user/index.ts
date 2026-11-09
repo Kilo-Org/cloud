@@ -115,6 +115,7 @@ import {
   github_connection_attempts,
   github_app_installations,
   provider_oauth_attempts,
+  pending_auth_links,
   model_eval_ingestions,
   stripe_dispute_actions,
   stripe_dispute_cases,
@@ -141,11 +142,13 @@ import {
 import { eq, and, inArray, isNotNull, isNull, sql, or, ne, notExists } from 'drizzle-orm';
 import { allow_fake_login, IS_DEVELOPMENT } from '@kilocode/web-shared/lib/constants';
 import {
+  AUTH_PROVIDER_DISPLAY_NAMES,
   hosted_domain_specials,
   knownSignupStepUpMethods,
   type AuthErrorType,
   type SignupStepUpMethod,
 } from '@kilocode/web-shared/lib/auth/constants';
+import { sendNewSignInMethodEmail } from '@kilocode/web-shared/lib/email';
 import { shouldAutoProvisionPlatformAdmin } from '@/lib/admin/platform-admin';
 import { revokeOpenSupportGrants } from '@/lib/admin/support-access-revocation';
 import { isEmailSignupDisabled } from '@/lib/auth/email-signup-switch';
@@ -278,8 +281,11 @@ export type CreateOrUpdateUserOptions = {
   skipSignupAdmission?: boolean;
 };
 
-/** A user settlement error other than a signup step-up, which carries its methods. */
-type UserSettlementError = Exclude<AuthErrorType, 'SIGNUP-STEP-UP'>;
+/**
+ * A user settlement error other than a signup step-up or a DIFFERENT-OAUTH
+ * refusal; those two carry extra fields in their own result types.
+ */
+type UserSettlementError = Exclude<AuthErrorType, 'SIGNUP-STEP-UP' | 'DIFFERENT-OAUTH'>;
 
 /** Bouncer admits this signup only with a stronger sign-in method; nothing was created. */
 export type SignupStepUpFailure = {
@@ -289,12 +295,22 @@ export type SignupStepUpFailure = {
   methods: SignupStepUpMethod[];
 };
 
+/** The sign-in email belongs to an existing account the credential did not settle. */
+export type DifferentOAuthFailure = {
+  success: false;
+  error: 'DIFFERENT-OAUTH';
+  targetUserId: string;
+  accountHasVerifiedPrimaryAddress: boolean;
+  providerAlreadyPresent: boolean;
+};
+
 export type CreateOrUpdateUserResult =
   | Result<
       { user: User; isNew: boolean; deferredSignInEvent?: DeferredSignInEvent },
       UserSettlementError
     >
-  | SignupStepUpFailure;
+  | SignupStepUpFailure
+  | DifferentOAuthFailure;
 
 export type CreateOrUpdateUserTrackingContext = {
   affiliateTouch?: ParsedImpactAffiliateTouch | null;
@@ -550,6 +566,14 @@ function hasVerifiedPrimaryAddress(
   );
 }
 
+/** The D3 rule: an account with no provider rows also counts as verified. */
+export async function accountHasVerifiedPrimaryAddress(userId: string): Promise<boolean> {
+  const user = await findUserById(userId);
+  if (!user) return false;
+  const providers = await getUserAuthProviders(userId);
+  return providers.length === 0 || hasVerifiedPrimaryAddress(user.google_user_email, providers);
+}
+
 export async function createOrUpdateUser(
   args: CreateOrUpdateUserArgs,
   turnstile_guid: UUID | undefined,
@@ -740,7 +764,13 @@ export async function createOrUpdateUser(
           },
         });
       }
-      return failureResult('DIFFERENT-OAUTH');
+      return {
+        success: false,
+        error: 'DIFFERENT-OAUTH',
+        targetUserId: userByEmail.id,
+        accountHasVerifiedPrimaryAddress,
+        providerAlreadyPresent: hasThisProvider,
+      } satisfies DifferentOAuthFailure;
     }
   }
 
@@ -983,6 +1013,13 @@ export async function linkAccountToExistingUser(
     return failureResult('SYSTEM_ERROR');
   }
 
+  const providersBeforeLink = await getUserAuthProviders(existingKiloUserId);
+  const isNoOpRelink = providersBeforeLink.some(
+    p =>
+      p.provider === authProviderData.provider &&
+      p.provider_account_id === authProviderData.provider_account_id
+  );
+
   // Link the new auth provider to the existing user
   const linkResult = await linkAuthProviderToUser({
     kilo_user_id: existingKiloUserId,
@@ -1020,6 +1057,25 @@ export async function linkAccountToExistingUser(
     authProviderData.provider_account_id,
     existingKiloUserId
   );
+
+  if (!isNoOpRelink && authProviderData.provider !== 'fake-login') {
+    try {
+      const notice = await sendNewSignInMethodEmail(
+        existingUser.google_user_email,
+        AUTH_PROVIDER_DISPLAY_NAMES[authProviderData.provider]
+      );
+      if (!notice.sent) {
+        console.warn('[auth] New sign-in method notice was not sent', {
+          provider: authProviderData.provider,
+          reason: notice.reason,
+        });
+      }
+    } catch {
+      console.warn('[auth] New sign-in method notice failed', {
+        provider: authProviderData.provider,
+      });
+    }
+  }
 
   // Log the account linking event
   posthogClient.capture({
@@ -1318,6 +1374,7 @@ export async function anonymizeCloudUserData(
 
   // ── 2. Hard-delete PII tables ────────────────────────────────────────
   await tx.delete(user_auth_provider).where(eq(user_auth_provider.kilo_user_id, userId));
+  await tx.delete(pending_auth_links).where(eq(pending_auth_links.kilo_user_id, userId));
   await tx.execute(sql`
     INSERT INTO user_data_export_object_deletions (object_key, multipart_upload_id, available_at)
     SELECT COALESCE(r2_object_key, 'exports/' || id::text || '/kilo-data-export.jsonl.gz'),

@@ -4441,5 +4441,8 @@
     "noEnabledContexts": "L-ebda kuntest mixgħul għall-briefings skedati",
     "sourceBlocker": "Is-sessjoni teħtieġ attenzjoni",
     "sourceMetadata": "Metadata maqbuda tas-sessjoni"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Ma stajniex niftħu dan ir-riżultat tat-tfittxija"
   }
 }

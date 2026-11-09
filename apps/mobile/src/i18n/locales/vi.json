@@ -4243,5 +4243,8 @@
     "noEnabledContexts": "Chưa bật bản tin theo lịch cho ngữ cảnh nào",
     "sourceBlocker": "Phiên cần được chú ý",
     "sourceMetadata": "Siêu dữ liệu phiên đã ghi lại"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Không thể mở kết quả tìm kiếm này"
   }
 }

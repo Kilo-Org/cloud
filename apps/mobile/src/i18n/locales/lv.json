@@ -4309,5 +4309,8 @@
     "noEnabledContexts": "Plānotajām atskaitēm nav iespējots neviens konteksts",
     "sourceBlocker": "Sesijai jāpievērš uzmanība",
     "sourceMetadata": "Fiksētie sesijas metadati"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Neizdevās atvērt šo meklēšanas rezultātu"
   }
 }

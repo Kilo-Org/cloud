@@ -4375,5 +4375,8 @@
     "noEnabledContexts": "Brak kontekstów z włączonymi zaplanowanymi raportami",
     "sourceBlocker": "Sesja wymaga uwagi",
     "sourceMetadata": "Zapisane metadane sesji"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Nie udało się otworzyć tego wyniku wyszukiwania"
   }
 }

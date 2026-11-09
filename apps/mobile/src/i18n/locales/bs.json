@@ -4309,5 +4309,8 @@
     "noEnabledContexts": "Nijedan kontekst nije omogućen za zakazane izvještaje",
     "sourceBlocker": "Sesija zahtijeva pažnju",
     "sourceMetadata": "Zabilježeni metapodaci sesije"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Nije moguće otvoriti ovaj rezultat pretrage"
   }
 }

@@ -4243,5 +4243,8 @@
     "noEnabledContexts": "شیڈول شدہ بریفنگز کے لیے کوئی سیاق فعال نہیں ہے",
     "sourceBlocker": "سیشن کو توجہ درکار ہے",
     "sourceMetadata": "محفوظ کردہ سیشن میٹا ڈیٹا"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "یہ تلاش کا نتیجہ کھولا نہیں جا سکا"
   }
 }

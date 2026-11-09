@@ -4243,5 +4243,8 @@
     "noEnabledContexts": "Ingen kontekster er aktivert for planlagte briefer",
     "sourceBlocker": "Økten krever oppmerksomhet",
     "sourceMetadata": "Lagrede øktmetadata"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Kunne ikke åpne dette søkeresultatet"
   }
 }

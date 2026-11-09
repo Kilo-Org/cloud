@@ -4243,5 +4243,8 @@
     "noEnabledContexts": "Geen kontekste vir geskeduleerde verslae geaktiveer nie",
     "sourceBlocker": "Sessie benodig aandag",
     "sourceMetadata": "Vasgelegde sessiemetadata"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Kon nie hierdie soektogresultaat oopmaak nie"
   }
 }

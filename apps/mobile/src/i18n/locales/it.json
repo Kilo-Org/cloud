@@ -4309,5 +4309,8 @@
     "noEnabledContexts": "Nessun contesto abilitato per i briefing programmati",
     "sourceBlocker": "La sessione richiede attenzione",
     "sourceMetadata": "Metadati della sessione acquisiti"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Impossibile aprire questo risultato di ricerca"
   }
 }

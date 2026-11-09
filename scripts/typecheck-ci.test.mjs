@@ -663,6 +663,27 @@ test('kilo-app CI builds the tRPC declarations once and both checks download the
   );
 });
 
+// Both workflows run the same declaration action, so both must install the same
+// closure. The action's program is the whole input: a wider install links
+// workspaces the build never reads, and a narrower one breaks the build.
+test('kilo-app CI installs the closure the declaration action needs', () => {
+  const install = (file, job) =>
+    workflows[file].jobs[job].steps.find(step =>
+      /^pnpm install --frozen-lockfile\b/.test(step.run ?? '')
+    )?.run;
+  const producerInstall = install('kilo-app-ci.yml', trpcProducer);
+  assert.match(
+    producerInstall ?? '',
+    /^pnpm install --frozen-lockfile --filter '@kilocode\/trpc\.\.\.' --filter 'web\.\.\.' --filter kilocode-monorepo$/,
+    'the producer installs the declaration closure, not the whole workspace'
+  );
+  assert.equal(
+    producerInstall,
+    install('ci.yml', 'trpc-declarations'),
+    'the two workflow jobs that build these declarations install the same closure'
+  );
+});
+
 // The tRPC action gets the same guard as the harness SDK build action: a hit
 // proves the key, not the tree.
 test('the tRPC declarations action rebuilds a hit that misses an entry point', () => {

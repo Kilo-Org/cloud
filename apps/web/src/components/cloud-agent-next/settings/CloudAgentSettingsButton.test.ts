@@ -8,6 +8,7 @@ type DialogProps = {
   open?: boolean;
   initialSection?: string;
   organizationId?: string;
+  onOpenChange?: (open: boolean) => void;
   onSectionChange?: (section: 'general' | 'profiles' | 'environments' | 'compute') => void;
 };
 
@@ -131,5 +132,35 @@ describe('CloudAgentSettingsButton deep links', () => {
     expect(mockReplace).toHaveBeenCalledWith('/cloud?foo=bar&settings=environments', {
       scroll: false,
     });
+  });
+
+  it('clears the settings query when the dialog closes', () => {
+    setSearchParams('?settings=general');
+    mockPathname = '/cloud';
+    const props = renderButton();
+
+    props.onOpenChange?.(false);
+
+    expect(mockReplace).toHaveBeenCalledWith('/cloud', { scroll: false });
+  });
+
+  it('keeps other query params when clearing settings on close', () => {
+    setSearchParams('?settings=environments&foo=bar');
+    mockPathname = '/cloud';
+    const props = renderButton();
+
+    props.onOpenChange?.(false);
+
+    expect(mockReplace).toHaveBeenCalledWith('/cloud?foo=bar', { scroll: false });
+  });
+
+  it('does not rewrite the URL when the dialog opens', () => {
+    setSearchParams('');
+    mockPathname = '/cloud';
+    const props = renderButton();
+
+    props.onOpenChange?.(true);
+
+    expect(mockReplace).not.toHaveBeenCalled();
   });
 });

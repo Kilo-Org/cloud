@@ -57,6 +57,19 @@ export function CloudAgentSettingsButton({ organizationId }: { organizationId?: 
     [pathname, router, searchParams]
   );
 
+  const handleOpenChange = useCallback(
+    (nextOpen: boolean) => {
+      setOpen(nextOpen);
+      if (nextOpen) return;
+      const params = new URLSearchParams(searchParams.toString());
+      if (!params.has('settings')) return;
+      params.delete('settings');
+      const query = params.toString();
+      router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+    },
+    [pathname, router, searchParams]
+  );
+
   return (
     <>
       <Tooltip>
@@ -78,7 +91,7 @@ export function CloudAgentSettingsButton({ organizationId }: { organizationId?: 
         initialSection={initialSection}
         onSectionChange={handleSectionChange}
         open={open}
-        onOpenChange={setOpen}
+        onOpenChange={handleOpenChange}
       />
     </>
   );

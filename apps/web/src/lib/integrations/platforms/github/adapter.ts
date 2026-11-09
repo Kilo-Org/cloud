@@ -1390,6 +1390,103 @@ export async function fetchPullRequestByNumber(params: {
   }
 }
 
+/** One open pull request a recovery sweep may reconsider. */
+export type OpenPullRequest = {
+  number: number;
+  title: string;
+  body: string | null;
+  draft: boolean;
+  htmlUrl: string;
+  createdAt: string;
+  updatedAt: string;
+  authorId: number;
+  authorLogin: string;
+  authorAvatarUrl: string;
+  authorType: string;
+  labels: string[];
+  headSha: string;
+  headRef: string;
+  headRepoFullName: string | null;
+  headRepoCloneUrl: string | null;
+  headRepoHtmlUrl: string | null;
+  baseSha: string;
+  baseRef: string;
+  baseRepoId: number;
+  baseRepoName: string;
+  baseRepoFullName: string;
+};
+
+/**
+ * Lists the most recently updated open pull requests of one repository, newest
+ * first. A recovery sweep reads this to reach a pull request whose review never
+ * started, which no webhook delivery will report again.
+ *
+ * @throws {GitHubRateLimitError} on 403 secondary rate limit.
+ */
+export async function fetchOpenPullRequests(params: {
+  installationId: string;
+  owner: string;
+  repo: string;
+  limit: number;
+  appType?: GitHubAppType;
+  signal?: AbortSignal;
+}): Promise<OpenPullRequest[]> {
+  const { installationId, owner, repo, limit, appType = 'standard', signal } = params;
+
+  const requestOptions = signal ? { request: { signal } } : {};
+  const tokenData = await generateGitHubInstallationToken(
+    installationId,
+    appType,
+    undefined,
+    'workflow',
+    signal
+  ).catch((error: unknown) => {
+    throw toGitHubRateLimitError(error) ?? error;
+  });
+  const octokit = new Octokit({ auth: tokenData.token });
+
+  try {
+    const { data } = await octokit.pulls.list({
+      owner,
+      repo,
+      state: 'open',
+      sort: 'updated',
+      direction: 'desc',
+      per_page: limit,
+      ...requestOptions,
+    });
+
+    return data.map(pull => ({
+      number: pull.number,
+      title: pull.title,
+      body: pull.body ?? null,
+      draft: pull.draft === true,
+      htmlUrl: pull.html_url,
+      createdAt: pull.created_at,
+      updatedAt: pull.updated_at,
+      authorId: pull.user?.id ?? 0,
+      authorLogin: pull.user?.login ?? '',
+      authorAvatarUrl: pull.user?.avatar_url ?? '',
+      authorType: pull.user?.type ?? 'User',
+      labels: pull.labels
+        .map(label => (typeof label === 'string' ? label : (label.name ?? '')))
+        .filter(name => name !== ''),
+      headSha: pull.head.sha,
+      headRef: pull.head.ref,
+      headRepoFullName: pull.head.repo?.full_name ?? null,
+      headRepoCloneUrl: pull.head.repo?.clone_url ?? null,
+      headRepoHtmlUrl: pull.head.repo?.html_url ?? null,
+      baseSha: pull.base.sha,
+      baseRef: pull.base.ref,
+      baseRepoId: pull.base.repo.id,
+      baseRepoName: pull.base.repo.name,
+      baseRepoFullName: pull.base.repo.full_name,
+    }));
+  } catch (error) {
+    throw toGitHubRateLimitError(error) ?? error;
+  }
+}
+
 export type ReviewDecision = 'approved' | 'changes_requested' | 'review_required';
 
 export type BatchedPrInput = {

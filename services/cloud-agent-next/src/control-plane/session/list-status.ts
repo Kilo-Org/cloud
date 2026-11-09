@@ -53,7 +53,12 @@ export function createSessionListStatusOutbox(input: {
   let inFlight: Promise<void> | undefined;
   const current = () => {
     const raw = input.storage.kv.get<unknown>(LIST_STATUS_KEY);
-    return raw === undefined ? undefined : storedStatusSchema.parse(raw);
+    if (raw === undefined) return undefined;
+    const parsed = storedStatusSchema.safeParse(raw);
+    if (parsed.success) return parsed.data;
+    input.storage.kv.delete(LIST_STATUS_KEY);
+    logger.warn('Discarded invalid session list status; the current session will rebuild it');
+    return undefined;
   };
 
   function record(
@@ -65,6 +70,8 @@ export function createSessionListStatusOutbox(input: {
     now = Date.now()
   ): void {
     const previous = current();
+    // Refresh on observed activity, not a timer that would keep a silent or
+    // disconnected runtime looking fresh indefinitely.
     if (
       previous?.update.status === status &&
       ((status !== 'busy' && status !== 'retry') ||
@@ -77,7 +84,7 @@ export function createSessionListStatusOutbox(input: {
       now,
       previous === undefined ? 0 : decodeTime(previous.update.transitionId) + 1
     );
-    input.storage.kv.put(LIST_STATUS_KEY, {
+    const snapshot = storedStatusSchema.safeParse({
       update: {
         ...identity,
         status,
@@ -85,7 +92,14 @@ export function createSessionListStatusOutbox(input: {
         transitionId: ulid(at),
       },
       dueAt: now,
-    } satisfies z.infer<typeof storedStatusSchema>);
+    });
+    if (!snapshot.success) {
+      logger
+        .withFields({ sessionId: identity.cloudAgentSessionId })
+        .warn('Skipped invalid session list status; the turn is unaffected');
+      return;
+    }
+    input.storage.kv.put(LIST_STATUS_KEY, snapshot.data);
   }
 
   async function deliver(now: number): Promise<void> {

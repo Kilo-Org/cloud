@@ -11,7 +11,9 @@ import {
   LIST_STATUS_REFRESH_MS,
 } from './list-status.js';
 
-vi.mock('../../logger.js', () => ({ logger: { withFields: () => ({ warn: vi.fn() }) } }));
+vi.mock('../../logger.js', () => ({
+  logger: { warn: vi.fn(), withFields: () => ({ warn: vi.fn() }) },
+}));
 
 const identity = {
   sessionId: `ses_${'a'.repeat(26)}`,
@@ -30,6 +32,7 @@ function fixture() {
       put: (key: string, value: unknown) => {
         values.set(key, structuredClone(value));
       },
+      delete: (key: string) => values.delete(key),
     },
   } as Pick<DurableObjectStorage, 'kv'>;
   const publish = vi.fn(async (_update: PublishCloudAgentSessionStatusParams): Promise<void> => {});
@@ -89,6 +92,27 @@ describe('session-list status', () => {
 });
 
 describe('session-list status outbox', () => {
+  it.each([null, { update: { status: 'busy' }, dueAt: 0 }, { unexpected: 'old shape' }])(
+    'discards malformed stored state and rebuilds it from the current session (%j)',
+    async raw => {
+      const { outbox, values, publish } = fixture();
+      values.set('session_list_status', raw);
+      expect(outbox.nextDueAt()).toBeNull();
+      expect(values.size).toBe(0);
+      outbox.record(identity, 'busy', 1000);
+      await outbox.repair(1000);
+      expect(publish).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ status: 'busy' }));
+    }
+  );
+
+  it('does not persist or publish an invalid session identity', async () => {
+    const { outbox, values, publish } = fixture();
+    outbox.record({ ...identity, sessionId: 'legacy-session-id' }, 'busy', 1000);
+    expect(values.size).toBe(0);
+    await outbox.repair(1000);
+    expect(publish).not.toHaveBeenCalled();
+  });
+
   it('publishes only transitions, not each native event, and remembers delivery across eviction', async () => {
     const { outbox, storage, publish } = fixture();
     outbox.record(identity, 'busy', 1000);

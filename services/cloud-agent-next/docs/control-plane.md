@@ -1780,6 +1780,8 @@ service binding. While work continues to produce events, busy/retry summaries
 also refresh at most once per minute so the sidebar's 20-minute stale-status
 cutoff does not hide a long-running background chat. Same-status refreshes update
 SQL recency without emitting another status notification; idle sessions do not refresh.
+There is no refresh-only alarm: a silent runtime must not gain synthetic liveness
+from the sidebar projection. Execution supervision and its failure deadlines are unchanged.
 Ingest checks the user and immutable Cloud Agent session owner
 under the row lock, applies the existing `status_transition_id` ordering, and
 broadcasts `session.status.updated` through the existing UserConnectionDO. A browser

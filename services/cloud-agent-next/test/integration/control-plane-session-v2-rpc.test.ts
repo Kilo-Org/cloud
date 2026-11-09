@@ -3,7 +3,7 @@ import { env, evictAllDurableObjects, reset, runInDurableObject } from 'cloudfla
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { sealRuntimeAuthorization } from '@kilocode/worker-utils/runtime-authorization';
 import type { EgressMode } from '@kilocode/worker-utils/egress-allowlist';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { SandboxControlV2 } from '../../src/control-plane/sandbox/sandbox-do.js';
 import { routes as sandboxRoutes } from '../../src/control-plane/sandbox/sqlite-schema.js';
 import type {
@@ -333,6 +333,7 @@ async function setupGeneratedTitleSession(
 }
 
 afterEach(async () => {
+  vi.restoreAllMocks();
   await reset();
 });
 
@@ -415,11 +416,168 @@ describe('SandboxSessionV2 worker RPC surface', () => {
     await stub.stop();
     await expectStatus('idle');
     const updates = await readPublished();
+    expect(updates[0]?.status).toBe('busy');
     expect(
       updates.every(
         (update, index) => index === 0 || update.transitionId > updates[index - 1].transitionId
       )
     ).toBe(true);
+  });
+
+  it('does not publish idle for registration alone, but still publishes autonomous native work', async () => {
+    const { stub, kiloId, sessionMetadata, sandboxSelection } = await setupGeneratedTitleSession();
+    await stub.registerSessionFromMetadata({ metadata: sessionMetadata, sandboxSelection });
+    expect(
+      await runInDurableObject(stub, (_instance, state) => state.storage.get('session_list_status'))
+    ).toBeUndefined();
+    await stub.onEvents({
+      events: [
+        { type: 'session.status', properties: { sessionID: kiloId, status: { type: 'busy' } } },
+      ],
+    });
+    await waitFor(async () => {
+      const updates = await runInDurableObject(stub, (_instance, state) =>
+        state.storage.get<PublishCloudAgentSessionStatusParams[]>(LIST_STATUS_PUBLISHES_KEY)
+      );
+      expect(updates?.map(update => update.status)).toEqual(['busy']);
+    });
+  });
+
+  it('repairs malformed status storage without failing admission or losing the execution alarm', async () => {
+    const { stub, sessionMetadata, sandboxSelection } = await setupGeneratedTitleSession();
+    await stub.registerSessionFromMetadata({ metadata: sessionMetadata, sandboxSelection });
+    await runInDurableObject(stub, (_instance, state) =>
+      state.storage.put('session_list_status', { old: 'invalid' })
+    );
+    await expect(stub.send(promptPayload(messageId()))).resolves.toEqual({ type: 'ok' });
+    await waitFor(async () => {
+      const updates = await runInDurableObject(stub, (_instance, state) =>
+        state.storage.get<PublishCloudAgentSessionStatusParams[]>(LIST_STATUS_PUBLISHES_KEY)
+      );
+      expect(updates?.at(-1)?.status).toBe('busy');
+    });
+    expect(
+      await runInDurableObject(stub, (_instance, state) => state.storage.getAlarm())
+    ).not.toBeNull();
+  });
+
+  it('does not replace committed event results or original task errors when final alarm maintenance fails', async () => {
+    const { stub, kiloId, sessionMetadata, sandboxSelection } = await setupGeneratedTitleSession();
+    await stub.registerSessionFromMetadata({ metadata: sessionMetadata, sandboxSelection });
+    await runInDurableObject(stub, async instance => {
+      Object.assign(instance, {
+        armAlarm: async () => {
+          throw new Error('alarm unavailable');
+        },
+      });
+      await expect(
+        instance.onEvents({
+          events: [
+            { type: 'session.status', properties: { sessionID: kiloId, status: { type: 'busy' } } },
+          ],
+        })
+      ).resolves.toBeUndefined();
+      expect((await instance.getSession()).type).toBe('found');
+      Object.assign(instance, {
+        persistMessages: async () => {
+          throw new Error('original message persistence error');
+        },
+      });
+      await expect(instance.send(promptPayload(messageId()))).rejects.toThrow(
+        'original message persistence error'
+      );
+    });
+  });
+
+  it('keeps execution backstops armed when writing the status projection fails', async () => {
+    const { stub, sessionMetadata, sandboxSelection } = await setupGeneratedTitleSession();
+    await stub.registerSessionFromMetadata({ metadata: sessionMetadata, sandboxSelection });
+    await runInDurableObject(stub, async (instance, state) => {
+      Object.assign(instance, {
+        listStatusOutbox: {
+          record: () => {
+            throw new Error('metadata storage unavailable');
+          },
+          nextDueAt: () => null,
+        },
+      });
+      await expect(instance.send(promptPayload(messageId()))).resolves.toEqual({ type: 'ok' });
+      expect(await state.storage.getAlarm()).not.toBeNull();
+    });
+  });
+
+  it('serializes publication alarm re-arming behind an in-flight answer', async () => {
+    const { stub, peer, sessionId, kiloId, sessionMetadata, sandboxSelection } =
+      await setupGeneratedTitleSession();
+    peer.prepareView = peer.view('ready');
+    await stub.createSessionWithInitialAdmission({
+      metadata: sessionMetadata,
+      sandboxSelection,
+      message: promptPayload(messageId()),
+    });
+    await waitFor(async () => {
+      const pending = await runInDurableObject(stub, (_instance, state) =>
+        state.storage.get<{ dueAt: number | null }>('session_list_status')
+      );
+      expect(pending?.dueAt).toBeNull();
+    });
+    await runInDurableObject(stub, async (instance, state) => {
+      const publication = Promise.withResolvers<void>();
+      const publicationStarted = Promise.withResolvers<void>();
+      const answering = Promise.withResolvers<void>();
+      const answerStarted = Promise.withResolvers<void>();
+      let alarmWrites = 0;
+      Object.assign(instance.env.SESSION_INGEST, {
+        publishCloudAgentSessionStatus: async () => {
+          publicationStarted.resolve();
+          await publication.promise;
+        },
+      });
+      const setAlarm = state.storage.setAlarm.bind(state.storage);
+      vi.spyOn(state.storage, 'setAlarm').mockImplementation(async at => {
+        alarmWrites += 1;
+        await setAlarm(at);
+      });
+      peer.answer = async () => {
+        answerStarted.resolve();
+        await answering.promise;
+        return 'sent';
+      };
+      await instance.onEvents({
+        events: [
+          {
+            type: 'question.asked',
+            properties: { id: 'question-lock', sessionID: kiloId, questions: [] },
+          },
+        ],
+      });
+      await publicationStarted.promise;
+      const answer = instance.answer({
+        sessionId,
+        reply: { action: 'answer', questionId: 'question-lock', answers: [['continue']] },
+      });
+      try {
+        await answerStarted.promise;
+        const before = alarmWrites;
+        publication.resolve();
+        await waitFor(() => {
+          expect(
+            state.storage.kv.get<{ dueAt: number | null }>('session_list_status')?.dueAt
+          ).toBeNull();
+        });
+        expect(alarmWrites).toBe(before);
+      } finally {
+        publication.resolve();
+        answering.resolve();
+        await answer;
+      }
+      await instance.onEvents({
+        events: [
+          { type: 'session.status', properties: { sessionID: kiloId, status: { type: 'busy' } } },
+        ],
+      });
+      expect(alarmWrites).toBeGreaterThan(0);
+    });
   });
 
   it('retains a failed status publication for alarm delivery without failing admission', async () => {

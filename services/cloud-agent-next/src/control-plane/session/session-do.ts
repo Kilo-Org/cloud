@@ -2485,24 +2485,38 @@ export class SandboxSessionV2 extends DurableObject<Env> {
    * Outbox due times retry failed reporting even once no message is open.
    */
   private async armAlarm(): Promise<void> {
-    if (
-      this.metadata !== null &&
-      this.registration !== null &&
-      this.env.SESSION_INGEST !== undefined
-    ) {
-      this.listStatusOutbox.record(
-        {
-          sessionId: this.registration.spec.kiloSessionId,
-          kiloUserId: this.metadata.identity.userId,
-          cloudAgentSessionId: this.sessionId,
-        },
-        deriveSessionListStatus({
+    let statusDueAt: number | null = null;
+    try {
+      if (
+        this.metadata !== null &&
+        this.registration !== null &&
+        this.env.SESSION_INGEST !== undefined
+      ) {
+        const nativeStatus = this.deriveSessionStatus()?.type;
+        const status = deriveSessionListStatus({
           messages: this.messages,
-          nativeStatus: this.deriveSessionStatus()?.type,
+          nativeStatus,
           pendingInteractions: this.pendingInteractions,
           routeState: this.route.state,
-        })
-      );
+        });
+        // Registration alone is not a transition. Native work may start without
+        // a Cloud message, so do not gate those updates on message admission.
+        if (this.messages.length > 0 || nativeStatus !== undefined || status !== 'idle') {
+          this.listStatusOutbox.record(
+            {
+              sessionId: this.registration.spec.kiloSessionId,
+              kiloUserId: this.metadata.identity.userId,
+              cloudAgentSessionId: this.sessionId,
+            },
+            status
+          );
+        }
+        statusDueAt = this.listStatusOutbox.nextDueAt();
+      }
+    } catch {
+      logger
+        .withFields({ sessionId: this.sessionId })
+        .warn('Session list status projection failed; execution alarms are unaffected');
     }
     if (!this.messages.some(message => message.state === 'queued')) {
       await this.clearTransportRecovery();
@@ -2512,17 +2526,29 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       nextBackstopAt(this.messages, this.sessionTimers()),
       this.reportOutbox.nextDueAt() ?? null,
       this.messageCallbacks.nextCallbackDueAt() ?? null,
-      this.listStatusOutbox.nextDueAt(),
+      statusDueAt,
     ].filter((value): value is number => value !== null);
     if (candidates.length === 0) {
       await this.ctx.storage.deleteAlarm();
       return;
     }
     await this.ctx.storage.setAlarm(Math.min(...candidates));
-    const statusDueAt = this.listStatusOutbox.nextDueAt();
     if (statusDueAt !== null && statusDueAt <= Date.now()) {
       // Metadata publication never holds up preparation, answers, or outcomes.
-      this.ctx.waitUntil(this.listStatusOutbox.repair().then(() => this.armAlarm()));
+      this.ctx.waitUntil(
+        this.listStatusOutbox
+          .repair()
+          .then(() =>
+            this.enqueue(async () => {
+              // The serialized finalizer re-arms the alarm after publication.
+            })
+          )
+          .catch(() => {
+            logger
+              .withFields({ sessionId: this.sessionId })
+              .warn('Session list status repair failed');
+          })
+      );
     }
   }
 
@@ -4290,7 +4316,13 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       try {
         return await task();
       } finally {
-        await this.armAlarm();
+        try {
+          await this.armAlarm();
+        } catch {
+          logger
+            .withFields({ sessionId: this.sessionId })
+            .warn('Session alarm finalization failed; the operation result is unchanged');
+        }
       }
     };
     const run = this.operations.tail.then(withStatus, withStatus);

@@ -154,8 +154,9 @@ function generateAppleClientSecret(): string {
 /**
  * Anthropic's ID token carries `sub`, `email` and `name`; it does not carry
  * `email_verified`. The claim may therefore be absent, but a token that states
- * the address is unverified is still refused: the subject binds the account,
- * and neither case auto-links to an existing Kilo account.
+ * the address is unverified is still refused. An absent claim settles without
+ * the auto-link step, and a `true` claim passes it on, so neither case needs a
+ * different identity rule.
  */
 const claudeEmailClaimSchema = z.object({
   email: z.email(),

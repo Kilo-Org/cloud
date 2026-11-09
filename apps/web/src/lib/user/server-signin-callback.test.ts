@@ -689,13 +689,21 @@ describe('Claude explicit linking persistence', () => {
       // Settlement finds the existing account that owns this email and another
       // provider's subject.
       mockCreateOrUpdateUser.mockResolvedValue({ success: false, error: 'DIFFERENT-OAUTH' });
-      await expect(
-        signIn({
-          user: { id: link.subject, email, name: 'External' },
-          account: { provider: 'claude', providerAccountId: link.subject, type: 'oauth' },
-          profile: { sub: link.subject, email },
-        } as never)
-      ).resolves.toEqual(expect.stringContaining('error=DIFFERENT-OAUTH'));
+      const result = await signIn({
+        user: { id: link.subject, email, name: 'External' },
+        account: { provider: 'claude', providerAccountId: link.subject, type: 'oauth' },
+        profile: { sub: link.subject, email },
+      } as never);
+      expect(result).toEqual(expect.stringContaining('error=DIFFERENT-OAUTH'));
+      // A plain sign-in reaches settlement for its own email without the
+      // auto-link step, so it cannot attach the subject to another account.
+      expect(mockCreateOrUpdateUser).toHaveBeenCalledTimes(1);
+      expect(mockCreateOrUpdateUser.mock.calls[0]?.[0]).toMatchObject({
+        google_user_email: email,
+        provider_account_id: `${CLAUDE_OIDC_ISSUER}#${link.subject}`,
+      });
+      expect(mockCreateOrUpdateUser.mock.calls[0]?.[2]).toBe(false);
+      expect(mockLinkAccountToExistingUser).not.toHaveBeenCalled();
       expect(await link.providers()).toEqual([]);
     }
   );

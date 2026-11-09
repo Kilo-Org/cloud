@@ -506,8 +506,10 @@ async function applyDirectoryUserChanges(
 
 /**
  * Refuses unless the directory's organization has captured the address's
- * domain, which is the only thing that authorizes taking over an account
- * someone else already holds.
+ * domain. Domain capture is what authorizes binding the address at all: the
+ * gate runs whether the address matches a pre-existing account or would create
+ * a new one, so a directory can neither take over nor mint an account at a
+ * domain it does not own. The refusal names that domain, never the address.
  *
  * The policy is read from the directory's organization rather than the
  * address: resolving an authority from the domain alone would let any

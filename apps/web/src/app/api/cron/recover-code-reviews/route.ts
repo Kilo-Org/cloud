@@ -37,7 +37,7 @@ export async function GET(request: Request) {
         reviews_started: summary.reviewsStarted,
         skipped_existing: summary.skippedExisting,
         skipped_active_review: summary.skippedActiveReview,
-        skipped_without_repository_id: summary.skippedWithoutRepositoryId,
+        unaddressable_repositories: summary.unaddressableRepositories,
         skipped_stale: summary.skippedStale,
         skipped_draft: summary.skippedDraft,
         skipped_without_owner: summary.skippedWithoutOwner,

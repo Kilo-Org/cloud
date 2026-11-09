@@ -10,11 +10,14 @@
  * review) applies unchanged.
  *
  * The slice rotates over all installed repositories with the clock, so every
- * repository is reached across successive runs without keeping a cursor.
+ * repository is reached across successive runs without keeping a cursor. The
+ * database selects the slice, so one run transfers a bounded number of rows
+ * however large the installation fleet is.
  */
 
+import * as z from 'zod';
 import pLimit from 'p-limit';
-import { and, asc, eq, isNotNull, sql } from 'drizzle-orm';
+import { inArray, sql, type SQL } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { platform_integrations, type PlatformIntegration } from '@kilocode/db/schema';
@@ -57,7 +60,8 @@ export const RECOVER_MISSED_REVIEWS_START_LIMIT = 10;
 /** Minutes between runs of the cron that calls this sweep. */
 const RECOVER_MISSED_REVIEWS_INTERVAL_MINUTES = 15;
 
-const RECOVER_CONCURRENCY = 4;
+/** Repository sweeps one run runs at once. */
+export const RECOVER_CONCURRENCY = 4;
 
 export type RecoverMissedReviewsSummary = {
   repositoriesConsidered: number;
@@ -66,7 +70,12 @@ export type RecoverMissedReviewsSummary = {
   reviewsStarted: number;
   skippedExisting: number;
   skippedActiveReview: number;
-  skippedWithoutRepositoryId: number;
+  /**
+   * Installed repository entries the sweep cannot address, because the payload
+   * needs a numeric platform id. Counted across the installation fleet, so it
+   * reports a standing gap rather than one run's work.
+   */
+  unaddressableRepositories: number;
   skippedStale: number;
   skippedDraft: number;
   skippedWithoutOwner: number;
@@ -96,7 +105,7 @@ function summaryWith(counts: Partial<RecoverMissedReviewsSummary>): RecoverMisse
     reviewsStarted: 0,
     skippedExisting: 0,
     skippedActiveReview: 0,
-    skippedWithoutRepositoryId: 0,
+    unaddressableRepositories: 0,
     skippedStale: 0,
     skippedDraft: 0,
     skippedWithoutOwner: 0,
@@ -107,23 +116,86 @@ function summaryWith(counts: Partial<RecoverMissedReviewsSummary>): RecoverMisse
   };
 }
 
-/** Every installed repository of one integration, in a stable order. */
-function repositoriesOf(integration: PlatformIntegration): RecoverableRepository[] {
-  return (integration.repositories ?? [])
-    .map(repository => {
-      const [ownerLogin, repoName] = repository.full_name.split('/');
-      if (ownerLogin === undefined || repoName === undefined || repoName === '') return null;
-      // The payload needs the platform's numeric repository id; a GitHub
-      // installation stores it as a number.
-      if (typeof repository.id !== 'number') return null;
-      return { integration, fullName: repository.full_name, ownerLogin, repoName };
-    })
-    .filter((entry): entry is RecoverableRepository => entry !== null)
-    .sort(
-      (left, right) =>
-        left.fullName.localeCompare(right.fullName) ||
-        left.integration.id.localeCompare(right.integration.id)
-    );
+/**
+ * Every installed repository of a healthy GitHub integration, expanded in the
+ * database. The sweep never loads the fleet into memory: only the selected
+ * slice crosses the wire.
+ */
+function installedRepositoriesSql(): SQL {
+  return sql`
+    FROM ${platform_integrations}
+    CROSS JOIN LATERAL jsonb_array_elements(${platform_integrations.repositories}) AS entry(repository)
+    WHERE ${platform_integrations.platform} = ${PLATFORM.GITHUB}
+      AND (${platformIntegrationHealthSql()})
+      AND ${platform_integrations.platform_installation_id} IS NOT NULL
+      AND jsonb_typeof(${platform_integrations.repositories}) = 'array'
+  `;
+}
+
+/**
+ * A stored repository entry the payload can name: the review payload carries the
+ * platform's numeric repository id, and the owner and name split on one slash.
+ * A GitHub installation stores a number; anything else cannot be reviewed.
+ */
+function addressableRepositorySql(): SQL {
+  return sql`
+    jsonb_typeof(repository->'id') = 'number'
+    AND split_part(repository->>'full_name', '/', 1) <> ''
+    AND split_part(repository->>'full_name', '/', 2) <> ''
+  `;
+}
+
+const installedRepositoriesCountSchema = z.object({
+  addressable: z.number(),
+  unaddressable: z.number(),
+});
+
+const repositorySliceRowSchema = z.object({
+  integration_id: z.string(),
+  full_name: z.string(),
+});
+
+/**
+ * The slice this run inspects, as an offset into the ordered installed
+ * repositories. Successive runs step by one slice, so every repository is swept
+ * within `ceil(total / slice)` runs.
+ */
+export function recoverMissedReviewsSliceOffset(installedRepositories: number, now: Date): number {
+  if (installedRepositories <= RECOVER_MISSED_REVIEWS_REPO_LIMIT) return 0;
+  const intervalMs = RECOVER_MISSED_REVIEWS_INTERVAL_MINUTES * 60 * 1000;
+  const slices = Math.ceil(installedRepositories / RECOVER_MISSED_REVIEWS_REPO_LIMIT);
+  return (Math.floor(now.getTime() / intervalMs) % slices) * RECOVER_MISSED_REVIEWS_REPO_LIMIT;
+}
+
+/** The installed repositories of the slice that starts at `offset`. */
+async function readRepositorySlice(
+  offset: number
+): Promise<Array<{ integrationId: string; fullName: string }>> {
+  const result = await db.execute(sql`
+    SELECT
+      ${platform_integrations.id} AS integration_id,
+      repository->>'full_name' AS full_name
+    ${installedRepositoriesSql()}
+      AND ${addressableRepositorySql()}
+    ORDER BY full_name, integration_id
+    LIMIT ${RECOVER_MISSED_REVIEWS_REPO_LIMIT}
+    OFFSET ${offset}
+  `);
+  const rows = z.array(repositorySliceRowSchema).parse(result.rows);
+  return rows.map(row => ({ integrationId: row.integration_id, fullName: row.full_name }));
+}
+
+/** How many installed repositories there are, and how many cannot be addressed. */
+async function countInstalledRepositories(): Promise<
+  z.infer<typeof installedRepositoriesCountSchema>
+> {
+  const result = await db.execute(sql`
+    SELECT
+      count(*) FILTER (WHERE ${addressableRepositorySql()})::int AS addressable,
+      count(*) FILTER (WHERE NOT (${addressableRepositorySql()}))::int AS unaddressable
+    ${installedRepositoriesSql()}
+  `);
+  return installedRepositoriesCountSchema.parse(result.rows[0]);
 }
 
 /**
@@ -139,21 +211,24 @@ function dedupeRepositories(repositories: RecoverableRepository[]): RecoverableR
   return [...seen.values()];
 }
 
-/**
- * The repositories this run inspects: the first `RECOVER_MISSED_REVIEWS_REPO_LIMIT`
- * entries of a list rotated by the run interval, so one run keeps a fixed cost
- * and successive runs move the window across every installed repository.
- */
-function selectRepositoryWindow(
-  repositories: RecoverableRepository[],
-  now: Date
+/** Joins the selected slice to the integration rows the handler needs. */
+function repositoriesFromSlice(
+  slice: Array<{ integrationId: string; fullName: string }>,
+  integrations: PlatformIntegration[]
 ): RecoverableRepository[] {
-  if (repositories.length <= RECOVER_MISSED_REVIEWS_REPO_LIMIT) return repositories;
-  const intervalMs = RECOVER_MISSED_REVIEWS_INTERVAL_MINUTES * 60 * 1000;
-  const windows = Math.ceil(repositories.length / RECOVER_MISSED_REVIEWS_REPO_LIMIT);
-  const start =
-    (Math.floor(now.getTime() / intervalMs) % windows) * RECOVER_MISSED_REVIEWS_REPO_LIMIT;
-  return repositories.slice(start, start + RECOVER_MISSED_REVIEWS_REPO_LIMIT);
+  const byId = new Map(integrations.map(integration => [integration.id, integration]));
+  const repositories: RecoverableRepository[] = [];
+  for (const row of slice) {
+    const integration = byId.get(row.integrationId);
+    // The integration row can change between the two reads; a removed one is
+    // swept by a later run.
+    if (integration === undefined) continue;
+    const [ownerLogin, repoName] = row.fullName.split('/');
+    if (ownerLogin === undefined || ownerLogin === '') continue;
+    if (repoName === undefined || repoName === '') continue;
+    repositories.push({ integration, fullName: row.fullName, ownerLogin, repoName });
+  }
+  return dedupeRepositories(repositories);
 }
 
 /**
@@ -173,8 +248,12 @@ function isKnownRepositoryName(pulls: OpenPullRequest[], entry: RecoverableRepos
 async function resolveReviewOwner(integration: PlatformIntegration): Promise<Owner | null> {
   if (integration.owned_by_organization_id) {
     const botUserId = await getBotUserId(integration.owned_by_organization_id, 'code-review');
-    if (botUserId === null) return null;
-    return { type: 'org', id: integration.owned_by_organization_id, userId: botUserId };
+    // The webhook handler runs the review for the requester when the org has no
+    // bot user yet; recovery must name the same owner or the integration's
+    // already-missed reviews stay missed.
+    const userId = botUserId ?? integration.kilo_requester_user_id ?? null;
+    if (userId === null || userId === '') return null;
+    return { type: 'org', id: integration.owned_by_organization_id, userId };
   }
   if (integration.owned_by_user_id) {
     return { type: 'user', id: integration.owned_by_user_id, userId: integration.owned_by_user_id };
@@ -277,19 +356,29 @@ async function recoverPullRequest(params: {
     return;
   }
 
-  const response = await handlePullRequestCodeReview(
-    toPullRequestPayload(pull, entry, installationId),
-    entry.integration
-  );
-
-  // The handler answers either way: a started review carries its review id in
-  // the message body, and one of its skip rules answers without one.
-  const body = (await response.json()) as { reviewId?: unknown };
-  if (typeof body.reviewId === 'string') {
-    summary.reviewsStarted += 1;
-    return;
+  // Reserve the slot synchronously: several repositories sweep at once, and an
+  // awaited handler call must not let a sibling start past the run's limit.
+  summary.reviewsStarted += 1;
+  let started = false;
+  try {
+    const response = await handlePullRequestCodeReview(
+      toPullRequestPayload(pull, entry, installationId),
+      entry.integration
+    );
+    // The handler answers 202 when it queued a review, 200 when one of its
+    // skip rules declines, and 500 when it failed.
+    if (response.status === 202) {
+      started = true;
+      return;
+    }
+    if (response.status >= 500) {
+      summary.providerFailures += 1;
+      return;
+    }
+    summary.refusedByHandler += 1;
+  } finally {
+    if (!started) summary.reviewsStarted -= 1;
   }
-  summary.refusedByHandler += 1;
 }
 
 async function recoverRepository(
@@ -372,23 +461,25 @@ export async function recoverMissedReviews(
     summary,
   };
 
-  const rows = await db
-    .select()
-    .from(platform_integrations)
-    .where(
-      and(
-        eq(platform_integrations.platform, PLATFORM.GITHUB),
-        sql`(${platformIntegrationHealthSql()})`,
-        isNotNull(platform_integrations.platform_installation_id),
-        isNotNull(platform_integrations.repositories)
-      )
-    )
-    .orderBy(asc(platform_integrations.id));
+  const counts = await countInstalledRepositories();
+  summary.unaddressableRepositories = counts.unaddressable;
 
-  const repositories = selectRepositoryWindow(
-    dedupeRepositories(rows.flatMap(integration => repositoriesOf(integration))),
-    now
-  );
+  // An empty fleet answers an empty slice, so the run always reads exactly
+  // once at its bound.
+  const slice = await readRepositorySlice(recoverMissedReviewsSliceOffset(counts.addressable, now));
+  const integrations =
+    slice.length === 0
+      ? []
+      : await db
+          .select()
+          .from(platform_integrations)
+          .where(
+            inArray(
+              platform_integrations.id,
+              slice.map(row => row.integrationId)
+            )
+          );
+  const repositories = repositoriesFromSlice(slice, integrations);
   summary.repositoriesConsidered = repositories.length;
 
   const limit = pLimit(RECOVER_CONCURRENCY);

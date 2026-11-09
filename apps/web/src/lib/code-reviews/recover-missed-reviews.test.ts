@@ -3,11 +3,11 @@
 // mocked while the real webhook handler decides the review-start verdict.
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   db: {
+    // Raw SQL reads go through execute; the query builder reads through select.
+    execute: (...args: unknown[]) => mockDbExecute(...args),
     select: () => ({
       from: () => ({
-        where: () => ({
-          orderBy: () => mockSelectIntegrations(),
-        }),
+        where: () => Promise.resolve(mockSelectIntegrations()),
       }),
     }),
     update: () => ({
@@ -24,6 +24,7 @@ jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
 }));
 
 const mockSelectIntegrations = jest.fn<Promise<any[]>, unknown[]>();
+const mockDbExecute = jest.fn<Promise<{ rows: any[] }>, unknown[]>();
 const mockFetchOpenPullRequests = jest.fn<Promise<OpenPullRequest[]>, unknown[]>();
 const mockFindExistingReview = jest.fn<Promise<any>, unknown[]>();
 const mockFindActiveReviews = jest.fn<Promise<string[]>, unknown[]>();
@@ -34,17 +35,23 @@ jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
   fetchOpenPullRequests: (params: unknown) => mockFetchOpenPullRequests(params),
 }));
 
-let handlerVerdict: 'started' | 'skipped' = 'started';
+let handlerVerdict: 'started' | 'skipped' | 'failed' = 'started';
 
-const mockHandlerResponse = (): { json: () => Promise<Record<string, unknown>> } => ({
+const mockHandlerResponse = (): {
+  status: number;
+  json: () => Promise<Record<string, unknown>>;
+} => ({
+  status: handlerVerdict === 'started' ? 202 : handlerVerdict === 'skipped' ? 200 : 500,
   json: async () =>
     handlerVerdict === 'started'
       ? { message: 'Code review queued', reviewId: 'review-new' }
-      : { message: 'Code review agent not enabled for this repository' },
+      : handlerVerdict === 'skipped'
+        ? { message: 'Code review agent not enabled for this repository' }
+        : { error: 'Failed to trigger code review' },
 });
 
 const mockHandlePullRequestCodeReview = jest.fn<
-  Promise<{ json: () => Promise<Record<string, unknown>> }>,
+  Promise<{ status: number; json: () => Promise<Record<string, unknown>> }>,
   unknown[]
 >(async () => mockHandlerResponse());
 
@@ -100,9 +107,13 @@ jest.mock('@/lib/code-reviews/review-memory/github-feedback', () => ({
 }));
 
 import type { PlatformIntegration } from '@kilocode/db/schema';
+import type { SQL } from 'drizzle-orm';
+import { PgDialect } from 'drizzle-orm/pg-core';
 import type { OpenPullRequest } from '@/lib/integrations/platforms/github/adapter';
 import {
+  RECOVER_CONCURRENCY,
   recoverMissedReviews,
+  recoverMissedReviewsSliceOffset,
   RECOVER_MISSED_REVIEWS_LOOKBACK_HOURS,
   RECOVER_MISSED_REVIEWS_REPO_LIMIT,
   RECOVER_MISSED_REVIEWS_START_LIMIT,
@@ -184,8 +195,38 @@ function makePull(overrides: Partial<OpenPullRequest> = {}): OpenPullRequest {
   } as OpenPullRequest;
 }
 
+/**
+ * Stubs the raw SQL reads: the count aggregate, the repository slice, and the
+ * integration rows of the slice. The slice repeats, like the same database
+ * read on every run.
+ */
+function installedSlice(
+  rows: Array<{ integrationId: string; fullName: string }>,
+  counts: { addressable: number; unaddressable: number } = {
+    addressable: rows.length,
+    unaddressable: 0,
+  }
+): void {
+  const slice = rows.map(row => ({ integration_id: row.integrationId, full_name: row.fullName }));
+  mockDbExecute.mockReset();
+  mockDbExecute.mockImplementation(async query => {
+    const { sql: text } = new PgDialect().sqlToQuery(query as SQL);
+    if (/count\(\*\)/.test(text)) return { rows: [counts] };
+    if (/LIMIT/.test(text)) return { rows: slice.slice() };
+    // The integration rows come from the query builder; a non-slice call is a
+    // stub mistake and answers nothing.
+    throw new Error(`Unexpected db query: ${text.slice(0, 80)}`);
+  });
+  mockSelectIntegrations.mockReset();
+  mockSelectIntegrations.mockImplementation(async () => {
+    const ids = [...new Set(rows.map(row => row.integrationId))];
+    return ids.map(id => makeIntegration({ id }));
+  });
+}
+
 beforeEach(() => {
   jest.clearAllMocks();
+  installedSlice([{ integrationId: INTEGRATION_ID, fullName: 'acme/widgets' }]);
   mockSelectIntegrations.mockResolvedValue([makeIntegration()]);
   mockFetchOpenPullRequests.mockResolvedValue([makePull()]);
   mockFindExistingReview.mockResolvedValue(null);
@@ -239,6 +280,12 @@ describe('recoverMissedReviews', () => {
     expect(summary).toMatchObject({ refusedByHandler: 1, reviewsStarted: 0 });
   });
 
+  it('counts a handler failure as a provider failure and frees the start slot', async () => {
+    handlerVerdict = 'failed';
+    const summary = await recoverMissedReviews({ now: FROZEN_NOW });
+    expect(summary).toMatchObject({ providerFailures: 1, refusedByHandler: 0, reviewsStarted: 0 });
+  });
+
   it('skips a draft pull request before the review lookup', async () => {
     mockFetchOpenPullRequests.mockResolvedValue([makePull({ draft: true })]);
     const summary = await recoverMissedReviews({ now: FROZEN_NOW });
@@ -279,36 +326,65 @@ describe('recoverMissedReviews', () => {
     expect(summary).toMatchObject({ providerFailures: 1, integrationsUnavailable: 0 });
   });
 
-  it('skips an organization without a code-review bot user', async () => {
+  it('skips an organization without a code-review bot user or a requester', async () => {
     mockGetBotUserId.mockResolvedValue(null);
     const summary = await recoverMissedReviews({ now: FROZEN_NOW });
     expect(summary).toMatchObject({ skippedWithoutOwner: 1, reviewsStarted: 0 });
     expect(mockFetchOpenPullRequests).not.toHaveBeenCalled();
   });
 
-  it('leaves a repository entry without a numeric platform id unswept', async () => {
-    const [repository] = makeIntegration().repositories as any[];
+  it('reviews for the requester when the org has no code-review bot user', async () => {
+    // The webhook handler names this owner from the requester's user id; the
+    // sweep must recover the same reviews instead of dropping them.
+    mockGetBotUserId.mockResolvedValue(null);
     mockSelectIntegrations.mockResolvedValue([
-      makeIntegration({
-        repositories: [repository, { ...repository, id: '902', full_name: 'acme/gears' }],
-      }),
+      makeIntegration({ kilo_requester_user_id: 'requester-1' }),
     ]);
 
     const summary = await recoverMissedReviews({ now: FROZEN_NOW });
-    expect(summary).toMatchObject({ repositoriesConsidered: 1, reviewsStarted: 1 });
-    expect(mockFetchOpenPullRequests.mock.calls.map(call => fetchParams(call[0]).repo)).toEqual([
-      'widgets',
+    expect(summary).toMatchObject({ skippedWithoutOwner: 0, reviewsStarted: 1 });
+    expect(mockFindExistingReview.mock.calls[0]?.[0]).toMatchObject({
+      owner: { type: 'org', id: ORG_ID, userId: 'requester-1' },
+    });
+  });
+
+  it('sweeps only the entries the database addresses and reports the rest', async () => {
+    installedSlice(
+      [
+        { integrationId: INTEGRATION_ID, fullName: 'acme/widgets' },
+        { integrationId: INTEGRATION_ID, fullName: 'acme/gears' },
+      ],
+      { addressable: 2, unaddressable: 1 }
+    );
+
+    const summary = await recoverMissedReviews({ now: FROZEN_NOW });
+    expect(summary).toMatchObject({
+      repositoriesConsidered: 2,
+      unaddressableRepositories: 1,
+      reviewsStarted: 1,
+    });
+    expect(mockFetchOpenPullRequests.mock.calls.map(call => fetchParams(call[0]).repo)).toEqual(
+      expect.arrayContaining(['gears', 'widgets'])
+    );
+  });
+
+  it('drops a slice row its integration no longer holds', async () => {
+    const missingId = '00000000-0000-4000-8000-0000000000dz';
+    installedSlice([
+      { integrationId: INTEGRATION_ID, fullName: 'acme/widgets' },
+      { integrationId: missingId, fullName: 'acme/gone' },
     ]);
+    // The integration fetch answers only the row that still exists.
+    mockSelectIntegrations.mockImplementation(async () => [makeIntegration()]);
+
+    const summary = await recoverMissedReviews({ now: FROZEN_NOW });
+    expect(summary).toMatchObject({ repositoriesConsidered: 1, reviewsStarted: 1 });
   });
 
   it('reports one repository failure and still recovers the other repositories', async () => {
-    mockSelectIntegrations.mockResolvedValue([
-      makeIntegration({
-        repositories: [
-          { id: 501, name: 'widgets', full_name: 'acme/widgets' },
-          { id: 502, name: 'gadgets', full_name: 'acme/gadgets' },
-        ],
-      }),
+    installedSlice([
+      { integrationId: INTEGRATION_ID, fullName: 'acme/widgets' },
+      { integrationId: INTEGRATION_ID, fullName: 'acme/gadgets' },
     ]);
     mockFetchOpenPullRequests.mockImplementation(async value => {
       if (fetchParams(value).repo === 'widgets') throw new Error('rate limited');
@@ -346,40 +422,68 @@ describe('recoverMissedReviews', () => {
     );
   });
 
-  it('reads at most the repository limit and rotates the window across runs', async () => {
-    const repositories = Array.from(
-      { length: RECOVER_MISSED_REVIEWS_REPO_LIMIT * 2 + 5 },
-      (_, index) => {
-        const name = `repo-${String(index).padStart(3, '0')}`;
-        return { id: 700 + index, name, full_name: `acme/${name}` };
-      }
+  it('never starts a review past the per-run limit while handlers are in flight', async () => {
+    // Ten repositories sweep at once; the first handler only answers after its
+    // successors' reservations, so an awaited check would let them all start.
+    const repositoryCount = RECOVER_MISSED_REVIEWS_START_LIMIT + RECOVER_CONCURRENCY;
+    installedSlice(
+      Array.from({ length: repositoryCount }, (_, index) => ({
+        integrationId: `00000000-0000-4000-8000-0000000001${String(index).padStart(2, '0')}`,
+        fullName: `acme/repo-${index}`,
+      })),
+      { addressable: repositoryCount, unaddressable: 0 }
     );
-    mockSelectIntegrations.mockResolvedValue([makeIntegration({ repositories })]);
+    mockSelectIntegrations.mockResolvedValue(
+      Array.from({ length: repositoryCount }, (_, index) =>
+        makeIntegration({
+          id: `00000000-0000-4000-8000-0000000001${String(index).padStart(2, '0')}`,
+        })
+      )
+    );
+    // Each repository's pull must name its own repository, or the rename guard
+    // drops it before a handler call.
+    mockFetchOpenPullRequests.mockImplementation(async params => {
+      const { owner, repo } = fetchParams(params);
+      return [makePull({ baseRepoName: repo, baseRepoFullName: `${owner}/${repo}` })];
+    });
+    let startedHandlers = 0;
+    const block = Promise.withResolvers<void>();
+    const gate = Promise.withResolvers<void>();
+    mockHandlePullRequestCodeReview.mockImplementation(async () => {
+      startedHandlers += 1;
+      if (startedHandlers === 1) gate.resolve();
+      await block.promise;
+      return { status: 202, json: async () => ({}) };
+    });
 
-    const fetched: string[][] = [];
-    for (let runIndex = 0; runIndex < 3; runIndex += 1) {
-      const now = new Date(FROZEN_NOW.getTime() + runIndex * 15 * 60 * 1000);
-      const seen: string[] = [];
-      mockFetchOpenPullRequests.mockImplementation(async value => {
-        seen.push(fetchParams(value).repo);
-        return [];
-      });
-      const summary = await recoverMissedReviews({ now });
-      if (runIndex < 2) {
-        expect(summary.repositoriesConsidered).toBe(RECOVER_MISSED_REVIEWS_REPO_LIMIT);
-      } else {
-        expect(summary.repositoriesConsidered).toBe(5);
-      }
-      fetched.push(seen);
+    const run = recoverMissedReviews({ now: FROZEN_NOW });
+    // The first handler is in flight; its gate is the real arrival signal.
+    await gate.promise;
+    expect(startedHandlers).toBeLessThanOrEqual(RECOVER_MISSED_REVIEWS_START_LIMIT);
+    block.resolve();
+    const summary = await run;
+
+    expect(summary.reviewsStarted).toBe(RECOVER_MISSED_REVIEWS_START_LIMIT);
+    expect(summary.skippedStartLimit).toBe(repositoryCount - RECOVER_MISSED_REVIEWS_START_LIMIT);
+    expect(mockHandlePullRequestCodeReview).toHaveBeenCalledTimes(
+      RECOVER_MISSED_REVIEWS_START_LIMIT
+    );
+  });
+
+  it('keeps one slice when the fleet fits the repository limit', () => {
+    expect(recoverMissedReviewsSliceOffset(RECOVER_MISSED_REVIEWS_REPO_LIMIT, FROZEN_NOW)).toBe(0);
+    expect(recoverMissedReviewsSliceOffset(12, FROZEN_NOW)).toBe(0);
+    // Two full slices and a remainder rotate over three runs, then wrap.
+    const sliceMs = 15 * 60 * 1000;
+    const start = Math.floor(FROZEN_NOW.getTime() / sliceMs);
+    for (let index = 0; index < 5; index += 1) {
+      const expected = (index % 3) * RECOVER_MISSED_REVIEWS_REPO_LIMIT;
+      expect(
+        recoverMissedReviewsSliceOffset(
+          RECOVER_MISSED_REVIEWS_REPO_LIMIT * 2 + 5,
+          new Date((start + index) * sliceMs)
+        )
+      ).toBe(expected);
     }
-
-    expect(fetched[0].length).toBe(RECOVER_MISSED_REVIEWS_REPO_LIMIT);
-    expect(fetched[1].length).toBe(RECOVER_MISSED_REVIEWS_REPO_LIMIT);
-    expect(new Set(fetched[0]).intersection(new Set(fetched[1])).size).toBe(0);
-    // The third run closes the rotation: both windows plus the remainder cover
-    // every installed repository exactly once.
-    expect(fetched[2].length).toBe(5);
-    const covered = new Set([...fetched[0], ...fetched[1], ...fetched[2]]);
-    expect(covered.size).toBe(RECOVER_MISSED_REVIEWS_REPO_LIMIT * 2 + 5);
   });
 });

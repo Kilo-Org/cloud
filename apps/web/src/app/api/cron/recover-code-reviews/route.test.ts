@@ -35,7 +35,7 @@ const SUMMARY = {
   reviewsStarted: 1,
   skippedExisting: 2,
   skippedActiveReview: 0,
-  skippedWithoutRepositoryId: 0,
+  unaddressableRepositories: 0,
   skippedStale: 1,
   skippedDraft: 0,
   skippedWithoutOwner: 0,

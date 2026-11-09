@@ -468,6 +468,16 @@ describe('upsertDirectoryUser', () => {
   test('refuses to create a user at a domain the organization never captured', async () => {
     await seedOrganizationWithDomain(`captured-${suffix}.test`);
 
+    // The account's own customer is minted by `createStripeCustomer` inside
+    // `createOrUpdateUser`. Cleared here, after seeding, so the assertions below
+    // see exactly the calls this refused upsert made — none.
+    const stripeClient = jest.requireMock<{
+      createStripeCustomer: jest.Mock;
+      deleteStripeCustomer: jest.Mock;
+    }>('@kilocode/web-shared/lib/stripe-client');
+    stripeClient.createStripeCustomer.mockClear();
+    stripeClient.deleteStripeCustomer.mockClear();
+
     const foreignEmail = `newcomer-${suffix}@unrelated-${suffix}.test`;
 
     await expect(
@@ -494,7 +504,8 @@ describe('upsertDirectoryUser', () => {
     expect(byAddress).toEqual([]);
 
     // No Stripe customer was settled for a user who was never created.
-    expect(organizationBilling.getOrCreateStripeCustomerIdForOrganization).not.toHaveBeenCalled();
+    expect(stripeClient.createStripeCustomer).not.toHaveBeenCalled();
+    expect(stripeClient.deleteStripeCustomer).not.toHaveBeenCalled();
 
     // The refusal is not a missing dependency: the directory is bound and an
     // address at its captured domain still binds, so a retry of *this* event

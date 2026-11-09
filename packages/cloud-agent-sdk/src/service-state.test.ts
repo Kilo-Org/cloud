@@ -1455,6 +1455,75 @@ describe('createServiceState', () => {
       expect(reconnected.getCloudStatus()).toEqual({ type: 'ready' });
     });
 
+    it.each([0, 1_790_000_000_000, undefined])(
+      'preserves selected snapshot time %j through live updates and normalized replay',
+      snapshotCapturedAt => {
+        const state = createServiceState(makeConfig());
+        const base = {
+          type: 'preparing' as const,
+          version: 2 as const,
+          attemptId: 'attempt-1',
+          triggerMessageId: 'message-1',
+          step: 'environment_snapshot',
+          message: 'Using environment snapshot',
+          timestamp: 2_000,
+        };
+        state.process({ ...base, action: 'attempt_started', revision: 1 });
+        state.process({
+          ...base,
+          action: 'step_started',
+          revision: 2,
+          stepId: 'snapshot',
+          kind: 'phase',
+          label: 'environment snapshot',
+        });
+        state.process({
+          ...base,
+          action: 'step_progress',
+          revision: 3,
+          stepId: 'snapshot',
+          detail: base.message,
+          ...(snapshotCapturedAt === undefined ? {} : { snapshotCapturedAt }),
+        });
+        state.process({
+          ...base,
+          action: 'step_progress',
+          revision: 4,
+          stepId: 'snapshot',
+          detail: `${base.message}; a replacement build is running`,
+        });
+        state.process({ ...base, action: 'attempt_completed', revision: 5 });
+        const attempt = state.getPreparationAttempts()[0];
+        if (!attempt) throw new Error('Expected preparation attempt');
+        if (snapshotCapturedAt === undefined)
+          expect(attempt.steps[0]).not.toHaveProperty('snapshotCapturedAt');
+        else expect(attempt.steps[0]).toHaveProperty('snapshotCapturedAt', snapshotCapturedAt);
+        const reconnected = createServiceState(makeConfig());
+        reconnected.process({
+          type: 'preparing',
+          ...preparingDataSchema.parse({
+            ...base,
+            action: 'attempt_snapshot',
+            revision: 5,
+            attempt,
+          }),
+        });
+        for (const stepSnapshot of attempt.steps) {
+          reconnected.process({
+            type: 'preparing',
+            ...preparingDataSchema.parse({
+              ...base,
+              action: 'step_snapshot',
+              revision: stepSnapshot.revision,
+              stepId: stepSnapshot.id,
+              stepSnapshot,
+            }),
+          });
+        }
+        expect(reconnected.getPreparationAttempts()).toEqual(state.getPreparationAttempts());
+      }
+    );
+
     it('keeps only the most recent step output and marks the step truncated', () => {
       const state = createServiceState(makeConfig());
       const base = {

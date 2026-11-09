@@ -674,7 +674,14 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
       existingStep.status === 'running'
     ) {
       if (event.action === 'step_progress' && event.detail !== undefined) {
-        nextStep = { ...existingStep, latestDetail: event.detail, revision: event.revision };
+        nextStep = {
+          ...existingStep,
+          latestDetail: event.detail,
+          ...(event.snapshotCapturedAt === undefined
+            ? {}
+            : { snapshotCapturedAt: event.snapshotCapturedAt }),
+          revision: event.revision,
+        };
       } else if (event.action === 'step_output' && event.output !== undefined) {
         const tail = utf8Tail(
           `${existingStep.outputTail ?? ''}${event.output}`,

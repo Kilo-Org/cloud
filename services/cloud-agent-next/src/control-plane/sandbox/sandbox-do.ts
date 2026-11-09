@@ -33,6 +33,9 @@ import {
   readWorkspaceSnapshotRaw,
   sameWorkspaceSnapshotIdentity,
   workspaceSnapshotIdentity,
+  workspaceSnapshotIdentitySchema,
+  workspaceSnapshotStatus,
+  type WorkspaceSnapshotIdentity,
   workspaceSnapshotsEnabled,
   selectWorkspaceSnapshotResult,
   snapshotRestorePending,
@@ -1040,17 +1043,33 @@ export class SandboxControlV2 extends DurableObject<Env> {
    * state into the public snapshot; it never probes the provider or the wrapper.
    * No owner means no evidence, so the snapshot is `unknown`.
    */
-  async getStatusSnapshot(): Promise<SandboxStatusSnapshot> {
+  async getStatusSnapshot(
+    identity: WorkspaceSnapshotIdentity | null = null
+  ): Promise<SandboxStatusSnapshot> {
     await this.initialized;
     return this.enqueue(async () => {
       const owner = await this.requireOwner();
       const allocation = owner === null ? null : await this.getAllocationState();
-      return projectAllocationStatusSnapshot({
-        allocation,
-        observedAt: Date.now(),
-        inactivityTimeoutMs: this.sandboxIdleTimeoutMs(allocation),
-        runtimeIdentity: readRuntimeIdentity(this.ctx.storage.kv, allocation?.allocationId ?? null),
-      });
+      const parsedIdentity = workspaceSnapshotIdentitySchema.safeParse(identity);
+      return {
+        ...projectAllocationStatusSnapshot({
+          allocation,
+          observedAt: Date.now(),
+          inactivityTimeoutMs: this.sandboxIdleTimeoutMs(allocation),
+          runtimeIdentity: readRuntimeIdentity(
+            this.ctx.storage.kv,
+            allocation?.allocationId ?? null
+          ),
+        }),
+        ...workspaceSnapshotStatus(
+          this.db,
+          parsedIdentity.success &&
+            parsedIdentity.data.sandboxId === this.sandboxId &&
+            parsedIdentity.data.userId === owner
+            ? parsedIdentity.data
+            : null
+        ),
+      };
     });
   }
 
@@ -1194,6 +1213,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
             return result;
           }),
         eligible: route => this.workspaceSnapshotRouteEligible(route),
+        stored: async () => this.broadcastStatusSnapshots(await this.readAllocation()),
         read: async () => {
           const state = await this.readAllocation();
           const socket = this.boundWrapperSocket(state);
@@ -1409,7 +1429,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
     const handoff = await this.enqueue(async () => {
       await this.initializeOwner(parsed.kiloUserId);
       const routes = await listRoutes(this.db);
-      deleteWorkspaceSnapshot(this.db, parsed.worktreeId, 'workspace_deleted');
+      if (deleteWorkspaceSnapshot(this.db, parsed.worktreeId, 'workspace_deleted'))
+        this.broadcastStatusSnapshots(await this.readAllocation());
       this.fenceWorkspaceSnapshot('workspace_deleted');
       const target = worktreeOwnedRoutes(routes, parsed);
       const state = await this.readAllocation();
@@ -2324,10 +2345,18 @@ export class SandboxControlV2 extends DurableObject<Env> {
         if (owner === null || owner !== url.searchParams.get('ownerId') || !sessionId)
           return new Response('Sandbox owner mismatch', { status: 403 });
         const allocation = await this.readAllocation();
+        const parsedIdentity = workspaceSnapshotIdentitySchema.safeParse({
+          sandboxId: this.sandboxId,
+          userId: owner,
+          workspaceId: url.searchParams.get('workspaceId'),
+          directory: url.searchParams.get('directory'),
+          orgId: url.searchParams.get('orgId') ?? undefined,
+        });
+        const identity = parsedIdentity.success ? parsedIdentity.data : null;
         const pair = new WebSocketPair();
         this.ctx.acceptWebSocket(pair[1], ['sandbox-status']);
-        pair[1].serializeAttachment({ kind: 'sandbox-status', sessionId });
-        this.sendStatusSnapshot(pair[1], sessionId, allocation);
+        pair[1].serializeAttachment({ kind: 'sandbox-status', sessionId, identity });
+        this.sendStatusSnapshot(pair[1], sessionId, allocation, identity);
         return new Response(null, { status: 101, webSocket: pair[0] });
       });
     }
@@ -5266,7 +5295,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
       log('selected', candidate.sessionId, candidate.owner.workspaceId);
       await notifyPreparingRoutes(this.routeContext(current), {
         step: 'restore',
-        detail: 'Restoring the workspace tail snapshot',
+        detail: 'Using workspace snapshot',
+        snapshotCapturedAt: descriptor.capturedAt,
       });
       return {
         snapshotId: descriptor.snapshotId,
@@ -5385,6 +5415,9 @@ export class SandboxControlV2 extends DurableObject<Env> {
     await notifyPreparingRoutes(this.routeContext(state), {
       step: 'environment_snapshot',
       detail: environmentStartDetail(candidate.reference, lookup),
+      ...(lookup.kind === 'resolved' && lookup.resolution.snapshot !== null
+        ? { snapshotCapturedAt: lookup.resolution.snapshot.capturedAt }
+        : {}),
     });
     return {
       options: decision.snapshot === undefined ? {} : { snapshot: decision.snapshot },
@@ -6507,6 +6540,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
       previous.unconfirmedProviderRef === state.unconfirmedProviderRef
     )
       return;
+    this.broadcastStatusSnapshots(state);
+  }
+
+  private broadcastStatusSnapshots(state: AllocationState): void {
     for (const socket of this.ctx.getWebSockets('sandbox-status')) {
       const attachment: unknown = socket.deserializeAttachment();
       if (
@@ -6514,22 +6551,39 @@ export class SandboxControlV2 extends DurableObject<Env> {
         attachment !== null &&
         'sessionId' in attachment &&
         typeof attachment.sessionId === 'string'
-      )
-        this.sendStatusSnapshot(socket, attachment.sessionId, state);
+      ) {
+        const identity = workspaceSnapshotIdentitySchema.safeParse(
+          'identity' in attachment ? attachment.identity : null
+        );
+        this.sendStatusSnapshot(
+          socket,
+          attachment.sessionId,
+          state,
+          identity.success ? identity.data : null
+        );
+      }
     }
   }
 
-  private sendStatusSnapshot(socket: WebSocket, sessionId: string, state: AllocationState): void {
-    const snapshot = projectAllocationStatusSnapshot({
-      allocation: {
-        ...state,
-        provider: this.currentProvider(),
-        configuration: this.providerPin?.configuration ?? null,
-      },
-      observedAt: Date.now(),
-      inactivityTimeoutMs: this.sandboxIdleTimeoutMs(state),
-      runtimeIdentity: readRuntimeIdentity(this.ctx.storage.kv, state.allocationId),
-    });
+  private sendStatusSnapshot(
+    socket: WebSocket,
+    sessionId: string,
+    state: AllocationState,
+    identity: WorkspaceSnapshotIdentity | null
+  ): void {
+    const snapshot = {
+      ...projectAllocationStatusSnapshot({
+        allocation: {
+          ...state,
+          provider: this.currentProvider(),
+          configuration: this.providerPin?.configuration ?? null,
+        },
+        observedAt: Date.now(),
+        inactivityTimeoutMs: this.sandboxIdleTimeoutMs(state),
+        runtimeIdentity: readRuntimeIdentity(this.ctx.storage.kv, state.allocationId),
+      }),
+      ...workspaceSnapshotStatus(this.db, identity),
+    };
     try {
       socket.send(
         JSON.stringify({

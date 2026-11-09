@@ -1,5 +1,6 @@
 import type { PreparationAttempt, PreparationStepSnapshot } from '@kilocode/cloud-agent-sdk';
 import { formatAttemptDuration, humanizePhaseLabel } from './preparation-phases';
+import { formatSnapshotTime } from './snapshot-display';
 
 export { isNoOpCompletedPreparationAttempt } from '@kilocode/cloud-agent-sdk';
 
@@ -74,7 +75,11 @@ function preparationSummaryTitle(summary: PreparationRowSummary): string {
  * fall back to the humanized label for steps that never reported one.
  */
 export function phaseDisplayText(step: PreparationStepSnapshot): string {
-  return step.latestDetail ?? humanizePhaseLabel(step);
+  const detail = step.latestDetail ?? humanizePhaseLabel(step);
+  if (step.snapshotCapturedAt === undefined) return detail;
+  const warningStart = detail.indexOf(';');
+  const labelEnd = warningStart === -1 ? detail.length : warningStart;
+  return `${detail.slice(0, labelEnd)} · ${formatSnapshotTime(step.snapshotCapturedAt)}${detail.slice(labelEnd)}`;
 }
 
 /** The setup command currently streaming output, if any. */

@@ -1,4 +1,3 @@
-import { environmentSnapshotName } from '../../shared/environment-snapshot-name.js';
 import { withTimeout } from '@kilocode/worker-utils';
 import type { EnvironmentBuild } from '../../environment-build/environment-build-do.js';
 import type { SnapshotAdmission, SnapshotResolution } from '../../environment-build/coordinator.js';
@@ -421,9 +420,7 @@ export function environmentSnapshotDecision(
 }
 
 /**
- * The preparation detail shown while the sandbox starts. It names the actual
- * snapshot by capture time and the real replacement build status. Changed
- * settings remain visible without exposing internal configuration revisions.
+ * Changed settings remain visible without exposing internal configuration revisions.
  */
 export function environmentStartDetail(
   reference: SessionEnvironmentReference,
@@ -445,5 +442,5 @@ export function environmentStartDetail(
     snapshot.stale === 'image'
       ? '; built for an earlier image; using it during the rollout window'
       : '';
-  return `Using snapshot · ${environmentSnapshotName(snapshot.capturedAt)}${image}${settings}${build === null ? '' : `; ${build}`}`;
+  return `Using environment snapshot${image}${settings}${build === null ? '' : `; ${build}`}`;
 }

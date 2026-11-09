@@ -527,6 +527,19 @@ export async function resolveOrganizationAccess(
 }
 
 /**
+ * The role the resolved access stands in for on the current procedure. A support
+ * grant stands in for its allowlist entry's role. Reads the access a procedure
+ * middleware already resolved, so a resolver that varies its response by role
+ * does not resolve, audit, or deny a second time.
+ */
+export function organizationAccessRole(
+  ctx: TRPCContext,
+  access: OrganizationAccess
+): OrganizationRole {
+  return access.kind === 'support' ? supportRoleForCurrentSurface(ctx, access) : access.role;
+}
+
+/**
  * Returns a role for the caller, admitting a support grant only when the exact
  * procedure is on the allowlist. Use this instead of `ensureOrganizationAccess`
  * on allowlisted reads and writes.
@@ -537,10 +550,7 @@ export async function ensureOrganizationAccess(
   roles?: OrganizationRole[]
 ): Promise<OrganizationRole> {
   const access = await resolveOrganizationAccess(ctx, organizationId, { roles });
-  const role =
-    access.kind === 'member' || access.kind === 'legacy_admin'
-      ? access.role
-      : supportRoleForCurrentSurface(ctx, access);
+  const role = organizationAccessRole(ctx, access);
   if (roles && roles.length > 0 && !roles.includes(role)) {
     throw new TRPCError({
       code: 'UNAUTHORIZED',

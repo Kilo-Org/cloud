@@ -72,6 +72,10 @@ function CloudAgentSettings({
   initialSelectedProfileId,
 }: Omit<CloudAgentSettingsDialogProps, 'open' | 'onOpenChange'>) {
   const [section, setSection] = useState(initialSection);
+  const changeSection = (next: SettingsSection) => {
+    setSection(next);
+    onSectionChange?.(next);
+  };
   const isMobile = useIsMobile();
   const settingsQuery = useCloudAgentSettings({ organizationId });
   const settings = settingsQuery.data;
@@ -109,8 +113,7 @@ function CloudAgentSettings({
             value === 'environments' ||
             (value === 'compute' && settings?.canManage)
           ) {
-            setSection(value);
-            onSectionChange?.(value);
+            changeSection(value);
           }
         }}
         orientation={isMobile ? 'horizontal' : 'vertical'}
@@ -176,7 +179,7 @@ function CloudAgentSettings({
                 <RepositoryOverridesSection
                   organizationId={organizationId}
                   settings={settings}
-                  onManageProfiles={() => setSection('profiles')}
+                  onManageProfiles={() => changeSection('profiles')}
                 />
               </section>
             ) : settingsQuery.isError ? (

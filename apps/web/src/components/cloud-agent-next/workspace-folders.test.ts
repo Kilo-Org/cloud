@@ -40,9 +40,33 @@ function makeGroup(worktreeId: string, cloudId = `workspace_${folderA}`): Sideba
 
 function makeFolders(): WorkspaceFolder[] {
   return [
-    { id: folderA, name: 'Product', color: 'blue', worktreeIds: [worktreeA, hiddenWorktree] },
-    { id: folderB, name: 'Research', color: 'purple', worktreeIds: [] },
-    { id: folderC, name: 'Backlog', color: 'default', worktreeIds: [] },
+    {
+      id: folderA,
+      name: 'Product',
+      color: 'blue',
+      kind: 'manual',
+      smartPreset: null,
+      sortMode: 'manual',
+      worktreeIds: [worktreeA, hiddenWorktree],
+    },
+    {
+      id: folderB,
+      name: 'Research',
+      color: 'purple',
+      kind: 'manual',
+      smartPreset: null,
+      sortMode: 'manual',
+      worktreeIds: [],
+    },
+    {
+      id: folderC,
+      name: 'Backlog',
+      color: 'default',
+      kind: 'manual',
+      smartPreset: null,
+      sortMode: 'manual',
+      worktreeIds: [],
+    },
   ];
 }
 
@@ -135,6 +159,30 @@ describe('workspace folder drops', () => {
         visibleWorktrees
       )
     ).toEqual({ type: 'move-worktree', worktreeId: worktreeA, folderId: null });
+  });
+
+  it('does not offer a smart folder as a workspace or session drop target', () => {
+    const folders = makeFolders().map(folder =>
+      folder.id === folderB
+        ? { ...folder, kind: 'smart' as const, smartPreset: 'needs_you' as const }
+        : folder
+    );
+    expect(
+      getWorkspaceFolderDropAction(
+        { type: 'worktree', id: worktreeA },
+        folderTarget(folderB),
+        folders,
+        visibleWorktrees
+      )
+    ).toBeNull();
+    expect(
+      getWorkspaceFolderDropAction(
+        { type: 'session', id: 'workspace_00000000-0000-4000-8000-000000000001' },
+        folderTarget(folderB),
+        folders,
+        visibleWorktrees
+      )
+    ).toBeNull();
   });
 
   it('ignores cancelled, external, stale and no-op workspace drops', () => {

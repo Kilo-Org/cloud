@@ -158,6 +158,7 @@ function makeSession(session_id: string): ApiSession {
     parent_session_id: null,
     created_at: '2026-08-26T12:00:00.000Z',
     updated_at: '2026-08-26T12:00:00.000Z',
+    last_activity_at: '2026-08-26T12:00:00.000Z',
     version: 2,
     status: 'busy',
     status_updated_at: null,
@@ -225,6 +226,13 @@ function createFixture() {
       'worktree_12345678-1234-4234-9234-123456789abc': {
         name: null,
         defaultTitle: sessions[0].title,
+        branch: null,
+        folderId: null,
+        sidebarPosition: null,
+        parentWorktreeId: null,
+        baseBranch: null,
+        baseSha: null,
+        createdAt: '2026-08-26T12:00:00.000Z',
         prSession: null,
         sessions: sessions.map(session => ({
           sessionId: session.session_id,

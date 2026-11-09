@@ -72,6 +72,7 @@ function CloudAgentSettings({
   initialSelectedProfileId,
 }: Omit<CloudAgentSettingsDialogProps, 'open' | 'onOpenChange'>) {
   const [section, setSection] = useState(initialSection);
+  const [environmentsVisited, setEnvironmentsVisited] = useState(initialSection === 'environments');
   const changeSection = (next: SettingsSection) => {
     setSection(next);
     onSectionChange?.(next);
@@ -113,6 +114,7 @@ function CloudAgentSettings({
             value === 'environments' ||
             (value === 'compute' && settings?.canManage)
           ) {
+            if (value === 'environments') setEnvironmentsVisited(true);
             changeSection(value);
           }
         }}
@@ -212,9 +214,16 @@ function CloudAgentSettings({
         </TabsContent>
         <TabsContent
           value="environments"
-          className="mt-0 min-h-0 min-w-0 flex-1 overflow-y-auto px-6 py-5"
+          forceMount
+          className="mt-0 flex min-h-0 min-w-0 flex-1 flex-col data-[state=inactive]:hidden"
         >
-          <EnvironmentsSection organizationId={organizationId} canManage={canManage} />
+          {environmentsVisited && (
+            <EnvironmentsSection
+              organizationId={organizationId}
+              canManage={canManage}
+              active={activeSection === 'environments'}
+            />
+          )}
         </TabsContent>
         <TabsContent
           value="profiles"

@@ -172,6 +172,20 @@ describe('Claude billing callback', () => {
     expect(exchangeClaudeBillingCode).not.toHaveBeenCalled();
   });
 
+  it('records the admin who links shared services again as its connector', async () => {
+    const { row } = await seed('shared_services');
+    const nextAdmin = await insertTestUser();
+    const pending = await consumeClaudeBillingPending();
+    if (!pending) throw new Error('Missing pending fixture');
+    jest.mocked(getUserFromSession).mockResolvedValue({ id: nextAdmin.id });
+    jest.mocked(consumeClaudeBillingPending).mockResolvedValue({
+      ...pending,
+      kiloUserId: nextAdmin.id,
+    });
+    expect((await callback()).headers.get('location')).toContain('claude_billing_shared=connected');
+    expect(await state(row.id)).toMatchObject({ status: 'connected', created_by: nextAdmin.id });
+  });
+
   it('rechecks membership for a member connection after approval', async () => {
     const { row } = await seed('member');
     jest.mocked(isClaudeBillingOrganizationMember).mockResolvedValue(false);

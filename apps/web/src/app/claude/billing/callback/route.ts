@@ -116,6 +116,8 @@ export async function GET(request: NextRequest) {
           connected_at: new Date().toISOString(),
           last_refusal_code: null,
           last_refusal_at: null,
+          // The person who linked it last; a shared-services link is gated on them.
+          created_by: session.id,
         })
         .where(
           and(

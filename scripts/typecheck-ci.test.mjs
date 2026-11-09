@@ -1104,13 +1104,8 @@ test('the matrix step decides from the document the affected step published', ()
 // would run the detector without js-yaml.
 test('the changes job installs the root project only for a resource manifest', () => {
   const steps = ciJobs.changes.steps;
-  const filter = steps.find(step => step.id === 'filter_resources');
-  assert.ok(filter, 'changes: the resource-manifest filter is missing');
-  assert.deepEqual(
-    Object.keys(load(filter.with.filters)),
-    ['resources'],
-    'the filter publishes one output that the install reads'
-  );
+  const filter = steps.find(step => step.id === 'filter');
+  assert.ok(filter, 'changes: the changes filter is missing');
   assert.deepEqual(
     load(filter.with.filters).resources,
     [...DEPENDENCY_MANIFESTS],
@@ -1119,12 +1114,11 @@ test('the changes job installs the root project only for a resource manifest', (
   const install = steps.find(step => step.name === 'Install root dependencies');
   assert.equal(
     install.if,
-    "steps.filter_resources.outputs.resources == 'true' || steps.filter_resources_retry.outputs.resources == 'true' || steps.resources_base.outputs.manifests == 'true'",
+    "steps.filter.outputs.resources == 'true' || steps.filter_retry.outputs.resources == 'true' || steps.resources_base.outputs.manifests == 'true'",
     'the install runs on the filter answer, first attempt or retry, or the detector-base diff'
   );
   assert.ok(
-    steps.indexOf(install) >
-      steps.indexOf(steps.find(step => step.id === 'filter_resources_retry')),
+    steps.indexOf(install) > steps.indexOf(steps.find(step => step.id === 'filter_retry')),
     'the install reads an answer the filter already wrote'
   );
   // dorny/paths-filter answers from the pull request's merge-base diff and

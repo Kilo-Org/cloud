@@ -11,9 +11,24 @@ import { load } from 'js-yaml';
 // wiring: without it a single dropped connection fails every check gated on
 // this job, and drifted filters between the two attempts would let the retry
 // evaluate different paths than the first attempt reported.
+//
+// The job publishes every path filter from that one document, so the action
+// lists the changed files once per run instead of once per purpose. This suite
+// pins that as well: a second document repeats the listing and carries a retry
+// contract nothing here would check.
 
 const actionRef = 'dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d';
-const filterNames = ['kilocode_backend', 'cloud_agent_next', 'ai_gateway'];
+const filterNames = [
+  'resources',
+  'kilocode_backend',
+  'cloud_agent_next',
+  'ai_gateway',
+  'harness_sdk',
+  'ai_gateway_secure_proxy',
+  'mobile_diagram_host',
+  'session_sync',
+  'wiring',
+];
 const fallbackOutput = name =>
   `\${{ steps.filter.outputs.${name} || steps.filter_retry.outputs.${name} }}`;
 
@@ -39,6 +54,11 @@ function retryStep(job) {
 function validate(job) {
   const first = firstAttempt(job);
   const retry = retryStep(job);
+  assert.deepEqual(
+    job.steps.filter(item => String(item.uses ?? '').startsWith(actionRef)).map(item => item.id),
+    ['filter', 'filter_retry'],
+    'changes: one Detect changes pair lists the changed files, not one pair per purpose'
+  );
   assert.ok(
     job.steps.indexOf(retry) > job.steps.indexOf(first),
     'changes: retry must run after the first Detect changes attempt'
@@ -68,7 +88,19 @@ function validate(job) {
   assert.deepEqual(
     Object.keys(load(first.with.filters)).sort(),
     [...filterNames].sort(),
-    'changes: filters must keep the expected filter names'
+    'changes: the one document must hold every filter the job publishes'
+  );
+  // A filter without its fallback leaves `needs.changes.outputs.*` empty when
+  // the retry answered, so a gated job is silently skipped on that run. An
+  // output that names no filter publishes nothing, and the document's key then
+  // decides no job at all.
+  const published = Object.entries(job.outputs)
+    .filter(([, value]) => String(value).includes('steps.filter.outputs.'))
+    .map(([name]) => name);
+  assert.deepEqual(
+    published.sort(),
+    [...filterNames].sort(),
+    'changes: every filter in the document publishes one falling-back output, and nothing else reads it'
   );
   for (const name of filterNames) {
     assert.equal(
@@ -83,70 +115,6 @@ test('ci.yml retries the changes filter after a transient GitHub API failure', (
   validate(readChangesJob());
 });
 
-// Every filter pair in the job follows that contract, not only the shared one:
-// the retry evaluates the same paths as the attempt whose result it replaces,
-// and every filter the pair declares publishes an output that falls back to it.
-// A pair that drifts decides a gated job from paths its failed attempt never
-// reported, and a filter without that output leaves `needs.changes.outputs.*`
-// empty on the normal path, so a gated job is silently skipped on every run.
-function validatePairs(job) {
-  const ids = job.steps.map(item => item.id).filter(id => typeof id === 'string');
-  const pairs = ids.filter(id => !id.endsWith('_retry') && ids.includes(`${id}_retry`));
-  assert.ok(pairs.length >= 2, 'changes: every filter runs as an attempt and a retry');
-  for (const id of pairs) {
-    const first = job.steps.find(item => item.id === id);
-    const retry = job.steps.find(item => item.id === `${id}_retry`);
-    assert.equal(first.uses, actionRef, `${id}: first attempt must use the pinned paths-filter`);
-    assert.equal(retry.uses, actionRef, `${id}: retry must use the same pinned paths-filter`);
-    assert.equal(first['continue-on-error'], true, `${id}: first attempt must tolerate failure`);
-    assert.equal(
-      retry['continue-on-error'],
-      undefined,
-      `${id}: a persistent filter failure must fail the job`
-    );
-    assert.equal(
-      retry.if,
-      `steps.${id}.outcome == 'failure'`,
-      `${id}: retry must run only after a failed first attempt`
-    );
-    assert.equal(
-      retry.with.filters,
-      first.with.filters,
-      `${id}: retry filters must be byte-identical to the first attempt`
-    );
-    for (const name of Object.keys(load(first.with.filters))) {
-      assert.equal(
-        job.outputs[name],
-        `\${{ steps.${id}.outputs.${name} || steps.${id}_retry.outputs.${name} }}`,
-        `changes: output ${name} must fall back to its retry attempt`
-      );
-    }
-  }
-}
-
-test('every filter pair retries with the same filters and publishes a fallback', () => {
-  validatePairs(readChangesJob());
-});
-
-test('changes rejects a drifted pair and an output without its fallback', () => {
-  const drifted = readChangesJob();
-  const retry = drifted.steps.find(item => item.id === 'filter_wiring_retry');
-  retry.with.filters = retry.with.filters.replace("'scripts/**'", "'script/**'");
-  assert.throws(() => validatePairs(drifted), assert.AssertionError);
-
-  const unfallen = readChangesJob();
-  unfallen.outputs.wiring = '${{ steps.filter_wiring.outputs.wiring }}';
-  assert.throws(() => validatePairs(unfallen), assert.AssertionError);
-
-  const retryOnly = readChangesJob();
-  retryOnly.outputs.wiring = '${{ steps.filter_wiring_retry.outputs.wiring }}';
-  assert.throws(() => validatePairs(retryOnly), assert.AssertionError);
-
-  const deleted = readChangesJob();
-  delete deleted.outputs.wiring;
-  assert.throws(() => validatePairs(deleted), assert.AssertionError);
-});
-
 for (const defect of [
   'missing-retry',
   'fatal-first-attempt',
@@ -154,6 +122,10 @@ for (const defect of [
   'unconditional-retry',
   'drifted-filters',
   'missing-fallback',
+  'retry-only-output',
+  'second-pair',
+  'unpublished-filter',
+  'stray-output',
 ]) {
   test(`changes rejects ${defect}`, () => {
     const job = readChangesJob();
@@ -167,6 +139,13 @@ for (const defect of [
       retry.with.filters = retry.with.filters.replace("'apps/web/src/**'", "'apps/web/src2/**'");
     if (defect === 'missing-fallback')
       job.outputs.kilocode_backend = '${{ steps.filter.outputs.kilocode_backend }}';
+    if (defect === 'retry-only-output')
+      job.outputs.wiring = '${{ steps.filter_retry.outputs.wiring }}';
+    if (defect === 'second-pair')
+      job.steps.push({ ...first, id: 'filter_extra' }, { ...retry, id: 'filter_extra_retry' });
+    if (defect === 'unpublished-filter')
+      first.with.filters += "            extra:\n              - 'extra/**'\n";
+    if (defect === 'stray-output') job.outputs.extra = fallbackOutput('extra');
     assert.throws(() => validate(job), assert.AssertionError);
   });
 }

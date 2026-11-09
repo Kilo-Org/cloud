@@ -870,7 +870,7 @@ export const internalElevationSites: readonly InternalElevationSite[] = [
     file: 'apps/web/src/lib/organizations/organization-auth.ts',
     actionClass: 'support_read',
     surface: 'rest',
-    occurrences: 2,
+    occurrences: 4,
   },
   {
     id: 'internal.webShared.organizationsUtils',

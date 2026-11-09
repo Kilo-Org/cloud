@@ -26,6 +26,7 @@ import {
   type OrganizationAccess,
   type SupportDecision,
   type SupportActionClass,
+  type SupportAccessReason,
   type SupportContext,
   type SupportSurface,
 } from '@kilocode/web-shared/lib/admin/support-access';
@@ -296,14 +297,6 @@ function supportActionIdFor(
   if (ctx.trpcPath !== undefined) return `${ctx.trpcPath}:${ctx.trpcType ?? 'query'}`;
   return key;
 }
-
-type SupportAccessReason =
-  | 'support_grant_required'
-  | 'support_grant_expired'
-  | 'support_grant_revoked'
-  | 'support_access_not_allowlisted'
-  | 'support_access_action_class'
-  | 'support_grant_lookup_failed';
 
 function supportAccessReasonFor(params: {
   decision: SupportDecision | null;

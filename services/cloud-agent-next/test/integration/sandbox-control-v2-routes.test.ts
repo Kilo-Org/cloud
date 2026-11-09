@@ -1372,7 +1372,7 @@ describe('SandboxControlV2 routes and forwarding', () => {
     expect((await wrapper.next())?.type).toBe('session.prompt');
   });
 
-  it('issues no organization grant once the owner left the organization', async () => {
+  it('retires a ready route once the owner left the organization', async () => {
     const provider = createFakeProvider();
     const { stub } = await setup(provider);
     await stub.prepare(prepareInput(SESSION));
@@ -1389,24 +1389,20 @@ describe('SandboxControlV2 routes and forwarding', () => {
       ...grant,
       expiresAt: Date.now() + TIMERS.credentialGrantReissueBelowMs / 2,
     }));
-    const before = await grantExpiry(stub, SESSION);
 
+    // The sandbox's own read is proof. No prompt goes out on the grant the
+    // route held, and the route is retired instead of waiting for it to expire.
     expect(await stub.deliver({ sessionId: SESSION, messages: [promptPayload('m1')] })).toBe(
-      'sent'
+      'not_ready'
     );
-    // No renewal frame: the prompt is the only frame that reaches the wrapper.
-    expect((await wrapper.next())?.type).toBe('session.prompt');
+    expect((await wrapper.next())?.type).toBe('session.release');
+    expect(await readRouteRow(stub, SESSION)).toBeNull();
 
-    // The route keeps its current grant until it expires; nothing was re-issued.
-    expect(await grantExpiry(stub, SESSION)).toBe(before);
-    expect(await readRouteRow(stub, SESSION)).toMatchObject({ state: 'ready' });
-
-    // A later send is denied the same way instead of running on new authority.
+    // A released route delivers nothing later either.
     expect(await stub.deliver({ sessionId: SESSION, messages: [promptPayload('m2')] })).toBe(
-      'sent'
+      'not_ready'
     );
-    expect((await wrapper.next())?.type).toBe('session.prompt');
-    expect(await grantExpiry(stub, SESSION)).toBe(before);
+    expect(await readRouteRow(stub, SESSION)).toBeNull();
     wrapper.close();
   });
 
@@ -1435,16 +1431,18 @@ describe('SandboxControlV2 routes and forwarding', () => {
       'sent'
     );
     expect((await wrapper.next())?.type).toBe('session.prompt');
-    expect(reads).toBe(1);
+    // One issuance reads again before it denies, so a single failed read does
+    // not decide the grant.
+    expect(reads).toBe(TIMERS.organizationMembershipReadAttempts);
     // An unreadable membership is not a revocation: the route stays ready on
-    // its grant and the next send retries the read instead of failing it.
+    // its grant and the next send retries the issuance instead of failing it.
     expect(await readRouteRow(stub, SESSION)).toMatchObject({ state: 'ready' });
     const before = await grantExpiry(stub, SESSION);
     expect(await stub.deliver({ sessionId: SESSION, messages: [promptPayload('m2')] })).toBe(
       'sent'
     );
     expect((await wrapper.next())?.type).toBe('session.prompt');
-    expect(reads).toBe(2);
+    expect(reads).toBe(2 * TIMERS.organizationMembershipReadAttempts);
     expect(await grantExpiry(stub, SESSION)).toBe(before);
     expect(await readRouteRow(stub, SESSION)).toMatchObject({ state: 'ready' });
     wrapper.close();
@@ -1465,13 +1463,37 @@ describe('SandboxControlV2 routes and forwarding', () => {
     expect(provider.launchEnvs).toHaveLength(0);
   });
 
+  it('recovers a preparation whose first membership read failed', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    let reads = 0;
+    await runInDurableObject(stub, instance => {
+      instance.organizationMembershipFor = async () => {
+        reads += 1;
+        if (reads === 1) throw new Error('membership read unavailable');
+        return true;
+      };
+    });
+
+    // One failed read is not a decision: the issuance reads again and the
+    // preparation proceeds.
+    expect((await stub.prepare(prepareInput(SESSION))).state).not.toBe('failed');
+    expect(reads).toBe(2);
+    expect(await readRouteRow(stub, SESSION)).toMatchObject({ state: 'preparing' });
+  });
+
   it('fails an organization preparation when the membership read cannot run', async () => {
     const provider = createFakeProvider();
     const { stub } = await setup(provider);
     // This worker binds no Hyperdrive, so the production default reader throws.
     // A grant must not be issued on an unanswered membership read.
+    let reads = 0;
     await runInDurableObject(stub, instance => {
-      instance.organizationMembershipFor = workerOrganizationMembershipReader(instance.env);
+      const production = workerOrganizationMembershipReader(instance.env);
+      instance.organizationMembershipFor = async (userId, organizationId) => {
+        reads += 1;
+        return production(userId, organizationId);
+      };
     });
 
     const stages: unknown[] = [];
@@ -1494,8 +1516,10 @@ describe('SandboxControlV2 routes and forwarding', () => {
     }
 
     expect(view).toMatchObject({ state: 'failed', reason: 'workspace_setup_failed' });
-    // The deny names its own cause instead of reading as a grant-mint fault.
+    // The deny names its own cause instead of reading as a grant-mint fault, and
+    // it comes only after the issuance exhausted its reads.
     expect(stages).toEqual(['organization_membership_unavailable']);
+    expect(reads).toBe(TIMERS.organizationMembershipReadAttempts);
     expect(await readRouteRow(stub, SESSION)).toMatchObject({ state: 'failed' });
     expect(provider.launchEnvs).toHaveLength(0);
   });

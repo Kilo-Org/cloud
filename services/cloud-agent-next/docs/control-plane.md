@@ -507,20 +507,25 @@ These keep their current owners and evidence; the rewrite ports them, it does no
 - Organization membership gates every organization-attributed grant. Preparation, the wrapper
   rebind after a restart and a warm renewal all issue through the same path, which reads the session
   owner's current membership of the grant's organization first. None of the three paths sends a
-  grant or a `session.credentials` frame to a non-member. A warm renewal returns the existing policy
-  failure, so the route keeps its current grant until that grant expires; preparation and the rebind
-  fail the attempt with `workspace_setup_failed` stage `organization_access_revoked` and do not
-  retry it. An unreadable membership denies the grant on every path, because a failed read is not
-  evidence that the grant is still allowed: a renewal keeps the five-minute retry, and a preparation
-  or rebind fails the attempt with `workspace_setup_failed` stage
-  `organization_membership_unavailable`, so the deny is distinguishable from a grant-mint fault.
-  Personal sources carry no organization and skip the read.
+  grant or a `session.credentials` frame to a non-member. A read that answers "not a member" is
+  proof: preparation and the rebind fail the attempt with `workspace_setup_failed` stage
+  `organization_access_revoked` and do not retry it, and a warm renewal retires the route at the
+  Sandbox DO on the path that proved the loss, so the route, its grant and the wrapper path go and
+  the wrapper receives `session.release` instead of the route continuing on the grant it already
+  holds. An unreadable membership denies the grant on every path, because a failed read is not
+  evidence that the grant is still allowed. One unreadable read is a single observation, so an
+  issuance reads again inside the grant issuance bound; only an exhausted read denies. A renewal
+  then keeps the five-minute retry, and a preparation or rebind fails the attempt with
+  `workspace_setup_failed` stage `organization_membership_unavailable`, so the deny is
+  distinguishable from a grant-mint fault. Personal sources carry no organization and skip the
+  read.
 - Organization access revocation (`POST /internal/streams/close`, sent when a member is removed)
   releases each of that member's matching sessions at the Sandbox DO in addition to closing their
   client sockets: the route row, its organization-attributed grant and the wrapper path go, and the
   wrapper receives `session.release`, ending organization-scoped execution instead of letting it
   run to grant expiry. One session's failed close does not skip the remaining sessions of the same
-  member; that session's next grant is still refused by the membership gate.
+  member, and a later grant renewal that proves the loss retires that session's route from the
+  Sandbox DO itself, so the same end does not depend on the close call.
 - Worktree deletion commits the authoritative ingest content removal before runtime cleanup, then
   attempts every journaled runtime location. Missing runtime history or an unconfirmed provider
   stop returns the logical deletion as successful with `cleanup: 'pending'`, retains the deletion

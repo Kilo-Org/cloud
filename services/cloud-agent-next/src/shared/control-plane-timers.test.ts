@@ -78,6 +78,18 @@ describe('control-plane external-work bounds', () => {
     expect(readMs).toBeLessThan(CONTROL_PLANE_TIMERS.sandbox.providerStopAttemptMs);
     // Scaling it down would turn a slow read into a deny in a local run.
     expect(scaled.sandbox.organizationMembershipReadMs).toBe(readMs);
+    expect(scaled.sandbox.organizationMembershipReadAttempts).toBe(
+      CONTROL_PLANE_TIMERS.sandbox.organizationMembershipReadAttempts
+    );
+    expect(scaled.sandbox.organizationMembershipReadRetryMs).toBe(
+      CONTROL_PLANE_TIMERS.sandbox.organizationMembershipReadRetryMs
+    );
+    // Every attempt of one issuance, timeouts and waits, still fits its bound.
+    const issuanceMs =
+      CONTROL_PLANE_TIMERS.sandbox.organizationMembershipReadAttempts * readMs +
+      (CONTROL_PLANE_TIMERS.sandbox.organizationMembershipReadAttempts - 1) *
+        CONTROL_PLANE_TIMERS.sandbox.organizationMembershipReadRetryMs;
+    expect(issuanceMs).toBeLessThan(CONTROL_PLANE_TIMERS.sandbox.providerStopAttemptMs);
   });
 });
 

@@ -857,6 +857,12 @@ function terminalRequestFrame(
   }
 }
 
+/** What a due grant renewal left behind: the route to keep using, or its end. */
+type RouteRenewal =
+  | { kind: 'ready'; route: RouteRecord }
+  | { kind: 'released' }
+  | { kind: 'failed' };
+
 export class SandboxControlV2 extends DurableObject<Env> {
   readonly sandboxId: string;
   private readonly db: ReturnType<typeof drizzle>;
@@ -1276,33 +1282,41 @@ export class SandboxControlV2 extends DurableObject<Env> {
   async release(payload: ControlPlaneSessionRefPayload): Promise<void> {
     await this.initialized;
     const parsed = controlPlaneSessionRefPayloadSchema.parse(payload);
-    await this.enqueue(async () => {
-      this.notifications.retire(parsed.sessionId);
-      await this.ctx.storage.delete(`${COMMAND_FAILURE_NOTE_KEY_PREFIX}${parsed.sessionId}`);
-      this.fenceWorkspaceSnapshot('release', parsed.sessionId);
-      const released = await readRoute(this.db, parsed.sessionId);
-      // A shared canonical handle survives on the other members, so removing
-      // this route's path rules is not worth a policy rebuild: a transient
-      // provider failure there would stop the sandbox and kill the survivor. The
-      // facade already denies the released root. Last-member release, a real
-      // alias retirement and wrapper replacement still rebuild fail-closed.
-      const sharedHandleSurvives = sharedCanonicalHandleSurvivesRelease(
-        released?.grant ?? null,
-        parsed.sessionId
-      );
-      await deleteRoute(this.db, this.ctx.storage.kv, parsed.sessionId);
-      if (!sharedHandleSurvives) {
-        // Rebuild the policy inside the queue; if it cannot apply, stop the
-        // sandbox as a platform failure so the alias is not left injected.
-        await this.applyVercelNetworkPolicyOrStop('sandbox_lost');
-      }
-      const state = await this.readAllocation();
-      await this.armAlarm(state);
-      const socket = this.boundWrapperSocket(state);
-      if (socket !== null) {
-        this.trySendFrame(socket, { type: 'session.release', sessionId: parsed.sessionId });
-      }
-    });
+    await this.enqueue(() => this.retireRoute(parsed.sessionId));
+  }
+
+  /**
+   * Retires one session's route inside the serial queue: its grant rows, the
+   * alias policy it owned, its notification state and its wrapper path go, the
+   * wrapper receives `session.release`, and the alarm is re-armed. `release` and
+   * a proven organization revocation both run this.
+   */
+  private async retireRoute(sessionId: string): Promise<void> {
+    this.notifications.retire(sessionId);
+    await this.ctx.storage.delete(`${COMMAND_FAILURE_NOTE_KEY_PREFIX}${sessionId}`);
+    this.fenceWorkspaceSnapshot('release', sessionId);
+    const released = await readRoute(this.db, sessionId);
+    // A shared canonical handle survives on the other members, so removing
+    // this route's path rules is not worth a policy rebuild: a transient
+    // provider failure there would stop the sandbox and kill the survivor. The
+    // facade already denies the released root. Last-member release, a real
+    // alias retirement and wrapper replacement still rebuild fail-closed.
+    const sharedHandleSurvives = sharedCanonicalHandleSurvivesRelease(
+      released?.grant ?? null,
+      sessionId
+    );
+    await deleteRoute(this.db, this.ctx.storage.kv, sessionId);
+    if (!sharedHandleSurvives) {
+      // Rebuild the policy inside the queue; if it cannot apply, stop the
+      // sandbox as a platform failure so the alias is not left injected.
+      await this.applyVercelNetworkPolicyOrStop('sandbox_lost');
+    }
+    const state = await this.readAllocation();
+    await this.armAlarm(state);
+    const socket = this.boundWrapperSocket(state);
+    if (socket !== null) {
+      this.trySendFrame(socket, { type: 'session.release', sessionId });
+    }
   }
 
   /**
@@ -2854,24 +2868,37 @@ export class SandboxControlV2 extends DurableObject<Env> {
   /**
    * Refuses an organization-attributed grant once the session owner is no longer
    * a current member of that organization. Personal sources are not gated. A
-   * read that does not answer is not evidence of membership, so it denies too;
-   * `issueRouteGrant` throws and each caller decides whether to fail the attempt
-   * or keep the route and retry.
+   * read that answers "not a member" is proof and denies at once. A read that
+   * does not answer is one observation, so it is retried inside the grant
+   * issuance bound; only an exhausted read denies, with its own error, because
+   * an unreadable membership is not evidence of membership. `issueRouteGrant`
+   * throws and each caller decides whether to fail the attempt or keep the route
+   * and retry.
    */
   private async requireOrganizationMembership(source: ControlPlaneCredentialSource): Promise<void> {
     const organizationId = source.orgId;
     if (organizationId === undefined) return;
-    let member: boolean;
-    try {
-      member = await withTimeout(
-        this.organizationMembershipFor(source.userId, organizationId),
-        this.sandboxTimers().organizationMembershipReadMs,
-        'Organization membership read timed out'
-      );
-    } catch {
-      throw new OrganizationMembershipUnavailableError();
+    const timers = this.sandboxTimers();
+    for (let attempt = 1; ; attempt += 1) {
+      let member: boolean;
+      try {
+        member = await withTimeout(
+          this.organizationMembershipFor(source.userId, organizationId),
+          timers.organizationMembershipReadMs,
+          'Organization membership read timed out'
+        );
+      } catch {
+        if (attempt >= timers.organizationMembershipReadAttempts) {
+          throw new OrganizationMembershipUnavailableError();
+        }
+        const wait = Promise.withResolvers<void>();
+        setTimeout(wait.resolve, timers.organizationMembershipReadRetryMs);
+        await wait.promise;
+        continue;
+      }
+      if (!member) throw new OrganizationAccessRevokedError();
+      return;
     }
-    if (!member) throw new OrganizationAccessRevokedError();
   }
 
   /** Route transitions need storage, the bound socket and the bounded notify. */
@@ -3347,10 +3374,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
 
     // Credentials half of B3: a due grant is re-issued and `session.credentials`
     // is sent before the prompts. A failed re-issue still delivers on the
-    // previous grant while it is valid.
-    const renewed = await this.renewRouteGrant(route, state);
-    if (renewed === null) return 'not_ready';
-    route = renewed;
+    // previous grant while it is valid; a route that was released ends here.
+    const renewal = await this.renewRouteGrant(route, state);
+    if (renewal.kind !== 'ready') return 'not_ready';
+    route = renewal.route;
 
     // One verified-expiry check immediately before the prompts, for adopted
     // handles only. A per-session scope keeps its historical behavior: the
@@ -3406,28 +3433,29 @@ export class SandboxControlV2 extends DurableObject<Env> {
    * renews its grant before the lease ends. A failed re-issue keeps the route
    * while its current grant is valid and lets the alarm retry later; once that
    * grant has expired there is no usable grant left, so the route fails now
-   * with the real reason. Returns null when the route failed.
+   * with the real reason. A proven revocation retires the route here, so the
+   * caller stops instead of delivering on the grant the route already holds.
    */
-  private async renewRouteGrant(
-    route: RouteRecord,
-    state: AllocationState
-  ): Promise<RouteRecord | null> {
-    if (route.grant === null || !this.grantNeedsReissue(route.grant)) return route;
+  private async renewRouteGrant(route: RouteRecord, state: AllocationState): Promise<RouteRenewal> {
+    if (route.grant === null || !this.grantNeedsReissue(route.grant)) {
+      return { kind: 'ready', route };
+    }
     const { scopeId, expiresAt } = route.grant;
     const outcome = await this.reissueRouteGrant(route, state);
+    if (outcome === 'released') return { kind: 'released' };
     if (outcome === 'issued') {
       this.credentialRenewalRetryAt.delete(scopeId);
     } else if (Date.now() >= expiresAt) {
       this.credentialRenewalRetryAt.delete(scopeId);
       await this.failUnrenewableRoute(route.sessionId, state);
-      return null;
+      return { kind: 'failed' };
     } else {
       this.credentialRenewalRetryAt.set(
         scopeId,
         Date.now() + this.sandboxTimers().credentialGrantRenewalRetryMs
       );
     }
-    return (await readRoute(this.db, route.sessionId)) ?? route;
+    return { kind: 'ready', route: (await readRoute(this.db, route.sessionId)) ?? route };
   }
 
   /** The route's grant expired and could not be re-issued: fail with the real reason. */
@@ -3462,7 +3490,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
       const { scopeId } = route.grant;
       if (expiredScopes.has(scopeId) && Date.now() >= route.grant.expiresAt) {
         await this.failUnrenewableRoute(route.sessionId, state);
-      } else if ((await this.renewRouteGrant(route, state)) === null) {
+      } else if ((await this.renewRouteGrant(route, state)).kind === 'failed') {
+        // Only a scope whose shared grant could not be renewed fails its other
+        // expired members without another attempt. A released member says
+        // nothing about its siblings' membership, so it never does.
         expiredScopes.add(scopeId);
       }
     }
@@ -3475,12 +3506,13 @@ export class SandboxControlV2 extends DurableObject<Env> {
    * caller must not send `session.credentials`; `renewRouteGrant` keeps the
    * route while the previous grant is still due and fails it once that grant
    * has expired, so the Session DO starts a fresh attempt instead of waiting
-   * for the backstop.
+   * for the backstop. A proven revocation retires the route instead, and reports
+   * `released`.
    */
   private async reissueRouteGrant(
     route: RouteRecord,
     state: AllocationState
-  ): Promise<'issued' | 'policy_failed' | 'skipped' | 'failed'> {
+  ): Promise<'issued' | 'policy_failed' | 'skipped' | 'failed' | 'released'> {
     const source = route.credentialSource;
     if (source === null) return 'skipped';
     const socket = this.boundWrapperSocket(state);
@@ -3495,11 +3527,16 @@ export class SandboxControlV2 extends DurableObject<Env> {
         'Credential grant re-issue timed out'
       );
     } catch (error) {
-      // A proven loss of organization membership is the existing policy
-      // failure: nothing is issued and the route stays until its grant expires.
-      // An unreadable membership (or any other failure) keeps the retry
+      if (error instanceof OrganizationAccessRevokedError) {
+        // The sandbox proved the owner left the organization. Retire the route
+        // on the path that proved it, so organization authority ends here
+        // instead of continuing on the grant the route already holds.
+        await this.retireRoute(route.sessionId);
+        return 'released';
+      }
+      // An unreadable membership read (or any other failure) keeps the retry
       // schedule, because it is not evidence that the grant is still allowed.
-      return error instanceof OrganizationAccessRevokedError ? 'policy_failed' : 'failed';
+      return 'failed';
     }
     const cloudAgentMcp = await this.tryIssueCloudAgentMcpGrant(route);
     if (!(await this.applyCandidateGrantPolicy(issued.grant))) return 'policy_failed';

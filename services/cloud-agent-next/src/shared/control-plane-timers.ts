@@ -39,6 +39,10 @@ export type ControlPlaneTimers = {
     scopeBackingTokenMs: number;
     /** Bounds the membership read that gates an organization-attributed grant. */
     organizationMembershipReadMs: number;
+    /** How many bounded membership reads one grant issuance makes before it denies. */
+    organizationMembershipReadAttempts: number;
+    /** Wait between two membership reads of the same issuance. */
+    organizationMembershipReadRetryMs: number;
     providerStopAttemptMs: number;
     providerStopLadderMs: readonly number[];
   };
@@ -137,8 +141,12 @@ function buildControlPlaneTimers(divisor: number): ControlPlaneTimers {
     scopeBackingTokenMs: 3_000,
     // The membership read is one indexed row. A read that cannot answer inside
     // the bound denies the grant instead of holding the Sandbox DO operation
-    // queue, so it stays real.
+    // queue, so it stays real. One unreadable read is a single observation, not
+    // a decision, so an issuance retries it a few times inside the 30 s grant
+    // issuance bound (3 * 3 s + 2 * 1 s = 11 s) before it denies.
     organizationMembershipReadMs: 3_000,
+    organizationMembershipReadAttempts: 3,
+    organizationMembershipReadRetryMs: 1_000,
     providerStopAttemptMs: 30_000,
     providerStopLadderMs: [5_000, 10_000, 10_000, 10_000, 10_000],
   };

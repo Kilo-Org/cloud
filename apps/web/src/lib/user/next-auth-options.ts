@@ -153,12 +153,13 @@ function generateAppleClientSecret(): string {
 
 /**
  * Anthropic's ID token carries `sub`, `email` and `name`; it does not carry
- * `email_verified`. The subject binds the account, and a claim-less profile
- * never auto-links to an existing Kilo account, so the email alone cannot take
- * one over.
+ * `email_verified`. The claim may therefore be absent, but a token that states
+ * the address is unverified is still refused: the subject binds the account,
+ * and neither case auto-links to an existing Kilo account.
  */
 const claudeEmailClaimSchema = z.object({
   email: z.email(),
+  email_verified: z.literal(true).optional(),
 });
 
 const anacondaProfileSchema = z.object({

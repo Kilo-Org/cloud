@@ -556,14 +556,18 @@ describe('authOptions.callbacks.signIn for Claude', () => {
     { email: null },
     { email: 'not-an-email' },
     { email: 'different@kilocode.ai' },
-  ])('refuses a missing or mismatched Claude email before flag evaluation: %s', async profile => {
-    setValidTurnstileCookie();
-    await expect(claudeSignIn(profile)).resolves.toEqual(
-      expect.stringContaining('error=UNKNOWN-ERROR')
-    );
-    expect(isClaudePlatformOAuthEnabled).not.toHaveBeenCalled();
-    expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
-  });
+    { email_verified: false },
+  ])(
+    'refuses a missing, unverified, or mismatched Claude email before flag evaluation: %s',
+    async profile => {
+      setValidTurnstileCookie();
+      await expect(claudeSignIn(profile)).resolves.toEqual(
+        expect.stringContaining('error=UNKNOWN-ERROR')
+      );
+      expect(isClaudePlatformOAuthEnabled).not.toHaveBeenCalled();
+      expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+    }
+  );
 });
 
 describe('Claude explicit linking persistence', () => {

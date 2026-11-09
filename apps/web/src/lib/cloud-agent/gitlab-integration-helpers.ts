@@ -1,5 +1,6 @@
 import { TRPCError } from '@trpc/server';
 import type { PlatformIntegration } from '@kilocode/db/schema';
+import z from 'zod';
 import {
   getIntegrationForOrganization,
   getIntegrationForOwner,
@@ -9,6 +10,8 @@ import { getGitLabIntegration, getValidGitLabToken } from '@/lib/integrations/gi
 import {
   fetchGitLabProjects,
   getGitLabProject as readGitLabProject,
+  GitLabProjectFetchError,
+  GITLAB_ACCESS_LEVELS,
 } from '@/lib/integrations/platforms/gitlab/adapter';
 import type { GitLabCredentialActor } from '@/lib/integrations/platforms/gitlab/credential-broker-client';
 import { PLATFORM } from '@/lib/integrations/core/constants';
@@ -40,33 +43,49 @@ export class GitLabProjectLookupError extends Error {
 }
 
 /**
- * The adapter reports an HTTP refusal from the single-project read only
- * through this exact message. Matching the whole message keeps a transport
- * failure or any other message that happens to end in digits from being read
- * as a refusal.
+ * The access levels the instance reports for the credential that read one
+ * project. `project_access` covers direct membership; `group_access` covers a
+ * membership inherited from a group. Either is absent when the credential can
+ * read the project without holding a role on it.
  */
-const GITLAB_PROJECT_FETCH_FAILURE = /^GitLab project fetch failed: (\d{3})$/;
+const gitLabProjectPermissionsSchema = z
+  .object({
+    project_access: z.object({ access_level: z.number() }).nullish(),
+    group_access: z.object({ access_level: z.number() }).nullish(),
+  })
+  .nullish();
 
 /**
- * Read one GitLab project by path with explicit credentials, converting the
- * adapter's status-bearing failure text into a typed status refusal.
+ * Read one GitLab project by path with explicit credentials and return the
+ * access level the instance reports for that credential. A response without a
+ * readable level counts as no access, so a caller that gates on a level fails
+ * closed. A provider refusal keeps its status, and any other failure keeps its
+ * original error as the cause.
  */
-async function getGitLabProjectForCredentials(
+async function getGitLabProjectAccessLevel(
   accessToken: string,
   projectPath: string,
   instanceUrl: string
-): Promise<void> {
-  try {
-    await readGitLabProject(accessToken, projectPath, instanceUrl);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : '';
-    const match = GITLAB_PROJECT_FETCH_FAILURE.exec(message);
-    throw new GitLabProjectLookupError(
-      match ? Number(match[1]) : 0,
-      'GitLab project lookup failed',
-      { cause: error }
-    );
+): Promise<number> {
+  const project = await readGitLabProject(accessToken, projectPath, instanceUrl).catch(
+    (error: unknown) => {
+      throw new GitLabProjectLookupError(
+        error instanceof GitLabProjectFetchError ? error.status : 0,
+        'GitLab project lookup failed',
+        { cause: error }
+      );
+    }
+  );
+
+  const permissions = gitLabProjectPermissionsSchema.safeParse(project.permissions);
+  if (!permissions.success) {
+    return GITLAB_ACCESS_LEVELS.NO_ACCESS;
   }
+  const levels = [
+    permissions.data?.project_access?.access_level,
+    permissions.data?.group_access?.access_level,
+  ].filter((level): level is number => typeof level === 'number');
+  return levels.length > 0 ? Math.max(...levels) : GITLAB_ACCESS_LEVELS.NO_ACCESS;
 }
 
 const gitLabInstanceUrlFromIntegration = (integration: { metadata: unknown }): string => {
@@ -311,19 +330,24 @@ export async function validateGitLabRepoAccessForUser(
 
 /**
  * Access verdict for a requester's own GitLab connection, resolved live: the
- * requester's credential reads the project from their own GitLab instance.
+ * requester's credential reads the project from their own GitLab instance and
+ * the instance reports the level that credential holds.
  */
 export type GitLabRequesterAccess = { outcome: 'allowed' } | { outcome: 'refused' };
 
 /**
- * What a Kilo account's own GitLab connection can see live.
+ * What a Kilo account's own GitLab connection can see live, and whether it can
+ * write there.
  *
- * `refused`: the account holds no GitLab connection of its own, its
- * connection is suspended, or its credential's instance answered that the
- * account cannot read the project (404, or a 401/403 the account's own
- * credential cannot clear). All of these are verdicts about this requester,
- * so the caller answers with the refusal line and starts no session. A
- * suspended connection is refused before any credential or project read.
+ * `allowed` means the project read succeeded under the account's own
+ * credential and the instance reports Developer or above for that credential,
+ * which is the level that can push. `refused`: the account holds no GitLab
+ * connection of its own, its connection is suspended, the instance keeps the
+ * project from its credential (404, or a 401/403 the account's own credential
+ * cannot clear), or the reported level is below Developer. All of these are
+ * verdicts about this requester, so the caller answers with the refusal line
+ * and starts no session. A suspended connection is refused before any
+ * credential or project read.
  *
  * Everything else (a 5xx, a rate limit, a transport failure, a credential
  * resolution outage) propagates: the caller's failure path answers with the
@@ -342,11 +366,14 @@ export async function getGitLabProjectAccessForRequester(
 
   const token = await resolveGitLabToken(integration, { userId });
   try {
-    await getGitLabProjectForCredentials(
+    const accessLevel = await getGitLabProjectAccessLevel(
       token,
       projectPath,
       gitLabInstanceUrlFromIntegration(integration)
     );
+    return accessLevel >= GITLAB_ACCESS_LEVELS.DEVELOPER
+      ? { outcome: 'allowed' }
+      : { outcome: 'refused' };
   } catch (error) {
     if (
       error instanceof GitLabProjectLookupError &&
@@ -356,7 +383,6 @@ export async function getGitLabProjectAccessForRequester(
     }
     throw error;
   }
-  return { outcome: 'allowed' };
 }
 
 /**

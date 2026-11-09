@@ -51,6 +51,40 @@ function buildBotCallbackUrl(botRequestId: string, currentStep: number | undefin
 }
 
 /**
+ * A stored GitLab instance URL that fails policy normalization cannot work on
+ * retry, so the reply must name the connection a user has to fix. The account
+ * connection and the integration's own connection are separate settings with
+ * separate owners.
+ */
+class GitLabConnectionUrlError extends Error {
+  constructor(
+    readonly connection: 'account' | 'integration',
+    options?: { cause?: unknown }
+  ) {
+    super(`GitLab ${connection} connection has an invalid instance URL`, options);
+    this.name = 'GitLabConnectionUrlError';
+  }
+}
+
+function normalizeStoredGitLabInstanceUrl(
+  instanceUrl: string,
+  connection: 'account' | 'integration'
+): string {
+  try {
+    return normalizeGitLabInstanceUrl(instanceUrl);
+  } catch (error) {
+    throw new GitLabConnectionUrlError(connection, { cause: error });
+  }
+}
+
+const GITLAB_INVALID_INSTANCE_RESPONSE: Record<'account' | 'integration', string> = {
+  account:
+    'Error: The GitLab connection on your account has an invalid instance URL. Update your GitLab connection in your Kilo Code settings.',
+  integration:
+    "Error: The GitLab connection for this integration has an invalid instance URL. Update the integration's GitLab connection in Kilo Code settings.",
+};
+
+/**
  * Result from spawning a Cloud Agent session
  */
 type SpawnCloudAgentResult = {
@@ -204,8 +238,8 @@ export default async function spawnCloudAgentSession(
           getGitLabInstanceUrlForOrganization(owner.id),
         ]);
         if (
-          normalizeGitLabInstanceUrl(requesterInstanceUrl) !==
-          normalizeGitLabInstanceUrl(orgInstanceUrl)
+          normalizeStoredGitLabInstanceUrl(requesterInstanceUrl, 'account') !==
+          normalizeStoredGitLabInstanceUrl(orgInstanceUrl, 'integration')
         ) {
           return {
             response:
@@ -233,12 +267,13 @@ export default async function spawnCloudAgentSession(
     } catch (error) {
       // A stored instance URL that fails policy normalization cannot start
       // working on retry, so it gets its own non-retryable answer instead of
-      // the retry message meant for provider and transport failures.
+      // the retry message meant for provider and transport failures. The
+      // answer names the connection whose URL failed.
+      if (error instanceof GitLabConnectionUrlError) {
+        return { response: GITLAB_INVALID_INSTANCE_RESPONSE[error.connection] };
+      }
       if (error instanceof GitLabInstanceUrlError) {
-        return {
-          response:
-            'Error: The GitLab connection for this integration has an invalid instance URL. Update the GitLab connection in your Kilo Code settings.',
-        };
+        return { response: GITLAB_INVALID_INSTANCE_RESPONSE.integration };
       }
       captureException(error, {
         tags: { component: 'kilo-bot', op: 'spawn-cloud-agent-session-gitlab-project' },

@@ -50,8 +50,8 @@ export type BotPlatform = {
    * own in the thread; the tool that starts a Cloud Agent session authorizes
    * any repository it names against the requesting account, for GitHub
    * through the requesting account's write permission and for GitLab through
-   * the requesting account's own GitLab connection. Platforms without this
-   * hook allow every message.
+   * the write access the requesting account's own GitLab connection holds on
+   * the project. Platforms without this hook allow every message.
    */
   authorizeBotActions?(params: {
     thread: Thread;

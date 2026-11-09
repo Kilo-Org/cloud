@@ -569,7 +569,7 @@ describe('spawnCloudAgentSession delegation', () => {
     expect(mockPrepareSession).not.toHaveBeenCalled();
   });
 
-  it('returns a non-retryable reason when the stored GitLab instance URL is invalid', async () => {
+  it('answers an invalid instance URL on the account connection with that connection', async () => {
     mockGetGitLabInstanceUrlForUser.mockResolvedValue('http://gitlab.example.com');
 
     const result = await spawnCloudAgentSession(
@@ -583,13 +583,42 @@ describe('spawnCloudAgentSession delegation', () => {
     );
 
     expect(result).toEqual(
-      expect.objectContaining({ response: expect.stringContaining('invalid instance URL') })
+      expect.objectContaining({
+        response: expect.stringContaining('GitLab connection on your account'),
+      })
     );
+    expect(result.response).toContain('invalid instance URL');
     expect(result.response).not.toContain('Please try again');
     expect(mockGetGitLabProjectAccessForRequester).not.toHaveBeenCalled();
     expect(mockValidateGitLabRepoAccessForOrganization).not.toHaveBeenCalled();
     expect(mockPrepareSession).not.toHaveBeenCalled();
     expect(mockGetGitLabTokenForOrganization).not.toHaveBeenCalled();
+  });
+
+  it('answers an invalid instance URL on the integration connection with that connection', async () => {
+    mockGetGitLabInstanceUrlForUser.mockResolvedValue('https://gitlab.com');
+    mockGetGitLabInstanceUrlForOrganization.mockResolvedValue('http://gitlab.example.com');
+
+    const result = await spawnCloudAgentSession(
+      { gitlabProject: 'group/repo', prompt: 'Use the files', mode: 'code' },
+      'model',
+      organizationIntegration,
+      'auth-token',
+      'request-gitlab-invalid-integration-instance',
+      undefined,
+      { requesterUserId: 'user-9' }
+    );
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        response: expect.stringContaining("integration's GitLab connection"),
+      })
+    );
+    expect(result.response).toContain('invalid instance URL');
+    expect(result.response).not.toContain('Please try again');
+    expect(mockGetGitLabProjectAccessForRequester).not.toHaveBeenCalled();
+    expect(mockValidateGitLabRepoAccessForOrganization).not.toHaveBeenCalled();
+    expect(mockPrepareSession).not.toHaveBeenCalled();
   });
 
   it('refuses an organization GitLab project for a run with no requesting account', async () => {

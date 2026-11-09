@@ -310,7 +310,7 @@ function NavGroupLabel({
 }) {
   return (
     <div
-      role="presentation"
+      aria-hidden
       className={cn(
         'text-muted-foreground hidden items-center gap-1.5 px-2 pt-1 pb-1.5 text-[11px] font-medium tracking-wide uppercase md:flex md:w-full',
         className

@@ -85,32 +85,6 @@ jest.mock('@/components/ui/badge', () => ({
     createElement('span', { 'data-slot': 'badge' }, children),
 }));
 
-let mockTabsOnValueChange: ((value: string) => void) | undefined;
-
-jest.mock('@/components/ui/tabs', () => ({
-  Tabs: ({
-    children,
-    onValueChange,
-  }: {
-    children?: React.ReactNode;
-    onValueChange?: (value: string) => void;
-  }) => {
-    mockTabsOnValueChange = onValueChange;
-    return createElement('div', null, children);
-  },
-  TabsList: ({ children }: { children?: React.ReactNode }) => createElement('div', null, children),
-  TabsTrigger: ({ value, children }: { value: string; children?: React.ReactNode }) =>
-    createElement(
-      'button',
-      { type: 'button', onClick: () => mockTabsOnValueChange?.(value) },
-      children
-    ),
-  TabsContent: ({ value, children }: { value: string; children?: React.ReactNode }) =>
-    value === 'general' || value === 'preferences'
-      ? createElement('div', { 'data-tab': value }, children)
-      : null,
-}));
-
 jest.mock('@/components/ui/tooltip', () => ({
   Tooltip: ({ children }: { children?: React.ReactNode }) =>
     createElement(React.Fragment, null, children),
@@ -180,6 +154,9 @@ Object.assign(globalThis, {
   StorageEvent: StorageEventStub,
   localStorage: localStorageStub,
   getComputedStyle: () => ({ animationName: 'none', display: 'block' }),
+  requestAnimationFrame: (callback: FrameRequestCallback) =>
+    setTimeout(() => callback(Date.now()), 0),
+  cancelAnimationFrame: (handle: ReturnType<typeof setTimeout>) => clearTimeout(handle),
   IS_REACT_ACT_ENVIRONMENT: true,
 });
 
@@ -218,6 +195,18 @@ function badgeTexts(): string[] {
   );
 }
 
+function selectTab(label: string): void {
+  const tab = Array.from(domDocument.querySelectorAll('[role="tab"]')).find(
+    element => element.textContent?.trim() === label
+  );
+  if (!tab) throw new Error(`Missing ${label} tab`);
+  act(() => {
+    tab.dispatchEvent(
+      Object.assign(new domWindow.Event('keydown', { bubbles: true }), { key: 'Enter' })
+    );
+  });
+}
+
 describe('CloudAgentSettingsDialog scope grouping', () => {
   let root: Root;
 
@@ -251,44 +240,58 @@ describe('CloudAgentSettingsDialog scope grouping', () => {
     mockUseCloudAgentSettings.mockReturnValue(queryResult({ data: settings(true) }));
     renderDialog('org-1');
 
-    expect(badgeTexts()).toEqual([
-      'Organization workspace',
-      'All members',
-      'Only you',
-      'This browser',
-    ]);
+    expect(badgeTexts()).toEqual(['Organization workspace', 'All members']);
 
     const headings = Array.from(domDocument.querySelectorAll('h3')).map(heading =>
       heading.getAttribute('id')
     );
-    expect(headings).toEqual(['session-defaults-heading', 'personal-preferences-heading']);
+    expect(headings).toEqual(['session-defaults-heading']);
 
     const organizationSection = section('session-defaults-heading');
     expect(organizationSection.textContent).toContain('Default sandbox');
     expect(organizationSection.textContent).toContain('Repository overrides');
     expect(organizationSection.textContent).not.toContain('Collapse tool calls');
     expect(organizationSection.textContent).not.toContain('Background models');
-    expect(organizationSection.closest('[data-tab]')?.getAttribute('data-tab')).toBe('general');
+    expect(organizationSection.closest('[role="tabpanel"]')?.getAttribute('data-state')).toBe(
+      'active'
+    );
+
+    selectTab('Preferences');
+
+    expect(badgeTexts()).toEqual(['Organization workspace', 'Only you', 'This browser']);
+    expect(domDocument.querySelector('#session-defaults-heading')).toBeNull();
 
     const personalSection = section('personal-preferences-heading');
     const personalText = personalSection.textContent ?? '';
-    expect(personalSection.closest('[data-tab]')?.getAttribute('data-tab')).toBe('preferences');
+    expect(personalSection.closest('[role="tabpanel"]')?.getAttribute('data-state')).toBe('active');
     expect(personalText).toContain('Collapse tool calls');
     expect(personalText).toContain('Modes');
     expect(personalText).toContain('Background models');
     expect(personalText).not.toContain('Default sandbox');
     expect(personalText).not.toContain('Repository overrides');
     expect(personalText.indexOf('Display')).toBeLessThan(personalText.indexOf('Modes'));
+
+    selectTab('General');
+    expect(domDocument.querySelector('#personal-preferences-heading')).toBeNull();
+    expect(domDocument.querySelector('[role="switch"]')).toBeNull();
+    expect(badgeTexts()).toEqual(['Organization workspace', 'All members']);
   });
 
   it('labels sidebar groups by who the settings apply to', () => {
     mockUseCloudAgentSettings.mockReturnValue(queryResult({ data: settings(true) }));
     renderDialog('org-1');
 
-    const navText = Array.from(domDocument.querySelectorAll('[role="presentation"]')).map(label =>
-      (label.textContent ?? '').trim()
-    );
+    const navText = Array.from(
+      domDocument.querySelectorAll('[role="tablist"] > div[aria-hidden="true"]')
+    )
+      .map(label => (label.textContent ?? '').trim())
+      .filter(Boolean);
     expect(navText).toEqual(['Organization', 'You']);
+    for (const decoration of domDocument.querySelectorAll(
+      '[role="tablist"] > :not([role="tab"])'
+    )) {
+      expect(decoration.getAttribute('aria-hidden')).toBe('true');
+    }
   });
 
   it('keeps personal preferences editable when organization settings are view only', () => {
@@ -298,11 +301,17 @@ describe('CloudAgentSettingsDialog scope grouping', () => {
     expect(domDocument.body.textContent).toContain(
       'Organization settings are view only. Your personal preferences remain editable.'
     );
+    selectTab('Preferences');
     expect(section('personal-preferences-heading').textContent).toContain('Only you');
 
     const toggle = personalSwitch();
     expect(toggle.disabled).toBe(false);
     expect(toggle.getAttribute('aria-checked')).toBe('false');
+    const descriptionId = toggle.getAttribute('aria-describedby');
+    expect(descriptionId).toBeTruthy();
+    expect(domDocument.getElementById(descriptionId ?? '')?.textContent).toBe(
+      'Groups tool calls and reasoning between messages into one row you can expand.'
+    );
 
     act(() => toggle.click());
 
@@ -314,21 +323,21 @@ describe('CloudAgentSettingsDialog scope grouping', () => {
     mockUseCloudAgentSettings.mockReturnValue(queryResult({ data: settings(true) }));
     renderDialog();
 
-    expect(badgeTexts()).toEqual([
-      'Personal workspace',
-      'New sessions',
-      'Only you',
-      'This browser',
-    ]);
+    expect(badgeTexts()).toEqual(['Personal workspace', 'New sessions']);
 
     const organizationSection = section('session-defaults-heading');
     expect(organizationSection.textContent).toContain('Session defaults');
     expect(organizationSection.textContent).not.toContain('All members');
 
-    const navText = Array.from(domDocument.querySelectorAll('[role="presentation"]')).map(label =>
-      (label.textContent ?? '').trim()
-    );
+    const navText = Array.from(
+      domDocument.querySelectorAll('[role="tablist"] > div[aria-hidden="true"]')
+    )
+      .map(label => (label.textContent ?? '').trim())
+      .filter(Boolean);
     expect(navText).toEqual(['Workspace', 'You']);
+
+    selectTab('Preferences');
+    expect(badgeTexts()).toEqual(['Personal workspace', 'Only you', 'This browser']);
   });
 
   it('keeps the personal preference control available while settings load', () => {
@@ -338,6 +347,7 @@ describe('CloudAgentSettingsDialog scope grouping', () => {
     expect(domDocument.querySelector('[role="status"]')?.textContent).toContain(
       'Loading settings...'
     );
+    selectTab('Preferences');
     expect(section('personal-preferences-heading').textContent).toContain('Collapse tool calls');
 
     const toggle = personalSwitch();
@@ -352,6 +362,7 @@ describe('CloudAgentSettingsDialog scope grouping', () => {
     expect(domDocument.querySelector('[role="alert"]')?.textContent).toContain(
       'Could not load Cloud Agent settings.'
     );
+    selectTab('Preferences');
     expect(section('personal-preferences-heading').textContent).toContain('Collapse tool calls');
 
     const toggle = personalSwitch();
@@ -375,21 +386,11 @@ describe('CloudAgentSettingsDialog scope grouping', () => {
       );
     });
 
-    const environments = Array.from(domDocument.querySelectorAll('button')).find(
-      button => button.textContent?.trim() === 'Environments'
-    );
-    if (!environments) throw new Error('Missing Environments tab');
-
-    act(() => environments.click());
+    selectTab('Environments');
 
     expect(onSectionChange).toHaveBeenCalledWith('environments');
 
-    const preferences = Array.from(domDocument.querySelectorAll('button')).find(
-      button => button.textContent?.trim() === 'Preferences'
-    );
-    if (!preferences) throw new Error('Missing Preferences tab');
-
-    act(() => preferences.click());
+    selectTab('Preferences');
 
     expect(onSectionChange).toHaveBeenCalledWith('preferences');
   });

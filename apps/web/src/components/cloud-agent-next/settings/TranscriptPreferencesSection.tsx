@@ -11,6 +11,9 @@ import { SettingHint } from './SettingHint';
 export function TranscriptPreferencesSection() {
   const headingId = useId();
   const collapseToolsId = useId();
+  const collapseToolsDescriptionId = useId();
+  const collapseToolsDescription =
+    'Groups tool calls and reasoning between messages into one row you can expand.';
   const { collapseTools, setCollapseTools } = useCollapseToolsPreference();
 
   return (
@@ -29,11 +32,17 @@ export function TranscriptPreferencesSection() {
           <Label htmlFor={collapseToolsId} className="pointer-coarse:min-h-11">
             Collapse tool calls
           </Label>
-          <SettingHint label="Collapse tool calls">
-            Groups tool calls and reasoning between messages into one row you can expand.
-          </SettingHint>
+          <SettingHint label="Collapse tool calls">{collapseToolsDescription}</SettingHint>
+          <span id={collapseToolsDescriptionId} className="sr-only">
+            {collapseToolsDescription}
+          </span>
         </div>
-        <Switch id={collapseToolsId} checked={collapseTools} onCheckedChange={setCollapseTools} />
+        <Switch
+          id={collapseToolsId}
+          aria-describedby={collapseToolsDescriptionId}
+          checked={collapseTools}
+          onCheckedChange={setCollapseTools}
+        />
       </div>
     </section>
   );

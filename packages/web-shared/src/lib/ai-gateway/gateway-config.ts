@@ -71,6 +71,7 @@ const storedOrganizationIds = z.array(z.string().transform(id => id.toLowerCase(
  */
 export const OrganizationFeaturesSchema = z.object({
   experimental_byok: storedOrganizationIds,
+  enkrypt_output_guardrail: storedOrganizationIds,
   gateway_settings: storedOrganizationIds,
   request_logs: storedOrganizationIds,
 });
@@ -84,6 +85,11 @@ export const ORGANIZATION_FEATURE_DESCRIPTIONS = {
   experimental_byok: {
     label: 'Direct Amazon Bedrock and Google Vertex AI BYOK',
     description: 'Lets the organization add direct Amazon Bedrock and Google Vertex AI keys.',
+  },
+  enkrypt_output_guardrail: {
+    label: 'Enkrypt output guardrails',
+    description:
+      'Lets the organization configure Enkrypt output guardrails in AI Guardrails. Existing output guardrails keep running when this feature is removed.',
   },
   gateway_settings: {
     label: 'Gateway settings',
@@ -121,6 +127,7 @@ const organizationIdsInput = z
 /** Schema for the admin organization-features mutation input. */
 export const OrganizationFeaturesInputSchema = z.object({
   experimental_byok: organizationIdsInput,
+  enkrypt_output_guardrail: organizationIdsInput,
   gateway_settings: organizationIdsInput,
   request_logs: organizationIdsInput,
 }) satisfies z.ZodType<OrganizationFeatures, unknown>;

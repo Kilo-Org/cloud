@@ -109,6 +109,7 @@ import { handleLlmProxyRequest } from './llm-proxy';
 import {
   createEmptyEnkryptOutputDetectors,
   createKiloDefaultEnkryptInputDetectors,
+  storableEnkryptInputDetectors,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detectors';
 import { getRuntimeOrganizationFeatures } from '@kilocode/web-shared/lib/ai-gateway/organization-features';
 import {
@@ -6298,6 +6299,58 @@ describe('Enkrypt input guardrail', () => {
           [expect.objectContaining({ decision, addedLatencyMs: expect.any(Number) })],
           [expect.objectContaining({ decision: 'allowed', addedLatencyMs: null })],
         ]);
+      }
+    );
+
+    it.each([
+      {
+        action: 'log',
+        status: 200,
+        upstreamCalls: 1,
+        decisions: ['allowed', 'allowed'],
+        scans: [['nsfw'], ['injection_attack', 'pii']],
+      },
+      {
+        action: 'block',
+        status: 400,
+        upstreamCalls: 0,
+        decisions: ['blocked', 'allowed'],
+        scans: [['injection_attack', 'nsfw'], ['pii']],
+      },
+    ] as const)(
+      'returns $status when prompt injection set to $action fires',
+      async ({ action, status, upstreamCalls, decisions, scans }) => {
+        const detectors = createKiloDefaultEnkryptInputDetectors();
+        detectors.injection_attack.action = action;
+        setOrganization({
+          enkrypt: {
+            input_guardrail: { enabled: true, detectors: storableEnkryptInputDetectors(detectors) },
+          },
+        });
+        enkryptResponds(async detectors =>
+          Response.json(
+            'injection_attack' in detectors
+              ? {
+                  summary: { injection_attack: 1, pii: 0, nsfw: 0 },
+                  result_message: 'Potential prompt injection detected.',
+                }
+              : { summary: { nsfw: 0 }, result_message: null },
+            { headers: credits }
+          )
+        );
+
+        const response = await handleLlmProxyRequest(makeRequest(makeBody()));
+
+        expect(response.status).toBe(status);
+        expect(mockedUpstreamRequest).toHaveBeenCalledTimes(upstreamCalls);
+        expect(enkryptRequestBodies().map(body => Object.keys(body.detectors))).toEqual(scans);
+        await runAfterTasks();
+        expect(mockedRecordEnkryptUsage.mock.calls.map(([record]) => record.decision)).toEqual(
+          decisions
+        );
+        expect(
+          mockedRecordEnkryptUsage.mock.calls.map(([record]) => record.addedLatencyMs)
+        ).toEqual([expect.any(Number), null]);
       }
     );
 

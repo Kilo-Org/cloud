@@ -62,6 +62,7 @@ describe('resolveEnkryptInputGuardrail', () => {
     const detectors = createKiloDefaultEnkryptInputDetectors();
     detectors.policy_violation = {
       enabled: true,
+      action: 'block',
       format: 'policy_text',
       policy_text: 'Never share customer records.',
       rules: [],
@@ -85,6 +86,57 @@ describe('resolveEnkryptInputGuardrail', () => {
         nsfw: { enabled: true },
       },
       blockingDetectors: ['injection_attack', 'policy_violation', 'nsfw'],
+    });
+  });
+
+  it('keeps blocking configurable detectors saved before they had an action', () => {
+    const { injection_attack, policy_violation, ...others } =
+      createKiloDefaultEnkryptInputDetectors();
+    const detectors = {
+      ...others,
+      injection_attack: { enabled: injection_attack.enabled },
+      policy_violation: {
+        enabled: true,
+        format: 'policy_text',
+        policy_text: 'Never share customer records.',
+        rules: policy_violation.rules,
+      },
+    };
+
+    expect(resolve({ enkrypt: { input_guardrail: { enabled: true, detectors } } })).toMatchObject({
+      status: 'ready',
+      blockingDetectors: ['injection_attack', 'policy_violation', 'nsfw'],
+    });
+  });
+
+  it('scans log only configurable detectors in the log only call, never the blocking one', () => {
+    const detectors = createKiloDefaultEnkryptInputDetectors();
+    detectors.injection_attack.action = 'log';
+    detectors.policy_violation = {
+      enabled: true,
+      action: 'log',
+      format: 'policy_text',
+      policy_text: 'Never share customer records.',
+      rules: [],
+    };
+    const config = resolve({ enkrypt: { input_guardrail: { enabled: true, detectors } } });
+    if (config?.status !== 'ready') throw new Error('Expected a ready guardrail');
+
+    expect(config.blockingDetectors).toEqual(['nsfw']);
+    const { blocking, logOnly } = splitEnkryptInputGuardrail(config);
+    expect(blocking).toEqual({ ...config, detectors: { nsfw: { enabled: true } } });
+    expect(logOnly).toEqual({
+      ...config,
+      blockingDetectors: [],
+      detectors: {
+        injection_attack: { enabled: true, need_explanation: false },
+        pii: { enabled: true, entities: ['secrets'] },
+        policy_violation: {
+          enabled: true,
+          need_explanation: false,
+          policy_text: 'Never share customer records.',
+        },
+      },
     });
   });
 

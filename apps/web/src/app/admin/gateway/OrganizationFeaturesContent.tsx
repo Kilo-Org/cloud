@@ -25,6 +25,7 @@ type FeatureValues = Record<OrganizationFeature, string>;
 function toFeatureValues(features: OrganizationFeatures): FeatureValues {
   return {
     experimental_byok: features.experimental_byok.join('\n'),
+    enkrypt_output_guardrail: features.enkrypt_output_guardrail.join('\n'),
     gateway_settings: features.gateway_settings.join('\n'),
     request_logs: features.request_logs.join('\n'),
   };
@@ -47,6 +48,7 @@ function OrganizationFeaturesPreview({
   const trpc = useTRPC();
   const parsed = OrganizationFeaturesInputSchema.safeParse({
     experimental_byok: parseOrganizationIds(values.experimental_byok),
+    enkrypt_output_guardrail: parseOrganizationIds(values.enkrypt_output_guardrail),
     gateway_settings: parseOrganizationIds(values.gateway_settings),
     request_logs: parseOrganizationIds(values.request_logs),
   });
@@ -185,6 +187,7 @@ export function OrganizationFeaturesContent() {
     if (!values) return;
     const parsed = OrganizationFeaturesInputSchema.safeParse({
       experimental_byok: parseOrganizationIds(values.experimental_byok),
+      enkrypt_output_guardrail: parseOrganizationIds(values.enkrypt_output_guardrail),
       gateway_settings: parseOrganizationIds(values.gateway_settings),
       request_logs: parseOrganizationIds(values.request_logs),
     });

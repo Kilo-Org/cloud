@@ -10,6 +10,7 @@ const deletedId = 'bbbbbbbb-2222-4222-8222-222222222222';
 const unknownId = 'cccccccc-3333-4333-8333-333333333333';
 const emptyFeatures: OrganizationFeatures = {
   experimental_byok: [],
+  enkrypt_output_guardrail: [],
   gateway_settings: [],
   request_logs: [],
 };
@@ -76,7 +77,12 @@ describe('OrganizationFeaturesContent', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
     Object.assign(mockConfigQuery, {
-      data: { experimental_byok: [activeId], gateway_settings: [], request_logs: [] },
+      data: {
+        experimental_byok: [activeId],
+        enkrypt_output_guardrail: [],
+        gateway_settings: [],
+        request_logs: [],
+      },
       isLoading: false,
       error: null,
     });
@@ -147,6 +153,7 @@ describe('OrganizationFeaturesContent', () => {
   it('shows organization names, IDs and admin links with deleted and unknown labels per feature', () => {
     mockConfigQuery.data = {
       experimental_byok: [activeId, unknownId],
+      enkrypt_output_guardrail: [activeId],
       gateway_settings: [deletedId, activeId],
       request_logs: [activeId],
     };
@@ -154,13 +161,17 @@ describe('OrganizationFeaturesContent', () => {
     render();
 
     expect(container.textContent).toContain('These features are experimental.');
+    expect(container.textContent).toContain(
+      'Lets the organization configure Enkrypt output guardrails in AI Guardrails. Existing output guardrails keep running when this feature is removed.'
+    );
     const sections = Array.from(container.querySelectorAll('section'));
     expect(sections.map(section => section.querySelector('h3')?.textContent)).toEqual([
       'Direct Amazon Bedrock and Google Vertex AI BYOK (2)',
+      'Enkrypt output guardrails (1)',
       'Gateway settings (2)',
       'Request logs (1)',
     ]);
-    expect(sections[2].querySelector('a')?.textContent).toBe('Active organization');
+    expect(sections[3].querySelector('a')?.textContent).toBe('Active organization');
     expect(sections[0].querySelector('a')?.textContent).toBe('Active organization');
     expect(sections[0].querySelector('a')?.getAttribute('href')).toBe(
       `/admin/organizations/${activeId}`
@@ -172,7 +183,7 @@ describe('OrganizationFeaturesContent', () => {
     const unknown = sections[0].querySelectorAll('li')[1];
     expect(unknown.textContent).toContain('Organization not found');
     expect(unknown.querySelector('a')).toBeNull();
-    const deleted = sections[1].querySelector('li');
+    const deleted = sections[2].querySelector('li');
     expect(deleted?.querySelector('a')?.textContent).toBe('Deleted organization');
     expect(deleted?.querySelector('a')?.getAttribute('href')).toBe(
       `/admin/organizations/${deletedId}`
@@ -188,10 +199,12 @@ describe('OrganizationFeaturesContent', () => {
     render();
     mockPreviewQuery.data = [{ id: deletedId, name: 'New organization', isDeleted: false }];
     edit('experimental_byok', ` ${deletedId.toUpperCase()} \n\n${deletedId}\n `);
+    edit('enkrypt_output_guardrail', deletedId);
     edit('gateway_settings', ` ${deletedId.toUpperCase()} \n${deletedId}\n`);
 
     const input = {
       experimental_byok: [deletedId],
+      enkrypt_output_guardrail: [deletedId],
       gateway_settings: [deletedId],
       request_logs: [],
     };
@@ -203,8 +216,8 @@ describe('OrganizationFeaturesContent', () => {
     expect(container.textContent).not.toContain('Active organization');
     expect(
       Array.from(container.querySelectorAll('section a')).map(link => link.textContent)
-    ).toEqual(['New organization', 'New organization']);
-    expect(container.querySelectorAll('section li')).toHaveLength(2);
+    ).toEqual(['New organization', 'New organization', 'New organization']);
+    expect(container.querySelectorAll('section li')).toHaveLength(3);
     expect(button('Save').disabled).toBe(false);
     expect(mockMutate).not.toHaveBeenCalled();
     act(() => button('Save').click());
@@ -269,11 +282,9 @@ describe('OrganizationFeaturesContent', () => {
     expect(mockPreviewOptions).toHaveBeenLastCalledWith(emptyFeatures, {
       enabled: false,
     });
-    expect(Array.from(container.querySelectorAll('section p')).map(p => p.textContent)).toEqual([
-      'No organizations enabled.',
-      'No organizations enabled.',
-      'No organizations enabled.',
-    ]);
+    expect(Array.from(container.querySelectorAll('section p')).map(p => p.textContent)).toEqual(
+      Array.from({ length: 4 }, () => 'No organizations enabled.')
+    );
     expect(container.querySelector('[role="status"]')).toBeNull();
     expect(container.querySelector('section li')).toBeNull();
   });

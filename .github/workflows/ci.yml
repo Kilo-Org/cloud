@@ -849,17 +849,17 @@ jobs:
         env:
           POSTGRES_URL: postgresql://unused:unused@localhost:5432/unused
 
-  # The web Jest suite is the slowest suite in CI. Eight shards run it in
-  # parallel; the `test` job below reports the combined result under the
-  # required check name. It also runs when a web test reads changed data.
+  # Four shards run the web Jest suite in parallel; the `test` job below
+  # reports the combined result under the required check name. It also runs
+  # when a web test reads changed data.
   web-test:
     needs: changes
     if: needs.changes.outputs.kilocode_backend == 'true' || contains(fromJSON(needs.changes.outputs.affected).test_only_packages, 'web')
-    name: web-test (${{ matrix.shard }}/8)
+    name: web-test (${{ matrix.shard }}/4)
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5, 6, 7, 8]
+        shard: [1, 2, 3, 4]
     runs-on: ${{ vars.RUNNER_LARGE_LABEL || 'ubuntu-24.04-8core' }}
     timeout-minutes: 30
 
@@ -930,7 +930,7 @@ jobs:
         run: pnpm install --frozen-lockfile --filter 'web...' --filter 'ai-gateway...' --filter kilocode-monorepo
 
       - name: Run web tests
-        run: pnpm --filter web test --shard=${{ matrix.shard }}/8
+        run: pnpm --filter web test --shard=${{ matrix.shard }}/4
 
   test-scripts:
     needs: changes

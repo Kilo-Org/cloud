@@ -10,6 +10,8 @@ import { openAiServedModelsMetadataSource } from '@kilocode/web-shared/lib/ai-ga
 import { mockOpenRouterModels } from '@kilocode/web-shared/tests/helpers/openrouter-models.helper';
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
 import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
+import { readStoredMetadata } from '@kilocode/web-shared/lib/ai-gateway/metadata-cache';
+import { vercelCatalogSource } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/vercel-catalog';
 import type * as StaleAlert from '@/lib/providers/metadata-cache/metadata-cache-stale-alert';
 
 jest.mock('@/lib/providers/metadata-cache/metadata-cache-stale-alert', () => ({
@@ -194,6 +196,27 @@ describe('refreshMetadataCache', () => {
     expect(await readRow(openRouterModelsMetadataSource.url)).toEqual(before);
     expect(summary).toMatchObject({ failed_count: 1, stale_count: 0 });
     expect(alertIfMetadataCacheStale).toHaveBeenCalledWith([]);
+  });
+
+  it('stores the Vercel model list that the Vercel catalog reads', async () => {
+    const vercelModels = {
+      data: gatewayModelIds().map((id, index) => ({
+        id,
+        name: `Model ${index}`,
+        type: 'language',
+        created: 1_790_000_000,
+        context_window: 128_000,
+        modalities: { input: ['text'], output: ['text'] },
+        pricing: { input: '0.000001', output: '0.000002' },
+      })),
+    };
+    respond(vercelGatewayModelsSource.url, () => Response.json(vercelModels));
+
+    await refreshMetadataCache();
+
+    expect(vercelCatalogSource.url).toBe(vercelGatewayModelsSource.url);
+    const catalog = await readStoredMetadata(vercelCatalogSource, db);
+    expect([...(catalog?.keys() ?? [])]).toEqual(gatewayModelIds());
   });
 
   it('keeps an unchanged body and still bumps updated_at', async () => {

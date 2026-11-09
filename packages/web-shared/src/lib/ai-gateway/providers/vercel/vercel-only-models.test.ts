@@ -304,10 +304,10 @@ describe('getVercelOnlyCatalogModels', () => {
     expect(getVercelCatalog).not.toHaveBeenCalled();
   });
 
-  it('lists nothing when the Vercel model list cannot be fetched', async () => {
+  it('lists nothing when the Vercel model list is neither stored nor fetchable', async () => {
     jest
       .mocked(getVercelCatalog)
-      .mockRejectedValue(new Error('Fetching Vercel models failed: 503'));
+      .mockRejectedValue(new Error('Fetching https://ai-gateway.vercel.sh/v1/models failed: 503'));
 
     await expect(
       getVercelOnlyCatalogModels({ openRouterModels, openRouterMetadata: {} })

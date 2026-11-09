@@ -1,7 +1,13 @@
 import * as z from 'zod';
-import { captureException } from '@sentry/nextjs';
 import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
 import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
+import {
+  createCachedMetadataReader,
+  type MetadataSource,
+} from '@kilocode/web-shared/lib/ai-gateway/metadata-cache';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
+
+const VERCEL_CATALOG_CACHE_TTL_MS = 5 * 60 * 1000;
 
 /** The fields of a Vercel AI Gateway `/v1/models` entry that describe a chat model. */
 const VercelCatalogModelSchema = z.object({
@@ -62,27 +68,28 @@ export function parseVercelCatalog(body: unknown): VercelCatalog {
   );
 }
 
+export const vercelCatalogSource: MetadataSource<VercelCatalog> = {
+  url: `${VERCEL_AI_GATEWAY.apiUrl}/models`,
+  headers: () => ({
+    Authorization: `Bearer ${VERCEL_AI_GATEWAY.apiKey}`,
+    ...ATTRIBUTION_HEADERS,
+  }),
+  parse: parseVercelCatalog,
+};
+
+const vercelCatalogReader = createCachedMetadataReader(vercelCatalogSource, {
+  fromDb: readDb,
+  ttlMs: VERCEL_CATALOG_CACHE_TTL_MS,
+});
+
+export function resetVercelCatalogCache() {
+  vercelCatalogReader.reset();
+}
+
 /**
- * Vercel's model list, cached in the shared fetch cache like `getRawOpenRouterModels`, so the
- * model list and the provider sync read the same data.
+ * Vercel's model list, read from the metadata cache table (live fetch only when the row is missing
+ * or unusable) and kept in memory for 5 minutes, like `getRawOpenRouterModels`.
  */
 export async function getVercelCatalog(): Promise<VercelCatalog> {
-  const response = await fetch(`${VERCEL_AI_GATEWAY.apiUrl}/models`, {
-    cache: 'force-cache',
-    method: 'GET',
-    headers: {
-      Authorization: `Bearer ${VERCEL_AI_GATEWAY.apiKey}`,
-      ...ATTRIBUTION_HEADERS,
-    },
-    next: { revalidate: 60 },
-  });
-  if (!response.ok) {
-    const error = new Error(`Fetching Vercel AI Gateway models failed: ${response.status}`);
-    captureException(error, {
-      tags: { endpoint: 'vercel/models', source: 'vercel_api' },
-      extra: { status: response.status, statusText: response.statusText },
-    });
-    throw error;
-  }
-  return parseVercelCatalog(await response.json());
+  return vercelCatalogReader.get();
 }

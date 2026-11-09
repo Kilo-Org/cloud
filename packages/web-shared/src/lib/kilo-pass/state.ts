@@ -154,7 +154,9 @@ export async function getKiloPassStateForUser(
       ),
       orderBy: desc(kilo_pass_store_purchases.purchased_at),
     });
-    const nowIso = dayjs().utc().toISOString();
+    // Read the clock through `Date.now()` so a test that overrides it (the store
+    // notification suites do) decides whether the purchase has lapsed.
+    const nowIso = dayjs(Date.now()).utc().toISOString();
 
     // Apple's EXPIRED server notification is best-effort and can be dropped, so we
     // derive the canceled status here when the latest store purchase has lapsed.

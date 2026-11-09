@@ -1051,6 +1051,24 @@ test('the changes job installs the root project only for a resource manifest', (
   );
 });
 
+// The eight shards run one Jest suite, and its roots are apps/web, the
+// web-shared and db sources its config maps in, and apps/ai-gateway. A
+// recursive workspace install links every other project for a step that reads
+// none of them, so the install names those closures. A suite that starts
+// reading another workspace widens the filter; it does not restore the full
+// install, and the shard count and the test step stay as they are.
+const webTestInstall =
+  "pnpm install --frozen-lockfile --filter 'web...' --filter 'ai-gateway...' --filter kilocode-monorepo";
+
+test('the web-test shards install the closure their Jest suite reads', () => {
+  const job = ciJobs['web-test'];
+  const install = job.steps.find(step => step.name === 'Install dependencies');
+  assert.equal(install.run, webTestInstall, 'the shards install the suite closure');
+  assert.deepEqual(job.strategy.matrix.shard, [1, 2, 3, 4, 5, 6, 7, 8], 'eight shards still run');
+  const run = job.steps.find(step => step.name === 'Run web tests');
+  assert.equal(run.run, 'pnpm --filter web test --shard=${{ matrix.shard }}/8');
+});
+
 // The extension's unit suite runs in extension-ci.yml for a pull request and a
 // main push, and that workflow has no merge_queue trigger: the ci.yml row is the
 // merge-queue gate, and it installs and tests nothing on the events the other

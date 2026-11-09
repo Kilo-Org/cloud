@@ -17,6 +17,7 @@ import { OrganizationWorkOSCard } from './OrganizationWorkOSCard';
 import { OrganizationAdminWebhooks } from './OrganizationAdminWebhooks';
 import { OrganizationAdminIntegrations } from './OrganizationAdminIntegrations';
 import { OrganizationAdminSupportAccessPrompt } from './OrganizationAdminSupportAccessPrompt';
+import { OrganizationAdminStripeLink } from './OrganizationAdminStripeLink';
 import { OrganizationContextProvider } from '@/components/organizations/OrganizationContext';
 import AdminPage from '@/app/admin/components/AdminPage';
 import {
@@ -63,6 +64,7 @@ export function OrganizationAdminDashboard({ organizationId }: { organizationId:
             <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
               <div className="space-y-4">
                 <OrganizationInfoCard organizationId={organizationId} showAdminControls />
+                <OrganizationAdminStripeLink organizationId={organizationId} />
                 <OrganizationAdminIntegrations organizationId={organizationId} />
                 <OrganizationAdminHierarchyManagement organizationId={organizationId} />
               </div>

@@ -5,3 +5,7 @@ CREATE TABLE "domain_blacklist_state" (
 	"migrated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "domain_blacklist_state_singleton" CHECK ("domain_blacklist_state"."id" = 1)
 );
+-->  statement-breakpoint
+INSERT INTO "domain_blacklist_state" ("id", "use_env_fallback")
+SELECT 1, NOT EXISTS (SELECT 1 FROM "blacklisted_domains" LIMIT 1)
+ON CONFLICT ("id") DO NOTHING;

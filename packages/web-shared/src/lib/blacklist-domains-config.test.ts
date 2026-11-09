@@ -5,9 +5,9 @@ import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import type * as BlacklistConfig from '@kilocode/web-shared/lib/blacklist-domains-config';
 import {
   BLACKLISTED_DOMAINS_SETTINGS_REDIS_KEY,
-  BLACKLISTED_DOMAINS_UPDATED_AT_REDIS_KEY,
   MAX_BLACKLIST_DOMAINS,
 } from '@kilocode/worker-utils/account-access';
+import { BLACKLIST_DOMAINS_REDIS_KEY } from '@kilocode/web-shared/lib/redis-keys';
 import { sql } from 'drizzle-orm';
 
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
@@ -94,6 +94,78 @@ describe('Postgres blacklist reads', () => {
 });
 
 describe('small shared signup/operator settings', () => {
+  test('reads uncached metadata from the new key before consulting legacy settings', async () => {
+    const legacy = JSON.stringify({
+      domains: { stale: 'legacy-domain-field' },
+      blocked_signup_tlds: [],
+      updated_at: 'legacy-time',
+      updated_by: 'legacy-admin',
+      updated_by_email: 'legacy-admin@example.com',
+    });
+    redisGet.mockImplementation(async key =>
+      key === BLACKLISTED_DOMAINS_SETTINGS_REDIS_KEY ? null : legacy
+    );
+
+    await expect(config.readBlacklistDomainsSettings()).resolves.toEqual({
+      domains: [],
+      blocked_signup_tlds: [],
+      updated_at: 'legacy-time',
+      updated_by: 'legacy-admin',
+      updated_by_email: 'legacy-admin@example.com',
+    });
+    expect(redisGet.mock.calls.map(([key]) => key)).toEqual([
+      BLACKLISTED_DOMAINS_SETTINGS_REDIS_KEY,
+      BLACKLIST_DOMAINS_REDIS_KEY,
+    ]);
+
+    redisGet.mockClear();
+    redisGet.mockImplementation(async key =>
+      key === BLACKLISTED_DOMAINS_SETTINGS_REDIS_KEY
+        ? settings({ blocked_signup_tlds: ['asia'], updated_at: 'legacy-time' })
+        : legacy
+    );
+    await expect(config.readBlacklistDomainsSettings()).resolves.toMatchObject({
+      blocked_signup_tlds: ['asia'],
+      updated_at: 'legacy-time',
+    });
+    expect(redisGet).toHaveBeenCalledTimes(1);
+    expect(redisGet).toHaveBeenCalledWith(BLACKLISTED_DOMAINS_SETTINGS_REDIS_KEY);
+  });
+
+  test.each(['', 'not-json', settings({ domains: ['not-allowed-in-small-settings.example'] })])(
+    'rejects malformed small settings without falling back to legacy: %s',
+    async smallSettings => {
+      redisGet.mockImplementation(async key =>
+        key === BLACKLISTED_DOMAINS_SETTINGS_REDIS_KEY
+          ? smallSettings
+          : settings({ blocked_signup_tlds: ['legacy'] })
+      );
+
+      await expect(config.readBlacklistDomainsSettings()).rejects.toThrow();
+      expect(redisGet.mock.calls.map(([key]) => key)).toEqual([
+        BLACKLISTED_DOMAINS_SETTINGS_REDIS_KEY,
+      ]);
+    }
+  );
+
+  test('rejects bad legacy metadata while ignoring its domain field', async () => {
+    redisGet.mockImplementation(async key =>
+      key === BLACKLISTED_DOMAINS_SETTINGS_REDIS_KEY
+        ? null
+        : JSON.stringify({
+            ...JSON.parse(settings()),
+            domains: 'ignored',
+            blocked_signup_tlds: [1],
+          })
+    );
+
+    await expect(config.readBlacklistDomainsSettings()).rejects.toThrow();
+    expect(redisGet.mock.calls.map(([key]) => key)).toEqual([
+      BLACKLISTED_DOMAINS_SETTINGS_REDIS_KEY,
+      BLACKLIST_DOMAINS_REDIS_KEY,
+    ]);
+  });
+
   test('reads signup TLDs from the new settings key', async () => {
     redisGet.mockResolvedValue(settings({ blocked_signup_tlds: ['asia'] }));
     await expect(config.getBlockedSignupTlds()).resolves.toEqual(['asia']);
@@ -128,9 +200,23 @@ describe('small shared signup/operator settings', () => {
   test('keeps the last good signup settings when Redis refresh fails', async () => {
     redisGet.mockResolvedValue(settings({ blocked_signup_tlds: ['asia'] }));
     await expect(config.getBlockedSignupTlds()).resolves.toEqual(['asia']);
-    now += 60_001;
+    now += 59_999;
+    await expect(config.getBlockedSignupTlds()).resolves.toEqual(['asia']);
+    expect(redisGet).toHaveBeenCalledTimes(1);
+
+    now += 1;
     redisGet.mockRejectedValue(new Error('Redis timeout'));
     await expect(config.getBlockedSignupTlds()).resolves.toEqual(['asia']);
-    expect(redisGet).toHaveBeenCalledWith(BLACKLISTED_DOMAINS_UPDATED_AT_REDIS_KEY);
+    expect(redisGet).toHaveBeenCalledWith(BLACKLISTED_DOMAINS_SETTINGS_REDIS_KEY);
+    expect(redisGet).toHaveBeenCalledTimes(2);
+
+    now += 29_999;
+    await expect(config.getBlockedSignupTlds()).resolves.toEqual(['asia']);
+    expect(redisGet).toHaveBeenCalledTimes(2);
+
+    now += 1;
+    redisGet.mockResolvedValue(settings({ blocked_signup_tlds: ['top'] }));
+    await expect(config.getBlockedSignupTlds()).resolves.toEqual(['top']);
+    expect(redisGet).toHaveBeenCalledTimes(3);
   });
 });

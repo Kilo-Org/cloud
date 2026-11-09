@@ -23,6 +23,44 @@ const schemaTestDb = createDrizzleClient({
   poolConfig: { application_name: 'db-schema-test', max: 1 },
 });
 
+const domainBlacklistMigration = fs.readFileSync(
+  path.join(__dirname, 'migrations/0345_chilly_hiroim.sql'),
+  'utf8'
+);
+const [domainBlacklistMigrationDdl, domainBlacklistMigrationSeed] = domainBlacklistMigration.split(
+  '-->  statement-breakpoint'
+);
+
+async function executeDomainBlacklistSeed(
+  domains: readonly string[],
+  runs = 1
+): Promise<(typeof schema.domain_blacklist_state.$inferSelect)[][]> {
+  if (!domainBlacklistMigrationDdl || !domainBlacklistMigrationSeed?.trim()) {
+    throw new Error('Domain blacklist migration DDL or seed is missing');
+  }
+
+  return schemaTestDb.db.transaction(async tx => {
+    await tx.execute(
+      sql`CREATE TEMP TABLE "blacklisted_domains" ("domain" text PRIMARY KEY) ON COMMIT DROP`
+    );
+    const temporaryStateTableDdl = domainBlacklistMigrationDdl
+      .replace('CREATE TABLE ', 'CREATE TEMP TABLE ')
+      .replace(/\);\s*$/, ') ON COMMIT DROP;');
+    await tx.execute(sql.raw(temporaryStateTableDdl));
+
+    for (const domain of domains) {
+      await tx.insert(schema.blacklisted_domains).values({ domain });
+    }
+
+    const states = [];
+    for (let run = 0; run < runs; run++) {
+      await tx.execute(sql.raw(domainBlacklistMigrationSeed));
+      states.push(await tx.select().from(schema.domain_blacklist_state));
+    }
+    return states;
+  });
+}
+
 afterAll(async () => {
   await schemaTestDb.pool.end();
 });
@@ -65,21 +103,45 @@ describe('domain blacklist schema', () => {
     expect(migration).toContain('"domain" text PRIMARY KEY NOT NULL');
   });
 
-  it('creates readiness state without recreating blacklisted_domains or inserting state', () => {
-    const migrationsDir = path.join(__dirname, 'migrations');
-    const migration = fs
-      .readdirSync(migrationsDir)
-      .filter(file => file.endsWith('.sql'))
-      .map(file => fs.readFileSync(path.join(migrationsDir, file), 'utf8'))
-      .find(contents => contents.includes('CREATE TABLE "domain_blacklist_state"'));
-
-    expect(migration).toBeDefined();
-    if (!migration) throw new Error('Domain blacklist readiness migration is missing');
-    expect(migration).not.toContain('CREATE TABLE "blacklisted_domains"');
-    expect(migration).toContain(
+  it('seeds readiness from the PostgreSQL blacklist without writing domain rows', () => {
+    expect(domainBlacklistMigrationDdl).toContain('CREATE TABLE "domain_blacklist_state"');
+    expect(domainBlacklistMigrationDdl).not.toContain('CREATE TABLE "blacklisted_domains"');
+    expect(domainBlacklistMigrationDdl).toContain(
       'CONSTRAINT "domain_blacklist_state_singleton" CHECK ("domain_blacklist_state"."id" = 1)'
     );
-    expect(migration).not.toMatch(/INSERT\s+INTO\s+"?domain_blacklist_state"?/i);
+    expect(domainBlacklistMigrationSeed).toMatch(
+      /INSERT INTO "domain_blacklist_state" \("id", "use_env_fallback"\)/i
+    );
+    expect(domainBlacklistMigrationSeed).toMatch(
+      /SELECT 1, NOT EXISTS \(SELECT 1 FROM "blacklisted_domains" LIMIT 1\)/i
+    );
+    expect(domainBlacklistMigrationSeed).toMatch(/ON CONFLICT \("id"\) DO NOTHING/i);
+    expect(domainBlacklistMigrationSeed?.trim().split(';').filter(Boolean)).toHaveLength(1);
+    expect(domainBlacklistMigration).not.toMatch(
+      /\b(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM|TRUNCATE(?:\s+TABLE)?)\s+"?blacklisted_domains"?/i
+    );
+  });
+
+  it.each([
+    { name: 'non-empty', domains: ['existing.example'], useEnvFallback: false },
+    { name: 'empty', domains: [], useEnvFallback: true },
+  ])(
+    'seeds fallback state for a $name PostgreSQL blacklist',
+    async ({ domains, useEnvFallback }) => {
+      const [state] = await executeDomainBlacklistSeed(domains);
+      expect(state).toHaveLength(1);
+      expect(state?.[0]).toMatchObject({ id: 1, use_env_fallback: useEnvFallback });
+      expect(state?.[0]?.revision).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+      );
+      expect(Date.parse(state?.[0]?.migrated_at ?? '')).not.toBeNaN();
+    }
+  );
+
+  it('preserves state and revision when the seed is rerun', async () => {
+    const [firstRun, secondRun] = await executeDomainBlacklistSeed(['existing.example'], 2);
+    expect(firstRun).toHaveLength(1);
+    expect(secondRun).toEqual(firstRun);
   });
 });
 

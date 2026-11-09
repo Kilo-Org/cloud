@@ -58,6 +58,7 @@ const mockedRedisMset = jest.mocked(redisClient.mset);
 const mockedRedisEval = jest.mocked(redisClient.eval);
 const redisValues = new Map<string, string>();
 const redisTtls = new Map<string, number>();
+const redisReadSettingsPresence: { key: string; smallSettingsPresent: boolean }[] = [];
 const initialSettings: BlacklistDomainsConfig = {
   domains: [],
   blocked_signup_tlds: ['shop', 'top'],
@@ -107,10 +108,15 @@ beforeEach(async () => {
   await cleanupDbForTest();
   redisValues.clear();
   redisTtls.clear();
+  redisReadSettingsPresence.length = 0;
   envFallbackDomains.splice(0, envFallbackDomains.length, ...originalEnvFallbackDomains);
   redisValues.set(BLACKLISTED_DOMAINS_SETTINGS_REDIS_KEY, JSON.stringify(initialSettings));
   mockedRedisGet.mockReset();
   mockedRedisGet.mockImplementation(async <T>(key: string) => {
+    redisReadSettingsPresence.push({
+      key,
+      smallSettingsPresent: redisValues.has(BLACKLISTED_DOMAINS_SETTINGS_REDIS_KEY),
+    });
     return (redisValues.get(key) ?? null) as T | null;
   });
   mockedRedisMset.mockReset();
@@ -132,7 +138,11 @@ beforeEach(async () => {
 
 afterEach(() => {
   envFallbackDomains.splice(0, envFallbackDomains.length, ...originalEnvFallbackDomains);
-  expect(mockedRedisGet).not.toHaveBeenCalledWith(BLACKLIST_DOMAINS_REDIS_KEY);
+  for (const read of redisReadSettingsPresence.filter(
+    ({ key }) => key === BLACKLIST_DOMAINS_REDIS_KEY
+  )) {
+    expect(read.smallSettingsPresent).toBe(false);
+  }
   expect(redisClient.ttl).not.toHaveBeenCalled();
   expect(redisClient.del).not.toHaveBeenCalled();
   for (const [values] of mockedRedisMset.mock.calls) {
@@ -485,6 +495,91 @@ describe('admin.blacklistDomains.suspicious', () => {
 });
 
 describe('admin.blacklistDomains.set', () => {
+  it('bootstraps settings from legacy on save and stops reading legacy after commit', async () => {
+    await setPostgresBlacklist(['previous.example']);
+    redisValues.delete(BLACKLISTED_DOMAINS_SETTINGS_REDIS_KEY);
+    redisValues.set(
+      BLACKLIST_DOMAINS_REDIS_KEY,
+      JSON.stringify({
+        domains: ['stale-legacy.example'],
+        blocked_signup_tlds: [' .ASIA ', 'asia'],
+        updated_at: 'legacy-time',
+        updated_by: 'legacy-admin',
+        updated_by_email: 'legacy-admin@example.com',
+      })
+    );
+    redisTtls.set(BLACKLIST_DOMAINS_REDIS_KEY, -1);
+    const caller = await createCallerForUser(admin.id);
+    const loaded = await caller.admin.blacklistDomains.get();
+
+    expect(loaded).toMatchObject({
+      domains: ['previous.example'],
+      blocked_signup_tlds: ['asia'],
+      updated_at: 'legacy-time',
+      updated_by: 'legacy-admin',
+      updated_by_email: 'legacy-admin@example.com',
+    });
+    expect(mockedRedisMset).not.toHaveBeenCalled();
+    expect(mockedRedisEval).not.toHaveBeenCalled();
+    expect(
+      mockedRedisGet.mock.calls.filter(([key]) => key === BLACKLIST_DOMAINS_REDIS_KEY)
+    ).toHaveLength(1);
+
+    const transaction = db.transaction.bind(db);
+    const order: string[] = [];
+    jest.spyOn(db, 'transaction').mockImplementationOnce(async callback => {
+      const result = await transaction(callback);
+      order.push('commit');
+      return result;
+    });
+    mockedRedisMset.mockImplementationOnce(async values => {
+      order.push('mset');
+      for (const [key, value] of Object.entries(values)) redisValues.set(key, String(value));
+      return 'OK';
+    });
+    mockedRedisEval.mockImplementationOnce(async () => {
+      order.push('cleanup');
+      expect(order).toEqual(['mset', 'commit', 'cleanup']);
+      expect(await db.select().from(blacklisted_domains)).toEqual([{ domain: 'previous.example' }]);
+      const persisted = JSON.parse(
+        redisValues.get(BLACKLISTED_DOMAINS_SETTINGS_REDIS_KEY) ?? 'null'
+      );
+      expect(persisted).toEqual({
+        domains: [],
+        blocked_signup_tlds: ['asia'],
+        updated_at: expect.any(String),
+        updated_by: admin.id,
+        updated_by_email: admin.google_user_email,
+      });
+      expect(redisValues.get(BLACKLIST_DOMAINS_UPDATED_AT_REDIS_KEY)).toBe(persisted.updated_at);
+      return cleanupLegacy();
+    });
+
+    const saved = await caller.admin.blacklistDomains.set({
+      domains: loaded.domains,
+      expected_version: loaded.version,
+    });
+
+    expect(saved.blocked_signup_tlds).toEqual(['asia']);
+    expect(saved.legacy_cleanup_failed).toBe(false);
+    expect(redisValues.has(BLACKLIST_DOMAINS_REDIS_KEY)).toBe(false);
+    expect(order).toEqual(['mset', 'commit', 'cleanup']);
+
+    const afterSave = await caller.admin.blacklistDomains.get();
+    expect(afterSave).toMatchObject({
+      domains: ['previous.example'],
+      blocked_signup_tlds: ['asia'],
+      updated_by: admin.id,
+    });
+    await caller.admin.blacklistDomains.set({
+      domains: afterSave.domains,
+      expected_version: afterSave.version,
+    });
+    expect(
+      mockedRedisGet.mock.calls.filter(([key]) => key === BLACKLIST_DOMAINS_REDIS_KEY)
+    ).toHaveLength(2);
+  });
+
   it('blocks existing accounts on a newly added domain and writes only small settings', async () => {
     const target = await insertTestUser({
       google_user_email: 'a@mailinator.com',
@@ -1215,6 +1310,90 @@ describe('admin.blacklistDomains.get', () => {
     expect(mockedRedisEval).not.toHaveBeenCalled();
   });
 
+  it('falls back to legacy metadata only and ignores its stale or malformed domain field', async () => {
+    await setPostgresBlacklist(['stored.example']);
+    redisValues.delete(BLACKLISTED_DOMAINS_SETTINGS_REDIS_KEY);
+    redisValues.set(
+      BLACKLIST_DOMAINS_REDIS_KEY,
+      JSON.stringify({
+        domains: { stale: ['legacy.example'] },
+        blocked_signup_tlds: [],
+        updated_at: 'legacy-time',
+        updated_by: 'legacy-admin',
+        updated_by_email: 'legacy-admin@example.com',
+      })
+    );
+    const caller = await createCallerForUser(admin.id);
+
+    const config = await caller.admin.blacklistDomains.get();
+
+    expect(config).toMatchObject({
+      domains: ['stored.example'],
+      blocked_signup_tlds: [],
+      updated_at: 'legacy-time',
+      updated_by: 'legacy-admin',
+      updated_by_email: 'legacy-admin@example.com',
+    });
+    expect(mockedRedisGet.mock.calls.map(([key]) => key)).toEqual([
+      BLACKLISTED_DOMAINS_SETTINGS_REDIS_KEY,
+      BLACKLIST_DOMAINS_REDIS_KEY,
+    ]);
+    expect(mockedRedisMset).not.toHaveBeenCalled();
+    expect(mockedRedisEval).not.toHaveBeenCalled();
+  });
+
+  it('uses defaults when both Redis settings keys are missing and saves without changing PG domains', async () => {
+    await setPostgresBlacklist(['stored.example']);
+    redisValues.delete(BLACKLISTED_DOMAINS_SETTINGS_REDIS_KEY);
+    redisValues.delete(BLACKLIST_DOMAINS_REDIS_KEY);
+    const caller = await createCallerForUser(admin.id);
+
+    const config = await caller.admin.blacklistDomains.get();
+
+    expect(config).toMatchObject({
+      domains: ['stored.example'],
+      blocked_signup_tlds: normalizeSignupTlds(envFallbackSignupTlds),
+      updated_at: null,
+      updated_by: null,
+      updated_by_email: null,
+    });
+    expect(mockedRedisGet.mock.calls.map(([key]) => key)).toEqual([
+      BLACKLISTED_DOMAINS_SETTINGS_REDIS_KEY,
+      BLACKLIST_DOMAINS_REDIS_KEY,
+    ]);
+    expect(mockedRedisMset).not.toHaveBeenCalled();
+    expect(mockedRedisEval).not.toHaveBeenCalled();
+
+    const saved = await caller.admin.blacklistDomains.set({
+      domains: config.domains,
+      expected_version: config.version,
+    });
+
+    expect(saved.domains).toEqual(['stored.example']);
+    expect(saved.blocked_signup_tlds).toEqual(normalizeSignupTlds(envFallbackSignupTlds));
+    expect(JSON.parse(redisValues.get(BLACKLISTED_DOMAINS_SETTINGS_REDIS_KEY) ?? 'null')).toEqual({
+      domains: [],
+      blocked_signup_tlds: normalizeSignupTlds(envFallbackSignupTlds),
+      updated_at: saved.updated_at,
+      updated_by: admin.id,
+      updated_by_email: admin.google_user_email,
+    });
+    expect(await db.select().from(blacklisted_domains)).toEqual([{ domain: 'stored.example' }]);
+  });
+
+  it('prefers valid small settings without reading malformed legacy JSON', async () => {
+    await setPostgresBlacklist(['stored.example']);
+    redisValues.set(BLACKLIST_DOMAINS_REDIS_KEY, 'not-json');
+    const caller = await createCallerForUser(admin.id);
+
+    const config = await caller.admin.blacklistDomains.get();
+
+    expect(config.domains).toEqual(['stored.example']);
+    expect(mockedRedisGet.mock.calls.map(([key]) => key)).toEqual([
+      BLACKLISTED_DOMAINS_SETTINGS_REDIS_KEY,
+    ]);
+  });
+
   it.each([false, true])(
     'shows actual stored rows rather than env fallback, enabled=%s',
     async fallback => {
@@ -1447,7 +1626,6 @@ describe('admin.blacklistDomains readiness', () => {
   });
 
   it.each([
-    undefined,
     '',
     'not-json',
     'null',
@@ -1482,6 +1660,39 @@ describe('admin.blacklistDomains readiness', () => {
     expect(await db.select().from(blacklisted_domains)).toEqual([{ domain: 'previous.example' }]);
     expect(await db.select().from(domain_blacklist_state)).toEqual(stateBefore);
     expect(redisValues.get(BLACKLISTED_DOMAINS_SETTINGS_REDIS_KEY)).toBe(settings);
+    expect(mockedRedisMset).not.toHaveBeenCalled();
+    expect(mockedRedisEval).not.toHaveBeenCalled();
+    expect(mockedBackfill).not.toHaveBeenCalled();
+    expect(mockedRedisGet).not.toHaveBeenCalledWith(BLACKLIST_DOMAINS_REDIS_KEY);
+  });
+
+  it('fails closed on bad legacy metadata without changing PG or running cleanup/backfill', async () => {
+    await setPostgresBlacklist(['previous.example']);
+    redisValues.delete(BLACKLISTED_DOMAINS_SETTINGS_REDIS_KEY);
+    redisValues.set(
+      BLACKLIST_DOMAINS_REDIS_KEY,
+      JSON.stringify({
+        domains: ['ignored-legacy.example'],
+        blocked_signup_tlds: [1],
+        updated_at: 'legacy-time',
+        updated_by: 'legacy-admin',
+        updated_by_email: 'legacy-admin@example.com',
+      })
+    );
+    const stateBefore = await db.select().from(domain_blacklist_state);
+    const caller = await createCallerForUser(admin.id);
+
+    await expect(caller.admin.blacklistDomains.get()).rejects.toThrow();
+    await expect(
+      caller.admin.blacklistDomains.set({
+        domains: ['new.example'],
+        expected_version: await configVersion(),
+      })
+    ).rejects.toThrow();
+
+    expect(await db.select().from(blacklisted_domains)).toEqual([{ domain: 'previous.example' }]);
+    expect(await db.select().from(domain_blacklist_state)).toEqual(stateBefore);
+    expect(redisValues.has(BLACKLISTED_DOMAINS_SETTINGS_REDIS_KEY)).toBe(false);
     expect(mockedRedisMset).not.toHaveBeenCalled();
     expect(mockedRedisEval).not.toHaveBeenCalled();
     expect(mockedBackfill).not.toHaveBeenCalled();

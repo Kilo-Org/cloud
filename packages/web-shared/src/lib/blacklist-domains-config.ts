@@ -7,9 +7,10 @@ import { blacklisted_domains, domain_blacklist_state } from '@kilocode/db/schema
 import {
   blockedSignupTldsFromConfig,
   isEmailDomainBlacklisted,
-  refreshBlacklistDomainsConfig,
+  BlacklistDomainsConfigSchema,
+  BLACKLISTED_DOMAINS_REDIS_KEY,
+  BLACKLISTED_DOMAINS_SETTINGS_REDIS_KEY,
   type BlacklistDomainsConfig,
-  type BlacklistDomainsConfigSnapshot,
 } from '@kilocode/worker-utils/account-access';
 import { redisClient } from '@kilocode/web-shared/lib/redis';
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
@@ -71,21 +72,27 @@ function getEnvFallbackSignupTlds(): string[] {
 export const envFallbackDomains = getEnvFallbackDomains();
 export const envFallbackSignupTlds = getEnvFallbackSignupTlds();
 
-let snapshot: BlacklistDomainsConfigSnapshot | null = null;
+const SmallSettingsSchema = BlacklistDomainsConfigSchema.extend({
+  domains: z.array(z.string()).length(0),
+});
+const LegacySettingsSchema = BlacklistDomainsConfigSchema.omit({ domains: true });
+
+export async function readBlacklistDomainsSettings(): Promise<BlacklistDomainsConfig> {
+  const raw = await redisClient.get<string>(BLACKLISTED_DOMAINS_SETTINGS_REDIS_KEY);
+  if (raw !== null) return SmallSettingsSchema.parse(JSON.parse(raw));
+  const legacy = await redisClient.get<string>(BLACKLISTED_DOMAINS_REDIS_KEY);
+  if (legacy === null) return DEFAULT_BLACKLIST_DOMAINS_CONFIG;
+  return { ...LegacySettingsSchema.parse(JSON.parse(legacy)), domains: [] };
+}
 
 /**
  * Reads the operator-maintained config from Redis. Throws when the read or the stored payload
  * is unusable, after reporting it: createCachedFetch then keeps serving the last config it read
  * successfully, and retries once the failure backoff window passes.
  */
-async function readConfigSnapshot(): Promise<BlacklistDomainsConfigSnapshot> {
+async function readSettings(): Promise<BlacklistDomainsConfig> {
   try {
-    snapshot = await refreshBlacklistDomainsConfig(
-      key => redisClient.get<string>(key),
-      snapshot,
-      Date.now()
-    );
-    return snapshot;
+    return await readBlacklistDomainsSettings();
   } catch (error) {
     errorExceptInTest('[blacklist-domains] Failed to read signup settings:', error);
     captureException(error, { tags: { source: 'blacklist_domains_config' } });
@@ -93,11 +100,11 @@ async function readConfigSnapshot(): Promise<BlacklistDomainsConfigSnapshot> {
   }
 }
 
-const getConfigSnapshot = createCachedFetch<BlacklistDomainsConfigSnapshot | null>(
-  readConfigSnapshot,
+const getCachedSettings = createCachedFetch<BlacklistDomainsConfig | null>(
+  readSettings,
   60_000,
   null,
-  { name: 'blacklistDomainsConfigSnapshot' }
+  { name: 'blacklistDomainsSettings' }
 );
 
 export function isEmailBlacklisted(email: string, fromDb: Pick<typeof db, 'select'> = db) {
@@ -146,8 +153,6 @@ export async function getBlacklistedDomains(
  * blocking.
  */
 export async function getBlockedSignupTlds(): Promise<string[]> {
-  const current = await getConfigSnapshot();
-  return normalizeSignupTlds(
-    blockedSignupTldsFromConfig(current?.config ?? null, envFallbackSignupTlds)
-  );
+  const current = await getCachedSettings();
+  return normalizeSignupTlds(blockedSignupTldsFromConfig(current, envFallbackSignupTlds));
 }

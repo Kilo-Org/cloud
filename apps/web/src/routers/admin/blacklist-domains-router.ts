@@ -5,12 +5,10 @@ import {
   envFallbackSignupTlds,
   getBlacklistedDomains,
   listStoredDomains,
+  readBlacklistDomainsSettings,
   normalizeSignupTlds,
 } from '@kilocode/web-shared/lib/blacklist-domains-config';
-import {
-  BlacklistDomainsConfigSchema,
-  BLACKLISTED_DOMAINS_SETTINGS_REDIS_KEY,
-} from '@kilocode/worker-utils/account-access';
+import { BLACKLISTED_DOMAINS_SETTINGS_REDIS_KEY } from '@kilocode/worker-utils/account-access';
 import {
   BLACKLIST_DOMAINS_REDIS_KEY,
   BLACKLIST_DOMAINS_UPDATED_AT_REDIS_KEY,
@@ -36,9 +34,6 @@ const SuspiciousDomainsInputSchema = z
   })
   .optional();
 
-const BlacklistSettingsSchema = BlacklistDomainsConfigSchema.extend({
-  domains: z.array(z.string()).length(0),
-});
 const AdminBlacklistDomainsInputSchema = BlacklistDomainsInputSchema.extend({
   domains: z.array(z.string().min(1).trim()),
   expected_version: z.string().length(64),
@@ -57,14 +52,7 @@ async function readConfigOrThrow(fromDb: Pick<typeof db, 'select'>) {
       message: 'Domain blacklist initialization has not completed.',
     });
   }
-  const raw = await redisClient.get<string>(BLACKLISTED_DOMAINS_SETTINGS_REDIS_KEY);
-  if (raw === null) {
-    throw new TRPCError({
-      code: 'PRECONDITION_FAILED',
-      message: 'Blacklist settings initialization has not completed.',
-    });
-  }
-  const settings = BlacklistSettingsSchema.parse(JSON.parse(raw));
+  const settings = await readBlacklistDomainsSettings();
   return {
     config: { ...settings, domains: await listStoredDomains(fromDb) },
     version: createHash('sha256').update(`postgres:${state.revision}`).digest('hex'),

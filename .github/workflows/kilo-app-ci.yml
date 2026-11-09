@@ -4,13 +4,15 @@ name: kilo-app CI
 # every PR and every main push (no path filters) and the `mobile-changes` job
 # gates the suite work. An unrelated PR or push still reports the suite checks
 # as skipped (a skipped job satisfies a required check) instead of leaving them
-# "Expected". A release started by the same main push consumes this run's
-# conclusion for that commit — every release path is inside the detection below,
-# so the run always executes the suite — and calls the suite through
-# `workflow_call` only for the hourly schedule, a manual run, or a reuse it
-# cannot prove: no run for the commit, or a run that ended without a pass,
-# including one the cancel-in-progress group above cancels when a later push
-# lands on main.
+# "Expected". A push that starts a release is inside the detection below, so its
+# run always executes the suite, and that release consumes this run's conclusion
+# for the commit. The hourly schedule and a manual run of main stand on the tip
+# of main and reuse that commit's push run as well, but only a run that passed
+# and whose shard job proves the suite executed. The release calls the suite
+# through `workflow_call` for any reuse it cannot prove: no run for the commit, a
+# run that ended without a pass (including one the cancel-in-progress group above
+# cancels when a later push lands on main), a run still in flight, and a run for
+# a commit that touched no app path and so skipped the suite.
 #
 # The app's formatting is gated by the repo-wide `format-check` job in ci.yml:
 # `oxfmt --list-different .` covers apps/mobile on every PR, merge-queue entry
@@ -33,8 +35,8 @@ permissions:
 jobs:
   # Always runs: the required suite checks must report on every PR and every
   # main push. The detection step diffs against the PR's base sha or, on a main
-  # push, `github.event.before`; when neither is available (workflow_dispatch
-  # release), the suite runs (a release must validate).
+  # push, `github.event.before`; when neither is available (a release's
+  # schedule or manual call), the suite runs (a release must validate).
   mobile-changes:
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 5

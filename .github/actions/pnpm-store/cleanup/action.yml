@@ -5,10 +5,12 @@ description: >-
   must never read a graph that another install wrote. The post step repeats the
   reset so a run that commits the sticky disk commits only the content store;
   it runs only on the default branch, the only ref whose runs commit the disk,
-  because any other ref mounts a clone that is discarded.
+  because any other ref mounts a clone that is discarded. Like any post step it
+  runs whatever the job's result, so a run that fails still leaves the disk with
+  only the content store.
 
 runs:
   using: node24
   main: cleanup.cjs
   post: cleanup.cjs
-  post-if: github.ref == 'refs/heads/main'
+  post-if: always() && github.ref == 'refs/heads/main'

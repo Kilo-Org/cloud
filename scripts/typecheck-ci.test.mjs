@@ -95,7 +95,10 @@ test('dependency cache keeps only the content store on the mounted filesystem', 
   assert.equal(cleanupAction.runs.post, 'cleanup.cjs');
   // Only default-branch runs commit the sticky disk, so only they pay the
   // second full reset. A run on another ref mounts a clone that is discarded.
-  assert.equal(cleanupAction.runs['post-if'], "github.ref == 'refs/heads/main'");
+  // The reset keeps its status-check behaviour: it runs whatever the job's
+  // result, so a failed default-branch run cannot leave an installed graph in
+  // the disk it commits.
+  assert.equal(cleanupAction.runs['post-if'], "always() && github.ref == 'refs/heads/main'");
 
   const result = spawnSync(process.execPath, [pnpmCleanup], {
     encoding: 'utf8',

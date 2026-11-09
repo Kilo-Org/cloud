@@ -17,6 +17,7 @@ export function supportAccessNeededContent(params: {
   organizationId: string;
   organizationName: string | null;
   reason: SupportAccessReason | null;
+  dashboardIsCurrent?: boolean;
 }): SupportAccessNeededContent {
   const organizationName = params.organizationName ?? 'this organization';
   const action = supportAccessDenialAction(params.reason);
@@ -31,7 +32,10 @@ export function supportAccessNeededContent(params: {
     description: descriptionFor(action, params.reason, organizationName),
     action,
     canRequest: action === 'request',
-    dashboardHref: dashboardAllowlisted ? `/organizations/${params.organizationId}` : null,
+    dashboardHref:
+      dashboardAllowlisted && params.dashboardIsCurrent !== true
+        ? `/organizations/${params.organizationId}`
+        : null,
     adminHref: `/admin/organizations/${params.organizationId}`,
   };
 }

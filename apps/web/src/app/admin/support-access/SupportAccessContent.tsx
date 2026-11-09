@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSession } from 'next-auth/react';
@@ -85,6 +85,7 @@ export function SupportAccessContent() {
   const [reason, setReason] = useState('');
   const [emergencyReason, setEmergencyReason] = useState('');
   const [requestOutcome, setRequestOutcome] = useState<SupportRequestOutcome | null>(null);
+  const requestedOrganization = useRef<SelectedSupportOrganization | null>(null);
 
   const mineOptions = trpc.admin.supportAccess.listMine.queryOptions();
   const pendingOptions = trpc.admin.supportAccess.listPending.queryOptions();
@@ -106,12 +107,13 @@ export function SupportAccessContent() {
     trpc.admin.supportAccess.request.mutationOptions({
       onSuccess: grant => {
         toast.success(grant.status === 'active' ? 'Read access active' : 'Write access requested');
+        const requested = requestedOrganization.current;
         setRequestOutcome(
           supportRequestOutcome({
             actionClass: grant.actionClass,
             status: grant.status,
             organizationId: grant.organizationId,
-            organizationName: organization?.name ?? null,
+            organizationName: requested?.id === grant.organizationId ? requested.name : null,
           })
         );
         setReason('');
@@ -276,6 +278,7 @@ export function SupportAccessContent() {
               disabled={request.isPending || missingRequirements.length > 0}
               onClick={() => {
                 setRequestOutcome(null);
+                requestedOrganization.current = organization;
                 request.mutate({
                   organizationId,
                   actionClass,

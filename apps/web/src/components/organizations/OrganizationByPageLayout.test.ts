@@ -212,6 +212,8 @@ describe('OrganizationByPageLayout', () => {
       expect(html).toContain('Access needed');
       expect(html).toContain('Request access');
       expect(html).toContain('Customer Org');
+      expect(html).not.toContain('Open organization dashboard');
+      expect(html).not.toContain('href="/organizations/org-1"');
     });
 
     it('explains an expired grant', async () => {
@@ -269,6 +271,7 @@ describe('OrganizationByPageLayout', () => {
 
       expect(html).toContain('Refresh the page to try again');
       expect(html).not.toContain('Request access');
+      expect(html).not.toContain('Open organization dashboard');
     });
 
     it('redirects a non-admin to the profile page', async () => {

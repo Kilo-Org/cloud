@@ -66,6 +66,7 @@ export async function OrganizationByPageLayout({
         organizationId,
         organizationName,
         reason: denial.reason,
+        dashboardIsCurrent: supportRead,
       });
       return (
         <SupportAccessNeeded

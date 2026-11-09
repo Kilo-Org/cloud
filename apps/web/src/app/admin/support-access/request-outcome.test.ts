@@ -15,7 +15,7 @@ describe('supportRequestOutcome', () => {
       organizationName: 'Customer Org',
     });
 
-    expect(outcome.kind).toBe('read');
+    expect(outcome.kind).toBe('read-active');
     expect(outcome.message).toContain('Customer Org');
 
     const html = renderToStaticMarkup(createElement(SupportRequestOutcomeNotice, { outcome }));
@@ -23,6 +23,24 @@ describe('supportRequestOutcome', () => {
     expect(html).toContain('href="/organizations/org-1"');
     expect(html).toContain('Open organization');
     expect(html).toContain('Customer Org');
+  });
+
+  it('does not describe a non-active read request as a write request', () => {
+    const outcome = supportRequestOutcome({
+      actionClass: 'support_read',
+      status: 'pending',
+      organizationId: 'org-1',
+      organizationName: 'Customer Org',
+    });
+
+    expect(outcome.kind).toBe('notice');
+    expect(outcome.message).toContain('requested but is not active');
+    expect(outcome.message).not.toContain('Write access request');
+
+    const html = renderToStaticMarkup(createElement(SupportRequestOutcomeNotice, { outcome }));
+
+    expect(html).not.toContain('Open organization');
+    expect(html).not.toContain('/organizations/org-1');
   });
 
   it('describes a pending write request without an open link', () => {
@@ -33,7 +51,7 @@ describe('supportRequestOutcome', () => {
       organizationName: 'Customer Org',
     });
 
-    expect(outcome.kind).toBe('write');
+    expect(outcome.kind).toBe('notice');
     expect(outcome.message).toContain("second admin's approval");
     expect(outcome.message).toContain('30 minutes');
 

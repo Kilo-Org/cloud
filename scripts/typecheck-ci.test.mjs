@@ -1214,7 +1214,10 @@ test('the ci-wiring job installs its closure in one pass', () => {
   const relay = steps.findIndex(step =>
     /scripts\/deployment-workflows\.test\.mjs/.test(step.run ?? '')
   );
-  assert.ok(relay > installIndex, 'the relay regression runs after the install that links Wrangler');
+  assert.ok(
+    relay > installIndex,
+    'the relay regression runs after the install that links Wrangler'
+  );
 });
 
 // The measured per-job install share of wall time keeps a narrowing above one

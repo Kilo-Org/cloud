@@ -432,7 +432,11 @@ function validate(workflow) {
     installCommand,
     `${prJobName}: the install selects the root project, the web closure and cloud-agent-next in one pass`
   );
-  assert.equal(prInstalls[0].if, changeGate, `${prJobName}: the install is gated on catalog changes`);
+  assert.equal(
+    prInstalls[0].if,
+    changeGate,
+    `${prJobName}: the install is gated on catalog changes`
+  );
   const prWiring = findStep(pr, step => step.run === wiringCommand, 'catalog wiring check step');
   assert.ok(
     pr.steps.indexOf(prInstalls[0]) < pr.steps.indexOf(prWiring),

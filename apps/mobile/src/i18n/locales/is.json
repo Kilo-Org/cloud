@@ -4036,7 +4036,7 @@
     },
     "repoBindings": {
       "title": "Sjálfgefin snið fyrir geymslur",
-      "entryLabel": "Sjálfgegnar síður",
+      "entryLabel": "Sjálfgefin snið",
       "add": "Bæta við sjálfgefnu",
       "empty": "Engar sjálfgefnar stillingar",
       "emptyDescription": "Bættu við sjálfgefnu til að nota prófíl sjálfkrafa þegar þú byrjar lotur fyrir geymslu.",

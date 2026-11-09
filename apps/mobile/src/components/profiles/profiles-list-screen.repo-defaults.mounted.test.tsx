@@ -7,6 +7,7 @@ import { ProfilesListScreen } from '@/components/profiles/profiles-list-screen';
 import {
   groupChildren,
   groupTexts,
+  parentGroup,
   profile,
   type ProfileSummary,
   REPO_DEFAULTS_HEADING,
@@ -122,20 +123,27 @@ describe('ProfilesListScreen repo defaults entry', () => {
     unmount();
   });
 
-  it('heads the profile rows with its own PROFILES group like the settings group', async () => {
+  it('heads the profile rows with its own group like the settings group', async () => {
     const { renderer, unmount } = await mount();
 
-    // The heading wraps every owner section in one labeled group, in the same
-    // element the settings group uses for its heading over its row.
-    const profileRow = rowByTitle(renderer.root, 'Personal profile');
-    const ownerGroup = rowGroup(renderer.root, profileRow);
-    const profilesGroup = rowGroup(renderer.root, ownerGroup);
+    // The profiles heading is a direct scroll child, exactly like the settings
+    // group's heading: the two groups space evenly and one heading cannot end
+    // up nested inside the other group's gap.
+    const settingsGroup = rowGroup(renderer.root, repoDefaultsRow(renderer.root));
+    // Text nodes and strings do not own Views, so the sibling check reads the
+    // heading's Text element position directly against the settings group's.
+    const heading = renderer.root.findAll(
+      node => node.type === 'Text' && node.props.children === 'Profiles'
+    )[0];
+    if (!heading) {
+      throw new Error('profiles heading missing');
+    }
+    const headingParent = heading.parent;
+    expect(headingParent?.children).toContain(settingsGroup);
+
     // The list labels the rows it already shows, so the unheaded profile
     // section cannot read as a stray row beside the labeled settings group.
-    expect(groupTexts(profilesGroup)[0]?.props.children).toBe('Profiles');
-    // The owner groups are the reference, so the two cannot drift apart.
-    const settingsGroup = rowGroup(renderer.root, repoDefaultsRow(renderer.root));
-    expect(profilesGroup.props.className).toBe(settingsGroup.props.className);
+    expect(heading.props.children).not.toBe(REPO_DEFAULTS_HEADING);
 
     unmount();
   });

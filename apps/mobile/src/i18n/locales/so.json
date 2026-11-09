@@ -4036,7 +4036,7 @@
     },
     "repoBindings": {
       "title": "Profile-ka ugu tala galay Repos",
-      "entryLabel": "Default profiles",
+      "entryLabel": "Profile-ka ugu tala galay",
       "add": "Kudar default",
       "empty": "Ma jiro wax khalad ah oo la habeeyey",
       "emptyDescription": "Ku dar default si toos ah u codso profile marka la bilaabayo fadhiyada repo.",

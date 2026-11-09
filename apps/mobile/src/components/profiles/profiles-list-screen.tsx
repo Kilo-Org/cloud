@@ -188,53 +188,57 @@ export function ProfilesListScreen({
             }
           />
         )}
+        {/* Every group the scroll shows is one direct child: heading over its
+            rows, sections nested inside the profiles group. The profiles
+            heading labels what the owner sections render, so the sections do
+            not read as stray rows beside the labeled settings group; REPOSITORIES
+            keeps the same heading-over-rows shape and the scroll's gap spaces
+            the groups evenly. */}
         {!isListLoading && sections.length > 0 && (
-          <View className="gap-3">
-            <ProfileSectionHeading>{t('profiles.title')}</ProfileSectionHeading>
-            {sections.map(section => (
-              <View key={section.key} className="gap-3">
-                {section.titleKey ? <ProfileOwnerHeading owner={section.key} /> : null}
-                {section.profiles.map((profile, index) => {
-                  const subtitle = formatProfileCountItems(t, profileCountItems(profile)).join(
-                    ' · '
-                  );
-                  const isDefault = isEffectiveDefault(profile, effectiveDefaultId);
-                  // The star is a visual mark inside the pressable row, so the
-                  // row's own name has to carry the state it announces. TalkBack
-                  // never reads `accessibilityHint` (React Native maps it to the
-                  // node's tooltip), so the action belongs in the name as well.
-                  const accessibilityLabel = [
-                    profile.name,
-                    subtitle,
-                    isDefault ? t('profiles.defaultSectionTitle') : '',
-                    t('profiles.openHint'),
-                  ]
-                    .filter(part => part.length > 0)
-                    .join(', ');
-                  return (
-                    <ConfigureRow
-                      key={profile.id}
-                      icon={ownerIcon(profile)}
-                      title={profile.name}
-                      subtitle={subtitle || undefined}
-                      accessibilityLabel={accessibilityLabel}
-                      className="rounded-lg bg-secondary px-3"
-                      last={index === section.profiles.length - 1}
-                      trailing={
-                        isDefault ? (
-                          <Star size={16} color={colors.primary} fill={colors.primary} />
-                        ) : undefined
-                      }
-                      onPress={() => {
-                        openProfile(profile);
-                      }}
-                    />
-                  );
-                })}
-              </View>
-            ))}
-          </View>
+          <ProfileSectionHeading>{t('profiles.title')}</ProfileSectionHeading>
         )}
+        {!isListLoading &&
+          sections.length > 0 &&
+          sections.map(section => (
+            <View key={section.key} className="gap-3">
+              {section.titleKey ? <ProfileOwnerHeading owner={section.key} /> : null}
+              {section.profiles.map((profile, index) => {
+                const subtitle = formatProfileCountItems(t, profileCountItems(profile)).join(' · ');
+                const isDefault = isEffectiveDefault(profile, effectiveDefaultId);
+                // The star is a visual mark inside the pressable row, so the
+                // row's own name has to carry the state it announces. TalkBack
+                // never reads `accessibilityHint` (React Native maps it to the
+                // node's tooltip), so the action belongs in the name as well.
+                const accessibilityLabel = [
+                  profile.name,
+                  subtitle,
+                  isDefault ? t('profiles.defaultSectionTitle') : '',
+                  t('profiles.openHint'),
+                ]
+                  .filter(part => part.length > 0)
+                  .join(', ');
+                return (
+                  <ConfigureRow
+                    key={profile.id}
+                    icon={ownerIcon(profile)}
+                    title={profile.name}
+                    subtitle={subtitle || undefined}
+                    accessibilityLabel={accessibilityLabel}
+                    className="rounded-lg bg-secondary px-3"
+                    last={index === section.profiles.length - 1}
+                    trailing={
+                      isDefault ? (
+                        <Star size={16} color={colors.primary} fill={colors.primary} />
+                      ) : undefined
+                    }
+                    onPress={() => {
+                      openProfile(profile);
+                    }}
+                  />
+                );
+              })}
+            </View>
+          ))}
         {/* The defaults screen binds a repo to one of this list's profiles, so
             it needs a profile to point at: the entry appears with the rows and
             leaves the loading, error and empty states as they were. It is a

@@ -482,9 +482,9 @@ export async function resolveOrganizationAccess(
       await recordSupportWriteUse({
         grantId: evaluation.access.grantId,
         actorKiloUserId: ctx.user.id,
-        organizationId,
+        grantOrganizationId: evaluation.access.inheritedFromOrganizationId ?? organizationId,
+        targetOrganizationId: organizationId,
         supportActionId: evaluation.access.supportActionId,
-        inheritedFromOrganizationId: evaluation.access.inheritedFromOrganizationId,
       });
     }
     await recordKiloAdminElevation(ctx, {
@@ -521,6 +521,7 @@ export async function resolveOrganizationAccess(
     supportGrantId: evaluation.grantId,
     supportActionId,
     inventoryId: null,
+    supportInheritedFromOrganizationId: evaluation.inheritedFromOrganizationId,
   });
   throw deniedAccessError({
     decision: evaluation.decision,

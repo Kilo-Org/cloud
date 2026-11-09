@@ -145,7 +145,7 @@ export function EnkryptDetectorList({
   return (
     <DetectorSection
       title="Detectors"
-      description="Block stops a flagged request. Log only records detections without delaying the request. NSFW content is always blocked and secrets are always logged."
+      description="Block stops a flagged request. Log only records detections without delaying the request. NSFW and secrets detections are log-only."
       action={action}
     >
       {ENKRYPT_CONFIGURABLE_INPUT_DETECTOR_IDS.map(id => (

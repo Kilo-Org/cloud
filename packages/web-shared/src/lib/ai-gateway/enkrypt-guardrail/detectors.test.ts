@@ -273,7 +273,7 @@ describe('enforcedEnkryptInputDetectors', () => {
     }
   });
 
-  it('blocks NSFW content and logs secrets even when the saved detectors turned them off', () => {
+  it('logs NSFW content and secrets even when the saved detectors turned them off', () => {
     const detectors = createKiloDefaultEnkryptInputDetectors();
     detectors.injection_attack.enabled = false;
     detectors.pii = { enabled: false, action: 'block', entities: ['url'] };
@@ -284,7 +284,7 @@ describe('enforcedEnkryptInputDetectors', () => {
       pii: { enabled: true, entities: ['secrets'] },
       nsfw: { enabled: true },
     });
-    expect(blockingEnkryptDetectorIds(enforced)).toEqual(['nsfw']);
+    expect(blockingEnkryptDetectorIds(enforced)).toEqual([]);
   });
 });
 
@@ -300,20 +300,13 @@ describe('detector metadata', () => {
 });
 
 describe('blockingEnkryptDetectorIds', () => {
-  it('blocks on enabled block-type detectors and on revise-type detectors set to block', () => {
+  it('blocks only on enabled configurable detectors set to block', () => {
     expect(blockingEnkryptDetectorIds(createKiloDefaultEnkryptInputDetectors())).toEqual([
       'injection_attack',
-      'nsfw',
     ]);
     expect(blockingEnkryptDetectorIds(allEnabled())).toEqual([
       'injection_attack',
-      'pii',
-      'keyword_detector',
-      'topic_detector',
       'policy_violation',
-      'toxicity',
-      'nsfw',
-      'sponge_attack',
     ]);
   });
 
@@ -328,7 +321,7 @@ describe('blockingEnkryptDetectorIds', () => {
       'policy_violation',
       'nsfw',
     ]);
-    expect(blockingEnkryptDetectorIds(detectors)).toEqual(['nsfw']);
+    expect(blockingEnkryptDetectorIds(detectors)).toEqual([]);
   });
 });
 

@@ -5100,6 +5100,40 @@ describe('Enkrypt output guardrail', () => {
     expect(billedBody).toBe(upstreamBody('messages', true));
   });
 
+  it('still blocks flagged NSFW output', async () => {
+    setOrganization({
+      enkrypt: {
+        output_guardrail: {
+          enabled: true,
+          detectors: {
+            ...createEmptyEnkryptOutputDetectors(),
+            nsfw: { enabled: true, action: 'block' },
+          },
+        },
+      },
+    });
+    enkryptAnswers({ summary: { nsfw: 1 }, result_message: 'NSFW content detected.' });
+
+    const response = await sendRequest('chat_completions', false);
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ error_type: 'guardrail_blocked' });
+    expect(enkryptRequestBodies()).toEqual([
+      expect.objectContaining({ text: assistantText, detectors: { nsfw: { enabled: true } } }),
+    ]);
+    expect(mockedRewriteModelResponse).not.toHaveBeenCalled();
+    await runAfterTasks();
+    expect(mockedRecordEnkryptUsage.mock.calls).toEqual([
+      [
+        expect.objectContaining({
+          decision: 'blocked',
+          detectorsFired: ['nsfw'],
+          guardrail: 'output',
+        }),
+      ],
+    ]);
+  });
+
   it.each([
     { stream: true, status: 200 },
     { stream: false, status: 503 },
@@ -5572,9 +5606,12 @@ describe('Enkrypt input guardrail', () => {
     return [
       expect.objectContaining({
         text,
-        detectors: { injection_attack: expect.anything(), nsfw: expect.anything() },
+        detectors: { injection_attack: expect.anything() },
       }),
-      expect.objectContaining({ text, detectors: { pii: expect.anything() } }),
+      expect.objectContaining({
+        text,
+        detectors: { pii: expect.anything(), nsfw: expect.anything() },
+      }),
     ];
   }
 
@@ -5780,7 +5817,7 @@ describe('Enkrypt input guardrail', () => {
         detectors: [
           { detector: 'injection_attack', action: 'block' },
           { detector: 'pii', action: 'log', pii_entities: ['secrets'] },
-          { detector: 'nsfw', action: 'block' },
+          { detector: 'nsfw', action: 'log' },
         ],
       },
       verdict: 'block',
@@ -6160,19 +6197,40 @@ describe('Enkrypt input guardrail', () => {
     expect(mockedLogUnrewrittenResponse).not.toHaveBeenCalled();
   });
 
-  it('blocks NSFW content and logs secrets even when the saved detectors turned them off', async () => {
+  it('allows and records flagged NSFW content and secrets even when saved detectors turned them off', async () => {
     const detectors = createKiloDefaultEnkryptInputDetectors();
     detectors.nsfw.enabled = false;
     detectors.pii.enabled = false;
     setOrganization({ enkrypt: { input_guardrail: { enabled: true, detectors } } });
-    enkryptAnswers({ summary: { nsfw: 1 }, result_message: 'NSFW content detected.' });
+    enkryptAnswers({
+      summary: { injection_attack: 0, pii: 1, nsfw: 1 },
+      result_message: 'NSFW content and secrets detected.',
+    });
 
     const response = await handleLlmProxyRequest(makeRequest(makeBody()));
 
-    expect(response.status).toBe(400);
-    expect(await response.json()).toMatchObject({ error_type: 'guardrail_blocked' });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      id: 'chatcmpl-1',
+      model: 'openai/gpt-4o',
+      choices: [],
+    });
     expect(enkryptRequestBodies()).toEqual(kiloDefaultScans('hello'));
-    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+    expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
+    await Promise.all(
+      jest.mocked(after).mock.calls.map(([task]) => (typeof task === 'function' ? task() : task))
+    );
+    expect(jest.mocked(recordEnkryptUsage).mock.calls).toEqual([
+      [expect.objectContaining({ decision: 'allowed', addedLatencyMs: expect.any(Number) })],
+      [
+        expect.objectContaining({
+          decision: 'allowed',
+          detectorsFired: ['pii', 'nsfw'],
+          creditsCost: 3,
+          addedLatencyMs: null,
+        }),
+      ],
+    ]);
   });
 
   it('ignores saved detectors that are no longer configurable', async () => {
@@ -6194,12 +6252,7 @@ describe('Enkrypt input guardrail', () => {
       })
     );
 
-    expect(enkryptRequestBodies()).toEqual([
-      expect.objectContaining({
-        detectors: { injection_attack: expect.anything(), nsfw: expect.anything() },
-      }),
-      expect.objectContaining({ detectors: { pii: expect.anything() } }),
-    ]);
+    expect(enkryptRequestBodies()).toEqual(kiloDefaultScans('tell me about Project Phoenix'));
   });
 
   it('rejects the request when the saved detectors are invalid', async () => {
@@ -6245,6 +6298,84 @@ describe('Enkrypt input guardrail', () => {
         jest.mocked(after).mock.calls.map(([task]) => (typeof task === 'function' ? task() : task))
       );
     }
+
+    it.each([
+      { injection: 'off', policy: 'off' },
+      { injection: 'off', policy: 'log' },
+      { injection: 'log', policy: 'off' },
+      { injection: 'log', policy: 'log' },
+    ] as const)(
+      'does not gate inference on a delayed, failed scan with injection $injection and policy $policy',
+      async ({ injection, policy }) => {
+        const detectors = createKiloDefaultEnkryptInputDetectors();
+        detectors.injection_attack = { enabled: injection === 'log', action: 'log' };
+        detectors.policy_violation = {
+          enabled: policy === 'log',
+          action: 'log',
+          format: 'policy_text',
+          policy_text: 'Do not disclose credentials.',
+          rules: [],
+        };
+        setOrganization({
+          enkrypt: {
+            input_guardrail: { enabled: true, detectors: storableEnkryptInputDetectors(detectors) },
+          },
+        });
+        const logOnlyScan = Promise.withResolvers<void>();
+        enkryptResponds(async () => {
+          await logOnlyScan.promise;
+          return Response.json({ detail: 'payment required' }, { status: 402, headers: credits });
+        });
+
+        try {
+          const response = await handleLlmProxyRequest(makeRequest(makeBody()));
+
+          expect(response.status).toBe(200);
+          expect(await response.json()).toEqual({
+            id: 'chatcmpl-1',
+            model: 'openai/gpt-4o',
+            choices: [],
+          });
+          expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
+          expect(enkryptRequestBodies()).toEqual([
+            expect.objectContaining({
+              text: 'hello',
+              detectors: {
+                ...(injection === 'log'
+                  ? { injection_attack: { enabled: true, need_explanation: false } }
+                  : {}),
+                pii: { enabled: true, entities: ['secrets'] },
+                ...(policy === 'log'
+                  ? {
+                      policy_violation: {
+                        enabled: true,
+                        need_explanation: false,
+                        policy_text: 'Do not disclose credentials.',
+                      },
+                    }
+                  : {}),
+                nsfw: { enabled: true },
+              },
+            }),
+          ]);
+          expect(mockedRecordEnkryptUsage).not.toHaveBeenCalled();
+        } finally {
+          logOnlyScan.resolve();
+          await runAfterTasks();
+        }
+
+        expect(mockedRecordEnkryptUsage.mock.calls).toEqual([
+          [
+            expect.objectContaining({
+              decision: 'error',
+              creditsCost: 3,
+              addedLatencyMs: expect.any(Number),
+            }),
+          ],
+        ]);
+        expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
+      }
+    );
 
     it('awaits only the blocking detectors and ignores a failing log-only scan', async () => {
       setOrganization({ enkrypt: { input_guardrail: { enabled: true } } });
@@ -6307,15 +6438,15 @@ describe('Enkrypt input guardrail', () => {
         action: 'log',
         status: 200,
         upstreamCalls: 1,
-        decisions: ['allowed', 'allowed'],
-        scans: [['nsfw'], ['injection_attack', 'pii']],
+        decisions: ['allowed'],
+        scans: [['injection_attack', 'pii', 'nsfw']],
       },
       {
         action: 'block',
         status: 400,
         upstreamCalls: 0,
         decisions: ['blocked', 'allowed'],
-        scans: [['injection_attack', 'nsfw'], ['pii']],
+        scans: [['injection_attack'], ['pii', 'nsfw']],
       },
     ] as const)(
       'returns $status when prompt injection set to $action fires',
@@ -6350,7 +6481,51 @@ describe('Enkrypt input guardrail', () => {
         );
         expect(
           mockedRecordEnkryptUsage.mock.calls.map(([record]) => record.addedLatencyMs)
-        ).toEqual([expect.any(Number), null]);
+        ).toEqual(action === 'log' ? [expect.any(Number)] : [expect.any(Number), null]);
+      }
+    );
+
+    it.each([
+      {
+        summary: { policy_violation: 1 },
+        scanStatus: 200,
+        status: 400,
+        error: 'guardrail_blocked',
+      },
+      { summary: {}, scanStatus: 402, status: 503, error: 'guardrail_unavailable' },
+    ])(
+      'keeps a blocking policy fail-closed when its scan returns $scanStatus',
+      async ({ summary, scanStatus, status, error }) => {
+        const detectors = createKiloDefaultEnkryptInputDetectors();
+        detectors.injection_attack.enabled = false;
+        detectors.policy_violation = {
+          enabled: true,
+          action: 'block',
+          format: 'policy_text',
+          policy_text: 'Do not disclose credentials.',
+          rules: [],
+        };
+        setOrganization({ enkrypt: { input_guardrail: { enabled: true, detectors } } });
+        enkryptResponds(async detectors =>
+          'policy_violation' in detectors
+            ? Response.json({ summary }, { status: scanStatus, headers: credits })
+            : Response.json({ summary: { pii: 1, nsfw: 1 } }, { headers: credits })
+        );
+
+        const response = await handleLlmProxyRequest(makeRequest(makeBody()));
+
+        expect(response.status).toBe(status);
+        expect(await response.json()).toMatchObject({ error_type: error });
+        expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+        expect(enkryptRequestBodies().map(body => Object.keys(body.detectors))).toEqual([
+          ['policy_violation'],
+          ['pii', 'nsfw'],
+        ]);
+        await runAfterTasks();
+        expect(mockedRecordEnkryptUsage.mock.calls.map(([record]) => record.decision)).toEqual([
+          scanStatus === 200 ? 'blocked' : 'error',
+          'allowed',
+        ]);
       }
     );
 
@@ -6625,9 +6800,8 @@ describe('Enkrypt input guardrail', () => {
                   scan === 'blocking'
                     ? {
                         injection_attack: { enabled: true, need_explanation: false },
-                        nsfw: { enabled: true },
                       }
-                    : { pii: { enabled: true, entities: ['secrets'] } },
+                    : { pii: { enabled: true, entities: ['secrets'] }, nsfw: { enabled: true } },
                 user_metadata: { organization_id: 'org-1' },
               },
               response: JSON.stringify(enkrypt.body),
@@ -6670,7 +6844,6 @@ describe('Enkrypt input guardrail', () => {
         text: 'hello',
         detectors: {
           injection_attack: { enabled: true, need_explanation: false },
-          nsfw: { enabled: true },
         },
         user_metadata: { organization_id: 'org-1' },
       };
@@ -6698,7 +6871,7 @@ describe('Enkrypt input guardrail', () => {
           scan: 'log_only',
           request: {
             ...request,
-            detectors: { pii: { enabled: true, entities: ['secrets'] } },
+            detectors: { pii: { enabled: true, entities: ['secrets'] }, nsfw: { enabled: true } },
           },
           response: logged,
           status_code: 200,
@@ -6753,7 +6926,6 @@ describe('Enkrypt input guardrail', () => {
               text: 'hello',
               detectors: {
                 injection_attack: { enabled: true, need_explanation: false },
-                nsfw: { enabled: true },
               },
               user_metadata: { organization_id: 'org-1' },
             },
@@ -6766,7 +6938,7 @@ describe('Enkrypt input guardrail', () => {
             scan: 'log_only',
             request: {
               text: 'hello',
-              detectors: { pii: { enabled: true, entities: ['secrets'] } },
+              detectors: { pii: { enabled: true, entities: ['secrets'] }, nsfw: { enabled: true } },
               user_metadata: { organization_id: 'org-1' },
             },
             response: loggedResponse,
@@ -6827,9 +6999,8 @@ describe('Enkrypt input guardrail', () => {
                   scan === 'blocking'
                     ? {
                         injection_attack: { enabled: true, need_explanation: false },
-                        nsfw: { enabled: true },
                       }
-                    : { pii: { enabled: true, entities: ['secrets'] } },
+                    : { pii: { enabled: true, entities: ['secrets'] }, nsfw: { enabled: true } },
                 user_metadata: { organization_id: 'org-1' },
               },
               response: JSON.stringify({

@@ -43,7 +43,7 @@ export const ENKRYPT_SUMMARY_DETECTORS: Record<string, EnkryptDetectorId> = {
 };
 
 /**
- * Kilo Default: prompt injection and NSFW content block; secrets are logged, as Enkrypt intends.
+ * Kilo Default: prompt injection blocks; NSFW content and secrets are logged.
  * NSFW and secrets stay on whatever an organization saves; see `enforcedEnkryptInputDetectors`.
  */
 export function createKiloDefaultEnkryptInputDetectors(): EnkryptInputDetectors {
@@ -74,8 +74,8 @@ export const ENKRYPT_CONFIGURABLE_INPUT_DETECTOR_IDS = [
 
 /**
  * The input detectors the gateway enforces: the configurable ones as saved and Kilo Default for
- * every other one, whatever was saved for it. Every organization therefore blocks NSFW content and
- * logs secrets.
+ * every other one, whatever was saved for it. Every organization therefore logs NSFW content and
+ * secrets while their input controls are unavailable.
  */
 export function enforcedEnkryptInputDetectors(
   detectors: EnkryptInputDetectors
@@ -113,11 +113,11 @@ export function enabledEnkryptDetectorIds(detectors: EnkryptInputDetectors): Enk
   return ENKRYPT_DETECTOR_IDS.filter(id => detectors[id].enabled);
 }
 
-/** Enabled detectors whose detection blocks the request. */
+/** Only detectors with input controls can block; hidden baseline detectors stay log-only. */
 export function blockingEnkryptDetectorIds(detectors: EnkryptInputDetectors): EnkryptDetectorId[] {
-  return enabledEnkryptDetectorIds(detectors).filter(id => {
+  return ENKRYPT_CONFIGURABLE_INPUT_DETECTOR_IDS.filter(id => {
     const detector = detectors[id];
-    return 'action' in detector ? detector.action === 'block' : true;
+    return detector.enabled && detector.action === 'block';
   });
 }
 

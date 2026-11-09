@@ -142,10 +142,9 @@ function EditTab() {
         {data && data.dropped_domains > 0 && (
           <p className="text-destructive flex items-center gap-2 text-xs">
             <AlertTriangle className="h-4 w-4 shrink-0" />
-            All {domainCount.toLocaleString()} entries are shown and preserved on save. Redis access
-            checks still use only the first {(domainCount - data.dropped_domains).toLocaleString()}{' '}
-            entries; the remaining {data.dropped_domains.toLocaleString()} are not enforced by those
-            checks.
+            Postgres checks use all {domainCount.toLocaleString()} entries. Legacy Redis readers
+            during rollout or rollback only enforce the first{' '}
+            {(domainCount - data.dropped_domains).toLocaleString()} entries.
           </p>
         )}
         <Textarea
@@ -205,10 +204,9 @@ function EditTab() {
 
         <div className="text-muted-foreground text-xs">
           <p>
-            Domains and signup TLDs are stored in Redis, so changes apply without a deploy. Auth
-            checks cache the lists for up to a minute. The BLACKLIST_DOMAINS and BLOCKED_SIGNUP_TLDS
-            env vars are fallbacks when Redis has no data. Each save or sync also copies the
-            complete domain list to Postgres; access checks continue to use Redis.
+            Access checks use Postgres with 60-second per-domain caching and replica propagation
+            delay. Each save or Sync updates both Postgres and Redis. Empty domain lists use
+            BLACKLIST_DOMAINS; unset signup TLDs use BLOCKED_SIGNUP_TLDS or the built-in defaults.
           </p>
         </div>
       </CardContent>

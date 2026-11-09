@@ -2,13 +2,10 @@ import 'server-only';
 import * as z from 'zod';
 import { captureException } from '@sentry/nextjs';
 import { after } from 'next/server';
-import { randomUUID } from 'node:crypto';
 import { asc, eq, gt, sql } from 'drizzle-orm';
 import { blacklisted_domains, domain_blacklist_state } from '@kilocode/db/schema';
 import {
   blockedSignupTldsFromConfig,
-  BLACKLISTED_DOMAINS_SETTINGS_REDIS_KEY,
-  BlacklistDomainsConfigSchema,
   isEmailDomainBlacklisted,
   refreshBlacklistDomainsConfig,
   type BlacklistDomainsConfig,
@@ -41,7 +38,6 @@ export const DEFAULT_BLACKLIST_DOMAINS_CONFIG: BlacklistDomainsConfig = {
 export const BlacklistDomainsInputSchema = z.object({
   domains: z.array(z.string().min(1).trim()),
   blocked_tlds: z.array(z.string().min(1).trim()).optional(),
-  revision: z.uuid(),
 });
 
 /**
@@ -104,12 +100,6 @@ const getConfigSnapshot = createCachedFetch<BlacklistDomainsConfigSnapshot | nul
   { name: 'blacklistDomainsConfigSnapshot' }
 );
 
-export async function getBlacklistDomainsSettings(): Promise<BlacklistDomainsConfig> {
-  const raw = await redisClient.get<string>(BLACKLISTED_DOMAINS_SETTINGS_REDIS_KEY);
-  if (!raw) throw new Error('Domain blacklist settings backfill has not completed');
-  return BlacklistDomainsConfigSchema.parse(JSON.parse(raw));
-}
-
 export function isEmailBlacklisted(email: string, fromDb: Pick<typeof db, 'select'> = db) {
   return isEmailDomainBlacklisted(fromDb, email, envFallbackDomains, {
     get: key => redisClient.get<string>(key),
@@ -148,44 +138,6 @@ export async function getBlacklistedDomains(
     .limit(1);
   if (!state) throw new Error('Domain blacklist backfill has not completed');
   return state.useEnvFallback ? envFallbackDomains : listStoredDomains(fromDb);
-}
-
-export async function saveBlacklistedDomains(
-  domains: string[],
-  revision: string,
-  saveSettings?: () => Promise<void>
-) {
-  const normalized = [
-    ...new Set(domains.map(domain => domain.toLowerCase().trim()).filter(Boolean)),
-  ];
-  return db.transaction(async tx => {
-    const [state] = await tx
-      .select({ revision: domain_blacklist_state.revision })
-      .from(domain_blacklist_state)
-      .where(eq(domain_blacklist_state.id, 1))
-      .limit(1)
-      .for('update');
-    if (!state) throw new Error('Domain blacklist backfill has not completed');
-    if (state.revision !== revision)
-      throw new Error('Domain blacklist changed; reload before saving');
-    const previous = new Set(await listStoredDomains(tx));
-    await tx.delete(blacklisted_domains).where(sql`true`);
-    for (let offset = 0; offset < normalized.length; offset += DOMAIN_BATCH_SIZE) {
-      await tx
-        .insert(blacklisted_domains)
-        .values(normalized.slice(offset, offset + DOMAIN_BATCH_SIZE).map(domain => ({ domain })));
-    }
-    const nextRevision = randomUUID();
-    await tx
-      .update(domain_blacklist_state)
-      .set({ revision: nextRevision, use_env_fallback: normalized.length === 0 })
-      .where(eq(domain_blacklist_state.id, 1));
-    await saveSettings?.();
-    return {
-      revision: nextRevision,
-      addedDomains: normalized.filter(domain => !previous.has(domain)),
-    };
-  });
 }
 
 /**

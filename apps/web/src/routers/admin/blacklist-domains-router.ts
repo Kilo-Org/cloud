@@ -9,6 +9,7 @@ import {
 } from '@kilocode/web-shared/lib/blacklist-domains-config';
 import {
   BlacklistDomainsConfigSchema,
+  BLACKLISTED_DOMAINS_SETTINGS_REDIS_KEY,
   MAX_BLACKLIST_DOMAINS,
 } from '@kilocode/worker-utils/account-access';
 import {
@@ -18,11 +19,11 @@ import {
 import type { BlacklistDomainsConfig } from '@kilocode/web-shared/lib/blacklist-domains-config';
 import { captureException } from '@sentry/nextjs';
 import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
-import { blacklisted_domains, kilocode_users } from '@kilocode/db/schema';
+import { blacklisted_domains, domain_blacklist_state, kilocode_users } from '@kilocode/db/schema';
 import { TRPCError } from '@trpc/server';
-import { sql, count, isNotNull, desc, min, max } from 'drizzle-orm';
+import { sql, count, isNotNull, desc, min, max, eq } from 'drizzle-orm';
 import * as z from 'zod';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { backfillBlockBlacklistedDomainsBatch } from '@/lib/abuse/block-blacklisted-domains';
 import {
   BLACKLIST_STATS_ROW_LIMIT,
@@ -114,10 +115,15 @@ export const adminBlacklistDomainsRouter = createTRPCRouter({
             .insert(blacklisted_domains)
             .values(normalizedDomains.slice(offset, offset + 1000).map(domain => ({ domain })));
         }
+        await tx
+          .update(domain_blacklist_state)
+          .set({ revision: randomUUID(), use_env_fallback: normalizedDomains.length === 0 })
+          .where(eq(domain_blacklist_state.id, 1));
         // Stage SQL first so failed batches leave Redis protection and the additions diff intact.
         // Redis and the commit cannot be atomic; never roll back Redis after an ambiguous failure.
         await redisClient.mset({
           [BLACKLIST_DOMAINS_REDIS_KEY]: JSON.stringify(config),
+          [BLACKLISTED_DOMAINS_SETTINGS_REDIS_KEY]: JSON.stringify({ ...config, domains: [] }),
           [BLACKLIST_DOMAINS_UPDATED_AT_REDIS_KEY]: updatedAt,
         });
         return { config, addedDomains };

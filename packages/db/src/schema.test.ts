@@ -28,14 +28,16 @@ afterAll(async () => {
 });
 
 describe('domain blacklist schema', () => {
-  it('defines domain primary keys and a constrained singleton readiness state', () => {
+  it('defines the blacklisted domain primary key', () => {
     const blacklist = getTableConfig(schema.blacklisted_domains);
     expect(blacklist.name).toBe('blacklisted_domains');
     expect(blacklist.columns).toHaveLength(1);
     expect(blacklist.columns[0]?.name).toBe('domain');
     expect(blacklist.columns[0]?.primary).toBe(true);
     expect(blacklist.columns[0]?.notNull).toBe(true);
+  });
 
+  it('defines a constrained singleton readiness state', () => {
     const state = getTableConfig(schema.domain_blacklist_state);
     const columns = new Map(state.columns.map(column => [column.name, column]));
     expect(state.name).toBe('domain_blacklist_state');
@@ -53,20 +55,27 @@ describe('domain blacklist schema', () => {
     expect(columns.get('migrated_at')?.default).toBeDefined();
   });
 
-  it('creates the tables without inserting readiness state', () => {
+  it('creates blacklisted_domains with a primary key in its original migration', () => {
+    const migration = fs.readFileSync(
+      path.join(__dirname, 'migrations/0344_open_jazinda.sql'),
+      'utf8'
+    );
+
+    expect(migration).toContain('CREATE TABLE "blacklisted_domains"');
+    expect(migration).toContain('"domain" text PRIMARY KEY NOT NULL');
+  });
+
+  it('creates readiness state without recreating blacklisted_domains or inserting state', () => {
     const migrationsDir = path.join(__dirname, 'migrations');
     const migration = fs
       .readdirSync(migrationsDir)
       .filter(file => file.endsWith('.sql'))
       .map(file => fs.readFileSync(path.join(migrationsDir, file), 'utf8'))
-      .find(
-        contents =>
-          contents.includes('CREATE TABLE "blacklisted_domains"') &&
-          contents.includes('CREATE TABLE "domain_blacklist_state"')
-      );
+      .find(contents => contents.includes('CREATE TABLE "domain_blacklist_state"'));
 
     expect(migration).toBeDefined();
-    if (!migration) throw new Error('Domain blacklist migration is missing');
+    if (!migration) throw new Error('Domain blacklist readiness migration is missing');
+    expect(migration).not.toContain('CREATE TABLE "blacklisted_domains"');
     expect(migration).toContain(
       'CONSTRAINT "domain_blacklist_state_singleton" CHECK ("domain_blacklist_state"."id" = 1)'
     );

@@ -1,5 +1,4 @@
 import { beforeAll, beforeEach, afterEach, describe, expect, jest, test } from '@jest/globals';
-import { randomUUID } from 'node:crypto';
 import { blacklisted_domains, domain_blacklist_state } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
@@ -51,18 +50,13 @@ beforeEach(async () => {
 afterEach(() => clock.mockRestore());
 
 async function initialize() {
-  const revision = randomUUID();
-  await db.insert(domain_blacklist_state).values({ revision, use_env_fallback: false });
-  return revision;
+  await db.insert(domain_blacklist_state).values({ use_env_fallback: false });
 }
 
-describe('Postgres blacklist management', () => {
+describe('Postgres blacklist reads', () => {
   test('refuses an uninitialized table instead of silently allowing access', async () => {
     await expect(config.getBlacklistedDomains()).rejects.toThrow('backfill');
     await expect(config.isEmailBlacklisted('user@example.com')).rejects.toThrow('backfill');
-    await expect(config.saveBlacklistedDomains(['example.com'], randomUUID())).rejects.toThrow(
-      'backfill'
-    );
   });
 
   test('enumerates admin entries across bounded pages without truncating them', async () => {
@@ -73,39 +67,6 @@ describe('Postgres blacklist management', () => {
     );
     await db.insert(blacklisted_domains).values(domains.map(domain => ({ domain })));
     await expect(config.getBlacklistedDomains()).resolves.toEqual(domains);
-  });
-
-  test('saves normalized entries atomically, rotates revision, and rejects stale editors', async () => {
-    const revision = await initialize();
-    await db.insert(blacklisted_domains).values({ domain: 'existing.example' });
-    const saved = await config.saveBlacklistedDomains(
-      [' EXISTING.example ', 'New.example', 'new.example'],
-      revision
-    );
-    expect(saved.revision).not.toBe(revision);
-    expect(saved.addedDomains).toEqual(['new.example']);
-    await expect(config.getBlacklistedDomains()).resolves.toEqual([
-      'existing.example',
-      'new.example',
-    ]);
-    await expect(config.saveBlacklistedDomains([], revision)).rejects.toThrow('reload');
-    await expect(config.getBlacklistedDomains()).resolves.toEqual([
-      'existing.example',
-      'new.example',
-    ]);
-  });
-
-  test('clearing entries restores the existing deployment fallback semantics', async () => {
-    const revision = await initialize();
-    await config.saveBlacklistedDomains([], revision);
-    const expected =
-      getEnvVariable('BLACKLIST_DOMAINS')
-        ?.split('|')
-        .map(value => value.trim())
-        .filter(Boolean) ?? [];
-    await expect(config.getBlacklistedDomains()).resolves.toEqual(expected);
-    const [state] = await db.select().from(domain_blacklist_state);
-    expect(state.use_env_fallback).toBe(true);
   });
 
   test('defers positive and negative lookup cache writes until after the response', async () => {
@@ -126,31 +87,25 @@ describe('Postgres blacklist management', () => {
       { length: MAX_BLACKLIST_DOMAINS + 1 },
       (_, index) => `${index}.example`
     );
-    expect(
-      config.BlacklistDomainsInputSchema.parse({ domains, revision: randomUUID() }).domains
-    ).toHaveLength(domains.length);
+    expect(config.BlacklistDomainsInputSchema.parse({ domains }).domains).toHaveLength(
+      domains.length
+    );
   });
 });
 
 describe('small shared signup/operator settings', () => {
-  test('reads only the new settings key and preserves operator metadata', async () => {
-    redisGet.mockResolvedValue(
-      settings({
-        blocked_signup_tlds: [],
-        updated_by: 'operator',
-        updated_by_email: 'admin@example.com',
-      })
-    );
-    const result = await config.getBlacklistDomainsSettings();
-    expect(result.blocked_signup_tlds).toEqual([]);
-    expect(result.updated_by).toBe('operator');
+  test('reads signup TLDs from the new settings key', async () => {
+    redisGet.mockResolvedValue(settings({ blocked_signup_tlds: ['asia'] }));
+    await expect(config.getBlockedSignupTlds()).resolves.toEqual(['asia']);
     expect(redisGet).toHaveBeenCalledWith(BLACKLISTED_DOMAINS_SETTINGS_REDIS_KEY);
   });
 
-  test('does not give an admin an empty editable config when settings are unavailable', async () => {
-    await expect(config.getBlacklistDomainsSettings()).rejects.toThrow('backfill');
-    redisGet.mockRejectedValue(new Error('Redis unavailable'));
-    await expect(config.getBlacklistDomainsSettings()).rejects.toThrow('Redis unavailable');
+  test('uses deployment fallback when no settings config is stored', async () => {
+    const expected = getEnvVariable('BLOCKED_SIGNUP_TLDS')
+      ? config.normalizeSignupTlds(getEnvVariable('BLOCKED_SIGNUP_TLDS').split('|'))
+      : ['shop', 'top'];
+    await expect(config.getBlockedSignupTlds()).resolves.toEqual(expected);
+    expect(redisGet).toHaveBeenCalledWith(BLACKLISTED_DOMAINS_SETTINGS_REDIS_KEY);
   });
 
   test('normalizes signup TLDs and retains an explicit empty override', async () => {

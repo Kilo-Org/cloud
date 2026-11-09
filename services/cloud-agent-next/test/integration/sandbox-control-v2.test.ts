@@ -47,10 +47,7 @@ import { CONTROL_PLANE_TIMERS } from '../../src/shared/control-plane-timers.js';
 import { logger } from '../../src/logger.js';
 import { encryptWithPublicKey } from '../../src/utils/encryption.js';
 import { FakeWrapper } from './helpers/fake-wrapper.js';
-import {
-  createFakeCredentialBroker,
-  installFakeSandboxEnv,
-} from './helpers/fake-credentials.js';
+import { createFakeCredentialBroker, installFakeSandboxEnv } from './helpers/fake-credentials.js';
 import { FakeSessionPeer, createRuntimeProxyMintingPeer } from './helpers/fake-session-peer.js';
 import { waitFor } from './wait-for.js';
 import { SandboxStatusSnapshotSchema } from '../../src/shared/sandbox-status.js';

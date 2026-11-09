@@ -52,10 +52,7 @@ import {
 import { createPreparationProgressRecorder } from '../../src/session/preparation-progress.js';
 import { sessionDoName } from '../../src/session-identity.js';
 import { SESSION_CREDENTIAL_UPGRADE_REQUIRED_MESSAGE } from '../../src/sandbox-control/session-credentials.js';
-import {
-  createFakeCredentialBroker,
-  installFakeSandboxEnv,
-} from './helpers/fake-credentials.js';
+import { createFakeCredentialBroker, installFakeSandboxEnv } from './helpers/fake-credentials.js';
 import { FakeSandboxPeer } from './helpers/fake-sandbox-peer.js';
 import { installFakeRuntimeProxyPeer } from './helpers/fake-session-peer.js';
 import { FakeWrapper } from './helpers/fake-wrapper.js';

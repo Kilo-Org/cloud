@@ -1,4 +1,5 @@
 import { containedKiloSessionIdSchema } from '@kilocode/session-ingest-contracts';
+import type { RuntimeProxyAttestationAudience } from '@kilocode/worker-utils/runtime-proxy-attestation';
 
 export type RuntimeCredentialProxyTargets = {
   backendBaseUrl: string;
@@ -116,6 +117,25 @@ function isAllowedProviderRoute(
       '/v1/responses',
     ].includes(path)
   );
+}
+
+const ORGANIZATION_MODEL_CATALOG_PATH =
+  /^\/api\/(?:openrouter|gateway)\/organizations\/[A-Za-z0-9._-]+\/models$/;
+
+/**
+ * The attestation plane that authenticates the upstream endpoint, which is not
+ * always the plane of the upstream host. The gateway app serves the
+ * organization model catalog with the shared web (kilo-api) tRPC context, so a
+ * provider-facade request to it must carry a kilo-api attestation.
+ */
+export function runtimeProxyAttestationAudience(
+  route: RuntimeCredentialProxyRoute,
+  pathname: string
+): RuntimeProxyAttestationAudience {
+  if (route === 'backend') return 'kilo-api';
+  if (route === 'ingest') return 'session-ingest';
+  if (route === 'provider' && ORGANIZATION_MODEL_CATALOG_PATH.test(pathname)) return 'kilo-api';
+  return 'kilo-gateway';
 }
 
 function logicalProviderPath(pathname: string, organizationId: string | undefined): string | null {

@@ -51,6 +51,10 @@ import { eq, getTableColumns } from 'drizzle-orm';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import { Readable } from 'node:stream';
 import { getFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
+import {
+  GATEWAY_HEADER_VALUE_MAX_LENGTH,
+  OVERSIZED_METADATA_VALUE,
+} from '@kilocode/web-shared/lib/ai-gateway/header-limits';
 import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { PgDialect } from 'drizzle-orm/pg-core';
@@ -1205,7 +1209,7 @@ describe('logMicrodollarUsage', () => {
     const baseContext1 = createBaseUsageContext(user);
     const req1headers = {
       'user-agent': 'test-agent-1',
-      'x-forwarded-for': '192.168.1.1',
+      'x-forwarded-for': '52.10.20.30',
       'x-vercel-ip-country': 'US',
       'x-vercel-ip-city': 'NYC',
       'x-vercel-ja4-digest': 'digest1',
@@ -1247,7 +1251,7 @@ describe('logMicrodollarUsage', () => {
       fraudHeaders: getFraudDetectionHeaders(
         new Headers({
           ...req1headers,
-          'x-forwarded-for': '192.168.1.2',
+          'x-forwarded-for': '52.10.20.31',
           'x-vercel-ip-country': 'CA',
           'x-vercel-ja4-digest': 'digest2',
         })
@@ -1291,7 +1295,7 @@ describe('logMicrodollarUsage', () => {
     expect(metadata1.http_user_agent_id).toBe(metadata3.http_user_agent_id);
     expect(metadata1.http_user_agent_id).not.toBe(metadata2.http_user_agent_id);
 
-    // Records 1 and 2 should share the same IP ID (both use '192.168.1.1')
+    // Records 1 and 2 send the same address, so they share the same IP ID
     expect(metadata1.http_ip_id).toBe(metadata2.http_ip_id);
     expect(metadata1.http_ip_id).not.toBe(metadata3.http_ip_id);
 
@@ -2701,5 +2705,172 @@ describe('toInsertableDbUsageRecord NUL-byte sanitization', () => {
     );
 
     expect(metadata.api_kind).toBe('audio_transcriptions');
+  });
+});
+
+describe('toInsertableDbUsageRecord header-derived metadata bounds', () => {
+  const usageStats: MicrodollarUsageStats = {
+    messageId: 'msg-id',
+    hasError: false,
+    cost_mUsd: 500,
+    inputTokens: 100,
+    outputTokens: 50,
+    cacheWriteTokens: 0,
+    cacheHitTokens: 0,
+    is_byok: false,
+    model: 'provider/model',
+    responseContent: '',
+    inference_provider: 'prov',
+    upstream_id: 'up',
+    finish_reason: 'stop',
+    latency: null,
+    moderation_latency: null,
+    generation_time: null,
+    streamed: null,
+    cancelled: null,
+    status_code: 200,
+  };
+
+  const contextWith = (
+    fraudHeaders: Partial<MicrodollarUsageContext['fraudHeaders']>
+  ): MicrodollarUsageContext => ({
+    api_kind: 'chat_completions',
+    kiloUserId: 'user-1',
+    prior_microdollar_usage: 0,
+    provider: 'openrouter',
+    fraudHeaders: {
+      ...getFraudDetectionHeaders(new Headers()),
+      ...fraudHeaders,
+    },
+    isStreaming: false,
+    project_id: null,
+    requested_model: 'provider/requested-model',
+    is_free: false,
+    custom_llm_pricing: null,
+    promptInfo: { system_prompt_prefix: 'sys', system_prompt_length: 3, user_prompt_prefix: 'usr' },
+    max_tokens: null,
+    has_middle_out_transform: null,
+    status_code: 200,
+    editor_name: null,
+    machine_id: null,
+    user_byok: false,
+    has_tools: false,
+    feature: null,
+    session_id: null,
+    mode: null,
+    auto_model: null,
+    reasoning_setting: null,
+    inference_region: null,
+    ttfb_ms: null,
+  });
+
+  const recordFor = async (
+    fraudHeaders: Partial<MicrodollarUsageContext['fraudHeaders']>,
+    stats: MicrodollarUsageStats = usageStats
+  ) => {
+    const { metadata } = await toInsertableDbUsageRecord(
+      stats,
+      extractUsageContextInfo(contextWith(fraudHeaders))
+    );
+    return metadata;
+  };
+
+  test('stores the client User-Agent within the shared maximum', async () => {
+    const userAgent = 'Mozilla/5.0 ' + 'a'.repeat(GATEWAY_HEADER_VALUE_MAX_LENGTH);
+
+    const metadata = await recordFor({ http_user_agent: userAgent });
+
+    expect(metadata.http_user_agent).toBe(OVERSIZED_METADATA_VALUE);
+  });
+
+  test('stores the first forward hop only, as one validated public literal', async () => {
+    const metadata = await recordFor({
+      http_x_forwarded_for:
+        '52.10.20.30, 70.41.3.18, 2a02:26f0:117::1f5, 131.203.0.9.1, not-an-address',
+    });
+
+    expect(metadata.http_x_forwarded_for).toBe('52.10.20.30');
+  });
+
+  test('drops the port and the IPv6 brackets from the recorded address', async () => {
+    expect(
+      (await recordFor({ http_x_forwarded_for: '52.10.20.30:51234' })).http_x_forwarded_for
+    ).toBe('52.10.20.30');
+    expect(
+      (await recordFor({ http_x_forwarded_for: '[2606:4700:4700::1111]:443' })).http_x_forwarded_for
+    ).toBe('2606:4700:4700::1111');
+  });
+
+  test('records no address when the first hop is not a public IP literal', async () => {
+    for (const forwardedFor of [
+      'not-an-address',
+      '192.168.1.5',
+      '127.0.0.1',
+      '10.0.0.7, 52.10.20.30',
+      'fe80::1%eth0',
+      '',
+    ]) {
+      expect((await recordFor({ http_x_forwarded_for: forwardedFor })).http_x_forwarded_for).toBe(
+        null
+      );
+    }
+  });
+
+  test('keeps an ordinary header value unchanged', async () => {
+    const metadata = await recordFor({
+      http_user_agent: 'Kilo-Code/4.2.1 VSCode/1.98.0',
+      http_x_forwarded_for: '52.10.20.30',
+      http_x_vercel_ip_country: 'NL',
+      http_x_vercel_ip_city: 'Amsterdam',
+      http_x_vercel_ja4_digest: 't13d1516h2_8daaf6152771_02713d6af862',
+    });
+
+    expect(metadata.http_user_agent).toBe('Kilo-Code/4.2.1 VSCode/1.98.0');
+    expect(metadata.http_x_forwarded_for).toBe('52.10.20.30');
+    expect(metadata.http_x_vercel_ip_country).toBe('NL');
+    expect(metadata.http_x_vercel_ip_city).toBe('Amsterdam');
+    expect(metadata.http_x_vercel_ja4_digest).toBe('t13d1516h2_8daaf6152771_02713d6af862');
+  });
+
+  test('applies the same bound to the other header-derived columns', async () => {
+    const long = 'b'.repeat(GATEWAY_HEADER_VALUE_MAX_LENGTH + 1);
+
+    const metadata = await recordFor({
+      http_x_vercel_ip_country: long,
+      http_x_vercel_ip_city: long,
+      http_x_vercel_ja4_digest: long,
+    });
+
+    expect(metadata.http_x_vercel_ip_country).toBe(OVERSIZED_METADATA_VALUE);
+    expect(metadata.http_x_vercel_ip_city).toBe(OVERSIZED_METADATA_VALUE);
+    expect(metadata.http_x_vercel_ja4_digest).toBe(OVERSIZED_METADATA_VALUE);
+  });
+
+  test('stores nothing for an absent or blank header', async () => {
+    const metadata = await recordFor({
+      http_user_agent: '   ',
+      http_x_vercel_ip_country: null,
+      http_x_vercel_ip_city: '',
+      http_x_vercel_ja4_digest: null,
+    });
+
+    expect(metadata.http_user_agent).toBeNull();
+    expect(metadata.http_x_vercel_ip_country).toBeNull();
+    expect(metadata.http_x_vercel_ip_city).toBeNull();
+    expect(metadata.http_x_vercel_ja4_digest).toBeNull();
+    expect(metadata.http_x_forwarded_for).toBeNull();
+  });
+
+  test('applies the same bound to a zero-cost record', async () => {
+    const metadata = await recordFor(
+      {
+        http_user_agent: 'c'.repeat(GATEWAY_HEADER_VALUE_MAX_LENGTH + 1),
+        http_x_forwarded_for: '52.10.20.30, 70.41.3.18',
+      },
+      { ...usageStats, cost_mUsd: 0, hasError: true, inputTokens: 0, outputTokens: 0 }
+    );
+
+    expect(metadata.http_user_agent).toBe(OVERSIZED_METADATA_VALUE);
+    expect(metadata.http_x_forwarded_for).toBe('52.10.20.30');
   });
 });

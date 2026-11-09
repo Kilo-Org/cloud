@@ -1,3 +1,4 @@
+// Measurement marker for the CI shard division; the next commit removes it.
 import { isCronAuthorizationValid } from '@/lib/cron-auth';
 
 describe('cron authorization', () => {

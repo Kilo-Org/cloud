@@ -131,6 +131,7 @@ export function readKilo2Messages(
           time: message.time,
           agent,
           model: { providerID: model?.providerID ?? 'kilo', modelID: model?.id ?? '' },
+          ...(model?.variant === undefined ? {} : { variant: model.variant }),
         },
         parts: [
           {
@@ -181,6 +182,7 @@ export function readKilo2Messages(
       mode: agent,
       modelID: model?.id ?? '',
       providerID: model?.providerID ?? 'kilo',
+      ...(model?.variant === undefined ? {} : { variant: model.variant }),
       path: { cwd: session.location.directory, root: session.location.directory },
       cost: message.cost ?? 0,
       tokens: message.tokens ?? { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },

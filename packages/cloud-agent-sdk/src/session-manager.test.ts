@@ -25,6 +25,7 @@ import type {
 } from './session';
 import type { JotaiSessionStorage } from './storage/jotai';
 import { createChatProcessor } from './chat-processor';
+import { readKilo2Messages } from './kilo2-source-messages';
 import { createServiceState } from './service-state';
 import type {
   AssistantMessage,
@@ -2381,6 +2382,42 @@ describe('createSessionManager', () => {
       expect(atomValue(config.store, mgr.atoms.observedModel)).toEqual({
         model: { providerID: 'anthropic', modelID: 'claude-sonnet-4' },
       });
+    });
+
+    it('keeps the selected Kilo2 variant through live user and assistant updates', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      const model = { providerID: 'kilo', id: 'openai/gpt-5', variant: 'high' };
+      mockSessionCallbacks.onSessionCreated?.({ id: 'ses-1', model });
+      mockSessionCallbacks.onReplayComplete?.();
+      const messages = readKilo2Messages(
+        {
+          id: 'ses-1',
+          location: { directory: '/workspace/app' },
+          model,
+          time: { created: 1, updated: 3 },
+        },
+        [
+          { id: 'msg_native_user', type: 'user', time: { created: 2 }, text: 'Continue' },
+          {
+            id: 'msg_native_assistant',
+            type: 'assistant',
+            agent: 'code',
+            model,
+            time: { created: 3 },
+            content: [{ type: 'text', text: 'Working' }],
+          },
+        ]
+      );
+      for (const message of messages) {
+        mockSessionCallbacks.onEvent?.({ type: 'message.updated', info: message.info });
+        expect(atomValue(config.store, mgr.atoms.observedModel)).toEqual({
+          model: { providerID: 'kilo', modelID: 'openai/gpt-5' },
+          variant: 'high',
+        });
+      }
+      expect(atomValue(config.store, mgr.atoms.sessionConfig)).toMatchObject({ variant: 'high' });
     });
 
     it('uses a replayed root message model when session metadata has no model', async () => {

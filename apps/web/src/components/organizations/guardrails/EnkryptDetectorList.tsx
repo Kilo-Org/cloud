@@ -130,7 +130,7 @@ function inputChoicePatch(choice: DetectorChoice) {
   return choice === 'off' ? { enabled: false, action: 'block' as const } : choicePatch(choice);
 }
 
-/** Only the configurable detectors are shown; the gateway applies Kilo Default to the others. */
+/** Only the configurable detectors are shown; the gateway turns the others off. */
 export function EnkryptDetectorList({
   detectors,
   issues,
@@ -145,7 +145,7 @@ export function EnkryptDetectorList({
   return (
     <DetectorSection
       title="Detectors"
-      description="Block stops a flagged request. Log only records detections without delaying the request. NSFW and secrets detections are log-only."
+      description="Block stops a flagged request. Log only records detections without delaying the request."
       action={action}
     >
       {ENKRYPT_CONFIGURABLE_INPUT_DETECTOR_IDS.map(id => (
